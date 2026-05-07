@@ -32,7 +32,7 @@ export async function hubContext(c: Context<AppEnv>, next: Next): Promise<Respon
 
   // Must have at least one permission in this hub (or be super admin)
   if (hubPermissions.length === 0) {
-    if (c.env.ENVIRONMENT === 'development') {
+    if (c.env?.ENVIRONMENT === 'development') {
       console.warn(`[hub] Access denied: pubkey=${user.pubkey?.slice(0, 16)}... roles=${JSON.stringify(user.roles)} hubId=${hubId} allRolesCount=${allRoles?.length ?? 0} hubRoles=${JSON.stringify(user.hubRoles)}`)
     }
     return c.json({ error: 'Access denied' }, 403)
