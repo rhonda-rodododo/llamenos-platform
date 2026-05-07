@@ -220,10 +220,10 @@ async function createRoleAccount(
     storageFile: string
   }
 ) {
-  // Navigate to Users page
+  // Navigate to Users page — wait for the page title, not networkidle
+  // (background polling like Nostr relay and blast-worker prevent networkidle from resolving)
   await adminPage.getByTestId(TestIds.NAV_VOLUNTEERS).click()
   await expect(adminPage.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: 10000 })
-  await adminPage.waitForLoadState('networkidle')
 
   // Click "Invite" button (the outline button with mail icon)
   const inviteBtn = adminPage.getByRole('button', { name: /invite/i })
@@ -277,7 +277,7 @@ async function createRoleAccount(
   const userPage = await userContext.newPage()
 
   try {
-    await userPage.goto(inviteLink, { waitUntil: 'networkidle' })
+    await userPage.goto(inviteLink, { waitUntil: 'domcontentloaded' })
     console.log(`[SETUP] ${opts.name}: landed on ${userPage.url()}`)
 
     // Wait for welcome page
