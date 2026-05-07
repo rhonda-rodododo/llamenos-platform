@@ -540,10 +540,16 @@ pub fn mobile_decrypt_hub_event(
         return Err(CryptoError::InvalidCiphertext);
     }
     let nonce = Nonce::from_slice(&data[..12]);
-    let cipher = Aes256Gcm::new_from_slice(key)
-        .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
+    let cipher =
+        Aes256Gcm::new_from_slice(key).map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
     let plaintext = cipher
-        .decrypt(nonce, Payload { msg: &data[12..], aad: crate::labels::LABEL_HUB_EVENT.as_bytes() })
+        .decrypt(
+            nonce,
+            Payload {
+                msg: &data[12..],
+                aad: crate::labels::LABEL_HUB_EVENT.as_bytes(),
+            },
+        )
         .map_err(|_| CryptoError::DecryptionFailed)?;
     String::from_utf8(plaintext).map_err(|_| CryptoError::DecryptionFailed)
 }
@@ -567,7 +573,13 @@ pub fn mobile_decrypt_event_with_attribution(
     let guard = state().lock().unwrap();
     for (hub_id, key) in &guard.hub_keys {
         if let Ok(cipher) = Aes256Gcm::new_from_slice(key) {
-            if let Ok(plaintext) = cipher.decrypt(nonce, Payload { msg: ciphertext, aad: crate::labels::LABEL_HUB_EVENT.as_bytes() }) {
+            if let Ok(plaintext) = cipher.decrypt(
+                nonce,
+                Payload {
+                    msg: ciphertext,
+                    aad: crate::labels::LABEL_HUB_EVENT.as_bytes(),
+                },
+            ) {
                 if let Ok(json) = String::from_utf8(plaintext) {
                     return Ok(vec![hub_id.clone(), json]);
                 }
@@ -599,14 +611,26 @@ pub fn mobile_decrypt_server_event(encrypted_hex: String) -> Result<String, Cryp
     let aad = crate::labels::LABEL_HUB_EVENT.as_bytes();
     let cipher = Aes256Gcm::new_from_slice(current)
         .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
-    if let Ok(plaintext) = cipher.decrypt(nonce, Payload { msg: ciphertext, aad }) {
+    if let Ok(plaintext) = cipher.decrypt(
+        nonce,
+        Payload {
+            msg: ciphertext,
+            aad,
+        },
+    ) {
         return String::from_utf8(plaintext).map_err(|_| CryptoError::DecryptionFailed);
     }
     if let Some(previous) = guard.server_event_previous_key.as_ref() {
         let cipher = Aes256Gcm::new_from_slice(previous)
             .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
         let plaintext = cipher
-            .decrypt(nonce, Payload { msg: ciphertext, aad })
+            .decrypt(
+                nonce,
+                Payload {
+                    msg: ciphertext,
+                    aad,
+                },
+            )
             .map_err(|_| CryptoError::DecryptionFailed)?;
         return String::from_utf8(plaintext).map_err(|_| CryptoError::DecryptionFailed);
     }
@@ -642,7 +666,13 @@ pub fn mobile_decrypt_hub_event_trial(encrypted_hex: String) -> Result<Vec<Strin
     let guard = state().lock().unwrap();
     for (hub_id, key) in &guard.hub_keys {
         if let Ok(cipher) = Aes256Gcm::new_from_slice(key) {
-            if let Ok(plaintext) = cipher.decrypt(nonce, Payload { msg: ciphertext, aad: crate::labels::LABEL_HUB_EVENT.as_bytes() }) {
+            if let Ok(plaintext) = cipher.decrypt(
+                nonce,
+                Payload {
+                    msg: ciphertext,
+                    aad: crate::labels::LABEL_HUB_EVENT.as_bytes(),
+                },
+            ) {
                 if let Ok(json) = String::from_utf8(plaintext) {
                     return Ok(vec![hub_id.clone(), json]);
                 }
@@ -782,7 +812,15 @@ mod tests {
         getrandom::getrandom(&mut nonce_bytes).unwrap();
         let nonce = Nonce::from_slice(&nonce_bytes);
         let cipher = Aes256Gcm::new_from_slice(&key).unwrap();
-        let ciphertext = cipher.encrypt(nonce, Payload { msg: plaintext.as_bytes(), aad: crate::labels::LABEL_HUB_EVENT.as_bytes() }).unwrap();
+        let ciphertext = cipher
+            .encrypt(
+                nonce,
+                Payload {
+                    msg: plaintext.as_bytes(),
+                    aad: crate::labels::LABEL_HUB_EVENT.as_bytes(),
+                },
+            )
+            .unwrap();
         let mut packed = Vec::with_capacity(12 + ciphertext.len());
         packed.extend_from_slice(&nonce_bytes);
         packed.extend_from_slice(&ciphertext);
@@ -825,7 +863,15 @@ mod tests {
             getrandom::getrandom(&mut nonce_bytes).unwrap();
             let nonce = Nonce::from_slice(&nonce_bytes);
             let cipher = Aes256Gcm::new_from_slice(key).unwrap();
-            let ct = cipher.encrypt(nonce, Payload { msg: msg.as_bytes(), aad: crate::labels::LABEL_HUB_EVENT.as_bytes() }).unwrap();
+            let ct = cipher
+                .encrypt(
+                    nonce,
+                    Payload {
+                        msg: msg.as_bytes(),
+                        aad: crate::labels::LABEL_HUB_EVENT.as_bytes(),
+                    },
+                )
+                .unwrap();
             let mut packed = Vec::with_capacity(12 + ct.len());
             packed.extend_from_slice(&nonce_bytes);
             packed.extend_from_slice(&ct);

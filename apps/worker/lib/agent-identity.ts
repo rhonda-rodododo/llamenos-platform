@@ -2,10 +2,10 @@
  * Agent identity management — generate and unseal Nostr keypairs for
  * automated agents (firehose inference agents).
  *
- * Agent nsecs are sealed using a deploy-level secret key via HKDF + XChaCha20-Poly1305.
+ * Agent nsecs are sealed using a deploy-level secret key via HKDF + AES-256-GCM.
  * The agentId is used as HKDF salt for key isolation between agents.
  */
-import { xchacha20poly1305 } from '@noble/ciphers/chacha.js'
+import { gcm } from '@noble/ciphers/aes.js'
 import { schnorr } from '@noble/curves/secp256k1.js'
 import { hkdf } from '@noble/hashes/hkdf.js'
 import { sha256 } from '@noble/hashes/sha2.js'
@@ -41,9 +41,9 @@ export function generateAgentKeypair(
     32,
   )
 
-  // Encrypt nsec with XChaCha20-Poly1305
-  const nonce = crypto.getRandomValues(new Uint8Array(24))
-  const cipher = xchacha20poly1305(derivedKey, nonce)
+  // Encrypt nsec with AES-256-GCM
+  const nonce = crypto.getRandomValues(new Uint8Array(12))
+  const cipher = gcm(derivedKey, nonce)
   const sealed = cipher.encrypt(new TextEncoder().encode(nsecHex))
 
   // Encode as hex: nonce || ciphertext
@@ -81,10 +81,10 @@ export function unsealAgentNsec(
   )
 
   const combined = hexToBytes(encryptedNsec)
-  const nonce = combined.slice(0, 24)
-  const ciphertext = combined.slice(24)
+  const nonce = combined.slice(0, 12)
+  const ciphertext = combined.slice(12)
 
-  const cipher = xchacha20poly1305(derivedKey, nonce)
+  const cipher = gcm(derivedKey, nonce)
   const decrypted = cipher.decrypt(ciphertext)
   return new TextDecoder().decode(decrypted)
 }

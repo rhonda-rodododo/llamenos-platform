@@ -304,12 +304,8 @@ mod tests {
         let (_admin_sk, admin_pk) = generate_x25519_keypair();
         let payload = r#"{"text":"FFI test note"}"#;
 
-        let encrypted = encrypt_note_for_recipients(
-            payload,
-            &author_pk,
-            vec![admin_pk.clone()],
-        )
-        .unwrap();
+        let encrypted =
+            encrypt_note_for_recipients(payload, &author_pk, vec![admin_pk.clone()]).unwrap();
 
         let decrypted = crate::encryption::decrypt_note(
             &encrypted.encrypted_content,
@@ -326,11 +322,9 @@ mod tests {
         let (_reader2_sk, reader2_pk) = generate_x25519_keypair();
         let plaintext = "FFI message test";
 
-        let encrypted = encrypt_message_for_readers(
-            plaintext,
-            vec![reader1_pk.clone(), reader2_pk.clone()],
-        )
-        .unwrap();
+        let encrypted =
+            encrypt_message_for_readers(plaintext, vec![reader1_pk.clone(), reader2_pk.clone()])
+                .unwrap();
 
         let decrypted = decrypt_message_for_reader(
             &encrypted.encrypted_content,
