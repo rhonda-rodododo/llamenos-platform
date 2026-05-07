@@ -97,6 +97,13 @@ class DashboardViewModel @Inject constructor(
             .filterNotNull()
             .onEach { refresh() }
             .launchIn(viewModelScope)
+
+        // Also refresh when explicitly signaled (e.g., after a test simulates a call).
+        // This avoids the StateFlow conflation problem where re-setting the same hub ID
+        // doesn't trigger a new emission.
+        activeHubState.refreshTrigger
+            .onEach { refresh() }
+            .launchIn(viewModelScope)
     }
 
     /**

@@ -5,8 +5,6 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.swipeDown
 import dagger.hilt.android.EntryPointAccessors
 import io.cucumber.java.en.And
 import io.cucumber.java.en.Given
@@ -89,13 +87,11 @@ class ActiveCallSteps : BaseSteps() {
     @Then("I should see the active call card")
     fun iShouldSeeTheActiveCallCard() {
         // Wait for the active call card to appear on the dashboard.
-        // The card may take a moment to render after the Nostr event arrives.
-        composeRule.waitUntil(10_000) {
-            composeRule.onAllNodesWithTag("active-call-card").fetchSemanticsNodes().isNotEmpty() ||
-                composeRule.onAllNodesWithTag("active-call-count").fetchSemanticsNodes().isNotEmpty() ||
-                composeRule.onAllNodesWithTag("dashboard-title").fetchSemanticsNodes().isNotEmpty()
+        // The card renders when DashboardViewModel.currentCall is non-null after fetchActiveCall().
+        composeRule.waitUntil(15_000) {
+            composeRule.onAllNodesWithTag("active-call-card").fetchSemanticsNodes().isNotEmpty()
         }
-        val found = assertAnyTagDisplayed("active-call-card", "active-call-count", "dashboard-title")
+        onNodeWithTag("active-call-card").assertIsDisplayed()
     }
 
     // ---- When ----
@@ -156,32 +152,31 @@ class ActiveCallSteps : BaseSteps() {
 
     @Then("the report spam button should be visible on the call card")
     fun theReportSpamButtonShouldBeVisibleOnTheCallCard() {
-        composeRule.waitUntil(10_000) {
+        composeRule.waitUntil(15_000) {
             composeRule.onAllNodesWithTag("active-call-card").fetchSemanticsNodes().isNotEmpty()
         }
-        val found = assertAnyTagDisplayed("report-spam-button", "active-call-card", "dashboard-title")
+        onNodeWithTag("report-spam-button").assertIsDisplayed()
     }
 
     @Then("the quick note button should be visible on the call card")
     fun theQuickNoteButtonShouldBeVisibleOnTheCallCard() {
-        composeRule.waitUntil(10_000) {
+        composeRule.waitUntil(15_000) {
             composeRule.onAllNodesWithTag("active-call-card").fetchSemanticsNodes().isNotEmpty()
         }
-        val found = assertAnyTagDisplayed("quick-note-button", "active-call-card", "dashboard-title")
+        onNodeWithTag("quick-note-button").assertIsDisplayed()
     }
 
     // ---- Helpers ----
 
     /**
-     * Force DashboardViewModel.refresh() by toggling the active hub ID.
+     * Force DashboardViewModel.refresh() via [ActiveHubState.triggerRefresh].
      *
-     * DashboardViewModel subscribes to [ActiveHubState.activeHubId] via
-     * `filterNotNull().onEach { refresh() }`. StateFlow only emits distinct values,
-     * so re-setting the same ID is a no-op. To force a new emission:
-     *   1. Set hub to a dummy value
-     *   2. Set hub back to the real test hub ID
-     * Both emissions trigger refresh(), but the second one is the one that matters
-     * (it sets the correct hub scope for API calls).
+     * The previous approach of toggling the hub ID ("__refresh__" → real hub) was
+     * unreliable due to StateFlow conflation: if the collector already saw the real
+     * hub ID and the intermediate value was conflated away, no emission occurred.
+     *
+     * [ActiveHubState.refreshTrigger] is a SharedFlow that bypasses this problem —
+     * every emit is delivered to all active collectors regardless of value equality.
      */
     private fun triggerHubRefresh() {
         val hubId = ScenarioHooks.currentHubId
@@ -193,12 +188,11 @@ class ActiveCallSteps : BaseSteps() {
             )
             val hubState = entryPoint.activeHubState()
             runBlocking {
-                hubState.setActiveHub("__refresh__")
-                hubState.setActiveHub(hubId)
+                hubState.triggerRefresh()
             }
-            Log.d("ActiveCallSteps", "triggerHubRefresh: toggled hub to force refresh")
+            Log.d("ActiveCallSteps", "triggerHubRefresh: emitted refreshTrigger")
             composeRule.waitForIdle()
-            // Give the ViewModel a moment to process the hub change and make the API call
+            // Give the ViewModel time to process the refresh and make the API call
             Thread.sleep(2000)
             composeRule.waitForIdle()
         } catch (e: Throwable) {
