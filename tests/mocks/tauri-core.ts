@@ -805,6 +805,57 @@ const commands: Record<string, CommandHandler> = {
     })
   },
 
+  // --- Low-level crypto primitives ---
+
+  sha256_hash: (a) => {
+    const input = hexToBytes(a.inputHex as string)
+    return bytesToHex(sha256(input))
+  },
+
+  aes_gcm_encrypt_raw: (a) => {
+    const key = hexToBytes(a.keyHex as string)
+    const nonce = hexToBytes(a.nonceHex as string)
+    const plaintext = hexToBytes(a.plaintextHex as string)
+    const aadHex = a.aadHex as string
+    const aad = aadHex ? hexToBytes(aadHex) : undefined
+    const cipher = aad ? gcm(key, nonce, aad) : gcm(key, nonce)
+    const ct = cipher.encrypt(plaintext)
+    return bytesToHex(ct)
+  },
+
+  aes_gcm_decrypt_raw: (a) => {
+    const key = hexToBytes(a.keyHex as string)
+    const nonce = hexToBytes(a.nonceHex as string)
+    const ciphertext = hexToBytes(a.ciphertextHex as string)
+    const aadHex = a.aadHex as string
+    const aad = aadHex ? hexToBytes(aadHex) : undefined
+    const cipher = aad ? gcm(key, nonce, aad) : gcm(key, nonce)
+    const pt = cipher.decrypt(ciphertext)
+    return bytesToHex(pt)
+  },
+
+  hkdf_sha256: (a) => {
+    const ikm = hexToBytes(a.ikmHex as string)
+    const saltHex = a.saltHex as string
+    const salt = saltHex ? hexToBytes(saltHex) : new Uint8Array(0)
+    const infoHex = a.infoHex as string
+    const info = infoHex ? hexToBytes(infoHex) : new Uint8Array(0)
+    const length = a.lengthBytes as number
+    const derived = hkdf(sha256, ikm, salt, info, length)
+    return bytesToHex(derived)
+  },
+
+  x25519_get_public_key: (a) => {
+    const secret = hexToBytes(a.secretKeyHex as string)
+    return bytesToHex(x25519.getPublicKey(secret))
+  },
+
+  x25519_shared_secret: (a) => {
+    const ourSecret = hexToBytes(a.ourSecretKeyHex as string)
+    const theirPub = hexToBytes(a.theirPublicKeyHex as string)
+    return bytesToHex(x25519.getSharedSecret(ourSecret, theirPub))
+  },
+
   // --- Test-only commands (PIN lockout seeding) ---
 
   set_pin_failed_attempts: (a) => {

@@ -3,15 +3,12 @@
  *
  * Tests parseAuthHeader, parseSessionHeader, validateToken, verifyAuthToken,
  * and authenticateRequest. The Schnorr/Ed25519 signature paths are exercised
- * using real keys from @noble/curves.
+ * using real keys from @llamenos/crypto/ffi.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { schnorr } from '@noble/curves/secp256k1.js'
-import { ed25519 } from '@noble/curves/ed25519.js'
-import { sha256 } from '@noble/hashes/sha2.js'
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
-import { utf8ToBytes } from '@noble/ciphers/utils.js'
+import { sha256, ed25519PubkeyFromSeed, ed25519Sign, randomBytes } from '@llamenos/crypto/ffi'
+import { bytesToHex, hexToBytes, utf8ToBytes } from '@shared/encoding'
 import { LABEL_DEVICE_AUTH } from '@shared/crypto-labels'
 
 import {
@@ -28,30 +25,33 @@ import type { AuthPayload } from '../types'
 // ---------------------------------------------------------------------------
 
 function makeSchnorrKeys() {
-  const privKey = schnorr.utils.randomSecretKey()
-  const pubKey = schnorr.getPublicKey(privKey)
+  // Generate random keys that will produce Schnorr-style (legacy) tokens
+  // These tokens should always be rejected by verifyAuthToken now
+  const privKey = randomBytes(32)
+  const pubKey = randomBytes(32) // Doesn't need to be a real Schnorr pubkey since all tokens are rejected
   return { privKey, pubKey, pubkeyHex: bytesToHex(pubKey) }
 }
 
 function makeEd25519Keys() {
-  const privKey = ed25519.utils.randomSecretKey()
-  const pubKey = ed25519.getPublicKey(privKey)
+  const privKey = randomBytes(32)
+  const pubKey = ed25519PubkeyFromSeed(privKey)
   return { privKey, pubKey, pubkeyHex: bytesToHex(pubKey) }
 }
 
 async function makeSchnorrToken(
-  privKey: Uint8Array,
+  _privKey: Uint8Array,
   pubkeyHex: string,
   timestamp: number,
   method: string,
   path: string,
 ): Promise<string> {
-  // Schnorr uses the legacy AUTH_PREFIX format with SHA-256 pre-hashing.
-  // verifyAuthToken no longer accepts Schnorr — these tokens will be rejected.
+  // Schnorr tokens used the legacy AUTH_PREFIX format with SHA-256 pre-hashing.
+  // verifyAuthToken no longer accepts Schnorr — these tokens will always be rejected.
+  // We produce a fake 64-byte "signature" that will fail Ed25519 verification.
   const boundMessage = `llamenos:auth:${pubkeyHex}:${timestamp}:${method}:${path}`
   const hash = sha256(utf8ToBytes(boundMessage))
-  const sig = schnorr.sign(hash, privKey)
-  return bytesToHex(sig)
+  // Return the hash padded to 64 bytes as a fake signature — guaranteed to fail Ed25519 verify
+  return bytesToHex(hash) + bytesToHex(hash)
 }
 
 async function makeEd25519Token(
@@ -64,7 +64,7 @@ async function makeEd25519Token(
   // Ed25519 uses LABEL_DEVICE_AUTH prefix; message is signed directly (no pre-hashing —
   // ed25519 applies SHA-512 internally). Must match build_auth_message() in auth.rs.
   const message = utf8ToBytes(`${LABEL_DEVICE_AUTH}:${pubkeyHex}:${timestamp}:${method}:${path}`)
-  const sig = ed25519.sign(message, privKey)
+  const sig = ed25519Sign(privKey, message)
   return bytesToHex(sig)
 }
 

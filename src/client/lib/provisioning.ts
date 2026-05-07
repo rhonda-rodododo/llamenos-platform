@@ -18,12 +18,14 @@
  * Wire format: hex(nonce_12 + ciphertext + tag_16)
  * SAS format: "XXX XXX" (6 digits, space-separated)
  */
-import { x25519 } from '@noble/curves/ed25519.js'
-import { gcm } from '@noble/ciphers/aes.js'
-import { hkdf } from '@noble/hashes/hkdf.js'
-import { sha256 } from '@noble/hashes/sha2.js'
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
-import { utf8ToBytes } from '@noble/ciphers/utils.js'
+import { bytesToHex, hexToBytes, utf8ToBytes } from '@shared/encoding'
+import {
+  x25519GetPublicKey,
+  x25519SharedSecret,
+  hkdfSha256,
+  aesGcmEncryptRaw,
+  aesGcmDecryptRaw,
+} from './platform'
 import { LABEL_DEVICE_PROVISION, LABEL_PROVISIONING_SALT, SAS_SALT, SAS_INFO } from '@shared/crypto-labels'
 
 function randomBytes(n: number): Uint8Array {
@@ -36,8 +38,10 @@ function randomBytes(n: number): Uint8Array {
  * Derive the symmetric key for provisioning using HKDF-SHA256.
  * Matches Rust derive_provisioning_key: salt=LABEL_PROVISIONING_SALT, info=LABEL_DEVICE_PROVISION.
  */
-function deriveProvisioningKey(sharedSecret: Uint8Array): Uint8Array {
-  return hkdf(sha256, sharedSecret, utf8ToBytes(LABEL_PROVISIONING_SALT), utf8ToBytes(LABEL_DEVICE_PROVISION), 32)
+async function deriveProvisioningKey(sharedSecretHex: string): Promise<string> {
+  const saltHex = bytesToHex(utf8ToBytes(LABEL_PROVISIONING_SALT))
+  const infoHex = bytesToHex(utf8ToBytes(LABEL_DEVICE_PROVISION))
+  return hkdfSha256(sharedSecretHex, saltHex, infoHex, 32)
 }
 
 // --- SAS Verification ---
@@ -47,8 +51,11 @@ function deriveProvisioningKey(sharedSecret: Uint8Array): Uint8Array {
  * Both devices compute this independently — if codes match, no MITM is present.
  * Returns formatted "XXX XXX" string for display.
  */
-export function computeProvisioningSAS(sharedSecret: Uint8Array): string {
-  const sasBytes = hkdf(sha256, sharedSecret, utf8ToBytes(SAS_SALT), utf8ToBytes(SAS_INFO), 4)
+export async function computeProvisioningSAS(sharedSecretHex: string): Promise<string> {
+  const saltHex = bytesToHex(utf8ToBytes(SAS_SALT))
+  const infoHex = bytesToHex(utf8ToBytes(SAS_INFO))
+  const sasBytesHex = await hkdfSha256(sharedSecretHex, saltHex, infoHex, 4)
+  const sasBytes = hexToBytes(sasBytesHex)
   const num = ((sasBytes[0] << 24) | (sasBytes[1] << 16) | (sasBytes[2] << 8) | sasBytes[3]) >>> 0
   const code = (num % 1_000_000).toString().padStart(6, '0')
   return `${code.slice(0, 3)} ${code.slice(3)}`
@@ -56,21 +63,21 @@ export function computeProvisioningSAS(sharedSecret: Uint8Array): string {
 
 /**
  * Compute the X25519 shared secret from our secret key and their public key.
- * Returns 32-byte shared secret.
+ * Returns hex-encoded 32-byte shared secret.
  */
-function computeSharedSecret(ourSecretKey: Uint8Array, theirPubkeyHex: string): Uint8Array {
-  return x25519.getSharedSecret(ourSecretKey, hexToBytes(theirPubkeyHex))
+async function computeSharedSecretHex(ourSecretKeyHex: string, theirPubkeyHex: string): Promise<string> {
+  return x25519SharedSecret(ourSecretKeyHex, theirPubkeyHex)
 }
 
 /**
  * Compute SAS code for the new device side.
  * Called after receiving the primary device's pubkey from the provisioning room.
  */
-export function computeSASForNewDevice(
+export async function computeSASForNewDevice(
   ephemeralSecret: Uint8Array,
   primaryPubkeyHex: string,
-): string {
-  const shared = computeSharedSecret(ephemeralSecret, primaryPubkeyHex)
+): Promise<string> {
+  const shared = await computeSharedSecretHex(bytesToHex(ephemeralSecret), primaryPubkeyHex)
   return computeProvisioningSAS(shared)
 }
 
@@ -78,11 +85,11 @@ export function computeSASForNewDevice(
  * Compute SAS code for the primary device side.
  * Called after fetching the new device's ephemeral pubkey from the provisioning room.
  */
-export function computeSASForPrimaryDevice(
+export async function computeSASForPrimaryDevice(
   primarySecretKey: Uint8Array,
   ephemeralPubkeyHex: string,
-): string {
-  const shared = computeSharedSecret(primarySecretKey, ephemeralPubkeyHex)
+): Promise<string> {
+  const shared = await computeSharedSecretHex(bytesToHex(primarySecretKey), ephemeralPubkeyHex)
   return computeProvisioningSAS(shared)
 }
 
@@ -97,12 +104,12 @@ export interface ProvisioningSession {
 
 export async function createProvisioningRoom(): Promise<ProvisioningSession> {
   const ephemeralSecret = randomBytes(32)
-  const ephemeralPubkey = x25519.getPublicKey(ephemeralSecret)
+  const ephemeralPubkeyHex = await x25519GetPublicKey(bytesToHex(ephemeralSecret))
 
   const res = await fetch('/api/provision/rooms', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ephemeralPubkey: bytesToHex(ephemeralPubkey) }),
+    body: JSON.stringify({ ephemeralPubkey: ephemeralPubkeyHex }),
   })
   if (!res.ok) throw new Error('Failed to create provisioning room')
   const data = await res.json() as { roomId: string; token: string }
@@ -111,7 +118,7 @@ export async function createProvisioningRoom(): Promise<ProvisioningSession> {
     roomId: data.roomId,
     token: data.token,
     ephemeralSecret,
-    ephemeralPubkey: bytesToHex(ephemeralPubkey),
+    ephemeralPubkey: ephemeralPubkeyHex,
   }
 }
 
@@ -133,23 +140,21 @@ export async function pollProvisioningRoom(
   return await res.json() as ProvisioningRoomStatus
 }
 
-export function decryptProvisionedNsec(
+export async function decryptProvisionedNsec(
   encryptedNsec: string,
   primaryPubkeyHex: string,
   ephemeralSecret: Uint8Array,
-): string {
+): Promise<string> {
   // X25519 shared secret
-  const shared = computeSharedSecret(ephemeralSecret, primaryPubkeyHex)
-  const symmetricKey = deriveProvisioningKey(shared)
+  const sharedHex = await computeSharedSecretHex(bytesToHex(ephemeralSecret), primaryPubkeyHex)
+  const symmetricKeyHex = await deriveProvisioningKey(sharedHex)
 
   // Decrypt: nonce(12) + ciphertext + tag(16)
-  const data = hexToBytes(encryptedNsec)
-  const nonce = data.slice(0, 12)
-  const ciphertext = data.slice(12)
-  const aad = utf8ToBytes(LABEL_DEVICE_PROVISION)
-  const cipher = gcm(symmetricKey, nonce, aad)
-  const plaintext = cipher.decrypt(ciphertext)
-  return new TextDecoder().decode(plaintext)
+  const nonceHex = encryptedNsec.slice(0, 24) // 12 bytes = 24 hex chars
+  const ciphertextHex = encryptedNsec.slice(24)
+  const aadHex = bytesToHex(utf8ToBytes(LABEL_DEVICE_PROVISION))
+  const plaintextHex = await aesGcmDecryptRaw(symmetricKeyHex, nonceHex, ciphertextHex, aadHex)
+  return new TextDecoder().decode(hexToBytes(plaintextHex))
 }
 
 // --- Primary Device Side ---
@@ -163,26 +168,24 @@ export async function getProvisioningRoom(
   return await res.json() as { ephemeralPubkey: string; status: string }
 }
 
-export function encryptNsecForDevice(
+export async function encryptNsecForDevice(
   nsec: string,
   ephemeralPubkeyHex: string,
   primarySecretKey: Uint8Array,
-): string {
+): Promise<string> {
   // X25519 shared secret
-  const shared = computeSharedSecret(primarySecretKey, ephemeralPubkeyHex)
-  const symmetricKey = deriveProvisioningKey(shared)
+  const sharedHex = await computeSharedSecretHex(bytesToHex(primarySecretKey), ephemeralPubkeyHex)
+  const symmetricKeyHex = await deriveProvisioningKey(sharedHex)
 
   // Encrypt nsec with AES-256-GCM
   const nonce = randomBytes(12)
-  const aad = utf8ToBytes(LABEL_DEVICE_PROVISION)
-  const cipher = gcm(symmetricKey, nonce, aad)
-  const ciphertext = cipher.encrypt(utf8ToBytes(nsec))
+  const nonceHex = bytesToHex(nonce)
+  const plaintextHex = bytesToHex(utf8ToBytes(nsec))
+  const aadHex = bytesToHex(utf8ToBytes(LABEL_DEVICE_PROVISION))
+  const ciphertextHex = await aesGcmEncryptRaw(symmetricKeyHex, nonceHex, plaintextHex, aadHex)
 
   // Pack: nonce(12) + ciphertext + tag(16)
-  const packed = new Uint8Array(nonce.length + ciphertext.length)
-  packed.set(nonce)
-  packed.set(ciphertext, nonce.length)
-  return bytesToHex(packed)
+  return nonceHex + ciphertextHex
 }
 
 export async function sendProvisionedKey(

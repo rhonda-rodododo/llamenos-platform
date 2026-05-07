@@ -1,9 +1,7 @@
 import Twilio from 'twilio'
 import { expect, type Page, type APIRequestContext } from '@playwright/test'
-import { gcm } from '@noble/ciphers/aes.js'
-import { utf8ToBytes } from '@noble/ciphers/utils.js'
-import { bytesToHex } from '@noble/hashes/utils.js'
-import { getPublicKey, nip19 } from 'nostr-tools'
+import { symmetricEncrypt, symmetricDecrypt, sha256, ed25519PubkeyFromSeed } from '@llamenos/crypto/ffi'
+import { bytesToHex, hexToBytes, utf8ToBytes } from '@shared/encoding'
 
 // Re-export helpers that don't depend on ADMIN_NSEC
 export { enterPin } from '../helpers'
@@ -24,7 +22,8 @@ export function getLiveConfig() {
     hotlineNumber: requireEnv('TWILIO_PHONE_NUMBER'),
     testCallerNumber: requireEnv('TWILIO_TEST_CALLER'),
     testSecret: requireEnv('E2E_TEST_SECRET'),
-    adminNsec: requireEnv('STAGING_ADMIN_NSEC'),
+    /** Hex-encoded 32-byte Ed25519 seed for the staging admin */
+    adminSeedHex: requireEnv('STAGING_ADMIN_SEED_HEX'),
     baseURL: process.env.LIVE_BASE_URL || 'https://demo-next.llamenos-platform.com',
   }
 }
@@ -37,8 +36,10 @@ export function createTwilioClient() {
 /**
  * Pre-compute an encrypted key blob and inject it into localStorage.
  * Same PBKDF2 + AES-256-GCM format as key-store.ts.
+ *
+ * Auth system is now Ed25519-based: seedHex is a 32-byte hex-encoded Ed25519 seed.
  */
-async function preloadEncryptedKey(page: Page, nsec: string, pin: string): Promise<void> {
+async function preloadEncryptedKey(page: Page, seedHex: string, pin: string): Promise<void> {
   const encoder = new TextEncoder()
   const pinBytes = encoder.encode(pin)
   const salt = crypto.getRandomValues(new Uint8Array(16))
@@ -51,14 +52,17 @@ async function preloadEncryptedKey(page: Page, nsec: string, pin: string): Promi
   )
   const kek = new Uint8Array(derivedBits)
 
-  const nonce = crypto.getRandomValues(new Uint8Array(12))
-  const cipher = gcm(kek, nonce)
-  const ciphertext = cipher.encrypt(utf8ToBytes(nsec))
+  // Encrypt the seed hex string with AES-256-GCM via FFI
+  const seedBytes = utf8ToBytes(seedHex)
+  const packed = symmetricEncrypt(kek, seedBytes, new Uint8Array(0))
+  // packed = nonce(12) || ciphertext || tag(16)
+  const nonce = packed.slice(0, 12)
+  const ciphertext = packed.slice(12)
 
-  const decoded = nip19.decode(nsec)
-  if (decoded.type !== 'nsec') throw new Error('Invalid nsec')
-  const pubkey = getPublicKey(decoded.data)
-  const hashInput = encoder.encode(`llamenos:keyid:${pubkey}`)
+  // Derive pubkey from seed for the key ID hash
+  const pubkey = ed25519PubkeyFromSeed(hexToBytes(seedHex))
+  const pubkeyHex = bytesToHex(pubkey)
+  const hashInput = encoder.encode(`llamenos:keyid:${pubkeyHex}`)
   const pubkeyHashBuf = await crypto.subtle.digest('SHA-256', hashInput)
   const pubkeyHash = bytesToHex(new Uint8Array(pubkeyHashBuf)).slice(0, 16)
 
@@ -77,13 +81,13 @@ async function preloadEncryptedKey(page: Page, nsec: string, pin: string): Promi
 }
 
 /**
- * Login as the staging admin using the nsec from STAGING_ADMIN_NSEC env var.
+ * Login as the staging admin using the Ed25519 seed from STAGING_ADMIN_SEED_HEX env var.
  */
 export async function loginAsAdmin(page: Page) {
-  const { adminNsec } = getLiveConfig()
+  const { adminSeedHex } = getLiveConfig()
   await page.goto('/login')
   await page.evaluate(() => sessionStorage.clear())
-  await preloadEncryptedKey(page, adminNsec, STAGING_PIN)
+  await preloadEncryptedKey(page, adminSeedHex, STAGING_PIN)
   await page.reload()
 
   // Enter PIN

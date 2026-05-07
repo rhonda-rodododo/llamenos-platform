@@ -27,7 +27,7 @@ import {
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3'
-import { bytesToHex } from '@noble/hashes/utils.js'
+import { bytesToHex } from '@shared/encoding'
 import { createLogger } from './logger'
 import type { StorageAdminClient } from './storage-admin'
 import { buildBucketPolicy } from './storage-admin'

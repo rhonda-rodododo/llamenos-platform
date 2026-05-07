@@ -35,11 +35,13 @@ Then('the nsec field should be a password field', async ({ page }) => {
 })
 
 When('I enter a valid 63-character nsec', async ({ page }) => {
-  const { generateSecretKey, nip19 } = await import('nostr-tools')
-  const sk = generateSecretKey()
-  const nsec = nip19.nsecEncode(sk)
-  await page.getByTestId(TestIds.NSEC_INPUT).fill(nsec)
-  // The login form requires a PIN alongside the nsec — fill the PIN field if present
+  // Auth is now Ed25519-based — generate a random 32-byte seed and use hex encoding
+  const { randomBytes } = await import('@llamenos/crypto/ffi')
+  const { bytesToHex } = await import('@shared/encoding')
+  const seed = randomBytes(32)
+  const seedHex = bytesToHex(seed)
+  await page.getByTestId(TestIds.NSEC_INPUT).fill(seedHex)
+  // The login form requires a PIN alongside the seed — fill the PIN field if present
   const pinField = page.locator('#nsec-pin')
   const pinVisible = await pinField.isVisible({ timeout: 1000 }).catch(() => false)
   if (pinVisible) {

@@ -11,10 +11,8 @@
  * This gives each user a distinct HMAC context so hash leakage from one user
  * cannot be correlated with another user's Signal identifier.
  */
-import { hmac } from '@noble/hashes/hmac.js'
-import { sha256 } from '@noble/hashes/sha2.js'
-import { bytesToHex, hexToBytes, utf8ToBytes } from '@noble/hashes/utils.js'
-import { hkdf } from '@noble/hashes/hkdf.js'
+import { hmacSha256, sha256, hkdfSha256 } from '@llamenos/crypto/ffi'
+import { bytesToHex, hexToBytes, utf8ToBytes } from '@shared/encoding'
 import { eq } from 'drizzle-orm'
 import type { Database } from '../db'
 import { userSignalContacts, type UserSignalContactRow } from '../db/schema/signal-notifications'
@@ -26,7 +24,7 @@ export { normalizeSignalIdentifier } from './signal-identifier-normalize'
  * The key itself is derived from the global server secret and the user pubkey.
  */
 export function hashSignalIdentifier(normalized: string, perUserKey: string): string {
-  const mac = hmac(sha256, utf8ToBytes(perUserKey), utf8ToBytes(normalized))
+  const mac = hmacSha256(utf8ToBytes(perUserKey), utf8ToBytes(normalized))
   return bytesToHex(mac)
 }
 
@@ -36,8 +34,7 @@ export function hashSignalIdentifier(normalized: string, perUserKey: string): st
  * This is the key returned to the client so it can hash locally before sending.
  */
 export function derivePerUserHmacKey(serverHmacSecret: string, userPubkey: string): string {
-  const derived = hkdf(
-    sha256,
+  const derived = hkdfSha256(
     hexToBytes(serverHmacSecret),
     utf8ToBytes(userPubkey),
     utf8ToBytes('signal-contact'),

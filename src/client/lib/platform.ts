@@ -490,6 +490,111 @@ export async function sframeDeriveKey(
   throw new Error('WASM sframe derive key not yet implemented')
 }
 
+// ── Low-level crypto primitives (IPC to Rust) ──────────────────────
+
+/**
+ * SHA-256 hash of hex-encoded input. Returns hex-encoded 32-byte hash.
+ */
+export async function sha256Hash(inputHex: string): Promise<string> {
+  if (useTauri) {
+    return tauriInvoke<string>('sha256_hash', { inputHex })
+  }
+  throw new Error('WASM sha256_hash not yet implemented')
+}
+
+/**
+ * AES-256-GCM encrypt with explicit nonce and optional AAD.
+ * All parameters and return value are hex-encoded.
+ * Returns hex(ciphertext + tag).
+ */
+export async function aesGcmEncryptRaw(
+  keyHex: string,
+  nonceHex: string,
+  plaintextHex: string,
+  aadHex?: string,
+): Promise<string> {
+  if (useTauri) {
+    return tauriInvoke<string>('aes_gcm_encrypt_raw', {
+      keyHex,
+      nonceHex,
+      plaintextHex,
+      aadHex: aadHex ?? '',
+    })
+  }
+  throw new Error('WASM aes_gcm_encrypt_raw not yet implemented')
+}
+
+/**
+ * AES-256-GCM decrypt with explicit nonce and optional AAD.
+ * All parameters and return value are hex-encoded.
+ * ciphertextHex includes the GCM tag.
+ */
+export async function aesGcmDecryptRaw(
+  keyHex: string,
+  nonceHex: string,
+  ciphertextHex: string,
+  aadHex?: string,
+): Promise<string> {
+  if (useTauri) {
+    return tauriInvoke<string>('aes_gcm_decrypt_raw', {
+      keyHex,
+      nonceHex,
+      ciphertextHex,
+      aadHex: aadHex ?? '',
+    })
+  }
+  throw new Error('WASM aes_gcm_decrypt_raw not yet implemented')
+}
+
+/**
+ * HKDF-SHA256: extract-and-expand.
+ * All parameters hex-encoded. Returns hex-encoded derived key.
+ */
+export async function hkdfSha256(
+  ikmHex: string,
+  saltHex: string,
+  infoHex: string,
+  lengthBytes: number,
+): Promise<string> {
+  if (useTauri) {
+    return tauriInvoke<string>('hkdf_sha256', {
+      ikmHex,
+      saltHex,
+      infoHex,
+      lengthBytes,
+    })
+  }
+  throw new Error('WASM hkdf_sha256 not yet implemented')
+}
+
+/**
+ * Derive an X25519 public key from a 32-byte secret key.
+ * Both input and output are hex-encoded.
+ */
+export async function x25519GetPublicKey(secretKeyHex: string): Promise<string> {
+  if (useTauri) {
+    return tauriInvoke<string>('x25519_get_public_key', { secretKeyHex })
+  }
+  throw new Error('WASM x25519_get_public_key not yet implemented')
+}
+
+/**
+ * Compute X25519 ECDH shared secret.
+ * Both keys and return value are hex-encoded.
+ */
+export async function x25519SharedSecret(
+  ourSecretKeyHex: string,
+  theirPublicKeyHex: string,
+): Promise<string> {
+  if (useTauri) {
+    return tauriInvoke<string>('x25519_shared_secret', {
+      ourSecretKeyHex,
+      theirPublicKeyHex,
+    })
+  }
+  throw new Error('WASM x25519_shared_secret not yet implemented')
+}
+
 // ── Key persistence ─────────────────────────────────────────────────
 
 const STORE_KEY = 'llamenos-encrypted-device-keys'

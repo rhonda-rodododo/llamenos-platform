@@ -5,23 +5,23 @@
  * key that is HPKE-wrapped individually for each member who needs it.
  *
  * HPKE wrap/unwrap operations delegate to Rust via platform.ts.
- * Symmetric hub encrypt/decrypt stays in JS (hub key is shared symmetric, not identity-secret).
+ * Symmetric hub encrypt/decrypt also delegates to Rust via platform.ts IPC.
  *
  * Key lifecycle:
  *   1. Admin generates hub key via generateHubKey()
  *   2. Key is wrapped for each member via wrapHubKeyForMember() (Rust HPKE)
  *   3. Members fetch their wrapped key from GET /api/hub/key
  *   4. Members unwrap with CryptoState via unwrapHubKey() (Rust HPKE)
- *   5. Hub key encrypts/decrypts hub-scoped data via encryptForHub()/decryptFromHub() (JS)
+ *   5. Hub key encrypts/decrypts hub-scoped data via encryptForHub()/decryptFromHub() (Rust AES-GCM)
  *   6. On rotation, admin generates new key + re-wraps for all members
  */
 
-import { gcm } from '@noble/ciphers/aes.js'
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
-import { utf8ToBytes } from '@noble/ciphers/utils.js'
+import { bytesToHex, hexToBytes, utf8ToBytes } from '@shared/encoding'
 import {
   unwrapHubKey as platformUnwrapHubKey,
   eciesWrapKey,
+  aesGcmEncryptRaw,
+  aesGcmDecryptRaw,
 } from './platform'
 import type { KeyEnvelope, RecipientEnvelope } from './platform'
 import { LABEL_HUB_KEY_WRAP, LABEL_HUB_EVENT } from '@shared/crypto-labels'
@@ -82,40 +82,41 @@ export async function unwrapHubKey(
  * Encrypt arbitrary data with the hub key using AES-256-GCM.
  * Returns hex: nonce(12) + ciphertext + tag(16).
  * AAD = LABEL_HUB_EVENT bytes for domain separation.
- * Hub key is shared symmetric — stays in JS.
+ * Hub key is shared symmetric — encryption routed through Rust IPC.
  */
-export function encryptForHub(
+export async function encryptForHub(
   plaintext: string,
   hubKey: Uint8Array,
-): string {
+): Promise<string> {
   const nonce = randomBytes(12)
-  const aad = utf8ToBytes(LABEL_HUB_EVENT)
-  const cipher = gcm(hubKey, nonce, aad)
-  const ciphertext = cipher.encrypt(utf8ToBytes(plaintext))
+  const nonceHex = bytesToHex(nonce)
+  const keyHex = bytesToHex(hubKey)
+  const plaintextHex = bytesToHex(utf8ToBytes(plaintext))
+  const aadHex = bytesToHex(utf8ToBytes(LABEL_HUB_EVENT))
 
-  const packed = new Uint8Array(nonce.length + ciphertext.length)
-  packed.set(nonce)
-  packed.set(ciphertext, nonce.length)
-  return bytesToHex(packed)
+  const ciphertextHex = await aesGcmEncryptRaw(keyHex, nonceHex, plaintextHex, aadHex)
+
+  return nonceHex + ciphertextHex
 }
 
 /**
  * Decrypt hub-encrypted data using the hub key.
  * Returns null on decryption failure (wrong key, corrupted data, etc.).
- * Hub key is shared symmetric — stays in JS.
+ * Hub key is shared symmetric — decryption routed through Rust IPC.
  */
-export function decryptFromHub(
+export async function decryptFromHub(
   packed: string,
   hubKey: Uint8Array,
-): string | null {
+): Promise<string | null> {
   try {
-    const data = hexToBytes(packed)
-    const nonce = data.slice(0, 12)
-    const ciphertext = data.slice(12)
-    const aad = utf8ToBytes(LABEL_HUB_EVENT)
-    const cipher = gcm(hubKey, nonce, aad)
-    const plaintext = cipher.decrypt(ciphertext)
-    return new TextDecoder().decode(plaintext)
+    // nonce is first 24 hex chars (12 bytes), rest is ciphertext
+    const nonceHex = packed.slice(0, 24)
+    const ciphertextHex = packed.slice(24)
+    const keyHex = bytesToHex(hubKey)
+    const aadHex = bytesToHex(utf8ToBytes(LABEL_HUB_EVENT))
+
+    const plaintextHex = await aesGcmDecryptRaw(keyHex, nonceHex, ciphertextHex, aadHex)
+    return new TextDecoder().decode(hexToBytes(plaintextHex))
   } catch {
     return null
   }

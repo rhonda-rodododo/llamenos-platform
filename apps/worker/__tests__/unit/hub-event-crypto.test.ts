@@ -9,7 +9,7 @@ import {
   unpadFromBucket,
 } from '@worker/lib/hub-event-crypto'
 import { deriveServerKeypair } from '@worker/lib/server-identity'
-import { bytesToHex } from '@noble/hashes/utils.js'
+import { bytesToHex } from '@shared/encoding'
 
 // A 64-hex-char (32-byte) test secret, as SERVER_NOSTR_SECRET is defined.
 const TEST_SECRET = 'c0ffee00'.repeat(8)

@@ -15,10 +15,8 @@
  * Recovery key: 128-bit random, Base32-encoded, formatted as XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX
  */
 
-import { gcm } from '@noble/ciphers/aes.js'
-import { utf8ToBytes } from '@noble/ciphers/utils.js'
-import { sha256 } from '@noble/hashes/sha2.js'
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
+import { bytesToHex, hexToBytes, utf8ToBytes } from '@shared/encoding'
+import { sha256Hash, aesGcmEncryptRaw, aesGcmDecryptRaw } from './platform'
 import { RECOVERY_SALT } from '@shared/crypto-labels'
 
 const BASE32_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
@@ -113,19 +111,19 @@ async function deriveFromPin(pin: string, salt: Uint8Array): Promise<Uint8Array>
   return new Uint8Array(derived)
 }
 
-function encrypt(plaintext: string, kek: Uint8Array): { nonce: string; ciphertext: string } {
+async function encrypt(plaintext: string, kek: Uint8Array): Promise<{ nonce: string; ciphertext: string }> {
   const nonce = new Uint8Array(12)
   crypto.getRandomValues(nonce)
-  const cipher = gcm(kek, nonce)
-  const ct = cipher.encrypt(utf8ToBytes(plaintext))
-  return { nonce: bytesToHex(nonce), ciphertext: bytesToHex(ct) }
+  const nonceHex = bytesToHex(nonce)
+  const plaintextHex = bytesToHex(utf8ToBytes(plaintext))
+  const ciphertextHex = await aesGcmEncryptRaw(bytesToHex(kek), nonceHex, plaintextHex)
+  return { nonce: nonceHex, ciphertext: ciphertextHex }
 }
 
-function decrypt(nonce: string, ciphertext: string, kek: Uint8Array): string | null {
+async function decrypt(nonce: string, ciphertext: string, kek: Uint8Array): Promise<string | null> {
   try {
-    const cipher = gcm(kek, hexToBytes(nonce))
-    const pt = cipher.decrypt(hexToBytes(ciphertext))
-    return new TextDecoder().decode(pt)
+    const plaintextHex = await aesGcmDecryptRaw(bytesToHex(kek), nonce, ciphertext)
+    return new TextDecoder().decode(hexToBytes(plaintextHex))
   } catch {
     return null
   }
@@ -135,9 +133,10 @@ function decrypt(nonce: string, ciphertext: string, kek: Uint8Array): string | n
  * Create a truncated pubkey identifier (first 6 hex chars of SHA-256).
  * Enough for the user to identify which backup is which, not enough to identify the pubkey.
  */
-function truncatedPubkeyId(pubkey: string): string {
-  const hash = sha256(utf8ToBytes(pubkey))
-  return bytesToHex(hash).slice(0, 6)
+async function truncatedPubkeyId(pubkey: string): Promise<string> {
+  const inputHex = bytesToHex(utf8ToBytes(pubkey))
+  const hashHex = await sha256Hash(inputHex)
+  return hashHex.slice(0, 6)
 }
 
 /**
@@ -161,16 +160,16 @@ export async function createBackup(
   const salt = new Uint8Array(16)
   crypto.getRandomValues(salt)
   const kek = await deriveFromPin(pin, salt)
-  const { nonce, ciphertext } = encrypt(nsec, kek)
+  const { nonce, ciphertext } = await encrypt(nsec, kek)
 
   const rSalt = new Uint8Array(16)
   crypto.getRandomValues(rSalt)
   const rKek = await deriveFromRecoveryKey(recoveryKey, rSalt)
-  const { nonce: rNonce, ciphertext: rCt } = encrypt(nsec, rKek)
+  const { nonce: rNonce, ciphertext: rCt } = await encrypt(nsec, rKek)
 
   return {
     v: 1,
-    id: truncatedPubkeyId(pubkey),
+    id: await truncatedPubkeyId(pubkey),
     t: roundToHour(new Date()),
     d: {
       s: bytesToHex(salt),

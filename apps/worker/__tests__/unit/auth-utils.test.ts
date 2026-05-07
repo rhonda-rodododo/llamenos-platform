@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { parseAuthHeader, parseSessionHeader, validateToken, verifyAuthToken, buildAuthMessage } from '@worker/lib/auth'
-import { ed25519 } from '@noble/curves/ed25519.js'
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
+import { ed25519PubkeyFromSeed, ed25519Sign, ed25519Verify } from '@llamenos/crypto/ffi'
+import { bytesToHex, hexToBytes } from '@shared/encoding'
 import { LABEL_DEVICE_AUTH } from '@shared/crypto-labels'
 
 describe('parseAuthHeader', () => {
@@ -137,12 +137,12 @@ describe('buildAuthMessage', () => {
 describe('verifyAuthToken', () => {
   // Ed25519 test keypair — deterministic seed
   const seed = new Uint8Array(32).fill(0x42)
-  const pubkeyBytes = ed25519.getPublicKey(seed)
+  const pubkeyBytes = ed25519PubkeyFromSeed(seed)
   const pubkeyHex = bytesToHex(pubkeyBytes)
 
   function createSignedToken(timestamp: number, method: string, path: string): string {
     const message = buildAuthMessage(pubkeyHex, timestamp, method, path)
-    const sig = ed25519.sign(message, seed)
+    const sig = ed25519Sign(seed, message)
     return bytesToHex(sig)
   }
 
@@ -193,7 +193,7 @@ describe('verifyAuthToken', () => {
     const timestamp = Date.now()
     const tokenFromA = createSignedToken(timestamp, 'GET', '/api/notes')
     const seedB = new Uint8Array(32).fill(0x77)
-    const pubkeyB = bytesToHex(ed25519.getPublicKey(seedB))
+    const pubkeyB = bytesToHex(ed25519PubkeyFromSeed(seedB))
     expect(verifyAuthToken({ pubkey: pubkeyB, timestamp, token: tokenFromA }, 'GET', '/api/notes')).toBe(false)
   })
 

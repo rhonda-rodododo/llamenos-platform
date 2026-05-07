@@ -24,11 +24,8 @@
  * Clients receive the server's event key via GET /api/auth/me (serverEventKeyHex).
  */
 
-import { hkdf } from '@noble/hashes/hkdf.js'
-import { sha256 } from '@noble/hashes/sha2.js'
-import { gcm } from '@noble/ciphers/aes.js'
-import { utf8ToBytes } from '@noble/ciphers/utils.js'
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
+import { hkdfSha256, symmetricEncrypt, symmetricDecrypt } from '@llamenos/crypto/ffi'
+import { bytesToHex, hexToBytes, utf8ToBytes } from '@shared/encoding'
 import {
   LABEL_HUB_EVENT,
   LABEL_SERVER_EVENT_ENCRYPTION_KEY,
@@ -97,7 +94,7 @@ export function deriveServerEventKey(
     ? utf8ToBytes(`${LABEL_HUB_EVENT_EPOCH}:${epoch}`)
     : utf8ToBytes(LABEL_SERVER_EVENT_ENCRYPTION_KEY_INFO)
 
-  return hkdf(sha256, hexToBytes(serverSecret), salt, info, 32)
+  return hkdfSha256(hexToBytes(serverSecret), salt, info, 32)
 }
 
 /** Default epoch duration in seconds (24 hours) */
@@ -129,16 +126,10 @@ function buildEventAad(epoch?: number): Uint8Array {
  * @param epoch — when provided, AAD includes the epoch for server event domain separation.
  */
 export function encryptHubEvent(content: Record<string, unknown>, eventKey: Uint8Array, epoch?: number): string {
-  const nonce = new Uint8Array(12)
-  crypto.getRandomValues(nonce)
   const plaintext = utf8ToBytes(JSON.stringify(content))
   const padded = padToBucket(plaintext)
   const aad = buildEventAad(epoch)
-  const cipher = gcm(eventKey, nonce, aad)
-  const ciphertext = cipher.encrypt(padded)
-  const packed = new Uint8Array(nonce.length + ciphertext.length)
-  packed.set(nonce)
-  packed.set(ciphertext, nonce.length)
+  const packed = symmetricEncrypt(eventKey, padded, aad)
   return bytesToHex(packed)
 }
 
@@ -153,11 +144,8 @@ export function decryptHubEvent(hex: string, eventKey: Uint8Array, epoch?: numbe
   if (packed.length < 28) {
     throw new Error('Invalid hub event ciphertext: too short (need at least 12-byte nonce + 16-byte tag)')
   }
-  const nonce = packed.slice(0, 12)
-  const ciphertext = packed.slice(12)
   const aad = buildEventAad(epoch)
-  const cipher = gcm(eventKey, nonce, aad)
-  const padded = cipher.decrypt(ciphertext)
+  const padded = symmetricDecrypt(eventKey, packed, aad)
   const plaintext = unpadFromBucket(padded)
   return JSON.parse(new TextDecoder().decode(plaintext)) as Record<string, unknown>
 }

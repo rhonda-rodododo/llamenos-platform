@@ -1,8 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { hashPhone, hashIP, hashAuditEntry, stableJsonStringify, encryptMessageForStorage, encryptCallRecordForStorage } from '@worker/lib/crypto'
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
-import { sha256 } from '@noble/hashes/sha2.js'
-import { utf8ToBytes } from '@noble/ciphers/utils.js'
+import { sha256 } from '@llamenos/crypto/ffi'
+import { bytesToHex, hexToBytes, utf8ToBytes } from '@shared/encoding'
 
 // Test HMAC secret (64 hex chars = 32 bytes)
 const TEST_SECRET = 'a'.repeat(64)

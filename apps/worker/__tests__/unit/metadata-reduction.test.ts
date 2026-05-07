@@ -5,9 +5,8 @@
  *   3. Country field removed from audit logs
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { sha256 } from '@noble/hashes/sha2.js'
-import { bytesToHex } from '@noble/hashes/utils.js'
-import { utf8ToBytes } from '@noble/ciphers/utils.js'
+import { sha256 } from '@llamenos/crypto/ffi'
+import { bytesToHex, utf8ToBytes } from '@shared/encoding'
 import { hashPhone } from '../../lib/crypto'
 import { AuditService, audit } from '../../services/audit'
 

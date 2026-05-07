@@ -6,24 +6,33 @@
  * - HPKE (RFC 9180) key wrapping: DHKEM(X25519, HKDF-SHA256) + HKDF-SHA256 + AES-256-GCM
  * - Wire format: hex(nonce_12 || ciphertext || tag_16)
  */
-import { CipherSuite, KemId, KdfId, AeadId } from 'hpke-js'
-import { gcm } from '@noble/ciphers/aes.js'
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
-import { utf8ToBytes } from '@noble/ciphers/utils.js'
-
-/** HPKE cipher suite matching Rust: DHKEM(X25519, HKDF-SHA256) + HKDF-SHA256 + AES-256-GCM */
-const hpkeSuite = new CipherSuite({
-  kem: KemId.DhkemX25519HkdfSha256,
-  kdf: KdfId.HkdfSha256,
-  aead: AeadId.Aes256Gcm,
-})
+import {
+  randomBytes,
+  symmetricEncrypt,
+  symmetricDecrypt,
+  hpkeSeal,
+  hpkeOpen,
+} from '@llamenos/crypto/ffi'
+import { bytesToHex, hexToBytes, utf8ToBytes, bytesToUtf8 } from '@shared/encoding'
 
 /**
  * Generate an X25519 keypair for HPKE operations (key wrapping).
  * Returns raw 32-byte hex strings for both secret and public keys.
+ *
+ * NOTE: The FFI layer derives the X25519 public key internally during hpkeSeal/hpkeOpen.
+ * For test keypairs we generate a random 32-byte secret and derive the public key
+ * using the x25519 scalar base multiplication from @noble/curves (still needed here
+ * since the FFI doesn't expose a standalone x25519 pubkey derivation).
  */
 export async function generateHpkeKeypair(): Promise<{ skHex: string; pubkeyHex: string }> {
-  const kp = await hpkeSuite.generateKeyPair()
+  // Use hpke-js for keypair generation since FFI doesn't expose x25519 pubkey derivation
+  const { CipherSuite, KemId, KdfId, AeadId } = await import('hpke-js')
+  const suite = new CipherSuite({
+    kem: KemId.DhkemX25519HkdfSha256,
+    kdf: KdfId.HkdfSha256,
+    aead: AeadId.Aes256Gcm,
+  })
+  const kp = await suite.generateKeyPair()
   const skRaw = await crypto.subtle.exportKey('raw', kp.privateKey)
   const pkRaw = await crypto.subtle.exportKey('raw', kp.publicKey)
   return {
@@ -38,9 +47,7 @@ export async function generateHpkeKeypair(): Promise<{ skHex: string; pubkeyHex:
 
 /** Generate a 32-byte random content key. */
 export function generateContentKey(): Uint8Array {
-  const key = new Uint8Array(32)
-  crypto.getRandomValues(key)
-  return key
+  return randomBytes(32)
 }
 
 /**
@@ -50,16 +57,8 @@ export function generateContentKey(): Uint8Array {
  * Matches the Rust `aes256gcm_encrypt` in `encryption.rs`.
  */
 export function encryptContent(plaintext: string, key: Uint8Array, label: string): string {
-  const nonce = new Uint8Array(12)
-  crypto.getRandomValues(nonce)
   const aad = utf8ToBytes(label)
-  const cipher = gcm(key, nonce, aad)
-  const ciphertext = cipher.encrypt(utf8ToBytes(plaintext))
-
-  const packed = new Uint8Array(nonce.length + ciphertext.length)
-  packed.set(nonce)
-  packed.set(ciphertext, nonce.length)
-
+  const packed = symmetricEncrypt(key, utf8ToBytes(plaintext), aad)
   return bytesToHex(packed)
 }
 
@@ -70,11 +69,8 @@ export function encryptContent(plaintext: string, key: Uint8Array, label: string
  */
 export function decryptContent(ciphertextHex: string, key: Uint8Array, label: string): string {
   const data = hexToBytes(ciphertextHex)
-  const nonce = data.slice(0, 12)
-  const ct = data.slice(12)
   const aad = utf8ToBytes(label)
-  const cipher = gcm(key, nonce, aad)
-  return new TextDecoder().decode(cipher.decrypt(ct))
+  return bytesToUtf8(symmetricDecrypt(key, data, aad))
 }
 
 // ---------------------------------------------------------------------------
@@ -87,7 +83,7 @@ export function decryptContent(ciphertextHex: string, key: Uint8Array, label: st
  * Uses DHKEM(X25519, HKDF-SHA256) + HKDF-SHA256 + AES-256-GCM.
  * info = label bytes, aad = "${label}:key-wrap" bytes.
  *
- * Output: { enc: hex(ephemeral_pubkey), ct: hex(ciphertext + tag) }
+ * Output: { enc: hex(ephemeral_pubkey_32), ct: hex(ciphertext + tag) }
  *
  * Matches `hpke_wrap_key` in `packages/crypto/src/encryption.rs`.
  */
@@ -97,19 +93,16 @@ export async function wrapKeyForRecipient(
   _senderSkHex: string,
   label: string,
 ): Promise<{ ct: string; enc: string }> {
-  const recipientPub = await hpkeSuite.importKey('raw', hexToBytes(recipientPubkeyHex), true)
+  const recipientPk = hexToBytes(recipientPubkeyHex)
   const info = utf8ToBytes(label)
   const aad = utf8ToBytes(`${label}:key-wrap`)
 
-  const result = await hpkeSuite.seal(
-    { recipientPublicKey: recipientPub, info },
-    contentKey,
-    aad,
-  )
+  // hpkeSeal returns: enc(32) || ciphertext || tag(16)
+  const sealed = hpkeSeal(recipientPk, contentKey, info, aad)
 
   return {
-    enc: bytesToHex(new Uint8Array(result.enc)),
-    ct: bytesToHex(new Uint8Array(result.ct)),
+    enc: bytesToHex(sealed.slice(0, 32)),
+    ct: bytesToHex(sealed.slice(32)),
   }
 }
 
@@ -125,19 +118,17 @@ export async function unwrapKey(
   recipientSkHex: string,
   label: string,
 ): Promise<Uint8Array> {
-  const recipientSk = await hpkeSuite.importKey('raw', hexToBytes(recipientSkHex), false)
   const enc = hexToBytes(encHex)
   const ct = hexToBytes(ctHex)
   const info = utf8ToBytes(label)
   const aad = utf8ToBytes(`${label}:key-wrap`)
 
-  const plaintext = await hpkeSuite.open(
-    { recipientKey: recipientSk, enc, info },
-    ct,
-    aad,
-  )
+  // Reconstruct the envelope: enc(32) || ciphertext || tag(16)
+  const envelope = new Uint8Array(enc.length + ct.length)
+  envelope.set(enc)
+  envelope.set(ct, enc.length)
 
-  return new Uint8Array(plaintext)
+  return hpkeOpen(hexToBytes(recipientSkHex), envelope, info, aad)
 }
 
 // ---------------------------------------------------------------------------

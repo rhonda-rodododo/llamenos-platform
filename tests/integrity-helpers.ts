@@ -219,11 +219,8 @@ if (import.meta.main) {
 
   // Test 9: Verify hash matches server algorithm format
   // The content string format is: id:action:actorPubkey:createdAt:JSON(details):previousEntryHash
-  const { sha256: sha256fn } = await import('@noble/hashes/sha2.js')
-  const { utf8ToBytes: u2b } = await import('@noble/ciphers/utils.js')
-  const { bytesToHex: b2h } = await import('@noble/hashes/utils.js')
   const manualContent = `test-id-001:volunteerAdded:${'a'.repeat(64)}:2026-01-01T00:00:00.000Z:${JSON.stringify({ role: 'volunteer' })}:`
-  const manualHash = b2h(sha256fn(u2b(manualContent)))
+  const manualHash = bytesToHex(sha256(utf8ToBytes(manualContent)))
   console.assert(hash1 === manualHash, `Hash mismatch: ${hash1} !== ${manualHash}`)
   console.log('[PASS] computeAuditEntryHash matches manual SHA-256 computation')
 

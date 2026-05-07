@@ -6,8 +6,8 @@
  */
 import { describe, it, expect } from 'vitest'
 import { generateAgentKeypair, unsealAgentNsec } from '@worker/lib/agent-identity'
-import { schnorr } from '@noble/curves/secp256k1.js'
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
+import { ed25519PubkeyFromSeed } from '@llamenos/crypto/ffi'
+import { bytesToHex, hexToBytes } from '@shared/encoding'
 
 // A valid 32-byte hex seal key
 const SEAL_KEY = 'a'.repeat(64)
@@ -15,7 +15,7 @@ const SEAL_LABEL = 'llamenos:agent-seal'
 
 describe('agent-identity', () => {
   describe('generateAgentKeypair', () => {
-    it('generates a valid secp256k1 keypair', () => {
+    it('generates a valid Ed25519 keypair', () => {
       const { pubkey, encryptedNsec } = generateAgentKeypair('agent-1', SEAL_KEY, SEAL_LABEL)
 
       // Pubkey should be 64 hex chars (32 bytes x-only)
@@ -43,11 +43,11 @@ describe('agent-identity', () => {
       expect(kp1.pubkey).not.toBe(kp2.pubkey)
     })
 
-    it('pubkey is valid for Schnorr verification', () => {
+    it('pubkey is a valid Ed25519 public key', () => {
       const { pubkey } = generateAgentKeypair('agent-test', SEAL_KEY, SEAL_LABEL)
-      // Should not throw when used as a public key
-      const point = schnorr.utils.lift_x(BigInt('0x' + pubkey))
-      expect(point).toBeDefined()
+      // Should be 64 hex chars (32 bytes) — valid Ed25519 pubkey
+      expect(pubkey).toMatch(/^[0-9a-f]{64}$/)
+      expect(hexToBytes(pubkey).length).toBe(32)
     })
   })
 
@@ -59,8 +59,8 @@ describe('agent-identity', () => {
       // nsec should be 64 hex chars (32 bytes)
       expect(nsecHex).toMatch(/^[0-9a-f]{64}$/)
 
-      // Derive pubkey from recovered nsec to verify it matches
-      const recoveredPubkey = bytesToHex(schnorr.getPublicKey(hexToBytes(nsecHex)))
+      // Derive pubkey from recovered seed to verify it matches
+      const recoveredPubkey = bytesToHex(ed25519PubkeyFromSeed(hexToBytes(nsecHex)))
       expect(recoveredPubkey).toBe(pubkey)
     })
 

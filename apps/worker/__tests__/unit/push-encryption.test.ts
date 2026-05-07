@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { bytesToHex } from '@noble/hashes/utils.js'
+import { bytesToHex } from '@shared/encoding'
 import { encryptWakePayload, encryptFullPayload } from '@worker/lib/push-encryption'
 import type { WakePayload, FullPushPayload } from '@worker/types/infra'
 

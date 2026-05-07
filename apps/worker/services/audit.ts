@@ -8,9 +8,8 @@
  * hash of the previous entry. Verification walks the chain backward.
  */
 import { eq, and, desc, sql, count, gte, lte, inArray } from 'drizzle-orm'
-import { sha256 } from '@noble/hashes/sha2.js'
-import { bytesToHex } from '@noble/hashes/utils.js'
-import { utf8ToBytes } from '@noble/ciphers/utils.js'
+import { sha256 } from '@llamenos/crypto/ffi'
+import { bytesToHex, utf8ToBytes } from '@shared/encoding'
 import type { Database } from '../db'
 import { auditLog } from '../db/schema'
 import { hashIP } from '../lib/crypto'

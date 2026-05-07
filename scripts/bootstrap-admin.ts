@@ -3,12 +3,12 @@
  * Bootstrap the first admin user (CLI method).
  *
  * Generates TWO keypairs:
- *   1. Identity keypair — for authentication (Schnorr signatures, login)
- *   2. Decryption keypair — for note/message encryption (ECIES wrapping)
+ *   1. Identity keypair — Ed25519 for authentication (signatures, login)
+ *   2. Encryption keypair — X25519 for note/message encryption (HPKE wrapping)
  *
- * Separating identity from decryption means revoking the identity key
+ * Separating identity from encryption means revoking the identity key
  * (e.g., after a session compromise) does NOT require re-encrypting all
- * stored notes. Conversely, rotating the decryption key does not invalidate
+ * stored notes. Conversely, rotating the encryption key does not invalidate
  * active sessions.
  *
  * NOTE: The recommended approach is in-browser bootstrap — simply visit
@@ -20,62 +20,48 @@
  *   bun run scripts/bootstrap-admin.ts
  */
 
-import { generateSecretKey, getPublicKey, nip19 } from 'nostr-tools'
-import { bytesToHex } from '@noble/hashes/utils'
+import { randomBytes, ed25519PubkeyFromSeed } from '@llamenos/crypto/ffi'
+import { bytesToHex } from '@shared/encoding'
 
-// --- Identity Keypair (auth/login) ---
-const identitySecret = generateSecretKey()
-const identityPubkey = getPublicKey(identitySecret)
-const identityNsec = nip19.nsecEncode(identitySecret)
-const identityNpub = nip19.npubEncode(identityPubkey)
+// --- Identity Keypair (Ed25519 auth/login) ---
+const identitySeed = randomBytes(32)
+const identityPubkey = bytesToHex(ed25519PubkeyFromSeed(identitySeed))
+const identitySeedHex = bytesToHex(identitySeed)
 
-// --- Decryption Keypair (note/message encryption) ---
-const decryptionSecret = generateSecretKey()
-const decryptionPubkey = getPublicKey(decryptionSecret)
-const decryptionNsec = nip19.nsecEncode(decryptionSecret)
-const decryptionNpub = nip19.npubEncode(decryptionPubkey)
+// --- Encryption Keypair (X25519 for HPKE envelope encryption) ---
+const encryptionSeed = randomBytes(32)
+const encryptionPubkey = bytesToHex(ed25519PubkeyFromSeed(encryptionSeed))
+const encryptionSeedHex = bytesToHex(encryptionSeed)
+
+// --- Server Secret (relay event signing + HMAC operations) ---
+const serverSecret = bytesToHex(crypto.getRandomValues(new Uint8Array(32)))
 
 console.log('=== Llámenos Admin Bootstrap ===\n')
 console.log('Two keypairs have been generated:\n')
 
-console.log('--- Identity Keypair (authentication) ---\n')
+console.log('--- Identity Keypair (Ed25519 authentication) ---\n')
 console.log('PUBLIC KEY (hex):')
 console.log(`  ${identityPubkey}\n`)
-console.log('PUBLIC KEY (npub):')
-console.log(`  ${identityNpub}\n`)
-console.log('SECRET KEY (nsec) — admin uses this to log in:')
-console.log(`  ${identityNsec}\n`)
+console.log('SECRET SEED (hex) — admin uses this to log in:')
+console.log(`  ${identitySeedHex}\n`)
 
-console.log('--- Decryption Keypair (note/message encryption) ---\n')
+console.log('--- Encryption Keypair (HPKE note/message encryption) ---\n')
 console.log('PUBLIC KEY (hex):')
-console.log(`  ${decryptionPubkey}\n`)
-console.log('PUBLIC KEY (npub):')
-console.log(`  ${decryptionNpub}\n`)
-console.log('SECRET KEY (nsec) — admin needs this to decrypt notes:')
-console.log(`  ${decryptionNsec}\n`)
+console.log(`  ${encryptionPubkey}\n`)
+console.log('SECRET SEED (hex) — admin needs this to decrypt notes:')
+console.log(`  ${encryptionSeedHex}\n`)
 
-// --- Server Nostr Secret (relay event signing) ---
-const serverNostrSecret = bytesToHex(crypto.getRandomValues(new Uint8Array(32)))
-
-console.log('--- Server Nostr Secret (relay event signing) ---\n')
-console.log('SERVER_NOSTR_SECRET (hex):')
-console.log(`  ${serverNostrSecret}\n`)
-console.log('This secret is used to derive the server\'s Nostr keypair for')
-console.log('signing real-time events (call notifications, presence, etc.).\n')
+console.log('--- Server Secret (relay signing + HMAC) ---\n')
+console.log('SERVER_SECRET (hex):')
+console.log(`  ${serverSecret}\n`)
 
 console.log('--- Next Steps ---\n')
-console.log('1. Set secrets for Cloudflare deployment:')
-console.log(`   echo "${identityPubkey}" | bunx wrangler secret put ADMIN_PUBKEY`)
-console.log(`   echo "${decryptionPubkey}" | bunx wrangler secret put ADMIN_DECRYPTION_PUBKEY`)
-console.log(`   echo "${serverNostrSecret}" | bunx wrangler secret put SERVER_NOSTR_SECRET\n`)
-console.log('2. For local development, add to .dev.vars:')
+console.log('1. For local development, add to .env:')
 console.log(`   ADMIN_PUBKEY=${identityPubkey}`)
-console.log(`   ADMIN_DECRYPTION_PUBKEY=${decryptionPubkey}`)
-console.log(`   SERVER_NOSTR_SECRET=${serverNostrSecret}\n`)
-console.log('3. For Docker deployment, add to .env:')
-console.log(`   ADMIN_PUBKEY=${identityPubkey}`)
-console.log(`   SERVER_NOSTR_SECRET=${serverNostrSecret}\n`)
-console.log('4. The admin logs in with the IDENTITY nsec.')
-console.log('5. The admin imports the DECRYPTION nsec to decrypt notes.')
-console.log('   (In the current single-admin setup, both nsecs are entered during onboarding.)\n')
-console.log('   IMPORTANT: Store both nsecs securely. They cannot be recovered.\n')
+console.log(`   ADMIN_ENCRYPTION_PUBKEY=${encryptionPubkey}`)
+console.log(`   SERVER_SECRET=${serverSecret}\n`)
+console.log('2. For Docker deployment, add the same vars to .env\n')
+console.log('3. The admin logs in with the IDENTITY seed hex.')
+console.log('4. The admin imports the ENCRYPTION seed hex to decrypt notes.')
+console.log('   (In the current single-admin setup, both seeds are entered during onboarding.)\n')
+console.log('   IMPORTANT: Store both seeds securely. They cannot be recovered.\n')

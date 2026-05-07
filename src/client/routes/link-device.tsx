@@ -66,7 +66,7 @@ function LinkDevicePage() {
             clearInterval(pollRef.current!)
             pollRef.current = null
             // Compute SAS for verification before decrypting
-            const sas = computeSASForNewDevice(s.ephemeralSecret, status.primaryPubkey)
+            const sas = await computeSASForNewDevice(s.ephemeralSecret, status.primaryPubkey)
             setSasCode(sas)
             setEncryptedNsecData({ encryptedNsec: status.encryptedNsec, primaryPubkey: status.primaryPubkey })
             setStep('verify-sas')
@@ -93,10 +93,10 @@ function LinkDevicePage() {
     }
   }, [])
 
-  function handleSASConfirm() {
+  async function handleSASConfirm() {
     if (!session || !encryptedNsecData) return
     try {
-      const decryptedNsec = decryptProvisionedNsec(
+      const decryptedNsec = await decryptProvisionedNsec(
         encryptedNsecData.encryptedNsec,
         encryptedNsecData.primaryPubkey,
         session.ephemeralSecret,

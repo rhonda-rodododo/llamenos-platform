@@ -27,10 +27,8 @@ import type {
 import { DEFAULT_BLAST_SETTINGS } from '@shared/types'
 import { BLAST_MAX_RETRIES } from '../types'
 import { computeRetryDecision } from '../lib/blast-delivery'
-import { hmac } from '@noble/hashes/hmac.js'
-import { sha256 } from '@noble/hashes/sha2.js'
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
-import { utf8ToBytes } from '@noble/ciphers/utils.js'
+import { hmacSha256, sha256 } from '@llamenos/crypto/ffi'
+import { bytesToHex, hexToBytes, utf8ToBytes } from '@shared/encoding'
 import { HMAC_PREFERENCE_TOKEN, HMAC_SUBSCRIBER } from '@shared/crypto-labels'
 import { encryptContactIdentifier } from '../lib/crypto'
 import { ServiceError } from './settings'
@@ -102,7 +100,7 @@ export class BlastsService {
     }
     const key = hexToBytes(this.hmacSecret)
     const input = utf8ToBytes(`${HMAC_PREFERENCE_TOKEN}${identifierHash}`)
-    return bytesToHex(hmac(sha256, key, input))
+    return bytesToHex(hmacSha256(key, input))
   }
 
   private hashIdentifier(identifier: string): string {
@@ -110,7 +108,7 @@ export class BlastsService {
       throw new ServiceError(500, 'HMAC secret not configured')
     }
     return bytesToHex(
-      hmac(sha256, hexToBytes(this.hmacSecret), utf8ToBytes(`${HMAC_SUBSCRIBER}${identifier}`)),
+      hmacSha256(hexToBytes(this.hmacSecret), utf8ToBytes(`${HMAC_SUBSCRIBER}${identifier}`)),
     )
   }
 

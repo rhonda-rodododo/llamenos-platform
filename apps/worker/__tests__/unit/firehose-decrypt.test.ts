@@ -7,7 +7,7 @@
  * 3. Output format is valid hex
  */
 import { describe, it, expect } from 'vitest'
-import { bytesToHex } from '@noble/hashes/utils.js'
+import { bytesToHex } from '@shared/encoding'
 import {
   encryptMessageForStorage,
 } from '@worker/lib/crypto'

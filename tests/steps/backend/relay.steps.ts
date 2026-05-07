@@ -16,7 +16,8 @@ import {
   simulateIncomingMessage,
   uniqueCallerNumber,
 } from '../../simulation-helpers'
-import { verifyEvent } from 'nostr-tools/pure'
+import { ed25519Verify, sha256 } from '@llamenos/crypto/ffi'
+import { hexToBytes, utf8ToBytes } from '@shared/encoding'
 import { deriveServerEventKey, decryptHubEvent, getCurrentEpoch } from '../../helpers/relay-crypto'
 
 const RELAY_URL = process.env.TEST_RELAY_URL || 'ws://localhost:7777'
@@ -195,8 +196,17 @@ Then(
 Then('the event signature should be valid', async ({ world }) => {
   const rs = getRelayState(world)
   expect(rs.lastCapturedEvent).toBeTruthy()
-  // verifyEvent checks id, sig, and pubkey
-  const valid = verifyEvent(rs.lastCapturedEvent as Parameters<typeof verifyEvent>[0])
+  const event = rs.lastCapturedEvent!
+
+  // The relay is now a native WebSocket relay with Ed25519 signatures.
+  // The CapturedEvent still carries pubkey + sig fields from the relay wire format.
+  // Verify by hashing the event ID and checking the Ed25519 signature.
+  const messageHash = sha256(utf8ToBytes(event.id))
+  const valid = ed25519Verify(
+    hexToBytes(event.pubkey),
+    messageHash,
+    hexToBytes(event.sig),
+  )
   expect(valid).toBe(true)
 })
 

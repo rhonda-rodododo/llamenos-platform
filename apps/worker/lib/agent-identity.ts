@@ -5,11 +5,8 @@
  * Agent nsecs are sealed using a deploy-level secret key via HKDF + AES-256-GCM.
  * The agentId is used as HKDF salt for key isolation between agents.
  */
-import { gcm } from '@noble/ciphers/aes.js'
-import { schnorr } from '@noble/curves/secp256k1.js'
-import { hkdf } from '@noble/hashes/hkdf.js'
-import { sha256 } from '@noble/hashes/sha2.js'
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
+import { symmetricEncrypt, symmetricDecrypt, ed25519PubkeyFromSeed, hkdfSha256 } from '@llamenos/crypto/ffi'
+import { bytesToHex, hexToBytes, utf8ToBytes } from '@shared/encoding'
 
 /**
  * Generate a random Nostr keypair for an agent, sealing the nsec under a
@@ -25,32 +22,27 @@ export function generateAgentKeypair(
   sealKey: string,
   sealLabel: string,
 ): { pubkey: string; encryptedNsec: string } {
-  // Generate random keypair
-  const nsecBytes = schnorr.utils.randomSecretKey()
-  const pubkeyBytes = schnorr.getPublicKey(nsecBytes)
+  // Generate random Ed25519 seed
+  const seedBytes = crypto.getRandomValues(new Uint8Array(32))
+  const pubkeyBytes = ed25519PubkeyFromSeed(seedBytes)
   const pubkey = bytesToHex(pubkeyBytes)
-  const nsecHex = bytesToHex(nsecBytes)
+  const seedHex = bytesToHex(seedBytes)
 
   // Derive per-agent seal key via HKDF
   const sealKeyBytes = hexToBytes(sealKey)
-  const derivedKey = hkdf(
-    sha256,
+  const derivedKey = hkdfSha256(
     sealKeyBytes,
-    new TextEncoder().encode(agentId),
-    new TextEncoder().encode(sealLabel),
+    utf8ToBytes(agentId),
+    utf8ToBytes(sealLabel),
     32,
   )
 
-  // Encrypt nsec with AES-256-GCM
-  const nonce = crypto.getRandomValues(new Uint8Array(12))
-  const cipher = gcm(derivedKey, nonce)
-  const sealed = cipher.encrypt(new TextEncoder().encode(nsecHex))
+  // Encrypt seed with AES-256-GCM (symmetricEncrypt handles nonce internally)
+  const sealed = symmetricEncrypt(derivedKey, utf8ToBytes(seedHex), new Uint8Array(0))
+  const encryptedNsec = bytesToHex(sealed)
 
-  // Encode as hex: nonce || ciphertext
-  const encryptedNsec = bytesToHex(nonce) + bytesToHex(sealed)
-
-  // Zero nsec from memory
-  nsecBytes.fill(0)
+  // Zero seed from memory
+  seedBytes.fill(0)
 
   return { pubkey, encryptedNsec }
 }
@@ -72,19 +64,14 @@ export function unsealAgentNsec(
   sealLabel: string,
 ): string {
   const sealKeyBytes = hexToBytes(sealKey)
-  const derivedKey = hkdf(
-    sha256,
+  const derivedKey = hkdfSha256(
     sealKeyBytes,
-    new TextEncoder().encode(agentId),
-    new TextEncoder().encode(sealLabel),
+    utf8ToBytes(agentId),
+    utf8ToBytes(sealLabel),
     32,
   )
 
   const combined = hexToBytes(encryptedNsec)
-  const nonce = combined.slice(0, 12)
-  const ciphertext = combined.slice(12)
-
-  const cipher = gcm(derivedKey, nonce)
-  const decrypted = cipher.decrypt(ciphertext)
+  const decrypted = symmetricDecrypt(derivedKey, combined, new Uint8Array(0))
   return new TextDecoder().decode(decrypted)
 }
