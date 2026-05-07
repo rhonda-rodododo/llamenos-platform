@@ -18,7 +18,7 @@ function createTestApp(opts: {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(c as any).env = {
       STORAGE_ENDPOINT: 'http://storage:9000',
-      NOSTR_RELAY_URL: 'ws://relay:7777',
+      SERVER_SECRET: 'a'.repeat(64),
       SIP_BRIDGE_URL: 'http://sip-bridge:3000',
       ...opts.env,
     }
@@ -38,9 +38,6 @@ describe('health route', () => {
       const urlStr = String(url)
       if (urlStr.includes('storage:9000')) {
         return new Response(null, { status: 403 })
-      }
-      if (urlStr.includes('relay:7777')) {
-        return new Response('relay info', { status: 200 })
       }
       if (urlStr.includes('sip-bridge')) {
         return new Response('ok', { status: 200 })
@@ -96,22 +93,6 @@ describe('health route', () => {
       expect(body.checks.storage.status).toBe('failing')
     })
 
-    it('returns 503 when relay is unreachable', async () => {
-      fetchSpy.mockImplementation(async (url: unknown) => {
-        if (String(url).includes('relay')) {
-          return new Response(null, { status: 502 })
-        }
-        return new Response(null, { status: 403 })
-      })
-
-      const app = createTestApp()
-      const res = await app.request('/')
-      expect(res.status).toBe(503)
-      const body = await res.json()
-      expect(body.checks.relay.status).toBe('failing')
-      expect(body.checks.relay.detail).toContain('502')
-    })
-
     it('returns 503 when sip bridge fails', async () => {
       fetchSpy.mockImplementation(async (url: unknown) => {
         if (String(url).includes('sip-bridge')) {
@@ -141,9 +122,6 @@ describe('health route', () => {
         if (urlStr.includes('storage:9000')) {
           return new Response(null, { status: 403 })
         }
-        if (urlStr.includes('relay:7777')) {
-          return new Response('relay info', { status: 200 })
-        }
         if (urlStr.includes('sip-bridge')) {
           return new Response('ok', { status: 200 })
         }
@@ -166,22 +144,22 @@ describe('health route', () => {
       expect(body.checks.storage.detail).toContain('STORAGE_ENDPOINT not configured')
     })
 
-    it('marks relay failing when NOSTR_RELAY_URL not configured', async () => {
-      const app = createTestApp({ env: { NOSTR_RELAY_URL: undefined } })
+    it('marks relay failing when SERVER_SECRET not configured', async () => {
+      const app = createTestApp({ env: { SERVER_SECRET: undefined } })
       const res = await app.request('/')
       expect(res.status).toBe(503)
       const body = await res.json()
       expect(body.checks.relay.status).toBe('failing')
-      expect(body.checks.relay.detail).toContain('NOSTR_RELAY_URL not configured')
+      expect(body.checks.relay.detail).toContain('SERVER_SECRET not configured')
     })
 
-    it('includes latency measurements for all checks', async () => {
+    it('includes latency measurements for external checks', async () => {
       const app = createTestApp()
       const res = await app.request('/')
       const body = await res.json()
       expect(body.checks.postgres.latencyMs).toBeGreaterThanOrEqual(0)
       expect(body.checks.storage.latencyMs).toBeGreaterThanOrEqual(0)
-      expect(body.checks.relay.latencyMs).toBeGreaterThanOrEqual(0)
+      // relay check is in-process (no latency), sipBridge is external
       expect(body.checks.sipBridge.latencyMs).toBeGreaterThanOrEqual(0)
     })
 
