@@ -1,6 +1,6 @@
 # Next Backlog
 
-Single source of truth for pending work. Updated 2026-04-27.
+Single source of truth for pending work. Updated 2026-05-07.
 
 ## Completed This Session (2026-04-27)
 
@@ -37,14 +37,50 @@ Single source of truth for pending work. Updated 2026-04-27.
 - [x] Structured Logging (namespaces, auto-redaction, correlation IDs)
 - [x] CLAUDE.md Refresh
 
-## Merging (PRs #13-18 in merge train)
+## In Progress (2026-05-07): Android E2E Test Suite
 
-- [ ] #13 — RCS adapter
-- [ ] #14 — CLAUDE.md refresh
-- [ ] #15 — Crypto LOW findings
-- [ ] #16 — UniFFI upgrade
-- [ ] #17 — Mobile crypto sync
-- [ ] #18 — Structured logging
+### Context
+Getting Android Cucumber BDD E2E tests passing in CI. Tests run on emulator with Docker Compose backend.
+
+### Done
+- [x] PR #198 (merged) — Fixed 3 foundational issues:
+  - `ApiService.hp()` URL routing (`/hubs/{id}/api/...` → `/api/hubs/{id}/...`)
+  - `ActiveCall` deserialization (`@SerialName("callId")` mapping)
+  - Hub refresh via `triggerHubRefresh()` (replaced unreliable swipe gesture)
+- [x] CI speedup: removed `android-build-test` gate from `android-e2e` job (saves ~3 min)
+
+### Open PR
+- [ ] PR #224 (`feat/android-e2e-active-call-fix`) — Fixes active call card never rendering:
+  - Root cause: `SimulationClient.createTestHub()` timeouts → `currentHubId` stays empty → everything silently no-ops
+  - Added `SharedFlow<Unit>` refresh trigger in `ActiveHubState` (avoids StateFlow conflation)
+  - Hub creation retry (3 attempts with backoff)
+  - Increased SimulationClient timeouts (10s→30s connect, 15s→30s read)
+  - Added logging to `DashboardViewModel.fetchActiveCall()` (CI logcat was empty before)
+  - Uses real device pubkey for `simulateAnswerCall` instead of hardcoded "admin"
+  - **Status**: CI running — merge if net improvement, iterate if not
+
+### Remaining E2E Failures (after active-call is fixed)
+- [ ] Hub Management (4 scenarios) — navigation to hub settings, collapsible section expansion
+- [ ] Hub Switching (2 scenarios) — two-hub setup, switching active hub
+- [ ] CMS/Cases (6 scenarios) — `theAppIsLaunchedAndAuthenticatedAsAdmin()` flow, admin promotion
+- [ ] Triage Queue (3 scenarios) — depends on CMS setup working
+- [ ] Event Management (2 detail scenarios) — needs event data created via test endpoint
+
+### Key Architecture Notes
+- Worktree: `/media/rikki/recover2/projects/llamenos-android-e2e-iterate-192`
+- Backend test endpoints: `apps/worker/routes/dev.ts` (gated by `ENVIRONMENT=development` + `X-Test-Secret`)
+- Hub isolation: `ScenarioHooks.kt` creates hub per scenario, sets `ActiveHubState`
+- All API calls hub-scoped via `ApiService.hp()` → `/api/hubs/{hubId}/...`
+- Auth: Ed25519 Schnorr signatures via `AuthInterceptor`
+- Permission: `resolveHubPermissions()` includes global role perms (no hub membership needed)
+- CI: Docker Compose test overlay, 2-shard parallel, emulator API 34 x86_64
+- Local testing: `emulator -avd test-emu-0`, `adb reverse tcp:3000 tcp:3000`, `bun run dev:server`
+
+### Debugging Tips
+- CI logcat artifacts are usually empty (emulator killed before collection)
+- Test locally with `adb logcat | grep -iE "ActiveCallSteps|SimulationClient|DashboardViewModel|ApiService|401|403"`
+- Curl test endpoints directly to verify backend flow works
+- `DashboardViewModel.fetchActiveCall()` now has logging (after PR #224)
 
 ## Pending (Future Sessions)
 
