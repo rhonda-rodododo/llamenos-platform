@@ -425,12 +425,13 @@ const commands: Record<string, CommandHandler> = {
       return JSON.stringify({ pubkey, timestamp, token: bytesToHex(sig) })
     }
 
-    // Ed25519 auth (v3 device keys)
+    // Ed25519 auth (v3 device keys) — must match Rust build_auth_message() exactly:
+    // Format: "llamenos:device-auth:v1:{pubkey}:{timestamp}:{method}:{path}"
+    // Sign raw UTF-8 bytes (no SHA-256 pre-hash — Ed25519 internally uses SHA-512)
     const secrets = requireSecrets()
     const pubkey = bytesToHex(deriveEd25519Pubkey(secrets.signingSeed))
-    const msgStr = `llamenos:auth:${pubkey}:${timestamp}:${method}:${path}`
-    const msgHash = sha256(utf8ToBytes(msgStr))
-    const sig = ed25519.sign(msgHash, secrets.signingSeed)
+    const msgStr = `llamenos:device-auth:v1:${pubkey}:${timestamp}:${method}:${path}`
+    const sig = ed25519.sign(utf8ToBytes(msgStr), secrets.signingSeed)
     return JSON.stringify({ pubkey, timestamp, token: bytesToHex(sig) })
   },
 
