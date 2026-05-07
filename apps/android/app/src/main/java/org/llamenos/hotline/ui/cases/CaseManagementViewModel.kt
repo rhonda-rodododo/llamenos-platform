@@ -433,8 +433,8 @@ class CaseManagementViewModel @Inject constructor(
                 val envelopes = encrypted.envelopes.map { env ->
                     CreateInteractionBodyContentEnvelope(
                         pubkey = env.recipientPubkey,
-                        wrappedKey = env.hpkeEnvelope.ct,
-                        ephemeralPubkey = env.hpkeEnvelope.enc,
+                        ct = env.hpkeEnvelope.ct,
+                        enc = env.hpkeEnvelope.enc,
                     )
                 }
                 val request = CreateInteractionBody(
@@ -627,7 +627,7 @@ class CaseManagementViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isDecryptingSummary = true) }
             try {
-                val hpkeEnv = HpkeEnvelope(v = 3, labelId = 0, enc = envelope.ephemeralPubkey, ct = envelope.wrappedKey)
+                val hpkeEnv = HpkeEnvelope(v = 3, labelId = 0, enc = envelope.enc, ct = envelope.ct)
                 val plaintext = cryptoService.decryptMessage(record.encryptedSummary, hpkeEnv)
                 if (plaintext != null) {
                     val jsonObj = json.decodeFromString<JsonObject>(plaintext)
@@ -665,7 +665,7 @@ class CaseManagementViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isDecryptingFields = true) }
             try {
-                val hpkeEnv = HpkeEnvelope(v = 3, labelId = 0, enc = envelope.ephemeralPubkey, ct = envelope.wrappedKey)
+                val hpkeEnv = HpkeEnvelope(v = 3, labelId = 0, enc = envelope.enc, ct = envelope.ct)
                 val plaintext = cryptoService.decryptMessage(encryptedFields, hpkeEnv)
                 if (plaintext != null) {
                     val jsonObj = json.decodeFromString<JsonObject>(plaintext)
@@ -701,7 +701,7 @@ class CaseManagementViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                val hpkeEnv = HpkeEnvelope(v = 3, labelId = 0, enc = envelope.ephemeralPubkey, ct = envelope.wrappedKey)
+                val hpkeEnv = HpkeEnvelope(v = 3, labelId = 0, enc = envelope.enc, ct = envelope.ct)
                 val plaintext = cryptoService.decryptMessage(encryptedContent, hpkeEnv)
                 if (plaintext != null) {
                     _uiState.update {
@@ -729,7 +729,7 @@ class CaseManagementViewModel @Inject constructor(
 
                 val envelope = record.summaryEnvelopes.find { it.pubkey == pubkey } ?: continue
                 try {
-                    val hpkeEnv = HpkeEnvelope(v = 3, labelId = 0, enc = envelope.ephemeralPubkey, ct = envelope.wrappedKey)
+                    val hpkeEnv = HpkeEnvelope(v = 3, labelId = 0, enc = envelope.enc, ct = envelope.ct)
                     val plaintext = cryptoService.decryptMessage(record.encryptedSummary, hpkeEnv)
                     if (plaintext != null) {
                         val jsonObj = json.decodeFromString<JsonObject>(plaintext)

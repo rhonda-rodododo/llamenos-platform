@@ -260,8 +260,8 @@ class ReportsViewModel @Inject constructor(
                 val envelopes = encrypted.envelopes.map { env ->
                     ReportEnvelope(
                         pubkey = env.recipientPubkey,
-                        wrappedKey = env.hpkeEnvelope.ct,
-                        ephemeralPubkey = env.hpkeEnvelope.enc,
+                        ct = env.hpkeEnvelope.ct,
+                        enc = env.hpkeEnvelope.enc,
                     )
                 }
                 val request = CreateReportRequest(
@@ -312,8 +312,8 @@ class ReportsViewModel @Inject constructor(
                 val envelopes = encrypted.envelopes.map { env ->
                     ReportEnvelope(
                         pubkey = env.recipientPubkey,
-                        wrappedKey = env.hpkeEnvelope.ct,
-                        ephemeralPubkey = env.hpkeEnvelope.enc,
+                        ct = env.hpkeEnvelope.ct,
+                        enc = env.hpkeEnvelope.enc,
                     )
                 }
 

@@ -19,12 +19,12 @@ class HubRepositoryTest {
 
     private val repo = HubRepository(apiService, cryptoService, activeHubState)
 
-    private fun makeEnvelope(wrappedKey: String = "aabb", ephemeralPubkey: String = "ccdd") =
+    private fun makeEnvelope(enc: String = "aabb", ct: String = "ccdd") =
         HubKeyEnvelopeResponse(
             envelope = HubKeyEnvelopeResponseEnvelope(
-                ephemeralPubkey = ephemeralPubkey,
+                enc = enc,
                 pubkey = "pub",
-                wrappedKey = wrappedKey,
+                ct = ct,
             )
         )
 

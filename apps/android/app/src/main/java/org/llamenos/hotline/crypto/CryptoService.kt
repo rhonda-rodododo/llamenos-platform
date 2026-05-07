@@ -371,8 +371,8 @@ class CryptoService @Inject constructor() {
                 )
                 RecipientEnvelope(
                     pubkey = pubkey,
-                    wrappedKey = hpkeEnv.ct,
-                    ephemeralPubkey = hpkeEnv.enc,
+                    enc = hpkeEnv.enc,
+                    ct = hpkeEnv.ct,
                 )
             }
 
@@ -586,8 +586,8 @@ class CryptoService @Inject constructor() {
             val ffiEnvelope = org.llamenos.core.HpkeEnvelope(
                 v = 3.toUByte(),
                 labelId = 0.toUByte(),
-                enc = envelope.envelope.wrappedKey,
-                ct = envelope.envelope.ephemeralPubkey,
+                enc = envelope.envelope.enc,
+                ct = envelope.envelope.ct,
             )
 
             val keyHex = try {
