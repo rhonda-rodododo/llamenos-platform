@@ -257,7 +257,11 @@ class ApiService @Inject constructor(
     fun hp(path: String): String {
         require(path.startsWith("/")) { "hp() path must start with '/': $path" }
         val hubId = activeHubState.activeHubId.value ?: return path
-        return "/hubs/$hubId$path"
+        return if (path.startsWith("/api/")) {
+            "/api/hubs/$hubId${path.removePrefix("/api")}"
+        } else {
+            "/hubs/$hubId$path"
+        }
     }
 
     /**
