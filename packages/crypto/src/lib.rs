@@ -43,6 +43,9 @@ pub mod blind_index;
 pub mod errors;
 pub mod padding;
 
+// === New v3 encryption module (HPKE + AES-256-GCM) ===
+pub mod encryption;
+
 // === Legacy modules (secp256k1 — kept for mobile ECIES, removed when HPKE migration completes) ===
 pub mod ecies;
 pub mod encryption_legacy;
@@ -51,8 +54,6 @@ pub mod legacy;
 pub mod nostr;
 pub mod provisioning;
 
-// Temporarily keep `encryption` and `keys` as pub aliases for existing imports
-pub use encryption_legacy as encryption;
 pub use keys_legacy as keys;
 
 #[cfg(feature = "mobile")]
@@ -73,8 +74,11 @@ pub use labels::*;
 pub use puk::PukState;
 pub use sigchain::{SigchainLink, SigchainVerifiedState};
 
+// Re-export new v3 types
+pub use encryption::{
+    EncryptedKeyData, EncryptedMessage, EncryptedNote, KeyEnvelope, RecipientKeyEnvelope,
+};
+
 // Re-export legacy types for backward compatibility during transition
-pub use ecies::{KeyEnvelope, RecipientKeyEnvelope};
-pub use encryption_legacy::{EncryptedKeyData, EncryptedMessage, EncryptedNote};
 pub use keys_legacy::KeyPair;
 pub use nostr::SignedNostrEvent;

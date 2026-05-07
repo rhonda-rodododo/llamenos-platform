@@ -29,7 +29,7 @@ sha2 = "0.10"
 hmac = "0.12"
 pbkdf2 = "0.12"
 hex = "0.4"
-chacha20poly1305 = "0.10"
+aes-gcm = "0.10"
 
 [features]
 default = ["custom-protocol", "updater"]

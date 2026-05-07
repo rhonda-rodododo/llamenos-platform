@@ -10,21 +10,24 @@
 use base64::{engine::general_purpose::STANDARD, Engine};
 use ed25519_dalek;
 use llamenos_core::auth::{create_auth_token_from_signing_key, verify_auth_token, AuthToken};
-use llamenos_core::ecies::{ecies_unwrap_key, ecies_wrap_key, KeyEnvelope, RecipientKeyEnvelope};
 use llamenos_core::encryption::{
     decrypt_call_record, decrypt_draft, decrypt_message, decrypt_note, decrypt_with_pin,
     encrypt_draft, encrypt_export, encrypt_message, encrypt_note, encrypt_with_pin,
-    EncryptedKeyData, EncryptedMessage, EncryptedNote,
+    hpke_unwrap_key, hpke_wrap_key,
+    EncryptedKeyData, EncryptedMessage, EncryptedNote, KeyEnvelope, RecipientKeyEnvelope,
 };
-use llamenos_core::keys::{generate_keypair, get_public_key};
+use llamenos_core::keys::generate_keypair;
 use llamenos_core::labels::*;
 use llamenos_core::nostr::{finalize_nostr_event, SignedNostrEvent};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fs;
+use x25519_dalek::{PublicKey as X25519PublicKey, StaticSecret as X25519StaticSecret};
 
 /// Well-known test keypair (NEVER use in production).
-/// Generated deterministically for reproducible test vectors.
+/// These 32-byte hex secrets serve as both X25519 private keys (for HPKE) and
+/// Ed25519 seeds (for auth tokens / Nostr signing). For secp256k1 Nostr tests,
+/// these also serve as secp256k1 secret keys.
 const TEST_SECRET_KEY: &str = "7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f";
 
 /// Second test keypair for multi-recipient tests.
@@ -38,6 +41,19 @@ const TEST_WRONG_SECRET_KEY: &str =
 /// Test PIN for key encryption vectors.
 const TEST_PIN: &str = "12345678";
 
+/// Derive X25519 public key hex from a 32-byte secret key hex.
+fn x25519_pubkey(secret_hex: &str) -> String {
+    let sk_bytes: [u8; 32] = hex::decode(secret_hex).unwrap().try_into().unwrap();
+    let secret = X25519StaticSecret::from(sk_bytes);
+    let pubkey = X25519PublicKey::from(&secret);
+    hex::encode(pubkey.as_bytes())
+}
+
+/// Derive secp256k1 x-only public key hex (for Nostr / legacy tests).
+fn secp256k1_pubkey(secret_hex: &str) -> String {
+    llamenos_core::keys::get_public_key(secret_hex).unwrap()
+}
+
 // ─── Top-Level Struct ────────────────────────────────────────
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -50,8 +66,8 @@ struct TestVectors {
     /// Key material (deterministic from known secrets)
     keys: KeyVectors,
 
-    /// ECIES wrap/unwrap vectors
-    ecies: EciesVectors,
+    /// HPKE wrap/unwrap vectors
+    hpke: HpkeVectors,
 
     /// Note encryption vectors (V2 forward secrecy)
     note_encryption: NoteEncryptionVectors,
@@ -72,7 +88,7 @@ struct TestVectors {
     /// Message encryption vectors (Epic 74 — E2EE messaging)
     message_encryption: MessageEncryptionVectors,
 
-    /// Hub key wrapping vectors (hub key ECIES distribution)
+    /// Hub key wrapping vectors (hub key HPKE distribution)
     hub_key: HubKeyVectors,
 
     /// Nostr event signing vectors (NIP-01)
@@ -81,7 +97,7 @@ struct TestVectors {
     /// Export encryption vectors (HKDF + base64)
     export_encryption: ExportEncryptionVectors,
 
-    /// Call record metadata vectors (admin-only ECIES)
+    /// Call record metadata vectors (admin-only HPKE)
     call_record: CallRecordVectors,
 
     /// Domain separation proof vectors
@@ -97,18 +113,22 @@ struct TestVectors {
 #[serde(rename_all = "camelCase")]
 struct KeyVectors {
     secret_key_hex: String,
-    public_key_hex: String,
+    /// X25519 public key for HPKE encryption
+    x25519_pubkey_hex: String,
+    /// secp256k1 x-only public key (for Nostr / legacy)
+    secp256k1_pubkey_hex: String,
     nsec: String,
     npub: String,
     admin_secret_key_hex: String,
-    admin_public_key_hex: String,
+    admin_x25519_pubkey_hex: String,
+    admin_secp256k1_pubkey_hex: String,
     wrong_secret_key_hex: String,
-    wrong_public_key_hex: String,
+    wrong_x25519_pubkey_hex: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct EciesVectors {
+struct HpkeVectors {
     envelope: KeyEnvelope,
     original_key_hex: String,
     label: String,
@@ -249,7 +269,7 @@ struct DomainSeparationVectors {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct AdversarialVectors {
-    ecies: AdversarialEcies,
+    hpke: AdversarialHpke,
     note: AdversarialNote,
     auth: AdversarialAuth,
     message: AdversarialMessage,
@@ -257,14 +277,14 @@ struct AdversarialVectors {
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct AdversarialEcies {
+struct AdversarialHpke {
     /// Valid envelope that can be unwrapped with admin key
     valid_envelope: KeyEnvelope,
     valid_label: String,
-    /// wrappedKey with a flipped bit in the ciphertext
-    tampered_wrapped_key: String,
-    /// wrappedKey truncated by 1 byte
-    truncated_wrapped_key: String,
+    /// ct with a flipped bit
+    tampered_ct: String,
+    /// ct truncated by 1 byte
+    truncated_ct: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -303,26 +323,30 @@ struct AdversarialMessage {
 #[test]
 fn generate_and_verify_test_vectors() {
     // --- Key derivation ---
-    let author_pubkey = get_public_key(TEST_SECRET_KEY).unwrap();
-    let admin_pubkey = get_public_key(TEST_ADMIN_SECRET_KEY).unwrap();
-    let wrong_pubkey = get_public_key(TEST_WRONG_SECRET_KEY).unwrap();
+    // X25519 pubkeys for HPKE encryption operations
+    let author_x25519 = x25519_pubkey(TEST_SECRET_KEY);
+    let admin_x25519 = x25519_pubkey(TEST_ADMIN_SECRET_KEY);
+    let wrong_x25519 = x25519_pubkey(TEST_WRONG_SECRET_KEY);
+    // secp256k1 pubkeys for Nostr signing
+    let author_secp = secp256k1_pubkey(TEST_SECRET_KEY);
+    let admin_secp = secp256k1_pubkey(TEST_ADMIN_SECRET_KEY);
 
     // Use a generated keypair for nsec-related tests (PIN encryption needs valid nsec)
     let test_kp = generate_keypair();
 
-    // --- ECIES wrap/unwrap roundtrip ---
+    // --- HPKE wrap/unwrap roundtrip ---
     let original_key = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
     let key_bytes: [u8; 32] = hex::decode(original_key).unwrap().try_into().unwrap();
-    let envelope = ecies_wrap_key(&key_bytes, &admin_pubkey, LABEL_NOTE_KEY).unwrap();
+    let envelope = hpke_wrap_key(&key_bytes, &admin_x25519, LABEL_NOTE_KEY).unwrap();
 
     // Verify unwrap works
-    let unwrapped = ecies_unwrap_key(&envelope, TEST_ADMIN_SECRET_KEY, LABEL_NOTE_KEY).unwrap();
+    let unwrapped = hpke_unwrap_key(&envelope, TEST_ADMIN_SECRET_KEY, LABEL_NOTE_KEY).unwrap();
     assert_eq!(hex::encode(&unwrapped), original_key);
 
     // --- Note encryption roundtrip ---
     let note_payload = r#"{"text":"Test note for interop","fields":{"severity":"high"}}"#;
     let encrypted_note =
-        encrypt_note(note_payload, &author_pubkey, &[admin_pubkey.clone()]).unwrap();
+        encrypt_note(note_payload, &author_x25519, &[admin_x25519.clone()]).unwrap();
 
     // Author can decrypt
     let author_decrypted = decrypt_note(
@@ -334,16 +358,16 @@ fn generate_and_verify_test_vectors() {
     assert_eq!(author_decrypted, note_payload);
 
     // Admin can decrypt
-    let admin_envelope = encrypted_note
+    let admin_env = encrypted_note
         .admin_envelopes
         .iter()
-        .find(|e| e.pubkey == admin_pubkey)
+        .find(|e| e.pubkey == admin_x25519)
         .unwrap();
     let admin_decrypted = decrypt_note(
         &encrypted_note.encrypted_content,
         &KeyEnvelope {
-            wrapped_key: admin_envelope.wrapped_key.clone(),
-            ephemeral_pubkey: admin_envelope.ephemeral_pubkey.clone(),
+            enc: admin_env.enc.clone(),
+            ct: admin_env.ct.clone(),
         },
         TEST_ADMIN_SECRET_KEY,
     )
@@ -372,7 +396,7 @@ fn generate_and_verify_test_vectors() {
 
     // ─── NEW v2: Message encryption roundtrip ────────────────
     let msg_plaintext = "Hello from volunteer — E2EE message interop test";
-    let msg_readers = vec![author_pubkey.clone(), admin_pubkey.clone()];
+    let msg_readers = vec![author_x25519.clone(), admin_x25519.clone()];
     let encrypted_msg = encrypt_message(msg_plaintext, &msg_readers).unwrap();
 
     // Volunteer can decrypt
@@ -380,7 +404,7 @@ fn generate_and_verify_test_vectors() {
         &encrypted_msg.encrypted_content,
         &encrypted_msg.reader_envelopes,
         TEST_SECRET_KEY,
-        &author_pubkey,
+        &author_x25519,
     )
     .unwrap();
     assert_eq!(vol_decrypted, msg_plaintext);
@@ -390,7 +414,7 @@ fn generate_and_verify_test_vectors() {
         &encrypted_msg.encrypted_content,
         &encrypted_msg.reader_envelopes,
         TEST_ADMIN_SECRET_KEY,
-        &admin_pubkey,
+        &admin_x25519,
     )
     .unwrap();
     assert_eq!(admin_msg_decrypted, msg_plaintext);
@@ -398,17 +422,17 @@ fn generate_and_verify_test_vectors() {
     // ─── NEW v2: Hub key wrapping ────────────────────────────
     let hub_key_hex = "cafebabecafebabecafebabecafebabecafebabecafebabecafebabecafebabe";
     let hub_key_bytes: [u8; 32] = hex::decode(hub_key_hex).unwrap().try_into().unwrap();
-    let hub_member_pubkeys = vec![author_pubkey.clone(), admin_pubkey.clone()];
+    let hub_member_pubkeys = vec![author_x25519.clone(), admin_x25519.clone()];
 
     let hub_envelope_vol =
-        ecies_wrap_key(&hub_key_bytes, &author_pubkey, LABEL_HUB_KEY_WRAP).unwrap();
+        hpke_wrap_key(&hub_key_bytes, &author_x25519, LABEL_HUB_KEY_WRAP).unwrap();
     let hub_envelope_admin =
-        ecies_wrap_key(&hub_key_bytes, &admin_pubkey, LABEL_HUB_KEY_WRAP).unwrap();
+        hpke_wrap_key(&hub_key_bytes, &admin_x25519, LABEL_HUB_KEY_WRAP).unwrap();
 
     // Both can unwrap
-    let vol_hub = ecies_unwrap_key(&hub_envelope_vol, TEST_SECRET_KEY, LABEL_HUB_KEY_WRAP).unwrap();
+    let vol_hub = hpke_unwrap_key(&hub_envelope_vol, TEST_SECRET_KEY, LABEL_HUB_KEY_WRAP).unwrap();
     assert_eq!(hex::encode(&vol_hub), hub_key_hex);
-    let admin_hub = ecies_unwrap_key(
+    let admin_hub = hpke_unwrap_key(
         &hub_envelope_admin,
         TEST_ADMIN_SECRET_KEY,
         LABEL_HUB_KEY_WRAP,
@@ -458,19 +482,19 @@ fn generate_and_verify_test_vectors() {
     // ─── NEW v2: Call record metadata (reuse message pattern with LABEL_CALL_META) ─
     // Call records are encrypted using the same pattern as messages but with LABEL_CALL_META.
     // Since there's no encrypt_call_record in Rust (server encrypts in JS), we manually
-    // construct one using the low-level ECIES + XChaCha20 primitives.
+    // construct one using the low-level HPKE + AES-256-GCM primitives.
     let call_record_json =
         r#"{"answeredBy":"vol-pubkey-here","callerNumber":"+15551234567","duration":120}"#;
 
     // Encrypt call record for admin only (volunteer can NOT decrypt call records)
-    let call_record_msg = encrypt_call_record_for_test(call_record_json, &[admin_pubkey.clone()]);
+    let call_record_msg = encrypt_call_record_for_test(call_record_json, &[admin_x25519.clone()]);
 
     // Admin can decrypt
     let call_decrypted = decrypt_call_record(
         &call_record_msg.encrypted_content,
         &call_record_msg.reader_envelopes,
         TEST_ADMIN_SECRET_KEY,
-        &admin_pubkey,
+        &admin_x25519,
     )
     .unwrap();
     assert_eq!(call_decrypted, call_record_json);
@@ -479,43 +503,43 @@ fn generate_and_verify_test_vectors() {
     let ds_key_hex = "1111111111111111111111111111111111111111111111111111111111111111";
     let ds_key_bytes: [u8; 32] = hex::decode(ds_key_hex).unwrap().try_into().unwrap();
 
-    let ds_note = ecies_wrap_key(&ds_key_bytes, &admin_pubkey, LABEL_NOTE_KEY).unwrap();
-    let ds_msg = ecies_wrap_key(&ds_key_bytes, &admin_pubkey, LABEL_MESSAGE).unwrap();
-    let ds_hub = ecies_wrap_key(&ds_key_bytes, &admin_pubkey, LABEL_HUB_KEY_WRAP).unwrap();
+    let ds_note = hpke_wrap_key(&ds_key_bytes, &admin_x25519, LABEL_NOTE_KEY).unwrap();
+    let ds_msg = hpke_wrap_key(&ds_key_bytes, &admin_x25519, LABEL_MESSAGE).unwrap();
+    let ds_hub = hpke_wrap_key(&ds_key_bytes, &admin_x25519, LABEL_HUB_KEY_WRAP).unwrap();
 
     // Same-label unwrap must succeed
-    assert!(ecies_unwrap_key(&ds_note, TEST_ADMIN_SECRET_KEY, LABEL_NOTE_KEY).is_ok());
-    assert!(ecies_unwrap_key(&ds_msg, TEST_ADMIN_SECRET_KEY, LABEL_MESSAGE).is_ok());
-    assert!(ecies_unwrap_key(&ds_hub, TEST_ADMIN_SECRET_KEY, LABEL_HUB_KEY_WRAP).is_ok());
+    assert!(hpke_unwrap_key(&ds_note, TEST_ADMIN_SECRET_KEY, LABEL_NOTE_KEY).is_ok());
+    assert!(hpke_unwrap_key(&ds_msg, TEST_ADMIN_SECRET_KEY, LABEL_MESSAGE).is_ok());
+    assert!(hpke_unwrap_key(&ds_hub, TEST_ADMIN_SECRET_KEY, LABEL_HUB_KEY_WRAP).is_ok());
 
     // Cross-label unwrap must fail
-    assert!(ecies_unwrap_key(&ds_note, TEST_ADMIN_SECRET_KEY, LABEL_MESSAGE).is_err());
-    assert!(ecies_unwrap_key(&ds_msg, TEST_ADMIN_SECRET_KEY, LABEL_NOTE_KEY).is_err());
-    assert!(ecies_unwrap_key(&ds_hub, TEST_ADMIN_SECRET_KEY, LABEL_NOTE_KEY).is_err());
+    assert!(hpke_unwrap_key(&ds_note, TEST_ADMIN_SECRET_KEY, LABEL_MESSAGE).is_err());
+    assert!(hpke_unwrap_key(&ds_msg, TEST_ADMIN_SECRET_KEY, LABEL_NOTE_KEY).is_err());
+    assert!(hpke_unwrap_key(&ds_hub, TEST_ADMIN_SECRET_KEY, LABEL_NOTE_KEY).is_err());
 
     // ─── Adversarial vectors ─────────────────────────────────
 
-    // ECIES adversarial: tampered and truncated wrapped keys
-    let adv_envelope = ecies_wrap_key(&key_bytes, &admin_pubkey, LABEL_NOTE_KEY).unwrap();
-    let tampered_wrapped = tamper_hex(&adv_envelope.wrapped_key);
-    let truncated_wrapped = truncate_hex(&adv_envelope.wrapped_key);
+    // HPKE adversarial: tampered and truncated ciphertext
+    let adv_envelope = hpke_wrap_key(&key_bytes, &admin_x25519, LABEL_NOTE_KEY).unwrap();
+    let tampered_ct = tamper_hex(&adv_envelope.ct);
+    let truncated_ct = truncate_hex(&adv_envelope.ct);
 
     // Verify tampered fails
     let tampered_env = KeyEnvelope {
-        wrapped_key: tampered_wrapped.clone(),
-        ephemeral_pubkey: adv_envelope.ephemeral_pubkey.clone(),
+        enc: adv_envelope.enc.clone(),
+        ct: tampered_ct.clone(),
     };
-    assert!(ecies_unwrap_key(&tampered_env, TEST_ADMIN_SECRET_KEY, LABEL_NOTE_KEY).is_err());
+    assert!(hpke_unwrap_key(&tampered_env, TEST_ADMIN_SECRET_KEY, LABEL_NOTE_KEY).is_err());
 
     // Verify truncated fails
     let truncated_env = KeyEnvelope {
-        wrapped_key: truncated_wrapped.clone(),
-        ephemeral_pubkey: adv_envelope.ephemeral_pubkey.clone(),
+        enc: adv_envelope.enc.clone(),
+        ct: truncated_ct.clone(),
     };
-    assert!(ecies_unwrap_key(&truncated_env, TEST_ADMIN_SECRET_KEY, LABEL_NOTE_KEY).is_err());
+    assert!(hpke_unwrap_key(&truncated_env, TEST_ADMIN_SECRET_KEY, LABEL_NOTE_KEY).is_err());
 
     // Note adversarial: tampered content
-    let adv_note = encrypt_note(note_payload, &author_pubkey, &[admin_pubkey.clone()]).unwrap();
+    let adv_note = encrypt_note(note_payload, &author_x25519, &[admin_x25519.clone()]).unwrap();
     let tampered_note_content = tamper_hex(&adv_note.encrypted_content);
     assert!(decrypt_note(
         &tampered_note_content,
@@ -537,34 +561,36 @@ fn generate_and_verify_test_vectors() {
         &adv_msg.encrypted_content,
         &adv_msg.reader_envelopes,
         TEST_WRONG_SECRET_KEY,
-        &wrong_pubkey,
+        &wrong_x25519,
     )
     .is_err());
 
     // ─── Build test vectors JSON ─────────────────────────────
     let vectors = TestVectors {
-        version: "2".to_string(),
-        generated_by: "llamenos-core interop test v2".to_string(),
+        version: "3".to_string(),
+        generated_by: "llamenos-core interop test v3 (HPKE + AES-256-GCM)".to_string(),
         keys: KeyVectors {
             secret_key_hex: TEST_SECRET_KEY.to_string(),
-            public_key_hex: author_pubkey.clone(),
+            x25519_pubkey_hex: author_x25519.clone(),
+            secp256k1_pubkey_hex: author_secp.clone(),
             nsec: test_kp.nsec.clone(),
             npub: test_kp.npub.clone(),
             admin_secret_key_hex: TEST_ADMIN_SECRET_KEY.to_string(),
-            admin_public_key_hex: admin_pubkey.clone(),
+            admin_x25519_pubkey_hex: admin_x25519.clone(),
+            admin_secp256k1_pubkey_hex: admin_secp.clone(),
             wrong_secret_key_hex: TEST_WRONG_SECRET_KEY.to_string(),
-            wrong_public_key_hex: wrong_pubkey.clone(),
+            wrong_x25519_pubkey_hex: wrong_x25519.clone(),
         },
-        ecies: EciesVectors {
+        hpke: HpkeVectors {
             envelope: envelope.clone(),
             original_key_hex: original_key.to_string(),
             label: LABEL_NOTE_KEY.to_string(),
-            recipient_pubkey_hex: admin_pubkey.clone(),
+            recipient_pubkey_hex: admin_x25519.clone(),
         },
         note_encryption: NoteEncryptionVectors {
             plaintext_json: note_payload.to_string(),
-            author_pubkey: author_pubkey.clone(),
-            admin_pubkeys: vec![admin_pubkey.clone()],
+            author_pubkey: author_x25519.clone(),
+            admin_pubkeys: vec![admin_x25519.clone()],
             encrypted: encrypted_note.clone(),
             author_can_decrypt: true,
             admin_can_decrypt: true,
@@ -644,24 +670,24 @@ fn generate_and_verify_test_vectors() {
         },
         call_record: CallRecordVectors {
             plaintext_json: call_record_json.to_string(),
-            admin_pubkeys: vec![admin_pubkey.clone()],
+            admin_pubkeys: vec![admin_x25519.clone()],
             encrypted_content: call_record_msg.encrypted_content,
             admin_envelopes: call_record_msg.reader_envelopes,
             admin_can_decrypt: true,
         },
         domain_separation: DomainSeparationVectors {
             original_key_hex: ds_key_hex.to_string(),
-            recipient_pubkey_hex: admin_pubkey.clone(),
+            recipient_pubkey_hex: admin_x25519.clone(),
             wrapped_with_note_label: ds_note,
             wrapped_with_message_label: ds_msg,
             wrapped_with_hub_label: ds_hub,
         },
         adversarial: AdversarialVectors {
-            ecies: AdversarialEcies {
+            hpke: AdversarialHpke {
                 valid_envelope: adv_envelope,
                 valid_label: LABEL_NOTE_KEY.to_string(),
-                tampered_wrapped_key: tampered_wrapped,
-                truncated_wrapped_key: truncated_wrapped,
+                tampered_ct,
+                truncated_ct,
             },
             note: AdversarialNote {
                 valid_encrypted: adv_note,
@@ -694,12 +720,12 @@ fn generate_and_verify_test_vectors() {
 
 // ─── Helper: Encrypt call record for test (mirrors JS server-side encrypt) ───
 
-/// Manually encrypt call record metadata using ECIES + XChaCha20-Poly1305.
+/// Manually encrypt call record metadata using HPKE + AES-256-GCM.
 /// This mirrors what the server (Worker) does in JS.
 fn encrypt_call_record_for_test(plaintext: &str, admin_pubkeys: &[String]) -> EncryptedMessage {
-    use chacha20poly1305::{
-        aead::{Aead, KeyInit},
-        XChaCha20Poly1305, XNonce,
+    use aes_gcm::{
+        aead::{Aead, KeyInit, Payload},
+        Aes256Gcm, Nonce,
     };
     use zeroize::Zeroize;
 
@@ -707,27 +733,35 @@ fn encrypt_call_record_for_test(plaintext: &str, admin_pubkeys: &[String]) -> En
     let mut record_key = [0u8; 32];
     getrandom::getrandom(&mut record_key).expect("getrandom failed");
 
-    // Generate random nonce
-    let mut nonce_bytes = [0u8; 24];
+    // Generate random nonce (12 bytes for AES-256-GCM)
+    let mut nonce_bytes = [0u8; 12];
     getrandom::getrandom(&mut nonce_bytes).expect("getrandom failed");
 
-    let nonce = XNonce::from_slice(&nonce_bytes);
-    let cipher = XChaCha20Poly1305::new_from_slice(&record_key).unwrap();
-    let ciphertext = cipher.encrypt(nonce, plaintext.as_bytes()).unwrap();
+    let nonce = Nonce::from_slice(&nonce_bytes);
+    let cipher = Aes256Gcm::new_from_slice(&record_key).unwrap();
+    let ciphertext = cipher
+        .encrypt(
+            nonce,
+            Payload {
+                msg: plaintext.as_bytes(),
+                aad: LABEL_CALL_META.as_bytes(),
+            },
+        )
+        .unwrap();
 
-    let mut packed = Vec::with_capacity(24 + ciphertext.len());
+    let mut packed = Vec::with_capacity(12 + ciphertext.len());
     packed.extend_from_slice(&nonce_bytes);
     packed.extend_from_slice(&ciphertext);
 
-    // Wrap the record key for each admin using LABEL_CALL_META
+    // Wrap the record key for each admin using LABEL_CALL_META via HPKE
     let reader_envelopes: Vec<RecipientKeyEnvelope> = admin_pubkeys
         .iter()
         .map(|pk| {
-            let env = ecies_wrap_key(&record_key, pk, LABEL_CALL_META).unwrap();
+            let env = hpke_wrap_key(&record_key, pk, LABEL_CALL_META).unwrap();
             RecipientKeyEnvelope {
                 pubkey: pk.clone(),
-                wrapped_key: env.wrapped_key,
-                ephemeral_pubkey: env.ephemeral_pubkey,
+                enc: env.enc,
+                ct: env.ct,
             }
         })
         .collect();
@@ -759,22 +793,22 @@ fn truncate_hex(hex_str: &str) -> String {
 // ─── Existing Tests ──────────────────────────────────────────
 
 #[test]
-fn ecies_cross_label_rejection() {
-    let admin_pubkey = get_public_key(TEST_ADMIN_SECRET_KEY).unwrap();
+fn hpke_cross_label_rejection() {
+    let admin_x25519 = x25519_pubkey(TEST_ADMIN_SECRET_KEY);
     let key_bytes: [u8; 32] =
         hex::decode("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
             .unwrap()
             .try_into()
             .unwrap();
 
-    let envelope = ecies_wrap_key(&key_bytes, &admin_pubkey, LABEL_NOTE_KEY).unwrap();
+    let envelope = hpke_wrap_key(&key_bytes, &admin_x25519, LABEL_NOTE_KEY).unwrap();
 
     // Unwrapping with wrong label should fail
-    let result = ecies_unwrap_key(&envelope, TEST_ADMIN_SECRET_KEY, LABEL_MESSAGE);
+    let result = hpke_unwrap_key(&envelope, TEST_ADMIN_SECRET_KEY, LABEL_MESSAGE);
     assert!(result.is_err(), "Cross-label unwrap must fail");
 
     // Unwrapping with correct label should succeed
-    let result = ecies_unwrap_key(&envelope, TEST_ADMIN_SECRET_KEY, LABEL_NOTE_KEY);
+    let result = hpke_unwrap_key(&envelope, TEST_ADMIN_SECRET_KEY, LABEL_NOTE_KEY);
     assert!(result.is_ok(), "Same-label unwrap must succeed");
 }
 
@@ -815,7 +849,7 @@ fn pin_encryption_format_consistency() {
         64,
         "salt must be 64 hex chars (32 bytes)"
     );
-    assert_eq!(encrypted.nonce.len(), 48, "nonce must be 48 hex chars");
+    assert_eq!(encrypted.nonce.len(), 24, "nonce must be 24 hex chars (12 bytes)");
 
     let decrypted = decrypt_with_pin(&encrypted, "56789012").unwrap();
     assert_eq!(decrypted, kp.nsec);
@@ -870,11 +904,11 @@ fn label_count_matches_expected() {
 
 #[test]
 fn message_encryption_roundtrip() {
-    let author_pubkey = get_public_key(TEST_SECRET_KEY).unwrap();
-    let admin_pubkey = get_public_key(TEST_ADMIN_SECRET_KEY).unwrap();
+    let author_x25519 = x25519_pubkey(TEST_SECRET_KEY);
+    let admin_x25519 = x25519_pubkey(TEST_ADMIN_SECRET_KEY);
 
     let plaintext = "Multi-reader encrypted message test";
-    let readers = vec![author_pubkey.clone(), admin_pubkey.clone()];
+    let readers = vec![author_x25519.clone(), admin_x25519.clone()];
     let encrypted = encrypt_message(plaintext, &readers).unwrap();
 
     // Both readers can decrypt
@@ -882,7 +916,7 @@ fn message_encryption_roundtrip() {
         &encrypted.encrypted_content,
         &encrypted.reader_envelopes,
         TEST_SECRET_KEY,
-        &author_pubkey,
+        &author_x25519,
     )
     .unwrap();
     assert_eq!(vol, plaintext);
@@ -891,41 +925,41 @@ fn message_encryption_roundtrip() {
         &encrypted.encrypted_content,
         &encrypted.reader_envelopes,
         TEST_ADMIN_SECRET_KEY,
-        &admin_pubkey,
+        &admin_x25519,
     )
     .unwrap();
     assert_eq!(admin, plaintext);
 
     // Wrong key fails
-    let wrong_pubkey = get_public_key(TEST_WRONG_SECRET_KEY).unwrap();
+    let wrong_x25519 = x25519_pubkey(TEST_WRONG_SECRET_KEY);
     let result = decrypt_message(
         &encrypted.encrypted_content,
         &encrypted.reader_envelopes,
         TEST_WRONG_SECRET_KEY,
-        &wrong_pubkey,
+        &wrong_x25519,
     );
     assert!(result.is_err(), "Wrong reader key must fail");
 }
 
 #[test]
 fn hub_key_multi_recipient_wrap() {
-    let vol_pubkey = get_public_key(TEST_SECRET_KEY).unwrap();
-    let admin_pubkey = get_public_key(TEST_ADMIN_SECRET_KEY).unwrap();
+    let vol_x25519 = x25519_pubkey(TEST_SECRET_KEY);
+    let admin_x25519 = x25519_pubkey(TEST_ADMIN_SECRET_KEY);
 
     let hub_key = [0xCA; 32]; // deterministic for test
-    let vol_env = ecies_wrap_key(&hub_key, &vol_pubkey, LABEL_HUB_KEY_WRAP).unwrap();
-    let admin_env = ecies_wrap_key(&hub_key, &admin_pubkey, LABEL_HUB_KEY_WRAP).unwrap();
+    let vol_env = hpke_wrap_key(&hub_key, &vol_x25519, LABEL_HUB_KEY_WRAP).unwrap();
+    let admin_env = hpke_wrap_key(&hub_key, &admin_x25519, LABEL_HUB_KEY_WRAP).unwrap();
 
     // Both unwrap to same hub key
-    let vol_unwrapped = ecies_unwrap_key(&vol_env, TEST_SECRET_KEY, LABEL_HUB_KEY_WRAP).unwrap();
+    let vol_unwrapped = hpke_unwrap_key(&vol_env, TEST_SECRET_KEY, LABEL_HUB_KEY_WRAP).unwrap();
     let admin_unwrapped =
-        ecies_unwrap_key(&admin_env, TEST_ADMIN_SECRET_KEY, LABEL_HUB_KEY_WRAP).unwrap();
+        hpke_unwrap_key(&admin_env, TEST_ADMIN_SECRET_KEY, LABEL_HUB_KEY_WRAP).unwrap();
 
     assert_eq!(vol_unwrapped, hub_key);
     assert_eq!(admin_unwrapped, hub_key);
 
     // Wrong label fails
-    assert!(ecies_unwrap_key(&vol_env, TEST_SECRET_KEY, LABEL_NOTE_KEY).is_err());
+    assert!(hpke_unwrap_key(&vol_env, TEST_SECRET_KEY, LABEL_NOTE_KEY).is_err());
 }
 
 #[test]
@@ -956,7 +990,7 @@ fn nostr_event_signing_interop() {
     assert_eq!(event.id, expected_id);
 
     // Pubkey matches
-    let expected_pubkey = get_public_key(TEST_SECRET_KEY).unwrap();
+    let expected_pubkey = secp256k1_pubkey(TEST_SECRET_KEY);
     assert_eq!(event.pubkey, expected_pubkey);
 
     // Signature is valid (verify pre-hashed with k256)
@@ -977,28 +1011,28 @@ fn export_encryption_roundtrip() {
 
     // Verify base64 encoding
     let decoded = STANDARD.decode(&encrypted).unwrap();
-    assert!(decoded.len() >= 24 + 16, "must have nonce + tag minimum");
+    assert!(decoded.len() >= 12 + 16, "must have nonce + tag minimum");
 
     // Since decrypt_export doesn't exist in Rust, verify structure manually:
-    // First 24 bytes are nonce, rest is ciphertext
-    let _nonce = &decoded[..24];
-    let _ciphertext = &decoded[24..];
+    // First 12 bytes are nonce, rest is ciphertext + tag
+    let _nonce = &decoded[..12];
+    let _ciphertext = &decoded[12..];
 }
 
 #[test]
 fn call_record_admin_only_decryption() {
-    let admin_pubkey = get_public_key(TEST_ADMIN_SECRET_KEY).unwrap();
-    let vol_pubkey = get_public_key(TEST_SECRET_KEY).unwrap();
+    let admin_x25519 = x25519_pubkey(TEST_ADMIN_SECRET_KEY);
+    let vol_x25519 = x25519_pubkey(TEST_SECRET_KEY);
 
     let plaintext = r#"{"answeredBy":"vol123","callerNumber":"+1555000"}"#;
-    let encrypted = encrypt_call_record_for_test(plaintext, &[admin_pubkey.clone()]);
+    let encrypted = encrypt_call_record_for_test(plaintext, &[admin_x25519.clone()]);
 
     // Admin can decrypt
     let decrypted = decrypt_call_record(
         &encrypted.encrypted_content,
         &encrypted.reader_envelopes,
         TEST_ADMIN_SECRET_KEY,
-        &admin_pubkey,
+        &admin_x25519,
     )
     .unwrap();
     assert_eq!(decrypted, plaintext);
@@ -1008,14 +1042,14 @@ fn call_record_admin_only_decryption() {
         &encrypted.encrypted_content,
         &encrypted.reader_envelopes,
         TEST_SECRET_KEY,
-        &vol_pubkey,
+        &vol_x25519,
     );
     assert!(result.is_err(), "Volunteer must not decrypt call records");
 }
 
 #[test]
 fn domain_separation_all_labels() {
-    let admin_pubkey = get_public_key(TEST_ADMIN_SECRET_KEY).unwrap();
+    let admin_x25519 = x25519_pubkey(TEST_ADMIN_SECRET_KEY);
     let key = [0x42; 32];
 
     // Wrap same key with different labels
@@ -1027,13 +1061,13 @@ fn domain_separation_all_labels() {
     ];
     let envelopes: Vec<_> = labels
         .iter()
-        .map(|l| ecies_wrap_key(&key, &admin_pubkey, l).unwrap())
+        .map(|l| hpke_wrap_key(&key, &admin_x25519, l).unwrap())
         .collect();
 
     // Each envelope only unwraps with its own label
     for (i, env) in envelopes.iter().enumerate() {
         for (j, label) in labels.iter().enumerate() {
-            let result = ecies_unwrap_key(env, TEST_ADMIN_SECRET_KEY, label);
+            let result = hpke_unwrap_key(env, TEST_ADMIN_SECRET_KEY, label);
             if i == j {
                 assert!(result.is_ok(), "Same label must succeed: {label}");
                 assert_eq!(result.unwrap(), key);

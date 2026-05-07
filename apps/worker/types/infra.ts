@@ -264,7 +264,7 @@ export interface EncryptedCallRecord {
   recordingSid?: string          // Twilio ID (not PII, server needs to update post-encryption)
 
   // Envelope-pattern encryption for admin(s)
-  encryptedContent: string       // hex: nonce(24) + ciphertext (XChaCha20-Poly1305)
+  encryptedContent: string       // hex: nonce(12) + ciphertext + tag(16) (AES-256-GCM)
   adminEnvelopes: RecipientEnvelope[]  // Per-record key wrapped for each admin
 }
 
@@ -322,8 +322,8 @@ export interface EncryptedMessage {
   conversationId: string
   direction: 'inbound' | 'outbound'
   authorPubkey: string             // volunteer pubkey or 'system:inbound'
-  encryptedContent: string         // hex: nonce(24) + ciphertext (XChaCha20-Poly1305)
-  // Per-reader key envelopes (ECIES-wrapped message key)
+  encryptedContent: string         // hex: nonce(12) + ciphertext + tag(16) (AES-256-GCM)
+  // Per-reader key envelopes (HPKE-wrapped message key)
   readerEnvelopes: RecipientEnvelope[]
   hasAttachments: boolean
   attachmentIds?: string[]         // references to R2 encrypted blobs

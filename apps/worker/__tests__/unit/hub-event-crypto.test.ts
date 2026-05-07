@@ -244,10 +244,10 @@ describe('encryptHubEvent', () => {
     expect(hex).toMatch(/^[0-9a-f]+$/)
   })
 
-  it('output is at least 24 bytes nonce + 512-byte padded ciphertext + 16-byte tag', () => {
+  it('output is at least 12 bytes nonce + 512-byte padded ciphertext + 16-byte GCM tag', () => {
     const hex = encryptHubEvent({ msg: 'hello' }, eventKey)
-    // 24-byte nonce + 512-byte padded payload + 16-byte Poly1305 tag
-    expect(hex.length / 2).toBeGreaterThanOrEqual(24 + 512 + 16)
+    // 12-byte nonce + 512-byte padded payload + 16-byte GCM tag
+    expect(hex.length / 2).toBeGreaterThanOrEqual(12 + 512 + 16)
   })
 
   it('produces different ciphertext each call (random nonce + random padding)', () => {

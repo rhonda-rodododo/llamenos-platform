@@ -207,10 +207,16 @@ describe('encryptHubEvent / decryptHubEvent', () => {
   })
 
   it('ciphertext length reflects padding (multiple of bucket sizes in hex)', () => {
-    // nonce (24B=48hex) + poly1305 tag (16B) + padded plaintext
+    // nonce (12B=24hex) + GCM tag (16B=32hex) + padded plaintext
     const hex = encryptHubEvent({ type: 'test' }, eventKey)
-    // Should be 48 (nonce) + 32 (tag) + 1024 (padded bucket) hex chars minimum
-    // Actual: 48 + (padded_bucket * 2) + 32 ≥ 48 + 1024 + 32 = 1104 hex chars
+    // Should be 24 (nonce) + 1024 (padded bucket) + 32 (tag) hex chars minimum
     expect(hex.length).toBeGreaterThan(1000)
+  })
+
+  it('epoch AAD prevents cross-epoch decryption', () => {
+    const hex = encryptHubEvent({ x: 1 }, eventKey, 100)
+    expect(decryptHubEvent(hex, eventKey, 100)).toEqual({ x: 1 })
+    expect(() => decryptHubEvent(hex, eventKey, 101)).toThrow()
+    expect(() => decryptHubEvent(hex, eventKey)).toThrow()
   })
 })

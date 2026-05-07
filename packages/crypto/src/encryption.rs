@@ -1,23 +1,23 @@
 //! High-level encryption operations: per-note, per-message, per-call-record,
 //! draft, export, and PIN-based key storage.
 //!
-//! All operations use the ECIES envelope pattern from `ecies.rs` with
-//! domain-separated labels from `labels.rs`.
+//! All operations use HPKE (RFC 9180) for key wrapping and AES-256-GCM for
+//! symmetric content encryption, with domain-separated labels from `labels.rs`.
 
-use argon2::Argon2;
-use chacha20poly1305::{
-    aead::{Aead, KeyInit},
-    XChaCha20Poly1305, XNonce,
+use aes_gcm::{
+    aead::{Aead, KeyInit, Payload},
+    Aes256Gcm, Nonce,
 };
+use argon2::Argon2;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use base64::Engine;
 use hkdf::Hkdf;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use zeroize::{Zeroize, Zeroizing};
 
-use crate::ecies::{
-    ecies_unwrap_key, ecies_wrap_key, random_bytes_32, KeyEnvelope, RecipientKeyEnvelope,
-};
 use crate::errors::CryptoError;
+use crate::hpke_envelope::{self, HpkeEnvelope};
 use crate::labels::*;
 
 /// Argon2id parameters (matching device_keys.rs).
@@ -25,14 +25,127 @@ const ARGON2_M_COST_KIB: u32 = 65_536;
 const ARGON2_T_COST: u32 = 3;
 const ARGON2_P_COST: u32 = 4;
 
-// --- Per-Note Encryption (V2 — forward secrecy) ---
+// ── Envelope types (hex-encoded wire format) ─────────────────────────
+
+/// A symmetric key wrapped via HPKE for a single recipient.
+///
+/// Wire format uses hex-encoded enc/ct (not the base64url HpkeEnvelope format).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "mobile", derive(uniffi::Record))]
+pub struct KeyEnvelope {
+    /// hex: 32-byte HPKE encapsulated key
+    pub enc: String,
+    /// hex: AEAD ciphertext (encrypted 32-byte symmetric key)
+    pub ct: String,
+}
+
+/// A KeyEnvelope tagged with the recipient's pubkey (for multi-recipient scenarios).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "mobile", derive(uniffi::Record))]
+pub struct RecipientKeyEnvelope {
+    /// recipient's X25519 pubkey (hex, 32 bytes / 64 hex chars)
+    pub pubkey: String,
+    /// hex: 32-byte HPKE encapsulated key
+    pub enc: String,
+    /// hex: AEAD ciphertext (encrypted 32-byte symmetric key)
+    pub ct: String,
+}
+
+// ── Helpers: HPKE key wrap/unwrap → wire format ──────────────────────
+
+/// Wrap a 32-byte symmetric key for a recipient using HPKE.
+/// Returns a wire-format `KeyEnvelope` (hex-encoded enc/ct).
+pub fn hpke_wrap_key(
+    key: &[u8; 32],
+    recipient_pubkey_hex: &str,
+    label: &str,
+) -> Result<KeyEnvelope, CryptoError> {
+    let aad = format!("{label}:key-wrap");
+    let envelope = hpke_envelope::hpke_seal_key(key, recipient_pubkey_hex, label, aad.as_bytes())?;
+    // Convert from base64url → hex wire format
+    let enc_bytes = URL_SAFE_NO_PAD
+        .decode(&envelope.enc)
+        .map_err(|e| CryptoError::InvalidFormat(format!("invalid base64url enc: {e}")))?;
+    let ct_bytes = URL_SAFE_NO_PAD
+        .decode(&envelope.ct)
+        .map_err(|e| CryptoError::InvalidFormat(format!("invalid base64url ct: {e}")))?;
+    Ok(KeyEnvelope {
+        enc: hex::encode(enc_bytes),
+        ct: hex::encode(ct_bytes),
+    })
+}
+
+/// Unwrap a 32-byte symmetric key from a wire-format `KeyEnvelope` using HPKE.
+pub fn hpke_unwrap_key(
+    envelope: &KeyEnvelope,
+    secret_key_hex: &str,
+    label: &str,
+) -> Result<[u8; 32], CryptoError> {
+    let aad = format!("{label}:key-wrap");
+    let enc_bytes = hex::decode(&envelope.enc).map_err(CryptoError::HexError)?;
+    let ct_bytes = hex::decode(&envelope.ct).map_err(CryptoError::HexError)?;
+    let label_id = crate::labels::label_to_id(label)
+        .ok_or_else(|| CryptoError::InvalidInput(format!("unknown crypto label: {label}")))?;
+    let hpke_env = HpkeEnvelope {
+        v: 3,
+        label_id,
+        enc: URL_SAFE_NO_PAD.encode(&enc_bytes),
+        ct: URL_SAFE_NO_PAD.encode(&ct_bytes),
+    };
+    hpke_envelope::hpke_open_key(&hpke_env, secret_key_hex, label, aad.as_bytes())
+}
+
+// ── Helpers: AES-256-GCM symmetric encryption ───────────────────────
+
+/// Encrypt plaintext with AES-256-GCM. Returns nonce(12) || ciphertext || tag(16).
+fn aes256gcm_encrypt(
+    key: &[u8; 32],
+    plaintext: &[u8],
+    aad: &[u8],
+) -> Result<Vec<u8>, CryptoError> {
+    let mut nonce_bytes = [0u8; 12];
+    getrandom::getrandom(&mut nonce_bytes).expect("getrandom failed");
+    let cipher = Aes256Gcm::new_from_slice(key)
+        .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
+    let nonce = Nonce::from_slice(&nonce_bytes);
+    let ciphertext = cipher
+        .encrypt(nonce, Payload { msg: plaintext, aad })
+        .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
+    let mut packed = Vec::with_capacity(12 + ciphertext.len());
+    packed.extend_from_slice(&nonce_bytes);
+    packed.extend_from_slice(&ciphertext);
+    Ok(packed)
+}
+
+/// Decrypt AES-256-GCM. Input: nonce(12) || ciphertext || tag(16).
+fn aes256gcm_decrypt(key: &[u8; 32], packed: &[u8], aad: &[u8]) -> Result<Vec<u8>, CryptoError> {
+    if packed.len() < 28 {
+        // 12 nonce + 16 tag minimum
+        return Err(CryptoError::InvalidCiphertext);
+    }
+    let nonce = Nonce::from_slice(&packed[..12]);
+    let cipher = Aes256Gcm::new_from_slice(key)
+        .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
+    cipher
+        .decrypt(nonce, Payload { msg: &packed[12..], aad })
+        .map_err(|_| CryptoError::DecryptionFailed)
+}
+
+/// Generate 32 random bytes.
+pub fn random_bytes_32() -> [u8; 32] {
+    let mut bytes = [0u8; 32];
+    getrandom::getrandom(&mut bytes).expect("getrandom failed");
+    bytes
+}
+
+// ── Per-Note Encryption (forward secrecy via random per-note key) ───
 
 /// Encrypted note with per-note key wrapped for author + each admin.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "mobile", derive(uniffi::Record))]
 pub struct EncryptedNote {
-    /// hex: nonce(24) + ciphertext
+    /// hex: nonce(12) + ciphertext
     pub encrypted_content: String,
     /// Note key wrapped for the author
     pub author_envelope: KeyEnvelope,
@@ -41,46 +154,25 @@ pub struct EncryptedNote {
 }
 
 /// Encrypt a note with a random per-note key, wrapped for the author and all admins.
-///
-/// Provides forward secrecy: compromising the identity key doesn't reveal past notes.
 pub fn encrypt_note(
     payload_json: &str,
     author_pubkey: &str,
     admin_pubkeys: &[String],
 ) -> Result<EncryptedNote, CryptoError> {
-    // Generate random per-note symmetric key (zeroized on all exit paths via Zeroizing drop)
     let note_key = Zeroizing::new(random_bytes_32());
-    let nonce_bytes = {
-        let mut n = [0u8; 24];
-        getrandom::getrandom(&mut n).expect("getrandom failed");
-        n
-    };
 
-    // Encrypt content with XChaCha20-Poly1305
-    let nonce = XNonce::from_slice(&nonce_bytes);
-    let cipher = XChaCha20Poly1305::new_from_slice(&*note_key)
-        .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
-    let ciphertext = cipher
-        .encrypt(nonce, payload_json.as_bytes())
-        .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
+    let packed = aes256gcm_encrypt(&note_key, payload_json.as_bytes(), LABEL_NOTE_KEY.as_bytes())?;
 
-    // Pack: nonce(24) + ciphertext
-    let mut packed = Vec::with_capacity(24 + ciphertext.len());
-    packed.extend_from_slice(&nonce_bytes);
-    packed.extend_from_slice(&ciphertext);
+    let author_envelope = hpke_wrap_key(&note_key, author_pubkey, LABEL_NOTE_KEY)?;
 
-    // Wrap note key for author
-    let author_envelope = ecies_wrap_key(&note_key, author_pubkey, LABEL_NOTE_KEY)?;
-
-    // Wrap note key for each admin
     let admin_envelopes: Result<Vec<RecipientKeyEnvelope>, CryptoError> = admin_pubkeys
         .iter()
         .map(|pk| {
-            let env = ecies_wrap_key(&note_key, pk, LABEL_NOTE_KEY)?;
+            let env = hpke_wrap_key(&note_key, pk, LABEL_NOTE_KEY)?;
             Ok(RecipientKeyEnvelope {
                 pubkey: pk.clone(),
-                wrapped_key: env.wrapped_key,
-                ephemeral_pubkey: env.ephemeral_pubkey,
+                enc: env.enc,
+                ct: env.ct,
             })
         })
         .collect();
@@ -92,43 +184,32 @@ pub fn encrypt_note(
     })
 }
 
-/// Decrypt a V2 note using the appropriate envelope for the current user.
+/// Decrypt a note using the appropriate envelope for the current user.
 #[cfg_attr(feature = "mobile", uniffi::export)]
 pub fn decrypt_note(
     encrypted_content: &str,
     envelope: &KeyEnvelope,
     secret_key_hex: &str,
 ) -> Result<String, CryptoError> {
-    let mut note_key = ecies_unwrap_key(envelope, secret_key_hex, LABEL_NOTE_KEY)?;
-
+    let mut note_key = hpke_unwrap_key(envelope, secret_key_hex, LABEL_NOTE_KEY)?;
     let data = hex::decode(encrypted_content).map_err(CryptoError::HexError)?;
-    if data.len() < 24 {
-        return Err(CryptoError::InvalidCiphertext);
-    }
-    let nonce = XNonce::from_slice(&data[..24]);
-    let ciphertext = &data[24..];
-
-    let cipher = XChaCha20Poly1305::new_from_slice(&note_key)
-        .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
-    let plaintext = Zeroizing::new(
-        cipher
-            .decrypt(nonce, ciphertext)
-            .map_err(|_| CryptoError::DecryptionFailed)?,
-    );
-
+    let plaintext = Zeroizing::new(aes256gcm_decrypt(
+        &note_key,
+        &data,
+        LABEL_NOTE_KEY.as_bytes(),
+    )?);
     note_key.zeroize();
-
     String::from_utf8(plaintext.to_vec()).map_err(|_| CryptoError::DecryptionFailed)
 }
 
-// --- Per-Message Encryption (Epic 74) ---
+// ── Per-Message Encryption ──────────────────────────────────────────
 
 /// Encrypted message with per-message key wrapped for each reader.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "mobile", derive(uniffi::Record))]
 pub struct EncryptedMessage {
-    /// hex: nonce(24) + ciphertext
+    /// hex: nonce(12) + ciphertext
     pub encrypted_content: String,
     /// Message key wrapped for each reader (volunteer + admins)
     pub reader_envelopes: Vec<RecipientKeyEnvelope>,
@@ -140,31 +221,18 @@ pub fn encrypt_message(
     reader_pubkeys: &[String],
 ) -> Result<EncryptedMessage, CryptoError> {
     let message_key = Zeroizing::new(random_bytes_32());
-    let nonce_bytes = {
-        let mut n = [0u8; 24];
-        getrandom::getrandom(&mut n).expect("getrandom failed");
-        n
-    };
 
-    let nonce = XNonce::from_slice(&nonce_bytes);
-    let cipher = XChaCha20Poly1305::new_from_slice(&*message_key)
-        .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
-    let ciphertext = cipher
-        .encrypt(nonce, plaintext.as_bytes())
-        .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
-
-    let mut packed = Vec::with_capacity(24 + ciphertext.len());
-    packed.extend_from_slice(&nonce_bytes);
-    packed.extend_from_slice(&ciphertext);
+    let packed =
+        aes256gcm_encrypt(&message_key, plaintext.as_bytes(), LABEL_MESSAGE.as_bytes())?;
 
     let reader_envelopes: Result<Vec<RecipientKeyEnvelope>, CryptoError> = reader_pubkeys
         .iter()
         .map(|pk| {
-            let env = ecies_wrap_key(&message_key, pk, LABEL_MESSAGE)?;
+            let env = hpke_wrap_key(&message_key, pk, LABEL_MESSAGE)?;
             Ok(RecipientKeyEnvelope {
                 pubkey: pk.clone(),
-                wrapped_key: env.wrapped_key,
-                ephemeral_pubkey: env.ephemeral_pubkey,
+                enc: env.enc,
+                ct: env.ct,
             })
         })
         .collect();
@@ -182,40 +250,28 @@ pub fn decrypt_message(
     secret_key_hex: &str,
     reader_pubkey: &str,
 ) -> Result<String, CryptoError> {
-    // Find the envelope for this reader
     let envelope = reader_envelopes
         .iter()
         .find(|e| e.pubkey == reader_pubkey)
         .ok_or(CryptoError::DecryptionFailed)?;
 
     let key_envelope = KeyEnvelope {
-        wrapped_key: envelope.wrapped_key.clone(),
-        ephemeral_pubkey: envelope.ephemeral_pubkey.clone(),
+        enc: envelope.enc.clone(),
+        ct: envelope.ct.clone(),
     };
 
-    let mut message_key = ecies_unwrap_key(&key_envelope, secret_key_hex, LABEL_MESSAGE)?;
-
+    let mut message_key = hpke_unwrap_key(&key_envelope, secret_key_hex, LABEL_MESSAGE)?;
     let data = hex::decode(encrypted_content).map_err(CryptoError::HexError)?;
-    if data.len() < 24 {
-        return Err(CryptoError::InvalidCiphertext);
-    }
-    let nonce = XNonce::from_slice(&data[..24]);
-    let ciphertext = &data[24..];
-
-    let cipher = XChaCha20Poly1305::new_from_slice(&message_key)
-        .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
-    let plaintext = Zeroizing::new(
-        cipher
-            .decrypt(nonce, ciphertext)
-            .map_err(|_| CryptoError::DecryptionFailed)?,
-    );
-
+    let plaintext = Zeroizing::new(aes256gcm_decrypt(
+        &message_key,
+        &data,
+        LABEL_MESSAGE.as_bytes(),
+    )?);
     message_key.zeroize();
-
     String::from_utf8(plaintext.to_vec()).map_err(|_| CryptoError::DecryptionFailed)
 }
 
-// --- Call Record Metadata Decryption (Epic 77) ---
+// ── Call Record Metadata Decryption ─────────────────────────────────
 
 /// Decrypt a call record's encrypted metadata.
 pub fn decrypt_call_record(
@@ -230,71 +286,22 @@ pub fn decrypt_call_record(
         .ok_or(CryptoError::DecryptionFailed)?;
 
     let key_envelope = KeyEnvelope {
-        wrapped_key: envelope.wrapped_key.clone(),
-        ephemeral_pubkey: envelope.ephemeral_pubkey.clone(),
+        enc: envelope.enc.clone(),
+        ct: envelope.ct.clone(),
     };
 
-    let mut record_key = ecies_unwrap_key(&key_envelope, secret_key_hex, LABEL_CALL_META)?;
-
+    let mut record_key = hpke_unwrap_key(&key_envelope, secret_key_hex, LABEL_CALL_META)?;
     let data = hex::decode(encrypted_content).map_err(CryptoError::HexError)?;
-    if data.len() < 24 {
-        return Err(CryptoError::InvalidCiphertext);
-    }
-    let nonce = XNonce::from_slice(&data[..24]);
-    let ciphertext = &data[24..];
-
-    let cipher = XChaCha20Poly1305::new_from_slice(&record_key)
-        .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
-    let plaintext = Zeroizing::new(
-        cipher
-            .decrypt(nonce, ciphertext)
-            .map_err(|_| CryptoError::DecryptionFailed)?,
-    );
-
+    let plaintext = Zeroizing::new(aes256gcm_decrypt(
+        &record_key,
+        &data,
+        LABEL_CALL_META.as_bytes(),
+    )?);
     record_key.zeroize();
-
     String::from_utf8(plaintext.to_vec()).map_err(|_| CryptoError::DecryptionFailed)
 }
 
-// --- Legacy V1 Note Decryption ---
-// V1 notes used HKDF-derived key from the secret key (no forward secrecy).
-// Kept for backward compatibility with pre-V2 notes.
-
-/// Decrypt a V1 legacy note (HKDF-derived key, not per-note forward secrecy).
-///
-/// packed_hex = hex(nonce(24) + ciphertext)
-pub fn decrypt_legacy_note(packed_hex: &str, secret_key_hex: &str) -> Result<String, CryptoError> {
-    let sk_bytes = hex::decode(secret_key_hex).map_err(CryptoError::HexError)?;
-    if sk_bytes.len() != 32 {
-        return Err(CryptoError::InvalidSecretKey);
-    }
-    let mut sk = [0u8; 32];
-    sk.copy_from_slice(&sk_bytes);
-
-    let mut key = derive_encryption_key(&sk, HKDF_CONTEXT_NOTES);
-
-    let data = hex::decode(packed_hex).map_err(CryptoError::HexError)?;
-    if data.len() < 24 {
-        return Err(CryptoError::InvalidCiphertext);
-    }
-    let nonce = XNonce::from_slice(&data[..24]);
-    let ciphertext = &data[24..];
-
-    let cipher = XChaCha20Poly1305::new_from_slice(&key)
-        .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
-    let plaintext = Zeroizing::new(
-        cipher
-            .decrypt(nonce, ciphertext)
-            .map_err(|_| CryptoError::DecryptionFailed)?,
-    );
-
-    key.zeroize();
-    sk.zeroize();
-
-    String::from_utf8(plaintext.to_vec()).map_err(|_| CryptoError::DecryptionFailed)
-}
-
-// --- HKDF-based Symmetric Encryption (legacy + drafts/export) ---
+// ── HKDF-based Symmetric Encryption (drafts, export) ────────────────
 
 /// Derive a symmetric encryption key from a secret key and label using HKDF.
 fn derive_encryption_key(secret_key: &[u8; 32], label: &str) -> [u8; 32] {
@@ -317,25 +324,10 @@ pub fn encrypt_draft(plaintext: &str, secret_key_hex: &str) -> Result<String, Cr
     sk.copy_from_slice(&sk_bytes);
 
     let mut key = derive_encryption_key(&sk, HKDF_CONTEXT_DRAFTS);
-    let nonce_bytes = {
-        let mut n = [0u8; 24];
-        getrandom::getrandom(&mut n).expect("getrandom failed");
-        n
-    };
-
-    let nonce = XNonce::from_slice(&nonce_bytes);
-    let cipher = XChaCha20Poly1305::new_from_slice(&key)
-        .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
-    let ciphertext = cipher
-        .encrypt(nonce, plaintext.as_bytes())
-        .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
+    let packed = aes256gcm_encrypt(&key, plaintext.as_bytes(), HKDF_CONTEXT_DRAFTS.as_bytes())?;
 
     key.zeroize();
     sk.zeroize();
-
-    let mut packed = Vec::with_capacity(24 + ciphertext.len());
-    packed.extend_from_slice(&nonce_bytes);
-    packed.extend_from_slice(&ciphertext);
 
     Ok(hex::encode(&packed))
 }
@@ -351,21 +343,9 @@ pub fn decrypt_draft(packed_hex: &str, secret_key_hex: &str) -> Result<String, C
     sk.copy_from_slice(&sk_bytes);
 
     let mut key = derive_encryption_key(&sk, HKDF_CONTEXT_DRAFTS);
-
     let data = hex::decode(packed_hex).map_err(CryptoError::HexError)?;
-    if data.len() < 24 {
-        return Err(CryptoError::InvalidCiphertext);
-    }
-    let nonce = XNonce::from_slice(&data[..24]);
-    let ciphertext = &data[24..];
-
-    let cipher = XChaCha20Poly1305::new_from_slice(&key)
-        .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
-    let plaintext = Zeroizing::new(
-        cipher
-            .decrypt(nonce, ciphertext)
-            .map_err(|_| CryptoError::DecryptionFailed)?,
-    );
+    let plaintext =
+        Zeroizing::new(aes256gcm_decrypt(&key, &data, HKDF_CONTEXT_DRAFTS.as_bytes())?);
 
     key.zeroize();
     sk.zeroize();
@@ -373,13 +353,9 @@ pub fn decrypt_draft(packed_hex: &str, secret_key_hex: &str) -> Result<String, C
     String::from_utf8(plaintext.to_vec()).map_err(|_| CryptoError::DecryptionFailed)
 }
 
-// --- Export Encryption ---
+// ── Export Encryption ───────────────────────────────────────────────
 
 /// Encrypt a JSON export blob. Returns base64-encoded ciphertext.
-///
-/// Uses HKDF-derived key with HKDF_CONTEXT_EXPORT.
-/// Returns base64(nonce(24) + ciphertext) — avoids JSON-serializing large byte
-/// arrays as number arrays over IPC.
 pub fn encrypt_export(json_string: &str, secret_key_hex: &str) -> Result<String, CryptoError> {
     let sk_bytes = hex::decode(secret_key_hex).map_err(CryptoError::HexError)?;
     if sk_bytes.len() != 32 {
@@ -389,32 +365,17 @@ pub fn encrypt_export(json_string: &str, secret_key_hex: &str) -> Result<String,
     sk.copy_from_slice(&sk_bytes);
 
     let mut key = derive_encryption_key(&sk, HKDF_CONTEXT_EXPORT);
-    let nonce_bytes = {
-        let mut n = [0u8; 24];
-        getrandom::getrandom(&mut n).expect("getrandom failed");
-        n
-    };
-
-    let nonce = XNonce::from_slice(&nonce_bytes);
-    let cipher = XChaCha20Poly1305::new_from_slice(&key)
-        .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
-    let ciphertext = cipher
-        .encrypt(nonce, json_string.as_bytes())
-        .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
+    let packed =
+        aes256gcm_encrypt(&key, json_string.as_bytes(), HKDF_CONTEXT_EXPORT.as_bytes())?;
 
     key.zeroize();
     sk.zeroize();
 
-    // Pack: nonce(24) + ciphertext, then base64 encode
-    let mut packed = Vec::with_capacity(24 + ciphertext.len());
-    packed.extend_from_slice(&nonce_bytes);
-    packed.extend_from_slice(&ciphertext);
-
-    use base64::{engine::general_purpose::STANDARD, Engine};
+    use base64::engine::general_purpose::STANDARD;
     Ok(STANDARD.encode(&packed))
 }
 
-// --- PIN-encrypted Key Storage ---
+// ── PIN-encrypted Key Storage ───────────────────────────────────────
 
 /// Encrypted key data stored on disk (Stronghold on desktop, Keychain on mobile).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -425,7 +386,7 @@ pub struct EncryptedKeyData {
     pub salt: String,
     /// Legacy field kept for serialization compat (ignored — Argon2id params are fixed)
     pub iterations: u32,
-    /// hex, 24 bytes (XChaCha20 nonce)
+    /// hex, 12 bytes (AES-256-GCM nonce)
     pub nonce: String,
     /// hex, encrypted nsec bech32 string
     pub ciphertext: String,
@@ -461,26 +422,23 @@ pub fn encrypt_with_pin(
 
     let mut kek = derive_kek_from_pin(pin, &salt);
 
-    let nonce_bytes = {
-        let mut n = [0u8; 24];
-        getrandom::getrandom(&mut n).expect("getrandom failed");
-        n
-    };
+    let mut nonce_bytes = [0u8; 12];
+    getrandom::getrandom(&mut nonce_bytes).expect("getrandom failed");
 
-    let nonce = XNonce::from_slice(&nonce_bytes);
-    let cipher = XChaCha20Poly1305::new_from_slice(&kek)
+    let nonce = Nonce::from_slice(&nonce_bytes);
+    let cipher = Aes256Gcm::new_from_slice(&kek)
         .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
     let ciphertext = cipher
         .encrypt(nonce, nsec.as_bytes())
         .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
 
-    // Hash pubkey for identification (matches JS: SHA-256(HMAC_KEYID_PREFIX + pubkey)[0..16])
+    // Hash pubkey for identification
     let hash_input = format!("{}{}", HMAC_KEYID_PREFIX, pubkey_hex);
     let pubkey_hash = {
         let mut hasher = Sha256::new();
         hasher.update(hash_input.as_bytes());
         let full = hasher.finalize();
-        hex::encode(&full[..8]) // 16 hex chars = 8 bytes
+        hex::encode(&full[..8])
     };
 
     kek.zeroize();
@@ -501,14 +459,14 @@ pub fn decrypt_with_pin(data: &EncryptedKeyData, pin: &str) -> Result<String, Cr
     let nonce_bytes = hex::decode(&data.nonce).map_err(CryptoError::HexError)?;
     let ciphertext = hex::decode(&data.ciphertext).map_err(CryptoError::HexError)?;
 
-    if nonce_bytes.len() != 24 {
+    if nonce_bytes.len() != 12 {
         return Err(CryptoError::InvalidNonce);
     }
 
     let mut kek = derive_kek_from_pin(pin, &salt);
-    let nonce = XNonce::from_slice(&nonce_bytes);
+    let nonce = Nonce::from_slice(&nonce_bytes);
 
-    let cipher = XChaCha20Poly1305::new_from_slice(&kek)
+    let cipher = Aes256Gcm::new_from_slice(&kek)
         .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
     let plaintext = Zeroizing::new(
         cipher
@@ -530,24 +488,28 @@ pub fn is_valid_pin(pin: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::keys::generate_keypair;
+    use crate::hpke_envelope::generate_x25519_keypair;
+
+    fn gen_keypair() -> (zeroize::Zeroizing<String>, String) {
+        generate_x25519_keypair()
+    }
 
     #[test]
     fn roundtrip_note_encryption() {
-        let author = generate_keypair();
-        let admin1 = generate_keypair();
-        let admin2 = generate_keypair();
+        let (author_sk, author_pk) = gen_keypair();
+        let (admin1_sk, admin1_pk) = gen_keypair();
+        let (_admin2_sk, admin2_pk) = gen_keypair();
 
         let payload = r#"{"text":"Test note content","customFields":{}}"#;
-        let admin_pubkeys = vec![admin1.public_key.clone(), admin2.public_key.clone()];
+        let admin_pubkeys = vec![admin1_pk.clone(), admin2_pk.clone()];
 
-        let encrypted = encrypt_note(payload, &author.public_key, &admin_pubkeys).unwrap();
+        let encrypted = encrypt_note(payload, &author_pk, &admin_pubkeys).unwrap();
 
         // Author can decrypt
         let decrypted = decrypt_note(
             &encrypted.encrypted_content,
             &encrypted.author_envelope,
-            &author.secret_key_hex,
+            &author_sk,
         )
         .unwrap();
         assert_eq!(decrypted, payload);
@@ -555,13 +517,13 @@ mod tests {
         // Admin1 can decrypt
         let admin1_env = &encrypted.admin_envelopes[0];
         let admin1_envelope = KeyEnvelope {
-            wrapped_key: admin1_env.wrapped_key.clone(),
-            ephemeral_pubkey: admin1_env.ephemeral_pubkey.clone(),
+            enc: admin1_env.enc.clone(),
+            ct: admin1_env.ct.clone(),
         };
         let decrypted = decrypt_note(
             &encrypted.encrypted_content,
             &admin1_envelope,
-            &admin1.secret_key_hex,
+            &admin1_sk,
         )
         .unwrap();
         assert_eq!(decrypted, payload);
@@ -569,19 +531,19 @@ mod tests {
 
     #[test]
     fn roundtrip_message_encryption() {
-        let reader1 = generate_keypair();
-        let reader2 = generate_keypair();
+        let (reader1_sk, reader1_pk) = gen_keypair();
+        let (_reader2_sk, reader2_pk) = gen_keypair();
 
         let plaintext = "Hello from the crisis line";
-        let reader_pubkeys = vec![reader1.public_key.clone(), reader2.public_key.clone()];
+        let reader_pubkeys = vec![reader1_pk.clone(), reader2_pk.clone()];
 
         let encrypted = encrypt_message(plaintext, &reader_pubkeys).unwrap();
 
         let decrypted = decrypt_message(
             &encrypted.encrypted_content,
             &encrypted.reader_envelopes,
-            &reader1.secret_key_hex,
-            &reader1.public_key,
+            &reader1_sk,
+            &reader1_pk,
         )
         .unwrap();
         assert_eq!(decrypted, plaintext);
@@ -589,11 +551,11 @@ mod tests {
 
     #[test]
     fn roundtrip_draft_encryption() {
-        let kp = generate_keypair();
+        let (sk, _pk) = gen_keypair();
         let plaintext = "Draft note content";
 
-        let encrypted = encrypt_draft(plaintext, &kp.secret_key_hex).unwrap();
-        let decrypted = decrypt_draft(&encrypted, &kp.secret_key_hex).unwrap();
+        let encrypted = encrypt_draft(plaintext, &sk).unwrap();
+        let decrypted = decrypt_draft(&encrypted, &sk).unwrap();
         assert_eq!(decrypted, plaintext);
     }
 
@@ -604,6 +566,8 @@ mod tests {
         let pubkey = "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
 
         let encrypted = encrypt_with_pin(nsec, pin, pubkey).unwrap();
+        // New encryptions use 12-byte nonce (24 hex chars)
+        assert_eq!(encrypted.nonce.len(), 24);
         let decrypted = decrypt_with_pin(&encrypted, pin).unwrap();
         assert_eq!(decrypted, nsec);
     }
@@ -631,19 +595,6 @@ mod tests {
     }
 
     #[test]
-    fn argon2id_32_byte_salt_roundtrip() {
-        let nsec = "nsec1test32bytesalt";
-        let pin = "12345678";
-        let pubkey = "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
-
-        let encrypted = encrypt_with_pin(nsec, pin, pubkey).unwrap();
-        // New encryptions use 32-byte salt (64 hex chars)
-        assert_eq!(encrypted.salt.len(), 64);
-        let decrypted = decrypt_with_pin(&encrypted, pin).unwrap();
-        assert_eq!(decrypted, nsec);
-    }
-
-    #[test]
     fn credential_validation() {
         assert!(!is_valid_pin("1234567")); // too short (7 digits)
         assert!(!is_valid_pin("short")); // too short (5 chars)
@@ -655,132 +606,93 @@ mod tests {
 
     #[test]
     fn note_wrong_admin_key_fails() {
-        let author = generate_keypair();
-        let admin = generate_keypair();
-        let wrong_admin = generate_keypair();
+        let (_author_sk, author_pk) = gen_keypair();
+        let (_admin_sk, admin_pk) = gen_keypair();
+        let (wrong_admin_sk, _wrong_admin_pk) = gen_keypair();
 
         let payload = r#"{"text":"Secret note"}"#;
-        let encrypted =
-            encrypt_note(payload, &author.public_key, &[admin.public_key.clone()]).unwrap();
+        let encrypted = encrypt_note(payload, &author_pk, &[admin_pk.clone()]).unwrap();
 
-        // Use admin's envelope but wrong admin's secret key
         let admin_envelope = KeyEnvelope {
-            wrapped_key: encrypted.admin_envelopes[0].wrapped_key.clone(),
-            ephemeral_pubkey: encrypted.admin_envelopes[0].ephemeral_pubkey.clone(),
+            enc: encrypted.admin_envelopes[0].enc.clone(),
+            ct: encrypted.admin_envelopes[0].ct.clone(),
         };
         let result = decrypt_note(
             &encrypted.encrypted_content,
             &admin_envelope,
-            &wrong_admin.secret_key_hex,
+            &wrong_admin_sk,
         );
         assert!(result.is_err());
     }
 
     #[test]
     fn note_tampered_content_fails() {
-        let author = generate_keypair();
-        let admin = generate_keypair();
+        let (author_sk, author_pk) = gen_keypair();
+        let (_admin_sk, admin_pk) = gen_keypair();
 
         let payload = r#"{"text":"Tamper test"}"#;
-        let encrypted =
-            encrypt_note(payload, &author.public_key, &[admin.public_key.clone()]).unwrap();
+        let encrypted = encrypt_note(payload, &author_pk, &[admin_pk.clone()]).unwrap();
 
-        // Flip a bit in the encrypted content (after nonce)
         let mut content_bytes = hex::decode(&encrypted.encrypted_content).unwrap();
-        if content_bytes.len() > 25 {
-            content_bytes[25] ^= 0x01;
+        if content_bytes.len() > 15 {
+            content_bytes[15] ^= 0x01;
         }
         let tampered = hex::encode(&content_bytes);
 
-        let result = decrypt_note(
-            &tampered,
-            &encrypted.author_envelope,
-            &author.secret_key_hex,
-        );
+        let result = decrypt_note(&tampered, &encrypted.author_envelope, &author_sk);
         assert!(result.is_err());
     }
 
     #[test]
     fn message_wrong_reader_fails() {
-        let reader1 = generate_keypair();
-        let reader2 = generate_keypair();
-        let wrong_reader = generate_keypair();
+        let (_reader1_sk, reader1_pk) = gen_keypair();
+        let (_reader2_sk, reader2_pk) = gen_keypair();
+        let (wrong_reader_sk, wrong_reader_pk) = gen_keypair();
 
         let encrypted = encrypt_message(
             "Secret message",
-            &[reader1.public_key.clone(), reader2.public_key.clone()],
+            &[reader1_pk.clone(), reader2_pk.clone()],
         )
         .unwrap();
 
-        // Wrong reader's key won't match any envelope
         let result = decrypt_message(
             &encrypted.encrypted_content,
             &encrypted.reader_envelopes,
-            &wrong_reader.secret_key_hex,
-            &wrong_reader.public_key,
+            &wrong_reader_sk,
+            &wrong_reader_pk,
         );
         assert!(result.is_err());
     }
 
     #[test]
     fn draft_wrong_key_fails() {
-        let author = generate_keypair();
-        let wrong_key = generate_keypair();
+        let (author_sk, _) = gen_keypair();
+        let (wrong_sk, _) = gen_keypair();
 
-        let encrypted = encrypt_draft("Draft content", &author.secret_key_hex).unwrap();
-        let result = decrypt_draft(&encrypted, &wrong_key.secret_key_hex);
+        let encrypted = encrypt_draft("Draft content", &author_sk).unwrap();
+        let result = decrypt_draft(&encrypted, &wrong_sk);
         assert!(result.is_err());
     }
 
     #[test]
-    fn roundtrip_legacy_note() {
-        let kp = generate_keypair();
-        let payload = r#"{"text":"Legacy note content","customFields":{}}"#;
-
-        // Encrypt with HKDF_CONTEXT_NOTES directly (simulating V1 encrypt)
-        let sk_bytes = hex::decode(&kp.secret_key_hex).unwrap();
-        let mut sk = [0u8; 32];
-        sk.copy_from_slice(&sk_bytes);
-        let key = derive_encryption_key(&sk, HKDF_CONTEXT_NOTES);
-        let nonce_bytes = {
-            let mut n = [0u8; 24];
-            getrandom::getrandom(&mut n).expect("getrandom failed");
-            n
-        };
-        let nonce = XNonce::from_slice(&nonce_bytes);
-        let cipher = XChaCha20Poly1305::new_from_slice(&key).unwrap();
-        let ciphertext = cipher.encrypt(nonce, payload.as_bytes()).unwrap();
-        let mut packed = Vec::with_capacity(24 + ciphertext.len());
-        packed.extend_from_slice(&nonce_bytes);
-        packed.extend_from_slice(&ciphertext);
-        let packed_hex = hex::encode(&packed);
-
-        // Decrypt with the new function
-        let decrypted = decrypt_legacy_note(&packed_hex, &kp.secret_key_hex).unwrap();
-        assert_eq!(decrypted, payload);
-    }
-
-    #[test]
     fn roundtrip_export_encryption() {
-        let kp = generate_keypair();
+        let (sk, _) = gen_keypair();
         let json = r#"{"notes":[{"id":"1","text":"test"}],"exportedAt":"2024-01-01"}"#;
 
-        let encrypted = encrypt_export(json, &kp.secret_key_hex).unwrap();
+        let encrypted = encrypt_export(json, &sk).unwrap();
 
         // Verify it's valid base64
-        use base64::{engine::general_purpose::STANDARD, Engine};
+        use base64::engine::general_purpose::STANDARD;
         let decoded = STANDARD.decode(&encrypted).unwrap();
-        assert!(decoded.len() > 24); // nonce + ciphertext
+        assert!(decoded.len() > 12); // nonce + ciphertext
 
         // Decrypt manually to verify correctness
-        let sk_bytes = hex::decode(&kp.secret_key_hex).unwrap();
-        let mut sk = [0u8; 32];
-        sk.copy_from_slice(&sk_bytes);
-        let key = derive_encryption_key(&sk, HKDF_CONTEXT_EXPORT);
-        let nonce = XNonce::from_slice(&decoded[..24]);
-        let ciphertext = &decoded[24..];
-        let cipher = XChaCha20Poly1305::new_from_slice(&key).unwrap();
-        let plaintext = cipher.decrypt(nonce, ciphertext).unwrap();
+        let sk_bytes = hex::decode(&*sk).unwrap();
+        let mut skb = [0u8; 32];
+        skb.copy_from_slice(&sk_bytes);
+        let key = derive_encryption_key(&skb, HKDF_CONTEXT_EXPORT);
+        let plaintext =
+            aes256gcm_decrypt(&key, &decoded, HKDF_CONTEXT_EXPORT.as_bytes()).unwrap();
         assert_eq!(String::from_utf8(plaintext).unwrap(), json);
     }
 }

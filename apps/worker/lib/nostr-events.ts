@@ -43,7 +43,7 @@ export async function publishNostrEvent(env: AppEnv['Bindings'], kind: number, c
   let eventContent: string
   if (env.SERVER_NOSTR_SECRET) {
     const eventKey = getOrDeriveEpochKey(env.SERVER_NOSTR_SECRET, epoch)
-    eventContent = encryptHubEvent(content, eventKey)
+    eventContent = encryptHubEvent(content, eventKey, epoch)
   } else {
     eventContent = JSON.stringify(content)
   }
