@@ -37,7 +37,7 @@ Feature: Storage Integrity
   Scenario: Encrypted envelope fields are byte-accurate through storage
     Given a registered volunteer "EnvelopeVol" with a known keypair
     And the admin keypair is known for envelope verification
-    When the volunteer creates a note with real ECIES envelopes
+    When the volunteer creates a note with real HPKE envelopes
     And the note is fetched via the API
     Then the API envelope ct should match the submitted ct exactly
     And the API envelope enc should match the submitted enc exactly

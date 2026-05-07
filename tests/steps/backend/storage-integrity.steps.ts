@@ -88,8 +88,8 @@ Given('a {string} entity is created via the API with structured JSONB data', asy
 
       const contentKey = generateContentKey()
       const ciphertextHex = encryptContent('Storage test note', contentKey, LABEL_NOTE_KEY)
-      const volEnv = wrapKeyForRecipient(contentKey, volKp.pubkey, volKp.seedHex, LABEL_NOTE_KEY)
-      const adminEnv = wrapKeyForRecipient(contentKey, adminPubkey, adminSeedHex, LABEL_NOTE_KEY)
+      const volEnv = await wrapKeyForRecipient(contentKey, volKp.pubkey, volKp.seedHex, LABEL_NOTE_KEY)
+      const adminEnv = await wrapKeyForRecipient(contentKey, adminPubkey, adminSeedHex, LABEL_NOTE_KEY)
 
       const { status, data } = await apiPost<Record<string, unknown>>(
         request,
@@ -302,15 +302,15 @@ When('the system_settings row is fetched directly from the database', async ({ w
   getStorageIntegrityState(world).dbRows.set('settings', rows ?? {})
 })
 
-When('the volunteer creates a note with real ECIES envelopes', async ({ request, world }) => {
+When('the volunteer creates a note with real HPKE envelopes', async ({ request, world }) => {
   expect(getStorageIntegrityState(world).volunteerKp).toBeDefined()
   expect(getStorageIntegrityState(world).adminPubkey).toBeDefined()
 
   const contentKey = generateContentKey()
   const ciphertextHex = encryptContent('Envelope accuracy test', contentKey, LABEL_NOTE_KEY)
 
-  const authorEnv = wrapKeyForRecipient(contentKey, getStorageIntegrityState(world).volunteerKp!.pubkey, getStorageIntegrityState(world).volunteerKp!.seedHex, LABEL_NOTE_KEY)
-  const adminEnv = wrapKeyForRecipient(contentKey, getStorageIntegrityState(world).adminPubkey!, getStorageIntegrityState(world).adminSeedHex!, LABEL_NOTE_KEY)
+  const authorEnv = await wrapKeyForRecipient(contentKey, getStorageIntegrityState(world).volunteerKp!.pubkey, getStorageIntegrityState(world).volunteerKp!.seedHex, LABEL_NOTE_KEY)
+  const adminEnv = await wrapKeyForRecipient(contentKey, getStorageIntegrityState(world).adminPubkey!, getStorageIntegrityState(world).adminSeedHex!, LABEL_NOTE_KEY)
 
   getStorageIntegrityState(world).submittedAuthorEnvelope = authorEnv
   getStorageIntegrityState(world).submittedEnvelopes = [{ pubkey: getStorageIntegrityState(world).adminPubkey!, ...adminEnv }]
