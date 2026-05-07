@@ -137,12 +137,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bech32"
-version = "0.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32637268377fc7b10a8c6d51de3e7fba1ce5dd371a96e342b34e6078db558e7f"
-
-[[package]]
 name = "bitflags"
 version = "2.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -442,7 +436,6 @@ dependencies = [
  "digest",
  "elliptic-curve",
  "rfc6979",
- "serdect",
  "signature",
  "spki",
 ]
@@ -495,7 +488,6 @@ dependencies = [
  "pkcs8",
  "rand_core 0.6.4",
  "sec1",
- "serdect",
  "subtle",
  "zeroize",
 ]
@@ -860,12 +852,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f6e3919bbaa2945715f0bb6d3934a173d1e9a59ac23767fbaaef277265a7411b"
 dependencies = [
  "cfg-if",
- "ecdsa",
  "elliptic-curve",
- "once_cell",
- "serdect",
- "sha2",
- "signature",
 ]
 
 [[package]]
@@ -1109,17 +1096,13 @@ dependencies = [
  "aes-gcm",
  "argon2",
  "base64",
- "bech32",
- "chacha20poly1305",
  "chrono",
  "ed25519-dalek",
- "elliptic-curve",
  "getrandom 0.2.17",
  "hex",
  "hkdf",
  "hmac",
  "hpke",
- "k256",
  "openmls",
  "openmls_basic_credential",
  "openmls_rust_crypto",
@@ -1633,7 +1616,6 @@ dependencies = [
  "der",
  "generic-array",
  "pkcs8",
- "serdect",
  "subtle",
  "zeroize",
 ]
@@ -1708,16 +1690,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6662b5879511e06e8999a8a235d848113e942c9124f211511b16466ee2995f26"
 dependencies = [
  "serde_core",
-]
-
-[[package]]
-name = "serdect"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a84f14a19e9a014bb9f4512488d9829a68e04ecabffb0f9904cd1ace94598177"
-dependencies = [
- "base16ct",
- "serde",
 ]
 
 [[package]]

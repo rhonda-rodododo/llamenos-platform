@@ -401,7 +401,7 @@ pub struct EncryptedKeyData {
     pub iterations: u32,
     /// hex, 12 bytes (AES-256-GCM nonce)
     pub nonce: String,
-    /// hex, encrypted nsec bech32 string
+    /// hex, encrypted secret key string
     pub ciphertext: String,
     /// Truncated SHA-256 hash of pubkey (not plaintext) for identification
     pub pubkey: String,
@@ -419,7 +419,7 @@ pub fn derive_kek_from_pin(credential: &str, salt: &[u8]) -> [u8; 32] {
     kek
 }
 
-/// Encrypt an nsec bech32 string with a credential (PIN or passphrase).
+/// Encrypt a secret key string with a credential (PIN or passphrase).
 #[cfg_attr(feature = "mobile", uniffi::export)]
 pub fn encrypt_with_pin(
     nsec: &str,
@@ -465,7 +465,7 @@ pub fn encrypt_with_pin(
     })
 }
 
-/// Decrypt a stored nsec using a PIN. Returns the nsec bech32 string or error.
+/// Decrypt a stored secret key using a PIN. Returns the secret key string or error.
 #[cfg_attr(feature = "mobile", uniffi::export)]
 pub fn decrypt_with_pin(data: &EncryptedKeyData, pin: &str) -> Result<String, CryptoError> {
     let salt = hex::decode(&data.salt).map_err(CryptoError::HexError)?;

@@ -1,9 +1,9 @@
 //! Device provisioning encryption — X25519 ECDH + HKDF + AES-256-GCM.
 //!
-//! The nsec NEVER leaves the Rust process. The primary device performs:
+//! The device secret key NEVER leaves the Rust process. The primary device performs:
 //!   1. X25519(primarySK, ephemeralPK) → shared_secret
 //!   2. HKDF(shared_secret, LABEL_DEVICE_PROVISION) → symmetric key
-//!   3. AES-256-GCM(nsec, symmetric_key, aad=LABEL_DEVICE_PROVISION) → ciphertext
+//!   3. AES-256-GCM(sk_hex, symmetric_key, aad=LABEL_DEVICE_PROVISION) → ciphertext
 //!   4. SAS = HKDF(shared_secret, SAS_SALT, SAS_INFO) → 6-digit code
 //!
 //! The new device performs the inverse using its ephemeral SK and the primary's PK.
@@ -23,22 +23,22 @@ use zeroize::{Zeroize, Zeroizing};
 use crate::errors::CryptoError;
 use crate::labels::{LABEL_DEVICE_PROVISION, LABEL_PROVISIONING_SALT, SAS_INFO, SAS_SALT};
 
-/// Result of encrypting the nsec for device provisioning.
+/// Result of encrypting the device secret key for provisioning.
 /// Contains the encrypted payload and the SAS code for verification.
 #[derive(Debug, Clone)]
 pub struct ProvisioningResult {
-    /// hex(nonce_12 + ciphertext + tag_16) — the encrypted nsec bech32 string
+    /// hex(nonce_12 + ciphertext + tag_16) — the encrypted secret key hex string
     pub encrypted_hex: String,
     /// "XXX XXX" format 6-digit SAS code
     pub sas_code: String,
 }
 
-/// Result of decrypting a provisioned nsec.
-/// Contains the nsec bech32 string and the SAS code for verification.
+/// Result of decrypting a provisioned device secret key.
+/// Contains the secret key hex string and the SAS code for verification.
 #[derive(Debug)]
 pub struct DecryptionResult {
-    /// The decrypted nsec bech32 string
-    pub nsec: Zeroizing<String>,
+    /// The decrypted secret key hex string
+    pub secret_key_hex: Zeroizing<String>,
     /// "XXX XXX" format 6-digit SAS code
     pub sas_code: String,
 }
@@ -88,16 +88,16 @@ fn compute_sas(shared_secret: &[u8]) -> String {
     format!("{} {}", &code[..3], &code[3..])
 }
 
-/// Encrypt the nsec for a provisioning room. The nsec never leaves Rust.
+/// Encrypt the device secret key for a provisioning room. The key never leaves Rust.
 ///
 /// Performs:
 ///   1. X25519(primarySK, ephemeralPK) → shared_secret
 ///   2. HKDF(shared_secret, info=LABEL_DEVICE_PROVISION) → symmetric key
-///   3. AES-256-GCM(nsec_bech32, symmetric_key, aad=LABEL_DEVICE_PROVISION) → ciphertext
+///   3. AES-256-GCM(sk_hex, symmetric_key, aad=LABEL_DEVICE_PROVISION) → ciphertext
 ///   4. SAS from shared_secret
 ///
 /// Returns (encrypted_hex, sas_code).
-pub fn encrypt_nsec_for_provisioning(
+pub fn encrypt_secret_key_for_provisioning(
     sk_bytes: &[u8],
     ephemeral_pubkey_hex: &str,
 ) -> Result<ProvisioningResult, CryptoError> {
@@ -119,11 +119,10 @@ pub fn encrypt_nsec_for_provisioning(
     // Compute SAS before zeroing shared secret
     let sas_code = compute_sas(&shared);
 
-    // Get the nsec bech32 from the secret key bytes
-    let nsec = bech32::encode::<bech32::Bech32>(bech32::Hrp::parse("nsec").unwrap(), sk_bytes)
-        .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
+    // Encode secret key as hex for encrypted transfer
+    let sk_hex = hex::encode(sk_bytes);
 
-    // Encrypt nsec with AES-256-GCM
+    // Encrypt secret key hex with AES-256-GCM
     let mut nonce_bytes = [0u8; 12];
     getrandom::getrandom(&mut nonce_bytes).expect("getrandom failed");
     let nonce = Nonce::from_slice(&nonce_bytes);
@@ -133,7 +132,7 @@ pub fn encrypt_nsec_for_provisioning(
         .encrypt(
             nonce,
             Payload {
-                msg: nsec.as_bytes(),
+                msg: sk_hex.as_bytes(),
                 aad: LABEL_DEVICE_PROVISION.as_bytes(),
             },
         )
@@ -155,16 +154,16 @@ pub fn encrypt_nsec_for_provisioning(
     })
 }
 
-/// Decrypt a provisioned nsec received from the primary device.
+/// Decrypt a provisioned secret key received from the primary device.
 ///
 /// Performs:
 ///   1. X25519(ephemeralSK, primaryPK) → shared_secret
 ///   2. HKDF(shared_secret, info=LABEL_DEVICE_PROVISION) → symmetric key
-///   3. Decrypt AES-256-GCM → nsec bech32
+///   3. Decrypt AES-256-GCM → secret key hex
 ///   4. SAS from shared_secret (for verification display)
 ///
-/// Returns (nsec_bech32, sas_code).
-pub fn decrypt_provisioned_nsec(
+/// Returns (secret_key_hex, sas_code).
+pub fn decrypt_provisioned_secret_key(
     encrypted_hex: &str,
     primary_pubkey_hex: &str,
     ephemeral_sk_bytes: &[u8],
@@ -215,10 +214,10 @@ pub fn decrypt_provisioned_nsec(
     shared.zeroize();
     sk_arr.zeroize();
 
-    let nsec = String::from_utf8(plaintext).map_err(|_| CryptoError::DecryptionFailed)?;
+    let secret_key_hex = String::from_utf8(plaintext).map_err(|_| CryptoError::DecryptionFailed)?;
 
     Ok(DecryptionResult {
-        nsec: Zeroizing::new(nsec),
+        secret_key_hex: Zeroizing::new(secret_key_hex),
         sas_code,
     })
 }
@@ -235,24 +234,20 @@ mod tests {
 
         let primary_sk_bytes = hex::decode(primary_sk.as_str()).unwrap();
 
-        // Primary encrypts nsec for provisioning
-        let result = encrypt_nsec_for_provisioning(&primary_sk_bytes, &ephemeral_pk).unwrap();
+        // Primary encrypts secret key for provisioning
+        let result = encrypt_secret_key_for_provisioning(&primary_sk_bytes, &ephemeral_pk).unwrap();
 
         // New device decrypts
         let ephemeral_sk_bytes = hex::decode(ephemeral_sk.as_str()).unwrap();
         let decrypted =
-            decrypt_provisioned_nsec(&result.encrypted_hex, &primary_pk, &ephemeral_sk_bytes)
+            decrypt_provisioned_secret_key(&result.encrypted_hex, &primary_pk, &ephemeral_sk_bytes)
                 .unwrap();
 
-        // Verify the nsec round-trips
-        let expected_nsec = bech32::encode::<bech32::Bech32>(
-            bech32::Hrp::parse("nsec").unwrap(),
-            &primary_sk_bytes,
-        )
-        .unwrap();
+        // Verify the secret key round-trips
+        let expected_sk_hex = hex::encode(&primary_sk_bytes);
         assert_eq!(
-            *decrypted.nsec, expected_nsec,
-            "Recovered nsec must match original"
+            *decrypted.secret_key_hex, expected_sk_hex,
+            "Recovered secret key must match original"
         );
 
         // SAS codes must match
@@ -269,7 +264,7 @@ mod tests {
         let (wrong_sk, _wrong_pk) = generate_x25519_keypair();
 
         let primary_sk_bytes = hex::decode(primary_sk.as_str()).unwrap();
-        let result = encrypt_nsec_for_provisioning(&primary_sk_bytes, &ephemeral_pk).unwrap();
+        let result = encrypt_secret_key_for_provisioning(&primary_sk_bytes, &ephemeral_pk).unwrap();
 
         // Derive primary pubkey for the decrypt side
         let primary_secret =
@@ -280,7 +275,7 @@ mod tests {
         // Try decrypting with wrong ephemeral key
         let wrong_sk_bytes = hex::decode(wrong_sk.as_str()).unwrap();
         let decrypted =
-            decrypt_provisioned_nsec(&result.encrypted_hex, &primary_pk_hex, &wrong_sk_bytes);
+            decrypt_provisioned_secret_key(&result.encrypted_hex, &primary_pk_hex, &wrong_sk_bytes);
         assert!(decrypted.is_err());
     }
 
@@ -290,7 +285,7 @@ mod tests {
         let (ephemeral_sk, ephemeral_pk) = generate_x25519_keypair();
 
         let primary_sk_bytes = hex::decode(primary_sk.as_str()).unwrap();
-        let result = encrypt_nsec_for_provisioning(&primary_sk_bytes, &ephemeral_pk).unwrap();
+        let result = encrypt_secret_key_for_provisioning(&primary_sk_bytes, &ephemeral_pk).unwrap();
 
         // Tamper with the ciphertext
         let mut bytes = hex::decode(&result.encrypted_hex).unwrap();
@@ -305,7 +300,8 @@ mod tests {
         let primary_pk_hex = hex::encode(primary_pubkey.as_bytes());
 
         let ephemeral_sk_bytes = hex::decode(ephemeral_sk.as_str()).unwrap();
-        let decrypted = decrypt_provisioned_nsec(&tampered, &primary_pk_hex, &ephemeral_sk_bytes);
+        let decrypted =
+            decrypt_provisioned_secret_key(&tampered, &primary_pk_hex, &ephemeral_sk_bytes);
         assert!(decrypted.is_err());
     }
 
@@ -317,8 +313,8 @@ mod tests {
         let primary_sk_bytes = hex::decode(primary_sk.as_str()).unwrap();
 
         // Encrypt twice — SAS should be the same (deterministic from X25519)
-        let r1 = encrypt_nsec_for_provisioning(&primary_sk_bytes, &ephemeral_pk).unwrap();
-        let r2 = encrypt_nsec_for_provisioning(&primary_sk_bytes, &ephemeral_pk).unwrap();
+        let r1 = encrypt_secret_key_for_provisioning(&primary_sk_bytes, &ephemeral_pk).unwrap();
+        let r2 = encrypt_secret_key_for_provisioning(&primary_sk_bytes, &ephemeral_pk).unwrap();
 
         assert_eq!(r1.sas_code, r2.sas_code);
         // But encrypted payloads differ (different random nonces)
