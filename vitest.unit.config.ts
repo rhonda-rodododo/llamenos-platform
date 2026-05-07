@@ -20,6 +20,9 @@ export default defineConfig({
       { find: /^@worker\/(.*)/, replacement: path.resolve(__dirname, "apps/worker/$1") },
       { find: /^@protocol\/(.*)/, replacement: path.resolve(__dirname, "packages/protocol/$1") },
       { find: /^@\/(.*)/, replacement: path.resolve(__dirname, "src/client/$1") },
+      // Map the Rust FFI module to a pure-TypeScript mock for the Node/Vitest environment.
+      // The real ffi.ts uses bun:ffi to load a native .so — unavailable in unit tests.
+      { find: "@llamenos/crypto/ffi", replacement: path.resolve(__dirname, "apps/worker/__tests__/mocks/llamenos-crypto-ffi.ts") },
     ],
   },
 });

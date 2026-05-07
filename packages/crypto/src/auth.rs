@@ -325,7 +325,8 @@ mod tests {
 
         // Build message and verify it matches expected format
         let message = build_auth_message(&pubkey_hex, timestamp, method, path);
-        let expected_prefix = format!("llamenos:device-auth:v1:{pubkey_hex}:1700000000000:GET:/api/calls");
+        let expected_prefix =
+            format!("{LABEL_DEVICE_AUTH}:{pubkey_hex}:1700000000000:GET:/api/calls");
         assert_eq!(message, expected_prefix.as_bytes());
 
         // Sign and verify

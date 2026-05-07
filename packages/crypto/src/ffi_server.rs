@@ -186,8 +186,8 @@ pub extern "C" fn ffi_hmac_sha256(
     let key_slice = unsafe { std::slice::from_raw_parts(key, key_len) };
     let data_slice = unsafe { std::slice::from_raw_parts(data, data_len) };
 
-    let mut mac = <Hmac<Sha256> as Mac>::new_from_slice(key_slice)
-        .expect("HMAC can accept any key length");
+    let mut mac =
+        <Hmac<Sha256> as Mac>::new_from_slice(key_slice).expect("HMAC can accept any key length");
     mac.update(data_slice);
     let result = mac.finalize().into_bytes();
 

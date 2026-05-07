@@ -139,53 +139,14 @@ jobs:
       - name: Format check
         run: cargo fmt --manifest-path packages/crypto/Cargo.toml --check
 
-  # ─── WASM Build Validation ─────────────────────────────────
+  # ─── WASM Build Validation (disabled — WASM target removed, using native Rust FFI) ──
   wasm-build:
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true'
+    if: false
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@efa25f7f19611383d5b0ccf2d1c8914531636bf9 # stable
-        with:
-          toolchain: stable
-          targets: wasm32-unknown-unknown
-
-      - name: Rust cache
-        uses: swatinem/rust-cache@82a92a6e8fbeee089604da2575dc567ae9ddeaab # v2.7.5
-        with:
-          workspaces: packages/crypto
-
-      - name: Install wasm-pack
-        run: cargo install wasm-pack --locked
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2.0.2
-        with:
-          bun-version: ${{ env.BUN_VERSION }}
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Generate interop test vectors
-        run: cargo test --manifest-path packages/crypto/Cargo.toml --test interop
-
-      - name: Build WASM
-        run: bun run crypto:wasm
-
-      - name: Upload WASM artifacts
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: wasm-artifacts
-          path: |
-            packages/crypto/dist/wasm/
-            packages/crypto/tests/fixtures/test-vectors.json
-          retention-days: 1
+      - name: Disabled
+        run: exit 0
 
   # ─── Dependency Vulnerability Scan ───────────────────────────
   audit:
@@ -213,7 +174,7 @@ jobs:
 
   # ─── E2E + Backend BDD Tests (Docker Compose) ──────────────
   e2e:
-    needs: [changes, build, wasm-build]
+    needs: [changes, build]
     if: needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -229,11 +190,6 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
-
-      - name: Download WASM artifacts
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: wasm-artifacts
 
       - name: Get Playwright version
         id: playwright-version
@@ -1080,7 +1036,7 @@ jobs:
 
   # ─── CI Status Gate ─────────────────────────────────────────
   ci-status:
-    needs: [build, audit, crypto-tests, wasm-build, e2e, backend-bdd, backend-unit, android-build-test, android-e2e, ios-build-test, crypto-guardrails, migration-drift]
+    needs: [build, audit, crypto-tests, e2e, backend-bdd, backend-unit, android-build-test, android-e2e, ios-build-test, crypto-guardrails, migration-drift]
     if: always()
     runs-on: ubuntu-latest
 
@@ -1096,7 +1052,6 @@ jobs:
           check_job "build" "${{ needs.build.result }}"
           check_job "audit" "${{ needs.audit.result }}"
           check_job "crypto-tests" "${{ needs.crypto-tests.result }}"
-          check_job "wasm-build" "${{ needs.wasm-build.result }}"
           check_job "e2e" "${{ needs.e2e.result }}"
           check_job "backend-bdd" "${{ needs.backend-bdd.result }}"
           check_job "backend-unit" "${{ needs.backend-unit.result }}"
