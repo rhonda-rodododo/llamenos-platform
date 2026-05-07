@@ -26,24 +26,9 @@ class HubManagementSteps : BaseSteps() {
 
     @When("I navigate to hub management")
     fun iNavigateToHubManagement() {
-        navigateToTab(NAV_SETTINGS)
-        composeRule.waitForIdle()
-
-        // The hub section is collapsible and starts collapsed.
-        // Expand it by clicking the section header before trying to access the hub card.
-        expandSettingsSection("settings-hub-section")
-
-        // Now scroll to and tap the hub settings card
-        try {
-            composeRule.waitUntil(5_000) {
-                composeRule.onAllNodesWithTag("settings-hub-card").fetchSemanticsNodes().isNotEmpty()
-            }
-            onNodeWithTag("settings-hub-card").performScrollTo()
-            onNodeWithTag("settings-hub-card").performClick()
-            composeRule.waitForIdle()
-        } catch (t: Throwable) {
-            Log.w("HubManagementSteps", "Hub card click failed: ${t.message}")
-        }
+        // Hub list is accessed via the "hubs-card" quick action on the Dashboard,
+        // NOT via Settings. settings-hub-card is just a display card with no click handler.
+        navigateViaDashboardCard("hubs-card")
 
         // Wait for the hubs screen to load
         composeRule.waitUntil(10_000) {
