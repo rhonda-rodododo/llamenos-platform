@@ -68,15 +68,7 @@ Then('I should see the version text', async ({ page }) => {
 // --- Lock & Logout steps ---
 
 Then('I should see the logout confirmation dialog', async ({ page }) => {
-  // The app currently logs out directly without a confirmation dialog.
-  // After tapping "Log Out", the user is redirected to /login.
-  // Accept either a confirm dialog or redirect to login as valid behavior.
-  const confirmDialog = page.getByTestId(TestIds.CONFIRM_DIALOG)
-  if (await confirmDialog.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) return
-  const loginPage = page.getByTestId(TestIds.NSEC_INPUT)
-    .or(page.getByTestId(TestIds.LOGIN_SUBMIT_BTN))
-    .or(page.locator('input[type="password"]'))
-  await expect(loginPage.first()).toBeVisible({ timeout: 2000 })
+  await expect(page.getByTestId(TestIds.CONFIRM_DIALOG)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 // NOTE: Lock & Logout assertion steps are defined in:

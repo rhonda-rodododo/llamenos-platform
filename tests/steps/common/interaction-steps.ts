@@ -34,6 +34,10 @@ const buttonTextToTestIdMap: Record<string, string> = {
   'Add Field': 'custom-field-add-btn',
   'Log In': 'login-submit-btn',
   'Log in': 'login-submit-btn',
+  'Log Out': TestIds.LOGOUT_BTN,
+  'Confirm': TestIds.CONFIRM_DIALOG_OK,
+  'Clock In': TestIds.BREAK_TOGGLE_BTN,
+  'Clock Out': TestIds.BREAK_TOGGLE_BTN,
 }
 
 /**
@@ -42,6 +46,27 @@ const buttonTextToTestIdMap: Record<string, string> = {
  * the actual button accessible name.
  */
 async function clickByTextOrTestId(page: import('@playwright/test').Page, text: string): Promise<void> {
+  // 0a. "Log Out" on settings page → use settings-specific button (shows confirmation dialog)
+  if (text === 'Log Out' && page.url().includes('/settings')) {
+    const settingsLogout = page.getByTestId(TestIds.SETTINGS_LOGOUT_BTN)
+    if (await settingsLogout.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
+      await settingsLogout.scrollIntoViewIfNeeded()
+      await settingsLogout.click()
+      return
+    }
+  }
+  // 0b. If a confirm dialog is open, "Cancel"/"Confirm" target the dialog buttons
+  if (text === 'Cancel' || text === 'Confirm') {
+    const dialog = page.getByTestId(TestIds.CONFIRM_DIALOG)
+    const dialogOpen = await dialog.isVisible({ timeout: 1000 }).catch(() => false)
+    if (dialogOpen) {
+      const testId = text === 'Cancel' ? TestIds.CONFIRM_DIALOG_CANCEL : TestIds.CONFIRM_DIALOG_OK
+      const btn = page.getByTestId(testId)
+      await expect(btn).toBeVisible({ timeout: Timeouts.ELEMENT })
+      await btn.click()
+      return
+    }
+  }
   // 0. Check button-text-to-testid map — resolves Gherkin text → data-testid
   const buttonTestId = buttonTextToTestIdMap[text]
   if (buttonTestId) {
@@ -193,6 +218,11 @@ When('I reload and re-authenticate', async ({ page }) => {
 
 When('I log out', async ({ page }) => {
   await page.getByTestId(TestIds.LOGOUT_BTN).click()
+  // Logout now shows a confirmation dialog — confirm it
+  const confirmBtn = page.getByTestId(TestIds.CONFIRM_DIALOG_OK)
+  if (await confirmBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await confirmBtn.click()
+  }
   await page.waitForURL(/\/login/, { timeout: Timeouts.ELEMENT })
 })
 

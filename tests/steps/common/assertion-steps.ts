@@ -110,7 +110,7 @@ Then('I should see {string} and {string} buttons', async ({ page }, btn1: string
 
   const testIdMap: Record<string, string> = {
     'Confirm': TestIds.CONFIRM_DIALOG_OK,
-    'Cancel': TestIds.FORM_CANCEL_BTN,
+    'Cancel': TestIds.CONFIRM_DIALOG_CANCEL,
     'Lock App': TestIds.LOGOUT_BTN,
     'Log Out': TestIds.LOGOUT_BTN,
   }

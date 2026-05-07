@@ -12,29 +12,25 @@ import { Given, When, Then } from '../fixtures'
 import { TestIds } from '../../test-ids'
 import { Timeouts } from '../../helpers'
 import { Navigation } from '../../pages/index'
-import { getCustomFieldsViaApi, listNotesViaApi } from '../../api-helpers'
+import { getCustomFieldsViaApi, updateCustomFieldsViaApi, listNotesViaApi } from '../../api-helpers'
 
 // --- Custom fields in note form ---
 
-Given('a text custom field {string} exists', async ({ page, request }, fieldLabel: string) => {
-  // Verify via API first
+Given('a text custom field {string} exists', async ({ request }, fieldLabel: string) => {
+  // Use API directly for reliable precondition setup
   const fields = await getCustomFieldsViaApi(request)
-  const exists = fields.some(f => f.label === fieldLabel)
-
-  if (!exists) {
-    // Navigate to hub settings and expand the custom fields section
-    await Navigation.goToHubSettings(page)
-    const trigger = page.getByTestId(`${TestIds.SETTINGS_CUSTOM_FIELDS}-trigger`)
-    await expect(trigger).toBeVisible({ timeout: Timeouts.ELEMENT })
-    await trigger.click()
-
-    await page.getByTestId(TestIds.CUSTOM_FIELD_ADD_BTN).click()
-    await page.getByLabel(/label/i).fill(fieldLabel)
-    await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
-
-    // Verify creation via API
-    const updatedFields = await getCustomFieldsViaApi(request)
-    expect(updatedFields.some(f => f.label === fieldLabel)).toBe(true)
+  if (!fields.some(f => f.label === fieldLabel)) {
+    const name = fieldLabel.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
+    await updateCustomFieldsViaApi(request, [
+      ...fields,
+      {
+        id: crypto.randomUUID(),
+        name,
+        label: fieldLabel,
+        type: 'text',
+        required: false,
+      },
+    ])
   }
 })
 
@@ -228,37 +224,54 @@ When('I add option {string}', async ({ page }, option: string) => {
 })
 
 Given('a custom field {string} exists', async ({ page, request }, fieldLabel: string) => {
-  // Verify via API
+  // Use API directly for reliable precondition setup
   const fields = await getCustomFieldsViaApi(request)
-  const exists = fields.some(f => f.label === fieldLabel)
-  if (!exists) {
-    // Navigate to settings and expand the custom fields section
-    await Navigation.goToHubSettings(page)
-    const trigger = page.getByTestId(`${TestIds.SETTINGS_CUSTOM_FIELDS}-trigger`)
-    await expect(trigger).toBeVisible({ timeout: Timeouts.ELEMENT })
-    await trigger.click()
-    await page.getByTestId(TestIds.CUSTOM_FIELD_ADD_BTN).click()
-    const labelInput = page.getByLabel(/label/i)
-    await expect(labelInput).toBeVisible({ timeout: Timeouts.ELEMENT })
-    await labelInput.fill(fieldLabel)
-    const saveBtn = page.getByTestId(TestIds.FORM_SAVE_BTN)
-    await expect(saveBtn).toBeEnabled({ timeout: Timeouts.ELEMENT })
-    await saveBtn.click()
+  const needsCreate = !fields.some(f => f.label === fieldLabel)
+  if (needsCreate) {
+    const name = fieldLabel.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
+    await updateCustomFieldsViaApi(request, [
+      ...fields,
+      {
+        id: crypto.randomUUID(),
+        name,
+        label: fieldLabel,
+        type: 'text',
+        required: false,
+      },
+    ])
   }
+  // Background already navigated to Hub Settings. If we created a field via API,
+  // the page needs to re-fetch its data. Use the UI to navigate away and back.
+  if (needsCreate) {
+    await page.getByTestId(TestIds.NAV_DASHBOARD).click()
+    await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.NAVIGATION })
+    await page.getByTestId(TestIds.NAV_ADMIN_SETTINGS).click()
+    await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.NAVIGATION })
+  }
+  // Ensure the custom fields section is expanded
+  const section = page.getByTestId(TestIds.SETTINGS_CUSTOM_FIELDS)
+  await expect(section).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await section.scrollIntoViewIfNeeded()
+  const isOpen = await section.locator('[data-state="open"]').isVisible({ timeout: 500 }).catch(() => false)
+  if (!isOpen) {
+    const trigger = page.getByTestId(`${TestIds.SETTINGS_CUSTOM_FIELDS}-trigger`)
+    await trigger.click()
+  }
+  // Wait for the field row to be visible
+  const fieldRow = page.getByTestId(TestIds.CUSTOM_FIELD_ROW).filter({ hasText: fieldLabel })
+  await expect(fieldRow.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 When('I click the delete button on {string}', async ({ page }, fieldLabel: string) => {
   const row = page.getByTestId(TestIds.CUSTOM_FIELD_ROW).filter({ hasText: fieldLabel })
+  await expect(row.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await row.first().scrollIntoViewIfNeeded()
   // Set up dialog handler to accept the confirm() before clicking delete
   page.once('dialog', async (dialog) => {
     await dialog.accept()
   })
-  await row.getByTestId(TestIds.CUSTOM_FIELD_DELETE_BTN).click()
-  // Wait for the API response to complete
-  await page.waitForResponse(
-    (res) => res.url().includes('/api/') && res.request().method() === 'PUT',
-    { timeout: 10000 },
-  ).catch(() => {
-    // API might not be available in test env — continue anyway
-  })
+  const deleteBtn = row.getByTestId(TestIds.CUSTOM_FIELD_DELETE_BTN)
+  await expect(deleteBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // Use force click since the card container can briefly intercept pointer events during re-render
+  await deleteBtn.click({ force: true })
 })
