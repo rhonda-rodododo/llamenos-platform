@@ -13,6 +13,7 @@ import io.cucumber.java.en.When
 import kotlinx.coroutines.runBlocking
 import org.llamenos.hotline.LlamenosApp
 import org.llamenos.hotline.di.ActiveHubEntryPoint
+import org.llamenos.hotline.di.CryptoEntryPoint
 import org.llamenos.hotline.helpers.SimulationClient
 import org.llamenos.hotline.steps.BaseSteps
 import org.llamenos.hotline.steps.ScenarioHooks
@@ -34,33 +35,40 @@ class ActiveCallSteps : BaseSteps() {
 
     @Given("an active call exists")
     fun anActiveCallExists() {
+        // Ensure we're on the dashboard (readNpubFromSettings might have navigated away)
+        navigateToTab(NAV_DASHBOARD)
+
+        // Get the actual signing pubkey for answering the call.
+        // Using "admin" as pubkey works for the GET /active query (which returns all calls)
+        // but fails for hangup/ban which check answeredBy === pubkey.
+        val signingPubkey = getSigningPubkey() ?: "admin"
+        Log.d("ActiveCallSteps", "Using pubkey for answer: ${signingPubkey.take(16)}...")
+
         // Simulate an incoming call and answer it via the test backend.
         // The call will then appear on the dashboard as an active call card.
         try {
+            val hubId = ScenarioHooks.currentHubId
+            Log.d("ActiveCallSteps", "Simulating call in hub: $hubId")
             val callResult = SimulationClient.simulateIncomingCall(
                 callerNumber = "+15559${System.currentTimeMillis().toString().takeLast(6)}",
-                hubId = ScenarioHooks.currentHubId.ifEmpty { null },
+                hubId = hubId.ifEmpty { null },
             )
             activeCallId = callResult.callId
-            Log.d("ActiveCallSteps", "Simulated call: id=$activeCallId, status=${callResult.status}")
+            Log.d("ActiveCallSteps", "Simulated call: id=$activeCallId, status=${callResult.status}, error=${callResult.error}")
 
             if (activeCallId.isNotEmpty()) {
                 val answerResult = SimulationClient.simulateAnswerCall(
                     callId = activeCallId,
-                    pubkey = "admin"
+                    pubkey = signingPubkey,
                 )
-                Log.d("ActiveCallSteps", "Answered call: status=${answerResult.status}")
+                Log.d("ActiveCallSteps", "Answered call: status=${answerResult.status}, error=${answerResult.error}")
             }
         } catch (e: Throwable) {
-            Log.w("ActiveCallSteps", "Call simulation failed: ${e.message}")
+            Log.w("ActiveCallSteps", "Call simulation failed: ${e.message}", e)
         }
 
         // Force DashboardViewModel to re-fetch active calls.
-        // DashboardViewModel subscribes to activeHubId changes and calls refresh().
-        // Re-setting the hub ID (via null → hubId toggle) triggers a new emission
-        // from the StateFlow, which forces refresh() → fetchActiveCall().
-        // PullToRefreshBox swipeDown() is unreliable in Compose UI tests —
-        // the gesture threshold may not be met consistently.
+        // DashboardViewModel subscribes to refreshTrigger and calls refresh().
         triggerHubRefresh()
 
         // Wait for the active call card to appear
@@ -169,6 +177,23 @@ class ActiveCallSteps : BaseSteps() {
     // ---- Helpers ----
 
     /**
+     * Get the app's Ed25519 signing pubkey from the CryptoService singleton.
+     * Returns the hex pubkey or null if unavailable.
+     */
+    private fun getSigningPubkey(): String? {
+        return try {
+            val entryPoint = EntryPointAccessors.fromApplication(
+                LlamenosApp.instance,
+                CryptoEntryPoint::class.java,
+            )
+            entryPoint.cryptoService().signingPubkeyHex
+        } catch (e: Throwable) {
+            Log.w("ActiveCallSteps", "getSigningPubkey failed: ${e.message}")
+            null
+        }
+    }
+
+    /**
      * Force DashboardViewModel.refresh() via [ActiveHubState.triggerRefresh].
      *
      * The previous approach of toggling the hub ID ("__refresh__" → real hub) was
@@ -180,23 +205,38 @@ class ActiveCallSteps : BaseSteps() {
      */
     private fun triggerHubRefresh() {
         val hubId = ScenarioHooks.currentHubId
-        if (hubId.isEmpty()) return
+        if (hubId.isEmpty()) {
+            Log.w("ActiveCallSteps", "triggerHubRefresh: hubId is empty, skipping")
+            return
+        }
         try {
             val entryPoint = EntryPointAccessors.fromApplication(
                 LlamenosApp.instance,
                 ActiveHubEntryPoint::class.java,
             )
             val hubState = entryPoint.activeHubState()
+            val currentHubValue = hubState.activeHubId.value
+            Log.d("ActiveCallSteps", "triggerHubRefresh: activeHubId.value=$currentHubValue, scenarioHub=$hubId")
+
+            // Ensure the active hub is set (might have been cleared during identity wipe)
+            if (currentHubValue != hubId) {
+                Log.d("ActiveCallSteps", "triggerHubRefresh: re-setting activeHub to $hubId")
+                runBlocking { hubState.setActiveHub(hubId) }
+                composeRule.waitForIdle()
+                Thread.sleep(500)
+            }
+
             runBlocking {
                 hubState.triggerRefresh()
             }
             Log.d("ActiveCallSteps", "triggerHubRefresh: emitted refreshTrigger")
             composeRule.waitForIdle()
-            // Give the ViewModel time to process the refresh and make the API call
-            Thread.sleep(2000)
+            // Give the ViewModel time to process the refresh and make the API call.
+            // Emulator with swiftshader_indirect GPU may need 3-5s for network I/O.
+            Thread.sleep(3000)
             composeRule.waitForIdle()
         } catch (e: Throwable) {
-            Log.w("ActiveCallSteps", "triggerHubRefresh failed: ${e.message}")
+            Log.w("ActiveCallSteps", "triggerHubRefresh failed: ${e.message}", e)
         }
     }
 }

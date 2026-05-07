@@ -66,21 +66,32 @@ class ScenarioHooks {
      * Create an isolated hub for this scenario.
      * Replaces the previous resetServerState() — no global database wipe.
      * Each scenario gets its own hub, so tests never share data.
+     *
+     * Retries up to 3 times with increasing delay to handle transient
+     * backend startup delays (Docker container warming, CI resource contention).
      */
     @Before(order = 1)
     fun createScenarioHub() {
-        try {
-            val response = SimulationClient.createTestHub()
-            if (response.id.isNotEmpty()) {
-                currentHubId = response.id
-                Log.d("ScenarioHooks", "Created test hub: ${response.id} (${response.name})")
-            } else {
-                Log.w("ScenarioHooks", "createTestHub returned empty ID — error: ${response.error}")
+        var lastError: Exception? = null
+        for (attempt in 1..3) {
+            try {
+                val response = SimulationClient.createTestHub()
+                if (response.id.isNotEmpty()) {
+                    currentHubId = response.id
+                    Log.d("ScenarioHooks", "Created test hub: ${response.id} (${response.name}) [attempt $attempt]")
+                    return
+                } else {
+                    Log.w("ScenarioHooks", "createTestHub returned empty ID — error: ${response.error} [attempt $attempt]")
+                }
+            } catch (e: Exception) {
+                lastError = e
+                Log.w("ScenarioHooks", "createTestHub attempt $attempt failed: ${e.message}")
+                if (attempt < 3) {
+                    Thread.sleep((attempt * 2000).toLong())
+                }
             }
-        } catch (e: Exception) {
-            Log.w("ScenarioHooks", "createTestHub failed: ${e.message}")
-            // Best-effort — don't fail the scenario if hub creation fails
         }
+        Log.e("ScenarioHooks", "createTestHub failed after 3 attempts: ${lastError?.message}")
     }
 
     /**
