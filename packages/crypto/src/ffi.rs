@@ -140,57 +140,52 @@ pub(crate) fn derive_kek_hex(credential: &str, salt_hex: &str) -> Result<String,
     Ok(hex_out)
 }
 
-/// Compute the ECDH shared x-coordinate for device provisioning.
+/// Compute the X25519 shared secret for device provisioning.
 ///
-/// Uses secp256k1 ECDH — retained for the provisioning protocol.
+/// Uses X25519 ECDH for the provisioning protocol.
 #[uniffi::export]
 pub fn compute_shared_x_hex(
     our_secret_hex: &str,
     their_pubkey_hex: &str,
 ) -> Result<String, CryptoError> {
-    use k256::{PublicKey, SecretKey};
+    use x25519_dalek::{PublicKey as X25519PublicKey, StaticSecret as X25519StaticSecret};
 
     let sk_bytes = hex::decode(our_secret_hex).map_err(CryptoError::HexError)?;
     if sk_bytes.len() != 32 {
         return Err(CryptoError::InvalidSecretKey);
     }
-    let secret_key = SecretKey::from_slice(&sk_bytes).map_err(|_| CryptoError::InvalidSecretKey)?;
+    let mut sk_arr = [0u8; 32];
+    sk_arr.copy_from_slice(&sk_bytes);
+    let secret = X25519StaticSecret::from(sk_arr);
 
-    let compressed = if their_pubkey_hex.len() == 64 {
-        let mut c = Vec::with_capacity(33);
-        c.push(0x02);
-        c.extend_from_slice(&hex::decode(their_pubkey_hex).map_err(CryptoError::HexError)?);
-        c
-    } else {
-        hex::decode(their_pubkey_hex).map_err(CryptoError::HexError)?
-    };
+    let pk_bytes = hex::decode(their_pubkey_hex).map_err(CryptoError::HexError)?;
+    if pk_bytes.len() != 32 {
+        return Err(CryptoError::InvalidPublicKey);
+    }
+    let mut pk_arr = [0u8; 32];
+    pk_arr.copy_from_slice(&pk_bytes);
+    let public_key = X25519PublicKey::from(pk_arr);
 
-    let public_key =
-        PublicKey::from_sec1_bytes(&compressed).map_err(|_| CryptoError::InvalidPublicKey)?;
-
-    let shared_point: elliptic_curve::ecdh::SharedSecret<k256::Secp256k1> =
-        k256::ecdh::diffie_hellman(secret_key.to_nonzero_scalar(), public_key.as_affine());
-    let mut shared_x = [0u8; 32];
-    shared_x.copy_from_slice(shared_point.raw_secret_bytes());
-    let hex_out = hex::encode(shared_x);
-    shared_x.zeroize();
+    let shared = secret.diffie_hellman(&public_key);
+    let mut shared_bytes = *shared.as_bytes();
+    let hex_out = hex::encode(shared_bytes);
+    shared_bytes.zeroize();
+    sk_arr.zeroize();
     Ok(hex_out)
 }
 
 /// Decrypt data that was encrypted with a provisioning shared key.
 ///
-/// `ciphertext_hex`: hex(nonce_24 + ciphertext) — XChaCha20-Poly1305 (provisioning protocol)
-/// `shared_x_hex`: 64-char hex shared x-coordinate from `compute_shared_x_hex`
-///
-/// Retained for the provisioning protocol (will migrate in Phase 3).
+/// `ciphertext_hex`: hex(nonce_12 + ciphertext + tag_16) — AES-256-GCM (provisioning protocol)
+/// `shared_x_hex`: 64-char hex shared secret from `compute_shared_x_hex`
 #[uniffi::export]
 pub fn decrypt_with_shared_key_hex(
     ciphertext_hex: &str,
     shared_x_hex: &str,
 ) -> Result<String, CryptoError> {
-    use chacha20poly1305::{
-        aead::{Aead, KeyInit},
-        XChaCha20Poly1305, XNonce,
+    use aes_gcm::{
+        aead::{Aead, KeyInit, Payload},
+        Aes256Gcm, Nonce,
     };
 
     let shared_x = hex::decode(shared_x_hex).map_err(CryptoError::HexError)?;
@@ -201,16 +196,22 @@ pub fn decrypt_with_shared_key_hex(
     let mut symmetric_key = crate::provisioning::derive_provisioning_key(&shared_x);
 
     let data = hex::decode(ciphertext_hex).map_err(CryptoError::HexError)?;
-    if data.len() < 24 {
+    if data.len() < 28 {
+        // 12 nonce + 16 tag minimum
         return Err(CryptoError::InvalidCiphertext);
     }
-    let nonce = XNonce::from_slice(&data[..24]);
-    let ciphertext = &data[24..];
+    let nonce = Nonce::from_slice(&data[..12]);
 
-    let cipher = XChaCha20Poly1305::new_from_slice(&symmetric_key)
+    let cipher = Aes256Gcm::new_from_slice(&symmetric_key)
         .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
     let plaintext = cipher
-        .decrypt(nonce, ciphertext)
+        .decrypt(
+            nonce,
+            Payload {
+                msg: &data[12..],
+                aad: crate::labels::LABEL_DEVICE_PROVISION.as_bytes(),
+            },
+        )
         .map_err(|_| CryptoError::DecryptionFailed)?;
 
     symmetric_key.zeroize();
@@ -364,53 +365,61 @@ mod tests {
 
     #[test]
     fn compute_shared_x_roundtrip() {
-        let alice = crate::keys::generate_keypair();
-        let bob = crate::keys::generate_keypair();
+        let (alice_sk, alice_pk) = generate_x25519_keypair();
+        let (bob_sk, bob_pk) = generate_x25519_keypair();
 
-        let shared_ab = compute_shared_x_hex(&alice.secret_key_hex, &bob.public_key).unwrap();
-        let shared_ba = compute_shared_x_hex(&bob.secret_key_hex, &alice.public_key).unwrap();
+        let shared_ab = compute_shared_x_hex(&alice_sk, &bob_pk).unwrap();
+        let shared_ba = compute_shared_x_hex(&bob_sk, &alice_pk).unwrap();
         assert_eq!(shared_ab, shared_ba);
         assert_eq!(shared_ab.len(), 64);
     }
 
     #[test]
     fn provisioning_encrypt_decrypt_roundtrip() {
-        use chacha20poly1305::{
-            aead::{Aead, KeyInit},
-            XChaCha20Poly1305, XNonce,
+        use aes_gcm::{
+            aead::{Aead, KeyInit, Payload},
+            Aes256Gcm, Nonce,
         };
 
-        let alice = crate::keys::generate_keypair();
-        let bob = crate::keys::generate_keypair();
+        let (alice_sk, alice_pk) = generate_x25519_keypair();
+        let (bob_sk, bob_pk) = generate_x25519_keypair();
 
-        let shared_x_hex = compute_shared_x_hex(&alice.secret_key_hex, &bob.public_key).unwrap();
+        let shared_x_hex = compute_shared_x_hex(&alice_sk, &bob_pk).unwrap();
         let shared_x = hex::decode(&shared_x_hex).unwrap();
 
         let symmetric_key = crate::provisioning::derive_provisioning_key(&shared_x);
 
         let plaintext = "this is the nsec to transfer";
-        let mut nonce_bytes = [0u8; 24];
+        let mut nonce_bytes = [0u8; 12];
         getrandom::getrandom(&mut nonce_bytes).unwrap();
-        let nonce = XNonce::from_slice(&nonce_bytes);
-        let cipher = XChaCha20Poly1305::new_from_slice(&symmetric_key).unwrap();
-        let ciphertext = cipher.encrypt(nonce, plaintext.as_bytes()).unwrap();
+        let nonce = Nonce::from_slice(&nonce_bytes);
+        let cipher = Aes256Gcm::new_from_slice(&symmetric_key).unwrap();
+        let ciphertext = cipher
+            .encrypt(
+                nonce,
+                Payload {
+                    msg: plaintext.as_bytes(),
+                    aad: crate::labels::LABEL_DEVICE_PROVISION.as_bytes(),
+                },
+            )
+            .unwrap();
 
-        let mut packed = Vec::with_capacity(24 + ciphertext.len());
+        let mut packed = Vec::with_capacity(12 + ciphertext.len());
         packed.extend_from_slice(&nonce_bytes);
         packed.extend_from_slice(&ciphertext);
         let ciphertext_hex = hex::encode(&packed);
 
-        let shared_x_bob = compute_shared_x_hex(&bob.secret_key_hex, &alice.public_key).unwrap();
+        let shared_x_bob = compute_shared_x_hex(&bob_sk, &alice_pk).unwrap();
         let decrypted = decrypt_with_shared_key_hex(&ciphertext_hex, &shared_x_bob).unwrap();
         assert_eq!(decrypted, plaintext);
     }
 
     #[test]
     fn sas_code_format() {
-        let alice = crate::keys::generate_keypair();
-        let bob = crate::keys::generate_keypair();
+        let (alice_sk, alice_pk) = generate_x25519_keypair();
+        let (bob_sk, bob_pk) = generate_x25519_keypair();
 
-        let shared_x = compute_shared_x_hex(&alice.secret_key_hex, &bob.public_key).unwrap();
+        let shared_x = compute_shared_x_hex(&alice_sk, &bob_pk).unwrap();
         let sas = compute_sas_code(&shared_x).unwrap();
 
         assert_eq!(sas.len(), 7);
@@ -421,7 +430,7 @@ mod tests {
         let sas2 = compute_sas_code(&shared_x).unwrap();
         assert_eq!(sas, sas2);
 
-        let shared_x_bob = compute_shared_x_hex(&bob.secret_key_hex, &alice.public_key).unwrap();
+        let shared_x_bob = compute_shared_x_hex(&bob_sk, &alice_pk).unwrap();
         let sas_bob = compute_sas_code(&shared_x_bob).unwrap();
         assert_eq!(sas, sas_bob);
     }
