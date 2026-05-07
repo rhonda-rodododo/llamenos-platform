@@ -19,7 +19,7 @@ export const GET: APIRoute = async ({ params }) => {
   const { title, tags } = post.data;
   const tag = tags[0];
 
-  const fontUrl = 'https://fonts.gstatic.com/s/dmsans/v15/rP2Yp2ywxg089UriI5-g4vlH9VoD8CmcqZG40F9JadbnoEwAopxRR23w.woff2';
+  const fontUrl = 'https://fonts.gstatic.com/s/dmsans/v17/rP2tp2ywxg089UriI5-g4vlH9VoD8CmcqZG40F9JadbnoEwAopxhTg.ttf';
   const fontResponse = await fetch(fontUrl);
   const fontData = await fontResponse.arrayBuffer();
 

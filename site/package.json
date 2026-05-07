@@ -16,6 +16,7 @@
     "astro": "^5.7.0",
     "astro-pagefind": "^1.8.6",
     "marked": "^18.0.2",
+    "react": "^19.0.0",
     "satori": "^0.12.2",
     "tailwindcss": "^4.1.18"
   }
