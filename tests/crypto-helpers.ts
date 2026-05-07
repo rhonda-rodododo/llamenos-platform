@@ -10,6 +10,7 @@ import { CipherSuite, KemId, KdfId, AeadId } from 'hpke-js'
 import { gcm } from '@noble/ciphers/aes.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
+import { x25519 } from '@noble/curves/ed25519.js'
 
 /** HPKE cipher suite matching Rust: DHKEM(X25519, HKDF-SHA256) + HKDF-SHA256 + AES-256-GCM */
 const hpkeSuite = new CipherSuite({
@@ -17,6 +18,17 @@ const hpkeSuite = new CipherSuite({
   kdf: KdfId.HkdfSha256,
   aead: AeadId.Aes256Gcm,
 })
+
+/**
+ * Derive an X25519 public key from a 32-byte seed.
+ *
+ * Ed25519 public keys and X25519 public keys are different byte representations
+ * even when derived from the same seed. HPKE operations (key wrapping) require
+ * X25519 keys, NOT Ed25519 keys.
+ */
+export function x25519PubkeyFromSeed(seedHex: string): string {
+  return bytesToHex(x25519.getPublicKey(hexToBytes(seedHex)))
+}
 
 /**
  * Generate an X25519 keypair for HPKE operations (key wrapping).

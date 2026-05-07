@@ -20,7 +20,7 @@ import { sha256 } from '@noble/hashes/sha2.js'
 import { gcm } from '@noble/ciphers/aes.js'
 import { bytesToHex, hexToBytes, utf8ToBytes } from '@noble/hashes/utils.js'
 import { schnorr } from '@noble/curves/secp256k1.js'
-import { ed25519 } from '@noble/curves/ed25519.js'
+import { ed25519, x25519 } from '@noble/curves/ed25519.js'
 import { hkdf } from '@noble/hashes/hkdf.js'
 import { CipherSuite, KemId, KdfId, AeadId } from 'hpke-js'
 import * as labels from '../packages/shared/crypto-labels'
@@ -80,8 +80,7 @@ test.describe('Cross-platform crypto interop', () => {
     const secretKeyHex = vectors.keys.secretKeyHex
     const expectedPubkey = vectors.keys.x25519PubkeyHex
 
-    // X25519 public key derivation — import as ed25519.js exports x25519
-    const { x25519 } = require('@noble/curves/ed25519.js')
+    // X25519 public key derivation — uses top-level ESM import of @noble/curves
     const pubkey = x25519.getPublicKey(hexToBytes(secretKeyHex))
     expect(bytesToHex(pubkey)).toBe(expectedPubkey)
   })
@@ -90,7 +89,7 @@ test.describe('Cross-platform crypto interop', () => {
     const secretKeyHex = vectors.keys.adminSecretKeyHex
     const expectedPubkey = vectors.keys.adminX25519PubkeyHex
 
-    const { x25519 } = require('@noble/curves/ed25519.js')
+    // X25519 pubkey derivation — uses top-level ESM import of @noble/curves
     const pubkey = x25519.getPublicKey(hexToBytes(secretKeyHex))
     expect(bytesToHex(pubkey)).toBe(expectedPubkey)
   })
@@ -130,12 +129,12 @@ test.describe('Cross-platform crypto interop', () => {
   test('JS can verify auth token produced by Rust', () => {
     const { token, method, path } = vectors.auth
 
-    // Reconstruct the Ed25519 auth message (v1: LABEL_DEVICE_AUTH:timestamp:method:path)
-    const message = `${labels.LABEL_DEVICE_AUTH}:${token.timestamp}:${method}:${path}`
-    const messageHash = sha256(utf8ToBytes(message))
+    // Reconstruct the Ed25519 auth message: LABEL_DEVICE_AUTH:pubkey:timestamp:method:path
+    // Signed as raw UTF-8 bytes (no SHA-256 pre-hash) — matches Rust build_auth_message()
+    const message = `${labels.LABEL_DEVICE_AUTH}:${token.pubkey}:${token.timestamp}:${method}:${path}`
 
-    // Verify Ed25519 signature
-    const valid = ed25519.verify(hexToBytes(token.token), messageHash, hexToBytes(token.pubkey))
+    // Verify Ed25519 signature (signs raw message bytes, no SHA-256 pre-hash)
+    const valid = ed25519.verify(hexToBytes(token.token), utf8ToBytes(message), hexToBytes(token.pubkey))
     expect(valid).toBe(true)
   })
 
@@ -353,18 +352,18 @@ test.describe('Cross-platform crypto interop', () => {
   test('Auth token with wrong method fails verification', () => {
     const { validToken, validPath, wrongMethod } = vectors.adversarial.auth
 
-    const message = `${labels.LABEL_DEVICE_AUTH}:${validToken.timestamp}:${wrongMethod}:${validPath}`
-    const messageHash = sha256(utf8ToBytes(message))
-    const valid = ed25519.verify(hexToBytes(validToken.token), messageHash, hexToBytes(validToken.pubkey))
+    // New format: includes pubkey, raw UTF-8 (no SHA-256 pre-hash)
+    const message = `${labels.LABEL_DEVICE_AUTH}:${validToken.pubkey}:${validToken.timestamp}:${wrongMethod}:${validPath}`
+    const valid = ed25519.verify(hexToBytes(validToken.token), utf8ToBytes(message), hexToBytes(validToken.pubkey))
     expect(valid).toBe(false)
   })
 
   test('Auth token with wrong path fails verification', () => {
     const { validToken, validMethod, wrongPath } = vectors.adversarial.auth
 
-    const message = `${labels.LABEL_DEVICE_AUTH}:${validToken.timestamp}:${validMethod}:${wrongPath}`
-    const messageHash = sha256(utf8ToBytes(message))
-    const valid = ed25519.verify(hexToBytes(validToken.token), messageHash, hexToBytes(validToken.pubkey))
+    // New format: includes pubkey, raw UTF-8 (no SHA-256 pre-hash)
+    const message = `${labels.LABEL_DEVICE_AUTH}:${validToken.pubkey}:${validToken.timestamp}:${validMethod}:${wrongPath}`
+    const valid = ed25519.verify(hexToBytes(validToken.token), utf8ToBytes(message), hexToBytes(validToken.pubkey))
     expect(valid).toBe(false)
   })
 
