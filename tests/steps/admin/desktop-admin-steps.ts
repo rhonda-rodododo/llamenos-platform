@@ -14,7 +14,7 @@
 import { expect, type Page } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
 import { TestIds, navTestIdMap } from '../../test-ids'
-import { Timeouts, navigateAfterLogin } from '../../helpers'
+import { Timeouts, navigateAfterLogin, loginAsAdmin } from '../../helpers'
 
 /**
  * Select a channel card in the setup wizard by label.
@@ -513,6 +513,12 @@ When('I enable the demo mode toggle', async ({ page }) => {
 })
 
 Given('demo mode has been enabled', async ({ page }) => {
+  // Ensure logged in first — this step may run before "I am logged in as an admin"
+  const sidebar = page.getByTestId(TestIds.NAV_SIDEBAR)
+  const isAuth = await sidebar.isVisible({ timeout: 1000 }).catch(() => false)
+  if (!isAuth) {
+    await loginAsAdmin(page)
+  }
   // Navigate to wizard summary and enable the demo mode toggle
   await advanceWizardToStep(page, 5)
   const toggle = page.getByTestId(TestIds.DEMO_MODE_TOGGLE)

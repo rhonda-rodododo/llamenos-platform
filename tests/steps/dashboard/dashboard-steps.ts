@@ -126,12 +126,30 @@ Then('the logout button should be visible in the top bar', async ({ page }) => {
 
 // --- Shift status steps ---
 
-Given('I am off shift', async () => {
-  // Default state — user starts off shift
+Given('I am off shift', async ({ page }) => {
+  // Ensure we're off shift — if button says "Clock Out", click to go off shift
+  const clockBtn = page.getByTestId(TestIds.BREAK_TOGGLE_BTN)
+  const isVisible = await clockBtn.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+  if (isVisible) {
+    const text = await clockBtn.textContent()
+    if (text?.includes('Clock Out')) {
+      await clockBtn.click()
+      await expect(clockBtn).toContainText('Clock In', { timeout: Timeouts.ELEMENT })
+    }
+  }
 })
 
-Given('I am on shift', async () => {
-  // This would require clocking in first — handled by test setup if needed
+Given('I am on shift', async ({ page }) => {
+  // Ensure we're on shift — if button says "Clock In", click to go on shift
+  const clockBtn = page.getByTestId(TestIds.BREAK_TOGGLE_BTN)
+  const isVisible = await clockBtn.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+  if (isVisible) {
+    const text = await clockBtn.textContent()
+    if (text?.includes('Clock In')) {
+      await clockBtn.click()
+      await expect(clockBtn).toContainText('Clock Out', { timeout: Timeouts.ELEMENT })
+    }
+  }
 })
 
 Then('the dashboard clock button should say {string}', async ({ page }, text: string) => {

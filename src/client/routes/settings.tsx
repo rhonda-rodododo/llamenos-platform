@@ -41,6 +41,7 @@ import {
   clearPendingReports,
 } from '@/lib/crash-reporting'
 import { SignalNotificationSection } from '@/components/signal-notification-section'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 
 export const Route = createFileRoute('/settings')({
   component: SettingsPage,
@@ -65,6 +66,7 @@ function SettingsPage() {
   const webauthnAvailable = isWebAuthnAvailable()
   const [currentCallPref, setCurrentCallPref] = useState<'phone' | 'browser' | 'both'>(callPreference)
   const [webrtcAvailable, setWebrtcAvailable] = useState(false)
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false)
 
   // Collapsible state — persisted in sessionStorage, profile expanded by default
   const { expanded, toggleSection } = usePersistedExpanded(
@@ -512,17 +514,27 @@ function SettingsPage() {
           {t('settings.lockApp', { defaultValue: 'Lock App' })}
         </button>
         <button
-          data-testid="logout-btn"
-          onClick={() => {
-            signOut()
-            void navigate({ to: '/login' })
-          }}
+          data-testid="settings-logout-btn"
+          onClick={() => setShowLogoutDialog(true)}
           className="flex w-full items-center gap-2 rounded-md border border-destructive/40 px-4 py-2.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10"
         >
           <LogOut className="h-4 w-4" />
           {t('common.logout', { defaultValue: 'Log Out' })}
         </button>
       </div>
+
+      <ConfirmDialog
+        open={showLogoutDialog}
+        onOpenChange={setShowLogoutDialog}
+        title={t('settings.logoutTitle', { defaultValue: 'Log Out' })}
+        description={t('settings.logoutDescription', { defaultValue: 'Are you sure you want to log out? Your encrypted keys will be removed from this device.' })}
+        confirmLabel={t('common.confirm', { defaultValue: 'Confirm' })}
+        variant="destructive"
+        onConfirm={async () => {
+          signOut()
+          await navigate({ to: '/login' })
+        }}
+      />
 
       {/* App version */}
       <p className="text-xs text-muted-foreground text-center pt-2">

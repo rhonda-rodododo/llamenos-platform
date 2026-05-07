@@ -1,70 +1,85 @@
 /**
  * Shift detail step definitions.
- * Matches steps from: packages/test-specs/features/shifts/shift-detail.feature
+ * Matches steps from: packages/test-specs/features/admin/shift-management.feature
  *
- * Behavioral depth: Hard assertions, no .or() fallbacks or if(visible) guards.
+ * Desktop: Shifts are managed inline (edit form in-page), not via a detail screen.
+ * "Tap a shift card" opens the edit form; "back button" cancels it.
  */
 import { expect } from '@playwright/test'
 import { When, Then } from '../fixtures'
 import { TestIds } from '../../test-ids'
 import { Timeouts } from '../../helpers'
 import { listShiftsViaApi, createShiftViaApi } from '../../api-helpers'
+import { Navigation } from '../../pages/index'
 
 When('I tap a shift card', async ({ page, backendRequest: request, workerHub }) => {
   // Ensure at least one shift exists so the tap has something to click.
   const existingShifts = await listShiftsViaApi(request, workerHub).catch(() => [])
   if (existingShifts.length === 0) {
     await createShiftViaApi(request, { name: `Auto-seeded Shift ${Date.now()}`, hubId: workerHub })
-    // SPA-navigate away and back to refresh the shift list, avoiding a full
-    // page reload (which would trigger PIN re-entry)
-    await page.evaluate(() => {
-      const router = (window as any).__TEST_ROUTER
-      if (router) {
-        router.navigate({ to: '/' })
-        setTimeout(() => router.navigate({ to: '/shifts' }), 100)
-      }
-    })
-    await page.waitForURL(/\/shifts/, { timeout: Timeouts.ELEMENT })
+    // Navigate away and back to refresh shift list
+    await Navigation.goToDashboard(page)
+    await Navigation.goToShifts(page)
   }
   const shiftCard = page.getByTestId(TestIds.SHIFT_CARD).first()
   await expect(shiftCard).toBeVisible({ timeout: Timeouts.ELEMENT })
-  await shiftCard.click()
+  // Desktop: click the edit button on the shift card to open the inline edit form
+  const editBtn = shiftCard.getByTestId(TestIds.SHIFT_EDIT_BTN)
+  await editBtn.click()
+  // Wait for the edit form to appear
+  await expect(page.getByTestId(TestIds.SHIFT_FORM)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('I should see the shift detail screen', async ({ page }) => {
-  // Shift detail shows shift info — verify page title or shift card is visible
-  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // Desktop: the shift edit form is the "detail screen"
+  await expect(page.getByTestId(TestIds.SHIFT_FORM)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('I should see the shift info card', async ({ page }) => {
-  await expect(page.getByTestId(TestIds.SHIFT_CARD).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // Desktop: shift form contains shift info (name, times)
+  await expect(page.getByTestId(TestIds.SHIFT_NAME_INPUT)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('I should see the volunteer assignment section', async ({ page }) => {
-  await expect(page.getByTestId(TestIds.SHIFT_VOLUNTEER_COUNT).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // Desktop: UserMultiSelect combobox in the shift form
+  const form = page.getByTestId(TestIds.SHIFT_FORM)
+  const combobox = form.getByRole('combobox')
+  await expect(combobox).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 When('I tap a volunteer assignment card', async ({ page }) => {
-  const checkbox = page.locator('input[type="checkbox"]').first()
-  await expect(checkbox).toBeVisible({ timeout: Timeouts.ELEMENT })
-  const wasBefore = await checkbox.isChecked()
-  await checkbox.click()
-  // Store the expected state for verification
-  await page.evaluate((prev) => {
-    (window as Record<string, unknown>).__test_checkbox_was = prev
-  }, wasBefore)
+  // Desktop: volunteer assignment is via UserMultiSelect combobox, not cards
+  const form = page.getByTestId(TestIds.SHIFT_FORM)
+  const combobox = form.getByRole('combobox')
+  await expect(combobox).toBeVisible({ timeout: Timeouts.ELEMENT })
+
+  // Count currently selected badges before toggling
+  const badgesBefore = await combobox.locator('[role="button"]').count()
+  await page.evaluate((count) => {
+    (window as Record<string, unknown>).__test_badge_count_before = count
+  }, badgesBefore)
+
+  // Open the dropdown and click the first volunteer
+  await combobox.click()
+  const firstOption = page.locator('[cmdk-item]').first()
+  await expect(firstOption).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await firstOption.click()
 })
 
 Then('the volunteer assignment should toggle', async ({ page }) => {
-  const checkbox = page.locator('input[type="checkbox"]').first()
-  const wasBefore = (await page.evaluate(() => (window as Record<string, unknown>).__test_checkbox_was)) as boolean
-  // Verify the checkbox actually toggled
-  const isNow = await checkbox.isChecked()
-  expect(isNow).not.toBe(wasBefore)
+  // Desktop: verify the badge count changed (volunteer added or removed)
+  const form = page.getByTestId(TestIds.SHIFT_FORM)
+  const combobox = form.getByRole('combobox')
+  const badgesBefore = (await page.evaluate(() =>
+    (window as Record<string, unknown>).__test_badge_count_before,
+  )) as number
+  const badgesAfter = await combobox.locator('[role="button"]').count()
+  expect(badgesAfter).not.toBe(badgesBefore)
 })
 
 When('I tap the back button on the shift detail', async ({ page }) => {
-  const backBtn = page.getByTestId(TestIds.BACK_BTN)
-  await expect(backBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
-  await backBtn.click()
+  // Desktop: "back" means cancel the edit form
+  const cancelBtn = page.getByTestId(TestIds.FORM_CANCEL_BTN)
+  await expect(cancelBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await cancelBtn.click()
 })

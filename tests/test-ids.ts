@@ -35,6 +35,7 @@ export const TestIds = {
   NAV_TRIAGE: 'nav-triage',
   NAV_HELP: 'nav-help',
   LOGOUT_BTN: 'logout-btn',
+  SETTINGS_LOGOUT_BTN: 'settings-logout-btn',
 
   // ============ Volunteers ============
   VOLUNTEER_LIST: 'volunteer-list',

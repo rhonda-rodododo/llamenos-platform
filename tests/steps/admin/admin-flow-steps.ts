@@ -42,13 +42,13 @@ When('I close the nsec card', async ({ page }) => {
   await expect(page.getByTestId(TestIds.DISMISS_NSEC)).not.toBeVisible({ timeout: 5000 })
 })
 
-Then('the volunteer should appear in the list', async ({ page, request, adminWorld }) => {
+Then('the volunteer should appear in the list', async ({ page, backendRequest, workerHub, adminWorld }) => {
   // UI verification
   const row = page.getByTestId(TestIds.VOLUNTEER_ROW).filter({ hasText: adminWorld.lastUserName })
   await expect(row.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 
   // API verification: volunteer exists in backend
-  const volunteers = await listVolunteersViaApi(request)
+  const volunteers = await listVolunteersViaApi(backendRequest, workerHub)
   const found = volunteers.find(v => v.name === adminWorld.lastUserName)
   expect(found).toBeTruthy()
   adminWorld.lastUserPubkey = found!.pubkey
@@ -61,20 +61,20 @@ When('I delete the volunteer', async ({ page, adminWorld }) => {
   await expect(page.getByRole('dialog')).toBeHidden({ timeout: 5000 })
 })
 
-Then('the volunteer should be removed from the list', async ({ page, request, adminWorld }) => {
+Then('the volunteer should be removed from the list', async ({ page, backendRequest, workerHub, adminWorld }) => {
   // UI verification
   const row = page.getByTestId(TestIds.VOLUNTEER_ROW).filter({ hasText: adminWorld.lastUserName })
   await expect(row).not.toBeVisible({ timeout: Timeouts.ELEMENT })
 
   // API verification: volunteer is gone
-  const volunteers = await listVolunteersViaApi(request)
+  const volunteers = await listVolunteersViaApi(backendRequest, workerHub)
   const found = volunteers.find(v => v.name === adminWorld.lastUserName)
   expect(found).toBeUndefined()
 })
 
 // --- Shift CRUD ---
 
-When('I create a new shift with a unique name', async ({ page, request, adminWorld }) => {
+When('I create a new shift with a unique name', async ({ page, backendRequest, workerHub, adminWorld }) => {
   adminWorld.lastShiftName = `Shift ${Date.now()}`
   await page.getByTestId(TestIds.SHIFT_CREATE_BTN).click()
   await page.getByTestId(TestIds.SHIFT_NAME_INPUT).fill(adminWorld.lastShiftName)
@@ -85,7 +85,7 @@ When('I create a new shift with a unique name', async ({ page, request, adminWor
   await expect(card.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 
   // API verification: shift was created in backend
-  const shifts = await listShiftsViaApi(request)
+  const shifts = await listShiftsViaApi(backendRequest, workerHub)
   const found = shifts.find(s => s.name === adminWorld.lastShiftName)
   expect(found).toBeTruthy()
 })
@@ -105,13 +105,13 @@ When('I edit the shift with a new name', async ({ page, adminWorld }) => {
   adminWorld.lastShiftName = updatedName
 })
 
-Then('the updated shift name should appear', async ({ page, request, adminWorld }) => {
+Then('the updated shift name should appear', async ({ page, backendRequest, workerHub, adminWorld }) => {
   // UI verification
   const card = page.getByTestId(TestIds.SHIFT_CARD).filter({ hasText: adminWorld.lastShiftName })
   await expect(card.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 
   // API verification: updated name persisted
-  const shifts = await listShiftsViaApi(request)
+  const shifts = await listShiftsViaApi(backendRequest, workerHub)
   const found = shifts.find(s => s.name === adminWorld.lastShiftName)
   expect(found).toBeTruthy()
 })
@@ -121,13 +121,13 @@ When('I delete the shift', async ({ page, adminWorld }) => {
   await shiftCard.getByTestId(TestIds.SHIFT_DELETE_BTN).click()
 })
 
-Then('the shift should no longer appear', async ({ page, request, adminWorld }) => {
+Then('the shift should no longer appear', async ({ page, backendRequest, workerHub, adminWorld }) => {
   // UI verification
   const card = page.getByTestId(TestIds.SHIFT_CARD).filter({ hasText: adminWorld.lastShiftName })
   await expect(card).not.toBeVisible({ timeout: Timeouts.ELEMENT })
 
   // API verification: shift is gone
-  const shifts = await listShiftsViaApi(request)
+  const shifts = await listShiftsViaApi(backendRequest, workerHub)
   const found = shifts.find(s => s.name === adminWorld.lastShiftName)
   expect(found).toBeUndefined()
 })
@@ -143,13 +143,13 @@ When('I ban a unique phone number with reason {string}', async ({ page, adminWor
   await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
 })
 
-Then('the banned phone number should appear', async ({ page, request, adminWorld }) => {
+Then('the banned phone number should appear', async ({ page, backendRequest, workerHub, adminWorld }) => {
   // UI verification
   const row = page.getByTestId(TestIds.BAN_ROW).filter({ hasText: adminWorld.lastPhone })
   await expect(row.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 
   // API verification
-  const bans = await listBansViaApi(request)
+  const bans = await listBansViaApi(backendRequest, workerHub)
   const found = bans.find(b => b.phone === adminWorld.lastPhone)
   expect(found).toBeTruthy()
 })
@@ -162,13 +162,13 @@ When('I remove the ban for that phone number', async ({ page, adminWorld }) => {
   await expect(page.getByRole('dialog')).toBeHidden({ timeout: 5000 })
 })
 
-Then('the phone number should no longer appear', async ({ page, request, adminWorld }) => {
+Then('the phone number should no longer appear', async ({ page, backendRequest, workerHub, adminWorld }) => {
   // UI verification
   const row = page.getByTestId(TestIds.BAN_ROW).filter({ hasText: adminWorld.lastPhone })
   await expect(row).not.toBeVisible({ timeout: Timeouts.ELEMENT })
 
   // API verification
-  const bans = await listBansViaApi(request)
+  const bans = await listBansViaApi(backendRequest, workerHub)
   const found = bans.find(b => b.phone === adminWorld.lastPhone)
   expect(found).toBeUndefined()
 })
