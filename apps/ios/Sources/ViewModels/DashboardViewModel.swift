@@ -292,12 +292,12 @@ final class DashboardViewModel {
                 var hpkeEnvelope: HpkeEnvelope?
 
                 if encrypted.authorPubkey == ourPubkey, let authorEnv = encrypted.authorEnvelope {
-                    hpkeEnvelope = HpkeEnvelope(v: 3, labelId: 0, enc: authorEnv.ephemeralPubkey, ct: authorEnv.wrappedKey)
+                    hpkeEnvelope = HpkeEnvelope(v: 3, labelId: 0, enc: authorEnv.enc, ct: authorEnv.ct)
                 }
 
                 if hpkeEnvelope == nil, let adminEnvs = encrypted.adminEnvelopes {
                     if let ourEnv = adminEnvs.first(where: { $0.pubkey == ourPubkey }) {
-                        hpkeEnvelope = HpkeEnvelope(v: 3, labelId: 0, enc: ourEnv.ephemeralPubkey, ct: ourEnv.wrappedKey)
+                        hpkeEnvelope = HpkeEnvelope(v: 3, labelId: 0, enc: ourEnv.enc, ct: ourEnv.ct)
                     }
                 }
 

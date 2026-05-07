@@ -254,26 +254,6 @@ final class WakeKeyService: @unchecked Sendable {
         return result
     }
 
-    /// Legacy ECIES decryption for push payloads (backward compat during server transition).
-    func decryptWakePayloadLegacy(encryptedHex: String) throws -> String {
-        let privateKeyHex = try retrieveWakePrivateKey()
-
-        guard encryptedHex.count >= 66 else {
-            throw WakeKeyError.decryptionFailed("Payload too short")
-        }
-
-        // ECIES payload format: ephemeralPubkey (33 bytes = 66 hex) + packed(nonce + ciphertext)
-        let ephemeralPubkeyHex = String(encryptedHex.prefix(66))
-        let packedHex = String(encryptedHex.dropFirst(66))
-
-        return try eciesDecryptContentHex(
-            packedHex: packedHex,
-            ephemeralPubkeyHex: ephemeralPubkeyHex,
-            secretKeyHex: privateKeyHex,
-            label: CryptoLabels.LABEL_PUSH_WAKE
-        )
-    }
-
     // MARK: - Key Derivation
 
     /// Derive an X25519 public key from a private key hex string.

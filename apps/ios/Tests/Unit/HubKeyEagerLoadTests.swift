@@ -19,9 +19,9 @@ final class TrackingHubAPIService: HubAPIServiceProtocol, @unchecked Sendable {
         if let error = hubKeyError { throw error }
         return HubKeyEnvelopeResponse(
             envelope: HubKeyEnvelopeResponseEnvelope(
-                ephemeralPubkey: "aabbcc",
-                pubkey: "ddeeff",
-                wrappedKey: "112233"
+                ct: "112233",
+                enc: "aabbcc",
+                pubkey: "ddeeff"
             )
         )
     }

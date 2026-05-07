@@ -889,8 +889,8 @@ private struct TimelineItemRow: View {
             let hpkeEnvelope = HpkeEnvelope(
                 v: 3,
                 labelId: 0,
-                enc: envelope.ephemeralPubkey,
-                ct: envelope.wrappedKey
+                enc: envelope.enc,
+                ct: envelope.ct
             )
             let plaintext = try cryptoService.decryptMessage(
                 encryptedContent: encrypted,

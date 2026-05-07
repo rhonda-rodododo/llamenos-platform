@@ -26,9 +26,9 @@ final class MockHubAPIService: HubAPIServiceProtocol {
             // HubKeyEnvelopeResponse is generated in packages/protocol/generated/swift/Types.swift
             return HubKeyEnvelopeResponse(
                 envelope: HubKeyEnvelopeResponseEnvelope(
-                    ephemeralPubkey: "112233",
-                    pubkey: "aabbcc",
-                    wrappedKey: "ddeeff"
+                    ct: "ddeeff",
+                    enc: "112233",
+                    pubkey: "aabbcc"
                 )
             )
         }
