@@ -55,10 +55,7 @@ fn parse_x25519_pubkey(pubkey_hex: &str) -> Result<X25519PublicKey, CryptoError>
 }
 
 /// Compute X25519 shared secret between our secret key and their public key.
-fn compute_shared_secret(
-    sk: &X25519StaticSecret,
-    their_pk: &X25519PublicKey,
-) -> [u8; 32] {
+fn compute_shared_secret(sk: &X25519StaticSecret, their_pk: &X25519PublicKey) -> [u8; 32] {
     let shared = sk.diffie_hellman(their_pk);
     *shared.as_bytes()
 }
@@ -239,17 +236,13 @@ mod tests {
         let primary_sk_bytes = hex::decode(primary_sk.as_str()).unwrap();
 
         // Primary encrypts nsec for provisioning
-        let result =
-            encrypt_nsec_for_provisioning(&primary_sk_bytes, &ephemeral_pk).unwrap();
+        let result = encrypt_nsec_for_provisioning(&primary_sk_bytes, &ephemeral_pk).unwrap();
 
         // New device decrypts
         let ephemeral_sk_bytes = hex::decode(ephemeral_sk.as_str()).unwrap();
-        let decrypted = decrypt_provisioned_nsec(
-            &result.encrypted_hex,
-            &primary_pk,
-            &ephemeral_sk_bytes,
-        )
-        .unwrap();
+        let decrypted =
+            decrypt_provisioned_nsec(&result.encrypted_hex, &primary_pk, &ephemeral_sk_bytes)
+                .unwrap();
 
         // Verify the nsec round-trips
         let expected_nsec = bech32::encode::<bech32::Bech32>(
@@ -276,23 +269,18 @@ mod tests {
         let (wrong_sk, _wrong_pk) = generate_x25519_keypair();
 
         let primary_sk_bytes = hex::decode(primary_sk.as_str()).unwrap();
-        let result =
-            encrypt_nsec_for_provisioning(&primary_sk_bytes, &ephemeral_pk).unwrap();
+        let result = encrypt_nsec_for_provisioning(&primary_sk_bytes, &ephemeral_pk).unwrap();
 
         // Derive primary pubkey for the decrypt side
-        let primary_secret = X25519StaticSecret::from(
-            <[u8; 32]>::try_from(primary_sk_bytes.as_slice()).unwrap(),
-        );
+        let primary_secret =
+            X25519StaticSecret::from(<[u8; 32]>::try_from(primary_sk_bytes.as_slice()).unwrap());
         let primary_pubkey = X25519PublicKey::from(&primary_secret);
         let primary_pk_hex = hex::encode(primary_pubkey.as_bytes());
 
         // Try decrypting with wrong ephemeral key
         let wrong_sk_bytes = hex::decode(wrong_sk.as_str()).unwrap();
-        let decrypted = decrypt_provisioned_nsec(
-            &result.encrypted_hex,
-            &primary_pk_hex,
-            &wrong_sk_bytes,
-        );
+        let decrypted =
+            decrypt_provisioned_nsec(&result.encrypted_hex, &primary_pk_hex, &wrong_sk_bytes);
         assert!(decrypted.is_err());
     }
 
@@ -302,8 +290,7 @@ mod tests {
         let (ephemeral_sk, ephemeral_pk) = generate_x25519_keypair();
 
         let primary_sk_bytes = hex::decode(primary_sk.as_str()).unwrap();
-        let result =
-            encrypt_nsec_for_provisioning(&primary_sk_bytes, &ephemeral_pk).unwrap();
+        let result = encrypt_nsec_for_provisioning(&primary_sk_bytes, &ephemeral_pk).unwrap();
 
         // Tamper with the ciphertext
         let mut bytes = hex::decode(&result.encrypted_hex).unwrap();
@@ -312,18 +299,13 @@ mod tests {
         }
         let tampered = hex::encode(&bytes);
 
-        let primary_secret = X25519StaticSecret::from(
-            <[u8; 32]>::try_from(primary_sk_bytes.as_slice()).unwrap(),
-        );
+        let primary_secret =
+            X25519StaticSecret::from(<[u8; 32]>::try_from(primary_sk_bytes.as_slice()).unwrap());
         let primary_pubkey = X25519PublicKey::from(&primary_secret);
         let primary_pk_hex = hex::encode(primary_pubkey.as_bytes());
 
         let ephemeral_sk_bytes = hex::decode(ephemeral_sk.as_str()).unwrap();
-        let decrypted = decrypt_provisioned_nsec(
-            &tampered,
-            &primary_pk_hex,
-            &ephemeral_sk_bytes,
-        );
+        let decrypted = decrypt_provisioned_nsec(&tampered, &primary_pk_hex, &ephemeral_sk_bytes);
         assert!(decrypted.is_err());
     }
 

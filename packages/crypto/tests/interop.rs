@@ -13,8 +13,8 @@ use llamenos_core::auth::{create_auth_token_from_signing_key, verify_auth_token,
 use llamenos_core::encryption::{
     decrypt_call_record, decrypt_draft, decrypt_message, decrypt_note, decrypt_with_pin,
     encrypt_draft, encrypt_export, encrypt_message, encrypt_note, encrypt_with_pin,
-    hpke_unwrap_key, hpke_wrap_key,
-    EncryptedKeyData, EncryptedMessage, EncryptedNote, KeyEnvelope, RecipientKeyEnvelope,
+    hpke_unwrap_key, hpke_wrap_key, EncryptedKeyData, EncryptedMessage, EncryptedNote, KeyEnvelope,
+    RecipientKeyEnvelope,
 };
 use llamenos_core::keys::generate_keypair;
 use llamenos_core::labels::*;
@@ -849,7 +849,11 @@ fn pin_encryption_format_consistency() {
         64,
         "salt must be 64 hex chars (32 bytes)"
     );
-    assert_eq!(encrypted.nonce.len(), 24, "nonce must be 24 hex chars (12 bytes)");
+    assert_eq!(
+        encrypted.nonce.len(),
+        24,
+        "nonce must be 24 hex chars (12 bytes)"
+    );
 
     let decrypted = decrypt_with_pin(&encrypted, "56789012").unwrap();
     assert_eq!(decrypted, kp.nsec);

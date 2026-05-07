@@ -98,18 +98,20 @@ pub fn hpke_unwrap_key(
 // ── Helpers: AES-256-GCM symmetric encryption ───────────────────────
 
 /// Encrypt plaintext with AES-256-GCM. Returns nonce(12) || ciphertext || tag(16).
-fn aes256gcm_encrypt(
-    key: &[u8; 32],
-    plaintext: &[u8],
-    aad: &[u8],
-) -> Result<Vec<u8>, CryptoError> {
+fn aes256gcm_encrypt(key: &[u8; 32], plaintext: &[u8], aad: &[u8]) -> Result<Vec<u8>, CryptoError> {
     let mut nonce_bytes = [0u8; 12];
     getrandom::getrandom(&mut nonce_bytes).expect("getrandom failed");
-    let cipher = Aes256Gcm::new_from_slice(key)
-        .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
+    let cipher =
+        Aes256Gcm::new_from_slice(key).map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
     let nonce = Nonce::from_slice(&nonce_bytes);
     let ciphertext = cipher
-        .encrypt(nonce, Payload { msg: plaintext, aad })
+        .encrypt(
+            nonce,
+            Payload {
+                msg: plaintext,
+                aad,
+            },
+        )
         .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
     let mut packed = Vec::with_capacity(12 + ciphertext.len());
     packed.extend_from_slice(&nonce_bytes);
@@ -124,10 +126,16 @@ fn aes256gcm_decrypt(key: &[u8; 32], packed: &[u8], aad: &[u8]) -> Result<Vec<u8
         return Err(CryptoError::InvalidCiphertext);
     }
     let nonce = Nonce::from_slice(&packed[..12]);
-    let cipher = Aes256Gcm::new_from_slice(key)
-        .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
+    let cipher =
+        Aes256Gcm::new_from_slice(key).map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
     cipher
-        .decrypt(nonce, Payload { msg: &packed[12..], aad })
+        .decrypt(
+            nonce,
+            Payload {
+                msg: &packed[12..],
+                aad,
+            },
+        )
         .map_err(|_| CryptoError::DecryptionFailed)
 }
 
@@ -161,7 +169,11 @@ pub fn encrypt_note(
 ) -> Result<EncryptedNote, CryptoError> {
     let note_key = Zeroizing::new(random_bytes_32());
 
-    let packed = aes256gcm_encrypt(&note_key, payload_json.as_bytes(), LABEL_NOTE_KEY.as_bytes())?;
+    let packed = aes256gcm_encrypt(
+        &note_key,
+        payload_json.as_bytes(),
+        LABEL_NOTE_KEY.as_bytes(),
+    )?;
 
     let author_envelope = hpke_wrap_key(&note_key, author_pubkey, LABEL_NOTE_KEY)?;
 
@@ -222,8 +234,7 @@ pub fn encrypt_message(
 ) -> Result<EncryptedMessage, CryptoError> {
     let message_key = Zeroizing::new(random_bytes_32());
 
-    let packed =
-        aes256gcm_encrypt(&message_key, plaintext.as_bytes(), LABEL_MESSAGE.as_bytes())?;
+    let packed = aes256gcm_encrypt(&message_key, plaintext.as_bytes(), LABEL_MESSAGE.as_bytes())?;
 
     let reader_envelopes: Result<Vec<RecipientKeyEnvelope>, CryptoError> = reader_pubkeys
         .iter()
@@ -344,8 +355,11 @@ pub fn decrypt_draft(packed_hex: &str, secret_key_hex: &str) -> Result<String, C
 
     let mut key = derive_encryption_key(&sk, HKDF_CONTEXT_DRAFTS);
     let data = hex::decode(packed_hex).map_err(CryptoError::HexError)?;
-    let plaintext =
-        Zeroizing::new(aes256gcm_decrypt(&key, &data, HKDF_CONTEXT_DRAFTS.as_bytes())?);
+    let plaintext = Zeroizing::new(aes256gcm_decrypt(
+        &key,
+        &data,
+        HKDF_CONTEXT_DRAFTS.as_bytes(),
+    )?);
 
     key.zeroize();
     sk.zeroize();
@@ -365,8 +379,7 @@ pub fn encrypt_export(json_string: &str, secret_key_hex: &str) -> Result<String,
     sk.copy_from_slice(&sk_bytes);
 
     let mut key = derive_encryption_key(&sk, HKDF_CONTEXT_EXPORT);
-    let packed =
-        aes256gcm_encrypt(&key, json_string.as_bytes(), HKDF_CONTEXT_EXPORT.as_bytes())?;
+    let packed = aes256gcm_encrypt(&key, json_string.as_bytes(), HKDF_CONTEXT_EXPORT.as_bytes())?;
 
     key.zeroize();
     sk.zeroize();
@@ -520,12 +533,8 @@ mod tests {
             enc: admin1_env.enc.clone(),
             ct: admin1_env.ct.clone(),
         };
-        let decrypted = decrypt_note(
-            &encrypted.encrypted_content,
-            &admin1_envelope,
-            &admin1_sk,
-        )
-        .unwrap();
+        let decrypted =
+            decrypt_note(&encrypted.encrypted_content, &admin1_envelope, &admin1_sk).unwrap();
         assert_eq!(decrypted, payload);
     }
 
@@ -649,11 +658,8 @@ mod tests {
         let (_reader2_sk, reader2_pk) = gen_keypair();
         let (wrong_reader_sk, wrong_reader_pk) = gen_keypair();
 
-        let encrypted = encrypt_message(
-            "Secret message",
-            &[reader1_pk.clone(), reader2_pk.clone()],
-        )
-        .unwrap();
+        let encrypted =
+            encrypt_message("Secret message", &[reader1_pk.clone(), reader2_pk.clone()]).unwrap();
 
         let result = decrypt_message(
             &encrypted.encrypted_content,
@@ -691,8 +697,7 @@ mod tests {
         let mut skb = [0u8; 32];
         skb.copy_from_slice(&sk_bytes);
         let key = derive_encryption_key(&skb, HKDF_CONTEXT_EXPORT);
-        let plaintext =
-            aes256gcm_decrypt(&key, &decoded, HKDF_CONTEXT_EXPORT.as_bytes()).unwrap();
+        let plaintext = aes256gcm_decrypt(&key, &decoded, HKDF_CONTEXT_EXPORT.as_bytes()).unwrap();
         assert_eq!(String::from_utf8(plaintext).unwrap(), json);
     }
 }
