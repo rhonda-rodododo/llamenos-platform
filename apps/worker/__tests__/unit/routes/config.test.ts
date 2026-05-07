@@ -83,7 +83,7 @@ describe('config route', () => {
       expect(body.hubs).toHaveLength(1)
       expect(body.hubs[0].id).toBe('hub-1')
       expect(body.defaultHubId).toBe('hub-1')
-      expect(body.nostrRelayUrl).toBe('wss://relay.example.com')
+      expect(body.nostrRelayUrl).toBe('/ws')
       expect(body.apiVersion).toBeDefined()
       expect(body.minApiVersion).toBeDefined()
       expect(body.sentryDsn).toBe('https://example.com/dsn')
@@ -199,29 +199,28 @@ describe('config route', () => {
       expect(body.hubs[0].status).toBe('active')
     })
 
-    it('falls back to /nostr for relay url when NOSTR_RELAY_PUBLIC_URL not set but NOSTR_RELAY_URL is set', async () => {
+    it('returns /ws for relay url when server secret is configured', async () => {
       const services = createMockServices()
-      const app = createTestApp({
-        services,
-        env: { NOSTR_RELAY_PUBLIC_URL: undefined, NOSTR_RELAY_URL: 'ws://localhost:7777' },
-      })
+      const app = createTestApp({ services })
 
       const res = await app.request('/')
       expect(res.status).toBe(200)
       const body = await res.json()
-      expect(body.nostrRelayUrl).toBe('/nostr')
+      expect(body.wsRelayUrl).toBe('/ws')
+      expect(body.nostrRelayUrl).toBe('/ws') // legacy alias
     })
 
-    it('returns undefined relay url when no relay configured', async () => {
+    it('returns undefined relay url when no server secret configured', async () => {
       const services = createMockServices()
       const app = createTestApp({
         services,
-        env: { NOSTR_RELAY_PUBLIC_URL: undefined, NOSTR_RELAY_URL: undefined },
+        env: { SERVER_SECRET: undefined, SERVER_NOSTR_SECRET: undefined },
       })
 
       const res = await app.request('/')
       expect(res.status).toBe(200)
       const body = await res.json()
+      expect(body.wsRelayUrl).toBeUndefined()
       expect(body.nostrRelayUrl).toBeUndefined()
     })
 
@@ -242,7 +241,7 @@ describe('config route', () => {
       const services = createMockServices()
       const app = createTestApp({
         services,
-        env: { SERVER_NOSTR_SECRET: undefined },
+        env: { SERVER_SECRET: undefined, SERVER_NOSTR_SECRET: undefined },
       })
 
       const res = await app.request('/')
@@ -255,7 +254,7 @@ describe('config route', () => {
       const services = createMockServices()
       const app = createTestApp({
         services,
-        env: { SERVER_NOSTR_SECRET: 'not-valid-hex' },
+        env: { SERVER_SECRET: 'not-valid-hex', SERVER_NOSTR_SECRET: 'not-valid-hex' },
       })
 
       const res = await app.request('/')
