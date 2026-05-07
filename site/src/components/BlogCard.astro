@@ -1,0 +1,56 @@
+---
+import type { CollectionEntry } from 'astro:content';
+
+interface Props {
+  post: CollectionEntry<'blog'>;
+}
+
+const { post } = Astro.props;
+const { title, description, pubDate, tags, coverImage } = post.data;
+
+// Estimate read time: ~200 words per minute
+const wordCount = post.body?.split(/\s+/).length || 0;
+const readTime = Math.max(1, Math.ceil(wordCount / 200));
+
+const dateStr = pubDate.toLocaleDateString('en-US', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+});
+---
+
+<article class="group flex flex-col bg-bg-card border border-border rounded-xl overflow-hidden transition-all duration-300 hover:border-accent/40 hover:shadow-lg hover:shadow-accent/5">
+  {coverImage && (
+    <div class="aspect-[16/9] overflow-hidden">
+      <img
+        src={coverImage}
+        alt={title}
+        class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+        loading="lazy"
+      />
+    </div>
+  )}
+  <div class="flex flex-col flex-1 p-6">
+    <div class="flex items-center gap-3 text-xs text-fg-dim mb-3">
+      <time datetime={pubDate.toISOString()}>{dateStr}</time>
+      <span>·</span>
+      <span>{readTime} min read</span>
+    </div>
+    <h3 class="text-lg font-semibold text-fg mb-2 group-hover:text-accent-bright transition-colors">
+      <a href={`/blog/${post.id}`} class="focus:outline-none">
+        <span class="absolute inset-0" aria-hidden="true"></span>
+        {title}
+      </a>
+    </h3>
+    <p class="text-sm text-fg-muted line-clamp-3 mb-4 flex-1">{description}</p>
+    {tags.length > 0 && (
+      <div class="flex flex-wrap gap-2">
+        {tags.map(tag => (
+          <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-bg-soft text-fg-muted border border-border">
+            {tag}
+          </span>
+        ))}
+      </div>
+    )}
+  </div>
+</article>

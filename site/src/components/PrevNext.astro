@@ -1,0 +1,46 @@
+---
+import type { CollectionEntry } from 'astro:content';
+
+interface Props {
+  prev?: CollectionEntry<'blog'>;
+  next?: CollectionEntry<'blog'>;
+}
+
+const { prev, next } = Astro.props;
+---
+
+{(prev || next) && (
+  <nav class="border-t border-border pt-10 mt-16">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {prev && (
+        <a
+          href={`/blog/${prev.id}`}
+          class="group flex flex-col p-6 rounded-xl border border-border bg-bg-soft/30 hover:border-accent/40 hover:bg-bg-soft transition-all"
+        >
+          <span class="text-xs text-fg-dim mb-2 flex items-center gap-1">
+            <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+            Previous
+          </span>
+          <span class="text-sm font-medium text-fg group-hover:text-accent-bright transition-colors line-clamp-2">
+            {prev.data.title}
+          </span>
+        </a>
+      )}
+      {!prev && <div />}
+      {next && (
+        <a
+          href={`/blog/${next.id}`}
+          class="group flex flex-col p-6 rounded-xl border border-border bg-bg-soft/30 hover:border-accent/40 hover:bg-bg-soft transition-all md:text-right"
+        >
+          <span class="text-xs text-fg-dim mb-2 flex items-center gap-1 md:justify-end">
+            Next
+            <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+          </span>
+          <span class="text-sm font-medium text-fg group-hover:text-accent-bright transition-colors line-clamp-2">
+            {next.data.title}
+          </span>
+        </a>
+      )}
+    </div>
+  </nav>
+)}

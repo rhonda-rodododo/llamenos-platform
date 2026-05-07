@@ -1,0 +1,61 @@
+---
+interface Props {
+  author: string;
+  authorUrl?: string;
+  pubDate: Date;
+  updatedDate?: Date;
+  tags: string[];
+  wordCount: number;
+}
+
+const { author, authorUrl, pubDate, updatedDate, tags, wordCount } = Astro.props;
+const readTime = Math.max(1, Math.ceil(wordCount / 200));
+
+const dateStr = pubDate.toLocaleDateString('en-US', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+});
+
+const updatedStr = updatedDate?.toLocaleDateString('en-US', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+});
+---
+
+<div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-fg-dim mb-8">
+  <span class="flex items-center gap-2">
+    <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-accent/10 text-accent-bright text-xs font-semibold">
+      {author.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+    </span>
+    {authorUrl ? (
+      <a href={authorUrl} class="text-fg-muted hover:text-accent-bright transition-colors">{author}</a>
+    ) : (
+      <span class="text-fg-muted">{author}</span>
+    )}
+  </span>
+  <span>·</span>
+  <time datetime={pubDate.toISOString()}>{dateStr}</time>
+  {updatedDate && (
+    <>
+      <span>·</span>
+      <span>Updated <time datetime={updatedDate.toISOString()}>{updatedStr}</time></span>
+    </>
+  )}
+  <span>·</span>
+  <span>{readTime} min read</span>
+</div>
+
+{tags.length > 0 && (
+  <div class="flex flex-wrap gap-2 mb-10">
+    {tags.map(tag => (
+      <a
+        href={`/blog/tag/${tag}`}
+        class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-bg-soft text-fg-muted border border-border hover:border-accent/40 hover:text-fg transition-colors"
+      >
+        {tag}
+      </a>
+    ))}
+  </div>
+)}
