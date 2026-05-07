@@ -15,7 +15,7 @@ import {
   createRoleViaApi,
   ADMIN_SEED,
 } from '../../api-helpers'
-import { ed25519Sign, ed25519PubkeyFromSeed } from '@llamenos/crypto/ffi'
+import { ed25519 } from '@noble/curves/ed25519.js'
 import { hexToBytes, bytesToHex, utf8ToBytes } from '@shared/encoding'
 import { LABEL_DEVICE_AUTH } from '@shared/crypto-labels'
 
@@ -54,7 +54,7 @@ function createRawAuthToken(
 ): { pubkey: string; timestamp: number; token: string } {
   const timestamp = timestampOverride ?? Date.now()
   const message = utf8ToBytes(`${LABEL_DEVICE_AUTH}:${pubkey}:${timestamp}:${method}:${path}`)
-  const sig = ed25519Sign(hexToBytes(seedHex), message)
+  const sig = ed25519.sign(message, hexToBytes(seedHex))
   return { pubkey, timestamp, token: bytesToHex(sig) }
 }
 

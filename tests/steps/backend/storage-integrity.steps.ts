@@ -24,7 +24,7 @@ import { LABEL_NOTE_KEY } from '@shared/crypto-labels'
 import { TestDB } from '../../db-helpers'
 import { assertIsObject, assertIsArray } from '../../integrity-helpers'
 import { bytesToHex, hexToBytes } from '@shared/encoding'
-import { ed25519PubkeyFromSeed } from '@llamenos/crypto/ffi'
+import { ed25519 } from '@noble/curves/ed25519.js'
 
 // ── State ───────────────────────────────────────────────────────────
 
@@ -64,7 +64,7 @@ Before(async ({ world }) => {
 // ── Helpers ─────────────────────────────────────────────────────────
 
 function seedHexToPubkey(seedHex: string): string {
-  return bytesToHex(ed25519PubkeyFromSeed(hexToBytes(seedHex)))
+  return bytesToHex(ed25519.getPublicKey(hexToBytes(seedHex)))
 }
 
 // ── Given: Entity creation ──────────────────────────────────────────

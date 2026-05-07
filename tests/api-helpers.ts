@@ -12,7 +12,7 @@
  */
 
 import { type APIRequestContext } from '@playwright/test'
-import { ed25519Sign, ed25519PubkeyFromSeed } from '@llamenos/crypto/ffi'
+import { ed25519 } from '@noble/curves/ed25519.js'
 import { hexToBytes, bytesToHex, utf8ToBytes } from '@shared/encoding'
 import { LABEL_DEVICE_AUTH } from '@shared/crypto-labels'
 
@@ -26,8 +26,7 @@ export const ADMIN_NSEC = ADMIN_SEED
 // ── Ed25519 Authentication ───────────────────────────────────────
 
 function seedHexToPubkey(seedHex: string): string {
-  const pubkeyBytes = ed25519PubkeyFromSeed(hexToBytes(seedHex))
-  return bytesToHex(pubkeyBytes)
+  return bytesToHex(ed25519.getPublicKey(hexToBytes(seedHex)))
 }
 
 /**
@@ -51,7 +50,7 @@ function createEd25519AuthToken(
   const pubkey = seedHexToPubkey(seedHex)
   const timestamp = Date.now()
   const message = buildAuthMessage(pubkey, timestamp, method, path)
-  const sig = ed25519Sign(hexToBytes(seedHex), message)
+  const sig = ed25519.sign(message, hexToBytes(seedHex))
   return { pubkey, timestamp, token: bytesToHex(sig) }
 }
 

@@ -32,7 +32,7 @@ import {
   uniqueName,
   type AuditEntry,
 } from '../../api-helpers'
-import { sha256 } from '@llamenos/crypto/ffi'
+import { sha256 } from '@noble/hashes/sha2.js'
 import { utf8ToBytes } from '@shared/encoding'
 import { bytesToHex } from '@shared/encoding'
 

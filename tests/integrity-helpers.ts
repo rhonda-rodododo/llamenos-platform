@@ -4,7 +4,7 @@
  * Provides type assertion functions for detecting double-serialization bugs
  * and a hash computation function matching the server's audit chain algorithm.
  */
-import { sha256 } from '@llamenos/crypto/ffi'
+import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex, utf8ToBytes } from '@shared/encoding'
 
 // ---------------------------------------------------------------------------

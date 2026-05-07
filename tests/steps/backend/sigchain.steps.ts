@@ -11,7 +11,7 @@ import {
   createUserViaApi,
   ADMIN_NSEC,
 } from '../../api-helpers'
-import { sha256 } from '@llamenos/crypto/ffi'
+import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex } from '@shared/encoding'
 import { utf8ToBytes } from '@shared/encoding'
 

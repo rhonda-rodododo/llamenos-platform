@@ -23,7 +23,7 @@ import {
   simulateIncomingMessage,
   uniqueCallerNumber,
 } from '../../simulation-helpers'
-import { ed25519Sign, ed25519PubkeyFromSeed } from '@llamenos/crypto/ffi'
+import { ed25519 } from '@noble/curves/ed25519.js'
 import { hexToBytes, bytesToHex, utf8ToBytes } from '@shared/encoding'
 import { LABEL_DEVICE_AUTH } from '@shared/crypto-labels'
 import * as crypto from 'crypto'
@@ -454,7 +454,7 @@ Given('a Schnorr token signed without method and path', async ({ world }) => {
   // Create a token without method+path binding (intentionally malformed)
   const timestamp = Date.now()
   const message = utf8ToBytes(`${AUTH_PREFIX}:${kp.pubkey}:${timestamp}`)
-  const sig = ed25519Sign(hexToBytes(kp.seedHex), message)
+  const sig = ed25519.sign(message, hexToBytes(kp.seedHex))
   getNetworkSecState(world).schnorrToken = JSON.stringify({
     pubkey: kp.pubkey,
     timestamp,

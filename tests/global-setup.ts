@@ -1,5 +1,5 @@
 import type { FullConfig } from '@playwright/test'
-import { ed25519Sign, ed25519PubkeyFromSeed } from '@llamenos/crypto/ffi'
+import { ed25519 } from '@noble/curves/ed25519.js'
 import { hexToBytes, bytesToHex, utf8ToBytes } from '@shared/encoding'
 import { LABEL_DEVICE_AUTH } from '@shared/crypto-labels'
 import { readFileSync } from 'fs'
@@ -31,11 +31,10 @@ const ADMIN_SEED = 'f54a5851e9372b87810a8e60cdd2e7cfd80b6e31c7af18188f7db106ceda
 
 function makeBootstrapToken(seedHex: string, method: string, path: string) {
   const seedBytes = hexToBytes(seedHex)
-  const pubkeyBytes = ed25519PubkeyFromSeed(seedBytes)
-  const pubkey = bytesToHex(pubkeyBytes)
+  const pubkey = bytesToHex(ed25519.getPublicKey(seedBytes))
   const timestamp = Date.now()
   const message = utf8ToBytes(`${LABEL_DEVICE_AUTH}:${pubkey}:${timestamp}:${method}:${path}`)
-  const sig = ed25519Sign(seedBytes, message)
+  const sig = ed25519.sign(message, seedBytes)
   return { pubkey, timestamp, token: bytesToHex(sig) }
 }
 

@@ -13,7 +13,7 @@ import {
   generateTestKeypair,
   ADMIN_SEED,
 } from '../../api-helpers'
-import { ed25519Sign, ed25519PubkeyFromSeed } from '@llamenos/crypto/ffi'
+import { ed25519 } from '@noble/curves/ed25519.js'
 import { hexToBytes, bytesToHex, utf8ToBytes } from '@shared/encoding'
 import { LABEL_DEVICE_AUTH } from '@shared/crypto-labels'
 
@@ -47,11 +47,10 @@ const BASE_URL = process.env.TEST_HUB_URL || 'http://localhost:3000'
 
 function createRedeemAuth(seedHex: string): { pubkey: string; timestamp: number; token: string } {
   const seedBytes = hexToBytes(seedHex)
-  const pubkeyBytes = ed25519PubkeyFromSeed(seedBytes)
-  const pubkey = bytesToHex(pubkeyBytes)
+  const pubkey = bytesToHex(ed25519.getPublicKey(seedBytes))
   const timestamp = Date.now()
   const message = utf8ToBytes(`${LABEL_DEVICE_AUTH}:${pubkey}:${timestamp}:POST:/api/invites/redeem`)
-  const sig = ed25519Sign(seedBytes, message)
+  const sig = ed25519.sign(message, seedBytes)
   return { pubkey, timestamp, token: bytesToHex(sig) }
 }
 
