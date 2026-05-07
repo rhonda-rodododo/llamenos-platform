@@ -16,10 +16,7 @@
 //! This is used in the HPKE envelope `labelId` field for compact wire representation.
 //! Indices are stable — never reorder or reuse indices.
 
-// --- ECIES / HPKE Key Wrapping ---
-
-/// Domain-specific HKDF salt for ECIES v2 key derivation
-pub const LABEL_ECIES_V2_SALT: &str = "llamenos:ecies:v2";
+// --- HPKE Key Wrapping ---
 
 /// Per-note symmetric key wrapping
 pub const LABEL_NOTE_KEY: &str = "llamenos:note-key";
@@ -109,14 +106,6 @@ pub const RECOVERY_SALT: &str = "llamenos:recovery";
 
 /// Generic backup encryption
 pub const LABEL_BACKUP: &str = "llamenos:backup";
-
-// --- Server Identity ---
-
-/// HKDF derivation for server keypair from SERVER_NOSTR_SECRET
-pub const LABEL_SERVER_NOSTR_KEY: &str = "llamenos:server-nostr-key";
-
-/// HKDF info parameter for server key (versioned for rotation)
-pub const LABEL_SERVER_NOSTR_KEY_INFO: &str = "llamenos:server-nostr-key:v1";
 
 // --- Push Notification Encryption ---
 
@@ -212,11 +201,6 @@ pub const LABEL_SFRAME_BASE_KEY: &str = "llamenos:sframe-base-key:v1";
 /// MLS key package provisioning
 pub const LABEL_MLS_PROVISION: &str = "llamenos:mls-provision:v1";
 
-// --- Nostr ---
-
-/// Nostr event tag type used to identify Llamenos hub events
-pub const NOSTR_EVENT_TAG: &str = "llamenos:event";
-
 /// Prefix for per-room Nostr event tags used in device provisioning flows
 pub const LABEL_PROVISION_PREFIX: &str = "llamenos:provision-";
 
@@ -229,8 +213,8 @@ pub const LABEL_STRONGHOLD: &str = "llamenos:stronghold:v1";
 // The index IS the labelId in the HPKE envelope wire format.
 // Indices are stable and MUST NEVER be reordered or reused.
 //
-// Indices 0-35: existing labels (from crypto-labels.json ordering)
-// Indices 36-46: new v3 labels (PUK, device auth, items key, SFrame, MLS)
+// Indices 0-33: existing labels (from crypto-labels.json ordering)
+// Indices 34-50: v3 labels (PUK, device auth, items key, SFrame, MLS, salt/derivation)
 // =============================================================================
 
 pub const LABEL_REGISTRY: &[&str] = &[
@@ -266,50 +250,46 @@ pub const LABEL_REGISTRY: &[&str] = &[
     // 22-23: Recovery/backup
     RECOVERY_SALT, // 22
     LABEL_BACKUP,  // 23
-    // 24-25: Server identity
-    LABEL_SERVER_NOSTR_KEY,      // 24
-    LABEL_SERVER_NOSTR_KEY_INFO, // 25
-    // 26-27: Push
-    LABEL_PUSH_WAKE, // 26
-    LABEL_PUSH_FULL, // 27
-    // 28-34: CMS
-    LABEL_CONTACT_ID,      // 28
-    LABEL_CONTACT_PROFILE, // 29
-    LABEL_CASE_SUMMARY,    // 30
-    LABEL_CASE_FIELDS,     // 31
-    LABEL_EVENT_DETAILS,   // 32
-    LABEL_BLIND_INDEX_KEY, // 33
-    LABEL_CROSS_HUB_SHARE, // 34
-    // 35-40: CMS HMAC
-    HMAC_CONTACT_NAME,  // 35
-    HMAC_CONTACT_TAG,   // 36
-    HMAC_CASE_STATUS,   // 37
-    HMAC_CASE_SEVERITY, // 38
-    HMAC_CASE_CATEGORY, // 39
-    HMAC_EVENT_TYPE,    // 40
-    // 41-45: PUK
-    LABEL_PUK_SIGN,           // 41
-    LABEL_PUK_DH,             // 42
-    LABEL_PUK_SECRETBOX,      // 43
-    LABEL_PUK_WRAP_TO_DEVICE, // 44
-    LABEL_PUK_PREVIOUS_GEN,   // 45
-    // 46: Device auth
-    LABEL_DEVICE_AUTH, // 46
-    // 47-48: Items key / note epoch
-    LABEL_ITEMS_KEY_EXPORT, // 47
-    LABEL_NOTE_EPOCH_KEY,   // 48
-    // 49: Hub PTK
-    LABEL_HUB_PTK_PREV_GEN, // 49
-    // 50-51: SFrame
-    LABEL_SFRAME_CALL_SECRET, // 50
-    LABEL_SFRAME_BASE_KEY,    // 51
-    // 52: MLS
-    LABEL_MLS_PROVISION, // 52
-    // 53-56: Salt/derivation labels
-    LABEL_ECIES_V2_SALT,     // 53
-    LABEL_PROVISIONING_SALT, // 54
-    LABEL_BLIND_INDEX_FIELD, // 55
-    LABEL_HUB_PTK,           // 56
+    // 24-25: Push
+    LABEL_PUSH_WAKE, // 24
+    LABEL_PUSH_FULL, // 25
+    // 26-32: CMS
+    LABEL_CONTACT_ID,      // 26
+    LABEL_CONTACT_PROFILE, // 27
+    LABEL_CASE_SUMMARY,    // 28
+    LABEL_CASE_FIELDS,     // 29
+    LABEL_EVENT_DETAILS,   // 30
+    LABEL_BLIND_INDEX_KEY, // 31
+    LABEL_CROSS_HUB_SHARE, // 32
+    // 33-38: CMS HMAC
+    HMAC_CONTACT_NAME,  // 33
+    HMAC_CONTACT_TAG,   // 34
+    HMAC_CASE_STATUS,   // 35
+    HMAC_CASE_SEVERITY, // 36
+    HMAC_CASE_CATEGORY, // 37
+    HMAC_EVENT_TYPE,    // 38
+    // 39-43: PUK
+    LABEL_PUK_SIGN,           // 39
+    LABEL_PUK_DH,             // 40
+    LABEL_PUK_SECRETBOX,      // 41
+    LABEL_PUK_WRAP_TO_DEVICE, // 42
+    LABEL_PUK_PREVIOUS_GEN,   // 43
+    // 44: Device auth
+    LABEL_DEVICE_AUTH, // 44
+    // 45-46: Items key / note epoch
+    LABEL_ITEMS_KEY_EXPORT, // 45
+    LABEL_NOTE_EPOCH_KEY,   // 46
+    // 47: Hub PTK
+    LABEL_HUB_PTK_PREV_GEN, // 47
+    // 48-49: SFrame
+    LABEL_SFRAME_CALL_SECRET, // 48
+    LABEL_SFRAME_BASE_KEY,    // 49
+    // 50: MLS
+    LABEL_MLS_PROVISION, // 50
+    // 51-53: Salt/derivation labels
+    LABEL_PROVISIONING_SALT, // 51
+    LABEL_BLIND_INDEX_FIELD, // 52
+    LABEL_HUB_PTK,           // 53
 ];
 
 /// Look up a label string by its numeric ID.
@@ -356,8 +336,6 @@ mod tests {
         assert_eq!(HMAC_PREFERENCE_TOKEN, "llamenos:preference-token");
         assert_eq!(RECOVERY_SALT, "llamenos:recovery");
         assert_eq!(LABEL_BACKUP, "llamenos:backup");
-        assert_eq!(LABEL_SERVER_NOSTR_KEY, "llamenos:server-nostr-key");
-        assert_eq!(LABEL_SERVER_NOSTR_KEY_INFO, "llamenos:server-nostr-key:v1");
         assert_eq!(LABEL_PUSH_WAKE, "llamenos:push-wake");
         assert_eq!(LABEL_PUSH_FULL, "llamenos:push-full");
         assert_eq!(LABEL_CONTACT_ID, "llamenos:contact-identifier");
@@ -378,7 +356,6 @@ mod tests {
         assert_eq!(LABEL_SFRAME_CALL_SECRET, "llamenos:sframe-call-secret:v1");
         assert_eq!(LABEL_SFRAME_BASE_KEY, "llamenos:sframe-base-key:v1");
         assert_eq!(LABEL_MLS_PROVISION, "llamenos:mls-provision:v1");
-        assert_eq!(LABEL_ECIES_V2_SALT, "llamenos:ecies:v2");
         assert_eq!(LABEL_PROVISIONING_SALT, "llamenos:provisioning:v1");
         assert_eq!(LABEL_BLIND_INDEX_FIELD, "llamenos:blind-idx:");
         assert_eq!(LABEL_HUB_PTK, "llamenos:hub-ptk:v1");
@@ -390,14 +367,13 @@ mod tests {
         assert_eq!(id_to_label(0), Some(LABEL_NOTE_KEY));
         assert_eq!(id_to_label(5), Some(LABEL_MESSAGE));
         assert_eq!(id_to_label(16), Some(AUTH_PREFIX));
-        assert_eq!(id_to_label(26), Some(LABEL_PUSH_WAKE));
-        assert_eq!(id_to_label(41), Some(LABEL_PUK_SIGN));
-        assert_eq!(id_to_label(46), Some(LABEL_DEVICE_AUTH));
-        assert_eq!(id_to_label(52), Some(LABEL_MLS_PROVISION));
-        assert_eq!(id_to_label(53), Some(LABEL_ECIES_V2_SALT));
-        assert_eq!(id_to_label(54), Some(LABEL_PROVISIONING_SALT));
-        assert_eq!(id_to_label(55), Some(LABEL_BLIND_INDEX_FIELD));
-        assert_eq!(id_to_label(56), Some(LABEL_HUB_PTK));
+        assert_eq!(id_to_label(24), Some(LABEL_PUSH_WAKE));
+        assert_eq!(id_to_label(39), Some(LABEL_PUK_SIGN));
+        assert_eq!(id_to_label(44), Some(LABEL_DEVICE_AUTH));
+        assert_eq!(id_to_label(50), Some(LABEL_MLS_PROVISION));
+        assert_eq!(id_to_label(51), Some(LABEL_PROVISIONING_SALT));
+        assert_eq!(id_to_label(52), Some(LABEL_BLIND_INDEX_FIELD));
+        assert_eq!(id_to_label(53), Some(LABEL_HUB_PTK));
     }
 
     /// Verify bidirectional lookup.

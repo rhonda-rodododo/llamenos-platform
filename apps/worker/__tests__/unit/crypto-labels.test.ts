@@ -63,11 +63,6 @@ describe('Crypto domain separation labels', () => {
     expect(labels.SAS_INFO).toBe('llamenos:provisioning-sas')
   })
 
-  it('has server Nostr key labels', () => {
-    expect(labels.LABEL_SERVER_NOSTR_KEY).toBe('llamenos:server-nostr-key')
-    expect(labels.LABEL_SERVER_NOSTR_KEY_INFO).toBe('llamenos:server-nostr-key:v1')
-  })
-
   it('has recovery/backup labels', () => {
     expect(labels.RECOVERY_SALT).toBe('llamenos:recovery')
     expect(labels.LABEL_BACKUP).toBe('llamenos:backup')

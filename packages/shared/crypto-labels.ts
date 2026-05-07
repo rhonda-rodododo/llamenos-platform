@@ -1,7 +1,7 @@
 /**
  * Authoritative domain separation constants for all cryptographic operations.
  *
- * Every ECIES derivation, HKDF context, HMAC key, and Schnorr signature binding
+ * Every HPKE envelope, HKDF derivation, HMAC key, and Ed25519 signature binding
  * uses a unique context string from this file. This prevents cross-context key
  * reuse attacks where a ciphertext from one domain could be valid in another.
  *
@@ -11,26 +11,21 @@
  * 3. All constants are prefixed with 'llamenos:' for collision avoidance
  */
 
-// --- ECIES V2 Key Derivation ---
+// --- HPKE Key Wrapping ---
 
-/** HKDF salt for legacy ECIES V2 symmetric key derivation */
-export const LABEL_ECIES_V2_SALT = 'llamenos:ecies:v2'
-
-// --- ECIES Key Wrapping ---
-
-/** Per-note symmetric key wrapping (V2 forward secrecy) */
+/** Per-note symmetric key wrapping (forward secrecy) */
 export const LABEL_NOTE_KEY = 'llamenos:note-key'
 
-/** Per-file symmetric key wrapping */
+/** Per-file HPKE key wrapping */
 export const LABEL_FILE_KEY = 'llamenos:file-key'
 
-/** File metadata ECIES wrapping */
+/** File metadata HPKE wrapping */
 export const LABEL_FILE_METADATA = 'llamenos:file-metadata'
 
-/** Hub key ECIES distribution wrapping (Epic 76.2) */
+/** Hub key HPKE distribution wrapping */
 export const LABEL_HUB_KEY_WRAP = 'llamenos:hub-key-wrap'
 
-// --- ECIES Content Encryption ---
+// --- Content Encryption Labels ---
 
 /** Server-side transcription encryption */
 export const LABEL_TRANSCRIPTION = 'llamenos:transcription'
@@ -61,9 +56,9 @@ export const HKDF_CONTEXT_EXPORT = 'llamenos:export'
 /** Hub event HKDF derivation from hub key (Epic 76.2) */
 export const LABEL_HUB_EVENT = 'llamenos:hub-event'
 
-// --- ECDH Key Agreement ---
+// --- Key Agreement ---
 
-/** Device provisioning ECDH shared key derivation */
+/** Device provisioning X25519 shared key derivation */
 export const LABEL_DEVICE_PROVISION = 'llamenos:device-provision'
 
 /** Provisioning HKDF salt for symmetric key derivation */
@@ -79,7 +74,7 @@ export const SAS_INFO = 'llamenos:provisioning-sas'
 
 // --- Auth Token ---
 
-/** Schnorr auth token message prefix */
+/** Auth token message prefix (legacy Schnorr compat — now Ed25519) */
 export const AUTH_PREFIX = 'llamenos:auth:'
 
 /** Ed25519 device auth token message binding (v1) */
@@ -110,20 +105,12 @@ export const RECOVERY_SALT = 'llamenos:recovery'
 /** Generic backup encryption (Epic 76.0 — new format) */
 export const LABEL_BACKUP = 'llamenos:backup'
 
-// --- Server Nostr Identity (Epic 76.1) ---
-
-/** HKDF derivation for server Nostr keypair from SERVER_NOSTR_SECRET */
-export const LABEL_SERVER_NOSTR_KEY = 'llamenos:server-nostr-key'
-
-/** HKDF info parameter for server Nostr key (versioned for rotation) */
-export const LABEL_SERVER_NOSTR_KEY_INFO = 'llamenos:server-nostr-key:v1'
-
 // --- Push Notification Encryption (Epic 86) ---
 
-/** Wake-tier ECIES push payload — decryptable without PIN (minimal metadata only) */
+/** Wake-tier push payload — decryptable without PIN (minimal metadata only) */
 export const LABEL_PUSH_WAKE = 'llamenos:push-wake'
 
-/** Full-tier ECIES push payload — decryptable only with volunteer's nsec */
+/** Full-tier push payload — decryptable only with volunteer's device key */
 export const LABEL_PUSH_FULL = 'llamenos:push-full'
 
 // --- Contact Identifier Encryption (Epic 255) ---
@@ -133,7 +120,7 @@ export const LABEL_CONTACT_ID = 'llamenos:contact-identifier'
 
 // --- Firehose Agent Crypto ---
 
-/** Firehose agent nsec sealing (HKDF + XChaCha20-Poly1305) */
+/** Firehose agent key sealing (HKDF + AES-256-GCM) */
 export const LABEL_FIREHOSE_AGENT_SEAL = 'llamenos:firehose:agent-seal'
 
 /** Firehose buffer message envelope encryption */
@@ -147,13 +134,7 @@ export const LABEL_FIREHOSE_REPORT_WRAP = 'llamenos:firehose:report-wrap'
 /** HKDF context for per-hub storage IAM credential encryption at rest */
 export const LABEL_STORAGE_CREDENTIAL_WRAP = 'llamenos:storage-credential-wrap'
 
-// --- Separated Signing / Encryption Derivation (Epic 258 H1) ---
-
-/** HKDF salt for server Nostr signing key derivation (separated from encryption) */
-export const LABEL_SERVER_NOSTR_SIGNING_KEY = 'llamenos:server-nostr-signing:v1'
-
-/** HKDF info for server Nostr signing key derivation */
-export const LABEL_SERVER_NOSTR_SIGNING_KEY_INFO = 'llamenos:server-nostr-signing-info:v1'
+// --- Server Event Encryption Key Derivation ---
 
 /** HKDF salt for server event encryption key derivation (separated from signing) */
 export const LABEL_SERVER_EVENT_ENCRYPTION_KEY = 'llamenos:server-event-encryption:v1'

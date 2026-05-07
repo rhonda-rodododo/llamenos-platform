@@ -196,8 +196,6 @@ struct LabelVectors {
     hmac_preference_token: String,
     recovery_salt: String,
     label_backup: String,
-    label_server_nostr_key: String,
-    label_server_nostr_key_info: String,
     label_push_wake: String,
     label_push_full: String,
 }
@@ -600,8 +598,6 @@ fn generate_and_verify_test_vectors() {
             hmac_preference_token: HMAC_PREFERENCE_TOKEN.to_string(),
             recovery_salt: RECOVERY_SALT.to_string(),
             label_backup: LABEL_BACKUP.to_string(),
-            label_server_nostr_key: LABEL_SERVER_NOSTR_KEY.to_string(),
-            label_server_nostr_key_info: LABEL_SERVER_NOSTR_KEY_INFO.to_string(),
             label_push_wake: LABEL_PUSH_WAKE.to_string(),
             label_push_full: LABEL_PUSH_FULL.to_string(),
         },
@@ -847,8 +843,6 @@ fn label_count_matches_expected() {
         hmac_preference_token: HMAC_PREFERENCE_TOKEN.to_string(),
         recovery_salt: RECOVERY_SALT.to_string(),
         label_backup: LABEL_BACKUP.to_string(),
-        label_server_nostr_key: LABEL_SERVER_NOSTR_KEY.to_string(),
-        label_server_nostr_key_info: LABEL_SERVER_NOSTR_KEY_INFO.to_string(),
         label_push_wake: LABEL_PUSH_WAKE.to_string(),
         label_push_full: LABEL_PUSH_FULL.to_string(),
     };
@@ -857,8 +851,8 @@ fn label_count_matches_expected() {
     let map = json.as_object().unwrap();
     assert_eq!(
         map.len(),
-        28,
-        "Expected 28 labels — update interop test if new labels were added"
+        26,
+        "Expected 26 labels — update interop test if new labels were added"
     );
 }
 

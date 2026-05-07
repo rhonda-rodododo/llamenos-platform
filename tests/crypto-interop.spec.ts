@@ -64,8 +64,6 @@ test.describe('Cross-platform crypto interop', () => {
     expect(labels.HMAC_PREFERENCE_TOKEN).toBe(rustLabels.hmacPreferenceToken)
     expect(labels.RECOVERY_SALT).toBe(rustLabels.recoverySalt)
     expect(labels.LABEL_BACKUP).toBe(rustLabels.labelBackup)
-    expect(labels.LABEL_SERVER_NOSTR_KEY).toBe(rustLabels.labelServerNostrKey)
-    expect(labels.LABEL_SERVER_NOSTR_KEY_INFO).toBe(rustLabels.labelServerNostrKeyInfo)
     expect(labels.LABEL_PUSH_WAKE).toBe(rustLabels.labelPushWake)
     expect(labels.LABEL_PUSH_FULL).toBe(rustLabels.labelPushFull)
   })
