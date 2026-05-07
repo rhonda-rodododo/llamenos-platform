@@ -53,6 +53,7 @@ COPY apps/worker/ apps/worker/
 COPY packages/shared/ packages/shared/
 COPY packages/i18n/ packages/i18n/
 COPY packages/protocol/ packages/protocol/
+COPY packages/crypto/package.json packages/crypto/package.json
 COPY packages/crypto/ffi.ts packages/crypto/ffi.ts
 COPY tsconfig.json ./
 
