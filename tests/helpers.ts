@@ -121,7 +121,7 @@ export async function reenterPinAfterReload(page: Page): Promise<void> {
  * (backward-compatible with the bootstrap flow).
  */
 export async function loginAsAdmin(page: Page) {
-  const secretHex = nsecToHex(ADMIN_NSEC)
+  const secretHex = ADMIN_SEED
 
   await page.goto('/login')
   await page.evaluate(() => {
@@ -161,19 +161,11 @@ export async function loginAsAdmin(page: Page) {
 }
 
 /**
- * Login as user (volunteer): imports key material via IPC mock,
+ * Login as user (volunteer): imports Ed25519 seed via IPC mock,
  * persists to store, then enters PIN to unlock.
- *
- * Accepts either:
- * - A bech32 nsec string (e.g. "nsec1...") — decoded and imported via
- *   legacyImportNsec (secp256k1 Schnorr key, as returned by createUserViaApi
- *   or createUserAndGetNsec)
- * - A raw Ed25519 signing seed hex string — imported via deviceImportAndLoad
  */
-export async function loginAsVolunteer(page: Page, nsecOrSeedHex: string) {
-  // Decode bech32 nsec to raw hex secret key if needed
-  const isNsec = nsecOrSeedHex.startsWith('nsec1')
-  const secretHex = isNsec ? nsecToHex(nsecOrSeedHex) : nsecOrSeedHex
+export async function loginAsVolunteer(page: Page, seedHex: string) {
+  const secretHex = seedHex
 
   await page.goto('/login')
   await page.evaluate(() => {
@@ -188,15 +180,13 @@ export async function loginAsVolunteer(page: Page, nsecOrSeedHex: string) {
   // Wait for __TEST_PLATFORM to be loaded
   await page.waitForFunction(() => !!(window as any).__TEST_PLATFORM, { timeout: 10000 })
 
-  // Import key: legacy secp256k1 (nsec) or Ed25519 seed
-  await page.evaluate(async ({ secretHex, isNsec, pin }) => {
+  // Import Ed25519 seed via test platform shim
+  await page.evaluate(async ({ secretHex, pin }) => {
     const platform = (window as any).__TEST_PLATFORM
-    const encrypted = isNsec
-      ? await platform.legacyImportNsec(secretHex, pin, crypto.randomUUID())
-      : await platform.deviceImportAndLoad(secretHex, pin, crypto.randomUUID())
+    const encrypted = await platform.deviceImportAndLoad(secretHex, pin, crypto.randomUUID())
     await platform.persistAndUnlockDeviceKeys(encrypted, pin)
     await platform.lockCrypto()
-  }, { secretHex, isNsec, pin: TEST_PIN })
+  }, { secretHex, pin: TEST_PIN })
 
   // Reload to trigger PIN screen
   await page.reload()
