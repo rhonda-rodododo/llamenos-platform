@@ -28,7 +28,7 @@ import { notifyContactsResponseSchema } from '@protocol/schemas/notifications'
 import { okResponseSchema } from '@protocol/schemas/common'
 import { authErrors, notFoundError } from '../openapi/helpers'
 import { audit } from '../services/audit'
-import { KIND_RECORD_CREATED, KIND_RECORD_UPDATED, KIND_RECORD_ASSIGNED } from '@shared/nostr-events'
+import { KIND_RECORD_CREATED, KIND_RECORD_UPDATED, KIND_RECORD_ASSIGNED } from '@shared/event-kinds'
 import { createLogger } from '../lib/logger'
 
 const logger = createLogger('routes.records')

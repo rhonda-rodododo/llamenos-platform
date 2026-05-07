@@ -1,26 +1,26 @@
 /**
- * React hooks for Nostr relay subscriptions.
+ * React hooks for WebSocket relay subscriptions.
  */
 
 import { useEffect, useRef } from 'react'
 import { useRelay, useRelayState } from './context'
-import type { NostrEventHandler } from './types'
+import type { RelayEventHandler } from './types'
 
 /**
- * Subscribe to Nostr events for a specific hub.
+ * Subscribe to relay events for a specific hub.
  *
  * Automatically manages subscription lifecycle: subscribes when the relay
  * is connected, unsubscribes on unmount or when deps change.
  *
  * @param hubId - Hub to subscribe to (from config)
- * @param kinds - Nostr event kinds to listen for
- * @param handler - Callback receiving (raw Nostr event, decrypted Llamenos event)
+ * @param kinds - Event kinds to listen for
+ * @param handler - Callback receiving (kind, decrypted content, hubId)
  * @param enabled - Set to false to disable the subscription (default: true)
  */
-export function useNostrSubscription(
+export function useRelaySubscription(
   hubId: string | undefined,
   kinds: number[],
-  handler: NostrEventHandler,
+  handler: RelayEventHandler,
   enabled = true,
 ): void {
   const relay = useRelay()
@@ -32,8 +32,8 @@ export function useNostrSubscription(
   useEffect(() => {
     if (!relay || !hubId || !enabled || state !== 'connected') return
 
-    const subId = relay.subscribe(hubId, kinds, (event, content) => {
-      handlerRef.current(event, content)
+    const subId = relay.subscribe(hubId, kinds, (kind, content, hub) => {
+      handlerRef.current(kind, content, hub)
     })
 
     return () => {

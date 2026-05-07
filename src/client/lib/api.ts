@@ -284,7 +284,11 @@ export async function getConfig() {
       needsBootstrap?: boolean
       hubs?: import('@shared/types').Hub[]
       defaultHubId?: string
+      serverPubkey?: string
+      wsRelayUrl?: string
+      /** @deprecated Use serverPubkey */
       serverNostrPubkey?: string
+      /** @deprecated Use wsRelayUrl */
       nostrRelayUrl?: string
       apiVersion?: number
       minApiVersion?: number

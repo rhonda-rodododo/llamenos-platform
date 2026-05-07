@@ -19,7 +19,7 @@ import {
   LABEL_FIREHOSE_REPORT_WRAP,
   LABEL_MESSAGE,
 } from '@shared/crypto-labels'
-import { KIND_FIREHOSE_REPORT } from '@shared/nostr-events'
+import { KIND_FIREHOSE_REPORT } from '@shared/event-kinds'
 import { bufferEnvelopeJsonSchema } from '@protocol/schemas/firehose'
 import type { RecipientEnvelope } from '@shared/types'
 import type { Database } from '../db'

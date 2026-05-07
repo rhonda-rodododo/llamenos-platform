@@ -3,7 +3,7 @@ import type { AppEnv } from '../types'
 import type { Hub, MessagingChannelType } from '@shared/types'
 import { hashPhone } from '../lib/crypto'
 import { publishEvent } from '../lib/ws-events'
-import { KIND_CALL_RING, KIND_CALL_UPDATE, KIND_CALL_VOICEMAIL, KIND_MESSAGE_NEW, KIND_PRESENCE_UPDATE } from '@shared/nostr-events'
+import { KIND_CALL_RING, KIND_CALL_UPDATE, KIND_CALL_VOICEMAIL, KIND_MESSAGE_NEW, KIND_PRESENCE_UPDATE } from '@shared/event-kinds'
 import { getTestPushLog, clearTestPushLog } from '../lib/push-dispatch'
 
 /**

@@ -5,7 +5,7 @@ import type { MessagingAdapter, IncomingMessage, MessageStatusUpdate } from './a
 import { getMessagingAdapterFromService } from '../lib/service-factories'
 import { audit } from '../services/audit'
 import { canClaimChannel } from '@shared/permissions'
-import { KIND_MESSAGE_NEW, KIND_CONVERSATION_ASSIGNED, KIND_MESSAGE_REACTION, KIND_TYPING_INDICATOR } from '@shared/nostr-events'
+import { KIND_MESSAGE_NEW, KIND_CONVERSATION_ASSIGNED, KIND_MESSAGE_REACTION, KIND_TYPING_INDICATOR } from '@shared/event-kinds'
 import { publishEvent } from '../lib/ws-events'
 import { createPushDispatcherFromService } from '../lib/push-dispatch'
 import { createLogger } from '../lib/logger'

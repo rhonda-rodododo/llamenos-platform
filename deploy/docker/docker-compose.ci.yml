@@ -43,12 +43,6 @@ services:
       - "${STORAGE_PORT:-9000}:9000"
       - "${STORAGE_CONSOLE_PORT:-9001}:9001"
 
-  strfry:
-    ports:
-      - "${STRFRY_PORT:-7777}:7777"
-    volumes:
-      - ./strfry-test.conf:/etc/strfry.conf:ro
-
   # ── Signal profile services ────────────────────────────────
   signal-cli:
     ports:

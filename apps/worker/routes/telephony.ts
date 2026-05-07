@@ -12,7 +12,7 @@ import { audit } from '../services/audit'
 import { startParallelRinging } from '../services/ringing'
 import { maybeTranscribe, transcribeVoicemail } from '../services/transcription'
 import { publishEvent } from '../lib/ws-events'
-import { KIND_CALL_UPDATE, KIND_CALL_VOICEMAIL, KIND_PRESENCE_UPDATE } from '@shared/nostr-events'
+import { KIND_CALL_UPDATE, KIND_CALL_VOICEMAIL, KIND_PRESENCE_UPDATE } from '@shared/event-kinds'
 import { createLogger } from '../lib/logger'
 import { backgroundTask } from '../lib/hono-compat'
 

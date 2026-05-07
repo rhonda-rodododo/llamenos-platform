@@ -22,7 +22,7 @@ import { createLogger } from '../lib/logger'
 
 const logger = createLogger('routes.events')
 import { audit } from '../services/audit'
-import { KIND_RECORD_CREATED, KIND_RECORD_UPDATED } from '@shared/nostr-events'
+import { KIND_RECORD_CREATED, KIND_RECORD_UPDATED } from '@shared/event-kinds'
 import { publishEvent } from '../lib/ws-events'
 
 const events = new Hono<AppEnv>()

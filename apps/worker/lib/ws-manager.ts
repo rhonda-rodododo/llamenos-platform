@@ -10,7 +10,7 @@ import { RingBuffer } from './ring-buffer'
 import {
   KIND_CALL_RING,
   KIND_CALL_UPDATE,
-} from '@shared/nostr-events'
+} from '@shared/event-kinds'
 import { WS_PROTOCOL_VERSION } from '@protocol/schemas/ws-messages'
 import type { WsEventMessage } from '@protocol/schemas/ws-messages'
 import { createLogger } from './logger'
