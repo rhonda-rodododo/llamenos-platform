@@ -154,8 +154,8 @@ describe('POST /events', () => {
     encryptedDetails: 'encrypted-payload',
     detailEnvelopes: [{
       pubkey: 'a'.repeat(64),
-      wrappedKey: 'wrapped-key-hex',
-      ephemeralPubkey: 'b'.repeat(64),
+      enc: 'b'.repeat(64),
+      ct: 'wrapped-key-hex',
     }],
   }
 

@@ -36,9 +36,9 @@ interface StorageIntegrityState {
   /** DB rows by entity type */
   dbRows: Map<string, Record<string, unknown>>
   /** Submitted envelope data for byte-accuracy checks */
-  submittedEnvelopes?: Array<{ pubkey: string; wrappedKey: string; ephemeralPubkey: string }>
+  submittedEnvelopes?: Array<{ pubkey: string; ct: string; enc: string }>
   /** Submitted author envelope */
-  submittedAuthorEnvelope?: { wrappedKey: string; ephemeralPubkey: string }
+  submittedAuthorEnvelope?: { ct: string; enc: string }
   /** Volunteer keypair for note creation */
   volunteerKp?: { nsec: string; pubkey: string; skHex: string }
   /** Admin keypair info */
@@ -118,7 +118,7 @@ Given('a {string} entity is created via the API with structured JSONB data', asy
           statusHash: 'open',
           blindIndexes: { searchField: 'hashed-value', category: 'test-cat' },
           summaryEnvelopes: [
-            { pubkey: 'a'.repeat(64), wrappedKey: 'b'.repeat(64), ephemeralPubkey: '02' + 'c'.repeat(64) },
+            { pubkey: 'a'.repeat(64), ct: 'b'.repeat(64), enc: '02' + 'c'.repeat(64) },
           ],
         },
       )
@@ -469,44 +469,44 @@ Then('the DB {word} should not be double-serialized', async ({ world }, dbColumn
 
 // ── Then: Envelope byte-accuracy assertions ─────────────────────────
 
-Then('the API envelope wrappedKey should match the submitted wrappedKey exactly', async ({ world }) => {
+Then('the API envelope ct should match the submitted ct exactly', async ({ world }) => {
   const apiNote = getStorageIntegrityState(world).apiResponses.get('envelope-note')
   expect(apiNote).toBeDefined()
   expect(getStorageIntegrityState(world).submittedEnvelopes).toBeDefined()
 
-  const apiAdminEnvelopes = apiNote!.adminEnvelopes as Array<{ wrappedKey: string }> | undefined
+  const apiAdminEnvelopes = apiNote!.adminEnvelopes as Array<{ ct: string }> | undefined
   expect(apiAdminEnvelopes).toBeDefined()
   expect(apiAdminEnvelopes!.length).toBeGreaterThan(0)
-  expect(apiAdminEnvelopes![0].wrappedKey).toBe(getStorageIntegrityState(world).submittedEnvelopes![0].wrappedKey)
+  expect(apiAdminEnvelopes![0].ct).toBe(getStorageIntegrityState(world).submittedEnvelopes![0].ct)
 })
 
-Then('the API envelope ephemeralPubkey should match the submitted ephemeralPubkey exactly', async ({ world }) => {
+Then('the API envelope enc should match the submitted enc exactly', async ({ world }) => {
   const apiNote = getStorageIntegrityState(world).apiResponses.get('envelope-note')
   expect(apiNote).toBeDefined()
   expect(getStorageIntegrityState(world).submittedEnvelopes).toBeDefined()
 
-  const apiAdminEnvelopes = apiNote!.adminEnvelopes as Array<{ ephemeralPubkey: string }> | undefined
+  const apiAdminEnvelopes = apiNote!.adminEnvelopes as Array<{ enc: string }> | undefined
   expect(apiAdminEnvelopes).toBeDefined()
-  expect(apiAdminEnvelopes![0].ephemeralPubkey).toBe(getStorageIntegrityState(world).submittedEnvelopes![0].ephemeralPubkey)
+  expect(apiAdminEnvelopes![0].enc).toBe(getStorageIntegrityState(world).submittedEnvelopes![0].enc)
 })
 
-Then('the DB admin_envelopes wrappedKey should match the submitted wrappedKey exactly', async ({ world }) => {
+Then('the DB admin_envelopes ct should match the submitted ct exactly', async ({ world }) => {
   const dbRow = getStorageIntegrityState(world).dbRows.get('envelope-note')
   expect(dbRow).toBeDefined()
   expect(getStorageIntegrityState(world).submittedEnvelopes).toBeDefined()
 
-  const dbAdminEnvelopes = dbRow!.admin_envelopes as Array<{ wrappedKey: string }>
+  const dbAdminEnvelopes = dbRow!.admin_envelopes as Array<{ ct: string }>
   assertIsArray(dbAdminEnvelopes, 'DB admin_envelopes')
   expect(dbAdminEnvelopes.length).toBeGreaterThan(0)
-  expect(dbAdminEnvelopes[0].wrappedKey).toBe(getStorageIntegrityState(world).submittedEnvelopes![0].wrappedKey)
+  expect(dbAdminEnvelopes[0].ct).toBe(getStorageIntegrityState(world).submittedEnvelopes![0].ct)
 })
 
-Then('the DB admin_envelopes ephemeralPubkey should match the submitted ephemeralPubkey exactly', async ({ world }) => {
+Then('the DB admin_envelopes enc should match the submitted enc exactly', async ({ world }) => {
   const dbRow = getStorageIntegrityState(world).dbRows.get('envelope-note')
   expect(dbRow).toBeDefined()
   expect(getStorageIntegrityState(world).submittedEnvelopes).toBeDefined()
 
-  const dbAdminEnvelopes = dbRow!.admin_envelopes as Array<{ ephemeralPubkey: string }>
+  const dbAdminEnvelopes = dbRow!.admin_envelopes as Array<{ enc: string }>
   assertIsArray(dbAdminEnvelopes, 'DB admin_envelopes')
-  expect(dbAdminEnvelopes[0].ephemeralPubkey).toBe(getStorageIntegrityState(world).submittedEnvelopes![0].ephemeralPubkey)
+  expect(dbAdminEnvelopes[0].enc).toBe(getStorageIntegrityState(world).submittedEnvelopes![0].enc)
 })

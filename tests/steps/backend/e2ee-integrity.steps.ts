@@ -36,7 +36,7 @@ interface E2EEIntegrityState {
   /** The hex ciphertext produced by encryptContent */
   ciphertextHex?: string
   /** Per-recipient ECIES envelopes: key = pubkey */
-  envelopes: Map<string, { wrappedKey: string; ephemeralPubkey: string }>
+  envelopes: Map<string, { ct: string; enc: string }>
   /** The note ID returned by the API */
   noteId?: string
   /** The full note object from the API */
@@ -351,8 +351,8 @@ When('the volunteer unwraps their envelope and decrypts the note', async ({ worl
   expect(envelope).toBeDefined()
 
   const recoveredKey = unwrapKey(
-    envelope!.wrappedKey,
-    envelope!.ephemeralPubkey,
+    envelope!.ct,
+    envelope!.enc,
     volKp.seedHex,
     LABEL_NOTE_KEY,
   )
@@ -368,8 +368,8 @@ When('the admin unwraps their envelope and decrypts the note', async ({ world })
   expect(envelope).toBeDefined()
 
   const recoveredKey = unwrapKey(
-    envelope!.wrappedKey,
-    envelope!.ephemeralPubkey,
+    envelope!.ct,
+    envelope!.enc,
     getE2EEIntegrityState(world).adminSeedHex!,
     LABEL_NOTE_KEY,
   )
@@ -428,13 +428,13 @@ Then('attempting to unwrap with {string} secret key should fail', async ({ world
   expect(getE2EEIntegrityState(world).apiNote).toBeDefined()
 
   // Try to unwrap the author envelope (which is VolA's) with VolB's key
-  const authorEnvelope = getE2EEIntegrityState(world).apiNote!.authorEnvelope as { wrappedKey?: string; ephemeralPubkey?: string } | undefined
-  if (authorEnvelope?.wrappedKey && authorEnvelope?.ephemeralPubkey) {
+  const authorEnvelope = getE2EEIntegrityState(world).apiNote!.authorEnvelope as { ct?: string; enc?: string } | undefined
+  if (authorEnvelope?.ct && authorEnvelope?.enc) {
     let decryptionFailed = false
     try {
       unwrapKey(
-        authorEnvelope.wrappedKey,
-        authorEnvelope.ephemeralPubkey,
+        authorEnvelope.ct,
+        authorEnvelope.enc,
         volKp.seedHex,
         LABEL_NOTE_KEY,
       )
@@ -458,8 +458,8 @@ Then(
     expect(envelope).toBeDefined()
 
     const recoveredKey = unwrapKey(
-      envelope!.wrappedKey,
-      envelope!.ephemeralPubkey,
+      envelope!.ct,
+      envelope!.enc,
       adminKp.seedHex,
       LABEL_NOTE_KEY,
     )
@@ -481,8 +481,8 @@ Then('the two admin wrapped keys should be different', async ({ world }) => {
   })
   expect(adminEnvelopes.length).toBeGreaterThanOrEqual(2)
 
-  const wrappedKeys = adminEnvelopes.map(([, env]) => env.wrappedKey)
-  expect(wrappedKeys[0]).not.toBe(wrappedKeys[1])
+  const ctValues = adminEnvelopes.map(([, env]) => env.ct)
+  expect(ctValues[0]).not.toBe(ctValues[1])
 })
 
 Then('the note ID should be returned', async ({ world }) => {

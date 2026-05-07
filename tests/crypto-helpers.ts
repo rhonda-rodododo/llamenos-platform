@@ -99,7 +99,7 @@ export function wrapKeyForRecipient(
   recipientPubkeyHex: string,
   _senderSkHex: string,
   label: string,
-): { wrappedKey: string; ephemeralPubkey: string } {
+): { ct: string; enc: string } {
   // Generate ephemeral keypair (sender SK is not used in server-side ECIES)
   const ephemeralSecret = new Uint8Array(32)
   crypto.getRandomValues(ephemeralSecret)
@@ -124,8 +124,8 @@ export function wrapKeyForRecipient(
   packed.set(ciphertext, 1 + nonce.length)
 
   return {
-    wrappedKey: bytesToHex(packed),
-    ephemeralPubkey: bytesToHex(ephemeralPublicKey),
+    ct: bytesToHex(packed),
+    enc: bytesToHex(ephemeralPublicKey),
   }
 }
 
@@ -136,12 +136,12 @@ export function wrapKeyForRecipient(
  * derives the symmetric key via HKDF, and decrypts.
  */
 export function unwrapKey(
-  wrappedKeyHex: string,
-  ephemeralPubkeyHex: string,
+  ctHex: string,
+  encHex: string,
   recipientSkHex: string,
   label: string,
 ): Uint8Array {
-  const packed = hexToBytes(wrappedKeyHex)
+  const packed = hexToBytes(ctHex)
 
   // Check version byte
   const version = packed[0]
@@ -153,7 +153,7 @@ export function unwrapKey(
   const ciphertext = packed.slice(25)
 
   // Compute ECDH shared secret
-  const ephemeralPubkey = hexToBytes(ephemeralPubkeyHex)
+  const ephemeralPubkey = hexToBytes(encHex)
   const shared = secp256k1.getSharedSecret(hexToBytes(recipientSkHex), ephemeralPubkey)
   const sharedX = shared.slice(1, 33)
 
@@ -188,10 +188,10 @@ if (import.meta.main) {
   const senderSk = bytesToHex(secp256k1.utils.randomSecretKey())
 
   const contentKey = generateContentKey()
-  const { wrappedKey, ephemeralPubkey } = wrapKeyForRecipient(
+  const { ct, enc } = wrapKeyForRecipient(
     contentKey, recipientPubkeyHex, senderSk, 'llamenos:message',
   )
-  const unwrapped = unwrapKey(wrappedKey, ephemeralPubkey, recipientSkHex, 'llamenos:message')
+  const unwrapped = unwrapKey(ct, enc, recipientSkHex, 'llamenos:message')
 
   console.assert(
     bytesToHex(unwrapped) === bytesToHex(contentKey),
@@ -207,7 +207,7 @@ if (import.meta.main) {
     noteKey, recipientPubkeyHex, senderSk, 'llamenos:note-key',
   )
   const recoveredKey = unwrapKey(
-    envelope.wrappedKey, envelope.ephemeralPubkey, recipientSkHex, 'llamenos:note-key',
+    envelope.ct, envelope.enc, recipientSkHex, 'llamenos:note-key',
   )
   const recoveredNote = decryptContent(encryptedNote, recoveredKey, 'llamenos:note-key')
   console.assert(recoveredNote === noteText, 'Full envelope round-trip failed')

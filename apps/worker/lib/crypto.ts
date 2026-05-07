@@ -1,10 +1,13 @@
-import { secp256k1 } from '@noble/curves/secp256k1.js'
-import { xchacha20poly1305 } from '@noble/ciphers/chacha.js'
-import { sha256 } from '@noble/hashes/sha2.js'
-import { hmac } from '@noble/hashes/hmac.js'
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
-import { utf8ToBytes } from '@noble/ciphers/utils.js'
-import { hkdf } from '@noble/hashes/hkdf.js'
+import {
+  hpkeSeal,
+  symmetricEncrypt,
+  symmetricDecrypt,
+  hkdfSha256,
+  hmacSha256,
+  sha256,
+  randomBytes,
+} from '@llamenos/crypto/ffi'
+import { hexToBytes, bytesToHex, utf8ToBytes } from '@shared/encoding'
 import { LABEL_MESSAGE, LABEL_CALL_META, LABEL_CONTACT_ID, LABEL_STORAGE_CREDENTIAL_WRAP, HMAC_PHONE_PREFIX, HMAC_IP_PREFIX } from '@shared/crypto-labels'
 import type { RecipientEnvelope } from '@shared/types'
 
@@ -15,7 +18,7 @@ import type { RecipientEnvelope } from '@shared/types'
 export function hashPhone(phone: string, secret: string): string {
   const key = hexToBytes(secret)
   const input = utf8ToBytes(`${HMAC_PHONE_PREFIX}${phone}`)
-  return bytesToHex(hmac(sha256, key, input))
+  return bytesToHex(hmacSha256(key, input))
 }
 
 /**
@@ -25,205 +28,135 @@ export function hashPhone(phone: string, secret: string): string {
 export function hashIP(ip: string, secret: string): string {
   const key = hexToBytes(secret)
   const input = utf8ToBytes(`${HMAC_IP_PREFIX}${ip}`)
-  return bytesToHex(hmac(sha256, key, input)).slice(0, 24)
+  return bytesToHex(hmacSha256(key, input)).slice(0, 24)
 }
 
-// --- Envelope-Pattern Message Encryption (Epic 74) ---
-
-/** ECIES version byte for HKDF-based key derivation (v2). */
-const ECIES_VERSION_V2 = 0x02
+// --- Server-Side Symmetric Encryption (Tier 1) ---
 
 /**
- * Derive ECIES symmetric key using HKDF-SHA256 (v2).
+ * Encrypt data with a server-derived key (HKDF + AES-256-GCM via FFI).
+ * Used for data the server must read at runtime (credentials, push endpoints).
  */
-function deriveEciesKeyV2(label: string, sharedX: Uint8Array): Uint8Array {
-  return hkdf(sha256, sharedX, new Uint8Array(0), utf8ToBytes(label), 32) as Uint8Array
+export function serverEncrypt(plaintext: Uint8Array, label: string, serverSecret: Uint8Array): Uint8Array {
+  const key = hkdfSha256(serverSecret, new Uint8Array(0), utf8ToBytes(label), 32)
+  return symmetricEncrypt(key, plaintext, utf8ToBytes(label))
 }
 
 /**
- * Legacy ECIES key derivation (v1): SHA-256(label || sharedX).
- * Used only for decryption of existing ciphertext without version byte.
+ * Decrypt server-encrypted data (HKDF + AES-256-GCM via FFI).
  */
-function deriveEciesKeyV1(label: string, sharedX: Uint8Array): Uint8Array {
-  const labelBytes = utf8ToBytes(label)
-  const keyInput = new Uint8Array(labelBytes.length + sharedX.length)
-  keyInput.set(labelBytes)
-  keyInput.set(sharedX, labelBytes.length)
-  return sha256(keyInput)
+export function serverDecrypt(ciphertext: Uint8Array, label: string, serverSecret: Uint8Array): Uint8Array {
+  const key = hkdfSha256(serverSecret, new Uint8Array(0), utf8ToBytes(label), 32)
+  return symmetricDecrypt(key, ciphertext, utf8ToBytes(label))
 }
+
+// --- Envelope-Pattern Encryption (Tier 3: E2EE) ---
 
 /**
- * ECIES key wrapping for a single recipient (server-side, v2).
- * Uses HKDF for key derivation and prepends version byte.
- */
-export function eciesWrapKeyForRecipient(
-  key: Uint8Array,
-  recipientPubkeyHex: string,
-  label: string,
-): { wrappedKey: string; ephemeralPubkey: string } {
-  return eciesWrapKeyServer(key, recipientPubkeyHex, label)
-}
-
-function eciesWrapKeyServer(
-  key: Uint8Array,
-  recipientPubkeyHex: string,
-  label: string,
-): { wrappedKey: string; ephemeralPubkey: string } {
-  const ephemeralSecret = new Uint8Array(32)
-  crypto.getRandomValues(ephemeralSecret)
-  const ephemeralPublicKey = secp256k1.getPublicKey(ephemeralSecret, true)
-
-  const recipientCompressed = hexToBytes('02' + recipientPubkeyHex)
-  const shared = secp256k1.getSharedSecret(ephemeralSecret, recipientCompressed)
-  const sharedX = shared.slice(1, 33)
-
-  const symmetricKey = deriveEciesKeyV2(label, sharedX)
-
-  const nonce = new Uint8Array(24)
-  crypto.getRandomValues(nonce)
-  const cipher = xchacha20poly1305(symmetricKey, nonce)
-  const ciphertext = cipher.encrypt(key)
-
-  // Pack: version(1) + nonce(24) + ciphertext
-  const packed = new Uint8Array(1 + nonce.length + ciphertext.length)
-  packed[0] = ECIES_VERSION_V2
-  packed.set(nonce, 1)
-  packed.set(ciphertext, 1 + nonce.length)
-
-  return {
-    wrappedKey: bytesToHex(packed),
-    ephemeralPubkey: bytesToHex(ephemeralPublicKey),
-  }
-}
-
-/**
- * Encrypt a message for storage using the envelope pattern.
- * Generates a random per-message symmetric key, encrypts the plaintext,
- * then wraps the key for each reader via ECIES.
+ * Encrypt a message for storage using the HPKE envelope pattern.
+ * Generates a random per-message symmetric key, encrypts the plaintext with AES-256-GCM,
+ * then wraps the key for each reader via HPKE.
  *
- * Used server-side when inbound messages arrive via webhooks.
  * The plaintext is discarded after encryption — the server cannot read
  * stored messages after this function returns.
- *
- * @param plaintext - Message text (from SMS/WhatsApp/Signal webhook)
- * @param readerPubkeys - Pubkeys of authorized readers (assigned volunteer + admins)
  */
 export function encryptMessageForStorage(
   plaintext: string,
   readerPubkeys: string[],
   label: string = LABEL_MESSAGE,
 ): { encryptedContent: string; readerEnvelopes: RecipientEnvelope[] } {
-  // Generate random per-message symmetric key
-  const messageKey = new Uint8Array(32)
-  crypto.getRandomValues(messageKey)
+  const messageKey = randomBytes(32)
+  const labelBytes = utf8ToBytes(label)
+  const aadKeyWrap = utf8ToBytes(`${label}:key-wrap`)
 
-  const nonce = new Uint8Array(24)
-  crypto.getRandomValues(nonce)
-  const cipher = xchacha20poly1305(messageKey, nonce)
-  const ciphertext = cipher.encrypt(utf8ToBytes(plaintext))
+  const encryptedContent = bytesToHex(symmetricEncrypt(messageKey, utf8ToBytes(plaintext), labelBytes))
 
-  const packed = new Uint8Array(nonce.length + ciphertext.length)
-  packed.set(nonce)
-  packed.set(ciphertext, nonce.length)
-
-  return {
-    encryptedContent: bytesToHex(packed),
-    readerEnvelopes: readerPubkeys.map(pk => ({
+  const readerEnvelopes: RecipientEnvelope[] = readerPubkeys.map(pk => {
+    const sealed = hpkeSeal(hexToBytes(pk), messageKey, labelBytes, aadKeyWrap)
+    return {
       pubkey: pk,
-      ...eciesWrapKeyServer(messageKey, pk, label),
-    })),
-  }
-  // messageKey goes out of scope — never stored
+      enc: bytesToHex(sealed.subarray(0, 32)),
+      ct: bytesToHex(sealed.subarray(32)),
+    }
+  })
+
+  return { encryptedContent, readerEnvelopes }
 }
 
 /**
- * Encrypt call record metadata for history storage (Epic 77).
- * Uses the same envelope pattern as messages: random per-record key
- * wrapped via ECIES for each admin pubkey.
- *
- * @param metadata - JSON-serializable call metadata (answeredBy, callerNumber, etc.)
- * @param adminPubkeys - Admin decryption pubkeys
+ * Encrypt call record metadata for history storage.
+ * Uses the same HPKE envelope pattern as messages: random per-record key
+ * wrapped via HPKE for each admin pubkey.
  */
 export function encryptCallRecordForStorage(
   metadata: Record<string, unknown>,
   adminPubkeys: string[],
 ): { encryptedContent: string; adminEnvelopes: RecipientEnvelope[] } {
-  const recordKey = new Uint8Array(32)
-  crypto.getRandomValues(recordKey)
+  const recordKey = randomBytes(32)
+  const labelBytes = utf8ToBytes(LABEL_CALL_META)
+  const aadKeyWrap = utf8ToBytes(`${LABEL_CALL_META}:key-wrap`)
 
-  const nonce = new Uint8Array(24)
-  crypto.getRandomValues(nonce)
-  const cipher = xchacha20poly1305(recordKey, nonce)
-  const ciphertext = cipher.encrypt(utf8ToBytes(JSON.stringify(metadata)))
+  const encryptedContent = bytesToHex(
+    symmetricEncrypt(recordKey, utf8ToBytes(JSON.stringify(metadata)), labelBytes),
+  )
 
-  const packed = new Uint8Array(nonce.length + ciphertext.length)
-  packed.set(nonce)
-  packed.set(ciphertext, nonce.length)
-
-  return {
-    encryptedContent: bytesToHex(packed),
-    adminEnvelopes: adminPubkeys.map(pk => ({
+  const adminEnvelopes: RecipientEnvelope[] = adminPubkeys.map(pk => {
+    const sealed = hpkeSeal(hexToBytes(pk), recordKey, labelBytes, aadKeyWrap)
+    return {
       pubkey: pk,
-      ...eciesWrapKeyServer(recordKey, pk, LABEL_CALL_META),
-    })),
-  }
+      enc: bytesToHex(sealed.subarray(0, 32)),
+      ct: bytesToHex(sealed.subarray(32)),
+    }
+  })
+
+  return { encryptedContent, adminEnvelopes }
 }
 
-// --- Contact Identifier Encryption (Epic 255) ---
+// --- Contact Identifier Encryption ---
 
 /**
  * Encrypt a contact identifier for at-rest storage.
- * Uses HKDF(HMAC_SECRET) → XChaCha20-Poly1305.
+ * Uses HKDF(HMAC_SECRET) → AES-256-GCM via FFI.
  * Stored with "enc:" prefix to distinguish from legacy plaintext.
  */
 export function encryptContactIdentifier(identifier: string, hmacSecret: string): string {
-  const key = hkdf(sha256, hexToBytes(hmacSecret), new Uint8Array(0), utf8ToBytes(LABEL_CONTACT_ID), 32)
-  const nonce = new Uint8Array(24)
-  crypto.getRandomValues(nonce)
-  const cipher = xchacha20poly1305(key, nonce)
-  const ct = cipher.encrypt(utf8ToBytes(identifier))
-  const packed = new Uint8Array(24 + ct.length)
-  packed.set(nonce)
-  packed.set(ct, 24)
-  return 'enc:' + bytesToHex(packed)
+  const ct = serverEncrypt(utf8ToBytes(identifier), LABEL_CONTACT_ID, hexToBytes(hmacSecret))
+  return 'enc:' + bytesToHex(ct)
 }
 
 /**
  * Decrypt a contact identifier from storage.
  * Handles both encrypted ("enc:"-prefixed) and legacy plaintext values.
- * Legacy plaintext values are returned as-is (migration is lazy on next write).
  */
 export function decryptContactIdentifier(stored: string, hmacSecret: string): string {
-  if (!stored.startsWith('enc:')) return stored // legacy plaintext
-  const hex = stored.slice(4)
-  const data = hexToBytes(hex)
-  const key = hkdf(sha256, hexToBytes(hmacSecret), new Uint8Array(0), utf8ToBytes(LABEL_CONTACT_ID), 32)
-  const nonce = data.slice(0, 24)
-  const ct = data.slice(24)
-  const cipher = xchacha20poly1305(key, nonce)
-  return new TextDecoder().decode(cipher.decrypt(ct))
+  if (!stored.startsWith('enc:')) return stored
+  const ct = hexToBytes(stored.slice(4))
+  return new TextDecoder().decode(serverDecrypt(ct, LABEL_CONTACT_ID, hexToBytes(hmacSecret)))
+}
+
+// --- Storage Credential Encryption ---
+
+/**
+ * Encrypt a storage IAM secret key for at-rest protection.
+ * Uses HKDF(HMAC_SECRET) → AES-256-GCM via FFI.
+ */
+export function encryptStorageCredential(secretKey: string, hmacSecret: string): string {
+  const ct = serverEncrypt(utf8ToBytes(secretKey), LABEL_STORAGE_CREDENTIAL_WRAP, hexToBytes(hmacSecret))
+  return bytesToHex(ct)
 }
 
 /**
- * Check if a stored contact needs migration from legacy plaintext to encrypted.
- * Returns the decrypted value and whether re-encryption is needed.
- *
- * - Legacy plaintext (no "enc:" prefix): returns as-is with needsUpdate=true
- * - Encrypted ("enc:" prefix): decrypts and returns with needsUpdate=false
+ * Decrypt a storage IAM secret key from at-rest storage.
  */
-export function migrateContactIfNeeded(stored: string, hmacSecret: string): {
-  value: string; needsUpdate: boolean
-} {
-  if (!stored.startsWith('enc:')) {
-    return { value: stored, needsUpdate: true }
-  }
-  return { value: decryptContactIdentifier(stored, hmacSecret), needsUpdate: false }
+export function decryptStorageCredential(encrypted: string, hmacSecret: string): string {
+  const ct = hexToBytes(encrypted)
+  return new TextDecoder().decode(serverDecrypt(ct, LABEL_STORAGE_CREDENTIAL_WRAP, hexToBytes(hmacSecret)))
 }
+
+// --- Audit Entry Hashing ---
 
 /**
  * Deterministic JSON serialization with sorted keys.
- * Matches the implementation in services/audit.ts — both must produce
- * identical output so hashes computed at write time match verification.
  */
 export function stableJsonStringify(value: unknown): string {
   return JSON.stringify(value, (_key, val: unknown) => {
@@ -238,7 +171,6 @@ export function stableJsonStringify(value: unknown): string {
 
 /**
  * Compute SHA-256 hash of an audit entry's core content for chain linking.
- * Uses stableJsonStringify for deterministic output regardless of key order.
  */
 export function hashAuditEntry(entry: {
   id: string
@@ -250,34 +182,4 @@ export function hashAuditEntry(entry: {
 }): string {
   const content = `${entry.id}:${entry.action}:${entry.actorPubkey}:${entry.createdAt}:${stableJsonStringify(entry.details ?? {})}:${entry.previousEntryHash || ''}`
   return bytesToHex(sha256(utf8ToBytes(content)))
-}
-
-// --- Storage Credential Encryption ---
-
-/**
- * Encrypt a storage IAM secret key for at-rest protection.
- * Uses HKDF(HMAC_SECRET) → XChaCha20-Poly1305.
- */
-export function encryptStorageCredential(secretKey: string, hmacSecret: string): string {
-  const key = hkdf(sha256, hexToBytes(hmacSecret), new Uint8Array(0), utf8ToBytes(LABEL_STORAGE_CREDENTIAL_WRAP), 32)
-  const nonce = new Uint8Array(24)
-  crypto.getRandomValues(nonce)
-  const cipher = xchacha20poly1305(key, nonce)
-  const ct = cipher.encrypt(utf8ToBytes(secretKey))
-  const packed = new Uint8Array(24 + ct.length)
-  packed.set(nonce)
-  packed.set(ct, 24)
-  return bytesToHex(packed)
-}
-
-/**
- * Decrypt a storage IAM secret key from at-rest storage.
- */
-export function decryptStorageCredential(encrypted: string, hmacSecret: string): string {
-  const data = hexToBytes(encrypted)
-  const key = hkdf(sha256, hexToBytes(hmacSecret), new Uint8Array(0), utf8ToBytes(LABEL_STORAGE_CREDENTIAL_WRAP), 32)
-  const nonce = data.slice(0, 24)
-  const ct = data.slice(24)
-  const cipher = xchacha20poly1305(key, nonce)
-  return new TextDecoder().decode(cipher.decrypt(ct))
 }

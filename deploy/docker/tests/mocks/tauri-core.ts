@@ -37,13 +37,13 @@ function npubEncode(pk: string): string {
   return bech32.encode('npub', bech32.toWords(hexToBytes(pk)), 1500)
 }
 
-function eciesWrap(keyHex: string, recipientPubkey: string) {
+function eciesWrap(keyHex: string, _recipientPubkey: string) {
   const ephSk = bytesToHex(randomBytes(32))
   const ephPk = pubFromSk(ephSk)
-  const ikm = sha256(hexToBytes(ephSk + recipientPubkey))
+  const ikm = sha256(hexToBytes(ephSk + _recipientPubkey))
   const nonce = randomBytes(24)
   const ct = xchacha20poly1305(ikm, nonce).encrypt(hexToBytes(keyHex))
-  return { wrappedKey: bytesToHex(nonce) + bytesToHex(ct), ephemeralPubkey: ephPk }
+  return { enc: ephPk, ct: bytesToHex(nonce) + bytesToHex(ct) }
 }
 
 function pinEncrypt(nsec: string, pin: string, pubkey: string) {

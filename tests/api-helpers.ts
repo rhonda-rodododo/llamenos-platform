@@ -596,8 +596,8 @@ export async function createReportViaApi(
   // Dummy ECIES envelope — server stores but doesn't validate crypto
   const envelope = {
     pubkey,
-    wrappedKey: 'a'.repeat(64),
-    ephemeralPubkey: pubkey,
+    ct: 'a'.repeat(64),
+    enc: pubkey,
   }
 
   const title = options?.title ?? `Test Report ${Date.now()}`
@@ -1095,9 +1095,9 @@ export async function createContactByNameViaApi(
   }, seedHex)
 }
 
-function dummyEnvelope(seedHex = ADMIN_SEED): { pubkey: string; wrappedKey: string; ephemeralPubkey: string } {
+function dummyEnvelope(seedHex = ADMIN_SEED): { pubkey: string; ct: string; enc: string } {
   const pubkey = seedHexToPubkey(seedHex)
-  return { pubkey, wrappedKey: 'a'.repeat(64), ephemeralPubkey: pubkey }
+  return { pubkey, ct: 'a'.repeat(64), enc: pubkey }
 }
 
 export async function createContactViaApi(

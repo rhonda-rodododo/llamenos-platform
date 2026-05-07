@@ -108,8 +108,8 @@ When('a note is created', async ({request, world}) => {
   // Build admin envelopes from the keypairs created in the "hub with N admins" step
   const adminEnvelopes = getNoteTestState(world).adminKeypairs.map(kp => ({
     pubkey: kp.pubkey,
-    wrappedKey: 'a'.repeat(64),
-    ephemeralPubkey: kp.pubkey,
+    ct: 'a'.repeat(64),
+    enc: kp.pubkey,
   }))
 
   const { status, data } = await apiPost<{ note?: Record<string, unknown> }>(

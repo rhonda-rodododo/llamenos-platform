@@ -301,8 +301,8 @@ test.describe('Cross-platform crypto interop', () => {
     const adminSecretKey = vectors.keys.adminSecretKeyHex
 
     const tamperedEnvelope = {
-      wrappedKey: tamperedWrappedKey,
-      ephemeralPubkey: validEnvelope.ephemeralPubkey,
+      ct: tamperedWrappedKey,
+      enc: validEnvelope.ephemeralPubkey,
     }
     expect(() => eciesUnwrap(tamperedEnvelope, adminSecretKey, validLabel)).toThrow()
   })
@@ -312,8 +312,8 @@ test.describe('Cross-platform crypto interop', () => {
     const adminSecretKey = vectors.keys.adminSecretKeyHex
 
     const truncatedEnvelope = {
-      wrappedKey: truncatedWrappedKey,
-      ephemeralPubkey: validEnvelope.ephemeralPubkey,
+      ct: truncatedWrappedKey,
+      enc: validEnvelope.ephemeralPubkey,
     }
     expect(() => eciesUnwrap(truncatedEnvelope, adminSecretKey, validLabel)).toThrow()
   })
@@ -380,18 +380,22 @@ test.describe('Cross-platform crypto interop', () => {
 
 // ─── Helpers ─────────────────────────────────────────────────
 
-/** ECIES unwrap: ECDH → HKDF-SHA256(sharedX, label) → XChaCha20-Poly1305 */
+/** ECIES unwrap: ECDH → HKDF-SHA256(sharedX, label) → XChaCha20-Poly1305
+ * Accepts both new {ct, enc} and legacy {wrappedKey, ephemeralPubkey} shapes
+ * (legacy shape comes from Rust-generated test vectors JSON) */
 function eciesUnwrap(
-  envelope: { wrappedKey: string; ephemeralPubkey: string },
+  envelope: { ct: string; enc: string } | { wrappedKey: string; ephemeralPubkey: string },
   secretKeyHex: string,
   label: string,
 ): Uint8Array {
-  const wrappedBytes = hexToBytes(envelope.wrappedKey)
+  const ctHex = 'ct' in envelope ? envelope.ct : envelope.wrappedKey
+  const encHex = 'enc' in envelope ? envelope.enc : envelope.ephemeralPubkey
+  const wrappedBytes = hexToBytes(ctHex)
   // v2 format: version(1) + nonce(24) + ciphertext
   const offset = wrappedBytes[0] === 0x02 ? 1 : 0
   const nonce = wrappedBytes.slice(offset, offset + 24)
   const ciphertext = wrappedBytes.slice(offset + 24)
-  const ephPubkey = hexToBytes(envelope.ephemeralPubkey)
+  const ephPubkey = hexToBytes(encHex)
 
   const sharedPoint = secp256k1.getSharedSecret(hexToBytes(secretKeyHex), ephPubkey)
   const sharedX = sharedPoint.slice(1, 33)

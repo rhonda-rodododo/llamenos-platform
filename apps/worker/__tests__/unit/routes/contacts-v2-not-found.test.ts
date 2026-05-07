@@ -10,8 +10,8 @@ import contactsV2Routes from '@worker/routes/contacts-v2'
 
 const VALID_ENVELOPE = {
   pubkey: 'a'.repeat(64),
-  wrappedKey: 'wrapped-key-hex',
-  ephemeralPubkey: 'b'.repeat(64),
+  enc: 'b'.repeat(64),
+  ct: 'wrapped-key-hex',
 }
 
 function makeApp() {

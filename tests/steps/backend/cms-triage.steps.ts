@@ -93,7 +93,7 @@ Given('a report of the conversion-enabled type exists', async ({ request, world 
       category: 'general',
       reportTypeId: getTriageState(world).enabledReportTypeId,
       encryptedContent: 'triage-report-content',
-      readerEnvelopes: [{ pubkey: kp.pubkey, wrappedKey: 'key', ephemeralPubkey: kp.pubkey }],
+      readerEnvelopes: [{ pubkey: kp.pubkey, ct: 'key', enc: kp.pubkey }],
     },
   )
   const id = (data as Record<string, unknown>)?.id as string
@@ -112,7 +112,7 @@ Given('a report of the conversion-disabled type exists', async ({ request, world
       category: 'general',
       reportTypeId: getTriageState(world).disabledReportTypeId,
       encryptedContent: 'disabled-report-content',
-      readerEnvelopes: [{ pubkey: kp.pubkey, wrappedKey: 'key', ephemeralPubkey: kp.pubkey }],
+      readerEnvelopes: [{ pubkey: kp.pubkey, ct: 'key', enc: kp.pubkey }],
     },
   )
 })
@@ -128,7 +128,7 @@ Given('a report of the conversion-enabled type exists with conversionStatus {str
       reportTypeId: getTriageState(world).enabledReportTypeId,
       encryptedContent: 'triage-status-report',
       conversionStatus,
-      readerEnvelopes: [{ pubkey: kp.pubkey, wrappedKey: 'key', ephemeralPubkey: kp.pubkey }],
+      readerEnvelopes: [{ pubkey: kp.pubkey, ct: 'key', enc: kp.pubkey }],
     },
   )
   const id = (data as Record<string, unknown>)?.id as string
@@ -256,7 +256,7 @@ When('the admin creates a case record from the report', async ({ request, world 
       entityTypeId: getTriageState(world).entityTypeId,
       statusHash: 'open',
       encryptedSummary: 'triage-case-summary',
-      summaryEnvelopes: [{ pubkey: kp.pubkey, wrappedKey: 'key', ephemeralPubkey: kp.pubkey }],
+      summaryEnvelopes: [{ pubkey: kp.pubkey, ct: 'key', enc: kp.pubkey }],
     },
   )
   if (status < 300) {

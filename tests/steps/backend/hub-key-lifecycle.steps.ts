@@ -23,16 +23,16 @@ interface HubMember {
 
 interface EnvelopeEntry {
   pubkey: string
-  wrappedKey: string
-  ephemeralPubkey: string
+  ct: string
+  enc: string
 }
 
 interface HubKeyState {
   hubId?: string
   members: Map<string, HubMember>
-  /** Original wrappedKey values keyed by member name */
+  /** Original ct values keyed by member name */
   originalEnvelopes: Map<string, string>
-  /** Current wrappedKey values keyed by member name */
+  /** Current ct values keyed by member name */
   currentEnvelopes: Map<string, string>
   /** Fetch results per member */
   fetchResults: Map<string, { status: number; envelope?: string }>
@@ -60,10 +60,10 @@ Before({ tags: '@crypto' }, async ({ world }) => {
 // ── Helpers ────────────────────────────────────────────────────────
 
 function generateMockEnvelopeEntry(pubkey: string, seed: string): EnvelopeEntry {
-  // wrappedKey encodes pubkey+seed so each member gets a DISTINCT value
-  const wrappedKey = Buffer.from(`wrapped:${pubkey}:${seed}`).toString('base64')
-  // ephemeralPubkey must match pubkeySchema: ^[0-9a-f]{64}$ — real pubkeys satisfy this
-  return { pubkey, wrappedKey, ephemeralPubkey: pubkey }
+  // ct encodes pubkey+seed so each member gets a DISTINCT value
+  const ct = Buffer.from(`wrapped:${pubkey}:${seed}`).toString('base64')
+  // enc must match pubkeySchema: ^[0-9a-f]{64}$ — real pubkeys satisfy this
+  return { pubkey, ct, enc: pubkey }
 }
 
 async function createHub(request: import('@playwright/test').APIRequestContext): Promise<string> {
@@ -114,8 +114,8 @@ When(
     for (const [name, member] of getHubKeyState(world).members) {
       const entry = generateMockEnvelopeEntry(member.pubkey, 'initial')
       envelopes.push(entry)
-      getHubKeyState(world).originalEnvelopes.set(name, entry.wrappedKey)
-      getHubKeyState(world).currentEnvelopes.set(name, entry.wrappedKey)
+      getHubKeyState(world).originalEnvelopes.set(name, entry.ct)
+      getHubKeyState(world).currentEnvelopes.set(name, entry.ct)
     }
 
     const res = await apiPut(
@@ -134,8 +134,8 @@ Given('hub key envelopes are set for all {int} members', async ({ request, world
   for (const [name, member] of getHubKeyState(world).members) {
     const entry = generateMockEnvelopeEntry(member.pubkey, 'initial')
     envelopes.push(entry)
-    getHubKeyState(world).originalEnvelopes.set(name, entry.wrappedKey)
-    getHubKeyState(world).currentEnvelopes.set(name, entry.wrappedKey)
+    getHubKeyState(world).originalEnvelopes.set(name, entry.ct)
+    getHubKeyState(world).currentEnvelopes.set(name, entry.ct)
   }
 
   const res = await apiPut(
@@ -155,15 +155,15 @@ Then(
     const member = getHubKeyState(world).members.get(name)
     expect(member).toBeTruthy()
 
-    const res = await apiGet<{ envelope: { pubkey: string; wrappedKey: string; ephemeralPubkey: string } }>(
+    const res = await apiGet<{ envelope: { pubkey: string; ct: string; enc: string } }>(
       request,
       `/hubs/${getHubKeyState(world).hubId}/key`,
       member!.nsec,
     )
     expect(res.status).toBe(200)
     expect(res.data.envelope).toBeTruthy()
-    expect(res.data.envelope.wrappedKey).toBeTruthy()
-    getHubKeyState(world).fetchResults.set(name, { status: res.status, envelope: res.data.envelope.wrappedKey })
+    expect(res.data.envelope.ct).toBeTruthy()
+    getHubKeyState(world).fetchResults.set(name, { status: res.status, envelope: res.data.envelope.ct })
   },
 )
 
@@ -200,7 +200,7 @@ When(
       expect(member).toBeTruthy()
       const entry = generateMockEnvelopeEntry(member!.pubkey, 'rotated')
       envelopes.push(entry)
-      getHubKeyState(world).currentEnvelopes.set(name, entry.wrappedKey)
+      getHubKeyState(world).currentEnvelopes.set(name, entry.ct)
     }
 
     const res = await apiPut(
@@ -245,7 +245,7 @@ When(
       if (getHubKeyState(world).currentEnvelopes.has(name)) {
         const entry = generateMockEnvelopeEntry(member.pubkey, 'new-key')
         envelopes.push(entry)
-        getHubKeyState(world).currentEnvelopes.set(name, entry.wrappedKey)
+        getHubKeyState(world).currentEnvelopes.set(name, entry.ct)
       }
     }
 
@@ -326,8 +326,8 @@ Given('hub key envelopes are set for {string}', async ({ request, world }, name:
   const entry = generateMockEnvelopeEntry(member!.pubkey, 'initial')
   const res = await apiPut(request, `/hubs/${hubId}/key`, { envelopes: [entry] })
   expect(res.status).toBe(200)
-  getHubKeyState(world).originalEnvelopes.set(name, entry.wrappedKey)
-  getHubKeyState(world).currentEnvelopes.set(name, entry.wrappedKey)
+  getHubKeyState(world).originalEnvelopes.set(name, entry.ct)
+  getHubKeyState(world).currentEnvelopes.set(name, entry.ct)
 })
 
 Given('a volunteer {string} who is not a hub member', async ({ request, world }, name: string) => {

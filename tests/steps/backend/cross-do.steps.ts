@@ -354,7 +354,7 @@ When('the reporter creates a report', async ({ request, world }) => {
       title: uniqueName('XDO Report'),
       category: 'general',
       encryptedContent: 'xdo-report-content',
-      readerEnvelopes: [{ pubkey: kp.pubkey, wrappedKey: 'key', ephemeralPubkey: kp.pubkey }],
+      readerEnvelopes: [{ pubkey: kp.pubkey, ct: 'key', enc: kp.pubkey }],
     },
     getCrossDoState(world).reporterNsec!,
   )

@@ -14,9 +14,9 @@ import recordsRouter from '../../routes/records'
 // ---------------------------------------------------------------------------
 
 const HEX64 = 'a'.repeat(64)
-const HEX66 = 'a'.repeat(66)
-const WRAPPED_KEY = 'dGVzdC13cmFwcGVkLWtleQ'
-const TEST_ENVELOPE = { pubkey: HEX64, wrappedKey: WRAPPED_KEY, ephemeralPubkey: HEX66 }
+const HPKE_ENC = 'b'.repeat(64)
+const WRAPPED_CT = 'dGVzdC13cmFwcGVkLWtleQ'
+const TEST_ENVELOPE = { pubkey: HEX64, enc: HPKE_ENC, ct: WRAPPED_CT }
 const VALID_UUID = '00000000-0000-4000-8000-000000000001'
 
 /** Minimal valid body for createRecordBodySchema */

@@ -39,8 +39,8 @@ Feature: Storage Integrity
     And the admin keypair is known for envelope verification
     When the volunteer creates a note with real ECIES envelopes
     And the note is fetched via the API
-    Then the API envelope wrappedKey should match the submitted wrappedKey exactly
-    And the API envelope ephemeralPubkey should match the submitted ephemeralPubkey exactly
+    Then the API envelope ct should match the submitted ct exactly
+    And the API envelope enc should match the submitted enc exactly
     When the envelope note row is fetched directly from the database
-    Then the DB admin_envelopes wrappedKey should match the submitted wrappedKey exactly
-    And the DB admin_envelopes ephemeralPubkey should match the submitted ephemeralPubkey exactly
+    Then the DB admin_envelopes ct should match the submitted ct exactly
+    And the DB admin_envelopes enc should match the submitted enc exactly

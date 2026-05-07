@@ -6,11 +6,17 @@
  * re-implements the same contract using @noble/curves and @noble/hashes
  * so unit tests can import any code that transitively imports auth.ts
  * or server-identity.ts without loading the native library.
+ *
+ * HPKE is implemented as X25519-HKDF-SHA256 + AES-256-GCM (simplified
+ * base mode matching the Rust implementation's wire format).
  */
 import { ed25519 } from '@noble/curves/ed25519.js'
+import { x25519 } from '@noble/curves/ed25519.js'
 import { hkdf } from '@noble/hashes/hkdf.js'
-import { sha256 } from '@noble/hashes/sha2.js'
+import { sha256 as sha256Noble } from '@noble/hashes/sha2.js'
 import { hmac } from '@noble/hashes/hmac.js'
+import { gcm } from '@noble/ciphers/aes.js'
+import { concatBytes } from '@noble/hashes/utils.js'
 
 export function randomBytes(len: number): Uint8Array {
   const out = new Uint8Array(len)
@@ -18,16 +24,20 @@ export function randomBytes(len: number): Uint8Array {
   return out
 }
 
+export function sha256(data: Uint8Array): Uint8Array {
+  return sha256Noble(data)
+}
+
 export function sha256Hash(data: Uint8Array): Uint8Array {
-  return sha256(data)
+  return sha256Noble(data)
 }
 
 export function hmacSha256(key: Uint8Array, data: Uint8Array): Uint8Array {
-  return hmac(sha256, key, data)
+  return hmac(sha256Noble, key, data)
 }
 
 export function hkdfSha256(ikm: Uint8Array, salt: Uint8Array, info: Uint8Array, len: number): Uint8Array {
-  return hkdf(sha256, ikm, salt.length > 0 ? salt : undefined, info.length > 0 ? info : undefined, len)
+  return hkdf(sha256Noble, ikm, salt.length > 0 ? salt : undefined, info.length > 0 ? info : undefined, len)
 }
 
 export function ed25519Sign(secretKey: Uint8Array, message: Uint8Array): Uint8Array {
@@ -46,19 +56,83 @@ export function ed25519PubkeyFromSeed(seed: Uint8Array): Uint8Array {
   return ed25519.getPublicKey(seed)
 }
 
-// Stub for HPKE operations — not needed in unit tests
-export function hpkeSeal(_recipientPk: Uint8Array, _plaintext: Uint8Array, _info: Uint8Array, _aad: Uint8Array): Uint8Array {
-  throw new Error('hpkeSeal not available in unit test mock')
+// ---------------------------------------------------------------------------
+// HPKE Base Mode (X25519-HKDF-SHA256-AES256GCM) — simplified mock
+// ---------------------------------------------------------------------------
+
+/**
+ * HPKE Seal: encrypt plaintext for recipientPk.
+ * Returns: enc(32 bytes) || ciphertext+tag
+ */
+export function hpkeSeal(recipientPk: Uint8Array, plaintext: Uint8Array, info: Uint8Array, aad: Uint8Array): Uint8Array {
+  // 1. Generate ephemeral X25519 keypair
+  const ephSecretKey = randomBytes(32)
+  const enc = x25519.getPublicKey(ephSecretKey) // 32 bytes
+
+  // 2. ECDH: shared_secret = X25519(ephSecretKey, recipientPk)
+  const sharedSecret = x25519.getSharedSecret(ephSecretKey, recipientPk)
+
+  // 3. KDF: derive symmetric key via HKDF
+  const kem_context = concatBytes(enc, recipientPk)
+  const prk = hkdf(sha256Noble, sharedSecret, new Uint8Array(0), kem_context, 32)
+  const symmetricKey = hkdf(sha256Noble, prk, new Uint8Array(0), info, 32)
+
+  // 4. AEAD: AES-256-GCM encrypt
+  const nonce = randomBytes(12)
+  const cipher = gcm(symmetricKey, nonce, aad)
+  const ciphertext = cipher.encrypt(plaintext)
+
+  // Wire format: enc(32) || nonce(12) || ciphertext+tag
+  return concatBytes(enc, nonce, ciphertext)
 }
 
-export function hpkeOpen(_secretKey: Uint8Array, _envelope: Uint8Array, _info: Uint8Array, _aad: Uint8Array): Uint8Array {
-  throw new Error('hpkeOpen not available in unit test mock')
+/**
+ * HPKE Open: decrypt ciphertext using secretKey.
+ * envelope = enc(32) || nonce(12) || ciphertext+tag
+ */
+export function hpkeOpen(secretKey: Uint8Array, envelope: Uint8Array, info: Uint8Array, aad: Uint8Array): Uint8Array {
+  const enc = envelope.subarray(0, 32)
+  const nonce = envelope.subarray(32, 44)
+  const ciphertext = envelope.subarray(44)
+
+  // Compute recipient public key from secret key
+  const recipientPk = x25519.getPublicKey(secretKey)
+
+  // ECDH: shared_secret = X25519(secretKey, enc)
+  const sharedSecret = x25519.getSharedSecret(secretKey, enc)
+
+  // KDF
+  const kem_context = concatBytes(enc, recipientPk)
+  const prk = hkdf(sha256Noble, sharedSecret, new Uint8Array(0), kem_context, 32)
+  const symmetricKey = hkdf(sha256Noble, prk, new Uint8Array(0), info, 32)
+
+  // AEAD decrypt
+  const cipher = gcm(symmetricKey, nonce, aad)
+  return cipher.decrypt(ciphertext)
 }
 
-export function symmetricEncrypt(_key: Uint8Array, _plaintext: Uint8Array, _aad: Uint8Array): Uint8Array {
-  throw new Error('symmetricEncrypt not available in unit test mock')
+// ---------------------------------------------------------------------------
+// Symmetric encryption (AES-256-GCM)
+// ---------------------------------------------------------------------------
+
+/**
+ * Symmetric encrypt: AES-256-GCM.
+ * Returns: nonce(12) || ciphertext+tag
+ */
+export function symmetricEncrypt(key: Uint8Array, plaintext: Uint8Array, aad: Uint8Array): Uint8Array {
+  const nonce = randomBytes(12)
+  const cipher = gcm(key, nonce, aad)
+  const ciphertext = cipher.encrypt(plaintext)
+  return concatBytes(nonce, ciphertext)
 }
 
-export function symmetricDecrypt(_key: Uint8Array, _ciphertext: Uint8Array, _aad: Uint8Array): Uint8Array {
-  throw new Error('symmetricDecrypt not available in unit test mock')
+/**
+ * Symmetric decrypt: AES-256-GCM.
+ * Input: nonce(12) || ciphertext+tag
+ */
+export function symmetricDecrypt(key: Uint8Array, data: Uint8Array, aad: Uint8Array): Uint8Array {
+  const nonce = data.subarray(0, 12)
+  const ciphertext = data.subarray(12)
+  const cipher = gcm(key, nonce, aad)
+  return cipher.decrypt(ciphertext)
 }

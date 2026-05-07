@@ -636,8 +636,8 @@ export interface EncryptedMessageResult {
 
 /** @deprecated Use HpkeEnvelope instead. */
 export interface FileKeyEnvelope {
-  wrappedKey: string
-  ephemeralPubkey: string
+  enc: string
+  ct: string
 }
 
 // --- Legacy function wrappers ---
@@ -714,7 +714,7 @@ function hexToBase64url(hex: string): string {
 
 // ── AES-256-GCM content encryption (WebCrypto) ─────────────────────
 
-async function aesGcmEncrypt(plaintext: string, keyHex: string): Promise<string> {
+export async function aesGcmEncrypt(plaintext: string, keyHex: string): Promise<string> {
   const keyBytes = new Uint8Array(keyHex.match(/.{2}/g)!.map(b => parseInt(b, 16)))
   const iv = crypto.getRandomValues(new Uint8Array(12))
   const cryptoKey = await crypto.subtle.importKey('raw', keyBytes, 'AES-GCM', false, ['encrypt'])
@@ -725,7 +725,7 @@ async function aesGcmEncrypt(plaintext: string, keyHex: string): Promise<string>
   return Array.from(packed, b => b.toString(16).padStart(2, '0')).join('')
 }
 
-async function aesGcmDecrypt(ciphertextHex: string, keyHex: string): Promise<string> {
+export async function aesGcmDecrypt(ciphertextHex: string, keyHex: string): Promise<string> {
   const data = new Uint8Array(ciphertextHex.match(/.{2}/g)!.map(b => parseInt(b, 16)))
   const iv = data.slice(0, 12)
   const ct = data.slice(12)
@@ -758,8 +758,7 @@ export async function eciesWrapKey(
 ): Promise<KeyEnvelope> {
   const encPubkey = await resolveEncryptionPubkey(recipientPubkey)
   const envelope = await hpkeSealKey(keyHex, encPubkey, label, '')
-  // Convert base64url enc to hex for eciesPubkeySchema compatibility
-  return { wrappedKey: envelope.ct, ephemeralPubkey: base64urlToHex(envelope.enc) }
+  return { enc: base64urlToHex(envelope.enc), ct: envelope.ct }
 }
 
 /** @deprecated Use hpkeOpenKeyFromState instead. */
@@ -791,8 +790,8 @@ export async function encryptNote(
   const authorEncPub = await resolveEncryptionPubkey(authorPubkey)
   const authorHpke = await hpkeSealKey(keyHex, authorEncPub, 'llamenos:note-key', '')
   const authorEnvelope: KeyEnvelope = {
-    wrappedKey: authorHpke.ct,
-    ephemeralPubkey: base64urlToHex(authorHpke.enc),
+    enc: base64urlToHex(authorHpke.enc),
+    ct: authorHpke.ct,
   }
 
   // HPKE-wrap key for each admin
@@ -802,8 +801,8 @@ export async function encryptNote(
       const hpke = await hpkeSealKey(keyHex, encPub, 'llamenos:note-key', '')
       return {
         pubkey,
-        wrappedKey: hpke.ct,
-        ephemeralPubkey: base64urlToHex(hpke.enc),
+        enc: base64urlToHex(hpke.enc),
+        ct: hpke.ct,
       }
     }),
   )
@@ -823,8 +822,8 @@ export async function decryptNote(
     const hpkeEnvelope: HpkeEnvelope = {
       v: 3,
       labelId: 0, // LABEL_NOTE_KEY index
-      enc: hexToBase64url(envelope.ephemeralPubkey),
-      ct: envelope.wrappedKey,
+      enc: hexToBase64url(envelope.enc),
+      ct: envelope.ct,
     }
     const keyHex = await hpkeOpenKeyFromState(hpkeEnvelope, 'llamenos:note-key', '')
     return await aesGcmDecrypt(encryptedContent, keyHex)
@@ -859,8 +858,8 @@ export async function encryptMessage(
       const hpke = await hpkeSealKey(keyHex, encPub, 'llamenos:message', '')
       return {
         pubkey,
-        wrappedKey: hpke.ct,
-        ephemeralPubkey: base64urlToHex(hpke.enc),
+        enc: base64urlToHex(hpke.enc),
+        ct: hpke.ct,
       }
     }),
   )
@@ -888,8 +887,8 @@ export async function decryptMessage(
     const hpkeEnvelope: HpkeEnvelope = {
       v: 3,
       labelId: 5, // LABEL_MESSAGE index
-      enc: hexToBase64url(myEnvelope.ephemeralPubkey),
-      ct: myEnvelope.wrappedKey,
+      enc: hexToBase64url(myEnvelope.enc),
+      ct: myEnvelope.ct,
     }
     const keyHex = await hpkeOpenKeyFromState(hpkeEnvelope, 'llamenos:message', '')
     return await aesGcmDecrypt(encryptedContent, keyHex)
@@ -918,8 +917,8 @@ export async function decryptCallRecord(
     const hpkeEnvelope: HpkeEnvelope = {
       v: 3,
       labelId: 6, // LABEL_CALL_META index
-      enc: hexToBase64url(myEnvelope.ephemeralPubkey),
-      ct: myEnvelope.wrappedKey,
+      enc: hexToBase64url(myEnvelope.enc),
+      ct: myEnvelope.ct,
     }
     const keyHex = await hpkeOpenKeyFromState(hpkeEnvelope, 'llamenos:call-meta', '')
     const plaintext = await aesGcmDecrypt(encryptedContent, keyHex)

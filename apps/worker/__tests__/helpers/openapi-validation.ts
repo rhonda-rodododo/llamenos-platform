@@ -28,8 +28,8 @@ export const VALID_HASH = 'd'.repeat(64)
 /** Valid compressed secp256k1 pubkey (33 bytes hex) */
 export const VALID_COMPRESSED_PUBKEY = '02' + 'a'.repeat(64)
 
-/** Valid ECIES pubkey (66-char hex, compressed SEC1) */
-export const VALID_ECIES_PUBKEY = '03' + 'a'.repeat(64)
+/** Valid HPKE enc value (64-char hex, 32-byte X25519 encapsulated key) */
+export const VALID_HPKE_ENC = 'b'.repeat(64)
 
 /** Valid E.164 phone number */
 export const VALID_E164 = '+12125551234'
@@ -37,17 +37,17 @@ export const VALID_E164 = '+12125551234'
 /** Valid UUID v4 */
 export const VALID_UUID = '550e8400-e29b-41d4-a716-446655440000'
 
-/** Valid recipient envelope */
+/** Valid recipient envelope (HPKE format) */
 export const VALID_ENVELOPE = {
   pubkey: VALID_PUBKEY,
-  wrappedKey: 'deadbeef',
-  ephemeralPubkey: VALID_ECIES_PUBKEY,
+  enc: VALID_HPKE_ENC,
+  ct: 'deadbeef',
 }
 
 /** Valid key envelope (no pubkey, for author copies) */
 export const VALID_KEY_ENVELOPE = {
-  wrappedKey: 'deadbeef',
-  ephemeralPubkey: VALID_ECIES_PUBKEY,
+  enc: VALID_HPKE_ENC,
+  ct: 'deadbeef',
 }
 
 // ---------------------------------------------------------------------------

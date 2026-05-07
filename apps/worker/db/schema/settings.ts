@@ -104,8 +104,8 @@ export const hubKeys = pgTable(
       .notNull()
       .references(() => hubs.id, { onDelete: 'cascade' }),
     recipientPubkey: text('recipient_pubkey').notNull(),
-    wrappedKey: text('wrapped_key').notNull(),
-    ephemeralPubkey: text('ephemeral_pubkey').notNull(),
+    enc: text('enc').notNull(),
+    ct: text('ct').notNull(),
   },
   (t) => [primaryKey({ columns: [t.hubId, t.recipientPubkey] })],
 )

@@ -6,16 +6,9 @@ import {
 } from '@worker/messaging/firehose-observer'
 import type { FirehoseService } from '@worker/services/firehose'
 
-vi.mock('@worker/lib/crypto', () => ({
-  eciesWrapKeyForRecipient: vi.fn((_key: Uint8Array, _pubkey: string, _label: string) => ({
-    wrappedKey: 'mock-wrapped-key-hex',
-    ephemeralPubkey: 'mock-ephemeral-pubkey-hex',
-  })),
-}))
-
-vi.mock('@shared/crypto-labels', () => ({
-  LABEL_FIREHOSE_BUFFER_ENCRYPT: 'llamenos:firehose:buffer-encrypt',
-}))
+// The observer imports hpkeSeal, symmetricEncrypt, randomBytes from @llamenos/crypto/ffi.
+// In the vitest environment, the mock in __tests__/mocks/llamenos-crypto-ffi.ts provides
+// working implementations of these (X25519 HPKE + AES-256-GCM).
 
 function createMockFirehoseService(overrides: Partial<FirehoseService> = {}): FirehoseService {
   return {
@@ -70,7 +63,7 @@ describe('firehose-observer', () => {
         findConnectionBySignalGroup: vi.fn().mockResolvedValue({
           id: 'conn-1',
           status: 'pending',
-          agentPubkey: 'pubkey-abc',
+          agentPubkey: 'a'.repeat(64),
           bufferTtlDays: 7,
         }),
       })
@@ -83,11 +76,13 @@ describe('firehose-observer', () => {
     })
 
     it('returns true and encrypts message when connection is active', async () => {
+      // Use a valid X25519 pubkey (base point u=9, 32 bytes little-endian hex)
+      const agentPubkey = '0900000000000000000000000000000000000000000000000000000000000000'
       const firehose = createMockFirehoseService({
         findConnectionBySignalGroup: vi.fn().mockResolvedValue({
           id: 'conn-1',
           status: 'active',
-          agentPubkey: 'pubkey-abc',
+          agentPubkey,
           bufferTtlDays: 7,
         }),
         getCurrentWindowKey: vi.fn().mockResolvedValue(null),
@@ -103,7 +98,7 @@ describe('firehose-observer', () => {
       expect(firehose.findConnectionBySignalGroup).toHaveBeenCalledWith('group-123', 'hub-456')
       expect(firehose.createWindowKey).toHaveBeenCalledWith({
         connectionId: 'conn-1',
-        sealedKey: expect.stringContaining('mock-wrapped-key'),
+        sealedKey: expect.stringMatching(/\{.*"enc".*"ct".*\}/), // HPKE sealed key JSON
         windowStart: expect.any(Date),
         windowEnd: expect.any(Date),
       })
@@ -121,11 +116,12 @@ describe('firehose-observer', () => {
     })
 
     it('reuses existing window key when valid and cached', async () => {
+      const agentPubkey = '0900000000000000000000000000000000000000000000000000000000000000'
       const firehose = createMockFirehoseService({
         findConnectionBySignalGroup: vi.fn().mockResolvedValue({
           id: 'conn-1',
           status: 'active',
-          agentPubkey: 'pubkey-abc',
+          agentPubkey,
           bufferTtlDays: 7,
         }),
         getCurrentWindowKey: vi.fn().mockResolvedValue(null),
@@ -149,7 +145,7 @@ describe('firehose-observer', () => {
         findConnectionBySignalGroup: vi.fn().mockResolvedValue({
           id: 'conn-1',
           status: 'active',
-          agentPubkey: 'pubkey-abc',
+          agentPubkey,
           bufferTtlDays: 7,
         }),
         getCurrentWindowKey: vi.fn().mockResolvedValue({
@@ -175,7 +171,7 @@ describe('firehose-observer', () => {
         findConnectionBySignalGroup: vi.fn().mockResolvedValue({
           id: 'conn-1',
           status: 'active',
-          agentPubkey: 'pubkey-abc',
+          agentPubkey: 'a'.repeat(64),
           bufferTtlDays: 7,
         }),
         getCurrentWindowKey: vi.fn().mockRejectedValue(new Error('DB error')),
@@ -190,11 +186,12 @@ describe('firehose-observer', () => {
 
   describe('clearWindowKeyCache', () => {
     it('clears the in-memory window key cache', async () => {
+      const agentPubkey = '0900000000000000000000000000000000000000000000000000000000000000'
       const firehose = createMockFirehoseService({
         findConnectionBySignalGroup: vi.fn().mockResolvedValue({
           id: 'conn-1',
           status: 'active',
-          agentPubkey: 'pubkey-abc',
+          agentPubkey,
           bufferTtlDays: 7,
         }),
         getCurrentWindowKey: vi.fn().mockResolvedValue(null),
@@ -213,7 +210,7 @@ describe('firehose-observer', () => {
         findConnectionBySignalGroup: vi.fn().mockResolvedValue({
           id: 'conn-1',
           status: 'active',
-          agentPubkey: 'pubkey-abc',
+          agentPubkey,
           bufferTtlDays: 7,
         }),
         getCurrentWindowKey: vi.fn().mockResolvedValue({
