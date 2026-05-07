@@ -769,7 +769,16 @@ jobs:
             adb reverse tcp:3000 tcp:3000
             # Verify backend is reachable from host before running tests
             curl -sf http://localhost:3000/api/health/ready || { echo "::error::Backend not reachable"; exit 1; }
-            cd apps/android && ./gradlew connectedDebugAndroidTest --console=plain -Pandroid.testInstrumentationRunnerArguments.cucumber.features="${{ steps.shard-features.outputs.features }}" -Pandroid.testInstrumentationRunnerArguments.testHubUrl="http://10.0.2.2:3000" -Pandroid.testInstrumentationRunnerArguments.testSecret="test-reset-secret"
+            # Capture logcat in background DURING tests — the emulator dies when this
+            # script block ends, so post-script adb logcat -d always gets an empty file.
+            adb logcat -v time > /tmp/logcat.txt 2>/dev/null &
+            LOGCAT_PID=$!
+            SHARD_FEATURES="${{ steps.shard-features.outputs.features }}"
+            cd apps/android && ./gradlew connectedDebugAndroidTest --console=plain -Pandroid.testInstrumentationRunnerArguments.cucumber.features="$SHARD_FEATURES" -Pandroid.testInstrumentationRunnerArguments.testHubUrl="http://10.0.2.2:3000" -Pandroid.testInstrumentationRunnerArguments.testSecret="test-reset-secret"
+            EXIT_CODE=$?
+            kill $LOGCAT_PID 2>/dev/null || true
+            wait $LOGCAT_PID 2>/dev/null || true
+            exit $EXIT_CODE
 
       - name: Upload test results
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -781,13 +790,9 @@ jobs:
             apps/android/app/build/reports/androidTests/
           retention-days: 7
 
-      - name: Collect logcat on failure
-        if: failure()
-        run: timeout 30 adb logcat -d > /tmp/logcat.txt 2>/dev/null || true
-
       - name: Upload logcat
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        if: failure()
+        if: ${{ !cancelled() }}
         with:
           name: android-e2e-logcat-shard-${{ matrix.shard }}
           path: /tmp/logcat.txt

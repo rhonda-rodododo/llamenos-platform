@@ -187,7 +187,7 @@ dev.post('/test-setup-cms', async (c) => {
     return c.json({ error: 'Not Found' }, 404)
   }
 
-  const body = await c.req.json().catch(() => ({})) as { pubkey?: string }
+  const body = await c.req.json().catch(() => ({})) as { pubkey?: string; hubId?: string }
   let pubkey: string | undefined
   if (body.pubkey) {
     try {
@@ -196,6 +196,7 @@ dev.post('/test-setup-cms', async (c) => {
       pubkey = body.pubkey // Fall back to raw value if decode fails
     }
   }
+  const hubId = body.hubId ?? ''
   const services = c.get('services')
   const templateId = 'jail-support'
 
@@ -309,7 +310,7 @@ dev.post('/test-setup-cms', async (c) => {
           : '{"title":"Test Case","summary":"BDD test case"}'),
         summaryEnvelopes: [],
         createdBy: pubkey ?? '',
-        hubId: '',
+        hubId,
       })
       if (!recordId) recordId = record.id
     } catch { /* ignore record creation failures */ }
