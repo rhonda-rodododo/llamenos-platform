@@ -80,7 +80,7 @@ function UsersPage() {
           <h1 data-testid="page-title" className="text-xl font-bold sm:text-2xl">{t('users.title')}</h1>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => { setShowInviteForm(true); setInviteLink(null) }}>
+          <Button variant="outline" data-testid="invite-btn" onClick={() => { setShowInviteForm(true); setInviteLink(null) }}>
             <Mail className="h-4 w-4" />
             {t('users.inviteVolunteer')}
           </Button>
@@ -132,7 +132,7 @@ function UsersPage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <code className="flex-1 break-all rounded-md bg-background px-3 py-2 text-xs">{inviteLink}</code>
+              <code data-testid="invite-link-code" className="flex-1 break-all rounded-md bg-background px-3 py-2 text-xs">{inviteLink}</code>
               <Button
                 variant="outline"
                 size="icon"
@@ -332,7 +332,7 @@ function InviteForm({ roles, onCreated, onCancel }: {
             </Select>
           </div>
           <div className="flex gap-2">
-            <Button type="submit" disabled={saving}>
+            <Button type="submit" data-testid="create-invite-btn" disabled={saving}>
               {saving ? t('common.loading') : t('users.createInvite')}
             </Button>
             <Button type="button" variant="outline" onClick={onCancel}>

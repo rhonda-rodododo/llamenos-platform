@@ -225,8 +225,8 @@ async function createRoleAccount(
   await adminPage.getByTestId(TestIds.NAV_VOLUNTEERS).click()
   await expect(adminPage.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: 10000 })
 
-  // Click "Invite" button (the outline button with mail icon)
-  const inviteBtn = adminPage.getByRole('button', { name: /invite/i })
+  // Click "Invite" button
+  const inviteBtn = adminPage.getByTestId('invite-btn')
   await inviteBtn.waitFor({ state: 'visible', timeout: 10000 })
   await inviteBtn.click()
 
@@ -256,10 +256,10 @@ async function createRoleAccount(
   }
 
   // Create invite
-  await adminPage.getByRole('button', { name: /create invite/i }).click()
+  await adminPage.getByTestId('create-invite-btn').click()
 
   // Wait for invite link to appear (green card with the link)
-  const inviteLinkCard = adminPage.locator('code').filter({ hasText: /onboarding\?code=/ })
+  const inviteLinkCard = adminPage.getByTestId('invite-link-code')
   await expect(inviteLinkCard).toBeVisible({ timeout: 15000 })
   const inviteLink = await inviteLinkCard.textContent()
   if (!inviteLink) throw new Error(`Failed to get invite link for ${opts.name}`)

@@ -14,6 +14,10 @@ import {
   Timeouts,
   TestIds,
 } from '../../helpers'
+import {
+  createUserViaApi,
+  createShiftViaApi,
+} from '../../api-helpers'
 
 Given('the app is freshly installed', async ({ page }) => {
   // Clear all storage to simulate a fresh install
@@ -72,6 +76,10 @@ Given('I am logged in', async ({ page }) => {
 })
 
 Given('I am logged in as an admin', async ({ page }) => {
+  await loginAsAdmin(page)
+})
+
+Given('I am logged in as admin', async ({ page }) => {
   await loginAsAdmin(page)
 })
 
@@ -144,3 +152,24 @@ When('I enter PIN {string}', async ({ page }, pin: string) => {
   const normalizedPin = pin.padEnd(8, '0')
   await enterPin(page, normalizedPin)
 })
+
+// ── Volunteer on shift ────────────────────────────────────────────
+
+Given('I am logged in as a volunteer on shift', async ({ page, backendRequest: request, workerHub }) => {
+  // Create a volunteer, put them on a current shift, then log in
+  const vol = await createUserViaApi(request)
+  await createShiftViaApi(request, {
+    name: `Shift-${Date.now()}`,
+    startTime: '00:00',
+    endTime: '23:59',
+    days: [0, 1, 2, 3, 4, 5, 6],
+    userPubkeys: [vol.pubkey],
+    hubId: workerHub,
+  })
+  await loginAsVolunteer(page, vol.nsec)
+})
+
+// Reporter steps defined in tests/steps/auth/user-steps.ts:
+// - "a reporter has been invited and onboarded"
+// - "the reporter logs in"
+// - "a reporter is logged in"

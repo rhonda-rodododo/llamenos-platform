@@ -8,7 +8,7 @@ const configDir = new URL(".", import.meta.url).pathname;
 // that use a different createBdd() instance.
 const desktopStepDirs = [
   "admin", "auth", "calls", "cases", "common", "contacts", "conversations",
-  "crypto", "dashboard", "help", "messaging", "notes", "reports",
+  "crypto", "dashboard", "help", "hub", "messaging", "notes", "reports",
   "security", "settings", "shifts",
 ];
 
