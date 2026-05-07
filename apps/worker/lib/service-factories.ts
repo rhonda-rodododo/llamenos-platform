@@ -1,7 +1,7 @@
 import type { Env } from '../types'
 import type { TelephonyAdapter } from '../telephony/adapter'
 import type { MessagingAdapter } from '../messaging/adapter'
-import { type NostrPublisher, createNostrPublisher, NodeNostrPublisher } from './nostr-publisher'
+// NostrPublisher removed — replaced by ConnectionManager in ws-manager.ts
 import type { TelephonyProviderConfig, MessagingChannelType, MessagingConfig } from '@shared/types'
 import { TwilioAdapter } from '../telephony/twilio'
 import { SignalWireAdapter } from '../telephony/signalwire'
@@ -106,35 +106,6 @@ export async function getMessagingAdapterFromService(
     default:
       throw new Error(`Unknown channel: ${channel}`)
   }
-}
-
-// --- Nostr Publisher (Epic 76.1) ---
-
-let cachedPublisher: NostrPublisher | null = null
-
-export function _resetNostrPublisherCache(): void {
-  cachedPublisher = null
-}
-
-/**
- * Get the Nostr event publisher for the current platform.
- * Lazily creates and caches the publisher instance.
- * Returns a NoopNostrPublisher if no relay is configured.
- */
-export function getNostrPublisher(env: Env): NostrPublisher {
-  if (!cachedPublisher) {
-    // Check if a pre-configured publisher was set by createBunEnv() (with outbox wired)
-    if (env.NOSTR_PUBLISHER) {
-      cachedPublisher = env.NOSTR_PUBLISHER
-    } else {
-      cachedPublisher = createNostrPublisher(env)
-      // Eagerly connect Node.js publisher so events don't queue behind a 2s auth timeout
-      if (cachedPublisher instanceof NodeNostrPublisher) {
-        cachedPublisher.connect().catch(() => {})
-      }
-    }
-  }
-  return cachedPublisher
 }
 
 /**

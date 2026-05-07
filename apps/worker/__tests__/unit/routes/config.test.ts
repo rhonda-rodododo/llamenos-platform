@@ -7,7 +7,7 @@ vi.stubGlobal('__BUILD_TIME__', '2024-01-01T00:00:00Z')
 import { Hono } from 'hono'
 import type { AppEnv } from '@worker/types'
 import configRoute from '@worker/routes/config'
-import * as nostrPublisher from '@worker/lib/nostr-publisher'
+import * as serverIdentity from '@worker/lib/server-identity'
 
 function createTestApp(opts: {
   env?: Record<string, string | undefined>
@@ -21,9 +21,8 @@ function createTestApp(opts: {
       HOTLINE_NAME: 'Test Hotline',
       TWILIO_PHONE_NUMBER: '+15551234567',
       DEMO_MODE: 'false',
-      NOSTR_RELAY_URL: 'ws://localhost:7777',
-      NOSTR_RELAY_PUBLIC_URL: 'wss://relay.example.com',
       GLITCHTIP_DSN: 'https://example.com/dsn',
+      SERVER_SECRET: 'a'.repeat(64),
       SERVER_NOSTR_SECRET: 'a'.repeat(64),
       ...opts.env,
     }
@@ -265,20 +264,22 @@ describe('config route', () => {
       expect(body.serverNostrPubkey).toBeUndefined()
     })
 
-    it('derives serverNostrPubkey from valid SERVER_NOSTR_SECRET', async () => {
-      const deriveSpy = vi.spyOn(nostrPublisher, 'deriveServerKeypair').mockReturnValue({
+    it('derives serverPubkey from valid SERVER_SECRET', async () => {
+      const deriveSpy = vi.spyOn(serverIdentity, 'deriveServerKeypair').mockReturnValue({
         secretKey: new Uint8Array(32),
-        pubkey: 'testpubkeyhex123',
+        pubkeyHex: 'testpubkeyhex123',
       })
       const services = createMockServices()
       const app = createTestApp({
         services,
-        env: { SERVER_NOSTR_SECRET: 'a'.repeat(64) },
+        env: { SERVER_SECRET: 'a'.repeat(64), SERVER_NOSTR_SECRET: 'a'.repeat(64) },
       })
 
       const res = await app.request('/')
       expect(res.status).toBe(200)
       const body = await res.json()
+      expect(body.serverPubkey).toBe('testpubkeyhex123')
+      // Legacy alias should also be present
       expect(body.serverNostrPubkey).toBe('testpubkeyhex123')
       deriveSpy.mockRestore()
     })

@@ -10,7 +10,7 @@ import { reportTypeListResponseSchema } from '@protocol/schemas/settings'
 import { authErrors, notFoundError } from '../openapi/helpers'
 import { audit } from '../services/audit'
 import { KIND_MESSAGE_NEW, KIND_CONVERSATION_ASSIGNED } from '@shared/nostr-events'
-import { publishNostrEvent } from '../lib/nostr-events'
+import { publishEvent } from '../lib/ws-events'
 import { verifyReportAccess, isReport } from '../lib/report-access'
 import { linkCaseToReportBodySchema } from '@protocol/schemas/report-links'
 import { createLogger } from '../lib/logger'
@@ -158,11 +158,11 @@ reports.post('/',
     })
 
     // Publish report event to Nostr relay
-    publishNostrEvent(c.env, KIND_MESSAGE_NEW, {
+    publishEvent(c.env, KIND_MESSAGE_NEW, {
       type: 'report:new',
       conversationId: conversation.id,
       category: body.category,
-    }).catch((e) => { logger.error('Failed to publish event', e) })
+    })
 
     await audit(services.audit, 'reportCreated', pubkey, {
       conversationId: conversation.id,
@@ -386,10 +386,10 @@ reports.post('/:id/messages',
     })
 
     // Publish message event to Nostr relay
-    publishNostrEvent(c.env, KIND_MESSAGE_NEW, {
+    publishEvent(c.env, KIND_MESSAGE_NEW, {
       type: 'message:new',
       conversationId: id,
-    }).catch((e) => { logger.error('Failed to publish event', e) })
+    })
 
     return c.json(msg)
   },
@@ -429,11 +429,11 @@ reports.post('/:id/assign',
     await audit(services.audit, 'reportAssigned', pubkey, { reportId: id, assignedTo: body.assignedTo })
 
     // Publish assignment event to Nostr relay
-    publishNostrEvent(c.env, KIND_CONVERSATION_ASSIGNED, {
+    publishEvent(c.env, KIND_CONVERSATION_ASSIGNED, {
       type: 'conversation:assigned',
       conversationId: id,
       assignedTo: body.assignedTo,
-    }).catch((e) => { logger.error('Failed to publish event', e) })
+    })
 
     return c.json(updated)
   },

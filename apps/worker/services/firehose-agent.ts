@@ -28,7 +28,7 @@ import { encryptMessageForStorage } from '../lib/crypto'
 import { CircuitBreaker, type CircuitBreakerOptions } from '../lib/circuit-breaker'
 import { createLogger } from '../lib/logger'
 import { clearWindowKeyCache } from '../messaging/firehose-observer'
-import { getNostrPublisher } from '../lib/service-factories'
+import { publishEvent } from '../lib/ws-events'
 import type { ConversationsService } from './conversations'
 import type { FirehoseService } from './firehose'
 import {
@@ -553,28 +553,17 @@ export class FirehoseAgentService {
     conversationId: string,
     confidence: number,
   ): void {
-    try {
-      const publisher = getNostrPublisher(this.env as import('../types/infra').Env)
-      publisher
-        .publish({
-          kind: KIND_FIREHOSE_REPORT,
-          created_at: Math.floor(Date.now() / 1000),
-          tags: [
-            ['d', conn.hubId],
-            ['t', 'llamenos:event'],
-            ['c', conn.id],
-          ],
-          content: JSON.stringify({
-            type: 'firehose:report',
-            connectionId: conn.id,
-            conversationId,
-            confidence,
-          }),
-        })
-        .catch((err: unknown) => log.error('Nostr publish failed', { error: err instanceof Error ? err.message : String(err) }))
-    } catch {
-      // Missing publisher config is expected in some envs
-    }
+    publishEvent(
+      this.env as import('../types/infra').Env,
+      KIND_FIREHOSE_REPORT,
+      {
+        type: 'firehose:report',
+        connectionId: conn.id,
+        conversationId,
+        confidence,
+      },
+      conn.hubId,
+    )
   }
 
   private getOrCreateInferenceClient(endpoint: string): FirehoseInferenceClient {

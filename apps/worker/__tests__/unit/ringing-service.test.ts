@@ -24,8 +24,8 @@ vi.mock('../../lib/voip-push', () => ({
   dispatchVoipPushFromService: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('../../lib/nostr-events', () => ({
-  publishNostrEvent: vi.fn().mockResolvedValue(undefined),
+vi.mock('../../lib/ws-events', () => ({
+  publishEvent: vi.fn(),
 }))
 
 vi.mock('../../lib/logger', () => ({

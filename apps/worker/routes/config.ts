@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { describeRoute, resolver } from 'hono-openapi'
 import type { AppEnv } from '../types'
-import { deriveServerKeypair } from '../lib/nostr-publisher'
+import { deriveServerKeypair } from '../lib/server-identity'
 import { CURRENT_API_VERSION, MIN_API_VERSION } from '../lib/api-versions'
 import type { EnabledChannels, Hub, SetupState } from '@shared/types'
 import { configResponseSchema, configVerifyResponseSchema } from '@protocol/schemas/config'
@@ -74,23 +74,19 @@ config.get('/',
       }
     } catch { /* default to empty */ }
 
-    // Derive server Nostr pubkey for client event verification (Epic 76.1)
-    // NOTE: serverEventKeyHex moved to authenticated /api/auth/me endpoint (Epic 258 C2)
-    let serverNostrPubkey: string | undefined
-    if (c.env.SERVER_NOSTR_SECRET) {
+    // Derive server Ed25519 pubkey for client event signature verification
+    const serverSecret = c.env.SERVER_SECRET ?? c.env.SERVER_NOSTR_SECRET
+    let serverPubkey: string | undefined
+    if (serverSecret) {
       try {
-        serverNostrPubkey = deriveServerKeypair(c.env.SERVER_NOSTR_SECRET).pubkey
+        serverPubkey = deriveServerKeypair(serverSecret).pubkeyHex
       } catch {
-        serverNostrPubkey = undefined
+        serverPubkey = undefined
       }
     }
 
-    // Client-facing relay URL:
-    // - Explicit env var takes priority (any deployment)
-    // - /nostr fallback only for self-hosted (NOSTR_RELAY_URL set = strfry behind Caddy)
-    // - CF deployments use NOSFLARE service binding (server-side only, no client WebSocket)
-    const nostrRelayUrl = c.env.NOSTR_RELAY_PUBLIC_URL
-      || (c.env.NOSTR_RELAY_URL ? '/nostr' : undefined)
+    // WebSocket relay URL — always /ws (proxied via Caddy in production)
+    const wsRelayUrl = serverSecret ? '/ws' : undefined
 
     return c.json({
       hotlineName: c.env.HOTLINE_NAME || 'Hotline',
@@ -102,8 +98,11 @@ config.get('/',
       needsBootstrap,
       hubs,
       defaultHubId,
-      serverNostrPubkey,
-      nostrRelayUrl,
+      serverPubkey,
+      wsRelayUrl,
+      // Legacy aliases for transitioning clients
+      serverNostrPubkey: serverPubkey,
+      nostrRelayUrl: wsRelayUrl,
       apiVersion: CURRENT_API_VERSION,
       minApiVersion: MIN_API_VERSION,
       // GlitchTip/Sentry DSN for client-side crash reporting (opt-in, privacy-first)

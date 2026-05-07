@@ -32,7 +32,7 @@ import { KIND_RECORD_CREATED, KIND_RECORD_UPDATED, KIND_RECORD_ASSIGNED } from '
 import { createLogger } from '../lib/logger'
 
 const logger = createLogger('routes.records')
-import { publishNostrEvent } from '../lib/nostr-events'
+import { publishEvent } from '../lib/ws-events'
 import { resolvePermissions } from '@shared/permissions'
 import { determineEnvelopeRecipients } from '../lib/envelope-recipients'
 import type { HubMemberInfo } from '../lib/envelope-recipients'
@@ -412,12 +412,12 @@ records.post('/',
     })
 
     // Publish Nostr event
-    publishNostrEvent(c.env, KIND_RECORD_CREATED, {
+    publishEvent(c.env, KIND_RECORD_CREATED, {
       type: 'record:created',
       recordId: record.id,
       entityTypeId: record.entityTypeId,
       caseNumber: record.caseNumber,
-    }).catch((e) => { logger.error('Failed to publish event', e) })
+    })
 
     await audit(services.audit, 'recordCreated', pubkey, {
       recordId: record.id,
@@ -474,10 +474,10 @@ records.patch('/:id',
     const updated = await services.cases.update(id, { ...body, authorPubkey: pubkey })
 
     // Publish update event
-    publishNostrEvent(c.env, KIND_RECORD_UPDATED, {
+    publishEvent(c.env, KIND_RECORD_UPDATED, {
       type: 'record:updated',
       recordId: id,
-    }).catch((e) => { logger.error('Failed to publish event', e) })
+    })
 
     await audit(services.audit, 'recordUpdated', pubkey, { recordId: id })
 
@@ -710,11 +710,11 @@ records.post('/:id/assign',
     const result = await services.cases.assign(id, body.pubkeys)
 
     // Publish assignment event
-    publishNostrEvent(c.env, KIND_RECORD_ASSIGNED, {
+    publishEvent(c.env, KIND_RECORD_ASSIGNED, {
       type: 'record:assigned',
       recordId: id,
       pubkeys: body.pubkeys,
-    }).catch((e) => { logger.error('Failed to publish event', e) })
+    })
 
     await audit(services.audit, 'recordAssigned', pubkey, {
       recordId: id,
@@ -754,11 +754,11 @@ records.post('/:id/unassign',
     const result = await services.cases.unassign(id, body.pubkey)
 
     // Publish assignment change event
-    publishNostrEvent(c.env, KIND_RECORD_ASSIGNED, {
+    publishEvent(c.env, KIND_RECORD_ASSIGNED, {
       type: 'record:unassigned',
       recordId: id,
       pubkey: body.pubkey,
-    }).catch((e) => { logger.error('Failed to publish event', e) })
+    })
 
     await audit(services.audit, 'recordUnassigned', pubkey, {
       recordId: id,

@@ -3,10 +3,7 @@ import {
   getTelephonyFromService,
   getHubTelephonyFromService,
   getMessagingAdapterFromService,
-  getNostrPublisher,
-  _resetNostrPublisherCache,
 } from '@worker/lib/service-factories'
-import { NodeNostrPublisher } from '@worker/lib/nostr-publisher'
 import type { TelephonyProviderConfig, MessagingConfig, MessagingChannelType } from '@shared/types'
 
 vi.mock('@worker/telephony/twilio', () => ({
@@ -77,26 +74,7 @@ vi.mock('@worker/messaging/telegram/factory', () => ({
   createTelegramAdapter: vi.fn().mockImplementation(() => ({ channel: 'telegram' })),
 }))
 
-const mockCreateNostrPublisher = vi.fn()
-const mockConnect = vi.fn().mockResolvedValue(undefined)
-
-vi.mock('@worker/lib/nostr-publisher', () => ({
-  createNostrPublisher: (...args: unknown[]) => mockCreateNostrPublisher(...args),
-  NodeNostrPublisher: class MockNodeNostrPublisher {
-    connect = mockConnect
-  },
-}))
-
 describe('service-factories', () => {
-  beforeEach(() => {
-    _resetNostrPublisherCache()
-    mockCreateNostrPublisher.mockClear()
-    mockConnect.mockClear()
-  })
-
-  afterEach(() => {
-    _resetNostrPublisherCache()
-  })
 
   describe('getTelephonyFromService', () => {
     it('returns adapter from settings config', async () => {
@@ -325,53 +303,5 @@ describe('service-factories', () => {
     })
   })
 
-  describe('getNostrPublisher', () => {
-    it('creates publisher from env when not cached', () => {
-      const fakePublisher = { publish: vi.fn(), serverPubkey: 'pub', close: vi.fn() }
-      mockCreateNostrPublisher.mockReturnValue(fakePublisher)
-      const env = { SERVER_NOSTR_SECRET: 'secret' } as Parameters<typeof getNostrPublisher>[0]
-      const result = getNostrPublisher(env)
-      expect(mockCreateNostrPublisher).toHaveBeenCalledWith(env)
-      expect(result).toBe(fakePublisher)
-    })
-
-    it('returns cached publisher on subsequent calls', () => {
-      const fakePublisher = { publish: vi.fn(), serverPubkey: 'pub', close: vi.fn() }
-      mockCreateNostrPublisher.mockReturnValue(fakePublisher)
-      const env = { SERVER_NOSTR_SECRET: 'secret' } as Parameters<typeof getNostrPublisher>[0]
-      const first = getNostrPublisher(env)
-      const second = getNostrPublisher(env)
-      expect(mockCreateNostrPublisher).toHaveBeenCalledTimes(1)
-      expect(second).toBe(first)
-    })
-
-    it('uses env.NOSTR_PUBLISHER if pre-configured', () => {
-      const preConfigured = { publish: vi.fn(), serverPubkey: 'pre', close: vi.fn() }
-      const env = { NOSTR_PUBLISHER: preConfigured } as unknown as Parameters<typeof getNostrPublisher>[0]
-      const result = getNostrPublisher(env)
-      expect(result).toBe(preConfigured)
-      expect(mockCreateNostrPublisher).not.toHaveBeenCalled()
-    })
-
-    it('calls connect on NodeNostrPublisher eagerly', () => {
-      const nodePub = new NodeNostrPublisher('ws://relay', 'a'.repeat(64))
-      mockCreateNostrPublisher.mockReturnValue(nodePub)
-      const env = { SERVER_NOSTR_SECRET: 'secret', NOSTR_RELAY_URL: 'ws://relay' } as Parameters<typeof getNostrPublisher>[0]
-      getNostrPublisher(env)
-      expect(mockConnect).toHaveBeenCalled()
-    })
-
-    it('allows cache reset for tests', () => {
-      const fakePublisher = { publish: vi.fn(), serverPubkey: 'pub', close: vi.fn() }
-      mockCreateNostrPublisher.mockReturnValue(fakePublisher)
-      const env = { SERVER_NOSTR_SECRET: 'secret' } as Parameters<typeof getNostrPublisher>[0]
-      getNostrPublisher(env)
-      _resetNostrPublisherCache()
-      const newFake = { publish: vi.fn(), serverPubkey: 'pub2', close: vi.fn() }
-      mockCreateNostrPublisher.mockReturnValue(newFake)
-      const result = getNostrPublisher(env)
-      expect(result).toBe(newFake)
-      expect(mockCreateNostrPublisher).toHaveBeenCalledTimes(2)
-    })
-  })
+  // NostrPublisher tests removed — replaced by ConnectionManager in ws-manager.ts
 })

@@ -11,7 +11,7 @@ import { detectLanguageFromPhone, languageFromDigit, DEFAULT_LANGUAGE } from '@s
 import { audit } from '../services/audit'
 import { startParallelRinging } from '../services/ringing'
 import { maybeTranscribe, transcribeVoicemail } from '../services/transcription'
-import { publishNostrEvent } from '../lib/nostr-events'
+import { publishEvent } from '../lib/ws-events'
 import { KIND_CALL_UPDATE, KIND_CALL_VOICEMAIL, KIND_PRESENCE_UPDATE } from '@shared/nostr-events'
 import { createLogger } from '../lib/logger'
 import { backgroundTask } from '../lib/hono-compat'
@@ -245,16 +245,16 @@ telephony.post('/user-answer',
   await services.calls.answerCall(hubId ?? '', parentCallSid, pubkey)
 
   // Publish call answered event + presence update
-  publishNostrEvent(c.env, KIND_CALL_UPDATE, {
+  publishEvent(c.env, KIND_CALL_UPDATE, {
     type: 'call:update',
     callId: parentCallSid,
     status: 'in-progress',
-  }, hubId ?? undefined).catch((e) => { logger.error('Failed to publish call update', e) })
+  }, hubId ?? undefined)
 
-  publishNostrEvent(c.env, KIND_PRESENCE_UPDATE, {
+  publishEvent(c.env, KIND_PRESENCE_UPDATE, {
     type: 'presence:summary',
     callId: parentCallSid,
-  }, hubId ?? undefined).catch((e) => { logger.error('Failed to publish presence update', e) })
+  }, hubId ?? undefined)
 
   const [, activeCallsForAnswer] = await Promise.all([
     services.identity.getUser(pubkey).catch(() => ({} as { name?: string })),
@@ -308,11 +308,11 @@ telephony.post('/call-status',
         logger.debug('Call end result', { parentCallSid, status: 200 })
 
         // Publish call completed event
-        publishNostrEvent(c.env, KIND_CALL_UPDATE, {
+        publishEvent(c.env, KIND_CALL_UPDATE, {
           type: 'call:update',
           callId: parentCallSid,
           status: 'completed',
-        }, hubId).catch((e) => { logger.error('Failed to publish call end', e) })
+        }, hubId)
 
         const duration = preCall
           ? Math.floor((Date.now() - new Date(preCall.startedAt).getTime()) / 1000)
@@ -448,10 +448,10 @@ telephony.post('/voicemail-recording', async (c) => {
     await services.calls.markVoicemail(hubId ?? '', callSid)
 
     // Publish voicemail event
-    publishNostrEvent(c.env, KIND_CALL_VOICEMAIL, {
+    publishEvent(c.env, KIND_CALL_VOICEMAIL, {
       type: 'voicemail:new',
       callId: callSid,
-    }, hubId).catch((e) => { logger.error('Failed to publish voicemail event', e) })
+    }, hubId)
 
     await audit(services.audit, 'voicemailReceived', 'system', { callSid }, { request: c.req.raw, hmacSecret: c.env.HMAC_SECRET })
 
