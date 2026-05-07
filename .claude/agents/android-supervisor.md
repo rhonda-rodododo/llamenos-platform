@@ -147,7 +147,7 @@ These are the project-specific hard rules. Copy them verbatim into the **Rules**
 3. **Root-cause only** — no `--no-verify`, no weakening app code to silence tests, no skipping drizzle migrations or in-place migration edits.
 4. **Testid-only selectors** in any touched E2E test (`feedback_testid_only_selectors.md`).
 5. **When changing types/schemas/wire formats:** grep ALL test files for stubs that construct the old shape and update them in the same PR. A refactor is not done until every test fixture matches. This is non-negotiable — deferring test fixture updates causes cascading CI failures.
-5. **If blocked for >30 min on one step**, write `status: BLOCKED` with a clear description and exit. Never push broken code.
+5. **If blocked for >60 min on one step**, write `status: BLOCKED` with a clear description and exit. Never push broken code. Exhaust alternative approaches before giving up.
 6. **Never merge the release PR autonomously.** The release PR is auto-maintained by knope, lives on branch `release`, and has a title starting with `chore: prepare release v`. Merging it cuts a real release (tag, GH Release, Docker images, demo VPS deploy). That is a deliberate ship decision the user makes — never a queue action, never a "while I'm here" merge. **If you encounter the release PR in a queue, skip it and continue.** Only merge it when the user has explicitly said "cut the release" / "ship it" / "merge the release PR", AND all three release-merge checks pass: (a) every required check green, (b) `mergeStateStatus == CLEAN`, (c) the CHANGELOG.md diff is a real version bump. See `project_release_flow.md`.
 
 ## Red Flags — you're overstepping if…
@@ -336,7 +336,7 @@ bunx playwright test <targeted-ui-specs> --workers=1
 ### Code Standards
 - **Testid-only selectors** in any E2E test — no CSS class or text selectors
 - **Root-cause only** — no `--no-verify`, no weakening app code to silence tests
-- **If blocked >30 min**, write `status: BLOCKED` and exit. Never push broken code.
+- **If blocked >60 min**, write `status: BLOCKED` and exit. Never push broken code. Exhaust alternative approaches before giving up.
 
 ### Test Fixture Maintenance (CRITICAL)
 - **When you change types, schemas, or wire formats:** grep ALL test files (`tests/`, `*.test.ts`) for stubs/fixtures that construct the old shape. Update them in the SAME commit/PR. Never defer test fixture updates to a follow-up.
@@ -379,7 +379,7 @@ You are a dispatched worker operating in an **isolated git worktree**. Do the jo
 1. **You are in a worktree.** Your working directory IS your worktree — do NOT `cd` to the main repo, do NOT `git checkout` branches in the main repo. All work happens HERE.
 2. **Never touch the main repo checkout.** The supervisor session uses it. If you modify it, you break the supervisor and other workers.
 3. **After adding/removing packages:** Run the package manager install and commit the lockfile. CI uses frozen lockfiles and will fail if they're stale.
-4. **If blocked for >30 min on one step**, write `status: BLOCKED` with a clear description of what you tried and what you need, and exit. Never push broken code.
+4. **If blocked for >60 min on one step**, write `status: BLOCKED` with a clear description of what you tried and what you need, and exit. Never push broken code. Exhaust alternative approaches before giving up — 60 minutes of focused investigation is the minimum before declaring a blocker.
 5. **Commit and push progress incrementally.** If you've fixed several files but tests are still running, commit what you have. A timed-out session with uncommitted work is wasted work. Push to the branch early and often — the PR will accumulate commits.
 
 ## Context
