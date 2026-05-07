@@ -1,0 +1,58 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import BlogCard from '../../../components/BlogCard.astro';
+import TagCloud from '../../../components/TagCloud.astro';
+
+export async function getStaticPaths() {
+  const posts = await getCollection('blog');
+  const publishedPosts = posts.filter(post => !post.data.draft);
+  const allTags = [...new Set(publishedPosts.flatMap(post => post.data.tags))];
+
+  return allTags.map(tag => ({
+    params: { tag },
+    props: { tag },
+  }));
+}
+
+const { tag } = Astro.props;
+
+const allPosts = await getCollection('blog');
+const posts = allPosts
+  .filter(post => !post.data.draft && post.data.tags.includes(tag))
+  .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+
+const allTags = [...new Set(allPosts.filter(p => !p.data.draft).flatMap(p => p.data.tags))].sort();
+
+const title = `Posts tagged "${tag}"`;
+const description = `Blog posts about ${tag} on the Llámenos blog.`;
+---
+
+<BaseLayout title={title} description={description} ogType="website">
+  <section class="pt-24 pb-16 md:pt-32 md:pb-20">
+    <div class="mx-auto max-w-6xl px-6">
+      <a
+        href="/blog"
+        class="inline-flex items-center gap-1 text-sm text-fg-muted hover:text-accent-bright transition-colors mb-6"
+      >
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        Back to all posts
+      </a>
+
+      <h1 class="text-3xl md:text-4xl font-bold tracking-tight text-fg mb-4">
+        Posts tagged <span class="text-accent-bright">#{tag}</span>
+      </h1>
+      <p class="text-fg-muted mb-8">{posts.length} post{posts.length !== 1 ? 's' : ''}</p>
+
+      <div class="mb-10">
+        <TagCloud tags={allTags} activeTag={tag} />
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {posts.map(post => (
+          <BlogCard post={post} />
+        ))}
+      </div>
+    </div>
+  </section>
+</BaseLayout>
