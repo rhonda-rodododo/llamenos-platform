@@ -121,7 +121,7 @@ export async function reenterPinAfterReload(page: Page): Promise<void> {
  * (backward-compatible with the bootstrap flow).
  */
 export async function loginAsAdmin(page: Page) {
-  const secretHex = nsecToHex(ADMIN_NSEC)
+  const secretHex = ADMIN_SEED
 
   await page.goto('/login')
   await page.evaluate(() => {
@@ -171,9 +171,7 @@ export async function loginAsAdmin(page: Page) {
  * - A raw Ed25519 signing seed hex string — imported via deviceImportAndLoad
  */
 export async function loginAsVolunteer(page: Page, nsecOrSeedHex: string) {
-  // Decode bech32 nsec to raw hex secret key if needed
-  const isNsec = nsecOrSeedHex.startsWith('nsec1')
-  const secretHex = isNsec ? nsecToHex(nsecOrSeedHex) : nsecOrSeedHex
+  const secretHex = nsecOrSeedHex
 
   await page.goto('/login')
   await page.evaluate(() => {
