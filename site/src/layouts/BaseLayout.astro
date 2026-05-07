@@ -9,10 +9,31 @@ interface Props {
   title: string;
   description?: string;
   lang?: Lang;
+  ogImage?: string;
+  ogType?: string;
+  canonical?: string;
+  articleMeta?: {
+    pubDate?: Date;
+    updatedDate?: Date;
+    author?: string;
+    tags?: string[];
+  };
+  structuredData?: object;
 }
 
-const { title, description = siteConfig.description, lang = defaultLang } = Astro.props;
+const {
+  title,
+  description = siteConfig.description,
+  lang = defaultLang,
+  ogImage,
+  ogType = 'website',
+  canonical,
+  articleMeta,
+  structuredData,
+} = Astro.props;
 const dir = languages[lang].dir;
+const canonicalUrl = canonical || new URL(Astro.url.pathname, Astro.site || 'https://llamenos-hotline.com').href;
+const ogImageUrl = ogImage || new URL('/favicon.svg', Astro.site || 'https://llamenos-hotline.com').href;
 ---
 
 <!DOCTYPE html>
@@ -26,6 +47,39 @@ const dir = languages[lang].dir;
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <title>{title} | Llámenos</title>
+  <link rel="canonical" href={canonicalUrl} />
+
+  <!-- OpenGraph -->
+  <meta property="og:type" content={ogType} />
+  <meta property="og:title" content={title} />
+  <meta property="og:description" content={description} />
+  <meta property="og:image" content={ogImageUrl} />
+  <meta property="og:url" content={canonicalUrl} />
+  <meta property="og:site_name" content="Llámenos" />
+
+  <!-- Twitter Cards -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content={title} />
+  <meta name="twitter:description" content={description} />
+  <meta name="twitter:image" content={ogImageUrl} />
+
+  {articleMeta?.pubDate && (
+    <meta property="article:published_time" content={articleMeta.pubDate.toISOString()} />
+  )}
+  {articleMeta?.updatedDate && (
+    <meta property="article:modified_time" content={articleMeta.updatedDate.toISOString()} />
+  )}
+  {articleMeta?.author && (
+    <meta property="article:author" content={articleMeta.author} />
+  )}
+  {articleMeta?.tags?.map(tag => (
+    <meta property="article:tag" content={tag} />
+  ))}
+
+  <!-- JSON-LD Structured Data -->
+  {structuredData && (
+    <script type="application/ld+json" set:html={JSON.stringify(structuredData)} />
+  )}
 </head>
 <body class="min-h-screen flex flex-col">
   <Header lang={lang} />

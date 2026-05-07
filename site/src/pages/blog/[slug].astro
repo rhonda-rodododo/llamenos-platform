@@ -1,0 +1,133 @@
+---
+import { getCollection, render } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import BlogPostMeta from '../../components/BlogPostMeta.astro';
+import TableOfContents from '../../components/TableOfContents.astro';
+import PrevNext from '../../components/PrevNext.astro';
+import RelatedPosts from '../../components/RelatedPosts.astro';
+
+export async function getStaticPaths() {
+  const posts = await getCollection('blog');
+  return posts
+    .filter(post => !post.data.draft)
+    .map(post => ({
+      params: { slug: post.id },
+      props: { post },
+    }));
+}
+
+const { post } = Astro.props;
+const { Content, headings } = await render(post);
+
+const { title, description, pubDate, updatedDate, author, authorUrl, tags, coverImage } = post.data;
+
+const wordCount = post.body?.split(/\s+/).length || 0;
+
+// Get prev/next posts (sorted by date)
+const allPosts = await getCollection('blog');
+const sortedPosts = allPosts
+  .filter(p => !p.data.draft)
+  .sort((a, b) => a.data.pubDate.valueOf() - b.data.pubDate.valueOf());
+
+const postIndex = sortedPosts.findIndex(p => p.id === post.id);
+const prev = postIndex > 0 ? sortedPosts[postIndex - 1] : undefined;
+const next = postIndex < sortedPosts.length - 1 ? sortedPosts[postIndex + 1] : undefined;
+
+// Get related posts (same tags, excluding current)
+const related = sortedPosts
+  .filter(p => p.id !== post.id)
+  .map(p => ({
+    post: p,
+    commonTags: p.data.tags.filter(t => tags.includes(t)).length,
+  }))
+  .filter(p => p.commonTags > 0)
+  .sort((a, b) => b.commonTags - a.commonTags)
+  .slice(0, 3)
+  .map(p => p.post);
+
+const ogImage = `https://llamenos-hotline.com/og/blog/${post.id}.png`;
+const canonical = `https://llamenos-hotline.com/blog/${post.id}`;
+
+const structuredData = {
+  '@context': 'https://schema.org',
+  '@type': 'BlogPosting',
+  headline: title,
+  description: description,
+  image: ogImage,
+  datePublished: pubDate.toISOString(),
+  dateModified: updatedDate?.toISOString() || pubDate.toISOString(),
+  author: {
+    '@type': 'Organization',
+    name: author,
+  },
+  publisher: {
+    '@type': 'Organization',
+    name: 'Llámenos',
+    logo: {
+      '@type': 'ImageObject',
+      url: 'https://llamenos-hotline.com/favicon.svg',
+    },
+  },
+  mainEntityOfPage: {
+    '@type': 'WebPage',
+    '@id': canonical,
+  },
+};
+---
+
+<BaseLayout
+  title={title}
+  description={description}
+  ogImage={ogImage}
+  ogType="article"
+  canonical={canonical}
+  articleMeta={{ pubDate, updatedDate, author, tags }}
+  structuredData={structuredData}
+>
+  <article class="pt-24 pb-16 md:pt-32 md:pb-20">
+    <div class="mx-auto max-w-6xl px-6">
+      <div class="flex gap-12">
+        <!-- Main content -->
+        <div class="flex-1 min-w-0">
+          <a
+            href="/blog"
+            class="inline-flex items-center gap-1 text-sm text-fg-muted hover:text-accent-bright transition-colors mb-6"
+          >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+            Back to blog
+          </a>
+
+          {coverImage && (
+            <div class="aspect-[16/9] rounded-xl overflow-hidden mb-8 border border-border">
+              <img src={coverImage} alt={title} class="w-full h-full object-cover" />
+            </div>
+          )}
+
+          <h1 class="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight text-fg mb-4">
+            {title}
+          </h1>
+
+          <BlogPostMeta
+            author={author}
+            authorUrl={authorUrl}
+            pubDate={pubDate}
+            updatedDate={updatedDate}
+            tags={tags}
+            wordCount={wordCount}
+          />
+
+          <div class="prose">
+            <Content />
+          </div>
+
+          <PrevNext prev={prev} next={next} />
+
+          <RelatedPosts posts={related} />
+        </div>
+
+        <!-- TOC sidebar -->
+        <TableOfContents headings={headings} />
+      </div>
+    </div>
+  </article>
+</BaseLayout>

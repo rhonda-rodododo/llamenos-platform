@@ -1,0 +1,46 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import BlogHero from '../../components/BlogHero.astro';
+import BlogCard from '../../components/BlogCard.astro';
+import TagCloud from '../../components/TagCloud.astro';
+
+const allPosts = await getCollection('blog');
+const posts = allPosts
+  .filter(post => !post.data.draft)
+  .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+
+const featuredPost = posts.find(post => post.data.featured) || posts[0];
+const nonFeaturedPosts = posts.filter(post => post.id !== featuredPost?.id);
+
+// Collect all unique tags
+const allTags = [...new Set(posts.flatMap(post => post.data.tags))].sort();
+
+const title = 'Blog';
+const description = 'Updates on secure crisis hotline technology, security research, and volunteer stories.';
+---
+
+<BaseLayout title={title} description={description} ogType="website">
+  {featuredPost && <BlogHero post={featuredPost} />}
+
+  <section class="py-16 md:py-20">
+    <div class="mx-auto max-w-6xl px-6">
+      <div class="mb-10">
+        <h2 class="text-2xl font-semibold text-fg mb-6">All Posts</h2>
+        <TagCloud tags={allTags} />
+      </div>
+
+      {nonFeaturedPosts.length > 0 ? (
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {nonFeaturedPosts.map(post => (
+            <BlogCard post={post} />
+          ))}
+        </div>
+      ) : (
+        <div class="text-center py-20">
+          <p class="text-fg-muted text-lg">No posts yet. Check back soon!</p>
+        </div>
+      )}
+    </div>
+  </section>
+</BaseLayout>
