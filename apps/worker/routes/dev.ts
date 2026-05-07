@@ -764,6 +764,20 @@ dev.post('/test-create-hub', async (c) => {
     return c.json({ error: message }, 500)
   }
 
+  // Add admin as a member of the new hub so WS relay subscribe works in tests
+  const adminPubkey = c.env?.ADMIN_PUBKEY as string | undefined
+  if (adminPubkey) {
+    try {
+      await services.identity.setHubRole({
+        pubkey: adminPubkey,
+        hubId: hub.id,
+        roleIds: ['role-super-admin'],
+      })
+    } catch {
+      // Admin user may not exist yet — non-fatal for hub creation
+    }
+  }
+
   return c.json({ id: hub.id, name: hub.name })
 })
 

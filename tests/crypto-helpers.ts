@@ -13,7 +13,19 @@ import {
   hpkeSeal,
   hpkeOpen,
 } from '@llamenos/crypto/ffi'
+import { x25519 } from '@noble/curves/ed25519.js'
 import { bytesToHex, hexToBytes, utf8ToBytes, bytesToUtf8 } from '@shared/encoding'
+
+/**
+ * Derive an X25519 public key from a 32-byte seed.
+ *
+ * Ed25519 public keys and X25519 public keys are different byte representations
+ * even when derived from the same seed. HPKE operations (key wrapping) require
+ * X25519 keys, NOT Ed25519 keys.
+ */
+export function x25519PubkeyFromSeed(seedHex: string): string {
+  return bytesToHex(x25519.getPublicKey(hexToBytes(seedHex)))
+}
 
 /**
  * Generate an X25519 keypair for HPKE operations (key wrapping).
