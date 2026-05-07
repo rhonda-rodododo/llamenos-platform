@@ -42,7 +42,7 @@ export const openAPIConfig = {
         bearerAuth: {
           type: 'http' as const,
           scheme: 'bearer',
-          description: 'Nostr session token (JSON with pubkey, timestamp, token signed via BIP-340 Schnorr)',
+          description: 'Session token (JSON with pubkey, timestamp, token signed via BIP-340 Schnorr)',
         },
       },
     },

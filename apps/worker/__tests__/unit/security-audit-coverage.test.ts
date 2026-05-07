@@ -377,7 +377,7 @@ describe('R8 Epic 258 C2: event keys behind auth', () => {
       hubName: 'Test Hub',
       setupCompleted: true,
       demoMode: false,
-      nostrRelayUrl: 'wss://relay.example.com',
+      wsRelayUrl: '/ws',
     }
     expect(publicConfig).not.toHaveProperty('serverEventKeyHex')
     expect(publicConfig).not.toHaveProperty('hubEventKeys')
@@ -492,7 +492,7 @@ describe('R8 Epic 262: Worker medium security fixes', () => {
   it('M13: hub settings only allow known keys', () => {
     const ALLOWED_HUB_SETTINGS = new Set([
       'hubName', 'timezone', 'language', 'welcomeMessage',
-      'emergencyMessage', 'maxConcurrentCalls', 'nostrRelayUrl',
+      'emergencyMessage', 'maxConcurrentCalls', 'wsRelayUrl',
     ])
 
     function filterHubSettings(input: Record<string, unknown>): Record<string, unknown> {

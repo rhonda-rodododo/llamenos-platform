@@ -1,14 +1,14 @@
 /**
- * Hub-event encryption for Nostr relay events.
+ * Hub-event encryption for WebSocket relay events.
  *
  * The hub key is client-side only (HPKE-wrapped per member); the server never
  * holds the raw hub key. For server-published events, we derive a symmetric
- * event encryption key from SERVER_NOSTR_SECRET so that relay content is
+ * event encryption key from SERVER_SECRET so that relay content is
  * encrypted at rest. Clients receive this key via the hub key distribution
  * envelope (the admin wraps it alongside the hub key).
  *
  * Derivation:
- *   event_key = HKDF(SHA-256, SERVER_NOSTR_SECRET, salt=empty, info="llamenos:hub-event", 32)
+ *   event_key = HKDF(SHA-256, SERVER_SECRET, salt=empty, info="llamenos:hub-event", 32)
  *   nonce = random(12)
  *   padded = pad_to_bucket(UTF-8(json))  -- power-of-2 bucket, min 512B
  *   ciphertext = AES-256-GCM(event_key, nonce, aad).encrypt(padded)
@@ -72,10 +72,10 @@ export function unpadFromBucket(padded: Uint8Array): Uint8Array {
 }
 
 /**
- * Derive the server event encryption key from SERVER_NOSTR_SECRET.
+ * Derive the server event encryption key from SERVER_SECRET.
  *
  * Uses encryption-specific domain separation labels (H1 fix) — cryptographically
- * independent from the signing key derived in nostr-publisher.ts.
+ * independent from the signing key derived in server-identity.ts.
  *
  * Optionally accepts a hubId for per-hub key scoping and an epoch for
  * forward secrecy (H5 fix). When epoch is provided, the key changes

@@ -431,8 +431,8 @@ Then('the server should reject with {int} citing missing permissions', async ({ 
 
 // ── Nostr Relay Events Steps ─────────────────────────────────────
 
-Given('a hub with SERVER_NOSTR_SECRET configured', async ({ world }) => {
-  // The test server has SERVER_NOSTR_SECRET configured
+Given('a hub with SERVER_SECRET configured', async ({ world }) => {
+  // The test server has SERVER_SECRET configured
   // This is a precondition verified by the server starting
 })
 

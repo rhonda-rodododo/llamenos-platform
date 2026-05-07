@@ -225,7 +225,6 @@ jobs:
             "BRIDGE_SECRET=ci-test-bridge-secret" \
             "ARI_PASSWORD=ci-test-ari-password" \
             "SERVER_SECRET=0000000000000000000000000000000000000000000000000000000000000001" \
-            "SERVER_NOSTR_SECRET=0000000000000000000000000000000000000000000000000000000000000001" \
             "STRFRY_ALLOWED_PUBKEY=c0fe6f73ada93d83b89d4fe8a2c20818154a57390fc90088e20653064036f0c5" \
             "NOTIFIER_API_KEY=ci-test-notifier-key" \
             "SIGNAL_REGISTERED_NUMBER=+15550000000" \
@@ -397,7 +396,6 @@ jobs:
             "BRIDGE_SECRET=ci-test-bridge-secret" \
             "ARI_PASSWORD=ci-test-ari-password" \
             "SERVER_SECRET=0000000000000000000000000000000000000000000000000000000000000001" \
-            "SERVER_NOSTR_SECRET=0000000000000000000000000000000000000000000000000000000000000001" \
             "STRFRY_ALLOWED_PUBKEY=c0fe6f73ada93d83b89d4fe8a2c20818154a57390fc90088e20653064036f0c5" \
             "NOTIFIER_API_KEY=ci-test-notifier-key" \
             "SIGNAL_REGISTERED_NUMBER=+15550000000" \
@@ -464,9 +462,9 @@ jobs:
           DEV_RESET_SECRET: test-reset-secret
           PBX_TYPE: ari
           DATABASE_URL: postgresql://llamenos:ci-test-password@localhost:5432/llamenos
-          # Must match SERVER_SECRET/SERVER_NOSTR_SECRET in .env
+          # Must match SERVER_SECRET in .env (fixed value = relay.steps DEV fallback)
+          # so backend-bdd tests can decrypt Nostr relay events produced by the docker app
           SERVER_SECRET: "0000000000000000000000000000000000000000000000000000000000000001"
-          SERVER_NOSTR_SECRET: "0000000000000000000000000000000000000000000000000000000000000001"
           # sip-bridge exposed on host port 3001 via docker-compose.test.yml
           SIP_BRIDGE_URL: http://localhost:3001
 
@@ -571,7 +569,7 @@ jobs:
 
   # ─── Android Instrumented Tests (Cucumber BDD on emulator) ──
   android-e2e:
-    needs: [changes]
+    needs: [changes, android-build-test]
     if: needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 90
@@ -669,7 +667,6 @@ jobs:
             "BRIDGE_SECRET=ci-test-bridge-secret" \
             "ARI_PASSWORD=ci-test-ari-password" \
             "SERVER_SECRET=0000000000000000000000000000000000000000000000000000000000000001" \
-            "SERVER_NOSTR_SECRET=0000000000000000000000000000000000000000000000000000000000000001" \
             "STRFRY_ALLOWED_PUBKEY=c0fe6f73ada93d83b89d4fe8a2c20818154a57390fc90088e20653064036f0c5" \
             "NOTIFIER_API_KEY=ci-test-notifier-key" \
             "SIGNAL_REGISTERED_NUMBER=+15550000000" \

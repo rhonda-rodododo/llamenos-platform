@@ -302,7 +302,6 @@ jobs:
           STORAGE_SECRET_KEY: testsecret123456
           STORAGE_BUCKET: llamenos-files
           SERVER_SECRET: "0000000000000000000000000000000000000000000000000000000000000001"
-          SERVER_NOSTR_SECRET: "0000000000000000000000000000000000000000000000000000000000000001"
         run: |
           nohup bun dist/server/index.js &>/tmp/backend.log &
           for i in $(seq 1 30); do

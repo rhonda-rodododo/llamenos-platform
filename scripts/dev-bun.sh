@@ -58,8 +58,7 @@ cmd_start() {
   export STORAGE_ACCESS_KEY=rustfsadmin
   export STORAGE_SECRET_KEY=rustfsadmin
   export STORAGE_BUCKET=llamenos-files
-  export SERVER_NOSTR_SECRET="${SERVER_NOSTR_SECRET:-0000000000000000000000000000000000000000000000000000000000000001}"
-  export NOSTR_RELAY_URL=ws://localhost:7777
+  export SERVER_SECRET="${SERVER_SECRET:-0000000000000000000000000000000000000000000000000000000000000001}"
 
   log "Starting Bun server on http://localhost:${PORT}..."
   log "Bun watches source files directly — single process, no build step"

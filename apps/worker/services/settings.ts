@@ -136,7 +136,7 @@ const ALLOWED_HUB_SETTINGS = new Set([
   'welcomeMessage',
   'emergencyMessage',
   'maxConcurrentCalls',
-  'nostrRelayUrl',
+  'wsRelayUrl',
   'callSettings',
   'spamSettings',
   'transcriptionEnabled',

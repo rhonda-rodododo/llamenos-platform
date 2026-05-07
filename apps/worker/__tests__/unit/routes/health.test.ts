@@ -18,7 +18,7 @@ function createTestApp(opts: {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(c as any).env = {
       STORAGE_ENDPOINT: 'http://storage:9000',
-      NOSTR_RELAY_URL: 'ws://relay:7777',
+      // WS relay is in-process — no URL env var needed
       SIP_BRIDGE_URL: 'http://sip-bridge:3000',
       ...opts.env,
     }
@@ -38,9 +38,6 @@ describe('health route', () => {
       const urlStr = String(url)
       if (urlStr.includes('storage:9000')) {
         return new Response(null, { status: 403 })
-      }
-      if (urlStr.includes('relay:7777')) {
-        return new Response('relay info', { status: 200 })
       }
       if (urlStr.includes('sip-bridge')) {
         return new Response('ok', { status: 200 })
@@ -96,20 +93,11 @@ describe('health route', () => {
       expect(body.checks.storage.status).toBe('failing')
     })
 
-    it('returns 503 when relay is unreachable', async () => {
-      fetchSpy.mockImplementation(async (url: unknown) => {
-        if (String(url).includes('relay')) {
-          return new Response(null, { status: 502 })
-        }
-        return new Response(null, { status: 403 })
-      })
-
+    it('relay is always ok (in-process WS relay)', async () => {
       const app = createTestApp()
       const res = await app.request('/')
-      expect(res.status).toBe(503)
       const body = await res.json()
-      expect(body.checks.relay.status).toBe('failing')
-      expect(body.checks.relay.detail).toContain('502')
+      expect(body.checks.relay.status).toBe('ok')
     })
 
     it('returns 503 when sip bridge fails', async () => {
@@ -141,9 +129,6 @@ describe('health route', () => {
         if (urlStr.includes('storage:9000')) {
           return new Response(null, { status: 403 })
         }
-        if (urlStr.includes('relay:7777')) {
-          return new Response('relay info', { status: 200 })
-        }
         if (urlStr.includes('sip-bridge')) {
           return new Response('ok', { status: 200 })
         }
@@ -166,13 +151,11 @@ describe('health route', () => {
       expect(body.checks.storage.detail).toContain('STORAGE_ENDPOINT not configured')
     })
 
-    it('marks relay failing when NOSTR_RELAY_URL not configured', async () => {
-      const app = createTestApp({ env: { NOSTR_RELAY_URL: undefined } })
+    it('relay is ok even without external relay URL (in-process)', async () => {
+      const app = createTestApp()
       const res = await app.request('/')
-      expect(res.status).toBe(503)
       const body = await res.json()
-      expect(body.checks.relay.status).toBe('failing')
-      expect(body.checks.relay.detail).toContain('NOSTR_RELAY_URL not configured')
+      expect(body.checks.relay.status).toBe('ok')
     })
 
     it('includes latency measurements for all checks', async () => {

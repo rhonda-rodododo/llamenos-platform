@@ -208,7 +208,7 @@ Feature: Network Security
 
   @backend
   Scenario: Nostr relay events are encrypted
-    Given a hub with SERVER_NOSTR_SECRET configured
+    Given a hub with SERVER_SECRET configured
     When the server publishes a Nostr event
     Then the event content should be encrypted with the derived event key
 

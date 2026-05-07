@@ -75,7 +75,7 @@ config.get('/',
     } catch { /* default to empty */ }
 
     // Derive server Ed25519 pubkey for client event signature verification
-    const serverSecret = c.env.SERVER_SECRET ?? c.env.SERVER_NOSTR_SECRET
+    const serverSecret = c.env.SERVER_SECRET
     let serverPubkey: string | undefined
     if (serverSecret) {
       try {

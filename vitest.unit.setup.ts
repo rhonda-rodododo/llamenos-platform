@@ -3,7 +3,7 @@
  *
  * WebSocket: The global WebSocket API was not consistently available in Bun
  * before 1.3.7. We polyfill it from the `ws` npm package so that
- * NodeNostrPublisher and RelayManager tests work in all CI environments.
+ * ConnectionManager and relay tests work in all CI environments.
  */
 
 import { WebSocket } from 'ws'

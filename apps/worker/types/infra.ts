@@ -68,8 +68,6 @@ export interface Env {
 
   // Server secret — hex 32 bytes used for HKDF key derivation (signing, encryption, auth)
   SERVER_SECRET?: string
-  // Legacy alias (will be removed after full migration)
-  SERVER_NOSTR_SECRET?: string
 
   // Firehose inference agent seal key (hex 32 bytes — seals agent nsecs at rest)
   FIREHOSE_AGENT_SEAL_KEY?: string

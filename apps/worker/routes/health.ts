@@ -47,22 +47,12 @@ async function checkStorage(env: Record<string, unknown>): Promise<CheckResult> 
   }
 }
 
-async function checkNostrRelay(env: Record<string, unknown>): Promise<CheckResult> {
-  const relayUrl = env.NOSTR_RELAY_URL as string | undefined
-  if (!relayUrl) return { status: 'failing', detail: 'NOSTR_RELAY_URL not configured' }
-  // Convert ws(s):// → http(s):// and probe the HTTP health endpoint
-  const httpUrl = relayUrl.replace(/^ws:\/\//, 'http://').replace(/^wss:\/\//, 'https://')
-  const t0 = Date.now()
-  try {
-    const res = await fetch(httpUrl, { signal: AbortSignal.timeout(3000) })
-    // strfry returns 200 on HTTP for the relay info endpoint
-    if (!res.ok && res.status !== 400 && res.status !== 404) {
-      return { status: 'failing', latencyMs: Date.now() - t0, detail: `HTTP ${res.status}` }
-    }
-    return { status: 'ok', latencyMs: Date.now() - t0 }
-  } catch (err) {
-    return { status: 'failing', latencyMs: Date.now() - t0, detail: err instanceof Error ? err.message : 'Unreachable' }
-  }
+/**
+ * WS relay health check — the relay is in-process (ConnectionManager in ws-manager.ts),
+ * so it's always available when the server is running. Returns ok unconditionally.
+ */
+async function checkWsRelay(): Promise<CheckResult> {
+  return { status: 'ok', latencyMs: 0 }
 }
 
 async function checkSipBridge(env: Record<string, unknown>): Promise<CheckResult | null> {
@@ -82,7 +72,7 @@ async function runChecks(env: Record<string, unknown>): Promise<HealthResult> {
   const [postgres, storage, relay, sipBridge] = await Promise.all([
     checkPostgres(),
     checkStorage(env),
-    checkNostrRelay(env),
+    checkWsRelay(),
     checkSipBridge(env),
   ])
 

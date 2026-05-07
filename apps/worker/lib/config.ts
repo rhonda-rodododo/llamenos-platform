@@ -68,7 +68,7 @@ export function validateConfig(env: ConfigInput = process.env): void {
   // --- Required vars ---
   assertDatabaseUrl(env)
   assertHex64(env, 'HMAC_SECRET')
-  assertHex64(env, 'SERVER_NOSTR_SECRET')
+  assertHex64(env, 'SERVER_SECRET')
 
   // ADMIN_PUBKEY: 64 hex chars (Nostr pubkey, x-only compressed)
   assertNonEmpty(env, 'ADMIN_PUBKEY')
@@ -84,7 +84,7 @@ export function validateConfig(env: ConfigInput = process.env): void {
   assertNonEmpty(env, 'ENVIRONMENT')
 
   // --- Optional vars (warn when absent, do not fail) ---
-  warnIfAbsent(env, 'NOSTR_RELAY_URL', 'real-time relay disabled')
+  // NOSTR_RELAY_URL no longer needed — WS relay is in-process (ws-manager.ts)
   warnIfAbsent(env, 'FCM_SERVICE_ACCOUNT_KEY', 'Android push notifications disabled')
   warnIfAbsent(env, 'APNS_KEY_P8', 'iOS push notifications disabled')
   warnIfAbsent(env, 'APNS_KEY_ID', 'iOS push notifications disabled')

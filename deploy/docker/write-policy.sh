@@ -6,7 +6,7 @@
 # stdout containing { "id": "<event-id>", "action": "accept"|"reject"|"shadowReject", "msg": "..." }.
 #
 # Environment:
-#   ALLOWED_PUBKEY — hex pubkey of the server (derived from SERVER_NOSTR_SECRET)
+#   ALLOWED_PUBKEY — hex pubkey of the server (derived from SERVER_SECRET)
 #
 # NIP-42 auth events (kind 22242) are always accepted regardless of pubkey,
 # because any connecting client must be able to authenticate.

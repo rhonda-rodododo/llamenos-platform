@@ -12,6 +12,9 @@ export const configResponseSchema = z.object({
   needsBootstrap: z.boolean(),
   hubs: z.array(z.looseObject({ id: z.string(), name: z.string(), slug: z.string(), status: z.string() })),
   defaultHubId: z.string().optional(),
+  serverPubkey: z.string().optional(),
+  wsRelayUrl: z.string().optional(),
+  // Legacy aliases for transitioning clients (will be removed in a future version)
   serverNostrPubkey: z.string().optional(),
   nostrRelayUrl: z.string().optional(),
   apiVersion: z.number(),

@@ -1,6 +1,11 @@
 /**
  * Migration 003: Nostr Event Outbox table.
  *
+ * LEGACY: The Nostr relay (strfry) was replaced by an in-process WebSocket
+ * relay (ConnectionManager in apps/worker/lib/ws-manager.ts). This migration
+ * is preserved for schema consistency — the table may still exist in databases
+ * that ran this migration. Do NOT delete migration files.
+ *
  * This is a PostgreSQL DDL migration (not a KV data migration).
  * The actual table creation is handled in initPostgresPool() alongside
  * kv_store and alarms tables, because PostgreSQL DDL must run before

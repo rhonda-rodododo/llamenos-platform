@@ -76,11 +76,10 @@ async function fetchServices(env: Record<string, unknown>): Promise<ServiceStatu
     details: hasStorage ? undefined : 'Not configured',
   })
 
-  // Check Nostr relay
+  // Check WS relay (in-process — always available when server is running)
   services.push({
-    name: 'Nostr Relay',
-    status: env.NOSTR_RELAY_URL ? 'ok' : 'down',
-    details: env.NOSTR_RELAY_URL ? undefined : 'Not configured',
+    name: 'WS Relay',
+    status: 'ok',
   })
 
   // Check telephony

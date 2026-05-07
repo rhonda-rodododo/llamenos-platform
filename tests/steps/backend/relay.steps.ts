@@ -226,7 +226,7 @@ Then("the event pubkey should match the server's configured pubkey", async ({ re
 // --- Helpers ---
 
 /**
- * Decrypt event content using the server event key derived from SERVER_NOSTR_SECRET.
+ * Decrypt event content using the server event key derived from SERVER_SECRET.
  *
  * Format: hex(nonce_24 || ciphertext)
  * Algorithm: XChaCha20-Poly1305
@@ -242,9 +242,9 @@ function decryptEventContent(event: CapturedEvent): Record<string, unknown> | nu
     // Content is encrypted — decrypt with server event key
   }
 
-  const secret = process.env.SERVER_NOSTR_SECRET || process.env.DEV_SERVER_SECRET || DEV_SERVER_SECRET
+  const secret = process.env.SERVER_SECRET || process.env.DEV_SERVER_SECRET || DEV_SERVER_SECRET
   if (!secret) {
-    console.warn('[relay.steps] No SERVER_NOSTR_SECRET — cannot decrypt event content')
+    console.warn('[relay.steps] No SERVER_SECRET — cannot decrypt event content')
     return null
   }
 

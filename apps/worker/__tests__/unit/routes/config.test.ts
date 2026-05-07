@@ -23,7 +23,6 @@ function createTestApp(opts: {
       DEMO_MODE: 'false',
       GLITCHTIP_DSN: 'https://example.com/dsn',
       SERVER_SECRET: 'a'.repeat(64),
-      SERVER_NOSTR_SECRET: 'a'.repeat(64),
       ...opts.env,
     }
     if (opts.services) {
@@ -83,6 +82,8 @@ describe('config route', () => {
       expect(body.hubs).toHaveLength(1)
       expect(body.hubs[0].id).toBe('hub-1')
       expect(body.defaultHubId).toBe('hub-1')
+      expect(body.wsRelayUrl).toBe('/ws')
+      // Legacy alias still present for transitioning clients
       expect(body.nostrRelayUrl).toBe('/ws')
       expect(body.apiVersion).toBeDefined()
       expect(body.minApiVersion).toBeDefined()
@@ -199,7 +200,7 @@ describe('config route', () => {
       expect(body.hubs[0].status).toBe('active')
     })
 
-    it('returns /ws for relay url when server secret is configured', async () => {
+    it('returns /ws as wsRelayUrl when SERVER_SECRET is set', async () => {
       const services = createMockServices()
       const app = createTestApp({ services })
 
@@ -207,14 +208,15 @@ describe('config route', () => {
       expect(res.status).toBe(200)
       const body = await res.json()
       expect(body.wsRelayUrl).toBe('/ws')
-      expect(body.nostrRelayUrl).toBe('/ws') // legacy alias
+      // Legacy alias still present for transitioning clients
+      expect(body.nostrRelayUrl).toBe('/ws')
     })
 
     it('returns undefined relay url when no server secret configured', async () => {
       const services = createMockServices()
       const app = createTestApp({
         services,
-        env: { SERVER_SECRET: undefined, SERVER_NOSTR_SECRET: undefined },
+        env: { SERVER_SECRET: undefined },
       })
 
       const res = await app.request('/')
@@ -237,30 +239,32 @@ describe('config route', () => {
       expect(body.sentryDsn).toBeUndefined()
     })
 
-    it('returns undefined serverNostrPubkey when SERVER_NOSTR_SECRET not set', async () => {
+    it('returns undefined serverPubkey when no server secret is set', async () => {
       const services = createMockServices()
       const app = createTestApp({
         services,
-        env: { SERVER_SECRET: undefined, SERVER_NOSTR_SECRET: undefined },
+        env: { SERVER_SECRET: undefined },
       })
 
       const res = await app.request('/')
       expect(res.status).toBe(200)
       const body = await res.json()
+      expect(body.serverPubkey).toBeUndefined()
+      // Legacy alias also undefined
       expect(body.serverNostrPubkey).toBeUndefined()
     })
 
-    it('handles invalid SERVER_NOSTR_SECRET gracefully without crashing', async () => {
+    it('handles invalid SERVER_SECRET gracefully without crashing', async () => {
       const services = createMockServices()
       const app = createTestApp({
         services,
-        env: { SERVER_SECRET: 'not-valid-hex', SERVER_NOSTR_SECRET: 'not-valid-hex' },
+        env: { SERVER_SECRET: 'not-valid-hex' },
       })
 
       const res = await app.request('/')
       expect(res.status).toBe(200)
       const body = await res.json()
-      expect(body.serverNostrPubkey).toBeUndefined()
+      expect(body.serverPubkey).toBeUndefined()
     })
 
     it('derives serverPubkey from valid SERVER_SECRET', async () => {
@@ -271,7 +275,7 @@ describe('config route', () => {
       const services = createMockServices()
       const app = createTestApp({
         services,
-        env: { SERVER_SECRET: 'a'.repeat(64), SERVER_NOSTR_SECRET: 'a'.repeat(64) },
+        env: { SERVER_SECRET: 'a'.repeat(64) },
       })
 
       const res = await app.request('/')

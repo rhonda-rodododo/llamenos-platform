@@ -138,7 +138,7 @@ STORAGE_SECRET_KEY=testsecret123456${shard_idx}
 HOTLINE_NAME=Llamenos-Shard-${shard_idx}
 BRIDGE_SECRET=test-bridge-${shard_idx}
 ARI_PASSWORD=test-ari-${shard_idx}
-SERVER_NOSTR_SECRET=$(openssl rand -hex 32)
+SERVER_SECRET=$(openssl rand -hex 32)
 APP_PORT=${port}
 ENV
 

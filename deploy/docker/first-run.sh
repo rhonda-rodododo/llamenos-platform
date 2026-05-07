@@ -53,7 +53,7 @@ else
   sed -i "s|^HMAC_SECRET=.*|HMAC_SECRET=${HMAC}|" .env
   sed -i "s|^STORAGE_ACCESS_KEY=.*|STORAGE_ACCESS_KEY=${STORAGE_AK}|" .env
   sed -i "s|^STORAGE_SECRET_KEY=.*|STORAGE_SECRET_KEY=${STORAGE_SK}|" .env
-  sed -i "s|^SERVER_NOSTR_SECRET=.*|SERVER_NOSTR_SECRET=${NOSTR_SECRET}|" .env
+  sed -i "s|^SERVER_SECRET=.*|SERVER_SECRET=${NOSTR_SECRET}|" .env
 
   echo "Generated .env with random secrets."
   echo ""

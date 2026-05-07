@@ -128,7 +128,7 @@
                 STORAGE_SECRET_KEY: dr-test-secret-key
                 HMAC_SECRET: "{{ 'dr-test-hmac-secret-for-validation-only' | hash('sha256') }}"
                 ADMIN_PUBKEY: "0000000000000000000000000000000000000000000000000000000000000000"
-                SERVER_NOSTR_SECRET: "{{ 'dr-test-nostr-secret-for-validation-only' | hash('sha256') }}"
+                SERVER_SECRET: "{{ 'dr-test-server-secret-for-validation-only' | hash('sha256') }}"
                 PORT: "3000"
               ports:
                 - "{{ dr_port }}:3000"
