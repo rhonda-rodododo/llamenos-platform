@@ -613,7 +613,7 @@ jobs:
 
   # ─── Android Instrumented Tests (Cucumber BDD on emulator) ──
   android-e2e:
-    needs: [changes, android-build-test]
+    needs: [changes]
     if: needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 90
