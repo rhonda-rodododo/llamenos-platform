@@ -47,22 +47,12 @@ async function checkStorage(env: Record<string, unknown>): Promise<CheckResult> 
   }
 }
 
-async function checkNostrRelay(env: Record<string, unknown>): Promise<CheckResult> {
-  const relayUrl = env.NOSTR_RELAY_URL as string | undefined
-  if (!relayUrl) return { status: 'failing', detail: 'NOSTR_RELAY_URL not configured' }
-  // Convert ws(s):// → http(s):// and probe the HTTP health endpoint
-  const httpUrl = relayUrl.replace(/^ws:\/\//, 'http://').replace(/^wss:\/\//, 'https://')
-  const t0 = Date.now()
-  try {
-    const res = await fetch(httpUrl, { signal: AbortSignal.timeout(3000) })
-    // strfry returns 200 on HTTP for the relay info endpoint
-    if (!res.ok && res.status !== 400 && res.status !== 404) {
-      return { status: 'failing', latencyMs: Date.now() - t0, detail: `HTTP ${res.status}` }
-    }
-    return { status: 'ok', latencyMs: Date.now() - t0 }
-  } catch (err) {
-    return { status: 'failing', latencyMs: Date.now() - t0, detail: err instanceof Error ? err.message : 'Unreachable' }
-  }
+async function checkRelay(env: Record<string, unknown>): Promise<CheckResult> {
+  // Native WebSocket relay is in-process — if the server is running, the relay is running.
+  // Only requires SERVER_SECRET to be set (used for relay auth key derivation).
+  const serverSecret = env.SERVER_SECRET ?? env.SERVER_NOSTR_SECRET
+  if (!serverSecret) return { status: 'failing', detail: 'SERVER_SECRET not configured (relay disabled)' }
+  return { status: 'ok' }
 }
 
 async function checkSipBridge(env: Record<string, unknown>): Promise<CheckResult | null> {
@@ -82,7 +72,7 @@ async function runChecks(env: Record<string, unknown>): Promise<HealthResult> {
   const [postgres, storage, relay, sipBridge] = await Promise.all([
     checkPostgres(),
     checkStorage(env),
-    checkNostrRelay(env),
+    checkRelay(env),
     checkSipBridge(env),
   ])
 
