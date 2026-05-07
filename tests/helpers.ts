@@ -1,17 +1,10 @@
 import { type Page, type APIRequestContext, expect } from '@playwright/test'
-import { nip19 } from 'nostr-tools'
-import { bytesToHex } from '@noble/hashes/utils.js'
 import { TestIds, navTestIdMap } from './test-ids'
 
-export const ADMIN_NSEC = 'nsec174zsa94n3e7t0ugfldh9tgkkzmaxhalr78uxt9phjq3mmn6d6xas5jdffh'
+export const ADMIN_SEED = 'f54a5851e9372b87810a8e60cdd2e7cfd80b6e31c7af18188f7db106ceda8be7'
+/** @deprecated Use ADMIN_SEED */
+export const ADMIN_NSEC = ADMIN_SEED
 export const TEST_PIN = '12345678'
-
-/** Decode a bech32 nsec to hex secret key (Node-side). */
-export function nsecToHex(nsec: string): string {
-  const decoded = nip19.decode(nsec)
-  if (decoded.type !== 'nsec') throw new Error('Invalid nsec')
-  return bytesToHex(decoded.data as Uint8Array)
-}
 
 /**
  * Default timeout values for common operations.

@@ -4,18 +4,15 @@ import type { Hub, MessagingChannelType } from '@shared/types'
 import { hashPhone } from '../lib/crypto'
 import { publishNostrEvent } from '../lib/nostr-events'
 import { KIND_CALL_RING, KIND_CALL_UPDATE, KIND_CALL_VOICEMAIL, KIND_MESSAGE_NEW, KIND_PRESENCE_UPDATE } from '@shared/nostr-events'
-import { nip19 } from 'nostr-tools'
 import { getTestPushLog, clearTestPushLog } from '../lib/push-dispatch'
 
 /**
- * Decode a pubkey that may be in npub1... bech32 format or raw hex.
+ * Decode a pubkey (hex only — npub1 bech32 encoding is no longer supported).
  * Returns the hex pubkey string.
  */
 function decodePubkey(input: string): string {
   if (input.startsWith('npub1')) {
-    const decoded = nip19.decode(input)
-    if (decoded.type === 'npub') return decoded.data
-    throw new Error(`Invalid npub: decoded type was ${decoded.type}`)
+    throw new Error('npub1 encoding is no longer supported — use raw hex pubkey')
   }
   return input
 }

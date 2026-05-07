@@ -17,6 +17,19 @@ import { utf8ToBytes } from '@noble/ciphers/utils.js'
 /** ECIES version byte for HKDF-based key derivation (v2) — must match server. */
 const ECIES_VERSION_V2 = 0x02
 
+/**
+ * Generate a secp256k1 keypair for ECIES operations (key wrapping).
+ * This is separate from Ed25519 auth keypairs — ECIES uses a different curve.
+ */
+export function generateEciesKeypair(): { skHex: string; pubkeyHex: string } {
+  const sk = secp256k1.utils.randomSecretKey()
+  const skHex = bytesToHex(sk)
+  const pubkey = secp256k1.getPublicKey(sk, true)
+  // x-only pubkey (strip the 02/03 prefix byte) for Nostr compatibility
+  const pubkeyHex = bytesToHex(pubkey).slice(2)
+  return { skHex, pubkeyHex }
+}
+
 // ---------------------------------------------------------------------------
 // Symmetric content encryption (XChaCha20-Poly1305)
 // ---------------------------------------------------------------------------

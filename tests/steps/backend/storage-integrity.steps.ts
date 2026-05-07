@@ -13,7 +13,7 @@ import {
   apiPatch,
   generateTestKeypair,
   uniquePhone,
-  ADMIN_NSEC,
+  ADMIN_SEED,
 } from '../../api-helpers'
 import {
   generateContentKey,
@@ -23,9 +23,8 @@ import {
 import { LABEL_NOTE_KEY } from '@shared/crypto-labels'
 import { TestDB } from '../../db-helpers'
 import { assertIsObject, assertIsArray } from '../../integrity-helpers'
-import { bytesToHex } from '@noble/hashes/utils.js'
-import { nip19, getPublicKey } from 'nostr-tools'
-import { hexToBytes } from '@noble/hashes/utils.js'
+import { bytesToHex, hexToBytes } from '@shared/encoding'
+import { ed25519PubkeyFromSeed } from '@llamenos/crypto/ffi'
 
 // ── State ───────────────────────────────────────────────────────────
 
@@ -43,7 +42,7 @@ interface StorageIntegrityState {
   /** Volunteer keypair for note creation */
   volunteerKp?: { nsec: string; pubkey: string; skHex: string }
   /** Admin keypair info */
-  adminSkHex?: string
+  adminSeedHex?: string
   adminPubkey?: string
 }
 
@@ -64,10 +63,8 @@ Before(async ({ world }) => {
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
-function nsecToSkHex(nsec: string): string {
-  const decoded = nip19.decode(nsec)
-  if (decoded.type !== 'nsec') throw new Error('Invalid nsec')
-  return bytesToHex(decoded.data as Uint8Array)
+function seedHexToPubkey(seedHex: string): string {
+  return bytesToHex(ed25519PubkeyFromSeed(hexToBytes(seedHex)))
 }
 
 // ── Given: Entity creation ──────────────────────────────────────────
@@ -86,13 +83,13 @@ Given('a {string} entity is created via the API with structured JSONB data', asy
       })
       expect([200, 201]).toContain(regResult.status)
 
-      const adminSkHex = nsecToSkHex(ADMIN_NSEC)
-      const adminPubkey = getPublicKey(hexToBytes(adminSkHex))
+      const adminSeedHex = ADMIN_SEED
+      const adminPubkey = seedHexToPubkey(adminSeedHex)
 
       const contentKey = generateContentKey()
       const ciphertextHex = encryptContent('Storage test note', contentKey, LABEL_NOTE_KEY)
-      const volEnv = wrapKeyForRecipient(contentKey, volKp.pubkey, volKp.skHex, LABEL_NOTE_KEY)
-      const adminEnv = wrapKeyForRecipient(contentKey, adminPubkey, adminSkHex, LABEL_NOTE_KEY)
+      const volEnv = wrapKeyForRecipient(contentKey, volKp.pubkey, volKp.seedHex, LABEL_NOTE_KEY)
+      const adminEnv = wrapKeyForRecipient(contentKey, adminPubkey, adminSeedHex, LABEL_NOTE_KEY)
 
       const { status, data } = await apiPost<Record<string, unknown>>(
         request,
@@ -215,9 +212,8 @@ Given('a registered volunteer {string} with a known keypair', async ({ request, 
 })
 
 Given('the admin keypair is known for envelope verification', async ({ world }) => {
-  const adminSkHex = nsecToSkHex(ADMIN_NSEC)
-  const adminPubkey = getPublicKey(hexToBytes(adminSkHex))
-  getStorageIntegrityState(world).adminSkHex = adminSkHex
+  const adminPubkey = seedHexToPubkey(ADMIN_SEED)
+  getStorageIntegrityState(world).adminSeedHex = ADMIN_SEED
   getStorageIntegrityState(world).adminPubkey = adminPubkey
 })
 
@@ -313,8 +309,8 @@ When('the volunteer creates a note with real ECIES envelopes', async ({ request,
   const contentKey = generateContentKey()
   const ciphertextHex = encryptContent('Envelope accuracy test', contentKey, LABEL_NOTE_KEY)
 
-  const authorEnv = wrapKeyForRecipient(contentKey, getStorageIntegrityState(world).volunteerKp!.pubkey, getStorageIntegrityState(world).volunteerKp!.skHex, LABEL_NOTE_KEY)
-  const adminEnv = wrapKeyForRecipient(contentKey, getStorageIntegrityState(world).adminPubkey!, getStorageIntegrityState(world).adminSkHex!, LABEL_NOTE_KEY)
+  const authorEnv = wrapKeyForRecipient(contentKey, getStorageIntegrityState(world).volunteerKp!.pubkey, getStorageIntegrityState(world).volunteerKp!.seedHex, LABEL_NOTE_KEY)
+  const adminEnv = wrapKeyForRecipient(contentKey, getStorageIntegrityState(world).adminPubkey!, getStorageIntegrityState(world).adminSeedHex!, LABEL_NOTE_KEY)
 
   getStorageIntegrityState(world).submittedAuthorEnvelope = authorEnv
   getStorageIntegrityState(world).submittedEnvelopes = [{ pubkey: getStorageIntegrityState(world).adminPubkey!, ...adminEnv }]

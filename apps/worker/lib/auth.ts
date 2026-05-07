@@ -1,10 +1,7 @@
 import type { AuthPayload, User } from '../types'
-import { schnorr } from '@noble/curves/secp256k1.js'
-import { ed25519 } from '@noble/curves/ed25519.js'
-import { sha256 } from '@noble/hashes/sha2.js'
-import { hexToBytes } from '@noble/hashes/utils.js'
-import { utf8ToBytes } from '@noble/ciphers/utils.js'
-import { AUTH_PREFIX } from '@shared/crypto-labels'
+import { ed25519Verify } from '@llamenos/crypto/ffi'
+import { hexToBytes, utf8ToBytes } from '@shared/encoding'
+import { LABEL_DEVICE_AUTH } from '@shared/crypto-labels'
 import type { IdentityService } from '../services/identity'
 import { ServiceError } from '../services/settings'
 import { createLogger } from './logger'
@@ -35,34 +32,33 @@ export function validateToken(auth: AuthPayload): boolean {
   return true
 }
 
-export async function verifyAuthToken(auth: AuthPayload, method?: string, path?: string): Promise<boolean> {
+/**
+ * Build the canonical auth message bytes.
+ * Format: `{LABEL_DEVICE_AUTH}:{pubkey_hex}:{timestamp_ms}:{METHOD}:{path}`
+ *
+ * MUST match exactly: packages/crypto/src/auth.rs::build_auth_message()
+ */
+export function buildAuthMessage(pubkey: string, timestamp: number, method: string, path: string): Uint8Array {
+  return utf8ToBytes(`${LABEL_DEVICE_AUTH}:${pubkey}:${timestamp}:${method}:${path}`)
+}
+
+export function verifyAuthToken(auth: AuthPayload, method?: string, path?: string): boolean {
   if (!validateToken(auth)) return false
-  if (!method || !path) return false // method+path binding is required
+  if (!method || !path) return false
   try {
-    const boundMessage = `${AUTH_PREFIX}${auth.pubkey}:${auth.timestamp}:${method}:${path}`
-    const boundHash = sha256(utf8ToBytes(boundMessage))
-    const tokenBytes = hexToBytes(auth.token)
-    const pubkeyBytes = hexToBytes(auth.pubkey)
-
-    // Try secp256k1 Schnorr first (backward compatible with Nostr-style keys)
-    try {
-      if (schnorr.verify(tokenBytes, boundHash, pubkeyBytes)) return true
-    } catch { /* Not a valid Schnorr signature — try Ed25519 */ }
-
-    // Try Ed25519 (v3 device keys)
-    try {
-      if (ed25519.verify(tokenBytes, boundHash, pubkeyBytes)) return true
-    } catch { /* Not a valid Ed25519 signature either */ }
-
-    return false
+    const message = buildAuthMessage(auth.pubkey, auth.timestamp, method, path)
+    return ed25519Verify(
+      hexToBytes(auth.pubkey),
+      message,
+      hexToBytes(auth.token),
+    )
   } catch {
     return false
   }
 }
 
 /**
- * Authenticate a request using session token or Schnorr signature.
- * Uses the IdentityService directly instead of DO stubs.
+ * Authenticate a request using session token or Ed25519 signature.
  */
 export async function authenticateRequest(
   request: Request,
@@ -85,13 +81,13 @@ export async function authenticateRequest(
     }
   }
 
-  // Fall back to signature auth (Schnorr or Ed25519)
+  // Fall back to Ed25519 signature auth
   const auth = parseAuthHeader(authHeader)
   if (!auth) return null
   const url = new URL(request.url)
-  if (!(await verifyAuthToken(auth, request.method, url.pathname))) return null
+  if (!verifyAuthToken(auth, request.method, url.pathname)) return null
 
-  // Look up volunteer via identity service
+  // Look up user via identity service
   try {
     const user = await identityService.getUserInternal(auth.pubkey)
     if (!user) return null
@@ -102,4 +98,3 @@ export async function authenticateRequest(
     return null
   }
 }
-

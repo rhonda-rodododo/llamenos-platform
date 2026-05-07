@@ -23,15 +23,14 @@ import {
   simulateIncomingMessage,
   uniqueCallerNumber,
 } from '../../simulation-helpers'
-import { schnorr } from '@noble/curves/secp256k1.js'
-import { sha256 } from '@noble/hashes/sha2.js'
-import { hexToBytes, bytesToHex } from '@noble/hashes/utils.js'
-import { utf8ToBytes } from '@noble/ciphers/utils.js'
+import { ed25519Sign, ed25519PubkeyFromSeed } from '@llamenos/crypto/ffi'
+import { hexToBytes, bytesToHex, utf8ToBytes } from '@shared/encoding'
+import { LABEL_DEVICE_AUTH } from '@shared/crypto-labels'
 import * as crypto from 'crypto'
 
 const BASE_URL = process.env.TEST_HUB_URL || 'http://localhost:3000'
 const TEST_SECRET = process.env.DEV_RESET_SECRET || 'test-reset-secret'
-const AUTH_PREFIX = 'llamenos:auth:'
+const AUTH_PREFIX = LABEL_DEVICE_AUTH
 
 // ── Local security audit state ──────────────────────────────────
 
@@ -452,11 +451,10 @@ Then('the event content should be encrypted with the derived event key', async (
 
 Given('a Schnorr token signed without method and path', async ({ world }) => {
   const kp = generateTestKeypair()
-  // Create a token without method+path binding (old format)
+  // Create a token without method+path binding (intentionally malformed)
   const timestamp = Date.now()
-  const message = `${AUTH_PREFIX}${kp.pubkey}:${timestamp}`
-  const messageHash = sha256(utf8ToBytes(message))
-  const sig = schnorr.sign(messageHash, hexToBytes(kp.skHex))
+  const message = utf8ToBytes(`${AUTH_PREFIX}:${kp.pubkey}:${timestamp}`)
+  const sig = ed25519Sign(hexToBytes(kp.seedHex), message)
   getNetworkSecState(world).schnorrToken = JSON.stringify({
     pubkey: kp.pubkey,
     timestamp,

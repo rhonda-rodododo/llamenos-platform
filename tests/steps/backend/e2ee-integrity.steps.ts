@@ -11,7 +11,7 @@ import {
   apiPost,
   generateTestKeypair,
   uniquePhone,
-  ADMIN_NSEC,
+  ADMIN_SEED,
 } from '../../api-helpers'
 import {
   generateContentKey,
@@ -23,15 +23,14 @@ import {
 import { LABEL_NOTE_KEY } from '@shared/crypto-labels'
 import { TestDB } from '../../db-helpers'
 import { assertIsObject, assertIsArray } from '../../integrity-helpers'
-import { bytesToHex } from '@noble/hashes/utils.js'
-import { nip19, getPublicKey } from 'nostr-tools'
-import { hexToBytes } from '@noble/hashes/utils.js'
+import { bytesToHex, hexToBytes } from '@shared/encoding'
+import { ed25519PubkeyFromSeed } from '@llamenos/crypto/ffi'
 
 // ── State ───────────────────────────────────────────────────────────
 
 interface E2EEIntegrityState {
   /** Named keypairs: key = name (e.g. "VolA", "AdminA") */
-  keypairs: Map<string, { nsec: string; pubkey: string; skHex: string }>
+  keypairs: Map<string, { seedHex: string; pubkey: string }>
   /** The current content key used for symmetric encryption */
   contentKey?: Uint8Array
   /** The hex ciphertext produced by encryptContent */
@@ -46,8 +45,8 @@ interface E2EEIntegrityState {
   dbRow?: Record<string, unknown>
   /** Last decrypted plaintext */
   decryptedText?: string
-  /** The admin nsec converted to skHex */
-  adminSkHex?: string
+  /** The admin seed hex */
+  adminSeedHex?: string
   /** The admin pubkey */
   adminPubkey?: string
 }
@@ -68,10 +67,8 @@ Before(async ({ world }) => {
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
-function nsecToSkHex(nsec: string): string {
-  const decoded = nip19.decode(nsec)
-  if (decoded.type !== 'nsec') throw new Error('Invalid nsec')
-  return bytesToHex(decoded.data as Uint8Array)
+function seedHexToPubkey(seedHex: string): string {
+  return bytesToHex(ed25519PubkeyFromSeed(hexToBytes(seedHex)))
 }
 
 function getKeypair(world: Record<string, unknown>, name: string) {
@@ -96,9 +93,8 @@ Given('a volunteer {string} with a real keypair', async ({ request, world }, nam
 })
 
 Given('the admin keypair is known', async ({ world }) => {
-  const skHex = nsecToSkHex(ADMIN_NSEC)
-  const pubkey = getPublicKey(hexToBytes(skHex))
-  getE2EEIntegrityState(world).adminSkHex = skHex
+  const pubkey = seedHexToPubkey(ADMIN_SEED)
+  getE2EEIntegrityState(world).adminSeedHex = ADMIN_SEED
   getE2EEIntegrityState(world).adminPubkey = pubkey
 })
 
@@ -123,7 +119,7 @@ When('the content key is ECIES-wrapped for the volunteer', async ({ world }) => 
   expect(volKp).toBeDefined()
   expect(getE2EEIntegrityState(world).contentKey).toBeDefined()
 
-  const envelope = wrapKeyForRecipient(getE2EEIntegrityState(world).contentKey!, volKp.pubkey, volKp.skHex, LABEL_NOTE_KEY)
+  const envelope = wrapKeyForRecipient(getE2EEIntegrityState(world).contentKey!, volKp.pubkey, volKp.seedHex, LABEL_NOTE_KEY)
   getE2EEIntegrityState(world).envelopes.set(volKp.pubkey, envelope)
 })
 
@@ -131,7 +127,7 @@ When('the content key is ECIES-wrapped for the admin', async ({ world }) => {
   expect(getE2EEIntegrityState(world).contentKey).toBeDefined()
   expect(getE2EEIntegrityState(world).adminPubkey).toBeDefined()
 
-  const envelope = wrapKeyForRecipient(getE2EEIntegrityState(world).contentKey!, getE2EEIntegrityState(world).adminPubkey!, getE2EEIntegrityState(world).adminSkHex!, LABEL_NOTE_KEY)
+  const envelope = wrapKeyForRecipient(getE2EEIntegrityState(world).contentKey!, getE2EEIntegrityState(world).adminPubkey!, getE2EEIntegrityState(world).adminSeedHex!, LABEL_NOTE_KEY)
   getE2EEIntegrityState(world).envelopes.set(getE2EEIntegrityState(world).adminPubkey!, envelope)
 })
 
@@ -180,11 +176,11 @@ When(
     getE2EEIntegrityState(world).ciphertextHex = encryptContent(plaintext, getE2EEIntegrityState(world).contentKey, LABEL_NOTE_KEY)
 
     // Wrap for volunteer
-    const volEnv = wrapKeyForRecipient(getE2EEIntegrityState(world).contentKey, volKp.pubkey, volKp.skHex, LABEL_NOTE_KEY)
+    const volEnv = wrapKeyForRecipient(getE2EEIntegrityState(world).contentKey, volKp.pubkey, volKp.seedHex, LABEL_NOTE_KEY)
     getE2EEIntegrityState(world).envelopes.set(volKp.pubkey, volEnv)
 
     // Wrap for admin
-    const adminEnv = wrapKeyForRecipient(getE2EEIntegrityState(world).contentKey, getE2EEIntegrityState(world).adminPubkey!, getE2EEIntegrityState(world).adminSkHex!, LABEL_NOTE_KEY)
+    const adminEnv = wrapKeyForRecipient(getE2EEIntegrityState(world).contentKey, getE2EEIntegrityState(world).adminPubkey!, getE2EEIntegrityState(world).adminSeedHex!, LABEL_NOTE_KEY)
     getE2EEIntegrityState(world).envelopes.set(getE2EEIntegrityState(world).adminPubkey!, adminEnv)
   },
 )
@@ -250,13 +246,13 @@ When(
     getE2EEIntegrityState(world).ciphertextHex = encryptContent(plaintext, getE2EEIntegrityState(world).contentKey, LABEL_NOTE_KEY)
 
     // Wrap for volunteer (author envelope)
-    const volEnv = wrapKeyForRecipient(getE2EEIntegrityState(world).contentKey, kp.pubkey, kp.skHex, LABEL_NOTE_KEY)
+    const volEnv = wrapKeyForRecipient(getE2EEIntegrityState(world).contentKey, kp.pubkey, kp.seedHex, LABEL_NOTE_KEY)
     getE2EEIntegrityState(world).envelopes.set(kp.pubkey, volEnv)
 
     // Wrap for each named admin
     for (const [name, adminKp] of getE2EEIntegrityState(world).keypairs.entries()) {
       if (name.startsWith('Admin')) {
-        const adminEnv = wrapKeyForRecipient(getE2EEIntegrityState(world).contentKey, adminKp.pubkey, adminKp.skHex, LABEL_NOTE_KEY)
+        const adminEnv = wrapKeyForRecipient(getE2EEIntegrityState(world).contentKey, adminKp.pubkey, adminKp.seedHex, LABEL_NOTE_KEY)
         getE2EEIntegrityState(world).envelopes.set(adminKp.pubkey, adminEnv)
       }
     }
@@ -308,11 +304,11 @@ When('the volunteer encrypts note content {string} with real crypto', async ({ r
   getE2EEIntegrityState(world).ciphertextHex = encryptContent(plaintext, getE2EEIntegrityState(world).contentKey, LABEL_NOTE_KEY)
 
   // Wrap for volunteer
-  const volEnv = wrapKeyForRecipient(getE2EEIntegrityState(world).contentKey, volKp.pubkey, volKp.skHex, LABEL_NOTE_KEY)
+  const volEnv = wrapKeyForRecipient(getE2EEIntegrityState(world).contentKey, volKp.pubkey, volKp.seedHex, LABEL_NOTE_KEY)
   getE2EEIntegrityState(world).envelopes.set(volKp.pubkey, volEnv)
 
   // Wrap for admin
-  const adminEnv = wrapKeyForRecipient(getE2EEIntegrityState(world).contentKey, getE2EEIntegrityState(world).adminPubkey!, getE2EEIntegrityState(world).adminSkHex!, LABEL_NOTE_KEY)
+  const adminEnv = wrapKeyForRecipient(getE2EEIntegrityState(world).contentKey, getE2EEIntegrityState(world).adminPubkey!, getE2EEIntegrityState(world).adminSeedHex!, LABEL_NOTE_KEY)
   getE2EEIntegrityState(world).envelopes.set(getE2EEIntegrityState(world).adminPubkey!, adminEnv)
 })
 
@@ -357,7 +353,7 @@ When('the volunteer unwraps their envelope and decrypts the note', async ({ worl
   const recoveredKey = unwrapKey(
     envelope!.wrappedKey,
     envelope!.ephemeralPubkey,
-    volKp.skHex,
+    volKp.seedHex,
     LABEL_NOTE_KEY,
   )
   getE2EEIntegrityState(world).decryptedText = decryptContent(getE2EEIntegrityState(world).ciphertextHex!, recoveredKey, LABEL_NOTE_KEY)
@@ -365,7 +361,7 @@ When('the volunteer unwraps their envelope and decrypts the note', async ({ worl
 
 When('the admin unwraps their envelope and decrypts the note', async ({ world }) => {
   expect(getE2EEIntegrityState(world).ciphertextHex).toBeDefined()
-  expect(getE2EEIntegrityState(world).adminSkHex).toBeDefined()
+  expect(getE2EEIntegrityState(world).adminSeedHex).toBeDefined()
   expect(getE2EEIntegrityState(world).adminPubkey).toBeDefined()
 
   const envelope = getE2EEIntegrityState(world).envelopes.get(getE2EEIntegrityState(world).adminPubkey!)
@@ -374,7 +370,7 @@ When('the admin unwraps their envelope and decrypts the note', async ({ world })
   const recoveredKey = unwrapKey(
     envelope!.wrappedKey,
     envelope!.ephemeralPubkey,
-    getE2EEIntegrityState(world).adminSkHex!,
+    getE2EEIntegrityState(world).adminSeedHex!,
     LABEL_NOTE_KEY,
   )
   getE2EEIntegrityState(world).decryptedText = decryptContent(getE2EEIntegrityState(world).ciphertextHex!, recoveredKey, LABEL_NOTE_KEY)
@@ -439,7 +435,7 @@ Then('attempting to unwrap with {string} secret key should fail', async ({ world
       unwrapKey(
         authorEnvelope.wrappedKey,
         authorEnvelope.ephemeralPubkey,
-        volKp.skHex,
+        volKp.seedHex,
         LABEL_NOTE_KEY,
       )
     } catch {
@@ -464,7 +460,7 @@ Then(
     const recoveredKey = unwrapKey(
       envelope!.wrappedKey,
       envelope!.ephemeralPubkey,
-      adminKp.skHex,
+      adminKp.seedHex,
       LABEL_NOTE_KEY,
     )
     const plaintext = decryptContent(getE2EEIntegrityState(world).ciphertextHex!, recoveredKey, LABEL_NOTE_KEY)
