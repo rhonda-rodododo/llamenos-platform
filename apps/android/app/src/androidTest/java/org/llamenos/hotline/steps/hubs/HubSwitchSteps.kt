@@ -66,13 +66,24 @@ class HubSwitchSteps : BaseSteps() {
         navigateToTab(NAV_SETTINGS)
         composeRule.waitForIdle()
 
+        // The hub card is inside a collapsible SettingsSection — expand it first
+        expandSettingsSection("settings-hub-section")
+
         // Tap the hub settings card to open HubListScreen
         try {
+            composeRule.waitUntil(5_000) {
+                composeRule.onAllNodesWithTag("settings-hub-card").fetchSemanticsNodes().isNotEmpty()
+            }
             onNodeWithTag("settings-hub-card").performScrollTo()
             onNodeWithTag("settings-hub-card").performClick()
             composeRule.waitForIdle()
         } catch (_: Throwable) {
-            // Hub card may not be present — hub list may open differently
+            // Hub card may not be present — try via dashboard card
+            try {
+                navigateViaDashboardCard("hubs-card")
+            } catch (_: Throwable) {
+                // Neither path worked
+            }
         }
 
         // Wait for the hub list screen to load

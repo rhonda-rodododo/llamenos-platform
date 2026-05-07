@@ -57,29 +57,27 @@ class ActiveCallSteps : BaseSteps() {
             Log.w("ActiveCallSteps", "Call simulation failed: ${e.message}")
         }
 
-        // Force DashboardViewModel to re-fetch active calls.
-        // DashboardViewModel subscribes to activeHubId changes and calls refresh().
-        // Re-setting the hub ID (via null → hubId toggle) triggers a new emission
-        // from the StateFlow, which forces refresh() → fetchActiveCall().
-        // PullToRefreshBox swipeDown() is unreliable in Compose UI tests —
-        // the gesture threshold may not be met consistently.
+        // Force DashboardViewModel to re-fetch active calls via multiple strategies.
+        // Strategy 1: Hub toggle (triggers ViewModel.refresh() via StateFlow emission).
         triggerHubRefresh()
 
-        // Wait for the active call card to appear
-        try {
-            composeRule.waitUntil(15_000) {
-                composeRule.onAllNodesWithTag("active-call-card").fetchSemanticsNodes().isNotEmpty()
-            }
-        } catch (_: Throwable) {
-            // Retry: trigger another hub refresh cycle
-            Log.d("ActiveCallSteps", "active-call-card not found, retrying with hub refresh")
-            triggerHubRefresh()
+        // Wait for the active call card to appear with retries.
+        // On CI emulators, API calls can be slow — retry hub refresh multiple times.
+        val maxAttempts = 3
+        for (attempt in 1..maxAttempts) {
             try {
-                composeRule.waitUntil(15_000) {
+                composeRule.waitUntil(10_000) {
                     composeRule.onAllNodesWithTag("active-call-card").fetchSemanticsNodes().isNotEmpty()
                 }
+                Log.d("ActiveCallSteps", "active-call-card appeared on attempt $attempt")
+                return
             } catch (_: Throwable) {
-                Log.w("ActiveCallSteps", "active-call-card did not appear after retry")
+                if (attempt < maxAttempts) {
+                    Log.d("ActiveCallSteps", "active-call-card not found (attempt $attempt), retrying hub refresh")
+                    triggerHubRefresh()
+                } else {
+                    Log.w("ActiveCallSteps", "active-call-card did not appear after $maxAttempts attempts")
+                }
             }
         }
     }
@@ -89,13 +87,11 @@ class ActiveCallSteps : BaseSteps() {
     @Then("I should see the active call card")
     fun iShouldSeeTheActiveCallCard() {
         // Wait for the active call card to appear on the dashboard.
-        // The card may take a moment to render after the Nostr event arrives.
-        composeRule.waitUntil(10_000) {
-            composeRule.onAllNodesWithTag("active-call-card").fetchSemanticsNodes().isNotEmpty() ||
-                composeRule.onAllNodesWithTag("active-call-count").fetchSemanticsNodes().isNotEmpty() ||
-                composeRule.onAllNodesWithTag("dashboard-title").fetchSemanticsNodes().isNotEmpty()
+        // The card renders when currentCall is non-null in the ViewModel.
+        composeRule.waitUntil(15_000) {
+            composeRule.onAllNodesWithTag("active-call-card").fetchSemanticsNodes().isNotEmpty()
         }
-        val found = assertAnyTagDisplayed("active-call-card", "active-call-count", "dashboard-title")
+        onNodeWithTag("active-call-card").assertIsDisplayed()
     }
 
     // ---- When ----
@@ -156,18 +152,18 @@ class ActiveCallSteps : BaseSteps() {
 
     @Then("the report spam button should be visible on the call card")
     fun theReportSpamButtonShouldBeVisibleOnTheCallCard() {
-        composeRule.waitUntil(10_000) {
-            composeRule.onAllNodesWithTag("active-call-card").fetchSemanticsNodes().isNotEmpty()
+        composeRule.waitUntil(15_000) {
+            composeRule.onAllNodesWithTag("report-spam-button").fetchSemanticsNodes().isNotEmpty()
         }
-        val found = assertAnyTagDisplayed("report-spam-button", "active-call-card", "dashboard-title")
+        onNodeWithTag("report-spam-button").assertIsDisplayed()
     }
 
     @Then("the quick note button should be visible on the call card")
     fun theQuickNoteButtonShouldBeVisibleOnTheCallCard() {
-        composeRule.waitUntil(10_000) {
-            composeRule.onAllNodesWithTag("active-call-card").fetchSemanticsNodes().isNotEmpty()
+        composeRule.waitUntil(15_000) {
+            composeRule.onAllNodesWithTag("quick-note-button").fetchSemanticsNodes().isNotEmpty()
         }
-        val found = assertAnyTagDisplayed("quick-note-button", "active-call-card", "dashboard-title")
+        onNodeWithTag("quick-note-button").assertIsDisplayed()
     }
 
     // ---- Helpers ----
@@ -198,8 +194,9 @@ class ActiveCallSteps : BaseSteps() {
             }
             Log.d("ActiveCallSteps", "triggerHubRefresh: toggled hub to force refresh")
             composeRule.waitForIdle()
-            // Give the ViewModel a moment to process the hub change and make the API call
-            Thread.sleep(2000)
+            // Give the ViewModel time to process the hub change and complete the API call.
+            // CI emulators with swiftshader are very slow — need generous wait.
+            Thread.sleep(4000)
             composeRule.waitForIdle()
         } catch (e: Throwable) {
             Log.w("ActiveCallSteps", "triggerHubRefresh failed: ${e.message}")

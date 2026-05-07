@@ -238,6 +238,38 @@ object SimulationClient {
         return json.decodeFromString<CmsSetupResponse>(responseText)
     }
 
+    // ─── Event Creation ─────────────────────────────────────────────
+
+    /**
+     * Response from the test event creation endpoint.
+     */
+    @Serializable
+    data class EventResponse(
+        val ok: Boolean = false,
+        val eventId: String = "",
+        val entityTypeId: String = "",
+        val error: String? = null,
+    )
+
+    /**
+     * Create a test event in the given hub.
+     *
+     * Corresponds to `POST /api/test-create-event`.
+     */
+    fun createTestEvent(
+        hubId: String,
+        name: String? = null,
+        entityTypeId: String? = null,
+    ): EventResponse {
+        val bodyMap = buildMap {
+            put("hubId", hubId)
+            if (name != null) put("name", name)
+            if (entityTypeId != null) put("entityTypeId", entityTypeId)
+        }
+        val responseText = post("/api/test-create-event", toJson(bodyMap))
+        return json.decodeFromString<EventResponse>(responseText)
+    }
+
     // ─── HTTP Helpers ───────────────────────────────────────────────
 
     /**

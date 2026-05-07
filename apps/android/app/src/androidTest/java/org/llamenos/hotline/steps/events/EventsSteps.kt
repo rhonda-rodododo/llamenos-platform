@@ -10,7 +10,9 @@ import io.cucumber.java.en.And
 import io.cucumber.java.en.Given
 import io.cucumber.java.en.Then
 import io.cucumber.java.en.When
+import org.llamenos.hotline.helpers.SimulationClient
 import org.llamenos.hotline.steps.BaseSteps
+import org.llamenos.hotline.steps.ScenarioHooks
 
 /**
  * Step definitions for event-management.feature scenarios.
@@ -26,9 +28,19 @@ class EventsSteps : BaseSteps() {
 
     @Given("events exist in the system")
     fun eventsExistInTheSystem() {
-        // Events are loaded from the backend by the ViewModel.
-        // Navigate to events to trigger loading.
-        iNavigateToTheEventsScreen()
+        // Create a test event in the current hub so the list has data.
+        val hubId = ScenarioHooks.currentHubId
+        if (hubId.isNotEmpty()) {
+            try {
+                val result = SimulationClient.createTestEvent(
+                    hubId = hubId,
+                    name = "BDD Test Event ${System.currentTimeMillis()}",
+                )
+                Log.d("EventsSteps", "Created test event: ok=${result.ok}, id=${result.eventId}, error=${result.error}")
+            } catch (e: Throwable) {
+                Log.w("EventsSteps", "Failed to create test event: ${e.message}")
+            }
+        }
     }
 
     // ---- When ----

@@ -28,13 +28,24 @@ class HubManagementSteps : BaseSteps() {
         navigateToTab(NAV_SETTINGS)
         composeRule.waitForIdle()
 
+        // The hub card is inside a collapsible SettingsSection — expand it first
+        expandSettingsSection("settings-hub-section")
+
         // Scroll to and tap the hub settings card
         try {
+            composeRule.waitUntil(5_000) {
+                composeRule.onAllNodesWithTag("settings-hub-card").fetchSemanticsNodes().isNotEmpty()
+            }
             onNodeWithTag("settings-hub-card").performScrollTo()
             onNodeWithTag("settings-hub-card").performClick()
             composeRule.waitForIdle()
         } catch (_: Throwable) {
-            // Hub card may not exist in settings — try direct navigation
+            // Hub card may not exist in settings — try via dashboard card
+            try {
+                navigateViaDashboardCard("hubs-card")
+            } catch (_: Throwable) {
+                // Neither path worked
+            }
         }
 
         // Wait for the hubs screen to load

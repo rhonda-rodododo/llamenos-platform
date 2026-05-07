@@ -769,4 +769,80 @@ dev.post('/test-create-hub', async (c) => {
   return c.json({ id: hub.id, name: hub.name })
 })
 
+// ─── Test Event Creation (E2E test helper) ──────────────────────────────────
+// Creates a minimal event in the given hub for E2E testing.
+// Gated by ENVIRONMENT=development + DEV_RESET_SECRET / E2E_TEST_SECRET.
+
+dev.post('/test-create-event', async (c) => {
+  const denied = simulationGuard(c)
+  if (denied) return denied
+
+  const body = await c.req.json().catch(() => ({})) as {
+    hubId?: string
+    name?: string
+    entityTypeId?: string
+    startDate?: string
+  }
+
+  const hubId = body.hubId ?? ''
+  const services = c.get('services')
+
+  // Find or create an entity type for events
+  let entityTypeId = body.entityTypeId
+  if (!entityTypeId) {
+    // Look for an existing event entity type in this hub
+    try {
+      const result = await services.settings.getEntityTypes(hubId)
+      const types = result.entityTypes
+      const eventType = types.find((et: { category: string }) => et.category === 'event') ?? types[0]
+      entityTypeId = eventType?.id
+    } catch { /* no entity types */ }
+  }
+
+  // If no entity type exists, create a minimal one
+  if (!entityTypeId) {
+    entityTypeId = crypto.randomUUID()
+    try {
+      await services.settings.createEntityType({
+        id: entityTypeId,
+        hubId,
+        name: 'test_event_type',
+        label: 'Test Event',
+        labelPlural: 'Test Events',
+        description: 'BDD test event type',
+        category: 'event',
+        color: '#3b82f6',
+        statuses: [
+          { value: 'planned', label: 'Planned', color: '#f59e0b', order: 1 },
+          { value: 'active', label: 'Active', color: '#22c55e', order: 2 },
+          { value: 'completed', label: 'Completed', color: '#6b7280', order: 3 },
+        ],
+        fieldDefinitions: [],
+      })
+    } catch { /* entity type might already exist */ }
+  }
+
+  const now = new Date().toISOString()
+  const eventName = body.name ?? `Test Event ${Date.now()}`
+
+  try {
+    const event = await services.cases.createEvent({
+      hubId,
+      entityTypeId: entityTypeId!,
+      startDate: body.startDate ?? now.slice(0, 10),
+      locationPrecision: 'city',
+      eventTypeHash: `hash:${eventName}`,
+      statusHash: 'hash:planned',
+      blindIndexes: { name_idx: `idx:${eventName}` },
+      encryptedDetails: JSON.stringify({ name: eventName, description: 'Auto-created for E2E test' }),
+      detailEnvelopes: [],
+      createdBy: 'test',
+    })
+    return c.json({ ok: true, eventId: event.id, entityTypeId })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to create event'
+    return c.json({ error: message }, 500)
+  }
+})
+
 export default dev
