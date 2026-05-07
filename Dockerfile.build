@@ -52,6 +52,9 @@ COPY apps/worker/ apps/worker/
 COPY packages/shared/ packages/shared/
 COPY packages/i18n/ packages/i18n/
 COPY packages/protocol/ packages/protocol/
+COPY packages/crypto/ffi.ts packages/crypto/ffi.ts
+COPY packages/crypto/ffi-bun.ts packages/crypto/ffi-bun.ts
+COPY packages/crypto/ffi-mock.ts packages/crypto/ffi-mock.ts
 
 # Build frontend (Vite) — reads SOURCE_DATE_EPOCH and GITHUB_SHA
 RUN bun run build

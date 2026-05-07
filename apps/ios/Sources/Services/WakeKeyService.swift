@@ -237,10 +237,6 @@ final class WakeKeyService: @unchecked Sendable {
         let envelope = try JSONDecoder().decode(HpkeEnvelope.self, from: data)
 
         // Use the HPKE open function with the wake private key
-        // Note: This calls into the Rust FFI which needs the wake private key directly,
-        // not the device key state. For now, use the legacy ECIES path if the server
-        // hasn't migrated to HPKE yet. When the server sends HPKE envelopes, this
-        // will use the HPKE open path.
         let plaintextHex = try mobileHpkeOpen(
             envelope: envelope,
             expectedLabel: CryptoLabels.LABEL_PUSH_WAKE,
@@ -254,34 +250,10 @@ final class WakeKeyService: @unchecked Sendable {
         return result
     }
 
-    /// Legacy ECIES decryption for push payloads (backward compat during server transition).
-    func decryptWakePayloadLegacy(encryptedHex: String) throws -> String {
-        let privateKeyHex = try retrieveWakePrivateKey()
-
-        guard encryptedHex.count >= 66 else {
-            throw WakeKeyError.decryptionFailed("Payload too short")
-        }
-
-        // ECIES payload format: ephemeralPubkey (33 bytes = 66 hex) + packed(nonce + ciphertext)
-        let ephemeralPubkeyHex = String(encryptedHex.prefix(66))
-        let packedHex = String(encryptedHex.dropFirst(66))
-
-        return try eciesDecryptContentHex(
-            packedHex: packedHex,
-            ephemeralPubkeyHex: ephemeralPubkeyHex,
-            secretKeyHex: privateKeyHex,
-            label: CryptoLabels.LABEL_PUSH_WAKE
-        )
-    }
-
     // MARK: - Key Derivation
 
     /// Derive an X25519 public key from a private key hex string.
-    /// Uses the Rust FFI to ensure consistent key derivation.
     private func deriveX25519PublicKey(from privateKeyHex: String) throws -> String {
-        // For wake keys, we still use the legacy secp256k1 derivation until the server
-        // migrates to X25519. The server sends ECIES-wrapped payloads keyed to this pubkey.
-        // TODO: Switch to X25519 key derivation when server sends HPKE envelopes.
         try getPublicKey(secretKeyHex: privateKeyHex)
     }
 

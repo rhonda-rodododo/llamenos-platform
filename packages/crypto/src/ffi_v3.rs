@@ -647,6 +647,22 @@ pub fn mobile_random_bytes_hex() -> String {
     hex::encode(bytes)
 }
 
+/// Generate an ephemeral X25519 keypair for device provisioning.
+///
+/// Returns `[secret_key_hex, public_key_hex]`. The secret key should be
+/// used immediately for ECDH and then discarded — it is NOT stored in
+/// Rust CryptoState.
+#[uniffi::export]
+pub fn mobile_generate_x25519_keypair() -> Vec<String> {
+    use x25519_dalek::{PublicKey as X25519PublicKey, StaticSecret as X25519Secret};
+
+    let mut rng_bytes = [0u8; 32];
+    getrandom::getrandom(&mut rng_bytes).expect("getrandom failed");
+    let secret = X25519Secret::from(rng_bytes);
+    let public = X25519PublicKey::from(&secret);
+    vec![hex::encode(rng_bytes), hex::encode(public.as_bytes())]
+}
+
 /// Try to decrypt an event by trial-decrypting with all cached hub keys.
 ///
 /// Returns `[hub_id, plaintext_json]` for the first key that succeeds,

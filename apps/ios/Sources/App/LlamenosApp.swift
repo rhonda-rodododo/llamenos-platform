@@ -260,7 +260,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
             return
         }
 
-        // Decrypt the ECIES-encrypted wake payload if present
+        // Decrypt the HPKE-encrypted wake payload if present
         guard let encryptedHex = userInfo["encrypted"] as? String else {
             completionHandler(.noData)
             return
@@ -328,14 +328,10 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     }
 }
 
-/// Decrypt a wake payload routing on the wire format: JSON envelope → HPKE,
-/// otherwise hex → legacy ECIES.
+/// Decrypt a wake payload (HPKE JSON envelope).
 private func decryptWakePayloadAuto(_ service: WakeKeyService, payload: String) throws -> String {
     let trimmed = payload.trimmingCharacters(in: .whitespaces)
-    if trimmed.hasPrefix("{") {
-        return try service.decryptWakePayload(envelopeJSON: trimmed)
-    }
-    return try service.decryptWakePayloadLegacy(encryptedHex: trimmed)
+    return try service.decryptWakePayload(envelopeJSON: trimmed)
 }
 
 // MARK: - UNUserNotificationCenterDelegate (Notification Tap Routing)

@@ -179,7 +179,7 @@ class WebSocketService @Inject constructor(
     private fun subscribe(ws: WebSocket) {
         // Subscribe to Llamenos event kinds tagged for this hub
         val subscriptionId = "llamenos-${System.currentTimeMillis()}"
-        val filter = """{"kinds":[1000,1001,1002,1010,1011,20000],"#t":["${CryptoLabels.NOSTR_EVENT_TAG}"]}"""
+        val filter = """{"kinds":[1000,1001,1002,1010,1011,20000],"#t":["${CryptoLabels.LABEL_HUB_EVENT}"]}"""
         val message = """["REQ","$subscriptionId",$filter]"""
         ws.send(message)
     }

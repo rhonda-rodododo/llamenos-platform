@@ -91,8 +91,8 @@ private func ffiMobileRandomBytesHex() -> String {
     mobileRandomBytesHex()
 }
 
-private func ffiGenerateEphemeralKeypair() -> EphemeralKeyPair {
-    generateEphemeralKeypairMobile()
+private func ffiMobileGenerateX25519Keypair() -> [String] {
+    mobileGenerateX25519Keypair()
 }
 
 // Hub key + server event key management (keys stored in Rust, never in Swift)
@@ -235,7 +235,7 @@ final class CryptoService: @unchecked Sendable {
         var envelopes: [NoteRecipientEnvelope] = []
         for pubkey in allReaders {
             let hpkeEnv = try ffiMobileHpkeSealKey(keyHex: keyHex, recipientPubkeyHex: pubkey, label: CryptoLabels.LABEL_MESSAGE, aadHex: "")
-            envelopes.append(NoteRecipientEnvelope(ephemeralPubkey: hpkeEnv.enc, pubkey: pubkey, wrappedKey: hpkeEnv.ct))
+            envelopes.append(NoteRecipientEnvelope(ct: hpkeEnv.ct, enc: hpkeEnv.enc, pubkey: pubkey))
         }
         return (ciphertextHex, envelopes)
     }
@@ -272,11 +272,11 @@ final class CryptoService: @unchecked Sendable {
         return try ffiMobileSigchainCreateLink(id: id, seq: seq, prevHash: prevHash, timestamp: timestamp, payloadJson: payloadJson)
     }
 
-    // MARK: - Device Linking ECDH (legacy secp256k1)
+    // MARK: - Device Linking ECDH (X25519)
 
     func generateEphemeralKeypair() -> (secretHex: String, publicHex: String) {
-        let kp = ffiGenerateEphemeralKeypair()
-        return (kp.secretKeyHex, kp.publicKey)
+        let kp = ffiMobileGenerateX25519Keypair()
+        return (kp[0], kp[1])
     }
 
     func deriveSharedSecret(ourSecret: String, theirPublic: String) throws -> String {
@@ -319,7 +319,7 @@ final class CryptoService: @unchecked Sendable {
     func loadHubKey(hubId: String, envelope: HubKeyEnvelopeResponse) throws {
         guard !hasHubKey(hubId: hubId) else { return }
         guard isUnlocked else { throw CryptoServiceError.noKeyLoaded }
-        let hpkeEnvelope = HpkeEnvelope(v: 3, labelId: 0, enc: envelope.envelope.wrappedKey, ct: envelope.envelope.ephemeralPubkey)
+        let hpkeEnvelope = HpkeEnvelope(v: 3, labelId: 0, enc: envelope.envelope.enc, ct: envelope.envelope.ct)
         let keyHex = try ffiMobileHpkeOpenKey(envelope: hpkeEnvelope, expectedLabel: CryptoLabels.LABEL_HUB_KEY_WRAP, aadHex: "")
         try ffiMobileSetHubKey(hubId: hubId, keyHex: keyHex)
     }

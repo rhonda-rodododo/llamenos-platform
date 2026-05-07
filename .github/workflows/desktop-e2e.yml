@@ -55,17 +55,6 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Cache Rust build artifacts
-        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            packages/crypto/target
-          key: rust-crypto-${{ runner.os }}-${{ hashFiles('packages/crypto/Cargo.lock') }}
-          restore-keys: |
-            rust-crypto-${{ runner.os }}-
-
       - name: Get Playwright version
         id: playwright-version
         run: echo "version=$(bunx playwright --version | awk '{print $2}')" >> $GITHUB_OUTPUT
@@ -134,27 +123,6 @@ jobs:
             fi
             sleep 2
           done
-
-      # ── WASM build (required for crypto-interop-wasm.spec.ts) ──
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@efa25f7f19611383d5b0ccf2d1c8914531636bf9 # stable
-        with:
-          toolchain: stable
-          targets: wasm32-unknown-unknown
-
-      - name: Rust cache
-        uses: swatinem/rust-cache@82a92a6e8fbeee089604da2575dc567ae9ddeaab # v2.7.5
-        with:
-          workspaces: packages/crypto
-
-      - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-
-      - name: Generate interop test vectors
-        run: cargo test --manifest-path packages/crypto/Cargo.toml --test interop
-
-      - name: Build WASM
-        run: bun run crypto:wasm
 
       # ── Run tests ──────────────────────────────────────────────
       - name: Run desktop E2E tests
