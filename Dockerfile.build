@@ -33,8 +33,8 @@ WORKDIR /build
 
 # Install dependencies first (layer caching)
 # Copy workspace package.json files so bun can resolve the lockfile.
-# packages/shared and packages/crypto have no package.json — bun's
-# workspace glob skips directories without one, so they don't need stubs.
+# packages/shared has no package.json — bun's workspace glob skips
+# directories without one, so it doesn't need a stub.
 COPY package.json bun.lockb ./
 COPY site/package.json site/
 COPY apps/worker/package.json apps/worker/
@@ -51,6 +51,7 @@ COPY index.html vite.config.ts tsconfig.json ./
 COPY tailwind.config.ts* ./
 COPY apps/worker/ apps/worker/
 COPY packages/shared/ packages/shared/
+COPY packages/crypto/ffi.ts packages/crypto/ffi.ts
 COPY packages/i18n/ packages/i18n/
 COPY packages/protocol/ packages/protocol/
 
