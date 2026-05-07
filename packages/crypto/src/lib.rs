@@ -61,8 +61,8 @@ mod ffi;
 #[cfg(feature = "mobile")]
 mod ffi_v3;
 
-#[cfg(feature = "wasm")]
-mod wasm;
+#[cfg(feature = "server")]
+pub mod ffi_server;
 
 // Re-export core types (new v3 API)
 pub use auth::AuthToken;

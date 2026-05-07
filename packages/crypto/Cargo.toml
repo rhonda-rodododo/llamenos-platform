@@ -6,9 +6,6 @@ description = "Shared cryptographic core for Llamenos — Ed25519/X25519, HPKE (
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/rhonda-rodododo/llamenos-platform"
 
-[package.metadata.wasm-pack.profile.release]
-wasm-opt = false
-
 [lib]
 crate-type = ["lib", "cdylib", "staticlib"]
 
@@ -60,10 +57,6 @@ thiserror = "2"
 # UniFFI for Swift/Kotlin bindings
 uniffi = { version = "0.31", optional = true }
 
-# WASM bindings for web browser
-wasm-bindgen = { version = "0.2", optional = true }
-serde-wasm-bindgen = { version = "0.6", optional = true }
-js-sys = { version = "0.3", optional = true }
 
 # MLS (RFC 9420) — always compiled in
 openmls = { version = "0.8", features = ["openmls_rust_crypto"] }
@@ -78,17 +71,14 @@ chacha20poly1305 = "0.10"
 
 [features]
 default = []
+server = []
 mobile = ["dep:uniffi"]
 uniffi-bindgen = ["mobile", "uniffi/cli"]
-wasm = ["dep:wasm-bindgen", "dep:serde-wasm-bindgen", "dep:js-sys", "getrandom/js"]
 
 [[bin]]
 name = "uniffi-bindgen"
 required-features = ["uniffi-bindgen"]
 
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-getrandom = { version = "0.2", features = ["js"] }
-openmls = { version = "0.8", features = ["openmls_rust_crypto", "js"] }
 
 [dev-dependencies]
 serde_json = "1"
