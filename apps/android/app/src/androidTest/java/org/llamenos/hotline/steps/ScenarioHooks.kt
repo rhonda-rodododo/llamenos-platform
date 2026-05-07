@@ -5,6 +5,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import dagger.hilt.android.EntryPointAccessors
 import io.cucumber.java.After
 import io.cucumber.java.Before
+import io.cucumber.java.Scenario
 import kotlinx.coroutines.runBlocking
 import org.llamenos.hotline.LlamenosApp
 import org.llamenos.hotline.crypto.CryptoService
@@ -27,6 +28,8 @@ import org.llamenos.hotline.hub.ActiveHubState
 class ScenarioHooks {
 
     companion object {
+        private const val TAG = "ScenarioHooks"
+
         /**
          * The hub ID created for the current scenario.
          * Set in @Before(order = 1), readable by step definitions via ScenarioHooks.currentHubId.
@@ -58,7 +61,7 @@ class ScenarioHooks {
                 "pm grant $packageName android.permission.CAMERA"
             ).close()
         } catch (e: Exception) {
-            Log.w("ScenarioHooks", "Camera permission grant failed: ${e.message}")
+            Log.w(TAG, "Camera permission grant failed: ${e.message}")
         }
     }
 
@@ -69,29 +72,38 @@ class ScenarioHooks {
      *
      * Retries up to 3 times with increasing delay to handle transient
      * backend startup delays (Docker container warming, CI resource contention).
+     *
+     * FAIL-FAST: Throws AssertionError if hub creation fails after all retries.
+     * Without a hub, all hub-scoped API calls will silently return wrong data,
+     * causing cascading timeouts that are impossible to debug.
      */
     @Before(order = 1)
     fun createScenarioHub() {
+        Log.i(TAG, "=== createScenarioHub: hubUrl=${SimulationClient.hubUrl} ===")
         var lastError: Exception? = null
         for (attempt in 1..3) {
             try {
                 val response = SimulationClient.createTestHub()
                 if (response.id.isNotEmpty()) {
                     currentHubId = response.id
-                    Log.d("ScenarioHooks", "Created test hub: ${response.id} (${response.name}) [attempt $attempt]")
+                    Log.i(TAG, "Created test hub: ${response.id} (${response.name}) [attempt $attempt]")
                     return
                 } else {
-                    Log.w("ScenarioHooks", "createTestHub returned empty ID — error: ${response.error} [attempt $attempt]")
+                    val msg = "createTestHub returned empty ID — error: ${response.error} [attempt $attempt]"
+                    Log.w(TAG, msg)
+                    lastError = RuntimeException(msg)
                 }
             } catch (e: Exception) {
                 lastError = e
-                Log.w("ScenarioHooks", "createTestHub attempt $attempt failed: ${e.message}")
+                Log.w(TAG, "createTestHub attempt $attempt failed: ${e.message}")
                 if (attempt < 3) {
                     Thread.sleep((attempt * 2000).toLong())
                 }
             }
         }
-        Log.e("ScenarioHooks", "createTestHub failed after 3 attempts: ${lastError?.message}")
+        val errorMsg = "createTestHub FAILED after 3 attempts (hubUrl=${SimulationClient.hubUrl}): ${lastError?.message}"
+        Log.e(TAG, errorMsg)
+        throw AssertionError(errorMsg, lastError)
     }
 
     /**
@@ -108,16 +120,26 @@ class ScenarioHooks {
      */
     @Before(order = 2)
     fun setActiveHubForScenario() {
-        if (currentHubId.isEmpty()) return
+        if (currentHubId.isEmpty()) {
+            Log.e(TAG, "setActiveHubForScenario: currentHubId is empty — hub creation must have failed")
+            return
+        }
         try {
             val entryPoint = EntryPointAccessors.fromApplication(
                 LlamenosApp.instance,
                 ActiveHubEntryPoint::class.java,
             )
-            runBlocking { entryPoint.activeHubState().setActiveHub(currentHubId) }
-            Log.d("ScenarioHooks", "ActiveHubState set to: $currentHubId")
+            val hubState = entryPoint.activeHubState()
+            runBlocking { hubState.setActiveHub(currentHubId) }
+            // Verify it was set
+            val confirmedId = hubState.activeHubId.value
+            Log.i(TAG, "ActiveHubState set to: $currentHubId (confirmed: $confirmedId)")
+            if (confirmedId != currentHubId) {
+                Log.e(TAG, "ActiveHubState MISMATCH: expected=$currentHubId actual=$confirmedId")
+            }
         } catch (e: Exception) {
-            Log.w("ScenarioHooks", "setActiveHub failed: ${e.message}")
+            Log.e(TAG, "setActiveHub FAILED: ${e.message}", e)
+            throw AssertionError("setActiveHub failed for hubId=$currentHubId", e)
         }
     }
 
@@ -128,11 +150,21 @@ class ScenarioHooks {
 
     @After(order = 9000)
     fun clearIdentityState() {
+        Log.d(TAG, "clearIdentityState: clearing keystore and crypto lock")
         try {
             keystoreService.clear()
             cryptoService.lock()
-        } catch (_: Throwable) {
-            // Cleanup is best-effort
+        } catch (t: Throwable) {
+            Log.w(TAG, "clearIdentityState failed (best-effort): ${t.message}")
         }
+    }
+
+    /**
+     * Log scenario outcome for CI diagnostics.
+     */
+    @After(order = 0)
+    fun logScenarioResult(scenario: Scenario) {
+        val status = if (scenario.isFailed) "FAILED" else "PASSED"
+        Log.i(TAG, "=== Scenario ${status}: ${scenario.name} (hub=$currentHubId) ===")
     }
 }

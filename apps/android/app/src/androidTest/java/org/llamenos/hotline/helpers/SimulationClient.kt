@@ -226,14 +226,17 @@ object SimulationClient {
      * jail-support template, creates a sample record, and optionally
      * registers a pubkey as admin so the test identity can access CMS data.
      *
+     * [hubId] scopes sample records to a specific hub so they appear in hub-scoped
+     * API queries (`/api/hubs/{hubId}/records`). Without this, records are created
+     * with empty hubId and invisible to the app.
+     *
      * Corresponds to `POST /api/test-setup-cms`.
      */
-    fun setupCms(pubkey: String? = null): CmsSetupResponse {
-        val body = if (pubkey != null) {
-            """{"pubkey":"${escapeJson(pubkey)}"}"""
-        } else {
-            "{}"
-        }
+    fun setupCms(pubkey: String? = null, hubId: String? = null): CmsSetupResponse {
+        val fields = mutableListOf<String>()
+        if (pubkey != null) fields.add("\"pubkey\":\"${escapeJson(pubkey)}\"")
+        if (hubId != null) fields.add("\"hubId\":\"${escapeJson(hubId)}\"")
+        val body = "{${fields.joinToString(",")}}"
         val responseText = post("/api/test-setup-cms", body)
         return json.decodeFromString<CmsSetupResponse>(responseText)
     }

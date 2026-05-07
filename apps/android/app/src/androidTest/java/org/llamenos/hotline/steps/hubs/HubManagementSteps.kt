@@ -1,5 +1,6 @@
 package org.llamenos.hotline.steps.hubs
 
+import android.util.Log
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onFirst
@@ -16,8 +17,8 @@ import org.llamenos.hotline.steps.BaseSteps
  * Covers: navigation to hub management, hub list rendering,
  * active hub indicator, and create hub button.
  *
- * Hub management is accessed via Settings > Hub card which
- * opens the HubListScreen with all connected hubs.
+ * Hub management is accessed via Settings > Hub section (collapsible) > Hub card.
+ * The hub section starts collapsed (AnimatedVisibility), so we must expand it first.
  */
 class HubManagementSteps : BaseSteps() {
 
@@ -28,13 +29,20 @@ class HubManagementSteps : BaseSteps() {
         navigateToTab(NAV_SETTINGS)
         composeRule.waitForIdle()
 
-        // Scroll to and tap the hub settings card
+        // The hub section is collapsible and starts collapsed.
+        // Expand it by clicking the section header before trying to access the hub card.
+        expandSettingsSection("settings-hub-section")
+
+        // Now scroll to and tap the hub settings card
         try {
+            composeRule.waitUntil(5_000) {
+                composeRule.onAllNodesWithTag("settings-hub-card").fetchSemanticsNodes().isNotEmpty()
+            }
             onNodeWithTag("settings-hub-card").performScrollTo()
             onNodeWithTag("settings-hub-card").performClick()
             composeRule.waitForIdle()
-        } catch (_: Throwable) {
-            // Hub card may not exist in settings — try direct navigation
+        } catch (t: Throwable) {
+            Log.w("HubManagementSteps", "Hub card click failed: ${t.message}")
         }
 
         // Wait for the hubs screen to load
