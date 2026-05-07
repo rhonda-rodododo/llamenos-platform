@@ -22,8 +22,8 @@ import java.net.URL
 object SimulationClient {
 
     private const val TAG = "SimulationClient"
-    private const val CONNECT_TIMEOUT_MS = 10_000
-    private const val READ_TIMEOUT_MS = 15_000
+    private const val CONNECT_TIMEOUT_MS = 30_000
+    private const val READ_TIMEOUT_MS = 30_000
 
     private val json = Json { ignoreUnknownKeys = true }
 
