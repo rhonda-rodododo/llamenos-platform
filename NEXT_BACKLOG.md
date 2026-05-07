@@ -87,13 +87,16 @@ Getting Android Cucumber BDD E2E tests passing in CI. Tests run on emulator with
 - Local testing: `emulator -avd test-emu-0`, `adb reverse tcp:3000 tcp:3000`, `bun run dev:server`
 
 ### Root Causes Found (2026-05-07)
+- **CRITICAL — Empty roles table**: `ensureInit()` never called at server startup. Docker Compose
+  CI starts with empty database → roles table empty → `resolvePermissions(['role-super-admin'], [])`
+  returns `[]` → hub middleware rejects ALL hub-scoped requests with "Access denied". Fix: seed
+  roles from test-create-hub and test-setup-cms endpoints (idempotent).
 - **Empty logcat**: `reactivecircus/android-emulator-runner` kills emulator when its script block
   exits. Post-step `adb logcat -d` finds no device. Fix: background capture inside script.
 - **Invisible CMS records**: `test-setup-cms` created all records with `hubId: ""`. App queries
   `GET /api/hubs/{testHubId}/records` which filters `WHERE hubId = ?`. Empty hubId never matches.
-- **Collapsed settings section**: `SettingsSection` uses `AnimatedVisibility(visible = expanded)`.
-  Content nodes don't exist in semantics tree when collapsed. `performScrollTo()` and
-  `performClick()` fail silently (caught by try/catch).
+- **Hub navigation wrong target**: Tests clicked `settings-hub-card` (display-only) instead of
+  `hubs-card` (Dashboard quick action that actually navigates to HubListScreen).
 - **Silent ScenarioHooks failure**: `createTestHub()` caught all exceptions and logged at WARN
   level but didn't throw. `currentHubId` stayed empty, `@Before(order=2)` returned early,
   `ActiveHubState` never set, all `hp()` calls returned bare paths.
