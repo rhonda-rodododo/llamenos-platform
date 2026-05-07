@@ -155,7 +155,53 @@ The Rust `CryptoState` in `apps/desktop/src/crypto.rs` already has access to `hp
 
 ## Client-Side (Mobile)
 
-iOS and Android already have `hpke_envelope` available via UniFFI. The mobile `CryptoService` wrappers switch from ECIES calls to HPKE calls. Same pattern as desktop.
+iOS and Android already have `hpke_envelope` available via UniFFI (`ffi_v3.rs` exports `mobile_hpke_seal`/`mobile_hpke_open`). However, significant updates are needed:
+
+**`packages/crypto/src/ffi_v3.rs` changes required:**
+
+| Function | Current | New |
+|----------|---------|-----|
+| `mobile_decrypt_hub_event` | XChaCha20-Poly1305 | AES-256-GCM |
+| `mobile_decrypt_server_event` | XChaCha20-Poly1305 | AES-256-GCM |
+| `mobile_set_server_event_keys` | Stores XChaCha20 keys | Stores AES-256-GCM keys (same key format, different AEAD) |
+| `mobile_hpke_seal` | Already HPKE | Keep as-is |
+| `mobile_hpke_open` | Already HPKE | Keep as-is |
+
+**`packages/crypto/src/ffi.rs` (mobile UniFFI) — functions to delete:**
+
+| Function | Reason |
+|----------|--------|
+| `ecies_wrap_key_hex` | Replaced by `mobile_hpke_seal` |
+| `ecies_unwrap_key_hex` | Replaced by `mobile_hpke_open` |
+| `ecies_encrypt_content_hex` | Replaced by AES-256-GCM symmetric via new export |
+| `ecies_decrypt_content_hex` | Replaced by AES-256-GCM symmetric via new export |
+| `compute_shared_x_hex` | Provisioning moves to HPKE |
+| `decrypt_with_shared_key_hex` | Provisioning moves to HPKE |
+| `compute_sas_code` | Rewrite for HPKE-based SAS derivation |
+
+**iOS impact:** `apps/ios/Sources/Services/CryptoService.swift` — update all ECIES call sites to HPKE equivalents. Update `CryptoServiceTests.swift`.
+
+**Android impact:** `apps/android/app/src/main/kotlin/.../crypto/CryptoService.kt` — same. Update unit tests.
+
+**XCFramework + JNI rebuild required:** After Rust changes, rebuild with `build-mobile.sh ios` and `build-mobile.sh android`. Regenerate UniFFI bindings.
+
+## `encryption.rs` Function Disposition
+
+The existing `encryption.rs` has ~12 functions. Each function's fate:
+
+| Function | Action | Notes |
+|----------|--------|-------|
+| `encrypt_note` | Migrate | ECIES → HPKE key wrap, XChaCha20 → AES-256-GCM content |
+| `decrypt_note` | Migrate | Same |
+| `encrypt_message` | Migrate | Same pattern as notes |
+| `decrypt_message` | Migrate | Same |
+| `encrypt_draft` | Migrate | Same |
+| `decrypt_draft` | Migrate | Same |
+| `encrypt_with_pin` | Keep | Uses PBKDF2 + AES — already correct, just switch AEAD |
+| `decrypt_with_pin` | Keep | Same |
+| `encrypt_export` | Migrate | ECIES → HPKE |
+| `decrypt_call_record` | Migrate | ECIES → HPKE |
+| `decrypt_legacy_note` | Delete | No production data to decrypt |
 
 ## Test Migration
 
@@ -188,9 +234,37 @@ iOS and Android already have `hpke_envelope` available via UniFFI. The mobile `C
 
 ## Decisions to Review
 
+## Provisioning SAS Derivation (IMPORTANT)
+
+The provisioning protocol's SAS (Short Authentication String) verification must derive from the **HPKE shared secret** (decapsulated key material), NOT from the `enc` value (ephemeral public key). The `enc` is public — visible to any network observer — so deriving SAS from it would defeat MITM detection entirely.
+
+**Correct SAS derivation:**
+```
+sas_input = HKDF(shared_secret, salt=LABEL_PROVISION_SAS, info=enc || recipient_pk, len=6)
+sas_code = numeric_encoding(sas_input)  // e.g., 6-digit decimal
+```
+
+The HPKE crate exposes the shared secret via `setup_receiver()` on the recipient side and via `encap()` on the sender side. Both sides independently derive the same SAS code and display it for out-of-band comparison.
+
+## AAD Construction Convention
+
+To prevent ambiguity, the canonical AAD format for each operation type:
+
+| Operation | `info` parameter | `aad` parameter |
+|-----------|-----------------|-----------------|
+| E2EE envelope key wrap | `label` (e.g., `LABEL_MESSAGE`) | `"{label}:key-wrap"` |
+| Symmetric content encryption | N/A (not HPKE) | `label` |
+| Hub event encryption | N/A (not HPKE) | `"{LABEL_HUB_EVENT_EPOCH}:{epoch}"` |
+| Server-side field encryption | N/A (not HPKE) | `label` |
+
+This must be consistent across all platforms (server FFI, desktop IPC, mobile UniFFI). Add cross-platform AAD test vectors.
+
+## Decisions to Review
+
 | Decision | Chosen | Alternative | Rationale |
 |----------|--------|-------------|-----------|
-| AES-256-GCM for all symmetric | Single AEAD | XChaCha20-Poly1305 for symmetric, AES-256-GCM for HPKE | One AEAD = simpler audit. AES-NI hardware acceleration on all server/desktop CPUs. No production data to migrate |
-| HPKE base mode (anonymous sender) | Base mode | Auth mode (sender-authenticated) | Matches v1 pattern. Sender identity established via auth token, not HPKE mode |
-| Label as both `info` and `aad` | Dual binding | Label as `info` only | Albrecht defense — defense in depth. Existing `hpke_envelope.rs` already does this |
+| AES-256-GCM for all symmetric | Single AEAD | XChaCha20-Poly1305 for symmetric, AES-256-GCM for HPKE | One AEAD = simpler audit. AES-NI hardware acceleration on all server/desktop CPUs. No production data to migrate. Epoch-rotated keys keep nonce space safe |
+| HPKE base mode (anonymous sender) | Base mode | Auth mode (sender-authenticated) | Matches v1 pattern. Sender identity established via auth token, not HPKE mode. Auth mode could be added later for E2EE notes where sender verification matters |
+| Label as `info`, contextual `aad` | Separate purposes | Same string for both | `info` binds the key schedule (purpose), `aad` binds the ciphertext (context). They serve different roles and may differ (e.g., aad includes record ID) |
 | Remove `migrateContactIfNeeded()` | Delete | Keep for future migrations | No production data. YAGNI. Can re-add if needed |
+| Provisioning SAS from shared secret | HPKE shared secret | HPKE `enc` value | `enc` is public — SAS from `enc` would be derivable by any observer, defeating MITM detection |

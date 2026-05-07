@@ -20,11 +20,21 @@ This is massive overkill. We're using Nostr as a dumb encrypted pipe with generi
 ```
 Client                          Server (Hono)
   |                                |
-  |── GET /ws?auth=<signed_payload> ──>|
+  |── GET /ws ─────────────────────>|
+  |<── 101 Switching Protocols ────|  Unauthenticated upgrade
+  |                                |
+  |<── {"type":"challenge",        |
+  |     "nonce":"<random_hex_32>"} ─|  Server sends random challenge
+  |                                |
+  |── {"type":"auth",              |
+  |    "pubkey":"<ed25519_hex>",   |
+  |    "nonce":"<echo_nonce>",     |
+  |    "ts":<unix_ms>,             |
+  |    "sig":"<ed25519_sig>"} ─────>|  Client signs challenge
   |                                |  Verify Ed25519 signature
   |                                |  Look up user, get hub memberships
-  |<── 101 Switching Protocols ────|
-  |                                |  Register connection in ConnectionManager
+  |<── {"type":"authenticated",    |
+  |     "hubs":["abc","def"]} ─────|  Confirm auth, list available hubs
   |                                |
   |── {"type":"subscribe",         |
   |    "hubId":"abc",              |
@@ -35,6 +45,7 @@ Client                          Server (Hono)
   |     "kind":1000,               |
   |     "payload":"<encrypted>",   |
   |     "ts":1717000000,           |
+  |     "epoch":19890,             |
   |     "sig":"<ed25519_sig>"} ────|  Server signs + pushes
   |                                |
   |── {"type":"replay",            |
@@ -45,23 +56,23 @@ Client                          Server (Hono)
   |<── {"type":"pong"} ────────────|
 ```
 
-### Auth on Upgrade
+### Auth via Post-Upgrade Challenge-Response
 
-The WebSocket upgrade request includes an Ed25519 signed auth payload in the query string:
+Authentication happens OVER the WebSocket connection (not in the URL), matching the security properties of the former NIP-42 approach without any Nostr dependency:
 
-```
-GET /ws?auth=<base64url(JSON)>
+1. **Client sends unauthenticated upgrade request:** `GET /ws` with no auth payload. Server upgrades unconditionally.
+2. **Server sends challenge:** Random 32-byte nonce (hex-encoded). Nonce is stored server-side with a 10-second TTL.
+3. **Client signs challenge:** Signs `llamenos:ws-auth:{pubkey}:{nonce}:{timestamp}` with device Ed25519 key.
+4. **Server verifies:** Checks nonce matches (prevents replay), timestamp freshness (10-second window), Ed25519 signature validity. On failure, sends `{"type":"error","code":"auth_failed"}` and closes connection.
+5. **Server confirms:** Sends `authenticated` message with list of hub memberships.
 
-{
-  "pubkey": "<ed25519_hex_64>",
-  "timestamp": <unix_ms>,
-  "sig": "<ed25519_sig_hex_128>"
-}
-```
+**Why challenge-response instead of query params:**
+- Query params are logged by proxies (Caddy, CDN) — leaks pubkey-to-IP binding
+- Challenge nonce is single-use — no replay possible even if traffic is captured
+- The nonce is never in URLs, browser history, or access logs
+- Matches NIP-42's security properties (which we're replacing)
 
-Signed message: `llamenos:ws-auth:<pubkey>:<timestamp>`
-
-Server verifies via `ed25519Verify()` from Rust FFI. Token freshness: 30-second window (tighter than API auth's 5 minutes since WebSocket upgrade is a one-time operation). On failure, server responds with HTTP 401 before upgrade.
+**Auth timeout:** If client doesn't complete auth within 10 seconds of connection, server closes with code 4001. Unauthenticated connections cannot subscribe or receive events.
 
 ### Message Protocol
 
@@ -70,13 +81,16 @@ All messages are JSON. No binary framing (events are small, JSON overhead is neg
 **Client → Server:**
 
 ```typescript
+// Authenticate (response to challenge)
+{ type: 'auth', pubkey: string, nonce: string, ts: number, sig: string }
+
 // Subscribe to events for a hub
 { type: 'subscribe', hubId: string, kinds: number[] }
 
 // Unsubscribe from a hub
 { type: 'unsubscribe', hubId: string }
 
-// Request replay of missed events
+// Request replay of missed events (since limited to max 5 min in past)
 { type: 'replay', hubId: string, since: number }
 
 // Keepalive
@@ -86,15 +100,22 @@ All messages are JSON. No binary framing (events are small, JSON overhead is neg
 **Server → Client:**
 
 ```typescript
+// Auth challenge (sent immediately after upgrade)
+{ type: 'challenge', nonce: string }
+
+// Auth confirmed
+{ type: 'authenticated', hubs: string[] }
+
 // Real-time event
 {
   type: 'event',
+  v: 1,              // protocol version for future-proofing
   hubId: string,
   kind: number,
   payload: string,   // hex: AES-256-GCM encrypted event content
-  epoch: number,      // encryption epoch for key derivation
+  epoch: number,      // encryption epoch (UTC day number) for key derivation
   ts: number,         // unix milliseconds
-  sig: string,        // hex: Ed25519 signature over (hubId + kind + payload + ts)
+  sig: string,        // hex: Ed25519 signature over (v + hubId + kind + epoch + payload + ts)
 }
 
 // Subscription confirmed
@@ -106,6 +127,10 @@ All messages are JSON. No binary framing (events are small, JSON overhead is neg
 // Error
 { type: 'error', code: string, message: string }
 ```
+
+**Event signature construction:** The signature covers `"{v}:{hubId}:{kind}:{epoch}:{payload}:{ts}"` — binding the epoch prevents an attacker from changing the epoch to cause decryption with the wrong key. The `v` field enables protocol evolution without breaking signature verification.
+
+**Maximum message size:** 64 KiB for client-to-server messages. Server rejects larger frames with `{"type":"error","code":"message_too_large"}` and closes the connection. Server-to-client events are bounded by the encrypted payload size (padded to power-of-2, max 64 KiB).
 
 ### Event Kinds (Unchanged Semantics)
 
@@ -165,19 +190,40 @@ app.get('/ws', async (c) => {
 
 **Ring buffer:** In-memory per-hub, bounded to 1000 events or 5 minutes (whichever fills first). Only durable events (kinds < 20000) are buffered. Ephemeral events (presence, typing) are fire-and-forget — if you're disconnected, you miss them. This matches the current Nostr behavior.
 
+**Priority reservation:** The ring buffer reserves 100 slots for CALL_RING (kind 1000) and CALL_UPDATE (kind 1001) events. These are life-safety-critical in a crisis hotline — an attacker flooding lower-priority events (RECORD_UPDATED, BLAST_PROGRESS) cannot evict call notifications.
+
+**Rate limiting:** Server-side rate limits per hub per event kind:
+- Kinds 1000-1002 (calls): max 100/min (legitimate — parallel ring to all volunteers)
+- Kinds 1010-1012 (messages): max 200/min
+- Kinds 1020-1023 (records): max 50/min
+- Kinds 1030-1032 (blast/firehose): max 20/min
+Events exceeding rate limits are dropped (not buffered, not delivered).
+
+**Replay limits:** The `since` timestamp in replay requests is clamped to `max(since, now - 5min)`. Clients cannot request events older than the ring buffer window. Replay requests are rate-limited to 1/connection/10s.
+
+**Hub membership eviction:** The `ConnectionManager` listens for membership-change events from the identity service. When a user's hub membership is revoked:
+1. Immediately unsubscribe them from that hub
+2. Send `{"type":"unsubscribed","hubId":"...","reason":"membership_revoked"}`
+3. Stop delivering events for that hub
+Hub key rotation (on member departure) provides the crypto-level lock-out; this provides the real-time enforcement.
+
 ### Event Encryption (Same Scheme, Different Primitives)
 
 **Encryption:**
 - AEAD: AES-256-GCM (was XChaCha20-Poly1305)
-- Key derivation: HKDF(SERVER_SECRET, salt=LABEL_HUB_EVENT, info=LABEL_HUB_EVENT_EPOCH:{N}, len=32)
-- Epoch: rotates every 24 hours (forward secrecy)
+- Key derivation: `HKDF(SERVER_SECRET, salt=empty, info="{LABEL_HUB_EVENT_EPOCH}:{utc_day_number}", len=32)`
+- Epoch: UTC day number (`floor(unix_seconds / 86400)`) — eliminates clock skew between servers
+- Key retention: current epoch + previous 2 epochs (48h window) to handle clients offline for extended periods
 - Padding: power-of-2 bucket (min 512B) with 4-byte LE length prefix (traffic analysis resistance)
 - All via Rust FFI
 
+**Forward secrecy note:** Epoch keys are deterministically derived from `SERVER_SECRET`. If `SERVER_SECRET` is compromised, all historical event encryption keys are derivable. This is an accepted trade-off — true forward secrecy for server-encrypted transport events would require ephemeral keys distributed out-of-band, adding significant complexity. The E2EE tier (HPKE envelopes for notes/messages) provides per-message forward secrecy via random content keys. The epoch rotation's value is limiting exposure from a key-in-memory compromise (e.g., cold boot attack on server RAM reveals only current+previous epoch keys, not all historical events).
+
 **Signing:**
-- Ed25519 signature over `hubId:kind:payload:ts` (was Schnorr over Nostr event serialization)
-- Server key derived from `SERVER_SECRET` via HKDF with `LABEL_SERVER_SIGNING_KEY`
+- Ed25519 signature over `"{v}:{hubId}:{kind}:{epoch}:{payload}:{ts}"` (was Schnorr over Nostr event serialization)
+- Server key derived from `SERVER_SECRET` via HKDF with `LABEL_SERVER_SIGNING_KEY` (registered in `crypto-labels.json`)
 - Client verifies via Rust CryptoState
+- Epoch binding in signature prevents an attacker from changing the epoch to cause wrong-key decryption
 
 ### Client-Side Implementation
 
@@ -301,13 +347,22 @@ If durable delivery guarantees become important later, a PostgreSQL-backed event
 - Remove `SERVER_NOSTR_SECRET` from env templates, Helm values, CI secrets
 - Remove `NOSTR_RELAY_URL` and `NOSTR_RELAY_PUBLIC_URL` env vars
 
+## Multi-Server Deployment
+
+The in-memory ring buffer is per-process. For multi-server deployments:
+- **Sticky sessions required:** Load balancer must route WebSocket connections from the same client to the same server instance (IP affinity or cookie-based).
+- **Event publishing:** All server instances publish events to their local `ConnectionManager`. If the app server handling an API request is different from the one holding a client's WebSocket, events must be distributed. Options: (a) Redis pub/sub between instances, (b) ensure API handler and WebSocket are co-located.
+- **For v1 (single server):** This is a non-issue. Document that multi-server requires a pub/sub bus (Redis or equivalent) as a follow-up.
+
 ## Decisions to Review
 
 | Decision | Chosen | Alternative | Rationale |
 |----------|--------|-------------|-----------|
-| In-memory ring buffer | Yes, bounded 1000 events / 5 min | PostgreSQL event log | Simpler. No production scale yet. Polling fallback exists. Can add persistent log later |
-| Auth in query param | `?auth=<base64url>` | Custom header / subprotocol | WebSocket API doesn't support custom headers from browser. Query param is standard practice |
+| In-memory ring buffer | Yes, bounded 1000 events / 5 min + priority reservation | PostgreSQL event log | Simpler. Single-server deployment for now. Polling fallback exists. Reserve slots protect critical call events. Can add persistent log later |
+| Post-upgrade challenge-response auth | Nonce-based, over WebSocket | Query param `?auth=` | Query params leak to proxy/server logs (pubkey-to-IP binding). Challenge-response is non-replayable (single-use nonce). Matches NIP-42 security properties |
 | JSON messages | JSON text frames | Binary protocol (protobuf, msgpack) | Events are small. JSON is debuggable. Binary optimization is premature |
 | Single WebSocket per client | One connection, multiple hub subscriptions | One WebSocket per hub | Less overhead, simpler connection management, matches multi-hub axiom |
-| 30-second auth window | Tighter than API (5 min) | Same 5-minute window | Upgrade is one-time — tighter window reduces replay attack surface |
-| No persistent outbox | Delete PostgreSQL outbox | Keep as durable event log | YAGNI. Polling fallback covers reconnection. Add if needed later |
+| 10-second auth timeout | Tight window after challenge | 30-second window | Nonce is single-use so replay is impossible regardless of window. 10s is generous for a sign operation |
+| No persistent outbox | Delete PostgreSQL outbox | Keep as durable event log | YAGNI. Polling fallback covers reconnection. Sticky sessions for multi-server. Add persistent bus if needed later |
+| Protocol version field | `v: 1` in events | No version | Enables protocol evolution without breaking signature verification |
+| Epoch as UTC day number | `floor(unix_s / 86400)` | Relative time / counter | Deterministic, no clock skew, same epoch across servers |

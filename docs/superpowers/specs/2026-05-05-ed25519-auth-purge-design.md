@@ -20,18 +20,20 @@ Llamenos authentication currently has a dual-path verification system: try Schno
 Current `verifyAuthToken()` has a try-Schnorr-then-try-Ed25519 ladder. Replace with a single Ed25519 verify call through Rust FFI:
 
 ```typescript
-import { ed25519Verify, sha256 } from '@llamenos/crypto/ffi'
+import { ed25519Verify } from '@llamenos/crypto/ffi'
 import { utf8ToBytes } from '@shared/encoding'
+import { LABEL_DEVICE_AUTH } from '@shared/crypto-labels'
 
 export async function verifyAuthToken(auth: AuthPayload, method?: string, path?: string): Promise<boolean> {
   if (!validateToken(auth)) return false
   if (!method || !path) return false
   try {
-    const boundMessage = `${AUTH_PREFIX}${auth.pubkey}:${auth.timestamp}:${method}:${path}`
-    const hash = sha256(utf8ToBytes(boundMessage))
+    const message = utf8ToBytes(
+      `${LABEL_DEVICE_AUTH}:${auth.pubkey}:${auth.timestamp}:${method}:${path}`
+    )
     return ed25519Verify(
       hexToBytes(auth.pubkey),
-      hash,
+      message,
       hexToBytes(auth.token),
     )
   } catch {
@@ -41,6 +43,21 @@ export async function verifyAuthToken(auth: AuthPayload, method?: string, path?:
 ```
 
 No fallback. No try/catch ladder. One code path.
+
+**CRITICAL: Canonical auth message format** (must match exactly between Rust `auth.rs` and server `auth.ts`):
+
+```
+{LABEL_DEVICE_AUTH}:{pubkey_hex}:{timestamp_ms}:{METHOD}:{path}
+```
+
+Example: `llamenos:device-auth:v1:abc123...def:1717000000000:GET:/api/calls`
+
+**Design decisions:**
+- **No pre-hashing:** Ed25519 signs the raw UTF-8 message bytes directly (not `SHA-256(message)`). Ed25519 internally applies SHA-512, providing full 256-bit collision resistance. Pre-hashing with SHA-256 would reduce this to 128 bits — unnecessary and weaker.
+- **Pubkey included in message:** Binds the signature to the specific key identity, preventing type confusion even though Ed25519 signatures are inherently key-bound.
+- **Label from `crypto-labels.json`:** Uses registered `LABEL_DEVICE_AUTH`, not a local string literal. Both Rust and TypeScript read from the same source of truth.
+
+**Rust `auth.rs` must be updated** to match this format (currently uses `LABEL_DEVICE_AUTH:{timestamp}:{method}:{path}` without pubkey). Add pubkey to the Rust message construction. Add cross-language test vectors to verify byte-identical messages.
 
 **Imports removed:**
 - `schnorr` from `@noble/curves/secp256k1.js`

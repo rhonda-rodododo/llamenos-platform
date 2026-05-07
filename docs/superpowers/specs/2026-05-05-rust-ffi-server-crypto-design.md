@@ -36,7 +36,34 @@ New script: `bun run crypto:build:server` wraps this and copies the `.so` to `pa
 
 All functions use `#[no_mangle] extern "C"` with simple pointer+length arguments. No heap allocation across the FFI boundary. Caller allocates output buffers, Rust writes into them.
 
-**Error handling:** Each function returns an `i32` status code (0 = success, negative = error). Error details written to a thread-local buffer retrievable via `ffi_last_error()`.
+**Safety contract (MANDATORY for every FFI function):**
+1. **Null pointer check:** If any pointer argument is null, return `-3` immediately
+2. **Buffer size validation:** If `out_len < required_output_size`, return `-2` immediately (never write past buffer)
+3. **Input size limit:** Reject inputs > 100 MiB (`-4`) to prevent DoS
+4. **Use `std::slice::from_raw_parts()`** with validated lengths, never raw pointer arithmetic
+5. **Zero sensitive stack data:** Use `zeroize` crate for any local copies of key material
+
+**Required output buffer sizes:**
+- `ffi_sha256`: 32 bytes
+- `ffi_hmac_sha256`: 32 bytes
+- `ffi_hkdf_sha256`: caller-specified `out_len`
+- `ffi_aes256gcm_encrypt`: 12 (nonce) + `pt_len` + 16 (tag)
+- `ffi_aes256gcm_decrypt`: `ct_len` - 12 (nonce) - 16 (tag)
+- `ffi_hpke_seal`: 32 (enc) + `pt_len` + 16 (tag)
+- `ffi_hpke_open`: `env_len` - 32 (enc) - 16 (tag)
+- `ffi_ed25519_sign`: 64 bytes
+- `ffi_ed25519_pubkey_from_seed`: 32 bytes
+- `ffi_random_bytes`: caller-specified `len`
+
+**Error codes:**
+- `0` — success
+- `-1` — cryptographic error (decryption failed, signature invalid, etc.)
+- `-2` — output buffer too small
+- `-3` — null pointer
+- `-4` — input too large
+- `-5` — invalid input (wrong key length, malformed data)
+
+**Error details:** Each function writes error details to a thread-local buffer retrievable via `ffi_last_error()`. **IMPORTANT:** The TypeScript wrapper MUST read the error immediately after a failing FFI call, before any subsequent FFI call (which would overwrite the thread-local). The wrapper enforces this by reading `ffi_last_error()` synchronously in the same microtask as the failing call.
 
 ```rust
 // packages/crypto/src/ffi.rs
@@ -175,6 +202,24 @@ The entire codebase standardizes on **AES-256-GCM** as the single AEAD cipher:
 
 XChaCha20-Poly1305 (24-byte nonce) is removed entirely. No production data exists, so no backward compatibility needed.
 
+### Nonce Safety Analysis
+
+AES-256-GCM with random 12-byte nonces has a birthday bound of ~2^48 encryptions per key. To stay well within NIST's recommendation of 2^32 invocations per key with random nonces:
+
+- **HPKE envelopes:** Safe — each `hpke_seal` generates a fresh ephemeral key, so the nonce space resets per operation.
+- **Server-encrypted tier (Tier 1):** Keys are now **epoch-rotated** — derived as `HKDF(SERVER_SECRET, salt=empty, info="{label}:{utc_day_number}", len=32)`. With daily rotation, even at 1M encryptions/day, the nonce collision probability is negligible (~2^-28).
+- **Hub event encryption:** Already epoch-rotated (24h). Same analysis — safe.
+
+The UTC day number (`floor(unix_seconds / 86400)`) is used as epoch to eliminate clock skew concerns across servers.
+
+### WASM Build Target — Removed
+
+The existing `wasm.rs` build target is **deleted**. It is no longer needed because:
+- Desktop crypto routes through Tauri IPC → native Rust (not WASM)
+- There is no browser/PWA mode
+- Playwright tests use the real `.so` via `bun:ffi` (no JS crypto mocks)
+- Client-side Whisper uses `@huggingface/transformers` ONNX (separate from our crypto crate)
+
 ## Build Integration
 
 - `bun run crypto:build:server` — build the `.so` for the current platform
@@ -194,7 +239,9 @@ XChaCha20-Poly1305 (24-byte nonce) is removed entirely. No production data exist
 | Decision | Chosen | Alternative | Rationale |
 |----------|--------|-------------|-----------|
 | FFI vs WASM for server | `bun:ffi` native `.so` | `wasm-pack` WASM module | Native perf, no 4GB memory limit, same build toolchain as mobile |
-| AES-256-GCM everywhere | Single AEAD | Keep XChaCha20 for symmetric | One cipher, aligns with HPKE internal AEAD, simpler audit |
+| AES-256-GCM everywhere | Single AEAD | Keep XChaCha20 for symmetric | One cipher, aligns with HPKE internal AEAD, simpler audit. Epoch-rotated keys keep nonce space safe (2^20 ops/day << 2^32 NIST limit) |
 | Caller-allocated buffers | Caller allocs output | Rust allocs + returns pointer | No cross-boundary heap management, simpler FFI |
-| Thread-local error buffer | `ffi_last_error()` | Return error struct | Simpler C ABI, avoids struct marshaling |
-| Feature-gated `cdylib` | `--features server` | Always build cdylib | Avoids cdylib overhead for desktop/mobile builds |
+| Thread-local error buffer | `ffi_last_error()` | Return error struct | Simpler C ABI, avoids struct marshaling. Wrapper reads immediately after failure (documented constraint) |
+| Feature-gated FFI module | `#[cfg(feature = "server")] pub mod ffi` | Always compile FFI | The `server` feature gates the FFI module (C ABI exports), not the crate-type. `cdylib` is already in crate-type unconditionally and works fine for mobile builds |
+| Delete WASM target | Remove `wasm.rs` entirely | Keep for browser fallback | No browser mode. Desktop uses Tauri IPC. Tests use real `.so`. WASM was only a transition artifact |
+| Mandatory bounds checks | Every function validates buffer sizes | Trust the caller | Raw pointers bypass Rust safety. Buffer overflow is UB. Defensive checks are non-negotiable at FFI boundary |

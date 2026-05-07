@@ -71,6 +71,7 @@ chacha20poly1305 = "0.10"
 | `src/keys_legacy.rs` | ~60 | `src/device_keys.rs` (Ed25519/X25519) |
 | `src/legacy.rs` | ~40 | Nothing |
 | `src/nostr.rs` | ~80 | Nothing (Nostr removed) |
+| `src/wasm.rs` | ~500 | Nothing (WASM target removed — desktop uses Tauri IPC, tests use .so FFI) |
 
 ### lib.rs Update
 
@@ -83,11 +84,21 @@ pub mod encryption_legacy;
 pub mod keys_legacy;
 pub mod legacy;
 pub mod nostr;
+pub mod wasm;  // WASM target removed
 
 // ADD:
 #[cfg(feature = "server")]
 pub mod ffi;
 ```
+
+### Verify OpenMLS Dependency Chain
+
+Before removing `k256` and `chacha20poly1305`, verify that `openmls` (behind the `mls` feature flag) does not transitively depend on them. Run:
+```bash
+cargo tree --manifest-path packages/crypto/Cargo.toml --features mls -i k256
+cargo tree --manifest-path packages/crypto/Cargo.toml --features mls -i chacha20poly1305
+```
+If either returns results, the MLS feature may need those deps retained (gated behind the `mls` feature). OpenMLS uses `openmls_rust_crypto` which typically uses `p256` and `aes-gcm`, not `k256` — but verify.
 
 ### provisioning.rs Rewrite
 
@@ -188,9 +199,25 @@ Update wire format specification:
 
 ### crypto-labels.json
 
-Review all 57 labels. Remove any that reference Nostr-specific operations. Add any new labels needed for:
-- `LABEL_SERVER_SIGNING_KEY` — HKDF label for server Ed25519 keypair
-- `LABEL_WS_EVENT_ENCRYPT` — HKDF label for WebSocket event encryption (if different from existing hub event label)
+Review all labels (do not cite a specific count — it changes). Remove Nostr/ECIES-specific labels:
+
+**Labels to remove:**
+- `LABEL_SERVER_NOSTR_KEY` (`llamenos:server-nostr-key`)
+- `LABEL_SERVER_NOSTR_KEY_INFO` (`llamenos:server-nostr-key:v1`)
+- `LABEL_SERVER_NOSTR_SIGNING_KEY` (`llamenos:server-nostr-signing:v1`)
+- `LABEL_SERVER_NOSTR_SIGNING_KEY_INFO` (`llamenos:server-nostr-signing-info:v1`)
+- `NOSTR_EVENT_TAG` (`llamenos:event`)
+- `LABEL_ECIES_V2_SALT` (`llamenos:ecies:v2`)
+
+**Labels to add:**
+- `LABEL_SERVER_SIGNING_KEY` (`llamenos:server-signing-key:v1`) — HKDF derivation for server Ed25519 keypair
+- `LABEL_SERVER_SIGNING_INFO` (`llamenos:server-signing-key-info:v1`) — HKDF info for same
+- `LABEL_WS_CHALLENGE` (`llamenos:ws-auth:v1`) — WebSocket auth challenge signed message prefix
+- `LABEL_PROVISION_SAS` (`llamenos:provision-sas:v1`) — SAS derivation for device provisioning
+
+**Label ID reassignment is safe** — no production data exists with stored `labelId` values. Reassign IDs to maintain a contiguous registry.
+
+All new labels MUST be added to `crypto-labels.json` (source of truth), then generated to TS/Swift/Kotlin via `bun run codegen`. No local string literals.
 
 ## Development Script Changes
 
@@ -202,6 +229,40 @@ Review all 57 labels. Remove any that reference Nostr-specific operations. Add a
 **Modify:**
 - `dev:server` — add `.so` build as prerequisite (or check if `.so` exists, build if missing)
 - `test:worker` — add `.so` build as prerequisite
+
+## SERVER_SECRET Compromise Recovery
+
+Consolidating to a single `SERVER_SECRET` requires documenting the blast radius and rotation procedure:
+
+**Blast radius if `SERVER_SECRET` is compromised:**
+- Server signing key → attacker can forge WebSocket events
+- All HMAC keys → attacker can compute phone/IP hashes (break blind indexes)
+- All server-side encryption keys → attacker can decrypt contact identifiers, storage credentials
+- All epoch event encryption keys → attacker can decrypt all historical WebSocket events (but NOT E2EE notes/messages — those use per-user HPKE keys)
+
+**Rotation procedure:**
+1. Generate new `SERVER_SECRET` (32 random bytes, hex-encoded)
+2. Re-derive all server keys (signing, HMAC, encryption) — this is automatic via HKDF
+3. Re-encrypt all server-encrypted data (contact identifiers, storage credentials) with new derived keys
+4. HMAC hashes (phone, IP) become **permanently non-verifiable** with the old secret — blind index lookup breaks. Must re-hash all stored identifiers with new HMAC key
+5. Distribute new server signing pubkey to all clients (via `/api/config`)
+6. Old epoch event keys are lost — historical events encrypted with old secret cannot be decrypted (acceptable — these are transient real-time events, not archival data)
+
+**Mitigation:** The E2EE tier (HPKE envelopes for notes, messages, PII) is NOT affected by `SERVER_SECRET` compromise. Those are protected by per-user device keys. The server-encrypted tier is for operational data only.
+
+## Cross-Platform Interop Tests
+
+After all changes, the following cross-platform interop tests MUST pass:
+
+1. **Server FFI seals → Mobile UniFFI opens** (HPKE envelope round-trip)
+2. **Desktop Tauri IPC seals → Server FFI opens** (same)
+3. **All platforms derive same HKDF output** for identical inputs
+4. **All platforms produce same HMAC/SHA-256** for identical inputs
+5. **Auth tokens created by any platform verify on server** (message format identity)
+6. **Label enforcement across FFI boundary** — seal with label A, open with label B → must fail
+7. **AES-256-GCM symmetric round-trip** — server encrypts, mobile decrypts (hub events)
+
+These extend the existing `tests/crypto-interop.spec.ts` and `packages/crypto/tests/interop.rs`.
 
 ## Quality Gates
 
