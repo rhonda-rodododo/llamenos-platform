@@ -220,14 +220,11 @@ async function createRoleAccount(
     storageFile: string
   }
 ) {
-  // Navigate to Users page — wait for the page title, not networkidle
-  // (background polling like Nostr relay and blast-worker prevent networkidle from resolving)
+  // Navigate to Users page — wait for invite-btn (users-page-specific) rather than
+  // generic page-title which may match the departing route during transition.
   await adminPage.getByTestId(TestIds.NAV_VOLUNTEERS).click()
-  await expect(adminPage.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: 10000 })
-
-  // Click "Invite" button
   const inviteBtn = adminPage.getByTestId('invite-btn')
-  await inviteBtn.waitFor({ state: 'visible', timeout: 10000 })
+  await inviteBtn.waitFor({ state: 'visible', timeout: 20000 })
   await inviteBtn.click()
 
   // Fill invite form
