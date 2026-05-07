@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/lib/auth'
 import { useConfig } from '@/lib/config'
 import { useTheme } from '@/lib/theme'
-import { isValidNsec, hasStoredKey } from '@/lib/platform'
+import { isValidSeedHex, hasStoredKey } from '@/lib/platform'
 import { readBackupFile, restoreFromBackupWithPin, restoreFromBackupWithRecoveryKey } from '@/lib/backup'
 import * as keyManager from '@/lib/key-manager'
 import { isWebAuthnAvailable } from '@/lib/webauthn'
@@ -94,7 +94,7 @@ function LoginPage() {
   async function handleNsecSubmit(e: React.FormEvent) {
     e.preventDefault()
     setValidationError('')
-    if (!nsec.trim() || !(await isValidNsec(nsec.trim()))) {
+    if (!nsec.trim() || !isValidSeedHex(nsec.trim())) {
       setValidationError(t('auth.invalidKey'))
       return
     }
@@ -188,11 +188,9 @@ function LoginPage() {
       }
       // Import the recovered key with the new PIN
       try {
-        await keyManager.importKey(recoveredNsec, pin)
+        const pubkeyHex = await keyManager.importKey(recoveredNsec, pin)
         // Key is now in CryptoState — use loginAfterKeyLoaded (not signIn, which would re-import)
-        await loginAfterKeyLoaded(
-          (await import('@/lib/platform').then(m => m.pubkeyFromNsec(recoveredNsec))) ?? '',
-        )
+        await loginAfterKeyLoaded(pubkeyHex)
         navigate({ to: '/' })
       } catch {
         setValidationError(t('common.error'))

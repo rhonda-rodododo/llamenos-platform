@@ -10,7 +10,7 @@
 //! ```
 //!
 //! Canonical auth message (UTF-8, signed directly — no pre-hashing):
-//! ```
+//! ```text
 //! llamenos:device-auth:v1:{pubkey_hex}:{timestamp_ms}:{METHOD}:{path}
 //! ```
 //!

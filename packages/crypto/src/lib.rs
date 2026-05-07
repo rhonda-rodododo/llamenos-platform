@@ -5,7 +5,7 @@
 //! This crate provides all cryptographic operations used across all platforms:
 //! - **Desktop (Tauri v2)**: native Rust dependency
 //! - **Mobile (iOS/Android)**: UniFFI-generated Swift/Kotlin bindings
-//! - **Web browser**: compiled to WASM via wasm-bindgen
+//! - **Server (Bun)**: loaded via bun:ffi as cdylib (feature = "server")
 //!
 //! ## Crypto Architecture (v3)
 //!
@@ -43,8 +43,7 @@ pub mod blind_index;
 pub mod errors;
 pub mod padding;
 
-// === Legacy modules (secp256k1 — kept during transition, removed in Phase 6) ===
-pub mod auth_legacy;
+// === Legacy modules (secp256k1 — kept for mobile ECIES, removed when HPKE migration completes) ===
 pub mod ecies;
 pub mod encryption_legacy;
 pub mod keys_legacy;
@@ -62,6 +61,7 @@ mod ffi;
 mod ffi_v3;
 
 #[cfg(feature = "server")]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub mod ffi_server;
 
 // Re-export core types (new v3 API)

@@ -41,7 +41,7 @@ const MAX_INPUT_SIZE: usize = 100 * 1024 * 1024;
 // ── Thread-local error buffer ──────────────────────────────────────────
 
 thread_local! {
-    static LAST_ERROR: RefCell<Vec<u8>> = RefCell::new(Vec::new());
+    static LAST_ERROR: RefCell<Vec<u8>> = const { RefCell::new(Vec::new()) };
 }
 
 fn set_error(msg: &str) {

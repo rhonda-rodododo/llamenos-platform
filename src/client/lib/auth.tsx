@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import {
-  pubkeyFromNsec,
-  legacyImportNsec,
+  deviceImportAndLoad,
+  isValidSeedHex,
   persistAndUnlockDeviceKeys,
   lockCrypto,
   createAuthToken,
@@ -225,25 +225,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => { mounted = false }
   }, [])
 
-  // Sign in with nsec + PIN (legacy recovery — secp256k1 Nostr key import)
-  // Decodes the bech32 nsec, imports via legacy_import_nsec IPC, persists encrypted.
-  const signIn = useCallback(async (nsec: string, pin: string) => {
+  // Sign in with Ed25519 seed hex + PIN
+  const signIn = useCallback(async (seedHex: string, pin: string) => {
     setState(s => ({ ...s, isLoading: true, error: null }))
-    const pubkeyHex = await pubkeyFromNsec(nsec)
-    if (!pubkeyHex) {
+    if (!isValidSeedHex(seedHex)) {
       setState(s => ({ ...s, isLoading: false, error: 'Invalid secret key' }))
       return
     }
     try {
-      // Decode nsec bech32 to raw hex secret key, import via legacy path
-      const { nip19 } = await import('nostr-tools')
-      const { bytesToHex } = await import('@noble/hashes/utils.js')
-      const decoded = nip19.decode(nsec)
-      if (decoded.type !== 'nsec') throw new Error('Invalid nsec format')
-      const nsecHex = bytesToHex(decoded.data as Uint8Array)
-      // Import and persist the legacy key — key stays unlocked in CryptoState
-      const encrypted = await legacyImportNsec(nsecHex, pin, crypto.randomUUID())
+      // Import Ed25519 seed, encrypt with PIN, persist to store
+      const encrypted = await deviceImportAndLoad(seedHex, pin, crypto.randomUUID())
       await persistAndUnlockDeviceKeys(encrypted, pin)
+      const pubkeyHex = encrypted.state.signingPubkeyHex
       keyManager.markUnlocked(pubkeyHex)
       // Create auth token using CryptoState (nsec never leaves Rust)
       const tokenJson = await createAuthToken(Date.now(), 'POST', '/api/auth/login')

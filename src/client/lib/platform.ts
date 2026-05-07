@@ -131,8 +131,9 @@ export async function deviceImportAndLoad(
 }
 
 /**
+ * @deprecated Use deviceImportAndLoad instead.
  * Import a legacy secp256k1 secret key (nsec hex) as device keys.
- * Used for backward-compatible admin login in tests.
+ * Kept only for Playwright test helpers during transition.
  */
 export async function legacyImportNsec(
   nsecHex: string,
@@ -683,32 +684,10 @@ export async function getPublicKeyFromState(): Promise<string | null> {
 }
 
 /**
- * Derive the secp256k1 x-only pubkey hex from a bech32 nsec string.
- * Used for legacy recovery login. Returns null if the nsec is invalid.
+ * Validate a hex-encoded Ed25519 seed (64 hex chars = 32 bytes).
  */
-export async function pubkeyFromNsec(nsec: string): Promise<string | null> {
-  try {
-    const { nip19, getPublicKey } = await import('nostr-tools')
-    const decoded = nip19.decode(nsec)
-    if (decoded.type !== 'nsec') return null
-    return getPublicKey(decoded.data as Uint8Array)
-  } catch {
-    return null
-  }
-}
-
-/**
- * Validate a bech32 nsec string.
- * Returns true if the string is a valid nsec (secp256k1 private key).
- */
-export async function isValidNsec(nsec: string): Promise<boolean> {
-  try {
-    const { nip19 } = await import('nostr-tools')
-    const decoded = nip19.decode(nsec)
-    return decoded.type === 'nsec'
-  } catch {
-    return false
-  }
+export function isValidSeedHex(seedHex: string): boolean {
+  return /^[0-9a-f]{64}$/i.test(seedHex)
 }
 
 /** @deprecated Use ed25519Verify instead. */
@@ -1031,20 +1010,12 @@ export async function generateBackupFromState(
 
 /**
  * Generate an ephemeral Ed25519 keypair for admin-created users.
- * Returns the hex-encoded signing seed as "nsec" for backward compat with callers.
- * The public key is the Ed25519 signing pubkey hex.
+ * Returns the hex-encoded signing seed. The public key is the Ed25519 signing pubkey hex.
  */
 export async function generateEphemeralKeypair(): Promise<EphemeralKeyPair> {
   if (useTauri) {
-    // Use the mock/Rust to generate a random Ed25519 seed and derive pubkey
     const result = await tauriInvoke<{ signingPubkeyHex: string; seedHex: string }>('generate_ephemeral_ed25519')
-    // Encode the 32-byte seed as bech32 nsec1... format for display purposes.
-    // seedHex is exposed separately so loginAsVolunteer can use deviceImportAndLoad (Ed25519).
-    const { nip19 } = await import('nostr-tools')
-    const seedBytes = new Uint8Array(result.seedHex.match(/.{2}/g)!.map(h => parseInt(h, 16)))
-    const nsec = nip19.nsecEncode(seedBytes)
-    const npub = nip19.npubEncode(result.signingPubkeyHex)
-    return { publicKey: result.signingPubkeyHex, npub, nsec, seedHex: result.seedHex }
+    return { publicKey: result.signingPubkeyHex, npub: '', nsec: result.seedHex, seedHex: result.seedHex }
   }
   throw new Error('WASM ephemeral keypair not yet implemented')
 }
