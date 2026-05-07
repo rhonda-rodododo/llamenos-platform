@@ -5,7 +5,7 @@ describe('validateConfig', () => {
   const validEnv = {
     DATABASE_URL: 'postgresql://llamenos:dev@localhost:5432/llamenos',
     HMAC_SECRET: 'a'.repeat(64),
-    SERVER_NOSTR_SECRET: 'b'.repeat(64),
+    SERVER_SECRET: 'b'.repeat(64),
     ADMIN_PUBKEY: 'c'.repeat(64),
     HOTLINE_NAME: 'Test Hotline',
     ENVIRONMENT: 'test',
@@ -43,12 +43,17 @@ describe('validateConfig', () => {
     expect(() => validateConfig({ ...validEnv, HMAC_SECRET: 'z'.repeat(64) })).toThrow(/HMAC_SECRET/)
   })
 
-  it('throws if SERVER_NOSTR_SECRET is missing', () => {
-    expect(() => validateConfig({ ...validEnv, SERVER_NOSTR_SECRET: '' })).toThrow(/SERVER_NOSTR_SECRET/)
+  it('throws if SERVER_SECRET is missing', () => {
+    expect(() => validateConfig({ ...validEnv, SERVER_SECRET: '' })).toThrow(/SERVER_SECRET/)
   })
 
-  it('throws if SERVER_NOSTR_SECRET is wrong length', () => {
-    expect(() => validateConfig({ ...validEnv, SERVER_NOSTR_SECRET: 'a'.repeat(63) })).toThrow(/SERVER_NOSTR_SECRET/)
+  it('throws if SERVER_SECRET is wrong length', () => {
+    expect(() => validateConfig({ ...validEnv, SERVER_SECRET: 'a'.repeat(63) })).toThrow(/SERVER_SECRET/)
+  })
+
+  it('accepts legacy SERVER_NOSTR_SECRET when SERVER_SECRET is absent', () => {
+    const { SERVER_SECRET: _, ...rest } = validEnv
+    expect(() => validateConfig({ ...rest, SERVER_NOSTR_SECRET: 'b'.repeat(64) })).not.toThrow()
   })
 
   it('throws if ADMIN_PUBKEY is missing', () => {
