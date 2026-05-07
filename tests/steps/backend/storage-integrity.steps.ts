@@ -100,7 +100,7 @@ Given('a {string} entity is created via the API with structured JSONB data', asy
           authorEnvelope: volEnv,
           adminEnvelopes: [{ pubkey: adminPubkey, ...adminEnv }],
         },
-        volKp.nsec,
+        volKp.seedHex,
       )
       expect([200, 201]).toContain(status)
       getStorageIntegrityState(world).entityIds.set(entityType, data.id as string)
@@ -229,7 +229,7 @@ When('the {string} is fetched via the API', async ({ request, world }, entityTyp
       const { status, data } = await apiGet<{ notes: Array<Record<string, unknown>> }>(
         request,
         '/notes',
-        volKp?.nsec,
+        volKp?.seedHex,
       )
       expect(status).toBe(200)
       const note = data.notes.find(n => n.id === id)
@@ -324,7 +324,7 @@ When('the volunteer creates a note with real HPKE envelopes', async ({ request, 
       authorEnvelope: authorEnv,
       adminEnvelopes: getStorageIntegrityState(world).submittedEnvelopes,
     },
-    getStorageIntegrityState(world).volunteerKp!.nsec,
+    getStorageIntegrityState(world).volunteerKp!.seedHex,
   )
   expect([200, 201]).toContain(status)
   const noteData = (data.note as Record<string, unknown> | undefined) ?? data
@@ -339,7 +339,7 @@ When('the note is fetched via the API', async ({ request, world }) => {
   const { status, data } = await apiGet<{ notes: Array<Record<string, unknown>> }>(
     request,
     '/notes',
-    getStorageIntegrityState(world).volunteerKp?.nsec,
+    getStorageIntegrityState(world).volunteerKp?.seedHex,
   )
   expect(status).toBe(200)
   const note = data.notes.find(n => n.id === id)

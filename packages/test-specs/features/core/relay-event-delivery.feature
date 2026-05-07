@@ -1,7 +1,7 @@
 @backend
 Feature: Real-Time Relay Event Delivery
-  The Nostr relay must deliver server-published events to subscribers.
-  Every state mutation that publishes a Nostr event must result in
+  The WebSocket relay must deliver server-published events to subscribers.
+  Every state mutation that publishes a relay event must result in
   the event arriving at the relay within 5 seconds.
 
   Background:

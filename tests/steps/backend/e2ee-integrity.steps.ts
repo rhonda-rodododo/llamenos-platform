@@ -158,7 +158,7 @@ When(
         authorEnvelope: volEnvelope ?? {},
         adminEnvelopes,
       },
-      volKp.nsec,
+      volKp.seedHex,
     )
     expect([200, 201]).toContain(status)
     getE2EEIntegrityState(world).noteId = data.note?.id
@@ -207,7 +207,7 @@ When('the encrypted note is submitted via the API by {string}', async ({ request
       authorEnvelope: volEnvelope ?? {},
       adminEnvelopes,
     },
-    volKp.nsec,
+    volKp.seedHex,
   )
   expect([200, 201]).toContain(status)
   getE2EEIntegrityState(world).noteId = data.note?.id
@@ -222,7 +222,7 @@ When('volunteer {string} fetches the note', async ({ request, world }, volName: 
   const { status, data } = await apiGet<{ notes: Array<Record<string, unknown>> }>(
     request,
     '/notes',
-    volKp.nsec,
+    volKp.seedHex,
   )
   expect(status).toBe(200)
 
@@ -286,7 +286,7 @@ When(
         authorEnvelope: volEnvelope ?? {},
         adminEnvelopes,
       },
-      kp.nsec,
+      kp.seedHex,
     )
     expect([200, 201]).toContain(status)
     getE2EEIntegrityState(world).noteId = data.note?.id
@@ -334,7 +334,7 @@ When('the encrypted note is submitted via the API with real envelopes', async ({
       authorEnvelope: volEnvelope ?? {},
       adminEnvelopes,
     },
-    volKp.nsec,
+    volKp.seedHex,
   )
   expect([200, 201]).toContain(status)
   getE2EEIntegrityState(world).noteId = data.note?.id

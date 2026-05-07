@@ -1,7 +1,7 @@
 /**
- * Step definitions for Nostr relay event delivery BDD scenarios.
+ * Step definitions for WebSocket relay event delivery BDD scenarios.
  *
- * Uses RelayCapture to subscribe to the local strfry instance and assert
+ * Uses RelayCapture to subscribe to the in-process WebSocket relay and assert
  * that server-published events arrive within the expected timeframe.
  */
 import { expect } from '@playwright/test'
@@ -16,12 +16,14 @@ import {
   simulateIncomingMessage,
   uniqueCallerNumber,
 } from '../../simulation-helpers'
-import { ed25519Verify, sha256 } from '@llamenos/crypto/ffi'
+import { ed25519Verify } from '@llamenos/crypto/ffi'
 import { hexToBytes, utf8ToBytes } from '@shared/encoding'
-import { deriveServerEventKey, decryptHubEvent, getCurrentEpoch } from '../../helpers/relay-crypto'
+import { deriveServerEventKey, decryptHubEvent } from '../../helpers/relay-crypto'
+import { WS_PROTOCOL_VERSION } from '@protocol/schemas/ws-messages'
+import { ADMIN_SEED } from '../../api-helpers'
 
-const RELAY_URL = process.env.TEST_RELAY_URL || 'ws://localhost:7777'
 const BASE_URL = process.env.TEST_HUB_URL || 'http://localhost:3000'
+const WS_URL = BASE_URL.replace(/^http/, 'ws') + '/ws'
 // Default dev secret from scripts/dev-node.sh — used for event decryption in tests
 const DEV_SERVER_SECRET = '0000000000000000000000000000000000000000000000000000000000000001'
 
@@ -48,9 +50,14 @@ Given('the test relay is connected and capturing events', async ({ world }) => {
   if (state.relayCapture) {
     state.relayCapture.close()
   }
-  // Pass hubId to scope the subscription — prevents cross-scenario relay event contamination
-  // when 3 Playwright workers run in parallel and events from other hubs leak in.
-  state.relayCapture = await RelayCapture.connect(RELAY_URL, state.hubId ?? undefined)
+  // Use the admin seed for WS authentication — admin is always registered and
+  // has membership in all hubs. The hubId scopes the subscription to prevent
+  // cross-scenario event contamination under parallel test workers.
+  state.relayCapture = await RelayCapture.connect(
+    WS_URL,
+    state.hubId ?? undefined,
+    ADMIN_SEED,
+  )
 })
 
 After(async ({ world }) => {
@@ -166,6 +173,7 @@ Then(
 Then('the raw event content should NOT be valid JSON', async ({ world }) => {
   const rs = getRelayState(world)
   expect(rs.lastCapturedEvent).toBeTruthy()
+  // In the WS relay, encrypted content is hex-encoded ciphertext, not JSON
   let isJson = false
   try {
     JSON.parse(rs.lastCapturedEvent!.content)
@@ -188,23 +196,32 @@ Then(
   async ({ world }, tagName: string, tagValue: string) => {
     const rs = getRelayState(world)
     expect(rs.lastCapturedEvent).toBeTruthy()
+    // Tags are synthesized from WS event fields for backward compatibility:
+    // ['t', 'llamenos:event'] — all relay events
+    // ['d', hubId] — hub scope
     const tag = rs.lastCapturedEvent!.tags.find((t) => t[0] === tagName && t[1] === tagValue)
     expect(tag).toBeTruthy()
   },
 )
 
-Then('the event signature should be valid', async ({ world }) => {
+Then('the event signature should be valid', async ({ request, world }) => {
   const rs = getRelayState(world)
   expect(rs.lastCapturedEvent).toBeTruthy()
   const event = rs.lastCapturedEvent!
 
-  // The relay is now a native WebSocket relay with Ed25519 signatures.
-  // The CapturedEvent still carries pubkey + sig fields from the relay wire format.
-  // Verify by hashing the event ID and checking the Ed25519 signature.
-  const messageHash = sha256(utf8ToBytes(event.id))
+  // Fetch server pubkey if we don't have it yet
+  if (!rs.serverPubkey) {
+    const res = await request.get(`${BASE_URL}/api/config`)
+    const config = (await res.json()) as { serverPubkey?: string }
+    rs.serverPubkey = config.serverPubkey
+  }
+  expect(rs.serverPubkey).toBeTruthy()
+
+  // Reconstruct the signed message: "${v}:${hubId}:${kind}:${epoch}:${payload}:${ts}"
+  const sigMessage = `${event.v}:${event.hubId}:${event.kind}:${event.epoch}:${event.payload}:${event.ts}`
   const valid = ed25519Verify(
-    hexToBytes(event.pubkey),
-    messageHash,
+    hexToBytes(rs.serverPubkey!),
+    utf8ToBytes(sigMessage),
     hexToBytes(event.sig),
   )
   expect(valid).toBe(true)
@@ -218,9 +235,20 @@ Then("the event pubkey should match the server's configured pubkey", async ({ re
     const config = (await res.json()) as { serverPubkey?: string }
     rs.serverPubkey = config.serverPubkey
   }
-  if (rs.serverPubkey) {
-    expect(rs.lastCapturedEvent!.pubkey).toBe(rs.serverPubkey)
-  }
+  // In the WS relay, the server signs events with its Ed25519 key.
+  // We verify the signature against the server pubkey (done in "signature should be valid").
+  // This step confirms the server pubkey is configured and matches expectations.
+  expect(rs.serverPubkey).toBeTruthy()
+
+  // Verify the signature was made with this pubkey
+  const event = rs.lastCapturedEvent!
+  const sigMessage = `${event.v}:${event.hubId}:${event.kind}:${event.epoch}:${event.payload}:${event.ts}`
+  const valid = ed25519Verify(
+    hexToBytes(rs.serverPubkey!),
+    utf8ToBytes(sigMessage),
+    hexToBytes(event.sig),
+  )
+  expect(valid).toBe(true)
 })
 
 // --- Helpers ---
@@ -228,11 +256,12 @@ Then("the event pubkey should match the server's configured pubkey", async ({ re
 /**
  * Decrypt event content using the server event key derived from SERVER_SECRET.
  *
- * Format: hex(nonce_24 || ciphertext)
- * Algorithm: XChaCha20-Poly1305
- * Key derivation: HKDF(SHA-256, secret, salt=empty, info="llamenos:hub-event", 32)
+ * Format: hex(nonce_12 || ciphertext || tag_16)
+ * Algorithm: AES-256-GCM with padded plaintext
+ * Key derivation: HKDF(SHA-256, secret, salt=LABEL_SERVER_EVENT_ENCRYPTION_KEY,
+ *                       info="llamenos:hub-event-epoch:{epoch}", 32)
  *
- * Falls back to direct JSON parse for unencrypted content (shouldn't happen in prod).
+ * Falls back to direct JSON parse for unencrypted content.
  */
 function decryptEventContent(event: CapturedEvent): Record<string, unknown> | null {
   // Try direct JSON parse first (unencrypted fallback)
@@ -249,11 +278,9 @@ function decryptEventContent(event: CapturedEvent): Record<string, unknown> | nu
   }
 
   try {
-    // Extract epoch from event tags — server embeds ['epoch', epochNum] for forward secrecy
-    const epochTag = event.tags.find(t => t[0] === 'epoch')
-    const epoch = epochTag ? parseInt(epochTag[1], 10) : getCurrentEpoch()
+    const epoch = event.epoch
     const eventKey = deriveServerEventKey(secret, undefined, epoch)
-    return decryptHubEvent(event.content, eventKey)
+    return decryptHubEvent(event.content, eventKey, epoch)
   } catch (err) {
     console.warn('[relay.steps] Failed to decrypt event content:', err)
     return null
