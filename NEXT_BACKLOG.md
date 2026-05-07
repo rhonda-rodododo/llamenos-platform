@@ -48,26 +48,36 @@ Getting Android Cucumber BDD E2E tests passing in CI. Tests run on emulator with
   - `ActiveCall` deserialization (`@SerialName("callId")` mapping)
   - Hub refresh via `triggerHubRefresh()` (replaced unreliable swipe gesture)
 - [x] CI speedup: removed `android-build-test` gate from `android-e2e` job (saves ~3 min)
+- [x] PR #224 (merged) — Active call card fixes:
+  - `SharedFlow<Unit>` refresh trigger in `ActiveHubState` (avoids StateFlow conflation)
+  - Hub creation retry (3 attempts with backoff), increased timeouts
+  - Real device pubkey for `simulateAnswerCall`, diagnostic logging
+  - Desktop E2E: +22 passed (582 vs 560), -23 failed (64 vs 87) — net improvement
+  - Active call still failing (ComposeTimeoutException) — continued in PR #228
 
 ### Open PR
-- [ ] PR #224 (`feat/android-e2e-active-call-fix`) — Fixes active call card never rendering:
-  - Root cause: `SimulationClient.createTestHub()` timeouts → `currentHubId` stays empty → everything silently no-ops
-  - Added `SharedFlow<Unit>` refresh trigger in `ActiveHubState` (avoids StateFlow conflation)
-  - Hub creation retry (3 attempts with backoff)
-  - Increased SimulationClient timeouts (10s→30s connect, 15s→30s read)
-  - Added logging to `DashboardViewModel.fetchActiveCall()` (CI logcat was empty before)
-  - Uses real device pubkey for `simulateAnswerCall` instead of hardcoded "admin"
-  - **Status**: CI running — merge if net improvement, iterate if not
+- [ ] PR #228 (`feat/android-e2e-observability`) — Three root causes fixed:
+  1. **CI logcat was always empty**: Emulator dies when `android-emulator-runner` script ends,
+     before the separate "Collect logcat" step runs. Fixed: background `adb logcat` DURING tests.
+  2. **Hub-scoped CMS data missing**: `test-setup-cms` created records with `hubId: ""` but
+     the app queries via `/api/hubs/{id}/records` which filters by hubId. Records were invisible.
+     Fixed: accepts `hubId` parameter, passes through to record creation.
+  3. **Collapsible settings section**: Hub management/switching tests tried to click
+     `settings-hub-card` inside a collapsed `AnimatedVisibility` section. Fixed: expand first.
+  - Also: ScenarioHooks fail-fast (throws on hub creation failure), diagnostic logging
+  - **Status**: CI running — expect Hub Management (+4), CMS data tests, Triage improvements
 
-### Remaining E2E Failures (after active-call is fixed)
-- [ ] Hub Management (4 scenarios) — navigation to hub settings, collapsible section expansion
-- [ ] Hub Switching (2 scenarios) — two-hub setup, switching active hub
-- [ ] CMS/Cases (6 scenarios) — `theAppIsLaunchedAndAuthenticatedAsAdmin()` flow, admin promotion
-- [ ] Triage Queue (3 scenarios) — depends on CMS setup working
-- [ ] Event Management (2 detail scenarios) — needs event data created via test endpoint
+### Remaining E2E Failures (expected after PR #228)
+- [ ] Active Call (5 scenarios) — card never appears despite correct hub, auth, and call simulation.
+  Root cause still unknown. Logcat from PR #228 will reveal whether `fetchActiveCall()` returns
+  data or fails silently. Possible: auth interceptor not sending headers, or DashboardViewModel
+  refresh not triggering properly.
+- [ ] CMS detail interaction (status picker, comments) — may be fixed by hub-scoped data fix
+- [ ] Event Management detail (2 scenarios) — depends on event records being hub-scoped (fixed)
+- [ ] Triage detail (3 scenarios) — depends on CMS setup being hub-scoped (fixed)
 
 ### Key Architecture Notes
-- Worktree: `/media/rikki/recover2/projects/llamenos-android-e2e-iterate-192`
+- Worktree: `~/projects/llamenos-android-e2e-observability`
 - Backend test endpoints: `apps/worker/routes/dev.ts` (gated by `ENVIRONMENT=development` + `X-Test-Secret`)
 - Hub isolation: `ScenarioHooks.kt` creates hub per scenario, sets `ActiveHubState`
 - All API calls hub-scoped via `ApiService.hp()` → `/api/hubs/{hubId}/...`
@@ -76,11 +86,23 @@ Getting Android Cucumber BDD E2E tests passing in CI. Tests run on emulator with
 - CI: Docker Compose test overlay, 2-shard parallel, emulator API 34 x86_64
 - Local testing: `emulator -avd test-emu-0`, `adb reverse tcp:3000 tcp:3000`, `bun run dev:server`
 
+### Root Causes Found (2026-05-07)
+- **Empty logcat**: `reactivecircus/android-emulator-runner` kills emulator when its script block
+  exits. Post-step `adb logcat -d` finds no device. Fix: background capture inside script.
+- **Invisible CMS records**: `test-setup-cms` created all records with `hubId: ""`. App queries
+  `GET /api/hubs/{testHubId}/records` which filters `WHERE hubId = ?`. Empty hubId never matches.
+- **Collapsed settings section**: `SettingsSection` uses `AnimatedVisibility(visible = expanded)`.
+  Content nodes don't exist in semantics tree when collapsed. `performScrollTo()` and
+  `performClick()` fail silently (caught by try/catch).
+- **Silent ScenarioHooks failure**: `createTestHub()` caught all exceptions and logged at WARN
+  level but didn't throw. `currentHubId` stayed empty, `@Before(order=2)` returned early,
+  `ActiveHubState` never set, all `hp()` calls returned bare paths.
+
 ### Debugging Tips
-- CI logcat artifacts are usually empty (emulator killed before collection)
-- Test locally with `adb logcat | grep -iE "ActiveCallSteps|SimulationClient|DashboardViewModel|ApiService|401|403"`
+- CI logcat: After PR #228, logcat should be populated (background capture during tests)
+- Filter logcat: `grep -iE "ScenarioHooks|SimulationClient|DashboardViewModel|CaseListSteps|ActiveCallSteps"`
 - Curl test endpoints directly to verify backend flow works
-- `DashboardViewModel.fetchActiveCall()` now has logging (after PR #224)
+- `DashboardViewModel.fetchActiveCall()` has logging (after PR #224)
 
 ## Pending (Future Sessions)
 
