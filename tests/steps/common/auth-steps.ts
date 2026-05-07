@@ -8,8 +8,7 @@ import {
   loginAsAdmin,
   loginAsVolunteer,
   enterPin,
-  nsecToHex,
-  ADMIN_NSEC,
+  ADMIN_SEED,
   TEST_PIN,
   Timeouts,
   TestIds,
@@ -42,7 +41,7 @@ Given('no identity exists on the device', async ({ page }) => {
 Given('an identity exists with PIN {string}', async ({ page }, pin: string) => {
   // Pre-load the admin key encrypted with the given PIN using the test platform shim.
   // This simulates a returning user who has set up their identity and locked the app.
-  const secretHex = nsecToHex(ADMIN_NSEC)
+  const secretHex = ADMIN_SEED
 
   await page.goto('/login')
   await page.evaluate(() => {
@@ -108,7 +107,7 @@ Given('I have a stored identity with PIN {string}', async ({ page }, pin: string
   // Uses legacyImportNsec so the admin nsec is stored and locked — leaving the app in the
   // "locked, PIN required" state that PIN setup/unlock scenarios test.
   const normalizedPin = pin.padEnd(8, '0')
-  const secretHex = nsecToHex(ADMIN_NSEC)
+  const secretHex = ADMIN_SEED
 
   await page.goto('/login')
   await page.evaluate(() => {
