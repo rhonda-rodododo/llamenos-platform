@@ -203,6 +203,11 @@ dev.post('/test-setup-cms', async (c) => {
   const services = c.get('services')
   const templateId = 'jail-support'
 
+  // Seed default roles if empty — the server doesn't call ensureInit() at startup,
+  // so the roles table may be empty in CI (Docker Compose fresh database).
+  // Without roles, resolvePermissions returns [] for all users → "Access denied" everywhere.
+  await services.settings.ensureInit({ ENVIRONMENT: c.env.ENVIRONMENT })
+
   // 0. Grant the default volunteer role cases:read permission so test
   //    identities (who register as volunteers during onboarding) can see
   //    all records without explicit assignment.
@@ -742,6 +747,12 @@ dev.post('/test-create-hub', async (c) => {
   const denied = simulationGuard(c)
   if (denied) return denied
 
+  // Seed default roles/settings if this is the first request to a fresh database.
+  // Docker Compose CI starts with empty tables — without seeding, all hub-scoped
+  // requests fail with "Access denied" because resolvePermissions finds no role defs.
+  const services = c.get('services')
+  await services.settings.ensureInit({ ENVIRONMENT: c.env.ENVIRONMENT })
+
   const rawBody = await c.req.json().catch(() => ({}))
   const hubName = typeof rawBody === 'object' && rawBody !== null && 'name' in rawBody && typeof rawBody.name === 'string'
     ? rawBody.name
@@ -759,7 +770,6 @@ dev.post('/test-create-hub', async (c) => {
     updatedAt: new Date().toISOString(),
   }
 
-  const services = c.get('services')
   try {
     await services.settings.createHub(hub)
   } catch (err) {
