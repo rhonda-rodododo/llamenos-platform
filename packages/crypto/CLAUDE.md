@@ -7,30 +7,28 @@ Shared Rust cryptographic core for the Llamenos crisis response hotline platform
 This crate provides a single, auditable implementation of all cryptographic operations across all platforms:
 
 - **Desktop (Tauri v2)**: Linked as a native Rust dependency (`apps/desktop/Cargo.toml` path dep)
+- **Server (Bun)**: Loaded as cdylib via `bun:ffi` (feature = "server"). Wrapper at `packages/crypto/ffi.ts`.
 - **iOS (native SwiftUI)**: Exposed via UniFFI XCFramework (`build-mobile.sh ios`)
 - **Android (native Kotlin/Compose)**: Exposed via UniFFI JNI `.so` files (`build-mobile.sh android`)
-- **Browser (test builds only)**: Compiled to WebAssembly via `wasm-bindgen`
 
 ## Modules
 
 | Module | Purpose |
 |--------|---------|
-| `labels` | 57 domain separation constants (source of truth: `../../packages/protocol/crypto-labels.json`) |
-| `hpke_envelope` | HPKE key wrapping/unwrapping (RFC 9180 X25519-HKDF-SHA256-AES256-GCM) — current |
-| `ecies` | Legacy ECIES (secp256k1 ECDH + XChaCha20-Poly1305) — scheduled for removal |
-| `encryption` | Per-note/message/file envelope encryption (HPKE); legacy decryption path |
+| `labels` | Domain separation constants (source of truth: `../../packages/protocol/crypto-labels.json`) |
+| `hpke_envelope` | HPKE key wrapping/unwrapping (RFC 9180 X25519-HKDF-SHA256-AES256-GCM) |
+| `encryption` | Per-note/message/file envelope encryption (HPKE + AES-256-GCM) |
 | `device_keys` | Ed25519 signing + X25519 encryption keypair generation and PIN-protected storage |
 | `sigchain` | Append-only, hash-chained, Ed25519-signed device authorization records |
 | `puk` | Per-User Key hierarchy + Cascading Lazy Key Rotation (CLKR) |
-| `auth` | Ed25519 auth token generation/verification; legacy Schnorr path |
+| `auth` | Ed25519 auth token generation/verification |
 | `blind_index` | Blind indexing for server-side E2EE search (HMAC-SHA256) |
-| `provisioning` | Ephemeral ECDH device provisioning with SAS verification |
+| `provisioning` | Ephemeral X25519 device provisioning with SAS verification |
 | `mls` | MLS group management (RFC 9420, OpenMLS 0.8) |
 | `sframe` | SFrame voice E2EE key derivation |
 | `padding` | Power-of-2 payload padding (traffic analysis mitigation) |
-| `nostr` | Nostr key derivation from `SERVER_NOSTR_SECRET` |
 | `ffi`, `ffi_v3` | UniFFI bindings for iOS/Android |
-| `wasm` | WASM exports for browser test builds |
+| `ffi_server` | C ABI exports for bun:ffi server bridge |
 
 ## Protocol Compatibility
 
@@ -44,6 +42,7 @@ bun run crypto:test          # cargo test
 bun run crypto:test:mobile   # cargo test --features mobile (UniFFI tests)
 bun run crypto:clippy        # cargo clippy
 bun run crypto:fmt           # cargo fmt --check
+bun run crypto:build:server  # Build libllamenos_core.so for bun:ffi
 
 # Mobile build:
 ./scripts/build-mobile.sh ios      # Build iOS XCFramework
@@ -52,9 +51,15 @@ bun run crypto:fmt           # cargo fmt --check
 
 ## Feature Flags
 
+- `server` — Enable C ABI exports for bun:ffi server bridge. Used by `packages/crypto/ffi.ts`.
 - `mobile` — Enable UniFFI scaffolding for iOS/Android. Required for library builds targeting mobile. Without it, the static archive has zero UniFFI symbols.
 - `uniffi-bindgen` — Extends `mobile` with the `uniffi-bindgen` CLI tool.
 
-## Legacy Notes
+## Crypto Primitives
 
-`ecies.rs`, `keys_legacy.rs`, `auth_legacy.rs`, `encryption_legacy.rs` contain the old secp256k1/ECIES/Schnorr/nsec implementations. These are kept for decrypting existing data and are being phased out. All new code uses HPKE + Ed25519/X25519.
+- **Signing**: Ed25519 (ed25519-dalek)
+- **Key agreement**: X25519 (x25519-dalek)
+- **Envelope encryption**: HPKE RFC 9180 (DHKEM(X25519) + HKDF-SHA256 + AES-256-GCM)
+- **Symmetric AEAD**: AES-256-GCM (sole AEAD — no XChaCha20-Poly1305)
+- **KDF**: HKDF-SHA256
+- **PIN/passphrase**: Argon2id (64MB, 3 iterations, 4 parallelism)

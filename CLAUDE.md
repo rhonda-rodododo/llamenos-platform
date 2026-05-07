@@ -18,7 +18,7 @@ Monorepo containing all platforms, shared crypto, and protocol definitions:
 | `apps/worker/` | Bun HTTP server (Hono + PostgreSQL; directory name retained — rename is separate epic) |
 | `apps/ios/` | Native SwiftUI iOS client |
 | `apps/android/` | Native Kotlin/Compose Android client |
-| `packages/crypto/` | Shared Rust crypto crate (native + WASM + UniFFI) |
+| `packages/crypto/` | Shared Rust crypto crate (native + bun:ffi + UniFFI) |
 | `packages/shared/` | Cross-boundary TypeScript types and config |
 | `packages/protocol/` | JSON Schema definitions + codegen (TS/Swift/Kotlin) |
 | `packages/i18n/` | Localization files + iOS/Android string codegen |
@@ -33,10 +33,10 @@ All platforms implement the same protocol: `docs/protocol/PROTOCOL.md`
 - **iOS**: Native SwiftUI (iOS 17+, `@Observable`, SPM)
 - **Android**: Native Kotlin 2.3/Compose (minSdk 26, Material 3, Hilt DI + KSP, AGP 9.1, Gradle 9.4)
 - **Backend**: Bun + PostgreSQL (self-hosted), Cloudflare Workers (marketing site only)
-- **Shared Crypto**: `packages/crypto/` Rust crate — single auditable implementation for all platforms (native, WASM, UniFFI)
+- **Shared Crypto**: `packages/crypto/` Rust crate — single auditable implementation for all platforms (native Tauri, bun:ffi server, UniFFI mobile)
 - **Protocol**: `packages/protocol/` JSON Schema → codegen (TypeScript, Swift, Kotlin via quicktype-core)
 - **Telephony**: 8 providers via `TelephonyAdapter` interface (Twilio, SignalWire, Vonage, Plivo, Telnyx, Bandwidth, Asterisk, FreeSWITCH). `SipBridgeAdapter` base class for ARI/ESL/Kamailio backends. `PBX_TYPE` env var selects backend for `sip-bridge/`.
-- **Auth**: Nostr keypairs (BIP-340 Schnorr signatures) + WebAuthn session tokens for multi-device support; Ed25519/X25519 per-device keys for E2EE
+- **Auth**: Ed25519 device keys (per-device signing) + WebAuthn session tokens for multi-device support; X25519 per-device keys for HPKE E2EE
 - **i18n**: `packages/i18n/` — 13 locales + codegen for iOS `.strings` and Android `strings.xml`
 - **Deployment**: Docker Compose / Helm (VPS self-hosted), Cloudflare Tunnels for ingress. EU/GDPR-compatible.
 - **Testing**: E2E via Playwright (desktop), XCUITest (iOS), Compose UI tests (Android); Rust tests via `cargo test`
@@ -88,8 +88,8 @@ apps/
     app/src/main/     # Kotlin source (crypto/, api/, ui/, di/, service/)
     gradle/           # Version catalog (libs.versions.toml)
 packages/
-  crypto/             # Shared Rust crypto crate (native + WASM + UniFFI)
-    src/              # Rust source (HPKE/X25519-HKDF-SHA256-AES256-GCM, Ed25519/Schnorr, PBKDF2, HKDF, XChaCha20-Poly1305, SFrame, MLS)
+  crypto/             # Shared Rust crypto crate (native + bun:ffi + UniFFI)
+    src/              # Rust source (HPKE/X25519-HKDF-SHA256-AES256-GCM, Ed25519, AES-256-GCM, HKDF, SFrame, MLS)
     scripts/          # Build scripts (build-mobile.sh for iOS/Android)
     Cargo.toml        # Crate config
   shared/             # Cross-boundary TypeScript types and config
@@ -101,7 +101,7 @@ packages/
     tools/schema-registry.ts  # Maps 85+ Zod schemas to named JSON Schemas
     openapi-snapshot.json     # OpenAPI spec snapshot (written by dev server on startup)
     generated/        # Auto-generated types — GITIGNORED (typescript/, swift/, kotlin/)
-    crypto-labels.json # 57 domain separation constants (source of truth)
+    crypto-labels.json # Domain separation constants (source of truth)
   i18n/               # Localization package
     locales/          # 13 locale JSON files (en, es, zh, tl, vi, ar, fr, ht, ko, ru, hi, pt, de)
     languages.ts      # Language config (codes, labels, Twilio voice IDs)
@@ -136,37 +136,36 @@ docs/
 - **Shift routing**: Automated, recurring schedule with ring groups. Fallback group if no schedule is defined.
 - **E2EE notes**: Per-note forward secrecy — unique random key per note, HPKE-wrapped for each reader via PUK (Per-User Key). PUK → items_key → per-note content key (cascading lazy key rotation). Dual-encrypted: one copy for volunteer, one for each admin (multi-admin envelopes).
 - **E2EE messaging**: Per-message envelope encryption — random symmetric key, HPKE-wrapped for assigned volunteer + each admin. Server encrypts inbound on webhook receipt, discards plaintext immediately.
-- **HPKE crypto**: RFC 9180 X25519-HKDF-SHA256-AES256-GCM replaces secp256k1 ECIES everywhere. Ed25519/X25519 per-device keys (no more single nsec per user). Label enforcement at decrypt (Albrecht defense — 57 domain separation labels).
+- **HPKE crypto**: RFC 9180 X25519-HKDF-SHA256-AES256-GCM for all key wrapping. Ed25519/X25519 per-device keys. AES-256-GCM as sole AEAD. Label enforcement at decrypt (Albrecht defense).
 - **User sigchain**: Append-only hash-chained, Ed25519-signed device authorization records. PUK (Per-User Key) with Cascading Lazy Key Rotation. MLS via OpenMLS (behind `mls` feature flag) for hub state.
 - **SFrame voice E2EE**: Key derivation integrated into `packages/crypto` for encrypted voice channel media.
 - **Platform abstraction**: `src/client/lib/platform.ts` is Tauri-only — all crypto calls route through Rust via IPC. Device private keys NEVER enter the webview. Always import from `platform.ts`, never from `@tauri-apps/*` directly.
-- **packages/crypto**: Shared Rust crypto crate (formerly separate `llamenos-core` repo). All crypto operations (HPKE, Ed25519/Schnorr, PBKDF2, HKDF, XChaCha20-Poly1305, SFrame, MLS) implemented once in Rust, compiled to native (Tauri), WASM (browser), and UniFFI (mobile). Desktop links via `apps/desktop/Cargo.toml` path dep to `../../packages/crypto`.
+- **packages/crypto**: Shared Rust crypto crate (formerly separate `llamenos-core` repo). All crypto operations (HPKE, Ed25519, AES-256-GCM, HKDF, SFrame, MLS) implemented once in Rust, compiled to native (Tauri), cdylib via bun:ffi (server), and UniFFI (mobile). Desktop links via `apps/desktop/Cargo.toml` path dep to `../../packages/crypto`. Server loads via `packages/crypto/ffi.ts` (bun:ffi wrapper). Build server lib with `bun run crypto:build:server`.
 - **Signal notification sidecar**: `signal-notifier/` at port 3100. Zero-knowledge: resolves contacts via HMAC-hashed identifiers, never stores plaintext phone numbers. Shared `SIGNAL_NOTIFIER_BEARER_TOKEN` between app and sidecar.
 - **Firehose inference agent**: LLM-powered message extraction using OpenAI-compatible SDK. Processes incoming message streams for structured data extraction.
 - **Protocol codegen**: `packages/protocol/tools/codegen.ts` generates Swift Codable structs and Kotlin @Serializable data classes from Zod schemas (via `toJSONSchema()` + quicktype). Also generates crypto label constants from `crypto-labels.json`. Zod schemas in `packages/protocol/schemas/` are the single source of truth (moved from `apps/worker/schemas/`). Schema registry in `packages/protocol/tools/schema-registry.ts` maps 85+ Zod schemas to named types. Kotlin post-processor injects `@Serializable` defaults for `.optional().default()` fields. Swift post-processor strips convenience extensions, adds `Sendable`, renames 15 types that shadow builtins. Run `bun run codegen` after schema changes. Generated output is gitignored — codegen runs as a build prerequisite.
 - **Key management**: PIN-encrypted per-device Ed25519/X25519 keys stored in Tauri Store (desktop), iOS Keychain, or Android Keystore (EncryptedSharedPreferences). Rust CryptoState holds device private key; UI only sees pubkey. Device linking via ephemeral ECDH provisioning rooms. User sigchain authorizes new devices.
 - **Tauri IPC mock for tests**: Playwright tests run in a regular browser. `PLAYWRIGHT_TEST=true` triggers Vite aliases that route `@tauri-apps/api/core` and `@tauri-apps/plugin-store` to JS mock implementations in `tests/mocks/`. The mock maintains a CryptoState that mirrors the Rust side.
 - **Mobile crypto**: iOS uses UniFFI XCFramework from `packages/crypto/`, Android uses JNI `.so` files. Both wrap CryptoService as a singleton — device private key is private and never leaves the service layer.
-- **Nostr relay real-time**: Ephemeral kind 20001 events via strfry (self-hosted) or Nosflare (CF). All event content encrypted with hub key. Generic tags (`["t", "llamenos:event"]`) — relay cannot distinguish event types.
+- **WebSocket relay**: In-process native WS relay (replaced strfry/Nostr). Ed25519 challenge-response auth. Hub-scoped event routing with encrypted payloads. Ring buffer for ephemeral event history.
 - **Hub key distribution**: Random 32 bytes (`crypto.getRandomValues`), HPKE-wrapped individually per member via `LABEL_HUB_KEY_WRAP`. Rotation on member departure excludes departed member.
 - **Client-side transcription**: WASM Whisper via `@huggingface/transformers` ONNX runtime. AudioWorklet ring buffer → Web Worker isolation. Audio never leaves the browser.
 - **Reproducible builds**: `Dockerfile.build` with `SOURCE_DATE_EPOCH`, content-hashed filenames. `CHECKSUMS.txt` in GitHub Releases. SLSA provenance + SBOM + cosign. knope manages release PRs automatically — never manually bump versions. Verification via `scripts/verify-build.sh`.
 - **Hash-chained audit log**: SHA-256 chain with `previousEntryHash` + `entryHash` for tamper detection (Epic 77).
-- **Domain separation**: All 57 crypto context constants defined in `packages/protocol/crypto-labels.json` (source of truth), generated to TS/Swift/Kotlin via codegen. NEVER use raw string literals for crypto contexts. Label enforced at decrypt (Albrecht defense).
+- **Domain separation**: All crypto context constants defined in `packages/protocol/crypto-labels.json` (source of truth), generated to TS/Swift/Kotlin via codegen. NEVER use raw string literals for crypto contexts. Label enforced at decrypt (Albrecht defense).
 - **Blast/Broadcast service**: PostgreSQL-backed delivery queue with per-channel rate limiting. Manages batched delivery of bulk messages (SMS/WhatsApp/Signal/Telegram/RCS) with per-recipient status tracking and retry logic.
 - **Kubernetes health probes**: `/health/ready` and `/health/live` endpoints. Prometheus ServiceMonitor configured. Caddyfile.production with security headers. Ansible preflight + smoke-check playbooks.
 
 ## Gotchas
 
-- `@noble/ciphers` and `@noble/hashes` require `.js` extension in imports (e.g., `@noble/ciphers/chacha.js`)
-- `schnorr` is a separate named export: `import { schnorr } from '@noble/curves/secp256k1.js'`
-- Nostr pubkeys are x-only (32 bytes) — prepend `"02"` for ECDH compressed format
-- Nostr relay (strfry) is a core service, not optional — always runs with Docker Compose and Helm
-- `SERVER_NOSTR_SECRET` must be exactly 64 hex chars; server derives its Nostr keypair via HKDF
+- **`@noble/*` is devDependencies only**: Used exclusively in test mocks (`tests/mocks/tauri-core.ts`, `apps/worker/__tests__/mocks/llamenos-crypto-ffi.ts`). Production code uses `@llamenos/crypto/ffi` (server) or Tauri IPC (client). Never import @noble from production code.
+- **`@llamenos/crypto/ffi` uses bun:ffi**: Only works in Bun runtime. For tests, vitest aliases it to a pure-JS mock. Client code routes through `platform.ts` Tauri IPC.
+- **`bun run crypto:build:server`** must run before `bun run dev:server` — builds `libllamenos_core.so` for bun:ffi.
+- **`SERVER_SECRET`** must be exactly 64 hex chars; server derives signing and encryption keys via HKDF.
 - Hub key is random bytes, NOT derived from any identity key — see `hub-key-manager.ts`
 - **`asterisk-bridge/` no longer exists** — replaced by `sip-bridge/`. Use `PBX_TYPE` env var to select ARI/ESL/Kamailio backend.
-- **HPKE replaces ECIES**: All new key-wrapping code must use HPKE (RFC 9180 X25519-HKDF-SHA256-AES256-GCM). No secp256k1 ECIES for new features.
-- **Per-device keys, not nsec**: Users have Ed25519/X25519 device keys authorized via sigchain. `nsec` is no longer the identity primitive.
+- **Ed25519/X25519 only**: All auth uses Ed25519 signatures. All key wrapping uses HPKE (RFC 9180 X25519-HKDF-SHA256-AES256-GCM). AES-256-GCM is the sole AEAD. No secp256k1, no Schnorr, no XChaCha20-Poly1305.
+- **Per-device keys**: Users have Ed25519/X25519 device keys authorized via sigchain.
 - **Signal notifier auth**: `SIGNAL_NOTIFIER_BEARER_TOKEN` must match between app config and `signal-notifier/` sidecar config.
 - **knope manages versions**: Never manually bump `package.json`, `Cargo.toml`, or platform version files. knope auto-maintains release PRs with changelogs.
 - **Tauri-only desktop**: No browser/PWA fallback. `platform.ts` always routes through Tauri IPC. Use `PLAYWRIGHT_TEST=true` for test builds that mock the IPC layer.
@@ -196,7 +195,7 @@ After `mise install`, install Ruby gems for Fastlane: `cd apps/ios && bundle ins
 **Always use dev compose (backing services) + `bun run dev:server` (app with file watching):**
 
 ```bash
-# 1. Start backing services (PostgreSQL, RustFS, strfry)
+# 1. Start backing services (PostgreSQL, RustFS)
 docker compose -f deploy/docker/docker-compose.dev.yml up -d
 
 # Optional profiles: --profile signal  --profile telephony  --profile inference  --profile monitoring
