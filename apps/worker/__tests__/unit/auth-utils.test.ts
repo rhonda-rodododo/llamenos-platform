@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { parseAuthHeader, parseSessionHeader, validateToken, verifyAuthToken, buildAuthMessage } from '@worker/lib/auth'
 import { ed25519 } from '@noble/curves/ed25519.js'
+import { schnorr } from '@noble/curves/secp256k1.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 import { LABEL_DEVICE_AUTH } from '@shared/crypto-labels'
 
