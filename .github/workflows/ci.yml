@@ -231,6 +231,7 @@ jobs:
             "SIGNAL_REGISTERED_NUMBER=+15550000000" \
             "PBX_TYPE=asterisk" \
             "GLITCHTIP_SECRET_KEY=$(openssl rand -hex 32)" \
+            "TOKEN_MAX_AGE_MS=3600000" \
             > .env
 
       - name: Build and start Docker Compose (core services)
@@ -403,6 +404,7 @@ jobs:
             "SIGNAL_REGISTERED_NUMBER=+15550000000" \
             "PBX_TYPE=asterisk" \
             "GLITCHTIP_SECRET_KEY=$(openssl rand -hex 32)" \
+            "TOKEN_MAX_AGE_MS=3600000" \
             > .env
 
       - name: Build and start Docker Compose (core services)
@@ -675,6 +677,7 @@ jobs:
             "SIGNAL_REGISTERED_NUMBER=+15550000000" \
             "PBX_TYPE=asterisk" \
             "GLITCHTIP_SECRET_KEY=$(openssl rand -hex 32)" \
+            "TOKEN_MAX_AGE_MS=3600000" \
             > .env
 
       - name: Build and start Docker Compose (core services)
