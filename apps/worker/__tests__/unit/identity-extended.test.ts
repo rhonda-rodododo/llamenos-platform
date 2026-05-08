@@ -106,6 +106,8 @@ function makeDeviceRow(overrides: Record<string, unknown> = {}) {
 
 function setup() {
   const { db } = createMockDb()
+  // setHubRole/removeHubRole use db.transaction() for row locking
+  ;(db as any).transaction = vi.fn().mockImplementation((fn: (tx: unknown) => Promise<unknown>) => fn(db))
   const service = new IdentityService(db as any)
   return { db, service }
 }

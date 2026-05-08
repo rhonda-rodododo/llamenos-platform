@@ -159,35 +159,12 @@ Then('I should see the reports title', async ({ page }) => {
 })
 
 Then('I should see the {string} report status filter', async ({ page, backendRequest, workerHub }, filterName: string) => {
-  // Filters only render when reports exist (not in empty state) and user is admin.
-  // Always ensure at least one report exists BEFORE checking visibility — the filter area
-  // is briefly visible during loading then disappears if no reports exist.
+  // Filters only render when reports exist (not in empty state).
+  // Always ensure at least one report exists BEFORE checking visibility.
   const existing = await listReportsViaApi(backendRequest, { hubId: workerHub }).catch(() => ({ conversations: [], total: 0 }))
   if (existing.conversations.length === 0) {
     await createReportViaApi(backendRequest, { title: `Seed for filter ${Date.now()}`, hubId: workerHub })
   }
-
-  // DEBUG: Check crypto state and try creating an auth token
-  const debugInfo = await page.evaluate(async () => {
-    const w = window as Record<string, unknown>
-    const km = w.__TEST_KEY_MANAGER as { isUnlocked?: () => boolean } | undefined
-    const platform = w.__TEST_PLATFORM as { createAuthToken?: (ts: number, m: string, p: string) => Promise<string> } | undefined
-    let authTokenResult = 'not-tried'
-    if (km?.isUnlocked?.()) {
-      try {
-        const token = await platform!.createAuthToken!(Date.now(), 'GET', '/api/reports')
-        authTokenResult = `ok:${token.slice(0, 20)}...`
-      } catch (e: unknown) {
-        authTokenResult = `error:${(e as Error).message}`
-      }
-    }
-    return {
-      url: window.location.pathname,
-      kmUnlocked: km?.isUnlocked?.(),
-      authTokenResult,
-    }
-  }).catch((e) => ({ url: 'eval-failed', kmUnlocked: 'eval-failed', authTokenResult: `catch:${e}` }))
-  console.log(`[report-filter-debug] workerHub=${workerHub} page=${JSON.stringify(debugInfo)}`)
 
   // SPA re-navigate to refresh the reports list
   await page.getByTestId(TestIds.NAV_DASHBOARD).click()
@@ -196,25 +173,24 @@ Then('I should see the {string} report status filter', async ({ page, backendReq
   const filterArea = page.getByTestId(TestIds.REPORT_FILTER_AREA)
   await expect(filterArea).toBeVisible({ timeout: Timeouts.ELEMENT })
 
-  // Click the status filter trigger to open dropdown and verify the option exists
-  const statusFilter = page.getByTestId('report-status-filter')
-  await expect(statusFilter).toBeVisible({ timeout: Timeouts.ELEMENT })
-  await statusFilter.click()
-
-  // Verify the specific filter option is visible
-  const optionSlug = filterName.toLowerCase()
-  const option = page.getByTestId(`report-status-option-${optionSlug}`)
+  // Filters use a Select dropdown — wait for stability then click to open (React re-renders detach DOM nodes)
+  const selectTrigger = filterArea.locator('button[role="combobox"]').first()
+  await expect(selectTrigger).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await selectTrigger.waitFor({ state: 'attached' })
+  await selectTrigger.click()
+  const option = page.getByRole('option', { name: new RegExp(filterName, 'i') })
   await expect(option).toBeVisible({ timeout: Timeouts.ELEMENT })
   await page.keyboard.press('Escape')
 })
 
 When('I tap the {string} report status filter', async ({ page }, filterName: string) => {
-  const statusFilter = page.getByTestId('report-status-filter')
-  await expect(statusFilter).toBeVisible({ timeout: Timeouts.ELEMENT })
-  await statusFilter.click()
-
-  const optionSlug = filterName.toLowerCase()
-  const option = page.getByTestId(`report-status-option-${optionSlug}`)
+  const filterArea = page.getByTestId(TestIds.REPORT_FILTER_AREA)
+  // Status filter is a Select dropdown — wait for stability then click trigger (React re-renders detach DOM nodes)
+  const selectTrigger = filterArea.locator('button[role="combobox"]').first()
+  await expect(selectTrigger).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await selectTrigger.waitFor({ state: 'attached' })
+  await selectTrigger.click()
+  const option = page.getByRole('option', { name: new RegExp(filterName, 'i') })
   await option.click()
 })
 
@@ -381,11 +357,6 @@ When('I fill in the required report fields', async ({ page }) => {
   }
 })
 
-// --- Reporter steps ---
-// "they create a new report" and "the report should be saved successfully"
-// are defined in tests/steps/auth/user-steps.ts
-// 'a success toast should appear' is defined in common/assertion-steps.ts
-// 'the report should appear in the reports list' is defined in admin/desktop-admin-steps.ts
 
 Then('the submitted report should appear in the list', async ({ page }) => {
   const reportList = page.getByTestId(TestIds.REPORT_LIST)

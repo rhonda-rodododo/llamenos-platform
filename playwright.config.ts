@@ -17,7 +17,7 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  workers: 3,
+      workers: process.env.CI ? 4 : 3,
   reporter: process.env.CI
     ? [
         ["github"],
@@ -87,7 +87,7 @@ export default defineConfig({
         baseURL: process.env.TEST_HUB_URL || "http://localhost:3000",
       },
       fullyParallel: true,
-      workers: 3,
+  workers: process.env.CI ? 4 : 3,
       // Wait for bootstrap tests to finish before starting.
       // backend-bdd scenarios create a hub per-scenario via workerHub fixture —
       // if bootstrap's test-reset-no-admin runs concurrently, the admin is gone
@@ -99,7 +99,7 @@ export default defineConfig({
     ? undefined
     : {
         // Build once, then serve static files — far more stable than Vite dev server
-        // under parallel test load (3 workers × 535 tests).
+        // under parallel test load (4 workers × 535 tests).
         // Uses `vite preview` which serves the production build without HMR.
         command:
           "PLAYWRIGHT_TEST=true bun run build && PLAYWRIGHT_TEST=true bunx vite preview --port 8788 --strictPort",

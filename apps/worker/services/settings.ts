@@ -498,16 +498,13 @@ export class SettingsService {
     const recent = timestamps.filter((t) => now - t < windowMs)
     recent.push(now)
 
-    if (existing) {
-      await this.db
-        .update(rateLimits)
-        .set({ timestamps: recent })
-        .where(eq(rateLimits.key, data.key))
-    } else {
-      await this.db
-        .insert(rateLimits)
-        .values({ key: data.key, timestamps: recent })
-    }
+    await this.db
+      .insert(rateLimits)
+      .values({ key: data.key, timestamps: recent })
+      .onConflictDoUpdate({
+        target: rateLimits.key,
+        set: { timestamps: recent },
+      })
 
     return { limited: recent.length >= data.maxPerMinute }
   }

@@ -57,11 +57,19 @@ export function createMockDb(tables: string[] = []) {
 
     const offsetFn = vi.fn(() => Promise.resolve(result))
 
+    const forFn = vi.fn(() =>
+      makeChainable(result, {
+        limit: limitFn,
+        offset: offsetFn,
+      })
+    )
+
     return makeChainable(result, {
       limit: limitFn,
       orderBy: orderByFn,
       offset: offsetFn,
       groupBy: groupByFn,
+      for: forFn,
     })
   }
 
