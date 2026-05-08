@@ -26,6 +26,12 @@ done
 
 export VERBOSE JSON_OUTPUT REPORTER_TIMEOUT
 
+source "$SCRIPT_DIR/lib/backend-manager.sh"
+
+DESKTOP_PORT="$(worktree_port 3001)"
+DB_SUFFIX="$(worktree_db_suffix)"
+DB_NAME="llamenos_desktop${DB_SUFFIX}"
+
 cd "$PROJECT_ROOT"
 
 reporter_init "desktop"
@@ -72,13 +78,32 @@ if command -v cargo &>/dev/null; then
   fi
 fi
 
+if ! ensure_shared_services; then
+  overall_result="fail"
+  reporter_summary "$overall_result"
+  exit 1
+fi
+
+if ! backend_start "desktop" "$DESKTOP_PORT" "$DB_NAME"; then
+  overall_result="fail"
+  reporter_summary "$overall_result"
+  exit 1
+fi
+
+export TEST_HUB_URL="http://localhost:${DESKTOP_PORT}"
+
+cleanup_backend() {
+  backend_stop "desktop"
+}
+trap cleanup_backend EXIT
+
 # Step 4: Start vite preview server and run Playwright E2E tests
 # Start the server in the background — set PLAYWRIGHT_BASE_URL so Playwright
 # skips its own webServer (which uses Unix env-var syntax incompatible with Windows).
 bunx vite preview --port 8788 --strictPort &
 PREVIEW_PID=$!
 cleanup_preview() { kill "$PREVIEW_PID" 2>/dev/null || true; wait "$PREVIEW_PID" 2>/dev/null || true; }
-trap cleanup_preview EXIT
+trap 'cleanup_backend; cleanup_preview' EXIT
 
 # Wait for the preview server to be ready (use bun for portability on Windows)
 for _i in $(seq 1 30); do
