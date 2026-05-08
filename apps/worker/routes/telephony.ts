@@ -249,12 +249,12 @@ telephony.post('/user-answer',
     type: 'call:update',
     callId: parentCallSid,
     status: 'in-progress',
-  }, hubId ?? undefined).catch((e) => { logger.error('Failed to publish call update', e) })
+  }, hubId ?? undefined)
 
   publishEvent(c.env, KIND_PRESENCE_UPDATE, {
     type: 'presence:summary',
     callId: parentCallSid,
-  }, hubId ?? undefined).catch((e) => { logger.error('Failed to publish presence update', e) })
+  }, hubId ?? undefined)
 
   const [, activeCallsForAnswer] = await Promise.all([
     services.identity.getUser(pubkey).catch(() => ({} as { name?: string })),
@@ -312,7 +312,7 @@ telephony.post('/call-status',
           type: 'call:update',
           callId: parentCallSid,
           status: 'completed',
-        }, hubId).catch((e) => { logger.error('Failed to publish call end', e) })
+        }, hubId)
 
         const duration = preCall
           ? Math.floor((Date.now() - new Date(preCall.startedAt).getTime()) / 1000)
@@ -451,7 +451,7 @@ telephony.post('/voicemail-recording', async (c) => {
     publishEvent(c.env, KIND_CALL_VOICEMAIL, {
       type: 'voicemail:new',
       callId: callSid,
-    }, hubId).catch((e) => { logger.error('Failed to publish voicemail event', e) })
+    }, hubId)
 
     await audit(services.audit, 'voicemailReceived', 'system', { callSid }, { request: c.req.raw, hmacSecret: c.env.HMAC_SECRET })
 
