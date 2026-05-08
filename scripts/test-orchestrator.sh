@@ -16,6 +16,7 @@ NO_CODEGEN="${NO_CODEGEN:-false}"
 JSON_OUTPUT="${JSON_OUTPUT:-false}"
 TIMEOUT="${REPORTER_TIMEOUT:-600}"
 PLATFORMS_OVERRIDE=""
+IOS_REMOTE="${IOS_REMOTE:-false}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -24,11 +25,19 @@ while [[ $# -gt 0 ]]; do
     --json) JSON_OUTPUT=true; shift ;;
     --timeout) TIMEOUT="$2"; shift 2 ;;
     --platforms) PLATFORMS_OVERRIDE="$2"; shift 2 ;;
+    --ios-remote) IOS_REMOTE=true; shift ;;
     *) echo "Unknown option: $1"; exit 1 ;;
   esac
 done
 
 cd "$PROJECT_ROOT"
+
+source "$SCRIPT_DIR/lib/backend-manager.sh"
+
+if ! ensure_shared_services; then
+  echo -e "${RED}Failed to start shared services. Aborting.${RESET}"
+  exit 1
+fi
 
 # Build pass-through args
 PASSTHROUGH_ARGS=()
@@ -73,6 +82,11 @@ start_time="$(date +%s)"
 # Launch all platform tests in parallel
 for platform in "${available[@]}"; do
   local_script="$SCRIPT_DIR/test-${platform}.sh"
+
+  if [[ "$platform" == "ios-remote" ]]; then
+    local_script="$SCRIPT_DIR/test-ios-remote.sh"
+  fi
+
   if [[ ! -x "$local_script" ]]; then
     if [[ "${JSON_OUTPUT}" != "true" ]]; then
       echo -e "${YELLOW}No test script for platform: ${platform}${RESET}"

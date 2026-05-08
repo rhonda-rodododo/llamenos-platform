@@ -32,9 +32,12 @@ detect_platforms() {
     platforms+=("worker")
   fi
 
-  # Backend BDD tests need bun and a running backend
   if command -v bun &>/dev/null; then
     platforms+=("backend-bdd")
+  fi
+
+  if [[ "$os" == "Linux" ]] && [[ -n "${MAC_SSH_HOST:-}" ]]; then
+    platforms+=("ios-remote")
   fi
 
   case "$os" in
