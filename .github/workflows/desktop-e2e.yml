@@ -141,21 +141,14 @@ jobs:
         uses: dtolnay/rust-toolchain@efa25f7f19611383d5b0ccf2d1c8914531636bf9 # stable
         with:
           toolchain: stable
-          targets: wasm32-unknown-unknown
 
       - name: Rust cache
         uses: swatinem/rust-cache@82a92a6e8fbeee089604da2575dc567ae9ddeaab # v2.7.5
         with:
           workspaces: packages/crypto
 
-      - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-
       - name: Generate interop test vectors
         run: cargo test --manifest-path packages/crypto/Cargo.toml --test interop
-
-      - name: Build WASM
-        run: bun run crypto:wasm
 
       # ── Run tests ──────────────────────────────────────────────
       - name: Run desktop E2E tests
