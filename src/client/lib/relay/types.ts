@@ -1,8 +1,6 @@
 /**
- * Nostr client types for the Llamenos relay integration.
+ * Relay event types for the Llamenos WebSocket relay.
  */
-
-import type { Event as NostrEvent } from 'nostr-tools/core'
 
 /** Decrypted event content with type discriminator */
 export interface LlamenosEvent {
@@ -94,8 +92,8 @@ export interface MessageStatusEvent extends LlamenosEvent {
   status: string
 }
 
-/** Nostr relay connection state */
+/** Relay connection state */
 export type RelayState = 'disconnected' | 'connecting' | 'connected' | 'authenticating'
 
-/** Event handler type */
-export type NostrEventHandler = (event: NostrEvent, content: LlamenosEvent) => void
+/** Event handler type — receives the decrypted event content */
+export type RelayEventHandler = (kind: number, content: LlamenosEvent, hubId: string) => void

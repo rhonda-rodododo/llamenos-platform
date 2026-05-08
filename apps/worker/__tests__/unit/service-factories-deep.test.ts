@@ -3,10 +3,7 @@ import {
   getTelephonyFromService,
   getHubTelephonyFromService,
   getMessagingAdapterFromService,
-  getNostrPublisher,
-  _resetNostrPublisherCache,
 } from '@worker/lib/service-factories'
-import { NoopNostrPublisher } from '@worker/lib/nostr-publisher'
 
 describe('getTelephonyFromService', () => {
   it('returns adapter from service config when available', async () => {
@@ -232,30 +229,4 @@ describe('getMessagingAdapterFromService', () => {
   })
 })
 
-describe('getNostrPublisher', () => {
-  beforeEach(() => {
-    _resetNostrPublisherCache()
-  })
-
-  afterEach(() => {
-    _resetNostrPublisherCache()
-  })
-
-  it('returns NoopNostrPublisher when no server secret', () => {
-    const publisher = getNostrPublisher({} as any)
-    expect(publisher).toBeInstanceOf(NoopNostrPublisher)
-  })
-
-  it('caches the publisher instance', () => {
-    const env = {} as any
-    const pub1 = getNostrPublisher(env)
-    const pub2 = getNostrPublisher(env)
-    expect(pub1).toBe(pub2)
-  })
-
-  it('uses pre-configured publisher from env.NOSTR_PUBLISHER', () => {
-    const preConfigured = new NoopNostrPublisher()
-    const publisher = getNostrPublisher({ NOSTR_PUBLISHER: preConfigured } as any)
-    expect(publisher).toBe(preConfigured)
-  })
-})
+// NostrPublisher tests removed — replaced by ConnectionManager in ws-manager.ts

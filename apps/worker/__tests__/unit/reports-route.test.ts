@@ -14,11 +14,11 @@ import reportsRouter from '../../routes/reports'
 // ---------------------------------------------------------------------------
 
 const HEX64 = 'a'.repeat(64)
-const HEX66 = 'a'.repeat(66)
-const WRAPPED = 'dGVzdC13cmFwcGVkLWtleQ'
+const HPKE_ENC = 'b'.repeat(64)
+const WRAPPED_CT = 'dGVzdC13cmFwcGVkLWtleQ'
 
 /** A valid recipientEnvelope for use in test request bodies. */
-const testEnvelope = { pubkey: HEX64, wrappedKey: WRAPPED, ephemeralPubkey: HEX66 }
+const testEnvelope = { pubkey: HEX64, enc: HPKE_ENC, ct: WRAPPED_CT }
 
 // ---------------------------------------------------------------------------
 // Test app factory

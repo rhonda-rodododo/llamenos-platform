@@ -11,7 +11,7 @@ final class APIConnectedUITests: BaseUITest {
 
     /// The mock identity pubkey matching ADMIN_PUBKEY in Docker .env.
     /// Used for call simulation endpoints that require a pubkey parameter.
-    private let mockPubkey = "ac4718373d30301e5c7cf55e9e6f2568efb94f3278fb88f37f4981e880505228"
+    private let mockPubkey = "79215a4c04f08fcd817c6f820c87169beb8cddf96dfa590a1315556b78af9183"
 
     // MARK: - Connection & Bootstrap
 

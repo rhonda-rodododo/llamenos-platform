@@ -12,7 +12,6 @@ export const noteResponseSchema = z.object({
   authorPubkey: pubkeySchema,
   authorEnvelope: keyEnvelopeSchema.optional(),
   adminEnvelopes: z.array(recipientEnvelopeSchema).optional(),
-  ephemeralPubkey: z.string().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
   replyCount: z.number().optional(),

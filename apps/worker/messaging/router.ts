@@ -5,8 +5,8 @@ import type { MessagingAdapter, IncomingMessage, MessageStatusUpdate } from './a
 import { getMessagingAdapterFromService } from '../lib/service-factories'
 import { audit } from '../services/audit'
 import { canClaimChannel } from '@shared/permissions'
-import { KIND_MESSAGE_NEW, KIND_CONVERSATION_ASSIGNED, KIND_MESSAGE_REACTION, KIND_TYPING_INDICATOR } from '@shared/nostr-events'
-import { publishNostrEvent } from '../lib/nostr-events'
+import { KIND_MESSAGE_NEW, KIND_CONVERSATION_ASSIGNED, KIND_MESSAGE_REACTION, KIND_TYPING_INDICATOR } from '@shared/event-kinds'
+import { publishEvent } from '../lib/ws-events'
 import { createPushDispatcherFromService } from '../lib/push-dispatch'
 import { createLogger } from '../lib/logger'
 import { backgroundTask } from '../lib/hono-compat'
@@ -104,15 +104,13 @@ messaging.post('/:channel/webhook', async (c) => {
           const result = await services.conversations.updateMessageStatus(statusUpdate)
 
           if ('conversationId' in result && result.conversationId && 'messageId' in result && result.messageId) {
-            // Publish status update to Nostr relay
-            publishNostrEvent(c.env, KIND_MESSAGE_NEW, {
+            // Publish status update to WebSocket relay
+            publishEvent(c.env, KIND_MESSAGE_NEW, {
               type: 'message:status',
               conversationId: result.conversationId,
               messageId: result.messageId,
               status: statusUpdate.status,
               timestamp: statusUpdate.timestamp,
-            }).catch((e) => {
-              logger.error('Failed to publish status update', e)
             })
           }
 
@@ -136,17 +134,15 @@ messaging.post('/:channel/webhook', async (c) => {
     try {
       const signalPayload: SignalWebhookPayload = await c.req.raw.clone().json()
 
-      // Handle typing indicators — broadcast as ephemeral Nostr event
+      // Handle typing indicators — broadcast as ephemeral event
       const typing = adapter.parseTypingIndicator(signalPayload)
       if (typing) {
-        publishNostrEvent(c.env, KIND_TYPING_INDICATOR, {
+        publishEvent(c.env, KIND_TYPING_INDICATOR, {
           type: 'typing',
           sender: typing.sender,
           isTyping: typing.isTyping,
           channelType: 'signal',
           timestamp: typing.timestamp,
-        }).catch((e) => {
-          logger.error('Failed to publish typing indicator', { error: e })
         })
         return c.json({ ok: true })
       }
@@ -154,7 +150,7 @@ messaging.post('/:channel/webhook', async (c) => {
       // Handle reactions — store and broadcast
       const reaction = adapter.parseReaction(signalPayload)
       if (reaction) {
-        publishNostrEvent(c.env, KIND_MESSAGE_REACTION, {
+        publishEvent(c.env, KIND_MESSAGE_REACTION, {
           type: 'message:reaction',
           emoji: reaction.emoji,
           targetAuthor: reaction.targetAuthor,
@@ -162,8 +158,6 @@ messaging.post('/:channel/webhook', async (c) => {
           isRemove: reaction.isRemove ?? false,
           sender: signalPayload.envelope.sourceUuid ?? signalPayload.envelope.source,
           channelType: 'signal',
-        }).catch((e) => {
-          logger.error('Failed to publish reaction event', { error: e })
         })
         return c.json({ ok: true })
       }
@@ -234,12 +228,12 @@ messaging.post('/:channel/webhook', async (c) => {
   // Forward to ConversationsService for processing
   const convResult = await services.conversations.handleIncoming(incoming, c.env.ADMIN_PUBKEY)
 
-  // Publish new inbound message event to Nostr relay
-  publishNostrEvent(c.env, KIND_MESSAGE_NEW, {
+  // Publish new inbound message event to WebSocket relay
+  publishEvent(c.env, KIND_MESSAGE_NEW, {
     type: 'message:new',
     conversationId: convResult.conversationId,
     channelType: channel,
-  }).catch((e) => { logger.error('Failed to publish inbound message event', e) })
+  })
 
   // Auto-assignment for new conversations
   if (convResult.isNew && convResult.status === 'waiting') {
@@ -351,13 +345,11 @@ async function tryAutoAssign(
     await services.conversations.claim(conversationId, bestCandidate)
 
     // Publish assignment to Nostr relay
-    publishNostrEvent(env, KIND_CONVERSATION_ASSIGNED, {
+    publishEvent(env, KIND_CONVERSATION_ASSIGNED, {
       type: 'conversation:assigned',
       conversationId,
       assignedTo: bestCandidate,
       autoAssigned: true,
-    }).catch((e) => {
-      logger.error('Failed to publish auto-assignment', e)
     })
 
     logger.info('Auto-assigned conversation', { conversationId, assignedTo: bestCandidate.slice(0, 8) })

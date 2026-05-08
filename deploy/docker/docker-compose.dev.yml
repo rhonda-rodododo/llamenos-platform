@@ -1,6 +1,6 @@
 # Llamenos Dev Services
 #
-# Starts only the backing services (PostgreSQL, RustFS, strfry) without the app.
+# Starts only the backing services (PostgreSQL, RustFS) without the app.
 # The app runs locally via `bun run dev:server`.
 #
 # Usage:
@@ -51,20 +51,6 @@ services:
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:9000/health"]
       interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-
-  strfry:
-    image: dockurr/strfry:1.0.1
-    ports:
-      - "7777:7777"
-    volumes:
-      - strfrydata:/app/strfry-db
-      - ./strfry-dev.conf:/etc/strfry.conf:ro
-    healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:7777"]
-      interval: 15s
       timeout: 5s
       retries: 5
       start_period: 10s
@@ -178,7 +164,6 @@ services:
 volumes:
   pgdata:
   rustfsdata:
-  strfrydata:
   signal-data:
   ollama-data:
   asterisk-config:

@@ -14,7 +14,7 @@ import filesRouter from '../../routes/files'
 // ---------------------------------------------------------------------------
 
 const HEX64 = 'a'.repeat(64)
-const HEX66 = 'a'.repeat(66)
+const HPKE_ENC = 'b'.repeat(64)
 
 // ---------------------------------------------------------------------------
 // Test app factory
@@ -24,7 +24,7 @@ type FileRecordLike = {
   id: string
   uploadedBy: string
   status: string
-  recipientEnvelopes?: Array<{ pubkey: string; wrappedKey: string }>
+  recipientEnvelopes?: Array<{ pubkey: string; enc: string; ct: string }>
   encryptedMetadata?: Array<{ pubkey: string; blob: string }>
 }
 
@@ -48,7 +48,7 @@ function makeApp(opts: {
       id: 'file-1',
       uploadedBy: 'uploader-pub',
       status: 'complete',
-      recipientEnvelopes: [{ pubkey: 'recipient-pub', wrappedKey: 'wk' }],
+      recipientEnvelopes: [{ pubkey: 'recipient-pub', enc: HEX64, ct: 'wk' }],
       encryptedMetadata: [{ pubkey: 'recipient-pub', blob: 'meta-blob' }],
     },
   } = opts
@@ -99,7 +99,7 @@ describe('GET /files/:id/content', () => {
         id: 'f1',
         uploadedBy: 'uploader',
         status: 'complete',
-        recipientEnvelopes: [{ pubkey: 'someone-else', wrappedKey: 'k' }],
+        recipientEnvelopes: [{ pubkey: 'someone-else', enc: HEX64, ct: 'k' }],
       },
     })
     const res = await request('/f1/content')
@@ -135,7 +135,7 @@ describe('GET /files/:id/content', () => {
         id: 'f1',
         uploadedBy: 'someone-else',
         status: 'complete',
-        recipientEnvelopes: [{ pubkey: 'recipient-pub', wrappedKey: 'key' }],
+        recipientEnvelopes: [{ pubkey: 'recipient-pub', enc: HEX64, ct: 'key' }],
       },
     })
     const res = await request('/f1/content')
@@ -189,7 +189,7 @@ describe('GET /files/:id/envelopes', () => {
         id: 'f1',
         uploadedBy: 'up',
         status: 'complete',
-        recipientEnvelopes: [{ pubkey: 'someone-else', wrappedKey: 'k' }],
+        recipientEnvelopes: [{ pubkey: 'someone-else', enc: HEX64, ct: 'k' }],
       },
     })
     const res = await request('/f1/envelopes')
@@ -204,8 +204,8 @@ describe('GET /files/:id/envelopes', () => {
         uploadedBy: 'up',
         status: 'complete',
         recipientEnvelopes: [
-          { pubkey: 'recipient-pub', wrappedKey: 'my-key' },
-          { pubkey: 'other-pub', wrappedKey: 'other-key' },
+          { pubkey: 'recipient-pub', enc: HEX64, ct: 'my-key' },
+          { pubkey: 'other-pub', enc: HEX64, ct: 'other-key' },
         ],
       },
     })
@@ -225,8 +225,8 @@ describe('GET /files/:id/envelopes', () => {
         uploadedBy: 'up',
         status: 'complete',
         recipientEnvelopes: [
-          { pubkey: 'pub-1', wrappedKey: 'k1' },
-          { pubkey: 'pub-2', wrappedKey: 'k2' },
+          { pubkey: 'pub-1', enc: HEX64, ct: 'k1' },
+          { pubkey: 'pub-2', enc: HEX64, ct: 'k2' },
         ],
       },
     })
@@ -243,7 +243,7 @@ describe('GET /files/:id/envelopes', () => {
         id: 'f1',
         uploadedBy: 'uploader-pub',
         status: 'complete',
-        recipientEnvelopes: [{ pubkey: 'someone-else', wrappedKey: 'k' }],
+        recipientEnvelopes: [{ pubkey: 'someone-else', enc: HEX64, ct: 'k' }],
       },
     })
     const res = await request('/f1/envelopes')
@@ -265,7 +265,7 @@ describe('GET /files/:id/metadata', () => {
         id: 'f1',
         uploadedBy: 'up',
         status: 'complete',
-        recipientEnvelopes: [{ pubkey: 'someone', wrappedKey: 'k' }],
+        recipientEnvelopes: [{ pubkey: 'someone', enc: HEX64, ct: 'k' }],
         encryptedMetadata: [{ pubkey: 'someone', blob: 'b' }],
       },
     })
@@ -280,7 +280,7 @@ describe('GET /files/:id/metadata', () => {
         id: 'f1',
         uploadedBy: 'up',
         status: 'complete',
-        recipientEnvelopes: [{ pubkey: 'my-pub', wrappedKey: 'k' }],
+        recipientEnvelopes: [{ pubkey: 'my-pub', enc: HEX64, ct: 'k' }],
         encryptedMetadata: [
           { pubkey: 'my-pub', blob: 'my-blob' },
           { pubkey: 'other-pub', blob: 'other-blob' },
@@ -321,11 +321,11 @@ describe('GET /files/:id/metadata', () => {
 // ---------------------------------------------------------------------------
 
 describe('POST /files/:id/share', () => {
-  // shareFileBodySchema requires fileKeyEnvelopeSchema (pubkey, encryptedFileKey,
-  // ephemeralPubkey) and encryptedMetadataEntrySchema (pubkey, encryptedContent, ephemeralPubkey)
+  // shareFileBodySchema requires fileKeyEnvelopeSchema (pubkey, enc, ct)
+  // and encryptedMetadataEntrySchema (pubkey, encryptedContent, enc, ct)
   const shareBody = {
-    envelope: { pubkey: HEX64, encryptedFileKey: 'encrypted-key-data', ephemeralPubkey: HEX66 },
-    encryptedMetadata: { pubkey: HEX64, encryptedContent: 'meta-content', ephemeralPubkey: HEX66 },
+    envelope: { pubkey: HEX64, enc: HPKE_ENC, ct: 'encrypted-key-data' },
+    encryptedMetadata: { pubkey: HEX64, encryptedContent: 'meta-content', enc: HPKE_ENC, ct: 'meta-ct' },
   }
 
   it('rejects without files:share permission', async () => {

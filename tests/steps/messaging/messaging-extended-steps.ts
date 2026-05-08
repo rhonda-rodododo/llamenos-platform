@@ -46,14 +46,11 @@ Given('I am on the messaging settings', async ({ page }) => {
 })
 
 When('I configure SMS channel with Twilio credentials', async ({ page }) => {
-  // Look for SMS toggle or label in the telephony section
-  const smsLabel = page.locator('text=/sms/i').first()
-  const hasSms = await smsLabel.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (hasSms) {
-    const toggle = page.locator('[role="switch"]').first()
-    const hasToggle = await toggle.isVisible({ timeout: 3000 }).catch(() => false)
-    if (hasToggle) await toggle.click()
-  }
+  const smsLabel = page.getByText(/sms/i).first()
+  await expect(smsLabel).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const smsToggle = smsLabel.locator('..').locator('[role="switch"], input[type="checkbox"]')
+  await expect(smsToggle).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await smsToggle.click()
 })
 
 Then('the SMS channel should be enabled', async ({ page }) => {
@@ -62,17 +59,16 @@ Then('the SMS channel should be enabled', async ({ page }) => {
 })
 
 When('I configure WhatsApp channel', async ({ page }) => {
-  const whatsappLabel = page.locator('text=/whatsapp/i').first()
-  const hasWhatsapp = await whatsappLabel.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (hasWhatsapp) {
-    const toggle = page.locator('[role="switch"]').first()
-    const hasToggle = await toggle.isVisible({ timeout: 3000 }).catch(() => false)
-    if (hasToggle) await toggle.click()
-  }
+  const whatsappLabel = page.getByText(/whatsapp/i).first()
+  await expect(whatsappLabel).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const whatsappToggle = whatsappLabel.locator('..').locator('[role="switch"], input[type="checkbox"]')
+  await expect(whatsappToggle).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await whatsappToggle.click()
 })
 
 Then('the WhatsApp channel should be enabled', async ({ page }) => {
-  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const whatsappLabel = page.getByText(/whatsapp/i).first()
+  await expect(whatsappLabel).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 // --- Active conversation steps ---
@@ -86,19 +82,18 @@ Given('I have an active conversation', async ({ page, backendRequest }) => {
   }).catch(() => {})
   await Navigation.goToConversations(page)
   const item = page.getByTestId(TestIds.CONVERSATION_ITEM).first()
-  const hasItem = await item.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (hasItem) await item.click()
+  await expect(item).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await item.click()
 })
 
 When('I type a message and click send', async ({ page }) => {
   const composer = page.getByTestId(TestIds.MESSAGE_COMPOSER)
-  const hasComposer = await composer.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (!hasComposer) return
+  await expect(composer).toBeVisible({ timeout: Timeouts.ELEMENT })
   const textarea = composer.locator('textarea, input[type="text"]').first()
   await textarea.fill(`Test message ${Date.now()}`)
   const sendBtn = page.getByTestId(TestIds.CONV_SEND_BTN)
-  const hasSend = await sendBtn.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (hasSend) await sendBtn.click()
+  await expect(sendBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await sendBtn.click()
 })
 
 Given('I sent a message in a conversation', async ({ page, backendRequest }) => {
@@ -110,27 +105,19 @@ Given('I sent a message in a conversation', async ({ page, backendRequest }) => 
   }).catch(() => {})
   await Navigation.goToConversations(page)
   const item = page.getByTestId(TestIds.CONVERSATION_ITEM).first()
-  const hasItem = await item.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (hasItem) await item.click()
+  await expect(item).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await item.click()
 })
 
 Then('I should see the delivery status indicator', async ({ page }) => {
-  // Delivery status appears in conversation thread messages
-  const thread = page.getByTestId(TestIds.CONVERSATION_THREAD)
-  const hasThread = await thread.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (!hasThread) return
-  // Status indicator may show as text or icon
-  const statusIndicator = thread.locator('text=/delivered|sent|pending|read/i').first()
-  const hasStatus = await statusIndicator.isVisible({ timeout: 3000 }).catch(() => false)
-  if (hasStatus) return
-  // Thread is visible — that's enough if no outbound messages exist
+  // Delivery status (delivered/sent/pending/read) should be visible in thread
+  const statusIndicator = page.getByText(/delivered|sent|pending|read/i).first()
+  await expect(statusIndicator).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('the conversation status should be {string}', async ({ page }, status: string) => {
-  const statusText = page.locator(`text=/${status}/i`).first()
-  const hasStatus = await statusText.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (hasStatus) return
-  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const statusText = page.getByText(new RegExp(status, 'i')).first()
+  await expect(statusText).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Given('I have an unassigned conversation', async ({ page, backendRequest }) => {
@@ -142,36 +129,23 @@ Given('I have an unassigned conversation', async ({ page, backendRequest }) => {
   }).catch(() => {})
   await Navigation.goToConversations(page)
   const item = page.getByTestId(TestIds.CONVERSATION_ITEM).first()
-  const hasItem = await item.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (hasItem) await item.click()
+  await expect(item).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await item.click()
 })
 
 When('I assign it to a volunteer', async ({ page }) => {
   // The "Claim" button is shown for waiting conversations
   const assignBtn = page.getByTestId(TestIds.CONV_ASSIGN_BTN)
-  const hasBtn = await assignBtn.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (hasBtn) {
-    await assignBtn.click()
-    return
-  }
-  // Try reassign button for already-assigned conversations
-  const reassignBtn = page.getByTestId('conv-reassign-btn')
-  const hasReassign = await reassignBtn.isVisible({ timeout: 3000 }).catch(() => false)
-  if (hasReassign) {
-    await reassignBtn.click()
-    const volunteerOption = page.locator('[role="option"], [role="menuitem"]').first()
-    const hasOption = await volunteerOption.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-    if (hasOption) await volunteerOption.click()
-  }
+  await expect(assignBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await assignBtn.click()
+  const volunteerOption = page.locator('[role="option"], [role="menuitem"]').first()
+  await expect(volunteerOption).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await volunteerOption.click()
 })
 
 Then('the volunteer name should appear on the conversation', async ({ page }) => {
-  // After claiming, conversation is now active with the current user assigned
-  const assigned = page.locator('text=/assigned|claimed|volunteer/i').first()
-  const hasAssigned = await assigned.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (hasAssigned) return
-  // Claiming succeeded (toast shown) — verify page is loaded
-  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const assigned = page.getByText(/assigned|volunteer/i).first()
+  await expect(assigned).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Given('multiple volunteers are available', async () => {
@@ -199,20 +173,14 @@ Given('conversations exist across SMS and WhatsApp', async ({ page, backendReque
     channel: 'whatsapp',
   }).catch(() => {})
   await Navigation.goToConversations(page)
-  const item = page.getByTestId(TestIds.CONVERSATION_ITEM).first()
-  const hasItem = await item.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (!hasItem) {
-    await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
-  }
+  const anyConvo = page.getByTestId(TestIds.CONVERSATION_ITEM).first()
+  await expect(anyConvo).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 When('I filter by SMS channel', async ({ page }) => {
-  // Desktop uses search to filter, not dedicated channel filter chips
-  const searchInput = page.getByTestId(TestIds.CONV_SEARCH)
-  const hasSearch = await searchInput.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (hasSearch) {
-    await searchInput.fill('SMS')
-  }
+  const smsFilter = page.getByTestId(TestIds.CONV_FILTER_CHIP).filter({ hasText: /SMS/i }).first()
+  await expect(smsFilter).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await smsFilter.click()
 })
 
 Then('I should only see SMS conversations', async ({ page }) => {

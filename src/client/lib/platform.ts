@@ -131,8 +131,9 @@ export async function deviceImportAndLoad(
 }
 
 /**
+ * @deprecated Use deviceImportAndLoad instead.
  * Import a legacy secp256k1 secret key (nsec hex) as device keys.
- * Used for backward-compatible admin login in tests.
+ * Kept only for Playwright test helpers during transition.
  */
 export async function legacyImportNsec(
   nsecHex: string,
@@ -635,8 +636,8 @@ export interface EncryptedMessageResult {
 
 /** @deprecated Use HpkeEnvelope instead. */
 export interface FileKeyEnvelope {
-  wrappedKey: string
-  ephemeralPubkey: string
+  enc: string
+  ct: string
 }
 
 // --- Legacy function wrappers ---
@@ -683,32 +684,10 @@ export async function getPublicKeyFromState(): Promise<string | null> {
 }
 
 /**
- * Derive the secp256k1 x-only pubkey hex from a bech32 nsec string.
- * Used for legacy recovery login. Returns null if the nsec is invalid.
+ * Validate a hex-encoded Ed25519 seed (64 hex chars = 32 bytes).
  */
-export async function pubkeyFromNsec(nsec: string): Promise<string | null> {
-  try {
-    const { nip19, getPublicKey } = await import('nostr-tools')
-    const decoded = nip19.decode(nsec)
-    if (decoded.type !== 'nsec') return null
-    return getPublicKey(decoded.data as Uint8Array)
-  } catch {
-    return null
-  }
-}
-
-/**
- * Validate a bech32 nsec string.
- * Returns true if the string is a valid nsec (secp256k1 private key).
- */
-export async function isValidNsec(nsec: string): Promise<boolean> {
-  try {
-    const { nip19 } = await import('nostr-tools')
-    const decoded = nip19.decode(nsec)
-    return decoded.type === 'nsec'
-  } catch {
-    return false
-  }
+export function isValidSeedHex(seedHex: string): boolean {
+  return /^[0-9a-f]{64}$/i.test(seedHex)
 }
 
 /** @deprecated Use ed25519Verify instead. */
@@ -735,7 +714,7 @@ function hexToBase64url(hex: string): string {
 
 // ── AES-256-GCM content encryption (WebCrypto) ─────────────────────
 
-async function aesGcmEncrypt(plaintext: string, keyHex: string): Promise<string> {
+export async function aesGcmEncrypt(plaintext: string, keyHex: string): Promise<string> {
   const keyBytes = new Uint8Array(keyHex.match(/.{2}/g)!.map(b => parseInt(b, 16)))
   const iv = crypto.getRandomValues(new Uint8Array(12))
   const cryptoKey = await crypto.subtle.importKey('raw', keyBytes, 'AES-GCM', false, ['encrypt'])
@@ -746,7 +725,7 @@ async function aesGcmEncrypt(plaintext: string, keyHex: string): Promise<string>
   return Array.from(packed, b => b.toString(16).padStart(2, '0')).join('')
 }
 
-async function aesGcmDecrypt(ciphertextHex: string, keyHex: string): Promise<string> {
+export async function aesGcmDecrypt(ciphertextHex: string, keyHex: string): Promise<string> {
   const data = new Uint8Array(ciphertextHex.match(/.{2}/g)!.map(b => parseInt(b, 16)))
   const iv = data.slice(0, 12)
   const ct = data.slice(12)
@@ -779,8 +758,7 @@ export async function eciesWrapKey(
 ): Promise<KeyEnvelope> {
   const encPubkey = await resolveEncryptionPubkey(recipientPubkey)
   const envelope = await hpkeSealKey(keyHex, encPubkey, label, '')
-  // Convert base64url enc to hex for eciesPubkeySchema compatibility
-  return { wrappedKey: envelope.ct, ephemeralPubkey: base64urlToHex(envelope.enc) }
+  return { enc: base64urlToHex(envelope.enc), ct: envelope.ct }
 }
 
 /** @deprecated Use hpkeOpenKeyFromState instead. */
@@ -812,8 +790,8 @@ export async function encryptNote(
   const authorEncPub = await resolveEncryptionPubkey(authorPubkey)
   const authorHpke = await hpkeSealKey(keyHex, authorEncPub, 'llamenos:note-key', '')
   const authorEnvelope: KeyEnvelope = {
-    wrappedKey: authorHpke.ct,
-    ephemeralPubkey: base64urlToHex(authorHpke.enc),
+    enc: base64urlToHex(authorHpke.enc),
+    ct: authorHpke.ct,
   }
 
   // HPKE-wrap key for each admin
@@ -823,8 +801,8 @@ export async function encryptNote(
       const hpke = await hpkeSealKey(keyHex, encPub, 'llamenos:note-key', '')
       return {
         pubkey,
-        wrappedKey: hpke.ct,
-        ephemeralPubkey: base64urlToHex(hpke.enc),
+        enc: base64urlToHex(hpke.enc),
+        ct: hpke.ct,
       }
     }),
   )
@@ -844,8 +822,8 @@ export async function decryptNote(
     const hpkeEnvelope: HpkeEnvelope = {
       v: 3,
       labelId: 0, // LABEL_NOTE_KEY index
-      enc: hexToBase64url(envelope.ephemeralPubkey),
-      ct: envelope.wrappedKey,
+      enc: hexToBase64url(envelope.enc),
+      ct: envelope.ct,
     }
     const keyHex = await hpkeOpenKeyFromState(hpkeEnvelope, 'llamenos:note-key', '')
     return await aesGcmDecrypt(encryptedContent, keyHex)
@@ -880,8 +858,8 @@ export async function encryptMessage(
       const hpke = await hpkeSealKey(keyHex, encPub, 'llamenos:message', '')
       return {
         pubkey,
-        wrappedKey: hpke.ct,
-        ephemeralPubkey: base64urlToHex(hpke.enc),
+        enc: base64urlToHex(hpke.enc),
+        ct: hpke.ct,
       }
     }),
   )
@@ -909,8 +887,8 @@ export async function decryptMessage(
     const hpkeEnvelope: HpkeEnvelope = {
       v: 3,
       labelId: 5, // LABEL_MESSAGE index
-      enc: hexToBase64url(myEnvelope.ephemeralPubkey),
-      ct: myEnvelope.wrappedKey,
+      enc: hexToBase64url(myEnvelope.enc),
+      ct: myEnvelope.ct,
     }
     const keyHex = await hpkeOpenKeyFromState(hpkeEnvelope, 'llamenos:message', '')
     return await aesGcmDecrypt(encryptedContent, keyHex)
@@ -939,8 +917,8 @@ export async function decryptCallRecord(
     const hpkeEnvelope: HpkeEnvelope = {
       v: 3,
       labelId: 6, // LABEL_CALL_META index
-      enc: hexToBase64url(myEnvelope.ephemeralPubkey),
-      ct: myEnvelope.wrappedKey,
+      enc: hexToBase64url(myEnvelope.enc),
+      ct: myEnvelope.ct,
     }
     const keyHex = await hpkeOpenKeyFromState(hpkeEnvelope, 'llamenos:call-meta', '')
     const plaintext = await aesGcmDecrypt(encryptedContent, keyHex)
@@ -1031,20 +1009,12 @@ export async function generateBackupFromState(
 
 /**
  * Generate an ephemeral Ed25519 keypair for admin-created users.
- * Returns the hex-encoded signing seed as "nsec" for backward compat with callers.
- * The public key is the Ed25519 signing pubkey hex.
+ * Returns the hex-encoded signing seed. The public key is the Ed25519 signing pubkey hex.
  */
 export async function generateEphemeralKeypair(): Promise<EphemeralKeyPair> {
   if (useTauri) {
-    // Use the mock/Rust to generate a random Ed25519 seed and derive pubkey
     const result = await tauriInvoke<{ signingPubkeyHex: string; seedHex: string }>('generate_ephemeral_ed25519')
-    // Encode the 32-byte seed as bech32 nsec1... format for display purposes.
-    // seedHex is exposed separately so loginAsVolunteer can use deviceImportAndLoad (Ed25519).
-    const { nip19 } = await import('nostr-tools')
-    const seedBytes = new Uint8Array(result.seedHex.match(/.{2}/g)!.map(h => parseInt(h, 16)))
-    const nsec = nip19.nsecEncode(seedBytes)
-    const npub = nip19.npubEncode(result.signingPubkeyHex)
-    return { publicKey: result.signingPubkeyHex, npub, nsec, seedHex: result.seedHex }
+    return { publicKey: result.signingPubkeyHex, npub: '', nsec: result.seedHex, seedHex: result.seedHex }
   }
   throw new Error('WASM ephemeral keypair not yet implemented')
 }

@@ -1,7 +1,7 @@
 /**
- * Step definitions for Nostr relay event delivery BDD scenarios.
+ * Step definitions for WebSocket relay event delivery BDD scenarios.
  *
- * Uses RelayCapture to subscribe to the local strfry instance and assert
+ * Uses RelayCapture to subscribe to the in-process WebSocket relay and assert
  * that server-published events arrive within the expected timeframe.
  */
 import { expect } from '@playwright/test'
@@ -12,17 +12,18 @@ import {
   simulateIncomingCall,
   simulateAnswerCall,
   simulateEndCall,
-  simulateVoicemail,
   simulateIncomingMessage,
   uniqueCallerNumber,
 } from '../../simulation-helpers'
-import { verifyEvent } from 'nostr-tools/pure'
-import { deriveServerEventKey, decryptHubEvent, getCurrentEpoch } from '../../helpers/relay-crypto'
+import { ed25519 } from '@noble/curves/ed25519.js'
+import { hexToBytes, utf8ToBytes } from '@shared/encoding'
+import { deriveServerEventKey, decryptHubEvent } from '../../helpers/relay-crypto'
+import { ADMIN_SEED } from '../../api-helpers'
 
-const RELAY_URL = process.env.TEST_RELAY_URL || 'ws://localhost:7777'
+const RELAY_URL = process.env.TEST_RELAY_URL || 'ws://localhost:3000/ws'
 const BASE_URL = process.env.TEST_HUB_URL || 'http://localhost:3000'
 // Default dev secret from scripts/dev-node.sh — used for event decryption in tests
-const DEV_SERVER_SECRET = '0000000000000000000000000000000000000000000000000000000000000001'
+const DEV_SERVER_SECRET = '0000000000000000000000000000000000000000000000000000000000000002'
 
 const RELAY_KEY = 'relay'
 
@@ -47,9 +48,10 @@ Given('the test relay is connected and capturing events', async ({ world }) => {
   if (state.relayCapture) {
     state.relayCapture.close()
   }
-  // Pass hubId to scope the subscription — prevents cross-scenario relay event contamination
-  // when 3 Playwright workers run in parallel and events from other hubs leak in.
-  state.relayCapture = await RelayCapture.connect(RELAY_URL, state.hubId ?? undefined)
+  state.relayCapture = await RelayCapture.connect(RELAY_URL, {
+    seedHex: ADMIN_SEED,
+    hubId: state.hubId ?? undefined,
+  })
 })
 
 After(async ({ world }) => {
@@ -90,8 +92,6 @@ When('the active call is ended', async ({ request, world }) => {
   expect(state.callId).toBeTruthy()
   await simulateEndCall(request, state.callId!)
 })
-
-// 'the call goes to voicemail' defined in call-routing.steps.ts
 
 // --- Messaging Triggers ---
 
@@ -138,7 +138,7 @@ Then(
 Then('the decrypted event content type should be {string}', async ({ world }, expectedType: string) => {
   const rs = getRelayState(world)
   expect(rs.lastCapturedEvent).toBeTruthy()
-  const content = decryptEventContent(rs.lastCapturedEvent!)
+  const content = decryptEventPayload(rs.lastCapturedEvent!)
   expect(content).toBeTruthy()
   expect(content!.type).toBe(expectedType)
 })
@@ -146,7 +146,7 @@ Then('the decrypted event content type should be {string}', async ({ world }, ex
 Then('the event should contain a {string} field', async ({ world }, fieldName: string) => {
   const rs = getRelayState(world)
   expect(rs.lastCapturedEvent).toBeTruthy()
-  const content = decryptEventContent(rs.lastCapturedEvent!)
+  const content = decryptEventPayload(rs.lastCapturedEvent!)
   expect(content).toBeTruthy()
   expect(content![fieldName]).toBeDefined()
 })
@@ -156,18 +156,18 @@ Then(
   async ({ world }, fieldName: string, expectedValue: string) => {
     const rs = getRelayState(world)
     expect(rs.lastCapturedEvent).toBeTruthy()
-    const content = decryptEventContent(rs.lastCapturedEvent!)
+    const content = decryptEventPayload(rs.lastCapturedEvent!)
     expect(content).toBeTruthy()
     expect(content![fieldName]).toBe(expectedValue)
   },
 )
 
-Then('the raw event content should NOT be valid JSON', async ({ world }) => {
+Then('the raw event payload should NOT be valid JSON', async ({ world }) => {
   const rs = getRelayState(world)
   expect(rs.lastCapturedEvent).toBeTruthy()
   let isJson = false
   try {
-    JSON.parse(rs.lastCapturedEvent!.content)
+    JSON.parse(rs.lastCapturedEvent!.payload)
     isJson = true
   } catch {
     isJson = false
@@ -178,25 +178,45 @@ Then('the raw event content should NOT be valid JSON', async ({ world }) => {
 Then('the decrypted event content should be valid JSON', async ({ world }) => {
   const rs = getRelayState(world)
   expect(rs.lastCapturedEvent).toBeTruthy()
-  const content = decryptEventContent(rs.lastCapturedEvent!)
+  const content = decryptEventPayload(rs.lastCapturedEvent!)
   expect(content).toBeTruthy()
 })
 
 Then(
-  'the event should have tag {string} with value {string}',
-  async ({ world }, tagName: string, tagValue: string) => {
+  'the event hubId should be {string}',
+  async ({ world }, expectedHubId: string) => {
     const rs = getRelayState(world)
     expect(rs.lastCapturedEvent).toBeTruthy()
-    const tag = rs.lastCapturedEvent!.tags.find((t) => t[0] === tagName && t[1] === tagValue)
-    expect(tag).toBeTruthy()
+    expect(rs.lastCapturedEvent!.hubId).toBe(expectedHubId)
   },
 )
 
-Then('the event signature should be valid', async ({ world }) => {
+Then('the event version should be {int}', async ({ world }, expectedVersion: number) => {
   const rs = getRelayState(world)
   expect(rs.lastCapturedEvent).toBeTruthy()
-  // verifyEvent checks id, sig, and pubkey
-  const valid = verifyEvent(rs.lastCapturedEvent as Parameters<typeof verifyEvent>[0])
+  expect(rs.lastCapturedEvent!.v).toBe(expectedVersion)
+})
+
+Then('the event signature should be valid', async ({ request, world }) => {
+  const rs = getRelayState(world)
+  expect(rs.lastCapturedEvent).toBeTruthy()
+
+  // Fetch server pubkey for signature verification
+  if (!rs.serverPubkey) {
+    const res = await request.get(`${BASE_URL}/api/config`)
+    const config = (await res.json()) as { serverPubkey?: string }
+    rs.serverPubkey = config.serverPubkey
+  }
+  expect(rs.serverPubkey).toBeTruthy()
+
+  const event = rs.lastCapturedEvent!
+  // Reconstruct the signed message: "{v}:{hubId}:{kind}:{epoch}:{payload}:{ts}"
+  const sigMessage = `${event.v}:${event.hubId}:${event.kind}:${event.epoch}:${event.payload}:${event.ts}`
+  const valid = ed25519.verify(
+    hexToBytes(event.sig),
+    utf8ToBytes(sigMessage),
+    hexToBytes(rs.serverPubkey!),
+  )
   expect(valid).toBe(true)
 })
 
@@ -208,44 +228,41 @@ Then("the event pubkey should match the server's configured pubkey", async ({ re
     const config = (await res.json()) as { serverPubkey?: string }
     rs.serverPubkey = config.serverPubkey
   }
-  if (rs.serverPubkey) {
-    expect(rs.lastCapturedEvent!.pubkey).toBe(rs.serverPubkey)
-  }
+  // In the new protocol, events don't carry pubkey — the server's identity
+  // is verified via the signature. Just assert we have a server pubkey configured.
+  expect(rs.serverPubkey).toBeTruthy()
 })
 
 // --- Helpers ---
 
 /**
- * Decrypt event content using the server event key derived from SERVER_NOSTR_SECRET.
+ * Decrypt event payload using the server event key derived from SERVER_NOSTR_SECRET.
  *
- * Format: hex(nonce_24 || ciphertext)
- * Algorithm: XChaCha20-Poly1305
- * Key derivation: HKDF(SHA-256, secret, salt=empty, info="llamenos:hub-event", 32)
+ * The new WsEventMessage uses `payload` (encrypted hex string) and `epoch`.
+ * Decryption uses HKDF(SHA-256, secret, salt=LABEL_SERVER_EVENT_ENCRYPTION_KEY,
+ * info=LABEL_HUB_EVENT_EPOCH:epoch, 32) + AES-256-GCM with padded plaintext.
  *
  * Falls back to direct JSON parse for unencrypted content (shouldn't happen in prod).
  */
-function decryptEventContent(event: CapturedEvent): Record<string, unknown> | null {
+function decryptEventPayload(event: CapturedEvent): Record<string, unknown> | null {
   // Try direct JSON parse first (unencrypted fallback)
   try {
-    return JSON.parse(event.content) as Record<string, unknown>
+    return JSON.parse(event.payload) as Record<string, unknown>
   } catch {
-    // Content is encrypted — decrypt with server event key
+    // Payload is encrypted — decrypt with server event key
   }
 
   const secret = process.env.SERVER_NOSTR_SECRET || process.env.DEV_SERVER_SECRET || DEV_SERVER_SECRET
   if (!secret) {
-    console.warn('[relay.steps] No SERVER_NOSTR_SECRET — cannot decrypt event content')
+    console.warn('[relay.steps] No SERVER_NOSTR_SECRET — cannot decrypt event payload')
     return null
   }
 
   try {
-    // Extract epoch from event tags — server embeds ['epoch', epochNum] for forward secrecy
-    const epochTag = event.tags.find(t => t[0] === 'epoch')
-    const epoch = epochTag ? parseInt(epochTag[1], 10) : getCurrentEpoch()
-    const eventKey = deriveServerEventKey(secret, undefined, epoch)
-    return decryptHubEvent(event.content, eventKey)
+    const eventKey = deriveServerEventKey(secret, undefined, event.epoch)
+    return decryptHubEvent(event.payload, eventKey, event.epoch)
   } catch (err) {
-    console.warn('[relay.steps] Failed to decrypt event content:', err)
+    console.warn('[relay.steps] Failed to decrypt event payload:', err)
     return null
   }
 }

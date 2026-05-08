@@ -106,8 +106,8 @@ describe('conversations route validation', () => {
         encryptedContent: 'some-content',
         readerEnvelopes: [{
           pubkey: 'bad',
-          wrappedKey: 'key',
-          ephemeralPubkey: VALID_ENVELOPE.ephemeralPubkey,
+          enc: VALID_ENVELOPE.enc,
+          ct: 'key',
         }],
       })
       expect(res.status).toBe(400)

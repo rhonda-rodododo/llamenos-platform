@@ -1,17 +1,10 @@
 /**
  * File encryption/decryption.
  *
- * ECIES operations (unwrap, decrypt metadata, rewrap) delegate to Rust via platform.ts.
- * Symmetric file content encryption stays in JS (random key, no nsec involved).
- * Metadata encryption for recipients stays in JS (ephemeral keys, no nsec).
+ * All HPKE and symmetric operations delegate to Rust via platform.ts IPC.
+ * No direct noble/crypto imports — everything routes through the Rust backend.
  */
 
-import { secp256k1 } from '@noble/curves/secp256k1.js'
-import { xchacha20poly1305 } from '@noble/ciphers/chacha.js'
-import { sha256 } from '@noble/hashes/sha2.js'
-import { hkdf } from '@noble/hashes/hkdf.js'
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
-import { utf8ToBytes } from '@noble/ciphers/utils.js'
 import type { EncryptedFileMetadata, FileKeyEnvelope } from '@shared/types'
 import { LABEL_FILE_KEY, LABEL_FILE_METADATA } from '@shared/crypto-labels'
 import {
@@ -19,7 +12,27 @@ import {
   decryptFileMetadata as platformDecryptFileMetadata,
   rewrapFileKey as platformRewrapFileKey,
   eciesWrapKey,
+  hpkeSealKey,
+  hpkeOpenKeyFromState,
+  aesGcmEncrypt,
+  aesGcmDecrypt,
 } from './platform'
+
+function bytesToHex(bytes: Uint8Array): string {
+  let hex = ''
+  for (let i = 0; i < bytes.length; i++) {
+    hex += bytes[i].toString(16).padStart(2, '0')
+  }
+  return hex
+}
+
+function hexToBytes(hex: string): Uint8Array {
+  const bytes = new Uint8Array(hex.length / 2)
+  for (let i = 0; i < bytes.length; i++) {
+    bytes[i] = parseInt(hex.substring(i * 2, i * 2 + 2), 16)
+  }
+  return bytes
+}
 
 function randomBytes(n: number): Uint8Array {
   const buf = new Uint8Array(n)
@@ -28,64 +41,25 @@ function randomBytes(n: number): Uint8Array {
 }
 
 /**
- * Unwrap a symmetric file key using CryptoState (nsec stays in Rust).
+ * Unwrap a symmetric file key using CryptoState (private key stays in Rust).
  * Returns the file key as hex string.
  */
 export async function unwrapFileKey(
-  encryptedFileKeyHex: string,
-  ephemeralPubkeyHex: string,
+  encHex: string,
+  ctHex: string,
 ): Promise<string> {
-  return platformUnwrapFileKey({
-    wrappedKey: encryptedFileKeyHex,
-    ephemeralPubkey: ephemeralPubkeyHex,
-  })
+  return platformUnwrapFileKey({ enc: encHex, ct: ctHex })
 }
 
 /**
- * Encrypt a file's metadata for a recipient (ECIES with LABEL_FILE_METADATA domain separation).
- * Uses ephemeral keys — no nsec involved, stays in JS.
- */
-function encryptMetadataForPubkey(
-  metadata: EncryptedFileMetadata,
-  recipientPubkeyHex: string,
-): { pubkey: string; encryptedContent: string; ephemeralPubkey: string } {
-  const ephemeralSecret = randomBytes(32)
-  const ephemeralPublicKey = secp256k1.getPublicKey(ephemeralSecret, true)
-
-  const recipientCompressed = hexToBytes('02' + recipientPubkeyHex)
-  const shared = secp256k1.getSharedSecret(ephemeralSecret, recipientCompressed)
-  const sharedX = shared.slice(1, 33)
-
-  // ECIES v2: HKDF-SHA256 key derivation with version byte
-  const symmetricKey = hkdf(sha256, sharedX, new Uint8Array(0), utf8ToBytes(LABEL_FILE_METADATA), 32)
-
-  const nonce = randomBytes(24)
-  const cipher = xchacha20poly1305(symmetricKey as Uint8Array, nonce)
-  const plaintext = utf8ToBytes(JSON.stringify(metadata))
-  const ciphertext = cipher.encrypt(plaintext)
-
-  // Pack: version(1) + nonce(24) + ciphertext
-  const packed = new Uint8Array(1 + nonce.length + ciphertext.length)
-  packed[0] = 0x02 // ECIES_VERSION_V2
-  packed.set(nonce, 1)
-  packed.set(ciphertext, 1 + nonce.length)
-
-  return {
-    pubkey: recipientPubkeyHex,
-    encryptedContent: bytesToHex(packed),
-    ephemeralPubkey: bytesToHex(ephemeralPublicKey),
-  }
-}
-
-/**
- * Decrypt file metadata using CryptoState (nsec stays in Rust).
+ * Decrypt file metadata using CryptoState.
  */
 export async function decryptFileMetadata(
   encryptedContentHex: string,
-  ephemeralPubkeyHex: string,
+  encHex: string,
 ): Promise<EncryptedFileMetadata | null> {
   try {
-    const json = await platformDecryptFileMetadata(encryptedContentHex, ephemeralPubkeyHex)
+    const json = await platformDecryptFileMetadata(encryptedContentHex, encHex)
     return json ? JSON.parse(json) : null
   } catch {
     return null
@@ -98,15 +72,15 @@ export interface EncryptedFileUpload {
   encryptedMetadata: Array<{
     pubkey: string
     encryptedContent: string
-    ephemeralPubkey: string
+    enc: string
+    ct: string
   }>
 }
 
 /**
  * Encrypt a file for multiple recipients.
- * Uses a single random symmetric key to encrypt the file content once,
- * then wraps that key for each recipient using ECIES via Rust.
- * No nsec involved — uses ephemeral keys for ECIES wrapping.
+ * Uses a single random symmetric key to encrypt the file content once (AES-256-GCM),
+ * then wraps that key for each recipient using HPKE via Rust.
  */
 export async function encryptFile(
   file: File,
@@ -126,32 +100,36 @@ export async function encryptFile(
   }
 
   // Generate random symmetric key for file content
-  const fileKey = randomBytes(32)
-  const fileNonce = randomBytes(24)
-  const cipher = xchacha20poly1305(fileKey, fileNonce)
-  const encryptedContent = cipher.encrypt(plaintextBytes)
+  const fileKeyHex = bytesToHex(randomBytes(32))
 
-  // Pack: nonce (24) + ciphertext
-  const packed = new Uint8Array(fileNonce.length + encryptedContent.length)
-  packed.set(fileNonce)
-  packed.set(encryptedContent, fileNonce.length)
+  // AES-256-GCM encrypt file content
+  const encryptedContentHex = await aesGcmEncrypt(
+    bytesToHex(plaintextBytes),
+    fileKeyHex,
+  )
+  const encryptedContent = hexToBytes(encryptedContentHex)
 
-  // Wrap the file key for each recipient using ECIES via Rust (stateless — ephemeral key)
-  const fileKeyHex = bytesToHex(fileKey)
+  // Wrap the file key for each recipient using HPKE via Rust
   const recipientEnvelopes: FileKeyEnvelope[] = await Promise.all(
     recipientPubkeys.map(async (pubkey) => {
-      const { wrappedKey, ephemeralPubkey } = await eciesWrapKey(fileKeyHex, pubkey, LABEL_FILE_KEY)
-      return { pubkey, encryptedFileKey: wrappedKey, ephemeralPubkey }
+      const { enc, ct } = await eciesWrapKey(fileKeyHex, pubkey, LABEL_FILE_KEY)
+      return { pubkey, enc, ct }
     })
   )
 
-  // Encrypt metadata for each recipient (JS — ephemeral keys, no nsec)
-  const encryptedMetadataList = recipientPubkeys.map(pubkey =>
-    encryptMetadataForPubkey(metadata, pubkey)
+  // Encrypt metadata for each recipient using HPKE via Rust
+  const metadataJson = JSON.stringify(metadata)
+  const encryptedMetadataList = await Promise.all(
+    recipientPubkeys.map(async (pubkey) => {
+      const metadataKeyHex = bytesToHex(randomBytes(32))
+      const encContent = await aesGcmEncrypt(metadataJson, metadataKeyHex)
+      const { enc, ct } = await eciesWrapKey(metadataKeyHex, pubkey, LABEL_FILE_METADATA)
+      return { pubkey, encryptedContent: encContent, enc, ct }
+    })
   )
 
   return {
-    encryptedContent: packed,
+    encryptedContent,
     recipientEnvelopes,
     encryptedMetadata: encryptedMetadataList,
   }
@@ -159,22 +137,18 @@ export async function encryptFile(
 
 /**
  * Decrypt a file given the encrypted content and key envelope.
- * ECIES unwrap goes through CryptoState (Rust); symmetric decryption stays in JS.
+ * HPKE unwrap goes through CryptoState (Rust); symmetric decryption also via IPC.
  */
 export async function decryptFile(
   encryptedContent: ArrayBuffer,
   envelope: FileKeyEnvelope,
 ): Promise<{ blob: Blob; checksum: string }> {
-  // Unwrap the file key via Rust CryptoState (returns hex)
-  const fileKeyHex = await unwrapFileKey(envelope.encryptedFileKey, envelope.ephemeralPubkey)
-  const fileKey = hexToBytes(fileKeyHex)
+  const fileKeyHex = await unwrapFileKey(envelope.enc, envelope.ct)
 
-  // Extract nonce and decrypt (symmetric — stays in JS)
   const data = new Uint8Array(encryptedContent)
-  const nonce = data.slice(0, 24)
-  const ciphertext = data.slice(24)
-  const cipher = xchacha20poly1305(fileKey, nonce)
-  const plaintext = cipher.decrypt(ciphertext)
+  const encryptedHex = bytesToHex(data)
+  const plaintextHex = await aesGcmDecrypt(encryptedHex, fileKeyHex)
+  const plaintext = hexToBytes(plaintextHex)
 
   // Compute checksum for verification
   const hashBuffer = await crypto.subtle.digest('SHA-256', plaintext.buffer as ArrayBuffer)
@@ -188,21 +162,21 @@ export async function decryptFile(
 
 /**
  * Re-wrap a file's symmetric key for a new recipient via CryptoState.
- * Admin's nsec stays in Rust — decrypts and re-encrypts in one IPC call.
+ * Admin's private key stays in Rust — decrypts and re-encrypts in one IPC call.
  */
 export async function rewrapFileKey(
-  encryptedFileKeyHex: string,
-  ephemeralPubkeyHex: string,
+  encHex: string,
+  ctHex: string,
   newRecipientPubkeyHex: string,
 ): Promise<FileKeyEnvelope> {
   const envelope = await platformRewrapFileKey(
-    encryptedFileKeyHex,
-    ephemeralPubkeyHex,
+    encHex,
+    ctHex,
     newRecipientPubkeyHex,
   )
   return {
     pubkey: newRecipientPubkeyHex,
-    encryptedFileKey: envelope.wrappedKey,
-    ephemeralPubkey: envelope.ephemeralPubkey,
+    enc: envelope.enc,
+    ct: envelope.ct,
   }
 }

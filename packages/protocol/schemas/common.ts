@@ -3,8 +3,11 @@ import { z } from 'zod'
 /** Hex-encoded 32-byte Nostr public key (x-only, 64 hex chars) */
 export const pubkeySchema = z.string().regex(/^[0-9a-f]{64}$/, 'Must be a 64-character hex string')
 
-/** Hex-encoded ECIES ephemeral public key — compressed SEC1 (33 bytes, 66 hex) or x-only (32 bytes, 64 hex) */
-export const eciesPubkeySchema = z.string().regex(/^[0-9a-f]{64,66}$/, 'Must be a 64 or 66-character hex string')
+/** Hex-encoded X25519 ephemeral public key (32 bytes, 64 hex) */
+export const hpkeEncSchema = z.string().regex(/^[0-9a-f]{64}$/, 'Must be a 64-character hex string (32-byte X25519 enc)')
+
+/** @deprecated Use hpkeEncSchema — kept only for schema migration references */
+export const eciesPubkeySchema = hpkeEncSchema
 
 /** UUID v4 */
 export const uuidSchema = z.uuid()
@@ -52,36 +55,37 @@ export const paginatedMeta = {
 /** Generic success response */
 export const okResponseSchema = z.object({ ok: z.boolean() })
 
-/** ECIES recipient envelope — used across notes, messages, files */
+/** HPKE recipient envelope — used across notes, messages, files */
 export const recipientEnvelopeSchema = z.looseObject({
   pubkey: pubkeySchema,
-  wrappedKey: z.string().min(1),
-  ephemeralPubkey: eciesPubkeySchema,
+  enc: hpkeEncSchema,
+  ct: z.string().min(1),
 })
 
 /** Key envelope — used for note author copies (no pubkey) */
 export const keyEnvelopeSchema = z.looseObject({
-  wrappedKey: z.string().min(1),
-  ephemeralPubkey: eciesPubkeySchema,
+  enc: hpkeEncSchema,
+  ct: z.string().min(1),
 })
 
 /** File key envelope — used for file uploads */
 export const fileKeyEnvelopeSchema = z.looseObject({
   pubkey: pubkeySchema,
-  encryptedFileKey: z.string().min(1),
-  ephemeralPubkey: eciesPubkeySchema,
+  enc: hpkeEncSchema,
+  ct: z.string().min(1),
 })
 
 /** Encrypted metadata entry — used for file uploads */
 export const encryptedMetadataEntrySchema = z.looseObject({
   pubkey: z.string().min(1),
   encryptedContent: z.string().min(1),
-  ephemeralPubkey: eciesPubkeySchema,
+  enc: hpkeEncSchema,
+  ct: z.string().min(1),
 })
 
 // --- Inferred types (canonical source of truth for envelope types) ---
 
-/** Unified ECIES-wrapped symmetric key for one recipient. */
+/** HPKE-wrapped symmetric key for one recipient. */
 export type RecipientEnvelope = z.infer<typeof recipientEnvelopeSchema>
 
 /** Key envelope — note author copies (no pubkey). @deprecated Use RecipientEnvelope. */
@@ -90,5 +94,5 @@ export type KeyEnvelope = z.infer<typeof keyEnvelopeSchema>
 /** @deprecated Use RecipientEnvelope instead. */
 export type RecipientKeyEnvelope = RecipientEnvelope
 
-/** ECIES-wrapped file encryption key for one recipient. */
+/** HPKE-wrapped file encryption key for one recipient. */
 export type FileKeyEnvelope = z.infer<typeof fileKeyEnvelopeSchema>

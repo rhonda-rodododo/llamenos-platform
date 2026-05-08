@@ -1,6 +1,6 @@
 import Twilio from 'twilio'
 import { expect, type Page, type APIRequestContext } from '@playwright/test'
-import { xchacha20poly1305 } from '@noble/ciphers/chacha.js'
+import { gcm } from '@noble/ciphers/aes.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
 import { bytesToHex } from '@noble/hashes/utils.js'
 import { getPublicKey, nip19 } from 'nostr-tools'
@@ -36,7 +36,7 @@ export function createTwilioClient() {
 
 /**
  * Pre-compute an encrypted key blob and inject it into localStorage.
- * Same PBKDF2 + XChaCha20-Poly1305 format as key-store.ts.
+ * Same PBKDF2 + AES-256-GCM format as key-store.ts.
  */
 async function preloadEncryptedKey(page: Page, nsec: string, pin: string): Promise<void> {
   const encoder = new TextEncoder()
@@ -51,8 +51,8 @@ async function preloadEncryptedKey(page: Page, nsec: string, pin: string): Promi
   )
   const kek = new Uint8Array(derivedBits)
 
-  const nonce = crypto.getRandomValues(new Uint8Array(24))
-  const cipher = xchacha20poly1305(kek, nonce)
+  const nonce = crypto.getRandomValues(new Uint8Array(12))
+  const cipher = gcm(kek, nonce)
   const ciphertext = cipher.encrypt(utf8ToBytes(nsec))
 
   const decoded = nip19.decode(nsec)

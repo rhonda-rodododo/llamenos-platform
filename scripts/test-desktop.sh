@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Desktop test runner
-# Pipeline: codegen -> typecheck -> test:build -> crypto:wasm -> crypto:interop-vectors -> playwright
+# Pipeline: codegen -> typecheck -> test:build -> crypto:interop-vectors -> playwright
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -60,18 +60,7 @@ if ! reporter_run_step "test:build" bun run build; then
 fi
 reporter_record_suite "build" 1 0 0
 
-# Step 3.5a: Build WASM crypto module (enables crypto-interop-wasm.spec.ts)
-# WASM dist is gitignored so must be built at test time.
-# Non-fatal: if wasm-pack is unavailable or compilation fails, the 8 WASM interop tests are skipped.
-if command -v wasm-pack &>/dev/null && command -v cargo &>/dev/null; then
-  if reporter_run_step "crypto:wasm" bun run crypto:wasm; then
-    reporter_record_suite "crypto:wasm" 1 0 0
-  else
-    echo "WARNING: WASM build failed — crypto-interop-wasm tests will be skipped" >&2
-  fi
-fi
-
-# Step 3.5b: Generate crypto interop test vectors (enables crypto-interop.spec.ts)
+# Step 3.5: Generate crypto interop test vectors (enables crypto-interop.spec.ts)
 # Vectors are gitignored (non-deterministic nonces) so must be generated at test time.
 # Non-fatal: if cargo is unavailable or compilation fails, the 32 interop tests are skipped.
 if command -v cargo &>/dev/null; then

@@ -29,8 +29,3 @@ pub mod provisioning {
 pub mod encryption {
     pub use crate::encryption_legacy::*;
 }
-
-/// Legacy BIP-340 Schnorr auth token (for backward compatibility during transition).
-pub mod auth_schnorr {
-    pub use crate::auth_legacy::*;
-}

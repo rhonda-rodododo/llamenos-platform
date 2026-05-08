@@ -284,7 +284,11 @@ export async function getConfig() {
       needsBootstrap?: boolean
       hubs?: import('@shared/types').Hub[]
       defaultHubId?: string
+      serverPubkey?: string
+      wsRelayUrl?: string
+      /** @deprecated Use serverPubkey */
       serverNostrPubkey?: string
+      /** @deprecated Use wsRelayUrl */
       nostrRelayUrl?: string
       apiVersion?: number
       minApiVersion?: number
@@ -1293,12 +1297,12 @@ export async function getFileEnvelopes(fileId: string) {
 }
 
 export async function getFileMetadata(fileId: string) {
-  return request<{ metadata: Array<{ pubkey: string; encryptedContent: string; ephemeralPubkey: string }> }>(`/files/${fileId}/metadata`)
+  return request<{ metadata: Array<{ pubkey: string; encryptedContent: string; enc: string; ct: string }> }>(`/files/${fileId}/metadata`)
 }
 
 export async function shareFile(fileId: string, data: {
   envelope: import('@shared/types').FileKeyEnvelope
-  encryptedMetadata: { pubkey: string; encryptedContent: string; ephemeralPubkey: string }
+  encryptedMetadata: { pubkey: string; encryptedContent: string; enc: string; ct: string }
 }) {
   return request<{ ok: true }>(`/files/${fileId}/share`, {
     method: 'POST',

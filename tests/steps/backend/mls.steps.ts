@@ -11,7 +11,7 @@ import {
   createUserViaApi,
   createHubViaApi,
 } from '../../api-helpers'
-import { bytesToHex } from '@noble/hashes/utils.js'
+import { bytesToHex } from '@shared/encoding'
 
 // ─��� State ────────────────────────────────��──────────────────────────
 

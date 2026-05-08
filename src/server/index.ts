@@ -3,7 +3,7 @@
  * Runs the Hono worker app as a pure API server using Bun's native HTTP.
  *
  * The frontend is served by Tauri's webview — this server handles
- * only API routes. Real-time events use the Nostr relay (strfry).
+ * only API routes. Real-time events use the WebSocket relay.
  */
 import 'reflect-metadata' // Required by @peculiar/x509 → tsyringe (transitive dep of @simplewebauthn/server)
 import { Hono } from 'hono'
@@ -11,13 +11,14 @@ import { createDatabase, closeDb } from '../../apps/worker/db'
 import { createServices, type Services } from '../../apps/worker/services'
 import { createBlobStorage } from '../../apps/worker/lib/blob-storage'
 import { createTranscriptionService } from '../../apps/worker/lib/transcription-client'
-import { createNostrPublisher, NodeNostrPublisher } from '../../apps/worker/lib/nostr-publisher'
-import { EventOutbox } from '../../apps/worker/lib/nostr-outbox'
-import { startOutboxPoller, stopOutboxPoller } from '../../apps/worker/lib/nostr-outbox-poller'
 import { validateConfig } from '../../apps/worker/lib/config'
 import { getMessagingAdapterFromService } from '../../apps/worker/lib/service-factories'
-import { publishNostrEvent } from '../../apps/worker/lib/nostr-events'
-import { KIND_BLAST_PROGRESS, KIND_BLAST_STATUS } from '../../packages/shared/nostr-events'
+import { publishEvent } from '../../apps/worker/lib/ws-events'
+import { initConnectionManager } from '../../apps/worker/lib/ws-manager'
+import { deriveServerKeypair } from '../../apps/worker/lib/server-identity'
+import { createWsHandler, createConnectionData } from '../../apps/worker/routes/ws'
+import type { WsConnectionData } from '../../apps/worker/routes/ws'
+import { KIND_BLAST_PROGRESS, KIND_BLAST_STATUS } from '../../packages/shared/event-kinds'
 import type { MessagingChannelType } from '../../packages/shared/types'
 import type { Env } from '../../apps/worker/types/infra'
 import fs from 'node:fs'
@@ -45,8 +46,8 @@ console.log('[llamenos] Database initialized')
 
 // --- Read secrets ---
 const hmacSecret = readSecret('hmac-secret', 'HMAC_SECRET')
-const serverNostrSecret = readSecret('server-nostr-secret', 'SERVER_NOSTR_SECRET')
-const nostrRelayUrl = process.env.NOSTR_RELAY_URL || ''
+// SERVER_SECRET is the canonical name; SERVER_NOSTR_SECRET is the legacy alias
+const serverSecret = readSecret('server-secret', 'SERVER_SECRET') || readSecret('server-nostr-secret', 'SERVER_NOSTR_SECRET')
 const firehoseSealKey = readSecret('firehose-agent-seal-key', 'FIREHOSE_AGENT_SEAL_KEY') || undefined
 
 // --- Create services (pass HMAC secret for encryption operations) ---
@@ -63,8 +64,8 @@ const services: Services = createServices(db, {
   env: {
     ADMIN_PUBKEY: readSecret('admin-pubkey', 'ADMIN_PUBKEY'),
     ADMIN_DECRYPTION_PUBKEY: process.env.ADMIN_DECRYPTION_PUBKEY || undefined,
-    SERVER_NOSTR_SECRET: serverNostrSecret || undefined,
-    NOSTR_RELAY_URL: nostrRelayUrl || undefined,
+    SERVER_SECRET: serverSecret || undefined,
+    SERVER_NOSTR_SECRET: serverSecret || undefined, // Legacy alias for transition
   },
 })
 console.log('[llamenos] Services initialized')
@@ -81,33 +82,20 @@ const env: Record<string, unknown> = {
   DEMO_MODE: process.env.DEMO_MODE || undefined,
   AI: createTranscriptionService(),
   R2_BUCKET: createBlobStorage(),
-  STORAGE_ENDPOINT: process.env.STORAGE_ENDPOINT || process.env.STORAGE_ENDPOINT || undefined,
-  SERVER_NOSTR_SECRET: serverNostrSecret || undefined,
-  NOSTR_RELAY_URL: nostrRelayUrl || undefined,
-  NOSTR_RELAY_PUBLIC_URL: process.env.NOSTR_RELAY_PUBLIC_URL || undefined,
+  STORAGE_ENDPOINT: process.env.STORAGE_ENDPOINT || undefined,
+  SERVER_SECRET: serverSecret || undefined,
+  SERVER_NOSTR_SECRET: serverSecret || undefined, // Legacy alias for transition
   GLITCHTIP_DSN: process.env.GLITCHTIP_DSN || undefined,
   DEV_RESET_SECRET: process.env.DEV_RESET_SECRET || undefined,
   E2E_TEST_SECRET: process.env.E2E_TEST_SECRET || undefined,
   FIREHOSE_AGENT_SEAL_KEY: firehoseSealKey,
 }
 
-// --- Nostr publisher with persistent outbox ---
-if (serverNostrSecret && nostrRelayUrl) {
-  const publisher = createNostrPublisher({
-    SERVER_NOSTR_SECRET: serverNostrSecret,
-    NOSTR_RELAY_URL: nostrRelayUrl,
-  })
-
-  if (publisher instanceof NodeNostrPublisher) {
-    const outbox = new EventOutbox(db)
-    publisher.setOutbox(outbox)
-    startOutboxPoller(outbox, publisher)
-    publisher.connect().catch((err) => {
-      console.warn('[server] Initial relay connection failed (outbox will retry):', err)
-    })
-  }
-
-  env.NOSTR_PUBLISHER = publisher
+// --- Initialize WebSocket relay ---
+if (serverSecret) {
+  const keypair = deriveServerKeypair(serverSecret)
+  initConnectionManager(keypair.secretKey)
+  console.log('[llamenos] WebSocket relay initialized (server pubkey:', keypair.pubkeyHex.slice(0, 8) + '...)')
 }
 
 // --- Start scheduled task poller with blast delivery worker ---
@@ -124,18 +112,18 @@ services.scheduler.start({
   resolveIdentifier: (subscriberId: string) =>
     services.blasts.resolveSubscriberIdentifier(subscriberId),
   onBlastProgress: (blastId, stats) => {
-    publishNostrEvent(env as unknown as Env, KIND_BLAST_PROGRESS, {
+    publishEvent(env as unknown as Env, KIND_BLAST_PROGRESS, {
       type: 'blast:progress',
       blastId,
       ...stats,
-    }).catch(() => {})
+    })
   },
   onBlastStatusChange: (blastId, status) => {
-    publishNostrEvent(env as unknown as Env, KIND_BLAST_STATUS, {
+    publishEvent(env as unknown as Env, KIND_BLAST_STATUS, {
       type: 'blast:status',
       blastId,
       status,
-    }).catch(() => {})
+    })
   },
 })
 
@@ -164,9 +152,39 @@ app.all('*', (c) => c.json({ error: 'Not Found' }, 404))
 
 const port = parseInt(process.env.PORT || '3000')
 
+// --- WebSocket handler ---
+const wsHandler = createWsHandler()
+
+/** Look up user hub memberships for WS auth */
+async function lookupUserHubs(pubkey: string): Promise<{ hubs: string[] } | null> {
+  const user = await services.identity.getUserInternal(pubkey)
+  if (!user || !user.active) return null
+  // Get all hubs and filter to those the user is a member of
+  const { hubs } = await services.settings.getHubs()
+  // User's hubRoles indicate hub membership
+  const memberHubIds = (user.hubRoles ?? []).map(hr => hr.hubId)
+  const activeHubIds = hubs
+    .filter(h => h.status === 'active' && memberHubIds.includes(h.id))
+    .map(h => h.id)
+  // Always include 'global' — messaging events (1010, 1011) and other
+  // hub-agnostic events are published to the 'global' pseudo-hub.
+  return { hubs: [...activeHubIds, 'global'] }
+}
+
 export default {
-  fetch: app.fetch,
   port,
+  fetch(req: Request, server: import('bun').Server<WsConnectionData>): Response | Promise<Response> {
+    // Handle WebSocket upgrade requests
+    const url = new URL(req.url)
+    if (url.pathname === '/ws' && req.headers.get('upgrade')?.toLowerCase() === 'websocket') {
+      const data = createConnectionData(lookupUserHubs)
+      const upgraded = server.upgrade(req, { data })
+      if (upgraded) return new Response(null, { status: 101 })
+      return new Response('WebSocket upgrade failed', { status: 500 })
+    }
+    return app.fetch(req, server)
+  },
+  websocket: wsHandler,
 }
 
 console.log(`[llamenos] Server running at http://localhost:${port}`)
@@ -190,7 +208,6 @@ const shutdown = async () => {
   console.log('[llamenos] Shutting down...')
   services.firehoseAgent?.shutdown()
   services.scheduler.stop()
-  stopOutboxPoller()
   await closeDb()
   console.log('[llamenos] Server stopped')
   process.exit(0)

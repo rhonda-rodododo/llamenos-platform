@@ -292,7 +292,7 @@ When('an admin creates a reply on the note', async ({ request, world }) => {
     const kp = generateTestKeypair()
     await apiPost(request, `/notes/${getCrudState(world).noteId}/replies`, {
       encryptedContent: 'crud-reply-content',
-      readerEnvelopes: [{ pubkey: kp.pubkey, wrappedKey: 'key', ephemeralPubkey: kp.pubkey }],
+      readerEnvelopes: [{ pubkey: kp.pubkey, ct: 'key', enc: kp.pubkey }],
     })
   }
 })
@@ -472,7 +472,7 @@ When('the reporter creates a report titled {string}', async ({ request, world },
       title,
       category: 'general',
       encryptedContent: 'crud-report-content',
-      readerEnvelopes: [{ pubkey: kp.pubkey, wrappedKey: 'key', ephemeralPubkey: kp.pubkey }],
+      readerEnvelopes: [{ pubkey: kp.pubkey, ct: 'key', enc: kp.pubkey }],
     },
     getCrudState(world).reporterNsec!,
   )

@@ -92,6 +92,27 @@
       "when": 1773708416650,
       "tag": "0012_add_missing_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1773708416651,
+      "tag": "0013_add_reported_by_column",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1773708416652,
+      "tag": "0014_hpke_hub_keys",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1773708416653,
+      "tag": "0015_drop_nostr_outbox",
+      "breakpoints": true
     }
   ]
 }

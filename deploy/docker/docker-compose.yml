@@ -5,7 +5,6 @@
 #   postgres - PostgreSQL database
 #   caddy    - Reverse proxy with automatic TLS
 #   rustfs   - S3-compatible object storage (RustFS)
-#   strfry   - Nostr relay for real-time events
 #
 # Optional services (via --profile):
 #   whisper    - Self-hosted transcription (profile: transcription)
@@ -58,9 +57,8 @@ services:
       - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID:-}
       - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN:-}
       - TWILIO_PHONE_NUMBER=${TWILIO_PHONE_NUMBER:-}
-      # Nostr relay — required for all real-time events (presence, calls, messages)
-      - "SERVER_NOSTR_SECRET=${SERVER_NOSTR_SECRET:?SERVER_NOSTR_SECRET is required — generate with openssl rand -hex 32}"
-      - NOSTR_RELAY_URL=${NOSTR_RELAY_URL:-ws://strfry:7777}
+      # Server signing secret — required for WebSocket relay auth and event signing
+      - "SERVER_SECRET=${SERVER_SECRET:?SERVER_SECRET is required — generate with openssl rand -hex 32}"
       # Optional: GlitchTip/Sentry DSN for client crash reporting (profile: monitoring)
       - GLITCHTIP_DSN=${GLITCHTIP_DSN:-}
       # Signal notification sidecar (profile: signal)
@@ -73,8 +71,6 @@ services:
       postgres:
         condition: service_healthy
       rustfs:
-        condition: service_healthy
-      strfry:
         condition: service_healthy
     logging:
       driver: json-file
@@ -143,31 +139,6 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:9000/ || test $? -eq 22"]
       interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-
-  # ── Core: Nostr Relay (strfry) ────────────────────────────
-  strfry:
-    # dockurr/strfry:1.0.1 pinned 2026-03-21
-    image: dockurr/strfry:1.0.1@sha256:4bcfddc8aab07e17d35198c0618d6a9c8e5d3e27b211741ebce9f7058cdd1e21
-    restart: unless-stopped
-    ulimits:
-      nofile:
-        soft: 1000000
-        hard: 1000000
-    environment:
-      # Server pubkey for write-policy plugin — derived from SERVER_NOSTR_SECRET at deploy time.
-      # Generate with: bun -e "const{deriveServerKeypair}=require('./apps/worker/lib/nostr-publisher');console.log(deriveServerKeypair(process.env.SERVER_NOSTR_SECRET).pubkey)"
-      ALLOWED_PUBKEY: "${STRFRY_ALLOWED_PUBKEY:?STRFRY_ALLOWED_PUBKEY is required — derive from SERVER_NOSTR_SECRET}"
-    volumes:
-      - nostr-data:/app/strfry-db
-      - ./write-policy.sh:/app/write-policy.sh:ro
-    networks:
-      - internal
-    healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:7777"]
-      interval: 15s
       timeout: 5s
       retries: 5
       start_period: 10s
@@ -401,7 +372,6 @@ volumes:
   caddy-data:
   caddy-config:
   rustfs-data:
-  nostr-data:
   signal-data:
 
 networks:

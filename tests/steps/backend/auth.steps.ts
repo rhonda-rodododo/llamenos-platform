@@ -1,6 +1,6 @@
 /**
  * Backend auth step definitions.
- * Verifies Schnorr token validation, expired/tampered tokens, and permission checks via API.
+ * Verifies Ed25519 token validation, expired/tampered tokens, and permission checks via API.
  */
 import { expect } from '@playwright/test'
 import {Given, When, Then, getState, setState, Before} from './fixtures'
@@ -13,24 +13,21 @@ import {
   testEndpointAccess,
   createVolunteerViaApi,
   createRoleViaApi,
-  ADMIN_NSEC,
+  ADMIN_SEED,
 } from '../../api-helpers'
-import { schnorr } from '@noble/curves/secp256k1.js'
-import { sha256 } from '@noble/hashes/sha2.js'
-import { hexToBytes, bytesToHex } from '@noble/hashes/utils.js'
-import { utf8ToBytes } from '@noble/ciphers/utils.js'
-import { nip19, getPublicKey } from 'nostr-tools'
+import { ed25519 } from '@noble/curves/ed25519.js'
+import { hexToBytes, bytesToHex, utf8ToBytes } from '@shared/encoding'
+import { LABEL_DEVICE_AUTH } from '@shared/crypto-labels'
 
-const AUTH_PREFIX = 'llamenos:auth:'
 const BASE_URL = process.env.TEST_HUB_URL || 'http://localhost:3000'
 
 // ── Local auth test state ────────────────────────────────────────
 
 interface AuthTestState {
-  keypair?: { nsec: string; pubkey: string; skHex: string }
+  keypair?: { seedHex: string; pubkey: string }
   tamperedToken?: string
   authResult?: { status: number; data: unknown }
-  volunteerNsec?: string
+  volunteerSeedHex?: string
   volunteerPubkey?: string
   roleIds: string[]
 }
@@ -49,16 +46,15 @@ Before({ tags: '@backend' }, async ({ world }) => {
 // ── Helper: create raw auth token with control over timestamp ────
 
 function createRawAuthToken(
-  skHex: string,
+  seedHex: string,
   pubkey: string,
   method: string,
   path: string,
   timestampOverride?: number,
 ): { pubkey: string; timestamp: number; token: string } {
   const timestamp = timestampOverride ?? Date.now()
-  const message = `${AUTH_PREFIX}${pubkey}:${timestamp}:${method}:${path}`
-  const messageHash = sha256(utf8ToBytes(message))
-  const sig = schnorr.sign(messageHash, hexToBytes(skHex))
+  const message = utf8ToBytes(`${LABEL_DEVICE_AUTH}:${pubkey}:${timestamp}:${method}:${path}`)
+  const sig = ed25519.sign(message, hexToBytes(seedHex))
   return { pubkey, timestamp, token: bytesToHex(sig) }
 }
 
@@ -71,10 +67,10 @@ Given('a user with a valid keypair', async ({ world }) => {
 When('the user creates a signed auth token', async ({request, world}) => {
   // Register a volunteer and use its keypair for auth testing
   const vol = await createVolunteerViaApi(request, { name: `Auth Test ${Date.now()}` })
-  getAuthTestState(world).keypair = { nsec: vol.nsec, pubkey: vol.pubkey, skHex: '' }
+  getAuthTestState(world).keypair = { seedHex: vol.seedHex, pubkey: vol.pubkey }
 
   // Test with /api/auth/me — the simplest authenticated endpoint
-  const result = await getMeViaApi(request, vol.nsec)
+  const result = await getMeViaApi(request, vol.seedHex)
   getAuthTestState(world).authResult = result
 })
 
@@ -87,11 +83,11 @@ Then('the server should verify the token successfully', async ({ world }) => {
 
 When('the user presents a token older than 5 minutes', async ({request, world}) => {
   expect(getAuthTestState(world).keypair).toBeDefined()
-  const { skHex, pubkey } = getAuthTestState(world).keypair!
+  const { seedHex, pubkey } = getAuthTestState(world).keypair!
 
   // Create a token with timestamp 6 minutes in the past
   const expiredTimestamp = Date.now() - 6 * 60 * 1000
-  const token = createRawAuthToken(skHex, pubkey, 'GET', '/api/auth/me', expiredTimestamp)
+  const token = createRawAuthToken(seedHex, pubkey, 'GET', '/api/auth/me', expiredTimestamp)
 
   const res = await request.get(`${BASE_URL}/api/auth/me`, {
     headers: {
@@ -112,7 +108,7 @@ Given('a tampered auth token', async ({ world }) => {
   getAuthTestState(world).keypair = keypair
 
   // Create a valid token then tamper with the signature
-  const token = createRawAuthToken(keypair.skHex, keypair.pubkey, 'GET', '/api/auth/me')
+  const token = createRawAuthToken(keypair.seedHex, keypair.pubkey, 'GET', '/api/auth/me')
   // Flip a byte in the signature to make it invalid
   const tamperedSig = token.token.slice(0, -2) + 'ff'
   getAuthTestState(world).tamperedToken = JSON.stringify({ ...token, token: tamperedSig })
@@ -135,20 +131,20 @@ Given('a token signed by an unregistered pubkey', async ({ world }) => {
   const keypair = generateTestKeypair()
   getAuthTestState(world).keypair = keypair
   // Create a valid token for this unregistered keypair so the When step can present it
-  const token = createRawAuthToken(keypair.skHex, keypair.pubkey, 'GET', '/api/auth/me')
+  const token = createRawAuthToken(keypair.seedHex, keypair.pubkey, 'GET', '/api/auth/me')
   getAuthTestState(world).tamperedToken = JSON.stringify(token)
 })
 
 Given('a user with a registered WebAuthn credential', async ({request, world}) => {
   // Register a volunteer so the auth token will be accepted
   const vol = await createVolunteerViaApi(request, { name: `WebAuthn Test ${Date.now()}` })
-  getAuthTestState(world).keypair = { nsec: vol.nsec, pubkey: vol.pubkey, skHex: '' }
+  getAuthTestState(world).keypair = { seedHex: vol.seedHex, pubkey: vol.pubkey }
 })
 
 When('the user presents a valid session token', async ({request, world}) => {
   // Session token validation is tested via the standard auth flow
   expect(getAuthTestState(world).keypair).toBeDefined()
-  const result = await getMeViaApi(request, getAuthTestState(world).keypair!.nsec)
+  const result = await getMeViaApi(request, getAuthTestState(world).keypair!.seedHex)
   getAuthTestState(world).authResult = result
 })
 
@@ -177,19 +173,19 @@ Given('a user with the {string} role', async ({request, world}, roleName: string
     name: `${roleName} Test ${Date.now()}`,
     roleIds: [roleName === 'Super Admin' ? 'role-super-admin' : `role-${roleName.toLowerCase().replace(/ /g, '-')}`],
   })
-  getAuthTestState(world).volunteerNsec = vol.nsec
+  getAuthTestState(world).volunteerSeedHex = vol.seedHex
   getAuthTestState(world).volunteerPubkey = vol.pubkey
 })
 
 Then('they should pass permission checks for any action', async ({request, world}) => {
-  expect(getAuthTestState(world).volunteerNsec).toBeDefined()
+  expect(getAuthTestState(world).volunteerSeedHex).toBeDefined()
   // Super Admin should access admin-only endpoints
-  const status = await testEndpointAccess(request, 'GET', '/users', getAuthTestState(world).volunteerNsec!)
+  const status = await testEndpointAccess(request, 'GET', '/users', getAuthTestState(world).volunteerSeedHex!)
   expect(status).toBe(200)
 })
 
 Then('they should pass permission checks for {string}', async ({request, world}, permission: string) => {
-  expect(getAuthTestState(world).volunteerNsec).toBeDefined()
+  expect(getAuthTestState(world).volunteerSeedHex).toBeDefined()
   // Map permission to an endpoint to verify
   const endpointMap: Record<string, { method: 'GET' | 'POST'; path: string }> = {
     'notes:create': { method: 'POST', path: '/notes' },
@@ -202,7 +198,7 @@ Then('they should pass permission checks for {string}', async ({request, world},
       request,
       endpoint.method,
       endpoint.path,
-      getAuthTestState(world).volunteerNsec!,
+      getAuthTestState(world).volunteerSeedHex!,
       endpoint.method === 'POST' ? { content: 'test' } : undefined,
     )
     // Should NOT get 403
@@ -211,7 +207,7 @@ Then('they should pass permission checks for {string}', async ({request, world},
 })
 
 Then('they should fail permission checks for {string}', async ({request, world}, permission: string) => {
-  expect(getAuthTestState(world).volunteerNsec).toBeDefined()
+  expect(getAuthTestState(world).volunteerSeedHex).toBeDefined()
   const endpointMap: Record<string, { method: 'GET' | 'POST'; path: string }> = {
     'admin:settings': { method: 'GET', path: '/settings/spam' },
     'notes:read': { method: 'GET', path: '/notes' },
@@ -222,7 +218,7 @@ Then('they should fail permission checks for {string}', async ({request, world},
       request,
       endpoint.method,
       endpoint.path,
-      getAuthTestState(world).volunteerNsec!,
+      getAuthTestState(world).volunteerSeedHex!,
     )
     expect(status).toBe(403)
   }
@@ -250,13 +246,13 @@ Given('a user with {string} and {string} roles', async ({request, world}, role1:
     name: `Multi-role Test ${Date.now()}`,
     roleIds: [roleSlug1, roleSlug2],
   })
-  getAuthTestState(world).volunteerNsec = vol.nsec
+  getAuthTestState(world).volunteerSeedHex = vol.seedHex
   getAuthTestState(world).volunteerPubkey = vol.pubkey
 })
 
 Then('they should have permissions from both roles combined', async ({request, world}) => {
-  expect(getAuthTestState(world).volunteerNsec).toBeDefined()
-  const result = await getMeViaApi(request, getAuthTestState(world).volunteerNsec!)
+  expect(getAuthTestState(world).volunteerSeedHex).toBeDefined()
+  const result = await getMeViaApi(request, getAuthTestState(world).volunteerSeedHex!)
   if (result.status === 200 && result.data) {
     expect(result.data.permissions.length).toBeGreaterThan(0)
   }
@@ -267,14 +263,14 @@ Given('a user with hub-scoped admin permissions', async ({request, world}) => {
     name: `Hub-scoped Test ${Date.now()}`,
     roleIds: ['role-hub-admin'],
   })
-  getAuthTestState(world).volunteerNsec = vol.nsec
+  getAuthTestState(world).volunteerSeedHex = vol.seedHex
   getAuthTestState(world).volunteerPubkey = vol.pubkey
 })
 
 Then('they should only have admin access to their assigned hub', async ({request, world}) => {
-  expect(getAuthTestState(world).volunteerNsec).toBeDefined()
+  expect(getAuthTestState(world).volunteerSeedHex).toBeDefined()
   // Hub Admin should have limited scope — verify they can access some endpoints
-  const result = await getMeViaApi(request, getAuthTestState(world).volunteerNsec!)
+  const result = await getMeViaApi(request, getAuthTestState(world).volunteerSeedHex!)
   if (result.status === 200 && result.data) {
     expect(result.data.roles).toContain('role-hub-admin')
   }
@@ -292,13 +288,13 @@ Given('a custom role with {string} and {string} permissions', async ({request, w
     name: `Custom Role User ${Date.now()}`,
     roleIds: [role.id],
   })
-  getAuthTestState(world).volunteerNsec = vol.nsec
+  getAuthTestState(world).volunteerSeedHex = vol.seedHex
   getAuthTestState(world).volunteerPubkey = vol.pubkey
 })
 
 Then('the user should pass checks for those permissions only', async ({request, world}) => {
-  expect(getAuthTestState(world).volunteerNsec).toBeDefined()
-  const result = await getMeViaApi(request, getAuthTestState(world).volunteerNsec!)
+  expect(getAuthTestState(world).volunteerSeedHex).toBeDefined()
+  const result = await getMeViaApi(request, getAuthTestState(world).volunteerSeedHex!)
   if (result.status === 200 && result.data) {
     expect(result.data.permissions.length).toBeGreaterThan(0)
   }

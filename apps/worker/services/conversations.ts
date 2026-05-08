@@ -80,7 +80,8 @@ export interface CreateFileInput {
   encryptedMetadata: Array<{
     pubkey: string
     encryptedContent: string
-    ephemeralPubkey: string
+    enc: string
+    ct: string
   }>
   totalSize: number
   totalChunks: number
@@ -630,7 +631,7 @@ export class ConversationsService {
   async addFileRecipient(
     id: string,
     envelope: FileKeyEnvelope,
-    encryptedMetadata: { pubkey: string; encryptedContent: string; ephemeralPubkey: string },
+    encryptedMetadata: { pubkey: string; encryptedContent: string; enc: string; ct: string },
   ): Promise<FileRow> {
     // Use JSONB append to add envelope and metadata atomically
     const [row] = await this.db

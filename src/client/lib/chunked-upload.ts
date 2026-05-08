@@ -7,7 +7,7 @@ export interface ChunkedUploadOptions {
   encryptedContent: Uint8Array
   conversationId: string
   recipientEnvelopes: FileKeyEnvelope[]
-  encryptedMetadata: Array<{ pubkey: string; encryptedContent: string; ephemeralPubkey: string }>
+  encryptedMetadata: Array<{ pubkey: string; encryptedContent: string; enc: string; ct: string }>
   chunkSize?: number
   onProgress?: (completed: number, total: number) => void
 }

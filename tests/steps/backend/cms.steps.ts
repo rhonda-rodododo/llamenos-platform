@@ -629,8 +629,8 @@ When('the admin updates the record status with change metadata', async ({ reques
       statusChangeContent: 'dGVzdCBzdGF0dXMgY2hhbmdl',
       statusChangeEnvelopes: [{
         pubkey: 'a'.repeat(64),
-        wrappedKey: 'b'.repeat(64),
-        ephemeralPubkey: 'a'.repeat(64),
+        ct: 'b'.repeat(64),
+        enc: 'a'.repeat(64),
       }],
     },
   )

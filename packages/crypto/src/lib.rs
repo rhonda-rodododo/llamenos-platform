@@ -5,7 +5,7 @@
 //! This crate provides all cryptographic operations used across all platforms:
 //! - **Desktop (Tauri v2)**: native Rust dependency
 //! - **Mobile (iOS/Android)**: UniFFI-generated Swift/Kotlin bindings
-//! - **Web browser**: compiled to WASM via wasm-bindgen
+//! - **Server (Bun)**: loaded via bun:ffi as cdylib (feature = "server")
 //!
 //! ## Crypto Architecture (v3)
 //!
@@ -43,8 +43,10 @@ pub mod blind_index;
 pub mod errors;
 pub mod padding;
 
-// === Legacy modules (secp256k1 — kept during transition, removed in Phase 6) ===
-pub mod auth_legacy;
+// === New v3 encryption module (HPKE + AES-256-GCM) ===
+pub mod encryption;
+
+// === Legacy modules (secp256k1 — kept for mobile ECIES, removed when HPKE migration completes) ===
 pub mod ecies;
 pub mod encryption_legacy;
 pub mod keys_legacy;
@@ -52,8 +54,6 @@ pub mod legacy;
 pub mod nostr;
 pub mod provisioning;
 
-// Temporarily keep `encryption` and `keys` as pub aliases for existing imports
-pub use encryption_legacy as encryption;
 pub use keys_legacy as keys;
 
 #[cfg(feature = "mobile")]
@@ -61,8 +61,9 @@ mod ffi;
 #[cfg(feature = "mobile")]
 mod ffi_v3;
 
-#[cfg(feature = "wasm")]
-mod wasm;
+#[cfg(feature = "server")]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub mod ffi_server;
 
 // Re-export core types (new v3 API)
 pub use auth::AuthToken;
@@ -73,8 +74,11 @@ pub use labels::*;
 pub use puk::PukState;
 pub use sigchain::{SigchainLink, SigchainVerifiedState};
 
+// Re-export new v3 types
+pub use encryption::{
+    EncryptedKeyData, EncryptedMessage, EncryptedNote, KeyEnvelope, RecipientKeyEnvelope,
+};
+
 // Re-export legacy types for backward compatibility during transition
-pub use ecies::{KeyEnvelope, RecipientKeyEnvelope};
-pub use encryption_legacy::{EncryptedKeyData, EncryptedMessage, EncryptedNote};
 pub use keys_legacy::KeyPair;
 pub use nostr::SignedNostrEvent;

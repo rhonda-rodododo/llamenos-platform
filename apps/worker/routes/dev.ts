@@ -2,20 +2,17 @@ import { Hono } from 'hono'
 import type { AppEnv } from '../types'
 import type { Hub, MessagingChannelType } from '@shared/types'
 import { hashPhone } from '../lib/crypto'
-import { publishNostrEvent } from '../lib/nostr-events'
-import { KIND_CALL_RING, KIND_CALL_UPDATE, KIND_CALL_VOICEMAIL, KIND_MESSAGE_NEW, KIND_PRESENCE_UPDATE } from '@shared/nostr-events'
-import { nip19 } from 'nostr-tools'
+import { publishEvent } from '../lib/ws-events'
+import { KIND_CALL_RING, KIND_CALL_UPDATE, KIND_CALL_VOICEMAIL, KIND_MESSAGE_NEW, KIND_PRESENCE_UPDATE } from '@shared/event-kinds'
 import { getTestPushLog, clearTestPushLog } from '../lib/push-dispatch'
 
 /**
- * Decode a pubkey that may be in npub1... bech32 format or raw hex.
+ * Decode a pubkey (hex only — npub1 bech32 encoding is no longer supported).
  * Returns the hex pubkey string.
  */
 function decodePubkey(input: string): string {
   if (input.startsWith('npub1')) {
-    const decoded = nip19.decode(input)
-    if (decoded.type === 'npub') return decoded.data
-    throw new Error(`Invalid npub: decoded type was ${decoded.type}`)
+    throw new Error('npub1 encoding is no longer supported — use raw hex pubkey')
   }
   return input
 }
@@ -202,6 +199,11 @@ dev.post('/test-setup-cms', async (c) => {
   const hubId = body.hubId ?? ''
   const services = c.get('services')
   const templateId = 'jail-support'
+
+  // Seed default roles if empty — the server doesn't call ensureInit() at startup,
+  // so the roles table may be empty in CI (Docker Compose fresh database).
+  // Without roles, resolvePermissions returns [] for all users → "Access denied" everywhere.
+  await services.settings.ensureInit({ ENVIRONMENT: c.env.ENVIRONMENT })
 
   // 0. Grant the default volunteer role cases:read permission so test
   //    identities (who register as volunteers during onboarding) can see
@@ -428,7 +430,7 @@ dev.post('/test-simulate/incoming-call', async (c) => {
 
   // Publish call ring event (mirrors real telephony flow)
   // Await to ensure event is in relay before returning — prevents race conditions in E2E tests
-  await publishNostrEvent(c.env, KIND_CALL_RING, {
+  publishEvent(c.env, KIND_CALL_RING, {
     type: 'call:ring',
     callId,
   }, hubId)
@@ -453,14 +455,14 @@ dev.post('/test-simulate/answer-call', async (c) => {
 
   // Publish call update event (mirrors real telephony flow)
   // Await to ensure event is in relay before returning — prevents race conditions in E2E tests
-  await publishNostrEvent(c.env, KIND_CALL_UPDATE, {
+  publishEvent(c.env, KIND_CALL_UPDATE, {
     type: 'call:update',
     callId: body.callId,
     status: 'in-progress',
   }, call.hubId ?? undefined)
 
   // Publish presence update (mirrors real telephony flow)
-  await publishNostrEvent(c.env, KIND_PRESENCE_UPDATE, {
+  publishEvent(c.env, KIND_PRESENCE_UPDATE, {
     type: 'presence:summary',
     callId: body.callId,
   }, call.hubId ?? undefined)
@@ -484,7 +486,7 @@ dev.post('/test-simulate/end-call', async (c) => {
   await services.calls.endCall(call.hubId ?? '', body.callId)
 
   // Publish call update event (mirrors real telephony flow)
-  await publishNostrEvent(c.env, KIND_CALL_UPDATE, {
+  publishEvent(c.env, KIND_CALL_UPDATE, {
     type: 'call:update',
     callId: body.callId,
     status: 'completed',
@@ -510,7 +512,7 @@ dev.post('/test-simulate/voicemail', async (c) => {
   await services.calls.endCall(call.hubId ?? '', body.callId)
 
   // Publish voicemail event (mirrors real telephony flow)
-  await publishNostrEvent(c.env, KIND_CALL_VOICEMAIL, {
+  publishEvent(c.env, KIND_CALL_VOICEMAIL, {
     type: 'voicemail:new',
     callId: body.callId,
   }, call.hubId ?? undefined)
@@ -544,7 +546,7 @@ dev.post('/test-simulate/incoming-message', async (c) => {
 
   // Publish Nostr event (mirrors real messaging webhook flow)
   // Messaging events use empty hubId — conversations span all hubs
-  await publishNostrEvent(c.env, KIND_MESSAGE_NEW, {
+  publishEvent(c.env, KIND_MESSAGE_NEW, {
     type: 'message:new',
     conversationId: result.conversationId,
     messageId: result.messageId,
@@ -742,6 +744,10 @@ dev.post('/test-create-hub', async (c) => {
   const denied = simulationGuard(c)
   if (denied) return denied
 
+  // Seed default roles/settings if this is the first request to a fresh database.
+  const services = c.get('services')
+  await services.settings.ensureInit({ ENVIRONMENT: c.env.ENVIRONMENT })
+
   const rawBody = await c.req.json().catch(() => ({}))
   const hubName = typeof rawBody === 'object' && rawBody !== null && 'name' in rawBody && typeof rawBody.name === 'string'
     ? rawBody.name
@@ -759,12 +765,25 @@ dev.post('/test-create-hub', async (c) => {
     updatedAt: new Date().toISOString(),
   }
 
-  const services = c.get('services')
   try {
     await services.settings.createHub(hub)
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to create hub'
     return c.json({ error: message }, 500)
+  }
+
+  // Add admin as a member of the new hub so WS relay subscribe works in tests
+  const adminPubkey = c.env?.ADMIN_PUBKEY as string | undefined
+  if (adminPubkey) {
+    try {
+      await services.identity.setHubRole({
+        pubkey: adminPubkey,
+        hubId: hub.id,
+        roleIds: ['role-super-admin'],
+      })
+    } catch {
+      // Admin user may not exist yet — non-fatal for hub creation
+    }
   }
 
   return c.json({ id: hub.id, name: hub.name })

@@ -2,12 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Hono } from 'hono'
 import type { AppEnv } from '@worker/types'
 import conversationsRoute from '@worker/routes/conversations'
-import * as nostrEvents from '@worker/lib/nostr-events'
+import * as wsEvents from '@worker/lib/ws-events'
 import * as pushDispatch from '@worker/lib/push-dispatch'
 import * as serviceFactories from '@worker/lib/service-factories'
 
-vi.mock('@worker/lib/nostr-events', () => ({
-  publishNostrEvent: vi.fn().mockResolvedValue(undefined),
+vi.mock('@worker/lib/ws-events', () => ({
+  publishEvent: vi.fn(),
 }))
 
 function createTestApp(opts: {
@@ -427,7 +427,7 @@ describe('conversations route', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           encryptedContent: 'encrypted123',
-          readerEnvelopes: [{ pubkey: 'a'.repeat(64), wrappedKey: 'key1', ephemeralPubkey: 'b'.repeat(64) }],
+          readerEnvelopes: [{ pubkey: 'a'.repeat(64), enc: 'b'.repeat(64), ct: 'key1' }],
         }),
       })
       expect(res.status).toBe(201)
@@ -457,7 +457,7 @@ describe('conversations route', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           encryptedContent: 'encrypted123',
-          readerEnvelopes: [{ pubkey: 'a'.repeat(64), wrappedKey: 'key1', ephemeralPubkey: 'b'.repeat(64) }],
+          readerEnvelopes: [{ pubkey: 'a'.repeat(64), enc: 'b'.repeat(64), ct: 'key1' }],
         }),
       })
       expect(res.status).toBe(201)
@@ -479,7 +479,7 @@ describe('conversations route', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           encryptedContent: 'encrypted123',
-          readerEnvelopes: [{ pubkey: 'a'.repeat(64), wrappedKey: 'key1', ephemeralPubkey: 'b'.repeat(64) }],
+          readerEnvelopes: [{ pubkey: 'a'.repeat(64), enc: 'b'.repeat(64), ct: 'key1' }],
         }),
       })
       expect(res.status).toBe(403)
@@ -503,7 +503,7 @@ describe('conversations route', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           encryptedContent: 'encrypted123',
-          readerEnvelopes: [{ pubkey: 'a'.repeat(64), wrappedKey: 'key1', ephemeralPubkey: 'b'.repeat(64) }],
+          readerEnvelopes: [{ pubkey: 'a'.repeat(64), enc: 'b'.repeat(64), ct: 'key1' }],
         }),
       })
 
@@ -533,7 +533,7 @@ describe('conversations route', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           encryptedContent: 'encrypted123',
-          readerEnvelopes: [{ pubkey: 'a'.repeat(64), wrappedKey: 'key1', ephemeralPubkey: 'b'.repeat(64) }],
+          readerEnvelopes: [{ pubkey: 'a'.repeat(64), enc: 'b'.repeat(64), ct: 'key1' }],
           plaintextForSending: 'Hello',
         }),
       })
@@ -566,7 +566,7 @@ describe('conversations route', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           encryptedContent: 'encrypted123',
-          readerEnvelopes: [{ pubkey: 'a'.repeat(64), wrappedKey: 'key1', ephemeralPubkey: 'b'.repeat(64) }],
+          readerEnvelopes: [{ pubkey: 'a'.repeat(64), enc: 'b'.repeat(64), ct: 'key1' }],
           plaintextForSending: 'Hello',
         }),
       })

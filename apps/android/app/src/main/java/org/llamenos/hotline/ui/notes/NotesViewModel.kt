@@ -266,14 +266,14 @@ class NotesViewModel @Inject constructor(
                 val request = CreateNoteBody(
                     encryptedContent = encrypted.ciphertextHex,
                     authorEnvelope = CreateNoteBodyAuthorEnvelope(
-                        ephemeralPubkey = authorEnv.hpkeEnvelope.enc,
-                        wrappedKey = authorEnv.hpkeEnvelope.ct,
+                        enc = authorEnv.hpkeEnvelope.enc,
+                        ct = authorEnv.hpkeEnvelope.ct,
                     ),
                     adminEnvelopes = adminEnvs.map { env ->
                         CreateNoteBodyAdminEnvelope(
                             pubkey = env.recipientPubkey,
-                            wrappedKey = env.hpkeEnvelope.ct,
-                            ephemeralPubkey = env.hpkeEnvelope.enc,
+                            ct = env.hpkeEnvelope.ct,
+                            enc = env.hpkeEnvelope.enc,
                         )
                     },
                     conversationID = conversationId,
@@ -390,14 +390,14 @@ class NotesViewModel @Inject constructor(
                 val request = CreateNoteBody(
                     encryptedContent = encrypted.ciphertextHex,
                     authorEnvelope = CreateNoteBodyAuthorEnvelope(
-                        ephemeralPubkey = authorEnv.hpkeEnvelope.enc,
-                        wrappedKey = authorEnv.hpkeEnvelope.ct,
+                        enc = authorEnv.hpkeEnvelope.enc,
+                        ct = authorEnv.hpkeEnvelope.ct,
                     ),
                     adminEnvelopes = adminEnvs.map { env ->
                         CreateNoteBodyAdminEnvelope(
                             pubkey = env.recipientPubkey,
-                            wrappedKey = env.hpkeEnvelope.ct,
-                            ephemeralPubkey = env.hpkeEnvelope.enc,
+                            ct = env.hpkeEnvelope.ct,
+                            enc = env.hpkeEnvelope.enc,
                         )
                     },
                 )
@@ -465,8 +465,8 @@ class NotesViewModel @Inject constructor(
                 val readerEnvelopes = encrypted.envelopes.map { env ->
                     CreateReplyBodyReaderEnvelope(
                         pubkey = env.recipientPubkey,
-                        wrappedKey = env.hpkeEnvelope.ct,
-                        ephemeralPubkey = env.hpkeEnvelope.enc,
+                        ct = env.hpkeEnvelope.ct,
+                        enc = env.hpkeEnvelope.enc,
                     )
                 }
 
@@ -513,15 +513,15 @@ class NotesViewModel @Inject constructor(
             if (reply.authorPubkey == ourPubkey && reply.authorEnvelope != null) {
                 org.llamenos.hotline.crypto.HpkeEnvelope(
                     v = 3, labelId = 0,
-                    enc = reply.authorEnvelope!!.ephemeralPubkey,
-                    ct = reply.authorEnvelope!!.wrappedKey,
+                    enc = reply.authorEnvelope!!.enc,
+                    ct = reply.authorEnvelope!!.ct,
                 )
             } else {
                 reply.adminEnvelopes?.find { it.pubkey == ourPubkey }?.let { adminEnv ->
                     org.llamenos.hotline.crypto.HpkeEnvelope(
                         v = 3, labelId = 0,
-                        enc = adminEnv.ephemeralPubkey,
-                        ct = adminEnv.wrappedKey,
+                        enc = adminEnv.enc,
+                        ct = adminEnv.ct,
                     )
                 } ?: return null
             }
@@ -555,15 +555,15 @@ class NotesViewModel @Inject constructor(
             if (note.authorPubkey == ourPubkey && note.authorEnvelope != null) {
                 org.llamenos.hotline.crypto.HpkeEnvelope(
                     v = 3, labelId = 0,
-                    enc = note.authorEnvelope!!.ephemeralPubkey,
-                    ct = note.authorEnvelope!!.wrappedKey,
+                    enc = note.authorEnvelope!!.enc,
+                    ct = note.authorEnvelope!!.ct,
                 )
             } else {
                 note.adminEnvelopes?.find { it.pubkey == ourPubkey }?.let { adminEnv ->
                     org.llamenos.hotline.crypto.HpkeEnvelope(
                         v = 3, labelId = 0,
-                        enc = adminEnv.ephemeralPubkey,
-                        ct = adminEnv.wrappedKey,
+                        enc = adminEnv.enc,
+                        ct = adminEnv.ct,
                     )
                 } ?: return null
             }

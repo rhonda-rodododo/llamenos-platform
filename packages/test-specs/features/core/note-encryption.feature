@@ -12,18 +12,18 @@ Feature: Note Encryption & Management
     Then the envelope should contain a unique random symmetric key
 
   @backend
-  Scenario: Note key is ECIES-wrapped for volunteer
+  Scenario: Note key is HPKE-wrapped for volunteer
     Given a note created by a volunteer
     Then the envelope should contain the key wrapped for the volunteer's pubkey
 
   @backend
-  Scenario: Note key is ECIES-wrapped for each admin
+  Scenario: Note key is HPKE-wrapped for each admin
     Given a hub with 3 admins
     When a note is created
     Then the envelope should contain 3 admin key wraps
 
   @backend
-  Scenario: Note content is encrypted with XChaCha20-Poly1305
+  Scenario: Note content is encrypted with AES-256-GCM
     Given an encrypted note envelope
     Then the ciphertext should be decryptable with the correct symmetric key
 

@@ -30,7 +30,7 @@ const ARGON2_P_COST: u32 = 4;
 /// Encrypted note with per-note key wrapped for author + each admin.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-#[cfg_attr(feature = "mobile", derive(uniffi::Record))]
+// Note: uniffi::Record removed — v3 encryption.rs provides the mobile types
 pub struct EncryptedNote {
     /// hex: nonce(24) + ciphertext
     pub encrypted_content: String,
@@ -93,7 +93,7 @@ pub fn encrypt_note(
 }
 
 /// Decrypt a V2 note using the appropriate envelope for the current user.
-#[cfg_attr(feature = "mobile", uniffi::export)]
+// Note: uniffi::export removed — v3 encryption.rs provides the mobile API
 pub fn decrypt_note(
     encrypted_content: &str,
     envelope: &KeyEnvelope,
@@ -126,7 +126,7 @@ pub fn decrypt_note(
 /// Encrypted message with per-message key wrapped for each reader.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-#[cfg_attr(feature = "mobile", derive(uniffi::Record))]
+// Note: uniffi::Record removed — v3 encryption.rs provides the mobile types
 pub struct EncryptedMessage {
     /// hex: nonce(24) + ciphertext
     pub encrypted_content: String,
@@ -307,7 +307,7 @@ fn derive_encryption_key(secret_key: &[u8; 32], label: &str) -> [u8; 32] {
 }
 
 /// Encrypt a draft (local auto-save) with HKDF-derived key.
-#[cfg_attr(feature = "mobile", uniffi::export)]
+// Note: uniffi::export removed — v3 encryption.rs provides the mobile API
 pub fn encrypt_draft(plaintext: &str, secret_key_hex: &str) -> Result<String, CryptoError> {
     let sk_bytes = hex::decode(secret_key_hex).map_err(CryptoError::HexError)?;
     if sk_bytes.len() != 32 {
@@ -341,7 +341,7 @@ pub fn encrypt_draft(plaintext: &str, secret_key_hex: &str) -> Result<String, Cr
 }
 
 /// Decrypt a draft.
-#[cfg_attr(feature = "mobile", uniffi::export)]
+// Note: uniffi::export removed — v3 encryption.rs provides the mobile API
 pub fn decrypt_draft(packed_hex: &str, secret_key_hex: &str) -> Result<String, CryptoError> {
     let sk_bytes = hex::decode(secret_key_hex).map_err(CryptoError::HexError)?;
     if sk_bytes.len() != 32 {
@@ -419,7 +419,7 @@ pub fn encrypt_export(json_string: &str, secret_key_hex: &str) -> Result<String,
 /// Encrypted key data stored on disk (Stronghold on desktop, Keychain on mobile).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-#[cfg_attr(feature = "mobile", derive(uniffi::Record))]
+// Note: uniffi::Record removed — v3 encryption.rs provides the mobile types
 pub struct EncryptedKeyData {
     /// hex, 32 bytes
     pub salt: String,
@@ -446,7 +446,7 @@ pub fn derive_kek_from_pin(credential: &str, salt: &[u8]) -> [u8; 32] {
 }
 
 /// Encrypt an nsec bech32 string with a credential (PIN or passphrase).
-#[cfg_attr(feature = "mobile", uniffi::export)]
+// Note: uniffi::export removed — v3 encryption.rs provides the mobile API
 pub fn encrypt_with_pin(
     nsec: &str,
     pin: &str,
@@ -495,7 +495,7 @@ pub fn encrypt_with_pin(
 }
 
 /// Decrypt a stored nsec using a PIN. Returns the nsec bech32 string or error.
-#[cfg_attr(feature = "mobile", uniffi::export)]
+// Note: uniffi::export removed — v3 encryption.rs provides the mobile API
 pub fn decrypt_with_pin(data: &EncryptedKeyData, pin: &str) -> Result<String, CryptoError> {
     let salt = hex::decode(&data.salt).map_err(CryptoError::HexError)?;
     let nonce_bytes = hex::decode(&data.nonce).map_err(CryptoError::HexError)?;
@@ -522,7 +522,7 @@ pub fn decrypt_with_pin(data: &EncryptedKeyData, pin: &str) -> Result<String, Cr
 }
 
 /// Validate credential format: numeric PIN (8+ digits) or alphanumeric passphrase (8+ chars with at least one letter).
-#[cfg_attr(feature = "mobile", uniffi::export)]
+// Note: uniffi::export removed — v3 encryption.rs provides the mobile API
 pub fn is_valid_pin(pin: &str) -> bool {
     crate::device_keys::is_valid_credential(pin)
 }

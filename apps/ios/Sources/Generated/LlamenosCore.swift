@@ -728,7 +728,7 @@ public func FfiConverterTypeDevicePukEnvelope_lower(_ value: DevicePukEnvelope) 
 
 
 /**
- * Encrypted device key blob for PIN-protected storage.
+ * Encrypted device key blob for credential-protected storage.
  */
 public struct EncryptedDeviceKeys: Equatable, Hashable {
     /**
@@ -769,25 +769,25 @@ public struct EncryptedDeviceKeys: Equatable, Hashable {
     public init(
         /**
          * KDF version (2 = Argon2id)
-         */kdfVersion: UInt8,
+         */kdfVersion: UInt8, 
         /**
          * Argon2id salt, hex-encoded (32 bytes)
-         */salt: String,
+         */salt: String, 
         /**
          * Argon2id memory cost in KiB
-         */argon2MCost: UInt32,
+         */argon2MCost: UInt32, 
         /**
          * Argon2id time cost (iterations)
-         */argon2TCost: UInt32,
+         */argon2TCost: UInt32, 
         /**
          * Argon2id parallelism
-         */argon2PCost: UInt32,
+         */argon2PCost: UInt32, 
         /**
          * AES-256-GCM nonce, hex-encoded (12 bytes)
-         */nonce: String,
+         */nonce: String, 
         /**
          * AES-256-GCM ciphertext of (signing_seed || encryption_seed), hex-encoded
-         */ciphertext: String,
+         */ciphertext: String, 
         /**
          * Device state (public info for identification)
          */state: DeviceKeyState) {
@@ -817,13 +817,13 @@ public struct FfiConverterTypeEncryptedDeviceKeys: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> EncryptedDeviceKeys {
         return
             try EncryptedDeviceKeys(
-                kdfVersion: FfiConverterUInt8.read(from: &buf),
-                salt: FfiConverterString.read(from: &buf),
-                argon2MCost: FfiConverterUInt32.read(from: &buf),
-                argon2TCost: FfiConverterUInt32.read(from: &buf),
-                argon2PCost: FfiConverterUInt32.read(from: &buf),
-                nonce: FfiConverterString.read(from: &buf),
-                ciphertext: FfiConverterString.read(from: &buf),
+                kdfVersion: FfiConverterUInt8.read(from: &buf), 
+                salt: FfiConverterString.read(from: &buf), 
+                argon2MCost: FfiConverterUInt32.read(from: &buf), 
+                argon2TCost: FfiConverterUInt32.read(from: &buf), 
+                argon2PCost: FfiConverterUInt32.read(from: &buf), 
+                nonce: FfiConverterString.read(from: &buf), 
+                ciphertext: FfiConverterString.read(from: &buf), 
                 state: FfiConverterTypeDeviceKeyState.read(from: &buf)
         )
     }
@@ -861,15 +861,15 @@ public func FfiConverterTypeEncryptedDeviceKeys_lower(_ value: EncryptedDeviceKe
  */
 public struct EncryptedKeyData: Equatable, Hashable {
     /**
-     * hex, 16 or 32 bytes (new encryptions use 32)
+     * hex, 32 bytes
      */
     public let salt: String
     /**
-     * PBKDF2 iteration count (600,000)
+     * Legacy field kept for serialization compat (ignored — Argon2id params are fixed)
      */
     public let iterations: UInt32
     /**
-     * hex, 24 bytes (XChaCha20 nonce)
+     * hex, 12 bytes (AES-256-GCM nonce)
      */
     public let nonce: String
     /**
@@ -885,13 +885,13 @@ public struct EncryptedKeyData: Equatable, Hashable {
     // declare one manually.
     public init(
         /**
-         * hex, 16 or 32 bytes (new encryptions use 32)
+         * hex, 32 bytes
          */salt: String, 
         /**
-         * PBKDF2 iteration count (600,000)
+         * Legacy field kept for serialization compat (ignored — Argon2id params are fixed)
          */iterations: UInt32, 
         /**
-         * hex, 24 bytes (XChaCha20 nonce)
+         * hex, 12 bytes (AES-256-GCM nonce)
          */nonce: String, 
         /**
          * hex, encrypted nsec bech32 string
@@ -960,7 +960,7 @@ public func FfiConverterTypeEncryptedKeyData_lower(_ value: EncryptedKeyData) ->
  */
 public struct EncryptedMessage: Equatable, Hashable {
     /**
-     * hex: nonce(24) + ciphertext
+     * hex: nonce(12) + ciphertext
      */
     public let encryptedContent: String
     /**
@@ -972,7 +972,7 @@ public struct EncryptedMessage: Equatable, Hashable {
     // declare one manually.
     public init(
         /**
-         * hex: nonce(24) + ciphertext
+         * hex: nonce(12) + ciphertext
          */encryptedContent: String, 
         /**
          * Message key wrapped for each reader (volunteer + admins)
@@ -1029,7 +1029,7 @@ public func FfiConverterTypeEncryptedMessage_lower(_ value: EncryptedMessage) ->
  */
 public struct EncryptedNote: Equatable, Hashable {
     /**
-     * hex: nonce(24) + ciphertext
+     * hex: nonce(12) + ciphertext
      */
     public let encryptedContent: String
     /**
@@ -1045,7 +1045,7 @@ public struct EncryptedNote: Equatable, Hashable {
     // declare one manually.
     public init(
         /**
-         * hex: nonce(24) + ciphertext
+         * hex: nonce(12) + ciphertext
          */encryptedContent: String, 
         /**
          * Note key wrapped for the author
@@ -1268,29 +1268,31 @@ public func FfiConverterTypeHpkeEnvelope_lower(_ value: HpkeEnvelope) -> RustBuf
 
 
 /**
- * A symmetric key wrapped via ECIES for a single recipient.
+ * A symmetric key wrapped via HPKE for a single recipient.
+ *
+ * Wire format uses hex-encoded enc/ct (not the base64url HpkeEnvelope format).
  */
 public struct KeyEnvelope: Equatable, Hashable {
     /**
-     * hex: nonce(24) + ciphertext(48 = 32 key + 16 tag)
+     * hex: 32-byte HPKE encapsulated key
      */
-    public let wrappedKey: String
+    public let enc: String
     /**
-     * hex: compressed 33-byte ephemeral pubkey
+     * hex: AEAD ciphertext (encrypted 32-byte symmetric key)
      */
-    public let ephemeralPubkey: String
+    public let ct: String
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
     public init(
         /**
-         * hex: nonce(24) + ciphertext(48 = 32 key + 16 tag)
-         */wrappedKey: String, 
+         * hex: 32-byte HPKE encapsulated key
+         */enc: String, 
         /**
-         * hex: compressed 33-byte ephemeral pubkey
-         */ephemeralPubkey: String) {
-        self.wrappedKey = wrappedKey
-        self.ephemeralPubkey = ephemeralPubkey
+         * hex: AEAD ciphertext (encrypted 32-byte symmetric key)
+         */ct: String) {
+        self.enc = enc
+        self.ct = ct
     }
 
     
@@ -1309,14 +1311,14 @@ public struct FfiConverterTypeKeyEnvelope: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> KeyEnvelope {
         return
             try KeyEnvelope(
-                wrappedKey: FfiConverterString.read(from: &buf), 
-                ephemeralPubkey: FfiConverterString.read(from: &buf)
+                enc: FfiConverterString.read(from: &buf), 
+                ct: FfiConverterString.read(from: &buf)
         )
     }
 
     public static func write(_ value: KeyEnvelope, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.wrappedKey, into: &buf)
-        FfiConverterString.write(value.ephemeralPubkey, into: &buf)
+        FfiConverterString.write(value.enc, into: &buf)
+        FfiConverterString.write(value.ct, into: &buf)
     }
 }
 
@@ -1709,33 +1711,33 @@ public func FfiConverterTypePukState_lower(_ value: PukState) -> RustBuffer {
  */
 public struct RecipientKeyEnvelope: Equatable, Hashable {
     /**
-     * recipient's x-only pubkey (hex, 32 bytes / 64 hex chars)
+     * recipient's X25519 pubkey (hex, 32 bytes / 64 hex chars)
      */
     public let pubkey: String
     /**
-     * hex: nonce(24) + ciphertext(48)
+     * hex: 32-byte HPKE encapsulated key
      */
-    public let wrappedKey: String
+    public let enc: String
     /**
-     * hex: compressed 33-byte ephemeral pubkey
+     * hex: AEAD ciphertext (encrypted 32-byte symmetric key)
      */
-    public let ephemeralPubkey: String
+    public let ct: String
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
     public init(
         /**
-         * recipient's x-only pubkey (hex, 32 bytes / 64 hex chars)
+         * recipient's X25519 pubkey (hex, 32 bytes / 64 hex chars)
          */pubkey: String, 
         /**
-         * hex: nonce(24) + ciphertext(48)
-         */wrappedKey: String, 
+         * hex: 32-byte HPKE encapsulated key
+         */enc: String, 
         /**
-         * hex: compressed 33-byte ephemeral pubkey
-         */ephemeralPubkey: String) {
+         * hex: AEAD ciphertext (encrypted 32-byte symmetric key)
+         */ct: String) {
         self.pubkey = pubkey
-        self.wrappedKey = wrappedKey
-        self.ephemeralPubkey = ephemeralPubkey
+        self.enc = enc
+        self.ct = ct
     }
 
     
@@ -1755,15 +1757,15 @@ public struct FfiConverterTypeRecipientKeyEnvelope: FfiConverterRustBuffer {
         return
             try RecipientKeyEnvelope(
                 pubkey: FfiConverterString.read(from: &buf), 
-                wrappedKey: FfiConverterString.read(from: &buf), 
-                ephemeralPubkey: FfiConverterString.read(from: &buf)
+                enc: FfiConverterString.read(from: &buf), 
+                ct: FfiConverterString.read(from: &buf)
         )
     }
 
     public static func write(_ value: RecipientKeyEnvelope, into buf: inout [UInt8]) {
         FfiConverterString.write(value.pubkey, into: &buf)
-        FfiConverterString.write(value.wrappedKey, into: &buf)
-        FfiConverterString.write(value.ephemeralPubkey, into: &buf)
+        FfiConverterString.write(value.enc, into: &buf)
+        FfiConverterString.write(value.ct, into: &buf)
     }
 }
 
@@ -2409,7 +2411,7 @@ public func decryptDraft(packedHex: String, secretKeyHex: String)throws  -> Stri
 })
 }
 /**
- * Decrypt a V2 note using the appropriate envelope for the current user.
+ * Decrypt a note using the appropriate envelope for the current user.
  */
 public func decryptNote(encryptedContent: String, envelope: KeyEnvelope, secretKeyHex: String)throws  -> String  {
     return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCryptoError_lift) {
@@ -2443,7 +2445,7 @@ public func encryptDraft(plaintext: String, secretKeyHex: String)throws  -> Stri
 })
 }
 /**
- * Encrypt an nsec bech32 string with a PIN.
+ * Encrypt an nsec bech32 string with a credential (PIN or passphrase).
  */
 public func encryptWithPin(nsec: String, pin: String, pubkeyHex: String)throws  -> EncryptedKeyData  {
     return try  FfiConverterTypeEncryptedKeyData_lift(try rustCallWithError(FfiConverterTypeCryptoError_lift) {
@@ -2455,7 +2457,7 @@ public func encryptWithPin(nsec: String, pin: String, pubkeyHex: String)throws  
 })
 }
 /**
- * Validate PIN format: 6-8 digits.
+ * Validate credential format: numeric PIN (8+ digits) or alphanumeric passphrase (8+ chars with at least one letter).
  */
 public func isValidPin(pin: String) -> Bool  {
     return try!  FfiConverterBool.lift(try! rustCall() {
@@ -2465,14 +2467,7 @@ public func isValidPin(pin: String) -> Bool  {
 })
 }
 /**
- * Derive a 6-digit SAS (Short Authentication String) code from an ECDH shared secret.
- *
- * `shared_x_hex`: 64-char hex shared x-coordinate from `compute_shared_x_hex`
- *
- * Returns a "XXX XXX" formatted 6-digit code. Both devices compute this
- * independently — matching codes prove no MITM is present.
- *
- * Uses the `hkdf` crate for proper HKDF (M25 — replaces manual HMAC HKDF).
+ * Derive a 6-digit SAS code from an ECDH shared secret.
  */
 public func computeSasCode(sharedXHex: String)throws  -> String  {
     return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCryptoError_lift) {
@@ -2482,13 +2477,9 @@ public func computeSasCode(sharedXHex: String)throws  -> String  {
 })
 }
 /**
- * Compute the ECDH shared x-coordinate for device provisioning.
+ * Compute the X25519 shared secret for device provisioning.
  *
- * `our_secret_hex`: 64-char hex secret key
- * `their_pubkey_hex`: 64-char hex x-only pubkey (or 66-char compressed)
- *
- * Returns the 32-byte shared x-coordinate as hex, which can be used
- * for `decrypt_with_shared_key_hex` and `compute_sas_code`.
+ * Uses X25519 ECDH for the provisioning protocol.
  */
 public func computeSharedXHex(ourSecretHex: String, theirPubkeyHex: String)throws  -> String  {
     return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCryptoError_lift) {
@@ -2525,9 +2516,9 @@ public func decryptMessageForReader(encryptedContent: String, readerEnvelopes: [
 })
 }
 /**
- * Decrypt a server-encrypted event payload (XChaCha20-Poly1305).
+ * Decrypt a server-encrypted event payload (AES-256-GCM).
  *
- * Input: hex(nonce_24 + ciphertext), 32-byte key as hex.
+ * Input: hex(nonce_12 + ciphertext), 32-byte key as hex.
  * Output: decrypted UTF-8 string (JSON).
  *
  * Used by mobile platforms to decrypt Nostr relay events encrypted
@@ -2544,75 +2535,14 @@ public func decryptServerEventHex(encryptedHex: String, keyHex: String)throws  -
 /**
  * Decrypt data that was encrypted with a provisioning shared key.
  *
- * `ciphertext_hex`: hex(nonce_24 + ciphertext) — XChaCha20-Poly1305
- * `shared_x_hex`: 64-char hex shared x-coordinate from `compute_shared_x_hex`
- *
- * Derives the symmetric key via HKDF (matches provisioning.rs — CRIT-C3 fix).
+ * `ciphertext_hex`: hex(nonce_12 + ciphertext + tag_16) — AES-256-GCM (provisioning protocol)
+ * `shared_x_hex`: 64-char hex shared secret from `compute_shared_x_hex`
  */
 public func decryptWithSharedKeyHex(ciphertextHex: String, sharedXHex: String)throws  -> String  {
     return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCryptoError_lift) {
     uniffi_llamenos_core_fn_func_decrypt_with_shared_key_hex(
         FfiConverterString.lower(ciphertextHex),
         FfiConverterString.lower(sharedXHex),$0
-    )
-})
-}
-/**
- * Decrypt an ECIES-encrypted payload (arbitrary length content).
- *
- * Supports both v2 (HKDF, version byte prefix) and v1 (legacy SHA-256) formats.
- * `packed_hex`: hex(version_byte? + nonce_24 + ciphertext)
- * `ephemeral_pubkey_hex`: compressed SEC1 (33 bytes / 66 hex chars)
- * `secret_key_hex`: recipient's secret key
- * `label`: domain separation label (e.g., LABEL_PUSH_WAKE)
- */
-public func eciesDecryptContentHex(packedHex: String, ephemeralPubkeyHex: String, secretKeyHex: String, label: String)throws  -> String  {
-    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCryptoError_lift) {
-    uniffi_llamenos_core_fn_func_ecies_decrypt_content_hex(
-        FfiConverterString.lower(packedHex),
-        FfiConverterString.lower(ephemeralPubkeyHex),
-        FfiConverterString.lower(secretKeyHex),
-        FfiConverterString.lower(label),$0
-    )
-})
-}
-/**
- * Encrypt arbitrary content via ECIES for a recipient.
- *
- * Returns `(packed_hex, ephemeral_pubkey_hex)`.
- */
-public func eciesEncryptContentHex(plaintext: String, recipientPubkeyHex: String, label: String)throws  -> [String]  {
-    return try  FfiConverterSequenceString.lift(try rustCallWithError(FfiConverterTypeCryptoError_lift) {
-    uniffi_llamenos_core_fn_func_ecies_encrypt_content_hex(
-        FfiConverterString.lower(plaintext),
-        FfiConverterString.lower(recipientPubkeyHex),
-        FfiConverterString.lower(label),$0
-    )
-})
-}
-/**
- * Unwrap a 32-byte symmetric key from an ECIES envelope, returned as hex.
- */
-public func eciesUnwrapKeyHex(envelope: KeyEnvelope, secretKeyHex: String, label: String)throws  -> String  {
-    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCryptoError_lift) {
-    uniffi_llamenos_core_fn_func_ecies_unwrap_key_hex(
-        FfiConverterTypeKeyEnvelope_lower(envelope),
-        FfiConverterString.lower(secretKeyHex),
-        FfiConverterString.lower(label),$0
-    )
-})
-}
-/**
- * Wrap a 32-byte symmetric key (hex) for a recipient using ECIES.
- *
- * The `key_hex` parameter is a 64-char hex string encoding 32 bytes.
- */
-public func eciesWrapKeyHex(keyHex: String, recipientPubkeyHex: String, label: String)throws  -> KeyEnvelope  {
-    return try  FfiConverterTypeKeyEnvelope_lift(try rustCallWithError(FfiConverterTypeCryptoError_lift) {
-    uniffi_llamenos_core_fn_func_ecies_wrap_key_hex(
-        FfiConverterString.lower(keyHex),
-        FfiConverterString.lower(recipientPubkeyHex),
-        FfiConverterString.lower(label),$0
     )
 })
 }
@@ -2640,6 +2570,31 @@ public func encryptNoteForRecipients(payloadJson: String, authorPubkey: String, 
 })
 }
 /**
+ * Unwrap a 32-byte symmetric key from a wire-format KeyEnvelope using HPKE.
+ */
+public func hpkeUnwrapKeyHex(envelope: KeyEnvelope, secretKeyHex: String, label: String)throws  -> String  {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCryptoError_lift) {
+    uniffi_llamenos_core_fn_func_hpke_unwrap_key_hex(
+        FfiConverterTypeKeyEnvelope_lower(envelope),
+        FfiConverterString.lower(secretKeyHex),
+        FfiConverterString.lower(label),$0
+    )
+})
+}
+/**
+ * Wrap a 32-byte symmetric key (hex) for a recipient using HPKE.
+ * Returns a wire-format KeyEnvelope (hex-encoded enc/ct).
+ */
+public func hpkeWrapKeyHex(keyHex: String, recipientPubkeyHex: String, label: String)throws  -> KeyEnvelope  {
+    return try  FfiConverterTypeKeyEnvelope_lift(try rustCallWithError(FfiConverterTypeCryptoError_lift) {
+    uniffi_llamenos_core_fn_func_hpke_wrap_key_hex(
+        FfiConverterString.lower(keyHex),
+        FfiConverterString.lower(recipientPubkeyHex),
+        FfiConverterString.lower(label),$0
+    )
+})
+}
+/**
  * Generate 32 random bytes, returned as a hex string.
  */
 public func randomBytesHex() -> String  {
@@ -2649,10 +2604,18 @@ public func randomBytesHex() -> String  {
 })
 }
 /**
- * Clear all hub keys from Rust memory. Called on lock/logout.
+ * Clear all hub keys from Rust memory.
  */
 public func mobileClearHubKeys()  {try! rustCall() {
     uniffi_llamenos_core_fn_func_mobile_clear_hub_keys($0
+    )
+}
+}
+/**
+ * Clear server event keys from Rust memory.
+ */
+public func mobileClearServerEventKeys()  {try! rustCall() {
+    uniffi_llamenos_core_fn_func_mobile_clear_server_event_keys($0
     )
 }
 }
@@ -2687,8 +2650,7 @@ public func mobileCreateAuthTokenFromSigningKey(signingKeyHex: String, timestamp
 }
 /**
  * Try to decrypt a relay event against ALL stored hub keys.
- * Returns (hub_id, decrypted_json) for the first key that succeeds, or error if none match.
- * This is used for multi-hub event attribution without exposing keys to Swift.
+ * Returns [hub_id, decrypted_json] for the first key that succeeds.
  */
 public func mobileDecryptEventWithAttribution(ciphertextHex: String)throws  -> [String]  {
     return try  FfiConverterSequenceString.lift(try rustCallWithError(FfiConverterTypeCryptoError_lift) {
@@ -2698,9 +2660,7 @@ public func mobileDecryptEventWithAttribution(ciphertextHex: String)throws  -> [
 })
 }
 /**
- * Decrypt a hub event payload (XChaCha20-Poly1305) using the hub key stored in Rust.
- * Input: hex(nonce_24 + ciphertext), hub ID to look up the key.
- * Output: decrypted UTF-8 string (JSON).
+ * Decrypt a hub event payload (AES-256-GCM) using the stored hub key.
  */
 public func mobileDecryptHubEvent(ciphertextHex: String, hubId: String)throws  -> String  {
     return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCryptoError_lift) {
@@ -2711,10 +2671,21 @@ public func mobileDecryptHubEvent(ciphertextHex: String, hubId: String)throws  -
 })
 }
 /**
+ * Try to decrypt an event by trial-decrypting with all cached hub keys.
+ *
+ * Returns `[hub_id, plaintext_json]` for the first key that succeeds,
+ * or an error if no key works. Equivalent to `mobile_decrypt_event_with_attribution`.
+ */
+public func mobileDecryptHubEventTrial(encryptedHex: String)throws  -> [String]  {
+    return try  FfiConverterSequenceString.lift(try rustCallWithError(FfiConverterTypeCryptoError_lift) {
+    uniffi_llamenos_core_fn_func_mobile_decrypt_hub_event_trial(
+        FfiConverterString.lower(encryptedHex),$0
+    )
+})
+}
+/**
  * Decrypt a server-published event using stored server event keys.
  * Tries current key first, falls back to previous key (epoch rotation).
- * Input: hex(nonce_24 + ciphertext).
- * Output: decrypted UTF-8 string (JSON).
  */
 public func mobileDecryptServerEvent(encryptedHex: String)throws  -> String  {
     return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCryptoError_lift) {
@@ -2826,7 +2797,7 @@ public func mobileIsUnlocked() -> Bool  {
 })
 }
 /**
- * Validate PIN format: 6-8 digits.
+ * Validate credential format: numeric PIN (8+ digits) or alphanumeric passphrase (8+ chars).
  */
 public func mobileIsValidPin(pin: String) -> Bool  {
     return try!  FfiConverterBool.lift(try! rustCall() {
@@ -3069,64 +3040,61 @@ private let initializationResult: InitializationResult = {
     if bindings_contract_version != scaffolding_contract_version {
         return InitializationResult.contractVersionMismatch
     }
-    if (uniffi_llamenos_core_checksum_func_decrypt_draft() != 63927) {
+    if (uniffi_llamenos_core_checksum_func_decrypt_draft() != 19509) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_llamenos_core_checksum_func_decrypt_note() != 57206) {
+    if (uniffi_llamenos_core_checksum_func_decrypt_note() != 12866) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_llamenos_core_checksum_func_decrypt_with_pin() != 5608) {
+    if (uniffi_llamenos_core_checksum_func_decrypt_with_pin() != 9712) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_llamenos_core_checksum_func_encrypt_draft() != 38129) {
+    if (uniffi_llamenos_core_checksum_func_encrypt_draft() != 25499) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_llamenos_core_checksum_func_encrypt_with_pin() != 1946) {
+    if (uniffi_llamenos_core_checksum_func_encrypt_with_pin() != 47768) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_llamenos_core_checksum_func_is_valid_pin() != 15961) {
+    if (uniffi_llamenos_core_checksum_func_is_valid_pin() != 51720) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_llamenos_core_checksum_func_compute_sas_code() != 38478) {
+    if (uniffi_llamenos_core_checksum_func_compute_sas_code() != 62033) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_llamenos_core_checksum_func_compute_shared_x_hex() != 41736) {
+    if (uniffi_llamenos_core_checksum_func_compute_shared_x_hex() != 20076) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_llamenos_core_checksum_func_decrypt_call_record_for_reader() != 35207) {
+    if (uniffi_llamenos_core_checksum_func_decrypt_call_record_for_reader() != 29910) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_llamenos_core_checksum_func_decrypt_message_for_reader() != 61088) {
+    if (uniffi_llamenos_core_checksum_func_decrypt_message_for_reader() != 16037) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_llamenos_core_checksum_func_decrypt_server_event_hex() != 48073) {
+    if (uniffi_llamenos_core_checksum_func_decrypt_server_event_hex() != 59916) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_llamenos_core_checksum_func_decrypt_with_shared_key_hex() != 43855) {
+    if (uniffi_llamenos_core_checksum_func_decrypt_with_shared_key_hex() != 62417) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_llamenos_core_checksum_func_ecies_decrypt_content_hex() != 6987) {
+    if (uniffi_llamenos_core_checksum_func_encrypt_message_for_readers() != 62867) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_llamenos_core_checksum_func_ecies_encrypt_content_hex() != 22114) {
+    if (uniffi_llamenos_core_checksum_func_encrypt_note_for_recipients() != 17380) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_llamenos_core_checksum_func_ecies_unwrap_key_hex() != 61678) {
+    if (uniffi_llamenos_core_checksum_func_hpke_unwrap_key_hex() != 31587) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_llamenos_core_checksum_func_ecies_wrap_key_hex() != 31825) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_llamenos_core_checksum_func_encrypt_message_for_readers() != 19073) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_llamenos_core_checksum_func_encrypt_note_for_recipients() != 20467) {
+    if (uniffi_llamenos_core_checksum_func_hpke_wrap_key_hex() != 2090) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_llamenos_core_checksum_func_random_bytes_hex() != 29596) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_llamenos_core_checksum_func_mobile_clear_hub_keys() != 49932) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_llamenos_core_checksum_func_mobile_clear_server_event_keys() != 57036) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_llamenos_core_checksum_func_mobile_create_auth_token() != 23090) {
@@ -3138,7 +3106,10 @@ private let initializationResult: InitializationResult = {
     if (uniffi_llamenos_core_checksum_func_mobile_decrypt_event_with_attribution() != 985) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_llamenos_core_checksum_func_mobile_decrypt_hub_event() != 23884) {
+    if (uniffi_llamenos_core_checksum_func_mobile_decrypt_hub_event() != 47164) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_llamenos_core_checksum_func_mobile_decrypt_hub_event_trial() != 46122) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_llamenos_core_checksum_func_mobile_decrypt_server_event() != 16015) {
@@ -3171,7 +3142,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_llamenos_core_checksum_func_mobile_is_unlocked() != 56931) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_llamenos_core_checksum_func_mobile_is_valid_pin() != 14552) {
+    if (uniffi_llamenos_core_checksum_func_mobile_is_valid_pin() != 59853) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_llamenos_core_checksum_func_mobile_lock() != 62527) {

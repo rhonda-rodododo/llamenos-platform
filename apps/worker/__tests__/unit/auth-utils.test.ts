@@ -1,10 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { parseAuthHeader, parseSessionHeader, validateToken, verifyAuthToken } from '@worker/lib/auth'
-import { schnorr } from '@noble/curves/secp256k1.js'
-import { sha256 } from '@noble/hashes/sha2.js'
+import { describe, it, expect } from 'vitest'
+import { parseAuthHeader, parseSessionHeader, validateToken, verifyAuthToken, buildAuthMessage } from '@worker/lib/auth'
+import { ed25519 } from '@noble/curves/ed25519.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
-import { utf8ToBytes } from '@noble/ciphers/utils.js'
-import { AUTH_PREFIX } from '@shared/crypto-labels'
+import { LABEL_DEVICE_AUTH } from '@shared/crypto-labels'
 
 describe('parseAuthHeader', () => {
   it('returns null for null header', () => {
@@ -126,110 +124,84 @@ describe('validateToken', () => {
   })
 })
 
-describe('verifyAuthToken', () => {
-  // Generate a real keypair for testing
-  const privKey = hexToBytes('a'.repeat(64).replace(/^a/, '1')) // valid private key
-  const privKeyForSign = privKey
-  const pubkeyHex = bytesToHex(schnorr.getPublicKey(privKeyForSign))
+describe('buildAuthMessage', () => {
+  it('produces the canonical LABEL_DEVICE_AUTH prefixed message', () => {
+    const pubkey = 'aabbcc'
+    const timestamp = 1700000000000
+    const msg = buildAuthMessage(pubkey, timestamp, 'GET', '/api/calls')
+    const expected = `${LABEL_DEVICE_AUTH}:${pubkey}:${timestamp}:GET:/api/calls`
+    expect(new TextDecoder().decode(msg)).toBe(expected)
+  })
+})
 
-  function createSignedToken(timestamp: number, method?: string, path?: string): string {
-    let message: string
-    if (method && path) {
-      message = `${AUTH_PREFIX}${pubkeyHex}:${timestamp}:${method}:${path}`
-    } else {
-      message = `${AUTH_PREFIX}${pubkeyHex}:${timestamp}`
-    }
-    const messageHash = sha256(utf8ToBytes(message))
-    return bytesToHex(schnorr.sign(messageHash, privKeyForSign))
+describe('verifyAuthToken', () => {
+  // Ed25519 test keypair — deterministic seed
+  const seed = new Uint8Array(32).fill(0x42)
+  const pubkeyBytes = ed25519.getPublicKey(seed)
+  const pubkeyHex = bytesToHex(pubkeyBytes)
+
+  function createSignedToken(timestamp: number, method: string, path: string): string {
+    const message = buildAuthMessage(pubkeyHex, timestamp, method, path)
+    const sig = ed25519.sign(message, seed)
+    return bytesToHex(sig)
   }
 
-  it('rejects unbound tokens without method/path', async () => {
-    const timestamp = Date.now()
-    const token = createSignedToken(timestamp)
-    const result = await verifyAuthToken({ pubkey: pubkeyHex, timestamp, token })
-    expect(result).toBe(false) // method+path binding is required
-  })
-
-  it('returns true for valid request-bound token', async () => {
+  it('returns true for valid Ed25519 token bound to GET /api/notes', () => {
     const timestamp = Date.now()
     const token = createSignedToken(timestamp, 'GET', '/api/notes')
-    const result = await verifyAuthToken({ pubkey: pubkeyHex, timestamp, token }, 'GET', '/api/notes')
-    expect(result).toBe(true)
+    expect(verifyAuthToken({ pubkey: pubkeyHex, timestamp, token }, 'GET', '/api/notes')).toBe(true)
   })
 
-  it('returns false for expired token', async () => {
+  it('returns false when method/path are omitted', () => {
+    const timestamp = Date.now()
+    const token = createSignedToken(timestamp, 'GET', '/api/notes')
+    expect(verifyAuthToken({ pubkey: pubkeyHex, timestamp, token })).toBe(false)
+  })
+
+  it('returns false for expired token', () => {
     const timestamp = Date.now() - 6 * 60 * 1000
     const token = createSignedToken(timestamp, 'GET', '/api/notes')
-    const result = await verifyAuthToken({ pubkey: pubkeyHex, timestamp, token }, 'GET', '/api/notes')
-    expect(result).toBe(false)
+    expect(verifyAuthToken({ pubkey: pubkeyHex, timestamp, token }, 'GET', '/api/notes')).toBe(false)
   })
 
-  it('returns false for wrong pubkey', async () => {
+  it('returns false for wrong pubkey', () => {
     const timestamp = Date.now()
     const token = createSignedToken(timestamp, 'GET', '/api/notes')
-    const wrongPubkey = '0'.repeat(64)
-    const result = await verifyAuthToken({ pubkey: wrongPubkey, timestamp, token }, 'GET', '/api/notes')
-    expect(result).toBe(false)
+    const wrongPubkey = '00'.repeat(32)
+    expect(verifyAuthToken({ pubkey: wrongPubkey, timestamp, token }, 'GET', '/api/notes')).toBe(false)
   })
 
-  it('returns false for tampered token', async () => {
+  it('returns false for tampered token', () => {
     const timestamp = Date.now()
     const token = createSignedToken(timestamp, 'GET', '/api/notes')
-    // Flip the last byte to guarantee the token differs from the original
-    // (changing the first char risks a no-op if it's already '0')
     const lastByte = parseInt(token.slice(-2), 16)
     const tampered = token.slice(0, -2) + ((lastByte ^ 0xff).toString(16).padStart(2, '0'))
-    const result = await verifyAuthToken({ pubkey: pubkeyHex, timestamp, token: tampered }, 'GET', '/api/notes')
-    expect(result).toBe(false)
+    expect(verifyAuthToken({ pubkey: pubkeyHex, timestamp, token: tampered }, 'GET', '/api/notes')).toBe(false)
   })
 
-  it('returns false for missing fields', async () => {
-    const result = await verifyAuthToken({ pubkey: '', timestamp: Date.now(), token: 'abc' }, 'GET', '/api/test')
-    expect(result).toBe(false)
+  it('returns false for missing pubkey', () => {
+    expect(verifyAuthToken({ pubkey: '', timestamp: Date.now(), token: 'abc' }, 'GET', '/api/test')).toBe(false)
   })
 
-  it('rejects unbound token even when method/path provided', async () => {
+  it('returns false when token is bound to different endpoint (cross-endpoint replay)', () => {
     const timestamp = Date.now()
-    const token = createSignedToken(timestamp) // unbound — signed without method/path
-    const result = await verifyAuthToken({ pubkey: pubkeyHex, timestamp, token }, 'GET', '/api/notes')
-    expect(result).toBe(false) // no fallback — unbound tokens are rejected
+    const token = createSignedToken(timestamp, 'POST', '/api/notes')
+    expect(verifyAuthToken({ pubkey: pubkeyHex, timestamp, token }, 'GET', '/api/notes')).toBe(false)
   })
 
-  it('rejects bound token used against wrong endpoint', async () => {
+  it('rejects token signed by key A when presented with pubkey B', () => {
     const timestamp = Date.now()
-    const token = createSignedToken(timestamp, 'GET', '/api/notes')
-    const result = await verifyAuthToken({ pubkey: pubkeyHex, timestamp, token }, 'DELETE', '/api/users/abc')
-    expect(result).toBe(false)
+    const tokenFromA = createSignedToken(timestamp, 'GET', '/api/notes')
+    const seedB = new Uint8Array(32).fill(0x77)
+    const pubkeyB = bytesToHex(ed25519.getPublicKey(seedB))
+    expect(verifyAuthToken({ pubkey: pubkeyB, timestamp, token: tokenFromA }, 'GET', '/api/notes')).toBe(false)
   })
 
-  it('returns false for completely invalid token hex', async () => {
-    const result = await verifyAuthToken({
+  it('returns false for completely invalid token hex', () => {
+    expect(verifyAuthToken({
       pubkey: pubkeyHex,
       timestamp: Date.now(),
       token: 'not-hex',
-    })
-    expect(result).toBe(false)
-  })
-
-  it('rejects token signed by key A when presented with pubkey B (replay attack)', async () => {
-    // Key A signs a valid token
-    const timestamp = Date.now()
-    const tokenFromA = createSignedToken(timestamp, 'GET', '/api/notes')
-
-    // Generate a different keypair (key B)
-    const privKeyB = hexToBytes('b'.repeat(64).replace(/^b/, '2'))
-    const pubkeyB = bytesToHex(schnorr.getPublicKey(privKeyB))
-
-    // Present key A's signature with key B's pubkey — must reject
-    const result = await verifyAuthToken({ pubkey: pubkeyB, timestamp, token: tokenFromA }, 'GET', '/api/notes')
-    expect(result).toBe(false)
-  })
-
-  it('rejects token with swapped method (cross-endpoint replay)', async () => {
-    const timestamp = Date.now()
-    const token = createSignedToken(timestamp, 'POST', '/api/notes')
-    // Replay the POST token on a GET endpoint
-    const result = await verifyAuthToken({ pubkey: pubkeyHex, timestamp, token }, 'GET', '/api/notes')
-    expect(result).toBe(false)
+    }, 'GET', '/api/test')).toBe(false)
   })
 })

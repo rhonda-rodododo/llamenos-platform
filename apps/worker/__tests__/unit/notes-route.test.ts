@@ -144,8 +144,8 @@ describe('GET /notes', () => {
 // ---------------------------------------------------------------------------
 
 const HEX64 = 'a'.repeat(64)
-const HEX66 = 'a'.repeat(66)
-const WRAPPED_KEY = 'dGVzdC13cmFwcGVkLWtleQ' // base64 non-empty
+const HPKE_ENC = 'b'.repeat(64)
+const WRAPPED_CT = 'dGVzdC13cmFwcGVkLWtleQ' // base64 non-empty
 
 // ---------------------------------------------------------------------------
 // POST / — create note
@@ -155,8 +155,8 @@ describe('POST /notes', () => {
   const noteBody = {
     callId: 'call-test-1',
     encryptedContent: 'enc-data',
-    authorEnvelope: { wrappedKey: WRAPPED_KEY, ephemeralPubkey: HEX64 },
-    adminEnvelopes: [{ pubkey: HEX64, wrappedKey: WRAPPED_KEY, ephemeralPubkey: HEX66 }],
+    authorEnvelope: { enc: HPKE_ENC, ct: WRAPPED_CT },
+    adminEnvelopes: [{ pubkey: HEX64, enc: HPKE_ENC, ct: WRAPPED_CT }],
   }
 
   it('rejects creation without notes:create permission', async () => {
@@ -211,8 +211,8 @@ describe('POST /notes', () => {
     const body = {
       callId: 'call-test-1',
       encryptedContent: 'enc-data',
-      authorEnvelope: { wrappedKey: WRAPPED_KEY, ephemeralPubkey: HEX64 },
-      adminEnvelopes: [{ pubkey: HEX64, wrappedKey: WRAPPED_KEY, ephemeralPubkey: HEX66 }],
+      authorEnvelope: { enc: HPKE_ENC, ct: WRAPPED_CT },
+      adminEnvelopes: [{ pubkey: HEX64, enc: HPKE_ENC, ct: WRAPPED_CT }],
       caseId: 'case-123',
       interactionTypeHash: 'hash-456',
     }
@@ -309,7 +309,7 @@ describe('GET /notes/:id/replies', () => {
 describe('POST /notes/:id/replies', () => {
   const replyBody = {
     encryptedContent: 'reply-content',
-    readerEnvelopes: [{ pubkey: HEX64, wrappedKey: WRAPPED_KEY, ephemeralPubkey: HEX66 }],
+    readerEnvelopes: [{ pubkey: HEX64, enc: HPKE_ENC, ct: WRAPPED_CT }],
   }
 
   it('rejects reply without notes:reply permission', async () => {

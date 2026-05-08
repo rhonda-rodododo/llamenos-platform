@@ -1,8 +1,9 @@
 # Multi-stage Dockerfile for Llamenos (Bun self-hosted mode)
 #
 # Builds:
-#   Stage 1: Install dependencies (pure JS — no native build tools needed)
-#   Stage 2: Production image (API-only — desktop clients connect to this)
+#   Stage 1: Install JS dependencies
+#   Stage 2: Build Rust crypto library (.so) for bun:ffi
+#   Stage 3: Production image (API-only — desktop clients connect to this)
 #
 # Bun runs TypeScript natively — no esbuild transpilation step needed.
 
@@ -16,6 +17,7 @@ COPY package.json bun.lockb ./
 # workspace packages. Without the lockfile, some @aws-sdk versions freshly downloaded
 # from npm carry workspace:^ refs for @smithy deps, which fail to resolve in a non-monorepo
 # Docker context. Using --frozen-lockfile with these stubs avoids re-resolution entirely.
+COPY packages/crypto/package.json packages/crypto/package.json
 COPY packages/i18n/package.json packages/i18n/package.json
 COPY packages/protocol/package.json packages/protocol/package.json
 COPY packages/test-specs/package.json packages/test-specs/package.json
@@ -23,7 +25,16 @@ COPY apps/worker/package.json apps/worker/package.json
 COPY site/package.json site/package.json
 RUN bun install --frozen-lockfile --production --ignore-scripts
 
-# Stage 2: Production
+# Stage 2: Build Rust crypto FFI (.so)
+FROM rust:1-slim AS rust-builder
+RUN apt-get update && apt-get install -y --no-install-recommends pkg-config && rm -rf /var/lib/apt/lists/*
+WORKDIR /build
+COPY packages/crypto/ packages/crypto/
+RUN cargo build --release --manifest-path packages/crypto/Cargo.toml --features server \
+    && mkdir -p packages/crypto/dist/server \
+    && cp packages/crypto/target/release/libllamenos_core.so packages/crypto/dist/server/
+
+# Stage 3: Production
 FROM oven/bun:1-slim@sha256:7e8ed3961db1cdedf17d516dda87948cfedbd294f53bf16462e5b57ed3fff0f1
 # oven/bun:1-slim pinned 2026-03-21 — update via Dependabot
 
@@ -42,7 +53,12 @@ COPY apps/worker/ apps/worker/
 COPY packages/shared/ packages/shared/
 COPY packages/i18n/ packages/i18n/
 COPY packages/protocol/ packages/protocol/
+COPY packages/crypto/package.json packages/crypto/package.json
+COPY packages/crypto/ffi.ts packages/crypto/ffi.ts
 COPY tsconfig.json ./
+
+# Copy native crypto library from Rust build
+COPY --from=rust-builder /build/packages/crypto/dist/server/libllamenos_core.so packages/crypto/dist/server/
 
 # Copy Drizzle SQL migrations + migration runner (applied at startup)
 COPY drizzle/migrations/ drizzle/migrations/

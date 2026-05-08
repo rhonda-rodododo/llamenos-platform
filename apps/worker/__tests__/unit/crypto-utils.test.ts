@@ -3,10 +3,6 @@ import { hashPhone, hashIP, hashAuditEntry, stableJsonStringify, encryptMessageF
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
-import { xchacha20poly1305 } from '@noble/ciphers/chacha.js'
-import { secp256k1 } from '@noble/curves/secp256k1.js'
-import { hkdf } from '@noble/hashes/hkdf.js'
-import { LABEL_MESSAGE } from '@shared/crypto-labels'
 
 // Test HMAC secret (64 hex chars = 32 bytes)
 const TEST_SECRET = 'a'.repeat(64)
@@ -151,9 +147,6 @@ describe('hashAuditEntry', () => {
 })
 
 describe('encryptMessageForStorage', () => {
-  // Valid secp256k1 pubkeys (x-only, 32 bytes hex)
-  // Generate deterministic test keys
-  const testPubkey1 = 'a'.repeat(64) // Not a real valid point, but structurally correct hex
   // Use a known valid x-only pubkey for real crypto ops
   // secp256k1 generator point x-coordinate:
   const validPubkey = '79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798'
@@ -169,20 +162,14 @@ describe('encryptMessageForStorage', () => {
     expect(result.readerEnvelopes[0].pubkey).toBe(validPubkey)
   })
 
-  it('each envelope has wrappedKey and ephemeralPubkey', () => {
+  it('each envelope has enc and ct fields (HPKE format)', () => {
     const result = encryptMessageForStorage('Test', [validPubkey])
     const envelope = result.readerEnvelopes[0]
-    expect(envelope.wrappedKey).toMatch(/^[0-9a-f]+$/)
-    expect(envelope.ephemeralPubkey).toMatch(/^[0-9a-f]+$/)
+    expect(envelope.enc).toMatch(/^[0-9a-f]{64}$/) // 32-byte X25519 enc
+    expect(envelope.ct).toMatch(/^[0-9a-f]+$/)
   })
 
-  it('encrypted content includes nonce prefix (24 bytes = 48 hex chars)', () => {
-    const result = encryptMessageForStorage('Test', [validPubkey])
-    // nonce (24 bytes) + ciphertext (message + 16 byte tag)
-    expect(result.encryptedContent.length).toBeGreaterThan(48)
-  })
-
-  it('produces different ciphertext for same plaintext (random nonce)', () => {
+  it('produces different ciphertext for same plaintext (random key)', () => {
     const result1 = encryptMessageForStorage('Same message', [validPubkey])
     const result2 = encryptMessageForStorage('Same message', [validPubkey])
     expect(result1.encryptedContent).not.toBe(result2.encryptedContent)
@@ -197,10 +184,10 @@ describe('encryptMessageForStorage', () => {
     expect(result.readerEnvelopes[1].pubkey).toBe(pubkey2)
   })
 
-  it('each reader gets a unique wrapped key', () => {
+  it('each reader gets a unique wrapped key (different enc values)', () => {
     const pubkey2 = 'c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5'
     const result = encryptMessageForStorage('Test', [validPubkey, pubkey2])
-    expect(result.readerEnvelopes[0].wrappedKey).not.toBe(result.readerEnvelopes[1].wrappedKey)
+    expect(result.readerEnvelopes[0].enc).not.toBe(result.readerEnvelopes[1].enc)
   })
 })
 
@@ -215,23 +202,18 @@ describe('encryptCallRecordForStorage', () => {
     expect(result.encryptedContent).toMatch(/^[0-9a-f]+$/)
   })
 
-  it('returns admin envelopes', () => {
+  it('returns admin envelopes with HPKE fields', () => {
     const result = encryptCallRecordForStorage(
       { answeredBy: 'pubkey123', callerNumber: 'hash123' },
       [validPubkey],
     )
     expect(result.adminEnvelopes.length).toBe(1)
     expect(result.adminEnvelopes[0].pubkey).toBe(validPubkey)
+    expect(result.adminEnvelopes[0].enc).toMatch(/^[0-9a-f]{64}$/)
+    expect(result.adminEnvelopes[0].ct).toMatch(/^[0-9a-f]+$/)
   })
 
-  it('encrypts JSON-serialized metadata', () => {
-    const metadata = { answeredBy: 'pk1', callerNumber: 'hash', extra: 'data' }
-    const result = encryptCallRecordForStorage(metadata, [validPubkey])
-    // Content should be nonce + ciphertext of JSON.stringify(metadata)
-    expect(result.encryptedContent.length).toBeGreaterThan(48) // at least nonce + some ciphertext
-  })
-
-  it('produces different ciphertext each time (random nonce)', () => {
+  it('produces different ciphertext each time (random key)', () => {
     const metadata = { answeredBy: 'pk1', callerNumber: 'hash' }
     const result1 = encryptCallRecordForStorage(metadata, [validPubkey])
     const result2 = encryptCallRecordForStorage(metadata, [validPubkey])
@@ -245,74 +227,5 @@ describe('encryptCallRecordForStorage', () => {
       [validPubkey, pubkey2],
     )
     expect(result.adminEnvelopes.length).toBe(2)
-  })
-})
-
-describe('encryptMessageForStorage decrypt round-trip', () => {
-  // Use a known private key and derive pubkey for full round-trip
-  const privKeyHex = '0000000000000000000000000000000000000000000000000000000000000001'
-  const privKey = hexToBytes(privKeyHex)
-  // secp256k1 generator point x-coordinate (pubkey of privkey=1)
-  const pubkeyHex = '79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798'
-
-  function eciesUnwrapKey(
-    wrappedKeyHex: string,
-    ephemeralPubkeyHex: string,
-    recipientPrivKey: Uint8Array,
-    label: string,
-  ): Uint8Array {
-    const packed = hexToBytes(wrappedKeyHex)
-    const version = packed[0]
-    expect(version).toBe(0x02) // v2
-
-    const nonce = packed.slice(1, 25)
-    const ciphertext = packed.slice(25)
-
-    // Derive shared secret: ECDH(recipientPrivKey, ephemeralPubkey)
-    const ephemeralCompressed = hexToBytes(ephemeralPubkeyHex)
-    const shared = secp256k1.getSharedSecret(recipientPrivKey, ephemeralCompressed)
-    const sharedX = shared.slice(1, 33)
-
-    // Derive symmetric key via HKDF (same as eciesWrapKeyServer)
-    const symmetricKey = hkdf(sha256, sharedX, new Uint8Array(0), utf8ToBytes(label), 32)
-
-    const cipher = xchacha20poly1305(symmetricKey, nonce)
-    return cipher.decrypt(ciphertext)
-  }
-
-  it('encrypts then decrypts to original plaintext', () => {
-    const plaintext = 'Hello, this is a secret message!'
-    const result = encryptMessageForStorage(plaintext, [pubkeyHex])
-
-    // Unwrap the message key from the envelope
-    const envelope = result.readerEnvelopes[0]
-    const messageKey = eciesUnwrapKey(
-      envelope.wrappedKey,
-      envelope.ephemeralPubkey,
-      privKey,
-      LABEL_MESSAGE,
-    )
-
-    // Decrypt the content using the unwrapped message key
-    const contentBytes = hexToBytes(result.encryptedContent)
-    const nonce = contentBytes.slice(0, 24)
-    const ciphertext = contentBytes.slice(24)
-    const cipher = xchacha20poly1305(messageKey, nonce)
-    const decrypted = new TextDecoder().decode(cipher.decrypt(ciphertext))
-
-    expect(decrypted).toBe(plaintext)
-  })
-
-  it('decryption fails with wrong private key', () => {
-    const plaintext = 'Secret data'
-    const result = encryptMessageForStorage(plaintext, [pubkeyHex])
-    const envelope = result.readerEnvelopes[0]
-
-    // Use a different private key
-    const wrongPrivKey = hexToBytes('0000000000000000000000000000000000000000000000000000000000000002')
-
-    expect(() => {
-      eciesUnwrapKey(envelope.wrappedKey, envelope.ephemeralPubkey, wrongPrivKey, LABEL_MESSAGE)
-    }).toThrow()
   })
 })

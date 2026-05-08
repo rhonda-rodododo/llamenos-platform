@@ -12,7 +12,7 @@ import { ed25519 } from '@noble/curves/ed25519.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
-import { AUTH_PREFIX } from '@shared/crypto-labels'
+import { LABEL_DEVICE_AUTH } from '@shared/crypto-labels'
 
 import {
   parseAuthHeader,
@@ -46,7 +46,9 @@ async function makeSchnorrToken(
   method: string,
   path: string,
 ): Promise<string> {
-  const boundMessage = `${AUTH_PREFIX}${pubkeyHex}:${timestamp}:${method}:${path}`
+  // Schnorr uses the legacy AUTH_PREFIX format with SHA-256 pre-hashing.
+  // verifyAuthToken no longer accepts Schnorr — these tokens will be rejected.
+  const boundMessage = `llamenos:auth:${pubkeyHex}:${timestamp}:${method}:${path}`
   const hash = sha256(utf8ToBytes(boundMessage))
   const sig = schnorr.sign(hash, privKey)
   return bytesToHex(sig)
@@ -59,9 +61,10 @@ async function makeEd25519Token(
   method: string,
   path: string,
 ): Promise<string> {
-  const boundMessage = `${AUTH_PREFIX}${pubkeyHex}:${timestamp}:${method}:${path}`
-  const hash = sha256(utf8ToBytes(boundMessage))
-  const sig = ed25519.sign(hash, privKey)
+  // Ed25519 uses LABEL_DEVICE_AUTH prefix; message is signed directly (no pre-hashing —
+  // ed25519 applies SHA-512 internally). Must match build_auth_message() in auth.rs.
+  const message = utf8ToBytes(`${LABEL_DEVICE_AUTH}:${pubkeyHex}:${timestamp}:${method}:${path}`)
+  const sig = ed25519.sign(message, privKey)
   return bytesToHex(sig)
 }
 
@@ -186,12 +189,14 @@ describe('validateToken', () => {
 // ---------------------------------------------------------------------------
 
 describe('verifyAuthToken (Schnorr)', () => {
-  it('verifies a valid Schnorr-signed token', async () => {
+  it('rejects Schnorr-signed tokens — Ed25519-only after auth purge', async () => {
+    // Schnorr tokens used the old AUTH_PREFIX + SHA-256-hashed format.
+    // verifyAuthToken now only accepts Ed25519 signatures over the LABEL_DEVICE_AUTH message.
     const { privKey, pubkeyHex } = makeSchnorrKeys()
     const ts = Date.now()
     const token = await makeSchnorrToken(privKey, pubkeyHex, ts, 'GET', '/api/me')
     const auth: AuthPayload = { pubkey: pubkeyHex, timestamp: ts, token }
-    expect(await verifyAuthToken(auth, 'GET', '/api/me')).toBe(true)
+    expect(await verifyAuthToken(auth, 'GET', '/api/me')).toBe(false)
   })
 
   it('rejects Schnorr token with wrong method', async () => {
@@ -328,10 +333,10 @@ describe('authenticateRequest', () => {
     expect(await authenticateRequest(req, svc as never)).toBeNull()
   })
 
-  it('authenticates via valid Schnorr signature', async () => {
-    const { privKey, pubkeyHex } = makeSchnorrKeys()
+  it('authenticates via valid Ed25519 signature', async () => {
+    const { privKey, pubkeyHex } = makeEd25519Keys()
     const ts = Date.now()
-    const token = await makeSchnorrToken(privKey, pubkeyHex, ts, 'GET', '/api/me')
+    const token = await makeEd25519Token(privKey, pubkeyHex, ts, 'GET', '/api/me')
     const payload: AuthPayload = { pubkey: pubkeyHex, timestamp: ts, token }
     const svc = makeIdentityService({
       getUserInternal: vi.fn().mockResolvedValue({ pubkey: pubkeyHex, active: true }),
@@ -343,10 +348,10 @@ describe('authenticateRequest', () => {
     expect(result?.pubkey).toBe(pubkeyHex)
   })
 
-  it('returns null when Schnorr user is inactive', async () => {
-    const { privKey, pubkeyHex } = makeSchnorrKeys()
+  it('returns null when Ed25519 user is inactive', async () => {
+    const { privKey, pubkeyHex } = makeEd25519Keys()
     const ts = Date.now()
-    const token = await makeSchnorrToken(privKey, pubkeyHex, ts, 'GET', '/api/me')
+    const token = await makeEd25519Token(privKey, pubkeyHex, ts, 'GET', '/api/me')
     const payload: AuthPayload = { pubkey: pubkeyHex, timestamp: ts, token }
     const svc = makeIdentityService({
       getUserInternal: vi.fn().mockResolvedValue({ pubkey: pubkeyHex, active: false }),

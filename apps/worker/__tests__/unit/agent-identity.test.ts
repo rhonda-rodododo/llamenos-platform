@@ -22,9 +22,9 @@ describe('agent-identity', () => {
       expect(pubkey).toMatch(/^[0-9a-f]{64}$/)
       // Encrypted nsec should be non-empty hex
       expect(encryptedNsec).toMatch(/^[0-9a-f]+$/)
-      // Encrypted nsec = 24 byte nonce + (32 byte nsec hex = 64 chars = 64 bytes + 16 byte tag)
-      // nonce(24) + ciphertext(64+16=80) = 104 bytes = 208 hex chars
-      expect(encryptedNsec.length).toBe(208)
+      // AES-256-GCM: 12 byte nonce + (64 byte nsec-hex plaintext + 16 byte tag = 80 bytes)
+      // nonce(12) + ciphertext(80) = 92 bytes = 184 hex chars
+      expect(encryptedNsec.length).toBe(184)
     })
 
     it('generates different keypairs for different agentIds', () => {

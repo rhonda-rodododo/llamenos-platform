@@ -124,8 +124,8 @@ final class NotesViewModel {
         if let ourPubkey = cryptoService.encryptionPubkeyHex,
            let ours = result.envelopes.first(where: { $0.pubkey == ourPubkey }) {
             authorEnvelope = ProtocolKeyEnvelope(
-                ephemeralPubkey: ours.envelope.enc,
-                wrappedKey: ours.envelope.ct
+                ct: ours.envelope.ct,
+                enc: ours.envelope.enc
             )
         } else {
             authorEnvelope = nil
@@ -135,9 +135,9 @@ final class NotesViewModel {
             .filter { $0.pubkey != cryptoService.encryptionPubkeyHex }
             .map { env in
                 RecipientEnvelope(
-                    ephemeralPubkey: env.envelope.enc,
-                    pubkey: env.pubkey,
-                    wrappedKey: env.envelope.ct
+                    ct: env.envelope.ct,
+                    enc: env.envelope.enc,
+                    pubkey: env.pubkey
                 )
             }
 
@@ -176,8 +176,8 @@ final class NotesViewModel {
             envelope = HpkeEnvelope(
                 v: 3,
                 labelId: 0,
-                enc: authorEnv.ephemeralPubkey,
-                ct: authorEnv.wrappedKey
+                enc: authorEnv.enc,
+                ct: authorEnv.ct
             )
         }
 
@@ -187,8 +187,8 @@ final class NotesViewModel {
                 envelope = HpkeEnvelope(
                     v: 3,
                     labelId: 0,
-                    enc: ourEnvelope.ephemeralPubkey,
-                    ct: ourEnvelope.wrappedKey
+                    enc: ourEnvelope.enc,
+                    ct: ourEnvelope.ct
                 )
             }
         }

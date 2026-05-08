@@ -63,7 +63,7 @@ export const addHubMemberBodySchema = z.looseObject({
 export const hubKeyEnvelopesBodySchema = z.looseObject({
   envelopes: z.array(z.object({
     pubkey: pubkeySchema,
-    wrappedKey: z.string().min(1),
-    ephemeralPubkey: pubkeySchema,
+    enc: z.string().min(1),
+    ct: z.string().min(1),
   })).min(1, 'At least one envelope required'),
 })

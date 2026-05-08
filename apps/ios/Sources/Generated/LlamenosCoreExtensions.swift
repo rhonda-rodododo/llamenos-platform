@@ -32,43 +32,43 @@ extension EncryptedKeyData: Codable {
 
 extension KeyEnvelope: Codable {
     enum CodingKeys: String, CodingKey {
-        case wrappedKey, ephemeralPubkey
+        case enc, ct
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.init(
-            wrappedKey: try container.decode(String.self, forKey: .wrappedKey),
-            ephemeralPubkey: try container.decode(String.self, forKey: .ephemeralPubkey)
+            enc: try container.decode(String.self, forKey: .enc),
+            ct: try container.decode(String.self, forKey: .ct)
         )
     }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(wrappedKey, forKey: .wrappedKey)
-        try container.encode(ephemeralPubkey, forKey: .ephemeralPubkey)
+        try container.encode(enc, forKey: .enc)
+        try container.encode(ct, forKey: .ct)
     }
 }
 
 extension RecipientKeyEnvelope: Codable {
     enum CodingKeys: String, CodingKey {
-        case pubkey, wrappedKey, ephemeralPubkey
+        case pubkey, enc, ct
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.init(
             pubkey: try container.decode(String.self, forKey: .pubkey),
-            wrappedKey: try container.decode(String.self, forKey: .wrappedKey),
-            ephemeralPubkey: try container.decode(String.self, forKey: .ephemeralPubkey)
+            enc: try container.decode(String.self, forKey: .enc),
+            ct: try container.decode(String.self, forKey: .ct)
         )
     }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(pubkey, forKey: .pubkey)
-        try container.encode(wrappedKey, forKey: .wrappedKey)
-        try container.encode(ephemeralPubkey, forKey: .ephemeralPubkey)
+        try container.encode(enc, forKey: .enc)
+        try container.encode(ct, forKey: .ct)
     }
 }
 

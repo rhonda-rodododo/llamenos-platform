@@ -72,7 +72,7 @@ When('the answering volunteer creates a note for the call', async ({ request, wo
       encryptedContent: 'lifecycle-test-note',
       callId: getScenarioState(world).callId,
       readerEnvelopes: [
-        { pubkey: vol.pubkey, wrappedKey: 'key-vol', ephemeralPubkey: kp.pubkey },
+        { pubkey: vol.pubkey, ct: 'key-vol', enc: kp.pubkey },
       ],
     },
     vol.nsec,

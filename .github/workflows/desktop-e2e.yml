@@ -28,7 +28,7 @@ permissions:
 
 env:
   BUN_VERSION: "1.3.5"
-  TEST_ADMIN_PUBKEY: "ac4718373d30301e5c7cf55e9e6f2568efb94f3278fb88f37f4981e880505228"
+  TEST_ADMIN_PUBKEY: "79215a4c04f08fcd817c6f820c87169beb8cddf96dfa590a1315556b78af9183"
 
 jobs:
   test:
@@ -100,6 +100,7 @@ jobs:
             "HOTLINE_NAME=Llámenos" \
             "BRIDGE_SECRET=ci-test-bridge-secret" \
             "ARI_PASSWORD=ci-test-ari-password" \
+            "SERVER_SECRET=0000000000000000000000000000000000000000000000000000000000000001" \
             "SERVER_NOSTR_SECRET=0000000000000000000000000000000000000000000000000000000000000001" \
             "STRFRY_ALLOWED_PUBKEY=c0fe6f73ada93d83b89d4fe8a2c20818154a57390fc90088e20653064036f0c5" \
             "NOTIFIER_API_KEY=ci-test-notifier-key" \
@@ -140,21 +141,14 @@ jobs:
         uses: dtolnay/rust-toolchain@efa25f7f19611383d5b0ccf2d1c8914531636bf9 # stable
         with:
           toolchain: stable
-          targets: wasm32-unknown-unknown
 
       - name: Rust cache
         uses: swatinem/rust-cache@82a92a6e8fbeee089604da2575dc567ae9ddeaab # v2.7.5
         with:
           workspaces: packages/crypto
 
-      - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-
       - name: Generate interop test vectors
         run: cargo test --manifest-path packages/crypto/Cargo.toml --test interop
-
-      - name: Build WASM
-        run: bun run crypto:wasm
 
       # ── Run tests ──────────────────────────────────────────────
       - name: Run desktop E2E tests

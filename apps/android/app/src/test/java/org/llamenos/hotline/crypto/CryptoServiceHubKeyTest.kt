@@ -97,9 +97,9 @@ class CryptoServiceHubKeyTest {
     fun `loadHubKey throws without native lib`(): Unit = runBlocking {
         val envelope = HubKeyEnvelopeResponse(
             envelope = HubKeyEnvelopeResponseEnvelope(
-                ephemeralPubkey = "02" + "ab".repeat(32),
+                enc = "02" + "ab".repeat(32),
                 pubkey = "cd".repeat(32),
-                wrappedKey = "AAEC".repeat(16), // base64 placeholder
+                ct = "AAEC".repeat(16), // base64 placeholder
             )
         )
         cryptoService.loadHubKey("hub-test", envelope)

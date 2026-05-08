@@ -1,23 +1,19 @@
 /**
  * Unit tests for worker crypto utilities.
  *
- * Covers: hashPhone, hashIP, eciesWrapKeyForRecipient, encryptMessageForStorage,
- * encryptCallRecordForStorage, encryptContactIdentifier/decrypt, migrateContactIfNeeded,
+ * Covers: hashPhone, hashIP, encryptMessageForStorage,
+ * encryptCallRecordForStorage, encryptContactIdentifier/decrypt,
  * stableJsonStringify, hashAuditEntry, encryptStorageCredential/decrypt.
  */
 
 import { describe, it, expect } from 'vitest'
-import { secp256k1 } from '@noble/curves/secp256k1.js'
-import { bytesToHex } from '@noble/hashes/utils.js'
 import {
   hashPhone,
   hashIP,
-  eciesWrapKeyForRecipient,
   encryptMessageForStorage,
   encryptCallRecordForStorage,
   encryptContactIdentifier,
   decryptContactIdentifier,
-  migrateContactIfNeeded,
   stableJsonStringify,
   hashAuditEntry,
   encryptStorageCredential,
@@ -86,79 +82,28 @@ describe('hashIP', () => {
 })
 
 // ---------------------------------------------------------------------------
-// eciesWrapKeyForRecipient
+// encryptMessageForStorage (HPKE envelopes)
 // ---------------------------------------------------------------------------
 
-describe('eciesWrapKeyForRecipient', () => {
-  function makeRecipient() {
-    const privKey = secp256k1.utils.randomSecretKey()
-    // x-only pubkey (32 bytes)
-    const fullPub = secp256k1.getPublicKey(privKey, true)
-    const xOnly = bytesToHex(fullPub.slice(1))
-    return { privKey, xOnly }
-  }
-
-  it('returns wrappedKey and ephemeralPubkey as non-empty hex strings', () => {
-    const { xOnly } = makeRecipient()
-    const key = new Uint8Array(32).fill(0x42)
-    const result = eciesWrapKeyForRecipient(key, xOnly, 'llamenos:test-label')
-    expect(result.wrappedKey).toMatch(/^[0-9a-f]+$/)
-    expect(result.ephemeralPubkey).toMatch(/^[0-9a-f]+$/)
-  })
-
-  it('produces different ciphertext on each call (random nonce)', () => {
-    const { xOnly } = makeRecipient()
-    const key = new Uint8Array(32).fill(0x01)
-    const r1 = eciesWrapKeyForRecipient(key, xOnly, 'llamenos:label')
-    const r2 = eciesWrapKeyForRecipient(key, xOnly, 'llamenos:label')
-    expect(r1.wrappedKey).not.toBe(r2.wrappedKey)
-  })
-
-  it('produces different output for different labels (domain separation)', () => {
-    const { xOnly } = makeRecipient()
-    const key = new Uint8Array(32).fill(0x01)
-    const r1 = eciesWrapKeyForRecipient(key, xOnly, 'llamenos:label-a')
-    const r2 = eciesWrapKeyForRecipient(key, xOnly, 'llamenos:label-b')
-    // Different labels should (almost always) produce different ephemeral pubkeys
-    // due to random ephemerals, but we at minimum ensure no crash
-    expect(r1.wrappedKey.length).toBeGreaterThan(0)
-    expect(r2.wrappedKey.length).toBeGreaterThan(0)
-  })
-
-  it('wrappedKey includes version byte 0x02 at start', () => {
-    const { xOnly } = makeRecipient()
-    const key = new Uint8Array(32).fill(0x07)
-    const { wrappedKey } = eciesWrapKeyForRecipient(key, xOnly, 'llamenos:test')
-    // First byte (2 hex chars) is 0x02
-    expect(wrappedKey.slice(0, 2)).toBe('02')
-  })
-})
-
-// ---------------------------------------------------------------------------
-// encryptMessageForStorage
-// ---------------------------------------------------------------------------
+// Valid X25519 public key (base point u=9, 32 bytes little-endian hex)
+const validPubkeyHex = '0900000000000000000000000000000000000000000000000000000000000000'
 
 describe('encryptMessageForStorage', () => {
-  function makeRecipient() {
-    const privKey = secp256k1.utils.randomSecretKey()
-    const pub = secp256k1.getPublicKey(privKey, true)
-    return bytesToHex(pub.slice(1)) // x-only
-  }
-
   it('returns encryptedContent as hex and envelopes for each reader', () => {
-    const readers = [makeRecipient(), makeRecipient()]
+    const pubkey2 = '0800000000000000000000000000000000000000000000000000000000000000'
+    const readers = [validPubkeyHex, pubkey2]
     const result = encryptMessageForStorage('Hello, world!', readers)
     expect(result.encryptedContent).toMatch(/^[0-9a-f]+$/)
     expect(result.readerEnvelopes).toHaveLength(2)
   })
 
-  it('each envelope has pubkey, wrappedKey, and ephemeralPubkey', () => {
-    const readers = [makeRecipient()]
+  it('each envelope has pubkey, enc, and ct (HPKE format)', () => {
+    const readers = [validPubkeyHex]
     const result = encryptMessageForStorage('test', readers)
     const env = result.readerEnvelopes[0]
     expect(env.pubkey).toBe(readers[0])
-    expect(env.wrappedKey).toMatch(/^[0-9a-f]+$/)
-    expect(env.ephemeralPubkey).toMatch(/^[0-9a-f]+$/)
+    expect(env.enc).toMatch(/^[0-9a-f]{64}$/) // 32-byte X25519 enc
+    expect(env.ct).toMatch(/^[0-9a-f]+$/)
   })
 
   it('handles empty reader list', () => {
@@ -168,16 +113,16 @@ describe('encryptMessageForStorage', () => {
   })
 
   it('produces different ciphertext each call (random key + nonce)', () => {
-    const readers = [makeRecipient()]
+    const readers = [validPubkeyHex]
     const r1 = encryptMessageForStorage('same text', readers)
     const r2 = encryptMessageForStorage('same text', readers)
     expect(r1.encryptedContent).not.toBe(r2.encryptedContent)
   })
 
-  it('encryptedContent minimum length is 48 chars (nonce 24B + poly1305 16B > 0 ct)', () => {
+  it('encryptedContent is valid hex with reasonable length', () => {
     const result = encryptMessageForStorage('x', [])
-    // nonce (24B) + ciphertext+tag (at least 17B) = at least 41 bytes = 82 hex chars
-    expect(result.encryptedContent.length).toBeGreaterThanOrEqual(82)
+    // nonce (12B) + ciphertext+tag (at least 17B) = at least 29 bytes = 58 hex chars
+    expect(result.encryptedContent.length).toBeGreaterThanOrEqual(58)
   })
 })
 
@@ -186,14 +131,8 @@ describe('encryptMessageForStorage', () => {
 // ---------------------------------------------------------------------------
 
 describe('encryptCallRecordForStorage', () => {
-  function makeAdmin() {
-    const priv = secp256k1.utils.randomSecretKey()
-    const pub = secp256k1.getPublicKey(priv, true)
-    return bytesToHex(pub.slice(1))
-  }
-
   it('returns encryptedContent and adminEnvelopes', () => {
-    const admins = [makeAdmin()]
+    const admins = [validPubkeyHex]
     const meta = { answeredBy: 'volunteer1', duration: 120 }
     const result = encryptCallRecordForStorage(meta, admins)
     expect(result.encryptedContent).toMatch(/^[0-9a-f]+$/)
@@ -201,7 +140,9 @@ describe('encryptCallRecordForStorage', () => {
   })
 
   it('handles multiple admins', () => {
-    const admins = [makeAdmin(), makeAdmin(), makeAdmin()]
+    const pubkey2 = '0800000000000000000000000000000000000000000000000000000000000000'
+    const pubkey3 = '0700000000000000000000000000000000000000000000000000000000000000'
+    const admins = [validPubkeyHex, pubkey2, pubkey3]
     const result = encryptCallRecordForStorage({ x: 1 }, admins)
     expect(result.adminEnvelopes).toHaveLength(3)
   })
@@ -251,30 +192,7 @@ describe('encryptContactIdentifier / decryptContactIdentifier', () => {
   })
 })
 
-// ---------------------------------------------------------------------------
-// migrateContactIfNeeded
-// ---------------------------------------------------------------------------
-
-describe('migrateContactIfNeeded', () => {
-  it('legacy plaintext: returns as-is with needsUpdate=true', () => {
-    const result = migrateContactIfNeeded('+15551234567', SECRET)
-    expect(result.value).toBe('+15551234567')
-    expect(result.needsUpdate).toBe(true)
-  })
-
-  it('encrypted value: decrypts and returns needsUpdate=false', () => {
-    const original = '+15559876543'
-    const enc = encryptContactIdentifier(original, SECRET)
-    const result = migrateContactIfNeeded(enc, SECRET)
-    expect(result.value).toBe(original)
-    expect(result.needsUpdate).toBe(false)
-  })
-
-  it('empty plaintext is treated as legacy (needsUpdate=true)', () => {
-    const result = migrateContactIfNeeded('', SECRET)
-    expect(result.needsUpdate).toBe(true)
-  })
-})
+// migrateContactIfNeeded was removed — legacy migration no longer needed
 
 // ---------------------------------------------------------------------------
 // stableJsonStringify
@@ -404,9 +322,9 @@ describe('encryptStorageCredential / decryptStorageCredential', () => {
     expect(decryptStorageCredential(enc, SECRET)).toBe('')
   })
 
-  it('minimum ciphertext length is 48 bytes (24B nonce + payload)', () => {
+  it('minimum ciphertext length includes nonce + payload', () => {
     const enc = encryptStorageCredential('x', SECRET)
-    // hex: 24B nonce = 48 chars, + ct+tag (17+ B) = 82+ chars
-    expect(enc.length).toBeGreaterThanOrEqual(82)
+    // hex: 12B nonce = 24 chars, + ct+tag (17+ B) = 58+ chars
+    expect(enc.length).toBeGreaterThanOrEqual(58)
   })
 })

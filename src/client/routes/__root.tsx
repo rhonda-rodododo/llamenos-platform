@@ -5,7 +5,7 @@ import { useConfig, useHasMessaging } from '@/lib/config'
 import { useTheme } from '@/lib/theme'
 import { useEffect, useState, type ReactNode } from 'react'
 import { setServerEventKeys } from '@/lib/platform'
-import { NostrProvider } from '@/lib/nostr/context'
+import { RelayProvider } from '@/lib/relay/context'
 import { useCalls, useShiftStatus } from '@/lib/hooks'
 import { CommandPalette, triggerCommandPalette } from '@/components/command-palette'
 import { KeyboardShortcutsDialog } from '@/components/keyboard-shortcuts-dialog'
@@ -137,7 +137,7 @@ function RootLayout() {
       )
     }
   } else {
-    content = <NostrWrappedLayout />
+    content = <RelayWrappedLayout />
   }
 
   return (
@@ -155,15 +155,14 @@ function RootLayout() {
 const DAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const
 
 /**
- * Wraps AuthenticatedLayout with NostrProvider for relay connectivity.
- * Separated so the NostrProvider has access to both auth and config contexts.
+ * Wraps AuthenticatedLayout with RelayProvider for WebSocket connectivity.
+ * Separated so the RelayProvider has access to both auth and config contexts.
  *
- * NIP-42 auth uses Rust CryptoState — no getSecretKey callback needed.
+ * Challenge-response auth uses Ed25519 via Rust CryptoState.
  */
-function NostrWrappedLayout() {
-  const { serverNostrPubkey, nostrRelayUrl } = useConfig()
-
-  const { serverEventKeyHex, serverEventKeyPrevHex, eventKeyEpoch } = useAuth()
+function RelayWrappedLayout() {
+  const { serverPubkey, wsRelayUrl } = useConfig()
+  const { publicKey, serverEventKeyHex, serverEventKeyPrevHex, eventKeyEpoch } = useAuth()
 
   // Push epoch-scoped server event keys to Rust CryptoState (H2 hardening —
   // keys never stay in JS memory longer than needed for the IPC call)
@@ -174,19 +173,20 @@ function NostrWrappedLayout() {
         keys.push([eventKeyEpoch - 1, serverEventKeyPrevHex])
       }
       setServerEventKeys(keys).catch((err: unknown) => {
-        console.error('[nostr] Failed to push event keys to Rust:', err)
+        console.error('[relay] Failed to push event keys to Rust:', err)
       })
     }
   }, [serverEventKeyHex, serverEventKeyPrevHex, eventKeyEpoch])
 
   return (
-    <NostrProvider
-      relayUrl={nostrRelayUrl}
-      serverPubkey={serverNostrPubkey}
+    <RelayProvider
+      relayUrl={wsRelayUrl}
+      serverPubkey={serverPubkey}
+      devicePubkey={publicKey ?? undefined}
       isAuthenticated={true}
     >
       <AuthenticatedLayout />
-    </NostrProvider>
+    </RelayProvider>
   )
 }
 

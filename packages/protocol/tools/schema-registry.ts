@@ -66,6 +66,10 @@ const EXCLUDED_SCHEMAS = new Set([
   // Signal notification — bare enum schemas used as building blocks
   'digestCadenceSchema',
   'notificationChannelSchema',
+
+  // WebSocket message unions — discriminated unions not representable in quicktype
+  'wsClientMessageSchema',
+  'wsServerMessageSchema',
 ])
 
 export interface SchemaRegistryEntry {

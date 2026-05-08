@@ -12,9 +12,9 @@ use std::sync::Mutex;
 use llamenos_core::{auth, device_keys, hpke_envelope, puk, sigchain};
 use tauri_plugin_store::StoreExt;
 
-use chacha20poly1305::{
-    aead::{Aead, KeyInit},
-    XChaCha20Poly1305, XNonce,
+use aes_gcm::{
+    aead::{Aead, KeyInit, Payload},
+    Aes256Gcm, Nonce,
 };
 
 fn err_str(e: impl std::fmt::Display) -> String {
@@ -33,7 +33,7 @@ pub struct CryptoState {
     pin_failed_attempts: Mutex<u32>,
     /// PIN lockout expiry — epoch millis. Zero means no lockout.
     pin_lockout_until: Mutex<u64>,
-    /// Hub symmetric key — 32 bytes for XChaCha20-Poly1305 hub event decryption.
+    /// Hub symmetric key — 32 bytes for AES-256-GCM hub event decryption.
     /// Stored in Rust to prevent webview JS from accessing it (H2 hardening).
     hub_key: Mutex<Option<Vec<u8>>>,
     /// Server event key(s) — epoch-scoped symmetric keys for relay event decryption.
@@ -454,7 +454,8 @@ pub fn set_server_event_keys(
 }
 
 /// Decrypt hub event content using the hub key stored in CryptoState.
-/// Input: hex-encoded nonce(24) + ciphertext (XChaCha20-Poly1305).
+/// Input: hex-encoded nonce(12) + ciphertext (AES-256-GCM).
+/// AAD: LABEL_HUB_EVENT bytes for domain separation.
 /// Returns the decrypted plaintext string.
 #[tauri::command]
 pub fn decrypt_hub_event(
@@ -465,21 +466,25 @@ pub fn decrypt_hub_event(
     let key = hub_key.as_ref().ok_or("Hub key not loaded")?;
 
     let data = hex::decode(&ciphertext_hex).map_err(err_str)?;
-    if data.len() < 24 {
-        return Err("Ciphertext too short (need at least 24-byte nonce)".into());
+    if data.len() < 28 {
+        return Err("Ciphertext too short (need at least 12-byte nonce + 16-byte tag)".into());
     }
 
-    let nonce = XNonce::from_slice(&data[..24]);
-    let cipher = XChaCha20Poly1305::new_from_slice(key)
+    let nonce = Nonce::from_slice(&data[..12]);
+    let cipher = Aes256Gcm::new_from_slice(key)
         .map_err(|e| format!("Invalid hub key: {e}"))?;
-    let plaintext = cipher.decrypt(nonce, &data[24..])
+    let plaintext = cipher.decrypt(nonce, Payload {
+        msg: &data[12..],
+        aad: llamenos_core::LABEL_HUB_EVENT.as_bytes(),
+    })
         .map_err(|_| "Hub event decryption failed (wrong key or corrupted data)".to_string())?;
 
     String::from_utf8(plaintext).map_err(|e| format!("Invalid UTF-8 in decrypted content: {e}"))
 }
 
 /// Decrypt a server-published relay event using the epoch-keyed server event key.
-/// Input: hex-encoded nonce(24) + ciphertext + epoch number.
+/// Input: hex-encoded nonce(12) + ciphertext + epoch number.
+/// AAD: "{LABEL_HUB_EVENT_EPOCH}:{epoch}" for domain separation.
 /// Returns the decrypted plaintext string.
 #[tauri::command]
 pub fn decrypt_server_event(
@@ -494,14 +499,18 @@ pub fn decrypt_server_event(
         .ok_or_else(|| format!("No server event key for epoch {epoch}"))?;
 
     let data = hex::decode(&ciphertext_hex).map_err(err_str)?;
-    if data.len() < 24 {
-        return Err("Ciphertext too short (need at least 24-byte nonce)".into());
+    if data.len() < 28 {
+        return Err("Ciphertext too short (need at least 12-byte nonce + 16-byte tag)".into());
     }
 
-    let nonce = XNonce::from_slice(&data[..24]);
-    let cipher = XChaCha20Poly1305::new_from_slice(key)
+    let aad = format!("{}:{}", llamenos_core::LABEL_HUB_EVENT, epoch);
+    let nonce = Nonce::from_slice(&data[..12]);
+    let cipher = Aes256Gcm::new_from_slice(key)
         .map_err(|e| format!("Invalid server event key: {e}"))?;
-    let plaintext = cipher.decrypt(nonce, &data[24..])
+    let plaintext = cipher.decrypt(nonce, Payload {
+        msg: &data[12..],
+        aad: aad.as_bytes(),
+    })
         .map_err(|_| "Server event decryption failed (wrong key or corrupted data)".to_string())?;
 
     String::from_utf8(plaintext).map_err(|e| format!("Invalid UTF-8 in decrypted content: {e}"))

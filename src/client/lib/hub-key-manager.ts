@@ -2,21 +2,21 @@
  * Hub Key Manager
  *
  * Hub-wide symmetric encryption key management. Each hub has a random 32-byte
- * key that is ECIES-wrapped individually for each member who needs it.
+ * key that is HPKE-wrapped individually for each member who needs it.
  *
- * ECIES wrap/unwrap operations delegate to Rust via platform.ts.
+ * HPKE wrap/unwrap operations delegate to Rust via platform.ts.
  * Symmetric hub encrypt/decrypt stays in JS (hub key is shared symmetric, not identity-secret).
  *
  * Key lifecycle:
  *   1. Admin generates hub key via generateHubKey()
- *   2. Key is wrapped for each member via wrapHubKeyForMember() (Rust ECIES)
+ *   2. Key is wrapped for each member via wrapHubKeyForMember() (Rust HPKE)
  *   3. Members fetch their wrapped key from GET /api/hub/key
- *   4. Members unwrap with CryptoState via unwrapHubKey() (Rust ECIES)
+ *   4. Members unwrap with CryptoState via unwrapHubKey() (Rust HPKE)
  *   5. Hub key encrypts/decrypts hub-scoped data via encryptForHub()/decryptFromHub() (JS)
  *   6. On rotation, admin generates new key + re-wraps for all members
  */
 
-import { xchacha20poly1305 } from '@noble/ciphers/chacha.js'
+import { gcm } from '@noble/ciphers/aes.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
 import {
@@ -24,7 +24,7 @@ import {
   eciesWrapKey,
 } from './platform'
 import type { KeyEnvelope, RecipientEnvelope } from './platform'
-import { LABEL_HUB_KEY_WRAP } from '@shared/crypto-labels'
+import { LABEL_HUB_KEY_WRAP, LABEL_HUB_EVENT } from '@shared/crypto-labels'
 
 function randomBytes(n: number): Uint8Array {
   const buf = new Uint8Array(n)
@@ -41,9 +41,8 @@ export function generateHubKey(): Uint8Array {
 }
 
 /**
- * Wrap a hub key for a specific member using ECIES via Rust.
+ * Wrap a hub key for a specific member using HPKE via Rust.
  * Uses LABEL_HUB_KEY_WRAP domain separation to prevent cross-context attacks.
- * No nsec involved — uses ephemeral keys for wrapping.
  */
 export async function wrapHubKeyForMember(
   hubKey: Uint8Array,
@@ -69,7 +68,7 @@ export async function wrapHubKeyForMembers(
 }
 
 /**
- * Unwrap a hub key from an ECIES envelope using CryptoState (nsec stays in Rust).
+ * Unwrap a hub key from an HPKE envelope using CryptoState (device key stays in Rust).
  * Returns the hub key as bytes.
  */
 export async function unwrapHubKey(
@@ -80,16 +79,18 @@ export async function unwrapHubKey(
 }
 
 /**
- * Encrypt arbitrary data with the hub key using XChaCha20-Poly1305.
- * Returns hex: nonce(24) + ciphertext.
+ * Encrypt arbitrary data with the hub key using AES-256-GCM.
+ * Returns hex: nonce(12) + ciphertext + tag(16).
+ * AAD = LABEL_HUB_EVENT bytes for domain separation.
  * Hub key is shared symmetric — stays in JS.
  */
 export function encryptForHub(
   plaintext: string,
   hubKey: Uint8Array,
 ): string {
-  const nonce = randomBytes(24)
-  const cipher = xchacha20poly1305(hubKey, nonce)
+  const nonce = randomBytes(12)
+  const aad = utf8ToBytes(LABEL_HUB_EVENT)
+  const cipher = gcm(hubKey, nonce, aad)
   const ciphertext = cipher.encrypt(utf8ToBytes(plaintext))
 
   const packed = new Uint8Array(nonce.length + ciphertext.length)
@@ -109,9 +110,10 @@ export function decryptFromHub(
 ): string | null {
   try {
     const data = hexToBytes(packed)
-    const nonce = data.slice(0, 24)
-    const ciphertext = data.slice(24)
-    const cipher = xchacha20poly1305(hubKey, nonce)
+    const nonce = data.slice(0, 12)
+    const ciphertext = data.slice(12)
+    const aad = utf8ToBytes(LABEL_HUB_EVENT)
+    const cipher = gcm(hubKey, nonce, aad)
     const plaintext = cipher.decrypt(ciphertext)
     return new TextDecoder().decode(plaintext)
   } catch {

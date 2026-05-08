@@ -13,7 +13,7 @@
 
 // --- ECIES V2 Key Derivation ---
 
-/** HKDF salt for ECIES V2 symmetric key derivation (secp256k1 ECDH + XChaCha20-Poly1305) */
+/** HKDF salt for legacy ECIES V2 symmetric key derivation */
 export const LABEL_ECIES_V2_SALT = 'llamenos:ecies:v2'
 
 // --- ECIES Key Wrapping ---
@@ -65,6 +65,9 @@ export const LABEL_HUB_EVENT = 'llamenos:hub-event'
 
 /** Device provisioning ECDH shared key derivation */
 export const LABEL_DEVICE_PROVISION = 'llamenos:device-provision'
+
+/** Provisioning HKDF salt for symmetric key derivation */
+export const LABEL_PROVISIONING_SALT = 'llamenos:provisioning:v1'
 
 // --- SAS Verification (Epic 76.0) ---
 
@@ -160,3 +163,16 @@ export const LABEL_SERVER_EVENT_ENCRYPTION_KEY_INFO = 'llamenos:server-event-enc
 
 /** HKDF info for epoch-based hub event key derivation */
 export const LABEL_HUB_EVENT_EPOCH = 'llamenos:hub-event-epoch:v1'
+
+// --- Server Identity (Ed25519) ---
+
+/** HKDF salt for deriving server Ed25519 signing key from SERVER_SECRET */
+export const LABEL_SERVER_SIGNING_KEY = 'llamenos:server-signing-key:v1'
+
+/** HKDF info for server signing key derivation */
+export const LABEL_SERVER_SIGNING_INFO = 'llamenos:server-signing-key-info:v1'
+
+// --- WebSocket Auth ---
+
+/** Challenge-response auth message binding for WebSocket relay */
+export const LABEL_WS_CHALLENGE = 'llamenos:ws-auth:v1'
