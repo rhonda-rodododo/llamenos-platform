@@ -33,6 +33,7 @@ import {
   shifts,
   activeCalls,
   callRecords,
+  callTokens,
   conversations,
   contacts,
   contactRelationships,
@@ -50,6 +51,7 @@ import {
   reportEvents,
   reportCases,
   events as hubCaseEvents,
+  files,
 } from '../db/schema'
 import type { SpamSettings, CallSettings } from '../types'
 import type {
@@ -1605,7 +1607,20 @@ export class SettingsService {
       await tx.delete(caseRecords).where(eq(caseRecords.hubId, id))
       await tx.delete(hubCaseEvents).where(eq(hubCaseEvents.hubId, id))
 
-      // 6. Conversations (messages, files, contactIdentifiers cascade via FK)
+      // 5.5. Call tokens (single-use opaque tokens, no FK constraint to hubs)
+      await tx.delete(callTokens).where(eq(callTokens.hubId, id))
+
+      // 6. Conversations
+      //   - messages and contactIdentifiers cascade via FK
+      //   - files do NOT cascade (schema has no onDelete rule) → must delete explicitly
+      const hubConversationIds = await tx
+        .select({ id: conversations.id })
+        .from(conversations)
+        .where(eq(conversations.hubId, id))
+      if (hubConversationIds.length > 0) {
+        const convIds = hubConversationIds.map(c => c.id)
+        await tx.delete(files).where(inArray(files.conversationId, convIds))
+      }
       await tx.delete(conversations).where(eq(conversations.hubId, id))
 
       // 7. Contacts
