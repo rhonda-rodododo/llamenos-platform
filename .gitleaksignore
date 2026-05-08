@@ -18,3 +18,6 @@ b077eaf65145531b2ffdb3b758fa0aeebefaf4c6:apps/worker/lib/crypto.test.ts:generic-
 
 # PR #207: crypto-utils.test.ts - secp256k1 generator point pubkey (well-known constant)
 8dc21ffe36a7e6f3a5765099bc9c3a0afe3980ea:apps/worker/__tests__/unit/crypto-utils.test.ts:generic-api-key:256
+
+# PR #240: dev-only HMAC_SECRET in start-server.sh (d723ba2b)
+d723ba2b586390ceb55bf40c99138a7376c7d119:start-server.sh:generic-api-key:10
