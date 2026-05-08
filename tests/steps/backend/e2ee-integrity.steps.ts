@@ -165,7 +165,7 @@ When(
         authorEnvelope: volEnvelope ?? {},
         adminEnvelopes,
       },
-      volKp.nsec,
+      volKp.seedHex,
     )
     expect([200, 201]).toContain(status)
     getE2EEIntegrityState(world).noteId = data.note?.id
@@ -214,7 +214,7 @@ When('the encrypted note is submitted via the API by {string}', async ({ request
       authorEnvelope: volEnvelope ?? {},
       adminEnvelopes,
     },
-    volKp.nsec,
+    volKp.seedHex,
   )
   expect([200, 201]).toContain(status)
   getE2EEIntegrityState(world).noteId = data.note?.id
@@ -229,7 +229,7 @@ When('volunteer {string} fetches the note', async ({ request, world }, volName: 
   const { status, data } = await apiGet<{ notes: Array<Record<string, unknown>> }>(
     request,
     '/notes',
-    volKp.nsec,
+    volKp.seedHex,
   )
   expect(status).toBe(200)
 
@@ -293,7 +293,7 @@ When(
         authorEnvelope: volEnvelope ?? {},
         adminEnvelopes,
       },
-      kp.nsec,
+      kp.seedHex,
     )
     expect([200, 201]).toContain(status)
     getE2EEIntegrityState(world).noteId = data.note?.id
@@ -311,11 +311,11 @@ When('the volunteer encrypts note content {string} with real crypto', async ({ r
   getE2EEIntegrityState(world).ciphertextHex = encryptContent(plaintext, getE2EEIntegrityState(world).contentKey, LABEL_NOTE_KEY)
 
   // Wrap for volunteer (X25519 pubkey for HPKE)
-  const volEnv = wrapKeyForRecipient(getE2EEIntegrityState(world).contentKey, volKp.x25519Pubkey, volKp.seedHex, LABEL_NOTE_KEY)
+  const volEnv = await wrapKeyForRecipient(getE2EEIntegrityState(world).contentKey, volKp.x25519Pubkey, volKp.seedHex, LABEL_NOTE_KEY)
   getE2EEIntegrityState(world).envelopes.set(volKp.x25519Pubkey, volEnv)
 
   // Wrap for admin (X25519 pubkey for HPKE)
-  const adminEnv = wrapKeyForRecipient(getE2EEIntegrityState(world).contentKey, getE2EEIntegrityState(world).adminX25519Pubkey!, getE2EEIntegrityState(world).adminSeedHex!, LABEL_NOTE_KEY)
+  const adminEnv = await wrapKeyForRecipient(getE2EEIntegrityState(world).contentKey, getE2EEIntegrityState(world).adminX25519Pubkey!, getE2EEIntegrityState(world).adminSeedHex!, LABEL_NOTE_KEY)
   getE2EEIntegrityState(world).envelopes.set(getE2EEIntegrityState(world).adminX25519Pubkey!, adminEnv)
 })
 
@@ -341,7 +341,7 @@ When('the encrypted note is submitted via the API with real envelopes', async ({
       authorEnvelope: volEnvelope ?? {},
       adminEnvelopes,
     },
-    volKp.nsec,
+    volKp.seedHex,
   )
   expect([200, 201]).toContain(status)
   getE2EEIntegrityState(world).noteId = data.note?.id
