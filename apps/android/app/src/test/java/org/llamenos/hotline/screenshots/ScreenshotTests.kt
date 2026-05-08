@@ -494,7 +494,7 @@ class ScreenshotTests {
                     callerNumber = "+1 (555) 123-****",
                     answeredBy = samplePubkey,
                     startedAt = sampleTimestamp,
-                    status = "in-progress",
+                    status = ActiveCallResponseStatus.InProgress,
                 ),
             )
         )

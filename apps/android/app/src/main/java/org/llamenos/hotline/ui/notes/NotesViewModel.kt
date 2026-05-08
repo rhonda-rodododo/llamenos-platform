@@ -511,17 +511,17 @@ class NotesViewModel @Inject constructor(
 
         val hpkeEnvelope: org.llamenos.hotline.crypto.HpkeEnvelope =
             if (reply.authorPubkey == ourPubkey && reply.authorEnvelope != null) {
-                org.llamenos.hotline.crypto.HpkeEnvelope(
-                    v = 3, labelId = 0,
-                    enc = reply.authorEnvelope!!.enc,
-                    ct = reply.authorEnvelope!!.ct,
-                )
+                    org.llamenos.hotline.crypto.HpkeEnvelope(
+                        v = 3, labelId = 0,
+                        enc = reply.authorEnvelope!!.ephemeralPubkey,
+                        ct = reply.authorEnvelope!!.wrappedKey,
+                    )
             } else {
                 reply.adminEnvelopes?.find { it.pubkey == ourPubkey }?.let { adminEnv ->
                     org.llamenos.hotline.crypto.HpkeEnvelope(
                         v = 3, labelId = 0,
-                        enc = adminEnv.enc,
-                        ct = adminEnv.ct,
+                        enc = adminEnv.ephemeralPubkey,
+                        ct = adminEnv.wrappedKey,
                     )
                 } ?: return null
             }
