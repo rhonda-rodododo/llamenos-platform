@@ -25,6 +25,11 @@ while [[ $# -gt 0 ]]; do
 done
 
 source "$SCRIPT_DIR/lib/test-reporter.sh"
+source "$SCRIPT_DIR/lib/backend-manager.sh"
+
+BDD_PORT="$(worktree_port 3002)"
+DB_SUFFIX="$(worktree_db_suffix)"
+DB_NAME="llamenos_bdd${DB_SUFFIX}"
 
 export VERBOSE JSON_OUTPUT REPORTER_TIMEOUT
 
@@ -43,11 +48,28 @@ if [[ "$NO_CODEGEN" != "true" ]]; then
   fi
 fi
 
-# Step 2: Check backend is reachable
-HUB_URL="${TEST_HUB_URL:-http://localhost:3000}"
+if ! ensure_shared_services; then
+  overall_result="fail"
+  reporter_summary "$overall_result"
+  exit 1
+fi
+
+if ! backend_start "backend-bdd" "$BDD_PORT" "$DB_NAME"; then
+  overall_result="fail"
+  reporter_summary "$overall_result"
+  exit 1
+fi
+
+export TEST_HUB_URL="http://localhost:${BDD_PORT}"
+
+cleanup_backend() {
+  backend_stop "backend-bdd"
+}
+trap cleanup_backend EXIT
+
+HUB_URL="${TEST_HUB_URL}"
 if ! reporter_run_step "health-check" curl -sf "${HUB_URL}/api/health" >/dev/null 2>&1; then
-  echo "Backend not reachable at ${HUB_URL}. Start it with:"
-  echo "  docker compose -f deploy/docker/docker-compose.dev.yml up -d && bun run dev:server"
+  echo "Backend not healthy at ${HUB_URL}"
   overall_result="fail"
   reporter_record_suite "health-check" 0 1 0
   reporter_summary "$overall_result"
