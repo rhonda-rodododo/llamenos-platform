@@ -16,6 +16,9 @@ JSON_OUTPUT="${JSON_OUTPUT:-false}"
 REPORTER_TIMEOUT="${REPORTER_TIMEOUT:-600}"
 SIMULATOR="${SIMULATOR:-iPhone 17}"
 
+REMOTE_BACKEND="${REMOTE_BACKEND:-false}"
+HUB_URL_OVERRIDE="${HUB_URL_OVERRIDE:-}"
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --verbose) VERBOSE=true; shift ;;
@@ -23,6 +26,8 @@ while [[ $# -gt 0 ]]; do
     --json) JSON_OUTPUT=true; shift ;;
     --timeout) REPORTER_TIMEOUT="$2"; shift 2 ;;
     --simulator) SIMULATOR="$2"; shift 2 ;;
+    --remote-backend) REMOTE_BACKEND=true; shift ;;
+    --hub-url) HUB_URL_OVERRIDE="$2"; shift 2 ;;
     *) echo "Unknown option: $1"; exit 1 ;;
   esac
 done
@@ -52,31 +57,40 @@ reporter_init "ios"
 
 overall_result="pass"
 
-# Step 0: Ensure backend is running
-# UI tests (APIConnectedUITests) require a live backend. Start it if needed.
-echo "Checking backend at ${TEST_HUB_URL}..."
-# Use -s (no -f) so 503/degraded health doesn't falsely indicate "not running"
-if ! curl -s "${TEST_HUB_URL}/api/health" 2>/dev/null | grep -q '"status"'; then
-  echo "Backend not running — starting bun run dev:node..."
-  nohup bun run dev:node > /tmp/dev-node-ios-test.log 2>&1 &
-  DEV_NODE_PID=$!
-
-  # Wait for health check to respond (any valid JSON response)
-  waited=0
-  until curl -s "${TEST_HUB_URL}/api/health" 2>/dev/null | grep -q '"status"'; do
-    sleep 2
-    waited=$((waited + 2))
-    if [[ $waited -ge $BACKEND_STARTUP_TIMEOUT ]]; then
-      echo "ERROR: Backend did not start within ${BACKEND_STARTUP_TIMEOUT}s"
-      echo "Check /tmp/dev-node-ios-test.log for details"
-      kill $DEV_NODE_PID 2>/dev/null || true
-      exit 1
-    fi
-  done
-  echo "Backend started (pid $DEV_NODE_PID, took ${waited}s)"
+if [[ "$REMOTE_BACKEND" == "true" ]]; then
+  TEST_HUB_URL="${HUB_URL_OVERRIDE:-${TEST_HUB_URL:-http://localhost:3003}}"
+  echo "Using remote backend at ${TEST_HUB_URL}"
 else
-  echo "Backend healthy."
+  source "$SCRIPT_DIR/lib/backend-manager.sh"
+
+  IOS_PORT="$(worktree_port 3003)"
+  DB_SUFFIX="$(worktree_db_suffix)"
+  DB_NAME="llamenos_ios${DB_SUFFIX}"
+
+  if ! ensure_shared_services; then
+    echo "Failed to start shared services"
+    exit 1
+  fi
+
+  if ! backend_start "ios" "$IOS_PORT" "$DB_NAME"; then
+    echo "Failed to start iOS backend"
+    exit 1
+  fi
+
+  TEST_HUB_URL="http://localhost:${IOS_PORT}"
+
+  cleanup_backend() {
+    backend_stop "ios"
+  }
+  trap cleanup_backend EXIT
 fi
+
+echo "Checking backend at ${TEST_HUB_URL}..."
+if ! curl -s "${TEST_HUB_URL}/api/health" 2>/dev/null | grep -q '"status"'; then
+  echo "ERROR: Backend not reachable at ${TEST_HUB_URL}"
+  exit 1
+fi
+echo "Backend healthy."
 
 # Step 1: Codegen guard
 if [[ "$NO_CODEGEN" != "true" ]]; then
