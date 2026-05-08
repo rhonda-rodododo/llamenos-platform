@@ -1,85 +1,91 @@
 ---
-title: Data Deletion & Retention
-subtitle: How to delete your data, what gets removed, and what is retained for audit integrity.
+title: Data Deletion
+subtitle: How to request deletion of your Llámenos data and what happens when you do.
 ---
 
-**Effective date: May 1, 2026**
+**Last updated: May 4, 2026**
 
-Llámenos is an EU-based project and complies with GDPR Article 17 (right to erasure). This page explains how to request deletion of your account and data, what is removed, and what is retained for audit chain integrity.
+Llámenos is developed by an EU-based organization. Under GDPR Article 17, you have the right to request erasure of your personal data. This page explains how to make that request and what data is deleted or retained.
 
 ---
 
-## How to Request Deletion
+## How to Request Data Deletion
 
-### 1. In-app (hub administrators)
+You can request deletion of your account and all associated data through any of the following methods:
 
-Hub administrators can delete user accounts directly from the admin panel. This immediately queues the account and all associated data for purge.
+### 1. In-app (self-service)
 
-### 2. By email
+Go to **Settings → Account → Delete Account** within the Llámenos app. This immediately removes your account and all associated data from your hub.
 
-Send a deletion request to [privacy@llamenos-hotline.com](mailto:privacy@llamenos-hotline.com) with:
+### 2. Via your hub administrator
 
-- Your display name
-- The name of your hub
+Hub administrators can delete volunteer accounts and all associated data from the admin panel. Contact the administrator of the hub you belong to and ask them to delete your account.
 
-Requests are processed within 30 days per GDPR Article 17.
+### 3. By email
 
-### 3. GDPR Article 17 — Right to Erasure
+Send a request to [privacy@llamenos-platform.com](mailto:privacy@llamenos-platform.com) with the following information:
 
-As an EU-organized project, all users in the European Economic Area have the right to request erasure of their personal data. Contact your hub administrator (the data controller for your hub) or reach us at [privacy@llamenos-hotline.com](mailto:privacy@llamenos-hotline.com).
+- Your display name in the app
+- The name of the hub you belong to (e.g., the organization running the hotline)
+
+Requests are processed within **30 days** per GDPR Article 17.
 
 ---
 
 ## What Gets Deleted
 
-When an account is deleted, the following data is permanently purged from the server:
+When your account is deleted, the following data is permanently removed:
 
-- **User account and profile** — display name, role assignments, hub memberships
-- **Encrypted notes, reports, and case records** — all ciphertext is removed from the server (the server was never able to read this content, but the encrypted blobs are deleted)
-- **Device push tokens** — push notification tokens associated with your devices
-- **Shift schedule assignments** — your scheduled and historical shift records
-
----
-
-## What Is Retained (Anonymized)
-
-### Audit log entries
-
-The audit log is a tamper-evident, hash-chained record of events in the system (e.g., "call answered", "note created"). It is required for integrity verification and cannot be deleted without breaking the chain.
-
-When your account is deleted:
-
-- All **personal identifiers** (display name, device key reference) are removed from audit log entries that reference you
-- Your user reference is replaced with a **one-way hash** — the event record is preserved but cannot be linked back to you
-- The hash chain structure is maintained for tamper detection
-
-This is consistent with GDPR Recital 65, which permits retention of data necessary for legal obligations when personal identifiers are removed.
+| Data | Deleted? |
+|------|----------|
+| Account credentials and device keys | Yes — immediately |
+| Display name and role | Yes — immediately |
+| All encrypted notes and reports you authored | Yes — ciphertext deleted from server |
+| Case records and contact records you created | Yes — ciphertext deleted from server |
+| Push notification token (FCM) | Yes — immediately |
+| Shift records and availability data | Yes — immediately |
+| Crash reports associated with your account | Yes — within 30 days |
 
 ---
 
-## Retention Periods
+## What Is Retained (and Why)
 
-| Data type | Retention |
-|-----------|-----------|
-| Active account data | Retained while account exists |
-| Notes, reports, case records (ciphertext) | Retained until deleted; purged within 30 days of deletion request |
-| Device push tokens | Removed on logout, uninstall, or account deletion |
-| Shift records | Purged within 30 days of account deletion |
-| Audit log entries | Anonymized immediately on deletion; retained indefinitely for audit chain integrity |
-| Backup snapshots | Purged within 90 days of account deletion |
+Some data is retained after deletion for legal and integrity reasons:
+
+### Audit log entries — anonymized, retained indefinitely
+
+Llámenos uses a tamper-evident hash-chained audit log to detect unauthorized modifications to activity records. Deleting individual entries would break the chain and undermine the integrity guarantee.
+
+**What happens instead:** All personal identifiers in audit log entries referencing you (your display name, account ID) are replaced with an anonymized hash. The event itself (e.g., "call answered at 14:32") is retained, but it cannot be linked back to you after anonymization.
+
+**Retention period:** Lifetime of the hub. The hub administrator controls when the hub's audit log is purged.
+
+### References in other users' content — anonymized
+
+If another user's encrypted notes reference you as a call participant, that reference is anonymized (replaced with a placeholder). The other user's content is not deleted — it belongs to them.
+
+---
+
+## Retention Periods Summary
+
+| Data type | Retention after deletion request |
+|-----------|----------------------------------|
+| Account, keys, tokens | Deleted immediately |
+| Encrypted notes, reports, messages | Deleted within 30 days |
+| Crash reports | Deleted within 30 days |
+| Backup copies | Purged from backup rotation within 90 days |
+| Audit log entries | Anonymized immediately; hash chain retained indefinitely |
 
 ---
 
 ## Data Portability
 
-Before requesting deletion, you can export your data. Contact your hub administrator to request a data export. Hub administrators have access to export tools in the admin panel.
-
-If you do not have access to a hub administrator, contact [privacy@llamenos-hotline.com](mailto:privacy@llamenos-hotline.com) and we will coordinate with the hub operator on your behalf.
+Before requesting deletion, you can export a copy of your data. Contact your hub administrator to request an export. They can provide your notes, reports, and account information in a structured format.
 
 ---
 
-## Contact
+## Questions
 
-**Privacy and deletion requests:** [privacy@llamenos-hotline.com](mailto:privacy@llamenos-hotline.com)
+For privacy-related questions, contact us at [privacy@llamenos-platform.com](mailto:privacy@llamenos-platform.com).
 
-See also: [Privacy Policy](/privacy)
+For more information about what data Llámenos collects and how it is protected, see our [Privacy Policy](/privacy).

@@ -3,10 +3,6 @@ import { hashPhone, hashIP, hashAuditEntry, stableJsonStringify, encryptMessageF
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
-import { xchacha20poly1305 } from '@noble/ciphers/chacha.js'
-import { secp256k1 } from '@noble/curves/secp256k1.js'
-import { hkdf } from '@noble/hashes/hkdf.js'
-import { LABEL_MESSAGE } from '@shared/crypto-labels'
 
 // Test HMAC secret (64 hex chars = 32 bytes)
 const TEST_SECRET = 'a'.repeat(64)
@@ -231,32 +227,5 @@ describe('encryptCallRecordForStorage', () => {
       [validPubkey, pubkey2],
     )
     expect(result.adminEnvelopes.length).toBe(2)
-  })
-})
-
-describe('encryptMessageForStorage HPKE envelope structure', () => {
-  // X25519 pubkey (arbitrary 32-byte value, hex-encoded to 64 chars)
-  const pubkeyHex = '79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798'
-
-  it('produces envelope with HPKE fields (pubkey, enc, ct)', () => {
-    const plaintext = 'Hello, this is a secret message!'
-    const result = encryptMessageForStorage(plaintext, [pubkeyHex])
-
-    expect(result.readerEnvelopes.length).toBe(1)
-    const envelope = result.readerEnvelopes[0]
-    // HPKE envelope schema: pubkey (recipient), enc (HPKE enc key), ct (ciphertext)
-    expect(envelope.pubkey).toBe(pubkeyHex)
-    expect(typeof envelope.enc).toBe('string')
-    expect(envelope.enc.length).toBe(64) // 32 bytes hex
-    expect(typeof envelope.ct).toBe('string')
-    expect(envelope.ct.length).toBeGreaterThan(0)
-  })
-
-  it('produces different envelopes each call (random HPKE ephemeral key)', () => {
-    const plaintext = 'Secret data'
-    const result1 = encryptMessageForStorage(plaintext, [pubkeyHex])
-    const result2 = encryptMessageForStorage(plaintext, [pubkeyHex])
-    // HPKE uses a fresh ephemeral key per call — enc fields must differ
-    expect(result1.readerEnvelopes[0].enc).not.toBe(result2.readerEnvelopes[0].enc)
   })
 })

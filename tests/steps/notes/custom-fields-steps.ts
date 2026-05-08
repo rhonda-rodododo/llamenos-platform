@@ -28,7 +28,6 @@ Given('a text custom field {string} exists', async ({ request }, fieldLabel: str
         name,
         label: fieldLabel,
         type: 'text',
-        context: 'call-notes',
         required: false,
       },
     ])
