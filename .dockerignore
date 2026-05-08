@@ -1,6 +1,7 @@
 node_modules
 dist
 .git
+packages/crypto/target
 .wrangler
 .dev.vars
 *.log

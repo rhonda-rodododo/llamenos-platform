@@ -41,11 +41,10 @@ struct CaseRecord: Codable, Identifiable, Sendable {
 // (PurpleFieldEnvelope, StickyPiiEnvelope, etc.) but we keep one canonical
 // name for all case-related envelopes.
 
-/// ECIES envelope for a record reader (pubkey + wrapped symmetric key + ephemeral pubkey).
 struct CaseEnvelope: Codable, Sendable {
     let pubkey: String
-    let wrappedKey: String
-    let ephemeralPubkey: String
+    let enc: String
+    let ct: String
 }
 
 // MARK: - EntityTypeDefinition

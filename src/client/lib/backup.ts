@@ -15,7 +15,7 @@
  * Recovery key: 128-bit random, Base32-encoded, formatted as XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX
  */
 
-import { xchacha20poly1305 } from '@noble/ciphers/chacha.js'
+import { gcm } from '@noble/ciphers/aes.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
@@ -114,16 +114,16 @@ async function deriveFromPin(pin: string, salt: Uint8Array): Promise<Uint8Array>
 }
 
 function encrypt(plaintext: string, kek: Uint8Array): { nonce: string; ciphertext: string } {
-  const nonce = new Uint8Array(24)
+  const nonce = new Uint8Array(12)
   crypto.getRandomValues(nonce)
-  const cipher = xchacha20poly1305(kek, nonce)
+  const cipher = gcm(kek, nonce)
   const ct = cipher.encrypt(utf8ToBytes(plaintext))
   return { nonce: bytesToHex(nonce), ciphertext: bytesToHex(ct) }
 }
 
 function decrypt(nonce: string, ciphertext: string, kek: Uint8Array): string | null {
   try {
-    const cipher = xchacha20poly1305(kek, hexToBytes(nonce))
+    const cipher = gcm(kek, hexToBytes(nonce))
     const pt = cipher.decrypt(hexToBytes(ciphertext))
     return new TextDecoder().decode(pt)
   } catch {

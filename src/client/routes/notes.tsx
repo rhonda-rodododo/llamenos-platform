@@ -117,10 +117,13 @@ function NotesPage() {
         filtered.map(async note => {
           const isTranscription = note.authorPubkey.startsWith('system:transcription')
           let payload: NotePayload
-          if (isTranscription && note.ephemeralPubkey && canDecrypt) {
-            const text = await decryptTranscription(note.encryptedContent, note.ephemeralPubkey) || '[Decryption failed]'
+          if (isTranscription && canDecrypt) {
+            // Transcription decryption via HPKE — use author envelope if present
+            const text = note.authorEnvelope
+              ? await decryptTranscription(note.encryptedContent, note.authorEnvelope.enc) || '[Decryption failed]'
+              : note.encryptedContent
             payload = { text }
-          } else if (isTranscription && !note.ephemeralPubkey) {
+          } else if (isTranscription) {
             payload = { text: note.encryptedContent }
           } else if (canDecrypt) {
             // Try V2 (per-note ECIES envelope) first, fall back to V1 (legacy HKDF)

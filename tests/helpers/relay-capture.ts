@@ -1,25 +1,37 @@
 import WebSocket from 'ws'
+import { ed25519 } from '@noble/curves/ed25519.js'
+import { hexToBytes, bytesToHex, utf8ToBytes } from '@shared/encoding'
+import { LABEL_WS_CHALLENGE } from '@shared/crypto-labels'
 
+/**
+ * Captured event from the in-process WebSocket relay.
+ * Matches the WsEventMessage schema from packages/protocol/schemas/ws-messages.ts.
+ */
 export interface CapturedEvent {
-  id: string
+  type: 'event'
+  v: number
+  hubId: string
   kind: number
-  content: string
-  tags: string[][]
-  created_at: number
-  pubkey: string
+  payload: string
+  epoch: number
+  ts: number
   sig: string
 }
 
+/** All event kinds the relay tests care about */
+const ALL_TEST_KINDS = [1000, 1001, 1002, 1010, 1011, 20000, 20001]
+
 /**
- * Subscribes to the Nostr relay and captures events for BDD test assertions.
+ * Subscribes to the in-process WebSocket relay and captures events for BDD test assertions.
  *
- * Uses a `since` filter set to 2 seconds before subscription time to avoid
- * receiving hundreds of historical events from prior test runs.
- * Events received before EOSE (end of stored events) are discarded so only
- * truly new events are captured.
+ * Connects, performs Ed25519 challenge-response auth, subscribes to a hub,
+ * and collects incoming events.
  *
  * Usage:
- *   const capture = await RelayCapture.connect('ws://localhost:7777')
+ *   const capture = await RelayCapture.connect('ws://localhost:3000/ws', {
+ *     seedHex: ADMIN_SEED,
+ *     hubId: 'test-hub-id',
+ *   })
  *   // ... trigger action that publishes an event ...
  *   const events = await capture.waitForEvents({ kind: 1000, count: 1, timeoutMs: 5000 })
  *   capture.close()
@@ -27,99 +39,91 @@ export interface CapturedEvent {
 export class RelayCapture {
   private ws: WebSocket
   private events: CapturedEvent[] = []
-  private eoseReceived = false
   private waiters: Array<{
     filter: { kind?: number; count: number }
     resolve: (events: CapturedEvent[]) => void
     timer: ReturnType<typeof setTimeout>
   }> = []
-  private subscriptionId = `test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-  private hubId?: string
+  private hubId: string
 
-  private constructor(ws: WebSocket, hubId?: string) {
+  private constructor(ws: WebSocket, hubId: string) {
     this.ws = ws
     this.hubId = hubId
   }
 
-  static async connect(relayUrl: string, hubId?: string): Promise<RelayCapture> {
+  static async connect(
+    relayUrl: string,
+    opts: { seedHex: string; hubId?: string; kinds?: number[] },
+  ): Promise<RelayCapture> {
+    const { seedHex, hubId = 'global', kinds = ALL_TEST_KINDS } = opts
+
+    const pubkey = bytesToHex(ed25519.getPublicKey(hexToBytes(seedHex)))
+
     return new Promise((resolve, reject) => {
       const ws = new WebSocket(relayUrl)
       const timeout = setTimeout(() => {
         ws.close()
         reject(new Error(`Relay connection timeout: ${relayUrl}`))
-      }, 10_000)
+      }, 15_000)
 
-      ws.on('open', () => {
-        clearTimeout(timeout)
-        const capture = new RelayCapture(ws, hubId)
-        capture.subscribe()
-        capture.listen()
-        resolve(capture)
-      })
+      const capture = new RelayCapture(ws, hubId)
 
       ws.on('error', (err) => {
         clearTimeout(timeout)
         reject(err)
       })
+
+      ws.on('message', (raw) => {
+        try {
+          const msg = JSON.parse(raw.toString())
+
+          // Step 1: Receive challenge, send auth
+          if (msg.type === 'challenge') {
+            const nonce = msg.nonce as string
+            const ts = Date.now()
+            const signedMessage = `${LABEL_WS_CHALLENGE}:${pubkey}:${nonce}:${ts}`
+            const sig = bytesToHex(ed25519.sign(utf8ToBytes(signedMessage), hexToBytes(seedHex)))
+            ws.send(JSON.stringify({ type: 'auth', pubkey, nonce, ts, sig }))
+            return
+          }
+
+          // Step 2: Receive authenticated, subscribe to hub(s)
+          if (msg.type === 'authenticated') {
+            ws.send(JSON.stringify({ type: 'subscribe', hubId, kinds }))
+            // Also subscribe to 'global' for hub-agnostic events (messaging)
+            if (hubId !== 'global') {
+              ws.send(JSON.stringify({ type: 'subscribe', hubId: 'global', kinds }))
+            }
+            return
+          }
+
+          // Step 3: Subscription(s) confirmed — ready to capture after primary hub
+          if (msg.type === 'subscribed' && msg.hubId === hubId) {
+            clearTimeout(timeout)
+            capture.listen()
+            resolve(capture)
+            return
+          }
+
+          // Auth/subscribe errors
+          if (msg.type === 'error') {
+            clearTimeout(timeout)
+            reject(new Error(`Relay error: ${msg.code} — ${msg.message}`))
+            return
+          }
+        } catch {
+          // Ignore malformed messages during handshake
+        }
+      })
     })
-  }
-
-  private subscribe(): void {
-    // Use `since` to filter out historical events from prior test runs.
-    // Subtract 2 seconds for clock skew tolerance.
-    const since = Math.floor(Date.now() / 1000) - 2
-
-    let filters: Record<string, unknown>[]
-    if (this.hubId) {
-      // Nostr REQ supports multiple filter objects (OR semantics per NIP-01).
-      // Call/presence events carry an ['h', hubId] tag — scope them to prevent
-      // cross-scenario contamination under parallel Playwright worker execution.
-      // Messaging events (1010, 1011) are hub-agnostic (they span all hubs) so
-      // they use a separate unscoped filter.
-      filters = [
-        {
-          kinds: [1000, 1001, 1002, 20000, 20001],
-          '#t': ['llamenos:event'],
-          '#h': [this.hubId],
-          since,
-        },
-        {
-          kinds: [1010, 1011],
-          '#t': ['llamenos:event'],
-          since,
-        },
-      ]
-    } else {
-      filters = [
-        {
-          kinds: [1000, 1001, 1002, 1010, 1011, 20000, 20001],
-          '#t': ['llamenos:event'],
-          since,
-        },
-      ]
-    }
-
-    const req = JSON.stringify(['REQ', this.subscriptionId, ...filters])
-    this.ws.send(req)
   }
 
   private listen(): void {
     this.ws.on('message', (raw) => {
       try {
-        const data = JSON.parse(raw.toString())
-        if (!Array.isArray(data)) return
-
-        if (data[0] === 'EOSE' && data[1] === this.subscriptionId) {
-          // All stored events have been delivered; start capturing new ones
-          this.eoseReceived = true
-          return
-        }
-
-        if (data[0] === 'EVENT' && data[1] === this.subscriptionId) {
-          // Discard historical events delivered before EOSE
-          if (!this.eoseReceived) return
-
-          const event = data[2] as CapturedEvent
+        const msg = JSON.parse(raw.toString())
+        if (msg.type === 'event') {
+          const event: CapturedEvent = msg as CapturedEvent
           this.events.push(event)
           this.checkWaiters()
         }
@@ -150,7 +154,6 @@ export class RelayCapture {
     const count = opts.count ?? 1
     const timeoutMs = opts.timeoutMs ?? 5000
 
-    // Check if we already have enough matching events
     const existing = this.getEvents(opts.kind)
     if (existing.length >= count) {
       return existing.slice(0, count)
@@ -188,13 +191,8 @@ export class RelayCapture {
     this.events = []
   }
 
-  /** Close the subscription and WebSocket connection */
+  /** Close the WebSocket connection */
   close(): void {
-    try {
-      this.ws.send(JSON.stringify(['CLOSE', this.subscriptionId]))
-    } catch {
-      // Ignore if already closed
-    }
     this.ws.close()
     for (const waiter of this.waiters) {
       clearTimeout(waiter.timer)

@@ -11,14 +11,15 @@
  *
  * Circuit breaker: 3 consecutive extraction failures auto-pause the connection.
  */
-import { hexToBytes } from '@noble/hashes/utils.js'
+import { hexToBytes, bytesToHex, utf8ToBytes } from '@shared/encoding'
+import { hpkeOpen, symmetricDecrypt } from '@llamenos/crypto/ffi'
 import {
   LABEL_FIREHOSE_AGENT_SEAL,
   LABEL_FIREHOSE_BUFFER_ENCRYPT,
   LABEL_FIREHOSE_REPORT_WRAP,
   LABEL_MESSAGE,
 } from '@shared/crypto-labels'
-import { KIND_FIREHOSE_REPORT } from '@shared/nostr-events'
+import { KIND_FIREHOSE_REPORT } from '@shared/event-kinds'
 import { bufferEnvelopeJsonSchema } from '@protocol/schemas/firehose'
 import type { RecipientEnvelope } from '@shared/types'
 import type { Database } from '../db'
@@ -27,7 +28,7 @@ import { encryptMessageForStorage } from '../lib/crypto'
 import { CircuitBreaker, type CircuitBreakerOptions } from '../lib/circuit-breaker'
 import { createLogger } from '../lib/logger'
 import { clearWindowKeyCache } from '../messaging/firehose-observer'
-import { getNostrPublisher } from '../lib/service-factories'
+import { publishEvent } from '../lib/ws-events'
 import type { ConversationsService } from './conversations'
 import type { FirehoseService } from './firehose'
 import {
@@ -481,111 +482,68 @@ export class FirehoseAgentService {
   }
 
   /**
-   * Unseal a window key by ECIES-decrypting it with the agent's nsec.
-   * The sealedKey is JSON: { wrappedKey, ephemeralPubkey }.
+   * Unseal a window key by HPKE-opening it with the agent's secret key.
+   * The sealedKey is JSON: { enc, ct }.
    */
   private async unsealWindowKey(
     windowKeyId: string,
-    nsecBytes: Uint8Array,
+    secretKey: Uint8Array,
   ): Promise<Uint8Array> {
-    const { secp256k1 } = require('@noble/curves/secp256k1.js') as typeof import('@noble/curves/secp256k1.js')
-    const { xchacha20poly1305 } = require('@noble/ciphers/chacha.js') as typeof import('@noble/ciphers/chacha.js')
-    const { hkdf } = require('@noble/hashes/hkdf.js') as typeof import('@noble/hashes/hkdf.js')
-    const { sha256 } = require('@noble/hashes/sha2.js') as typeof import('@noble/hashes/sha2.js')
-    const { hexToBytes: htb } = require('@noble/hashes/utils.js') as typeof import('@noble/hashes/utils.js')
-    const { utf8ToBytes } = require('@noble/ciphers/utils.js') as typeof import('@noble/ciphers/utils.js')
-
     const windowKeyRow = await this.firehose.getWindowKey(windowKeyId)
     if (!windowKeyRow) throw new Error(`Window key ${windowKeyId} not found`)
 
     const sealed = JSON.parse(windowKeyRow.sealedKey) as {
-      wrappedKey: string
-      ephemeralPubkey: string
+      enc: string
+      ct: string
     }
 
-    // ECIES shared secret derivation
-    const ephemeralPubBytes = htb(sealed.ephemeralPubkey)
-    const sharedPoint = secp256k1.getSharedSecret(nsecBytes, ephemeralPubBytes)
-    const sharedX = sharedPoint.slice(1, 33)
+    const envelope = new Uint8Array(hexToBytes(sealed.enc).length + hexToBytes(sealed.ct).length)
+    envelope.set(hexToBytes(sealed.enc))
+    envelope.set(hexToBytes(sealed.ct), 32)
 
-    const symKey = hkdf(
-      sha256,
-      sharedX,
-      new Uint8Array(0),
+    return hpkeOpen(
+      secretKey,
+      envelope,
       utf8ToBytes(LABEL_FIREHOSE_BUFFER_ENCRYPT),
-      32,
+      utf8ToBytes(`${LABEL_FIREHOSE_BUFFER_ENCRYPT}:key-wrap`),
     )
-
-    // Unwrap the window key: version(1) + nonce(24) + ciphertext
-    const wrappedKeyBytes = htb(sealed.wrappedKey)
-    const keyNonce = wrappedKeyBytes.slice(1, 25)
-    const keyCiphertext = wrappedKeyBytes.slice(25)
-    const keyCipher = xchacha20poly1305(symKey, keyNonce)
-    return keyCipher.decrypt(keyCiphertext)
   }
 
   /**
    * Decrypt a value that was encrypted directly with a window key.
-   * Format: hex-encoded nonce(24) + ciphertext.
+   * Format: hex-encoded nonce(12) + ciphertext + tag(16) (AES-256-GCM).
    */
   private decryptWithWindowKey(encryptedHex: string, windowKey: Uint8Array): string {
-    const { xchacha20poly1305 } = require('@noble/ciphers/chacha.js') as typeof import('@noble/ciphers/chacha.js')
-    const { hexToBytes: htb } = require('@noble/hashes/utils.js') as typeof import('@noble/hashes/utils.js')
-
-    const bytes = htb(encryptedHex)
-    const nonce = bytes.slice(0, 24)
-    const ciphertext = bytes.slice(24)
-    const cipher = xchacha20poly1305(windowKey, nonce)
-    const plaintext = cipher.decrypt(ciphertext)
+    const bytes = hexToBytes(encryptedHex)
+    const plaintext = symmetricDecrypt(windowKey, bytes, utf8ToBytes(LABEL_FIREHOSE_BUFFER_ENCRYPT))
     return new TextDecoder().decode(plaintext)
   }
 
   /**
-   * Decrypt an envelope-encrypted value using the agent's nsec (legacy path).
-   * Pre-window-key messages were encrypted with encryptMessageForStorage's
-   * default label (LABEL_MESSAGE), NOT LABEL_FIREHOSE_BUFFER_ENCRYPT.
+   * Decrypt an HPKE envelope-encrypted value using the agent's secret key.
+   * Uses LABEL_MESSAGE for key unwrapping (encryptMessageForStorage default).
    */
   private decryptEnvelope(
     encryptedHex: string,
     envelope: RecipientEnvelope,
-    nsecBytes: Uint8Array,
+    secretKey: Uint8Array,
   ): string {
-    // Import needed crypto primitives
-    const { secp256k1 } = require('@noble/curves/secp256k1.js') as typeof import('@noble/curves/secp256k1.js')
-    const { xchacha20poly1305 } = require('@noble/ciphers/chacha.js') as typeof import('@noble/ciphers/chacha.js')
-    const { hkdf } = require('@noble/hashes/hkdf.js') as typeof import('@noble/hashes/hkdf.js')
-    const { sha256 } = require('@noble/hashes/sha2.js') as typeof import('@noble/hashes/sha2.js')
-    const { hexToBytes: htb } = require('@noble/hashes/utils.js') as typeof import('@noble/hashes/utils.js')
-    const { utf8ToBytes } = require('@noble/ciphers/utils.js') as typeof import('@noble/ciphers/utils.js')
+    const labelBytes = utf8ToBytes(LABEL_MESSAGE)
+    const aadKeyWrap = utf8ToBytes(`${LABEL_MESSAGE}:key-wrap`)
 
-    // Derive shared secret from ephemeral pubkey + agent nsec
-    const ephemeralPubBytes = htb(envelope.ephemeralPubkey)
-    const sharedPoint = secp256k1.getSharedSecret(nsecBytes, ephemeralPubBytes)
-    const sharedX = sharedPoint.slice(1, 33)
+    // Reconstruct the HPKE envelope: enc(32) || ct
+    const encBytes = hexToBytes(envelope.enc)
+    const ctBytes = hexToBytes(envelope.ct)
+    const hpkeEnvelope = new Uint8Array(encBytes.length + ctBytes.length)
+    hpkeEnvelope.set(encBytes)
+    hpkeEnvelope.set(ctBytes, encBytes.length)
 
-    // Legacy messages used LABEL_MESSAGE (encryptMessageForStorage default)
-    const symKey = hkdf(
-      sha256,
-      sharedX,
-      new Uint8Array(0),
-      utf8ToBytes(LABEL_MESSAGE),
-      32,
-    )
+    // Unwrap the per-message key via HPKE
+    const messageKey = hpkeOpen(secretKey, hpkeEnvelope, labelBytes, aadKeyWrap)
 
-    // Unwrap the per-message key
-    const wrappedKeyBytes = htb(envelope.wrappedKey)
-    // wrappedKey format: version(1) + nonce(24) + ciphertext
-    const keyNonce = wrappedKeyBytes.slice(1, 25)
-    const keyCiphertext = wrappedKeyBytes.slice(25)
-    const keyCipher = xchacha20poly1305(symKey, keyNonce)
-    const messageKey = keyCipher.decrypt(keyCiphertext)
-
-    // Decrypt the actual content
-    const contentBytes = htb(encryptedHex)
-    const contentNonce = contentBytes.slice(0, 24)
-    const contentCiphertext = contentBytes.slice(24)
-    const contentCipher = xchacha20poly1305(messageKey, contentNonce)
-    const plaintext = contentCipher.decrypt(contentCiphertext)
+    // Decrypt the content with AES-256-GCM
+    const contentBytes = hexToBytes(encryptedHex)
+    const plaintext = symmetricDecrypt(messageKey, contentBytes, labelBytes)
 
     return new TextDecoder().decode(plaintext)
   }
@@ -595,28 +553,17 @@ export class FirehoseAgentService {
     conversationId: string,
     confidence: number,
   ): void {
-    try {
-      const publisher = getNostrPublisher(this.env as import('../types/infra').Env)
-      publisher
-        .publish({
-          kind: KIND_FIREHOSE_REPORT,
-          created_at: Math.floor(Date.now() / 1000),
-          tags: [
-            ['d', conn.hubId],
-            ['t', 'llamenos:event'],
-            ['c', conn.id],
-          ],
-          content: JSON.stringify({
-            type: 'firehose:report',
-            connectionId: conn.id,
-            conversationId,
-            confidence,
-          }),
-        })
-        .catch((err: unknown) => log.error('Nostr publish failed', { error: err instanceof Error ? err.message : String(err) }))
-    } catch {
-      // Missing publisher config is expected in some envs
-    }
+    publishEvent(
+      this.env as import('../types/infra').Env,
+      KIND_FIREHOSE_REPORT,
+      {
+        type: 'firehose:report',
+        connectionId: conn.id,
+        conversationId,
+        confidence,
+      },
+      conn.hubId,
+    )
   }
 
   private getOrCreateInferenceClient(endpoint: string): FirehoseInferenceClient {

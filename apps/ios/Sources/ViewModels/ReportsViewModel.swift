@@ -165,8 +165,8 @@ final class ReportsViewModel {
                 throw CryptoServiceError.noKeyLoaded
             }
             let authorEnvelope = ProtocolKeyEnvelope(
-                ephemeralPubkey: ours.envelope.enc,
-                wrappedKey: ours.envelope.ct
+                ct: ours.envelope.ct,
+                enc: ours.envelope.enc
             )
 
             let request = CreateReportRequest(
@@ -178,9 +178,9 @@ final class ReportsViewModel {
                     .filter { $0.pubkey != ourPubkey }
                     .map { env in
                         RecipientEnvelope(
-                            ephemeralPubkey: env.envelope.enc,
-                            pubkey: env.pubkey,
-                            wrappedKey: env.envelope.ct
+                            ct: env.envelope.ct,
+                            enc: env.envelope.enc,
+                            pubkey: env.pubkey
                         )
                     }
             )

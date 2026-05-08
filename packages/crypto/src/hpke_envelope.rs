@@ -50,7 +50,7 @@ const ENVELOPE_VERSION: u8 = 3;
 /// Bridge getrandom 0.2 to hpke's rand_core 0.9 interface.
 /// The hpke crate v0.13 uses rand_core 0.9, while the rest of this crate
 /// uses getrandom 0.2. This adapter bridges them without adding rand 0.9.
-struct OsRng09;
+pub struct OsRng09;
 
 impl hpke::rand_core::RngCore for OsRng09 {
     fn next_u32(&mut self) -> u32 {

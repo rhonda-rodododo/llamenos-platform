@@ -218,20 +218,20 @@ describe('hubs route validation', () => {
       const res = await sendJSON(app, '/hubs/hub-1/key', {
         envelopes: [{
           pubkey: 'bad',
-          wrappedKey: 'deadbeef',
-          ephemeralPubkey: VALID_PUBKEY,
+          enc: VALID_PUBKEY,
+          ct: 'deadbeef',
         }],
       }, 'PUT')
       expect(res.status).toBe(400)
     })
 
-    it('rejects envelope with empty wrappedKey', async () => {
+    it('rejects envelope with empty ct', async () => {
       const app = createApp()
       const res = await sendJSON(app, '/hubs/hub-1/key', {
         envelopes: [{
           pubkey: VALID_PUBKEY,
-          wrappedKey: '',
-          ephemeralPubkey: VALID_PUBKEY,
+          enc: VALID_PUBKEY,
+          ct: '',
         }],
       }, 'PUT')
       expect(res.status).toBe(400)
@@ -242,8 +242,8 @@ describe('hubs route validation', () => {
       const res = await sendJSON(app, '/hubs/hub-1/key', {
         envelopes: [{
           pubkey: VALID_PUBKEY,
-          wrappedKey: 'deadbeef',
-          ephemeralPubkey: VALID_PUBKEY_2,
+          enc: VALID_PUBKEY_2,
+          ct: 'deadbeef',
         }],
       }, 'PUT')
       expect(res.status).not.toBe(400)

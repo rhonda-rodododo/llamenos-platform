@@ -9,7 +9,6 @@ import {
   getWebRtcStatus,
 } from '@/lib/api'
 import * as keyManager from '@/lib/key-manager'
-import { nip19 } from 'nostr-tools'
 import { useToast } from '@/lib/toast'
 import { Settings2, Mic, Bell, User, Globe, Fingerprint, KeyRound, Trash2, Plus, Phone, Monitor, PhoneCall, Smartphone, Loader2, CheckCircle2, Bug, Send, MessageSquare, LogOut, Lock } from 'lucide-react'
 import { isWebAuthnAvailable, registerCredential, listCredentials, deleteCredential, type WebAuthnCredentialInfo } from '@/lib/webauthn'
@@ -82,9 +81,8 @@ function SettingsPage() {
   const [profileError, setProfileError] = useState('')
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>(spokenLanguages || ['en'])
 
-  // Get npub for display
+  // Get public key hex for display
   const pk = keyManager.getPublicKeyHex() || publicKey
-  const npub = pk ? nip19.npubEncode(pk) : ''
 
   useEffect(() => {
     const promises: Promise<void>[] = [
@@ -183,10 +181,10 @@ function SettingsPage() {
           </div>
         </div>
 
-        {npub && (
+        {pk && (
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">{t('profileSettings.yourPublicKey')}</p>
-            <code className="block break-all rounded-md bg-muted px-3 py-2 text-xs">{npub}</code>
+            <code className="block break-all rounded-md bg-muted px-3 py-2 text-xs">{pk}</code>
           </div>
         )}
 
@@ -246,7 +244,7 @@ function SettingsPage() {
           {t('profileSettings.keyBackupNote', { defaultValue: 'Download a backup from the onboarding flow or use your recovery key to restore access on a new device.' })}
         </p>
         <p className="text-xs text-muted-foreground">
-          {npub ? `${t('profileSettings.publicKey', { defaultValue: 'Public key' })}: ${npub.slice(0, 16)}...` : ''}
+          {pk ? `${t('profileSettings.publicKey', { defaultValue: 'Public key' })}: ${pk.slice(0, 16)}...` : ''}
         </p>
       </SettingsSection>
 

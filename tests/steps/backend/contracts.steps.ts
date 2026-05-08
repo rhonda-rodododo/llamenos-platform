@@ -92,7 +92,7 @@ When('an admin sends {string} to {string} with empty encrypted content', async (
 When('an admin sends {string} to {string} with missing title', async ({ request, world }, _method: string, _path: string) => {
   setLastResponse(world, await apiPost(request, '/reports', {
     encryptedContent: 'test-content',
-    readerEnvelopes: [{ pubkey: 'a'.repeat(64), wrappedKey: 'key', ephemeralPubkey: 'b'.repeat(64) }],
+    readerEnvelopes: [{ pubkey: 'a'.repeat(64), ct: 'key', enc: 'b'.repeat(64) }],
   }, ADMIN_NSEC))
 })
 

@@ -240,8 +240,8 @@ final class CaseManagementViewModel {
                 let hpkeEnvelope = HpkeEnvelope(
                     v: 3,
                     labelId: 0,
-                    enc: envelope.ephemeralPubkey,
-                    ct: envelope.wrappedKey
+                    enc: envelope.enc,
+                    ct: envelope.ct
                 )
                 let plaintext = try cryptoService.decryptMessage(
                     encryptedContent: encryptedSummary,
@@ -281,8 +281,8 @@ final class CaseManagementViewModel {
             let hpkeEnvelope = HpkeEnvelope(
                 v: 3,
                 labelId: 0,
-                enc: envelope.ephemeralPubkey,
-                ct: envelope.wrappedKey
+                enc: envelope.enc,
+                ct: envelope.ct
             )
             let plaintext = try cryptoService.decryptMessage(
                 encryptedContent: encryptedFields,
@@ -404,8 +404,8 @@ final class CaseManagementViewModel {
             let envelopes = encrypted.envelopes.map { env in
                 CaseEnvelope(
                     pubkey: env.pubkey,
-                    wrappedKey: env.wrappedKey,
-                    ephemeralPubkey: env.ephemeralPubkey
+                    enc: env.enc,
+                    ct: env.ct
                 )
             }
 

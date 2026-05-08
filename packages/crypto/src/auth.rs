@@ -4,18 +4,21 @@
 //! ```json
 //! {
 //!   "pubkey": "<ed25519 verifying key hex>",
-//!   "sig": "<ed25519 signature hex>",
-//!   "ts": <unix timestamp ms>,
-//!   "method": "GET",
-//!   "path": "/api/..."
+//!   "timestamp": <unix timestamp ms>,
+//!   "token": "<ed25519 signature hex>"
 //! }
 //! ```
 //!
-//! Signed message: `SHA-256("llamenos:device-auth:v1:" + timestamp + ":" + method + ":" + path)`
+//! Canonical auth message (UTF-8, signed directly — no pre-hashing):
+//! ```text
+//! llamenos:device-auth:v1:{pubkey_hex}:{timestamp_ms}:{METHOD}:{path}
+//! ```
+//!
+//! Ed25519 internally applies SHA-512, providing 256-bit collision resistance.
+//! Pre-hashing with SHA-256 would reduce this to 128 bits — unnecessary and weaker.
 
 use ed25519_dalek::{Signer, Verifier, VerifyingKey};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 
 use crate::device_keys::DeviceSecrets;
 use crate::errors::CryptoError;
@@ -30,19 +33,20 @@ pub struct AuthToken {
     pub token: String,
 }
 
-/// Build the auth message bytes: SHA-256("llamenos:device-auth:v1:" + ts + ":" + method + ":" + path)
-fn build_auth_message(timestamp: u64, method: &str, path: &str) -> [u8; 32] {
-    let message = format!("{LABEL_DEVICE_AUTH}:{timestamp}:{method}:{path}");
-    let hash = Sha256::digest(message.as_bytes());
-    let mut out = [0u8; 32];
-    out.copy_from_slice(&hash);
-    out
+/// Build the canonical auth message bytes (UTF-8, no hashing).
+///
+/// Format: `{LABEL_DEVICE_AUTH}:{pubkey_hex}:{timestamp_ms}:{METHOD}:{path}`
+///
+/// This is the EXACT byte sequence that gets signed/verified.
+/// Both Rust and TypeScript MUST produce identical bytes for interop.
+pub fn build_auth_message(pubkey_hex: &str, timestamp: u64, method: &str, path: &str) -> Vec<u8> {
+    format!("{LABEL_DEVICE_AUTH}:{pubkey_hex}:{timestamp}:{method}:{path}").into_bytes()
 }
 
 /// Create an Ed25519 auth token using device secrets.
 ///
-/// The message is bound to the specific request method + path to prevent
-/// cross-endpoint replay attacks.
+/// The message is bound to the specific key, method, and path to prevent
+/// cross-endpoint replay and type-confusion attacks.
 pub fn create_auth_token(
     secrets: &DeviceSecrets,
     timestamp: u64,
@@ -52,8 +56,8 @@ pub fn create_auth_token(
     let signing_key = secrets.signing_key();
     let pubkey_hex = hex::encode(signing_key.verifying_key().to_bytes());
 
-    let message_hash = build_auth_message(timestamp, method, path);
-    let signature = signing_key.sign(&message_hash);
+    let message = build_auth_message(&pubkey_hex, timestamp, method, path);
+    let signature = signing_key.sign(&message);
     let token_hex = hex::encode(signature.to_bytes());
 
     Ok(AuthToken {
@@ -63,7 +67,7 @@ pub fn create_auth_token(
     })
 }
 
-/// Create an Ed25519 auth token from raw signing key bytes.
+/// Create an Ed25519 auth token from a raw 32-byte signing seed (hex-encoded).
 ///
 /// Used by FFI and stateless callers that don't have a DeviceSecrets struct.
 pub fn create_auth_token_from_signing_key(
@@ -85,8 +89,8 @@ pub fn create_auth_token_from_signing_key(
     let signing_key = ed25519_dalek::SigningKey::from_bytes(&sk_arr);
     let pubkey_hex = hex::encode(signing_key.verifying_key().to_bytes());
 
-    let message_hash = build_auth_message(timestamp, method, path);
-    let signature = signing_key.sign(&message_hash);
+    let message = build_auth_message(&pubkey_hex, timestamp, method, path);
+    let signature = signing_key.sign(&message);
     let token_hex = hex::encode(signature.to_bytes());
 
     Ok(AuthToken {
@@ -133,7 +137,7 @@ pub fn verify_auth_token(token: &AuthToken, method: &str, path: &str) -> Result<
     let verifying_key =
         VerifyingKey::from_bytes(&pubkey_arr).map_err(|_| CryptoError::InvalidPublicKey)?;
 
-    let message_hash = build_auth_message(token.timestamp, method, path);
+    let message = build_auth_message(&token.pubkey, token.timestamp, method, path);
 
     let sig_bytes = hex::decode(&token.token).map_err(CryptoError::HexError)?;
     if sig_bytes.len() != 64 {
@@ -145,7 +149,7 @@ pub fn verify_auth_token(token: &AuthToken, method: &str, path: &str) -> Result<
         .map_err(|_| CryptoError::SignatureVerificationFailed)?;
     let signature = ed25519_dalek::Signature::from_bytes(&sig_arr);
 
-    match verifying_key.verify(&message_hash, &signature) {
+    match verifying_key.verify(&message, &signature) {
         Ok(()) => Ok(true),
         Err(_) => Ok(false),
     }
@@ -304,5 +308,42 @@ mod tests {
         };
         let result = verify_auth_token(&nonhex_token, "GET", "/api/notes");
         assert!(result.is_err());
+    }
+
+    /// Cross-language test vector: deterministic seed produces known auth message.
+    /// TypeScript test MUST produce the same message bytes and verify the same signature.
+    #[test]
+    fn cross_language_test_vector() {
+        // Deterministic seed: all zeros
+        let seed = [0u8; 32];
+        let signing_key = ed25519_dalek::SigningKey::from_bytes(&seed);
+        let pubkey_hex = hex::encode(signing_key.verifying_key().to_bytes());
+
+        let timestamp = 1700000000000u64;
+        let method = "GET";
+        let path = "/api/calls";
+
+        // Build message and verify it matches expected format
+        let message = build_auth_message(&pubkey_hex, timestamp, method, path);
+        let expected_prefix =
+            format!("{LABEL_DEVICE_AUTH}:{pubkey_hex}:1700000000000:GET:/api/calls");
+        assert_eq!(message, expected_prefix.as_bytes());
+
+        // Sign and verify
+        let signature = signing_key.sign(&message);
+        let token = AuthToken {
+            pubkey: pubkey_hex.clone(),
+            timestamp,
+            token: hex::encode(signature.to_bytes()),
+        };
+        assert!(verify_auth_token(&token, method, path).unwrap());
+
+        // Print for cross-language verification
+        // pubkey: 3b6a27bcceb6a42d62a3a8d02a6f0d73653215771de243a63ac048a18b59da29
+        // (this is the well-known ed25519 pubkey for all-zeros seed)
+        assert_eq!(
+            pubkey_hex,
+            "3b6a27bcceb6a42d62a3a8d02a6f0d73653215771de243a63ac048a18b59da29"
+        );
     }
 }

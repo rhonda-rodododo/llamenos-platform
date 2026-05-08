@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useNostrSubscription } from './nostr/hooks'
+import { useRelaySubscription } from './relay/hooks'
 import { useConfig } from './config'
 import { startRinging, stopRinging } from './notifications'
 import {
@@ -20,8 +20,8 @@ import {
   KIND_MESSAGE_NEW,
   KIND_CONVERSATION_ASSIGNED,
   KIND_PRESENCE_UPDATE,
-} from '@shared/nostr-events'
-import type { LlamenosEvent } from './nostr/types'
+} from '@shared/event-kinds'
+import type { LlamenosEvent } from './relay/types'
 
 /** All call-related Nostr event kinds */
 const CALL_KINDS = [KIND_CALL_RING, KIND_CALL_UPDATE, KIND_CALL_VOICEMAIL, KIND_PRESENCE_UPDATE]
@@ -46,7 +46,7 @@ export function useCalls() {
   currentCallRef.current = currentCall
 
   // --- Nostr subscription for real-time call events ---
-  useNostrSubscription(currentHubId, CALL_KINDS, (_event, content: LlamenosEvent) => {
+  useRelaySubscription(currentHubId, CALL_KINDS, (_kind, content: LlamenosEvent) => {
     switch (content.type) {
       case 'call:ring': {
         const call = content as LlamenosEvent & { callId: string; callerLast4?: string; startedAt: string }
@@ -208,7 +208,7 @@ export function useConversations() {
   const { currentHubId } = useConfig()
 
   // --- Nostr subscription for conversation events ---
-  useNostrSubscription(currentHubId, CONVERSATION_KINDS, (_event, content: LlamenosEvent) => {
+  useRelaySubscription(currentHubId, CONVERSATION_KINDS, (_kind, content: LlamenosEvent) => {
     switch (content.type) {
       case 'conversation:new': {
         const { conversationId } = content as LlamenosEvent & { conversationId: string }

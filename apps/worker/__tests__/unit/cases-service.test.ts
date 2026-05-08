@@ -45,7 +45,7 @@ function makeCaseRow(overrides: Partial<{
     assignedTo: [],
     blindIndexes: {},
     encryptedSummary: 'enc-summary',
-    summaryEnvelopes: [{ pubkey: 'pk-admin', wrappedKey: 'wk1', ephemeralPubkey: 'eph1' }],
+    summaryEnvelopes: [{ pubkey: 'pk-admin', enc: 'b'.repeat(64), ct: 'wk1' }],
     encryptedFields: null,
     fieldEnvelopes: null,
     encryptedPii: null,
@@ -89,7 +89,7 @@ describe('CasesService — CRUD', () => {
         entityTypeId: 'et-incident',
         createdBy: 'pk-author',
         encryptedSummary: 'enc-summary',
-        summaryEnvelopes: [{ pubkey: 'pk-admin', wrappedKey: 'wk1', ephemeralPubkey: 'eph1' }],
+        summaryEnvelopes: [{ pubkey: 'pk-admin', enc: 'b'.repeat(64), ct: 'wk1' }],
         statusHash: 'hash-open',
       })
 
@@ -124,7 +124,7 @@ describe('CasesService — CRUD', () => {
         entityTypeId: 'et-incident',
         createdBy: 'pk-author',
         encryptedSummary: 'enc',
-        summaryEnvelopes: [{ pubkey: 'pk-admin', wrappedKey: 'wk1', ephemeralPubkey: 'eph1' }],
+        summaryEnvelopes: [{ pubkey: 'pk-admin', enc: 'b'.repeat(64), ct: 'wk1' }],
         statusHash: 'hash-open',
         contactLinks: [
           { contactId: 'contact-1', role: 'caller' },

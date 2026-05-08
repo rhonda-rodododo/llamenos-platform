@@ -11,13 +11,11 @@ import {
   apiDelete,
   createUserViaApi,
   generateTestKeypair,
-  ADMIN_NSEC,
+  ADMIN_SEED,
 } from '../../api-helpers'
-import { schnorr } from '@noble/curves/secp256k1.js'
-import { sha256 } from '@noble/hashes/sha2.js'
-import { hexToBytes, bytesToHex } from '@noble/hashes/utils.js'
-import { utf8ToBytes } from '@noble/ciphers/utils.js'
-import { nip19, getPublicKey } from 'nostr-tools'
+import { ed25519 } from '@noble/curves/ed25519.js'
+import { hexToBytes, bytesToHex, utf8ToBytes } from '@shared/encoding'
+import { LABEL_DEVICE_AUTH } from '@shared/crypto-labels'
 
 // ── State ──────────────────────────────────────────────────────────���
 
@@ -45,23 +43,14 @@ Before(async ({ request, world }) => {
 })
 
 const BASE_URL = process.env.TEST_HUB_URL || 'http://localhost:3000'
-const AUTH_PREFIX = 'llamenos:auth:'
-
 // ── Helpers ─────────────────────────────────────────────────────────
 
-function nsecToSkHex(nsec: string): string {
-  const decoded = nip19.decode(nsec)
-  if (decoded.type !== 'nsec') throw new Error('Invalid nsec')
-  return bytesToHex(decoded.data as Uint8Array)
-}
-
-function createRedeemAuth(nsec: string): { pubkey: string; timestamp: number; token: string } {
-  const skHex = nsecToSkHex(nsec)
-  const pubkey = getPublicKey(hexToBytes(skHex))
+function createRedeemAuth(seedHex: string): { pubkey: string; timestamp: number; token: string } {
+  const seedBytes = hexToBytes(seedHex)
+  const pubkey = bytesToHex(ed25519.getPublicKey(seedBytes))
   const timestamp = Date.now()
-  const message = `${AUTH_PREFIX}${pubkey}:${timestamp}:POST:/api/invites/redeem`
-  const messageHash = sha256(utf8ToBytes(message))
-  const sig = schnorr.sign(messageHash, hexToBytes(skHex))
+  const message = utf8ToBytes(`${LABEL_DEVICE_AUTH}:${pubkey}:${timestamp}:POST:/api/invites/redeem`)
+  const sig = ed25519.sign(message, seedBytes)
   return { pubkey, timestamp, token: bytesToHex(sig) }
 }
 
@@ -71,7 +60,7 @@ Given('an invite exists for {string} with phone {string}', async ({ request, wor
   const s = getS(world)
   const res = await apiPost<{ invite: { code: string } }>(request, '/invites', {
     name, phone, roleIds: ['role-volunteer'],
-  }, ADMIN_NSEC)
+  }, ADMIN_SEED)
   expect(res.status).toBe(201)
   s.inviteCode = res.data.invite.code
 })
@@ -80,7 +69,7 @@ Given('the invite has been redeemed by a user', async ({ request, world }) => {
   const s = getS(world)
   expect(s.inviteCode).toBeDefined()
   const kp = generateTestKeypair()
-  const auth = createRedeemAuth(kp.nsec)
+  const auth = createRedeemAuth(kp.seedHex)
   const res = await request.post(`${BASE_URL}/api/invites/redeem`, {
     headers: { 'Content-Type': 'application/json' },
     data: { code: s.inviteCode, ...auth },
@@ -99,7 +88,7 @@ When('the admin creates an invite for {string} with phone {string}', async ({ re
   const s = getS(world)
   const res = await apiPost<{ invite: { code: string } }>(request, '/invites', {
     name, phone, roleIds: ['role-volunteer'],
-  }, ADMIN_NSEC)
+  }, ADMIN_SEED)
   setLastResponse(world, res)
   if (res.status === 201 && (res.data as Record<string, unknown>)?.invite) {
     s.inviteCode = (res.data as { invite: { code: string } }).invite.code
@@ -128,7 +117,7 @@ When('a new user redeems the invite', async ({ request, world }) => {
   const s = getS(world)
   expect(s.inviteCode).toBeDefined()
   const kp = generateTestKeypair()
-  const auth = createRedeemAuth(kp.nsec)
+  const auth = createRedeemAuth(kp.seedHex)
   const res = await request.post(`${BASE_URL}/api/invites/redeem`, {
     headers: { 'Content-Type': 'application/json' },
     data: { code: s.inviteCode, ...auth },
@@ -138,7 +127,7 @@ When('a new user redeems the invite', async ({ request, world }) => {
 })
 
 When('the admin lists invites', async ({ request, world }) => {
-  setLastResponse(world, await apiGet(request, '/invites', ADMIN_NSEC))
+  setLastResponse(world, await apiGet(request, '/invites', ADMIN_SEED))
 })
 
 When('the admin revokes the invite', async ({ request, world }) => {

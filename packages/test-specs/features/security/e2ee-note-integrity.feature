@@ -1,15 +1,15 @@
 @backend @security @crypto
 Feature: E2EE Note Integrity
   As the encryption system
-  I want real ECIES encrypt-decrypt round-trips for notes
+  I want real HPKE encrypt-decrypt round-trips for notes
   So that note confidentiality is cryptographically verified end-to-end
 
-  Scenario: Real ECIES encrypt-decrypt round-trip for notes
+  Scenario: Real HPKE encrypt-decrypt round-trip for notes
     Given a volunteer "IntegrityVol" with a real keypair
     And the admin keypair is known
     When the volunteer encrypts note content "Patient reported chest pain" with a random content key
-    And the content key is ECIES-wrapped for the volunteer
-    And the content key is ECIES-wrapped for the admin
+    And the content key is HPKE-wrapped for the volunteer
+    And the content key is HPKE-wrapped for the admin
     And the encrypted note is submitted via the API with real ciphertext and envelopes
     Then the API should return the note with the exact ciphertext
     When the volunteer unwraps their envelope and decrypts the note

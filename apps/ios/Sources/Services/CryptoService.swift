@@ -235,7 +235,7 @@ final class CryptoService: @unchecked Sendable {
         var envelopes: [NoteRecipientEnvelope] = []
         for pubkey in allReaders {
             let hpkeEnv = try ffiMobileHpkeSealKey(keyHex: keyHex, recipientPubkeyHex: pubkey, label: CryptoLabels.LABEL_MESSAGE, aadHex: "")
-            envelopes.append(NoteRecipientEnvelope(ephemeralPubkey: hpkeEnv.enc, pubkey: pubkey, wrappedKey: hpkeEnv.ct))
+            envelopes.append(NoteRecipientEnvelope(ct: hpkeEnv.ct, enc: hpkeEnv.enc, pubkey: pubkey))
         }
         return (ciphertextHex, envelopes)
     }
@@ -319,7 +319,7 @@ final class CryptoService: @unchecked Sendable {
     func loadHubKey(hubId: String, envelope: HubKeyEnvelopeResponse) throws {
         guard !hasHubKey(hubId: hubId) else { return }
         guard isUnlocked else { throw CryptoServiceError.noKeyLoaded }
-        let hpkeEnvelope = HpkeEnvelope(v: 3, labelId: 0, enc: envelope.envelope.wrappedKey, ct: envelope.envelope.ephemeralPubkey)
+        let hpkeEnvelope = HpkeEnvelope(v: 3, labelId: 0, enc: envelope.envelope.enc, ct: envelope.envelope.ct)
         let keyHex = try ffiMobileHpkeOpenKey(envelope: hpkeEnvelope, expectedLabel: CryptoLabels.LABEL_HUB_KEY_WRAP, aadHex: "")
         try ffiMobileSetHubKey(hubId: hubId, keyHex: keyHex)
     }

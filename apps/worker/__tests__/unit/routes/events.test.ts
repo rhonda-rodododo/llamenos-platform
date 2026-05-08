@@ -9,9 +9,9 @@ import { Hono } from 'hono'
 import type { AppEnv } from '@worker/types'
 import eventsRouter from '@worker/routes/events'
 
-// Mock Nostr publish — it's fire-and-forget and shouldn't affect route behavior
-vi.mock('@worker/lib/nostr-events', () => ({
-  publishNostrEvent: vi.fn().mockResolvedValue(undefined),
+// Mock event publish — it's fire-and-forget and shouldn't affect route behavior
+vi.mock('@worker/lib/ws-events', () => ({
+  publishEvent: vi.fn(),
 }))
 
 // ---------------------------------------------------------------------------
@@ -154,8 +154,8 @@ describe('POST /events', () => {
     encryptedDetails: 'encrypted-payload',
     detailEnvelopes: [{
       pubkey: 'a'.repeat(64),
-      wrappedKey: 'wrapped-key-hex',
-      ephemeralPubkey: 'b'.repeat(64),
+      enc: 'b'.repeat(64),
+      ct: 'wrapped-key-hex',
     }],
   }
 

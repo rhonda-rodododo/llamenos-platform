@@ -1,9 +1,7 @@
 import type { FullConfig } from '@playwright/test'
-import { schnorr } from '@noble/curves/secp256k1.js'
-import { sha256 } from '@noble/hashes/sha2.js'
-import { hexToBytes, bytesToHex } from '@noble/hashes/utils.js'
-import { utf8ToBytes } from '@noble/ciphers/utils.js'
-import { nip19, getPublicKey } from 'nostr-tools'
+import { ed25519 } from '@noble/curves/ed25519.js'
+import { hexToBytes, bytesToHex, utf8ToBytes } from '@shared/encoding'
+import { LABEL_DEVICE_AUTH } from '@shared/crypto-labels'
 import { readFileSync } from 'fs'
 import { resolve } from 'path'
 
@@ -28,18 +26,15 @@ function loadDevVarsSecret(): string | undefined {
   }
 }
 
-const AUTH_PREFIX = 'llamenos:auth:'
-const ADMIN_NSEC = 'nsec174zsa94n3e7t0ugfldh9tgkkzmaxhalr78uxt9phjq3mmn6d6xas5jdffh'
+// Admin Ed25519 seed — must match tests/api-helpers.ts ADMIN_SEED
+const ADMIN_SEED = 'f54a5851e9372b87810a8e60cdd2e7cfd80b6e31c7af18188f7db106ceda8be7'
 
-function makeBootstrapToken(nsec: string, method: string, path: string) {
-  const decoded = nip19.decode(nsec)
-  if (decoded.type !== 'nsec') throw new Error('Invalid nsec')
-  const skBytes = decoded.data as Uint8Array
-  const pubkey = getPublicKey(skBytes)
+function makeBootstrapToken(seedHex: string, method: string, path: string) {
+  const seedBytes = hexToBytes(seedHex)
+  const pubkey = bytesToHex(ed25519.getPublicKey(seedBytes))
   const timestamp = Date.now()
-  const message = `${AUTH_PREFIX}${pubkey}:${timestamp}:${method}:${path}`
-  const messageHash = sha256(utf8ToBytes(message))
-  const sig = schnorr.sign(messageHash, hexToBytes(bytesToHex(skBytes)))
+  const message = utf8ToBytes(`${LABEL_DEVICE_AUTH}:${pubkey}:${timestamp}:${method}:${path}`)
+  const sig = ed25519.sign(message, seedBytes)
   return { pubkey, timestamp, token: bytesToHex(sig) }
 }
 
@@ -68,7 +63,7 @@ async function resetTestState(baseUrl: string): Promise<void> {
  */
 async function bootstrapAdmin(baseUrl: string): Promise<void> {
   const path = '/api/auth/bootstrap'
-  const body = makeBootstrapToken(ADMIN_NSEC, 'POST', path)
+  const body = makeBootstrapToken(ADMIN_SEED, 'POST', path)
   const res = await fetch(`${baseUrl}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

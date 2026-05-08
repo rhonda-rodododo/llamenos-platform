@@ -268,8 +268,8 @@ final class ConversationsViewModel {
             let hpkeEnvelope = HpkeEnvelope(
                 v: 3,
                 labelId: 0,
-                enc: ourEnvelope.ephemeralPubkey,
-                ct: ourEnvelope.wrappedKey
+                enc: ourEnvelope.enc,
+                ct: ourEnvelope.ct
             )
 
             let decryptedText = try cryptoService.decryptMessage(

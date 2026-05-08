@@ -140,8 +140,8 @@ Given('a test note exists', async ({ request, world }) => {
       encryptedContent: 'test-encrypted-content',
       callId: `pm-test-note-${Date.now()}`,
       authorEnvelope: {
-        wrappedKey: 'test-key-data',
-        ephemeralPubkey: keypair.pubkey,
+        ct: 'test-key-data',
+        enc: keypair.pubkey,
       },
     })
     if (status === 200 || status === 201) {
@@ -267,8 +267,8 @@ When('the {string} user sends {string} to {string} with valid note body', async 
     encryptedContent: 'pm-test-encrypted',
     callId: `pm-note-${Date.now()}`,
     authorEnvelope: {
-      wrappedKey: 'test-key',
-      ephemeralPubkey: user.pubkey,
+      ct: 'test-key',
+      enc: user.pubkey,
     },
   }, user.nsec)
 })
@@ -281,8 +281,8 @@ When('the {string} user sends {string} to the test note reply endpoint with repl
     encryptedContent: 'pm-test-reply',
     readerEnvelopes: [{
       pubkey: user.pubkey,
-      wrappedKey: 'test-key',
-      ephemeralPubkey: user.pubkey,
+      ct: 'test-key',
+      enc: user.pubkey,
     }],
   }, user.nsec)
 })
@@ -416,8 +416,8 @@ When('the {string} user sends {string} to {string} with share body', async ({ re
 
   // Extract file ID from path, send share request
   getSharedState(world).lastResponse = await apiPost(request, '/files/test-file-id/share', {
-    envelope: { pubkey: user.pubkey, encryptedFileKey: 'test', ephemeralPubkey: user.pubkey },
-    encryptedMetadata: { pubkey: user.pubkey, encryptedContent: 'test', ephemeralPubkey: user.pubkey },
+    envelope: { pubkey: user.pubkey, encryptedFileKey: 'test', enc: user.pubkey },
+    encryptedMetadata: { pubkey: user.pubkey, encryptedContent: 'test', enc: user.pubkey },
   }, user.nsec)
 })
 
@@ -441,8 +441,8 @@ When('the {string} user sends {string} to {string} with valid report body', asyn
     encryptedContent: 'pm-test-encrypted-report',
     readerEnvelopes: [{
       pubkey: user.pubkey,
-      wrappedKey: 'test-key',
-      ephemeralPubkey: user.pubkey,
+      ct: 'test-key',
+      enc: user.pubkey,
     }],
   }, user.nsec)
 })

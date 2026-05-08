@@ -1,7 +1,7 @@
 /**
  * Hub-event encryption for Nostr relay events.
  *
- * The hub key is client-side only (ECIES-wrapped per member); the server never
+ * The hub key is client-side only (HPKE-wrapped per member); the server never
  * holds the raw hub key. For server-published events, we derive a symmetric
  * event encryption key from SERVER_NOSTR_SECRET so that relay content is
  * encrypted at rest. Clients receive this key via the hub key distribution
@@ -9,10 +9,14 @@
  *
  * Derivation:
  *   event_key = HKDF(SHA-256, SERVER_NOSTR_SECRET, salt=empty, info="llamenos:hub-event", 32)
- *   nonce = random(24)
+ *   nonce = random(12)
  *   padded = pad_to_bucket(UTF-8(json))  -- power-of-2 bucket, min 512B
- *   ciphertext = XChaCha20-Poly1305(event_key, nonce).encrypt(padded)
- *   output = hex(nonce || ciphertext)
+ *   ciphertext = AES-256-GCM(event_key, nonce, aad).encrypt(padded)
+ *   output = hex(nonce || ciphertext || tag)
+ *
+ * AAD (domain separation):
+ *   hub events:    LABEL_HUB_EVENT bytes
+ *   server events: "${LABEL_HUB_EVENT}:${epoch}" bytes
  *
  * Padding format: [4-byte LE actual-length][plaintext][random padding bytes]
  * Buckets: 512, 1024, 2048, 4096, 8192, ... (powers of 2, minimum 512B)
@@ -22,10 +26,11 @@
 
 import { hkdf } from '@noble/hashes/hkdf.js'
 import { sha256 } from '@noble/hashes/sha2.js'
-import { xchacha20poly1305 } from '@noble/ciphers/chacha.js'
+import { gcm } from '@noble/ciphers/aes.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 import {
+  LABEL_HUB_EVENT,
   LABEL_SERVER_EVENT_ENCRYPTION_KEY,
   LABEL_SERVER_EVENT_ENCRYPTION_KEY_INFO,
   LABEL_HUB_EVENT_EPOCH,
@@ -105,16 +110,31 @@ export function getCurrentEpoch(timestampSec?: number): number {
 }
 
 /**
+ * Build the AAD bytes for hub/server event encryption.
+ * Hub events (no epoch): LABEL_HUB_EVENT bytes.
+ * Server events (with epoch): "${LABEL_HUB_EVENT}:{epoch}" bytes.
+ */
+function buildEventAad(epoch?: number): Uint8Array {
+  if (epoch !== undefined) {
+    return utf8ToBytes(`${LABEL_HUB_EVENT}:${epoch}`)
+  }
+  return utf8ToBytes(LABEL_HUB_EVENT)
+}
+
+/**
  * Encrypt event content for Nostr relay publication.
  * Pads plaintext to a power-of-2 bucket before encrypting to resist traffic analysis.
- * Returns hex-encoded nonce || ciphertext.
+ * Returns hex-encoded nonce(12) || ciphertext || tag(16).
+ *
+ * @param epoch — when provided, AAD includes the epoch for server event domain separation.
  */
-export function encryptHubEvent(content: Record<string, unknown>, eventKey: Uint8Array): string {
-  const nonce = new Uint8Array(24)
+export function encryptHubEvent(content: Record<string, unknown>, eventKey: Uint8Array, epoch?: number): string {
+  const nonce = new Uint8Array(12)
   crypto.getRandomValues(nonce)
   const plaintext = utf8ToBytes(JSON.stringify(content))
   const padded = padToBucket(plaintext)
-  const cipher = xchacha20poly1305(eventKey, nonce)
+  const aad = buildEventAad(epoch)
+  const cipher = gcm(eventKey, nonce, aad)
   const ciphertext = cipher.encrypt(padded)
   const packed = new Uint8Array(nonce.length + ciphertext.length)
   packed.set(nonce)
@@ -125,15 +145,18 @@ export function encryptHubEvent(content: Record<string, unknown>, eventKey: Uint
 /**
  * Decrypt a hub event previously encrypted with encryptHubEvent.
  * Strips payload padding and returns the original content object.
+ *
+ * @param epoch — must match the epoch used during encryption for AAD verification.
  */
-export function decryptHubEvent(hex: string, eventKey: Uint8Array): Record<string, unknown> {
+export function decryptHubEvent(hex: string, eventKey: Uint8Array, epoch?: number): Record<string, unknown> {
   const packed = hexToBytes(hex)
-  if (packed.length < 24) {
-    throw new Error('Invalid hub event ciphertext: too short')
+  if (packed.length < 28) {
+    throw new Error('Invalid hub event ciphertext: too short (need at least 12-byte nonce + 16-byte tag)')
   }
-  const nonce = packed.slice(0, 24)
-  const ciphertext = packed.slice(24)
-  const cipher = xchacha20poly1305(eventKey, nonce)
+  const nonce = packed.slice(0, 12)
+  const ciphertext = packed.slice(12)
+  const aad = buildEventAad(epoch)
+  const cipher = gcm(eventKey, nonce, aad)
   const padded = cipher.decrypt(ciphertext)
   const plaintext = unpadFromBucket(padded)
   return JSON.parse(new TextDecoder().decode(plaintext)) as Record<string, unknown>

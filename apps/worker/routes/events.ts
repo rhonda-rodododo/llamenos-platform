@@ -22,8 +22,8 @@ import { createLogger } from '../lib/logger'
 
 const logger = createLogger('routes.events')
 import { audit } from '../services/audit'
-import { KIND_RECORD_CREATED, KIND_RECORD_UPDATED } from '@shared/nostr-events'
-import { publishNostrEvent } from '../lib/nostr-events'
+import { KIND_RECORD_CREATED, KIND_RECORD_UPDATED } from '@shared/event-kinds'
+import { publishEvent } from '../lib/ws-events'
 
 const events = new Hono<AppEnv>()
 
@@ -140,12 +140,12 @@ events.post('/',
     })
 
     // Publish Nostr event (events use the same kinds as records)
-    publishNostrEvent(c.env, KIND_RECORD_CREATED, {
+    publishEvent(c.env, KIND_RECORD_CREATED, {
       type: 'event:created',
       eventId: event.id,
       entityTypeId: event.entityTypeId,
       caseNumber: event.caseNumber,
-    }).catch((e) => { logger.error('Failed to publish event', e) })
+    })
 
     await audit(services.audit, 'eventCreated', pubkey, {
       eventId: event.id,
@@ -185,10 +185,10 @@ events.patch('/:id',
 
     const updated = await services.cases.updateEvent(id, body)
 
-    publishNostrEvent(c.env, KIND_RECORD_UPDATED, {
+    publishEvent(c.env, KIND_RECORD_UPDATED, {
       type: 'event:updated',
       eventId: id,
-    }).catch((e) => { logger.error('Failed to publish event', e) })
+    })
 
     await audit(services.audit, 'eventUpdated', pubkey, { eventId: id })
 

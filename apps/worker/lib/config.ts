@@ -68,7 +68,12 @@ export function validateConfig(env: ConfigInput = process.env): void {
   // --- Required vars ---
   assertDatabaseUrl(env)
   assertHex64(env, 'HMAC_SECRET')
-  assertHex64(env, 'SERVER_NOSTR_SECRET')
+  // SERVER_SECRET is the canonical name; SERVER_NOSTR_SECRET is the legacy alias.
+  // Prefer SERVER_SECRET; fall back to SERVER_NOSTR_SECRET only if it has a value.
+  const hasCanonical = !!env['SERVER_SECRET']?.trim()
+  const hasLegacy = !!env['SERVER_NOSTR_SECRET']?.trim()
+  const serverSecretKey = hasCanonical ? 'SERVER_SECRET' : hasLegacy ? 'SERVER_NOSTR_SECRET' : 'SERVER_SECRET'
+  assertHex64(env, serverSecretKey)
 
   // ADMIN_PUBKEY: 64 hex chars (Nostr pubkey, x-only compressed)
   assertNonEmpty(env, 'ADMIN_PUBKEY')
@@ -84,7 +89,7 @@ export function validateConfig(env: ConfigInput = process.env): void {
   assertNonEmpty(env, 'ENVIRONMENT')
 
   // --- Optional vars (warn when absent, do not fail) ---
-  warnIfAbsent(env, 'NOSTR_RELAY_URL', 'real-time relay disabled')
+  // NOSTR_RELAY_URL removed — replaced by in-process WebSocket relay
   warnIfAbsent(env, 'FCM_SERVICE_ACCOUNT_KEY', 'Android push notifications disabled')
   warnIfAbsent(env, 'APNS_KEY_P8', 'iOS push notifications disabled')
   warnIfAbsent(env, 'APNS_KEY_ID', 'iOS push notifications disabled')

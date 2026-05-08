@@ -13,7 +13,7 @@ import {
   apiPatch,
   generateTestKeypair,
   uniquePhone,
-  ADMIN_NSEC,
+  ADMIN_SEED,
 } from '../../api-helpers'
 import {
   generateContentKey,
@@ -23,9 +23,8 @@ import {
 import { LABEL_NOTE_KEY } from '@shared/crypto-labels'
 import { TestDB } from '../../db-helpers'
 import { assertIsObject, assertIsArray } from '../../integrity-helpers'
-import { bytesToHex } from '@noble/hashes/utils.js'
-import { nip19, getPublicKey } from 'nostr-tools'
-import { hexToBytes } from '@noble/hashes/utils.js'
+import { bytesToHex, hexToBytes } from '@shared/encoding'
+import { ed25519 } from '@noble/curves/ed25519.js'
 
 // ── State ───────────────────────────────────────────────────────────
 
@@ -37,13 +36,13 @@ interface StorageIntegrityState {
   /** DB rows by entity type */
   dbRows: Map<string, Record<string, unknown>>
   /** Submitted envelope data for byte-accuracy checks */
-  submittedEnvelopes?: Array<{ pubkey: string; wrappedKey: string; ephemeralPubkey: string }>
+  submittedEnvelopes?: Array<{ pubkey: string; ct: string; enc: string }>
   /** Submitted author envelope */
-  submittedAuthorEnvelope?: { wrappedKey: string; ephemeralPubkey: string }
+  submittedAuthorEnvelope?: { ct: string; enc: string }
   /** Volunteer keypair for note creation */
   volunteerKp?: { nsec: string; pubkey: string; skHex: string }
   /** Admin keypair info */
-  adminSkHex?: string
+  adminSeedHex?: string
   adminPubkey?: string
 }
 
@@ -64,10 +63,8 @@ Before(async ({ world }) => {
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
-function nsecToSkHex(nsec: string): string {
-  const decoded = nip19.decode(nsec)
-  if (decoded.type !== 'nsec') throw new Error('Invalid nsec')
-  return bytesToHex(decoded.data as Uint8Array)
+function seedHexToPubkey(seedHex: string): string {
+  return bytesToHex(ed25519.getPublicKey(hexToBytes(seedHex)))
 }
 
 // ── Given: Entity creation ──────────────────────────────────────────
@@ -86,13 +83,13 @@ Given('a {string} entity is created via the API with structured JSONB data', asy
       })
       expect([200, 201]).toContain(regResult.status)
 
-      const adminSkHex = nsecToSkHex(ADMIN_NSEC)
-      const adminPubkey = getPublicKey(hexToBytes(adminSkHex))
+      const adminSeedHex = ADMIN_SEED
+      const adminPubkey = seedHexToPubkey(adminSeedHex)
 
       const contentKey = generateContentKey()
       const ciphertextHex = encryptContent('Storage test note', contentKey, LABEL_NOTE_KEY)
-      const volEnv = wrapKeyForRecipient(contentKey, volKp.pubkey, volKp.skHex, LABEL_NOTE_KEY)
-      const adminEnv = wrapKeyForRecipient(contentKey, adminPubkey, adminSkHex, LABEL_NOTE_KEY)
+      const volEnv = await wrapKeyForRecipient(contentKey, volKp.pubkey, volKp.seedHex, LABEL_NOTE_KEY)
+      const adminEnv = await wrapKeyForRecipient(contentKey, adminPubkey, adminSeedHex, LABEL_NOTE_KEY)
 
       const { status, data } = await apiPost<Record<string, unknown>>(
         request,
@@ -121,7 +118,7 @@ Given('a {string} entity is created via the API with structured JSONB data', asy
           statusHash: 'open',
           blindIndexes: { searchField: 'hashed-value', category: 'test-cat' },
           summaryEnvelopes: [
-            { pubkey: 'a'.repeat(64), wrappedKey: 'b'.repeat(64), ephemeralPubkey: '02' + 'c'.repeat(64) },
+            { pubkey: 'a'.repeat(64), ct: 'b'.repeat(64), enc: '02' + 'c'.repeat(64) },
           ],
         },
       )
@@ -215,9 +212,8 @@ Given('a registered volunteer {string} with a known keypair', async ({ request, 
 })
 
 Given('the admin keypair is known for envelope verification', async ({ world }) => {
-  const adminSkHex = nsecToSkHex(ADMIN_NSEC)
-  const adminPubkey = getPublicKey(hexToBytes(adminSkHex))
-  getStorageIntegrityState(world).adminSkHex = adminSkHex
+  const adminPubkey = seedHexToPubkey(ADMIN_SEED)
+  getStorageIntegrityState(world).adminSeedHex = ADMIN_SEED
   getStorageIntegrityState(world).adminPubkey = adminPubkey
 })
 
@@ -306,15 +302,15 @@ When('the system_settings row is fetched directly from the database', async ({ w
   getStorageIntegrityState(world).dbRows.set('settings', rows ?? {})
 })
 
-When('the volunteer creates a note with real ECIES envelopes', async ({ request, world }) => {
+When('the volunteer creates a note with real HPKE envelopes', async ({ request, world }) => {
   expect(getStorageIntegrityState(world).volunteerKp).toBeDefined()
   expect(getStorageIntegrityState(world).adminPubkey).toBeDefined()
 
   const contentKey = generateContentKey()
   const ciphertextHex = encryptContent('Envelope accuracy test', contentKey, LABEL_NOTE_KEY)
 
-  const authorEnv = wrapKeyForRecipient(contentKey, getStorageIntegrityState(world).volunteerKp!.pubkey, getStorageIntegrityState(world).volunteerKp!.skHex, LABEL_NOTE_KEY)
-  const adminEnv = wrapKeyForRecipient(contentKey, getStorageIntegrityState(world).adminPubkey!, getStorageIntegrityState(world).adminSkHex!, LABEL_NOTE_KEY)
+  const authorEnv = await wrapKeyForRecipient(contentKey, getStorageIntegrityState(world).volunteerKp!.pubkey, getStorageIntegrityState(world).volunteerKp!.seedHex, LABEL_NOTE_KEY)
+  const adminEnv = await wrapKeyForRecipient(contentKey, getStorageIntegrityState(world).adminPubkey!, getStorageIntegrityState(world).adminSeedHex!, LABEL_NOTE_KEY)
 
   getStorageIntegrityState(world).submittedAuthorEnvelope = authorEnv
   getStorageIntegrityState(world).submittedEnvelopes = [{ pubkey: getStorageIntegrityState(world).adminPubkey!, ...adminEnv }]
@@ -473,44 +469,44 @@ Then('the DB {word} should not be double-serialized', async ({ world }, dbColumn
 
 // ── Then: Envelope byte-accuracy assertions ─────────────────────────
 
-Then('the API envelope wrappedKey should match the submitted wrappedKey exactly', async ({ world }) => {
+Then('the API envelope ct should match the submitted ct exactly', async ({ world }) => {
   const apiNote = getStorageIntegrityState(world).apiResponses.get('envelope-note')
   expect(apiNote).toBeDefined()
   expect(getStorageIntegrityState(world).submittedEnvelopes).toBeDefined()
 
-  const apiAdminEnvelopes = apiNote!.adminEnvelopes as Array<{ wrappedKey: string }> | undefined
+  const apiAdminEnvelopes = apiNote!.adminEnvelopes as Array<{ ct: string }> | undefined
   expect(apiAdminEnvelopes).toBeDefined()
   expect(apiAdminEnvelopes!.length).toBeGreaterThan(0)
-  expect(apiAdminEnvelopes![0].wrappedKey).toBe(getStorageIntegrityState(world).submittedEnvelopes![0].wrappedKey)
+  expect(apiAdminEnvelopes![0].ct).toBe(getStorageIntegrityState(world).submittedEnvelopes![0].ct)
 })
 
-Then('the API envelope ephemeralPubkey should match the submitted ephemeralPubkey exactly', async ({ world }) => {
+Then('the API envelope enc should match the submitted enc exactly', async ({ world }) => {
   const apiNote = getStorageIntegrityState(world).apiResponses.get('envelope-note')
   expect(apiNote).toBeDefined()
   expect(getStorageIntegrityState(world).submittedEnvelopes).toBeDefined()
 
-  const apiAdminEnvelopes = apiNote!.adminEnvelopes as Array<{ ephemeralPubkey: string }> | undefined
+  const apiAdminEnvelopes = apiNote!.adminEnvelopes as Array<{ enc: string }> | undefined
   expect(apiAdminEnvelopes).toBeDefined()
-  expect(apiAdminEnvelopes![0].ephemeralPubkey).toBe(getStorageIntegrityState(world).submittedEnvelopes![0].ephemeralPubkey)
+  expect(apiAdminEnvelopes![0].enc).toBe(getStorageIntegrityState(world).submittedEnvelopes![0].enc)
 })
 
-Then('the DB admin_envelopes wrappedKey should match the submitted wrappedKey exactly', async ({ world }) => {
+Then('the DB admin_envelopes ct should match the submitted ct exactly', async ({ world }) => {
   const dbRow = getStorageIntegrityState(world).dbRows.get('envelope-note')
   expect(dbRow).toBeDefined()
   expect(getStorageIntegrityState(world).submittedEnvelopes).toBeDefined()
 
-  const dbAdminEnvelopes = dbRow!.admin_envelopes as Array<{ wrappedKey: string }>
+  const dbAdminEnvelopes = dbRow!.admin_envelopes as Array<{ ct: string }>
   assertIsArray(dbAdminEnvelopes, 'DB admin_envelopes')
   expect(dbAdminEnvelopes.length).toBeGreaterThan(0)
-  expect(dbAdminEnvelopes[0].wrappedKey).toBe(getStorageIntegrityState(world).submittedEnvelopes![0].wrappedKey)
+  expect(dbAdminEnvelopes[0].ct).toBe(getStorageIntegrityState(world).submittedEnvelopes![0].ct)
 })
 
-Then('the DB admin_envelopes ephemeralPubkey should match the submitted ephemeralPubkey exactly', async ({ world }) => {
+Then('the DB admin_envelopes enc should match the submitted enc exactly', async ({ world }) => {
   const dbRow = getStorageIntegrityState(world).dbRows.get('envelope-note')
   expect(dbRow).toBeDefined()
   expect(getStorageIntegrityState(world).submittedEnvelopes).toBeDefined()
 
-  const dbAdminEnvelopes = dbRow!.admin_envelopes as Array<{ ephemeralPubkey: string }>
+  const dbAdminEnvelopes = dbRow!.admin_envelopes as Array<{ enc: string }>
   assertIsArray(dbAdminEnvelopes, 'DB admin_envelopes')
-  expect(dbAdminEnvelopes[0].ephemeralPubkey).toBe(getStorageIntegrityState(world).submittedEnvelopes![0].ephemeralPubkey)
+  expect(dbAdminEnvelopes[0].enc).toBe(getStorageIntegrityState(world).submittedEnvelopes![0].enc)
 })

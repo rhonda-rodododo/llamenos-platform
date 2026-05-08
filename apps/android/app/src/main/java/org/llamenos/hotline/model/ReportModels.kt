@@ -54,8 +54,8 @@ data class CreateReportRequest(
 @Serializable
 data class ReportEnvelope(
     val pubkey: String,
-    val wrappedKey: String,
-    val ephemeralPubkey: String,
+    val enc: String,
+    val ct: String,
 )
 
 @Serializable

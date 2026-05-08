@@ -520,15 +520,15 @@ pub fn mobile_set_server_event_keys(
     Ok(())
 }
 
-/// Decrypt a hub event payload (XChaCha20-Poly1305) using the stored hub key.
+/// Decrypt a hub event payload (AES-256-GCM) using the stored hub key.
 #[uniffi::export]
 pub fn mobile_decrypt_hub_event(
     ciphertext_hex: String,
     hub_id: String,
 ) -> Result<String, CryptoError> {
-    use chacha20poly1305::{
-        aead::{Aead, KeyInit},
-        XChaCha20Poly1305, XNonce,
+    use aes_gcm::{
+        aead::{Aead, KeyInit, Payload},
+        Aes256Gcm, Nonce,
     };
     let guard = state().lock().unwrap();
     let key = guard
@@ -536,14 +536,20 @@ pub fn mobile_decrypt_hub_event(
         .get(&hub_id)
         .ok_or_else(|| CryptoError::InvalidInput(format!("No hub key for hub: {hub_id}")))?;
     let data = hex::decode(&ciphertext_hex).map_err(CryptoError::HexError)?;
-    if data.len() < 40 {
+    if data.len() < 28 {
         return Err(CryptoError::InvalidCiphertext);
     }
-    let nonce = XNonce::from_slice(&data[..24]);
-    let cipher = XChaCha20Poly1305::new_from_slice(key)
-        .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
+    let nonce = Nonce::from_slice(&data[..12]);
+    let cipher =
+        Aes256Gcm::new_from_slice(key).map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
     let plaintext = cipher
-        .decrypt(nonce, &data[24..])
+        .decrypt(
+            nonce,
+            Payload {
+                msg: &data[12..],
+                aad: crate::labels::LABEL_HUB_EVENT.as_bytes(),
+            },
+        )
         .map_err(|_| CryptoError::DecryptionFailed)?;
     String::from_utf8(plaintext).map_err(|_| CryptoError::DecryptionFailed)
 }
@@ -554,20 +560,26 @@ pub fn mobile_decrypt_hub_event(
 pub fn mobile_decrypt_event_with_attribution(
     ciphertext_hex: String,
 ) -> Result<Vec<String>, CryptoError> {
-    use chacha20poly1305::{
-        aead::{Aead, KeyInit},
-        XChaCha20Poly1305, XNonce,
+    use aes_gcm::{
+        aead::{Aead, KeyInit, Payload},
+        Aes256Gcm, Nonce,
     };
     let data = hex::decode(&ciphertext_hex).map_err(CryptoError::HexError)?;
-    if data.len() < 40 {
+    if data.len() < 28 {
         return Err(CryptoError::InvalidCiphertext);
     }
-    let nonce = XNonce::from_slice(&data[..24]);
-    let ciphertext = &data[24..];
+    let nonce = Nonce::from_slice(&data[..12]);
+    let ciphertext = &data[12..];
     let guard = state().lock().unwrap();
     for (hub_id, key) in &guard.hub_keys {
-        if let Ok(cipher) = XChaCha20Poly1305::new_from_slice(key) {
-            if let Ok(plaintext) = cipher.decrypt(nonce, ciphertext) {
+        if let Ok(cipher) = Aes256Gcm::new_from_slice(key) {
+            if let Ok(plaintext) = cipher.decrypt(
+                nonce,
+                Payload {
+                    msg: ciphertext,
+                    aad: crate::labels::LABEL_HUB_EVENT.as_bytes(),
+                },
+            ) {
                 if let Ok(json) = String::from_utf8(plaintext) {
                     return Ok(vec![hub_id.clone(), json]);
                 }
@@ -581,9 +593,9 @@ pub fn mobile_decrypt_event_with_attribution(
 /// Tries current key first, falls back to previous key (epoch rotation).
 #[uniffi::export]
 pub fn mobile_decrypt_server_event(encrypted_hex: String) -> Result<String, CryptoError> {
-    use chacha20poly1305::{
-        aead::{Aead, KeyInit},
-        XChaCha20Poly1305, XNonce,
+    use aes_gcm::{
+        aead::{Aead, KeyInit, Payload},
+        Aes256Gcm, Nonce,
     };
     let guard = state().lock().unwrap();
     let current = guard
@@ -591,21 +603,34 @@ pub fn mobile_decrypt_server_event(encrypted_hex: String) -> Result<String, Cryp
         .as_ref()
         .ok_or_else(|| CryptoError::InvalidInput("No server event key set".into()))?;
     let data = hex::decode(&encrypted_hex).map_err(CryptoError::HexError)?;
-    if data.len() < 40 {
+    if data.len() < 28 {
         return Err(CryptoError::InvalidCiphertext);
     }
-    let nonce = XNonce::from_slice(&data[..24]);
-    let ciphertext = &data[24..];
-    let cipher = XChaCha20Poly1305::new_from_slice(current)
+    let nonce = Nonce::from_slice(&data[..12]);
+    let ciphertext = &data[12..];
+    let aad = crate::labels::LABEL_HUB_EVENT.as_bytes();
+    let cipher = Aes256Gcm::new_from_slice(current)
         .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
-    if let Ok(plaintext) = cipher.decrypt(nonce, ciphertext) {
+    if let Ok(plaintext) = cipher.decrypt(
+        nonce,
+        Payload {
+            msg: ciphertext,
+            aad,
+        },
+    ) {
         return String::from_utf8(plaintext).map_err(|_| CryptoError::DecryptionFailed);
     }
     if let Some(previous) = guard.server_event_previous_key.as_ref() {
-        let cipher = XChaCha20Poly1305::new_from_slice(previous)
+        let cipher = Aes256Gcm::new_from_slice(previous)
             .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
         let plaintext = cipher
-            .decrypt(nonce, ciphertext)
+            .decrypt(
+                nonce,
+                Payload {
+                    msg: ciphertext,
+                    aad,
+                },
+            )
             .map_err(|_| CryptoError::DecryptionFailed)?;
         return String::from_utf8(plaintext).map_err(|_| CryptoError::DecryptionFailed);
     }
@@ -628,20 +653,26 @@ pub fn mobile_random_bytes_hex() -> String {
 /// or an error if no key works. Equivalent to `mobile_decrypt_event_with_attribution`.
 #[uniffi::export]
 pub fn mobile_decrypt_hub_event_trial(encrypted_hex: String) -> Result<Vec<String>, CryptoError> {
-    use chacha20poly1305::{
-        aead::{Aead, KeyInit},
-        XChaCha20Poly1305, XNonce,
+    use aes_gcm::{
+        aead::{Aead, KeyInit, Payload},
+        Aes256Gcm, Nonce,
     };
     let data = hex::decode(&encrypted_hex).map_err(CryptoError::HexError)?;
-    if data.len() < 40 {
+    if data.len() < 28 {
         return Err(CryptoError::InvalidCiphertext);
     }
-    let nonce = XNonce::from_slice(&data[..24]);
-    let ciphertext = &data[24..];
+    let nonce = Nonce::from_slice(&data[..12]);
+    let ciphertext = &data[12..];
     let guard = state().lock().unwrap();
     for (hub_id, key) in &guard.hub_keys {
-        if let Ok(cipher) = XChaCha20Poly1305::new_from_slice(key) {
-            if let Ok(plaintext) = cipher.decrypt(nonce, ciphertext) {
+        if let Ok(cipher) = Aes256Gcm::new_from_slice(key) {
+            if let Ok(plaintext) = cipher.decrypt(
+                nonce,
+                Payload {
+                    msg: ciphertext,
+                    aad: crate::labels::LABEL_HUB_EVENT.as_bytes(),
+                },
+            ) {
                 if let Ok(json) = String::from_utf8(plaintext) {
                     return Ok(vec![hub_id.clone(), json]);
                 }
@@ -761,9 +792,9 @@ mod tests {
 
     #[test]
     fn hub_key_set_and_decrypt() {
-        use chacha20poly1305::{
-            aead::{Aead, KeyInit},
-            XChaCha20Poly1305, XNonce,
+        use aes_gcm::{
+            aead::{Aead, KeyInit, Payload},
+            Aes256Gcm, Nonce,
         };
 
         let mut key = [0u8; 32];
@@ -775,14 +806,22 @@ mod tests {
         assert!(mobile_has_hub_key(hub_id.into()));
         assert!(!mobile_has_hub_key("other-hub".into()));
 
-        // Encrypt a test payload
+        // Encrypt a test payload with AES-256-GCM
         let plaintext = r#"{"type":"call:ring","callId":"test123"}"#;
-        let mut nonce_bytes = [0u8; 24];
+        let mut nonce_bytes = [0u8; 12];
         getrandom::getrandom(&mut nonce_bytes).unwrap();
-        let nonce = XNonce::from_slice(&nonce_bytes);
-        let cipher = XChaCha20Poly1305::new_from_slice(&key).unwrap();
-        let ciphertext = cipher.encrypt(nonce, plaintext.as_bytes()).unwrap();
-        let mut packed = Vec::with_capacity(24 + ciphertext.len());
+        let nonce = Nonce::from_slice(&nonce_bytes);
+        let cipher = Aes256Gcm::new_from_slice(&key).unwrap();
+        let ciphertext = cipher
+            .encrypt(
+                nonce,
+                Payload {
+                    msg: plaintext.as_bytes(),
+                    aad: crate::labels::LABEL_HUB_EVENT.as_bytes(),
+                },
+            )
+            .unwrap();
+        let mut packed = Vec::with_capacity(12 + ciphertext.len());
         packed.extend_from_slice(&nonce_bytes);
         packed.extend_from_slice(&ciphertext);
         let encrypted_hex = hex::encode(&packed);
@@ -806,9 +845,9 @@ mod tests {
 
     #[test]
     fn server_event_key_set_and_decrypt() {
-        use chacha20poly1305::{
-            aead::{Aead, KeyInit},
-            XChaCha20Poly1305, XNonce,
+        use aes_gcm::{
+            aead::{Aead, KeyInit, Payload},
+            Aes256Gcm, Nonce,
         };
 
         let mut key1 = [0u8; 32];
@@ -818,14 +857,22 @@ mod tests {
         let key1_hex = hex::encode(&key1);
         let key2_hex = hex::encode(&key2);
 
-        // Helper to encrypt with a specific key
+        // Helper to encrypt with AES-256-GCM
         let encrypt = |key: &[u8; 32], msg: &str| -> String {
-            let mut nonce_bytes = [0u8; 24];
+            let mut nonce_bytes = [0u8; 12];
             getrandom::getrandom(&mut nonce_bytes).unwrap();
-            let nonce = XNonce::from_slice(&nonce_bytes);
-            let cipher = XChaCha20Poly1305::new_from_slice(key).unwrap();
-            let ct = cipher.encrypt(nonce, msg.as_bytes()).unwrap();
-            let mut packed = Vec::with_capacity(24 + ct.len());
+            let nonce = Nonce::from_slice(&nonce_bytes);
+            let cipher = Aes256Gcm::new_from_slice(key).unwrap();
+            let ct = cipher
+                .encrypt(
+                    nonce,
+                    Payload {
+                        msg: msg.as_bytes(),
+                        aad: crate::labels::LABEL_HUB_EVENT.as_bytes(),
+                    },
+                )
+                .unwrap();
+            let mut packed = Vec::with_capacity(12 + ct.len());
             packed.extend_from_slice(&nonce_bytes);
             packed.extend_from_slice(&ct);
             hex::encode(&packed)

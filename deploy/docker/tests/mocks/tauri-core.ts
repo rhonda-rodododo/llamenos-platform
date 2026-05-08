@@ -7,7 +7,7 @@ import { schnorr } from '@noble/curves/secp256k1.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { pbkdf2 } from '@noble/hashes/pbkdf2.js'
-import { xchacha20poly1305 } from '@noble/ciphers/chacha.js'
+import { gcm } from '@noble/ciphers/aes.js'
 import { randomBytes, utf8ToBytes } from '@noble/ciphers/utils.js'
 import { bech32 } from '@scure/base'
 
@@ -37,21 +37,21 @@ function npubEncode(pk: string): string {
   return bech32.encode('npub', bech32.toWords(hexToBytes(pk)), 1500)
 }
 
-function eciesWrap(keyHex: string, recipientPubkey: string) {
+function eciesWrap(keyHex: string, _recipientPubkey: string) {
   const ephSk = bytesToHex(randomBytes(32))
   const ephPk = pubFromSk(ephSk)
-  const ikm = sha256(hexToBytes(ephSk + recipientPubkey))
-  const nonce = randomBytes(24)
-  const ct = xchacha20poly1305(ikm, nonce).encrypt(hexToBytes(keyHex))
-  return { wrappedKey: bytesToHex(nonce) + bytesToHex(ct), ephemeralPubkey: ephPk }
+  const ikm = sha256(hexToBytes(ephSk + _recipientPubkey))
+  const nonce = randomBytes(12)
+  const ct = gcm(ikm, nonce).encrypt(hexToBytes(keyHex))
+  return { enc: ephPk, ct: bytesToHex(nonce) + bytesToHex(ct) }
 }
 
 function pinEncrypt(nsec: string, pin: string, pubkey: string) {
   const sk = nsecDecode(nsec)
   const salt = randomBytes(16)
   const kek = pbkdf2(sha256, utf8ToBytes(pin), salt, { c: 100, dkLen: 32 })
-  const nonce = randomBytes(24)
-  const ct = xchacha20poly1305(kek, nonce).encrypt(hexToBytes(sk))
+  const nonce = randomBytes(12)
+  const ct = gcm(kek, nonce).encrypt(hexToBytes(sk))
   secretKeyHex = sk
   publicKeyHex = pubkey
   return { salt: bytesToHex(salt), iterations: 600_000, nonce: bytesToHex(nonce), ciphertext: bytesToHex(ct), pubkey }
@@ -59,7 +59,7 @@ function pinEncrypt(nsec: string, pin: string, pubkey: string) {
 
 function pinDecrypt(data: { salt: string; nonce: string; ciphertext: string; pubkey: string }, pin: string): string {
   const kek = pbkdf2(sha256, utf8ToBytes(pin), hexToBytes(data.salt), { c: 100, dkLen: 32 })
-  const sk = xchacha20poly1305(kek, hexToBytes(data.nonce)).decrypt(hexToBytes(data.ciphertext))
+  const sk = gcm(kek, hexToBytes(data.nonce)).decrypt(hexToBytes(data.ciphertext))
   secretKeyHex = bytesToHex(sk)
   publicKeyHex = data.pubkey
   return data.pubkey
@@ -97,15 +97,15 @@ const commands: Record<string, (a: Args) => unknown> = {
   ecies_wrap_key: (a) => eciesWrap(a.keyHex as string, a.recipientPubkey as string),
   ecies_unwrap_key_from_state: () => bytesToHex(randomBytes(32)),
   encrypt_note: (a) => {
-    const nk = bytesToHex(randomBytes(32)); const n = randomBytes(24)
-    const ct = xchacha20poly1305(hexToBytes(nk), n).encrypt(utf8ToBytes(a.payloadJson as string))
+    const nk = bytesToHex(randomBytes(32)); const n = randomBytes(12)
+    const ct = gcm(hexToBytes(nk), n).encrypt(utf8ToBytes(a.payloadJson as string))
     return { encryptedContent: bytesToHex(n) + bytesToHex(ct), authorEnvelope: eciesWrap(nk, a.authorPubkey as string), adminEnvelopes: (a.adminPubkeys as string[]).map(pk => ({ pubkey: pk, ...eciesWrap(nk, pk) })) }
   },
   decrypt_note_from_state: () => '{"text":"mock note","customFields":{}}',
   decrypt_legacy_note_from_state: () => '{"text":"mock note","customFields":{}}',
   encrypt_message: (a) => {
-    const k = bytesToHex(randomBytes(32)); const n = randomBytes(24)
-    const ct = xchacha20poly1305(hexToBytes(k), n).encrypt(utf8ToBytes(a.plaintext as string))
+    const k = bytesToHex(randomBytes(32)); const n = randomBytes(12)
+    const ct = gcm(hexToBytes(k), n).encrypt(utf8ToBytes(a.plaintext as string))
     return { encryptedContent: bytesToHex(n) + bytesToHex(ct), readerEnvelopes: (a.readerPubkeys as string[]).map(pk => ({ pubkey: pk, ...eciesWrap(k, pk) })) }
   },
   decrypt_message_from_state: () => 'mock message',

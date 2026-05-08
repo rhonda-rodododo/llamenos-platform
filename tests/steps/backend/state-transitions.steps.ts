@@ -64,7 +64,7 @@ When('the reporter submits a report for conversion', async ({ request, world }) 
       title: uniqueName('Conversion Report'),
       category: 'general',
       encryptedContent: 'conversion-report-content',
-      readerEnvelopes: [{ pubkey: kp.pubkey, wrappedKey: 'key', ephemeralPubkey: kp.pubkey }],
+      readerEnvelopes: [{ pubkey: kp.pubkey, ct: 'key', enc: kp.pubkey }],
     },
     getTransitionState(world).reporterNsec!,
   )
@@ -99,7 +99,7 @@ When('the admin converts the submitted report to a case', async ({ request, worl
       entityTypeId: getTransitionState(world).entityTypeId,
       statusHash: 'open',
       encryptedSummary: 'transition-case-summary',
-      summaryEnvelopes: [{ pubkey: kp.pubkey, wrappedKey: 'key', ephemeralPubkey: kp.pubkey }],
+      summaryEnvelopes: [{ pubkey: kp.pubkey, ct: 'key', enc: kp.pubkey }],
     },
   )
 

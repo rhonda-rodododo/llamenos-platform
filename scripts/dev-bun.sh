@@ -46,7 +46,7 @@ cmd_start() {
   export PORT=3000
   export DATABASE_URL="postgresql://llamenos:dev@localhost:5432/llamenos"
   export PG_POOL_SIZE=5
-  export ADMIN_PUBKEY="${ADMIN_PUBKEY:-ac4718373d30301e5c7cf55e9e6f2568efb94f3278fb88f37f4981e880505228}"
+  export ADMIN_PUBKEY="${ADMIN_PUBKEY:-79215a4c04f08fcd817c6f820c87169beb8cddf96dfa590a1315556b78af9183}"
   export HOTLINE_NAME="${HOTLINE_NAME:-Llámenos (Dev)}"
   export ENVIRONMENT=development
   export DEV_RESET_SECRET="${DEV_RESET_SECRET:-test-reset-secret}"

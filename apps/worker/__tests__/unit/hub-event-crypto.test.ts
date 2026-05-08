@@ -8,7 +8,7 @@ import {
   padToBucket,
   unpadFromBucket,
 } from '@worker/lib/hub-event-crypto'
-import { deriveServerKeypair, deriveServerKeypairLegacy } from '@worker/lib/nostr-publisher'
+import { deriveServerKeypair } from '@worker/lib/server-identity'
 import { bytesToHex } from '@noble/hashes/utils.js'
 
 // A 64-hex-char (32-byte) test secret, as SERVER_NOSTR_SECRET is defined.
@@ -41,14 +41,6 @@ describe('H1: Signing / encryption key separation', () => {
 
     // The signing secret key (32 bytes) must differ from the encryption key (32 bytes)
     expect(bytesToHex(signingKeypair.secretKey)).not.toBe(bytesToHex(encryptionKey))
-  })
-
-  it('new signing key differs from legacy signing key', () => {
-    const newKeypair = deriveServerKeypair(TEST_SECRET)
-    const legacyKeypair = deriveServerKeypairLegacy(TEST_SECRET)
-
-    expect(newKeypair.pubkey).not.toBe(legacyKeypair.pubkey)
-    expect(bytesToHex(newKeypair.secretKey)).not.toBe(bytesToHex(legacyKeypair.secretKey))
   })
 
   it('encryption key is deterministic for same inputs', () => {
@@ -244,10 +236,10 @@ describe('encryptHubEvent', () => {
     expect(hex).toMatch(/^[0-9a-f]+$/)
   })
 
-  it('output is at least 24 bytes nonce + 512-byte padded ciphertext + 16-byte tag', () => {
+  it('output is at least 12 bytes nonce + 512-byte padded ciphertext + 16-byte GCM tag', () => {
     const hex = encryptHubEvent({ msg: 'hello' }, eventKey)
-    // 24-byte nonce + 512-byte padded payload + 16-byte Poly1305 tag
-    expect(hex.length / 2).toBeGreaterThanOrEqual(24 + 512 + 16)
+    // 12-byte nonce + 512-byte padded payload + 16-byte GCM tag
+    expect(hex.length / 2).toBeGreaterThanOrEqual(12 + 512 + 16)
   })
 
   it('produces different ciphertext each call (random nonce + random padding)', () => {

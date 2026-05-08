@@ -66,13 +66,10 @@ export interface Env {
   DEMO_MODE?: string              // "true" to enable
   DEMO_RESET_CRON?: string        // Human-readable schedule label (e.g., "every 4 hours")
 
-  // Server Nostr identity (Epic 76.1) — hex secret for HKDF keypair derivation
+  // Server secret — hex 32 bytes used for HKDF key derivation (signing, encryption, auth)
+  SERVER_SECRET?: string
+  // Legacy alias (will be removed after full migration)
   SERVER_NOSTR_SECRET?: string
-  // Relay URL for Node.js persistent WebSocket (Docker/self-hosted)
-  NOSTR_RELAY_URL?: string
-  // Public-facing relay URL for client browser connections (e.g., wss://relay.example.com)
-  // Falls back to /nostr (reverse-proxied via Caddy) if not set but relay is configured
-  NOSTR_RELAY_PUBLIC_URL?: string
 
   // Firehose inference agent seal key (hex 32 bytes — seals agent nsecs at rest)
   FIREHOSE_AGENT_SEAL_KEY?: string
@@ -96,8 +93,8 @@ export interface Env {
   // Push notifications (Epic 86) — FCM (Android)
   FCM_SERVICE_ACCOUNT_KEY?: string  // Google Cloud service account JSON
 
-  // Pre-configured NostrPublisher (self-hosted only — set by createBunEnv with outbox wired)
-  NOSTR_PUBLISHER?: import('../lib/nostr-publisher').NostrPublisher
+  // Connection manager for WebSocket relay (initialized in server bootstrap)
+  WS_MANAGER?: import('../lib/ws-manager').ConnectionManager
 }
 
 // ---------------------------------------------------------------------------
@@ -264,7 +261,7 @@ export interface EncryptedCallRecord {
   recordingSid?: string          // Twilio ID (not PII, server needs to update post-encryption)
 
   // Envelope-pattern encryption for admin(s)
-  encryptedContent: string       // hex: nonce(24) + ciphertext (XChaCha20-Poly1305)
+  encryptedContent: string       // hex: nonce(12) + ciphertext + tag(16) (AES-256-GCM)
   adminEnvelopes: RecipientEnvelope[]  // Per-record key wrapped for each admin
 }
 
@@ -322,8 +319,8 @@ export interface EncryptedMessage {
   conversationId: string
   direction: 'inbound' | 'outbound'
   authorPubkey: string             // volunteer pubkey or 'system:inbound'
-  encryptedContent: string         // hex: nonce(24) + ciphertext (XChaCha20-Poly1305)
-  // Per-reader key envelopes (ECIES-wrapped message key)
+  encryptedContent: string         // hex: nonce(12) + ciphertext + tag(16) (AES-256-GCM)
+  // Per-reader key envelopes (HPKE-wrapped message key)
   readerEnvelopes: RecipientEnvelope[]
   hasAttachments: boolean
   attachmentIds?: string[]         // references to R2 encrypted blobs

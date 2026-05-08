@@ -1,22 +1,22 @@
 /**
  * Singleton Key Manager — manages crypto lock/unlock state.
  *
- * **Tauri-only**: The nsec lives exclusively in Rust CryptoState.
+ * **Tauri-only**: The Ed25519 signing seed lives exclusively in Rust CryptoState.
  * This module tracks unlock state and cached public key for the UI.
  * It never holds or touches the secret key.
  *
  * States:
  *   Locked:   unlocked === false — only session-token auth available
- *   Unlocked: unlocked === true — CryptoState has nsec, full crypto available
+ *   Unlocked: unlocked === true — CryptoState has signing seed, full crypto available
  */
 
 import {
   decryptWithPin,
   lockCrypto,
-  legacyImportNsec,
+  deviceImportAndLoad,
   persistAndUnlockDeviceKeys,
   clearStoredKey as platformClearStoredKey,
-  pubkeyFromNsec,
+  isValidSeedHex,
   hasStoredKey as platformHasStoredKey,
 } from './platform'
 
@@ -121,25 +121,16 @@ export function lock() {
 }
 
 /**
- * Import a key (onboarding / recovery): encrypt and store, then load into CryptoState.
- * Decodes the bech32 nsec to raw hex and uses legacyImportNsec (secp256k1 Schnorr key).
+ * Import an Ed25519 seed (hex): encrypt with PIN, store, and load into CryptoState.
  */
-export async function importKey(nsec: string, pin: string): Promise<string> {
-  const pubkeyHex = await pubkeyFromNsec(nsec)
-  if (!pubkeyHex) throw new Error('Invalid nsec')
+export async function importKey(seedHex: string, pin: string): Promise<string> {
+  if (!isValidSeedHex(seedHex)) throw new Error('Invalid seed hex')
 
-  // Decode bech32 nsec to raw hex for legacyImportNsec
-  const { nip19 } = await import('nostr-tools')
-  const decoded = nip19.decode(nsec)
-  if (decoded.type !== 'nsec') throw new Error('Invalid nsec format')
-  const { bytesToHex } = await import('@noble/hashes/utils.js')
-  const nsecHex = bytesToHex(decoded.data as Uint8Array)
-
-  // Import via legacy secp256k1 path, persist encrypted keys, and unlock
   const deviceId = crypto.randomUUID()
-  const encrypted = await legacyImportNsec(nsecHex, pin, deviceId)
+  const encrypted = await deviceImportAndLoad(seedHex, pin, deviceId)
   await persistAndUnlockDeviceKeys(encrypted, pin)
 
+  const pubkeyHex = encrypted.state.signingPubkeyHex
   publicKey = pubkeyHex
   unlocked = true
   resetIdleTimer()

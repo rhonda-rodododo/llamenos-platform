@@ -2,8 +2,8 @@ import type { Env } from '../types'
 import type { Services } from '../services'
 import { getTelephonyFromService, getHubTelephonyFromService } from '../lib/service-factories'
 import { dispatchVoipPushFromService } from '../lib/voip-push'
-import { publishNostrEvent } from '../lib/nostr-events'
-import { KIND_CALL_RING } from '@shared/nostr-events'
+import { publishEvent } from '../lib/ws-events'
+import { KIND_CALL_RING } from '@shared/event-kinds'
 import { createLogger } from '../lib/logger'
 import { withRetry, isRetryableError } from '../lib/retry'
 import { getCircuitBreaker } from '../lib/circuit-breaker'
@@ -75,10 +75,10 @@ export async function startParallelRinging(
     })
 
     // Publish call ring event to Nostr relay
-    publishNostrEvent(env, KIND_CALL_RING, {
+    publishEvent(env, KIND_CALL_RING, {
       type: 'call:ring',
       callId: callSid,
-    }).catch((e) => { logger.error('Failed to publish event', e) })
+    })
 
     // Dispatch VoIP push notifications to mobile volunteers with registered VoIP tokens.
     // Skip VoIP push for global-scope (hubId='') calls — mobile clients require a real hub ID to route the call.

@@ -1,8 +1,8 @@
 @backend
 Feature: Real-Time Relay Event Delivery
-  The Nostr relay must deliver server-published events to subscribers.
-  Every state mutation that publishes a Nostr event must result in
-  the event arriving at the relay within 5 seconds.
+  The in-process WebSocket relay must deliver server-published events to
+  authenticated subscribers. Every state mutation that publishes an event
+  must result in the event arriving at the relay within 5 seconds.
 
   Background:
     And 1 volunteers are on shift
@@ -66,20 +66,19 @@ Feature: Real-Time Relay Event Delivery
   Scenario: All relay events are encrypted with the server event key
     When an incoming call arrives from a unique number
     Then the relay should receive a kind 1000 event within 5 seconds
-    And the raw event content should NOT be valid JSON
+    And the raw event payload should NOT be valid JSON
     And the decrypted event content should be valid JSON
 
   # --- Event Structure ---
 
   @relay
-  Scenario: All relay events have the llamenos:event tag
+  Scenario: All relay events carry protocol version and hubId
     When an incoming call arrives from a unique number
     Then the relay should receive a kind 1000 event within 5 seconds
-    And the event should have tag "t" with value "llamenos:event"
-    And the event should have tag "d" with value "global"
+    And the event version should be 1
 
   @relay
-  Scenario: All relay events are signed by the server pubkey
+  Scenario: All relay events are signed by the server
     When an incoming call arrives from a unique number
     Then the relay should receive a kind 1000 event within 5 seconds
     And the event signature should be valid

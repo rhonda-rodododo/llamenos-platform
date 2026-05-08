@@ -10,10 +10,10 @@ import { paginationSchema, okResponseSchema } from '@protocol/schemas/common'
 import { authErrors, notFoundError } from '../openapi/helpers'
 import { audit } from '../services/audit'
 import { canClaimChannel, getClaimableChannels } from '@shared/permissions'
-import { KIND_MESSAGE_NEW, KIND_CONVERSATION_ASSIGNED } from '@shared/nostr-events'
+import { KIND_MESSAGE_NEW, KIND_CONVERSATION_ASSIGNED } from '@shared/event-kinds'
 import { createPushDispatcherFromService } from '../lib/push-dispatch'
 import type { WakePayload, FullPushPayload } from '../types'
-import { publishNostrEvent } from '../lib/nostr-events'
+import { publishEvent } from '../lib/ws-events'
 import { withRetry, isRetryableError } from '../lib/retry'
 import { getCircuitBreaker } from '../lib/circuit-breaker'
 import { incCounter } from './metrics'
@@ -416,16 +416,16 @@ conversations.post('/:id/messages',
     })
 
     // Publish new message event to Nostr relay
-    publishNostrEvent(c.env, KIND_MESSAGE_NEW, {
+    publishEvent(c.env, KIND_MESSAGE_NEW, {
       type: 'message:new',
       conversationId: id,
       channelType: 'outbound',
-    }).catch((e) => { logger.error('Failed to publish event', e) })
+    })
 
     audit(c.get('services').audit, 'messageSent', pubkey, {
       conversationId: id,
       channel: conv.channelType,
-    }).catch((e) => { logger.error('Audit failed', e) })
+    })
 
     return c.json(msg, 201)
   },
@@ -470,15 +470,15 @@ conversations.patch('/:id',
 
     // Publish status change to Nostr relay
     const convEventType = body.status === 'closed' ? 'conversation:closed' : 'conversation:assigned'
-    publishNostrEvent(c.env, KIND_CONVERSATION_ASSIGNED, {
+    publishEvent(c.env, KIND_CONVERSATION_ASSIGNED, {
       type: convEventType,
       conversationId: id,
       assignedTo: body.assignedTo,
-    }).catch((e) => { logger.error('Failed to publish event', e) })
+    })
 
     audit(c.get('services').audit, body.status === 'closed' ? 'conversationClosed' : 'conversationUpdated', pubkey, {
       conversationId: id,
-    }).catch((e) => { logger.error('Audit failed', e) })
+    })
 
     return c.json(updated)
   },
@@ -547,11 +547,11 @@ conversations.post('/:id/claim',
     const claimed = await services.conversations.claim(id, pubkey)
 
     // Publish assignment to Nostr relay
-    publishNostrEvent(c.env, KIND_CONVERSATION_ASSIGNED, {
+    publishEvent(c.env, KIND_CONVERSATION_ASSIGNED, {
       type: 'conversation:assigned',
       conversationId: id,
       assignedTo: pubkey,
-    }).catch((e) => { logger.error('Failed to publish event', e) })
+    })
 
     // Push notification to assigned user (Epic 86)
     dispatchPushToUser(c.env, services, pubkey, {
@@ -569,7 +569,7 @@ conversations.post('/:id/claim',
     audit(c.get('services').audit, 'conversationClaimed', pubkey, {
       conversationId: id,
       channelType: conv.channelType,
-    }).catch((e) => { logger.error('Audit failed', e) })
+    })
 
     return c.json(claimed)
   },

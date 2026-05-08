@@ -7,7 +7,7 @@ vi.stubGlobal('__BUILD_TIME__', '2024-01-01T00:00:00Z')
 import { Hono } from 'hono'
 import type { AppEnv } from '@worker/types'
 import configRoute from '@worker/routes/config'
-import * as nostrPublisher from '@worker/lib/nostr-publisher'
+import * as serverIdentity from '@worker/lib/server-identity'
 
 function createTestApp(opts: {
   env?: Record<string, string | undefined>
@@ -21,9 +21,8 @@ function createTestApp(opts: {
       HOTLINE_NAME: 'Test Hotline',
       TWILIO_PHONE_NUMBER: '+15551234567',
       DEMO_MODE: 'false',
-      NOSTR_RELAY_URL: 'ws://localhost:7777',
-      NOSTR_RELAY_PUBLIC_URL: 'wss://relay.example.com',
       GLITCHTIP_DSN: 'https://example.com/dsn',
+      SERVER_SECRET: 'a'.repeat(64),
       SERVER_NOSTR_SECRET: 'a'.repeat(64),
       ...opts.env,
     }
@@ -84,7 +83,7 @@ describe('config route', () => {
       expect(body.hubs).toHaveLength(1)
       expect(body.hubs[0].id).toBe('hub-1')
       expect(body.defaultHubId).toBe('hub-1')
-      expect(body.nostrRelayUrl).toBe('wss://relay.example.com')
+      expect(body.nostrRelayUrl).toBe('/ws')
       expect(body.apiVersion).toBeDefined()
       expect(body.minApiVersion).toBeDefined()
       expect(body.sentryDsn).toBe('https://example.com/dsn')
@@ -200,29 +199,28 @@ describe('config route', () => {
       expect(body.hubs[0].status).toBe('active')
     })
 
-    it('falls back to /nostr for relay url when NOSTR_RELAY_PUBLIC_URL not set but NOSTR_RELAY_URL is set', async () => {
+    it('returns /ws for relay url when server secret is configured', async () => {
       const services = createMockServices()
-      const app = createTestApp({
-        services,
-        env: { NOSTR_RELAY_PUBLIC_URL: undefined, NOSTR_RELAY_URL: 'ws://localhost:7777' },
-      })
+      const app = createTestApp({ services })
 
       const res = await app.request('/')
       expect(res.status).toBe(200)
       const body = await res.json()
-      expect(body.nostrRelayUrl).toBe('/nostr')
+      expect(body.wsRelayUrl).toBe('/ws')
+      expect(body.nostrRelayUrl).toBe('/ws') // legacy alias
     })
 
-    it('returns undefined relay url when no relay configured', async () => {
+    it('returns undefined relay url when no server secret configured', async () => {
       const services = createMockServices()
       const app = createTestApp({
         services,
-        env: { NOSTR_RELAY_PUBLIC_URL: undefined, NOSTR_RELAY_URL: undefined },
+        env: { SERVER_SECRET: undefined, SERVER_NOSTR_SECRET: undefined },
       })
 
       const res = await app.request('/')
       expect(res.status).toBe(200)
       const body = await res.json()
+      expect(body.wsRelayUrl).toBeUndefined()
       expect(body.nostrRelayUrl).toBeUndefined()
     })
 
@@ -243,7 +241,7 @@ describe('config route', () => {
       const services = createMockServices()
       const app = createTestApp({
         services,
-        env: { SERVER_NOSTR_SECRET: undefined },
+        env: { SERVER_SECRET: undefined, SERVER_NOSTR_SECRET: undefined },
       })
 
       const res = await app.request('/')
@@ -256,7 +254,7 @@ describe('config route', () => {
       const services = createMockServices()
       const app = createTestApp({
         services,
-        env: { SERVER_NOSTR_SECRET: 'not-valid-hex' },
+        env: { SERVER_SECRET: 'not-valid-hex', SERVER_NOSTR_SECRET: 'not-valid-hex' },
       })
 
       const res = await app.request('/')
@@ -265,20 +263,22 @@ describe('config route', () => {
       expect(body.serverNostrPubkey).toBeUndefined()
     })
 
-    it('derives serverNostrPubkey from valid SERVER_NOSTR_SECRET', async () => {
-      const deriveSpy = vi.spyOn(nostrPublisher, 'deriveServerKeypair').mockReturnValue({
+    it('derives serverPubkey from valid SERVER_SECRET', async () => {
+      const deriveSpy = vi.spyOn(serverIdentity, 'deriveServerKeypair').mockReturnValue({
         secretKey: new Uint8Array(32),
-        pubkey: 'testpubkeyhex123',
+        pubkeyHex: 'testpubkeyhex123',
       })
       const services = createMockServices()
       const app = createTestApp({
         services,
-        env: { SERVER_NOSTR_SECRET: 'a'.repeat(64) },
+        env: { SERVER_SECRET: 'a'.repeat(64), SERVER_NOSTR_SECRET: 'a'.repeat(64) },
       })
 
       const res = await app.request('/')
       expect(res.status).toBe(200)
       const body = await res.json()
+      expect(body.serverPubkey).toBe('testpubkeyhex123')
+      // Legacy alias should also be present
       expect(body.serverNostrPubkey).toBe('testpubkeyhex123')
       deriveSpy.mockRestore()
     })

@@ -24,7 +24,7 @@ concurrency:
 
 env:
   BUN_VERSION: "1.3.5"
-  TEST_ADMIN_PUBKEY: "ac4718373d30301e5c7cf55e9e6f2568efb94f3278fb88f37f4981e880505228"
+  TEST_ADMIN_PUBKEY: "79215a4c04f08fcd817c6f820c87169beb8cddf96dfa590a1315556b78af9183"
 
 jobs:
   # ─── Detect Changed Files ─────────────────────────────────────
@@ -139,53 +139,14 @@ jobs:
       - name: Format check
         run: cargo fmt --manifest-path packages/crypto/Cargo.toml --check
 
-  # ─── WASM Build Validation ─────────────────────────────────
+  # ─── WASM Build Validation (disabled — WASM target removed, using native Rust FFI) ──
   wasm-build:
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true'
+    if: false
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@efa25f7f19611383d5b0ccf2d1c8914531636bf9 # stable
-        with:
-          toolchain: stable
-          targets: wasm32-unknown-unknown
-
-      - name: Rust cache
-        uses: swatinem/rust-cache@82a92a6e8fbeee089604da2575dc567ae9ddeaab # v2.7.5
-        with:
-          workspaces: packages/crypto
-
-      - name: Install wasm-pack
-        run: cargo install wasm-pack --locked
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2.0.2
-        with:
-          bun-version: ${{ env.BUN_VERSION }}
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Generate interop test vectors
-        run: cargo test --manifest-path packages/crypto/Cargo.toml --test interop
-
-      - name: Build WASM
-        run: bun run crypto:wasm
-
-      - name: Upload WASM artifacts
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: wasm-artifacts
-          path: |
-            packages/crypto/dist/wasm/
-            packages/crypto/tests/fixtures/test-vectors.json
-          retention-days: 1
+      - name: Disabled
+        run: exit 0
 
   # ─── Dependency Vulnerability Scan ───────────────────────────
   audit:
@@ -213,7 +174,7 @@ jobs:
 
   # ─── E2E + Backend BDD Tests (Docker Compose) ──────────────
   e2e:
-    needs: [changes, build, wasm-build]
+    needs: [changes, build]
     if: needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -229,11 +190,6 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
-
-      - name: Download WASM artifacts
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: wasm-artifacts
 
       - name: Get Playwright version
         id: playwright-version
@@ -268,6 +224,7 @@ jobs:
             "HOTLINE_NAME=Llámenos" \
             "BRIDGE_SECRET=ci-test-bridge-secret" \
             "ARI_PASSWORD=ci-test-ari-password" \
+            "SERVER_SECRET=0000000000000000000000000000000000000000000000000000000000000001" \
             "SERVER_NOSTR_SECRET=0000000000000000000000000000000000000000000000000000000000000001" \
             "STRFRY_ALLOWED_PUBKEY=c0fe6f73ada93d83b89d4fe8a2c20818154a57390fc90088e20653064036f0c5" \
             "NOTIFIER_API_KEY=ci-test-notifier-key" \
@@ -342,7 +299,7 @@ jobs:
         run: bunx playwright test --project=bootstrap --project=chromium --project=bdd
         env:
           TEST_HUB_URL: http://localhost:3000
-          TEST_RELAY_URL: ws://127.0.0.1:7777
+          TEST_RELAY_URL: ws://127.0.0.1:3000/ws
           SIGNAL_NOTIFIER_URL: http://localhost:3100
           SIGNAL_NOTIFIER_BEARER_TOKEN: ci-test-notifier-key
           PBX_TYPE: ari
@@ -439,6 +396,7 @@ jobs:
             "HOTLINE_NAME=Llámenos" \
             "BRIDGE_SECRET=ci-test-bridge-secret" \
             "ARI_PASSWORD=ci-test-ari-password" \
+            "SERVER_SECRET=0000000000000000000000000000000000000000000000000000000000000001" \
             "SERVER_NOSTR_SECRET=0000000000000000000000000000000000000000000000000000000000000001" \
             "STRFRY_ALLOWED_PUBKEY=c0fe6f73ada93d83b89d4fe8a2c20818154a57390fc90088e20653064036f0c5" \
             "NOTIFIER_API_KEY=ci-test-notifier-key" \
@@ -500,14 +458,14 @@ jobs:
         timeout-minutes: 15
         env:
           TEST_HUB_URL: http://localhost:3000
-          TEST_RELAY_URL: ws://127.0.0.1:7777
+          TEST_RELAY_URL: ws://127.0.0.1:3000/ws
           SIGNAL_NOTIFIER_URL: http://localhost:3100
           SIGNAL_NOTIFIER_BEARER_TOKEN: ci-test-notifier-key
           DEV_RESET_SECRET: test-reset-secret
           PBX_TYPE: ari
           DATABASE_URL: postgresql://llamenos:ci-test-password@localhost:5432/llamenos
-          # Must match SERVER_NOSTR_SECRET in .env (fixed value = relay.steps DEV fallback)
-          # so backend-bdd tests can decrypt Nostr relay events produced by the docker app
+          # Must match SERVER_SECRET/SERVER_NOSTR_SECRET in .env
+          SERVER_SECRET: "0000000000000000000000000000000000000000000000000000000000000001"
           SERVER_NOSTR_SECRET: "0000000000000000000000000000000000000000000000000000000000000001"
           # sip-bridge exposed on host port 3001 via docker-compose.test.yml
           SIP_BRIDGE_URL: http://localhost:3001
@@ -710,6 +668,7 @@ jobs:
             "HOTLINE_NAME=Llámenos" \
             "BRIDGE_SECRET=ci-test-bridge-secret" \
             "ARI_PASSWORD=ci-test-ari-password" \
+            "SERVER_SECRET=0000000000000000000000000000000000000000000000000000000000000001" \
             "SERVER_NOSTR_SECRET=0000000000000000000000000000000000000000000000000000000000000001" \
             "STRFRY_ALLOWED_PUBKEY=c0fe6f73ada93d83b89d4fe8a2c20818154a57390fc90088e20653064036f0c5" \
             "NOTIFIER_API_KEY=ci-test-notifier-key" \
@@ -1085,7 +1044,7 @@ jobs:
 
   # ─── CI Status Gate ─────────────────────────────────────────
   ci-status:
-    needs: [build, audit, crypto-tests, wasm-build, e2e, backend-bdd, backend-unit, android-build-test, android-e2e, ios-build-test, crypto-guardrails, migration-drift]
+    needs: [build, audit, crypto-tests, e2e, backend-bdd, backend-unit, android-build-test, android-e2e, ios-build-test, crypto-guardrails, migration-drift]
     if: always()
     runs-on: ubuntu-latest
 
@@ -1101,7 +1060,6 @@ jobs:
           check_job "build" "${{ needs.build.result }}"
           check_job "audit" "${{ needs.audit.result }}"
           check_job "crypto-tests" "${{ needs.crypto-tests.result }}"
-          check_job "wasm-build" "${{ needs.wasm-build.result }}"
           check_job "e2e" "${{ needs.e2e.result }}"
           check_job "backend-bdd" "${{ needs.backend-bdd.result }}"
           check_job "backend-unit" "${{ needs.backend-unit.result }}"

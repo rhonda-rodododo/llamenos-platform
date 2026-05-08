@@ -33,7 +33,7 @@ const ECIES_VERSION_V2: u8 = 0x02;
 /// A symmetric key wrapped via ECIES for a single recipient.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-#[cfg_attr(feature = "mobile", derive(uniffi::Record))]
+// Note: uniffi::Record removed — v3 encryption.rs KeyEnvelope/RecipientKeyEnvelope are the mobile types
 pub struct KeyEnvelope {
     /// hex: nonce(24) + ciphertext(48 = 32 key + 16 tag)
     pub wrapped_key: String,
@@ -44,7 +44,7 @@ pub struct KeyEnvelope {
 /// A KeyEnvelope tagged with the recipient's pubkey (for multi-recipient scenarios).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-#[cfg_attr(feature = "mobile", derive(uniffi::Record))]
+// Note: uniffi::Record removed — v3 encryption.rs KeyEnvelope/RecipientKeyEnvelope are the mobile types
 pub struct RecipientKeyEnvelope {
     /// recipient's x-only pubkey (hex, 32 bytes / 64 hex chars)
     pub pubkey: String,

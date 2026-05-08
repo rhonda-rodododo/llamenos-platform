@@ -328,14 +328,9 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     }
 }
 
-/// Decrypt a wake payload routing on the wire format: JSON envelope → HPKE,
-/// otherwise hex → legacy ECIES.
 private func decryptWakePayloadAuto(_ service: WakeKeyService, payload: String) throws -> String {
     let trimmed = payload.trimmingCharacters(in: .whitespaces)
-    if trimmed.hasPrefix("{") {
-        return try service.decryptWakePayload(envelopeJSON: trimmed)
-    }
-    return try service.decryptWakePayloadLegacy(encryptedHex: trimmed)
+    return try service.decryptWakePayload(envelopeJSON: trimmed)
 }
 
 // MARK: - UNUserNotificationCenterDelegate (Notification Tap Routing)

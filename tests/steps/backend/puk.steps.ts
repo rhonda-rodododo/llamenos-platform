@@ -10,7 +10,7 @@ import {
   apiPost,
   createUserViaApi,
 } from '../../api-helpers'
-import { bytesToHex } from '@noble/hashes/utils.js'
+import { bytesToHex } from '@shared/encoding'
 
 // ── State ──────────────��────────────────────────────────────────────
 

@@ -14,7 +14,7 @@
 import { expect } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
 
-type KP = { nsec: string; npub: string; publicKey: string }
+type KP = { nsec: string; npub: string; publicKey: string; seedHex?: string }
 type EncryptedKeyData = {
   ciphertext: string
   salt: string
@@ -159,12 +159,13 @@ When('I import that nsec into a fresh CryptoService', async ({ page }) => {
   const kp = await page.evaluate(
     () => (window as Record<string, unknown>).__test_keypair,
   ) as KP
-  const derivedPubkey = await page.evaluate(async (nsec) => {
+  const derivedPubkey = await page.evaluate(async (seedHex) => {
     const p = (window as Record<string, unknown>).__TEST_PLATFORM as {
-      pubkeyFromNsec(nsec: string): Promise<string | null>
+      deviceImportAndLoad(signingSecretHex: string, pin: string, deviceId: string): Promise<{ state: { signingPubkeyHex: string } }>
     }
-    return p.pubkeyFromNsec(nsec)
-  }, kp.nsec)
+    const result = await p.deviceImportAndLoad(seedHex, '12345678', crypto.randomUUID())
+    return result.state.signingPubkeyHex
+  }, kp.seedHex || kp.nsec)
   await page.evaluate((pubkey) => {
     (window as Record<string, unknown>).__test_derived_pubkey = pubkey
   }, derivedPubkey)

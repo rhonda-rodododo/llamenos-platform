@@ -13,7 +13,7 @@ import { publicErrors, authErrors } from '../openapi/helpers'
 import { audit } from '../services/audit'
 import { getPrimaryRole } from '@shared/permissions'
 import { deriveServerEventKey, getCurrentEpoch, EVENT_KEY_EPOCH_DURATION } from '../lib/hub-event-crypto'
-import { bytesToHex } from '@noble/hashes/utils.js'
+import { bytesToHex } from '@shared/encoding'
 
 const auth = new Hono<AppEnv>()
 
@@ -156,9 +156,10 @@ auth.get('/me',
     let eventKeyEpoch: number | undefined
     let eventKeyEpochDuration: number | undefined
 
-    if (c.env.SERVER_NOSTR_SECRET) {
-      serverEventKeyHex = bytesToHex(deriveServerEventKey(c.env.SERVER_NOSTR_SECRET, undefined, currentEpoch))
-      serverEventKeyPrevHex = bytesToHex(deriveServerEventKey(c.env.SERVER_NOSTR_SECRET, undefined, currentEpoch - 1))
+    const serverSecret = c.env.SERVER_SECRET ?? c.env.SERVER_NOSTR_SECRET
+    if (serverSecret) {
+      serverEventKeyHex = bytesToHex(deriveServerEventKey(serverSecret, undefined, currentEpoch))
+      serverEventKeyPrevHex = bytesToHex(deriveServerEventKey(serverSecret, undefined, currentEpoch - 1))
       eventKeyEpoch = currentEpoch
       eventKeyEpochDuration = EVENT_KEY_EPOCH_DURATION
     }

@@ -1533,6 +1533,7 @@ export class SettingsService {
 
     await this.db.transaction(async (tx) => {
       // 1. Delete users who belong exclusively to this hub (cascade deletes sessions, webauthn, etc.)
+      // Exclude super-admins — they are system-level accounts that must survive hub deletion.
       await tx.execute(sql`
         DELETE FROM users
         WHERE (
@@ -1543,6 +1544,7 @@ export class SettingsService {
           SELECT COUNT(*) FROM jsonb_array_elements(hub_roles) AS hr
           WHERE hr->>'hubId' != ${id}
         ) = 0
+        AND NOT ('role-super-admin' = ANY(roles))
       `)
 
       // 2. Remove this hub from remaining users' hubRoles
@@ -1838,8 +1840,8 @@ export class SettingsService {
   async getHubKeyEnvelopes(hubId: string): Promise<{
     envelopes: Array<{
       pubkey: string
-      wrappedKey: string
-      ephemeralPubkey: string
+      enc: string
+      ct: string
     }>
   }> {
     const rows = await this.db
@@ -1850,8 +1852,8 @@ export class SettingsService {
     return {
       envelopes: rows.map((r) => ({
         pubkey: r.recipientPubkey,
-        wrappedKey: r.wrappedKey,
-        ephemeralPubkey: r.ephemeralPubkey,
+        enc: r.enc,
+        ct: r.ct,
       })),
     }
   }
@@ -1861,8 +1863,8 @@ export class SettingsService {
     data: {
       envelopes: Array<{
         pubkey: string
-        wrappedKey: string
-        ephemeralPubkey: string
+        enc: string
+        ct: string
       }>
     },
   ): Promise<{ ok: true }> {
@@ -1882,8 +1884,8 @@ export class SettingsService {
         await tx.insert(hubKeys).values({
           hubId,
           recipientPubkey: envelope.pubkey,
-          wrappedKey: envelope.wrappedKey,
-          ephemeralPubkey: envelope.ephemeralPubkey,
+          enc: envelope.enc,
+          ct: envelope.ct,
         })
       }
     })

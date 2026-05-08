@@ -463,8 +463,8 @@ describe('hubs routes', () => {
     it('returns envelope for current user', async () => {
       const getHubKeyEnvelopesSpy = vi.fn().mockResolvedValue({
         envelopes: [
-          { pubkey: 'a'.repeat(64), wrappedKey: 'wrapped', ephemeralPubkey: 'd'.repeat(64) },
-          { pubkey: 'c'.repeat(64), wrappedKey: 'wrapped2', ephemeralPubkey: 'e'.repeat(64) },
+          { pubkey: 'a'.repeat(64), enc: 'd'.repeat(64), ct: 'wrapped' },
+          { pubkey: 'c'.repeat(64), enc: 'e'.repeat(64), ct: 'wrapped2' },
         ],
       })
       const { app } = createTestApp({
@@ -481,7 +481,7 @@ describe('hubs routes', () => {
 
     it('returns 404 when no envelope for user', async () => {
       const getHubKeyEnvelopesSpy = vi.fn().mockResolvedValue({
-        envelopes: [{ pubkey: 'c'.repeat(64), wrappedKey: 'wrapped', ephemeralPubkey: 'd'.repeat(64) }],
+        envelopes: [{ pubkey: 'c'.repeat(64), enc: 'd'.repeat(64), ct: 'wrapped' }],
       })
       const { app } = createTestApp({
         permissions: ['hubs:read'],
@@ -535,14 +535,14 @@ describe('hubs routes', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           envelopes: [
-            { pubkey: 'f'.repeat(64), wrappedKey: 'wrap1', ephemeralPubkey: '1'.repeat(64) },
+            { pubkey: 'f'.repeat(64), enc: '1'.repeat(64), ct: 'wrap1' },
           ],
         }),
       })
 
       expect(res.status).toBe(200)
       expect(setHubKeyEnvelopesSpy).toHaveBeenCalledWith('hub-1', {
-        envelopes: [{ pubkey: 'f'.repeat(64), wrappedKey: 'wrap1', ephemeralPubkey: '1'.repeat(64) }],
+        envelopes: [{ pubkey: 'f'.repeat(64), enc: '1'.repeat(64), ct: 'wrap1' }],
       })
     })
 

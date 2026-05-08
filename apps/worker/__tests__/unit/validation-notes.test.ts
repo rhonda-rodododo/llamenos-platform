@@ -81,7 +81,7 @@ describe('notes route validation', () => {
       expect(res.status).not.toBe(400)
     })
 
-    it('rejects invalid envelope structure (missing wrappedKey)', async () => {
+    it('rejects invalid envelope structure (missing ct)', async () => {
       const app = createApp()
       const res = await sendJSON(app, '/notes', {
         ...VALID_NOTE,
@@ -90,14 +90,14 @@ describe('notes route validation', () => {
       expect(res.status).toBe(400)
     })
 
-    it('rejects invalid envelope structure (empty wrappedKey)', async () => {
+    it('rejects invalid envelope structure (empty ct)', async () => {
       const app = createApp()
       const res = await sendJSON(app, '/notes', {
         ...VALID_NOTE,
         adminEnvelopes: [{
           pubkey: VALID_ENVELOPE.pubkey,
-          wrappedKey: '',
-          ephemeralPubkey: VALID_ENVELOPE.ephemeralPubkey,
+          enc: VALID_ENVELOPE.enc,
+          ct: '',
         }],
       })
       expect(res.status).toBe(400)

@@ -16,10 +16,10 @@ interface ConfigContextValue {
   currentHubId: string | undefined
   setCurrentHubId: (id: string) => void
   isMultiHub: boolean
-  /** Server's Nostr pubkey for verifying authoritative events */
-  serverNostrPubkey: string | undefined
-  /** Client-facing Nostr relay URL */
-  nostrRelayUrl: string | undefined
+  /** Server's Ed25519 pubkey for verifying event signatures */
+  serverPubkey: string | undefined
+  /** WebSocket relay URL */
+  wsRelayUrl: string | undefined
 }
 
 const defaultChannels: EnabledChannels = {
@@ -46,8 +46,8 @@ const ConfigContext = createContext<ConfigContextValue>({
   currentHubId: undefined,
   setCurrentHubId: () => {},
   isMultiHub: false,
-  serverNostrPubkey: undefined,
-  nostrRelayUrl: undefined,
+  serverPubkey: undefined,
+  wsRelayUrl: undefined,
 })
 
 export function ConfigProvider({ children }: { children: ReactNode }) {
@@ -62,8 +62,8 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const [hubs, setHubs] = useState<Hub[]>([])
   const [defaultHubId, setDefaultHubId] = useState<string | undefined>()
   const [currentHubId, setCurrentHubIdState] = useState<string | undefined>()
-  const [serverNostrPubkey, setServerNostrPubkey] = useState<string | undefined>()
-  const [nostrRelayUrl, setNostrRelayUrl] = useState<string | undefined>()
+  const [serverPubkey, setServerPubkey] = useState<string | undefined>()
+  const [wsRelayUrl, setWsRelayUrl] = useState<string | undefined>()
 
   function setCurrentHubId(id: string) {
     setCurrentHubIdState(id)
@@ -95,8 +95,11 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
           setCurrentHubIdState(hubId)
           setActiveHub(hubId)
         }
-        if (config.serverNostrPubkey) setServerNostrPubkey(config.serverNostrPubkey)
-        if (config.nostrRelayUrl) setNostrRelayUrl(config.nostrRelayUrl)
+        // Support both new and legacy config field names
+        const pubkey = config.serverPubkey ?? config.serverNostrPubkey
+        const relayUrl = config.wsRelayUrl ?? config.nostrRelayUrl
+        if (pubkey) setServerPubkey(pubkey)
+        if (relayUrl) setWsRelayUrl(relayUrl)
         // Wire Sentry/GlitchTip DSN for crash reporting (if configured server-side)
         if (config.sentryDsn) {
           import('@/lib/crash-reporting').then(({ setSentryDsn }) => {
@@ -119,7 +122,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     <ConfigContext.Provider value={{
       hotlineName, hotlineNumber, channels, setupCompleted,
       demoMode, demoResetSchedule, needsBootstrap, isLoading, hubs, defaultHubId, currentHubId,
-      setCurrentHubId, isMultiHub, serverNostrPubkey, nostrRelayUrl,
+      setCurrentHubId, isMultiHub, serverPubkey, wsRelayUrl,
     }}>
       {children}
     </ConfigContext.Provider>

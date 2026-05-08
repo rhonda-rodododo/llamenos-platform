@@ -278,8 +278,8 @@ class ConversationsViewModel @Inject constructor(
                 val envelopes = encrypted.envelopes.map { env ->
                     CreateMessageEnvelope(
                         pubkey = env.pubkey,
-                        wrappedKey = env.wrappedKey,
-                        ephemeralPubkey = env.ephemeralPubkey,
+                        enc = env.enc,
+                        ct = env.ct,
                     )
                 }
 
@@ -480,8 +480,8 @@ class ConversationsViewModel @Inject constructor(
         val hpkeEnvelope = org.llamenos.hotline.crypto.HpkeEnvelope(
             v = 3,
             labelId = 0,
-            enc = envelope.ephemeralPubkey,
-            ct = envelope.wrappedKey,
+            enc = envelope.enc,
+            ct = envelope.ct,
         )
 
         return try {

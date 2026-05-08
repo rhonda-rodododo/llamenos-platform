@@ -15,7 +15,8 @@
     "paths": {
       "@worker/*": ["./*"],
       "@shared/*": ["../../packages/shared/*"],
-      "@protocol/*": ["../../packages/protocol/*"]
+      "@protocol/*": ["../../packages/protocol/*"],
+      "@llamenos/crypto/ffi": ["../../packages/crypto/ffi.ts"]
     }
   },
   "include": ["./**/*.ts"],
