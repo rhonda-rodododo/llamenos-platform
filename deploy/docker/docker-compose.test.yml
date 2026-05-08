@@ -31,6 +31,7 @@ services:
       - ENVIRONMENT=development
       - DEMO_MODE=true
       - DEV_RESET_SECRET=test-reset-secret
+      - TOKEN_MAX_AGE_MS=${TOKEN_MAX_AGE_MS:-3600000}
       # Wire up sidecar services so integration tests can reach them
       - NOTIFIER_URL=http://signal-notifier:3100
       - NOTIFIER_API_KEY=${NOTIFIER_API_KEY:-ci-test-notifier-key}
