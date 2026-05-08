@@ -8,7 +8,7 @@ import { createLogger } from './logger'
 
 const logger = createLogger('auth')
 
-const TOKEN_MAX_AGE_MS = 5 * 60 * 1000 // 5 minutes
+const TOKEN_MAX_AGE_MS = Number(process.env.TOKEN_MAX_AGE_MS) || 5 * 60 * 1000 // 5 minutes
 
 export function parseAuthHeader(header: string | null): AuthPayload | null {
   if (!header?.startsWith('Bearer ')) return null

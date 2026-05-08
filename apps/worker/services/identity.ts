@@ -384,42 +384,58 @@ export class IdentityService {
    * Set hub-specific role assignments for a volunteer.
    */
   async setHubRole(data: { pubkey: string; hubId: string; roleIds: string[] }): Promise<{ volunteer: User }> {
-    const vol = await this.getUserInternal(data.pubkey)
-    if (!vol) throw new ServiceError(404, 'User not found')
+    return this.db.transaction(async (tx) => {
+      const rows = await tx
+        .select()
+        .from(users)
+        .where(eq(users.pubkey, data.pubkey))
+        .for('update')
+        .limit(1)
+      if (rows.length === 0) throw new ServiceError(404, 'User not found')
 
-    const hubRoles = vol.hubRoles ?? []
-    const idx = hubRoles.findIndex(hr => hr.hubId === data.hubId)
-    if (idx >= 0) {
-      hubRoles[idx].roleIds = data.roleIds
-    } else {
-      hubRoles.push({ hubId: data.hubId, roleIds: data.roleIds })
-    }
+      const vol = rowToUser(rows[0])
+      const hubRoles = vol.hubRoles ?? []
+      const idx = hubRoles.findIndex(hr => hr.hubId === data.hubId)
+      if (idx >= 0) {
+        hubRoles[idx].roleIds = data.roleIds
+      } else {
+        hubRoles.push({ hubId: data.hubId, roleIds: data.roleIds })
+      }
 
-    const [row] = await this.db
-      .update(users)
-      .set({ hubRoles, updatedAt: new Date() })
-      .where(eq(users.pubkey, data.pubkey))
-      .returning()
+      const [row] = await tx
+        .update(users)
+        .set({ hubRoles, updatedAt: new Date() })
+        .where(eq(users.pubkey, data.pubkey))
+        .returning()
 
-    return { volunteer: rowToUser(row) }
+      return { volunteer: rowToUser(row) }
+    })
   }
 
   /**
    * Remove all hub-specific roles for a volunteer in a given hub.
    */
   async removeHubRole(data: { pubkey: string; hubId: string }): Promise<{ volunteer: User }> {
-    const vol = await this.getUserInternal(data.pubkey)
-    if (!vol) throw new ServiceError(404, 'User not found')
+    return this.db.transaction(async (tx) => {
+      const rows = await tx
+        .select()
+        .from(users)
+        .where(eq(users.pubkey, data.pubkey))
+        .for('update')
+        .limit(1)
+      if (rows.length === 0) throw new ServiceError(404, 'User not found')
 
-    const hubRoles = (vol.hubRoles ?? []).filter(hr => hr.hubId !== data.hubId)
+      const vol = rowToUser(rows[0])
+      const hubRoles = (vol.hubRoles ?? []).filter(hr => hr.hubId !== data.hubId)
 
-    const [row] = await this.db
-      .update(users)
-      .set({ hubRoles, updatedAt: new Date() })
-      .where(eq(users.pubkey, data.pubkey))
-      .returning()
+      const [row] = await tx
+        .update(users)
+        .set({ hubRoles, updatedAt: new Date() })
+        .where(eq(users.pubkey, data.pubkey))
+        .returning()
 
-    return { volunteer: rowToUser(row) }
+      return { volunteer: rowToUser(row) }
+    })
   }
 
   // =========================================================================

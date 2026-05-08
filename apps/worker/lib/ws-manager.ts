@@ -62,7 +62,10 @@ interface RateLimitBucket {
 export interface ConnectionState {
   pubkey: string
   ws: WebSocket
+  /** Hub IDs the user is a member of (from auth lookup) */
   hubs: Set<string>
+  /** Hub IDs this specific connection has subscribed to */
+  subscribedHubs: Set<string>
   lastReplayAt: number
 }
 
@@ -105,23 +108,26 @@ export class ConnectionManager {
         this.connections.delete(state.pubkey)
       }
     }
-    // Remove from all hub subscriptions
-    for (const hubId of state.hubs) {
-      this.removeSubscription(state.pubkey, hubId)
+    const remainingConns = this.connections.get(state.pubkey)
+    if (!remainingConns || remainingConns.size === 0) {
+      for (const hubId of state.subscribedHubs) {
+        this.removeSubscription(state.pubkey, hubId)
+      }
     }
   }
 
   /** Subscribe a user to event kinds on a hub. */
-  subscribe(pubkey: string, hubId: string, kinds: number[]): void {
+  subscribe(state: ConnectionState, hubId: string, kinds: number[]): void {
+    state.subscribedHubs.add(hubId)
     let hubSubs = this.hubSubscriptions.get(hubId)
     if (!hubSubs) {
       hubSubs = new Map()
       this.hubSubscriptions.set(hubId, hubSubs)
     }
-    let userKinds = hubSubs.get(pubkey)
+    let userKinds = hubSubs.get(state.pubkey)
     if (!userKinds) {
       userKinds = new Set()
-      hubSubs.set(pubkey, userKinds)
+      hubSubs.set(state.pubkey, userKinds)
     }
     for (const kind of kinds) {
       userKinds.add(kind)

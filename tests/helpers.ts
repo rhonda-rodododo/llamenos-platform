@@ -128,33 +128,78 @@ export async function reenterPinAfterReload(page: Page): Promise<void> {
  * (backward-compatible with the bootstrap flow).
  */
 export async function loginAsAdmin(page: Page) {
-  const secretHex = ADMIN_SEED
+  const storagePath = 'tests/storage/admin.json'
+  let storageState: { origins: Array<{ origin: string; localStorage: Array<{ name: string; value: string }> }> } | null = null
+
+  try {
+    const fs = await import('fs/promises')
+    const content = await fs.readFile(storagePath, 'utf-8')
+    storageState = JSON.parse(content)
+  } catch {
+    storageState = null
+  }
 
   await page.goto('/login')
-  await page.evaluate(() => {
-    sessionStorage.clear()
-    localStorage.removeItem('llamenos:llamenos-encrypted-device-keys')
-    localStorage.removeItem('llamenos:llamenos-encrypted-key')
-    localStorage.removeItem('llamenos-encrypted-key')
-  })
-  await page.reload()
   await page.waitForLoadState('domcontentloaded')
 
-  // Wait for __TEST_PLATFORM to be loaded (set asynchronously in main.tsx)
-  await page.waitForFunction(() => !!(window as any).__TEST_PLATFORM, { timeout: 10000 })
+  let usingLegacy = false
+  if (storageState) {
+    await page.evaluate((state) => {
+      sessionStorage.clear()
+      localStorage.clear()
+      for (const origin of state.origins || []) {
+        for (const item of origin.localStorage || []) {
+          localStorage.setItem(item.name, item.value)
+        }
+      }
+    }, storageState)
 
-  // Import the secp256k1 secret via legacy_import_nsec, persist encrypted keys
-  await page.evaluate(async ({ secretHex, pin }) => {
-    const platform = (window as any).__TEST_PLATFORM
-    const encrypted = await platform.legacyImportNsec(secretHex, pin, crypto.randomUUID())
-    await platform.persistAndUnlockDeviceKeys(encrypted, pin)
-    await platform.lockCrypto()
-  }, { secretHex, pin: TEST_PIN })
+    await page.reload()
+    await page.waitForLoadState('domcontentloaded')
+    await enterPin(page, TEST_PIN)
 
-  // Reload to trigger PIN screen — the encrypted key persists in localStorage
-  await page.reload()
-  await page.waitForLoadState('domcontentloaded')
-  await enterPin(page, TEST_PIN)
+    const url = page.url()
+    if (url.includes('/login')) {
+      console.log('[TEST] Bootstrap admin keys stale (test-reset restored legacy admin). Falling back to ADMIN_SEED.')
+      usingLegacy = true
+      await page.evaluate(() => {
+        sessionStorage.clear()
+        localStorage.removeItem('llamenos:llamenos-encrypted-device-keys')
+        localStorage.removeItem('llamenos:llamenos-encrypted-key')
+        localStorage.removeItem('llamenos-encrypted-key')
+      })
+      await page.reload()
+      await page.waitForLoadState('domcontentloaded')
+    }
+  } else {
+    usingLegacy = true
+  }
+
+  if (usingLegacy) {
+    await page.evaluate(() => {
+      sessionStorage.clear()
+      localStorage.removeItem('llamenos:llamenos-encrypted-device-keys')
+      localStorage.removeItem('llamenos:llamenos-encrypted-key')
+      localStorage.removeItem('llamenos-encrypted-key')
+    })
+    await page.reload()
+    await page.waitForLoadState('domcontentloaded')
+
+    await page.waitForFunction(() => !!(window as any).__TEST_PLATFORM, { timeout: 10000 })
+
+    const secretHex = ADMIN_SEED
+    await page.evaluate(async ({ secretHex, pin }) => {
+      const platform = (window as any).__TEST_PLATFORM
+      const encrypted = await platform.deviceImportAndLoad(secretHex, pin, crypto.randomUUID())
+      await platform.persistAndUnlockDeviceKeys(encrypted, pin)
+      await platform.lockCrypto()
+    }, { secretHex, pin: TEST_PIN })
+
+    await page.reload()
+    await page.waitForLoadState('domcontentloaded')
+    await enterPin(page, TEST_PIN)
+  }
+
   await page.waitForURL(url => !url.toString().includes('/login'), { timeout: Timeouts.AUTH })
   await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.AUTH })
   // Wait for admin section in sidebar or hamburger button (mobile) — confirms getMe() completed.
@@ -189,15 +234,13 @@ export async function loginAsVolunteer(page: Page, seedHex: string) {
   // Wait for __TEST_PLATFORM to be loaded
   await page.waitForFunction(() => !!(window as any).__TEST_PLATFORM, { timeout: 10000 })
 
-  // Import key: legacy secp256k1 (nsec) or Ed25519 seed
-  await page.evaluate(async ({ secretHex, isNsec, pin }) => {
+  // Import Ed25519 seed (volunteers created via API use Ed25519, not legacy secp256k1)
+  await page.evaluate(async ({ secretHex, pin }) => {
     const platform = (window as any).__TEST_PLATFORM
-    const encrypted = isNsec
-      ? await platform.legacyImportNsec(secretHex, pin, crypto.randomUUID())
-      : await platform.deviceImportAndLoad(secretHex, pin, crypto.randomUUID())
+    const encrypted = await platform.deviceImportAndLoad(secretHex, pin, crypto.randomUUID())
     await platform.persistAndUnlockDeviceKeys(encrypted, pin)
     await platform.lockCrypto()
-  }, { secretHex, isNsec, pin: TEST_PIN })
+  }, { secretHex, pin: TEST_PIN })
 
   // Reload to trigger PIN screen
   await page.reload()

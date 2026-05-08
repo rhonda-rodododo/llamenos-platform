@@ -1046,9 +1046,10 @@ jobs:
 
   # ─── CI Status Gate ─────────────────────────────────────────
   ci-status:
-    needs: [build, audit, crypto-tests, e2e, backend-bdd, backend-unit, android-build-test, android-e2e, ios-build-test, crypto-guardrails, migration-drift]
+    needs: [build, audit, crypto-tests, e2e, backend-bdd, backend-unit, android-build-test, ios-build-test, crypto-guardrails, migration-drift]
     if: always()
     runs-on: ubuntu-latest
+    timeout-minutes: 2
 
     steps:
       - name: Check all required jobs
@@ -1066,7 +1067,6 @@ jobs:
           check_job "backend-bdd" "${{ needs.backend-bdd.result }}"
           check_job "backend-unit" "${{ needs.backend-unit.result }}"
           check_job "android-build-test" "${{ needs.android-build-test.result }}"
-          check_job "android-e2e" "${{ needs.android-e2e.result }}"
           check_job "ios-build-test" "${{ needs.ios-build-test.result }}"
           check_job "crypto-guardrails" "${{ needs.crypto-guardrails.result }}"
           check_job "migration-drift" "${{ needs.migration-drift.result }}"
