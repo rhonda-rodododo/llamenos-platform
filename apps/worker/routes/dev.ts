@@ -188,7 +188,6 @@ dev.post('/test-setup-cms', async (c) => {
   }
 
   const body = await c.req.json().catch(() => ({})) as { pubkey?: string; hubId?: string }
-  const requestHubId = body.hubId ?? ''
   let pubkey: string | undefined
   if (body.pubkey) {
     try {
@@ -245,7 +244,6 @@ dev.post('/test-setup-cms', async (c) => {
   try {
     await services.settings.createEntityType({
       id: entityTypeId,
-      hubId: requestHubId,
       name: 'arrest_case',
       label: 'Arrest Case',
       labelPlural: 'Arrest Cases',
@@ -276,7 +274,6 @@ dev.post('/test-setup-cms', async (c) => {
   try {
     await services.settings.createEntityType({
       id: eventEntityTypeId,
-      hubId: requestHubId,
       name: 'protest_event',
       label: 'Protest Event',
       labelPlural: 'Protest Events',
@@ -300,7 +297,7 @@ dev.post('/test-setup-cms', async (c) => {
   } catch { /* ignore event entity type creation failures */ }
 
   // 3. Get entity types to verify creation
-  const { entityTypes } = await services.settings.getEntityTypes(requestHubId)
+  const { entityTypes } = await services.settings.getEntityTypes()
 
   // 4. Create sample records for both case and event entity types
   let recordId: string | null = null
@@ -318,7 +315,7 @@ dev.post('/test-setup-cms', async (c) => {
           : '{"title":"Test Case","summary":"BDD test case"}'),
         summaryEnvelopes: [],
         createdBy: pubkey ?? '',
-        hubId: requestHubId,
+        hubId,
       })
       if (!recordId) recordId = record.id
     } catch { /* ignore record creation failures */ }

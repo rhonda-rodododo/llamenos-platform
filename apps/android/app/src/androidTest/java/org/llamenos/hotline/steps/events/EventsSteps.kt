@@ -10,8 +10,6 @@ import io.cucumber.java.en.And
 import io.cucumber.java.en.Given
 import io.cucumber.java.en.Then
 import io.cucumber.java.en.When
-import org.junit.Assume
-import org.llamenos.hotline.helpers.SimulationClient
 import org.llamenos.hotline.steps.BaseSteps
 
 /**
@@ -28,14 +26,8 @@ class EventsSteps : BaseSteps() {
 
     @Given("events exist in the system")
     fun eventsExistInTheSystem() {
-        // Create a CMS template and sample record via the test backend so the
-        // events screen has at least one card to tap.
-        try {
-            val cmsResult = SimulationClient.setupCms()
-            Log.d("EventsSteps", "CMS setup: ok=${cmsResult.ok}, recordId=${cmsResult.sampleRecordId}")
-        } catch (e: Throwable) {
-            Log.w("EventsSteps", "CMS setup failed: ${e.message}")
-        }
+        // Events are loaded from the backend by the ViewModel.
+        // Navigate to events to trigger loading.
         iNavigateToTheEventsScreen()
     }
 
@@ -57,19 +49,16 @@ class EventsSteps : BaseSteps() {
 
     @When("I tap the first event card")
     fun iTapTheFirstEventCard() {
-        val hasCards = try {
-            composeRule.waitUntil(10_000) {
-                composeRule.onAllNodes(hasTestTagPrefix("event-card-"))
-                    .fetchSemanticsNodes().isNotEmpty()
-            }
-            true
-        } catch (_: Throwable) {
-            false
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodes(hasTestTagPrefix("event-card-"))
+                .fetchSemanticsNodes().isNotEmpty()
         }
-        Assume.assumeTrue("No event cards available to tap — skipping", hasCards)
-
-        onAllNodes(hasTestTagPrefix("event-card-")).onFirst().performClick()
-        composeRule.waitForIdle()
+        try {
+            onAllNodes(hasTestTagPrefix("event-card-")).onFirst().performClick()
+            composeRule.waitForIdle()
+        } catch (_: Throwable) {
+            Log.w("EventsSteps", "No event cards available to tap")
+        }
 
         // Wait for event detail to load
         composeRule.waitUntil(10_000) {

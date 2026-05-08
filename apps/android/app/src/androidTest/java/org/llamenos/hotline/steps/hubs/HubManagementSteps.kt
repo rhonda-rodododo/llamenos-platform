@@ -9,7 +9,6 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import io.cucumber.java.en.Then
 import io.cucumber.java.en.When
-import org.junit.Assume
 import org.llamenos.hotline.steps.BaseSteps
 
 /**
@@ -32,17 +31,13 @@ class HubManagementSteps : BaseSteps() {
         navigateViaDashboardCard("hubs-card")
 
         // Wait for the hubs screen to load
-        val loaded = try {
-            composeRule.waitUntil(10_000) {
-                composeRule.onAllNodesWithTag("hubs-title").fetchSemanticsNodes().isNotEmpty() ||
-                    composeRule.onAllNodesWithTag("hubs-list").fetchSemanticsNodes().isNotEmpty() ||
-                    composeRule.onAllNodesWithTag("hubs-loading").fetchSemanticsNodes().isNotEmpty() ||
-                    composeRule.onAllNodesWithTag("hubs-empty").fetchSemanticsNodes().isNotEmpty() ||
-                    composeRule.onAllNodesWithTag("hubs-error").fetchSemanticsNodes().isNotEmpty()
-            }
-            true
-        } catch (_: Throwable) { false }
-        Assume.assumeTrue("Hub management screen did not load", loaded)
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithTag("hubs-title").fetchSemanticsNodes().isNotEmpty() ||
+                composeRule.onAllNodesWithTag("hubs-list").fetchSemanticsNodes().isNotEmpty() ||
+                composeRule.onAllNodesWithTag("hubs-loading").fetchSemanticsNodes().isNotEmpty() ||
+                composeRule.onAllNodesWithTag("hubs-empty").fetchSemanticsNodes().isNotEmpty() ||
+                composeRule.onAllNodesWithTag("hubs-error").fetchSemanticsNodes().isNotEmpty()
+        }
     }
 
     // ---- Then ----

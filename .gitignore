@@ -36,7 +36,6 @@ apps/android/*.jks
 apps/android/*.keystore
 apps/android/app/*.jks
 apps/android/app/*.keystore
-<<<<<<< HEAD
 # Google Play service account key — never commit
 apps/android/google-play-key.json
 
