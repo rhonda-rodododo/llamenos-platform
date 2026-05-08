@@ -39,7 +39,7 @@ All platforms implement the same protocol: `docs/protocol/PROTOCOL.md`
 - **Auth**: Nostr keypairs (BIP-340 Schnorr signatures) + WebAuthn session tokens for multi-device support; Ed25519/X25519 per-device keys for E2EE
 - **i18n**: `packages/i18n/` — 13 locales + codegen for iOS `.strings` and Android `strings.xml`
 - **Deployment**: Docker Compose / Helm (VPS self-hosted), Cloudflare Tunnels for ingress. EU/GDPR-compatible.
-- **Testing**: E2E via Playwright (desktop), XCUITest (iOS), Compose UI tests (Android); Rust tests via `cargo test`
+- **Testing**: E2E via Playwright (desktop), XCUITest (iOS), Compose UI tests (Android); Rust tests via `cargo test`. Concurrent test orchestration with per-suite isolated backends and PostgreSQL databases. See `docs/testing.md`.
 - **Desktop Security**: Tauri Stronghold (encrypted vault), isolation pattern, CSP, single-instance
 
 ## Architecture Roles
@@ -266,6 +266,15 @@ bun run test:android                     # Android: codegen → gradle unit + li
 bun run test:worker                      # Worker: codegen → typecheck → integration tests
 bun run test:crypto                      # Crypto: cargo test + clippy
 bun run test:backend:bdd                 # Backend BDD against local backend (API-level)
+
+# Concurrent E2E Test Orchestration (isolated backends + databases)
+# Each suite runs with its own backend process and PostgreSQL database.
+# Supports parallel execution across desktop, backend-bdd, and iOS (via SSH to macOS).
+# See docs/testing.md for full details.
+bash scripts/test-orchestrator.sh desktop       # Desktop E2E on port 3001 (DB: llamenos_desktop)
+bash scripts/test-orchestrator.sh backend-bdd   # Backend BDD on port 3002 (DB: llamenos_bdd)
+bash scripts/test-orchestrator.sh ios-remote    # iOS E2E on port 3003 (DB: llamenos_ios), requires macOS SSH host
+bash scripts/test-orchestrator.sh all           # Run all suites concurrently with isolated backends
 
 # Deploy (runs on Linux machine)
 bun run deploy                           # Deploy EVERYTHING (Worker + marketing site)
