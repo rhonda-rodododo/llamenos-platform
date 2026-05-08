@@ -36,9 +36,9 @@ interface LifecycleState {
   caseRecordId?: string
   caseLinkId?: string
   volunteerPubkey?: string
-  volunteerNsec?: string
+  volunteerSeedHex?: string
   /** Reporter-specific state for isolation tests */
-  reporters: Map<string, { nsec: string; pubkey: string; reportIds: string[]; reportTitles: string[] }>
+  reporters: Map<string, { seedHex: string; pubkey: string; reportIds: string[]; reportTitles: string[] }>
   /** Last fetched report data */
   lastFetchedReport?: Record<string, unknown>
 }
@@ -91,7 +91,7 @@ Given('a volunteer is assigned to the report', async ({ request, world }) => {
     name: `Lifecycle Vol ${Date.now()}`,
   })
   getLifecycleState(world).volunteerPubkey = vol.pubkey
-  getLifecycleState(world).volunteerNsec = vol.nsec
+  getLifecycleState(world).volunteerSeedHex = vol.seedHex
 
   await assignReportViaApi(request, getLifecycleState(world).reportId!, vol.pubkey)
 })
@@ -161,12 +161,12 @@ Given(
     // as the contact/author — required for the reporter-isolation filter in GET /reports
     const report = await createReportViaApi(request, {
       title,
-      nsec: vol.nsec,
+      seedHex: vol.seedHex,
     })
 
     if (!getLifecycleState(world).reporters.has(reporterName)) {
       getLifecycleState(world).reporters.set(reporterName, {
-        nsec: vol.nsec,
+        seedHex: vol.seedHex,
         pubkey: vol.pubkey,
         reportIds: [],
         reportTitles: [],
@@ -185,7 +185,7 @@ When('{string} lists their own reports', async ({ request, world }, reporterName
   const { status, data } = await apiGet<{ conversations: Array<{ id: string; metadata?: { reportTitle?: string } }> }>(
     request,
     '/reports',
-    reporter!.nsec,
+    reporter!.seedHex,
   )
   // Store for assertion
   getLifecycleState(world).lastFetchedReport = { conversations: data?.conversations ?? [], reporterName }
