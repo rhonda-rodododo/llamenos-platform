@@ -166,7 +166,9 @@ async function lookupUserHubs(pubkey: string): Promise<{ hubs: string[] } | null
   const activeHubIds = hubs
     .filter(h => h.status === 'active' && memberHubIds.includes(h.id))
     .map(h => h.id)
-  return { hubs: activeHubIds }
+  // Always include 'global' — messaging events (1010, 1011) and other
+  // hub-agnostic events are published to the 'global' pseudo-hub.
+  return { hubs: [...activeHubIds, 'global'] }
 }
 
 export default {
