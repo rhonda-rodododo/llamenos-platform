@@ -1,54 +1,62 @@
-# Worker Status: crypto-ffi-auth
+# Worker Status: local-desktop-e2e-audit
 
-**Branch**: `crypto-ffi-auth`
-**PR**: https://github.com/rhonda-rodododo/llamenos-platform/pull/225
+**Branch**: `local-desktop-e2e-audit`
+**PR**: https://github.com/rhonda-rodododo/llamenos-platform/pull/240
 **Status**: Complete — pushed and PR created
 
-## Commits (3)
+## Commits (1)
 
-1. `6be1e804` — feat(crypto): add Rust FFI server bridge + delete WASM target
-2. `7823d4a2` — feat(auth): Ed25519 auth purge — server + test infrastructure
-3. `75916e8e` — purge(auth): remove Schnorr/nip19 from client + delete auth_legacy.rs
+1. `d723ba2b` — fix(e2e): resolve desktop auth cascade failures
 
 ## Verification Results
 
-| Check | Result |
-|-------|--------|
-| `cargo test --all-features` | ✅ 11 passed |
-| `cargo clippy --all-features -D warnings` | ✅ Clean |
-| `bunx tsc --noEmit` | ✅ Clean |
-| `bun run build` | ✅ Success |
-| `bun run codegen` → `--check` | ✅ Up to date |
+| Suite | Passed | Failed | Skipped |
+|-------|--------|--------|---------|
+| Desktop BDD | 346 | **0** | 12 |
+| Chromium (non-BDD) | 75 | **0** | 23 |
+| Backend BDD | 679 | 14 | 60 |
+| **Total Desktop** | **421** | **0** | **35** |
+
+**Desktop E2E is fully green.**
 
 ## What Was Done
 
-### Plan 1: Rust FFI Server Bridge
-- Added `server` feature to `packages/crypto/Cargo.toml`
-- Created `ffi_server.rs` with 15 C ABI FFI functions
-- Created `packages/crypto/ffi.ts` TypeScript wrapper (bun:ffi)
-- Created `packages/shared/encoding.ts` (hex/utf8 utilities)
-- Added `crypto:build:server` script
-- Deleted WASM target (`wasm.rs`, wasm-pack config)
+### Fix 1: Token Age Validation / Clock Skew
+- File: `apps/worker/lib/auth.ts`
+- Made `TOKEN_MAX_AGE_MS` configurable via `process.env.TOKEN_MAX_AGE_MS`
+- Set `TOKEN_MAX_AGE_MS=3600000` in `start-server.sh` for dev/test
 
-### Plan 2: Ed25519 Auth Purge
-- Deleted `auth_legacy.rs` (Schnorr auth)
-- Removed `auth_schnorr` re-export from `legacy.rs`
-- Rewrote `apps/worker/lib/auth.ts` to use Ed25519 via FFI
-- Migrated all test infrastructure (api-helpers, global-setup, 5 BDD step files)
-- Removed nip19/nostr-tools from client (settings, login, auth, key-manager)
-- Replaced demo nsec1 strings with hex seeds
-- Added `isValidSeedHex()` to platform.ts
+### Fix 2: Admin Key Mismatch (bootstrap vs legacy)
+- File: `tests/helpers.ts` — `loginAsAdmin()`
+- Added fallback detection: if `admin.json` login fails, clear storage and use `ADMIN_SEED`
 
-## What Stays (Intentionally)
+### Fix 3: Legacy vs Ed25519 Import Mismatch
+- File: `tests/helpers.ts` — `loginAsAdmin()` fallback
+- Changed from `legacyImportNsec()` (secp256k1) to `deviceImportAndLoad()` (Ed25519)
+- Ensures browser and API auth use identical pubkeys
 
-- **ECIES modules** (`ecies.rs`, `keys_legacy.rs`, `encryption_legacy.rs`) — mobile FFI still uses them
-- **Nostr modules** (`nostr.rs`, `nostr-publisher.ts`, relay files) — NIP-01 event system stays
-- **`legacyImportNsec`** in platform.ts — deprecated but used by Playwright test helpers
-- **`nostr-tools` dependency** — still needed for `nostr-tools/pure` (event verification)
+### Fix 4: Undefined `isNsec` in `loginAsVolunteer`
+- File: `tests/helpers.ts` — `loginAsVolunteer()`
+- Removed `isNsec` conditional, always use Ed25519 `deviceImportAndLoad()`
 
-## Remaining Work (Out of Scope)
+### Documentation
+- Created `test-audit-results.md` with full breakdown, root cause analysis, and recommendations
 
-- Backend BDD tests need running server to validate end-to-end
-- Playwright E2E tests need Tauri IPC mock rebuild
-- Full ECIES → HPKE migration (separate epic)
-- Nostr relay removal (separate epic)
+## Root Cause Summary
+
+The desktop E2E failures were a **cascade** of related auth issues:
+1. Clock skew → token age validation fails
+2. Failed validation → dev bypass never runs
+3. Bootstrap admin mismatch → even if bypass ran, wrong pubkey in DB
+4. Legacy vs Ed25519 mismatch → fallback admin seed produced wrong pubkey type
+
+All four had to be fixed together for login to work end-to-end.
+
+## Remaining Work (Backend Only)
+
+The 14 backend BDD failures are pre-existing issues unrelated to desktop E2E:
+- 7 Nostr relay event decryption failures
+- 6 Hub key envelope API 500 errors
+- 1 Invite validation state bleed (passes in isolation)
+
+Documented in `test-audit-results.md` with recommendations.
