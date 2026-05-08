@@ -357,11 +357,6 @@ When('I fill in the required report fields', async ({ page }) => {
   }
 })
 
-// --- Reporter steps ---
-// "they create a new report" and "the report should be saved successfully"
-// are defined in tests/steps/auth/user-steps.ts
-// 'a success toast should appear' is defined in common/assertion-steps.ts
-// 'the report should appear in the reports list' is defined in admin/desktop-admin-steps.ts
 
 Then('the submitted report should appear in the list', async ({ page }) => {
   const reportList = page.getByTestId(TestIds.REPORT_LIST)

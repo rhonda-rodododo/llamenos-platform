@@ -583,8 +583,8 @@ export async function listReportsViaApi(
   const qs = new URLSearchParams()
   if (params?.status) qs.set('status', params.status)
   const qsStr = qs.toString()
-  const basePath = hubPath('/reports', params?.hubId)
-  const path = basePath + (qsStr ? `?${qsStr}` : '')
+  const base = hubPath('/reports', params?.hubId)
+  const path = `${base}${qsStr ? `?${qsStr}` : ''}`
   const { status, data } = await apiGet<{ conversations: ReportRecord[]; total: number }>(request, path)
   if (status !== 200) throw new Error(`Failed to list reports: ${status}`)
   return data
@@ -596,7 +596,7 @@ export async function listReportsViaApi(
  */
 export async function createReportViaApi(
   request: APIRequestContext,
-  options?: { title?: string; category?: string; status?: string; reportTypeId?: string; seedHex?: string; hubId?: string },
+  options?: { title?: string; category?: string; status?: string; reportTypeId?: string; seedHex?: string; nsec?: string; hubId?: string },
 ): Promise<ReportRecord> {
   const seedHex = options?.seedHex ?? ADMIN_SEED
   const pubkey = seedHexToPubkey(seedHex)
@@ -617,7 +617,8 @@ export async function createReportViaApi(
   }
   if (options?.reportTypeId) body.reportTypeId = options.reportTypeId
 
-  const { status, data } = await apiPost<ReportRecord>(request, hubPath('/reports', options?.hubId), body, seedHex)
+  const path = hubPath('/reports', options?.hubId)
+  const { status, data } = await apiPost<ReportRecord>(request, path, body, seedHex)
   if (status !== 201 && status !== 200) {
     throw new Error(`Failed to create report: ${status} ${JSON.stringify(data)}`)
   }

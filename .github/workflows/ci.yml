@@ -829,6 +829,7 @@ jobs:
 
       # Cache the XCFramework AND generated Swift bindings together.
       # Both must come from the same Rust build or checksums will mismatch.
+      # Key includes all Rust sources + Cargo manifests + the build script.
       - name: Cache crypto XCFramework + bindings
         id: xcframework-cache
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
