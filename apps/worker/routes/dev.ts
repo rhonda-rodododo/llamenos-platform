@@ -188,7 +188,6 @@ dev.post('/test-setup-cms', async (c) => {
   }
 
   const body = await c.req.json().catch(() => ({})) as { pubkey?: string; hubId?: string }
-  const requestHubId = body.hubId ?? ''
   let pubkey: string | undefined
   if (body.pubkey) {
     try {
@@ -245,7 +244,6 @@ dev.post('/test-setup-cms', async (c) => {
   try {
     await services.settings.createEntityType({
       id: entityTypeId,
-      hubId: requestHubId,
       name: 'arrest_case',
       label: 'Arrest Case',
       labelPlural: 'Arrest Cases',
@@ -276,7 +274,6 @@ dev.post('/test-setup-cms', async (c) => {
   try {
     await services.settings.createEntityType({
       id: eventEntityTypeId,
-      hubId: requestHubId,
       name: 'protest_event',
       label: 'Protest Event',
       labelPlural: 'Protest Events',
@@ -300,7 +297,7 @@ dev.post('/test-setup-cms', async (c) => {
   } catch { /* ignore event entity type creation failures */ }
 
   // 3. Get entity types to verify creation
-  const { entityTypes } = await services.settings.getEntityTypes(requestHubId)
+  const { entityTypes } = await services.settings.getEntityTypes()
 
   // 4. Create sample records for both case and event entity types
   let recordId: string | null = null
@@ -318,7 +315,7 @@ dev.post('/test-setup-cms', async (c) => {
           : '{"title":"Test Case","summary":"BDD test case"}'),
         summaryEnvelopes: [],
         createdBy: pubkey ?? '',
-        hubId: requestHubId,
+        hubId,
       })
       if (!recordId) recordId = record.id
     } catch { /* ignore record creation failures */ }
@@ -790,33 +787,6 @@ dev.post('/test-create-hub', async (c) => {
   }
 
   return c.json({ id: hub.id, name: hub.name })
-})
-
-// ─── Test Hub Deletion (dev/test isolation helper) ──────────────────────────
-// Deletes a hub and all its data — mirror of test-create-hub, bypasses auth.
-// Gated by ENVIRONMENT=development + DEV_RESET_SECRET / E2E_TEST_SECRET.
-
-dev.post('/test-delete-hub', async (c) => {
-  const denied = simulationGuard(c)
-  if (denied) return denied
-
-  const rawBody = await c.req.json().catch(() => ({}))
-  const hubId = typeof rawBody === 'object' && rawBody !== null && 'id' in rawBody && typeof rawBody.id === 'string'
-    ? rawBody.id
-    : null
-  if (!hubId) {
-    return c.json({ error: 'Missing hub id' }, 400)
-  }
-
-  const services = c.get('services')
-  try {
-    await services.settings.deleteHub(hubId)
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to delete hub'
-    return c.json({ error: message }, 500)
-  }
-
-  return c.json({ ok: true })
 })
 
 export default dev

@@ -51,7 +51,7 @@ Then('I should see an error message', async ({ page }) => {
   // May be on login page (which has no page-title) — that's acceptable for cascading failures
   const loginForm = page.getByTestId(TestIds.NSEC_INPUT)
     .or(page.getByTestId(TestIds.LOGIN_SUBMIT_BTN))
-    .or(page.locator('input[aria-label="PIN or passphrase"]'))
+    .or(page.getByTestId(TestIds.PIN_INPUT))
   await expect(loginForm.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
@@ -64,7 +64,7 @@ Then('I should remain on the unlock screen', async ({ page }) => {
   // The PIN unlock screen should still be visible — check sequentially
   const pinTestId = page.getByTestId(TestIds.PIN_INPUT)
   if (await pinTestId.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) return
-  await expect(page.locator('input[aria-label="PIN or passphrase"]')).toBeVisible({ timeout: 2000 })
+  await expect(page.getByTestId(TestIds.PIN_INPUT)).toBeVisible({ timeout: 2000 })
 })
 
 Then('I should remain on the settings screen', async ({ page }) => {
@@ -77,7 +77,7 @@ Then('I should remain on the PIN confirmation screen', async ({ page }) => {
   if (await confirmDialog.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) return
   const pinTestId = page.getByTestId(TestIds.PIN_INPUT)
   if (await pinTestId.isVisible({ timeout: 2000 }).catch(() => false)) return
-  await expect(page.locator('input[aria-label="PIN or passphrase"]')).toBeVisible({ timeout: 2000 })
+  await expect(page.getByTestId(TestIds.PIN_INPUT)).toBeVisible({ timeout: 2000 })
 })
 
 Then('I should see a confirmation dialog', async ({ page }) => {
@@ -110,7 +110,7 @@ Then('I should see {string} and {string} buttons', async ({ page }, btn1: string
 
   const testIdMap: Record<string, string> = {
     'Confirm': TestIds.CONFIRM_DIALOG_OK,
-    'Cancel': TestIds.FORM_CANCEL_BTN,
+    'Cancel': TestIds.CONFIRM_DIALOG_CANCEL,
     'Lock App': TestIds.LOGOUT_BTN,
     'Log Out': TestIds.LOGOUT_BTN,
   }

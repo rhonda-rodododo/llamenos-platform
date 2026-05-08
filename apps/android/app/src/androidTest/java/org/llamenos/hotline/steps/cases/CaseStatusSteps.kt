@@ -8,7 +8,6 @@ import androidx.compose.ui.test.performClick
 import io.cucumber.java.en.And
 import io.cucumber.java.en.Then
 import io.cucumber.java.en.When
-import org.junit.Assume
 import org.llamenos.hotline.steps.BaseSteps
 
 /**
@@ -27,9 +26,7 @@ class CaseStatusSteps : BaseSteps() {
 
     @When("I tap the status pill")
     fun iTapTheStatusPill() {
-        val hasPill = composeRule.onAllNodesWithTag("case-status-pill")
-            .fetchSemanticsNodes().isNotEmpty()
-        Assume.assumeTrue("Status pill not present — case detail may not be loaded", hasPill)
+        onNodeWithTag("case-status-pill").assertIsDisplayed()
         onNodeWithTag("case-status-pill").performClick()
         composeRule.waitForIdle()
     }
@@ -65,13 +62,9 @@ class CaseStatusSteps : BaseSteps() {
 
     @Then("the status picker sheet should appear")
     fun theStatusPickerSheetShouldAppear() {
-        val hasSheet = try {
-            composeRule.waitUntil(5_000) {
-                composeRule.onAllNodesWithTag("status-sheet-title").fetchSemanticsNodes().isNotEmpty()
-            }
-            true
-        } catch (_: Throwable) { false }
-        Assume.assumeTrue("Status picker sheet did not appear", hasSheet)
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithTag("status-sheet-title").fetchSemanticsNodes().isNotEmpty()
+        }
         onNodeWithTag("status-sheet-title").assertIsDisplayed()
     }
 

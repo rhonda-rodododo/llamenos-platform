@@ -9,11 +9,28 @@ typealias CallRecord = org.llamenos.protocol.CallRecordResponse
 typealias CallHistoryRecord = org.llamenos.protocol.CallHistoryResponseCall
 
 /**
- * Active call. Uses the generated ActiveCallsResponseCall which is a superset
- * (includes callerLast4, hasRecording, etc.). Extension properties in
- * Extensions.kt provide backward-compatible accessors.
+ * Active call — a call currently ringing or in progress.
+ * Client-only type because the API returns `callId` (DB column name) whereas the
+ * generated ActiveCallsResponseCall expects `id`. This data class handles the
+ * actual wire format with @SerialName mapping.
  */
-typealias ActiveCall = org.llamenos.protocol.ActiveCallsResponseCall
+@Serializable
+data class ActiveCall(
+    @SerialName("callId") val id: String,
+    val callerNumber: String? = null,
+    val answeredBy: String? = null,
+    val startedAt: String,
+    val status: String,
+)
+
+/**
+ * Response from GET /api/calls/active — list of the volunteer's active calls.
+ * Client-only type wrapping our custom ActiveCall (not the generated one).
+ */
+@Serializable
+data class ActiveCallsResponse(
+    val calls: List<ActiveCall>,
+)
 
 /**
  * Call history response from GET /calls/history.
@@ -26,12 +43,6 @@ typealias CallHistoryResponse = org.llamenos.protocol.CallHistoryResponse
  * Uses the generated TodayCountResponse. Count is Double.
  */
 typealias CallCountResponse = org.llamenos.protocol.TodayCountResponse
-
-/**
- * Response from GET /api/calls/active.
- * Uses the generated ActiveCallsResponse.
- */
-typealias ActiveCallsResponse = org.llamenos.protocol.ActiveCallsResponse
 
 // ── Client-specific request types ───────────────────────────────────────────
 

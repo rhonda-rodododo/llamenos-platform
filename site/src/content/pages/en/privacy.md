@@ -71,14 +71,12 @@ See our [Security page](/security) for a full breakdown.
 
 ---
 
-## Data Retention and Deletion
+## Data Retention
 
 - **Content you create** is retained until you or an admin deletes it, or your hub is shut down.
 - **Call metadata and audit logs** are retained per your hub administrator's configuration.
 - **Push tokens** are removed when you log out or uninstall the app.
 - **Account data** is removed when your account is deleted by an admin.
-
-For full details on how to request deletion, what gets removed, and what is retained for audit chain integrity, see our [Data Deletion & Retention](/data-deletion) page.
 
 ---
 

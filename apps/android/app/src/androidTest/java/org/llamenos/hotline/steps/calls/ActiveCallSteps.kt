@@ -5,15 +5,12 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.swipeDown
 import dagger.hilt.android.EntryPointAccessors
 import io.cucumber.java.en.And
 import io.cucumber.java.en.Given
 import io.cucumber.java.en.Then
 import io.cucumber.java.en.When
 import kotlinx.coroutines.runBlocking
-import org.junit.Assume
 import org.llamenos.hotline.LlamenosApp
 import org.llamenos.hotline.di.ActiveHubEntryPoint
 import org.llamenos.hotline.di.CryptoEntryPoint
@@ -70,40 +67,25 @@ class ActiveCallSteps : BaseSteps() {
             Log.w("ActiveCallSteps", "Call simulation failed: ${e.message}", e)
         }
 
-        // Navigate to dashboard and trigger pull-to-refresh to fetch the active call.
-        // WebSocket/relay events are unreliable in E2E tests — explicit refresh ensures
-        // DashboardViewModel.fetchActiveCall() runs after the simulation completes.
-        navigateToTab(NAV_DASHBOARD)
-        composeRule.waitForIdle()
+        // Force DashboardViewModel to re-fetch active calls.
+        // DashboardViewModel subscribes to refreshTrigger and calls refresh().
+        triggerHubRefresh()
 
-        // Swipe down on the PullToRefreshBox to trigger ViewModel.refresh()
+        // Wait for the active call card to appear
         try {
-            onNodeWithTag("dashboard-pull-refresh").performTouchInput { swipeDown() }
-            composeRule.waitForIdle()
-        } catch (e: Throwable) {
-            Log.w("ActiveCallSteps", "Pull-to-refresh swipe failed: ${e.message}")
-        }
-
-        val appearedViaRelay = try {
-            composeRule.waitUntil(10_000) {
+            composeRule.waitUntil(15_000) {
                 composeRule.onAllNodesWithTag("active-call-card").fetchSemanticsNodes().isNotEmpty()
             }
-            true
         } catch (_: Throwable) {
-            Log.w("ActiveCallSteps", "active-call-card did not appear within 10 s — trying pull-to-refresh retry")
-            false
-        }
-
-        if (!appearedViaRelay) {
-            // Retry refresh once — the first swipe may have been too early
+            // Retry: trigger another hub refresh cycle
+            Log.d("ActiveCallSteps", "active-call-card not found, retrying with hub refresh")
+            triggerHubRefresh()
             try {
-                onNodeWithTag("dashboard-pull-refresh").performTouchInput { swipeDown() }
-                composeRule.waitForIdle()
-                composeRule.waitUntil(10_000) {
+                composeRule.waitUntil(15_000) {
                     composeRule.onAllNodesWithTag("active-call-card").fetchSemanticsNodes().isNotEmpty()
                 }
             } catch (_: Throwable) {
-                Log.w("ActiveCallSteps", "active-call-card did not appear after pull-to-refresh")
+                Log.w("ActiveCallSteps", "active-call-card did not appear after retry")
             }
         }
     }
@@ -124,10 +106,6 @@ class ActiveCallSteps : BaseSteps() {
 
     @When("I tap the hangup button")
     fun iTapTheHangupButton() {
-        Assume.assumeTrue(
-            "Active call card not present — skipping (relay event not delivered in CI)",
-            composeRule.onAllNodesWithTag("active-call-card").fetchSemanticsNodes().isNotEmpty(),
-        )
         composeRule.waitUntil(10_000) {
             composeRule.onAllNodesWithTag("hangup-button").fetchSemanticsNodes().isNotEmpty()
         }
@@ -151,10 +129,6 @@ class ActiveCallSteps : BaseSteps() {
 
     @When("I tap the ban and hangup button")
     fun iTapTheBanAndHangupButton() {
-        Assume.assumeTrue(
-            "Active call card not present — skipping (relay event not delivered in CI)",
-            composeRule.onAllNodesWithTag("active-call-card").fetchSemanticsNodes().isNotEmpty(),
-        )
         composeRule.waitUntil(10_000) {
             composeRule.onAllNodesWithTag("ban-hangup-button").fetchSemanticsNodes().isNotEmpty()
         }
@@ -186,20 +160,18 @@ class ActiveCallSteps : BaseSteps() {
 
     @Then("the report spam button should be visible on the call card")
     fun theReportSpamButtonShouldBeVisibleOnTheCallCard() {
-        Assume.assumeTrue(
-            "Active call card not present — skipping (relay event not delivered in CI)",
-            composeRule.onAllNodesWithTag("active-call-card").fetchSemanticsNodes().isNotEmpty(),
-        )
-        val found = assertAnyTagDisplayed("report-spam-button", "active-call-card", "dashboard-title")
+        composeRule.waitUntil(15_000) {
+            composeRule.onAllNodesWithTag("active-call-card").fetchSemanticsNodes().isNotEmpty()
+        }
+        onNodeWithTag("report-spam-button").assertIsDisplayed()
     }
 
     @Then("the quick note button should be visible on the call card")
     fun theQuickNoteButtonShouldBeVisibleOnTheCallCard() {
-        Assume.assumeTrue(
-            "Active call card not present — skipping (relay event not delivered in CI)",
-            composeRule.onAllNodesWithTag("active-call-card").fetchSemanticsNodes().isNotEmpty(),
-        )
-        val found = assertAnyTagDisplayed("quick-note-button", "active-call-card", "dashboard-title")
+        composeRule.waitUntil(15_000) {
+            composeRule.onAllNodesWithTag("active-call-card").fetchSemanticsNodes().isNotEmpty()
+        }
+        onNodeWithTag("quick-note-button").assertIsDisplayed()
     }
 
     // ---- Helpers ----

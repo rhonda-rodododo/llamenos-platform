@@ -14,7 +14,6 @@ import io.cucumber.java.en.And
 import io.cucumber.java.en.Given
 import io.cucumber.java.en.Then
 import io.cucumber.java.en.When
-import org.junit.Assume
 import org.llamenos.hotline.LlamenosApp
 import org.llamenos.hotline.di.CryptoEntryPoint
 import org.llamenos.hotline.helpers.SimulationClient
@@ -36,9 +35,10 @@ class HubSwitchSteps : BaseSteps() {
 
     @Given("the app is launched with two test hubs")
     fun launchWithTwoHubs() {
-        // Launch the app first so the user identity is created before we add a second hub.
-        // ScenarioHooks @Before(order = 1) already created the first hub; navigateToMainScreen()
-        // creates the device key and registers the user against it.
+        // ScenarioHooks @Before(order = 1) already created the first hub.
+        // Create a second hub so the list has two entries.
+        SimulationClient.createTestHub("android-test-hub-2-${System.currentTimeMillis()}")
+        // Launch the app (creates identity and navigates to dashboard).
         navigateToMainScreen()
 
         // Promote the test user to super-admin so GET /api/hubs returns ALL hubs
@@ -59,13 +59,6 @@ class HubSwitchSteps : BaseSteps() {
         } catch (e: Throwable) {
             Log.w("HubSwitchSteps", "Admin promotion failed: ${e.message}")
         }
-
-        // Create a second hub now that the user exists.
-        try {
-            SimulationClient.createTestHub("android-test-hub-2-${System.currentTimeMillis()}")
-        } catch (e: Throwable) {
-            android.util.Log.w("HubSwitchSteps", "Second hub creation failed: ${e.message}")
-        }
     }
 
     @Given("I am on the hub management screen")
@@ -74,33 +67,22 @@ class HubSwitchSteps : BaseSteps() {
         navigateViaDashboardCard("hubs-card")
 
         // Wait for the hub list screen to load
-        val loaded = try {
-            composeRule.waitUntil(10_000) {
-                composeRule.onAllNodesWithTag("hubs-list").fetchSemanticsNodes().isNotEmpty() ||
-                    composeRule.onAllNodesWithTag("hubs-loading").fetchSemanticsNodes().isNotEmpty() ||
-                    composeRule.onAllNodesWithTag("hubs-empty").fetchSemanticsNodes().isNotEmpty() ||
-                    composeRule.onAllNodesWithTag("hubs-error").fetchSemanticsNodes().isNotEmpty()
-            }
-            true
-        } catch (_: Throwable) { false }
-        Assume.assumeTrue("Hub management screen did not load", loaded)
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithTag("hubs-list").fetchSemanticsNodes().isNotEmpty() ||
+                composeRule.onAllNodesWithTag("hubs-loading").fetchSemanticsNodes().isNotEmpty() ||
+                composeRule.onAllNodesWithTag("hubs-empty").fetchSemanticsNodes().isNotEmpty() ||
+                composeRule.onAllNodesWithTag("hubs-error").fetchSemanticsNodes().isNotEmpty()
+        }
     }
 
     // ---- When ----
 
     @When("I tap the second hub in the list")
     fun tapSecondHub() {
-        // Wait for at least two hub-row nodes to appear.
-        // If the second hub isn't visible (user not a member), skip rather than fail.
-        val hasTwoHubs = try {
-            composeRule.waitUntil(10_000) {
-                composeRule.onAllNodesWithTag("hub-row").fetchSemanticsNodes().size >= 2
-            }
-            true
-        } catch (_: Throwable) {
-            false
+        // Wait for at least two hub-row nodes to appear
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithTag("hub-row").fetchSemanticsNodes().size >= 2
         }
-        Assume.assumeTrue("Less than 2 hub rows visible — skipping hub switch test", hasTwoHubs)
         composeRule.onAllNodesWithTag("hub-row")[1].performClick()
         composeRule.waitForIdle()
     }
@@ -115,15 +97,9 @@ class HubSwitchSteps : BaseSteps() {
 
     @Then("the second hub shows the active indicator")
     fun secondHubShowsActiveIndicator() {
-        val hasTwoHubs = try {
-            composeRule.waitUntil(5_000) {
-                composeRule.onAllNodesWithTag("hub-row").fetchSemanticsNodes().size >= 2
-            }
-            true
-        } catch (_: Throwable) {
-            false
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithTag("hub-row").fetchSemanticsNodes().size >= 2
         }
-        Assume.assumeTrue("Less than 2 hub rows visible — skipping indicator check", hasTwoHubs)
         composeRule.onAllNodesWithTag("hub-row")[1]
             .onChildren()
             .filter(hasTestTag("hub-active-indicator"))
