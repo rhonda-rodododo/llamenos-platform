@@ -125,7 +125,7 @@ export function createWsHandler() {
             ws.sendText(JSON.stringify({ type: 'error', code: 'not_member', message: `Not a member of hub ${msg.hubId}` }))
             return
           }
-          manager.subscribe(data.connState.pubkey, msg.hubId, msg.kinds)
+          manager.subscribe(data.connState, msg.hubId, msg.kinds)
           ws.sendText(JSON.stringify({ type: 'subscribed', hubId: msg.hubId, kinds: msg.kinds }))
           break
         }
@@ -223,6 +223,7 @@ async function handleAuth(
     pubkey: msg.pubkey,
     ws: ws as unknown as WebSocket,
     hubs: new Set(user.hubs),
+    subscribedHubs: new Set(),
     lastReplayAt: 0,
   }
   data.connState = connState
