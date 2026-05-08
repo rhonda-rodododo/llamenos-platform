@@ -22,8 +22,8 @@ import { ADMIN_SEED } from '../../api-helpers'
 
 const RELAY_URL = process.env.TEST_RELAY_URL || 'ws://localhost:3000/ws'
 const BASE_URL = process.env.TEST_HUB_URL || 'http://localhost:3000'
-// Default dev secret from scripts/dev-node.sh — used for event decryption in tests
-const DEV_SERVER_SECRET = '0000000000000000000000000000000000000000000000000000000000000002'
+// Default dev secret from scripts/dev-bun.sh — used for event decryption in tests
+const DEV_SERVER_SECRET = '0000000000000000000000000000000000000000000000000000000000000001'
 
 const RELAY_KEY = 'relay'
 
