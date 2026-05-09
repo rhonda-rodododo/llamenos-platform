@@ -165,12 +165,22 @@ Then('the volunteer name should appear in the pending invites list', async ({ pa
 })
 
 When('I revoke the invite', async ({ page }) => {
+  // The frontend does an optimistic removal but restores the invite on API failure,
+  // so we must wait for the DELETE response before the assertion step runs.
+  const responsePromise = page.waitForResponse(
+    resp => resp.url().includes('/api/invites/') && resp.request().method() === 'DELETE',
+    { timeout: Timeouts.API },
+  )
   await page.getByTestId(TestIds.REVOKE_INVITE_BTN).first().click()
-  // Confirm if dialog appears
+  // Confirm if a confirmation dialog appears (currently no dialog for revoke,
+  // but handle it defensively in case one is added later)
   const dialog = page.getByRole('dialog')
-  if (await dialog.isVisible({ timeout: 2000 }).catch(() => false)) {
+  if (await dialog.isVisible().catch(() => false)) {
     await page.getByTestId(TestIds.CONFIRM_DIALOG_OK).click()
   }
+  // Wait for the DELETE API call to succeed so the optimistic removal sticks
+  const response = await responsePromise
+  expect(response.status()).toBeLessThan(400)
 })
 
 Then('the volunteer name should no longer appear in the list', async ({ page }) => {

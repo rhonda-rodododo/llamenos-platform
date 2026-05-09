@@ -320,10 +320,12 @@ When('I confirm the deletion', async ({ page }) => {
 })
 
 Then('the hub should be removed', async ({ page }) => {
-  // After deletion, a success toast should appear or the hub should no longer be in the list
+  // After deletion, a success toast should appear or the hub should no longer be in the list.
+  // Check toast first; fall back to text match only if needed (avoid .or() strict mode violations).
   const toast = page.locator('[role="status"]').first()
-  const deleted = toast.or(page.getByText(/deleted|removed/i).first())
-  await expect(deleted).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const hasToast = await toast.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+  if (hasToast) return
+  await expect(page.getByText(/deleted|removed/i).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 // --- Setup wizard ---

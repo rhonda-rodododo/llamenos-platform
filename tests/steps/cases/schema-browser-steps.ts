@@ -114,8 +114,10 @@ Then('I should see the statuses defined for {string}', async ({ page }, _typeNam
 })
 
 Then('the initial status should be marked', async ({ page }) => {
-  // The default/initial status should have a "set default" or "default" indicator
+  // The default/initial status should have a "set default" or "default" indicator.
+  // Check data-testid first; fall back to text match only if needed.
   const statusBadge = page.locator('[data-testid^="status-"]').first()
-    .or(page.getByText(/default|initial|open/i).first())
-  await expect(statusBadge).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const hasBadge = await statusBadge.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+  if (hasBadge) return
+  await expect(page.getByText(/default|initial|open/i).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })

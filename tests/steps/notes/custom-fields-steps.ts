@@ -310,15 +310,14 @@ Given('a custom field {string} exists', async ({ page, request }, fieldLabel: st
 })
 
 When('I click the delete button on {string}', async ({ page }, fieldLabel: string) => {
-  const row = page.getByTestId(TestIds.CUSTOM_FIELD_ROW).filter({ hasText: fieldLabel })
-  await expect(row.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
-  await row.first().scrollIntoViewIfNeeded()
-  // Set up dialog handler to accept the confirm() before clicking delete
-  page.once('dialog', async (dialog) => {
-    await dialog.accept()
-  })
+  const row = page.getByTestId(TestIds.CUSTOM_FIELD_ROW).filter({ hasText: fieldLabel }).first()
+  await expect(row).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await row.scrollIntoViewIfNeeded()
   const deleteBtn = row.getByTestId(TestIds.CUSTOM_FIELD_DELETE_BTN)
   await expect(deleteBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
-  // Use force click since the card container can briefly intercept pointer events during re-render
-  await deleteBtn.click({ force: true })
+  // Register dialog handler before clicking. The handler must call accept()
+  // synchronously (no await) to prevent the confirm() dialog from blocking
+  // the click action and causing a timeout.
+  page.once('dialog', dialog => dialog.accept())
+  await deleteBtn.click()
 })

@@ -72,7 +72,9 @@ When('I fill in Twilio credentials with a different phone number', async ({ page
 })
 
 Then('the phone number field should be pre-filled', async ({ page }) => {
-  await expect(page.locator('input[type="tel"]')).toHaveValue(/555\s*987\s*6/)
+  // Use the specific provider phone input (id="provider-phone") to avoid matching
+  // other tel inputs on the page (e.g. Signal notification phone field).
+  await expect(page.locator('#provider-phone')).toHaveValue(/555\s*987\s*6/)
 })
 
 Then('the Account SID field should be pre-filled', async ({ page }) => {
