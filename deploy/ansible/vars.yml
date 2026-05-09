@@ -37,6 +37,7 @@ llamenos_strfry_enabled: true
 llamenos_transcription_enabled: false
 llamenos_asterisk_enabled: false
 llamenos_signal_enabled: false
+kamailio_enabled: false
 
 # ─── Service Images ─────────────────────────────────────────────
 llamenos_app_image: ghcr.io/llamenos/llamenos:0.1.0
@@ -173,8 +174,6 @@ healthcheck_endpoints:
     url: "http://app:3000/api/health"
   - name: postgres
     url: "tcp://postgres:5432"
-  - name: strfry
-    url: "http://strfry:7777"
 healthcheck_ntfy_url: "https://ntfy.sh"
 healthcheck_ntfy_topic: "llamenos-health"
 
