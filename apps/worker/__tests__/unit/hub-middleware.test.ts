@@ -8,6 +8,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { Hono } from 'hono'
 import type { AppEnv } from '@worker/types/infra'
 import { hubContext, requireHubPermission, checkHubPermission } from '@worker/middleware/hub'
+import { ServiceError } from '@worker/services/settings'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -65,7 +66,7 @@ function createApp(user: Record<string, unknown>, hubExists = true) {
   const services = {
     settings: {
       getHub: vi.fn().mockImplementation(async (id: string) => {
-        if (!hubExists) throw new Error('not found')
+        if (!hubExists) throw new ServiceError(404, 'Not found')
         return { id, name: 'Test Hub' }
       }),
     },

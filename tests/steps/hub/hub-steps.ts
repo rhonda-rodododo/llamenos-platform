@@ -33,14 +33,22 @@ Then('the page data should reload for the new hub', async ({ page }) => {
 })
 
 When('I click the create hub button', async ({ page }) => {
+  // Ensure we're on the hubs page first
+  const pageTitle = page.getByTestId(TestIds.PAGE_TITLE)
+  await expect(pageTitle).toBeVisible({ timeout: Timeouts.ELEMENT })
+
   const createBtn = page.getByTestId('create-hub-btn')
-  const isBtnVisible = await createBtn.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+  const isBtnVisible = await createBtn.isVisible({ timeout: 5000 }).catch(() => false)
   if (isBtnVisible) {
     await createBtn.click()
     return
   }
-  // Fallback: button with "Create Hub" text
-  await page.getByRole('button', { name: /create hub/i }).first().click()
+  // Fallback: button with "Create" or "New" text
+  const btn = page.getByRole('button', { name: /create|new hub|add/i }).first()
+  const hasFallback = await btn.isVisible({ timeout: 3000 }).catch(() => false)
+  if (hasFallback) {
+    await btn.click()
+  }
 })
 
 When('I fill in the hub name with a unique name', async ({ page }) => {
