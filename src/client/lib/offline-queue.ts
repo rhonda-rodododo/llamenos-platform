@@ -48,7 +48,7 @@ const BASE_RETRY_DELAY = 1_000
 const MAX_RETRY_DELAY = 60_000
 
 /** Classify an API path + method into a queue operation type */
-function classifyOperation(path: string, method: string): QueuedOperationType {
+export function classifyOperation(path: string, method: string): QueuedOperationType {
   if (path.includes('/notes') && method === 'POST') return 'note:create'
   if (path.includes('/notes/') && method === 'PATCH') return 'note:update'
   if (path.includes('/messages') && method === 'POST') return 'message:send'
