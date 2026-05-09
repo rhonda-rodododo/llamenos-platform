@@ -338,11 +338,14 @@ Then(
 Then('each settings section should have a {string} button', async ({ page }) => {
   // Each SettingsSection renders with data-testid={id} and data-settings-section.
   // The copy-link button lives inside the CardHeader trigger element.
+  // Wait for at least one settings section to be visible before counting
   const sections = page.locator('[data-testid][data-settings-section]')
+  await expect(sections.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
   const sectionCount = await sections.count()
   expect(sectionCount).toBeGreaterThanOrEqual(1)
   // Check at least one section has an aria-labelled button (copy link)
   const linkButtons = page.locator('[data-testid][data-settings-section] button[aria-label]')
+  await expect(linkButtons.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
   const count = await linkButtons.count()
   expect(count).toBeGreaterThanOrEqual(1)
 })

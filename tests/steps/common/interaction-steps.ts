@@ -71,7 +71,7 @@ async function clickByTextOrTestId(page: import('@playwright/test').Page, text: 
   // 0b. If a confirm dialog is open, "Cancel"/"Confirm" target the dialog buttons
   if (text === 'Cancel' || text === 'Confirm') {
     const dialog = page.getByTestId(TestIds.CONFIRM_DIALOG)
-    const dialogOpen = await dialog.isVisible({ timeout: 1000 }).catch(() => false)
+    const dialogOpen = await dialog.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
     if (dialogOpen) {
       const testId = text === 'Cancel' ? TestIds.CONFIRM_DIALOG_CANCEL : TestIds.CONFIRM_DIALOG_OK
       const btn = page.getByTestId(testId)
@@ -250,7 +250,7 @@ When('I log out', async ({ page }) => {
   await page.getByTestId(TestIds.LOGOUT_BTN).click()
   // Logout now shows a confirmation dialog — confirm it
   const confirmBtn = page.getByTestId(TestIds.CONFIRM_DIALOG_OK)
-  if (await confirmBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+  if (await confirmBtn.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
     await confirmBtn.click()
   }
   await page.waitForURL(/\/login/, { timeout: Timeouts.ELEMENT })

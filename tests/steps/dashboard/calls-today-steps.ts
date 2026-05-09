@@ -34,13 +34,13 @@ When('I pull to refresh the dashboard', async ({ page }) => {
   // On desktop, pull-to-refresh is simulated by page reload or a refresh button
   await page.reload()
   await page.waitForLoadState('domcontentloaded')
-  // Re-enter PIN if needed (reload clears in-memory keyManager)
+  // Re-enter PIN if needed (allow time for the login/PIN screen to render in CI)
   const pinInput = page.getByTestId('pin-input').locator('input')
-  const pinVisible = await pinInput.isVisible({ timeout: 5000 }).catch(() => false)
+  const pinVisible = await pinInput.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
   if (pinVisible) {
     const { enterPin, TEST_PIN, Timeouts: T } = await import('../../helpers')
     await enterPin(page, TEST_PIN)
-    await page.waitForURL((u) => !u.toString().includes('/login'), { timeout: T.AUTH })
+    await page.waitForURL((u) => !u.toString().includes('/login'), { timeout: Timeouts.AUTH })
   }
   // Wait for authenticated layout after reload
   const { TestIds: TI, Timeouts: T } = await import('../../helpers')

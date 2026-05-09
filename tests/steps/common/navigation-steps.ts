@@ -85,7 +85,7 @@ Given('I am authenticated and on the shifts screen', async ({ page }) => {
 Given('I am on the settings screen', async ({ page }) => {
   // If not yet authenticated (fresh page context in parallel mode), log in first
   const sidebar = page.getByTestId(TestIds.NAV_SIDEBAR)
-  const isAuthenticated = await sidebar.isVisible({ timeout: 2000 }).catch(() => false)
+  const isAuthenticated = await sidebar.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
   if (!isAuthenticated) {
     const { loginAsAdmin } = await import('../../helpers')
     await loginAsAdmin(page)
@@ -96,7 +96,7 @@ Given('I am on the settings screen', async ({ page }) => {
 Given('I am on the dashboard', async ({ page }) => {
   // If not yet authenticated (fresh page context in parallel mode), log in first
   const sidebar = page.getByTestId(TestIds.NAV_SIDEBAR)
-  const isAuthenticated = await sidebar.isVisible({ timeout: 2000 }).catch(() => false)
+  const isAuthenticated = await sidebar.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
   if (!isAuthenticated) {
     const { loginAsAdmin } = await import('../../helpers')
     await loginAsAdmin(page)

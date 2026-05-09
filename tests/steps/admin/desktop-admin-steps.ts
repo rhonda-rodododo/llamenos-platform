@@ -506,7 +506,7 @@ When('I click on the report', async ({ page }) => {
 })
 
 Then('I should see the report detail view', async ({ page }) => {
-  await expect(page.getByTestId(TestIds.REPORT_DETAIL).or(page.getByTestId(TestIds.REPORT_METADATA))).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(page.getByTestId(TestIds.REPORT_DETAIL).or(page.getByTestId(TestIds.REPORT_METADATA)).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('I should see the report content', async ({ page }) => {
