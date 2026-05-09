@@ -60,9 +60,12 @@ const buttonTextToTestIdMap: Record<string, string> = {
  */
 async function clickByTextOrTestId(page: import('@playwright/test').Page, text: string): Promise<void> {
   // 0a. "Log Out" on settings page → use settings-specific button (shows confirmation dialog)
+  //     The logout button is at the bottom of the settings page and may be below the fold,
+  //     so check DOM attachment (not viewport visibility) then scroll into view before clicking.
   if (text === 'Log Out' && page.url().includes('/settings')) {
     const settingsLogout = page.getByTestId(TestIds.SETTINGS_LOGOUT_BTN)
-    if (await settingsLogout.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
+    const attached = await settingsLogout.waitFor({ state: 'attached', timeout: Timeouts.ELEMENT }).then(() => true).catch(() => false)
+    if (attached) {
       await settingsLogout.scrollIntoViewIfNeeded()
       await settingsLogout.click()
       return
