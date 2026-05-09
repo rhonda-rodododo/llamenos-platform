@@ -54,7 +54,8 @@ entitySchema.get('/case-management',
   requirePermission('settings:read'),
   async (c) => {
     const services = c.get('services')
-    const result = await services.settings.getCaseManagementEnabled()
+    const hubId = c.get('hubId') as string | undefined
+    const result = await services.settings.getCaseManagementEnabled(hubId)
     return c.json(result)
   },
 )
@@ -76,7 +77,8 @@ entitySchema.put('/case-management',
   async (c) => {
     const body = c.req.valid('json')
     const services = c.get('services')
-    const result = await services.settings.setCaseManagementEnabled(body)
+    const hubId = c.get('hubId') as string | undefined
+    const result = await services.settings.setCaseManagementEnabled(body, hubId)
     await audit(services.audit, 'caseManagementToggled', c.get('pubkey'), body)
     return c.json(result)
   },

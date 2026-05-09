@@ -288,14 +288,13 @@ Given('a custom field {string} exists', async ({ page, request }, fieldLabel: st
       },
     ])
   }
-  // Background already navigated to Hub Settings. If we created a field via API,
-  // the page needs to re-fetch its data. Use the UI to navigate away and back.
-  if (needsCreate) {
-    await page.getByTestId(TestIds.NAV_DASHBOARD).click()
-    await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.NAVIGATION })
-    await page.getByTestId(TestIds.NAV_ADMIN_SETTINGS).click()
-    await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.NAVIGATION })
-  }
+  // Always navigate away and back so the page re-fetches fresh data from the API.
+  // This prevents stale React state from a prior test run and ensures the field row
+  // is present regardless of whether it was just created or already existed.
+  await page.getByTestId(TestIds.NAV_DASHBOARD).click()
+  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.NAVIGATION })
+  await page.getByTestId(TestIds.NAV_ADMIN_SETTINGS).click()
+  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.NAVIGATION })
   // Ensure the custom fields section is expanded
   const section = page.getByTestId(TestIds.SETTINGS_CUSTOM_FIELDS)
   await expect(section).toBeVisible({ timeout: Timeouts.ELEMENT })

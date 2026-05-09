@@ -90,7 +90,8 @@ When('I fill in SignalWire credentials', async ({ page }) => {
   }
   const acInput = page.getByPlaceholder('AC...')
   if (await acInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await acInput.fill('SW-project-id-123')
+    // SignalWire project IDs are UUIDs, not Twilio AC... format
+    await acInput.fill('a1b2c3d4-e5f6-7890-abcd-ef1234567890')
   }
   const authTokenInput = page.locator('input[type="password"]').first()
   if (await authTokenInput.isVisible({ timeout: 3000 }).catch(() => false)) {

@@ -19,7 +19,6 @@ import {
   listEntityTypesViaApi,
   createEntityTypeViaApi,
   createRecordViaApi,
-  createEventViaApi,
   listRecordsViaApi,
   linkRecordToEventViaApi,
   linkReportToEventViaApi,
@@ -214,10 +213,9 @@ Then('the event start date should be displayed', async ({ page }) => {
 
 Given('an event with linked cases exists', async ({ backendRequest: request, casesWorld, workerHub }) => {
   const entityTypeId = await ensureEventEntityType(request, casesWorld, workerHub)
-  const event = await createEventViaApi(request, entityTypeId, { statusHash: 'active', hubId: workerHub }).catch(async () => {
-    // Fallback: create as a record
-    return createRecordViaApi(request, entityTypeId, { statusHash: 'active', hubId: workerHub })
-  })
+  // Use createRecordViaApi directly: the frontend events page uses listRecords (not the /events API),
+  // so events must live in the records table to appear in the UI.
+  const event = await createRecordViaApi(request, entityTypeId, { statusHash: 'active', hubId: workerHub })
   casesWorld.lastEventId = (event as { id: string }).id
 
   // Create and link a case
@@ -232,9 +230,8 @@ Given('an event with linked cases exists', async ({ backendRequest: request, cas
 
 Given('an event with {int} linked cases exists', async ({ backendRequest: request, casesWorld, workerHub }, count: number) => {
   const entityTypeId = await ensureEventEntityType(request, casesWorld, workerHub)
-  const event = await createEventViaApi(request, entityTypeId, { statusHash: 'active', hubId: workerHub }).catch(async () => {
-    return createRecordViaApi(request, entityTypeId, { statusHash: 'active', hubId: workerHub })
-  })
+  // Use createRecordViaApi: frontend uses listRecords, not the /events API endpoint
+  const event = await createRecordViaApi(request, entityTypeId, { statusHash: 'active', hubId: workerHub })
   casesWorld.lastEventId = (event as { id: string }).id
 
   const entityTypes = await listEntityTypesViaApi(request, workerHub)
@@ -250,9 +247,8 @@ Given('an event with {int} linked cases exists', async ({ backendRequest: reques
 
 Given('an event with linked reports exists', async ({ backendRequest: request, casesWorld, workerHub }) => {
   const entityTypeId = await ensureEventEntityType(request, casesWorld, workerHub)
-  const event = await createEventViaApi(request, entityTypeId, { statusHash: 'active', hubId: workerHub }).catch(async () => {
-    return createRecordViaApi(request, entityTypeId, { statusHash: 'active', hubId: workerHub })
-  })
+  // Use createRecordViaApi: frontend uses listRecords, not the /events API endpoint
+  const event = await createRecordViaApi(request, entityTypeId, { statusHash: 'active', hubId: workerHub })
   casesWorld.lastEventId = (event as { id: string }).id
 
   const report = await createReportViaApi(request, { title: `Event Report ${Date.now()}`, hubId: workerHub })

@@ -59,7 +59,8 @@ When('I fill in Twilio credentials with WebRTC config', async ({ page }) => {
   // Fill Account SID (may use placeholder or testid)
   const sidInput = page.getByTestId(TestIds.ACCOUNT_SID)
   if (await sidInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await sidInput.fill('ACwebrtctest123')
+    // Must match ^AC[0-9a-f]{32}$ — AC prefix + exactly 32 lowercase hex chars
+    await sidInput.fill('AC00000000000000000000000000000001')
   }
   const tokenInput = page.getByTestId(TestIds.AUTH_TOKEN)
   if (await tokenInput.isVisible({ timeout: 2000 }).catch(() => false)) {
@@ -75,17 +76,27 @@ When('I fill in Twilio credentials with WebRTC config', async ({ page }) => {
     await phoneInput.blur()
   }
 
-  // Enable WebRTC toggle
+  // Enable WebRTC toggle — check current state first to avoid toggling it OFF.
+  // If a previous test already saved webrtcEnabled=true, the toggle starts ON.
   const telephonySection = page.getByTestId(TestIds.TELEPHONY_PROVIDER)
   const hasSect = await telephonySection.isVisible({ timeout: 3000 }).catch(() => false)
   if (hasSect) {
     const toggle = telephonySection.getByRole('switch').first()
     const hasToggle = await toggle.isVisible({ timeout: 3000 }).catch(() => false)
-    if (hasToggle) await toggle.click()
+    if (hasToggle) {
+      // Only click if WebRTC is currently disabled (data-state=unchecked / aria-checked=false)
+      const isAlreadyOn = await toggle.evaluate((el) =>
+        el.getAttribute('data-state') === 'checked' || el.getAttribute('aria-checked') === 'true'
+      ).catch(() => false)
+      if (!isAlreadyOn) {
+        await toggle.click()
+      }
+    }
   }
 
+  // Wait for the WebRTC API key fields to appear after enabling the toggle
   const apiKeySid = page.getByTestId(TestIds.API_KEY_SID)
-  if (await apiKeySid.isVisible({ timeout: 3000 }).catch(() => false)) {
+  if (await apiKeySid.isVisible({ timeout: 5000 }).catch(() => false)) {
     await apiKeySid.fill('SKtestkey123')
   }
   const twimlSid = page.getByTestId(TestIds.TWIML_APP_SID)

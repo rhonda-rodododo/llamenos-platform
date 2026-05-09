@@ -223,8 +223,10 @@ When('I tap the {string} report status filter', async ({ page, backendRequest, w
     } catch (e) {
       console.warn('[reports] Seeding failed:', e)
     }
-    // Wait for network to settle so the seeded report appears
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {})
+    // Wait for a report card to appear — confirms the list has loaded with seeded data.
+    // This is more reliable than waitForLoadState('networkidle') which doesn't guarantee
+    // that the React state has been updated with the fetched reports.
+    await expect(page.getByTestId(TestIds.REPORT_CARD).first()).toBeVisible({ timeout: Timeouts.ELEMENT }).catch(() => {})
   }
 
   await expect(filterArea).toBeVisible({ timeout: Timeouts.ELEMENT })

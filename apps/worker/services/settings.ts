@@ -142,6 +142,7 @@ const ALLOWED_HUB_SETTINGS = new Set([
   'transcriptionEnabled',
   'autoAssignment',
   'fallbackGroup',
+  'caseManagementEnabled',
 ])
 
 const VALID_PROVIDER_TYPES = [
@@ -1894,19 +1895,32 @@ export class SettingsService {
   // Case Management — Entity Type Definitions (Epic 315)
   // =========================================================================
 
-  async getCaseManagementEnabled(): Promise<{ enabled: boolean }> {
+  async getCaseManagementEnabled(hubId?: string): Promise<{ enabled: boolean }> {
+    // Hub-scoped: check hub_settings first; fall back to global system_settings
+    if (hubId) {
+      const hubSettingsRow = await this.getHubSettings(hubId)
+      if (typeof hubSettingsRow.caseManagementEnabled === 'boolean') {
+        return { enabled: hubSettingsRow.caseManagementEnabled }
+      }
+    }
     const row = await getSettings(this.db)
     return { enabled: row.caseManagementEnabled ?? false }
   }
 
   async setCaseManagementEnabled(data: {
     enabled: boolean
-  }): Promise<{ enabled: boolean }> {
+  }, hubId?: string): Promise<{ enabled: boolean }> {
     const enabled = !!data.enabled
-    await this.db
-      .update(systemSettings)
-      .set({ caseManagementEnabled: enabled })
-      .where(eq(systemSettings.id, SINGLETON_ID))
+    if (hubId) {
+      // Hub-scoped: store in hub_settings so parallel tests don't interfere
+      await this.updateHubSettings(hubId, { caseManagementEnabled: enabled })
+    } else {
+      // Global fallback (non-hub-scoped path)
+      await this.db
+        .update(systemSettings)
+        .set({ caseManagementEnabled: enabled })
+        .where(eq(systemSettings.id, SINGLETON_ID))
+    }
     return { enabled }
   }
 

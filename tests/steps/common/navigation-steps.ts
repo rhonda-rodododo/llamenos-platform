@@ -255,6 +255,13 @@ Then('the page title should contain {string}', async ({ page }, text: string) =>
   expect(title.toLowerCase()).toContain(text.toLowerCase())
 })
 
+Then('the app has a non-empty page title', async ({ page }) => {
+  // The page title comes from index.html default ("Hotline") or the configured
+  // HOTLINE_NAME (e.g. "Llámenos" in CI). Accept any non-empty title.
+  const title = await page.title()
+  expect(title.trim().length).toBeGreaterThan(0)
+})
+
 Then('I should be redirected to the login page', async ({ page }) => {
   await page.waitForURL(/\/login/, { timeout: Timeouts.NAVIGATION })
 })

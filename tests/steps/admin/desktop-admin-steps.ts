@@ -300,6 +300,18 @@ When('I confirm the deletion', async ({ page }) => {
   // others use a React AlertDialog. Handle both cases.
   const dialog = page.getByRole('dialog')
   if (await dialog.isVisible({ timeout: 2000 }).catch(() => false)) {
+    // The DeleteHubDialog requires typing the hub name into the confirmation input
+    // before the "Delete Hub" confirm button becomes enabled.
+    const confirmInput = page.getByTestId('delete-hub-confirm-input')
+    const hasInput = await confirmInput.isVisible({ timeout: 2000 }).catch(() => false)
+    if (hasInput) {
+      // Read the expected hub name displayed above the input (the <p> with font-mono class)
+      const hubNameLabel = dialog.locator('p.font-mono.font-medium').first()
+      const hubName = await hubNameLabel.textContent({ timeout: 2000 }).catch(() => null)
+      if (hubName) {
+        await confirmInput.fill(hubName.trim())
+      }
+    }
     const okBtn = page.getByTestId(TestIds.CONFIRM_DIALOG_OK)
     const hasOk = await okBtn.isVisible({ timeout: 2000 }).catch(() => false)
     if (hasOk) await okBtn.click()

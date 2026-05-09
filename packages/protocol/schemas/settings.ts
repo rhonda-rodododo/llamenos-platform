@@ -156,8 +156,12 @@ export const messagingConfigSchema = z.looseObject({
 
 export const telephonyProviderSchema = z.looseObject({
   type: telephonyProviderTypeSchema,
-  // HIGH-W5: Validate Twilio/SignalWire Account SID format to prevent SSRF via crafted SIDs
-  accountSid: z.string().regex(/^AC[0-9a-f]{32}$/, 'Invalid Account SID format (must be AC followed by 32 hex chars)').optional(),
+  // HIGH-W5: Validate Account SID / Project ID format to prevent SSRF via crafted values.
+  // Twilio uses AC + 32 hex chars; SignalWire uses UUID project IDs.
+  accountSid: z.string().regex(
+    /^(AC[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/,
+    'Invalid Account SID / Project ID format (must be Twilio AC+32hex or UUID)',
+  ).optional(),
   authToken: z.string().optional(),
   apiKeySid: z.string().optional(),
   apiKeySecret: z.string().optional(),
