@@ -49,7 +49,15 @@ export default defineConfig({
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
       // Exclude bootstrap tests — they run in the sequential "bootstrap" project above.
-      testIgnore: ["**/live/**", "**/desktop/**", "**/integration/**", "**/bootstrap.spec.ts"],
+      // Exclude traditional tests — they run in the "traditional" project below.
+      testIgnore: ["**/live/**", "**/desktop/**", "**/integration/**", "**/bootstrap.spec.ts", "**/traditional/**"],
+      // Wait for bootstrap tests to complete and restore admin before parallel tests run.
+      dependencies: ["bootstrap"],
+    },
+    {
+      name: "traditional",
+      use: { ...devices["Desktop Chrome"] },
+      testMatch: ["**/traditional/**/*.spec.ts"],
       // Wait for bootstrap tests to complete and restore admin before parallel tests run.
       dependencies: ["bootstrap"],
     },
