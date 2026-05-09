@@ -215,7 +215,6 @@ export const TestIds = {
   DASHBOARD_ACTIVE_CALLS: 'dashboard-active-calls',
   DASHBOARD_SHIFT_STATUS: 'dashboard-shift-status',
   DASHBOARD_CALLS_TODAY: 'dashboard-calls-today',
-  DASHBOARD_QUICK_ACTIONS: 'dashboard-quick-actions',
   BREAK_TOGGLE_BTN: 'break-toggle-btn',
 
   // ============ Settings ============
