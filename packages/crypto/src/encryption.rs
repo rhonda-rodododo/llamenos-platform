@@ -707,7 +707,12 @@ mod tests {
         let plaintext = r#"{"answeredBy":"vol-1","callerNumber":"+1234"}"#;
 
         let message_key = Zeroizing::new(random_bytes_32());
-        let packed = aes256gcm_encrypt(&message_key, plaintext.as_bytes(), LABEL_CALL_META.as_bytes()).unwrap();
+        let packed = aes256gcm_encrypt(
+            &message_key,
+            plaintext.as_bytes(),
+            LABEL_CALL_META.as_bytes(),
+        )
+        .unwrap();
         let encrypted_content = hex::encode(&packed);
 
         let admin_env = hpke_wrap_key(&message_key, &admin_pk, LABEL_CALL_META).unwrap();
@@ -717,7 +722,9 @@ mod tests {
             ct: admin_env.ct.clone(),
         }];
 
-        let decrypted = decrypt_call_record(&encrypted_content, &admin_envelopes, &admin_sk, &admin_pk).unwrap();
+        let decrypted =
+            decrypt_call_record(&encrypted_content, &admin_envelopes, &admin_sk, &admin_pk)
+                .unwrap();
         assert_eq!(decrypted, plaintext);
     }
 
@@ -728,7 +735,12 @@ mod tests {
         let plaintext = r#"{"answeredBy":"vol-1","callerNumber":"+1234"}"#;
 
         let message_key = Zeroizing::new(random_bytes_32());
-        let packed = aes256gcm_encrypt(&message_key, plaintext.as_bytes(), LABEL_CALL_META.as_bytes()).unwrap();
+        let packed = aes256gcm_encrypt(
+            &message_key,
+            plaintext.as_bytes(),
+            LABEL_CALL_META.as_bytes(),
+        )
+        .unwrap();
         let encrypted_content = hex::encode(&packed);
 
         let admin_env = hpke_wrap_key(&message_key, &admin_pk, LABEL_CALL_META).unwrap();
@@ -738,7 +750,8 @@ mod tests {
             ct: admin_env.ct.clone(),
         }];
 
-        let result = decrypt_call_record(&encrypted_content, &admin_envelopes, &wrong_sk, &wrong_pk);
+        let result =
+            decrypt_call_record(&encrypted_content, &admin_envelopes, &wrong_sk, &wrong_pk);
         assert!(result.is_err());
     }
 
@@ -798,7 +811,12 @@ mod tests {
         let (_author_sk, author_pk) = gen_keypair();
         let payload = "";
         let encrypted = encrypt_note(payload, &author_pk, &[]).unwrap();
-        let decrypted = decrypt_note(&encrypted.encrypted_content, &encrypted.author_envelope, &_author_sk).unwrap();
+        let decrypted = decrypt_note(
+            &encrypted.encrypted_content,
+            &encrypted.author_envelope,
+            &_author_sk,
+        )
+        .unwrap();
         assert_eq!(decrypted, payload);
     }
 
@@ -819,8 +837,12 @@ mod tests {
 
         for (i, admin_sk) in admin_sks.iter().enumerate() {
             let env = &encrypted.admin_envelopes[i];
-            let envelope = KeyEnvelope { enc: env.enc.clone(), ct: env.ct.clone() };
-            let decrypted = decrypt_note(&encrypted.encrypted_content, &envelope, admin_sk).unwrap();
+            let envelope = KeyEnvelope {
+                enc: env.enc.clone(),
+                ct: env.ct.clone(),
+            };
+            let decrypted =
+                decrypt_note(&encrypted.encrypted_content, &envelope, admin_sk).unwrap();
             assert_eq!(decrypted, payload);
         }
     }
