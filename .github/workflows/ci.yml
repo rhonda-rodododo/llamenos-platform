@@ -212,6 +212,12 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: bunx playwright install-deps chromium
 
+      - name: Download build artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: app-build
+          path: dist
+
       - name: Create .env for Docker Compose
         run: |
           printf '%s\n' \
@@ -296,16 +302,36 @@ jobs:
       - name: Generate BDD test files
         run: bunx bddgen
 
+      - name: Start Vite preview server
+        run: |
+          bunx vite preview --port 8788 --strictPort &
+          PREVIEW_PID=$!
+          echo "preview_pid=$PREVIEW_PID" >> "$GITHUB_ENV"
+          for _i in $(seq 1 30); do
+            if bun -e "try{await fetch('http://localhost:8788');process.exit(0)}catch{process.exit(1)}" 2>/dev/null; then
+              echo "Preview server ready"
+              break
+            fi
+            sleep 1
+          done
+
       - name: Run E2E tests
         run: bunx playwright test --project=bootstrap --project=chromium --project=bdd
         env:
+          CI: "true"
+          PLAYWRIGHT_BASE_URL: "http://localhost:8788"
           TEST_HUB_URL: http://localhost:3000
           TEST_RELAY_URL: ws://127.0.0.1:3000/ws
           SIGNAL_NOTIFIER_URL: http://localhost:3100
           SIGNAL_NOTIFIER_BEARER_TOKEN: ci-test-notifier-key
           PBX_TYPE: ari
           DEV_RESET_SECRET: test-reset-secret
+          E2E_TEST_SECRET: test-reset-secret
           DATABASE_URL: postgresql://llamenos:ci-test-password@localhost:5432/llamenos
+
+      - name: Stop Vite preview server
+        if: always()
+        run: kill "$preview_pid" 2>/dev/null || true
 
       - name: Smoke check sidecar health endpoints
         if: always()
