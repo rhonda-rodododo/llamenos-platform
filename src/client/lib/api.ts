@@ -138,7 +138,7 @@ function checkVersionHeaders(res: Response): void {
   }
 }
 
-async function request<T>(path: string, options: RequestInit & { retries?: number } = {}): Promise<T> {
+export async function request<T>(path: string, options: RequestInit & { retries?: number } = {}): Promise<T> {
   const method = ((options.method as string) || 'GET').toUpperCase()
   const isIdempotent = method === 'GET' || method === 'HEAD'
   const maxRetries = options.retries ?? (isIdempotent ? MAX_RETRIES : 0)

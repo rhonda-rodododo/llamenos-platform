@@ -99,4 +99,77 @@ describe('formatRelativeTime', () => {
     const twoDaysAgo = new Date('2024-01-13T14:00:00Z')
     expect(formatRelativeTime(twoDaysAgo.toISOString(), mockT)).toBe('2d ago')
   })
+
+  it('handles exactly 60 seconds as minutes', () => {
+    const now = new Date('2024-01-15T14:00:00Z')
+    vi.setSystemTime(now)
+
+    const exactly60Sec = new Date('2024-01-15T13:59:00Z')
+    expect(formatRelativeTime(exactly60Sec.toISOString(), mockT)).toBe('1m ago')
+  })
+
+  it('handles exactly 60 minutes as hours', () => {
+    const now = new Date('2024-01-15T14:00:00Z')
+    vi.setSystemTime(now)
+
+    const exactly60Min = new Date('2024-01-15T13:00:00Z')
+    expect(formatRelativeTime(exactly60Min.toISOString(), mockT)).toBe('1h ago')
+  })
+
+  it('handles exactly 24 hours as days', () => {
+    const now = new Date('2024-01-15T14:00:00Z')
+    vi.setSystemTime(now)
+
+    const exactly24h = new Date('2024-01-14T14:00:00Z')
+    expect(formatRelativeTime(exactly24h.toISOString(), mockT)).toBe('1d ago')
+  })
+
+  it('handles very old dates', () => {
+    const now = new Date('2024-01-15T14:00:00Z')
+    vi.setSystemTime(now)
+
+    const yearAgo = new Date('2023-01-15T14:00:00Z')
+    expect(formatRelativeTime(yearAgo.toISOString(), mockT)).toBe('365d ago')
+  })
+
+  it('handles invalid date', () => {
+    const now = new Date('2024-01-15T14:00:00Z')
+    vi.setSystemTime(now)
+
+    const result = formatRelativeTime('invalid', mockT)
+    expect(result === 'just now' || result === 'NaNd ago').toBe(true)
+  })
+})
+
+describe('formatTimestamp edge cases', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('handles year boundary', () => {
+    const now = new Date('2024-01-01T14:30:00Z')
+    vi.setSystemTime(now)
+
+    const lastYear = new Date('2023-12-31T10:00:00Z')
+    const result = formatTimestamp(lastYear.toISOString())
+    expect(result).toMatch(/Dec/)
+  })
+
+  it('handles month boundary', () => {
+    const now = new Date('2024-01-15T14:30:00Z')
+    vi.setSystemTime(now)
+
+    const lastMonth = new Date('2023-12-15T10:00:00Z')
+    const result = formatTimestamp(lastMonth.toISOString())
+    expect(result).toMatch(/Dec/)
+  })
+
+  it('handles empty string', () => {
+    const result = formatTimestamp('')
+    expect(result).toBe('Invalid Date')
+  })
 })
