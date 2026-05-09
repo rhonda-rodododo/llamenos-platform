@@ -1,0 +1,14 @@
+#!/bin/bash
+# PostgreSQL vacuum script — managed by Ansible
+# Do not edit manually; changes will be overwritten on next deploy.
+
+set -euo pipefail
+
+APP_DIR="{{ app_dir }}"
+
+echo "=== PostgreSQL Vacuum ==="
+echo "Started: $(date -Iseconds)"
+
+docker compose -f "${APP_DIR}/services/postgres/docker-compose.yml" exec -T postgres psql -U llamenos -d llamenos -c "VACUUM ANALYZE;" 2>/dev/null || true
+
+echo "Completed: $(date -Iseconds)"

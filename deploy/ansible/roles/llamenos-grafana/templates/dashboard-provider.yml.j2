@@ -1,14 +1,11 @@
-# Grafana Dashboard Provisioning — managed by Ansible
 apiVersion: 1
 
 providers:
-  - name: llamenos
+  - name: 'default'
     orgId: 1
-    folder: Llamenos
+    folder: ''
     type: file
     disableDeletion: false
-    updateIntervalSeconds: 30
-    allowUiUpdates: true
+    editable: true
     options:
       path: /var/lib/grafana/dashboards
-      foldersFromFilesStructure: false

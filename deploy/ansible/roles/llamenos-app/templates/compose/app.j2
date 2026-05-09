@@ -1,0 +1,54 @@
+name: llamenos-app
+
+services:
+  app:
+    image: {{ llamenos_app_image }}
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:size=64M
+    environment:
+      - PLATFORM=bun
+      - PORT=3000
+      - DATABASE_URL=postgresql://llamenos:{{ pg_password }}@postgres:5432/llamenos
+      - PG_POOL_SIZE={{ pg_pool_size | default(10) }}
+      - ADMIN_PUBKEY={{ admin_pubkey }}
+      - HOTLINE_NAME={{ hotline_name | default('Hotline') }}
+      - ENVIRONMENT={{ app_environment | default('production') }}
+      - HMAC_SECRET={{ hmac_secret }}
+      - STORAGE_ENDPOINT=http://rustfs:9000
+      - STORAGE_ACCESS_KEY={{ storage_access_key }}
+      - STORAGE_SECRET_KEY={{ storage_secret_key }}
+      - STORAGE_BUCKET={{ storage_bucket | default('llamenos-files') }}
+      - WHISPER_URL=http://whisper:8080/v1/audio/transcriptions
+      - TWILIO_ACCOUNT_SID={{ twilio_account_sid | default('') }}
+      - TWILIO_AUTH_TOKEN={{ twilio_auth_token | default('') }}
+      - TWILIO_PHONE_NUMBER={{ twilio_phone_number | default('') }}
+      - SERVER_NOSTR_SECRET={{ server_nostr_secret }}
+      - NOSTR_RELAY_URL=ws://localhost:7777
+    networks:
+      - llamenos-web
+      - llamenos-internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rustfs:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+        tag: "llamenos-app"
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://localhost:3000/api/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+networks:
+  llamenos-web:
+    external: true
+  llamenos-internal:
+    external: true

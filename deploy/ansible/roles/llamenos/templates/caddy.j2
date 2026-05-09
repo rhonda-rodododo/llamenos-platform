@@ -1,0 +1,17 @@
+# Llamenos Caddyfile — managed by Ansible
+# Do not edit manually; changes will be overwritten on next deploy.
+
+{{ domain }} {
+    reverse_proxy app:3000
+    tls {{ acme_email }}
+}
+
+app.{{ domain }} {
+    reverse_proxy app:3000
+    tls {{ acme_email }}
+}
+
+api.{{ domain }} {
+    reverse_proxy app:3000
+    tls {{ acme_email }}
+}

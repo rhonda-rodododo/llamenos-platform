@@ -1,0 +1,26 @@
+#!/bin/bash
+# Certificate expiry monitor — managed by Ansible
+# Do not edit manually; changes will be overwritten on next deploy.
+
+set -euo pipefail
+
+DOMAIN="{{ domain }}"
+ALERT_DAYS="{{ llamenos_alert_cert_expiry_days | default(7) }}"
+
+echo "=== Certificate Expiry Check ==="
+echo "Domain: ${DOMAIN}"
+echo "Alert threshold: ${ALERT_DAYS} days"
+
+EXPIRY=$(echo | openssl s_client -servername "${DOMAIN}" -connect "${DOMAIN}:443" 2>/dev/null | openssl x509 -noout -dates | grep notAfter | cut -d= -f2)
+EXPIRY_EPOCH=$(date -d "${EXPIRY}" +%s)
+NOW_EPOCH=$(date +%s)
+DAYS_REMAINING=$(( (EXPIRY_EPOCH - NOW_EPOCH) / 86400 ))
+
+echo "Days remaining: ${DAYS_REMAINING}"
+
+if [ "${DAYS_REMAINING}" -le "${ALERT_DAYS}" ]; then
+    echo "ALERT: Certificate expires in ${DAYS_REMAINING} days!"
+    exit 1
+fi
+
+echo "Certificate OK"

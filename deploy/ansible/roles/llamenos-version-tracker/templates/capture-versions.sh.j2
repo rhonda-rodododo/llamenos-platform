@@ -1,36 +1,26 @@
-#!/usr/bin/env bash
-# Capture current Docker image digests and tags for all running services.
-# Output: JSON object mapping service name to { image, digest }.
+#!/bin/bash
+# Version capture script — managed by Ansible
+# Do not edit manually; changes will be overwritten on next deploy.
+
 set -euo pipefail
 
-cd "{{ app_dir }}"
+APP_DIR="{{ app_dir }}"
+VERSION_FILE="${APP_DIR}/.version-history/current.json"
+HISTORY_FILE="${APP_DIR}/.version-history/history.json"
 
-# Get image info for each service defined in docker-compose.yml
-services=$(docker compose config --services 2>/dev/null || true)
-if [ -z "$services" ]; then
-  echo '{}'
-  exit 0
-fi
+echo "=== Capture Versions ==="
+echo "Started: $(date -Iseconds)"
 
-echo '{'
-first=true
-for svc in $services; do
-  # Get the image reference for this service
-  image=$(docker compose images "$svc" --format json 2>/dev/null | \
-    python3 -c "import sys,json; data=json.load(sys.stdin); print(data[0].get('Repository','') + ':' + data[0].get('Tag','') if data else '')" 2>/dev/null || true)
+# Get current versions
+APP_VERSION=$(docker inspect --format='{{ '{{' }}.RepoTags{{ '}}' }}' $(docker compose -f "${APP_DIR}/services/app/docker-compose.yml" ps -q app 2>/dev/null) 2>/dev/null || echo "unknown")
+POSTGRES_VERSION=$(docker inspect --format='{{ '{{' }}.RepoTags{{ '}}' }}' $(docker compose -f "${APP_DIR}/services/postgres/docker-compose.yml" ps -q postgres 2>/dev/null) 2>/dev/null || echo "unknown")
 
-  # Get the digest
-  digest=$(docker compose images "$svc" --format json 2>/dev/null | \
-    python3 -c "import sys,json; data=json.load(sys.stdin); print(data[0].get('ID','') if data else '')" 2>/dev/null || true)
+cat > "${VERSION_FILE}" << EOF
+{
+  "timestamp": "$(date -Iseconds)",
+  "app": "${APP_VERSION}",
+  "postgres": "${POSTGRES_VERSION}"
+}
+EOF
 
-  if [ -n "$image" ] && [ "$image" != ":" ]; then
-    if [ "$first" = true ]; then
-      first=false
-    else
-      echo ','
-    fi
-    printf '  "%s": {"image": "%s", "digest": "%s"}' "$svc" "$image" "$digest"
-  fi
-done
-echo ''
-echo '}'
+echo "Versions captured"

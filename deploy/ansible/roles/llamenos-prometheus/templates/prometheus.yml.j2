@@ -6,7 +6,7 @@ global:
   evaluation_interval: {{ prometheus_scrape_interval }}
   external_labels:
     cluster: llamenos
-    environment: {{ environment }}
+    environment: {{ app_environment | default('production') }}
 
 rule_files:
   - /etc/prometheus/rules/*.yml

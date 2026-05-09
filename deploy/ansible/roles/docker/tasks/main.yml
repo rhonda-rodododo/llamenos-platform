@@ -126,3 +126,14 @@
 - name: Verify Docker is running
   ansible.builtin.command: docker info
   changed_when: false
+
+- name: Create Llamenos Docker networks
+  community.docker.docker_network:
+    name: "{{ item }}"
+    state: present
+    driver: bridge
+  loop:
+    - llamenos-web
+    - llamenos-internal
+    - llamenos-observability
+  tags: [docker, deploy]

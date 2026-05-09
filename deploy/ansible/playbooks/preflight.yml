@@ -91,7 +91,7 @@
           ===========================================
           Target: {{ inventory_hostname }}
           Domain: {{ domain | default('NOT SET') }}
-          Environment: {{ environment | default('production') }}
+          Environment: {{ app_environment | default('production') }}
           Deploy User: {{ deploy_user | default('deploy') }}
           App Directory: {{ app_dir | default('/opt/llamenos') }}
           ===========================================
@@ -161,22 +161,32 @@
             2. Set llamenos_app_image to a valid image reference
         success_msg: "llamenos_app_image: {{ llamenos_app_image }}"
 
-    - name: Assert admin_pubkey is a valid 64-character hex string
+    - name: Warn if admin_pubkey is not set (web UI bootstrap allowed)
+      ansible.builtin.debug:
+        msg: |
+          WARNING: 'admin_pubkey' is not set. Admin will need to be bootstrapped via the web UI.
+          
+          To pre-configure an admin:
+            1. Generate a keypair: bun run bootstrap-admin
+            2. Copy the hex public key to admin_pubkey in vars.yml
+      when: admin_pubkey is not defined or admin_pubkey | length == 0
+
+    - name: Assert admin_pubkey is a valid 64-character hex string (if set)
       ansible.builtin.assert:
         that:
-          - admin_pubkey is defined
           - admin_pubkey | length == 64
           - admin_pubkey | regex_search('^[0-9a-f]{64}$') is truthy
         fail_msg: |
-          REQUIRED: 'admin_pubkey' must be a 64-character lowercase hex string (Nostr public key).
+          INVALID: 'admin_pubkey' must be a 64-character lowercase hex string (Nostr public key).
           
-          Current value: {{ admin_pubkey | default('NOT SET') }}
-          Length: {{ admin_pubkey | default('') | length }} chars (expected: 64)
+          Current value: {{ admin_pubkey }}
+          Length: {{ admin_pubkey | length }} chars (expected: 64)
           
           To fix:
             1. Generate a keypair: bun run bootstrap-admin
             2. Copy the hex public key to admin_pubkey in vars.yml
         success_msg: "admin_pubkey: {{ admin_pubkey[:8] }}... (64 chars)"
+      when: admin_pubkey is defined and admin_pubkey | length > 0
 
     - name: Assert hmac_secret meets minimum length
       ansible.builtin.assert:

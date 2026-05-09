@@ -1,0 +1,21 @@
+#!/bin/bash
+# Disk space monitor — managed by Ansible
+# Do not edit manually; changes will be overwritten on next deploy.
+
+set -euo pipefail
+
+APP_DIR="{{ app_dir }}"
+ALERT_PERCENT="{{ llamenos_alert_disk_percent | default(85) }}"
+
+echo "=== Disk Space Check ==="
+echo "Alert threshold: ${ALERT_PERCENT}%"
+
+USAGE=$(df "${APP_DIR}" | tail -1 | awk '{print $5}' | tr -d '%')
+echo "Usage: ${USAGE}%"
+
+if [ "${USAGE}" -ge "${ALERT_PERCENT}" ]; then
+    echo "ALERT: Disk usage is ${USAGE}%!"
+    exit 1
+fi
+
+echo "Disk space OK"

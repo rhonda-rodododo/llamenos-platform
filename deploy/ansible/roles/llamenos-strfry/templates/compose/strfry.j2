@@ -1,0 +1,29 @@
+name: llamenos-strfry
+
+services:
+  strfry:
+    image: {{ llamenos_strfry_image | default('dockurr/strfry:1.0.1') }}
+    restart: unless-stopped
+    volumes:
+      - strfry-data:/app/strfry-db
+    networks:
+      - llamenos-internal
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "llamenos-strfry"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7777"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  strfry-data:
+
+networks:
+  llamenos-internal:
+    external: true

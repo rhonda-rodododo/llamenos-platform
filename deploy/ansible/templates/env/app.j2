@@ -7,7 +7,7 @@ PLATFORM=bun
 PORT=3000
 ADMIN_PUBKEY={{ admin_pubkey }}
 HOTLINE_NAME={{ hotline_name }}
-ENVIRONMENT={{ environment }}
+ENVIRONMENT={{ app_environment | default('production') }}
 HMAC_SECRET={{ hmac_secret }}
 
 # ─── Database ────────────────────────────────────────────────

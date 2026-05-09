@@ -1,0 +1,26 @@
+#!/bin/bash
+# Container watchdog script — managed by Ansible
+# Do not edit manually; changes will be overwritten on next deploy.
+
+set -euo pipefail
+
+MAX_FAILURES="{{ llamenos_watchdog_max_failures | default(3) }}"
+MAX_RESTARTS="{{ llamenos_watchdog_max_restarts | default(5) }}"
+APP_DIR="{{ app_dir }}"
+
+echo "=== Container Watchdog ==="
+echo "Started: $(date -Iseconds)"
+
+# Check all llamenos containers
+for container in $(docker ps --filter "name=llamenos" --format "{{ '{{' }}.Names{{ '}}' }}" 2>/dev/null); do
+    HEALTH=$(docker inspect --format='{{ '{{' }}.State.Health.Status{{ '}}' }}' "${container}" 2>/dev/null || echo "none")
+    RESTART_COUNT=$(docker inspect --format='{{ '{{' }}.RestartCount{{ '}}' }}' "${container}" 2>/dev/null || echo "0")
+    
+    echo "Container: ${container} | Health: ${HEALTH} | Restarts: ${RESTART_COUNT}"
+    
+    if [ "${RESTART_COUNT}" -ge "${MAX_RESTARTS}" ]; then
+        echo "ALERT: ${container} has restarted ${RESTART_COUNT} times!"
+    fi
+done
+
+echo "Completed: $(date -Iseconds)"

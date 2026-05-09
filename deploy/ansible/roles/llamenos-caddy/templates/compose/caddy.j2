@@ -1,0 +1,33 @@
+name: llamenos-caddy
+
+services:
+  caddy:
+    image: {{ llamenos_caddy_image | default('caddy:2.9-alpine') }}
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    environment:
+      - DOMAIN={{ domain }}
+      - ACME_EMAIL={{ acme_email }}
+    networks:
+      - llamenos-web
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+        tag: "llamenos-caddy"
+
+volumes:
+  caddy-data:
+  caddy-config:
+
+networks:
+  llamenos-web:
+    external: true
