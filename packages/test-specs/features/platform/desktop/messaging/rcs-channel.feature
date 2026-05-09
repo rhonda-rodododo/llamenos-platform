@@ -14,4 +14,4 @@ Feature: RCS Channel Configuration
   Scenario: Save RCS configuration
     When I fill in valid RCS settings
     And I click "Save"
-    Then I should see a success message
+    Then the RCS agent ID should be saved

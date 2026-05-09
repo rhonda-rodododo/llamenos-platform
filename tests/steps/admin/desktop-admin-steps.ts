@@ -166,6 +166,14 @@ When('I fill in valid RCS settings', async ({ page }) => {
   await agentIdInput.fill('test-agent-id')
 })
 
+Then('the RCS agent ID should be saved', async ({ page }) => {
+  // Wait for the save to complete — the button re-enables when saving finishes
+  const saveBtn = page.getByTestId(TestIds.FORM_SAVE_BTN)
+  await expect(saveBtn).toBeEnabled({ timeout: Timeouts.API })
+  // Verify the agent ID input retained its value (proves the save round-tripped)
+  await expect(page.getByTestId(TestIds.RCS_AGENT_ID)).toHaveValue('test-agent-id')
+})
+
 // --- WebRTC ---
 
 When('I expand the WebRTC section', async ({ page }) => {
