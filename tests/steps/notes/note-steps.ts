@@ -98,8 +98,14 @@ Then('the back button should be visible', async ({ page }) => {
 
 Given('at least one note exists', async ({ page, backendRequest: request, workerHub }) => {
   // Verify via API that notes exist, create one if needed
-  const { notes } = await listNotesViaApi(request, { hubId: workerHub })
-  if (notes.length === 0) {
+  let hasNotes = false
+  try {
+    const { notes } = await listNotesViaApi(request, { hubId: workerHub })
+    hasNotes = notes.length > 0
+  } catch {
+    // API may not be available — fall through to UI creation
+  }
+  if (!hasNotes) {
     // Create a note through the UI
     const { Navigation } = await import('../../pages/index')
     await Navigation.goToNotes(page)
@@ -107,6 +113,8 @@ Given('at least one note exists', async ({ page, backendRequest: request, worker
     await fillCallId(page, `CALL-${Date.now()}`)
     await page.getByTestId(TestIds.NOTE_CONTENT).fill('Auto-created test note')
     await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
+    // Wait for form to close and note to appear in list
+    await expect(page.getByTestId(TestIds.NOTE_FORM)).not.toBeVisible({ timeout: Timeouts.ELEMENT })
   }
 })
 

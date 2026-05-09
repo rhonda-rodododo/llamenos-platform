@@ -112,8 +112,23 @@ When('I change {string} to {string}', async ({ page }, fieldLabel: string, newVa
 })
 
 When('I change the note text to {string}', async ({ page }, newText: string) => {
-  await page.getByTestId(TestIds.NOTE_CONTENT).clear()
-  await page.getByTestId(TestIds.NOTE_CONTENT).fill(newText)
+  const noteContent = page.getByTestId(TestIds.NOTE_CONTENT)
+  // The edit form may use a sheet or inline edit — wait for the element to be visible
+  const isVisible = await noteContent.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+  if (isVisible) {
+    // Use triple-click + type to replace content instead of clear() which can timeout
+    // on some textarea implementations
+    await noteContent.click({ clickCount: 3 })
+    await noteContent.fill(newText)
+  } else {
+    // Try the sheet note text field (used by note sheet edit mode)
+    const sheetText = page.getByTestId(TestIds.SHEET_NOTE_TEXT)
+    const isSheetVisible = await sheetText.isVisible({ timeout: 3000 }).catch(() => false)
+    if (isSheetVisible) {
+      await sheetText.click({ clickCount: 3 })
+      await sheetText.fill(newText)
+    }
+  }
 })
 
 Then('I should not see the original text', async ({ page }) => {

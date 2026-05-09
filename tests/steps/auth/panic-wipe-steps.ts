@@ -41,6 +41,8 @@ When('I press Escape once more', async ({ page }) => {
 Then('the encrypted key should still be in storage', async ({ page }) => {
   const hasKey = await page.evaluate(() => {
     return (
+      localStorage.getItem('tauri-store:keys.json:llamenos-encrypted-device-keys') !== null ||
+      localStorage.getItem('llamenos:llamenos-encrypted-device-keys') !== null ||
       localStorage.getItem('llamenos-encrypted-key') !== null ||
       localStorage.getItem('tauri-store:keys.json:llamenos-encrypted-key') !== null
     )

@@ -16,10 +16,22 @@ When('I open the schema browser', async ({ page }) => {
 })
 
 Then('I should see a list of entity types from the template', async ({ page }) => {
-  // Entity type list should show at least one entry after template is applied
-  const entityTypeList = page.getByTestId('entity-type-list')
+  // Entity type rows should be visible after template is applied.
+  // The entity-types section may need to be expanded first.
+  const section = page.getByTestId('entity-types')
+  const hasSect = await section.isVisible({ timeout: 5000 }).catch(() => false)
+  if (hasSect) {
+    // Check if section is collapsed — expand it
+    const isOpen = await section.locator('[data-state="open"]').isVisible({ timeout: 500 }).catch(() => false)
+    if (!isOpen) {
+      const trigger = page.getByTestId('entity-types-trigger')
+      const hasTrigger = await trigger.isVisible({ timeout: 2000 }).catch(() => false)
+      if (hasTrigger) await trigger.click()
+    }
+  }
+  const entityTypeRow = page.getByTestId('entity-type-row').first()
     .or(page.locator('[data-testid^="entity-type-"]').first())
-  await expect(entityTypeList.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(entityTypeRow).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('I should see the {string} entity type', async ({ page }, typeName: string) => {
@@ -33,27 +45,37 @@ When('I select the {string} entity type', async ({ page }, typeName: string) => 
 })
 
 Then('I should see the fields defined for {string}', async ({ page }, _typeName: string) => {
-  // After selecting an entity type, its fields should be displayed
-  const fieldsSection = page.getByTestId('entity-type-fields')
+  // After selecting an entity type, the entity editor shows fields tab.
+  // Click the "Fields" tab to view fields.
+  const fieldsTab = page.getByTestId('entity-tab-fields')
+  const hasTab = await fieldsTab.isVisible({ timeout: 3000 }).catch(() => false)
+  if (hasTab) await fieldsTab.click()
+  // Look for entity-field-row or fallback to Fields text
+  const fieldRow = page.getByTestId('entity-field-row').first()
     .or(page.getByText(/fields/i).first())
-  await expect(fieldsSection).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(fieldRow).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('each field should show its type and label', async ({ page }) => {
-  // At least one field should be visible with type and label information
-  const fieldRow = page.locator('[data-testid^="field-"]').first()
-    .or(page.locator('tr, [role="row"]').first())
+  // At least one field row should be visible with type and label information
+  const fieldRow = page.getByTestId('entity-field-row').first()
+    .or(page.locator('[data-testid^="entity-field-"]').first())
   await expect(fieldRow).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('I should see the statuses defined for {string}', async ({ page }, _typeName: string) => {
-  // Status definitions should be visible in the entity type detail view
-  const statusSection = page.getByText(/statuses|status/i).first()
-  await expect(statusSection).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // Click the "Statuses" tab in the entity editor
+  const statusTab = page.getByTestId('entity-tab-statuses')
+  const hasTab = await statusTab.isVisible({ timeout: 3000 }).catch(() => false)
+  if (hasTab) await statusTab.click()
+  // Status rows should appear
+  const statusRow = page.getByTestId('status-row').first()
+    .or(page.getByText(/statuses|status/i).first())
+  await expect(statusRow).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('the initial status should be marked', async ({ page }) => {
-  // The default/initial status should have some visual indicator
+  // The default/initial status should have a "set default" or "default" indicator
   const statusBadge = page.locator('[data-testid^="status-"]').first()
     .or(page.getByText(/default|initial|open/i).first())
   await expect(statusBadge).toBeVisible({ timeout: Timeouts.ELEMENT })

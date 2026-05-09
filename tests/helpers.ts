@@ -29,12 +29,23 @@ export * from './pages/index'
 
 /**
  * Enter a PIN into the PinInput component.
- * The PinInput is a single password input field — fill the value and press Enter.
+ * The PinInput is a single password input field.
+ *
+ * Uses clear + type() instead of fill() to ensure React processes each keystroke
+ * and updates component state before we press Enter. With fill(), React may not
+ * have committed the state update by the time Enter fires, causing the
+ * handleKeyDown closure to see the old (empty) value and skip onComplete.
+ *
+ * After typing, we verify the input value matches expectations before pressing
+ * Enter to trigger onComplete.
  */
 export async function enterPin(page: Page, pin: string) {
   const pinInput = page.getByTestId('pin-input').locator('input')
   await pinInput.waitFor({ state: 'visible', timeout: 10000 })
-  await pinInput.fill(pin)
+  await pinInput.clear()
+  await pinInput.pressSequentially(pin, { delay: 10 })
+  // Verify React state has caught up before pressing Enter
+  await expect(pinInput).toHaveValue(pin, { timeout: 5000 })
   await pinInput.press('Enter')
 }
 
@@ -92,6 +103,48 @@ export async function navigateAfterLogin(page: Page, url: string, expectAccessDe
     // silently renders an access-denied message it shouldn't.
     await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
   }
+}
+
+/**
+ * Navigate via SPA without asserting page-title or access-denied.
+ * Useful for steps that navigate to a page and then assert the result
+ * in a subsequent step (e.g., volunteer navigating to a restricted page).
+ */
+export async function navigateViaSpa(page: Page, url: string): Promise<void> {
+  // Check if we're already authenticated (sidebar visible)
+  const sidebar = page.getByTestId(TestIds.NAV_SIDEBAR)
+  const isAuthenticated = await sidebar.isVisible({ timeout: 1000 }).catch(() => false)
+
+  if (!isAuthenticated) {
+    await page.goto('/login')
+    await page.waitForLoadState('domcontentloaded')
+
+    const pinInput = page.getByTestId('pin-input').locator('input')
+    const pinVisible = await pinInput.isVisible({ timeout: 5000 }).catch(() => false)
+
+    if (pinVisible) {
+      await enterPin(page, TEST_PIN)
+    }
+
+    await sidebar.waitFor({ state: 'visible', timeout: Timeouts.AUTH })
+  }
+
+  // SPA navigation via TanStack Router
+  const parsed = new URL(url, 'http://localhost')
+  const searchParams = Object.fromEntries(parsed.searchParams.entries())
+  await page.evaluate(({ pathname, search }) => {
+    const router = (window as any).__TEST_ROUTER
+    if (!router) return
+    if (Object.keys(search).length > 0) {
+      router.navigate({ to: pathname, search })
+    } else {
+      router.navigate({ to: pathname })
+    }
+  }, { pathname: parsed.pathname, search: searchParams })
+  await page.waitForURL(u => u.toString().includes(parsed.pathname), { timeout: Timeouts.NAVIGATION })
+
+  // Wait briefly for route component to mount without asserting specific content
+  await page.waitForLoadState('domcontentloaded')
 }
 
 /**

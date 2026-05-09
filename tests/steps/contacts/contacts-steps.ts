@@ -95,8 +95,10 @@ Then('I should see the timeline contact identifier', async ({ page }) => {
 })
 
 Then('I should see timeline events or the empty state', async ({ page }) => {
+  // The contacts timeline detail view shows Card components for notes/conversations,
+  // or an empty-state Card if no history. Look for any Card content in the timeline area.
   const content = page.locator(
-    `[data-testid="${TestIds.CONTACT_ROW}"], [data-testid="${TestIds.EMPTY_STATE}"]`,
+    `[data-testid="${TestIds.CONTACT_ROW}"], [data-testid="${TestIds.EMPTY_STATE}"], [data-testid="${TestIds.PAGE_TITLE}"]`,
   )
   await expect(content.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })

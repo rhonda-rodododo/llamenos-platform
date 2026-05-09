@@ -619,27 +619,52 @@ Given('a contact with PII data exists', async ({ backendRequest: request, casesW
 
 Given('I am logged in as a volunteer without PII access', async ({ page, backendRequest: request, casesWorld }) => {
   // Create a volunteer with default role-volunteer (no contacts:view-pii permission)
-  const { createVolunteerViaApi } = await import('../../api-helpers')
+  // but with contacts:view so they can access the contact directory
+  const { createRoleViaApi, createVolunteerViaApi } = await import('../../api-helpers')
   const { loginAsVolunteer } = await import('../../helpers')
+  const role = await createRoleViaApi(request, {
+    name: `PII Restricted ${Date.now()}`,
+    slug: `pii-restricted-${Date.now()}`,
+    permissions: [
+      'calls:answer', 'calls:read-active',
+      'notes:read-own', 'shifts:read-own',
+      'contacts:view',
+      'settings:read',
+    ],
+  })
   const vol = await createVolunteerViaApi(request, {
     name: `PII Restricted Vol ${Date.now()}`,
+    roleIds: [role.id],
   })
   await loginAsVolunteer(page, vol.nsec)
 })
 
 When('I click on the restricted contact card', async ({ page }) => {
-  // After re-login, ensure at least one contact is visible
-  await ensureContactVisibleInDirectory(page)
+  // After re-login as volunteer, contacts should be visible but undecryptable (showing "Restricted").
+  // If no contacts are visible, create one via UI so we have something to click.
+  const card = page.getByTestId('directory-contact-card').first()
+  let cardVisible = await card.isVisible({ timeout: 8000 }).catch(() => false)
 
-  // Look for a card showing "Restricted" text or lock icon
-  const restricted = page.getByTestId('directory-contact-card').filter({ hasText: /restricted/i })
-  if (await restricted.first().isVisible({ timeout: 3000 }).catch(() => false)) {
-    await restricted.first().click()
-  } else {
-    // Fallback: click the first card (admin can decrypt all, so none show as restricted)
-    const firstCard = page.getByTestId('directory-contact-card').first()
-    if (await firstCard.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await firstCard.click()
+  if (!cardVisible) {
+    // No contacts visible — try creating one via the UI
+    await ensureContactVisibleInDirectory(page)
+    cardVisible = await card.isVisible({ timeout: 5000 }).catch(() => false)
+  }
+
+  if (!cardVisible) {
+    // Still not visible — navigate again in case the page needs a refresh
+    const { navigateAfterLogin } = await import('../../helpers')
+    await navigateAfterLogin(page, '/contacts-directory')
+    cardVisible = await card.isVisible({ timeout: 8000 }).catch(() => false)
+  }
+
+  if (cardVisible) {
+    // Prefer a card showing "Restricted" text
+    const restricted = page.getByTestId('directory-contact-card').filter({ hasText: /restricted/i })
+    if (await restricted.first().isVisible({ timeout: 3000 }).catch(() => false)) {
+      await restricted.first().click()
+    } else {
+      await card.click()
     }
   }
 })

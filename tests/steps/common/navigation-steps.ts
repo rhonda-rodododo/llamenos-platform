@@ -32,6 +32,7 @@ Given('I navigate to the {string} page', async ({ page }, pageName: string) => {
     Events: (p) => navigateAfterLogin(p, '/events'),
     'Case Management': (p) => navigateAfterLogin(p, '/admin/case-management'),
     'Case Management Settings': (p) => navigateAfterLogin(p, '/admin/case-management'),
+    Hubs: (p) => navigateAfterLogin(p, '/admin/hubs'),
   }
   const navFn = navMap[pageName]
   if (navFn) {
@@ -189,6 +190,16 @@ When('I tap the back button', async ({ page }) => {
   if (cancelVisible) {
     await cancelBtn.click()
     return
+  }
+  // On desktop settings page, sections are inline — "back" from a section means
+  // collapse the expanded section rather than navigating away from settings.
+  if (page.url().includes('/settings')) {
+    // Collapse the currently expanded linked-devices section if it's open
+    const linkedDevicesOpen = page.getByTestId('linked-devices').locator('[data-state="open"]')
+    if (await linkedDevicesOpen.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await page.getByTestId('linked-devices-trigger').click()
+      return
+    }
   }
   await page.goBack()
 })

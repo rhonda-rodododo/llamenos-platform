@@ -421,6 +421,7 @@ function EventDetail({
             <Button
               size="sm"
               variant="outline"
+              data-testid="event-link-case-btn"
               onClick={() => setShowLinkCaseDialog(true)}
             >
               <Link2 className="h-3.5 w-3.5" />
@@ -429,6 +430,7 @@ function EventDetail({
             <Button
               size="sm"
               variant="outline"
+              data-testid="event-link-report-btn"
               onClick={() => setShowLinkReportDialog(true)}
             >
               <Link2 className="h-3.5 w-3.5" />
