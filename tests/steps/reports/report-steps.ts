@@ -199,9 +199,26 @@ Then('I should see the {string} report status filter', async ({ page, backendReq
   await page.keyboard.press('Escape')
 })
 
-When('I tap the {string} report status filter', async ({ page }, filterName: string) => {
-  // Ensure filter area is visible (reports are loaded, not in empty state)
+When('I tap the {string} report status filter', async ({ page, backendRequest, workerHub }, filterName: string) => {
+  // Filters only render when reports exist. Seed if needed.
   const filterArea = page.getByTestId(TestIds.REPORT_FILTER_AREA)
+  const isFilterVisible = await filterArea.isVisible({ timeout: 3000 }).catch(() => false)
+  if (!isFilterVisible) {
+    try {
+      const existing = await listReportsViaApi(backendRequest, { hubId: workerHub }).catch(() => ({ conversations: [], total: 0 }))
+      if (existing.conversations.length === 0) {
+        await createReportViaApi(backendRequest, { title: `Seed for filter ${Date.now()}`, hubId: workerHub })
+      }
+      // SPA re-navigate to refresh the reports list
+      await page.getByTestId(TestIds.NAV_DASHBOARD).click()
+      await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+      await page.getByTestId(TestIds.NAV_REPORTS).click()
+      await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+    } catch {
+      // Backend not available — try to proceed anyway
+    }
+  }
+
   await expect(filterArea).toBeVisible({ timeout: Timeouts.ELEMENT })
 
   const statusFilter = page.getByTestId('report-status-filter')

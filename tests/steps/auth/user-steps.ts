@@ -88,14 +88,21 @@ When('they tap the break button', async ({ page }) => {
 
 When('I create an invite for a new volunteer', async ({ page }) => {
   // Click the "Invite Volunteer" button (not "Add Volunteer" which generates nsec directly)
-  const inviteBtn = page.getByRole('button', { name: /invite volunteer/i })
+  const inviteBtn = page.getByTestId(TestIds.INVITE_BTN)
   await inviteBtn.click()
   const name = `InviteVol ${Date.now()}`
   await page.getByLabel('Name').fill(name)
   const phone = `+1212${Date.now().toString().slice(-7)}`
   await page.getByLabel('Phone Number').fill(phone)
   await page.getByLabel('Phone Number').blur()
-  await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
+  // Invite form uses 'create-invite-btn', not 'form-save-btn'
+  const createInviteBtn = page.getByTestId('create-invite-btn')
+  const isCreateInvite = await createInviteBtn.isVisible({ timeout: 3000 }).catch(() => false)
+  if (isCreateInvite) {
+    await createInviteBtn.click()
+  } else {
+    await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
+  }
   // Wait for the invite link card to appear
   await page.getByTestId('dismiss-invite').waitFor({ state: 'visible', timeout: Timeouts.ELEMENT })
   await page.evaluate((n) => {

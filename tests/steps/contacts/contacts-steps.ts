@@ -11,6 +11,7 @@ import { expect } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
 import { TestIds } from '../../test-ids'
 import { Timeouts, Navigation } from '../../helpers'
+import { createContactByNameViaApi, listContactsViaApi } from '../../api-helpers'
 
 // --- Contacts list steps ---
 
@@ -79,8 +80,25 @@ When('I tap the view contacts button', async ({ page }) => {
   await page.getByTestId(TestIds.NAV_CONTACTS).click()
 })
 
-When('I tap a contact card', async ({ page }) => {
+When('I tap a contact card', async ({ page, backendRequest, workerHub }) => {
+  // Ensure at least one contact exists so the tap has something to click.
   const contactRow = page.getByTestId(TestIds.CONTACT_ROW).first()
+  const hasContact = await contactRow.isVisible({ timeout: 3000 }).catch(() => false)
+  if (!hasContact) {
+    try {
+      const existing = await listContactsViaApi(backendRequest, { hubId: workerHub })
+      if (existing.contacts.length === 0) {
+        await createContactByNameViaApi(backendRequest, `Test Contact ${Date.now()}`, { hubId: workerHub })
+      }
+      // SPA re-navigate to refresh the contacts list
+      await page.getByTestId(TestIds.NAV_DASHBOARD).click()
+      await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+      await page.getByTestId(TestIds.NAV_CONTACTS).click()
+      await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+    } catch {
+      // Backend not available — skip gracefully
+    }
+  }
   await expect(contactRow).toBeVisible({ timeout: Timeouts.ELEMENT })
   await contactRow.click()
 })

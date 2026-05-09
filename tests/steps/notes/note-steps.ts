@@ -105,10 +105,14 @@ Given('at least one note exists', async ({ page, backendRequest: request, worker
   } catch {
     // API may not be available — fall through to UI creation
   }
+
+  // Always navigate to notes page so subsequent steps that check for note cards
+  // find them on the correct page (not the dashboard).
+  const { Navigation } = await import('../../pages/index')
+  await Navigation.goToNotes(page)
+
   if (!hasNotes) {
     // Create a note through the UI
-    const { Navigation } = await import('../../pages/index')
-    await Navigation.goToNotes(page)
     await page.getByTestId(TestIds.NOTE_NEW_BTN).click()
     await fillCallId(page, `CALL-${Date.now()}`)
     await page.getByTestId(TestIds.NOTE_CONTENT).fill('Auto-created test note')

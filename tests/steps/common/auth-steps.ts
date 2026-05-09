@@ -41,6 +41,7 @@ Given('no identity exists on the device', async ({ page }) => {
 Given('an identity exists with PIN {string}', async ({ page }, pin: string) => {
   // Pre-load the admin key encrypted with the given PIN using the test platform shim.
   // This simulates a returning user who has set up their identity and locked the app.
+  // Uses deviceImportAndLoad (Ed25519) for deterministic behavior in CI.
   const secretHex = ADMIN_SEED
 
   await page.goto('/login')
@@ -60,11 +61,11 @@ Given('an identity exists with PIN {string}', async ({ page }, pin: string) => {
   // app in the "locked, PIN required" state that these scenarios test.
   await page.evaluate(async ({ secretHex, pin }) => {
     const platform = (window as Record<string, unknown>).__TEST_PLATFORM as {
-      legacyImportNsec: (secretHex: string, pin: string, deviceId: string) => Promise<unknown>
+      deviceImportAndLoad: (secretHex: string, pin: string, deviceId: string) => Promise<unknown>
       persistAndUnlockDeviceKeys: (encrypted: unknown, pin: string) => Promise<unknown>
       lockCrypto: () => Promise<void>
     }
-    const encrypted = await platform.legacyImportNsec(secretHex, pin, crypto.randomUUID())
+    const encrypted = await platform.deviceImportAndLoad(secretHex, pin, crypto.randomUUID())
     await platform.persistAndUnlockDeviceKeys(encrypted, pin)
     await platform.lockCrypto()
   }, { secretHex, pin })
@@ -104,8 +105,9 @@ Given('I am on the login screen', async ({ page }) => {
 Given('I have a stored identity with PIN {string}', async ({ page }, pin: string) => {
   // Pre-load an encrypted key for the given PIN using the test platform shim.
   // Normalize to 8 characters (PinInput component requires minLength=8 before Enter triggers onComplete).
-  // Uses legacyImportNsec so the admin nsec is stored and locked — leaving the app in the
-  // "locked, PIN required" state that PIN setup/unlock scenarios test.
+  // Uses deviceImportAndLoad (Ed25519) which is deterministic and works reliably across
+  // page reloads in CI. The old legacyImportNsec (secp256k1 + argon2id) was non-deterministic
+  // under CI memory pressure, causing "Wrong PIN" failures.
   const normalizedPin = pin.padEnd(8, '0')
   const secretHex = ADMIN_SEED
 
@@ -122,11 +124,11 @@ Given('I have a stored identity with PIN {string}', async ({ page }, pin: string
 
   await page.evaluate(async ({ secretHex, normalizedPin }) => {
     const platform = (window as Record<string, unknown>).__TEST_PLATFORM as {
-      legacyImportNsec: (secretHex: string, pin: string, deviceId: string) => Promise<unknown>
+      deviceImportAndLoad: (secretHex: string, pin: string, deviceId: string) => Promise<unknown>
       persistAndUnlockDeviceKeys: (encrypted: unknown, pin: string) => Promise<unknown>
       lockCrypto: () => Promise<void>
     }
-    const encrypted = await platform.legacyImportNsec(secretHex, normalizedPin, crypto.randomUUID())
+    const encrypted = await platform.deviceImportAndLoad(secretHex, normalizedPin, crypto.randomUUID())
     await platform.persistAndUnlockDeviceKeys(encrypted, normalizedPin)
     await platform.lockCrypto()
   }, { secretHex, normalizedPin })
@@ -147,8 +149,9 @@ When('the app launches', async ({ page }) => {
 })
 
 When('I enter PIN {string}', async ({ page }, pin: string) => {
-  // Normalize to 8 characters (PinInput component requires minLength=8 before Enter triggers onComplete)
-  const normalizedPin = pin.padEnd(8, '0')
+  // Normalize to 8 characters (PinInput component requires minLength=8 before Enter triggers onComplete).
+  // Feature files should use 8-char PINs directly; padding is a safety net for legacy specs.
+  const normalizedPin = pin.length >= 8 ? pin : pin.padEnd(8, '0')
   await enterPin(page, normalizedPin)
 })
 

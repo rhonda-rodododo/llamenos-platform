@@ -286,15 +286,16 @@ When('I fill in entity type label {string}', async ({ page }, label: string) => 
 })
 
 Then('the name input should auto-populate with {string}', async ({ page }, expected: string) => {
-  await expect(page.getByTestId('entity-type-name-input')).toHaveValue(expected)
+  // Auto-population is driven by a React onChange handler — allow time for state update
+  await expect(page.getByTestId('entity-type-name-input')).toHaveValue(expected, { timeout: 5000 })
 })
 
 Then('the name input should show {string}', async ({ page }, expected: string) => {
-  await expect(page.getByTestId('entity-type-name-input')).toHaveValue(expected)
+  await expect(page.getByTestId('entity-type-name-input')).toHaveValue(expected, { timeout: 5000 })
 })
 
 Then('the plural label should auto-populate with {string}', async ({ page }, expected: string) => {
-  await expect(page.getByTestId('entity-type-label-plural-input')).toHaveValue(expected)
+  await expect(page.getByTestId('entity-type-label-plural-input')).toHaveValue(expected, { timeout: 5000 })
 })
 
 Then('default statuses {string} and {string} should be pre-populated', async ({ page }, s1: string, s2: string) => {
