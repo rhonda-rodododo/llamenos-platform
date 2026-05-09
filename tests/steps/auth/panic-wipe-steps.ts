@@ -18,17 +18,19 @@ Then('the panic wipe overlay should appear', async ({ page }) => {
 })
 
 Then('all local storage should be cleared', async ({ page }) => {
-  // Panic wipe triggers navigation which may destroy the execution context;
-  // wait for the new page to load before evaluating localStorage.
-  await page.waitForLoadState('load')
+  // Panic wipe clears storage and navigates to /login, potentially triggering
+  // multiple navigations (SPA redirect chain). Wait for the URL to settle on
+  // the login page, then wait for networkidle to ensure no further navigations.
+  await page.waitForURL(/\/login/, { timeout: Timeouts.ELEMENT })
+  await page.waitForLoadState('networkidle').catch(() => {})
   const count = await page.evaluate(() => localStorage.length)
   expect(count).toBe(0)
 })
 
 Then('all session storage should be cleared', async ({ page }) => {
-  // Panic wipe triggers navigation which may destroy the execution context;
-  // wait for the new page to load before evaluating sessionStorage.
-  await page.waitForLoadState('load')
+  // Same as above — wait for the navigation chain to settle before evaluating.
+  await page.waitForURL(/\/login/, { timeout: Timeouts.ELEMENT })
+  await page.waitForLoadState('networkidle').catch(() => {})
   const count = await page.evaluate(() => sessionStorage.length)
   expect(count).toBe(0)
 })

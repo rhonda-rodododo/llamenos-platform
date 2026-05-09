@@ -109,8 +109,10 @@ When('I create an invite for a new volunteer', async ({ page }) => {
   }
   // Wait for the invite link card to appear
   await page.getByTestId('dismiss-invite').waitFor({ state: 'visible', timeout: Timeouts.API })
+  // Persist the vol name in localStorage so it survives page.reload()
   await page.evaluate((n) => {
     (window as Record<string, unknown>).__test_invite_vol_name = n
+    localStorage.setItem('__test_invite_vol_name', n)
   }, name)
 })
 
@@ -141,7 +143,7 @@ When('the volunteer opens the invite link', async ({ page }) => {
 })
 
 Then('they should see a welcome screen with their name', async ({ page }) => {
-  const volName = (await page.evaluate(() => (window as Record<string, unknown>).__test_invite_vol_name)) as string
+  const volName = (await page.evaluate(() => (window as Record<string, unknown>).__test_invite_vol_name || localStorage.getItem('__test_invite_vol_name'))) as string
   expect(volName).toBeTruthy()
   // Content assertion — verifying displayed volunteer name
   await expect(page.getByText(new RegExp(volName, 'i')).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
@@ -158,7 +160,7 @@ When('the volunteer completes the onboarding flow', async ({ page }) => {
 })
 
 Then('the volunteer name should appear in the pending invites list', async ({ page }) => {
-  const volName = (await page.evaluate(() => (window as Record<string, unknown>).__test_invite_vol_name)) as string
+  const volName = (await page.evaluate(() => (window as Record<string, unknown>).__test_invite_vol_name || localStorage.getItem('__test_invite_vol_name'))) as string
   expect(volName).toBeTruthy()
   // Content assertion — verifying volunteer name is displayed
   await expect(page.getByText(volName, { exact: true }).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
@@ -182,7 +184,7 @@ When('I revoke the invite', async ({ page }) => {
 })
 
 Then('the volunteer name should no longer appear in the list', async ({ page }) => {
-  const volName = (await page.evaluate(() => (window as Record<string, unknown>).__test_invite_vol_name)) as string
+  const volName = (await page.evaluate(() => (window as Record<string, unknown>).__test_invite_vol_name || localStorage.getItem('__test_invite_vol_name'))) as string
   expect(volName).toBeTruthy()
   // After the revoke step reloads the page, navigate to Volunteers to check.
   const { Navigation } = await import('../../pages/index')

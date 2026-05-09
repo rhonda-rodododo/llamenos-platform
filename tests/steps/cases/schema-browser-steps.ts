@@ -66,9 +66,10 @@ When('I select the {string} entity type', async ({ page }, typeName: string) => 
   // Wait for the entity type row to become visible (accordion may be animating open)
   const typeRow = page.getByTestId('entity-type-row').filter({ hasText: typeName }).first()
   await expect(typeRow).toBeVisible({ timeout: Timeouts.ELEMENT })
-  // Click the Edit button on the matching row to open the entity type editor
+  // Click the Edit button on the matching row to open the entity type editor.
+  // Use ELEMENT timeout — 2s was too short in CI.
   const editBtn = typeRow.getByTestId('entity-type-edit-btn')
-  const hasEditBtn = await editBtn.isVisible({ timeout: 2000 }).catch(() => false)
+  const hasEditBtn = await editBtn.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
   if (hasEditBtn) {
     await editBtn.click()
   } else {
