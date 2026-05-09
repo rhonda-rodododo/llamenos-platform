@@ -375,4 +375,86 @@ mod tests {
         let result = hpke_seal(b"test", &pk_hex, "unknown:label:not-in-registry", b"aad");
         assert!(matches!(result, Err(CryptoError::InvalidInput(_))));
     }
+
+    #[test]
+    fn seal_with_invalid_pubkey_hex_rejected() {
+        let result = hpke_seal(b"test", "not-hex!", LABEL_NOTE_KEY, b"aad");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn open_with_tampered_enc_fails() {
+        let (sk_hex, pk_hex) = gen_keypair();
+        let plaintext = b"tamper enc test";
+        let aad = b"aad";
+
+        let mut envelope = hpke_seal(plaintext, &pk_hex, LABEL_NOTE_KEY, aad).unwrap();
+        let mut enc_bytes = URL_SAFE_NO_PAD.decode(&envelope.enc).unwrap();
+        enc_bytes[0] ^= 0x01;
+        envelope.enc = URL_SAFE_NO_PAD.encode(&enc_bytes);
+
+        let result = hpke_open(&envelope, &sk_hex, LABEL_NOTE_KEY, aad);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn open_with_wrong_version_fails() {
+        let (sk_hex, pk_hex) = gen_keypair();
+        let plaintext = b"version test";
+        let aad = b"aad";
+
+        let mut envelope = hpke_seal(plaintext, &pk_hex, LABEL_NOTE_KEY, aad).unwrap();
+        envelope.v = 99;
+
+        let result = hpke_open(&envelope, &sk_hex, LABEL_NOTE_KEY, aad);
+        assert!(matches!(result, Err(CryptoError::InvalidFormat(_))));
+    }
+
+    #[test]
+    fn open_with_unknown_label_id_fails() {
+        let (sk_hex, pk_hex) = gen_keypair();
+        let plaintext = b"label id test";
+        let aad = b"aad";
+
+        let mut envelope = hpke_seal(plaintext, &pk_hex, LABEL_NOTE_KEY, aad).unwrap();
+        envelope.label_id = 255;
+
+        let result = hpke_open(&envelope, &sk_hex, LABEL_NOTE_KEY, aad);
+        assert!(matches!(result, Err(CryptoError::InvalidFormat(_))));
+    }
+
+    #[test]
+    fn hpke_seal_empty_plaintext() {
+        let (sk_hex, pk_hex) = gen_keypair();
+        let plaintext = b"";
+        let aad = b"aad";
+
+        let envelope = hpke_seal(plaintext, &pk_hex, LABEL_NOTE_KEY, aad).unwrap();
+        let decrypted = hpke_open(&envelope, &sk_hex, LABEL_NOTE_KEY, aad).unwrap();
+        assert_eq!(decrypted, plaintext);
+    }
+
+    #[test]
+    fn hpke_seal_large_plaintext() {
+        let (sk_hex, pk_hex) = gen_keypair();
+        let plaintext = vec![0xABu8; 10_000];
+        let aad = b"aad";
+
+        let envelope = hpke_seal(&plaintext, &pk_hex, LABEL_NOTE_KEY, aad).unwrap();
+        let decrypted = hpke_open(&envelope, &sk_hex, LABEL_NOTE_KEY, aad).unwrap();
+        assert_eq!(decrypted, plaintext);
+    }
+
+    #[test]
+    fn hpke_open_key_with_wrong_secret_fails() {
+        let (_sk_hex, pk_hex) = gen_keypair();
+        let (wrong_sk, _) = gen_keypair();
+        let mut key = [0u8; 32];
+        getrandom::getrandom(&mut key).unwrap();
+        let aad = b"key-wrap";
+
+        let envelope = hpke_seal_key(&key, &pk_hex, LABEL_NOTE_KEY, aad).unwrap();
+        let result = hpke_open_key(&envelope, &wrong_sk, LABEL_NOTE_KEY, aad);
+        assert!(result.is_err());
+    }
 }
