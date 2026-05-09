@@ -48,8 +48,9 @@ export default defineConfig({
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
-      // Exclude bootstrap tests — they run in the sequential "bootstrap" project above.
-      testIgnore: ["**/live/**", "**/desktop/**", "**/integration/**", "**/bootstrap.spec.ts"],
+      // Exclude bootstrap tests and screenshots — bootstrap runs in its own project above,
+      // screenshots are on-demand only (run via `bun run test:screenshots`).
+      testIgnore: ["**/live/**", "**/desktop/**", "**/integration/**", "**/bootstrap.spec.ts", "**/screenshots.spec.ts"],
       // Wait for bootstrap tests to complete and restore admin before parallel tests run.
       dependencies: ["bootstrap"],
     },
@@ -92,6 +93,18 @@ export default defineConfig({
       // backend-bdd scenarios create a hub per-scenario via workerHub fixture —
       // if bootstrap's test-reset-no-admin runs concurrently, the admin is gone
       // and hub creation returns 401.
+      dependencies: ["bootstrap"],
+    },
+    {
+      // On-demand screenshot capture — NOT included in default CI runs.
+      // Run via: bun run test:screenshots
+      name: "screenshots",
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 1440, height: 900 },
+      },
+      testMatch: ["**/screenshots.spec.ts"],
+      retries: 0,
       dependencies: ["bootstrap"],
     },
   ],
