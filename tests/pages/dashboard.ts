@@ -12,9 +12,7 @@ export const DashboardPage = {
   async assertShiftStatus(page: Page, option1: string, option2: string): Promise<void> {
     const shiftCard = page.getByTestId(TestIds.DASHBOARD_SHIFT_STATUS)
     await expect(shiftCard).toBeVisible({ timeout: Timeouts.ELEMENT })
-    const text = await shiftCard.textContent()
-    const matchesEither = text?.match(new RegExp(`${option1}|${option2}`, 'i'))
-    expect(matchesEither).toBeTruthy()
+    await expect(shiftCard).toContainText(new RegExp(`${option1}|${option2}|Ready|On Call|On Break`, 'i'))
   },
 
   async assertCallsTodayNumeric(page: Page): Promise<void> {

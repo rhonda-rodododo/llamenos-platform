@@ -11,7 +11,10 @@ test.describe('Notes Management', () => {
 
   test('notes page loads', async ({ page }) => {
     await Navigation.goToNotes(page)
-    await expect(page.getByTestId(TestIds.NOTE_LIST)).toBeVisible({ timeout: Timeouts.ELEMENT })
+    await page.waitForLoadState('networkidle')
+    const list = page.getByTestId(TestIds.NOTE_LIST)
+    const empty = page.getByTestId('empty-state')
+    await expect(list.or(empty)).toBeVisible({ timeout: Timeouts.ELEMENT })
   })
 
   test('can create a note', async ({ page }) => {

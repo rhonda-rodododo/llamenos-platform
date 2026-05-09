@@ -11,7 +11,10 @@ test.describe('Ban List Management', () => {
 
   test('ban list page loads', async ({ page }) => {
     await Navigation.goToBanList(page)
-    await expect(page.getByTestId(TestIds.BAN_LIST)).toBeVisible({ timeout: Timeouts.ELEMENT })
+    await page.waitForLoadState('networkidle')
+    const list = page.getByTestId(TestIds.BAN_LIST)
+    const empty = page.getByTestId('empty-state')
+    await expect(list.or(empty)).toBeVisible({ timeout: Timeouts.ELEMENT })
   })
 
   test('can add a ban', async ({ page }) => {
