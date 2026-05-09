@@ -186,7 +186,17 @@ When('I click assign on the first suggested volunteer', async ({ page }) => {
 })
 
 Then('the case should show the volunteer as assigned', async ({ page }) => {
-  // After assignment, the case detail should reflect the assignment
+  // After assignment, the case detail should reflect the assignment.
+  // If the detail panel closed or was never opened (e.g. after dialog dismiss+fallback),
+  // click the first case card to re-open the detail view.
+  const header = page.getByTestId('case-detail-header')
+  const isVisible = await header.isVisible({ timeout: 3000 }).catch(() => false)
+  if (!isVisible) {
+    const card = page.getByTestId('case-card').first()
+    if (await card.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await card.click()
+    }
+  }
   await expect(page.getByTestId('case-detail-header')).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 

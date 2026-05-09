@@ -122,9 +122,10 @@ When('I tap the back button on report detail', async ({ page }) => {
     await backBtn.click()
     return
   }
-  // Desktop split-pane: click the report list header area to deselect
-  // or use browser back navigation
-  await page.goBack()
+  // Desktop split-pane: use SPA router navigation to /reports instead of browser
+  // back (which can overshoot past the reports list back to the dashboard).
+  const { Navigation } = await import('../../pages/index')
+  await Navigation.goToReports(page)
 })
 
 Given('I am viewing a report with status {string}', async ({ page, backendRequest, workerHub }, status: string) => {
@@ -175,10 +176,13 @@ Then('I should see the {string} report status filter', async ({ page, backendReq
     await createReportViaApi(backendRequest, { title: `Seed for filter ${Date.now()}`, hubId: workerHub })
   }
 
-  // SPA re-navigate to refresh the reports list so the seeded report appears
-  await page.getByTestId(TestIds.NAV_DASHBOARD).click()
+  // SPA re-navigate to refresh the reports list so the seeded report appears.
+  // Use Navigation helper (handles auth state) instead of clicking nav links directly,
+  // which can time out if the sidebar isn't visible (e.g., session not yet fully loaded).
+  const { Navigation } = await import('../../pages/index')
+  await Navigation.goToDashboard(page)
   await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
-  await page.getByTestId(TestIds.NAV_REPORTS).click()
+  await Navigation.goToReports(page)
   await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
 
   // Wait for the report list to load (report cards appear = data loaded, not empty state)
@@ -209,14 +213,20 @@ When('I tap the {string} report status filter', async ({ page, backendRequest, w
       if (existing.conversations.length === 0) {
         await createReportViaApi(backendRequest, { title: `Seed for filter ${Date.now()}`, hubId: workerHub })
       }
-      // SPA re-navigate to refresh the reports list
-      await page.getByTestId(TestIds.NAV_DASHBOARD).click()
+      // SPA re-navigate to refresh the reports list.
+      // Use Navigation helper (handles auth state) instead of clicking nav links directly.
+      const { Navigation } = await import('../../pages/index')
+      await Navigation.goToDashboard(page)
       await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
-      await page.getByTestId(TestIds.NAV_REPORTS).click()
+      await Navigation.goToReports(page)
       await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
-    } catch {
-      // Backend not available — try to proceed anyway
+    } catch (e) {
+      console.warn('[reports] Seeding failed:', e)
     }
+    // Wait for a report card to appear — confirms the list has loaded with seeded data.
+    // This is more reliable than waitForLoadState('networkidle') which doesn't guarantee
+    // that the React state has been updated with the fetched reports.
+    await expect(page.getByTestId(TestIds.REPORT_CARD).first()).toBeVisible({ timeout: Timeouts.ELEMENT }).catch(() => {})
   }
 
   await expect(filterArea).toBeVisible({ timeout: Timeouts.ELEMENT })

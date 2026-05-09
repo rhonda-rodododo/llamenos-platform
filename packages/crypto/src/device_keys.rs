@@ -460,8 +460,14 @@ mod tests {
         let encrypted1 = generate_device_keys("dev-1", "12345678").unwrap();
         let encrypted2 = generate_device_keys("dev-2", "12345678").unwrap();
 
-        assert_ne!(encrypted1.state.signing_pubkey_hex, encrypted2.state.signing_pubkey_hex);
-        assert_ne!(encrypted1.state.encryption_pubkey_hex, encrypted2.state.encryption_pubkey_hex);
+        assert_ne!(
+            encrypted1.state.signing_pubkey_hex,
+            encrypted2.state.signing_pubkey_hex
+        );
+        assert_ne!(
+            encrypted1.state.encryption_pubkey_hex,
+            encrypted2.state.encryption_pubkey_hex
+        );
     }
 
     #[test]

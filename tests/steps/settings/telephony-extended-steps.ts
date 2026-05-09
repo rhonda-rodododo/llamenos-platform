@@ -36,7 +36,11 @@ Then(
 // "the {string} button should be disabled" is defined in interaction-steps.ts
 
 When('I fill in Twilio credentials with phone number', async ({ page }) => {
-  await page.locator('input[type="tel"]').fill('+12125551234')
+  // Use pressSequentially to properly trigger react-phone-number-input onChange
+  const telInput = page.locator('input[type="tel"]').first()
+  await telInput.clear()
+  await telInput.pressSequentially('+12125551234', { delay: 30 })
+  await telInput.blur()
   await page.getByPlaceholder('AC...').fill('AC00000000000000000000000000000001')
   const authTokenInput = page.locator('input[type="password"]').first()
   await authTokenInput.fill('test-auth-token-123')
@@ -51,9 +55,11 @@ Then('I should see {string} with {string}', async ({ page }, text1: string, text
 })
 
 When('I fill in Twilio credentials with a different phone number', async ({ page }) => {
-  const telInput = page.locator('input[type="tel"]')
+  const telInput = page.locator('input[type="tel"]').first()
   if (await telInput.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
-    await telInput.fill('+12125559876')
+    await telInput.clear()
+    await telInput.pressSequentially('+12125559876', { delay: 30 })
+    await telInput.blur()
   }
   const acInput = page.getByPlaceholder('AC...')
   if (await acInput.isVisible({ timeout: 2000 }).catch(() => false)) {
@@ -66,7 +72,9 @@ When('I fill in Twilio credentials with a different phone number', async ({ page
 })
 
 Then('the phone number field should be pre-filled', async ({ page }) => {
-  await expect(page.locator('input[type="tel"]')).toHaveValue(/555\s*987\s*6/)
+  // Use the specific provider phone input (id="provider-phone") to avoid matching
+  // other tel inputs on the page (e.g. Signal notification phone field).
+  await expect(page.locator('#provider-phone')).toHaveValue(/555\s*987\s*6/)
 })
 
 Then('the Account SID field should be pre-filled', async ({ page }) => {
@@ -74,13 +82,18 @@ Then('the Account SID field should be pre-filled', async ({ page }) => {
 })
 
 When('I fill in SignalWire credentials', async ({ page }) => {
-  const telInput = page.locator('input[type="tel"]')
+  // The phone field uses react-phone-number-input which requires pressSequentially
+  // (fires key events) rather than fill() to trigger the onChange handler correctly.
+  const telInput = page.locator('input[type="tel"]').first()
   if (await telInput.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
-    await telInput.fill('+12125551122')
+    await telInput.clear()
+    await telInput.pressSequentially('+12125551122', { delay: 30 })
+    await telInput.blur()
   }
   const acInput = page.getByPlaceholder('AC...')
   if (await acInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await acInput.fill('SW-project-id-123')
+    // SignalWire project IDs are UUIDs, not Twilio AC... format
+    await acInput.fill('a1b2c3d4-e5f6-7890-abcd-ef1234567890')
   }
   const authTokenInput = page.locator('input[type="password"]').first()
   if (await authTokenInput.isVisible({ timeout: 3000 }).catch(() => false)) {

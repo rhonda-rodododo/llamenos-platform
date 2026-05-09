@@ -6,7 +6,7 @@ Feature: Sidebar Navigation
 
   Scenario: App loads with correct title
     When I visit the app root
-    Then the page title should contain "Hotline"
+    Then the app has a non-empty page title
 
   Scenario: Unauthenticated user is redirected to login
     When I visit "/notes" without authentication

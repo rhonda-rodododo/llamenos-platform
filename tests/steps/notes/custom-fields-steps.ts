@@ -112,6 +112,14 @@ When('I change {string} to {string}', async ({ page }, fieldLabel: string, newVa
 })
 
 When('I change the note text to {string}', async ({ page }, newText: string) => {
+  // The inline edit form uses note-edit-input (NoteEditForm textarea)
+  const editInput = page.getByTestId(TestIds.NOTE_EDIT_INPUT)
+  const isEditInput = await editInput.isVisible({ timeout: 3000 }).catch(() => false)
+  if (isEditInput) {
+    await editInput.click({ clickCount: 3 })
+    await editInput.fill(newText)
+    return
+  }
   const noteContent = page.getByTestId(TestIds.NOTE_CONTENT)
   // The edit form may use a sheet or inline edit — wait for the element to be visible
   const isVisible = await noteContent.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
@@ -280,14 +288,13 @@ Given('a custom field {string} exists', async ({ page, request }, fieldLabel: st
       },
     ])
   }
-  // Background already navigated to Hub Settings. If we created a field via API,
-  // the page needs to re-fetch its data. Use the UI to navigate away and back.
-  if (needsCreate) {
-    await page.getByTestId(TestIds.NAV_DASHBOARD).click()
-    await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.NAVIGATION })
-    await page.getByTestId(TestIds.NAV_ADMIN_SETTINGS).click()
-    await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.NAVIGATION })
-  }
+  // Always navigate away and back so the page re-fetches fresh data from the API.
+  // This prevents stale React state from a prior test run and ensures the field row
+  // is present regardless of whether it was just created or already existed.
+  await page.getByTestId(TestIds.NAV_DASHBOARD).click()
+  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.NAVIGATION })
+  await page.getByTestId(TestIds.NAV_ADMIN_SETTINGS).click()
+  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.NAVIGATION })
   // Ensure the custom fields section is expanded
   const section = page.getByTestId(TestIds.SETTINGS_CUSTOM_FIELDS)
   await expect(section).toBeVisible({ timeout: Timeouts.ELEMENT })
@@ -303,15 +310,14 @@ Given('a custom field {string} exists', async ({ page, request }, fieldLabel: st
 })
 
 When('I click the delete button on {string}', async ({ page }, fieldLabel: string) => {
-  const row = page.getByTestId(TestIds.CUSTOM_FIELD_ROW).filter({ hasText: fieldLabel })
-  await expect(row.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
-  await row.first().scrollIntoViewIfNeeded()
-  // Set up dialog handler to accept the confirm() before clicking delete
-  page.once('dialog', async (dialog) => {
-    await dialog.accept()
-  })
+  const row = page.getByTestId(TestIds.CUSTOM_FIELD_ROW).filter({ hasText: fieldLabel }).first()
+  await expect(row).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await row.scrollIntoViewIfNeeded()
   const deleteBtn = row.getByTestId(TestIds.CUSTOM_FIELD_DELETE_BTN)
   await expect(deleteBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
-  // Use force click since the card container can briefly intercept pointer events during re-render
-  await deleteBtn.click({ force: true })
+  // Register dialog handler before clicking. The handler must call accept()
+  // synchronously (no await) to prevent the confirm() dialog from blocking
+  // the click action and causing a timeout.
+  page.once('dialog', dialog => dialog.accept())
+  await deleteBtn.click()
 })

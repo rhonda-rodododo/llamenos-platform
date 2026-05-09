@@ -19,7 +19,6 @@ import {
   listEntityTypesViaApi,
   createEntityTypeViaApi,
   createRecordViaApi,
-  createEventViaApi,
   listRecordsViaApi,
   linkRecordToEventViaApi,
   linkReportToEventViaApi,
@@ -133,9 +132,34 @@ When('I click the new event button', async ({ page }) => {
 When('I fill in the event name with a unique name', async ({ page, casesWorld }) => {
   casesWorld.lastEventName = `Test Event ${Date.now()}`
   const titleInput = page.getByTestId('case-title-input')
-  if (await titleInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await titleInput.fill(casesWorld.lastEventName)
+
+  // The title input only renders after an entity type is selected.
+  // If the dialog has a type select (multiple entity types exist), select the event type.
+  const titleVisible = await titleInput.isVisible({ timeout: 3000 }).catch(() => false)
+  if (!titleVisible) {
+    // Wait for loader to disappear
+    const loader = page.locator('[role="dialog"]').getByText(/loading/i)
+    await loader.waitFor({ state: 'hidden', timeout: Timeouts.ELEMENT }).catch(() => {})
+
+    // Try to select an event-type entity type from the dropdown
+    const typeSelect = page.getByTestId('case-type-select')
+    if (await typeSelect.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await typeSelect.click()
+      // Prefer event-category types; fall back to first available type
+      const eventOption = page.getByRole('option', { name: /event|protest/i })
+      const firstOption = page.getByRole('option').first()
+      const hasEventOption = await eventOption.first().isVisible({ timeout: 2000 }).catch(() => false)
+      if (hasEventOption) {
+        await eventOption.first().click()
+      } else if (await firstOption.isVisible({ timeout: 2000 }).catch(() => false)) {
+        await firstOption.click()
+      }
+    }
+    // Wait for title input to appear after type selection
+    await expect(titleInput).toBeVisible({ timeout: Timeouts.ELEMENT })
   }
+
+  await titleInput.fill(casesWorld.lastEventName)
 })
 
 When('I fill in the event start date', async ({ page }) => {
@@ -189,10 +213,9 @@ Then('the event start date should be displayed', async ({ page }) => {
 
 Given('an event with linked cases exists', async ({ backendRequest: request, casesWorld, workerHub }) => {
   const entityTypeId = await ensureEventEntityType(request, casesWorld, workerHub)
-  const event = await createEventViaApi(request, entityTypeId, { statusHash: 'active', hubId: workerHub }).catch(async () => {
-    // Fallback: create as a record
-    return createRecordViaApi(request, entityTypeId, { statusHash: 'active', hubId: workerHub })
-  })
+  // Use createRecordViaApi directly: the frontend events page uses listRecords (not the /events API),
+  // so events must live in the records table to appear in the UI.
+  const event = await createRecordViaApi(request, entityTypeId, { statusHash: 'active', hubId: workerHub })
   casesWorld.lastEventId = (event as { id: string }).id
 
   // Create and link a case
@@ -207,9 +230,8 @@ Given('an event with linked cases exists', async ({ backendRequest: request, cas
 
 Given('an event with {int} linked cases exists', async ({ backendRequest: request, casesWorld, workerHub }, count: number) => {
   const entityTypeId = await ensureEventEntityType(request, casesWorld, workerHub)
-  const event = await createEventViaApi(request, entityTypeId, { statusHash: 'active', hubId: workerHub }).catch(async () => {
-    return createRecordViaApi(request, entityTypeId, { statusHash: 'active', hubId: workerHub })
-  })
+  // Use createRecordViaApi: frontend uses listRecords, not the /events API endpoint
+  const event = await createRecordViaApi(request, entityTypeId, { statusHash: 'active', hubId: workerHub })
   casesWorld.lastEventId = (event as { id: string }).id
 
   const entityTypes = await listEntityTypesViaApi(request, workerHub)
@@ -225,9 +247,8 @@ Given('an event with {int} linked cases exists', async ({ backendRequest: reques
 
 Given('an event with linked reports exists', async ({ backendRequest: request, casesWorld, workerHub }) => {
   const entityTypeId = await ensureEventEntityType(request, casesWorld, workerHub)
-  const event = await createEventViaApi(request, entityTypeId, { statusHash: 'active', hubId: workerHub }).catch(async () => {
-    return createRecordViaApi(request, entityTypeId, { statusHash: 'active', hubId: workerHub })
-  })
+  // Use createRecordViaApi: frontend uses listRecords, not the /events API endpoint
+  const event = await createRecordViaApi(request, entityTypeId, { statusHash: 'active', hubId: workerHub })
   casesWorld.lastEventId = (event as { id: string }).id
 
   const report = await createReportViaApi(request, { title: `Event Report ${Date.now()}`, hubId: workerHub })

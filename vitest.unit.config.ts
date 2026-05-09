@@ -8,7 +8,6 @@ export default defineConfig({
       "apps/worker/__tests__/unit/**/*.test.ts",
       "apps/worker/lib/**/*.test.ts",
       "apps/worker/db/**/*.test.ts",
-      "src/client/lib/**/*.test.ts",
       "deploy/docker/tests/**/*.test.ts",
     ],
     environment: "node",

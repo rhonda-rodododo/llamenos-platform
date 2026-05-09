@@ -63,8 +63,8 @@ describe('useCallTimer', () => {
     vi.setSystemTime(now)
 
     const { result, rerender } = renderHook(
-      ({ startedAt }) => useCallTimer(startedAt),
-      { initialProps: { startedAt: new Date(now).toISOString() } },
+      ({ startedAt }: { startedAt: string | null }) => useCallTimer(startedAt),
+      { initialProps: { startedAt: new Date(now).toISOString() as string | null } },
     )
 
     act(() => {

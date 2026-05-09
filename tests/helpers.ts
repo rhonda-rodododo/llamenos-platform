@@ -57,6 +57,17 @@ export async function navigateAfterLogin(page: Page, url: string, expectAccessDe
     await sidebar.waitFor({ state: 'visible', timeout: Timeouts.AUTH })
   }
 
+  // Wait for ConfigProvider to set the active hub — prevents race condition where
+  // page components fire data-fetching useEffects before activeHubId is set.
+  // In CI with Docker backend, getConfig() takes longer, making this race likely.
+  await page.waitForFunction(() => {
+    const getHub = (window as any).__TEST_GET_ACTIVE_HUB
+    return getHub ? !!getHub() : false
+  }, { timeout: Timeouts.AUTH }).catch(() => {
+    // If __TEST_GET_ACTIVE_HUB isn't available, continue — will work locally
+  })
+
+  // SPA navigation via TanStack Router (no page reload, keeps auth state)
   const parsed = new URL(url, 'http://localhost')
   const searchParams = Object.fromEntries(parsed.searchParams.entries())
 
@@ -104,6 +115,16 @@ export async function navigateViaSpa(page: Page, url: string): Promise<void> {
 
     await sidebar.waitFor({ state: 'visible', timeout: Timeouts.AUTH })
   }
+
+  // Wait for ConfigProvider to set the active hub — prevents race condition where
+  // page components fire data-fetching useEffects before activeHubId is set.
+  // In CI with Docker backend, getConfig() takes longer, making this race likely.
+  await page.waitForFunction(() => {
+    const getHub = (window as any).__TEST_GET_ACTIVE_HUB
+    return getHub ? !!getHub() : false
+  }, { timeout: Timeouts.AUTH }).catch(() => {
+    // If __TEST_GET_ACTIVE_HUB isn't available, continue — will work locally
+  })
 
   // SPA navigation via TanStack Router
   const parsed = new URL(url, 'http://localhost')
@@ -196,6 +217,14 @@ export async function loginAsAdmin(page: Page) {
   await page.goto('/login')
   await page.waitForLoadState('domcontentloaded')
 
+  // Reset PIN lockout counter to prevent accumulation across serial tests.
+  // In serial mode the browser context is reused, so failed PIN attempts from
+  // stale cached storage compound across tests. Without this reset, the mock's
+  // escalating lockout triggers a 10-minute lockout after ~9 loginAsAdmin calls.
+  await page.evaluate(() => {
+    localStorage.removeItem('__test_pin_lockout_state')
+  })
+
   let usingLegacy = false
 
   if (storageState) {
@@ -234,6 +263,12 @@ export async function loginAsAdmin(page: Page) {
   }
 
   await page.waitForURL(url => !url.toString().includes('/login'), { timeout: Timeouts.AUTH })
+  // Ensure hub context is ready before asserting page content — prevents race
+  // where components fetch data before ConfigProvider sets activeHubId.
+  await page.waitForFunction(() => {
+    const getHub = (window as any).__TEST_GET_ACTIVE_HUB
+    return getHub ? !!getHub() : false
+  }, { timeout: 15000 }).catch(() => {})
   // Wait for the authenticated layout — use longer timeout for CI (PBKDF2 + Docker overhead)
   await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.AUTH })
   // Wait for admin section in sidebar or hamburger button (mobile) — confirms getMe() completed.
@@ -267,6 +302,12 @@ export async function loginAsVolunteer(page: Page, seedHex: string) {
   await page.waitForLoadState('domcontentloaded')
   await enterPin(page, TEST_PIN)
   await page.waitForURL(url => !url.toString().includes('/login'), { timeout: Timeouts.AUTH })
+  // Ensure hub context is ready before asserting page content — prevents race
+  // where components fetch data before ConfigProvider sets activeHubId.
+  await page.waitForFunction(() => {
+    const getHub = (window as any).__TEST_GET_ACTIVE_HUB
+    return getHub ? !!getHub() : false
+  }, { timeout: 15000 }).catch(() => {})
 
   const profileSetupBtn = page.getByRole('button', { name: /complete setup/i })
   const sidebar = page.getByTestId(TestIds.NAV_SIDEBAR)
