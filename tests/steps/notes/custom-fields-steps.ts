@@ -112,6 +112,14 @@ When('I change {string} to {string}', async ({ page }, fieldLabel: string, newVa
 })
 
 When('I change the note text to {string}', async ({ page }, newText: string) => {
+  // The inline edit form uses note-edit-input (NoteEditForm textarea)
+  const editInput = page.getByTestId(TestIds.NOTE_EDIT_INPUT)
+  const isEditInput = await editInput.isVisible({ timeout: 3000 }).catch(() => false)
+  if (isEditInput) {
+    await editInput.click({ clickCount: 3 })
+    await editInput.fill(newText)
+    return
+  }
   const noteContent = page.getByTestId(TestIds.NOTE_CONTENT)
   // The edit form may use a sheet or inline edit — wait for the element to be visible
   const isVisible = await noteContent.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)

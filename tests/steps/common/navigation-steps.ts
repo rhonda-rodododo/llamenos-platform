@@ -192,12 +192,20 @@ When('I tap the back button', async ({ page }) => {
     return
   }
   // On desktop settings page, sections are inline — "back" from a section means
-  // collapse the expanded section rather than navigating away from settings.
+  // collapsing the expanded section rather than navigating away from settings.
+  // The CollapsibleContent inside the linked-devices card has data-state="open"
+  // when expanded (set by Radix UI Collapsible).
   if (page.url().includes('/settings')) {
-    // Collapse the currently expanded linked-devices section if it's open
-    const linkedDevicesOpen = page.getByTestId('linked-devices').locator('[data-state="open"]')
-    if (await linkedDevicesOpen.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await page.getByTestId('linked-devices-trigger').click()
+    const linkedDevicesSection = page.getByTestId('linked-devices')
+    const sectionInDom = await linkedDevicesSection.isVisible({ timeout: 2000 }).catch(() => false)
+    if (sectionInDom) {
+      // Check if expanded by looking for CollapsibleContent with data-state="open"
+      const content = linkedDevicesSection.locator('[data-state="open"]').first()
+      const isExpanded = await content.isVisible({ timeout: 1000 }).catch(() => false)
+      if (isExpanded) {
+        await page.getByTestId('linked-devices-trigger').click()
+      }
+      // Remain on the settings page — no navigation needed on desktop
       return
     }
   }

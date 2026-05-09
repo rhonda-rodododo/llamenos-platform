@@ -115,9 +115,13 @@ When('I create an invite for a new volunteer', async ({ page }) => {
 })
 
 Then('an invite link should be generated', async ({ page }) => {
-  // After creating a volunteer, either invite card, nsec card, or nsec code should appear
+  // After creating an invite, the invite link card appears (testid="invite-link-code").
+  // The nsec card/code appears after direct volunteer creation (not invite flow).
+  const inviteLinkCode = page.getByTestId('invite-link-code')
+  const isInviteLink = await inviteLinkCode.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+  if (isInviteLink) return
   const inviteCard = page.getByTestId(TestIds.VOLUNTEER_INVITE_CARD)
-  const isInvite = await inviteCard.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+  const isInvite = await inviteCard.isVisible({ timeout: 2000 }).catch(() => false)
   if (isInvite) return
   const nsecCard = page.getByTestId(TestIds.VOLUNTEER_NSEC_CARD)
   const isNsecCard = await nsecCard.isVisible({ timeout: 2000 }).catch(() => false)
@@ -172,8 +176,9 @@ When('I revoke the invite', async ({ page }) => {
 Then('the volunteer name should no longer appear in the list', async ({ page }) => {
   const volName = (await page.evaluate(() => (window as Record<string, unknown>).__test_invite_vol_name)) as string
   expect(volName).toBeTruthy()
-  // Content assertion — verifying volunteer name is not displayed
-  await expect(page.getByText(volName, { exact: true }).first()).not.toBeVisible({ timeout: Timeouts.ELEMENT })
+  // Wait for the revoke API call + re-render. Use a longer timeout so the
+  // optimistic state update and network round-trip both complete before asserting.
+  await expect(page.getByText(volName, { exact: true }).first()).not.toBeVisible({ timeout: 20000 })
 })
 
 // --- Form validation ---
