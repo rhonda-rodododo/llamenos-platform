@@ -21,12 +21,13 @@ cd packages/crypto && ./scripts/build-mobile.sh android
 
 ```bash
 bun run test:android          # Unit tests + lint + build androidTest APK
-bun run test:android:e2e      # Cucumber BDD E2E on connected device/emulator
+bun run test:android:e2e      # Traditional Compose UI tests on connected device/emulator
 
 # Direct Gradle (from apps/android/)
 ./gradlew testDebugUnitTest         # Unit tests
 ./gradlew lintDebug                 # Lint
-./gradlew compileDebugAndroidTestKotlin  # Compile E2E test APK
+./gradlew compileDebugAndroidTestKotlin  # Compile UI test APK
+./gradlew connectedDebugAndroidTest   # Run UI tests on connected device/emulator
 ./gradlew assembleDebug             # Build debug APK
 ```
 
