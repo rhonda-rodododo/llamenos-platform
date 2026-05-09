@@ -96,3 +96,7 @@ export function initPanicWipe(onWipe?: () => void): () => void {
     panicWipeCallback = null
   }
 }
+
+export function _resetPanicWipeState(): void {
+  escapeTimes = []
+}

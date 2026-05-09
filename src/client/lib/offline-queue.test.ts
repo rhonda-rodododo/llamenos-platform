@@ -39,7 +39,7 @@ describe('classifyOperation', () => {
   })
 
   it('classifies report message', () => {
-    expect(classifyOperation('/reports/123/messages', 'POST')).toBe('message:send')
+    expect(classifyOperation('/reports/123/messages', 'POST')).toBe('report:message')
   })
 
   it('classifies ban add', () => {

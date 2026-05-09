@@ -6,6 +6,7 @@ export default defineConfig({
     name: "desktop-unit",
     include: [
       "src/client/lib/**/*.test.ts",
+      "src/client/lib/**/*.test.tsx",
     ],
     environment: "happy-dom",
     setupFiles: ["./vitest.desktop.setup.ts"],
