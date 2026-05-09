@@ -83,23 +83,26 @@ When('I tap the view contacts button', async ({ page }) => {
 When('I tap a contact card', async ({ page, backendRequest, workerHub }) => {
   // Ensure at least one contact exists so the tap has something to click.
   const contactRow = page.getByTestId(TestIds.CONTACT_ROW).first()
-  const hasContact = await contactRow.isVisible({ timeout: 3000 }).catch(() => false)
+  const hasContact = await contactRow.isVisible({ timeout: 5000 }).catch(() => false)
   if (!hasContact) {
     try {
       const existing = await listContactsViaApi(backendRequest, { hubId: workerHub })
       if (existing.contacts.length === 0) {
         await createContactByNameViaApi(backendRequest, `Test Contact ${Date.now()}`, { hubId: workerHub })
       }
-      // SPA re-navigate to refresh the contacts list
+      // SPA re-navigate to refresh the contacts list — navigate away then back
       await page.getByTestId(TestIds.NAV_DASHBOARD).click()
       await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
       await page.getByTestId(TestIds.NAV_CONTACTS).click()
       await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+      // Wait for network to settle so the seeded contact appears
+      await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {})
     } catch {
       // Backend not available — skip gracefully
     }
   }
-  await expect(contactRow).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // Use longer timeout in CI to allow for slow API responses
+  await expect(contactRow).toBeVisible({ timeout: Timeouts.API })
   await contactRow.click()
 })
 

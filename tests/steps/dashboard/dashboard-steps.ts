@@ -92,10 +92,8 @@ Then('the shift card should show {string} or {string}', async ({ page }, option1
   // Wait for dashboard to fully load
   const shiftCard = page.getByTestId(TestIds.DASHBOARD_SHIFT_STATUS)
   await expect(shiftCard).toBeVisible({ timeout: Timeouts.ELEMENT })
-  // Wait a bit more for text content to render (shift status may load asynchronously)
-  const text = await shiftCard.textContent()
-  const matchesEither = text?.match(new RegExp(`${option1}|${option2}`, 'i'))
-  expect(matchesEither).toBeTruthy()
+  // Wait for text content to render (shift status loads asynchronously from the API)
+  await expect(shiftCard).toContainText(new RegExp(`${option1}|${option2}`, 'i'), { timeout: Timeouts.ELEMENT })
 })
 
 Then('a clock in\\/out button should be visible', async ({ page }) => {

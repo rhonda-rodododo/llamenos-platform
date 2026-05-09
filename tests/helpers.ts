@@ -17,8 +17,9 @@ export const Timeouts = {
   API: 15000,
   /** Time to wait for elements to appear */
   ELEMENT: 10000,
-  /** Time to wait for auth-related operations (includes PBKDF2 600K iterations) */
-  AUTH: 45000,
+  /** Time to wait for auth-related operations (includes PBKDF2 600K iterations).
+   *  CI containers have limited CPU which makes PBKDF2 significantly slower. */
+  AUTH: 55000,
 } as const
 
 // Re-export TestIds for convenience
@@ -83,6 +84,10 @@ export async function navigateAfterLogin(page: Page, url: string, expectAccessDe
   // SPA navigation via TanStack Router (no page reload, keeps auth state)
   const parsed = new URL(url, 'http://localhost')
   const searchParams = Object.fromEntries(parsed.searchParams.entries())
+
+  // Wait for the router to be available (may take a moment after login in CI)
+  await page.waitForFunction(() => !!(window as any).__TEST_ROUTER, { timeout: 10000 })
+
   await page.evaluate(({ pathname, search }) => {
     const router = (window as any).__TEST_ROUTER
     if (!router) return
@@ -132,6 +137,10 @@ export async function navigateViaSpa(page: Page, url: string): Promise<void> {
   // SPA navigation via TanStack Router
   const parsed = new URL(url, 'http://localhost')
   const searchParams = Object.fromEntries(parsed.searchParams.entries())
+
+  // Wait for the router to be available (may take a moment after login in CI)
+  await page.waitForFunction(() => !!(window as any).__TEST_ROUTER, { timeout: 10000 })
+
   await page.evaluate(({ pathname, search }) => {
     const router = (window as any).__TEST_ROUTER
     if (!router) return
@@ -267,6 +276,7 @@ export async function loginAsAdmin(page: Page) {
   }
 
   await page.waitForURL(url => !url.toString().includes('/login'), { timeout: Timeouts.AUTH })
+  // Wait for the authenticated layout — use longer timeout for CI (PBKDF2 + Docker overhead)
   await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.AUTH })
   // Wait for admin section in sidebar or hamburger button (mobile) — confirms getMe() completed.
   const viewport = page.viewportSize()
@@ -276,6 +286,8 @@ export async function loginAsAdmin(page: Page) {
   } else {
     await page.getByTestId(TestIds.NAV_ADMIN_SECTION).waitFor({ state: 'visible', timeout: Timeouts.AUTH })
   }
+  // Ensure network has settled so subsequent navigation doesn't race with auth API calls
+  await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {})
 }
 
 /**

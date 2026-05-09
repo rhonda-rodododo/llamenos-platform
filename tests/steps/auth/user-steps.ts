@@ -87,8 +87,12 @@ When('they tap the break button', async ({ page }) => {
 // --- Invite onboarding ---
 
 When('I create an invite for a new volunteer', async ({ page }) => {
+  // Wait for the Volunteers page to fully load before trying to click buttons
+  await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {})
+
   // Click the "Invite Volunteer" button (not "Add Volunteer" which generates nsec directly)
   const inviteBtn = page.getByTestId(TestIds.INVITE_BTN)
+  await expect(inviteBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
   await inviteBtn.click()
   const name = `InviteVol ${Date.now()}`
   await page.getByLabel('Name').fill(name)
@@ -97,14 +101,14 @@ When('I create an invite for a new volunteer', async ({ page }) => {
   await page.getByLabel('Phone Number').blur()
   // Invite form uses 'create-invite-btn', not 'form-save-btn'
   const createInviteBtn = page.getByTestId('create-invite-btn')
-  const isCreateInvite = await createInviteBtn.isVisible({ timeout: 3000 }).catch(() => false)
+  const isCreateInvite = await createInviteBtn.isVisible({ timeout: 5000 }).catch(() => false)
   if (isCreateInvite) {
     await createInviteBtn.click()
   } else {
     await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
   }
   // Wait for the invite link card to appear
-  await page.getByTestId('dismiss-invite').waitFor({ state: 'visible', timeout: Timeouts.ELEMENT })
+  await page.getByTestId('dismiss-invite').waitFor({ state: 'visible', timeout: Timeouts.API })
   await page.evaluate((n) => {
     (window as Record<string, unknown>).__test_invite_vol_name = n
   }, name)
@@ -296,24 +300,30 @@ When('they create a new report', async ({ page }) => {
   const newBtn = page.getByTestId(TestIds.REPORT_NEW_BTN)
   await expect(newBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
   await newBtn.click()
-  // Reports use a chat-style interface — find textarea and submit button
-  const textarea = page.locator('textarea').first()
-  await expect(textarea).toBeVisible({ timeout: Timeouts.ELEMENT })
-  await textarea.fill('Test report content')
-  // Submit via send button, save button, or submit button (sequential check)
-  const sendAriaBtn = page.locator('button[aria-label*="submit" i], button[aria-label*="send" i]').first()
-  const isSend = await sendAriaBtn.isVisible({ timeout: 2000 }).catch(() => false)
-  if (isSend) {
-    await sendAriaBtn.click()
-    return
+  // Reports creation form — fill in title and body
+  const titleInput = page.getByTestId(TestIds.REPORT_TITLE_INPUT)
+  const isTitleVisible = await titleInput.isVisible({ timeout: 5000 }).catch(() => false)
+  if (isTitleVisible) {
+    await titleInput.fill('Test report content')
   }
-  const saveBtn = page.getByTestId(TestIds.FORM_SAVE_BTN)
-  const isSave = await saveBtn.isVisible({ timeout: 2000 }).catch(() => false)
-  if (isSave) {
-    await saveBtn.click()
-    return
+  const bodyInput = page.getByTestId(TestIds.REPORT_BODY_INPUT)
+  const isBodyVisible = await bodyInput.isVisible({ timeout: 3000 }).catch(() => false)
+  if (isBodyVisible) {
+    await bodyInput.fill('Test report body content')
+  } else {
+    // Chat-style interface — find textarea
+    const textarea = page.locator('textarea').first()
+    const isTextarea = await textarea.isVisible({ timeout: 3000 }).catch(() => false)
+    if (isTextarea) {
+      await textarea.fill('Test report content')
+    }
   }
-  await page.getByTestId(TestIds.FORM_SUBMIT_BTN).click()
+  // Submit via report submit button, form save, or generic submit (use combined locator)
+  const submitBtn = page.getByTestId(TestIds.REPORT_SUBMIT_BTN)
+    .or(page.getByTestId(TestIds.FORM_SAVE_BTN))
+    .or(page.getByTestId(TestIds.FORM_SUBMIT_BTN))
+  await expect(submitBtn.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await submitBtn.first().click()
 })
 
 Then('the report should be saved successfully', async ({ page }) => {

@@ -8,8 +8,11 @@ import { TestIds } from '../../test-ids'
 import { Timeouts, loginAsAdmin } from '../../helpers'
 
 Given('the app is launched', async ({ page }) => {
+  // In CI, loginAsAdmin may take longer due to PBKDF2 + Docker overhead.
+  // Use AUTH timeout for the page-title assertion.
   await loginAsAdmin(page)
-  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.AUTH })
+  // loginAsAdmin already asserts PAGE_TITLE visibility, but add extra wait for dashboard data
+  await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {})
 })
 
 Then('I should see the calls today count on the dashboard', async ({ page }) => {
@@ -31,12 +34,15 @@ When('I pull to refresh the dashboard', async ({ page }) => {
   // On desktop, pull-to-refresh is simulated by page reload or a refresh button
   await page.reload()
   await page.waitForLoadState('domcontentloaded')
-  // Re-enter PIN if needed
+  // Re-enter PIN if needed (reload clears in-memory keyManager)
   const pinInput = page.getByTestId('pin-input').locator('input')
-  const pinVisible = await pinInput.isVisible({ timeout: 2000 }).catch(() => false)
+  const pinVisible = await pinInput.isVisible({ timeout: 5000 }).catch(() => false)
   if (pinVisible) {
-    const { enterPin, TEST_PIN } = await import('../../helpers')
+    const { enterPin, TEST_PIN, Timeouts: T } = await import('../../helpers')
     await enterPin(page, TEST_PIN)
-    await page.waitForURL((u) => !u.toString().includes('/login'), { timeout: 15000 })
+    await page.waitForURL((u) => !u.toString().includes('/login'), { timeout: T.AUTH })
   }
+  // Wait for authenticated layout after reload
+  const { TestIds: TI, Timeouts: T } = await import('../../helpers')
+  await page.getByTestId(TI.PAGE_TITLE).waitFor({ state: 'visible', timeout: T.AUTH }).catch(() => {})
 })

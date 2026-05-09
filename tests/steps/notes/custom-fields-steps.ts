@@ -194,18 +194,27 @@ Then('both notes should appear under a single call header', async ({ page }) => 
 
 Given('a note exists', async ({ page, backendRequest: request, workerHub }) => {
   // Verify via API first
-  const { notes } = await listNotesViaApi(request, { hubId: workerHub })
+  let noteCount = 0
+  try {
+    const { notes } = await listNotesViaApi(request, { hubId: workerHub })
+    noteCount = notes.length
+  } catch {
+    // API may not be available
+  }
 
   // Always navigate to notes page so subsequent steps find note cards
   await Navigation.goToNotes(page)
 
-  if (notes.length === 0) {
-    await page.getByTestId(TestIds.NOTE_NEW_BTN).click()
+  if (noteCount === 0) {
+    const newBtn = page.getByTestId(TestIds.NOTE_NEW_BTN)
+    await expect(newBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
+    await newBtn.click()
     await expect(page.getByTestId(TestIds.NOTE_FORM)).toBeVisible({ timeout: Timeouts.ELEMENT })
     await fillCallId(page, `CALL-${Date.now()}`)
     await page.getByTestId(TestIds.NOTE_CONTENT).fill('Existing note for testing')
     await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
     await expect(page.getByTestId(TestIds.NOTE_FORM)).not.toBeVisible({ timeout: Timeouts.ELEMENT })
+    await expect(page.getByTestId(TestIds.NOTE_CARD).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
   }
 })
 

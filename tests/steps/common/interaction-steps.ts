@@ -10,7 +10,7 @@
 import { expect } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
 import { TestIds, navTestIdMap, sectionTestIdMap } from '../../test-ids'
-import { Timeouts } from '../../helpers'
+import { Timeouts, navigateViaSpa } from '../../helpers'
 
 /**
  * Map from feature-file button text to data-testid values.
@@ -504,7 +504,6 @@ When('they navigate to the {string} page', async ({ page }, pageName: string) =>
 })
 
 When('they navigate to {string} via SPA', async ({ page }, path: string) => {
-  const { navigateViaSpa } = await import('../../helpers')
   await navigateViaSpa(page, path)
 })
 
@@ -552,7 +551,8 @@ When('I dismiss the invite link card', async ({ page }) => {
 
 Then('the page should have the {string} class', async ({ page }, className: string) => {
   const html = page.locator('html')
-  await expect(html).toHaveClass(new RegExp(className))
+  // Theme class may take a moment to apply after reload (ThemeProvider reads from localStorage)
+  await expect(html).toHaveClass(new RegExp(className), { timeout: Timeouts.ELEMENT })
 })
 
 Then('the page should not have the {string} class', async ({ page }, className: string) => {

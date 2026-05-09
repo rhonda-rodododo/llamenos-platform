@@ -25,16 +25,16 @@ export default defineConfig({
         ["line"],
       ]
     : [["list"]],
-  timeout: process.env.CI ? 45_000 : 30_000,
+  timeout: process.env.CI ? 60_000 : 30_000,
   globalSetup: './tests/global-setup.ts',
   expect: {
-    timeout: 10_000,
+    timeout: process.env.CI ? 15_000 : 10_000,
   },
   use: {
     baseURL: process.env.PLAYWRIGHT_BASE_URL || "http://localhost:8788",
     trace: "on-first-retry",
-    actionTimeout: 10_000,
-    navigationTimeout: process.env.CI ? 20_000 : 15_000,
+    actionTimeout: process.env.CI ? 15_000 : 10_000,
+    navigationTimeout: process.env.CI ? 30_000 : 15_000,
   },
   projects: [
     {
@@ -62,7 +62,7 @@ export default defineConfig({
           ...desktopStepDirs.map((d) => `tests/steps/${d}/**/*.ts`),
         ],
         featuresRoot: "packages/test-specs/features",
-        tags: "@desktop and not @backend and not @wip",
+        tags: "@desktop and not @backend and not @wip and not @requires-camera",
         // Backend-only scenarios have steps not defined in desktop — skip them
         missingSteps: "skip-scenario",
       }),

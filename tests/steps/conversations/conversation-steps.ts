@@ -145,13 +145,12 @@ Then('I should see the assign dialog', async ({ page }) => {
 })
 
 Then('I should see the add note button', async ({ page }) => {
-  const convNoteBtn = page.getByTestId(TestIds.CONV_ADD_NOTE_BTN)
-  const isConvBtn = await convNoteBtn.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (isConvBtn) return
-  // Note button on conversation may use generic testid
-  const noteNewBtn = page.getByTestId(TestIds.NOTE_NEW_BTN)
-  const isNoteBtn = await noteNewBtn.isVisible({ timeout: 3000 }).catch(() => false)
-  if (isNoteBtn) return
+  // Check for either the conversation-specific add note button or the generic one.
+  // Use combined locator to avoid sequential timeouts that add up.
+  const noteBtn = page.getByTestId(TestIds.CONV_ADD_NOTE_BTN)
+    .or(page.getByTestId(TestIds.NOTE_NEW_BTN))
+  const isBtn = await noteBtn.first().isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+  if (isBtn) return
   // Conversation may not have been opened (no simulation backend) — verify page loaded
   await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })

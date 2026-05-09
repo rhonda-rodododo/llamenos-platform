@@ -30,8 +30,9 @@ Then('all session storage should be cleared', async ({ page }) => {
 When('I press Escape twice then wait over one second', async ({ page }) => {
   await page.keyboard.press('Escape')
   await page.keyboard.press('Escape')
-  // Wait >1 second so the panic wipe window expires before the next Escape
-  await page.waitForTimeout(1200)
+  // Wait >1 second so the panic wipe window expires before the next Escape.
+  // Use 2s in CI to account for event loop lag under heavy parallel load.
+  await page.waitForTimeout(2000)
 })
 
 When('I press Escape once more', async ({ page }) => {

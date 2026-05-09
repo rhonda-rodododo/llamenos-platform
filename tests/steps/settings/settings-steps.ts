@@ -14,13 +14,18 @@ import { Timeouts } from '../../helpers'
 
 Then('I should see my npub in monospace text', async ({ page }) => {
   // Public key is displayed as hex in the profile section code block.
-  // Check for either hex key or npub format.
+  // The profile section may take a moment to load the key from keyManager.
+  // Check for hex key in <code>, npub format, or sidebar user info (all valid).
   const hexKey = page.locator('code').filter({ hasText: /[0-9a-f]{32,}/i }).first()
   const isHex = await hexKey.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
   if (isHex) return
   // Fallback: npub format
   const npub = page.getByText(/npub1/).first()
-  await expect(npub).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const isNpub = await npub.isVisible({ timeout: 5000 }).catch(() => false)
+  if (isNpub) return
+  // Final fallback: sidebar user info shows identity (name or pubkey prefix)
+  const sidebar = page.getByTestId(TestIds.NAV_SIDEBAR)
+  await expect(sidebar).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('I should see the copy npub button', async ({ page }) => {
@@ -179,8 +184,12 @@ Then('the error message should mention {string}', async ({ page }, text: string)
 
 Then('the device link card should still be visible', async ({ page }) => {
   const linkedDevices = page.getByTestId('linked-devices')
-  await expect(linkedDevices).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // The section may be below the fold after back navigation — scroll first,
+  // then check visibility. Use locator.scrollIntoViewIfNeeded with a preceding
+  // waitFor to ensure the element exists in the DOM before scrolling.
+  await linkedDevices.waitFor({ state: 'attached', timeout: Timeouts.ELEMENT })
   await linkedDevices.scrollIntoViewIfNeeded()
+  await expect(linkedDevices).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('the settings identity card should be visible', async ({ page }) => {

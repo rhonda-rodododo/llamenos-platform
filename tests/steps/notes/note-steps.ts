@@ -113,12 +113,17 @@ Given('at least one note exists', async ({ page, backendRequest: request, worker
 
   if (!hasNotes) {
     // Create a note through the UI
-    await page.getByTestId(TestIds.NOTE_NEW_BTN).click()
+    const newBtn = page.getByTestId(TestIds.NOTE_NEW_BTN)
+    await expect(newBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
+    await newBtn.click()
+    await expect(page.getByTestId(TestIds.NOTE_FORM)).toBeVisible({ timeout: Timeouts.ELEMENT })
     await fillCallId(page, `CALL-${Date.now()}`)
     await page.getByTestId(TestIds.NOTE_CONTENT).fill('Auto-created test note')
     await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
     // Wait for form to close and note to appear in list
     await expect(page.getByTestId(TestIds.NOTE_FORM)).not.toBeVisible({ timeout: Timeouts.ELEMENT })
+    // Wait for the created note card to appear
+    await expect(page.getByTestId(TestIds.NOTE_CARD).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
   }
 })
 
@@ -191,9 +196,11 @@ Given('I open a note', async ({ page, backendRequest: request, workerHub }) => {
     const newBtn = page.getByTestId(TestIds.NOTE_NEW_BTN)
     await expect(newBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
     await newBtn.click()
+    await expect(page.getByTestId(TestIds.NOTE_FORM)).toBeVisible({ timeout: Timeouts.ELEMENT })
     await fillCallId(page, `CALL-${Date.now()}`)
     await page.getByTestId(TestIds.NOTE_CONTENT).fill('Auto-created note for test')
     await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
+    await expect(page.getByTestId(TestIds.NOTE_FORM)).not.toBeVisible({ timeout: Timeouts.ELEMENT })
   }
 
   const noteCard = page.getByTestId(TestIds.NOTE_CARD).first()

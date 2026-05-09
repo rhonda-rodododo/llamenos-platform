@@ -104,11 +104,10 @@ Given('I am on the login screen', async ({ page }) => {
 
 Given('I have a stored identity with PIN {string}', async ({ page }, pin: string) => {
   // Pre-load an encrypted key for the given PIN using the test platform shim.
-  // Normalize to 8 characters (PinInput component requires minLength=8 before Enter triggers onComplete).
+  // Feature files MUST use 8+ character PINs (PinInput minLength=8).
+  // No padding — the PIN used here must exactly match the PIN entered later.
   // Uses deviceImportAndLoad (Ed25519) which is deterministic and works reliably across
-  // page reloads in CI. The old legacyImportNsec (secp256k1 + argon2id) was non-deterministic
-  // under CI memory pressure, causing "Wrong PIN" failures.
-  const normalizedPin = pin.padEnd(8, '0')
+  // page reloads in CI.
   const secretHex = ADMIN_SEED
 
   await page.goto('/login')
@@ -122,16 +121,16 @@ Given('I have a stored identity with PIN {string}', async ({ page }, pin: string
   // Wait for __TEST_PLATFORM to be loaded (set asynchronously in main.tsx)
   await page.waitForFunction(() => !!(window as Record<string, unknown>).__TEST_PLATFORM, { timeout: 10000 })
 
-  await page.evaluate(async ({ secretHex, normalizedPin }) => {
+  await page.evaluate(async ({ secretHex, pin }) => {
     const platform = (window as Record<string, unknown>).__TEST_PLATFORM as {
       deviceImportAndLoad: (secretHex: string, pin: string, deviceId: string) => Promise<unknown>
       persistAndUnlockDeviceKeys: (encrypted: unknown, pin: string) => Promise<unknown>
       lockCrypto: () => Promise<void>
     }
-    const encrypted = await platform.deviceImportAndLoad(secretHex, normalizedPin, crypto.randomUUID())
-    await platform.persistAndUnlockDeviceKeys(encrypted, normalizedPin)
+    const encrypted = await platform.deviceImportAndLoad(secretHex, pin, crypto.randomUUID())
+    await platform.persistAndUnlockDeviceKeys(encrypted, pin)
     await platform.lockCrypto()
-  }, { secretHex, normalizedPin })
+  }, { secretHex, pin })
 })
 
 Given('the app is restarted', async ({ page }) => {
@@ -149,10 +148,9 @@ When('the app launches', async ({ page }) => {
 })
 
 When('I enter PIN {string}', async ({ page }, pin: string) => {
-  // Normalize to 8 characters (PinInput component requires minLength=8 before Enter triggers onComplete).
-  // Feature files should use 8-char PINs directly; padding is a safety net for legacy specs.
-  const normalizedPin = pin.length >= 8 ? pin : pin.padEnd(8, '0')
-  await enterPin(page, normalizedPin)
+  // Feature files MUST use 8+ character PINs (PinInput minLength=8).
+  // No padding — the PIN entered must exactly match the PIN used in the Given step.
+  await enterPin(page, pin)
 })
 
 // ── Volunteer on shift ────────────────────────────────────────────
