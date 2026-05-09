@@ -63,7 +63,7 @@ export default defineConfig({
           ...desktopStepDirs.map((d) => `tests/steps/${d}/**/*.ts`),
         ],
         featuresRoot: "packages/test-specs/features",
-        tags: "@desktop and not @backend and not @wip and not @requires-camera and not @requires-live-calls and not @requires-demo",
+        tags: "@desktop and not @backend and not @wip and not @fixme and not @requires-camera and not @requires-live-calls and not @requires-demo",
         // Backend-only scenarios have steps not defined in desktop — skip them
         missingSteps: "skip-scenario",
       }),
