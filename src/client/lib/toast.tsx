@@ -24,7 +24,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setToasts(prev => [...prev, { id, message, type }])
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id))
-    }, 4000)
+    }, import.meta.env.PLAYWRIGHT_TEST ? 8000 : 4000)
   }, [])
 
   const dismiss = useCallback((id: string) => {
@@ -39,6 +39,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <div
             key={t.id}
             role={t.type === 'error' ? 'alert' : 'status'}
+            data-testid={t.type === 'success' ? 'toast-success' : t.type === 'error' ? 'toast-error' : 'toast-info'}
             className={`flex items-center gap-2 rounded-lg px-4 py-3 text-sm shadow-lg transition-all animate-in slide-in-from-right ${
               t.type === 'error'
                 ? 'bg-red-900/90 text-red-100 border border-red-700'
