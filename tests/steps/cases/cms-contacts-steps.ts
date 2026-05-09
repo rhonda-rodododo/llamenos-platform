@@ -65,12 +65,27 @@ async function ensureContactVisibleInDirectory(
     const dialog = page.getByTestId('create-contact-dialog')
     await dialog.waitFor({ state: 'hidden', timeout: Timeouts.ELEMENT }).catch(() => {})
 
+    // If dialog is still open (e.g. submission pending), force-close with Escape
+    const stillOpen = await dialog.isVisible({ timeout: 1000 }).catch(() => false)
+    if (stillOpen) {
+      await page.keyboard.press('Escape')
+      await dialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
+    }
+
     // Check if card appeared after creation
     const appeared = await card.isVisible({ timeout: 5000 }).catch(() => false)
     if (!appeared) {
       // Contact may have been created but directory needs a reload to show it
       await navigateAfterLogin(page, '/contacts-directory')
     }
+  }
+
+  // Ensure any residual create-contact-dialog is dismissed before returning,
+  // so subsequent card clicks are not blocked by the dialog overlay.
+  const residualDialog = page.getByTestId('create-contact-dialog')
+  if (await residualDialog.isVisible({ timeout: 500 }).catch(() => false)) {
+    await page.keyboard.press('Escape')
+    await residualDialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
   }
 }
 
@@ -456,6 +471,12 @@ When('I click on the {string} contact card', async ({ page }, name: string) => {
     await card.first().click()
   } else {
     await ensureContactVisibleInDirectory(page, name)
+    // Dismiss any open dialog before clicking (ensureContactVisibleInDirectory may have left one open)
+    const openDialog = page.getByTestId('create-contact-dialog')
+    if (await openDialog.isVisible({ timeout: 500 }).catch(() => false)) {
+      await page.keyboard.press('Escape')
+      await openDialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
+    }
     const anyCard = page.getByTestId('directory-contact-card').first()
     if (await anyCard.isVisible({ timeout: 5000 }).catch(() => false)) {
       await anyCard.click()
@@ -469,6 +490,12 @@ When('I click on the contact card', async ({ page }) => {
   let isVisible = await card.isVisible({ timeout: 8000 }).catch(() => false)
   if (!isVisible) {
     await ensureContactVisibleInDirectory(page)
+    // Dismiss any open dialog before clicking the card
+    const openDialog = page.getByTestId('create-contact-dialog')
+    if (await openDialog.isVisible({ timeout: 500 }).catch(() => false)) {
+      await page.keyboard.press('Escape')
+      await openDialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
+    }
     isVisible = await card.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
   }
   if (isVisible) {
@@ -656,6 +683,14 @@ When('I click on the restricted contact card', async ({ page }) => {
     const { navigateAfterLogin } = await import('../../helpers')
     await navigateAfterLogin(page, '/contacts-directory')
     cardVisible = await card.isVisible({ timeout: 8000 }).catch(() => false)
+  }
+
+  // Close any open dialog that may be blocking clicks (e.g. create-contact-dialog
+  // left open after ensureContactVisibleInDirectory ran its UI creation fallback)
+  const openDialog = page.getByTestId('create-contact-dialog')
+  if (await openDialog.isVisible({ timeout: 1000 }).catch(() => false)) {
+    await page.keyboard.press('Escape')
+    await openDialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
   }
 
   if (cardVisible) {

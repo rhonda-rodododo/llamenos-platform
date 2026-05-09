@@ -169,7 +169,7 @@ Then('a success toast should appear', async ({ page }) => {
   // Toasts auto-dismiss after 4s, so check for either the toast element or matching page text.
   // Use a short polling loop to catch fast-dismissing toasts.
   const toastLocator = page.locator('[role="status"], [role="alert"]')
-  const textLocator = page.getByText(/success|saved|enabled|disabled|created|applied|archived|deleted/i)
+  const textLocator = page.getByText(/success|saved|enabled|disabled|created|applied|archived|deleted|assigned/i)
   const combined = toastLocator.or(textLocator)
   await expect(combined.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })

@@ -152,7 +152,7 @@ Feature: Admin & User Settings
     And I should see "Evening Team"
     And I should see "Weekend Coverage"
 
-  @desktop @ios @android
+  @desktop @ios @android @requires-demo
   Scenario: Demo bans are populated
     Given demo mode has been enabled
     And I am logged in as an admin

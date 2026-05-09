@@ -9,11 +9,7 @@ import { TestIds, Timeouts, enterPin, TEST_PIN } from '../../helpers'
 
 When('I click the phone visibility toggle', async ({ page }) => {
   const toggleBtn = page.getByTestId(TestIds.TOGGLE_PHONE_VISIBILITY).first()
-  const hasToggle = await toggleBtn.isVisible({ timeout: 5000 }).catch(() => false)
-  if (!hasToggle) {
-    // No volunteers with phones — skip remaining steps
-    return
-  }
+  await expect(toggleBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
   await toggleBtn.click()
 })
 

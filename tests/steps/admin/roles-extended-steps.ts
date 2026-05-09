@@ -17,6 +17,7 @@ import {
   listRolesViaApi,
   testEndpointAccess,
   getMeViaApi,
+  addHubMemberViaApi,
   ADMIN_NSEC,
 } from '../../api-helpers'
 
@@ -24,13 +25,15 @@ import {
 
 // --- Role enforcement steps ---
 
-Given('I am logged in as a volunteer', async ({ page, request, rolesWorld }) => {
-  // Create a real volunteer via API with proper auth, then login
+Given('I am logged in as a volunteer', async ({ page, request, rolesWorld, workerHub }) => {
+  // Create a real volunteer via API with proper auth, then login.
+  // Also add them to workerHub so the hub-scoped CMS toggle takes effect for them.
   const vol = await createVolunteerViaApi(request, {
     name: `RoleVol ${Date.now()}`,
     roleIds: ['role-volunteer'],
   })
   rolesWorld.volunteerNsec = vol.nsec
+  await addHubMemberViaApi(request, workerHub, vol.pubkey, ['role-volunteer'])
   await loginAsVolunteer(page, vol.nsec)
 })
 

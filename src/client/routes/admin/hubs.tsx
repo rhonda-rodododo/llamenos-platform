@@ -66,7 +66,7 @@ function HubsPage() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Building2 className="h-6 w-6 text-primary" />
-          <h1 className="text-xl font-bold sm:text-2xl">{t('hubs.title')}</h1>
+          <h1 className="text-xl font-bold sm:text-2xl" data-testid="page-title">{t('hubs.title')}</h1>
         </div>
         <Button onClick={() => setShowCreateDialog(true)}>
           <Plus className="h-4 w-4" />
@@ -361,7 +361,7 @@ function DeleteHubDialog({
               type="submit"
               variant="destructive"
               disabled={deleting || confirmName !== hub.name}
-              data-testid="delete-hub-confirm-button"
+              data-testid="confirm-dialog-ok"
             >
               {deleting ? t('common.loading') : t('hubs.deleteHub')}
             </Button>

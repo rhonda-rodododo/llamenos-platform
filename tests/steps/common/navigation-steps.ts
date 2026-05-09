@@ -85,7 +85,7 @@ Given('I am authenticated and on the shifts screen', async ({ page }) => {
 Given('I am on the settings screen', async ({ page }) => {
   // If not yet authenticated (fresh page context in parallel mode), log in first
   const sidebar = page.getByTestId(TestIds.NAV_SIDEBAR)
-  const isAuthenticated = await sidebar.isVisible({ timeout: 2000 }).catch(() => false)
+  const isAuthenticated = await sidebar.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
   if (!isAuthenticated) {
     const { loginAsAdmin } = await import('../../helpers')
     await loginAsAdmin(page)
@@ -96,7 +96,7 @@ Given('I am on the settings screen', async ({ page }) => {
 Given('I am on the dashboard', async ({ page }) => {
   // If not yet authenticated (fresh page context in parallel mode), log in first
   const sidebar = page.getByTestId(TestIds.NAV_SIDEBAR)
-  const isAuthenticated = await sidebar.isVisible({ timeout: 2000 }).catch(() => false)
+  const isAuthenticated = await sidebar.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
   if (!isAuthenticated) {
     const { loginAsAdmin } = await import('../../helpers')
     await loginAsAdmin(page)
@@ -192,12 +192,20 @@ When('I tap the back button', async ({ page }) => {
     return
   }
   // On desktop settings page, sections are inline — "back" from a section means
-  // collapse the expanded section rather than navigating away from settings.
+  // collapsing the expanded section rather than navigating away from settings.
+  // The CollapsibleContent inside the linked-devices card has data-state="open"
+  // when expanded (set by Radix UI Collapsible).
   if (page.url().includes('/settings')) {
-    // Collapse the currently expanded linked-devices section if it's open
-    const linkedDevicesOpen = page.getByTestId('linked-devices').locator('[data-state="open"]')
-    if (await linkedDevicesOpen.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await page.getByTestId('linked-devices-trigger').click()
+    const linkedDevicesSection = page.getByTestId('linked-devices')
+    const sectionInDom = await linkedDevicesSection.isVisible({ timeout: 2000 }).catch(() => false)
+    if (sectionInDom) {
+      // Check if expanded by looking for CollapsibleContent with data-state="open"
+      const content = linkedDevicesSection.locator('[data-state="open"]').first()
+      const isExpanded = await content.isVisible({ timeout: 1000 }).catch(() => false)
+      if (isExpanded) {
+        await page.getByTestId('linked-devices-trigger').click()
+      }
+      // Remain on the settings page — no navigation needed on desktop
       return
     }
   }
@@ -245,6 +253,13 @@ When('I check the API config endpoint', async ({ page }) => {
 Then('the page title should contain {string}', async ({ page }, text: string) => {
   const title = await page.title()
   expect(title.toLowerCase()).toContain(text.toLowerCase())
+})
+
+Then('the app has a non-empty page title', async ({ page }) => {
+  // The page title comes from index.html default ("Hotline") or the configured
+  // HOTLINE_NAME (e.g. "Llámenos" in CI). Accept any non-empty title.
+  const title = await page.title()
+  expect(title.trim().length).toBeGreaterThan(0)
 })
 
 Then('I should be redirected to the login page', async ({ page }) => {

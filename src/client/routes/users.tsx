@@ -197,11 +197,14 @@ function UsersPage() {
                     size="sm"
                     data-testid="revoke-invite-btn"
                     onClick={async () => {
+                      // Optimistic removal — update UI immediately, restore on failure
+                      setInvites(prev => prev.filter(i => i.code !== invite.code))
                       try {
                         await revokeInvite(invite.code)
-                        setInvites(prev => prev.filter(i => i.code !== invite.code))
                         toast(t('users.inviteRevoked'), 'success')
                       } catch {
+                        // Restore the invite if the API call failed
+                        setInvites(prev => [...prev, invite])
                         toast(t('common.error'), 'error')
                       }
                     }}
