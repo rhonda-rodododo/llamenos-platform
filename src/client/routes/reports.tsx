@@ -206,6 +206,33 @@ function ReportsPage() {
         </Button>
       </div>
 
+      {isAdmin && (
+        <div data-testid="report-filter-area" className="flex gap-2">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger data-testid="report-status-filter" size="sm" className="flex-1">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem data-testid="report-status-option-all" value="all">{t('reports.allStatuses', { defaultValue: 'All statuses' })}</SelectItem>
+              <SelectItem data-testid="report-status-option-waiting" value="waiting">{t('reports.statusWaiting', { defaultValue: 'Waiting' })}</SelectItem>
+              <SelectItem data-testid="report-status-option-active" value="active">{t('reports.statusActive', { defaultValue: 'Active' })}</SelectItem>
+              <SelectItem data-testid="report-status-option-closed" value="closed">{t('reports.statusClosed', { defaultValue: 'Closed' })}</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger data-testid="report-category-filter" size="sm" className="flex-1">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t('reports.allCategories', { defaultValue: 'All categories' })}</SelectItem>
+              {reportTypes.map(rt => (
+                <SelectItem key={rt.id} value={rt.name}>{rt.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
       {showEmptyState ? (
         <Card data-testid="empty-state">
           <CardContent className="flex flex-col items-center justify-center py-16 text-center">
@@ -228,32 +255,6 @@ function ReportsPage() {
                 </h2>
               </div>
 
-              {isAdmin && (
-                <div data-testid="report-filter-area" className="flex gap-2">
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger data-testid="report-status-filter" size="sm" className="flex-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem data-testid="report-status-option-all" value="all">{t('reports.allStatuses', { defaultValue: 'All statuses' })}</SelectItem>
-                      <SelectItem data-testid="report-status-option-waiting" value="waiting">{t('reports.statusWaiting', { defaultValue: 'Waiting' })}</SelectItem>
-                      <SelectItem data-testid="report-status-option-active" value="active">{t('reports.statusActive', { defaultValue: 'Active' })}</SelectItem>
-                      <SelectItem data-testid="report-status-option-closed" value="closed">{t('reports.statusClosed', { defaultValue: 'Closed' })}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                    <SelectTrigger data-testid="report-category-filter" size="sm" className="flex-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">{t('reports.allCategories', { defaultValue: 'All categories' })}</SelectItem>
-                      {reportTypes.map(rt => (
-                        <SelectItem key={rt.id} value={rt.name}>{rt.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
             </div>
 
             {loading ? (

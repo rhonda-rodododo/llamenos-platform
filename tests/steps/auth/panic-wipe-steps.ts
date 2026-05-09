@@ -18,11 +18,17 @@ Then('the panic wipe overlay should appear', async ({ page }) => {
 })
 
 Then('all local storage should be cleared', async ({ page }) => {
+  // Panic wipe triggers navigation which may destroy the execution context;
+  // wait for the new page to load before evaluating localStorage.
+  await page.waitForLoadState('load')
   const count = await page.evaluate(() => localStorage.length)
   expect(count).toBe(0)
 })
 
 Then('all session storage should be cleared', async ({ page }) => {
+  // Panic wipe triggers navigation which may destroy the execution context;
+  // wait for the new page to load before evaluating sessionStorage.
+  await page.waitForLoadState('load')
   const count = await page.evaluate(() => sessionStorage.length)
   expect(count).toBe(0)
 })

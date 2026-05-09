@@ -30,6 +30,7 @@ declare global {
     __TEST_KEY_MANAGER: typeof import('./lib/key-manager')
     __TEST_PLATFORM: typeof import('./lib/platform')
     __TEST_SET_ACTIVE_HUB: (id: string | null) => void
+    __TEST_GET_ACTIVE_HUB: () => string | null
   }
 }
 if (typeof window !== 'undefined') {
@@ -42,6 +43,7 @@ if (typeof window !== 'undefined') {
   })
   import('./lib/api').then(api => {
     window.__TEST_SET_ACTIVE_HUB = api.setActiveHub
+    window.__TEST_GET_ACTIVE_HUB = api.getActiveHub
   })
 }
 

@@ -342,10 +342,10 @@ function AuthenticatedLayout() {
               <NavLink to="/shifts" icon={<Clock className="h-4 w-4" />}>{t('nav.shifts')}</NavLink>
               <NavLink to="/users" icon={<Users className="h-4 w-4" />}>{t('nav.users')}</NavLink>
               <NavLink to="/bans" icon={<ShieldBan className="h-4 w-4" />}>{t('nav.banList')}</NavLink>
-              {hasPermission('contacts:manage') && (
+              {hasPermission('contacts:view') && (
                 <NavLink to="/contacts" icon={<Contact className="h-4 w-4" />}>{t('nav.contacts', { defaultValue: 'Contacts' })}</NavLink>
               )}
-              {hasPermission('contacts:manage') && (
+              {hasPermission('contacts:view') && (
                 <NavLink to="/contacts-directory" icon={<BookUser className="h-4 w-4" />}>{t('contactDirectory.title', { defaultValue: 'Contact Directory' })}</NavLink>
               )}
               <NavLink to="/audit" icon={<ScrollText className="h-4 w-4" />}>{t('nav.auditLog')}</NavLink>

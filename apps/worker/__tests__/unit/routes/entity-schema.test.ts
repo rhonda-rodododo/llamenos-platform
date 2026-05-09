@@ -132,7 +132,7 @@ describe('entity-schema routes', () => {
       expect(res.status).toBe(200)
       const json = await res.json()
       expect(json.enabled).toBe(true)
-      expect(setCaseMgmtSpy).toHaveBeenCalledWith({ enabled: true })
+      expect(setCaseMgmtSpy).toHaveBeenCalledWith({ enabled: true }, undefined)
       expect(auditLogSpy).toHaveBeenCalledOnce()
     })
 

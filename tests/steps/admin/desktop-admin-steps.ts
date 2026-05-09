@@ -153,16 +153,17 @@ Then('I should see the RCS configuration section', async ({ page }) => {
 })
 
 When('I fill in valid RCS settings', async ({ page }) => {
-  // Ensure we're on Hub Settings with the RCS section visible
+  // Ensure we're on Hub Settings with the RCS section expanded and visible.
+  // The RCS Channel section (id="rcs-channel") is separate from the telephony section.
   const agentIdInput = page.getByTestId(TestIds.RCS_AGENT_ID)
   if (!await agentIdInput.isVisible({ timeout: 3000 }).catch(() => false)) {
     // Navigate to hub settings
     const { Navigation } = await import('../../pages/index')
     await Navigation.goToHubSettings(page)
-    // Expand the messaging/telephony section using the trigger pattern
-    const trigger = page.getByTestId(`${TestIds.SETTINGS_TELEPHONY}-trigger`)
-    if (await trigger.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await trigger.click()
+    // Expand the RCS channel section trigger (data-testid="rcs-channel-trigger")
+    const rcsTrigger = page.getByTestId('rcs-channel-trigger')
+    if (await rcsTrigger.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await rcsTrigger.click()
     }
   }
   // Fill the agent ID if visible
@@ -280,13 +281,18 @@ Given('a non-default hub exists', async ({ page }) => {
 })
 
 When('I click {string} on the hub', async ({ page }, text: string) => {
-  // Use confirm dialog OK for known delete/confirm actions
-  const lowerText = text.toLowerCase()
-  if (lowerText === 'delete') {
-    await page.getByTestId(TestIds.CONFIRM_DIALOG_OK).click()
-  } else {
-    await page.getByRole('button', { name: text }).first().click()
+  // Always navigate to the hubs admin page before looking for hub action buttons.
+  // Checking only for page-title visibility is insufficient — the page could be on
+  // any route (e.g., Dashboard) even when page-title is visible.
+  const currentUrl = page.url()
+  if (!currentUrl.includes('/admin/hubs')) {
+    await navigateAfterLogin(page, '/admin/hubs')
+    await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
   }
+  // Click the action button on a hub row (e.g. "Delete", "Edit")
+  const btn = page.getByRole('button', { name: new RegExp(text, 'i') }).first()
+  await expect(btn).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await btn.click()
 })
 
 When('I confirm the deletion', async ({ page }) => {
@@ -294,6 +300,18 @@ When('I confirm the deletion', async ({ page }) => {
   // others use a React AlertDialog. Handle both cases.
   const dialog = page.getByRole('dialog')
   if (await dialog.isVisible({ timeout: 2000 }).catch(() => false)) {
+    // The DeleteHubDialog requires typing the hub name into the confirmation input
+    // before the "Delete Hub" confirm button becomes enabled.
+    const confirmInput = page.getByTestId('delete-hub-confirm-input')
+    const hasInput = await confirmInput.isVisible({ timeout: 2000 }).catch(() => false)
+    if (hasInput) {
+      // Read the expected hub name displayed above the input (the <p> with font-mono class)
+      const hubNameLabel = dialog.locator('p.font-mono.font-medium').first()
+      const hubName = await hubNameLabel.textContent({ timeout: 2000 }).catch(() => null)
+      if (hubName) {
+        await confirmInput.fill(hubName.trim())
+      }
+    }
     const okBtn = page.getByTestId(TestIds.CONFIRM_DIALOG_OK)
     const hasOk = await okBtn.isVisible({ timeout: 2000 }).catch(() => false)
     if (hasOk) await okBtn.click()
@@ -302,10 +320,12 @@ When('I confirm the deletion', async ({ page }) => {
 })
 
 Then('the hub should be removed', async ({ page }) => {
-  // After deletion, a success toast should appear or the hub should no longer be in the list
+  // After deletion, a success toast should appear or the hub should no longer be in the list.
+  // Check toast first; fall back to text match only if needed (avoid .or() strict mode violations).
   const toast = page.locator('[role="status"]').first()
-  const deleted = toast.or(page.getByText(/deleted|removed/i).first())
-  await expect(deleted).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const hasToast = await toast.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+  if (hasToast) return
+  await expect(page.getByText(/deleted|removed/i).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 // --- Setup wizard ---
@@ -506,7 +526,7 @@ When('I click on the report', async ({ page }) => {
 })
 
 Then('I should see the report detail view', async ({ page }) => {
-  await expect(page.getByTestId(TestIds.REPORT_DETAIL).or(page.getByTestId(TestIds.REPORT_METADATA))).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(page.getByTestId(TestIds.REPORT_DETAIL).or(page.getByTestId(TestIds.REPORT_METADATA)).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('I should see the report content', async ({ page }) => {
