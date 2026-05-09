@@ -217,6 +217,14 @@ export async function loginAsAdmin(page: Page) {
   await page.goto('/login')
   await page.waitForLoadState('domcontentloaded')
 
+  // Reset PIN lockout counter to prevent accumulation across serial tests.
+  // In serial mode the browser context is reused, so failed PIN attempts from
+  // stale cached storage compound across tests. Without this reset, the mock's
+  // escalating lockout triggers a 10-minute lockout after ~9 loginAsAdmin calls.
+  await page.evaluate(() => {
+    localStorage.removeItem('__test_pin_lockout_state')
+  })
+
   let usingLegacy = false
   if (storageState) {
     await page.evaluate((state) => {
@@ -331,6 +339,8 @@ export async function loginAsVolunteer(page: Page, seedHex: string) {
     localStorage.removeItem('llamenos:llamenos-encrypted-device-keys')
     localStorage.removeItem('llamenos:llamenos-encrypted-key')
     localStorage.removeItem('llamenos-encrypted-key')
+    // Reset PIN lockout counter to prevent accumulation across serial tests
+    localStorage.removeItem('__test_pin_lockout_state')
   })
   await page.reload()
   await page.waitForLoadState('domcontentloaded')
