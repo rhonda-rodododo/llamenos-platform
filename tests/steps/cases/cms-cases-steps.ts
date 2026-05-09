@@ -318,6 +318,7 @@ Given('a volunteer without cases:update permission is logged in', async ({ page,
       'notes:read-own', 'shifts:read-own',
       'cases:create', 'cases:read-assigned',
       'contacts:view', 'events:read',
+      'settings:read',
     ],
   })
   const vol = await createVolunteerViaApi(request, {

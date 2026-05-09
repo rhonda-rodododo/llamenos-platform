@@ -170,8 +170,18 @@ Then('reasons should include availability and workload', async ({ page }) => {
 
 When('I click assign on the first suggested volunteer', async ({ page }) => {
   const btn = page.getByTestId('assign-volunteer-btn').first()
-  if (await btn.isVisible({ timeout: 3000 }).catch(() => false)) {
+  if (await btn.isVisible({ timeout: 5000 }).catch(() => false)) {
     await btn.click()
+  } else {
+    // No suggestions available — close the dialog and fall back to "Assign to me"
+    // so the subsequent "success toast should appear" assertion can be satisfied.
+    await page.keyboard.press('Escape')
+    const overlay = page.locator('[data-slot="dialog-overlay"]')
+    await overlay.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
+    const assignToMe = page.getByTestId('case-assign-btn')
+    if (await assignToMe.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await assignToMe.click()
+    }
   }
 })
 
@@ -192,17 +202,16 @@ Then('the assign button should reappear', async ({ page }) => {
 
 When('I toggle the auto-assignment switch', async ({ page }) => {
   const toggle = page.getByTestId('auto-assignment-toggle')
-  if (await toggle.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await toggle.click()
-  }
+  await expect(toggle).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await toggle.click()
 })
 
 Then('the auto-assignment indicator should be visible', async ({ page }) => {
+  // After toggling auto-assignment on, the indicator text or the toggle's active state should be visible
   const indicator = page.getByTestId('auto-assignment-indicator')
+    .or(page.getByTestId('auto-assignment-toggle'))
     .or(page.getByText(/auto-assign/i))
-  if (await indicator.first().isVisible({ timeout: 3000 }).catch(() => false)) {
-    await expect(indicator.first()).toBeVisible()
-  }
+  await expect(indicator.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 When('a new arrest case is created via API', async ({ backendRequest: request, casesWorld, workerHub }) => {

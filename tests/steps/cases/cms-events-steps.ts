@@ -238,9 +238,10 @@ When('I view the event detail', async ({ page, backendRequest: request, casesWor
   await navigateAfterLogin(page, '/events')
   // Click first case card (event) to open detail
   const card = page.getByTestId('case-card').first()
-  if (await card.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
-    await card.click()
-  }
+  await expect(card).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await card.click()
+  // Wait for detail panel to render before subsequent tab interactions
+  await expect(page.getByTestId('case-detail-header')).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('linked case records should be visible', async ({ page }) => {

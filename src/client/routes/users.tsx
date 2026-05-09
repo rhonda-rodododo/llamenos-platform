@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/lib/auth'
 import { useEffect, useState } from 'react'
@@ -485,11 +485,11 @@ function UserRow({ user, roles, onUpdate, onDelete }: {
   return (
     <div data-testid="volunteer-row" data-volunteer-id={user.pubkey.slice(0, 8)} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-4 sm:px-6">
       <div className="flex items-center gap-3 sm:gap-4">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+        <Link to="/users/$pubkey" params={{ pubkey: user.pubkey }} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
           {user.name.charAt(0).toUpperCase()}
-        </div>
+        </Link>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium">{user.name} <span className="font-mono text-xs text-muted-foreground">({user.pubkey.slice(0, 8)})</span></p>
+          <Link to="/users/$pubkey" params={{ pubkey: user.pubkey }} className="text-sm font-medium hover:underline">{user.name} <span className="font-mono text-xs text-muted-foreground">({user.pubkey.slice(0, 8)})</span></Link>
           {user.phone && (
             <p className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
               {showPhone ? user.phone : maskedPhone(user.phone)}

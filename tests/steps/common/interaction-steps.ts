@@ -10,7 +10,7 @@
 import { expect } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
 import { TestIds, navTestIdMap, sectionTestIdMap } from '../../test-ids'
-import { Timeouts } from '../../helpers'
+import { Timeouts, navigateViaSpa } from '../../helpers'
 
 /**
  * Map from feature-file button text to data-testid values.
@@ -31,13 +31,26 @@ const buttonTextToTestIdMap: Record<string, string> = {
   'New Contact': 'contact-new-btn',
   'New Event': 'event-new-btn',
   'New Case': 'case-new-btn',
+  'Assign': 'case-assign-dialog-btn',
+  'Assign to me': 'case-assign-btn',
+  'Unassign': 'case-unassign-btn',
+  'Link Case': 'event-link-case-btn',
+  'Link Report': 'event-link-report-btn',
   'Add Field': 'custom-field-add-btn',
+  'Add Volunteer': TestIds.VOLUNTEER_ADD_BTN,
+  'Ban Number': TestIds.BAN_ADD_BTN,
+  'Import': TestIds.BAN_IMPORT_BTN,
+  'Invite Volunteer': TestIds.INVITE_BTN,
   'Log In': 'login-submit-btn',
   'Log in': 'login-submit-btn',
   'Log Out': TestIds.LOGOUT_BTN,
+  'Recovery options': TestIds.RECOVERY_OPTIONS_BTN,
+  'Recovery Options': TestIds.RECOVERY_OPTIONS_BTN,
   'Confirm': TestIds.CONFIRM_DIALOG_OK,
   'Clock In': TestIds.BREAK_TOGGLE_BTN,
   'Clock Out': TestIds.BREAK_TOGGLE_BTN,
+  'Go to Dashboard': 'setup-complete-btn',
+  'Update Profile': 'form-save-btn',
 }
 
 /**
@@ -71,7 +84,9 @@ async function clickByTextOrTestId(page: import('@playwright/test').Page, text: 
   const buttonTestId = buttonTextToTestIdMap[text]
   if (buttonTestId) {
     const el = page.getByTestId(buttonTestId)
-    if (await el.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
+    // Use shorter timeout (5s) for testid lookup — fall through quickly
+    // to role/text strategies if the element doesn't exist
+    if (await el.isVisible({ timeout: 5000 }).catch(() => false)) {
       await expect(el).toBeEnabled({ timeout: Timeouts.ELEMENT })
       await el.click()
       return
@@ -122,7 +137,17 @@ When('I click {string}', async ({ page }, text: string) => {
 })
 
 When('I click the {string} button', async ({ page }, text: string) => {
-  await page.getByRole('button', { name: text }).click()
+  // Check button-text-to-testid map first to avoid strict mode violations
+  // when multiple buttons share the same accessible name (e.g., "Assign").
+  const testId = buttonTextToTestIdMap[text]
+  if (testId) {
+    const el = page.getByTestId(testId)
+    if (await el.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
+      await el.click()
+      return
+    }
+  }
+  await page.getByRole('button', { name: text }).first().click()
 })
 
 When('I click the {string} link', async ({ page }, name: string) => {
@@ -212,8 +237,13 @@ When('I expand the {string} section', async ({ page }, sectionName: string) => {
 // --- Reload and auth ---
 
 When('I reload and re-authenticate', async ({ page }) => {
-  const { loginAsAdmin } = await import('../../helpers')
-  await loginAsAdmin(page)
+  const { reenterPinAfterReload, Timeouts: T, TestIds: TI } = await import('../../helpers')
+  // Reload instead of full re-login to preserve user preferences (theme, language)
+  // that are stored in localStorage and would be wiped by loginAsAdmin.
+  await page.reload()
+  await reenterPinAfterReload(page)
+  // Wait for authenticated layout
+  await page.getByTestId(TI.PAGE_TITLE).waitFor({ state: 'visible', timeout: T.AUTH })
 })
 
 When('I log out', async ({ page }) => {
@@ -318,7 +348,8 @@ Then('I should see a {string} toggle', async ({ page }, text: string) => {
 })
 
 Then('I should not see {string}', async ({ page }, text: string) => {
-  await expect(page.getByText(text, { exact: true }).first()).not.toBeVisible({ timeout: 3000 })
+  // Wait longer for save operations to complete and re-render (e.g. custom field updates)
+  await expect(page.getByText(text, { exact: true }).first()).not.toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('{string} should no longer be visible', async ({ page }, text: string) => {
@@ -377,7 +408,12 @@ Then('they should see {string}', async ({ page }, text: string) => {
 })
 
 Then('they should see the {string} section', async ({ page }, text: string) => {
-  await expect(page.getByText(text, { exact: true }).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const testId = sectionTestIdMap[text]
+  if (testId) {
+    await expect(page.getByTestId(testId)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  } else {
+    await expect(page.getByText(text, { exact: true }).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  }
 })
 
 Then('they should see the {string} heading', async ({ page }, text: string) => {
@@ -393,8 +429,14 @@ Then('they should see a phone input', async ({ page }) => {
 })
 
 Then('they should see their public key', async ({ page }) => {
-  // npub is displayed in the settings/profile — look for npub text
-  await expect(page.getByText(/npub1/).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // Public key is displayed as hex in the settings/profile code block
+  // Look for the public key hex string or npub format
+  const hexKey = page.locator('code').filter({ hasText: /[0-9a-f]{32,}/i }).first()
+  const isHex = await hexKey.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+  if (isHex) return
+  // Fallback: npub format
+  const npub = page.getByText(/npub1/).first()
+  await expect(npub).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('they should not see a {string} link', async ({ page }, text: string) => {
@@ -435,15 +477,34 @@ Then('they should not see {string} in the navigation', async ({ page }, text: st
 When('they navigate to the {string} page', async ({ page }, pageName: string) => {
   const testId = navTestIdMap[pageName]
   if (testId) {
-    await page.getByTestId(testId).click()
+    const navLink = page.getByTestId(testId)
+    const isVisible = await navLink.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+    if (isVisible) {
+      await navLink.click()
+    } else {
+      // Nav link may not be visible (e.g. volunteer without channel access) — navigate directly
+      const pathMap: Record<string, string> = {
+        'Dashboard': '/', 'Settings': '/settings', 'Reports': '/reports',
+        'Volunteers': '/users', 'Shifts': '/shifts', 'Ban List': '/bans',
+        'Audit Log': '/audit', 'Hub Settings': '/admin/settings',
+        'Notes': '/notes', 'Conversations': '/conversations', 'Blasts': '/blasts',
+      }
+      const path = pathMap[pageName]
+      if (path) {
+        await page.evaluate((p) => {
+          const router = (window as Record<string, unknown>).__TEST_ROUTER as { navigate: (opts: { to: string }) => void } | undefined
+          if (router) router.navigate({ to: p })
+        }, path)
+        await page.waitForLoadState('domcontentloaded')
+      }
+    }
   } else {
     await page.getByTestId(TestIds.NAV_SIDEBAR).getByText(pageName, { exact: true }).click()
   }
 })
 
 When('they navigate to {string} via SPA', async ({ page }, path: string) => {
-  const { navigateAfterLogin } = await import('../../helpers')
-  await navigateAfterLogin(page, path)
+  await navigateViaSpa(page, path)
 })
 
 When('they click the {string} link', async ({ page }, linkText: string) => {
@@ -490,7 +551,8 @@ When('I dismiss the invite link card', async ({ page }) => {
 
 Then('the page should have the {string} class', async ({ page }, className: string) => {
   const html = page.locator('html')
-  await expect(html).toHaveClass(new RegExp(className))
+  // Theme class may take a moment to apply after reload (ThemeProvider reads from localStorage)
+  await expect(html).toHaveClass(new RegExp(className), { timeout: Timeouts.ELEMENT })
 })
 
 Then('the page should not have the {string} class', async ({ page }, className: string) => {

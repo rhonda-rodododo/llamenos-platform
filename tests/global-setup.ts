@@ -76,13 +76,18 @@ async function bootstrapAdmin(baseUrl: string): Promise<void> {
   }
 }
 
-/**
- * Global setup: verify backend is reachable before running tests,
- * reset state (if E2E_TEST_SECRET is set), then bootstrap the admin user.
- */
+async function verifyAdminAccess(baseUrl: string): Promise<void> {
+  const token = makeBootstrapToken(ADMIN_SEED, 'GET', '/api/auth/me')
+  const res = await fetch(`${baseUrl}/api/auth/me`, {
+    headers: { Authorization: `Bearer ${JSON.stringify(token)}` },
+  })
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`Admin verification failed: ${res.status} ${text}`)
+  }
+}
+
 export default async function globalSetup(_config: FullConfig): Promise<void> {
-  // CI with Docker Compose can take 30-60s for the app to be ready.
-  // 30 attempts × 3s = 90s max wait, which covers slow CI startups.
   const maxAttempts = process.env.CI ? 30 : 10
   const retryDelayMs = process.env.CI ? 3000 : 2000
 
@@ -92,14 +97,13 @@ export default async function globalSetup(_config: FullConfig): Promise<void> {
       if (res.ok) {
         await resetTestState(BACKEND_URL)
         await bootstrapAdmin(BACKEND_URL)
+        await verifyAdminAccess(BACKEND_URL)
         return
       }
-      // Non-OK response (e.g. 503 during startup) — retry
       if (i % 5 === 4) {
         console.log(`[global-setup] Backend returned ${res.status}, retrying... (${i + 1}/${maxAttempts})`)
       }
     } catch {
-      // Server not ready yet — retry
       if (i % 5 === 4) {
         console.log(`[global-setup] Backend not reachable, retrying... (${i + 1}/${maxAttempts})`)
       }

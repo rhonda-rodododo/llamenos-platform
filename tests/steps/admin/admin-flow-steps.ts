@@ -31,10 +31,12 @@ When('I add a new volunteer with a unique name and phone', async ({ page, adminW
 Then('I should see the generated nsec', async ({ page }) => {
   const nsecCode = page.getByTestId(TestIds.VOLUNTEER_NSEC_CODE)
   await expect(nsecCode).toBeVisible({ timeout: 15000 })
-  // Verify the nsec looks valid (starts with nsec1)
+  // Verify the key looks valid: either bech32 nsec1 or hex seed (v3 API)
   const nsecText = await nsecCode.textContent()
   expect(nsecText).toBeTruthy()
-  expect(nsecText!.startsWith('nsec1')).toBe(true)
+  const isNsec = nsecText!.startsWith('nsec1')
+  const isHexSeed = /^[0-9a-f]{64}$/i.test(nsecText!.trim())
+  expect(isNsec || isHexSeed).toBe(true)
 })
 
 When('I close the nsec card', async ({ page }) => {
