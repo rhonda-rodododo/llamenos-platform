@@ -700,4 +700,128 @@ mod tests {
         let plaintext = aes256gcm_decrypt(&key, &decoded, HKDF_CONTEXT_EXPORT.as_bytes()).unwrap();
         assert_eq!(String::from_utf8(plaintext).unwrap(), json);
     }
+
+    #[test]
+    fn call_record_roundtrip() {
+        let (admin_sk, admin_pk) = gen_keypair();
+        let plaintext = r#"{"answeredBy":"vol-1","callerNumber":"+1234"}"#;
+
+        let message_key = Zeroizing::new(random_bytes_32());
+        let packed = aes256gcm_encrypt(&message_key, plaintext.as_bytes(), LABEL_CALL_META.as_bytes()).unwrap();
+        let encrypted_content = hex::encode(&packed);
+
+        let admin_env = hpke_wrap_key(&message_key, &admin_pk, LABEL_CALL_META).unwrap();
+        let admin_envelopes = vec![RecipientKeyEnvelope {
+            pubkey: admin_pk.clone(),
+            enc: admin_env.enc.clone(),
+            ct: admin_env.ct.clone(),
+        }];
+
+        let decrypted = decrypt_call_record(&encrypted_content, &admin_envelopes, &admin_sk, &admin_pk).unwrap();
+        assert_eq!(decrypted, plaintext);
+    }
+
+    #[test]
+    fn call_record_wrong_admin_fails() {
+        let (admin_sk, admin_pk) = gen_keypair();
+        let (wrong_sk, wrong_pk) = gen_keypair();
+        let plaintext = r#"{"answeredBy":"vol-1","callerNumber":"+1234"}"#;
+
+        let message_key = Zeroizing::new(random_bytes_32());
+        let packed = aes256gcm_encrypt(&message_key, plaintext.as_bytes(), LABEL_CALL_META.as_bytes()).unwrap();
+        let encrypted_content = hex::encode(&packed);
+
+        let admin_env = hpke_wrap_key(&message_key, &admin_pk, LABEL_CALL_META).unwrap();
+        let admin_envelopes = vec![RecipientKeyEnvelope {
+            pubkey: admin_pk.clone(),
+            enc: admin_env.enc.clone(),
+            ct: admin_env.ct.clone(),
+        }];
+
+        let result = decrypt_call_record(&encrypted_content, &admin_envelopes, &wrong_sk, &wrong_pk);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn aes256gcm_short_input_rejected() {
+        let key = [0u8; 32];
+        let result = aes256gcm_decrypt(&key, &[0u8; 10], b"aad");
+        assert!(matches!(result, Err(CryptoError::InvalidCiphertext)));
+    }
+
+    #[test]
+    fn aes256gcm_tampered_tag_fails() {
+        let key = [42u8; 32];
+        let plaintext = b"tamper test";
+        let aad = b"test-aad";
+        let packed = aes256gcm_encrypt(&key, plaintext, aad).unwrap();
+
+        let mut tampered = packed.clone();
+        let last = tampered.len() - 1;
+        tampered[last] ^= 0x01;
+
+        let result = aes256gcm_decrypt(&key, &tampered, aad);
+        assert!(matches!(result, Err(CryptoError::DecryptionFailed)));
+    }
+
+    #[test]
+    fn aes256gcm_wrong_aad_fails() {
+        let key = [42u8; 32];
+        let plaintext = b"aad test";
+        let packed = aes256gcm_encrypt(&key, plaintext, b"correct-aad").unwrap();
+
+        let result = aes256gcm_decrypt(&key, &packed, b"wrong-aad");
+        assert!(matches!(result, Err(CryptoError::DecryptionFailed)));
+    }
+
+    #[test]
+    fn encrypt_with_pin_invalid_pin_rejected() {
+        let result = encrypt_with_pin("nsec1test", "123", "a".repeat(64).as_str());
+        assert!(matches!(result, Err(CryptoError::InvalidPin)));
+    }
+
+    #[test]
+    fn decrypt_with_pin_wrong_nonce_length_fails() {
+        let bad_data = EncryptedKeyData {
+            salt: hex::encode([0u8; 32]),
+            iterations: 0,
+            nonce: hex::encode([0u8; 8]),
+            ciphertext: hex::encode([0u8; 16]),
+            pubkey: "abcd".to_string(),
+        };
+        let result = decrypt_with_pin(&bad_data, "12345678");
+        assert!(matches!(result, Err(CryptoError::InvalidNonce)));
+    }
+
+    #[test]
+    fn empty_note_payload_roundtrip() {
+        let (_author_sk, author_pk) = gen_keypair();
+        let payload = "";
+        let encrypted = encrypt_note(payload, &author_pk, &[]).unwrap();
+        let decrypted = decrypt_note(&encrypted.encrypted_content, &encrypted.author_envelope, &_author_sk).unwrap();
+        assert_eq!(decrypted, payload);
+    }
+
+    #[test]
+    fn note_with_many_admins() {
+        let (author_sk, author_pk) = gen_keypair();
+        let mut admin_pubkeys = vec![];
+        let mut admin_sks = vec![];
+        for _ in 0..10 {
+            let (sk, pk) = gen_keypair();
+            admin_pubkeys.push(pk);
+            admin_sks.push(sk);
+        }
+
+        let payload = r#"{"text":"Many admins test"}"#;
+        let encrypted = encrypt_note(payload, &author_pk, &admin_pubkeys).unwrap();
+        assert_eq!(encrypted.admin_envelopes.len(), 10);
+
+        for (i, admin_sk) in admin_sks.iter().enumerate() {
+            let env = &encrypted.admin_envelopes[i];
+            let envelope = KeyEnvelope { enc: env.enc.clone(), ct: env.ct.clone() };
+            let decrypted = decrypt_note(&encrypted.encrypted_content, &envelope, admin_sk).unwrap();
+            assert_eq!(decrypted, payload);
+        }
+    }
 }
