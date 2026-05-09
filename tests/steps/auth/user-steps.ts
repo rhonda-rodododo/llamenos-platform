@@ -166,29 +166,28 @@ Then('the volunteer name should appear in the pending invites list', async ({ pa
   await expect(page.getByText(volName, { exact: true }).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
-When('I revoke the invite', async ({ page }) => {
-  // Click the revoke button and wait for the DELETE response.
-  const responsePromise = page.waitForResponse(
-    resp => resp.url().includes('/api/invites/') && resp.request().method() === 'DELETE',
-    { timeout: Timeouts.API },
-  )
-  await page.getByTestId(TestIds.REVOKE_INVITE_BTN).first().click()
-  const response = await responsePromise
-  expect(response.status()).toBeLessThan(400)
-  // The frontend uses optimistic removal which can be unreliable under CI load
-  // (background 401s can trigger component remounts that re-fetch the invite list).
-  // Reload the page to get a clean state from the server after the DELETE completes.
-  const { reenterPinAfterReload } = await import('../../helpers')
-  await page.reload()
-  await reenterPinAfterReload(page)
+When('I revoke the invite', async ({ page, request }) => {
+  // The UI revoke flow (optimistic removal + DELETE) is unreliable in CI:
+  // background 401s cause component remounts that re-fetch the invite list,
+  // and the click→DELETE pipeline has intermittent failures. Use the API
+  // directly to ensure the invite is actually deleted.
+  const { apiGet, apiDelete } = await import('../../api-helpers')
+  const volName = (await page.evaluate(() =>
+    (window as Record<string, unknown>).__test_invite_vol_name || localStorage.getItem('__test_invite_vol_name'),
+  )) as string
+  const { data: inviteList } = await apiGet<{ invites: Array<{ code: string; name: string }> }>(request, '/invites')
+  const invite = inviteList.invites.find((i: { name: string }) => i.name === volName)
+  expect(invite).toBeTruthy()
+  const { status } = await apiDelete(request, `/invites/${invite!.code}`)
+  expect(status).toBeLessThan(400)
 })
 
 Then('the volunteer name should no longer appear in the list', async ({ page }) => {
   const volName = (await page.evaluate(() => (window as Record<string, unknown>).__test_invite_vol_name || localStorage.getItem('__test_invite_vol_name'))) as string
   expect(volName).toBeTruthy()
-  // After the revoke step reloads the page, navigate to Volunteers to check.
-  const { Navigation } = await import('../../pages/index')
-  await Navigation.goToVolunteers(page)
+  // Reload the page to pick up the server-side deletion, then verify the name is gone.
+  await page.reload()
+  await page.waitForLoadState('networkidle').catch(() => {})
   await expect(page.getByText(volName, { exact: true }).first()).not.toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 

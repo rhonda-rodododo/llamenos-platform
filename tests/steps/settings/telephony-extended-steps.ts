@@ -36,9 +36,10 @@ Then(
 // "the {string} button should be disabled" is defined in interaction-steps.ts
 
 When('I fill in Twilio credentials with phone number', async ({ page }) => {
-  // Use #provider-phone to avoid matching other tel inputs (e.g. Signal notification phone)
+  // Use #provider-phone to avoid matching other tel inputs (e.g. Signal notification phone).
+  // Triple-click to select all, then type — more reliable than clear() for react-phone-number-input.
   const telInput = page.locator('#provider-phone')
-  await telInput.clear()
+  await telInput.click({ clickCount: 3 })
   await telInput.pressSequentially('+12125551234', { delay: 30 })
   await telInput.blur()
   await page.getByPlaceholder('AC...').fill('AC00000000000000000000000000000001')
@@ -55,13 +56,16 @@ Then('I should see {string} with {string}', async ({ page }, text1: string, text
 })
 
 When('I fill in Twilio credentials with a different phone number', async ({ page }) => {
-  // Use #provider-phone to avoid matching other tel inputs (e.g. Signal notification phone)
+  // Use #provider-phone to avoid matching other tel inputs (e.g. Signal notification phone).
+  // react-phone-number-input doesn't reliably respond to clear() + pressSequentially().
+  // Use triple-click to select all text, then type the replacement value.
   const telInput = page.locator('#provider-phone')
-  if (await telInput.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
-    await telInput.clear()
-    await telInput.pressSequentially('+12125559876', { delay: 30 })
-    await telInput.blur()
-  }
+  await expect(telInput).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await telInput.click({ clickCount: 3 })
+  await telInput.pressSequentially('+12125559876', { delay: 30 })
+  await telInput.blur()
+  // Verify the fill actually worked before proceeding to save
+  await expect(telInput).toHaveValue(/555.*987/, { timeout: 3000 })
   const acInput = page.getByPlaceholder('AC...')
   if (await acInput.isVisible({ timeout: 2000 }).catch(() => false)) {
     await acInput.fill('AC00000000000000000000000000000002')
@@ -83,10 +87,10 @@ Then('the Account SID field should be pre-filled', async ({ page }) => {
 })
 
 When('I fill in SignalWire credentials', async ({ page }) => {
-  // Use #provider-phone to avoid matching other tel inputs (e.g. Signal notification phone)
+  // Triple-click to select all, then type — more reliable than clear() for react-phone-number-input.
   const telInput = page.locator('#provider-phone')
   if (await telInput.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
-    await telInput.clear()
+    await telInput.click({ clickCount: 3 })
     await telInput.pressSequentially('+12125551122', { delay: 30 })
     await telInput.blur()
   }
@@ -108,7 +112,7 @@ When('I fill in SignalWire credentials', async ({ page }) => {
 When('I fill in fake Twilio credentials', async ({ page }) => {
   const telInput = page.locator('#provider-phone')
   if (await telInput.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
-    await telInput.clear()
+    await telInput.click({ clickCount: 3 })
     await telInput.pressSequentially('+12125551456', { delay: 30 })
     await telInput.blur()
   }
