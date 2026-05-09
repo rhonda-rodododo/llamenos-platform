@@ -805,7 +805,7 @@ export async function createEntityTypeViaApi(
   ]
   const { status, data } = await apiPost<Record<string, unknown>>(
     request,
-    '/settings/cms/entity-types',
+    hubPath('/settings/cms/entity-types', options?.hubId),
     {
       name,
       label: options?.label ?? name.replace(/_/g, ' '),

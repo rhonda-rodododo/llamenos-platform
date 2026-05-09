@@ -87,9 +87,9 @@ async function clickByTextOrTestId(page: import('@playwright/test').Page, text: 
   const buttonTestId = buttonTextToTestIdMap[text]
   if (buttonTestId) {
     const el = page.getByTestId(buttonTestId)
-    // Use shorter timeout (5s) for testid lookup — fall through quickly
-    // to role/text strategies if the element doesn't exist
-    if (await el.isVisible({ timeout: 5000 }).catch(() => false)) {
+    // Use ELEMENT timeout for testid lookup — gives enough time for
+    // buttons to render after navigation before falling through
+    if (await el.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
       await expect(el).toBeEnabled({ timeout: Timeouts.ELEMENT })
       await el.click()
       return

@@ -214,9 +214,11 @@ When('I tap the {string} report status filter', async ({ page, backendRequest, w
       await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
       await page.getByTestId(TestIds.NAV_REPORTS).click()
       await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
-    } catch {
-      // Backend not available — try to proceed anyway
+    } catch (e) {
+      console.warn('[reports] Seeding failed:', e)
     }
+    // Wait for network to settle so the seeded report appears
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {})
   }
 
   await expect(filterArea).toBeVisible({ timeout: Timeouts.ELEMENT })

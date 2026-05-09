@@ -43,8 +43,8 @@ Given('the {string} template has been applied', async ({ backendRequest: request
   const templates = await listTemplatesViaApi(request, ADMIN_NSEC, workerHub)
   const match = templates.find(t => t.id === templateSlug || t.name.toLowerCase().includes(templateSlug.replace('-', ' ')))
   if (match) {
-    await applyTemplateViaApi(request, match.id, ADMIN_NSEC, workerHub).catch(() => {
-      // Template may already be applied
+    await applyTemplateViaApi(request, match.id, ADMIN_NSEC, workerHub).catch((e) => {
+      console.warn('[cms] Template apply failed (may already be applied):', e)
     })
   }
   // Ensure entity types exist regardless of template availability
@@ -64,7 +64,9 @@ Given('the {string} template has been applied', async ({ backendRequest: request
     for (const t of types) {
       const exists = entityTypes.find(e => (e as Record<string, unknown>).name === t.name)
       if (!exists) {
-        await createEntityTypeViaApi(request, { name: t.name, category: t.category, hubId: workerHub }).catch(() => {})
+        await createEntityTypeViaApi(request, { name: t.name, category: t.category, hubId: workerHub }).catch((e) => {
+          console.warn(`[cms] Failed to create entity type "${t.name}":`, e)
+        })
       }
     }
   }
