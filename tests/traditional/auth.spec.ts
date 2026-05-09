@@ -17,7 +17,7 @@ test.describe('Authentication', () => {
 
     test('admin logout button is visible after login', async ({ page }) => {
       await loginAsAdmin(page)
-      await LoginPage.assertLogoutVisible(page)
+      await expect(page.getByTestId(TestIds.LOGOUT_BTN)).toBeVisible({ timeout: Timeouts.ELEMENT })
     })
   })
 
@@ -47,7 +47,7 @@ test.describe('Authentication', () => {
       await pinInput.fill('99999999')
       await pinInput.press('Enter')
 
-      await expect(page.getByTestId(TestIds.ERROR_MESSAGE).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+      await expect(page.getByRole('alert')).toBeVisible({ timeout: Timeouts.ELEMENT })
     })
   })
 })

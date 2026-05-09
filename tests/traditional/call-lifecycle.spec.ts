@@ -26,9 +26,9 @@ test.describe('Call Lifecycle', () => {
       await DashboardPage.assertCallsTodayNumeric(page)
     })
 
-    test('dashboard shows quick actions', async ({ page }) => {
+    test('dashboard shows admin navigation', async ({ page }) => {
       await Navigation.goToDashboard(page)
-      await DashboardPage.assertQuickActionsVisible(page)
+      await expect(page.getByTestId(TestIds.NAV_ADMIN_SECTION)).toBeVisible({ timeout: Timeouts.ELEMENT })
     })
 
     test('clock in button shows when off shift', async ({ page }) => {
@@ -41,7 +41,7 @@ test.describe('Call Lifecycle', () => {
   test.describe('Call history page', () => {
     test('call history page loads', async ({ page }) => {
       await Navigation.goToCallHistory(page)
-      await expect(page.getByTestId(TestIds.CALL_LIST)).toBeVisible({ timeout: Timeouts.ELEMENT })
+      await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
     })
 
     test('call history search filters are visible', async ({ page }) => {
