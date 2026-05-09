@@ -116,12 +116,34 @@ Then('the create case sheet should be visible', async ({ page }) => {
 })
 
 When('I select entity type {string} in the create dialog', async ({ page }, typeName: string) => {
+  // Wait for entity types to finish loading — the dialog fetches them async on open.
+  // Either the select dropdown renders (multiple types) or a single-type badge renders.
   const typeSelect = page.getByTestId('case-type-select')
-  const isSelect = await typeSelect.isVisible({ timeout: 3000 }).catch(() => false)
+  const singleTypeBadge = page.locator('[role="dialog"] .font-medium').filter({ hasText: typeName })
+  const loader = page.locator('[role="dialog"]').getByText(/loading/i)
+
+  // Wait for loader to disappear first
+  await loader.waitFor({ state: 'hidden', timeout: Timeouts.ELEMENT }).catch(() => {})
+
+  const isSelect = await typeSelect.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
   if (isSelect) {
     await typeSelect.click()
     const option = page.getByRole('option', { name: new RegExp(typeName, 'i') })
+    await expect(option).toBeVisible({ timeout: Timeouts.ELEMENT })
     await option.click()
+  } else {
+    // Single entity type was auto-selected — verify by looking for the type label badge
+    const isSingle = await singleTypeBadge.isVisible({ timeout: 3000 }).catch(() => false)
+    if (!isSingle) {
+      // Entity types may have failed to load — try waiting more for the select
+      const retrySelect = await typeSelect.isVisible({ timeout: 5000 }).catch(() => false)
+      if (retrySelect) {
+        await typeSelect.click()
+        const option = page.getByRole('option', { name: new RegExp(typeName, 'i') })
+        await expect(option).toBeVisible({ timeout: Timeouts.ELEMENT })
+        await option.click()
+      }
+    }
   }
 })
 

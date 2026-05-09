@@ -153,16 +153,17 @@ Then('I should see the RCS configuration section', async ({ page }) => {
 })
 
 When('I fill in valid RCS settings', async ({ page }) => {
-  // Ensure we're on Hub Settings with the RCS section visible
+  // Ensure we're on Hub Settings with the RCS section expanded and visible.
+  // The RCS Channel section (id="rcs-channel") is separate from the telephony section.
   const agentIdInput = page.getByTestId(TestIds.RCS_AGENT_ID)
   if (!await agentIdInput.isVisible({ timeout: 3000 }).catch(() => false)) {
     // Navigate to hub settings
     const { Navigation } = await import('../../pages/index')
     await Navigation.goToHubSettings(page)
-    // Expand the messaging/telephony section using the trigger pattern
-    const trigger = page.getByTestId(`${TestIds.SETTINGS_TELEPHONY}-trigger`)
-    if (await trigger.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await trigger.click()
+    // Expand the RCS channel section trigger (data-testid="rcs-channel-trigger")
+    const rcsTrigger = page.getByTestId('rcs-channel-trigger')
+    if (await rcsTrigger.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await rcsTrigger.click()
     }
   }
   // Fill the agent ID if visible
@@ -280,11 +281,13 @@ Given('a non-default hub exists', async ({ page }) => {
 })
 
 When('I click {string} on the hub', async ({ page }, text: string) => {
-  // Ensure we're on the hubs page first
-  const pageTitle = page.getByTestId(TestIds.PAGE_TITLE)
-  const isOnHubsPage = await pageTitle.isVisible({ timeout: 2000 }).catch(() => false)
-  if (!isOnHubsPage) {
+  // Always navigate to the hubs admin page before looking for hub action buttons.
+  // Checking only for page-title visibility is insufficient — the page could be on
+  // any route (e.g., Dashboard) even when page-title is visible.
+  const currentUrl = page.url()
+  if (!currentUrl.includes('/admin/hubs')) {
     await navigateAfterLogin(page, '/admin/hubs')
+    await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
   }
   // Click the action button on a hub row (e.g. "Delete", "Edit")
   const btn = page.getByRole('button', { name: new RegExp(text, 'i') }).first()

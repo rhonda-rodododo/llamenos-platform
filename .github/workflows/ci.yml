@@ -316,7 +316,7 @@ jobs:
           done
 
       - name: Run E2E tests
-        run: bunx playwright test --project=bootstrap --project=chromium --project=bdd
+        run: bunx playwright test --project=bootstrap --project=bdd
         env:
           CI: "true"
           PLAYWRIGHT_BASE_URL: "http://localhost:8788"

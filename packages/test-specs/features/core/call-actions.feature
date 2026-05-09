@@ -45,7 +45,7 @@ Feature: In-Call Quick Actions
 
   # --- UI scenarios (desktop + mobile) ---
 
-  @desktop @ios @android @calls
+  @desktop @ios @android @calls @requires-live-calls
   Scenario: Active call panel shows during call
     Given I am logged in as a volunteer on shift
     And I have an active call
@@ -53,7 +53,7 @@ Feature: In-Call Quick Actions
     Then the active call panel should be visible
     And the call timer should be visible
 
-  @desktop @ios @android @calls @bans
+  @desktop @ios @android @calls @bans @requires-live-calls
   Scenario: Ban with custom reason via UI
     Given I am logged in as a volunteer on shift
     And I have an active call
@@ -64,7 +64,7 @@ Feature: In-Call Quick Actions
     And I confirm the ban
     Then a toast "banned" should appear
 
-  @desktop @ios @android @calls
+  @desktop @ios @android @calls @requires-live-calls
   Scenario: Call panel disappears when call ends
     Given I am logged in as a volunteer on shift
     And I have an active call

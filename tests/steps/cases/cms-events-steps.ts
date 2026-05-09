@@ -133,9 +133,34 @@ When('I click the new event button', async ({ page }) => {
 When('I fill in the event name with a unique name', async ({ page, casesWorld }) => {
   casesWorld.lastEventName = `Test Event ${Date.now()}`
   const titleInput = page.getByTestId('case-title-input')
-  if (await titleInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await titleInput.fill(casesWorld.lastEventName)
+
+  // The title input only renders after an entity type is selected.
+  // If the dialog has a type select (multiple entity types exist), select the event type.
+  const titleVisible = await titleInput.isVisible({ timeout: 3000 }).catch(() => false)
+  if (!titleVisible) {
+    // Wait for loader to disappear
+    const loader = page.locator('[role="dialog"]').getByText(/loading/i)
+    await loader.waitFor({ state: 'hidden', timeout: Timeouts.ELEMENT }).catch(() => {})
+
+    // Try to select an event-type entity type from the dropdown
+    const typeSelect = page.getByTestId('case-type-select')
+    if (await typeSelect.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await typeSelect.click()
+      // Prefer event-category types; fall back to first available type
+      const eventOption = page.getByRole('option', { name: /event|protest/i })
+      const firstOption = page.getByRole('option').first()
+      const hasEventOption = await eventOption.first().isVisible({ timeout: 2000 }).catch(() => false)
+      if (hasEventOption) {
+        await eventOption.first().click()
+      } else if (await firstOption.isVisible({ timeout: 2000 }).catch(() => false)) {
+        await firstOption.click()
+      }
+    }
+    // Wait for title input to appear after type selection
+    await expect(titleInput).toBeVisible({ timeout: Timeouts.ELEMENT })
   }
+
+  await titleInput.fill(casesWorld.lastEventName)
 })
 
 When('I fill in the event start date', async ({ page }) => {

@@ -168,6 +168,23 @@ export async function createHubViaApi(
   return data.id
 }
 
+/**
+ * Add a user to a hub with the specified role IDs.
+ * Used to ensure test volunteers are members of the worker-scoped hub.
+ */
+export async function addHubMemberViaApi(
+  request: APIRequestContext,
+  hubId: string,
+  pubkey: string,
+  roleIds: string[] = ['role-volunteer'],
+): Promise<void> {
+  const { status } = await apiPost(request, `/hubs/${hubId}/members`, { pubkey, roleIds })
+  if (status !== 200 && status !== 201 && status !== 204 && status !== 409) {
+    // 409 = already a member, which is fine
+    console.warn(`Failed to add hub member (hub=${hubId}, pubkey=${pubkey}): ${status}`)
+  }
+}
+
 export async function deleteHubViaApi(
   request: APIRequestContext,
   hubId: string,

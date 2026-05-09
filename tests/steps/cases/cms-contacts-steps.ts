@@ -658,6 +658,14 @@ When('I click on the restricted contact card', async ({ page }) => {
     cardVisible = await card.isVisible({ timeout: 8000 }).catch(() => false)
   }
 
+  // Close any open dialog that may be blocking clicks (e.g. create-contact-dialog
+  // left open after ensureContactVisibleInDirectory ran its UI creation fallback)
+  const openDialog = page.getByTestId('create-contact-dialog')
+  if (await openDialog.isVisible({ timeout: 1000 }).catch(() => false)) {
+    await page.keyboard.press('Escape')
+    await openDialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
+  }
+
   if (cardVisible) {
     // Prefer a card showing "Restricted" text
     const restricted = page.getByTestId('directory-contact-card').filter({ hasText: /restricted/i })

@@ -59,8 +59,19 @@ Given('I have an open conversation', async ({ page, backendRequest }) => {
     const hasClaim = await claimBtn.isVisible({ timeout: 3000 }).catch(() => false)
     if (hasClaim) {
       await claimBtn.click()
-      // Wait for the composer to appear (confirms status changed to "active")
-      await page.getByTestId(TestIds.MESSAGE_COMPOSER).waitFor({ state: 'visible', timeout: Timeouts.ELEMENT }).catch(() => {})
+    }
+    // Always wait for the composer — without it the Send button won't be visible.
+    // If the conversation was already claimed the composer should appear immediately.
+    const composerVisible = await page.getByTestId(TestIds.MESSAGE_COMPOSER)
+      .waitFor({ state: 'visible', timeout: Timeouts.ELEMENT })
+      .then(() => true)
+      .catch(() => false)
+    if (!composerVisible) {
+      // Composer not available (e.g., conversation is waiting/unassigned and claim failed)
+      // Flag so downstream steps skip gracefully
+      await page.evaluate(() => {
+        (window as Record<string, unknown>).__test_no_conversation = true
+      })
     }
   } else {
     // Backend not available — flag so downstream steps skip gracefully

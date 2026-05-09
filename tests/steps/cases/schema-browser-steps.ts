@@ -46,9 +46,28 @@ Then('I should see the {string} entity type', async ({ page }, typeName: string)
 })
 
 When('I select the {string} entity type', async ({ page }, typeName: string) => {
-  const typeItem = page.getByText(typeName, { exact: false }).first()
-  await expect(typeItem).toBeVisible({ timeout: Timeouts.ELEMENT })
-  await typeItem.click()
+  // The entity-types section may be collapsed — expand it before looking for the entity type
+  const trigger = page.getByTestId('entity-types-trigger')
+  const hasTrigger = await trigger.isVisible({ timeout: 3000 }).catch(() => false)
+  if (hasTrigger) {
+    // Check if it's collapsed (no entity-type-row visible)
+    const hasRow = await page.getByTestId('entity-type-row').first().isVisible({ timeout: 500 }).catch(() => false)
+    if (!hasRow) {
+      await trigger.click()
+    }
+  }
+  // Wait for the entity type row to become visible (accordion may be animating open)
+  const typeRow = page.getByTestId('entity-type-row').filter({ hasText: typeName }).first()
+  await expect(typeRow).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // Click the Edit button on the matching row to open the entity type editor
+  const editBtn = typeRow.getByTestId('entity-type-edit-btn')
+  const hasEditBtn = await editBtn.isVisible({ timeout: 2000 }).catch(() => false)
+  if (hasEditBtn) {
+    await editBtn.click()
+  } else {
+    // Fallback: click the row itself
+    await typeRow.click()
+  }
 })
 
 Then('I should see the fields defined for {string}', async ({ page }, _typeName: string) => {
