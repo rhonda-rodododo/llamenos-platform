@@ -153,24 +153,17 @@ Then('I should see the RCS configuration section', async ({ page }) => {
 })
 
 When('I fill in valid RCS settings', async ({ page }) => {
-  // Ensure we're on Hub Settings with the RCS section expanded and visible.
-  // The RCS Channel section (id="rcs-channel") is separate from the telephony section.
+  // Navigate to Hub Settings if not already there
+  const { Navigation } = await import('../../pages/index')
+  await Navigation.goToHubSettings(page)
+  // Scroll the RCS section trigger into view and expand it
+  const rcsTrigger = page.getByTestId('rcs-channel-trigger')
+  await rcsTrigger.scrollIntoViewIfNeeded()
+  await rcsTrigger.click()
+  // Wait for the agent ID input to appear after expansion
   const agentIdInput = page.getByTestId(TestIds.RCS_AGENT_ID)
-  if (!await agentIdInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-    // Navigate to hub settings
-    const { Navigation } = await import('../../pages/index')
-    await Navigation.goToHubSettings(page)
-    // Expand the RCS channel section trigger (data-testid="rcs-channel-trigger")
-    const rcsTrigger = page.getByTestId('rcs-channel-trigger')
-    if (await rcsTrigger.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await rcsTrigger.click()
-    }
-  }
-  // Fill the agent ID if visible
-  const isAgentVisible = await agentIdInput.isVisible({ timeout: 5000 }).catch(() => false)
-  if (isAgentVisible) {
-    await agentIdInput.fill('test-agent-id')
-  }
+  await expect(agentIdInput).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await agentIdInput.fill('test-agent-id')
 })
 
 // --- WebRTC ---
