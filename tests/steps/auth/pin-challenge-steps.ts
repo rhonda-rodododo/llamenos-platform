@@ -10,14 +10,13 @@ import { TestIds, Timeouts, enterPin, TEST_PIN } from '../../helpers'
 When('I click the phone visibility toggle', async ({ page }) => {
   const toggleBtn = page.getByTestId(TestIds.TOGGLE_PHONE_VISIBILITY).first()
   await expect(toggleBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await toggleBtn.scrollIntoViewIfNeeded()
   await toggleBtn.click()
 })
 
 Then('I should see the PIN challenge dialog', async ({ page }) => {
   const pinDialog = page.getByTestId(TestIds.PIN_CHALLENGE_DIALOG)
-  const isDialog = await pinDialog.isVisible({ timeout: 5000 }).catch(() => false)
-  if (isDialog) return
-  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(pinDialog).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 When('I enter the correct PIN', async ({ page }) => {

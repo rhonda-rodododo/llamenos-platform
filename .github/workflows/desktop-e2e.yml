@@ -212,7 +212,9 @@ jobs:
           done
 
       - name: Run desktop E2E tests
-        run: bunx playwright test --project=bootstrap --project=chromium --project=bdd
+        # BDD tests already run in ci.yml's e2e job on every PR.
+        # This workflow only runs the chromium (non-BDD spec) tests to avoid duplication.
+        run: bunx playwright test --project=bootstrap --project=chromium
         env:
           CI: "true"
           PLAYWRIGHT_TEST: "true"
