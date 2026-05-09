@@ -280,13 +280,16 @@ Given('a non-default hub exists', async ({ page }) => {
 })
 
 When('I click {string} on the hub', async ({ page }, text: string) => {
-  // Use confirm dialog OK for known delete/confirm actions
-  const lowerText = text.toLowerCase()
-  if (lowerText === 'delete') {
-    await page.getByTestId(TestIds.CONFIRM_DIALOG_OK).click()
-  } else {
-    await page.getByRole('button', { name: text }).first().click()
+  // Ensure we're on the hubs page first
+  const pageTitle = page.getByTestId(TestIds.PAGE_TITLE)
+  const isOnHubsPage = await pageTitle.isVisible({ timeout: 2000 }).catch(() => false)
+  if (!isOnHubsPage) {
+    await navigateAfterLogin(page, '/admin/hubs')
   }
+  // Click the action button on a hub row (e.g. "Delete", "Edit")
+  const btn = page.getByRole('button', { name: new RegExp(text, 'i') }).first()
+  await expect(btn).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await btn.click()
 })
 
 When('I confirm the deletion', async ({ page }) => {

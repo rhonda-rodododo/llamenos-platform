@@ -31,18 +31,10 @@ Then('I should see the calls today count on the dashboard', async ({ page }) => 
 })
 
 When('I pull to refresh the dashboard', async ({ page }) => {
-  // On desktop, pull-to-refresh is simulated by page reload or a refresh button
   await page.reload()
   await page.waitForLoadState('domcontentloaded')
-  // Re-enter PIN if needed (allow time for the login/PIN screen to render in CI)
-  const pinInput = page.getByTestId('pin-input').locator('input')
-  const pinVisible = await pinInput.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (pinVisible) {
-    const { enterPin, TEST_PIN, Timeouts: T } = await import('../../helpers')
-    await enterPin(page, TEST_PIN)
-    await page.waitForURL((u) => !u.toString().includes('/login'), { timeout: Timeouts.AUTH })
-  }
-  // Wait for authenticated layout after reload
-  const { TestIds: TI, Timeouts: T } = await import('../../helpers')
-  await page.getByTestId(TI.PAGE_TITLE).waitFor({ state: 'visible', timeout: T.AUTH }).catch(() => {})
+  // Full re-login needed — page.reload() clears in-memory keyManager,
+  // so PIN re-entry is required to unlock the encrypted device keys.
+  const { reenterPinAfterReload } = await import('../../helpers')
+  await reenterPinAfterReload(page)
 })
