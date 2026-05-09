@@ -38,6 +38,7 @@ const buttonTextToTestIdMap: Record<string, string> = {
   'Link Report': 'event-link-report-btn',
   'Add Field': 'custom-field-add-btn',
   'Add Volunteer': TestIds.VOLUNTEER_ADD_BTN,
+  'Recovery options': TestIds.RECOVERY_OPTIONS_BTN,
   'Ban Number': TestIds.BAN_ADD_BTN,
   'Import': TestIds.BAN_IMPORT_BTN,
   'Invite Volunteer': TestIds.INVITE_BTN,

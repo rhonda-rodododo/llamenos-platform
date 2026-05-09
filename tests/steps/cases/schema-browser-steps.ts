@@ -75,6 +75,11 @@ When('I select the {string} entity type', async ({ page }, typeName: string) => 
     // Fallback: click the row itself
     await typeRow.click()
   }
+  // Wait for the editor tabs to render before proceeding — the editor
+  // is rendered conditionally and may take a frame to appear.
+  await expect(
+    page.getByTestId('entity-tab-general').or(page.getByTestId('entity-tab-fields')),
+  ).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('I should see the fields defined for {string}', async ({ page }, _typeName: string) => {

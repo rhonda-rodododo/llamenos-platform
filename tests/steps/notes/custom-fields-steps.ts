@@ -288,13 +288,18 @@ Given('a custom field {string} exists', async ({ page, request }, fieldLabel: st
       },
     ])
   }
-  // Always navigate away and back so the page re-fetches fresh data from the API.
-  // This prevents stale React state from a prior test run and ensures the field row
-  // is present regardless of whether it was just created or already existed.
+  // Navigate away and back so the page re-fetches fresh data from the API.
+  // Wait for the settings API response to complete after navigation to avoid
+  // race conditions where the field list hasn't loaded yet.
   await page.getByTestId(TestIds.NAV_DASHBOARD).click()
   await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.NAVIGATION })
+  const settingsResponsePromise = page.waitForResponse(
+    resp => resp.url().includes('/api/settings') && resp.request().method() === 'GET',
+    { timeout: Timeouts.API },
+  ).catch(() => null)
   await page.getByTestId(TestIds.NAV_ADMIN_SETTINGS).click()
   await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.NAVIGATION })
+  await settingsResponsePromise
   // Ensure the custom fields section is expanded
   const section = page.getByTestId(TestIds.SETTINGS_CUSTOM_FIELDS)
   await expect(section).toBeVisible({ timeout: Timeouts.ELEMENT })
@@ -310,14 +315,14 @@ Given('a custom field {string} exists', async ({ page, request }, fieldLabel: st
 })
 
 When('I click the delete button on {string}', async ({ page }, fieldLabel: string) => {
-  const row = page.getByTestId(TestIds.CUSTOM_FIELD_ROW).filter({ hasText: fieldLabel }).first()
-  await expect(row).toBeVisible({ timeout: Timeouts.ELEMENT })
-  await row.scrollIntoViewIfNeeded()
-  const deleteBtn = row.getByTestId(TestIds.CUSTOM_FIELD_DELETE_BTN)
-  await expect(deleteBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // Re-locate the row fresh each time to avoid stale DOM references from re-renders.
+  const rowLocator = page.getByTestId(TestIds.CUSTOM_FIELD_ROW).filter({ hasText: fieldLabel }).first()
+  await expect(rowLocator).toBeVisible({ timeout: Timeouts.ELEMENT })
   // Register dialog handler before clicking. The handler must call accept()
   // synchronously (no await) to prevent the confirm() dialog from blocking
   // the click action and causing a timeout.
   page.once('dialog', dialog => dialog.accept())
+  // Click the delete button directly — Playwright auto-scrolls into view on click()
+  const deleteBtn = rowLocator.getByTestId(TestIds.CUSTOM_FIELD_DELETE_BTN)
   await deleteBtn.click()
 })
