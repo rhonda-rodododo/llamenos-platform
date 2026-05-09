@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page, type Browser } from '@playwright/test'
 import { enterPin, resetTestState, TEST_PIN, Timeouts, completeProfileSetup } from './helpers'
 import { TestIds } from './test-ids'
 
@@ -13,7 +13,7 @@ test.describe.configure({ mode: 'serial', timeout: 300_000 })
  * Enter PIN during the admin bootstrap flow.
  * v2 uses a single input field (not per-digit slots).
  */
-async function enterBootstrapPin(page: import('@playwright/test').Page, pin: string) {
+async function enterBootstrapPin(page: Page, pin: string) {
   const pinInput = page.getByTestId('pin-input').locator('input')
   await pinInput.waitFor({ state: 'visible', timeout: 15000 })
   await pinInput.fill(pin)
@@ -24,7 +24,7 @@ async function enterBootstrapPin(page: import('@playwright/test').Page, pin: str
  * After loading storage state and navigating to /, handle PIN entry.
  * Blocks refresh to force PIN screen, enters PIN, waits for dashboard.
  */
-async function unlockAndNavigateToDashboard(page: import('@playwright/test').Page) {
+async function unlockAndNavigateToDashboard(page: Page) {
   // Block the automatic restoreSession refresh so the PIN screen appears first.
   let refreshBlocked = true
   await page.route('**/api/auth/token/refresh', async (route) => {
@@ -81,7 +81,7 @@ async function unlockAndNavigateToDashboard(page: import('@playwright/test').Pag
  * 4. Download backup, acknowledge, continue to setup wizard
  * 5. Complete setup wizard (identity + channels + skip remaining + launch)
  */
-async function bootstrapAdmin(page: import('@playwright/test').Page) {
+async function bootstrapAdmin(page: Page) {
   await page.goto('/setup', { waitUntil: 'domcontentloaded' })
   await page.evaluate(() => {
     localStorage.clear()
@@ -211,8 +211,8 @@ async function bootstrapAdmin(page: import('@playwright/test').Page) {
  * Returns after saving the new user's storage state.
  */
 async function createRoleAccount(
-  adminPage: import('@playwright/test').Page,
-  browser: import('@playwright/test').Browser,
+  adminPage: Page,
+  browser: Browser,
   opts: {
     name: string
     phone: string
