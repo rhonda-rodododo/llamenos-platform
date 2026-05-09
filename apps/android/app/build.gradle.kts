@@ -31,7 +31,7 @@ android {
         versionCode = 1
         versionName = "0.1.0"
 
-        testInstrumentationRunner = "org.llamenos.hotline.CucumberHiltRunner"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
             abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
@@ -137,19 +137,8 @@ val copyTestVectors by tasks.registering(Copy::class) {
     into("src/androidTest/assets")
 }
 
-// Copy BDD feature files from shared test-specs for Cucumber test runner.
-// Only include platform/mobile/ features — core/, security/, admin/, and
-// platform/desktop/ features have steps not implemented on Android and
-// cause UndefinedStepException crashes even when filtered by @android tag
-// (backend+android dual-tagged features still load backend-only steps).
-val copyFeatureFiles by tasks.registering(Copy::class) {
-    from("${rootProject.projectDir}/../../packages/test-specs/features/platform/mobile")
-    into("src/androidTest/assets/features/platform/mobile")
-}
-
 tasks.named("preBuild") {
     dependsOn(copyTestVectors)
-    dependsOn(copyFeatureFiles)
 }
 
 dependencies {
@@ -209,5 +198,4 @@ dependencies {
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.compose.ui.test.junit4)
     androidTestImplementation(libs.test.runner)
-    androidTestImplementation(libs.cucumber.android)
 }
