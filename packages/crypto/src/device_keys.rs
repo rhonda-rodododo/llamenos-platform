@@ -445,4 +445,120 @@ mod tests {
             assert_eq!(hex::encode(secrets.signing_pubkey().to_bytes()), pubkey);
         }
     }
+
+    #[test]
+    fn encryption_pubkey_matches_secret() {
+        let encrypted = generate_device_keys("dev-enc", "12345678").unwrap();
+        let secrets = unlock_device_keys(&encrypted, "12345678").unwrap();
+
+        let derived_enc_pk = hex::encode(secrets.encryption_pubkey().to_bytes());
+        assert_eq!(derived_enc_pk, encrypted.state.encryption_pubkey_hex);
+    }
+
+    #[test]
+    fn different_devices_different_keys() {
+        let encrypted1 = generate_device_keys("dev-1", "12345678").unwrap();
+        let encrypted2 = generate_device_keys("dev-2", "12345678").unwrap();
+
+        assert_ne!(
+            encrypted1.state.signing_pubkey_hex,
+            encrypted2.state.signing_pubkey_hex
+        );
+        assert_ne!(
+            encrypted1.state.encryption_pubkey_hex,
+            encrypted2.state.encryption_pubkey_hex
+        );
+    }
+
+    #[test]
+    fn same_credential_different_salt_different_ciphertext() {
+        let encrypted1 = generate_device_keys("dev-a", "12345678").unwrap();
+        let encrypted2 = generate_device_keys("dev-b", "12345678").unwrap();
+
+        assert_ne!(encrypted1.salt, encrypted2.salt);
+        assert_ne!(encrypted1.ciphertext, encrypted2.ciphertext);
+    }
+
+    #[test]
+    fn unlock_with_empty_credential_fails() {
+        let encrypted = generate_device_keys("dev-empty", "12345678").unwrap();
+        let result = unlock_device_keys(&encrypted, "");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn unlock_with_partially_correct_credential_fails() {
+        let encrypted = generate_device_keys("dev-partial", "12345678").unwrap();
+        let result = unlock_device_keys(&encrypted, "1234567");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn credential_boundary_8_chars() {
+        assert!(!is_valid_credential("1234567"));
+        assert!(is_valid_credential("12345678"));
+        assert!(is_valid_credential("123456789"));
+    }
+
+    #[test]
+    fn sign_produces_valid_64_byte_signature() {
+        let encrypted = generate_device_keys("dev-sign", "12345678").unwrap();
+        let secrets = unlock_device_keys(&encrypted, "12345678").unwrap();
+
+        let msg = b"sign this";
+        let sig = sign_bytes(&secrets, msg);
+        assert_eq!(sig.len(), 64);
+
+        let pubkey = hex::encode(secrets.signing_pubkey().to_bytes());
+        let valid = verify_signature(msg, &sig, &pubkey).unwrap();
+        assert!(valid);
+    }
+
+    #[test]
+    fn signature_tampered_message_fails() {
+        let encrypted = generate_device_keys("dev-tamper", "12345678").unwrap();
+        let secrets = unlock_device_keys(&encrypted, "12345678").unwrap();
+
+        let msg = b"original";
+        let sig = sign_bytes(&secrets, msg);
+        let pubkey = hex::encode(secrets.signing_pubkey().to_bytes());
+
+        let valid = verify_signature(b"tampered", &sig, &pubkey).unwrap();
+        assert!(!valid);
+    }
+
+    #[test]
+    fn signature_tampered_sig_fails() {
+        let encrypted = generate_device_keys("dev-sig-tamper", "12345678").unwrap();
+        let secrets = unlock_device_keys(&encrypted, "12345678").unwrap();
+
+        let msg = b"message";
+        let mut sig = sign_bytes(&secrets, msg);
+        sig[0] ^= 0x01;
+
+        let pubkey = hex::encode(secrets.signing_pubkey().to_bytes());
+        let valid = verify_signature(msg, &sig, &pubkey).unwrap();
+        assert!(!valid);
+    }
+
+    #[test]
+    fn derive_kek_different_salts_different_keys() {
+        let salt1 = [1u8; 32];
+        let salt2 = [2u8; 32];
+
+        let kek1 = derive_kek("password", &salt1).unwrap();
+        let kek2 = derive_kek("password", &salt2).unwrap();
+
+        assert_ne!(kek1, kek2);
+    }
+
+    #[test]
+    fn derive_kek_same_input_deterministic() {
+        let salt = [42u8; 32];
+
+        let kek1 = derive_kek("same", &salt).unwrap();
+        let kek2 = derive_kek("same", &salt).unwrap();
+
+        assert_eq!(kek1, kek2);
+    }
 }
