@@ -115,6 +115,15 @@ export default defineConfig({
       retries: 0,
       dependencies: ["bootstrap"],
     },
+    {
+      // Traditional-style Playwright tests for UI-focused assertions.
+      // Complements BDD tests — more concise for element visibility/text checks.
+      name: "desktop-e2e",
+      use: { ...devices["Desktop Chrome"] },
+      testMatch: ["**/desktop-e2e/**/*.spec.ts"],
+      // Wait for bootstrap tests to complete and restore admin before parallel tests run.
+      dependencies: ["bootstrap"],
+    },
   ],
   webServer: process.env.PLAYWRIGHT_BASE_URL
     ? undefined

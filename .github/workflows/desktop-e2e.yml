@@ -212,7 +212,7 @@ jobs:
           done
 
       - name: Run desktop E2E tests
-        run: bunx playwright test --project=bootstrap --project=chromium --project=bdd
+        run: bunx playwright test --project=bootstrap --project=chromium --project=bdd --project=desktop-e2e
         env:
           CI: "true"
           PLAYWRIGHT_TEST: "true"
