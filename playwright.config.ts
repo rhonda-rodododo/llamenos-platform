@@ -118,9 +118,9 @@ export default defineConfig({
     {
       // Traditional-style Playwright tests for UI-focused assertions.
       // Complements BDD tests — more concise for element visibility/text checks.
-      name: "desktop-e2e",
+      name: "traditional",
       use: { ...devices["Desktop Chrome"] },
-      testMatch: ["**/desktop-e2e/**/*.spec.ts"],
+      testMatch: ["**/traditional/**/*.spec.ts"],
       // Wait for bootstrap tests to complete and restore admin before parallel tests run.
       dependencies: ["bootstrap"],
     },

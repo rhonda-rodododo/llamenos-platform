@@ -1,5 +1,5 @@
 import { expect } from '@playwright/test'
-import { test } from '../desktop-e2e-fixtures'
+import { test } from '../traditional-fixtures'
 import { Navigation, ShiftPage } from '../pages'
 import { loginAsAdmin, Timeouts } from '../helpers'
 import { TestIds } from '../test-ids'

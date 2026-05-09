@@ -44,7 +44,8 @@ test.describe('Authentication', () => {
 
       const pinInput = page.getByTestId('pin-input').locator('input')
       await pinInput.waitFor({ state: 'visible', timeout: Timeouts.ELEMENT })
-      await pinInput.fill('99999999')
+      // Use pressSequentially instead of fill for React state consistency
+      await pinInput.pressSequentially('99999999', { delay: 10 })
       await pinInput.press('Enter')
 
       await expect(page.getByRole('alert')).toBeVisible({ timeout: Timeouts.ELEMENT })
