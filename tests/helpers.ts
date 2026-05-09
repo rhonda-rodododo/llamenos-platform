@@ -153,13 +153,25 @@ export async function loginAsAdmin(page: Page) {
 
     const url = page.url()
     if (url.includes('/login')) {
-      console.log('[TEST] Bootstrap admin keys stale (test-reset restored legacy admin). Falling back to ADMIN_SEED.')
+      console.log('[TEST] Bootstrap admin keys stale (test-reset cleared sessions). Falling back to ADMIN_SEED.')
       usingLegacy = true
+      try {
+        const fs = await import('fs/promises')
+        await fs.unlink(storagePath)
+      } catch {}
       await page.evaluate(() => {
         sessionStorage.clear()
+        localStorage.clear()
         localStorage.removeItem('llamenos:llamenos-encrypted-device-keys')
         localStorage.removeItem('llamenos:llamenos-encrypted-key')
         localStorage.removeItem('llamenos-encrypted-key')
+      })
+      await page.context().clearCookies()
+      await page.evaluate(async () => {
+        const dbs = await window.indexedDB.databases?.().catch(() => [] as Array<{ name?: string }>) ?? []
+        for (const db of dbs) {
+          if (db.name) window.indexedDB.deleteDatabase(db.name)
+        }
       })
       await page.reload()
       await page.waitForLoadState('domcontentloaded')
@@ -171,9 +183,17 @@ export async function loginAsAdmin(page: Page) {
   if (usingLegacy) {
     await page.evaluate(() => {
       sessionStorage.clear()
+      localStorage.clear()
       localStorage.removeItem('llamenos:llamenos-encrypted-device-keys')
       localStorage.removeItem('llamenos:llamenos-encrypted-key')
       localStorage.removeItem('llamenos-encrypted-key')
+    })
+    await page.context().clearCookies()
+    await page.evaluate(async () => {
+      const dbs = await window.indexedDB.databases?.().catch(() => [] as Array<{ name?: string }>) ?? []
+      for (const db of dbs) {
+        if (db.name) window.indexedDB.deleteDatabase(db.name)
+      }
     })
     await page.reload()
     await page.waitForLoadState('domcontentloaded')
