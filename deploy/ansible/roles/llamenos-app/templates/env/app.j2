@@ -10,9 +10,10 @@ STORAGE_ENDPOINT=http://rustfs:9000
 STORAGE_ACCESS_KEY={{ storage_access_key }}
 STORAGE_SECRET_KEY={{ storage_secret_key }}
 STORAGE_BUCKET={{ storage_bucket | default('llamenos-files') }}
+{% if llamenos_transcription_enabled | default(false) %}
 WHISPER_URL=http://whisper:8080/v1/audio/transcriptions
+{% endif %}
 TWILIO_ACCOUNT_SID={{ twilio_account_sid | default('') }}
 TWILIO_AUTH_TOKEN={{ twilio_auth_token | default('') }}
 TWILIO_PHONE_NUMBER={{ twilio_phone_number | default('') }}
 SERVER_NOSTR_SECRET={{ server_nostr_secret }}
-NOSTR_RELAY_URL=ws://localhost:7777
