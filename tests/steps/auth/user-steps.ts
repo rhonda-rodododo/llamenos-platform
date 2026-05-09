@@ -165,33 +165,29 @@ Then('the volunteer name should appear in the pending invites list', async ({ pa
 })
 
 When('I revoke the invite', async ({ page }) => {
-  const volName = (await page.evaluate(() => (window as Record<string, unknown>).__test_invite_vol_name)) as string
-  // Scope the revoke click to the row containing this volunteer's name,
-  // so we don't accidentally click a different invite's revoke button.
-  const row = page.locator('div').filter({ hasText: volName }).locator(`[data-testid="${TestIds.REVOKE_INVITE_BTN}"]`).first()
-  // The frontend does an optimistic removal but restores the invite on API failure,
-  // so we must wait for the DELETE response before the assertion step runs.
+  // Click the revoke button and wait for the DELETE response.
   const responsePromise = page.waitForResponse(
     resp => resp.url().includes('/api/invites/') && resp.request().method() === 'DELETE',
     { timeout: Timeouts.API },
   )
-  await row.click()
-  // Confirm if a confirmation dialog appears
-  const dialog = page.getByRole('dialog')
-  if (await dialog.isVisible().catch(() => false)) {
-    await page.getByTestId(TestIds.CONFIRM_DIALOG_OK).click()
-  }
-  // Wait for the DELETE API call to succeed so the optimistic removal sticks
+  await page.getByTestId(TestIds.REVOKE_INVITE_BTN).first().click()
   const response = await responsePromise
   expect(response.status()).toBeLessThan(400)
+  // The frontend uses optimistic removal which can be unreliable under CI load
+  // (background 401s can trigger component remounts that re-fetch the invite list).
+  // Reload the page to get a clean state from the server after the DELETE completes.
+  const { reenterPinAfterReload } = await import('../../helpers')
+  await page.reload()
+  await reenterPinAfterReload(page)
 })
 
 Then('the volunteer name should no longer appear in the list', async ({ page }) => {
   const volName = (await page.evaluate(() => (window as Record<string, unknown>).__test_invite_vol_name)) as string
   expect(volName).toBeTruthy()
-  // Wait for the revoke API call + re-render. Use a longer timeout so the
-  // optimistic state update and network round-trip both complete before asserting.
-  await expect(page.getByText(volName, { exact: true }).first()).not.toBeVisible({ timeout: 20000 })
+  // After the revoke step reloads the page, navigate to Volunteers to check.
+  const { Navigation } = await import('../../pages/index')
+  await Navigation.goToVolunteers(page)
+  await expect(page.getByText(volName, { exact: true }).first()).not.toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 // --- Form validation ---

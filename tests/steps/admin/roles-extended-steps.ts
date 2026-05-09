@@ -228,7 +228,14 @@ When('I change their role to {string} via the dropdown', async ({ page }, roleNa
     const row = page.getByTestId(TestIds.VOLUNTEER_ROW).filter({ hasText: volName })
     const dropdown = row.locator('select, [role="combobox"]').first()
     if (await dropdown.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await dropdown.selectOption({ label: roleName })
+      const tagName = await dropdown.evaluate(el => el.tagName.toLowerCase())
+      if (tagName === 'select') {
+        await dropdown.selectOption({ label: roleName })
+      } else {
+        // Radix Select combobox — click to open, then click the option
+        await dropdown.click()
+        await page.getByRole('option', { name: roleName }).click()
+      }
     }
   }
 })
