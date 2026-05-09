@@ -379,6 +379,154 @@ export const Dialogs = {
   },
 }
 
+// ============ Login Page ============
+
+export const LoginPage = {
+  /**
+   * Navigate to the login page.
+   */
+  async goto(page: Page): Promise<void> {
+    await page.goto('/login')
+    await page.waitForLoadState('domcontentloaded')
+  },
+
+  /**
+   * Enter an nsec into the login input.
+   */
+  async enterNsec(page: Page, nsec: string): Promise<void> {
+    await page.getByTestId(TestIds.NSEC_INPUT).fill(nsec)
+  },
+
+  /**
+   * Submit the login form.
+   */
+  async submit(page: Page): Promise<void> {
+    await page.getByTestId(TestIds.LOGIN_SUBMIT_BTN).click()
+  },
+
+  /**
+   * Check if the nsec input is a password field.
+   */
+  async assertNsecIsPasswordField(page: Page): Promise<void> {
+    await expect(page.getByTestId(TestIds.NSEC_INPUT)).toHaveAttribute('type', 'password')
+  },
+
+  /**
+   * Check if an error message is visible.
+   */
+  async assertErrorVisible(page: Page): Promise<void> {
+    await expect(page.getByTestId(TestIds.ERROR_MESSAGE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  },
+
+  /**
+   * Check if the PIN input is visible (post-login PIN setup).
+   */
+  async assertPinInputVisible(page: Page): Promise<void> {
+    await expect(page.getByTestId(TestIds.PIN_INPUT).first()).toBeVisible({ timeout: Timeouts.AUTH })
+  },
+}
+
+// ============ Dashboard Page ============
+
+export const DashboardPage = {
+  /**
+   * Assert that all dashboard status cards are visible.
+   */
+  async assertCardsVisible(page: Page): Promise<void> {
+    await expect(page.getByTestId(TestIds.DASHBOARD_SHIFT_STATUS)).toBeVisible({ timeout: Timeouts.ELEMENT })
+    await expect(page.getByTestId(TestIds.DASHBOARD_ACTIVE_CALLS)).toBeVisible({ timeout: Timeouts.ELEMENT })
+    await expect(page.getByTestId(TestIds.DASHBOARD_CALLS_TODAY)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  },
+
+  /**
+   * Assert that the shift status card shows one of the expected texts.
+   */
+  async assertShiftStatus(page: Page, option1: string, option2: string): Promise<void> {
+    const shiftCard = page.getByTestId(TestIds.DASHBOARD_SHIFT_STATUS)
+    await expect(shiftCard).toBeVisible({ timeout: Timeouts.ELEMENT })
+    const text = await shiftCard.textContent()
+    const matchesEither = text?.match(new RegExp(`${option1}|${option2}`, 'i'))
+    expect(matchesEither).toBeTruthy()
+  },
+
+  /**
+   * Assert that the calls today card shows a numeric count.
+   */
+  async assertCallsTodayNumeric(page: Page): Promise<void> {
+    const callsCard = page.getByTestId(TestIds.DASHBOARD_CALLS_TODAY)
+    await expect(callsCard).toBeVisible({ timeout: Timeouts.ELEMENT })
+    const text = await callsCard.textContent()
+    expect(text).toMatch(/\d+/)
+  },
+
+  /**
+   * Assert that the clock in/out button is visible.
+   */
+  async assertClockButtonVisible(page: Page): Promise<void> {
+    await expect(page.getByTestId(TestIds.BREAK_TOGGLE_BTN)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  },
+
+  /**
+   * Assert the clock button text.
+   */
+  async assertClockButtonText(page: Page, text: string): Promise<void> {
+    const clockBtn = page.getByTestId(TestIds.BREAK_TOGGLE_BTN)
+    await expect(clockBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
+    await expect(clockBtn).toContainText(text)
+  },
+
+  /**
+   * Click the clock in/out button.
+   */
+  async clickClockButton(page: Page): Promise<void> {
+    await page.getByTestId(TestIds.BREAK_TOGGLE_BTN).click()
+  },
+
+  /**
+   * Ensure the volunteer is on shift.
+   */
+  async ensureOnShift(page: Page): Promise<void> {
+    const clockBtn = page.getByTestId(TestIds.BREAK_TOGGLE_BTN)
+    const isVisible = await clockBtn.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+    if (isVisible) {
+      const text = await clockBtn.textContent()
+      if (text?.includes('Clock In')) {
+        await clockBtn.click()
+        await expect(clockBtn).toContainText('Clock Out', { timeout: Timeouts.ELEMENT })
+      }
+    }
+  },
+
+  /**
+   * Ensure the volunteer is off shift.
+   */
+  async ensureOffShift(page: Page): Promise<void> {
+    const clockBtn = page.getByTestId(TestIds.BREAK_TOGGLE_BTN)
+    const isVisible = await clockBtn.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+    if (isVisible) {
+      const text = await clockBtn.textContent()
+      if (text?.includes('Clock Out')) {
+        await clockBtn.click()
+        await expect(clockBtn).toContainText('Clock In', { timeout: Timeouts.ELEMENT })
+      }
+    }
+  },
+
+  /**
+   * Assert that the quick actions grid is visible.
+   */
+  async assertQuickActionsVisible(page: Page): Promise<void> {
+    await expect(page.getByTestId(TestIds.DASHBOARD_QUICK_ACTIONS)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  },
+
+  /**
+   * Assert that the logout button is visible.
+   */
+  async assertLogoutVisible(page: Page): Promise<void> {
+    await expect(page.getByTestId(TestIds.LOGOUT_BTN)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  },
+}
+
 // ============ Form Helpers ============
 
 export const Forms = {

@@ -1,6 +1,6 @@
 import { type APIRequestContext } from '@playwright/test'
-import { test as base, createBdd } from 'playwright-bdd'
-import { createHubViaApi } from '../api-helpers'
+import { createBdd } from 'playwright-bdd'
+import { test as traditionalTest } from '../traditional-fixtures'
 
 // ── Scenario-scoped World types ──────────────────────────────────────
 // Each scenario gets a fresh instance via fixture. Step definitions read/write
@@ -48,7 +48,7 @@ export type CasesWorld = {
  * window.__TEST_SET_ACTIVE_HUB — each Playwright worker gets its own
  * isolated hub so parallel tests don't share database state.
  */
-export const test = base.extend<
+export const test = traditionalTest.extend<
   {
     apiErrors: { responses: Array<{ url: string; status: number }>; pageErrors: Error[] }
     backendRequest: APIRequestContext
@@ -57,7 +57,7 @@ export const test = base.extend<
     casesWorld: CasesWorld
   },
   {
-    workerHub: string
+    // workerHub is inherited from traditional-fixtures.ts
   }
 >({
   // Backend API request context — targets the backend server directly (not the Vite preview).
@@ -130,17 +130,6 @@ export const test = base.extend<
       triageReportTypeId: '', triageReportId: '',
     })
   },
-  // Worker-scoped hub: created once per Playwright worker process.
-  // Each worker gets its own isolated hub so parallel tests don't share state.
-  // Hub is NOT deleted after tests — stale hubs accumulate and are purged separately.
-  workerHub: [async ({ playwright }, use, workerInfo) => {
-    const backendUrl = process.env.TEST_HUB_URL || 'http://localhost:3000'
-    const ctx = await playwright.request.newContext({ baseURL: backendUrl, timeout: 60_000 })
-    const name = `test-hub-${workerInfo.workerIndex}-${Date.now()}`
-    const hubId = await createHubViaApi(ctx, name)
-    await ctx.dispose()
-    await use(hubId)
-  }, { scope: 'worker', timeout: 60_000 }],
 })
 
 export const { Given, When, Then, Before, After } = createBdd(test)
