@@ -83,6 +83,21 @@
   changed_when: false
   failed_when: false
 
+- name: Create dockremap user for userns-remap
+  ansible.builtin.user:
+    name: dockremap
+    system: true
+    home: /nonexistent
+    shell: /usr/sbin/nologin
+    create_home: false
+  when: docker_userns_remap
+
+- name: Restart Docker to enable userns-remap
+  ansible.builtin.systemd:
+    name: docker
+    state: restarted
+  when: docker_userns_remap
+
 - name: Create userns-remap subordinate UID mapping
   ansible.builtin.copy:
     dest: /etc/subuid
