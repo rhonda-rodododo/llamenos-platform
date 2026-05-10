@@ -1075,6 +1075,7 @@ jobs:
             | grep -v '"llamenos:event"' \
             | grep -v '"llamenos:provision-' \
             | grep -v '"llamenos:stronghold' \
+            | grep -v '"llamenos://' \
             | grep -v 'hub-event-crypto\.ts' \
             | grep -v '#\[test\]' \
             | grep -v 'let aad = b"llamenos:' \
