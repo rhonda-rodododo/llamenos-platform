@@ -124,6 +124,26 @@ dev.post('/test-reset-records', async (c) => {
   return c.json({ ok: true })
 })
 
+// ─── A2P Brand Approve (BDD test helper) ──────────────────────────────────────
+// Directly transitions an A2P brand to "approved" state — no real provider poll.
+// Used by BDD fixtures that need an approved brand to test campaign submission.
+
+dev.post('/test-a2p-approve-brand', async (c) => {
+  if (c.env.ENVIRONMENT !== 'development') {
+    return c.json({ error: 'Not Found' }, 404)
+  }
+  if (!checkResetSecret(c)) {
+    return c.json({ error: 'Not Found' }, 404)
+  }
+  const body = await c.req.json().catch(() => ({})) as { registrationId?: string }
+  if (!body.registrationId) {
+    return c.json({ error: 'registrationId is required' }, 400)
+  }
+  const services = c.get('services')
+  await services.a2pRegistration.testApproveBrand(body.registrationId)
+  return c.json({ ok: true })
+})
+
 // ─── Rate Limit Reset (BDD test helper) ─────────────────────────────────────
 // Clears all rate limit counters — prevents cross-scenario bleed in BDD tests.
 
