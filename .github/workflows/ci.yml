@@ -91,7 +91,7 @@ jobs:
         run: bun run i18n:validate:all
 
       - name: Validate test-specs coverage
-        run: bun run test-specs:validate
+        run: bun run test-specs:validate --platform desktop --platform backend
 
       - name: Typecheck
         run: bun run typecheck
