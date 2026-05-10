@@ -66,6 +66,8 @@ const services: Services = createServices(db, {
     ADMIN_DECRYPTION_PUBKEY: process.env.ADMIN_DECRYPTION_PUBKEY || undefined,
     SERVER_SECRET: serverSecret || undefined,
     SERVER_NOSTR_SECRET: serverSecret || undefined, // Legacy alias for transition
+    ENVIRONMENT: process.env.ENVIRONMENT || undefined,
+    DOMAIN: process.env.DOMAIN || undefined,
   },
 })
 console.log('[llamenos] Services initialized')

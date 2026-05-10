@@ -71,11 +71,19 @@ const MAX_VERIFY_ATTEMPTS = 3
 
 // ── Service ───────────────────────────────────────────────────────────────
 
+/** Test verification code — bridge is not contacted in dev mode. */
+const TEST_VALID_CODE = '123456'
+
 export class SignalRegistrationService {
+  private readonly isDev: boolean
+
   constructor(
     private readonly db: Database,
     private readonly hmacSecret: string,
-  ) {}
+    env?: { ENVIRONMENT?: string },
+  ) {
+    this.isDev = env?.ENVIRONMENT === 'development'
+  }
 
   /**
    * Start a Signal bridge registration.
@@ -105,8 +113,18 @@ export class SignalRegistrationService {
       expiresAt,
     })
 
-    // Call bridge to initiate verification
-    await this.callBridgeRegister(bridgeUrl, params.phoneNumber, params.method === 'voice')
+    // Call bridge to initiate verification — if the bridge is unreachable,
+    // the record still exists in pending state. The admin can retry or
+    // investigate connectivity. We store the error but don't fail the request.
+    try {
+      await this.callBridgeRegister(bridgeUrl, params.phoneNumber, params.method === 'voice')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      await this.db
+        .update(signalRegistrations)
+        .set({ error: `Bridge call failed: ${message}`, updatedAt: new Date() })
+        .where(eq(signalRegistrations.id, id))
+    }
 
     const row = await this.loadRow(id)
     return this.toPublic(row)
@@ -131,22 +149,23 @@ export class SignalRegistrationService {
       return this.toPublic(row)
     }
 
-    const phone = this.decryptPhone(row.phoneNumber)
-
-    try {
-      const res = await fetch(
-        `${bridgeUrl}/v1/accounts/${encodeURIComponent(phone)}`,
-        { headers: { 'Content-Type': 'application/json' } },
-      )
-
-      if (res.ok) {
-        // Bridge confirmed the account exists — registration complete
-        if (row.status === 'pending' && row.method === 'sms') {
-          await this.transition(row, 'complete')
+    // In dev mode, skip bridge poll — no bridge is running
+    if (!this.isDev) {
+      const phone = this.decryptPhone(row.phoneNumber)
+      try {
+        const res = await fetch(
+          `${bridgeUrl}/v1/accounts/${encodeURIComponent(phone)}`,
+          { headers: { 'Content-Type': 'application/json' } },
+        )
+        if (res.ok) {
+          // Bridge confirmed the account exists — registration complete
+          if (row.status === 'pending' && row.method === 'sms') {
+            await this.transition(row, 'complete')
+          }
         }
+      } catch {
+        // Transient error — do not change status
       }
-    } catch {
-      // Transient error — do not change status
     }
 
     const updated = await this.loadRow(registrationId)
@@ -180,40 +199,34 @@ export class SignalRegistrationService {
       await this.transition(row, 'verifying')
     }
 
-    const phone = this.decryptPhone(row.phoneNumber)
+    // In dev mode, simulate bridge verification without a real bridge.
+    // Matches the A2P pattern where Twilio calls return synthetic results.
+    const codeAccepted = this.isDev
+      ? params.code === TEST_VALID_CODE
+      : await this.callBridgeVerify(bridgeUrl, row, params)
 
-    try {
-      const res = await fetch(
-        `${bridgeUrl}/v1/register/${encodeURIComponent(phone)}/verify/${encodeURIComponent(params.code)}`,
-        { method: 'POST', headers: { 'Content-Type': 'application/json' } },
-      )
+    if (codeAccepted) {
+      await this.db
+        .update(signalRegistrations)
+        .set({ status: 'complete', updatedAt: new Date() })
+        .where(eq(signalRegistrations.id, params.registrationId))
+    } else {
+      const currentRow = await this.loadRow(params.registrationId)
+      const newAttempts = (currentRow.attempts ?? 0) + 1
+      const nextStatus: SignalRegistrationStatus =
+        newAttempts >= MAX_VERIFY_ATTEMPTS ? 'failed' : 'verifying'
 
-      if (res.ok) {
-        await this.db
-          .update(signalRegistrations)
-          .set({ status: 'complete', updatedAt: new Date() })
-          .where(eq(signalRegistrations.id, params.registrationId))
-      } else {
-        const newAttempts = (row.attempts ?? 0) + 1
-        const nextStatus: SignalRegistrationStatus =
-          newAttempts >= MAX_VERIFY_ATTEMPTS ? 'failed' : 'verifying'
-        const errorText = await res.text()
-
-        await this.db
-          .update(signalRegistrations)
-          .set({
-            status: nextStatus,
-            attempts: newAttempts,
-            error: nextStatus === 'failed'
-              ? `Verification failed after ${MAX_VERIFY_ATTEMPTS} attempts: ${errorText}`
-              : `Verification code rejected (attempt ${newAttempts}/${MAX_VERIFY_ATTEMPTS})`,
-            updatedAt: new Date(),
-          })
-          .where(eq(signalRegistrations.id, params.registrationId))
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      throw new SignalRegistrationError(`Bridge unreachable: ${message}`, 502)
+      await this.db
+        .update(signalRegistrations)
+        .set({
+          status: nextStatus,
+          attempts: newAttempts,
+          error: nextStatus === 'failed'
+            ? `Verification failed after ${MAX_VERIFY_ATTEMPTS} attempts`
+            : `Verification code rejected (attempt ${newAttempts}/${MAX_VERIFY_ATTEMPTS})`,
+          updatedAt: new Date(),
+        })
+        .where(eq(signalRegistrations.id, params.registrationId))
     }
 
     const updated = await this.loadRow(params.registrationId)
@@ -227,7 +240,7 @@ export class SignalRegistrationService {
     const row = await this.loadRow(registrationId)
     const bridgeUrl = row.bridgeUrl
 
-    if (bridgeUrl) {
+    if (bridgeUrl && !this.isDev) {
       const phone = this.decryptPhone(row.phoneNumber)
       try {
         await fetch(
@@ -352,6 +365,10 @@ export class SignalRegistrationService {
     phoneNumber: string,
     useVoice: boolean,
   ): Promise<void> {
+    // In dev mode, skip the real bridge call — no bridge is running.
+    // Matches the A2P pattern where callTwilioSubmitBrand returns synthetic data.
+    if (this.isDev) return
+
     try {
       const res = await fetch(
         `${bridgeUrl}/v1/register/${encodeURIComponent(phoneNumber)}`,
@@ -374,6 +391,28 @@ export class SignalRegistrationService {
         `Bridge unreachable: ${err instanceof Error ? err.message : String(err)}`,
         502,
       )
+    }
+  }
+
+  /**
+   * Call the bridge to verify a code. Returns true if the bridge accepted the code.
+   * Throws SignalRegistrationError on bridge unreachable.
+   */
+  private async callBridgeVerify(
+    bridgeUrl: string,
+    row: typeof signalRegistrations.$inferSelect,
+    params: VerifyCodeParams,
+  ): Promise<boolean> {
+    const phone = this.decryptPhone(row.phoneNumber)
+    try {
+      const res = await fetch(
+        `${bridgeUrl}/v1/register/${encodeURIComponent(phone)}/verify/${encodeURIComponent(params.code)}`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' } },
+      )
+      return res.ok
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      throw new SignalRegistrationError(`Bridge unreachable: ${message}`, 502)
     }
   }
 

@@ -327,6 +327,19 @@ export class A2pRegistrationService {
     return row ?? null
   }
 
+  /**
+   * Test-only: directly transition a brand to "approved" state.
+   * Used by BDD fixtures that need an approved brand to test campaign submission.
+   */
+  async testApproveBrand(registrationId: string): Promise<A2pRegistration> {
+    await this.db
+      .update(a2pRegistrations)
+      .set({ brandStatus: 'approved', approvedAt: new Date(), updatedAt: new Date() })
+      .where(eq(a2pRegistrations.id, registrationId))
+    const row = await this.loadRow(registrationId)
+    return this.toPublic(row)
+  }
+
   // ── Private helpers ──────────────────────────────────────────────────────
 
   private async loadRow(id: string) {
