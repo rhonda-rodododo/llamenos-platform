@@ -115,18 +115,18 @@ function isA2pSupportedProvider(p: string): p is A2pSupportedProvider {
 /** Valid brand state transitions. */
 const BRAND_TRANSITIONS: Record<BrandStatus, BrandStatus[]> = {
   not_submitted: ['pending', 'skipped'],
-  pending: ['approved', 'failed'],
+  pending: ['approved', 'failed', 'skipped'],
   approved: [],
-  failed: ['pending'],
+  failed: ['pending', 'skipped'],
   skipped: [],
 }
 
 /** Valid campaign state transitions. */
 const CAMPAIGN_TRANSITIONS: Record<CampaignStatus, CampaignStatus[]> = {
   not_submitted: ['pending', 'skipped'],
-  pending: ['approved', 'failed'],
+  pending: ['approved', 'failed', 'skipped'],
   approved: [],
-  failed: ['pending'],
+  failed: ['pending', 'skipped'],
   skipped: [],
 }
 
@@ -295,6 +295,10 @@ export class A2pRegistrationService {
     const existing = await this.getRegistrationForHub(hubId)
 
     if (existing) {
+      // Enforce state transitions — cannot skip if already approved
+      this.enforceBrandTransition(existing.brandStatus as BrandStatus, 'skipped')
+      this.enforceCampaignTransition(existing.campaignStatus as CampaignStatus, 'skipped')
+
       await this.db
         .update(a2pRegistrations)
         .set({ brandStatus: 'skipped', campaignStatus: 'skipped', updatedAt: new Date() })

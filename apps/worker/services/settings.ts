@@ -1085,63 +1085,17 @@ export class SettingsService {
     }
   }
 
+  /**
+   * @deprecated Use ProviderSetupService.configure() instead — it encrypts credentials at rest.
+   * This legacy method stores credentials in plaintext and will be removed in a future release.
+   */
   async updateTelephonyProvider(
-    data: TelephonyProviderConfig,
-  ): Promise<TelephonyProviderConfig> {
-    if (!data || typeof data !== 'object') {
-      throw new ServiceError(400, 'Invalid request body')
-    }
-    if (!data.type) {
-      throw new ServiceError(400, 'Provider type is required')
-    }
-    if (!(VALID_PROVIDER_TYPES as readonly string[]).includes(data.type)) {
-      throw new ServiceError(
-        400,
-        `Invalid provider type: ${data.type}`,
-      )
-    }
-    const required = PROVIDER_REQUIRED_FIELDS[data.type]
-    for (const field of required) {
-      if (!data[field]) {
-        throw new ServiceError(400, `Missing required field: ${field}`)
-      }
-    }
-    if (data.phoneNumber && !/^\+\d{7,15}$/.test(data.phoneNumber)) {
-      throw new ServiceError(
-        400,
-        'Phone number must be in E.164 format',
-      )
-    }
-    const existing = await this.db
-      .select()
-      .from(providerConfigs)
-      .where(isNull(providerConfigs.hubId))
-      .limit(1)
-    const id = existing[0]?.id ?? crypto.randomUUID()
-    await this.db
-      .insert(providerConfigs)
-      .values({
-        id,
-        hubId: null,
-        providerType: data.type,
-        credentials: JSON.stringify(data),
-        status: 'connected',
-        capabilities: [],
-        phoneNumbers: data.phoneNumber ? [data.phoneNumber] : [],
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .onConflictDoUpdate({
-        target: providerConfigs.id,
-        set: {
-          providerType: data.type,
-          credentials: JSON.stringify(data),
-          status: 'connected',
-          phoneNumbers: data.phoneNumber ? [data.phoneNumber] : [],
-          updatedAt: new Date(),
-        },
-      })
-    return data
+    _data: TelephonyProviderConfig,
+  ): Promise<never> {
+    throw new ServiceError(
+      400,
+      'updateTelephonyProvider is deprecated — use POST /provider-setup/configure which encrypts credentials at rest',
+    )
   }
 
   // =========================================================================

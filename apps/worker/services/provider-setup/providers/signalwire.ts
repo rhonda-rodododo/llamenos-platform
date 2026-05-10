@@ -6,6 +6,7 @@ import type {
 } from '@protocol/schemas/provider-setup'
 import type { ProviderCapabilityImpl, ConnectionTestResult, WebhookUrls } from '../types'
 import { ProviderApiError } from '../types'
+import { validateExternalUrl } from '../../../lib/ssrf-guard'
 
 function basicAuth(username: string, password: string): string {
   return `Basic ${btoa(`${username}:${password}`)}`
@@ -23,9 +24,14 @@ export const signalwireProvider: ProviderCapabilityImpl = {
     const projectId = String(credentials.projectId ?? '')
     const apiToken = String(credentials.apiToken ?? '')
     const spaceUrl = String(credentials.spaceUrl ?? credentials.signalwireSpace ?? '')
+    const fullUrl = `https://${spaceUrl}/api/relay/rest/phone_numbers?page_size=1`
+    const ssrfError = validateExternalUrl(fullUrl, 'SignalWire space URL')
+    if (ssrfError) {
+      return { connected: false, latencyMs: 0, error: ssrfError, errorType: 'unknown' }
+    }
     const start = Date.now()
     try {
-      const res = await fetch(`https://${spaceUrl}/api/relay/rest/phone_numbers?page_size=1`, {
+      const res = await fetch(fullUrl, {
         headers: { Authorization: basicAuth(projectId, apiToken) },
       })
       if (!res.ok) {

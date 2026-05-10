@@ -153,7 +153,7 @@ export class SignalRegistrationService {
     if (!this.isDev) {
       const phone = this.decryptPhone(row.phoneNumber)
       try {
-        const res = await fetch(
+        const res = await this.fetchBridge(
           `${bridgeUrl}/v1/accounts/${encodeURIComponent(phone)}`,
           { headers: { 'Content-Type': 'application/json' } },
         )
@@ -256,7 +256,7 @@ export class SignalRegistrationService {
     if (bridgeUrl && !this.isDev) {
       const phone = this.decryptPhone(row.phoneNumber)
       try {
-        await fetch(
+        await this.fetchBridge(
           `${bridgeUrl}/v1/accounts/${encodeURIComponent(phone)}`,
           { method: 'DELETE', headers: { 'Content-Type': 'application/json' } },
         )
@@ -288,7 +288,7 @@ export class SignalRegistrationService {
     }
 
     try {
-      const res = await fetch(
+      const res = await this.fetchBridge(
         `${bridgeUrl}/v1/accounts/${encodeURIComponent(phone)}`,
         { headers: { 'Content-Type': 'application/json' } },
       )
@@ -331,6 +331,15 @@ export class SignalRegistrationService {
   }
 
   // ── Private helpers ──────────────────────────────────────────────────────
+
+  /** Validate bridge URL for SSRF safety, then fetch. */
+  private async fetchBridge(url: string, opts?: RequestInit): Promise<Response> {
+    const ssrfError = validateExternalUrl(url, 'Bridge URL')
+    if (ssrfError) {
+      throw new SignalRegistrationError(ssrfError, 400)
+    }
+    return fetch(url, opts)
+  }
 
   private async loadRow(id: string) {
     const [row] = await this.db
@@ -383,7 +392,7 @@ export class SignalRegistrationService {
     if (this.isDev) return
 
     try {
-      const res = await fetch(
+      const res = await this.fetchBridge(
         `${bridgeUrl}/v1/register/${encodeURIComponent(phoneNumber)}`,
         {
           method: 'POST',
@@ -439,7 +448,7 @@ export class SignalRegistrationService {
     return {
       id: row.id,
       hubId: row.hubId,
-      bridgeUrl: row.bridgeUrl,
+      bridgeUrl: null, // Never expose internal bridge URL in API responses
       phoneNumberMasked: maskPhone(phone),
       method: row.method as 'sms' | 'voice',
       status: row.status as SignalRegistrationStatus,

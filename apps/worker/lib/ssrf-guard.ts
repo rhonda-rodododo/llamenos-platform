@@ -105,3 +105,44 @@ export function validateExternalUrl(url: string, label = 'URL'): string | null {
 
   return null
 }
+
+/**
+ * Resolve DNS and validate the resolved IP is not internal.
+ * Protects against DNS rebinding attacks where a hostname initially resolves
+ * to a public IP but later resolves to an internal IP.
+ *
+ * Returns null if safe, or an error message if blocked.
+ */
+export async function validateExternalUrlWithDns(url: string, label = 'URL'): Promise<string | null> {
+  const staticError = validateExternalUrl(url, label)
+  if (staticError) return staticError
+
+  const parsed = new URL(url)
+  // If the hostname is already an IP, skip DNS resolution
+  if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(parsed.hostname) || parsed.hostname.includes(':')) {
+    return null
+  }
+
+  try {
+    // Use Bun's DNS resolver (or Node's dns.resolve4)
+    const { resolve4, resolve6 } = await import('node:dns/promises')
+    const [ipv4Results, ipv6Results] = await Promise.allSettled([
+      resolve4(parsed.hostname),
+      resolve6(parsed.hostname),
+    ])
+
+    const ips: string[] = []
+    if (ipv4Results.status === 'fulfilled') ips.push(...ipv4Results.value)
+    if (ipv6Results.status === 'fulfilled') ips.push(...ipv6Results.value)
+
+    for (const ip of ips) {
+      if (isInternalAddress(ip)) {
+        return `${label} resolves to internal address (DNS rebinding protection)`
+      }
+    }
+  } catch {
+    // DNS resolution failed — allow the request (fail-open for non-resolvable hosts)
+  }
+
+  return null
+}

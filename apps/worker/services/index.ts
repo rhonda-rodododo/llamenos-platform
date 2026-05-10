@@ -24,7 +24,7 @@ import { SignalContactsService } from './signal-contacts'
 import { SecurityPrefsService } from './security-prefs'
 import { UserNotificationsService } from './user-notifications'
 import { DigestCronService } from './digest-cron'
-import { ProviderSetup } from './provider-setup'
+import { ProviderSetup, registerAllProviders } from './provider-setup'
 import { SignalRegistrationService } from './provider-setup/signal-registration'
 import { A2pRegistrationService } from './provider-setup/a2p-registration'
 
@@ -64,6 +64,9 @@ export interface ServicesOpts {
 }
 
 export function createServices(db: Database, opts?: ServicesOpts): Services {
+  // Register provider implementations once during service initialization (not at module import)
+  registerAllProviders()
+
   const audit = new AuditService(db)
   const settings = new SettingsService(db)
   const conversations = new ConversationsService(db, opts?.hmacSecret)

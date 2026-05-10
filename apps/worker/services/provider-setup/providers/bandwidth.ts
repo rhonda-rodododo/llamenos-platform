@@ -15,6 +15,16 @@ function nowISO(): string {
   return new Date().toISOString()
 }
 
+/** Escape special characters for safe XML interpolation. */
+function escapeXml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;')
+}
+
 export const bandwidthProvider: ProviderCapabilityImpl = {
   providerType: 'bandwidth',
   capabilities: ['listNumbers', 'provisionNumbers', 'autoWebhooks'],
@@ -144,10 +154,10 @@ export const bandwidthProvider: ProviderCapabilityImpl = {
         },
         body: `<Order>
           <Name>Llamenos Number Order</Name>
-          <SiteId>${accountId}</SiteId>
+          <SiteId>${escapeXml(accountId)}</SiteId>
           <ExistingTelephoneNumberOrderType>
             <TelephoneNumberList>
-              <TelephoneNumber>${request.phoneNumber}</TelephoneNumber>
+              <TelephoneNumber>${escapeXml(request.phoneNumber)}</TelephoneNumber>
             </TelephoneNumberList>
           </ExistingTelephoneNumberOrderType>
         </Order>`,
@@ -192,10 +202,10 @@ export const bandwidthProvider: ProviderCapabilityImpl = {
         },
         body: `<Application>
           <ServiceType>Voice-V2</ServiceType>
-          <AppName>Llamenos - ${urls.voiceIncoming}</AppName>
-          <CallInitiatedCallbackUrl>${urls.voiceIncoming}</CallInitiatedCallbackUrl>
-          <CallStatusCallbackUrl>${urls.voiceStatus}</CallStatusCallbackUrl>
-          ${urls.sms ? `<MessageCallbackUrl>${urls.sms}</MessageCallbackUrl>` : ''}
+          <AppName>${escapeXml(`Llamenos - ${urls.voiceIncoming}`)}</AppName>
+          <CallInitiatedCallbackUrl>${escapeXml(urls.voiceIncoming)}</CallInitiatedCallbackUrl>
+          <CallStatusCallbackUrl>${escapeXml(urls.voiceStatus)}</CallStatusCallbackUrl>
+          ${urls.sms ? `<MessageCallbackUrl>${escapeXml(urls.sms)}</MessageCallbackUrl>` : ''}
         </Application>`,
       },
     )
