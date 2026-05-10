@@ -221,7 +221,7 @@ export class SignalRegistrationService {
         newAttempts >= MAX_VERIFY_ATTEMPTS ? 'failed' : 'verifying'
 
       // CAS: only update if attempts hasn't changed (prevents concurrent bypass of 3-attempt limit)
-      const result = await this.db
+      const casResult = await this.db
         .update(signalRegistrations)
         .set({
           status: nextStatus,
@@ -235,8 +235,9 @@ export class SignalRegistrationService {
           eq(signalRegistrations.id, params.registrationId),
           eq(signalRegistrations.attempts, currentRow.attempts ?? 0),
         ))
+        .returning({ id: signalRegistrations.id })
 
-      if (!result.rowCount) {
+      if (casResult.length === 0) {
         throw new SignalRegistrationError('Concurrent verification attempt detected — please retry', 409)
       }
     }
