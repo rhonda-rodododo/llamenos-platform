@@ -5,7 +5,7 @@
  * IVR audio, rate limits, captchas, and case number sequences.
  * All state is stored in PostgreSQL via Drizzle ORM.
  */
-import { eq, and, sql, lt, inArray, or, isNull } from 'drizzle-orm'
+import { eq, and, sql, lt, inArray, or, isNull, desc } from 'drizzle-orm'
 import type { Database } from '../db'
 import {
   systemSettings,
@@ -1026,27 +1026,26 @@ export class SettingsService {
   async upsertProviderConfig(
     config: Partial<typeof providerConfigs.$inferInsert>,
   ): Promise<typeof providerConfigs.$inferSelect> {
-    const id = config.id ?? crypto.randomUUID()
     const now = new Date()
-    await this.db
-      .insert(providerConfigs)
-      .values({
-        id,
-        hubId: config.hubId !== undefined ? config.hubId : null,
-        providerType: config.providerType ?? '',
-        credentials: config.credentials ?? null,
-        status: config.status ?? 'disconnected',
-        capabilities: config.capabilities ?? [],
-        phoneNumbers: config.phoneNumbers ?? [],
-        error: config.error ?? null,
-        lastCheckedAt: config.lastCheckedAt ?? null,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .onConflictDoUpdate({
-        target: providerConfigs.id,
-        set: {
-          hubId: config.hubId,
+    const hubId = config.hubId !== undefined ? config.hubId : null
+
+    // Find existing config for this hub (or global if hubId is null)
+    const whereClause = hubId !== null
+      ? eq(providerConfigs.hubId, hubId)
+      : isNull(providerConfigs.hubId)
+
+    const [existing] = await this.db
+      .select({ id: providerConfigs.id })
+      .from(providerConfigs)
+      .where(whereClause)
+      .limit(1)
+
+    const id = existing?.id ?? config.id ?? crypto.randomUUID()
+
+    if (existing) {
+      await this.db
+        .update(providerConfigs)
+        .set({
           providerType: config.providerType,
           credentials: config.credentials,
           status: config.status,
@@ -1055,8 +1054,26 @@ export class SettingsService {
           error: config.error,
           lastCheckedAt: config.lastCheckedAt,
           updatedAt: now,
-        },
-      })
+        })
+        .where(eq(providerConfigs.id, id))
+    } else {
+      await this.db
+        .insert(providerConfigs)
+        .values({
+          id,
+          hubId,
+          providerType: config.providerType ?? '',
+          credentials: config.credentials ?? null,
+          status: config.status ?? 'disconnected',
+          capabilities: config.capabilities ?? [],
+          phoneNumbers: config.phoneNumbers ?? [],
+          error: config.error ?? null,
+          lastCheckedAt: config.lastCheckedAt ?? null,
+          createdAt: now,
+          updatedAt: now,
+        })
+    }
+
     const [row] = await this.db
       .select()
       .from(providerConfigs)
@@ -1076,6 +1093,7 @@ export class SettingsService {
       .select()
       .from(providerConfigs)
       .where(isNull(providerConfigs.hubId))
+      .orderBy(desc(providerConfigs.updatedAt))
       .limit(1)
     if (!row) return null
 
