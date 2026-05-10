@@ -27,6 +27,8 @@ services:
       - TWILIO_AUTH_TOKEN={{ twilio_auth_token | default('') }}
       - TWILIO_PHONE_NUMBER={{ twilio_phone_number | default('') }}
       - SERVER_NOSTR_SECRET={{ server_nostr_secret }}
+    ports:
+      - "127.0.0.1:3000:3000"
     networks:
       - llamenos-web
       - llamenos-internal

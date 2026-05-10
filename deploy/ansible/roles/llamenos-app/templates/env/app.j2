@@ -4,9 +4,6 @@ DATABASE_URL=postgresql://llamenos:{{ pg_password }}@postgres:5432/llamenos
 PG_POOL_SIZE={{ pg_pool_size | default(10) }}
 {% if admin_pubkey | default('') | length > 0 %}
 ADMIN_PUBKEY={{ admin_pubkey }}
-{% else %}
-# Auto-generated temporary admin key — replace via web UI bootstrap
-ADMIN_PUBKEY={{ lookup('community.general.random_string', length=64, override_special='abcdef0123456789') }}
 {% endif %}
 HOTLINE_NAME={{ hotline_name | default('Hotline') }}
 ENVIRONMENT={{ app_environment | default('production') }}
