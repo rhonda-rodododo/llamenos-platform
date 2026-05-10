@@ -7,31 +7,7 @@ import type {
 import type { ProviderCapabilityImpl, ConnectionTestResult, SipTrunkConfig, WebhookUrls } from '../types'
 import { ProviderApiError } from '../types'
 import { isInternalAddress } from '../../../lib/ssrf-guard'
-
-/**
- * Determine ESL base URL. Defaults to HTTPS unless eslUseTls is explicitly false
- * AND the host is a loopback/private address.
- */
-function getEslBaseUrl(credentials: Record<string, unknown>): string {
-  const eslHost = String(credentials.eslHost ?? '')
-  const eslPort = Number(credentials.eslPort ?? 8021)
-  const eslUseTls = credentials.eslUseTls !== false
-
-  if (eslUseTls) {
-    return `https://${eslHost}:${eslPort}`
-  }
-
-  // Only allow plaintext HTTP for loopback/private IPs
-  if (!isInternalAddress(eslHost)) {
-    throw new ProviderApiError(
-      'ESL over plaintext HTTP is only allowed for loopback/private addresses. Set eslUseTls: true for external hosts.',
-      400,
-      'TLS required for external hosts',
-    )
-  }
-
-  return `http://${eslHost}:${eslPort}`
-}
+import { nowISO } from '../utils'
 
 /**
  * Determine ESL base URL. Defaults to HTTPS unless eslUseTls is explicitly false
