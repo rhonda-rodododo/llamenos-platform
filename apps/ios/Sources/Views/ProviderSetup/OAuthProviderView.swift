@@ -205,15 +205,16 @@ struct OAuthProviderView: View {
 
             let queryItems = URLComponents(url: callbackURL ?? URL(string: "llamenos://")!, resolvingAgainstBaseURL: false)?.queryItems
             let status = queryItems?.first(where: { $0.name == "status" })?.value
+            let csrfState = queryItems?.first(where: { $0.name == "csrf_state" })?.value
             if status == "success" {
-                viewModel.handleOAuthCallback(success: true)
+                viewModel.handleOAuthCallback(success: true, state: csrfState)
             } else {
                 let msg = queryItems?.first(where: { $0.name == "error" })?.value
-                viewModel.handleOAuthCallback(success: false, errorMessage: msg)
+                viewModel.handleOAuthCallback(success: false, state: csrfState, errorMessage: msg)
             }
         }
         session.presentationContextProvider = contextProvider
-        session.prefersEphemeralWebBrowserSession = false
+        session.prefersEphemeralWebBrowserSession = true
         session.start()
         authSession = session
 

@@ -11,6 +11,7 @@ struct ProviderSetupView: View {
     @State private var showPhoneNumbers: Bool = false
     @State private var showWebhookConfirmation: Bool = false
     @State private var webhookState: WebhookConfigState?
+    @State private var webhookError: String?
 
     init(appState: AppState) {
         let service = ProviderSetupService(api: appState.apiService)
@@ -60,6 +61,19 @@ struct ProviderSetupView: View {
                     NavigationStack {
                         WebhookConfirmationView(state: state)
                     }
+                }
+            }
+            .alert(
+                NSLocalizedString("provider_webhook_error_title", comment: "Webhook Configuration Failed"),
+                isPresented: Binding(
+                    get: { webhookError != nil },
+                    set: { if !$0 { webhookError = nil } }
+                )
+            ) {
+                Button(NSLocalizedString("ok", comment: "OK"), role: .cancel) {}
+            } message: {
+                if let msg = webhookError {
+                    Text(msg)
                 }
             }
         }
@@ -116,7 +130,9 @@ struct ProviderSetupView: View {
                     showWebhookConfirmation = true
                 }
             } catch {
-                // Non-fatal: surface via provider status check
+                await MainActor.run {
+                    webhookError = error.localizedDescription
+                }
             }
         }
     }

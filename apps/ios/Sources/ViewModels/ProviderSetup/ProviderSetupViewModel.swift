@@ -89,6 +89,9 @@ final class ProviderSetupViewModel {
     /// Active OAuth state ID for polling
     var activeOAuthStateId: String?
 
+    /// CSRF state parameter for OAuth deep link validation
+    private var oauthCSRFState: String?
+
     /// OAuth phase tracking
     var oauthPhase: OAuthPhase = .idle
 
@@ -117,9 +120,11 @@ final class ProviderSetupViewModel {
         oauthPhase = .idle
         credentials = [:]
         activeOAuthStateId = nil
+        oauthCSRFState = nil
     }
 
     /// Start OAuth flow — returns the authorization URL to open in ASWebAuthenticationSession.
+    /// Generates a random CSRF state token for deep link validation.
     func startOAuth() async throws -> URL {
         guard let provider = selectedProvider else {
             throw APIError.requestFailed(statusCode: 400, body: "No provider selected")
@@ -129,7 +134,11 @@ final class ProviderSetupViewModel {
         oauthPhase = .waitingForBrowser
         defer { isConnecting = false }
 
-        let redirectURL = "llamenos://oauth/callback"
+        // Generate CSRF state to prevent forged deep link callbacks
+        let csrfState = UUID().uuidString
+        oauthCSRFState = csrfState
+
+        let redirectURL = "llamenos://oauth/callback?csrf_state=\(csrfState)"
         let response = try await service.startOAuth(
             provider: provider.id,
             redirectURL: redirectURL,
@@ -175,7 +184,18 @@ final class ProviderSetupViewModel {
     }
 
     /// Handle OAuth callback from deep link.
-    func handleOAuthCallback(success: Bool, errorMessage: String? = nil) {
+    /// Validates the CSRF state parameter to prevent forged callbacks.
+    func handleOAuthCallback(success: Bool, state: String? = nil, errorMessage: String? = nil) {
+        // Validate CSRF state — reject if it doesn't match
+        if let expectedState = oauthCSRFState {
+            guard let state, state == expectedState else {
+                oauthPhase = .failed(NSLocalizedString("provider_oauth_state_mismatch", comment: "OAuth state mismatch — callback rejected"))
+                oauthCSRFState = nil
+                return
+            }
+        }
+        oauthCSRFState = nil
+
         if success {
             oauthPhase = .complete
             connectionStatus = .connected
@@ -185,11 +205,19 @@ final class ProviderSetupViewModel {
     }
 
     /// Configure provider with manual API credentials.
+    /// Clears credential values from memory after submission regardless of outcome.
     func configureWithCredentials() async {
         guard let provider = selectedProvider else { return }
         isConnecting = true
         error = nil
-        defer { isConnecting = false }
+        defer {
+            isConnecting = false
+            // Clear sensitive credential values from memory after sending to server
+            for key in credentials.keys {
+                credentials[key] = ""
+            }
+            credentials.removeAll()
+        }
         do {
             try await service.configureProvider(provider: provider.id, credentials: credentials, hubId: hubId)
             connectionStatus = .connected
