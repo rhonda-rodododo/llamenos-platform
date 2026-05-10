@@ -21,7 +21,7 @@
     }
 }
 
-{{ domain }} {
+shared.{{ domain }} {
     reverse_proxy app:3000
     tls {{ acme_email }}
     import security_headers

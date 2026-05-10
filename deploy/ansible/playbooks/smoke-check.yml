@@ -129,7 +129,7 @@
     - name: Check PostgreSQL is accepting connections
       ansible.builtin.shell: |
         set -euo pipefail
-        docker compose -f "{{ app_dir }}/docker-compose.yml" exec -T postgres \
+        docker compose -f "{{ app_dir }}/services/postgres/docker-compose.yml" exec -T postgres \
           pg_isready -U {{ backup_postgres_user | default('llamenos') }} -d {{ backup_postgres_db | default('llamenos') }}
       args:
         executable: /bin/bash
@@ -165,7 +165,7 @@
 
     - name: Check Caddy is serving HTTPS
       ansible.builtin.uri:
-        url: "https://{{ domain }}"
+        url: "https://shared.{{ domain }}"
         method: HEAD
         status_code: [200, 301, 302, 307, 308]
         validate_certs: false
