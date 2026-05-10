@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { Hono, type Context } from 'hono'
 import { describeRoute, resolver, validator } from 'hono-openapi'
 import { z } from 'zod'
 import type { AppEnv } from '../types'
@@ -18,6 +18,8 @@ import {
 } from '@protocol/schemas/provider-setup'
 import { okResponseSchema } from '@protocol/schemas/common'
 import { getProviderCapability } from '../services/provider-setup/registry'
+import { SignalRegistrationError } from '../services/provider-setup/signal-registration'
+import { A2pRegistrationError } from '../services/provider-setup/a2p-registration'
 
 // Per-provider OAuth metadata — authorization URLs, token URLs, and default scopes.
 const PROVIDER_OAUTH_CONFIG: Record<string, {
@@ -580,6 +582,372 @@ providerSetup.post('/create-sip-trunk',
         return c.json({ error: err.message }, err.statusCode as 400 | 401 | 403 | 404 | 500)
       }
       throw err
+    }
+  },
+)
+
+// ── Signal Registration ────────────────────────────────────────────────────
+
+const SignalRegisterRequestSchema = z.looseObject({
+  bridgeUrl: z.string(),
+  phoneNumber: z.string(),
+  method: z.enum(['sms', 'voice']).optional().default('sms'),
+  hubId: z.string().optional(),
+})
+
+const SignalVerifyRequestSchema = z.looseObject({
+  registrationId: z.string(),
+  code: z.string(),
+  hubId: z.string().optional(),
+})
+
+const SignalUnregisterRequestSchema = z.looseObject({
+  registrationId: z.string(),
+  hubId: z.string().optional(),
+})
+
+function handleSignalError(err: unknown, c: Context<AppEnv>): Response {
+  if (err instanceof SignalRegistrationError) {
+    return c.json({ error: err.message }, err.statusCode as 400 | 404 | 409 | 410 | 502)
+  }
+  throw err
+}
+
+providerSetup.post('/signal/register',
+  requirePermission('messaging:manage-signal'),
+  describeRoute({
+    tags: ['Provider Setup'],
+    summary: 'Start Signal bridge registration (SMS or voice)',
+    responses: {
+      200: { description: 'Registration started' },
+      502: { description: 'Bridge unreachable' },
+      ...authErrors,
+    },
+  }),
+  validator('json', SignalRegisterRequestSchema),
+  async (c) => {
+    const body = c.req.valid('json')
+    const services = c.get('services')
+    const hubId = c.get('hubId') ?? body.hubId
+
+    if (!hubId) {
+      return c.json({ error: 'hubId is required' }, 400)
+    }
+
+    try {
+      const registration = await services.signalRegistration.startRegistration({
+        bridgeUrl: body.bridgeUrl,
+        phoneNumber: body.phoneNumber,
+        method: body.method ?? 'sms',
+        hubId,
+      })
+      return c.json(registration)
+    } catch (err) {
+      return handleSignalError(err, c)
+    }
+  },
+)
+
+providerSetup.get('/signal/status',
+  requirePermission('messaging:manage-signal'),
+  describeRoute({
+    tags: ['Provider Setup'],
+    summary: 'Get Signal registration status (optionally polls bridge)',
+    responses: {
+      200: { description: 'Registration status' },
+      404: { description: 'No registration found' },
+      ...authErrors,
+    },
+  }),
+  async (c) => {
+    const hubId = c.get('hubId') ?? c.req.query('hubId')
+    const registrationId = c.req.query('registrationId')
+    const services = c.get('services')
+
+    try {
+      if (registrationId) {
+        const registration = await services.signalRegistration.checkStatus(registrationId)
+        return c.json(registration)
+      }
+
+      if (!hubId) {
+        return c.json({ error: 'hubId or registrationId is required' }, 400)
+      }
+
+      const registration = await services.signalRegistration.getRegistrationForHub(hubId)
+      if (!registration) {
+        return c.json({ error: 'No registration found for this hub' }, 404)
+      }
+      return c.json(registration)
+    } catch (err) {
+      return handleSignalError(err, c)
+    }
+  },
+)
+
+providerSetup.post('/signal/verify',
+  requirePermission('messaging:manage-signal'),
+  describeRoute({
+    tags: ['Provider Setup'],
+    summary: 'Verify Signal registration code (voice flow)',
+    responses: {
+      200: { description: 'Verification result' },
+      409: { description: 'Invalid state for verification' },
+      ...authErrors,
+    },
+  }),
+  validator('json', SignalVerifyRequestSchema),
+  async (c) => {
+    const body = c.req.valid('json')
+    const services = c.get('services')
+
+    try {
+      const registration = await services.signalRegistration.verifyCode({
+        registrationId: body.registrationId,
+        code: body.code,
+      })
+      return c.json(registration)
+    } catch (err) {
+      return handleSignalError(err, c)
+    }
+  },
+)
+
+providerSetup.delete('/signal/unregister',
+  requirePermission('messaging:manage-signal'),
+  describeRoute({
+    tags: ['Provider Setup'],
+    summary: 'Unregister a Signal number (calls bridge + deletes DB record)',
+    responses: {
+      200: { description: 'Unregistered' },
+      404: { description: 'Registration not found' },
+      ...authErrors,
+    },
+  }),
+  async (c) => {
+    // Accept registrationId from JSON body OR query param (DELETE may not carry a body)
+    const registrationId = c.req.query('registrationId')
+      ?? (await c.req.json().then((b: Record<string, unknown>) => b.registrationId as string | undefined).catch(() => undefined))
+
+    const services = c.get('services')
+
+    if (!registrationId) {
+      return c.json({ error: 'registrationId is required' }, 400)
+    }
+
+    try {
+      await services.signalRegistration.unregister(registrationId)
+      return c.json({ ok: true })
+    } catch (err) {
+      return handleSignalError(err, c)
+    }
+  },
+)
+
+providerSetup.get('/signal/account',
+  requirePermission('messaging:manage-signal'),
+  describeRoute({
+    tags: ['Provider Setup'],
+    summary: 'Get Signal account info from bridge',
+    responses: {
+      200: { description: 'Account info' },
+      404: { description: 'Registration not found' },
+      ...authErrors,
+    },
+  }),
+  async (c) => {
+    const registrationId = c.req.query('registrationId')
+    const services = c.get('services')
+
+    if (!registrationId) {
+      return c.json({ error: 'registrationId query param required' }, 400)
+    }
+
+    try {
+      const info = await services.signalRegistration.getAccountInfo(registrationId)
+      return c.json(info)
+    } catch (err) {
+      return handleSignalError(err, c)
+    }
+  },
+)
+
+// ── A2P Registration ───────────────────────────────────────────────────────
+
+const A2pBrandRequestSchema = z.looseObject({
+  providerType: z.string().optional().default('twilio'),
+  brandInfo: z.looseObject({
+    entityType: z.string(),
+    companyName: z.string(),
+    ein: z.string(),
+    phone: z.string(),
+    street: z.string(),
+    city: z.string(),
+    state: z.string(),
+    postalCode: z.string(),
+    country: z.string(),
+    email: z.string(),
+    website: z.string().optional(),
+    vertical: z.string().optional(),
+  }),
+  hubId: z.string().optional(),
+})
+
+const A2pCampaignRequestSchema = z.looseObject({
+  registrationId: z.string(),
+  campaignInfo: z.looseObject({
+    useCase: z.string(),
+    description: z.string(),
+    helpMessage: z.string(),
+    optinMessage: z.string(),
+    optoutMessage: z.string(),
+    sampleMessages: z.array(z.string()),
+    embeddedLink: z.boolean().optional(),
+    embeddedPhone: z.boolean().optional(),
+    subscriberOptin: z.boolean().optional(),
+    subscriberOptout: z.boolean().optional(),
+    subscriberHelp: z.boolean().optional(),
+  }),
+  hubId: z.string().optional(),
+})
+
+const A2pSkipRequestSchema = z.looseObject({
+  providerType: z.string().optional().default('twilio'),
+  hubId: z.string().optional(),
+})
+
+function handleA2pError(err: unknown, c: Context<AppEnv>): Response {
+  if (err instanceof A2pRegistrationError) {
+    return c.json({ error: err.message }, err.statusCode as 400 | 404 | 409)
+  }
+  throw err
+}
+
+providerSetup.post('/a2p/brand',
+  requirePermission('telephony:manage-a2p'),
+  describeRoute({
+    tags: ['Provider Setup'],
+    summary: 'Submit A2P brand registration',
+    responses: {
+      200: { description: 'Brand submitted' },
+      ...authErrors,
+    },
+  }),
+  validator('json', A2pBrandRequestSchema),
+  async (c) => {
+    const body = c.req.valid('json')
+    const services = c.get('services')
+    const hubId = c.get('hubId') ?? body.hubId
+
+    if (!hubId) {
+      return c.json({ error: 'hubId is required' }, 400)
+    }
+
+    try {
+      const registration = await services.a2pRegistration.submitBrand(
+        body.providerType ?? 'twilio',
+        body.brandInfo as Parameters<typeof services.a2pRegistration.submitBrand>[1],
+        hubId,
+      )
+      return c.json(registration)
+    } catch (err) {
+      return handleA2pError(err, c)
+    }
+  },
+)
+
+providerSetup.post('/a2p/campaign',
+  requirePermission('telephony:manage-a2p'),
+  describeRoute({
+    tags: ['Provider Setup'],
+    summary: 'Submit A2P campaign registration (brand must be approved first)',
+    responses: {
+      200: { description: 'Campaign submitted' },
+      ...authErrors,
+    },
+  }),
+  validator('json', A2pCampaignRequestSchema),
+  async (c) => {
+    const body = c.req.valid('json')
+    const services = c.get('services')
+
+    try {
+      const registration = await services.a2pRegistration.submitCampaign(
+        body.registrationId,
+        body.campaignInfo as Parameters<typeof services.a2pRegistration.submitCampaign>[1],
+      )
+      return c.json(registration)
+    } catch (err) {
+      return handleA2pError(err, c)
+    }
+  },
+)
+
+providerSetup.get('/a2p/status',
+  requirePermission('telephony:manage-a2p'),
+  describeRoute({
+    tags: ['Provider Setup'],
+    summary: 'Get A2P registration status (optionally polls provider)',
+    responses: {
+      200: { description: 'A2P registration status' },
+      404: { description: 'No registration found' },
+      ...authErrors,
+    },
+  }),
+  async (c) => {
+    const hubId = c.get('hubId') ?? c.req.query('hubId')
+    const registrationId = c.req.query('registrationId')
+    const services = c.get('services')
+
+    try {
+      if (registrationId) {
+        const registration = await services.a2pRegistration.checkStatus(registrationId)
+        return c.json(registration)
+      }
+
+      if (!hubId) {
+        return c.json({ error: 'hubId or registrationId is required' }, 400)
+      }
+
+      const row = await services.a2pRegistration.getRegistrationForHub(hubId)
+      if (!row) {
+        return c.json({ error: 'No A2P registration found for this hub' }, 404)
+      }
+
+      // Convert raw row to public format via checkStatus (no-op polling for non-pending)
+      const registration = await services.a2pRegistration.checkStatus(row.id)
+      return c.json(registration)
+    } catch (err) {
+      return handleA2pError(err, c)
+    }
+  },
+)
+
+providerSetup.post('/a2p/skip',
+  requirePermission('telephony:manage-a2p'),
+  describeRoute({
+    tags: ['Provider Setup'],
+    summary: 'Skip A2P registration (mark as not required for this hub)',
+    responses: {
+      200: { description: 'A2P marked as skipped' },
+      ...authErrors,
+    },
+  }),
+  validator('json', A2pSkipRequestSchema),
+  async (c) => {
+    const body = c.req.valid('json')
+    const services = c.get('services')
+    const hubId = c.get('hubId') ?? body.hubId
+
+    if (!hubId) {
+      return c.json({ error: 'hubId is required' }, 400)
+    }
+
+    try {
+      const registration = await services.a2pRegistration.skip(hubId, body.providerType ?? 'twilio')
+      return c.json(registration)
+    } catch (err) {
+      return handleA2pError(err, c)
     }
   },
 )

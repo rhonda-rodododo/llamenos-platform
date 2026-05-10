@@ -25,6 +25,8 @@ import { SecurityPrefsService } from './security-prefs'
 import { UserNotificationsService } from './user-notifications'
 import { DigestCronService } from './digest-cron'
 import { ProviderSetup } from './provider-setup'
+import { SignalRegistrationService } from './provider-setup/signal-registration'
+import { A2pRegistrationService } from './provider-setup/a2p-registration'
 
 export interface Services {
   identity: IdentityService
@@ -47,6 +49,8 @@ export interface Services {
   userNotifications: UserNotificationsService
   digestCron: DigestCronService
   providerSetup: ProviderSetup
+  signalRegistration: SignalRegistrationService
+  a2pRegistration: A2pRegistrationService
 }
 
 export interface ServicesOpts {
@@ -92,6 +96,8 @@ export function createServices(db: Database, opts?: ServicesOpts): Services {
     userNotifications,
     digestCron,
     providerSetup: new ProviderSetup(db, opts?.hmacSecret ?? '', opts?.env?.DOMAIN ?? 'localhost'),
+    signalRegistration: new SignalRegistrationService(db, opts?.hmacSecret ?? ''),
+    a2pRegistration: new A2pRegistrationService(db, opts?.hmacSecret ?? ''),
   }
 
   // Only create firehose agent if seal key is configured
@@ -131,4 +137,6 @@ export {
   UserNotificationsService,
   DigestCronService,
   ProviderSetup,
+  SignalRegistrationService,
+  A2pRegistrationService,
 }
