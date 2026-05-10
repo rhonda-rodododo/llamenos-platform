@@ -32,10 +32,10 @@ bun run bootstrap-admin
 
 ## 3. تكوين المتغيرات السرية
 
-أنشئ ملف `.dev.vars` في جذر المشروع للتطوير المحلي. يستخدم هذا المثال Twilio — إذا كنت تستخدم مزوداً مختلفاً، يمكنك تخطي متغيرات Twilio وتكوين مزودك من خلال واجهة المسؤول بعد أول تسجيل دخول.
+أنشئ ملف `.env` في جذر المشروع للتطوير المحلي. يستخدم هذا المثال Twilio — إذا كنت تستخدم مزوداً مختلفاً، يمكنك تخطي متغيرات Twilio وتكوين مزودك من خلال واجهة المسؤول بعد أول تسجيل دخول.
 
 ```bash
-# .dev.vars
+# .env
 TWILIO_ACCOUNT_SID=your_twilio_account_sid
 TWILIO_AUTH_TOKEN=your_twilio_auth_token
 TWILIO_PHONE_NUMBER=+1234567890

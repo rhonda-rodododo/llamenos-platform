@@ -49,7 +49,7 @@ No secrets in `.mise.toml`. The `[env]` section will only set non-secret develop
 ENVIRONMENT = "development"
 ```
 
-Secrets (ADMIN_PUBKEY, telephony credentials, etc.) remain in `.dev.vars` per the existing pattern.
+Secrets (ADMIN_PUBKEY, telephony credentials, etc.) are stored in `.env` (gitignored).
 
 ### 1.3 Tasks
 
@@ -113,7 +113,7 @@ The README serves two audiences: **operators** (deploying the app) and **contrib
 | `bun run dev:worker` | `bun run dev:server` |
 | `cd ../llamenos-core && cargo test` | `bun run crypto:test` |
 | Architecture section shows `src-tauri/`, `src/worker/` | Update to actual monorepo structure |
-| Quick Start says `cp .dev.vars.example .dev.vars` but Step 4 shows `bun run dev:worker` | Fix Step 4 to show `bun run dev:server` |
+| Quick Start says `cp .env.example .env` but Step 4 shows `bun run dev:worker` | Fix Step 4 to show `bun run dev:server` |
 | Prerequisites: "Rust (for Tauri desktop builds)" | Make clear Rust is only needed for desktop/crypto work |
 | No mention of `scripts/dev-setup.sh` | Add to Quick Start |
 | No Contributing section | Add with link to CONTRIBUTING.md |
@@ -130,9 +130,9 @@ bun run dev:server    # backend
 
 ---
 
-## 4. .dev.vars.example Audit
+## 4. .env.example Audit
 
-The existing `.dev.vars.example` is minimal (4 vars). It should be accurate. Current state is fine — no changes needed.
+The existing `.env.example` is comprehensive (148 lines). It should be accurate. Current state is fine — no changes needed.
 
 ---
 

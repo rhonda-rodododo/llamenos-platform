@@ -32,10 +32,10 @@ Hãy lưu trữ `nsec` một cách an toàn — đây là thông tin đăng nh�
 
 ## 3. Cấu hình khóa bí mật
 
-Tạo một tệp `.dev.vars` tại thư mục gốc của dự án cho phát triển cục bộ. Ví dụ này sử dụng Twilio — nếu bạn sử dụng nhà cung cấp khác, bạn có thể bỏ qua các biến Twilio và cấu hình nhà cung cấp của bạn qua giao diện quản trị sau lần đăng nhập đầu tiên.
+Tạo một tệp `.env` tại thư mục gốc của dự án cho phát triển cục bộ. Ví dụ này sử dụng Twilio — nếu bạn sử dụng nhà cung cấp khác, bạn có thể bỏ qua các biến Twilio và cấu hình nhà cung cấp của bạn qua giao diện quản trị sau lần đăng nhập đầu tiên.
 
 ```bash
-# .dev.vars
+# .env
 TWILIO_ACCOUNT_SID=your_twilio_account_sid
 TWILIO_AUTH_TOKEN=your_twilio_auth_token
 TWILIO_PHONE_NUMBER=+1234567890

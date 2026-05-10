@@ -32,10 +32,10 @@ bun run bootstrap-admin
 
 ## 3. 비밀 값 구성
 
-로컬 개발을 위해 프로젝트 루트에 `.dev.vars` 파일을 생성합니다. 이 예시는 Twilio를 사용합니다 — 다른 제공업체를 사용하는 경우 Twilio 변수를 건너뛰고 첫 로그인 후 관리자 UI에서 제공업체를 구성할 수 있습니다.
+로컬 개발을 위해 프로젝트 루트에 `.env` 파일을 생성합니다. 이 예시는 Twilio를 사용합니다 — 다른 제공업체를 사용하는 경우 Twilio 변수를 건너뛰고 첫 로그인 후 관리자 UI에서 제공업체를 구성할 수 있습니다.
 
 ```bash
-# .dev.vars
+# .env
 TWILIO_ACCOUNT_SID=your_twilio_account_sid
 TWILIO_AUTH_TOKEN=your_twilio_auth_token
 TWILIO_PHONE_NUMBER=+1234567890
