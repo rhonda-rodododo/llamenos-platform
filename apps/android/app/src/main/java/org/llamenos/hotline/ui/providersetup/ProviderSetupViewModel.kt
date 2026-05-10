@@ -14,6 +14,7 @@ import org.llamenos.hotline.api.ProviderSetupRepository
 import org.llamenos.hotline.api.TestConnectionResult
 import org.llamenos.protocol.ProviderStatusResponse
 import org.llamenos.protocol.ProviderStatus
+import org.llamenos.protocol.StartOAuthResponse
 import javax.inject.Inject
 
 sealed interface ProviderSetupUiState {
@@ -25,7 +26,7 @@ sealed interface ProviderSetupUiState {
 
 @HiltViewModel
 class ProviderSetupViewModel @Inject constructor(
-    val repository: ProviderSetupRepository,
+    private val repository: ProviderSetupRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<ProviderSetupUiState>(ProviderSetupUiState.Loading)
@@ -45,6 +46,9 @@ class ProviderSetupViewModel @Inject constructor(
 
     private val _configError = MutableStateFlow<String?>(null)
     val configError: StateFlow<String?> = _configError.asStateFlow()
+
+    private val _configSuccess = MutableStateFlow(false)
+    val configSuccess: StateFlow<Boolean> = _configSuccess.asStateFlow()
 
     fun selectProvider(provider: String) {
         _selectedProvider.value = provider
@@ -78,10 +82,12 @@ class ProviderSetupViewModel @Inject constructor(
         viewModelScope.launch {
             _isConfiguring.value = true
             _configError.value = null
+            _configSuccess.value = false
             val result = repository.configureProvider(provider, credentials)
             result.fold(
                 onSuccess = {
                     _isConfiguring.value = false
+                    _configSuccess.value = true
                     loadStatus(provider)
                 },
                 onFailure = { error ->
@@ -90,6 +96,14 @@ class ProviderSetupViewModel @Inject constructor(
                 },
             )
         }
+    }
+
+    suspend fun startOAuth(provider: String, state: String): Result<StartOAuthResponse> {
+        return repository.startOAuth(provider, state = state)
+    }
+
+    fun clearConfigSuccess() {
+        _configSuccess.value = false
     }
 
     fun testConnection(provider: String? = null) {

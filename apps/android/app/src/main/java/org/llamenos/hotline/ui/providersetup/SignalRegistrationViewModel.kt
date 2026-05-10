@@ -151,8 +151,10 @@ class SignalRegistrationViewModel @Inject constructor(
     fun startPolling() {
         stopPolling()
         pollJob = viewModelScope.launch {
+            var delayMs = POLL_INITIAL_DELAY_MS
             while (isActive) {
-                delay(3000)
+                delay(delayMs)
+                delayMs = (delayMs * 2).coerceAtMost(POLL_MAX_DELAY_MS)
                 val current = _state.value ?: break
                 if (current.status != SignalRegistrationStatus.Pending &&
                     current.status != SignalRegistrationStatus.Registering
@@ -175,6 +177,11 @@ class SignalRegistrationViewModel @Inject constructor(
                 )
             }
         }
+    }
+
+    companion object {
+        private const val POLL_INITIAL_DELAY_MS = 3_000L
+        private const val POLL_MAX_DELAY_MS = 30_000L
     }
 
     fun stopPolling() {

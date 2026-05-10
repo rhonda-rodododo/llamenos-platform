@@ -17,8 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
@@ -47,7 +45,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -124,103 +121,101 @@ fun ProviderSetupScreen(
         },
         modifier = modifier,
     ) { paddingValues ->
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
-                .verticalScroll(rememberScrollState()),
+                .padding(paddingValues),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(
-                text = stringResource(R.string.provider_setup_description),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(16.dp),
-            )
+            item {
+                Text(
+                    text = stringResource(R.string.provider_setup_description),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 8.dp),
+                )
+            }
 
             // Provider selection grid
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(400.dp),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                items(PROVIDERS, key = { it.first }) { (provider, capabilities) ->
-                    ProviderCard(
-                        provider = provider,
-                        capabilities = capabilities,
-                        isSelected = selectedProvider == provider,
-                        onClick = { viewModel.selectProvider(provider) },
-                    )
-                }
+            items(PROVIDERS, key = { it.first }) { (provider, capabilities) ->
+                ProviderCard(
+                    provider = provider,
+                    capabilities = capabilities,
+                    isSelected = selectedProvider == provider,
+                    onClick = { viewModel.selectProvider(provider) },
+                )
             }
 
             // Selected provider details
             selectedProvider?.let { provider ->
-                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                item {
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
-                when (val state = uiState) {
-                    is ProviderSetupUiState.Loading -> {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(32.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            CircularProgressIndicator()
+                    when (val state = uiState) {
+                        is ProviderSetupUiState.Loading -> {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(32.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                CircularProgressIndicator()
+                            }
                         }
-                    }
 
-                    is ProviderSetupUiState.Connected -> {
-                        ConnectedProviderPanel(
-                            provider = provider,
-                            status = state.status,
-                            onTest = { viewModel.testConnection() },
-                            isTesting = isTesting,
-                            testResult = testResult,
-                            onNavigateToPhoneNumbers = { onNavigateToPhoneNumbers(provider) },
-                        )
-                    }
+                        is ProviderSetupUiState.Connected -> {
+                            ConnectedProviderPanel(
+                                provider = provider,
+                                status = state.status,
+                                onTest = { viewModel.testConnection() },
+                                isTesting = isTesting,
+                                testResult = testResult,
+                                onNavigateToPhoneNumbers = { onNavigateToPhoneNumbers(provider) },
+                            )
+                        }
 
-                    is ProviderSetupUiState.Disconnected -> {
-                        DisconnectedProviderPanel(
-                            provider = provider,
-                            status = state.status,
-                            onConnectOAuth = { onNavigateToOAuth(provider) },
-                            onConnectApiKey = { onNavigateToApiKey(provider) },
-                            onTest = { viewModel.testConnection() },
-                            isTesting = isTesting,
-                            testResult = testResult,
-                            isConfiguring = isConfiguring,
-                            configError = configError,
-                            onConfigure = { credentials ->
-                                viewModel.configureWithCredentials(provider, credentials)
-                            },
-                        )
-                    }
+                        is ProviderSetupUiState.Disconnected -> {
+                            DisconnectedProviderPanel(
+                                provider = provider,
+                                status = state.status,
+                                onConnectOAuth = { onNavigateToOAuth(provider) },
+                                onConnectApiKey = { onNavigateToApiKey(provider) },
+                                onTest = { viewModel.testConnection() },
+                                isTesting = isTesting,
+                                testResult = testResult,
+                                isConfiguring = isConfiguring,
+                                configError = configError,
+                                onConfigure = { credentials ->
+                                    viewModel.configureWithCredentials(provider, credentials)
+                                },
+                            )
+                        }
 
-                    is ProviderSetupUiState.Error -> {
-                        ErrorPanel(
-                            message = state.message,
-                            onRetry = { viewModel.loadStatus(provider) },
-                        )
+                        is ProviderSetupUiState.Error -> {
+                            ErrorPanel(
+                                message = state.message,
+                                onRetry = { viewModel.loadStatus(provider) },
+                            )
+                        }
                     }
                 }
             }
 
             // Signal registration button
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-            Button(
-                onClick = onNavigateToSignalRegistration,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
-                    .testTag("signal-registration-button"),
-            ) {
-                Text(stringResource(R.string.signal_registration_title))
-            }
+            item {
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                Button(
+                    onClick = onNavigateToSignalRegistration,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("signal-registration-button"),
+                ) {
+                    Text(stringResource(R.string.signal_registration_title))
+                }
 
-            Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+            }
         }
     }
 }

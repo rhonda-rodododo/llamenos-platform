@@ -37,6 +37,7 @@ import org.llamenos.hotline.R
 fun WebhookConfirmationScreen(
     provider: String,
     phoneNumber: String,
+    webhookBaseUrl: String,
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ProviderSetupViewModel = hiltViewModel(),
@@ -86,21 +87,21 @@ fun WebhookConfirmationScreen(
 
             WebhookUrlCard(
                 label = stringResource(R.string.voice_incoming_webhook),
-                url = "https://your-domain.com/api/telephony/incoming",
+                url = "${webhookBaseUrl}/api/telephony/incoming",
             )
 
             Spacer(modifier = Modifier.height(12.dp))
 
             WebhookUrlCard(
                 label = stringResource(R.string.voice_status_webhook),
-                url = "https://your-domain.com/api/telephony/status",
+                url = "${webhookBaseUrl}/api/telephony/status",
             )
 
             Spacer(modifier = Modifier.height(12.dp))
 
             WebhookUrlCard(
                 label = stringResource(R.string.sms_webhook),
-                url = "https://your-domain.com/api/messaging/incoming",
+                url = "${webhookBaseUrl}/api/messaging/incoming",
             )
 
             Spacer(modifier = Modifier.height(24.dp))

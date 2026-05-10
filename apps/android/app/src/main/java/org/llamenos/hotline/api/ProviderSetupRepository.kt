@@ -96,14 +96,16 @@ class ProviderSetupRepository @Inject constructor(
     suspend fun startOAuth(
         provider: String,
         callbackScheme: String = "llamenos://",
+        state: String? = null,
         hubId: String? = null,
     ): Result<StartOAuthResponse> = withContext(Dispatchers.IO) {
         runCatching {
-            val body = mapOf(
-                "provider" to provider,
-                "redirectUrl" to "${callbackScheme}oauth/callback",
-                "hubId" to (hubId ?: activeHubState.activeHubId.value),
-            )
+            val body = buildMap {
+                put("provider", provider)
+                put("redirectUrl", "${callbackScheme}oauth/callback")
+                put("hubId", hubId ?: activeHubState.activeHubId.value)
+                if (state != null) put("state", state)
+            }
             apiService.request("POST", "/api/provider-setup/oauth/start", body)
         }
     }

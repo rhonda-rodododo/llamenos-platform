@@ -25,6 +25,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,6 +53,14 @@ fun APIKeyProviderScreen(
 ) {
     val isConfiguring by viewModel.isConfiguring.collectAsState()
     val configError by viewModel.configError.collectAsState()
+    val configSuccess by viewModel.configSuccess.collectAsState()
+
+    LaunchedEffect(configSuccess) {
+        if (configSuccess) {
+            viewModel.clearConfigSuccess()
+            onConfigured()
+        }
+    }
 
     var accountSid by remember { mutableStateOf("") }
     var authToken by remember { mutableStateOf("") }
@@ -189,7 +198,6 @@ fun APIKeyProviderScreen(
                         else -> emptyMap()
                     }
                     viewModel.configureWithCredentials(provider, credentials)
-                    onConfigured()
                 },
                 enabled = !isConfiguring && (
                     if (isTwilioLike) accountSid.isNotBlank() && authToken.isNotBlank()

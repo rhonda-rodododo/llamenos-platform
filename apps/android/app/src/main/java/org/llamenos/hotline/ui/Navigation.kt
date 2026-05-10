@@ -963,9 +963,11 @@ fun LlamenosNavigation(
         }
 
         composable(LlamenosRoute.WebhookConfirmation.route) {
+            val webhookBaseUrl = keystoreService.retrieve(KeystoreService.KEY_HUB_URL) ?: ""
             WebhookConfirmationScreen(
                 provider = "twilio",
                 phoneNumber = "",
+                webhookBaseUrl = webhookBaseUrl,
                 onNavigateBack = { navController.popBackStack() },
             )
         }

@@ -37,6 +37,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import org.llamenos.hotline.DeepLinkActivity
 import org.llamenos.hotline.R
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -124,7 +125,8 @@ fun OAuthProviderScreen(
                     Button(
                         onClick = {
                             scope.launch {
-                                val result = viewModel.repository.startOAuth(provider)
+                                val state = DeepLinkActivity.generateOAuthState()
+                                val result = viewModel.startOAuth(provider, state)
                                 result.fold(
                                     onSuccess = { response ->
                                         launchBrowser(context, response.authURL)
