@@ -7,6 +7,7 @@ import {
   type TelephonyProviderConfig,
   type TelephonyProviderType,
 } from '@/lib/api'
+import { testProviderConnection } from '@/lib/api/provider-setup'
 import { TELEPHONY_PROVIDER_LABELS } from '@shared/types'
 import { SettingsSection } from '@/components/settings-section'
 import { Switch } from '@/components/ui/switch'
@@ -14,7 +15,9 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { PhoneInput } from '@/components/phone-input'
-import { Radio, Save } from 'lucide-react'
+import { Radio, Save, Loader2, CheckCircle2, XCircle, RefreshCw } from 'lucide-react'
+import { ProviderStatusBadge } from '@/components/setup/ProviderStatusBadge'
+import { WebhookConfirmation } from '@/components/setup/WebhookConfirmation'
 
 interface Props {
   config: TelephonyProviderConfig | null
@@ -32,9 +35,23 @@ export function TelephonyProviderSection({ config, draft, onConfigChange, onDraf
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ ok: boolean; error?: string } | null>(null)
   const [saving, setSaving] = useState(false)
+  const [showWebhooks, setShowWebhooks] = useState(false)
 
   function updateDraft(patch: Partial<TelephonyProviderConfig>) {
     onDraftChange({ ...draft, ...patch })
+  }
+
+  async function handleTest() {
+    setTesting(true)
+    setTestResult(null)
+    try {
+      const result = await testProviderConnection(draft.type || config?.type || 'twilio')
+      setTestResult({ ok: result.connected, error: result.error })
+    } catch (err) {
+      setTestResult({ ok: false, error: err instanceof Error ? err.message : String(err) })
+    } finally {
+      setTesting(false)
+    }
   }
 
   return (
@@ -49,10 +66,14 @@ export function TelephonyProviderSection({ config, draft, onConfigChange, onDraf
       statusSummary={statusSummary}
     >
       {config && (
-        <div className="rounded-lg border border-border bg-muted/50 p-3">
-          <p className="text-xs text-muted-foreground">
-            {t('telephonyProvider.currentProvider')}: <span className="font-medium text-foreground">{TELEPHONY_PROVIDER_LABELS[config.type]}</span>
-          </p>
+        <div className="rounded-lg border border-border bg-muted/50 p-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">
+              {t('telephonyProvider.currentProvider')}:{' '}
+              <span className="font-medium text-foreground">{TELEPHONY_PROVIDER_LABELS[config.type]}</span>
+            </p>
+            <ProviderStatusBadge status="connected" />
+          </div>
         </div>
       )}
       {!config && (
@@ -66,11 +87,12 @@ export function TelephonyProviderSection({ config, draft, onConfigChange, onDraf
           <Label>{t('telephonyProvider.provider')}</Label>
           <select
             value={draft.type || 'twilio'}
-            onChange={e => {
+            onChange={(e) => {
               onDraftChange({ type: e.target.value as TelephonyProviderType })
               setTestResult(null)
             }}
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            data-testid="provider-select"
           >
             {(Object.entries(TELEPHONY_PROVIDER_LABELS) as [TelephonyProviderType, string][]).map(([key, label]) => (
               <option key={key} value={key}>{label}</option>
@@ -100,7 +122,7 @@ export function TelephonyProviderSection({ config, draft, onConfigChange, onDraf
                 <Label>{t('telephonyProvider.accountSid')}</Label>
                 <Input
                   value={draft.accountSid || ''}
-                  onChange={e => updateDraft({ accountSid: e.target.value })}
+                  onChange={(e) => updateDraft({ accountSid: e.target.value })}
                   placeholder="AC..."
                   data-testid="account-sid"
                 />
@@ -110,7 +132,7 @@ export function TelephonyProviderSection({ config, draft, onConfigChange, onDraf
                 <Input
                   type="password"
                   value={draft.authToken || ''}
-                  onChange={e => updateDraft({ authToken: e.target.value })}
+                  onChange={(e) => updateDraft({ authToken: e.target.value })}
                   data-testid="auth-token"
                 />
               </div>
@@ -121,7 +143,7 @@ export function TelephonyProviderSection({ config, draft, onConfigChange, onDraf
                 <p className="text-xs text-muted-foreground">{t('telephonyProvider.signalwireSpaceHelp')}</p>
                 <Input
                   value={draft.signalwireSpace || ''}
-                  onChange={e => updateDraft({ signalwireSpace: e.target.value })}
+                  onChange={(e) => updateDraft({ signalwireSpace: e.target.value })}
                   placeholder="myspace"
                 />
               </div>
@@ -136,7 +158,7 @@ export function TelephonyProviderSection({ config, draft, onConfigChange, onDraf
               <Label>{t('telephonyProvider.apiKey')}</Label>
               <Input
                 value={draft.apiKey || ''}
-                onChange={e => updateDraft({ apiKey: e.target.value })}
+                onChange={(e) => updateDraft({ apiKey: e.target.value })}
               />
             </div>
             <div className="space-y-1">
@@ -144,14 +166,14 @@ export function TelephonyProviderSection({ config, draft, onConfigChange, onDraf
               <Input
                 type="password"
                 value={draft.apiSecret || ''}
-                onChange={e => updateDraft({ apiSecret: e.target.value })}
+                onChange={(e) => updateDraft({ apiSecret: e.target.value })}
               />
             </div>
             <div className="space-y-1">
               <Label>{t('telephonyProvider.applicationId')}</Label>
               <Input
                 value={draft.applicationId || ''}
-                onChange={e => updateDraft({ applicationId: e.target.value })}
+                onChange={(e) => updateDraft({ applicationId: e.target.value })}
               />
             </div>
           </div>
@@ -164,7 +186,7 @@ export function TelephonyProviderSection({ config, draft, onConfigChange, onDraf
               <Label>{t('telephonyProvider.authId')}</Label>
               <Input
                 value={draft.authId || ''}
-                onChange={e => updateDraft({ authId: e.target.value })}
+                onChange={(e) => updateDraft({ authId: e.target.value })}
               />
             </div>
             <div className="space-y-1">
@@ -172,7 +194,7 @@ export function TelephonyProviderSection({ config, draft, onConfigChange, onDraf
               <Input
                 type="password"
                 value={draft.authToken || ''}
-                onChange={e => updateDraft({ authToken: e.target.value })}
+                onChange={(e) => updateDraft({ authToken: e.target.value })}
               />
             </div>
           </div>
@@ -186,7 +208,7 @@ export function TelephonyProviderSection({ config, draft, onConfigChange, onDraf
               <p className="text-xs text-muted-foreground">{t('telephonyProvider.ariUrlHelp')}</p>
               <Input
                 value={draft.ariUrl || ''}
-                onChange={e => updateDraft({ ariUrl: e.target.value })}
+                onChange={(e) => updateDraft({ ariUrl: e.target.value })}
                 placeholder="https://asterisk.example.com:8089/ari"
               />
             </div>
@@ -195,7 +217,7 @@ export function TelephonyProviderSection({ config, draft, onConfigChange, onDraf
                 <Label>{t('telephonyProvider.ariUsername')}</Label>
                 <Input
                   value={draft.ariUsername || ''}
-                  onChange={e => updateDraft({ ariUsername: e.target.value })}
+                  onChange={(e) => updateDraft({ ariUsername: e.target.value })}
                 />
               </div>
               <div className="space-y-1">
@@ -203,26 +225,9 @@ export function TelephonyProviderSection({ config, draft, onConfigChange, onDraf
                 <Input
                   type="password"
                   value={draft.ariPassword || ''}
-                  onChange={e => updateDraft({ ariPassword: e.target.value })}
+                  onChange={(e) => updateDraft({ ariPassword: e.target.value })}
                 />
               </div>
-            </div>
-            <div className="space-y-1">
-              <Label>{t('telephonyProvider.bridgeCallbackUrl')}</Label>
-              <p className="text-xs text-muted-foreground">{t('telephonyProvider.bridgeCallbackUrlHelp')}</p>
-              <Input
-                value={draft.bridgeCallbackUrl || ''}
-                onChange={e => updateDraft({ bridgeCallbackUrl: e.target.value })}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>{t('telephonyProvider.bridgeSecret')}</Label>
-              <p className="text-xs text-muted-foreground">{t('telephonyProvider.bridgeSecretHelp')}</p>
-              <Input
-                type="password"
-                value={draft.bridgeSecret || ''}
-                onChange={e => updateDraft({ bridgeSecret: e.target.value })}
-              />
             </div>
           </>
         )}
@@ -237,7 +242,7 @@ export function TelephonyProviderSection({ config, draft, onConfigChange, onDraf
               </div>
               <Switch
                 checked={draft.webrtcEnabled || false}
-                onCheckedChange={checked => updateDraft({ webrtcEnabled: checked })}
+                onCheckedChange={(checked) => updateDraft({ webrtcEnabled: checked })}
               />
             </div>
             {draft.webrtcEnabled && (draft.type === 'twilio' || draft.type === 'signalwire') && (
@@ -247,7 +252,7 @@ export function TelephonyProviderSection({ config, draft, onConfigChange, onDraf
                   <p className="text-xs text-muted-foreground">{t('telephonyProvider.apiKeySidHelp')}</p>
                   <Input
                     value={draft.apiKeySid || ''}
-                    onChange={e => updateDraft({ apiKeySid: e.target.value })}
+                    onChange={(e) => updateDraft({ apiKeySid: e.target.value })}
                     placeholder="SK..."
                     data-testid="api-key-sid"
                   />
@@ -257,7 +262,7 @@ export function TelephonyProviderSection({ config, draft, onConfigChange, onDraf
                   <Input
                     type="password"
                     value={draft.apiKeySecret || ''}
-                    onChange={e => updateDraft({ apiKeySecret: e.target.value })}
+                    onChange={(e) => updateDraft({ apiKeySecret: e.target.value })}
                   />
                 </div>
                 <div className="space-y-1 sm:col-span-2">
@@ -265,7 +270,7 @@ export function TelephonyProviderSection({ config, draft, onConfigChange, onDraf
                   <p className="text-xs text-muted-foreground">{t('telephonyProvider.twimlAppSidHelp')}</p>
                   <Input
                     value={draft.twimlAppSid || ''}
-                    onChange={e => updateDraft({ twimlAppSid: e.target.value })}
+                    onChange={(e) => updateDraft({ twimlAppSid: e.target.value })}
                     placeholder="AP..."
                     data-testid="twiml-app-sid"
                   />
@@ -277,32 +282,45 @@ export function TelephonyProviderSection({ config, draft, onConfigChange, onDraf
 
         {/* Test result */}
         {testResult && (
-          <div className={`rounded-lg border p-3 ${testResult.ok ? 'border-green-500/30 bg-green-500/10' : 'border-destructive/30 bg-destructive/10'}`}>
-            <p className={`text-xs ${testResult.ok ? 'text-green-700 dark:text-green-400' : 'text-destructive'}`}>
-              {testResult.ok ? t('telephonyProvider.testSuccess') : `${t('telephonyProvider.testFailed')}: ${testResult.error || ''}`}
+          <div
+            className={`rounded-lg border p-3 ${
+              testResult.ok
+                ? 'border-green-500/30 bg-green-500/10'
+                : 'border-destructive/30 bg-destructive/10'
+            }`}
+          >
+            <p
+              className={`text-xs ${
+                testResult.ok
+                  ? 'text-green-700 dark:text-green-400'
+                  : 'text-destructive'
+              }`}
+            >
+              {testResult.ok
+                ? t('telephonyProvider.testSuccess')
+                : `${t('telephonyProvider.testFailed')}: ${testResult.error || ''}`}
             </p>
           </div>
         )}
 
         {/* Action buttons */}
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button
             variant="outline"
             disabled={testing}
-            onClick={async () => {
-              setTesting(true)
-              setTestResult(null)
-              try {
-                const result = await testTelephonyProvider(draft as TelephonyProviderConfig)
-                setTestResult(result)
-              } catch (err) {
-                setTestResult({ ok: false, error: String(err) })
-              } finally {
-                setTesting(false)
-              }
-            }}
+            onClick={handleTest}
+            data-testid="test-connection-btn"
           >
+            {testing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
             {testing ? t('telephonyProvider.testing') : t('telephonyProvider.testConnection')}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setShowWebhooks((s) => !s)}
+            data-testid="show-webhooks-btn"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            {showWebhooks ? t('setup.webhooks.hide', { defaultValue: 'Hide Webhooks' }) : t('setup.webhooks.show', { defaultValue: 'Show Webhooks' })}
           </Button>
           <Button
             data-testid="form-save-btn"
@@ -325,6 +343,23 @@ export function TelephonyProviderSection({ config, draft, onConfigChange, onDraf
             {saving ? t('common.loading') : t('telephonyProvider.saveProvider')}
           </Button>
         </div>
+
+        {/* Webhook URLs */}
+        {showWebhooks && (
+          <WebhookConfirmation
+            urls={[
+              {
+                label: t('setup.webhooks.voice', { defaultValue: 'Voice' }),
+                url: `${window.location.origin}/api/telephony/incoming`,
+              },
+              {
+                label: t('setup.webhooks.status', { defaultValue: 'Status' }),
+                url: `${window.location.origin}/api/telephony/status`,
+              },
+            ]}
+            visible={true}
+          />
+        )}
       </div>
     </SettingsSection>
   )

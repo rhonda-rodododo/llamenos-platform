@@ -13,8 +13,6 @@ import {
 import {
   updateMessagingConfig,
   testMessagingChannel,
-  signalRegister,
-  signalVerify,
   getSignalAccountInfo,
   getSignalIdentities,
   updateSignalIdentityTrust,
@@ -23,6 +21,8 @@ import {
   type SignalIdentityRecord,
   type SignalQueueStats,
 } from '@/lib/api'
+import { SignalRegistrationFlow } from '@/components/setup/SignalRegistrationFlow'
+import { ProviderStatusBadge } from '@/components/setup/ProviderStatusBadge'
 
 interface SignalChannelSectionProps {
   config: MessagingConfig
@@ -200,7 +200,21 @@ export function SignalChannelSection({
         </div>
 
         {/* Registration Section */}
-        <SignalRegistrationPanel bridgeUrl={signal.bridgeUrl} bridgeApiKey={signal.bridgeApiKey} />
+        <div className="mt-6 space-y-3 border-t pt-4">
+          <div className="flex items-center gap-2">
+            <Phone className="h-4 w-4 text-muted-foreground" />
+            <h4 className="font-medium text-sm">{t('signalRegistration.title', { defaultValue: 'Number Registration' })}</h4>
+          </div>
+          <SignalRegistrationFlow
+            isConfigured={!!signal.registeredNumber}
+            onRegistrationComplete={() => {
+              toast(t('signalRegistration.connected', { defaultValue: 'Signal connected' }), 'success')
+            }}
+            onUnregister={() => {
+              updateSignal({ registeredNumber: '' })
+            }}
+          />
+        </div>
 
         {/* Identity Trust Section */}
         <SignalIdentityPanel />
@@ -212,133 +226,7 @@ export function SignalChannelSection({
   )
 }
 
-// ---------------------------------------------------------------------------
-// Signal Registration Panel
-// ---------------------------------------------------------------------------
-
-function SignalRegistrationPanel({ bridgeUrl, bridgeApiKey }: { bridgeUrl: string; bridgeApiKey: string }) {
-  const { t } = useTranslation()
-  const { toast } = useToast()
-  const [phoneNumber, setPhoneNumber] = useState('')
-  const [verificationCode, setVerificationCode] = useState('')
-  const [registering, setRegistering] = useState(false)
-  const [verifying, setVerifying] = useState(false)
-  const [step, setStep] = useState<'idle' | 'pending_verification' | 'verified' | 'failed'>('idle')
-  const [error, setError] = useState<string | null>(null)
-  const [accountInfo, setAccountInfo] = useState<{ registered: boolean; uuid?: string } | null>(null)
-
-  useEffect(() => {
-    if (bridgeUrl && bridgeApiKey) {
-      getSignalAccountInfo()
-        .then(setAccountInfo)
-        .catch(() => {})
-    }
-  }, [bridgeUrl, bridgeApiKey])
-
-  async function handleRegister() {
-    setRegistering(true)
-    setError(null)
-    try {
-      const result = await signalRegister({ bridgeUrl, bridgeApiKey, phoneNumber })
-      setStep(result.step)
-      if (result.error) setError(result.error)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Registration failed')
-      setStep('failed')
-    } finally {
-      setRegistering(false)
-    }
-  }
-
-  async function handleVerify() {
-    setVerifying(true)
-    setError(null)
-    try {
-      const result = await signalVerify({ bridgeUrl, bridgeApiKey, phoneNumber, verificationCode })
-      setStep(result.step)
-      if (result.error) setError(result.error)
-      if (result.step === 'verified') {
-        toast('Signal number registered successfully', 'success')
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Verification failed')
-      setStep('failed')
-    } finally {
-      setVerifying(false)
-    }
-  }
-
-  return (
-    <div className="mt-6 space-y-3 border-t pt-4">
-      <div className="flex items-center gap-2">
-        <Phone className="h-4 w-4 text-muted-foreground" />
-        <h4 className="font-medium text-sm">Number Registration</h4>
-        {accountInfo?.registered && (
-          <Badge variant="outline" className="text-green-600 text-xs">
-            <CheckCircle2 className="h-3 w-3 mr-1" /> Registered
-          </Badge>
-        )}
-      </div>
-
-      {!bridgeUrl && (
-        <p className="text-xs text-muted-foreground">Configure bridge URL above to enable registration.</p>
-      )}
-
-      {bridgeUrl && step === 'idle' && (
-        <div className="space-y-2">
-          <Label htmlFor="signal-reg-number">Phone Number to Register</Label>
-          <div className="flex gap-2">
-            <Input
-              id="signal-reg-number"
-              value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
-              placeholder="+12125551234"
-              data-testid="signal-reg-number"
-            />
-            <Button onClick={handleRegister} disabled={registering || !phoneNumber} size="sm">
-              {registering ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Register'}
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {step === 'pending_verification' && (
-        <div className="space-y-2">
-          <p className="text-xs text-muted-foreground">
-            A verification code was sent to {phoneNumber}. Enter it below.
-          </p>
-          <div className="flex gap-2">
-            <Input
-              value={verificationCode}
-              onChange={(e) => setVerificationCode(e.target.value)}
-              placeholder="123456"
-              data-testid="signal-verification-code"
-            />
-            <Button onClick={handleVerify} disabled={verifying || !verificationCode} size="sm">
-              {verifying ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Verify'}
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {step === 'verified' && (
-        <p className="text-xs text-green-600">Registration complete. Update the registered number above and save.</p>
-      )}
-
-      {error && (
-        <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-2 dark:border-red-800 dark:bg-red-950/30">
-          <AlertTriangle className="h-4 w-4 text-red-600 mt-0.5 shrink-0" />
-          <p className="text-xs text-red-700 dark:text-red-400">{error}</p>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
 // Signal Identity Trust Panel
-// ---------------------------------------------------------------------------
-
 function SignalIdentityPanel() {
   const { toast } = useToast()
   const [identities, setIdentities] = useState<SignalIdentityRecord[]>([])
@@ -384,18 +272,18 @@ function SignalIdentityPanel() {
         </p>
       )}
 
-      {identities.filter(i => i.trustLevel === 'UNTRUSTED').length > 0 && (
+      {identities.filter((i) => i.trustLevel === 'UNTRUSTED').length > 0 && (
         <div className="rounded-md border border-amber-200 bg-amber-50 p-2 dark:border-amber-800 dark:bg-amber-950/30">
           <p className="text-xs text-amber-700 dark:text-amber-400">
             <AlertTriangle className="inline h-3 w-3 mr-1" />
-            {identities.filter(i => i.trustLevel === 'UNTRUSTED').length} contact(s) have changed identity keys and need review.
+            {identities.filter((i) => i.trustLevel === 'UNTRUSTED').length} contact(s) have changed identity keys and need review.
           </p>
         </div>
       )}
 
       {identities.length > 0 && (
         <div className="space-y-1 max-h-48 overflow-y-auto">
-          {identities.map(identity => (
+          {identities.map((identity) => (
             <div key={identity.id} className="flex items-center justify-between text-xs py-1 border-b last:border-b-0">
               <div className="flex items-center gap-2">
                 <span className="font-mono">{identity.number.slice(-4).padStart(identity.number.length, '*')}</span>
@@ -426,10 +314,7 @@ function SignalIdentityPanel() {
   )
 }
 
-// ---------------------------------------------------------------------------
 // Signal Queue Monitoring Panel
-// ---------------------------------------------------------------------------
-
 function SignalQueuePanel() {
   const [stats, setStats] = useState<SignalQueueStats | null>(null)
   const [loading, setLoading] = useState(false)

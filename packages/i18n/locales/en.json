@@ -2493,7 +2493,48 @@
     "whatsappProvider": "WhatsApp Integration",
     "whatsappTwilio": "Via Twilio",
     "whatsappTwilioNote": "WhatsApp messages will be handled through your existing Twilio telephony provider. No additional configuration needed.",
-    "whatsappVerifyToken": "Verify Token"
+    "whatsappVerifyToken": "Verify Token",
+    "oauth": {
+      "checkStatus": "Check status",
+      "connect": "Connect {{provider}}",
+      "connected": "{{provider}} connected",
+      "connecting": "Connecting...",
+      "connectionFailed": "Connection failed",
+      "credentialsValid": "{{provider}} connected successfully",
+      "failed": "OAuth authorization failed",
+      "openAuth": "Open auth",
+      "retry": "Retry {{provider}}",
+      "signUp": "Sign up for {{provider}}",
+      "stillPending": "Authorization still pending",
+      "validationFailed": "Validation failed"
+    },
+    "phoneNumbers": {
+      "areaCode": "Area Code",
+      "buyNew": "Get a New Number",
+      "countryCode": "Country",
+      "existing": "Your Numbers",
+      "noExisting": "No existing numbers found",
+      "provision": "Get",
+      "provisionFailed": "Failed to provision number",
+      "provisioned": "Number provisioned successfully",
+      "search": "Search",
+      "searchFailed": "Search failed",
+      "sms": "SMS",
+      "validateFirst": "Validate provider credentials first",
+      "voice": "Voice"
+    },
+    "providerConnection": "Provider Connection",
+    "oauthOrCredentials": "Connect via OAuth or enter API credentials above.",
+    "webhooks": {
+      "copyAll": "Copy All",
+      "description": "Copy these URLs into your provider dashboard.",
+      "hide": "Hide Webhooks",
+      "reconfigure": "Reconfigure",
+      "show": "Show Webhooks",
+      "status": "Status",
+      "title": "Webhook URLs",
+      "voice": "Voice"
+    }
   },
   "shifts": {
     "activeCalls": "%d active call(s)",
