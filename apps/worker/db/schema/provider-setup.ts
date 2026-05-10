@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm'
 import {
+  integer,
   pgTable,
   text,
   timestamp,
@@ -47,9 +48,12 @@ export const signalRegistrations = pgTable('signal_registrations', {
   id: text('id').primaryKey(),
   hubId: text('hub_id').notNull(),
   bridgeUrl: text('bridge_url'),
+  /** Encrypted phone number (PII — use encryptCredentials/decryptCredentials). */
   phoneNumber: text('phone_number').notNull(),
   method: text('method').notNull(),
   status: text('status').notNull().default('pending'),
+  /** Number of failed verification attempts (enforces 3-attempt limit). */
+  attempts: integer('attempts').notNull().default(0),
   error: text('error'),
   expiresAt: timestamp('expires_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true })
@@ -66,6 +70,12 @@ export const a2pRegistrations = pgTable('a2p_registrations', {
   providerType: text('provider_type').notNull(),
   brandStatus: text('brand_status').notNull().default('not_submitted'),
   campaignStatus: text('campaign_status').notNull().default('not_submitted'),
+  /** Encrypted brand SID from provider (PII/sensitive). */
+  brandSid: text('brand_sid'),
+  /** Encrypted campaign SID from provider (PII/sensitive). */
+  campaignSid: text('campaign_sid'),
+  /** Error or rejection reason from provider. */
+  error: text('error'),
   submittedAt: timestamp('submitted_at', { withTimezone: true }),
   approvedAt: timestamp('approved_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true })
