@@ -851,35 +851,25 @@ describe('SettingsService.getTelephonyProvider', () => {
 })
 
 describe('SettingsService.updateTelephonyProvider', () => {
-  it('throws 400 when type is missing', async () => {
+  it('throws deprecation error for any input', async () => {
     const { service } = setup()
     await expect(
-      service.updateTelephonyProvider({ type: '' } as any),
-    ).rejects.toMatchObject({ status: 400 })
+      service.updateTelephonyProvider({ type: 'twilio' } as never),
+    ).rejects.toThrow(/deprecated.*POST \/provider-setup\/configure/i)
   })
 
-  it('throws 400 for invalid provider type', async () => {
+  it('throws deprecation error regardless of provider type', async () => {
     const { service } = setup()
     await expect(
-      service.updateTelephonyProvider({ type: 'invalidpbx' } as any),
-    ).rejects.toMatchObject({ status: 400, message: expect.stringContaining('Invalid provider type') })
+      service.updateTelephonyProvider({ type: 'invalidpbx' } as never),
+    ).rejects.toThrow(/deprecated/)
   })
 
-  it('throws 400 for invalid E.164 phone number', async () => {
+  it('throws deprecation error regardless of phone format', async () => {
     const { service } = setup()
     await expect(
-      service.updateTelephonyProvider({ type: 'twilio', accountSid: 'AC', authToken: 'tok', phoneNumber: '5551234567' } as any),
-    ).rejects.toMatchObject({ status: 400, message: expect.stringContaining('E.164') })
-  })
-
-  it('saves valid provider configuration', async () => {
-    const { db, service } = setup()
-    const provider = { type: 'twilio' as const, accountSid: 'AC123', authToken: 'tok', phoneNumber: '+15551234567' }
-    db.$setSelectResult([])
-
-    const result = await service.updateTelephonyProvider(provider as any)
-    expect(result.type).toBe('twilio')
-    expect(db.insert).toHaveBeenCalled()
+      service.updateTelephonyProvider({ type: 'twilio', phoneNumber: '+15551234567' } as never),
+    ).rejects.toThrow(/deprecated/)
   })
 })
 
