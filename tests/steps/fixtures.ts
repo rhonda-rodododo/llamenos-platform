@@ -1,5 +1,5 @@
 import { type APIRequestContext } from '@playwright/test'
-import { createBdd } from 'playwright-bdd'
+import { test as base, createBdd } from 'playwright-bdd'
 import { test as traditionalTest } from '../traditional-fixtures'
 
 // ── Scenario-scoped World types ──────────────────────────────────────
@@ -48,7 +48,7 @@ export type CasesWorld = {
  * window.__TEST_SET_ACTIVE_HUB — each Playwright worker gets its own
  * isolated hub so parallel tests don't share database state.
  */
-export const test = traditionalTest.extend<
+export const test = base.extend<
   {
     apiErrors: { responses: Array<{ url: string; status: number }>; pageErrors: Error[] }
     backendRequest: APIRequestContext
