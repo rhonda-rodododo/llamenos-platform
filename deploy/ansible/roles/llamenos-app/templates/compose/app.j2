@@ -30,11 +30,6 @@ services:
     networks:
       - llamenos-web
       - llamenos-internal
-    depends_on:
-      postgres:
-        condition: service_healthy
-      rustfs:
-        condition: service_healthy
     logging:
       driver: json-file
       options:
