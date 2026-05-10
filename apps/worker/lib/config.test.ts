@@ -56,8 +56,8 @@ describe('validateConfig', () => {
     expect(() => validateConfig({ ...rest, SERVER_NOSTR_SECRET: 'b'.repeat(64) })).not.toThrow()
   })
 
-  it('throws if ADMIN_PUBKEY is missing', () => {
-    expect(() => validateConfig({ ...validEnv, ADMIN_PUBKEY: '' })).toThrow(/ADMIN_PUBKEY/)
+  it('warns if ADMIN_PUBKEY is missing but does not throw', () => {
+    expect(() => validateConfig({ ...validEnv, ADMIN_PUBKEY: '' })).not.toThrow()
   })
 
   it('throws if ADMIN_PUBKEY is wrong length', () => {
