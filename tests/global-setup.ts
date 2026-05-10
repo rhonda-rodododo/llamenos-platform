@@ -2,28 +2,10 @@ import type { FullConfig } from '@playwright/test'
 import { ed25519 } from '@noble/curves/ed25519.js'
 import { hexToBytes, bytesToHex, utf8ToBytes } from '@shared/encoding'
 import { LABEL_DEVICE_AUTH } from '@shared/crypto-labels'
-import { readFileSync } from 'fs'
-import { resolve } from 'path'
-
 const BACKEND_URL = process.env.TEST_HUB_URL || 'http://localhost:3000'
 
-/**
- * Load E2E_TEST_SECRET from .dev.vars if not already set in the environment.
- * This lets the test reset work out-of-the-box for local dev without extra env setup.
- */
 function loadDevVarsSecret(): string | undefined {
-  // Check process env first (CI sets E2E_TEST_SECRET or DEV_RESET_SECRET)
-  if (process.env.E2E_TEST_SECRET) return process.env.E2E_TEST_SECRET
-  if (process.env.DEV_RESET_SECRET) return process.env.DEV_RESET_SECRET
-  // Fall back to reading from .dev.vars (local dev — dev-bun.sh sets DEV_RESET_SECRET)
-  try {
-    const devVarsPath = resolve(process.cwd(), '.dev.vars')
-    const content = readFileSync(devVarsPath, 'utf-8')
-    const match = content.match(/^(?:E2E_TEST_SECRET|DEV_RESET_SECRET)=(.+)$/m)
-    return match?.[1]?.trim()
-  } catch {
-    return undefined
-  }
+  return process.env.E2E_TEST_SECRET || process.env.DEV_RESET_SECRET || undefined
 }
 
 // Admin Ed25519 seed — must match tests/api-helpers.ts ADMIN_SEED
@@ -38,10 +20,6 @@ function makeBootstrapToken(seedHex: string, method: string, path: string) {
   return { pubkey, timestamp, token: bytesToHex(sig) }
 }
 
-/**
- * Reset all server state (test databases only).
- * Requires E2E_TEST_SECRET in .dev.vars (server side) and readable from .dev.vars or env.
- */
 async function resetTestState(baseUrl: string): Promise<void> {
   const secret = loadDevVarsSecret()
   if (!secret) return // No secret configured — skip reset
@@ -57,10 +35,6 @@ async function resetTestState(baseUrl: string): Promise<void> {
   }
 }
 
-/**
- * Bootstrap the admin user if not already created.
- * The bootstrap endpoint is a one-shot operation — if admin exists (403), skip silently.
- */
 async function bootstrapAdmin(baseUrl: string): Promise<void> {
   const path = '/api/auth/bootstrap'
   const body = makeBootstrapToken(ADMIN_SEED, 'POST', path)

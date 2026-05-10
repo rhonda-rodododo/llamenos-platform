@@ -118,7 +118,7 @@ Update the deactivation test steps to expect 401:
 
 ### Admin account exception
 
-The admin bootstrapped via `ADMIN_PUBKEY` in `.dev.vars` does not have a volunteer record.
+The admin bootstrapped via `ADMIN_PUBKEY` in `.env` does not have a volunteer record.
 Requests from admin use the `requireAdmin` middleware which validates via `ADMIN_PUBKEY` env var,
 not through `authenticateRequest`. Admin is unaffected by this change.
 

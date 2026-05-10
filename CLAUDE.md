@@ -296,7 +296,7 @@ bun run bootstrap-admin                  # Generate admin keypair
 
 **Deployment rules — NEVER run `wrangler pages deploy` or `wrangler deploy` directly.** Always use `bun run deploy` or `bun run deploy:site` from the root. Running wrangler from the wrong directory will deploy the wrong artifact.
 
-**Key config files**: `site/wrangler.jsonc` (Cloudflare Pages, marketing site only), `playwright.config.ts`, `.dev.vars` (Twilio creds + ADMIN_PUBKEY, gitignored)
+**Key config files**: `site/wrangler.jsonc` (Cloudflare Pages, marketing site only), `playwright.config.ts`, `.env` (Twilio creds + ADMIN_PUBKEY, gitignored)
 
 ## Claude Code Working Style
 

@@ -146,10 +146,10 @@ This outputs:
 ### 3. Configure environment
 
 ```bash
-cp .dev.vars.example .dev.vars
+cp .env.example .env
 ```
 
-Edit `.dev.vars` with your admin public key and telephony credentials:
+Edit `.env` with your admin public key and telephony credentials:
 
 ```env
 ADMIN_PUBKEY=hex_public_key_from_step_2

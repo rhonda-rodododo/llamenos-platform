@@ -32,10 +32,10 @@ Conservez le `nsec` en lieu sur -- c'est votre identifiant de connexion administ
 
 ## 3. Configurer les secrets
 
-Creez un fichier `.dev.vars` a la racine du projet pour le developpement local. Cet exemple utilise Twilio -- si vous utilisez un autre fournisseur, vous pouvez ignorer les variables Twilio et configurer votre fournisseur via l'interface d'administration apres la premiere connexion.
+Creez un fichier `.env` a la racine du projet pour le developpement local. Cet exemple utilise Twilio -- si vous utilisez un autre fournisseur, vous pouvez ignorer les variables Twilio et configurer votre fournisseur via l'interface d'administration apres la premiere connexion.
 
 ```bash
-# .dev.vars
+# .env
 TWILIO_ACCOUNT_SID=your_twilio_account_sid
 TWILIO_AUTH_TOKEN=your_twilio_auth_token
 TWILIO_PHONE_NUMBER=+1234567890

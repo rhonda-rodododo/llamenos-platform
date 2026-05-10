@@ -2,7 +2,7 @@
 
 ## Problem
 
-Deploying Llamenos currently requires following a multi-step technical guide: cloning the repo, generating Nostr keys via CLI, manually editing `.dev.vars`, configuring telephony provider webhooks, and knowing which provider to choose. This creates a high barrier to entry for non-technical organizers who want to run a crisis hotline. The current first-login experience drops the admin into a mostly-empty dashboard with no guidance.
+Deploying Llamenos currently requires following a multi-step technical guide: cloning the repo, generating Nostr keys via CLI, manually editing `.env`, configuring telephony provider webhooks, and knowing which provider to choose. This creates a high barrier to entry for non-technical organizers who want to run a crisis hotline. The current first-login experience drops the admin into a mostly-empty dashboard with no guidance.
 
 Additionally, telephony is currently a hard requirement — the app assumes voice calls are the primary channel. With the addition of messaging channels (SMS, WhatsApp, Signal) in Epics 44-46, an admin should be able to deploy a text-only hotline, a voice-only hotline, or a multi-channel hotline. Telephony should be optional.
 
