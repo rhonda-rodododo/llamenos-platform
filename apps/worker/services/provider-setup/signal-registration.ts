@@ -113,18 +113,17 @@ export class SignalRegistrationService {
       expiresAt,
     })
 
-    // Call bridge to initiate verification — if the bridge is unreachable,
-    // the record still exists in pending state. The admin can retry or
-    // investigate connectivity. We store the error but don't fail the request.
-    try {
-      await this.callBridgeRegister(bridgeUrl, params.phoneNumber, params.method === 'voice')
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      await this.db
-        .update(signalRegistrations)
-        .set({ error: `Bridge call failed: ${message}`, updatedAt: new Date() })
-        .where(eq(signalRegistrations.id, id))
-    }
+    // Call bridge to initiate verification — non-fatal.
+    // The record is already persisted with status 'pending'. If the bridge is
+    // unreachable the admin can poll via checkStatus once it comes back online.
+    // Fire-and-forget: detach the promise so the HTTP response is not blocked
+    // by the bridge's TCP connect timeout (which can be 30+ seconds).
+    this.callBridgeRegister(bridgeUrl, params.phoneNumber, params.method === 'voice')
+      .catch((_err: unknown) => {
+        // Bridge unreachable or returned an error — registration stays pending.
+        // Intentionally swallowed: bridge availability is not required for the
+        // registration record to exist.
+      })
 
     const row = await this.loadRow(id)
     return this.toPublic(row)
