@@ -1,5 +1,4 @@
 import { useEffect, useCallback } from 'react'
-import { useToast } from '@/lib/toast'
 
 /**
  * Hook to handle OAuth deep link callbacks.
@@ -7,12 +6,18 @@ import { useToast } from '@/lib/toast'
  * web-based OAuth redirects (window.location.search params).
  */
 export function useOAuthDeepLinkHandler() {
-  const { toast } = useToast()
 
   const handleOAuthCallback = useCallback(
     (url: string) => {
       try {
         const parsed = new URL(url)
+
+        // Validate the callback origin — only accept expected schemes
+        const allowedProtocols = ['llamenos:', 'http:', 'https:']
+        if (!allowedProtocols.includes(parsed.protocol)) {
+          return // Reject unexpected origins
+        }
+
         const status = parsed.searchParams.get('status')
         const message = parsed.searchParams.get('message')
 

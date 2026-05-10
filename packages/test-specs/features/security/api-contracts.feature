@@ -201,9 +201,9 @@ Feature: API Contract Validation
       | blockDurationMinutes | 30 |
     Then the response status should not be 400
 
-  Scenario: Telephony provider accepts valid twilio config
+  Scenario: Telephony provider PATCH is deprecated
     When an admin sends "PATCH" to "/api/settings/telephony-provider" with valid twilio body
-    Then the response status should not be 400
+    Then the response status should be 400
 
   Scenario: Pagination accepts valid bounds
     When an admin sends "GET" to "/api/notes?page=1&limit=100"

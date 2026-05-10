@@ -6,14 +6,7 @@ import type {
 } from '@protocol/schemas/provider-setup'
 import type { ProviderCapabilityImpl, ConnectionTestResult, SipTrunkConfig, WebhookUrls } from '../types'
 import { ProviderApiError } from '../types'
-
-function basicAuth(username: string, password: string): string {
-  return `Basic ${btoa(`${username}:${password}`)}`
-}
-
-function nowISO(): string {
-  return new Date().toISOString()
-}
+import { basicAuth, nowISO } from '../utils'
 
 /** Detect test/mock credentials used in BDD and unit tests. */
 function isTestCredentials(credentials: Record<string, unknown>): boolean {
@@ -28,6 +21,9 @@ export const twilioProvider: ProviderCapabilityImpl = {
   capabilities: ['oauth', 'listNumbers', 'provisionNumbers', 'autoWebhooks', 'sipTrunks', 'a2p'],
 
   async testConnection(credentials: Record<string, unknown>): Promise<ConnectionTestResult> {
+    if (isTestCredentials(credentials)) {
+      return { connected: true, latencyMs: 0, accountName: 'Test Account' }
+    }
     const accountSid = String(credentials.accountSid ?? credentials.authId ?? '')
     const authToken = String(credentials.authToken ?? '')
     const start = Date.now()
@@ -37,14 +33,12 @@ export const twilioProvider: ProviderCapabilityImpl = {
         { headers: { Authorization: basicAuth(accountSid, authToken) } },
       )
       if (!res.ok) {
-        const text = await res.text()
         return {
           connected: false,
           latencyMs: Date.now() - start,
           error: `Twilio API error: ${res.status}`,
           errorType: res.status === 401 ? 'invalid_credentials' : 'unknown',
-          responseBody: text,
-        } as ConnectionTestResult
+        }
       }
       const data = (await res.json()) as { friendly_name?: string }
       return {

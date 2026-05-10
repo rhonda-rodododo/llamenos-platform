@@ -14,6 +14,7 @@ import {
   createUserViaApi,
   uniqueName,
 } from '../../api-helpers'
+import { TestDB } from '../../db-helpers'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 

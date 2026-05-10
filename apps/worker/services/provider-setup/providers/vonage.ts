@@ -6,14 +6,7 @@ import type {
 } from '@protocol/schemas/provider-setup'
 import type { ProviderCapabilityImpl, ConnectionTestResult, WebhookUrls } from '../types'
 import { ProviderApiError } from '../types'
-
-function basicAuth(username: string, password: string): string {
-  return `Basic ${btoa(`${username}:${password}`)}`
-}
-
-function nowISO(): string {
-  return new Date().toISOString()
-}
+import { basicAuth, nowISO } from '../utils'
 
 export const vonageProvider: ProviderCapabilityImpl = {
   providerType: 'vonage',
@@ -50,8 +43,9 @@ export const vonageProvider: ProviderCapabilityImpl = {
   async listOwnedNumbers(credentials: Record<string, unknown>): Promise<OwnedNumber[]> {
     const apiKey = String(credentials.apiKey ?? '')
     const apiSecret = String(credentials.apiSecret ?? '')
-    const params = new URLSearchParams({ api_key: apiKey, api_secret: apiSecret })
-    const res = await fetch(`https://rest.nexmo.com/account/numbers?${params.toString()}`)
+    const res = await fetch('https://rest.nexmo.com/account/numbers', {
+      headers: { Authorization: basicAuth(apiKey, apiSecret) },
+    })
     if (!res.ok) {
       const text = await res.text()
       throw new ProviderApiError('Failed to list Vonage numbers', res.status, text)
@@ -86,14 +80,14 @@ export const vonageProvider: ProviderCapabilityImpl = {
     const apiKey = String(credentials.apiKey ?? '')
     const apiSecret = String(credentials.apiSecret ?? '')
     const params = new URLSearchParams({
-      api_key: apiKey,
-      api_secret: apiSecret,
       country: query.countryCode ?? 'US',
       features: 'VOICE,SMS',
       size: String(Math.min(query.limit ?? 20, 50)),
     })
 
-    const res = await fetch(`https://rest.nexmo.com/number/search?${params.toString()}`)
+    const res = await fetch(`https://rest.nexmo.com/number/search?${params.toString()}`, {
+      headers: { Authorization: basicAuth(apiKey, apiSecret) },
+    })
     if (!res.ok) {
       const text = await res.text()
       throw new ProviderApiError('Failed to search Vonage numbers', res.status, text)
@@ -126,15 +120,16 @@ export const vonageProvider: ProviderCapabilityImpl = {
     }
 
     const buyParams = new URLSearchParams({
-      api_key: apiKey,
-      api_secret: apiSecret,
       country: countryCode,
       msisdn,
     })
 
     const buyRes = await fetch('https://rest.nexmo.com/number/buy', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: {
+        Authorization: basicAuth(apiKey, apiSecret),
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
       body: buyParams.toString(),
     })
     if (!buyRes.ok) {
@@ -197,8 +192,6 @@ export const vonageProvider: ProviderCapabilityImpl = {
 
     const msisdn = number.replace('+', '')
     const linkParams = new URLSearchParams({
-      api_key: apiKey,
-      api_secret: apiSecret,
       country: msisdn.length > 10 ? msisdn.slice(0, msisdn.length - 10) : 'US',
       msisdn,
       app_id: appData.id,
@@ -206,7 +199,10 @@ export const vonageProvider: ProviderCapabilityImpl = {
 
     const linkRes = await fetch('https://rest.nexmo.com/number/update', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: {
+        Authorization: basicAuth(apiKey, apiSecret),
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
       body: linkParams.toString(),
     })
     if (!linkRes.ok) {

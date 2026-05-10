@@ -5,7 +5,7 @@
  * IVR audio, rate limits, captchas, and case number sequences.
  * All state is stored in PostgreSQL via Drizzle ORM.
  */
-import { eq, and, sql, lt, inArray, or, isNull } from 'drizzle-orm'
+import { eq, and, sql, lt, inArray, or, isNull, desc } from 'drizzle-orm'
 import type { Database } from '../db'
 import {
   systemSettings,
@@ -1026,27 +1026,26 @@ export class SettingsService {
   async upsertProviderConfig(
     config: Partial<typeof providerConfigs.$inferInsert>,
   ): Promise<typeof providerConfigs.$inferSelect> {
-    const id = config.id ?? crypto.randomUUID()
     const now = new Date()
-    await this.db
-      .insert(providerConfigs)
-      .values({
-        id,
-        hubId: config.hubId !== undefined ? config.hubId : null,
-        providerType: config.providerType ?? '',
-        credentials: config.credentials ?? null,
-        status: config.status ?? 'disconnected',
-        capabilities: config.capabilities ?? [],
-        phoneNumbers: config.phoneNumbers ?? [],
-        error: config.error ?? null,
-        lastCheckedAt: config.lastCheckedAt ?? null,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .onConflictDoUpdate({
-        target: providerConfigs.id,
-        set: {
-          hubId: config.hubId,
+    const hubId = config.hubId !== undefined ? config.hubId : null
+
+    // Find existing config for this hub (or global if hubId is null)
+    const whereClause = hubId !== null
+      ? eq(providerConfigs.hubId, hubId)
+      : isNull(providerConfigs.hubId)
+
+    const [existing] = await this.db
+      .select({ id: providerConfigs.id })
+      .from(providerConfigs)
+      .where(whereClause)
+      .limit(1)
+
+    const id = existing?.id ?? config.id ?? crypto.randomUUID()
+
+    if (existing) {
+      await this.db
+        .update(providerConfigs)
+        .set({
           providerType: config.providerType,
           credentials: config.credentials,
           status: config.status,
@@ -1055,8 +1054,26 @@ export class SettingsService {
           error: config.error,
           lastCheckedAt: config.lastCheckedAt,
           updatedAt: now,
-        },
-      })
+        })
+        .where(eq(providerConfigs.id, id))
+    } else {
+      await this.db
+        .insert(providerConfigs)
+        .values({
+          id,
+          hubId,
+          providerType: config.providerType ?? '',
+          credentials: config.credentials ?? null,
+          status: config.status ?? 'disconnected',
+          capabilities: config.capabilities ?? [],
+          phoneNumbers: config.phoneNumbers ?? [],
+          error: config.error ?? null,
+          lastCheckedAt: config.lastCheckedAt ?? null,
+          createdAt: now,
+          updatedAt: now,
+        })
+    }
+
     const [row] = await this.db
       .select()
       .from(providerConfigs)
@@ -1071,77 +1088,54 @@ export class SettingsService {
     return { ok: true }
   }
 
-  async getTelephonyProvider(): Promise<TelephonyProviderConfig | null> {
+  async getTelephonyProvider(hmacSecret?: string): Promise<TelephonyProviderConfig | null> {
     const [row] = await this.db
       .select()
       .from(providerConfigs)
       .where(isNull(providerConfigs.hubId))
+      .orderBy(desc(providerConfigs.updatedAt))
       .limit(1)
-    if (!row?.credentials) return null
-    try {
-      return JSON.parse(row.credentials) as TelephonyProviderConfig
-    } catch {
-      return null
+    if (!row) return null
+
+    // Build base config from provider_configs metadata
+    const config: Record<string, unknown> = {
+      type: row.providerType,
+      phoneNumber: (row.phoneNumbers as string[])?.[0] ?? '',
     }
+
+    // Decrypt credentials if hmacSecret is provided and credentials exist
+    if (row.credentials && hmacSecret) {
+      try {
+        const { decryptCredentials } = await import('./provider-setup/crypto')
+        const creds = decryptCredentials(row.credentials, hmacSecret)
+        Object.assign(config, creds)
+      } catch {
+        // Credentials may be plain JSON (legacy) — try parsing directly
+        try {
+          Object.assign(config, JSON.parse(row.credentials))
+        } catch { /* ignore */ }
+      }
+    } else if (row.credentials) {
+      // No hmacSecret — try plain JSON parse (legacy path)
+      try {
+        Object.assign(config, JSON.parse(row.credentials))
+      } catch { /* encrypted, can't decrypt without secret */ }
+    }
+
+    return config as unknown as TelephonyProviderConfig
   }
 
+  /**
+   * @deprecated Use ProviderSetupService.configure() instead — it encrypts credentials at rest.
+   * This legacy method stores credentials in plaintext and will be removed in a future release.
+   */
   async updateTelephonyProvider(
-    data: TelephonyProviderConfig,
-  ): Promise<TelephonyProviderConfig> {
-    if (!data || typeof data !== 'object') {
-      throw new ServiceError(400, 'Invalid request body')
-    }
-    if (!data.type) {
-      throw new ServiceError(400, 'Provider type is required')
-    }
-    if (!(VALID_PROVIDER_TYPES as readonly string[]).includes(data.type)) {
-      throw new ServiceError(
-        400,
-        `Invalid provider type: ${data.type}`,
-      )
-    }
-    const required = PROVIDER_REQUIRED_FIELDS[data.type]
-    for (const field of required) {
-      if (!data[field]) {
-        throw new ServiceError(400, `Missing required field: ${field}`)
-      }
-    }
-    if (data.phoneNumber && !/^\+\d{7,15}$/.test(data.phoneNumber)) {
-      throw new ServiceError(
-        400,
-        'Phone number must be in E.164 format',
-      )
-    }
-    const existing = await this.db
-      .select()
-      .from(providerConfigs)
-      .where(isNull(providerConfigs.hubId))
-      .limit(1)
-    const id = existing[0]?.id ?? crypto.randomUUID()
-    await this.db
-      .insert(providerConfigs)
-      .values({
-        id,
-        hubId: null,
-        providerType: data.type,
-        credentials: JSON.stringify(data),
-        status: 'connected',
-        capabilities: [],
-        phoneNumbers: data.phoneNumber ? [data.phoneNumber] : [],
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .onConflictDoUpdate({
-        target: providerConfigs.id,
-        set: {
-          providerType: data.type,
-          credentials: JSON.stringify(data),
-          status: 'connected',
-          phoneNumbers: data.phoneNumber ? [data.phoneNumber] : [],
-          updatedAt: new Date(),
-        },
-      })
-    return data
+    _data: TelephonyProviderConfig,
+  ): Promise<never> {
+    throw new ServiceError(
+      400,
+      'updateTelephonyProvider is deprecated — use POST /provider-setup/configure which encrypts credentials at rest',
+    )
   }
 
   // =========================================================================

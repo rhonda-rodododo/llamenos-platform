@@ -17,8 +17,6 @@ import type { WebhookUrls, ConnectionTestResult, SipTrunkConfig } from './types'
 import { ProviderApiError } from './types'
 import { registerAllProviders } from './providers'
 
-registerAllProviders()
-
 export class ProviderSetup {
   private readonly settings: SettingsService
 
@@ -34,6 +32,7 @@ export class ProviderSetup {
     provider: TelephonyProviderType,
     credentials: Record<string, string>,
     hubId?: string,
+    phoneNumber?: string,
   ): Promise<{ ok: true }> {
     const impl = getProviderCapability(provider)
     if (!impl) {
@@ -48,7 +47,7 @@ export class ProviderSetup {
       credentials: encryptedCreds,
       status: 'connected',
       capabilities: impl.capabilities as string[],
-      phoneNumbers: [],
+      phoneNumbers: phoneNumber ? [phoneNumber] : [],
       error: null,
       lastCheckedAt: new Date(),
     })
@@ -191,6 +190,7 @@ export class ProviderSetup {
     provider: string
     redirectUrl: string
     callbackScheme?: string
+    hubId?: string
     ttlMs?: number
   }): Promise<{ stateId: string; expiresAt: Date }> {
     const stateId = randomBytes(32).toString('hex')
@@ -198,6 +198,7 @@ export class ProviderSetup {
     await this.db.insert(oauthStates).values({
       id: stateId,
       provider: opts.provider,
+      hubId: opts.hubId ?? null,
       status: 'pending',
       redirectUrl: opts.redirectUrl,
       callbackScheme: opts.callbackScheme ?? null,
@@ -220,7 +221,7 @@ export class ProviderSetup {
     const [stateRow] = await this.db.select().from(oauthStates).where(eq(oauthStates.id, stateId))
     if (!stateRow) return
 
-    const encryptedCreds = encryptCredentials(credentials as Record<string, string>, this.hmacSecret)
+    const encryptedCreds = encryptCredentials(credentials, this.hmacSecret)
 
     await this.settings.upsertProviderConfig({
       hubId: hubId ?? null,

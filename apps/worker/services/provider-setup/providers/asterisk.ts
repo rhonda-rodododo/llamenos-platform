@@ -6,10 +6,8 @@ import type {
 } from '@protocol/schemas/provider-setup'
 import type { ProviderCapabilityImpl, ConnectionTestResult, SipTrunkConfig, WebhookUrls } from '../types'
 import { ProviderApiError } from '../types'
-
-function nowISO(): string {
-  return new Date().toISOString()
-}
+import { validateExternalUrl } from '../../../lib/ssrf-guard'
+import { nowISO } from '../utils'
 
 export const asteriskProvider: ProviderCapabilityImpl = {
   providerType: 'asterisk',
@@ -19,6 +17,10 @@ export const asteriskProvider: ProviderCapabilityImpl = {
     const ariUrl = String(credentials.ariUrl ?? '')
     const ariUsername = String(credentials.ariUsername ?? '')
     const ariPassword = String(credentials.ariPassword ?? '')
+    const ssrfError = validateExternalUrl(ariUrl, 'Asterisk ARI URL')
+    if (ssrfError) {
+      return { connected: false, latencyMs: 0, error: ssrfError, errorType: 'unknown' }
+    }
     const start = Date.now()
     try {
       const res = await fetch(`${ariUrl}/ari/asterisk/info`, {
@@ -69,6 +71,10 @@ export const asteriskProvider: ProviderCapabilityImpl = {
     const ariUrl = String(credentials.ariUrl ?? '')
     const ariUsername = String(credentials.ariUsername ?? '')
     const ariPassword = String(credentials.ariPassword ?? '')
+    const ssrfError = validateExternalUrl(ariUrl, 'Asterisk ARI URL')
+    if (ssrfError) {
+      throw new ProviderApiError(ssrfError, 400, 'SSRF validation failed')
+    }
     const auth = `Basic ${btoa(`${ariUsername}:${ariPassword}`)}`
 
     const sipUsername = `llamenos-${crypto.randomUUID().slice(0, 8)}`

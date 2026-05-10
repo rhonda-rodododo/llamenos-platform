@@ -195,6 +195,18 @@ export class TestDB {
     return { valid: true, entries: rows.length }
   }
 
+  /**
+   * Update a single column on a row identified by id.
+   */
+  static async updateColumn(table: string, id: string, column: string, value: unknown): Promise<void> {
+    validateIdentifier(table)
+    validateIdentifier(column)
+    await sql.unsafe(
+      `UPDATE ${table} SET ${column} = $1 WHERE id = $2`,
+      [value, id],
+    )
+  }
+
   /** Close the database connection pool. */
   static async close(): Promise<void> {
     await sql.end()

@@ -6,14 +6,7 @@ import type {
 } from '@protocol/schemas/provider-setup'
 import type { ProviderCapabilityImpl, ConnectionTestResult, WebhookUrls } from '../types'
 import { ProviderApiError } from '../types'
-
-function basicAuth(username: string, password: string): string {
-  return `Basic ${btoa(`${username}:${password}`)}`
-}
-
-function nowISO(): string {
-  return new Date().toISOString()
-}
+import { basicAuth, nowISO } from '../utils'
 
 export const plivoProvider: ProviderCapabilityImpl = {
   providerType: 'plivo',

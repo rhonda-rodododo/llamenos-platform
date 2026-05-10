@@ -34,6 +34,7 @@ export const providerConfigs = pgTable('provider_configs', {
 export const oauthStates = pgTable('oauth_states', {
   id: text('id').primaryKey(),
   provider: text('provider').notNull(),
+  hubId: text('hub_id').references(() => hubs.id, { onDelete: 'cascade' }),
   status: text('status').notNull().default('pending'),
   redirectUrl: text('redirect_url').notNull(),
   callbackScheme: text('callback_scheme'),
@@ -46,7 +47,7 @@ export const oauthStates = pgTable('oauth_states', {
 
 export const signalRegistrations = pgTable('signal_registrations', {
   id: text('id').primaryKey(),
-  hubId: text('hub_id').notNull(),
+  hubId: text('hub_id').notNull().references(() => hubs.id, { onDelete: 'cascade' }),
   bridgeUrl: text('bridge_url'),
   /** Encrypted phone number (PII — use encryptCredentials/decryptCredentials). */
   phoneNumber: text('phone_number').notNull(),
@@ -66,7 +67,7 @@ export const signalRegistrations = pgTable('signal_registrations', {
 
 export const a2pRegistrations = pgTable('a2p_registrations', {
   id: text('id').primaryKey(),
-  hubId: text('hub_id').notNull(),
+  hubId: text('hub_id').notNull().references(() => hubs.id, { onDelete: 'cascade' }),
   providerType: text('provider_type').notNull(),
   brandStatus: text('brand_status').notNull().default('not_submitted'),
   campaignStatus: text('campaign_status').notNull().default('not_submitted'),

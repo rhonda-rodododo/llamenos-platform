@@ -113,18 +113,17 @@ export class SignalRegistrationService {
       expiresAt,
     })
 
-    // Call bridge to initiate verification — if the bridge is unreachable,
-    // the record still exists in pending state. The admin can retry or
-    // investigate connectivity. We store the error but don't fail the request.
-    try {
-      await this.callBridgeRegister(bridgeUrl, params.phoneNumber, params.method === 'voice')
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      await this.db
-        .update(signalRegistrations)
-        .set({ error: `Bridge call failed: ${message}`, updatedAt: new Date() })
-        .where(eq(signalRegistrations.id, id))
-    }
+    // Call bridge to initiate verification — non-fatal.
+    // The record is already persisted with status 'pending'. If the bridge is
+    // unreachable the admin can poll via checkStatus once it comes back online.
+    // Fire-and-forget: detach the promise so the HTTP response is not blocked
+    // by the bridge's TCP connect timeout (which can be 30+ seconds).
+    this.callBridgeRegister(bridgeUrl, params.phoneNumber, params.method === 'voice')
+      .catch((_err: unknown) => {
+        // Bridge unreachable or returned an error — registration stays pending.
+        // Intentionally swallowed: bridge availability is not required for the
+        // registration record to exist.
+      })
 
     const row = await this.loadRow(id)
     return this.toPublic(row)
@@ -138,7 +137,7 @@ export class SignalRegistrationService {
    */
   async checkStatus(registrationId: string): Promise<SignalRegistration> {
     const row = await this.loadRow(registrationId)
-    this.enforceNotExpired(row)
+    await this.enforceNotExpired(row)
 
     if (row.status === 'complete' || row.status === 'failed') {
       return this.toPublic(row)
@@ -153,7 +152,7 @@ export class SignalRegistrationService {
     if (!this.isDev) {
       const phone = this.decryptPhone(row.phoneNumber)
       try {
-        const res = await fetch(
+        const res = await this.fetchBridge(
           `${bridgeUrl}/v1/accounts/${encodeURIComponent(phone)}`,
           { headers: { 'Content-Type': 'application/json' } },
         )
@@ -179,8 +178,13 @@ export class SignalRegistrationService {
    * moves to 'failed' and cannot be retried without a new startRegistration.
    */
   async verifyCode(params: VerifyCodeParams): Promise<SignalRegistration> {
+    // Defense-in-depth: validate code format even if route schema already checks
+    if (!/^\d{3,8}$/.test(params.code)) {
+      throw new SignalRegistrationError('Invalid verification code format', 400)
+    }
+
     const row = await this.loadRow(params.registrationId)
-    this.enforceNotExpired(row)
+    await this.enforceNotExpired(row)
 
     if (row.status !== 'pending' && row.status !== 'verifying') {
       throw new SignalRegistrationError(
@@ -216,7 +220,8 @@ export class SignalRegistrationService {
       const nextStatus: SignalRegistrationStatus =
         newAttempts >= MAX_VERIFY_ATTEMPTS ? 'failed' : 'verifying'
 
-      await this.db
+      // CAS: only update if attempts hasn't changed (prevents concurrent bypass of 3-attempt limit)
+      const casResult = await this.db
         .update(signalRegistrations)
         .set({
           status: nextStatus,
@@ -226,7 +231,15 @@ export class SignalRegistrationService {
             : `Verification code rejected (attempt ${newAttempts}/${MAX_VERIFY_ATTEMPTS})`,
           updatedAt: new Date(),
         })
-        .where(eq(signalRegistrations.id, params.registrationId))
+        .where(and(
+          eq(signalRegistrations.id, params.registrationId),
+          eq(signalRegistrations.attempts, currentRow.attempts ?? 0),
+        ))
+        .returning({ id: signalRegistrations.id })
+
+      if (casResult.length === 0) {
+        throw new SignalRegistrationError('Concurrent verification attempt detected — please retry', 409)
+      }
     }
 
     const updated = await this.loadRow(params.registrationId)
@@ -243,7 +256,7 @@ export class SignalRegistrationService {
     if (bridgeUrl && !this.isDev) {
       const phone = this.decryptPhone(row.phoneNumber)
       try {
-        await fetch(
+        await this.fetchBridge(
           `${bridgeUrl}/v1/accounts/${encodeURIComponent(phone)}`,
           { method: 'DELETE', headers: { 'Content-Type': 'application/json' } },
         )
@@ -275,7 +288,7 @@ export class SignalRegistrationService {
     }
 
     try {
-      const res = await fetch(
+      const res = await this.fetchBridge(
         `${bridgeUrl}/v1/accounts/${encodeURIComponent(phone)}`,
         { headers: { 'Content-Type': 'application/json' } },
       )
@@ -319,6 +332,15 @@ export class SignalRegistrationService {
 
   // ── Private helpers ──────────────────────────────────────────────────────
 
+  /** Validate bridge URL for SSRF safety, then fetch. */
+  private async fetchBridge(url: string, opts?: RequestInit): Promise<Response> {
+    const ssrfError = validateExternalUrl(url, 'Bridge URL')
+    if (ssrfError) {
+      throw new SignalRegistrationError(ssrfError, 400)
+    }
+    return fetch(url, opts)
+  }
+
   private async loadRow(id: string) {
     const [row] = await this.db
       .select()
@@ -328,10 +350,10 @@ export class SignalRegistrationService {
     return row
   }
 
-  private enforceNotExpired(row: typeof signalRegistrations.$inferSelect): void {
+  private async enforceNotExpired(row: typeof signalRegistrations.$inferSelect): Promise<void> {
     if (row.status === 'complete' || row.status === 'failed') return
     if (row.expiresAt && new Date() > row.expiresAt) {
-      void this.db
+      await this.db
         .update(signalRegistrations)
         .set({ status: 'failed', error: 'Registration expired', updatedAt: new Date() })
         .where(eq(signalRegistrations.id, row.id))
@@ -370,7 +392,7 @@ export class SignalRegistrationService {
     if (this.isDev) return
 
     try {
-      const res = await fetch(
+      const res = await this.fetchBridge(
         `${bridgeUrl}/v1/register/${encodeURIComponent(phoneNumber)}`,
         {
           method: 'POST',
@@ -426,7 +448,7 @@ export class SignalRegistrationService {
     return {
       id: row.id,
       hubId: row.hubId,
-      bridgeUrl: row.bridgeUrl,
+      bridgeUrl: null, // Never expose internal bridge URL in API responses
       phoneNumberMasked: maskPhone(phone),
       method: row.method as 'sms' | 'voice',
       status: row.status as SignalRegistrationStatus,

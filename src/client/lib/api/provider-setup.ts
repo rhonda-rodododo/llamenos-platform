@@ -118,7 +118,7 @@ export async function createSipTrunk(
 ): Promise<{
   sipProvider: string
   sipUsername: string
-  sipPassword: string
+  credentialsStored: boolean
   trunkSid?: string
   connectionId?: string
 }> {

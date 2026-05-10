@@ -18,8 +18,21 @@ import {
 } from '@protocol/schemas/provider-setup'
 import { okResponseSchema } from '@protocol/schemas/common'
 import { getProviderCapability } from '../services/provider-setup/registry'
+import { ProviderApiError } from '../services/provider-setup/types'
 import { SignalRegistrationError } from '../services/provider-setup/signal-registration'
 import { A2pRegistrationError } from '../services/provider-setup/a2p-registration'
+
+/** Read OAuth client_id from environment for a provider. */
+function getOAuthClientId(provider: string): string {
+  const envKey = `${provider.toUpperCase()}_CLIENT_ID`
+  return process.env[envKey] ?? ''
+}
+
+/** Read OAuth client_secret from environment for a provider. */
+function getOAuthClientSecret(provider: string): string {
+  const envKey = `${provider.toUpperCase()}_CLIENT_SECRET`
+  return process.env[envKey] ?? ''
+}
 
 // Per-provider OAuth metadata — authorization URLs, token URLs, and default scopes.
 const PROVIDER_OAUTH_CONFIG: Record<string, {
@@ -54,26 +67,26 @@ const PROVIDER_OAUTH_CONFIG: Record<string, {
   },
 }
 
-const OAuthCallbackBodySchema = z.looseObject({
+const OAuthCallbackBodySchema = z.object({
   code: z.string().optional(),
   state: z.string().optional(),
   error: z.string().optional(),
 })
 
-const ConfigureWebhooksRequestSchema = z.looseObject({
+const ConfigureWebhooksRequestSchema = z.object({
   provider: z.string(),
   numberId: z.string(),
   enableSms: z.boolean().optional().default(false),
   hubId: z.string().optional(),
 })
 
-const CreateSipTrunkRequestSchema = z.looseObject({
+const CreateSipTrunkRequestSchema = z.object({
   provider: z.string(),
   domain: z.string(),
   hubId: z.string().optional(),
 })
 
-const TestConnectionRequestSchema = z.looseObject({
+const TestConnectionRequestSchema = z.object({
   provider: z.string(),
   hubId: z.string().optional(),
 })
@@ -107,14 +120,18 @@ providerSetup.post('/oauth/start',
       return c.json({ error: `Provider ${body.provider} does not support OAuth` }, 400)
     }
 
+    const hubId = c.get('hubId')
     const { stateId, expiresAt } = await services.providerSetup.createOAuthState({
       provider: body.provider,
       redirectUrl: body.redirectUrl,
       callbackScheme: body.redirectUrl,
+      hubId,
     })
 
+    const clientId = getOAuthClientId(body.provider)
     const params = new URLSearchParams({
       response_type: 'code',
+      client_id: clientId,
       state: stateId,
       scope: oauthConfig.defaultScopes.join(' '),
       redirect_uri: body.redirectUrl,
@@ -185,6 +202,8 @@ providerSetup.post('/oauth/callback',
     }
 
     try {
+      const clientId = getOAuthClientId(stateRow.provider)
+      const clientSecret = getOAuthClientSecret(stateRow.provider)
       const tokenRes = await fetch(oauthConfig.tokenUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -192,6 +211,8 @@ providerSetup.post('/oauth/callback',
           grant_type: 'authorization_code',
           code,
           redirect_uri: stateRow.redirectUrl,
+          client_id: clientId,
+          client_secret: clientSecret,
         }),
       })
 
@@ -212,7 +233,102 @@ providerSetup.post('/oauth/callback',
       const impl = getProviderCapability(stateRow.provider as Parameters<typeof getProviderCapability>[0])
       const capabilities = (impl?.capabilities ?? []) as string[]
 
-      await services.providerSetup.completeOAuthState(state, credentials, capabilities, null)
+      await services.providerSetup.completeOAuthState(state, credentials, capabilities, stateRow.hubId ?? null)
+
+      return oauthRedirect(`${stateRow.redirectUrl}?status=success`)
+    } catch (err) {
+      await services.providerSetup.failOAuthState(state)
+      const message = err instanceof Error ? err.message : 'OAuth flow failed'
+      return oauthRedirect(`${stateRow.redirectUrl}?status=error&message=${encodeURIComponent(message)}`)
+    }
+  },
+)
+
+// ── OAuth Callback (GET) — most OAuth providers redirect via GET with query params
+providerSetup.get('/oauth/callback',
+  describeRoute({
+    tags: ['Provider Setup'],
+    summary: 'Handle OAuth callback via GET redirect (no auth — state token is proof)',
+    responses: {
+      302: { description: 'Redirect to client callback URL' },
+      400: { description: 'Invalid state token' },
+    },
+  }),
+  async (c) => {
+    const code = c.req.query('code')
+    const state = c.req.query('state')
+    const oauthError = c.req.query('error')
+
+    if (!state) {
+      return c.json({ error: 'Missing state parameter' }, 400)
+    }
+
+    const services = c.get('services')
+    const stateRow = await services.providerSetup.getOAuthState(state)
+
+    if (!stateRow) {
+      return c.json({ error: 'Unknown or expired state token' }, 400)
+    }
+
+    if (stateRow.status !== 'pending') {
+      return c.json({ error: 'State token already used' }, 400)
+    }
+
+    if (new Date() > stateRow.expiresAt) {
+      await services.providerSetup.failOAuthState(state)
+      return c.json({ error: 'State token expired' }, 400)
+    }
+
+    const isHttpRedirect = stateRow.redirectUrl.startsWith('http://') || stateRow.redirectUrl.startsWith('https://')
+    const oauthRedirect = (urlWithParams: string) =>
+      isHttpRedirect ? c.redirect(urlWithParams) : c.json({ redirectUrl: urlWithParams }, 200)
+
+    if (oauthError || !code) {
+      await services.providerSetup.failOAuthState(state)
+      const redirectUrl = `${stateRow.redirectUrl}?status=error&message=${encodeURIComponent(oauthError ?? 'Authorization denied')}`
+      return oauthRedirect(redirectUrl)
+    }
+
+    const oauthConfig = PROVIDER_OAUTH_CONFIG[stateRow.provider]
+    if (!oauthConfig) {
+      await services.providerSetup.failOAuthState(state)
+      const redirectUrl = `${stateRow.redirectUrl}?status=error&message=Provider+not+configured`
+      return oauthRedirect(redirectUrl)
+    }
+
+    try {
+      const clientId = getOAuthClientId(stateRow.provider)
+      const clientSecret = getOAuthClientSecret(stateRow.provider)
+      const tokenRes = await fetch(oauthConfig.tokenUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          grant_type: 'authorization_code',
+          code,
+          redirect_uri: stateRow.redirectUrl,
+          client_id: clientId,
+          client_secret: clientSecret,
+        }),
+      })
+
+      if (!tokenRes.ok) {
+        await services.providerSetup.failOAuthState(state)
+        const redirectUrl = `${stateRow.redirectUrl}?status=error&message=${encodeURIComponent(`Token exchange failed: ${tokenRes.status}`)}`
+        return oauthRedirect(redirectUrl)
+      }
+
+      const tokenData = await tokenRes.json() as Record<string, unknown>
+      const credentials = {
+        accessToken: String(tokenData.access_token ?? ''),
+        refreshToken: String(tokenData.refresh_token ?? ''),
+        tokenType: String(tokenData.token_type ?? ''),
+        scope: String(tokenData.scope ?? ''),
+      }
+
+      const impl = getProviderCapability(stateRow.provider as Parameters<typeof getProviderCapability>[0])
+      const capabilities = (impl?.capabilities ?? []) as string[]
+
+      await services.providerSetup.completeOAuthState(state, credentials, capabilities, stateRow.hubId ?? null)
 
       return oauthRedirect(`${stateRow.redirectUrl}?status=success`)
     } catch (err) {
@@ -285,10 +401,10 @@ providerSetup.post('/configure',
         body.provider,
         body.credentials ?? {},
         hubId ?? body.hubId,
+        body.phoneNumber,
       )
       return c.json({ ok: true })
     } catch (err) {
-      const { ProviderApiError } = await import('../services/provider-setup/types')
       if (err instanceof ProviderApiError) {
         return c.json({ error: err.message }, err.statusCode as 400 | 401 | 403 | 404 | 500)
       }
@@ -392,7 +508,6 @@ providerSetup.get('/phone-numbers',
       )
       return c.json({ numbers })
     } catch (err) {
-      const { ProviderApiError } = await import('../services/provider-setup/types')
       if (err instanceof ProviderApiError) {
         return c.json({ error: err.message }, err.statusCode as 400 | 401 | 403 | 404 | 500)
       }
@@ -423,7 +538,7 @@ providerSetup.post('/phone-numbers/search',
     const hubId = c.get('hubId')
     const body = c.req.valid('json')
 
-    const limited = await checkRateLimit(services.settings, `provider-search:${pubkey}`, 5)
+    const limited = await checkRateLimit(services.settings, `provider-search:${hubId ?? 'global'}:${pubkey}`, 5)
     if (limited) {
       return c.json({ error: 'Rate limit exceeded' }, 429)
     }
@@ -436,7 +551,6 @@ providerSetup.post('/phone-numbers/search',
       )
       return c.json({ numbers })
     } catch (err) {
-      const { ProviderApiError } = await import('../services/provider-setup/types')
       if (err instanceof ProviderApiError) {
         return c.json({ error: err.message }, err.statusCode as 400 | 401 | 403 | 404 | 500)
       }
@@ -467,7 +581,7 @@ providerSetup.post('/phone-numbers/provision',
     const hubId = c.get('hubId')
     const body = c.req.valid('json')
 
-    const limited = await checkRateLimit(services.settings, `provider-provision:${pubkey}`, 1)
+    const limited = await checkRateLimit(services.settings, `provider-provision:${hubId ?? 'global'}:${pubkey}`, 1)
     if (limited) {
       return c.json({ error: 'Rate limit exceeded' }, 429)
     }
@@ -479,6 +593,7 @@ providerSetup.post('/phone-numbers/provision',
         hubId ?? body.hubId,
       )
 
+      let webhookWarning: string | undefined
       if (body.autoConfigureWebhooks) {
         try {
           await services.providerSetup.configureWebhooks(
@@ -486,14 +601,13 @@ providerSetup.post('/phone-numbers/provision',
             number.id,
             { hubId: hubId ?? body.hubId },
           )
-        } catch {
-          // Non-fatal: number provisioned, webhook config failed silently
+        } catch (webhookErr) {
+          webhookWarning = webhookErr instanceof Error ? webhookErr.message : 'Webhook configuration failed'
         }
       }
 
-      return c.json(number)
+      return c.json({ ...number, webhookWarning })
     } catch (err) {
-      const { ProviderApiError } = await import('../services/provider-setup/types')
       if (err instanceof ProviderApiError) {
         return c.json({ error: err.message }, err.statusCode as 400 | 401 | 403 | 404 | 500)
       }
@@ -530,7 +644,6 @@ providerSetup.post('/configure-webhooks',
       )
       return c.json({ ok: true })
     } catch (err) {
-      const { ProviderApiError } = await import('../services/provider-setup/types')
       if (err instanceof ProviderApiError) {
         return c.json({ error: err.message }, err.statusCode as 400 | 401 | 403 | 404 | 500)
       }
@@ -553,7 +666,7 @@ providerSetup.post('/create-sip-trunk',
             schema: resolver(z.object({
               sipProvider: z.string(),
               sipUsername: z.string(),
-              sipPassword: z.string(),
+              credentialsStored: z.boolean(),
               trunkSid: z.string().optional(),
               connectionId: z.string().optional(),
             })),
@@ -575,9 +688,15 @@ providerSetup.post('/create-sip-trunk',
         body.domain,
         hubId ?? body.hubId,
       )
-      return c.json(trunk)
+      // Never return sipPassword in the response — credentials are stored encrypted server-side
+      return c.json({
+        sipProvider: trunk.sipProvider,
+        sipUsername: trunk.sipUsername,
+        credentialsStored: true,
+        trunkSid: trunk.trunkSid,
+        connectionId: trunk.connectionId,
+      })
     } catch (err) {
-      const { ProviderApiError } = await import('../services/provider-setup/types')
       if (err instanceof ProviderApiError) {
         return c.json({ error: err.message }, err.statusCode as 400 | 401 | 403 | 404 | 500)
       }
@@ -588,20 +707,20 @@ providerSetup.post('/create-sip-trunk',
 
 // ── Signal Registration ────────────────────────────────────────────────────
 
-const SignalRegisterRequestSchema = z.looseObject({
+const SignalRegisterRequestSchema = z.object({
   bridgeUrl: z.string(),
   phoneNumber: z.string(),
   method: z.enum(['sms', 'voice']).optional().default('sms'),
   hubId: z.string().optional(),
 })
 
-const SignalVerifyRequestSchema = z.looseObject({
+const SignalVerifyRequestSchema = z.object({
   registrationId: z.string(),
-  code: z.string(),
+  code: z.string().regex(/^\d{3,8}$/),
   hubId: z.string().optional(),
 })
 
-const SignalUnregisterRequestSchema = z.looseObject({
+const SignalUnregisterRequestSchema = z.object({
   registrationId: z.string(),
   hubId: z.string().optional(),
 })
@@ -700,6 +819,12 @@ providerSetup.post('/signal/verify',
   async (c) => {
     const body = c.req.valid('json')
     const services = c.get('services')
+    const pubkey = c.get('pubkey')
+
+    const limited = await checkRateLimit(services.settings, `signal-verify:${pubkey}`, 5)
+    if (limited) {
+      return c.json({ error: 'Rate limit exceeded — max 5 verification attempts per minute' }, 429)
+    }
 
     try {
       const registration = await services.signalRegistration.verifyCode({
@@ -774,9 +899,9 @@ providerSetup.get('/signal/account',
 
 // ── A2P Registration ───────────────────────────────────────────────────────
 
-const A2pBrandRequestSchema = z.looseObject({
+const A2pBrandRequestSchema = z.object({
   providerType: z.string().optional().default('twilio'),
-  brandInfo: z.looseObject({
+  brandInfo: z.object({
     entityType: z.string(),
     companyName: z.string(),
     ein: z.string(),
@@ -793,9 +918,9 @@ const A2pBrandRequestSchema = z.looseObject({
   hubId: z.string().optional(),
 })
 
-const A2pCampaignRequestSchema = z.looseObject({
+const A2pCampaignRequestSchema = z.object({
   registrationId: z.string(),
-  campaignInfo: z.looseObject({
+  campaignInfo: z.object({
     useCase: z.string(),
     description: z.string(),
     helpMessage: z.string(),
@@ -811,7 +936,7 @@ const A2pCampaignRequestSchema = z.looseObject({
   hubId: z.string().optional(),
 })
 
-const A2pSkipRequestSchema = z.looseObject({
+const A2pSkipRequestSchema = z.object({
   providerType: z.string().optional().default('twilio'),
   hubId: z.string().optional(),
 })
