@@ -113,6 +113,20 @@
       "when": 1773708416653,
       "tag": "0015_drop_nostr_outbox",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1778427628314,
+      "tag": "0016_provider_auto_config",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1778427628314,
+      "tag": "0017_phase4_signal_a2p",
+      "breakpoints": true
     }
   ]
 }
