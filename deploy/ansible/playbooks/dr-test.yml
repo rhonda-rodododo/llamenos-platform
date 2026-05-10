@@ -109,7 +109,7 @@
                 - dr-rustfs:/data
 
             app:
-              image: ghcr.io/llamenos/llamenos:latest
+              image: docker.io/llamenos/llamenos:latest
               depends_on:
                 postgres:
                   condition: service_healthy

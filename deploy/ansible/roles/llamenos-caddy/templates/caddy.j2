@@ -1,5 +1,16 @@
 # Llamenos Caddyfile — managed by Ansible
 # Do not edit manually; changes will be overwritten on next deploy.
+#
+# The API is served from the configured domain or subdomain.
+# Users configure this via the `domain` and `api_subdomain` variables in vars.yml.
+#
+# Examples:
+#   domain: "hotline.example.org", api_subdomain: "api"
+#     → API served at https://api.hotline.example.org
+#   domain: "hotline.example.org", api_subdomain: ""
+#     → API served at https://hotline.example.org
+#   domain: "192-168-1-100.nip.io", api_subdomain: ""
+#     → API served at https://192-168-1-100.nip.io
 
 # Security headers for threat model: nation states, right-wing groups, private hacking firms
 (security_headers) {
@@ -21,20 +32,24 @@
     }
 }
 
-shared.{{ domain }} {
+{% if api_subdomain | default("") | length > 0 %}
+# Subdomain mode: API served from {{ api_subdomain }}.{{ domain }}
+{{ api_subdomain }}.{{ domain }} {
     reverse_proxy app:3000
     tls {{ acme_email }}
     import security_headers
 }
 
-app.{{ domain }} {
+# Root domain redirects to API subdomain
+{{ domain }} {
+    redir https://{{ api_subdomain }}.{{ domain }}{uri}
+    tls {{ acme_email }}
+}
+{% else %}
+# Single-domain mode: API served directly from {{ domain }}
+{{ domain }} {
     reverse_proxy app:3000
     tls {{ acme_email }}
     import security_headers
 }
-
-api.{{ domain }} {
-    reverse_proxy app:3000
-    tls {{ acme_email }}
-    import security_headers
-}
+{% endif %}

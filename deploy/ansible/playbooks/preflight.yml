@@ -154,7 +154,7 @@
           
           Current value: {{ llamenos_app_image | default('NOT SET') }}
           
-          Example: llamenos_app_image: ghcr.io/llamenos/llamenos:0.1.0
+          Example: llamenos_app_image: docker.io/llamenos/llamenos:latest
           
           To fix:
             1. Edit vars.yml

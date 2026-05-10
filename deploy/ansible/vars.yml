@@ -1,70 +1,106 @@
 ---
 # Llamenos Deployment Configuration
-# Server: vps-195-246-230-104.1984.is
-# Generated: 2026-05-09T05:45:34-04:00
+# 
+# This is a template configuration. Copy to vars.yml and customize for your deployment.
+# All values shown here are defaults — uncomment and modify as needed.
+#
+# Deployment modes:
+#   1. Production domain: domain = "hotline.example.org"
+#   2. Subdomain mode (default): app.hotline.example.org, api.hotline.example.org
+#   3. Single domain: set use_subdomains: false
+#   4. Home/nip.io: domain = "192-168-1-100.nip.io" or local IP
 
 # ─── Domain & TLS ────────────────────────────────────────────────
-domain: vps-195-246-230-104.1984.is
+# Your domain name. Can be:
+#   - A real domain: "hotline.example.org"
+#   - A nip.io domain: "192-168-1-100.nip.io" (for local/home setups)
+#   - A bare IP: "203.0.113.10" (not recommended for production)
+domain: ""
 
-# Subdomains for the split-origin layout
-app_domain: "app.{{ domain }}"
-api_domain: "api.{{ domain }}"
-crypto_domain: "crypto.{{ domain }}"
-downloads_domain: "downloads.{{ domain }}"
-updates_domain: "updates.{{ domain }}"
+# API subdomain — leave empty to serve API directly from the root domain
+# Examples:
+#   api_subdomain: "api"   → API at https://api.hotline.example.org
+#   api_subdomain: ""      → API at https://hotline.example.org
+api_subdomain: ""
 
 # Email for Let's Encrypt certificate notifications
-acme_email: admin@1984.is
+# Required for TLS certificate issuance
+acme_email: ""
 
 # ─── SSH Hardening ────────────────────────────────────────────────
 # Port to move SSH to (default 22 is heavily targeted by bots)
-ssh_port: 2222
+# Set to 22 to keep default, or change to a non-standard port
+ssh_port: 22
 
 # CIDR ranges allowed to connect via SSH
+# Default allows all (0.0.0.0/0) — restrict this in production!
+# Examples:
+#   - Your home IP: "203.0.113.10/32"
+#   - Your office: "198.51.100.0/24"
+#   - Disable SSH hardening: set ssh_hardening_enabled: false below
 ssh_allowed_cidrs:
-  - "2a02:6ea0:de10:6102::12/128"
+  - "0.0.0.0/0"
+
+# Set to false to skip SSH hardening (useful for local/Vagrant deployments)
+ssh_hardening_enabled: true
 
 # ─── Deploy User ─────────────────────────────────────────────────
+# The user that will own the application files and run Docker containers
 deploy_user: deploy
 deploy_group: deploy
 
 # ─── Service Toggles ────────────────────────────────────────────
+# Enable/disable services as needed
 llamenos_app_enabled: true
 llamenos_postgres_enabled: true
 llamenos_caddy_enabled: true
 llamenos_rustfs_enabled: true
-llamenos_strfry_enabled: true
+# Strfry Nostr relay — disabled by default (built-in relay is preferred)
+llamenos_strfry_enabled: false
+# Whisper transcription — requires GPU or significant CPU
 llamenos_transcription_enabled: false
+# Asterisk PBX — for self-hosted telephony
 llamenos_asterisk_enabled: false
+# Signal messaging bridge
 llamenos_signal_enabled: false
+# Kamailio SIP proxy
 kamailio_enabled: false
 
 # ─── Service Images ─────────────────────────────────────────────
-llamenos_app_image: ghcr.io/llamenos/llamenos:0.1.0
-llamenos_postgres_image: postgres:17-alpine@sha256:3430fe182f5065a6ea505c3d432d2c7fff18fbab954df8f277c1dbf4c70124af
-llamenos_caddy_image: caddy:2.9-alpine@sha256:b4e3952384eb9524a887633ce65c752dd7c71314d2c2acf98cd5c715aaa534f0
-llamenos_rustfs_image: rustfs/rustfs:latest
-llamenos_strfry_image: dockurr/strfry:1.0.1@sha256:4bcfddc8aab07e17d35198c0618d6a9c8e5d3e27b211741ebce9f7058cdd1e21
+# Docker images for each service
+# Override these to use your own registry or specific versions
+llamenos_app_image: "docker.io/llamenos/llamenos:latest"
+llamenos_postgres_image: "postgres:17-alpine"
+llamenos_caddy_image: "caddy:2.9-alpine"
+llamenos_rustfs_image: "rustfs/rustfs:latest"
+llamenos_strfry_image: "dockurr/strfry:1.0.1"
+llamenos_whisper_image: "fedirz/faster-whisper-server:0.4.1"
+llamenos_asterisk_image: "andrius/asterisk:20"
+llamenos_signal_image: "bbernhard/signal-cli-rest-api:0.92"
 
 # ─── Application ─────────────────────────────────────────────────
 app_dir: /opt/llamenos
 hotline_name: Hotline
 app_environment: production
 
-# Admin public key (Nostr hex pubkey)
-admin_pubkey: "2ebc43516e5d794e6acd88817eb63c4e4714b3bfacd90f1584f95215ff33ee7d"
+# Admin public key (hex pubkey for first admin)
+# Leave empty to bootstrap via the Tauri desktop app
+admin_pubkey: ""
 
 # HMAC secret for hashing phone numbers and IPs
-hmac_secret: "73240e50b6eb9d3ce636d9a1ebb9b2dfa5d644df321dc917d3e78e99b4875478"
+# Generate with: openssl rand -hex 32
+hmac_secret: ""
 
 # ─── PostgreSQL ──────────────────────────────────────────────────
-pg_password: "oyIThyBN5r2obu0HkX1lwDfNhFcWo9tK"
+# Generate with: openssl rand -hex 16
+pg_password: ""
 pg_pool_size: 10
 llamenos_postgres_port: 5432
 
 # ─── Storage (RustFS) ──────────────────────────────────────────
-storage_access_key: "mcAFLEQLRni30N0qE++1fRTjJkP79A4O"
-storage_secret_key: "kFkjoXF4KLYqkN4QdKLfn9OqRdTVZB8S"
+# Generate with: openssl rand -hex 16 (access key) and openssl rand -base64 32 (secret)
+storage_access_key: ""
+storage_secret_key: ""
 storage_bucket: llamenos-files
 storage_endpoint: http://rustfs:9000
 storage_sse_enabled: true
@@ -76,11 +112,14 @@ twilio_account_sid: ""
 twilio_auth_token: ""
 twilio_phone_number: ""
 
-# ─── Nostr Relay (Core) ─────────────────────────────────────────
-server_nostr_secret: "1220512359d694dc1085703f5372e50bae49032b5125fab9baab44de1c706ea8"
+# ─── Nostr Relay ─────────────────────────────────────────────────
+# Generate with: openssl rand -hex 32
+server_nostr_secret: ""
 llamenos_strfry_port: 7777
 
 # ─── Optional Profiles ──────────────────────────────────────────
+# Docker Compose profiles to enable
+# Available: transcription, asterisk, signal, monitoring
 compose_profiles: []
 
 # ─── Cross-Host Networking ──────────────────────────────────────
@@ -97,24 +136,30 @@ backup_rclone_remote: ""
 backup_postgres_retain_daily: 7
 backup_postgres_retain_weekly: 4
 backup_postgres_retain_monthly: 3
+
 backup_strfry_retain_daily: 7
 backup_strfry_retain_weekly: 4
 backup_strfry_retain_monthly: 3
+
 backup_rustfs_retain_daily: 7
 backup_rustfs_retain_weekly: 4
 backup_rustfs_retain_monthly: 3
+
 backup_config_retain_daily: 14
 backup_config_retain_weekly: 8
 backup_config_retain_monthly: 6
 backup_config_extra_paths: []
 
-# ─── Backup Monitoring ────────────────────────────────────────
+# ─── Backup Monitoring ──────────────────────────────────────────
 backup_monitor_max_age_hours: 26
 
 # ─── Docker Hardening ───────────────────────────────────────────
+# Enable Docker userns-remap for additional isolation
+# Set to false if you encounter permission issues
 docker_userns_remap: true
 
 # ─── Firewall ───────────────────────────────────────────────────
+# Additional ports to open (beyond SSH and HTTPS)
 firewall_extra_ports: []
 
 # ─── NTP ─────────────────────────────────────────────────────────
@@ -140,7 +185,7 @@ prometheus_retention_size: 5GB
 prometheus_scrape_interval: 15s
 
 grafana_image: grafana/grafana-oss:11.5.2
-grafana_admin_password: "yF8ajlmOmjjwx+uyibO5xHsBfgVHd6FO"
+grafana_admin_password: ""
 grafana_domain: ""
 grafana_allow_signup: false
 
@@ -156,8 +201,8 @@ alert_smtp_host: ""
 alert_smtp_port: 587
 alert_smtp_username: ""
 alert_smtp_password: ""
-alert_smtp_from: "alerts@1984.is"
-alert_smtp_to: "oncall@1984.is"
+alert_smtp_from: ""
+alert_smtp_to: ""
 
 alert_ntfy_url: "https://ntfy.sh"
 alert_ntfy_topic: "llamenos-alerts"
@@ -184,14 +229,14 @@ llamenos_watchdog_max_restarts: 5
 llamenos_alert_cert_expiry_days: 7
 llamenos_alert_disk_percent: 85
 
-# ─── Alerting ─────────────────────────────────────────────────────────
+# ─── Alerting ───────────────────────────────────────────────────
 llamenos_alerting_enabled: false
 llamenos_alerting_provider: ntfy
 llamenos_ntfy_url: "https://ntfy.sh"
 llamenos_ntfy_topic: "llamenos-alerts"
 llamenos_alerting_tags: "llamenos"
 
-# ─── Security Scanning ─────────────────────────────────────────────
+# ─── Security Scanning ──────────────────────────────────────────
 security_auto_updates: true
 security_update_hour: "4"
 security_update_minute: "0"

@@ -5,9 +5,9 @@ all:
     llamenos_servers:
       hosts:
         vps1:
-          ansible_host: 185.165.171.77
-          ansible_user: deploy
-          ansible_ssh_private_key_file: ~/.ssh/riseup
+          ansible_host: YOUR_SERVER_IP
+          ansible_user: YOUR_DEPLOY_USER
+          ansible_ssh_private_key_file: ~/.ssh/YOUR_SSH_KEY
           ansible_port: 22
     llamenos_app:
       hosts:
