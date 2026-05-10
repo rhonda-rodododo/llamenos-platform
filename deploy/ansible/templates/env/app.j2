@@ -7,7 +7,7 @@ PLATFORM=bun
 PORT=3000
 ADMIN_PUBKEY={{ admin_pubkey }}
 HOTLINE_NAME={{ hotline_name }}
-ENVIRONMENT={{ environment }}
+ENVIRONMENT={{ app_environment | default('production') }}
 HMAC_SECRET={{ hmac_secret }}
 
 # ─── Database ────────────────────────────────────────────────
@@ -30,7 +30,6 @@ WHISPER_URL={{ llamenos_whisper_url }}
 
 # ─── Nostr Relay ─────────────────────────────────────────────
 SERVER_NOSTR_SECRET={{ server_nostr_secret }}
-NOSTR_RELAY_URL={{ llamenos_relay_url }}
 
 {% if llamenos_asterisk_enabled | default(false) %}
 # ─── Asterisk ────────────────────────────────────────────────

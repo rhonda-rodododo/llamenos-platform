@@ -9,7 +9,7 @@
 #   ansible-playbook playbooks/deploy.yml --ask-vault-pass --tags postgres
 #   ansible-playbook playbooks/deploy.yml --ask-vault-pass --tags app
 #
-# Tags: docker, service-discovery, internal-tls, postgres, rustfs, strfry,
+# Tags: docker, service-discovery, internal-tls, postgres, rustfs,
 #       app, caddy, whisper, asterisk, signal, deploy
 
 - name: Gather facts and run service discovery
@@ -35,7 +35,7 @@
       tags: [internal-tls, deploy]
       when: llamenos_internal_tls_enabled | default(false)
 
-- name: Deploy infrastructure services (database, storage, relay)
+- name: Deploy infrastructure services (database, storage)
   hosts: llamenos_servers
   become: true
   vars_files:

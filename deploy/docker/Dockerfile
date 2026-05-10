@@ -43,36 +43,33 @@ RUN groupadd -r llamenos && useradd -r -g llamenos -d /app -s /sbin/nologin llam
 
 WORKDIR /app
 
-# Copy runtime dependencies
-COPY package.json ./
-COPY --from=deps /app/node_modules/ node_modules/
+# Copy runtime dependencies with correct ownership
+COPY --chown=llamenos:llamenos package.json ./
+COPY --chown=llamenos:llamenos --from=deps /app/node_modules/ node_modules/
 
-# Copy source (Bun runs TS directly — no bundled output)
-COPY src/ src/
-COPY apps/worker/ apps/worker/
-COPY packages/shared/ packages/shared/
-COPY packages/i18n/ packages/i18n/
-COPY packages/protocol/ packages/protocol/
-COPY packages/crypto/package.json packages/crypto/package.json
-COPY packages/crypto/ffi.ts packages/crypto/ffi.ts
-COPY tsconfig.json ./
+# Copy source with correct ownership (Bun runs TS directly — no bundled output)
+COPY --chown=llamenos:llamenos src/ src/
+COPY --chown=llamenos:llamenos apps/worker/ apps/worker/
+COPY --chown=llamenos:llamenos packages/shared/ packages/shared/
+COPY --chown=llamenos:llamenos packages/i18n/ packages/i18n/
+COPY --chown=llamenos:llamenos packages/protocol/ packages/protocol/
+COPY --chown=llamenos:llamenos packages/crypto/package.json packages/crypto/package.json
+COPY --chown=llamenos:llamenos packages/crypto/ffi.ts packages/crypto/ffi.ts
+COPY --chown=llamenos:llamenos tsconfig.json ./
 
-# Copy native crypto library from Rust build
-COPY --from=rust-builder /build/packages/crypto/dist/server/libllamenos_core.so packages/crypto/dist/server/
+# Copy native crypto library from Rust build with correct ownership
+COPY --chown=llamenos:llamenos --from=rust-builder /build/packages/crypto/dist/server/libllamenos_core.so packages/crypto/dist/server/
 
-# Copy Drizzle SQL migrations + migration runner (applied at startup)
-COPY drizzle/migrations/ drizzle/migrations/
-COPY scripts/run-migrations.ts scripts/run-migrations.ts
+# Copy Drizzle SQL migrations + migration runner with correct ownership
+COPY --chown=llamenos:llamenos drizzle/migrations/ drizzle/migrations/
+COPY --chown=llamenos:llamenos scripts/run-migrations.ts scripts/run-migrations.ts
 
 # Copy entrypoint (runs migrations then starts the app)
-COPY deploy/docker/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+COPY --chown=llamenos:llamenos deploy/docker/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Serve a minimal download page for browsers hitting the root URL
-COPY deploy/docker/download-page/ public/
-
-# Set ownership
-RUN chown -R llamenos:llamenos /app
+COPY --chown=llamenos:llamenos deploy/docker/download-page/ public/
 
 # Switch to non-root user
 USER llamenos

@@ -83,6 +83,21 @@
   changed_when: false
   failed_when: false
 
+- name: Create dockremap user for userns-remap
+  ansible.builtin.user:
+    name: dockremap
+    system: true
+    home: /nonexistent
+    shell: /usr/sbin/nologin
+    create_home: false
+  when: docker_userns_remap
+
+- name: Restart Docker to enable userns-remap
+  ansible.builtin.systemd:
+    name: docker
+    state: restarted
+  when: docker_userns_remap
+
 - name: Create userns-remap subordinate UID mapping
   ansible.builtin.copy:
     dest: /etc/subuid
@@ -126,3 +141,14 @@
 - name: Verify Docker is running
   ansible.builtin.command: docker info
   changed_when: false
+
+- name: Create Llamenos Docker networks
+  community.docker.docker_network:
+    name: "{{ item }}"
+    state: present
+    driver: bridge
+  loop:
+    - llamenos-web
+    - llamenos-internal
+    - llamenos-observability
+  tags: [docker, deploy]

@@ -220,5 +220,5 @@
           Cron: Daily at {{ backup_cron_hour | default('3') }}:{{ backup_cron_minute | default('0') }} UTC
           Encryption: {{ 'ENABLED (age)' if backup_age_public_key | default('') | length > 0 else 'DISABLED — set backup_age_public_key' }}
           Remote: {{ backup_rclone_remote | default('DISABLED — set backup_rclone_remote') }}
-          Webhook: {{ backup_monitor_webhook_url | default('DISABLED — set backup_monitor_webhook_url') }}
+          Webhook: {{ backup_monitor_webhook_url | default('DISABLED') }}
       tags: always

@@ -1,0 +1,15 @@
+#!/bin/bash
+# NTP drift monitor — managed by Ansible
+# Do not edit manually; changes will be overwritten on next deploy.
+
+set -euo pipefail
+
+echo "=== NTP Drift Check ==="
+
+# Check chrony tracking
+chronyc tracking 2>/dev/null || echo "chrony not available"
+
+# Check if time is synced
+chronyc waitsync 1 0.1 2>/dev/null || true
+
+echo "NTP check completed"

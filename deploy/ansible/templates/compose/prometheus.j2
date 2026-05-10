@@ -1,45 +1,35 @@
-# Prometheus Docker Compose — managed by Ansible
-# Do not edit manually; changes will be overwritten on next deploy.
-
-name: llamenos
+name: llamenos-prometheus
 
 services:
   prometheus:
-    image: {{ prometheus_image }}
+    image: {{ prometheus_image | default('prom/prometheus:v3.2.1') }}
     restart: unless-stopped
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.path=/prometheus"
-      - "--storage.tsdb.retention.time={{ prometheus_retention }}"
-      - "--storage.tsdb.retention.size={{ prometheus_retention_size }}"
-      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
-      - "--web.console.templates=/usr/share/prometheus/consoles"
-      - "--web.external-url=/prometheus/"
-      - "--web.route-prefix=/prometheus/"
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./rules:/etc/prometheus/rules:ro
-      - ./data:/prometheus
+      - ./alert-rules.yml:/etc/prometheus/rules/alert-rules.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time={{ prometheus_retention | default('15d') }}'
+      - '--storage.tsdb.retention.size={{ prometheus_retention_size | default('5GB') }}'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
     networks:
-      - monitoring
-      - internal
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9090/prometheus/-/healthy"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    security_opt:
-      - no-new-privileges:true
-    deploy:
-      resources:
-        limits:
-          memory: 512M
+      - llamenos-internal
+      - llamenos-observability
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  prometheus-data:
 
 networks:
-  monitoring:
-    name: llamenos_monitoring
+  llamenos-internal:
     external: true
-  internal:
-    name: llamenos_internal
+  llamenos-observability:
     external: true

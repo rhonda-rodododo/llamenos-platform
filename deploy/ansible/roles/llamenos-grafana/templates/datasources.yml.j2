@@ -1,4 +1,3 @@
-# Grafana Datasource Provisioning — managed by Ansible
 apiVersion: 1
 
 datasources:
@@ -9,12 +8,8 @@ datasources:
     isDefault: true
     editable: false
 
-{% if loki_enabled | default(true) %}
   - name: Loki
     type: loki
     access: proxy
     url: http://loki:3100
     editable: false
-    jsonData:
-      maxLines: 1000
-{% endif %}

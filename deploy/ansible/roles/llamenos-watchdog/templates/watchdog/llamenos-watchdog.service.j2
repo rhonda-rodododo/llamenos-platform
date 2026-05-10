@@ -1,0 +1,11 @@
+[Unit]
+Description=Llamenos Container Watchdog
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart={{ app_dir }}/scripts/container-watchdog.sh
+User=root
+
+[Install]
+WantedBy=multi-user.target

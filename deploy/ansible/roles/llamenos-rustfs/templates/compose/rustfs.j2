@@ -1,0 +1,33 @@
+name: llamenos-rustfs
+
+services:
+  rustfs:
+    image: {{ llamenos_rustfs_image | default('rustfs/rustfs:latest') }}
+    command: server /data --console-address ":9001"
+    restart: unless-stopped
+    volumes:
+      - rustfs-data:/data
+    environment:
+      - RUSTFS_ACCESS_KEY={{ storage_access_key }}
+      - RUSTFS_SECRET_KEY={{ storage_secret_key }}
+      - RUSTFS_CONSOLE_ENABLE=true
+    networks:
+      - llamenos-internal
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/ || test $? -eq 22"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  rustfs-data:
+
+networks:
+  llamenos-internal:
+    external: true

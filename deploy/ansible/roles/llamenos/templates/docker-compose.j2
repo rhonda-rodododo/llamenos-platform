@@ -1,0 +1,118 @@
+name: llamenos
+
+services:
+  app:
+    image: {{ llamenos_app_image }}
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:size=64M
+    environment:
+      - PLATFORM=bun
+      - PORT=3000
+      - DATABASE_URL=postgresql://llamenos:{{ pg_password }}@postgres:5432/llamenos
+      - PG_POOL_SIZE={{ pg_pool_size | default(10) }}
+      - ADMIN_PUBKEY={{ admin_pubkey }}
+      - HOTLINE_NAME={{ hotline_name | default('Hotline') }}
+      - ENVIRONMENT={{ app_environment | default('production') }}
+      - HMAC_SECRET={{ hmac_secret }}
+      - STORAGE_ENDPOINT=http://rustfs:9000
+      - STORAGE_ACCESS_KEY={{ storage_access_key }}
+      - STORAGE_SECRET_KEY={{ storage_secret_key }}
+      - STORAGE_BUCKET={{ storage_bucket | default('llamenos-files') }}
+      - WHISPER_URL=http://whisper:8080/v1/audio/transcriptions
+      - TWILIO_ACCOUNT_SID={{ twilio_account_sid | default('') }}
+      - TWILIO_AUTH_TOKEN={{ twilio_auth_token | default('') }}
+      - TWILIO_PHONE_NUMBER={{ twilio_phone_number | default('') }}
+      - SERVER_NOSTR_SECRET={{ server_nostr_secret }}
+      - NOSTR_RELAY_URL=ws://localhost:7777
+    networks:
+      - web
+      - internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rustfs:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+        tag: "llamenos-app"
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://localhost:3000/api/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  postgres:
+    image: {{ llamenos_postgres_image | default('postgres:17-alpine') }}
+    restart: unless-stopped
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=llamenos
+      - POSTGRES_USER=llamenos
+      - POSTGRES_PASSWORD={{ pg_password }}
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U llamenos -d llamenos"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  caddy:
+    image: {{ llamenos_caddy_image | default('caddy:2.9-alpine') }}
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    environment:
+      - DOMAIN={{ domain }}
+      - ACME_EMAIL={{ acme_email }}
+    networks:
+      - web
+    depends_on:
+      app:
+        condition: service_healthy
+
+  rustfs:
+    image: {{ llamenos_rustfs_image | default('rustfs/rustfs:latest') }}
+    command: server /data --console-address ":9001"
+    restart: unless-stopped
+    volumes:
+      - rustfs-data:/data
+    environment:
+      - RUSTFS_ACCESS_KEY={{ storage_access_key }}
+      - RUSTFS_SECRET_KEY={{ storage_secret_key }}
+      - RUSTFS_CONSOLE_ENABLE=true
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/ || test $? -eq 22"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  postgres-data:
+  caddy-data:
+  caddy-config:
+  rustfs-data:
+
+networks:
+  web:
+    driver: bridge
+  internal:
+    driver: bridge
+    internal: true

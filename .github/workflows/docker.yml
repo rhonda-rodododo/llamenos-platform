@@ -1,4 +1,4 @@
-# Build and push Docker images to GitHub Container Registry.
+# Build and push Docker images to Docker Hub.
 # Triggered by release.yml via workflow_dispatch, or manually.
 # Builds both the main app and sip-bridge images with
 # SBOM attestation, SLSA provenance, cosign signing, and Trivy scan.
@@ -12,8 +12,8 @@ on:
         required: true
 
 env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  REGISTRY: docker.io
+  IMAGE_NAME: llamenos
 
 jobs:
   build:
@@ -32,12 +32,11 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
 
-      - name: Log in to GHCR
+      - name: Log in to Docker Hub
         uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Compute Docker tags
         id: meta
@@ -47,9 +46,9 @@ jobs:
           MAJOR_MINOR=$(echo "$VERSION" | cut -d. -f1,2)
           {
             echo "tags<<EOF"
-            echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}"
-            echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${MAJOR_MINOR}"
-            echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${GITHUB_SHA::7}"
+            echo "${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${VERSION}"
+            echo "${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${MAJOR_MINOR}"
+            echo "${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:sha-${GITHUB_SHA::7}"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
@@ -67,7 +66,7 @@ jobs:
       - name: Generate SBOM attestation
         uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v2.1.0
         with:
-          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-name: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}
           subject-digest: ${{ steps.build-push.outputs.digest }}
           push-to-registry: true
 
@@ -79,13 +78,13 @@ jobs:
           DIGEST: ${{ steps.build-push.outputs.digest }}
         run: |
           cosign sign --yes \
-            "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${DIGEST}"
-          echo "Signed: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${DIGEST}"
+            "${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}@${DIGEST}"
+          echo "Signed: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}@${DIGEST}"
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+          image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
           format: 'sarif'
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH'
@@ -112,18 +111,17 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
 
-      - name: Log in to GHCR
+      - name: Log in to Docker Hub
         uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Compute Docker tags
         id: meta
         uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5.7.0
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-sip-bridge
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}-sip-bridge
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -142,7 +140,7 @@ jobs:
       - name: Generate SBOM attestation
         uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v2.1.0
         with:
-          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-sip-bridge
+          subject-name: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}-sip-bridge
           subject-digest: ${{ steps.build-push.outputs.digest }}
           push-to-registry: true
 
@@ -154,4 +152,5 @@ jobs:
           DIGEST: ${{ steps.build-push.outputs.digest }}
         run: |
           cosign sign --yes \
-            "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-sip-bridge@${DIGEST}"
+            "${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}-sip-bridge@${DIGEST}"
+          echo "Signed: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}-sip-bridge@${DIGEST}"

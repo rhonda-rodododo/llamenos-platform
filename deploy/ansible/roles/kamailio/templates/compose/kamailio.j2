@@ -1,0 +1,31 @@
+name: llamenos-kamailio
+
+services:
+  kamailio:
+    image: kamailio/kamailio:5.7
+    restart: unless-stopped
+    ports:
+      - "5060:5060/udp"
+      - "5060:5060/tcp"
+      - "5061:5061/tcp"
+    volumes:
+      - ./kamailio.cfg:/etc/kamailio/kamailio.cfg:ro
+      - ./dispatcher.list:/etc/kamailio/dispatcher.list:ro
+      - ./tls.cfg:/etc/kamailio/tls.cfg:ro
+    networks:
+      - llamenos-internal
+    healthcheck:
+      test: ["CMD", "kamcmd", "core.version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  llamenos-internal:
+    external: true

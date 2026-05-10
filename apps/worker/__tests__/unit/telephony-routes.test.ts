@@ -3,6 +3,9 @@ import { Hono } from 'hono'
 import type { AppEnv } from '@worker/types'
 import type { TelephonyAdapter } from '@worker/telephony/adapter'
 import type { Services } from '@worker/services'
+// Ensure the crypto FFI mock is loaded before any code that imports @llamenos/crypto/ffi.
+// The real ffi.ts uses bun:ffi to load a native .so — unavailable in the Vitest environment.
+import '@worker/__tests__/mocks/llamenos-crypto-ffi'
 
 function makeMockAdapter(overrides?: Partial<TelephonyAdapter>): TelephonyAdapter {
   return {

@@ -1,0 +1,31 @@
+name: llamenos-signal
+
+services:
+  signal-cli:
+    image: {{ llamenos_signal_image | default('bbernhard/signal-cli-rest-api:0.92') }}
+    restart: unless-stopped
+    environment:
+      - MODE=json-rpc
+      - AUTO_RECEIVE_SCHEDULE=0 * * * *
+    volumes:
+      - signal-data:/home/.local/share/signal-cli
+    networks:
+      - llamenos-internal
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/about"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  signal-data:
+
+networks:
+  llamenos-internal:
+    external: true

@@ -1,0 +1,26 @@
+name: llamenos-whisper
+
+services:
+  whisper:
+    image: {{ llamenos_whisper_image | default('fedirz/faster-whisper-server:0.4.1') }}
+    restart: unless-stopped
+    environment:
+      - WHISPER__MODEL={{ whisper_model | default('Systran/faster-whisper-base') }}
+      - WHISPER__DEVICE={{ whisper_device | default('cpu') }}
+    networks:
+      - llamenos-internal
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  llamenos-internal:
+    external: true

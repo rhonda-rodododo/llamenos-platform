@@ -24,10 +24,12 @@
 		reverse_proxy app:3000
 	}
 
+{% if llamenos_strfry_enabled | default(false) %}
 	# Nostr relay WebSocket proxy (strfry)
 	handle /nostr {
 		reverse_proxy strfry:7777
 	}
+{% endif %}
 
 {% if 'monitoring' in compose_profiles | default([]) %}
 	# ── GlitchTip Error Tracking ───────────────────────────

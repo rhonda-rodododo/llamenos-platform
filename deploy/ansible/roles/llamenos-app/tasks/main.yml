@@ -41,13 +41,14 @@
     mode: "0600"
   notify: Restart app service
 
-- name: Pull app image
+- name: Pull app image (if using registry)
   community.docker.docker_compose_v2:
     project_src: "{{ app_dir }}/services/app"
     pull: always
     state: present
     recreate: never
   register: app_pull
+  ignore_errors: true
 
 - name: Start app service
   community.docker.docker_compose_v2:

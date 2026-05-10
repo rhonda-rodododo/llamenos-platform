@@ -1,0 +1,22 @@
+#!/bin/bash
+# Maintenance cleanup script — managed by Ansible
+# Do not edit manually; changes will be overwritten on next deploy.
+
+set -euo pipefail
+
+APP_DIR="{{ app_dir }}"
+LOG_DIR="${APP_DIR}/logs"
+
+echo "=== Llamenos Maintenance Cleanup ==="
+echo "Started: $(date -Iseconds)"
+
+# Clean old logs (keep 14 days)
+find "${LOG_DIR}" -type f -name "*.log" -mtime +14 -delete 2>/dev/null || true
+
+# Clean Docker build cache (keep last 24h)
+docker system prune -f --filter "until=24h" 2>/dev/null || true
+
+# Clean old Docker images (keep last 3)
+docker image prune -f --filter "until=168h" 2>/dev/null || true
+
+echo "Completed: $(date -Iseconds)"

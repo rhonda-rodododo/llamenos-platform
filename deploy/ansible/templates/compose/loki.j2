@@ -1,33 +1,24 @@
-# Loki Docker Compose — managed by Ansible
-# Do not edit manually; changes will be overwritten on next deploy.
-
-name: llamenos
+name: llamenos-loki
 
 services:
   loki:
-    image: {{ loki_image }}
+    image: {{ loki_image | default('grafana/loki:3.4.2') }}
     restart: unless-stopped
-    command:
-      - "-config.file=/etc/loki/loki-config.yml"
     volumes:
-      - ./loki-config.yml:/etc/loki/loki-config.yml:ro
-      - ./data:/loki
+      - ./loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki-data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
     networks:
-      - monitoring
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3100/ready"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
-    security_opt:
-      - no-new-privileges:true
-    deploy:
-      resources:
-        limits:
-          memory: 256M
+      - llamenos-observability
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  loki-data:
 
 networks:
-  monitoring:
-    name: llamenos_monitoring
+  llamenos-observability:
     external: true
