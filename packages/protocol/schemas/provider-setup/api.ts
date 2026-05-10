@@ -1,0 +1,41 @@
+import { z } from 'zod'
+import { telephonyProviderTypeSchema } from '@protocol/schemas/settings'
+import { providerStatusSchema } from './provider-types'
+
+export const startOAuthRequestSchema = z.looseObject({
+  provider: telephonyProviderTypeSchema,
+  redirectUrl: z.string(),
+  hubId: z.string().optional(),
+})
+export type StartOAuthRequest = z.infer<typeof startOAuthRequestSchema>
+
+export const startOAuthResponseSchema = z.object({
+  authUrl: z.string(),
+  stateId: z.string(),
+  expiresAt: z.string(),
+})
+export type StartOAuthResponse = z.infer<typeof startOAuthResponseSchema>
+
+export const configureProviderRequestSchema = z.looseObject({
+  provider: telephonyProviderTypeSchema,
+  credentials: z.record(z.string(), z.string()).optional(),
+  hubId: z.string().optional(),
+  phoneNumber: z.string().optional(),
+})
+export type ConfigureProviderRequest = z.infer<typeof configureProviderRequestSchema>
+
+export const listNumbersRequestSchema = z.looseObject({
+  provider: telephonyProviderTypeSchema,
+  hubId: z.string().optional(),
+})
+export type ListNumbersRequest = z.infer<typeof listNumbersRequestSchema>
+
+export const providerStatusResponseSchema = z.object({
+  provider: telephonyProviderTypeSchema,
+  status: providerStatusSchema,
+  capabilities: z.array(z.string()),
+  phoneNumbers: z.array(z.string()).optional(),
+  error: z.string().optional(),
+  lastCheckedAt: z.string().optional(),
+})
+export type ProviderStatusResponse = z.infer<typeof providerStatusResponseSchema>

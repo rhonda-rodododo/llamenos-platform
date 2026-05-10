@@ -50,6 +50,7 @@ import {
   reportEvents,
   reportCases,
   events as hubCaseEvents,
+  providerConfigs,
 } from '../db/schema'
 import type { SpamSettings, CallSettings } from '../types'
 import type {
@@ -151,6 +152,9 @@ const VALID_PROVIDER_TYPES = [
   'vonage',
   'plivo',
   'asterisk',
+  'telnyx',
+  'bandwidth',
+  'freeswitch',
 ] as const
 
 const CAPTCHA_TTL_MS = 5 * 60 * 1000 // 5 minutes
@@ -746,12 +750,16 @@ export class SettingsService {
     TWILIO_PHONE_NUMBER?: string
   }): Promise<EnabledChannels> {
     const row = await getSettings(this.db)
-    const telephonyConfig = row.telephonyProvider as TelephonyProviderConfig | null
+    const [providerConfig] = await this.db
+      .select()
+      .from(providerConfigs)
+      .where(eq(providerConfigs.hubId, ''))
+      .limit(1)
     const messagingConfig = row.messagingConfig as MessagingConfig | null
     const setupState = row.setupState as SetupState | null
 
     const voiceEnabled =
-      !!telephonyConfig ||
+      !!providerConfig ||
       !!(
         env.TWILIO_ACCOUNT_SID &&
         env.TWILIO_AUTH_TOKEN &&
@@ -997,9 +1005,84 @@ export class SettingsService {
   // Telephony Provider
   // =========================================================================
 
+  async getProviderConfig(
+    providerType: string,
+    hubId?: string,
+  ): Promise<typeof providerConfigs.$inferSelect | null> {
+    const [row] = await this.db
+      .select()
+      .from(providerConfigs)
+      .where(
+        and(
+          eq(providerConfigs.providerType, providerType),
+          hubId
+            ? eq(providerConfigs.hubId, hubId)
+            : eq(providerConfigs.hubId, ''),
+        ),
+      )
+    return row ?? null
+  }
+
+  async upsertProviderConfig(
+    config: Partial<typeof providerConfigs.$inferInsert>,
+  ): Promise<typeof providerConfigs.$inferSelect> {
+    const id = config.id ?? crypto.randomUUID()
+    const now = new Date()
+    await this.db
+      .insert(providerConfigs)
+      .values({
+        id,
+        hubId: config.hubId ?? '',
+        providerType: config.providerType ?? '',
+        credentials: config.credentials ?? null,
+        status: config.status ?? 'disconnected',
+        capabilities: config.capabilities ?? [],
+        phoneNumbers: config.phoneNumbers ?? [],
+        error: config.error ?? null,
+        lastCheckedAt: config.lastCheckedAt ?? null,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: providerConfigs.id,
+        set: {
+          hubId: config.hubId,
+          providerType: config.providerType,
+          credentials: config.credentials,
+          status: config.status,
+          capabilities: config.capabilities,
+          phoneNumbers: config.phoneNumbers,
+          error: config.error,
+          lastCheckedAt: config.lastCheckedAt,
+          updatedAt: now,
+        },
+      })
+    const [row] = await this.db
+      .select()
+      .from(providerConfigs)
+      .where(eq(providerConfigs.id, id))
+    return row
+  }
+
+  async deleteProviderConfig(id: string): Promise<{ ok: true }> {
+    await this.db
+      .delete(providerConfigs)
+      .where(eq(providerConfigs.id, id))
+    return { ok: true }
+  }
+
   async getTelephonyProvider(): Promise<TelephonyProviderConfig | null> {
-    const row = await getSettings(this.db)
-    return (row.telephonyProvider as TelephonyProviderConfig) ?? null
+    const [row] = await this.db
+      .select()
+      .from(providerConfigs)
+      .where(eq(providerConfigs.hubId, ''))
+      .limit(1)
+    if (!row?.credentials) return null
+    try {
+      return JSON.parse(row.credentials) as TelephonyProviderConfig
+    } catch {
+      return null
+    }
   }
 
   async updateTelephonyProvider(
@@ -1029,10 +1112,35 @@ export class SettingsService {
         'Phone number must be in E.164 format',
       )
     }
+    const existing = await this.db
+      .select()
+      .from(providerConfigs)
+      .where(eq(providerConfigs.hubId, ''))
+      .limit(1)
+    const id = existing[0]?.id ?? crypto.randomUUID()
     await this.db
-      .update(systemSettings)
-      .set({ telephonyProvider: data })
-      .where(eq(systemSettings.id, SINGLETON_ID))
+      .insert(providerConfigs)
+      .values({
+        id,
+        hubId: '',
+        providerType: data.type,
+        credentials: JSON.stringify(data),
+        status: 'connected',
+        capabilities: [],
+        phoneNumbers: data.phoneNumber ? [data.phoneNumber] : [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: providerConfigs.id,
+        set: {
+          providerType: data.type,
+          credentials: JSON.stringify(data),
+          status: 'connected',
+          phoneNumbers: data.phoneNumber ? [data.phoneNumber] : [],
+          updatedAt: new Date(),
+        },
+      })
     return data
   }
 
@@ -1760,9 +1868,15 @@ export class SettingsService {
   ): Promise<TelephonyProviderConfig | null> {
     const [row] = await this.db
       .select()
-      .from(hubSettingsTable)
-      .where(eq(hubSettingsTable.hubId, hubId))
-    return (row?.telephonyProvider as TelephonyProviderConfig) ?? null
+      .from(providerConfigs)
+      .where(eq(providerConfigs.hubId, hubId))
+      .limit(1)
+    if (!row?.credentials) return null
+    try {
+      return JSON.parse(row.credentials) as TelephonyProviderConfig
+    } catch {
+      return null
+    }
   }
 
   async setHubTelephonyProvider(
@@ -1794,12 +1908,34 @@ export class SettingsService {
       )
     }
 
+    const existing = await this.db
+      .select()
+      .from(providerConfigs)
+      .where(eq(providerConfigs.hubId, hubId))
+      .limit(1)
+    const id = existing[0]?.id ?? crypto.randomUUID()
     await this.db
-      .insert(hubSettingsTable)
-      .values({ hubId, telephonyProvider: config })
+      .insert(providerConfigs)
+      .values({
+        id,
+        hubId,
+        providerType: config.type,
+        credentials: JSON.stringify(config),
+        status: 'connected',
+        capabilities: [],
+        phoneNumbers: config.phoneNumber ? [config.phoneNumber] : [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
       .onConflictDoUpdate({
-        target: hubSettingsTable.hubId,
-        set: { telephonyProvider: config },
+        target: providerConfigs.id,
+        set: {
+          providerType: config.type,
+          credentials: JSON.stringify(config),
+          status: 'connected',
+          phoneNumbers: config.phoneNumber ? [config.phoneNumber] : [],
+          updatedAt: new Date(),
+        },
       })
     return { ok: true }
   }
