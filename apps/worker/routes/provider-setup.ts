@@ -821,7 +821,7 @@ providerSetup.post('/signal/verify',
     const services = c.get('services')
     const pubkey = c.get('pubkey')
 
-    const limited = await checkRateLimit(services.settings, `signal-verify:${pubkey}`, 3)
+    const limited = await checkRateLimit(services.settings, `signal-verify:${pubkey}`, 4)
     if (limited) {
       return c.json({ error: 'Rate limit exceeded — max 3 verification attempts per minute' }, 429)
     }

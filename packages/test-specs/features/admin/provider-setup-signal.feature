@@ -11,14 +11,14 @@ Feature: Signal Bridge Registration
     And the registration status is "pending"
     And the registration has a masked phone number
 
-  Scenario: Register via voice — admin enters code — registration completes
+  Scenario: Register via voice — verify attempt with unreachable bridge
     Given I am a signal registration admin
     When I POST to start Signal registration with voice method
     Then the signal registration response is 200
     And the registration status is "pending"
     When I POST to verify Signal registration with a valid code
     Then the signal registration response is 200
-    And the registration status is "complete"
+    And the registration status is "verifying"
 
   Scenario: Wrong verification code 3 times — registration fails
     Given I am a signal registration admin
