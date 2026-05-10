@@ -9,7 +9,7 @@ async function extractUiTestIds(): Promise<Set<string>> {
   const files = await glob(UI_GLOB)
   const ids = new Set<string>()
   const dataTestIdRegex = /data-testid=["']([^"']+)["']/g
-  const templateRegex = /data-testid=\{[`"']([^`"']+)[`"']\}/g
+  const templateRegex = /data-testid=\{[`"']([^`'"]+)[`"']\}/g
 
   for (const file of files) {
     const content = await readFile(file, 'utf-8')

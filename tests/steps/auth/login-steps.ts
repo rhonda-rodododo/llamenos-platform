@@ -35,10 +35,11 @@ Then('the nsec field should be a password field', async ({ page }) => {
 })
 
 When('I enter a valid 63-character nsec', async ({ page }) => {
-  const { generateSecretKey, nip19 } = await import('nostr-tools')
-  const sk = generateSecretKey()
-  const nsec = nip19.nsecEncode(sk)
-  await page.getByTestId(TestIds.NSEC_INPUT).fill(nsec)
+  // The login page validates via isValidSeedHex() which expects a 64-char hex string
+  // (raw Ed25519 seed), not a bech32 nsec. Use the admin seed so the backend
+  // recognizes the derived pubkey and getMe() succeeds after signIn().
+  const { ADMIN_SEED } = await import('../../helpers')
+  await page.getByTestId(TestIds.NSEC_INPUT).fill(ADMIN_SEED)
   // The login form requires a PIN alongside the nsec — fill the PIN field if present
   const pinField = page.locator('#nsec-pin')
   const pinVisible = await pinField.isVisible({ timeout: 1000 }).catch(() => false)

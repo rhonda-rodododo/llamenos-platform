@@ -305,6 +305,7 @@ export function TelephonyProviderSection({ config, draft, onConfigChange, onDraf
             {testing ? t('telephonyProvider.testing') : t('telephonyProvider.testConnection')}
           </Button>
           <Button
+            data-testid="form-save-btn"
             disabled={saving || !draft.phoneNumber}
             onClick={async () => {
               setSaving(true)

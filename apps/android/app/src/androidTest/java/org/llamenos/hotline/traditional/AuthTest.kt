@@ -1,7 +1,10 @@
 package org.llamenos.hotline.traditional
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import org.junit.Test
 import org.llamenos.hotline.helpers.SimulationClient
 

@@ -84,6 +84,12 @@ export default defineConfig({
         '/ws': {
           target: process.env.API_URL?.replace('http', 'ws') || 'ws://localhost:3000',
           ws: true,
+          configure: (proxy) => {
+            proxy.on('error', (err: Error) => {
+              if ((err as NodeJS.ErrnoException).code === 'ECONNRESET') return
+              console.error('[vite:ws-proxy]', err.message)
+            })
+          },
         },
       },
     } : {}),
@@ -98,6 +104,12 @@ export default defineConfig({
       '/ws': {
         target: process.env.API_URL?.replace('http', 'ws') || 'ws://localhost:3000',
         ws: true,
+        configure: (proxy) => {
+          proxy.on('error', (err: Error) => {
+            if ((err as NodeJS.ErrnoException).code === 'ECONNRESET') return
+            console.error('[vite:ws-proxy]', err.message)
+          })
+        },
       },
     },
   },

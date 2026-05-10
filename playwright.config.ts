@@ -25,16 +25,16 @@ export default defineConfig({
         ["line"],
       ]
     : [["list"]],
-  timeout: process.env.CI ? 45_000 : 30_000,
+  timeout: process.env.CI ? 60_000 : 30_000,
   globalSetup: './tests/global-setup.ts',
   expect: {
-    timeout: 10_000,
+    timeout: process.env.CI ? 15_000 : 10_000,
   },
   use: {
     baseURL: process.env.PLAYWRIGHT_BASE_URL || "http://localhost:8788",
     trace: "on-first-retry",
-    actionTimeout: 10_000,
-    navigationTimeout: process.env.CI ? 20_000 : 15_000,
+    actionTimeout: process.env.CI ? 15_000 : 10_000,
+    navigationTimeout: process.env.CI ? 30_000 : 15_000,
   },
   projects: [
     {
@@ -48,9 +48,10 @@ export default defineConfig({
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
-      // Exclude bootstrap tests — they run in the sequential "bootstrap" project above.
+      // Exclude bootstrap tests and screenshots — bootstrap runs in its own project above,
+      // screenshots are on-demand only (run via `bun run test:screenshots`).
       // Exclude traditional tests — they run in the "traditional" project below.
-      testIgnore: ["**/live/**", "**/desktop/**", "**/integration/**", "**/bootstrap.spec.ts", "**/traditional/**"],
+      testIgnore: ["**/live/**", "**/desktop/**", "**/integration/**", "**/bootstrap.spec.ts", "**/screenshots.spec.ts", "**/traditional/**"],
       // Wait for bootstrap tests to complete and restore admin before parallel tests run.
       dependencies: ["bootstrap"],
     },
@@ -70,7 +71,7 @@ export default defineConfig({
           ...desktopStepDirs.map((d) => `tests/steps/${d}/**/*.ts`),
         ],
         featuresRoot: "packages/test-specs/features",
-        tags: "@desktop and not @backend and not @wip",
+        tags: "@desktop and not @backend and not @wip and not @requires-camera and not @requires-live-calls and not @requires-demo",
         // Backend-only scenarios have steps not defined in desktop — skip them
         missingSteps: "skip-scenario",
       }),
@@ -100,6 +101,27 @@ export default defineConfig({
       // backend-bdd scenarios create a hub per-scenario via workerHub fixture —
       // if bootstrap's test-reset-no-admin runs concurrently, the admin is gone
       // and hub creation returns 401.
+      dependencies: ["bootstrap"],
+    },
+    {
+      // On-demand screenshot capture — NOT included in default CI runs.
+      // Run via: bun run test:screenshots
+      name: "screenshots",
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 1440, height: 900 },
+      },
+      testMatch: ["**/screenshots.spec.ts"],
+      retries: 0,
+      dependencies: ["bootstrap"],
+    },
+    {
+      // Traditional-style Playwright tests for UI-focused assertions.
+      // Complements BDD tests — more concise for element visibility/text checks.
+      name: "traditional",
+      use: { ...devices["Desktop Chrome"] },
+      testMatch: ["**/traditional/**/*.spec.ts"],
+      // Wait for bootstrap tests to complete and restore admin before parallel tests run.
       dependencies: ["bootstrap"],
     },
   ],

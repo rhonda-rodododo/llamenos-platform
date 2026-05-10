@@ -17,8 +17,8 @@ Feature: Telephony Provider Configuration
 
   Scenario: Provider dropdown shows all providers
     When I expand the "Telephony Provider" section
-    Then the provider dropdown should have 5 options
-    And the provider options should be Twilio, SignalWire, Vonage, Plivo, and Asterisk
+    Then the provider dropdown should have 8 options
+    And the provider options should be Twilio, SignalWire, Vonage, Plivo, Asterisk, Telnyx, Bandwidth, and FreeSWITCH
 
   Scenario: Changing provider updates credential form fields
     When I expand the "Telephony Provider" section

@@ -257,9 +257,16 @@ test.describe('Records Architecture', () => {
   // ============ Report Isolation ============
 
   test('reports page shows reports and new-report button, not conversation cards', async ({ page }) => {
-    // Seed a report via API so the page has content
+    // Seed a report via API so the page has content.
+    // Use the active hub from the browser session so the report lands in the same hub
+    // the UI is browsing — otherwise the report appears in the wrong hub and the page
+    // shows empty state despite the API call succeeding.
     const { createReportViaApi } = await import('./api-helpers')
-    await createReportViaApi(page.request, { title: `Isolation Report ${Date.now()}` })
+    const activeHubId = await page.evaluate(() => {
+      const getHub = (window as Record<string, unknown>).__TEST_GET_ACTIVE_HUB as (() => string) | undefined
+      return getHub ? getHub() : undefined
+    }).catch(() => undefined)
+    await createReportViaApi(page.request, { title: `Isolation Report ${Date.now()}`, hubId: activeHubId })
 
     await Navigation.goToReports(page)
 

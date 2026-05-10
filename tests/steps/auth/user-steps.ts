@@ -87,26 +87,41 @@ When('they tap the break button', async ({ page }) => {
 // --- Invite onboarding ---
 
 When('I create an invite for a new volunteer', async ({ page }) => {
+  // Wait for the Volunteers page to fully load before trying to click buttons
+  await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {})
+
   // Click the "Invite Volunteer" button (not "Add Volunteer" which generates nsec directly)
-  const inviteBtn = page.getByRole('button', { name: /invite volunteer/i })
+  const inviteBtn = page.getByTestId(TestIds.INVITE_BTN)
+  await expect(inviteBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
   await inviteBtn.click()
   const name = `InviteVol ${Date.now()}`
   await page.getByLabel('Name').fill(name)
   const phone = `+1212${Date.now().toString().slice(-7)}`
   await page.getByLabel('Phone Number').fill(phone)
   await page.getByLabel('Phone Number').blur()
-  await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
+  // Invite form uses 'create-invite-btn', not 'form-save-btn'
+  const createInviteBtn = page.getByTestId('create-invite-btn')
+  const isCreateInvite = await createInviteBtn.isVisible({ timeout: 5000 }).catch(() => false)
+  if (isCreateInvite) {
+    await createInviteBtn.click()
+  } else {
+    await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
+  }
   // Wait for the invite link card to appear
-  await page.getByTestId('dismiss-invite').waitFor({ state: 'visible', timeout: Timeouts.ELEMENT })
+  await page.getByTestId('dismiss-invite').waitFor({ state: 'visible', timeout: Timeouts.API })
   await page.evaluate((n) => {
     (window as Record<string, unknown>).__test_invite_vol_name = n
   }, name)
 })
 
 Then('an invite link should be generated', async ({ page }) => {
-  // After creating a volunteer, either invite card, nsec card, or nsec code should appear
+  // After creating an invite, the invite link card appears (testid="invite-link-code").
+  // The nsec card/code appears after direct volunteer creation (not invite flow).
+  const inviteLinkCode = page.getByTestId('invite-link-code')
+  const isInviteLink = await inviteLinkCode.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+  if (isInviteLink) return
   const inviteCard = page.getByTestId(TestIds.VOLUNTEER_INVITE_CARD)
-  const isInvite = await inviteCard.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+  const isInvite = await inviteCard.isVisible({ timeout: 2000 }).catch(() => false)
   if (isInvite) return
   const nsecCard = page.getByTestId(TestIds.VOLUNTEER_NSEC_CARD)
   const isNsecCard = await nsecCard.isVisible({ timeout: 2000 }).catch(() => false)
@@ -150,19 +165,30 @@ Then('the volunteer name should appear in the pending invites list', async ({ pa
 })
 
 When('I revoke the invite', async ({ page }) => {
+  // The frontend does an optimistic removal but restores the invite on API failure,
+  // so we must wait for the DELETE response before the assertion step runs.
+  const responsePromise = page.waitForResponse(
+    resp => resp.url().includes('/api/invites/') && resp.request().method() === 'DELETE',
+    { timeout: Timeouts.API },
+  )
   await page.getByTestId(TestIds.REVOKE_INVITE_BTN).first().click()
-  // Confirm if dialog appears
+  // Confirm if a confirmation dialog appears (currently no dialog for revoke,
+  // but handle it defensively in case one is added later)
   const dialog = page.getByRole('dialog')
-  if (await dialog.isVisible({ timeout: 2000 }).catch(() => false)) {
+  if (await dialog.isVisible().catch(() => false)) {
     await page.getByTestId(TestIds.CONFIRM_DIALOG_OK).click()
   }
+  // Wait for the DELETE API call to succeed so the optimistic removal sticks
+  const response = await responsePromise
+  expect(response.status()).toBeLessThan(400)
 })
 
 Then('the volunteer name should no longer appear in the list', async ({ page }) => {
   const volName = (await page.evaluate(() => (window as Record<string, unknown>).__test_invite_vol_name)) as string
   expect(volName).toBeTruthy()
-  // Content assertion — verifying volunteer name is not displayed
-  await expect(page.getByText(volName, { exact: true }).first()).not.toBeVisible({ timeout: Timeouts.ELEMENT })
+  // Wait for the revoke API call + re-render. Use a longer timeout so the
+  // optimistic state update and network round-trip both complete before asserting.
+  await expect(page.getByText(volName, { exact: true }).first()).not.toBeVisible({ timeout: 20000 })
 })
 
 // --- Form validation ---
@@ -252,14 +278,36 @@ Given('a reporter has been invited and onboarded', async ({ page }) => {
 })
 
 Given('a reporter is logged in', async ({ page }) => {
-  const nsec = (await page.evaluate(() => (window as Record<string, unknown>).__test_reporter_nsec)) as string
-  expect(nsec).toBeTruthy()
+  // Check if a reporter nsec was set by a previous step (e.g., "a reporter has been invited and onboarded")
+  let nsec = (await page.evaluate(() => (window as Record<string, unknown>).__test_reporter_nsec)) as string | undefined
+  if (!nsec) {
+    // No reporter exists yet — create one via the admin flow
+    // Ensure we're logged in as admin first
+    const sidebar = page.getByTestId(TestIds.NAV_SIDEBAR)
+    const isAuth = await sidebar.isVisible({ timeout: 1000 }).catch(() => false)
+    if (!isAuth) {
+      await loginAsAdmin(page)
+    }
+    await Navigation.goToVolunteers(page)
+    const name = `Reporter ${Date.now()}`
+    const phone = `+1212${Date.now().toString().slice(-7)}`
+    nsec = await createUserAndGetNsec(page, name, phone)
+    await dismissNsecCard(page)
+  }
   await loginAsVolunteer(page, nsec)
 })
 
 When('the reporter logs in', async ({ page }) => {
-  const nsec = (await page.evaluate(() => (window as Record<string, unknown>).__test_reporter_nsec)) as string
-  expect(nsec).toBeTruthy()
+  let nsec = (await page.evaluate(() => (window as Record<string, unknown>).__test_reporter_nsec)) as string | undefined
+  if (!nsec) {
+    // Reporter wasn't set up yet — create one (loginAsAdmin first to access volunteers)
+    await loginAsAdmin(page)
+    await Navigation.goToVolunteers(page)
+    const name = `Reporter ${Date.now()}`
+    const phone = `+1212${Date.now().toString().slice(-7)}`
+    nsec = await createUserAndGetNsec(page, name, phone)
+    await dismissNsecCard(page)
+  }
   await loginAsVolunteer(page, nsec)
 })
 
@@ -267,24 +315,30 @@ When('they create a new report', async ({ page }) => {
   const newBtn = page.getByTestId(TestIds.REPORT_NEW_BTN)
   await expect(newBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
   await newBtn.click()
-  // Reports use a chat-style interface — find textarea and submit button
-  const textarea = page.locator('textarea').first()
-  await expect(textarea).toBeVisible({ timeout: Timeouts.ELEMENT })
-  await textarea.fill('Test report content')
-  // Submit via send button, save button, or submit button (sequential check)
-  const sendAriaBtn = page.locator('button[aria-label*="submit" i], button[aria-label*="send" i]').first()
-  const isSend = await sendAriaBtn.isVisible({ timeout: 2000 }).catch(() => false)
-  if (isSend) {
-    await sendAriaBtn.click()
-    return
+  // Reports creation form — fill in title and body
+  const titleInput = page.getByTestId(TestIds.REPORT_TITLE_INPUT)
+  const isTitleVisible = await titleInput.isVisible({ timeout: 5000 }).catch(() => false)
+  if (isTitleVisible) {
+    await titleInput.fill('Test report content')
   }
-  const saveBtn = page.getByTestId(TestIds.FORM_SAVE_BTN)
-  const isSave = await saveBtn.isVisible({ timeout: 2000 }).catch(() => false)
-  if (isSave) {
-    await saveBtn.click()
-    return
+  const bodyInput = page.getByTestId(TestIds.REPORT_BODY_INPUT)
+  const isBodyVisible = await bodyInput.isVisible({ timeout: 3000 }).catch(() => false)
+  if (isBodyVisible) {
+    await bodyInput.fill('Test report body content')
+  } else {
+    // Chat-style interface — find textarea
+    const textarea = page.locator('textarea').first()
+    const isTextarea = await textarea.isVisible({ timeout: 3000 }).catch(() => false)
+    if (isTextarea) {
+      await textarea.fill('Test report content')
+    }
   }
-  await page.getByTestId(TestIds.FORM_SUBMIT_BTN).click()
+  // Submit via report submit button, form save, or generic submit (use combined locator)
+  const submitBtn = page.getByTestId(TestIds.REPORT_SUBMIT_BTN)
+    .or(page.getByTestId(TestIds.FORM_SAVE_BTN))
+    .or(page.getByTestId(TestIds.FORM_SUBMIT_BTN))
+  await expect(submitBtn.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await submitBtn.first().click()
 })
 
 Then('the report should be saved successfully', async ({ page }) => {

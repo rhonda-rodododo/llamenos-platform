@@ -1,6 +1,7 @@
 import type { Context, Next } from 'hono'
 import type { AppEnv } from '../types'
 import { permissionGranted, resolveHubPermissions } from '@shared/permissions'
+import { ServiceError } from '../services/settings'
 
 /**
  * Hub middleware: extracts hubId from URL params, validates the user
@@ -16,10 +17,15 @@ export async function hubContext(c: Context<AppEnv>, next: Next): Promise<Respon
   const allRoles = c.get('allRoles')
   const services = c.get('services')
 
-  // Verify hub exists
-  const hub = await services.settings.getHub(hubId).catch(() => null)
-  if (!hub) {
-    return c.json({ error: 'Hub not found' }, 404)
+  // Verify hub exists — distinguish "not found" from database errors
+  let hub: Awaited<ReturnType<typeof services.settings.getHub>>
+  try {
+    hub = await services.settings.getHub(hubId)
+  } catch (err) {
+    if (err instanceof ServiceError && err.status === 404) {
+      return c.json({ error: 'Hub not found' }, 404)
+    }
+    throw err // Propagate DB errors as 500
   }
 
   // Resolve hub-scoped permissions

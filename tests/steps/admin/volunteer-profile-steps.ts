@@ -8,9 +8,20 @@ import { TestIds } from '../../test-ids'
 import { Timeouts } from '../../helpers'
 
 When('I tap a volunteer card', async ({ page }) => {
-  const volCard = page.getByTestId(TestIds.VOLUNTEER_ROW).first()
-  await expect(volCard).toBeVisible({ timeout: Timeouts.ELEMENT })
-  await volCard.click()
+  const volRow = page.getByTestId(TestIds.VOLUNTEER_ROW).first()
+  await expect(volRow).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // Click the link inside the row (volunteer name) to navigate to profile.
+  // Try link role first; if not available, click the row itself (some layouts
+  // use clickable rows instead of inner links).
+  const nameLink = volRow.getByRole('link').first()
+  const hasLink = await nameLink.isVisible({ timeout: 3000 }).catch(() => false)
+  if (hasLink) {
+    await nameLink.click()
+  } else {
+    await volRow.click()
+  }
+  // Wait for profile page to load
+  await page.waitForURL(/\/users\/[^/]+/, { timeout: Timeouts.NAVIGATION })
 })
 
 Then('I should see the volunteer detail screen', async ({ page }) => {

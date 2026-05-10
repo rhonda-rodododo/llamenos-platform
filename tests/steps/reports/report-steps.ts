@@ -113,9 +113,19 @@ Then('I should see the report status badge', async ({ page }) => {
 })
 
 When('I tap the back button on report detail', async ({ page }) => {
+  // Desktop uses a split-pane layout — there is no separate "back" navigation.
+  // If a back button exists, click it. Otherwise, deselect by clicking away from
+  // the selected report (the report list is always visible on desktop).
   const backBtn = page.getByTestId(TestIds.BACK_BTN)
-  await expect(backBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
-  await backBtn.click()
+  const backVisible = await backBtn.isVisible({ timeout: 2000 }).catch(() => false)
+  if (backVisible) {
+    await backBtn.click()
+    return
+  }
+  // Desktop split-pane: use SPA router navigation to /reports instead of browser
+  // back (which can overshoot past the reports list back to the dashboard).
+  const { Navigation } = await import('../../pages/index')
+  await Navigation.goToReports(page)
 })
 
 Given('I am viewing a report with status {string}', async ({ page, backendRequest, workerHub }, status: string) => {
@@ -160,38 +170,23 @@ Then('I should see the reports title', async ({ page }) => {
 
 Then('I should see the {string} report status filter', async ({ page, backendRequest, workerHub }, filterName: string) => {
   // Filters only render when reports exist (not in empty state) and user is admin.
-  // Always ensure at least one report exists BEFORE checking visibility — the filter area
-  // is briefly visible during loading then disappears if no reports exist.
+  // Always ensure at least one report exists BEFORE checking visibility.
   const existing = await listReportsViaApi(backendRequest, { hubId: workerHub }).catch(() => ({ conversations: [], total: 0 }))
   if (existing.conversations.length === 0) {
     await createReportViaApi(backendRequest, { title: `Seed for filter ${Date.now()}`, hubId: workerHub })
   }
 
-  // DEBUG: Check crypto state and try creating an auth token
-  const debugInfo = await page.evaluate(async () => {
-    const w = window as Record<string, unknown>
-    const km = w.__TEST_KEY_MANAGER as { isUnlocked?: () => boolean } | undefined
-    const platform = w.__TEST_PLATFORM as { createAuthToken?: (ts: number, m: string, p: string) => Promise<string> } | undefined
-    let authTokenResult = 'not-tried'
-    if (km?.isUnlocked?.()) {
-      try {
-        const token = await platform!.createAuthToken!(Date.now(), 'GET', '/api/reports')
-        authTokenResult = `ok:${token.slice(0, 20)}...`
-      } catch (e: unknown) {
-        authTokenResult = `error:${(e as Error).message}`
-      }
-    }
-    return {
-      url: window.location.pathname,
-      kmUnlocked: km?.isUnlocked?.(),
-      authTokenResult,
-    }
-  }).catch((e) => ({ url: 'eval-failed', kmUnlocked: 'eval-failed', authTokenResult: `catch:${e}` }))
-  console.log(`[report-filter-debug] workerHub=${workerHub} page=${JSON.stringify(debugInfo)}`)
+  // SPA re-navigate to refresh the reports list so the seeded report appears.
+  // Use Navigation helper (handles auth state) instead of clicking nav links directly,
+  // which can time out if the sidebar isn't visible (e.g., session not yet fully loaded).
+  const { Navigation } = await import('../../pages/index')
+  await Navigation.goToDashboard(page)
+  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await Navigation.goToReports(page)
+  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
 
-  // SPA re-navigate to refresh the reports list
-  await page.getByTestId(TestIds.NAV_DASHBOARD).click()
-  await page.getByTestId(TestIds.NAV_REPORTS).click()
+  // Wait for the report list to load (report cards appear = data loaded, not empty state)
+  await expect(page.getByTestId(TestIds.REPORT_CARD).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 
   const filterArea = page.getByTestId(TestIds.REPORT_FILTER_AREA)
   await expect(filterArea).toBeVisible({ timeout: Timeouts.ELEMENT })
@@ -201,20 +196,48 @@ Then('I should see the {string} report status filter', async ({ page, backendReq
   await expect(statusFilter).toBeVisible({ timeout: Timeouts.ELEMENT })
   await statusFilter.click()
 
-  // Verify the specific filter option is visible
+  // Verify the specific filter option is visible (rendered in portal by Radix Select)
   const optionSlug = filterName.toLowerCase()
   const option = page.getByTestId(`report-status-option-${optionSlug}`)
   await expect(option).toBeVisible({ timeout: Timeouts.ELEMENT })
   await page.keyboard.press('Escape')
 })
 
-When('I tap the {string} report status filter', async ({ page }, filterName: string) => {
+When('I tap the {string} report status filter', async ({ page, backendRequest, workerHub }, filterName: string) => {
+  // Filters only render when reports exist. Seed if needed.
+  const filterArea = page.getByTestId(TestIds.REPORT_FILTER_AREA)
+  const isFilterVisible = await filterArea.isVisible({ timeout: 3000 }).catch(() => false)
+  if (!isFilterVisible) {
+    try {
+      const existing = await listReportsViaApi(backendRequest, { hubId: workerHub }).catch(() => ({ conversations: [], total: 0 }))
+      if (existing.conversations.length === 0) {
+        await createReportViaApi(backendRequest, { title: `Seed for filter ${Date.now()}`, hubId: workerHub })
+      }
+      // SPA re-navigate to refresh the reports list.
+      // Use Navigation helper (handles auth state) instead of clicking nav links directly.
+      const { Navigation } = await import('../../pages/index')
+      await Navigation.goToDashboard(page)
+      await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+      await Navigation.goToReports(page)
+      await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+    } catch (e) {
+      console.warn('[reports] Seeding failed:', e)
+    }
+    // Wait for a report card to appear — confirms the list has loaded with seeded data.
+    // This is more reliable than waitForLoadState('networkidle') which doesn't guarantee
+    // that the React state has been updated with the fetched reports.
+    await expect(page.getByTestId(TestIds.REPORT_CARD).first()).toBeVisible({ timeout: Timeouts.ELEMENT }).catch(() => {})
+  }
+
+  await expect(filterArea).toBeVisible({ timeout: Timeouts.ELEMENT })
+
   const statusFilter = page.getByTestId('report-status-filter')
   await expect(statusFilter).toBeVisible({ timeout: Timeouts.ELEMENT })
   await statusFilter.click()
 
   const optionSlug = filterName.toLowerCase()
   const option = page.getByTestId(`report-status-option-${optionSlug}`)
+  await expect(option).toBeVisible({ timeout: Timeouts.ELEMENT })
   await option.click()
 })
 

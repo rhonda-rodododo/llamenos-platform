@@ -93,12 +93,12 @@ function ContactsPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-3">
-          <Button data-testid="contact-back-btn" variant="ghost" size="sm" onClick={() => setSelectedHash(null)}>
+          <Button data-testid="back-btn" variant="ghost" size="sm" onClick={() => setSelectedHash(null)}>
             <ArrowLeft className="h-4 w-4" />
             {t('common.back')}
           </Button>
           <Contact className="h-6 w-6 text-primary" />
-          <h1 className="text-xl font-bold sm:text-2xl">
+          <h1 data-testid="page-title" className="text-xl font-bold sm:text-2xl">
             {selectedContact?.last4 ? `***-${selectedContact.last4}` : t('contacts.contact', { defaultValue: 'Contact' })}
           </h1>
         </div>

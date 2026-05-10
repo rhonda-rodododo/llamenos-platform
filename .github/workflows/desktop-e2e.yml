@@ -95,7 +95,7 @@ jobs:
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: app-build
-          path: .
+          path: dist
 
       - name: Cache Rust build artifacts
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
@@ -149,6 +149,7 @@ jobs:
             "SIGNAL_REGISTERED_NUMBER=+15550000000" \
             "PBX_TYPE=asterisk" \
             "GLITCHTIP_SECRET_KEY=$(openssl rand -hex 32)" \
+            "TOKEN_MAX_AGE_MS=3600000" \
             > .env
 
       - name: Build and start Docker Compose (core services)
@@ -192,6 +193,10 @@ jobs:
       - name: Generate interop test vectors
         run: cargo test --manifest-path packages/crypto/Cargo.toml --test interop
 
+      # ── Generate BDD test files from Gherkin features ───────────
+      - name: Generate BDD test files
+        run: bunx bddgen
+
       # ── Start preview server and run Playwright ─────────────────
       - name: Start Vite preview server
         run: |
@@ -207,12 +212,16 @@ jobs:
           done
 
       - name: Run desktop E2E tests
-        run: bunx playwright test --project=bootstrap --project=chromium --project=bdd
+        # BDD tests already run in ci.yml's e2e job on every PR.
+        # This workflow only runs the chromium + traditional (non-BDD spec) tests to avoid duplication.
+        run: bunx playwright test --project=bootstrap --project=chromium --project=traditional
         env:
           CI: "true"
           PLAYWRIGHT_TEST: "true"
           PLAYWRIGHT_BASE_URL: "http://localhost:8788"
           E2E_TEST_SECRET: "test-reset-secret"
+          DEV_RESET_SECRET: "test-reset-secret"
+          TEST_HUB_URL: "http://localhost:3000"
 
       - name: Stop Vite preview server
         if: always()

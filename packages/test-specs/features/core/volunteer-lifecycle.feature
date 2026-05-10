@@ -71,7 +71,7 @@ Feature: Volunteer Lifecycle
     Given I am logged in as an admin
     And a volunteer is logged in and on the dashboard
     When they click the "Settings" link
-    Then they should see the "Account Settings" heading
+    Then they should see the "Settings" heading
     And they should not see "Spam Mitigation"
 
   # ── Desktop/Mobile: Volunteer Profile ─────────────────────────────

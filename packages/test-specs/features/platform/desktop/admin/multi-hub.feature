@@ -9,9 +9,9 @@ Feature: Multi-Hub Management
 
   Scenario: Create a new hub
     When I navigate to the hub management page
-    And I click "Create Hub"
-    And I fill in the hub name
-    And I click "Save"
+    And I click the create hub button
+    And I fill in the hub name with a unique name
+    And I submit the create hub form
     Then the new hub should appear in the hub list
 
   Scenario: Switch between hubs

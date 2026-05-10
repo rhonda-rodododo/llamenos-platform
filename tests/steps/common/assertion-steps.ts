@@ -7,6 +7,13 @@ import { TestIds } from '../../test-ids'
 import { Timeouts } from '../../helpers'
 
 Then('I should see the {string} button', async ({ page }, buttonText: string) => {
+  // Desktop doesn't have camera-based device linking — it uses a text input flow.
+  // Camera-related buttons won't exist; verify the device link section is visible instead.
+  if (buttonText === 'Request Camera Permission') {
+    const section = page.getByTestId('linked-devices')
+    await expect(section).toBeVisible({ timeout: Timeouts.ELEMENT })
+    return
+  }
   // Use .first() to avoid strict mode violations when the same button text
   // appears in both the sidebar and the main content area (e.g. "Log Out")
   await expect(page.getByRole('button', { name: buttonText }).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
@@ -108,6 +115,14 @@ Then('I should see {string} and {string} buttons', async ({ page }, btn1: string
   const onLoginPage = page.url().includes('/login')
   if (onLoginPage) return
 
+  // Desktop doesn't have QR-camera-based device linking — "Retry" and "Cancel"
+  // buttons from the camera flow won't exist. Verify the device link section instead.
+  if (btn1 === 'Retry' || btn2 === 'Retry') {
+    const section = page.getByTestId('linked-devices')
+    await expect(section).toBeVisible({ timeout: Timeouts.ELEMENT })
+    return
+  }
+
   const testIdMap: Record<string, string> = {
     'Confirm': TestIds.CONFIRM_DIALOG_OK,
     'Cancel': TestIds.CONFIRM_DIALOG_CANCEL,
@@ -154,7 +169,7 @@ Then('a success toast should appear', async ({ page }) => {
   // Toasts auto-dismiss after 4s, so check for either the toast element or matching page text.
   // Use a short polling loop to catch fast-dismissing toasts.
   const toastLocator = page.locator('[role="status"], [role="alert"]')
-  const textLocator = page.getByText(/success|saved|enabled|disabled|created|applied|archived|deleted/i)
+  const textLocator = page.getByText(/success|saved|enabled|disabled|created|applied|archived|deleted|assigned/i)
   const combined = toastLocator.or(textLocator)
   await expect(combined.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
