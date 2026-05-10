@@ -178,7 +178,7 @@ fun callsCountShows(expected: String) {
 - ComposeTimeoutException -- add `composeTestRule.waitForIdle()` before assertions
 - R.string.* mismatch -- run `bun run i18n:validate:android`
 - Build failures -- check `JAVA_HOME` (JDK 21), Gradle wrapper version
-- Emulator broken on macOS 26 -- run E2E on Linux (192.168.50.95) or real device
+- Emulator may have issues on some macOS versions -- run E2E on Linux (192.168.50.95) or real device
 
 ### Crypto (Rust)
 

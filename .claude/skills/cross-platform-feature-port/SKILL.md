@@ -67,7 +67,7 @@ If the feature needs new API endpoints:
 1. **Worker route**: Add to `apps/worker/routes/` or the relevant Durable Object
 2. **DORouter**: Register new method+path combination
 3. **Auth guard**: Apply appropriate permission check
-4. **Nostr broadcast**: If real-time updates needed, add encrypted event publishing
+4. **WebSocket broadcast**: If real-time updates needed, add encrypted event publishing via WebSocket
 5. **Tests**: Worker integration tests via `bun run test:worker`
 
 ### Step 4: Write Step Definitions First (Red-Green-Refactor)

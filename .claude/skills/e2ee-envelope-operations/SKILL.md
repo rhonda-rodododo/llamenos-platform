@@ -1,6 +1,6 @@
 ---
 name: e2ee-envelope-operations
-description: Use when adding encryption for a new data type, implementing envelope encryption, working with ECIES key wrapping, managing crypto labels, or handling multi-recipient decryption. Also use when the user mentions "encrypt", "E2EE", "envelope", "ECIES", "forward secrecy", "crypto label", "admin envelope", "content key", or needs to understand how data is encrypted at rest.
+description: Use when adding encryption for a new data type, implementing envelope encryption, working with HPKE key wrapping, managing crypto labels, or handling multi-recipient decryption. Also use when the user mentions "encrypt", "E2EE", "envelope", "HPKE", "forward secrecy", "crypto label", "admin envelope", "content key", or needs to understand how data is encrypted at rest.
 ---
 
 # E2EE Envelope Encryption Operations
@@ -12,14 +12,14 @@ Per-record envelope encryption with forward secrecy. Every encrypted record foll
 ```
 1. Generate random 32-byte content key (unique per record — NEVER reuse)
 2. Encrypt plaintext with XChaCha20-Poly1305 using content key
-3. ECIES-wrap content key for EACH reader (author + every admin)
+3. HPKE-wrap content key for EACH reader (author + every admin)
 4. Store: ciphertext + wrapped envelopes (server never sees plaintext or content key)
-5. Decrypt: find your envelope by pubkey -> ECIES-unwrap -> decrypt content
+5. Decrypt: find your envelope by pubkey -> HPKE-unwrap -> decrypt content
 ```
 
 Wire format for encrypted content: `hex(nonce_24 + ciphertext)`
 
-Wire format for ECIES envelope: `hex(version_byte_1 + nonce_24 + ciphertext_48)` where ciphertext_48 = 32-byte key + 16-byte Poly1305 tag.
+Wire format for HPKE envelope: `hex(ephemeral_pubkey_32 + ciphertext + auth_tag_16)`
 
 ## Existing Encrypted Data Types
 
@@ -36,7 +36,7 @@ Wire format for ECIES envelope: `hex(version_byte_1 + nonce_24 + ciphertext_48)`
 | Drafts | author only | `HKDF_CONTEXT_DRAFTS` | `llamenos:drafts` | `encrypt_draft_from_state` / `decrypt_draft_from_state` |
 | Exports | author only | `HKDF_CONTEXT_EXPORT` | `llamenos:export` | `encrypt_export_from_state` |
 
-Notes and messages use the full envelope pattern (multi-recipient ECIES wrapping). Drafts and exports use HKDF-derived symmetric keys (single-user, no envelope).
+Notes and messages use the full envelope pattern (multi-recipient HPKE wrapping). Drafts and exports use HKDF-derived symmetric keys (single-user, no envelope).
 
 ## Adding a New Encrypted Data Type — Checklist
 
@@ -89,8 +89,8 @@ pub fn encrypt_your_type(
 ) -> Result<EncryptedYourType, CryptoError> {
     let mut content_key = random_bytes_32();
     // ... XChaCha20-Poly1305 encrypt with content_key ...
-    // ... ecies_wrap_key(&content_key, author_pubkey, LABEL_YOUR_TYPE) ...
-    // ... ecies_wrap_key(&content_key, each_admin, LABEL_YOUR_TYPE) ...
+    // ... hpke_wrap_key(&content_key, author_pubkey, LABEL_YOUR_TYPE) ...
+    // ... hpke_wrap_key(&content_key, each_admin, LABEL_YOUR_TYPE) ...
     content_key.zeroize();
     // return EncryptedYourType { ... }
 }
@@ -174,7 +174,7 @@ Add to `tests/mocks/tauri-ipc-mock.ts` — mirror the Rust logic in JS using `@n
 
 Add encrypted fields to the relevant Durable Object. Store ONLY:
 - `encryptedContent` (hex string)
-- `authorEnvelope` or `readerEnvelopes` (ECIES envelopes)
+- `authorEnvelope` or `readerEnvelopes` (HPKE envelopes)
 - `version: 2` (for future algorithm migration)
 
 NEVER store plaintext. NEVER log plaintext.
@@ -185,53 +185,46 @@ NEVER store plaintext. NEVER log plaintext.
 - Android: JNI wraps the same Rust functions
 - Rebuild with `packages/crypto/scripts/build-mobile.sh ios|android`
 
-## ECIES Implementation Details
+## HPKE Implementation Details
 
-Source: `packages/crypto/src/ecies.rs`
+Source: `packages/crypto/src/hpke.rs`
 
-### Wrapping (ecies_wrap_key)
+All envelope encryption uses HPKE (RFC 9180) with DHKEM(X25519, HKDF-SHA256) + HKDF-SHA256 + AES-256-GCM.
+
+### Wrapping (hpke_wrap_key)
 
 ```
-1. Generate ephemeral secp256k1 keypair (random per wrap)
-2. Parse recipient x-only pubkey (32 bytes) -> prepend 0x02 for compressed SEC1
-3. ECDH: ephemeral_secret x recipient_pubkey -> shared_point
-4. Extract shared_x (32 bytes) from shared_point
-5. KDF: HKDF-SHA256(ikm=shared_x, salt=empty, info=label_bytes) -> 32-byte symmetric key
-6. Encrypt: XChaCha20-Poly1305(symmetric_key, random_24_nonce, content_key)
-7. Output: KeyEnvelope {
-     wrapped_key: hex(version_0x02 + nonce_24 + ciphertext_48),
-     ephemeral_pubkey: hex(compressed_33)
+1. Generate ephemeral X25519 keypair (random per wrap)
+2. Parse recipient X25519 pubkey (32 bytes)
+3. ECDH: ephemeral_secret x recipient_pubkey -> shared_secret
+4. KEM encapsulation + key derivation (RFC 9180 single-shot)
+5. Output: KeyEnvelope {
+     wrapped_key: hex(ciphertext + auth_tag),
+     ephemeral_pubkey: hex(32_bytes)
    }
-8. Zeroize: symmetric_key, shared_x
+6. Zeroize: ephemeral_secret, shared_secret
 ```
 
-### Unwrapping (ecies_unwrap_key)
+### Unwrapping (hpke_unwrap_key)
 
 ```
-1. Parse secret key (32 bytes hex)
-2. Parse ephemeral pubkey (compressed SEC1, 33 bytes)
-3. ECDH: decryptor_secret x ephemeral_pubkey -> shared_x
-4. Detect version: first byte == 0x02 -> v2 (HKDF), else v1 (legacy SHA-256)
-5. Derive symmetric key using same KDF as wrapping
-6. Decrypt: XChaCha20-Poly1305 -> recover 32-byte content key
-7. Zeroize: symmetric_key, shared_x, sk_bytes
+1. Parse secret key (32 bytes hex, Ed25519 seed -> X25519 scalar)
+2. Parse ephemeral pubkey (32 bytes X25519)
+3. ECDH: decryptor_secret x ephemeral_pubkey -> shared_secret
+4. KEM decapsulation + key derivation (RFC 9180 single-shot)
+5. Decrypt: AES-256-GCM -> recover 32-byte content key
+6. Zeroize: shared_secret, sk_bytes
 ```
-
-### Version Migration
-
-- v2 (current): `HKDF-SHA256(ikm=shared_x, salt=empty, info=label)` — prefixed with `0x02` version byte
-- v1 (legacy): `SHA-256(label || shared_x)` — no version byte prefix
-- `ecies_unwrap_key_versioned()` returns `(key, needs_migration: bool)` for v1 data
 
 ## Multi-Admin Decryption Flow
 
-Each admin receives an independent ECIES envelope with its own ephemeral keypair:
+Each admin receives an independent HPKE envelope with its own ephemeral keypair:
 
 ```
 Record encrypted with content_key K:
   admin_envelopes: [
-    { pubkey: "admin1_pk", wrappedKey: ECIES(K, admin1_pk), ephemeralPubkey: "eph1" },
-    { pubkey: "admin2_pk", wrappedKey: ECIES(K, admin2_pk), ephemeralPubkey: "eph2" },
+    { pubkey: "admin1_pk", wrappedKey: HPKE(K, admin1_pk), ephemeralPubkey: "eph1" },
+    { pubkey: "admin2_pk", wrappedKey: HPKE(K, admin2_pk), ephemeralPubkey: "eph2" },
   ]
 ```
 
@@ -268,7 +261,7 @@ If no envelope matches your pubkey, decryption fails with `DecryptionFailed`.
 ### Server (Worker/Node.js)
 
 - Server encrypts inbound messages on webhook receipt, discards plaintext immediately
-- Uses `@noble/curves/secp256k1` + `@noble/ciphers` for ECIES in JS
+- Uses `@noble/curves/ed25519` + `@noble/hashes` for HPKE in JS
 - Server CANNOT decrypt E2EE data (no access to volunteer/admin secret keys)
 
 ## Critical Rules
@@ -277,11 +270,11 @@ If no envelope matches your pubkey, decryption fails with `DecryptionFailed`.
 
 2. **NEVER use raw string literals for labels** — import from generated constants (`LABEL_NOTE_KEY`, etc.). Source of truth: `packages/protocol/crypto-labels.json`.
 
-3. **NEVER put plaintext in Nostr events** — Nostr events are encrypted notifications for real-time transport. Data at rest lives in Durable Objects.
+3. **NEVER put plaintext in WebSocket events** — WebSocket events are encrypted notifications for real-time transport. Data at rest lives in PostgreSQL.
 
 4. **NEVER reuse content keys** — each record (note, message, call record, file) gets its own `random_bytes_32()` content key. This provides forward secrecy.
 
-5. **Hub key is for Nostr event encryption ONLY** — do NOT use `LABEL_HUB_KEY_WRAP` for data at rest. Hub key encrypts ephemeral transport; envelope encryption protects stored data.
+5. **Hub key is for WebSocket event encryption ONLY** — do NOT use `LABEL_HUB_KEY_WRAP` for data at rest. Hub key encrypts ephemeral transport; envelope encryption protects stored data.
 
 6. **Forward secrecy means old data is NOT re-encrypted for new admins** — a new admin cannot decrypt records created before they were added. This is by design.
 
@@ -301,15 +294,15 @@ If no envelope matches your pubkey, decryption fails with `DecryptionFailed`.
 | Re-encrypting old data for new admins | Breaks forward secrecy guarantee | New admins only decrypt future records |
 | Missing `version: 2` in stored records | No migration path for future algorithm changes | Include version field in every encrypted record |
 | Forgetting to zeroize content key | Key material lingers in memory | Call `content_key.zeroize()` after all envelopes are created |
-| Using `ecies_unwrap_key` (stateless) on desktop | Secret key crosses IPC boundary | Use `ecies_unwrap_key_from_state` (stateful) |
+| Using `hpke_unwrap_key` (stateless) on desktop | Secret key crosses IPC boundary | Use `hpke_unwrap_key_from_state` (stateful) |
 
 ## File Locations
 
 | File | Purpose |
 |------|---------|
-| `packages/protocol/crypto-labels.json` | Source of truth for all 28 domain separation labels |
+| `packages/protocol/crypto-labels.json` | Source of truth for all 69 domain separation labels |
 | `packages/crypto/src/labels.rs` | Rust label constants (must match JSON) |
-| `packages/crypto/src/ecies.rs` | ECIES wrap/unwrap implementation |
+| `packages/crypto/src/hpke.rs` | HPKE wrap/unwrap implementation (RFC 9180) |
 | `packages/crypto/src/encryption.rs` | High-level encrypt/decrypt for notes, messages, call records, drafts, exports |
 | `apps/desktop/src/crypto.rs` | Tauri IPC command wrappers + CryptoState |
 | `apps/desktop/src/lib.rs` | `generate_handler![]` registration (line 144) |

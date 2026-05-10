@@ -43,12 +43,11 @@ Pure crypto functions with zero Tauri dependency. This crate compiles to native 
 | File | Purpose |
 |------|---------|
 | `lib.rs` | Module declarations, re-exports |
-| `ecies.rs` | ECDH key agreement, ECIES wrap/unwrap (secp256k1 + XChaCha20-Poly1305) |
+| `hpke.rs` | HPKE wrap/unwrap (RFC 9180 X25519-HKDF-SHA256-AES256-GCM) |
 | `encryption.rs` | Note, message, call record, draft, file, export, PIN encrypt/decrypt |
-| `auth.rs` | BIP-340 Schnorr auth token creation and verification |
-| `keys.rs` | Keypair generation, nsec/npub bech32 encoding, validation |
+| `auth.rs` | Ed25519 auth token creation and verification |
+| `keys.rs` | Keypair generation, Ed25519/X25519 encoding, validation |
 | `labels.rs` | Domain separation constants (LABEL_NOTE_KEY, LABEL_FILE_KEY, etc.) |
-| `nostr.rs` | Nostr event ID computation and signing |
 | `errors.rs` | CryptoError enum |
 | `ffi.rs` | UniFFI exports for iOS/Android (feature-gated) |
 
@@ -251,42 +250,40 @@ All commands registered in `generate_handler![]` in `apps/desktop/src/lib.rs`:
 | `lock_crypto` | Zeroize and clear secret key |
 | `is_crypto_unlocked` | Check if state holds a key |
 | `get_public_key_from_state` | Return pubkey without exposing nsec |
-| `create_auth_token_from_state` | Schnorr auth token from state key |
-| `ecies_unwrap_key_from_state` | ECIES unwrap with generic label |
-| `decrypt_note_from_state` | Decrypt V2 note envelope |
+| `create_auth_token_from_state` | Ed25519 auth token from state key |
+| `hpke_unwrap_key_from_state` | HPKE unwrap with generic label |
+| `decrypt_note_from_state` | Decrypt note envelope |
 | `decrypt_message_from_state` | Decrypt message with reader envelopes |
 | `decrypt_call_record_from_state` | Decrypt call record metadata |
-| `decrypt_legacy_note_from_state` | Decrypt V1 packed note |
 | `decrypt_transcription_from_state` | Decrypt server-encrypted transcription |
 | `encrypt_draft_from_state` | Encrypt draft for local auto-save |
 | `decrypt_draft_from_state` | Decrypt locally-saved draft |
 | `encrypt_export_from_state` | Encrypt JSON export blob (returns base64) |
-| `sign_nostr_event_from_state` | Compute event ID + Schnorr signature |
-| `decrypt_file_metadata_from_state` | Decrypt ECIES file metadata |
+| `decrypt_file_metadata_from_state` | Decrypt file metadata envelope |
 | `unwrap_file_key_from_state` | Unwrap file key envelope |
 | `unwrap_hub_key_from_state` | Unwrap hub key envelope |
 | `rewrap_file_key_from_state` | Unwrap + re-wrap file key for new recipient |
-| `request_provisioning_token` | Generate one-time token for nsec export |
-| `get_nsec_from_state` | Export nsec (requires provisioning token) |
+| `request_provisioning_token` | Generate one-time token for key export |
+| `get_device_key_from_state` | Export device key (requires provisioning token) |
 
 ### Stateless (no CryptoState)
 
 | Command | Purpose |
 |---------|---------|
-| `generate_keypair` | Generate new Nostr keypair |
-| `key_pair_from_nsec` | Derive keypair from nsec (onboarding) |
-| `is_valid_nsec` | Validate nsec bech32 format |
-| `ecies_wrap_key` | ECIES wrap key for recipient (public-key-only) |
+| `generate_keypair` | Generate new Ed25519/X25519 keypair |
+| `key_pair_from_seed` | Derive keypair from seed (onboarding) |
+| `is_valid_seed` | Validate seed format |
+| `hpke_wrap_key` | HPKE wrap key for recipient (public-key-only) |
 | `encrypt_note` | Encrypt note with per-note forward secrecy |
 | `encrypt_message` | Encrypt message for multiple readers |
 | `create_auth_token` | Auth token with explicit secret key (sign-in only) |
-| `verify_schnorr` | Verify Schnorr signature |
+| `verify_ed25519` | Verify Ed25519 signature |
 
 ### Deregistered (kept for unit tests only)
 
 These accept `secret_key_hex` as a parameter and are marked `#[allow(dead_code)]`. They are NOT in `generate_handler![]`:
 
-`ecies_unwrap_key`, `decrypt_note`, `decrypt_message`, `encrypt_with_pin`, `decrypt_with_pin`, `get_public_key`
+`hpke_unwrap_key`, `decrypt_note`, `decrypt_message`, `encrypt_with_pin`, `decrypt_with_pin`, `get_public_key`
 
 ## Step-by-Step: Adding a New IPC Command
 

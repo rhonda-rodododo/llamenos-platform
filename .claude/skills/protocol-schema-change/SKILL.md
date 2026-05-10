@@ -60,7 +60,7 @@ packages/protocol/
     swift/CryptoLabels.swift
     kotlin/Types.kt            # ~103 KB Kotlin @Serializable data classes
     kotlin/CryptoLabels.kt
-  crypto-labels.json    # 28 domain separation constants (source of truth)
+  crypto-labels.json    # 69 domain separation constants (source of truth)
 ```
 
 ## Zod Schema Conventions

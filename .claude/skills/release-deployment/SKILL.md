@@ -25,12 +25,12 @@ Running `wrangler pages deploy dist` from wrong directory deploys Vite app to Pa
 | postgres | postgres:16 | Primary database (Drizzle ORM, Bun SQL) | internal |
 | caddy | caddy:2 | Reverse proxy, auto-TLS | web |
 | rustfs | rustfs/rustfs | Blob storage (R2 equivalent) | internal |
-| strfry | strfry | Nostr relay (real-time events) | internal |
+| websocket | (built-in) | WebSocket real-time events | internal |
 | whisper | (profile) | Transcription service | internal |
 | asterisk | (profile) | PBX for self-hosted telephony | internal |
 | signal-cli | (profile) | Signal messaging bridge | internal |
 
-Required env vars: PG_PASSWORD, SERVER_NOSTR_SECRET (64 hex), HMAC_SECRET, ADMIN_PUBKEY, NOSTR_RELAY_URL
+Required env vars: PG_PASSWORD, HMAC_SECRET, ADMIN_PUBKEY, WEBSOCKET_URL
 
 ## Helm (deploy/helm/)
 - Multi-replica RollingUpdate
@@ -75,7 +75,7 @@ build → e2e-cf + e2e-docker (parallel) → version → deploy-app + deploy-sit
 | Mistake | Consequence | Fix |
 |---------|------------|-----|
 | Running wrangler deploy directly | Breaks marketing site | Use bun run deploy:* scripts |
-| Forgetting SERVER_NOSTR_SECRET | Nostr events not signed | Generate: openssl rand -hex 32 |
+| Forgetting HMAC_SECRET | Webhook validation fails | Generate: openssl rand -hex 32 |
 | Version desync across platforms | Build failures | Always use bun run version:bump |
 | Missing ADMIN_PUBKEY | No bootstrap admin | Run bun run bootstrap-admin first |
 | Pushing without E2E passing | Broken deploy | CI gates on both CF + Docker E2E |

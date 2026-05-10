@@ -66,7 +66,7 @@ Group findings into epic-sized chunks by affected component:
 |-----------|-----------|-----------------|
 | **CI/CD & Supply Chain** | GitHub Actions, Docker images, dependency scanning | Action pinning, image digests, audit thresholds |
 | **Protocol & Schema** | Wire format, JSON Schema constraints | Schema validation, legacy format removal |
-| **Crypto (Rust)** | `packages/crypto/`, KDF, ECIES, Schnorr | KDF upgrades, zeroization, interop, salt handling |
+| **Crypto (Rust)** | `packages/crypto/`, KDF, HPKE, Ed25519 | KDF upgrades, zeroization, interop, salt handling |
 | **Worker** | `apps/worker/`, DOs, routes | Auth, rate limiting, webhook validation, data exposure |
 | **Desktop (Tauri)** | `apps/desktop/`, `src/client/` | CSP, IPC, Stronghold, PIN lockout, updater |
 | **iOS** | `apps/ios/` | Biometric, cert pinning, URL validation, keychain |
@@ -100,7 +100,7 @@ Android (uses crypto via CryptoService JNI + worker API)
 ```
 
 Why this order matters:
-- Crypto wire format changes (e.g., ECIES v1→v2) must land before any platform that encrypts/decrypts
+- Crypto wire format changes (e.g., HPKE algorithm upgrade) must land before any platform that encrypts/decrypts
 - Worker API changes must land before clients that call those APIs
 - CI/CD can harden independently without blocking feature work
 
@@ -128,7 +128,7 @@ These are the most important tests in security work — they prove the vulnerabi
 
 ### Breaking Change Management
 
-When a fix changes wire format (e.g., ECIES KDF upgrade):
+When a fix changes wire format (e.g., HPKE algorithm upgrade):
 
 1. Add a **version byte** to the new format
 2. Implement **fallback detection** in the old format reader
@@ -181,5 +181,5 @@ These categories appear in almost every audit round — check them proactively:
 - **Threat model**: `docs/security/THREAT_MODEL.md`
 - **Deployment hardening**: `docs/security/DEPLOYMENT_HARDENING.md`
 - **Protocol spec**: `docs/protocol/PROTOCOL.md`
-- **Crypto labels**: `packages/protocol/crypto-labels.json` (28 domain separation constants)
+- **Crypto labels**: `packages/protocol/crypto-labels.json` (69 domain separation constants)
 - **Previous audits**: `docs/security/SECURITY_AUDIT_*.md`
