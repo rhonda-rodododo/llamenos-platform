@@ -18,6 +18,16 @@ function escapeXml(str: string): string {
     .replace(/'/g, '&apos;')
 }
 
+/** Escape special characters for safe XML interpolation. */
+function escapeXml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;')
+}
+
 export const bandwidthProvider: ProviderCapabilityImpl = {
   providerType: 'bandwidth',
   capabilities: ['listNumbers', 'provisionNumbers', 'autoWebhooks'],
