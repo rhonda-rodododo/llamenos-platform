@@ -76,13 +76,16 @@ export function validateConfig(env: ConfigInput = process.env): void {
   assertHex64(env, serverSecretKey)
 
   // ADMIN_PUBKEY: 64 hex chars (Nostr pubkey, x-only compressed)
-  assertNonEmpty(env, 'ADMIN_PUBKEY')
-  const adminPubkey = env['ADMIN_PUBKEY']!.trim()
-  if (adminPubkey.length !== 64 || !HEX_RE.test(adminPubkey)) {
+  // Optional: if not set, admin must be bootstrapped via the web UI.
+  const adminPubkey = env['ADMIN_PUBKEY']?.trim() ?? ''
+  if (adminPubkey.length > 0 && (adminPubkey.length !== 64 || !HEX_RE.test(adminPubkey))) {
     throw new Error(
       `[llamenos] ADMIN_PUBKEY must be exactly 64 hex characters (Nostr x-only pubkey). Got length ${adminPubkey.length}. ` +
       `Generate with: bun run bootstrap-admin`
     )
+  }
+  if (adminPubkey.length === 0) {
+    logger.warn('ADMIN_PUBKEY not set — admin must be bootstrapped via the web UI')
   }
 
   assertNonEmpty(env, 'HOTLINE_NAME')

@@ -13,6 +13,14 @@
     group: "{{ deploy_group }}"
     mode: "0750"
 
+- name: Create scripts directory
+  ansible.builtin.file:
+    path: "{{ app_dir }}/scripts"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0750"
+
 - name: Create watchdog script
   ansible.builtin.template:
     src: watchdog/container-watchdog.sh.j2
