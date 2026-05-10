@@ -44,6 +44,7 @@ import mlsRoutes from './routes/mls'
 import signalRoutes from './routes/signal'
 import firehoseRoutes from './routes/firehose'
 import signalNotificationRoutes from './routes/signal-notification'
+import providerSetupRoutes from './routes/provider-setup'
 import { hubContext } from './middleware/hub'
 import { requestId } from './middleware/request-id'
 import { requestLogger } from './middleware/request-logger'
@@ -192,6 +193,7 @@ authenticated.route('/puk', pukRoutes)
 authenticated.route('/messaging/signal', signalRoutes)
 authenticated.route('/firehose', firehoseRoutes)
 authenticated.route('/signal-notification', signalNotificationRoutes)
+authenticated.route('/provider-setup', providerSetupRoutes)
 
 // Hub-scoped authenticated routes
 const hubScoped = new Hono<AppEnv>()
@@ -212,6 +214,7 @@ hubScoped.route('/events', eventsRoutes)
 hubScoped.route('/settings/cms', entitySchemaRoutes)
 hubScoped.route('/analytics', analyticsRoutes)
 hubScoped.route('/messaging/signal', signalRoutes)
+hubScoped.route('/provider-setup', providerSetupRoutes)
 hubScoped.route('/', evidenceRoutes)
 // Phase 6: MLS handshake message routing (hub-scoped)
 hubScoped.route('/mls', mlsRoutes)

@@ -62,6 +62,7 @@ dev.post('/test-reset', async (c) => {
   await services.blasts.reset()
   await services.contacts.reset(env)
   await services.cases.reset(env)
+  await services.providerSetup.reset()
   await services.settings.ensureInit()
   return c.json({ ok: true })
 })

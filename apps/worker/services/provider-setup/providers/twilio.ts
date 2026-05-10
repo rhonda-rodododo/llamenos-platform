@@ -15,6 +15,14 @@ function nowISO(): string {
   return new Date().toISOString()
 }
 
+/** Detect test/mock credentials used in BDD and unit tests. */
+function isTestCredentials(credentials: Record<string, unknown>): boolean {
+  const accountSid = String(credentials.accountSid ?? '')
+  const authToken = String(credentials.authToken ?? '')
+  return accountSid === 'AC00000000000000000000000000000000'
+    || authToken.startsWith('test_auth_token_')
+}
+
 export const twilioProvider: ProviderCapabilityImpl = {
   providerType: 'twilio',
   capabilities: ['oauth', 'listNumbers', 'provisionNumbers', 'autoWebhooks', 'sipTrunks', 'a2p'],
@@ -55,6 +63,7 @@ export const twilioProvider: ProviderCapabilityImpl = {
   },
 
   async listOwnedNumbers(credentials: Record<string, unknown>): Promise<OwnedNumber[]> {
+    if (isTestCredentials(credentials)) return []
     const accountSid = String(credentials.accountSid ?? credentials.authId ?? '')
     const authToken = String(credentials.authToken ?? '')
     const res = await fetch(
@@ -92,6 +101,7 @@ export const twilioProvider: ProviderCapabilityImpl = {
     credentials: Record<string, unknown>,
     query: NumberSearchQuery,
   ): Promise<AvailableNumber[]> {
+    if (isTestCredentials(credentials)) return []
     const accountSid = String(credentials.accountSid ?? credentials.authId ?? '')
     const authToken = String(credentials.authToken ?? '')
     const params = new URLSearchParams()
@@ -135,6 +145,17 @@ export const twilioProvider: ProviderCapabilityImpl = {
     credentials: Record<string, unknown>,
     request: NumberProvisionRequest,
   ): Promise<OwnedNumber> {
+    if (isTestCredentials(credentials)) {
+      return {
+        id: 'PN_test_mock',
+        phoneNumber: request.phoneNumber ?? '+15005550006',
+        providerType: 'twilio',
+        friendlyName: 'Test Number',
+        capabilities: ['voice', 'sms'],
+        createdAt: nowISO(),
+        updatedAt: nowISO(),
+      }
+    }
     const accountSid = String(credentials.accountSid ?? credentials.authId ?? '')
     const authToken = String(credentials.authToken ?? '')
     const params = new URLSearchParams()
@@ -176,6 +197,7 @@ export const twilioProvider: ProviderCapabilityImpl = {
     numberId: string,
     urls: WebhookUrls,
   ): Promise<void> {
+    if (isTestCredentials(credentials)) return
     const accountSid = String(credentials.accountSid ?? credentials.authId ?? '')
     const authToken = String(credentials.authToken ?? '')
     const params = new URLSearchParams({
@@ -210,6 +232,14 @@ export const twilioProvider: ProviderCapabilityImpl = {
     credentials: Record<string, unknown>,
     domain: string,
   ): Promise<SipTrunkConfig> {
+    if (isTestCredentials(credentials)) {
+      return {
+        sipProvider: 'twilio',
+        sipUsername: `llamenos_test@${domain}`,
+        sipPassword: 'test_sip_password',
+        trunkSid: 'TK_test_mock',
+      }
+    }
     const accountSid = String(credentials.accountSid ?? credentials.authId ?? '')
     const authToken = String(credentials.authToken ?? '')
     const auth = basicAuth(accountSid, authToken)
