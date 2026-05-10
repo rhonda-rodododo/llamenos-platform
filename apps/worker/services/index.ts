@@ -24,6 +24,7 @@ import { SignalContactsService } from './signal-contacts'
 import { SecurityPrefsService } from './security-prefs'
 import { UserNotificationsService } from './user-notifications'
 import { DigestCronService } from './digest-cron'
+import { ProviderSetup } from './provider-setup'
 
 export interface Services {
   identity: IdentityService
@@ -45,6 +46,7 @@ export interface Services {
   securityPrefs: SecurityPrefsService
   userNotifications: UserNotificationsService
   digestCron: DigestCronService
+  providerSetup: ProviderSetup
 }
 
 export interface ServicesOpts {
@@ -89,6 +91,7 @@ export function createServices(db: Database, opts?: ServicesOpts): Services {
     securityPrefs,
     userNotifications,
     digestCron,
+    providerSetup: new ProviderSetup(db, opts?.hmacSecret ?? '', opts?.env?.DOMAIN ?? 'localhost'),
   }
 
   // Only create firehose agent if seal key is configured
@@ -127,4 +130,5 @@ export {
   SecurityPrefsService,
   UserNotificationsService,
   DigestCronService,
+  ProviderSetup,
 }
