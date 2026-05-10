@@ -4,12 +4,37 @@ pre-commit:
     typecheck:
       run: bun run typecheck
       stage_fixed: true
+    lint:
+      glob: "{src,apps/worker}/**/*.{ts,tsx}"
+      run: bun run lint
+      stage_fixed: true
     codegen-freshness:
       glob: "packages/protocol/schemas/*.ts"
       run: bun run codegen && git diff --exit-code packages/protocol/generated/
+    bddgen-freshness:
+      glob: "{packages/test-specs/features/**/*.feature,tests/steps/**/*.ts}"
+      run: bunx bddgen && git diff --exit-code .features-gen/
+    worker-unit-tests:
+      glob: "apps/worker/**/*.{ts,tsx}"
+      run: bun run test:worker:unit
+    crypto-unit-tests:
+      glob: "packages/crypto/**/*.rs"
+      run: bun run crypto:test
+    crypto-ffi-build:
+      glob: "packages/crypto/**/*.rs"
+      run: bun run crypto:build:server
     migration-drift:
       glob: "apps/worker/db/schema/*.ts"
       run: bun scripts/check-migration-drift.ts
+    ipc-allowlist-check:
+      glob: "{apps/desktop/src/**/*.rs,src/client/lib/platform.ts}"
+      run: bun run check:ipc-allowlist
+    i18n-validate:
+      glob: "{packages/i18n/locales/*.json,src/client/**/*.tsx}"
+      run: bun run i18n:validate:all
+    test-specs-validate:
+      glob: "{packages/test-specs/features/**/*.feature,tests/steps/**/*.ts}"
+      run: bun run test-specs:validate
     block-env-files:
       run: |
         # Block actual .env files (which may contain secrets) but allow .env.example (template)
@@ -27,3 +52,6 @@ pre-push:
       run: bun run codegen:check
     check-migration-drift:
       run: bun scripts/check-migration-drift.ts
+    rust-format-check:
+      glob: "packages/crypto/**/*.rs"
+      run: bun run crypto:fmt

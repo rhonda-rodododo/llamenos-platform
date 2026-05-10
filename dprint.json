@@ -1,0 +1,54 @@
+{
+  "typescript": {
+    "lineWidth": 100,
+    "indentWidth": 2,
+    "useTabs": false,
+    "semiColons": "always",
+    "quoteStyle": "preferDouble",
+    "trailingCommas": "always",
+    "arrowFunction.useParentheses": "force",
+    "module.sortImportDeclarations": "maintain",
+    "module.sortExportDeclarations": "maintain"
+  },
+  "json": {},
+  "markdown": {},
+  "toml": {},
+  "dockerfile": {},
+  "includes": [
+    "**/*.{ts,tsx,js,jsx,mjs,cjs}",
+    "**/*.{json,jsonc}",
+    "**/*.toml",
+    "**/*.yml",
+    "**/*.yaml",
+    "**/*.Dockerfile",
+    "**/Dockerfile"
+  ],
+  "excludes": [
+    "**/node_modules",
+    "**/dist",
+    "**/build",
+    "**/.git",
+    "**/target",
+    "packages/protocol/generated",
+    "apps/ios/vendor",
+    "apps/android/vendor",
+    "apps/android/app/build",
+    "apps/ios/build",
+    "apps/desktop/src-tauri/target",
+    "tests/.features-gen",
+    "**/*.lock",
+    "**/*.md",
+    "apps/ios/Resources/**/*.json",
+    "drizzle/migrations/**/*.json",
+    "package.json",
+    "apps/desktop/tauri.conf.json",
+    "site/wrangler.jsonc"
+  ],
+  "plugins": [
+    "https://plugins.dprint.dev/typescript-0.93.0.wasm",
+    "https://plugins.dprint.dev/json-0.19.3.wasm",
+    "https://plugins.dprint.dev/markdown-0.17.8.wasm",
+    "https://plugins.dprint.dev/toml-0.6.3.wasm",
+    "https://plugins.dprint.dev/dockerfile-0.3.2.wasm"
+  ]
+}

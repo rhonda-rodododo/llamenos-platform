@@ -73,3 +73,6 @@ apps/ios/.swiftpm/
 # Load test results
 tests/load/*.json
 .worktrees/
+
+# dprint cache
+.dprint/cache/
