@@ -230,8 +230,8 @@ Record encrypted with content_key K:
 
 Decryption:
 1. Find envelope where `pubkey == my_pubkey`
-2. ECDH: `my_secret x ephemeral_pubkey -> shared_x`
-3. HKDF derive symmetric key with the record's label
+2. ECDH: `my_secret x ephemeral_pubkey -> shared_secret`
+3. HPKE decapsulate to derive symmetric key
 4. Unwrap content key K
 5. XChaCha20-Poly1305 decrypt the `encrypted_content` with K
 

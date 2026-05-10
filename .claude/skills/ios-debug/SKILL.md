@@ -9,8 +9,8 @@ user-invocable: false
 ## Mac SSH Setup
 
 **Host alias**: `ssh mac`
-**Hardware**: Mac mini M4, macOS 26.2 (Tahoe), Xcode 26.2
-**iOS Simulator runtime**: 26.2 — available: iPhone 17 series, iPhone 16e, iPad Pro/Air/mini (NO iPhone 16)
+**Hardware**: Mac mini M4, macOS 15.x, Xcode 16+
+**iOS Simulator runtime**: iOS 17+ — available: iPhone 15 series, iPhone 16 series, iPad Pro/Air/mini
 **Worktree path**: `~/.worktrees/<branch-name>` (NOT `~/projects/llamenos/.worktrees/`)
 
 **Always init PATH for non-login SSH shells:**
@@ -58,10 +58,10 @@ bun run ios:status        # Check Xcode/Rust/xcodegen status
 
 ```bash
 # Build for simulator (SPM scheme)
-ssh mac "cd ~/projects/llamenos && eval \"\$(/opt/homebrew/bin/brew shellenv)\" && xcodebuild build -scheme Llamenos-Package -destination 'platform=iOS Simulator,name=iPhone 17'"
+ssh mac "cd ~/projects/llamenos && eval \"\$(/opt/homebrew/bin/brew shellenv)\" && xcodebuild build -scheme Llamenos-Package -destination 'platform=iOS Simulator,name=iPhone 16'"
 
 # Run unit tests
-ssh mac "cd ~/projects/llamenos && eval \"\$(/opt/homebrew/bin/brew shellenv)\" && xcodebuild test -scheme Llamenos-Package -destination 'platform=iOS Simulator,name=iPhone 17'"
+ssh mac "cd ~/projects/llamenos && eval \"\$(/opt/homebrew/bin/brew shellenv)\" && xcodebuild test -scheme Llamenos-Package -destination 'platform=iOS Simulator,name=iPhone 16'"
 
 # List available simulators (when device not found)
 ssh mac "xcrun simctl list devices available"
@@ -110,11 +110,11 @@ EXCLUDED_ARCHS[sdk=iphonesimulator*] = x86_64
 (already in xcconfig — check if missing after xcodegen regeneration)
 
 ### "iPhone 16" simulator not found
-Use `iPhone 17` or `iPhone 16e` — Xcode 26.2 on macos-26 runner has these, not iPhone 16.
+Use `iPhone 15` or `iPhone 16` — Xcode 16+ has these models available.
 
 ### Dynamic simulator detection (for CI)
 ```bash
-xcrun simctl list devices available | grep -E "iPhone (17|16e)" | head -1 | awk -F'[()]' '{print $2}'
+xcrun simctl list devices available | grep -E "iPhone (15|16)" | head -1 | awk -F'[()]' '{print $2}'
 ```
 
 ## Import Foundation in Test Files

@@ -30,9 +30,16 @@ bun run test:desktop   # Playwright BDD
 bun run test:ios       # XCUITest + unit tests
 bun run test:android   # Gradle unit + lint + androidTest compilation
 bun run test:worker    # Worker integration tests
+bun run test:worker:unit       # Worker unit tests via Vitest
+bun run test:worker:integration # Worker integration tests via Vitest
+bun run test:worker:watch      # Worker tests in watch mode
 bun run test:crypto    # cargo test + clippy
 bun run test:backend:bdd  # Backend BDD against Docker Compose (API-level)
 bun run test:feature <name>  # Tests matching feature name across platforms
+bun run test:desktop:wdio     # WebDriverIO desktop tests
+bun run test:android:direct   # Direct Android gradle tests
+bun run test:android:e2e:parallel # Parallel Android E2E tests
+bun run test:live       # Playwright live tests
 ```
 
 All scripts support: `--verbose`, `--no-codegen`, `--json`, `--timeout <seconds>`
@@ -57,8 +64,8 @@ All scripts support: `--verbose`, `--no-codegen`, `--json`, `--timeout <seconds>
 │ + Docker ││ + Docker ││ +Simulator │     │ + Emulator*  │
 └──────────┘└──────────┘└────────────┘     └──────────────┘
                                                   │
-                                            * Emulator broken
-                                              on macOS 26
+     * Emulator may have issues
+                                               on some macOS versions
     ┌────────────┐     ┌──────────────┐
     │   Worker   │     │    Crypto    │
     │  Vitest    │     │  cargo test  │
@@ -112,7 +119,7 @@ No browser needed -- tests hit the API directly via Playwright's APIRequestConte
 **Always use dev compose (backing services) + `bun run dev:server` (app with file watching):**
 
 ```bash
-# 1. Start backing services (PostgreSQL, RustFS, strfry)
+# 1. Start backing services (PostgreSQL, RustFS)
 docker compose -f deploy/docker/docker-compose.dev.yml up -d
 
 # 2. Start app locally (auto-reloads on code changes via --watch)
@@ -192,7 +199,7 @@ xcrun simctl shutdown all
 xcrun simctl erase "iPhone 17"
 
 # Available on this Mac: iPhone 17 series, iPhone Air, iPhone 16e
-# NOT available: iPhone 16 (Xcode 26.3)
+# Check available simulators with: xcrun simctl list devices available
 ```
 
 ### Running
@@ -255,9 +262,9 @@ cd apps/android && ./gradlew lintDebug
 cd apps/android && ./gradlew compileDebugAndroidTestKotlin
 ```
 
-### Emulator (BROKEN on macOS 26)
+### Emulator
 
-Android emulator does NOT work on macOS 26 Tahoe due to HVF permission issues.
+Android emulator may have issues on some macOS versions due to HVF permission issues.
 
 **For E2E tests, use the Linux machine (192.168.50.95)**:
 
@@ -333,7 +340,7 @@ docker compose -f deploy/docker/docker-compose.dev.yml down    # keep data
 docker compose -f deploy/docker/docker-compose.dev.yml down -v  # wipe data
 ```
 
-The dev compose exposes PostgreSQL (5432), RustFS (9000/9001), and strfry (7777) directly.
+The dev compose exposes PostgreSQL (5432) and RustFS (9000/9001) directly.
 `bun run dev:server` sets `ENVIRONMENT=development` automatically, enabling `/api/test-reset`.
 
 ### For CI Only

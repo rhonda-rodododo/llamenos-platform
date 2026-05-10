@@ -4,9 +4,10 @@
 
 | Tool | Install |
 |------|---------|
-| [Bun](https://bun.sh/) (v1.0+) | `curl -fsSL https://bun.sh/install \| bash` |
+| [Bun](https://bun.sh/) (v1.3.5+) | `curl -fsSL https://bun.sh/install \| bash` |
 | [Rust](https://rustup.rs/) (1.85+) | Required for desktop and crypto crate |
 | [Docker + Docker Compose](https://docs.docker.com/engine/install/) | Required for backend development |
+| [mise](https://mise.jdx.dev/) | Polyglot version manager — run `mise install` once after cloning |
 
 **Linux WebKit (for Tauri desktop):**
 ```bash
@@ -14,7 +15,7 @@ sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev \
   libayatana-appindicator3-dev librsvg2-dev
 ```
 
-**iOS (requires Mac M4 with Xcode 26+):** See `docs/DEVELOPMENT_SETUP.md`.
+**iOS (requires Mac with Xcode 16+):** See `docs/DEVELOPMENT_SETUP.md`.
 
 ## Initial Setup
 
@@ -29,7 +30,7 @@ bun run bootstrap-admin          # Generate admin keypair
 Always use the dev compose for backing services + `bun run dev:server` for the app:
 
 ```bash
-# 1. Start PostgreSQL, RustFS, strfry relay
+# 1. Start PostgreSQL, RustFS
 docker compose -f deploy/docker/docker-compose.dev.yml up -d
 
 # 2. Start the Bun HTTP server with file watching
@@ -95,8 +96,8 @@ apps/
 packages/
   crypto/             # Shared Rust crypto crate (native + WASM + UniFFI)
   protocol/           # JSON Schema definitions + codegen (TS/Swift/Kotlin)
-    schemas/          # 80+ Zod schema files — source of truth for all types
-    crypto-labels.json # 57 domain separation constants
+    schemas/          # 42+ Zod schema files — source of truth for all types
+    crypto-labels.json # 69 domain separation constants
   shared/             # Cross-boundary TypeScript types and config
   i18n/               # Localization files + iOS/Android string codegen
 src/
@@ -106,7 +107,7 @@ src/
     lib/
       platform.ts     # Platform abstraction — routes crypto to Rust IPC
       auth.tsx        # Auth context (Ed25519 device keys + WebAuthn)
-      ws.ts           # WebSocket / Nostr relay connection
+      ws.ts           # WebSocket connection
 tests/
   mocks/              # Tauri IPC mock layer for Playwright test builds
 docs/                 # Guides, protocol spec, security docs
@@ -162,8 +163,8 @@ All crypto is implemented in `packages/crypto/` (Rust), compiled to:
 - **Envelope encryption**: HPKE RFC 9180 (X25519 + HKDF-SHA256 + AES-256-GCM)
 - **Symmetric**: XChaCha20-Poly1305 (hub events)
 - **KDF**: HKDF-SHA-256, Argon2id (PINs, 64MB/3/4)
-- **Signing**: Ed25519 (device auth, sigchain) + BIP-340 Schnorr (Nostr identity only)
-- **Domain separation**: 57 labeled contexts in `packages/protocol/crypto-labels.json`
+- **Signing**: Ed25519 (device auth, sigchain) + BIP-340 Schnorr (legacy Nostr identity, being phased out)
+- **Domain separation**: 69 labeled contexts in `packages/protocol/crypto-labels.json`
 
 **Key model**: Each device has its own Ed25519 (signing) + X25519 (encryption) keypair. Device keys never enter the webview — all crypto calls go through Rust via Tauri IPC. The `platform.ts` abstraction is the only correct way to invoke crypto from the frontend.
 
@@ -176,7 +177,7 @@ Authorization: Session <WebAuthn token>
 
 ### Real-Time Sync
 
-Nostr relay (strfry, self-hosted). All event content is encrypted with the hub key. Generic tags (`["t", "llamenos:event"]`) — relay cannot distinguish event types.
+WebSocket-based real-time sync. All event content is encrypted with the hub key.
 
 ## Testing
 
@@ -221,7 +222,7 @@ bun run typecheck  # Verify no type errors
 
 - `@noble/ciphers` and `@noble/hashes` require `.js` extension in imports
 - `schnorr` is a separate named export: `import { schnorr } from '@noble/curves/secp256k1.js'`
-- Nostr pubkeys are x-only (32 bytes) — prepend `"02"` for ECDH
+- WebSocket events replace the previous Nostr relay implementation
 - Never use raw string literals for crypto contexts — always use generated label constants from `@protocol/crypto-labels`
 - `PLAYWRIGHT_TEST=true` enables Vite aliases that swap Tauri IPC for JS mocks in `tests/mocks/`
 - **wrangler.jsonc is only at `site/wrangler.jsonc`** — do not run `wrangler` from the repo root
@@ -237,4 +238,22 @@ bun install
 bun run dev         # Local dev server
 bun run build       # Build static site
 bun run deploy:site # Deploy (from repo root — do NOT run wrangler directly)
+```
+
+## Development Workflow
+
+- **New feature**: `superpowers:brainstorming` → spec → `superpowers:writing-plans` → plan → `superpowers:executing-plans`
+- **Bug fix**: `superpowers:systematic-debugging`
+- **Code complete**: `superpowers:verification-before-completion` + `superpowers:requesting-code-review`
+
+## Load Testing
+
+k6-based load tests are available for performance validation:
+
+```bash
+bun run load:calls      # Call routing load test
+bun run load:messages   # Messaging load test
+bun run load:mixed      # Mixed traffic load test
+bun run load:burst      # Burst traffic load test
+bun run load:all        # All load tests
 ```

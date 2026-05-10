@@ -21,7 +21,11 @@ All methods return provider-agnostic types. Business logic never touches provide
 | SignalWire | TwiML XML | 60 | TwilioAdapter | Override base URL + webhook header |
 | Vonage | NCCO JSON | 495 | — | JWT auth, different action names |
 | Plivo | Plivo XML | 449 | — | Similar to TwiML, different elements |
-| Asterisk | ARI JSON | 543 | — | Self-hosted, needs bridge service |
+| Telnyx | TwiML XML | ~400 | TwilioAdapter | Override base URL + API key auth |
+| Bandwidth | BXML XML | ~350 | — | Similar to TwiML, BXML format |
+| Asterisk | ARI JSON | 543 | SipBridgeAdapter | Self-hosted, ARI backend |
+| FreeSWITCH | ESL JSON | ~400 | SipBridgeAdapter | Self-hosted, ESL backend |
+| sip-bridge | Protocol-agnostic | — | — | PBX_TYPE selects ARI/ESL/Kamailio |
 
 ## Adding a New Voice Provider - Checklist
 
@@ -87,6 +91,18 @@ Show equivalent for "speak text, gather DTMF digits, route call" in each format:
 ]}
 ```
 
+## Messaging Channels
+
+All messaging goes through `MessagingAdapter` interface. Supported channels:
+
+| Channel | Location | Adapters |
+|---------|----------|----------|
+| **SMS** | `apps/worker/messaging/sms/` | Twilio, SignalWire, Vonage, Plivo |
+| **WhatsApp** | `apps/worker/messaging/whatsapp/` | Meta Cloud API, Twilio wrapper |
+| **Signal** | `apps/worker/messaging/signal/` | signal-cli-rest-api bridge |
+| **Telegram** | `apps/worker/messaging/telegram/` | Bot API |
+| **RCS** | `apps/worker/messaging/rcs/` | Google RBM |
+
 ## Adding SMS Support
 
 1. Create `apps/worker/messaging/sms/provider.ts` implementing `MessagingAdapter`
@@ -109,4 +125,4 @@ Two modes:
 | Missing phone normalization | Lookup failures | Always E.164 format with + prefix |
 | Provider-specific voice codes | Wrong language spoken | Map to provider's language code format |
 | Hardcoded Twilio-specific field names | Crashes on other providers | Use adapter method return types |
-| Missing bridge service for Asterisk | No self-hosted voice | Deploy asterisk-bridge alongside app |
+| Missing bridge service for Asterisk/FreeSWITCH | No self-hosted voice | Deploy sip-bridge with PBX_TYPE env var |

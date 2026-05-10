@@ -23,7 +23,7 @@ Missing a step means type mismatches, runtime crashes, or crypto failures on one
 
 ```
 packages/protocol/
-  schemas/              # 80+ Zod schema files (SOURCE OF TRUTH)
+  schemas/              # 42+ Zod schema files (SOURCE OF TRUTH)
     common.ts           # Pagination, errors, envelopes, crypto types
     auth.ts             # Login, bootstrap, profile, session types
     notes.ts            # Note CRUD, replies, custom fields
