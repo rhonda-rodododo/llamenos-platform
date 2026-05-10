@@ -1,0 +1,20 @@
+{
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  },
+  "storage-driver": "overlay2",
+  "live-restore": true,
+  "userland-proxy": false,
+  "no-new-privileges": true,
+  {% if docker_userns_remap | default(false) %}
+  "userns-remap": "default",
+  {% endif %}
+  "default-address-pools": [
+    {
+      "base": "172.30.0.0/16",
+      "size": 24
+    }
+  ]
+}

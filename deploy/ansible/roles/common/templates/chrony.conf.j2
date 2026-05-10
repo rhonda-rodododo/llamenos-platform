@@ -1,0 +1,37 @@
+# chrony.conf - managed by Ansible
+# Do not edit manually
+
+# NTP servers from vars.yml
+{% for server in ntp_servers %}
+server {{ server }} iburst
+{% endfor %}
+
+# Record the rate at which the system clock gains/losses time
+driftfile /var/lib/chrony/chrony.drift
+
+# Allow the system clock to be stepped in the first three updates
+# if its offset is larger than 1 second
+makestep 1.0 3
+
+# Enable kernel synchronization of the real-time clock (RTC)
+rtcsync
+
+# Serve time even if not synchronized to a time source
+# (useful in isolated networks)
+# local stratum 10
+
+# Allow NTP client access from local network
+# allow 192.168.0.0/16
+
+# Listen for commands only on localhost
+bindcmdaddress 127.0.0.1
+bindcmdaddress ::1
+
+# Disable logging of client accesses
+noclientlog
+
+# Send a message to syslog if a clock adjustment is larger than 0.5 seconds
+logchange 0.5
+
+# Log clock adjustments
+log tracking measurements statistics
