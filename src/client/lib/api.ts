@@ -825,10 +825,24 @@ export async function getTelephonyProvider() {
 }
 
 export async function updateTelephonyProvider(config: TelephonyProviderConfig) {
-  return request<TelephonyProviderConfig>('/settings/telephony-provider', {
-    method: 'PATCH',
-    body: JSON.stringify(config),
+  // Extract credentials from config — everything except 'type' and 'phoneNumber'
+  const { type, phoneNumber, ...rest } = config as unknown as Record<string, unknown>
+  const credentials: Record<string, string> = {}
+  for (const [k, v] of Object.entries(rest)) {
+    if (v != null && v !== '') credentials[k] = String(v)
+  }
+
+  await request<{ ok: true }>('/provider-setup/configure', {
+    method: 'POST',
+    body: JSON.stringify({
+      provider: type,
+      credentials,
+      phoneNumber,
+    }),
   })
+
+  // Return the config as-is since the caller uses it for UI state
+  return config
 }
 
 export async function testTelephonyProvider(config: Partial<TelephonyProviderConfig> & { type: string }) {

@@ -383,17 +383,17 @@ Feature: Permission Matrix
       | volunteer    | denied    | 403    |
       | reporter     | denied    | 403    |
 
-  Scenario Outline: <role> <expected> access to update telephony provider
+  Scenario Outline: <role> <expected> access to update telephony provider (deprecated)
     When the "<role>" user sends "PATCH" to "/api/settings/telephony-provider" with telephony body
     Then the response status should be <status>
 
     Examples:
-      | role         | expected  | status |
-      | super-admin  | has       | 200    |
-      | hub-admin    | has       | 200    |
-      | reviewer     | denied    | 403    |
-      | volunteer    | denied    | 403    |
-      | reporter     | denied    | 403    |
+      | role         | expected    | status |
+      | super-admin  | deprecated  | 400    |
+      | hub-admin    | deprecated  | 400    |
+      | reviewer     | denied      | 403    |
+      | volunteer    | denied      | 403    |
+      | reporter     | denied      | 403    |
 
   # ─── Settings Domain: Messaging ───────────────────────────────────
 

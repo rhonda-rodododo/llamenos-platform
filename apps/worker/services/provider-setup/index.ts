@@ -32,6 +32,7 @@ export class ProviderSetup {
     provider: TelephonyProviderType,
     credentials: Record<string, string>,
     hubId?: string,
+    phoneNumber?: string,
   ): Promise<{ ok: true }> {
     const impl = getProviderCapability(provider)
     if (!impl) {
@@ -46,7 +47,7 @@ export class ProviderSetup {
       credentials: encryptedCreds,
       status: 'connected',
       capabilities: impl.capabilities as string[],
-      phoneNumbers: [],
+      phoneNumbers: phoneNumber ? [phoneNumber] : [],
       error: null,
       lastCheckedAt: new Date(),
     })

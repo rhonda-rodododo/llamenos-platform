@@ -401,6 +401,7 @@ providerSetup.post('/configure',
         body.provider,
         body.credentials ?? {},
         hubId ?? body.hubId,
+        body.phoneNumber,
       )
       return c.json({ ok: true })
     } catch (err) {

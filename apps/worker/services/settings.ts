@@ -1071,18 +1071,40 @@ export class SettingsService {
     return { ok: true }
   }
 
-  async getTelephonyProvider(): Promise<TelephonyProviderConfig | null> {
+  async getTelephonyProvider(hmacSecret?: string): Promise<TelephonyProviderConfig | null> {
     const [row] = await this.db
       .select()
       .from(providerConfigs)
       .where(isNull(providerConfigs.hubId))
       .limit(1)
-    if (!row?.credentials) return null
-    try {
-      return JSON.parse(row.credentials) as TelephonyProviderConfig
-    } catch {
-      return null
+    if (!row) return null
+
+    // Build base config from provider_configs metadata
+    const config: Record<string, unknown> = {
+      type: row.providerType,
+      phoneNumber: (row.phoneNumbers as string[])?.[0] ?? '',
     }
+
+    // Decrypt credentials if hmacSecret is provided and credentials exist
+    if (row.credentials && hmacSecret) {
+      try {
+        const { decryptCredentials } = await import('./provider-setup/crypto')
+        const creds = decryptCredentials(row.credentials, hmacSecret)
+        Object.assign(config, creds)
+      } catch {
+        // Credentials may be plain JSON (legacy) — try parsing directly
+        try {
+          Object.assign(config, JSON.parse(row.credentials))
+        } catch { /* ignore */ }
+      }
+    } else if (row.credentials) {
+      // No hmacSecret — try plain JSON parse (legacy path)
+      try {
+        Object.assign(config, JSON.parse(row.credentials))
+      } catch { /* encrypted, can't decrypt without secret */ }
+    }
+
+    return config as unknown as TelephonyProviderConfig
   }
 
   /**
