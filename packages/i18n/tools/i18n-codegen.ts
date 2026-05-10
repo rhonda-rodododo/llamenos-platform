@@ -111,7 +111,7 @@ function generateKotlinConstants(keys: Record<string, string>): string {
   const entries = Object.entries(keys)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([key, value]) => {
-      const constName = key.toUpperCase()
+      const constName = camelToSnake(key).replace(/\./g, '_').toUpperCase()
       // Truncate long English values in comments
       const sanitized = value.replace(/\n/g, '\\n').replace(/"/g, '\\"')
       const comment = sanitized.length > 60 ? sanitized.slice(0, 57) + '...' : sanitized
