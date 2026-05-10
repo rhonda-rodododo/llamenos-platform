@@ -6,10 +6,7 @@ import type {
 } from '@protocol/schemas/provider-setup'
 import type { ProviderCapabilityImpl, ConnectionTestResult, SipTrunkConfig, WebhookUrls } from '../types'
 import { ProviderApiError } from '../types'
-
-function nowISO(): string {
-  return new Date().toISOString()
-}
+import { nowISO } from '../utils'
 
 export const telnyxProvider: ProviderCapabilityImpl = {
   providerType: 'telnyx',

@@ -47,13 +47,22 @@ export interface SipTrunkConfig {
  * Provider API error — thrown when a provider returns a non-2xx response.
  */
 export class ProviderApiError extends Error {
+  public readonly responseBody: string
+
   constructor(
     message: string,
     public readonly statusCode: number,
-    public readonly responseBody: string,
+    responseBody: string,
   ) {
     super(message)
     this.name = 'ProviderApiError'
+    // Truncate to prevent leaking sensitive data in logs
+    this.responseBody = responseBody.length > 500 ? responseBody.slice(0, 500) + '...' : responseBody
+  }
+
+  /** Safe string representation that omits the response body. */
+  toSafeString(): string {
+    return `${this.name}: ${this.message} (HTTP ${this.statusCode})`
   }
 }
 

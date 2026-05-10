@@ -7,10 +7,7 @@ import type {
 import type { ProviderCapabilityImpl, ConnectionTestResult, SipTrunkConfig, WebhookUrls } from '../types'
 import { ProviderApiError } from '../types'
 import { validateExternalUrl } from '../../../lib/ssrf-guard'
-
-function nowISO(): string {
-  return new Date().toISOString()
-}
+import { nowISO } from '../utils'
 
 export const asteriskProvider: ProviderCapabilityImpl = {
   providerType: 'asterisk',

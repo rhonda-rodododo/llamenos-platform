@@ -5,7 +5,8 @@ import { hexToBytes, bytesToHex, utf8ToBytes } from '@shared/encoding'
 /**
  * Encrypt provider credentials for at-rest storage.
  *
- * Uses serverEncrypt (HKDF + AES-256-GCM) with LABEL_STORAGE_CREDENTIAL_WRAP.
+ * Uses serverEncrypt (HKDF-SHA256 key derivation + symmetric encryption via FFI)
+ * with LABEL_STORAGE_CREDENTIAL_WRAP for domain separation.
  * Returns a hex-encoded ciphertext string.
  */
 export function encryptCredentials(

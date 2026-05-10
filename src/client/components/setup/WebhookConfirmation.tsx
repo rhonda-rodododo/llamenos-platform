@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Check, Copy, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -19,6 +19,13 @@ export function WebhookConfirmation({ urls, visible, onReconfigure }: WebhookCon
   const { t } = useTranslation()
   const { toast } = useToast()
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null)
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current)
+    }
+  }, [])
 
   if (!visible || urls.length === 0) return null
 
@@ -26,7 +33,8 @@ export function WebhookConfirmation({ urls, visible, onReconfigure }: WebhookCon
     navigator.clipboard.writeText(url)
     setCopiedUrl(url)
     toast(t('setup.webhookCopied'), 'success')
-    setTimeout(() => setCopiedUrl(null), 2000)
+    if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current)
+    copyTimeoutRef.current = setTimeout(() => setCopiedUrl(null), 2000)
   }
 
   function handleCopyAll() {

@@ -182,8 +182,8 @@ export const PERMISSION_CATALOG = {
   // Messaging
   'messaging:manage-signal': 'Manage Signal bridge registration',
 
-  // Hubs
-  'hub:configure': 'Configure hub provisioning and setup wizard',
+  // Hub Configuration
+  'hubs:configure': 'Configure hub provisioning and setup wizard',
 
   // System (super-admin only)
   'system:view-roles': 'View role definitions',
@@ -246,7 +246,7 @@ export const DEFAULT_ROLES: Omit<Role, 'createdAt' | 'updatedAt'>[] = [
       'firehose:*',
       'telephony:manage-providers', 'telephony:view-providers', 'telephony:manage-numbers', 'telephony:view-numbers', 'telephony:manage-a2p',
       'messaging:manage-signal',
-      'hub:configure',
+      'hubs:configure',
       'hubs:read', 'hubs:manage-members', 'hubs:manage-keys',
       'metrics:read', 'system:view-roles',
     ],

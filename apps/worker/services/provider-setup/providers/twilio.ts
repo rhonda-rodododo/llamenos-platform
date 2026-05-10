@@ -6,14 +6,7 @@ import type {
 } from '@protocol/schemas/provider-setup'
 import type { ProviderCapabilityImpl, ConnectionTestResult, SipTrunkConfig, WebhookUrls } from '../types'
 import { ProviderApiError } from '../types'
-
-function basicAuth(username: string, password: string): string {
-  return `Basic ${btoa(`${username}:${password}`)}`
-}
-
-function nowISO(): string {
-  return new Date().toISOString()
-}
+import { basicAuth, nowISO } from '../utils'
 
 /** Detect test/mock credentials used in BDD and unit tests. */
 function isTestCredentials(credentials: Record<string, unknown>): boolean {

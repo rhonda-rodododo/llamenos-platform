@@ -38,6 +38,11 @@ export interface A2pRegistration {
   updatedAt: string
 }
 
+/**
+ * Brand registration info — contains PII (phone, EIN, address).
+ * This data is ephemeral: sent directly to the provider API and never persisted to the DB.
+ * If brand info is ever stored for audit purposes, it MUST be encrypted at rest.
+ */
 export interface BrandInfo {
   entityType: 'PRIVATE_PROFIT' | 'PUBLIC_PROFIT' | 'NON_PROFIT' | 'GOVERNMENT'
   companyName: string

@@ -7,10 +7,7 @@ import type {
 import type { ProviderCapabilityImpl, ConnectionTestResult, SipTrunkConfig, WebhookUrls } from '../types'
 import { ProviderApiError } from '../types'
 import { isInternalAddress } from '../../../lib/ssrf-guard'
-
-function nowISO(): string {
-  return new Date().toISOString()
-}
+import { nowISO } from '../utils'
 
 /**
  * Determine ESL base URL. Defaults to HTTPS unless eslUseTls is explicitly false

@@ -7,14 +7,7 @@ import type {
 import type { ProviderCapabilityImpl, ConnectionTestResult, WebhookUrls } from '../types'
 import { ProviderApiError } from '../types'
 import { validateExternalUrl } from '../../../lib/ssrf-guard'
-
-function basicAuth(username: string, password: string): string {
-  return `Basic ${btoa(`${username}:${password}`)}`
-}
-
-function nowISO(): string {
-  return new Date().toISOString()
-}
+import { basicAuth, nowISO } from '../utils'
 
 export const signalwireProvider: ProviderCapabilityImpl = {
   providerType: 'signalwire',
