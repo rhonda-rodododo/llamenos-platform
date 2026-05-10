@@ -169,11 +169,12 @@ jobs:
       - name: Upload test build artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: ios-e2e-build
+          name: ios-e2e-build-${{ github.run_id }}
           path: |
             /tmp/llamenos-build/Build/Products/
           retention-days: 1
           compression-level: 1
+          if-no-files-found: error
 
       - name: Build backend bundle
         run: bun run build:server
@@ -191,7 +192,7 @@ jobs:
       - name: Upload backend bundle + tools
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: ios-e2e-backend
+          name: ios-e2e-backend-${{ github.run_id }}
           path: |
             dist/server/
             scripts/run-migrations.ts
@@ -201,6 +202,7 @@ jobs:
             .tmp-s3-compat-storage
           retention-days: 1
           compression-level: 1
+          if-no-files-found: error
 
   # ─── Run E2E Tests (4 Shards) ─────────────────────────────────
   ios-e2e:
@@ -224,16 +226,18 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
 
       - name: Download test build artifacts
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v4.1.7
         with:
-          name: ios-e2e-build
+          name: ios-e2e-build-${{ github.run_id }}
           path: /tmp/llamenos-build/Build/Products/
+          if-no-files-found: error
 
       - name: Download backend bundle
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v4.1.7
         with:
-          name: ios-e2e-backend
+          name: ios-e2e-backend-${{ github.run_id }}
           path: .
+          if-no-files-found: error
 
       - name: Detect simulator
         id: sim
