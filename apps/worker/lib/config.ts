@@ -76,7 +76,7 @@ export function validateConfig(env: ConfigInput = process.env): void {
   assertHex64(env, serverSecretKey)
 
   // ADMIN_PUBKEY: 64 hex chars (Nostr pubkey, x-only compressed)
-  // Optional: if not set, the first admin is bootstrapped via the desktop app.
+  // Optional: if not set, the first admin is bootstrapped via the Tauri desktop app.
   const adminPubkey = env['ADMIN_PUBKEY']?.trim() ?? ''
   if (adminPubkey.length > 0 && (adminPubkey.length !== 64 || !HEX_RE.test(adminPubkey))) {
     throw new Error(
@@ -85,7 +85,7 @@ export function validateConfig(env: ConfigInput = process.env): void {
     )
   }
   if (adminPubkey.length === 0) {
-    logger.warn('ADMIN_PUBKEY not set — first admin must be bootstrapped via the desktop app')
+    logger.warn('ADMIN_PUBKEY not set — first admin must be bootstrapped via the Tauri desktop app')
   }
 
   assertNonEmpty(env, 'HOTLINE_NAME')

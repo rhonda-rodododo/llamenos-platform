@@ -161,10 +161,10 @@
             2. Set llamenos_app_image to a valid image reference
         success_msg: "llamenos_app_image: {{ llamenos_app_image }}"
 
-    - name: Warn if admin_pubkey is not set (web UI bootstrap allowed)
+    - name: Warn if admin_pubkey is not set (Tauri desktop app bootstrap allowed)
       ansible.builtin.debug:
         msg: |
-          WARNING: 'admin_pubkey' is not set. Admin will need to be bootstrapped via the web UI.
+          WARNING: 'admin_pubkey' is not set. The first admin will need to be bootstrapped via the Tauri desktop app.
           
           To pre-configure an admin:
             1. Generate a keypair: bun run bootstrap-admin
