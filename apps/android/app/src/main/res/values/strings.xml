@@ -2770,4 +2770,73 @@
     <string name="your_identity">Your Identity</string>
     <string name="your_private_key">Your Private Key</string>
     <string name="your_public_key">Your Public Key</string>
+
+    <!-- Provider Setup -->
+    <string name="provider_setup_title">Provider Setup</string>
+    <string name="provider_setup_description">Configure telephony and messaging providers for your hub.</string>
+    <string name="provider_connected">Connected</string>
+    <string name="provider_disconnected">Disconnected</string>
+    <string name="connect_with_oauth">Connect with %s</string>
+    <string name="enter_api_credentials">Enter API Credentials</string>
+    <string name="test_connection">Test Connection</string>
+    <string name="connection_success">Connected in %d ms</string>
+    <string name="connection_failed">Connection failed</string>
+    <string name="account_name_label">Account: %s</string>
+    <string name="manage_phone_numbers">Manage Phone Numbers</string>
+    <string name="phone_numbers_label">Phone Numbers (%d)</string>
+    <string name="continue_button">Continue</string>
+    <string name="save_credentials">Save Credentials</string>
+
+    <!-- OAuth -->
+    <string name="oauth_connect_title">Connect %s</string>
+    <string name="oauth_description">You will be redirected to %s to authorize access to your account.</string>
+    <string name="oauth_starting">Starting OAuth flow...</string>
+
+    <!-- API Key -->
+    <string name="api_key_title">%s Credentials</string>
+    <string name="api_key_description">Enter your %s API credentials.</string>
+    <string name="account_sid_label">Account SID</string>
+    <string name="auth_token_label">Auth Token</string>
+    <string name="api_key_label">API Key</string>
+    <string name="api_secret_label">API Secret</string>
+
+    <!-- Phone Numbers -->
+    <string name="phone_numbers_title">Phone Numbers</string>
+    <string name="owned_numbers_tab">Owned</string>
+    <string name="search_numbers_tab">Search</string>
+    <string name="no_owned_numbers">No phone numbers configured yet.</string>
+    <string name="country_code_label">Country Code</string>
+    <string name="area_code_label">Area Code</string>
+    <string name="contains_label">Contains</string>
+    <string name="search_button">Search</string>
+    <string name="select_number">Select</string>
+    <string name="provision_number_title">Provision Number</string>
+    <string name="provision_number_confirm">Provision %s?</string>
+    <string name="provision_button">Provision</string>
+    <string name="provision_success_title">Number Provisioned</string>
+    <string name="provision_success_message">Successfully provisioned %s.</string>
+
+    <!-- Webhooks -->
+    <string name="webhook_confirmation_title">Webhook Configuration</string>
+    <string name="webhook_description">Configure these webhook URLs in your provider dashboard.</string>
+    <string name="voice_incoming_webhook">Voice Incoming</string>
+    <string name="voice_status_webhook">Voice Status</string>
+    <string name="sms_webhook">SMS Incoming</string>
+
+    <!-- Signal Registration -->
+    <string name="signal_registration_title">Signal Registration</string>
+    <string name="bridge_url_label">Bridge URL</string>
+    <string name="phone_number_label">Phone Number</string>
+    <string name="verification_method_label">Verification Method</string>
+    <string name="method_sms">SMS</string>
+    <string name="method_voice">Voice</string>
+    <string name="start_registration">Start Registration</string>
+    <string name="signal_status_label">Status</string>
+    <string name="signal_registration_in_progress">Registration in progress...</string>
+    <string name="verification_code_label">Verification Code</string>
+    <string name="verify_code_button">Verify Code</string>
+    <string name="signal_registered_message">Signal is registered and ready.</string>
+    <string name="unregister_signal">Unregister</string>
+    <string name="retry_registration">Retry</string>
+    <string name="signal_expired_message">Registration expired. Please try again.</string>
 </resources>

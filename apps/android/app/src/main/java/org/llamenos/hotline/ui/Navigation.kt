@@ -64,6 +64,12 @@ import org.llamenos.hotline.ui.hubs.HubManagementViewModel
 import org.llamenos.hotline.ui.settings.DeviceLinkScreen
 import org.llamenos.hotline.ui.contacts.ContactDetailScreen
 import org.llamenos.hotline.ui.contacts.ContactDetailViewModel
+import org.llamenos.hotline.ui.providersetup.APIKeyProviderScreen
+import org.llamenos.hotline.ui.providersetup.OAuthProviderScreen
+import org.llamenos.hotline.ui.providersetup.PhoneNumberScreen
+import org.llamenos.hotline.ui.providersetup.ProviderSetupScreen
+import org.llamenos.hotline.ui.providersetup.SignalRegistrationScreen
+import org.llamenos.hotline.ui.providersetup.WebhookConfirmationScreen
 import org.llamenos.hotline.ui.triage.TriageScreen
 import org.llamenos.hotline.ui.triage.TriageDetailScreen
 import org.llamenos.hotline.ui.triage.TriageViewModel
@@ -285,6 +291,45 @@ sealed interface LlamenosRoute {
         companion object {
             const val ROUTE_PATTERN = "contact_detail/{contactHash}"
         }
+    }
+
+    /** Provider setup screen. */
+    data object ProviderSetup : LlamenosRoute {
+        override val route = "provider_setup"
+    }
+
+    /** OAuth provider connection. */
+    data class OAuthProvider(val providerName: String) : LlamenosRoute {
+        override val route = "oauth_provider/$providerName"
+        companion object {
+            const val ROUTE_PATTERN = "oauth_provider/{providerName}"
+        }
+    }
+
+    /** API key provider connection. */
+    data class APIKeyProvider(val providerName: String) : LlamenosRoute {
+        override val route = "api_key_provider/$providerName"
+        companion object {
+            const val ROUTE_PATTERN = "api_key_provider/{providerName}"
+        }
+    }
+
+    /** Phone number management. */
+    data class PhoneNumbers(val providerName: String) : LlamenosRoute {
+        override val route = "phone_numbers/$providerName"
+        companion object {
+            const val ROUTE_PATTERN = "phone_numbers/{providerName}"
+        }
+    }
+
+    /** Webhook confirmation. */
+    data object WebhookConfirmation : LlamenosRoute {
+        override val route = "webhook_confirmation"
+    }
+
+    /** Signal registration. */
+    data object SignalRegistration : LlamenosRoute {
+        override val route = "signal_registration"
     }
 }
 
@@ -844,6 +889,89 @@ fun LlamenosNavigation(
             val eventsViewModel: EventsViewModel = hiltViewModel()
             CreateEventScreen(
                 viewModel = eventsViewModel,
+                onNavigateBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(LlamenosRoute.ProviderSetup.route) {
+            ProviderSetupScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToOAuth = { provider ->
+                    navController.navigate("oauth_provider/$provider")
+                },
+                onNavigateToApiKey = { provider ->
+                    navController.navigate("api_key_provider/$provider")
+                },
+                onNavigateToPhoneNumbers = { provider ->
+                    navController.navigate("phone_numbers/$provider")
+                },
+                onNavigateToSignalRegistration = {
+                    navController.navigate(LlamenosRoute.SignalRegistration.route)
+                },
+            )
+        }
+
+        composable(
+            LlamenosRoute.OAuthProvider.ROUTE_PATTERN,
+            arguments = listOf(
+                navArgument("providerName") {
+                    type = NavType.StringType
+                },
+            ),
+        ) { backStackEntry ->
+            val providerName = backStackEntry.arguments?.getString("providerName") ?: ""
+            OAuthProviderScreen(
+                provider = providerName,
+                onNavigateBack = { navController.popBackStack() },
+                onOAuthComplete = { success, _ ->
+                    if (success) {
+                        navController.popBackStack()
+                    }
+                },
+            )
+        }
+
+        composable(
+            LlamenosRoute.APIKeyProvider.ROUTE_PATTERN,
+            arguments = listOf(
+                navArgument("providerName") {
+                    type = NavType.StringType
+                },
+            ),
+        ) { backStackEntry ->
+            val providerName = backStackEntry.arguments?.getString("providerName") ?: ""
+            APIKeyProviderScreen(
+                provider = providerName,
+                onNavigateBack = { navController.popBackStack() },
+                onConfigured = { navController.popBackStack() },
+            )
+        }
+
+        composable(
+            LlamenosRoute.PhoneNumbers.ROUTE_PATTERN,
+            arguments = listOf(
+                navArgument("providerName") {
+                    type = NavType.StringType
+                },
+            ),
+        ) { backStackEntry ->
+            val providerName = backStackEntry.arguments?.getString("providerName") ?: ""
+            PhoneNumberScreen(
+                provider = providerName,
+                onNavigateBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(LlamenosRoute.WebhookConfirmation.route) {
+            WebhookConfirmationScreen(
+                provider = "twilio",
+                phoneNumber = "",
+                onNavigateBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(LlamenosRoute.SignalRegistration.route) {
+            SignalRegistrationScreen(
                 onNavigateBack = { navController.popBackStack() },
             )
         }
