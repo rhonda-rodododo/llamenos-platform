@@ -2177,7 +2177,8 @@
       "searchFailed": "Search failed",
       "sms": "SMS",
       "validateFirst": "Validate provider credentials first",
-      "voice": "Voice"
+      "voice": "Voice",
+      "refresh": "Refresh"
     },
     "providerConnection": "Provider Connection",
     "oauthOrCredentials": "Connect via OAuth or enter API credentials above.",
@@ -2282,7 +2283,11 @@
     "registeredNumber": "Registered Number",
     "title": "Signal",
     "webhookSecret": "Webhook Secret",
-    "webhookUrl": "Webhook URL"
+    "webhookUrl": "Webhook URL",
+    "security": {
+      "bridgeDecryptionNotice": "The Signal bridge decrypts messages before forwarding. Ensure you trust the bridge operator.",
+      "transportLabel": "Transport Security"
+    }
   },
   "spam": {
     "blockDuration": "Dire blokaj (minit)",
@@ -2359,7 +2364,11 @@
     "webrtcConfig": "Konfigirasyon WebRTC",
     "webrtcConfigHelp": "Aktive apèl nan navigatè pou volontè yo. Mande plis enfòmasyon koneksyon.",
     "bridgeSecret": "Bridge Secret",
-    "bridgeSecretHelp": "HMAC shared secret for authenticating bridge-worker communication (must not reuse ARI password)"
+    "bridgeSecretHelp": "HMAC shared secret for authenticating bridge-worker communication (must not reuse ARI password)",
+    "connected": "Connected",
+    "connecting": "Connecting...",
+    "disconnected": "Not connected",
+    "error": "Connection error"
   },
   "timeline": {
     "contactId": "Contact",
@@ -2996,32 +3005,27 @@
     "noContactWarning": "No Signal contact registered",
     "privacyNote": "Only a hash of your contact info is stored"
   },
-  "setup.phoneNumbers.refresh": "Refresh",
-  "signalRegistration.alreadyInProgress": "A registration is already in progress",
-  "signalRegistration.bridgeUrl": "Bridge URL",
-  "signalRegistration.connected": "Signal bridge connected",
-  "signalRegistration.description": "Connect a Signal bridge to receive messages via Signal",
-  "signalRegistration.expired": "Registration expired. Please try again.",
-  "signalRegistration.notConfigured": "Signal bridge not configured",
-  "signalRegistration.registerButton": "Register",
-  "signalRegistration.registeredNumber": "Registered number",
-  "signalRegistration.registrationFailed": "Registration failed",
-  "signalRegistration.startRegistration": "Start Registration",
-  "signalRegistration.title": "Signal Registration",
-  "signalRegistration.tryAgain": "Try Again",
-  "signalRegistration.unregister": "Unregister",
-  "signalRegistration.unregistered": "Signal bridge unregistered",
-  "signalRegistration.useVoice": "Use voice verification",
-  "signalRegistration.verificationCode": "Verification Code",
-  "signalRegistration.verificationFailed": "Verification failed. Please try again.",
-  "signalRegistration.voiceDescription": "You will receive a phone call with a verification code",
-  "signalRegistration.voiceVerification": "Voice Verification",
-  "signalRegistration.waitingSms": "Waiting for SMS verification...",
-  "signalRegistration.waitingSmsDescription": "A verification SMS has been sent. This may take up to 10 minutes.",
-  "signal.security.bridgeDecryptionNotice": "The Signal bridge decrypts messages before forwarding. Ensure you trust the bridge operator.",
-  "signal.security.transportLabel": "Transport Security",
-  "telephonyProvider.connected": "Connected",
-  "telephonyProvider.connecting": "Connecting...",
-  "telephonyProvider.disconnected": "Not connected",
-  "telephonyProvider.error": "Connection error"
+  "signalRegistration": {
+    "alreadyInProgress": "A registration is already in progress",
+    "bridgeUrl": "Bridge URL",
+    "connected": "Signal bridge connected",
+    "description": "Connect a Signal bridge to receive messages via Signal",
+    "expired": "Registration expired. Please try again.",
+    "notConfigured": "Signal bridge not configured",
+    "registerButton": "Register",
+    "registeredNumber": "Registered number",
+    "registrationFailed": "Registration failed",
+    "startRegistration": "Start Registration",
+    "title": "Signal Registration",
+    "tryAgain": "Try Again",
+    "unregister": "Unregister",
+    "unregistered": "Signal bridge unregistered",
+    "useVoice": "Use voice verification",
+    "verificationCode": "Verification Code",
+    "verificationFailed": "Verification failed. Please try again.",
+    "voiceDescription": "You will receive a phone call with a verification code",
+    "voiceVerification": "Voice Verification",
+    "waitingSms": "Waiting for SMS verification...",
+    "waitingSmsDescription": "A verification SMS has been sent. This may take up to 10 minutes."
+  }
 }
