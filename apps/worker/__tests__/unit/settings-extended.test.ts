@@ -28,7 +28,6 @@ function makeSettingsRow(overrides: Record<string, unknown> = {}) {
     messagingConfig: null,
     reportCategories: null,
     reportTypes: null,
-    telephonyProvider: null,
     ttlOverrides: null,
     cleanupMetrics: null,
     transcriptionEnabled: true,
@@ -614,11 +613,13 @@ describe('SettingsService.updateSetupState', () => {
 describe('SettingsService.getEnabledChannels', () => {
   it('returns voice enabled when telephony provider configured', async () => {
     const { db, service } = setup()
-    db.$setSelectResult([makeSettingsRow({
-      telephonyProvider: { type: 'twilio', accountSid: 'AC123', authToken: 'tok', phoneNumber: '+15551234567' },
-      messagingConfig: { enabledChannels: ['sms'], inactivityTimeout: 60, maxConcurrentPerUser: 5, requireAssignment: false },
-      setupState: { selectedChannels: ['voice', 'sms', 'reports'], completedSteps: [], pendingChannels: [], setupCompleted: true },
-    })])
+    db.$setSelectResults([
+      [makeSettingsRow({
+        messagingConfig: { enabledChannels: ['sms'], inactivityTimeout: 60, maxConcurrentPerUser: 5, requireAssignment: false },
+        setupState: { selectedChannels: ['voice', 'sms', 'reports'], completedSteps: [], pendingChannels: [], setupCompleted: true },
+      })],
+      [{ id: 'pc-1', hubId: '', providerType: 'twilio', credentials: JSON.stringify({ type: 'twilio', accountSid: 'AC123', authToken: 'tok', phoneNumber: '+15551234567' }), status: 'connected', capabilities: [], phoneNumbers: ['+15551234567'] }],
+    ])
 
     const result = await service.getEnabledChannels({})
     expect(result.voice).toBe(true)
@@ -629,7 +630,10 @@ describe('SettingsService.getEnabledChannels', () => {
 
   it('returns voice enabled via env vars when no provider configured', async () => {
     const { db, service } = setup()
-    db.$setSelectResult([makeSettingsRow({ telephonyProvider: null, messagingConfig: null, setupState: null })])
+    db.$setSelectResults([
+      [makeSettingsRow({ messagingConfig: null, setupState: null })],
+      [],
+    ])
 
     const result = await service.getEnabledChannels({
       TWILIO_ACCOUNT_SID: 'AC123',
@@ -641,7 +645,10 @@ describe('SettingsService.getEnabledChannels', () => {
 
   it('returns voice disabled when neither provider nor env vars present', async () => {
     const { db, service } = setup()
-    db.$setSelectResult([makeSettingsRow({ telephonyProvider: null })])
+    db.$setSelectResults([
+      [makeSettingsRow({})],
+      [],
+    ])
 
     const result = await service.getEnabledChannels({})
     expect(result.voice).toBe(false)
@@ -820,7 +827,15 @@ describe('SettingsService.getTelephonyProvider', () => {
   it('returns provider from DB', async () => {
     const { db, service } = setup()
     const provider = { type: 'twilio', accountSid: 'AC123', authToken: 'tok', phoneNumber: '+15551234567' }
-    db.$setSelectResult([makeSettingsRow({ telephonyProvider: provider })])
+    db.$setSelectResult([{
+      id: 'pc-1',
+      hubId: '',
+      providerType: 'twilio',
+      credentials: JSON.stringify(provider),
+      status: 'connected',
+      capabilities: [],
+      phoneNumbers: ['+15551234567'],
+    }])
 
     const result = await service.getTelephonyProvider()
     expect(result?.type).toBe('twilio')
@@ -828,7 +843,7 @@ describe('SettingsService.getTelephonyProvider', () => {
 
   it('returns null when no provider configured', async () => {
     const { db, service } = setup()
-    db.$setSelectResult([makeSettingsRow({ telephonyProvider: null })])
+    db.$setSelectResult([])
 
     const result = await service.getTelephonyProvider()
     expect(result).toBeNull()
@@ -860,10 +875,11 @@ describe('SettingsService.updateTelephonyProvider', () => {
   it('saves valid provider configuration', async () => {
     const { db, service } = setup()
     const provider = { type: 'twilio' as const, accountSid: 'AC123', authToken: 'tok', phoneNumber: '+15551234567' }
+    db.$setSelectResult([])
 
     const result = await service.updateTelephonyProvider(provider as any)
     expect(result.type).toBe('twilio')
-    expect(db.update).toHaveBeenCalled()
+    expect(db.insert).toHaveBeenCalled()
   })
 })
 

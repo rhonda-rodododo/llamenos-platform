@@ -172,6 +172,19 @@ export const PERMISSION_CATALOG = {
   // Metrics
   'metrics:read': 'View system metrics (Prometheus, JSON)',
 
+  // Telephony
+  'telephony:manage-providers': 'Configure telephony providers',
+  'telephony:view-providers': 'View telephony provider configuration',
+  'telephony:manage-numbers': 'Provision and manage phone numbers',
+  'telephony:view-numbers': 'View owned phone numbers',
+  'telephony:manage-a2p': 'Manage A2P 10DLC registration',
+
+  // Messaging
+  'messaging:manage-signal': 'Manage Signal bridge registration',
+
+  // Hubs
+  'hub:configure': 'Configure hub provisioning and setup wizard',
+
   // System (super-admin only)
   'system:view-roles': 'View role definitions',
   'system:manage-roles': 'Create/edit/delete custom roles',
@@ -231,6 +244,9 @@ export const DEFAULT_ROLES: Omit<Role, 'createdAt' | 'updatedAt'>[] = [
       'reports:*', 'conversations:*', 'calls:*', 'blasts:*', 'files:*',
       'contacts:*', 'cases:*', 'events:*', 'evidence:*',
       'firehose:*',
+      'telephony:manage-providers', 'telephony:view-providers', 'telephony:manage-numbers', 'telephony:view-numbers', 'telephony:manage-a2p',
+      'messaging:manage-signal',
+      'hub:configure',
       'hubs:read', 'hubs:manage-members', 'hubs:manage-keys',
       'metrics:read', 'system:view-roles',
     ],

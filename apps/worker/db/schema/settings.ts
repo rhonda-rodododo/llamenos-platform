@@ -32,7 +32,6 @@ export const systemSettings = pgTable('system_settings', {
     .notNull()
     .default(sql`'{}'::text[]`),
   messagingConfig: jsonb('messaging_config').notNull().default({}),
-  telephonyProvider: jsonb('telephony_provider'),
   setupState: jsonb('setup_state').notNull().default({}),
   webauthnSettings: jsonb('webauthn_settings').notNull().default({}),
   caseManagementEnabled: boolean('case_management_enabled').default(false),
@@ -89,7 +88,6 @@ export const hubSettings = pgTable('hub_settings', {
     .primaryKey()
     .references(() => hubs.id, { onDelete: 'cascade' }),
   settings: jsonb('settings').notNull().default({}),
-  telephonyProvider: jsonb('telephony_provider'),
   phoneNumber: text('phone_number'),
 })
 
