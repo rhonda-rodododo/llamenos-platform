@@ -138,7 +138,7 @@ export class SignalRegistrationService {
    */
   async checkStatus(registrationId: string): Promise<SignalRegistration> {
     const row = await this.loadRow(registrationId)
-    this.enforceNotExpired(row)
+    await this.enforceNotExpired(row)
 
     if (row.status === 'complete' || row.status === 'failed') {
       return this.toPublic(row)
@@ -179,8 +179,13 @@ export class SignalRegistrationService {
    * moves to 'failed' and cannot be retried without a new startRegistration.
    */
   async verifyCode(params: VerifyCodeParams): Promise<SignalRegistration> {
+    // Defense-in-depth: validate code format even if route schema already checks
+    if (!/^\d{3,8}$/.test(params.code)) {
+      throw new SignalRegistrationError('Invalid verification code format', 400)
+    }
+
     const row = await this.loadRow(params.registrationId)
-    this.enforceNotExpired(row)
+    await this.enforceNotExpired(row)
 
     if (row.status !== 'pending' && row.status !== 'verifying') {
       throw new SignalRegistrationError(
@@ -216,7 +221,8 @@ export class SignalRegistrationService {
       const nextStatus: SignalRegistrationStatus =
         newAttempts >= MAX_VERIFY_ATTEMPTS ? 'failed' : 'verifying'
 
-      await this.db
+      // CAS: only update if attempts hasn't changed (prevents concurrent bypass of 3-attempt limit)
+      const result = await this.db
         .update(signalRegistrations)
         .set({
           status: nextStatus,
@@ -226,7 +232,14 @@ export class SignalRegistrationService {
             : `Verification code rejected (attempt ${newAttempts}/${MAX_VERIFY_ATTEMPTS})`,
           updatedAt: new Date(),
         })
-        .where(eq(signalRegistrations.id, params.registrationId))
+        .where(and(
+          eq(signalRegistrations.id, params.registrationId),
+          eq(signalRegistrations.attempts, currentRow.attempts ?? 0),
+        ))
+
+      if (!result.rowCount) {
+        throw new SignalRegistrationError('Concurrent verification attempt detected — please retry', 409)
+      }
     }
 
     const updated = await this.loadRow(params.registrationId)
@@ -328,10 +341,10 @@ export class SignalRegistrationService {
     return row
   }
 
-  private enforceNotExpired(row: typeof signalRegistrations.$inferSelect): void {
+  private async enforceNotExpired(row: typeof signalRegistrations.$inferSelect): Promise<void> {
     if (row.status === 'complete' || row.status === 'failed') return
     if (row.expiresAt && new Date() > row.expiresAt) {
-      void this.db
+      await this.db
         .update(signalRegistrations)
         .set({ status: 'failed', error: 'Registration expired', updatedAt: new Date() })
         .where(eq(signalRegistrations.id, row.id))

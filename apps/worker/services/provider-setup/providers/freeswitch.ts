@@ -6,9 +6,35 @@ import type {
 } from '@protocol/schemas/provider-setup'
 import type { ProviderCapabilityImpl, ConnectionTestResult, SipTrunkConfig, WebhookUrls } from '../types'
 import { ProviderApiError } from '../types'
+import { isInternalAddress } from '../../../lib/ssrf-guard'
 
 function nowISO(): string {
   return new Date().toISOString()
+}
+
+/**
+ * Determine ESL base URL. Defaults to HTTPS unless eslUseTls is explicitly false
+ * AND the host is a loopback/private address.
+ */
+function getEslBaseUrl(credentials: Record<string, unknown>): string {
+  const eslHost = String(credentials.eslHost ?? '')
+  const eslPort = Number(credentials.eslPort ?? 8021)
+  const eslUseTls = credentials.eslUseTls !== false
+
+  if (eslUseTls) {
+    return `https://${eslHost}:${eslPort}`
+  }
+
+  // Only allow plaintext HTTP for loopback/private IPs
+  if (!isInternalAddress(eslHost)) {
+    throw new ProviderApiError(
+      'ESL over plaintext HTTP is only allowed for loopback/private addresses. Set eslUseTls: true for external hosts.',
+      400,
+      'TLS required for external hosts',
+    )
+  }
+
+  return `http://${eslHost}:${eslPort}`
 }
 
 export const freeswitchProvider: ProviderCapabilityImpl = {
@@ -16,12 +42,11 @@ export const freeswitchProvider: ProviderCapabilityImpl = {
   capabilities: ['sipTrunks'],
 
   async testConnection(credentials: Record<string, unknown>): Promise<ConnectionTestResult> {
-    const eslHost = String(credentials.eslHost ?? '')
-    const eslPort = Number(credentials.eslPort ?? 8021)
     const eslPassword = String(credentials.eslPassword ?? '')
+    const baseUrl = getEslBaseUrl(credentials)
     const start = Date.now()
     try {
-      const res = await fetch(`http://${eslHost}:${eslPort}/api/sofia?status`, {
+      const res = await fetch(`${baseUrl}/api/sofia?status`, {
         headers: {
           Authorization: `Basic ${btoa(`:${eslPassword}`)}`,
         },
@@ -66,9 +91,8 @@ export const freeswitchProvider: ProviderCapabilityImpl = {
     credentials: Record<string, unknown>,
     domain: string,
   ): Promise<SipTrunkConfig> {
-    const eslHost = String(credentials.eslHost ?? '')
-    const eslPort = Number(credentials.eslPort ?? 8021)
     const eslPassword = String(credentials.eslPassword ?? '')
+    const baseUrl = getEslBaseUrl(credentials)
 
     const sipUsername = `llamenos-${crypto.randomUUID().slice(0, 8)}`
     const sipPassword = Array.from(crypto.getRandomValues(new Uint8Array(24)))
@@ -76,7 +100,7 @@ export const freeswitchProvider: ProviderCapabilityImpl = {
       .join('')
       .slice(0, 32)
 
-    const res = await fetch(`http://${eslHost}:${eslPort}/api/bgapi`, {
+    const res = await fetch(`${baseUrl}/api/bgapi`, {
       method: 'POST',
       headers: {
         Authorization: `Basic ${btoa(`:${eslPassword}`)}`,

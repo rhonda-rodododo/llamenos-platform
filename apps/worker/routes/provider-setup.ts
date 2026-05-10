@@ -18,8 +18,21 @@ import {
 } from '@protocol/schemas/provider-setup'
 import { okResponseSchema } from '@protocol/schemas/common'
 import { getProviderCapability } from '../services/provider-setup/registry'
+import { ProviderApiError } from '../services/provider-setup/types'
 import { SignalRegistrationError } from '../services/provider-setup/signal-registration'
 import { A2pRegistrationError } from '../services/provider-setup/a2p-registration'
+
+/** Read OAuth client_id from environment for a provider. */
+function getOAuthClientId(provider: string): string {
+  const envKey = `${provider.toUpperCase()}_CLIENT_ID`
+  return process.env[envKey] ?? ''
+}
+
+/** Read OAuth client_secret from environment for a provider. */
+function getOAuthClientSecret(provider: string): string {
+  const envKey = `${provider.toUpperCase()}_CLIENT_SECRET`
+  return process.env[envKey] ?? ''
+}
 
 // Per-provider OAuth metadata — authorization URLs, token URLs, and default scopes.
 const PROVIDER_OAUTH_CONFIG: Record<string, {
@@ -113,8 +126,10 @@ providerSetup.post('/oauth/start',
       callbackScheme: body.redirectUrl,
     })
 
+    const clientId = getOAuthClientId(body.provider)
     const params = new URLSearchParams({
       response_type: 'code',
+      client_id: clientId,
       state: stateId,
       scope: oauthConfig.defaultScopes.join(' '),
       redirect_uri: body.redirectUrl,
@@ -185,6 +200,8 @@ providerSetup.post('/oauth/callback',
     }
 
     try {
+      const clientId = getOAuthClientId(stateRow.provider)
+      const clientSecret = getOAuthClientSecret(stateRow.provider)
       const tokenRes = await fetch(oauthConfig.tokenUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -192,6 +209,8 @@ providerSetup.post('/oauth/callback',
           grant_type: 'authorization_code',
           code,
           redirect_uri: stateRow.redirectUrl,
+          client_id: clientId,
+          client_secret: clientSecret,
         }),
       })
 
@@ -553,7 +572,7 @@ providerSetup.post('/create-sip-trunk',
             schema: resolver(z.object({
               sipProvider: z.string(),
               sipUsername: z.string(),
-              sipPassword: z.string(),
+              credentialsStored: z.boolean(),
               trunkSid: z.string().optional(),
               connectionId: z.string().optional(),
             })),
@@ -575,9 +594,15 @@ providerSetup.post('/create-sip-trunk',
         body.domain,
         hubId ?? body.hubId,
       )
-      return c.json(trunk)
+      // Never return sipPassword in the response — credentials are stored encrypted server-side
+      return c.json({
+        sipProvider: trunk.sipProvider,
+        sipUsername: trunk.sipUsername,
+        credentialsStored: true,
+        trunkSid: trunk.trunkSid,
+        connectionId: trunk.connectionId,
+      })
     } catch (err) {
-      const { ProviderApiError } = await import('../services/provider-setup/types')
       if (err instanceof ProviderApiError) {
         return c.json({ error: err.message }, err.statusCode as 400 | 401 | 403 | 404 | 500)
       }
@@ -595,9 +620,9 @@ const SignalRegisterRequestSchema = z.looseObject({
   hubId: z.string().optional(),
 })
 
-const SignalVerifyRequestSchema = z.looseObject({
+const SignalVerifyRequestSchema = z.object({
   registrationId: z.string(),
-  code: z.string(),
+  code: z.string().regex(/^\d{3,8}$/),
   hubId: z.string().optional(),
 })
 
