@@ -1,6 +1,6 @@
 import { type APIRequestContext } from '@playwright/test'
 import { test as base, createBdd } from 'playwright-bdd'
-import { test as traditionalTest } from '../traditional-fixtures'
+import { createHubViaApi } from '../api-helpers'
 
 // ── Scenario-scoped World types ──────────────────────────────────────
 // Each scenario gets a fresh instance via fixture. Step definitions read/write
@@ -57,9 +57,17 @@ export const test = base.extend<
     casesWorld: CasesWorld
   },
   {
-    // workerHub is inherited from traditional-fixtures.ts
+    workerHub: string
   }
 >({
+  workerHub: [async ({ playwright }, use, workerInfo) => {
+    const backendUrl = process.env.TEST_HUB_URL || 'http://localhost:3000'
+    const ctx = await playwright.request.newContext({ baseURL: backendUrl, timeout: 60_000 })
+    const name = `test-hub-${workerInfo.workerIndex}-${Date.now()}`
+    const hubId = await createHubViaApi(ctx, name)
+    await ctx.dispose()
+    await use(hubId)
+  }, { scope: 'worker', timeout: 60_000 }],
   // Backend API request context — targets the backend server directly (not the Vite preview).
   // Used by CMS step definitions that need to call API helpers for Given-step data setup.
   backendRequest: async ({ playwright }, use) => {

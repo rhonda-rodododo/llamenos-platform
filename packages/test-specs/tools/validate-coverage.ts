@@ -313,6 +313,7 @@ function parseSwiftTestFile(path: string): TestMethod[] {
 function checkAndroidCoverage(scenarios: Scenario[]): { covered: number; missing: number } {
   const stepsDir = join(ANDROID_TEST_DIR, "steps");
   const e2eDir = join(ANDROID_TEST_DIR, "e2e");
+  const traditionalDir = join(ANDROID_TEST_DIR, "traditional");
   const useCucumber = existsSync(stepsDir) && findFiles(stepsDir, "Steps.kt").length > 0;
 
   if (useCucumber) {
@@ -320,7 +321,7 @@ function checkAndroidCoverage(scenarios: Scenario[]): { covered: number; missing
   }
 
   // Legacy: @Test method matching
-  const testDirs = [e2eDir, stepsDir];
+  const testDirs = [e2eDir, stepsDir, traditionalDir];
   const allMethods: TestMethod[] = [];
 
   for (const dir of testDirs) {
