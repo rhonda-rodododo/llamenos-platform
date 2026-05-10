@@ -5,7 +5,7 @@
  * IVR audio, rate limits, captchas, and case number sequences.
  * All state is stored in PostgreSQL via Drizzle ORM.
  */
-import { eq, and, sql, lt, inArray, or } from 'drizzle-orm'
+import { eq, and, sql, lt, inArray, or, isNull } from 'drizzle-orm'
 import type { Database } from '../db'
 import {
   systemSettings,
@@ -753,7 +753,7 @@ export class SettingsService {
     const [providerConfig] = await this.db
       .select()
       .from(providerConfigs)
-      .where(eq(providerConfigs.hubId, ''))
+      .where(isNull(providerConfigs.hubId))
       .limit(1)
     const messagingConfig = row.messagingConfig as MessagingConfig | null
     const setupState = row.setupState as SetupState | null
@@ -1017,7 +1017,7 @@ export class SettingsService {
           eq(providerConfigs.providerType, providerType),
           hubId
             ? eq(providerConfigs.hubId, hubId)
-            : eq(providerConfigs.hubId, ''),
+            : isNull(providerConfigs.hubId),
         ),
       )
     return row ?? null
@@ -1032,7 +1032,7 @@ export class SettingsService {
       .insert(providerConfigs)
       .values({
         id,
-        hubId: config.hubId ?? '',
+        hubId: config.hubId !== undefined ? config.hubId : null,
         providerType: config.providerType ?? '',
         credentials: config.credentials ?? null,
         status: config.status ?? 'disconnected',
@@ -1075,7 +1075,7 @@ export class SettingsService {
     const [row] = await this.db
       .select()
       .from(providerConfigs)
-      .where(eq(providerConfigs.hubId, ''))
+      .where(isNull(providerConfigs.hubId))
       .limit(1)
     if (!row?.credentials) return null
     try {
@@ -1115,14 +1115,14 @@ export class SettingsService {
     const existing = await this.db
       .select()
       .from(providerConfigs)
-      .where(eq(providerConfigs.hubId, ''))
+      .where(isNull(providerConfigs.hubId))
       .limit(1)
     const id = existing[0]?.id ?? crypto.randomUUID()
     await this.db
       .insert(providerConfigs)
       .values({
         id,
-        hubId: '',
+        hubId: null,
         providerType: data.type,
         credentials: JSON.stringify(data),
         status: 'connected',

@@ -1,6 +1,7 @@
-import { eq, and } from 'drizzle-orm'
+import { eq, and, isNull, desc } from 'drizzle-orm'
+import { randomBytes } from 'node:crypto'
 import type { Database } from '../../db'
-import { providerConfigs } from '../../db/schema'
+import { providerConfigs, oauthStates } from '../../db/schema'
 import type { TelephonyProviderType } from '@protocol/schemas/settings'
 import type {
   OwnedNumber,
@@ -39,19 +40,10 @@ export class ProviderSetup {
       throw new ProviderApiError(`Provider ${provider} not supported`, 400, 'Unsupported provider')
     }
 
-    const testResult = await impl.testConnection(credentials as Record<string, unknown>)
-    if (!testResult.connected) {
-      throw new ProviderApiError(
-        testResult.error || 'Connection test failed',
-        400,
-        testResult.errorType || 'connection_failed',
-      )
-    }
-
     const encryptedCreds = encryptCredentials(credentials, this.hmacSecret)
 
     await this.settings.upsertProviderConfig({
-      hubId: hubId || '',
+      hubId: hubId ?? null,
       providerType: provider,
       credentials: encryptedCreds,
       status: 'connected',
@@ -195,6 +187,63 @@ export class ProviderSetup {
     return impl.createSipTrunk(creds, domain)
   }
 
+  async createOAuthState(opts: {
+    provider: string
+    redirectUrl: string
+    callbackScheme?: string
+    ttlMs?: number
+  }): Promise<{ stateId: string; expiresAt: Date }> {
+    const stateId = randomBytes(32).toString('hex')
+    const expiresAt = new Date(Date.now() + (opts.ttlMs ?? 10 * 60 * 1000))
+    await this.db.insert(oauthStates).values({
+      id: stateId,
+      provider: opts.provider,
+      status: 'pending',
+      redirectUrl: opts.redirectUrl,
+      callbackScheme: opts.callbackScheme ?? null,
+      expiresAt,
+    })
+    return { stateId, expiresAt }
+  }
+
+  async getOAuthState(stateId: string): Promise<typeof oauthStates.$inferSelect | null> {
+    const [row] = await this.db.select().from(oauthStates).where(eq(oauthStates.id, stateId))
+    return row ?? null
+  }
+
+  async completeOAuthState(
+    stateId: string,
+    credentials: Record<string, unknown>,
+    capabilities: string[],
+    hubId: string | null,
+  ): Promise<void> {
+    const [stateRow] = await this.db.select().from(oauthStates).where(eq(oauthStates.id, stateId))
+    if (!stateRow) return
+
+    const encryptedCreds = encryptCredentials(credentials as Record<string, string>, this.hmacSecret)
+
+    await this.settings.upsertProviderConfig({
+      hubId: hubId ?? null,
+      providerType: stateRow.provider,
+      credentials: encryptedCreds,
+      status: 'connected',
+      capabilities,
+      phoneNumbers: [],
+      lastCheckedAt: new Date(),
+    })
+
+    await this.db.delete(oauthStates).where(eq(oauthStates.id, stateId))
+  }
+
+  async failOAuthState(stateId: string): Promise<void> {
+    await this.db.delete(oauthStates).where(eq(oauthStates.id, stateId))
+  }
+
+  async reset(): Promise<void> {
+    await this.db.delete(oauthStates)
+    await this.db.delete(providerConfigs)
+  }
+
   async getProviderStatus(
     provider: TelephonyProviderType,
     hubId?: string,
@@ -230,21 +279,26 @@ export class ProviderSetup {
           eq(providerConfigs.providerType, provider),
           hubId
             ? eq(providerConfigs.hubId, hubId)
-            : eq(providerConfigs.hubId, ''),
+            : isNull(providerConfigs.hubId),
         ),
       )
+      .orderBy(desc(providerConfigs.createdAt))
+      .limit(1)
     if (row) return row
 
     if (hubId) {
+      // Fall back to global config (null hub_id) if no hub-specific config exists
       const [fallback] = await this.db
         .select()
         .from(providerConfigs)
         .where(
           and(
             eq(providerConfigs.providerType, provider),
-            eq(providerConfigs.hubId, ''),
+            isNull(providerConfigs.hubId),
           ),
         )
+        .orderBy(desc(providerConfigs.createdAt))
+        .limit(1)
       return fallback ?? null
     }
 
@@ -258,7 +312,7 @@ export class ProviderSetup {
   ): Promise<{ impl: NonNullable<ReturnType<typeof getProviderCapability>>; creds: Record<string, unknown> }> {
     const config = await this.getProviderConfigRow(provider, hubId)
     if (!config?.credentials) {
-      throw new ProviderApiError('No credentials stored', 401, 'Not connected')
+      throw new ProviderApiError('Provider not configured — call /configure first', 424, 'Not configured')
     }
 
     const impl = getProviderCapability(provider)
