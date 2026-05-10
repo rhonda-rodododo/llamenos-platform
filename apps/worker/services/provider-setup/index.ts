@@ -1,7 +1,7 @@
 import { eq, and, isNull, desc } from 'drizzle-orm'
 import { randomBytes } from 'node:crypto'
 import type { Database } from '../../db'
-import { providerConfigs, oauthStates } from '../../db/schema'
+import { providerConfigs, oauthStates, signalRegistrations, a2pRegistrations } from '../../db/schema'
 import type { TelephonyProviderType } from '@protocol/schemas/settings'
 import type {
   OwnedNumber,
@@ -240,6 +240,8 @@ export class ProviderSetup {
   }
 
   async reset(): Promise<void> {
+    await this.db.delete(signalRegistrations)
+    await this.db.delete(a2pRegistrations)
     await this.db.delete(oauthStates)
     await this.db.delete(providerConfigs)
   }
