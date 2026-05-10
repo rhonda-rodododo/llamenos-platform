@@ -168,6 +168,16 @@ struct LlamenosApp: App {
             if appState.isAdmin {
                 router.navigate(to: .admin)
             }
+        case "oauth":
+            // llamenos://oauth/callback?status=success|error&error=<message>
+            let queryItems = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems
+            let status = queryItems?.first(where: { $0.name == "status" })?.value
+            let errorMsg = queryItems?.first(where: { $0.name == "error" })?.value
+            NotificationCenter.default.post(
+                name: .llamenos_oauthCallback,
+                object: nil,
+                userInfo: ["status": status ?? "error", "error": errorMsg as Any]
+            )
         default:
             break
         }
@@ -372,6 +382,13 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
     ) {
         completionHandler([.banner, .sound])
     }
+}
+
+// MARK: - Notification Names
+
+extension Notification.Name {
+    /// Posted when an OAuth callback deep link is received (`llamenos://oauth/callback`).
+    static let llamenos_oauthCallback = Notification.Name("llamenos.oauthCallback")
 }
 
 // MARK: - Privacy Overlay (M28)

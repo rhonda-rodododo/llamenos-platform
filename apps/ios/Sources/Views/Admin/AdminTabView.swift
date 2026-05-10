@@ -83,6 +83,30 @@ struct AdminTabView: View {
             }
             .accessibilityIdentifier("admin-events")
 
+            // MARK: - Provider Setup Section
+
+            Section(header: Text(NSLocalizedString("admin_provider_setup", comment: "Provider Auto-Configuration"))) {
+                NavigationLink {
+                    ProviderSetupView(appState: appState)
+                } label: {
+                    Label(
+                        NSLocalizedString("admin_provider_setup", comment: "Provider Auto-Configuration"),
+                        systemImage: "antenna.radiowaves.left.and.right"
+                    )
+                }
+                .accessibilityIdentifier("admin-provider-setup")
+
+                NavigationLink {
+                    SignalRegistrationView(appState: appState)
+                } label: {
+                    Label(
+                        NSLocalizedString("admin_signal_registration", comment: "Signal Registration"),
+                        systemImage: "bubble.left.and.exclamationmark.bubble.right.fill"
+                    )
+                }
+                .accessibilityIdentifier("admin-signal-registration")
+            }
+
             // MARK: - Settings Section
 
             Section(header: Text(NSLocalizedString("admin_settings_section", comment: "Settings"))) {
