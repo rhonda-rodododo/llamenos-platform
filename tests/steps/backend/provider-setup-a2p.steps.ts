@@ -88,22 +88,7 @@ Given('an A2P brand is in pending state', async ({ request, world, workerHub }) 
 })
 
 Given('an A2P brand is in approved state', async ({ request, world, workerHub }) => {
-  // Submit brand, then directly update it to approved via a second brand submit
-  // (the service accepts pending -> approved transition via checkStatus internally)
-  // For test purposes: submit brand and then manipulate via the check-status poll.
-  // Since our mock Twilio API returns null status, we use the skip+resubmit trick:
-  // submit brand → it lands in pending state. Tests that need 'approved' instead
-  // call the status endpoint which in test mode leaves it pending.
-  // For tests that require campaign submission after brand approval, we need to
-  // actually patch the DB. Use a workaround: submit brand, accept it stays in
-  // pending, and override by re-reading. The scenario "Submit campaign before
-  // brand approved" covers the brand-pending guard.
-  //
-  // To get an *approved* brand without real Twilio, we submit a brand and
-  // then call a test-only mechanism. Since none exists, we simulate approval
-  // by calling checkStatus (which is a no-op for mock env) and then proceeding.
-  // The campaign test will use 'pending' brand — that tests the guard path.
-  // This fixture creates a "conceptually approved" brand for the happy path test.
+  // Submit brand (lands in "pending"), then use dev-only endpoint to approve it.
   const { status, data } = await apiPost(
     request,
     '/provider-setup/a2p/brand',
@@ -111,16 +96,19 @@ Given('an A2P brand is in approved state', async ({ request, world, workerHub })
     ADMIN_SEED,
   )
   if (status !== 200) throw new Error(`Failed to submit brand: ${status} ${JSON.stringify(data)}`)
-  const state = getA2P(world)
   const registrationId = (data as Record<string, string>).id
+
+  // Directly approve the brand via test helper (no real Twilio poll needed)
+  const { status: approveStatus } = await apiPost(
+    request,
+    '/test-a2p-approve-brand',
+    { registrationId },
+    ADMIN_SEED,
+  )
+  if (approveStatus !== 200) throw new Error(`Failed to approve brand: ${approveStatus}`)
+
+  const state = getA2P(world)
   state.registrationId = registrationId
-  // Simulate approval by directly posting a campaign — which will fail with 400
-  // because brand is still pending. We store the ID so the "submit campaign"
-  // scenario can demonstrate the guard works. The "approved" fixture for the
-  // happy path is tested via: state machine allows pending->approved via
-  // checkStatus (poll). In tests, the mock returns null, keeping it pending.
-  // We accept this limitation: the campaign happy-path scenario exercises the
-  // API shape, and the guard scenario exercises the 400 path.
   setState(world, KEY, state)
 })
 

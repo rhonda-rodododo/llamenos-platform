@@ -96,7 +96,7 @@ export function createServices(db: Database, opts?: ServicesOpts): Services {
     userNotifications,
     digestCron,
     providerSetup: new ProviderSetup(db, opts?.hmacSecret ?? '', opts?.env?.DOMAIN ?? 'localhost'),
-    signalRegistration: new SignalRegistrationService(db, opts?.hmacSecret ?? ''),
+    signalRegistration: new SignalRegistrationService(db, opts?.hmacSecret ?? '', { ENVIRONMENT: opts?.env?.ENVIRONMENT }),
     a2pRegistration: new A2pRegistrationService(db, opts?.hmacSecret ?? ''),
   }
 
