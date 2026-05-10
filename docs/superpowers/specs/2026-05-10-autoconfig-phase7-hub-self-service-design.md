@@ -52,13 +52,32 @@ Usage tracking is aggregate only (call count, SMS count), visible to both hub ad
 
 ## Architecture
 
+### Security Prerequisite: Global Config Fallback Removal
+
+**CRITICAL — must be completed before any Phase 7 work begins.**
+
+The current `getProviderConfigRow()` in `apps/worker/services/provider-setup/index.ts` falls back to global config (`hubId IS NULL`) when no hub-specific config exists. This breaks hub isolation: a hub without its own config would silently inherit the platform-level config, allowing one hub's calls to route through another entity's credentials.
+
+**Required fix**: Remove the `hubId IS NULL` fallback from `getProviderConfigRow()` and add a runtime assertion that provider config queries always include a non-null `hubId`. If no hub-specific config exists, the query must return `null` (not fall back to global). Callers must handle the "no config" case explicitly (e.g., show onboarding wizard).
+
+### Provider Config: One Provider Per Hub
+
+The current `upsertProviderConfig` queries by `hubId` alone (not `(hubId, providerType)`), enforcing a **single telephony provider per hub**. This is intentional for Phase 7. When a hub admin switches providers:
+
+1. The existing provider config is deleted (or soft-deleted)
+2. A new config for the new provider type is created
+3. The onboarding wizard handles this as a "re-onboard" flow
+
+Multi-provider per hub is explicitly out of scope (see Future Work).
+
 ### Separate Entry Points (Option B)
 
-The hub onboarding wizard is a **distinct flow** from the platform setup wizard. They share components but have separate orchestration:
+The hub onboarding wizard is a **distinct flow** from the platform setup wizard. They share **sub-components** but have separate orchestration:
 
 ```
 Platform Setup Wizard (super-admin)     Hub Onboarding Wizard (hub admin)
-├── StepProviders.tsx                   ├── HubOnboardingWizard.tsx
+├── StepProviders.tsx (NOT reusable     ├── HubOnboardingWizard.tsx (NEW)
+│   — tightly coupled to SetupData)     │
 ├── OAuthConnectButton.tsx ◄──SHARED──► ├── OAuthConnectButton.tsx
 ├── PhoneNumberSelector.tsx ◄──SHARED──► ├── PhoneNumberSelector.tsx
 ├── VoiceSmsProviderForm.tsx ◄──SHARED──► ├── VoiceSmsProviderForm.tsx
@@ -67,7 +86,7 @@ Platform Setup Wizard (super-admin)     Hub Onboarding Wizard (hub admin)
 └── (platform-level settings)           └── HubProviderSettings.tsx (ongoing mgmt)
 ```
 
-The platform wizard (`StepProviders.tsx`) remains unchanged. The hub onboarding wizard is new, uses the same shared components (they already accept props, not global state), but has its own step orchestration, template selection, and hub-scoped API calls.
+**Note on `StepProviders.tsx`**: This component is tightly coupled to the `SetupData` type and the platform wizard's step orchestration. It is NOT reusable as-is. However, its **sub-components** (`OAuthConnectButton`, `PhoneNumberSelector`, `VoiceSmsProviderForm`, `WhatsAppProviderForm`, `SignalProviderForm`) already accept props (not global state) and ARE individually reusable. The hub onboarding wizard composes these sub-components with its own step orchestration.
 
 ### Hub Creation Paths
 
@@ -87,37 +106,40 @@ Invite-only is the default behavior. Self-create requires explicit permission gr
 
 ### What Already Exists (Reuse)
 
-| Component | Status |
-|-----------|--------|
-| `providerConfigs` table with `hubId` FK | Phase 1 |
-| `oauthStates`, `signalRegistrations`, `a2pRegistrations` with `hubId` | Phase 1 |
-| Hub-scoped permissions (`telephony:manage-providers`, `hubs:configure`, etc.) | Phase 1 |
-| `hasHubPermission()` authorization in `packages/shared/permissions.ts` | Existing |
-| `ProviderSetupService` with hubId parameter | Phase 2-3 |
-| Provider capability registry (8 providers) in `registry.ts` | Phase 2 |
-| OAuth flows with hubId scoping | Phase 3 |
-| Desktop setup wizard (`StepProviders.tsx`) with shared components | Phase 5 |
-| iOS/Android provider setup UI | Phase 6 |
-| 14 CaseManagementTemplate bundles in `packages/protocol/templates/` with `suggestedRoles[]` | Existing |
-| Role CRUD via `/api/roles` including `/roles/from-template` | Existing |
+| Component | Status | Notes |
+|-----------|--------|-------|
+| `providerConfigs` table with `hubId` FK | Phase 1 | |
+| `oauthStates`, `signalRegistrations`, `a2pRegistrations` with `hubId` | Phase 1 | |
+| Hub-scoped permissions (`telephony:manage-providers`, `hubs:configure`, etc.) | Phase 1 | |
+| `hasHubPermission()` authorization in `packages/shared/permissions.ts` | Existing | |
+| `ProviderSetupService` with hubId parameter | Phase 2-3 | |
+| Provider capability registry (8 providers) in `registry.ts` | Phase 2 | |
+| OAuth flows with hubId scoping | Phase 3 | |
+| Desktop shared sub-components (`OAuthConnectButton`, `PhoneNumberSelector`, `VoiceSmsProviderForm`, etc.) | Phase 5 | Individually reusable; parent `StepProviders.tsx` is NOT |
+| Hub-scoped provider-setup routes at `/api/hubs/:hubId/provider-setup/*` | Phase 5 | New routes MUST use this hub-scoped mounting |
+| 14 CaseManagementTemplate bundles in `packages/protocol/templates/` | Existing | These are CMS entity templates (entity types, fields, relationships) — NOT provider templates |
+| Role CRUD via `/api/roles` including `/roles/from-template` | Existing | |
+| `hubRoles` JSONB column on `users` table | Existing | NOT a separate join table — roles stored as JSONB array per user |
 
 ### What Phase 7 Adds
 
-1. **Hub Onboarding Wizard** — hub-specific guided flow (separate entry point from platform wizard, shared components)
-2. **Template Extensions** — extend existing `CaseManagementTemplate` JSON schema with provider configuration fields (channel defaults, provider hints, sub-account config)
-3. **Channel Mix-and-Match** — any combination of telephony, Signal, WhatsApp, Telegram, RCS per hub
-4. **Sub-Account Provisioning** — optional auto-provisioning mode when super-admin has configured master provider
-5. **Hub Settings Panel** — dedicated provider management page in hub settings (persistent, not just onboarding)
-6. **Hub Quotas** — extension to `hubSettings.settings` JSONB for quota tracking
-7. **Usage Tracking** — lightweight aggregation of hub provider usage (call count, SMS count)
-8. **New Permission** — `system:create-hub` for self-serve hub creation
-9. **Multi-Hub Isolation Tests** — dedicated test suite verifying cross-hub data isolation across ALL platforms
+1. **Hub Onboarding Wizard** — hub-specific guided flow (separate entry point from platform wizard, reuses sub-components with new orchestration)
+2. **Provider Templates** — a completely NEW concept: super-admin-managed templates for provider configuration (channel defaults, provider hints, sub-account config). Stored in a new `provider_templates` DB table. Separate from CaseManagementTemplates (which are CMS entity templates)
+3. **CaseManagementTemplate Extensions** — optional provider config fields added to existing CMS templates, allowing a case management template to suggest channel defaults and recommended providers
+4. **Channel Mix-and-Match** — any combination of telephony, Signal, WhatsApp, Telegram, RCS per hub
+5. **Sub-Account Provisioning** — optional auto-provisioning mode when super-admin has configured master provider
+6. **Hub Settings Panel** — dedicated provider management page in hub settings (persistent, not just onboarding)
+7. **Hub Quotas** — extension to `hubSettings.settings` JSONB for quota tracking
+8. **Usage Tracking** — lightweight aggregation of hub provider usage (call count, SMS count)
+9. **New Permission** — `system:create-hub` for self-serve hub creation
+10. **Multi-Hub Isolation Tests** — dedicated test suite verifying cross-hub data isolation across ALL platforms
+11. **Mobile Hub Settings Discovery** — iOS and Android have no hub-specific provider management UI yet; Phase 7 scaffolds and implements these screens from scratch
 
 ## Data Model Changes
 
 ### Extension: CaseManagementTemplate (packages/protocol/templates/)
 
-Rather than creating a separate `provider_templates` DB table, Phase 7 extends the existing CaseManagementTemplate JSON schema with provider configuration fields. This keeps templates as a single concept — one template configures both case management (entity types, roles) AND communications (channels, provider hints).
+The existing templates in `packages/protocol/templates/` are **CMS entity templates** — they define entity types, custom fields, and relationships for case management. Phase 7 adds optional provider configuration fields to this schema, allowing a CMS template to also suggest channel defaults and provider recommendations. This is a schema extension, not a replacement.
 
 New fields added to template JSON schema:
 
@@ -172,7 +194,7 @@ CREATE TABLE hub_onboarding_state (
 
 ### New Table: `provider_templates` (Super-Admin Managed)
 
-For super-admin-created provider configuration templates (separate from case management templates). These are lightweight provider-only templates that can be applied independently or alongside a case management template:
+A completely new concept for super-admin-created provider configuration templates. These are **NOT** related to the existing CaseManagementTemplate bundles in `packages/protocol/templates/` (which are CMS entity templates). Provider templates are lightweight, DB-stored templates that configure communications channels and provider settings:
 
 ```sql
 CREATE TABLE provider_templates (
@@ -191,6 +213,8 @@ CREATE TABLE provider_templates (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 ```
+
+**Important**: `credential_hints` stores UI hints (field labels, placeholder text, help URLs) — NEVER actual API keys or secrets. Validation at write time rejects values that look like real credentials (e.g., base64-encoded strings, values over 100 chars).
 
 ### Extension: `hubSettings.settings` JSONB
 
@@ -267,7 +291,48 @@ Two modes for provider credentials:
    - Super-admin has enabled `allowSubAccounts` on the master config
    - Template (if selected) has `allowSubAccounts: true`
 
-   In sub-account mode, the onboarding wizard calls a platform API to auto-provision a sub-account under the master provider. The hub admin never sees master credentials. The sub-account credentials are stored in the hub's `providerConfigs`.
+   In sub-account mode, the onboarding wizard calls a platform API to auto-provision a sub-account under the master provider. The hub admin never sees master credentials. The sub-account credentials are encrypted and stored per-hub.
+
+### Sub-Account Capabilities by Provider
+
+All 8 telephony providers support some form of sub-account/multi-tenant isolation:
+
+| Provider | Sub-Account Mechanism | Billing | Limits | Notes |
+|----------|----------------------|---------|--------|-------|
+| **Twilio** | Full Subaccounts API | Per-subaccount billing | Unlimited | Most complete implementation; ISV-friendly |
+| **SignalWire** | Subprojects | Shared billing (master pays) | Unlimited | Subprojects share the master account's billing |
+| **Vonage** | Sub-accounts (GA) | Per-subaccount | Unlimited | GA API, similar to Twilio |
+| **Plivo** | Subaccounts API | Per-subaccount | Unlimited | Full isolation |
+| **Telnyx** | Managed Accounts | Per-account | **Limited release — must qualify** | Contact Telnyx to enable; not self-service |
+| **Bandwidth** | Sites (Sub-accounts) | Per-site | **Max 50 sub-accounts** | Hard cap at 50; plan for hub growth accordingly |
+| **Asterisk** | N/A (self-hosted) | N/A | N/A | No sub-account concept; each hub runs own config |
+| **FreeSWITCH** | N/A (self-hosted) | N/A | N/A | No sub-account concept; each hub runs own config |
+
+**Scaling note**: Bandwidth's 50 sub-account limit may be a constraint for large deployments. Document this in the admin panel when Bandwidth is the master provider.
+
+### A2P 10DLC Registration (Per Sub-Account)
+
+A2P 10DLC registration works per sub-account via the ISV (Independent Software Vendor) onboarding flow:
+
+1. Master account registers as ISV with The Campaign Registry (TCR)
+2. For each hub sub-account: master creates a **Secondary Customer Profile** → **Brand** → **Campaign**
+3. Campaign review takes **10-15 business days** (carrier-dependent)
+4. Once approved, the sub-account's phone numbers are associated with the campaign
+
+The onboarding wizard shows A2P status and estimated review timelines. Hub admins can proceed with voice-only while A2P review is pending.
+
+### Signal Registration Notes
+
+- **VoIP numbers work but are less reliable** for Signal registration — some VoIP ranges are blocked by Signal's anti-spam systems
+- **Recommendation**: Use real SIM-backed numbers for production Signal registration
+- **Registration Lock PIN**: Recommend enabling Registration Lock PIN after successful registration to prevent number hijacking
+- The `signal-notifier` sidecar handles registration; the onboarding wizard calls its API
+
+### OAuth and Authentication
+
+All 8 telephony providers use **API key authentication** (Account SID + Auth Token, API key + secret, etc.) — none use OAuth for provider API access. The `OAuthConnectButton` component is used for providers that offer an OAuth convenience flow for initial credential exchange, but the stored credentials are always API keys.
+
+If OAuth-based services are added in the future (e.g., Google RCS Business Messaging), use a single redirect URI with the `state` parameter encoding `hubId` to maintain hub isolation.
 
 ## Hub Onboarding Wizard Flow
 
@@ -279,8 +344,8 @@ Template-driven with checklist fallback. 7 steps:
 - If hub was created from a case management template that has `defaultChannels`, mention the suggested setup
 
 ### Step 2: Choose Template
-- Card grid of available provider templates (super-admin-created)
-- If the hub was created with a case management template, its `defaultChannels` and `recommendedProvider` are pre-selected
+- Card grid of available provider templates (super-admin-created, from `provider_templates` table)
+- If the hub was created with a case management template that has `defaultChannels` and `recommendedProvider`, those values are pre-selected as defaults
 - "Start from scratch" option for manual configuration
 - Templates are starting points — users can modify any settings
 
@@ -291,9 +356,9 @@ Template-driven with checklist fallback. 7 steps:
 - If "from scratch": skip directly to Step 4
 
 ### Step 4: Provision Phone Number
-- Connect provider (OAuth or credential entry) — reuses `OAuthConnectButton`, `VoiceSmsProviderForm`
+- Connect provider (API key entry or OAuth convenience flow) — reuses `OAuthConnectButton`, `VoiceSmsProviderForm` sub-components
 - If sub-account mode: auto-provision sub-account, then proceed
-- Search for available numbers → buy/assign — reuses `PhoneNumberSelector`
+- Search for available numbers → buy/assign — reuses `PhoneNumberSelector` sub-component
 - Phone number is required for most channels (except Telegram)
 - Quota check: reject if hub exceeds `maxPhoneNumbers`
 
@@ -334,6 +399,10 @@ Persistent dashboard at `/hub/:hubId/settings/communications` for ongoing manage
 
 ## API Changes
 
+### Route Mounting
+
+New hub-specific routes MUST be mounted under the existing hub-scoped prefix: `/api/hubs/:hubId/...`. Provider-setup routes are already mounted at BOTH `/api/provider-setup/*` (global) AND `/api/hubs/:hubId/provider-setup/*` (hub-scoped). New template routes at the global level are acceptable since templates are platform-wide resources.
+
 ### New Routes
 
 | Method | Path | Permission | Description |
@@ -355,11 +424,15 @@ Persistent dashboard at `/hub/:hubId/settings/communications` for ongoing manage
 ### Modifications to Existing Routes
 
 - `POST /api/hubs` — add `system:create-hub` as alternative permission (currently requires `system:manage-hubs`)
-- All existing `/api/provider-setup/*` routes already accept `hubId` from context — no changes needed
+- All existing `/api/hubs/:hubId/provider-setup/*` routes already accept `hubId` from context — no changes needed
 - Add quota enforcement to `POST /phone-numbers/provision` — reject if hub exceeds `maxPhoneNumbers`
 - Add quota check to telephony/messaging adapters at call/SMS time (hook point added, runtime enforcement deferred)
 
 ## UI Design
+
+### i18n Rule (ALL Platforms)
+
+**ALL i18n strings MUST be added to `packages/i18n/locales/en.json` first, then propagated to all 12 other locale files, then generated via `bun run i18n:codegen`. NEVER add strings directly to platform-specific files (iOS `.strings`, Android `strings.xml`, desktop source). Run `bun run i18n:validate:all` before pushing.** This applies to every frontend task in this spec.
 
 ### Desktop Implementation
 
@@ -371,22 +444,37 @@ Persistent dashboard at `/hub/:hubId/settings/communications` for ongoing manage
   - `ChannelSetupFlow.tsx` — per-channel sub-flow orchestration
   - `HubProviderSettings.tsx` — ongoing management panel
   - `HubUsageCard.tsx` — usage display
-- Reuses: `OAuthConnectButton`, `PhoneNumberSelector`, `VoiceSmsProviderForm`, `WhatsAppProviderForm`, `SignalProviderForm`, `WebhookConfirmation`, `ProviderStatusBadge` (all existing)
-- i18n keys added for new strings
+- Reuses **sub-components**: `OAuthConnectButton`, `PhoneNumberSelector`, `VoiceSmsProviderForm`, `WhatsAppProviderForm`, `SignalProviderForm`, `WebhookConfirmation`, `ProviderStatusBadge` (all existing, all accept props)
+- Does NOT reuse `StepProviders.tsx` (tightly coupled to `SetupData`)
+- i18n: all strings via `packages/i18n` + codegen
 
 ### iOS Implementation
 
-- New screens mirroring the desktop hub settings panel
-- Onboarding wizard as SwiftUI sheet flow
-- Reuses existing provider setup view components from Phase 6
-- i18n strings via codegen
+- **No hub-specific provider management UI exists yet** — all screens are new (not extending existing Phase 6 screens)
+- New screens:
+  - `HubCommunicationsView.swift` — main hub settings communications screen
+  - `HubOnboardingSheet.swift` — onboarding wizard as SwiftUI sheet flow
+  - `ProviderTemplateListView.swift` — template picker
+  - `ChannelChecklistView.swift` — channel toggles
+  - `HubUsageView.swift` — usage display
+  - `HubCommunicationsViewModel.swift` — view model with API calls
+  - `HubOnboardAPI.swift` — API client for new endpoints
+- Reuses existing provider setup sub-components from Phase 6 where applicable
+- i18n: all strings via `packages/i18n` codegen → `.strings` files
 
 ### Android Implementation
 
-- New screens mirroring the desktop hub settings panel
-- Onboarding wizard as Compose ModalBottomSheet flow
-- Reuses existing provider setup view components from Phase 6
-- i18n strings via codegen
+- **No hub-specific provider management UI exists yet** — all screens are new (not extending existing Phase 6 screens)
+- New screens:
+  - `HubCommunicationsScreen.kt` — main hub settings Compose screen
+  - `HubOnboardingFlow.kt` — onboarding BottomSheet flow
+  - `ProviderTemplateList.kt` — template picker (Material 3 cards)
+  - `ChannelChecklist.kt` — channel switches (Material 3 Switch)
+  - `HubUsageCard.kt` — usage display
+  - `HubCommunicationsViewModel.kt` — view model
+  - `HubOnboardApi.kt` — API client for new endpoints
+- Reuses existing provider setup sub-components from Phase 6 where applicable
+- i18n: all strings via `packages/i18n` codegen → `strings.xml` + `I18n.kt`
 
 ### Cross-Platform Feature Matrix
 
@@ -410,11 +498,12 @@ All platforms share:
 
 ### Hub Isolation (Critical)
 
-1. **Query scoping**: Every provider-related DB query MUST filter by `hubId`. The existing `ProviderSetupService` already takes `hubId` as a parameter — ensure all new queries follow this pattern.
-2. **No cross-hub credential access**: `decryptCredentials()` is called with the row's own HMAC — but add a runtime assertion that the requesting user's hub matches the row's `hubId`.
-3. **Template secrets**: `provider_templates.credential_hints` and `CaseManagementTemplate.providerDefaults` MUST NOT contain actual API keys. They store field hints/labels only.
-4. **OAuth state binding**: OAuth flows already bind `stateId` to `hubId` — verify in callback that the completing user belongs to the same hub.
-5. **Sub-account isolation**: When auto-provisioning sub-accounts, the master credentials are read server-side only. Hub admins never see master credentials. Sub-account credentials are encrypted and stored per-hub.
+1. **Global config fallback removal** (PREREQUISITE): Remove `hubId IS NULL` fallback from `getProviderConfigRow()`. Every provider config query must require a non-null `hubId`. See "Security Prerequisite" section above.
+2. **Query scoping**: Every provider-related DB query MUST filter by `hubId`. The existing `ProviderSetupService` already takes `hubId` as a parameter — ensure all new queries follow this pattern.
+3. **No cross-hub credential access**: `decryptCredentials()` is called with the row's own HMAC — but add a runtime assertion that the requesting user's hub matches the row's `hubId`.
+4. **Template secrets**: `provider_templates.credential_hints` and `CaseManagementTemplate.providerDefaults` MUST NOT contain actual API keys. They store field hints/labels only. Validated at write time.
+5. **OAuth state binding**: OAuth flows already bind `stateId` to `hubId` — verify in callback that the completing user belongs to the same hub.
+6. **Sub-account isolation**: When auto-provisioning sub-accounts, the master credentials are read server-side only. Hub admins never see master credentials. Sub-account credentials are encrypted and stored per-hub.
 
 ### Zero-Knowledge Super-Admin Boundaries
 
@@ -448,32 +537,72 @@ All platforms share:
 
 ## Testing Strategy
 
-### Backend
+### Backend Unit Tests
 
-1. **Unit tests**: 
-   - `ProviderTemplateService` CRUD operations
-   - `HubOnboardService` template instantiation, step progression
-   - Quota checking logic
-   - Channel enable/disable validation
-   - Sub-account provisioning logic
-   - `system:create-hub` permission resolution
+Unit tests using the existing `createMockDb()` + `vitest` pattern:
 
-2. **BDD scenarios** (`apps/worker/tests/features/`):
+1. **`apps/worker/__tests__/unit/provider-template-service.test.ts`**:
+   - CRUD operations (create, read, update, deactivate)
+   - `instantiateTemplate` applies defaults correctly
+   - Slug uniqueness validation
+   - Active-only filter on list
+   - `credential_hints` secret detection validation
+
+2. **`apps/worker/__tests__/unit/hub-onboard-service.test.ts`**:
+   - `getHubSetupStatus` returns correct composite status
+   - `completeOnboarding` marks hub as setup-complete
+   - `getHubUsage` returns current month aggregates
+   - `checkQuota` blocks when limit reached, allows when under
+   - Step progression validation (can't skip steps)
+   - Channel enable/disable toggles config correctly
+
+### Security BDD Scenarios
+
+Dedicated security test suite (`packages/test-specs/features/security/hub-self-service-security.feature`):
+
+- Cross-hub credential access attempt → denied (403)
+- Tampered `hubId` in API request body vs. auth context → denied (403)
+- Super-admin cannot read hub credentials via any API path
+- OAuth state bound to `hubId` — callback with wrong hub user → denied
+- Template `default_credentials` / `credential_hints` contains no real secrets (validation test)
+- Sub-account provisioning does not expose master credentials in response
+
+### Backend BDD Scenarios
+
+Expanded scenarios in `apps/worker/tests/features/`:
+
+1. **Hub Onboarding** (`hub-onboarding.feature`):
    - Hub admin onboards via template → provider config created with correct hubId, roles created
    - Hub admin onboards "from scratch" → manual config, no roles auto-created
-   - Hub admin cannot access another hub's provider config (cross-hub isolation)
+   - Hub admin completes all onboarding steps → hub marked as providerSetupComplete
    - Hub admin enables/disables channels independently
-   - Quota enforcement blocks phone number provisioning when limit reached
-   - Super-admin creates/edits/deactivates provider templates
-   - Super-admin sets hub quotas
-   - Super-admin CANNOT see hub credentials (zero-knowledge boundary)
    - User with `system:create-hub` creates own hub and runs onboarding
-   - User without `system:create-hub` cannot create hubs
+   - User without `system:create-hub` cannot create hubs (403)
    - Sub-account auto-provisioning when master provider is configured
    - Channel setup sub-flows complete correctly per channel type
    - Usage tracking aggregate counts are correct
+   - Hub admin rotates credentials → new credentials encrypted, old deleted
+   - Hub admin switches provider → old config deleted, new config created
 
-3. **Multi-hub isolation test suite** (`apps/worker/tests/features/hub-isolation.feature`):
+2. **Provider Templates** (`provider-templates.feature`):
+   - Super-admin CRUD on provider templates (create, list, update, deactivate)
+   - Template CRUD scenarios for super-admin (full lifecycle)
+   - Super-admin sets hub quotas → hub admin sees limits
+   - Quota enforcement blocks phone number provisioning when limit reached
+   - Quota administration: set quota, exceed quota → blocked
+   - Super-admin cannot see hub credentials via any API path (zero-knowledge)
+
+3. **Channel Configuration** (`hub-channels.feature`):
+   - Channel mix configuration: telephony only
+   - Channel mix configuration: Signal + telephony
+   - Channel mix configuration: all channels enabled
+   - Hub admin selectively enables/disables channels
+
+4. **Hub Lifecycle** (`hub-lifecycle.feature`):
+   - Self-service hub creation (`system:create-hub` permission)
+   - Hub admin onboards from scratch (no template)
+
+5. **Multi-Hub Isolation** (`hub-isolation.feature`):
    - 2+ hubs with separate providers, numbers, channels
    - Cross-hub credential access attempt → 403
    - Cross-hub phone number access attempt → empty list
@@ -481,30 +610,51 @@ All platforms share:
    - Super-admin aggregate view shows both hubs' status but no credentials
    - Hub deactivation does not affect other hubs
 
-### Desktop (Playwright E2E)
+### Desktop E2E (Playwright)
 
-1. Hub admin navigates to hub settings → sees onboarding wizard (unconfigured hub)
-2. Selects template → template details shown, channels pre-selected
-3. Proceeds through wizard → provider connected, number provisioned, channels configured
-4. Hub marked as configured → settings panel shows instead of wizard
-5. Settings panel: provider status card, phone numbers, channel toggles, usage
-6. Non-admin user cannot access hub communications settings
-7. Channel enable/disable from settings panel
-8. "Start from scratch" flow without template
+Comprehensive test suite:
 
-### iOS (XCUITest)
+1. **Wizard Steps** (`tests/hub-onboarding.spec.ts`):
+   - Step 1 (Welcome): renders correctly for unconfigured hub
+   - Step 2 (Template): template cards load, selection works, "from scratch" works
+   - Step 3 (Template Application): roles created, channels pre-selected
+   - Step 4 (Phone Number): provider connection, number search/selection
+   - Step 5 (Channel Checklist): toggles work, pre-checked from template
+   - Step 6 (Channel Setup): sub-flows render per enabled channel
+   - Step 7 (Summary): shows configured vs. pending, completion CTA
+
+2. **Hub Settings Panel** (`tests/hub-settings.spec.ts`):
+   - View provider status card with connection info
+   - Modify channels (enable/disable from settings)
+   - View usage stats and quota
+   - Rotate credentials flow
+   - Switch provider flow
+
+3. **Multi-Hub Navigation** (`tests/hub-multi-hub.spec.ts`):
+   - Navigate between hubs with different provider configs
+   - Each hub shows its own provider status, channels, usage
+   - No cross-hub data leakage in UI
+
+4. **Permission gating**: Non-admin user cannot access hub communications settings
+
+### iOS UI Tests (XCUITest)
+
+Expanded test suite:
 
 1. Hub settings shows communications section
 2. Onboarding sheet presented for unconfigured hub
 3. Template selection updates UI and pre-selects channels
 4. Channel checklist toggles work
-5. Provider connection form renders correctly
-6. Settings screen shows provider status after setup
-7. Permission-gated: non-admin cannot see communications settings
+5. **OAuth connection via ASWebAuthenticationSession** — flow completes, credentials stored
+6. **Channel enable/disable toggles** — each channel can be independently toggled
+7. **Settings panel interactions** — view status, modify channels, view usage
+8. Provider form renders and accepts input
+9. Settings screen shows provider status after setup
+10. Permission-gated: non-admin cannot see communications settings
 
-### Android (Compose UI Tests + Cucumber BDD E2E)
+### Android Tests (Compose UI Tests + Cucumber BDD E2E)
 
-1. **Compose UI tests**:
+1. **Compose UI tests** (`HubCommunicationsTest.kt`):
    - Hub settings shows communications section
    - Onboarding BottomSheet flow renders for unconfigured hub
    - Template selection card interactions
@@ -512,10 +662,12 @@ All platforms share:
    - Provider form field validation
    - Settings screen provider status display
 
-2. **Cucumber BDD E2E**:
-   - Full onboarding flow with template selection
+2. **Cucumber BDD E2E** (`apps/android/app/src/androidTest/assets/features/hub-self-service.feature`):
+   - Step definitions in `steps/hubs/HubSelfServiceSteps.kt`
+   - Full onboarding E2E flow (template selection → provider → number → channels → complete)
+   - Settings management E2E (view status, modify channels, view usage)
    - Channel enable/disable round-trip
-   - Settings panel after onboarding complete
+   - Settings panel after onboarding complete shows all configured channels
 
 ### Crypto
 
