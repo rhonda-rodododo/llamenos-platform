@@ -203,21 +203,21 @@
             openssl rand -hex 32
         success_msg: "hmac_secret: [set, {{ hmac_secret | length }} chars]"
 
-    - name: Assert server_nostr_secret is a valid 64-character hex string
+    - name: Assert server_secret is a valid 64-character hex string
       ansible.builtin.assert:
         that:
-          - server_nostr_secret is defined
-          - server_nostr_secret | length == 64
-          - server_nostr_secret | regex_search('^[0-9a-f]{64}$') is truthy
+          - server_secret is defined
+          - server_secret | length == 64
+          - server_secret | regex_search('^[0-9a-f]{64}$') is truthy
         fail_msg: |
-          REQUIRED: 'server_nostr_secret' must be exactly 64 lowercase hex characters.
+          REQUIRED: 'server_secret' must be exactly 64 lowercase hex characters.
           
-          Current value: {{ server_nostr_secret | default('NOT SET') }}
-          Length: {{ server_nostr_secret | default('') | length }} chars (expected: 64)
+          Current value: {{ server_secret | default('NOT SET') }}
+          Length: {{ server_secret | default('') | length }} chars (expected: 64)
           
           To generate:
             openssl rand -hex 32
-        success_msg: "server_nostr_secret: [set, 64 chars]"
+        success_msg: "server_secret: [set, 64 chars]"
 
     - name: Assert pg_password meets minimum length
       ansible.builtin.assert:
@@ -321,7 +321,7 @@
           ===========================================
           Domain: {{ domain }}
           Admin Pubkey: {{ admin_pubkey[:16] }}...
-          Server Nostr Secret: {{ server_nostr_secret[:8] }}...
+          Server Secret: {{ server_secret[:8] }}...
           PostgreSQL Password: [set, {{ pg_password | length }} chars]
            Storage Access Key: [set]
            Storage Secret Key: [set, {{ storage_secret_key | length }} chars]

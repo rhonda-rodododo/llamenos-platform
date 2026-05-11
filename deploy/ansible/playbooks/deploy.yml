@@ -49,9 +49,6 @@
     - role: llamenos-rustfs
       tags: [rustfs, deploy]
       when: llamenos_rustfs_enabled | default(true)
-    - role: llamenos-strfry
-      tags: [strfry, deploy]
-      when: llamenos_strfry_enabled | default(true)
 
 - name: Deploy application services
   hosts: llamenos_servers

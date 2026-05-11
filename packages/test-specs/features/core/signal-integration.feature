@@ -26,13 +26,13 @@ Feature: Signal Adapter Integration
   Scenario: Signal reaction creates reaction event
     Given an active Signal conversation
     When a reaction webhook arrives with emoji "heart" targeting timestamp "1700000000001"
-    Then a MESSAGE_REACTION Nostr event should be published
+    Then a MESSAGE_REACTION WebSocket event should be published
     And the event should contain the emoji "heart"
 
-  Scenario: Signal typing indicator publishes Nostr event
+  Scenario: Signal typing indicator publishes WebSocket event
     Given an active Signal conversation
     When a typing STARTED webhook arrives from the Signal contact
-    Then a TYPING_INDICATOR Nostr event should be published
+    Then a TYPING_INDICATOR WebSocket event should be published
     And the event should indicate typing is active
 
   # ── Registration & Verification ──────────────────────────────────

@@ -139,7 +139,7 @@ bun run bootstrap-admin
 ```
 
 This outputs:
-- An **nsec** (secret key) — give this to the admin, store it securely
+- A **recovery key** — give this to the admin, store it securely
 - A **hex public key** — you'll need this in the next step
 
 ### 3. Configure environment

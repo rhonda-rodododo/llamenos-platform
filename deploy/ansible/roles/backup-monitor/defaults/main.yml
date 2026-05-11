@@ -18,9 +18,6 @@ backup_monitor_dirs:
   - name: postgres
     path: "{{ backup_base_dir }}/postgres/daily"
     pattern: "llamenos-postgres-*.dump*"
-  - name: strfry
-    path: "{{ backup_base_dir }}/strfry/daily"
-    pattern: "llamenos-strfry-*.jsonl*"
   - name: rustfs
     path: "{{ backup_base_dir }}/rustfs/daily"
     pattern: "llamenos-rustfs-*.tar*"

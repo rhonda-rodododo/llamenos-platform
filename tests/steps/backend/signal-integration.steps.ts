@@ -375,7 +375,7 @@ Then(
   },
 )
 
-Then('a MESSAGE_REACTION Nostr event should be published', async ({ world }) => {
+Then('a MESSAGE_REACTION WebSocket event should be published', async ({ world }) => {
   const signalState = getSignalState(world)
   // The simulation endpoint returns the event type if it was published,
   // or the webhook returned a success status indicating the event was dispatched.
@@ -395,7 +395,7 @@ Then('the event should contain the emoji {string}', async ({ world }, emoji: str
   // If not returned, the test passes — the webhook was accepted (200 OK)
 })
 
-Then('a TYPING_INDICATOR Nostr event should be published', async ({ world }) => {
+Then('a TYPING_INDICATOR WebSocket event should be published', async ({ world }) => {
   const signalState = getSignalState(world)
   expect(
     signalState.wsEventType === 'TYPING_INDICATOR' ||

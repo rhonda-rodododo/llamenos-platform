@@ -87,7 +87,7 @@ export function validateConfig(env: ConfigInput = process.env): void {
   assertNonEmpty(env, 'ENVIRONMENT')
 
   // --- Optional vars (warn when absent, do not fail) ---
-  // NOSTR_RELAY_URL removed — replaced by in-process WebSocket relay
+  // WebSocket relay is in-process — no external relay URL needed
   warnIfAbsent(env, 'FCM_SERVICE_ACCOUNT_KEY', 'Android push notifications disabled')
   warnIfAbsent(env, 'APNS_KEY_P8', 'iOS push notifications disabled')
   warnIfAbsent(env, 'APNS_KEY_ID', 'iOS push notifications disabled')

@@ -15,7 +15,7 @@ Feature: SIP Bridge Integration
   Scenario: Parallel ring reaches multiple volunteers
     Given 3 volunteers are on shift
     When an inbound SIP call arrives from "+15553330001"
-    Then a call ring Nostr event should be published
+    Then a call ring WebSocket event should be published
     And the SIP call status should be "ringing"
 
   Scenario: Call answered terminates other ringing channels

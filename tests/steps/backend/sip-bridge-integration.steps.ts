@@ -206,7 +206,7 @@ Then('the call should have a unique call ID', async ({ world }) => {
   expect(state.callId!.length).toBeGreaterThan(0)
 })
 
-Then('a call ring Nostr event should be published', async ({ world }) => {
+Then('a call ring WebSocket event should be published', async ({ world }) => {
   const state = getScenarioState(world)
   // Verify the call was created — the ring event is published synchronously
   expect(state.callId).toBeDefined()

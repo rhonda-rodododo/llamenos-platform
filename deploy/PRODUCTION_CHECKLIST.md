@@ -19,9 +19,9 @@ Pre-launch checklist for self-hosted Llamenos instances. Complete all items befo
 - [ ] `.env` file has strong, unique secrets (not defaults)
 - [ ] `PG_PASSWORD` is cryptographically random (≥24 chars)
 - [ ] `HMAC_SECRET` is 64 hex chars (`openssl rand -hex 32`)
-- [ ] `SERVER_NOSTR_SECRET` is 64 hex chars
+- [ ] `SERVER_SECRET` is 64 hex chars
 - [ ] `STORAGE_ACCESS_KEY` and `STORAGE_SECRET_KEY` are unique and >= 24 chars
-- [ ] `ADMIN_PUBKEY` set to real admin's Nostr pubkey
+- [ ] `ADMIN_PUBKEY` set to real admin's Ed25519 pubkey
 - [ ] `DOMAIN` set to actual production domain
 - [ ] `ACME_EMAIL` set for Let's Encrypt notifications
 - [ ] `ENVIRONMENT=production` (not development)
@@ -99,13 +99,13 @@ Pre-launch checklist for self-hosted Llamenos instances. Complete all items befo
 - [ ] No secrets in Docker Compose file (all in `.env`)
 - [ ] `.env` file permissions: 600 (owner-only read)
 - [ ] No debug endpoints exposed in production
-- [ ] Nostr relay only accessible internally (not on public network)
+- [ ] WebSocket relay only accessible via authenticated connections
 
 ## Kubernetes (if using Helm)
 
 - [ ] `helm lint` passes
 - [ ] Secrets stored in Kubernetes Secrets (not values.yaml)
-- [ ] PodDisruptionBudget configured for app and strfry
+- [ ] PodDisruptionBudget configured for app
 - [ ] Resource limits set for all containers
 - [ ] RustFS uses StatefulSet (not Deployment)
 - [ ] Liveness probe: `/api/health/live`
