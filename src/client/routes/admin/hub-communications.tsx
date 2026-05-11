@@ -147,7 +147,7 @@ function HubCommunicationsSettingsPage() {
       {usage && (
         <HubUsageCard
           usage={usage}
-          quota={{
+          quota={providerStatus?.quotas ?? {
             maxPhoneNumbers: 5,
             maxSmsPerMonth: 1000,
             maxCallsPerMonth: 500,

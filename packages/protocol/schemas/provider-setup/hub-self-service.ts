@@ -120,5 +120,6 @@ export const hubSetupStatusSchema = z.object({
   channelsPending: z.array(hubChannelTypeSchema),
   a2pStatus: z.string().optional(),
   onboardingComplete: z.boolean(),
+  quotas: hubQuotaSchema.optional(),
 })
 export type HubSetupStatus = z.infer<typeof hubSetupStatusSchema>
