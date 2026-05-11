@@ -27,7 +27,6 @@ done
 
 if [[ "$BUILD_IOS" == false && "$BUILD_ANDROID" == false ]]; then
   if git -C "$PROJECT_ROOT" rev-parse --git-dir &>/dev/null; then
-    local branch
     branch=$(git -C "$PROJECT_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || true)
     if [[ "$branch" == feat/ios* || "$branch" == feat/mobile* || "$branch" == fix/ios* || "$branch" == fix/mobile* ]]; then
       BUILD_IOS=true
@@ -81,7 +80,7 @@ needs_rebuild() {
   if [[ ! -e "$outputs" ]]; then
     return 0
   fi
-
+  
   local newest_source
   local newest_output
   newest_source=$(find $sources -type f -printf '%T@\n' 2>/dev/null | sort -n | tail -1)
