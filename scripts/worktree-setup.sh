@@ -251,7 +251,7 @@ copy_android_artifacts() {
 }
 
 main() {
-  echo "Workspace Setup"
+  echo "Worktree Setup"
   echo "==============="
   echo ""
 

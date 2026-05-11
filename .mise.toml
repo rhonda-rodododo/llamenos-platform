@@ -32,9 +32,9 @@ ENVIRONMENT = "development"
 description = "Full first-time setup for new contributors"
 run         = "bash scripts/setup.sh"
 
-[tasks.workspace-setup]
+[tasks.worktree-setup]
 description = "Regenerate codegen and rebuild crypto artifacts (runs automatically on bun install)"
-run         = "bash scripts/workspace-setup.sh"
+run         = "bash scripts/worktree-setup.sh"
 
 [tasks.dev]
 description = "Start local backend (PostgreSQL + backing services + Bun server)"
