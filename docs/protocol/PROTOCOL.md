@@ -752,11 +752,11 @@ All hub members who possess the hub key can derive the same event key and decryp
 
 #### Targeted Messages (Single Recipient)
 
-For events intended for a single recipient (e.g., direct provisioning messages), use NIP-44 encryption from the WebSocket protocol.
+For events intended for a single recipient (e.g., direct provisioning messages), use HPKE encryption targeted to the recipient's X25519 pubkey.
 
 ### 2.9 Server WebSocket Keypair Derivation
 
-The server derives its WebSocket keypair deterministically from a 64-hex-char secret (`SERVER_NOSTR_SECRET`):
+The server derives its event signing keypair deterministically from a 64-hex-char secret (`SERVER_SECRET`):
 
 ```
 deriveServerKeypair(server_secret_hex):
@@ -766,8 +766,8 @@ deriveServerKeypair(server_secret_hex):
   secret_key = HKDF(
     hash = SHA-256,
     ikm  = secret_bytes,
-    salt = UTF-8("llamenos:server-WebSocket-key"),
-    info = UTF-8("llamenos:server-WebSocket-key:v1"),
+    salt = UTF-8("llamenos:server-event-key"),
+    info = UTF-8("llamenos:server-event-key:v1"),
     length = 32
   )
 
@@ -838,7 +838,7 @@ New devices are authorized via an append-only hash-chained sigchain. Each sigcha
 
 #### Relationship to WebSocket Identity
 
-WebSocket identity keys (secp256k1 nsec/npub) remain separate from device keys. The nsec is used for WebSocket protocol compatibility (relay auth, event signing). Device Ed25519 keys handle application-level auth and sigchain. Device X25519 keys handle HPKE encryption. These are NOT derived from the nsec.
+WebSocket events are signed by the server's derived event keypair. Clients verify the server signature on all WebSocket events. Device Ed25519 keys handle application-level auth and sigchain. Device X25519 keys handle HPKE encryption. These are NOT derived from the server event key.
 
 ### 2.12 Audit Log Hash Chain
 
@@ -965,7 +965,7 @@ interface RecipientEnvelope {
 
 ## 3. WebSocket Event Schema
 
-Llamenos uses a self-hosted WebSocket relay (WebSocket relay or Nosflare) for real-time event distribution. All events are server-signed and encrypted with the hub key.
+Llamenos uses a built-in WebSocket endpoint on the API server for real-time event distribution. All events are server-signed and encrypted with the hub key.
 
 ### 3.1 Event Kind Definitions
 
@@ -988,11 +988,11 @@ Llamenos uses a self-hosted WebSocket relay (WebSocket relay or Nosflare) for re
 | 20000 | `KIND_PRESENCE_UPDATE` | Volunteer presence update -- online counts, availability |
 | 20001 | `KIND_CALL_SIGNAL` | Call answer/hangup signals -- real-time coordination |
 
-#### Standard NIP Kinds
+#### Authentication Events
 
-| Kind | Constant | Purpose |
+| Type | Constant | Purpose |
 |------|----------|---------|
-| 22242 | `KIND_NIP42_AUTH` | NIP-42 authentication event |
+| `auth` | `EVENT_AUTH` | WebSocket authentication |
 
 ### 3.2 Event Format
 
@@ -1015,7 +1015,7 @@ All server-published events follow this structure:
 
 #### Tag Convention
 
-All events carry the tag `["t", "llamenos:event"]`. This generic tag prevents the relay from distinguishing between event types (call events, message events, settings events all look the same to the relay).
+All events include a generic `type` field inside the encrypted payload. This prevents the WebSocket infrastructure from distinguishing between event types (call events, message events, settings events all look the same to the server).
 
 The `["d", "global"]` tag is used for hub-wide broadcasts. Hub-scoped events would use `["d", hub_id]`.
 
@@ -1045,26 +1045,26 @@ The plaintext content is a JSON string with a `type` field identifying the event
 Events are signed using the server's derived keypair (Section 2.9). Clients verify against the `serverWebSocketPubkey` from `GET /api/config`.
 
 ```
-signServerEvent(template, secret_key):
-  event = finalizeEvent(template, secret_key)
-  // Uses WebSocket-tools/pure.finalizeEvent
-  // Computes event.id = SHA-256(serialized_event)
-  // Computes event.sig = schnorr.sign(event.id, secret_key)
+signServerEvent(payload, secret_key):
+  // Serialize payload deterministically
+  message = SHA-256(JSON.stringify(payload))
+  // Sign with BIP-340 Schnorr
+  signature = schnorr.sign(message, secret_key)
+  return { payload, signature: hex(signature), pubkey: serverPubkey }
 ```
 
 ### 3.4 Client Connection
 
-Clients connect to the relay URL provided by `GET /api/config`:
-- `WebSocketRelayUrl`: WebSocket URL (e.g., `wss://relay.example.com` or relative `/WebSocket`)
-- If `WebSocketRelayUrl` is null, WebSocket real-time is not configured.
+Clients connect to the WebSocket endpoint provided by `GET /api/config`:
+- `wsUrl`: WebSocket URL (e.g., `wss://api.example.com/ws` or relative `/ws`)
+- If `wsUrl` is null, WebSocket real-time is not configured.
 
-Clients subscribe to events with a filter:
+Clients authenticate and then receive events for their subscribed hubs:
 
 ```json
 {
-  "kinds": [1000, 1001, 1002, 1010, 1011, 1020, 1030, 20000, 20001],
-  "#t": ["llamenos:event"],
-  "since": <current_timestamp>
+  "action": "subscribe",
+  "hubIds": ["hub-id-1", "hub-id-2"]
 }
 ```
 
@@ -2547,7 +2547,7 @@ Clients implementing this protocol need the following cryptographic capabilities
 
 | Operation | Library (JS reference) | Algorithm |
 |-----------|----------------------|-----------|
-| Key generation | `WebSocket-tools` | secp256k1 |
+| Key generation | `@noble/curves` | secp256k1, Ed25519, X25519 |
 | Schnorr signatures | `@noble/curves/secp256k1` | BIP-340 |
 | ECDH | `@noble/curves/secp256k1` | secp256k1 |
 | SHA-256 | `@noble/hashes/sha2` | SHA-256 |
@@ -2555,7 +2555,7 @@ Clients implementing this protocol need the following cryptographic capabilities
 | HKDF | `@noble/hashes/hkdf` | HKDF-SHA256 |
 | AEAD | `@noble/ciphers/chacha` | XChaCha20-Poly1305 |
 | PBKDF2 | Web Crypto API | PBKDF2-SHA256 |
-| WebSocket encoding | `WebSocket-tools` | bech32 (nsec/npub) |
+| Encoding | `@noble/hashes` | hex, utf8 |
 
 **Gotchas for non-JS implementations:**
 - `@noble/ciphers` and `@noble/hashes` require `.js` extension in import paths (JS-specific).

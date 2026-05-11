@@ -59,7 +59,7 @@ The following findings represent the highest-risk vulnerabilities and must be ad
 **File(s)**: `deploy/docker/Dockerfile:10,18`
 **Description**: Both `FROM oven/bun:1 AS deps` and `FROM oven/bun:1-slim` use mutable tag references. `Dockerfile.build` (the reproducible build image) correctly uses a SHA-256 digest pin. The production image is inconsistent with the reproducibility guarantee.
 **Impact**: A backdoored base image (via a compromised Docker Hub account or a supply-chain attack on the upstream image) runs with all application code, including E2EE note decryption and database access. The attack is invisible to source-level review.
-**Exploit Scenario**: Attacker compromises the `oven/bun` Docker Hub account and pushes a backdoored image under the `1` and `1-slim` tags. Next production build pulls the malicious image. The backdoor exfiltrates `DATABASE_URL`, `SERVER_NOSTR_SECRET`, and all decrypted note keys processed in-memory.
+**Exploit Scenario**: Attacker compromises the `oven/bun` Docker Hub account and pushes a backdoored image under the `1` and `1-slim` tags. Next production build pulls the malicious image. The backdoor exfiltrates `DATABASE_URL`, `SERVER_SECRET`, and all decrypted note keys processed in-memory.
 **Fix**: Pin both `FROM` stages to the same verified SHA-256 digest used in `Dockerfile.build`. Update the digest on a planned cadence with explicit review.
 
 ---
@@ -116,14 +116,14 @@ The following findings represent the highest-risk vulnerabilities and must be ad
 
 ---
 
-### CRIT-H2 (CRITICAL): iOS hub switch does not invalidate relay connection or clear hub key
+### CRIT-H2 (CRITICAL): iOS hub switch does not invalidate WebSocket connection or clear hub key
 
 **Component**: iOS — Hub switching
 **File(s)**: `apps/ios/Sources/ViewModels/HubManagementViewModel.swift:61-64`
-**Description**: `switchHub(to:)` sets `activeHubSlug` and nothing else. The WebSocket connection to the old hub's relay remains open and authenticated. `serverEventKeyHex` from Hub A remains set on `WebSocketService`. The app does not disconnect, does not nil the key, does not reconnect to the new hub relay URL, and does not re-fetch `/api/auth/me` for the new hub context.
-**Impact**: After switching to Hub B, all relay events received are still decrypted with Hub A's key. Hub B events that use Hub B's key cannot be decrypted. More critically, Hub A's relay key remains in memory and active — if Hub A and Hub B are separate organizations, Hub A traffic continues to be readable after the switch.
-**Exploit Scenario**: A volunteer who works for two crisis organizations switches their app from Hub A (Organization A) to Hub B (Organization B). Hub A's relay stream continues to arrive and decrypt correctly, exposing Organization A's operational events to a context where Organization B's app session is active. If the device is compromised after the switch, Hub A key material is still in memory.
-**Fix**: On hub switch, call WebSocket disconnect, nil `serverEventKeyHex`, reconnect using the new hub's relay URL from `HubConfig`, and re-fetch `/api/auth/me` to receive the correct hub-scoped key.
+**Description**: `switchHub(to:)` sets `activeHubSlug` and nothing else. The WebSocket connection to the old hub remains open and authenticated. `serverEventKeyHex` from Hub A remains set on `WebSocketService`. The app does not disconnect, does not nil the key, does not reconnect to the new hub WebSocket endpoint, and does not re-fetch `/api/auth/me` for the new hub context.
+**Impact**: After switching to Hub B, all WebSocket events received are still decrypted with Hub A's key. Hub B events that use Hub B's key cannot be decrypted. More critically, Hub A's event key remains in memory and active — if Hub A and Hub B are separate organizations, Hub A traffic continues to be readable after the switch.
+**Exploit Scenario**: A volunteer who works for two crisis organizations switches their app from Hub A (Organization A) to Hub B (Organization B). Hub A's WebSocket event stream continues to arrive and decrypt correctly, exposing Organization A's operational events to a context where Organization B's app session is active. If the device is compromised after the switch, Hub A key material is still in memory.
+**Fix**: On hub switch, call WebSocket disconnect, nil `serverEventKeyHex`, reconnect using the new hub's WebSocket endpoint from `HubConfig`, and re-fetch `/api/auth/me` to receive the correct hub-scoped key.
 
 ---
 
@@ -131,10 +131,10 @@ The following findings represent the highest-risk vulnerabilities and must be ad
 
 **Component**: Android — Hub switching
 **File(s)**: `apps/android/app/src/main/java/org/llamenos/hotline/ui/hubs/HubManagementViewModel.kt:120-122`
-**Description**: `switchHub()` updates only `_uiState.copy(activeHubId = hubId)`. `WebSocketService` is never instructed to disconnect or reconnect. The singleton WebSocket stays connected to the previous hub's relay URL and retains the previous hub's `serverEventKeyHex`.
-**Impact**: Identical to CRIT-H2 on Android. The previous hub's relay key and connection persist indefinitely after switching. On Android the singleton service pattern means the leaked state survives even app backgrounding.
-**Exploit Scenario**: Same as CRIT-H2. Additionally, incoming real-time events for the new hub cannot be received or decrypted because the connection remains pointed at the old hub's relay URL.
-**Fix**: `switchHub()` must invoke a full WebSocket disconnect/reconnect cycle with the new hub's relay URL, clear `serverEventKeyHex`, and re-authenticate to receive the new hub's key.
+**Description**: `switchHub()` updates only `_uiState.copy(activeHubId = hubId)`. `WebSocketService` is never instructed to disconnect or reconnect. The singleton WebSocket stays connected to the previous hub's endpoint and retains the previous hub's `serverEventKeyHex`.
+**Impact**: Identical to CRIT-H2 on Android. The previous hub's event key and connection persist indefinitely after switching. On Android the singleton service pattern means the leaked state survives even app backgrounding.
+**Exploit Scenario**: Same as CRIT-H2. Additionally, incoming real-time events for the new hub cannot be received or decrypted because the connection remains pointed at the old hub's WebSocket endpoint.
+**Fix**: `switchHub()` must invoke a full WebSocket disconnect/reconnect cycle with the new hub's WebSocket endpoint, clear `serverEventKeyHex`, and re-authenticate to receive the new hub's key.
 
 ---
 
@@ -239,13 +239,10 @@ The following findings represent the highest-risk vulnerabilities and must be ad
 
 ---
 
-### HIGH-CI2 (HIGH): WebSocket relay relay image not pinned to digest in production Docker Compose
-
-**Component**: CI/CD — Docker Compose / WebSocket relay
-**File(s)**: `deploy/docker/docker-compose.yml:147`
-**Description**: `image: dockurr/WebSocket relay:1.0.1` is tag-only for a non-official image. The comment acknowledges the TODO. WebSocket relay handles all real-time hub events including key distribution.
-**Impact**: A compromised or tag-replaced image can intercept all encrypted WebSocket relay traffic, corrupt key distribution events, or silently drop events to cause denial of service for on-shift volunteers.
-**Fix**: Pull the image, record the digest, and pin: `image: dockurr/WebSocket relay@sha256:<digest>`. Verify the publisher's identity before trusting.
+### HIGH-CI2 (HIGH): No longer applicable — built-in WebSocket endpoint replaces separate relay
+**Component**: CI/CD — Docker Compose
+**Description**: The application now uses a built-in WebSocket endpoint on the API server. No separate relay image is deployed. This finding is retained for historical context only.
+**Status**: Resolved — separate relay removed in favor of built-in `/ws` endpoint on the API server.
 
 ---
 
@@ -292,9 +289,9 @@ The following findings represent the highest-risk vulnerabilities and must be ad
 
 **Component**: CI/CD — Secret management
 **File(s)**: `deploy/docker/.env`; `deploy/docker/.env.shard-0` through `.env.shard-3`
-**Description**: Files on disk contain apparent real hex secrets (`HMAC_SECRET`, `SERVER_NOSTR_SECRET`). `.gitignore` excludes these patterns but the files exist on disk and may have been committed previously.
-**Impact**: If any of these secrets appear in git history, all data encrypted or authenticated with them is compromised. `SERVER_NOSTR_SECRET` is the root secret from which the server's WebSocket keypair is derived via HKDF. `HMAC_SECRET` authenticates API tokens.
-**Exploit Scenario**: An adversary with read access to git history (any past clone, GitHub archive request, or source code leak) extracts `SERVER_NOSTR_SECRET` and derives the server's WebSocket private key, enabling them to sign events as the server and decrypt all hub key distribution events.
+**Description**: Files on disk contain apparent real hex secrets (`HMAC_SECRET`, `SERVER_SECRET`). `.gitignore` excludes these patterns but the files exist on disk and may have been committed previously.
+**Impact**: If any of these secrets appear in git history, all data encrypted or authenticated with them is compromised. `SERVER_SECRET` is the root secret from which the server's event signing keypair is derived via HKDF. `HMAC_SECRET` authenticates API tokens.
+**Exploit Scenario**: An adversary with read access to git history (any past clone, GitHub archive request, or source code leak) extracts `SERVER_SECRET` and derives the server's event signing private key, enabling them to sign events as the server and decrypt all hub key distribution events.
 **Fix**: Run `git log --all --full-history -- 'deploy/docker/.env*'` immediately. If any of these files appear in history, rotate every secret contained in them. Add a pre-commit hook and CI check to prevent future commits of `.env` files.
 
 ---
@@ -393,10 +390,9 @@ The following findings represent the highest-risk vulnerabilities and must be ad
 
 ### HIGH-W1 (HIGH): `serverEventKeyHex` returned to all authenticated users regardless of role
 
-**Component**: Worker — Authentication / WebSocket relay key
-**File(s)**: `apps/worker/routes/auth.ts:153-155,173`
-**Description**: `serverEventKeyHex` is derived deterministically from `SERVER_NOSTR_SECRET` and returned in the `/api/auth/me` response to every authenticated user. This is a single global key for all hubs. Any compromised volunteer session token — regardless of the volunteer's hub, role, or active status — yields the key to decrypt all hub relay traffic.
-**Impact**: Compromise of any single low-privilege account gives an adversary the ability to decrypt all past and future WebSocket relay relay events across all hubs. This key cannot be rotated without re-provisioning all clients simultaneously. One key protects all organizational communications.
+**Component**: Worker — Authentication / WebSocket event key
+**Description**: `serverEventKeyHex` is derived deterministically from `SERVER_SECRET` and returned in the `/api/auth/me` response to every authenticated user. This is a single global key for all hubs. Any compromised volunteer session token — regardless of the volunteer's hub, role, or active status — yields the key to decrypt all hub WebSocket event traffic.
+**Impact**: Compromise of any single low-privilege account gives an adversary the ability to decrypt all past and future WebSocket events across all hubs. This key cannot be rotated without re-provisioning all clients simultaneously. One key protects all organizational communications.
 **Fix**: Scope key delivery to users with a specific elevated permission, or — as the architecture intends — migrate to per-hub key envelopes delivered via ECIES wrap (matching the hub key model). Each volunteer should receive only the key(s) for their hub(s), unwrapped client-side.
 
 ---
@@ -679,7 +675,7 @@ The following security controls are well-implemented and represent genuine stren
 
 **Per-Test PostgreSQL Schema Isolation**: The `POST /api/test-create-hub` endpoint and hub-per-worker test isolation design eliminates shared state between parallel test workers, which is the correct approach for a security-sensitive test suite.
 
-**WebSocket Tag Opacity**: Using generic tags (`["t", "llamenos:event"]`) so the relay cannot distinguish event types is a correct implementation of the zero-knowledge relay design. The relay operator cannot perform traffic analysis on event categories.
+**WebSocket Event Opacity**: Event types are encrypted inside the payload. The server cannot distinguish event types from ciphertext alone. This is a correct implementation of the zero-knowledge event design.
 
 ---
 
@@ -732,7 +728,7 @@ Steps:
 
 Addresses: CRIT-H1, CRIT-W1, CRIT-W2, HIGH-H1, HIGH-H2, HIGH-W1 through HIGH-W5, MED-W1, MED-W2
 
-Rationale: Worker security is foundational to all client platforms. Webhook signature bypass (CRIT-W1) and hub membership check gaps (CRIT-H1) are exploitable from the network without client access. Global relay key delivery (HIGH-W1) must be scoped before any client work proceeds on hub key isolation.
+Rationale: Worker security is foundational to all client platforms. Webhook signature bypass (CRIT-W1) and hub membership check gaps (CRIT-H1) are exploitable from the network without client access. Global WebSocket event key delivery (HIGH-W1) must be scoped before any client work proceeds on hub key isolation.
 
 Steps:
 1. Add hub membership check to `GET /api/hubs/:hubId/key` (CRIT-H1).

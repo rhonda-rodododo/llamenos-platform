@@ -226,7 +226,7 @@ If the user continues with the organization on a new device:
 
 ## 4. Hub Key Rotation Ceremony
 
-The hub key is a shared symmetric key used to encrypt WebSocket relay events broadcast to all members. Rotation ensures departed members cannot decrypt future events.
+The hub key is a shared symmetric key used to encrypt WebSocket events broadcast to all members. Rotation ensures departed members cannot decrypt future events.
 
 **Responsible party**: An administrator.
 
@@ -245,7 +245,7 @@ The hub key is a shared symmetric key used to encrypt WebSocket relay events bro
 
 5. **HPKE-wrap the new hub key for each remaining member** using each member's X25519 pubkey (label: `LABEL_HUB_KEY_WRAP`). One HPKE envelope per member.
 
-6. **Publish a key rotation event** to the WebSocket relay:
+6. **Publish a key rotation event** via WebSocket:
    - Encrypted with the OLD hub key (so current members can read it)
    - Contains reference to new key version
 
@@ -282,13 +282,13 @@ If rotation fails mid-ceremony:
 
 ## 5. Hub Event Key Epoch Rotation
 
-The server event key (used for XChaCha20-Poly1305 encryption of WebSocket relay events) rotates automatically every 24 hours. This is **automatic** — no operator action is required for routine epoch rotation.
+The server event key (used for XChaCha20-Poly1305 encryption of WebSocket events) rotates automatically every 24 hours. This is **automatic** — no operator action is required for routine epoch rotation.
 
 ### 5.1 How Epoch Rotation Works
 
 The server event key is derived as:
 ```
-event_key = HKDF-SHA256(SERVER_NOSTR_SECRET, salt=LABEL_SERVER_EVENT_ENCRYPTION_KEY[:hubId], info=LABEL_HUB_EVENT_EPOCH:[epoch])
+event_key = HKDF-SHA256(SERVER_SECRET, salt=LABEL_SERVER_EVENT_ENCRYPTION_KEY[:hubId], info=LABEL_HUB_EVENT_EPOCH:[epoch])
 ```
 
 Where `epoch = floor(unix_timestamp / 86400)` — a new key every 24 hours.
@@ -299,13 +299,13 @@ Clients receive the **current epoch key** and the **previous epoch key** from `G
 
 | Scenario | Action |
 |----------|--------|
-| `SERVER_NOSTR_SECRET` compromised | Rotate `SERVER_NOSTR_SECRET` immediately (redeploy required). All past epoch keys are invalidated. Redistribute new epoch keys to clients via `/api/auth/me`. |
+| `SERVER_SECRET` compromised | Rotate `SERVER_SECRET` immediately (redeploy required). All past epoch keys are invalidated. Redistribute new epoch keys to clients via `/api/auth/me`. |
 | Client stuck on old epoch | Client should receive previous epoch key from `/api/auth/me`. If persistent, check that client is syncing auth/me on reconnect. |
 | Hub key rotation (member departure) | Hub key rotation is separate from epoch rotation. Both may be needed simultaneously — see [Section 4](#4-hub-key-rotation-ceremony). |
 
-### 5.3 Emergency: Rotate SERVER_NOSTR_SECRET
+### 5.3 Emergency: Rotate SERVER_SECRET
 
-If the server's WebSocket secret is compromised, an attacker can decrypt all stored relay events (retroactively) and forge new events until the key is rotated.
+If the server's secret is compromised, an attacker can decrypt all stored events (retroactively) and forge new events until the key is rotated.
 
 1. Generate a new secret:
    ```bash
@@ -314,7 +314,7 @@ If the server's WebSocket secret is compromised, an attacker can decrypt all sto
 
 2. Update `.env`:
    ```bash
-   sed -i "s|^SERVER_NOSTR_SECRET=.*|SERVER_NOSTR_SECRET=<new_secret>|" .env
+   sed -i "s|^SERVER_SECRET=.*|SERVER_SECRET=<new_secret>|" .env
    ```
 
 3. Redeploy:
@@ -322,16 +322,13 @@ If the server's WebSocket secret is compromised, an attacker can decrypt all sto
    docker compose restart app
    ```
 
-4. Update `ALLOWED_PUBKEY` in WebSocket relay config if the new secret produces a different server WebSocket pubkey:
+4. Verify the new server pubkey via `/api/config` after restart:
    ```bash
    # Derive new pubkey from new secret
    bun run bootstrap-admin  # or use the /api/config endpoint after restart
    ```
 
-5. Restart WebSocket relay with the new `ALLOWED_PUBKEY`:
-   ```bash
-   docker compose restart WebSocket relay
-   ```
+5. All connected WebSocket clients will receive the new epoch key automatically. No separate relay restart is needed.
 
 All clients will receive the new epoch key on next `GET /api/auth/me`. Old epoch keys derived from the compromised secret are permanently invalidated.
 
@@ -371,7 +368,7 @@ When a user departs or a device is compromised, the PUK must be rotated so the d
 | Device seizure (panic wipe confirmed) | Hub key rotation (precautionary) | 24 hours |
 | Routine hub key rotation | Scheduled | Per organizational policy (quarterly recommended) |
 | Hub event key epoch rotation | Automatic | Every 24 hours — no operator action required |
-| SERVER_NOSTR_SECRET compromise | Emergency rotation | Immediately — rotate secret, redeploy, update ALLOWED_PUBKEY in WebSocket relay |
+| SERVER_SECRET compromise | Emergency rotation | Immediately — rotate secret, redeploy |
 
 ---
 
@@ -379,6 +376,6 @@ When a user departs or a device is compromised, the PUK must be rotated so the d
 
 | Date | Version | Changes |
 |------|---------|---------|
-| 2026-05-03 | 2.1 | Post-hardening: added Section 5 (hub event key epoch rotation + SERVER_NOSTR_SECRET emergency rotation); updated Section 3.3 to reflect Argon2id + min 8-digit/alphanumeric credential; updated response timeframes table |
+| 2026-05-03 | 2.1 | Post-hardening: added Section 5 (hub event key epoch rotation + SERVER_SECRET emergency rotation); updated Section 3.3 to reflect Argon2id + min 8-digit/alphanumeric credential; updated response timeframes table |
 | 2026-05-02 | 2.0 | Complete rewrite: HPKE replaces ECIES for all key wrapping, sigchain-based device deauthorization replaces nsec revocation, added PUK rotation section, added CLKR chain references, updated device storage (Tauri Store/Keychain/Keystore not localStorage), removed Cloudflare Workers references, updated panic wipe to platform-native lock |
 | 2026-02-25 | 1.0 | Initial version |

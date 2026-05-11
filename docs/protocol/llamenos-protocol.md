@@ -30,7 +30,7 @@ Identity Key (nsec / secretKey)
   └── Recovery Key Encryption (Section 9)
   └── Auth Token Signing (Section 4)
   └── ECIES Key Agreement (Sections 5-7)
-  └── NIP-42 Relay Authentication (Section 4.3)
+   └── WebSocket Authentication (Section 4.3)
 
 Admin Decryption Key (Epic 76.2)
   Separate secp256k1 keypair from identity key
@@ -45,8 +45,8 @@ Hub Key (Epic 76.2)
   └── Presence encryption (volunteer-tier: boolean only)
   └── Distribution: ECIES-wrapped individually per member ("llamenos:hub-key-wrap")
 
-Server WebSocket Key (Epic 76.1)
-  Derived: HKDF-SHA256(SERVER_NOSTR_SECRET, "llamenos:server-WebSocket-key", "llamenos:server-WebSocket-key:v1")
+Server Event Key (Epic 76.1)
+  Derived: HKDF-SHA256(SERVER_SECRET, "llamenos:server-event-key", "llamenos:server-event-key:v1")
   └── Signs server-authoritative WebSocket events (call:ring, call:answered)
   └── Clients verify server pubkey for authoritative events
   └── CANNOT decrypt any user content
@@ -144,8 +144,8 @@ Every cryptographic operation uses a unique domain separation string to prevent 
 
 | Constant | Label | Purpose | Section |
 |----------|-------|---------|---------|
-| `LABEL_SERVER_NOSTR_KEY` | `"llamenos:server-WebSocket-key"` | HKDF derivation for server WebSocket keypair from `SERVER_NOSTR_SECRET` | 14 |
-| `LABEL_SERVER_NOSTR_KEY_INFO` | `"llamenos:server-WebSocket-key:v1"` | HKDF info parameter for server WebSocket key (versioned for rotation) | 14 |
+| `LABEL_SERVER_EVENT_KEY` | `"llamenos:server-event-key"` | HKDF derivation for server event keypair from `SERVER_SECRET` | 14 |
+| `LABEL_SERVER_EVENT_KEY_INFO` | `"llamenos:server-event-key:v1"` | HKDF info parameter for server event key (versioned for rotation) | 14 |
 
 ## 3. Local Key Protection
 
@@ -237,17 +237,16 @@ token = 32 random bytes, hex-encoded
 - Check expiry (8 hours from creation)
 - Extract associated pubkey
 
-### 4.3 WebSocket Relay Authentication (NIP-42)
+### 4.3 WebSocket Authentication
 
-Clients authenticate to the WebSocket relay using the NIP-42 protocol:
+Clients authenticate to the WebSocket endpoint using the same session token or Schnorr/Ed25519 signature token used for REST API requests:
 
-1. Client connects to the relay via WebSocket (`wss://domain/WebSocket`)
-2. Relay sends `["AUTH", <challenge_string>]`
-3. Client signs the challenge using its WebSocket identity key (BIP-340 Schnorr)
-4. Client sends the signed NIP-42 auth event back to the relay
-5. Relay verifies the signature and grants access to publish/subscribe
+1. Client connects to the WebSocket endpoint (`wss://domain/ws`)
+2. Client sends an authentication message with their session token or signed challenge
+3. Server verifies the token/signature and grants access to hub-scoped events
+4. Server pushes real-time events (call notifications, presence updates, etc.) to connected clients
 
-Only authenticated clients can publish events or subscribe to hub-scoped events. The relay enforces a write policy that restricts publishing to known server and member pubkeys.
+Only authenticated clients can receive events. The server handles all event publishing internally — clients do not publish to the WebSocket.
 
 ## 5. Note Encryption (Per-Note Forward Secrecy)
 
@@ -470,7 +469,7 @@ New Device (N)                         Primary Device (P)
 ### 10.2 Security Properties
 
 - **Ephemeral channel**: The ECDH shared secret is derived from a fresh keypair on the new device, so even if the QR code is photographed, the attacker cannot decrypt without the ephemeral private key.
-- **Server-blind**: The provisioning relay only sees encrypted bytes — never the nsec.
+- **Server-blind**: The provisioning server only sees encrypted bytes — never the nsec.
 - **Room TTL**: Provisioning rooms expire after 5 minutes.
 - **Verification**: The new device verifies that the decrypted nsec's public key matches the primary device's advertised pubkey.
 
@@ -511,7 +510,9 @@ WebAuthn sessions authenticate the user but do not unlock crypto operations. The
 | `@noble/curves` | ^1.x | secp256k1 ECDH, BIP-340 Schnorr signatures |
 | `@noble/ciphers` | ^1.x | XChaCha20-Poly1305 symmetric encryption |
 | `@noble/hashes` | ^1.x | SHA-256, HKDF-SHA256, hex/utf8 encoding |
-| `WebSocket-tools` | ^2.x | Key generation, bech32 nsec/npub encoding |
+| `@noble/curves` | ^1.x | secp256k1 ECDH, BIP-340 Schnorr signatures |
+| `@noble/ciphers` | ^1.x | XChaCha20-Poly1305 symmetric encryption |
+| `@noble/hashes` | ^1.x | SHA-256, HKDF-SHA256, hex/utf8 encoding |
 | Web Crypto API | — | PBKDF2 key derivation, random bytes |
 
 All cryptographic operations use audited, constant-time implementations. No custom crypto primitives.
@@ -532,7 +533,7 @@ All cryptographic operations use audited, constant-time implementations. No cust
 
 ### 14.1 Hub Key Distribution
 
-The hub key is a shared 32-byte symmetric key used to encrypt WebSocket relay events visible to all hub members.
+The hub key is a shared 32-byte symmetric key used to encrypt WebSocket events visible to all hub members.
 
 ```
 hubKey = crypto.getRandomValues(new Uint8Array(32))
@@ -540,7 +541,7 @@ hubKey = crypto.getRandomValues(new Uint8Array(32))
 // Wrap for each member via ECIES
 for each memberPubkey in activeMembers:
   wrappedHubKey = wrapKeyForPubkey(hubKey, memberPubkey, "llamenos:hub-key-wrap")
-  // Publish wrapped key to relay or store server-side
+  // Store wrapped key server-side for distribution
 ```
 
 The hub key is **random** (not derived from any identity key). This ensures:
@@ -564,22 +565,21 @@ encryptedContent = XChaCha20-Poly1305(eventKey, nonce, JSON.stringify({
   ...
 }))
 
-// Publish to relay
-Event {
-  kind: 20001,  // Ephemeral — relay forwards, never stores
-  tags: [["d", hubId], ["t", "llamenos:event"]],  // Generic tag only
-  content: hex(nonce || encryptedContent),
-  pubkey: serverPubkey
+// Send via WebSocket
+{
+  hubId: "...",
+  encryptedPayload: hex(nonce || encryptedContent),
+  serverPubkey: serverPubkey
 }
 ```
 
 ### 14.3 Server WebSocket Identity
 
-The server derives its WebSocket keypair from the `SERVER_NOSTR_SECRET` environment variable:
+The server derives its event signing keypair from the `SERVER_SECRET` environment variable:
 
 ```
-ikm = hex_decode(SERVER_NOSTR_SECRET)
-serverSecretKey = HKDF-SHA256(ikm, "llamenos:server-WebSocket-key", "llamenos:server-WebSocket-key:v1", 32)
+ikm = hex_decode(SERVER_SECRET)
+serverSecretKey = HKDF-SHA256(ikm, "llamenos:server-event-key", "llamenos:server-event-key:v1", 32)
 serverPubkey = secp256k1.getPublicKey(serverSecretKey)
 ```
 

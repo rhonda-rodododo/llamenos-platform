@@ -158,7 +158,7 @@ This document defines the threat model for Llamenos, a secure crisis response ho
 | User → Other user's notes | Note content theft | E2EE — server has no plaintext; `notes:read-own` permission scoping; per-note HPKE wrapping |
 | User → Caller identification | PII exposure | Caller numbers hashed; only `callerLast4` sent to answering volunteer; redacted for others |
 | Admin → Excessive data access | Insider threat | Audit logging of all admin actions; admin notes are separately encrypted |
-| WebSocket relay event injection | Fake call events | Server-signed events (clients verify server pubkey) + NIP-42 auth + hub key encryption |
+| WebSocket event injection | Fake call events | Server-signed events (clients verify server pubkey) + authenticated connections + hub key encryption |
 | Device compromise → Other devices | Lateral movement | Sigchain-based device authorization — compromised device can be deauthorized without affecting others |
 
 ## Cryptographic Properties
@@ -187,7 +187,7 @@ This document defines the threat model for Llamenos, a secure crisis response ho
 | SMS/WhatsApp E2EE | Provider requires plaintext during send; Signal-first routing used when available; SMS notification-only mode omits body content | Partial — Signal routing eliminates provider visibility when applicable |
 | PIN brute-force resistance (offline) | Argon2id (64MB, 3 iter, 4 lanes) + minimum 8 digits or alphanumeric passphrase | Significantly improved — GPU/ASIC attack substantially more expensive than PBKDF2 |
 | Server-side key deletion verification | Cannot prove hosting provider deleted data | Yes — fundamental cloud trust limitation |
-| WebSocket relay metadata privacy | Relay observes pseudonymous pubkeys, timing; write-policy limits publishers to server pubkey; content epoch-encrypted per hub | Improved — event injection blocked; content hidden; metadata still visible |
+| WebSocket metadata privacy | Server handles all event distribution; authenticated connections only; content epoch-encrypted per hub | Improved — event injection blocked; content hidden; connection metadata visible to server only |
 
 ## Legal Compulsion and Subpoena Scenarios
 
@@ -402,36 +402,30 @@ All cryptographic operations are implemented in `packages/crypto/` (Rust), elimi
 - SHA-pinned GitHub Actions
 - Bun does not run postinstall scripts by default
 
-## WebSocket Relay Trust Boundary
+## WebSocket Trust Boundary
 
-The WebSocket relay (WebSocket relay, self-hosted) handles all real-time event delivery.
+The API server handles all real-time event delivery via a built-in WebSocket endpoint at `/ws`.
 
-### What the Relay Can Observe
+### What the Server Can Observe
 
 | Observable | Detail | Severity |
 |-----------|--------|----------|
-| Event metadata | Pubkeys (pseudonymous), timestamps, event kinds | Medium |
+| Event metadata | Hub IDs, timestamps, event types (before encryption) | Medium |
 | Connection metadata | IP addresses, connection timing, duration | Medium |
 | Event sizes (bucket only) | Ciphertext padded to power-of-2 buckets (min 512B) — exact size hidden | Low |
-| Generic tags | All events use `["t", "llamenos:event"]` — relay cannot distinguish event types | Low |
 
-### What the Relay Cannot Observe
+### What is Protected
 
 | Protected | Mechanism |
 |-----------|-----------|
 | Event content | Encrypted with epoch-rotating server event key (XChaCha20-Poly1305 + HKDF, 24h epoch rotation) |
 | Event type | Actual type (call:ring, presence, typing) is inside encrypted content |
-| User identity | Pubkeys are pseudonymous; relay has no mapping to real identities |
-| Fake event injection | Write-policy plugin (`write-policy.sh`) whitelists server pubkey only; rejects all other publishers |
+| User identity | Device keys are pseudonymous; no mapping to real identities in event payloads |
+| Fake event injection | Only the server publishes events — clients receive only; no client publishing path |
 
-### Relay Write Policy
+### Client Authentication
 
-The WebSocket relay relay runs a write-policy plugin (`deploy/docker/write-policy.sh`) that:
-- Accepts events only from `ALLOWED_PUBKEY` (the server's derived WebSocket pubkey)
-- Always accepts NIP-42 auth events (kind 22242) from any pubkey — required for client authentication
-- Rejects all other publishers with `"action": "reject"` + reason
-
-This prevents any attacker who compromises a client (or intercepts credentials) from injecting fake events into the relay.
+Clients authenticate to the WebSocket using the same session token or signed auth token used for REST API requests. All connections must authenticate before receiving events. The server filters events server-side — clients only receive events for hubs they are members of.
 
 ## Audit Log Tamper Detection
 
@@ -481,6 +475,6 @@ Audio from the volunteer's microphone is processed entirely in-browser/in-app:
 |------|---------|--------|---------|
 | 2026-05-03 | 2.1 | Post-hardening update | Argon2id + min-8 PIN; WebSocket write-policy publisher verification; epoch-rotating event keys; power-of-2 payload padding; Signal-first routing; SMS notification-only mode; User-Agent hashed / country removed from audit; MLS always-on |
 | 2026-05-02 | 2.0 | Security docs overhaul | Complete rewrite: HPKE replaces ECIES, per-device Ed25519/X25519 keys replace nsec, added sigchain/PUK/CLKR/MLS/SFrame, removed Cloudflare Workers/Durable Objects references (backend is Bun+PostgreSQL), updated trust boundary diagram, updated all crypto references to packages/crypto Rust crate |
-| 2026-02-25 | 1.3 | ZK Architecture Overhaul | Added WebSocket relay trust boundary, audit log tamper detection, admin key separation, hub key compromise analysis, reproducible builds, client-side transcription |
+| 2026-02-25 | 1.3 | ZK Architecture Overhaul | Added WebSocket trust boundary, audit log tamper detection, admin key separation, hub key compromise analysis, reproducible builds, client-side transcription |
 | 2026-02-25 | 1.2 | Epic 76.0 Phase 4 | Added APNs/FCM trust, Cloudflare trust boundary, admin pubkey fetch trust, departed volunteer key retirement, SMS/WhatsApp outbound limitation, npm supply chain risk |
 | 2026-02-23 | 1.0 | Security Audit R6 | Initial threat model document |

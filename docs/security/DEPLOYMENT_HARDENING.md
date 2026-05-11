@@ -110,7 +110,7 @@ The base compose (`deploy/docker/docker-compose.yml`) runs:
 | **postgres** | PostgreSQL 17-alpine (SHA256-pinned) | internal | Health checks, internal-only |
 | **caddy** | Caddy 2.9-alpine | web | TLS termination, security headers |
 | **rustfs** | S3-compatible storage | internal | Console API on 9001 (disable in prod) |
-| **WebSocket relay** | WebSocket relay 1.0.1 | internal + web | WebSocket relay |
+| **app** | Bun (port 3000) | internal + web | Built-in WebSocket endpoint at `/ws` |
 
 Optional profiles: `--profile signal`, `--profile telephony`, `--profile monitoring`, `--profile transcription`.
 
@@ -125,7 +125,7 @@ The production overlay (`deploy/docker/docker-compose.production.yml`) adds:
 ┌─────────────┐
 │ Public (web) │ ← Caddy (443) ← Internet
 ├─────────────┤
-│ Internal     │ ← app ↔ postgres ↔ rustfs ↔ WebSocket relay
+│ Internal     │ ← app ↔ postgres ↔ rustfs
 │ (172.17.0.0) │   (no external access)
 └─────────────┘
 ```
@@ -135,11 +135,11 @@ The production overlay (`deploy/docker/docker-compose.production.yml`) adds:
 ```bash
 # Generate secrets (NEVER commit .env to version control)
 openssl rand -hex 32  # PG_PASSWORD
-openssl rand -hex 32  # SERVER_NOSTR_SECRET (must be exactly 64 hex chars)
+openssl rand -hex 32  # SERVER_SECRET (must be exactly 64 hex chars)
 openssl rand -hex 32  # HMAC_SECRET (64 hex chars)
 
 # Required in .env:
-# PG_PASSWORD, ADMIN_PUBKEY, SERVER_NOSTR_SECRET, HMAC_SECRET
+# PG_PASSWORD, ADMIN_PUBKEY, SERVER_SECRET, HMAC_SECRET
 # STORAGE_ACCESS_KEY, STORAGE_SECRET_KEY, ARI_PASSWORD, BRIDGE_SECRET
 
 chmod 600 .env
@@ -161,7 +161,7 @@ docker compose exec -T postgres pg_dump -U llamenos llamenos \
 find "$BACKUP_DIR" -name "*.age" -mtime +30 -delete
 ```
 
-Additional backup roles: `backup-postgres/`, `backup-rustfs/`, `backup-WebSocket relay/`, `backup-config/`, `backup-monitor/`.
+Additional backup roles: `backup-postgres/`, `backup-rustfs/`, `backup-config/`, `backup-monitor/`.
 
 ### Monitoring
 
@@ -306,49 +306,32 @@ The `crypto.{domain}` origin enforces `connect-src 'none'` — the crypto iframe
 
 ---
 
-## WebSocket Relay Operations (WebSocket relay)
+## WebSocket Operations
 
-The WebSocket relay handles all real-time event delivery (call notifications, presence, typing indicators).
+The API server provides a built-in WebSocket endpoint at `/ws` for real-time event delivery (call notifications, presence, typing indicators). No separate relay service is required.
 
 ### Configuration
 
-Production config at `deploy/docker/WebSocket relay-prod.conf`:
-- Max event size: 64KB
-- Reject events older than 300 seconds (5 minutes) or newer than 30 seconds
-- Ephemeral event TTL: 300 seconds (5 minutes)
-- Max 10 subscriptions per connection
-- Negentropy enabled for efficient sync
-- Compression enabled
+The WebSocket endpoint is configured via environment variables:
+- `SERVER_SECRET`: 64-hex-char root secret from which the server derives its event signing key
+- `WS_MAX_PAYLOAD_SIZE`: Max event payload size (default: 64KB)
+- `WS_EPOCH_ROTATION_HOURS`: Event encryption key rotation interval (default: 24 hours)
 
-### Write-Policy Plugin
+### Authentication
 
-`deploy/docker/write-policy.sh` runs as a WebSocket relay write-policy subprocess:
+Clients authenticate to the WebSocket using the same session token or signed auth token used for REST API requests:
 
-```bash
-writePolicy {
-    plugin = "/app/write-policy.sh"
-}
-```
-
-The plugin enforces:
-- **Server pubkey whitelist**: Only the server's derived WebSocket pubkey (`ALLOWED_PUBKEY` env var) may publish events
-- **NIP-42 passthrough**: Auth events (kind 22242) are always accepted from any pubkey — required for client authentication
-- **All other publishers rejected**: Returns `"action": "reject"` with reason `"unauthorized publisher"`
-
-Set `ALLOWED_PUBKEY` to the server's WebSocket pubkey (derived from `SERVER_NOSTR_SECRET` via HKDF at startup). The docker-compose.yml mounts the plugin read-only:
-
-```yaml
-volumes:
-  - ./write-policy.sh:/app/write-policy.sh:ro
-```
+1. Client opens WebSocket connection to `wss://api.example.com/ws`
+2. Client sends auth message with session token or signed challenge
+3. Server verifies auth and associates connection with user identity
+4. Server pushes hub-scoped events to which the user has access
 
 ### Security Properties
 
-- **Ephemeral events** (kind 20001): Never stored to disk — forwarded to active subscribers only
-- **Generic tags**: All events use `["t", "llamenos:event"]` — relay cannot distinguish event types
+- **Server-only publishing**: Only the server publishes events — clients receive only
 - **Content encryption**: All event content encrypted with epoch-rotating server event key (XChaCha20-Poly1305 + HKDF, 24h epoch rotation) with per-hub key scoping
-- **NIP-42 auth**: Server authenticates to relay on connect; clients authenticate before subscribing
-- **Publisher verification**: Write-policy rejects all non-server publishers
+- **Auth verification**: All connections must authenticate before receiving events
+- **Hub scoping**: Events are filtered server-side — clients only receive events for hubs they are members of
 
 ### Signal-First Delivery Configuration
 
@@ -377,7 +360,7 @@ The sidecar connects to the same PostgreSQL instance as the main app. Ensure `SI
 
 ### Internal TLS
 
-The `internal-tls` Ansible role generates a self-signed CA and per-host certificates for cross-host service communication (PostgreSQL, RustFS, WebSocket relay). Certificates include DNS SAN + IP SAN, valid for 1 year.
+The `internal-tls` Ansible role generates a self-signed CA and per-host certificates for cross-host service communication (PostgreSQL, RustFS). Certificates include DNS SAN + IP SAN, valid for 1 year.
 
 ---
 
@@ -385,7 +368,7 @@ The `internal-tls` Ansible role generates a self-signed CA and per-host certific
 
 1. **Admin device keys**: Generated via `bun run bootstrap-admin` on a trusted device. Store securely (HSM or hardened device). Admin has separate Ed25519 signing and X25519 encryption keys.
 
-2. **Server WebSocket secret**: `openssl rand -hex 32`. Set as `SERVER_NOSTR_SECRET`. Must be exactly 64 hex chars. Server derives its WebSocket keypair via HKDF.
+2. **Server secret**: `openssl rand -hex 32`. Set as `SERVER_SECRET`. Must be exactly 64 hex chars. Server derives its event signing keypair via HKDF.
 
 3. **Hub key**: Random 32 bytes, generated by admin client during hub setup. HPKE-wrapped per member (label: `LABEL_HUB_KEY_WRAP`). Rotation handled via admin UI — see [Key Revocation Runbook, Section 4](KEY_REVOCATION_RUNBOOK.md#4-hub-key-rotation-ceremony).
 
@@ -453,7 +436,7 @@ Trust anchor is the **GitHub Release** (not the running application). CI generat
 
 | Date | Version | Changes |
 |------|---------|---------|
-| 2026-05-03 | 2.1 | Post-hardening: WebSocket relay write-policy plugin configuration + ALLOWED_PUBKEY setup; corrected event age limits (300s, not 24h); Signal-first delivery and SMS notification-only mode config; updated hub event encryption cipher (XChaCha20-Poly1305 + epoch rotation) |
+| 2026-05-03 | 2.1 | Post-hardening: updated WebSocket section for built-in endpoint (no separate relay); corrected event age limits (300s, not 24h); Signal-first delivery and SMS notification-only mode config; updated hub event encryption cipher (XChaCha20-Poly1305 + epoch rotation) |
 | 2026-05-02 | 2.0 | Complete rewrite: removed Cloudflare Workers section (backend is Bun+PostgreSQL, not CF Workers), updated to match actual deploy/ configs (Ansible roles, Docker Compose overlays, Helm templates, Caddyfile.production), HPKE replaces ECIES, device keys replace nsec, added sigchain/PUK references, added split-origin production Caddyfile, added internal TLS, added security scanning role |
-| 2026-02-25 | 1.2 | Added Caddy section, WebSocket relay operations, reproducible builds |
+| 2026-02-25 | 1.2 | Added Caddy section, WebSocket operations, reproducible builds |
 | 2026-02-23 | 1.0 | Initial deployment hardening guide |
