@@ -76,6 +76,31 @@ export const providerTemplateSchema = z.object({
 })
 export type ProviderTemplate = z.infer<typeof providerTemplateSchema>
 
+export const createProviderTemplateSchema = z.object({
+  name: z.string(),
+  slug: z.string(),
+  description: z.string().optional(),
+  providerType: telephonyProviderTypeSchema,
+  defaultChannels: z.array(hubChannelTypeSchema).optional(),
+  credentialHints: z.object({}).passthrough().optional(),
+  recommendedSettings: z.object({}).passthrough().optional(),
+  allowSubAccounts: z.boolean().optional(),
+})
+export type CreateProviderTemplate = z.infer<typeof createProviderTemplateSchema>
+
+export const updateProviderTemplateSchema = z.object({
+  name: z.string().optional(),
+  slug: z.string().optional(),
+  description: z.string().optional(),
+  providerType: telephonyProviderTypeSchema.optional(),
+  defaultChannels: z.array(hubChannelTypeSchema).optional(),
+  credentialHints: z.object({}).passthrough().optional(),
+  recommendedSettings: z.object({}).passthrough().optional(),
+  allowSubAccounts: z.boolean().optional(),
+  isActive: z.boolean().optional(),
+})
+export type UpdateProviderTemplate = z.infer<typeof updateProviderTemplateSchema>
+
 export const hubOnboardingStateSchema = z.object({
   hubId: z.string(),
   templateId: z.string().optional(),

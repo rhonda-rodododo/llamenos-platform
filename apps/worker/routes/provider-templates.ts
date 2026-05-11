@@ -7,6 +7,7 @@ import { checkRateLimit } from '../lib/helpers'
 import { authErrors } from '../openapi/helpers'
 import { providerTemplateSchema } from '@protocol/schemas/provider-setup'
 import { okResponseSchema } from '@protocol/schemas/common'
+import { ProviderApiError } from '../services/provider-setup/types'
 
 const providerTemplatesRoute = new Hono<AppEnv>()
 
@@ -88,8 +89,8 @@ providerTemplatesRoute.post('/',
     name: z.string().min(1),
     slug: z.string().min(1),
     description: z.string().optional(),
-    providerType: z.string(),
-    defaultChannels: z.array(z.string()).optional(),
+    providerType: z.enum(['twilio', 'signalwire', 'vonage', 'plivo', 'asterisk', 'telnyx', 'bandwidth', 'freeswitch']),
+    defaultChannels: z.array(z.enum(['voice', 'sms', 'email', 'signal', 'whatsapp', 'telegram', 'rcs'])).optional(),
     credentialHints: z.object({}).passthrough().optional(),
     recommendedSettings: z.object({}).passthrough().optional(),
     allowSubAccounts: z.boolean().optional(),
@@ -109,11 +110,11 @@ providerTemplatesRoute.post('/',
         ...body,
         createdBy: pubkey,
         isActive: true,
-      } as any)
+      })
       return c.json({ template }, 201)
     } catch (err) {
-      if (err instanceof Error && err.message.includes('already exists')) {
-        return c.json({ error: err.message }, 409)
+      if (err instanceof ProviderApiError) {
+        return c.json({ error: err.message }, err.statusCode as 400 | 409)
       }
       throw err
     }
@@ -143,8 +144,8 @@ providerTemplatesRoute.put('/:id',
     name: z.string().min(1).optional(),
     slug: z.string().min(1).optional(),
     description: z.string().optional(),
-    providerType: z.string().optional(),
-    defaultChannels: z.array(z.string()).optional(),
+    providerType: z.enum(['twilio', 'signalwire', 'vonage', 'plivo', 'asterisk', 'telnyx', 'bandwidth', 'freeswitch']).optional(),
+    defaultChannels: z.array(z.enum(['voice', 'sms', 'email', 'signal', 'whatsapp', 'telegram', 'rcs'])).optional(),
     credentialHints: z.object({}).passthrough().optional(),
     recommendedSettings: z.object({}).passthrough().optional(),
     allowSubAccounts: z.boolean().optional(),
@@ -156,14 +157,11 @@ providerTemplatesRoute.put('/:id',
     const body = c.req.valid('json')
 
     try {
-      const template = await services.providerTemplates.updateTemplate(id, body as any)
+      const template = await services.providerTemplates.updateTemplate(id, body)
       return c.json({ template })
     } catch (err) {
-      if (err instanceof Error && err.message.includes('Not found')) {
-        return c.json({ error: 'Template not found' }, 404)
-      }
-      if (err instanceof Error && err.message.includes('already exists')) {
-        return c.json({ error: err.message }, 409)
+      if (err instanceof ProviderApiError) {
+        return c.json({ error: err.message }, err.statusCode as 404 | 409)
       }
       throw err
     }
@@ -197,8 +195,8 @@ providerTemplatesRoute.delete('/:id',
       await services.providerTemplates.deactivateTemplate(id)
       return c.json({ ok: true })
     } catch (err) {
-      if (err instanceof Error && err.message.includes('Not found')) {
-        return c.json({ error: 'Template not found' }, 404)
+      if (err instanceof ProviderApiError) {
+        return c.json({ error: err.message }, err.statusCode as 404)
       }
       throw err
     }

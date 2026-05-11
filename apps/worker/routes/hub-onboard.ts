@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { describeRoute, resolver, validator } from 'hono-openapi'
 import { z } from 'zod'
 import type { AppEnv } from '../types'
-import { requirePermission } from '../middleware/permission-guard'
+import { requireHubPermission } from '../middleware/hub'
 import { checkRateLimit } from '../lib/helpers'
 import { authErrors } from '../openapi/helpers'
 import {
@@ -13,12 +13,13 @@ import {
   channelConfigSchema,
 } from '@protocol/schemas/provider-setup'
 import { okResponseSchema } from '@protocol/schemas/common'
+import { ProviderApiError } from '../services/provider-setup/types'
 
 const hubOnboardRoute = new Hono<AppEnv>()
 
 // ── Start Onboarding ───────────────────────────────────────────────────────
 hubOnboardRoute.post('/:hubId/onboard',
-  requirePermission('hubs:configure'),
+  requireHubPermission('hubs:configure'),
   describeRoute({
     tags: ['Hub Onboarding'],
     summary: 'Start or resume hub onboarding',
@@ -55,7 +56,7 @@ hubOnboardRoute.post('/:hubId/onboard',
 
 // ── Get Onboarding Status ──────────────────────────────────────────────────
 hubOnboardRoute.get('/:hubId/onboard/status',
-  requirePermission('telephony:view-providers'),
+  requireHubPermission('telephony:view-providers'),
   describeRoute({
     tags: ['Hub Onboarding'],
     summary: 'Get onboarding progress',
@@ -81,7 +82,7 @@ hubOnboardRoute.get('/:hubId/onboard/status',
 
 // ── Complete Step ──────────────────────────────────────────────────────────
 hubOnboardRoute.put('/:hubId/onboard/step',
-  requirePermission('hubs:configure'),
+  requireHubPermission('hubs:configure'),
   describeRoute({
     tags: ['Hub Onboarding'],
     summary: 'Complete an onboarding step',
@@ -99,7 +100,9 @@ hubOnboardRoute.put('/:hubId/onboard/step',
   }),
   validator('json', z.object({
     step: z.string(),
-    data: z.object({}).passthrough().optional(),
+    data: z.object({
+      channelConfig: channelConfigSchema.optional(),
+    }).optional(),
   })),
   async (c) => {
     const services = c.get('services')
@@ -110,13 +113,8 @@ hubOnboardRoute.put('/:hubId/onboard/step',
       const onboarding = await services.hubOnboard.completeStep(hubId, body.step, body.data)
       return c.json({ onboarding })
     } catch (err) {
-      if (err instanceof Error) {
-        if (err.message.includes('Invalid step')) {
-          return c.json({ error: err.message }, 400)
-        }
-        if (err.message.includes('Onboarding not started')) {
-          return c.json({ error: err.message }, 404)
-        }
+      if (err instanceof ProviderApiError) {
+        return c.json({ error: err.message }, err.statusCode as 400 | 404)
       }
       throw err
     }
@@ -125,7 +123,7 @@ hubOnboardRoute.put('/:hubId/onboard/step',
 
 // ── Get Provider Status ────────────────────────────────────────────────────
 hubOnboardRoute.get('/:hubId/provider-status',
-  requirePermission('telephony:view-providers'),
+  requireHubPermission('telephony:view-providers'),
   describeRoute({
     tags: ['Hub Onboarding'],
     summary: 'Get hub provider setup status',
@@ -151,7 +149,7 @@ hubOnboardRoute.get('/:hubId/provider-status',
 
 // ── Get Usage ──────────────────────────────────────────────────────────────
 hubOnboardRoute.get('/:hubId/usage',
-  requirePermission('telephony:view-providers'),
+  requireHubPermission('telephony:view-providers'),
   describeRoute({
     tags: ['Hub Onboarding'],
     summary: 'Get hub usage stats',
@@ -177,7 +175,7 @@ hubOnboardRoute.get('/:hubId/usage',
 
 // ── Set Quotas ─────────────────────────────────────────────────────────────
 hubOnboardRoute.put('/:hubId/quotas',
-  requirePermission('system:manage-instance'),
+  requireHubPermission('system:manage-instance'),
   describeRoute({
     tags: ['Hub Onboarding'],
     summary: 'Set hub quotas',
@@ -206,7 +204,7 @@ hubOnboardRoute.put('/:hubId/quotas',
 
 // ── Update Channels ────────────────────────────────────────────────────────
 hubOnboardRoute.put('/:hubId/channels',
-  requirePermission('hubs:configure'),
+  requireHubPermission('hubs:configure'),
   describeRoute({
     tags: ['Hub Onboarding'],
     summary: 'Enable or disable channels',
@@ -241,7 +239,7 @@ hubOnboardRoute.put('/:hubId/channels',
 
 // ── Provision Sub-Account ──────────────────────────────────────────────────
 hubOnboardRoute.post('/:hubId/sub-account',
-  requirePermission('hubs:configure'),
+  requireHubPermission('hubs:configure'),
   describeRoute({
     tags: ['Hub Onboarding'],
     summary: 'Auto-provision a sub-account',

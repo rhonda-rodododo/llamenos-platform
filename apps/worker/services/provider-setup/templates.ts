@@ -20,7 +20,7 @@ export class ProviderTemplateService {
   constructor(private readonly db: Database) {}
 
   async createTemplate(
-    data: Omit<ProviderTemplate, 'id' | 'createdAt' | 'updatedAt'>,
+    data: import('@protocol/schemas/provider-setup').CreateProviderTemplate & { createdBy: string; isActive?: boolean },
   ): Promise<ProviderTemplate> {
     const slug = data.slug.trim().toLowerCase()
 
@@ -87,7 +87,7 @@ export class ProviderTemplateService {
 
   async updateTemplate(
     id: string,
-    data: Partial<Omit<ProviderTemplate, 'id' | 'createdAt' | 'updatedAt'>>,
+    data: import('@protocol/schemas/provider-setup').UpdateProviderTemplate,
   ): Promise<ProviderTemplate> {
     const [existing] = await this.db
       .select()

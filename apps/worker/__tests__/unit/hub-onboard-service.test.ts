@@ -1,13 +1,15 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { HubOnboardService } from '@worker/services/provider-setup/hub-onboard'
 import { ProviderSetup } from '@worker/services/provider-setup'
+import { SettingsService } from '@worker/services/settings'
 import { ProviderApiError } from '@worker/services/provider-setup/types'
 import { createMockDb } from './mock-db'
 
 function setup() {
   const { db, reset } = createMockDb()
   const providerSetup = new ProviderSetup(db as any, 'secret', 'localhost')
-  const service = new HubOnboardService(db as any, providerSetup)
+  const settings = new SettingsService(db as any)
+  const service = new HubOnboardService(db as any, providerSetup, settings)
   return { db, service, reset }
 }
 

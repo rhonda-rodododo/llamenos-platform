@@ -37,14 +37,11 @@ function getNextStep(current: OnboardingStep): OnboardingStep | null {
 }
 
 export class HubOnboardService {
-  private readonly settings: SettingsService
-
   constructor(
     private readonly db: Database,
     private readonly providerSetup: ProviderSetup,
-  ) {
-    this.settings = new SettingsService(db)
-  }
+    private readonly settings: SettingsService,
+  ) {}
 
   async startOnboarding(
     hubId: string,
