@@ -169,14 +169,19 @@ struct LlamenosApp: App {
                 router.navigate(to: .admin)
             }
         case "oauth":
-            // llamenos://oauth/callback?status=success|error&error=<message>
+            // llamenos://oauth/callback?status=success|error&error=<message>&csrf_state=<state>
             let queryItems = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems
             let status = queryItems?.first(where: { $0.name == "status" })?.value
             let errorMsg = queryItems?.first(where: { $0.name == "error" })?.value
+            let csrfState = queryItems?.first(where: { $0.name == "csrf_state" })?.value
             NotificationCenter.default.post(
                 name: .llamenos_oauthCallback,
                 object: nil,
-                userInfo: ["status": status ?? "error", "error": errorMsg as Any]
+                userInfo: [
+                    "status": status ?? "error",
+                    "error": errorMsg as Any,
+                    "csrf_state": csrfState as Any
+                ]
             )
         default:
             break
