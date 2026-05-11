@@ -259,6 +259,7 @@ jobs:
           SIGNAL_NOTIFIER_URL: http://localhost:3100
           SIGNAL_NOTIFIER_BEARER_TOKEN: ci-test-notifier-key
           PBX_TYPE: ari
+          SIP_BRIDGE_URL: http://localhost:3001
           DEV_RESET_SECRET: test-reset-secret
           E2E_TEST_SECRET: test-reset-secret
           DATABASE_URL: postgresql://llamenos:ci-test-password@localhost:5432/llamenos
@@ -272,6 +273,7 @@ jobs:
         run: |
           curl -sf http://localhost:3000/api/health/ready || echo "::warning::app health check failed"
           curl -sf http://localhost:3100/health || echo "::warning::signal-notifier health check failed"
+          curl -sf http://localhost:3001/health || echo "::warning::sip-bridge health check failed"
 
       - name: Summarize test failures
         if: always()
@@ -350,6 +352,7 @@ jobs:
           admin_pubkey: ${{ env.TEST_ADMIN_PUBKEY }}
           with_sidecars: 'true'
           wait_for_signal: 'true'
+          wait_for_sip_bridge: 'true'
 
       - name: Generate BDD test files
         run: bunx bddgen
