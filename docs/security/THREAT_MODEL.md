@@ -143,7 +143,7 @@ This document defines the threat model for Llamenos, a secure crisis response ho
 |---------|------------|---------------|------------|
 | Login | `POST /api/auth/login` | No | Ed25519 signature + rate limit |
 | Bootstrap | `POST /api/auth/bootstrap` | No | Ed25519 signature + one-shot guard + rate limit |
-| Config | `GET /api/config` | No | Read-only; exposes server Nostr pubkey |
+| Config | `GET /api/config` | No | Read-only; exposes server WebSocket pubkey |
 | Telephony webhooks (10 endpoints) | `POST /telephony/*` | Webhook signature | Provider-specific HMAC |
 | Messaging webhooks | `POST /messaging/*` | Webhook signature | Provider-specific validation |
 | All other API endpoints | `*/api/*` | Ed25519 or Session | Auth + permission middleware |
@@ -158,7 +158,7 @@ This document defines the threat model for Llamenos, a secure crisis response ho
 | User → Other user's notes | Note content theft | E2EE — server has no plaintext; `notes:read-own` permission scoping; per-note HPKE wrapping |
 | User → Caller identification | PII exposure | Caller numbers hashed; only `callerLast4` sent to answering volunteer; redacted for others |
 | Admin → Excessive data access | Insider threat | Audit logging of all admin actions; admin notes are separately encrypted |
-| Nostr relay event injection | Fake call events | Server-signed events (clients verify server pubkey) + NIP-42 auth + hub key encryption |
+| WebSocket relay event injection | Fake call events | Server-signed events (clients verify server pubkey) + NIP-42 auth + hub key encryption |
 | Device compromise → Other devices | Lateral movement | Sigchain-based device authorization — compromised device can be deauthorized without affecting others |
 
 ## Cryptographic Properties
@@ -187,7 +187,7 @@ This document defines the threat model for Llamenos, a secure crisis response ho
 | SMS/WhatsApp E2EE | Provider requires plaintext during send; Signal-first routing used when available; SMS notification-only mode omits body content | Partial — Signal routing eliminates provider visibility when applicable |
 | PIN brute-force resistance (offline) | Argon2id (64MB, 3 iter, 4 lanes) + minimum 8 digits or alphanumeric passphrase | Significantly improved — GPU/ASIC attack substantially more expensive than PBKDF2 |
 | Server-side key deletion verification | Cannot prove hosting provider deleted data | Yes — fundamental cloud trust limitation |
-| Nostr relay metadata privacy | Relay observes pseudonymous pubkeys, timing; write-policy limits publishers to server pubkey; content epoch-encrypted per hub | Improved — event injection blocked; content hidden; metadata still visible |
+| WebSocket relay metadata privacy | Relay observes pseudonymous pubkeys, timing; write-policy limits publishers to server pubkey; content epoch-encrypted per hub | Improved — event injection blocked; content hidden; metadata still visible |
 
 ## Legal Compulsion and Subpoena Scenarios
 
@@ -372,7 +372,7 @@ Outbound messages via SMS and WhatsApp are **not zero-knowledge**. The server se
 | Channel | Server Sees Plaintext? | Provider Sees Plaintext? | True E2EE Possible? |
 |---------|----------------------|--------------------------|---------------------|
 | In-app notes | No | N/A | Yes (current) |
-| In-app messaging (Nostr) | No | N/A | Yes (current) |
+| In-app messaging (WebSocket) | No | N/A | Yes (current) |
 | SMS outbound | Yes (momentarily, only when Signal unavailable) | Yes (stored by provider) | No — but `smsContentMode: 'notification-only'` omits body content by default |
 | WhatsApp outbound (Business API) | Yes (momentarily) | Yes (Meta can read) | No |
 | Signal outbound (via signal-notifier sidecar) | No (sidecar handles) | No (Signal protocol E2EE) | Yes — preferred when recipient is Signal-registered (`preferSignalDelivery: true` default) |
@@ -402,9 +402,9 @@ All cryptographic operations are implemented in `packages/crypto/` (Rust), elimi
 - SHA-pinned GitHub Actions
 - Bun does not run postinstall scripts by default
 
-## Nostr Relay Trust Boundary
+## WebSocket Relay Trust Boundary
 
-The Nostr relay (strfry, self-hosted) handles all real-time event delivery.
+The WebSocket relay (WebSocket relay, self-hosted) handles all real-time event delivery.
 
 ### What the Relay Can Observe
 
@@ -426,8 +426,8 @@ The Nostr relay (strfry, self-hosted) handles all real-time event delivery.
 
 ### Relay Write Policy
 
-The strfry relay runs a write-policy plugin (`deploy/docker/write-policy.sh`) that:
-- Accepts events only from `ALLOWED_PUBKEY` (the server's derived Nostr pubkey)
+The WebSocket relay relay runs a write-policy plugin (`deploy/docker/write-policy.sh`) that:
+- Accepts events only from `ALLOWED_PUBKEY` (the server's derived WebSocket pubkey)
 - Always accepts NIP-42 auth events (kind 22242) from any pubkey — required for client authentication
 - Rejects all other publishers with `"action": "reject"` + reason
 
@@ -479,8 +479,8 @@ Audio from the volunteer's microphone is processed entirely in-browser/in-app:
 
 | Date | Version | Author | Changes |
 |------|---------|--------|---------|
-| 2026-05-03 | 2.1 | Post-hardening update | Argon2id + min-8 PIN; Nostr write-policy publisher verification; epoch-rotating event keys; power-of-2 payload padding; Signal-first routing; SMS notification-only mode; User-Agent hashed / country removed from audit; MLS always-on |
+| 2026-05-03 | 2.1 | Post-hardening update | Argon2id + min-8 PIN; WebSocket write-policy publisher verification; epoch-rotating event keys; power-of-2 payload padding; Signal-first routing; SMS notification-only mode; User-Agent hashed / country removed from audit; MLS always-on |
 | 2026-05-02 | 2.0 | Security docs overhaul | Complete rewrite: HPKE replaces ECIES, per-device Ed25519/X25519 keys replace nsec, added sigchain/PUK/CLKR/MLS/SFrame, removed Cloudflare Workers/Durable Objects references (backend is Bun+PostgreSQL), updated trust boundary diagram, updated all crypto references to packages/crypto Rust crate |
-| 2026-02-25 | 1.3 | ZK Architecture Overhaul | Added Nostr relay trust boundary, audit log tamper detection, admin key separation, hub key compromise analysis, reproducible builds, client-side transcription |
+| 2026-02-25 | 1.3 | ZK Architecture Overhaul | Added WebSocket relay trust boundary, audit log tamper detection, admin key separation, hub key compromise analysis, reproducible builds, client-side transcription |
 | 2026-02-25 | 1.2 | Epic 76.0 Phase 4 | Added APNs/FCM trust, Cloudflare trust boundary, admin pubkey fetch trust, departed volunteer key retirement, SMS/WhatsApp outbound limitation, npm supply chain risk |
 | 2026-02-23 | 1.0 | Security Audit R6 | Initial threat model document |

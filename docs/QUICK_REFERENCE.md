@@ -14,7 +14,7 @@ curl -s https://hotline.yourorg.org/api/health
 docker compose ps --format "table {{.Name}}\t{{.Status}}\t{{.Health}}"
 
 # Is the relay reachable?
-curl -sI https://hotline.yourorg.org/nostr    # Expect: 426
+curl -sI https://hotline.yourorg.org/WebSocket    # Expect: 426
 
 # Is the database accepting connections?
 docker compose exec postgres pg_isready -U llamenos
@@ -26,7 +26,7 @@ docker compose exec postgres pg_isready -U llamenos
 docker compose logs -f app                  # Follow app logs
 docker compose logs --since 1h app          # Last hour
 docker compose logs app | grep -i error     # Errors only
-docker compose logs --since 24h strfry      # Relay logs
+docker compose logs --since 24h WebSocket relay      # Relay logs
 ```
 
 ## Restart / Stop / Start

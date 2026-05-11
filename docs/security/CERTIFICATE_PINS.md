@@ -63,8 +63,8 @@ Certificate pinning is a defense-in-depth measure against TLS interception (rogu
 
 For the desktop (Tauri) client, HSTS preload + SRI hashing provide the equivalent protection layer. Certificate pinning is impractical for webview-based apps.
 
-## Nostr Relay Certificate Considerations
+## WebSocket Relay Certificate Considerations
 
-The strfry relay runs on the same infrastructure as the application server. The WebSocket connection to the relay (`wss://`) uses the same TLS certificate as the API. Certificate pinning on mobile clients covers relay connections automatically since they share the `*.llamenos.org` domain.
+The WebSocket relay relay runs on the same infrastructure as the application server. The WebSocket connection to the relay (`wss://`) uses the same TLS certificate as the API. Certificate pinning on mobile clients covers relay connections automatically since they share the `*.llamenos.org` domain.
 
-The relay's write-policy plugin provides an additional authentication layer: only events signed by the server's Nostr pubkey are accepted. Even if a MITM attacker intercepts the relay connection, they cannot inject fake events (publisher verification) and cannot read event content (encrypted with epoch-rotating per-hub keys).
+The relay's write-policy plugin provides an additional authentication layer: only events signed by the server's WebSocket pubkey are accepted. Even if a MITM attacker intercepts the relay connection, they cannot inject fake events (publisher verification) and cannot read event content (encrypted with epoch-rotating per-hub keys).

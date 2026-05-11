@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Bug Fixes
 
-- fix strfry config for CI instead of disabling it
+- fix WebSocket relay config for CI instead of disabling it
 
 ### Miscellaneous
 
@@ -35,11 +35,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - handle WebSocket upgrades directly for Node.js platform
 - fix presence endpoint — use correct ShiftManagerDO response key
-- promote Nostr relay (strfry) from optional profile to core service
+- promote WebSocket relay (WebSocket relay) from optional profile to core service
 - add SERVER_NOSTR_SECRET to e2e-docker CI env
 - include .github/ in CI change detection patterns
-- CI change detection + strfry dependency for Docker E2E
-- disable strfry in Docker E2E tests, replace --wait with targeted health check
+- CI change detection + WebSocket relay dependency for Docker E2E
+- disable WebSocket relay in Docker E2E tests, replace --wait with targeted health check
 
 ### CI/CD
 
@@ -66,9 +66,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add SAS verification to device provisioning protocol
 - generic backup file format without identifying strings
 - generic ECIES, multi-admin envelopes, admin key separation, hub key manager
-- NostrPublisher interface, server keypair, relay infrastructure
-- migrate real-time events from WebSocket to Nostr relay
-- complete WS removal — clean DO, Nostr-only broadcasts
+- WebSocketPublisher interface, server keypair, relay infrastructure
+- migrate real-time events from WebSocket to WebSocket relay
+- complete WS removal — clean DO, WebSocket-only broadcasts
 - E2EE messaging with envelope encryption pattern
 - metadata encryption — per-record DO storage, encrypted call history, hash-chained audit log
 - reproducible builds — deterministic output, checksums, verification tooling
@@ -470,9 +470,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add SAS verification to device provisioning protocol
 - generic backup file format without identifying strings
 - generic ECIES, multi-admin envelopes, admin key separation, hub key manager
-- NostrPublisher interface, server keypair, relay infrastructure
-- migrate real-time events from WebSocket to Nostr relay
-- complete WS removal — clean DO, Nostr-only broadcasts
+- WebSocketPublisher interface, server keypair, relay infrastructure
+- migrate real-time events from WebSocket to WebSocket relay
+- complete WS removal — clean DO, WebSocket-only broadcasts
 - E2EE messaging with envelope encryption pattern
 - metadata encryption — per-record DO storage, encrypted call history, hash-chained audit log
 - reproducible builds — deterministic output, checksums, verification tooling
@@ -489,7 +489,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Epic 80 — desktop security hardening (Tauri v2)
 - Epic 81 Phase 1 — migrate all crypto call sites to platform.ts
 - Epic 92 — Rust IPC expansion for Tauri-only desktop
-- add nostr event signing, ECIES content decrypt, legacy note + export encryption
+- add WebSocket event signing, ECIES content decrypt, legacy note + export encryption
 - Epic 93 — Tauri-only TypeScript migration, nsec never in webview
 - Epic 94 — Build cleanup, test infra, dead code removal
 - Epic 95 — Deployment architecture for desktop-only
@@ -501,7 +501,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - expand crypto interop tests to 24 cases, fix @noble v2 compat
 - add cross-repo CI dispatch on main push
 - add repository_dispatch trigger for cross-repo CI
-- add adversarial crypto tests for ECIES, encryption, auth, Nostr
+- add adversarial crypto tests for ECIES, encryption, auth, WebSocket
 - add docs site pages — mobile guide, architecture, troubleshooting, API reference (Epics 114, 118)
 - add mobile guide, architecture, and troubleshooting docs
 - complete i18n translations for all 12 languages (Epic 115)
@@ -648,11 +648,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add callActions i18n strings across 13 locales
 - domain-specific response schemas + Zod v4 modernization + describeRoute on all client routes
 - retire validate.ts middleware and clean up AppEnv types
-- add RelayCapture test helper for Nostr event assertions
-- BDD scenarios for Nostr relay event delivery
+- add RelayCapture test helper for WebSocket event assertions
+- BDD scenarios for WebSocket relay event delivery
 - BDD scenarios for in-call ban+hangup and notes
 - add OpenAPI BDD scenarios + fix duplicate step definitions
-- make publishNostrEvent async + add route error handlers
+- make publishWebSocketEvent async + add route error handlers
 - add decrypt_server_event_hex FFI + wire desktop relay decryption
 - add relay event decryption to iOS and Android
 - add typed event stream to iOS, granular event dispatch
@@ -708,7 +708,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - triage queue, contact detail, schema admin tab (Epic 353)
 - wire triage + contact detail navigation routes
 - platform.ts dual-backend crypto (Tauri IPC + WASM direct)
-- add missing Nostr event types + provisioning stubs + epic 356
+- add missing WebSocket event types + provisioning stubs + epic 356
 - CI/CD hardening — pre-commit hooks, WASM CI, ESLint, i18n gates
 - APNs wiring, deep linking, offline queue, call history
 - offline banner + navigation polish
@@ -901,7 +901,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - filter WebSocket errors in Docker test environment
 - handle WebSocket upgrades directly for Node.js platform
 - fix presence endpoint — use correct ShiftManagerDO response key
-- promote Nostr relay (strfry) from optional profile to core service
+- promote WebSocket relay (WebSocket relay) from optional profile to core service
 - Epic 82 — Tauri config fixes and platform.ts PIN flow
 - update E2E tests for Tauri-only migration (313/322 pass)
 - CI workflow issues — sed on Windows, Flatpak offline build, stale ref
@@ -914,9 +914,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add screenshots to site
 - add SERVER_NOSTR_SECRET to e2e-docker CI env
 - include .github/ in CI change detection patterns
-- CI change detection + strfry dependency for Docker E2E
-- disable strfry in Docker E2E tests, replace --wait with targeted health check
-- fix strfry config for CI instead of disabling it
+- CI change detection + WebSocket relay dependency for Docker E2E
+- disable WebSocket relay in Docker E2E tests, replace --wait with targeted health check
+- fix WebSocket relay config for CI instead of disabling it
 - use sign_prehash/verify_prehash for BIP-340 Schnorr interop
 - improve French translations with proper accented characters
 - add proper accented characters to French WhatsApp setup guide
@@ -935,7 +935,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - resolve compilation issues across iOS and Android
 - remove autoVerify from custom scheme intent-filter (Android lint)
 - seed demo accounts and setup state on DO init when DEMO_MODE enabled
-- stop false Nostr WebSocket errors and auto-lock in demo mode
+- stop false WebSocket WebSocket errors and auto-lock in demo mode
 - enable SMS + Signal channels in demo mode so Conversations appears
 - resolve stale closure bug in PinInput causing sequential input loss
 - achieve 100% BDD coverage — fix validator Cucumber escapes + add missing step aliases
@@ -1013,10 +1013,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - resolve backend BDD test failures against Docker Compose
 - restore ScreenshotAuditTests.swift deleted during E301 reorganization
 - resolve 5 of 6 iOS XCUITest failures + add Epic 304 plan
-- NodeNostrPublisher rejects on relay rejection/timeout
+- NodeWebSocketPublisher rejects on relay rejection/timeout
 - mobile clients subscribe to all event kinds, fix type string parsing
 - use server-side ban+hangup instead of client-side addBan
-- encrypt messaging router relay events via publishNostrEvent
+- encrypt messaging router relay events via publishWebSocketEvent
 - publisher reliability — flush OK tracking, reconnect cap, NIP42 import
 - remove non-null assertion on route param in conversations
 - add missing auth guards and Zod validation to conversations, calls, reports
@@ -1034,8 +1034,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix build failures — dep compat, codegen prereqs, rust fmt
 - re-add desktop branch to CI trigger, gate version to main
 - resolve iOS/Android/E2E/integration failures
-- use docker run for MinIO instead of service container
-- add MockWebServer dep, fix MinIO + test selector
+- use docker run for RustFS instead of service container
+- add MockWebServer dep, fix RustFS + test selector
 - resolve Android, E2E bootstrap, and integration-node failures
 - resolve Android Lint, bootstrap test, postgres null, iOS Docker failures
 - use colima for Docker on macOS iOS CI runner
@@ -1043,7 +1043,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - put android e2e gradle command on single line
 - postgres null storage and bootstrap PIN submission
 - install colima via brew, use cliPluginsExtraDirs for compose
-- use native PostgreSQL + MinIO on macOS instead of Docker
+- use native PostgreSQL + RustFS on macOS instead of Docker
 - update PIN minimum to 6 digits, fix crypto interop + bootstrap tests, ecryptfs build
 - update worker integration test fixtures for current API (Epic 313)
 - run desktop BDD serially, add epic 314 for step alignment
@@ -1110,7 +1110,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add new event type branches + MasterKey.Builder API
 - re-seed admin after test-reset + pass HMAC secret to services
 - auth token validation + audit log reset for BDD tests (Epic 359)
-- Epic 360 — response shapes, Nostr events, auth, permission matrix, CMS state
+- Epic 360 — response shapes, WebSocket events, auth, permission matrix, CMS state
 - resolve final 26 BDD failures (Epic 360)
 - add callerLast4 to simulation endpoint + regenerate BDD specs
 - iOS duplicate RecordContact + Android i18n + backend BDD step defs
@@ -1173,8 +1173,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - pin production Dockerfile base images to SHA-256 digest
 - scope contents:write to publish jobs only in release workflows
 - add --locked/--frozen-lockfile to all install commands
-- pin strfry image to SHA-256 digest in compose and Helm
-- pin MinIO to digest in Linux CI and verify checksum in macOS CI
+- pin WebSocket relay image to SHA-256 digest in compose and Helm
+- pin RustFS to digest in Linux CI and verify checksum in macOS CI
 - add pre-commit hook blocking .env commits + document policy
 - prevent shell injection via workflow_dispatch version input in tauri-release.yml
 - remove hardcoded admin key and unsafe print statements from iOS
@@ -1219,7 +1219,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - resolve merge conflicts from firehose+blast integration
 - add telegram to messaging rate limits default
 - fix fetch mock typing in test files
-- address LOW security findings — Zeroizing, raw labels, Nostr tag constant
+- address LOW security findings — Zeroizing, raw labels, WebSocket tag constant
 - add missing string keys to unblock build CI
 - resolve 6 CI failures after mass merge session
 - fix crypto-guardrails and audit job failures
@@ -1248,7 +1248,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - default testHubURL to Linux dev machine for screenshot capture
 - sync tauri.conf.json version to 0.19.2 — unblocks knope prepare-release
 - v3 HPKE envelope format — hex enc field for schema compat
-- resolve 5 CI failures on main — crypto flake, MinIO hash, android paths
+- resolve 5 CI failures on main — crypto flake, RustFS hash, android paths
 - smoke title assertion + report-types hub scope
 - add report-type-badge testid to ReportCard in list view
 - thread-safe test mocks for concurrent hub key loading
@@ -1329,9 +1329,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add SAS verification to device provisioning protocol
 - generic backup file format without identifying strings
 - generic ECIES, multi-admin envelopes, admin key separation, hub key manager
-- NostrPublisher interface, server keypair, relay infrastructure
-- migrate real-time events from WebSocket to Nostr relay
-- complete WS removal — clean DO, Nostr-only broadcasts
+- WebSocketPublisher interface, server keypair, relay infrastructure
+- migrate real-time events from WebSocket to WebSocket relay
+- complete WS removal — clean DO, WebSocket-only broadcasts
 - E2EE messaging with envelope encryption pattern
 - metadata encryption — per-record DO storage, encrypted call history, hash-chained audit log
 - reproducible builds — deterministic output, checksums, verification tooling
@@ -1348,7 +1348,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Epic 80 — desktop security hardening (Tauri v2)
 - Epic 81 Phase 1 — migrate all crypto call sites to platform.ts
 - Epic 92 — Rust IPC expansion for Tauri-only desktop
-- add nostr event signing, ECIES content decrypt, legacy note + export encryption
+- add WebSocket event signing, ECIES content decrypt, legacy note + export encryption
 - Epic 93 — Tauri-only TypeScript migration, nsec never in webview
 - Epic 94 — Build cleanup, test infra, dead code removal
 - Epic 95 — Deployment architecture for desktop-only
@@ -1360,7 +1360,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - expand crypto interop tests to 24 cases, fix @noble v2 compat
 - add cross-repo CI dispatch on main push
 - add repository_dispatch trigger for cross-repo CI
-- add adversarial crypto tests for ECIES, encryption, auth, Nostr
+- add adversarial crypto tests for ECIES, encryption, auth, WebSocket
 - add docs site pages — mobile guide, architecture, troubleshooting, API reference (Epics 114, 118)
 - add mobile guide, architecture, and troubleshooting docs
 - complete i18n translations for all 12 languages (Epic 115)
@@ -1507,11 +1507,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add callActions i18n strings across 13 locales
 - domain-specific response schemas + Zod v4 modernization + describeRoute on all client routes
 - retire validate.ts middleware and clean up AppEnv types
-- add RelayCapture test helper for Nostr event assertions
-- BDD scenarios for Nostr relay event delivery
+- add RelayCapture test helper for WebSocket event assertions
+- BDD scenarios for WebSocket relay event delivery
 - BDD scenarios for in-call ban+hangup and notes
 - add OpenAPI BDD scenarios + fix duplicate step definitions
-- make publishNostrEvent async + add route error handlers
+- make publishWebSocketEvent async + add route error handlers
 - add decrypt_server_event_hex FFI + wire desktop relay decryption
 - add relay event decryption to iOS and Android
 - add typed event stream to iOS, granular event dispatch
@@ -1567,7 +1567,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - triage queue, contact detail, schema admin tab (Epic 353)
 - wire triage + contact detail navigation routes
 - platform.ts dual-backend crypto (Tauri IPC + WASM direct)
-- add missing Nostr event types + provisioning stubs + epic 356
+- add missing WebSocket event types + provisioning stubs + epic 356
 - CI/CD hardening — pre-commit hooks, WASM CI, ESLint, i18n gates
 - APNs wiring, deep linking, offline queue, call history
 - offline banner + navigation polish
@@ -1760,7 +1760,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - filter WebSocket errors in Docker test environment
 - handle WebSocket upgrades directly for Node.js platform
 - fix presence endpoint — use correct ShiftManagerDO response key
-- promote Nostr relay (strfry) from optional profile to core service
+- promote WebSocket relay (WebSocket relay) from optional profile to core service
 - Epic 82 — Tauri config fixes and platform.ts PIN flow
 - update E2E tests for Tauri-only migration (313/322 pass)
 - CI workflow issues — sed on Windows, Flatpak offline build, stale ref
@@ -1773,9 +1773,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add screenshots to site
 - add SERVER_NOSTR_SECRET to e2e-docker CI env
 - include .github/ in CI change detection patterns
-- CI change detection + strfry dependency for Docker E2E
-- disable strfry in Docker E2E tests, replace --wait with targeted health check
-- fix strfry config for CI instead of disabling it
+- CI change detection + WebSocket relay dependency for Docker E2E
+- disable WebSocket relay in Docker E2E tests, replace --wait with targeted health check
+- fix WebSocket relay config for CI instead of disabling it
 - use sign_prehash/verify_prehash for BIP-340 Schnorr interop
 - improve French translations with proper accented characters
 - add proper accented characters to French WhatsApp setup guide
@@ -1794,7 +1794,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - resolve compilation issues across iOS and Android
 - remove autoVerify from custom scheme intent-filter (Android lint)
 - seed demo accounts and setup state on DO init when DEMO_MODE enabled
-- stop false Nostr WebSocket errors and auto-lock in demo mode
+- stop false WebSocket WebSocket errors and auto-lock in demo mode
 - enable SMS + Signal channels in demo mode so Conversations appears
 - resolve stale closure bug in PinInput causing sequential input loss
 - achieve 100% BDD coverage — fix validator Cucumber escapes + add missing step aliases
@@ -1872,10 +1872,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - resolve backend BDD test failures against Docker Compose
 - restore ScreenshotAuditTests.swift deleted during E301 reorganization
 - resolve 5 of 6 iOS XCUITest failures + add Epic 304 plan
-- NodeNostrPublisher rejects on relay rejection/timeout
+- NodeWebSocketPublisher rejects on relay rejection/timeout
 - mobile clients subscribe to all event kinds, fix type string parsing
 - use server-side ban+hangup instead of client-side addBan
-- encrypt messaging router relay events via publishNostrEvent
+- encrypt messaging router relay events via publishWebSocketEvent
 - publisher reliability — flush OK tracking, reconnect cap, NIP42 import
 - remove non-null assertion on route param in conversations
 - add missing auth guards and Zod validation to conversations, calls, reports
@@ -1893,8 +1893,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix build failures — dep compat, codegen prereqs, rust fmt
 - re-add desktop branch to CI trigger, gate version to main
 - resolve iOS/Android/E2E/integration failures
-- use docker run for MinIO instead of service container
-- add MockWebServer dep, fix MinIO + test selector
+- use docker run for RustFS instead of service container
+- add MockWebServer dep, fix RustFS + test selector
 - resolve Android, E2E bootstrap, and integration-node failures
 - resolve Android Lint, bootstrap test, postgres null, iOS Docker failures
 - use colima for Docker on macOS iOS CI runner
@@ -1902,7 +1902,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - put android e2e gradle command on single line
 - postgres null storage and bootstrap PIN submission
 - install colima via brew, use cliPluginsExtraDirs for compose
-- use native PostgreSQL + MinIO on macOS instead of Docker
+- use native PostgreSQL + RustFS on macOS instead of Docker
 - update PIN minimum to 6 digits, fix crypto interop + bootstrap tests, ecryptfs build
 - update worker integration test fixtures for current API (Epic 313)
 - run desktop BDD serially, add epic 314 for step alignment
@@ -1969,7 +1969,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add new event type branches + MasterKey.Builder API
 - re-seed admin after test-reset + pass HMAC secret to services
 - auth token validation + audit log reset for BDD tests (Epic 359)
-- Epic 360 — response shapes, Nostr events, auth, permission matrix, CMS state
+- Epic 360 — response shapes, WebSocket events, auth, permission matrix, CMS state
 - resolve final 26 BDD failures (Epic 360)
 - add callerLast4 to simulation endpoint + regenerate BDD specs
 - iOS duplicate RecordContact + Android i18n + backend BDD step defs
@@ -2032,8 +2032,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - pin production Dockerfile base images to SHA-256 digest
 - scope contents:write to publish jobs only in release workflows
 - add --locked/--frozen-lockfile to all install commands
-- pin strfry image to SHA-256 digest in compose and Helm
-- pin MinIO to digest in Linux CI and verify checksum in macOS CI
+- pin WebSocket relay image to SHA-256 digest in compose and Helm
+- pin RustFS to digest in Linux CI and verify checksum in macOS CI
 - add pre-commit hook blocking .env commits + document policy
 - prevent shell injection via workflow_dispatch version input in tauri-release.yml
 - remove hardcoded admin key and unsafe print statements from iOS
@@ -2078,7 +2078,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - resolve merge conflicts from firehose+blast integration
 - add telegram to messaging rate limits default
 - fix fetch mock typing in test files
-- address LOW security findings — Zeroizing, raw labels, Nostr tag constant
+- address LOW security findings — Zeroizing, raw labels, WebSocket tag constant
 - add missing string keys to unblock build CI
 - resolve 6 CI failures after mass merge session
 - fix crypto-guardrails and audit job failures
@@ -2107,7 +2107,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - default testHubURL to Linux dev machine for screenshot capture
 - sync tauri.conf.json version to 0.19.2 — unblocks knope prepare-release
 - v3 HPKE envelope format — hex enc field for schema compat
-- resolve 5 CI failures on main — crypto flake, MinIO hash, android paths
+- resolve 5 CI failures on main — crypto flake, RustFS hash, android paths
 - smoke title assertion + report-types hub scope
 - add report-type-badge testid to ReportCard in list view
 - thread-safe test mocks for concurrent hub key loading
@@ -2186,9 +2186,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add SAS verification to device provisioning protocol
 - generic backup file format without identifying strings
 - generic ECIES, multi-admin envelopes, admin key separation, hub key manager
-- NostrPublisher interface, server keypair, relay infrastructure
-- migrate real-time events from WebSocket to Nostr relay
-- complete WS removal — clean DO, Nostr-only broadcasts
+- WebSocketPublisher interface, server keypair, relay infrastructure
+- migrate real-time events from WebSocket to WebSocket relay
+- complete WS removal — clean DO, WebSocket-only broadcasts
 - E2EE messaging with envelope encryption pattern
 - metadata encryption — per-record DO storage, encrypted call history, hash-chained audit log
 - reproducible builds — deterministic output, checksums, verification tooling
@@ -2205,7 +2205,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Epic 80 — desktop security hardening (Tauri v2)
 - Epic 81 Phase 1 — migrate all crypto call sites to platform.ts
 - Epic 92 — Rust IPC expansion for Tauri-only desktop
-- add nostr event signing, ECIES content decrypt, legacy note + export encryption
+- add WebSocket event signing, ECIES content decrypt, legacy note + export encryption
 - Epic 93 — Tauri-only TypeScript migration, nsec never in webview
 - Epic 94 — Build cleanup, test infra, dead code removal
 - Epic 95 — Deployment architecture for desktop-only
@@ -2217,7 +2217,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - expand crypto interop tests to 24 cases, fix @noble v2 compat
 - add cross-repo CI dispatch on main push
 - add repository_dispatch trigger for cross-repo CI
-- add adversarial crypto tests for ECIES, encryption, auth, Nostr
+- add adversarial crypto tests for ECIES, encryption, auth, WebSocket
 - add docs site pages — mobile guide, architecture, troubleshooting, API reference (Epics 114, 118)
 - add mobile guide, architecture, and troubleshooting docs
 - complete i18n translations for all 12 languages (Epic 115)
@@ -2364,11 +2364,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add callActions i18n strings across 13 locales
 - domain-specific response schemas + Zod v4 modernization + describeRoute on all client routes
 - retire validate.ts middleware and clean up AppEnv types
-- add RelayCapture test helper for Nostr event assertions
-- BDD scenarios for Nostr relay event delivery
+- add RelayCapture test helper for WebSocket event assertions
+- BDD scenarios for WebSocket relay event delivery
 - BDD scenarios for in-call ban+hangup and notes
 - add OpenAPI BDD scenarios + fix duplicate step definitions
-- make publishNostrEvent async + add route error handlers
+- make publishWebSocketEvent async + add route error handlers
 - add decrypt_server_event_hex FFI + wire desktop relay decryption
 - add relay event decryption to iOS and Android
 - add typed event stream to iOS, granular event dispatch
@@ -2424,7 +2424,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - triage queue, contact detail, schema admin tab (Epic 353)
 - wire triage + contact detail navigation routes
 - platform.ts dual-backend crypto (Tauri IPC + WASM direct)
-- add missing Nostr event types + provisioning stubs + epic 356
+- add missing WebSocket event types + provisioning stubs + epic 356
 - CI/CD hardening — pre-commit hooks, WASM CI, ESLint, i18n gates
 - APNs wiring, deep linking, offline queue, call history
 - offline banner + navigation polish
@@ -2615,7 +2615,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - filter WebSocket errors in Docker test environment
 - handle WebSocket upgrades directly for Node.js platform
 - fix presence endpoint — use correct ShiftManagerDO response key
-- promote Nostr relay (strfry) from optional profile to core service
+- promote WebSocket relay (WebSocket relay) from optional profile to core service
 - Epic 82 — Tauri config fixes and platform.ts PIN flow
 - update E2E tests for Tauri-only migration (313/322 pass)
 - CI workflow issues — sed on Windows, Flatpak offline build, stale ref
@@ -2628,9 +2628,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add screenshots to site
 - add SERVER_NOSTR_SECRET to e2e-docker CI env
 - include .github/ in CI change detection patterns
-- CI change detection + strfry dependency for Docker E2E
-- disable strfry in Docker E2E tests, replace --wait with targeted health check
-- fix strfry config for CI instead of disabling it
+- CI change detection + WebSocket relay dependency for Docker E2E
+- disable WebSocket relay in Docker E2E tests, replace --wait with targeted health check
+- fix WebSocket relay config for CI instead of disabling it
 - use sign_prehash/verify_prehash for BIP-340 Schnorr interop
 - improve French translations with proper accented characters
 - add proper accented characters to French WhatsApp setup guide
@@ -2649,7 +2649,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - resolve compilation issues across iOS and Android
 - remove autoVerify from custom scheme intent-filter (Android lint)
 - seed demo accounts and setup state on DO init when DEMO_MODE enabled
-- stop false Nostr WebSocket errors and auto-lock in demo mode
+- stop false WebSocket WebSocket errors and auto-lock in demo mode
 - enable SMS + Signal channels in demo mode so Conversations appears
 - resolve stale closure bug in PinInput causing sequential input loss
 - achieve 100% BDD coverage — fix validator Cucumber escapes + add missing step aliases
@@ -2727,10 +2727,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - resolve backend BDD test failures against Docker Compose
 - restore ScreenshotAuditTests.swift deleted during E301 reorganization
 - resolve 5 of 6 iOS XCUITest failures + add Epic 304 plan
-- NodeNostrPublisher rejects on relay rejection/timeout
+- NodeWebSocketPublisher rejects on relay rejection/timeout
 - mobile clients subscribe to all event kinds, fix type string parsing
 - use server-side ban+hangup instead of client-side addBan
-- encrypt messaging router relay events via publishNostrEvent
+- encrypt messaging router relay events via publishWebSocketEvent
 - publisher reliability — flush OK tracking, reconnect cap, NIP42 import
 - remove non-null assertion on route param in conversations
 - add missing auth guards and Zod validation to conversations, calls, reports
@@ -2748,8 +2748,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix build failures — dep compat, codegen prereqs, rust fmt
 - re-add desktop branch to CI trigger, gate version to main
 - resolve iOS/Android/E2E/integration failures
-- use docker run for MinIO instead of service container
-- add MockWebServer dep, fix MinIO + test selector
+- use docker run for RustFS instead of service container
+- add MockWebServer dep, fix RustFS + test selector
 - resolve Android, E2E bootstrap, and integration-node failures
 - resolve Android Lint, bootstrap test, postgres null, iOS Docker failures
 - use colima for Docker on macOS iOS CI runner
@@ -2757,7 +2757,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - put android e2e gradle command on single line
 - postgres null storage and bootstrap PIN submission
 - install colima via brew, use cliPluginsExtraDirs for compose
-- use native PostgreSQL + MinIO on macOS instead of Docker
+- use native PostgreSQL + RustFS on macOS instead of Docker
 - update PIN minimum to 6 digits, fix crypto interop + bootstrap tests, ecryptfs build
 - update worker integration test fixtures for current API (Epic 313)
 - run desktop BDD serially, add epic 314 for step alignment
@@ -2824,7 +2824,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add new event type branches + MasterKey.Builder API
 - re-seed admin after test-reset + pass HMAC secret to services
 - auth token validation + audit log reset for BDD tests (Epic 359)
-- Epic 360 — response shapes, Nostr events, auth, permission matrix, CMS state
+- Epic 360 — response shapes, WebSocket events, auth, permission matrix, CMS state
 - resolve final 26 BDD failures (Epic 360)
 - add callerLast4 to simulation endpoint + regenerate BDD specs
 - iOS duplicate RecordContact + Android i18n + backend BDD step defs
@@ -2887,8 +2887,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - pin production Dockerfile base images to SHA-256 digest
 - scope contents:write to publish jobs only in release workflows
 - add --locked/--frozen-lockfile to all install commands
-- pin strfry image to SHA-256 digest in compose and Helm
-- pin MinIO to digest in Linux CI and verify checksum in macOS CI
+- pin WebSocket relay image to SHA-256 digest in compose and Helm
+- pin RustFS to digest in Linux CI and verify checksum in macOS CI
 - add pre-commit hook blocking .env commits + document policy
 - prevent shell injection via workflow_dispatch version input in tauri-release.yml
 - remove hardcoded admin key and unsafe print statements from iOS
@@ -2933,7 +2933,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - resolve merge conflicts from firehose+blast integration
 - add telegram to messaging rate limits default
 - fix fetch mock typing in test files
-- address LOW security findings — Zeroizing, raw labels, Nostr tag constant
+- address LOW security findings — Zeroizing, raw labels, WebSocket tag constant
 - add missing string keys to unblock build CI
 - resolve 6 CI failures after mass merge session
 - fix crypto-guardrails and audit job failures
@@ -2962,7 +2962,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - default testHubURL to Linux dev machine for screenshot capture
 - sync tauri.conf.json version to 0.19.2 — unblocks knope prepare-release
 - v3 HPKE envelope format — hex enc field for schema compat
-- resolve 5 CI failures on main — crypto flake, MinIO hash, android paths
+- resolve 5 CI failures on main — crypto flake, RustFS hash, android paths
 - smoke title assertion + report-types hub scope
 - add report-type-badge testid to ReportCard in list view
 - thread-safe test mocks for concurrent hub key loading

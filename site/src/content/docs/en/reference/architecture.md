@@ -75,7 +75,7 @@ Worker API  -->  ConversationDO
     |                | Wraps symmetric key via ECIES for assigned volunteer + admins
     |                | Discards plaintext
     |                v
-    |           Nostr relay (encrypted hub event notifies online clients)
+    |           WebSocket relay (encrypted hub event notifies online clients)
     |
     v
 Client (volunteer's browser/app)
@@ -111,7 +111,7 @@ All DOs are accessed as singletons via `idFromName()` and routed internally usin
 | Report attachments | Yes (E2EE) | XChaCha20-Poly1305 (streamed) | Report author + all admins |
 | Message content | Yes (E2EE) | XChaCha20-Poly1305 + ECIES envelope | Assigned volunteer + all admins |
 | Transcripts | Yes (at-rest) | XChaCha20-Poly1305 | Transcript creator + all admins |
-| Hub events (Nostr) | Yes (symmetric) | XChaCha20-Poly1305 with hub key | All current hub members |
+| Hub events (WebSocket) | Yes (symmetric) | XChaCha20-Poly1305 with hub key | All current hub members |
 | Volunteer nsec | Yes (at-rest) | PBKDF2 + XChaCha20-Poly1305 (PIN) | Volunteer only |
 | Audit log entries | No (integrity-protected) | SHA-256 hash chain | Admins (read), system (write) |
 | Caller phone numbers | No (server-side only) | N/A | Server + admins |
@@ -130,11 +130,11 @@ Volunteer nsec (BIP-340 Schnorr / secp256k1)
     |
     +-- Used for ECIES key agreement (prepend 02 for compressed form)
     |
-    +-- Signs Nostr events (Schnorr signature)
+    +-- Signs WebSocket events (Schnorr signature)
 
 Hub key (random 32 bytes, NOT derived from any identity)
     |
-    +-- Encrypts real-time Nostr hub events
+    +-- Encrypts real-time WebSocket hub events
     |
     +-- ECIES-wrapped per member via LABEL_HUB_KEY_WRAP
     |
@@ -151,9 +151,9 @@ Per-note key (random 32 bytes)
 
 ## Real-time communication
 
-Real-time updates (new calls, messages, shift changes, presence) flow through a Nostr relay:
+Real-time updates (new calls, messages, shift changes, presence) flow through a WebSocket relay:
 
-- **Self-hosted**: strfry relay running alongside the app in Docker/Kubernetes
+- **Self-hosted**: WebSocket relay relay running alongside the app in Docker/Kubernetes
 - **Cloudflare**: Nosflare (Cloudflare Workers-based relay)
 
 All events are ephemeral (kind 20001) and encrypted with the hub key. Events use generic tags (`["t", "llamenos:event"]`) so the relay cannot distinguish event types. The content field contains XChaCha20-Poly1305 ciphertext.
@@ -164,9 +164,9 @@ All events are ephemeral (kind 20001) and encrypted with the hub key. Events use
 Client A (volunteer action)
     |
     | Encrypt event content with hub key
-    | Sign as Nostr event (Schnorr)
+    | Sign as WebSocket event (Schnorr)
     v
-Nostr relay (strfry / Nosflare)
+WebSocket relay (WebSocket relay / Nosflare)
     |
     | Broadcast to subscribers
     v
@@ -185,13 +185,13 @@ The relay sees encrypted blobs and valid signatures but cannot read event conten
 ### Transport layer
 
 - All client-server communication over HTTPS (TLS 1.3)
-- WebSocket connections to Nostr relay over WSS
+- WebSocket connections to WebSocket relay over WSS
 - Content Security Policy (CSP) restricts script sources, connections, and frame ancestors
 - Tauri isolation pattern separates IPC from the webview
 
 ### Application layer
 
-- Authentication via Nostr keypairs (BIP-340 Schnorr signatures)
+- Authentication via WebSocket keypairs (BIP-340 Schnorr signatures)
 - WebAuthn session tokens for multi-device convenience
 - Role-based access control (caller, volunteer, reporter, admin)
 - All 25 cryptographic domain separation constants defined in `crypto-labels.ts` prevent cross-protocol attacks

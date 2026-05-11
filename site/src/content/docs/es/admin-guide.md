@@ -7,7 +7,7 @@ Como administrador, gestionas todo: voluntarios, turnos, canales de comunicacion
 
 ## Iniciar sesion
 
-Inicia sesion con el `nsec` (clave secreta Nostr) generado durante la [configuracion inicial](/es/docs/deploy). La pagina de inicio de sesion acepta el formato nsec (`nsec1...`). Tu navegador firma un desafio con la clave, y el secreto nunca sale del dispositivo.
+Inicia sesion con el `nsec` (clave secreta WebSocket) generado durante la [configuracion inicial](/es/docs/deploy). La pagina de inicio de sesion acepta el formato nsec (`nsec1...`). Tu navegador firma un desafio con la clave, y el secreto nunca sale del dispositivo.
 
 Opcionalmente, registra una passkey de WebAuthn en Configuracion para iniciar sesion sin contrasena en otros dispositivos.
 
@@ -26,7 +26,7 @@ Despues de completar el asistente, la bandera `setupCompleted` se establece y el
 
 Navega a **Voluntarios** en la barra lateral para:
 
-- **Agregar un voluntario** -- genera un nuevo par de claves Nostr. Comparte el nsec de forma segura con el voluntario (se muestra una sola vez).
+- **Agregar un voluntario** -- genera un nuevo par de claves WebSocket. Comparte el nsec de forma segura con el voluntario (se muestra una sola vez).
 - **Crear un enlace de invitacion** -- genera un enlace de uso unico. El flujo de invitacion incluye un selector de rol (voluntario, administrador o reportero).
 - **Editar** -- actualizar nombre, numero de telefono y rol.
 - **Eliminar** -- desactivar el acceso de un voluntario.
@@ -70,7 +70,7 @@ Cuando los canales de mensajeria (SMS, WhatsApp, Signal) estan habilitados, apar
 Cada conversacion muestra:
 - Burbujas de mensajes con marcas de tiempo y direccion (entrante/saliente)
 - El canal por el que llego el mensaje (SMS, WhatsApp, Signal)
-- Actualizaciones en tiempo real via relay Nostr — los nuevos mensajes aparecen al instante
+- Actualizaciones en tiempo real via relay WebSocket — los nuevos mensajes aparecen al instante
 
 Las conversaciones se crean automaticamente cuando llega un mensaje entrante. Los voluntarios pueden responder directamente desde la vista de conversacion.
 

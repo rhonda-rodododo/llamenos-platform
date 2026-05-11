@@ -147,7 +147,7 @@ The following findings represent the highest-risk vulnerabilities and must be ad
 **Component**: Desktop — Tauri IPC / Key management
 **File(s)**: `packages/crypto/src/keys.rs:16-25`; `apps/desktop/src/lib.rs:175-176`; `src/client/routes/onboarding.tsx:135-141`; `src/client/components/setup/AdminBootstrap.tsx:132-138`
 **Description**: The `KeyPair` struct serializes four fields over IPC: `secretKeyHex`, `publicKey`, `nsec`, and `npub`. Both `generate_keypair` and `key_pair_from_nsec` return the complete struct. In the webview, `kp.nsec` and `kp.secretKeyHex` are stored in React component state. This directly contradicts the platform's foundational security claim that the nsec never enters the webview.
-**Impact**: Any XSS vulnerability in a rendered field (a crafted call note, an admin-supplied field name, a Nostr event content injection) can read React component state and exfiltrate the volunteer's nsec. Once exfiltrated, the nsec provides permanent access to all encrypted notes and Nostr identity.
+**Impact**: Any XSS vulnerability in a rendered field (a crafted call note, an admin-supplied field name, a WebSocket event content injection) can read React component state and exfiltrate the volunteer's nsec. Once exfiltrated, the nsec provides permanent access to all encrypted notes and WebSocket identity.
 **Exploit Scenario**: An attacker with the ability to influence any rendered string (call note, volunteer name, hub description) injects a `<script>` or uses a DOM-based XSS vector. The script reads `window.__REACT_FIBER__` or DevTools-equivalent introspection to extract `kp.nsec` from component state and exfiltrates it via a WebSocket or fetch to an attacker endpoint.
 **Fix**: `generate_keypair` returns only `{ publicKey, npub }`. Key generation, PIN encryption, and CryptoState loading happen entirely in Rust in a single atomic command. `key_pair_from_nsec` is replaced with a command that accepts the nsec string on the Rust side, validates it, loads it into CryptoState, and returns only the pubkey. The nsec must never cross the IPC boundary outbound.
 
@@ -169,7 +169,7 @@ The following findings represent the highest-risk vulnerabilities and must be ad
 **Component**: Desktop — Tauri IPC / Authentication
 **File(s)**: `apps/desktop/src/crypto.rs:562-571`; `apps/desktop/src/lib.rs:174`; `apps/desktop/isolation/index.html:51`
 **Description**: `create_auth_token` accepts `secret_key_hex: String` from the webview for signing. Per an inline comment, stateless commands were supposed to be deregistered (Epic 257 C4), but this command is explicitly carved out. It remains in `generate_handler![]` and in the isolation allowlist. The preferred successor `create_auth_token_from_state` exists and should be the only signing command.
-**Impact**: Any code path or injection that can invoke IPC commands can pass an arbitrary secret key to produce a validly signed auth token for any Nostr identity, including admins. This is a privilege escalation vector — an attacker does not need to exfiltrate the nsec; they only need to invoke this command with a known key.
+**Impact**: Any code path or injection that can invoke IPC commands can pass an arbitrary secret key to produce a validly signed auth token for any WebSocket identity, including admins. This is a privilege escalation vector — an attacker does not need to exfiltrate the nsec; they only need to invoke this command with a known key.
 **Exploit Scenario**: An attacker who has obtained an admin's `secret_key_hex` via any means (git history, CRIT-M3, CRIT-D1) and achieves JS execution in the webview calls `create_auth_token` with the admin key to produce a valid session token and authenticate as admin.
 **Fix**: Remove `create_auth_token` from `generate_handler![]` and the isolation allowlist. The sign-in flow must pass the nsec to `import_key_to_state` first, then invoke `create_auth_token_from_state` for all signing operations.
 
@@ -239,13 +239,13 @@ The following findings represent the highest-risk vulnerabilities and must be ad
 
 ---
 
-### HIGH-CI2 (HIGH): strfry relay image not pinned to digest in production Docker Compose
+### HIGH-CI2 (HIGH): WebSocket relay relay image not pinned to digest in production Docker Compose
 
-**Component**: CI/CD — Docker Compose / Nostr relay
+**Component**: CI/CD — Docker Compose / WebSocket relay
 **File(s)**: `deploy/docker/docker-compose.yml:147`
-**Description**: `image: dockurr/strfry:1.0.1` is tag-only for a non-official image. The comment acknowledges the TODO. strfry handles all real-time hub events including key distribution.
-**Impact**: A compromised or tag-replaced image can intercept all encrypted Nostr relay traffic, corrupt key distribution events, or silently drop events to cause denial of service for on-shift volunteers.
-**Fix**: Pull the image, record the digest, and pin: `image: dockurr/strfry@sha256:<digest>`. Verify the publisher's identity before trusting.
+**Description**: `image: dockurr/WebSocket relay:1.0.1` is tag-only for a non-official image. The comment acknowledges the TODO. WebSocket relay handles all real-time hub events including key distribution.
+**Impact**: A compromised or tag-replaced image can intercept all encrypted WebSocket relay traffic, corrupt key distribution events, or silently drop events to cause denial of service for on-shift volunteers.
+**Fix**: Pull the image, record the digest, and pin: `image: dockurr/WebSocket relay@sha256:<digest>`. Verify the publisher's identity before trusting.
 
 ---
 
@@ -293,8 +293,8 @@ The following findings represent the highest-risk vulnerabilities and must be ad
 **Component**: CI/CD — Secret management
 **File(s)**: `deploy/docker/.env`; `deploy/docker/.env.shard-0` through `.env.shard-3`
 **Description**: Files on disk contain apparent real hex secrets (`HMAC_SECRET`, `SERVER_NOSTR_SECRET`). `.gitignore` excludes these patterns but the files exist on disk and may have been committed previously.
-**Impact**: If any of these secrets appear in git history, all data encrypted or authenticated with them is compromised. `SERVER_NOSTR_SECRET` is the root secret from which the server's Nostr keypair is derived via HKDF. `HMAC_SECRET` authenticates API tokens.
-**Exploit Scenario**: An adversary with read access to git history (any past clone, GitHub archive request, or source code leak) extracts `SERVER_NOSTR_SECRET` and derives the server's Nostr private key, enabling them to sign events as the server and decrypt all hub key distribution events.
+**Impact**: If any of these secrets appear in git history, all data encrypted or authenticated with them is compromised. `SERVER_NOSTR_SECRET` is the root secret from which the server's WebSocket keypair is derived via HKDF. `HMAC_SECRET` authenticates API tokens.
+**Exploit Scenario**: An adversary with read access to git history (any past clone, GitHub archive request, or source code leak) extracts `SERVER_NOSTR_SECRET` and derives the server's WebSocket private key, enabling them to sign events as the server and decrypt all hub key distribution events.
 **Fix**: Run `git log --all --full-history -- 'deploy/docker/.env*'` immediately. If any of these files appear in history, rotate every secret contained in them. Add a pre-commit hook and CI check to prevent future commits of `.env` files.
 
 ---
@@ -393,10 +393,10 @@ The following findings represent the highest-risk vulnerabilities and must be ad
 
 ### HIGH-W1 (HIGH): `serverEventKeyHex` returned to all authenticated users regardless of role
 
-**Component**: Worker — Authentication / Nostr relay key
+**Component**: Worker — Authentication / WebSocket relay key
 **File(s)**: `apps/worker/routes/auth.ts:153-155,173`
 **Description**: `serverEventKeyHex` is derived deterministically from `SERVER_NOSTR_SECRET` and returned in the `/api/auth/me` response to every authenticated user. This is a single global key for all hubs. Any compromised volunteer session token — regardless of the volunteer's hub, role, or active status — yields the key to decrypt all hub relay traffic.
-**Impact**: Compromise of any single low-privilege account gives an adversary the ability to decrypt all past and future strfry relay events across all hubs. This key cannot be rotated without re-provisioning all clients simultaneously. One key protects all organizational communications.
+**Impact**: Compromise of any single low-privilege account gives an adversary the ability to decrypt all past and future WebSocket relay relay events across all hubs. This key cannot be rotated without re-provisioning all clients simultaneously. One key protects all organizational communications.
 **Fix**: Scope key delivery to users with a specific elevated permission, or — as the architecture intends — migrate to per-hub key envelopes delivered via ECIES wrap (matching the hub key model). Each volunteer should receive only the key(s) for their hub(s), unwrapped client-side.
 
 ---
@@ -571,7 +571,7 @@ The following findings represent the highest-risk vulnerabilities and must be ad
 
 **Component**: Crypto — Key encoding
 **File(s)**: `packages/crypto/src/ecies.rs:97-106`
-**Description**: The function always prepends `0x02` (even-y). For BIP-340/Nostr x-only keys this is correct by convention, as BIP-340 lifts to the even-y point. However, `keys.rs:34` uses `pk.to_encoded_point(true)`, which produces `0x02` or `0x03` based on actual y-parity. If non-BIP-340 keys are ever processed by this function, ~50% will produce incorrect compressed points and ECIES will silently fail.
+**Description**: The function always prepends `0x02` (even-y). For BIP-340/WebSocket x-only keys this is correct by convention, as BIP-340 lifts to the even-y point. However, `keys.rs:34` uses `pk.to_encoded_point(true)`, which produces `0x02` or `0x03` based on actual y-parity. If non-BIP-340 keys are ever processed by this function, ~50% will produce incorrect compressed points and ECIES will silently fail.
 **Fix**: Add a clear code comment documenting that this function is BIP-340-only and must never be used with non-BIP-340 keys. Add a compile-time or runtime assertion. If non-BIP-340 pubkeys are introduced in future, use the full 33-byte compressed form throughout.
 
 ---
@@ -679,7 +679,7 @@ The following security controls are well-implemented and represent genuine stren
 
 **Per-Test PostgreSQL Schema Isolation**: The `POST /api/test-create-hub` endpoint and hub-per-worker test isolation design eliminates shared state between parallel test workers, which is the correct approach for a security-sensitive test suite.
 
-**Nostr Tag Opacity**: Using generic tags (`["t", "llamenos:event"]`) so the relay cannot distinguish event types is a correct implementation of the zero-knowledge relay design. The relay operator cannot perform traffic analysis on event categories.
+**WebSocket Tag Opacity**: Using generic tags (`["t", "llamenos:event"]`) so the relay cannot distinguish event types is a correct implementation of the zero-knowledge relay design. The relay operator cannot perform traffic analysis on event categories.
 
 ---
 

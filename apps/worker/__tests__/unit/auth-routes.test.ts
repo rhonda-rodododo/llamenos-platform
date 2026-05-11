@@ -277,7 +277,7 @@ describe('auth routes', () => {
     it('returns current user profile', async () => {
       const { app } = createApp()
 
-      const res = await app.request('/auth/me', {}, { ...defaultEnv as Record<string, string>, SERVER_NOSTR_SECRET: 'a'.repeat(64) } as never)
+      const res = await app.request('/auth/me', {}, { ...defaultEnv as Record<string, string>, SERVER_SECRET: 'a'.repeat(64) } as never)
       expect(res.status).toBe(200)
       const body = await res.json()
       expect(body.pubkey).toBe('aabb1122eeff3344')

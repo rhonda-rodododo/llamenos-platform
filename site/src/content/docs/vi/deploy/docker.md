@@ -21,7 +21,7 @@ cd llamenos
 
 ## 2. Tạo cặp khóa quản trị
 
-Bạn cần một cặp khóa Nostr cho tài khoản quản trị. Chạy lệnh này trên máy cục bộ (hoặc trên máy chủ nếu đã cài Bun):
+Bạn cần một cặp khóa WebSocket cho tài khoản quản trị. Chạy lệnh này trên máy cục bộ (hoặc trên máy chủ nếu đã cài Bun):
 
 ```bash
 bun install

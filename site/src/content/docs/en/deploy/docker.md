@@ -3,7 +3,7 @@ title: "Deploy: Docker Compose"
 description: Deploy Llamenos on your own server with Docker Compose.
 ---
 
-This guide walks you through deploying Llamenos with Docker Compose on a single server. You'll have a fully functional hotline with automatic HTTPS, PostgreSQL database, object storage, Nostr relay, and optional transcription — all managed by Docker Compose.
+This guide walks you through deploying Llamenos with Docker Compose on a single server. You'll have a fully functional hotline with automatic HTTPS, PostgreSQL database, object storage, WebSocket relay, and optional transcription — all managed by Docker Compose.
 
 ## Prerequisites
 
@@ -29,7 +29,7 @@ Visit **http://localhost:8000** and follow the setup wizard.
 ```
 
 The setup script:
-1. Generates strong random secrets (database password, HMAC key, storage credentials, Nostr relay secret)
+1. Generates strong random secrets (database password, HMAC key, storage credentials, WebSocket relay secret)
 2. Writes them to `deploy/docker/.env`
 3. Builds and starts all services using the production overlay
 4. Waits for the app to become healthy
@@ -55,7 +55,7 @@ Edit `.env` and fill in the required secrets:
 # Hex secrets (HMAC_SECRET, SERVER_NOSTR_SECRET):
 openssl rand -hex 32
 
-# Passwords (PG_PASSWORD, MINIO_ACCESS_KEY, MINIO_SECRET_KEY):
+# Passwords (PG_PASSWORD, STORAGE_ACCESS_KEY, STORAGE_SECRET_KEY):
 openssl rand -base64 24
 ```
 
@@ -89,8 +89,8 @@ docker compose -f docker-compose.yml -f docker-compose.production.yml up -d
 | **app** | Llamenos application (Bun + Hono) | 3000 (internal) |
 | **postgres** | PostgreSQL database | 5432 (internal) |
 | **caddy** | Reverse proxy + automatic TLS | 8000 (local), 80/443 (production) |
-| **minio** | S3-compatible file storage | 9000 (internal) |
-| **strfry** | Nostr relay for real-time events | 7777 (internal) |
+| **RustFS** | S3-compatible file storage | 9000 (internal) |
+| **WebSocket relay** | WebSocket relay for real-time events | 7777 (internal) |
 
 ## Optional profiles
 
@@ -171,7 +171,7 @@ docker compose -f docker-compose.yml -f docker-compose.production.yml build
 docker compose -f docker-compose.yml -f docker-compose.production.yml up -d
 ```
 
-Data persists in Docker volumes (`postgres-data`, `minio-data`, etc.) across restarts and rebuilds.
+Data persists in Docker volumes (`postgres-data`, `RustFS-data`, etc.) across restarts and rebuilds.
 
 ## Backups
 

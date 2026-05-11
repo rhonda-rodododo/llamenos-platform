@@ -14,7 +14,7 @@ This directory contains security documentation for Llamenos, a crisis response h
 | [Threat Model](THREAT_MODEL.md) | Adversaries, attack surfaces, trust boundaries, legal compulsion scenarios | Auditors, security engineers |
 | [Data Classification](DATA_CLASSIFICATION.md) | Complete data inventory with encryption status per field | Auditors, operators, legal |
 | [Protocol Specification](../protocol/PROTOCOL.md) | Wire formats, API contracts, cryptographic algorithms | Auditors, developers |
-| [Deployment Hardening](DEPLOYMENT_HARDENING.md) | Docker Compose, Kubernetes Helm, Ansible, Caddy, strfry configuration | Operators, DevOps |
+| [Deployment Hardening](DEPLOYMENT_HARDENING.md) | Docker Compose, Kubernetes Helm, Ansible, Caddy, WebSocket relay configuration | Operators, DevOps |
 | [Key Revocation Runbook](KEY_REVOCATION_RUNBOOK.md) | Device deauthorization via sigchain, hub key rotation, PUK rotation | Operators |
 | [Incident Response](INCIDENT_RESPONSE.md) | Server compromise, CI/CD compromise, account compromise, GDPR notification | Operators |
 | [Certificate Pins](CERTIFICATE_PINS.md) | iOS/Android certificate pinning (scaffolding — pins pending first deployment) | Mobile developers |
@@ -38,7 +38,7 @@ All cryptographic operations are implemented once in `packages/crypto/` (Rust), 
 | Ed25519 | Device signing keys, auth tokens, sigchain entries |
 | X25519 | Device encryption keys, HPKE decapsulation |
 | AES-256-GCM | Symmetric encryption (notes, messages, HPKE AEAD) |
-| XChaCha20-Poly1305 | Hub event encryption (Nostr relay events) |
+| XChaCha20-Poly1305 | Hub event encryption (WebSocket relay events) |
 | Argon2id (64MB, 3 iterations, 4 parallelism) | PIN/passphrase-to-KEK derivation for device key storage |
 | HMAC-SHA256 | Phone/IP hashing, blind index generation |
 | 57 domain separation labels | Albrecht defense — label enforced at decrypt |
@@ -85,7 +85,7 @@ The server **cannot read** these, even under legal compulsion:
 - **Traffic analysis resistance (full)**: Hub events are padded to power-of-2 buckets (min 512B), but no dummy traffic or cover traffic — patterns from connection timing remain visible
 - **Metadata confidentiality**: Server needs timestamps, routing data, and event counts; caller numbers are HMAC-hashed and User-Agent SHA-256 hashed, country is not stored — but connection metadata remains
 - **SMS/WhatsApp transport E2EE**: Provider sees plaintext during transit; Signal-first routing (when the recipient has Signal) avoids this, and SMS notification-only mode omits message content from SMS bodies — but provider-visible delivery still occurs
-- **Nostr relay metadata privacy**: Relay observes event metadata (pseudonymous pubkeys, timing, sizes); content is per-hub encrypted with epoch-rotating keys; write-policy plugin limits events to the whitelisted server pubkey only — relay cannot fake events but can observe metadata
+- **WebSocket relay metadata privacy**: Relay observes event metadata (pseudonymous pubkeys, timing, sizes); content is per-hub encrypted with epoch-rotating keys; write-policy plugin limits events to the whitelisted server pubkey only — relay cannot fake events but can observe metadata
 - **PIN brute-force resistance (offline) — now significantly improved**: Minimum 8 digits or alphanumeric passphrase (8+ chars); Argon2id (64MB, 3 iterations, 4 parallelism) replaces PBKDF2 for strong GPU/ASIC resistance. Seizure of encrypted blob requires defeating Argon2id in addition to guessing credential.
 - **Deletion verification**: Cannot cryptographically prove hosting provider deleted data
 

@@ -75,8 +75,7 @@ describe('createBlobStorage — credentials', () => {
     })).not.toThrow()
   })
 
-  // Bug fix test: MINIO_* legacy vars trigger deprecation warning, STORAGE_* do not
-  it('does NOT warn when using STORAGE_* env vars (bug fix: was warning on correct vars)', () => {
+  it('does NOT warn when using STORAGE_* env vars', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     try {
       createBlobStorage({
@@ -87,24 +86,6 @@ describe('createBlobStorage — credentials', () => {
       expect(warnSpy).not.toHaveBeenCalled()
     } finally {
       warnSpy.mockRestore()
-    }
-  })
-
-  it('warns when using legacy MINIO_* env vars', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const savedKey = process.env.MINIO_ACCESS_KEY
-    process.env.MINIO_ACCESS_KEY = 'legacy-key'
-    try {
-      createBlobStorage({
-        endpoint: 'http://test:9000',
-        accessKeyId: 'k',
-        secretAccessKey: 's',
-      })
-      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('DEPRECATED'))
-    } finally {
-      warnSpy.mockRestore()
-      if (savedKey !== undefined) process.env.MINIO_ACCESS_KEY = savedKey
-      else delete process.env.MINIO_ACCESS_KEY
     }
   })
 })

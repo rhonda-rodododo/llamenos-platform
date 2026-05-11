@@ -92,7 +92,7 @@ Estas melhorias estao disponiveis hoje:
 | Sem numeros de telefone em texto plano no banco | Numeros de chamadores sao armazenados como hashes irreversiveis — seu banco de dados nunca contem o numero real |
 | Criptografia por hub com sigilo futuro | Eventos em tempo real de cada hub sao criptografados com chaves que rotacionam a cada 24 horas — chaves antigas nao podem decifrar novos eventos |
 | Criptografia em Rust em todas as plataformas | Desktop, iOS e Android executam a mesma biblioteca criptografica Rust auditada — chaves nunca entram em codigo JavaScript, Swift ou Kotlin |
-| Acesso restrito ao relay | Seu relay Nostr aceita eventos apenas do seu servidor — nenhum terceiro pode injetar notificacoes falsas |
+| Acesso restrito ao relay | Seu relay WebSocket aceita eventos apenas do seu servidor — nenhum terceiro pode injetar notificacoes falsas |
 | Armazenamento criptografado de mensagens | Mensagens SMS, WhatsApp e Signal armazenadas como texto cifrado no seu servidor |
 | Transcricao no dispositivo | Audio nunca sai do seu navegador — processado inteiramente no seu dispositivo |
 | Protecao de chaves multifator | Suas chaves de criptografia sao protegidas pelo seu PIN, provedor de identidade e opcionalmente chave de seguranca de hardware |

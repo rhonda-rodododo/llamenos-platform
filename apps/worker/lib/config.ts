@@ -68,12 +68,7 @@ export function validateConfig(env: ConfigInput = process.env): void {
   // --- Required vars ---
   assertDatabaseUrl(env)
   assertHex64(env, 'HMAC_SECRET')
-  // SERVER_SECRET is the canonical name; SERVER_NOSTR_SECRET is the legacy alias.
-  // Prefer SERVER_SECRET; fall back to SERVER_NOSTR_SECRET only if it has a value.
-  const hasCanonical = !!env['SERVER_SECRET']?.trim()
-  const hasLegacy = !!env['SERVER_NOSTR_SECRET']?.trim()
-  const serverSecretKey = hasCanonical ? 'SERVER_SECRET' : hasLegacy ? 'SERVER_NOSTR_SECRET' : 'SERVER_SECRET'
-  assertHex64(env, serverSecretKey)
+  assertHex64(env, 'SERVER_SECRET')
 
   // ADMIN_PUBKEY: 64 hex chars (Nostr pubkey, x-only compressed)
   // Optional: if not set, the first admin is bootstrapped via the Tauri desktop app.

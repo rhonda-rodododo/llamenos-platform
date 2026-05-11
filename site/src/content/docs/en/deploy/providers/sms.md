@@ -60,7 +60,7 @@ Send an SMS to your hotline phone number. You should see the conversation appear
 1. An SMS arrives at your provider, which sends a webhook to your server
 2. The server validates the webhook signature (provider-specific HMAC)
 3. The message is parsed and stored in the ConversationService
-4. On-shift volunteers are notified via Nostr relay events
+4. On-shift volunteers are notified via WebSocket relay events
 5. Volunteers reply from the Conversations tab — responses are sent back via your provider's SMS API
 
 ## Security notes

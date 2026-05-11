@@ -47,7 +47,7 @@ Llamenos — это одностраничное приложение (SPA), р�
 | Фронтенд | Vite + React + TanStack Router |
 | Бэкенд | Cloudflare Workers + Durable Objects |
 | Телефония | Twilio, SignalWire, Vonage, Plivo или Asterisk (через интерфейс TelephonyAdapter) |
-| Аутентификация | Ключевые пары Nostr (BIP-340 Schnorr) + WebAuthn |
+| Аутентификация | Ключевые пары WebSocket (BIP-340 Schnorr) + WebAuthn |
 | Шифрование | ECIES (secp256k1 + XChaCha20-Poly1305) |
 | Транскрипция | Whisper на стороне клиента (WASM) |
 | Интернационализация | i18next (более 12 языков) |

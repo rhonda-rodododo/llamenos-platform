@@ -8,7 +8,7 @@ Kòm yon repòtè, ou ka soumèt rapò chifre nan òganizasyon ou a atravè plat
 ## Kòmanse
 
 Admin ou a ap ba ou youn nan:
-- Yon **nsec** (kle sekrè Nostr) — yon chèn ki kòmanse ak `nsec1`
+- Yon **nsec** (kle sekrè WebSocket) — yon chèn ki kòmanse ak `nsec1`
 - Yon **lyen envitasyon** — yon URL yon sèl fwa ki kreye kalifikasyon pou ou
 
 **Kenbe nsec ou a prive.** Se idantite ou ak kalifikasyon koneksyon ou. Estoke li nan yon jestyon modpas.

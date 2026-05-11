@@ -23,7 +23,7 @@ function makeEventInput(pubkey: string, kind: number, id?: string) {
   })
 }
 
-describe('strfry write-policy plugin', () => {
+describe('write-policy write-policy plugin', () => {
   let proc: ChildProcess
   let responses: string[] = []
   let ready: Promise<void>

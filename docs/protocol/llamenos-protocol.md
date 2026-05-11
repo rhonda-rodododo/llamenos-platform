@@ -41,13 +41,13 @@ Admin Decryption Key (Epic 76.2)
 Hub Key (Epic 76.2)
   32-byte random: crypto.getRandomValues(new Uint8Array(32))
   NOT derived from any identity key
-  └── Nostr event content encryption (XChaCha20-Poly1305 + HKDF per-event)
+  └── WebSocket event content encryption (XChaCha20-Poly1305 + HKDF per-event)
   └── Presence encryption (volunteer-tier: boolean only)
   └── Distribution: ECIES-wrapped individually per member ("llamenos:hub-key-wrap")
 
-Server Nostr Key (Epic 76.1)
-  Derived: HKDF-SHA256(SERVER_NOSTR_SECRET, "llamenos:server-nostr-key", "llamenos:server-nostr-key:v1")
-  └── Signs server-authoritative Nostr events (call:ring, call:answered)
+Server WebSocket Key (Epic 76.1)
+  Derived: HKDF-SHA256(SERVER_NOSTR_SECRET, "llamenos:server-WebSocket-key", "llamenos:server-WebSocket-key:v1")
+  └── Signs server-authoritative WebSocket events (call:ring, call:answered)
   └── Clients verify server pubkey for authoritative events
   └── CANNOT decrypt any user content
 
@@ -140,12 +140,12 @@ Every cryptographic operation uses a unique domain separation string to prevent 
 | `RECOVERY_SALT` | `"llamenos:recovery"` | Recovery key PBKDF2 fallback salt (legacy) | 9 |
 | `LABEL_BACKUP` | `"llamenos:backup"` | Generic backup encryption | 9 |
 
-#### Server Nostr Identity
+#### Server WebSocket Identity
 
 | Constant | Label | Purpose | Section |
 |----------|-------|---------|---------|
-| `LABEL_SERVER_NOSTR_KEY` | `"llamenos:server-nostr-key"` | HKDF derivation for server Nostr keypair from `SERVER_NOSTR_SECRET` | 14 |
-| `LABEL_SERVER_NOSTR_KEY_INFO` | `"llamenos:server-nostr-key:v1"` | HKDF info parameter for server Nostr key (versioned for rotation) | 14 |
+| `LABEL_SERVER_NOSTR_KEY` | `"llamenos:server-WebSocket-key"` | HKDF derivation for server WebSocket keypair from `SERVER_NOSTR_SECRET` | 14 |
+| `LABEL_SERVER_NOSTR_KEY_INFO` | `"llamenos:server-WebSocket-key:v1"` | HKDF info parameter for server WebSocket key (versioned for rotation) | 14 |
 
 ## 3. Local Key Protection
 
@@ -237,13 +237,13 @@ token = 32 random bytes, hex-encoded
 - Check expiry (8 hours from creation)
 - Extract associated pubkey
 
-### 4.3 Nostr Relay Authentication (NIP-42)
+### 4.3 WebSocket Relay Authentication (NIP-42)
 
-Clients authenticate to the Nostr relay using the NIP-42 protocol:
+Clients authenticate to the WebSocket relay using the NIP-42 protocol:
 
-1. Client connects to the relay via WebSocket (`wss://domain/nostr`)
+1. Client connects to the relay via WebSocket (`wss://domain/WebSocket`)
 2. Relay sends `["AUTH", <challenge_string>]`
-3. Client signs the challenge using its Nostr identity key (BIP-340 Schnorr)
+3. Client signs the challenge using its WebSocket identity key (BIP-340 Schnorr)
 4. Client sends the signed NIP-42 auth event back to the relay
 5. Relay verifies the signature and grants access to publish/subscribe
 
@@ -511,7 +511,7 @@ WebAuthn sessions authenticate the user but do not unlock crypto operations. The
 | `@noble/curves` | ^1.x | secp256k1 ECDH, BIP-340 Schnorr signatures |
 | `@noble/ciphers` | ^1.x | XChaCha20-Poly1305 symmetric encryption |
 | `@noble/hashes` | ^1.x | SHA-256, HKDF-SHA256, hex/utf8 encoding |
-| `nostr-tools` | ^2.x | Key generation, bech32 nsec/npub encoding |
+| `WebSocket-tools` | ^2.x | Key generation, bech32 nsec/npub encoding |
 | Web Crypto API | — | PBKDF2 key derivation, random bytes |
 
 All cryptographic operations use audited, constant-time implementations. No custom crypto primitives.
@@ -532,7 +532,7 @@ All cryptographic operations use audited, constant-time implementations. No cust
 
 ### 14.1 Hub Key Distribution
 
-The hub key is a shared 32-byte symmetric key used to encrypt Nostr relay events visible to all hub members.
+The hub key is a shared 32-byte symmetric key used to encrypt WebSocket relay events visible to all hub members.
 
 ```
 hubKey = crypto.getRandomValues(new Uint8Array(32))
@@ -549,7 +549,7 @@ The hub key is **random** (not derived from any identity key). This ensures:
 
 ### 14.2 Event Encryption
 
-Each Nostr event's content is encrypted with a per-event derived key:
+Each WebSocket event's content is encrypted with a per-event derived key:
 
 ```
 // Derive per-event encryption key
@@ -573,13 +573,13 @@ Event {
 }
 ```
 
-### 14.3 Server Nostr Identity
+### 14.3 Server WebSocket Identity
 
-The server derives its Nostr keypair from the `SERVER_NOSTR_SECRET` environment variable:
+The server derives its WebSocket keypair from the `SERVER_NOSTR_SECRET` environment variable:
 
 ```
 ikm = hex_decode(SERVER_NOSTR_SECRET)
-serverSecretKey = HKDF-SHA256(ikm, "llamenos:server-nostr-key", "llamenos:server-nostr-key:v1", 32)
+serverSecretKey = HKDF-SHA256(ikm, "llamenos:server-WebSocket-key", "llamenos:server-WebSocket-key:v1", 32)
 serverPubkey = secp256k1.getPublicKey(serverSecretKey)
 ```
 

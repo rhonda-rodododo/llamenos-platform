@@ -75,7 +75,7 @@ Worker API  -->  ConversationDO
     |                | Vlope kle simetrik via ECIES pou vòlontè asine + admin yo
     |                | Efase tèks klè a
     |                v
-    |           Relè Nostr (evènman hub chifre notifye kliyan an liy)
+    |           Relè WebSocket (evènman hub chifre notifye kliyan an liy)
     |
     v
 Kliyan (navigatè/aplikasyon vòlontè a)
@@ -111,7 +111,7 @@ Tout DO yo aksesib kòm singleton via `idFromName()` ak route entènman lè l s�
 | Atachman rapò | Wi (E2EE) | XChaCha20-Poly1305 (an fliks) | Otè rapò + tout admin yo |
 | Kontni mesaj | Wi (E2EE) | XChaCha20-Poly1305 + anvlòp ECIES | Vòlontè asine + tout admin yo |
 | Transkripsyon | Wi (nan repo) | XChaCha20-Poly1305 | Kreyatè transkripsyon + tout admin yo |
-| Evènman hub (Nostr) | Wi (simetrik) | XChaCha20-Poly1305 ak kle hub | Tout manm hub aktyèl yo |
+| Evènman hub (WebSocket) | Wi (simetrik) | XChaCha20-Poly1305 ak kle hub | Tout manm hub aktyèl yo |
 | nsec vòlontè | Wi (nan repo) | PBKDF2 + XChaCha20-Poly1305 (PIN) | Vòlontè sèlman |
 | Antre jounal odit | Non (pwoteje entegrite) | Chenn hash SHA-256 | Admin yo (li), sistèm (ekri) |
 | Nimewo telefòn moun k ap rele | Non (sèlman sèvè) | N/A | Sèvè + admin yo |
@@ -130,11 +130,11 @@ nsec vòlontè (BIP-340 Schnorr / secp256k1)
     |
     +-- Itilize pou akò kle ECIES (prefiks 02 pou fòm konprese)
     |
-    +-- Siyen evènman Nostr (siyati Schnorr)
+    +-- Siyen evènman WebSocket (siyati Schnorr)
 
 Kle hub (32 bytes aléatwa, PA derive nan okenn idantite)
     |
-    +-- Chifre evènman hub Nostr an tan reyèl
+    +-- Chifre evènman hub WebSocket an tan reyèl
     |
     +-- Vlope ECIES pa manm via LABEL_HUB_KEY_WRAP
     |
@@ -151,9 +151,9 @@ Kle pa nòt (32 bytes aléatwa)
 
 ## Kominikasyon an tan reyèl
 
-Mizajou an tan reyèl (nouvo apèl, mesaj, chanjman vire wouk, prezans) koule atravè yon relè Nostr :
+Mizajou an tan reyèl (nouvo apèl, mesaj, chanjman vire wouk, prezans) koule atravè yon relè WebSocket :
 
-- **Pwòp tèt ou** : relè strfry k ap kouri akote aplikasyon an nan Docker/Kubernetes
+- **Pwòp tèt ou** : relè WebSocket relay k ap kouri akote aplikasyon an nan Docker/Kubernetes
 - **Cloudflare** : Nosflare (relè baze sou Cloudflare Workers)
 
 Tout evènman yo efemè (kind 20001) ak chifre ak kle hub la. Evènman yo itilize tag jenerik (`["t", "llamenos:event"]`) pou relè a pa ka distenge tip evènman. Chan kontni an genyen tèks chifre XChaCha20-Poly1305.
@@ -164,9 +164,9 @@ Tout evènman yo efemè (kind 20001) ak chifre ak kle hub la. Evènman yo itiliz
 Kliyan A (aksyon vòlontè)
     |
     | Chifre kontni evènman ak kle hub
-    | Siyen kòm evènman Nostr (Schnorr)
+    | Siyen kòm evènman WebSocket (Schnorr)
     v
-Relè Nostr (strfry / Nosflare)
+Relè WebSocket (WebSocket relay / Nosflare)
     |
     | Difize bay abòne yo
     v
@@ -185,13 +185,13 @@ Relè a wè blòb chifre ak siyati valid men pa ka li kontni evènman oswa detè
 ### Kouch transpò
 
 - Tout kominikasyon kliyan-sèvè via HTTPS (TLS 1.3)
-- Koneksyon WebSocket nan relè Nostr via WSS
+- Koneksyon WebSocket nan relè WebSocket via WSS
 - Politik Sekirite Kontni (CSP) limite sous skrip, koneksyon, ak ansèt frame
 - Modèl izolasyon Tauri separe IPC de webview la
 
 ### Kouch aplikasyon
 
-- Otantifikasyon via pè kle Nostr (siyati BIP-340 Schnorr)
+- Otantifikasyon via pè kle WebSocket (siyati BIP-340 Schnorr)
 - Jeton sesyon WebAuthn pou konfò miltidispozitif
 - Kontwòl aksè baze sou wòl (moun k ap rele, vòlontè, rapòtè, admin)
 - 25 konstant separasyon domèn kriptografik defini nan `crypto-labels.ts` anpeche atak atravè protokòl

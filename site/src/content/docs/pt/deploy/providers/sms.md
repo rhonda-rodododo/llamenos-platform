@@ -60,7 +60,7 @@ Envie um SMS para o numero de telefone da sua linha. Voce deve ver a conversa ap
 1. Um SMS chega ao seu provedor, que envia um webhook para o seu Worker
 2. O Worker valida a assinatura do webhook (HMAC especifico do provedor)
 3. A mensagem e analisada e armazenada no ConversationDO
-4. Os voluntarios em turno sao notificados via eventos do relay Nostr
+4. Os voluntarios em turno sao notificados via eventos do relay WebSocket
 5. Os voluntarios respondem pela aba de Conversas -- as respostas sao enviadas de volta pela API de SMS do seu provedor
 
 ## Notas de seguranca

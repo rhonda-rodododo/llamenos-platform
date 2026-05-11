@@ -75,7 +75,7 @@ Worker API  -->  ConversationDO
     |                | Envolve chave simetrica via ECIES para voluntario atribuido + admins
     |                | Descarta texto simples
     |                v
-    |           Nostr relay (evento criptografado do hub notifica clientes online)
+    |           WebSocket relay (evento criptografado do hub notifica clientes online)
     |
     v
 Cliente (navegador/app do voluntario)
@@ -111,7 +111,7 @@ Todos os DOs sao acessados como singletons via `idFromName()` e roteados interna
 | Anexos de reportes | Sim (E2EE) | XChaCha20-Poly1305 (streaming) | Autor do reporte + todos os admins |
 | Conteudo de mensagens | Sim (E2EE) | XChaCha20-Poly1305 + envelope ECIES | Voluntario atribuido + todos os admins |
 | Transcricoes | Sim (em repouso) | XChaCha20-Poly1305 | Criador da transcricao + todos os admins |
-| Eventos do hub (Nostr) | Sim (simetrico) | XChaCha20-Poly1305 com chave do hub | Todos os membros atuais do hub |
+| Eventos do hub (WebSocket) | Sim (simetrico) | XChaCha20-Poly1305 com chave do hub | Todos os membros atuais do hub |
 | nsec do voluntario | Sim (em repouso) | PBKDF2 + XChaCha20-Poly1305 (PIN) | Apenas o voluntario |
 | Entradas de auditoria | Nao (integridade protegida) | Cadeia de hash SHA-256 | Admins (leitura), sistema (escrita) |
 | Numeros de telefone de chamadores | Nao (apenas servidor) | N/A | Servidor + admins |
@@ -130,11 +130,11 @@ nsec do voluntario (BIP-340 Schnorr / secp256k1)
     |
     +-- Usada para acordo de chaves ECIES (prefixa 02 para formato comprimido)
     |
-    +-- Assina eventos Nostr (assinatura Schnorr)
+    +-- Assina eventos WebSocket (assinatura Schnorr)
 
 Chave do hub (32 bytes aleatorios, NAO derivada de nenhuma chave de identidade)
     |
-    +-- Criptografa eventos Nostr do hub em tempo real
+    +-- Criptografa eventos WebSocket do hub em tempo real
     |
     +-- Envolvida via ECIES por membro via LABEL_HUB_KEY_WRAP
     |
@@ -151,9 +151,9 @@ Chave por nota (32 bytes aleatorios)
 
 ## Comunicacao em tempo real
 
-Atualizacoes em tempo real (novas chamadas, mensagens, mudancas de turno, presenca) fluem atraves de um relay Nostr:
+Atualizacoes em tempo real (novas chamadas, mensagens, mudancas de turno, presenca) fluem atraves de um relay WebSocket:
 
-- **Auto-hospedado**: relay strfry rodando ao lado do app em Docker/Kubernetes
+- **Auto-hospedado**: relay WebSocket relay rodando ao lado do app em Docker/Kubernetes
 - **Cloudflare**: Nosflare (relay baseado em Cloudflare Workers)
 
 Todos os eventos sao efemeros (kind 20001) e criptografados com a chave do hub. Os eventos usam tags genericas (`["t", "llamenos:event"]`) para que o relay nao consiga distinguir tipos de evento. O campo de conteudo contem texto cifrado XChaCha20-Poly1305.
@@ -164,9 +164,9 @@ Todos os eventos sao efemeros (kind 20001) e criptografados com a chave do hub. 
 Cliente A (acao do voluntario)
     |
     | Criptografa conteudo do evento com chave do hub
-    | Assina como evento Nostr (Schnorr)
+    | Assina como evento WebSocket (Schnorr)
     v
-Nostr relay (strfry / Nosflare)
+WebSocket relay (WebSocket relay / Nosflare)
     |
     | Transmite para assinantes
     v
@@ -185,13 +185,13 @@ O relay ve blobs criptografados e assinaturas validas, mas nao consegue ler o co
 ### Camada de transporte
 
 - Toda comunicacao cliente-servidor sobre HTTPS (TLS 1.3)
-- Conexoes WebSocket ao relay Nostr sobre WSS
+- Conexoes WebSocket ao relay WebSocket sobre WSS
 - Content Security Policy (CSP) restringe fontes de scripts, conexoes e ancestrais de frames
 - Padrao de isolamento Tauri separa IPC da webview
 
 ### Camada de aplicacao
 
-- Autenticacao via pares de chaves Nostr (assinaturas BIP-340 Schnorr)
+- Autenticacao via pares de chaves WebSocket (assinaturas BIP-340 Schnorr)
 - Tokens de sessao WebAuthn para conveniencia multi-dispositivo
 - Controle de acesso baseado em funcoes (chamador, voluntario, reportero, admin)
 - Todas as 25 constantes de separacao de dorustfs criptografico definidas em `crypto-labels.ts` previnem ataques entre protocolos

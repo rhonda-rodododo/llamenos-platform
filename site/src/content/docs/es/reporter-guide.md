@@ -8,7 +8,7 @@ Como reportero, puedes enviar reportes cifrados a tu organizacion a traves de la
 ## Primeros pasos
 
 Tu administrador te dara una de las siguientes opciones:
-- Un **nsec** (clave secreta Nostr) — una cadena que comienza con `nsec1`
+- Un **nsec** (clave secreta WebSocket) — una cadena que comienza con `nsec1`
 - Un **enlace de invitacion** — una URL de uso unico que crea credenciales para ti
 
 **Manten tu nsec en privado.** Es tu identidad y credencial de inicio de sesion. Guardalo en un gestor de contrasenas.

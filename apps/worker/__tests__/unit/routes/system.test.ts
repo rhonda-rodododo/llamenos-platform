@@ -138,8 +138,8 @@ describe('GET /system/health', () => {
     const res = await app.request('/health')
     const json = await res.json() as Record<string, unknown>
     const services = json.services as Array<{ name: string; status: string }>
-    const nostrService = services.find(s => s.name === 'Nostr Relay')
-    expect(nostrService?.status).toBe('down')
+    const wsService = services.find(s => s.name === 'WebSocket Relay')
+    expect(wsService?.status).toBe('down')
   })
 
   it('marks Nostr relay as ok when configured', async () => {
@@ -148,8 +148,8 @@ describe('GET /system/health', () => {
     const res = await app.request('/health')
     const json = await res.json() as Record<string, unknown>
     const services = json.services as Array<{ name: string; status: string }>
-    const nostrService = services.find(s => s.name === 'Nostr Relay')
-    expect(nostrService?.status).toBe('ok')
+    const wsService = services.find(s => s.name === 'WebSocket Relay')
+    expect(wsService?.status).toBe('ok')
   })
 
   it('marks telephony as ok when TWILIO_ACCOUNT_SID configured', async () => {

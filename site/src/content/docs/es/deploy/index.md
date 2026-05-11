@@ -26,7 +26,7 @@ bun install
 
 ## 2. Generar el par de claves del administrador
 
-Genera un par de claves Nostr para la cuenta de administrador. Esto produce una clave secreta (nsec) y una clave publica (npub/hex).
+Genera un par de claves WebSocket para la cuenta de administrador. Esto produce una clave secreta (nsec) y una clave publica (npub/hex).
 
 ```bash
 bun run bootstrap-admin

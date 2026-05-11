@@ -98,7 +98,7 @@ Filter by entity type using the tab bar at the top. Filter by status using the d
 
 ### Changing Status
 
-Click the **status pill** on any case to change its status. Status changes are logged in the timeline automatically and published as Nostr events for real-time sync.
+Click the **status pill** on any case to change its status. Status changes are logged in the timeline automatically and published as WebSocket events for real-time sync.
 
 ### Assignment
 

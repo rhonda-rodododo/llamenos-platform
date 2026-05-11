@@ -117,7 +117,7 @@ subtitle: Alles, was eine Krisenreaktionsplattform braucht, in einem Open-Source
 
 **Forward Secrecy pro Notiz** -- Jede Notiz wird mit einem einzigartigen Zufallsschluessel verschluesselt, der dann via ECIES fuer jeden autorisierten Leser umhuellt wird. Die Kompromittierung des Identitaetsschluessels offenbart keine vergangenen Notizen.
 
-**Nostr-Schluesselpaar-Authentifizierung** -- Freiwillige authentifizieren sich mit Nostr-kompatiblen Schluesselpaaren (nsec/npub). BIP-340 Schnorr-Signaturverifikation. Keine Passwoerter, keine E-Mail-Adressen.
+**WebSocket-Schluesselpaar-Authentifizierung** -- Freiwillige authentifizieren sich mit WebSocket-kompatiblen Schluesselpaaren (nsec/npub). BIP-340 Schnorr-Signaturverifikation. Keine Passwoerter, keine E-Mail-Adressen.
 
 **WebAuthn-Passkeys** -- Optionale Passkey-Unterstuetzung fuer Multi-Geraete-Login. Registrieren Sie einen Hardware-Schluessel oder Biometrie, und melden Sie sich dann ohne Eingabe Ihres geheimen Schluessels an.
 

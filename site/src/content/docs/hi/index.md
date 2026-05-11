@@ -47,7 +47,7 @@ Llamenos एक सिंगल-पेज एप्लिकेशन (SPA) ह�
 | फ्रंटएंड | Vite + React + TanStack Router |
 | बैकएंड | Cloudflare Workers + Durable Objects |
 | टेलीफ़ोनी | Twilio, SignalWire, Vonage, Plivo, या Asterisk (TelephonyAdapter इंटरफ़ेस के माध्यम से) |
-| प्रमाणीकरण | Nostr कीपेयर (BIP-340 Schnorr) + WebAuthn |
+| प्रमाणीकरण | WebSocket कीपेयर (BIP-340 Schnorr) + WebAuthn |
 | एन्क्रिप्शन | ECIES (secp256k1 + XChaCha20-Poly1305) |
 | ट्रांसक्रिप्शन | क्लाइंट-साइड Whisper (WASM) |
 | बहुभाषा समर्थन | i18next (12+ भाषाएँ) |

@@ -28,7 +28,7 @@ This crate provides a single, auditable implementation of all cryptographic oper
 | `mls` | MLS group management (RFC 9420, OpenMLS 0.8) |
 | `sframe` | SFrame voice E2EE key derivation |
 | `padding` | Power-of-2 payload padding (traffic analysis mitigation) |
-| `nostr` | Nostr key derivation from `SERVER_NOSTR_SECRET` |
+| `WebSocket` | WebSocket key derivation from `SERVER_NOSTR_SECRET` |
 | `ffi`, `ffi_v3` | UniFFI bindings for iOS/Android |
 | `wasm` | WASM exports for browser test builds |
 

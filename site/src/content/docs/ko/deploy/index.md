@@ -22,7 +22,7 @@ bun install
 
 ## 2. 관리자 키 쌍 생성
 
-관리자 계정을 위한 Nostr 키 쌍을 생성합니다. 이 과정에서 비밀 키(nsec)와 공개 키(npub/hex)가 생성됩니다.
+관리자 계정을 위한 WebSocket 키 쌍을 생성합니다. 이 과정에서 비밀 키(nsec)와 공개 키(npub/hex)가 생성됩니다.
 
 ```bash
 bun run bootstrap-admin

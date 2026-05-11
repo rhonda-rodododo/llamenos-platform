@@ -46,7 +46,7 @@ vi.mock('../../routes/metrics', () => ({
 
 function makeEnv(overrides?: Partial<Env>): Env {
   return {
-    SERVER_NOSTR_SECRET: 'a'.repeat(64),
+    SERVER_SECRET: 'a'.repeat(64),
     NOSTR_RELAY_URL: 'ws://localhost:7777',
     HMAC_SECRET: TEST_HMAC_SECRET,
     ...overrides,

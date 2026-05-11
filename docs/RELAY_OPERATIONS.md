@@ -1,6 +1,6 @@
-# Nostr Relay Operations Guide
+# WebSocket Relay Operations Guide
 
-This document covers the deployment, hardening, monitoring, and troubleshooting of the Nostr relay used by Llamenos for real-time event delivery.
+This document covers the deployment, hardening, monitoring, and troubleshooting of the WebSocket relay used by Llamenos for real-time event delivery.
 
 **Related documents**:
 - [E2EE Architecture](architecture/E2EE_ARCHITECTURE.md) — Overall zero-knowledge architecture
@@ -12,7 +12,7 @@ This document covers the deployment, hardening, monitoring, and troubleshooting 
 
 ## 1. Overview
 
-The Nostr relay replaces the former WebSocket server for all real-time communication in Llamenos. It handles:
+The WebSocket relay replaces the former WebSocket server for all real-time communication in Llamenos. It handles:
 
 - **Call notifications**: Incoming call ring events broadcast to on-shift volunteers
 - **Presence updates**: Volunteer availability status (hub-encrypted)
@@ -22,23 +22,23 @@ The Nostr relay replaces the former WebSocket server for all real-time communica
 
 All event content is encrypted with the hub key before publishing. The relay sees only encrypted blobs and generic tags — it cannot distinguish event types or read content.
 
-### Why Nostr Instead of WebSocket
+### Why WebSocket Instead of WebSocket
 
-| Concern | WebSocket (old) | Nostr Relay (new) |
+| Concern | WebSocket (old) | WebSocket Relay (new) |
 |---------|----------------|-------------------|
 | Server sees content | Yes — server relayed all events in plaintext | No — relay sees only encrypted events |
 | Event-type visibility | Yes — server knew event types for routing | No — generic `["t", "llamenos:event"]` tag only |
 | Protocol standard | Custom proprietary | NIP-01/NIP-42 open standard |
-| Self-hosted option | Same server as app | Independent infrastructure (strfry) |
+| Self-hosted option | Same server as app | Independent infrastructure (WebSocket relay) |
 | CF deployment | Built into Worker | Nosflare DO service binding |
 
 ---
 
 ## 2. Architecture
 
-### strfry (Self-Hosted)
+### WebSocket relay (Self-Hosted)
 
-[strfry](https://github.com/hoytech/strfry) is a high-performance Nostr relay written in C++ using LMDB for storage. It is the recommended relay for self-hosted deployments.
+[WebSocket relay](https://github.com/hoytech/WebSocket relay) is a high-performance WebSocket relay written in C++ using LMDB for storage. It is the recommended relay for self-hosted deployments.
 
 **Characteristics**:
 - Single binary, minimal dependencies
@@ -50,7 +50,7 @@ All event content is encrypted with the hub key before publishing. The relay see
 
 ### Nosflare (Cloudflare)
 
-For Cloudflare Workers deployments, Nosflare runs as a Durable Object with a service binding. It provides the same NIP-01/NIP-42 interface as strfry but runs on Cloudflare's edge network.
+For Cloudflare Workers deployments, Nosflare runs as a Durable Object with a service binding. It provides the same NIP-01/NIP-42 interface as WebSocket relay but runs on Cloudflare's edge network.
 
 **Characteristics**:
 - No separate infrastructure to manage
@@ -64,27 +64,27 @@ For Cloudflare Workers deployments, Nosflare runs as a Durable Object with a ser
 
 ### Docker Compose
 
-The Nostr relay (strfry) is a core service that starts automatically with `docker compose up -d`. The `SERVER_NOSTR_SECRET` env var is required in `.env` (see [Quickstart](QUICKSTART.md)).
+The WebSocket relay (WebSocket relay) is a core service that starts automatically with `docker compose up -d`. The `SERVER_NOSTR_SECRET` env var is required in `.env` (see [Quickstart](QUICKSTART.md)).
 
-The relay runs on port 7777 internally. Caddy proxies `/nostr` to the relay via WebSocket.
+The relay runs on port 7777 internally. Caddy proxies `/WebSocket` to the relay via WebSocket.
 
 **Environment variables**:
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `SERVER_NOSTR_SECRET` | Yes | — | 64-char hex; server derives its Nostr keypair from this |
-| `NOSTR_RELAY_URL` | No | `ws://strfry:7777` | Internal relay URL (Docker network) |
+| `SERVER_NOSTR_SECRET` | Yes | — | 64-char hex; server derives its WebSocket keypair from this |
+| `NOSTR_RELAY_URL` | No | `ws://WebSocket relay:7777` | Internal relay URL (Docker network) |
 
 ### Kubernetes (StatefulSet)
 
-The Helm chart includes a strfry StatefulSet:
+The Helm chart includes a WebSocket relay StatefulSet:
 
 ```yaml
 # values.yaml
-nostr:
+WebSocket:
   enabled: true
-  relayUrl: "ws://strfry:7777"
+  relayUrl: "ws://WebSocket relay:7777"
   image:
-    repository: dockurr/strfry
+    repository: dockurr/WebSocket relay
     tag: "latest"
   persistence:
     size: 5Gi
@@ -92,20 +92,20 @@ nostr:
 
 Create the server secret:
 ```bash
-kubectl create secret generic llamenos-nostr-secret \
-  --from-literal=server-nostr-secret=$(openssl rand -hex 32)
+kubectl create secret generic llamenos-WebSocket-secret \
+  --from-literal=server-WebSocket-secret=$(openssl rand -hex 32)
 ```
 
 The StatefulSet uses a PersistentVolumeClaim for the LMDB data directory.
 
 ### Cloudflare (Service Binding)
 
-> **Note**: The Llamenos backend (`apps/worker/`) is a Bun HTTP server on a self-hosted VPS — it is **not** a Cloudflare Worker. The only Cloudflare deployment is the marketing site (`site/`). Nosflare is an alternative relay option for organizations that want to run *only* the relay on Cloudflare's edge network (e.g., as a relay-only Cloudflare Worker separate from the main backend). The self-hosted strfry relay (Docker Compose) is the default and recommended approach.
+> **Note**: The Llamenos backend (`apps/worker/`) is a Bun HTTP server on a self-hosted VPS — it is **not** a Cloudflare Worker. The only Cloudflare deployment is the marketing site (`site/`). Nosflare is an alternative relay option for organizations that want to run *only* the relay on Cloudflare's edge network (e.g., as a relay-only Cloudflare Worker separate from the main backend). The self-hosted WebSocket relay relay (Docker Compose) is the default and recommended approach.
 
 If deploying Nosflare as a standalone Cloudflare Worker, configure a separate `wrangler.jsonc` for the Nosflare Worker (not `site/wrangler.jsonc`, which is for the marketing site):
 
 ```bash
-# Set the server Nostr secret in the Nosflare Worker
+# Set the server WebSocket secret in the Nosflare Worker
 wrangler secret put SERVER_NOSTR_SECRET
 ```
 
@@ -117,28 +117,28 @@ No separate deployment step — Nosflare is part of the Worker bundle.
 
 ### NIP-42 Authentication
 
-strfry supports NIP-42 (client authentication). When enabled:
+WebSocket relay supports NIP-42 (client authentication). When enabled:
 
 1. Client connects to the relay
 2. Relay sends an `AUTH` challenge
-3. Client signs the challenge with its Nostr identity key
+3. Client signs the challenge with its WebSocket identity key
 4. Relay verifies the signature before allowing publish/subscribe
 
 This prevents anonymous clients from subscribing to hub events or injecting events.
 
 ### Write Policy
 
-Configure strfry's write policy to restrict publishing:
+Configure WebSocket relay's write policy to restrict publishing:
 
 - **Server pubkey**: Allowed to publish server-authoritative events (call:ring, call:answered)
 - **Member pubkeys**: Allowed to publish client events (presence, typing)
 - **All others**: Rejected
 
-The server can optionally maintain an allowlist of member pubkeys and push updates to strfry's write policy.
+The server can optionally maintain an allowlist of member pubkeys and push updates to WebSocket relay's write policy.
 
 ### Rate Limiting
 
-Configure per-connection rate limits in strfry:
+Configure per-connection rate limits in WebSocket relay:
 
 - **Max events per second**: 50 (generous for real-time events)
 - **Max subscriptions per connection**: 10
@@ -147,7 +147,7 @@ Configure per-connection rate limits in strfry:
 
 ### Ephemeral Events
 
-Llamenos uses kind 20001 (ephemeral) for all real-time events. strfry forwards these to active subscribers but **never persists them to disk**. This is a critical privacy feature:
+Llamenos uses kind 20001 (ephemeral) for all real-time events. WebSocket relay forwards these to active subscribers but **never persists them to disk**. This is a critical privacy feature:
 
 - Relay compromise does not reveal historical real-time events
 - LMDB database contains only persistent events (if any) and relay state
@@ -171,7 +171,7 @@ All Llamenos events use a single generic tag: `["t", "llamenos:event"]`. The act
 curl http://localhost:7777
 
 # Or from inside the Docker network
-docker compose exec strfry curl -sf http://localhost:7777
+docker compose exec WebSocket relay curl -sf http://localhost:7777
 ```
 
 A healthy relay returns JSON with relay information (name, supported NIPs, etc.).
@@ -181,23 +181,23 @@ A healthy relay returns JSON with relay information (name, supported NIPs, etc.)
 | Metric | How to Observe | Alert Threshold |
 |--------|---------------|-----------------|
 | Relay reachable | HTTP GET to relay port | Any failure |
-| Active connections | strfry logs (`connection count`) | > 500 (investigate) |
-| Event throughput | strfry logs (`events/sec`) | > 1000/s sustained (unusual) |
-| LMDB size | `du -sh /app/strfry-db/` | > 1GB (investigate persistent events) |
-| Memory usage | `docker stats strfry` | > 256MB (investigate) |
-| CPU usage | `docker stats strfry` | > 50% sustained (investigate) |
+| Active connections | WebSocket relay logs (`connection count`) | > 500 (investigate) |
+| Event throughput | WebSocket relay logs (`events/sec`) | > 1000/s sustained (unusual) |
+| LMDB size | `du -sh /app/WebSocket relay-db/` | > 1GB (investigate persistent events) |
+| Memory usage | `docker stats WebSocket relay` | > 256MB (investigate) |
+| CPU usage | `docker stats WebSocket relay` | > 50% sustained (investigate) |
 
 ### Log Analysis
 
 ```bash
 # View relay logs
-docker compose logs strfry --tail 100
+docker compose logs WebSocket relay --tail 100
 
 # Follow live
-docker compose logs -f strfry
+docker compose logs -f WebSocket relay
 
 # Filter for errors
-docker compose logs strfry | grep -i "error\|warn\|fail"
+docker compose logs WebSocket relay | grep -i "error\|warn\|fail"
 ```
 
 ---
@@ -214,25 +214,25 @@ If persistent events are used (e.g., kind 1 for shift updates), back up the LMDB
 
 ```bash
 # Docker Compose
-docker run --rm -v llamenos_nostr-data:/data -v /opt/llamenos/backups:/backup \
-  alpine tar czf /backup/strfry-$(date +%Y%m%d).tar.gz -C /data .
+docker run --rm -v llamenos_WebSocket-data:/data -v /opt/llamenos/backups:/backup \
+  alpine tar czf /backup/WebSocket relay-$(date +%Y%m%d).tar.gz -C /data .
 
 # Kubernetes
-kubectl exec strfry-0 -- tar czf - /app/strfry-db | gzip > strfry-backup.tar.gz
+kubectl exec WebSocket relay-0 -- tar czf - /app/WebSocket relay-db | gzip > WebSocket relay-backup.tar.gz
 ```
 
 ### Restore
 
 ```bash
 # Stop the relay
-docker compose stop strfry
+docker compose stop WebSocket relay
 
 # Restore LMDB data
-docker run --rm -v llamenos_nostr-data:/data -v /opt/llamenos/backups:/backup \
-  alpine sh -c "rm -rf /data/* && tar xzf /backup/strfry-20260225.tar.gz -C /data"
+docker run --rm -v llamenos_WebSocket-data:/data -v /opt/llamenos/backups:/backup \
+  alpine sh -c "rm -rf /data/* && tar xzf /backup/WebSocket relay-20260225.tar.gz -C /data"
 
 # Restart
-docker compose start strfry
+docker compose start WebSocket relay
 ```
 
 ---
@@ -245,23 +245,23 @@ docker compose start strfry
 
 1. Check if the relay container is running:
    ```bash
-   docker compose ps strfry
+   docker compose ps WebSocket relay
    ```
 
-2. Check the strfry container status:
+2. Check the WebSocket relay container status:
    ```bash
-   docker compose ps strfry
+   docker compose ps WebSocket relay
    ```
 
-3. Check Caddy is proxying `/nostr`:
+3. Check Caddy is proxying `/WebSocket`:
    ```bash
-   curl -sI https://hotline.yourorg.org/nostr
+   curl -sI https://hotline.yourorg.org/WebSocket
    # Should return 426 Upgrade Required (not a proper WS handshake)
    ```
 
 4. Check relay logs for errors:
    ```bash
-   docker compose logs strfry --tail 50
+   docker compose logs WebSocket relay --tail 50
    ```
 
 ### NIP-42 Auth Failures
@@ -276,7 +276,7 @@ docker compose start strfry
 
 **Symptom**: Events take >1 second to reach subscribers.
 
-1. Check relay CPU and memory usage — under load, strfry may queue events
+1. Check relay CPU and memory usage — under load, WebSocket relay may queue events
 2. Check network latency between the app server and relay (should be <10ms if co-located)
 3. For Nosflare, check Cloudflare's edge latency to the client
 
@@ -295,4 +295,4 @@ docker compose restart app
 
 **Symptom**: After rotating `SERVER_NOSTR_SECRET`, clients reject server events.
 
-This is expected — changing the secret changes the server's Nostr identity. Clients will see a new server pubkey after re-authenticating. All active clients must reconnect to accept events from the new server identity.
+This is expected — changing the secret changes the server's WebSocket identity. Clients will see a new server pubkey after re-authenticating. All active clients must reconnect to accept events from the new server identity.

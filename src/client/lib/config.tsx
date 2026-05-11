@@ -95,9 +95,8 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
           setCurrentHubIdState(hubId)
           setActiveHub(hubId)
         }
-        // Support both new and legacy config field names
-        const pubkey = config.serverPubkey ?? config.serverNostrPubkey
-        const relayUrl = config.wsRelayUrl ?? config.nostrRelayUrl
+        const pubkey = config.serverPubkey
+        const relayUrl = config.wsRelayUrl
         if (pubkey) setServerPubkey(pubkey)
         if (relayUrl) setWsRelayUrl(relayUrl)
         // Wire Sentry/GlitchTip DSN for crash reporting (if configured server-side)

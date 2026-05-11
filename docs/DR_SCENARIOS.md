@@ -70,7 +70,7 @@ This document covers five disaster recovery scenarios for Llamenos self-hosted d
 
 ### Notes
 - E2EE notes remain protected. The server never had plaintext note content.
-- The strfry relay database is ephemeral (kind 20001 events) and does not need restoration. It rebuilds as clients reconnect.
+- The WebSocket relay relay database is ephemeral (kind 20001 events) and does not need restoration. It rebuilds as clients reconnect.
 - Caddy will automatically obtain new TLS certificates on first request.
 
 ---
@@ -139,7 +139,7 @@ This document covers five disaster recovery scenarios for Llamenos self-hosted d
 
 **Cause**: Attacker gains access to the server and encrypts all files, demanding payment for the decryption key.
 
-**Data at risk**: Everything on the compromised server. Assume all server-side secrets (database password, HMAC secret, RustFS credentials, Twilio API keys, server Nostr secret) are compromised.
+**Data at risk**: Everything on the compromised server. Assume all server-side secrets (database password, HMAC secret, RustFS credentials, Twilio API keys, server WebSocket secret) are compromised.
 
 **Target RTO**: < 4 hours
 

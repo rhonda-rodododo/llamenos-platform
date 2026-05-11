@@ -75,7 +75,7 @@ Worker API  -->  ConversationDO
     |                | Wraps symmetric key via ECIES for assigned volunteer + admins
     |                | Discards plaintext
     |                v
-    |           Nostr relay (encrypted hub event notifies online clients)
+    |           WebSocket relay (encrypted hub event notifies online clients)
     |
     v
 Client (volunteer's browser/app)
@@ -111,7 +111,7 @@ Tất cả DO được truy cập dưới dạng singleton qua `idFromName()` v�
 | Tệp đính kèm | Có (E2EE) | XChaCha20-Poly1305 (luồng) | Tác giả + tất cả quản trị viên |
 | Nội dung tin nhắn | Có (E2EE) | XChaCha20-Poly1305 + ECIES envelope | Tình nguyện viên được giao + quản trị viên |
 | Bản chuyển đổi | Có (lưu trữ) | XChaCha20-Poly1305 | Người tạo + quản trị viên |
-| Hub events (Nostr) | Có (đối xứng) | XChaCha20-Poly1305 với hub key | Tất cả thành viên hub hiện tại |
+| Hub events (WebSocket) | Có (đối xứng) | XChaCha20-Poly1305 với hub key | Tất cả thành viên hub hiện tại |
 | Volunteer nsec | Có (lưu trữ) | PBKDF2 + XChaCha20-Poly1305 (PIN) | Chỉ tình nguyện viên |
 | Nhật ký kiểm toán | Không (bảo vệ toàn vẹn) | SHA-256 hash chain | Quản trị viên (đọc), hệ thống (ghi) |
 
@@ -126,11 +126,11 @@ Volunteer nsec (BIP-340 Schnorr / secp256k1)
     |
     +-- Derives npub (x-only public key, 32 bytes)
     +-- Used for ECIES key agreement (prepend 02 for compressed form)
-    +-- Signs Nostr events (Schnorr signature)
+    +-- Signs WebSocket events (Schnorr signature)
 
 Hub key (random 32 bytes, NOT derived from any identity)
     |
-    +-- Encrypts real-time Nostr hub events
+    +-- Encrypts real-time WebSocket hub events
     +-- ECIES-wrapped per member via LABEL_HUB_KEY_WRAP
     +-- Rotated on member departure
 
@@ -143,9 +143,9 @@ Per-note key (random 32 bytes)
 
 ## Giao tiếp thời gian thực
 
-Cập nhật thời gian thực qua Nostr relay:
+Cập nhật thời gian thực qua WebSocket relay:
 
-- **Tự lưu trữ**: strfry relay chạy cùng ứng dụng trong Docker/Kubernetes
+- **Tự lưu trữ**: WebSocket relay relay chạy cùng ứng dụng trong Docker/Kubernetes
 - **Cloudflare**: Nosflare (relay dựa trên Cloudflare Workers)
 
 Tất cả sự kiện là tạm thời (kind 20001) và được mã hóa bằng hub key. Relay chỉ thấy blob mã hóa và chữ ký hợp lệ.
@@ -155,13 +155,13 @@ Tất cả sự kiện là tạm thời (kind 20001) và được mã hóa bằn
 ### Lớp vận chuyển
 
 - Tất cả giao tiếp client-server qua HTTPS (TLS 1.3)
-- WebSocket đến Nostr relay qua WSS
+- WebSocket đến WebSocket relay qua WSS
 - Content Security Policy (CSP) hạn chế nguồn script, kết nối
 - Tauri isolation pattern tách biệt IPC khỏi webview
 
 ### Lớp ứng dụng
 
-- Xác thực qua cặp khóa Nostr (chữ ký BIP-340 Schnorr)
+- Xác thực qua cặp khóa WebSocket (chữ ký BIP-340 Schnorr)
 - WebAuthn session token cho tiện lợi đa thiết bị
 - Kiểm soát truy cập dựa trên vai trò
 - 25 hằng số tách biệt miền mật mã trong `crypto-labels.ts`

@@ -1,6 +1,6 @@
 # CI workflow for desktop Playwright E2E tests.
 # Runs Playwright tests against a Vite build with mocked Tauri IPC.
-# Backend services (PostgreSQL, MinIO, strfry) via Docker Compose — globalSetup
+# Backend services (PostgreSQL, RustFS, WebSocket relay) via Docker Compose — globalSetup
 # requires a running backend for state reset and admin bootstrap.
 #
 # Trigger: PRs touching apps/desktop/, src/client/, tests/, or packages/, manual dispatch.
@@ -143,8 +143,6 @@ jobs:
             "BRIDGE_SECRET=ci-test-bridge-secret" \
             "ARI_PASSWORD=ci-test-ari-password" \
             "SERVER_SECRET=0000000000000000000000000000000000000000000000000000000000000001" \
-            "SERVER_NOSTR_SECRET=0000000000000000000000000000000000000000000000000000000000000001" \
-            "STRFRY_ALLOWED_PUBKEY=c0fe6f73ada93d83b89d4fe8a2c20818154a57390fc90088e20653064036f0c5" \
             "NOTIFIER_API_KEY=ci-test-notifier-key" \
             "SIGNAL_REGISTERED_NUMBER=+15550000000" \
             "PBX_TYPE=asterisk" \

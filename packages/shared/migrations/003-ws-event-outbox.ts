@@ -8,7 +8,7 @@
  *
  * This file documents the schema for reference and changelog purposes.
  *
- * Table: nostr_event_outbox
+ * Table: ws_event_outbox
  * Purpose: Persistent outbox for Nostr relay event delivery with retry.
  *
  * Schema:

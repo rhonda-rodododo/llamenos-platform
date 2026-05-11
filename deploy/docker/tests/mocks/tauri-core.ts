@@ -114,7 +114,7 @@ const commands: Record<string, (a: Args) => unknown> = {
   encrypt_draft_from_state: (a) => btoa(a.plaintext as string),
   decrypt_draft_from_state: (a) => atob(a.packed as string),
   encrypt_export_from_state: (a) => btoa(a.jsonString as string),
-  sign_nostr_event_from_state: (a) => {
+  sign_event_from_state: (a) => {
     const sk = requireUnlocked(); const pk = publicKeyHex!
     const ser = JSON.stringify([0, pk, a.createdAt, a.kind, a.tags, a.content])
     const id = bytesToHex(sha256(utf8ToBytes(ser)))

@@ -26,8 +26,8 @@ interface SignalIntegrationState {
   messageTimestamp?: string
   registrationState?: string
   auditLogCount?: number
-  nostrEventType?: string
-  nostrEventPayload?: Record<string, unknown>
+  wsEventType?: string
+  wsEventPayload?: Record<string, unknown>
   webhookStatus?: number
   conversationCountBefore?: number
 }
@@ -211,8 +211,8 @@ When(
     )
     signalState.webhookStatus = status
     if (data) {
-      signalState.nostrEventType = data.eventType
-      signalState.nostrEventPayload = data.payload
+      signalState.wsEventType = data.eventType
+      signalState.wsEventPayload = data.payload
     }
   },
 )
@@ -232,8 +232,8 @@ When(
     )
     signalState.webhookStatus = status
     if (data) {
-      signalState.nostrEventType = data.eventType
-      signalState.nostrEventPayload = data.payload
+      signalState.wsEventType = data.eventType
+      signalState.wsEventPayload = data.payload
     }
   },
 )
@@ -380,7 +380,7 @@ Then('a MESSAGE_REACTION Nostr event should be published', async ({ world }) => 
   // The simulation endpoint returns the event type if it was published,
   // or the webhook returned a success status indicating the event was dispatched.
   expect(
-    signalState.nostrEventType === 'MESSAGE_REACTION' ||
+    signalState.wsEventType === 'MESSAGE_REACTION' ||
     signalState.webhookStatus === undefined ||
     (signalState.webhookStatus >= 200 && signalState.webhookStatus < 300),
   ).toBe(true)
@@ -389,8 +389,8 @@ Then('a MESSAGE_REACTION Nostr event should be published', async ({ world }) => 
 Then('the event should contain the emoji {string}', async ({ world }, emoji: string) => {
   const signalState = getSignalState(world)
   // If the simulation returned a payload, verify it contains the emoji
-  if (signalState.nostrEventPayload) {
-    expect(JSON.stringify(signalState.nostrEventPayload)).toContain(emoji)
+  if (signalState.wsEventPayload) {
+    expect(JSON.stringify(signalState.wsEventPayload)).toContain(emoji)
   }
   // If not returned, the test passes — the webhook was accepted (200 OK)
 })
@@ -398,7 +398,7 @@ Then('the event should contain the emoji {string}', async ({ world }, emoji: str
 Then('a TYPING_INDICATOR Nostr event should be published', async ({ world }) => {
   const signalState = getSignalState(world)
   expect(
-    signalState.nostrEventType === 'TYPING_INDICATOR' ||
+    signalState.wsEventType === 'TYPING_INDICATOR' ||
     signalState.webhookStatus === undefined ||
     (signalState.webhookStatus >= 200 && signalState.webhookStatus < 300),
   ).toBe(true)
@@ -406,10 +406,10 @@ Then('a TYPING_INDICATOR Nostr event should be published', async ({ world }) => 
 
 Then('the event should indicate typing is active', async ({ world }) => {
   const signalState = getSignalState(world)
-  if (signalState.nostrEventPayload) {
+  if (signalState.wsEventPayload) {
     expect(
-      signalState.nostrEventPayload['action'] === 'STARTED' ||
-      JSON.stringify(signalState.nostrEventPayload).includes('STARTED'),
+      signalState.wsEventPayload['action'] === 'STARTED' ||
+      JSON.stringify(signalState.wsEventPayload).includes('STARTED'),
     ).toBe(true)
   }
 })

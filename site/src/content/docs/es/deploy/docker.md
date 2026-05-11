@@ -21,7 +21,7 @@ cd llamenos
 
 ## 2. Generar el par de claves admin
 
-Necesitas un par de claves Nostr para la cuenta admin. Ejecuta esto en tu maquina local (o en el servidor si Bun esta instalado):
+Necesitas un par de claves WebSocket para la cuenta admin. Ejecuta esto en tu maquina local (o en el servidor si Bun esta instalado):
 
 ```bash
 bun install

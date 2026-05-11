@@ -110,7 +110,7 @@ The base compose (`deploy/docker/docker-compose.yml`) runs:
 | **postgres** | PostgreSQL 17-alpine (SHA256-pinned) | internal | Health checks, internal-only |
 | **caddy** | Caddy 2.9-alpine | web | TLS termination, security headers |
 | **rustfs** | S3-compatible storage | internal | Console API on 9001 (disable in prod) |
-| **strfry** | Nostr relay 1.0.1 | internal + web | WebSocket relay |
+| **WebSocket relay** | WebSocket relay 1.0.1 | internal + web | WebSocket relay |
 
 Optional profiles: `--profile signal`, `--profile telephony`, `--profile monitoring`, `--profile transcription`.
 
@@ -125,7 +125,7 @@ The production overlay (`deploy/docker/docker-compose.production.yml`) adds:
 ┌─────────────┐
 │ Public (web) │ ← Caddy (443) ← Internet
 ├─────────────┤
-│ Internal     │ ← app ↔ postgres ↔ rustfs ↔ strfry
+│ Internal     │ ← app ↔ postgres ↔ rustfs ↔ WebSocket relay
 │ (172.17.0.0) │   (no external access)
 └─────────────┘
 ```
@@ -140,7 +140,7 @@ openssl rand -hex 32  # HMAC_SECRET (64 hex chars)
 
 # Required in .env:
 # PG_PASSWORD, ADMIN_PUBKEY, SERVER_NOSTR_SECRET, HMAC_SECRET
-# MINIO_ACCESS_KEY, MINIO_SECRET_KEY, ARI_PASSWORD, BRIDGE_SECRET
+# STORAGE_ACCESS_KEY, STORAGE_SECRET_KEY, ARI_PASSWORD, BRIDGE_SECRET
 
 chmod 600 .env
 chown root:root .env
@@ -161,7 +161,7 @@ docker compose exec -T postgres pg_dump -U llamenos llamenos \
 find "$BACKUP_DIR" -name "*.age" -mtime +30 -delete
 ```
 
-Additional backup roles: `backup-postgres/`, `backup-rustfs/`, `backup-strfry/`, `backup-config/`, `backup-monitor/`.
+Additional backup roles: `backup-postgres/`, `backup-rustfs/`, `backup-WebSocket relay/`, `backup-config/`, `backup-monitor/`.
 
 ### Monitoring
 
@@ -209,7 +209,7 @@ RustFS pod:
   Egress: none
 
 Strfry pod:
-  Ingress: from app pod (7777/tcp) + ingress controller (/nostr)
+  Ingress: from app pod (7777/tcp) + ingress controller (/WebSocket)
   Egress: none
 ```
 
@@ -285,7 +285,7 @@ Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
 X-Content-Type-Options: nosniff
 X-Frame-Options: DENY
 Referrer-Policy: strict-origin-when-cross-origin
-Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://{domain}/nostr
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss://{domain}/WebSocket
 Permissions-Policy: camera=(), microphone=(self), geolocation=(), payment=(), usb=()
 Server: (removed)
 ```
@@ -306,13 +306,13 @@ The `crypto.{domain}` origin enforces `connect-src 'none'` — the crypto iframe
 
 ---
 
-## Nostr Relay Operations (strfry)
+## WebSocket Relay Operations (WebSocket relay)
 
-The Nostr relay handles all real-time event delivery (call notifications, presence, typing indicators).
+The WebSocket relay handles all real-time event delivery (call notifications, presence, typing indicators).
 
 ### Configuration
 
-Production config at `deploy/docker/strfry-prod.conf`:
+Production config at `deploy/docker/WebSocket relay-prod.conf`:
 - Max event size: 64KB
 - Reject events older than 300 seconds (5 minutes) or newer than 30 seconds
 - Ephemeral event TTL: 300 seconds (5 minutes)
@@ -322,7 +322,7 @@ Production config at `deploy/docker/strfry-prod.conf`:
 
 ### Write-Policy Plugin
 
-`deploy/docker/write-policy.sh` runs as a strfry write-policy subprocess:
+`deploy/docker/write-policy.sh` runs as a WebSocket relay write-policy subprocess:
 
 ```bash
 writePolicy {
@@ -331,11 +331,11 @@ writePolicy {
 ```
 
 The plugin enforces:
-- **Server pubkey whitelist**: Only the server's derived Nostr pubkey (`ALLOWED_PUBKEY` env var) may publish events
+- **Server pubkey whitelist**: Only the server's derived WebSocket pubkey (`ALLOWED_PUBKEY` env var) may publish events
 - **NIP-42 passthrough**: Auth events (kind 22242) are always accepted from any pubkey — required for client authentication
 - **All other publishers rejected**: Returns `"action": "reject"` with reason `"unauthorized publisher"`
 
-Set `ALLOWED_PUBKEY` to the server's Nostr pubkey (derived from `SERVER_NOSTR_SECRET` via HKDF at startup). The docker-compose.yml mounts the plugin read-only:
+Set `ALLOWED_PUBKEY` to the server's WebSocket pubkey (derived from `SERVER_NOSTR_SECRET` via HKDF at startup). The docker-compose.yml mounts the plugin read-only:
 
 ```yaml
 volumes:
@@ -377,7 +377,7 @@ The sidecar connects to the same PostgreSQL instance as the main app. Ensure `SI
 
 ### Internal TLS
 
-The `internal-tls` Ansible role generates a self-signed CA and per-host certificates for cross-host service communication (PostgreSQL, RustFS, strfry). Certificates include DNS SAN + IP SAN, valid for 1 year.
+The `internal-tls` Ansible role generates a self-signed CA and per-host certificates for cross-host service communication (PostgreSQL, RustFS, WebSocket relay). Certificates include DNS SAN + IP SAN, valid for 1 year.
 
 ---
 
@@ -385,7 +385,7 @@ The `internal-tls` Ansible role generates a self-signed CA and per-host certific
 
 1. **Admin device keys**: Generated via `bun run bootstrap-admin` on a trusted device. Store securely (HSM or hardened device). Admin has separate Ed25519 signing and X25519 encryption keys.
 
-2. **Server Nostr secret**: `openssl rand -hex 32`. Set as `SERVER_NOSTR_SECRET`. Must be exactly 64 hex chars. Server derives its Nostr keypair via HKDF.
+2. **Server WebSocket secret**: `openssl rand -hex 32`. Set as `SERVER_NOSTR_SECRET`. Must be exactly 64 hex chars. Server derives its WebSocket keypair via HKDF.
 
 3. **Hub key**: Random 32 bytes, generated by admin client during hub setup. HPKE-wrapped per member (label: `LABEL_HUB_KEY_WRAP`). Rotation handled via admin UI — see [Key Revocation Runbook, Section 4](KEY_REVOCATION_RUNBOOK.md#4-hub-key-rotation-ceremony).
 
@@ -453,7 +453,7 @@ Trust anchor is the **GitHub Release** (not the running application). CI generat
 
 | Date | Version | Changes |
 |------|---------|---------|
-| 2026-05-03 | 2.1 | Post-hardening: strfry write-policy plugin configuration + ALLOWED_PUBKEY setup; corrected event age limits (300s, not 24h); Signal-first delivery and SMS notification-only mode config; updated hub event encryption cipher (XChaCha20-Poly1305 + epoch rotation) |
+| 2026-05-03 | 2.1 | Post-hardening: WebSocket relay write-policy plugin configuration + ALLOWED_PUBKEY setup; corrected event age limits (300s, not 24h); Signal-first delivery and SMS notification-only mode config; updated hub event encryption cipher (XChaCha20-Poly1305 + epoch rotation) |
 | 2026-05-02 | 2.0 | Complete rewrite: removed Cloudflare Workers section (backend is Bun+PostgreSQL, not CF Workers), updated to match actual deploy/ configs (Ansible roles, Docker Compose overlays, Helm templates, Caddyfile.production), HPKE replaces ECIES, device keys replace nsec, added sigchain/PUK references, added split-origin production Caddyfile, added internal TLS, added security scanning role |
-| 2026-02-25 | 1.2 | Added Caddy section, Nostr relay operations, reproducible builds |
+| 2026-02-25 | 1.2 | Added Caddy section, WebSocket relay operations, reproducible builds |
 | 2026-02-23 | 1.0 | Initial deployment hardening guide |

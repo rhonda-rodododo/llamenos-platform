@@ -93,7 +93,7 @@
 
 1. **Application tier:** Stateless Bun HTTP server — add instances behind a load balancer.
    - WebSocket connections require sticky sessions or a shared pub/sub layer (Redis, NATS).
-   - Nostr relay handles real-time event distribution, reducing direct WS fanout needs.
+   - WebSocket relay handles real-time event distribution, reducing direct WS fanout needs.
 2. **Database tier:** Read replicas for volunteer list, shift schedule, audit log reads.
    - Write operations (notes, audit entries) stay on primary.
 3. **Telephony:** Twilio handles scaling on their side. Monitor concurrent call limits in your Twilio account.
