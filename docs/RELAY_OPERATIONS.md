@@ -64,15 +64,15 @@ For Cloudflare Workers deployments, Nosflare runs as a Durable Object with a ser
 
 ### Docker Compose
 
-The WebSocket relay (WebSocket relay) is a core service that starts automatically with `docker compose up -d`. The `SERVER_NOSTR_SECRET` env var is required in `.env` (see [Quickstart](QUICKSTART.md)).
+The WebSocket relay (WebSocket relay) is a core service that starts automatically with `docker compose up -d`. The `SERVER_SECRET` env var is required in `.env` (see [Quickstart](QUICKSTART.md)).
 
 The relay runs on port 7777 internally. Caddy proxies `/WebSocket` to the relay via WebSocket.
 
 **Environment variables**:
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `SERVER_NOSTR_SECRET` | Yes | — | 64-char hex; server derives its WebSocket keypair from this |
-| `NOSTR_RELAY_URL` | No | `ws://WebSocket relay:7777` | Internal relay URL (Docker network) |
+| `SERVER_SECRET` | Yes | — | 64-char hex; server derives its WebSocket keypair from this |
+| `RELAY_URL` | No | `ws://WebSocket relay:7777` | Internal relay URL (Docker network) |
 
 ### Kubernetes (StatefulSet)
 
@@ -106,7 +106,7 @@ If deploying Nosflare as a standalone Cloudflare Worker, configure a separate `w
 
 ```bash
 # Set the server WebSocket secret in the Nosflare Worker
-wrangler secret put SERVER_NOSTR_SECRET
+wrangler secret put SERVER_SECRET
 ```
 
 No separate deployment step — Nosflare is part of the Worker bundle.
@@ -270,7 +270,7 @@ docker compose start WebSocket relay
 
 1. Verify the client is sending a valid NIP-42 auth event
 2. Check if the client's pubkey is in the relay's allowlist
-3. Verify the server pubkey matches what clients expect (derived from `SERVER_NOSTR_SECRET`)
+3. Verify the server pubkey matches what clients expect (derived from `SERVER_SECRET`)
 
 ### Event Delivery Delays
 
@@ -280,19 +280,19 @@ docker compose start WebSocket relay
 2. Check network latency between the app server and relay (should be <10ms if co-located)
 3. For Nosflare, check Cloudflare's edge latency to the client
 
-### SERVER_NOSTR_SECRET Missing
+### SERVER_SECRET Missing
 
-**Symptom**: App fails to start with "SERVER_NOSTR_SECRET is required" or events are not signed.
+**Symptom**: App fails to start with "SERVER_SECRET is required" or events are not signed.
 
 ```bash
 # Generate and set the secret
-SERVER_NOSTR_SECRET=$(openssl rand -hex 32)
-echo "SERVER_NOSTR_SECRET=$SERVER_NOSTR_SECRET" >> .env
+SERVER_SECRET=$(openssl rand -hex 32)
+echo "SERVER_SECRET=$SERVER_SECRET" >> .env
 docker compose restart app
 ```
 
 ### Server Identity Changed
 
-**Symptom**: After rotating `SERVER_NOSTR_SECRET`, clients reject server events.
+**Symptom**: After rotating `SERVER_SECRET`, clients reject server events.
 
 This is expected — changing the secret changes the server's WebSocket identity. Clients will see a new server pubkey after re-authenticating. All active clients must reconnect to accept events from the new server identity.

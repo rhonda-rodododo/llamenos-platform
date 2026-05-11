@@ -356,7 +356,7 @@ Rotate credentials on a quarterly schedule. Each rotation procedure is detailed 
 | HMAC secret | Generate new hex, update `.env`, restart app. **Warning**: invalidates all ban list hashes |
 | Asterisk secrets | Update `.env`, update ARI config, restart asterisk + bridge + app |
 
-Annually: `SERVER_NOSTR_SECRET` (only if compromised or deliberately changing server identity).
+Annually: `SERVER_SECRET` (only if compromised or deliberately changing server identity).
 
 ### 5.2 Full Restore Test
 
@@ -458,14 +458,14 @@ Call notifications, presence, typing indicators missing
 |   +-- Connection refused => Caddy not proxying. Check Caddyfile and caddy logs.
 |   +-- 502 => Caddy can't reach WebSocket relay. Check Docker network.
 |
-+-- Is SERVER_NOSTR_SECRET set?
-|   => grep SERVER_NOSTR_SECRET .env
++-- Is SERVER_SECRET set?
+|   => grep SERVER_SECRET .env
 |   |
 |   +-- Missing => Generate: openssl rand -hex 32, add to .env, restart app
 |
 +-- NIP-42 auth failures in browser console?
     => Client pubkey may not be allowed. Check relay logs.
-    => If SERVER_NOSTR_SECRET was rotated, clients must reconnect.
+    => If SERVER_SECRET was rotated, clients must reconnect.
 ```
 
 ### 6.4 TLS Certificate Issues
@@ -837,7 +837,7 @@ du -sh /opt/llamenos/backups/
 cat /var/run/reboot-required 2>/dev/null || echo "No reboot required"
 
 # Secret generation
-openssl rand -hex 32        # For HMAC_SECRET, SERVER_NOSTR_SECRET
+openssl rand -hex 32        # For HMAC_SECRET, SERVER_SECRET
 openssl rand -base64 24     # For passwords (PG_PASSWORD, RustFS, etc.)
 ```
 

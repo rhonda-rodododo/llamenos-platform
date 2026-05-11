@@ -199,9 +199,9 @@ This document covers five disaster recovery scenarios for Llamenos self-hosted d
 
 ## Scenario 4: Key Compromise
 
-**Cause**: The admin's private key (nsec) is compromised through device theft, malware, social engineering, or insider threat. Alternatively, the `SERVER_NOSTR_SECRET` is exposed.
+**Cause**: The admin's private key (nsec) is compromised through device theft, malware, social engineering, or insider threat. Alternatively, the `SERVER_SECRET` is exposed.
 
-**Data at risk**: Admin-wrapped note envelopes (the attacker can decrypt notes wrapped for the compromised admin key). Active session tokens. Server identity if `SERVER_NOSTR_SECRET` is compromised.
+**Data at risk**: Admin-wrapped note envelopes (the attacker can decrypt notes wrapped for the compromised admin key). Active session tokens. Server identity if `SERVER_SECRET` is compromised.
 
 **Target RTO**: < 2 hours
 
@@ -224,10 +224,10 @@ This document covers five disaster recovery scenarios for Llamenos self-hosted d
    sed -i "s|^ADMIN_PUBKEY=.*|ADMIN_PUBKEY=<new_pubkey>|" .env
    ```
 
-4. **Rotate `SERVER_NOSTR_SECRET`** (always rotate this during a key compromise).
+4. **Rotate `SERVER_SECRET`** (always rotate this during a key compromise).
    ```bash
    NEW_NOSTR_SECRET=$(openssl rand -hex 32)
-   sed -i "s|^SERVER_NOSTR_SECRET=.*|SERVER_NOSTR_SECRET=${NEW_NOSTR_SECRET}|" .env
+   sed -i "s|^SERVER_SECRET=.*|SERVER_SECRET=${NEW_NOSTR_SECRET}|" .env
    ```
 
 5. **Rotate HMAC secret** to invalidate all active sessions.

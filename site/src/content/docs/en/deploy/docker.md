@@ -52,7 +52,7 @@ cp .env.example .env
 Edit `.env` and fill in the required secrets:
 
 ```bash
-# Hex secrets (HMAC_SECRET, SERVER_NOSTR_SECRET):
+# Hex secrets (HMAC_SECRET, SERVER_SECRET):
 openssl rand -hex 32
 
 # Passwords (PG_PASSWORD, STORAGE_ACCESS_KEY, STORAGE_SECRET_KEY):

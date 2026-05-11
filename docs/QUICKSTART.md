@@ -329,8 +329,8 @@ echo "STORAGE_ACCESS_KEY: $STORAGE_ACCESS_KEY"
 echo "STORAGE_SECRET_KEY: $STORAGE_SECRET_KEY"
 
 # Generate server WebSocket secret (for relay event signing)
-SERVER_NOSTR_SECRET=$(openssl rand -hex 32)
-echo "SERVER_NOSTR_SECRET: $SERVER_NOSTR_SECRET"
+SERVER_SECRET=$(openssl rand -hex 32)
+echo "SERVER_SECRET: $SERVER_SECRET"
 ```
 
 **SECURITY WARNING**: Record these secrets in a password manager immediately. They cannot be recovered if lost. You will need the database password for backup recovery operations.
@@ -353,7 +353,7 @@ PG_PASSWORD=<generated above>
 HMAC_SECRET=<generated above>
 STORAGE_ACCESS_KEY=<generated above>
 STORAGE_SECRET_KEY=<generated above>
-SERVER_NOSTR_SECRET=<generated above>
+SERVER_SECRET=<generated above>
 
 # Application
 HOTLINE_NAME=Hotline
@@ -552,7 +552,7 @@ Run through this checklist to verify your deployment:
 
 - [ ] Relay container is running: `docker compose ps WebSocket relay`
 - [ ] `/WebSocket` WebSocket endpoint responds: `curl -sI https://hotline.yourorg.org/WebSocket` returns 426 Upgrade Required
-- [ ] `SERVER_NOSTR_SECRET` is set in `.env`
+- [ ] `SERVER_SECRET` is set in `.env`
 - [ ] Real-time events work: open two browser tabs, verify presence updates appear
 
 ### Telephony (if configured)

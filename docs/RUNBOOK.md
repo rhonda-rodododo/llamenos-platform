@@ -133,16 +133,16 @@ Alternatively, rotate credentials through the admin UI at Settings > Telephony P
 
 **Frequency**: Only when compromised, or when deliberately changing the server's WebSocket identity.
 
-**WARNING**: Rotating `SERVER_NOSTR_SECRET` changes the server's WebSocket keypair. All clients will see a new server pubkey after re-authenticating. Active relay subscriptions will need to be re-established.
+**WARNING**: Rotating `SERVER_SECRET` changes the server's WebSocket keypair. All clients will see a new server pubkey after re-authenticating. Active relay subscriptions will need to be re-established.
 
 ```bash
 cd /opt/llamenos/deploy/docker
 
 # 1. Generate new secret (must be exactly 64 hex characters)
-NEW_NOSTR_SECRET=$(openssl rand -hex 32)
+NEW_SERVER_SECRET=$(openssl rand -hex 32)
 
 # 2. Update .env
-sed -i "s|^SERVER_NOSTR_SECRET=.*|SERVER_NOSTR_SECRET=${NEW_NOSTR_SECRET}|" .env
+sed -i "s|^SERVER_SECRET=.*|SERVER_SECRET=${NEW_SERVER_SECRET}|" .env
 
 # 3. Restart the application (relay does not need restart)
 docker compose restart app
@@ -762,7 +762,7 @@ curl -sI https://hotline.yourorg.org/WebSocket
 |---------|-------|----------|
 | Relay container not running | Container stopped or failed | `docker compose up -d WebSocket relay` |
 | 502 on `/WebSocket` | Caddy can't reach WebSocket relay | Check `docker compose logs caddy` for upstream errors |
-| Auth failures in browser console | `SERVER_NOSTR_SECRET` missing or changed | Verify `.env` has `SERVER_NOSTR_SECRET`; restart app if changed |
+| Auth failures in browser console | `SERVER_SECRET` missing or changed | Verify `.env` has `SERVER_SECRET`; restart app if changed |
 | Events not delivered | NIP-42 auth failing | Check relay logs; verify client pubkey is allowed |
 | Cloudflare 524 timeout | CF drops idle WebSocket after 100s | Enable WebSocket in Cloudflare dashboard; app sends periodic pings |
 
