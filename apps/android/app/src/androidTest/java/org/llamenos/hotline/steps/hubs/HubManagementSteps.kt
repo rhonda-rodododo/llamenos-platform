@@ -30,8 +30,10 @@ class HubManagementSteps : BaseSteps() {
         // NOT via Settings. settings-hub-card is just a display card with no click handler.
         navigateViaDashboardCard("hubs-card")
 
-        // Wait for the hubs screen to load
-        composeRule.waitUntil(10_000) {
+        // Wait for the hubs screen to load. The TopAppBar title ("hubs-title") is
+        // always rendered regardless of data loading state. Allow extra time on CI
+        // where navigation transitions take longer with software rendering.
+        composeRule.waitUntil(20_000) {
             composeRule.onAllNodesWithTag("hubs-title").fetchSemanticsNodes().isNotEmpty() ||
                 composeRule.onAllNodesWithTag("hubs-list").fetchSemanticsNodes().isNotEmpty() ||
                 composeRule.onAllNodesWithTag("hubs-loading").fetchSemanticsNodes().isNotEmpty() ||

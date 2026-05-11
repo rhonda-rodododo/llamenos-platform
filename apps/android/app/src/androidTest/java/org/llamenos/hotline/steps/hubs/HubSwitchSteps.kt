@@ -37,27 +37,30 @@ class HubSwitchSteps : BaseSteps() {
     fun launchWithTwoHubs() {
         // ScenarioHooks @Before(order = 1) already created the first hub.
         // Create a second hub so the list has two entries.
-        SimulationClient.createTestHub("android-test-hub-2-${System.currentTimeMillis()}")
+        val hub2 = SimulationClient.createTestHub("android-test-hub-2-${System.currentTimeMillis()}")
+        check(hub2.id.isNotEmpty()) {
+            "Failed to create second test hub: ${hub2.error}"
+        }
+        Log.d("HubSwitchSteps", "Created second hub: ${hub2.id}")
+
         // Launch the app (creates identity and navigates to dashboard).
         navigateToMainScreen()
 
         // Promote the test user to super-admin so GET /api/hubs returns ALL hubs
         // (non-super-admin users only see hubs they are members of, and
         // test-create-hub doesn't add members).
-        try {
-            val entryPoint = EntryPointAccessors.fromApplication(
-                LlamenosApp.instance,
-                CryptoEntryPoint::class.java,
-            )
-            val signingPubkey = entryPoint.cryptoService().signingPubkeyHex
-            if (signingPubkey != null) {
-                val result = SimulationClient.promoteToAdmin(signingPubkey)
-                Log.d("HubSwitchSteps", "Promoted to admin: ok=${result.ok}, error=${result.error}")
-            } else {
-                Log.w("HubSwitchSteps", "No signing pubkey available for admin promotion")
-            }
-        } catch (e: Throwable) {
-            Log.w("HubSwitchSteps", "Admin promotion failed: ${e.message}")
+        val entryPoint = EntryPointAccessors.fromApplication(
+            LlamenosApp.instance,
+            CryptoEntryPoint::class.java,
+        )
+        val signingPubkey = entryPoint.cryptoService().signingPubkeyHex
+        check(signingPubkey != null) {
+            "No signing pubkey available — identity creation may have failed"
+        }
+        val result = SimulationClient.promoteToAdmin(signingPubkey)
+        Log.d("HubSwitchSteps", "Promoted to admin: ok=${result.ok}, error=${result.error}")
+        check(result.ok || result.error == null) {
+            "Admin promotion failed: ${result.error}"
         }
     }
 
@@ -66,9 +69,11 @@ class HubSwitchSteps : BaseSteps() {
         // Hub list is accessed via the "hubs-card" quick action on the Dashboard
         navigateViaDashboardCard("hubs-card")
 
-        // Wait for the hub list screen to load
-        composeRule.waitUntil(10_000) {
-            composeRule.onAllNodesWithTag("hubs-list").fetchSemanticsNodes().isNotEmpty() ||
+        // Wait for the hub list screen to load. Include "hubs-title" (TopAppBar)
+        // as it's always rendered immediately after navigation completes.
+        composeRule.waitUntil(20_000) {
+            composeRule.onAllNodesWithTag("hubs-title").fetchSemanticsNodes().isNotEmpty() ||
+                composeRule.onAllNodesWithTag("hubs-list").fetchSemanticsNodes().isNotEmpty() ||
                 composeRule.onAllNodesWithTag("hubs-loading").fetchSemanticsNodes().isNotEmpty() ||
                 composeRule.onAllNodesWithTag("hubs-empty").fetchSemanticsNodes().isNotEmpty() ||
                 composeRule.onAllNodesWithTag("hubs-error").fetchSemanticsNodes().isNotEmpty()
