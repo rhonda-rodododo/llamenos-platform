@@ -32,10 +32,10 @@ Sere `nsec` la nan yon kote ki an sekirite -- sa se idantifyan koneksyon adminis
 
 ## 3. Konfigire sekrè yo
 
-Kreye yon fichye `.dev.vars` nan rasin pwojè a pou devlopman lokal. Egzanp sa a itilize Twilio -- si w ap itilize yon lòt founisè, ou ka sote varyab Twilio yo epi konfigire founisè ou a atravè admin UI a apre premye koneksyon.
+Kreye yon fichye `.env` nan rasin pwojè a pou devlopman lokal. Egzanp sa a itilize Twilio -- si w ap itilize yon lòt founisè, ou ka sote varyab Twilio yo epi konfigire founisè ou a atravè admin UI a apre premye koneksyon.
 
 ```bash
-# .dev.vars
+# .env
 TWILIO_ACCOUNT_SID=your_twilio_account_sid
 TWILIO_AUTH_TOKEN=your_twilio_auth_token
 TWILIO_PHONE_NUMBER=+1234567890

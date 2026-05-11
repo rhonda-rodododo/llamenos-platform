@@ -32,10 +32,10 @@ bun run bootstrap-admin
 
 ## 3. 配置密钥
 
-在项目根目录创建一个 `.dev.vars` 文件用于本地开发。此示例使用 Twilio — 如果您使用其他提供商，可以跳过 Twilio 相关变量，首次登录后通过管理界面配置您的提供商。
+在项目根目录创建一个 `.env` 文件用于本地开发。此示例使用 Twilio — 如果您使用其他提供商，可以跳过 Twilio 相关变量，首次登录后通过管理界面配置您的提供商。
 
 ```bash
-# .dev.vars
+# .env
 TWILIO_ACCOUNT_SID=your_twilio_account_sid
 TWILIO_AUTH_TOKEN=your_twilio_auth_token
 TWILIO_PHONE_NUMBER=+1234567890

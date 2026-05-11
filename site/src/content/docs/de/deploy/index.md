@@ -32,10 +32,10 @@ Bewahren Sie den `nsec` sicher auf -- das ist Ihr Admin-Anmeldedaten. Sie benoet
 
 ## 3. Secrets konfigurieren
 
-Erstellen Sie eine `.dev.vars`-Datei im Projektstammverzeichnis fuer die lokale Entwicklung. Dieses Beispiel verwendet Twilio -- wenn Sie einen anderen Anbieter nutzen, koennen Sie die Twilio-Variablen ueberspringen und Ihren Anbieter ueber die Admin-Oberflaeche nach der ersten Anmeldung konfigurieren.
+Erstellen Sie eine `.env`-Datei im Projektstammverzeichnis fuer die lokale Entwicklung. Dieses Beispiel verwendet Twilio -- wenn Sie einen anderen Anbieter nutzen, koennen Sie die Twilio-Variablen ueberspringen und Ihren Anbieter ueber die Admin-Oberflaeche nach der ersten Anmeldung konfigurieren.
 
 ```bash
-# .dev.vars
+# .env
 TWILIO_ACCOUNT_SID=your_twilio_account_sid
 TWILIO_AUTH_TOKEN=your_twilio_auth_token
 TWILIO_PHONE_NUMBER=+1234567890

@@ -36,10 +36,10 @@ Guarda el `nsec` de forma segura: es tu credencial de inicio de sesion como admi
 
 ## 3. Configurar secretos
 
-Crea un archivo `.dev.vars` en la raiz del proyecto para desarrollo local. Como minimo necesitas la clave publica del administrador. Las credenciales de Twilio son opcionales si planeas configurar los canales a traves del asistente de configuracion.
+Crea un archivo `.env` en la raiz del proyecto para desarrollo local. Como minimo necesitas la clave publica del administrador. Las credenciales de Twilio son opcionales si planeas configurar los canales a traves del asistente de configuracion.
 
 ```bash
-# .dev.vars
+# .env
 ADMIN_PUBKEY=tu_clave_publica_hex_del_paso_2
 ENVIRONMENT=development
 
