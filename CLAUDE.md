@@ -202,6 +202,19 @@ mise run --list       # Discover all available mise tasks (discovery helpers for
 
 After `mise install`, install Ruby gems for Fastlane: `cd apps/ios && bundle install`
 
+### Workspace Bootstrap
+
+```bash
+mise run setup              # First-time full setup (installs tools, deps, builds crypto, runs codegen)
+mise run setup --quick      # Skip mobile builds (desktop/backend only)
+bun run workspace-setup     # Manual incremental sync (runs automatically on bun install)
+bun run workspace-setup --force  # Full rebuild without timestamp checks
+bun run workspace-setup --ios    # Include iOS crypto build
+bun run workspace-setup --android  # Include Android crypto build
+```
+
+Mobile builds are skipped by default for speed. Pass `--ios` or `--android` explicitly, or use branch names like `feat/ios-*` / `feat/android-*` / `feat/mobile-*` to auto-enable them.
+
 ### Local Backend Setup (REQUIRED for backend development and testing)
 
 **Always use dev compose (backing services) + `bun run dev:server` (app with file watching):**

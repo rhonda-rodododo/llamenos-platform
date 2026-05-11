@@ -92,6 +92,9 @@
     "load:mixed": "tests/load/run.sh mixed",
     "load:burst": "tests/load/run.sh burst",
     "load:all": "tests/load/run.sh all",
+    "postinstall": "bash scripts/worktree-setup.sh",
+    "worktree-setup": "bash scripts/worktree-setup.sh",
+    "setup": "bash scripts/setup.sh",
     "lint": "eslint src/ apps/worker/",
     "supervisors": "scripts/supervisors.sh",
     "supervisors:kill": "scripts/supervisors.sh --kill"
