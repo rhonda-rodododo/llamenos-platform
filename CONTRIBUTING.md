@@ -225,7 +225,7 @@ Version bumps are managed by `knope` automatically — never manually edit `pack
 
 ## Security Rules
 
-- **Never commit secrets** — `.dev.vars`, `.env`, and all `.env.*` files are gitignored.
+- **Never commit secrets** — `.env` and all `.env.*` files are gitignored.
   A pre-commit hook blocks staging them. Even placeholder values look like secrets in git
   history, which is permanent.
 - **No raw string literals for crypto contexts** — always use constants from

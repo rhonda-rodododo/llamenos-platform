@@ -32,10 +32,10 @@ Guarde o `nsec` com seguranca -- essa e sua credencial de login de administrador
 
 ## 3. Configurar os secrets
 
-Crie um arquivo `.dev.vars` na raiz do projeto para desenvolvimento local. Este exemplo usa Twilio -- se voce estiver usando outro provedor, pode pular as variaveis do Twilio e configurar seu provedor pela interface de administracao apos o primeiro login.
+Crie um arquivo `.env` na raiz do projeto para desenvolvimento local. Este exemplo usa Twilio -- se voce estiver usando outro provedor, pode pular as variaveis do Twilio e configurar seu provedor pela interface de administracao apos o primeiro login.
 
 ```bash
-# .dev.vars
+# .env
 TWILIO_ACCOUNT_SID=your_twilio_account_sid
 TWILIO_AUTH_TOKEN=your_twilio_auth_token
 TWILIO_PHONE_NUMBER=+1234567890

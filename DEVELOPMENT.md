@@ -21,7 +21,7 @@ sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev \
 
 ```bash
 bun install
-cp .dev.vars.example .dev.vars   # Configure Twilio creds + ADMIN_PUBKEY
+cp .env.example .env             # Configure Twilio creds + ADMIN_PUBKEY
 bun run bootstrap-admin          # Generate admin keypair
 ```
 
@@ -130,7 +130,7 @@ Configured in `tsconfig.json` and `vite.config.ts`:
 ## Key Config Files
 
 - `playwright.config.ts` — E2E test config
-- `.dev.vars` — Local secrets (gitignored): Twilio creds, ADMIN_PUBKEY
+- `.env` — Local secrets (gitignored): Twilio creds, ADMIN_PUBKEY
 - `vite.config.ts` — Frontend build config
 - `tsconfig.json` — TypeScript config
 - `site/wrangler.jsonc` — Cloudflare Pages config (marketing site only — **no** wrangler config in `apps/worker/`)

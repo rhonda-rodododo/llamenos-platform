@@ -243,7 +243,7 @@ The current file is 309 lines. Target is approximately 185 lines (~40% reduction
   bun run dev:server                       # Bun HTTP server with file watching
   ```
 
-- [ ] **Section: Development Commands** — at the bottom, update the key config files note. Current: `**Key config files**: \`apps/worker/wrangler.jsonc\` (Worker + DO bindings), \`playwright.config.ts\`, \`.dev.vars\` (Twilio creds + ADMIN_PUBKEY, gitignored)`. Replace with: `**Key config files**: \`apps/worker/wrangler.jsonc\` (marketing site/CF Pages only), \`playwright.config.ts\`, \`.dev.vars\` (Twilio creds + ADMIN_PUBKEY, gitignored)`.
+- [ ] **Section: Development Commands** — at the bottom, update the key config files note. Current: `**Key config files**: \`site/wrangler.jsonc\` (marketing site/CF Pages only), \`playwright.config.ts\`, \`.env\` (Twilio creds + ADMIN_PUBKEY, gitignored)`. Replace with: `**Key config files**: \`site/wrangler.jsonc\` (marketing site/CF Pages only), \`playwright.config.ts\`, \`.env\` (Twilio creds + ADMIN_PUBKEY, gitignored)`.
 
 - [ ] **Section: Claude Code Working Style** — replace the entire `### Feature Development: 3-Phase BDD Workflow` subsection and its content. Current text occupies lines 265–281. Replace the whole `## Claude Code Working Style` section with:
 
