@@ -69,7 +69,7 @@ bootstrap_workspace() {
     ws_args="--force"
   fi
 
-  bash scripts/workspace-setup.sh $ws_args
+  bash scripts/worktree-setup.sh $ws_args
   ok "Workspace bootstrapped"
 }
 
