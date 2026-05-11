@@ -80,7 +80,7 @@ needs_rebuild() {
   if [[ ! -e "$outputs" ]]; then
     return 0
   fi
-
+  
   local newest_source
   local newest_output
   newest_source=$(find $sources -type f -printf '%T@\n' 2>/dev/null | sort -n | tail -1)
