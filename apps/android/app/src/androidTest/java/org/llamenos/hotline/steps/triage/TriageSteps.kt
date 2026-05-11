@@ -37,8 +37,10 @@ class TriageSteps : BaseSteps() {
     @When("I navigate to the Triage screen")
     fun iNavigateToTheTriageScreen() {
         navigateViaDashboardCard("triage-card")
-        // Wait for the triage screen to load
-        composeRule.waitUntil(10_000) {
+        // Wait for the triage screen to load. The TopAppBar title ("triage-title") is
+        // always rendered regardless of data loading state. Allow extra time on CI
+        // where navigation transitions take longer with software rendering.
+        composeRule.waitUntil(20_000) {
             composeRule.onAllNodesWithTag("triage-title").fetchSemanticsNodes().isNotEmpty() ||
                 composeRule.onAllNodesWithTag("triage-list").fetchSemanticsNodes().isNotEmpty() ||
                 composeRule.onAllNodesWithTag("triage-loading").fetchSemanticsNodes().isNotEmpty() ||
