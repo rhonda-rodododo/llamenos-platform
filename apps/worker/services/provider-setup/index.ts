@@ -274,38 +274,26 @@ export class ProviderSetup {
     provider: TelephonyProviderType,
     hubId?: string,
   ): Promise<typeof providerConfigs.$inferSelect | null> {
+    if (hubId === null || hubId === undefined) {
+      throw new ProviderApiError(
+        'hubId is required for provider config lookup',
+        400,
+        'Missing hubId',
+      )
+    }
+
     const [row] = await this.db
       .select()
       .from(providerConfigs)
       .where(
         and(
           eq(providerConfigs.providerType, provider),
-          hubId
-            ? eq(providerConfigs.hubId, hubId)
-            : isNull(providerConfigs.hubId),
+          eq(providerConfigs.hubId, hubId),
         ),
       )
       .orderBy(desc(providerConfigs.createdAt))
       .limit(1)
-    if (row) return row
-
-    if (hubId) {
-      // Fall back to global config (null hub_id) if no hub-specific config exists
-      const [fallback] = await this.db
-        .select()
-        .from(providerConfigs)
-        .where(
-          and(
-            eq(providerConfigs.providerType, provider),
-            isNull(providerConfigs.hubId),
-          ),
-        )
-        .orderBy(desc(providerConfigs.createdAt))
-        .limit(1)
-      return fallback ?? null
-    }
-
-    return null
+    return row ?? null
   }
 
   private async resolveProvider(
