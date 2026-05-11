@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { CheckCircle2, XCircle, Phone, MessageSquare, Signal, Mail, Send, Smartphone } from 'lucide-react'
-import type { HubSetupStatus, ChannelConfig } from '@protocol/schemas/provider-setup'
+import { HUB_CHANNEL_TYPES } from '@protocol/schemas/provider-setup'
+import type { HubSetupStatus, ChannelConfig, HubChannelType } from '@protocol/schemas/provider-setup'
 import { Card } from '@/components/ui/card'
 import { TELEPHONY_PROVIDER_LABELS } from '@shared/types'
 
@@ -9,7 +10,7 @@ interface HubProviderSettingsProps {
   channelConfig: ChannelConfig
 }
 
-const CHANNEL_ICONS: Record<string, React.ReactNode> = {
+const CHANNEL_ICONS: Record<HubChannelType, React.ReactNode> = {
   voice: <Phone className="h-4 w-4" />,
   sms: <MessageSquare className="h-4 w-4" />,
   email: <Mail className="h-4 w-4" />,
@@ -70,15 +71,15 @@ export function HubProviderSettings({ status, channelConfig }: HubProviderSettin
       <Card className="p-4">
         <h3 className="text-sm font-semibold mb-3">{t('hubOnboarding.channelSettingsTitle')}</h3>
         <div className="space-y-2">
-          {Object.entries(channelConfig).map(([key, enabled]) => {
-            const channelKey = key as keyof ChannelConfig
-            const isConfigured = status.channelsConfigured.includes(channelKey)
-            const isPending = status.channelsPending.includes(channelKey)
+          {HUB_CHANNEL_TYPES.map((key) => {
+            const enabled = channelConfig[key]
+            const isConfigured = status.channelsConfigured.includes(key)
+            const isPending = status.channelsPending.includes(key)
 
             return (
               <div key={key} className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground">{CHANNEL_ICONS[key] || null}</span>
+                  <span className="text-muted-foreground">{CHANNEL_ICONS[key]}</span>
                   <span className="text-sm">{t(`hubOnboarding.channel${key.charAt(0).toUpperCase() + key.slice(1)}` as const)}</span>
                 </div>
                 <div className="flex items-center gap-2">

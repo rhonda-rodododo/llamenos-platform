@@ -14,17 +14,7 @@ interface ProviderTemplateCardProps {
 export function ProviderTemplateCard({ template, selected, onSelect }: ProviderTemplateCardProps) {
   const { t } = useTranslation()
 
-  const channelLabels: Record<string, string> = {
-    voice: t('hubOnboarding.channelVoice'),
-    sms: t('hubOnboarding.channelSms'),
-    email: t('hubOnboarding.channelEmail'),
-    signal: t('hubOnboarding.channelSignal'),
-    whatsapp: t('hubOnboarding.channelWhatsApp'),
-    telegram: t('hubOnboarding.channelTelegram'),
-    rcs: t('hubOnboarding.channelRcs'),
-  }
-
-  const channelsText = template.defaultChannels?.map(c => channelLabels[c] || c).join(', ') || ''
+  const channelsText = template.defaultChannels?.map((c) => t(`hubOnboarding.channel${c.charAt(0).toUpperCase() + c.slice(1)}` as const)).join(', ') || ''
   const providerLabel = TELEPHONY_PROVIDER_LABELS[template.providerType] || template.providerType
 
   return (

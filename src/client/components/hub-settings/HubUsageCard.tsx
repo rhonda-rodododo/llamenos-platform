@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { Phone, MessageSquare, Signal, Smartphone } from 'lucide-react'
-import type { HubUsage, HubQuota } from '@protocol/schemas/provider-setup'
+import { HUB_CHANNEL_TYPES } from '@protocol/schemas/provider-setup'
+import type { HubUsage, HubQuota, HubChannelType } from '@protocol/schemas/provider-setup'
 import { Card } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 
@@ -9,35 +10,29 @@ interface HubUsageCardProps {
   quota: HubQuota
 }
 
+const USAGE_ICONS: Record<string, React.ReactNode> = {
+  callsReceived: <Phone className="h-4 w-4" />,
+  smsSent: <MessageSquare className="h-4 w-4" />,
+  signalMessagesSent: <Signal className="h-4 w-4" />,
+  whatsAppMessagesSent: <Smartphone className="h-4 w-4" />,
+}
+
+const USAGE_KEYS = [
+  { usageKey: 'callsReceived' as const, quotaKey: 'maxCallsPerMonth' as const, labelKey: 'usageCalls' },
+  { usageKey: 'smsSent' as const, quotaKey: 'maxSmsPerMonth' as const, labelKey: 'usageSms' },
+  { usageKey: 'signalMessagesSent' as const, quotaKey: 'maxSignalMessagesPerMonth' as const, labelKey: 'usageSignal' },
+  { usageKey: 'whatsAppMessagesSent' as const, quotaKey: 'maxWhatsAppMessagesPerMonth' as const, labelKey: 'usageWhatsApp' },
+]
+
 export function HubUsageCard({ usage, quota }: HubUsageCardProps) {
   const { t } = useTranslation()
 
-  const items = [
-    {
-      label: t('hubOnboarding.usageCalls'),
-      value: usage.callsReceived || 0,
-      max: quota.maxCallsPerMonth || 500,
-      icon: <Phone className="h-4 w-4" />,
-    },
-    {
-      label: t('hubOnboarding.usageSms'),
-      value: usage.smsSent || 0,
-      max: quota.maxSmsPerMonth || 1000,
-      icon: <MessageSquare className="h-4 w-4" />,
-    },
-    {
-      label: t('hubOnboarding.usageSignal'),
-      value: usage.signalMessagesSent || 0,
-      max: quota.maxSignalMessagesPerMonth || 500,
-      icon: <Signal className="h-4 w-4" />,
-    },
-    {
-      label: t('hubOnboarding.usageWhatsApp'),
-      value: usage.whatsAppMessagesSent || 0,
-      max: quota.maxWhatsAppMessagesPerMonth || 500,
-      icon: <Smartphone className="h-4 w-4" />,
-    },
-  ]
+  const items = USAGE_KEYS.map(({ usageKey, quotaKey, labelKey }) => ({
+    label: t(`hubOnboarding.${labelKey}`),
+    value: usage[usageKey] || 0,
+    max: quota[quotaKey] || 0,
+    icon: USAGE_ICONS[usageKey],
+  }))
 
   return (
     <Card className="p-4 space-y-4" data-testid="hub-usage-card">

@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { telephonyProviderTypeSchema } from '@protocol/schemas/settings'
 
-export const hubChannelTypeSchema = z.enum([
+export const HUB_CHANNEL_TYPES = [
   'voice',
   'sms',
   'email',
@@ -9,18 +9,14 @@ export const hubChannelTypeSchema = z.enum([
   'whatsapp',
   'telegram',
   'rcs',
-])
+] as const
+
+export const hubChannelTypeSchema = z.enum(HUB_CHANNEL_TYPES)
 export type HubChannelType = z.infer<typeof hubChannelTypeSchema>
 
-export const channelConfigSchema = z.object({
-  voice: z.boolean().optional().default(false),
-  sms: z.boolean().optional().default(false),
-  email: z.boolean().optional().default(false),
-  signal: z.boolean().optional().default(false),
-  whatsapp: z.boolean().optional().default(false),
-  telegram: z.boolean().optional().default(false),
-  rcs: z.boolean().optional().default(false),
-})
+export const channelConfigSchema = z.object(
+  Object.fromEntries(HUB_CHANNEL_TYPES.map((t) => [t, z.boolean().optional().default(false)]))
+)
 export type ChannelConfig = z.infer<typeof channelConfigSchema>
 
 export const hubQuotaSchema = z.object({
@@ -46,9 +42,9 @@ export type HubUsage = z.infer<typeof hubUsageSchema>
 
 export const hubProviderSettingsSchema = z.object({
   providerType: telephonyProviderTypeSchema.optional(),
-  channels: channelConfigSchema.optional().default({
-    voice: false, sms: false, email: false, signal: false, whatsapp: false, telegram: false, rcs: false,
-  }),
+  channels: channelConfigSchema.optional().default(
+    Object.fromEntries(HUB_CHANNEL_TYPES.map((t) => [t, false])) as Record<HubChannelType, boolean>
+  ),
   quotas: hubQuotaSchema.optional().default({
     maxPhoneNumbers: 5, maxSmsPerMonth: 1000, maxCallsPerMonth: 500, maxSignalMessagesPerMonth: 500, maxWhatsAppMessagesPerMonth: 500, maxSubAccounts: 0,
   }),
@@ -106,9 +102,9 @@ export const hubOnboardingStateSchema = z.object({
   templateId: z.string().optional(),
   currentStep: z.string().optional().default('template_selection'),
   completedSteps: z.array(z.string()).optional().default([]),
-  channelConfig: channelConfigSchema.optional().default({
-    voice: false, sms: false, email: false, signal: false, whatsapp: false, telegram: false, rcs: false,
-  }),
+  channelConfig: channelConfigSchema.optional().default(
+    Object.fromEntries(HUB_CHANNEL_TYPES.map((t) => [t, false])) as Record<HubChannelType, boolean>
+  ),
   isComplete: z.boolean().optional().default(false),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),

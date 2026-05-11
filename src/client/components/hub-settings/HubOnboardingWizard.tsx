@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, ArrowRight, Loader2 } from 'lucide-react'
+import { HUB_CHANNEL_TYPES } from '@protocol/schemas/provider-setup'
 import type {
   ProviderTemplate,
   ChannelConfig,
@@ -41,15 +42,9 @@ interface HubOnboardingWizardProps {
   onComplete: () => void
 }
 
-export const DEFAULT_CHANNEL_CONFIG: ChannelConfig = {
-  voice: false,
-  sms: false,
-  email: false,
-  signal: false,
-  whatsapp: false,
-  telegram: false,
-  rcs: false,
-}
+export const DEFAULT_CHANNEL_CONFIG: ChannelConfig = Object.fromEntries(
+  HUB_CHANNEL_TYPES.map((t) => [t, false])
+) as ChannelConfig
 
 export function HubOnboardingWizard({ hubId, hubName, onComplete }: HubOnboardingWizardProps) {
   const { t } = useTranslation()
@@ -89,7 +84,10 @@ export function HubOnboardingWizard({ hubId, hubName, onComplete }: HubOnboardin
     setLoading(true)
     listProviderTemplates()
       .then((res) => setTemplates(res.templates))
-      .catch(() => toast(t('hubOnboarding.errorLoading'), 'error'))
+      .catch((err) => {
+        console.error('Failed to load provider templates:', err)
+        toast(t('hubOnboarding.errorLoading'), 'error')
+      })
       .finally(() => setLoading(false))
   }, [toast, t])
 
@@ -385,8 +383,7 @@ export function HubOnboardingWizard({ hubId, hubName, onComplete }: HubOnboardin
                 </span>
               </div>
 
-              {Object.entries(channelConfig).map(([key, enabled]) => {
-                if (!enabled) return null
+              {HUB_CHANNEL_TYPES.filter((key) => channelConfig[key]).map((key) => {
                 const configured =
                   (key === 'voice' || key === 'sms') ? providerValidated :
                   key === 'signal' ? signalConfigured :
