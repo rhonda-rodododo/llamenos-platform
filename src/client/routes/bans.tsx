@@ -16,7 +16,7 @@ export const Route = createFileRoute('/bans')({
   component: BansPage,
 })
 
-function BansPage() {
+export function BansPage() {
   const { t } = useTranslation()
   const { isAdmin } = useAuth()
   const { toast } = useToast()

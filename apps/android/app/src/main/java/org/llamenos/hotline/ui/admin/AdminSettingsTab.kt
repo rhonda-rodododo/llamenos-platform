@@ -191,7 +191,7 @@ fun AdminSettingsTab(
 // ---- Transcription Section ----
 
 @Composable
-private fun TranscriptionSection(
+internal fun TranscriptionSection(
     transcriptionEnabled: Boolean,
     transcriptionOptOut: Boolean,
     onToggleTranscription: (Boolean) -> Unit,
@@ -242,7 +242,7 @@ private fun TranscriptionSection(
 // ---- Report Categories Section ----
 
 @Composable
-private fun ReportCategoriesSection(
+internal fun ReportCategoriesSection(
     categories: List<org.llamenos.hotline.model.ReportCategory>,
     isLoading: Boolean,
     error: String?,
@@ -345,7 +345,7 @@ private fun ReportCategoriesSection(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TelephonySection(
+internal fun TelephonySection(
     provider: String,
     accountSid: String,
     authToken: String,
@@ -495,7 +495,7 @@ private fun TelephonySection(
 // ---- Call Settings Section ----
 
 @Composable
-private fun CallSettingsSection(
+internal fun CallSettingsSection(
     ringTimeout: Int,
     maxCallDuration: Int,
     parallelRingCount: Int,
@@ -603,7 +603,7 @@ private fun CallSettingsSection(
 /**
  * All 13 supported IVR languages with their codes and native labels.
  */
-private val IVR_LANGUAGE_LIST = listOf(
+internal val IVR_LANGUAGE_LIST = listOf(
     "en" to "English",
     "es" to "Espa\u00f1ol",
     "zh" to "\u4e2d\u6587",
@@ -620,7 +620,7 @@ private val IVR_LANGUAGE_LIST = listOf(
 )
 
 @Composable
-private fun IvrLanguagesSection(
+internal fun IvrLanguagesSection(
     languages: Map<String, Boolean>,
     isLoading: Boolean,
     error: String?,
@@ -705,7 +705,7 @@ private fun IvrLanguagesSection(
 // ---- Spam Settings Section ----
 
 @Composable
-private fun SpamSettingsSection(
+internal fun SpamSettingsSection(
     maxCallsPerHour: Int,
     voiceCaptchaEnabled: Boolean,
     knownNumberBypass: Boolean,
@@ -805,7 +805,7 @@ private fun SpamSettingsSection(
 // ---- Shared Composables ----
 
 @Composable
-private fun SectionHeader(
+internal fun SectionHeader(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
     modifier: Modifier = Modifier,
@@ -830,7 +830,7 @@ private fun SectionHeader(
 }
 
 @Composable
-private fun SettingsToggleRow(
+internal fun SettingsToggleRow(
     title: String,
     description: String,
     checked: Boolean,
@@ -864,7 +864,7 @@ private fun SettingsToggleRow(
 }
 
 @Composable
-private fun SliderSetting(
+internal fun SliderSetting(
     label: String,
     value: Float,
     valueRange: ClosedFloatingPointRange<Float>,
@@ -904,7 +904,7 @@ private fun SliderSetting(
 // ---- Add Category Dialog ----
 
 @Composable
-private fun AddCategoryDialog(
+internal fun AddCategoryDialog(
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
 ) {

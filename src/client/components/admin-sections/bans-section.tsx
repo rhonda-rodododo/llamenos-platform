@@ -1,13 +1,5 @@
-import { useTranslation } from 'react-i18next'
-import { SectionBody, SectionDescription } from '@/components/admin-shell/section-layout'
+import { BansPage } from '@/routes/bans'
 
 export function BansSection() {
-  const { t } = useTranslation()
-
-  return (
-    <SectionBody>
-      <SectionDescription>{t('adminNav.items.bans')}</SectionDescription>
-      <div className="text-muted-foreground">{t('common.comingSoon')}</div>
-    </SectionBody>
-  )
+  return <BansPage />
 }

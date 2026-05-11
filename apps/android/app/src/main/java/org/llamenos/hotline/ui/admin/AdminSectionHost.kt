@@ -2,11 +2,15 @@ package org.llamenos.hotline.ui.admin
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import org.llamenos.hotline.R
 
@@ -14,8 +18,16 @@ import org.llamenos.hotline.R
 fun AdminSectionHost(
     viewModel: AdminViewModel = hiltViewModel(),
 ) {
-    val uiState = viewModel.uiState.collectAsState().value
+    val uiState by viewModel.uiState.collectAsState()
     val section = uiState.selectedAdminSection
+
+    // Show add-category dialog when report-types section triggers it
+    if (uiState.showAddCategoryDialog) {
+        AddCategoryDialog(
+            onDismiss = { viewModel.dismissAddCategoryDialog() },
+            onConfirm = { name -> viewModel.addReportCategory(name) },
+        )
+    }
 
     Box(
         modifier = Modifier.fillMaxSize(),
@@ -30,14 +42,69 @@ fun AdminSectionHost(
             "teams" -> Text(stringResource(R.string.adminNav_items_teams))
             "tags" -> Text(stringResource(R.string.adminNav_items_tags))
             "custom-fields" -> CustomFieldsTab(viewModel = viewModel)
-            "report-types" -> Text(stringResource(R.string.adminNav_items_reportTypes))
+            "report-types" -> ReportCategoriesSection(
+                categories = uiState.reportCategories,
+                isLoading = uiState.isLoadingCategories,
+                error = uiState.categoriesError,
+                onAddCategory = { viewModel.showAddCategoryDialog() },
+                onDeleteCategory = { viewModel.deleteReportCategory(it) },
+                modifier = Modifier.padding(16.dp),
+            )
             "firehose" -> Text(stringResource(R.string.adminNav_items_firehose))
-            "call-settings" -> Text(stringResource(R.string.adminNav_items_callSettings))
+            "call-settings" -> CallSettingsSection(
+                ringTimeout = uiState.ringTimeout,
+                maxCallDuration = uiState.maxCallDuration,
+                parallelRingCount = uiState.parallelRingCount,
+                isLoading = uiState.isLoadingCallSettings,
+                error = uiState.callSettingsError,
+                onRingTimeoutChange = { viewModel.updateRingTimeout(it) },
+                onMaxCallDurationChange = { viewModel.updateMaxCallDuration(it) },
+                onParallelRingCountChange = { viewModel.updateParallelRingCount(it) },
+                onSave = { viewModel.saveCallSettings() },
+                modifier = Modifier.padding(16.dp),
+            )
             "voice-prompts" -> Text(stringResource(R.string.adminNav_items_voicePrompts))
-            "phone-menu-languages" -> Text(stringResource(R.string.adminNav_items_phoneMenuLanguages))
-            "transcription" -> Text(stringResource(R.string.adminNav_items_transcription))
-            "spam-protection" -> Text(stringResource(R.string.adminNav_items_spamProtection))
-            "phone-provider" -> Text(stringResource(R.string.adminNav_items_phoneProvider))
+            "phone-menu-languages" -> IvrLanguagesSection(
+                languages = uiState.ivrLanguages,
+                isLoading = uiState.isLoadingIvrLanguages,
+                error = uiState.ivrLanguagesError,
+                onToggleLanguage = { code, enabled -> viewModel.toggleIvrLanguage(code, enabled) },
+                onSave = { viewModel.saveIvrLanguages() },
+                modifier = Modifier.padding(16.dp),
+            )
+            "transcription" -> TranscriptionSection(
+                transcriptionEnabled = uiState.transcriptionEnabled,
+                transcriptionOptOut = uiState.transcriptionOptOut,
+                onToggleTranscription = { viewModel.toggleTranscription(it) },
+                onToggleOptOut = { viewModel.toggleTranscriptionOptOut(it) },
+                modifier = Modifier.padding(16.dp),
+            )
+            "spam-protection" -> SpamSettingsSection(
+                maxCallsPerHour = uiState.maxCallsPerHour,
+                voiceCaptchaEnabled = uiState.voiceCaptchaEnabled,
+                knownNumberBypass = uiState.knownNumberBypass,
+                isLoading = uiState.isLoadingSpamSettings,
+                error = uiState.spamSettingsError,
+                onMaxCallsPerHourChange = { viewModel.updateMaxCallsPerHour(it) },
+                onToggleVoiceCaptcha = { viewModel.toggleVoiceCaptcha(it) },
+                onToggleKnownNumberBypass = { viewModel.toggleKnownNumberBypass(it) },
+                onSave = { viewModel.saveSpamSettings() },
+                modifier = Modifier.padding(16.dp),
+            )
+            "phone-provider" -> TelephonySection(
+                provider = uiState.telephonyProvider,
+                accountSid = uiState.telephonyAccountSid,
+                authToken = uiState.telephonyAuthToken,
+                phoneNumber = uiState.telephonyPhoneNumber,
+                isLoading = uiState.isLoadingTelephony,
+                error = uiState.telephonyError,
+                onProviderChange = { viewModel.updateTelephonyProvider(it) },
+                onAccountSidChange = { viewModel.updateTelephonyAccountSid(it) },
+                onAuthTokenChange = { viewModel.updateTelephonyAuthToken(it) },
+                onPhoneNumberChange = { viewModel.updateTelephonyPhoneNumber(it) },
+                onSave = { viewModel.saveTelephonySettings() },
+                modifier = Modifier.padding(16.dp),
+            )
             "messaging-sms" -> Text(stringResource(R.string.adminNav_items_messagingSms))
             "rcs" -> Text(stringResource(R.string.adminNav_items_rcs))
             "signal" -> Text(stringResource(R.string.adminNav_items_signal))
