@@ -132,12 +132,3 @@ runs:
           -f deploy/docker/docker-compose.test.yml \
           logs --tail=50 || true
 
-    - name: Tear down Docker Compose
-      if: always()
-      shell: bash
-      run: |
-        docker compose --env-file .env \
-          --profile signal --profile asterisk \
-          -f deploy/docker/docker-compose.yml \
-          -f deploy/docker/docker-compose.test.yml \
-          down -v

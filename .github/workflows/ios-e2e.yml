@@ -336,6 +336,14 @@ jobs:
             apps/ios/build/reports/
           retention-days: 7
 
+      - name: Tear down Docker Compose
+        if: always()
+        run: |
+          docker compose --env-file .env \
+            -f deploy/docker/docker-compose.yml \
+            -f deploy/docker/docker-compose.test.yml \
+            down -v 2>/dev/null || true
+
       - name: Stop backend services
         if: always()
         run: |
