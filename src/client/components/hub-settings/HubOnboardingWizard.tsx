@@ -24,6 +24,17 @@ import { SignalRegistrationFlow } from '@/components/setup/SignalRegistrationFlo
 import { WhatsAppProviderForm } from '@/components/setup/WhatsAppProviderForm'
 import { SignalProviderForm } from '@/components/setup/SignalProviderForm'
 import type { SetupData } from '@/components/setup/SetupWizard'
+import type { HubChannelType } from '@protocol/schemas/provider-setup'
+
+const CHANNEL_LABELS: Record<HubChannelType, string> = {
+  voice: 'hubOnboarding.channelVoice',
+  sms: 'hubOnboarding.channelSms',
+  email: 'hubOnboarding.channelEmail',
+  signal: 'hubOnboarding.channelSignal',
+  whatsapp: 'hubOnboarding.channelWhatsApp',
+  telegram: 'hubOnboarding.channelTelegram',
+  rcs: 'hubOnboarding.channelRcs',
+}
 
 const WIZARD_STEPS = [
   'template_selection',
@@ -392,7 +403,7 @@ export function HubOnboardingWizard({ hubId, hubName, onComplete }: HubOnboardin
 
                 return (
                   <div key={key} className="flex items-center justify-between rounded-lg border p-3">
-                    <span className="text-sm">{t(`hubOnboarding.channel${key.charAt(0).toUpperCase() + key.slice(1)}` as const)}</span>
+                    <span className="text-sm">{t(CHANNEL_LABELS[key])}</span>
                     <span className={`text-xs ${configured ? 'text-green-700 dark:text-green-400' : 'text-amber-600'}`}>
                       {configured ? t('hubOnboarding.summaryConfigured') : t('hubOnboarding.summaryPending')}
                     </span>

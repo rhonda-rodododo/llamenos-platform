@@ -10,6 +10,16 @@ interface HubProviderSettingsProps {
   channelConfig: ChannelConfig
 }
 
+const CHANNEL_LABELS: Record<HubChannelType, string> = {
+  voice: 'hubOnboarding.channelVoice',
+  sms: 'hubOnboarding.channelSms',
+  email: 'hubOnboarding.channelEmail',
+  signal: 'hubOnboarding.channelSignal',
+  whatsapp: 'hubOnboarding.channelWhatsApp',
+  telegram: 'hubOnboarding.channelTelegram',
+  rcs: 'hubOnboarding.channelRcs',
+}
+
 const CHANNEL_ICONS: Record<HubChannelType, React.ReactNode> = {
   voice: <Phone className="h-4 w-4" />,
   sms: <MessageSquare className="h-4 w-4" />,
@@ -80,7 +90,7 @@ export function HubProviderSettings({ status, channelConfig }: HubProviderSettin
               <div key={key} className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="text-muted-foreground">{CHANNEL_ICONS[key]}</span>
-                  <span className="text-sm">{t(`hubOnboarding.channel${key.charAt(0).toUpperCase() + key.slice(1)}` as const)}</span>
+                  <span className="text-sm">{t(CHANNEL_LABELS[key])}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   {enabled ? (
