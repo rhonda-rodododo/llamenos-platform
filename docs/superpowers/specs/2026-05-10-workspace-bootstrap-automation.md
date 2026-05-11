@@ -66,16 +66,20 @@ Runs automatically after `bun install` via `package.json` `postinstall`. Assumes
 | 2. Run codegen | `bun run codegen` | Always run — ensures latest generated output |
 | 3. Run i18n codegen | `bun run i18n:codegen` | Always run — ensures latest generated output |
 | 4. Build crypto (server) | `cargo build` in `packages/crypto` | Skip if `target/` artifacts are newer than `src/` |
-| 5. Build crypto (iOS) | `packages/crypto/scripts/build-mobile.sh ios` | Skip if not on macOS or artifacts up-to-date |
-| 6. Build crypto (Android) | `packages/crypto/scripts/build-mobile.sh android` | Skip if NDK missing or artifacts up-to-date |
+| 5. Build crypto (iOS) | `packages/crypto/scripts/build-mobile.sh ios` | Only if `--ios` flag or branch name matches `feat/ios-*` / `feat/mobile-*` |
+| 6. Build crypto (Android) | `packages/crypto/scripts/build-mobile.sh android` | Only if `--android` flag or branch name matches `feat/android-*` / `feat/mobile-*` |
 | 7. Copy iOS artifacts | Copy XCFramework + Swift bindings to `apps/ios/` | Skip if already in place and up-to-date |
 | 8. Copy Android artifacts | Copy `.so` files to `apps/android/app/src/main/jniLibs/` | Skip if already in place and up-to-date |
 
 **Interface:**
 ```bash
-bun run workspace-setup              # Manual run
+bun run workspace-setup              # Manual run (skips mobile by default)
 bun run workspace-setup --force      # Skip timestamp checks, rebuild everything
+bun run workspace-setup --ios        # Include iOS crypto build
+bun run workspace-setup --android    # Include Android crypto build
 ```
+
+Mobile builds are skipped by default for speed. Pass `--ios` or `--android` explicitly, or use branch names like `feat/ios-*` / `feat/android-*` / `feat/mobile-*` to auto-enable them.
 
 **Post-install integration:**
 ```json
