@@ -17,11 +17,11 @@ export function AdminShell({ currentSlug, currentLabelKey, children }: Props) {
 
   return (
     <div data-testid="admin-shell" className="flex min-h-screen bg-background">
-      {&#8203;}<aside className="hidden w-64 shrink-0 border-r border-sidebar-border lg:block">
+      <aside className="hidden w-64 shrink-0 border-r border-sidebar-border lg:block">
         <AdminSidebar />
       </aside>
 
-      {&#8203;}<Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetContent
           side="left"
           id="admin-sidebar-drawer"
@@ -34,7 +34,7 @@ export function AdminShell({ currentSlug, currentLabelKey, children }: Props) {
         </SheetContent>
       </Sheet>
 
-      {&#8203;}<main className="flex-1 min-w-0">
+      <main className="flex-1 min-w-0">
         <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border/60 bg-background/90 px-4 py-3 backdrop-blur-md supports-[backdrop-filter]:bg-background/75 lg:px-8">
           <Button
             variant="ghost"

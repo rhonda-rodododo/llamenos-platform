@@ -1,9 +1,9 @@
 import { createFileRoute, Navigate } from '@tanstack/react-router'
 
-export const Route = createFileRoute('/admin/case-management')({
+export const Route = createFileRoute('/admin/case-management-redirect')({
   component: AdminCaseManagementRedirect,
 })
 
 function AdminCaseManagementRedirect() {
-  return <Navigate to="/admin/health" replace />
+  return <Navigate to="/admin/system" replace />
 }

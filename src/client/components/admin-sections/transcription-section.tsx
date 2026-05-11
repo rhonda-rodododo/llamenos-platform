@@ -1,13 +1,46 @@
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { SectionBody, SectionDescription } from '@/components/admin-shell/section-layout'
+import { useToast } from '@/lib/toast'
+import { getTranscriptionSettings } from '@/lib/api'
+import { TranscriptionSection as TranscriptionSectionInner } from '@/components/admin-settings/transcription-section'
 
 export function TranscriptionSection() {
   const { t } = useTranslation()
+  const { toast } = useToast()
+  const [globalEnabled, setGlobalEnabled] = useState(false)
+  const [allowOptOut, setAllowOptOut] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    getTranscriptionSettings()
+      .then(r => {
+        setGlobalEnabled(r.globalEnabled)
+        setAllowOptOut(r.allowUserOptOut)
+      })
+      .catch(() => toast(t('common.error'), 'error'))
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading) return <div className="text-muted-foreground">{t('common.loading')}</div>
+
+  const statusSummary = globalEnabled
+    ? t('common.enabled', { defaultValue: 'Enabled' })
+    : t('common.disabled', { defaultValue: 'Disabled' })
 
   return (
-    <SectionBody>
-      <SectionDescription>{t('adminNav.items.transcription')}</SectionDescription>
-      <div className="text-muted-foreground">{t('common.comingSoon')}</div>
-    </SectionBody>
+    <TranscriptionSectionInner
+      globalEnabled={globalEnabled}
+      allowOptOut={allowOptOut}
+      onGlobalChange={setGlobalEnabled}
+      onOptOutChange={setAllowOptOut}
+      onConfirmToggle={(key, newValue) => {
+        if (key === 'transcription') {
+          setGlobalEnabled(newValue)
+        }
+      }}
+      expanded={true}
+      onToggle={() => {}}
+      statusSummary={statusSummary}
+    />
   )
 }

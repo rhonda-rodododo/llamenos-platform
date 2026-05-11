@@ -1,13 +1,5 @@
-import { useTranslation } from 'react-i18next'
-import { SectionBody, SectionDescription } from '@/components/admin-shell/section-layout'
+import { SystemHealthPage } from '@/routes/admin/system'
 
 export function HealthSection() {
-  const { t } = useTranslation()
-
-  return (
-    <SectionBody>
-      <SectionDescription>{t('adminNav.items.health')}</SectionDescription>
-      <div className="text-muted-foreground">{t('common.comingSoon')}</div>
-    </SectionBody>
-  )
+  return <SystemHealthPage />
 }

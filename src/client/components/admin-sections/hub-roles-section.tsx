@@ -1,13 +1,14 @@
 import { useTranslation } from 'react-i18next'
-import { SectionBody, SectionDescription } from '@/components/admin-shell/section-layout'
+import { RolesSection as RolesSectionInner } from '@/components/admin-settings/roles-section'
 
 export function HubRolesSection() {
   const { t } = useTranslation()
 
   return (
-    <SectionBody>
-      <SectionDescription>{t('adminNav.items.hubRoles')}</SectionDescription>
-      <div className="text-muted-foreground">{t('common.comingSoon')}</div>
-    </SectionBody>
+    <RolesSectionInner
+      expanded={true}
+      onToggle={() => {}}
+      statusSummary={t('roles.summary', { defaultValue: 'Manage roles' })}
+    />
   )
 }

@@ -1,57 +1,40 @@
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '@/lib/toast'
-import { updateWebAuthnSettings, type WebAuthnSettings } from '@/lib/api'
-import { SectionBody, SectionField, SectionActions, SectionDescription } from '@/components/admin-shell/section-layout'
-import { Switch } from '@/components/ui/switch'
-import { useState } from 'react'
+import { getWebAuthnSettings, type WebAuthnSettings } from '@/lib/api'
+import { PasskeyPolicySection as PasskeyPolicySectionInner } from '@/components/admin-settings/passkey-policy-section'
 
 export function PasskeyPolicySection() {
   const { t } = useTranslation()
   const { toast } = useToast()
   const [settings, setSettings] = useState<WebAuthnSettings | null>(null)
-  const [saving, setSaving] = useState(false)
-  const [showSaved, setShowSaved] = useState(false)
+  const [loading, setLoading] = useState(true)
 
-  async function handleToggle(field: keyof WebAuthnSettings, checked: boolean) {
-    if (!settings) return
-    setSaving(true)
-    try {
-      const res = await updateWebAuthnSettings({ [field]: checked })
-      setSettings(res)
-      setShowSaved(true)
-      setTimeout(() => setShowSaved(false), 2000)
-    } catch {
-      toast(t('common.error'), 'error')
-    } finally {
-      setSaving(false)
-    }
-  }
+  useEffect(() => {
+    getWebAuthnSettings()
+      .then(setSettings)
+      .catch(() => toast(t('common.error'), 'error'))
+      .finally(() => setLoading(false))
+  }, [])
 
-  if (!settings) {
-    return <div className="text-muted-foreground">{t('common.loading')}</div>
-  }
+  if (loading) return <div className="text-muted-foreground">{t('common.loading')}</div>
+  if (!settings) return <div className="text-muted-foreground">{t('common.error')}</div>
+
+  const statusSummary = settings.requireForAdmins && settings.requireForUsers
+    ? t('webauthn.requiredAll', { defaultValue: 'Required for all' })
+    : settings.requireForAdmins
+      ? t('webauthn.requiredAdmins', { defaultValue: 'Required for admins' })
+      : settings.requireForUsers
+        ? t('webauthn.requiredUsers', { defaultValue: 'Required for volunteers' })
+        : t('webauthn.notRequired', { defaultValue: 'Not required' })
 
   return (
-    <SectionBody>
-      <SectionDescription>{t('webauthn.policyDescription')}</SectionDescription>
-      <SectionField label={t('webauthn.requireForAdmins')}>
-        <Switch
-          checked={settings.requireForAdmins}
-          onCheckedChange={(checked) => handleToggle('requireForAdmins', checked)}
-        />
-      </SectionField>
-      <SectionField label={t('webauthn.requireForUsers')}>
-        <Switch
-          checked={settings.requireForUsers}
-          onCheckedChange={(checked) => handleToggle('requireForUsers', checked)}
-        />
-      </SectionField>
-      <SectionActions
-        slug="passkey-policy"
-        onSave={() => {}}
-        saving={saving}
-        showSaved={showSaved}
-      />
-    </SectionBody>
+    <PasskeyPolicySectionInner
+      settings={settings}
+      onChange={setSettings}
+      expanded={true}
+      onToggle={() => {}}
+      statusSummary={statusSummary}
+    />
   )
 }

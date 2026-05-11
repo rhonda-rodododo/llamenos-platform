@@ -1,13 +1,14 @@
 import { useTranslation } from 'react-i18next'
-import { SectionBody, SectionDescription } from '@/components/admin-shell/section-layout'
+import { ReportTypesSection as ReportTypesSectionInner } from '@/components/admin-settings/report-types-section'
 
 export function ReportTypesSection() {
   const { t } = useTranslation()
 
   return (
-    <SectionBody>
-      <SectionDescription>{t('adminNav.items.reportTypes')}</SectionDescription>
-      <div className="text-muted-foreground">{t('common.comingSoon')}</div>
-    </SectionBody>
+    <ReportTypesSectionInner
+      expanded={true}
+      onToggle={() => {}}
+      statusSummary={t('reportTypes.title', { defaultValue: 'Report Types' })}
+    />
   )
 }
