@@ -38,7 +38,8 @@ export class ProviderTemplateService {
       )
     }
 
-    for (const [key, value] of Object.entries(data.credentialHints ?? {})) {
+    const hints = data.credentialHints as Record<string, string> ?? {}
+    for (const [key, value] of Object.entries(hints)) {
       if (typeof value === 'string' && looksLikeSecret(value)) {
         throw new ProviderApiError(
           `credentialHints["${key}"] appears to contain a real secret. Use placeholder descriptions only.`,
@@ -48,7 +49,7 @@ export class ProviderTemplateService {
       }
     }
 
-    const now = new Date().toISOString()
+    const now = new Date()
     const id = randomUUID()
 
     await this.db.insert(providerTemplates).values({
@@ -58,8 +59,8 @@ export class ProviderTemplateService {
       description: data.description ?? null,
       providerType: data.providerType,
       defaultChannels: data.defaultChannels ?? [],
-      credentialHints: data.credentialHints ?? {},
-      recommendedSettings: data.recommendedSettings ?? {},
+      credentialHints: hints,
+      recommendedSettings: (data.recommendedSettings ?? {}) as Record<string, unknown>,
       allowSubAccounts: data.allowSubAccounts ?? false,
       isActive: data.isActive ?? true,
       createdBy: data.createdBy,
@@ -74,13 +75,13 @@ export class ProviderTemplateService {
       description: data.description,
       providerType: data.providerType,
       defaultChannels: data.defaultChannels ?? [],
-      credentialHints: data.credentialHints ?? {},
+      credentialHints: hints,
       recommendedSettings: data.recommendedSettings ?? {},
       allowSubAccounts: data.allowSubAccounts ?? false,
       isActive: data.isActive ?? true,
       createdBy: data.createdBy,
-      createdAt: now,
-      updatedAt: now,
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
     }
   }
 
@@ -99,7 +100,7 @@ export class ProviderTemplateService {
     }
 
     if (data.slug) {
-      const slug = data.slug.trim().toLowerCase()
+      const slug = (data.slug as string).trim().toLowerCase()
       if (slug !== existing.slug) {
         const [duplicate] = await this.db
           .select()
@@ -117,7 +118,7 @@ export class ProviderTemplateService {
     }
 
     if (data.credentialHints) {
-      for (const [key, value] of Object.entries(data.credentialHints)) {
+      for (const [key, value] of Object.entries(data.credentialHints as Record<string, string>)) {
         if (typeof value === 'string' && looksLikeSecret(value)) {
           throw new ProviderApiError(
             `credentialHints["${key}"] appears to contain a real secret. Use placeholder descriptions only.`,
@@ -130,7 +131,7 @@ export class ProviderTemplateService {
 
     const updates: Record<string, unknown> = { updatedAt: new Date().toISOString() }
     if (data.name !== undefined) updates.name = data.name
-    if (data.slug !== undefined) updates.slug = data.slug.trim().toLowerCase()
+    if (data.slug !== undefined) updates.slug = (data.slug as string).trim().toLowerCase()
     if (data.description !== undefined) updates.description = data.description
     if (data.providerType !== undefined) updates.providerType = data.providerType
     if (data.defaultChannels !== undefined) updates.defaultChannels = data.defaultChannels
@@ -203,7 +204,7 @@ export class ProviderTemplateService {
       slug: row.slug,
       description: row.description ?? undefined,
       providerType: row.providerType as ProviderTemplate['providerType'],
-      defaultChannels: (row.defaultChannels as string[]) ?? [],
+      defaultChannels: ((row.defaultChannels as string[]) ?? []) as ProviderTemplate['defaultChannels'],
       credentialHints: (row.credentialHints as Record<string, string>) ?? {},
       recommendedSettings:
         (row.recommendedSettings as Record<string, unknown>) ?? {},

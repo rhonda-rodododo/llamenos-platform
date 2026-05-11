@@ -50,7 +50,7 @@ describe('ProviderTemplateService', () => {
         allowSubAccounts: false,
         isActive: true,
         createdBy: 'admin-1',
-      })
+      } as any)
 
       expect(result.name).toBe('Twilio Hotline')
       expect(result.slug).toBe('twilio-hotline')
@@ -69,7 +69,7 @@ describe('ProviderTemplateService', () => {
           slug: 'twilio-hotline',
           providerType: 'twilio',
           createdBy: 'admin-1',
-        }),
+        } as any),
       ).rejects.toThrow(ProviderApiError)
     })
 
@@ -84,7 +84,7 @@ describe('ProviderTemplateService', () => {
           providerType: 'twilio',
           createdBy: 'admin-1',
           credentialHints: { authToken: 'sk_live_abc123def456' },
-        }),
+        } as any),
       ).rejects.toThrow('appears to contain a real secret')
     })
 
@@ -99,7 +99,7 @@ describe('ProviderTemplateService', () => {
           providerType: 'twilio',
           createdBy: 'admin-1',
           credentialHints: { cert: 'a'.repeat(101) },
-        }),
+        } as any),
       ).rejects.toThrow('appears to contain a real secret')
     })
   })

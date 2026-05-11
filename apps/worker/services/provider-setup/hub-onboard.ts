@@ -50,7 +50,7 @@ export class HubOnboardService {
     hubId: string,
     templateId?: string,
   ): Promise<HubOnboardingState> {
-    const now = new Date().toISOString()
+    const now = new Date()
 
     let channelConfig: ChannelConfig = {
       voice: false,
@@ -109,8 +109,8 @@ export class HubOnboardService {
       completedSteps: [],
       channelConfig,
       isComplete: false,
-      createdAt: now,
-      updatedAt: now,
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
     }
   }
 
@@ -244,7 +244,7 @@ export class HubOnboardService {
       .set({
         isComplete: true,
         currentStep: 'completion',
-        updatedAt: new Date().toISOString(),
+        updatedAt: new Date(),
       })
       .where(eq(hubOnboardingState.hubId, hubId))
 
