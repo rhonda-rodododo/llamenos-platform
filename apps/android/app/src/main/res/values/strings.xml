@@ -2770,4 +2770,47 @@
     <string name="your_identity">Your Identity</string>
     <string name="your_private_key">Your Private Key</string>
     <string name="your_public_key">Your Public Key</string>
+
+    <!-- Admin Sidebar Navigation -->
+    <string name="adminNav_openMenu">Open menu</string>
+    <string name="adminNav_scopes_thisHub">This Hub</string>
+    <string name="adminNav_scopes_platform">Platform</string>
+    <string name="adminNav_groups_general">General</string>
+    <string name="adminNav_groups_people">People</string>
+    <string name="adminNav_groups_intake">Intake</string>
+    <string name="adminNav_groups_callsVoice">Calls & Voice</string>
+    <string name="adminNav_groups_channels">Channels</string>
+    <string name="adminNav_groups_operations">Operations</string>
+    <string name="adminNav_groups_platform">Platform</string>
+    <string name="adminNav_items_locationLookup">Location Lookup</string>
+    <string name="adminNav_items_passkeyPolicy">Passkey Policy</string>
+    <string name="adminNav_items_recoveryGroup">Recovery Group</string>
+    <string name="adminNav_items_devices">Devices</string>
+    <string name="adminNav_items_hubRoles">Hub Roles</string>
+    <string name="adminNav_items_teams">Teams</string>
+    <string name="adminNav_items_tags">Tags</string>
+    <string name="adminNav_items_customFields">Custom Fields</string>
+    <string name="adminNav_items_reportTypes">Report Types</string>
+    <string name="adminNav_items_firehose">Firehose</string>
+    <string name="adminNav_items_callSettings">Call Settings</string>
+    <string name="adminNav_items_voicePrompts">Voice Prompts</string>
+    <string name="adminNav_items_phoneMenuLanguages">Phone Menu Languages</string>
+    <string name="adminNav_items_transcription">Transcription</string>
+    <string name="adminNav_items_spamProtection">Spam Protection</string>
+    <string name="adminNav_items_phoneProvider">Phone Provider</string>
+    <string name="adminNav_items_messagingSms">Messaging / SMS</string>
+    <string name="adminNav_items_rcs">RCS</string>
+    <string name="adminNav_items_signal">Signal</string>
+    <string name="adminNav_items_bans">Bans</string>
+    <string name="adminNav_items_audit">Audit</string>
+    <string name="adminNav_items_analytics">Analytics</string>
+    <string name="adminNav_items_health">Health</string>
+    <string name="adminNav_items_hubs">Hubs</string>
+    <string name="adminNav_items_platformRoles">Platform Roles</string>
+    <string name="adminNav_items_platformBans">Bans</string>
+    <string name="adminNav_items_platformAudit">Audit</string>
+    <string name="adminNav_items_platformAnalytics">Analytics</string>
+    <string name="adminNav_items_platformHealth">Health</string>
+    <string name="adminNav_items_platformSettings">Platform Settings</string>
+    <string name="adminNav_items_gdprErasure">GDPR Erasure</string>
 </resources>

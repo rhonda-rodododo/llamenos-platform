@@ -748,7 +748,8 @@
     "ok": "OK",
     "create": "Create",
     "all": "All",
-    "previous": "Previous"
+    "previous": "Previous",
+    "comingSoon": "Coming soon"
   },
   "confirm": {
     "backup": "Confirm Backup",
@@ -3027,5 +3028,54 @@
     "voiceVerification": "Voice Verification",
     "waitingSms": "Waiting for SMS verification...",
     "waitingSmsDescription": "A verification SMS has been sent. This may take up to 10 minutes."
+  },
+  "adminNav": {
+    "openMenu": "Open menu",
+    "scopes": {
+      "thisHub": "This Hub",
+      "platform": "Platform"
+    },
+    "groups": {
+      "general": "General",
+      "people": "People",
+      "intake": "Intake",
+      "callsVoice": "Calls & Voice",
+      "channels": "Channels",
+      "operations": "Operations",
+      "platform": "Platform"
+    },
+    "items": {
+      "locationLookup": "Location Lookup",
+      "passkeyPolicy": "Passkey Policy",
+      "recoveryGroup": "Recovery Group",
+      "devices": "Devices",
+      "hubRoles": "Hub Roles",
+      "teams": "Teams",
+      "tags": "Tags",
+      "customFields": "Custom Fields",
+      "reportTypes": "Report Types",
+      "firehose": "Firehose",
+      "callSettings": "Call Settings",
+      "voicePrompts": "Voice Prompts",
+      "phoneMenuLanguages": "Phone Menu Languages",
+      "transcription": "Transcription",
+      "spamProtection": "Spam Protection",
+      "phoneProvider": "Phone Provider",
+      "messagingSms": "Messaging / SMS",
+      "rcs": "RCS",
+      "signal": "Signal",
+      "bans": "Bans",
+      "audit": "Audit",
+      "analytics": "Analytics",
+      "health": "Health",
+      "hubs": "Hubs",
+      "platformRoles": "Platform Roles",
+      "platformBans": "Bans",
+      "platformAudit": "Audit",
+      "platformAnalytics": "Analytics",
+      "platformHealth": "Health",
+      "platformSettings": "Platform Settings",
+      "gdprErasure": "GDPR Erasure"
+    }
   }
 }

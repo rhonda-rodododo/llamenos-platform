@@ -2767,3 +2767,47 @@
 "your_identity" = "Your Identity";
 "your_private_key" = "Your Private Key";
 "your_public_key" = "Your Public Key";
+
+
+/* Admin Sidebar Navigation */
+"adminNav_openMenu" = "Open menu";
+"adminNav_scopes_thisHub" = "This Hub";
+"adminNav_scopes_platform" = "Platform";
+"adminNav_groups_general" = "General";
+"adminNav_groups_people" = "People";
+"adminNav_groups_intake" = "Intake";
+"adminNav_groups_callsVoice" = "Calls & Voice";
+"adminNav_groups_channels" = "Channels";
+"adminNav_groups_operations" = "Operations";
+"adminNav_groups_platform" = "Platform";
+"adminNav_items_locationLookup" = "Location Lookup";
+"adminNav_items_passkeyPolicy" = "Passkey Policy";
+"adminNav_items_recoveryGroup" = "Recovery Group";
+"adminNav_items_devices" = "Devices";
+"adminNav_items_hubRoles" = "Hub Roles";
+"adminNav_items_teams" = "Teams";
+"adminNav_items_tags" = "Tags";
+"adminNav_items_customFields" = "Custom Fields";
+"adminNav_items_reportTypes" = "Report Types";
+"adminNav_items_firehose" = "Firehose";
+"adminNav_items_callSettings" = "Call Settings";
+"adminNav_items_voicePrompts" = "Voice Prompts";
+"adminNav_items_phoneMenuLanguages" = "Phone Menu Languages";
+"adminNav_items_transcription" = "Transcription";
+"adminNav_items_spamProtection" = "Spam Protection";
+"adminNav_items_phoneProvider" = "Phone Provider";
+"adminNav_items_messagingSms" = "Messaging / SMS";
+"adminNav_items_rcs" = "RCS";
+"adminNav_items_signal" = "Signal";
+"adminNav_items_bans" = "Bans";
+"adminNav_items_audit" = "Audit";
+"adminNav_items_analytics" = "Analytics";
+"adminNav_items_health" = "Health";
+"adminNav_items_hubs" = "Hubs";
+"adminNav_items_platformRoles" = "Platform Roles";
+"adminNav_items_platformBans" = "Bans";
+"adminNav_items_platformAudit" = "Audit";
+"adminNav_items_platformAnalytics" = "Analytics";
+"adminNav_items_platformHealth" = "Health";
+"adminNav_items_platformSettings" = "Platform Settings";
+"adminNav_items_gdprErasure" = "GDPR Erasure";
