@@ -50,12 +50,27 @@ cd apps/ios && bundle install    # installs Fastlane into apps/ios/vendor/bundle
 ```bash
 git clone git@github.com:your-org/llamenos.git
 cd llamenos
-mise install          # Bun + JDK + Ruby
-bun install           # JS/TS dependencies
-bash scripts/dev-setup.sh    # prerequisite check + troubleshooting hints
+mise run setup        # One command: installs tools, deps, builds crypto, runs codegen
 ```
 
-`dev-setup.sh` checks your toolchain and tells you exactly what's missing.
+`mise run setup` bootstraps the entire workspace. For a faster setup that skips mobile builds:
+
+```bash
+mise run setup --quick
+```
+
+After pulling changes that affect generated code (schemas, i18n, crypto), `bun install` automatically
+runs `bun run workspace-setup` to keep everything in sync. You can also run it manually:
+
+```bash
+bun run workspace-setup           # Incremental sync (timestamp-aware, skips mobile by default)
+bun run workspace-setup --force   # Full rebuild
+bun run workspace-setup --ios     # Include iOS crypto build
+bun run workspace-setup --android # Include Android crypto build
+```
+
+Mobile builds are skipped by default for speed. Pass `--ios` or `--android` explicitly, or use branch names
+like `feat/ios-*` / `feat/android-*` / `feat/mobile-*` to auto-enable them.
 
 ---
 

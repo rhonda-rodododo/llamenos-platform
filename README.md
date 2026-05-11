@@ -127,8 +127,7 @@ The app auto-updates when new versions are available.
 ```bash
 git clone https://github.com/your-org/llamenos.git
 cd llamenos
-bun install
-bash scripts/dev-setup.sh    # checks prerequisites and reports what's missing
+mise run setup    # One command: installs tools, deps, builds crypto, runs codegen
 ```
 
 ### 2. Generate an admin keypair
