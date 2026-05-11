@@ -170,17 +170,34 @@ abstract class BaseSteps : SemanticsNodeInteractionsProvider {
 
     /**
      * Navigate to a dashboard card by its test tag.
-     * Navigates: Dashboard tab → Scroll to card → Click.
+     * Navigates: Dashboard tab → Wait for card → Scroll to card → Click.
+     *
+     * Waits for the card node to exist in the semantics tree before
+     * attempting scroll/click. On CI emulators the dashboard Column may
+     * take time to fully lay out (especially with PullToRefreshBox wrapping
+     * a verticalScroll Column). Without this wait, performScrollTo() can
+     * throw before the node is available, and the silently-swallowed error
+     * causes downstream waitUntil timeouts (the actual CI failure mode).
      */
     protected fun navigateViaDashboardCard(cardTag: String) {
         navigateToTab(NAV_DASHBOARD)
+        // Wait for the dashboard to render the card node in the semantics tree.
+        // The dashboard uses a Column with verticalScroll — all nodes exist from
+        // the start, but on slow CI emulators layout may take a frame or two.
+        composeRule.waitUntil(15_000) {
+            composeRule.onAllNodesWithTag(cardTag).fetchSemanticsNodes().isNotEmpty()
+        }
+        // performScrollTo() can fail when PullToRefreshBox adds nested scroll
+        // semantics that confuse the scroll target resolution. Fall back to
+        // direct click (Compose test clicks fire regardless of node visibility).
         try {
             onNodeWithTag(cardTag).performScrollTo()
-            onNodeWithTag(cardTag).performClick()
-            composeRule.waitForIdle()
         } catch (_: Throwable) {
-            // Dashboard card not available
+            // Scroll failed — node exists but scrollable ancestor couldn't be resolved.
+            // performClick() below still works because Compose test clicks use semantics.
         }
+        onNodeWithTag(cardTag).performClick()
+        composeRule.waitForIdle()
     }
 
     /**

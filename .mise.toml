@@ -29,8 +29,12 @@ ENVIRONMENT = "development"
 # CI uses `bun run` directly — mise tasks are not required for CI.
 
 [tasks.setup]
-description = "Check prerequisites and install all dependencies"
-run         = "bash scripts/dev-setup.sh"
+description = "Full first-time setup for new contributors"
+run         = "bash scripts/setup.sh"
+
+[tasks.worktree-setup]
+description = "Regenerate codegen and rebuild crypto artifacts (runs automatically on bun install)"
+run         = "bash scripts/worktree-setup.sh"
 
 [tasks.dev]
 description = "Start local backend (PostgreSQL + backing services + Bun server)"
