@@ -22,7 +22,7 @@ bun install
 
 ## 2. Bootstrap admin keypair la
 
-Jenere yon Nostr keypair pou kont administratè a. Sa pwodui yon kle sekrè (nsec) ak yon kle piblik (npub/hex).
+Jenere yon WebSocket keypair pou kont administratè a. Sa pwodui yon kle sekrè (nsec) ak yon kle piblik (npub/hex).
 
 ```bash
 bun run bootstrap-admin

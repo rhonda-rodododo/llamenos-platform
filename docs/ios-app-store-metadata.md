@@ -199,7 +199,7 @@ The app does not use data to track users across apps or websites owned by other 
 | Attribute | Value |
 |-----------|-------|
 | Data Type | User ID (`NSPrivacyCollectedDataTypeUserID`) |
-| Collected | Yes — Ed25519 public key serves as the user identifier (Nostr-compatible) |
+| Collected | Yes — Ed25519 public key serves as the user identifier (WebSocket-compatible) |
 | Linked to Identity | Yes |
 | Used for Tracking | No |
 | Purpose | App Functionality — user identity for authentication and E2EE key wrapping |

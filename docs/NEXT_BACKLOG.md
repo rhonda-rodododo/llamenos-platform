@@ -21,7 +21,7 @@
 - [x] **CRITICAL**: Caller phone hash leaked in spam report WS response
 - [x] **HIGH**: Mass assignment — volunteer self-update now restricted to safe fields allowlist
 - [x] **HIGH**: SSRF in provider test — ARI URL validation, internal IP blocking, fetch timeout
-- [x] **HIGH**: ~~WebSocket flooding~~ — WebSocket removed; Nostr relay rate limiting replaces
+- [x] **HIGH**: ~~WebSocket flooding~~ — WebSocket removed; WebSocket relay rate limiting replaces
 - [x] **HIGH**: ~~WebSocket prototype pollution~~ — WebSocket removed; no longer applicable
 - [x] **HIGH**: Weak KDF — upgraded SHA-256 concat to HKDF-SHA256 for note encryption
 - [x] **HIGH**: Security headers — COOP, no-referrer, expanded CSP and Permissions-Policy
@@ -69,7 +69,7 @@
 ## Security Audit Findings (2026-03-04, Round 7)
 
 ### Fixed — Epics 252-256
-- [x] **[Epic 252: Nostr Hub-Key Encryption](epics/epic-252-nostr-hub-key-encryption.md)** — Encrypt all Nostr relay events with XChaCha20-Poly1305 via HKDF(SERVER_NOSTR_SECRET), expose serverEventKeyHex to authenticated clients
+- [x] **[Epic 252: WebSocket Hub-Key Encryption](epics/epic-252-WebSocket-hub-key-encryption.md)** — Encrypt all WebSocket relay events with XChaCha20-Poly1305 via HKDF(SERVER_NOSTR_SECRET), expose serverEventKeyHex to authenticated clients
 - [x] **[Epic 253: Invite Role Authorization](epics/epic-253-invite-role-authorization.md)** — Validate that invite creators have all permissions in assigned roles (prevent privilege escalation)
 - [x] **[Epic 254: Remove Auth Token Fallback](epics/epic-254-remove-auth-token-fallback.md)** — Remove unbound Schnorr token acceptance; require method+path binding
 - [x] **[Epic 255: Encrypt Contact Identifiers](epics/epic-255-encrypt-contact-identifiers.md)** — Encrypt phone/email at rest in ConversationDO with HKDF+XChaCha20-Poly1305, lazy migration for legacy plaintext
@@ -182,11 +182,11 @@ Architecture overview: [`docs/architecture/E2EE_ARCHITECTURE.md`](architecture/E
 
 ### Pre-Implementation Foundations — COMPLETE
 - [x] **[Epic 76.0: Security Foundations](epics/epic-76.0-security-foundations.md)** — Domain separation label audit, provisioning SAS verification fix, crypto-labels.ts
-- [x] **[Epic 76.1: Worker-Relay Communication](epics/epic-76.1-worker-relay-communication.md)** — NostrPublisher interface, CF/Node implementations, server keypair, relay infrastructure
+- [x] **[Epic 76.1: Worker-Relay Communication](epics/epic-76.1-worker-relay-communication.md)** — WebSocketPublisher interface, CF/Node implementations, server keypair, relay infrastructure
 - [x] **[Epic 76.2: Key Architecture Redesign](epics/epic-76.2-key-architecture-redesign.md)** — Hub key = random 32 bytes ECIES-wrapped per member, multi-admin envelopes, hub key manager
 
 ### Foundation Layer — COMPLETE
-- [x] **[Epic 76: Nostr Relay Real-Time Sync](epics/epic-76-nostr-relay-sync.md)** — Complete WS removal, Nostr-only real-time broadcasts, ephemeral kind 20001 events
+- [x] **[Epic 76: WebSocket Relay Real-Time Sync](epics/epic-76-WebSocket-relay-sync.md)** — Complete WS removal, WebSocket-only real-time broadcasts, ephemeral kind 20001 events
 
 ### Data Encryption Layer — COMPLETE
 - [x] **[Epic 74: E2EE Messaging Storage](epics/epic-74-e2ee-messaging-storage.md)** — Envelope encryption: per-message random key, ECIES envelopes for volunteer + admin
@@ -212,7 +212,7 @@ Desktop (Tauri v2) and mobile (React Native/Expo 55) clients. Ordered by depende
 - [x] **[Epic 87: Desktop Auto-Updater & Distribution](epics/epic-87-desktop-auto-updater.md)** — Ed25519 signed updates, CI builds (macOS/Windows/Linux), Apple notarization, GitHub Releases manifest, self-hosted endpoint support
 
 ### Mobile Foundation & Auth
-- [x] **[Epic 83: Mobile Foundation](epics/epic-83-mobile-foundation.md)** — Full crypto layer, auth flow, NativeWind 4, Zustand/MMKV, React Query, Nostr relay, i18n, tab navigator
+- [x] **[Epic 83: Mobile Foundation](epics/epic-83-mobile-foundation.md)** — Full crypto layer, auth flow, NativeWind 4, Zustand/MMKV, React Query, WebSocket relay, i18n, tab navigator
 
 ### Mobile Core Screens
 - [x] **[Epic 84: Mobile Core Screens](epics/epic-84-mobile-core-screens.md)** — Dashboard, calls, notes (E2EE), shifts, settings, call screen with note editor
@@ -500,7 +500,7 @@ Design doc: [`docs/plans/2026-03-08-production-readiness-design.md`](plans/2026-
 
 ### Track 1: Ansible Fleet Deployment — COMPLETE
 - [x] **[Epic 276: Multi-Host Ansible Inventory & Service Discovery](epics/epic-276-multi-host-inventory.md)** — matrix-docker-ansible-deploy style, per-service toggles, multi-host service discovery
-- [x] **[Epic 277: Backup Orchestration for Distributed Deployments](epics/epic-277-backup-orchestration.md)** — Per-service backup roles, cross-host aggregation, strfry/RustFS/config backup, restore playbook
+- [x] **[Epic 277: Backup Orchestration for Distributed Deployments](epics/epic-277-backup-orchestration.md)** — Per-service backup roles, cross-host aggregation, WebSocket relay/RustFS/config backup, restore playbook
 - [x] **[Epic 278: Observability Stack via Ansible](epics/epic-278-observability-stack.md)** — Prometheus + Grafana + Loki (full) or health-poll + ntfy (lightweight), pre-built dashboards
 - [x] **[Epic 279: Auto-Healing & Zero-Touch Operations](epics/epic-279-auto-healing.md)** — Container watchdog, stale data cleanup, NTP drift detection, disk management
 - [x] **[Epic 280: Rolling Updates with Rollback](epics/epic-280-rolling-updates.md)** — Health-gated updates, dependency-ordered multi-host, version history, automatic rollback
@@ -521,7 +521,7 @@ Design doc: [`docs/plans/2026-03-08-production-readiness-design.md`](plans/2026-
 - [x] **[Epic 289: Desktop Auto-Update (Tauri Updater)](epics/epic-289-desktop-auto-update.md)** — GitHub Releases + self-hosted manifest, Ed25519 signing, background checks
 - [x] **[Epic 290: Mobile App Distribution & Update Management](epics/epic-290-mobile-app-distribution.md)** — TestFlight + Play Store + F-Droid + direct APK, version check on launch
 - [x] **[Epic 291: Client-Side Transcription on Mobile](epics/epic-291-mobile-transcription.md)** — iOS Speech framework, Android SpeechRecognizer, on-device only
-- [x] **[Epic 292: Offline Resilience & Sync](epics/epic-292-offline-resilience.md)** — Offline operation queue, replay on reconnect, Nostr event replay
+- [x] **[Epic 292: Offline Resilience & Sync](epics/epic-292-offline-resilience.md)** — Offline operation queue, replay on reconnect, WebSocket event replay
 - [x] **[Epic 293: Client Crash Reporting & Diagnostics](epics/epic-293-crash-reporting.md)** — GlitchTip (self-hosted Sentry), all 3 platforms, PII stripping, source maps
 
 ### Track 5: Operational Sustainability — COMPLETE
@@ -540,13 +540,13 @@ Design doc: [`docs/plans/2026-03-08-production-readiness-design.md`](plans/2026-
 - Track 4: 288 → (289 | 290) → 291 → 292 → 293
 - Track 5: 278 → 294 → 295 → 296 → 297 → 298 → 299 → 300
 
-## Nostr Relay & Call Actions (Epics 305-310) ✅ COMPLETED
+## WebSocket Relay & Call Actions (Epics 305-310) ✅ COMPLETED
 - [x] **[Epic 305: OpenAPI Spec + Scalar Docs](epics/epic-305-openapi-spec-scalar-docs.md)** — hono-openapi + Scalar UI at /api/docs, 158 documented paths, 25 tags, Zod v4 domain schemas, 5 BDD scenarios
-- [x] **[Epic 306: Nostr Relay Event Delivery Fixes](epics/epic-306-nostr-relay-event-delivery-fixes.md)** — NodeNostrPublisher rejection handling, mobile kind filters, Android/iOS event type string alignment
+- [x] **[Epic 306: WebSocket Relay Event Delivery Fixes](epics/epic-306-WebSocket-relay-event-delivery-fixes.md)** — NodeWebSocketPublisher rejection handling, mobile kind filters, Android/iOS event type string alignment
 - [x] **[Epic 307: Real-Time Event Delivery BDD Coverage](epics/epic-307-realtime-event-delivery-bdd-coverage.md)** — RelayCapture test helper, 9 BDD scenarios for all event kinds + encryption + tags + signatures
 - [x] **[Epic 308: In-Call Quick Actions — Ban & Notes](epics/epic-308-call-action-buttons-ban-notes.md)** — POST /api/calls/:callId/ban server-side endpoint, client API fix, i18n strings, 5 BDD scenarios
 - [x] **[Epic 309: Relay Event Decryption — All Platforms](epics/epic-309-relay-event-decryption.md)** — Wire serverEventKeyHex into desktop/iOS/Android relay decryption, add decrypt_server_event_hex Rust FFI
-- [x] **[Epic 310: Nostr Publisher Reliability & Cleanup](epics/epic-310-nostr-publisher-reliability-cleanup.md)** — Async publishNostrEvent, messaging router encryption fix, flush OK tracking, reconnect cap, orphaned constants, skill docs, strfry hardening
+- [x] **[Epic 310: WebSocket Publisher Reliability & Cleanup](epics/epic-310-WebSocket-publisher-reliability-cleanup.md)** — Async publishWebSocketEvent, messaging router encryption fix, flush OK tracking, reconnect cap, orphaned constants, skill docs, WebSocket relay hardening
 
 ## Cross-Platform Security & Quality (Epics 311+) ✅ COMPLETED
 - [x] **[Epic 311: Mobile Admin Envelope Encryption & Blasts Authorization](epics/epic-311-mobile-admin-envelope-encryption-blasts-auth.md)** — Wire adminDecryptionPubkey into iOS/Android encryption, add requirePermission to 14 blast endpoints, Zod validation for 10 endpoints
@@ -643,7 +643,7 @@ Complete backend modernization: replace Node.js with Bun runtime, then replace t
 - [x] **[Epic 357: Migrate from Node.js to Bun Runtime](epics/epic-357-bun-runtime-migration.md)** — Server entry point (Hono Bun adapter), PostgreSQL driver (Bun.sql), remove esbuild, Docker image (oven/bun:1-slim), dev scripts, WebSocket, deploy configs (Compose, Helm, Ansible), documentation
 - [x] **[Epic 358: Drop DO Architecture — Drizzle ORM + Direct PostgreSQL](epics/epic-358-drop-do-architecture.md)** — Replaced 9 DOs (8,160 lines) + platform layer (1,200 lines) with 11 Drizzle-backed service classes (9,081 lines). 51 typed PostgreSQL tables with GIN/partial indexes. Net -10,680 lines deleted. ConversationDO/BlastDO subscriber data integrity bug fixed.
 - [x] **[Epic 359: BDD Test Compatibility — Fix Service Response Shapes](epics/epic-359-bdd-service-compat.md)** — Fixed 3 root causes: response shape wrapping (shifts/bans/events), auth dev-mode token validation, audit log reset. Results: 417→455 passed (+38), 230→~48 remaining failures.
-- [x] **Epic 360: BDD Test Parity — Fix Remaining Failures** — Fixed response shapes (notes, calls), Nostr event publishing (8 endpoints), auth validation (no auto-register), permission matrix (201 status codes), CMS state init, callerLast4, audit field names. Results: 417→501 passed (+84), 2 remaining edge cases, 230 pre-existing skips (unimplemented steps)
+- [x] **Epic 360: BDD Test Parity — Fix Remaining Failures** — Fixed response shapes (notes, calls), WebSocket event publishing (8 endpoints), auth validation (no auto-register), permission matrix (201 status codes), CMS state init, callerLast4, audit field names. Results: 417→501 passed (+84), 2 remaining edge cases, 230 pre-existing skips (unimplemented steps)
 - [x] **[Epic 361: Mobile Client Compatibility — Drizzle Backend Validation](epics/epic-361-mobile-drizzle-compat.md)** — Codegen verified: zero drift on TS/Swift/Kotlin types + i18n. Protocol schemas unchanged. iOS build fixed (duplicate RecordContact), Android build fixed (66 missing i18n strings). iOS: 107 unit tests pass. XCUITests: 253 executed.
 - [x] **[Epic 362: Permission Granularity Overhaul](epics/epic-362-permission-granularity.md)** — 73→93 permissions. 20 new, 30 route guard fixes, 5 phantom fixes, 8 unguarded endpoints guarded, 14 templates updated. Split calls:answer (3-way), settings:manage (5-way). All 5 default roles updated.
 - [x] **[Epic 363: Wire Schema Coverage — All Endpoints Validated](epics/epic-363-wire-schema-coverage.md)** — ~130 endpoints with response schemas, ~60 named schemas, all registered for codegen. 566 BDD tests pass, 0 failures.

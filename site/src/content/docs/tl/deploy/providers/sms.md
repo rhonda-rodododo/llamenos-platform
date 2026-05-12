@@ -60,7 +60,7 @@ Magpadala ng SMS sa iyong hotline phone number. Dapat makita mo ang conversation
 1. Dumarating ang SMS sa iyong provider, na nagpapadala ng webhook sa iyong Worker
 2. Vine-validate ng Worker ang webhook signature (provider-specific HMAC)
 3. Ang mensahe ay pine-parse at iniimbak sa ConversationDO
-4. Nino-notify ang mga on-shift na volunteer sa pamamagitan ng Nostr relay events
+4. Nino-notify ang mga on-shift na volunteer sa pamamagitan ng WebSocket relay events
 5. Tumutugon ang mga volunteer mula sa Conversations tab — ang mga sagot ay ipinapadala pabalik sa pamamagitan ng SMS API ng iyong provider
 
 ## Mga tala sa seguridad

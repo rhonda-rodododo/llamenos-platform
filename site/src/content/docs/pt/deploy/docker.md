@@ -21,7 +21,7 @@ cd llamenos
 
 ## 2. Gerar o par de chaves do administrador
 
-Voce precisa de um par de chaves Nostr para a conta de administrador. Execute isso na sua maquina local (ou no servidor se o Bun estiver instalado):
+Voce precisa de um par de chaves WebSocket para a conta de administrador. Execute isso na sua maquina local (ou no servidor se o Bun estiver instalado):
 
 ```bash
 bun install

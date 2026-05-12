@@ -70,7 +70,7 @@ This document covers five disaster recovery scenarios for Llamenos self-hosted d
 
 ### Notes
 - E2EE notes remain protected. The server never had plaintext note content.
-- The strfry relay database is ephemeral (kind 20001 events) and does not need restoration. It rebuilds as clients reconnect.
+- The WebSocket relay relay database is ephemeral (kind 20001 events) and does not need restoration. It rebuilds as clients reconnect.
 - Caddy will automatically obtain new TLS certificates on first request.
 
 ---
@@ -139,7 +139,7 @@ This document covers five disaster recovery scenarios for Llamenos self-hosted d
 
 **Cause**: Attacker gains access to the server and encrypts all files, demanding payment for the decryption key.
 
-**Data at risk**: Everything on the compromised server. Assume all server-side secrets (database password, HMAC secret, RustFS credentials, Twilio API keys, server Nostr secret) are compromised.
+**Data at risk**: Everything on the compromised server. Assume all server-side secrets (database password, HMAC secret, RustFS credentials, Twilio API keys, server WebSocket secret) are compromised.
 
 **Target RTO**: < 4 hours
 
@@ -199,9 +199,9 @@ This document covers five disaster recovery scenarios for Llamenos self-hosted d
 
 ## Scenario 4: Key Compromise
 
-**Cause**: The admin's private key (nsec) is compromised through device theft, malware, social engineering, or insider threat. Alternatively, the `SERVER_NOSTR_SECRET` is exposed.
+**Cause**: The admin's private key (nsec) is compromised through device theft, malware, social engineering, or insider threat. Alternatively, the `SERVER_SECRET` is exposed.
 
-**Data at risk**: Admin-wrapped note envelopes (the attacker can decrypt notes wrapped for the compromised admin key). Active session tokens. Server identity if `SERVER_NOSTR_SECRET` is compromised.
+**Data at risk**: Admin-wrapped note envelopes (the attacker can decrypt notes wrapped for the compromised admin key). Active session tokens. Server identity if `SERVER_SECRET` is compromised.
 
 **Target RTO**: < 2 hours
 
@@ -224,10 +224,10 @@ This document covers five disaster recovery scenarios for Llamenos self-hosted d
    sed -i "s|^ADMIN_PUBKEY=.*|ADMIN_PUBKEY=<new_pubkey>|" .env
    ```
 
-4. **Rotate `SERVER_NOSTR_SECRET`** (always rotate this during a key compromise).
+4. **Rotate `SERVER_SECRET`** (always rotate this during a key compromise).
    ```bash
    NEW_NOSTR_SECRET=$(openssl rand -hex 32)
-   sed -i "s|^SERVER_NOSTR_SECRET=.*|SERVER_NOSTR_SECRET=${NEW_NOSTR_SECRET}|" .env
+   sed -i "s|^SERVER_SECRET=.*|SERVER_SECRET=${NEW_NOSTR_SECRET}|" .env
    ```
 
 5. **Rotate HMAC secret** to invalidate all active sessions.

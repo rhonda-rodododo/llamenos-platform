@@ -5,8 +5,7 @@
 # 1. Stop all services
 # 2. Restore config (docker-compose.yml, .env, Caddyfile)
 # 3. Restore PostgreSQL
-# 4. Restore strfry (Nostr events)
-# 5. Restore RustFS (file attachments)
+# 4. Restore RustFS (file attachments)
 # 6. Verify data integrity
 # 7. Start services
 #
@@ -72,27 +71,13 @@
         patterns: "{{ 'llamenos-postgres-' + restore_timestamp + '*' if restore_timestamp else 'llamenos-postgres-*' }}"
         file_type: file
       register: pg_backup_files
-      tags: [postgres, strfry, rustfs, config]
+      tags: [postgres, rustfs, config]
 
     - name: Select PostgreSQL backup file
       ansible.builtin.set_fact:
         pg_backup_file: "{{ (pg_backup_files.files | sort(attribute='mtime') | last).path }}"
       when: pg_backup_files.matched > 0
       tags: [postgres]
-
-    - name: Find strfry backup
-      ansible.builtin.find:
-        paths: "{{ restore_source_dir }}/strfry/daily"
-        patterns: "{{ 'llamenos-strfry-' + restore_timestamp + '*' if restore_timestamp else 'llamenos-strfry-*' }}"
-        file_type: file
-      register: strfry_backup_files
-      tags: [strfry]
-
-    - name: Select strfry backup file
-      ansible.builtin.set_fact:
-        strfry_backup_file: "{{ (strfry_backup_files.files | sort(attribute='mtime') | last).path }}"
-      when: strfry_backup_files.matched > 0
-      tags: [strfry]
 
     - name: Find RustFS backup
       ansible.builtin.find:
@@ -127,7 +112,6 @@
         msg: |
           Selected backup files:
             PostgreSQL: {{ pg_backup_file | default('NOT FOUND') }}
-            strfry:     {{ strfry_backup_file | default('NOT FOUND') }}
             RustFS:     {{ rustfs_backup_file | default('NOT FOUND') }}
             Config:     {{ config_backup_file | default('NOT FOUND') }}
       tags: always
@@ -138,14 +122,14 @@
       ansible.builtin.command:
         cmd: docker compose -f {{ app_dir }}/docker-compose.yml down
       when: not restore_dry_run
-      tags: [postgres, strfry, rustfs, config]
+      tags: [postgres, rustfs, config]
       ignore_errors: true
 
     - name: "[DRY RUN] Would stop Docker Compose stack"
       ansible.builtin.debug:
         msg: "docker compose down (skipped — dry run)"
       when: restore_dry_run
-      tags: [postgres, strfry, rustfs, config]
+      tags: [postgres, rustfs, config]
 
     # ── Create temp directory ──────────────────────────────────────
 
@@ -199,8 +183,8 @@
     - name: Start PostgreSQL container only
       ansible.builtin.command:
         cmd: docker compose -f {{ app_dir }}/docker-compose.yml up -d postgres
-      when: not restore_dry_run and (pg_backup_file is defined or strfry_backup_file is defined or rustfs_backup_file is defined)
-      tags: [postgres, strfry, rustfs]
+      when: not restore_dry_run and (pg_backup_file is defined or rustfs_backup_file is defined)
+      tags: [postgres, rustfs]
 
     - name: Wait for PostgreSQL to be ready
       ansible.builtin.command:
@@ -273,62 +257,6 @@
       when: restore_dry_run and pg_backup_file is defined
       tags: [postgres]
 
-    # ── Restore strfry ─────────────────────────────────────────────
-
-    - name: Start strfry container
-      ansible.builtin.command:
-        cmd: docker compose -f {{ app_dir }}/docker-compose.yml up -d strfry
-      when: not restore_dry_run and strfry_backup_file is defined
-      tags: [strfry]
-
-    - name: Wait for strfry to be ready
-      ansible.builtin.uri:
-        url: "http://localhost:7777"
-        method: GET
-        status_code: [200, 101, 400]
-      register: strfry_ready
-      retries: 10
-      delay: 2
-      until: strfry_ready.status is defined
-      when: not restore_dry_run and strfry_backup_file is defined
-      tags: [strfry]
-      ignore_errors: true
-
-    - name: Decrypt strfry backup
-      ansible.builtin.shell: |
-        {% if backup_age_public_key | default('') | length > 0 %}
-        age -d -i {{ restore_age_key_path }} {{ strfry_backup_file }} | gunzip > {{ restore_tmpdir.path }}/strfry-events.jsonl
-        {% else %}
-        gunzip -c {{ strfry_backup_file }} > {{ restore_tmpdir.path }}/strfry-events.jsonl
-        {% endif %}
-      when:
-        - strfry_backup_file is defined
-        - not restore_dry_run
-      tags: [strfry]
-
-    - name: Import events into strfry
-      ansible.builtin.shell: |
-        cat {{ restore_tmpdir.path }}/strfry-events.jsonl | \
-          docker compose -f {{ app_dir }}/docker-compose.yml exec -T strfry strfry import
-      register: strfry_restore_result
-      when:
-        - strfry_backup_file is defined
-        - not restore_dry_run
-      tags: [strfry]
-      ignore_errors: true
-
-    - name: Display strfry restore result
-      ansible.builtin.debug:
-        msg: "strfry import: {{ strfry_restore_result.stdout_lines | default(['no output']) }}"
-      when: strfry_restore_result is defined
-      tags: [strfry]
-
-    - name: "[DRY RUN] Would restore strfry from {{ strfry_backup_file | default('N/A') }}"
-      ansible.builtin.debug:
-        msg: "strfry restore skipped (dry run)"
-      when: restore_dry_run and strfry_backup_file is defined
-      tags: [strfry]
-
     # ── Restore RustFS ─────────────────────────────────────────────
 
     - name: Start RustFS container
@@ -393,7 +321,7 @@
       ansible.builtin.command:
         cmd: docker compose -f {{ app_dir }}/docker-compose.yml up -d
       when: not restore_dry_run
-      tags: [postgres, strfry, rustfs, config]
+      tags: [postgres, rustfs, config]
 
     - name: Wait for application health check
       ansible.builtin.uri:
@@ -406,7 +334,7 @@
       delay: 5
       until: health_check.status == 200
       when: not restore_dry_run
-      tags: [postgres, strfry, rustfs, config]
+      tags: [postgres, rustfs, config]
       ignore_errors: true
 
     - name: Display restore summary
@@ -415,7 +343,6 @@
           Restore {{ 'DRY RUN ' if restore_dry_run else '' }}complete.
 
            PostgreSQL: {{ 'RESTORED' if pg_backup_file is defined and not restore_dry_run else 'SKIPPED' }}
-           strfry:     {{ 'RESTORED' if strfry_backup_file is defined and not restore_dry_run else 'SKIPPED' }}
            RustFS:     {{ 'RESTORED' if rustfs_backup_file is defined and not restore_dry_run else 'SKIPPED' }}
            Config:     {{ 'RESTORED' if config_backup_file is defined and not restore_dry_run else 'SKIPPED' }}
 

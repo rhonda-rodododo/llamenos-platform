@@ -368,9 +368,7 @@ jobs:
           DEV_RESET_SECRET: test-reset-secret
           PBX_TYPE: ari
           DATABASE_URL: postgresql://llamenos:ci-test-password@localhost:5432/llamenos
-          # Must match SERVER_SECRET/SERVER_NOSTR_SECRET in .env
           SERVER_SECRET: "0000000000000000000000000000000000000000000000000000000000000001"
-          SERVER_NOSTR_SECRET: "0000000000000000000000000000000000000000000000000000000000000001"
           # sip-bridge exposed on host port 3001 via docker-compose.test.yml
           SIP_BRIDGE_URL: http://localhost:3001
 
@@ -885,7 +883,7 @@ jobs:
           # - Rust doc/line comments (//! or /// or // containing "llamenos:")
           # - Rust const definitions (pub const ... = "llamenos:...")
           # - Rust assert_eq! in test blocks
-          # - Nostr event tag literals ("llamenos:event" and "llamenos:provision-") used at protocol boundary
+          # - WebSocket event tag literals ("llamenos:event" and "llamenos:provision-") used at protocol boundary
           # - Stronghold salt in desktop lib.rs
           FILTERED=$(echo "$VIOLATIONS" \
             | grep -v 'crypto-labels.json' \

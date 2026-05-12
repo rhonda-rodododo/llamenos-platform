@@ -21,7 +21,7 @@ cd llamenos
 
 ## 2. 生成管理员密钥对
 
-您需要一个 Nostr 密钥对作为管理员账户。在本地机器（或已安装 Bun 的服务器）上运行：
+您需要一个 WebSocket 密钥对作为管理员账户。在本地机器（或已安装 Bun 的服务器）上运行：
 
 ```bash
 bun install

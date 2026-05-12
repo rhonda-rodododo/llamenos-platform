@@ -5,7 +5,7 @@
  * Runs on a 60s interval. When a scheduled blast's scheduledAt <= now,
  * transitions it to 'sending' and expands it into delivery rows.
  *
- * Follows the same pattern as nostr-outbox-poller.ts.
+ * Follows the same pattern as blast-delivery-worker.ts.
  */
 
 import type { BlastsService } from '../services/blasts'

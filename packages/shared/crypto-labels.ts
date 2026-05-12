@@ -110,14 +110,6 @@ export const RECOVERY_SALT = 'llamenos:recovery'
 /** Generic backup encryption (Epic 76.0 — new format) */
 export const LABEL_BACKUP = 'llamenos:backup'
 
-// --- Server Nostr Identity (Epic 76.1) ---
-
-/** HKDF derivation for server Nostr keypair from SERVER_NOSTR_SECRET */
-export const LABEL_SERVER_NOSTR_KEY = 'llamenos:server-nostr-key'
-
-/** HKDF info parameter for server Nostr key (versioned for rotation) */
-export const LABEL_SERVER_NOSTR_KEY_INFO = 'llamenos:server-nostr-key:v1'
-
 // --- Push Notification Encryption (Epic 86) ---
 
 /** Wake-tier ECIES push payload — decryptable without PIN (minimal metadata only) */
@@ -147,15 +139,9 @@ export const LABEL_FIREHOSE_REPORT_WRAP = 'llamenos:firehose:report-wrap'
 /** HKDF context for per-hub storage IAM credential encryption at rest */
 export const LABEL_STORAGE_CREDENTIAL_WRAP = 'llamenos:storage-credential-wrap'
 
-// --- Separated Signing / Encryption Derivation (Epic 258 H1) ---
+// --- Server Event Encryption ---
 
-/** HKDF salt for server Nostr signing key derivation (separated from encryption) */
-export const LABEL_SERVER_NOSTR_SIGNING_KEY = 'llamenos:server-nostr-signing:v1'
-
-/** HKDF info for server Nostr signing key derivation */
-export const LABEL_SERVER_NOSTR_SIGNING_KEY_INFO = 'llamenos:server-nostr-signing-info:v1'
-
-/** HKDF salt for server event encryption key derivation (separated from signing) */
+/** HKDF salt for server event encryption key derivation */
 export const LABEL_SERVER_EVENT_ENCRYPTION_KEY = 'llamenos:server-event-encryption:v1'
 
 /** HKDF info for server event encryption key derivation */

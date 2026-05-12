@@ -2,7 +2,7 @@
  * WebSocket relay message schemas.
  *
  * Defines all client→server and server→client messages for the
- * authenticated WebSocket relay that replaces the Nostr/strfry relay.
+ * authenticated WebSocket relay that replaces the legacy relay.
  */
 import { z } from 'zod'
 

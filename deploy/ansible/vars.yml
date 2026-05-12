@@ -55,8 +55,6 @@ llamenos_app_enabled: true
 llamenos_postgres_enabled: true
 llamenos_caddy_enabled: true
 llamenos_rustfs_enabled: true
-# Strfry Nostr relay — disabled by default (built-in relay is preferred)
-llamenos_strfry_enabled: false
 # Whisper transcription — requires GPU or significant CPU
 llamenos_transcription_enabled: false
 # Asterisk PBX — for self-hosted telephony
@@ -73,7 +71,6 @@ llamenos_app_image: "docker.io/llamenos/llamenos:latest"
 llamenos_postgres_image: "postgres:17-alpine"
 llamenos_caddy_image: "caddy:2.9-alpine"
 llamenos_rustfs_image: "rustfs/rustfs:latest"
-llamenos_strfry_image: "dockurr/strfry:1.0.1"
 llamenos_whisper_image: "fedirz/faster-whisper-server:0.4.1"
 llamenos_asterisk_image: "andrius/asterisk:20"
 llamenos_signal_image: "bbernhard/signal-cli-rest-api:0.92"
@@ -112,10 +109,9 @@ twilio_account_sid: ""
 twilio_auth_token: ""
 twilio_phone_number: ""
 
-# ─── Nostr Relay ─────────────────────────────────────────────────
+# ─── Server Identity ─────────────────────────────────────────────
 # Generate with: openssl rand -hex 32
-server_nostr_secret: ""
-llamenos_strfry_port: 7777
+server_secret: ""
 
 # ─── Optional Profiles ──────────────────────────────────────────
 # Docker Compose profiles to enable
@@ -136,10 +132,6 @@ backup_rclone_remote: ""
 backup_postgres_retain_daily: 7
 backup_postgres_retain_weekly: 4
 backup_postgres_retain_monthly: 3
-
-backup_strfry_retain_daily: 7
-backup_strfry_retain_weekly: 4
-backup_strfry_retain_monthly: 3
 
 backup_rustfs_retain_daily: 7
 backup_rustfs_retain_weekly: 4

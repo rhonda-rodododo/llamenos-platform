@@ -1,15 +1,15 @@
 # Llamenos Release Signing — Environment Configuration
 # Copy to ~/.llamenos-release.env and fill in values.
 #
-# This file contains credentials for the RustFS (MinIO S3-compatible)
+# This file contains credentials for the RustFS S3-compatible
 # blob storage used for release artifact hosting.
 #
 # NEVER commit real credentials. This is a template only.
 
-# RustFS (MinIO) endpoint — the S3-compatible API URL
+# RustFS endpoint — the S3-compatible API URL
 RUSTFS_ENDPOINT=https://rustfs.llamenos.org
 
-# RustFS credentials (separate from the app's MINIO_ACCESS_KEY)
+# RustFS credentials (separate from the app's STORAGE_ACCESS_KEY)
 RUSTFS_ACCESS_KEY=
 RUSTFS_SECRET_KEY=
 

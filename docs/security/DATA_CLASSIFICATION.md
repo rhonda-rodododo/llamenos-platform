@@ -231,7 +231,7 @@ Data stored in PostgreSQL (migrated from SQLite for durability and column encryp
 
 **Note**: Transcription is performed entirely on-device using WASM Whisper (`@huggingface/transformers`). Audio never leaves the device.
 
-#### Nostr Relay (strfry, self-hosted)
+#### WebSocket Events (built-in endpoint on API server)
 
 | Data | Classification | Retention | Notes |
 |------|---------------|-----------|-------|
@@ -309,7 +309,7 @@ Data stored in PostgreSQL (migrated from SQLite for durability and column encryp
                                         │ 5. Store: hash + last4  │
                                         │    Discard: full number │
                                         │                         │
-                                        │ 6. Nostr relay event:   │
+                                        │ 6. WebSocket event:   │
                                         │    callerLast4 only     │
                                         │    (hub-key encrypted)  │
                                         └─────────────────────────┘
@@ -350,7 +350,7 @@ Note: Llamenos does not currently enforce automated retention policies. Operator
 
 | Date | Version | Changes |
 |------|---------|---------|
-| 2026-05-03 | 2.1 | Post-hardening: added `ua` (SHA-256 hashed) field to audit logs; noted country is not collected; updated Nostr relay events (epoch-rotating per-hub key, power-of-2 padding, write-policy publisher constraint) |
-| 2026-05-02 | 2.0 | Complete rewrite: HPKE replaces ECIES for all key wrapping, per-device Ed25519/X25519 keys replace nsec, added sigchain/PUK/CLKR entries, added CMS data, added hub key distribution, added blind indexes, updated client storage to Tauri Store/Keychain/Keystore (not localStorage), updated Nostr relay data, added signal-notifier sidecar, removed Durable Objects/Cloudflare references |
+| 2026-05-03 | 2.1 | Post-hardening: added `ua` (SHA-256 hashed) field to audit logs; noted country is not collected; updated WebSocket events (epoch-rotating per-hub key, power-of-2 padding, server-only publishing) |
+| 2026-05-02 | 2.0 | Complete rewrite: HPKE replaces ECIES for all key wrapping, per-device Ed25519/X25519 keys replace nsec, added sigchain/PUK/CLKR entries, added CMS data, added hub key distribution, added blind indexes, updated client storage to Tauri Store/Keychain/Keystore (not localStorage), updated WebSocket event data, added signal-notifier sidecar, removed Durable Objects/Cloudflare references |
 | 2026-02-25 | 1.1 | ZK Architecture Overhaul: Updated ConversationDO to E2EE, ShiftManagerDO encrypted details, AuditDO hash chain, client-side transcription |
 | 2026-02-25 | 1.0 | Initial data classification document |

@@ -163,7 +163,7 @@ All crypto is implemented in `packages/crypto/` (Rust), compiled to:
 - **Envelope encryption**: HPKE RFC 9180 (X25519 + HKDF-SHA256 + AES-256-GCM)
 - **Symmetric**: XChaCha20-Poly1305 (hub events)
 - **KDF**: HKDF-SHA-256, Argon2id (PINs, 64MB/3/4)
-- **Signing**: Ed25519 (device auth, sigchain) + BIP-340 Schnorr (legacy Nostr identity, being phased out)
+- **Signing**: Ed25519 (device auth, sigchain) + BIP-340 Schnorr (legacy, being phased out)
 - **Domain separation**: 69 labeled contexts in `packages/protocol/crypto-labels.json`
 
 **Key model**: Each device has its own Ed25519 (signing) + X25519 (encryption) keypair. Device keys never enter the webview — all crypto calls go through Rust via Tauri IPC. The `platform.ts` abstraction is the only correct way to invoke crypto from the frontend.
@@ -222,7 +222,7 @@ bun run typecheck  # Verify no type errors
 
 - `@noble/ciphers` and `@noble/hashes` require `.js` extension in imports
 - `schnorr` is a separate named export: `import { schnorr } from '@noble/curves/secp256k1.js'`
-- WebSocket events replace the previous Nostr relay implementation
+- WebSocket events are the real-time sync mechanism (in-process relay)
 - Never use raw string literals for crypto contexts — always use generated label constants from `@protocol/crypto-labels`
 - `PLAYWRIGHT_TEST=true` enables Vite aliases that swap Tauri IPC for JS mocks in `tests/mocks/`
 - **wrangler.jsonc is only at `site/wrangler.jsonc`** — do not run `wrangler` from the repo root

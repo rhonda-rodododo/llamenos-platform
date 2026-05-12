@@ -48,7 +48,6 @@
         - postgres
         - caddy
         - rustfs
-        - strfry
 
     - name: Create optional service directories (if enabled)
       ansible.builtin.file:

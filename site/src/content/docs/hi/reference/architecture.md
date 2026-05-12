@@ -75,7 +75,7 @@ Worker API  -->  ConversationDO
     |                | Wraps symmetric key via ECIES for assigned volunteer + admins
     |                | Discards plaintext
     |                v
-    |           Nostr relay (encrypted hub event notifies online clients)
+    |           WebSocket relay (encrypted hub event notifies online clients)
     |
     v
 Client (volunteer's browser/app)
@@ -111,7 +111,7 @@ Worker API  -->  ConversationDO  -->  Messaging Provider (sends reply)
 | रिपोर्ट अटैचमेंट | हाँ (E2EE) | XChaCha20-Poly1305 (स्ट्रीम्ड) | रिपोर्ट लेखक + सभी एडमिन |
 | मैसेज कंटेंट | हाँ (E2EE) | XChaCha20-Poly1305 + ECIES एनवेलप | असाइन किया गया स्वयंसेवक + सभी एडमिन |
 | ट्रांसक्रिप्ट | हाँ (at-rest) | XChaCha20-Poly1305 | ट्रांसक्रिप्ट निर्माता + सभी एडमिन |
-| Hub events (Nostr) | हाँ (सिमेट्रिक) | hub key के साथ XChaCha20-Poly1305 | सभी मौजूदा hub सदस्य |
+| Hub events (WebSocket) | हाँ (सिमेट्रिक) | hub key के साथ XChaCha20-Poly1305 | सभी मौजूदा hub सदस्य |
 | स्वयंसेवक nsec | हाँ (at-rest) | PBKDF2 + XChaCha20-Poly1305 (PIN) | केवल स्वयंसेवक |
 | ऑडिट लॉग प्रविष्टियां | नहीं (integrity-protected) | SHA-256 हैश चेन | एडमिन (पढ़ना), सिस्टम (लिखना) |
 | कॉलर फोन नंबर | नहीं (केवल सर्वर-साइड) | N/A | सर्वर + एडमिन |
@@ -130,11 +130,11 @@ Volunteer nsec (BIP-340 Schnorr / secp256k1)
     |
     +-- Used for ECIES key agreement (prepend 02 for compressed form)
     |
-    +-- Signs Nostr events (Schnorr signature)
+    +-- Signs WebSocket events (Schnorr signature)
 
 Hub key (random 32 bytes, NOT derived from any identity)
     |
-    +-- Encrypts real-time Nostr hub events
+    +-- Encrypts real-time WebSocket hub events
     |
     +-- ECIES-wrapped per member via LABEL_HUB_KEY_WRAP
     |
@@ -151,9 +151,9 @@ Per-note key (random 32 bytes)
 
 ## रियल-टाइम संचार
 
-रियल-टाइम अपडेट (नई कॉल, संदेश, शिफ्ट परिवर्तन, उपस्थिति) एक Nostr relay के माध्यम से प्रवाहित होते हैं:
+रियल-टाइम अपडेट (नई कॉल, संदेश, शिफ्ट परिवर्तन, उपस्थिति) एक WebSocket relay के माध्यम से प्रवाहित होते हैं:
 
-- **स्व-होस्टेड**: Docker/Kubernetes में ऐप के साथ चलने वाला strfry relay
+- **स्व-होस्टेड**: Docker/Kubernetes में ऐप के साथ चलने वाला WebSocket relay relay
 - **Cloudflare**: Nosflare (Cloudflare Workers-आधारित relay)
 
 सभी events ephemeral (kind 20001) हैं और hub key से एन्क्रिप्ट किए गए हैं। Events generic tags (`["t", "llamenos:event"]`) का उपयोग करते हैं ताकि relay event प्रकारों को अलग न कर सके। कंटेंट फ़ील्ड में XChaCha20-Poly1305 ciphertext है।
@@ -164,9 +164,9 @@ Per-note key (random 32 bytes)
 Client A (volunteer action)
     |
     | Encrypt event content with hub key
-    | Sign as Nostr event (Schnorr)
+    | Sign as WebSocket event (Schnorr)
     v
-Nostr relay (strfry / Nosflare)
+WebSocket relay (WebSocket relay / Nosflare)
     |
     | Broadcast to subscribers
     v
@@ -185,13 +185,13 @@ Relay एन्क्रिप्टेड blobs और वैध सिग्�
 ### ट्रांसपोर्ट परत
 
 - HTTPS (TLS 1.3) पर सभी client-server संचार
-- WSS पर Nostr relay से WebSocket कनेक्शन
+- WSS पर WebSocket relay से WebSocket कनेक्शन
 - Content Security Policy (CSP) स्क्रिप्ट स्रोत, कनेक्शन और frame ancestors को प्रतिबंधित करता है
 - Tauri isolation pattern IPC को webview से अलग करता है
 
 ### एप्लिकेशन परत
 
-- Nostr keypairs के माध्यम से प्रमाणीकरण (BIP-340 Schnorr signatures)
+- WebSocket keypairs के माध्यम से प्रमाणीकरण (BIP-340 Schnorr signatures)
 - मल्टी-डिवाइस सुविधा के लिए WebAuthn session tokens
 - Role-based access control (caller, volunteer, reporter, admin)
 - `crypto-labels.ts` में परिभाषित सभी 25 क्रिप्टोग्राफ़िक domain separation constants cross-protocol attacks को रोकते हैं

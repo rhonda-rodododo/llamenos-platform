@@ -75,7 +75,7 @@ Worker API  -->  ConversationDO
     |                | Bina-wrap ang symmetric key sa pamamagitan ng ECIES para sa assigned na boluntaryo + mga admin
     |                | Itinatatapon ang plaintext
     |                v
-    |           Nostr relay (encrypted hub event na nagaabiso sa mga online na client)
+    |           WebSocket relay (encrypted hub event na nagaabiso sa mga online na client)
     |
     v
 Client (browser/app ng boluntaryo)
@@ -111,7 +111,7 @@ Ang lahat ng DO ay ina-access bilang mga singleton sa pamamagitan ng `idFromName
 | Mga attachment ng ulat | Oo (E2EE) | XChaCha20-Poly1305 (streamed) | May-akda ng ulat + lahat ng admin |
 | Nilalaman ng mensahe | Oo (E2EE) | XChaCha20-Poly1305 + ECIES envelope | Assigned na boluntaryo + lahat ng admin |
 | Mga transcript | Oo (at-rest) | XChaCha20-Poly1305 | Tagalikha ng transcript + lahat ng admin |
-| Mga hub event (Nostr) | Oo (symmetric) | XChaCha20-Poly1305 gamit ang hub key | Lahat ng kasalukuyang miyembro ng hub |
+| Mga hub event (WebSocket) | Oo (symmetric) | XChaCha20-Poly1305 gamit ang hub key | Lahat ng kasalukuyang miyembro ng hub |
 | nsec ng boluntaryo | Oo (at-rest) | PBKDF2 + XChaCha20-Poly1305 (PIN) | Boluntaryo lamang |
 | Mga entry ng audit log | Hindi (protektado ang integridad) | SHA-256 hash chain | Mga admin (basahin), sistema (sumulat) |
 | Mga numero ng telepono ng caller | Hindi (server-side lamang) | N/A | Server + mga admin |
@@ -130,11 +130,11 @@ nsec ng Boluntaryo (BIP-340 Schnorr / secp256k1)
     |
     +-- Ginagamit para sa ECIES key agreement (magdagdag ng 02 para sa compressed na form)
     |
-    +-- Naglagda ng mga Nostr event (Schnorr signature)
+    +-- Naglagda ng mga WebSocket event (Schnorr signature)
 
 Hub key (random na 32 bytes, HINDI nagmumula sa anumang identity key)
     |
-    +-- Ine-encrypt ang real-time na Nostr hub event
+    +-- Ine-encrypt ang real-time na WebSocket hub event
     |
     +-- ECIES-wrapped bawat miyembro sa pamamagitan ng LABEL_HUB_KEY_WRAP
     |
@@ -151,9 +151,9 @@ Per-note key (random na 32 bytes)
 
 ## Real-time na komunikasyon
 
-Ang mga real-time na update (mga bagong tawag, mensahe, pagbabago ng shift, presensya) ay dumadaan sa isang Nostr relay:
+Ang mga real-time na update (mga bagong tawag, mensahe, pagbabago ng shift, presensya) ay dumadaan sa isang WebSocket relay:
 
-- **Self-hosted**: strfry relay na tumatakbo kasabay ng app sa Docker/Kubernetes
+- **Self-hosted**: WebSocket relay relay na tumatakbo kasabay ng app sa Docker/Kubernetes
 - **Cloudflare**: Nosflare (Cloudflare Workers-based relay)
 
 Ang lahat ng event ay ephemeral (kind 20001) at naka-encrypt gamit ang hub key. Gumagamit ang mga event ng mga generic na tag (`["t", "llamenos:event"]`) kaya hindi matukoy ng relay ang mga uri ng event. Ang field ng nilalaman ay naglalaman ng XChaCha20-Poly1305 ciphertext.
@@ -164,9 +164,9 @@ Ang lahat ng event ay ephemeral (kind 20001) at naka-encrypt gamit ang hub key. 
 Client A (aksyon ng boluntaryo)
     |
     | Ine-encrypt ang nilalaman ng event gamit ang hub key
-    | Lumagda bilang Nostr event (Schnorr)
+    | Lumagda bilang WebSocket event (Schnorr)
     v
-Nostr relay (strfry / Nosflare)
+WebSocket relay (WebSocket relay / Nosflare)
     |
     | Ibinabahagi sa mga subscriber
     v
@@ -185,13 +185,13 @@ Nakikita ng relay ang mga encrypted blob at wastong mga lagda ngunit hindi mabas
 ### Layer ng transport
 
 - Lahat ng komunikasyon ng client-server sa HTTPS (TLS 1.3)
-- Mga koneksyon ng WebSocket sa Nostr relay sa WSS
+- Mga koneksyon ng WebSocket sa WebSocket relay sa WSS
 - Nililimitahan ng Content Security Policy (CSP) ang mga pinagmulan ng script, mga koneksyon, at mga ninuno ng frame
 - Hinahating-isa ng pattern ng Tauri isolation ang IPC mula sa webview
 
 ### Layer ng application
 
-- Authentication sa pamamagitan ng mga Nostr keypair (BIP-340 Schnorr signatures)
+- Authentication sa pamamagitan ng mga WebSocket keypair (BIP-340 Schnorr signatures)
 - Mga WebAuthn session token para sa kaginhawaan ng multi-device
 - Role-based na access control (caller, boluntaryo, reporter, admin)
 - Ang lahat ng 25 cryptographic domain separation constant na tinukoy sa `crypto-labels.ts` ay pumipigil sa mga cross-protocol attack

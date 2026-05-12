@@ -11,14 +11,14 @@ Bun HTTP server — the Llamenos backend. Built with [Hono](https://hono.dev/) r
 | HTTP framework | Hono |
 | Database | PostgreSQL via Bun SQL + Drizzle ORM |
 | File storage | RustFS (S3-compatible) |
-| Real-time | Nostr relay (strfry) |
+| Real-time | WebSocket relay (in-process) |
 | Telephony | `TelephonyAdapter` — 8 providers (Twilio, SignalWire, Vonage, Plivo, Telnyx, Bandwidth, Asterisk, FreeSWITCH) |
 | Messaging | `MessagingAdapter` — SMS, WhatsApp, Signal, Telegram, RCS |
 
 ## Running Locally
 
 ```bash
-# Start backing services first (PostgreSQL, RustFS, strfry)
+# Start backing services first (PostgreSQL, RustFS)
 docker compose -f deploy/docker/docker-compose.dev.yml up -d
 
 # Start the server with file watching

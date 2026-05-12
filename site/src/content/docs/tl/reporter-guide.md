@@ -8,7 +8,7 @@ Bilang isang reporter, maaari kang magsumite ng mga naka-encrypt na ulat sa iyon
 ## Pagsisimula
 
 Ibibigay sa iyo ng iyong admin ang isa sa mga sumusunod:
-- Isang **nsec** (Nostr secret key) — isang string na nagsisimula sa `nsec1`
+- Isang **nsec** (WebSocket secret key) — isang string na nagsisimula sa `nsec1`
 - Isang **invite link** — isang one-time URL na lumilikha ng mga credential para sa iyo
 
 **Panatilihing pribado ang iyong nsec.** Ito ang iyong pagkakakilanlan at login credential. Itago ito sa isang password manager.

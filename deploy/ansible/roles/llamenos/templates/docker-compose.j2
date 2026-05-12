@@ -24,8 +24,7 @@ services:
       - TWILIO_ACCOUNT_SID={{ twilio_account_sid | default('') }}
       - TWILIO_AUTH_TOKEN={{ twilio_auth_token | default('') }}
       - TWILIO_PHONE_NUMBER={{ twilio_phone_number | default('') }}
-      - SERVER_NOSTR_SECRET={{ server_nostr_secret }}
-      - NOSTR_RELAY_URL=ws://localhost:7777
+      - SERVER_SECRET={{ server_secret }}
     networks:
       - web
       - internal

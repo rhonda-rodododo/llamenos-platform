@@ -7,7 +7,7 @@ Bilang admin, pinamamahalaan mo ang lahat: mga boluntaryo, shift, mga setting ng
 
 ## Pag-log in
 
-Mag-log in gamit ang `nsec` (Nostr secret key) na nabuo sa panahon ng [pag-setup](/docs/deploy). Tinatanggap ng login page ang nsec format (`nsec1...`). Pumipirma ang iyong browser ng hamon gamit ang key -- hindi kailanman umaalis ang secret sa device.
+Mag-log in gamit ang `nsec` (WebSocket secret key) na nabuo sa panahon ng [pag-setup](/docs/deploy). Tinatanggap ng login page ang nsec format (`nsec1...`). Pumipirma ang iyong browser ng hamon gamit ang key -- hindi kailanman umaalis ang secret sa device.
 
 Opsyonal, mag-register ng WebAuthn passkey sa Settings para sa passwordless login sa ibang mga device.
 
@@ -15,7 +15,7 @@ Opsyonal, mag-register ng WebAuthn passkey sa Settings para sa passwordless logi
 
 Mag-navigate sa **Volunteers** sa sidebar para:
 
-- **Magdagdag ng boluntaryo** -- bumubuo ng bagong Nostr keypair. Ibahagi nang ligtas ang nsec sa boluntaryo (ipinapakita lamang ito nang isang beses).
+- **Magdagdag ng boluntaryo** -- bumubuo ng bagong WebSocket keypair. Ibahagi nang ligtas ang nsec sa boluntaryo (ipinapakita lamang ito nang isang beses).
 - **Lumikha ng invite link** -- bumubuo ng isang beses na link na magagamit ng boluntaryo para mag-self-register.
 - **I-edit** -- i-update ang pangalan, numero ng telepono, at tungkulin.
 - **Alisin** -- i-deactivate ang access ng boluntaryo.

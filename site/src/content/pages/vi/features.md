@@ -115,7 +115,7 @@ subtitle: Mọi thứ một nền tảng ứng phó khủng hoảng cần, trong
 
 **Bảo mật chuyển tiếp mỗi ghi chú** — Mỗi ghi chú mã hóa bằng khóa ngẫu nhiên duy nhất, bọc qua ECIES cho mỗi người đọc.
 
-**Xác thực cặp khóa Nostr** — Xác thực bằng cặp khóa Nostr (nsec/npub). Không mật khẩu, không email.
+**Xác thực cặp khóa WebSocket** — Xác thực bằng cặp khóa WebSocket (nsec/npub). Không mật khẩu, không email.
 
 **WebAuthn passkeys** — Hỗ trợ passkey tùy chọn cho đăng nhập đa thiết bị.
 

@@ -60,7 +60,7 @@ POST https://your-worker.your-domain.com/api/messaging/sms/webhook
 1. تصل رسالة SMS إلى مزودك، الذي يرسل webhook إلى Worker الخاص بك
 2. يتحقق Worker من توقيع الـ webhook (HMAC خاص بالمزود)
 3. تُحلل الرسالة وتُخزن في ConversationDO
-4. يتم إخطار المتطوعين في المناوبة عبر أحداث مرحّل Nostr
+4. يتم إخطار المتطوعين في المناوبة عبر أحداث مرحّل WebSocket
 5. يرد المتطوعون من علامة تبويب المحادثات — تُرسل الردود عبر SMS API لمزودك
 
 ## ملاحظات أمنية

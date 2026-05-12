@@ -28,8 +28,8 @@ TWILIO_PHONE_NUMBER={{ twilio_phone_number }}
 # ─── Transcription ───────────────────────────────────────────
 WHISPER_URL={{ llamenos_whisper_url }}
 
-# ─── Nostr Relay ─────────────────────────────────────────────
-SERVER_NOSTR_SECRET={{ server_nostr_secret }}
+# ─── Server Identity ─────────────────────────────────────────
+SERVER_SECRET={{ server_secret }}
 
 {% if llamenos_asterisk_enabled | default(false) %}
 # ─── Asterisk ────────────────────────────────────────────────

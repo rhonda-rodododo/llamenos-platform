@@ -76,11 +76,12 @@ async function fetchServices(env: Record<string, unknown>): Promise<ServiceStatu
     details: hasStorage ? undefined : 'Not configured',
   })
 
-  // Check Nostr relay
+  // WebSocket relay is in-process — if SERVER_SECRET is set, relay is available
+  const hasRelay = !!env.SERVER_SECRET
   services.push({
-    name: 'Nostr Relay',
-    status: env.NOSTR_RELAY_URL ? 'ok' : 'down',
-    details: env.NOSTR_RELAY_URL ? undefined : 'Not configured',
+    name: 'WebSocket Relay',
+    status: hasRelay ? 'ok' : 'down',
+    details: hasRelay ? undefined : 'SERVER_SECRET not configured (relay disabled)',
   })
 
   // Check telephony

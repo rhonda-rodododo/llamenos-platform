@@ -85,7 +85,7 @@
 
 ### Track 1: Ansible Fleet Deployment (E276-E280) — COMPLETE
 - **E276**: Multi-host Ansible inventory with per-service toggles, service discovery templates, matrix-docker-ansible-deploy pattern
-- **E277**: Per-service backup roles (postgres, strfry, rustfs, config), cross-host aggregation, backup monitoring, restore playbook
+- **E277**: Per-service backup roles (postgres, WebSocket relay, rustfs, config), cross-host aggregation, backup monitoring, restore playbook
 - **E278**: Full observability stack (Prometheus, Grafana, Loki, Promtail, Alertmanager, Node Exporter) + lightweight healthcheck-only mode
 - **E279**: Container watchdog with restart budgets, PostgreSQL VACUUM maintenance, NTP drift detection, cert/disk monitoring
 - **E280**: Blue-green rolling updates with block/rescue auto-rollback, version tracking, dependency-ordered multi-host updates
@@ -263,8 +263,8 @@
 ### Additional Silent Error Handling
 - Dashboard calls-today count, volunteer detail page, settings page, note-sheet, reports list refresh
 
-### Nostr Relay Tab Visibility Reconnection
-- Added `visibilitychange` listener to `NostrProvider` — when tab regains focus, proactively reconnects if WebSocket was killed by the browser during background
+### WebSocket Relay Tab Visibility Reconnection
+- Added `visibilitychange` listener to `WebSocketProvider` — when tab regains focus, proactively reconnects if WebSocket was killed by the browser during background
 - Previously relied only on exponential backoff which could delay reconnection by up to 30s after tab refocus
 
 ## 2026-03-07: Test Suite Fix — PIN Entry for 8-Field PinInput
@@ -550,10 +550,10 @@
 
 ## 2026-03-04: Security Audit Round 7 — Epics 252-256
 
-### Epic 252: Nostr Hub-Key Encryption
+### Epic 252: WebSocket Hub-Key Encryption
 - **hub-event-crypto.ts** (CREATED): `deriveServerEventKey()` HKDF from SERVER_NOSTR_SECRET, `encryptHubEvent()` XChaCha20-Poly1305
-- **nostr-events.ts**: Updated shared `publishNostrEvent()` to encrypt content when SERVER_NOSTR_SECRET is available
-- **call-router.ts**: Updated private `publishNostrEvent()` with cached event key + encryption
+- **WebSocket-events.ts**: Updated shared `publishWebSocketEvent()` to encrypt content when SERVER_NOSTR_SECRET is available
+- **call-router.ts**: Updated private `publishWebSocketEvent()` with cached event key + encryption
 - **config.ts**: Expose `serverEventKeyHex` to authenticated clients for decryption
 
 ### Epic 253: Invite Role Authorization
@@ -642,15 +642,15 @@
 ### Epic 236: Node.js Production Deployment Primacy & Infrastructure Hardening
 **Phase 1-3 (Health, Docker, Dev Tooling):**
 - **Health endpoint**: `apps/worker/routes/health.ts` — `/health` (dependency checks), `/health/live` (liveness), `/health/ready` (readiness). Platform-aware: PostgreSQL checked only on Node.js
-- **Docker**: strfry pinned to 1.0.1, JSON logging driver (50MB rotation, 5 files), health check → `/api/health/ready`
+- **Docker**: WebSocket relay pinned to 1.0.1, JSON logging driver (50MB rotation, 5 files), health check → `/api/health/ready`
 - **Dockerfile**: replaced fragile `sed` workspace stripping with Node.js JSON manipulation
 - **Caddyfile**: JSON access logging to stdout
 - **esbuild**: conditional sourcemaps (`process.env.NODE_ENV !== 'production'`)
 - **first-run.sh**: one-command setup (secret generation, env validation, stack startup, health wait)
-- **docker-compose.dev.yml**: backing services only (PostgreSQL, RustFS, strfry) with localhost ports
+- **docker-compose.dev.yml**: backing services only (PostgreSQL, RustFS, WebSocket relay) with localhost ports
 
 **Phase 4-6 (Helm, Ansible, OpenTofu):**
-- **Helm chart 0.2.0**: RustFS Deployment → StatefulSet (data loss protection), HPA (CPU 70%, memory 80%), PDB (app + strfry), ServiceMonitor for Prometheus, split liveness/readiness probes
+- **Helm chart 0.2.0**: RustFS Deployment → StatefulSet (data loss protection), HPA (CPU 70%, memory 80%), PDB (app + WebSocket relay), ServiceMonitor for Prometheus, split liveness/readiness probes
 - **Ansible**: RustFS backup via `mc mirror` in backup role, `playbooks/test-restore.yml` for restore verification
 - **OpenTofu**: `admin_ssh_cidrs` variable replacing hardcoded `0.0.0.0/0` in Hetzner firewall
 
@@ -711,7 +711,7 @@
 - Commit: `296efd9`
 
 ### Epic 233: Worker Backend Test Suite
-- **295 unit tests** across 13 test files in `apps/worker/__tests__/unit/`: permissions (55), ssrf-guard (34), helpers (30), crypto-utils (30), auth-utils (28), do-router (21), messaging-adapter (21), telephony-adapter (19), nostr-publisher (16), audit-chain (14), crypto-labels (12), do-access (9), permission-guard (6)
+- **295 unit tests** across 13 test files in `apps/worker/__tests__/unit/`: permissions (55), ssrf-guard (34), helpers (30), crypto-utils (30), auth-utils (28), do-router (21), messaging-adapter (21), telephony-adapter (19), WebSocket-publisher (16), audit-chain (14), crypto-labels (12), do-access (9), permission-guard (6)
 - **8 backend BDD feature files** in `packages/test-specs/features/backend/`: auth-verification, permission-system, do-routing, telephony-adapter, shift-routing, conversation-routing, note-encryption, audit-chain (all tagged `@backend`)
 - **6 integration test stubs** in `apps/worker/__tests__/integration/` (DO tests, require miniflare)
 - **CI updated**: `worker-tests` job in `.github/workflows/ci.yml`
@@ -930,7 +930,7 @@
 - iOS & Android: Shifts with clock in/out, weekly schedule, signup/drop
 - iOS & Android: Push notification encryption (two-tier wake key)
 - iOS & Android: Tab-based navigation (Dashboard, Notes, Shifts, Settings)
-- iOS & Android: WebSocket real-time events via Nostr relay
+- iOS & Android: WebSocket real-time events via WebSocket relay
 - iOS & Android: Settings screens (identity, hub, connection, lock/logout)
 - UI tests: 7 note flow + 10 shift flow tests per platform
 
@@ -1246,15 +1246,15 @@ Complete Tauri-only build cleanup with Playwright test compatibility:
 ### Epic 93: Tauri-Only TypeScript Migration (e3aeabb)
 
 Complete rewrite of TypeScript crypto plumbing — nsec never enters webview:
-- **platform.ts**: Removed all `isBrowser()`/`isTauri()` branching. Every function is a direct `tauriInvoke`. Dropped `secretKeyHex` from ~12 stateful functions. Added `signNostrEvent`, `decryptFileMetadata`, `unwrapFileKey`, `unwrapHubKey`, `rewrapFileKey`, `getNsecFromState`, `isValidNsec` (async), `keyPairFromNsec`, `createAuthTokenStateless`, `verifySchnorr`.
+- **platform.ts**: Removed all `isBrowser()`/`isTauri()` branching. Every function is a direct `tauriInvoke`. Dropped `secretKeyHex` from ~12 stateful functions. Added `signWebSocketEvent`, `decryptFileMetadata`, `unwrapFileKey`, `unwrapHubKey`, `rewrapFileKey`, `getNsecFromState`, `isValidNsec` (async), `keyPairFromNsec`, `createAuthTokenStateless`, `verifySchnorr`.
 - **key-manager.ts**: Deleted `secretKey: Uint8Array` closure, `getSecretKey()`, `getNsec()`, `createAuthToken()`. Tracks only `unlocked: boolean` + cached pubkey.
 - **auth.tsx**: Uses `createAuthTokenStateless` for sign-in (pre-CryptoState flow).
 - **api.ts**: `getAuthHeaders()` now async, uses `platform.createAuthToken()`.
 - **file-crypto.ts**: ECIES ops → Rust IPC; symmetric file content crypto stays in JS.
 - **hub-key-manager.ts**: `eciesWrapKey`/`unwrapKey` → platform.ts async IPC.
-- **nostr/relay.ts**: Removed `getSecretKey`, `handleAuth` uses `signNostrEvent`.
-- **nostr/events.ts**: `createHubEvent` uses `signNostrEvent` (no `secretKey` param).
-- **nostr/context.tsx**: Removed `getSecretKey` prop from `NostrProvider`.
+- **WebSocket/relay.ts**: Removed `getSecretKey`, `handleAuth` uses `signWebSocketEvent`.
+- **WebSocket/events.ts**: `createHubEvent` uses `signWebSocketEvent` (no `secretKey` param).
+- **WebSocket/context.tsx**: Removed `getSecretKey` prop from `WebSocketProvider`.
 - **23 files changed**: 585 insertions, 639 deletions. All verified: zero `getSecretKey` in code, zero `isBrowser()`, zero `from '@/lib/key-store'`.
 
 ### Epic 92: Rust IPC Expansion (d419584)
@@ -1384,7 +1384,7 @@ Added ~15 new stateful IPC commands to `src-tauri/src/crypto.rs` delegating to `
 - [x] Haptic feedback via expo-haptics: semantic methods (light/medium/heavy/warning/success/error/selection) on call answer, hangup, spam, shift sign-up/drop, PIN entry, profile save, pull-to-refresh
 - [x] Animated skeleton loading components (NoteCardSkeleton, ConversationCardSkeleton, VolunteerCardSkeleton, AuditEntrySkeleton, ShiftCardSkeleton, ListSkeleton) with reanimated pulse
 - [x] Screen error boundaries with retry UI using react-error-boundary
-- [x] Offline/relay disconnected banner using NetInfo + Nostr relay context state
+- [x] Offline/relay disconnected banner using NetInfo + WebSocket relay context state
 - [x] Toast notifications (react-native-toast-message) with theme-aware custom config (success/error/info)
 - [x] Language picker with 13 locales, RTL support for Arabic via I18nManager.forceRTL, restart alert
 - [x] Language display names and persistence via Zustand settings store
@@ -1406,7 +1406,7 @@ Added ~15 new stateful IPC commands to `src-tauri/src/crypto.rs` delegating to `
 - [x] PushDispatcher: sendToVolunteer, sendToAllOnShift with stale token cleanup
 - [x] Device registration API: POST /api/devices/register, DELETE /api/devices
 - [x] IdentityDO: devices:${pubkey} storage, register/cleanup/delete methods, 5 device limit
-- [x] CallRouterDO: voicemail push dispatch after KIND_CALL_VOICEMAIL Nostr event
+- [x] CallRouterDO: voicemail push dispatch after KIND_CALL_VOICEMAIL WebSocket event
 - [x] ConversationDO routes: message push to assigned volunteer, assignment push on claim
 - [x] Messaging router: inbound message push dispatch via executionCtx.waitUntil
 - [x] ShiftManagerDO: 5-minute alarm for shift reminders 15 min before start, dedup tracking
@@ -1436,7 +1436,7 @@ Added ~15 new stateful IPC commands to `src-tauri/src/crypto.rs` delegating to `
 - [x] PIN-encrypted key storage via expo-secure-store (WHEN_UNLOCKED_THIS_DEVICE_ONLY)
 - [x] Key manager with AppState-based auto-lock (5min idle, 30s background grace)
 - [x] Hub key manager for E2EE envelope encryption (generateHubKey, wrap/unwrap, rotate)
-- [x] Nostr relay client (WebSocket property handlers for RN, NIP-42 auth, event dedup)
+- [x] WebSocket relay client (WebSocket property handlers for RN, NIP-42 auth, event dedup)
 - [x] Zustand stores with MMKV v4 persistence (auth state, hub config)
 - [x] React Query with AppState focus/online managers
 - [x] API client with Schnorr auth tokens and hub discovery (/api/config)
@@ -1450,10 +1450,10 @@ Added ~15 new stateful IPC commands to `src-tauri/src/crypto.rs` delegating to `
 ## 2026-02-25: Documentation Overhaul (`next` branch)
 
 ### ZK Architecture Documentation
-- [x] Security docs: THREAT_MODEL (Nostr relay trust, audit log tamper detection, admin key separation, hub key compromise, reproducible builds, client-side transcription), DEPLOYMENT_HARDENING (Caddy ingress, strfry operations, build verification), KEY_REVOCATION_RUNBOOK (verification checklists, CLI rotation), DATA_CLASSIFICATION (E2EE messaging, hash-chained audit, encrypted shifts), security/README (E2EE at rest for messages, additional security features table)
+- [x] Security docs: THREAT_MODEL (WebSocket relay trust, audit log tamper detection, admin key separation, hub key compromise, reproducible builds, client-side transcription), DEPLOYMENT_HARDENING (Caddy ingress, WebSocket relay operations, build verification), KEY_REVOCATION_RUNBOOK (verification checklists, CLI rotation), DATA_CLASSIFICATION (E2EE messaging, hash-chained audit, encrypted shifts), security/README (E2EE at rest for messages, additional security features table)
 - [x] Architecture docs: E2EE_ARCHITECTURE (implemented status, past-tense history, resolved questions), llamenos-protocol (NIP-42 auth, envelope encryption, all 25 crypto labels, hub event encryption, audit integrity)
-- [x] New docs: RELAY_OPERATIONS.md (strfry/Nosflare deployment, hardening, monitoring, backup, troubleshooting), REPRODUCIBLE_BUILDS.md (trust model, verification, scope, CI, SLSA)
-- [x] Deployment docs: QUICKSTART (relay setup, test checklist), RUNBOOK (relay troubleshooting, server Nostr secret rotation, relay monitoring/backup, scaling), Helm values.yaml (Caddy ingress, serverNostrSecret)
+- [x] New docs: RELAY_OPERATIONS.md (WebSocket relay/Nosflare deployment, hardening, monitoring, backup, troubleshooting), REPRODUCIBLE_BUILDS.md (trust model, verification, scope, CI, SLSA)
+- [x] Deployment docs: QUICKSTART (relay setup, test checklist), RUNBOOK (relay troubleshooting, server WebSocket secret rotation, relay monitoring/backup, scaling), Helm values.yaml (Caddy ingress, serverWebSocketSecret)
 - [x] Project docs: CLAUDE.md (ZK patterns, gotchas, directory structure)
 
 ## 2026-02-25: Zero-Knowledge Architecture (`next` branch)
@@ -1465,10 +1465,10 @@ Added ~15 new stateful IPC commands to `src-tauri/src/crypto.rs` delegating to `
 - [x] Generic backup file format
 
 ### Epic 76.1: Worker-Relay Communication
-- [x] `NostrPublisher` interface with CF (DO service binding) and Node.js (persistent WebSocket) implementations
+- [x] `WebSocketPublisher` interface with CF (DO service binding) and Node.js (persistent WebSocket) implementations
 - [x] Server keypair derivation from `SERVER_NOSTR_SECRET` env var
 - [x] Nosflare service binding in wrangler.jsonc
-- [x] strfry in docker-compose.yml for Node.js path
+- [x] WebSocket relay in docker-compose.yml for Node.js path
 
 ### Epic 76.2: Key Architecture Redesign
 - [x] Hub key = `crypto.getRandomValues(32)`, ECIES-wrapped per member
@@ -1477,10 +1477,10 @@ Added ~15 new stateful IPC commands to `src-tauri/src/crypto.rs` delegating to `
 - [x] Updated RecordsDO, ConversationDO storage for envelope arrays
 - [x] Identity + decryption key separation in bootstrap-admin
 
-### Epic 76: Nostr Relay Real-Time Sync
+### Epic 76: WebSocket Relay Real-Time Sync
 - [x] Complete WebSocket removal — deleted `ws.ts`, `websocket.ts`, `websocket-pair.ts`
-- [x] Nostr-only real-time broadcasts via ephemeral kind 20001 events
-- [x] Client-side Nostr relay subscription hooks
+- [x] WebSocket-only real-time broadcasts via ephemeral kind 20001 events
+- [x] Client-side WebSocket relay subscription hooks
 - [x] Server-authoritative call state (REST + DO serialization, relay for notification)
 
 ### Epic 74: E2EE Messaging Storage
@@ -2043,7 +2043,7 @@ Added ~15 new stateful IPC commands to `src-tauri/src/crypto.rs` delegating to `
 - [x] Vite + TanStack Router SPA with file-based routing
 - [x] Tailwind CSS v4 with dark theme
 - [x] i18n with English + Spanish translations
-- [x] Nostr keypair authentication
+- [x] WebSocket keypair authentication
 - [x] XChaCha20-Poly1305 note encryption
 - [x] WebSocket real-time updates
 - [x] Cloudflare Workers + Durable Objects backend

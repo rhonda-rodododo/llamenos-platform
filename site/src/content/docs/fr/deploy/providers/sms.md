@@ -60,7 +60,7 @@ Envoyez un SMS à votre numéro de ligne d'urgence. Vous devriez voir la convers
 1. Un SMS arrive chez votre fournisseur, qui envoie un webhook à votre Worker
 2. Le Worker valide la signature du webhook (HMAC spécifique au fournisseur)
 3. Le message est analysé et stocké dans le ConversationDO
-4. Les bénévoles en service sont notifiés via les événements du relais Nostr
+4. Les bénévoles en service sont notifiés via les événements du relais WebSocket
 5. Les bénévoles répondent depuis l'onglet Conversations — les réponses sont envoyées via l'API SMS de votre fournisseur
 
 ## Notes de sécurité

@@ -8,7 +8,7 @@ Với tư cách là người báo cáo, bạn có thể gửi các báo cáo đ�
 ## Bắt đầu
 
 Quản trị viên sẽ cung cấp cho bạn một trong hai:
-- Một **nsec** (khóa bí mật Nostr) — một chuỗi bắt đầu bằng `nsec1`
+- Một **nsec** (khóa bí mật WebSocket) — một chuỗi bắt đầu bằng `nsec1`
 - Một **liên kết mời** — URL sử dụng một lần tạo thông tin xác thực cho bạn
 
 **Giữ nsec của bạn riêng tư.** Đó là danh tính và thông tin đăng nhập của bạn. Lưu trữ nó trong trình quản lý mật khẩu.

@@ -17,22 +17,13 @@ export function createBlobStorage(opts?: {
   bucket?: string
   region?: string
 }): BlobStorage {
-  // Backward-compat: read legacy MINIO_* env vars (deprecated)
-  const legacyEndpoint = process.env.MINIO_ENDPOINT
-  const legacyAccessKey = process.env.MINIO_ACCESS_KEY
-  const legacySecretKey = process.env.MINIO_SECRET_KEY
-  const legacyBucket = process.env.MINIO_BUCKET
-  if (legacyEndpoint || legacyAccessKey || legacySecretKey) {
-    console.warn('[blob-storage] DEPRECATED: MINIO_* env vars are deprecated. Use STORAGE_* instead.')
-  }
-
-  const endpoint = opts?.endpoint || process.env.STORAGE_ENDPOINT || legacyEndpoint || 'http://localhost:9000'
-  const accessKeyId = opts?.accessKeyId || process.env.STORAGE_ACCESS_KEY || legacyAccessKey
-  const secretAccessKey = opts?.secretAccessKey || process.env.STORAGE_SECRET_KEY || legacySecretKey
+  const endpoint = opts?.endpoint || process.env.STORAGE_ENDPOINT || 'http://localhost:9000'
+  const accessKeyId = opts?.accessKeyId || process.env.STORAGE_ACCESS_KEY
+  const secretAccessKey = opts?.secretAccessKey || process.env.STORAGE_SECRET_KEY
   if (!accessKeyId || !secretAccessKey) {
     throw new Error('Storage credentials required: set STORAGE_ACCESS_KEY and STORAGE_SECRET_KEY environment variables')
   }
-  const bucket = opts?.bucket || process.env.STORAGE_BUCKET || legacyBucket || 'llamenos-files'
+  const bucket = opts?.bucket || process.env.STORAGE_BUCKET || 'llamenos-files'
   const region = opts?.region || 'us-east-1'
 
   const client = new S3Client({

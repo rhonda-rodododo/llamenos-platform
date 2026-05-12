@@ -100,7 +100,7 @@ The Ansible `setup-all` command performs:
 2. The setup wizard guides you through keypair creation, hotline naming, channel selection, and provider configuration.
 3. **Download the encrypted backup** and store it in a password manager.
 
-**SECURITY**: The admin nsec is the master key. If compromised, an attacker can manage all volunteers, read admin-wrapped notes, and modify settings. Store it in a hardware security module or high-security password manager (1Password, Bitwarden, KeePassXC). Never reuse this keypair on public Nostr relays.
+**SECURITY**: The admin nsec is the master key. If compromised, an attacker can manage all volunteers, read admin-wrapped notes, and modify settings. Store it in a hardware security module or high-security password manager (1Password, Bitwarden, KeePassXC). Never reuse this keypair on public WebSocket relays.
 
 ### 1.6 Verify Deployment
 
@@ -197,7 +197,7 @@ docker compose logs --since 24h app | grep -i "error\|warn\|fail"
 docker compose logs --since 24h caddy | grep -i "error"
 
 # Relay errors
-docker compose logs --since 24h strfry | grep -i "error\|warn"
+docker compose logs --since 24h WebSocket relay | grep -i "error\|warn"
 ```
 
 ### 2.3 Check Disk Space
@@ -258,7 +258,7 @@ docker system df -v
 docker compose exec postgres du -sh /var/lib/postgresql/data/
 
 # Relay data
-docker compose exec strfry du -sh /app/strfry-db/
+docker compose exec WebSocket relay du -sh /app/WebSocket relay-db/
 ```
 
 The relay LMDB should stay small if only ephemeral events (kind 20001) are in use. If it exceeds 1 GB, investigate for unexpected persistent events.
@@ -356,7 +356,7 @@ Rotate credentials on a quarterly schedule. Each rotation procedure is detailed 
 | HMAC secret | Generate new hex, update `.env`, restart app. **Warning**: invalidates all ban list hashes |
 | Asterisk secrets | Update `.env`, update ARI config, restart asterisk + bridge + app |
 
-Annually: `SERVER_NOSTR_SECRET` (only if compromised or deliberately changing server identity).
+Annually: `SERVER_SECRET` (only if compromised or deliberately changing server identity).
 
 ### 5.2 Full Restore Test
 
@@ -447,25 +447,25 @@ Browser shows 502 or "Bad Gateway"
 Call notifications, presence, typing indicators missing
 |
 +-- Is the relay container running?
-|   => docker compose ps strfry
+|   => docker compose ps WebSocket relay
 |   |
-|   +-- Not running => docker compose up -d strfry
+|   +-- Not running => docker compose up -d WebSocket relay
 |
 +-- Is the relay reachable?
-|   => curl -sI https://hotline.yourorg.org/nostr
+|   => curl -sI https://hotline.yourorg.org/WebSocket
 |   Expected: 426 Upgrade Required
 |   |
 |   +-- Connection refused => Caddy not proxying. Check Caddyfile and caddy logs.
-|   +-- 502 => Caddy can't reach strfry. Check Docker network.
+|   +-- 502 => Caddy can't reach WebSocket relay. Check Docker network.
 |
-+-- Is SERVER_NOSTR_SECRET set?
-|   => grep SERVER_NOSTR_SECRET .env
++-- Is SERVER_SECRET set?
+|   => grep SERVER_SECRET .env
 |   |
 |   +-- Missing => Generate: openssl rand -hex 32, add to .env, restart app
 |
 +-- NIP-42 auth failures in browser console?
     => Client pubkey may not be allowed. Check relay logs.
-    => If SERVER_NOSTR_SECRET was rotated, clients must reconnect.
+    => If SERVER_SECRET was rotated, clients must reconnect.
 ```
 
 ### 6.4 TLS Certificate Issues
@@ -702,8 +702,8 @@ When nothing else is salvageable:
               +------------+------------+
               |            |            |
         +-----+----+ +----+-----+ +---+----+
-        |   App    | |  strfry  | |  RustFS  |
-        | (Node.js)| |  (Nostr  | | (Blob   |
+        |   App    | |  WebSocket relay  | |  RustFS  |
+        | (Node.js)| |  (WebSocket  | | (Blob   |
         | Port 3000| |  Relay)  | | Storage)|
         +-----+----+ | Port 7777| +---------+
               |       +----------+
@@ -726,20 +726,20 @@ When nothing else is salvageable:
 | **App** | Node.js application server (API, webhooks, business logic) | None (stateless) |
 | **PostgreSQL** | Primary data store (identities, notes, settings, audit log) | Yes -- `/var/lib/postgresql/data/` |
 | **Caddy** | Reverse proxy, TLS termination, static files | TLS certificates |
-| **strfry** | Nostr relay for real-time events (calls, presence, typing) | LMDB (ephemeral events not persisted) |
+| **WebSocket relay** | WebSocket relay for real-time events (calls, presence, typing) | LMDB (ephemeral events not persisted) |
 | **RustFS** | S3-compatible blob storage (encrypted reports, IVR audio) | Yes -- uploaded files |
 
 ### 8.3 Data Flow
 
-1. **Inbound call**: Telephony provider webhook -> Caddy -> App -> CallRouterDO -> parallel ring via Nostr relay
+1. **Inbound call**: Telephony provider webhook -> Caddy -> App -> CallRouterDO -> parallel ring via WebSocket relay
 2. **Note creation**: Volunteer encrypts note client-side -> App stores encrypted blob -> Admin sees wrapped envelope
-3. **Real-time events**: App publishes hub-encrypted Nostr event -> strfry forwards to subscribers -> Clients decrypt with hub key
-4. **Messaging**: Provider webhook -> App encrypts per-message envelope -> ConversationDO stores -> Nostr notification to assigned volunteer
+3. **Real-time events**: App publishes hub-encrypted WebSocket event -> WebSocket relay forwards to subscribers -> Clients decrypt with hub key
+4. **Messaging**: Provider webhook -> App encrypts per-message envelope -> ConversationDO stores -> WebSocket notification to assigned volunteer
 
 ### 8.4 Security Boundaries
 
 - **The server never sees plaintext note content.** Notes are encrypted client-side with per-note forward secrecy.
-- **The relay sees only encrypted blobs.** All Nostr event content is encrypted with the hub key. Generic tags prevent event-type inference.
+- **The relay sees only encrypted blobs.** All WebSocket event content is encrypted with the hub key. Generic tags prevent event-type inference.
 - **Volunteer identity is hidden.** Personal info visible only to admins, never to other volunteers or callers.
 - **The admin nsec is the master key.** Protect it as the most critical credential in the system.
 
@@ -837,7 +837,7 @@ du -sh /opt/llamenos/backups/
 cat /var/run/reboot-required 2>/dev/null || echo "No reboot required"
 
 # Secret generation
-openssl rand -hex 32        # For HMAC_SECRET, SERVER_NOSTR_SECRET
+openssl rand -hex 32        # For HMAC_SECRET, SERVER_SECRET
 openssl rand -base64 24     # For passwords (PG_PASSWORD, RustFS, etc.)
 ```
 
@@ -864,9 +864,9 @@ docker compose exec -T postgres psql -U llamenos -d llamenos < /tmp/restore.sql
 rm -f /tmp/restore.sql
 docker compose start app
 
-# Nostr relay backup
-docker run --rm -v llamenos_nostr-data:/data -v /opt/llamenos/backups:/backup \
-  alpine tar czf /backup/strfry-$(date +%Y%m%d).tar.gz -C /data .
+# WebSocket relay backup
+docker run --rm -v llamenos_WebSocket-data:/data -v /opt/llamenos/backups:/backup \
+  alpine tar czf /backup/WebSocket relay-$(date +%Y%m%d).tar.gz -C /data .
 ```
 
 ---
@@ -882,14 +882,14 @@ docker run --rm -v llamenos_nostr-data:/data -v /opt/llamenos/backups:/backup \
 | **E2EE** | End-to-end encryption. Notes are encrypted client-side; the server never sees plaintext. |
 | **ECIES** | Elliptic Curve Integrated Encryption Scheme. Used for wrapping per-note symmetric keys for each reader. |
 | **Forward secrecy** | Each note uses a unique random key. Compromising one key does not reveal other notes. |
-| **Hub key** | A random symmetric key shared among all members for encrypting Nostr relay events. Rotated when members depart. |
+| **Hub key** | A random symmetric key shared among all members for encrypting WebSocket relay events. Rotated when members depart. |
 | **HMAC secret** | Server-side secret used for hashing phone numbers and IPs in ban lists and audit logs. |
 | **RustFS** | S3-compatible blob storage for encrypted file uploads (reports, IVR audio). |
-| **NIP-42** | Nostr Implementation Possibility 42: client authentication for relay access control. |
-| **Nostr** | An open protocol for decentralized event relay. Llamenos uses it for real-time communication. |
-| **nsec** | A Nostr secret key (BIP-340 Schnorr). The admin nsec is the master credential. |
+| **NIP-42** | WebSocket Implementation Possibility 42: client authentication for relay access control. |
+| **WebSocket** | An open protocol for decentralized event relay. Llamenos uses it for real-time communication. |
+| **nsec** | A WebSocket secret key (BIP-340 Schnorr). The admin nsec is the master credential. |
 | **Parallel ringing** | All on-shift, non-busy volunteers ring simultaneously. First pickup terminates others. |
-| **strfry** | A high-performance C++ Nostr relay using LMDB storage. The default relay for self-hosted deployments. |
+| **WebSocket relay** | A high-performance C++ WebSocket relay using LMDB storage. The default relay for self-hosted deployments. |
 | **Volunteer** | An on-shift responder who answers calls and writes encrypted notes. Cannot see other volunteers' identities. |
 
 ---
@@ -922,7 +922,7 @@ docker run --rm -v llamenos_nostr-data:/data -v /opt/llamenos/backups:/backup \
 | [Quick Reference Card](QUICK_REFERENCE.md) | One-page cheat sheet of the most common commands |
 | [QUICKSTART.md](QUICKSTART.md) | Full step-by-step first deployment walkthrough |
 | [RUNBOOK.md](RUNBOOK.md) | Detailed operational procedures (secret rotation, backup, incident response) |
-| [RELAY_OPERATIONS.md](RELAY_OPERATIONS.md) | Nostr relay deployment, hardening, and monitoring |
+| [RELAY_OPERATIONS.md](RELAY_OPERATIONS.md) | WebSocket relay deployment, hardening, and monitoring |
 | [REPRODUCIBLE_BUILDS.md](REPRODUCIBLE_BUILDS.md) | Build verification and supply chain integrity |
 | [DEPLOYMENT_HARDENING.md](security/DEPLOYMENT_HARDENING.md) | Infrastructure security for all deployment architectures |
 | [KEY_REVOCATION_RUNBOOK.md](security/KEY_REVOCATION_RUNBOOK.md) | Cryptographic key compromise response procedures |
