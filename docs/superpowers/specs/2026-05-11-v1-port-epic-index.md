@@ -23,7 +23,7 @@ This is the master index for porting remaining v1 features to v2. Each epic is a
 | EP03 | [Teams & Tags](2026-05-11-EP03-teams-tags-design.md) | 2 | EP01 | Specced + Planned |
 | EP04 | [Analytics & Dashboards](2026-05-11-EP04-analytics-dashboards-design.md) | 3 | — | Specced + Planned |
 | EP05 | [Messaging Channels & Blast System](2026-05-11-EP05-messaging-blast-system-design.md) | 3 | EP01 | Specced + Planned |
-| EP06 | [CMS/CRM — Contacts, Cases, Events, Evidence](2026-05-11-EP06-cms-crm-design.md) | 4 | EP01, EP03 | Stub |
+| EP06 | [CMS/CRM — Unified Entity System](2026-05-11-EP06-cms-crm-design.md) | 4 | EP01, EP03 | Specced + Planned (4 phases: A1-A4) |
 | EP07 | [Shift Management](2026-05-11-EP07-shift-management-design.md) | 2 | EP01, EP03 | Specced + Planned |
 | EP08 | [Platform Operations & Compliance](2026-05-11-EP08-platform-ops-compliance-design.md) | 3 | EP01 | Stub |
 | EP09 | [Recovery Group & Key Escrow](2026-05-11-EP09-recovery-group-design.md) | 5 | EP01, EP02 | Stub |
