@@ -3,7 +3,8 @@ import { cn } from '@/lib/utils'
 import { Link, useRouterState } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { adminNavConfig } from './admin-nav-config'
-import type { AdminNavGroup, AdminNavItem } from './admin-nav-config.types'
+import type { AdminNavGroup } from './admin-nav-config.types'
+import { canSeeItem, getVisibleGroups } from './admin-nav-visibility'
 
 interface Props {
   onNavigate?: () => void
@@ -14,19 +15,9 @@ export function AdminSidebar({ onNavigate }: Props) {
   const auth = useAuth()
   const { location } = useRouterState()
   const activeSlug = location.pathname.replace(/^\/admin\/?/, '') || ''
+  const authCtx = { roles: auth.roles, hasPermission: auth.hasPermission }
 
-  function canSee(item: AdminNavItem): boolean {
-    if (item.requiredRole && !auth.roles.includes(item.requiredRole)) return false
-    if (item.requiredPermissions.length === 0) return true
-    return item.requiredPermissions.every((p) => auth.hasPermission(p))
-  }
-
-  function canSeeGroup(group: AdminNavGroup): boolean {
-    if (group.scope === 'platform' && !auth.roles.includes('role-super-admin')) return false
-    return group.items.some(canSee)
-  }
-
-  const visibleGroups = adminNavConfig.groups.filter(canSeeGroup)
+  const visibleGroups = getVisibleGroups(adminNavConfig.groups, authCtx)
   const thisHubGroups = visibleGroups.filter((g) => g.scope === 'this-hub')
   const platformGroups = visibleGroups.filter((g) => g.scope === 'platform')
 
@@ -39,7 +30,7 @@ export function AdminSidebar({ onNavigate }: Props) {
         >
           {t(group.labelKey)}
         </div>
-        {group.items.filter(canSee).map((item) => {
+        {group.items.filter((item) => canSeeItem(item, authCtx)).map((item) => {
           const active = activeSlug === item.slug
           return (
             <Link

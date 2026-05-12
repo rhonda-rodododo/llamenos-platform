@@ -7,6 +7,7 @@ export default defineConfig({
     include: [
       "src/client/lib/**/*.test.ts",
       "src/client/lib/**/*.test.tsx",
+      "src/client/components/**/__tests__/**/*.test.ts",
     ],
     environment: "happy-dom",
     setupFiles: ["./vitest.desktop.setup.ts"],
