@@ -261,12 +261,13 @@ Add the required import at the top:
 import { entityTemplateCustomizeBodySchema } from '@protocol/schemas/entity-schema'
 ```
 
-If `services.entitySchema.applyHubCustomization` does not exist, add a stub to `apps/worker/services/entity-schema.ts`:
+Add the `applyHubCustomization` method to `apps/worker/services/entity-schema.ts`:
 
 ```typescript
 async applyHubCustomization(id: string, overrides: EntityTemplateCustomizeBody): Promise<EntityTypeDefinition> {
-  // Merge overrides into the stored entity type definition (hub-editable fields only)
   const current = await this.getEntityType(id)
+  if (!current) throw new HTTPException(404, { message: 'Entity type not found' })
+  // Merge hub-editable overrides (field visibility, labels, ordering) into the stored definition
   const merged = { ...current, ...overrides, id, updatedAt: new Date().toISOString() }
   await this.saveEntityType(merged)
   return merged
@@ -3445,3 +3446,7 @@ git commit -m "chore(EP06-A2): verification gate — all platforms green, EP06-A
 - [ ] **Step 9: Mark spec as implemented**
 
 Update the `status` frontmatter in `docs/superpowers/specs/2026-05-12-EP06-A2-cms-write-ux-design.md` from `specced` to `implemented`.
+
+---
+
+> **Note — Mobile entity create/edit forms:** No separate task is needed for iOS or Android entity create/edit forms. The iOS `EntityTypeEditorView` and Android `EntityTypeEditorScreen` (established in A1 entity type admin) use the same dynamic `SchemaForm`-equivalent field rendering components that entity creation/editing requires. Mobile entity forms reuse these field renderers directly — the only mobile work in this plan is the platform-specific contact editing, relationship, and group UIs listed above.

@@ -37,12 +37,16 @@
 - `apps/ios/Sources/Views/Cases/AssignmentSheet.swift` — new: volunteer suggestion sheet
 - `apps/ios/Sources/ViewModels/TriageViewModel.swift` — add `convertToEntity(report:entityTypeId:)` using atomic endpoint
 - `apps/ios/Sources/Views/Cases/ContactNotificationSheet.swift` — new: bottom sheet after status change
+- `apps/ios/Sources/Views/Triage/TriageView.swift` — new: report list with status tabs (pending/reviewing/converted/dismissed) and report detail
+- `apps/ios/Sources/App/AppDelegate.swift` — modify: handle `case_assigned` push notification, fetch + decrypt entity, navigate to detail
 
 ### Android (modify + new)
 - `apps/android/app/src/main/java/org/llamenos/hotline/ui/cases/AssignmentViewModel.kt` — new
 - `apps/android/app/src/main/java/org/llamenos/hotline/ui/cases/AssignmentSheet.kt` — new composable
 - `apps/android/app/src/main/java/org/llamenos/hotline/ui/triage/TriageViewModel.kt` — update `convertToCase()` to call atomic endpoint
 - `apps/android/app/src/main/java/org/llamenos/hotline/ui/cases/ContactNotificationSheet.kt` — new composable
+- `apps/android/app/src/main/java/org/llamenos/hotline/ui/triage/TriageScreen.kt` — new: report list with status tabs (pending/reviewing/converted/dismissed)
+- `apps/android/app/src/main/java/org/llamenos/hotline/service/LlamenosFirebaseMessagingService.kt` — modify: handle `case_assigned` FCM push, navigate to entity detail
 
 ### i18n (modify)
 - `packages/i18n/locales/en.json` — add keys for scoring breakdown, assignment labels, conversion actions, notification prompts
@@ -963,15 +967,59 @@ publishEvent(c.env, KIND_RECORD_ASSIGNED, {
 })
 ```
 
-- [ ] **Step 3: Run typecheck**
+- [ ] **Step 3: Write test for enriched WebSocket event payload**
+
+Add to `apps/worker/__tests__/unit/routes/records.test.ts`:
+
+```typescript
+describe('POST /:id/assign — WebSocket event enrichment', () => {
+  it('publishes record:assigned event with hubId and entityTypeId', async () => {
+    const publishSpy = vi.fn()
+    const getSpy = vi.fn().mockResolvedValue({ id: 'rec-1', entityTypeId: 'et-1', assignedTo: [] })
+    const assignSpy = vi.fn().mockResolvedValue({ id: 'rec-1', assignedTo: ['vol-1'] })
+
+    const { app } = createTestApp({
+      permissions: ['cases:assign'],
+      hubId: 'hub-1',
+      services: {
+        cases: { get: getSpy, assign: assignSpy },
+        audit: { log: vi.fn() },
+      },
+      publishEvent: publishSpy,
+    })
+
+    await app.request('/records/rec-1/assign', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pubkeys: ['vol-1'] }),
+    })
+
+    expect(publishSpy).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.any(Number),
+      expect.objectContaining({
+        type: 'record:assigned',
+        recordId: 'rec-1',
+        hubId: 'hub-1',
+        entityTypeId: 'et-1',
+      }),
+    )
+  })
+})
+```
+
+Run: `cd apps/worker && bun test __tests__/unit/routes/records.test.ts --grep "WebSocket event enrichment"`
+Expected: PASS
+
+- [ ] **Step 4: Run typecheck**
 
 Run: `bun run typecheck`
 Expected: Clean exit
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add apps/worker/routes/records.ts
+git add apps/worker/routes/records.ts apps/worker/__tests__/unit/routes/records.test.ts
 git commit -m "feat(backend): enrich assignment WebSocket events with hubId and entityTypeId"
 ```
 
@@ -1034,7 +1082,7 @@ In `src/client/components/cases/assignment-dialog.tsx`, replace the score badge 
         title={t('assignment.specializationLabel', { defaultValue: 'Specialization match' })}
       >
         <BookOpen className="h-2.5 w-2.5 mr-0.5" />
-        {s.matchedSpecializations.length}/{s.matchedSpecializations.length + (s.specializationScore < 25 ? 1 : 0)} spec
+        {s.specializationScore}/25 spec
       </Badge>
     )}
     {s.languageScore > 0 && (
@@ -2210,7 +2258,373 @@ git commit -m "feat(android): atomic triage conversion via new endpoint, contact
 
 ---
 
-## Task 12: i18n — Scoring Labels, Assignment, Conversion, Notifications
+## Task 12: iOS — Triage View + Push Notification Handling
+
+**Files:**
+- Create: `apps/ios/Sources/Views/Triage/TriageView.swift`
+- Modify: `apps/ios/Sources/App/AppDelegate.swift` (or notification extension)
+
+The spec requires iOS to have a full triage view with report list and status tabs, plus handling for `case_assigned` push notifications.
+
+- [ ] **Step 1: Create TriageView.swift with report list and status tabs**
+
+Create `apps/ios/Sources/Views/Triage/TriageView.swift`:
+
+```swift
+import SwiftUI
+
+enum TriageStatusFilter: String, CaseIterable, Identifiable {
+    case pending, reviewing, converted, dismissed
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .pending: NSLocalizedString("triage_status_pending", comment: "Pending")
+        case .reviewing: NSLocalizedString("triage_status_reviewing", comment: "Reviewing")
+        case .converted: NSLocalizedString("triage_status_converted", comment: "Converted")
+        case .dismissed: NSLocalizedString("triage_status_dismissed", comment: "Dismissed")
+        }
+    }
+}
+
+struct TriageView: View {
+    @State private var viewModel: TriageViewModel
+    @State private var selectedFilter: TriageStatusFilter = .pending
+    @State private var showEntityTypePicker = false
+    @State private var selectedReport: ClientReportResponse?
+
+    init(apiService: APIService) {
+        _viewModel = State(wrappedValue: TriageViewModel(apiService: apiService))
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                // Status tabs
+                Picker(NSLocalizedString("triage_filter", comment: "Filter"), selection: $selectedFilter) {
+                    ForEach(TriageStatusFilter.allCases) { filter in
+                        Text(filter.label).tag(filter)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+                .onChange(of: selectedFilter) { _, newValue in
+                    Task { await viewModel.loadReports(filter: newValue.rawValue) }
+                }
+
+                // Report list
+                Group {
+                    if viewModel.isLoading {
+                        ProgressView()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if viewModel.reports.isEmpty {
+                        ContentUnavailableView(
+                            NSLocalizedString("triage_no_reports", comment: "No reports"),
+                            systemImage: "tray",
+                            description: Text(NSLocalizedString("triage_no_reports_hint", comment: "No reports match this filter."))
+                        )
+                    } else {
+                        List(viewModel.reports, id: \.id) { report in
+                            TriageReportRow(report: report)
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    selectedReport = report
+                                }
+                        }
+                        .listStyle(.plain)
+                        .refreshable { await viewModel.loadReports(filter: selectedFilter.rawValue) }
+                    }
+                }
+            }
+            .navigationTitle(NSLocalizedString("triage_title", comment: "Triage"))
+            .sheet(item: $selectedReport) { report in
+                TriageReportDetailSheet(
+                    report: report,
+                    viewModel: viewModel,
+                    onConvert: { showEntityTypePicker = true }
+                )
+            }
+        }
+        .task { await viewModel.loadReports(filter: selectedFilter.rawValue) }
+    }
+}
+
+private struct TriageReportRow: View {
+    let report: ClientReportResponse
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(report.title ?? report.id)
+                .font(.body)
+                .lineLimit(1)
+            HStack(spacing: 8) {
+                Text(report.createdAt, style: .relative)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if let status = report.conversionStatus {
+                    Text(status)
+                        .font(.caption2)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.accentColor.opacity(0.1), in: Capsule())
+                }
+            }
+        }
+        .padding(.vertical, 4)
+        .accessibilityIdentifier("triage-report-row")
+    }
+}
+
+private struct TriageReportDetailSheet: View {
+    let report: ClientReportResponse
+    let viewModel: TriageViewModel
+    let onConvert: () -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(report.title ?? "Report")
+                        .font(.headline)
+                    // Report metadata and content shown here
+                    // (fields depend on report type definition)
+
+                    Divider()
+
+                    Button(action: onConvert) {
+                        Label(NSLocalizedString("triage_convert_to_entity", comment: "Convert to Entity"), systemImage: "arrow.triangle.turn.up.right.diamond")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(viewModel.isActionInProgress)
+                }
+                .padding()
+            }
+            .navigationTitle(NSLocalizedString("triage_report_detail", comment: "Report Detail"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(NSLocalizedString("common_close", comment: "Close")) { dismiss() }
+                }
+            }
+        }
+    }
+}
+```
+
+- [ ] **Step 2: Handle `case_assigned` push notification in AppDelegate**
+
+In `apps/ios/Sources/App/AppDelegate.swift` (or the UNUserNotificationCenter delegate), add handling for the `case_assigned` push payload. When received:
+1. Extract `recordId` and `hubId` from the notification payload
+2. Fetch the entity via `APIService` (`GET /api/records/{recordId}`)
+3. Decrypt the entity envelope using `CryptoService`
+4. Navigate to the entity detail view
+
+Add the following to the `userNotificationCenter(_:didReceive:withCompletionHandler:)` method:
+
+```swift
+case "case_assigned":
+    guard let recordId = userInfo["recordId"] as? String,
+          let hubId = userInfo["hubId"] as? String else {
+        completionHandler()
+        return
+    }
+    // Do NOT call setActiveHub here (multi-hub axiom — only explicit user taps may switch hub)
+    Task {
+        do {
+            let record: CaseRecord = try await apiService.request(
+                method: "GET",
+                path: apiService.hp("/api/records/\(recordId)")
+            )
+            // Decrypt envelope if needed
+            let decrypted = try await cryptoService.decryptRecordEnvelope(record.encryptedContent)
+            // Navigate to entity detail
+            await MainActor.run {
+                router.navigate(to: .entityDetail(recordId: recordId, hubId: hubId))
+            }
+        } catch {
+            logger.error("Failed to handle case_assigned push: \(error)")
+        }
+    }
+    completionHandler()
+```
+
+- [ ] **Step 3: Build to verify**
+
+Run: `bun run ios:build`
+Expected: Build succeeds, no errors.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add apps/ios/Sources/Views/Triage/ apps/ios/Sources/App/AppDelegate.swift
+git commit -m "feat(ios): add triage view with status tabs and case_assigned push handling"
+```
+
+---
+
+## Task 13: Android — Triage Screen + Push Notification Handling
+
+**Files:**
+- Create: `apps/android/app/src/main/java/org/llamenos/hotline/ui/triage/TriageScreen.kt`
+- Modify: `apps/android/app/src/main/java/org/llamenos/hotline/service/LlamenosFirebaseMessagingService.kt`
+
+The spec requires Android to have a full triage screen with report list and status tabs, plus handling for `case_assigned` FCM push notifications.
+
+- [ ] **Step 1: Create TriageScreen.kt with report list and status tabs**
+
+Create `apps/android/app/src/main/java/org/llamenos/hotline/ui/triage/TriageScreen.kt`:
+
+```kotlin
+package org.llamenos.hotline.ui.triage
+
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import org.llamenos.app.R
+
+enum class TriageStatusFilter(val value: String, val labelRes: Int) {
+    PENDING("pending", R.string.triage_status_pending),
+    REVIEWING("reviewing", R.string.triage_status_reviewing),
+    CONVERTED("converted", R.string.triage_status_converted),
+    DISMISSED("dismissed", R.string.triage_status_dismissed),
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TriageScreen(
+    onReportClick: (reportId: String) -> Unit,
+    viewModel: TriageViewModel = hiltViewModel(),
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    var selectedFilter by remember { mutableStateOf(TriageStatusFilter.PENDING) }
+
+    LaunchedEffect(selectedFilter) {
+        viewModel.loadTriageQueue(filter = selectedFilter.value)
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(title = { Text(stringResource(R.string.triage_title)) })
+        },
+    ) { padding ->
+        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+            // Status tabs
+            TabRow(selectedTabIndex = TriageStatusFilter.entries.indexOf(selectedFilter)) {
+                TriageStatusFilter.entries.forEach { filter ->
+                    Tab(
+                        selected = selectedFilter == filter,
+                        onClick = { selectedFilter = filter },
+                        text = { Text(stringResource(filter.labelRes), style = MaterialTheme.typography.labelMedium) },
+                    )
+                }
+            }
+
+            // Report list
+            when {
+                uiState.isLoading -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                }
+                uiState.reports.isEmpty() -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            text = stringResource(R.string.triage_no_reports),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                else -> {
+                    LazyColumn(modifier = Modifier.fillMaxSize()) {
+                        items(uiState.reports, key = { it.id }) { report ->
+                            ListItem(
+                                modifier = Modifier
+                                    .clickable { onReportClick(report.id) }
+                                    .semantics { contentDescription = "triage-report-row" },
+                                headlineContent = { Text(report.title ?: report.id) },
+                                supportingContent = {
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Text(report.createdAt, style = MaterialTheme.typography.labelSmall)
+                                        report.conversionStatus?.let { status ->
+                                            AssistChip(
+                                                onClick = {},
+                                                label = { Text(status, style = MaterialTheme.typography.labelSmall) },
+                                            )
+                                        }
+                                    }
+                                },
+                            )
+                            HorizontalDivider()
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+- [ ] **Step 2: Handle `case_assigned` FCM push in LlamenosFirebaseMessagingService**
+
+In `apps/android/app/src/main/java/org/llamenos/hotline/service/LlamenosFirebaseMessagingService.kt`, add handling for the `case_assigned` notification type in the `onMessageReceived` method:
+
+```kotlin
+"case_assigned" -> {
+    val recordId = data["recordId"] ?: return
+    val hubId = data["hubId"] ?: return
+    // Do NOT call setActiveHub here (multi-hub axiom)
+    scope.launch {
+        try {
+            val record = apiService.request<CaseRecord>(
+                "GET",
+                apiService.hp("/api/records/$recordId"),
+            )
+            // Decrypt envelope if needed
+            val decrypted = cryptoService.decryptRecordEnvelope(record.encryptedContent)
+            // Build navigation intent to entity detail
+            val intent = Intent(this@LlamenosFirebaseMessagingService, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                putExtra("navigation", "entity_detail")
+                putExtra("recordId", recordId)
+                putExtra("hubId", hubId)
+            }
+            // Show notification that navigates to entity on tap
+            showAssignmentNotification(recordId, decrypted, intent)
+        } catch (e: Exception) {
+            logger.error("Failed to handle case_assigned push", e)
+        }
+    }
+}
+```
+
+- [ ] **Step 3: Build to verify**
+
+Run: `bun run test:android`
+Expected: Unit tests pass, build succeeds.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add apps/android/app/src/main/java/org/llamenos/hotline/ui/triage/TriageScreen.kt apps/android/app/src/main/java/org/llamenos/hotline/service/LlamenosFirebaseMessagingService.kt
+git commit -m "feat(android): add triage screen with status tabs and case_assigned FCM push handling"
+```
+
+---
+
+## Task 14: i18n — Scoring Labels, Assignment, Conversion, Notifications
 
 **Files:**
 - Modify: `packages/i18n/locales/en.json`
@@ -2258,20 +2672,41 @@ Also add to the `"triage"` section:
 
 - [ ] **Step 2: Propagate keys to all 12 other locale files**
 
-For each locale in `packages/i18n/locales/{es,zh,tl,vi,ar,fr,ht,ko,ru,hi,pt,de}.json`, add the same keys with English values as fallback (translators will update):
+For each locale in `packages/i18n/locales/{es,zh,tl,vi,ar,fr,ht,ko,ru,hi,pt,de}.json`, copy the `en.json` structure for the new sections. Values use English as fallback (translators will update later):
 
 ```json
-"assignment": { ... same keys as en.json ... },
-"notifications": { ... same keys as en.json ... }
+"assignment": {
+  "title": "Assign Volunteer",
+  "assignBtn": "Assign",
+  "noVolunteers": "No available volunteers",
+  "noVolunteersHint": "Make sure volunteers are on-shift and have capacity.",
+  "workloadLabel": "Workload",
+  "languageMatch": "Language match",
+  "specializationLabel": "Specialization match",
+  "scoreBreakdown": "Score breakdown",
+  "autoAssignedBadge": "Auto-assigned"
+},
+"notifications": {
+  "title": "Notify Contacts?",
+  "description": "Send a status update to linked contacts. Messages are rendered on your device.",
+  "contactsSection": "Contacts",
+  "send": "Send",
+  "skip": "Skip",
+  "sent": "Notifications sent",
+  "sendError": "Failed to send notifications",
+  "noContacts": "No linked contacts found.",
+  "statusChangeTemplate": "Your case {{caseNumber}} at {{hubName}} has been updated. New status: {{status}}."
+}
 ```
 
-And the new triage keys in the `"triage"` section.
+And the new triage keys (`convertToEntity`, `converted`, `convertError`, `selectEntityType`, `entityTypePlaceholder`, `convertConfirmEntityType`) in the `"triage"` section, also using the English values as fallback.
 
 - [ ] **Step 3: Add Android string resources**
 
 In `apps/android/app/src/main/res/values/strings.xml` (generated output path — run codegen), the keys map to:
 - `assignment_title`, `assignment_assign_btn`, `assignment_no_volunteers`, `assignment_no_volunteers_hint`, `assignment_language_match`
 - `notifications_title`, `notifications_send`, `notifications_skip`
+- `triage_title`, `triage_status_pending`, `triage_status_reviewing`, `triage_status_converted`, `triage_status_dismissed`, `triage_no_reports`, `triage_convert_to_entity`
 
 Run: `bun run i18n:codegen`
 Expected: Android strings.xml updated, iOS .strings updated.
@@ -2290,7 +2725,7 @@ git commit -m "feat(i18n): add assignment scoring, triage conversion, and contac
 
 ---
 
-## Task 13: BDD Tests
+## Task 15: BDD Tests
 
 **Files:**
 - Create: `packages/test-specs/features/cms/assignment.feature`
@@ -2530,7 +2965,7 @@ git commit -m "test(bdd): add assignment scoring and triage conversion BDD scena
 
 ---
 
-## Task 14: Verification Gate
+## Task 16: Verification Gate
 
 - [ ] **Step 1: Run full backend unit test suite**
 
@@ -2593,7 +3028,11 @@ git commit -m "feat(EP06-A3): CMS intelligence — real scoring, auto-assignment
 | iOS `AssignmentViewModel.swift` + `AssignmentSheet.swift` | New: volunteer suggestion sheet |
 | iOS `TriageViewModel.swift` | Updated to atomic conversion endpoint |
 | iOS `ContactNotificationSheet.swift` | New: post-status-change notification bottom sheet |
+| iOS `TriageView.swift` | New: report list with status tabs (pending/reviewing/converted/dismissed) and report detail |
+| iOS `AppDelegate.swift` | Handle `case_assigned` push: fetch + decrypt entity, navigate to detail |
 | Android `AssignmentViewModel.kt` + `AssignmentSheet.kt` | New: volunteer suggestion sheet |
 | Android `TriageViewModel.kt` | Updated to atomic conversion endpoint |
 | Android `ContactNotificationSheet.kt` | New: post-status-change notification bottom sheet |
+| Android `TriageScreen.kt` | New: report list with status tabs (pending/reviewing/converted/dismissed) |
+| Android `LlamenosFirebaseMessagingService.kt` | Handle `case_assigned` FCM push, navigate to entity detail |
 | `packages/i18n/locales/*.json` | New `assignment.*`, `notifications.*`, and triage conversion keys (13 locales) |

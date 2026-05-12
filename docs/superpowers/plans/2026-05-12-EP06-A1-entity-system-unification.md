@@ -948,16 +948,45 @@ cd apps/worker && bun test __tests__/unit/events-deprecation.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Add `events:*` → `cases:*` permission aliasing**
+
+The spec requires that `events:*` permissions alias to their `cases:*` equivalents so that existing role definitions granting `events:*` continue to work after unification. Since this is pre-production, implement via a simple mapping function in the permission guard middleware.
+
+In `apps/worker/middleware/permission-guard.ts` (or the file where `requirePermission` is defined), add a permission alias map and apply it before the permission check:
+
+```typescript
+/**
+ * EP06-A1: events:* permissions alias to cases:* equivalents.
+ * Pre-production simplification — once all roles are updated to use cases:*,
+ * this map can be removed.
+ */
+const PERMISSION_ALIASES: Record<string, string> = {
+  'events:create': 'cases:create',
+  'events:read': 'cases:read-all',
+  'events:update': 'cases:update',
+  'events:delete': 'cases:delete',
+  'events:link': 'cases:link',
+}
+
+function resolvePermission(permission: string): string {
+  return PERMISSION_ALIASES[permission] ?? permission
+}
+```
+
+Then update the `requirePermission` middleware to call `resolvePermission(requiredPermission)` before checking against the user's granted permissions. Also update the user's granted permission set expansion: if a user has `events:read` in their role, resolve it to `cases:read-all` before the set-membership check.
+
+Update any permission constants file (e.g. `apps/worker/lib/permissions.ts` or equivalent) to document the aliases in comments for future cleanup.
+
+- [ ] **Step 6: Commit**
 
 ```bash
-git add apps/worker/routes/events.ts apps/worker/__tests__/unit/events-deprecation.test.ts
-git commit -m "feat(backend): deprecate events routes — all 11 handlers return 301 to records equivalents"
+git add apps/worker/routes/events.ts apps/worker/__tests__/unit/events-deprecation.test.ts apps/worker/middleware/permission-guard.ts
+git commit -m "feat(backend): deprecate events routes — all 11 handlers return 301 to records equivalents; add events:* → cases:* permission aliasing"
 ```
 
 ---
 
-## Task 6: Backend — Date blind index support in CasesService
+## Task 6: Backend — Date and location blind index support in CasesService
 
 **Files:**
 - Modify: `apps/worker/services/cases.ts`
@@ -1078,7 +1107,78 @@ cd apps/worker && bun test __tests__/unit/cases-date-blind-index.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 5: Run full backend unit tests to confirm no regressions**
+- [ ] **Step 5: Add location blind index (city-level region bucket) support**
+
+Location fields with `indexType: "location"` use city-level region bucket tokens instead of date buckets. The client computes a region bucket string (e.g. `"region:US:CA:Los Angeles"` or `"region:US:NY:New York"`) from the location's city-level geocode and sends it in `blindIndexes` alongside any date tokens.
+
+Add a test to `apps/worker/__tests__/unit/cases-date-blind-index.test.ts` (or rename the file to `cases-blind-index.test.ts`):
+
+```typescript
+describe('CasesService location blind index handling', () => {
+  it('accepts blindIndexes with region bucket for location fields', async () => {
+    const { service } = setup()
+
+    const blindIndexes = {
+      'location': ['region:US:CA:Los Angeles', 'region:US:CA'],
+    }
+
+    const record = await service.createRecord({
+      hubId: 'hub-1',
+      entityTypeId: 'evt-type-1',
+      statusHash: 'hash-active',
+      blindIndexes,
+      encryptedSummary: 'encrypted-summary',
+      summaryEnvelopes: [{ pubkey: 'pk1', enc: 'enc1', ct: 'ct1' }],
+      createdBy: 'user-pubkey',
+    })
+
+    expect(record.blindIndexes).toEqual(blindIndexes)
+  })
+
+  it('filters records by region bucket using blind index containment', async () => {
+    const { db, service } = setup()
+
+    await service.createRecord({
+      hubId: 'hub-1',
+      entityTypeId: 'evt-type-1',
+      statusHash: 'hash-active',
+      blindIndexes: { 'location': ['region:US:CA:Los Angeles', 'region:US:CA'] },
+      encryptedSummary: 'enc-la',
+      summaryEnvelopes: [{ pubkey: 'pk1', enc: 'e1', ct: 'c1' }],
+      createdBy: 'user-pubkey',
+    })
+
+    await service.createRecord({
+      hubId: 'hub-1',
+      entityTypeId: 'evt-type-1',
+      statusHash: 'hash-active',
+      blindIndexes: { 'location': ['region:US:NY:New York', 'region:US:NY'] },
+      encryptedSummary: 'enc-ny',
+      summaryEnvelopes: [{ pubkey: 'pk1', enc: 'e2', ct: 'c2' }],
+      createdBy: 'user-pubkey',
+    })
+
+    const result = await service.listRecords({
+      hubId: 'hub-1',
+      blindIndexToken: 'region:US:CA',
+      blindIndexField: 'location',
+    })
+
+    expect(result.records).toHaveLength(1)
+    expect(result.records[0].encryptedSummary).toBe('enc-la')
+  })
+})
+```
+
+The JSONB containment query added in Step 3 already handles location tokens identically to date tokens -- both use the same `blindIndexes->>'fieldName' @> token` pattern. The location tokens are just a different format (`region:*` instead of `month:*`/`day:*`/`week:*`). Verify this by running the new location tests:
+
+```bash
+cd apps/worker && bun test __tests__/unit/cases-blind-index.test.ts
+```
+
+Expected: PASS -- both date and location blind index tests green.
+
+- [ ] **Step 6: Run full backend unit tests to confirm no regressions**
 
 ```bash
 cd apps/worker && bun test __tests__/unit/
@@ -1086,11 +1186,11 @@ cd apps/worker && bun test __tests__/unit/
 
 Expected: All tests pass.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add apps/worker/services/cases.ts apps/worker/__tests__/unit/cases-date-blind-index.test.ts
-git commit -m "feat(backend): add blindIndexToken/blindIndexField filter to listRecords for date/location blind index queries"
+git add apps/worker/services/cases.ts apps/worker/__tests__/unit/cases-blind-index.test.ts
+git commit -m "feat(backend): add blindIndexToken/blindIndexField filter to listRecords for date and location blind index queries"
 ```
 
 ---
@@ -1239,7 +1339,15 @@ bun run typecheck
 
 Expected: Clean — no errors.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Run existing backend unit tests to confirm no regressions**
+
+```bash
+cd apps/worker && bun test __tests__/unit/
+```
+
+Expected: All tests pass. The new routes are integration-tested via BDD in Task 16; unit tests here confirm no regressions from service registration changes.
+
+- [ ] **Step 6: Commit**
 
 ```bash
 git add apps/worker/routes/entity-templates.ts apps/worker/routes/entity-schema.ts apps/worker/services/index.ts
@@ -1613,7 +1721,15 @@ bun run typecheck
 
 Expected: Clean — no references to removed event functions.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 4: Run existing Playwright desktop tests to confirm no regressions**
+
+```bash
+bun run test:desktop
+```
+
+Expected: All existing desktop tests pass. The events page renders correctly with the new component.
+
+- [ ] **Step 5: Commit**
 
 ```bash
 git add src/client/components/cases/entity-type-filtered-record-list.tsx src/client/routes/events.tsx
@@ -1622,12 +1738,66 @@ git commit -m "feat(desktop): rewrite events.tsx as EntityTypeFilteredRecordList
 
 ---
 
-## Task 10: Desktop — Admin migration UI for existing events
+## Task 10: Desktop — Admin migration UI and backend endpoints for existing events
 
 **Files:**
 - Modify: `src/client/routes/admin/hub-settings.tsx` (or the appropriate hub settings route)
 
-- [ ] **Step 1: Locate hub settings route**
+- [ ] **Step 1: Create backend migration status and migrate endpoints**
+
+The admin migration UI calls two backend endpoints that do not yet exist. Create them before building the frontend.
+
+**Files:**
+- Modify: `apps/worker/routes/events.ts` (or create a separate `apps/worker/routes/admin-events-migration.ts` and mount it)
+
+Add the following two endpoints to the events router (or a new admin router mounted at `/api/admin/events`):
+
+```typescript
+// GET /api/admin/events/migration-status
+// Returns count of events that have NOT been deprecated (deprecated_at IS NULL)
+events.get('/admin/events/migration-status',
+  requirePermission('admin:settings'),
+  async (c) => {
+    const db = c.get('db')
+    const hubId = c.get('hubId') ?? ''
+    const result = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(events)
+      .where(and(
+        eq(events.hubId, hubId),
+        isNull(events.deprecatedAt),
+      ))
+    return c.json({ pendingCount: Number(result[0]?.count ?? 0) })
+  },
+)
+
+// POST /api/admin/events/migrate
+// Sets deprecated_at on all un-migrated events for this hub.
+// NOTE: Client-side re-encryption of cleartext date/location fields into
+// encrypted field envelopes is the caller's responsibility — the server
+// only marks the events table rows as deprecated so they stop appearing
+// in legacy queries.
+events.post('/admin/events/migrate',
+  requirePermission('admin:settings'),
+  async (c) => {
+    const db = c.get('db')
+    const hubId = c.get('hubId') ?? ''
+    const result = await db
+      .update(events)
+      .set({ deprecatedAt: new Date() })
+      .where(and(
+        eq(events.hubId, hubId),
+        isNull(events.deprecatedAt),
+      ))
+      .returning({ id: events.id })
+    return c.json({ migrated: result.length })
+  },
+)
+```
+
+If these are added to the existing `events.ts` (which now returns 301s for the CRUD routes), place them **before** the catch-all redirect handlers so they match first. Alternatively, mount them in a separate admin router file.
+
+- [ ] **Step 2: Locate hub settings route**
 
 ```bash
 grep -r "EventsMigration\|events.*migration\|migrate.*events" src/client/routes/ --include="*.tsx" -l
@@ -1639,7 +1809,7 @@ If no existing migration panel exists, find the hub settings admin page:
 grep -r "hub-settings\|hubSettings\|HubSettings" src/client/routes/ --include="*.tsx" -l
 ```
 
-- [ ] **Step 2: Add EventsMigrationPanel component**
+- [ ] **Step 3: Add EventsMigrationPanel component**
 
 In the admin hub settings route file, add an `EventsMigrationPanel` component that:
 
@@ -1742,11 +1912,20 @@ function EventsMigrationPanel() {
 
 Mount `<EventsMigrationPanel />` in the hub settings admin page.
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 4: Run typecheck and existing tests**
 
 ```bash
-git add src/client/routes/admin/hub-settings.tsx
-git commit -m "feat(desktop): add EventsMigrationPanel to hub admin settings for one-time events migration"
+bun run typecheck
+cd apps/worker && bun test __tests__/unit/
+```
+
+Expected: Typecheck clean. All backend unit tests pass (migration endpoints use existing DB schema from Task 3).
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add apps/worker/routes/events.ts src/client/routes/admin/hub-settings.tsx
+git commit -m "feat: add admin events migration endpoints (GET status, POST migrate) and EventsMigrationPanel UI"
 ```
 
 ---
@@ -2397,11 +2576,11 @@ In `packages/i18n/locales/en.json`, add an `entityTemplates` section:
 }
 ```
 
-- [ ] **Step 2: Add translations to all 12 non-English locale files**
+- [ ] **Step 2: Add English-fallback structure to all 12 non-English locale files**
 
-For each locale file (`es`, `zh`, `tl`, `vi`, `ar`, `fr`, `ht`, `ko`, `ru`, `hi`, `pt`, `de`), add the `entityTemplates` section with appropriate translations. Use the translation patterns established by existing keys in each file.
+Copy the `entityTemplates` and `admin` migration key structures from `en.json` into all 12 non-English locale files: `es.json`, `zh.json`, `tl.json`, `vi.json`, `ar.json`, `fr.json`, `ht.json`, `ko.json`, `ru.json`, `hi.json`, `pt.json`, `de.json`. Values use English as fallback -- translation into each target language is a separate i18n pass. The important thing is that every locale file has the same key structure so codegen and validation pass.
 
-Spanish (`es`):
+For Spanish (`es.json`), provide actual translations as the reference example since it is the primary non-English locale:
 ```json
 "entityTemplates": {
   "title": "Plantillas de Entidades",
@@ -2438,7 +2617,7 @@ Spanish (`es`):
 }
 ```
 
-Provide equivalent translations for all remaining locales following the same structure. Each locale must have complete `entityTemplates` and `admin` migration keys.
+For the remaining 11 non-English locales (`zh`, `tl`, `vi`, `ar`, `fr`, `ht`, `ko`, `ru`, `hi`, `pt`, `de`), copy the `en.json` structure with English values as placeholders. Each locale must have the complete `entityTemplates` and `admin` migration key trees so that `i18n:validate:all` passes. Actual translations are a separate i18n pass.
 
 - [ ] **Step 3: Run i18n codegen and validate**
 

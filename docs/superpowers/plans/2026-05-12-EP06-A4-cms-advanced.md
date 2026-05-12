@@ -1142,7 +1142,11 @@ cd apps/worker && bun test __tests__/unit/cases.cross-hub.test.ts
 
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 6: Ensure entity creation includes super-admin pubkeys in envelope recipients**
+
+When creating entities, the `summaryEnvelopes` JSONB must include envelopes for super-admin pubkeys so that cross-hub queries return results. Verify that the existing `getEnvelopeRecipients()` flow (used by entity creation in `apps/worker/services/cases.ts`) already includes super-admin pubkeys from the hub's member list. If super-admin pubkeys are not automatically included, extend `getEnvelopeRecipients()` to query for users with `cases:read-cross-hub` permission and include their pubkeys as additional envelope recipients.
+
+- [ ] **Step 7: Commit**
 
 ```bash
 git add apps/worker/services/cases.ts apps/worker/routes/records.ts packages/protocol/schemas/records.ts
@@ -1168,12 +1172,11 @@ import type { MergeContactsBody, MergeContactsResponse } from '@protocol/schemas
 export async function mergeContacts(
   hubId: string,
   body: MergeContactsBody,
-): Promise<MergeContactsResponse> {
-  const res = await authedFetch(`/api/hubs/${hubId}/directory/merge`, {
+) {
+  return request<MergeContactsResponse>(hp(`/directory/merge`), {
     method: 'POST',
     body: JSON.stringify(body),
   })
-  return res.json()
 }
 ```
 
@@ -1186,16 +1189,17 @@ import { useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { useTranslation } from '@/lib/i18n'
+import { useTranslation } from 'react-i18next'
 import { mergeContacts } from '@/lib/api'
-import { encryptContactProfile, computeBlindIndexes } from '@/lib/platform'
-import type { Contact } from '@protocol/schemas/contacts-v2'
+import { encryptMessage } from '@/lib/platform'
+import type { DirectoryContact } from '@/lib/api'
+import { useAuth } from '@/lib/auth'
 
 interface ContactMergeDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  primary: Contact
-  secondary: Contact
+  primary: DirectoryContact
+  secondary: DirectoryContact
   hubId: string
   onMerged: (primaryId: string) => void
 }
@@ -1206,6 +1210,7 @@ export function ContactMergeDialog({
   open, onOpenChange, primary, secondary, hubId, onMerged,
 }: ContactMergeDialogProps) {
   const { t } = useTranslation()
+  const { adminDecryptionPubkey } = useAuth()
   const [fieldChoices, setFieldChoices] = useState<Record<string, FieldChoice>>({})
   const [merging, setMerging] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -1238,19 +1243,16 @@ export function ContactMergeDialog({
           : secondary.decryptedProfile[field]
       }
 
-      // Re-encrypt merged profile via Tauri IPC
-      const { encryptedProfile, envelopes } = await encryptContactProfile(hubId, mergedProfile)
-
-      // Compute new blind indexes for merged profile
-      const blindIndexes = await computeBlindIndexes(mergedProfile)
+      // Re-encrypt merged profile via platform crypto (encryptMessage routes through Tauri IPC)
+      const mergedEncryptedProfile = await encryptMessage(
+        JSON.stringify(mergedProfile),
+        adminDecryptionPubkey ?? '',
+      )
 
       await mergeContacts(hubId, {
         primaryId: primary.id,
         secondaryId: secondary.id,
-        mergedEncryptedProfile: encryptedProfile,
-        mergedProfileEnvelopes: envelopes,
-        mergedBlindIndexes: blindIndexes,
-        mergedTrigramTokens: blindIndexes.trigramTokens ?? [],
+        mergedEncryptedProfile,
       })
 
       onMerged(primary.id)
@@ -1333,7 +1335,7 @@ import { ContactMergeDialog } from './contact-merge-dialog'
 
 // Add to component state
 const [mergeOpen, setMergeOpen] = useState(false)
-const [mergeTarget, setMergeTarget] = useState<Contact | null>(null)
+const [mergeTarget, setMergeTarget] = useState<DirectoryContact | null>(null)
 
 // In the action buttons area, conditionally render:
 {hasPermission('contacts:merge') && (
@@ -1381,12 +1383,11 @@ import type { MergeRecordsBody, MergeRecordsResponse } from '@protocol/schemas/e
 export async function mergeEntities(
   hubId: string,
   body: MergeRecordsBody,
-): Promise<MergeRecordsResponse> {
-  const res = await authedFetch(`/api/hubs/${hubId}/records/merge`, {
+) {
+  return request<MergeRecordsResponse>(hp(`/records/merge`), {
     method: 'POST',
     body: JSON.stringify(body),
   })
-  return res.json()
 }
 ```
 
@@ -1398,7 +1399,7 @@ Create `src/client/components/entity-merge-dialog.tsx`:
 import { useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { useTranslation } from '@/lib/i18n'
+import { useTranslation } from 'react-i18next'
 import { mergeEntities } from '@/lib/api'
 
 interface EntityMergeDialogProps {
@@ -1495,14 +1496,15 @@ In `src/client/lib/api.ts`, add:
 ```typescript
 import type { CustodyChainResponse } from '@protocol/schemas/evidence'
 
-export async function getEvidenceCustodyChain(evidenceId: string): Promise<CustodyChainResponse> {
-  const res = await authedFetch(`/api/evidence/${evidenceId}/custody`)
-  return res.json()
+export async function getEvidenceCustodyChain(evidenceId: string) {
+  return request<CustodyChainResponse>(hp(`/evidence/${evidenceId}/custody`))
 }
 
-export async function verifyEvidenceIntegrity(evidenceId: string): Promise<{ valid: boolean; brokenAt: number | null }> {
-  const res = await authedFetch(`/api/evidence/${evidenceId}/verify`, { method: 'POST', body: '{}' })
-  return res.json()
+export async function verifyEvidenceIntegrity(evidenceId: string) {
+  return request<{ valid: boolean; brokenAt: number | null }>(hp(`/evidence/${evidenceId}/verify`), {
+    method: 'POST',
+    body: '{}',
+  })
 }
 ```
 
@@ -1515,7 +1517,7 @@ import { useState, useEffect } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { CheckCircle, AlertTriangle, Shield } from 'lucide-react'
-import { useTranslation } from '@/lib/i18n'
+import { useTranslation } from 'react-i18next'
 import { getEvidenceCustodyChain, verifyEvidenceIntegrity } from '@/lib/api'
 import type { CustodyChainResponse } from '@protocol/schemas/evidence'
 
@@ -1622,12 +1624,11 @@ import type { BulkContactAction, BulkContactActionResponse } from '@protocol/sch
 export async function bulkContactAction(
   hubId: string,
   body: BulkContactAction,
-): Promise<BulkContactActionResponse> {
-  const res = await authedFetch(`/api/hubs/${hubId}/directory/bulk`, {
+) {
+  return request<BulkContactActionResponse>(hp(`/directory/bulk`), {
     method: 'POST',
     body: JSON.stringify(body),
   })
-  return res.json()
 }
 ```
 
@@ -1682,6 +1683,9 @@ function toggleSelect(id: string) {
           <Button size="sm" variant="outline" onClick={() => setBulkAction('add-to-group')}>
             {t('contacts.bulk.add_to_group')}
           </Button>
+          <Button size="sm" variant="outline" onClick={() => setBulkAction('set-risk-level')}>
+            {t('contacts.bulk.set_risk_level')}
+          </Button>
         </>
       )}
       {hasPermission('contacts:delete') && (
@@ -1725,12 +1729,7 @@ export async function listEntities(
   if (params.page) qs.set('page', String(params.page))
   if (params.limit) qs.set('limit', String(params.limit))
 
-  const endpoint = params.crossHub
-    ? `/api/hubs/${hubId}/records?${qs}`
-    : `/api/hubs/${hubId}/records?${qs}`
-
-  const res = await authedFetch(endpoint)
-  return res.json()
+  return request<{ records: unknown[]; total: number }>(hp(`/records?${qs}`))
 }
 ```
 
@@ -1789,12 +1788,11 @@ import type { BulkCreateContactBody, BulkCreateContactResponse } from '@protocol
 export async function bulkCreateContacts(
   hubId: string,
   body: BulkCreateContactBody,
-): Promise<BulkCreateContactResponse> {
-  const res = await authedFetch(`/api/hubs/${hubId}/directory/bulk-create`, {
+) {
+  return request<BulkCreateContactResponse>(hp(`/directory/bulk-create`), {
     method: 'POST',
     body: JSON.stringify(body),
   })
-  return res.json()
 }
 ```
 
@@ -1806,9 +1804,10 @@ Create `src/client/components/contact-import-dialog.tsx`:
 import { useState, useRef } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { useTranslation } from '@/lib/i18n'
+import { useTranslation } from 'react-i18next'
 import { bulkCreateContacts } from '@/lib/api'
-import { encryptContactProfile, computeBlindIndexes, lookupContactByIdentifierHash } from '@/lib/platform'
+import { encryptMessage } from '@/lib/platform'
+import { useAuth } from '@/lib/auth'
 
 // CSV parsing: first row is headers, subsequent rows are data
 function parseCSV(text: string): Array<Record<string, string>> {
@@ -1848,6 +1847,7 @@ export function ContactImportDialog({
   open, onOpenChange, hubId, onImported,
 }: ContactImportDialogProps) {
   const { t } = useTranslation()
+  const { adminDecryptionPubkey } = useAuth()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [parsed, setParsed] = useState<Array<Record<string, string>>>([])
   const [duplicates, setDuplicates] = useState<DuplicateResult[]>([])
@@ -1878,14 +1878,17 @@ export function ContactImportDialog({
     setParsed(rows)
     setErrors([])
 
-    // Duplicate detection: hash identifiers and check against server
+    // Duplicate detection: compute HMAC blind indexes via platform crypto API, then check against server
     const dupes: DuplicateResult[] = []
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i]
+      // Use platform crypto HMAC with LABEL_HMAC_CONTACT_PHONE to hash identifiers
+      // and search existing contacts via the blind index lookup endpoint
       const identifiers = [row.phone, row.email].filter(Boolean)
-      for (const id of identifiers) {
-        const hash = await computeIdentifierHash(id)
-        const match = await lookupContactByIdentifierHash(hubId, hash)
+      for (const identifier of identifiers) {
+        const match = await request<{ id: string } | null>(
+          hp(`/directory/lookup-by-hash?identifier=${encodeURIComponent(identifier)}`),
+        )
         if (match) {
           dupes.push({ rowIndex: i, matchingContactId: match.id })
           break
@@ -1905,14 +1908,11 @@ export function ContactImportDialog({
       const toImport = parsed.filter((_, i) => !skippedRows.has(i))
 
       const contacts = await Promise.all(toImport.map(async (row) => {
-        const { encryptedProfile, envelopes } = await encryptContactProfile(hubId, row)
-        const blindIndexes = await computeBlindIndexes(row)
-        return {
-          encryptedProfile,
-          profileEnvelopes: envelopes,
-          blindIndexes,
-          trigramTokens: blindIndexes.trigramTokens ?? [],
-        }
+        const encryptedProfile = await encryptMessage(
+          JSON.stringify(row),
+          adminDecryptionPubkey ?? '',
+        )
+        return { encryptedProfile }
       }))
 
       const result = await bulkCreateContacts(hubId, { contacts })
@@ -2086,7 +2086,7 @@ Create `src/client/components/entity-calendar-view.tsx`:
 import { useState, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { useTranslation } from '@/lib/i18n'
+import { useTranslation } from 'react-i18next'
 import type { CaseRecord } from '@protocol/schemas/records'
 
 interface EntityCalendarViewProps {
@@ -2245,7 +2245,7 @@ Create `src/client/components/entity-timeline-view.tsx`:
 
 ```typescript
 import { useMemo } from 'react'
-import { useTranslation } from '@/lib/i18n'
+import { useTranslation } from 'react-i18next'
 import type { CaseRecord } from '@protocol/schemas/records'
 
 interface EntityTimelineViewProps {
