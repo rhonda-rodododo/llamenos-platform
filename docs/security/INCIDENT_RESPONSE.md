@@ -39,7 +39,7 @@ Procedures for responding to security incidents affecting a Llamenos deployment.
    ```bash
    # Generate new secrets
    openssl rand -hex 32  # New PG_PASSWORD
-   openssl rand -hex 32  # New SERVER_NOSTR_SECRET
+   openssl rand -hex 32  # New SERVER_SECRET
    openssl rand -hex 32  # New HMAC_SECRET
 
    # Update .env and redeploy
@@ -69,7 +69,7 @@ Procedures for responding to security incidents affecting a Llamenos deployment.
 - Plaintext metadata (call timestamps, durations, routing data)
 - HMAC secret (can reverse phone hashes to phone numbers)
 - Telephony credentials (can make API calls to telephony providers)
-- Server Nostr secret (can impersonate server on relay)
+- Server secret (can impersonate server on WebSocket)
 - Hub key (if captured from memory — can decrypt hub events)
 
 ---
@@ -156,7 +156,7 @@ The signal-notifier sidecar (port 3100) handles Signal message delivery and cont
 
 ### Key Separation Note
 
-The server's Nostr signing key and event encryption key are derived independently from `SERVER_NOSTR_SECRET` using separate HKDF labels. A signing key compromise (attacker can publish fake events) does NOT compromise event content confidentiality, and vice versa. When assessing server compromise scope, determine which derived key was exposed.
+The server's event signing key and event encryption key are derived independently from `SERVER_SECRET` using separate HKDF labels. A signing key compromise (attacker can publish fake events) does NOT compromise event content confidentiality, and vice versa. When assessing server compromise scope, determine which derived key was exposed.
 
 ---
 

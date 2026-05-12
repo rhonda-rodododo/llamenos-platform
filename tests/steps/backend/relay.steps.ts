@@ -236,7 +236,7 @@ Then("the event pubkey should match the server's configured pubkey", async ({ re
 // --- Helpers ---
 
 /**
- * Decrypt event payload using the server event key derived from SERVER_NOSTR_SECRET.
+ * Decrypt event payload using the server event key derived from SERVER_SECRET.
  *
  * The new WsEventMessage uses `payload` (encrypted hex string) and `epoch`.
  * Decryption uses HKDF(SHA-256, secret, salt=LABEL_SERVER_EVENT_ENCRYPTION_KEY,
@@ -252,9 +252,9 @@ function decryptEventPayload(event: CapturedEvent): Record<string, unknown> | nu
     // Payload is encrypted — decrypt with server event key
   }
 
-  const secret = process.env.SERVER_NOSTR_SECRET || process.env.DEV_SERVER_SECRET || DEV_SERVER_SECRET
+  const secret = process.env.SERVER_SECRET || process.env.DEV_SERVER_SECRET || DEV_SERVER_SECRET
   if (!secret) {
-    console.warn('[relay.steps] No SERVER_NOSTR_SECRET — cannot decrypt event payload')
+    console.warn('[relay.steps] No SERVER_SECRET — cannot decrypt event payload')
     return null
   }
 

@@ -22,7 +22,7 @@ You are a cryptography security expert reviewing changes to the Llamenos secure 
 - **nsec leakage**: any path that returns, logs, or serializes the nsec outside `CryptoState` in Rust
 - **ECIES shared secret extraction**: must use `.slice(1, 33)` to get x-coord from `secp256k1.getSharedSecret()` (returns 33 bytes)
 - **Timing-unsafe secret comparison**: never use `===` or `==` for secret/key/signature comparison; must use constant-time compare
-- **Nostr pubkey format errors**: x-only pubkeys (32 bytes) require `"02"` prepended for ECDH compressed format
+- **WebSocket pubkey format errors**: x-only pubkeys (32 bytes) require `"02"` prepended for ECDH compressed format
 
 ### MEDIUM severity
 - **Hub key derivation**: hub key must be `crypto.getRandomValues`, never derived from any identity key

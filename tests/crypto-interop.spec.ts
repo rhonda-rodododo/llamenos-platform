@@ -221,7 +221,7 @@ test.describe('Cross-platform crypto interop', () => {
   })
 
   test('JS can verify Nostr event produced by Rust', () => {
-    const { event, canonicalJson } = vectors.nostrEvent
+    const { event, canonicalJson } = vectors.wsEvent
 
     // Recompute event ID from canonical JSON
     const computedId = bytesToHex(sha256(utf8ToBytes(canonicalJson)))

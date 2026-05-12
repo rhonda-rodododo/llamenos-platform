@@ -75,7 +75,7 @@ Worker API  -->  ConversationDO
     |                | Umhuellt symmetrischen Schluessel via ECIES fuer zugewiesenen Freiwilligen + Admins
     |                | Verwirft Klartext
     |                v
-    |           Nostr-Relay (verschluesseltes Hub-Event benachrichtigt Online-Clients)
+    |           WebSocket-Relay (verschluesseltes Hub-Event benachrichtigt Online-Clients)
     |
     v
 Client (Browser/App des Freiwilligen)
@@ -111,7 +111,7 @@ Alle DOs werden als Singletons ueber `idFromName()` aufgerufen und intern ueber 
 | Berichtsanhaenge | Ja (E2EE) | XChaCha20-Poly1305 (gestreamt) | Berichtsautor + alle Admins |
 | Nachrichteninhalt | Ja (E2EE) | XChaCha20-Poly1305 + ECIES-Envelope | Zugewiesener Freiwilliger + alle Admins |
 | Transkripte | Ja (Ruhezustand) | XChaCha20-Poly1305 | Transkript-Ersteller + alle Admins |
-| Hub-Events (Nostr) | Ja (symmetrisch) | XChaCha20-Poly1305 mit Hub-Schluessel | Alle aktuellen Hub-Mitglieder |
+| Hub-Events (WebSocket) | Ja (symmetrisch) | XChaCha20-Poly1305 mit Hub-Schluessel | Alle aktuellen Hub-Mitglieder |
 | Freiwilligen-nsec | Ja (Ruhezustand) | PBKDF2 + XChaCha20-Poly1305 (PIN) | Nur der Freiwillige |
 | Audit-Log-Eintraege | Nein (integritaetsgeschuetzt) | SHA-256-Hash-Kette | Admins (lesen), System (schreiben) |
 | Anrufer-Telefonnummern | Nein (nur serverseitig) | N/A | Server + Admins |
@@ -130,11 +130,11 @@ Freiwilligen-nsec (BIP-340 Schnorr / secp256k1)
     |
     +-- Verwendet fuer ECIES-Schluesselvereinbarung (02 fuer komprimiertes Format voranstellen)
     |
-    +-- Signiert Nostr-Events (Schnorr-Signatur)
+    +-- Signiert WebSocket-Events (Schnorr-Signatur)
 
 Hub-Schluessel (zufaellige 32 Bytes, NICHT von einer Identitaet abgeleitet)
     |
-    +-- Verschluesselt Echtzeit-Nostr-Hub-Events
+    +-- Verschluesselt Echtzeit-WebSocket-Hub-Events
     |
     +-- ECIES-umhuellt pro Mitglied via LABEL_HUB_KEY_WRAP
     |
@@ -151,9 +151,9 @@ Pro-Notiz-Schluessel (zufaellige 32 Bytes)
 
 ## Echtzeitkommunikation
 
-Echtzeit-Updates (neue Anrufe, Nachrichten, Schichtaenderungen, Praesenz) fliessen ueber ein Nostr-Relay:
+Echtzeit-Updates (neue Anrufe, Nachrichten, Schichtaenderungen, Praesenz) fliessen ueber ein WebSocket-Relay:
 
-- **Selbst gehostet**: strfry-Relay laeuft neben der App in Docker/Kubernetes
+- **Selbst gehostet**: WebSocket relay-Relay laeuft neben der App in Docker/Kubernetes
 - **Cloudflare**: Nosflare (Cloudflare Workers-basiertes Relay)
 
 Alle Events sind ephemer (Kind 20001) und mit dem Hub-Schluessel verschluesselt. Events verwenden generische Tags (`["t", "llamenos:event"]`), sodass das Relay keine Event-Typen unterscheiden kann. Das Inhaltsfeld enthaelt XChaCha20-Poly1305-Chiffretext.
@@ -164,9 +164,9 @@ Alle Events sind ephemer (Kind 20001) und mit dem Hub-Schluessel verschluesselt.
 Client A (Freiwilligen-Aktion)
     |
     | Verschluesselt Event-Inhalt mit Hub-Schluessel
-    | Signiert als Nostr-Event (Schnorr)
+    | Signiert als WebSocket-Event (Schnorr)
     v
-Nostr-Relay (strfry / Nosflare)
+WebSocket-Relay (WebSocket relay / Nosflare)
     |
     | Sendet an Abonnenten
     v
@@ -185,13 +185,13 @@ Das Relay sieht verschluesselte Blobs und gueltige Signaturen, kann aber weder E
 ### Transportschicht
 
 - Gesamte Client-Server-Kommunikation ueber HTTPS (TLS 1.3)
-- WebSocket-Verbindungen zum Nostr-Relay ueber WSS
+- WebSocket-Verbindungen zum WebSocket-Relay ueber WSS
 - Content Security Policy (CSP) schraenkt Skriptquellen, Verbindungen und Frame-Vorfahren ein
 - Tauri-Isolationsmuster trennt IPC von der Webview
 
 ### Anwendungsschicht
 
-- Authentifizierung ueber Nostr-Schluesselpaare (BIP-340 Schnorr-Signaturen)
+- Authentifizierung ueber WebSocket-Schluesselpaare (BIP-340 Schnorr-Signaturen)
 - WebAuthn-Session-Tokens fuer Multi-Geraete-Komfort
 - Rollenbasierte Zugriffskontrolle (Anrufer, Freiwilliger, Berichterstatter, Admin)
 - Alle 25 kryptografischen Domain-Separation-Konstanten definiert in `crypto-labels.ts` verhindern Cross-Protocol-Angriffe

@@ -46,14 +46,14 @@ else
   HMAC="$(openssl rand -hex 32)"
   STORAGE_AK="$(openssl rand -base64 16 | tr -d '=/+')"
   STORAGE_SK="$(openssl rand -base64 24)"
-  NOSTR_SECRET="$(openssl rand -hex 32)"
+  SERVER_SECRET_VAL="$(openssl rand -hex 32)"
 
   # Use sed to fill in generated values
   sed -i "s|^PG_PASSWORD=.*|PG_PASSWORD=${PG_PASS}|" .env
   sed -i "s|^HMAC_SECRET=.*|HMAC_SECRET=${HMAC}|" .env
   sed -i "s|^STORAGE_ACCESS_KEY=.*|STORAGE_ACCESS_KEY=${STORAGE_AK}|" .env
   sed -i "s|^STORAGE_SECRET_KEY=.*|STORAGE_SECRET_KEY=${STORAGE_SK}|" .env
-  sed -i "s|^SERVER_SECRET=.*|SERVER_SECRET=${NOSTR_SECRET}|" .env
+  sed -i "s|^SERVER_SECRET=.*|SERVER_SECRET=${SERVER_SECRET_VAL}|" .env
 
   echo "Generated .env with random secrets."
   echo ""

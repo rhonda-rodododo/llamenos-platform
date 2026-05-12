@@ -21,7 +21,7 @@ cd llamenos
 
 ## 2. Gumawa ng admin keypair
 
-Kailangan mo ng Nostr keypair para sa admin account. Patakbuhin ito sa iyong lokal na machine (o sa server kung naka-install ang Bun):
+Kailangan mo ng WebSocket keypair para sa admin account. Patakbuhin ito sa iyong lokal na machine (o sa server kung naka-install ang Bun):
 
 ```bash
 bun install

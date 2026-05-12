@@ -136,7 +136,7 @@ describe('health route', () => {
     })
 
     it('marks storage failing when STORAGE_ENDPOINT not configured', async () => {
-      const app = createTestApp({ env: { STORAGE_ENDPOINT: undefined, MINIO_ENDPOINT: undefined } })
+      const app = createTestApp({ env: { STORAGE_ENDPOINT: undefined } })
       const res = await app.request('/')
       expect(res.status).toBe(503)
       const body = await res.json()

@@ -79,7 +79,7 @@ Llamenos ist eine Single-Page-Anwendung (SPA), die auf **Cloudflare Workers** od
 | Speicher | R2 | RustFS (S3-kompatibel) |
 | Sprache | Twilio, SignalWire, Vonage, Plivo oder Asterisk | Gleich |
 | Nachrichten | SMS, WhatsApp Business, Signal | Gleich |
-| Authentifizierung | Nostr-Schluessel (BIP-340 Schnorr) + WebAuthn | Gleich |
+| Authentifizierung | WebSocket-Schluessel (BIP-340 Schnorr) + WebAuthn | Gleich |
 | Verschluesselung | ECIES (secp256k1 + XChaCha20-Poly1305) | Gleich |
 | Transkription | Client-seitiges Whisper (WASM) | Client-seitiges Whisper (WASM) |
 | i18n | i18next (13 Sprachen) | Gleich |

@@ -51,16 +51,16 @@ sudo lsof -i :9000
 - تحقق من صحة حاوية PostgreSQL: `docker compose ps`
 - إذا تم تغيير كلمة المرور، قد تحتاج إلى إزالة الحجم وإعادة الإنشاء: `docker compose down -v && docker compose up -d`
 
-### مرحّل strfry لا يتصل
+### مرحّل WebSocket relay لا يتصل
 
-مرحّل Nostr (strfry) خدمة أساسية، وليس اختيارياً. إذا لم يكن المرحّل يعمل:
+مرحّل WebSocket (WebSocket relay) خدمة أساسية، وليس اختيارياً. إذا لم يكن المرحّل يعمل:
 
 ```bash
 # تحقق من حالة المرحّل
-docker compose logs strfry
+docker compose logs WebSocket relay
 
 # أعد تشغيل المرحّل
-docker compose restart strfry
+docker compose restart WebSocket relay
 ```
 
 إذا فشل المرحّل في البدء، تحقق من تعارضات المنفذ 7777 أو صلاحيات غير كافية على مجلد البيانات.
@@ -233,7 +233,7 @@ bun run deploy:site     # نشر موقع التسويق فقط
 إذا فشلت أحداث hub في التحقق من التوقيع:
 
 - تحقق من مزامنة ساعة النظام (NTP). الانحراف الكبير في الساعة يمكن أن يسبب مشاكل مع طوابع الوقت
-- تحقق من أن مرحّل Nostr لا يُعيد بث أحداث من مفاتيح عامة غير معروفة
+- تحقق من أن مرحّل WebSocket لا يُعيد بث أحداث من مفاتيح عامة غير معروفة
 - أعد تشغيل التطبيق لإعادة جلب قائمة أعضاء hub الحالية
 
 ### أخطاء ظرف ECIES

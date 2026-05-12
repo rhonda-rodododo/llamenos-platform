@@ -187,7 +187,6 @@ describe('Health Routes — response conformance', () => {
     const { app, env } = buildApp('/', healthRoutes, {
       extraEnv: {
         STORAGE_ENDPOINT: 'http://fake-storage:9000',
-        NOSTR_RELAY_URL: 'ws://fake-relay:7777',
       },
     })
 
@@ -208,7 +207,6 @@ describe('Health Routes — response conformance', () => {
     const { app, env } = buildApp('/', healthRoutes, {
       extraEnv: {
         STORAGE_ENDPOINT: 'http://fake-storage:9000',
-        NOSTR_RELAY_URL: 'ws://fake-relay:7777',
       },
     })
 

@@ -60,7 +60,7 @@ POST https://your-worker.your-domain.com/api/messaging/sms/webhook
 1. एक SMS आपके provider पर आता है, जो आपके Worker को webhook भेजता है
 2. Worker webhook signature validate करता है (provider-specific HMAC)
 3. Message parse होता है और ConversationDO में store होता है
-4. On-shift volunteers को Nostr relay events के माध्यम से notify किया जाता है
+4. On-shift volunteers को WebSocket relay events के माध्यम से notify किया जाता है
 5. Volunteers Conversations tab से reply करते हैं — responses आपके provider के SMS API के माध्यम से वापस भेजे जाते हैं
 
 ## सुरक्षा नोट्स

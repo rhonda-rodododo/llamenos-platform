@@ -129,20 +129,20 @@ Alternatively, rotate credentials through the admin UI at Settings > Telephony P
 
 4. Revoke the old API key in the Twilio Console.
 
-### 1.6 Server Nostr Secret Rotation
+### 1.6 Server WebSocket Secret Rotation
 
-**Frequency**: Only when compromised, or when deliberately changing the server's Nostr identity.
+**Frequency**: Only when compromised, or when deliberately changing the server's WebSocket identity.
 
-**WARNING**: Rotating `SERVER_NOSTR_SECRET` changes the server's Nostr keypair. All clients will see a new server pubkey after re-authenticating. Active relay subscriptions will need to be re-established.
+**WARNING**: Rotating `SERVER_SECRET` changes the server's WebSocket keypair. All clients will see a new server pubkey after re-authenticating. Active relay subscriptions will need to be re-established.
 
 ```bash
 cd /opt/llamenos/deploy/docker
 
 # 1. Generate new secret (must be exactly 64 hex characters)
-NEW_NOSTR_SECRET=$(openssl rand -hex 32)
+NEW_SERVER_SECRET=$(openssl rand -hex 32)
 
 # 2. Update .env
-sed -i "s|^SERVER_NOSTR_SECRET=.*|SERVER_NOSTR_SECRET=${NEW_NOSTR_SECRET}|" .env
+sed -i "s|^SERVER_SECRET=.*|SERVER_SECRET=${NEW_SERVER_SECRET}|" .env
 
 # 3. Restart the application (relay does not need restart)
 docker compose restart app
@@ -413,14 +413,14 @@ docker compose start app
 docker compose exec app curl -sf http://localhost:3000/api/health
 ```
 
-### 4.5 Nostr Relay (strfry) Backup
+### 4.5 WebSocket Relay (WebSocket relay) Backup
 
-Back up the strfry LMDB data directory:
+Back up the WebSocket relay LMDB data directory:
 
 ```bash
-# Back up the strfry-db Docker volume
-docker run --rm -v llamenos_nostr-data:/data -v /opt/llamenos/backups:/backup \
-  alpine tar czf /backup/strfry-$(date +%Y%m%d).tar.gz -C /data .
+# Back up the WebSocket relay-db Docker volume
+docker run --rm -v llamenos_WebSocket-data:/data -v /opt/llamenos/backups:/backup \
+  alpine tar czf /backup/WebSocket relay-$(date +%Y%m%d).tar.gz -C /data .
 ```
 
 **Note**: If all events are ephemeral (kind 20001), the relay database is small and contains only relay state — not user data. Backup is recommended but not critical.
@@ -662,22 +662,22 @@ Docker log rotation is configured in the daemon settings (`/etc/docker/daemon.js
 
 This limits each container to 30 MB of logs (3 files x 10 MB). Adjust if you need more history.
 
-### 6.5 Nostr Relay Monitoring
+### 6.5 WebSocket Relay Monitoring
 
-Monitor the Nostr relay (core service):
+Monitor the WebSocket relay (core service):
 
 ```bash
 # Check relay health
-docker compose exec strfry curl -sf http://localhost:7777
+docker compose exec WebSocket relay curl -sf http://localhost:7777
 
 # View relay logs
-docker compose logs strfry --tail 50
+docker compose logs WebSocket relay --tail 50
 
 # Check LMDB database size
-docker compose exec strfry du -sh /app/strfry-db/
+docker compose exec WebSocket relay du -sh /app/WebSocket relay-db/
 
 # Check relay container resource usage
-docker stats strfry --no-stream
+docker stats WebSocket relay --no-stream
 ```
 
 For detailed relay monitoring and troubleshooting, see [`docs/RELAY_OPERATIONS.md`](RELAY_OPERATIONS.md).
@@ -737,32 +737,32 @@ docker compose logs caddy --tail 20
 
 **Likely causes**: The app container is still starting (wait for health check), or it crashed (check app logs).
 
-### 7.3 Nostr Relay Connection Fails
+### 7.3 WebSocket Relay Connection Fails
 
 **Symptom**: Real-time updates (call notifications, presence indicators) do not work.
 
 ```bash
 # Check if the relay container is running
-docker compose ps strfry
+docker compose ps WebSocket relay
 
 # Check the relay health
-docker compose exec strfry curl -sf http://localhost:7777
+docker compose exec WebSocket relay curl -sf http://localhost:7777
 
 # Test the WebSocket proxy endpoint from outside
-curl -sI https://hotline.yourorg.org/nostr
+curl -sI https://hotline.yourorg.org/WebSocket
 # Should return 426 Upgrade Required (not a proper WS handshake, but confirms routing)
 
 # Check browser console for relay errors
-# Common: "Failed to connect to wss://hotline.yourorg.org/nostr"
+# Common: "Failed to connect to wss://hotline.yourorg.org/WebSocket"
 ```
 
 **Common causes**:
 
 | Symptom | Cause | Solution |
 |---------|-------|----------|
-| Relay container not running | Container stopped or failed | `docker compose up -d strfry` |
-| 502 on `/nostr` | Caddy can't reach strfry | Check `docker compose logs caddy` for upstream errors |
-| Auth failures in browser console | `SERVER_NOSTR_SECRET` missing or changed | Verify `.env` has `SERVER_NOSTR_SECRET`; restart app if changed |
+| Relay container not running | Container stopped or failed | `docker compose up -d WebSocket relay` |
+| 502 on `/WebSocket` | Caddy can't reach WebSocket relay | Check `docker compose logs caddy` for upstream errors |
+| Auth failures in browser console | `SERVER_SECRET` missing or changed | Verify `.env` has `SERVER_SECRET`; restart app if changed |
 | Events not delivered | NIP-42 auth failing | Check relay logs; verify client pubkey is allowed |
 | Cloudflare 524 timeout | CF drops idle WebSocket after 100s | Enable WebSocket in Cloudflare dashboard; app sends periodic pings |
 
@@ -837,7 +837,7 @@ The Docker Compose deployment on a single VPS is designed for small organization
 | Resource | Capacity |
 |----------|----------|
 | Concurrent calls | ~50 (limited by telephony provider, not server) |
-| Concurrent Nostr relay subscriptions | ~500 (strfry handles thousands; practical limit is app-side) |
+| Concurrent WebSocket relay subscriptions | ~500 (WebSocket relay handles thousands; practical limit is app-side) |
 | Database storage | Limited by disk size |
 | API requests | ~1000/s (Hono on Node.js) |
 

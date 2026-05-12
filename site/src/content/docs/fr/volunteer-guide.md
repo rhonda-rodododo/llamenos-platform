@@ -9,7 +9,7 @@ Ce guide couvre tout ce que vous devez savoir en tant que benevole : connexion, 
 
 Votre administrateur vous fournira l'un des elements suivants :
 
-- Un **nsec** (cle secrete Nostr) -- une chaine commencant par `nsec1`
+- Un **nsec** (cle secrete WebSocket) -- une chaine commencant par `nsec1`
 - Un **lien d'invitation** -- une URL a usage unique qui genere vos identifiants
 
 **Gardez votre nsec prive.** C'est votre identite et votre identifiant de connexion. Toute personne possedant votre nsec peut se faire passer pour vous. Stockez-le dans un gestionnaire de mots de passe.

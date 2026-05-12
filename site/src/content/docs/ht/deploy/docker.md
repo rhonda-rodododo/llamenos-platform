@@ -21,7 +21,7 @@ cd llamenos
 
 ## 2. Jenere pè kle administratè a
 
-Ou bezwen yon pè kle Nostr pou kont administratè a. Egzekite sa sou machin lokal ou (oswa sou sèvè a si Bun enstale):
+Ou bezwen yon pè kle WebSocket pou kont administratè a. Egzekite sa sou machin lokal ou (oswa sou sèvè a si Bun enstale):
 
 ```bash
 bun install

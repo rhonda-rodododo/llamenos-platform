@@ -85,8 +85,6 @@ deploy-rustfs *ARGS:
     ansible-playbook playbooks/deploy.yml --ask-vault-pass --tags rustfs {{ARGS}}
 
 # Deploy only strfry Nostr relay
-deploy-strfry *ARGS:
-    ansible-playbook playbooks/deploy.yml --ask-vault-pass --tags strfry {{ARGS}}
 
 # Deploy only Whisper transcription
 deploy-whisper *ARGS:
@@ -108,11 +106,11 @@ migrate *ARGS:
 
 # ── Backup ──────────────────────────────────────────────────────
 
-# Run all backups (postgres, strfry, rustfs, config) with monitoring
+# Run all backups (postgres, rustfs, config) with monitoring
 backup *ARGS:
     ansible-playbook playbooks/backup.yml --ask-vault-pass {{ARGS}}
 
-# Run backup for a specific service only (postgres, strfry, rustfs, config)
+# Run backup for a specific service only (postgres, rustfs, config)
 backup-service SERVICE *ARGS:
     ansible-playbook playbooks/backup.yml --ask-vault-pass --tags {{SERVICE}} {{ARGS}}
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Local Bun development server
 #
-# Starts backing services (PostgreSQL, RustFS, strfry) via Docker Compose,
+# Starts backing services (PostgreSQL, RustFS) via Docker Compose,
 # then runs the server directly with Bun's --watch mode (single process).
 #
 # Usage:
@@ -34,7 +34,7 @@ cmd_logs() {
 cmd_start() {
   # Ensure Docker Compose services are running
   if ! docker compose -f "$COMPOSE_FILE" ps --status running 2>/dev/null | grep -q postgres; then
-    log "Starting backing services (PostgreSQL, RustFS, strfry)..."
+    log "Starting backing services (PostgreSQL, RustFS)..."
     docker compose -f "$COMPOSE_FILE" up -d --wait
     log "Backing services ready"
   else
@@ -58,8 +58,7 @@ cmd_start() {
   export STORAGE_ACCESS_KEY=rustfsadmin
   export STORAGE_SECRET_KEY=rustfsadmin
   export STORAGE_BUCKET=llamenos-files
-  export SERVER_NOSTR_SECRET="${SERVER_NOSTR_SECRET:-0000000000000000000000000000000000000000000000000000000000000001}"
-  export NOSTR_RELAY_URL=ws://localhost:7777
+  export SERVER_SECRET="${SERVER_SECRET:-0000000000000000000000000000000000000000000000000000000000000001}"
 
   log "Starting Bun server on http://localhost:${PORT}..."
   log "Bun watches source files directly — single process, no build step"

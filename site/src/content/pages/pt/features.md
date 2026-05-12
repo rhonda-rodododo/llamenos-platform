@@ -117,7 +117,7 @@ subtitle: Tudo o que uma plataforma de resposta a crises precisa, em um pacote d
 
 **Sigilo futuro por nota** -- Cada nota e criptografada com uma chave aleatoria unica, que e entao envolvida via ECIES para cada leitor autorizado. Comprometer a chave de identidade nao revela notas anteriores.
 
-**Autenticacao com chaves Nostr** -- Os voluntarios se autenticam com pares de chaves compativeis com Nostr (nsec/npub). Verificacao de assinatura BIP-340 Schnorr. Sem senhas, sem enderecos de email.
+**Autenticacao com chaves WebSocket** -- Os voluntarios se autenticam com pares de chaves compativeis com WebSocket (nsec/npub). Verificacao de assinatura BIP-340 Schnorr. Sem senhas, sem enderecos de email.
 
 **Passkeys com WebAuthn** -- Suporte opcional a passkeys para login multi-dispositivo. Registre uma chave de hardware ou biometria, e entao faca login sem digitar sua chave secreta.
 

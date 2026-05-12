@@ -92,7 +92,7 @@ Các cải tiến này đã hoạt động:
 | Không số điện thoại rõ trong cơ sở dữ liệu | Số người gọi được lưu dưới dạng hash không thể đảo ngược — cơ sở dữ liệu không bao giờ chứa số thực |
 | Mã hóa theo hub với bí mật chuyển tiếp | Sự kiện thời gian thực của mỗi hub được mã hóa bằng khóa xoay mỗi 24 giờ — khóa cũ không thể giải mã sự kiện mới |
 | Mật mã học Rust trên mọi nền tảng | Desktop, iOS và Android đều chạy cùng thư viện mật mã Rust đã kiểm toán — khóa không bao giờ vào mã JavaScript, Swift hay Kotlin |
-| Truy cập relay bị hạn chế | Relay Nostr chỉ chấp nhận sự kiện từ máy chủ của bạn — không bên ngoài nào có thể chèn thông báo giả |
+| Truy cập relay bị hạn chế | Relay WebSocket chỉ chấp nhận sự kiện từ máy chủ của bạn — không bên ngoài nào có thể chèn thông báo giả |
 | Lưu trữ tin nhắn mã hóa | SMS, WhatsApp và Signal được lưu dưới dạng bản mã trên máy chủ của bạn |
 | Chuyển đổi trên thiết bị | Âm thanh không bao giờ rời trình duyệt — xử lý hoàn toàn trên thiết bị của bạn |
 | Bảo vệ khóa đa yếu tố | Khóa mã hóa được bảo vệ bởi PIN, nhà cung cấp danh tính và tùy chọn khóa bảo mật phần cứng |

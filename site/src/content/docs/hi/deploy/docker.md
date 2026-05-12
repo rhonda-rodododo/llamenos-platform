@@ -21,7 +21,7 @@ cd llamenos
 
 ## 2. Admin keypair जनरेट करें
 
-आपको admin account के लिए एक Nostr keypair चाहिए। इसे अपनी local machine पर चलाएं (या सर्वर पर यदि Bun इंस्टॉल है):
+आपको admin account के लिए एक WebSocket keypair चाहिए। इसे अपनी local machine पर चलाएं (या सर्वर पर यदि Bun इंस्टॉल है):
 
 ```bash
 bun install

@@ -8,7 +8,7 @@ En tant que rapporteur, vous pouvez soumettre des rapports chiffrés à votre or
 ## Pour commencer
 
 Votre administrateur vous fournira l'un des éléments suivants :
-- Un **nsec** (clé secrète Nostr) — une chaîne commençant par `nsec1`
+- Un **nsec** (clé secrète WebSocket) — une chaîne commençant par `nsec1`
 - Un **lien d'invitation** — une URL à usage unique qui crée des identifiants pour vous
 
 **Gardez votre nsec privé.** C'est votre identité et votre identifiant de connexion. Stockez-le dans un gestionnaire de mots de passe.

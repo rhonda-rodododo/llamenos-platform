@@ -81,7 +81,7 @@ describe('createStorageAdmin — auth headers', () => {
     globalThis.fetch = originalFetch
   })
 
-  it('calls /minio/admin/v3/info for availability check', async () => {
+  it('calls /admin/v3/info for availability check', async () => {
     fetchSpy.mockResolvedValueOnce({ status: 200 })
     const admin = createStorageAdmin({
       endpoint: 'http://storage:9000',
@@ -93,7 +93,7 @@ describe('createStorageAdmin — auth headers', () => {
 
     expect(result).toBe(true)
     expect(fetchSpy).toHaveBeenCalledWith(
-      'http://storage:9000/minio/admin/v3/info',
+      'http://storage:9000/admin/v3/info',
       expect.objectContaining({ method: 'GET' }),
     )
   })

@@ -89,7 +89,7 @@ The app auto-updates when new versions are available.
 - **WhatsApp Business** — Meta Cloud API with template messages and media support
 - **Signal** — via signal-cli-rest-api bridge with voice message transcription
 - **Threaded conversations** — all channels flow into a unified conversation view
-- **Real-time updates** — new messages appear instantly via Nostr relay
+- **Real-time updates** — new messages appear instantly via WebSocket relay
 
 ### Encrypted Notes & Reports
 - **End-to-end encrypted notes** — the server never sees plaintext
@@ -118,7 +118,7 @@ The app auto-updates when new versions are available.
 ### Prerequisites
 
 - [Bun](https://bun.sh/) 1.3.5+ — runtime and package manager
-- [Docker](https://docs.docker.com/get-docker/) — local backing services (PostgreSQL, Nostr relay, object storage)
+- [Docker](https://docs.docker.com/get-docker/) — local backing services (PostgreSQL, object storage)
 - [Rust](https://rustup.rs/) — only needed for Tauri desktop or crypto builds
 - A telephony provider account for voice/SMS (see [Telephony Providers](#telephony-providers))
 
@@ -132,14 +132,14 @@ mise run setup    # One command: installs tools, deps, builds crypto, runs codeg
 
 ### 2. Generate an admin keypair
 
-Authentication uses [Nostr](https://nostr.com/) keypairs. Generate the first admin:
+Authentication uses Ed25519/X25519 keypairs. Generate the first admin:
 
 ```bash
 bun run bootstrap-admin
 ```
 
 This outputs:
-- An **nsec** (secret key) — give this to the admin, store it securely
+- A **recovery key** — give this to the admin, store it securely
 - A **hex public key** — you'll need this in the next step
 
 ### 3. Configure environment
@@ -163,7 +163,7 @@ TWILIO_PHONE_NUMBER=+1234567890
 ### 4. Run locally
 
 ```bash
-# Start backing services (PostgreSQL, object storage, Nostr relay)
+# Start backing services (PostgreSQL, object storage)
 docker compose -f deploy/docker/docker-compose.dev.yml up -d
 
 # Start the backend (auto-reloads on code changes)
@@ -204,7 +204,7 @@ bun run deploy:api
 
 ### Option B: Self-Hosted (Docker Compose)
 
-Run the API on your own server with Docker Compose. Includes Caddy (automatic HTTPS), PostgreSQL, RustFS (file storage), strfry (Nostr relay), and optional Whisper transcription.
+Run the API on your own server with Docker Compose. Includes Caddy (automatic HTTPS), PostgreSQL, RustFS (file storage), and optional Whisper transcription.
 
 ```bash
 cd deploy/docker
@@ -290,7 +290,7 @@ site/              # Marketing site (Astro, Cloudflare Pages)
 
 - **Tauri desktop** — device private key lives exclusively in the Rust process; the webview never receives it
 - **Ed25519/X25519 device keys** — per-device keypairs authorized via a hash-chained sigchain
-- **Nostr keypairs** — BIP-340 Schnorr signatures for authentication + WebAuthn passkeys
+- **Ed25519/X25519 keypairs** — Ed25519 signatures for authentication + WebAuthn passkeys
 - **PIN-encrypted key store** — PBKDF2 + XChaCha20-Poly1305, stored in Tauri Store (desktop) / Keychain (iOS) / Keystore (Android)
 - **Per-note forward secrecy** — unique random key per note, HPKE-wrapped (RFC 9180 X25519-HKDF-SHA256-AES256-GCM) for each authorized reader
 - **Zero-knowledge server** — the API never sees plaintext notes, transcriptions, or encryption keys
