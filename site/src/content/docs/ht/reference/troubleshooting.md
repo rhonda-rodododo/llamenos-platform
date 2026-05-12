@@ -53,14 +53,14 @@ Si aplikasyon an pa kapab konekte ak PostgreSQL :
 
 ### Relè Strfry pa konekte
 
-Relè Nostr (strfry) se yon sèvis prensipal, pa opsyonèl. Si relè a pa kouri :
+Relè WebSocket (WebSocket relay) se yon sèvis prensipal, pa opsyonèl. Si relè a pa kouri :
 
 ```bash
 # Verifye estati relè a
-docker compose logs strfry
+docker compose logs WebSocket relay
 
 # Rekòmanse relè a
-docker compose restart strfry
+docker compose restart WebSocket relay
 ```
 
 Si relè a pa kòmanse, verifye konfli pò 7777 oswa pèmisyon ensifizans sou repertwa done a.
@@ -233,7 +233,7 @@ Si apèl yo pa route pou vòlontè :
 Si evènman hub echwe verifikasyon siyati :
 
 - Verifye oraj sistèm senkronize (NTP). Gwo dekalkaj oraj ka koze pwoblèm ak timestamp evènman
-- Verifye relè Nostr pa relè evènman ki soti nan pubkey enkoni
+- Verifye relè WebSocket pa relè evènman ki soti nan pubkey enkoni
 - Relance aplikasyon an pou rekipere lis manm hub aktyèl la
 
 ### Erè anvlòp ECIES

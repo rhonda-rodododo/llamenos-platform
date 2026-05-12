@@ -8,7 +8,7 @@ description: एन्क्रिप्टेड रिपोर्ट कै�
 ## शुरुआत करना
 
 आपका admin आपको इनमें से एक देगा:
-- एक **nsec** (Nostr secret key) — `nsec1` से शुरू होने वाली string
+- एक **nsec** (WebSocket secret key) — `nsec1` से शुरू होने वाली string
 - एक **invite link** — एक one-time URL जो आपके लिए credentials बनाता है
 
 **अपना nsec private रखें।** यह आपकी identity और login credential है। इसे password manager में store करें।

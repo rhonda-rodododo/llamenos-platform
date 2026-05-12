@@ -22,6 +22,4 @@ paths = [
 regexes = [
   # RustFS local dev default — mirrors docker-compose.dev.yml RUSTFS_*_KEY values
   '''(STORAGE|RUSTFS)_(ACCESS|SECRET)_KEY\s*[:=]\s*rustfsadmin''',
-  # MinIO local dev default — standard minioadmin default, no production use
-  '''MINIO_(ACCESS|SECRET)_KEY\s*[:=]\s*minioadmin''',
 ]

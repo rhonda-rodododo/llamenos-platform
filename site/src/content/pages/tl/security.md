@@ -92,7 +92,7 @@ Ang mga pagpapabuti na ito ay live na ngayon:
 | Walang plaintext phone number sa database | Ang mga caller number ay naka-store bilang irreversible hash — hindi kailanman naglalaman ng tunay na numero ang database |
 | Per-hub encryption na may forward secrecy | Ang real-time events ng bawat hub ay naka-encrypt gamit ang mga key na nagro-rotate bawat 24 oras — hindi ma-decrypt ng lumang key ang bagong events |
 | Cryptography sa Rust sa lahat ng platform | Desktop, iOS, at Android ay gumagamit ng parehong audited Rust cryptography library — hindi kailanman pumapasok ang mga key sa JavaScript, Swift, o Kotlin code |
-| Restricted relay access | Ang Nostr relay mo ay tumatanggap ng events mula lamang sa server mo — walang outside party ang maka-inject ng pekeng notifications |
+| Restricted relay access | Ang WebSocket relay mo ay tumatanggap ng events mula lamang sa server mo — walang outside party ang maka-inject ng pekeng notifications |
 | Encrypted message storage | Ang SMS, WhatsApp, at Signal messages ay naka-store bilang ciphertext sa iyong server |
 | On-device transcription | Hindi umaalis ang audio sa iyong browser — pinoproseso nang buo sa iyong device |
 | Multi-factor key protection | Ang iyong encryption keys ay protektado ng iyong PIN, identity provider, at opsyonal na hardware security key |

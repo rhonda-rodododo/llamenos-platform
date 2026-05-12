@@ -21,7 +21,7 @@ cd llamenos
 
 ## 2. Générer la paire de clés administrateur
 
-Vous avez besoin d'une paire de clés Nostr pour le compte administrateur. Exécutez ceci sur votre machine locale (ou sur le serveur si Bun est installé) :
+Vous avez besoin d'une paire de clés WebSocket pour le compte administrateur. Exécutez ceci sur votre machine locale (ou sur le serveur si Bun est installé) :
 
 ```bash
 bun install

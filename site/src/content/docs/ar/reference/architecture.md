@@ -75,7 +75,7 @@ Worker API  -->  ConversationDO
     |                | Wraps symmetric key via ECIES for assigned volunteer + admins
     |                | Discards plaintext
     |                v
-    |           Nostr relay (encrypted hub event notifies online clients)
+    |           WebSocket relay (encrypted hub event notifies online clients)
     |
     v
 Client (volunteer's browser/app)
@@ -111,7 +111,7 @@ Worker API  -->  ConversationDO  -->  Messaging Provider (sends reply)
 | مرفقات التقارير | نعم (E2EE) | XChaCha20-Poly1305 (متدفق) | كاتب التقرير + جميع المسؤولين |
 | محتوى الرسائل | نعم (E2EE) | XChaCha20-Poly1305 + ظرف ECIES | المتطوع المعين + جميع المسؤولين |
 | النسخ التلقائي | نعم (في السكون) | XChaCha20-Poly1305 | منشئ النسخة + جميع المسؤولين |
-| أحداث Hub (Nostr) | نعم (متماثل) | XChaCha20-Poly1305 مع مفتاح hub | جميع أعضاء hub الحاليين |
+| أحداث Hub (WebSocket) | نعم (متماثل) | XChaCha20-Poly1305 مع مفتاح hub | جميع أعضاء hub الحاليين |
 | nsec المتطوع | نعم (في السكون) | PBKDF2 + XChaCha20-Poly1305 (PIN) | المتطوع فقط |
 | إدخالات سجل التدقيق | لا (محمية السلامة) | سلسلة تجزئة SHA-256 | المسؤولون (قراءة)، النظام (كتابة) |
 | أرقام هواتف المتصلين | لا (جانب الخادم فقط) | غير متاح | الخادم + المسؤولون |
@@ -130,11 +130,11 @@ Volunteer nsec (BIP-340 Schnorr / secp256k1)
     |
     +-- Used for ECIES key agreement (prepend 02 for compressed form)
     |
-    +-- Signs Nostr events (Schnorr signature)
+    +-- Signs WebSocket events (Schnorr signature)
 
 Hub key (random 32 bytes, NOT derived from any identity)
     |
-    +-- Encrypts real-time Nostr hub events
+    +-- Encrypts real-time WebSocket hub events
     |
     +-- ECIES-wrapped per member via LABEL_HUB_KEY_WRAP
     |
@@ -151,9 +151,9 @@ Per-note key (random 32 bytes)
 
 ## الاتصال في الوقت الفعلي
 
-تتدفق التحديثات في الوقت الفعلي (مكالمات جديدة، رسائل، تغييرات المناوبة، الحضور) عبر مرحّل Nostr:
+تتدفق التحديثات في الوقت الفعلي (مكالمات جديدة، رسائل، تغييرات المناوبة، الحضور) عبر مرحّل WebSocket:
 
-- **مستضاف ذاتياً**: مرحّل strfry يعمل بجانب التطبيق في Docker/Kubernetes
+- **مستضاف ذاتياً**: مرحّل WebSocket relay يعمل بجانب التطبيق في Docker/Kubernetes
 - **Cloudflare**: Nosflare (مرحّل قائم على Cloudflare Workers)
 
 جميع الأحداث سريعة الزوال (kind 20001) ومشفرة بمفتاح hub. تستخدم الأحداث وسوماً عامة (`["t", "llamenos:event"]`) حتى لا يستطيع المرحّل تمييز أنواع الأحداث. يحتوي حقل المحتوى على نص مشفر بـ XChaCha20-Poly1305.
@@ -164,9 +164,9 @@ Per-note key (random 32 bytes)
 Client A (volunteer action)
     |
     | Encrypt event content with hub key
-    | Sign as Nostr event (Schnorr)
+    | Sign as WebSocket event (Schnorr)
     v
-Nostr relay (strfry / Nosflare)
+WebSocket relay (WebSocket relay / Nosflare)
     |
     | Broadcast to subscribers
     v
@@ -185,13 +185,13 @@ Update local UI state
 ### طبقة النقل
 
 - جميع الاتصالات بين العميل والخادم عبر HTTPS (TLS 1.3)
-- اتصالات WebSocket بمرحّل Nostr عبر WSS
+- اتصالات WebSocket بمرحّل WebSocket عبر WSS
 - سياسة أمان المحتوى (CSP) تقيد مصادر السكريبت والاتصالات وأسلاف الإطارات
 - نمط عزل Tauri يفصل IPC عن الـ webview
 
 ### طبقة التطبيق
 
-- المصادقة عبر أزواج مفاتيح Nostr (توقيعات BIP-340 Schnorr)
+- المصادقة عبر أزواج مفاتيح WebSocket (توقيعات BIP-340 Schnorr)
 - رموز جلسة WebAuthn لراحة الأجهزة المتعددة
 - التحكم في الوصول القائم على الأدوار (متصل، متطوع، مُبلّغ، مسؤول)
 - جميع ثوابت فصل النطاق التشفيرية الـ 25 محددة في `crypto-labels.ts` تمنع الهجمات عبر البروتوكولات

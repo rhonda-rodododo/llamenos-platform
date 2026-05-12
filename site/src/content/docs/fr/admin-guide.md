@@ -7,7 +7,7 @@ En tant qu'administrateur, vous gerez tout : benevoles, equipes, parametres d'ap
 
 ## Connexion
 
-Connectez-vous avec le `nsec` (cle secrete Nostr) genere lors de la [configuration](/docs/deploy). La page de connexion accepte le format nsec (`nsec1...`). Votre navigateur signe un defi avec la cle -- le secret ne quitte jamais l'appareil.
+Connectez-vous avec le `nsec` (cle secrete WebSocket) genere lors de la [configuration](/docs/deploy). La page de connexion accepte le format nsec (`nsec1...`). Votre navigateur signe un defi avec la cle -- le secret ne quitte jamais l'appareil.
 
 Vous pouvez egalement enregistrer une cle d'acces WebAuthn dans les Parametres pour une connexion sans mot de passe sur d'autres appareils.
 
@@ -15,7 +15,7 @@ Vous pouvez egalement enregistrer une cle d'acces WebAuthn dans les Parametres p
 
 Accedez a **Benevoles** dans la barre laterale pour :
 
-- **Ajouter un benevole** -- genere une nouvelle paire de cles Nostr. Partagez le nsec de maniere securisee avec le benevole (il n'est affiche qu'une seule fois).
+- **Ajouter un benevole** -- genere une nouvelle paire de cles WebSocket. Partagez le nsec de maniere securisee avec le benevole (il n'est affiche qu'une seule fois).
 - **Creer un lien d'invitation** -- genere un lien a usage unique qu'un benevole peut utiliser pour s'inscrire.
 - **Modifier** -- mettre a jour le nom, le numero de telephone et le role.
 - **Supprimer** -- desactiver l'acces d'un benevole.

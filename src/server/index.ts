@@ -46,8 +46,7 @@ console.log('[llamenos] Database initialized')
 
 // --- Read secrets ---
 const hmacSecret = readSecret('hmac-secret', 'HMAC_SECRET')
-// SERVER_SECRET is the canonical name; SERVER_NOSTR_SECRET is the legacy alias
-const serverSecret = readSecret('server-secret', 'SERVER_SECRET') || readSecret('server-nostr-secret', 'SERVER_NOSTR_SECRET')
+const serverSecret = readSecret('server-secret', 'SERVER_SECRET')
 const firehoseSealKey = readSecret('firehose-agent-seal-key', 'FIREHOSE_AGENT_SEAL_KEY') || undefined
 
 // --- Create services (pass HMAC secret for encryption operations) ---
@@ -65,7 +64,6 @@ const services: Services = createServices(db, {
     ADMIN_PUBKEY: readSecret('admin-pubkey', 'ADMIN_PUBKEY'),
     ADMIN_DECRYPTION_PUBKEY: process.env.ADMIN_DECRYPTION_PUBKEY || undefined,
     SERVER_SECRET: serverSecret || undefined,
-    SERVER_NOSTR_SECRET: serverSecret || undefined, // Legacy alias for transition
     ENVIRONMENT: process.env.ENVIRONMENT || undefined,
     DOMAIN: process.env.DOMAIN || undefined,
   },
@@ -86,7 +84,6 @@ const env: Record<string, unknown> = {
   R2_BUCKET: createBlobStorage(),
   STORAGE_ENDPOINT: process.env.STORAGE_ENDPOINT || undefined,
   SERVER_SECRET: serverSecret || undefined,
-  SERVER_NOSTR_SECRET: serverSecret || undefined, // Legacy alias for transition
   GLITCHTIP_DSN: process.env.GLITCHTIP_DSN || undefined,
   DEV_RESET_SECRET: process.env.DEV_RESET_SECRET || undefined,
   E2E_TEST_SECRET: process.env.E2E_TEST_SECRET || undefined,

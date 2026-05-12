@@ -9,7 +9,7 @@ Este guia abrange tudo o que voce precisa saber como voluntario: login, recebime
 
 Seu administrador fornecera um dos seguintes:
 
-- Um **nsec** (chave secreta Nostr) -- uma string que comeca com `nsec1`
+- Um **nsec** (chave secreta WebSocket) -- uma string que comeca com `nsec1`
 - Um **link de convite** -- uma URL de uso unico que gera suas credenciais
 
 **Mantenha seu nsec privado.** Ele e sua identidade e credencial de login. Qualquer pessoa com seu nsec pode se passar por voce. Armazene-o em um gerenciador de senhas.

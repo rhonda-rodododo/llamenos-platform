@@ -75,7 +75,7 @@ Worker API  -->  ConversationDO
     |                | Envuelve clave simetrica via ECIES para voluntario asignado + admins
     |                | Descarta texto plano
     |                v
-    |           Nostr relay (evento cifrado del hub notifica clientes en linea)
+    |           WebSocket relay (evento cifrado del hub notifica clientes en linea)
     |
     v
 Cliente (navegador/app del voluntario)
@@ -111,7 +111,7 @@ Todos los DOs son accedidos como singletons via `idFromName()` y enrutados inter
 | Adjuntos de reportes | Si (E2EE) | XChaCha20-Poly1305 (streaming) | Autor del reporte + todos los admins |
 | Contenido de mensajes | Si (E2EE) | XChaCha20-Poly1305 + sobre ECIES | Voluntario asignado + todos los admins |
 | Transcripciones | Si (en reposo) | XChaCha20-Poly1305 | Creador de la transcripcion + todos los admins |
-| Eventos del hub (Nostr) | Si (simetrico) | XChaCha20-Poly1305 con clave del hub | Todos los miembros actuales del hub |
+| Eventos del hub (WebSocket) | Si (simetrico) | XChaCha20-Poly1305 con clave del hub | Todos los miembros actuales del hub |
 | nsec del voluntario | Si (en reposo) | PBKDF2 + XChaCha20-Poly1305 (PIN) | Solo el voluntario |
 | Entradas de auditoria | No (integridad protegida) | Cadena de hash SHA-256 | Admins (lectura), sistema (escritura) |
 | Numeros de telefono de llamantes | No (solo servidor) | N/A | Servidor + admins |
@@ -130,11 +130,11 @@ nsec del voluntario (BIP-340 Schnorr / secp256k1)
     |
     +-- Usada para acuerdo de claves ECIES (prefija 02 para formato comprimido)
     |
-    +-- Firma eventos Nostr (firma Schnorr)
+    +-- Firma eventos WebSocket (firma Schnorr)
 
 Clave del hub (32 bytes aleatorios, NO derivada de ninguna identidad)
     |
-    +-- Cifra eventos Nostr del hub en tiempo real
+    +-- Cifra eventos WebSocket del hub en tiempo real
     |
     +-- Envuelta via ECIES por miembro via LABEL_HUB_KEY_WRAP
     |
@@ -151,9 +151,9 @@ Clave por nota (32 bytes aleatorios)
 
 ## Comunicacion en tiempo real
 
-Las actualizaciones en tiempo real (nuevas llamadas, mensajes, cambios de turno, presencia) fluyen a traves de un relay Nostr:
+Las actualizaciones en tiempo real (nuevas llamadas, mensajes, cambios de turno, presencia) fluyen a traves de un relay WebSocket:
 
-- **Autoalojado**: relay strfry ejecutandose junto a la app en Docker/Kubernetes
+- **Autoalojado**: relay WebSocket relay ejecutandose junto a la app en Docker/Kubernetes
 - **Cloudflare**: Nosflare (relay basado en Cloudflare Workers)
 
 Todos los eventos son efimeros (kind 20001) y cifrados con la clave del hub. Los eventos usan tags genericos (`["t", "llamenos:event"]`) para que el relay no pueda distinguir tipos de evento. El campo de contenido contiene texto cifrado XChaCha20-Poly1305.
@@ -164,9 +164,9 @@ Todos los eventos son efimeros (kind 20001) y cifrados con la clave del hub. Los
 Cliente A (accion del voluntario)
     |
     | Cifra contenido del evento con clave del hub
-    | Firma como evento Nostr (Schnorr)
+    | Firma como evento WebSocket (Schnorr)
     v
-Nostr relay (strfry / Nosflare)
+WebSocket relay (WebSocket relay / Nosflare)
     |
     | Transmite a suscriptores
     v
@@ -185,13 +185,13 @@ El relay ve blobs cifrados y firmas validas, pero no puede leer el contenido de 
 ### Capa de transporte
 
 - Toda comunicacion cliente-servidor sobre HTTPS (TLS 1.3)
-- Conexiones WebSocket al relay Nostr sobre WSS
+- Conexiones WebSocket al relay WebSocket sobre WSS
 - Content Security Policy (CSP) restringe fuentes de scripts, conexiones y ancestros de frames
 - Patron de aislamiento de Tauri separa IPC del webview
 
 ### Capa de aplicacion
 
-- Autenticacion via pares de claves Nostr (firmas BIP-340 Schnorr)
+- Autenticacion via pares de claves WebSocket (firmas BIP-340 Schnorr)
 - Tokens de sesion WebAuthn para conveniencia multi-dispositivo
 - Control de acceso basado en roles (llamante, voluntario, reportero, admin)
 - Las 25 constantes de separacion de dorustfs criptografico definidas en `crypto-labels.ts` previenen ataques entre protocolos

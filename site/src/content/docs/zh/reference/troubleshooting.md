@@ -53,14 +53,14 @@ sudo lsof -i :9000
 
 ### Strfry relay 未连接
 
-Nostr relay (strfry) 是核心服务，不是可选的。如果 relay 未运行：
+WebSocket relay (WebSocket relay) 是核心服务，不是可选的。如果 relay 未运行：
 
 ```bash
 # 检查 relay 状态
-docker compose logs strfry
+docker compose logs WebSocket relay
 
 # 重启 relay
-docker compose restart strfry
+docker compose restart WebSocket relay
 ```
 
 如果 relay 启动失败，请检查 7777 端口冲突或数据目录权限不足。
@@ -233,7 +233,7 @@ Llamenos 强制单实例模式。如果应用提示已在运行但找不到窗�
 如果 hub 事件签名验证失败：
 
 - 检查系统时钟是否已同步（NTP）。较大的时钟偏差可能导致事件时间戳问题
-- 验证 Nostr relay 是否在转发来自未知公钥的事件
+- 验证 WebSocket relay 是否在转发来自未知公钥的事件
 - 重启应用以重新获取当前的 hub 成员列表
 
 ### ECIES 信封错误

@@ -10,7 +10,7 @@ Cross-boundary TypeScript types, constants, and utilities shared between the fro
 | `crypto-labels.ts` | Domain separation constants re-exported from `packages/protocol` |
 | `languages.ts` | Language configuration (codes, display labels, Twilio voice IDs) |
 | `permissions.ts` | Role-based permission definitions |
-| `nostr-events.ts` | Nostr event type constants |
+| `ws-events.ts` | Nostr event type constants |
 | `demo-accounts.ts` | Demo/seed account data for development |
 | `voice-prompts.ts` | IVR voice prompt configuration |
 

@@ -132,24 +132,24 @@ describe('GET /system/health', () => {
     expect(blobService?.status).toBe('ok')
   })
 
-  it('marks Nostr relay as down when not configured', async () => {
+  it('marks WebSocket relay as down when SERVER_SECRET not configured', async () => {
     const { app } = makeApp({ env: {} })
 
     const res = await app.request('/health')
     const json = await res.json() as Record<string, unknown>
     const services = json.services as Array<{ name: string; status: string }>
-    const nostrService = services.find(s => s.name === 'Nostr Relay')
-    expect(nostrService?.status).toBe('down')
+    const wsService = services.find(s => s.name === 'WebSocket Relay')
+    expect(wsService?.status).toBe('down')
   })
 
-  it('marks Nostr relay as ok when configured', async () => {
-    const { app } = makeApp({ env: { NOSTR_RELAY_URL: 'wss://relay.example.com' } })
+  it('marks WebSocket relay as ok when SERVER_SECRET configured', async () => {
+    const { app } = makeApp({ env: { SERVER_SECRET: 'a'.repeat(64) } })
 
     const res = await app.request('/health')
     const json = await res.json() as Record<string, unknown>
     const services = json.services as Array<{ name: string; status: string }>
-    const nostrService = services.find(s => s.name === 'Nostr Relay')
-    expect(nostrService?.status).toBe('ok')
+    const wsService = services.find(s => s.name === 'WebSocket Relay')
+    expect(wsService?.status).toBe('ok')
   })
 
   it('marks telephony as ok when TWILIO_ACCOUNT_SID configured', async () => {

@@ -7,7 +7,7 @@ Với vai trò quản trị viên, bạn quản lý mọi thứ: tình nguyện 
 
 ## Đăng nhập
 
-Đăng nhập bằng `nsec` (khóa bí mật Nostr) được tạo trong quá trình [thiết lập](/docs/deploy). Trang đăng nhập chấp nhận định dạng nsec (`nsec1...`). Trình duyệt của bạn ký xác thực bằng khóa — khóa bí mật không bao giờ rời khỏi thiết bị.
+Đăng nhập bằng `nsec` (khóa bí mật WebSocket) được tạo trong quá trình [thiết lập](/docs/deploy). Trang đăng nhập chấp nhận định dạng nsec (`nsec1...`). Trình duyệt của bạn ký xác thực bằng khóa — khóa bí mật không bao giờ rời khỏi thiết bị.
 
 Tùy chọn, đăng ký passkey WebAuthn trong Cài đặt để đăng nhập không cần mật khẩu trên các thiết bị khác.
 
@@ -15,7 +15,7 @@ Tùy chọn, đăng ký passkey WebAuthn trong Cài đặt để đăng nhập k
 
 Điều hướng đến **Tình nguyện viên** trong thanh bên để:
 
-- **Thêm tình nguyện viên** — tạo cặp khóa Nostr mới. Chia sẻ nsec một cách an toàn với tình nguyện viên (chỉ hiển thị một lần).
+- **Thêm tình nguyện viên** — tạo cặp khóa WebSocket mới. Chia sẻ nsec một cách an toàn với tình nguyện viên (chỉ hiển thị một lần).
 - **Tạo liên kết mời** — tạo liên kết dùng một lần mà tình nguyện viên có thể sử dụng để tự đăng ký.
 - **Chỉnh sửa** — cập nhật tên, số điện thoại và vai trò.
 - **Xóa** — vô hiệu hóa quyền truy cập của tình nguyện viên.

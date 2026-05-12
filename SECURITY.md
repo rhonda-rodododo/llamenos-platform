@@ -6,13 +6,13 @@ Llámenos protects vulnerable populations. We take security reports seriously an
 
 **Preferred method:** Use [GitHub's private security advisory feature](https://github.com/rhonda-rodododo/llamenos-platform/security/advisories/new). This keeps the report confidential until a fix is ready.
 
-**Encrypted communication:** If you need to communicate outside GitHub, contact the maintainers via Nostr. The project's Nostr public key is published in the repository's signed releases.
+**Encrypted communication:** If you need to communicate outside GitHub, contact the maintainers using the encrypted contact methods listed in the repository's signed releases.
 
 ## Scope
 
 The following are in scope:
 
-- Authentication and session handling (Nostr keypairs, WebAuthn, device sigchain)
+- Authentication and session handling (Ed25519 device keys, WebAuthn, device sigchain)
 - End-to-end encryption of notes, messages, and call metadata
 - Volunteer/caller identity protection
 - Hub key management and rotation

@@ -23,16 +23,16 @@ import {
 } from '@shared/event-kinds'
 import type { LlamenosEvent } from './relay/types'
 
-/** All call-related Nostr event kinds */
+/** All call-related WebSocket event kinds */
 const CALL_KINDS = [KIND_CALL_RING, KIND_CALL_UPDATE, KIND_CALL_VOICEMAIL, KIND_PRESENCE_UPDATE]
 
-/** All conversation-related Nostr event kinds */
+/** All conversation-related WebSocket event kinds */
 const CONVERSATION_KINDS = [KIND_MESSAGE_NEW, KIND_CONVERSATION_ASSIGNED]
 
 /**
- * Hook to manage real-time call state via Nostr relay + REST polling fallback.
+ * Hook to manage real-time call state via WebSocket relay + REST polling fallback.
  *
- * Real-time updates arrive via Nostr subscription. REST polling (every 15s)
+ * Real-time updates arrive via WebSocket subscription. REST polling (every 15s)
  * acts as a safety net for missed events or relay downtime.
  *
  * Call actions (answer, hangup, spam) are POST requests to REST endpoints.
@@ -45,7 +45,7 @@ export function useCalls() {
   const currentCallRef = useRef(currentCall)
   currentCallRef.current = currentCall
 
-  // --- Nostr subscription for real-time call events ---
+  // --- WebSocket subscription for real-time call events ---
   useRelaySubscription(currentHubId, CALL_KINDS, (_kind, content: LlamenosEvent) => {
     switch (content.type) {
       case 'call:ring': {
@@ -198,16 +198,16 @@ export function useShiftStatus() {
 }
 
 /**
- * Hook to manage real-time conversation state via Nostr relay + REST polling.
+ * Hook to manage real-time conversation state via WebSocket relay + REST polling.
  *
- * Nostr delivers real-time updates (new messages, assignments, closures).
+ * WebSocket delivers real-time updates (new messages, assignments, closures).
  * REST polling (every 30s) provides the full conversation list as a fallback.
  */
 export function useConversations() {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const { currentHubId } = useConfig()
 
-  // --- Nostr subscription for conversation events ---
+  // --- WebSocket subscription for conversation events ---
   useRelaySubscription(currentHubId, CONVERSATION_KINDS, (_kind, content: LlamenosEvent) => {
     switch (content.type) {
       case 'conversation:new': {

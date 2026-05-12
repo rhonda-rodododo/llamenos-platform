@@ -60,7 +60,7 @@ Voye yon SMS nan nimewo telefòn liy dèd ou a. Ou ta dwe wè konvèsasyon an pa
 1. Yon SMS rive nan founisè ou a, ki voye yon webhook nan Worker ou a
 2. Worker la valide siyati webhook (HMAC espesifik founisè)
 3. Mesaj la parse epi estoke nan ConversationDO
-4. Vòlontè ki nan sèvis notifye via evènman relè Nostr
+4. Vòlontè ki nan sèvis notifye via evènman relè WebSocket
 5. Vòlontè yo reponn soti nan onglet Konvèsasyon — repons yo voye tounen via SMS API founisè ou a
 
 ## Nòt sekirite

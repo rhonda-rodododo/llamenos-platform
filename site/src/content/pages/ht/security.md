@@ -92,7 +92,7 @@ Amelyorasyon sa yo disponib jodi a :
 | Pa gen nimewo telefòn klè nan baz done | Nimewo moun k ap rele estoke kòm hash irreversib — baz done ou pa janm gen nimewo reyèl la |
 | Chifreman pa hub ak sekrè pwogrèsis | Evènman an tan reyèl chak hub chifre ak kle ki woule chak 24 èdtan — ansyen kle pa ka dechifre nouvo evènman |
 | Kriptografi nan Rust sou tout platfòm | Biwo, iOS, ak Android tout itilize menm bibliyotèk kriptografi Rust odite a — kle pa janm antre nan kòd JavaScript, Swift, oswa Kotlin |
-| Aksè limite nan relè | Relè Nostr ou aksepte evènman sèlman nan sèvè ou — okènn pati deyò pa ka enjekte fo notifikasyon |
+| Aksè limite nan relè | Relè WebSocket ou aksepte evènman sèlman nan sèvè ou — okènn pati deyò pa ka enjekte fo notifikasyon |
 | Estokaj mesaj chifre | Mesaj SMS, WhatsApp ak Signal estoke kòm tèks chifre sou sèvè ou |
 | Transkripsyon sou aparèy | Odyo pa janm kite navigatè ou — trete nèt sou aparèy ou |
 | Pwoteksyon kle milti-faktè | Kle chifraj ou pwoteje pa PIN ou, founisè idantite ou, ak opsyonèlman kle sekirite materyèl |

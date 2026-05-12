@@ -2,7 +2,7 @@
 #
 # Requires these env vars (set in .env and passed into the caddy container):
 #   APP_DOMAIN    — e.g. app.llamenos.example     (SPA static files)
-#   API_DOMAIN    — e.g. api.llamenos.example     (Bun/Hono backend + /nostr)
+#   API_DOMAIN    — e.g. api.llamenos.example     (Bun/Hono backend)
 #   CRYPTO_DOMAIN — e.g. crypto.llamenos.example  (sandboxed crypto iframe)
 #   ACME_EMAIL    — contact for Let's Encrypt
 #
@@ -58,12 +58,6 @@
 	# Auth endpoint rate limiting — strict (login, register, WebAuthn)
 	rate_limit /api/auth/* 10r/m
 	rate_limit /api/register 5r/m
-
-	# Nostr relay WebSocket proxy lives on the API origin so the SPA only
-	# needs one allowed WSS host in its CSP.
-	handle /nostr {
-		reverse_proxy strfry:7777
-	}
 
 	# CORS enforcement — allow only the SPA origin for credentialed requests.
 	# Hono middleware sets the final CORS headers for actual requests;

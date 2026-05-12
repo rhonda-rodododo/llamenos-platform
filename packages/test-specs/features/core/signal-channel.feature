@@ -19,13 +19,13 @@ Feature: Signal Messaging Channel
   Scenario: Emoji reaction is broadcast via Nostr
     Given an active Signal conversation
     When a reaction webhook arrives with emoji "thumbsup" targeting timestamp "1700000000000"
-    Then a MESSAGE_REACTION Nostr event should be published
+    Then a MESSAGE_REACTION WebSocket event should be published
     And the event should contain the emoji and target timestamp
 
   Scenario: Typing indicator is broadcast as ephemeral event
     Given an active Signal conversation
     When a typing STARTED webhook arrives from the contact
-    Then a TYPING_INDICATOR Nostr event should be published
+    Then a TYPING_INDICATOR WebSocket event should be published
     And the event should indicate typing is active
 
   Scenario: Unknown envelope types are acknowledged without error

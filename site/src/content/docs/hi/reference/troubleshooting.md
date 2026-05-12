@@ -53,14 +53,14 @@ sudo lsof -i :9000
 
 ### Strfry relay कनेक्ट नहीं हो रहा
 
-Nostr relay (strfry) एक मुख्य सेवा है, वैकल्पिक नहीं। यदि relay चल नहीं रही है:
+WebSocket relay (WebSocket relay) एक मुख्य सेवा है, वैकल्पिक नहीं। यदि relay चल नहीं रही है:
 
 ```bash
 # relay की स्थिति जांचें
-docker compose logs strfry
+docker compose logs WebSocket relay
 
 # relay को पुनः आरंभ करें
-docker compose restart strfry
+docker compose restart WebSocket relay
 ```
 
 यदि relay शुरू नहीं हो रही, port 7777 conflicts या data directory पर अपर्याप्त अनुमतियों की जांच करें।
@@ -233,7 +233,7 @@ Llamenos single-instance mode enforce करता है। यदि app क�
 यदि hub events signature verification विफल हो जाते हैं:
 
 - जांचें कि system clock synchronized है (NTP)। बड़ी clock skew event timestamps के साथ समस्याएं पैदा कर सकती है
-- सत्यापित करें कि Nostr relay अज्ञात pubkeys से events relay नहीं कर रहा
+- सत्यापित करें कि WebSocket relay अज्ञात pubkeys से events relay नहीं कर रहा
 - वर्तमान hub member list फिर से प्राप्त करने के लिए app restart करें
 
 ### ECIES envelope त्रुटियाँ

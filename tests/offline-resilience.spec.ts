@@ -137,7 +137,7 @@ test.describe('Offline Resilience', () => {
     await page.context().setOffline(false)
   })
 
-  test('nostr relay state tracks disconnection for replay', async ({ page }) => {
+  test('WebSocket relay state tracks disconnection for replay', async ({ page }) => {
     // This test verifies that the RelayState type includes disconnected
     // and that the relay connection handles reconnection
     const relayStates = await page.evaluate(() => {

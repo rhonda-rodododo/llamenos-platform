@@ -8,7 +8,7 @@ Como reportero, voce pode enviar reportes criptografados para sua organizacao at
 ## Primeiros passos
 
 Seu administrador fornecera um dos seguintes:
-- Um **nsec** (chave secreta Nostr) -- uma string que comeca com `nsec1`
+- Um **nsec** (chave secreta WebSocket) -- uma string que comeca com `nsec1`
 - Um **link de convite** -- uma URL de uso unico que cria credenciais para voce
 
 **Mantenha seu nsec privado.** Ele e sua identidade e credencial de login. Armazene-o em um gerenciador de senhas.

@@ -22,7 +22,7 @@ bun install
 
 ## 2. Admin-Schluesselpaar generieren
 
-Generieren Sie ein Nostr-Schluesselpaar fuer das Administratorkonto. Dies erzeugt einen geheimen Schluessel (nsec) und einen oeffentlichen Schluessel (npub/hex).
+Generieren Sie ein WebSocket-Schluesselpaar fuer das Administratorkonto. Dies erzeugt einen geheimen Schluessel (nsec) und einen oeffentlichen Schluessel (npub/hex).
 
 ```bash
 bun run bootstrap-admin

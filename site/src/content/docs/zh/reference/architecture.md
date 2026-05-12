@@ -75,7 +75,7 @@ Worker API  -->  ConversationDO
     |                | Wraps symmetric key via ECIES for assigned volunteer + admins
     |                | Discards plaintext
     |                v
-    |           Nostr relay (encrypted hub event notifies online clients)
+    |           WebSocket relay (encrypted hub event notifies online clients)
     |
     v
 Client (volunteer's browser/app)
@@ -111,7 +111,7 @@ Worker API  -->  ConversationDO  -->  Messaging Provider (sends reply)
 | 报告附件 | 是 (E2EE) | XChaCha20-Poly1305（流式） | 报告作者 + 所有管理员 |
 | 消息内容 | 是 (E2EE) | XChaCha20-Poly1305 + ECIES envelope | 指定的志愿者 + 所有管理员 |
 | 转录文本 | 是（静态加密） | XChaCha20-Poly1305 | 转录创建者 + 所有管理员 |
-| Hub 事件 (Nostr) | 是（对称加密） | XChaCha20-Poly1305 with hub key | 所有当前 hub 成员 |
+| Hub 事件 (WebSocket) | 是（对称加密） | XChaCha20-Poly1305 with hub key | 所有当前 hub 成员 |
 | 志愿者 nsec | 是（静态加密） | PBKDF2 + XChaCha20-Poly1305 (PIN) | 仅志愿者本人 |
 | 审计日志条目 | 否（完整性保护） | SHA-256 hash chain | 管理员（读取），系统（写入） |
 | 来电者电话号码 | 否（仅服务器端） | N/A | 服务器 + 管理员 |
@@ -130,11 +130,11 @@ Volunteer nsec (BIP-340 Schnorr / secp256k1)
     |
     +-- Used for ECIES key agreement (prepend 02 for compressed form)
     |
-    +-- Signs Nostr events (Schnorr signature)
+    +-- Signs WebSocket events (Schnorr signature)
 
 Hub key (random 32 bytes, NOT derived from any identity)
     |
-    +-- Encrypts real-time Nostr hub events
+    +-- Encrypts real-time WebSocket hub events
     |
     +-- ECIES-wrapped per member via LABEL_HUB_KEY_WRAP
     |
@@ -151,9 +151,9 @@ Per-note key (random 32 bytes)
 
 ## 实时通信
 
-实时更新（新来电、消息、排班变更、在线状态）通过 Nostr relay 传输：
+实时更新（新来电、消息、排班变更、在线状态）通过 WebSocket relay 传输：
 
-- **自托管**：与应用程序一起在 Docker/Kubernetes 中运行的 strfry relay
+- **自托管**：与应用程序一起在 Docker/Kubernetes 中运行的 WebSocket relay relay
 - **Cloudflare**：Nosflare（基于 Cloudflare Workers 的 relay）
 
 所有事件都是临时的（kind 20001）并使用 hub key 加密。事件使用通用标签（`["t", "llamenos:event"]`），因此 relay 无法区分事件类型。内容字段包含 XChaCha20-Poly1305 密文。
@@ -164,9 +164,9 @@ Per-note key (random 32 bytes)
 Client A (volunteer action)
     |
     | Encrypt event content with hub key
-    | Sign as Nostr event (Schnorr)
+    | Sign as WebSocket event (Schnorr)
     v
-Nostr relay (strfry / Nosflare)
+WebSocket relay (WebSocket relay / Nosflare)
     |
     | Broadcast to subscribers
     v
@@ -185,13 +185,13 @@ Relay 只能看到加密的数据块和有效签名，但无法读取事件内�
 ### 传输层
 
 - 所有客户端-服务器通信通过 HTTPS (TLS 1.3)
-- 到 Nostr relay 的 WebSocket 连接通过 WSS
+- 到 WebSocket relay 的 WebSocket 连接通过 WSS
 - Content Security Policy (CSP) 限制脚本来源、连接和 frame ancestors
 - Tauri isolation pattern 将 IPC 与 webview 隔离
 
 ### 应用层
 
-- 通过 Nostr 密钥对进行身份验证（BIP-340 Schnorr 签名）
+- 通过 WebSocket 密钥对进行身份验证（BIP-340 Schnorr 签名）
 - WebAuthn session token 用于多设备便利性
 - 基于角色的访问控制（来电者、志愿者、报告人、管理员）
 - 所有 25 个密码学域分离常量在 `crypto-labels.ts` 中定义，防止跨协议攻击

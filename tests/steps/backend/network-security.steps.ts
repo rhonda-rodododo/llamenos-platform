@@ -431,18 +431,18 @@ Then('the server should reject with {int} citing missing permissions', async ({ 
 
 // ── Nostr Relay Events Steps ─────────────────────────────────────
 
-Given('a hub with SERVER_NOSTR_SECRET configured', async ({ world }) => {
-  // The test server has SERVER_NOSTR_SECRET configured
+Given('a hub with SERVER_SECRET configured', async ({ world }) => {
+  // The test server has SERVER_SECRET configured
   // This is a precondition verified by the server starting
 })
 
-When('the server publishes a Nostr event', async ({ world }) => {
-  // Nostr events are published internally by the server
+When('the server publishes a WebSocket event', async ({ world }) => {
+  // WebSocket events are published internally by the server
   // This step verifies the architecture ensures encryption
 })
 
 Then('the event content should be encrypted with the derived event key', async ({ world }) => {
-  // The server uses HKDF-derived event key for Nostr event encryption
+  // The server uses HKDF-derived event key for WebSocket event encryption
   // This is an architectural constraint verified by code review
   expect(true).toBeTruthy()
 })

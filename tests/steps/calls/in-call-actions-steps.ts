@@ -24,7 +24,7 @@ Given('I have an active call', async ({ page, backendRequest }) => {
         return p?.getDevicePubkeys?.().then(k => k.signingPubkeyHex).catch(() => 'a'.repeat(64)) ?? 'a'.repeat(64)
       })
       await simulateAnswerCall(backendRequest, callResult.callId, pubkey)
-      // Allow time for the Nostr event / REST poll to propagate to the UI
+      // Allow time for the WebSocket event / REST poll to propagate to the UI
       await page.waitForTimeout(1500)
     }
   } catch {

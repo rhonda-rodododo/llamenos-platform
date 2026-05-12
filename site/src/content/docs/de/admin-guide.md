@@ -7,7 +7,7 @@ Als Administrator verwalten Sie alles: Freiwillige, Schichten, Anrufeinstellunge
 
 ## Anmeldung
 
-Melden Sie sich mit dem `nsec` (Nostr-Geheimschluessel) an, der waehrend der [Einrichtung](/docs/deploy) generiert wurde. Die Anmeldeseite akzeptiert das nsec-Format (`nsec1...`). Ihr Browser signiert eine Challenge mit dem Schluessel -- das Geheimnis verlaesst niemals das Geraet.
+Melden Sie sich mit dem `nsec` (WebSocket-Geheimschluessel) an, der waehrend der [Einrichtung](/docs/deploy) generiert wurde. Die Anmeldeseite akzeptiert das nsec-Format (`nsec1...`). Ihr Browser signiert eine Challenge mit dem Schluessel -- das Geheimnis verlaesst niemals das Geraet.
 
 Optional koennen Sie einen WebAuthn-Passkey in den Einstellungen registrieren, um sich auf weiteren Geraeten ohne Passwort anzumelden.
 
@@ -15,7 +15,7 @@ Optional koennen Sie einen WebAuthn-Passkey in den Einstellungen registrieren, u
 
 Navigieren Sie zu **Freiwillige** in der Seitenleiste, um:
 
-- **Freiwilligen hinzufuegen** -- generiert ein neues Nostr-Schluesselpaar. Teilen Sie den nsec sicher mit dem Freiwilligen (er wird nur einmal angezeigt).
+- **Freiwilligen hinzufuegen** -- generiert ein neues WebSocket-Schluesselpaar. Teilen Sie den nsec sicher mit dem Freiwilligen (er wird nur einmal angezeigt).
 - **Einladungslink erstellen** -- generiert einen Einmal-Link, den ein Freiwilliger zur Selbstregistrierung verwenden kann.
 - **Bearbeiten** -- Name, Telefonnummer und Rolle aktualisieren.
 - **Entfernen** -- den Zugang eines Freiwilligen deaktivieren.

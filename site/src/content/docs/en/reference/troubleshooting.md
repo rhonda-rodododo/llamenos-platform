@@ -53,14 +53,14 @@ If the app cannot connect to PostgreSQL:
 
 ### Strfry relay not connecting
 
-The Nostr relay (strfry) is a core service, not optional. If the relay is not running:
+The WebSocket relay (WebSocket relay) is a core service, not optional. If the relay is not running:
 
 ```bash
 # Check relay status
-docker compose logs strfry
+docker compose logs WebSocket relay
 
 # Restart the relay
-docker compose restart strfry
+docker compose restart WebSocket relay
 ```
 
 If the relay fails to start, check for port 7777 conflicts or insufficient permissions on the data directory.
@@ -233,7 +233,7 @@ If calls are not routing to volunteers:
 If hub events fail signature verification:
 
 - Check that the system clock is synchronized (NTP). Large clock skew can cause issues with event timestamps
-- Verify that the Nostr relay is not relaying events from unknown pubkeys
+- Verify that the WebSocket relay is not relaying events from unknown pubkeys
 - Restart the app to re-fetch the current hub member list
 
 ### ECIES envelope errors

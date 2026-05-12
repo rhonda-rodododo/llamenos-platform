@@ -119,7 +119,7 @@ nano .env
 # DATABASE_URL=postgres://llamenos:CHANGEME@db:5432/llamenos
 # PG_PASSWORD=CHANGEME
 # HMAC_SECRET=<64 random hex chars: openssl rand -hex 32>
-# SERVER_NOSTR_SECRET=<64 hex chars: openssl rand -hex 32>
+# SERVER_SECRET=<64 hex chars: openssl rand -hex 32>
 # BRIDGE_SECRET=<32 hex chars: openssl rand -hex 16>
 # PBX_TYPE=telnyx   # or signalwire, vonage, asterisk, etc.
 

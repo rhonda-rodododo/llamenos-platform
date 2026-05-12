@@ -187,6 +187,7 @@ services:
     environment:
       - PBX_TYPE=${PBX_TYPE:-asterisk}
       - ARI_URL=ws://asterisk:8088/ari/events
+      - ARI_REST_URL=http://asterisk:8088/ari
       - ARI_USERNAME=${ARI_USERNAME:-llamenos}
       - ARI_PASSWORD=${ARI_PASSWORD:?ARI_PASSWORD is required — do NOT use the default}
       - WORKER_WEBHOOK_URL=http://app:3000

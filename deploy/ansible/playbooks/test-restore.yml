@@ -8,7 +8,7 @@
 # Usage:
 #   just test-restore --ask-vault-pass
 #   ansible-playbook playbooks/test-restore.yml -i inventory.yml --ask-vault-pass
-#   ansible-playbook playbooks/test-restore.yml --ask-vault-pass -e test_service=strfry
+#   ansible-playbook playbooks/test-restore.yml --ask-vault-pass -e test_service=rustfs
 #
 # This playbook is non-destructive — it does NOT touch any production services.
 
@@ -20,7 +20,7 @@
     - ../vars.yml
 
   vars:
-    test_service: all   # all, postgres, strfry, config
+    test_service: all   # all, postgres, config
 
   tasks:
     # ── PostgreSQL restore test ────────────────────────────────────
@@ -155,15 +155,6 @@
           - Backup file: {{ latest_pg_backup }}
       when: latest_pg_backup is defined
 
-    # ── strfry restore test ────────────────────────────────────────
-
-    - name: Find latest strfry backup
-      ansible.builtin.find:
-        paths: "{{ app_dir }}/backups/strfry/daily"
-        patterns: "llamenos-strfry-*.jsonl*"
-        file_type: file
-      register: strfry_backup_files
-      when: test_service in ['all', 'strfry']
 
     - name: Validate strfry backup exists and is non-empty
       ansible.builtin.debug:

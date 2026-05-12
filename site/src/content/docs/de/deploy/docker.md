@@ -21,7 +21,7 @@ cd llamenos
 
 ## 2. Admin-Schluesselpaar generieren
 
-Sie benoetigen ein Nostr-Schluesselpaar fuer das Admin-Konto. Fuehren Sie dies auf Ihrem lokalen Rechner aus (oder auf dem Server, wenn Bun installiert ist):
+Sie benoetigen ein WebSocket-Schluesselpaar fuer das Admin-Konto. Fuehren Sie dies auf Ihrem lokalen Rechner aus (oder auf dem Server, wenn Bun installiert ist):
 
 ```bash
 bun install

@@ -48,11 +48,11 @@ Kung hindi makakonekta ang app sa PostgreSQL:
 
 ### Hindi kumokonekta ang Strfry relay
 
-Ang Nostr relay (strfry) ay isang core service, hindi opsyonal. Kung hindi tumatakbo ang relay:
+Ang WebSocket relay (WebSocket relay) ay isang core service, hindi opsyonal. Kung hindi tumatakbo ang relay:
 
 ```bash
-docker compose logs strfry
-docker compose restart strfry
+docker compose logs WebSocket relay
+docker compose restart WebSocket relay
 ```
 
 Kung nabigo ang pagsisimula ng relay, suriin ang port 7777 conflicts o kakulangan ng permissions sa data directory.

@@ -9,7 +9,7 @@ Sinasaklaw ng gabay na ito ang lahat ng kailangan mong malaman bilang boluntaryo
 
 Ibibigay sa iyo ng iyong admin ang isa sa mga sumusunod:
 
-- Isang **nsec** (Nostr secret key) -- isang string na nagsisimula sa `nsec1`
+- Isang **nsec** (WebSocket secret key) -- isang string na nagsisimula sa `nsec1`
 - Isang **invite link** -- isang isang-beses na URL na bumubuo ng mga kredensyal para sa iyo
 
 **Panatilihing pribado ang iyong nsec.** Ito ang iyong pagkakakilanlan at login credential. Sinumang may hawak ng iyong nsec ay maaaring magpanggap bilang ikaw. Itago ito sa isang password manager.

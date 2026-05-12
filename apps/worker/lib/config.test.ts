@@ -51,11 +51,6 @@ describe('validateConfig', () => {
     expect(() => validateConfig({ ...validEnv, SERVER_SECRET: 'a'.repeat(63) })).toThrow(/SERVER_SECRET/)
   })
 
-  it('accepts legacy SERVER_NOSTR_SECRET when SERVER_SECRET is absent', () => {
-    const { SERVER_SECRET: _, ...rest } = validEnv
-    expect(() => validateConfig({ ...rest, SERVER_NOSTR_SECRET: 'b'.repeat(64) })).not.toThrow()
-  })
-
   it('warns if ADMIN_PUBKEY is missing but does not throw', () => {
     expect(() => validateConfig({ ...validEnv, ADMIN_PUBKEY: '' })).not.toThrow()
   })

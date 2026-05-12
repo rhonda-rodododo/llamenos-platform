@@ -1,4 +1,4 @@
-//! Nostr event signing — produces events compatible with nostr-tools/pure::finalizeEvent.
+//! Ed25519 event signing — produces events compatible with nostr-tools/pure::finalizeEvent.
 //!
 //! Implements NIP-01 canonical JSON serialization and BIP-340 Schnorr signing.
 //!

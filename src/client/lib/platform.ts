@@ -951,15 +951,7 @@ export async function encryptExport(_jsonString: string): Promise<string> {
   throw new Error('encryptExport removed in v3 — needs migration to HPKE')
 }
 
-/** @deprecated Nostr signing removed in v3. Use ed25519Sign. */
-export async function signNostrEvent(
-  _kind: number,
-  _createdAt: number,
-  _tags: string[][],
-  _content: string,
-): Promise<SignedNostrEvent> {
-  throw new Error('signNostrEvent removed in v3 — Nostr replaced with Ed25519/sigchain')
-}
+
 
 /** @deprecated Use hpkeOpenFromState with LABEL_FILE_METADATA. */
 export async function decryptFileMetadata(
