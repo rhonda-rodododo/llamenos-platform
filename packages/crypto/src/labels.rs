@@ -223,6 +223,43 @@ pub const LABEL_PROVISION_PREFIX: &str = "llamenos:provision-";
 /// PBKDF2 salt for Tauri Stronghold key derivation (desktop only)
 pub const LABEL_STRONGHOLD: &str = "llamenos:stronghold:v1";
 
+/// Storage credential wrapping (encrypted key material at rest)
+pub const LABEL_STORAGE_CREDENTIAL_WRAP: &str = "llamenos:storage-credential-wrap";
+
+// --- Server Nostr Signing ---
+
+/// HKDF derivation for server Nostr signing key
+pub const LABEL_SERVER_NOSTR_SIGNING_KEY: &str = "llamenos:server-nostr-signing:v1";
+
+/// HKDF info for server Nostr signing key
+pub const LABEL_SERVER_NOSTR_SIGNING_KEY_INFO: &str = "llamenos:server-nostr-signing-info:v1";
+
+// --- Server Event Encryption ---
+
+/// HKDF derivation for server event encryption key
+pub const LABEL_SERVER_EVENT_ENCRYPTION_KEY: &str = "llamenos:server-event-encryption:v1";
+
+/// HKDF info for server event encryption key
+pub const LABEL_SERVER_EVENT_ENCRYPTION_KEY_INFO: &str = "llamenos:server-event-encryption-info:v1";
+
+// --- Hub Event Epoch ---
+
+/// Hub event epoch key derivation
+pub const LABEL_HUB_EVENT_EPOCH: &str = "llamenos:hub-event-epoch:v1";
+
+// --- Server Signing ---
+
+/// Server signing key derivation
+pub const LABEL_SERVER_SIGNING_KEY: &str = "llamenos:server-signing-key:v1";
+
+/// Server signing key HKDF info
+pub const LABEL_SERVER_SIGNING_INFO: &str = "llamenos:server-signing-key-info:v1";
+
+// --- WebSocket Auth ---
+
+/// WebSocket authentication challenge label
+pub const LABEL_WS_CHALLENGE: &str = "llamenos:ws-auth:v1";
+
 // =============================================================================
 // LABEL REGISTRY — maps numeric IDs (u8) to label strings.
 //
@@ -231,6 +268,7 @@ pub const LABEL_STRONGHOLD: &str = "llamenos:stronghold:v1";
 //
 // Indices 0-35: existing labels (from crypto-labels.json ordering)
 // Indices 36-46: new v3 labels (PUK, device auth, items key, SFrame, MLS)
+// Indices 57-68: labels synced from crypto-labels.json
 // =============================================================================
 
 pub const LABEL_REGISTRY: &[&str] = &[
@@ -310,6 +348,19 @@ pub const LABEL_REGISTRY: &[&str] = &[
     LABEL_PROVISIONING_SALT, // 54
     LABEL_BLIND_INDEX_FIELD, // 55
     LABEL_HUB_PTK,           // 56
+    // 57-68: New labels (synced from crypto-labels.json)
+    NOSTR_EVENT_TAG,                        // 57
+    LABEL_PROVISION_PREFIX,                 // 58
+    LABEL_STRONGHOLD,                       // 59
+    LABEL_STORAGE_CREDENTIAL_WRAP,          // 60
+    LABEL_SERVER_NOSTR_SIGNING_KEY,         // 61
+    LABEL_SERVER_NOSTR_SIGNING_KEY_INFO,    // 62
+    LABEL_SERVER_EVENT_ENCRYPTION_KEY,      // 63
+    LABEL_SERVER_EVENT_ENCRYPTION_KEY_INFO, // 64
+    LABEL_HUB_EVENT_EPOCH,                 // 65
+    LABEL_SERVER_SIGNING_KEY,              // 66
+    LABEL_SERVER_SIGNING_INFO,             // 67
+    LABEL_WS_CHALLENGE,                    // 68
 ];
 
 /// Look up a label string by its numeric ID.
@@ -382,6 +433,15 @@ mod tests {
         assert_eq!(LABEL_PROVISIONING_SALT, "llamenos:provisioning:v1");
         assert_eq!(LABEL_BLIND_INDEX_FIELD, "llamenos:blind-idx:");
         assert_eq!(LABEL_HUB_PTK, "llamenos:hub-ptk:v1");
+        assert_eq!(LABEL_STORAGE_CREDENTIAL_WRAP, "llamenos:storage-credential-wrap");
+        assert_eq!(LABEL_SERVER_NOSTR_SIGNING_KEY, "llamenos:server-nostr-signing:v1");
+        assert_eq!(LABEL_SERVER_NOSTR_SIGNING_KEY_INFO, "llamenos:server-nostr-signing-info:v1");
+        assert_eq!(LABEL_SERVER_EVENT_ENCRYPTION_KEY, "llamenos:server-event-encryption:v1");
+        assert_eq!(LABEL_SERVER_EVENT_ENCRYPTION_KEY_INFO, "llamenos:server-event-encryption-info:v1");
+        assert_eq!(LABEL_HUB_EVENT_EPOCH, "llamenos:hub-event-epoch:v1");
+        assert_eq!(LABEL_SERVER_SIGNING_KEY, "llamenos:server-signing-key:v1");
+        assert_eq!(LABEL_SERVER_SIGNING_INFO, "llamenos:server-signing-key-info:v1");
+        assert_eq!(LABEL_WS_CHALLENGE, "llamenos:ws-auth:v1");
     }
 
     /// Verify registry index stability.
@@ -398,6 +458,18 @@ mod tests {
         assert_eq!(id_to_label(54), Some(LABEL_PROVISIONING_SALT));
         assert_eq!(id_to_label(55), Some(LABEL_BLIND_INDEX_FIELD));
         assert_eq!(id_to_label(56), Some(LABEL_HUB_PTK));
+        assert_eq!(id_to_label(57), Some(NOSTR_EVENT_TAG));
+        assert_eq!(id_to_label(58), Some(LABEL_PROVISION_PREFIX));
+        assert_eq!(id_to_label(59), Some(LABEL_STRONGHOLD));
+        assert_eq!(id_to_label(60), Some(LABEL_STORAGE_CREDENTIAL_WRAP));
+        assert_eq!(id_to_label(61), Some(LABEL_SERVER_NOSTR_SIGNING_KEY));
+        assert_eq!(id_to_label(62), Some(LABEL_SERVER_NOSTR_SIGNING_KEY_INFO));
+        assert_eq!(id_to_label(63), Some(LABEL_SERVER_EVENT_ENCRYPTION_KEY));
+        assert_eq!(id_to_label(64), Some(LABEL_SERVER_EVENT_ENCRYPTION_KEY_INFO));
+        assert_eq!(id_to_label(65), Some(LABEL_HUB_EVENT_EPOCH));
+        assert_eq!(id_to_label(66), Some(LABEL_SERVER_SIGNING_KEY));
+        assert_eq!(id_to_label(67), Some(LABEL_SERVER_SIGNING_INFO));
+        assert_eq!(id_to_label(68), Some(LABEL_WS_CHALLENGE));
     }
 
     /// Verify bidirectional lookup.

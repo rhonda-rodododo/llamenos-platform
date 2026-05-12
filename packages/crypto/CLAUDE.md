@@ -15,7 +15,7 @@ This crate provides a single, auditable implementation of all cryptographic oper
 
 | Module | Purpose |
 |--------|---------|
-| `labels` | 57 domain separation constants (source of truth: `../../packages/protocol/crypto-labels.json`) |
+| `labels` | 69 domain separation constants (source of truth: `../../packages/protocol/crypto-labels.json`) |
 | `hpke_envelope` | HPKE key wrapping/unwrapping (RFC 9180 X25519-HKDF-SHA256-AES256-GCM) — current |
 | `ecies` | Legacy ECIES (secp256k1 ECDH + XChaCha20-Poly1305) — scheduled for removal |
 | `encryption` | Per-note/message/file envelope encryption (HPKE); legacy decryption path |
