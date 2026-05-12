@@ -608,14 +608,11 @@ export async function clearStoredKey(): Promise<void> {
 }
 
 // ══════════════════════════════════════════════════════════════════════
-// Backward-compatibility layer — transitional exports for callers that
-// still use the v2 (secp256k1/ECIES/Schnorr) API names.
-//
-// These will be removed once all callers are migrated to the v3 API.
-// Functions that cannot be meaningfully mapped throw at runtime.
+// Convenience types and wrappers for callers that need wire-format
+// KeyEnvelope (hex-encoded enc/ct) rather than raw HpkeEnvelope.
 // ══════════════════════════════════════════════════════════════════════
 
-// --- Legacy type re-exports ---
+// --- Wire-format type re-exports ---
 
 import type {
   KeyEnvelope as _KeyEnvelope,
@@ -657,17 +654,6 @@ export interface EphemeralKeyPair {
   nsec: string
   /** Raw 32-byte Ed25519 seed as hex (64 chars). Use this for deviceImportAndLoad. */
   seedHex: string
-}
-
-/** @deprecated Removed in v3 — use Ed25519 signing. */
-export interface SignedNostrEvent {
-  id: string
-  pubkey: string
-  created_at: number
-  kind: number
-  tags: string[][]
-  content: string
-  sig: string
 }
 
 /** @deprecated High-level encryption results. */
@@ -799,8 +785,12 @@ async function resolveEncryptionPubkey(signingOrEncPubkey: string): Promise<stri
   return signingOrEncPubkey
 }
 
-/** @deprecated Use hpkeSealKey instead. */
-export async function eciesWrapKey(
+/**
+ * Wrap a symmetric key for a recipient using HPKE.
+ * Resolves signing pubkey to encryption pubkey if needed,
+ * and returns hex-encoded enc/ct wire format.
+ */
+export async function hpkeWrapKey(
   keyHex: string,
   recipientPubkey: string,
   label: string,
@@ -808,14 +798,6 @@ export async function eciesWrapKey(
   const encPubkey = await resolveEncryptionPubkey(recipientPubkey)
   const envelope = await hpkeSealKey(keyHex, encPubkey, label, '')
   return { enc: base64urlToHex(envelope.enc), ct: envelope.ct }
-}
-
-/** @deprecated Use hpkeOpenKeyFromState instead. */
-export async function eciesUnwrapKey(
-  _envelope: KeyEnvelope,
-  _label: string,
-): Promise<string> {
-  throw new Error('eciesUnwrapKey removed in v3 — use hpkeOpenKeyFromState with HpkeEnvelope')
 }
 
 /**

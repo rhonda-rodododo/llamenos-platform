@@ -147,8 +147,7 @@ describe('hashAuditEntry', () => {
 })
 
 describe('encryptMessageForStorage', () => {
-  // Use a known valid x-only pubkey for real crypto ops
-  // secp256k1 generator point x-coordinate:
+  // Use a known valid X25519 pubkey for real crypto ops:
   const validPubkey = '79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798'
 
   it('returns encrypted content as hex', () => {

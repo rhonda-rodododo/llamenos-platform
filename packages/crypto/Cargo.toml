@@ -63,11 +63,8 @@ openmls = { version = "0.8", features = ["openmls_rust_crypto"] }
 openmls_rust_crypto = "0.5"
 openmls_basic_credential = "0.5"
 
-# Legacy dependencies (kept for legacy.rs during transition — removed in Phase 6)
-k256 = { version = "0.13", features = ["ecdh", "schnorr", "serde"] }
-elliptic-curve = { version = "0.13", features = ["sec1"] }
+# bech32 encoding (used by provisioning.rs for nsec transport)
 bech32 = "0.11"
-chacha20poly1305 = "0.10"
 
 [features]
 default = []

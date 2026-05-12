@@ -10,7 +10,7 @@
  *   - HMAC key is fetched from the server (per-user derived key)
  *   - Client hashes the identifier locally before sending to the server
  *   - Plaintext is sent separately to the sidecar via a server-proxied endpoint
- *   - Server stores only the hash + HPKE-encrypted ciphertext (no plaintext)
+ *   - Server stores only the hash + HPKE ciphertext (no plaintext)
  */
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'

@@ -4,7 +4,7 @@ import { encryptWakePayload, encryptFullPayload } from '@worker/lib/push-encrypt
 import type { WakePayload, FullPushPayload } from '@worker/types/infra'
 
 /**
- * Push encryption now uses HPKE via FFI (not ECIES).
+ * Push encryption uses HPKE via FFI.
  * Output format: hex-encoded enc(32) || ciphertext+tag.
  *
  * We cannot perform a JS-side round-trip decrypt because HPKE open

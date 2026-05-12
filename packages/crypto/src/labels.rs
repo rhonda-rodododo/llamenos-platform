@@ -16,9 +16,11 @@
 //! This is used in the HPKE envelope `labelId` field for compact wire representation.
 //! Indices are stable — never reorder or reuse indices.
 
-// --- ECIES / HPKE Key Wrapping ---
+// --- HPKE Key Wrapping ---
 
-/// Domain-specific HKDF salt for ECIES v2 key derivation
+/// DEPRECATED: Was used for ECIES v2 key derivation (secp256k1).
+/// Kept to preserve stable label registry indices — do NOT reuse index 53.
+#[deprecated(note = "ECIES removed — all key wrapping now uses HPKE")]
 pub const LABEL_ECIES_V2_SALT: &str = "llamenos:ecies:v2";
 
 /// Per-note symmetric key wrapping
@@ -344,7 +346,8 @@ pub const LABEL_REGISTRY: &[&str] = &[
     // 52: MLS
     LABEL_MLS_PROVISION, // 52
     // 53-56: Salt/derivation labels
-    LABEL_ECIES_V2_SALT,     // 53
+    #[allow(deprecated)]
+    LABEL_ECIES_V2_SALT, // 53 (deprecated — ECIES removed)
     LABEL_PROVISIONING_SALT, // 54
     LABEL_BLIND_INDEX_FIELD, // 55
     LABEL_HUB_PTK,           // 56
@@ -429,7 +432,10 @@ mod tests {
         assert_eq!(LABEL_SFRAME_CALL_SECRET, "llamenos:sframe-call-secret:v1");
         assert_eq!(LABEL_SFRAME_BASE_KEY, "llamenos:sframe-base-key:v1");
         assert_eq!(LABEL_MLS_PROVISION, "llamenos:mls-provision:v1");
-        assert_eq!(LABEL_ECIES_V2_SALT, "llamenos:ecies:v2");
+        #[allow(deprecated)]
+        {
+            assert_eq!(LABEL_ECIES_V2_SALT, "llamenos:ecies:v2");
+        }
         assert_eq!(LABEL_PROVISIONING_SALT, "llamenos:provisioning:v1");
         assert_eq!(LABEL_BLIND_INDEX_FIELD, "llamenos:blind-idx:");
         assert_eq!(LABEL_HUB_PTK, "llamenos:hub-ptk:v1");
@@ -464,6 +470,7 @@ mod tests {
 
     /// Verify registry index stability.
     #[test]
+    #[allow(deprecated)]
     fn registry_indices_stable() {
         assert_eq!(id_to_label(0), Some(LABEL_NOTE_KEY));
         assert_eq!(id_to_label(5), Some(LABEL_MESSAGE));

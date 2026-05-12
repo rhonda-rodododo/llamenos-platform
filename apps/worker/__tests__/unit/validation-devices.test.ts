@@ -2,7 +2,7 @@
  * OpenAPI request validation tests for device routes.
  *
  * Devices are security-critical — validates Ed25519/X25519 pubkeys,
- * compressed secp256k1 wake keys, and platform enums.
+ * wake keys, and platform enums.
  */
 import { describe, it, expect } from 'vitest'
 import devicesRoutes from '../../routes/devices'
@@ -70,7 +70,7 @@ describe('devices route validation', () => {
       expect(res.status).toBe(400)
     })
 
-    it('rejects wakeKeyPublic that is not compressed secp256k1', async () => {
+    it('rejects wakeKeyPublic that is not compressed format', async () => {
       const app = createApp()
       const res = await sendJSON(app, '/devices/register', {
         ...VALID_REGISTER,

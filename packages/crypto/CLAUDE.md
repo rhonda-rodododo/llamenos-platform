@@ -16,21 +16,18 @@ This crate provides a single, auditable implementation of all cryptographic oper
 | Module | Purpose |
 |--------|---------|
 | `labels` | 69 domain separation constants (source of truth: `../../packages/protocol/crypto-labels.json`) |
-| `hpke_envelope` | HPKE key wrapping/unwrapping (RFC 9180 X25519-HKDF-SHA256-AES256-GCM) — current |
-| `ecies` | Legacy ECIES (secp256k1 ECDH + XChaCha20-Poly1305) — scheduled for removal |
-| `encryption` | Per-note/message/file envelope encryption (HPKE); legacy decryption path |
+| `hpke_envelope` | HPKE key wrapping/unwrapping (RFC 9180 X25519-HKDF-SHA256-AES256-GCM) |
+| `encryption` | Per-note/message/file envelope encryption (HPKE + AES-256-GCM) |
 | `device_keys` | Ed25519 signing + X25519 encryption keypair generation and PIN-protected storage |
 | `sigchain` | Append-only, hash-chained, Ed25519-signed device authorization records |
 | `puk` | Per-User Key hierarchy + Cascading Lazy Key Rotation (CLKR) |
-| `auth` | Ed25519 auth token generation/verification; legacy Schnorr path |
+| `auth` | Ed25519 auth token generation/verification |
 | `blind_index` | Blind indexing for server-side E2EE search (HMAC-SHA256) |
-| `provisioning` | Ephemeral ECDH device provisioning with SAS verification |
+| `provisioning` | X25519 ECDH device provisioning with SAS verification |
 | `mls` | MLS group management (RFC 9420, OpenMLS 0.8) |
 | `sframe` | SFrame voice E2EE key derivation |
 | `padding` | Power-of-2 payload padding (traffic analysis mitigation) |
-| `WebSocket` | WebSocket key derivation from `SERVER_SECRET` |
 | `ffi`, `ffi_v3` | UniFFI bindings for iOS/Android |
-| `wasm` | WASM exports for browser test builds |
 
 ## Protocol Compatibility
 
@@ -55,6 +52,14 @@ bun run crypto:fmt           # cargo fmt --check
 - `mobile` — Enable UniFFI scaffolding for iOS/Android. Required for library builds targeting mobile. Without it, the static archive has zero UniFFI symbols.
 - `uniffi-bindgen` — Extends `mobile` with the `uniffi-bindgen` CLI tool.
 
-## Legacy Notes
+## Crypto Architecture
 
-`ecies.rs`, `keys_legacy.rs`, `auth_legacy.rs`, `encryption_legacy.rs` contain the old secp256k1/ECIES/Schnorr/nsec implementations. These are kept for decrypting existing data and are being phased out. All new code uses HPKE + Ed25519/X25519.
+All cryptographic operations use:
+- **Signing**: Ed25519 (ed25519-dalek)
+- **Key agreement**: X25519 (x25519-dalek)
+- **Envelope encryption**: HPKE RFC 9180 (DHKEM(X25519) + HKDF-SHA256 + AES-256-GCM)
+- **Symmetric**: AES-256-GCM (PIN storage, items_key, content encryption)
+- **KDF**: HKDF-SHA256
+- **PIN/passphrase key derivation**: Argon2id (64MB, 3 iterations, 4 parallelism)
+
+Legacy secp256k1/ECIES/Schnorr/XChaCha20-Poly1305 code has been fully removed. No legacy fallbacks exist — this is a pre-production codebase.
