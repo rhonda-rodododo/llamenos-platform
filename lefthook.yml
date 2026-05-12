@@ -16,8 +16,7 @@ pre-commit:
       run: bunx bddgen && git diff --exit-code .features-gen/
     worker-unit-tests:
       glob: "apps/worker/**/*.{ts,tsx}"
-      run: |
-        bun run test:worker:unit || echo "WARN: vitest exited non-zero (open handles under parallel execution)"
+      run: bun run test:worker:unit
     crypto-unit-tests:
       glob: "packages/crypto/**/*.rs"
       run: bun run crypto:test
