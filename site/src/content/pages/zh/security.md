@@ -100,9 +100,11 @@ subtitle: 哪些数据受到保护、哪些可见、哪些可依传票获取—�
 
 ## 仍在计划中
 
-| 功能 | 隐私收益 |
-|------|---------|
-| 原生来电接听应用 | 不再暴露个人电话号码 |
+| 功能 | 隐私收益 | Status |
+|------|---------|--------|
+| Native call-receiving apps | No personal phone numbers exposed | In development |
+| Certificate pinning for relay and API | Prevents MITM on real-time connections | Scaffolding complete; pins pending first deployment |
+| SFrame voice encryption | Per-frame encryption for call audio | Key derivation complete; per-frame encryption planned |
 
 ---
 

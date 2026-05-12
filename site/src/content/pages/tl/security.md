@@ -100,9 +100,11 @@ Ang mga pagpapabuti na ito ay live na ngayon:
 
 ## Naplano pa
 
-| Feature | Privacy benefit |
-|---------|-----------------|
-| Native call-receiving apps | Walang personal phone number ang malelantad |
+| Feature | Privacy benefit | Status |
+|---------|-----------------|--------|
+| Native call-receiving apps | No personal phone numbers exposed | In development |
+| Certificate pinning for relay and API | Prevents MITM on real-time connections | Scaffolding complete; pins pending first deployment |
+| SFrame voice encryption | Per-frame encryption for call audio | Key derivation complete; per-frame encryption planned |
 
 ---
 

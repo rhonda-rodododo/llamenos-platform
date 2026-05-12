@@ -100,9 +100,11 @@ Amelyorasyon sa yo disponib jodi a :
 
 ## Toujou Planifye
 
-| Fonksyon | Benefis vi prive |
-|---------|-----------------|
-| Aplikasyon natif pou resevwa apèl | Pa gen nimewo telefòn pèsonèl ekspoze |
+| Fonksyon | Benefis vi prive | Status |
+|---------|-----------------|--------|
+| Native call-receiving apps | No personal phone numbers exposed | In development |
+| Certificate pinning for relay and API | Prevents MITM on real-time connections | Scaffolding complete; pins pending first deployment |
+| SFrame voice encryption | Per-frame encryption for call audio | Key derivation complete; per-frame encryption planned |
 
 ---
 

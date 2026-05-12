@@ -100,9 +100,11 @@ subtitle: क्या सुरक्षित है, क्या दृश�
 
 ## अभी भी योजनाबद्ध
 
-| सुविधा | गोपनीयता लाभ |
-|---------|-----------------|
-| नेटिव कॉल-रिसीविंग ऐप | कोई व्यक्तिगत फ़ोन नंबर उजागर नहीं |
+| सुविधा | गोपनीयता लाभ | Status |
+|---------|-----------------|--------|
+| Native call-receiving apps | No personal phone numbers exposed | In development |
+| Certificate pinning for relay and API | Prevents MITM on real-time connections | Scaffolding complete; pins pending first deployment |
+| SFrame voice encryption | Per-frame encryption for call audio | Key derivation complete; per-frame encryption planned |
 
 ---
 

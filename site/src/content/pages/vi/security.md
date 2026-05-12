@@ -102,9 +102,11 @@ Các cải tiến này đã hoạt động:
 
 ## Vẫn trong kế hoạch
 
-| Tính năng | Lợi ích bảo mật |
-|-----------|-----------------|
-| Ứng dụng nhận cuộc gọi gốc | Không lộ số điện thoại cá nhân |
+| Tính năng | Lợi ích bảo mật | Status |
+|-----------|-----------------|--------|
+| Native call-receiving apps | No personal phone numbers exposed | In development |
+| Certificate pinning for relay and API | Prevents MITM on real-time connections | Scaffolding complete; pins pending first deployment |
+| SFrame voice encryption | Per-frame encryption for call audio | Key derivation complete; per-frame encryption planned |
 
 ---
 

@@ -100,9 +100,11 @@ Diese Verbesserungen sind heute verfuegbar:
 
 ## Noch geplant
 
-| Funktion | Datenschutzvorteil |
-|----------|-------------------|
-| Native Anrufempfangs-Apps | Keine persoenlichen Telefonnummern exponiert |
+| Funktion | Datenschutzvorteil | Status |
+|----------|-------------------|--------|
+| Native call-receiving apps | No personal phone numbers exposed | In development |
+| Certificate pinning for relay and API | Prevents MITM on real-time connections | Scaffolding complete; pins pending first deployment |
+| SFrame voice encryption | Per-frame encryption for call audio | Key derivation complete; per-frame encryption planned |
 
 ---
 
@@ -131,6 +133,7 @@ Technische Dokumentation:
 - [Protokollspezifikation](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/protocol/llamenos-protocol.md)
 - [Bedrohungsmodell](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/THREAT_MODEL.md)
 - [Datenklassifizierung](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/DATA_CLASSIFICATION.md)
+- [Security Gaps and Roadmap](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/SECURITY_GAPS_AND_ROADMAP.md)
 - [Sicherheitsaudits](https://github.com/rhonda-rodododo/llamenos-platform/tree/main/docs/security)
 - [API-Dokumentation](/api/docs)
 

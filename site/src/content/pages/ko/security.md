@@ -100,9 +100,11 @@ subtitle: 무엇이 보호되고, 무엇이 보이며, 소환장에 의해 무�
 
 ## 아직 계획 중
 
-| 기능 | 개인정보 보호 이점 |
-|------|-------------------|
-| 네이티브 통화 수신 앱 | 개인 전화번호가 노출되지 않음 |
+| 기능 | 개인정보 보호 이점 | Status |
+|------|-------------------|--------|
+| Native call-receiving apps | No personal phone numbers exposed | In development |
+| Certificate pinning for relay and API | Prevents MITM on real-time connections | Scaffolding complete; pins pending first deployment |
+| SFrame voice encryption | Per-frame encryption for call audio | Key derivation complete; per-frame encryption planned |
 
 ---
 

@@ -100,9 +100,11 @@ subtitle: Что защищено, что видно и что может быт
 
 ## Ещё в планах
 
-| Функция | Преимущество для конфиденциальности |
-|---------|-----------------|
-| Нативные приложения для получения звонков | Личные номера телефонов не раскрываются |
+| Функция | Преимущество для конфиденциальности | Status |
+|---------|-----------------|--------|
+| Native call-receiving apps | No personal phone numbers exposed | In development |
+| Certificate pinning for relay and API | Prevents MITM on real-time connections | Scaffolding complete; pins pending first deployment |
+| SFrame voice encryption | Per-frame encryption for call audio | Key derivation complete; per-frame encryption planned |
 
 ---
 

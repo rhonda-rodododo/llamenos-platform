@@ -100,9 +100,11 @@ subtitle: ما هو محمي، ما هو مرئي، وما يمكن الحصول
 
 ## لا يزال مخططاً
 
-| الميزة | فائدة الخصوصية |
-|--------|---------------|
-| تطبيقات أصلية لاستقبال المكالمات | لا تنكشف أرقام الهواتف الشخصية |
+| الميزة | فائدة الخصوصية | Status |
+|--------|---------------|--------|
+| Native call-receiving apps | No personal phone numbers exposed | In development |
+| Certificate pinning for relay and API | Prevents MITM on real-time connections | Scaffolding complete; pins pending first deployment |
+| SFrame voice encryption | Per-frame encryption for call audio | Key derivation complete; per-frame encryption planned |
 
 ---
 
@@ -131,6 +133,7 @@ subtitle: ما هو محمي، ما هو مرئي، وما يمكن الحصول
 - [مواصفات البروتوكول](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/protocol/llamenos-protocol.md)
 - [نموذج التهديدات](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/THREAT_MODEL.md)
 - [تصنيف البيانات](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/DATA_CLASSIFICATION.md)
+- [Security Gaps and Roadmap](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/SECURITY_GAPS_AND_ROADMAP.md)
 - [تدقيقات الأمان](https://github.com/rhonda-rodododo/llamenos-platform/tree/main/docs/security)
 - [توثيق API](/api/docs)
 

@@ -100,9 +100,11 @@ Estas melhorias estao disponiveis hoje:
 
 ## Ainda planejado
 
-| Funcionalidade | Beneficio de privacidade |
-|----------------|--------------------------|
-| Aplicativos nativos para receber chamadas | Numeros de telefone pessoais nao expostos |
+| Funcionalidade | Beneficio de privacidade | Status |
+|----------------|--------------------------|--------|
+| Native call-receiving apps | No personal phone numbers exposed | In development |
+| Certificate pinning for relay and API | Prevents MITM on real-time connections | Scaffolding complete; pins pending first deployment |
+| SFrame voice encryption | Per-frame encryption for call audio | Key derivation complete; per-frame encryption planned |
 
 ---
 
