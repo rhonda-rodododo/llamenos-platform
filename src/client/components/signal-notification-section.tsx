@@ -10,11 +10,14 @@
  *   - HMAC key is fetched from the server (per-user derived key)
  *   - Client hashes the identifier locally before sending to the server
  *   - Plaintext is sent separately to the sidecar via a server-proxied endpoint
- *   - Server stores only the hash + ECIES ciphertext (no plaintext)
+ *   - Server stores only the hash + HPKE-encrypted ciphertext (no plaintext)
  */
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useAuth } from '@/lib/auth'
 import { useToast } from '@/lib/toast'
+import { aesGcmEncrypt, hpkeSealKey } from '@/lib/platform'
+import { LABEL_CONTACT_ID } from '@shared/crypto-labels'
 import {
   getSignalContact,
   registerSignalContact,
@@ -61,24 +64,36 @@ function normalizeSignalIdentifier(raw: string, type: 'phone' | 'username'): str
 }
 
 // ---------------------------------------------------------------------------
-// Placeholder encryption — real ECIES from platform.ts needed for production.
-// This produces a non-empty ciphertext so the DB constraint is satisfied.
-// TODO: wire into ECIES encrypt via platform.ts in the full implementation.
+// HPKE envelope encryption for Signal contact identifiers.
+// Generates a random AES-256-GCM key, encrypts the identifier, then
+// HPKE-wraps the key for each admin (same pattern as encryptNote).
 // ---------------------------------------------------------------------------
-async function encryptIdentifier(plaintext: string): Promise<{
+async function encryptIdentifier(
+  plaintext: string,
+  adminPubkeys: string[],
+): Promise<{
   ciphertext: string
   envelope: { recipientPubkey: string; encryptedKey: string }[]
 }> {
-  // Encode the plaintext as hex for storage (real impl: ECIES encrypt)
-  const encoder = new TextEncoder()
-  const bytes = encoder.encode(plaintext)
-  const hex = Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('')
-  return {
-    ciphertext: hex,
-    envelope: [], // Real impl: per-admin key envelopes
-  }
+  // Generate random 32-byte content key
+  const keyBytes = crypto.getRandomValues(new Uint8Array(32))
+  const keyHex = Array.from(keyBytes, (b) => b.toString(16).padStart(2, '0')).join('')
+
+  // AES-256-GCM encrypt the identifier
+  const ciphertext = await aesGcmEncrypt(plaintext, keyHex)
+
+  // HPKE-wrap the key for each admin
+  const envelope = await Promise.all(
+    adminPubkeys.map(async (pubkey) => {
+      const hpkeEnvelope = await hpkeSealKey(keyHex, pubkey, LABEL_CONTACT_ID, '')
+      return {
+        recipientPubkey: pubkey,
+        encryptedKey: JSON.stringify(hpkeEnvelope),
+      }
+    }),
+  )
+
+  return { ciphertext, envelope }
 }
 
 // ---------------------------------------------------------------------------
@@ -92,6 +107,7 @@ interface SignalNotificationSectionProps {
 
 export function SignalNotificationSection({ available = true }: SignalNotificationSectionProps) {
   const { t } = useTranslation()
+  const { adminDecryptionPubkey } = useAuth()
   const { toast } = useToast()
 
   const [loading, setLoading] = useState(true)
@@ -136,8 +152,9 @@ export function SignalNotificationSection({ available = true }: SignalNotificati
       const normalized = normalizeSignalIdentifier(identifier.trim(), identifierType)
       const identifierHash = await hmacSha256Hex(hmacKey, normalized)
 
-      // Step 3: Encrypt identifier (placeholder — see encryptIdentifier comment)
-      const { ciphertext, envelope } = await encryptIdentifier(normalized)
+      // Step 3: Encrypt identifier with HPKE for admin readers
+      const adminPubkeys = adminDecryptionPubkey ? [adminDecryptionPubkey] : []
+      const { ciphertext, envelope } = await encryptIdentifier(normalized, adminPubkeys)
 
       // Step 4: Store hash + ciphertext in main DB
       await registerSignalContact({
