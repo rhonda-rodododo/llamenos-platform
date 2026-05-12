@@ -23,7 +23,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import org.llamenos.hotline.R
-import org.llamenos.hotline.api.ProviderTemplate
+import org.llamenos.protocol.ProviderTemplate
 
 /**
  * Material 3 card list showing available provider templates.
@@ -142,7 +142,7 @@ private fun TemplateCard(
             Text(
                 text = stringResource(
                     R.string.hub_onboarding_template_provider,
-                    template.providerType.replaceFirstChar { it.uppercase() },
+                    template.providerType.value.replaceFirstChar { it.uppercase() },
                 ),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -159,7 +159,7 @@ private fun TemplateCard(
                             onClick = {},
                             label = {
                                 Text(
-                                    text = channel.replaceFirstChar { it.uppercase() },
+                                    text = channel.value.replaceFirstChar { it.uppercase() },
                                     style = MaterialTheme.typography.labelSmall,
                                 )
                             },

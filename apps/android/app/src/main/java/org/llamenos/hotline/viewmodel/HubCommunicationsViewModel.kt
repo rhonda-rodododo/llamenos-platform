@@ -8,13 +8,15 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import org.llamenos.hotline.api.ChannelConfig
 import org.llamenos.hotline.api.HubOnboardApi
-import org.llamenos.hotline.api.HubOnboardingState
-import org.llamenos.hotline.api.HubQuota
-import org.llamenos.hotline.api.HubSetupStatus
-import org.llamenos.hotline.api.HubUsage
-import org.llamenos.hotline.api.ProviderTemplate
+import org.llamenos.protocol.ChannelConfig
+import org.llamenos.protocol.ChannelConfigClass
+import org.llamenos.protocol.HubChannelType
+import org.llamenos.protocol.HubOnboardingState
+import org.llamenos.protocol.HubQuota
+import org.llamenos.protocol.HubSetupStatus
+import org.llamenos.protocol.HubUsage
+import org.llamenos.protocol.ProviderTemplate
 import javax.inject.Inject
 
 /**
@@ -161,7 +163,7 @@ class HubCommunicationsViewModel @Inject constructor(
                         it.copy(
                             onboardingState = state,
                             isCompletingStep = false,
-                            channels = state.channelConfig,
+                            channels = state.channelConfig.toChannelConfig(),
                         )
                     }
                 },
@@ -289,13 +291,24 @@ class HubCommunicationsViewModel @Inject constructor(
     private fun channelConfigFromStatus(status: HubSetupStatus): ChannelConfig {
         val configured = status.channelsConfigured
         return ChannelConfig(
-            voice = "voice" in configured,
-            sms = "sms" in configured,
-            email = "email" in configured,
-            signal = "signal" in configured,
-            whatsapp = "whatsapp" in configured,
-            telegram = "telegram" in configured,
-            rcs = "rcs" in configured,
+            voice = HubChannelType.Voice in configured,
+            sms = HubChannelType.SMS in configured,
+            email = HubChannelType.Email in configured,
+            signal = HubChannelType.Signal in configured,
+            whatsapp = HubChannelType.Whatsapp in configured,
+            telegram = HubChannelType.Telegram in configured,
+            rcs = HubChannelType.RCS in configured,
         )
     }
 }
+
+/** Convert the codegen [ChannelConfigClass] (used inside [HubOnboardingState]) to the standalone [ChannelConfig]. */
+private fun ChannelConfigClass.toChannelConfig(): ChannelConfig = ChannelConfig(
+    voice = voice,
+    sms = sms,
+    email = email,
+    signal = signal,
+    whatsapp = whatsapp,
+    telegram = telegram,
+    rcs = rcs,
+)

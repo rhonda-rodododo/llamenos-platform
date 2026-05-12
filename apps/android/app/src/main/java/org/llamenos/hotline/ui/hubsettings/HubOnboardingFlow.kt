@@ -33,9 +33,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import org.llamenos.hotline.R
-import org.llamenos.hotline.api.ChannelConfig
-import org.llamenos.hotline.api.HubOnboardingState
-import org.llamenos.hotline.api.ProviderTemplate
+import org.llamenos.protocol.ChannelConfig
+import org.llamenos.protocol.HubOnboardingState
+import org.llamenos.protocol.ProviderTemplate
 
 /**
  * Steps in the onboarding wizard.

@@ -9,13 +9,17 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import kotlinx.serialization.json.JsonObject
 import org.junit.Rule
 import org.junit.Test
-import org.llamenos.hotline.api.ChannelConfig
-import org.llamenos.hotline.api.HubOnboardingState
-import org.llamenos.hotline.api.HubQuota
-import org.llamenos.hotline.api.HubUsage
-import org.llamenos.hotline.api.ProviderTemplate
+import org.llamenos.protocol.ChannelConfig
+import org.llamenos.protocol.ChannelConfigClass
+import org.llamenos.protocol.HubChannelType
+import org.llamenos.protocol.HubOnboardingState
+import org.llamenos.protocol.HubQuota
+import org.llamenos.protocol.HubUsage
+import org.llamenos.protocol.ProviderTemplate
+import org.llamenos.protocol.ProviderType
 import org.llamenos.hotline.ui.hubsettings.ChannelChecklist
 import org.llamenos.hotline.ui.hubsettings.HubOnboardingFlow
 import org.llamenos.hotline.ui.hubsettings.HubUsageCard
@@ -41,20 +45,26 @@ class HubCommunicationsTest {
             name = "Twilio Starter",
             slug = "twilio-starter",
             description = "Basic Twilio setup with voice and SMS",
-            providerType = "twilio",
-            defaultChannels = listOf("voice", "sms"),
+            providerType = ProviderType.Twilio,
+            defaultChannels = listOf(HubChannelType.Voice, HubChannelType.SMS),
             allowSubAccounts = false,
             isActive = true,
+            createdBy = "system",
+            credentialHints = JsonObject(emptyMap()),
+            recommendedSettings = JsonObject(emptyMap()),
         ),
         ProviderTemplate(
             id = "tmpl-2",
             name = "SignalWire Pro",
             slug = "signalwire-pro",
             description = "Full-featured SignalWire with all channels",
-            providerType = "signalwire",
-            defaultChannels = listOf("voice", "sms", "whatsapp"),
+            providerType = ProviderType.Signalwire,
+            defaultChannels = listOf(HubChannelType.Voice, HubChannelType.SMS, HubChannelType.Whatsapp),
             allowSubAccounts = true,
             isActive = true,
+            createdBy = "system",
+            credentialHints = JsonObject(emptyMap()),
+            recommendedSettings = JsonObject(emptyMap()),
         ),
     )
 
@@ -69,19 +79,19 @@ class HubCommunicationsTest {
     )
 
     private val sampleUsage = HubUsage(
-        phoneNumbers = 2,
-        smsSent = 150,
-        callsReceived = 42,
-        signalMessagesSent = 10,
-        whatsAppMessagesSent = 25,
+        phoneNumbers = 2L,
+        smsSent = 150L,
+        callsReceived = 42L,
+        signalMessagesSent = 10L,
+        whatsAppMessagesSent = 25L,
     )
 
     private val sampleQuotas = HubQuota(
-        maxPhoneNumbers = 5,
-        maxSmsPerMonth = 1000,
-        maxCallsPerMonth = 500,
-        maxSignalMessagesPerMonth = 500,
-        maxWhatsAppMessagesPerMonth = 500,
+        maxPhoneNumbers = 5L,
+        maxSMSPerMonth = 1000L,
+        maxCallsPerMonth = 500L,
+        maxSignalMessagesPerMonth = 500L,
+        maxWhatsAppMessagesPerMonth = 500L,
     )
 
     // ── ProviderTemplateList ────────────────────────────────────────────────
@@ -395,7 +405,11 @@ class HubCommunicationsTest {
         composeRule.setContent {
             HubOnboardingFlow(
                 onboardingState = HubOnboardingState(
-                    hubId = "test-hub",
+                    hubID = "test-hub",
+                    channelConfig = ChannelConfigClass(
+                        voice = false, sms = false, email = false,
+                        signal = false, whatsapp = false, telegram = false, rcs = false,
+                    ),
                     currentStep = "channel_selection",
                     completedSteps = listOf("template_selection"),
                 ),
@@ -422,7 +436,11 @@ class HubCommunicationsTest {
         composeRule.setContent {
             HubOnboardingFlow(
                 onboardingState = HubOnboardingState(
-                    hubId = "test-hub",
+                    hubID = "test-hub",
+                    channelConfig = ChannelConfigClass(
+                        voice = false, sms = false, email = false,
+                        signal = false, whatsapp = false, telegram = false, rcs = false,
+                    ),
                     currentStep = "channel_selection",
                     completedSteps = listOf("template_selection"),
                 ),
@@ -447,7 +465,11 @@ class HubCommunicationsTest {
         composeRule.setContent {
             HubOnboardingFlow(
                 onboardingState = HubOnboardingState(
-                    hubId = "test-hub",
+                    hubID = "test-hub",
+                    channelConfig = ChannelConfigClass(
+                        voice = false, sms = false, email = false,
+                        signal = false, whatsapp = false, telegram = false, rcs = false,
+                    ),
                     currentStep = "summary",
                     completedSteps = listOf(
                         "template_selection",
@@ -480,7 +502,11 @@ class HubCommunicationsTest {
         composeRule.setContent {
             HubOnboardingFlow(
                 onboardingState = HubOnboardingState(
-                    hubId = "test-hub",
+                    hubID = "test-hub",
+                    channelConfig = ChannelConfigClass(
+                        voice = false, sms = false, email = false,
+                        signal = false, whatsapp = false, telegram = false, rcs = false,
+                    ),
                     currentStep = "summary",
                     completedSteps = listOf(
                         "template_selection",
@@ -515,7 +541,11 @@ class HubCommunicationsTest {
         composeRule.setContent {
             HubOnboardingFlow(
                 onboardingState = HubOnboardingState(
-                    hubId = "test-hub",
+                    hubID = "test-hub",
+                    channelConfig = ChannelConfigClass(
+                        voice = false, sms = false, email = false,
+                        signal = false, whatsapp = false, telegram = false, rcs = false,
+                    ),
                     currentStep = "provider_connection",
                     completedSteps = listOf("template_selection", "channel_selection"),
                 ),
@@ -540,7 +570,11 @@ class HubCommunicationsTest {
         composeRule.setContent {
             HubOnboardingFlow(
                 onboardingState = HubOnboardingState(
-                    hubId = "test-hub",
+                    hubID = "test-hub",
+                    channelConfig = ChannelConfigClass(
+                        voice = false, sms = false, email = false,
+                        signal = false, whatsapp = false, telegram = false, rcs = false,
+                    ),
                     currentStep = "phone_number",
                     completedSteps = listOf(
                         "template_selection",

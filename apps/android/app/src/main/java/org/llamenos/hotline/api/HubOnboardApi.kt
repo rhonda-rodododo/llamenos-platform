@@ -4,82 +4,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import org.llamenos.hotline.hub.ActiveHubState
+import org.llamenos.protocol.ChannelConfig
+import org.llamenos.protocol.HubOnboardingState
+import org.llamenos.protocol.HubQuota
+import org.llamenos.protocol.HubSetupStatus
+import org.llamenos.protocol.HubUsage
+import org.llamenos.protocol.ProviderTemplate
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// ── Response / request models for hub onboarding & communications ───────────
-
-@Serializable
-data class ChannelConfig(
-    val voice: Boolean = false,
-    val sms: Boolean = false,
-    val email: Boolean = false,
-    val signal: Boolean = false,
-    val whatsapp: Boolean = false,
-    val telegram: Boolean = false,
-    val rcs: Boolean = false,
-)
-
-@Serializable
-data class HubQuota(
-    val maxPhoneNumbers: Int = 5,
-    val maxSmsPerMonth: Int = 1000,
-    val maxCallsPerMonth: Int = 500,
-    val maxSignalMessagesPerMonth: Int = 500,
-    val maxWhatsAppMessagesPerMonth: Int = 500,
-    val maxSubAccounts: Int = 0,
-)
-
-@Serializable
-data class HubUsage(
-    val phoneNumbers: Int = 0,
-    val smsSent: Int = 0,
-    val callsReceived: Int = 0,
-    val signalMessagesSent: Int = 0,
-    val whatsAppMessagesSent: Int = 0,
-    val month: String? = null,
-    val year: Int? = null,
-)
-
-@Serializable
-data class ProviderTemplate(
-    val id: String,
-    val name: String,
-    val slug: String,
-    val description: String? = null,
-    val providerType: String,
-    val defaultChannels: List<String> = emptyList(),
-    val allowSubAccounts: Boolean = false,
-    val isActive: Boolean = true,
-    val createdBy: String = "",
-    val createdAt: String? = null,
-    val updatedAt: String? = null,
-)
-
-@Serializable
-data class HubOnboardingState(
-    val hubId: String,
-    val templateId: String? = null,
-    val currentStep: String = "template_selection",
-    val completedSteps: List<String> = emptyList(),
-    val channelConfig: ChannelConfig = ChannelConfig(),
-    val isComplete: Boolean = false,
-    val createdAt: String? = null,
-    val updatedAt: String? = null,
-)
-
-@Serializable
-data class HubSetupStatus(
-    val hubId: String,
-    val providerConnected: Boolean,
-    val providerType: String? = null,
-    val numbersProvisioned: Int = 0,
-    val channelsConfigured: List<String> = emptyList(),
-    val channelsPending: List<String> = emptyList(),
-    val a2pStatus: String? = null,
-    val onboardingComplete: Boolean = false,
-    val quotas: HubQuota? = null,
-)
+// ── Response / request wrappers (API-specific, not in protocol) ─────────────
 
 @Serializable
 data class ProviderTemplatesResponse(

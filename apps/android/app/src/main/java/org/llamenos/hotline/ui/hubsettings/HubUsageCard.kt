@@ -19,8 +19,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import org.llamenos.hotline.R
-import org.llamenos.hotline.api.HubQuota
-import org.llamenos.hotline.api.HubUsage
+import org.llamenos.protocol.HubQuota
+import org.llamenos.protocol.HubUsage
 
 /**
  * Card displaying current month usage statistics with progress bars against quotas.
@@ -69,7 +69,7 @@ fun HubUsageCard(
                 UsageRow(
                     label = stringResource(R.string.hub_onboarding_usage_sms),
                     current = usage.smsSent,
-                    max = quotas?.maxSmsPerMonth,
+                    max = quotas?.maxSMSPerMonth,
                     testTag = "hub-usage-sms",
                 )
 
@@ -98,8 +98,8 @@ fun HubUsageCard(
 @Composable
 private fun UsageRow(
     label: String,
-    current: Int,
-    max: Int?,
+    current: Long,
+    max: Long?,
     testTag: String,
 ) {
     Column(

@@ -45,6 +45,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import org.llamenos.hotline.R
 import org.llamenos.hotline.viewmodel.HubCommunicationsViewModel
+import org.llamenos.protocol.HubQuota
+import org.llamenos.protocol.ProviderType
 
 /**
  * Hub communications settings screen.
@@ -189,7 +191,7 @@ fun HubCommunicationsScreen(
                     ProviderStatusCard(
                         providerConnected = uiState.providerConnected,
                         providerType = uiState.setupStatus?.providerType,
-                        numbersProvisioned = uiState.setupStatus?.numbersProvisioned ?: 0,
+                        numbersProvisioned = uiState.setupStatus?.numbersProvisioned ?: 0L,
                         onStartSetup = { viewModel.showOnboarding() },
                         onNavigateToProviderSetup = onNavigateToProviderSetup,
                     )
@@ -250,7 +252,7 @@ fun HubCommunicationsScreen(
                     onNavigateToProviderSetup()
                 },
                 onNavigateToPhoneNumbers = {
-                    val provider = uiState.setupStatus?.providerType ?: "twilio"
+                    val provider = uiState.setupStatus?.providerType?.value ?: "twilio"
                     viewModel.dismissOnboarding()
                     onNavigateToPhoneNumbers(provider)
                 },
@@ -266,8 +268,8 @@ fun HubCommunicationsScreen(
 @Composable
 private fun ProviderStatusCard(
     providerConnected: Boolean,
-    providerType: String?,
-    numbersProvisioned: Int,
+    providerType: ProviderType?,
+    numbersProvisioned: Long,
     onStartSetup: () -> Unit,
     onNavigateToProviderSetup: () -> Unit,
 ) {
@@ -324,7 +326,7 @@ private fun ProviderStatusCard(
                 Text(
                     text = stringResource(
                         R.string.hub_onboarding_template_provider,
-                        providerType.replaceFirstChar { it.uppercase() },
+                        providerType.value.replaceFirstChar { it.uppercase() },
                     ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -379,7 +381,7 @@ private fun ProviderStatusCard(
  */
 @Composable
 private fun QuotaCard(
-    quotas: org.llamenos.hotline.api.HubQuota,
+    quotas: HubQuota,
 ) {
     Card(
         modifier = Modifier
@@ -403,7 +405,7 @@ private fun QuotaCard(
             )
             QuotaRow(
                 label = stringResource(R.string.hub_onboarding_quota_sms),
-                value = quotas.maxSmsPerMonth.toString(),
+                value = quotas.maxSMSPerMonth.toString(),
             )
             QuotaRow(
                 label = stringResource(R.string.hub_onboarding_quota_calls),
