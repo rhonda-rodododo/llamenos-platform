@@ -11,12 +11,7 @@
  * 3. All constants are prefixed with 'llamenos:' for collision avoidance
  */
 
-// --- ECIES V2 Key Derivation ---
-
-/** HKDF salt for legacy ECIES V2 symmetric key derivation */
-export const LABEL_ECIES_V2_SALT = 'llamenos:ecies:v2'
-
-// --- ECIES Key Wrapping ---
+// --- HPKE Key Wrapping ---
 
 /** Per-note symmetric key wrapping (V2 forward secrecy) */
 export const LABEL_NOTE_KEY = 'llamenos:note-key'

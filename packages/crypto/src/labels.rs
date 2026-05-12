@@ -18,11 +18,6 @@
 
 // --- HPKE Key Wrapping ---
 
-/// DEPRECATED: Was used for ECIES v2 key derivation (secp256k1).
-/// Kept to preserve stable label registry indices — do NOT reuse index 53.
-#[deprecated(note = "ECIES removed — all key wrapping now uses HPKE")]
-pub const LABEL_ECIES_V2_SALT: &str = "llamenos:ecies:v2";
-
 /// Per-note symmetric key wrapping
 pub const LABEL_NOTE_KEY: &str = "llamenos:note-key";
 
@@ -270,6 +265,7 @@ pub const LABEL_WS_CHALLENGE: &str = "llamenos:ws-auth:v1";
 //
 // Indices 0-35: existing labels (from crypto-labels.json ordering)
 // Indices 36-46: new v3 labels (PUK, device auth, items key, SFrame, MLS)
+// Index 53: TOMBSTONE (was LABEL_ECIES_V2_SALT — ECIES removed, index reserved)
 // Indices 57-68: labels synced from crypto-labels.json
 // =============================================================================
 
@@ -346,8 +342,7 @@ pub const LABEL_REGISTRY: &[&str] = &[
     // 52: MLS
     LABEL_MLS_PROVISION, // 52
     // 53-56: Salt/derivation labels
-    #[allow(deprecated)]
-    LABEL_ECIES_V2_SALT, // 53 (deprecated — ECIES removed)
+    "",                      // 53 — TOMBSTONE (was LABEL_ECIES_V2_SALT, ECIES removed)
     LABEL_PROVISIONING_SALT, // 54
     LABEL_BLIND_INDEX_FIELD, // 55
     LABEL_HUB_PTK,           // 56
@@ -367,12 +362,22 @@ pub const LABEL_REGISTRY: &[&str] = &[
 ];
 
 /// Look up a label string by its numeric ID.
+///
+/// Returns `None` for out-of-range IDs and for tombstoned indices (empty strings).
 pub fn id_to_label(id: u8) -> Option<&'static str> {
-    LABEL_REGISTRY.get(id as usize).copied()
+    LABEL_REGISTRY
+        .get(id as usize)
+        .copied()
+        .filter(|s| !s.is_empty())
 }
 
 /// Look up the numeric ID for a label string.
+///
+/// Empty strings (tombstoned indices) are never matched.
 pub fn label_to_id(label: &str) -> Option<u8> {
+    if label.is_empty() {
+        return None;
+    }
     LABEL_REGISTRY
         .iter()
         .position(|&l| l == label)
@@ -432,10 +437,6 @@ mod tests {
         assert_eq!(LABEL_SFRAME_CALL_SECRET, "llamenos:sframe-call-secret:v1");
         assert_eq!(LABEL_SFRAME_BASE_KEY, "llamenos:sframe-base-key:v1");
         assert_eq!(LABEL_MLS_PROVISION, "llamenos:mls-provision:v1");
-        #[allow(deprecated)]
-        {
-            assert_eq!(LABEL_ECIES_V2_SALT, "llamenos:ecies:v2");
-        }
         assert_eq!(LABEL_PROVISIONING_SALT, "llamenos:provisioning:v1");
         assert_eq!(LABEL_BLIND_INDEX_FIELD, "llamenos:blind-idx:");
         assert_eq!(LABEL_HUB_PTK, "llamenos:hub-ptk:v1");
@@ -470,7 +471,6 @@ mod tests {
 
     /// Verify registry index stability.
     #[test]
-    #[allow(deprecated)]
     fn registry_indices_stable() {
         assert_eq!(id_to_label(0), Some(LABEL_NOTE_KEY));
         assert_eq!(id_to_label(5), Some(LABEL_MESSAGE));
@@ -479,7 +479,7 @@ mod tests {
         assert_eq!(id_to_label(41), Some(LABEL_PUK_SIGN));
         assert_eq!(id_to_label(46), Some(LABEL_DEVICE_AUTH));
         assert_eq!(id_to_label(52), Some(LABEL_MLS_PROVISION));
-        assert_eq!(id_to_label(53), Some(LABEL_ECIES_V2_SALT));
+        assert_eq!(id_to_label(53), None); // tombstone (was LABEL_ECIES_V2_SALT)
         assert_eq!(id_to_label(54), Some(LABEL_PROVISIONING_SALT));
         assert_eq!(id_to_label(55), Some(LABEL_BLIND_INDEX_FIELD));
         assert_eq!(id_to_label(56), Some(LABEL_HUB_PTK));
@@ -500,10 +500,19 @@ mod tests {
         assert_eq!(id_to_label(68), Some(LABEL_WS_CHALLENGE));
     }
 
-    /// Verify bidirectional lookup.
+    /// Verify bidirectional lookup (skipping tombstoned indices).
     #[test]
     fn label_id_roundtrip() {
         for (i, &label) in LABEL_REGISTRY.iter().enumerate() {
+            if label.is_empty() {
+                // Tombstoned index — id_to_label returns None, label_to_id("") returns None
+                assert_eq!(
+                    id_to_label(i as u8),
+                    None,
+                    "tombstone at index {i} should return None"
+                );
+                continue;
+            }
             assert_eq!(
                 label_to_id(label),
                 Some(i as u8),
@@ -524,11 +533,14 @@ mod tests {
         assert_eq!(label_to_id("nonexistent:label"), None);
     }
 
-    /// Verify no duplicate labels in registry.
+    /// Verify no duplicate labels in registry (tombstones excluded).
     #[test]
     fn no_duplicate_labels() {
         let mut seen = std::collections::HashSet::new();
         for &label in LABEL_REGISTRY {
+            if label.is_empty() {
+                continue; // skip tombstoned slots
+            }
             assert!(seen.insert(label), "duplicate label in registry: {label}");
         }
     }

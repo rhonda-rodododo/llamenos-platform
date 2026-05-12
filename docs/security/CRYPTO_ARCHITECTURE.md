@@ -167,7 +167,8 @@ All labels are defined in `packages/protocol/crypto-labels.json` (source of trut
 | 49 | Hub PTK | `LABEL_HUB_PTK_PREV_GEN` |
 | 50–51 | SFrame | `LABEL_SFRAME_CALL_SECRET`, `LABEL_SFRAME_BASE_KEY` |
 | 52 | MLS | `LABEL_MLS_PROVISION` |
-| 53–56 | Salts/derivation | `LABEL_ECIES_V2_SALT`, `LABEL_PROVISIONING_SALT`, `LABEL_HUB_PTK`, etc. |
+| 53 | *(tombstone)* | Removed — was `LABEL_ECIES_V2_SALT` |
+| 54–56 | Salts/derivation | `LABEL_PROVISIONING_SALT`, `LABEL_BLIND_INDEX_FIELD`, `LABEL_HUB_PTK` |
 
 **Rule**: Never use raw string literals for crypto contexts. Always use the generated label constants.
 
