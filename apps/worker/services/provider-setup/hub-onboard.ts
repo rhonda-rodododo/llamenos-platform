@@ -49,7 +49,7 @@ export class HubOnboardService {
   ): Promise<HubOnboardingState> {
     const now = new Date()
 
-    let channelConfig: ChannelConfig = {
+    const channelConfig: ChannelConfig = {
       voice: false,
       sms: false,
       email: false,
@@ -155,17 +155,12 @@ export class HubOnboardService {
     const currentIdx = ONBOARDING_STEPS.indexOf(row.currentStep as OnboardingStep)
     const stepIdx = ONBOARDING_STEPS.indexOf(step as OnboardingStep)
 
-    if (stepIdx < currentIdx) {
+    // Must complete the current step — no skipping forward and no going back
+    if (stepIdx !== currentIdx) {
       throw new ProviderApiError(
-        'Cannot complete a previous step',
-        400,
-        'Invalid step progression',
-      )
-    }
-
-    if (stepIdx > currentIdx + 1) {
-      throw new ProviderApiError(
-        'Cannot skip steps',
+        stepIdx < currentIdx
+          ? 'Cannot complete a previous step'
+          : 'Cannot skip steps — complete the current step first',
         400,
         'Invalid step progression',
       )
@@ -176,7 +171,7 @@ export class HubOnboardService {
 
     const updates: Record<string, unknown> = {
       completedSteps: Array.from(completed),
-      updatedAt: new Date().toISOString(),
+      updatedAt: new Date(),
     }
 
     if (nextStep) {
@@ -209,12 +204,12 @@ export class HubOnboardService {
       .limit(1)
 
     const onboarding = await this.getOnboardingStatus(hubId)
-    const settings = await this.settings.getHubProviderSettings(hubId)
+    const hubSettings = await this.settings.getHubProviderSettings(hubId)
 
     const channelsConfigured: string[] = []
     const channelsPending: string[] = []
 
-    const channelConfig = (onboarding?.channelConfig ?? settings.channels ?? {}) as ChannelConfig
+    const channelConfig = (onboarding?.channelConfig ?? hubSettings.channels ?? {}) as ChannelConfig
     for (const [channel, enabled] of Object.entries(channelConfig)) {
       if (enabled) {
         channelsConfigured.push(channel)
@@ -230,7 +225,7 @@ export class HubOnboardService {
       numbersProvisioned: (config?.phoneNumbers as string[])?.length ?? 0,
       channelsConfigured: channelsConfigured as HubSetupStatus['channelsConfigured'],
       channelsPending: channelsPending as HubSetupStatus['channelsPending'],
-      a2pStatus: settings.subAccountEnabled ? 'configured' : undefined,
+      a2pStatus: hubSettings.subAccountEnabled ? 'configured' : undefined,
       onboardingComplete: onboarding?.isComplete ?? false,
     }
   }
@@ -245,9 +240,9 @@ export class HubOnboardService {
       })
       .where(eq(hubOnboardingState.hubId, hubId))
 
-    const settings = await this.settings.getHubSettings(hubId)
+    const hubSettings = await this.settings.getHubSettings(hubId)
     await this.settings.updateHubSettings(hubId, {
-      ...settings,
+      ...hubSettings,
       providerSetupComplete: true,
     })
 
@@ -255,8 +250,8 @@ export class HubOnboardService {
   }
 
   async getHubUsage(hubId: string): Promise<HubUsage> {
-    const settings = await this.settings.getHubSettings(hubId)
-    const usage = (settings.usage as HubUsage[]) ?? []
+    const hubSettings = await this.settings.getHubSettings(hubId)
+    const usage = (hubSettings.usage as HubUsage[]) ?? []
 
     const now = new Date()
     const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
@@ -279,37 +274,41 @@ export class HubOnboardService {
     hubId: string,
     resource: string,
   ): Promise<{ allowed: boolean; limit: number; current: number }> {
-    const settings = await this.settings.getHubSettings(hubId)
-    const quotas = (settings.quotas as Record<string, number>) ?? {}
-    const usage = (settings.usage as HubUsage[]) ?? []
+    const hubSettings = await this.settings.getHubSettings(hubId)
+    const quotas = (hubSettings.quotas as Record<string, number | null>) ?? {}
+    const usage = (hubSettings.usage as HubUsage[]) ?? []
 
     const now = new Date()
     const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
     const currentMonth = usage.find((u) => u.month === month)
 
-    const limit = quotas[resource] ?? 0
+    const limit = quotas[resource] ?? null
     const current = (currentMonth?.[resource as keyof HubUsage] as number) ?? 0
 
-    return { allowed: limit === 0 || current < limit, limit, current }
+    // null/undefined = unlimited (no quota set), 0 = blocked (no allocation)
+    if (limit === null || limit === undefined) {
+      return { allowed: true, limit: 0, current }
+    }
+    return { allowed: limit > 0 && current < limit, limit, current }
   }
 
   async enableChannel(hubId: string, channel: string): Promise<ChannelConfig> {
-    const settings = await this.settings.getHubSettings(hubId)
-    const channels = { ...(settings.channels as ChannelConfig) }
+    const hubSettings = await this.settings.getHubSettings(hubId)
+    const channels = { ...(hubSettings.channels as ChannelConfig) }
     if (channel in channels) {
       channels[channel as keyof ChannelConfig] = true
     }
-    await this.settings.updateHubSettings(hubId, { ...settings, channels })
+    await this.settings.updateHubSettings(hubId, { ...hubSettings, channels })
     return channels
   }
 
   async disableChannel(hubId: string, channel: string): Promise<ChannelConfig> {
-    const settings = await this.settings.getHubSettings(hubId)
-    const channels = { ...(settings.channels as ChannelConfig) }
+    const hubSettings = await this.settings.getHubSettings(hubId)
+    const channels = { ...(hubSettings.channels as ChannelConfig) }
     if (channel in channels) {
       channels[channel as keyof ChannelConfig] = false
     }
-    await this.settings.updateHubSettings(hubId, { ...settings, channels })
+    await this.settings.updateHubSettings(hubId, { ...hubSettings, channels })
     return channels
   }
 
@@ -317,9 +316,24 @@ export class HubOnboardService {
     hubId: string,
     newProviderType: string,
   ): Promise<{ ok: true }> {
-    await this.db
-      .delete(providerConfigs)
+    // Find the current provider type so we only delete that specific provider config,
+    // not ALL configs for this hub (e.g. messaging providers should be preserved)
+    const [current] = await this.db
+      .select()
+      .from(providerConfigs)
       .where(eq(providerConfigs.hubId, hubId))
+      .limit(1)
+
+    if (current) {
+      await this.db
+        .delete(providerConfigs)
+        .where(
+          and(
+            eq(providerConfigs.hubId, hubId),
+            eq(providerConfigs.providerType, current.providerType),
+          ),
+        )
+    }
 
     await this.db.insert(providerConfigs).values({
       id: crypto.randomUUID(),
@@ -339,14 +353,42 @@ export class HubOnboardService {
     hubId: string,
     masterConfigId: string,
   ): Promise<{ subAccountId: string }> {
+    // Verify masterConfigId belongs to the requesting hub to prevent cross-hub access
     const [master] = await this.db
       .select()
       .from(providerConfigs)
-      .where(eq(providerConfigs.id, masterConfigId))
+      .where(
+        and(
+          eq(providerConfigs.id, masterConfigId),
+          eq(providerConfigs.hubId, hubId),
+        ),
+      )
       .limit(1)
 
     if (!master) {
       throw new ProviderApiError('Master config not found', 404, 'Not found')
+    }
+
+    // Check sub-account quota
+    const hubSettings = await this.settings.getHubSettings(hubId)
+    const quotas = (hubSettings.quotas as Record<string, number>) ?? {}
+    const maxSubAccounts = quotas.maxSubAccounts ?? 0
+
+    if (maxSubAccounts > 0) {
+      const existingConfigs = await this.db
+        .select()
+        .from(providerConfigs)
+        .where(eq(providerConfigs.hubId, hubId))
+
+      // Subtract 1 for the master config itself
+      const subAccountCount = Math.max(0, existingConfigs.length - 1)
+      if (subAccountCount >= maxSubAccounts) {
+        throw new ProviderApiError(
+          `Sub-account quota exceeded (max: ${maxSubAccounts})`,
+          429,
+          'Quota exceeded',
+        )
+      }
     }
 
     const subAccountId = crypto.randomUUID()
@@ -362,9 +404,8 @@ export class HubOnboardService {
       updatedAt: new Date(),
     })
 
-    const settings = await this.settings.getHubSettings(hubId)
     await this.settings.updateHubSettings(hubId, {
-      ...settings,
+      ...hubSettings,
       subAccountEnabled: true,
       subAccountConfigId: subAccountId,
     })

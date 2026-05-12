@@ -12,13 +12,16 @@ import {
   hubQuotaSchema,
   channelConfigSchema,
 } from '@protocol/schemas/provider-setup'
-import { okResponseSchema } from '@protocol/schemas/common'
 import { ProviderApiError } from '../services/provider-setup/types'
 
 const hubOnboardRoute = new Hono<AppEnv>()
 
+// Routes are mounted via hubScoped.route('/onboard', hubOnboardRoutes)
+// where hubScoped lives at /hubs/:hubId — so the full API path is
+// /api/hubs/:hubId/onboard/<path>. hubId comes from c.get('hubId').
+
 // ── Start Onboarding ───────────────────────────────────────────────────────
-hubOnboardRoute.post('/:hubId/onboard',
+hubOnboardRoute.post('/',
   requireHubPermission('hubs:configure'),
   describeRoute({
     tags: ['Hub Onboarding'],
@@ -41,21 +44,21 @@ hubOnboardRoute.post('/:hubId/onboard',
   async (c) => {
     const services = c.get('services')
     const pubkey = c.get('pubkey')
-    const hubId = c.req.param('hubId')
-    const body = c.req.valid('json') || {}
+    const hubId = c.get('hubId')!
 
     const limited = await checkRateLimit(services.settings, `hub-onboard-start:${pubkey}`, 10)
     if (limited) {
       return c.json({ error: 'Rate limit exceeded' }, 429)
     }
 
+    const body = c.req.valid('json') || {}
     const onboarding = await services.hubOnboard.startOnboarding(hubId, body.templateId)
     return c.json({ onboarding })
   },
 )
 
 // ── Get Onboarding Status ──────────────────────────────────────────────────
-hubOnboardRoute.get('/:hubId/onboard/status',
+hubOnboardRoute.get('/status',
   requireHubPermission('telephony:view-providers'),
   describeRoute({
     tags: ['Hub Onboarding'],
@@ -74,14 +77,14 @@ hubOnboardRoute.get('/:hubId/onboard/status',
   }),
   async (c) => {
     const services = c.get('services')
-    const hubId = c.req.param('hubId')
+    const hubId = c.get('hubId')!
     const onboarding = await services.hubOnboard.getOnboardingStatus(hubId)
     return c.json({ onboarding })
   },
 )
 
 // ── Complete Step ──────────────────────────────────────────────────────────
-hubOnboardRoute.put('/:hubId/onboard/step',
+hubOnboardRoute.put('/step',
   requireHubPermission('hubs:configure'),
   describeRoute({
     tags: ['Hub Onboarding'],
@@ -106,7 +109,7 @@ hubOnboardRoute.put('/:hubId/onboard/step',
   })),
   async (c) => {
     const services = c.get('services')
-    const hubId = c.req.param('hubId')
+    const hubId = c.get('hubId')!
     const body = c.req.valid('json')
 
     try {
@@ -122,7 +125,7 @@ hubOnboardRoute.put('/:hubId/onboard/step',
 )
 
 // ── Get Provider Status ────────────────────────────────────────────────────
-hubOnboardRoute.get('/:hubId/provider-status',
+hubOnboardRoute.get('/provider-status',
   requireHubPermission('telephony:view-providers'),
   describeRoute({
     tags: ['Hub Onboarding'],
@@ -141,14 +144,14 @@ hubOnboardRoute.get('/:hubId/provider-status',
   }),
   async (c) => {
     const services = c.get('services')
-    const hubId = c.req.param('hubId')
+    const hubId = c.get('hubId')!
     const status = await services.hubOnboard.getHubSetupStatus(hubId)
     return c.json({ status })
   },
 )
 
 // ── Get Usage ──────────────────────────────────────────────────────────────
-hubOnboardRoute.get('/:hubId/usage',
+hubOnboardRoute.get('/usage',
   requireHubPermission('telephony:view-providers'),
   describeRoute({
     tags: ['Hub Onboarding'],
@@ -167,14 +170,14 @@ hubOnboardRoute.get('/:hubId/usage',
   }),
   async (c) => {
     const services = c.get('services')
-    const hubId = c.req.param('hubId')
+    const hubId = c.get('hubId')!
     const usage = await services.hubOnboard.getHubUsage(hubId)
     return c.json({ usage })
   },
 )
 
 // ── Set Quotas ─────────────────────────────────────────────────────────────
-hubOnboardRoute.put('/:hubId/quotas',
+hubOnboardRoute.put('/quotas',
   requireHubPermission('system:manage-instance'),
   describeRoute({
     tags: ['Hub Onboarding'],
@@ -194,7 +197,7 @@ hubOnboardRoute.put('/:hubId/quotas',
   validator('json', hubQuotaSchema),
   async (c) => {
     const services = c.get('services')
-    const hubId = c.req.param('hubId')
+    const hubId = c.get('hubId')!
     const body = c.req.valid('json')
 
     const quotas = await services.settings.updateHubQuotas(hubId, body)
@@ -203,7 +206,7 @@ hubOnboardRoute.put('/:hubId/quotas',
 )
 
 // ── Update Channels ────────────────────────────────────────────────────────
-hubOnboardRoute.put('/:hubId/channels',
+hubOnboardRoute.put('/channels',
   requireHubPermission('hubs:configure'),
   describeRoute({
     tags: ['Hub Onboarding'],
@@ -226,7 +229,7 @@ hubOnboardRoute.put('/:hubId/channels',
   })),
   async (c) => {
     const services = c.get('services')
-    const hubId = c.req.param('hubId')
+    const hubId = c.get('hubId')!
     const body = c.req.valid('json')
 
     const channels = body.enabled
@@ -238,7 +241,7 @@ hubOnboardRoute.put('/:hubId/channels',
 )
 
 // ── Provision Sub-Account ──────────────────────────────────────────────────
-hubOnboardRoute.post('/:hubId/sub-account',
+hubOnboardRoute.post('/sub-account',
   requireHubPermission('hubs:configure'),
   describeRoute({
     tags: ['Hub Onboarding'],
@@ -260,7 +263,7 @@ hubOnboardRoute.post('/:hubId/sub-account',
   })),
   async (c) => {
     const services = c.get('services')
-    const hubId = c.req.param('hubId')
+    const hubId = c.get('hubId')!
     const body = c.req.valid('json')
 
     const result = await services.hubOnboard.provisionSubAccount(hubId, body.masterConfigId)

@@ -1,7 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { Phone, MessageSquare, Signal, Smartphone } from 'lucide-react'
-import { HUB_CHANNEL_TYPES } from '@protocol/schemas/provider-setup'
-import type { HubUsage, HubQuota, HubChannelType } from '@protocol/schemas/provider-setup'
+import type { HubUsage, HubQuota } from '@protocol/schemas/provider-setup'
 import { Card } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 
@@ -40,7 +39,9 @@ export function HubUsageCard({ usage, quota }: HubUsageCardProps) {
 
       <div className="space-y-3">
         {items.map((item) => {
-          const percent = Math.min(100, Math.round((item.value / item.max) * 100))
+          const percent = item.max > 0
+            ? Math.min(100, Math.round((item.value / item.max) * 100))
+            : 0
 
           return (
             <div key={item.label} className="space-y-1">

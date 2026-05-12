@@ -42,22 +42,27 @@ export async function completeOnboardingStep(
 
 export async function getProviderStatus(hubId: string): Promise<{ status: HubSetupStatus }> {
   return request<{ status: HubSetupStatus }>(
-    `/hubs/${encodeURIComponent(hubId)}/provider-status`,
+    `/hubs/${encodeURIComponent(hubId)}/onboard/provider-status`,
   )
 }
 
 export async function getHubUsage(hubId: string): Promise<{ usage: HubUsage }> {
-  return request<{ usage: HubUsage }>(`/hubs/${encodeURIComponent(hubId)}/usage`)
+  return request<{ usage: HubUsage }>(
+    `/hubs/${encodeURIComponent(hubId)}/onboard/usage`,
+  )
 }
 
 export async function setHubQuotas(
   hubId: string,
   quotas: HubQuota,
 ): Promise<{ quotas: HubQuota }> {
-  return request<{ quotas: HubQuota }>(`/hubs/${encodeURIComponent(hubId)}/quotas`, {
-    method: 'PUT',
-    body: JSON.stringify(quotas),
-  })
+  return request<{ quotas: HubQuota }>(
+    `/hubs/${encodeURIComponent(hubId)}/onboard/quotas`,
+    {
+      method: 'PUT',
+      body: JSON.stringify(quotas),
+    },
+  )
 }
 
 export async function updateChannel(
@@ -65,10 +70,13 @@ export async function updateChannel(
   channel: string,
   enabled: boolean,
 ): Promise<{ channels: ChannelConfig }> {
-  return request<{ channels: ChannelConfig }>(`/hubs/${encodeURIComponent(hubId)}/channels`, {
-    method: 'PUT',
-    body: JSON.stringify({ channel, enabled }),
-  })
+  return request<{ channels: ChannelConfig }>(
+    `/hubs/${encodeURIComponent(hubId)}/onboard/channels`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ channel, enabled }),
+    },
+  )
 }
 
 export async function provisionSubAccount(
@@ -76,7 +84,7 @@ export async function provisionSubAccount(
   masterConfigId: string,
 ): Promise<{ subAccountId: string }> {
   return request<{ subAccountId: string }>(
-    `/hubs/${encodeURIComponent(hubId)}/sub-account`,
+    `/hubs/${encodeURIComponent(hubId)}/onboard/sub-account`,
     {
       method: 'POST',
       body: JSON.stringify({ masterConfigId }),

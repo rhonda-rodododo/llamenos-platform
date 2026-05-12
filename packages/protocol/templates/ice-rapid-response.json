@@ -11,6 +11,34 @@
     "rapid-response"
   ],
   "extends": [],
+
+  "defaultChannels": ["voice", "sms", "signal", "whatsapp"],
+  "recommendedProvider": "twilio",
+  "providerDefaults": {
+    "a2pRequired": true,
+    "webrtcEnabled": false,
+    "sipTrunkEnabled": false
+  },
+  "allowSubAccounts": true,
+  "channelGuidance": [
+    {
+      "channel": "voice",
+      "instructions": "Urgent rapid response calls for ICE sightings and enforcement actions"
+    },
+    {
+      "channel": "sms",
+      "instructions": "Broadcast alerts for nearby rapid response volunteers (requires A2P registration)"
+    },
+    {
+      "channel": "signal",
+      "instructions": "Encrypted coordination between legal observers and rapid responders"
+    },
+    {
+      "channel": "whatsapp",
+      "instructions": "Community outreach and know-your-rights information in multiple languages"
+    }
+  ],
+
   "labels": {
     "en": {
       "immigration_case.label": "Immigration Case",

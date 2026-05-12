@@ -8,6 +8,29 @@
   "tags": ["hotline", "general", "basic"],
   "extends": [],
 
+  "defaultChannels": ["voice", "sms"],
+  "recommendedProvider": "twilio",
+  "providerDefaults": {
+    "a2pRequired": false,
+    "webrtcEnabled": false,
+    "sipTrunkEnabled": false
+  },
+  "allowSubAccounts": false,
+  "channelGuidance": [
+    {
+      "channel": "voice",
+      "instructions": "Inbound voice calls from callers to on-shift volunteers"
+    },
+    {
+      "channel": "sms",
+      "instructions": "SMS follow-up messages and automated notifications"
+    },
+    {
+      "channel": "signal",
+      "instructions": "Encrypted messaging for sensitive follow-ups"
+    }
+  ],
+
   "labels": {
     "en": {
       "general_case.label": "Case",

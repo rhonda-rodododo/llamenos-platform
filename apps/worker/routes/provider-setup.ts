@@ -22,6 +22,16 @@ import { ProviderApiError } from '../services/provider-setup/types'
 import { SignalRegistrationError } from '../services/provider-setup/signal-registration'
 import { A2pRegistrationError } from '../services/provider-setup/a2p-registration'
 
+/** Extract hubId from context or request body, returning non-optional string.
+ *  Throws 400 if hubId is not available from either source. */
+function resolveHubId(c: Context<AppEnv>, bodyHubId?: string): string {
+  const hubId = c.get('hubId') ?? bodyHubId
+  if (!hubId) {
+    throw new ProviderApiError('hubId is required', 400, 'Missing hubId')
+  }
+  return hubId
+}
+
 /** Read OAuth client_id from environment for a provider. */
 function getOAuthClientId(provider: string): string {
   const envKey = `${provider.toUpperCase()}_CLIENT_ID`
@@ -441,11 +451,11 @@ providerSetup.post('/test',
   async (c) => {
     const body = c.req.valid('json')
     const services = c.get('services')
-    const hubId = c.get('hubId')
+    const hubId = resolveHubId(c, body.hubId)
 
     const result = await services.providerSetup.testConnection(
       body.provider as Parameters<typeof services.providerSetup.testConnection>[0],
-      hubId ?? body.hubId,
+      hubId,
     )
     return c.json(result)
   },
@@ -468,7 +478,7 @@ providerSetup.get('/status/:provider',
   async (c) => {
     const provider = c.req.param('provider')
     const services = c.get('services')
-    const hubId = c.get('hubId')
+    const hubId = resolveHubId(c)
 
     const result = await services.providerSetup.getProviderStatus(
       provider as Parameters<typeof services.providerSetup.getProviderStatus>[0],
@@ -495,7 +505,7 @@ providerSetup.get('/phone-numbers',
   async (c) => {
     const provider = c.req.query('provider')
     const services = c.get('services')
-    const hubId = c.get('hubId') ?? c.req.query('hubId')
+    const hubId = resolveHubId(c, c.req.query('hubId'))
 
     if (!provider) {
       return c.json({ error: 'provider query param required' }, 400)
@@ -535,10 +545,10 @@ providerSetup.post('/phone-numbers/search',
   async (c) => {
     const pubkey = c.get('pubkey')
     const services = c.get('services')
-    const hubId = c.get('hubId')
+    const hubId = resolveHubId(c)
     const body = c.req.valid('json')
 
-    const limited = await checkRateLimit(services.settings, `provider-search:${hubId ?? 'global'}:${pubkey}`, 5)
+    const limited = await checkRateLimit(services.settings, `provider-search:${hubId}:${pubkey}`, 5)
     if (limited) {
       return c.json({ error: 'Rate limit exceeded' }, 429)
     }
@@ -578,10 +588,10 @@ providerSetup.post('/phone-numbers/provision',
   async (c) => {
     const pubkey = c.get('pubkey')
     const services = c.get('services')
-    const hubId = c.get('hubId')
+    const hubId = resolveHubId(c, c.req.valid('json').hubId)
     const body = c.req.valid('json')
 
-    const limited = await checkRateLimit(services.settings, `provider-provision:${hubId ?? 'global'}:${pubkey}`, 1)
+    const limited = await checkRateLimit(services.settings, `provider-provision:${hubId}:${pubkey}`, 1)
     if (limited) {
       return c.json({ error: 'Rate limit exceeded' }, 429)
     }
@@ -590,7 +600,7 @@ providerSetup.post('/phone-numbers/provision',
       const number = await services.providerSetup.provisionNumber(
         body.providerType,
         body,
-        hubId ?? body.hubId,
+        hubId,
       )
 
       let webhookWarning: string | undefined
@@ -599,7 +609,7 @@ providerSetup.post('/phone-numbers/provision',
           await services.providerSetup.configureWebhooks(
             body.providerType,
             number.id,
-            { hubId: hubId ?? body.hubId },
+            { hubId },
           )
         } catch (webhookErr) {
           webhookWarning = webhookErr instanceof Error ? webhookErr.message : 'Webhook configuration failed'
@@ -634,13 +644,12 @@ providerSetup.post('/configure-webhooks',
   async (c) => {
     const body = c.req.valid('json')
     const services = c.get('services')
-    const hubId = c.get('hubId')
 
     try {
       await services.providerSetup.configureWebhooks(
         body.provider as Parameters<typeof services.providerSetup.configureWebhooks>[0],
         body.numberId,
-        { enableSms: body.enableSms, hubId: hubId ?? body.hubId },
+        { enableSms: body.enableSms, hubId: resolveHubId(c, body.hubId) },
       )
       return c.json({ ok: true })
     } catch (err) {
@@ -680,13 +689,12 @@ providerSetup.post('/create-sip-trunk',
   async (c) => {
     const body = c.req.valid('json')
     const services = c.get('services')
-    const hubId = c.get('hubId')
 
     try {
       const trunk = await services.providerSetup.createSipTrunk(
         body.provider as Parameters<typeof services.providerSetup.createSipTrunk>[0],
         body.domain,
-        hubId ?? body.hubId,
+        resolveHubId(c, body.hubId),
       )
       // Never return sipPassword in the response — credentials are stored encrypted server-side
       return c.json({
@@ -717,11 +725,6 @@ const SignalRegisterRequestSchema = z.object({
 const SignalVerifyRequestSchema = z.object({
   registrationId: z.string(),
   code: z.string().regex(/^\d{3,8}$/),
-  hubId: z.string().optional(),
-})
-
-const SignalUnregisterRequestSchema = z.object({
-  registrationId: z.string(),
   hubId: z.string().optional(),
 })
 

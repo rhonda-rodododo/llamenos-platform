@@ -1,4 +1,4 @@
-import { eq, and, desc } from 'drizzle-orm'
+import { eq, desc } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import type { Database } from '../../db'
 import { providerTemplates } from '../../db/schema'
@@ -129,7 +129,7 @@ export class ProviderTemplateService {
       }
     }
 
-    const updates: Record<string, unknown> = { updatedAt: new Date().toISOString() }
+    const updates: Record<string, unknown> = { updatedAt: new Date() }
     if (data.name !== undefined) updates.name = data.name
     if (data.slug !== undefined) updates.slug = (data.slug as string).trim().toLowerCase()
     if (data.description !== undefined) updates.description = data.description

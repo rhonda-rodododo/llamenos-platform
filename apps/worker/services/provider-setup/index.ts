@@ -1,4 +1,4 @@
-import { eq, and, isNull, desc } from 'drizzle-orm'
+import { eq, and, desc } from 'drizzle-orm'
 import { randomBytes } from 'node:crypto'
 import type { Database } from '../../db'
 import { providerConfigs, oauthStates, signalRegistrations, a2pRegistrations } from '../../db/schema'
@@ -15,7 +15,6 @@ import { getProviderCapability, hasCapability } from './registry'
 import { encryptCredentials, decryptCredentials } from './crypto'
 import type { WebhookUrls, ConnectionTestResult, SipTrunkConfig } from './types'
 import { ProviderApiError } from './types'
-import { registerAllProviders } from './providers'
 
 export class ProviderSetup {
   private readonly settings: SettingsService
@@ -158,7 +157,7 @@ export class ProviderSetup {
   async configureWebhooks(
     provider: TelephonyProviderType,
     numberId: string,
-    options: { enableSms?: boolean; hubId?: string },
+    options: { enableSms?: boolean; hubId: string },
   ): Promise<void> {
     const { impl, creds } = await this.resolveProvider(
       provider,
@@ -180,7 +179,7 @@ export class ProviderSetup {
   async createSipTrunk(
     provider: TelephonyProviderType,
     domain: string,
-    hubId?: string,
+    hubId: string,
   ): Promise<SipTrunkConfig> {
     const { impl, creds } = await this.resolveProvider(provider, hubId, 'sipTrunks')
     return impl.createSipTrunk(creds, domain)
