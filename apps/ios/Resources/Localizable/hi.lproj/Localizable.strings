@@ -907,6 +907,7 @@
 "common_edit" = "संपादित करें";
 "common_enabled" = "Enabled";
 "common_error" = "त्रुटि";
+"common_hide_advanced" = "Hide Advanced";
 "common_language" = "भाषा";
 "common_loading" = "लोड हो रहा है...";
 "common_logout" = "लॉग आउट";
@@ -923,8 +924,10 @@
 "common_remove" = "Remove";
 "common_retry" = "Retry";
 "common_save" = "सहेजें";
+"common_saved" = "Saved";
 "common_search" = "खोजें";
 "common_settings" = "सेटिंग्स";
+"common_show_advanced" = "Show Advanced";
 "common_status" = "स्थिति";
 "common_submit" = "सबमिट करें";
 "common_success" = "सफलता";

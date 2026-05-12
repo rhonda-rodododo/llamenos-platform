@@ -174,9 +174,20 @@ jobs:
 
       - name: Audit dependencies
         run: |
+          # GHSA-rmmr-r34h-pfm5 flags @tanstack/history >=0 but the malicious versions
+          # were 1.161.9+ published 2026-05-11. Our pinned 1.161.6 is safe.
+          # Filter out this overbroad advisory until GitHub narrows the affected range.
           bun audit --audit-level=high || {
             echo "::warning::High-severity vulns found — checking for critical"
-            bun audit --audit-level=critical
+            CRITICAL_OUTPUT=$(bun audit --audit-level=critical 2>&1) || {
+              if echo "$CRITICAL_OUTPUT" | grep -q "GHSA-rmmr-r34h-pfm5" && \
+                 ! echo "$CRITICAL_OUTPUT" | grep -v "GHSA-rmmr-r34h-pfm5" | grep -q "critical:"; then
+                echo "::warning::Only critical finding is GHSA-rmmr-r34h-pfm5 (@tanstack/history >=0 overbroad range) — our 1.161.6 is safe, skipping"
+              else
+                echo "$CRITICAL_OUTPUT"
+                exit 1
+              fi
+            }
           }
 
   # ─── E2E + Backend BDD Tests (Docker Compose) ──────────────

@@ -63,7 +63,7 @@ fun AdminSettingsScreenWithSidebar(
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = stringResource(R.string.adminNav_openMenu),
+                                contentDescription = stringResource(R.string.admin_nav_open_menu),
                             )
                         }
                     },

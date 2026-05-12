@@ -907,6 +907,7 @@
 "common_edit" = "I-edit";
 "common_enabled" = "Enabled";
 "common_error" = "Error";
+"common_hide_advanced" = "Hide Advanced";
 "common_language" = "Wika";
 "common_loading" = "Naglo-load...";
 "common_logout" = "Mag-log out";
@@ -923,8 +924,10 @@
 "common_remove" = "Remove";
 "common_retry" = "Retry";
 "common_save" = "I-save";
+"common_saved" = "Saved";
 "common_search" = "Maghanap";
 "common_settings" = "Mga Setting";
+"common_show_advanced" = "Show Advanced";
 "common_status" = "Status";
 "common_submit" = "Isumite";
 "common_success" = "Tagumpay";

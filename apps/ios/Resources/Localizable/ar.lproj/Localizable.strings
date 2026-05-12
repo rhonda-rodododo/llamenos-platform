@@ -907,6 +907,7 @@
 "common_edit" = "تعديل";
 "common_enabled" = "Enabled";
 "common_error" = "خطأ";
+"common_hide_advanced" = "Hide Advanced";
 "common_language" = "اللغة";
 "common_loading" = "جاري التحميل...";
 "common_logout" = "تسجيل الخروج";
@@ -923,8 +924,10 @@
 "common_remove" = "Remove";
 "common_retry" = "Retry";
 "common_save" = "حفظ";
+"common_saved" = "Saved";
 "common_search" = "بحث";
 "common_settings" = "الإعدادات";
+"common_show_advanced" = "Show Advanced";
 "common_status" = "الحالة";
 "common_submit" = "إرسال";
 "common_success" = "نجاح";

@@ -910,6 +910,7 @@
     <string name="common_edit">I-edit</string>
     <string name="common_enabled">Enabled</string>
     <string name="common_error">Error</string>
+    <string name="common_hide_advanced">Hide Advanced</string>
     <string name="common_language">Wika</string>
     <string name="common_loading">Naglo-load...</string>
     <string name="common_logout">Mag-log out</string>
@@ -926,8 +927,10 @@
     <string name="common_remove">Remove</string>
     <string name="common_retry">Retry</string>
     <string name="common_save">I-save</string>
+    <string name="common_saved">Saved</string>
     <string name="common_search">Maghanap</string>
     <string name="common_settings">Mga Setting</string>
+    <string name="common_show_advanced">Show Advanced</string>
     <string name="common_status">Status</string>
     <string name="common_submit">Isumite</string>
     <string name="common_success">Tagumpay</string>

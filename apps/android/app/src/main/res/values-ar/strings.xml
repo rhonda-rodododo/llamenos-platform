@@ -910,6 +910,7 @@
     <string name="common_edit">تعديل</string>
     <string name="common_enabled">Enabled</string>
     <string name="common_error">خطأ</string>
+    <string name="common_hide_advanced">Hide Advanced</string>
     <string name="common_language">اللغة</string>
     <string name="common_loading">جاري التحميل...</string>
     <string name="common_logout">تسجيل الخروج</string>
@@ -926,8 +927,10 @@
     <string name="common_remove">Remove</string>
     <string name="common_retry">Retry</string>
     <string name="common_save">حفظ</string>
+    <string name="common_saved">Saved</string>
     <string name="common_search">بحث</string>
     <string name="common_settings">الإعدادات</string>
+    <string name="common_show_advanced">Show Advanced</string>
     <string name="common_status">الحالة</string>
     <string name="common_submit">إرسال</string>
     <string name="common_success">نجاح</string>

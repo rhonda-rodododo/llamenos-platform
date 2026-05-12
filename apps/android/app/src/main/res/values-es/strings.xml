@@ -910,6 +910,7 @@
     <string name="common_edit">Editar</string>
     <string name="common_enabled">Enabled</string>
     <string name="common_error">Error</string>
+    <string name="common_hide_advanced">Hide Advanced</string>
     <string name="common_language">Idioma</string>
     <string name="common_loading">Cargando...</string>
     <string name="common_logout">Cerrar sesión</string>
@@ -926,8 +927,10 @@
     <string name="common_remove">Remove</string>
     <string name="common_retry">Retry</string>
     <string name="common_save">Guardar</string>
+    <string name="common_saved">Saved</string>
     <string name="common_search">Buscar</string>
     <string name="common_settings">Configuración</string>
+    <string name="common_show_advanced">Show Advanced</string>
     <string name="common_status">Estado</string>
     <string name="common_submit">Enviar</string>
     <string name="common_success">Éxito</string>

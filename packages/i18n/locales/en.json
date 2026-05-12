@@ -1014,7 +1014,10 @@
     "create": "Create",
     "all": "All",
     "previous": "Previous",
-    "comingSoon": "Coming soon"
+    "comingSoon": "Coming soon",
+    "hideAdvanced": "Hide Advanced",
+    "showAdvanced": "Show Advanced",
+    "saved": "Saved"
   },
   "confirm": {
     "backup": "Confirm Backup",

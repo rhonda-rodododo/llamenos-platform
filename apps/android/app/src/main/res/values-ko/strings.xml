@@ -910,6 +910,7 @@
     <string name="common_edit">편집</string>
     <string name="common_enabled">Enabled</string>
     <string name="common_error">오류</string>
+    <string name="common_hide_advanced">Hide Advanced</string>
     <string name="common_language">언어</string>
     <string name="common_loading">로딩 중...</string>
     <string name="common_logout">로그아웃</string>
@@ -926,8 +927,10 @@
     <string name="common_remove">Remove</string>
     <string name="common_retry">Retry</string>
     <string name="common_save">저장</string>
+    <string name="common_saved">Saved</string>
     <string name="common_search">검색</string>
     <string name="common_settings">설정</string>
+    <string name="common_show_advanced">Show Advanced</string>
     <string name="common_status">상태</string>
     <string name="common_submit">제출</string>
     <string name="common_success">성공</string>

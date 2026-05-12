@@ -910,6 +910,7 @@
     <string name="common_edit">编辑</string>
     <string name="common_enabled">Enabled</string>
     <string name="common_error">错误</string>
+    <string name="common_hide_advanced">Hide Advanced</string>
     <string name="common_language">语言</string>
     <string name="common_loading">加载中...</string>
     <string name="common_logout">退出登录</string>
@@ -926,8 +927,10 @@
     <string name="common_remove">Remove</string>
     <string name="common_retry">Retry</string>
     <string name="common_save">保存</string>
+    <string name="common_saved">Saved</string>
     <string name="common_search">搜索</string>
     <string name="common_settings">设置</string>
+    <string name="common_show_advanced">Show Advanced</string>
     <string name="common_status">状态</string>
     <string name="common_submit">提交</string>
     <string name="common_success">成功</string>

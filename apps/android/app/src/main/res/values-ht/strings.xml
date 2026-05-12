@@ -910,6 +910,7 @@
     <string name="common_edit">Modifye</string>
     <string name="common_enabled">Enabled</string>
     <string name="common_error">Erè</string>
+    <string name="common_hide_advanced">Hide Advanced</string>
     <string name="common_language">Lang</string>
     <string name="common_loading">Ap chaje...</string>
     <string name="common_logout">Dekonekte</string>
@@ -926,8 +927,10 @@
     <string name="common_remove">Remove</string>
     <string name="common_retry">Retry</string>
     <string name="common_save">Anrejistre</string>
+    <string name="common_saved">Saved</string>
     <string name="common_search">Chèche</string>
     <string name="common_settings">Paramèt</string>
+    <string name="common_show_advanced">Show Advanced</string>
     <string name="common_status">Eta</string>
     <string name="common_submit">Soumèt</string>
     <string name="common_success">Siksè</string>

@@ -910,6 +910,7 @@
     <string name="common_edit">संपादित करें</string>
     <string name="common_enabled">Enabled</string>
     <string name="common_error">त्रुटि</string>
+    <string name="common_hide_advanced">Hide Advanced</string>
     <string name="common_language">भाषा</string>
     <string name="common_loading">लोड हो रहा है...</string>
     <string name="common_logout">लॉग आउट</string>
@@ -926,8 +927,10 @@
     <string name="common_remove">Remove</string>
     <string name="common_retry">Retry</string>
     <string name="common_save">सहेजें</string>
+    <string name="common_saved">Saved</string>
     <string name="common_search">खोजें</string>
     <string name="common_settings">सेटिंग्स</string>
+    <string name="common_show_advanced">Show Advanced</string>
     <string name="common_status">स्थिति</string>
     <string name="common_submit">सबमिट करें</string>
     <string name="common_success">सफलता</string>

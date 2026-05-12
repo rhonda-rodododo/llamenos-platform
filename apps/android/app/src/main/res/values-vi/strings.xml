@@ -910,6 +910,7 @@
     <string name="common_edit">Chỉnh sửa</string>
     <string name="common_enabled">Enabled</string>
     <string name="common_error">Lỗi</string>
+    <string name="common_hide_advanced">Hide Advanced</string>
     <string name="common_language">Ngôn ngữ</string>
     <string name="common_loading">Đang tải...</string>
     <string name="common_logout">Đăng xuất</string>
@@ -926,8 +927,10 @@
     <string name="common_remove">Remove</string>
     <string name="common_retry">Retry</string>
     <string name="common_save">Lưu</string>
+    <string name="common_saved">Saved</string>
     <string name="common_search">Tìm kiếm</string>
     <string name="common_settings">Cài đặt</string>
+    <string name="common_show_advanced">Show Advanced</string>
     <string name="common_status">Trạng thái</string>
     <string name="common_submit">Gửi</string>
     <string name="common_success">Thành công</string>

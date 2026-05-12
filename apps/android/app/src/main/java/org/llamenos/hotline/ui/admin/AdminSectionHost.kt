@@ -34,13 +34,13 @@ fun AdminSectionHost(
         contentAlignment = Alignment.Center,
     ) {
         when (section) {
-            "location-lookup" -> Text(stringResource(R.string.adminNav_items_locationLookup))
-            "passkey-policy" -> Text(stringResource(R.string.adminNav_items_passkeyPolicy))
-            "recovery-group" -> Text(stringResource(R.string.adminNav_items_recoveryGroup))
-            "devices" -> Text(stringResource(R.string.adminNav_items_devices))
-            "hub-roles" -> Text(stringResource(R.string.adminNav_items_hubRoles))
-            "teams" -> Text(stringResource(R.string.adminNav_items_teams))
-            "tags" -> Text(stringResource(R.string.adminNav_items_tags))
+            "location-lookup" -> Text(stringResource(R.string.admin_nav_items_location_lookup))
+            "passkey-policy" -> Text(stringResource(R.string.admin_nav_items_passkey_policy))
+            "recovery-group" -> Text(stringResource(R.string.admin_nav_items_recovery_group))
+            "devices" -> Text(stringResource(R.string.admin_nav_items_devices))
+            "hub-roles" -> Text(stringResource(R.string.admin_nav_items_hub_roles))
+            "teams" -> Text(stringResource(R.string.admin_nav_items_teams))
+            "tags" -> Text(stringResource(R.string.admin_nav_items_tags))
             "custom-fields" -> CustomFieldsTab(viewModel = viewModel)
             "report-types" -> ReportCategoriesSection(
                 categories = uiState.reportCategories,
@@ -50,7 +50,7 @@ fun AdminSectionHost(
                 onDeleteCategory = { viewModel.deleteReportCategory(it) },
                 modifier = Modifier.padding(16.dp),
             )
-            "firehose" -> Text(stringResource(R.string.adminNav_items_firehose))
+            "firehose" -> Text(stringResource(R.string.admin_nav_items_firehose))
             "call-settings" -> CallSettingsSection(
                 ringTimeout = uiState.ringTimeout,
                 maxCallDuration = uiState.maxCallDuration,
@@ -63,7 +63,7 @@ fun AdminSectionHost(
                 onSave = { viewModel.saveCallSettings() },
                 modifier = Modifier.padding(16.dp),
             )
-            "voice-prompts" -> Text(stringResource(R.string.adminNav_items_voicePrompts))
+            "voice-prompts" -> Text(stringResource(R.string.admin_nav_items_voice_prompts))
             "phone-menu-languages" -> IvrLanguagesSection(
                 languages = uiState.ivrLanguages,
                 isLoading = uiState.isLoadingIvrLanguages,
@@ -105,21 +105,21 @@ fun AdminSectionHost(
                 onSave = { viewModel.saveTelephonySettings() },
                 modifier = Modifier.padding(16.dp),
             )
-            "messaging-sms" -> Text(stringResource(R.string.adminNav_items_messagingSms))
-            "rcs" -> Text(stringResource(R.string.adminNav_items_rcs))
-            "signal" -> Text(stringResource(R.string.adminNav_items_signal))
+            "messaging-sms" -> Text(stringResource(R.string.admin_nav_items_messaging_sms))
+            "rcs" -> Text(stringResource(R.string.admin_nav_items_rcs))
+            "signal" -> Text(stringResource(R.string.admin_nav_items_signal))
             "bans" -> BanListTab(viewModel = viewModel)
             "audit" -> AuditLogTab(viewModel = viewModel)
-            "analytics" -> Text(stringResource(R.string.adminNav_items_analytics))
+            "analytics" -> Text(stringResource(R.string.admin_nav_items_analytics))
             "health" -> SystemHealthTab(viewModel = viewModel)
-            "hubs" -> Text(stringResource(R.string.adminNav_items_hubs))
-            "platform-roles" -> Text(stringResource(R.string.adminNav_items_platformRoles))
+            "hubs" -> Text(stringResource(R.string.admin_nav_items_hubs))
+            "platform-roles" -> Text(stringResource(R.string.admin_nav_items_platform_roles))
             "platform-bans" -> BanListTab(viewModel = viewModel)
             "platform-audit" -> AuditLogTab(viewModel = viewModel)
-            "platform-analytics" -> Text(stringResource(R.string.adminNav_items_platformAnalytics))
+            "platform-analytics" -> Text(stringResource(R.string.admin_nav_items_platform_analytics))
             "platform-health" -> SystemHealthTab(viewModel = viewModel)
-            "platform-settings" -> Text(stringResource(R.string.adminNav_items_platformSettings))
-            "gdpr-erasure" -> Text(stringResource(R.string.adminNav_items_gdprErasure))
+            "platform-settings" -> Text(stringResource(R.string.admin_nav_items_platform_settings))
+            "gdpr-erasure" -> Text(stringResource(R.string.admin_nav_items_gdpr_erasure))
             else -> Text(stringResource(R.string.common_loading))
         }
     }

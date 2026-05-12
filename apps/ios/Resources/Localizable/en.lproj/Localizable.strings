@@ -907,6 +907,7 @@
 "common_edit" = "Edit";
 "common_enabled" = "Enabled";
 "common_error" = "Error";
+"common_hide_advanced" = "Hide Advanced";
 "common_language" = "Language";
 "common_loading" = "Loading...";
 "common_logout" = "Log Out";
@@ -923,8 +924,10 @@
 "common_remove" = "Remove";
 "common_retry" = "Retry";
 "common_save" = "Save";
+"common_saved" = "Saved";
 "common_search" = "Search";
 "common_settings" = "Settings";
+"common_show_advanced" = "Show Advanced";
 "common_status" = "Status";
 "common_submit" = "Submit";
 "common_success" = "Success";

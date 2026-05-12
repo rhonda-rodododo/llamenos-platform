@@ -910,6 +910,7 @@
     <string name="common_edit">Редактировать</string>
     <string name="common_enabled">Enabled</string>
     <string name="common_error">Ошибка</string>
+    <string name="common_hide_advanced">Hide Advanced</string>
     <string name="common_language">Язык</string>
     <string name="common_loading">Загрузка...</string>
     <string name="common_logout">Выйти</string>
@@ -926,8 +927,10 @@
     <string name="common_remove">Remove</string>
     <string name="common_retry">Retry</string>
     <string name="common_save">Сохранить</string>
+    <string name="common_saved">Saved</string>
     <string name="common_search">Поиск</string>
     <string name="common_settings">Настройки</string>
+    <string name="common_show_advanced">Show Advanced</string>
     <string name="common_status">Статус</string>
     <string name="common_submit">Отправить</string>
     <string name="common_success">Успешно</string>
