@@ -1,9 +1,18 @@
 import { useTranslation } from 'react-i18next'
 import { Check, Sparkles } from 'lucide-react'
-import type { ProviderTemplate } from '@protocol/schemas/provider-setup'
+import type { HubChannelType, ProviderTemplate } from '@protocol/schemas/provider-setup'
 import { Card } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { TELEPHONY_PROVIDER_LABELS } from '@shared/types'
+
+const CHANNEL_I18N_KEYS: Record<HubChannelType, string> = {
+  voice: 'channelVoice',
+  sms: 'channelSms',
+  email: 'channelEmail',
+  signal: 'channelSignal',
+  whatsapp: 'channelWhatsApp',
+  telegram: 'channelTelegram',
+  rcs: 'channelRcs',
+}
 
 interface ProviderTemplateCardProps {
   template: ProviderTemplate
@@ -14,7 +23,7 @@ interface ProviderTemplateCardProps {
 export function ProviderTemplateCard({ template, selected, onSelect }: ProviderTemplateCardProps) {
   const { t } = useTranslation()
 
-  const channelsText = template.defaultChannels?.map((c) => t(`hubOnboarding.channel${c.charAt(0).toUpperCase() + c.slice(1)}` as const)).join(', ') || ''
+  const channelsText = template.defaultChannels?.map((c) => t(`hubOnboarding.${CHANNEL_I18N_KEYS[c]}`)).join(', ') || ''
   const providerLabel = TELEPHONY_PROVIDER_LABELS[template.providerType] || template.providerType
 
   return (

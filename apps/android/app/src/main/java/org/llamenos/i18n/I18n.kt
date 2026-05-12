@@ -935,6 +935,7 @@ object I18n {
     const val COMMON_STATUS = "common_status"  // "Status"
     const val COMMON_SUBMIT = "common_submit"  // "Submit"
     const val COMMON_SUCCESS = "common_success"  // "Success"
+    const val COMMON_UNAUTHORIZED = "common_unauthorized"  // "Unauthorized"
     const val COMMON_YES = "common_yes"  // "Yes"
     const val CONFIRM_BACKUP = "confirm_backup"  // "Confirm Backup"
     const val CONFIRM_CAPTCHA_DISABLE = "confirm_captcha_disable"  // "Disable voice CAPTCHA? Callers will be connected directly..."

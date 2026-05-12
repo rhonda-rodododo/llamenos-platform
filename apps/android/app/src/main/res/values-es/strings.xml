@@ -934,6 +934,7 @@
     <string name="common_status">Estado</string>
     <string name="common_submit">Enviar</string>
     <string name="common_success">Éxito</string>
+    <string name="common_unauthorized">Unauthorized</string>
     <string name="common_yes">Sí</string>
     <string name="confirm_backup">Confirm Backup</string>
     <string name="confirm_captcha_disable">¿Deshabilitar CAPTCHA de voz? Los llamantes se conectarán directamente sin verificación.</string>

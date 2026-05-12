@@ -931,6 +931,7 @@
 "common_status" = "Статус";
 "common_submit" = "Отправить";
 "common_success" = "Успешно";
+"common_unauthorized" = "Unauthorized";
 "common_yes" = "Да";
 "confirm_backup" = "Confirm Backup";
 "confirm_captcha_disable" = "Отключить голосовую CAPTCHA? Звонящие будут подключаться напрямую без проверки.";

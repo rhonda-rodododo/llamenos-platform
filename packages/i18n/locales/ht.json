@@ -712,6 +712,7 @@
     "accessDenied": "Access denied",
     "actions": "Aksyon",
     "add": "Ajoute",
+    "all": "All",
     "appName": "Llámenos",
     "back": "Retounen",
     "cancel": "Anile",
@@ -720,6 +721,7 @@
     "configured": "Configured",
     "confirm": "Konfime",
     "continue": "Continue",
+    "create": "Create",
     "delete": "Efase",
     "disabled": "Disabled",
     "dismiss": "Dismiss",
@@ -736,8 +738,10 @@
     "none": "None",
     "off": "off",
     "offline": "You are offline. Calls and messages will not work until connectivity is restored.",
+    "ok": "OK",
     "on": "on",
     "or": "oswa",
+    "previous": "Previous",
     "remove": "Remove",
     "retry": "Retry",
     "save": "Anrejistre",
@@ -754,7 +758,8 @@
     "comingSoon": "Coming soon",
     "hideAdvanced": "Hide Advanced",
     "showAdvanced": "Show Advanced",
-    "saved": "Saved"
+    "saved": "Saved",
+"unauthorized": "Unauthorized"
   },
   "confirm": {
     "backup": "Confirm Backup",

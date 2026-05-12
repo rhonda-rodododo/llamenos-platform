@@ -934,6 +934,7 @@
     <string name="common_status">状态</string>
     <string name="common_submit">提交</string>
     <string name="common_success">成功</string>
+    <string name="common_unauthorized">Unauthorized</string>
     <string name="common_yes">是</string>
     <string name="confirm_backup">Confirm Backup</string>
     <string name="confirm_captcha_disable">禁用语音验证码？来电者将直接接通，无需验证。</string>

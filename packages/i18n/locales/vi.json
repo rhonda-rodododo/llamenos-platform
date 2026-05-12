@@ -712,6 +712,7 @@
     "accessDenied": "Access denied",
     "actions": "Hành động",
     "add": "Thêm",
+    "all": "All",
     "appName": "Llámenos",
     "back": "Quay lại",
     "cancel": "Hủy",
@@ -720,6 +721,7 @@
     "configured": "Configured",
     "confirm": "Xác nhận",
     "continue": "Continue",
+    "create": "Create",
     "delete": "Xóa",
     "disabled": "Disabled",
     "dismiss": "Dismiss",
@@ -736,8 +738,10 @@
     "none": "None",
     "off": "off",
     "offline": "You are offline. Calls and messages will not work until connectivity is restored.",
+    "ok": "OK",
     "on": "on",
     "or": "hoặc",
+    "previous": "Previous",
     "remove": "Remove",
     "retry": "Retry",
     "save": "Lưu",
@@ -754,7 +758,8 @@
     "comingSoon": "Coming soon",
     "hideAdvanced": "Hide Advanced",
     "showAdvanced": "Show Advanced",
-    "saved": "Saved"
+    "saved": "Saved",
+"unauthorized": "Unauthorized"
   },
   "confirm": {
     "backup": "Confirm Backup",

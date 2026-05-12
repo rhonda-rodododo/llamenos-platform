@@ -712,6 +712,7 @@
     "accessDenied": "Access denied",
     "actions": "작업",
     "add": "추가",
+    "all": "All",
     "appName": "Llámenos",
     "back": "뒤로",
     "cancel": "취소",
@@ -720,6 +721,7 @@
     "configured": "Configured",
     "confirm": "확인",
     "continue": "Continue",
+    "create": "Create",
     "delete": "삭제",
     "disabled": "Disabled",
     "dismiss": "Dismiss",
@@ -736,8 +738,10 @@
     "none": "None",
     "off": "off",
     "offline": "You are offline. Calls and messages will not work until connectivity is restored.",
+    "ok": "OK",
     "on": "on",
     "or": "또는",
+    "previous": "Previous",
     "remove": "Remove",
     "retry": "Retry",
     "save": "저장",
@@ -754,7 +758,8 @@
     "comingSoon": "Coming soon",
     "hideAdvanced": "Hide Advanced",
     "showAdvanced": "Show Advanced",
-    "saved": "Saved"
+    "saved": "Saved",
+"unauthorized": "Unauthorized"
   },
   "confirm": {
     "backup": "Confirm Backup",

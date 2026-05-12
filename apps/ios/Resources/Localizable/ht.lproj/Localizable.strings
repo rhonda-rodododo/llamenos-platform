@@ -931,6 +931,7 @@
 "common_status" = "Eta";
 "common_submit" = "Soumèt";
 "common_success" = "Siksè";
+"common_unauthorized" = "Unauthorized";
 "common_yes" = "Wi";
 "confirm_backup" = "Confirm Backup";
 "confirm_captcha_disable" = "Dezaktive CAPTCHA vwa? Moun ki rele yo ap konekte dirèkteman san verifikasyon.";

@@ -931,6 +931,7 @@
 "common_status" = "الحالة";
 "common_submit" = "إرسال";
 "common_success" = "نجاح";
+"common_unauthorized" = "Unauthorized";
 "common_yes" = "نعم";
 "confirm_backup" = "Confirm Backup";
 "confirm_captcha_disable" = "تعطيل CAPTCHA الصوتي؟ سيتم توصيل المتصلين مباشرة بدون تحقق.";

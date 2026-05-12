@@ -712,6 +712,7 @@
     "accessDenied": "Access denied",
     "actions": "操作",
     "add": "添加",
+    "all": "All",
     "appName": "Llámenos",
     "back": "返回",
     "cancel": "取消",
@@ -720,6 +721,7 @@
     "configured": "Configured",
     "confirm": "确认",
     "continue": "Continue",
+    "create": "Create",
     "delete": "删除",
     "disabled": "Disabled",
     "dismiss": "Dismiss",
@@ -736,8 +738,10 @@
     "none": "None",
     "off": "off",
     "offline": "You are offline. Calls and messages will not work until connectivity is restored.",
+    "ok": "OK",
     "on": "on",
     "or": "或",
+    "previous": "Previous",
     "remove": "Remove",
     "retry": "Retry",
     "save": "保存",
@@ -754,7 +758,8 @@
     "comingSoon": "Coming soon",
     "hideAdvanced": "Hide Advanced",
     "showAdvanced": "Show Advanced",
-    "saved": "Saved"
+    "saved": "Saved",
+"unauthorized": "Unauthorized"
   },
   "confirm": {
     "backup": "Confirm Backup",
