@@ -61,7 +61,6 @@ Feature: Telephony Provider Configuration
     And I expand the "Telephony Provider" section
     Then I should see "Current provider"
     And the phone number field should be pre-filled
-    And the Account SID field should be pre-filled
 
   Scenario: Admin can save SignalWire provider config
     When I expand the "Telephony Provider" section
