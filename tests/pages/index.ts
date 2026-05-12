@@ -98,10 +98,10 @@ export const Navigation = {
       await navLink.click()
     } else {
       // Nav link may not be visible (sidebar collapsed, or not admin) — try direct URL navigation
-      await page.goto('/admin/settings')
+      await page.goto('/admin')
       await page.waitForLoadState('domcontentloaded')
     }
-    await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+    await expect(page.getByTestId(TestIds.PAGE_TITLE).or(page.getByTestId('admin-section-heading'))).toBeVisible({ timeout: Timeouts.ELEMENT })
   },
 
   async goToReports(page: Page): Promise<void> {

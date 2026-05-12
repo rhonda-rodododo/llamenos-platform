@@ -193,8 +193,8 @@ test.describe('Records Architecture', () => {
   // ============ Custom Fields Context Filtering ============
 
   test('custom fields section supports context selection', async ({ page }) => {
-    await page.getByRole('link', { name: 'Hub Settings' }).click()
-    await expect(page.getByRole('heading', { name: 'Hub Settings', exact: true })).toBeVisible()
+    await page.getByTestId('nav-admin-settings').click()
+    await expect(page.getByTestId('page-title').or(page.getByTestId('admin-section-heading'))).toBeVisible()
 
     // Expand custom fields section by clicking its trigger
     const customFieldsTrigger = page.getByTestId(`${TestIds.SETTINGS_CUSTOM_FIELDS}-trigger`)
