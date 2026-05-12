@@ -378,7 +378,8 @@ settings.get('/telephony-provider',
   async (c) => {
     const services = c.get('services')
     const hmacSecret = c.env.HMAC_SECRET as string | undefined
-    const result = await services.settings.getTelephonyProvider(hmacSecret)
+    const hubId = c.get('hubId') as string | undefined
+    const result = await services.settings.getTelephonyProvider(hmacSecret, hubId)
     return c.json(result)
   },
 )

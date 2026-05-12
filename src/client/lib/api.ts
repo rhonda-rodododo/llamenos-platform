@@ -817,7 +817,7 @@ export type { TelephonyProviderConfig, TelephonyProviderType } from '@shared/typ
 import type { TelephonyProviderConfig } from '@shared/types'
 
 export async function getTelephonyProvider() {
-  return request<TelephonyProviderConfig | null>('/settings/telephony-provider')
+  return request<TelephonyProviderConfig | null>(hp('/settings/telephony-provider'))
 }
 
 export async function updateTelephonyProvider(config: TelephonyProviderConfig) {
@@ -828,7 +828,7 @@ export async function updateTelephonyProvider(config: TelephonyProviderConfig) {
     if (v != null && v !== '') credentials[k] = String(v)
   }
 
-  await request<{ ok: true }>('/provider-setup/configure', {
+  await request<{ ok: true }>(hp('/provider-setup/configure'), {
     method: 'POST',
     body: JSON.stringify({
       provider: type,
@@ -842,7 +842,7 @@ export async function updateTelephonyProvider(config: TelephonyProviderConfig) {
 }
 
 export async function testTelephonyProvider(config: Partial<TelephonyProviderConfig> & { type: string }) {
-  return request<{ ok: boolean; error?: string }>('/settings/telephony-provider/test', {
+  return request<{ ok: boolean; error?: string }>(hp('/settings/telephony-provider/test'), {
     method: 'POST',
     body: JSON.stringify(config),
   })
