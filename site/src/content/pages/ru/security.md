@@ -100,11 +100,11 @@ subtitle: Что защищено, что видно и что может быт
 
 ## Ещё в планах
 
-| Функция | Преимущество для конфиденциальности | Status |
+| Функция | Преимущество для конфиденциальности | Статус |
 |---------|-----------------|--------|
-| Native call-receiving apps | No personal phone numbers exposed | In development |
-| Certificate pinning for relay and API | Prevents MITM on real-time connections | Scaffolding complete; pins pending first deployment |
-| SFrame voice encryption | Per-frame encryption for call audio | Key derivation complete; per-frame encryption planned |
+| Нативные приложения для приёма звонков | Личные номера телефонов не раскрываются | В разработке |
+| Закрепление сертификатов (мобильные) | Защита от перехвата TLS мошенническим удостоверяющим центром | Каркас готов; закрепление ожидает первого развёртывания |
+| Шифрование голосовых медиа SFrame | Сквозное шифрование голосовых звонков | Деривация ключей завершена; покадровое шифрование запланировано |
 
 ---
 
@@ -121,6 +121,8 @@ subtitle: Что защищено, что видно и что может быт
 | Метаданные команд/ролей | Да (зашифровано) | Нет | Только шифртекст |
 | Определения пользовательских полей | Да (зашифровано) | Нет | Только шифртекст |
 | Содержимое SMS/WhatsApp/Signal | Да (на вашем сервере) | Нет | Шифртекст с вашего сервера; провайдер может иметь оригинал |
+| События реального времени | Да (по хабам, ротация ключей) | Нет | Только шифртекст |
+| Строки User-Agent | SHA-256 хеш | Только хеш | Хеш (не обратимый) |
 | Метаданные звонков | Нет | Да | Да |
 | Хеши телефонов звонящих | HMAC-хеш | Только хеш | Хеш (не обратимый без вашего секрета) |
 
@@ -130,9 +132,10 @@ subtitle: Что защищено, что видно и что может быт
 
 Техническая документация:
 
-- [Спецификация протокола](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/protocol/llamenos-protocol.md)
+- [Спецификация протокола](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/protocol/PROTOCOL.md)
 - [Модель угроз](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/THREAT_MODEL.md)
 - [Классификация данных](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/DATA_CLASSIFICATION.md)
+- [Пробелы безопасности и дорожная карта](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/SECURITY_GAPS_AND_ROADMAP.md)
 - [Аудиты безопасности](https://github.com/rhonda-rodododo/llamenos-platform/tree/main/docs/security)
 - [Документация API](/api/docs)
 

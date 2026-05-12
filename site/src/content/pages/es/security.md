@@ -100,11 +100,11 @@ Estas mejoras estan disponibles hoy:
 
 ## Aun planeado
 
-| Funcion | Beneficio de privacidad | Status |
+| Funcion | Beneficio de privacidad | Estado |
 |---------|------------------------|--------|
-| Native call-receiving apps | No personal phone numbers exposed | In development |
-| Certificate pinning for relay and API | Prevents MITM on real-time connections | Scaffolding complete; pins pending first deployment |
-| SFrame voice encryption | Per-frame encryption for call audio | Key derivation complete; per-frame encryption planned |
+| Apps nativas para recibir llamadas | No se exponen numeros de telefono personales | En desarrollo |
+| Fijacion de certificados (movil) | Defensa contra intercepcion TLS por CA fraudulenta | Estructura completa; fijacion pendiente del primer despliegue |
+| Cifrado de medios de voz SFrame | Llamadas de voz cifradas de extremo a extremo | Derivacion de claves completa; cifrado por cuadro planificado |
 
 ---
 
@@ -121,6 +121,8 @@ Estas mejoras estan disponibles hoy:
 | Metadatos de equipo/roles | Si (cifrado) | No | Solo texto cifrado |
 | Definiciones de campos personalizados | Si (cifrado) | No | Solo texto cifrado |
 | Contenido SMS/WhatsApp/Signal | Si (en tu servidor) | No | Texto cifrado de tu servidor; proveedor puede tener original |
+| Eventos en tiempo real | Si (por hub, claves rotativas) | No | Solo texto cifrado |
+| Cadenas User-Agent | SHA-256 hasheado | Solo hash | Hash (no reversible) |
 | Metadatos de llamadas | No | Si | Si |
 | Hashes de telefonos de llamantes | HMAC hasheado | Solo hash | Hash (no reversible sin tu secreto) |
 
@@ -130,10 +132,10 @@ Estas mejoras estan disponibles hoy:
 
 Documentacion tecnica:
 
-- [Especificacion del Protocolo](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/protocol/llamenos-protocol.md)
+- [Especificacion del Protocolo](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/protocol/PROTOCOL.md)
 - [Modelo de Amenazas](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/THREAT_MODEL.md)
 - [Clasificacion de Datos](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/DATA_CLASSIFICATION.md)
-- [Security Gaps and Roadmap](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/SECURITY_GAPS_AND_ROADMAP.md)
+- [Brechas de Seguridad y Hoja de Ruta](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/SECURITY_GAPS_AND_ROADMAP.md)
 - [Auditorias de Seguridad](https://github.com/rhonda-rodododo/llamenos-platform/tree/main/docs/security)
 - [Documentacion API](/api/docs)
 

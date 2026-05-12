@@ -8,8 +8,6 @@ subtitle: Những gì được bảo vệ, những gì hiển thị và những 
 | Họ CÓ THỂ cung cấp | Họ KHÔNG THỂ cung cấp |
 |---------------------|----------------------|
 | Metadata cuộc gọi/tin nhắn (thời gian, thời lượng) | Nội dung ghi chú, bản chuyển đổi, nội dung báo cáo |
-| Sự kiện thời gian thực | Có (theo hub, khóa xoay) | Không | Chỉ bản mã |
-| Chuỗi User-Agent | SHA-256 hash | Chỉ hash | Hash (không đảo ngược được) |
 | Blob cơ sở dữ liệu mã hóa | Tên tình nguyện viên (mã hóa đầu cuối) |
 | Tình nguyện viên nào hoạt động khi nào | Bản ghi danh bạ liên hệ (mã hóa đầu cuối) |
 | | Nội dung tin nhắn (mã hóa khi đến, lưu trữ dưới dạng bản mã) |
@@ -102,11 +100,11 @@ Các cải tiến này đã hoạt động:
 
 ## Vẫn trong kế hoạch
 
-| Tính năng | Lợi ích bảo mật | Status |
-|-----------|-----------------|--------|
-| Native call-receiving apps | No personal phone numbers exposed | In development |
-| Certificate pinning for relay and API | Prevents MITM on real-time connections | Scaffolding complete; pins pending first deployment |
-| SFrame voice encryption | Per-frame encryption for call audio | Key derivation complete; per-frame encryption planned |
+| Tính năng | Lợi ích bảo mật | Trạng thái |
+|-----------|-----------------|------------|
+| Ứng dụng gốc nhận cuộc gọi | Không lộ số điện thoại cá nhân | Đang phát triển |
+| Ghim chứng chỉ (di động) | Phòng thủ chống chặn TLS bởi CA giả mạo | Khung hoàn thành; ghim chờ triển khai lần đầu |
+| Mã hóa phương tiện giọng nói SFrame | Cuộc gọi thoại mã hóa đầu cuối | Dẫn xuất khóa hoàn thành; mã hóa theo khung đang lên kế hoạch |
 
 ---
 
@@ -123,6 +121,8 @@ Các cải tiến này đã hoạt động:
 | Metadata nhóm/vai trò | Có (mã hóa) | Không | Chỉ bản mã |
 | Định nghĩa trường tùy chỉnh | Có (mã hóa) | Không | Chỉ bản mã |
 | Nội dung SMS/WhatsApp/Signal | Có (trên máy chủ bạn) | Không | Bản mã từ máy chủ bạn; nhà cung cấp có thể có bản gốc |
+| Sự kiện thời gian thực | Có (theo hub, khóa xoay) | Không | Chỉ bản mã |
+| Chuỗi User-Agent | SHA-256 hash | Chỉ hash | Hash (không đảo ngược được) |
 | Metadata cuộc gọi | Không | Có | Có |
 | Hash số người gọi | HMAC hash | Chỉ hash | Hash (không đảo ngược được nếu không có bí mật) |
 
@@ -132,9 +132,10 @@ Các cải tiến này đã hoạt động:
 
 Tài liệu kỹ thuật:
 
-- [Đặc tả giao thức](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/protocol/llamenos-protocol.md)
+- [Đặc tả giao thức](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/protocol/PROTOCOL.md)
 - [Mô hình đe dọa](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/THREAT_MODEL.md)
 - [Phân loại dữ liệu](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/DATA_CLASSIFICATION.md)
+- [Khoảng trống bảo mật và lộ trình](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/SECURITY_GAPS_AND_ROADMAP.md)
 - [Kiểm toán bảo mật](https://github.com/rhonda-rodododo/llamenos-platform/tree/main/docs/security)
 - [Tài liệu API](/api/docs)
 

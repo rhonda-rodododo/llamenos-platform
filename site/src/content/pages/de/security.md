@@ -102,9 +102,9 @@ Diese Verbesserungen sind heute verfuegbar:
 
 | Funktion | Datenschutzvorteil | Status |
 |----------|-------------------|--------|
-| Native call-receiving apps | No personal phone numbers exposed | In development |
-| Certificate pinning for relay and API | Prevents MITM on real-time connections | Scaffolding complete; pins pending first deployment |
-| SFrame voice encryption | Per-frame encryption for call audio | Key derivation complete; per-frame encryption planned |
+| Native Anrufempfangs-Apps | Keine persoenlichen Telefonnummern exponiert | In Entwicklung |
+| Zertifikatspinning (mobil) | Verteidigung gegen TLS-Abfangen durch betruegende Zertifizierungsstellen | Geruest fertig; Pins ausstehend bis zur ersten Bereitstellung |
+| SFrame-Sprachverschluesselung | Ende-zu-Ende-verschluesselte Sprachanrufe | Schluesselableitung abgeschlossen; Pro-Frame-Verschluesselung geplant |
 
 ---
 
@@ -121,6 +121,8 @@ Diese Verbesserungen sind heute verfuegbar:
 | Team-/Rollenmetadaten | Ja (verschluesselt) | Nein | Nur Chiffretext |
 | Benutzerdefinierte Felddefinitionen | Ja (verschluesselt) | Nein | Nur Chiffretext |
 | SMS-/WhatsApp-/Signal-Inhalte | Ja (auf Ihrem Server) | Nein | Chiffretext von Ihrem Server; Anbieter kann Original haben |
+| Echtzeit-Ereignisse | Ja (pro Hub, rotierende Schluessel) | Nein | Nur Chiffretext |
+| User-Agent-Zeichenfolgen | SHA-256 gehasht | Nur Hash | Hash (nicht umkehrbar) |
 | Anrufmetadaten | Nein | Ja | Ja |
 | Anrufer-Telefon-Hashes | HMAC-gehasht | Nur Hash | Hash (nicht umkehrbar ohne Ihr Geheimnis) |
 
@@ -130,10 +132,10 @@ Diese Verbesserungen sind heute verfuegbar:
 
 Technische Dokumentation:
 
-- [Protokollspezifikation](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/protocol/llamenos-protocol.md)
+- [Protokollspezifikation](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/protocol/PROTOCOL.md)
 - [Bedrohungsmodell](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/THREAT_MODEL.md)
 - [Datenklassifizierung](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/DATA_CLASSIFICATION.md)
-- [Security Gaps and Roadmap](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/SECURITY_GAPS_AND_ROADMAP.md)
+- [Sicherheitsluecken und Fahrplan](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/SECURITY_GAPS_AND_ROADMAP.md)
 - [Sicherheitsaudits](https://github.com/rhonda-rodododo/llamenos-platform/tree/main/docs/security)
 - [API-Dokumentation](/api/docs)
 

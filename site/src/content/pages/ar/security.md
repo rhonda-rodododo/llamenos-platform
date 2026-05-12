@@ -100,11 +100,11 @@ subtitle: ما هو محمي، ما هو مرئي، وما يمكن الحصول
 
 ## لا يزال مخططاً
 
-| الميزة | فائدة الخصوصية | Status |
+| الميزة | فائدة الخصوصية | الحالة |
 |--------|---------------|--------|
-| Native call-receiving apps | No personal phone numbers exposed | In development |
-| Certificate pinning for relay and API | Prevents MITM on real-time connections | Scaffolding complete; pins pending first deployment |
-| SFrame voice encryption | Per-frame encryption for call audio | Key derivation complete; per-frame encryption planned |
+| تطبيقات أصلية لاستقبال المكالمات | لا تُكشف أرقام هواتف شخصية | قيد التطوير |
+| تثبيت الشهادات (الهاتف المحمول) | حماية ضد اعتراض TLS عبر جهة إصدار شهادات مزورة | الهيكل مكتمل؛ التثبيت في انتظار النشر الأول |
+| تشفير وسائط الصوت SFrame | مكالمات صوتية مشفرة من طرف إلى طرف | اشتقاق المفاتيح مكتمل؛ التشفير لكل إطار مخطط |
 
 ---
 
@@ -121,6 +121,8 @@ subtitle: ما هو محمي، ما هو مرئي، وما يمكن الحصول
 | بيانات وصفية للفريق/الأدوار | نعم (مشفر) | لا | نص مشفر فقط |
 | تعريفات الحقول المخصصة | نعم (مشفر) | لا | نص مشفر فقط |
 | محتوى SMS/WhatsApp/Signal | نعم (على خادمك) | لا | نص مشفر من خادمك؛ المزود قد يملك الأصل |
+| الأحداث الفورية | نعم (لكل مركز، مفاتيح دوارة) | لا | نص مشفر فقط |
+| سلاسل User-Agent | مجزأة بـ SHA-256 | التجزئة فقط | تجزئة (غير قابلة للعكس) |
 | بيانات وصفية للمكالمات | لا | نعم | نعم |
 | تجزئات هواتف المتصلين | مجزأة بـ HMAC | التجزئة فقط | تجزئة (غير قابلة للعكس بدون سرك) |
 
@@ -130,10 +132,10 @@ subtitle: ما هو محمي، ما هو مرئي، وما يمكن الحصول
 
 التوثيق التقني:
 
-- [مواصفات البروتوكول](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/protocol/llamenos-protocol.md)
+- [مواصفات البروتوكول](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/protocol/PROTOCOL.md)
 - [نموذج التهديدات](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/THREAT_MODEL.md)
 - [تصنيف البيانات](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/DATA_CLASSIFICATION.md)
-- [Security Gaps and Roadmap](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/SECURITY_GAPS_AND_ROADMAP.md)
+- [الثغرات الأمنية وخارطة الطريق](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/SECURITY_GAPS_AND_ROADMAP.md)
 - [تدقيقات الأمان](https://github.com/rhonda-rodododo/llamenos-platform/tree/main/docs/security)
 - [توثيق API](/api/docs)
 

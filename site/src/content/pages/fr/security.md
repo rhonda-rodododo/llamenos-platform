@@ -100,11 +100,11 @@ Ces améliorations sont disponibles aujourd'hui :
 
 ## Encore prévu
 
-| Fonctionnalité | Avantage pour la confidentialité | Status |
+| Fonctionnalite | Avantage pour la confidentialite | Statut |
 |---------|-----------------|--------|
-| Native call-receiving apps | No personal phone numbers exposed | In development |
-| Certificate pinning for relay and API | Prevents MITM on real-time connections | Scaffolding complete; pins pending first deployment |
-| SFrame voice encryption | Per-frame encryption for call audio | Key derivation complete; per-frame encryption planned |
+| Applications natives de reception d'appels | Aucun numero de telephone personnel expose | En developpement |
+| Epinglage de certificats (mobile) | Defense contre l'interception TLS par une autorite de certification frauduleuse | Structure complete ; epinglage en attente du premier deploiement |
+| Chiffrement vocal SFrame | Appels vocaux chiffres de bout en bout | Derivation de cles complete ; chiffrement par trame prevu |
 
 ---
 
@@ -121,6 +121,8 @@ Ces améliorations sont disponibles aujourd'hui :
 | Métadonnées d'équipe/rôles | Oui (chiffré) | Non | Texte chiffré uniquement |
 | Définitions de champs personnalisés | Oui (chiffré) | Non | Texte chiffré uniquement |
 | Contenu SMS/WhatsApp/Signal | Oui (sur votre serveur) | Non | Texte chiffré de votre serveur ; le fournisseur peut avoir l'original |
+| Evenements en temps reel | Oui (par hub, cles rotatives) | Non | Texte chiffre uniquement |
+| Chaines User-Agent | Hache SHA-256 | Hachage uniquement | Hachage (non reversible) |
 | Métadonnées d'appel | Non | Oui | Oui |
 | Hachages de téléphone des appelants | Haché HMAC | Hachage uniquement | Hachage (non réversible sans votre secret) |
 
@@ -130,10 +132,10 @@ Ces améliorations sont disponibles aujourd'hui :
 
 Documentation technique :
 
-- [Spécification du protocole](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/protocol/llamenos-protocol.md)
+- [Specification du protocole](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/protocol/PROTOCOL.md)
 - [Modèle de menace](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/THREAT_MODEL.md)
 - [Classification des données](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/DATA_CLASSIFICATION.md)
-- [Security Gaps and Roadmap](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/SECURITY_GAPS_AND_ROADMAP.md)
+- [Lacunes de securite et feuille de route](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/SECURITY_GAPS_AND_ROADMAP.md)
 - [Audits de sécurité](https://github.com/rhonda-rodododo/llamenos-platform/tree/main/docs/security)
 - [Documentation API](/api/docs)
 

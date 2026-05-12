@@ -100,11 +100,11 @@ subtitle: 哪些数据受到保护、哪些可见、哪些可依传票获取—�
 
 ## 仍在计划中
 
-| 功能 | 隐私收益 | Status |
-|------|---------|--------|
-| Native call-receiving apps | No personal phone numbers exposed | In development |
-| Certificate pinning for relay and API | Prevents MITM on real-time connections | Scaffolding complete; pins pending first deployment |
-| SFrame voice encryption | Per-frame encryption for call audio | Key derivation complete; per-frame encryption planned |
+| 功能 | 隐私收益 | 状态 |
+|------|---------|------|
+| 原生来电接听应用 | 不暴露个人电话号码 | 开发中 |
+| 证书固定（移动端） | 防御伪造 CA 的 TLS 中间人攻击 | 框架已完成；等待首次部署后固定 |
+| SFrame 语音媒体加密 | 端到端加密语音通话 | 密钥派生已完成；逐帧加密计划中 |
 
 ---
 
@@ -121,6 +121,8 @@ subtitle: 哪些数据受到保护、哪些可见、哪些可依传票获取—�
 | 团队/角色元数据 | 是（加密） | 否 | 仅密文 |
 | 自定义字段定义 | 是（加密） | 否 | 仅密文 |
 | SMS/WhatsApp/Signal 内容 | 是（在您的服务器上） | 否 | 您的服务器上为密文；服务商可能持有原文 |
+| 实时事件 | 是（逐中心，轮换密钥） | 否 | 仅密文 |
+| User-Agent 字符串 | SHA-256 哈希 | 仅哈希值 | 哈希值（不可逆） |
 | 通话元数据 | 否 | 是 | 是 |
 | 来电者电话哈希 | HMAC 哈希 | 仅哈希值 | 哈希值（没有您的密钥无法反向解析） |
 
@@ -130,9 +132,10 @@ subtitle: 哪些数据受到保护、哪些可见、哪些可依传票获取—�
 
 技术文档：
 
-- [协议规范](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/protocol/llamenos-protocol.md)
+- [协议规范](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/protocol/PROTOCOL.md)
 - [威胁模型](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/THREAT_MODEL.md)
 - [数据分类](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/DATA_CLASSIFICATION.md)
+- [安全缺口与路线图](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/SECURITY_GAPS_AND_ROADMAP.md)
 - [安全审计](https://github.com/rhonda-rodododo/llamenos-platform/tree/main/docs/security)
 - [API 文档](/api/docs)
 

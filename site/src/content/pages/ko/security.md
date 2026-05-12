@@ -100,11 +100,11 @@ subtitle: 무엇이 보호되고, 무엇이 보이며, 소환장에 의해 무�
 
 ## 아직 계획 중
 
-| 기능 | 개인정보 보호 이점 | Status |
-|------|-------------------|--------|
-| Native call-receiving apps | No personal phone numbers exposed | In development |
-| Certificate pinning for relay and API | Prevents MITM on real-time connections | Scaffolding complete; pins pending first deployment |
-| SFrame voice encryption | Per-frame encryption for call audio | Key derivation complete; per-frame encryption planned |
+| 기능 | 개인정보 보호 이점 | 상태 |
+|------|-------------------|------|
+| 네이티브 통화 수신 앱 | 개인 전화번호 노출 없음 | 개발 중 |
+| 인증서 고정 (모바일) | 위조 CA에 의한 TLS 가로채기 방어 | 구조 완료; 첫 배포 후 고정 예정 |
+| SFrame 음성 미디어 암호화 | 종단 간 암호화된 음성 통화 | 키 도출 완료; 프레임별 암호화 계획 중 |
 
 ---
 
@@ -121,6 +121,8 @@ subtitle: 무엇이 보호되고, 무엇이 보이며, 소환장에 의해 무�
 | 팀/역할 메타데이터 | 예 (암호화) | 아니오 | 암호문만 |
 | 사용자 정의 필드 정의 | 예 (암호화) | 아니오 | 암호문만 |
 | SMS/WhatsApp/Signal 내용 | 예 (서버에서) | 아니오 | 서버의 암호문; 제공업체가 원본 보유 가능 |
+| 실시간 이벤트 | 예 (허브별, 순환 키) | 아니오 | 암호문만 |
+| User-Agent 문자열 | SHA-256 해시 | 해시만 | 해시 (역추적 불가) |
 | 통화 메타데이터 | 아니오 | 예 | 예 |
 | 발신자 전화 해시 | HMAC 해시 | 해시만 | 해시 (시크릿 없이 역추적 불가) |
 
@@ -130,9 +132,10 @@ subtitle: 무엇이 보호되고, 무엇이 보이며, 소환장에 의해 무�
 
 기술 문서:
 
-- [프로토콜 사양](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/protocol/llamenos-protocol.md)
+- [프로토콜 사양](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/protocol/PROTOCOL.md)
 - [위협 모델](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/THREAT_MODEL.md)
 - [데이터 분류](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/DATA_CLASSIFICATION.md)
+- [보안 격차 및 로드맵](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/SECURITY_GAPS_AND_ROADMAP.md)
 - [보안 감사](https://github.com/rhonda-rodododo/llamenos-platform/tree/main/docs/security)
 - [API 문서](/api/docs)
 

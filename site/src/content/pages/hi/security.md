@@ -100,11 +100,11 @@ subtitle: क्या सुरक्षित है, क्या दृश�
 
 ## अभी भी योजनाबद्ध
 
-| सुविधा | गोपनीयता लाभ | Status |
+| सुविधा | गोपनीयता लाभ | स्थिति |
 |---------|-----------------|--------|
-| Native call-receiving apps | No personal phone numbers exposed | In development |
-| Certificate pinning for relay and API | Prevents MITM on real-time connections | Scaffolding complete; pins pending first deployment |
-| SFrame voice encryption | Per-frame encryption for call audio | Key derivation complete; per-frame encryption planned |
+| नेटिव कॉल-प्राप्ति ऐप्स | व्यक्तिगत फ़ोन नंबर उजागर नहीं होते | विकासाधीन |
+| प्रमाणपत्र पिनिंग (मोबाइल) | धोखाधड़ी CA द्वारा TLS अवरोधन के विरुद्ध सुरक्षा | ढांचा पूर्ण; पहले डिप्लॉयमेंट के बाद पिनिंग लंबित |
+| SFrame वॉयस मीडिया एन्क्रिप्शन | एंड-टू-एंड एन्क्रिप्टेड वॉयस कॉल | कुंजी व्युत्पन्न पूर्ण; प्रति-फ्रेम एन्क्रिप्शन योजनाबद्ध |
 
 ---
 
@@ -121,6 +121,8 @@ subtitle: क्या सुरक्षित है, क्या दृश�
 | टीम/भूमिका मेटाडेटा | हाँ (एन्क्रिप्टेड) | नहीं | केवल साइफरटेक्स्ट |
 | कस्टम फ़ील्ड परिभाषाएं | हाँ (एन्क्रिप्टेड) | नहीं | केवल साइफरटेक्स्ट |
 | SMS/WhatsApp/Signal सामग्री | हाँ (आपके सर्वर पर) | नहीं | आपके सर्वर से साइफरटेक्स्ट; प्रदाता के पास मूल हो सकता है |
+| रियल-टाइम इवेंट | हाँ (प्रति-हब, घूमती कुंजियाँ) | नहीं | केवल साइफरटेक्स्ट |
+| User-Agent स्ट्रिंग | SHA-256 हैश्ड | केवल हैश | हैश (उलटा नहीं किया जा सकता) |
 | कॉल मेटाडेटा | नहीं | हाँ | हाँ |
 | कॉलर फोन हैश | HMAC हैश्ड | केवल हैश | हैश (आपके रहस्य के बिना उलटा नहीं) |
 
@@ -130,9 +132,10 @@ subtitle: क्या सुरक्षित है, क्या दृश�
 
 तकनीकी दस्तावेज़ीकरण:
 
-- [प्रोटोकॉल विशिष्टता](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/protocol/llamenos-protocol.md)
+- [प्रोटोकॉल विशिष्टता](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/protocol/PROTOCOL.md)
 - [खतरा मॉडल](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/THREAT_MODEL.md)
 - [डेटा वर्गीकरण](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/DATA_CLASSIFICATION.md)
+- [सुरक्षा अंतराल और रोडमैप](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/SECURITY_GAPS_AND_ROADMAP.md)
 - [सुरक्षा ऑडिट](https://github.com/rhonda-rodododo/llamenos-platform/tree/main/docs/security)
 - [API दस्तावेज़ीकरण](/api/docs)
 
