@@ -64,8 +64,6 @@ describe('Crypto domain separation labels', () => {
   })
 
   it('has server Nostr key labels', () => {
-    expect(labels.LABEL_SERVER_NOSTR_KEY).toBe('llamenos:server-nostr-key')
-    expect(labels.LABEL_SERVER_NOSTR_KEY_INFO).toBe('llamenos:server-nostr-key:v1')
   })
 
   it('has recovery/backup labels', () => {

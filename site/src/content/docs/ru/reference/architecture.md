@@ -75,7 +75,7 @@ Worker API  -->  ConversationDO
     |                | Wraps symmetric key via ECIES for assigned volunteer + admins
     |                | Discards plaintext
     |                v
-    |           Nostr relay (encrypted hub event notifies online clients)
+    |           WebSocket relay (encrypted hub event notifies online clients)
     |
     v
 Client (volunteer's browser/app)
@@ -111,7 +111,7 @@ Worker API  -->  ConversationDO  -->  Messaging Provider (sends reply)
 | Вложения отчётов | Да (E2EE) | XChaCha20-Poly1305 (потоковое) | Автор отчёта + все администраторы |
 | Содержимое сообщений | Да (E2EE) | XChaCha20-Poly1305 + ECIES-конверт | Назначенный волонтёр + все администраторы |
 | Транскрипты | Да (в покое) | XChaCha20-Poly1305 | Создатель транскрипта + все администраторы |
-| Хаб-события (Nostr) | Да (симметричное) | XChaCha20-Poly1305 с хаб-ключом | Все текущие члены хаба |
+| Хаб-события (WebSocket) | Да (симметричное) | XChaCha20-Poly1305 с хаб-ключом | Все текущие члены хаба |
 | nsec волонтёра | Да (в покое) | PBKDF2 + XChaCha20-Poly1305 (PIN) | Только волонтёр |
 | Записи журнала аудита | Нет (защищено целостностью) | Цепочка хешей SHA-256 | Администраторы (чтение), система (запись) |
 | Номера телефонов звонящих | Нет (только на стороне сервера) | Нет | Сервер + администраторы |
@@ -130,11 +130,11 @@ Volunteer nsec (BIP-340 Schnorr / secp256k1)
     |
     +-- Used for ECIES key agreement (prepend 02 for compressed form)
     |
-    +-- Signs Nostr events (Schnorr signature)
+    +-- Signs WebSocket events (Schnorr signature)
 
 Hub key (random 32 bytes, NOT derived from any identity)
     |
-    +-- Encrypts real-time Nostr hub events
+    +-- Encrypts real-time WebSocket hub events
     |
     +-- ECIES-wrapped per member via LABEL_HUB_KEY_WRAP
     |
@@ -151,9 +151,9 @@ Per-note key (random 32 bytes)
 
 ## Коммуникация в реальном времени
 
-Обновления в реальном времени (новые звонки, сообщения, изменения смен, присутствие) проходят через Nostr-релей:
+Обновления в реальном времени (новые звонки, сообщения, изменения смен, присутствие) проходят через WebSocket-релей:
 
-- **Самостоятельный хостинг**: релей strfry, работающий рядом с приложением в Docker/Kubernetes
+- **Самостоятельный хостинг**: релей WebSocket relay, работающий рядом с приложением в Docker/Kubernetes
 - **Cloudflare**: Nosflare (релей на базе Cloudflare Workers)
 
 Все события эфемерны (kind 20001) и зашифрованы хаб-ключом. События используют общие теги (`["t", "llamenos:event"]`), поэтому релей не может различить типы событий. Поле содержимого содержит шифртекст XChaCha20-Poly1305.
@@ -164,9 +164,9 @@ Per-note key (random 32 bytes)
 Client A (volunteer action)
     |
     | Encrypt event content with hub key
-    | Sign as Nostr event (Schnorr)
+    | Sign as WebSocket event (Schnorr)
     v
-Nostr relay (strfry / Nosflare)
+WebSocket relay (WebSocket relay / Nosflare)
     |
     | Broadcast to subscribers
     v
@@ -185,13 +185,13 @@ Update local UI state
 ### Транспортный уровень
 
 - Всё взаимодействие клиент-сервер через HTTPS (TLS 1.3)
-- Подключения WebSocket к Nostr-релею через WSS
+- Подключения WebSocket к WebSocket-релею через WSS
 - Политика безопасности содержимого (CSP) ограничивает источники скриптов, соединения и предков фреймов
 - Шаблон изоляции Tauri отделяет IPC от webview
 
 ### Уровень приложения
 
-- Аутентификация через пары ключей Nostr (подписи BIP-340 Schnorr)
+- Аутентификация через пары ключей WebSocket (подписи BIP-340 Schnorr)
 - Токены сессии WebAuthn для удобства на нескольких устройствах
 - Управление доступом на основе ролей (звонящий, волонтёр, репортёр, администратор)
 - Все 25 констант разделения криптографических доменов, определённые в `crypto-labels.ts`, предотвращают межпротокольные атаки
@@ -294,7 +294,7 @@ Worker API  -->  ConversationDO
     |                | Wraps symmetric key via ECIES for assigned volunteer + admins
     |                | Discards plaintext
     |                v
-    |           Nostr relay (encrypted hub event notifies online clients)
+    |           WebSocket relay (encrypted hub event notifies online clients)
     |
     v
 Client (volunteer's browser/app)
@@ -330,7 +330,7 @@ Worker API  -->  ConversationDO  -->  Messaging Provider (sends reply)
 | Вложения отчётов | Да (E2EE) | XChaCha20-Poly1305 (потоковое) | Автор отчёта + все администраторы |
 | Содержимое сообщений | Да (E2EE) | XChaCha20-Poly1305 + ECIES-конверт | Назначенный волонтёр + все администраторы |
 | Транскрипты | Да (в покое) | XChaCha20-Poly1305 | Создатель транскрипта + все администраторы |
-| Хаб-события (Nostr) | Да (симметричное) | XChaCha20-Poly1305 с хаб-ключом | Все текущие члены хаба |
+| Хаб-события (WebSocket) | Да (симметричное) | XChaCha20-Poly1305 с хаб-ключом | Все текущие члены хаба |
 | nsec волонтёра | Да (в покое) | PBKDF2 + XChaCha20-Poly1305 (PIN) | Только волонтёр |
 | Записи журнала аудита | Нет (защищено целостностью) | Цепочка хешей SHA-256 | Администраторы (чтение), система (запись) |
 | Номера телефонов звонящих | Нет (только на стороне сервера) | Нет | Сервер + администраторы |
@@ -349,11 +349,11 @@ Volunteer nsec (BIP-340 Schnorr / secp256k1)
     |
     +-- Used for ECIES key agreement (prepend 02 for compressed form)
     |
-    +-- Signs Nostr events (Schnorr signature)
+    +-- Signs WebSocket events (Schnorr signature)
 
 Hub key (random 32 bytes, NOT derived from any identity)
     |
-    +-- Encrypts real-time Nostr hub events
+    +-- Encrypts real-time WebSocket hub events
     |
     +-- ECIES-wrapped per member via LABEL_HUB_KEY_WRAP
     |
@@ -370,9 +370,9 @@ Per-note key (random 32 bytes)
 
 ## Коммуникация в реальном времени
 
-Обновления в реальном времени (новые звонки, сообщения, изменения смен, присутствие) проходят через Nostr-релей:
+Обновления в реальном времени (новые звонки, сообщения, изменения смен, присутствие) проходят через WebSocket-релей:
 
-- **Самостоятельный хостинг**: релей strfry, работающий рядом с приложением в Docker/Kubernetes
+- **Самостоятельный хостинг**: релей WebSocket relay, работающий рядом с приложением в Docker/Kubernetes
 - **Cloudflare**: Nosflare (релей на базе Cloudflare Workers)
 
 Все события эфемерны (kind 20001) и зашифрованы хаб-ключом. События используют общие теги (`["t", "llamenos:event"]`), поэтому релей не может различить типы событий. Поле содержимого содержит шифртекст XChaCha20-Poly1305.
@@ -383,9 +383,9 @@ Per-note key (random 32 bytes)
 Client A (volunteer action)
     |
     | Encrypt event content with hub key
-    | Sign as Nostr event (Schnorr)
+    | Sign as WebSocket event (Schnorr)
     v
-Nostr relay (strfry / Nosflare)
+WebSocket relay (WebSocket relay / Nosflare)
     |
     | Broadcast to subscribers
     v
@@ -404,13 +404,13 @@ Update local UI state
 ### Транспортный уровень
 
 - Всё взаимодействие клиент-сервер через HTTPS (TLS 1.3)
-- Подключения WebSocket к Nostr-релею через WSS
+- Подключения WebSocket к WebSocket-релею через WSS
 - Политика безопасности содержимого (CSP) ограничивает источники скриптов, соединения и предков фреймов
 - Шаблон изоляции Tauri отделяет IPC от webview
 
 ### Уровень приложения
 
-- Аутентификация через пары ключей Nostr (подписи BIP-340 Schnorr)
+- Аутентификация через пары ключей WebSocket (подписи BIP-340 Schnorr)
 - Токены сессии WebAuthn для удобства на нескольких устройствах
 - Управление доступом на основе ролей (звонящий, волонтёр, репортёр, администратор)
 - Все 25 констант разделения криптографических доменов, определённые в `crypto-labels.ts`, предотвращают межпротокольные атаки

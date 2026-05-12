@@ -6,7 +6,7 @@
 #   - Disables the app service (CI runs the app on the runner, not in Docker)
 #   - Exposes all service ports to the host for test assertions
 #   - Enables signal + telephony profiles automatically
-#   - Mounts test strfry config (suppresses ulimit that exceeds GitHub Actions limit)
+#   - Applies CI-specific health check settings
 #   - Sets test-friendly environment (shorter timeouts, debug logging)
 #   - Applies health checks compatible with `docker compose up --wait`
 #

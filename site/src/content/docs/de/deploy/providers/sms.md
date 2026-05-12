@@ -60,7 +60,7 @@ Senden Sie eine SMS an Ihre Hotline-Telefonnummer. Sie sollten die Konversation 
 1. Eine SMS kommt bei Ihrem Anbieter an, der einen Webhook an Ihren Worker sendet
 2. Der Worker validiert die Webhook-Signatur (anbieterspezifisches HMAC)
 3. Die Nachricht wird geparst und im ConversationDO gespeichert
-4. Diensthabende Freiwillige werden ueber Nostr-Relay-Events benachrichtigt
+4. Diensthabende Freiwillige werden ueber WebSocket-Relay-Events benachrichtigt
 5. Freiwillige antworten ueber den Konversationen-Tab -- Antworten werden ueber die SMS-API Ihres Anbieters zurueckgesendet
 
 ## Sicherheitshinweise

@@ -22,7 +22,7 @@ description: 使用官方 Helm Chart 将 Llamenos 部署到 Kubernetes。
 helm install llamenos deploy/helm/llamenos/ \
   --set secrets.postgresPassword=YOUR_PG_PASSWORD \
   --set secrets.hmacSecret=YOUR_HMAC_HEX \
-  --set secrets.serverNostrSecret=YOUR_NOSTR_HEX \
+  --set secrets.serverWebSocketSecret=YOUR_NOSTR_HEX \
   --set postgres.host=YOUR_PG_HOST \
   --set rustfs.credentials.accessKey=your-access-key \
   --set rustfs.credentials.secretKey=your-secret-key \
@@ -62,7 +62,7 @@ postgres:
 secrets:
   postgresPassword: "your-strong-password"
   hmacSecret: "64-hex-chars-hmac-signing-key"
-  serverNostrSecret: "64-hex-chars-nostr-identity-key"
+  serverWebSocketSecret: "64-hex-chars-WebSocket-identity-key"
   # twilioAccountSid: ""
   # twilioAuthToken: ""
   # twilioPhoneNumber: ""
@@ -76,7 +76,7 @@ rustfs:
     accessKey: "your-access-key"
     secretKey: "your-secret-key-change-me"
 
-strfry:
+WebSocket relay:
   enabled: true
 
 signalNotifier:
@@ -161,7 +161,7 @@ kubectl get ingress llamenos
 | 参数 | 描述 | 默认值 |
 |------|------|--------|
 | `secrets.hmacSecret` | HMAC signing key — 64 hex chars (required) | `""` |
-| `secrets.serverNostrSecret` | Server Nostr identity key — 64 hex chars (required) | `""` |
+| `secrets.serverWebSocketSecret` | Server WebSocket identity key — 64 hex chars (required) | `""` |
 | `secrets.postgresPassword` | PostgreSQL 密码（必填） | `""` |
 | `secrets.twilioAccountSid` | Twilio Account SID | `""` |
 | `secrets.twilioAuthToken` | Twilio Auth Token | `""` |
@@ -228,7 +228,7 @@ secrets:
 # 手动创建
 kubectl create secret generic llamenos-secrets \
   --from-literal=hmac-secret=your_hmac_hex \
-  --from-literal=server-nostr-secret=your_nostr_hex \
+  --from-literal=server-WebSocket-secret=your_WebSocket_hex \
   --from-literal=postgres-password=your_password \
   --from-literal=rustfs-access-key=your_key \
   --from-literal=rustfs-secret-key=your_key
@@ -417,15 +417,15 @@ spec:
     - secretKey: hmac-secret
       remoteRef:
         key: llamenos/hmac-secret
-    - secretKey: server-nostr-secret
+    - secretKey: server-WebSocket-secret
       remoteRef:
-        key: llamenos/server-nostr-secret
-    - secretKey: minio-access-key
+        key: llamenos/server-WebSocket-secret
+    - secretKey: RustFS-access-key
       remoteRef:
-        key: llamenos/minio-access-key
-    - secretKey: minio-secret-key
+        key: llamenos/RustFS-access-key
+    - secretKey: RustFS-secret-key
       remoteRef:
-        key: llamenos/minio-secret-key
+        key: llamenos/RustFS-secret-key
 ```
 
 Then reference in Helm values:

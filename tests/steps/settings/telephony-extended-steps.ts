@@ -82,10 +82,6 @@ Then('the phone number field should be pre-filled', async ({ page }) => {
   await expect(page.locator('#provider-phone')).toHaveValue(/555\s*987\s*6/)
 })
 
-Then('the Account SID field should be pre-filled', async ({ page }) => {
-  await expect(page.getByPlaceholder('AC...')).toHaveValue('AC00000000000000000000000000000002')
-})
-
 When('I fill in SignalWire credentials', async ({ page }) => {
   // Triple-click to select all, then type — more reliable than clear() for react-phone-number-input.
   const telInput = page.locator('#provider-phone')

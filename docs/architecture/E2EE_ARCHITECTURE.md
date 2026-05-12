@@ -10,7 +10,7 @@
 > **What changed since this document was written:**
 > - ECIES (secp256k1 + XChaCha20-Poly1305) replaced by **HPKE (RFC 9180, X25519 + AES-256-GCM)** for all envelope encryption
 > - Single nsec-per-user replaced by **per-device Ed25519/X25519 keypairs** with sigchain authorization
-> - Auth uses **Ed25519 signatures** (Schnorr retained for Nostr event signing only)
+> - Auth uses **Ed25519 signatures** (Schnorr retained for WebSocket event signing only)
 > - Backend is **Bun + PostgreSQL** (not Cloudflare Workers / Durable Objects)
 > - Mobile clients are **native SwiftUI (iOS) and Kotlin/Compose (Android)** (not React Native)
 > - Domain separation constants expanded from 25 to **57 labels** (`packages/protocol/crypto-labels.json`)
@@ -22,7 +22,7 @@
 Transform Llamenos from a "server-side encrypted" model to a **true zero-knowledge architecture** where:
 
 1. **The server stores data it cannot read** - All content E2EE
-2. **The server sees minimal metadata** - Real-time events via Nostr relay
+2. **The server sees minimal metadata** - Real-time events via WebSocket relay
 3. **The server cannot correlate activity** - Encrypted metadata, ephemeral presence
 4. **Users can verify code integrity** - Reproducible builds
 5. **Audio never leaves the device** - Client-side transcription
@@ -49,11 +49,11 @@ Transform Llamenos from a "server-side encrypted" model to a **true zero-knowled
 
 | Event Type | Implementation | Epic |
 | ---------- | -------------- | ---- |
-| Call notifications | Nostr relay ephemeral kind 20001 events, hub-key encrypted, generic tags | 76 |
-| Presence updates | Nostr relay ephemeral events, hub-key encrypted (volunteer: boolean; admin: ECIES with full counts) | 76 |
-| Message notifications | Nostr relay ephemeral events, hub-key encrypted | 76 |
-| Typing indicators | Nostr relay ephemeral events, hub-key encrypted | 76 |
-| Call state changes | REST API (server-authoritative via DO serialization) + Nostr relay propagation | 76 |
+| Call notifications | WebSocket relay ephemeral kind 20001 events, hub-key encrypted, generic tags | 76 |
+| Presence updates | WebSocket relay ephemeral events, hub-key encrypted (volunteer: boolean; admin: ECIES with full counts) | 76 |
+| Message notifications | WebSocket relay ephemeral events, hub-key encrypted | 76 |
+| Typing indicators | WebSocket relay ephemeral events, hub-key encrypted | 76 |
+| Call state changes | REST API (server-authoritative via DO serialization) + WebSocket relay propagation | 76 |
 
 ### External Data Flows
 
@@ -78,24 +78,24 @@ Transform Llamenos from a "server-side encrypted" model to a **true zero-knowled
 │  ┌────────────────────────────────┴────────────────────────────────────┐   │
 │  │                        SHARED CLIENT CORE                            │   │
 │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐              │   │
-│  │  │ Key Manager  │  │ Crypto (E2EE)│  │ Nostr Client │              │   │
+│  │  │ Key Manager  │  │ Crypto (E2EE)│  │ WebSocket Client │              │   │
 │  │  │ (PIN-locked) │  │ ECIES+XChaCha│  │ (Relay Conn) │              │   │
 │  │  └──────────────┘  └──────────────┘  └──────────────┘              │   │
 │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐              │   │
 │  │  │ Transcription│  │ Twilio Voice │  │ State Sync   │              │   │
-│  │  │ (WASM Whisper│  │ SDK Handler  │  │ (REST+Nostr) │              │   │
+│  │  │ (WASM Whisper│  │ SDK Handler  │  │ (REST+WebSocket) │              │   │
 │  │  └──────────────┘  └──────────────┘  └──────────────┘              │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────────┘
                     │                              │
-                    │ REST API                     │ Nostr Events (ephemeral)
+                    │ REST API                     │ WebSocket Events (ephemeral)
                     │ (state mutations,            │ (encrypted content,
                     │  E2EE blob storage)          │  generic tags only)
                     ▼                              ▼
 ┌─────────────────────────────────────┐  ┌─────────────────────────────────────┐
 │           SERVER LAYER              │  │           NOSTR RELAY               │
 │  ┌─────────────────────────────┐   │  │  ┌─────────────────────────────┐   │
-│  │ Cloudflare Workers / Node.js│   │  │  │ Nosflare (CF) / strfry     │   │
+│  │ Cloudflare Workers / Node.js│   │  │  │ Nosflare (CF) / WebSocket relay     │   │
 │  │                             │   │  │  │                             │   │
 │  │ • Auth (Schnorr/WebAuthn)   │   │  │  │ • NIP-01 Events             │   │
 │  │ • Telephony webhooks        │   │  │  │ • NIP-42 Auth               │   │
@@ -162,7 +162,7 @@ Transform Llamenos from a "server-side encrypted" model to a **true zero-knowled
     └─────┬─────┘           │
           ▼                 │
 ┌─────────────────────┐    │
-│   Epic 76: Nostr    │    │
+│   Epic 76: WebSocket    │    │
 │   Relay Sync        │    │
 │   (Foundation)      │    │
 └─────────┬───────────┘    │
@@ -203,7 +203,7 @@ Since Llamenos is **pre-production with no deployed users**, we do a clean rewri
 
 | The server HAS | The server NEVER HAS |
 | --------------- | -------------------- |
-| Its own server nsec (for signing Nostr events) | Admin nsec (admin's private key) |
+| Its own server nsec (for signing WebSocket events) | Admin nsec (admin's private key) |
 | Admin npub (public key, for ECIES encryption) | Volunteer nsec (any volunteer's private key) |
 | Volunteer npubs (for ECIES encryption) | Hub key (symmetric, only clients have it) |
 | Encrypted blobs it cannot read | Ability to decrypt any user content |
@@ -213,7 +213,7 @@ ECIES encryption only needs the **public key** to encrypt. The private key is on
 
 ### What We Still Need a Server API For
 
-Even with Nostr relay handling all real-time events, we still need a thin REST API for:
+Even with WebSocket relay handling all real-time events, we still need a thin REST API for:
 
 | Function | Why Server Required | What Server Sees |
 | -------- | ------------------- | ---------------- |
@@ -236,14 +236,14 @@ Even with Nostr relay handling all real-time events, we still need a thin REST A
    - Backup file privacy fix (generic format)
 
 2. **Epic 76.1 + 76.2: Architecture Redesign** (Completed)
-   - Worker-to-relay communication: `NostrPublisher` with CF (DO service binding) and Node.js (persistent WebSocket) implementations
+   - Worker-to-relay communication: `WebSocketPublisher` with CF (DO service binding) and Node.js (persistent WebSocket) implementations
    - Hub key = `crypto.getRandomValues(32)`, ECIES-wrapped per member
    - Multi-admin envelopes: `adminPubkeys[]` → `adminEnvelopes[]`
    - Identity + decryption key separation
 
-3. **Epic 76: Nostr Relay Sync** (Completed)
+3. **Epic 76: WebSocket Relay Sync** (Completed)
    - Complete WebSocket removal — deleted `ws.ts`, `websocket.ts`, `websocket-pair.ts`
-   - Nostr-only real-time via ephemeral kind 20001 events with generic tags
+   - WebSocket-only real-time via ephemeral kind 20001 events with generic tags
    - Server-authoritative call state (REST + DO serialization, relay for notification)
 
 4. **Epic 74: E2EE Messaging Storage** (Completed)
@@ -283,10 +283,10 @@ Even with Nostr relay handling all real-time events, we still need a thin REST A
 ### 2. Server is Authoritative for State, Relay for Events
 
 - **REST for state mutations**: answer call, create note, reassign conversation (DO serializes atomically)
-- **Nostr for event propagation**: call:ring, call:answered, presence (broadcast to subscribers)
+- **WebSocket for event propagation**: call:ring, call:answered, presence (broadcast to subscribers)
 - **REST for state recovery**: on reconnect, poll `/api/calls/active`, `/api/conversations`
 
-### 3. Ephemeral Nostr Events (Not Replaceable)
+### 3. Ephemeral WebSocket Events (Not Replaceable)
 
 **Old (BROKEN):** Kind 30078 (parameterized replaceable) — relay silently drops concurrent events.
 
@@ -311,7 +311,7 @@ Every admin envelope is per-admin ECIES. Adding/removing admins wraps/revokes ke
 | Claim | Reality |
 | ----- | ------- |
 | "Server can't read content" | TRUE for stored data. Server sees outbound SMS/WhatsApp plaintext momentarily (inherent provider limitation). |
-| "Nostr relay adds privacy vs CF" | PARTIALLY TRUE. Protects against database-only subpoena. Does NOT protect against CF as active adversary (CF can observe relay connections). |
+| "WebSocket relay adds privacy vs CF" | PARTIALLY TRUE. Protects against database-only subpoena. Does NOT protect against CF as active adversary (CF can observe relay connections). |
 | "E2EE for all messages" | TRUE for storage. FALSE for the SMS/WhatsApp transport layer (provider sees plaintext — inherent). |
 | "Audio never leaves device" | TRUE for transcription. Audio is captured locally only (volunteer mic). Remote party audio not accessible via Twilio SDK. |
 
@@ -331,7 +331,7 @@ Admin nsec (secp256k1) — IDENTITY AND SIGNING ONLY
 
 Hub Key (random 32 bytes, NOT derived from any identity key)
     │
-    ├─→ Nostr event content encryption (XChaCha20-Poly1305 + HKDF per-event)
+    ├─→ WebSocket event content encryption (XChaCha20-Poly1305 + HKDF per-event)
     ├─→ Presence encryption (volunteer-tier: boolean only)
     ├─→ Ephemeral broadcast data
     │
@@ -349,7 +349,7 @@ Per-Message Key (random 32 bytes) — NEW (matches note pattern)
     └─→ Wrapped for each admin (ECIES)
 
 Server nsec (secp256k1) — SERVER IDENTITY ONLY
-    ├─→ Signs Nostr events published by server (call:ring, call:answered)
+    ├─→ Signs WebSocket events published by server (call:ring, call:answered)
     ├─→ Clients verify server pubkey for authoritative events
     └─→ CANNOT decrypt any user content
 ```
@@ -364,7 +364,7 @@ Server nsec (secp256k1) — SERVER IDENTITY ONLY
 | `llamenos:message` | ECIES wrapping of per-message symmetric key | Client + server crypto |
 | `llamenos:transcription` | Transcription key wrapping | Server-side transcription |
 | `llamenos:file-key` | Per-file attachment key wrapping | Client crypto |
-| `llamenos:hub-event` | Hub key encryption of Nostr event content | Client Nostr encryption |
+| `llamenos:hub-event` | Hub key encryption of WebSocket event content | Client WebSocket encryption |
 | `llamenos:hub-key-wrap` | ECIES wrapping of hub key for member distribution | Admin client |
 | `llamenos:call-meta` | Encrypted call record metadata (assignments) | Client + server crypto |
 | `llamenos:shift-schedule` | Encrypted shift schedule details | Client + server crypto |
@@ -385,7 +385,7 @@ Server nsec (secp256k1) — SERVER IDENTITY ONLY
    • timestamp
    │
    ▼
-3. Server publishes to Nostr relay (via DO service binding / HTTP):
+3. Server publishes to WebSocket relay (via DO service binding / HTTP):
    Event {
      kind: 20001,  // Ephemeral — relay forwards, never stores
      tags: [["d", hubId], ["t", "llamenos:event"]],  // Generic tag
@@ -435,7 +435,7 @@ Server nsec (secp256k1) — SERVER IDENTITY ONLY
    • Stores ONLY encrypted fields (discards plaintext immediately)
    │
    ▼
-5. Server publishes to Nostr relay:
+5. Server publishes to WebSocket relay:
    Event {
      kind: 20001,
      tags: [["d", hubId], ["t", "llamenos:event"]],
@@ -468,7 +468,7 @@ Server DOES see: outbound plaintext momentarily (inherent SMS/WhatsApp limitatio
 | Subpoena of CF hosting | Metadata + activity patterns | Encrypted blobs, relay connection metadata |
 | Subpoena of DB only | Full plaintext access | Ciphertext only (relay provides additional protection here) |
 | Admin nsec compelled | ALL data decryptable | Only auth compromised (decryption key is separate, 76.2) |
-| Hub key compromised | N/A | Nostr events decryptable, but notes/messages still require per-note/per-message keys |
+| Hub key compromised | N/A | WebSocket events decryptable, but notes/messages still require per-note/per-message keys |
 | Device seizure | PIN brute-force → all keys | PIN brute-force → that device's keys only |
 | Volunteer departure | Historical access retained | Hub key rotated, departed volunteer locked out |
 
@@ -533,7 +533,7 @@ All features verified:
 
 1. **Multi-hub key management**: Each hub has an independent random key. Clients store multiple hub keys indexed by hub ID and key version. Hub switcher UI selects the active hub context.
 
-2. **Relay architecture**: Single self-hosted relay (strfry for Docker/K8s, Nosflare for CF). Federation deferred — single relay is sufficient for the target scale. REST polling fallback for state recovery on reconnect.
+2. **Relay architecture**: Single self-hosted relay (WebSocket relay for Docker/K8s, Nosflare for CF). Federation deferred — single relay is sufficient for the target scale. REST polling fallback for state recovery on reconnect.
 
 3. **Offline support**: Notes support full offline operation (local encrypted drafts). Calls require connectivity (telephony is inherently online). Messages queue locally and send when connected.
 

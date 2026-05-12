@@ -1,6 +1,6 @@
 # CI workflow for desktop Playwright E2E tests.
 # Runs Playwright tests against a Vite build with mocked Tauri IPC.
-# Backend services (PostgreSQL, RustFS) via Docker Compose — globalSetup
+# Backend services (PostgreSQL, RustFS, WebSocket relay) via Docker Compose — globalSetup
 # requires a running backend for state reset and admin bootstrap.
 #
 # Trigger: PRs touching apps/desktop/, src/client/, tests/, or packages/, manual dispatch.

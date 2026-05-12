@@ -363,7 +363,7 @@ This one is a big deal.
 :::columns
 :::left
 ### v1: secp256k1 ECIES
-- Non-standard curve for key agreement (Nostr-specific)
+- Non-standard curve for key agreement (WebSocket-specific)
 - Custom construction — no formal proof for this exact combination
 - Single secret key per user = single point of compromise
 - No domain separation = cross-protocol attack surface
@@ -378,7 +378,7 @@ This one is a big deal.
 - **57 domain separation labels** (Albrecht defense)
 :::
 
-<!-- notes: The v1 → v2 migration came out of a review by a cryptographer who has worked on Signal's protocol. The core problem with v1 was: it worked, but "it worked" is not the same as "it's formally verified." A custom ECIES scheme using Nostr's secp256k1 curve — you can't point a peer at an RFC and say "that's what we do." HPKE is an IETF RFC. It's the same key agreement used in TLS 1.3's 0-RTT mode. The formal security analysis exists. That matters when you're trying to explain your security model to a lawyer, a journalist, or another cryptographer. -->
+<!-- notes: The v1 → v2 migration came out of a review by a cryptographer who has worked on Signal's protocol. The core problem with v1 was: it worked, but "it worked" is not the same as "it's formally verified." A custom ECIES scheme using WebSocket's secp256k1 curve — you can't point a peer at an RFC and say "that's what we do." HPKE is an IETF RFC. It's the same key agreement used in TLS 1.3's 0-RTT mode. The formal security analysis exists. That matters when you're trying to explain your security model to a lawyer, a journalist, or another cryptographer. -->
 
 ---
 
@@ -816,7 +816,7 @@ SFrame (RFC 9605):
 services:
   db:           PostgreSQL 16 (encrypted notes, audit log)
   app:          Bun + Hono (the API server)
-  relay:        strfry (self-hosted Nostr relay — real-time events)
+  relay:        WebSocket relay (self-hosted WebSocket relay — real-time events)
   sip-bridge:   Asterisk / FreeSWITCH / Kamailio (SIP routing)
   
 # Optional profiles:
@@ -829,7 +829,7 @@ services:
 - **1984 Hosting** (Iceland) — outside US CLOUD Act jurisdiction, custom FDE ISO, GDPR-compliant
 - **Kubernetes** option: Helm chart with health probes and network policies
 
-<!-- notes: The strfry Nostr relay is not optional — it's the real-time event bus between server and clients. Your Nostr relay, running on your infrastructure, not one of the public ones. This is important: hub events, call routing, presence — all go through the relay. That relay is yours. We host on 1984 Hosting in Iceland — they're not subject to the US CLOUD Act, which means a US subpoena doesn't compel them to hand over data. They support custom FDE ISOs, so you control the full-disk encryption key — even 1984 staff can't read your disk at rest. Cost for a small org: 2 CPU, 4GB RAM VPS on 1984 is about €10/month. SIP DID from Telnyx is $1-5/month. That's the infrastructure cost for a nation-state-resistant hotline. -->
+<!-- notes: The WebSocket relay WebSocket relay is not optional — it's the real-time event bus between server and clients. Your WebSocket relay, running on your infrastructure, not one of the public ones. This is important: hub events, call routing, presence — all go through the relay. That relay is yours. We host on 1984 Hosting in Iceland — they're not subject to the US CLOUD Act, which means a US subpoena doesn't compel them to hand over data. They support custom FDE ISOs, so you control the full-disk encryption key — even 1984 staff can't read your disk at rest. Cost for a small org: 2 CPU, 4GB RAM VPS on 1984 is about €10/month. SIP DID from Telnyx is $1-5/month. That's the infrastructure cost for a nation-state-resistant hotline. -->
 
 ---
 
@@ -948,7 +948,7 @@ Active hub in the UI doesn't affect which calls they receive.
 *This is pre-production software. We built it to be auditable. We built it to be self-hosted. We built it because the existing options were a gift to cops.*
 :::
 
-<!-- notes: The project is pre-production. No production users yet. We need orgs with real security needs who are willing to give us real-world feedback. If you've been subpoenaed — I want to talk to you specifically. Your experience stress-tests our assumptions in ways that theoretical analysis cannot. Come find me after this. I'll be the one by the coffee trying to convince people that self-hosting a Nostr relay is worth it.
+<!-- notes: The project is pre-production. No production users yet. We need orgs with real security needs who are willing to give us real-world feedback. If you've been subpoenaed — I want to talk to you specifically. Your experience stress-tests our assumptions in ways that theoretical analysis cannot. Come find me after this. I'll be the one by the coffee trying to convince people that self-hosting a WebSocket relay is worth it.
 
 Likely questions:
 1. "What does it cost?" — €10-20/month VPS on 1984 Hosting (Iceland). $1-5/month SIP DID. That's it.

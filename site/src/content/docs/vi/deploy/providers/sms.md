@@ -58,7 +58,7 @@ Gửi SMS đến số đường dây nóng. Cuộc hội thoại sẽ xuất hi�
 1. SMS đến nhà cung cấp, nhà cung cấp gửi webhook đến Worker
 2. Worker xác thực chữ ký webhook (HMAC theo nhà cung cấp)
 3. Tin nhắn được phân tích và lưu vào ConversationDO
-4. Tình nguyện viên đang trực được thông báo qua Nostr relay
+4. Tình nguyện viên đang trực được thông báo qua WebSocket relay
 5. Tình nguyện viên trả lời từ tab Hội thoại — phản hồi gửi qua SMS API của nhà cung cấp
 
 ## Lưu ý bảo mật

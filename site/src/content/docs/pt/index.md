@@ -79,7 +79,7 @@ Llamenos e uma aplicacao de pagina unica (SPA) que pode ser executada no **Cloud
 | Armazenamento | R2 | RustFS (compativel com S3) |
 | Voz | Twilio, SignalWire, Vonage, Plivo ou Asterisk | Igual |
 | Mensagens | SMS, WhatsApp Business, Signal | Igual |
-| Autenticacao | Chaves Nostr (BIP-340 Schnorr) + WebAuthn | Igual |
+| Autenticacao | Chaves WebSocket (BIP-340 Schnorr) + WebAuthn | Igual |
 | Criptografia | ECIES (secp256k1 + XChaCha20-Poly1305) | Igual |
 | Transcricao | Whisper no lado do cliente (WASM) | Whisper no lado do cliente (WASM) |
 | i18n | i18next (13 idiomas) | Igual |

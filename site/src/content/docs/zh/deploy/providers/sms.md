@@ -60,7 +60,7 @@ POST https://your-worker.your-domain.com/api/messaging/sms/webhook
 1. SMS 到达您的提供商，提供商向您的 Worker 发送 Webhook
 2. Worker 验证 Webhook 签名（提供商特定的 HMAC）
 3. 消息被解析并存储到 ConversationDO
-4. 在班志愿者通过 Nostr relay 事件收到通知
+4. 在班志愿者通过 WebSocket relay 事件收到通知
 5. 志愿者从对话选项卡回复——回复通过您的提供商的 SMS API 发送
 
 ## 安全说明

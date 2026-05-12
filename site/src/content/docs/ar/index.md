@@ -47,7 +47,7 @@ Llamenos هو تطبيق صفحة واحدة (SPA) مدعوم بـ Cloudflare Wo
 | الواجهة الأمامية | Vite + React + TanStack Router |
 | الواجهة الخلفية | Cloudflare Workers + Durable Objects |
 | الاتصالات الهاتفية | Twilio أو SignalWire أو Vonage أو Plivo أو Asterisk (عبر واجهة TelephonyAdapter) |
-| المصادقة | مفاتيح Nostr (BIP-340 Schnorr) + WebAuthn |
+| المصادقة | مفاتيح WebSocket (BIP-340 Schnorr) + WebAuthn |
 | التشفير | ECIES (secp256k1 + XChaCha20-Poly1305) |
 | النسخ التلقائي | Whisper من جانب العميل (WASM) |
 | تعدد اللغات | i18next (أكثر من 12 لغة) |

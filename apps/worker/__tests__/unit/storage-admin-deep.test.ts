@@ -53,7 +53,7 @@ describe('createStorageAdmin', () => {
   beforeEach(() => {
     mockFetch.mockReset()
     admin = createStorageAdmin({
-      endpoint: 'http://minio:9000',
+      endpoint: 'http://storage:9000',
       accessKeyId: 'admin-key',
       secretAccessKey: 'admin-secret',
     })
@@ -69,7 +69,7 @@ describe('createStorageAdmin', () => {
 
       const result = await admin.available()
       expect(result).toBe(true)
-      expect(mockFetch.mock.calls[0][0]).toBe('http://minio:9000/minio/admin/v3/info')
+      expect(mockFetch.mock.calls[0][0]).toBe('http://storage:9000/admin/v3/info')
     })
 
     it('returns true when admin info endpoint returns 403 (API exists but auth issue)', async () => {
@@ -113,7 +113,7 @@ describe('createStorageAdmin', () => {
 
       expect(mockFetch).toHaveBeenCalledOnce()
       const [url, opts] = mockFetch.mock.calls[0]
-      expect(url).toBe('http://minio:9000/minio/admin/v3/add-user?accessKey=hub-user-abc')
+      expect(url).toBe('http://storage:9000/admin/v3/add-user?accessKey=hub-user-abc')
       expect(opts.method).toBe('PUT')
       const body = JSON.parse(opts.body)
       expect(body.secretKey).toBe('user-secret-xyz')
@@ -152,7 +152,7 @@ describe('createStorageAdmin', () => {
       await admin.deleteUser('hub-user-del')
 
       const [url, opts] = mockFetch.mock.calls[0]
-      expect(url).toBe('http://minio:9000/minio/admin/v3/remove-user?accessKey=hub-user-del')
+      expect(url).toBe('http://storage:9000/admin/v3/remove-user?accessKey=hub-user-del')
       expect(opts.method).toBe('DELETE')
     })
 
@@ -179,7 +179,7 @@ describe('createStorageAdmin', () => {
       await admin.createPolicy('test-policy', policy)
 
       const [url, opts] = mockFetch.mock.calls[0]
-      expect(url).toBe('http://minio:9000/minio/admin/v3/add-canned-policy?name=test-policy')
+      expect(url).toBe('http://storage:9000/admin/v3/add-canned-policy?name=test-policy')
       expect(opts.method).toBe('PUT')
       const body = JSON.parse(opts.body)
       expect(body.Version).toBe('2012-10-17')
@@ -199,7 +199,7 @@ describe('createStorageAdmin', () => {
       await admin.deletePolicy('hub-policy')
 
       const [url, opts] = mockFetch.mock.calls[0]
-      expect(url).toBe('http://minio:9000/minio/admin/v3/remove-canned-policy?name=hub-policy')
+      expect(url).toBe('http://storage:9000/admin/v3/remove-canned-policy?name=hub-policy')
       expect(opts.method).toBe('DELETE')
     })
 

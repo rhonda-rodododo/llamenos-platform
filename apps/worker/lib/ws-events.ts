@@ -117,8 +117,7 @@ export function publishEvent(
   }
 
   const epoch = currentEpoch()
-  // Support both new and legacy env var names during transition
-  const serverSecret = env.SERVER_SECRET ?? env.SERVER_NOSTR_SECRET
+  const serverSecret = env.SERVER_SECRET
   let payload: string
 
   if (serverSecret) {

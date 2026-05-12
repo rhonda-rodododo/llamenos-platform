@@ -179,15 +179,14 @@ jobs:
       - name: Build backend bundle
         run: bun run build:server
 
-      - name: Download S3-compatible storage binary
+      - name: Download RustFS binary
         env:
-          S3_COMPAT_VERSION: "RELEASE.2025-09-07T16-13-09Z"
-          S3_COMPAT_SHA256: "7c3b3039b76e55a1b80935848ed83998d5e8d317374f87851f46a019ff5c0aa4"
+          RUSTFS_VERSION: "v1.2.0"
+          RUSTFS_SHA256: "7c3b3039b76e55a1b80935848ed83998d5e8d317374f87851f46a019ff5c0aa4"
         run: |
-          URL_PREFIX=$(echo "aHR0cHM6Ly9kbC5taW4uaW8vc2VydmVyL21pbmlvL3JlbGVhc2UvZGFyd2luLWFybTY0L2FyY2hpdmUvbWluaW8u" | base64 -d)
-          curl -sSfL "${URL_PREFIX}${S3_COMPAT_VERSION}" -o .tmp-s3-compat-storage
-          echo "${S3_COMPAT_SHA256}  .tmp-s3-compat-storage" | shasum -a 256 -c -
-          chmod +x .tmp-s3-compat-storage
+          curl -sSfL "https://github.com/rustfs/rustfs/releases/download/${RUSTFS_VERSION}/rustfs-darwin-arm64" -o .tmp-rustfs
+          echo "${RUSTFS_SHA256}  .tmp-rustfs" | shasum -a 256 -c -
+          chmod +x .tmp-rustfs
 
       - name: Upload backend bundle + tools
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -199,7 +198,7 @@ jobs:
             node_modules/
             bun.lockb
             package.json
-            .tmp-s3-compat-storage
+            .tmp-rustfs
           retention-days: 1
           compression-level: 1
           if-no-files-found: error
@@ -348,5 +347,5 @@ jobs:
         if: always()
         run: |
           pkill -f "bun dist/server/index.js" || true
-          pkill -f s3-compat-storage || true
+          pkill -f rustfs || true
           pg_ctl -D /tmp/pgdata stop 2>/dev/null || true

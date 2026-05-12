@@ -47,11 +47,6 @@ describe('resolveStorageCredentials', () => {
     delete process.env.STORAGE_ENDPOINT
     delete process.env.STORAGE_ACCESS_KEY
     delete process.env.STORAGE_SECRET_KEY
-    delete process.env.MINIO_ENDPOINT
-    delete process.env.MINIO_ACCESS_KEY
-    delete process.env.MINIO_SECRET_KEY
-    delete process.env.MINIO_APP_USER
-    delete process.env.MINIO_APP_PASSWORD
   })
 
   afterEach(() => {
@@ -76,61 +71,12 @@ describe('resolveStorageCredentials', () => {
     expect(result.endpoint).toBe('https://storage.example.com')
   })
 
-  it('falls back to MINIO_ENDPOINT when STORAGE_ENDPOINT is not set', () => {
-    process.env.STORAGE_ACCESS_KEY = 'a'
-    process.env.STORAGE_SECRET_KEY = 's'
-    process.env.MINIO_ENDPOINT = 'http://minio.local:9000'
-
-    const result = resolveStorageCredentials()
-    expect(result.endpoint).toBe('http://minio.local:9000')
-  })
-
   it('defaults endpoint to localhost:9000', () => {
     process.env.STORAGE_ACCESS_KEY = 'a'
     process.env.STORAGE_SECRET_KEY = 's'
 
     const result = resolveStorageCredentials()
     expect(result.endpoint).toBe('http://localhost:9000')
-  })
-
-  it('falls back to MINIO_APP_USER / MINIO_APP_PASSWORD', () => {
-    process.env.MINIO_APP_USER = 'app-user'
-    process.env.MINIO_APP_PASSWORD = 'app-pass'
-
-    const result = resolveStorageCredentials()
-    expect(result.accessKeyId).toBe('app-user')
-    expect(result.secretAccessKey).toBe('app-pass')
-  })
-
-  it('falls back to MINIO_ACCESS_KEY / MINIO_SECRET_KEY', () => {
-    process.env.MINIO_ACCESS_KEY = 'minio-access'
-    process.env.MINIO_SECRET_KEY = 'minio-secret'
-
-    const result = resolveStorageCredentials()
-    expect(result.accessKeyId).toBe('minio-access')
-    expect(result.secretAccessKey).toBe('minio-secret')
-  })
-
-  it('prefers STORAGE_ACCESS_KEY over MINIO variants', () => {
-    process.env.STORAGE_ACCESS_KEY = 'preferred'
-    process.env.STORAGE_SECRET_KEY = 'preferred-secret'
-    process.env.MINIO_ACCESS_KEY = 'fallback'
-    process.env.MINIO_SECRET_KEY = 'fallback-secret'
-
-    const result = resolveStorageCredentials()
-    expect(result.accessKeyId).toBe('preferred')
-    expect(result.secretAccessKey).toBe('preferred-secret')
-  })
-
-  it('prefers MINIO_APP_USER over MINIO_ACCESS_KEY', () => {
-    process.env.MINIO_APP_USER = 'app-user'
-    process.env.MINIO_APP_PASSWORD = 'app-pass'
-    process.env.MINIO_ACCESS_KEY = 'root'
-    process.env.MINIO_SECRET_KEY = 'root-secret'
-
-    const result = resolveStorageCredentials()
-    expect(result.accessKeyId).toBe('app-user')
-    expect(result.secretAccessKey).toBe('app-pass')
   })
 
   it('throws when no credentials are available', () => {

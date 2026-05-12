@@ -75,7 +75,7 @@ Worker API  -->  ConversationDO
     |                | 배정된 자원봉사자 + 관리자용 ECIES로 대칭 키 래핑
     |                | 평문 폐기
     |                v
-    |           Nostr relay (암호화된 허브 이벤트가 온라인 클라이언트에 알림)
+    |           WebSocket relay (암호화된 허브 이벤트가 온라인 클라이언트에 알림)
     |
     v
 클라이언트 (자원봉사자의 브라우저/앱)
@@ -111,7 +111,7 @@ Worker API  -->  ConversationDO  -->  메시징 제공업체 (답장 전송)
 | 신고서 첨부 파일 | 예 (E2EE) | XChaCha20-Poly1305 (스트리밍) | 신고 작성자 + 모든 관리자 |
 | 메시지 내용 | 예 (E2EE) | XChaCha20-Poly1305 + ECIES envelope | 배정된 자원봉사자 + 모든 관리자 |
 | 음성 변환 기록 | 예 (at-rest) | XChaCha20-Poly1305 | 변환 생성자 + 모든 관리자 |
-| 허브 이벤트 (Nostr) | 예 (대칭) | XChaCha20-Poly1305 with hub key | 모든 현재 허브 멤버 |
+| 허브 이벤트 (WebSocket) | 예 (대칭) | XChaCha20-Poly1305 with hub key | 모든 현재 허브 멤버 |
 | 자원봉사자 nsec | 예 (at-rest) | PBKDF2 + XChaCha20-Poly1305 (PIN) | 자원봉사자 본인만 |
 | 감사 로그 항목 | 아니오 (무결성 보호) | SHA-256 hash chain | 관리자 (읽기), 시스템 (쓰기) |
 | 발신자 전화번호 | 아니오 (서버측만) | N/A | 서버 + 관리자 |
@@ -130,11 +130,11 @@ Worker API  -->  ConversationDO  -->  메시징 제공업체 (답장 전송)
     |
     +-- ECIES 키 합의에 사용 (압축 형식을 위해 02 접두사)
     |
-    +-- Nostr 이벤트 서명 (Schnorr 서명)
+    +-- WebSocket 이벤트 서명 (Schnorr 서명)
 
 허브 키 (랜덤 32바이트, 어떤 신원 키에서도 파생되지 않음)
     |
-    +-- 실시간 Nostr 허브 이벤트 암호화
+    +-- 실시간 WebSocket 허브 이벤트 암호화
     |
     +-- LABEL_HUB_KEY_WRAP을 통해 멤버별 ECIES 래핑
     |
@@ -151,9 +151,9 @@ Worker API  -->  ConversationDO  -->  메시징 제공업체 (답장 전송)
 
 ## 실시간 통신
 
-실시간 업데이트 (새 통화, 메시지, 근무 변경, 접속 상태)는 Nostr relay를 통해 흐릅니다:
+실시간 업데이트 (새 통화, 메시지, 근무 변경, 접속 상태)는 WebSocket relay를 통해 흐릅니다:
 
-- **자체 호스팅**: Docker/Kubernetes에서 앱과 함께 실행되는 strfry relay
+- **자체 호스팅**: Docker/Kubernetes에서 앱과 함께 실행되는 WebSocket relay relay
 - **Cloudflare**: Nosflare (Cloudflare Workers 기반 relay)
 
 모든 이벤트는 임시(kind 20001)이며 허브 키로 암호화됩니다. 이벤트는 일반 태그(`["t", "llamenos:event"]`)를 사용하므로 relay는 이벤트 유형을 구분할 수 없습니다. content 필드에는 XChaCha20-Poly1305 암호문이 포함됩니다.
@@ -164,9 +164,9 @@ Worker API  -->  ConversationDO  -->  메시징 제공업체 (답장 전송)
 클라이언트 A (자원봉사자 액션)
     |
     | 허브 키로 이벤트 내용 암호화
-    | Nostr 이벤트로 서명 (Schnorr)
+    | WebSocket 이벤트로 서명 (Schnorr)
     v
-Nostr relay (strfry / Nosflare)
+WebSocket relay (WebSocket relay / Nosflare)
     |
     | 구독자에게 브로드캐스트
     v
@@ -185,13 +185,13 @@ relay는 암호화된 블롭과 유효한 서명을 볼 수 있지만 이벤트 
 ### 전송 계층
 
 - 모든 클라이언트-서버 통신은 HTTPS (TLS 1.3) 사용
-- Nostr relay에 대한 WebSocket 연결은 WSS 사용
+- WebSocket relay에 대한 WebSocket 연결은 WSS 사용
 - Content Security Policy (CSP)는 스크립트 소스, 연결 및 프레임 상위를 제한
 - Tauri isolation 패턴은 IPC를 웹뷰에서 분리
 
 ### 애플리케이션 계층
 
-- Nostr 키 쌍(BIP-340 Schnorr 서명)을 통한 인증
+- WebSocket 키 쌍(BIP-340 Schnorr 서명)을 통한 인증
 - 다중 디바이스 편의를 위한 WebAuthn 세션 토큰
 - 역할 기반 접근 제어 (발신자, 자원봉사자, 신고자, 관리자)
 - `crypto-labels.ts`에 정의된 25개의 암호화 도메인 분리 상수가 교차 프로토콜 공격을 방지

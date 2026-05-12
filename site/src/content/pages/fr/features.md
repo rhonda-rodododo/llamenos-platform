@@ -117,7 +117,7 @@ subtitle: Tout ce dont une plateforme de réponse aux crises a besoin, dans un s
 
 **Confidentialité persistante par note** — Chaque note est chiffrée avec une clé aléatoire unique, puis cette clé est encapsulée via ECIES pour chaque lecteur autorisé. Compromettre la clé d'identité ne révèle pas les notes passées.
 
-**Authentification par paire de clés Nostr** — Les bénévoles s'authentifient avec des paires de clés compatibles Nostr (nsec/npub). Vérification de signature Schnorr BIP-340. Pas de mots de passe, pas d'adresses e-mail.
+**Authentification par paire de clés WebSocket** — Les bénévoles s'authentifient avec des paires de clés compatibles WebSocket (nsec/npub). Vérification de signature Schnorr BIP-340. Pas de mots de passe, pas d'adresses e-mail.
 
 **Clés d'accès WebAuthn** — Prise en charge optionnelle des clés d'accès pour la connexion multi-appareils. Enregistrez une clé matérielle ou biométrique, puis connectez-vous sans saisir votre clé secrète.
 

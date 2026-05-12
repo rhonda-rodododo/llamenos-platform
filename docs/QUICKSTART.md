@@ -328,9 +328,9 @@ STORAGE_SECRET_KEY=$(openssl rand -base64 24)
 echo "STORAGE_ACCESS_KEY: $STORAGE_ACCESS_KEY"
 echo "STORAGE_SECRET_KEY: $STORAGE_SECRET_KEY"
 
-# Generate server Nostr secret (for relay event signing)
-SERVER_NOSTR_SECRET=$(openssl rand -hex 32)
-echo "SERVER_NOSTR_SECRET: $SERVER_NOSTR_SECRET"
+# Generate server WebSocket secret (for relay event signing)
+SERVER_SECRET=$(openssl rand -hex 32)
+echo "SERVER_SECRET: $SERVER_SECRET"
 ```
 
 **SECURITY WARNING**: Record these secrets in a password manager immediately. They cannot be recovered if lost. You will need the database password for backup recovery operations.
@@ -353,7 +353,7 @@ PG_PASSWORD=<generated above>
 HMAC_SECRET=<generated above>
 STORAGE_ACCESS_KEY=<generated above>
 STORAGE_SECRET_KEY=<generated above>
-SERVER_NOSTR_SECRET=<generated above>
+SERVER_SECRET=<generated above>
 
 # Application
 HOTLINE_NAME=Hotline
@@ -428,7 +428,7 @@ curl -s https://hotline.yourorg.org/api/health
 
 ## 5. Bootstrap the Admin Account
 
-The admin account is the root of trust for your Llamenos instance. It uses a Nostr keypair (secp256k1 public/private key) rather than a username and password.
+The admin account is the root of trust for your Llamenos instance. It uses a WebSocket keypair (secp256k1 public/private key) rather than a username and password.
 
 ### In-Browser Bootstrap (Recommended)
 
@@ -472,7 +472,7 @@ SECRET KEY (nsec) -- share this securely with the admin:
 3. Store the nsec in a password manager. It cannot be recovered.
 4. Log in at `https://hotline.yourorg.org` using the nsec.
 
-**SECURITY WARNING**: The admin nsec is the master key for your hotline. If compromised, an attacker can manage all volunteers, read admin-wrapped notes, and modify all settings. Store it in a hardware security module or a high-security password manager (1Password, Bitwarden, KeePassXC). Never reuse this keypair on public Nostr relays or other services.
+**SECURITY WARNING**: The admin nsec is the master key for your hotline. If compromised, an attacker can manage all volunteers, read admin-wrapped notes, and modify all settings. Store it in a hardware security module or a high-security password manager (1Password, Bitwarden, KeePassXC). Never reuse this keypair on public WebSocket relays or other services.
 
 ---
 
@@ -548,11 +548,11 @@ Run through this checklist to verify your deployment:
   ```
 - [ ] fail2ban is active: `sudo fail2ban-client status sshd`
 
-### Nostr Relay
+### WebSocket Relay
 
-- [ ] Relay container is running: `docker compose ps strfry`
-- [ ] `/nostr` WebSocket endpoint responds: `curl -sI https://hotline.yourorg.org/nostr` returns 426 Upgrade Required
-- [ ] `SERVER_NOSTR_SECRET` is set in `.env`
+- [ ] Relay container is running: `docker compose ps WebSocket relay`
+- [ ] `/WebSocket` WebSocket endpoint responds: `curl -sI https://hotline.yourorg.org/WebSocket` returns 426 Upgrade Required
+- [ ] `SERVER_SECRET` is set in `.env`
 - [ ] Real-time events work: open two browser tabs, verify presence updates appear
 
 ### Telephony (if configured)

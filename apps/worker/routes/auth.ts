@@ -156,7 +156,7 @@ auth.get('/me',
     let eventKeyEpoch: number | undefined
     let eventKeyEpochDuration: number | undefined
 
-    const serverSecret = c.env.SERVER_SECRET ?? c.env.SERVER_NOSTR_SECRET
+    const serverSecret = c.env.SERVER_SECRET
     if (serverSecret) {
       serverEventKeyHex = bytesToHex(deriveServerEventKey(serverSecret, undefined, currentEpoch))
       serverEventKeyPrevHex = bytesToHex(deriveServerEventKey(serverSecret, undefined, currentEpoch - 1))

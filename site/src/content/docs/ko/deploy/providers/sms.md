@@ -60,7 +60,7 @@ POST https://your-worker.your-domain.com/api/messaging/sms/webhook
 1. SMS가 제공업체에 도착하면, 제공업체가 Worker로 웹훅을 보냅니다
 2. Worker가 웹훅 서명을 검증합니다 (제공업체별 HMAC)
 3. 메시지가 파싱되어 ConversationDO에 저장됩니다
-4. 근무 중인 자원봉사자에게 Nostr relay 이벤트로 알림이 갑니다
+4. 근무 중인 자원봉사자에게 WebSocket relay 이벤트로 알림이 갑니다
 5. 자원봉사자가 대화 탭에서 답장하면 — 제공업체의 SMS API를 통해 응답이 발송됩니다
 
 ## 보안 참고 사항

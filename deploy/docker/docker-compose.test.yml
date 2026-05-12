@@ -8,7 +8,7 @@
 #   - Exposes app port 3000 directly (bypasses Caddy)
 #   - Sets ENVIRONMENT=development (enables /api/test-reset endpoint)
 #   - Disables read_only to allow SQLite WAL files in tmpfs
-#   - Fixes strfry NOFILES config for CI (default 1M exceeds GitHub Actions ulimit of 65536)
+#   - Applies CI-compatible health check settings
 #   - Configures signal-notifier and sip-bridge in test mode
 
 services:

@@ -21,12 +21,12 @@ Authoritative reference for all cryptographic primitives, key hierarchies, and p
 | **Ed25519** | `ed25519-dalek` v2 | Device signing keys, auth tokens, sigchain signatures |
 | **X25519** | `x25519-dalek` v2 | Device encryption keys, HPKE decapsulation |
 | **AES-256-GCM** | `aes-gcm` 0.10 | Symmetric encryption (items_key, CLKR chain links, HPKE AEAD) |
-| **XChaCha20-Poly1305** | `chacha20poly1305` 0.10 | Hub event encryption (Nostr relay events, `hub-event-crypto.ts`) |
+| **XChaCha20-Poly1305** | `chacha20poly1305` 0.10 | Hub event encryption (WebSocket events, `hub-event-crypto.ts`) |
 | **HKDF-SHA256** | `hkdf` 0.12 | Key derivation with domain separation |
 | **Argon2id** | `argon2` crate — 64MB memory, 3 iterations, 4 parallelism | PIN/passphrase-to-KEK derivation for device key storage (replaces PBKDF2) |
 | **HMAC-SHA256** | `hmac` 0.12 | Phone/IP hashing, blind index generation, PUK subkey derivation |
 | **SHA-256** | `sha2` 0.10 | Hashing, hash-chained audit logs, User-Agent hashing in audit |
-| **BIP-340 Schnorr** | `k256` 0.13 (legacy) | Nostr event signing only — being phased out for non-Nostr auth |
+| **BIP-340 Schnorr** | `k256` 0.13 (legacy) | WebSocket event signing only — being phased out for non-WebSocket auth |
 
 ### Legacy Primitives (Scheduled for Removal)
 
@@ -65,7 +65,7 @@ User Identity (sigchain)
 │
 Hub Key (per-hub, random 32 bytes)
 ├── HPKE-wrapped per member (label: LABEL_HUB_KEY_WRAP)
-├── Hub Event Key (HKDF from hub key, label: LABEL_HUB_EVENT) ── Nostr event encryption
+├── Hub Event Key (HKDF from hub key, label: LABEL_HUB_EVENT) ── WebSocket event encryption
 └── Hub PTK (derived via MLS export or HKDF, label: LABEL_HUB_PTK)
     └── SFrame Call Secrets (per-call, label: LABEL_SFRAME_CALL_SECRET)
         └── SFrame Base Key (label: LABEL_SFRAME_BASE_KEY)
@@ -257,20 +257,20 @@ Derived from PUK via HKDF export (`LABEL_ITEMS_KEY_EXPORT`). Used as an intermed
 
 Same pattern as notes but with label `LABEL_MESSAGE`. Server encrypts inbound webhook messages (SMS/WhatsApp/Signal) immediately on receipt, discards plaintext.
 
-### Hub Event Encryption (Server-Published Nostr Events)
+### Hub Event Encryption (Server-Published WebSocket Events)
 
-The server publishes Nostr events encrypted under a key derived from `SERVER_NOSTR_SECRET` (not the hub key directly). The derivation uses epoch-based forward secrecy:
+The server publishes WebSocket events encrypted under a key derived from `SERVER_SECRET` (not the hub key directly). The derivation uses epoch-based forward secrecy:
 
-1. Derive `event_key = HKDF-SHA256(SERVER_NOSTR_SECRET, salt=LABEL_SERVER_EVENT_ENCRYPTION_KEY[:hubId], info=LABEL_HUB_EVENT_EPOCH[:epoch], 32)`
+1. Derive `event_key = HKDF-SHA256(SERVER_SECRET, salt=LABEL_SERVER_EVENT_ENCRYPTION_KEY[:hubId], info=LABEL_HUB_EVENT_EPOCH[:epoch], 32)`
    - Epoch = `floor(unix_timestamp / 86400)` — key changes every 24 hours
    - `hubId` scopes the key per-hub for isolation
 2. Pad event JSON to a power-of-2 bucket (minimum 512B): `[4-byte LE length][plaintext][random padding]`
 3. Encrypt padded bytes with XChaCha20-Poly1305 using `event_key` and a random 24-byte nonce
 4. Wire format: `hex(nonce || ciphertext)`
 
-Clients receive the server event key (current + previous epoch) via `GET /api/auth/me` (in the hub key distribution envelope). The key is distinct from the server's Nostr signing key — separate derivation labels enforce cryptographic independence (Albrecht defense, H1/H5 hardening).
+Clients receive the server event key (current + previous epoch) via `GET /api/auth/me` (in the hub key distribution envelope). The key is distinct from the server's event signing key — separate derivation labels enforce cryptographic independence (Albrecht defense, H1/H5 hardening).
 
-**NIP-42 authentication**: The Nostr publisher connects to strfry with NIP-42 auth. The relay's write-policy plugin (`deploy/docker/write-policy.sh`) accepts events only from the whitelisted `ALLOWED_PUBKEY` (server's derived Nostr pubkey). NIP-42 auth events (kind 22242) are always allowed for client authentication. This prevents injection of fake events by any third party.
+**WebSocket authentication**: Clients authenticate to the built-in WebSocket endpoint using the same session token or signed auth token used for REST API requests. Only authenticated clients receive events. The server handles all event publishing — clients cannot inject events.
 
 ### Voice E2EE (SFrame)
 
@@ -311,17 +311,17 @@ An observer sees only the bucket size (a power of 2), not the actual payload len
 
 ### Scope
 
-Padding applies to Nostr hub events. It does NOT currently apply to note/message/transcription API payloads — those arrive over HTTPS with TLS-layer encryption.
+Padding applies to WebSocket hub events. It does NOT currently apply to note/message/transcription API payloads — those arrive over HTTPS with TLS-layer encryption.
 
 ---
 
-## Nostr Key Separation (Signing vs. Encryption)
+## WebSocket Key Separation (Signing vs. Encryption)
 
-The server has two cryptographically independent keys derived from `SERVER_NOSTR_SECRET`:
+The server has two cryptographically independent keys derived from `SERVER_SECRET`:
 
 | Key | Derivation label | Usage |
 |-----|-----------------|-------|
-| Nostr signing key | `LABEL_SERVER_NOSTR_KEY` | Signing published Nostr events (Ed25519/Schnorr) |
+| WebSocket signing key | `LABEL_SERVER_NOSTR_KEY` | Signing published WebSocket events (Ed25519/Schnorr) |
 | Event encryption key | `LABEL_SERVER_EVENT_ENCRYPTION_KEY` | Encrypting event content (XChaCha20-Poly1305) |
 
 Using separate labels means a signing key compromise does not compromise content confidentiality, and vice versa. This separation was introduced as the H1 hardening fix.
@@ -407,5 +407,5 @@ All dependencies use `Cargo.lock` for reproducible builds. The `packages/crypto/
 
 | Date | Version | Changes |
 |------|---------|---------|
-| 2026-05-03 | 1.1 | Post-hardening update: Argon2id (64MB/3/4) replaces PBKDF2 for PIN/passphrase; min 8 digits or alphanumeric passphrase; XChaCha20-Poly1305 for hub events (was misattributed); per-hub epoch-based event key rotation (24h); power-of-2 payload padding section; NIP-42 auth + write-policy publisher verification; Nostr signing/encryption key separation; MLS always-on (feature flag removed) |
+| 2026-05-03 | 1.1 | Post-hardening update: Argon2id (64MB/3/4) replaces PBKDF2 for PIN/passphrase; min 8 digits or alphanumeric passphrase; XChaCha20-Poly1305 for hub events (was misattributed); per-hub epoch-based event key rotation (24h); power-of-2 payload padding section; WebSocket auth + built-in endpoint; WebSocket signing/encryption key separation; MLS always-on (feature flag removed) |
 | 2026-05-02 | 1.0 | Initial document — consolidated from protocol spec, crate source, and CLAUDE.md |

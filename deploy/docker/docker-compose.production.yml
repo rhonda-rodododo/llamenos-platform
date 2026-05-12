@@ -128,26 +128,6 @@ services:
       retries: 3
       start_period: 15s
 
-  strfry:
-    security_opt:
-      - no-new-privileges:true
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: "0.5"
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-        tag: "llamenos-strfry"
-    healthcheck:
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
-
   # ── Optional profiles: resource limits ─────────────────────
 
   whisper:

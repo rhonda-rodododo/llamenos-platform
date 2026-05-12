@@ -160,7 +160,7 @@ Ouvrez `https://hotline.yourdomain.com` dans votre navigateur. Connectez-vous av
 
 | Paramètre | Description | Défaut |
 |-----------|-------------|--------|
-| `secrets.adminPubkey` | Clé publique Nostr hex de l'admin | `""` |
+| `secrets.adminPubkey` | Clé publique WebSocket hex de l'admin | `""` |
 | `secrets.postgresPassword` | Mot de passe PostgreSQL (requis) | `""` |
 | `secrets.twilioAccountSid` | Twilio Account SID | `""` |
 | `secrets.twilioAuthToken` | Twilio Auth Token | `""` |

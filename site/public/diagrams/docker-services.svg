@@ -33,12 +33,6 @@
   <text x="95" y="111" class="label">Llámenos app</text>
   <text x="210" y="111" class="detail">Bun/Hono HTTP server</text>
 
-  <!-- strfry -->
-  <line x1="45" y1="148" x2="75" y2="148" class="branch"/>
-  <rect x="80" y="132" width="360" height="30" class="node" fill="url(#leafGrad)" stroke="#51AFAE" stroke-width="1.5"/>
-  <text x="95" y="151" class="label">strfry</text>
-  <text x="210" y="151" class="detail">self-hosted Nostr relay (real-time events)</text>
-
   <!-- sip-bridge -->
   <line x1="45" y1="188" x2="75" y2="188" class="branch"/>
   <rect x="80" y="172" width="360" height="30" class="node" fill="url(#leafGrad)" stroke="#51AFAE" stroke-width="1.5"/>

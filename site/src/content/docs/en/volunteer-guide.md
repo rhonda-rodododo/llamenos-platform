@@ -9,7 +9,7 @@ This guide covers everything you need to know as a volunteer: logging in, receiv
 
 Your admin will give you one of:
 
-- An **nsec** (Nostr secret key) — a string starting with `nsec1`
+- An **nsec** (WebSocket secret key) — a string starting with `nsec1`
 - An **invite link** — a one-time URL that generates credentials for you
 
 **Keep your nsec private.** It's your identity and login credential. Anyone with your nsec can impersonate you. Store it in a password manager.

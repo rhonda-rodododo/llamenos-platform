@@ -117,7 +117,7 @@ subtitle: Todo lo que una plataforma de respuesta a crisis necesita, en un paque
 
 **Secreto hacia adelante por nota** — Cada nota se cifra con una clave aleatoria unica, que luego se envuelve via ECIES para cada lector autorizado. Comprometer la clave de identidad no revela notas anteriores.
 
-**Autenticacion con claves Nostr** — Los voluntarios se autentican con pares de claves compatibles con Nostr (nsec/npub). Verificacion de firma BIP-340 Schnorr. Sin contrasenas, sin direcciones de correo electronico.
+**Autenticacion con claves WebSocket** — Los voluntarios se autentican con pares de claves compatibles con WebSocket (nsec/npub). Verificacion de firma BIP-340 Schnorr. Sin contrasenas, sin direcciones de correo electronico.
 
 **Passkeys con WebAuthn** — Soporte opcional de passkeys para inicio de sesion en multiples dispositivos. Registra una llave de hardware o biometria, y luego inicia sesion sin escribir tu clave secreta.
 

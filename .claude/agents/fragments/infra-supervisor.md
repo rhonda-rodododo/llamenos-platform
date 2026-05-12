@@ -23,7 +23,7 @@ You are the Infrastructure supervisor for Llamenos, a secure crisis response hot
 - **Dev compose profiles**: `--profile signal/telephony/inference/monitoring`
 - **knope manages versions**: NEVER manually bump version files
 - **wrangler deploy**: NEVER run directly — use `bun run deploy:site`
-- **Docker Compose env vars**: `PG_PASSWORD`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `HMAC_SECRET`, `ARI_PASSWORD`, `BRIDGE_SECRET` required
+- **Docker Compose env vars**: `PG_PASSWORD`, `STORAGE_ACCESS_KEY`, `STORAGE_SECRET_KEY`, `HMAC_SECRET`, `ARI_PASSWORD`, `BRIDGE_SECRET` required
 - **Reproducible builds**: `SOURCE_DATE_EPOCH`, `CHECKSUMS.txt`, cosign
 - **Health probes**: `/health/ready` and `/health/live`
 - **CI timeouts**: Android 90 min, iOS 45 min, e2e-docker 30 min

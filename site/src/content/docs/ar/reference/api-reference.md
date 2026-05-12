@@ -86,8 +86,8 @@ Returns public hub configuration, enabled channels, and server identity.
   "needsBootstrap": false,
   "hubs": [{ "id": "...", "name": "...", "slug": "..." }],
   "defaultHubId": "...",
-  "serverNostrPubkey": "hex_64",
-  "nostrRelayUrl": "wss://..."
+  "serverWebSocketPubkey": "hex_64",
+  "WebSocketRelayUrl": "wss://..."
 }
 ```
 

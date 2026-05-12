@@ -68,19 +68,14 @@ export function validateConfig(env: ConfigInput = process.env): void {
   // --- Required vars ---
   assertDatabaseUrl(env)
   assertHex64(env, 'HMAC_SECRET')
-  // SERVER_SECRET is the canonical name; SERVER_NOSTR_SECRET is the legacy alias.
-  // Prefer SERVER_SECRET; fall back to SERVER_NOSTR_SECRET only if it has a value.
-  const hasCanonical = !!env['SERVER_SECRET']?.trim()
-  const hasLegacy = !!env['SERVER_NOSTR_SECRET']?.trim()
-  const serverSecretKey = hasCanonical ? 'SERVER_SECRET' : hasLegacy ? 'SERVER_NOSTR_SECRET' : 'SERVER_SECRET'
-  assertHex64(env, serverSecretKey)
+  assertHex64(env, 'SERVER_SECRET')
 
-  // ADMIN_PUBKEY: 64 hex chars (Nostr pubkey, x-only compressed)
+  // ADMIN_PUBKEY: 64 hex chars (Ed25519 public key, hex-encoded)
   // Optional: if not set, the first admin is bootstrapped via the Tauri desktop app.
   const adminPubkey = env['ADMIN_PUBKEY']?.trim() ?? ''
   if (adminPubkey.length > 0 && (adminPubkey.length !== 64 || !HEX_RE.test(adminPubkey))) {
     throw new Error(
-      `[llamenos] ADMIN_PUBKEY must be exactly 64 hex characters (Nostr x-only pubkey). Got length ${adminPubkey.length}. ` +
+      `[llamenos] ADMIN_PUBKEY must be exactly 64 hex characters (Ed25519 public key). Got length ${adminPubkey.length}. ` +
       `Generate with: bun run bootstrap-admin`
     )
   }
@@ -92,7 +87,7 @@ export function validateConfig(env: ConfigInput = process.env): void {
   assertNonEmpty(env, 'ENVIRONMENT')
 
   // --- Optional vars (warn when absent, do not fail) ---
-  // NOSTR_RELAY_URL removed — replaced by in-process WebSocket relay
+  // WebSocket relay is in-process — no external relay URL needed
   warnIfAbsent(env, 'FCM_SERVICE_ACCOUNT_KEY', 'Android push notifications disabled')
   warnIfAbsent(env, 'APNS_KEY_P8', 'iOS push notifications disabled')
   warnIfAbsent(env, 'APNS_KEY_ID', 'iOS push notifications disabled')

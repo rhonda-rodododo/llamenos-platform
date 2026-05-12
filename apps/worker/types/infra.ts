@@ -39,14 +39,11 @@ export interface Env {
   // Blob storage (CF: R2Bucket, Node: S3-compatible storage)
   R2_BUCKET: BlobStorage
 
-  // Hub-scoped storage manager (RustFS/MinIO with per-hub IAM)
+  // Hub-scoped storage manager (RustFS with per-hub IAM)
   STORAGE_MANAGER?: import('../lib/storage-manager').StorageManager
 
   // Storage admin client for IAM operations
   STORAGE_ADMIN?: import('../lib/storage-admin').StorageAdminClient
-
-  // Nostr relay service binding (CF: Fetcher to Nosflare, Node: null)
-  NOSFLARE?: { fetch(request: Request): Promise<Response> }
 
   // Plain env vars / secrets (same on both platforms)
   TWILIO_ACCOUNT_SID: string
@@ -68,8 +65,6 @@ export interface Env {
 
   // Server secret — hex 32 bytes used for HKDF key derivation (signing, encryption, auth)
   SERVER_SECRET?: string
-  // Legacy alias (will be removed after full migration)
-  SERVER_NOSTR_SECRET?: string
 
   // Firehose inference agent seal key (hex 32 bytes — seals agent nsecs at rest)
   FIREHOSE_AGENT_SEAL_KEY?: string

@@ -9,7 +9,7 @@ Gid sa a kouvri tout sa ou bezwen konnen kòm volontè: koneksyon, resevwa apèl
 
 Administratè ou a ap ba ou youn nan sa yo:
 
-- Yon **nsec** (kle sekrè Nostr) -- yon tèks ki kòmanse ak `nsec1`
+- Yon **nsec** (kle sekrè WebSocket) -- yon tèks ki kòmanse ak `nsec1`
 - Yon **lyen envitasyon** -- yon URL yon sèl fwa ki jenere idantifyan pou ou
 
 **Kenbe nsec ou prive.** Se idantite ou ak idantifyan koneksyon ou. Nenpòt moun ki gen nsec ou ka pran idantite ou. Mete li nan yon jesyonè modpas.

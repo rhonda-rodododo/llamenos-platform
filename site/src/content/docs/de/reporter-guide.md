@@ -8,7 +8,7 @@ Als Berichterstatter koennen Sie verschluesselte Berichte an Ihre Organisation u
 ## Erste Schritte
 
 Ihr Administrator wird Ihnen eines der folgenden bereitstellen:
-- Einen **nsec** (Nostr-Geheimschluessel) -- eine Zeichenkette, die mit `nsec1` beginnt
+- Einen **nsec** (WebSocket-Geheimschluessel) -- eine Zeichenkette, die mit `nsec1` beginnt
 - Einen **Einladungslink** -- eine einmalige URL, die Anmeldedaten fuer Sie erstellt
 
 **Halten Sie Ihren nsec privat.** Er ist Ihre Identitaet und Anmeldeberechtigung. Speichern Sie ihn in einem Passwort-Manager.
