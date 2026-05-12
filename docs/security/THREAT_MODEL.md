@@ -46,7 +46,7 @@ This document defines the threat model for Llamenos, a secure crisis response ho
 - Sigchain device revocation — compromised devices can be deauthorized without affecting other devices
 
 **Residual risks**:
-- PIN entropy (minimum 8 digits; alphanumeric passphrase supported) with Argon2id (64MB/3/4) materially increases offline brute-force cost — but seized encrypted blob + sufficient GPU resources can still crack weak credentials
+- PIN/passphrase entropy: numeric PIN (minimum 8 digits, ~26.6 bits) or alphanumeric passphrase (minimum 8 characters with at least one letter, ~47+ bits for mixed case + digits). Argon2id (64MB/3/4) materially increases offline brute-force cost — but seized encrypted blob + sufficient GPU resources can still crack weak credentials. Alphanumeric passphrase is strongly recommended for high-threat environments
 - Caller phone numbers are transiently available to answering volunteers during active calls
 - Traffic analysis can reveal call timing, duration, and volunteer activity patterns (hub event padding partially mitigates size analysis)
 - Legal compulsion of hosting provider yields encrypted blobs (but not decryption keys)
@@ -185,7 +185,7 @@ This document defines the threat model for Llamenos, a secure crisis response ho
 | Traffic analysis (full) | Hub events padded to power-of-2 buckets; API payloads not padded; no dummy traffic | Partial — hub event sizes hidden; call pattern timing still visible |
 | Metadata confidentiality | Server needs `callId`, `authorPubkey`, timestamps; caller number is HMAC-hashed; User-Agent is SHA-256 hashed; country not stored | Improved — less metadata retained than before; routing metadata unavoidable |
 | SMS/WhatsApp E2EE | Provider requires plaintext during send; Signal-first routing used when available; SMS notification-only mode omits body content | Partial — Signal routing eliminates provider visibility when applicable |
-| PIN brute-force resistance (offline) | Argon2id (64MB, 3 iter, 4 lanes) + minimum 8 digits or alphanumeric passphrase | Significantly improved — GPU/ASIC attack substantially more expensive than PBKDF2 |
+| PIN/passphrase brute-force resistance (offline) | Argon2id (64MB, 3 iter, 4 lanes) + minimum 8-digit PIN (~26.6 bits) or alphanumeric passphrase (~47+ bits for mixed case + digits) | Significantly improved — GPU/ASIC attack substantially more expensive than PBKDF2. Alphanumeric passphrase strongly recommended |
 | Server-side key deletion verification | Cannot prove hosting provider deleted data | Yes — fundamental cloud trust limitation |
 | WebSocket metadata privacy | Server handles all event distribution; authenticated connections only; content epoch-encrypted per hub | Improved — event injection blocked; content hidden; connection metadata visible to server only |
 
