@@ -221,7 +221,7 @@ fn derive_base_nonce(send_key: &[u8; 32]) -> [u8; NONCE_SIZE] {
 fn compute_nonce(base_nonce: &[u8; NONCE_SIZE], counter: u64) -> [u8; NONCE_SIZE] {
     let mut nonce = *base_nonce;
     let ctr_bytes = counter.to_be_bytes(); // 8 bytes
-    // XOR counter into the last 8 bytes of the 12-byte nonce.
+                                           // XOR counter into the last 8 bytes of the 12-byte nonce.
     for i in 0..8 {
         nonce[NONCE_SIZE - 8 + i] ^= ctr_bytes[i];
     }
@@ -297,10 +297,7 @@ pub fn sframe_encrypt(
 /// Returns `CryptoError::InvalidInput` if `send_key` is not 32 bytes.
 /// Returns `CryptoError::InvalidCiphertext` if the frame is too short to parse.
 /// Returns `CryptoError::DecryptionFailed` if AES-256-GCM authentication fails.
-pub fn sframe_decrypt(
-    send_key: &[u8],
-    ciphertext: &[u8],
-) -> Result<Vec<u8>, CryptoError> {
+pub fn sframe_decrypt(send_key: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>, CryptoError> {
     if send_key.len() != 32 {
         return Err(CryptoError::InvalidInput(
             "send_key must be 32 bytes".into(),
