@@ -1,7 +1,7 @@
 # v1 → v2 Feature Port: Epic Index
 
-**Date:** 2026-05-11
-**Status:** Stub specs complete, awaiting prioritization and detailed planning
+**Date:** 2026-05-11 (updated 2026-05-12)
+**Status:** EP01-EP03 specced and planned; EP04-EP09 are stubs
 
 ## Overview
 
@@ -18,9 +18,9 @@ This is the master index for porting remaining v1 features to v2. Each epic is a
 
 | Epic | Title | Phase | Depends On | Status |
 |------|-------|-------|------------|--------|
-| EP01 | [Permission System & Role Management](2026-05-11-EP01-permission-role-management-design.md) | 1 | — | Stub |
-| EP02 | [Device & Identity Management](2026-05-11-EP02-device-management-design.md) | 2 | EP01 | Stub |
-| EP03 | [Teams & Tags](2026-05-11-EP03-teams-tags-design.md) | 2 | EP01 | Stub |
+| EP01 | [Permission System & Role Management](2026-05-11-EP01-permission-role-management-design.md) | 1 | — | Specced + Planned |
+| EP02 | [Device & Identity Management](2026-05-11-EP02-device-management-design.md) | 2 | EP01 | Specced + Planned |
+| EP03 | [Teams & Tags](2026-05-11-EP03-teams-tags-design.md) | 2 | EP01 | Specced + Planned |
 | EP04 | [Analytics & Dashboards](2026-05-11-EP04-analytics-dashboards-design.md) | 3 | — | Stub |
 | EP05 | [Messaging Channels & Blast System](2026-05-11-EP05-messaging-blast-system-design.md) | 3 | EP01 | Stub |
 | EP06 | [CMS/CRM — Contacts, Cases, Events, Evidence](2026-05-11-EP06-cms-crm-design.md) | 4 | EP01, EP03 | Stub |
