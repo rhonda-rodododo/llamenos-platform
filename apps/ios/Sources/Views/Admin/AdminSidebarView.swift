@@ -6,7 +6,8 @@ struct AdminSidebarView: View {
     
     var body: some View {
         List(selection: $selectedSection) {
-            Section(header: Text(NSLocalizedString("adminNav_scopes_thisHub", comment: "This Hub"))) {
+            Section(header: Text(NSLocalizedString("adminNav_scopes_thisHub", comment: "This Hub"))
+                .accessibilityIdentifier("admin-sidebar-header-this-hub")) {
                 ForEach(thisHubItems) { item in
                     NavigationLink(value: item) {
                         Label(
@@ -19,7 +20,8 @@ struct AdminSidebarView: View {
             }
             
             if platformItems.count > 0 {
-                Section(header: Text(NSLocalizedString("adminNav_scopes_platform", comment: "Platform"))) {
+                Section(header: Text(NSLocalizedString("adminNav_scopes_platform", comment: "Platform"))
+                    .accessibilityIdentifier("admin-sidebar-header-platform")) {
                     ForEach(platformItems) { item in
                         NavigationLink(value: item) {
                             Label(
@@ -33,6 +35,7 @@ struct AdminSidebarView: View {
             }
         }
         .listStyle(.sidebar)
+        .accessibilityIdentifier("admin-sidebar-list")
         .navigationTitle(NSLocalizedString("admin_title", comment: "Admin"))
     }
     
