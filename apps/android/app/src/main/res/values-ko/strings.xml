@@ -934,6 +934,7 @@
     <string name="common_status">상태</string>
     <string name="common_submit">제출</string>
     <string name="common_success">성공</string>
+    <string name="common_unauthorized">Unauthorized</string>
     <string name="common_yes">예</string>
     <string name="confirm_backup">Confirm Backup</string>
     <string name="confirm_captcha_disable">음성 CAPTCHA를 비활성화하시겠습니까? 발신자는 확인 없이 바로 연결됩니다.</string>

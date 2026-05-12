@@ -712,6 +712,7 @@
     "accessDenied": "Access denied",
     "actions": "कार्रवाइयाँ",
     "add": "जोड़ें",
+    "all": "All",
     "appName": "Llámenos",
     "back": "वापस",
     "cancel": "रद्द करें",
@@ -720,6 +721,7 @@
     "configured": "Configured",
     "confirm": "पुष्टि करें",
     "continue": "Continue",
+    "create": "Create",
     "delete": "हटाएं",
     "disabled": "Disabled",
     "dismiss": "Dismiss",
@@ -736,8 +738,10 @@
     "none": "None",
     "off": "off",
     "offline": "You are offline. Calls and messages will not work until connectivity is restored.",
+    "ok": "OK",
     "on": "on",
     "or": "या",
+    "previous": "Previous",
     "remove": "Remove",
     "retry": "Retry",
     "save": "सहेजें",
@@ -754,7 +758,8 @@
     "comingSoon": "Coming soon",
     "hideAdvanced": "Hide Advanced",
     "showAdvanced": "Show Advanced",
-    "saved": "Saved"
+    "saved": "Saved",
+"unauthorized": "Unauthorized"
   },
   "confirm": {
     "backup": "Confirm Backup",

@@ -931,6 +931,7 @@
 "common_status" = "स्थिति";
 "common_submit" = "सबमिट करें";
 "common_success" = "सफलता";
+"common_unauthorized" = "Unauthorized";
 "common_yes" = "हाँ";
 "confirm_backup" = "Confirm Backup";
 "confirm_captcha_disable" = "वॉइस CAPTCHA अक्षम करें? कॉल करने वाले बिना सत्यापन के सीधे कनेक्ट हो जाएंगे।";

@@ -61,6 +61,7 @@ import org.llamenos.hotline.ui.events.EventsViewModel
 import org.llamenos.hotline.ui.hubs.CreateHubScreen
 import org.llamenos.hotline.ui.hubs.HubListScreen
 import org.llamenos.hotline.ui.hubs.HubManagementViewModel
+import org.llamenos.hotline.ui.hubsettings.HubCommunicationsScreen
 import org.llamenos.hotline.ui.settings.DeviceLinkScreen
 import org.llamenos.hotline.ui.contacts.ContactDetailScreen
 import org.llamenos.hotline.ui.contacts.ContactDetailViewModel
@@ -330,6 +331,11 @@ sealed interface LlamenosRoute {
     /** Signal registration. */
     data object SignalRegistration : LlamenosRoute {
         override val route = "signal_registration"
+    }
+
+    /** Hub communications settings. */
+    data object HubCommunications : LlamenosRoute {
+        override val route = "hub_communications"
     }
 }
 
@@ -975,6 +981,18 @@ fun LlamenosNavigation(
         composable(LlamenosRoute.SignalRegistration.route) {
             SignalRegistrationScreen(
                 onNavigateBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(LlamenosRoute.HubCommunications.route) {
+            HubCommunicationsScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToProviderSetup = {
+                    navController.navigate(LlamenosRoute.ProviderSetup.route)
+                },
+                onNavigateToPhoneNumbers = { provider ->
+                    navController.navigate("phone_numbers/$provider")
+                },
             )
         }
     }

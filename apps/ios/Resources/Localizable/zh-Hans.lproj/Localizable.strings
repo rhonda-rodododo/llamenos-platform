@@ -931,6 +931,7 @@
 "common_status" = "状态";
 "common_submit" = "提交";
 "common_success" = "成功";
+"common_unauthorized" = "Unauthorized";
 "common_yes" = "是";
 "confirm_backup" = "Confirm Backup";
 "confirm_captcha_disable" = "禁用语音验证码？来电者将直接接通，无需验证。";

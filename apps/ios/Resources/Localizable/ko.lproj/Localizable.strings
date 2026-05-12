@@ -931,6 +931,7 @@
 "common_status" = "상태";
 "common_submit" = "제출";
 "common_success" = "성공";
+"common_unauthorized" = "Unauthorized";
 "common_yes" = "예";
 "confirm_backup" = "Confirm Backup";
 "confirm_captcha_disable" = "음성 CAPTCHA를 비활성화하시겠습니까? 발신자는 확인 없이 바로 연결됩니다.";

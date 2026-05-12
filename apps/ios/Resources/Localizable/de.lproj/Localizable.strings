@@ -931,6 +931,7 @@
 "common_status" = "Status";
 "common_submit" = "Absenden";
 "common_success" = "Erfolg";
+"common_unauthorized" = "Unauthorized";
 "common_yes" = "Ja";
 "confirm_backup" = "Confirm Backup";
 "confirm_captcha_disable" = "Sprach-CAPTCHA deaktivieren? Anrufer werden direkt ohne Überprüfung verbunden.";

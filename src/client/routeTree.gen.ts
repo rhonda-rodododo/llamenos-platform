@@ -39,6 +39,7 @@ import { Route as AdminSystemRouteImport } from './routes/admin/system'
 import { Route as AdminSettingsRouteImport } from './routes/admin/settings'
 import { Route as AdminHubsRedirectRouteImport } from './routes/admin/hubs-redirect'
 import { Route as AdminHubsRouteImport } from './routes/admin/hubs'
+import { Route as AdminHubCommunicationsRouteImport } from './routes/admin/hub-communications'
 import { Route as AdminFirehoseRedirectRouteImport } from './routes/admin/firehose-redirect'
 import { Route as AdminFirehoseRouteImport } from './routes/admin/firehose'
 import { Route as AdminCaseManagementRedirectRouteImport } from './routes/admin/case-management-redirect'
@@ -195,6 +196,11 @@ const AdminHubsRoute = AdminHubsRouteImport.update({
   path: '/hubs',
   getParentRoute: () => AdminRouteRoute,
 } as any)
+const AdminHubCommunicationsRoute = AdminHubCommunicationsRouteImport.update({
+  id: '/hub-communications',
+  path: '/hub-communications',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
 const AdminFirehoseRedirectRoute = AdminFirehoseRedirectRouteImport.update({
   id: '/firehose-redirect',
   path: '/firehose-redirect',
@@ -252,6 +258,7 @@ export interface FileRoutesByFullPath {
   '/admin/case-management-redirect': typeof AdminCaseManagementRedirectRoute
   '/admin/firehose': typeof AdminFirehoseRoute
   '/admin/firehose-redirect': typeof AdminFirehoseRedirectRoute
+  '/admin/hub-communications': typeof AdminHubCommunicationsRoute
   '/admin/hubs': typeof AdminHubsRoute
   '/admin/hubs-redirect': typeof AdminHubsRedirectRoute
   '/admin/settings': typeof AdminSettingsRoute
@@ -288,6 +295,7 @@ export interface FileRoutesByTo {
   '/admin/case-management-redirect': typeof AdminCaseManagementRedirectRoute
   '/admin/firehose': typeof AdminFirehoseRoute
   '/admin/firehose-redirect': typeof AdminFirehoseRedirectRoute
+  '/admin/hub-communications': typeof AdminHubCommunicationsRoute
   '/admin/hubs': typeof AdminHubsRoute
   '/admin/hubs-redirect': typeof AdminHubsRedirectRoute
   '/admin/settings': typeof AdminSettingsRoute
@@ -326,6 +334,7 @@ export interface FileRoutesById {
   '/admin/case-management-redirect': typeof AdminCaseManagementRedirectRoute
   '/admin/firehose': typeof AdminFirehoseRoute
   '/admin/firehose-redirect': typeof AdminFirehoseRedirectRoute
+  '/admin/hub-communications': typeof AdminHubCommunicationsRoute
   '/admin/hubs': typeof AdminHubsRoute
   '/admin/hubs-redirect': typeof AdminHubsRedirectRoute
   '/admin/settings': typeof AdminSettingsRoute
@@ -365,6 +374,7 @@ export interface FileRouteTypes {
     | '/admin/case-management-redirect'
     | '/admin/firehose'
     | '/admin/firehose-redirect'
+    | '/admin/hub-communications'
     | '/admin/hubs'
     | '/admin/hubs-redirect'
     | '/admin/settings'
@@ -401,6 +411,7 @@ export interface FileRouteTypes {
     | '/admin/case-management-redirect'
     | '/admin/firehose'
     | '/admin/firehose-redirect'
+    | '/admin/hub-communications'
     | '/admin/hubs'
     | '/admin/hubs-redirect'
     | '/admin/settings'
@@ -438,6 +449,7 @@ export interface FileRouteTypes {
     | '/admin/case-management-redirect'
     | '/admin/firehose'
     | '/admin/firehose-redirect'
+    | '/admin/hub-communications'
     | '/admin/hubs'
     | '/admin/hubs-redirect'
     | '/admin/settings'
@@ -686,6 +698,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminHubsRouteImport
       parentRoute: typeof AdminRouteRoute
     }
+    '/admin/hub-communications': {
+      id: '/admin/hub-communications'
+      path: '/hub-communications'
+      fullPath: '/admin/hub-communications'
+      preLoaderRoute: typeof AdminHubCommunicationsRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
     '/admin/firehose-redirect': {
       id: '/admin/firehose-redirect'
       path: '/firehose-redirect'
@@ -730,6 +749,7 @@ interface AdminRouteRouteChildren {
   AdminCaseManagementRedirectRoute: typeof AdminCaseManagementRedirectRoute
   AdminFirehoseRoute: typeof AdminFirehoseRoute
   AdminFirehoseRedirectRoute: typeof AdminFirehoseRedirectRoute
+  AdminHubCommunicationsRoute: typeof AdminHubCommunicationsRoute
   AdminHubsRoute: typeof AdminHubsRoute
   AdminHubsRedirectRoute: typeof AdminHubsRedirectRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
@@ -743,6 +763,7 @@ const AdminRouteRouteChildren: AdminRouteRouteChildren = {
   AdminCaseManagementRedirectRoute: AdminCaseManagementRedirectRoute,
   AdminFirehoseRoute: AdminFirehoseRoute,
   AdminFirehoseRedirectRoute: AdminFirehoseRedirectRoute,
+  AdminHubCommunicationsRoute: AdminHubCommunicationsRoute,
   AdminHubsRoute: AdminHubsRoute,
   AdminHubsRedirectRoute: AdminHubsRedirectRoute,
   AdminSettingsRoute: AdminSettingsRoute,

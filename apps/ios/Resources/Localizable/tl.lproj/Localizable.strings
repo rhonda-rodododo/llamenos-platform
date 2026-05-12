@@ -931,6 +931,7 @@
 "common_status" = "Status";
 "common_submit" = "Isumite";
 "common_success" = "Tagumpay";
+"common_unauthorized" = "Unauthorized";
 "common_yes" = "Oo";
 "confirm_backup" = "Confirm Backup";
 "confirm_captcha_disable" = "I-disable ang voice CAPTCHA? Direktang makakakonekta ang mga tumatawag nang walang verification.";

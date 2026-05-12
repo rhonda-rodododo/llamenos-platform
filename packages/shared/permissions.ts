@@ -189,6 +189,7 @@ export const PERMISSION_CATALOG = {
   'system:view-roles': 'View role definitions',
   'system:manage-roles': 'Create/edit/delete custom roles',
   'system:manage-hubs': 'Create/manage hubs',
+  'system:create-hub': 'Create new hubs (self-serve hub creation)',
   'system:manage-instance': 'Instance-level settings',
 } as const
 

@@ -931,6 +931,7 @@
 "common_status" = "Trạng thái";
 "common_submit" = "Gửi";
 "common_success" = "Thành công";
+"common_unauthorized" = "Unauthorized";
 "common_yes" = "Có";
 "confirm_backup" = "Confirm Backup";
 "confirm_captcha_disable" = "Tắt CAPTCHA giọng nói? Người gọi sẽ được kết nối trực tiếp mà không cần xác minh.";

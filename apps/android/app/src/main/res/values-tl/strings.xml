@@ -934,6 +934,7 @@
     <string name="common_status">Status</string>
     <string name="common_submit">Isumite</string>
     <string name="common_success">Tagumpay</string>
+    <string name="common_unauthorized">Unauthorized</string>
     <string name="common_yes">Oo</string>
     <string name="confirm_backup">Confirm Backup</string>
     <string name="confirm_captcha_disable">I-disable ang voice CAPTCHA? Direktang makakakonekta ang mga tumatawag nang walang verification.</string>

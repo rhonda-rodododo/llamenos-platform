@@ -934,6 +934,7 @@
     <string name="common_status">Статус</string>
     <string name="common_submit">Отправить</string>
     <string name="common_success">Успешно</string>
+    <string name="common_unauthorized">Unauthorized</string>
     <string name="common_yes">Да</string>
     <string name="confirm_backup">Confirm Backup</string>
     <string name="confirm_captcha_disable">Отключить голосовую CAPTCHA? Звонящие будут подключаться напрямую без проверки.</string>
