@@ -134,6 +134,13 @@
       "when": 1778428174585,
       "tag": "0018_fix_provider_setup_fk_drift",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1778568679164,
+      "tag": "0019_provider_templates_and_onboarding",
+      "breakpoints": true
     }
   ]
 }

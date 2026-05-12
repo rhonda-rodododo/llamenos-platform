@@ -4,7 +4,7 @@ import { createCmsReportTypeViaApi, createReportViaApi } from './api-helpers'
 
 async function navigateToAdminSettings(page: Page): Promise<void> {
   await page.getByTestId('nav-admin-settings').click()
-  await expect(page.getByTestId('page-title')).toBeVisible({ timeout: 10000 })
+  await expect(page.getByTestId('page-title').or(page.getByTestId('admin-section-heading'))).toBeVisible({ timeout: 10000 })
 }
 
 async function navigateToReports(page: Page): Promise<void> {

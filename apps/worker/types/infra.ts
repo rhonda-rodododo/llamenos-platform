@@ -99,7 +99,7 @@ export interface Env {
 export interface DeviceRecord {
   platform: 'ios' | 'android'
   pushToken: string
-  wakeKeyPublic: string      // secp256k1 compressed pubkey (hex) for wake-tier ECIES
+  wakeKeyPublic: string      // X25519 pubkey (hex) for wake-tier HPKE
   registeredAt: string
   lastSeenAt: string
 }
@@ -306,7 +306,7 @@ export type MessageDeliveryStatus = 'pending' | 'sent' | 'delivered' | 'read' | 
  * Encrypted message using the envelope pattern (Epic 74).
  *
  * Single ciphertext encrypted with a random per-message symmetric key.
- * The key is ECIES-wrapped separately for each authorized reader.
+ * The key is HPKE-wrapped separately for each authorized reader.
  * Domain separation label: 'llamenos:message'.
  */
 export interface EncryptedMessage {

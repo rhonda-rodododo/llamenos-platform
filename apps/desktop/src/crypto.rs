@@ -6,11 +6,14 @@
 //! On desktop, the webview calls stateful commands via `platform.ts`.
 //! Device keys are decrypted once (unlock_with_pin), stored in DeviceKeyState,
 //! and zeroized on lock/quit/sleep.
+//!
+//! Encrypted device key blobs are persisted in Tauri Stronghold (encrypted vault
+//! with PBKDF2 key derivation) via the frontend — see `platform.ts`. This module
+//! does not access storage directly; it only manages in-memory crypto state.
 
 use std::sync::Mutex;
 
 use llamenos_core::{auth, device_keys, hpke_envelope, puk, sigchain};
-use tauri_plugin_store::StoreExt;
 
 use aes_gcm::{
     aead::{Aead, KeyInit, Payload},
@@ -115,11 +118,10 @@ pub fn device_generate_and_load(
 ///   5-6 failures: 30s lockout
 ///   7-8 failures: 2min lockout
 ///   9 failures: 10min lockout
-///   10+ failures: wipe encrypted keys from store
+///   10+ failures: signal frontend to wipe encrypted keys from Stronghold
 #[tauri::command]
 pub fn unlock_with_pin(
     state: tauri::State<'_, CryptoState>,
-    app_handle: tauri::AppHandle,
     data: device_keys::EncryptedDeviceKeys,
     pin: String,
 ) -> Result<serde_json::Value, String> {
@@ -157,10 +159,8 @@ pub fn unlock_with_pin(
                 7..=8 => 120_000,
                 9 => 600_000,
                 _ => {
-                    let store = app_handle
-                        .store("keys.json")
-                        .map_err(|e: tauri_plugin_store::Error| e.to_string())?;
-                    store.delete("llamenos-encrypted-device-keys");
+                    // Signal the frontend to wipe the encrypted keys from Stronghold.
+                    // The frontend handles storage — Rust only manages in-memory state.
                     *state.pin_failed_attempts.lock().unwrap() = 0;
                     *state.pin_lockout_until.lock().unwrap() = 0;
                     return Err("Too many failed attempts. Keys wiped.".to_string());

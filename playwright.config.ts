@@ -50,7 +50,7 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
       // Exclude bootstrap tests and screenshots — bootstrap runs in its own project above,
       // screenshots are on-demand only (run via `bun run test:screenshots`).
-      testIgnore: ["**/live/**", "**/desktop/**", "**/integration/**", "**/bootstrap.spec.ts", "**/screenshots.spec.ts"],
+      testIgnore: ["**/live/**", "**/desktop/**", "**/integration/**", "**/bootstrap.spec.ts", "**/screenshots.*", "**/screenshots.spec.ts"],
       // Wait for bootstrap tests to complete and restore admin before parallel tests run.
       dependencies: ["bootstrap"],
     },

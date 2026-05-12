@@ -194,7 +194,8 @@ All 69 labels are defined in `packages/protocol/crypto-labels.json` (source of t
 | 49 | Hub PTK | `LABEL_HUB_PTK_PREV_GEN` |
 | 50–51 | SFrame | `LABEL_SFRAME_CALL_SECRET`, `LABEL_SFRAME_BASE_KEY` |
 | 52 | MLS | `LABEL_MLS_PROVISION` |
-| 53–56 | Salts/derivation | `LABEL_ECIES_V2_SALT`, `LABEL_PROVISIONING_SALT`, `LABEL_HUB_PTK`, etc. |
+| 53 | *(tombstone)* | Removed — was `LABEL_ECIES_V2_SALT` |
+| 54–56 | Salts/derivation | `LABEL_PROVISIONING_SALT`, `LABEL_BLIND_INDEX_FIELD`, `LABEL_HUB_PTK` |
 | 57–68 | Server/hub/misc | `LABEL_WS_CHALLENGE`, `LABEL_SERVER_SIGNING_KEY`, `LABEL_SERVER_EVENT_ENCRYPTION_KEY`, `LABEL_HUB_EVENT_EPOCH`, etc. |
 
 **Rule**: Never use raw string literals for crypto contexts. Always use the generated label constants.

@@ -31,3 +31,24 @@ export const auditListResponseSchema = z.object({
   entries: z.array(auditEntryResponseSchema),
   ...paginatedMeta,
 })
+
+// --- Chain verification ---
+
+export const auditVerifyQuerySchema = z.object({
+  hubId: z.string().optional(),
+  limit: z.coerce.number().int().positive().optional(),
+  offset: z.coerce.number().int().min(0).optional(),
+})
+
+export const auditVerifyResponseSchema = z.object({
+  valid: z.boolean(),
+  totalEntries: z.number(),
+  checkedEntries: z.number(),
+  firstBrokenEntry: z.object({
+    id: z.string(),
+    seqIndex: z.number(),
+    expected: z.string().nullable(),
+    actual: z.string().nullable(),
+    reason: z.string(),
+  }).optional(),
+})

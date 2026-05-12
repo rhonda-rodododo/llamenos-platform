@@ -16,10 +16,7 @@
 //! This is used in the HPKE envelope `labelId` field for compact wire representation.
 //! Indices are stable — never reorder or reuse indices.
 
-// --- ECIES / HPKE Key Wrapping ---
-
-/// Domain-specific HKDF salt for ECIES v2 key derivation
-pub const LABEL_ECIES_V2_SALT: &str = "llamenos:ecies:v2";
+// --- HPKE Key Wrapping ---
 
 /// Per-note symmetric key wrapping
 pub const LABEL_NOTE_KEY: &str = "llamenos:note-key";
@@ -223,6 +220,43 @@ pub const LABEL_PROVISION_PREFIX: &str = "llamenos:provision-";
 /// PBKDF2 salt for Tauri Stronghold key derivation (desktop only)
 pub const LABEL_STRONGHOLD: &str = "llamenos:stronghold:v1";
 
+/// Storage credential wrapping (encrypted key material at rest)
+pub const LABEL_STORAGE_CREDENTIAL_WRAP: &str = "llamenos:storage-credential-wrap";
+
+// --- Server Nostr Signing ---
+
+/// HKDF derivation for server Nostr signing key
+pub const LABEL_SERVER_NOSTR_SIGNING_KEY: &str = "llamenos:server-nostr-signing:v1";
+
+/// HKDF info for server Nostr signing key
+pub const LABEL_SERVER_NOSTR_SIGNING_KEY_INFO: &str = "llamenos:server-nostr-signing-info:v1";
+
+// --- Server Event Encryption ---
+
+/// HKDF derivation for server event encryption key
+pub const LABEL_SERVER_EVENT_ENCRYPTION_KEY: &str = "llamenos:server-event-encryption:v1";
+
+/// HKDF info for server event encryption key
+pub const LABEL_SERVER_EVENT_ENCRYPTION_KEY_INFO: &str = "llamenos:server-event-encryption-info:v1";
+
+// --- Hub Event Epoch ---
+
+/// Hub event epoch key derivation
+pub const LABEL_HUB_EVENT_EPOCH: &str = "llamenos:hub-event-epoch:v1";
+
+// --- Server Signing ---
+
+/// Server signing key derivation
+pub const LABEL_SERVER_SIGNING_KEY: &str = "llamenos:server-signing-key:v1";
+
+/// Server signing key HKDF info
+pub const LABEL_SERVER_SIGNING_INFO: &str = "llamenos:server-signing-key-info:v1";
+
+// --- WebSocket Auth ---
+
+/// WebSocket authentication challenge label
+pub const LABEL_WS_CHALLENGE: &str = "llamenos:ws-auth:v1";
+
 // =============================================================================
 // LABEL REGISTRY — maps numeric IDs (u8) to label strings.
 //
@@ -231,6 +265,8 @@ pub const LABEL_STRONGHOLD: &str = "llamenos:stronghold:v1";
 //
 // Indices 0-35: existing labels (from crypto-labels.json ordering)
 // Indices 36-46: new v3 labels (PUK, device auth, items key, SFrame, MLS)
+// Index 53: TOMBSTONE (was LABEL_ECIES_V2_SALT — ECIES removed, index reserved)
+// Indices 57-68: labels synced from crypto-labels.json
 // =============================================================================
 
 pub const LABEL_REGISTRY: &[&str] = &[
@@ -306,19 +342,42 @@ pub const LABEL_REGISTRY: &[&str] = &[
     // 52: MLS
     LABEL_MLS_PROVISION, // 52
     // 53-56: Salt/derivation labels
-    LABEL_ECIES_V2_SALT,     // 53
+    "",                      // 53 — TOMBSTONE (was LABEL_ECIES_V2_SALT, ECIES removed)
     LABEL_PROVISIONING_SALT, // 54
     LABEL_BLIND_INDEX_FIELD, // 55
     LABEL_HUB_PTK,           // 56
+    // 57-68: New labels (synced from crypto-labels.json)
+    NOSTR_EVENT_TAG,                        // 57
+    LABEL_PROVISION_PREFIX,                 // 58
+    LABEL_STRONGHOLD,                       // 59
+    LABEL_STORAGE_CREDENTIAL_WRAP,          // 60
+    LABEL_SERVER_NOSTR_SIGNING_KEY,         // 61
+    LABEL_SERVER_NOSTR_SIGNING_KEY_INFO,    // 62
+    LABEL_SERVER_EVENT_ENCRYPTION_KEY,      // 63
+    LABEL_SERVER_EVENT_ENCRYPTION_KEY_INFO, // 64
+    LABEL_HUB_EVENT_EPOCH,                  // 65
+    LABEL_SERVER_SIGNING_KEY,               // 66
+    LABEL_SERVER_SIGNING_INFO,              // 67
+    LABEL_WS_CHALLENGE,                     // 68
 ];
 
 /// Look up a label string by its numeric ID.
+///
+/// Returns `None` for out-of-range IDs and for tombstoned indices (empty strings).
 pub fn id_to_label(id: u8) -> Option<&'static str> {
-    LABEL_REGISTRY.get(id as usize).copied()
+    LABEL_REGISTRY
+        .get(id as usize)
+        .copied()
+        .filter(|s| !s.is_empty())
 }
 
 /// Look up the numeric ID for a label string.
+///
+/// Empty strings (tombstoned indices) are never matched.
 pub fn label_to_id(label: &str) -> Option<u8> {
+    if label.is_empty() {
+        return None;
+    }
     LABEL_REGISTRY
         .iter()
         .position(|&l| l == label)
@@ -378,10 +437,36 @@ mod tests {
         assert_eq!(LABEL_SFRAME_CALL_SECRET, "llamenos:sframe-call-secret:v1");
         assert_eq!(LABEL_SFRAME_BASE_KEY, "llamenos:sframe-base-key:v1");
         assert_eq!(LABEL_MLS_PROVISION, "llamenos:mls-provision:v1");
-        assert_eq!(LABEL_ECIES_V2_SALT, "llamenos:ecies:v2");
         assert_eq!(LABEL_PROVISIONING_SALT, "llamenos:provisioning:v1");
         assert_eq!(LABEL_BLIND_INDEX_FIELD, "llamenos:blind-idx:");
         assert_eq!(LABEL_HUB_PTK, "llamenos:hub-ptk:v1");
+        assert_eq!(
+            LABEL_STORAGE_CREDENTIAL_WRAP,
+            "llamenos:storage-credential-wrap"
+        );
+        assert_eq!(
+            LABEL_SERVER_NOSTR_SIGNING_KEY,
+            "llamenos:server-nostr-signing:v1"
+        );
+        assert_eq!(
+            LABEL_SERVER_NOSTR_SIGNING_KEY_INFO,
+            "llamenos:server-nostr-signing-info:v1"
+        );
+        assert_eq!(
+            LABEL_SERVER_EVENT_ENCRYPTION_KEY,
+            "llamenos:server-event-encryption:v1"
+        );
+        assert_eq!(
+            LABEL_SERVER_EVENT_ENCRYPTION_KEY_INFO,
+            "llamenos:server-event-encryption-info:v1"
+        );
+        assert_eq!(LABEL_HUB_EVENT_EPOCH, "llamenos:hub-event-epoch:v1");
+        assert_eq!(LABEL_SERVER_SIGNING_KEY, "llamenos:server-signing-key:v1");
+        assert_eq!(
+            LABEL_SERVER_SIGNING_INFO,
+            "llamenos:server-signing-key-info:v1"
+        );
+        assert_eq!(LABEL_WS_CHALLENGE, "llamenos:ws-auth:v1");
     }
 
     /// Verify registry index stability.
@@ -394,16 +479,40 @@ mod tests {
         assert_eq!(id_to_label(41), Some(LABEL_PUK_SIGN));
         assert_eq!(id_to_label(46), Some(LABEL_DEVICE_AUTH));
         assert_eq!(id_to_label(52), Some(LABEL_MLS_PROVISION));
-        assert_eq!(id_to_label(53), Some(LABEL_ECIES_V2_SALT));
+        assert_eq!(id_to_label(53), None); // tombstone (was LABEL_ECIES_V2_SALT)
         assert_eq!(id_to_label(54), Some(LABEL_PROVISIONING_SALT));
         assert_eq!(id_to_label(55), Some(LABEL_BLIND_INDEX_FIELD));
         assert_eq!(id_to_label(56), Some(LABEL_HUB_PTK));
+        assert_eq!(id_to_label(57), Some(NOSTR_EVENT_TAG));
+        assert_eq!(id_to_label(58), Some(LABEL_PROVISION_PREFIX));
+        assert_eq!(id_to_label(59), Some(LABEL_STRONGHOLD));
+        assert_eq!(id_to_label(60), Some(LABEL_STORAGE_CREDENTIAL_WRAP));
+        assert_eq!(id_to_label(61), Some(LABEL_SERVER_NOSTR_SIGNING_KEY));
+        assert_eq!(id_to_label(62), Some(LABEL_SERVER_NOSTR_SIGNING_KEY_INFO));
+        assert_eq!(id_to_label(63), Some(LABEL_SERVER_EVENT_ENCRYPTION_KEY));
+        assert_eq!(
+            id_to_label(64),
+            Some(LABEL_SERVER_EVENT_ENCRYPTION_KEY_INFO)
+        );
+        assert_eq!(id_to_label(65), Some(LABEL_HUB_EVENT_EPOCH));
+        assert_eq!(id_to_label(66), Some(LABEL_SERVER_SIGNING_KEY));
+        assert_eq!(id_to_label(67), Some(LABEL_SERVER_SIGNING_INFO));
+        assert_eq!(id_to_label(68), Some(LABEL_WS_CHALLENGE));
     }
 
-    /// Verify bidirectional lookup.
+    /// Verify bidirectional lookup (skipping tombstoned indices).
     #[test]
     fn label_id_roundtrip() {
         for (i, &label) in LABEL_REGISTRY.iter().enumerate() {
+            if label.is_empty() {
+                // Tombstoned index — id_to_label returns None, label_to_id("") returns None
+                assert_eq!(
+                    id_to_label(i as u8),
+                    None,
+                    "tombstone at index {i} should return None"
+                );
+                continue;
+            }
             assert_eq!(
                 label_to_id(label),
                 Some(i as u8),
@@ -424,11 +533,14 @@ mod tests {
         assert_eq!(label_to_id("nonexistent:label"), None);
     }
 
-    /// Verify no duplicate labels in registry.
+    /// Verify no duplicate labels in registry (tombstones excluded).
     #[test]
     fn no_duplicate_labels() {
         let mut seen = std::collections::HashSet::new();
         for &label in LABEL_REGISTRY {
+            if label.is_empty() {
+                continue; // skip tombstoned slots
+            }
             assert!(seen.insert(label), "duplicate label in registry: {label}");
         }
     }

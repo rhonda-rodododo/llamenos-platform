@@ -144,6 +144,12 @@ const ALLOWED_HUB_SETTINGS = new Set([
   'autoAssignment',
   'fallbackGroup',
   'caseManagementEnabled',
+  'providerSetupComplete',
+  'channels',
+  'quotas',
+  'usage',
+  'subAccountEnabled',
+  'subAccountConfigId',
 ])
 
 const VALID_PROVIDER_TYPES = [
@@ -1859,6 +1865,82 @@ export class SettingsService {
       })
 
     return merged
+  }
+
+  async getHubProviderSettings(
+    hubId: string,
+  ): Promise<Record<string, unknown>> {
+    const settings = await this.getHubSettings(hubId)
+    return {
+      providerSetupComplete: settings.providerSetupComplete ?? false,
+      channels: settings.channels ?? {},
+      quotas: settings.quotas ?? {},
+      usage: settings.usage ?? [],
+      subAccountEnabled: settings.subAccountEnabled ?? false,
+      subAccountConfigId: settings.subAccountConfigId ?? undefined,
+    }
+  }
+
+  async updateHubQuotas(
+    hubId: string,
+    quotas: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    const current = await this.getHubSettings(hubId)
+    const updated = { ...current, quotas }
+    await this.db
+      .insert(hubSettingsTable)
+      .values({ hubId, settings: updated })
+      .onConflictDoUpdate({
+        target: hubSettingsTable.hubId,
+        set: { settings: updated },
+      })
+    return updated.quotas as Record<string, unknown>
+  }
+
+  async updateHubUsage(
+    hubId: string,
+    usage: Record<string, unknown>[],
+  ): Promise<Record<string, unknown>[]> {
+    const current = await this.getHubSettings(hubId)
+    const updated = { ...current, usage }
+    await this.db
+      .insert(hubSettingsTable)
+      .values({ hubId, settings: updated })
+      .onConflictDoUpdate({
+        target: hubSettingsTable.hubId,
+        set: { settings: updated },
+      })
+    return updated.usage as Record<string, unknown>[]
+  }
+
+  async incrementHubUsage(
+    hubId: string,
+    resource: string,
+    amount = 1,
+  ): Promise<Record<string, unknown>> {
+    const settings = await this.getHubSettings(hubId)
+    const usage = (settings.usage as Record<string, unknown>[]) ?? []
+    const now = new Date()
+    const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+
+    let currentMonth = usage.find((u) => u.month === month)
+    if (!currentMonth) {
+      currentMonth = { month, year: now.getFullYear() }
+      usage.push(currentMonth)
+    }
+
+    currentMonth[resource] = ((currentMonth[resource] as number) ?? 0) + amount
+
+    const updated = { ...settings, usage }
+    await this.db
+      .insert(hubSettingsTable)
+      .values({ hubId, settings: updated })
+      .onConflictDoUpdate({
+        target: hubSettingsTable.hubId,
+        set: { settings: updated },
+      })
+
+    return currentMonth
   }
 
   async getHubTelephonyProvider(

@@ -103,7 +103,7 @@ packages/
     tools/schema-registry.ts  # Maps 85+ Zod schemas to named JSON Schemas
     openapi-snapshot.json     # OpenAPI spec snapshot (written by dev server on startup)
     generated/        # Auto-generated types — GITIGNORED (typescript/, swift/, kotlin/)
-    crypto-labels.json # 69 domain separation constants (source of truth)
+    crypto-labels.json # 68 domain separation constants (source of truth)
   i18n/               # Localization package
     locales/          # 13 locale JSON files (en, es, zh, tl, vi, ar, fr, ht, ko, ru, hi, pt, de)
     languages.ts      # Language config (codes, labels, Twilio voice IDs)
@@ -138,7 +138,7 @@ docs/
 - **Shift routing**: Automated, recurring schedule with ring groups. Fallback group if no schedule is defined.
 - **E2EE notes**: Per-note forward secrecy — unique random key per note, HPKE-wrapped for each reader via PUK (Per-User Key). PUK → items_key → per-note content key (cascading lazy key rotation). Dual-encrypted: one copy for volunteer, one for each admin (multi-admin envelopes).
 - **E2EE messaging**: Per-message envelope encryption — random symmetric key, HPKE-wrapped for assigned volunteer + each admin. Server encrypts inbound on webhook receipt, discards plaintext immediately.
-- **HPKE crypto**: RFC 9180 X25519-HKDF-SHA256-AES256-GCM replaces secp256k1 ECIES everywhere. Ed25519/X25519 per-device keys (no more single nsec per user). Label enforcement at decrypt (Albrecht defense — 69 domain separation labels).
+- **HPKE crypto**: RFC 9180 X25519-HKDF-SHA256-AES256-GCM replaces secp256k1 ECIES everywhere. Ed25519/X25519 per-device keys (no more single nsec per user). Label enforcement at decrypt (Albrecht defense — 68 domain separation labels).
 - **User sigchain**: Append-only hash-chained, Ed25519-signed device authorization records. PUK (Per-User Key) with Cascading Lazy Key Rotation. MLS via OpenMLS (behind `mls` feature flag) for hub state.
 - **SFrame voice E2EE**: Key derivation integrated into `packages/crypto` for encrypted voice channel media.
 - **Platform abstraction**: `src/client/lib/platform.ts` is Tauri-only — all crypto calls route through Rust via IPC. Device private keys NEVER enter the webview. Always import from `platform.ts`, never from `@tauri-apps/*` directly.

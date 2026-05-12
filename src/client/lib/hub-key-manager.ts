@@ -21,7 +21,7 @@ import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
 import {
   unwrapHubKey as platformUnwrapHubKey,
-  eciesWrapKey,
+  hpkeWrapKey,
 } from './platform'
 import type { KeyEnvelope, RecipientEnvelope } from './platform'
 import { LABEL_HUB_KEY_WRAP, LABEL_HUB_EVENT } from '@shared/crypto-labels'
@@ -49,7 +49,7 @@ export async function wrapHubKeyForMember(
   memberPubkeyHex: string,
 ): Promise<RecipientEnvelope> {
   const hubKeyHex = bytesToHex(hubKey)
-  const envelope = await eciesWrapKey(hubKeyHex, memberPubkeyHex, LABEL_HUB_KEY_WRAP)
+  const envelope = await hpkeWrapKey(hubKeyHex, memberPubkeyHex, LABEL_HUB_KEY_WRAP)
   return {
     pubkey: memberPubkeyHex,
     ...envelope,

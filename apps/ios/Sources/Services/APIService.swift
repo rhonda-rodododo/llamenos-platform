@@ -430,8 +430,8 @@ enum CertificatePins {
     // Cloudflare intermediate CA pins (SHA-256 SPKI hash, base64-encoded).
     // Populate from docs/security/CERTIFICATE_PINS.md before production release.
     static let cloudflareHashes: [String] = [
-        // Placeholder: replace with actual Cloudflare intermediate CA pin hashes
-        // "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=",
+        // Populate via: bun run cert-pins:inject <domain>
+        // See docs/security/CERTIFICATE_PINS.md
     ]
 
     /// Whether certificate pinning is active (pins are configured).

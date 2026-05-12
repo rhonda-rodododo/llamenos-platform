@@ -2,7 +2,7 @@
  * Push notification dispatch service (Epic 86).
  *
  * Sends encrypted push notifications to mobile devices via APNs (iOS) and FCM (Android).
- * Two-tier encryption: wake key for lock-screen display, nsec for full content.
+ * Two-tier encryption: wake key for lock-screen display, device key for full content.
  *
  * Direct APNs/FCM — no third-party intermediary (Expo Push Service not used).
  */

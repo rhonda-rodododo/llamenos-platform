@@ -27,7 +27,6 @@ done
 
 if [[ "$BUILD_IOS" == false && "$BUILD_ANDROID" == false ]]; then
   if git -C "$PROJECT_ROOT" rev-parse --git-dir &>/dev/null; then
-    local branch
     branch=$(git -C "$PROJECT_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || true)
     if [[ "$branch" == feat/ios* || "$branch" == feat/mobile* || "$branch" == fix/ios* || "$branch" == fix/mobile* ]]; then
       BUILD_IOS=true

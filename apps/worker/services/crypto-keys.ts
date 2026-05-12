@@ -9,6 +9,8 @@
 import { and, asc, desc, eq, max } from 'drizzle-orm'
 import type { Database } from '../db'
 import { sigchainLinks, pukEnvelopes, mlsPendingMessages } from '../db/schema'
+import { ed25519Verify } from '@llamenos/crypto/ffi'
+import { hexToBytes } from '@shared/encoding'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -79,14 +81,12 @@ export class CryptoKeysService {
   }
 
   /**
-   * Append a new sigchain link, validating hash-chain continuity.
+   * Append a new sigchain link, validating hash-chain continuity and signature.
    *
    * The server verifies:
    *   1. seqNo === expected (last seqNo + 1, or 0 for genesis)
    *   2. prevHash matches the hash of the current chain head
-   *
-   * Signature validation is left to the client — the server is an honest
-   * delivery service that enforces ordering, not a trust anchor.
+   *   3. Ed25519 signature over the entry hash is valid for userPubkey
    *
    * Returns the persisted link on success.
    */
@@ -121,6 +121,26 @@ export class CryptoKeysService {
       throw new CryptoKeyError(
         'sigchain prevHash mismatch: does not match current chain head',
         409,
+      )
+    }
+
+    // Verify Ed25519 signature over the entry hash
+    try {
+      const hashBytes = hexToBytes(link.hash)
+      const sigBytes = hexToBytes(link.signature)
+      const pubkeyBytes = hexToBytes(userPubkey)
+      const valid = ed25519Verify(pubkeyBytes, hashBytes, sigBytes)
+      if (!valid) {
+        throw new CryptoKeyError(
+          'sigchain signature verification failed',
+          403,
+        )
+      }
+    } catch (e) {
+      if (e instanceof CryptoKeyError) throw e
+      throw new CryptoKeyError(
+        'sigchain signature verification failed: invalid format',
+        400,
       )
     }
 
@@ -323,7 +343,7 @@ export class CryptoKeysService {
 export class CryptoKeyError extends Error {
   constructor(
     message: string,
-    readonly status: 400 | 404 | 409 | 500 = 500,
+    readonly status: 400 | 403 | 404 | 409 | 500 = 500,
   ) {
     super(message)
     this.name = 'CryptoKeyError'

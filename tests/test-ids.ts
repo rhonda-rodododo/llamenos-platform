@@ -262,6 +262,18 @@ export const TestIds = {
   TRANSCRIPTION_SECTION: 'transcription',
   SPAM_SECTION: 'spam-section',
 
+  // ============ Hub Onboarding ============
+  HUB_ONBOARDING_WIZARD: 'hub-onboarding-wizard',
+  HUB_ONBOARDING_STEP: 'hub-onboarding-step',
+  HUB_ONBOARDING_NEXT: 'hub-onboarding-next',
+  HUB_ONBOARDING_BACK: 'hub-onboarding-back',
+  HUB_ONBOARDING_COMPLETE: 'hub-onboarding-complete',
+  HUB_PROVIDER_SETTINGS: 'hub-provider-settings',
+  HUB_USAGE_CARD: 'hub-usage-card',
+  TEMPLATE_CARD_SCRATCH: 'template-card-scratch',
+  CHANNEL_CHECKLIST: 'channel-checklist',
+  RESTART_SETUP_BTN: 'restart-setup-btn',
+
   // ============ Setup Wizard ============
   SETUP_WIZARD: 'setup-wizard',
   SETUP_STEP: 'setup-step',

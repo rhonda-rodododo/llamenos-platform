@@ -21,7 +21,7 @@ Feature: Auth Guards
 
   Scenario: Unauthenticated user is redirected from admin settings
     Given I am not authenticated
-    When I visit "/admin/settings" without authentication
+    When I visit "/admin" without authentication
     Then I should be redirected to the login page
 
   Scenario: Session requires PIN re-entry after reload

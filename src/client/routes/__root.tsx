@@ -58,7 +58,7 @@ export const Route = createRootRoute({
 
 function RootLayout() {
   const { t } = useTranslation()
-  const { isAuthenticated, isAdmin, signOut, name, isLoading, profileCompleted, hasPermission, primaryRoleName } = useAuth()
+  const { isAuthenticated, isAdmin, signOut, name, isLoading, profileCompleted, hasPermission, primaryRoleName, webauthnEnrollmentRequired } = useAuth()
   const { hotlineName, needsBootstrap, demoMode, isLoading: configLoading } = useConfig()
   const { theme, setTheme } = useTheme()
   const navigate = useNavigate()
@@ -101,6 +101,16 @@ function RootLayout() {
       navigate({ to: '/' })
     }
   }, [isLoading, isAuthenticated, profileCompleted, location.pathname, navigate])
+
+  // WebAuthn enrollment enforcement: redirect to settings#passkeys when passkey registration is required
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && profileCompleted && webauthnEnrollmentRequired) {
+      const allowedPaths = ['/settings', '/login', '/setup']
+      if (!allowedPaths.includes(location.pathname)) {
+        navigate({ to: '/settings', search: { section: 'passkeys' } })
+      }
+    }
+  }, [isLoading, isAuthenticated, profileCompleted, webauthnEnrollmentRequired, location.pathname, navigate])
 
   // PanicWipeIndicator renders at root level unconditionally so it persists
   // across auth state changes during a wipe (when keyManager.wipeKey() fires,

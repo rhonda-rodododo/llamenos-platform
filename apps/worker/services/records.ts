@@ -2,7 +2,7 @@
  * RecordsService — notes, bans, and contact metadata backed by PostgreSQL.
  *
  * Replaces the DO-backed RecordsDO. The service never decrypts note content —
- * it stores and retrieves opaque encrypted blobs with their ECIES envelopes.
+ * it stores and retrieves opaque encrypted blobs with their HPKE envelopes.
  */
 import { eq, and, desc, asc, sql, count } from 'drizzle-orm'
 import type { Database } from '../db'

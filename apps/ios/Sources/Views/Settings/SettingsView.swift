@@ -112,6 +112,8 @@ struct SettingsView: View {
                 switch destination {
                 case "hubs":
                     HubManagementView()
+                case "communications":
+                    HubCommunicationsView()
                 case "account":
                     AccountSettingsView()
                 case "preferences":
@@ -205,6 +207,19 @@ struct SettingsView: View {
                 }
             }
             .accessibilityIdentifier("settings-hubs-link")
+
+            if appState.isAdmin {
+                NavigationLink(value: "communications") {
+                    Label {
+                        Text(NSLocalizedString("hub_onboarding_settings_title", comment: "Communications"))
+                            .foregroundStyle(.primary)
+                    } icon: {
+                        Image(systemName: "phone.badge.waveform")
+                            .foregroundStyle(Color.brandPrimary)
+                    }
+                }
+                .accessibilityIdentifier("settings-communications-link")
+            }
 
             NavigationLink(value: "account") {
                 Label {

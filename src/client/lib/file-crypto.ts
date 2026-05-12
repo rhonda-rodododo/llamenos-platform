@@ -11,7 +11,7 @@ import {
   unwrapFileKey as platformUnwrapFileKey,
   decryptFileMetadata as platformDecryptFileMetadata,
   rewrapFileKey as platformRewrapFileKey,
-  eciesWrapKey,
+  hpkeWrapKey,
   hpkeSealKey,
   hpkeOpenKeyFromState,
   aesGcmEncrypt,
@@ -112,7 +112,7 @@ export async function encryptFile(
   // Wrap the file key for each recipient using HPKE via Rust
   const recipientEnvelopes: FileKeyEnvelope[] = await Promise.all(
     recipientPubkeys.map(async (pubkey) => {
-      const { enc, ct } = await eciesWrapKey(fileKeyHex, pubkey, LABEL_FILE_KEY)
+      const { enc, ct } = await hpkeWrapKey(fileKeyHex, pubkey, LABEL_FILE_KEY)
       return { pubkey, enc, ct }
     })
   )
@@ -123,7 +123,7 @@ export async function encryptFile(
     recipientPubkeys.map(async (pubkey) => {
       const metadataKeyHex = bytesToHex(randomBytes(32))
       const encContent = await aesGcmEncrypt(metadataJson, metadataKeyHex)
-      const { enc, ct } = await eciesWrapKey(metadataKeyHex, pubkey, LABEL_FILE_METADATA)
+      const { enc, ct } = await hpkeWrapKey(metadataKeyHex, pubkey, LABEL_FILE_METADATA)
       return { pubkey, encryptedContent: encContent, enc, ct }
     })
   )

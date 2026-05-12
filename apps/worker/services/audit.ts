@@ -7,7 +7,7 @@
  * The hash chain guarantees tamper detection: each entry stores the SHA-256
  * hash of the previous entry. Verification walks the chain backward.
  */
-import { eq, and, desc, sql, count, gte, lte, inArray } from 'drizzle-orm'
+import { eq, and, asc, desc, sql, count, gte, lte, inArray } from 'drizzle-orm'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex } from '@noble/hashes/utils.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
@@ -66,6 +66,19 @@ export interface AuditListFilters {
 }
 
 export type AuditEntry = typeof auditLog.$inferSelect
+
+export interface ChainVerificationResult {
+  valid: boolean
+  totalEntries: number
+  checkedEntries: number
+  firstBrokenEntry?: {
+    id: string
+    seqIndex: number
+    expected: string | null
+    actual: string | null
+    reason: string
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Hash computation (matches lib/crypto.ts hashAuditEntry but works on DB row)
@@ -260,6 +273,117 @@ export class AuditService {
       .limit(1)
 
     return row?.entryHash ?? null
+  }
+
+  /**
+   * Verify the integrity of the hash chain for a hub (or global if no hubId).
+   *
+   * Walks entries in chronological order and checks:
+   * 1. Each entry's stored entryHash matches the recomputed hash
+   * 2. Each entry's previousEntryHash matches the prior entry's entryHash
+   *
+   * Supports pagination via optional limit/offset for large chains.
+   */
+  async verifyChain(
+    hubId: string | undefined,
+    options: { limit?: number; offset?: number } = {},
+  ): Promise<ChainVerificationResult> {
+    const { limit, offset = 0 } = options
+
+    const condition = hubId
+      ? eq(auditLog.hubId, hubId)
+      : sql`${auditLog.hubId} IS NULL`
+
+    // Get total count first
+    const [{ total }] = await this.db
+      .select({ total: count() })
+      .from(auditLog)
+      .where(condition)
+
+    const totalEntries = Number(total)
+
+    if (totalEntries === 0) {
+      return { valid: true, totalEntries: 0, checkedEntries: 0 }
+    }
+
+    // When using offset, we need the entry just before the offset to check
+    // the first returned entry's previousEntryHash linkage.
+    let predecessorHash: string | null = null
+    if (offset > 0) {
+      const [pred] = await this.db
+        .select({ entryHash: auditLog.entryHash })
+        .from(auditLog)
+        .where(condition)
+        .orderBy(asc(auditLog.createdAt))
+        .limit(1)
+        .offset(offset - 1)
+
+      predecessorHash = pred?.entryHash ?? null
+    }
+
+    // Fetch the batch to verify
+    const baseQuery = this.db
+      .select()
+      .from(auditLog)
+      .where(condition)
+      .orderBy(asc(auditLog.createdAt))
+
+    const entries = limit != null
+      ? await baseQuery.limit(limit).offset(offset)
+      : await baseQuery.offset(offset)
+
+    let previousHash: string | null = offset === 0 ? null : predecessorHash
+
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i]
+
+      // Check previousEntryHash linkage
+      if (entry.previousEntryHash !== previousHash) {
+        return {
+          valid: false,
+          totalEntries,
+          checkedEntries: i,
+          firstBrokenEntry: {
+            id: entry.id,
+            seqIndex: offset + i,
+            expected: previousHash,
+            actual: entry.previousEntryHash,
+            reason: 'previousEntryHash mismatch',
+          },
+        }
+      }
+
+      // Recompute the hash and check it matches stored entryHash
+      const recomputed = computeEntryHash({
+        id: entry.id,
+        action: entry.action,
+        actorPubkey: entry.actorPubkey,
+        createdAt: entry.createdAt instanceof Date
+          ? entry.createdAt.toISOString()
+          : entry.createdAt,
+        details: (entry.details ?? {}) as Record<string, unknown>,
+        previousEntryHash: entry.previousEntryHash,
+      })
+
+      if (recomputed !== entry.entryHash) {
+        return {
+          valid: false,
+          totalEntries,
+          checkedEntries: i,
+          firstBrokenEntry: {
+            id: entry.id,
+            seqIndex: offset + i,
+            expected: recomputed,
+            actual: entry.entryHash,
+            reason: 'entryHash mismatch',
+          },
+        }
+      }
+
+      previousHash = entry.entryHash
+    }
+
+    return { valid: true, totalEntries, checkedEntries: entries.length }
   }
 
   /** Clear all audit log entries (test/demo reset only). */

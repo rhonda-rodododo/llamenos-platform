@@ -6,7 +6,7 @@ pre-commit:
       stage_fixed: true
     lint:
       glob: "{src,apps/worker}/**/*.{ts,tsx}"
-      run: bun run lint
+      run: bunx eslint {staged_files}
       stage_fixed: true
     codegen-freshness:
       glob: "packages/protocol/schemas/*.ts"

@@ -36,6 +36,8 @@ vi.mock('./api', () => ({
     serverEventKeyPrevHex: null,
     eventKeyEpoch: undefined,
     eventKeyEpochDuration: undefined,
+    webauthnRequired: false,
+    webauthnRegistered: false,
   })),
   login: vi.fn(),
   logout: vi.fn(),

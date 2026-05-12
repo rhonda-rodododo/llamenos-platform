@@ -2,7 +2,7 @@ import { createMiddleware } from 'hono/factory'
 import type { AppEnv, User } from '../types'
 import { authenticateRequest, parseAuthHeader, parseSessionHeader, validateToken } from '../lib/auth'
 import type { Role } from '@shared/permissions'
-import { resolvePermissions } from '@shared/permissions'
+import { resolvePermissions, permissionGranted } from '@shared/permissions'
 import { createLogger } from '../lib/logger'
 import { incError } from '../lib/error-counter'
 
@@ -65,5 +65,25 @@ export const auth = createMiddleware<AppEnv>(async (c, next) => {
   c.set('user', authResult.user)
   c.set('permissions', permissions)
   c.set('allRoles', allRoles)
+
+  // WebAuthn enforcement: if enabled, require passkey registration
+  const webauthnSettings = await services.identity.getWebAuthnSettings()
+  const isAdmin = permissionGranted(permissions, 'settings:manage')
+  const webauthnRequired = isAdmin ? webauthnSettings.requireForAdmins : webauthnSettings.requireForUsers
+
+  if (webauthnRequired) {
+    const { credentials } = await services.identity.getWebAuthnCredentials(authResult.pubkey)
+    if (credentials.length === 0) {
+      // Allow access to: GET /auth/me, WebAuthn routes, logout
+      // Block everything else so the user can register a passkey
+      const path = new URL(c.req.url).pathname
+      const allowedPaths = ['/api/auth/me', '/api/auth/me/logout', '/api/webauthn']
+      const isAllowed = allowedPaths.some(p => path.startsWith(p))
+      if (!isAllowed) {
+        return c.json({ error: 'WebAuthn registration required', code: 'WEBAUTHN_REQUIRED' }, 403)
+      }
+    }
+  }
+
   await next()
 })
