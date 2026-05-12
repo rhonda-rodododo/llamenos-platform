@@ -225,84 +225,13 @@ jobs:
           name: app-build
           path: dist
 
-      - name: Create .env for Docker Compose
-        run: |
-          printf '%s\n' \
-            "ADMIN_PUBKEY=${{ env.TEST_ADMIN_PUBKEY }}" \
-            "DOMAIN=localhost" \
-            "PG_PASSWORD=ci-test-password" \
-            "HMAC_SECRET=$(openssl rand -hex 32)" \
-            "STORAGE_ACCESS_KEY=testaccess" \
-            "STORAGE_SECRET_KEY=testsecret123456" \
-            "HOTLINE_NAME=Llámenos" \
-            "BRIDGE_SECRET=ci-test-bridge-secret" \
-            "ARI_PASSWORD=ci-test-ari-password" \
-            "SERVER_SECRET=0000000000000000000000000000000000000000000000000000000000000001" \
-            "NOTIFIER_API_KEY=ci-test-notifier-key" \
-            "SIGNAL_REGISTERED_NUMBER=+15550000000" \
-            "PBX_TYPE=asterisk" \
-            "GLITCHTIP_SECRET_KEY=$(openssl rand -hex 32)" \
-            "TOKEN_MAX_AGE_MS=3600000" \
-            > .env
-
-      - name: Build and start Docker Compose (core services)
-        run: |
-          docker compose --env-file .env \
-            -f deploy/docker/docker-compose.yml \
-            -f deploy/docker/docker-compose.test.yml \
-            up -d --build --wait app
-        timeout-minutes: 10
-
-      - name: Start sidecar profiles (signal + telephony)
-        run: |
-          docker compose --env-file .env \
-            --profile signal --profile asterisk \
-            -f deploy/docker/docker-compose.yml \
-            -f deploy/docker/docker-compose.test.yml \
-            up -d --build --no-recreate
-        timeout-minutes: 5
-
-      - name: Wait for signal-notifier health
-        run: |
-          echo "Waiting for signal-notifier..."
-          for i in $(seq 1 30); do
-            if curl -sf http://localhost:3100/health; then
-              echo "signal-notifier is ready"
-              break
-            fi
-            if [ "$i" -eq 30 ]; then
-              echo "::warning::signal-notifier did not become healthy — sidecar tests will be skipped"
-            fi
-            sleep 3
-          done
-
-      - name: Wait for sip-bridge health
-        run: |
-          echo "Waiting for sip-bridge..."
-          for i in $(seq 1 20); do
-            if curl -sf http://localhost:3001/health; then
-              echo "sip-bridge is ready"
-              break
-            fi
-            if [ "$i" -eq 20 ]; then
-              echo "::warning::sip-bridge did not become healthy — SIP health check test will fail"
-            fi
-            sleep 3
-          done
-
-      - name: Show container status
-        if: ${{ !cancelled() }}
-        run: |
-          docker compose --env-file .env \
-            --profile signal --profile asterisk \
-            -f deploy/docker/docker-compose.yml \
-            -f deploy/docker/docker-compose.test.yml \
-            ps || true
-          docker compose --env-file .env \
-            --profile signal --profile asterisk \
-            -f deploy/docker/docker-compose.yml \
-            -f deploy/docker/docker-compose.test.yml \
-            logs --tail=50 || true
+      - name: Bootstrap backend
+        uses: ./.github/actions/bootstrap-backend
+        with:
+          admin_pubkey: ${{ env.TEST_ADMIN_PUBKEY }}
+          with_sidecars: 'true'
+          wait_for_signal: 'true'
+          wait_for_sip_bridge: 'true'
 
       - name: Generate BDD test files
         run: bunx bddgen
@@ -330,6 +259,7 @@ jobs:
           SIGNAL_NOTIFIER_URL: http://localhost:3100
           SIGNAL_NOTIFIER_BEARER_TOKEN: ci-test-notifier-key
           PBX_TYPE: ari
+          SIP_BRIDGE_URL: http://localhost:3001
           DEV_RESET_SECRET: test-reset-secret
           E2E_TEST_SECRET: test-reset-secret
           DATABASE_URL: postgresql://llamenos:ci-test-password@localhost:5432/llamenos
@@ -343,6 +273,7 @@ jobs:
         run: |
           curl -sf http://localhost:3000/api/health/ready || echo "::warning::app health check failed"
           curl -sf http://localhost:3100/health || echo "::warning::signal-notifier health check failed"
+          curl -sf http://localhost:3001/health || echo "::warning::sip-bridge health check failed"
 
       - name: Summarize test failures
         if: always()
@@ -356,6 +287,15 @@ jobs:
             " || true
           fi
 
+      - name: Tear down Docker Compose
+        if: always()
+        run: |
+          docker compose --env-file .env \
+            --profile signal --profile asterisk \
+            -f deploy/docker/docker-compose.yml \
+            -f deploy/docker/docker-compose.test.yml \
+            down -v || true
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -365,16 +305,6 @@ jobs:
             playwright-report/
             test-results/
           retention-days: 7
-
-      - name: Tear down Docker Compose
-        if: always()
-        run: |
-          docker compose --env-file .env \
-            --profile signal --profile asterisk \
-            -f deploy/docker/docker-compose.yml \
-            -f deploy/docker/docker-compose.test.yml \
-            down -v
-
 
   # ─── Backend BDD Tests ─────────────────────────────────────
   backend-bdd:
@@ -416,70 +346,13 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: bunx playwright install-deps chromium
 
-      - name: Create .env for Docker Compose
-        run: |
-          printf '%s\n' \
-            "ADMIN_PUBKEY=${{ env.TEST_ADMIN_PUBKEY }}" \
-            "DOMAIN=localhost" \
-            "PG_PASSWORD=ci-test-password" \
-            "HMAC_SECRET=$(openssl rand -hex 32)" \
-            "STORAGE_ACCESS_KEY=testaccess" \
-            "STORAGE_SECRET_KEY=testsecret123456" \
-            "HOTLINE_NAME=Llámenos" \
-            "BRIDGE_SECRET=ci-test-bridge-secret" \
-            "ARI_PASSWORD=ci-test-ari-password" \
-            "SERVER_SECRET=0000000000000000000000000000000000000000000000000000000000000001" \
-            "NOTIFIER_API_KEY=ci-test-notifier-key" \
-            "SIGNAL_REGISTERED_NUMBER=+15550000000" \
-            "PBX_TYPE=asterisk" \
-            "GLITCHTIP_SECRET_KEY=$(openssl rand -hex 32)" \
-            "TOKEN_MAX_AGE_MS=3600000" \
-            > .env
-
-      - name: Build and start Docker Compose (core services)
-        run: |
-          docker compose --env-file .env \
-            -f deploy/docker/docker-compose.yml \
-            -f deploy/docker/docker-compose.test.yml \
-            up -d --build --wait app
-        timeout-minutes: 10
-
-      - name: Start sidecar profiles (signal + telephony)
-        run: |
-          docker compose --env-file .env \
-            --profile signal --profile asterisk \
-            -f deploy/docker/docker-compose.yml \
-            -f deploy/docker/docker-compose.test.yml \
-            up -d --build --no-recreate
-        timeout-minutes: 5
-
-      - name: Wait for signal-notifier health
-        run: |
-          echo "Waiting for signal-notifier..."
-          for i in $(seq 1 30); do
-            if curl -sf http://localhost:3100/health; then
-              echo "signal-notifier is ready"
-              break
-            fi
-            if [ "$i" -eq 30 ]; then
-              echo "::warning::signal-notifier did not become healthy — sidecar tests will be skipped"
-            fi
-            sleep 3
-          done
-
-      - name: Show container status
-        if: ${{ !cancelled() }}
-        run: |
-          docker compose --env-file .env \
-            --profile signal --profile asterisk \
-            -f deploy/docker/docker-compose.yml \
-            -f deploy/docker/docker-compose.test.yml \
-            ps || true
-          docker compose --env-file .env \
-            --profile signal --profile asterisk \
-            -f deploy/docker/docker-compose.yml \
-            -f deploy/docker/docker-compose.test.yml \
-            logs --tail=50 || true
+      - name: Bootstrap backend
+        uses: ./.github/actions/bootstrap-backend
+        with:
+          admin_pubkey: ${{ env.TEST_ADMIN_PUBKEY }}
+          with_sidecars: 'true'
+          wait_for_signal: 'true'
+          wait_for_sip_bridge: 'true'
 
       - name: Generate BDD test files
         run: bunx bddgen
@@ -499,6 +372,15 @@ jobs:
           # sip-bridge exposed on host port 3001 via docker-compose.test.yml
           SIP_BRIDGE_URL: http://localhost:3001
 
+      - name: Tear down Docker Compose
+        if: always()
+        run: |
+          docker compose --env-file .env \
+            --profile signal --profile asterisk \
+            -f deploy/docker/docker-compose.yml \
+            -f deploy/docker/docker-compose.test.yml \
+            down -v || true
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -508,15 +390,6 @@ jobs:
             playwright-report/
             test-results/
           retention-days: 7
-
-      - name: Tear down Docker Compose
-        if: always()
-        run: |
-          docker compose --env-file .env \
-            --profile signal --profile asterisk \
-            -f deploy/docker/docker-compose.yml \
-            -f deploy/docker/docker-compose.test.yml \
-            down -v
 
   # ─── Backend Unit Tests ────────────────────────────────────
   backend-unit:
@@ -741,52 +614,10 @@ jobs:
       # Android E2E tests need a running backend for hub creation,
       # authentication, and call/message simulation endpoints.
       # The emulator reaches the host via 10.0.2.2 (Android's host loopback alias).
-      - name: Create .env for Docker Compose
-        run: |
-          printf '%s\n' \
-            "ADMIN_PUBKEY=${{ env.TEST_ADMIN_PUBKEY }}" \
-            "DOMAIN=localhost" \
-            "PG_PASSWORD=ci-test-password" \
-            "HMAC_SECRET=$(openssl rand -hex 32)" \
-            "STORAGE_ACCESS_KEY=testaccess" \
-            "STORAGE_SECRET_KEY=testsecret123456" \
-            "HOTLINE_NAME=Llámenos" \
-            "BRIDGE_SECRET=ci-test-bridge-secret" \
-            "ARI_PASSWORD=ci-test-ari-password" \
-            "SERVER_SECRET=0000000000000000000000000000000000000000000000000000000000000001" \
-            "NOTIFIER_API_KEY=ci-test-notifier-key" \
-            "SIGNAL_REGISTERED_NUMBER=+15550000000" \
-            "PBX_TYPE=asterisk" \
-            "GLITCHTIP_SECRET_KEY=$(openssl rand -hex 32)" \
-            "TOKEN_MAX_AGE_MS=3600000" \
-            > .env
-
-      - name: Build and start Docker Compose (core services)
-        run: |
-          docker compose --env-file .env \
-            -f deploy/docker/docker-compose.yml \
-            -f deploy/docker/docker-compose.test.yml \
-            up -d --build --wait app
-        timeout-minutes: 10
-
-      - name: Wait for backend health
-        run: |
-          echo "Waiting for backend to be ready..."
-          for i in $(seq 1 60); do
-            if curl -sf http://localhost:3000/api/health/ready; then
-              echo "Backend is ready"
-              break
-            fi
-            if [ "$i" -eq 60 ]; then
-              echo "::error::Backend did not become healthy after 120s"
-              docker compose --env-file .env \
-                -f deploy/docker/docker-compose.yml \
-                -f deploy/docker/docker-compose.test.yml \
-                logs --tail=50 || true
-              exit 1
-            fi
-            sleep 2
-          done
+      - name: Bootstrap backend
+        uses: ./.github/actions/bootstrap-backend
+        with:
+          admin_pubkey: ${{ env.TEST_ADMIN_PUBKEY }}
 
       - name: Cache AVD snapshot
         id: avd-cache
@@ -867,6 +698,14 @@ jobs:
             wait $LOGCAT_PID 2>/dev/null || true
             exit $EXIT_CODE
 
+      - name: Tear down Docker Compose
+        if: always()
+        run: |
+          docker compose --env-file .env \
+            -f deploy/docker/docker-compose.yml \
+            -f deploy/docker/docker-compose.test.yml \
+            down -v || true
+
       - name: Upload test results
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: ${{ !cancelled() }}
@@ -884,14 +723,6 @@ jobs:
           name: android-e2e-logcat-shard-${{ matrix.shard }}
           path: /tmp/logcat.txt
           retention-days: 7
-
-      - name: Tear down Docker Compose
-        if: always()
-        run: |
-          docker compose --env-file .env \
-            -f deploy/docker/docker-compose.yml \
-            -f deploy/docker/docker-compose.test.yml \
-            down -v
 
   ios-build-test:
     needs: changes
@@ -1067,6 +898,7 @@ jobs:
             | grep -v '"llamenos:event"' \
             | grep -v '"llamenos:provision-' \
             | grep -v '"llamenos:stronghold' \
+            | grep -v '"llamenos://' \
             | grep -v 'hub-event-crypto\.ts' \
             | grep -v '#\[test\]' \
             | grep -v 'let aad = b"llamenos:' \

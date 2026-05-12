@@ -87,7 +87,9 @@ services:
       - web
     environment:
       - ARI_URL=ws://asterisk:8088/ari/events
+      - ARI_REST_URL=http://asterisk:8088/ari
       - ARI_USERNAME=llamenos
-      - ARI_PASSWORD=${ARI_PASSWORD:-ci-test-ari-password}
+      - ARI_PASSWORD=${ARI_PASSWORD:-changeme}
       - WORKER_WEBHOOK_URL=http://app:3000
       - BRIDGE_SECRET=${BRIDGE_SECRET:-ci-test-bridge-secret}
+      - CONNECTION_TIMEOUT_MS=60000

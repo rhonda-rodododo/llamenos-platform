@@ -1,0 +1,133 @@
+name: 'Bootstrap Backend for E2E'
+description: 'Shared composite action to bootstrap the Llámenos backend for E2E tests. Creates .env, starts Docker Compose core services + optional sidecars, waits for health, and optionally shows container status.'
+
+inputs:
+  admin_pubkey:
+    description: 'Admin public key for the test backend'
+    required: true
+  with_sidecars:
+    description: 'Start signal-notifier and sip-bridge sidecars (true/false)'
+    required: false
+    default: 'false'
+  wait_for_signal:
+    description: 'Wait for signal-notifier health (true/false)'
+    required: false
+    default: 'false'
+  wait_for_sip_bridge:
+    description: 'Wait for sip-bridge health (true/false)'
+    required: false
+    default: 'false'
+  show_status:
+    description: 'Show container status and logs on failure (true/false)'
+    required: false
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - name: Create .env for Docker Compose
+      shell: bash
+      run: |
+        printf '%s\n' \
+          "ADMIN_PUBKEY=${{ inputs.admin_pubkey }}" \
+          "DOMAIN=localhost" \
+          "PG_PASSWORD=ci-test-password" \
+          "HMAC_SECRET=$(openssl rand -hex 32)" \
+          "STORAGE_ACCESS_KEY=testaccess" \
+          "STORAGE_SECRET_KEY=testsecret123456" \
+          "HOTLINE_NAME=Llámenos" \
+          "BRIDGE_SECRET=ci-test-bridge-secret" \
+          "ARI_PASSWORD=changeme" \
+          "SERVER_SECRET=0000000000000000000000000000000000000000000000000000000000000001" \
+          "NOTIFIER_API_KEY=ci-test-notifier-key" \
+          "SIGNAL_REGISTERED_NUMBER=+15550000000" \
+          "PBX_TYPE=asterisk" \
+          "GLITCHTIP_SECRET_KEY=$(openssl rand -hex 32)" \
+          "TOKEN_MAX_AGE_MS=3600000" \
+          > .env
+
+    - name: Build and start Docker Compose (core services)
+      shell: bash
+      run: |
+        timeout 600 docker compose --env-file .env \
+          -f deploy/docker/docker-compose.yml \
+          -f deploy/docker/docker-compose.test.yml \
+          up -d --build --wait app
+
+    - name: Start sidecar profiles (signal + telephony)
+      if: inputs.with_sidecars == 'true'
+      shell: bash
+      run: |
+        timeout 300 docker compose --env-file .env \
+          --profile signal --profile asterisk \
+          -f deploy/docker/docker-compose.yml \
+          -f deploy/docker/docker-compose.test.yml \
+          up -d --build --no-recreate
+
+    - name: Wait for signal-notifier health
+      if: inputs.wait_for_signal == 'true'
+      shell: bash
+      run: |
+        echo "Waiting for signal-notifier..."
+        for i in $(seq 1 30); do
+          if curl -sf http://localhost:3100/health; then
+            echo "signal-notifier is ready"
+            break
+          fi
+          if [ "$i" -eq 30 ]; then
+            echo "::warning::signal-notifier did not become healthy — sidecar tests will be skipped"
+          fi
+          sleep 3
+        done
+
+    - name: Wait for sip-bridge health
+      if: inputs.wait_for_sip_bridge == 'true'
+      shell: bash
+      run: |
+        echo "Waiting for sip-bridge..."
+        for i in $(seq 1 20); do
+          if curl -sf http://localhost:3001/health; then
+            echo "sip-bridge is ready"
+            break
+          fi
+          if [ "$i" -eq 20 ]; then
+            echo "::warning::sip-bridge did not become healthy — SIP health check test will fail"
+          fi
+          sleep 3
+        done
+
+    - name: Wait for backend health
+      shell: bash
+      run: |
+        echo "Waiting for backend to be ready..."
+        for i in $(seq 1 60); do
+          if curl -sf http://localhost:3000/api/health/ready; then
+            echo "Backend is ready"
+            break
+          fi
+          if [ "$i" -eq 60 ]; then
+            echo "::error::Backend did not become healthy after 120s"
+            docker compose --env-file .env \
+              -f deploy/docker/docker-compose.yml \
+              -f deploy/docker/docker-compose.test.yml \
+              logs --tail=50 || true
+            exit 1
+          fi
+          sleep 2
+        done
+
+    - name: Show container status
+      if: ${{ !cancelled() && inputs.show_status == 'true' }}
+      shell: bash
+      run: |
+        docker compose --env-file .env \
+          --profile signal --profile asterisk \
+          -f deploy/docker/docker-compose.yml \
+          -f deploy/docker/docker-compose.test.yml \
+          ps || true
+        docker compose --env-file .env \
+          --profile signal --profile asterisk \
+          -f deploy/docker/docker-compose.yml \
+          -f deploy/docker/docker-compose.test.yml \
+          logs --tail=50 || true
+
