@@ -63,6 +63,8 @@ function makeServices(overrides: Record<string, unknown> = {}) {
   return {
     identity: {
       getUserInternal: vi.fn(),
+      getWebAuthnSettings: vi.fn().mockResolvedValue({ requireForAdmins: false, requireForUsers: false }),
+      getWebAuthnCredentials: vi.fn().mockResolvedValue({ credentials: [] }),
       ...overrides,
     },
     settings: {
@@ -244,5 +246,163 @@ describe('auth middleware', () => {
     expect(res.status).toBe(401)
     const { incError } = await import('@worker/lib/error-counter')
     expect(incError).toHaveBeenCalledWith('auth')
+  })
+
+  describe('WebAuthn enforcement', () => {
+    it('allows access when WebAuthn is not required', async () => {
+      const user = makeUser({ roles: ['role-volunteer'] })
+      mockAuthenticateRequest.mockResolvedValue({ pubkey: user.pubkey, user })
+      const { app, services } = createApp()
+      ;(services.identity.getWebAuthnSettings as ReturnType<typeof vi.fn>).mockResolvedValue({
+        requireForAdmins: false,
+        requireForUsers: false,
+      })
+
+      const res = await req(app, '/test')
+      expect(res.status).toBe(200)
+    })
+
+    it('allows access when WebAuthn is required and user has passkeys', async () => {
+      const user = makeUser({ roles: ['role-volunteer'] })
+      mockAuthenticateRequest.mockResolvedValue({ pubkey: user.pubkey, user })
+      const { app, services } = createApp()
+      ;(services.identity.getWebAuthnSettings as ReturnType<typeof vi.fn>).mockResolvedValue({
+        requireForAdmins: false,
+        requireForUsers: true,
+      })
+      ;(services.identity.getWebAuthnCredentials as ReturnType<typeof vi.fn>).mockResolvedValue({
+        credentials: [{ id: 'cred1', label: 'My Passkey' }],
+      })
+
+      const res = await req(app, '/test')
+      expect(res.status).toBe(200)
+    })
+
+    it('returns 403 when WebAuthn is required for users and user has no passkeys', async () => {
+      const user = makeUser({ roles: ['role-volunteer'] })
+      mockAuthenticateRequest.mockResolvedValue({ pubkey: user.pubkey, user })
+      const { app, services } = createApp()
+      ;(services.identity.getWebAuthnSettings as ReturnType<typeof vi.fn>).mockResolvedValue({
+        requireForAdmins: false,
+        requireForUsers: true,
+      })
+      ;(services.identity.getWebAuthnCredentials as ReturnType<typeof vi.fn>).mockResolvedValue({
+        credentials: [],
+      })
+
+      const res = await req(app, '/test')
+      expect(res.status).toBe(403)
+      const body = await res.json()
+      expect(body.code).toBe('WEBAUTHN_REQUIRED')
+    })
+
+    it('returns 403 when WebAuthn is required for admins and admin has no passkeys', async () => {
+      const user = makeUser({ roles: ['role-super-admin'] })
+      mockAuthenticateRequest.mockResolvedValue({ pubkey: user.pubkey, user })
+      const { app, services } = createApp()
+      ;(services.identity.getWebAuthnSettings as ReturnType<typeof vi.fn>).mockResolvedValue({
+        requireForAdmins: true,
+        requireForUsers: false,
+      })
+      ;(services.identity.getWebAuthnCredentials as ReturnType<typeof vi.fn>).mockResolvedValue({
+        credentials: [],
+      })
+
+      const res = await req(app, '/test')
+      expect(res.status).toBe(403)
+      const body = await res.json()
+      expect(body.code).toBe('WEBAUTHN_REQUIRED')
+    })
+
+    it('allows access to /api/auth/me when WebAuthn is required but not registered', async () => {
+      const user = makeUser({ roles: ['role-volunteer'] })
+      mockAuthenticateRequest.mockResolvedValue({ pubkey: user.pubkey, user })
+
+      const app = new Hono<AppEnv>()
+      const services = makeServices()
+      ;(services.identity.getWebAuthnSettings as ReturnType<typeof vi.fn>).mockResolvedValue({
+        requireForAdmins: false,
+        requireForUsers: true,
+      })
+      ;(services.identity.getWebAuthnCredentials as ReturnType<typeof vi.fn>).mockResolvedValue({
+        credentials: [],
+      })
+
+      app.use('*', async (c, next) => {
+        c.set('services', services as never)
+        c.set('requestId', 'test-req-1')
+        await next()
+      })
+      app.use('*', auth)
+      app.get('/api/auth/me', (c) => c.json({ ok: true }))
+
+      const res = await req(app, '/api/auth/me')
+      expect(res.status).toBe(200)
+    })
+
+    it('allows access to /api/webauthn routes when WebAuthn is required but not registered', async () => {
+      const user = makeUser({ roles: ['role-volunteer'] })
+      mockAuthenticateRequest.mockResolvedValue({ pubkey: user.pubkey, user })
+
+      const app = new Hono<AppEnv>()
+      const services = makeServices()
+      ;(services.identity.getWebAuthnSettings as ReturnType<typeof vi.fn>).mockResolvedValue({
+        requireForAdmins: false,
+        requireForUsers: true,
+      })
+      ;(services.identity.getWebAuthnCredentials as ReturnType<typeof vi.fn>).mockResolvedValue({
+        credentials: [],
+      })
+
+      app.use('*', async (c, next) => {
+        c.set('services', services as never)
+        c.set('requestId', 'test-req-1')
+        await next()
+      })
+      app.use('*', auth)
+      app.post('/api/webauthn/register', (c) => c.json({ ok: true }))
+
+      const res = await app.request('/api/webauthn/register', { method: 'POST' }, defaultEnv as never)
+      expect(res.status).toBe(200)
+    })
+
+    it('allows access to /api/auth/me/logout when WebAuthn is required but not registered', async () => {
+      const user = makeUser({ roles: ['role-volunteer'] })
+      mockAuthenticateRequest.mockResolvedValue({ pubkey: user.pubkey, user })
+
+      const app = new Hono<AppEnv>()
+      const services = makeServices()
+      ;(services.identity.getWebAuthnSettings as ReturnType<typeof vi.fn>).mockResolvedValue({
+        requireForAdmins: false,
+        requireForUsers: true,
+      })
+      ;(services.identity.getWebAuthnCredentials as ReturnType<typeof vi.fn>).mockResolvedValue({
+        credentials: [],
+      })
+
+      app.use('*', async (c, next) => {
+        c.set('services', services as never)
+        c.set('requestId', 'test-req-1')
+        await next()
+      })
+      app.use('*', auth)
+      app.post('/api/auth/me/logout', (c) => c.json({ ok: true }))
+
+      const res = await app.request('/api/auth/me/logout', { method: 'POST' }, defaultEnv as never)
+      expect(res.status).toBe(200)
+    })
+
+    it('does not enforce WebAuthn for users when only requireForAdmins is true', async () => {
+      const user = makeUser({ roles: ['role-volunteer'] })
+      mockAuthenticateRequest.mockResolvedValue({ pubkey: user.pubkey, user })
+      const { app, services } = createApp()
+      ;(services.identity.getWebAuthnSettings as ReturnType<typeof vi.fn>).mockResolvedValue({
+        requireForAdmins: true,
+        requireForUsers: false,
+      })
+
+      const res = await req(app, '/test')
+      expect(res.status).toBe(200)
+    })
   })
 })

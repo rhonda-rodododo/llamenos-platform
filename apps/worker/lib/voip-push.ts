@@ -9,7 +9,7 @@
  * 1. iOS VoIP push uses a different APNs topic (bundleId.voip)
  * 2. The payload is unencrypted (minimal — just callId + caller display)
  * 3. It must be delivered with maximum priority to wake the native SIP stack
- * 4. Regular push goes through two-tier ECIES encryption
+ * 4. Regular push goes through two-tier HPKE encryption
  */
 
 import type { Env } from '../types'

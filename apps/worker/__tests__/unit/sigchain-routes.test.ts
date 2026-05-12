@@ -153,6 +153,23 @@ describe('sigchain routes', () => {
       expect(res.status).toBe(409)
     })
 
+    it('returns 403 on Ed25519 signature verification failure', async () => {
+      const { app, services } = createApp('user1')
+      services.cryptoKeys.appendSigchainLink.mockRejectedValue(
+        new CryptoKeyError('sigchain signature verification failed', 403),
+      )
+
+      const res = await app.request('/users/user1/sigchain', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(validLink),
+      }, defaultEnv)
+
+      expect(res.status).toBe(403)
+      const body = await res.json()
+      expect(body.error).toContain('signature verification failed')
+    })
+
     it('returns 400 on other CryptoKeyError', async () => {
       const { app, services } = createApp('user1')
       services.cryptoKeys.appendSigchainLink.mockRejectedValue(

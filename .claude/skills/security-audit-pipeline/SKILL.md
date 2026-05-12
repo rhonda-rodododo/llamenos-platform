@@ -181,5 +181,5 @@ These categories appear in almost every audit round — check them proactively:
 - **Threat model**: `docs/security/THREAT_MODEL.md`
 - **Deployment hardening**: `docs/security/DEPLOYMENT_HARDENING.md`
 - **Protocol spec**: `docs/protocol/PROTOCOL.md`
-- **Crypto labels**: `packages/protocol/crypto-labels.json` (69 domain separation constants)
+- **Crypto labels**: `packages/protocol/crypto-labels.json` (68 domain separation constants)
 - **Previous audits**: `docs/security/SECURITY_AUDIT_*.md`

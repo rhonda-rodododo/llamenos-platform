@@ -66,6 +66,8 @@ struct LlamenosApp: App {
                 }
             }
             .onAppear {
+                // Defense-in-depth: verify no DEBUG code leaked into production
+                BuildSafety.verifyProductionIntegrity()
                 // Sync router to initial auth state (onChange only fires on subsequent changes)
                 router.resetForAuthStatus(appState.authStatus)
                 // Check API version compatibility on launch

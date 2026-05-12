@@ -126,7 +126,7 @@ function NotesPage() {
           } else if (isTranscription) {
             payload = { text: note.encryptedContent }
           } else if (canDecrypt) {
-            // Try V2 (per-note ECIES envelope) first, fall back to V1 (legacy HKDF)
+            // Decrypt per-note HPKE envelope
             const myPubkey = publicKey!
             const envelope = isAdmin
               ? note.adminEnvelopes?.find(e => e.pubkey === myPubkey) ?? note.adminEnvelopes?.[0]

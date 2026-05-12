@@ -35,6 +35,8 @@ interface AuthState {
   serverEventKeyPrevHex: string | null
   eventKeyEpoch: number | undefined
   eventKeyEpochDuration: number | undefined
+  webauthnRequired: boolean
+  webauthnRegistered: boolean
 }
 
 interface AuthContextValue extends AuthState {
@@ -53,6 +55,7 @@ interface AuthContextValue extends AuthState {
   hasNsec: boolean
   adminPubkey: string
   adminDecryptionPubkey: string
+  webauthnEnrollmentRequired: boolean
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -81,6 +84,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     serverEventKeyPrevHex: null,
     eventKeyEpoch: undefined,
     eventKeyEpochDuration: undefined,
+    webauthnRequired: false,
+    webauthnRegistered: false,
   })
 
   const lastApiActivity = useRef(Date.now())
@@ -171,6 +176,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         serverEventKeyPrevHex: me.serverEventKeyPrevHex ?? null,
         eventKeyEpoch: me.eventKeyEpoch,
         eventKeyEpochDuration: me.eventKeyEpochDuration,
+            webauthnRequired: me.webauthnRequired ?? false,
+            webauthnRegistered: me.webauthnRegistered ?? false,
             sessionExpiring: false,
             sessionExpired: false,
           })
@@ -210,6 +217,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         serverEventKeyPrevHex: me.serverEventKeyPrevHex ?? null,
         eventKeyEpoch: me.eventKeyEpoch,
         eventKeyEpochDuration: me.eventKeyEpochDuration,
+            webauthnRequired: me.webauthnRequired ?? false,
+            webauthnRegistered: me.webauthnRegistered ?? false,
             sessionExpiring: false,
             sessionExpired: false,
           })
@@ -265,6 +274,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         serverEventKeyPrevHex: me.serverEventKeyPrevHex ?? null,
         eventKeyEpoch: me.eventKeyEpoch,
         eventKeyEpochDuration: me.eventKeyEpochDuration,
+        webauthnRequired: me.webauthnRequired ?? false,
+        webauthnRegistered: me.webauthnRegistered ?? false,
         sessionExpiring: false,
         sessionExpired: false,
       })
@@ -310,6 +321,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         serverEventKeyPrevHex: me.serverEventKeyPrevHex ?? null,
         eventKeyEpoch: me.eventKeyEpoch,
         eventKeyEpochDuration: me.eventKeyEpochDuration,
+        webauthnRequired: me.webauthnRequired ?? false,
+        webauthnRegistered: me.webauthnRegistered ?? false,
         sessionExpiring: false,
         sessionExpired: false,
       })
@@ -351,6 +364,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         serverEventKeyPrevHex: me.serverEventKeyPrevHex ?? null,
         eventKeyEpoch: me.eventKeyEpoch,
         eventKeyEpochDuration: me.eventKeyEpochDuration,
+        webauthnRequired: me.webauthnRequired ?? false,
+        webauthnRegistered: me.webauthnRegistered ?? false,
         sessionExpiring: false,
         sessionExpired: false,
       })
@@ -394,6 +409,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         serverEventKeyPrevHex: me.serverEventKeyPrevHex ?? null,
         eventKeyEpoch: me.eventKeyEpoch,
         eventKeyEpochDuration: me.eventKeyEpochDuration,
+        webauthnRequired: me.webauthnRequired ?? false,
+        webauthnRegistered: me.webauthnRegistered ?? false,
         sessionExpiring: false,
         sessionExpired: false,
       })
@@ -429,6 +446,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         serverEventKeyPrevHex: me.serverEventKeyPrevHex ?? null,
         eventKeyEpoch: me.eventKeyEpoch,
         eventKeyEpochDuration: me.eventKeyEpochDuration,
+        webauthnRequired: me.webauthnRequired ?? false,
+        webauthnRegistered: me.webauthnRegistered ?? false,
         sessionExpiring: false,
         sessionExpired: false,
       }))
@@ -460,6 +479,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         serverEventKeyPrevHex: me.serverEventKeyPrevHex ?? null,
         eventKeyEpoch: me.eventKeyEpoch,
         eventKeyEpochDuration: me.eventKeyEpochDuration,
+        webauthnRequired: me.webauthnRequired ?? false,
+        webauthnRegistered: me.webauthnRegistered ?? false,
         sessionExpiring: false,
         sessionExpired: false,
       }))
@@ -509,6 +530,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       serverEventKeyPrevHex: null,
       eventKeyEpoch: undefined,
       eventKeyEpochDuration: undefined,
+      webauthnRequired: false,
+      webauthnRegistered: false,
       sessionExpiring: false,
       sessionExpired: false,
     })
@@ -531,6 +554,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isAdmin: permissionGranted(state.permissions, 'settings:manage'),
     isAuthenticated: (state.isKeyUnlocked || hasSessionToken) && state.roles.length > 0,
     hasNsec: state.isKeyUnlocked,
+    webauthnEnrollmentRequired: state.webauthnRequired && !state.webauthnRegistered,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

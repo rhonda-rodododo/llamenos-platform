@@ -27,11 +27,11 @@ export const userSignalContacts = pgTable(
      *  The server uses this to dispatch without knowing the plaintext. */
     identifierHash: text('identifier_hash').notNull(),
 
-    /** ECIES-encrypted Signal identifier (hex: nonce + ciphertext).
+    /** HPKE-encrypted Signal identifier (hex: nonce + ciphertext).
      *  Encrypted with a random per-entry symmetric key. */
     identifierCiphertext: text('identifier_ciphertext').notNull(),
 
-    /** Per-reader key envelopes (ECIES-wrapped symmetric key for each authorized reader).
+    /** Per-reader key envelopes (HPKE-wrapped symmetric key for each authorized reader).
      *  Follows the same envelope pattern as E2EE notes and messages. */
     identifierEnvelope: jsonb('identifier_envelope')
       .notNull()

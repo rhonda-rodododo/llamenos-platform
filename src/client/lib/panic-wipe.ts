@@ -48,10 +48,16 @@ export function performPanicWipe(): void {
 
   // 4. Defer redirect — gives React one frame to paint the overlay
   setTimeout(async () => {
-    // Clear Tauri Store (async cleanup)
+    // Clear Stronghold vault (encrypted device keys)
+    try {
+      const { clearStoredKey } = await import('./platform')
+      await clearStoredKey()
+    } catch { /* Stronghold may be unavailable */ }
+
+    // Clear Tauri Store (non-security preferences)
     try {
       const { Store } = await import('@tauri-apps/plugin-store')
-      for (const name of ['keys.json', 'settings.json', 'drafts.json']) {
+      for (const name of ['settings.json', 'drafts.json']) {
         try {
           const store = await Store.load(name)
           await store.clear()
