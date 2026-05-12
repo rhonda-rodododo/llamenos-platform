@@ -357,10 +357,10 @@ pub const LABEL_REGISTRY: &[&str] = &[
     LABEL_SERVER_NOSTR_SIGNING_KEY_INFO,    // 62
     LABEL_SERVER_EVENT_ENCRYPTION_KEY,      // 63
     LABEL_SERVER_EVENT_ENCRYPTION_KEY_INFO, // 64
-    LABEL_HUB_EVENT_EPOCH,                 // 65
-    LABEL_SERVER_SIGNING_KEY,              // 66
-    LABEL_SERVER_SIGNING_INFO,             // 67
-    LABEL_WS_CHALLENGE,                    // 68
+    LABEL_HUB_EVENT_EPOCH,                  // 65
+    LABEL_SERVER_SIGNING_KEY,               // 66
+    LABEL_SERVER_SIGNING_INFO,              // 67
+    LABEL_WS_CHALLENGE,                     // 68
 ];
 
 /// Look up a label string by its numeric ID.
@@ -433,14 +433,32 @@ mod tests {
         assert_eq!(LABEL_PROVISIONING_SALT, "llamenos:provisioning:v1");
         assert_eq!(LABEL_BLIND_INDEX_FIELD, "llamenos:blind-idx:");
         assert_eq!(LABEL_HUB_PTK, "llamenos:hub-ptk:v1");
-        assert_eq!(LABEL_STORAGE_CREDENTIAL_WRAP, "llamenos:storage-credential-wrap");
-        assert_eq!(LABEL_SERVER_NOSTR_SIGNING_KEY, "llamenos:server-nostr-signing:v1");
-        assert_eq!(LABEL_SERVER_NOSTR_SIGNING_KEY_INFO, "llamenos:server-nostr-signing-info:v1");
-        assert_eq!(LABEL_SERVER_EVENT_ENCRYPTION_KEY, "llamenos:server-event-encryption:v1");
-        assert_eq!(LABEL_SERVER_EVENT_ENCRYPTION_KEY_INFO, "llamenos:server-event-encryption-info:v1");
+        assert_eq!(
+            LABEL_STORAGE_CREDENTIAL_WRAP,
+            "llamenos:storage-credential-wrap"
+        );
+        assert_eq!(
+            LABEL_SERVER_NOSTR_SIGNING_KEY,
+            "llamenos:server-nostr-signing:v1"
+        );
+        assert_eq!(
+            LABEL_SERVER_NOSTR_SIGNING_KEY_INFO,
+            "llamenos:server-nostr-signing-info:v1"
+        );
+        assert_eq!(
+            LABEL_SERVER_EVENT_ENCRYPTION_KEY,
+            "llamenos:server-event-encryption:v1"
+        );
+        assert_eq!(
+            LABEL_SERVER_EVENT_ENCRYPTION_KEY_INFO,
+            "llamenos:server-event-encryption-info:v1"
+        );
         assert_eq!(LABEL_HUB_EVENT_EPOCH, "llamenos:hub-event-epoch:v1");
         assert_eq!(LABEL_SERVER_SIGNING_KEY, "llamenos:server-signing-key:v1");
-        assert_eq!(LABEL_SERVER_SIGNING_INFO, "llamenos:server-signing-key-info:v1");
+        assert_eq!(
+            LABEL_SERVER_SIGNING_INFO,
+            "llamenos:server-signing-key-info:v1"
+        );
         assert_eq!(LABEL_WS_CHALLENGE, "llamenos:ws-auth:v1");
     }
 
@@ -465,7 +483,10 @@ mod tests {
         assert_eq!(id_to_label(61), Some(LABEL_SERVER_NOSTR_SIGNING_KEY));
         assert_eq!(id_to_label(62), Some(LABEL_SERVER_NOSTR_SIGNING_KEY_INFO));
         assert_eq!(id_to_label(63), Some(LABEL_SERVER_EVENT_ENCRYPTION_KEY));
-        assert_eq!(id_to_label(64), Some(LABEL_SERVER_EVENT_ENCRYPTION_KEY_INFO));
+        assert_eq!(
+            id_to_label(64),
+            Some(LABEL_SERVER_EVENT_ENCRYPTION_KEY_INFO)
+        );
         assert_eq!(id_to_label(65), Some(LABEL_HUB_EVENT_EPOCH));
         assert_eq!(id_to_label(66), Some(LABEL_SERVER_SIGNING_KEY));
         assert_eq!(id_to_label(67), Some(LABEL_SERVER_SIGNING_INFO));
