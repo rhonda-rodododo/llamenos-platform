@@ -63,13 +63,12 @@ class ApiService @Inject constructor(
          * Certificate pinner for llamenos API domains.
          *
          * Pin hashes are shared with iOS — see docs/security/CERTIFICATE_PINS.md.
-         * TODO: Replace placeholder pins after first production deployment to app.llamenos.org.
-         * Run the extraction commands in CERTIFICATE_PINS.md and update these values.
+         * Populate via: bun run cert-pins:inject <domain>
          */
         val certificatePinner: CertificatePinner = CertificatePinner.Builder()
-            // Primary pin — Cloudflare intermediate CA (from docs/security/CERTIFICATE_PINS.md)
+            // Primary pin — leaf certificate (populate via: bun run cert-pins:inject <domain>)
             .add("*.llamenos.org", "sha256/REPLACE_AFTER_DEPLOYMENT")
-            // Backup pin — Cloudflare root CA (from docs/security/CERTIFICATE_PINS.md)
+            // Backup pin — intermediate CA (populate via: bun run cert-pins:inject <domain>)
             .add("*.llamenos.org", "sha256/REPLACE_AFTER_DEPLOYMENT")
             .build()
     }

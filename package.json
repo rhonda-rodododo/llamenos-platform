@@ -94,6 +94,8 @@
     "postinstall": "bash scripts/worktree-setup.sh",
     "worktree-setup": "bash scripts/worktree-setup.sh",
     "setup": "bash scripts/setup.sh",
+    "cert-pins:extract": "bash scripts/extract-cert-pins.sh",
+    "cert-pins:inject": "bun scripts/inject-cert-pins.ts",
     "lint": "eslint src/ apps/worker/",
     "supervisors": "scripts/supervisors.sh",
     "supervisors:kill": "scripts/supervisors.sh --kill"
