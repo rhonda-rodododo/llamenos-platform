@@ -1,7 +1,7 @@
 # Data Classification Reference
 
-**Version:** 2.2
-**Date:** 2026-05-11
+**Version:** 2.3
+**Date:** 2026-05-12
 
 Complete inventory of all data stored and processed by Llamenos, with classification levels for security audits, legal review, and GDPR compliance.
 
@@ -168,7 +168,7 @@ Hash-chained for tamper detection.
 
 **Note**: Country/region is explicitly **not collected** — the audit service omits it entirely ("privacy cost outweighs operational value"). Prior deployments that stored country should remove it on next migration.
 
-> **Note:** There is currently no API endpoint for independent audit log chain verification. See [Security Gaps](SECURITY_GAPS_AND_ROADMAP.md#24-audit-log-chain-verification-low).
+> **Note:** Audit log chain integrity can be independently verified via `GET /api/audit/verify`, which walks the full hash chain and reports any integrity violations.
 
 ---
 
@@ -342,6 +342,7 @@ Note: Llamenos does not currently enforce automated retention policies. Operator
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-05-12 | 2.3 | Updated audit log chain verification note — `GET /api/audit/verify` endpoint now available (PR #288) |
 | 2026-05-11 | 2.2 | Added legacy field note (`encryptedSecretKey`); added 3-tier envelope clarification; added Stronghold/Store note; added audit log verification note; added Security Gaps cross-references |
 | 2026-05-03 | 2.1 | Post-hardening: added `ua` (SHA-256 hashed) field to audit logs; noted country is not collected; updated WebSocket events (epoch-rotating per-hub key, power-of-2 padding, server-only publishing) |
 | 2026-05-02 | 2.0 | Complete rewrite: HPKE replaces ECIES for all key wrapping, per-device Ed25519/X25519 keys replace nsec, added sigchain/PUK/CLKR entries, added CMS data, added hub key distribution, added blind indexes, updated client storage to Tauri Store/Keychain/Keystore (not localStorage), updated WebSocket event data, added signal-notifier sidecar, removed Durable Objects/Cloudflare references |

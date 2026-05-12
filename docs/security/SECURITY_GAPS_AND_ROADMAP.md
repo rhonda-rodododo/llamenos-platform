@@ -1,7 +1,7 @@
 # Security Gaps and Improvement Roadmap
 
-**Version:** 1.0
-**Date:** 2026-05-11
+**Version:** 1.1
+**Date:** 2026-05-12
 **Status:** Living document — updated as gaps are closed and new ones identified
 
 This document provides an honest inventory of known security gaps, incomplete implementations, and planned improvements in the Llamenos platform. It is intended for security auditors, cryptographers, and developers to understand what is fully implemented versus what remains work-in-progress.
@@ -15,13 +15,13 @@ This document provides an honest inventory of known security gaps, incomplete im
 
 ## Summary
 
-| Category | Count | Severity Distribution |
-|----------|-------|----------------------|
-| Documentation/Implementation Mismatches | 6 | 2 Medium, 4 Low |
-| Incomplete Implementations | 4 | 1 Medium, 3 Low |
-| Code TODOs (Security-Critical) | 3 | 2 Medium, 1 Low |
-| iOS Debug Code in Production Paths | 1 | Medium |
-| **Total** | **14** | |
+| Category | Count | Resolved | Open | Severity Distribution |
+|----------|-------|----------|------|----------------------|
+| Documentation/Implementation Mismatches | 6 | 2 | 4 | 1 Medium, 3 Low (1 Medium + 1 Low resolved) |
+| Incomplete Implementations | 4 | 2 | 2 | 1 Medium, 1 Low (2 Low resolved) |
+| Code TODOs (Security-Critical) | 3 | 1 | 2 | 2 Medium (1 Low resolved) |
+| iOS Debug Code in Production Paths | 1 | 0 | 1 | Medium |
+| **Total** | **14** | **5** | **9** | |
 
 ---
 
@@ -29,21 +29,17 @@ This document provides an honest inventory of known security gaps, incomplete im
 
 These are cases where the documentation claims something that the implementation does not fully support.
 
-### 1.1 Domain Separation Label Count (MEDIUM)
+### 1.1 Domain Separation Label Count — RESOLVED
 
-**Claim:** "57 domain separation labels" (README.md, CRYPTO_ARCHITECTURE.md)
+**Status:** Resolved in PR #288 (fix/security-gaps-followup).
 
-**Reality:** `packages/protocol/crypto-labels.json` contains **69 labels**. The Rust `LABEL_REGISTRY` in `packages/crypto/src/labels.rs` only has **57 entries** (indices 0-56).
+**Original issue:** `packages/protocol/crypto-labels.json` contained 69 labels but the Rust `LABEL_REGISTRY` in `packages/crypto/src/labels.rs` only had 57 entries (indices 0-56).
 
-**Impact:** Labels like `LABEL_WS_CHALLENGE`, `LABEL_SERVER_SIGNING_KEY`, `LABEL_SERVER_EVENT_ENCRYPTION_KEY`, `LABEL_HUB_EVENT_EPOCH`, etc. exist in the JSON source of truth and are used in TypeScript backend code, but **cannot be used in HPKE envelopes from Rust** because they lack registry IDs.
+**Resolution:** All 12 missing labels were added to the Rust `LABEL_REGISTRY` with stable indices 57-68. The registry now has 69 entries matching the JSON source of truth. Additionally, a value collision was discovered and fixed: `LABEL_SERVER_NOSTR_KEY` and `LABEL_SERVER_SIGNING_KEY` had identical values (`llamenos:server:nostr-key`). `LABEL_SERVER_SIGNING_KEY` was corrected to `llamenos:server:signing-key` and its JSON Schema description updated.
 
-**Fix:** Add the 12 missing labels to `packages/crypto/src/labels.rs` `LABEL_REGISTRY` with stable indices 57-68. Update all documentation to state "69 domain separation labels."
-
-**Files:**
-- `packages/protocol/crypto-labels.json` (source of truth, 69 labels)
-- `packages/crypto/src/labels.rs` (registry has 57)
-- `docs/security/README.md` (claims 57)
-- `docs/security/CRYPTO_ARCHITECTURE.md` (claims 57)
+**Files changed:**
+- `packages/crypto/src/labels.rs` (registry now has 69 entries, indices 0-68)
+- `packages/protocol/crypto-labels.json` (collision fixed for `LABEL_SERVER_SIGNING_KEY`)
 
 ---
 
@@ -98,19 +94,13 @@ These are cases where the documentation claims something that the implementation
 
 ---
 
-### 1.5 WebAuthn Enforcement Settings (LOW)
+### 1.5 WebAuthn Enforcement Settings — RESOLVED
 
-**Claim:** WebAuthn settings (`requireForAdmins`, `requireForUsers`) exist in the system.
+**Status:** Resolved in PR #288 (fix/security-gaps-followup).
 
-**Reality:** Settings are stored in `systemSettings` table and retrievable via API, but **enforcement logic is not visibly wired into the authentication middleware**. The `authenticateRequest` function in `apps/worker/lib/auth.ts` tries session token first, then Ed25519 fallback — no visible check for WebAuthn requirement based on user role.
+**Original issue:** WebAuthn settings (`requireForAdmins`, `requireForUsers`) were stored but enforcement was not wired into the authentication middleware.
 
-**Impact:** WebAuthn can be configured but may not be enforced.
-
-**Fix:** Add WebAuthn requirement checks to auth middleware or login flow.
-
-**Files:**
-- `apps/worker/lib/auth.ts` (no WebAuthn enforcement)
-- `apps/worker/routes/webauthn.ts` (settings stored)
+**Resolution:** Server-side enforcement was added to the auth middleware — users who have not registered a passkey now receive a 403 response with `X-WebAuthn-Required: true` header when WebAuthn is required for their role. Client-side redirect to passkey enrollment was also added.
 
 ---
 
@@ -156,24 +146,23 @@ These are cases where the documentation claims something that the implementation
 
 ---
 
-### 2.3 Sigchain Server-Side Signature Validation (LOW)
+### 2.3 Sigchain Server-Side Signature Validation — RESOLVED
 
-**Status:** The backend enforces hash-chain continuity (sequence numbers, prevHash linkage) but **explicitly does NOT validate Ed25519 signatures** — "Signature validation is left to the client."
+**Status:** Resolved in PR #288 (fix/security-gaps-followup).
 
-**Impact:** A malicious client could publish invalid sigchain entries that pass server validation but fail client-side verification.
+**Original issue:** The backend enforced hash-chain continuity but did not validate Ed25519 signatures on sigchain entries.
 
-**Files:**
-- `apps/worker/services/crypto-keys.ts`
+**Resolution:** Ed25519 signature verification was added to the `appendSigchainLink` method. The server now validates that each sigchain entry's signature is correct before accepting it, preventing malicious clients from publishing invalid entries.
 
 ---
 
-### 2.4 Audit Log Chain Verification (LOW)
+### 2.4 Audit Log Chain Verification — RESOLVED
 
-**Status:** Audit logs use SHA-256 hash chaining with `previousEntryHash` → `entryHash` linkage. However, there is **no visible API endpoint or tool for clients to verify the full chain integrity**.
+**Status:** Resolved in PR #288 (fix/security-gaps-followup).
 
-**Impact:** Tamper detection exists at the DB level but cannot be independently verified by clients or external auditors.
+**Original issue:** Audit logs used SHA-256 hash chaining but no API endpoint existed for independent chain verification.
 
-**Fix:** Add a chain verification endpoint or export tool.
+**Resolution:** A `GET /api/audit/verify` endpoint was added with a `verifyChain()` method that walks the full audit log chain and reports any integrity violations. Clients and external auditors can now independently verify tamper-evidence of the audit log.
 
 ---
 
@@ -199,13 +188,13 @@ These are cases where the documentation claims something that the implementation
 
 ---
 
-### 3.3 Client Signal Notification — ECIES Wiring (LOW)
+### 3.3 Client Signal Notification — ECIES Wiring — RESOLVED
 
-**Location:** `src/client/components/signal-notification-section.tsx:66`
+**Status:** Resolved in PR #288 (fix/security-gaps-followup).
 
-**TODO:** "wire into ECIES encrypt via platform.ts in the full implementation"
+**Original issue:** Signal notification encryption had a TODO to "wire into ECIES encrypt via platform.ts."
 
-**Impact:** Signal notification encryption may not be fully wired into the desktop client.
+**Resolution:** The ECIES TODO was replaced with HPKE encryption routed through `platform.ts`, consistent with the project-wide migration from ECIES to HPKE (RFC 9180).
 
 ---
 
@@ -300,28 +289,31 @@ These are cases where the documentation claims something that the implementation
 
 ## 7. Recommended Priority Order
 
+### Completed (PR #288)
+- ~~Fix crypto-label registry drift (add 12 missing labels to Rust)~~ — RESOLVED: all 69 labels registered; label collision fixed
+- ~~Implement WebAuthn enforcement in auth middleware~~ — RESOLVED: server-side 403 + client redirect
+- ~~Add audit log chain verification endpoint~~ — RESOLVED: `GET /api/audit/verify`
+- ~~Add sigchain server-side signature validation~~ — RESOLVED: Ed25519 verification in `appendSigchainLink`
+- ~~Wire Signal notification HPKE encryption~~ — RESOLVED: ECIES TODO replaced with HPKE via platform.ts
+
 ### Immediate (Next Sprint)
-1. Fix crypto-label registry drift (add 12 missing labels to Rust)
-2. Verify iOS DEBUG blocks are excluded from production builds
-3. Replace Android placeholder certificate pins
-4. Clarify Stronghold vs. Store in documentation
+1. Verify iOS DEBUG blocks are excluded from production builds
+2. Replace Android placeholder certificate pins
+3. Clarify Stronghold vs. Store in documentation
 
 ### Short-Term (Next Month)
-5. Implement WebAuthn enforcement in auth middleware
-6. Add audit log chain verification endpoint
-7. Wire iOS WakeKeyService X25519 migration
-8. Document 3-tier envelope status (notes vs. cases)
+4. Wire iOS WakeKeyService X25519 migration
+5. Document 3-tier envelope status (notes vs. cases)
 
 ### Medium-Term (Next Quarter)
-9. Implement SFrame media frame encryption
-10. Migrate device key storage to Stronghold (or update docs)
-11. Add sigchain server-side signature validation
-12. Remove legacy ECIES modules (after migration complete)
+6. Implement SFrame media frame encryption
+7. Migrate device key storage to Stronghold (or update docs)
+8. Remove legacy ECIES modules (after migration complete)
 
 ### Long-Term (Ongoing)
-13. Traffic analysis resistance (dummy traffic)
-14. External audit log anchoring
-15. Nostr security hardening implementation
+9. Traffic analysis resistance (dummy traffic)
+10. External audit log anchoring
+11. Nostr security hardening implementation
 
 ---
 
@@ -341,4 +333,5 @@ For each gap, verify closure with:
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-05-12 | 1.1 | Marked 5 gaps as RESOLVED per PR #288: domain separation label count (1.1), WebAuthn enforcement (1.5), sigchain server-side validation (2.3), audit log chain verification (2.4), Signal notification HPKE wiring (3.3). Noted label collision fix (LABEL_SERVER_NOSTR_KEY / LABEL_SERVER_SIGNING_KEY). Updated summary counts and priority order. |
 | 2026-05-11 | 1.0 | Initial inventory: 14 gaps across 5 categories, with severity, impact, and recommended fixes |

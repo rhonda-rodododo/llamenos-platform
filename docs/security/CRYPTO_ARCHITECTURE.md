@@ -1,7 +1,7 @@
 # Cryptographic Architecture
 
-**Version:** 1.2
-**Date:** 2026-05-11
+**Version:** 1.3
+**Date:** 2026-05-12
 
 Authoritative reference for all cryptographic primitives, key hierarchies, and protocols used in Llamenos. All crypto operations are implemented once in `packages/crypto/` (Rust), compiled to native (Tauri desktop), WASM (browser testing), and UniFFI (iOS/Android). There is no separate JS crypto implementation for production use.
 
@@ -171,11 +171,9 @@ This prevents cross-context key reuse attacks (e.g., using a note key envelope t
 
 ---
 
-## Domain Separation Labels (69 Defined, 57 in Rust Registry)
+## Domain Separation Labels (69 Total)
 
-All labels are defined in `packages/protocol/crypto-labels.json` (source of truth) and generated to TypeScript, Swift, Kotlin, and Rust via codegen. Labels are registered in `packages/crypto/src/labels.rs` with stable numeric IDs (indices never reordered).
-
-> **Important:** 69 labels are defined in the JSON source of truth, but the Rust `LABEL_REGISTRY` currently contains 57 entries. The 12 newer labels exist in JSON/TypeScript but lack Rust registry IDs. See [Security Gaps](SECURITY_GAPS_AND_ROADMAP.md#11-domain-separation-label-count-medium).
+All 69 labels are defined in `packages/protocol/crypto-labels.json` (source of truth) and generated to TypeScript, Swift, Kotlin, and Rust via codegen. Labels are registered in `packages/crypto/src/labels.rs` with stable numeric IDs (indices 0-68, never reordered).
 
 | Range | Category | Examples |
 |-------|----------|----------|
@@ -197,7 +195,7 @@ All labels are defined in `packages/protocol/crypto-labels.json` (source of trut
 | 50–51 | SFrame | `LABEL_SFRAME_CALL_SECRET`, `LABEL_SFRAME_BASE_KEY` |
 | 52 | MLS | `LABEL_MLS_PROVISION` |
 | 53–56 | Salts/derivation | `LABEL_ECIES_V2_SALT`, `LABEL_PROVISIONING_SALT`, `LABEL_HUB_PTK`, etc. |
-| 57–68 | *Not yet in Rust registry* | `LABEL_WS_CHALLENGE`, `LABEL_SERVER_SIGNING_KEY`, `LABEL_SERVER_EVENT_ENCRYPTION_KEY`, `LABEL_HUB_EVENT_EPOCH`, etc. |
+| 57–68 | Server/hub/misc | `LABEL_WS_CHALLENGE`, `LABEL_SERVER_SIGNING_KEY`, `LABEL_SERVER_EVENT_ENCRYPTION_KEY`, `LABEL_HUB_EVENT_EPOCH`, etc. |
 
 **Rule**: Never use raw string literals for crypto contexts. Always use the generated label constants.
 
@@ -238,7 +236,7 @@ Each user has a sigchain — an append-only, hash-chained log of device authoriz
 | `remove-device` | Deauthorize a device (revocation) |
 | `rotate-puk` | Record PUK generation rotation |
 
-> **Note:** The backend enforces sequence monotonicity and prevHash linkage but **does not validate Ed25519 signatures server-side** — signature validation is delegated to clients. See [Security Gaps](SECURITY_GAPS_AND_ROADMAP.md#23-sigchain-server-side-signature-validation-low).
+> **Note:** The backend enforces sequence monotonicity, prevHash linkage, **and Ed25519 signature verification** on each sigchain entry before accepting it.
 
 ---
 
@@ -445,6 +443,7 @@ All dependencies use `Cargo.lock` for reproducible builds. The `packages/crypto/
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-05-12 | 1.3 | All 69 domain separation labels now in Rust registry (was 57); sigchain server-side Ed25519 validation now implemented; updated section headers and notes to reflect PR #288 fixes |
 | 2026-05-11 | 1.2 | Updated domain separation label count (69 defined, 57 in Rust registry); added Stronghold/Store clarification; added SFrame completeness note; added 3-tier envelope clarification; added sigchain server-side validation note; added MLS client integration note; added Security Gaps cross-references |
 | 2026-05-03 | 1.1 | Post-hardening update: Argon2id (64MB/3/4) replaces PBKDF2 for PIN/passphrase; min 8 digits or alphanumeric passphrase; XChaCha20-Poly1305 for hub events (was misattributed); per-hub epoch-based event key rotation (24h); power-of-2 payload padding section; WebSocket auth + built-in endpoint; WebSocket signing/encryption key separation; MLS always-on (feature flag removed) |
 | 2026-05-02 | 1.0 | Initial document — consolidated from protocol spec, crate source, and CLAUDE.md |

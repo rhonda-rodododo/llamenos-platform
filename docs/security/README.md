@@ -1,6 +1,6 @@
 # Llamenos Security Documentation
 
-**Last Updated:** 2026-05-11
+**Last Updated:** 2026-05-12
 **Crypto Architecture:** HPKE (RFC 9180) + Ed25519/X25519 + AES-256-GCM
 **Audit Status:** Two historical audits (2026-02, 2026-03); docs updated for current architecture
 **Domain Separation Labels:** 69 defined (source of truth in `packages/protocol/crypto-labels.json`)
@@ -45,7 +45,7 @@ All cryptographic operations are implemented once in `packages/crypto/` (Rust), 
 | HMAC-SHA256 | Phone/IP hashing, blind index generation |
 | **69 domain separation labels** | Albrecht defense — label enforced at decrypt |
 
-> **Note:** 69 labels are defined in `packages/protocol/crypto-labels.json` (source of truth). The Rust `LABEL_REGISTRY` currently contains 57 entries; 12 newer labels are used in TypeScript backend code but not yet registered in Rust. See [Security Gaps](SECURITY_GAPS_AND_ROADMAP.md#11-domain-separation-label-count-medium).
+> All 69 labels are defined in `packages/protocol/crypto-labels.json` (source of truth) and registered in the Rust `LABEL_REGISTRY` with stable indices 0-68.
 
 ### End-to-End Encrypted (Zero-Knowledge for Content)
 
@@ -100,12 +100,15 @@ The server **cannot read** these, even under legal compulsion:
 
 For a complete inventory of known gaps, incomplete implementations, and planned improvements, see [Security Gaps and Roadmap](SECURITY_GAPS_AND_ROADMAP.md).
 
-Highlights:
-- **12 domain separation labels** in JSON are not yet in the Rust registry
+Highlights (9 open gaps remain, 5 resolved in PR #288):
+- ~~Domain separation label registry drift~~ — RESOLVED: all 69 labels now in Rust registry
+- ~~WebAuthn enforcement~~ — RESOLVED: server-side enforcement added
+- ~~Sigchain server-side signature validation~~ — RESOLVED: Ed25519 verification added
+- ~~Audit log chain verification~~ — RESOLVED: `GET /api/audit/verify` endpoint added
+- ~~Signal notification ECIES wiring~~ — RESOLVED: replaced with HPKE via platform.ts
 - **Tauri Stronghold** is initialized but device keys are stored via `tauri-plugin-store`
 - **SFrame** has key derivation but no media frame encryption
 - **Certificate pinning** is scaffolding only (placeholder pins)
-- **WebAuthn enforcement** settings exist but may not be wired into auth middleware
 - **iOS DEBUG blocks** in security-critical paths need production build verification
 
 ## Reporting Security Issues
