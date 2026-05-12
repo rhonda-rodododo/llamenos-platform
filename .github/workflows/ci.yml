@@ -146,15 +146,6 @@ jobs:
       - name: Format check
         run: cargo fmt --manifest-path packages/crypto/Cargo.toml --check
 
-  # ─── WASM Build Validation (disabled — WASM target removed, using native Rust FFI) ──
-  wasm-build:
-    needs: changes
-    if: false
-    runs-on: ubuntu-latest
-    steps:
-      - name: Disabled
-        run: exit 0
-
   # ─── Dependency Vulnerability Scan ───────────────────────────
   audit:
     needs: changes
