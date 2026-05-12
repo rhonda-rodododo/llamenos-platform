@@ -323,7 +323,7 @@ export class CryptoKeysService {
 export class CryptoKeyError extends Error {
   constructor(
     message: string,
-    readonly status: 400 | 404 | 409 | 500 = 500,
+    readonly status: 400 | 403 | 404 | 409 | 500 = 500,
   ) {
     super(message)
     this.name = 'CryptoKeyError'
