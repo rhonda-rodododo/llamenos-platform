@@ -8,8 +8,6 @@ subtitle: Sa ki pwoteje, sa ki vizib, ak sa ki ka jwenn anba sibpena — òganiz
 | Yo KAPAB bay | Yo PA KAPAB bay |
 |------------------|---------------------|
 | Metadata apèl/mesaj (lè, dire) | Kontni nòt, transkripsyon, kò rapò |
-| Evènman an tan reyèl | Wi (pa hub, kle k ap woule) | Non | Sèlman tèks chifre |
-| Chèn User-Agent | SHA-256 hache | Hash sèlman | Hash (pa ranvèsab) |
 | Blòb baz done chifre | Non vòlontè (chifre de-bout-an-bout) |
 | Ki vòlontè ki te aktif ak lè | Dosye repètwa kontak (chifre de-bout-an-bout) |
 | | Kontni mesaj (chifre lè li rive, estoke kòm tèks chifre) |

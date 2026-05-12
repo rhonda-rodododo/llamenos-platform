@@ -1,8 +1,9 @@
 # Llamenos Security Documentation
 
-**Last Updated:** 2026-05-03
+**Last Updated:** 2026-05-11
 **Crypto Architecture:** HPKE (RFC 9180) + Ed25519/X25519 + AES-256-GCM
 **Audit Status:** Two historical audits (2026-02, 2026-03); docs updated for current architecture
+**Domain Separation Labels:** 69 defined (source of truth in `packages/protocol/crypto-labels.json`)
 
 This directory contains security documentation for Llamenos, a crisis response hotline app designed to protect volunteer and caller identity against well-funded adversaries.
 
@@ -18,6 +19,7 @@ This directory contains security documentation for Llamenos, a crisis response h
 | [Key Revocation Runbook](KEY_REVOCATION_RUNBOOK.md) | Device deauthorization via sigchain, hub key rotation, PUK rotation | Operators |
 | [Incident Response](INCIDENT_RESPONSE.md) | Server compromise, CI/CD compromise, account compromise, GDPR notification | Operators |
 | [Certificate Pins](CERTIFICATE_PINS.md) | iOS/Android certificate pinning (scaffolding — pins pending first deployment) | Mobile developers |
+| [Security Gaps and Roadmap](SECURITY_GAPS_AND_ROADMAP.md) | Known gaps, incomplete implementations, planned improvements | Auditors, developers, operators |
 
 ### Historical Audit Reports
 
@@ -41,9 +43,11 @@ All cryptographic operations are implemented once in `packages/crypto/` (Rust), 
 | XChaCha20-Poly1305 | Hub event encryption (WebSocket events) |
 | Argon2id (64MB, 3 iterations, 4 parallelism) | PIN/passphrase-to-KEK derivation for device key storage |
 | HMAC-SHA256 | Phone/IP hashing, blind index generation |
-| 57 domain separation labels | Albrecht defense — label enforced at decrypt |
+| **69 domain separation labels** | Albrecht defense — label enforced at decrypt |
 
-### End-to-End Encrypted (Zero-Knowledge)
+> **Note:** 69 labels are defined in `packages/protocol/crypto-labels.json` (source of truth). The Rust `LABEL_REGISTRY` currently contains 57 entries; 12 newer labels are used in TypeScript backend code but not yet registered in Rust. See [Security Gaps](SECURITY_GAPS_AND_ROADMAP.md#11-domain-separation-label-count-medium).
+
+### End-to-End Encrypted (Zero-Knowledge for Content)
 
 The server **cannot read** these, even under legal compulsion:
 
@@ -58,6 +62,8 @@ The server **cannot read** these, even under legal compulsion:
 | Draft notes | AES-256-GCM (HKDF-derived key) | No (deterministic key, local-only) |
 | Device private keys | Argon2id + AES-256-GCM | N/A (platform secure storage) |
 
+> **Note:** The server is zero-knowledge for note/message/file **content**. The server DOES see metadata (timestamps, routing, call durations) and processes plaintext momentarily during SMS/WhatsApp outbound sends. See [What We Do NOT Claim](#what-we-do-not-claim).
+
 ### Identity Model
 
 - **Per-device Ed25519/X25519 keys** — not a single "nsec" per user
@@ -66,7 +72,7 @@ The server **cannot read** these, even under legal compulsion:
 - **Hub key** — random 32 bytes, HPKE-wrapped per member, rotated on departure
 - **MLS** (RFC 9420) — group state management (always compiled; no feature flag)
 - **Hub event epoch rotation** — server event key rotates every 24 hours for forward secrecy
-- **SFrame** — voice E2EE key derivation
+- **SFrame** — voice E2EE key derivation (media frame encryption planned — see [Security Gaps](SECURITY_GAPS_AND_ROADMAP.md#13-sframe-voice-e2ee-low))
 
 ### Server-Accessible Under Subpoena
 
@@ -88,6 +94,19 @@ The server **cannot read** these, even under legal compulsion:
 - **WebSocket metadata privacy**: The server handles all event distribution; authenticated connections only; content is per-hub encrypted with epoch-rotating keys — server cannot fake events but can observe connection metadata
 - **PIN brute-force resistance (offline) — now significantly improved**: Minimum 8 digits or alphanumeric passphrase (8+ chars); Argon2id (64MB, 3 iterations, 4 parallelism) replaces PBKDF2 for strong GPU/ASIC resistance. Seizure of encrypted blob requires defeating Argon2id in addition to guessing credential.
 - **Deletion verification**: Cannot cryptographically prove hosting provider deleted data
+- **SFrame voice media encryption**: Key derivation is implemented; per-frame AES-128-CTR + HMAC encryption is planned but not yet complete
+
+## Known Security Gaps
+
+For a complete inventory of known gaps, incomplete implementations, and planned improvements, see [Security Gaps and Roadmap](SECURITY_GAPS_AND_ROADMAP.md).
+
+Highlights:
+- **12 domain separation labels** in JSON are not yet in the Rust registry
+- **Tauri Stronghold** is initialized but device keys are stored via `tauri-plugin-store`
+- **SFrame** has key derivation but no media frame encryption
+- **Certificate pinning** is scaffolding only (placeholder pins)
+- **WebAuthn enforcement** settings exist but may not be wired into auth middleware
+- **iOS DEBUG blocks** in security-critical paths need production build verification
 
 ## Reporting Security Issues
 

@@ -28,8 +28,6 @@ Ang iyong privacy exposure ay depende sa kung aling mga channel ang ine-enable m
 | Kung gumagamit ka ng... | Maa-access ng third party | Maa-access ng server | End-to-end encrypted na content |
 |-------------------------|---------------------------|----------------------|--------------------------------|
 | Twilio/SignalWire/Vonage/Plivo | Call audio (live), call records | Call metadata | Notes, transcripts |
-| Real-time events | Oo (per-hub, rotating keys) | Hindi | Ciphertext lang |
-| User-Agent strings | SHA-256 hashed | Hash lang | Hash (hindi mare-reverse) |
 | Self-hosted Asterisk | Wala (ikaw ang may kontrol) | Call metadata | Notes, transcripts |
 | Browser-to-browser (WebRTC) | Wala | Call metadata | Notes, transcripts |
 

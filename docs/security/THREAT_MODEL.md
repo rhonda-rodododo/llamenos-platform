@@ -10,6 +10,7 @@ This document defines the threat model for Llamenos, a secure crisis response ho
 - [Data Classification](DATA_CLASSIFICATION.md) — Complete data inventory with encryption status
 - [Protocol Specification](../protocol/PROTOCOL.md) — Wire formats and API contracts
 - [Deployment Hardening](DEPLOYMENT_HARDENING.md) — Infrastructure security guidance
+- [Security Gaps and Roadmap](SECURITY_GAPS_AND_ROADMAP.md) — Known gaps and planned improvements
 
 ## Protected Assets
 
@@ -40,7 +41,7 @@ This document defines the threat model for Llamenos, a secure crisis response ho
 - Per-device Ed25519/X25519 keys — no single "identity key" to compromise; device deauthorization via sigchain
 - PIN-encrypted device keys — physical seizure requires PIN brute-force (Argon2id 64MB/3/4 — GPU/ASIC resistant)
 - Auto-lock on idle — limits physical access window
-- 57 domain separation labels — prevents cross-context key reuse (Albrecht defense)
+- 69 domain separation labels — prevents cross-context key reuse (Albrecht defense)
 - HPKE label enforcement at decrypt — label mismatch causes immediate rejection before decryption
 - Certificate pinning scaffolding (iOS/Android) — pins to be populated after first production deployment
 - Sigchain device revocation — compromised devices can be deauthorized without affecting other devices
@@ -50,6 +51,7 @@ This document defines the threat model for Llamenos, a secure crisis response ho
 - Caller phone numbers are transiently available to answering volunteers during active calls
 - Traffic analysis can reveal call timing, duration, and volunteer activity patterns (hub event padding partially mitigates size analysis)
 - Legal compulsion of hosting provider yields encrypted blobs (but not decryption keys)
+- Certificate pinning is not yet active (scaffolding only) — mobile apps rely on standard TLS validation
 
 ### Tier 2: Private Intelligence / Hacking Firm
 
@@ -65,6 +67,10 @@ This document defines the threat model for Llamenos, a secure crisis response ho
 - Invite-code system — no open registration; requires admin approval
 - Webhook signature validation — prevents telephony API spoofing
 - Device keys never enter webview — private keys stay in Rust CryptoState (desktop) or MobileState (iOS/Android)
+
+**Residual risks**:
+- WebAuthn enforcement settings exist but may not be wired into auth middleware (see [Security Gaps](SECURITY_GAPS_AND_ROADMAP.md#15-webauthn-enforcement-settings-low))
+- iOS DEBUG blocks in security-critical paths could expose mock identities if compiled into production (see [Security Gaps](SECURITY_GAPS_AND_ROADMAP.md#4-ios-debug-code-in-production-paths-medium))
 
 ### Tier 3: Opportunistic Attacker / Script Kiddie
 
@@ -83,44 +89,51 @@ This document defines the threat model for Llamenos, a secure crisis response ho
 
 ## Trust Boundaries
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        UNTRUSTED                                │
-│  Callers (PSTN)  │  Public Internet  │  Hosting Provider       │
-└──────┬───────────┴────────┬──────────┴──────────┬──────────────┘
-       │                    │                     │
-       │ Telephony          │ HTTPS/WSS           │ Infrastructure
-       │ Webhooks           │                     │ Access
-       ▼                    ▼                     ▼
-┌──────────────────────────────────────────────────────────────────┐
-│                    SEMI-TRUSTED                                   │
-│  Bun HTTP Server (Hono) + PostgreSQL                             │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌───────────────┐      │
-│  │ Hono API │→│ Auth MW  │→│ Perm MW  │→│ Route Handler │      │
-│  └──────────┘ └──────────┘ └──────────┘ └───────┬───────┘      │
-│                                                  │               │
-│  ┌─────────────────────────────────────────────┐ │               │
-│  │ PostgreSQL                                  │←┘               │
-│  │ (encrypted blobs, hashed identifiers)       │                 │
-│  └─────────────────────────────────────────────┘                 │
-│                                                                   │
-│  Server can see: metadata (who wrote, when, callId, routing)     │
-│  Server CANNOT see: note content, transcription text, file data  │
-└──────────────────────────────────────────────────────────────────┘
-       │                    │
-       │ E2EE payloads      │ HPKE-wrapped key blobs
-       ▼                    ▼
-┌──────────────────────────────────────────────────────────────────┐
-│                       TRUSTED                                     │
-│  Client App (Tauri Desktop / iOS / Android)                      │
-│  ┌───────────┐ ┌──────────────┐ ┌──────────────┐                │
-│  │ Device Key│ │ Crypto (Rust)│ │ Auth Context │                │
-│  │ Manager   │ │ HPKE+AES-GCM│ │ Ed25519/WA   │                │
-│  └───────────┘ └──────────────┘ └──────────────┘                │
-│                                                                   │
-│  Decrypted notes exist ONLY here, in memory, while unlocked      │
-│  Device private keys NEVER leave the Rust layer                  │
-└──────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph UNTRUSTED["🌐 UNTRUSTED"]
+        direction LR
+        PSTN["Callers (PSTN)"]
+        Internet["Public Internet"]
+        Provider["Hosting Provider"]
+    end
+
+    subgraph SEMI["🔒 SEMI-TRUSTED"]
+        direction TB
+        Server["Bun HTTP Server (Hono) + PostgreSQL"]
+        API["Hono API → Auth MW → Perm MW → Route Handler"]
+        DB["PostgreSQL<br/>(encrypted blobs, hashed identifiers)"]
+        ServerMeta["Server can see: metadata (who wrote, when, callId, routing)"]
+        ServerCant["Server CANNOT see: note content, transcription text, file data"]
+    end
+
+    subgraph TRUSTED["✅ TRUSTED"]
+        direction TB
+        Client["Client App (Tauri Desktop / iOS / Android)"]
+        DevKey["Device Key Manager"]
+        Crypto["Crypto (Rust)<br/>HPKE + AES-GCM"]
+        Auth["Auth Context<br/>Ed25519 / WebAuthn"]
+        ClientNote["Decrypted notes exist ONLY here, in memory, while unlocked"]
+        ClientKey["Device private keys NEVER leave the Rust layer"]
+    end
+
+    PSTN -->|Telephony Webhooks| Server
+    Internet -->|HTTPS / WSS| Server
+    Provider -->|Infrastructure Access| Server
+
+    Server -->|E2EE payloads| Client
+    Server -->|HPKE-wrapped key blobs| Client
+
+    Server --- API
+    API --- DB
+    Server --- ServerMeta
+    Server --- ServerCant
+
+    Client --- DevKey
+    Client --- Crypto
+    Client --- Auth
+    Client --- ClientNote
+    Client --- ClientKey
 ```
 
 ### Boundary Rules
@@ -174,7 +187,7 @@ This document defines the threat model for Llamenos, a secure crisis response ho
 | Auth token unforgeability | Ed25519 signatures | 128-bit security level |
 | Session token unpredictability | `crypto.getRandomValues(32)` | 256-bit |
 | Phone hash preimage resistance | HMAC-SHA256 with operator secret | Infeasible without HMAC secret |
-| Cross-context key reuse prevention | 57 domain separation labels + Albrecht defense | Label enforced at decrypt |
+| Cross-context key reuse prevention | 69 domain separation labels + Albrecht defense | Label enforced at decrypt |
 | Device authorization integrity | Sigchain — append-only, hash-chained, Ed25519-signed | Tamper-evident |
 | User key forward secrecy | PUK with CLKR — key rotation without re-encrypting historical data | Per-generation isolation |
 
@@ -188,6 +201,8 @@ This document defines the threat model for Llamenos, a secure crisis response ho
 | PIN/passphrase brute-force resistance (offline) | Argon2id (64MB, 3 iter, 4 lanes) + minimum 8-digit PIN (~26.6 bits) or alphanumeric passphrase (~47+ bits for mixed case + digits) | Significantly improved — GPU/ASIC attack substantially more expensive than PBKDF2. Alphanumeric passphrase strongly recommended |
 | Server-side key deletion verification | Cannot prove hosting provider deleted data | Yes — fundamental cloud trust limitation |
 | WebSocket metadata privacy | Server handles all event distribution; authenticated connections only; content epoch-encrypted per hub | Improved — event injection blocked; content hidden; connection metadata visible to server only |
+| Certificate pinning | Scaffolding only; placeholder pins on mobile | No — pins must be populated after first production deployment |
+| SFrame media encryption | Key derivation implemented; per-frame AES-128-CTR + HMAC not yet complete | No — voice E2EE is not end-to-end complete |
 
 ## Legal Compulsion and Subpoena Scenarios
 
@@ -304,6 +319,8 @@ Mobile push notifications require routing through Apple Push Notification servic
 ### What APNs/FCM Cannot Observe (With Encrypted Payloads)
 
 Push payloads are encrypted with a per-device wake key (symmetric, HPKE-wrapped for the device's X25519 pubkey). APNs/FCM see an opaque blob and a priority level.
+
+> **Note:** iOS WakeKeyService has a TODO to "Switch to X25519 key derivation when server sends HPKE envelopes." See [Security Gaps](SECURITY_GAPS_AND_ROADMAP.md#31-ios-wakekeyservice--x25519-migration-medium).
 
 ### Two-Tier Push Encryption
 
@@ -437,6 +454,8 @@ Audit logs use a SHA-256 hash chain with `previousEntryHash` → `entryHash` lin
 
 **Mitigation for advanced threats**: Periodically export and sign audit log checkpoints to an external append-only store.
 
+> **Note:** There is currently no API endpoint or tool for independent chain verification. See [Security Gaps](SECURITY_GAPS_AND_ROADMAP.md#24-audit-log-chain-verification-low).
+
 ## Admin Key Separation
 
 The admin has separate keys for different operations:
@@ -473,6 +492,7 @@ Audio from the volunteer's microphone is processed entirely in-browser/in-app:
 
 | Date | Version | Author | Changes |
 |------|---------|--------|---------|
+| 2026-05-11 | 2.2 | Security docs overhaul | Added Security Gaps cross-references; added certificate pinning residual risk; added SFrame media encryption gap; added iOS DEBUG block risk; added WebAuthn enforcement gap; added audit log verification gap; updated domain separation label count to 69 |
 | 2026-05-03 | 2.1 | Post-hardening update | Argon2id + min-8 PIN; WebSocket write-policy publisher verification; epoch-rotating event keys; power-of-2 payload padding; Signal-first routing; SMS notification-only mode; User-Agent hashed / country removed from audit; MLS always-on |
 | 2026-05-02 | 2.0 | Security docs overhaul | Complete rewrite: HPKE replaces ECIES, per-device Ed25519/X25519 keys replace nsec, added sigchain/PUK/CLKR/MLS/SFrame, removed Cloudflare Workers/Durable Objects references (backend is Bun+PostgreSQL), updated trust boundary diagram, updated all crypto references to packages/crypto Rust crate |
 | 2026-02-25 | 1.3 | ZK Architecture Overhaul | Added WebSocket trust boundary, audit log tamper detection, admin key separation, hub key compromise analysis, reproducible builds, client-side transcription |

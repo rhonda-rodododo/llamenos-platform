@@ -28,8 +28,6 @@ Ihre Datenschutzexposition haengt davon ab, welche Kanaele Sie aktivieren:
 | Wenn Sie verwenden... | Dritte koennen zugreifen | Server kann zugreifen | E2EE-Inhalte |
 |-----------------------|-------------------------|----------------------|--------------|
 | Twilio/SignalWire/Vonage/Plivo | Anrufaudio (live), Aufzeichnungen | Anrufmetadaten | Notizen, Transkripte |
-| Echtzeit-Ereignisse | Ja (pro Hub, rotierende Schluessel) | Nein | Nur Chiffretext |
-| User-Agent-Strings | SHA-256 gehasht | Nur Hash | Hash (nicht umkehrbar) |
 | Selbst gehosteter Asterisk | Nichts (Sie kontrollieren es) | Anrufmetadaten | Notizen, Transkripte |
 | Browser-zu-Browser (WebRTC) | Nichts | Anrufmetadaten | Notizen, Transkripte |
 

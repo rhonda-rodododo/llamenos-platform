@@ -28,8 +28,6 @@ Votre exposition à la confidentialité dépend des canaux que vous activez :
 | Si vous utilisez... | Les tiers peuvent accéder à | Le serveur peut accéder à | Contenu E2EE |
 |---------------|-------------------------|-------------------|--------------|
 | Twilio/SignalWire/Vonage/Plivo | Audio d'appel (en direct), enregistrements d'appels | Métadonnées d'appel | Notes, transcriptions |
-| Evenements en temps reel | Oui (par hub, cles rotatives) | Non | Texte chiffre uniquement |
-| Chaines User-Agent | Hache SHA-256 | Hachage uniquement | Hachage (non reversible) |
 | Asterisk auto-hébergé | Rien (vous le contrôlez) | Métadonnées d'appel | Notes, transcriptions |
 | Navigateur à navigateur (WebRTC) | Rien | Métadonnées d'appel | Notes, transcriptions |
 

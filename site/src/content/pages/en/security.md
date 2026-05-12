@@ -100,9 +100,11 @@ These improvements are live today:
 
 ## Still planned
 
-| Feature | Privacy benefit |
-|---------|-----------------|
-| Native call-receiving apps | No personal phone numbers exposed |
+| Feature | Privacy benefit | Status |
+|---------|-----------------|--------|
+| Native call-receiving apps | No personal phone numbers exposed | In development |
+| Certificate pinning (mobile) | Defense against rogue CA TLS interception | Scaffolding complete; pins pending first deployment |
+| SFrame voice media encryption | End-to-end encrypted voice calls | Key derivation complete; per-frame encryption planned |
 
 ---
 
@@ -130,9 +132,10 @@ These improvements are live today:
 
 Technical documentation:
 
-- [Protocol Specification](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/protocol/llamenos-protocol.md)
+- [Protocol Specification](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/protocol/PROTOCOL.md)
 - [Threat Model](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/THREAT_MODEL.md)
 - [Data Classification](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/DATA_CLASSIFICATION.md)
+- [Security Gaps and Roadmap](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/SECURITY_GAPS_AND_ROADMAP.md)
 - [Security Audits](https://github.com/rhonda-rodododo/llamenos-platform/tree/main/docs/security)
 - [API Documentation](/api/docs)
 

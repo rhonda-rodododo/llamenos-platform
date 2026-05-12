@@ -121,13 +121,27 @@ The production overlay (`deploy/docker/docker-compose.production.yml`) adds:
 
 ### Network Isolation
 
-```
-┌─────────────┐
-│ Public (web) │ ← Caddy (443) ← Internet
-├─────────────┤
-│ Internal     │ ← app ↔ postgres ↔ rustfs
-│ (172.17.0.0) │   (no external access)
-└─────────────┘
+```mermaid
+flowchart TB
+    Internet["Internet"] -->|443/tcp+udp| Caddy["Caddy (TLS termination)"]
+
+    subgraph Public["Public Network (web)"]
+        Caddy
+    end
+
+    subgraph Internal["Internal Network (172.17.0.0)"]
+        direction LR
+        App["app (Bun, :3000)"]
+        Postgres["postgres (:5432)"]
+        RustFS["rustfs (:9000)"]
+    end
+
+    Caddy -->|proxy| App
+    App -->|internal| Postgres
+    App -->|internal| RustFS
+
+    style Internal fill:#e1f5e1,stroke:#2e7d32,stroke-width:2px
+    style Public fill:#fff3e0,stroke:#ef6c00,stroke-width:2px
 ```
 
 ### Secrets Management

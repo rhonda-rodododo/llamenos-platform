@@ -8,8 +8,6 @@ subtitle: O que esta protegido, o que e visivel e o que pode ser obtido sob inti
 | Podem fornecer | NAO podem fornecer |
 |----------------|---------------------|
 | Metadados de chamadas/mensagens (horarios, duracoes) | Conteudo de notas, transcricoes, corpos de reportes |
-| Eventos em tempo real | Sim (por hub, chaves rotativas) | Nao | Apenas texto cifrado |
-| Strings User-Agent | SHA-256 hasheado | Apenas hash | Hash (nao reversivel) |
 | Blobs de banco de dados criptografados | Nomes de voluntarios (criptografia de ponta a ponta) |
 | Quais voluntarios estavam ativos e quando | Registros do diretorio de contatos (criptografia de ponta a ponta) |
 | | Conteudo de mensagens (criptografado na chegada, armazenado como texto cifrado) |

@@ -8,8 +8,6 @@ subtitle: Que esta protegido, que es visible, y que puede obtenerse bajo citacio
 | Pueden proporcionar | NO pueden proporcionar |
 |---------------------|------------------------|
 | Metadatos de llamadas/mensajes (horarios, duraciones) | Contenido de notas, transcripciones, cuerpos de reportes |
-| Eventos en tiempo real | Si (por hub, claves rotativas) | No | Solo texto cifrado |
-| Cadenas User-Agent | SHA-256 hasheado | Solo hash | Hash (no reversible) |
 | Blobs de base de datos cifrados | Nombres de voluntarios (cifrado de extremo a extremo) |
 | Que cuentas de voluntarios estaban activas cuando | Registros del directorio de contactos (cifrado de extremo a extremo) |
 | | Contenido de mensajes (cifrado al llegar, almacenado como texto cifrado) |

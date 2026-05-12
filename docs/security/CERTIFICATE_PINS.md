@@ -12,6 +12,26 @@ Certificate pinning infrastructure exists on both iOS and Android but is not yet
 | **Android** | `apps/android/app/src/main/java/org/llamenos/hotline/api/ApiService.kt` | `CertificatePinner` (OkHttp) | Scaffolding exists; placeholder `sha256/REPLACE_AFTER_DEPLOYMENT` values |
 | **Desktop (Tauri)** | N/A | N/A | Not applicable — Tauri uses system TLS; cert pinning impractical for desktop web apps |
 
+## Known TODOs
+
+### Android Placeholder Pins
+
+**Location:** `apps/android/app/src/main/java/org/llamenos/hotline/api/ApiService.kt:66`
+
+**TODO:** "Replace placeholder pins after first production deployment to app.llamenos.org"
+
+**Impact:** Android app uses standard TLS validation without certificate pinning. A rogue CA or national-level MITM could intercept HTTPS traffic.
+
+**Action Required:** After first production deployment, extract actual certificate pins and replace placeholders.
+
+### iOS Certificate Pinning Delegate
+
+**Location:** `apps/ios/Sources/Services/APIService.swift`
+
+**Status:** `CertificatePinningDelegate` class exists but no hashes are configured. Falls back to standard `URLSession` TLS validation.
+
+**Action Required:** Configure `sha256/...` pins in the pinning delegate after production deployment.
+
 ## Extracting Pins
 
 After first production deployment, extract pins from the live domain:
@@ -68,3 +88,12 @@ For the desktop (Tauri) client, HSTS preload + SRI hashing provide the equivalen
 The API server's built-in WebSocket endpoint (`/ws`) uses the same TLS certificate as the API. Certificate pinning on mobile clients covers WebSocket connections automatically since they share the `*.llamenos.org` domain.
 
 Clients authenticate to the WebSocket using the same session token or signed auth token used for REST API requests. The server handles all event publishing — clients receive only. Even if a MITM attacker intercepts the WebSocket connection, they cannot inject fake events (server-only publishing) and cannot read event content (encrypted with epoch-rotating per-hub keys).
+
+---
+
+## Revision History
+
+| Date | Version | Changes |
+|------|---------|---------|
+| 2026-05-11 | 1.1 | Added known TODOs section with Android placeholder and iOS delegate status; added action required notes |
+| 2026-05-02 | 1.0 | Initial document |
