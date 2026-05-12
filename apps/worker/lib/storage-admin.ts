@@ -1,8 +1,8 @@
 /**
- * RustFS/MinIO admin IAM client — manages per-hub users and bucket-scoped policies.
+ * RustFS admin IAM client — manages per-hub users and bucket-scoped policies.
  *
- * Uses direct HTTP calls to the MinIO-compatible admin API at /minio/admin/v3/.
- * Auth: root credentials sent via the standard MinIO admin auth header.
+ * Uses direct HTTP calls to the RustFS admin API at /admin/v3/.
+ * Auth: root credentials sent via the standard admin auth header.
  *
  * If the admin API is unavailable (older RustFS version, network issue), the client
  * degrades gracefully: `available()` returns false. Callers should check before invoking.
@@ -50,8 +50,8 @@ export function buildBucketPolicy(bucketNames: string[]): Record<string, unknown
 }
 
 /**
- * Create an admin API client for RustFS/MinIO IAM operations.
- * Uses HTTP calls to the /minio/admin/v3/ endpoints with bearer auth.
+ * Create an admin API client for RustFS IAM operations.
+ * Uses HTTP calls to the /admin/v3/ endpoints with bearer auth.
  */
 export function createStorageAdmin(opts: {
   endpoint: string
@@ -61,7 +61,7 @@ export function createStorageAdmin(opts: {
   const { endpoint, accessKeyId, secretAccessKey } = opts
 
   /**
-   * MinIO admin API auth: generate a bearer token by signing the access key
+   * RustFS admin API auth: generate a bearer token by signing the access key
    * with the secret key using HMAC-SHA256.
    */
   function authHeaders(): Record<string, string> {
@@ -73,7 +73,7 @@ export function createStorageAdmin(opts: {
   }
 
   async function adminFetch(path: string, method: string, body?: string): Promise<Response> {
-    const url = `${endpoint}/minio/admin/v3${path}`
+    const url = `${endpoint}/admin/v3${path}`
     const res = await fetch(url, {
       method,
       headers: authHeaders(),

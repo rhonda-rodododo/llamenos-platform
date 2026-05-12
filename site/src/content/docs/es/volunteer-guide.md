@@ -9,7 +9,7 @@ Esta guia cubre todo lo que necesitas saber como voluntario: iniciar sesion, rec
 
 Tu administrador te dara una de las siguientes opciones:
 
-- Un **nsec** (clave secreta Nostr) -- una cadena que comienza con `nsec1`
+- Un **nsec** (clave secreta WebSocket) -- una cadena que comienza con `nsec1`
 - Un **enlace de invitacion** -- una URL de uso unico que genera credenciales para ti
 
 **Mantén tu nsec en privado.** Es tu identidad y credencial de inicio de sesion. Cualquier persona con tu nsec puede hacerse pasar por ti. Guardalo en un gestor de contrasenas.

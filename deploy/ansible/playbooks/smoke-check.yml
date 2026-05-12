@@ -145,23 +145,7 @@
       when: llamenos_postgres_enabled | default(true) | bool
       tags: always
 
-    - name: Check Nostr relay is reachable
-      ansible.builtin.uri:
-        url: "http://localhost:{{ llamenos_strfry_port | default(7777) }}"
-        method: GET
-        status_code: [200, 426]
-      register: strfry_check
-      retries: 3
-      delay: 3
-      ignore_errors: true
-      when: llamenos_strfry_enabled | default(true) | bool
-      tags: always
 
-    - name: Record strfry result
-      ansible.builtin.set_fact:
-        smoke_results: "{{ smoke_results + [{'check': 'Nostr relay reachable', 'status': 'PASS' if strfry_check is succeeded else 'FAIL' if strfry_check is failed else 'SKIP'}] }}"
-      when: llamenos_strfry_enabled | default(true) | bool
-      tags: always
 
     - name: Check Caddy is serving HTTPS
       ansible.builtin.uri:

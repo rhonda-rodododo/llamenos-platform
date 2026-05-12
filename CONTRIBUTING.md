@@ -10,7 +10,7 @@ want to work on — you don't need to set up all platforms.
 
 **All contributors need:**
 - [mise](https://mise.jdx.dev/) — polyglot version manager (`curl https://mise.run | sh`)
-- [Docker](https://docs.docker.com/get-docker/) — for local backing services (PostgreSQL, object storage, Nostr relay)
+- [Docker](https://docs.docker.com/get-docker/) — for local backing services (PostgreSQL, object storage, WebSocket relay)
 - Git
 
 **Desktop (Tauri) or Crypto (Rust):**
@@ -81,7 +81,7 @@ like `feat/ios-*` / `feat/android-*` / `feat/mobile-*` to auto-enable them.
 The backend is a Bun HTTP server (Hono + PostgreSQL) in `apps/worker/`.
 
 ```bash
-# Start backing services (PostgreSQL, object storage, Nostr relay)
+# Start backing services (PostgreSQL, object storage, WebSocket relay)
 docker compose -f deploy/docker/docker-compose.dev.yml up -d
 
 # Start the backend with file watching

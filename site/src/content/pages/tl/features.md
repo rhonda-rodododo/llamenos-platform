@@ -117,7 +117,7 @@ subtitle: Lahat ng kailangan ng isang crisis response platform, sa isang open-so
 
 **Per-note forward secrecy** — Bawat nota ay naka-encrypt gamit ang natatanging random key, pagkatapos ang key na iyon ay bini-wrap sa pamamagitan ng ECIES para sa bawat awtorisadong reader. Ang pag-compromise sa identity key ay hindi magbubunyag ng mga nakaraang nota.
 
-**Nostr keypair auth** — Nagpa-authenticate ang mga volunteer gamit ang Nostr-compatible keypairs (nsec/npub). BIP-340 Schnorr signature verification. Walang mga password, walang email addresses.
+**WebSocket keypair auth** — Nagpa-authenticate ang mga volunteer gamit ang WebSocket-compatible keypairs (nsec/npub). BIP-340 Schnorr signature verification. Walang mga password, walang email addresses.
 
 **WebAuthn passkeys** — Opsyonal na passkey support para sa multi-device login. Mag-register ng hardware key o biometric, pagkatapos ay mag-sign in nang hindi tina-type ang iyong secret key.
 

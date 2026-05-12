@@ -117,7 +117,7 @@ subtitle: Tout sa yon platfòm repons kriz bezwen, nan yon sèl pakèt sous louv
 
 **Konfidansyalite pèsistan pa nòt** — Chak nòt chifre ak yon kle aléatwa inik, epi kle sa a vlope via ECIES pou chak lektè otorize. Konpwomèt kle idantite a pa révèle ansyen nòt yo.
 
-**Otantifikasyon pè kle Nostr** — Vòlontè yo otantifye ak pè kle konpatib Nostr (nsec/npub). Verifikasyon siyati Schnorr BIP-340. Pa gen modpas, pa gen adrès imèl.
+**Otantifikasyon pè kle WebSocket** — Vòlontè yo otantifye ak pè kle konpatib WebSocket (nsec/npub). Verifikasyon siyati Schnorr BIP-340. Pa gen modpas, pa gen adrès imèl.
 
 **Paskey WebAuthn** — Sipò paskey opsyonèl pou koneksyon miltidispozitif. Anrejistre yon kle materyèl oswa byometrik, epi konekte san tape kle sekrè ou.
 

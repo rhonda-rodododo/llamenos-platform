@@ -137,7 +137,7 @@ const ALLOWED_HUB_SETTINGS = new Set([
   'welcomeMessage',
   'emergencyMessage',
   'maxConcurrentCalls',
-  'nostrRelayUrl',
+
   'callSettings',
   'spamSettings',
   'transcriptionEnabled',
@@ -1088,11 +1088,15 @@ export class SettingsService {
     return { ok: true }
   }
 
-  async getTelephonyProvider(hmacSecret?: string): Promise<TelephonyProviderConfig | null> {
+  async getTelephonyProvider(hmacSecret?: string, hubId?: string): Promise<TelephonyProviderConfig | null> {
+    // When a hubId is provided, read the hub-scoped config instead of the global one.
+    const hubCondition = hubId
+      ? eq(providerConfigs.hubId, hubId)
+      : isNull(providerConfigs.hubId)
     const [row] = await this.db
       .select()
       .from(providerConfigs)
-      .where(isNull(providerConfigs.hubId))
+      .where(hubCondition)
       .orderBy(desc(providerConfigs.updatedAt))
       .limit(1)
     if (!row) return null

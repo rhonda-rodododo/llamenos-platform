@@ -2,7 +2,7 @@
  * WebSocket ConnectionManager — manages authenticated connections, hub subscriptions,
  * event fan-out with signing, and per-hub ring buffers for replay.
  *
- * Replaces NostrPublisher + strfry relay.
+ * Replaces legacy relay implementation.
  */
 import { ed25519Sign } from '@llamenos/crypto/ffi'
 import { bytesToHex, utf8ToBytes } from '@shared/encoding'

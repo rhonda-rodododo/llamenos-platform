@@ -7,7 +7,7 @@
 # Usage:
 #   ansible-playbook playbooks/backup.yml --ask-vault-pass
 #   ansible-playbook playbooks/backup.yml --ask-vault-pass --tags postgres
-#   ansible-playbook playbooks/backup.yml --ask-vault-pass --tags strfry
+#   ansible-playbook playbooks/backup.yml --ask-vault-pass 
 #   ansible-playbook playbooks/backup.yml --ask-vault-pass --tags rustfs
 #   ansible-playbook playbooks/backup.yml --ask-vault-pass --tags config
 #   ansible-playbook playbooks/backup.yml --ask-vault-pass --tags monitor
@@ -65,9 +65,6 @@
     - role: backup-postgres
       tags: [backup, postgres]
 
-    # 3. strfry (Nostr relay events)
-    - role: backup-strfry
-      tags: [backup, strfry]
 
     # 4. RustFS (file attachments — can be large, runs last)
     - role: backup-rustfs
@@ -136,7 +133,6 @@
           # Run in dependency order
           run_backup "config" "${SCRIPTS_DIR}/backup-config.sh"
           run_backup "postgres" "${SCRIPTS_DIR}/backup-postgres.sh"
-          run_backup "strfry" "${SCRIPTS_DIR}/backup-strfry.sh"
           run_backup "rustfs" "${SCRIPTS_DIR}/backup-rustfs.sh"
 
           # Generate manifest checksum
@@ -206,14 +202,12 @@
           Scripts installed:
             {{ app_dir }}/scripts/backup-all.sh      (orchestrator)
             {{ app_dir }}/scripts/backup-postgres.sh  (PostgreSQL)
-            {{ app_dir }}/scripts/backup-strfry.sh    (Nostr relay)
             {{ app_dir }}/scripts/backup-rustfs.sh    (RustFS objects)
             {{ app_dir }}/scripts/backup-config.sh    (configuration)
             {{ app_dir }}/scripts/backup-monitor.sh   (health check)
 
           Backup directories:
             {{ app_dir }}/backups/postgres/{daily,weekly,monthly}
-            {{ app_dir }}/backups/strfry/{daily,weekly,monthly}
             {{ app_dir }}/backups/rustfs/{daily,weekly,monthly}
             {{ app_dir }}/backups/config/{daily,weekly,monthly}
 

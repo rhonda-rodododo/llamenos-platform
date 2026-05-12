@@ -7,7 +7,7 @@ As an admin, you manage everything: volunteers, shifts, communication channels, 
 
 ## Logging in
 
-Log in with the `nsec` (Nostr secret key) generated during [setup](/docs/deploy). The login page accepts the nsec format (`nsec1...`). Your browser signs a challenge with the key — the secret never leaves the device.
+Log in with the `nsec` (WebSocket secret key) generated during [setup](/docs/deploy). The login page accepts the nsec format (`nsec1...`). Your browser signs a challenge with the key — the secret never leaves the device.
 
 Optionally, register a WebAuthn passkey in Settings for passwordless login on additional devices.
 
@@ -26,7 +26,7 @@ After completing the wizard, the `setupCompleted` flag is set and the wizard won
 
 Navigate to **Volunteers** in the sidebar to:
 
-- **Add a volunteer** — generates a new Nostr keypair. Share the nsec securely with the volunteer (it's shown once).
+- **Add a volunteer** — generates a new WebSocket keypair. Share the nsec securely with the volunteer (it's shown once).
 - **Create an invite link** — generates a one-time link. The invite flow includes a role selector (volunteer, admin, or reporter).
 - **Edit** — update name, phone number, and role.
 - **Remove** — deactivate a volunteer's access.
@@ -70,7 +70,7 @@ When messaging channels (SMS, WhatsApp, Signal) are enabled, a **Conversations**
 Each conversation shows:
 - Message bubbles with timestamps and direction (inbound/outbound)
 - The channel the message arrived on (SMS, WhatsApp, Signal)
-- Real-time updates via Nostr relay — new messages appear instantly
+- Real-time updates via WebSocket relay — new messages appear instantly
 
 Conversations are created automatically when an inbound message arrives. Volunteers can respond directly from the conversation view.
 

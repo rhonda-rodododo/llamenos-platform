@@ -22,7 +22,7 @@ bun install
 
 ## 2. Generer la paire de cles administrateur
 
-Generez une paire de cles Nostr pour le compte administrateur. Cela produit une cle secrete (nsec) et une cle publique (npub/hex).
+Generez une paire de cles WebSocket pour le compte administrateur. Cela produit une cle secrete (nsec) et une cle publique (npub/hex).
 
 ```bash
 bun run bootstrap-admin

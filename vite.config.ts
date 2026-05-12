@@ -65,7 +65,7 @@ export default defineConfig({
         manualChunks(id) {
           if (id.includes('node_modules')) {
             if (id.includes('react-dom') || id.includes('@radix-ui')) return 'vendor-ui'
-            if (id.includes('@noble/') || id.includes('nostr-tools')) return 'vendor-crypto'
+            if (id.includes('@noble/')) return 'vendor-crypto'
           }
         },
       },

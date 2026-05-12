@@ -12,8 +12,7 @@ export STORAGE_ENDPOINT=http://localhost:9000
 export STORAGE_ACCESS_KEY=rustfsadmin
 export STORAGE_SECRET_KEY=rustfsadmin
 export STORAGE_BUCKET=llamenos-files
-export SERVER_NOSTR_SECRET="0000000000000000000000000000000000000000000000000000000000000001"
-export NOSTR_RELAY_URL=ws://localhost:7777
+export SERVER_SECRET="0000000000000000000000000000000000000000000000000000000000000001"
 # Allow 1-hour token age in dev/test to tolerate clock skew between test client and server
 export TOKEN_MAX_AGE_MS=3600000
 

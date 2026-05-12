@@ -22,7 +22,7 @@ bun install
 
 ## 2. I-bootstrap ang admin keypair
 
-Bumuo ng Nostr keypair para sa admin account. Gumagawa ito ng secret key (nsec) at public key (npub/hex).
+Bumuo ng WebSocket keypair para sa admin account. Gumagawa ito ng secret key (nsec) at public key (npub/hex).
 
 ```bash
 bun run bootstrap-admin

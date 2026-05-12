@@ -168,7 +168,7 @@ Most platforms ship a web app with a thin native wrapper. Llámenos ships three 
 `packages/crypto/` implements:
 
 - HPKE (RFC 9180): X25519-HKDF-SHA256-AES256-GCM
-- Ed25519 signatures (BIP-340 Schnorr for Nostr compatibility)
+- Ed25519 signatures (BIP-340 Schnorr for WebSocket compatibility)
 - X25519 key agreement
 - PBKDF2 key derivation (600K iterations)
 - HKDF (RFC 5869)
@@ -202,7 +202,7 @@ Llámenos is not hardcoded to any specific use case. Everything is template-driv
 
 ## Authentication & Key Management
 
-**Nostr keypairs** — Users authenticate with Nostr-compatible Ed25519 keypairs. BIP-340 Schnorr signature verification. No passwords, no email addresses required for authentication.
+**WebSocket keypairs** — Users authenticate with WebSocket-compatible Ed25519 keypairs. BIP-340 Schnorr signature verification. No passwords, no email addresses required for authentication.
 
 **WebAuthn passkeys** — Optional passkey support for multi-device login. Register a hardware security key or platform biometric, then sign in without typing a PIN.
 
@@ -222,13 +222,13 @@ Llámenos is not hardcoded to any specific use case. Everything is template-driv
 
 ## Real-Time Infrastructure
 
-**Nostr relay** — Self-hosted strfry relay (or Nosflare on Cloudflare) for real-time event distribution. All event content is encrypted with the hub key. Generic tags (`["t", "llamenos:event"]`) prevent relay-level metadata inference about event types.
+**WebSocket relay** — Self-hosted WebSocket relay relay (or Nosflare on Cloudflare) for real-time event distribution. All event content is encrypted with the hub key. Generic tags (`["t", "llamenos:event"]`) prevent relay-level metadata inference about event types.
 
 **Hub key** — Random 32 bytes (`crypto.getRandomValues`), HPKE-wrapped individually per hub member via `LABEL_HUB_KEY_WRAP`. Rotated on member departure — departed members cannot decrypt future events.
 
 **WebSocket** — Real-time call status, volunteer presence, conversation updates, and admin monitoring via WebSocket. Reconnects with exponential backoff.
 
-**Nostr real-time sync** — Ephemeral kind 20001 events for cross-device and cross-hub state synchronization. Content encrypted; relay cannot distinguish event types.
+**WebSocket real-time sync** — Ephemeral kind 20001 events for cross-device and cross-hub state synchronization. Content encrypted; relay cannot distinguish event types.
 
 ---
 
@@ -268,7 +268,7 @@ Llámenos is not hardcoded to any specific use case. Everything is template-driv
 
 ### Docker Compose (Single Server)
 
-- Full stack: Bun HTTP server, PostgreSQL, MinIO (object storage), strfry (Nostr relay)
+- Full stack: Bun HTTP server, PostgreSQL, RustFS (object storage), WebSocket relay (WebSocket relay)
 - Optional profiles: `--profile signal` (signal-cli sidecar), `--profile telephony` (Kamailio + CoTURN), `--profile inference` (LLM firehose agent), `--profile monitoring` (Prometheus + Grafana)
 - `docker-compose.dev.yml` for local development with file watching
 - `docker-compose.production.yml` overlay for production hardening

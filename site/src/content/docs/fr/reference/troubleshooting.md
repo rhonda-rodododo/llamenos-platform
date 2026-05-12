@@ -51,16 +51,16 @@ Si l'application ne peut pas se connecter à PostgreSQL :
 - Vérifiez que le conteneur PostgreSQL est sain : `docker compose ps`
 - Si le mot de passe a été changé, vous devrez peut-être supprimer le volume et recréer : `docker compose down -v && docker compose up -d`
 
-### Le relais strfry ne se connecte pas
+### Le relais WebSocket relay ne se connecte pas
 
-Le relais Nostr (strfry) est un service principal, pas optionnel. Si le relais ne fonctionne pas :
+Le relais WebSocket (WebSocket relay) est un service principal, pas optionnel. Si le relais ne fonctionne pas :
 
 ```bash
 # Vérifier le statut du relais
-docker compose logs strfry
+docker compose logs WebSocket relay
 
 # Redémarrer le relais
-docker compose restart strfry
+docker compose restart WebSocket relay
 ```
 
 Si le relais ne démarre pas, vérifiez les conflits sur le port 7777 ou les permissions insuffisantes sur le répertoire de données.
@@ -233,7 +233,7 @@ Si les appels ne sont pas routés vers les bénévoles :
 Si les événements hub échouent à la vérification de signature :
 
 - Vérifiez que l'horloge système est synchronisée (NTP). Un décalage important peut causer des problèmes avec les horodatages des événements
-- Vérifiez que le relais Nostr ne relaie pas d'événements provenant de clés publiques inconnues
+- Vérifiez que le relais WebSocket ne relaie pas d'événements provenant de clés publiques inconnues
 - Redémarrez l'application pour récupérer la liste actuelle des membres du hub
 
 ### Erreurs d'enveloppe ECIES

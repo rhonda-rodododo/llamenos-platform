@@ -48,6 +48,20 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".DeepLinkActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.NoDisplay"
+            android:noHistory="true"
+            android:excludeFromRecents="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="llamenos" android:host="oauth" android:pathPrefix="/callback" />
+            </intent-filter>
+        </activity>
+
         <service
             android:name=".service.PushService"
             android:exported="false">

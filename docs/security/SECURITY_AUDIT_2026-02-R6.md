@@ -221,7 +221,7 @@ No egress rule for external PostgreSQL (port 5432). In a default-deny Kubernetes
 
 **File**: `src/worker/routes/config.ts:64`
 
-The admin's Nostr public key was returned without authentication, enabling correlation with the admin's identity on other Nostr-connected platforms.
+The admin's WebSocket public key was returned without authentication, enabling correlation with the admin's identity on other WebSocket-connected platforms.
 
 **Fix**: Removed `adminPubkey` from the public `/api/config` endpoint. It is now returned only in the authenticated `/api/auth/me` response. Client auth context updated to source `adminPubkey` from the auth state instead of the config context.
 

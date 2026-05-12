@@ -187,7 +187,9 @@
     "searchUsers": "Search volunteers…",
     "tabUsers": "Volunteers",
     "users": "Volunteers",
-    "schemaBrowser": "Schema Browser"
+    "schemaBrowser": "Schema Browser",
+    "providerSetup": "Provider Setup",
+    "signalRegistration": "Signal Registration"
   },
   "announcement": "Announcement",
   "announcementBody": "Announcement body",
@@ -2359,7 +2361,63 @@
     "security": {
       "bridgeDecryptionNotice": "The Signal bridge decrypts messages before forwarding. Ensure you trust the bridge operator.",
       "transportLabel": "Transport Security"
-    }
+    },
+    "bridge": {
+      "urlLabel": "Bridge URL",
+      "urlPlaceholder": "https://signal-bridge.example.com",
+      "apiKeyLabel": "Bridge API Key",
+      "apiKeyPlaceholder": "Enter your bridge API key",
+      "footer": "Configure your Signal bridge connection"
+    },
+    "phone": {
+      "numberLabel": "Phone Number",
+      "numberPlaceholder": "+1234567890"
+    },
+    "config": {
+      "header": "Bridge Configuration",
+      "footer": "Configure your Signal bridge connection"
+    },
+    "useVoice": "Use voice call for verification",
+    "verificationMethod": {
+      "header": "Verification Method"
+    },
+    "voiceMethod": {
+      "footer": "You will receive a phone call with a verification code"
+    },
+    "smsMethod": {
+      "footer": "You will receive an SMS with a verification code"
+    },
+    "startRegistration": "Start Registration",
+    "status": {
+      "header": "Registration Status"
+    },
+    "code": {
+      "label": "Verification Code",
+      "placeholder": "Enter 6-digit code",
+      "entryHeader": "Enter Verification Code",
+      "footer": "Enter the code you received"
+    },
+    "verify": "Verify",
+    "cancelRegistration": "Cancel Registration",
+    "registered": {
+      "success": "Signal registration successful"
+    },
+    "unregister": "Unregister",
+    "registration": {
+      "failed": "Registration failed",
+      "incompleteForm": "Please fill in all required fields"
+    },
+    "retry": "Retry",
+    "registering": "Registering...",
+    "pendingVerification": "Pending verification...",
+    "bridgeConfig": {
+      "header": "Bridge Configuration",
+      "footer": "Configure your Signal bridge connection"
+    },
+    "startRegistrationButton": "Start Registration",
+    "verifyButton": "Verify",
+    "unregisterButton": "Unregister",
+    "retryButton": "Retry"
   },
   "spam": {
     "blockDuration": "Dire blokaj (minit)",
@@ -3098,7 +3156,19 @@
     "voiceDescription": "You will receive a phone call with a verification code",
     "voiceVerification": "Voice Verification",
     "waitingSms": "Waiting for SMS verification...",
-    "waitingSmsDescription": "A verification SMS has been sent. This may take up to 10 minutes."
+    "waitingSmsDescription": "A verification SMS has been sent. This may take up to 10 minutes.",
+    "bridgeUrlLabel": "Bridge URL",
+    "phoneNumberLabel": "Phone Number",
+    "verificationMethodLabel": "Verification Method",
+    "methodSms": "SMS",
+    "methodVoice": "Voice",
+    "statusLabel": "Signal Status",
+    "registrationInProgress": "Registration in progress...",
+    "verifyCodeButton": "Verify Code",
+    "registeredMessage": "Signal registered successfully",
+    "unregisterSignal": "Unregister Signal",
+    "retryRegistration": "Retry Registration",
+    "expiredMessage": "Registration expired"
   },
   "adminNav": {
     "openMenu": "Open menu",
@@ -3147,6 +3217,223 @@
       "platformHealth": "Health",
       "platformSettings": "Platform Settings",
       "gdprErasure": "GDPR Erasure"
+    }
+  },
+  "providerSetup": {
+    "title": "Provider Setup",
+    "description": "Configure your telephony provider",
+    "connected": "Connected",
+    "disconnected": "Disconnected",
+    "connectionSuccess": "Connection successful",
+    "connectionFailed": "Connection failed",
+    "testConnection": "Test Connection",
+    "connectWithOAuth": "Connect with OAuth",
+    "enterApiCredentials": "Enter API Credentials",
+    "accountNameLabel": "Account Name",
+    "phoneNumbersLabel": "Phone Numbers",
+    "managePhoneNumbers": "Manage Phone Numbers",
+    "saveCredentials": "Save Credentials",
+    "continueButton": "Continue"
+  },
+  "apiKeyProvider": {
+    "title": "API Key Provider",
+    "description": "Enter your API key credentials",
+    "accountSidLabel": "Account SID",
+    "authTokenLabel": "Auth Token",
+    "apiKeyLabel": "API Key",
+    "apiSecretLabel": "API Secret"
+  },
+  "oauthProvider": {
+    "connectTitle": "Connect Provider",
+    "description": "Connect via OAuth",
+    "starting": "Starting OAuth..."
+  },
+  "phoneNumber": {
+    "title": "Phone Numbers",
+    "ownedNumbersTab": "Owned Numbers",
+    "searchNumbersTab": "Search Numbers",
+    "provisionSuccessTitle": "Number Provisioned",
+    "provisionSuccessMessage": "Your phone number has been provisioned successfully",
+    "provisionNumberTitle": "Provision Number",
+    "provisionNumberConfirm": "Are you sure you want to provision this number?",
+    "provisionButton": "Provision",
+    "noOwnedNumbers": "No owned numbers",
+    "countryCodeLabel": "Country Code",
+    "areaCodeLabel": "Area Code",
+    "containsLabel": "Contains",
+    "searchButton": "Search",
+    "selectNumber": "Select Number"
+  },
+  "webhookConfirmation": {
+    "title": "Webhook Confirmation",
+    "description": "Configure webhook URLs",
+    "voiceIncomingWebhook": "Voice Incoming Webhook",
+    "voiceStatusWebhook": "Voice Status Webhook",
+    "smsWebhook": "SMS Webhook"
+  },
+  "providerConnected": "Connected",
+  "phoneNumbersLabel": "Phone Numbers",
+  "managePhoneNumbers": "Manage Phone Numbers",
+  "testConnection": "Test Connection",
+  "providerDisconnected": "Disconnected",
+  "connectWithOauth": "Connect with OAuth",
+  "enterApiCredentials": "Enter API Credentials",
+  "connectionSuccess": "Connection successful",
+  "accountNameLabel": "Account Name",
+  "connectionFailed": "Connection failed",
+  "bridgeUrlLabel": "Bridge URL",
+  "phoneNumberLabel": "Phone Number",
+  "verificationMethodLabel": "Verification Method",
+  "methodSms": "SMS",
+  "methodVoice": "Voice",
+  "startRegistration": "Start Registration",
+  "signalStatusLabel": "Signal Status",
+  "signalRegistrationInProgress": "Registration in progress...",
+  "verificationCodeLabel": "Verification Code",
+  "verifyCodeButton": "Verify Code",
+  "signalRegisteredMessage": "Signal registered successfully",
+  "unregisterSignal": "Unregister Signal",
+  "retryRegistration": "Retry Registration",
+  "signalExpiredMessage": "Registration expired",
+  "apiKeyTitle": "API Key Provider",
+  "apiKeyDescription": "Enter your API key credentials",
+  "accountSidLabel": "Account SID",
+  "authTokenLabel": "Auth Token",
+  "apiKeyLabel": "API Key",
+  "apiSecretLabel": "API Secret",
+  "saveCredentials": "Save Credentials",
+  "oauthConnectTitle": "Connect Provider",
+  "oauthDescription": "Connect via OAuth",
+  "oauthStarting": "Starting OAuth...",
+  "continueButton": "Continue",
+  "provisionSuccessTitle": "Number Provisioned",
+  "provisionSuccessMessage": "Your phone number has been provisioned successfully",
+  "phoneNumbersTitle": "Phone Numbers",
+  "ownedNumbersTab": "Owned Numbers",
+  "searchNumbersTab": "Search Numbers",
+  "provisionNumberTitle": "Provision Number",
+  "provisionNumberConfirm": "Are you sure you want to provision this number?",
+  "provisionButton": "Provision",
+  "noOwnedNumbers": "No owned numbers",
+  "countryCodeLabel": "Country Code",
+  "areaCodeLabel": "Area Code",
+  "containsLabel": "Contains",
+  "searchButton": "Search",
+  "selectNumber": "Select Number",
+  "webhookDescription": "Configure webhook URLs",
+  "voiceIncomingWebhook": "Voice Incoming Webhook",
+  "voiceStatusWebhook": "Voice Status Webhook",
+  "smsWebhook": "SMS Webhook",
+  "back": "Back",
+  "provider": {
+    "setup": {
+      "title": "Provider Setup"
+    },
+    "status": {
+      "connected": "Connected",
+      "connecting": "Connecting...",
+      "disconnected": "Disconnected",
+      "error": "Error"
+    },
+    "webhook": {
+      "errorTitle": "Webhook Error"
+    },
+    "cap": {
+      "oauth": "OAuth",
+      "listNumbers": "List Numbers",
+      "provision": "Provision",
+      "webhooks": "Webhooks",
+      "a2p": "A2P Messaging",
+      "sip": "SIP"
+    },
+    "oauth": {
+      "failed": "OAuth authorization failed",
+      "expired": "OAuth session expired. Please try again.",
+      "timeout": "OAuth authorization timed out",
+      "stateMismatch": "OAuth state mismatch. Possible CSRF attack.",
+      "failedLabel": "OAuth Failed",
+      "connectionHeader": "OAuth Connection",
+      "footer": "Connect your provider account via OAuth",
+      "connectButton": "Connect Account",
+      "waiting": "Waiting for authorization...",
+      "authorized": "Successfully authorized"
+    },
+    "field": {
+      "accountSid": "Account SID",
+      "authToken": "Auth Token",
+      "projectId": "Project ID",
+      "apiToken": "API Token",
+      "spaceUrl": "Space URL",
+      "apiKey": "API Key",
+      "apiSecret": "API Secret",
+      "accountId": "Account ID",
+      "authId": "Auth ID",
+      "ariUrl": "ARI URL",
+      "ariUsername": "ARI Username",
+      "ariPassword": "ARI Password"
+    },
+    "credentials": {
+      "header": "Provider Credentials",
+      "footer": "Enter your provider API credentials"
+    },
+    "saveAndTest": "Save and Test",
+    "test": {
+      "connection": "Test Connection",
+      "success": "Connection successful",
+      "latency": "Latency: {{ms}}ms",
+      "failed": "Connection test failed"
+    },
+    "selectPhoneNumber": "Select Phone Number",
+    "nextSteps": {
+      "header": "Next Steps"
+    },
+    "numberTab": "Numbers",
+    "yourNumbers": "Your Numbers",
+    "getNewNumber": "Get New Number",
+    "selectNumber": {
+      "title": "Select a Phone Number"
+    },
+    "noNumbers": {
+      "title": "No Phone Numbers",
+      "desc": "You don't have any phone numbers yet. Search for available numbers below."
+    },
+    "search": {
+      "country": "Country",
+      "criteriaHeader": "Search Criteria",
+      "numbersButton": "Search Available Numbers"
+    },
+    "areaCode": "Area Code",
+    "areaCodeOptional": "Area Code (Optional)",
+    "availableNumbers": {
+      "header": "Available Numbers"
+    },
+    "getNumber": {
+      "button": "Get This Number"
+    }
+  },
+  "webhook": {
+    "config": {
+      "title": "Webhook Configuration"
+    },
+    "configured": {
+      "success": "All webhooks configured successfully",
+      "partial": "Some webhooks configured",
+      "desc": "Review the webhook URLs below"
+    },
+    "voice": {
+      "url": "Voice URL",
+      "header": "Voice Webhook"
+    },
+    "sms": {
+      "url": "SMS URL",
+      "header": "SMS Webhook"
+    },
+    "status": {
+      "url": "Status URL",
+      "header": "Status Webhook"
+    },
+    "setupComplete": {
+      "footer": "Webhook setup complete"
     }
   }
 }

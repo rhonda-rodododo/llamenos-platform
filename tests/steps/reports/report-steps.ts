@@ -16,12 +16,9 @@ import { listReportsViaApi, createReportViaApi } from '../../api-helpers'
 // --- Report list ---
 
 Then('I should see the reports screen', async ({ page }) => {
-  // Report list or empty state should be visible — check sequentially, not via .or()
   const reportList = page.getByTestId(TestIds.REPORT_LIST)
-  const isReportList = await reportList.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (isReportList) return
   const emptyState = page.getByTestId(TestIds.EMPTY_STATE)
-  await expect(emptyState).toBeVisible({ timeout: 3000 })
+  await expect(reportList.or(emptyState).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('I should see the reports card on the dashboard', async ({ page }) => {

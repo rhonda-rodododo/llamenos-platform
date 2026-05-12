@@ -3,7 +3,7 @@ import { expect, type Page, type APIRequestContext } from '@playwright/test'
 import { gcm } from '@noble/ciphers/aes.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
 import { bytesToHex } from '@noble/hashes/utils.js'
-import { getPublicKey, nip19 } from 'nostr-tools'
+import { getPublicKey, nip19 } from '@llamenos/crypto/ffi'
 
 // Re-export helpers that don't depend on ADMIN_NSEC
 export { enterPin } from '../helpers'

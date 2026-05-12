@@ -22,7 +22,7 @@ bun install
 
 ## 2. 生成管理员密钥对
 
-为管理员账户生成一个 Nostr 密钥对。此操作会生成一个私钥（nsec）和公钥（npub/hex）。
+为管理员账户生成一个 WebSocket 密钥对。此操作会生成一个私钥（nsec）和公钥（npub/hex）。
 
 ```bash
 bun run bootstrap-admin

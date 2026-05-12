@@ -75,7 +75,7 @@ config.get('/',
     } catch { /* default to empty */ }
 
     // Derive server Ed25519 pubkey for client event signature verification
-    const serverSecret = c.env.SERVER_SECRET ?? c.env.SERVER_NOSTR_SECRET
+    const serverSecret = c.env.SERVER_SECRET
     let serverPubkey: string | undefined
     if (serverSecret) {
       try {
@@ -100,9 +100,6 @@ config.get('/',
       defaultHubId,
       serverPubkey,
       wsRelayUrl,
-      // Legacy aliases for transitioning clients
-      serverNostrPubkey: serverPubkey,
-      nostrRelayUrl: wsRelayUrl,
       apiVersion: CURRENT_API_VERSION,
       minApiVersion: MIN_API_VERSION,
       // GlitchTip/Sentry DSN for client-side crash reporting (opt-in, privacy-first)

@@ -9,7 +9,7 @@ Hướng dẫn này bao gồm mọi thứ bạn cần biết với vai trò tìn
 
 Quản trị viên sẽ cung cấp cho bạn một trong hai:
 
-- Một **nsec** (khóa bí mật Nostr) — chuỗi ký tự bắt đầu bằng `nsec1`
+- Một **nsec** (khóa bí mật WebSocket) — chuỗi ký tự bắt đầu bằng `nsec1`
 - Một **liên kết mời** — URL dùng một lần sẽ tạo thông tin đăng nhập cho bạn
 
 **Giữ bí mật nsec của bạn.** Đó là danh tính và thông tin đăng nhập của bạn. Bất kỳ ai có nsec của bạn đều có thể mạo danh bạn. Hãy lưu trữ nó trong trình quản lý mật khẩu.

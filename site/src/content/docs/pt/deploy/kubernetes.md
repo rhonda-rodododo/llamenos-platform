@@ -160,7 +160,7 @@ Abra `https://hotline.seudorustfs.com` no seu navegador. Faca login com o nsec d
 
 | Parametro | Descricao | Padrao |
 |-----------|-----------|--------|
-| `secrets.adminPubkey` | Chave publica hex Nostr do admin | `""` |
+| `secrets.adminPubkey` | Chave publica hex WebSocket do admin | `""` |
 | `secrets.postgresPassword` | Senha do PostgreSQL (obrigatorio) | `""` |
 | `secrets.twilioAccountSid` | Twilio Account SID | `""` |
 | `secrets.twilioAuthToken` | Twilio Auth Token | `""` |

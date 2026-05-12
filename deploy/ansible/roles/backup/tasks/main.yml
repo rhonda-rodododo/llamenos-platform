@@ -3,7 +3,6 @@
 #
 # This role has been superseded by per-service backup roles:
 #   - backup-postgres  (PostgreSQL pg_dump)
-#   - backup-strfry    (Nostr relay event export)
 #   - backup-rustfs    (RustFS object mirror)
 #   - backup-config    (deployment configuration)
 #   - backup-monitor   (health checks + alerting)
@@ -18,16 +17,13 @@
   ansible.builtin.debug:
     msg: >
       The 'backup' role is deprecated. Use playbooks/backup.yml with
-      per-service roles (backup-postgres, backup-strfry, backup-rustfs,
       backup-config, backup-monitor) instead.
 
 - name: Include PostgreSQL backup role
   ansible.builtin.include_role:
     name: backup-postgres
 
-- name: Include strfry backup role
   ansible.builtin.include_role:
-    name: backup-strfry
 
 - name: Include RustFS backup role
   ansible.builtin.include_role:

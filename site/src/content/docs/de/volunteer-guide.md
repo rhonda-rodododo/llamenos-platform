@@ -9,7 +9,7 @@ Dieses Handbuch behandelt alles, was Sie als Freiwilliger wissen muessen: Anmeld
 
 Ihr Administrator wird Ihnen eines der folgenden bereitstellen:
 
-- Einen **nsec** (Nostr-Geheimschluessel) -- eine Zeichenkette, die mit `nsec1` beginnt
+- Einen **nsec** (WebSocket-Geheimschluessel) -- eine Zeichenkette, die mit `nsec1` beginnt
 - Einen **Einladungslink** -- eine Einmal-URL, die Ihre Zugangsdaten generiert
 
 **Halten Sie Ihren nsec geheim.** Er ist Ihre Identitaet und Ihr Anmeldedaten. Jeder mit Ihrem nsec kann sich als Sie ausgeben. Speichern Sie ihn in einem Passwort-Manager.

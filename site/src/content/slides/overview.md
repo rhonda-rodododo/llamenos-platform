@@ -130,7 +130,7 @@ Most crisis hotlines use tools designed for different threat models:
 docker compose up -d
 ```
 
-- **What runs**: PostgreSQL, Llámenos app, Nostr relay, SIP bridge, optional Signal sidecar
+- **What runs**: PostgreSQL, Llámenos app, WebSocket relay, SIP bridge, optional Signal sidecar
 - **Where**: Any Linux server — Hetzner (EU), DigitalOcean, your own hardware
 - **Cost**: ~$15-20/month for most hotline volumes
 - **Jurisdiction**: Host in the EU for GDPR compliance; host where you trust the legal system

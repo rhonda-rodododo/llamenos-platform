@@ -77,11 +77,9 @@ export class FirehoseAgentService {
     private readonly settings: SettingsService,
     private readonly sealKey: string,
     private readonly env: {
-      SERVER_NOSTR_SECRET?: string
-      NOSTR_RELAY_URL?: string
+      SERVER_SECRET?: string
       ADMIN_PUBKEY?: string
       ADMIN_DECRYPTION_PUBKEY?: string
-      NOSTR_PUBLISHER?: unknown
     },
   ) {}
 

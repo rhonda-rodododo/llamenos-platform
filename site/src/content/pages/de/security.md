@@ -92,7 +92,7 @@ Diese Verbesserungen sind heute verfuegbar:
 | Keine Klartext-Telefonnummern in der Datenbank | Anrufernummern werden als irreversible Hashes gespeichert — Ihre Datenbank enthaelt nie die tatsaechliche Telefonnummer |
 | Hub-spezifische Verschluesselung mit Vorwaertsgeheimnis | Echtzeit-Ereignisse jedes Hubs werden mit Schluesseln verschluesselt die alle 24 Stunden rotieren — alte Schluessel koennen neue Ereignisse nicht entschluesseln |
 | Kryptographie in Rust auf allen Plattformen | Desktop, iOS und Android nutzen dieselbe gepruefte Rust-Kryptographiebibliothek — Schluessel gelangen nie in JavaScript-, Swift- oder Kotlin-Code |
-| Eingeschraenkter Relay-Zugang | Ihr Nostr-Relay akzeptiert nur Ereignisse von Ihrem Server — kein Dritter kann gefaelschte Benachrichtigungen einschleusen |
+| Eingeschraenkter Relay-Zugang | Ihr WebSocket-Relay akzeptiert nur Ereignisse von Ihrem Server — kein Dritter kann gefaelschte Benachrichtigungen einschleusen |
 | Verschluesselte Nachrichtenspeicherung | SMS-, WhatsApp- und Signal-Nachrichten werden als Chiffretext auf Ihrem Server gespeichert |
 | Geraeteinterne Transkription | Audio verlaesst nie Ihren Browser — wird vollstaendig auf Ihrem Geraet verarbeitet |
 | Mehrfaktor-Schluesselschutz | Ihre Verschluesselungsschluessel sind durch Ihre PIN, Ihren Identitaetsanbieter und optional einen Hardware-Sicherheitsschluessel geschuetzt |

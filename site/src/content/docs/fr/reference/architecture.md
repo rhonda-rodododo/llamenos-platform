@@ -75,7 +75,7 @@ Worker API  -->  ConversationDO
     |                | Enveloppe la clé symétrique via ECIES pour le bénévole assigné + admins
     |                | Supprime le texte en clair
     |                v
-    |           Relais Nostr (événement hub chiffré notifie les clients en ligne)
+    |           Relais WebSocket (événement hub chiffré notifie les clients en ligne)
     |
     v
 Client (navigateur/application du bénévole)
@@ -111,7 +111,7 @@ Tous les DOs sont accessibles en tant que singletons via `idFromName()` et rout�
 | Pièces jointes des rapports | Oui (E2EE) | XChaCha20-Poly1305 (en flux) | Auteur du rapport + tous les admins |
 | Contenu des messages | Oui (E2EE) | XChaCha20-Poly1305 + enveloppe ECIES | Bénévole assigné + tous les admins |
 | Transcriptions | Oui (au repos) | XChaCha20-Poly1305 | Créateur de la transcription + tous les admins |
-| Événements hub (Nostr) | Oui (symétrique) | XChaCha20-Poly1305 avec clé hub | Tous les membres actuels du hub |
+| Événements hub (WebSocket) | Oui (symétrique) | XChaCha20-Poly1305 avec clé hub | Tous les membres actuels du hub |
 | nsec du bénévole | Oui (au repos) | PBKDF2 + XChaCha20-Poly1305 (PIN) | Bénévole uniquement |
 | Entrées du journal d'audit | Non (protection de l'intégrité) | Chaîne de hachage SHA-256 | Admins (lecture), système (écriture) |
 | Numéros de téléphone des appelants | Non (côté serveur uniquement) | N/A | Serveur + admins |
@@ -130,11 +130,11 @@ nsec du bénévole (BIP-340 Schnorr / secp256k1)
     |
     +-- Utilisé pour l'accord de clé ECIES (préfixe 02 pour la forme compressée)
     |
-    +-- Signe les événements Nostr (signature Schnorr)
+    +-- Signe les événements WebSocket (signature Schnorr)
 
 Clé hub (32 octets aléatoires, NON dérivée d'une identité)
     |
-    +-- Chiffre les événements hub Nostr en temps réel
+    +-- Chiffre les événements hub WebSocket en temps réel
     |
     +-- Enveloppée par ECIES par membre via LABEL_HUB_KEY_WRAP
     |
@@ -151,9 +151,9 @@ Clé par note (32 octets aléatoires)
 
 ## Communication en temps réel
 
-Les mises à jour en temps réel (nouveaux appels, messages, changements de permanence, présence) transitent par un relais Nostr :
+Les mises à jour en temps réel (nouveaux appels, messages, changements de permanence, présence) transitent par un relais WebSocket :
 
-- **Auto-hébergé** : relais strfry fonctionnant aux côtés de l'application dans Docker/Kubernetes
+- **Auto-hébergé** : relais WebSocket relay fonctionnant aux côtés de l'application dans Docker/Kubernetes
 - **Cloudflare** : Nosflare (relais basé sur Cloudflare Workers)
 
 Tous les événements sont éphémères (kind 20001) et chiffrés avec la clé hub. Les événements utilisent des tags génériques (`["t", "llamenos:event"]`) afin que le relais ne puisse pas distinguer les types d'événements. Le champ de contenu contient du texte chiffré XChaCha20-Poly1305.
@@ -164,9 +164,9 @@ Tous les événements sont éphémères (kind 20001) et chiffrés avec la clé h
 Client A (action du bénévole)
     |
     | Chiffre le contenu de l'événement avec la clé hub
-    | Signe en tant qu'événement Nostr (Schnorr)
+    | Signe en tant qu'événement WebSocket (Schnorr)
     v
-Relais Nostr (strfry / Nosflare)
+Relais WebSocket (WebSocket relay / Nosflare)
     |
     | Diffuse aux abonnés
     v
@@ -185,13 +185,13 @@ Le relais voit des blobs chiffrés et des signatures valides, mais ne peut pas l
 ### Couche transport
 
 - Toutes les communications client-serveur via HTTPS (TLS 1.3)
-- Connexions WebSocket au relais Nostr via WSS
+- Connexions WebSocket au relais WebSocket via WSS
 - La politique de sécurité du contenu (CSP) restreint les sources de scripts, les connexions et les ancêtres de frames
 - Le schéma d'isolation Tauri sépare les IPC de la webview
 
 ### Couche applicative
 
-- Authentification via des paires de clés Nostr (signatures BIP-340 Schnorr)
+- Authentification via des paires de clés WebSocket (signatures BIP-340 Schnorr)
 - Jetons de session WebAuthn pour la commodité multi-appareils
 - Contrôle d'accès basé sur les rôles (appelant, bénévole, rapporteur, admin)
 - Les 25 constantes de séparation de domaine cryptographique définies dans `crypto-labels.ts` préviennent les attaques inter-protocoles

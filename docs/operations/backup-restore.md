@@ -7,7 +7,7 @@ This document covers the Llamenos backup and restore procedures. Backups are man
 | Service | Data | Criticality |
 |---------|------|-------------|
 | **PostgreSQL** | All application data (calls, notes, volunteers, shifts, audit logs, key material) | Critical |
-| **strfry** | Nostr relay events (real-time presence, hub events) | High |
+| **WebSocket relay** | WebSocket relay events (real-time presence, hub events) | High |
 | **RustFS** | File attachments | Medium |
 | **Config** | `docker-compose.yml`, `.env`, `Caddyfile` | Critical |
 
@@ -44,7 +44,7 @@ To backup a single service:
 
 ```bash
 /opt/llamenos/scripts/backup-postgres.sh   # PostgreSQL only
-/opt/llamenos/scripts/backup-strfry.sh     # Nostr relay only
+/opt/llamenos/scripts/backup-WebSocket relay.sh     # WebSocket relay only
 /opt/llamenos/scripts/backup-rustfs.sh     # RustFS objects only
 /opt/llamenos/scripts/backup-config.sh     # Config files only
 ```
@@ -53,7 +53,7 @@ Via Ansible with a tag:
 
 ```bash
 ansible-playbook playbooks/backup.yml --ask-vault-pass --tags postgres
-ansible-playbook playbooks/backup.yml --ask-vault-pass --tags strfry
+ansible-playbook playbooks/backup.yml --ask-vault-pass --tags WebSocket relay
 ansible-playbook playbooks/backup.yml --ask-vault-pass --tags rustfs
 ansible-playbook playbooks/backup.yml --ask-vault-pass --tags config
 ```
@@ -65,7 +65,7 @@ Backups are stored on-server at `{{ app_dir }}/backups/`:
 ```
 backups/
   postgres/{daily,weekly,monthly}/
-  strfry/{daily,weekly,monthly}/
+  WebSocket relay/{daily,weekly,monthly}/
   rustfs/{daily,weekly,monthly}/
   config/{daily,weekly,monthly}/
   manifest-YYYYMMDD-HHMMSS.txt    # Unified checksums, kept for 30 runs
@@ -110,7 +110,7 @@ Restore order is fixed:
 1. Stop all services
 2. Restore config (`docker-compose.yml`, `.env`, `Caddyfile`)
 3. Start PostgreSQL only, restore database (drop + recreate + pg_restore)
-4. Start strfry, import Nostr events
+4. Start WebSocket relay, import WebSocket events
 5. Start RustFS, sync file attachments
 6. Start full stack
 7. Wait for `/api/health` to return 200
@@ -128,7 +128,7 @@ ansible-playbook playbooks/restore.yml --ask-vault-pass \
 
 ```bash
 ansible-playbook playbooks/restore.yml --ask-vault-pass --tags postgres
-ansible-playbook playbooks/restore.yml --ask-vault-pass --tags strfry
+ansible-playbook playbooks/restore.yml --ask-vault-pass --tags WebSocket relay
 ansible-playbook playbooks/restore.yml --ask-vault-pass --tags rustfs
 ansible-playbook playbooks/restore.yml --ask-vault-pass --tags config
 ```
@@ -179,8 +179,8 @@ docker compose ps
 docker compose exec postgres psql -U llamenos -d llamenos \
   -c "SELECT COUNT(*) FROM kv_store;"
 
-# Check Nostr relay
-curl -sI https://hotline.yourorg.org/nostr
+# Check WebSocket relay
+curl -sI https://hotline.yourorg.org/WebSocket
 # Expected: 426 Upgrade Required
 
 # Check RustFS

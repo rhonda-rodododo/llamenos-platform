@@ -39,11 +39,11 @@ sudo lsof -i :9000
 
 ### Strfry relay không kết nối
 
-Nostr relay (strfry) là dịch vụ cốt lõi, không tùy chọn:
+WebSocket relay (WebSocket relay) là dịch vụ cốt lõi, không tùy chọn:
 
 ```bash
-docker compose logs strfry
-docker compose restart strfry
+docker compose logs WebSocket relay
+docker compose restart WebSocket relay
 ```
 
 ### Lỗi RustFS / S3

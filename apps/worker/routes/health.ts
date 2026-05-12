@@ -32,11 +32,11 @@ async function checkPostgres(): Promise<CheckResult> {
 }
 
 async function checkStorage(env: Record<string, unknown>): Promise<CheckResult> {
-  const endpoint = (env.STORAGE_ENDPOINT as string | undefined) || (env.MINIO_ENDPOINT as string | undefined)
+  const endpoint = env.STORAGE_ENDPOINT as string | undefined
   if (!endpoint) return { status: 'failing', detail: 'STORAGE_ENDPOINT not configured' }
   const t0 = Date.now()
   try {
-    // RustFS doesn't serve /minio/health/live — returns 403 on all unauthenticated paths.
+    // RustFS returns 403 on unauthenticated paths — this still proves reachability.
     // A 403 still proves the server is running and reachable.
     const url = `${endpoint.replace(/\/$/, '')}/`
     const res = await fetch(url, { signal: AbortSignal.timeout(3000) })
@@ -50,7 +50,7 @@ async function checkStorage(env: Record<string, unknown>): Promise<CheckResult> 
 async function checkRelay(env: Record<string, unknown>): Promise<CheckResult> {
   // Native WebSocket relay is in-process — if the server is running, the relay is running.
   // Only requires SERVER_SECRET to be set (used for relay auth key derivation).
-  const serverSecret = env.SERVER_SECRET ?? env.SERVER_NOSTR_SECRET
+  const serverSecret = env.SERVER_SECRET
   if (!serverSecret) return { status: 'failing', detail: 'SERVER_SECRET not configured (relay disabled)' }
   return { status: 'ok' }
 }

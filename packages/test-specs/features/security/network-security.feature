@@ -207,9 +207,9 @@ Feature: Network Security
     Then the server should reject with 403 citing missing permissions
 
   @backend
-  Scenario: Nostr relay events are encrypted
-    Given a hub with SERVER_NOSTR_SECRET configured
-    When the server publishes a Nostr event
+  Scenario: WebSocket relay events are encrypted
+    Given a hub with SERVER_SECRET configured
+    When the server publishes a WebSocket event
     Then the event content should be encrypted with the derived event key
 
   @backend

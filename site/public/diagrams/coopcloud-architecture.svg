@@ -65,7 +65,7 @@
   <!-- Arrow to PostgreSQL -->
   <line x1="150" y1="305" x2="100" y2="350" class="arrow"/>
 
-  <!-- Arrow to MinIO -->
+  <!-- Arrow to RustFS -->
   <line x1="250" y1="305" x2="300" y2="350" class="arrow"/>
 
   <!-- PostgreSQL -->
@@ -73,9 +73,9 @@
   <text x="95" y="373" class="label">PostgreSQL</text>
   <text x="95" y="390" class="sublabel">:5432</text>
 
-  <!-- MinIO -->
+  <!-- RustFS -->
   <rect x="220" y="350" width="160" height="50" class="node" fill="url(#dbGrad)" stroke="#6b9ab8" stroke-width="2"/>
-  <text x="300" y="373" class="label">MinIO (S3)</text>
+  <text x="300" y="373" class="label">RustFS (S3)</text>
   <text x="300" y="390" class="sublabel">:9000</text>
 
   <!-- Optional services -->

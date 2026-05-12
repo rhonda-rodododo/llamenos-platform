@@ -22,7 +22,7 @@ bun install
 
 ## 2. Tạo cặp khóa quản trị viên
 
-Tạo một cặp khóa Nostr cho tài khoản quản trị viên. Thao tác này tạo ra một khóa bí mật (nsec) và khóa công khai (npub/hex).
+Tạo một cặp khóa WebSocket cho tài khoản quản trị viên. Thao tác này tạo ra một khóa bí mật (nsec) và khóa công khai (npub/hex).
 
 ```bash
 bun run bootstrap-admin

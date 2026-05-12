@@ -12,7 +12,7 @@ This document is the definitive wire-format specification for interoperating wit
 
 1. [Authentication Protocol](#1-authentication-protocol)
 2. [Cryptographic Operations](#2-cryptographic-operations)
-3. [Nostr Event Schema](#3-nostr-event-schema)
+3. [WebSocket Event Schema](#3-WebSocket-event-schema)
 4. [REST API Endpoints](#4-rest-api-endpoints)
 5. [Push Notification Protocol](#5-push-notification-protocol)
 6. [Device Provisioning Protocol](#6-device-provisioning-protocol)
@@ -236,12 +236,12 @@ Every HPKE/ECIES derivation, HKDF context, HMAC key, and signature binding uses 
 | `RECOVERY_SALT` | `llamenos:recovery` | Recovery key PBKDF2 fallback salt (legacy) |
 | `LABEL_BACKUP` | `llamenos:backup` | Generic backup encryption |
 
-#### Server Nostr Identity
+#### Server WebSocket Identity
 
 | Constant | Value | Purpose |
 |----------|-------|---------|
-| `LABEL_SERVER_NOSTR_KEY` | `llamenos:server-nostr-key` | HKDF salt for server Nostr keypair derivation |
-| `LABEL_SERVER_NOSTR_KEY_INFO` | `llamenos:server-nostr-key:v1` | HKDF info parameter (versioned for rotation) |
+| `LABEL_SERVER_NOSTR_KEY` | `llamenos:server-WebSocket-key` | HKDF salt for server WebSocket keypair derivation |
+| `LABEL_SERVER_NOSTR_KEY_INFO` | `llamenos:server-WebSocket-key:v1` | HKDF info parameter (versioned for rotation) |
 
 ### 2.2 HPKE Envelope Encryption (Current)
 
@@ -318,7 +318,7 @@ eciesWrapKey(plaintext_key[32], recipient_pubkey_hex[64], label_string):
      // ephemeral_pubkey: 33 bytes (compressed format, 0x02 or 0x03 prefix)
 
   2. Prepare recipient compressed pubkey:
-     // Nostr pubkeys are x-only (32 bytes / 64 hex chars). Prepend 0x02.
+     // WebSocket pubkeys are x-only (32 bytes / 64 hex chars). Prepend 0x02.
      recipient_compressed = 0x02 || hex_to_bytes(recipient_pubkey_hex)
      // Result: 33 bytes
 
@@ -588,7 +588,7 @@ Decryption uses `eciesUnwrapKey(envelope, secret_key, "llamenos:call-meta")`.
 
 ### 2.6 Key Storage (PIN-Encrypted)
 
-The user's Nostr secret key (nsec, bech32-encoded) is encrypted with a user-chosen PIN and stored in the client's local persistent storage (localStorage on web, secure storage on native).
+The user's WebSocket secret key (nsec, bech32-encoded) is encrypted with a user-chosen PIN and stored in the client's local persistent storage (localStorage on web, secure storage on native).
 
 #### Encryption Parameters
 
@@ -725,7 +725,7 @@ On member departure:
 4. Re-encrypt any hub-scoped data with the new key.
 5. Distribute via `GET /api/hubs/:hubId/key`.
 
-### 2.8 Nostr Event Encryption
+### 2.8 WebSocket Event Encryption
 
 #### Hub-Wide Broadcasts
 
@@ -752,11 +752,11 @@ All hub members who possess the hub key can derive the same event key and decryp
 
 #### Targeted Messages (Single Recipient)
 
-For events intended for a single recipient (e.g., direct provisioning messages), use NIP-44 encryption from the Nostr protocol.
+For events intended for a single recipient (e.g., direct provisioning messages), use HPKE encryption targeted to the recipient's X25519 pubkey.
 
-### 2.9 Server Nostr Keypair Derivation
+### 2.9 Server WebSocket Keypair Derivation
 
-The server derives its Nostr keypair deterministically from a 64-hex-char secret (`SERVER_NOSTR_SECRET`):
+The server derives its event signing keypair deterministically from a 64-hex-char secret (`SERVER_SECRET`):
 
 ```
 deriveServerKeypair(server_secret_hex):
@@ -766,8 +766,8 @@ deriveServerKeypair(server_secret_hex):
   secret_key = HKDF(
     hash = SHA-256,
     ikm  = secret_bytes,
-    salt = UTF-8("llamenos:server-nostr-key"),
-    info = UTF-8("llamenos:server-nostr-key:v1"),
+    salt = UTF-8("llamenos:server-event-key"),
+    info = UTF-8("llamenos:server-event-key:v1"),
     length = 32
   )
 
@@ -776,7 +776,7 @@ deriveServerKeypair(server_secret_hex):
   Return { secretKey, pubkey }
 ```
 
-The server's pubkey is distributed to clients via `GET /api/config` in the `serverNostrPubkey` field. Clients verify server-published Nostr events against this pubkey.
+The server's pubkey is distributed to clients via `GET /api/config` in the `serverWebSocketPubkey` field. Clients verify server-published WebSocket events against this pubkey.
 
 ### 2.10 HMAC Operations
 
@@ -836,9 +836,9 @@ PIN Encryption (Phase 6):
 
 New devices are authorized via an append-only hash-chained sigchain. Each sigchain entry is Ed25519-signed by an existing authorized device and contains the new device's Ed25519 + X25519 public keys. The PUK (Per-User Key) is wrapped for each authorized device via `LABEL_PUK_WRAP_TO_DEVICE`.
 
-#### Relationship to Nostr Identity
+#### Relationship to WebSocket Identity
 
-Nostr identity keys (secp256k1 nsec/npub) remain separate from device keys. The nsec is used for Nostr protocol compatibility (relay auth, event signing). Device Ed25519 keys handle application-level auth and sigchain. Device X25519 keys handle HPKE encryption. These are NOT derived from the nsec.
+WebSocket events are signed by the server's derived event keypair. Clients verify the server signature on all WebSocket events. Device Ed25519 keys handle application-level auth and sigchain. Device X25519 keys handle HPKE encryption. These are NOT derived from the server event key.
 
 ### 2.12 Audit Log Hash Chain
 
@@ -963,9 +963,9 @@ interface RecipientEnvelope {
 
 ---
 
-## 3. Nostr Event Schema
+## 3. WebSocket Event Schema
 
-Llamenos uses a self-hosted Nostr relay (strfry or Nosflare) for real-time event distribution. All events are server-signed and encrypted with the hub key.
+Llamenos uses a built-in WebSocket endpoint on the API server for real-time event distribution. All events are server-signed and encrypted with the hub key.
 
 ### 3.1 Event Kind Definitions
 
@@ -988,11 +988,11 @@ Llamenos uses a self-hosted Nostr relay (strfry or Nosflare) for real-time event
 | 20000 | `KIND_PRESENCE_UPDATE` | Volunteer presence update -- online counts, availability |
 | 20001 | `KIND_CALL_SIGNAL` | Call answer/hangup signals -- real-time coordination |
 
-#### Standard NIP Kinds
+#### Authentication Events
 
-| Kind | Constant | Purpose |
+| Type | Constant | Purpose |
 |------|----------|---------|
-| 22242 | `KIND_NIP42_AUTH` | NIP-42 authentication event |
+| `auth` | `EVENT_AUTH` | WebSocket authentication |
 
 ### 3.2 Event Format
 
@@ -1008,14 +1008,14 @@ All server-published events follow this structure:
   ],
   "content": "<encrypted_json_string>",
   "id": "<computed_event_id>",
-  "pubkey": "<server_nostr_pubkey>",
+  "pubkey": "<server_WebSocket_pubkey>",
   "sig": "<schnorr_signature>"
 }
 ```
 
 #### Tag Convention
 
-All events carry the tag `["t", "llamenos:event"]`. This generic tag prevents the relay from distinguishing between event types (call events, message events, settings events all look the same to the relay).
+All events include a generic `type` field inside the encrypted payload. This prevents the WebSocket infrastructure from distinguishing between event types (call events, message events, settings events all look the same to the server).
 
 The `["d", "global"]` tag is used for hub-wide broadcasts. Hub-scoped events would use `["d", hub_id]`.
 
@@ -1042,29 +1042,29 @@ The plaintext content is a JSON string with a `type` field identifying the event
 
 ### 3.3 Server Signing
 
-Events are signed using the server's derived keypair (Section 2.9). Clients verify against the `serverNostrPubkey` from `GET /api/config`.
+Events are signed using the server's derived keypair (Section 2.9). Clients verify against the `serverWebSocketPubkey` from `GET /api/config`.
 
 ```
-signServerEvent(template, secret_key):
-  event = finalizeEvent(template, secret_key)
-  // Uses nostr-tools/pure.finalizeEvent
-  // Computes event.id = SHA-256(serialized_event)
-  // Computes event.sig = schnorr.sign(event.id, secret_key)
+signServerEvent(payload, secret_key):
+  // Serialize payload deterministically
+  message = SHA-256(JSON.stringify(payload))
+  // Sign with BIP-340 Schnorr
+  signature = schnorr.sign(message, secret_key)
+  return { payload, signature: hex(signature), pubkey: serverPubkey }
 ```
 
 ### 3.4 Client Connection
 
-Clients connect to the relay URL provided by `GET /api/config`:
-- `nostrRelayUrl`: WebSocket URL (e.g., `wss://relay.example.com` or relative `/nostr`)
-- If `nostrRelayUrl` is null, Nostr real-time is not configured.
+Clients connect to the WebSocket endpoint provided by `GET /api/config`:
+- `wsUrl`: WebSocket URL (e.g., `wss://api.example.com/ws` or relative `/ws`)
+- If `wsUrl` is null, WebSocket real-time is not configured.
 
-Clients subscribe to events with a filter:
+Clients authenticate and then receive events for their subscribed hubs:
 
 ```json
 {
-  "kinds": [1000, 1001, 1002, 1010, 1011, 1020, 1030, 20000, 20001],
-  "#t": ["llamenos:event"],
-  "since": <current_timestamp>
+  "action": "subscribe",
+  "hubIds": ["hub-id-1", "hub-id-2"]
 }
 ```
 
@@ -1100,8 +1100,8 @@ Response: {
   "needsBootstrap": false,
   "hubs": [{ "id": "...", "name": "...", "slug": "...", ... }],
   "defaultHubId": "...",
-  "serverNostrPubkey": "hex_64",
-  "nostrRelayUrl": "wss://...",
+  "serverWebSocketPubkey": "hex_64",
+  "WebSocketRelayUrl": "wss://...",
   "apiVersion": "1.0.0",
   "minApiVersion": "0.9.0",
   "sentryDsn"?: "https://..."   // Optional, only if GlitchTip/Sentry is configured
@@ -2547,7 +2547,7 @@ Clients implementing this protocol need the following cryptographic capabilities
 
 | Operation | Library (JS reference) | Algorithm |
 |-----------|----------------------|-----------|
-| Key generation | `nostr-tools` | secp256k1 |
+| Key generation | `@noble/curves` | secp256k1, Ed25519, X25519 |
 | Schnorr signatures | `@noble/curves/secp256k1` | BIP-340 |
 | ECDH | `@noble/curves/secp256k1` | secp256k1 |
 | SHA-256 | `@noble/hashes/sha2` | SHA-256 |
@@ -2555,12 +2555,12 @@ Clients implementing this protocol need the following cryptographic capabilities
 | HKDF | `@noble/hashes/hkdf` | HKDF-SHA256 |
 | AEAD | `@noble/ciphers/chacha` | XChaCha20-Poly1305 |
 | PBKDF2 | Web Crypto API | PBKDF2-SHA256 |
-| Nostr encoding | `nostr-tools` | bech32 (nsec/npub) |
+| Encoding | `@noble/hashes` | hex, utf8 |
 
 **Gotchas for non-JS implementations:**
 - `@noble/ciphers` and `@noble/hashes` require `.js` extension in import paths (JS-specific).
 - `schnorr` is a separate named export from secp256k1 (not the default).
-- Nostr pubkeys are x-only (32 bytes) -- prepend `0x02` for ECDH compressed format.
+- WebSocket pubkeys are x-only (32 bytes) -- prepend `0x02` for ECDH compressed format.
 - `secp256k1.getSharedSecret()` returns 33 bytes; extract x-coordinate with `[1..33]`.
 - XChaCha20-Poly1305 uses a 24-byte nonce, not 12-byte (unlike standard ChaCha20-Poly1305).
 - The Poly1305 tag is 16 bytes, appended to the ciphertext by the AEAD implementation.

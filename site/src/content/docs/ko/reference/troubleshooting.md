@@ -53,14 +53,14 @@ sudo lsof -i :9000
 
 ### Strfry relay 연결 안 됨
 
-Nostr relay (strfry)는 선택 사항이 아닌 핵심 서비스입니다. relay가 실행되지 않는 경우:
+WebSocket relay (WebSocket relay)는 선택 사항이 아닌 핵심 서비스입니다. relay가 실행되지 않는 경우:
 
 ```bash
 # relay 상태 확인
-docker compose logs strfry
+docker compose logs WebSocket relay
 
 # relay 재시작
-docker compose restart strfry
+docker compose restart WebSocket relay
 ```
 
 relay 시작이 실패하면, 포트 7777 충돌이나 데이터 디렉토리의 권한 부족을 확인하세요.
@@ -233,7 +233,7 @@ Llamenos는 단일 인스턴스 모드를 적용합니다. 앱이 이미 실행 
 허브 이벤트의 서명 검증이 실패하는 경우:
 
 - 시스템 시계가 동기화되어 있는지 확인하세요 (NTP). 큰 시계 편차가 이벤트 타임스탬프에 문제를 일으킬 수 있습니다
-- Nostr relay가 알 수 없는 pubkey의 이벤트를 중계하고 있지 않은지 확인하세요
+- WebSocket relay가 알 수 없는 pubkey의 이벤트를 중계하고 있지 않은지 확인하세요
 - 앱을 재시작하여 현재 허브 멤버 목록을 다시 가져오세요
 
 ### ECIES 봉투 오류

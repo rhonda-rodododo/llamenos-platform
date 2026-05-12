@@ -5,21 +5,14 @@ describe('resolveStorageCredentials', () => {
   const originalEnv = { ...process.env }
 
   beforeEach(() => {
-    // Clear all storage-related env vars
     delete process.env.STORAGE_ENDPOINT
-    delete process.env.MINIO_ENDPOINT
     delete process.env.STORAGE_ACCESS_KEY
     delete process.env.STORAGE_SECRET_KEY
-    delete process.env.MINIO_APP_USER
-    delete process.env.MINIO_APP_PASSWORD
-    delete process.env.MINIO_ACCESS_KEY
-    delete process.env.MINIO_SECRET_KEY
   })
 
   afterEach(() => {
-    // Restore environment
     for (const key of Object.keys(process.env)) {
-      if (key.startsWith('STORAGE_') || key.startsWith('MINIO_')) {
+      if (key.startsWith('STORAGE_')) {
         delete process.env[key]
       }
     }
@@ -33,34 +26,6 @@ describe('resolveStorageCredentials', () => {
     const result = resolveStorageCredentials()
     expect(result.accessKeyId).toBe('primary-key')
     expect(result.secretAccessKey).toBe('primary-secret')
-  })
-
-  it('falls back to MINIO_APP_USER/MINIO_APP_PASSWORD', () => {
-    process.env.MINIO_APP_USER = 'app-user'
-    process.env.MINIO_APP_PASSWORD = 'app-pass'
-
-    const result = resolveStorageCredentials()
-    expect(result.accessKeyId).toBe('app-user')
-    expect(result.secretAccessKey).toBe('app-pass')
-  })
-
-  it('falls back to MINIO_ACCESS_KEY/MINIO_SECRET_KEY', () => {
-    process.env.MINIO_ACCESS_KEY = 'root-key'
-    process.env.MINIO_SECRET_KEY = 'root-secret'
-
-    const result = resolveStorageCredentials()
-    expect(result.accessKeyId).toBe('root-key')
-    expect(result.secretAccessKey).toBe('root-secret')
-  })
-
-  it('prefers STORAGE_ over MINIO_ vars', () => {
-    process.env.STORAGE_ACCESS_KEY = 'primary-key'
-    process.env.STORAGE_SECRET_KEY = 'primary-secret'
-    process.env.MINIO_ACCESS_KEY = 'legacy-key'
-    process.env.MINIO_SECRET_KEY = 'legacy-secret'
-
-    const result = resolveStorageCredentials()
-    expect(result.accessKeyId).toBe('primary-key')
   })
 
   it('throws when no credentials are configured', () => {
@@ -79,23 +44,13 @@ describe('resolveStorageCredentials', () => {
     expect(() => resolveStorageCredentials()).toThrow('Storage credentials required')
   })
 
-  it('uses STORAGE_ENDPOINT over MINIO_ENDPOINT', () => {
+  it('uses STORAGE_ENDPOINT', () => {
     process.env.STORAGE_ENDPOINT = 'http://rustfs:9000'
-    process.env.MINIO_ENDPOINT = 'http://minio:9000'
     process.env.STORAGE_ACCESS_KEY = 'key'
     process.env.STORAGE_SECRET_KEY = 'secret'
 
     const result = resolveStorageCredentials()
     expect(result.endpoint).toBe('http://rustfs:9000')
-  })
-
-  it('falls back to MINIO_ENDPOINT', () => {
-    process.env.MINIO_ENDPOINT = 'http://minio:9000'
-    process.env.STORAGE_ACCESS_KEY = 'key'
-    process.env.STORAGE_SECRET_KEY = 'secret'
-
-    const result = resolveStorageCredentials()
-    expect(result.endpoint).toBe('http://minio:9000')
   })
 
   it('defaults endpoint to localhost:9000', () => {

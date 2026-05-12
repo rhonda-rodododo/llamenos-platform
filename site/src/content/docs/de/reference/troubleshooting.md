@@ -53,14 +53,14 @@ Wenn die App keine Verbindung zu PostgreSQL herstellen kann:
 
 ### Strfry-Relay verbindet sich nicht
 
-Das Nostr-Relay (strfry) ist ein Kerndienst, nicht optional. Wenn das Relay nicht laeuft:
+Das WebSocket-Relay (WebSocket relay) ist ein Kerndienst, nicht optional. Wenn das Relay nicht laeuft:
 
 ```bash
 # Relay-Status pruefen
-docker compose logs strfry
+docker compose logs WebSocket relay
 
 # Relay neu starten
-docker compose restart strfry
+docker compose restart WebSocket relay
 ```
 
 Wenn das Relay nicht startet, pruefen Sie auf Konflikte an Port 7777 oder unzureichende Berechtigungen im Datenverzeichnis.
@@ -233,7 +233,7 @@ Wenn Anrufe nicht an Freiwillige weitergeleitet werden:
 Wenn Hub-Events die Signaturverifikation nicht bestehen:
 
 - Pruefen Sie, ob die Systemuhr synchronisiert ist (NTP). Grosse Zeitabweichungen koennen Probleme mit Event-Zeitstempeln verursachen
-- Ueberpruefen Sie, ob das Nostr-Relay keine Events von unbekannten Pubkeys weiterleitet
+- Ueberpruefen Sie, ob das WebSocket-Relay keine Events von unbekannten Pubkeys weiterleitet
 - Starten Sie die App neu, um die aktuelle Hub-Mitgliederliste erneut abzurufen
 
 ### ECIES-Envelope-Fehler

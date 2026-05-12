@@ -17,7 +17,7 @@ export const hubStorageSettings = pgTable(
 )
 
 /**
- * Per-hub IAM credentials for RustFS/MinIO bucket-scoped access.
+ * Per-hub IAM credentials for RustFS bucket-scoped access.
  *
  * Each hub gets its own IAM user with a policy limiting access to that hub's
  * buckets only. The secret key is encrypted with the server's HKDF-derived

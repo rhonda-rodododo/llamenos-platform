@@ -43,7 +43,7 @@ openssl s_client -connect app.llamenos.org:443 -servername app.llamenos.org -sho
 
 ## Domains
 
-- `*.llamenos.org` (API, relay, app)
+- `*.llamenos.org` (API, app)
 
 ## Rotation Procedure
 
@@ -63,8 +63,8 @@ Certificate pinning is a defense-in-depth measure against TLS interception (rogu
 
 For the desktop (Tauri) client, HSTS preload + SRI hashing provide the equivalent protection layer. Certificate pinning is impractical for webview-based apps.
 
-## Nostr Relay Certificate Considerations
+## WebSocket Relay Certificate Considerations
 
-The strfry relay runs on the same infrastructure as the application server. The WebSocket connection to the relay (`wss://`) uses the same TLS certificate as the API. Certificate pinning on mobile clients covers relay connections automatically since they share the `*.llamenos.org` domain.
+The API server's built-in WebSocket endpoint (`/ws`) uses the same TLS certificate as the API. Certificate pinning on mobile clients covers WebSocket connections automatically since they share the `*.llamenos.org` domain.
 
-The relay's write-policy plugin provides an additional authentication layer: only events signed by the server's Nostr pubkey are accepted. Even if a MITM attacker intercepts the relay connection, they cannot inject fake events (publisher verification) and cannot read event content (encrypted with epoch-rotating per-hub keys).
+Clients authenticate to the WebSocket using the same session token or signed auth token used for REST API requests. The server handles all event publishing — clients receive only. Even if a MITM attacker intercepts the WebSocket connection, they cannot inject fake events (server-only publishing) and cannot read event content (encrypted with epoch-rotating per-hub keys).

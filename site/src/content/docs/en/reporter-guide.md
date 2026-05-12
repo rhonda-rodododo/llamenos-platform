@@ -8,7 +8,7 @@ As a reporter, you can submit encrypted reports to your organization through the
 ## Getting started
 
 Your admin will give you one of:
-- An **nsec** (Nostr secret key) — a string starting with `nsec1`
+- An **nsec** (WebSocket secret key) — a string starting with `nsec1`
 - An **invite link** — a one-time URL that creates credentials for you
 
 **Keep your nsec private.** It's your identity and login credential. Store it in a password manager.

@@ -1,13 +1,11 @@
 /**
  * Hub-aware, namespace-scoped object storage manager.
- * Uses S3-compatible API (RustFS / MinIO) with per-hub bucket isolation.
+ * Uses S3-compatible API (RustFS) with per-hub bucket isolation.
  *
  * Bucket naming: `{hubId}-{namespace}` (e.g., `hub-abc123-voicemails`)
  *
  * Credential priority:
  *   1. STORAGE_ACCESS_KEY / STORAGE_SECRET_KEY — preferred (provider-agnostic)
- *   2. MINIO_APP_USER / MINIO_APP_PASSWORD — dedicated app IAM user (legacy)
- *   3. MINIO_ACCESS_KEY / MINIO_SECRET_KEY — root credentials (legacy dev fallback)
  *
  * Per-hub IAM isolation:
  *   When a StorageAdminClient is provided and available, provisionHub() creates
@@ -119,37 +117,17 @@ export function resolveStorageCredentials(): {
   secretAccessKey: string
 } {
   // Endpoint priority
-  const endpoint =
-    process.env.STORAGE_ENDPOINT || process.env.MINIO_ENDPOINT || 'http://localhost:9000'
+  const endpoint = process.env.STORAGE_ENDPOINT || 'http://localhost:9000'
 
-  // Access key priority with deprecation warnings
-  let accessKeyId = process.env.STORAGE_ACCESS_KEY
-  if (!accessKeyId) {
-    if (process.env.MINIO_APP_USER) {
-      log.warn('MINIO_APP_USER is deprecated, use STORAGE_ACCESS_KEY instead')
-      accessKeyId = process.env.MINIO_APP_USER
-    } else if (process.env.MINIO_ACCESS_KEY) {
-      log.warn('MINIO_ACCESS_KEY is deprecated, use STORAGE_ACCESS_KEY instead')
-      accessKeyId = process.env.MINIO_ACCESS_KEY
-    }
-  }
+  // Access key
+  const accessKeyId = process.env.STORAGE_ACCESS_KEY
 
-  // Secret key priority with deprecation warnings
-  let secretAccessKey = process.env.STORAGE_SECRET_KEY
-  if (!secretAccessKey) {
-    if (process.env.MINIO_APP_PASSWORD) {
-      log.warn('MINIO_APP_PASSWORD is deprecated, use STORAGE_SECRET_KEY instead')
-      secretAccessKey = process.env.MINIO_APP_PASSWORD
-    } else if (process.env.MINIO_SECRET_KEY) {
-      log.warn('MINIO_SECRET_KEY is deprecated, use STORAGE_SECRET_KEY instead')
-      secretAccessKey = process.env.MINIO_SECRET_KEY
-    }
-  }
+  // Secret key
+  const secretAccessKey = process.env.STORAGE_SECRET_KEY
 
   if (!accessKeyId || !secretAccessKey) {
     throw new Error(
-      'Storage credentials required: set STORAGE_ACCESS_KEY/STORAGE_SECRET_KEY ' +
-        '(or legacy MINIO_APP_USER/MINIO_APP_PASSWORD, MINIO_ACCESS_KEY/MINIO_SECRET_KEY)'
+      'Storage credentials required: set STORAGE_ACCESS_KEY and STORAGE_SECRET_KEY'
     )
   }
 
@@ -177,7 +155,7 @@ export function createStorageManager(opts?: StorageManagerOptions): StorageManag
       accessKeyId: resolved.accessKeyId,
       secretAccessKey: resolved.secretAccessKey,
     },
-    forcePathStyle: true, // Required for S3-compatible stores (RustFS, MinIO)
+    forcePathStyle: true, // Required for S3-compatible stores (RustFS)
   })
 
   const namespaces = Object.keys(STORAGE_NAMESPACES) as StorageNamespace[]

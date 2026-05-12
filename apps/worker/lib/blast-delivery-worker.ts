@@ -3,7 +3,7 @@
  * through the messaging adapter, respecting rate limits and handling
  * retries with exponential backoff.
  *
- * Follows the same background poller pattern as nostr-outbox-poller.ts.
+ * Follows the same background poller pattern as blast-delivery-worker.ts.
  *
  * Lifecycle:
  *   1. TaskScheduler calls `startBlastWorker()` at server startup
