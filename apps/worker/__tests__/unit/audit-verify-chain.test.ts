@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { AuditService } from '@worker/services/audit'
 import { hashAuditEntry } from '@worker/lib/crypto'
 import { createMockDb } from './mock-db'
@@ -65,7 +65,7 @@ function buildValidChain() {
 describe('AuditService.verifyChain', () => {
   it('returns valid for an empty chain', async () => {
     const { db } = setupVerifyDb()
-    const service = new AuditService(db as never)
+    const service = new AuditService(db as any)
 
     // count returns 0
     db.$setSelectResults([[{ total: 0 }]])
@@ -76,7 +76,7 @@ describe('AuditService.verifyChain', () => {
 
   it('returns valid for a correct single-entry chain', async () => {
     const { db } = setupVerifyDb()
-    const service = new AuditService(db as never)
+    const service = new AuditService(db as any)
 
     const [e1] = buildValidChain()
     // 1. count query, 2. entries query
@@ -88,7 +88,7 @@ describe('AuditService.verifyChain', () => {
 
   it('returns valid for a correct 3-entry chain', async () => {
     const { db } = setupVerifyDb()
-    const service = new AuditService(db as never)
+    const service = new AuditService(db as any)
 
     const chain = buildValidChain()
     db.$setSelectResults([[{ total: 3 }], chain])
@@ -99,7 +99,7 @@ describe('AuditService.verifyChain', () => {
 
   it('detects a tampered entryHash', async () => {
     const { db } = setupVerifyDb()
-    const service = new AuditService(db as never)
+    const service = new AuditService(db as any)
 
     const chain = buildValidChain()
     // Tamper with e2's stored entryHash
@@ -121,7 +121,7 @@ describe('AuditService.verifyChain', () => {
 
   it('detects a broken previousEntryHash linkage', async () => {
     const { db } = setupVerifyDb()
-    const service = new AuditService(db as never)
+    const service = new AuditService(db as any)
 
     const chain = buildValidChain()
     // Break e2's previousEntryHash — point it to wrong hash
@@ -144,7 +144,7 @@ describe('AuditService.verifyChain', () => {
 
   it('detects when first entry has a non-null previousEntryHash', async () => {
     const { db } = setupVerifyDb()
-    const service = new AuditService(db as never)
+    const service = new AuditService(db as any)
 
     // First entry with a previousEntryHash (should be null)
     const badFirst = makeChainEntry('e1', 'login', '2026-01-01T00:00:00.000Z', 'should-be-null')
@@ -159,7 +159,7 @@ describe('AuditService.verifyChain', () => {
 
   it('supports limit parameter for batch verification', async () => {
     const { db } = setupVerifyDb()
-    const service = new AuditService(db as never)
+    const service = new AuditService(db as any)
 
     const chain = buildValidChain()
     // Only verify first 2 entries
@@ -171,7 +171,7 @@ describe('AuditService.verifyChain', () => {
 
   it('supports offset parameter with predecessor lookup', async () => {
     const { db } = setupVerifyDb()
-    const service = new AuditService(db as never)
+    const service = new AuditService(db as any)
 
     const chain = buildValidChain()
     // With offset=1: count, predecessor (e1), entries (e2, e3)

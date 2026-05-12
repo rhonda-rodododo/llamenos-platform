@@ -1,5 +1,18 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { CryptoKeysService, CryptoKeyError } from '../../services/crypto-keys'
+
+// Mock ed25519Verify and hexToBytes for sigchain signature validation
+const mockEd25519Verify = vi.fn().mockReturnValue(true)
+vi.mock('@llamenos/crypto/ffi', () => ({
+  ed25519Verify: (...args: unknown[]) => mockEd25519Verify(...args),
+}))
+
+const mockHexToBytes = vi.fn().mockImplementation((hex: string) =>
+  new Uint8Array(hex.match(/.{2}/g)?.map(b => parseInt(b, 16)) ?? [])
+)
+vi.mock('@shared/encoding', () => ({
+  hexToBytes: (...args: unknown[]) => mockHexToBytes(...args),
+}))
 
 // ---------------------------------------------------------------------------
 // DB mock helpers
@@ -53,6 +66,13 @@ function makeLink(overrides: Partial<MockLink> & { seqNo: number; hash: string }
 // ---------------------------------------------------------------------------
 
 describe('CryptoKeysService — Sigchain', () => {
+  beforeEach(() => {
+    mockEd25519Verify.mockReset().mockReturnValue(true)
+    mockHexToBytes.mockReset().mockImplementation((hex: string) =>
+      new Uint8Array(hex.match(/.{2}/g)?.map(b => parseInt(b, 16)) ?? [])
+    )
+  })
+
   describe('getSigchain', () => {
     it('returns empty array for user with no sigchain', async () => {
       const db = {
@@ -284,6 +304,81 @@ describe('CryptoKeysService — Sigchain', () => {
         expect(err).toBeInstanceOf(CryptoKeyError)
         expect((err as CryptoKeyError).status).toBe(409)
       }
+    })
+  })
+
+  describe('appendSigchainLink — Ed25519 signature verification', () => {
+    function makeGenesisDb() {
+      return {
+        select: vi.fn().mockReturnValue({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              orderBy: vi.fn().mockReturnValue({
+                limit: vi.fn().mockResolvedValue([]), // empty chain
+              }),
+            }),
+          }),
+        }),
+        insert: vi.fn().mockReturnValue({
+          values: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([
+              makeLink({ seqNo: 0, hash: 'h0', prevHash: '', createdAt: new Date() }),
+            ]),
+          }),
+        }),
+      }
+    }
+
+    const genesisLink = {
+      seqNo: 0,
+      linkType: 'add_device',
+      payload: { devicePubkey: 'dev-pk' },
+      signature: 'aabbcc',
+      prevHash: '',
+      hash: 'ddeeff',
+    }
+
+    it('accepts entry with valid Ed25519 signature', async () => {
+      mockEd25519Verify.mockReturnValue(true)
+      const svc = new CryptoKeysService(makeGenesisDb() as never)
+      const result = await svc.appendSigchainLink('user-pk1', genesisLink)
+      expect(result).toBeDefined()
+      expect(mockEd25519Verify).toHaveBeenCalledOnce()
+    })
+
+    it('rejects entry with invalid Ed25519 signature (403)', async () => {
+      mockEd25519Verify.mockReturnValue(false)
+      const svc = new CryptoKeysService(makeGenesisDb() as never)
+      try {
+        await svc.appendSigchainLink('user-pk1', genesisLink)
+        expect.unreachable('should have thrown')
+      } catch (err) {
+        expect(err).toBeInstanceOf(CryptoKeyError)
+        expect((err as CryptoKeyError).status).toBe(403)
+        expect((err as CryptoKeyError).message).toContain('signature verification failed')
+      }
+    })
+
+    it('rejects malformed hex with 400', async () => {
+      mockHexToBytes.mockImplementation(() => { throw new Error('invalid hex') })
+      const svc = new CryptoKeysService(makeGenesisDb() as never)
+      try {
+        await svc.appendSigchainLink('user-pk1', genesisLink)
+        expect.unreachable('should have thrown')
+      } catch (err) {
+        expect(err).toBeInstanceOf(CryptoKeyError)
+        expect((err as CryptoKeyError).status).toBe(400)
+      }
+    })
+
+    it('passes correct byte arrays to ed25519Verify', async () => {
+      mockEd25519Verify.mockReturnValue(true)
+      const svc = new CryptoKeysService(makeGenesisDb() as never)
+      await svc.appendSigchainLink('user-pk1', genesisLink)
+
+      expect(mockHexToBytes).toHaveBeenCalledWith('ddeeff') // hash
+      expect(mockHexToBytes).toHaveBeenCalledWith('aabbcc') // signature
+      expect(mockHexToBytes).toHaveBeenCalledWith('user-pk1') // pubkey
     })
   })
 
