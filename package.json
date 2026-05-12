@@ -91,7 +91,6 @@
     "load:mixed": "tests/load/run.sh mixed",
     "load:burst": "tests/load/run.sh burst",
     "load:all": "tests/load/run.sh all",
-    "postinstall": "bash scripts/worktree-setup.sh",
     "worktree-setup": "bash scripts/worktree-setup.sh",
     "setup": "bash scripts/setup.sh",
     "lint": "eslint src/ apps/worker/",
@@ -171,7 +170,6 @@
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.59.0",
     "vite": "^8.0.10",
-    "vite-plugin-wasm": "^3.6.0",
     "vitest": "^4.1.5",
     "webdriverio": "^9.27.0",
     "wrangler": "^4.85.0"

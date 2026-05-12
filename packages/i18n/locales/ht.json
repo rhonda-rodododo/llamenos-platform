@@ -750,7 +750,11 @@
     "ok": "OK",
     "create": "Create",
     "all": "All",
-    "previous": "Previous"
+    "previous": "Previous",
+    "comingSoon": "Coming soon",
+    "hideAdvanced": "Hide Advanced",
+    "showAdvanced": "Show Advanced",
+    "saved": "Saved"
   },
   "confirm": {
     "backup": "Confirm Backup",
@@ -3168,6 +3172,55 @@
     "unregisterSignal": "Unregister Signal",
     "retryRegistration": "Retry Registration",
     "expiredMessage": "Registration expired"
+  },
+  "adminNav": {
+    "openMenu": "Open menu",
+    "scopes": {
+      "thisHub": "This Hub",
+      "platform": "Platform"
+    },
+    "groups": {
+      "general": "General",
+      "people": "People",
+      "intake": "Intake",
+      "callsVoice": "Calls & Voice",
+      "channels": "Channels",
+      "operations": "Operations",
+      "platform": "Platform"
+    },
+    "items": {
+      "locationLookup": "Location Lookup",
+      "passkeyPolicy": "Passkey Policy",
+      "recoveryGroup": "Recovery Group",
+      "devices": "Devices",
+      "hubRoles": "Hub Roles",
+      "teams": "Teams",
+      "tags": "Tags",
+      "customFields": "Custom Fields",
+      "reportTypes": "Report Types",
+      "firehose": "Firehose",
+      "callSettings": "Call Settings",
+      "voicePrompts": "Voice Prompts",
+      "phoneMenuLanguages": "Phone Menu Languages",
+      "transcription": "Transcription",
+      "spamProtection": "Spam Protection",
+      "phoneProvider": "Phone Provider",
+      "messagingSms": "Messaging / SMS",
+      "rcs": "RCS",
+      "signal": "Signal",
+      "bans": "Bans",
+      "audit": "Audit",
+      "analytics": "Analytics",
+      "health": "Health",
+      "hubs": "Hubs",
+      "platformRoles": "Platform Roles",
+      "platformBans": "Bans",
+      "platformAudit": "Audit",
+      "platformAnalytics": "Analytics",
+      "platformHealth": "Health",
+      "platformSettings": "Platform Settings",
+      "gdprErasure": "GDPR Erasure"
+    }
   },
   "providerSetup": {
     "title": "Provider Setup",

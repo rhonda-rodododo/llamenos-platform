@@ -516,7 +516,7 @@ When('they navigate to the {string} page', async ({ page }, pageName: string) =>
       const pathMap: Record<string, string> = {
         'Dashboard': '/', 'Settings': '/settings', 'Reports': '/reports',
         'Volunteers': '/users', 'Shifts': '/shifts', 'Ban List': '/bans',
-        'Audit Log': '/audit', 'Hub Settings': '/admin/settings',
+        'Audit Log': '/audit', 'Hub Settings': '/admin',
         'Notes': '/notes', 'Conversations': '/conversations', 'Blasts': '/blasts',
       }
       const path = pathMap[pageName]

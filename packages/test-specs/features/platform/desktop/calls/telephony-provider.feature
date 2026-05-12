@@ -78,5 +78,5 @@ Feature: Telephony Provider Configuration
     And I should see "Connection failed"
 
   Scenario: Deep link to telephony-provider section auto-expands it
-    When I navigate to "/admin/settings?section=telephony-provider"
+    When I navigate to "/admin/phone-provider"
     Then the provider dropdown should be visible

@@ -14,6 +14,12 @@ Given('I navigate to the admin settings tab', async ({ page }) => {
   await Navigation.goToHubSettings(page)
 })
 
+Given('I navigate to the admin {string} section', async ({ page }, section: string) => {
+  await page.goto(`/admin/${section}`)
+  await page.waitForLoadState('domcontentloaded')
+  await expect(page.getByTestId('admin-section').or(page.getByTestId(TestIds.PAGE_TITLE))).toBeVisible({ timeout: Timeouts.ELEMENT })
+})
+
 Then('I should see the transcription settings card', async ({ page }) => {
   await expect(page.getByTestId(TestIds.TRANSCRIPTION_SECTION)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })

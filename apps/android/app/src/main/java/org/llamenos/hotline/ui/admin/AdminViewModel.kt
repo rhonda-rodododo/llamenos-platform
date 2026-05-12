@@ -61,6 +61,7 @@ enum class AdminTab {
 
 data class AdminUiState(
     val selectedTab: AdminTab = AdminTab.VOLUNTEERS,
+    val selectedAdminSection: String = "location-lookup",
 
     // Users
     val volunteers: List<User> = emptyList(),
@@ -188,6 +189,25 @@ class AdminViewModel @Inject constructor(
             AdminTab.SHIFTS -> loadAdminShifts()
             AdminTab.SETTINGS -> loadAdminSettings()
             AdminTab.SYSTEM_HEALTH -> loadSystemHealth()
+        }
+    }
+
+    /**
+     * Select an admin section by slug (used by sidebar navigation).
+     * Loads relevant data for sections that need it.
+     */
+    fun selectAdminSection(slug: String) {
+        _uiState.update { it.copy(selectedAdminSection = slug) }
+        when (slug) {
+            "report-types" -> loadReportCategories()
+            "call-settings" -> loadCallSettings()
+            "phone-menu-languages" -> loadIvrLanguages()
+            "spam-protection" -> loadSpamSettings()
+            "phone-provider" -> loadTelephonySettings()
+            "custom-fields" -> loadCustomFields()
+            "bans", "platform-bans" -> loadBans()
+            "audit", "platform-audit" -> loadAuditLog(page = 1)
+            "health", "platform-health" -> loadSystemHealth()
         }
     }
 
