@@ -1,6 +1,6 @@
-import { describe, it, expect, vi } from 'vitest'
-import { AuditService } from '@worker/services/audit'
-import { hashAuditEntry } from '@worker/lib/crypto'
+import { describe, it, expect } from 'vitest'
+import { AuditService } from '../../services/audit'
+import { hashAuditEntry } from '../../lib/crypto'
 import { createMockDb } from './mock-db'
 
 // ---------------------------------------------------------------------------
