@@ -4,7 +4,7 @@
 import { Hono } from 'hono'
 import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
-import { requirePermission, checkPermission } from '../middleware/permission-guard'
+import { requirePermission, requireAnyPermission, checkPermission } from '../middleware/permission-guard'
 import { createHubBodySchema, updateHubBodySchema, addHubMemberBodySchema, hubKeyEnvelopesBodySchema, hubResponseSchema, hubListResponseSchema, hubDetailResponseSchema, hubKeyEnvelopeResponseSchema } from '@protocol/schemas/hubs'
 import { okResponseSchema } from '@protocol/schemas/common'
 import { authErrors, notFoundError } from '../openapi/helpers'
@@ -75,7 +75,7 @@ routes.post('/',
       ...authErrors,
     },
   }),
-  requirePermission('system:manage-hubs'),
+  requireAnyPermission('system:manage-hubs', 'system:create-hub'),
   validator('json', createHubBodySchema),
   async (c) => {
     const pubkey = c.get('pubkey')

@@ -75,7 +75,7 @@ function StatusCard({ title, icon, testId, children }: {
   )
 }
 
-function SystemHealthPage() {
+export function SystemHealthPage() {
   const { t } = useTranslation()
   const [health, setHealth] = useState<SystemHealth | null>(null)
   const [loading, setLoading] = useState(true)

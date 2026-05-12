@@ -1,10 +1,13 @@
 import { sql } from 'drizzle-orm'
 import {
+  boolean,
   integer,
   pgTable,
   text,
   timestamp,
+  unique,
 } from 'drizzle-orm/pg-core'
+import { jsonb } from '../bun-jsonb'
 import { hubs } from './settings'
 
 export const providerConfigs = pgTable('provider_configs', {
@@ -79,6 +82,61 @@ export const a2pRegistrations = pgTable('a2p_registrations', {
   error: text('error'),
   submittedAt: timestamp('submitted_at', { withTimezone: true }),
   approvedAt: timestamp('approved_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+})
+
+// ---------------------------------------------------------------------------
+// provider_templates — super-admin-managed provider configuration templates
+// ---------------------------------------------------------------------------
+
+export const providerTemplates = pgTable(
+  'provider_templates',
+  {
+    id: text('id').primaryKey(),
+    name: text('name').notNull(),
+    slug: text('slug').notNull(),
+    description: text('description'),
+    providerType: text('provider_type').notNull(),
+    defaultChannels: text('default_channels')
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    credentialHints: jsonb('credential_hints').notNull().default({}),
+    recommendedSettings: jsonb('recommended_settings').notNull().default({}),
+    allowSubAccounts: boolean('allow_sub_accounts').notNull().default(false),
+    isActive: boolean('is_active').notNull().default(true),
+    createdBy: text('created_by').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [unique('provider_templates_slug_unique').on(t.slug)],
+)
+
+// ---------------------------------------------------------------------------
+// hub_onboarding_state — tracks per-hub provider onboarding progress
+// ---------------------------------------------------------------------------
+
+export const hubOnboardingState = pgTable('hub_onboarding_state', {
+  hubId: text('hub_id')
+    .primaryKey()
+    .references(() => hubs.id, { onDelete: 'cascade' }),
+  templateId: text('template_id'),
+  currentStep: text('current_step').notNull().default('template_selection'),
+  completedSteps: text('completed_steps')
+    .array()
+    .notNull()
+    .default(sql`'{}'::text[]`),
+  channelConfig: jsonb('channel_config').notNull().default({}),
+  isComplete: boolean('is_complete').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
     .defaultNow(),

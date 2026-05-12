@@ -1,4 +1,4 @@
-import { eq, and, isNull, desc } from 'drizzle-orm'
+import { eq, and, desc } from 'drizzle-orm'
 import { randomBytes } from 'node:crypto'
 import type { Database } from '../../db'
 import { providerConfigs, oauthStates, signalRegistrations, a2pRegistrations } from '../../db/schema'
@@ -15,7 +15,6 @@ import { getProviderCapability, hasCapability } from './registry'
 import { encryptCredentials, decryptCredentials } from './crypto'
 import type { WebhookUrls, ConnectionTestResult, SipTrunkConfig } from './types'
 import { ProviderApiError } from './types'
-import { registerAllProviders } from './providers'
 
 export class ProviderSetup {
   private readonly settings: SettingsService
@@ -158,7 +157,7 @@ export class ProviderSetup {
   async configureWebhooks(
     provider: TelephonyProviderType,
     numberId: string,
-    options: { enableSms?: boolean; hubId?: string },
+    options: { enableSms?: boolean; hubId: string },
   ): Promise<void> {
     const { impl, creds } = await this.resolveProvider(
       provider,
@@ -180,7 +179,7 @@ export class ProviderSetup {
   async createSipTrunk(
     provider: TelephonyProviderType,
     domain: string,
-    hubId?: string,
+    hubId: string,
   ): Promise<SipTrunkConfig> {
     const { impl, creds } = await this.resolveProvider(provider, hubId, 'sipTrunks')
     return impl.createSipTrunk(creds, domain)
@@ -274,38 +273,26 @@ export class ProviderSetup {
     provider: TelephonyProviderType,
     hubId?: string,
   ): Promise<typeof providerConfigs.$inferSelect | null> {
+    if (hubId === null || hubId === undefined) {
+      throw new ProviderApiError(
+        'hubId is required for provider config lookup',
+        400,
+        'Missing hubId',
+      )
+    }
+
     const [row] = await this.db
       .select()
       .from(providerConfigs)
       .where(
         and(
           eq(providerConfigs.providerType, provider),
-          hubId
-            ? eq(providerConfigs.hubId, hubId)
-            : isNull(providerConfigs.hubId),
+          eq(providerConfigs.hubId, hubId),
         ),
       )
       .orderBy(desc(providerConfigs.createdAt))
       .limit(1)
-    if (row) return row
-
-    if (hubId) {
-      // Fall back to global config (null hub_id) if no hub-specific config exists
-      const [fallback] = await this.db
-        .select()
-        .from(providerConfigs)
-        .where(
-          and(
-            eq(providerConfigs.providerType, provider),
-            isNull(providerConfigs.hubId),
-          ),
-        )
-        .orderBy(desc(providerConfigs.createdAt))
-        .limit(1)
-      return fallback ?? null
-    }
-
-    return null
+    return row ?? null
   }
 
   private async resolveProvider(

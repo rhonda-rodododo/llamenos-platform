@@ -32,7 +32,7 @@ export const Route = createFileRoute('/admin/hubs')({
   component: HubsPage,
 })
 
-function HubsPage() {
+export function HubsPage() {
   const { t } = useTranslation()
   const { hasPermission } = useAuth()
   const { toast } = useToast()

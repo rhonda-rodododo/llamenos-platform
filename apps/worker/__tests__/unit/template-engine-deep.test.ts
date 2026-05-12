@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { applyTemplate, detectTemplateUpdates } from '@worker/lib/template-engine'
 import type { CaseManagementTemplate } from '../../../../packages/protocol/template-types'
-import type { EntityTypeDefinition } from '@protocol/schemas/entity-schema'
 import type { ReportTypeDefinition } from '@protocol/schemas/report-types'
 
 const minStatus = { value: 'open', label: 'Open', order: 0 }
@@ -51,6 +50,10 @@ function makeTemplate(overrides: Partial<CaseManagementTemplate> & { id: string 
     tags: [],
     extends: [],
     labels: { en: {} },
+    defaultChannels: [],
+    providerDefaults: { a2pRequired: false, webrtcEnabled: false, sipTrunkEnabled: false },
+    allowSubAccounts: false,
+    channelGuidance: [],
     entityTypes: [],
     relationshipTypes: [],
     reportTypes: [],
@@ -413,9 +416,9 @@ describe('applyTemplate — field ordering', () => {
       entityTypes: [makeEntityType({
         name: 'autoorder',
         fields: [
-          { ...minField, name: 'a', order: undefined as any },
-          { ...minField, name: 'b', order: undefined as any },
-          { ...minField, name: 'c', order: undefined as any },
+          { ...minField, name: 'a', order: undefined as unknown as number },
+          { ...minField, name: 'b', order: undefined as unknown as number },
+          { ...minField, name: 'c', order: undefined as unknown as number },
         ],
       })],
     })

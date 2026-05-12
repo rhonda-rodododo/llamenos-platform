@@ -31,13 +31,20 @@ import { Route as CallsRouteImport } from './routes/calls'
 import { Route as BlastsRouteImport } from './routes/blasts'
 import { Route as BansRouteImport } from './routes/bans'
 import { Route as AuditRouteImport } from './routes/audit'
+import { Route as AdminRouteRouteImport } from './routes/admin/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as UsersPubkeyRouteImport } from './routes/users_.$pubkey'
 import { Route as AdminSystemRouteImport } from './routes/admin/system'
 import { Route as AdminSettingsRouteImport } from './routes/admin/settings'
+import { Route as AdminHubsRedirectRouteImport } from './routes/admin/hubs-redirect'
 import { Route as AdminHubsRouteImport } from './routes/admin/hubs'
+import { Route as AdminHubCommunicationsRouteImport } from './routes/admin/hub-communications'
+import { Route as AdminFirehoseRedirectRouteImport } from './routes/admin/firehose-redirect'
 import { Route as AdminFirehoseRouteImport } from './routes/admin/firehose'
+import { Route as AdminCaseManagementRedirectRouteImport } from './routes/admin/case-management-redirect'
 import { Route as AdminCaseManagementRouteImport } from './routes/admin/case-management'
+import { Route as AdminSectionRouteImport } from './routes/admin/$section'
 
 const UsersRoute = UsersRouteImport.update({
   id: '/users',
@@ -149,10 +156,20 @@ const AuditRoute = AuditRouteImport.update({
   path: '/audit',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRouteRoute = AdminRouteRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRouteRoute,
 } as any)
 const UsersPubkeyRoute = UsersPubkeyRouteImport.update({
   id: '/users_/$pubkey',
@@ -160,33 +177,60 @@ const UsersPubkeyRoute = UsersPubkeyRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminSystemRoute = AdminSystemRouteImport.update({
-  id: '/admin/system',
-  path: '/admin/system',
-  getParentRoute: () => rootRouteImport,
+  id: '/system',
+  path: '/system',
+  getParentRoute: () => AdminRouteRoute,
 } as any)
 const AdminSettingsRoute = AdminSettingsRouteImport.update({
-  id: '/admin/settings',
-  path: '/admin/settings',
-  getParentRoute: () => rootRouteImport,
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
+const AdminHubsRedirectRoute = AdminHubsRedirectRouteImport.update({
+  id: '/hubs-redirect',
+  path: '/hubs-redirect',
+  getParentRoute: () => AdminRouteRoute,
 } as any)
 const AdminHubsRoute = AdminHubsRouteImport.update({
-  id: '/admin/hubs',
-  path: '/admin/hubs',
-  getParentRoute: () => rootRouteImport,
+  id: '/hubs',
+  path: '/hubs',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
+const AdminHubCommunicationsRoute = AdminHubCommunicationsRouteImport.update({
+  id: '/hub-communications',
+  path: '/hub-communications',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
+const AdminFirehoseRedirectRoute = AdminFirehoseRedirectRouteImport.update({
+  id: '/firehose-redirect',
+  path: '/firehose-redirect',
+  getParentRoute: () => AdminRouteRoute,
 } as any)
 const AdminFirehoseRoute = AdminFirehoseRouteImport.update({
-  id: '/admin/firehose',
-  path: '/admin/firehose',
-  getParentRoute: () => rootRouteImport,
+  id: '/firehose',
+  path: '/firehose',
+  getParentRoute: () => AdminRouteRoute,
 } as any)
+const AdminCaseManagementRedirectRoute =
+  AdminCaseManagementRedirectRouteImport.update({
+    id: '/case-management-redirect',
+    path: '/case-management-redirect',
+    getParentRoute: () => AdminRouteRoute,
+  } as any)
 const AdminCaseManagementRoute = AdminCaseManagementRouteImport.update({
-  id: '/admin/case-management',
-  path: '/admin/case-management',
-  getParentRoute: () => rootRouteImport,
+  id: '/case-management',
+  path: '/case-management',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
+const AdminSectionRoute = AdminSectionRouteImport.update({
+  id: '/$section',
+  path: '/$section',
+  getParentRoute: () => AdminRouteRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteRouteWithChildren
   '/audit': typeof AuditRoute
   '/bans': typeof BansRoute
   '/blasts': typeof BlastsRoute
@@ -209,12 +253,18 @@ export interface FileRoutesByFullPath {
   '/shifts': typeof ShiftsRoute
   '/triage': typeof TriageRoute
   '/users': typeof UsersRoute
+  '/admin/$section': typeof AdminSectionRoute
   '/admin/case-management': typeof AdminCaseManagementRoute
+  '/admin/case-management-redirect': typeof AdminCaseManagementRedirectRoute
   '/admin/firehose': typeof AdminFirehoseRoute
+  '/admin/firehose-redirect': typeof AdminFirehoseRedirectRoute
+  '/admin/hub-communications': typeof AdminHubCommunicationsRoute
   '/admin/hubs': typeof AdminHubsRoute
+  '/admin/hubs-redirect': typeof AdminHubsRedirectRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/system': typeof AdminSystemRoute
   '/users/$pubkey': typeof UsersPubkeyRoute
+  '/admin/': typeof AdminIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -240,16 +290,23 @@ export interface FileRoutesByTo {
   '/shifts': typeof ShiftsRoute
   '/triage': typeof TriageRoute
   '/users': typeof UsersRoute
+  '/admin/$section': typeof AdminSectionRoute
   '/admin/case-management': typeof AdminCaseManagementRoute
+  '/admin/case-management-redirect': typeof AdminCaseManagementRedirectRoute
   '/admin/firehose': typeof AdminFirehoseRoute
+  '/admin/firehose-redirect': typeof AdminFirehoseRedirectRoute
+  '/admin/hub-communications': typeof AdminHubCommunicationsRoute
   '/admin/hubs': typeof AdminHubsRoute
+  '/admin/hubs-redirect': typeof AdminHubsRedirectRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/system': typeof AdminSystemRoute
   '/users/$pubkey': typeof UsersPubkeyRoute
+  '/admin': typeof AdminIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteRouteWithChildren
   '/audit': typeof AuditRoute
   '/bans': typeof BansRoute
   '/blasts': typeof BlastsRoute
@@ -272,17 +329,24 @@ export interface FileRoutesById {
   '/shifts': typeof ShiftsRoute
   '/triage': typeof TriageRoute
   '/users': typeof UsersRoute
+  '/admin/$section': typeof AdminSectionRoute
   '/admin/case-management': typeof AdminCaseManagementRoute
+  '/admin/case-management-redirect': typeof AdminCaseManagementRedirectRoute
   '/admin/firehose': typeof AdminFirehoseRoute
+  '/admin/firehose-redirect': typeof AdminFirehoseRedirectRoute
+  '/admin/hub-communications': typeof AdminHubCommunicationsRoute
   '/admin/hubs': typeof AdminHubsRoute
+  '/admin/hubs-redirect': typeof AdminHubsRedirectRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/system': typeof AdminSystemRoute
   '/users_/$pubkey': typeof UsersPubkeyRoute
+  '/admin/': typeof AdminIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/audit'
     | '/bans'
     | '/blasts'
@@ -305,12 +369,18 @@ export interface FileRouteTypes {
     | '/shifts'
     | '/triage'
     | '/users'
+    | '/admin/$section'
     | '/admin/case-management'
+    | '/admin/case-management-redirect'
     | '/admin/firehose'
+    | '/admin/firehose-redirect'
+    | '/admin/hub-communications'
     | '/admin/hubs'
+    | '/admin/hubs-redirect'
     | '/admin/settings'
     | '/admin/system'
     | '/users/$pubkey'
+    | '/admin/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -336,15 +406,22 @@ export interface FileRouteTypes {
     | '/shifts'
     | '/triage'
     | '/users'
+    | '/admin/$section'
     | '/admin/case-management'
+    | '/admin/case-management-redirect'
     | '/admin/firehose'
+    | '/admin/firehose-redirect'
+    | '/admin/hub-communications'
     | '/admin/hubs'
+    | '/admin/hubs-redirect'
     | '/admin/settings'
     | '/admin/system'
     | '/users/$pubkey'
+    | '/admin'
   id:
     | '__root__'
     | '/'
+    | '/admin'
     | '/audit'
     | '/bans'
     | '/blasts'
@@ -367,16 +444,23 @@ export interface FileRouteTypes {
     | '/shifts'
     | '/triage'
     | '/users'
+    | '/admin/$section'
     | '/admin/case-management'
+    | '/admin/case-management-redirect'
     | '/admin/firehose'
+    | '/admin/firehose-redirect'
+    | '/admin/hub-communications'
     | '/admin/hubs'
+    | '/admin/hubs-redirect'
     | '/admin/settings'
     | '/admin/system'
     | '/users_/$pubkey'
+    | '/admin/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRouteRoute: typeof AdminRouteRouteWithChildren
   AuditRoute: typeof AuditRoute
   BansRoute: typeof BansRoute
   BlastsRoute: typeof BlastsRoute
@@ -399,11 +483,6 @@ export interface RootRouteChildren {
   ShiftsRoute: typeof ShiftsRoute
   TriageRoute: typeof TriageRoute
   UsersRoute: typeof UsersRoute
-  AdminCaseManagementRoute: typeof AdminCaseManagementRoute
-  AdminFirehoseRoute: typeof AdminFirehoseRoute
-  AdminHubsRoute: typeof AdminHubsRoute
-  AdminSettingsRoute: typeof AdminSettingsRoute
-  AdminSystemRoute: typeof AdminSystemRoute
   UsersPubkeyRoute: typeof UsersPubkeyRoute
 }
 
@@ -563,12 +642,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuditRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRouteRoute
     }
     '/users_/$pubkey': {
       id: '/users_/$pubkey'
@@ -579,44 +672,112 @@ declare module '@tanstack/react-router' {
     }
     '/admin/system': {
       id: '/admin/system'
-      path: '/admin/system'
+      path: '/system'
       fullPath: '/admin/system'
       preLoaderRoute: typeof AdminSystemRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AdminRouteRoute
     }
     '/admin/settings': {
       id: '/admin/settings'
-      path: '/admin/settings'
+      path: '/settings'
       fullPath: '/admin/settings'
       preLoaderRoute: typeof AdminSettingsRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
+    '/admin/hubs-redirect': {
+      id: '/admin/hubs-redirect'
+      path: '/hubs-redirect'
+      fullPath: '/admin/hubs-redirect'
+      preLoaderRoute: typeof AdminHubsRedirectRouteImport
+      parentRoute: typeof AdminRouteRoute
     }
     '/admin/hubs': {
       id: '/admin/hubs'
-      path: '/admin/hubs'
+      path: '/hubs'
       fullPath: '/admin/hubs'
       preLoaderRoute: typeof AdminHubsRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
+    '/admin/hub-communications': {
+      id: '/admin/hub-communications'
+      path: '/hub-communications'
+      fullPath: '/admin/hub-communications'
+      preLoaderRoute: typeof AdminHubCommunicationsRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
+    '/admin/firehose-redirect': {
+      id: '/admin/firehose-redirect'
+      path: '/firehose-redirect'
+      fullPath: '/admin/firehose-redirect'
+      preLoaderRoute: typeof AdminFirehoseRedirectRouteImport
+      parentRoute: typeof AdminRouteRoute
     }
     '/admin/firehose': {
       id: '/admin/firehose'
-      path: '/admin/firehose'
+      path: '/firehose'
       fullPath: '/admin/firehose'
       preLoaderRoute: typeof AdminFirehoseRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
+    '/admin/case-management-redirect': {
+      id: '/admin/case-management-redirect'
+      path: '/case-management-redirect'
+      fullPath: '/admin/case-management-redirect'
+      preLoaderRoute: typeof AdminCaseManagementRedirectRouteImport
+      parentRoute: typeof AdminRouteRoute
     }
     '/admin/case-management': {
       id: '/admin/case-management'
-      path: '/admin/case-management'
+      path: '/case-management'
       fullPath: '/admin/case-management'
       preLoaderRoute: typeof AdminCaseManagementRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
+    '/admin/$section': {
+      id: '/admin/$section'
+      path: '/$section'
+      fullPath: '/admin/$section'
+      preLoaderRoute: typeof AdminSectionRouteImport
+      parentRoute: typeof AdminRouteRoute
     }
   }
 }
 
+interface AdminRouteRouteChildren {
+  AdminSectionRoute: typeof AdminSectionRoute
+  AdminCaseManagementRoute: typeof AdminCaseManagementRoute
+  AdminCaseManagementRedirectRoute: typeof AdminCaseManagementRedirectRoute
+  AdminFirehoseRoute: typeof AdminFirehoseRoute
+  AdminFirehoseRedirectRoute: typeof AdminFirehoseRedirectRoute
+  AdminHubCommunicationsRoute: typeof AdminHubCommunicationsRoute
+  AdminHubsRoute: typeof AdminHubsRoute
+  AdminHubsRedirectRoute: typeof AdminHubsRedirectRoute
+  AdminSettingsRoute: typeof AdminSettingsRoute
+  AdminSystemRoute: typeof AdminSystemRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+}
+
+const AdminRouteRouteChildren: AdminRouteRouteChildren = {
+  AdminSectionRoute: AdminSectionRoute,
+  AdminCaseManagementRoute: AdminCaseManagementRoute,
+  AdminCaseManagementRedirectRoute: AdminCaseManagementRedirectRoute,
+  AdminFirehoseRoute: AdminFirehoseRoute,
+  AdminFirehoseRedirectRoute: AdminFirehoseRedirectRoute,
+  AdminHubCommunicationsRoute: AdminHubCommunicationsRoute,
+  AdminHubsRoute: AdminHubsRoute,
+  AdminHubsRedirectRoute: AdminHubsRedirectRoute,
+  AdminSettingsRoute: AdminSettingsRoute,
+  AdminSystemRoute: AdminSystemRoute,
+  AdminIndexRoute: AdminIndexRoute,
+}
+
+const AdminRouteRouteWithChildren = AdminRouteRoute._addFileChildren(
+  AdminRouteRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRouteRoute: AdminRouteRouteWithChildren,
   AuditRoute: AuditRoute,
   BansRoute: BansRoute,
   BlastsRoute: BlastsRoute,
@@ -639,11 +800,6 @@ const rootRouteChildren: RootRouteChildren = {
   ShiftsRoute: ShiftsRoute,
   TriageRoute: TriageRoute,
   UsersRoute: UsersRoute,
-  AdminCaseManagementRoute: AdminCaseManagementRoute,
-  AdminFirehoseRoute: AdminFirehoseRoute,
-  AdminHubsRoute: AdminHubsRoute,
-  AdminSettingsRoute: AdminSettingsRoute,
-  AdminSystemRoute: AdminSystemRoute,
   UsersPubkeyRoute: UsersPubkeyRoute,
 }
 export const routeTree = rootRouteImport

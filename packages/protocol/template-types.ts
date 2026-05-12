@@ -126,6 +126,20 @@ export const templateManifestSchema = z.object({
     z.record(z.string(), z.string()),
   ).default({}),
 
+  // Hub communications / provider auto-config fields
+  defaultChannels: z.array(z.string()).optional().default([]),
+  providerDefaults: z.object({
+    a2pRequired: z.boolean().optional().default(false),
+    webrtcEnabled: z.boolean().optional().default(false),
+    sipTrunkEnabled: z.boolean().optional().default(false),
+  }).optional().default({ a2pRequired: false, webrtcEnabled: false, sipTrunkEnabled: false }),
+  allowSubAccounts: z.boolean().optional().default(false),
+  channelGuidance: z.array(z.object({
+    channel: z.string(),
+    instructions: z.string(),
+  })).optional().default([]),
+  recommendedProvider: z.string().optional(),
+
   entityTypes: z.array(entityTypeTemplateSchema),
   relationshipTypes: z.array(relationshipTypeTemplateSchema).default([]),
   reportTypes: z.array(reportTypeTemplateSchema).default([]),

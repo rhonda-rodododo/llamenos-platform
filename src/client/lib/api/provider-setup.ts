@@ -119,6 +119,7 @@ export async function createSipTrunk(
   sipProvider: string
   sipUsername: string
   credentialsStored: boolean
+  sipPassword: string
   trunkSid?: string
   connectionId?: string
 }> {

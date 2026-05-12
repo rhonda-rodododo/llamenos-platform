@@ -40,7 +40,7 @@ function getEventCategoryColor(action: string): string {
   return 'bg-secondary text-secondary-foreground'
 }
 
-function AuditPage() {
+export function AuditPage() {
   const { t } = useTranslation()
   const { isAdmin } = useAuth()
   const [entries, setEntries] = useState<AuditLogEntry[]>([])

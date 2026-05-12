@@ -28,7 +28,7 @@ const STATUS_COLORS: Record<string, string> = {
   disabled: 'bg-red-500',
 }
 
-function FirehosePage() {
+export function FirehosePage() {
   const { isAdmin } = useAuth()
   const { toast } = useToast()
   const [connections, setConnections] = useState<FirehoseConnection[]>([])
