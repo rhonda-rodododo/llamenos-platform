@@ -258,6 +258,45 @@ export class ConnectionManager {
     return count
   }
 
+  /**
+   * Send a message to all connections of a specific user.
+   * Used for device:wipe events.
+   */
+  sendToUser(pubkey: string, message: string): number {
+    const conns = this.connections.get(pubkey)
+    if (!conns) return 0
+    let sent = 0
+    for (const conn of conns) {
+      try {
+        conn.ws.send(message)
+        sent++
+      } catch {
+        log.debug('Failed to send to connection', { pubkey })
+      }
+    }
+    return sent
+  }
+
+  /**
+   * Terminate all connections for a user.
+   * Called after erasure execution to force disconnect.
+   */
+  terminateUser(pubkey: string): void {
+    const conns = this.connections.get(pubkey)
+    if (!conns) return
+    for (const conn of conns) {
+      for (const hubId of conn.subscribedHubs) {
+        this.removeSubscription(pubkey, hubId)
+      }
+      try {
+        conn.ws.close(4001, 'account_erased')
+      } catch {
+        // Already closed
+      }
+    }
+    this.connections.delete(pubkey)
+  }
+
   private removeSubscription(pubkey: string, hubId: string): void {
     const hubSubs = this.hubSubscriptions.get(hubId)
     if (hubSubs) {

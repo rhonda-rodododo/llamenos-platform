@@ -1,0 +1,542 @@
+/**
+ * ErasureService — manages account erasure lifecycle.
+ *
+ * Handles self-service erasure requests (with configurable delay),
+ * admin immediate erasure, cryptographic cascade execution,
+ * and re-encryption job queuing.
+ */
+import { eq, and, sql, lt, desc, count } from 'drizzle-orm'
+import type { Database } from '../db'
+import {
+  erasureRequests,
+  erasureConfig,
+  reEncryptionJobs,
+  auditUserKeys,
+  users,
+  auditLog,
+  webauthnCredentials,
+  provisionRooms,
+  pukEnvelopes,
+  sessions,
+  devices,
+  hubKeys,
+} from '../db/schema'
+import { ServiceError } from './settings'
+import type { AuditService } from './audit'
+
+// Emergency override minimum floor — hard-coded, not configurable
+const EMERGENCY_MIN_HOURS = 4
+
+export class ErasureService {
+  constructor(protected db: Database) {}
+
+  // ---------------------------------------------------------------------------
+  // Erasure Config (per-hub)
+  // ---------------------------------------------------------------------------
+
+  async getConfig(hubId: string): Promise<{
+    hubId: string
+    delayHours: number
+    emergencyOverrideEnabled: boolean
+    updatedAt: Date
+    updatedBy: string
+  } | null> {
+    const [row] = await this.db
+      .select()
+      .from(erasureConfig)
+      .where(eq(erasureConfig.hubId, hubId))
+      .limit(1)
+    return row ?? null
+  }
+
+  async upsertConfig(
+    hubId: string,
+    updates: { delayHours?: number; emergencyOverrideEnabled?: boolean },
+    updatedBy: string,
+    platformMinDelayHours: number,
+  ): Promise<void> {
+    if (updates.delayHours !== undefined) {
+      if (updates.delayHours < 24 || updates.delayHours > 168) {
+        throw new ServiceError(400, 'delayHours must be between 24 and 168')
+      }
+      if (updates.delayHours < platformMinDelayHours) {
+        throw new ServiceError(
+          400,
+          `delayHours cannot be less than platform floor (${platformMinDelayHours}h)`,
+        )
+      }
+    }
+
+    const existing = await this.getConfig(hubId)
+    if (existing) {
+      await this.db
+        .update(erasureConfig)
+        .set({
+          ...(updates.delayHours !== undefined && {
+            delayHours: updates.delayHours,
+          }),
+          ...(updates.emergencyOverrideEnabled !== undefined && {
+            emergencyOverrideEnabled: updates.emergencyOverrideEnabled,
+          }),
+          updatedAt: new Date(),
+          updatedBy,
+        })
+        .where(eq(erasureConfig.hubId, hubId))
+    } else {
+      await this.db.insert(erasureConfig).values({
+        hubId,
+        delayHours: updates.delayHours ?? 72,
+        emergencyOverrideEnabled: updates.emergencyOverrideEnabled ?? true,
+        updatedAt: new Date(),
+        updatedBy,
+      })
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Erasure Request Lifecycle
+  // ---------------------------------------------------------------------------
+
+  async getMyRequest(userId: string): Promise<typeof erasureRequests.$inferSelect | null> {
+    const [row] = await this.db
+      .select()
+      .from(erasureRequests)
+      .where(
+        and(
+          eq(erasureRequests.userId, userId),
+          eq(erasureRequests.status, 'pending'),
+        ),
+      )
+      .limit(1)
+    return row ?? null
+  }
+
+  async createSelfRequest(
+    userId: string,
+    hubId: string,
+    justification?: string,
+    emergency?: {
+      coApproverPubkey: string
+      coApproverSignature: string
+      timestamp: string
+    },
+  ): Promise<typeof erasureRequests.$inferSelect> {
+    // Check for existing pending request
+    const existing = await this.getMyRequest(userId)
+    if (existing) {
+      throw new ServiceError(409, 'Erasure request already pending')
+    }
+
+    // Get hub config for delay
+    const config = await this.getConfig(hubId)
+    const delayHours = config?.delayHours ?? 72
+
+    let effectiveDelayHours = delayHours
+    let isEmergency = false
+
+    if (emergency) {
+      // Validate emergency override
+      if (config && !config.emergencyOverrideEnabled) {
+        throw new ServiceError(403, 'Emergency override is disabled for this hub')
+      }
+      if (emergency.coApproverPubkey === userId) {
+        throw new ServiceError(400, 'Co-approver cannot be the same user as the requester')
+      }
+      effectiveDelayHours = EMERGENCY_MIN_HOURS
+      isEmergency = true
+    }
+
+    const executeAt = new Date(Date.now() + effectiveDelayHours * 60 * 60 * 1000)
+
+    const [row] = await this.db
+      .insert(erasureRequests)
+      .values({
+        userId,
+        status: 'pending',
+        requestedBy: userId,
+        requestedAt: new Date(),
+        executeAt,
+        justification: justification ?? null,
+        emergencyOverride: isEmergency,
+        coApproverPubkey: emergency?.coApproverPubkey ?? null,
+        coApproverSignature: emergency?.coApproverSignature ?? null,
+      })
+      .returning()
+
+    return row
+  }
+
+  async cancelSelfRequest(userId: string): Promise<void> {
+    const existing = await this.getMyRequest(userId)
+    if (!existing) {
+      throw new ServiceError(404, 'No pending erasure request found')
+    }
+
+    await this.db
+      .update(erasureRequests)
+      .set({
+        status: 'cancelled',
+        cancelledAt: new Date(),
+      })
+      .where(eq(erasureRequests.id, existing.id))
+  }
+
+  async listRequests(
+    filters: { status?: string; limit?: number; offset?: number } = {},
+  ): Promise<{
+    requests: (typeof erasureRequests.$inferSelect)[]
+    total: number
+  }> {
+    const { status, limit = 50, offset = 0 } = filters
+    const conditions = status ? [eq(erasureRequests.status, status)] : []
+    const where = conditions.length > 0 ? and(...conditions) : undefined
+
+    const [rows, [{ total }]] = await Promise.all([
+      this.db
+        .select()
+        .from(erasureRequests)
+        .where(where)
+        .orderBy(desc(erasureRequests.requestedAt))
+        .limit(limit)
+        .offset(offset),
+      this.db
+        .select({ total: count() })
+        .from(erasureRequests)
+        .where(where),
+    ])
+
+    return { requests: rows, total: Number(total) }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Erasure Execution
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Execute the full cryptographic cascade for a user erasure.
+   *
+   * Phase 1 (revocation) and Phase 3 (crypto-shredding) happen here.
+   * Phase 2 (server-side cleanup) is also transactional.
+   * Phase 4 (re-encryption) is queued as a background job.
+   */
+  async executeErasure(
+    userId: string,
+    executedBy: string,
+    justification: string,
+    auditService: AuditService,
+  ): Promise<{ reEncryptionJobIds: string[] }> {
+    // Log the audit entry BEFORE crypto-shredding (so it's recorded with the user's key)
+    await auditService.log('userErasureExecuted', executedBy, {
+      targetUserId: userId,
+      justification,
+    })
+
+    const reEncryptionJobIds: string[] = []
+
+    await this.db.transaction(async (tx) => {
+      // Phase 2: Server-side cleanup
+
+      // Delete WebAuthn credentials
+      await tx.delete(webauthnCredentials).where(eq(webauthnCredentials.pubkey, userId))
+
+      // Delete provision rooms where user is a participant
+      await tx.delete(provisionRooms).where(eq(provisionRooms.primaryPubkey, userId))
+
+      // Remove user from shift schedules (text[] — remove the departed user)
+      await tx.execute(sql`
+        UPDATE shifts
+        SET user_pubkeys = array_remove(user_pubkeys, ${userId})
+        WHERE ${userId} = ANY(user_pubkeys)
+      `)
+
+      // Delete sessions
+      await tx.delete(sessions).where(eq(sessions.pubkey, userId))
+
+      // Delete PUK envelopes addressed to the user
+      await tx.delete(pukEnvelopes).where(eq(pukEnvelopes.userPubkey, userId))
+
+      // Delete hub key envelopes addressed to the user
+      await tx.delete(hubKeys).where(eq(hubKeys.recipientPubkey, userId))
+
+      // Delete devices
+      await tx.delete(devices).where(eq(devices.pubkey, userId))
+
+      // Anonymize user row
+      await tx
+        .update(users)
+        .set({
+          status: 'erased',
+          displayName: null,
+          phone: null,
+          active: false,
+          encryptedSecretKey: '',
+          availability: 'unavailable',
+          updatedAt: new Date(),
+        })
+        .where(eq(users.pubkey, userId))
+
+      // Phase 3: Crypto-shredding
+
+      // Destroy per-user audit envelope key
+      await tx.delete(auditUserKeys).where(eq(auditUserKeys.userPubkey, userId))
+
+      // Replace actorPubkey with [erased] on audit entries and mark erasedAt
+      await tx
+        .update(auditLog)
+        .set({
+          actorPubkey: '[erased]',
+          erasedAt: new Date(),
+        })
+        .where(eq(auditLog.actorPubkey, userId))
+
+      // Scrub plaintext details on pre-EP08 audit entries
+      await tx.execute(sql`
+        UPDATE audit_log
+        SET details = NULL, erased_at = NOW()
+        WHERE actor_pubkey = '[erased]'
+        AND erased_at IS NOT NULL
+        AND details IS NOT NULL
+        AND jsonb_typeof(details) != 'null'
+      `)
+    })
+
+    // Phase 4: Queue re-encryption jobs (outside transaction — these are background)
+    const hubMemberships = await this.db.execute(sql`
+      SELECT DISTINCT hub_id FROM hub_keys WHERE recipient_pubkey = ${userId}
+      UNION
+      SELECT DISTINCT hub_id FROM notes WHERE author_pubkey = ${userId}
+    `)
+
+    for (const row of hubMemberships as { hub_id: string }[]) {
+      if (!row.hub_id) continue
+      const [job] = await this.db
+        .insert(reEncryptionJobs)
+        .values({
+          userId,
+          hubId: row.hub_id,
+          status: 'queued',
+        })
+        .returning()
+      reEncryptionJobIds.push(job.id)
+    }
+
+    // Update erasure request status to completed (if there was one)
+    await this.db
+      .update(erasureRequests)
+      .set({
+        status: 'completed',
+        executedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(erasureRequests.userId, userId),
+          eq(erasureRequests.status, 'executing'),
+        ),
+      )
+
+    return { reEncryptionJobIds }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Pending erasure execution (called by scheduler)
+  // ---------------------------------------------------------------------------
+
+  async getExpiredPendingRequests(): Promise<(typeof erasureRequests.$inferSelect)[]> {
+    return this.db
+      .select()
+      .from(erasureRequests)
+      .where(
+        and(
+          eq(erasureRequests.status, 'pending'),
+          lt(erasureRequests.executeAt, new Date()),
+        ),
+      )
+  }
+
+  async markExecuting(requestId: string): Promise<void> {
+    await this.db
+      .update(erasureRequests)
+      .set({ status: 'executing' })
+      .where(eq(erasureRequests.id, requestId))
+  }
+
+  async markFailed(requestId: string): Promise<void> {
+    await this.db
+      .update(erasureRequests)
+      .set({ status: 'failed' })
+      .where(eq(erasureRequests.id, requestId))
+  }
+
+  // ---------------------------------------------------------------------------
+  // Re-encryption jobs
+  // ---------------------------------------------------------------------------
+
+  async listReEncryptionJobs(
+    userId?: string,
+  ): Promise<(typeof reEncryptionJobs.$inferSelect)[]> {
+    const condition = userId
+      ? eq(reEncryptionJobs.userId, userId)
+      : undefined
+    return this.db
+      .select()
+      .from(reEncryptionJobs)
+      .where(condition)
+      .orderBy(desc(reEncryptionJobs.createdAt))
+  }
+
+  async getQueuedReEncryptionJobs(): Promise<(typeof reEncryptionJobs.$inferSelect)[]> {
+    return this.db
+      .select()
+      .from(reEncryptionJobs)
+      .where(eq(reEncryptionJobs.status, 'queued'))
+      .limit(10)
+  }
+
+  async updateReEncryptionJobProgress(
+    jobId: string,
+    processedEnvelopes: number,
+    totalEnvelopes: number,
+  ): Promise<void> {
+    await this.db
+      .update(reEncryptionJobs)
+      .set({
+        processedEnvelopes,
+        totalEnvelopes,
+        status: processedEnvelopes >= totalEnvelopes ? 'completed' : 'running',
+        startedAt: sql`COALESCE(started_at, NOW())`,
+        completedAt:
+          processedEnvelopes >= totalEnvelopes ? new Date() : undefined,
+      })
+      .where(eq(reEncryptionJobs.id, jobId))
+  }
+
+  /**
+   * Process a single re-encryption job: remove departed user's envelope copies.
+   */
+  async processReEncryptionJob(jobId: string): Promise<void> {
+    const [job] = await this.db
+      .select()
+      .from(reEncryptionJobs)
+      .where(eq(reEncryptionJobs.id, jobId))
+      .limit(1)
+
+    if (!job || job.status === 'completed') return
+
+    const userPubkey = job.userId
+    const hubId = job.hubId
+
+    const noteCount = await this.db.execute(sql`
+      SELECT COUNT(*) as cnt FROM notes
+      WHERE hub_id = ${hubId}
+      AND (
+        admin_envelopes @> ${JSON.stringify([{ pubkey: userPubkey }])}::jsonb
+        OR author_envelope->>'pubkey' = ${userPubkey}
+      )
+    `)
+
+    const replyCount = await this.db.execute(sql`
+      SELECT COUNT(*) as cnt FROM note_replies nr
+      JOIN notes n ON nr.note_id = n.id
+      WHERE n.hub_id = ${hubId}
+      AND nr.reader_envelopes @> ${JSON.stringify([{ pubkey: userPubkey }])}::jsonb
+    `)
+
+    const messageCount = await this.db.execute(sql`
+      SELECT COUNT(*) as cnt FROM messages m
+      JOIN conversations c ON m.conversation_id = c.id
+      WHERE c.hub_id = ${hubId}
+      AND m.reader_envelopes @> ${JSON.stringify([{ pubkey: userPubkey }])}::jsonb
+    `)
+
+    const total =
+      Number((noteCount[0] as { cnt: string }).cnt) +
+      Number((replyCount[0] as { cnt: string }).cnt) +
+      Number((messageCount[0] as { cnt: string }).cnt)
+
+    await this.updateReEncryptionJobProgress(jobId, 0, total)
+
+    if (total === 0) {
+      return
+    }
+
+    let processed = 0
+
+    await this.db.execute(sql`
+      UPDATE notes
+      SET admin_envelopes = (
+        SELECT COALESCE(jsonb_agg(elem), '[]'::jsonb)
+        FROM jsonb_array_elements(admin_envelopes) elem
+        WHERE elem->>'pubkey' != ${userPubkey}
+      )
+      WHERE hub_id = ${hubId}
+      AND admin_envelopes @> ${JSON.stringify([{ pubkey: userPubkey }])}::jsonb
+    `)
+    processed += Number((noteCount[0] as { cnt: string }).cnt)
+    await this.updateReEncryptionJobProgress(jobId, processed, total)
+
+    await this.db.execute(sql`
+      UPDATE note_replies
+      SET reader_envelopes = (
+        SELECT COALESCE(jsonb_agg(elem), '[]'::jsonb)
+        FROM jsonb_array_elements(reader_envelopes) elem
+        WHERE elem->>'pubkey' != ${userPubkey}
+      )
+      WHERE note_id IN (SELECT id FROM notes WHERE hub_id = ${hubId})
+      AND reader_envelopes @> ${JSON.stringify([{ pubkey: userPubkey }])}::jsonb
+    `)
+    processed += Number((replyCount[0] as { cnt: string }).cnt)
+    await this.updateReEncryptionJobProgress(jobId, processed, total)
+
+    await this.db.execute(sql`
+      UPDATE messages
+      SET reader_envelopes = (
+        SELECT COALESCE(jsonb_agg(elem), '[]'::jsonb)
+        FROM jsonb_array_elements(reader_envelopes) elem
+        WHERE elem->>'pubkey' != ${userPubkey}
+      )
+      WHERE conversation_id IN (
+        SELECT id FROM conversations WHERE hub_id = ${hubId}
+      )
+      AND reader_envelopes @> ${JSON.stringify([{ pubkey: userPubkey }])}::jsonb
+    `)
+    processed += Number((messageCount[0] as { cnt: string }).cnt)
+    await this.updateReEncryptionJobProgress(jobId, processed, total)
+  }
+
+  // ---------------------------------------------------------------------------
+  // Audit user key management
+  // ---------------------------------------------------------------------------
+
+  async getAuditUserKey(
+    userPubkey: string,
+  ): Promise<typeof auditUserKeys.$inferSelect | null> {
+    const [row] = await this.db
+      .select()
+      .from(auditUserKeys)
+      .where(eq(auditUserKeys.userPubkey, userPubkey))
+      .limit(1)
+    return row ?? null
+  }
+
+  async upsertAuditUserKey(
+    userPubkey: string,
+    encryptedKey: string,
+    adminEnvelopes: unknown[],
+  ): Promise<void> {
+    await this.db
+      .insert(auditUserKeys)
+      .values({
+        userPubkey,
+        encryptedKey,
+        adminEnvelopes,
+        createdAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: auditUserKeys.userPubkey,
+        set: {
+          encryptedKey,
+          adminEnvelopes,
+        },
+      })
+  }
+}

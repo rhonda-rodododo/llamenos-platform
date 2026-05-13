@@ -24,7 +24,6 @@ import {
   captchas,
   caseNumberSequences,
   // Hub deletion — all tables with hub-scoped data
-  users,
   notes,
   noteReplies,
   bans,
@@ -1140,7 +1139,7 @@ export class SettingsService {
    * This legacy method stores credentials in plaintext and will be removed in a future release.
    */
   async updateTelephonyProvider(
-    _data: TelephonyProviderConfig,
+    _data: TelephonyProviderConfig, // eslint-disable-line @typescript-eslint/no-unused-vars
   ): Promise<never> {
     throw new ServiceError(
       400,
@@ -3087,5 +3086,77 @@ export class SettingsService {
       createdAt: r.createdAt.toISOString(),
       updatedAt: r.updatedAt.toISOString(),
     } as ReportTypeDefinition
+  }
+
+  // ---------------------------------------------------------------------------
+  // Platform Settings (EP08)
+  // ---------------------------------------------------------------------------
+
+  async getPlatformSettings(): Promise<Record<string, unknown>> {
+    const [row] = await this.db
+      .select({ platformSettings: systemSettings.platformSettings })
+      .from(systemSettings)
+      .where(eq(systemSettings.id, SINGLETON_ID))
+      .limit(1)
+
+    if (!row) {
+      return {
+        featureFlags: {
+          mlsEnabled: false,
+          transcriptionEnabled: true,
+          caseManagementEnabled: false,
+          crossHubSharingEnabled: false,
+        },
+        branding: {
+          instanceName: 'Llamenos',
+          supportEmail: '',
+          privacyPolicyUrl: '',
+        },
+        sessionPolicy: {
+          maxSessionDurationHours: 720,
+          maxInactiveHours: 168,
+        },
+        erasurePlatformFloor: {
+          minDelayHours: 24,
+        },
+        retentionPurge: {
+          cronHourUtc: 3,
+          enabled: true,
+        },
+      }
+    }
+
+    return (row.platformSettings ?? {}) as Record<string, unknown>
+  }
+
+  async updatePlatformSettings(
+    updates: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    const current = await this.getPlatformSettings()
+
+    const merged: Record<string, unknown> = { ...current }
+    for (const [section, value] of Object.entries(updates)) {
+      if (
+        value &&
+        typeof value === 'object' &&
+        !Array.isArray(value) &&
+        current[section] &&
+        typeof current[section] === 'object'
+      ) {
+        merged[section] = {
+          ...(current[section] as Record<string, unknown>),
+          ...(value as Record<string, unknown>),
+        }
+      } else if (value !== undefined) {
+        merged[section] = value
+      }
+    }
+
+    await this.db
+      .update(systemSettings)
+      .set({ platformSettings: merged })
+      .where(eq(systemSettings.id, SINGLETON_ID))
+
+    return merged
   }
 }

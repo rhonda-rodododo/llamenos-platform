@@ -4,7 +4,7 @@
  * Replaces the DO-backed RecordsDO. The service never decrypts note content —
  * it stores and retrieves opaque encrypted blobs with their HPKE envelopes.
  */
-import { eq, and, desc, asc, sql, count } from 'drizzle-orm'
+import { eq, and, desc, asc, sql, count, isNull, or } from 'drizzle-orm'
 import type { Database } from '../db'
 import {
   notes,
@@ -198,7 +198,7 @@ export class RecordsService {
 
   async createReply(noteId: string, input: CreateReplyInput): Promise<NoteReplyRow> {
     // Verify the parent note exists
-    const note = await this.getNote(noteId)
+    await this.getNote(noteId)
 
     const [reply] = await this.db
       .insert(noteReplies)
@@ -347,17 +347,15 @@ export class RecordsService {
   }
 
   async checkBan(phone: string, hubId?: string): Promise<boolean> {
-    const conditions = [eq(bans.phone, phone)]
-    if (hubId) {
-      conditions.push(eq(bans.hubId, hubId))
-    } else {
-      conditions.push(sql`${bans.hubId} IS NULL`)
-    }
+    // Include platform-scoped bans (hubId IS NULL) in addition to hub-specific bans
+    const where = hubId
+      ? and(eq(bans.phone, phone), or(eq(bans.hubId, hubId), isNull(bans.hubId)))
+      : and(eq(bans.phone, phone), isNull(bans.hubId))
 
     const [row] = await this.db
       .select({ id: bans.id })
       .from(bans)
-      .where(and(...conditions))
+      .where(where)
       .limit(1)
 
     return !!row
@@ -465,5 +463,53 @@ export class RecordsService {
       noteCount: Number(noteCount),
       banCount: Number(banCount),
     }
+  }
+
+  // -----------------------------------------------------------------------
+  // Platform Bans (EP08)
+  // -----------------------------------------------------------------------
+
+  async listPlatformBans(
+    limit = 50,
+    offset = 0,
+  ): Promise<{ bans: BanRow[]; total: number }> {
+    const [rows, [{ total }]] = await Promise.all([
+      this.db
+        .select()
+        .from(bans)
+        .where(isNull(bans.hubId))
+        .orderBy(desc(bans.bannedAt))
+        .limit(limit)
+        .offset(offset),
+      this.db
+        .select({ total: count() })
+        .from(bans)
+        .where(isNull(bans.hubId)),
+    ])
+    return { bans: rows, total: Number(total) }
+  }
+
+  async searchBansByPhone(phoneHash: string): Promise<BanRow[]> {
+    return this.db
+      .select()
+      .from(bans)
+      .where(eq(bans.phone, phoneHash))
+  }
+
+  async deletePlatformBan(banId: string): Promise<BanRow | null> {
+    const [deleted] = await this.db
+      .delete(bans)
+      .where(and(eq(bans.id, banId), isNull(bans.hubId)))
+      .returning()
+    return deleted ?? null
+  }
+
+  async getBanById(banId: string): Promise<BanRow | null> {
+    const [row] = await this.db
+      .select()
+      .from(bans)
+      .where(eq(bans.id, banId))
+      .limit(1)
+    return row ?? null
   }
 }
