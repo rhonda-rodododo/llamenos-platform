@@ -4,6 +4,7 @@ import { registerSection } from './registry'
 import { LocationLookupSection } from './location-lookup-section'
 import { PasskeyPolicySection } from './passkey-policy-section'
 import { RecoveryGroupSection } from './recovery-group-section'
+import { RecoveryRequestsAdminSection } from './recovery-requests-section'
 import { DevicesSection } from './devices-section'
 import { HubRolesSection } from './hub-roles-section'
 import { TeamsSection } from './teams-section'
@@ -33,6 +34,7 @@ const sections: Record<string, ComponentType> = {
   'location-lookup': LocationLookupSection,
   'passkey-policy': PasskeyPolicySection,
   'recovery-group': RecoveryGroupSection,
+  'recovery-requests': RecoveryRequestsAdminSection,
   'devices': DevicesSection,
   'hub-roles': HubRolesSection,
   'teams': TeamsSection,

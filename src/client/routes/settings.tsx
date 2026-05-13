@@ -40,6 +40,7 @@ import {
   clearPendingReports,
 } from '@/lib/crash-reporting'
 import { SignalNotificationSection } from '@/components/signal-notification-section'
+import { RecoveryStatusSection } from '@/components/recovery-status-section'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 
 export const Route = createFileRoute('/settings')({
@@ -486,6 +487,9 @@ function SettingsPage() {
         <SignalNotificationSection />
       </SettingsSection>
 
+      {/* Social Recovery Status */}
+      <RecoveryStatusSection />
+
       {/* Crash Reporting / Diagnostics */}
       <SettingsSection
         id="diagnostics"
@@ -598,7 +602,6 @@ function NotificationPermissionStatus() {
 
 function LinkDeviceSection() {
   const { t } = useTranslation()
-  const { toast } = useToast()
   const [linkCode, setLinkCode] = useState('')
   const [status, setStatus] = useState<'idle' | 'linking' | 'verify-sas' | 'success' | 'error'>('idle')
   const [statusMessage, setStatusMessage] = useState('')

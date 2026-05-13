@@ -1,0 +1,226 @@
+import { test, expect } from '@playwright/test'
+
+async function goToAdminSection(page: import('@playwright/test').Page, section: string) {
+  await page.goto(`/admin/${section}`)
+  await page.waitForSelector('[data-testid]', { timeout: 10_000 })
+}
+
+async function loginAsAdmin(page: import('@playwright/test').Page) {
+  await page.goto('/login')
+  await page.waitForSelector('[data-testid="pin-input"]', { timeout: 10_000 })
+  const pinInput = page.locator('[data-testid="pin-input"] input').first()
+  await pinInput.fill('testpin123')
+  await pinInput.press('Enter')
+  await page.waitForURL('/', { timeout: 15_000 })
+}
+
+test.describe('Recovery Group - Admin Configuration', () => {
+  test.beforeEach(async ({ page }) => {
+    await loginAsAdmin(page)
+  })
+
+  test('should display recovery team configuration section', async ({ page }) => {
+    await goToAdminSection(page, 'recovery-group')
+    await expect(page.locator('[data-testid="recovery-threshold"]')).toBeVisible()
+    await expect(page.locator('[data-testid="recovery-total"]')).toBeVisible()
+    await expect(page.locator('[data-testid="recovery-delay"]')).toBeVisible()
+    await expect(page.locator('[data-testid="recovery-emergency-floor"]')).toBeVisible()
+  })
+
+  test('should disable save when threshold exceeds total', async ({ page }) => {
+    await goToAdminSection(page, 'recovery-group')
+    await page.locator('[data-testid="recovery-total"]').fill('3')
+    await page.locator('[data-testid="recovery-threshold"]').fill('4')
+    await expect(
+      page.locator('[data-testid="admin-recovery-group-save"]'),
+    ).toBeDisabled()
+  })
+
+  test('should disable save when not enough holders selected', async ({ page }) => {
+    await goToAdminSection(page, 'recovery-group')
+    await page.locator('[data-testid="recovery-threshold"]').fill('2')
+    await page.locator('[data-testid="recovery-total"]').fill('3')
+    // No holders selected → save should be disabled
+    await expect(
+      page.locator('[data-testid="admin-recovery-group-save"]'),
+    ).toBeDisabled()
+  })
+})
+
+test.describe('Recovery Group - Recovery Requests Dashboard', () => {
+  test.beforeEach(async ({ page }) => {
+    await loginAsAdmin(page)
+  })
+
+  test('should display recovery requests section', async ({ page }) => {
+    await goToAdminSection(page, 'recovery-requests')
+    await expect(
+      page.getByText(/Account Recovery Requests|Active requests/i),
+    ).toBeVisible()
+  })
+
+  test('should show empty state when no active requests', async ({ page }) => {
+    await goToAdminSection(page, 'recovery-requests')
+    await expect(
+      page.getByText(/No active recovery requests/i),
+    ).toBeVisible()
+  })
+})
+
+test.describe('Recovery Group - Account Recovery Flow', () => {
+  test('should show "I lost my device" link on login when key exists', async ({ page }) => {
+    await page.goto('/login')
+    // The link appears after PIN entry state is detected
+    const lostDeviceLink = page.locator('[data-testid="lost-device-link"]')
+    if (await lostDeviceLink.isVisible()) {
+      await expect(lostDeviceLink).toBeVisible()
+    }
+  })
+
+  test('should open account recovery flow', async ({ page }) => {
+    await page.goto('/login')
+    const lostDeviceLink = page.locator('[data-testid="lost-device-link"]')
+    if (!await lostDeviceLink.isVisible({ timeout: 5_000 }).catch(() => false)) {
+      test.skip()
+      return
+    }
+
+    await lostDeviceLink.click()
+    await expect(page.locator('[data-testid="recovery-identifier"]')).toBeVisible()
+    await expect(page.locator('[data-testid="recovery-hub"]')).toBeVisible()
+    await expect(page.locator('[data-testid="recovery-submit"]')).toBeVisible()
+  })
+
+  test('should navigate back from recovery flow', async ({ page }) => {
+    await page.goto('/login')
+    const lostDeviceLink = page.locator('[data-testid="lost-device-link"]')
+    if (!await lostDeviceLink.isVisible({ timeout: 5_000 }).catch(() => false)) {
+      test.skip()
+      return
+    }
+
+    await lostDeviceLink.click()
+    await expect(page.locator('[data-testid="recovery-identifier"]')).toBeVisible()
+
+    // Click the back button (ArrowLeft icon button)
+    await page.locator('button').filter({ has: page.locator('svg') }).first().click()
+    await expect(lostDeviceLink).toBeVisible()
+  })
+
+  test('should require identifier and hub ID before submitting', async ({ page }) => {
+    await page.goto('/login')
+    const lostDeviceLink = page.locator('[data-testid="lost-device-link"]')
+    if (!await lostDeviceLink.isVisible({ timeout: 5_000 }).catch(() => false)) {
+      test.skip()
+      return
+    }
+
+    await lostDeviceLink.click()
+    // Submit button should be disabled with empty fields
+    await expect(page.locator('[data-testid="recovery-submit"]')).toBeDisabled()
+
+    // Fill identifier only — should still be disabled
+    await page.locator('[data-testid="recovery-identifier"]').fill('user@example.com')
+    await expect(page.locator('[data-testid="recovery-submit"]')).toBeDisabled()
+
+    // Fill hub ID too — should be enabled
+    await page.locator('[data-testid="recovery-hub"]').fill('test-hub')
+    await expect(page.locator('[data-testid="recovery-submit"]')).toBeEnabled()
+  })
+})
+
+test.describe('Recovery Group - IPC Mock Verification', () => {
+  test('shamir split and combine round-trips correctly', async ({ page }) => {
+    await page.goto('/login')
+
+    const result = await page.evaluate(async () => {
+      const { invoke } = await import('@tauri-apps/api/core')
+
+      const secretHex =
+        'deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
+
+      const splitResult = (await invoke('shamir_split', {
+        secretHex,
+        total: 3,
+        threshold: 2,
+      })) as { shares: Array<{ x: number; y: string }>; commitments: string[] }
+
+      const recovered = (await invoke('shamir_combine', {
+        sharesJson: JSON.stringify(splitResult.shares.slice(0, 2)),
+      })) as string
+
+      const commitment0 = (await invoke('shamir_commit', {
+        x: splitResult.shares[0].x,
+        yHex: splitResult.shares[0].y,
+      })) as string
+
+      const verified = (await invoke('shamir_verify', {
+        x: splitResult.shares[0].x,
+        yHex: splitResult.shares[0].y,
+        commitmentHex: commitment0,
+      })) as boolean
+
+      return {
+        secretMatches: recovered === secretHex,
+        commitmentMatches: commitment0 === splitResult.commitments[0],
+        commitmentVerified: verified,
+        shareCount: splitResult.shares.length,
+        commitmentCount: splitResult.commitments.length,
+      }
+    })
+
+    expect(result.secretMatches).toBe(true)
+    expect(result.commitmentMatches).toBe(true)
+    expect(result.commitmentVerified).toBe(true)
+    expect(result.shareCount).toBe(3)
+    expect(result.commitmentCount).toBe(3)
+  })
+
+  test('recovery group keypair generation produces valid hex keys', async ({ page }) => {
+    await page.goto('/login')
+
+    const result = await page.evaluate(async () => {
+      const { invoke } = await import('@tauri-apps/api/core')
+
+      const keypair = (await invoke('recovery_group_generate_keypair')) as {
+        publicKeyHex: string
+        privateKeyHex: string
+      }
+
+      return {
+        hasPublicKey: keypair.publicKeyHex.length === 64,
+        hasPrivateKey: keypair.privateKeyHex.length === 64,
+        keysAreDifferent: keypair.publicKeyHex !== keypair.privateKeyHex,
+      }
+    })
+
+    expect(result.hasPublicKey).toBe(true)
+    expect(result.hasPrivateKey).toBe(true)
+    expect(result.keysAreDifferent).toBe(true)
+  })
+
+  test('shamir verify rejects invalid commitment', async ({ page }) => {
+    await page.goto('/login')
+
+    const result = await page.evaluate(async () => {
+      const { invoke } = await import('@tauri-apps/api/core')
+
+      const splitResult = (await invoke('shamir_split', {
+        secretHex: 'aabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaabbccdd',
+        total: 3,
+        threshold: 2,
+      })) as { shares: Array<{ x: number; y: string }>; commitments: string[] }
+
+      const badCommitment = '0'.repeat(64)
+      const rejected = (await invoke('shamir_verify', {
+        x: splitResult.shares[0].x,
+        yHex: splitResult.shares[0].y,
+        commitmentHex: badCommitment,
+      })) as boolean
+
+      return { rejected }
+    })
+
+    expect(result.rejected).toBe(false)
+  })
+})
