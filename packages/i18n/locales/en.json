@@ -990,6 +990,7 @@
     "edit": "Edit",
     "enabled": "Enabled",
     "error": "Error",
+    "from": "From",
     "language": "Language",
     "loading": "Loading...",
     "logout": "Log Out",
@@ -1009,6 +1010,7 @@
     "status": "Status",
     "submit": "Submit",
     "success": "Success",
+    "to": "To",
     "unauthorized": "Unauthorized",
     "yes": "Yes",
     "ok": "OK",
@@ -2682,7 +2684,64 @@
     "noUsersFound": "No volunteers found",
     "removeUser": "Remove {{name}}",
     "searchUsers": "Search volunteers...",
-    "users": "Volunteers"
+    "users": "Volunteers",
+    "ringGroups": {
+      "title": "Ring Groups",
+      "create": "Create Ring Group",
+      "edit": "Edit Ring Group",
+      "delete": "Delete Ring Group",
+      "deleteConfirm": "Are you sure you want to delete this ring group?",
+      "name": "Ring Group Name",
+      "members": "Members",
+      "memberCount": "{{count}} member(s)",
+      "addMembers": "Add Members",
+      "removeMembers": "Remove Members",
+      "empty": "No ring groups",
+      "emptySubtitle": "Create a ring group to assign volunteers to shifts"
+    },
+    "overrides": {
+      "title": "Shift Overrides",
+      "create": "Create Override",
+      "delete": "Delete Override",
+      "deleteConfirm": "Are you sure you want to delete this override?",
+      "type": "Override Type",
+      "typeCancel": "Cancel shift",
+      "typeSubstitute": "Substitute volunteers",
+      "date": "Date",
+      "note": "Note",
+      "empty": "No overrides",
+      "emptySubtitle": "Add overrides to modify shift assignments for specific dates"
+    },
+    "availability": {
+      "title": "Availability",
+      "create": "Add Availability Block",
+      "delete": "Remove Availability Block",
+      "deleteConfirm": "Are you sure you want to remove this availability block?",
+      "startDate": "Start Date",
+      "endDate": "End Date",
+      "reason": "Reason (optional)",
+      "empty": "No availability blocks",
+      "emptySubtitle": "Add blocks to indicate when you are unavailable"
+    },
+    "requests": {
+      "title": "Shift Requests",
+      "create": "Request Shift Change",
+      "approve": "Approve",
+      "reject": "Reject",
+      "typeJoin": "Join request",
+      "typeLeave": "Leave request",
+      "statusPending": "Pending",
+      "statusApproved": "Approved",
+      "statusDenied": "Denied",
+      "empty": "No pending requests",
+      "emptySubtitle": "Shift join/leave requests will appear here"
+    },
+    "active": {
+      "title": "Active Volunteers",
+      "empty": "No volunteers currently clocked in",
+      "since": "Clocked in since {{time}}",
+      "heartbeat": "Last heartbeat {{time}}"
+    }
   },
   "shortcuts": {
     "answerCall": "Answer call",

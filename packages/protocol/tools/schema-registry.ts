@@ -70,6 +70,9 @@ const EXCLUDED_SCHEMAS = new Set([
   // WebSocket message unions — discriminated unions not representable in quicktype
   'wsClientMessageSchema',
   'wsServerMessageSchema',
+
+  // EP07 shift management — query schemas and bare enum building blocks
+  'overrideQuerySchema',
 ])
 
 export interface SchemaRegistryEntry {

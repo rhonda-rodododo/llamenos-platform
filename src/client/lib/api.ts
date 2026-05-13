@@ -413,6 +413,135 @@ export async function setFallbackGroup(volunteers: string[]) {
   })
 }
 
+// --- Ring Groups ---
+
+export async function listRingGroups() {
+  return request<{ ringGroups: Array<{ id: string; hubId: string; encryptedName: string; memberCount: number; createdAt: string }> }>(hp('/ring-groups'))
+}
+
+export async function getRingGroup(id: string) {
+  return request<{ id: string; hubId: string; encryptedName: string; members: Array<{ pubkey: string; addedBy: string; createdAt: string }>; createdAt: string }>(hp(`/ring-groups/${id}`))
+}
+
+export async function createRingGroup(data: { id: string; encryptedName: string }) {
+  return request<{ id: string; hubId: string; encryptedName: string; members: Array<{ pubkey: string; addedBy: string; createdAt: string }>; createdAt: string }>(hp('/ring-groups'), {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function updateRingGroup(id: string, data: { encryptedName: string }) {
+  return request<{ id: string; hubId: string; encryptedName: string; members: Array<{ pubkey: string; addedBy: string; createdAt: string }>; createdAt: string }>(hp(`/ring-groups/${id}`), {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function deleteRingGroup(id: string) {
+  return request<{ ok: true }>(hp(`/ring-groups/${id}`), { method: 'DELETE' })
+}
+
+export async function addRingGroupMembers(id: string, pubkeys: string[]) {
+  return request<{ id: string; hubId: string; encryptedName: string; members: Array<{ pubkey: string; addedBy: string; createdAt: string }>; createdAt: string }>(hp(`/ring-groups/${id}/members`), {
+    method: 'POST',
+    body: JSON.stringify({ pubkeys }),
+  })
+}
+
+export async function removeRingGroupMembers(id: string, pubkeys: string[]) {
+  return request<{ id: string; hubId: string; encryptedName: string; members: Array<{ pubkey: string; addedBy: string; createdAt: string }>; createdAt: string }>(hp(`/ring-groups/${id}/members`), {
+    method: 'DELETE',
+    body: JSON.stringify({ pubkeys }),
+  })
+}
+
+// --- Shift Clock-in / Clock-out / Heartbeat ---
+
+export async function clockIn() {
+  return request<{ ok: true }>(hp('/shifts/clock-in'), { method: 'POST' })
+}
+
+export async function clockOut() {
+  return request<{ ok: true }>(hp('/shifts/clock-out'), { method: 'POST' })
+}
+
+export async function sendHeartbeat() {
+  return request<{ ok: true }>(hp('/shifts/heartbeat'), { method: 'POST' })
+}
+
+export async function listActiveShifts() {
+  return request<{ activeShifts: Array<{ pubkey: string; hubId: string; startedAt: string; lastHeartbeat: string }> }>(hp('/shifts/active'))
+}
+
+// --- Shift Overrides ---
+
+export async function listShiftOverrides(from: string, to: string) {
+  return request<{ overrides: Array<{ id: string; hubId: string; shiftId: string | null; date: string; type: string; userPubkeys: string[] | null; encryptedNote: string | null; createdBy: string; createdAt: string }> }>(
+    hp(`/shifts/overrides?from=${from}&to=${to}`)
+  )
+}
+
+export async function createShiftOverride(data: { id: string; shiftId?: string | null; date: string; type: 'cancel' | 'substitute'; userPubkeys?: string[] | null; encryptedNote?: string | null }) {
+  return request<{ id: string; hubId: string; shiftId: string | null; date: string; type: string; userPubkeys: string[] | null; encryptedNote: string | null; createdBy: string; createdAt: string }>(hp('/shifts/overrides'), {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function deleteShiftOverride(id: string) {
+  return request<{ ok: true }>(hp(`/shifts/overrides/${id}`), { method: 'DELETE' })
+}
+
+// --- Availability Blocks ---
+
+export async function listAvailabilityBlocks(from: string, to: string) {
+  return request<{ blocks: Array<{ id: string; hubId: string; userPubkey: string; startDate: string; endDate: string; encryptedReason: string | null; createdAt: string }> }>(
+    hp(`/shifts/availability?from=${from}&to=${to}`)
+  )
+}
+
+export async function listMyAvailabilityBlocks() {
+  return request<{ blocks: Array<{ id: string; hubId: string; userPubkey: string; startDate: string; endDate: string; encryptedReason: string | null; createdAt: string }> }>(hp('/shifts/availability/my'))
+}
+
+export async function createAvailabilityBlock(data: { id: string; startDate: string; endDate: string; encryptedReason?: string | null }) {
+  return request<{ id: string; hubId: string; userPubkey: string; startDate: string; endDate: string; encryptedReason: string | null; createdAt: string }>(hp('/shifts/availability'), {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function deleteAvailabilityBlock(id: string) {
+  return request<{ ok: true }>(hp(`/shifts/availability/${id}`), { method: 'DELETE' })
+}
+
+// --- Shift Requests ---
+
+export async function listShiftRequests() {
+  return request<{ requests: Array<{ id: string; hubId: string; shiftId: string; userPubkey: string; type: string; status: string; reviewedBy: string | null; reviewedAt: string | null; createdAt: string }> }>(hp('/shifts/requests'))
+}
+
+export async function createShiftRequest(data: { shiftId: string; type: 'join' | 'leave' }) {
+  return request<{ id: string; hubId: string; shiftId: string; userPubkey: string; type: string; status: string; reviewedBy: string | null; reviewedAt: string | null; createdAt: string }>(hp('/shifts/requests'), {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function approveShiftRequest(id: string) {
+  return request<{ id: string; hubId: string; shiftId: string; userPubkey: string; type: string; status: string; reviewedBy: string | null; reviewedAt: string | null; createdAt: string }>(hp(`/shifts/requests/${id}/approve`), {
+    method: 'POST',
+    body: JSON.stringify({ status: 'approved' }),
+  })
+}
+
+export async function rejectShiftRequest(id: string) {
+  return request<{ id: string; hubId: string; shiftId: string; userPubkey: string; type: string; status: string; reviewedBy: string | null; reviewedAt: string | null; createdAt: string }>(hp(`/shifts/requests/${id}/reject`), {
+    method: 'POST',
+    body: JSON.stringify({ status: 'denied' }),
+  })
+}
+
 // --- Ban List ---
 
 export async function listBans() {
@@ -1364,8 +1493,8 @@ export async function seedDemoData() {
   }
 
   // Create shifts
-  const maria = DEMO_ACCOUNTS.find(a => a.name === 'Maria Santos')!
-  const james = DEMO_ACCOUNTS.find(a => a.name === 'James Chen')!
+  const maria = DEMO_ACCOUNTS.find(a => a.name === 'Maria Santos') ?? DEMO_ACCOUNTS[0]
+  const james = DEMO_ACCOUNTS.find(a => a.name === 'James Chen') ?? DEMO_ACCOUNTS[1]
   const shifts = [
     { id: crypto.randomUUID(), encryptedName: 'Morning Team', startTime: '08:00', endTime: '16:00', days: [1, 2, 3, 4, 5], userPubkeys: [maria.pubkey, james.pubkey], ringGroupId: null },
     { id: crypto.randomUUID(), encryptedName: 'Evening Team', startTime: '16:00', endTime: '23:59', days: [1, 2, 3, 4, 5], userPubkeys: [maria.pubkey], ringGroupId: null },

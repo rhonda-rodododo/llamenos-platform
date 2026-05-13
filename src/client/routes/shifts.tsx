@@ -10,13 +10,29 @@ import {
   listUsers,
   getFallbackGroup,
   setFallbackGroup,
+  listRingGroups,
+  createRingGroup,
+  updateRingGroup,
+  deleteRingGroup,
+  addRingGroupMembers,
+  removeRingGroupMembers,
+  listActiveShifts,
+  listShiftOverrides,
+  createShiftOverride,
+  deleteShiftOverride,
+  listMyAvailabilityBlocks,
+  createAvailabilityBlock,
+  deleteAvailabilityBlock,
+  listShiftRequests,
+  approveShiftRequest,
+  rejectShiftRequest,
   type Shift,
   type User,
 } from '@/lib/api'
 import { z } from 'zod'
 import { createShiftBodySchema } from '@protocol/schemas/shifts'
 import { useToast } from '@/lib/toast'
-import { CalendarPlus, Clock, Users, Pencil, Trash2, LifeBuoy, LogIn, LogOut } from 'lucide-react'
+import { CalendarPlus, Clock, Users, Pencil, Trash2, LifeBuoy, UserPlus, UserMinus, ShieldCheck, CalendarX, CalendarOff, Activity, CheckCircle, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -30,10 +46,119 @@ export const Route = createFileRoute('/shifts')({
 
 const DAY_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const
 
+type Tab = 'schedule' | 'ring-groups' | 'overrides' | 'availability' | 'requests' | 'active'
+
+type RingGroup = {
+  id: string
+  hubId: string
+  encryptedName: string
+  memberCount: number
+  createdAt: string
+}
+
+type RingGroupDetail = Omit<RingGroup, 'memberCount'> & {
+  memberCount: number
+  members: Array<{ pubkey: string; addedBy: string; createdAt: string }>
+}
+
+type ShiftOverride = {
+  id: string
+  hubId: string
+  shiftId: string | null
+  date: string
+  type: string
+  userPubkeys: string[] | null
+  encryptedNote: string | null
+  createdBy: string
+  createdAt: string
+}
+
+type AvailabilityBlock = {
+  id: string
+  hubId: string
+  userPubkey: string
+  startDate: string
+  endDate: string
+  encryptedReason: string | null
+  createdAt: string
+}
+
+type ShiftRequest = {
+  id: string
+  hubId: string
+  shiftId: string
+  userPubkey: string
+  type: string
+  status: string
+  reviewedBy: string | null
+  reviewedAt: string | null
+  createdAt: string
+}
+
+type ActiveShift = {
+  pubkey: string
+  hubId: string
+  startedAt: string
+  lastHeartbeat: string
+}
+
 function ShiftsPage() {
   const { t } = useTranslation()
-  const { isAdmin, onBreak, toggleBreak } = useAuth()
+  const { isAdmin } = useAuth()
   const { toast } = useToast()
+  const [activeTab, setActiveTab] = useState<Tab>('schedule')
+
+  const tabs: Array<{ id: Tab; label: string; adminOnly?: boolean }> = [
+    { id: 'schedule', label: t('shifts.schedule') },
+    { id: 'ring-groups', label: t('shifts.ringGroups.title'), adminOnly: true },
+    { id: 'overrides', label: t('shifts.overrides.title'), adminOnly: true },
+    { id: 'availability', label: t('shifts.availability.title') },
+    { id: 'requests', label: t('shifts.requests.title'), adminOnly: true },
+    { id: 'active', label: t('shifts.active.title'), adminOnly: true },
+  ]
+
+  const visibleTabs = tabs.filter(tab => !tab.adminOnly || isAdmin)
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <Clock className="h-6 w-6 text-primary" />
+        <h1 data-testid="page-title" className="text-xl font-bold sm:text-2xl">{t('shifts.title')}</h1>
+      </div>
+
+      {/* Tab bar */}
+      <div className="flex flex-wrap gap-1 border-b pb-0">
+        {visibleTabs.map(tab => (
+          <button
+            key={tab.id}
+            data-testid={`shifts-tab-${tab.id}`}
+            onClick={() => setActiveTab(tab.id)}
+            className={`rounded-t px-4 py-2 text-sm font-medium transition-colors ${
+              activeTab === tab.id
+                ? 'border-b-2 border-primary text-primary'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'schedule' && <ScheduleTab isAdmin={isAdmin} toast={toast} t={t} />}
+      {activeTab === 'ring-groups' && isAdmin && <RingGroupsTab toast={toast} t={t} />}
+      {activeTab === 'overrides' && isAdmin && <OverridesTab toast={toast} t={t} />}
+      {activeTab === 'availability' && <AvailabilityTab toast={toast} t={t} />}
+      {activeTab === 'requests' && isAdmin && <RequestsTab toast={toast} t={t} />}
+      {activeTab === 'active' && isAdmin && <ActiveTab toast={toast} t={t} />}
+    </div>
+  )
+}
+
+// ============================================================================
+// Schedule Tab (existing shift CRUD + fallback)
+// ============================================================================
+
+function ScheduleTab({ isAdmin, toast, t }: { isAdmin: boolean; toast: ReturnType<typeof useToast>['toast']; t: ReturnType<typeof useTranslation>['t'] }) {
   const [shifts, setShifts] = useState<Shift[]>([])
   const [users, setUsers] = useState<User[]>([])
   const [fallback, setFallback] = useState<string[]>([])
@@ -45,14 +170,10 @@ function ShiftsPage() {
     Promise.all([
       listShifts().then(r => setShifts(r.shifts)),
       listUsers().then(r => setUsers(r.users)),
-      getFallbackGroup().then(r => setFallback(r.userPubkeys)),
+      isAdmin ? getFallbackGroup().then(r => setFallback(r.userPubkeys)) : Promise.resolve(),
     ]).catch(() => toast(t('common.error'), 'error'))
       .finally(() => setLoading(false))
-  }, [])
-
-  if (!isAdmin) {
-    return <div className="text-muted-foreground">{t('common.accessDenied')}</div>
-  }
+  }, [isAdmin])
 
   async function handleSaveFallback(selected: string[]) {
     try {
@@ -65,33 +186,14 @@ function ShiftsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <Clock className="h-6 w-6 text-primary" />
-          <h1 data-testid="page-title" className="text-xl font-bold sm:text-2xl">{t('shifts.title')}</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant={onBreak ? 'default' : 'outline'}
-            size="sm"
-            data-testid="break-toggle-btn"
-            onClick={async () => {
-              try {
-                await toggleBreak()
-              } catch {
-                toast(t('common.error'), 'error')
-              }
-            }}
-          >
-            {onBreak ? <LogIn className="h-3.5 w-3.5" /> : <LogOut className="h-3.5 w-3.5" />}
-            {onBreak ? t('dashboard.clockIn', { defaultValue: 'Clock In' }) : t('dashboard.clockOut', { defaultValue: 'Clock Out' })}
-          </Button>
+      {isAdmin && (
+        <div className="flex justify-end">
           <Button data-testid="shift-create-btn" onClick={() => { setShowForm(true); setEditingShift(null) }}>
             <CalendarPlus className="h-4 w-4" />
             {t('shifts.createShift')}
           </Button>
         </div>
-      </div>
+      )}
 
       {(showForm || editingShift) && (
         <ShiftForm
@@ -114,36 +216,27 @@ function ShiftsPage() {
             }
           }}
           onCancel={() => { setShowForm(false); setEditingShift(null) }}
+          t={t}
         />
       )}
 
-      {/* Shifts list */}
       <div data-testid="shift-list" className="space-y-3">
         {loading ? (
           <div className="space-y-3">
             {Array.from({ length: 3 }).map((_, i) => (
-              <Card key={i}>
-                <CardContent className="space-y-2">
-                  <div className="h-5 w-40 animate-pulse rounded bg-muted" />
-                  <div className="h-4 w-24 animate-pulse rounded bg-muted" />
-                  <div className="flex gap-1">
-                    {Array.from({ length: 5 }).map((_, j) => (
-                      <div key={j} className="h-5 w-12 animate-pulse rounded bg-muted" />
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+              <Card key={i}><CardContent className="space-y-2">
+                <div className="h-5 w-40 animate-pulse rounded bg-muted" />
+                <div className="h-4 w-24 animate-pulse rounded bg-muted" />
+              </CardContent></Card>
             ))}
           </div>
         ) : shifts.length === 0 ? (
-          <Card>
-            <CardContent>
-              <div className="py-8 text-center text-muted-foreground">
-                <Clock className="mx-auto mb-2 h-8 w-8 opacity-40" />
-                {t('shifts.noShifts')}
-              </div>
-            </CardContent>
-          </Card>
+          <Card><CardContent>
+            <div className="py-8 text-center text-muted-foreground">
+              <Clock className="mx-auto mb-2 h-8 w-8 opacity-40" />
+              {t('shifts.noShifts')}
+            </div>
+          </CardContent></Card>
         ) : (
           shifts.map(shift => (
             <Card key={shift.id} data-testid="shift-card" data-shift-id={shift.id}>
@@ -157,9 +250,7 @@ function ShiftsPage() {
                     </p>
                     <div className="mt-2 flex flex-wrap gap-1">
                       {shift.days.map(d => (
-                        <Badge key={d} variant="secondary">
-                          {t(`shifts.days.${DAY_KEYS[d]}`)}
-                        </Badge>
+                        <Badge key={d} variant="secondary">{t(`shifts.days.${DAY_KEYS[d]}`)}</Badge>
                       ))}
                     </div>
                     <p data-testid="shift-volunteer-count" className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -167,28 +258,30 @@ function ShiftsPage() {
                       {shift.userPubkeys.length} {t('shifts.users').toLowerCase()}
                     </p>
                   </div>
-                  <div className="flex gap-1">
-                    <Button data-testid="shift-edit-btn" variant="ghost" size="icon-xs" onClick={() => setEditingShift(shift)} aria-label={t('a11y.editItem')}>
-                      <Pencil className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      data-testid="shift-delete-btn"
-                      variant="ghost"
-                      size="icon-xs"
-                      className="text-destructive hover:text-destructive"
-                      aria-label={t('a11y.deleteItem')}
-                      onClick={async () => {
-                        try {
-                          await deleteShift(shift.id)
-                          setShifts(prev => prev.filter(s => s.id !== shift.id))
-                        } catch {
-                          toast(t('common.error'), 'error')
-                        }
-                      }}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
+                  {isAdmin && (
+                    <div className="flex gap-1">
+                      <Button data-testid="shift-edit-btn" variant="ghost" size="icon-xs" onClick={() => setEditingShift(shift)} aria-label={t('a11y.editItem')}>
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        data-testid="shift-delete-btn"
+                        variant="ghost"
+                        size="icon-xs"
+                        className="text-destructive hover:text-destructive"
+                        aria-label={t('a11y.deleteItem')}
+                        onClick={async () => {
+                          try {
+                            await deleteShift(shift.id)
+                            setShifts(prev => prev.filter(s => s.id !== shift.id))
+                          } catch {
+                            toast(t('common.error'), 'error')
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -196,34 +289,623 @@ function ShiftsPage() {
         )}
       </div>
 
-      {/* Fallback group */}
-      <Card data-testid="fallback-group-card">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <LifeBuoy className="h-4 w-4 text-muted-foreground" />
-            {t('shifts.fallbackGroup')}
-          </CardTitle>
-          <CardDescription>{t('shifts.fallbackDescription')}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <UserMultiSelect
-            users={users.filter(u => u.active)}
-            selected={fallback}
-            onSelectionChange={handleSaveFallback}
-          />
-        </CardContent>
-      </Card>
+      {isAdmin && (
+        <Card data-testid="fallback-group-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <LifeBuoy className="h-4 w-4 text-muted-foreground" />
+              {t('shifts.fallbackGroup')}
+            </CardTitle>
+            <CardDescription>{t('shifts.fallbackDescription')}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <UserMultiSelect
+              users={users.filter(u => u.active)}
+              selected={fallback}
+              onSelectionChange={handleSaveFallback}
+            />
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }
 
-function ShiftForm({ shift, users, onSave, onCancel }: {
+// ============================================================================
+// Ring Groups Tab
+// ============================================================================
+
+function RingGroupsTab({ toast, t }: { toast: ReturnType<typeof useToast>['toast']; t: ReturnType<typeof useTranslation>['t'] }) {
+  const [groups, setGroups] = useState<RingGroup[]>([])
+  const [users, setUsers] = useState<User[]>([])
+  const [loading, setLoading] = useState(true)
+  const [editingGroup, setEditingGroup] = useState<RingGroupDetail | null>(null)
+  const [showForm, setShowForm] = useState(false)
+  const [nameInput, setNameInput] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    Promise.all([
+      listRingGroups().then(r => setGroups(r.ringGroups)),
+      listUsers().then(r => setUsers(r.users)),
+    ]).catch(() => toast(t('common.error'), 'error'))
+      .finally(() => setLoading(false))
+  }, [])
+
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault()
+    if (!nameInput.trim()) return
+    setSaving(true)
+    try {
+      const res = await createRingGroup({ id: crypto.randomUUID(), encryptedName: nameInput.trim() })
+      setGroups(prev => [...prev, { ...res, memberCount: 0 }])
+      setNameInput('')
+      setShowForm(false)
+      toast(t('common.success'), 'success')
+    } catch {
+      toast(t('common.error'), 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDelete(id: string) {
+    try {
+      await deleteRingGroup(id)
+      setGroups(prev => prev.filter(g => g.id !== id))
+    } catch {
+      toast(t('common.error'), 'error')
+    }
+  }
+
+  async function handleAddMembers(groupId: string, pubkeys: string[]) {
+    try {
+      const res = await addRingGroupMembers(groupId, pubkeys)
+      setEditingGroup({ ...res, memberCount: res.members.length })
+      setGroups(prev => prev.map(g => g.id === groupId ? { ...g, memberCount: res.members.length } : g))
+    } catch {
+      toast(t('common.error'), 'error')
+    }
+  }
+
+  async function handleRemoveMember(groupId: string, pubkey: string) {
+    try {
+      const res = await removeRingGroupMembers(groupId, [pubkey])
+      setEditingGroup({ ...res, memberCount: res.members.length })
+      setGroups(prev => prev.map(g => g.id === groupId ? { ...g, memberCount: res.members.length } : g))
+    } catch {
+      toast(t('common.error'), 'error')
+    }
+  }
+
+  if (loading) return <div className="py-8 text-center text-muted-foreground">{t('common.loading')}</div>
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <Button data-testid="ring-group-create-btn" onClick={() => { setShowForm(true); setNameInput('') }}>
+          <UserPlus className="h-4 w-4" />
+          {t('shifts.ringGroups.create')}
+        </Button>
+      </div>
+
+      {showForm && (
+        <Card>
+          <CardContent className="pt-4">
+            <form data-testid="ring-group-form" onSubmit={handleCreate} className="flex gap-2">
+              <Input
+                data-testid="ring-group-name-input"
+                value={nameInput}
+                onChange={e => setNameInput(e.target.value)}
+                placeholder={t('shifts.ringGroups.name')}
+                required
+              />
+              <Button type="submit" disabled={saving}>{saving ? t('common.loading') : t('common.save')}</Button>
+              <Button type="button" variant="outline" onClick={() => setShowForm(false)}>{t('common.cancel')}</Button>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
+      <div data-testid="ring-group-list" className="space-y-3">
+        {groups.length === 0 ? (
+          <Card><CardContent>
+            <div className="py-8 text-center text-muted-foreground">
+              <Users className="mx-auto mb-2 h-8 w-8 opacity-40" />
+              <p>{t('shifts.ringGroups.empty')}</p>
+              <p className="text-xs">{t('shifts.ringGroups.emptySubtitle')}</p>
+            </div>
+          </CardContent></Card>
+        ) : groups.map(group => (
+          <Card key={group.id} data-testid="ring-group-card" data-ring-group-id={group.id}>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-medium">{group.encryptedName}</h3>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                    <Users className="h-3 w-3" />
+                    {t('shifts.ringGroups.memberCount', { count: group.memberCount })}
+                  </p>
+                </div>
+                <div className="flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    data-testid="ring-group-edit-btn"
+                    onClick={async () => {
+                      try {
+                        const res = await updateRingGroup(group.id, { encryptedName: group.encryptedName })
+                        setEditingGroup({ ...res, memberCount: res.members.length })
+                      } catch {
+                        toast(t('common.error'), 'error')
+                      }
+                    }}
+                  >
+                    <UserPlus className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    className="text-destructive hover:text-destructive"
+                    data-testid="ring-group-delete-btn"
+                    onClick={() => handleDelete(group.id)}
+                    aria-label={t('a11y.deleteItem')}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {editingGroup && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{editingGroup.encryptedName} — {t('shifts.ringGroups.members')}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              {editingGroup.members.map(m => (
+                <div key={m.pubkey} className="flex items-center justify-between text-sm">
+                  <span className="font-mono text-xs text-muted-foreground">{m.pubkey.slice(0, 16)}…</span>
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => handleRemoveMember(editingGroup.id, m.pubkey)}
+                  >
+                    <UserMinus className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+            <div>
+              <Label>{t('shifts.ringGroups.addMembers')}</Label>
+              <UserMultiSelect
+                users={users.filter(u => u.active && !editingGroup.members.some(m => m.pubkey === u.pubkey))}
+                selected={[]}
+                onSelectionChange={(pubkeys) => handleAddMembers(editingGroup.id, pubkeys)}
+                placeholder={t('shifts.searchUsers')}
+              />
+            </div>
+            <Button variant="outline" onClick={() => setEditingGroup(null)}>{t('common.close')}</Button>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  )
+}
+
+// ============================================================================
+// Overrides Tab
+// ============================================================================
+
+function OverridesTab({ toast, t }: { toast: ReturnType<typeof useToast>['toast']; t: ReturnType<typeof useTranslation>['t'] }) {
+  const now = new Date()
+  const defaultFrom = now.toISOString().slice(0, 10)
+  const defaultTo = new Date(now.getFullYear(), now.getMonth() + 2, 0).toISOString().slice(0, 10)
+  const [from, setFrom] = useState(defaultFrom)
+  const [to, setTo] = useState(defaultTo)
+  const [overrides, setOverrides] = useState<ShiftOverride[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [formDate, setFormDate] = useState(defaultFrom)
+  const [formType, setFormType] = useState<'cancel' | 'substitute'>('cancel')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    listShiftOverrides(from, to)
+      .then(r => setOverrides(r.overrides))
+      .catch(() => toast(t('common.error'), 'error'))
+      .finally(() => setLoading(false))
+  }, [from, to])
+
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault()
+    setSaving(true)
+    try {
+      const res = await createShiftOverride({ id: crypto.randomUUID(), date: formDate, type: formType })
+      setOverrides(prev => [...prev, res])
+      setShowForm(false)
+      toast(t('common.success'), 'success')
+    } catch {
+      toast(t('common.error'), 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDelete(id: string) {
+    try {
+      await deleteShiftOverride(id)
+      setOverrides(prev => prev.filter(o => o.id !== id))
+    } catch {
+      toast(t('common.error'), 'error')
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="space-y-1">
+          <Label>{t('common.from')}</Label>
+          <Input type="date" value={from} onChange={e => setFrom(e.target.value)} />
+        </div>
+        <div className="space-y-1">
+          <Label>{t('common.to')}</Label>
+          <Input type="date" value={to} onChange={e => setTo(e.target.value)} />
+        </div>
+        <Button data-testid="override-create-btn" onClick={() => setShowForm(true)}>
+          <CalendarX className="h-4 w-4" />
+          {t('shifts.overrides.create')}
+        </Button>
+      </div>
+
+      {showForm && (
+        <Card>
+          <CardContent className="pt-4">
+            <form data-testid="override-form" onSubmit={handleCreate} className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label>{t('shifts.overrides.date')}</Label>
+                  <Input type="date" value={formDate} onChange={e => setFormDate(e.target.value)} required />
+                </div>
+                <div className="space-y-1">
+                  <Label>{t('shifts.overrides.type')}</Label>
+                  <select
+                    className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                    value={formType}
+                    onChange={e => setFormType(e.target.value as 'cancel' | 'substitute')}
+                  >
+                    <option value="cancel">{t('shifts.overrides.typeCancel')}</option>
+                    <option value="substitute">{t('shifts.overrides.typeSubstitute')}</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button type="submit" disabled={saving}>{saving ? t('common.loading') : t('common.save')}</Button>
+                <Button type="button" variant="outline" onClick={() => setShowForm(false)}>{t('common.cancel')}</Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
+      <div data-testid="override-list" className="space-y-2">
+        {loading ? (
+          <div className="py-4 text-center text-muted-foreground">{t('common.loading')}</div>
+        ) : overrides.length === 0 ? (
+          <Card><CardContent>
+            <div className="py-8 text-center text-muted-foreground">
+              <CalendarOff className="mx-auto mb-2 h-8 w-8 opacity-40" />
+              <p>{t('shifts.overrides.empty')}</p>
+            </div>
+          </CardContent></Card>
+        ) : overrides.map(ov => (
+          <Card key={ov.id} data-testid="override-card">
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">{ov.date}</p>
+                  <Badge variant={ov.type === 'cancel' ? 'destructive' : 'secondary'} className="mt-1">
+                    {ov.type === 'cancel' ? t('shifts.overrides.typeCancel') : t('shifts.overrides.typeSubstitute')}
+                  </Badge>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  className="text-destructive hover:text-destructive"
+                  data-testid="override-delete-btn"
+                  onClick={() => handleDelete(ov.id)}
+                  aria-label={t('a11y.deleteItem')}
+                >
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ============================================================================
+// Availability Tab (volunteer self-service)
+// ============================================================================
+
+function AvailabilityTab({ toast, t }: { toast: ReturnType<typeof useToast>['toast']; t: ReturnType<typeof useTranslation>['t'] }) {
+  const [blocks, setBlocks] = useState<AvailabilityBlock[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [formStart, setFormStart] = useState('')
+  const [formEnd, setFormEnd] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    listMyAvailabilityBlocks()
+      .then(r => setBlocks(r.blocks))
+      .catch(() => toast(t('common.error'), 'error'))
+      .finally(() => setLoading(false))
+  }, [])
+
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault()
+    setSaving(true)
+    try {
+      const res = await createAvailabilityBlock({ id: crypto.randomUUID(), startDate: formStart, endDate: formEnd })
+      setBlocks(prev => [...prev, res])
+      setShowForm(false)
+      setFormStart('')
+      setFormEnd('')
+      toast(t('common.success'), 'success')
+    } catch {
+      toast(t('common.error'), 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDelete(id: string) {
+    try {
+      await deleteAvailabilityBlock(id)
+      setBlocks(prev => prev.filter(b => b.id !== id))
+    } catch {
+      toast(t('common.error'), 'error')
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <Button data-testid="availability-create-btn" onClick={() => setShowForm(true)}>
+          <CalendarPlus className="h-4 w-4" />
+          {t('shifts.availability.create')}
+        </Button>
+      </div>
+
+      {showForm && (
+        <Card>
+          <CardContent className="pt-4">
+            <form data-testid="availability-form" onSubmit={handleCreate} className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label>{t('shifts.availability.startDate')}</Label>
+                  <Input type="date" value={formStart} onChange={e => setFormStart(e.target.value)} required />
+                </div>
+                <div className="space-y-1">
+                  <Label>{t('shifts.availability.endDate')}</Label>
+                  <Input type="date" value={formEnd} onChange={e => setFormEnd(e.target.value)} required />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button type="submit" disabled={saving}>{saving ? t('common.loading') : t('common.save')}</Button>
+                <Button type="button" variant="outline" onClick={() => setShowForm(false)}>{t('common.cancel')}</Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
+      <div data-testid="availability-list" className="space-y-2">
+        {loading ? (
+          <div className="py-4 text-center text-muted-foreground">{t('common.loading')}</div>
+        ) : blocks.length === 0 ? (
+          <Card><CardContent>
+            <div className="py-8 text-center text-muted-foreground">
+              <CalendarOff className="mx-auto mb-2 h-8 w-8 opacity-40" />
+              <p>{t('shifts.availability.empty')}</p>
+              <p className="text-xs">{t('shifts.availability.emptySubtitle')}</p>
+            </div>
+          </CardContent></Card>
+        ) : blocks.map(block => (
+          <Card key={block.id} data-testid="availability-card">
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">{block.startDate} → {block.endDate}</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  className="text-destructive hover:text-destructive"
+                  data-testid="availability-delete-btn"
+                  onClick={() => handleDelete(block.id)}
+                  aria-label={t('a11y.deleteItem')}
+                >
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ============================================================================
+// Shift Requests Tab (admin approval)
+// ============================================================================
+
+function RequestsTab({ toast, t }: { toast: ReturnType<typeof useToast>['toast']; t: ReturnType<typeof useTranslation>['t'] }) {
+  const [requests, setRequests] = useState<ShiftRequest[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    listShiftRequests()
+      .then(r => setRequests(r.requests))
+      .catch(() => toast(t('common.error'), 'error'))
+      .finally(() => setLoading(false))
+  }, [])
+
+  async function handleApprove(id: string) {
+    try {
+      const res = await approveShiftRequest(id)
+      setRequests(prev => prev.map(r => r.id === id ? res : r))
+      toast(t('common.success'), 'success')
+    } catch {
+      toast(t('common.error'), 'error')
+    }
+  }
+
+  async function handleReject(id: string) {
+    try {
+      const res = await rejectShiftRequest(id)
+      setRequests(prev => prev.map(r => r.id === id ? res : r))
+      toast(t('common.success'), 'success')
+    } catch {
+      toast(t('common.error'), 'error')
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div data-testid="requests-list" className="space-y-2">
+        {loading ? (
+          <div className="py-4 text-center text-muted-foreground">{t('common.loading')}</div>
+        ) : requests.length === 0 ? (
+          <Card><CardContent>
+            <div className="py-8 text-center text-muted-foreground">
+              <ShieldCheck className="mx-auto mb-2 h-8 w-8 opacity-40" />
+              <p>{t('shifts.requests.empty')}</p>
+              <p className="text-xs">{t('shifts.requests.emptySubtitle')}</p>
+            </div>
+          </CardContent></Card>
+        ) : requests.map(req => (
+          <Card key={req.id} data-testid="request-card">
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={req.type === 'join' ? 'default' : 'secondary'}>
+                      {req.type === 'join' ? t('shifts.requests.typeJoin') : t('shifts.requests.typeLeave')}
+                    </Badge>
+                    <Badge variant={req.status === 'pending' ? 'outline' : req.status === 'approved' ? 'default' : 'destructive'}>
+                      {req.status === 'pending' ? t('shifts.requests.statusPending') : req.status === 'approved' ? t('shifts.requests.statusApproved') : t('shifts.requests.statusDenied')}
+                    </Badge>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground font-mono">{req.userPubkey.slice(0, 20)}…</p>
+                </div>
+                {req.status === 'pending' && (
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      className="text-green-600 hover:text-green-700"
+                      data-testid="request-approve-btn"
+                      onClick={() => handleApprove(req.id)}
+                      aria-label={t('shifts.requests.approve')}
+                    >
+                      <CheckCircle className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      className="text-destructive hover:text-destructive"
+                      data-testid="request-reject-btn"
+                      onClick={() => handleReject(req.id)}
+                      aria-label={t('shifts.requests.reject')}
+                    >
+                      <XCircle className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ============================================================================
+// Active Volunteers Tab (admin view)
+// ============================================================================
+
+function ActiveTab({ toast, t }: { toast: ReturnType<typeof useToast>['toast']; t: ReturnType<typeof useTranslation>['t'] }) {
+  const [active, setActive] = useState<ActiveShift[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    listActiveShifts()
+      .then(r => setActive(r.activeShifts))
+      .catch(() => toast(t('common.error'), 'error'))
+      .finally(() => setLoading(false))
+  }, [])
+
+  return (
+    <div className="space-y-4">
+      <div data-testid="active-list" className="space-y-2">
+        {loading ? (
+          <div className="py-4 text-center text-muted-foreground">{t('common.loading')}</div>
+        ) : active.length === 0 ? (
+          <Card><CardContent>
+            <div className="py-8 text-center text-muted-foreground">
+              <Activity className="mx-auto mb-2 h-8 w-8 opacity-40" />
+              <p>{t('shifts.active.empty')}</p>
+            </div>
+          </CardContent></Card>
+        ) : active.map(a => (
+          <Card key={a.pubkey} data-testid="active-card">
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-mono text-sm">{a.pubkey.slice(0, 20)}…</p>
+                  <p className="text-xs text-muted-foreground">
+                    {t('shifts.active.since', { time: new Date(a.startedAt).toLocaleTimeString() })}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {t('shifts.active.heartbeat', { time: new Date(a.lastHeartbeat).toLocaleTimeString() })}
+                  </p>
+                </div>
+                <Badge variant="default" className="bg-green-100 text-green-800">
+                  <Activity className="mr-1 h-3 w-3" />
+                  {t('shifts.onShift')}
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ============================================================================
+// Shift Form (used in ScheduleTab)
+// ============================================================================
+
+function ShiftForm({ shift, users, onSave, onCancel, t }: {
   shift: Shift | null
   users: User[]
   onSave: (data: Partial<Shift>) => Promise<void>
   onCancel: () => void
+  t: ReturnType<typeof useTranslation>['t']
 }) {
-  const { t } = useTranslation()
   const [encryptedName, setEncryptedName] = useState(shift?.encryptedName || '')
   const [startTime, setStartTime] = useState(shift?.startTime || '09:00')
   const [endTime, setEndTime] = useState(shift?.endTime || '17:00')
@@ -264,23 +946,11 @@ function ShiftForm({ shift, users, onSave, onCancel }: {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="start-time">{t('shifts.startTime')}</Label>
-              <Input
-                id="start-time"
-                data-testid="shift-start-time"
-                type="time"
-                value={startTime}
-                onChange={e => setStartTime(e.target.value)}
-              />
+              <Input id="start-time" data-testid="shift-start-time" type="time" value={startTime} onChange={e => setStartTime(e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="end-time">{t('shifts.endTime')}</Label>
-              <Input
-                id="end-time"
-                data-testid="shift-end-time"
-                type="time"
-                value={endTime}
-                onChange={e => setEndTime(e.target.value)}
-              />
+              <Input id="end-time" data-testid="shift-end-time" type="time" value={endTime} onChange={e => setEndTime(e.target.value)} />
             </div>
           </div>
           <div className="space-y-2">
@@ -293,9 +963,7 @@ function ShiftForm({ shift, users, onSave, onCancel }: {
                   aria-pressed={days.includes(i)}
                   onClick={() => setDays(prev => prev.includes(i) ? prev.filter(d => d !== i) : [...prev, i])}
                 >
-                  <Badge variant={days.includes(i) ? 'default' : 'outline'}>
-                    {t(`shifts.days.${day}`)}
-                  </Badge>
+                  <Badge variant={days.includes(i) ? 'default' : 'outline'}>{t(`shifts.days.${day}`)}</Badge>
                 </button>
               ))}
             </div>

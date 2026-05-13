@@ -47,6 +47,7 @@ import signalNotificationRoutes from './routes/signal-notification'
 import providerSetupRoutes from './routes/provider-setup'
 import providerTemplatesRoutes from './routes/provider-templates'
 import hubOnboardRoutes from './routes/hub-onboard'
+import ringGroupsRoutes from './routes/ring-groups'
 import { hubContext } from './middleware/hub'
 import { requestId } from './middleware/request-id'
 import { requestLogger } from './middleware/request-logger'
@@ -197,6 +198,7 @@ authenticated.route('/firehose', firehoseRoutes)
 authenticated.route('/signal-notification', signalNotificationRoutes)
 authenticated.route('/provider-setup', providerSetupRoutes)
 authenticated.route('/provider-templates', providerTemplatesRoutes)
+authenticated.route('/ring-groups', ringGroupsRoutes)
 
 // Hub-scoped authenticated routes
 const hubScoped = new Hono<AppEnv>()
@@ -224,6 +226,7 @@ hubScoped.route('/', evidenceRoutes)
 hubScoped.route('/mls', mlsRoutes)
 hubScoped.route('/firehose', firehoseRoutes)
 hubScoped.route('/onboard', hubOnboardRoutes)
+hubScoped.route('/ring-groups', ringGroupsRoutes)
 
 authenticated.route('/hubs/:hubId', hubScoped)
 

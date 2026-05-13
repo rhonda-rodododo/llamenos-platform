@@ -5,7 +5,7 @@
  * for a specific date (e.g., sick day coverage, special event).
  * All state is stored in PostgreSQL via Drizzle ORM.
  */
-import { eq, and, gte, lte, inArray } from 'drizzle-orm'
+import { eq, and, gte, lte } from 'drizzle-orm'
 import type { Database } from '../db'
 import { shiftOverrides } from '../db/schema'
 import { ServiceError } from './settings'
@@ -67,8 +67,8 @@ export class ShiftOverridesService {
     }
 
     // Validate override type
-    if (!['override', 'cancel', 'add'].includes(data.type)) {
-      throw new ServiceError(400, "type must be 'override', 'cancel', or 'add'")
+    if (!['cancel', 'substitute'].includes(data.type)) {
+      throw new ServiceError(400, "type must be 'cancel' or 'substitute'")
     }
 
     const id = crypto.randomUUID()
