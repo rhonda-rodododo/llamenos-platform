@@ -1,186 +1,289 @@
 ---
 epic: EP02
 title: Device & Identity Management
-status: stub
+status: specced
 depends-on: [EP01]
 phase: 2
 ---
 
 # EP02: Device & Identity Management
 
-**Date:** 2026-05-11
-**Status:** Stub (awaiting detailed planning)
-**Depends on:** EP01 (Admin sidebar port — provides the admin shell + nav infrastructure)
+**Date:** 2026-05-12
+**Status:** Specced
+**Depends on:** EP01 (Permission System & Role Management — provides admin shell, nav infrastructure, role definitions)
+
+## Summary
+
+This epic ports v1's device and identity management features to v2 and extends them with v2's per-device Ed25519/X25519 crypto architecture:
+
+1. Adding a dedicated `/security/*` route tree with tabbed navigation for user device, session, passkey, and security history management
+2. Implementing device list, device revocation (with sigchain + PUK + hub key rotation), and device rename across all platforms
+3. Building active session management (view, terminate, sign-out-everywhere, emergency lockdown)
+4. Enhancing WebAuthn passkey management with rename, transport badges, and backup status
+5. Creating a security event timeline with append-only `security_events` table
+6. Adding admin device oversight section in the admin shell (hub-scoped device inventory, SAS emoji verification)
+7. Building the user-role assignment UI (multi-select picker) that EP01 deferred
+8. Delivering device list, session management, and security events on iOS and Android
+
+This covers Tier 1 of the device observability spec (`2026-05-03-device-observability-ux.md`) except T1.5 alert delivery (security event table is built but push/Signal notification wiring is deferred), plus admin device oversight from Tier 2. Anomaly detection, push delivery tracking, sigchain visualization, health dashboards, and lost device wizards are out of scope.
+
+## Design Decisions
+
+### D1: Dedicated `/security` route tree
+
+Device, session, and security management gets its own tabbed route layout at `/security/*`, separate from `/settings`. This matches v1's architecture and prevents the settings page from becoming a monolith.
+
+| Route | Tab label | Content |
+|-------|-----------|---------|
+| `/security/devices` | Devices | Device list, rename, revoke, fingerprint display |
+| `/security/sessions` | Sessions | Active session list, terminate, sign-out-everywhere, emergency lockdown |
+| `/security/passkeys` | Passkeys | Enhanced WebAuthn credential management |
+| `/security/history` | History | Security event timeline, report suspicious, JSON export |
+
+The `/security` layout component renders a tab bar and `<Outlet />`. TanStack Router file-based routing: `src/client/routes/security.tsx` (layout) + `src/client/routes/security/devices.tsx`, etc. Navigation entry point: sidebar icon or settings link — not embedded in admin shell (this is user-facing, not admin-facing).
+
+### D2: Per-user (global) device verification
+
+SAS emoji verification confirms a device's Ed25519 pubkey, which is bound to the user's sigchain — a per-user, not per-hub, structure. Verification status is therefore global.
+
+| Aspect | v1 (per-hub) | v2 (per-user) |
+|--------|--------------|---------------|
+| Scope | Hub-scoped verification | Global verification |
+| Storage | Hub device table | `device_verifications` table keyed by `(verifierPubkey, deviceId)` |
+| Visibility | Admin sees per-hub | Admin sees global status across all hubs |
+| Re-verify | Per hub on join | Once per device, persists across hubs |
+
+The `device_verifications` table stores: `id`, `verifierPubkey`, `targetDeviceId`, `targetPubkey`, `verifiedAt`, `signedAuditEntry` (the Ed25519-signed audit entry from the verifier). Admin device oversight views show a verified/unverified badge per device based on whether any admin has verified it.
+
+### D3: Global emergency lockdown
+
+Lockdown means "my account is compromised." There is no per-hub lockdown — compromise is account-level.
+
+**Lockdown flow:**
+1. User triggers lockdown from `/security/sessions` via `LockdownModal`
+2. Requires fresh PIN unlock or WebAuthn assertion (elevated auth)
+3. **Phase 1 (server):** Terminate all sessions except current, create `account_lockdown` security event
+4. **Phase 2 (client-driven):** Client rotates PUK (re-seal to current device only), then iterates all user's hubs and rotates each hub key. Each hub key rotation is an individual operation — partial failure is acceptable (retried on next app launch). The server cannot generate hub keys (zero-knowledge).
+5. All other devices receive 401 on next request and must re-authenticate
+6. Post-lockdown: user should review device list and revoke any unknown devices
+
+**Endpoint:** `POST /api/account/lockdown` — requires elevated auth. Server terminates sessions and returns `{ sessionsTerminated: number, hubIds: string[] }`. Client then performs PUK rotation and hub key rotations client-side, reporting completion via `POST /api/account/lockdown/complete`.
+
+### D4: SAS emoji table from `packages/crypto`
+
+The emoji table is a constant exported from the Rust crate, available via UniFFI (mobile), WASM (browser test), and Tauri IPC (desktop). Single source of truth — no platform-specific emoji tables.
+
+**SAS derivation** (in Rust):
+1. Input: `min(verifierEd25519Pubkey, targetEd25519Pubkey) || max(...) || sessionNonce(32 bytes)` — canonical ordering by lexicographic comparison prevents role-confusion
+2. HKDF-SHA256 with domain separation label `LABEL_SAS_DERIVE`, output 42 bits (ceil(7 * 6 / 8) = 6 bytes)
+3. Extract seven 6-bit values (0–63) from the HKDF output for unbiased indices into the 64-entry emoji table
+4. Display: 7 emojis in a row, verifier and target compare visually
+
+**Nonce transport:** The session nonce is generated by the verifier (admin) and communicated to the target device owner **out-of-band** — either verbally in person, via a separate secure channel, or displayed as a QR code that the target device scans. The nonce is not transmitted via any API relay to prevent server manipulation.
+
+**New domain separation label:** `LABEL_SAS_DERIVE` added to `packages/protocol/crypto-labels.json`.
+
+The SAS derivation function signature (Rust): `fn derive_sas(pubkey_a: &[u8; 32], pubkey_b: &[u8; 32], nonce: &[u8; 32]) -> [u8; 7]` — internally canonicalizes pubkey order. Exposed via `platform.ts` IPC command `derive_sas` on desktop, UniFFI `CryptoService.deriveSas()` on mobile.
+
+### D5: Auto-detect all device metadata
+
+All device metadata is auto-detected. Only `deviceName` is user-editable (defaults to auto-detected value).
+
+| Field | Desktop (Tauri) | iOS | Android | Editable |
+|-------|-----------------|-----|---------|----------|
+| `deviceName` | `os.hostname()` | `UIDevice.current.name` | `Build.MODEL` | Yes |
+| `deviceModel` | `os.arch() + platform` | `utsname.machine` mapped | `Build.MODEL` | No |
+| `osVersion` | `os.release()` | `UIDevice.current.systemVersion` | `Build.VERSION.RELEASE` | No |
+| `appVersion` | `Cargo.toml` version via Tauri | `Bundle.main.infoDictionary` | `BuildConfig.VERSION_NAME` | No |
+
+Metadata is sent on `POST /api/devices/register` and refreshed on each session creation. No manual entry forms.
+
+## Architecture
+
+### Component hierarchy (desktop)
+
+```
+SecurityLayout (/security)
+├── TabBar [Devices | Sessions | Passkeys | History]
+├── DevicesPage (/security/devices)
+│   ├── DeviceList
+│   │   └── DeviceCard (name, platform icon, model, last seen, current badge)
+│   │       ├── DeviceFingerprint (truncated Ed25519 pubkey, copy)
+│   │       ├── RenameDevice (inline edit)
+│   │       └── RevokeDevice (confirmation dialog)
+│   └── DeviceLimitIndicator (X/5 devices)
+├── SessionsPage (/security/sessions)
+│   ├── SessionList
+│   │   └── SessionCard (device link, created, expires, last activity)
+│   ├── EndAllOtherSessions (button + confirmation)
+│   └── LockdownModal (elevated auth + confirmation)
+├── PasskeysPage (/security/passkeys)
+│   ├── PasskeyList (existing, enhanced)
+│   │   └── PasskeyCard (label edit, transport badges, backup status, last used)
+│   └── RegisterPasskey (existing)
+└── HistoryPage (/security/history)
+    ├── SecurityEventTimeline
+    │   └── SecurityEventRow (type icon, description, timestamp, device)
+    ├── ReportSuspicious (per-event action)
+    └── ExportJSON (download button)
+
+AdminShell (from EP01)
+└── AdminSettingsPage
+    └── DevicesSection (admin-sections/devices-section.tsx)
+        ├── AdminDeviceList (hub-scoped)
+        │   └── AdminDeviceRow (user, device count, last seen, verified badge)
+        ├── VerifyFingerprintModal (SAS 7-emoji ceremony)
+        └── DeviceVerificationBadge
+```
+
+### Data flow (device revocation)
+
+```
+1. User taps "Remove" on DeviceCard
+2. Confirmation dialog: "Remove [name]? It will lose access to all encrypted content."
+3. On confirm (requires fresh PIN/WebAuthn):
+   a. POST /api/devices/:id/revoke { confirm: true }
+   b. Server (atomic transaction):
+      - Append device_remove sigchain link (signed by requesting device)
+      - Delete device record
+      - Rotate PUK (exclude removed device from re-sealing)
+      - Rotate hub keys for all user's hubs
+      - Create security_event { type: 'device_remove', deviceId }
+      - Push notification to remaining devices
+   c. Client invalidates device list + session queries
+4. Revoked device: next API call → 401, next key unlock → sigchain check → "Device removed" screen
+```
+
+### Data flow (SAS verification — admin)
+
+```
+1. Admin opens DevicesSection, clicks "Verify" on unverified device
+2. VerifyFingerprintModal opens
+3. Client generates 32-byte session nonce
+4. Client calls platform.deriveSas(adminPubkey, targetPubkey, nonce) → 7 emoji indices
+5. Admin reads emojis aloud (or compares in person) with device owner
+6. Device owner calls platform.deriveSas(adminPubkey, targetPubkey, nonce) → same 7 emojis
+7. Both confirm match
+8. Admin's client calls platform.signAuditEntry({ type: 'device_fingerprint_verified', targetDeviceId, targetPubkey, nonce })
+9. POST /api/devices/:id/verify { signedAuditEntry }
+10. Server stores verification in device_verifications table
+```
+
+### Backend changes
+
+| Change | File | Detail |
+|--------|------|--------|
+| Add device metadata columns | `apps/worker/db/schema/users.ts` | `deviceName`, `deviceModel`, `osVersion`, `appVersion`, `lastIpHash` on `devices` table |
+| Create `security_events` table | `apps/worker/db/schema/security.ts` (new) | `id`, `userPubkey`, `eventType`, `deviceId`, `metadata` (JSONB), `ipHash`, `createdAt` — append-only |
+| Create `device_verifications` table | `apps/worker/db/schema/security.ts` | `id`, `verifierPubkey`, `targetDeviceId`, `targetPubkey`, `signedAuditEntry`, `verifiedAt` |
+| Populate `sessions.deviceInfo` | `apps/worker/services/identity.ts` | On session creation: `{ deviceId, platform, userAgent, ipHash }` |
+| Orchestrated revoke endpoint | `apps/worker/routes/devices.ts` | `POST /api/devices/:id/revoke` — transaction: sigchain + delete + PUK rotation + hub key rotation |
+| Device rename endpoint | `apps/worker/routes/devices.ts` | `PATCH /api/devices/:id` — owner only |
+| Device verify endpoint | `apps/worker/routes/devices.ts` | `POST /api/devices/:id/verify` — admin only, stores signed audit entry |
+| Session CRUD | `apps/worker/routes/sessions.ts` (new) | `GET /api/sessions`, `DELETE /api/sessions/:token`, `POST /api/sessions/terminate-others` |
+| Security events | `apps/worker/routes/security-events.ts` (new) | `GET /api/security-events?limit=50&offset=0` (user, own events only), `GET /api/admin/security-events` (admin) |
+| Account lockdown | `apps/worker/routes/account.ts` (new) | `POST /api/account/lockdown` + `POST /api/account/lockdown/complete` — elevated auth required |
+| Admin device overview | `apps/worker/routes/admin/devices.ts` (new) | `GET /api/admin/devices/overview?hubId=X&limit=50&offset=0` — paginated hub-scoped aggregate stats |
+| Emit security events | Various services | Wire event creation into device register, sigchain append, WebAuthn auth, session create/terminate |
+| Accept device metadata | `apps/worker/routes/devices.ts` | Extend `POST /api/devices/register` body to accept metadata fields |
+| Add `users:manage-devices` permission | `packages/shared/permissions.ts` | Gates admin device oversight and verification |
+| Add `LABEL_SAS_DERIVE` | `packages/protocol/crypto-labels.json` | Domain separation for SAS derivation |
+| New Zod schemas | `packages/protocol/schemas/device-management.ts` (new) | `deviceMetadata`, `revokeDeviceBody`, `revokeDeviceResponse`, `securityEvent`, `sessionResponse`, `adminDeviceOverview` |
+| User-role assignment UI | `src/client/components/user-role-assignment.tsx` (new) | Multi-select picker for admin user management views |
+
+### User-role assignment UI
+
+EP01 established the role definitions, permission engine, and backend support for multi-role assignment (role ID arrays). EP02 adds the UI.
+
+**Component:** `UserRoleAssignment` — a multi-select picker showing available roles with descriptions. Used in:
+- Admin user profile/detail view (admin assigns roles to users)
+- Invite code creation (pre-assign roles to invitees)
+
+**Behavior:** Checkboxes per role, grouped by scope (hub roles vs platform roles). Shows permission count per role. Submits as an array of role IDs via `PATCH /api/users/:pubkey` (existing endpoint, already accepts `roles` array).
 
 ## Scope
 
-Port v1's device and identity management features to v2 and extend them with the v2 crypto architecture (per-device Ed25519/X25519 keys, sigchains, PUK, HPKE). This epic covers both the admin-facing hub device oversight and the user-facing device/session management.
+### In scope
 
-## What Exists in v2
+- `/security/*` route tree with tabbed layout (devices, sessions, passkeys, history)
+- Device list view with metadata (name, platform, model, last seen, current badge, PUK generation)
+- Device revocation with sigchain link + PUK rotation + hub key rotation
+- Device rename (inline edit)
+- Device fingerprint display (truncated Ed25519 pubkey with copy)
+- Active session management (list, terminate, sign-out-everywhere)
+- Emergency lockdown modal with elevated auth
+- Enhanced passkey management (rename, transport badges, backup status, credential count warning)
+- Security event timeline with event type labels, timestamps, report suspicious, JSON export
+- Admin device oversight section (hub-scoped device list, verification badges, SAS verification modal)
+- SAS emoji verification ceremony with `packages/crypto` derivation
+- DB migrations: device metadata columns, `security_events` table, `device_verifications` table, `sessions.deviceInfo` population
+- New endpoints: revoke, rename, verify, sessions CRUD, security events, lockdown, admin overview
+- New Zod schemas in `packages/protocol/schemas/device-management.ts` + codegen
+- New domain separation label: `LABEL_SAS_DERIVE`
+- New permission: `users:manage-devices`
+- User-role assignment UI (multi-select picker for admin user management views)
+- iOS: device list, session list, security events in Settings
+- Android: device list, session list, security events in Settings
+- Mobile device metadata reporting on registration
+- React Query hooks for all device/session/event data
 
-### Crypto Foundation (Complete)
+### Out of scope
 
-- `packages/crypto/` — Ed25519/X25519 device keys, sigchain (append-only hash-chained device authorization), provisioning (ECDH + SAS), PUK with CLKR, per-device auth tokens
-- Tauri `CryptoState` holds device private keys; UI only sees pubkeys via `platform.ts`
-- Device linking works both directions (new device via `link-device.tsx`, primary via settings `LinkDeviceSection`)
-
-### Backend (Complete)
-
-- `apps/worker/routes/devices.ts` — `GET /api/devices`, `POST /api/devices/register`, `DELETE /api/devices/:id`, VoIP token management
-- `apps/worker/routes/sigchain.ts` — sigchain read/append
-- `apps/worker/routes/webauthn.ts` — 6 WebAuthn endpoints (login/register options+verify, list/delete credentials)
-- `apps/worker/routes/provisioning.ts` — ephemeral device linking relay rooms
-- `apps/worker/routes/puk.ts` — PUK envelope distribution
-- `apps/worker/services/identity.ts` — device registration with LRU eviction (max 5), session management (8h sliding, 1h renewal)
-- `apps/worker/services/crypto-keys.ts` — sigchain append with sequence/hash validation
-
-### User-Facing Settings (v2, Partial)
-
-- `src/client/routes/settings.tsx` — has `LinkDeviceSection` (provisioning QR/code), WebAuthn passkey management (list, register, delete with labels/badges), key backup info
-- No dedicated `/security/*` routes in v2 (v1 had `/security/sessions`, `/security/passkeys`, `/security/history`, `/security/factors`)
-- No device list view, no device revocation UI, no session management, no security event history
-
-### Admin Settings (v2)
-
-- `src/client/routes/admin/settings.tsx` — admin settings page with section components, but NO devices section registered
-- No `devices-section.tsx` in v2's `admin-sections/` or `admin-settings/` directories
-- Admin nav config (from EP01) has a "Devices" item under General group (nav slug: `devices`, permission: `settings:read`)
-
-### Existing Spec
-
-- `docs/superpowers/specs/2026-05-03-device-observability-ux.md` — comprehensive 3-tier spec covering device list, revocation, sessions, security events, admin oversight, sigchain visualization, anomaly detection. Defines API design, DB schema changes, UX mockups, security considerations, and implementation phases.
-
-## What v1 Had
-
-### Admin Devices Section (`devices-section.tsx`)
-
-- Hub-scoped device list via `GET /hubs/:hubId/devices`
-- Per-device row: label (or truncated ID), verified badge (`DeviceBadge`), verify button for unverified devices
-- SAS 7-emoji verification ceremony via `VerifyFingerprintModal`:
-  - Derives SAS from verifier pubkey + target pubkey + fresh session nonce (32 random bytes)
-  - 7x3 emoji grid display + 8-column emoji picker for interactive verification
-  - Mismatch detection with warning, reset capability
-  - On confirm: creates `device_fingerprint_verified` signed audit entry via `buildSignedAuditEntry`, submits to `/hubs/:hubId/devices/:id/verify`
-- Admin role check (role-admin, role-super-admin, admin, super_admin)
-
-### User Security Routes
-
-- `/security/sessions` — active session list with revoke, sign-out-everywhere, emergency lockdown modal
-- `/security/passkeys` — WebAuthn credential management with rename, delete, transport badges (USB/internal/hybrid/NFC/BLE/smart-card), backup status, last-used dates
-- `/security/history` — security event timeline with event type labels, location display, timestamps, "report suspicious" per-event, JSON export
-- `/security/factors` — PIN change, recovery key rotation, idle lock settings
-- `/security` layout — tabbed navigation across all security sub-routes
-
-## What Needs to Be Built
-
-### Phase 1: Admin Device Oversight (Desktop)
-
-1. **Admin devices section component** — port v1's `devices-section.tsx` to v2's admin settings architecture
-   - Register in admin nav under General > Devices (EP01 nav config already has the slot)
-   - Hub-scoped device list with metadata (name, platform, model, last seen)
-   - Device verification status badges
-   - Verify button triggering SAS emoji ceremony
-
-2. **SAS emoji verification modal** — port v1's `VerifyFingerprintModal`
-   - Adapt to v2's crypto architecture (per-device Ed25519 keys via `platform.ts` IPC)
-   - Session nonce generation, SAS derivation, 7-emoji interactive picker
-   - Signed audit entry creation via Tauri CryptoState (device private key never in JS)
-   - Verification endpoint integration
-
-3. **Device fingerprint display** — truncated Ed25519 pubkey with copy button per device
-
-### Phase 2: User Device & Session Management (Desktop)
-
-4. **User device list** — new settings section showing all linked devices for current user
-   - Current device highlighted
-   - Device name (editable), platform icon, model, last seen, PUK generation
-   - Revoke/remove action with confirmation (creates `device_remove` sigchain link, rotates PUK, rotates hub keys)
-
-5. **Session management** — active sessions with revoke
-   - Port v1's session list with current-session badge, last-active, user-agent display
-   - "Sign out everywhere else" action
-   - Emergency lockdown (port v1's `LockdownModal`)
-
-6. **Security event history** — port v1's history view
-   - Event type labels, timestamps, location (resolved on-the-fly, never stored)
-   - Report suspicious, JSON export
-
-7. **Enhanced passkey management** — v2 settings already has basic passkey CRUD; enhance with:
-   - Rename (inline edit like v1)
-   - Transport badges (v1 pattern)
-   - Credential count warning
-
-### Phase 3: Backend Enhancements
-
-8. **New endpoints** (per device-observability spec):
-   - `POST /api/devices/:id/revoke` — orchestrated revocation (sigchain + delete + PUK rotation + hub key rotation)
-   - `PATCH /api/devices/:id` — device rename
-   - `GET /api/sessions`, `DELETE /api/sessions/:token`, `DELETE /api/sessions/others` — session management
-   - `GET /api/security-events` — user-facing security event log
-   - `GET /api/admin/devices/overview` — admin aggregate device stats
-
-9. **DB schema changes**:
-   - Add `deviceName`, `deviceModel`, `osVersion`, `appVersion`, `lastIpHash` to `devices` table
-   - Populate `sessions.deviceInfo` JSONB on session creation
-   - Create `security_events` table (append-only)
-
-10. **New Zod schemas** in `packages/protocol/schemas/device-management.ts` + codegen for Swift/Kotlin
-
-### Phase 4: Mobile (iOS + Android)
-
-11. **iOS device management views** — SwiftUI device list, session list, security events in Settings
-12. **Android device management views** — Compose device list, session list, security events in Settings
-13. **Mobile device metadata reporting** — send deviceModel, osVersion, appVersion on registration
-
-### Phase 5: Advanced (Post-Launch)
-
-14. **Sigchain visualization** — interactive timeline of device authorization chain
-15. **Security alert delivery** — wire `alertOnNewDevice`/`alertOnPasskeyChange`/`alertOnPinChange` prefs to push + Signal notifications
-16. **Session anomaly detection** — flag unusual login patterns (informational, no auto-block)
-17. **Lost device recovery wizard** — guided multi-step flow for device loss
-18. **Device health dashboard** — per-device health score (key age, PUK freshness, app version)
-
-## Key Architecture Decisions
-
-### Crypto Key Management
-
-- All SAS derivation and signing happens in Rust (`packages/crypto`), invoked via Tauri IPC on desktop, UniFFI on iOS, JNI on Android
-- Device private keys NEVER enter JavaScript/webview — `platform.ts` routes through IPC
-- SAS emoji verification binds to a fresh per-session nonce to prevent pre-computation attacks
-- Device revocation creates a `device_remove` sigchain link, which triggers PUK rotation excluding the revoked device
-
-### Permission Model
-
-- Users see their own devices, sessions, and security events
-- Admins see hub-scoped device list with verification status (device counts + last-seen per user, not session details)
-- Admins can verify devices (SAS ceremony) but cannot view/terminate user sessions (zero-knowledge principle)
-
-### Relationship to Device Observability Spec
-
-The existing `2026-05-03-device-observability-ux.md` spec provides the comprehensive design for all tiers. This epic spec defines the **porting scope and sequencing** — what to bring from v1 first, what new v2-specific work is needed, and how it maps to the admin sidebar infrastructure from EP01.
+- Session anomaly detection (T2.2 — post-launch)
+- Push delivery tracking / `push_delivery_log` (T2.4 — post-launch)
+- WebAuthn credential usage log (T2.5 — post-launch)
+- Sigchain visualization (T3.1 — future)
+- Device health dashboard / health scores (T3.2 — future)
+- Lost device recovery wizard (T3.3 — future)
+- Notification channel health grid (T3.4 — future)
+- Security alert delivery (wiring `alertOnNewDevice` prefs to push/Signal) — separate follow-up
+- Admin device oversight on mobile (admin features are desktop-only initially)
+- Mobile passkey management enhancements (deferred to mobile design pass)
+- `/security/factors` route (PIN change, recovery key rotation, idle lock — separate epic)
 
 ## Dependencies
 
 | Dependency | Status | Required For |
 |------------|--------|-------------|
-| EP01: Permission System & Role Management | In progress | Admin nav routing, role definitions for multi-role assignment UI |
-| `packages/crypto` SAS derivation | Complete | Emoji verification ceremony |
-| Tauri IPC `CryptoState` | Complete | Desktop device key operations |
-| Backend device/sigchain routes | Complete | All device management features |
-| `packages/protocol` codegen | Complete | Cross-platform type generation |
+| EP01: Permission System & Role Management | Specced | Admin shell, nav infrastructure, role definitions, `users:read` permission |
+| `packages/crypto` SAS derivation | Needs new function | SAS emoji verification ceremony |
+| `packages/crypto` emoji table constant | Needs export | Cross-platform SAS display |
+| Tauri IPC `CryptoState` | Complete | Desktop device key operations, `derive_sas` command |
+| Backend device/sigchain routes | Complete | Device list, revocation foundation |
+| `packages/protocol` codegen | Complete | Cross-platform type generation for new schemas |
+| `packages/crypto` UniFFI bindings | Complete | Mobile SAS derivation (iOS/Android) |
 
-## Cross-Epic Notes
+## Platform Coverage
 
-- **Multi-role assignment UI**: EP01 establishes multi-role support (union model) in the permission engine and role definitions. The actual user-role assignment UI (multi-select picker on user profile/management views) should be built as part of this epic's user management work. The backend already supports role ID arrays — this is a UI task.
+| Platform | Work needed |
+|----------|-------------|
+| **Backend** | DB migrations (3 tables/columns), 7 new endpoints, security event emission, device metadata acceptance, `users:manage-devices` permission |
+| **Desktop** | `/security/*` route tree (4 pages + layout), admin devices section, SAS verification modal, user-role assignment picker, React Query hooks |
+| **iOS** | Device list, session list, security events in Settings tab. Device metadata reporting on register. |
+| **Android** | Device list, session list, security events in Settings tab. Device metadata reporting on register. |
+| **Protocol** | New Zod schemas in `device-management.ts`, `LABEL_SAS_DERIVE` in `crypto-labels.json`, codegen run |
+| **Crypto** | Export SAS emoji table, add `derive_sas()` function, expose via FFI/IPC |
 
-## Open Questions
+## Security Considerations
 
-1. **Migrate v1 security routes or integrate into settings?** v1 had standalone `/security/*` routes with tabbed navigation. v2 currently has everything in `/settings`. Should we add a `/security` route tree or keep device/session management as settings sections?
+- **Device private keys never in JS**: All SAS derivation, signing, and key operations route through `packages/crypto` via Tauri IPC (desktop), UniFFI (iOS), JNI (Android). The webview/JS layer only sees pubkeys and derived SAS indices.
+- **SAS binds to fresh nonce**: Each verification session generates a 32-byte random nonce. The SAS is derived from `verifierPubkey || targetPubkey || nonce` via HKDF with domain separation. Pre-computation attacks are prevented by the nonce.
+- **Elevated auth for destructive ops**: Device revocation, sign-out-everywhere, emergency lockdown, and security preference changes require a fresh PIN unlock or WebAuthn assertion — not just a valid session token.
+- **IP handling**: Raw IPs are never stored. `lastIpHash = HMAC-SHA256(IP, SERVER_HMAC_SECRET)` for anomaly grouping. Coarse geo resolved on-the-fly for display, never persisted.
+- **Zero-knowledge admin boundary**: Admins see hub-scoped device lists with verification status and aggregate stats. Admins cannot view user sessions, session tokens, or session activity — that would violate the zero-knowledge principle.
+- **Security events are append-only**: The `security_events` table has no UPDATE or DELETE operations. For GDPR erasure, `userPubkey` is set to `'deleted'` — events are anonymized, not removed, preserving audit integrity.
+- **Device metadata is self-reported**: `deviceModel`, `osVersion`, `appVersion` come from the client. Never trusted for security decisions — used only for display and observability.
+- **Revocation cascades**: Device revocation atomically creates a `device_remove` sigchain link, rotates PUK (excluding revoked device), and rotates hub keys for all hubs. Forward secrecy is maintained — the revoked device cannot decrypt any content encrypted after revocation.
+- **Rate limiting**: Device revocation (3/hour), session termination (10/hour), device registration (5/hour per user), WebAuthn registration (3/hour), security event queries (30/minute), admin overview (10/minute).
 
-2. **Admin device verification scope** — v1 verified devices per-hub. With v2's multi-hub architecture, should verification be per-hub (v1 behavior) or per-user (global trust)?
+## Open Questions (Resolved)
 
-3. **Emergency lockdown scope** — v1's lockdown modal existed on the sessions page. In v2's multi-hub world, should lockdown be per-hub or global (all hubs)?
+1. **Migrate v1 security routes or integrate into settings?** → D1: Dedicated `/security/*` route tree with tabbed navigation. Device/session/security management is complex enough to warrant its own route layout.
 
-4. **SAS emoji table** — v1 used a custom emoji table (`SAS_EMOJI_TABLE` in `@/lib/mls/emoji-table`). Should v2 use the same table or derive from `packages/crypto` (making it consistent across all platforms)?
+2. **Admin device verification scope — per-hub or per-user?** → D2: Per-user (global). SAS verification confirms the device's Ed25519 pubkey which is bound to the user's sigchain, not to any hub.
 
-5. **Device metadata collection** — the observability spec proposes `deviceModel`, `osVersion`, `appVersion` etc. How much metadata should Tauri desktop auto-detect vs. require manual entry?
+3. **Emergency lockdown scope — per-hub or global?** → D3: Global. Lockdown means "account is compromised" and terminates all sessions, rotates PUK, rotates all hub keys.
+
+4. **SAS emoji table — custom table or from packages/crypto?** → D4: From `packages/crypto`. The emoji table is a constant in the Rust crate, available on all platforms via UniFFI/WASM/IPC.
+
+5. **Device metadata — auto-detect or manual entry?** → D5: Auto-detect everything. Only `deviceName` is user-editable (defaults to auto-detected hostname/model).

@@ -109,6 +109,7 @@ Getting Android Cucumber BDD E2E tests passing in CI. Tests run on emulator with
 
 ## Pending (Future Sessions)
 
+- [ ] Localized blast content (multi-language tabs in blast composer) — `localizedContent` JSONB field needs adding to blasts table, per-language content editing UI. Deferred from EP05; neither v1 nor v2 implements it yet.
 - [ ] RustCrypto major upgrade (k256 0.14, sha2 0.11) — blocked on k256 stable release
 - [ ] WebRTC gateway mode for SIP bridge (browser-to-SIP)
 - [ ] Post-quantum hybrid KEM (ML-KEM-1024 + X25519) — waiting for ML-KEM finalization
