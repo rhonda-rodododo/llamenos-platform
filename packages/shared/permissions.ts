@@ -69,6 +69,7 @@ export const PERMISSION_CATALOG = {
   'users:update': 'Update user profiles',
   'users:delete': 'Deactivate/delete users',
   'users:manage-roles': 'Assign/change user roles',
+  'users:manage-devices': 'View and manage user devices (admin device oversight, SAS verification)',
 
   // Shifts
   'shifts:read-own': 'Check own shift status',
