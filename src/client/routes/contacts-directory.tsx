@@ -1,6 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
-import { useAuth } from '@/lib/auth'
 import { useToast } from '@/lib/toast'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
@@ -15,17 +14,17 @@ import {
   type ContactIdentifier,
 } from '@/lib/api'
 import { decryptMessage } from '@/lib/platform'
-import * as keyManager from '@/lib/key-manager'
 import { ContactCard } from '@/components/contacts/contact-card'
 import { ContactProfile } from '@/components/contacts/contact-profile'
 import { CreateContactDialog } from '@/components/contacts/create-contact-dialog'
+import { ContactImportDialog } from '@/components/contact-import-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
-  Users, Plus, Search, Loader2, Lock,
+  Users, Plus, Search, Loader2, Lock, Upload,
 } from 'lucide-react'
 
 export const Route = createFileRoute('/contacts-directory')({
@@ -116,7 +115,6 @@ async function decryptContact(raw: RawContact): Promise<DirectoryContact> {
 
 function ContactDirectoryPage() {
   const { t } = useTranslation()
-  const { hasNsec } = useAuth()
   const { toast } = useToast()
 
   const [contacts, setContacts] = useState<DirectoryContact[]>([])
@@ -126,6 +124,7 @@ function ContactDirectoryPage() {
   const [selectedContact, setSelectedContact] = useState<DirectoryContact | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [showImportDialog, setShowImportDialog] = useState(false)
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('')
@@ -240,10 +239,21 @@ function ContactDirectoryPage() {
             </Badge>
           )}
         </div>
-        <Button size="sm" data-testid="new-contact-btn" onClick={() => setShowCreateDialog(true)}>
-          <Plus className="h-3.5 w-3.5" />
-          {t('contactDirectory.new', { defaultValue: 'New Contact' })}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            data-testid="import-contacts-btn"
+            onClick={() => setShowImportDialog(true)}
+          >
+            <Upload className="h-3.5 w-3.5" />
+            {t('cms.importContacts', { defaultValue: 'Import' })}
+          </Button>
+          <Button size="sm" data-testid="new-contact-btn" onClick={() => setShowCreateDialog(true)}>
+            <Plus className="h-3.5 w-3.5" />
+            {t('contactDirectory.new', { defaultValue: 'New Contact' })}
+          </Button>
+        </div>
       </div>
 
       {showEmptyState ? (
@@ -359,7 +369,10 @@ function ContactDirectoryPage() {
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 </div>
               ) : (
-                <ContactProfile contact={selectedContact} />
+                <ContactProfile
+                contact={selectedContact}
+                onContactMerged={() => { setSelectedId(null); loadContacts() }}
+              />
               )
             ) : (
               <div className="flex flex-1 flex-col items-center justify-center text-muted-foreground">
@@ -375,6 +388,15 @@ function ContactDirectoryPage() {
         open={showCreateDialog}
         onOpenChange={setShowCreateDialog}
         onCreated={handleContactCreated}
+      />
+
+      <ContactImportDialog
+        open={showImportDialog}
+        onOpenChange={setShowImportDialog}
+        onImported={(count) => {
+          toast(t('cms.importSuccess', { count }))
+          loadContacts()
+        }}
       />
     </div>
   )

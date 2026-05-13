@@ -10,6 +10,9 @@ import { recordSchema, recordContactSchema } from '@protocol/schemas/records'
 import { caseInteractionSchema } from '@protocol/schemas/interactions'
 import { reportTypeDefinitionSchema } from '@protocol/schemas/report-types'
 import { createEntityTypeBodySchema, templateSummarySchema } from '@protocol/schemas/entity-schema'
+import type { MergeContactsBody, MergeContactsResponse } from '@protocol/schemas/contact-merge'
+import type { BulkContactAction, BulkContactActionResponse, BulkCreateContactBody, BulkCreateContactResponse } from '@protocol/schemas/contact-bulk'
+import type { MergeRecordsBody, MergeRecordsResponse } from '@protocol/schemas/entity-merge'
 import { contactRelationshipResponseSchema, contactGroupResponseSchema } from '@protocol/schemas/contact-relationships'
 import type {
   SignalRegistrationState,
@@ -2191,4 +2194,47 @@ export async function updateSecurityPrefs(patch: Partial<Omit<SecurityPrefs, 'up
     method: 'PATCH',
     body: JSON.stringify(patch),
   })
+}
+
+// --- Contact Merge API ---
+
+export async function mergeContacts(body: MergeContactsBody) {
+  return request<MergeContactsResponse>(hp('/directory/merge'), {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function bulkContactAction(body: BulkContactAction) {
+  return request<BulkContactActionResponse>(hp('/directory/bulk'), {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function bulkCreateContacts(body: BulkCreateContactBody) {
+  return request<BulkCreateContactResponse>(hp('/directory/bulk-create'), {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+// --- Entity Merge API ---
+
+export async function mergeEntities(body: MergeRecordsBody) {
+  return request<MergeRecordsResponse>(hp('/records/merge'), {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+// --- Entity list with cross-hub support ---
+
+export async function listEntitiesCrossHub(params: { crossHub?: boolean; page?: number; limit?: number; entityTypeId?: string }) {
+  const qs = new URLSearchParams()
+  if (params.crossHub) qs.set('crossHub', 'true')
+  if (params.page) qs.set('page', String(params.page))
+  if (params.limit) qs.set('limit', String(params.limit))
+  if (params.entityTypeId) qs.set('entityTypeId', params.entityTypeId)
+  return request<{ records: unknown[]; total: number; page: number; limit: number; hasMore: boolean }>(hp(`/records?${qs}`))
 }

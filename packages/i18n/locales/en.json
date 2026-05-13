@@ -3437,5 +3437,38 @@
     "setupComplete": {
       "footer": "Webhook setup complete"
     }
+  },
+  "cms": {
+    "mergeContact": "Merge",
+    "mergeContactDesc": "Merge a duplicate contact into this one. The secondary contact will be soft-deleted and its data relinked.",
+    "mergePrimary": "Primary contact",
+    "mergeSearchPlaceholder": "Search contacts to merge...",
+    "mergeSelected": "Selected",
+    "mergeWarning": "This action cannot be undone. All data from the secondary contact will be relinked to the primary.",
+    "mergeConfirm": "Merge contacts",
+    "mergeContactSuccess": "Contacts merged successfully",
+    "mergeContactError": "Failed to merge contacts",
+    "mergeEntity": "Merge",
+    "mergeEntityDesc": "Merge a duplicate record into this one. Contacts, interactions, and evidence will be relinked.",
+    "mergeSecondaryId": "Secondary record",
+    "mergeSecondaryIdPlaceholder": "Paste the ID of the record to merge...",
+    "mergeEntityWarning": "All data from the secondary record will be relinked to this record and the secondary will be closed.",
+    "mergeEntitySuccess": "Records merged successfully",
+    "mergeEntityError": "Failed to merge records",
+    "crossHub": "All Hubs",
+    "crossHubOff": "This Hub Only",
+    "displayType": "View",
+    "custodyChain": "Chain of Custody",
+    "custodyEntries": "entries",
+    "custodyEmpty": "No custody entries recorded",
+    "custodyLoadError": "Failed to load custody chain",
+    "importContacts": "Import",
+    "importContactsDesc": "Import contacts from a CSV file. Data is encrypted client-side before upload.",
+    "importDropHint": "Click to choose a CSV file",
+    "importParsed": "{{count}} contacts found",
+    "importRun": "Import {{count}} contacts",
+    "importSuccess": "Imported {{count}} contacts",
+    "importError": "Import failed",
+    "importDone": "Import complete"
   }
 }

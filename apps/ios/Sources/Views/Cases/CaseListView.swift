@@ -42,12 +42,40 @@ struct CaseListView: View {
                 ToolbarItem(placement: .primaryAction) {
                     if vm.cmsEnabled == true && !vm.entityTypes.isEmpty {
                         Button {
-                            // Navigate to create flow — trigger by setting a flag
                             vm.showCreateSheet = true
                         } label: {
                             Image(systemName: "plus")
                         }
                         .accessibilityIdentifier("case-new-btn")
+                    }
+                }
+                ToolbarItem(placement: .secondaryAction) {
+                    Menu {
+                        // Display type picker
+                        Menu(NSLocalizedString("cms_display_type", comment: "Display")) {
+                            ForEach(CaseDisplayType.allCases, id: \.self) { dt in
+                                Button {
+                                    vm.displayType = dt
+                                } label: {
+                                    Label(dt.rawValue.capitalized, systemImage: displayTypeIcon(dt))
+                                }
+                            }
+                        }
+                        // Cross-hub toggle
+                        Button {
+                            vm.crossHubEnabled.toggle()
+                            Task { await vm.loadRecords() }
+                        } label: {
+                            Label(
+                                vm.crossHubEnabled
+                                    ? NSLocalizedString("cms_cross_hub_off", comment: "This Hub Only")
+                                    : NSLocalizedString("cms_cross_hub", comment: "All Hubs"),
+                                systemImage: vm.crossHubEnabled ? "globe.slash" : "globe"
+                            )
+                        }
+                        .accessibilityIdentifier("cross-hub-toggle")
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
                     }
                 }
             }
@@ -123,23 +151,36 @@ struct CaseListView: View {
                 statusFilterRow(vm: vm)
             }
 
-            // Records list
-            List {
-                ForEach(vm.records) { record in
-                    CaseCardRow(
-                        record: record,
-                        entityType: vm.entityType(for: record.entityTypeId),
-                        statusDef: vm.statusDef(for: record),
-                        decryptedTitle: vm.decryptedTitle(for: record.id)
-                    )
-                    .accessibilityIdentifier("case-card-\(record.id)")
-                    .onTapGesture {
-                        Task { await vm.selectRecord(record) }
+            // Records list — display type determines rendering
+            switch vm.displayType {
+            case .calendar:
+                EntityCalendarView(records: vm.records) { record in
+                    Task { await vm.selectRecord(record) }
+                }
+                .accessibilityIdentifier("entity-calendar-view")
+            case .timeline:
+                EntityTimelineView(records: vm.records) { record in
+                    Task { await vm.selectRecord(record) }
+                }
+                .accessibilityIdentifier("entity-timeline-view")
+            case .table:
+                List {
+                    ForEach(vm.records) { record in
+                        CaseCardRow(
+                            record: record,
+                            entityType: vm.entityType(for: record.entityTypeId),
+                            statusDef: vm.statusDef(for: record),
+                            decryptedTitle: vm.decryptedTitle(for: record.id)
+                        )
+                        .accessibilityIdentifier("case-card-\(record.id)")
+                        .onTapGesture {
+                            Task { await vm.selectRecord(record) }
+                        }
                     }
                 }
+                .listStyle(.plain)
+                .accessibilityIdentifier("case-list")
             }
-            .listStyle(.plain)
-            .accessibilityIdentifier("case-list")
 
             // Pagination
             if vm.totalPages > 1 {
@@ -473,3 +514,13 @@ private struct CreateCasePlaceholderSheet: View {
 }
 
 // Color.init(hex:) is defined in ReportTypePicker.swift — reused here.
+
+// MARK: - Display Type Icon Helper
+
+private func displayTypeIcon(_ dt: CaseDisplayType) -> String {
+    switch dt {
+    case .table: return "list.bullet"
+    case .calendar: return "calendar"
+    case .timeline: return "clock"
+    }
+}
