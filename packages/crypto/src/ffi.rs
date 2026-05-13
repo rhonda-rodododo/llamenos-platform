@@ -550,9 +550,7 @@ pub fn mobile_shamir_combine(
 ///
 /// Returns the 32-byte commitment as a hex string.
 #[uniffi::export]
-pub fn mobile_shamir_commit(
-    share: &crate::shamir::ShamirShare,
-) -> String {
+pub fn mobile_shamir_commit(share: &crate::shamir::ShamirShare) -> String {
     let share = share.to_share().expect("invalid hex in ShamirShare");
     hex::encode(crate::shamir::commit(&share))
 }

@@ -33,8 +33,8 @@ pub mod device_keys;
 pub mod hpke_envelope;
 pub mod labels;
 pub mod puk;
-pub mod sigchain;
 pub mod shamir;
+pub mod sigchain;
 
 pub mod mls;
 pub mod sframe;

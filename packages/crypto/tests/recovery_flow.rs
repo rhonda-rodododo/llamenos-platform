@@ -12,10 +12,11 @@
 
 use llamenos_core::hpke_envelope::{generate_x25519_keypair, hpke_open, hpke_seal};
 use llamenos_core::labels::{
-    LABEL_RECOVERY_GROUP_SHARE_WRAP, LABEL_RECOVERY_PUK_SEED_WRAP,
-    LABEL_RECOVERY_SHARE_CONTRIBUTE,
+    LABEL_RECOVERY_GROUP_SHARE_WRAP, LABEL_RECOVERY_PUK_SEED_WRAP, LABEL_RECOVERY_SHARE_CONTRIBUTE,
 };
-use llamenos_core::shamir::{combine, commit, generate_recovery_group_keypair, split, verify, Share};
+use llamenos_core::shamir::{
+    combine, commit, generate_recovery_group_keypair, split, verify, Share,
+};
 
 #[test]
 fn full_recovery_ceremony_flow() {

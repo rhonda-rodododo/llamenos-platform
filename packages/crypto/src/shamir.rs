@@ -189,12 +189,12 @@ pub fn split(secret: &[u8], total: u8, threshold: u8) -> Result<Vec<Share>, Cryp
         .collect();
 
     // For each byte of the secret, evaluate the polynomial at each share's x
-    for byte_idx in 0..secret_len {
+    for (byte_idx, secret_byte) in secret.iter().enumerate() {
         let coeff_offset = byte_idx * (threshold as usize - 1);
 
         for share in shares.iter_mut() {
             // Evaluate polynomial: secret[byte_idx] + c1*x + c2*x^2 + ... + c_{k-1}*x^{k-1}
-            let mut value = secret[byte_idx];
+            let mut value = *secret_byte;
             let mut x_power = share.x; // x^1
 
             for coeff_idx in 0..(threshold as usize - 1) {
@@ -223,9 +223,7 @@ pub fn split(secret: &[u8], total: u8, threshold: u8) -> Result<Vec<Share>, Cryp
 /// as long as the shares are consistent.
 pub fn combine(shares: &[Share]) -> Result<Vec<u8>, CryptoError> {
     if shares.is_empty() {
-        return Err(CryptoError::InvalidInput(
-            "no shares provided".to_string(),
-        ));
+        return Err(CryptoError::InvalidInput("no shares provided".to_string()));
     }
 
     // Verify all shares have the same y length
@@ -258,12 +256,12 @@ pub fn combine(shares: &[Share]) -> Result<Vec<u8>, CryptoError> {
     let mut secret = vec![0u8; secret_len];
 
     // Lagrange interpolation at x=0 for each byte position
-    for byte_idx in 0..secret_len {
+    for (byte_idx, _) in shares[0].y.iter().enumerate() {
         let mut value = 0u8;
 
-        for i in 0..shares.len() {
-            let xi = shares[i].x;
-            let yi = shares[i].y[byte_idx];
+        for (i, share_i) in shares.iter().enumerate() {
+            let xi = share_i.x;
+            let yi = share_i.y[byte_idx];
 
             // Compute Lagrange basis polynomial L_i(0)
             // L_i(0) = product_{j != i} (0 - x_j) / (x_i - x_j)
@@ -272,11 +270,11 @@ pub fn combine(shares: &[Share]) -> Result<Vec<u8>, CryptoError> {
             let mut numerator = 1u8;
             let mut denominator = 1u8;
 
-            for j in 0..shares.len() {
+            for (j, share_j) in shares.iter().enumerate() {
                 if i == j {
                     continue;
                 }
-                let xj = shares[j].x;
+                let xj = share_j.x;
                 numerator = gf256_mul(numerator, xj); // product of x_j
                 denominator = gf256_mul(denominator, gf256_add(xi, xj)); // product of (x_i XOR x_j)
             }
@@ -418,11 +416,7 @@ mod tests {
         for a in 1..=255u8 {
             let inv = gf256_inv(a);
             assert_ne!(inv, 0, "inverse of nonzero element should be nonzero");
-            assert_eq!(
-                gf256_mul(a, inv),
-                1,
-                "a * a^(-1) should equal 1 for a={a}"
-            );
+            assert_eq!(gf256_mul(a, inv), 1, "a * a^(-1) should equal 1 for a={a}");
         }
     }
 
@@ -551,7 +545,10 @@ mod tests {
         // 2 shares (below threshold of 3) should produce wrong output
         let subset = vec![shares[0].clone(), shares[1].clone()];
         let wrong = combine(&subset).unwrap();
-        assert_ne!(wrong, secret, "below-threshold reconstruction should not match secret");
+        assert_ne!(
+            wrong, secret,
+            "below-threshold reconstruction should not match secret"
+        );
     }
 
     #[test]
@@ -612,7 +609,10 @@ mod tests {
         // Tamper with y
         let mut tampered = shares[0].clone();
         tampered.y[0] ^= 0x01;
-        assert!(!verify(&tampered, &commitment), "tampered y should fail verification");
+        assert!(
+            !verify(&tampered, &commitment),
+            "tampered y should fail verification"
+        );
     }
 
     #[test]
@@ -624,7 +624,10 @@ mod tests {
         // Tamper with x
         let mut tampered = shares[0].clone();
         tampered.x = if tampered.x == 1 { 2 } else { 1 };
-        assert!(!verify(&tampered, &commitment), "tampered x should fail verification");
+        assert!(
+            !verify(&tampered, &commitment),
+            "tampered x should fail verification"
+        );
     }
 
     // =========================================================================
@@ -636,7 +639,10 @@ mod tests {
         let secret = random_secret(32);
         let result = split(&secret, 3, 1);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("threshold must be at least 2"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("threshold must be at least 2"));
     }
 
     #[test]
@@ -644,7 +650,10 @@ mod tests {
         let secret = random_secret(32);
         let result = split(&secret, 5, 6);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("threshold must be at most 5"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("threshold must be at most 5"));
     }
 
     #[test]
@@ -652,7 +661,10 @@ mod tests {
         let secret = random_secret(32);
         let result = split(&secret, 2, 2);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("total shares must be at least 3"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("total shares must be at least 3"));
     }
 
     #[test]
@@ -660,7 +672,10 @@ mod tests {
         let secret = random_secret(32);
         let result = split(&secret, 6, 3);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("total shares must be at most 5"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("total shares must be at most 5"));
     }
 
     #[test]
@@ -668,32 +683,41 @@ mod tests {
         let secret = random_secret(32);
         let result = split(&secret, 3, 4);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("must not exceed total"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("must not exceed total"));
     }
 
     #[test]
     fn empty_secret_rejected() {
         let result = split(&[], 3, 2);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("secret must not be empty"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("secret must not be empty"));
     }
 
     #[test]
     fn empty_shares_rejected() {
         let result = combine(&[]);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("no shares provided"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("no shares provided"));
     }
 
     #[test]
     fn duplicate_x_rejected() {
-        let share = Share {
-            x: 1,
-            y: vec![42],
-        };
+        let share = Share { x: 1, y: vec![42] };
         let result = combine(&[share.clone(), share]);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("duplicate share x value"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("duplicate share x value"));
     }
 
     // =========================================================================
@@ -751,7 +775,10 @@ mod tests {
             .iter()
             .zip(shares2.iter())
             .any(|(s1, s2)| s1.y != s2.y);
-        assert!(any_differ, "two splits of the same secret should produce different shares");
+        assert!(
+            any_differ,
+            "two splits of the same secret should produce different shares"
+        );
     }
 
     // =========================================================================
@@ -772,10 +799,8 @@ mod tests {
         // Round-trip: seal a PUK seed under the recovery group pubkey, open with privkey
         let puk_seed = random_secret(32);
         let aad = b"test-hub-id:puk-seed";
-        let envelope =
-            hpke_seal(&puk_seed, &pk_hex, LABEL_RECOVERY_PUK_SEED_WRAP, aad).unwrap();
-        let decrypted =
-            hpke_open(&envelope, &sk_hex, LABEL_RECOVERY_PUK_SEED_WRAP, aad).unwrap();
+        let envelope = hpke_seal(&puk_seed, &pk_hex, LABEL_RECOVERY_PUK_SEED_WRAP, aad).unwrap();
+        let decrypted = hpke_open(&envelope, &sk_hex, LABEL_RECOVERY_PUK_SEED_WRAP, aad).unwrap();
         assert_eq!(decrypted, puk_seed);
     }
 

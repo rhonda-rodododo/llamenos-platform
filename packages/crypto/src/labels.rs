@@ -374,10 +374,10 @@ pub const LABEL_REGISTRY: &[&str] = &[
     LABEL_SERVER_SIGNING_INFO,              // 67
     LABEL_WS_CHALLENGE,                     // 68
     // 69-72: Recovery Group
-    LABEL_RECOVERY_GROUP_SHARE_WRAP,  // 69
-    LABEL_RECOVERY_PUK_SEED_WRAP,     // 70
-    LABEL_RECOVERY_SHARE_CONTRIBUTE,  // 71
-    LABEL_RECOVERY_LIVENESS_PROOF,    // 72
+    LABEL_RECOVERY_GROUP_SHARE_WRAP, // 69
+    LABEL_RECOVERY_PUK_SEED_WRAP,    // 70
+    LABEL_RECOVERY_SHARE_CONTRIBUTE, // 71
+    LABEL_RECOVERY_LIVENESS_PROOF,   // 72
 ];
 
 /// Look up a label string by its numeric ID.

@@ -130,7 +130,7 @@ pub fn create_initial_puk(
     let state = derive_puk_subkeys(&seed, 1);
 
     // Seal seed to device
-    let aad = format!("{}:{}", LABEL_PUK_WRAP_TO_DEVICE, device_id);
+        let aad = format!("{LABEL_PUK_WRAP_TO_DEVICE}:{device_id}");
     let envelope = hpke_seal(
         &seed,
         device_encryption_pubkey_hex,
@@ -167,7 +167,7 @@ pub fn rotate_puk(
     // Seal new seed to each remaining device
     let mut device_envelopes = Vec::with_capacity(remaining_devices.len());
     for (device_id, pubkey_hex) in remaining_devices {
-        let aad = format!("{}:{}", LABEL_PUK_WRAP_TO_DEVICE, device_id);
+    let aad = format!("{LABEL_PUK_WRAP_TO_DEVICE}:{device_id}");
         let envelope = hpke_seal(
             &new_seed,
             pubkey_hex,
@@ -202,7 +202,7 @@ fn encrypt_clkr_link(
     let nonce = Nonce::from_slice(&nonce_bytes);
 
     // Include generation in AAD to prevent replay
-    let aad_str = format!("{}:{generation}", LABEL_PUK_PREVIOUS_GEN);
+    let aad_str = format!("{LABEL_PUK_PREVIOUS_GEN}:{generation}");
 
     let cipher = Aes256Gcm::new_from_slice(secretbox_key)
         .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
@@ -238,7 +238,7 @@ pub fn decrypt_clkr_link(
     let nonce = Nonce::from_slice(&data[..12]);
     let ciphertext = &data[12..];
 
-    let aad_str = format!("{}:{generation}", LABEL_PUK_PREVIOUS_GEN);
+    let aad_str = format!("{LABEL_PUK_PREVIOUS_GEN}:{generation}");
 
     let cipher = Aes256Gcm::new_from_slice(secretbox_key)
         .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
