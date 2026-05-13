@@ -138,6 +138,7 @@ export const auditLog = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
+    erasedAt: timestamp('erased_at', { withTimezone: true }),
   },
   (table) => [
     index('audit_log_hub_id_created_at_idx').on(
