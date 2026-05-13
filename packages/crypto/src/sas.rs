@@ -16,70 +16,70 @@ use crate::labels::LABEL_SAS_DERIVE;
 /// The 64-entry emoji table for SAS verification display.
 /// Each index (0-63) maps to a single emoji codepoint.
 pub const SAS_EMOJI_TABLE: [&str; 64] = [
-    "\u{1F436}", // dog
-    "\u{1F431}", // cat
-    "\u{1F434}", // horse
-    "\u{1F437}", // pig
-    "\u{1F430}", // rabbit
-    "\u{1F43B}", // bear
-    "\u{1F42F}", // tiger
-    "\u{1F428}", // koala
-    "\u{1F43C}", // panda
-    "\u{1F981}", // lion
-    "\u{1F984}", // unicorn
-    "\u{1F422}", // turtle
-    "\u{1F420}", // tropical fish
-    "\u{1F419}", // octopus
-    "\u{1F98B}", // butterfly
-    "\u{1F33B}", // sunflower
-    "\u{1F332}", // evergreen tree
-    "\u{1F335}", // cactus
-    "\u{1F344}", // mushroom
-    "\u{1F30D}", // globe
-    "\u{1F319}", // crescent moon
-    "\u{2B50}",  // star
-    "\u{26A1}",  // lightning
-    "\u{1F525}", // fire
-    "\u{1F4A7}", // droplet
+    "\u{1F436}",         // dog
+    "\u{1F431}",         // cat
+    "\u{1F434}",         // horse
+    "\u{1F437}",         // pig
+    "\u{1F430}",         // rabbit
+    "\u{1F43B}",         // bear
+    "\u{1F42F}",         // tiger
+    "\u{1F428}",         // koala
+    "\u{1F43C}",         // panda
+    "\u{1F981}",         // lion
+    "\u{1F984}",         // unicorn
+    "\u{1F422}",         // turtle
+    "\u{1F420}",         // tropical fish
+    "\u{1F419}",         // octopus
+    "\u{1F98B}",         // butterfly
+    "\u{1F33B}",         // sunflower
+    "\u{1F332}",         // evergreen tree
+    "\u{1F335}",         // cactus
+    "\u{1F344}",         // mushroom
+    "\u{1F30D}",         // globe
+    "\u{1F319}",         // crescent moon
+    "\u{2B50}",          // star
+    "\u{26A1}",          // lightning
+    "\u{1F525}",         // fire
+    "\u{1F4A7}",         // droplet
     "\u{2744}\u{FE0F}",  // snowflake
-    "\u{1F308}", // rainbow
+    "\u{1F308}",         // rainbow
     "\u{2600}\u{FE0F}",  // sun
     "\u{2601}\u{FE0F}",  // cloud
-    "\u{1F30A}", // wave
+    "\u{1F30A}",         // wave
     "\u{1F3D4}\u{FE0F}", // mountain
     "\u{1F3DD}\u{FE0F}", // desert island
-    "\u{1F680}", // rocket
+    "\u{1F680}",         // rocket
     "\u{2708}\u{FE0F}",  // airplane
-    "\u{1F6A2}", // ship
-    "\u{1F3E0}", // house
-    "\u{1F3F0}", // castle
-    "\u{1F3A8}", // palette
-    "\u{1F3B5}", // music note
-    "\u{1F3B2}", // dice
-    "\u{1F3C6}", // trophy
-    "\u{1F48E}", // gem
-    "\u{1F511}", // key
+    "\u{1F6A2}",         // ship
+    "\u{1F3E0}",         // house
+    "\u{1F3F0}",         // castle
+    "\u{1F3A8}",         // palette
+    "\u{1F3B5}",         // music note
+    "\u{1F3B2}",         // dice
+    "\u{1F3C6}",         // trophy
+    "\u{1F48E}",         // gem
+    "\u{1F511}",         // key
     "\u{1F6E1}\u{FE0F}", // shield
     "\u{2764}\u{FE0F}",  // heart
-    "\u{1F31F}", // glowing star
-    "\u{1F3AF}", // bullseye
-    "\u{1F52E}", // crystal ball
-    "\u{1F9E9}", // puzzle piece
-    "\u{1F3C0}", // basketball
-    "\u{26BD}",  // soccer ball
-    "\u{1F3B3}", // bowling
-    "\u{1F40C}", // snail
-    "\u{1F98A}", // fox
-    "\u{1F427}", // penguin
-    "\u{1F989}", // owl
-    "\u{1F99C}", // parrot
-    "\u{1F982}", // scorpion
-    "\u{1F980}", // crab
-    "\u{1F41D}", // honeybee
-    "\u{1F33F}", // herb
-    "\u{1F34E}", // apple
-    "\u{1F352}", // cherries
-    "\u{1F349}", // watermelon
+    "\u{1F31F}",         // glowing star
+    "\u{1F3AF}",         // bullseye
+    "\u{1F52E}",         // crystal ball
+    "\u{1F9E9}",         // puzzle piece
+    "\u{1F3C0}",         // basketball
+    "\u{26BD}",          // soccer ball
+    "\u{1F3B3}",         // bowling
+    "\u{1F40C}",         // snail
+    "\u{1F98A}",         // fox
+    "\u{1F427}",         // penguin
+    "\u{1F989}",         // owl
+    "\u{1F99C}",         // parrot
+    "\u{1F982}",         // scorpion
+    "\u{1F980}",         // crab
+    "\u{1F41D}",         // honeybee
+    "\u{1F33F}",         // herb
+    "\u{1F34E}",         // apple
+    "\u{1F352}",         // cherries
+    "\u{1F349}",         // watermelon
 ];
 
 /// Derive 7 SAS emoji indices from two Ed25519 public keys and a session nonce.
@@ -115,7 +115,9 @@ pub fn derive_sas(
     // Extract seven 6-bit values from 42 bits of the 48-bit output.
     // The 48-bit value is stored big-endian in output[0..6].
     // Bits 0-5 are unused.
-    let bits = u64::from_be_bytes([0, 0, output[0], output[1], output[2], output[3], output[4], output[5]]);
+    let bits = u64::from_be_bytes([
+        0, 0, output[0], output[1], output[2], output[3], output[4], output[5],
+    ]);
     let mut indices = [0u8; 7];
     for (i, idx) in indices.iter_mut().enumerate() {
         // Shift to extract group starting at bit (42 - 6*i) in the 48-bit value

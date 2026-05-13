@@ -365,7 +365,7 @@ pub const LABEL_REGISTRY: &[&str] = &[
     LABEL_SERVER_SIGNING_INFO,              // 67
     LABEL_WS_CHALLENGE,                     // 68
     // 69: SAS derivation
-    LABEL_SAS_DERIVE,                       // 69
+    LABEL_SAS_DERIVE, // 69
 ];
 
 /// Look up a label string by its numeric ID.
