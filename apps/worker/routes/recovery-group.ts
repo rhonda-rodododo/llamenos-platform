@@ -378,8 +378,8 @@ publicRoutes.post('/initiate',
 
     // Signal notifier function — sends verification code via sidecar
     const signalNotifierFn = async (identifierHash: string, code: string): Promise<boolean> => {
-      const notifierUrl = c.env.SIGNAL_NOTIFIER_URL || 'http://localhost:3100'
-      const notifierToken = c.env.SIGNAL_NOTIFIER_BEARER_TOKEN || ''
+      const notifierUrl = c.env.NOTIFIER_URL || 'http://localhost:3100'
+      const notifierToken = c.env.NOTIFIER_API_KEY || ''
 
       try {
         const res = await fetch(`${notifierUrl}/api/send`, {
