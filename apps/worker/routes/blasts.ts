@@ -7,6 +7,8 @@ import { okResponseSchema } from '@protocol/schemas/common'
 import { authErrors } from '../openapi/helpers'
 import { createLogger } from '../lib/logger'
 import { backgroundTask } from '../lib/hono-compat'
+import { publishEvent } from '../lib/ws-events'
+import { KIND_BLAST_PROGRESS } from '@shared/event-kinds'
 
 const logger = createLogger('routes.blasts')
 
@@ -498,8 +500,17 @@ blasts.post('/:id/deliveries/:deliveryId/retry',
   async (c) => {
     const blastId = c.req.param('id')
     const deliveryId = c.req.param('deliveryId')
+    const hubId = c.get('hubId')
     const services = c.get('services')
     const delivery = await services.blasts.retryDelivery(blastId, deliveryId)
+    // Emit progress event so UI updates in real-time
+    backgroundTask(c,
+      services.blasts.computeBlastStats(blastId).then((stats) => {
+        publishEvent(c.env, KIND_BLAST_PROGRESS, { type: 'blast:progress', hubId, blastId, stats, batch: [] }, hubId)
+      }).catch((err) => {
+        logger.warn('Failed to emit blast progress after retryDelivery', err)
+      })
+    )
     return c.json({ ok: true, delivery })
   },
 )
@@ -523,8 +534,17 @@ blasts.post('/:id/retry-failed',
   requirePermission('blasts:send'),
   async (c) => {
     const blastId = c.req.param('id')
+    const hubId = c.get('hubId')
     const services = c.get('services')
     const retriedCount = await services.blasts.retryFailedDeliveries(blastId)
+    // Emit progress event so UI updates in real-time
+    backgroundTask(c,
+      services.blasts.computeBlastStats(blastId).then((stats) => {
+        publishEvent(c.env, KIND_BLAST_PROGRESS, { type: 'blast:progress', hubId, blastId, stats, batch: [] }, hubId)
+      }).catch((err) => {
+        logger.warn('Failed to emit blast progress after retryFailedDeliveries', err)
+      })
+    )
     return c.json({ ok: true, retriedCount })
   },
 )
