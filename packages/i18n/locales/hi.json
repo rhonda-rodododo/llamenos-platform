@@ -189,7 +189,14 @@
     "users": "Volunteers",
     "schemaBrowser": "Schema Browser",
     "providerSetup": "Provider Setup",
-    "signalRegistration": "Signal Registration"
+    "signalRegistration": "Signal Registration",
+    "eventsMigrationTitle": "Legacy Events Migration",
+    "eventsMigrationDesc": "{{count}} events need migration to the entity record system.",
+    "eventsMigrateBtn": "Migrate Events",
+    "eventsMigrationComplete": "Events migration complete",
+    "eventsMigrationError": "Migration failed",
+    "checkingMigration": "Checking migration status...",
+    "eventsMigratingProgress": "Migrating... {{migrated}} of {{count}}"
   },
   "announcement": "Announcement",
   "announcementBody": "Announcement body",
@@ -751,15 +758,11 @@
     "submit": "सबमिट करें",
     "success": "सफलता",
     "yes": "हाँ",
-    "ok": "OK",
-    "create": "Create",
-    "all": "All",
-    "previous": "Previous",
     "comingSoon": "Coming soon",
     "hideAdvanced": "Hide Advanced",
     "showAdvanced": "Show Advanced",
     "saved": "Saved",
-"unauthorized": "Unauthorized"
+    "unauthorized": "Unauthorized"
   },
   "confirm": {
     "backup": "Confirm Backup",
@@ -3442,6 +3445,64 @@
     },
     "setupComplete": {
       "footer": "Webhook setup complete"
+    }
+  },
+  "entityTemplates": {
+    "title": "Entity Templates",
+    "apply": "Apply Template",
+    "applied": "Applied",
+    "notApplied": "Not Applied",
+    "applyBtn": "Enable for this hub",
+    "applySuccess": "Template applied successfully",
+    "applyError": "Failed to apply template",
+    "builtinBadge": "Built-in",
+    "templates": {
+      "case": {
+        "label": "Case",
+        "labelPlural": "Cases",
+        "description": "General-purpose case for tracking incidents and follow-up."
+      },
+      "event": {
+        "label": "Event",
+        "labelPlural": "Events",
+        "description": "Time-bounded event with encrypted dates and location."
+      },
+      "incidentReport": {
+        "label": "Incident Report",
+        "labelPlural": "Incident Reports",
+        "description": "Triage-oriented incident documentation with severity tracking."
+      },
+      "contactNote": {
+        "label": "Contact Note",
+        "labelPlural": "Contact Notes",
+        "description": "Minimal note linked to a contact."
+      }
+    },
+    "fields": {
+      "startDate": "Start Date",
+      "endDate": "End Date",
+      "location": "Location",
+      "title": "Title",
+      "description": "Description",
+      "note": "Note",
+      "date": "Date",
+      "incidentDate": "Incident Date/Time",
+      "incidentLocation": "Incident Location",
+      "whatHappened": "What Happened"
+    },
+    "statuses": {
+      "open": "Open",
+      "inProgress": "In Progress",
+      "resolved": "Resolved",
+      "closed": "Closed",
+      "planned": "Planned",
+      "active": "Active",
+      "concluded": "Concluded",
+      "cancelled": "Cancelled",
+      "new": "New",
+      "underReview": "Under Review",
+      "documented": "Documented",
+      "archived": "Archived"
     }
   }
 }

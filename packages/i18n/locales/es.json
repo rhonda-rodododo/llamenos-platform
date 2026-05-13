@@ -189,7 +189,14 @@
     "users": "Volunteers",
     "schemaBrowser": "Schema Browser",
     "providerSetup": "Provider Setup",
-    "signalRegistration": "Signal Registration"
+    "signalRegistration": "Signal Registration",
+    "eventsMigrationTitle": "Migración de Eventos Legados",
+    "eventsMigrationDesc": "{{count}} eventos necesitan migración al sistema de registros de entidades.",
+    "eventsMigrateBtn": "Migrar Eventos",
+    "eventsMigrationComplete": "Migración de eventos completada",
+    "eventsMigrationError": "Error en la migración",
+    "checkingMigration": "Verificando estado de migración...",
+    "eventsMigratingProgress": "Migrando... {{migrated}} de {{count}}"
   },
   "announcement": "Announcement",
   "announcementBody": "Announcement body",
@@ -751,15 +758,11 @@
     "submit": "Enviar",
     "success": "Éxito",
     "yes": "Sí",
-    "ok": "OK",
-    "create": "Create",
-    "all": "All",
-    "previous": "Previous",
     "comingSoon": "Coming soon",
     "hideAdvanced": "Hide Advanced",
     "showAdvanced": "Show Advanced",
     "saved": "Saved",
-"unauthorized": "Unauthorized"
+    "unauthorized": "Unauthorized"
   },
   "confirm": {
     "backup": "Confirm Backup",
@@ -1049,6 +1052,64 @@
     "sec": "%ds"
   },
   "encryptingKeys": "Encrypting keys...",
+  "entityTemplates": {
+    "title": "Plantillas de Entidades",
+    "apply": "Aplicar Plantilla",
+    "applied": "Aplicada",
+    "notApplied": "No Aplicada",
+    "applyBtn": "Activar para este hub",
+    "applySuccess": "Plantilla aplicada con éxito",
+    "applyError": "Error al aplicar la plantilla",
+    "builtinBadge": "Integrada",
+    "templates": {
+      "case": {
+        "label": "Caso",
+        "labelPlural": "Casos",
+        "description": "Caso de uso general para seguimiento de incidentes."
+      },
+      "event": {
+        "label": "Evento",
+        "labelPlural": "Eventos",
+        "description": "Evento con fechas y ubicación cifradas."
+      },
+      "incidentReport": {
+        "label": "Informe de Incidente",
+        "labelPlural": "Informes de Incidentes",
+        "description": "Documentación de incidentes con seguimiento de gravedad."
+      },
+      "contactNote": {
+        "label": "Nota de Contacto",
+        "labelPlural": "Notas de Contacto",
+        "description": "Nota mínima vinculada a un contacto."
+      }
+    },
+    "fields": {
+      "startDate": "Fecha de Inicio",
+      "endDate": "Fecha de Fin",
+      "location": "Ubicación",
+      "title": "Título",
+      "description": "Descripción",
+      "note": "Nota",
+      "date": "Fecha",
+      "incidentDate": "Fecha/Hora del Incidente",
+      "incidentLocation": "Ubicación del Incidente",
+      "whatHappened": "Qué Ocurrió"
+    },
+    "statuses": {
+      "open": "Abierto",
+      "inProgress": "En Progreso",
+      "resolved": "Resuelto",
+      "closed": "Cerrado",
+      "planned": "Planificado",
+      "active": "Activo",
+      "concluded": "Concluido",
+      "cancelled": "Cancelado",
+      "new": "Nuevo",
+      "underReview": "En Revisión",
+      "documented": "Documentado",
+      "archived": "Archivado"
+    }
+  },
   "error": {
     "biometricNotAvailable": "Biometric authentication is not available",
     "boundary": {
