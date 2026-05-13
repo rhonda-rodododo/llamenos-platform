@@ -130,7 +130,7 @@ pub fn create_initial_puk(
     let state = derive_puk_subkeys(&seed, 1);
 
     // Seal seed to device
-        let aad = format!("{LABEL_PUK_WRAP_TO_DEVICE}:{device_id}");
+    let aad = format!("{LABEL_PUK_WRAP_TO_DEVICE}:{device_id}");
     let envelope = hpke_seal(
         &seed,
         device_encryption_pubkey_hex,
@@ -167,7 +167,7 @@ pub fn rotate_puk(
     // Seal new seed to each remaining device
     let mut device_envelopes = Vec::with_capacity(remaining_devices.len());
     for (device_id, pubkey_hex) in remaining_devices {
-    let aad = format!("{LABEL_PUK_WRAP_TO_DEVICE}:{device_id}");
+        let aad = format!("{LABEL_PUK_WRAP_TO_DEVICE}:{device_id}");
         let envelope = hpke_seal(
             &new_seed,
             pubkey_hex,
