@@ -1141,7 +1141,8 @@ export class SettingsService {
    * This legacy method stores credentials in plaintext and will be removed in a future release.
    */
   async updateTelephonyProvider(
-    _data: TelephonyProviderConfig,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _config: TelephonyProviderConfig,
   ): Promise<never> {
     throw new ServiceError(
       400,
@@ -1307,7 +1308,7 @@ export class SettingsService {
     if (!data || typeof data !== 'object') {
       throw new ServiceError(400, 'Invalid request')
     }
-    const { name, slug, permissions, description, encryptedName, encryptedDescription, envelopes } = data
+    const { slug, permissions, description, encryptedName, encryptedDescription, envelopes } = data
     if (!slug || !permissions) {
       throw new ServiceError(
         400,
@@ -1336,12 +1337,12 @@ export class SettingsService {
     const now = new Date()
     const id = data.id ?? `role-${crypto.randomUUID()}`
 
-    const roleName = name ?? ''
+    // Non-system roles: do not store plaintext name (only encrypted envelopes)
     const roleDescription = description ?? ''
 
     await this.db.insert(rolesTable).values({
       id,
-      name: roleName,
+      // name intentionally omitted — will be NULL (zero-knowledge: stored only in encrypted envelopes)
       slug,
       permissions: permissions as string[],
       isDefault: false,
@@ -1368,7 +1369,7 @@ export class SettingsService {
 
     return {
       id,
-      name: roleName,
+      name: null,
       slug,
       permissions: permissions as string[],
       isDefault: false,
@@ -1396,8 +1397,8 @@ export class SettingsService {
     }
 
     const now = new Date()
+    // Never store plaintext name for non-system roles — name column stays null
     const updates: Record<string, unknown> = { updatedAt: now }
-    if (data.name) updates.name = data.name
     if (data.description) updates.description = data.description
     if (data.permissions) updates.permissions = data.permissions as string[]
 
@@ -1476,7 +1477,7 @@ export class SettingsService {
     return { ok: true }
   }
 
-  async getEffectivePermissions(userId: string): Promise<{ userId: string; permissions: string[] }> {
+  async getEffectivePermissions(userId: string, hubId?: string): Promise<{ userId: string; permissions: string[] }> {
     const [user] = await this.db
       .select()
       .from(users)
@@ -1485,15 +1486,24 @@ export class SettingsService {
       throw new ServiceError(404, 'User not found')
     }
 
-    const { resolveHubPermissions } = await import('@shared/permissions')
+    const { resolveHubPermissions, resolvePermissions } = await import('@shared/permissions')
     const allRoles = await this.getRoles()
     const hubRoles = Array.isArray(user.hubRoles) ? user.hubRoles as Array<{ hubId: string; roleIds: string[] }> : []
-    const permissions = resolveHubPermissions(
-      user.roles ?? [],
-      hubRoles,
-      allRoles.roles,
-      '',
-    )
+
+    let permissions: string[]
+    if (hubId) {
+      // Resolve for a specific hub (global + that hub's roles)
+      permissions = resolveHubPermissions(user.roles ?? [], hubRoles, allRoles.roles, hubId)
+    } else {
+      // Union global permissions with all hub-scoped permissions
+      const allPerms = new Set<string>(resolvePermissions(user.roles ?? [], allRoles.roles))
+      for (const assignment of hubRoles) {
+        for (const p of resolveHubPermissions(user.roles ?? [], hubRoles, allRoles.roles, assignment.hubId)) {
+          allPerms.add(p)
+        }
+      }
+      permissions = Array.from(allPerms)
+    }
     return { userId, permissions }
   }
 

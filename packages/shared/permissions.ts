@@ -202,30 +202,12 @@ export const PERMISSION_CATALOG = {
 export type Permission = keyof typeof PERMISSION_CATALOG
 
 /** Human-readable labels for permission domains, used in the permission picker UI. */
-export const PERMISSION_GROUP_LABELS: Record<string, string> = {
-  audit: 'Audit',
-  bans: 'Bans',
-  blasts: 'Blasts',
-  calls: 'Calls',
-  cases: 'Cases',
-  contacts: 'Contacts',
-  conversations: 'Conversations',
-  events: 'Events',
-  evidence: 'Evidence',
-  files: 'Files',
-  firehose: 'Firehose',
-  hubs: 'Hubs',
-  invites: 'Invites',
-  messaging: 'Messaging',
-  metrics: 'Metrics',
-  notes: 'Notes',
-  reports: 'Reports',
-  settings: 'Settings',
-  shifts: 'Shifts',
-  system: 'System',
-  telephony: 'Telephony',
-  users: 'Users',
-}
+/** Permission group domain keys. Display labels live in i18n at permissions.groups.* */
+export const PERMISSION_GROUP_DOMAINS = [
+  'audit', 'bans', 'blasts', 'calls', 'cases', 'contacts', 'conversations',
+  'events', 'evidence', 'files', 'firehose', 'hubs', 'invites', 'messaging',
+  'metrics', 'notes', 'reports', 'settings', 'shifts', 'system', 'telephony', 'users',
+] as const
 
 /** All permission domains (first part before the colon) */
 export type PermissionDomain = Permission extends `${infer D}:${string}` ? D : never
@@ -245,7 +227,8 @@ export function getPermissionsByDomain(): Record<string, { key: Permission; labe
 
 export interface Role {
   id: string
-  name: string
+  /** null for non-system roles — plaintext name stored only in encrypted envelopes */
+  name: string | null
   slug: string
   permissions: string[]
   isDefault: boolean   // ships with system

@@ -14,7 +14,6 @@
 import { relations } from 'drizzle-orm'
 import {
   index,
-  jsonb,
   pgTable,
   text,
   timestamp,
@@ -46,7 +45,7 @@ export const userRoleEnvelopes = pgTable(
      * Encrypted with the user's X25519 public key.
      * Encoding: base64url(ciphertext)
      */
-    encryptedPermissions: jsonb('encrypted_permissions').notNull(),
+    encryptedPermissions: text('encrypted_permissions').notNull(),
     /**
      * HPKE KEM output (ephemeral sender public key material).
      * Encoding: base64url(kem_output)

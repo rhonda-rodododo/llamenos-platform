@@ -436,7 +436,7 @@ settings.post('/telephony-provider/test',
     const body = c.req.valid('json')
     try {
       let testUrl: string
-      let testHeaders: Record<string, string> = {}
+      const testHeaders: Record<string, string> = {}
 
       switch (body.type) {
         case 'twilio':
@@ -957,8 +957,9 @@ settings.get('/users/:id/effective-permissions',
   requirePermission('users:read'),
   async (c) => {
     const id = c.req.param('id')
+    const hubId = c.req.query('hubId') || undefined
     const services = c.get('services')
-    const result = await services.settings.getEffectivePermissions(id)
+    const result = await services.settings.getEffectivePermissions(id, hubId)
     return c.json(result)
   },
 )

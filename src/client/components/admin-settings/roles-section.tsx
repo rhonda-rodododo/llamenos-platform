@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '@/lib/toast'
+import { useAuth } from '@/lib/auth'
 import {
   listRoles,
   createRole,
@@ -50,6 +51,8 @@ interface RoleFormData {
 export function RolesSection({ expanded, onToggle, statusSummary }: Props) {
   const { t } = useTranslation()
   const { toast } = useToast()
+  const { hasPermission } = useAuth()
+  const canManageRoles = hasPermission('system:manage-roles')
 
   const [roles, setRoles] = useState<RoleDefinition[]>([])
   const [catalog, setCatalog] = useState<PermissionCatalog | null>(null)
@@ -94,7 +97,7 @@ export function RolesSection({ expanded, onToggle, statusSummary }: Props) {
   function startEdit(role: RoleDefinition) {
     setEditingId(role.id)
     setForm({
-      name: role.name,
+      name: role.name ?? '',
       slug: role.slug,
       description: role.description,
       permissions: [...role.permissions],
@@ -219,8 +222,8 @@ export function RolesSection({ expanded, onToggle, statusSummary }: Props) {
     return domain.charAt(0).toUpperCase() + domain.slice(1).replace(/-/g, ' ')
   }
 
-  const canEdit = (role: RoleDefinition) => !role.isSystem
-  const canDelete = (role: RoleDefinition) => !role.isSystem && !role.isDefault
+  const canEdit = (role: RoleDefinition) => canManageRoles && !role.isSystem
+  const canDelete = (role: RoleDefinition) => canManageRoles && !role.isSystem && !role.isDefault
 
   if (loading) return null
 
@@ -247,7 +250,7 @@ export function RolesSection({ expanded, onToggle, statusSummary }: Props) {
           >
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium truncate">{role.name}</span>
+                <span className="text-sm font-medium truncate">{role.name ?? role.slug}</span>
                 {role.isSystem && (
                   <Badge variant="secondary" className="text-[10px] gap-1">
                     <Lock className="h-2.5 w-2.5" />
@@ -437,7 +440,7 @@ export function RolesSection({ expanded, onToggle, statusSummary }: Props) {
       )}
 
       {/* Create button (shown when not editing) */}
-      {editingId === null && (
+      {editingId === null && canManageRoles && (
         <Button variant="outline" onClick={startCreate}>
           <Plus className="h-4 w-4" />
           {t('roles.create', { defaultValue: 'Create role' })}
@@ -452,8 +455,8 @@ export function RolesSection({ expanded, onToggle, statusSummary }: Props) {
         description={
           deleteTarget
             ? t('roles.deleteConfirm.description', {
-                defaultValue: `Are you sure you want to delete "${deleteTarget.name}"? Users assigned this role will lose its permissions.`,
-                name: deleteTarget.name,
+                defaultValue: `Are you sure you want to delete "${deleteTarget.name ?? deleteTarget.slug}"? Users assigned this role will lose its permissions.`,
+                name: deleteTarget.name ?? deleteTarget.slug,
               })
             : ''
         }

@@ -110,7 +110,8 @@ export const hubKeys = pgTable(
 
 export const roles = pgTable('roles', {
   id: text('id').primaryKey(),
-  name: text('name').notNull(),
+  // null for non-system roles (name stored only in encrypted envelopes to maintain zero-knowledge)
+  name: text('name'),
   slug: text('slug').notNull().unique(),
   permissions: text('permissions')
     .array()

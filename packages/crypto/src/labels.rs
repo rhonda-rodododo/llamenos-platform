@@ -260,13 +260,13 @@ pub const LABEL_WS_CHALLENGE: &str = "llamenos:ws-auth:v1";
 // --- Role Encryption ---
 
 /// Platform role name encryption (per-admin HPKE envelope)
-pub const LABEL_PLATFORM_ROLE_NAME_ENCRYPT: &str = "llamenos:platform-role-name-encrypt";
+pub const LABEL_PLATFORM_ROLE_NAME_ENCRYPT: &str = "llamenos:platform-role-name-encrypt:v1";
 
 /// Platform role description encryption (per-admin HPKE envelope)
-pub const LABEL_PLATFORM_ROLE_DESC_ENCRYPT: &str = "llamenos:platform-role-desc-encrypt";
+pub const LABEL_PLATFORM_ROLE_DESC_ENCRYPT: &str = "llamenos:platform-role-desc-encrypt:v1";
 
 /// Hub role encryption (hub key symmetric encryption)
-pub const LABEL_HUB_ROLE_ENCRYPT: &str = "llamenos:hub-role-encrypt";
+pub const LABEL_HUB_ROLE_ENCRYPT: &str = "llamenos:hub-role-encrypt:v1";
 
 // =============================================================================
 // LABEL REGISTRY — maps numeric IDs (u8) to label strings.
@@ -484,13 +484,13 @@ mod tests {
         assert_eq!(LABEL_WS_CHALLENGE, "llamenos:ws-auth:v1");
         assert_eq!(
             LABEL_PLATFORM_ROLE_NAME_ENCRYPT,
-            "llamenos:platform-role-name-encrypt"
+            "llamenos:platform-role-name-encrypt:v1"
         );
         assert_eq!(
             LABEL_PLATFORM_ROLE_DESC_ENCRYPT,
-            "llamenos:platform-role-desc-encrypt"
+            "llamenos:platform-role-desc-encrypt:v1"
         );
-        assert_eq!(LABEL_HUB_ROLE_ENCRYPT, "llamenos:hub-role-encrypt");
+        assert_eq!(LABEL_HUB_ROLE_ENCRYPT, "llamenos:hub-role-encrypt:v1");
     }
 
     /// Verify registry index stability.

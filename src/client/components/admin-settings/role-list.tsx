@@ -20,7 +20,7 @@ export function RoleList({ roles, editingId, onEdit, onDelete }: RoleListProps) 
     if (!a.isSystem && b.isSystem) return 1
     if (a.isDefault && !b.isDefault) return -1
     if (!a.isDefault && b.isDefault) return 1
-    return a.name.localeCompare(b.name)
+    return (a.name ?? a.slug).localeCompare(b.name ?? b.slug)
   })
 
   return (
@@ -36,7 +36,7 @@ export function RoleList({ roles, editingId, onEdit, onDelete }: RoleListProps) 
         >
           <div className="flex items-center gap-2 min-w-0">
             <div className="truncate">
-              <span className="font-medium text-sm">{role.name}</span>
+              <span className="font-medium text-sm">{role.name ?? role.slug}</span>
               {role.description && (
                 <p className="text-xs text-muted-foreground truncate">{role.description}</p>
               )}

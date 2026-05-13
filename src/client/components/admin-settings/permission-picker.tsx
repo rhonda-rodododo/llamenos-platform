@@ -4,8 +4,6 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
 import { ChevronDown, ChevronRight } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { PERMISSION_GROUP_LABELS } from '@shared/permissions'
 
 interface PermissionPickerProps {
   catalog: Record<string, { key: string; label: string }[]>
@@ -156,7 +154,7 @@ export function PermissionPicker({ catalog, selected, onChange, excludeDomains =
               <Checkbox
                 checked={state === 'all' ? true : state === 'some' ? 'indeterminate' : false}
                 onCheckedChange={() => toggleDomainAll(domain, perms)}
-                aria-label={t('permissions.toggleAll', { domain: PERMISSION_GROUP_LABELS[domain] ?? domain })}
+                aria-label={t('permissions.toggleAll', { domain: t(`permissions.groups.${domain}`, { defaultValue: domain }) })}
               />
               <button
                 type="button"
@@ -164,7 +162,7 @@ export function PermissionPicker({ catalog, selected, onChange, excludeDomains =
                 onClick={() => toggleDomain(domain)}
               >
                 {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                {PERMISSION_GROUP_LABELS[domain] ?? domain}
+                {t(`permissions.groups.${domain}`, { defaultValue: domain })}
                 <span className="text-muted-foreground text-xs ml-auto">
                   {selectedCount}/{perms.length}
                 </span>

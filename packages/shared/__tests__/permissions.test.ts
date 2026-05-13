@@ -1,8 +1,7 @@
 import { describe, test, expect } from 'bun:test'
 import {
   PERMISSION_CATALOG,
-  PERMISSION_GROUP_LABELS,
-  Permission,
+  PERMISSION_GROUP_DOMAINS,
   permissionGranted,
   getPermissionsByDomain,
   isValidPermission,
@@ -38,19 +37,19 @@ describe('new system:view-* permissions', () => {
   })
 })
 
-describe('PERMISSION_GROUP_LABELS', () => {
-  test('every domain in catalog has a label', () => {
+describe('PERMISSION_GROUP_DOMAINS', () => {
+  test('every domain in catalog is in PERMISSION_GROUP_DOMAINS', () => {
     const domains = Object.keys(getPermissionsByDomain())
+    const domainSet = new Set<string>(PERMISSION_GROUP_DOMAINS)
     for (const domain of domains) {
-      expect(PERMISSION_GROUP_LABELS[domain]).toBeDefined()
-      expect(typeof PERMISSION_GROUP_LABELS[domain]).toBe('string')
+      expect(domainSet.has(domain)).toBe(true)
     }
   })
 
-  test('no label exists for a non-existent domain', () => {
-    const domains = new Set(Object.keys(getPermissionsByDomain()))
-    for (const labelDomain of Object.keys(PERMISSION_GROUP_LABELS)) {
-      expect(domains.has(labelDomain)).toBe(true)
+  test('no domain in PERMISSION_GROUP_DOMAINS is outside the catalog', () => {
+    const catalogDomains = new Set(Object.keys(getPermissionsByDomain()))
+    for (const domain of PERMISSION_GROUP_DOMAINS) {
+      expect(catalogDomains.has(domain)).toBe(true)
     }
   })
 })

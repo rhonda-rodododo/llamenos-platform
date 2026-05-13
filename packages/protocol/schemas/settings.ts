@@ -64,7 +64,8 @@ export type RoleEnvelope = z.infer<typeof roleEnvelopeSchema>
 
 export const roleResponseSchema = z.object({
   id: z.string(),
-  name: z.string(),
+  /** null for non-system roles — plaintext name stored only in encrypted envelopes */
+  name: z.string().nullable(),
   slug: z.string(),
   permissions: z.array(z.string()),
   isDefault: z.boolean(),
