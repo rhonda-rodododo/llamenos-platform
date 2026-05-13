@@ -59,7 +59,12 @@ pub fn wrap_audit_key_to_admins(
 
     let mut envelopes = Vec::with_capacity(admin_pubkeys_hex.len());
     for &admin_pk in admin_pubkeys_hex {
-        let envelope = hpke_seal_key(audit_key, admin_pk, LABEL_AUDIT_USER_KEY_WRAP, aad.as_bytes())?;
+        let envelope = hpke_seal_key(
+            audit_key,
+            admin_pk,
+            LABEL_AUDIT_USER_KEY_WRAP,
+            aad.as_bytes(),
+        )?;
         envelopes.push(AuditKeyAdminEnvelope {
             admin_pubkey_hex: admin_pk.to_string(),
             envelope,
@@ -116,13 +121,20 @@ pub fn encrypt_audit_details(
     let aad = format!("{}:{}", LABEL_AUDIT_USER_KEY_WRAP, entry_id);
 
     let ciphertext = cipher
-        .encrypt(nonce, aes_gcm::aead::Payload {
-            msg: details_json,
-            aad: aad.as_bytes(),
-        })
+        .encrypt(
+            nonce,
+            aes_gcm::aead::Payload {
+                msg: details_json,
+                aad: aad.as_bytes(),
+            },
+        )
         .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
 
-    Ok(format!("{}:{}", hex::encode(nonce_bytes), hex::encode(ciphertext)))
+    Ok(format!(
+        "{}:{}",
+        hex::encode(nonce_bytes),
+        hex::encode(ciphertext)
+    ))
 }
 
 /// Decrypt audit entry details using the user's audit key.
@@ -158,10 +170,13 @@ pub fn decrypt_audit_details(
     let aad = format!("{}:{}", LABEL_AUDIT_USER_KEY_WRAP, entry_id);
 
     let plaintext = cipher
-        .decrypt(nonce, aes_gcm::aead::Payload {
-            msg: ciphertext.as_ref(),
-            aad: aad.as_bytes(),
-        })
+        .decrypt(
+            nonce,
+            aes_gcm::aead::Payload {
+                msg: ciphertext.as_ref(),
+                aad: aad.as_bytes(),
+            },
+        )
         .map_err(|_| CryptoError::DecryptionFailed)?;
 
     Ok(plaintext)
@@ -187,8 +202,7 @@ mod tests {
         let (admin_sk, admin_pk) = generate_x25519_keypair();
         let user_pubkey = "aa".repeat(32); // 64 hex chars, mock user pubkey
 
-        let envelopes =
-            wrap_audit_key_to_admins(&audit_key, &[&admin_pk], &user_pubkey).unwrap();
+        let envelopes = wrap_audit_key_to_admins(&audit_key, &[&admin_pk], &user_pubkey).unwrap();
         assert_eq!(envelopes.len(), 1);
         assert_eq!(envelopes[0].admin_pubkey_hex, admin_pk);
 
@@ -228,8 +242,7 @@ mod tests {
         let (wrong_sk, _) = generate_x25519_keypair();
         let user_pubkey = "cc".repeat(32);
 
-        let envelopes =
-            wrap_audit_key_to_admins(&audit_key, &[&admin_pk], &user_pubkey).unwrap();
+        let envelopes = wrap_audit_key_to_admins(&audit_key, &[&admin_pk], &user_pubkey).unwrap();
 
         let result = unwrap_audit_key(&envelopes[0], &wrong_sk, &user_pubkey);
         assert!(result.is_err());
@@ -241,8 +254,7 @@ mod tests {
         let (admin_sk, admin_pk) = generate_x25519_keypair();
         let user_pubkey = "dd".repeat(32);
 
-        let envelopes =
-            wrap_audit_key_to_admins(&audit_key, &[&admin_pk], &user_pubkey).unwrap();
+        let envelopes = wrap_audit_key_to_admins(&audit_key, &[&admin_pk], &user_pubkey).unwrap();
 
         // Wrong user pubkey changes the AAD, causing decryption failure
         let result = unwrap_audit_key(&envelopes[0], &admin_sk, &"ee".repeat(32));
@@ -311,8 +323,7 @@ mod tests {
         let encrypted = encrypt_audit_details(&audit_key, details, "entry-1").unwrap();
 
         // Wrap to admin
-        let envelopes =
-            wrap_audit_key_to_admins(&audit_key, &[&admin_pk], &user_pubkey).unwrap();
+        let envelopes = wrap_audit_key_to_admins(&audit_key, &[&admin_pk], &user_pubkey).unwrap();
 
         // Admin can still decrypt via unwrap
         let recovered = unwrap_audit_key(&envelopes[0], &admin_sk, &user_pubkey).unwrap();
@@ -323,7 +334,10 @@ mod tests {
         // We simulate this by using a random wrong key.
         let destroyed_key = generate_audit_user_key();
         let result = decrypt_audit_details(&destroyed_key, &encrypted, "entry-1");
-        assert!(result.is_err(), "crypto-shredding: decryption must fail after key destruction");
+        assert!(
+            result.is_err(),
+            "crypto-shredding: decryption must fail after key destruction"
+        );
     }
 
     #[test]
@@ -340,7 +354,10 @@ mod tests {
 
         // Missing colon separator
         let result = decrypt_audit_details(&audit_key, "no_colon_here", "entry-x");
-        assert!(matches!(result, Err(CryptoError::InvalidFormat(_)) | Err(CryptoError::HexError(_))));
+        assert!(matches!(
+            result,
+            Err(CryptoError::InvalidFormat(_)) | Err(CryptoError::HexError(_))
+        ));
 
         // Empty string
         let result = decrypt_audit_details(&audit_key, "", "entry-x");

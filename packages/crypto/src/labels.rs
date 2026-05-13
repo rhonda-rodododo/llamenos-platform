@@ -479,7 +479,10 @@ mod tests {
         );
         assert_eq!(LABEL_WS_CHALLENGE, "llamenos:ws-auth:v1");
         assert_eq!(LABEL_AUDIT_USER_KEY_WRAP, "llamenos:audit-user-key-wrap:v1");
-        assert_eq!(LABEL_ERASURE_OVERRIDE_SIG, "llamenos:erasure-override-sig:v1");
+        assert_eq!(
+            LABEL_ERASURE_OVERRIDE_SIG,
+            "llamenos:erasure-override-sig:v1"
+        );
     }
 
     /// Verify registry index stability.

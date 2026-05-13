@@ -200,8 +200,7 @@ mod tests {
         let sig = sign_erasure_override(&secrets, target, timestamp, justification);
 
         let valid =
-            verify_erasure_override(&sig, &other_pubkey, target, timestamp, justification)
-                .unwrap();
+            verify_erasure_override(&sig, &other_pubkey, target, timestamp, justification).unwrap();
         assert!(!valid, "wrong co-approver pubkey must fail verification");
     }
 
@@ -268,9 +267,14 @@ mod tests {
 
         let sig = sign_device_wipe(&server_secrets, &target, timestamp, "user-erasure");
 
-        let valid =
-            verify_device_wipe(&sig, &server_pubkey, &target, timestamp, "device-revocation")
-                .unwrap();
+        let valid = verify_device_wipe(
+            &sig,
+            &server_pubkey,
+            &target,
+            timestamp,
+            "device-revocation",
+        )
+        .unwrap();
         assert!(!valid);
     }
 
@@ -296,9 +300,11 @@ mod tests {
 
         let sig = sign_device_wipe(&server_secrets, &target, timestamp, reason);
 
-        let valid =
-            verify_device_wipe(&sig, &other_pubkey, &target, timestamp, reason).unwrap();
-        assert!(!valid, "wrong server key must fail — prevents forged wipe attacks");
+        let valid = verify_device_wipe(&sig, &other_pubkey, &target, timestamp, reason).unwrap();
+        assert!(
+            !valid,
+            "wrong server key must fail — prevents forged wipe attacks"
+        );
     }
 
     #[test]
@@ -335,8 +341,7 @@ mod tests {
         let mut sig = sign_device_wipe(&server_secrets, &target, timestamp, reason);
         sig[31] ^= 0xFF;
 
-        let valid =
-            verify_device_wipe(&sig, &server_pubkey, &target, timestamp, reason).unwrap();
+        let valid = verify_device_wipe(&sig, &server_pubkey, &target, timestamp, reason).unwrap();
         assert!(!valid);
     }
 }
