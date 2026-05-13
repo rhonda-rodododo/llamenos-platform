@@ -34,6 +34,7 @@ pub mod hpke_envelope;
 pub mod labels;
 pub mod puk;
 pub mod sigchain;
+pub mod shamir;
 
 pub mod mls;
 pub mod sframe;
@@ -71,3 +72,6 @@ pub use sigchain::{SigchainLink, SigchainVerifiedState};
 pub use encryption::{
     EncryptedKeyData, EncryptedMessage, EncryptedNote, KeyEnvelope, RecipientKeyEnvelope,
 };
+
+// Re-export Shamir types
+pub use shamir::Share;

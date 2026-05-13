@@ -257,6 +257,20 @@ pub const LABEL_SERVER_SIGNING_INFO: &str = "llamenos:server-signing-key-info:v1
 /// WebSocket authentication challenge label
 pub const LABEL_WS_CHALLENGE: &str = "llamenos:ws-auth:v1";
 
+// --- Recovery Group ---
+
+/// HPKE wrapping each share holder's Shamir share at rest
+pub const LABEL_RECOVERY_GROUP_SHARE_WRAP: &str = "llamenos:recovery-group:share-wrap:v1";
+
+/// HPKE wrapping user's PUK seed under recovery group pubkey
+pub const LABEL_RECOVERY_PUK_SEED_WRAP: &str = "llamenos:recovery-group:puk-seed-wrap:v1";
+
+/// HPKE wrapping share contribution to user's new device during ceremony
+pub const LABEL_RECOVERY_SHARE_CONTRIBUTE: &str = "llamenos:recovery-group:share-contribute:v1";
+
+/// Domain separation for share liveness proofs
+pub const LABEL_RECOVERY_LIVENESS_PROOF: &str = "llamenos:recovery-group:liveness-proof:v1";
+
 // =============================================================================
 // LABEL REGISTRY — maps numeric IDs (u8) to label strings.
 //
@@ -359,6 +373,11 @@ pub const LABEL_REGISTRY: &[&str] = &[
     LABEL_SERVER_SIGNING_KEY,               // 66
     LABEL_SERVER_SIGNING_INFO,              // 67
     LABEL_WS_CHALLENGE,                     // 68
+    // 69-72: Recovery Group
+    LABEL_RECOVERY_GROUP_SHARE_WRAP,  // 69
+    LABEL_RECOVERY_PUK_SEED_WRAP,     // 70
+    LABEL_RECOVERY_SHARE_CONTRIBUTE,  // 71
+    LABEL_RECOVERY_LIVENESS_PROOF,    // 72
 ];
 
 /// Look up a label string by its numeric ID.
@@ -467,6 +486,22 @@ mod tests {
             "llamenos:server-signing-key-info:v1"
         );
         assert_eq!(LABEL_WS_CHALLENGE, "llamenos:ws-auth:v1");
+        assert_eq!(
+            LABEL_RECOVERY_GROUP_SHARE_WRAP,
+            "llamenos:recovery-group:share-wrap:v1"
+        );
+        assert_eq!(
+            LABEL_RECOVERY_PUK_SEED_WRAP,
+            "llamenos:recovery-group:puk-seed-wrap:v1"
+        );
+        assert_eq!(
+            LABEL_RECOVERY_SHARE_CONTRIBUTE,
+            "llamenos:recovery-group:share-contribute:v1"
+        );
+        assert_eq!(
+            LABEL_RECOVERY_LIVENESS_PROOF,
+            "llamenos:recovery-group:liveness-proof:v1"
+        );
     }
 
     /// Verify registry index stability.
@@ -498,6 +533,10 @@ mod tests {
         assert_eq!(id_to_label(66), Some(LABEL_SERVER_SIGNING_KEY));
         assert_eq!(id_to_label(67), Some(LABEL_SERVER_SIGNING_INFO));
         assert_eq!(id_to_label(68), Some(LABEL_WS_CHALLENGE));
+        assert_eq!(id_to_label(69), Some(LABEL_RECOVERY_GROUP_SHARE_WRAP));
+        assert_eq!(id_to_label(70), Some(LABEL_RECOVERY_PUK_SEED_WRAP));
+        assert_eq!(id_to_label(71), Some(LABEL_RECOVERY_SHARE_CONTRIBUTE));
+        assert_eq!(id_to_label(72), Some(LABEL_RECOVERY_LIVENESS_PROOF));
     }
 
     /// Verify bidirectional lookup (skipping tombstoned indices).

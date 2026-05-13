@@ -505,3 +505,85 @@ mod tests {
         assert!(result.is_err());
     }
 }
+
+// =============================================================================
+// Recovery Group — Shamir Secret Sharing
+// =============================================================================
+
+/// Recovery group X25519 keypair for UniFFI export.
+#[derive(uniffi::Record)]
+pub struct RecoveryGroupKeypair {
+    pub private_key_hex: String,
+    pub public_key_hex: String,
+}
+
+/// Split a secret (hex) into N Shamir shares with threshold K.
+///
+/// Returns shares with hex-encoded y values.
+#[uniffi::export]
+pub fn mobile_shamir_split(
+    secret_hex: &str,
+    total: u8,
+    threshold: u8,
+) -> Result<Vec<crate::shamir::ShamirShare>, CryptoError> {
+    let secret = hex::decode(secret_hex).map_err(CryptoError::HexError)?;
+    let shares = crate::shamir::split(&secret, total, threshold)?;
+    Ok(shares.into_iter().map(|s| s.to_shamir_share()).collect())
+}
+
+/// Combine Shamir shares to reconstruct the secret.
+///
+/// Returns the reconstructed secret as a hex string.
+#[uniffi::export]
+pub fn mobile_shamir_combine(
+    shares: Vec<crate::shamir::ShamirShare>,
+) -> Result<String, CryptoError> {
+    let shares: Vec<crate::shamir::Share> = shares
+        .into_iter()
+        .map(|s| s.to_share())
+        .collect::<Result<Vec<_>, _>>()?;
+    let secret = crate::shamir::combine(&shares)?;
+    Ok(hex::encode(secret))
+}
+
+/// Compute a SHA-256 commitment for a Shamir share.
+///
+/// Returns the 32-byte commitment as a hex string.
+#[uniffi::export]
+pub fn mobile_shamir_commit(
+    share: &crate::shamir::ShamirShare,
+) -> String {
+    let share = share.to_share().expect("invalid hex in ShamirShare");
+    hex::encode(crate::shamir::commit(&share))
+}
+
+/// Verify a Shamir share against a hex-encoded commitment.
+#[uniffi::export]
+pub fn mobile_shamir_verify(
+    share: &crate::shamir::ShamirShare,
+    commitment_hex: &str,
+) -> Result<bool, CryptoError> {
+    let share = share.to_share()?;
+    let commitment_bytes = hex::decode(commitment_hex).map_err(CryptoError::HexError)?;
+    if commitment_bytes.len() != 32 {
+        return Err(CryptoError::InvalidInput(format!(
+            "commitment must be 32 bytes, got {}",
+            commitment_bytes.len()
+        )));
+    }
+    let mut commitment = [0u8; 32];
+    commitment.copy_from_slice(&commitment_bytes);
+    Ok(crate::shamir::verify(&share, &commitment))
+}
+
+/// Generate an X25519 keypair for a recovery group.
+///
+/// Returns (secret_key_hex, public_key_hex).
+#[uniffi::export]
+pub fn mobile_recovery_group_generate_keypair() -> RecoveryGroupKeypair {
+    let (sk, pk) = crate::shamir::generate_recovery_group_keypair();
+    RecoveryGroupKeypair {
+        private_key_hex: sk.to_string(),
+        public_key_hex: pk,
+    }
+}
