@@ -88,7 +88,7 @@ When('I create a new shift with a unique name', async ({ page, backendRequest, w
 
   // API verification: shift was created in backend
   const shifts = await listShiftsViaApi(backendRequest, workerHub)
-  const found = shifts.find(s => s.name === adminWorld.lastShiftName)
+  const found = shifts.find(s => s.encryptedName === adminWorld.lastShiftName)
   expect(found).toBeTruthy()
 })
 
@@ -114,7 +114,7 @@ Then('the updated shift name should appear', async ({ page, backendRequest, work
 
   // API verification: updated name persisted
   const shifts = await listShiftsViaApi(backendRequest, workerHub)
-  const found = shifts.find(s => s.name === adminWorld.lastShiftName)
+  const found = shifts.find(s => s.encryptedName === adminWorld.lastShiftName)
   expect(found).toBeTruthy()
 })
 
@@ -130,7 +130,7 @@ Then('the shift should no longer appear', async ({ page, backendRequest, workerH
 
   // API verification: shift is gone
   const shifts = await listShiftsViaApi(backendRequest, workerHub)
-  const found = shifts.find(s => s.name === adminWorld.lastShiftName)
+  const found = shifts.find(s => s.encryptedName === adminWorld.lastShiftName)
   expect(found).toBeUndefined()
 })
 
