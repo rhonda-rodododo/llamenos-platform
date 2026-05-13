@@ -27,6 +27,16 @@ import {
 import { okResponseSchema } from '@protocol/schemas/common'
 import { authErrors, notFoundError } from '../openapi/helpers'
 import { audit } from '../services/audit'
+import {
+  mergeContactsBodySchema,
+  mergeContactsResponseSchema,
+} from '@protocol/schemas/contact-merge'
+import {
+  bulkContactActionSchema,
+  bulkContactActionResponseSchema,
+  bulkCreateContactBodySchema,
+  bulkCreateContactResponseSchema,
+} from '@protocol/schemas/contact-bulk'
 
 const contactsV2 = new Hono<AppEnv>()
 
@@ -537,6 +547,94 @@ contactsV2.get('/:id/groups',
     const services = c.get('services')
     const groups = await services.contacts.listGroupsForContact(contactId)
     return c.json({ groups })
+  },
+)
+
+// POST /merge — client-side re-encrypted contact merge
+contactsV2.post('/merge',
+  describeRoute({
+    tags: ['Contact Directory'],
+    summary: 'Merge two contacts (client-side re-encryption)',
+    responses: {
+      200: {
+        description: 'Contacts merged',
+        content: { 'application/json': { schema: resolver(mergeContactsResponseSchema) } },
+      },
+      ...authErrors,
+      ...notFoundError,
+    },
+  }),
+  requirePermission('contacts:edit'),
+  validator('json', mergeContactsBodySchema),
+  async (c) => {
+    const services = c.get('services')
+    const hubId = c.get('hubId') ?? ''
+    const body = c.req.valid('json')
+
+    const result = await services.contacts.mergeContacts(hubId, body)
+
+    await audit(services.audit, 'contactMerged', c.get('pubkey') ?? '', {
+      primaryId: result.primaryId,
+      secondaryId: result.secondaryId,
+    })
+    return c.json(result)
+  },
+)
+
+// POST /bulk — in-app batch mutations (no export)
+contactsV2.post('/bulk',
+  describeRoute({
+    tags: ['Contact Directory'],
+    summary: 'Bulk contact operations — in-app mutations only',
+    responses: {
+      200: {
+        description: 'Bulk action result',
+        content: { 'application/json': { schema: resolver(bulkContactActionResponseSchema) } },
+      },
+      ...authErrors,
+    },
+  }),
+  requirePermission('contacts:edit'),
+  validator('json', bulkContactActionSchema),
+  async (c) => {
+    const services = c.get('services')
+    const hubId = c.get('hubId') ?? ''
+    const body = c.req.valid('json')
+
+    const result = await services.contacts.bulkAction(hubId, body)
+
+    await audit(services.audit, 'contactBulkAction', c.get('pubkey') ?? '', {
+      action: body.action,
+      count: result.affected,
+    })
+    return c.json(result)
+  },
+)
+
+// POST /bulk-create — batch import (max 100, client-side encrypted)
+contactsV2.post('/bulk-create',
+  describeRoute({
+    tags: ['Contact Directory'],
+    summary: 'Batch create contacts — client-side encrypted, max 100 per batch',
+    responses: {
+      201: {
+        description: 'Contacts created',
+        content: { 'application/json': { schema: resolver(bulkCreateContactResponseSchema) } },
+      },
+      ...authErrors,
+    },
+  }),
+  requirePermission('contacts:create'),
+  validator('json', bulkCreateContactBodySchema),
+  async (c) => {
+    const services = c.get('services')
+    const hubId = c.get('hubId') ?? ''
+    const { contacts: batch } = c.req.valid('json')
+
+    const result = await services.contacts.bulkCreate(hubId, batch)
+
+    await audit(services.audit, 'contactBulkCreate', c.get('pubkey') ?? '', { count: result.created })
+    return c.json(result, 201)
   },
 )
 

@@ -10,7 +10,7 @@
  * - trigram_tokens GIN index     -> replaces idx:trigram:{token}:{id}
  * - tag_hashes GIN index         -> replaces idx:tag:{hash}:{id}
  */
-import { eq, and, desc, sql, or, count } from 'drizzle-orm'
+import { eq, and, desc, sql, or, count, inArray, isNull } from 'drizzle-orm'
 import type { Database } from '../db'
 import {
   contacts,
@@ -18,6 +18,8 @@ import {
   affinityGroups,
   groupMembers,
 } from '../db/schema'
+import type { MergeContactsBody } from '@protocol/schemas/contact-merge'
+import type { BulkContactAction, BulkCreateContactBody } from '@protocol/schemas/contact-bulk'
 import { ServiceError } from './settings'
 import type { CreateContactBody, UpdateContactBody } from '@protocol/schemas/contacts-v2'
 import type {
@@ -687,6 +689,181 @@ export class ContactsService {
     }
 
     return { interactionCount: updated.interactionCount }
+  }
+
+  // =========================================================================
+  // Merge contacts (client-side re-encryption)
+  // =========================================================================
+
+  async mergeContacts(
+    hubId: string,
+    body: MergeContactsBody,
+  ): Promise<{ primaryId: string; secondaryId: string; mergedAt: string }> {
+    const { primaryId, secondaryId, mergedEncryptedSummary, mergedSummaryEnvelopes,
+      mergedBlindIndexes, mergedTrigramTokens, mergedNameHash } = body
+
+    const [primary, secondary] = await Promise.all([
+      this.db.select().from(contacts).where(
+        and(eq(contacts.id, primaryId), eq(contacts.hubId, hubId))
+      ).limit(1),
+      this.db.select().from(contacts).where(
+        and(eq(contacts.id, secondaryId), eq(contacts.hubId, hubId))
+      ).limit(1),
+    ])
+
+    if (!primary[0]) throw new ServiceError(404, 'primary contact not found')
+    if (!secondary[0]) throw new ServiceError(404, 'secondary contact not found')
+    if (secondary[0].hubId !== primary[0].hubId) throw new ServiceError(400, 'cross-hub merge not permitted')
+
+    const mergedAt = new Date()
+
+    await this.db.transaction(async (tx) => {
+      // 1. Update primary with merged encrypted data and indexes
+      await tx.update(contacts)
+        .set({
+          encryptedSummary: mergedEncryptedSummary,
+          summaryEnvelopes: mergedSummaryEnvelopes,
+          identifierHashes: mergedBlindIndexes.identifierHashes ?? [],
+          tagHashes: mergedBlindIndexes.tagHashes ?? [],
+          contactTypeHash: mergedBlindIndexes.contactTypeHash ?? null,
+          trigramTokens: mergedTrigramTokens ?? [],
+          nameHash: mergedNameHash ?? null,
+          updatedAt: mergedAt,
+        })
+        .where(eq(contacts.id, primaryId))
+
+      // 2. Relink relationships (contactIdA / contactIdB)
+      await tx.update(contactRelationships)
+        .set({ contactIdA: primaryId })
+        .where(and(
+          eq(contactRelationships.contactIdA, secondaryId),
+          eq(contactRelationships.hubId, hubId),
+        ))
+      await tx.update(contactRelationships)
+        .set({ contactIdB: primaryId })
+        .where(and(
+          eq(contactRelationships.contactIdB, secondaryId),
+          eq(contactRelationships.hubId, hubId),
+        ))
+
+      // 3. Relink group memberships
+      await tx.update(groupMembers)
+        .set({ contactId: primaryId })
+        .where(eq(groupMembers.contactId, secondaryId))
+
+      // 4. Soft-delete secondary with merge pointer
+      await tx.update(contacts)
+        .set({
+          mergedIntoId: primaryId,
+          deletedAt: mergedAt,
+          identifierHashes: [],
+          tagHashes: [],
+          trigramTokens: [],
+          nameHash: null,
+        })
+        .where(eq(contacts.id, secondaryId))
+    })
+
+    return { primaryId, secondaryId, mergedAt: mergedAt.toISOString() }
+  }
+
+  // =========================================================================
+  // Bulk contact operations
+  // =========================================================================
+
+  async bulkAction(
+    hubId: string,
+    body: BulkContactAction,
+  ): Promise<{ affected: number; action: string }> {
+    const { action, contactIds } = body
+
+    // Verify all contacts belong to this hub and are not deleted
+    const existing = await this.db.select({ id: contacts.id })
+      .from(contacts)
+      .where(and(
+        inArray(contacts.id, contactIds),
+        eq(contacts.hubId, hubId),
+        isNull(contacts.deletedAt),
+      ))
+    const validIds = existing.map(r => r.id)
+
+    if (action === 'delete') {
+      await this.db.update(contacts)
+        .set({ deletedAt: new Date() })
+        .where(inArray(contacts.id, validIds))
+      return { affected: validIds.length, action }
+    }
+
+    if (action === 'add-tags' || action === 'remove-tags') {
+      const indexes = body.payload.updatedBlindIndexes ?? []
+      if (indexes.length > 0) {
+        await Promise.all(indexes.map(({ contactId, tagHashes }) =>
+          this.db.update(contacts)
+            .set({ tagHashes })
+            .where(and(eq(contacts.id, contactId), eq(contacts.hubId, hubId)))
+        ))
+      }
+      return { affected: validIds.length, action }
+    }
+
+    if (action === 'add-to-group') {
+      const { groupId } = body.payload
+      const rows = validIds.map(contactId => ({ contactId, groupId }))
+      if (rows.length > 0) {
+        await this.db.insert(groupMembers).values(rows).onConflictDoNothing()
+      }
+      return { affected: validIds.length, action }
+    }
+
+    if (action === 'remove-from-group') {
+      const { groupId } = body.payload
+      if (validIds.length > 0) {
+        await this.db.delete(groupMembers)
+          .where(and(
+            inArray(groupMembers.contactId, validIds),
+            eq(groupMembers.groupId, groupId),
+          ))
+      }
+      return { affected: validIds.length, action }
+    }
+
+    if (action === 'set-risk-level') {
+      // riskLevel is stored as a tag-like blind index — we track the hash in blindIndexes
+      // This is a no-op at the DB level since risk levels are encrypted in the contact profile.
+      // The action is audited for compliance purposes.
+      return { affected: validIds.length, action }
+    }
+
+    throw new ServiceError(400, `unknown bulk action: ${action}`)
+  }
+
+  // =========================================================================
+  // Batch create contacts (import)
+  // =========================================================================
+
+  async bulkCreate(
+    hubId: string,
+    batch: BulkCreateContactBody['contacts'],
+  ): Promise<{ created: number; contactIds: string[] }> {
+    if (batch.length > 100) throw new ServiceError(400, 'batch exceeds maximum of 100')
+
+    const rows = batch.map(c => ({
+      id: crypto.randomUUID(),
+      hubId,
+      encryptedSummary: c.encryptedSummary,
+      summaryEnvelopes: c.summaryEnvelopes,
+      identifierHashes: c.blindIndexes.identifierHashes ?? [],
+      tagHashes: c.blindIndexes.tagHashes ?? [],
+      contactTypeHash: c.blindIndexes.contactTypeHash ?? null,
+      trigramTokens: c.trigramTokens ?? [],
+      nameHash: c.nameHash ?? null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }))
+
+    await this.db.insert(contacts).values(rows)
+
+    return { created: rows.length, contactIds: rows.map(r => r.id) }
   }
 
   // =========================================================================

@@ -54,6 +54,7 @@ export const caseRecords = pgTable(
       .notNull()
       .default(sql`'{}'::text[]`),
     parentRecordId: text('parent_record_id'),
+    mergedIntoId: text('merged_into_id'),
     createdBy: text('created_by').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
