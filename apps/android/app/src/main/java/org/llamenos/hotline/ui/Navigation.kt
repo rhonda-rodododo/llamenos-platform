@@ -10,9 +10,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
+import kotlinx.coroutines.flow.filterIsInstance
 import org.llamenos.hotline.api.VersionChecker
 import org.llamenos.hotline.ui.components.UpdateBanner
 import org.llamenos.hotline.ui.components.UpdateRequiredScreen
+import org.llamenos.hotline.model.LlamenosEvent
+import org.llamenos.hotline.service.AttributedHubEvent
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -63,6 +66,8 @@ import org.llamenos.hotline.ui.hubs.HubListScreen
 import org.llamenos.hotline.ui.hubs.HubManagementViewModel
 import org.llamenos.hotline.ui.hubsettings.HubCommunicationsScreen
 import org.llamenos.hotline.ui.settings.DeviceLinkScreen
+import org.llamenos.hotline.ui.settings.ErasureRequestScreen
+import org.llamenos.hotline.ui.auth.DeviceWipeReceiptScreen
 import org.llamenos.hotline.ui.contacts.ContactDetailScreen
 import org.llamenos.hotline.ui.contacts.ContactDetailViewModel
 import org.llamenos.hotline.ui.providersetup.APIKeyProviderScreen
@@ -337,6 +342,14 @@ sealed interface LlamenosRoute {
     data object HubCommunications : LlamenosRoute {
         override val route = "hub_communications"
     }
+
+    data object ErasureRequest : LlamenosRoute {
+        override val route = "erasure_request"
+    }
+
+    data object DeviceWipe : LlamenosRoute {
+        override val route = "device_wipe"
+    }
 }
 
 /**
@@ -383,6 +396,28 @@ fun LlamenosNavigation(
             is VersionChecker.VersionStatus.UpdateAvailable -> showUpdateBanner = true
             else -> { /* no banner */ }
         }
+    }
+
+    var isDeviceWiped by remember { mutableStateOf(false) }
+    var deviceWipeReason by remember { mutableStateOf("") }
+
+    LaunchedEffect(Unit) {
+        webSocketService.typedEvents
+            .filterIsInstance<AttributedHubEvent<LlamenosEvent.DeviceWipe>>()
+            .collect { attributed ->
+                val wipeEvent = attributed.event
+                keystoreService.wipeAll()
+                isDeviceWiped = true
+                deviceWipeReason = wipeEvent.reason
+            }
+    }
+
+    if (isDeviceWiped) {
+        DeviceWipeReceiptScreen(
+            reason = deviceWipeReason,
+            modifier = Modifier,
+        )
+        return
     }
 
     // Force-update screen blocks the entire app
@@ -549,6 +584,9 @@ fun LlamenosNavigation(
                 },
                 onNavigateToDeviceLink = {
                     navController.navigate(LlamenosRoute.DeviceLink.route)
+                },
+                onNavigateToErasure = {
+                    navController.navigate(LlamenosRoute.ErasureRequest.route)
                 },
                 onNavigateToHubs = {
                     navController.navigate(LlamenosRoute.HubList.route)
@@ -993,6 +1031,19 @@ fun LlamenosNavigation(
                 onNavigateToPhoneNumbers = { provider ->
                     navController.navigate("phone_numbers/$provider")
                 },
+            )
+        }
+
+        composable(LlamenosRoute.ErasureRequest.route) {
+            ErasureRequestScreen(
+                modifier = Modifier.padding(0.dp),
+            )
+        }
+
+        composable(LlamenosRoute.DeviceWipe.route) {
+            DeviceWipeReceiptScreen(
+                reason = "",
+                modifier = Modifier.padding(0.dp),
             )
         }
     }
