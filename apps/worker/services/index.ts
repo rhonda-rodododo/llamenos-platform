@@ -29,6 +29,7 @@ import { SignalRegistrationService } from './provider-setup/signal-registration'
 import { A2pRegistrationService } from './provider-setup/a2p-registration'
 import { ProviderTemplateService } from './provider-setup/templates'
 import { HubOnboardService } from './provider-setup/hub-onboard'
+import { RecoveryGroupService } from './recovery-group'
 
 export interface Services {
   identity: IdentityService
@@ -55,6 +56,7 @@ export interface Services {
   a2pRegistration: A2pRegistrationService
   providerTemplates: ProviderTemplateService
   hubOnboard: HubOnboardService
+  recoveryGroup: RecoveryGroupService
 }
 
 export interface ServicesOpts {
@@ -108,6 +110,7 @@ export function createServices(db: Database, opts?: ServicesOpts): Services {
     a2pRegistration: new A2pRegistrationService(db, opts?.hmacSecret ?? ''),
     providerTemplates: new ProviderTemplateService(db),
     hubOnboard: new HubOnboardService(db, providerSetup, settings),
+    recoveryGroup: new RecoveryGroupService(db, audit),
   }
 
   // Only create firehose agent if seal key is configured
@@ -151,4 +154,5 @@ export {
   A2pRegistrationService,
   ProviderTemplateService,
   HubOnboardService,
+  RecoveryGroupService,
 }
