@@ -234,7 +234,7 @@ export const adminNavConfig: AdminNavConfig = {
         {
           slug: 'gdpr-erasure',
           labelKey: 'adminNav.items.gdprErasure',
-          requiredPermissions: ['gdpr:admin'],
+          requiredPermissions: ['system:manage-instance'],
           testid: 'admin-sidebar-item-gdpr-erasure',
         },
       ],
