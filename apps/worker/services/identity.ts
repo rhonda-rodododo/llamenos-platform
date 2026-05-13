@@ -35,7 +35,7 @@ import { DEMO_ACCOUNTS } from '@shared/demo-accounts'
 // ---------------------------------------------------------------------------
 
 import { SESSION_DURATION_MS, RENEWAL_THRESHOLD_MS } from '../lib/session-renewal'
-import { decideDeviceRegistration, MAX_DEVICES_PER_VOLUNTEER } from '../lib/device-eviction'
+import { decideDeviceRegistration } from '../lib/device-eviction'
 const INVITE_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 const CHALLENGE_TTL_MS = 5 * 60 * 1000 // 5 minutes
 const PROVISION_ROOM_TTL_MS = 5 * 60 * 1000 // 5 minutes
@@ -872,24 +872,42 @@ export class IdentityService {
   async listDevices(pubkey: string): Promise<Array<{
     id: string
     platform: string
+    deviceName: string | null
+    deviceModel: string | null
+    osVersion: string | null
+    appVersion: string | null
     wakeKeyPublic: string | null
     ed25519Pubkey: string | null
     x25519Pubkey: string | null
     registeredAt: Date
     lastSeenAt: Date | null
+    lastIpHash: string | null
   }>> {
     return this.db
       .select({
         id: devices.id,
         platform: devices.platform,
+        deviceName: devices.deviceName,
+        deviceModel: devices.deviceModel,
+        osVersion: devices.osVersion,
+        appVersion: devices.appVersion,
         wakeKeyPublic: devices.wakeKeyPublic,
         ed25519Pubkey: devices.ed25519Pubkey,
         x25519Pubkey: devices.x25519Pubkey,
         registeredAt: devices.registeredAt,
         lastSeenAt: devices.lastSeenAt,
+        lastIpHash: devices.lastIpHash,
       })
       .from(devices)
       .where(eq(devices.pubkey, pubkey))
+  }
+
+  async deleteDeviceById(pubkey: string, deviceId: string): Promise<boolean> {
+    const result = await this.db
+      .delete(devices)
+      .where(and(eq(devices.id, deviceId), eq(devices.pubkey, pubkey)))
+      .returning({ id: devices.id })
+    return result.length > 0
   }
 
   /**
@@ -911,7 +929,7 @@ export class IdentityService {
   async revokeDevice(
     pubkey: string,
     deviceId: string,
-    sigchainData?: {
+    _sigchainData?: {
       signature?: string
       sigchainHash?: string
       sigchainSeqNo?: number
@@ -1306,7 +1324,7 @@ export class IdentityService {
     offset: number,
   ) {
     // Get users with their devices, optionally filtered by hub membership
-    let userQuery = this.db
+    const userQuery = this.db
       .select({
         pubkey: users.pubkey,
         displayName: users.displayName,

@@ -922,6 +922,7 @@
 "common_error" = "Error";
 "common_hide_advanced" = "Hide Advanced";
 "common_language" = "Wika";
+"common_load_more" = "Mag-load ng higit pa";
 "common_loading" = "Naglo-load...";
 "common_logout" = "Mag-log out";
 "common_next" = "Susunod";
@@ -1756,6 +1757,7 @@
 "nav_hubs" = "Hubs";
 "nav_notes" = "Mga Tala ng Tawag";
 "nav_reports" = "Reports";
+"nav_security" = "Seguridad";
 "nav_settings" = "Mga Setting";
 "nav_shifts" = "Mga Shift";
 "nav_triage" = "Triage";
@@ -2255,6 +2257,7 @@
 "retry_registration" = "Retry Registration";
 "role_admin" = "Admin";
 "role_volunteer" = "Volunteer";
+"roles_all_permissions" = "Lahat ng pahintulot";
 "roles_create_role" = "Create Role";
 "roles_created" = "Role created";
 "roles_default" = "Default";

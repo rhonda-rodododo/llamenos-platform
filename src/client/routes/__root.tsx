@@ -50,6 +50,7 @@ import {
   Calendar,
   Inbox,
   Radio,
+  Shield,
 } from 'lucide-react'
 
 export const Route = createRootRoute({
@@ -58,9 +59,8 @@ export const Route = createRootRoute({
 
 function RootLayout() {
   const { t } = useTranslation()
-  const { isAuthenticated, isAdmin, signOut, name, isLoading, profileCompleted, hasPermission, primaryRoleName, webauthnEnrollmentRequired } = useAuth()
-  const { hotlineName, needsBootstrap, demoMode, isLoading: configLoading } = useConfig()
-  const { theme, setTheme } = useTheme()
+  const { isAuthenticated, isLoading, profileCompleted, webauthnEnrollmentRequired } = useAuth()
+  const { needsBootstrap, demoMode, isLoading: configLoading } = useConfig()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -338,6 +338,7 @@ function AuthenticatedLayout() {
               {isAdmin && (
                 <NavLink to="/calls" icon={<PhoneIncoming className="h-4 w-4" />}>{t('nav.callHistory')}</NavLink>
               )}
+              <NavLink to="/security" icon={<Shield className="h-4 w-4" />}>{t('nav.security')}</NavLink>
               <NavLink to="/settings" icon={<Settings className="h-4 w-4" />}>{t('nav.settings')}</NavLink>
             </>
           )}

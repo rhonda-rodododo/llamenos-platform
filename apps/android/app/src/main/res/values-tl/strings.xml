@@ -925,6 +925,7 @@
     <string name="common_error">Error</string>
     <string name="common_hide_advanced">Hide Advanced</string>
     <string name="common_language">Wika</string>
+    <string name="common_load_more">Mag-load ng higit pa</string>
     <string name="common_loading">Naglo-load...</string>
     <string name="common_logout">Mag-log out</string>
     <string name="common_next">Susunod</string>
@@ -1759,6 +1760,7 @@
     <string name="nav_hubs">Hubs</string>
     <string name="nav_notes">Mga Tala ng Tawag</string>
     <string name="nav_reports">Reports</string>
+    <string name="nav_security">Seguridad</string>
     <string name="nav_settings">Mga Setting</string>
     <string name="nav_shifts">Mga Shift</string>
     <string name="nav_triage">Triage</string>
@@ -2258,6 +2260,7 @@
     <string name="retry_registration">Retry Registration</string>
     <string name="role_admin">Admin</string>
     <string name="role_volunteer">Volunteer</string>
+    <string name="roles_all_permissions">Lahat ng pahintulot</string>
     <string name="roles_create_role">Create Role</string>
     <string name="roles_created">Role created</string>
     <string name="roles_default">Default</string>

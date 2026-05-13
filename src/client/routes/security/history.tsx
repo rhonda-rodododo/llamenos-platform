@@ -71,7 +71,7 @@ function HistoryPage() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="text-xs">
-                    {t(`security.history.events.${event.eventType}`, { defaultValue: event.eventType })}
+                    {t(`security.history.events.${event.eventType.replace(/_([a-z])/g, (_: string, c: string) => c.toUpperCase())}`, { defaultValue: event.eventType })}
                   </Badge>
                   <span className="text-xs text-muted-foreground">
                     {new Date(event.createdAt).toLocaleString()}

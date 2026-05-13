@@ -15,7 +15,7 @@ struct SessionListView: View {
                 }
             }
         }
-        .navigationTitle(String(localized: "security.sessions.title"))
+        .navigationTitle(String(localized: "security_sessions_title"))
         .task { await loadSessions() }
     }
 

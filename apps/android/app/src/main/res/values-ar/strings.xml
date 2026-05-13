@@ -925,6 +925,7 @@
     <string name="common_error">خطأ</string>
     <string name="common_hide_advanced">Hide Advanced</string>
     <string name="common_language">اللغة</string>
+    <string name="common_load_more">تحميل المزيد</string>
     <string name="common_loading">جاري التحميل...</string>
     <string name="common_logout">تسجيل الخروج</string>
     <string name="common_next">التالي</string>
@@ -1759,6 +1760,7 @@
     <string name="nav_hubs">Hubs</string>
     <string name="nav_notes">ملاحظات المكالمات</string>
     <string name="nav_reports">Reports</string>
+    <string name="nav_security">الأمان</string>
     <string name="nav_settings">الإعدادات</string>
     <string name="nav_shifts">المناوبات</string>
     <string name="nav_triage">الفرز</string>
@@ -2258,6 +2260,7 @@
     <string name="retry_registration">Retry Registration</string>
     <string name="role_admin">Admin</string>
     <string name="role_volunteer">Volunteer</string>
+    <string name="roles_all_permissions">جميع الأذونات</string>
     <string name="roles_create_role">Create Role</string>
     <string name="roles_created">Role created</string>
     <string name="roles_default">Default</string>

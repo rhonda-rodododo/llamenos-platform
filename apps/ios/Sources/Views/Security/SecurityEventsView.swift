@@ -26,7 +26,7 @@ struct SecurityEventsView: View {
                 }
             }
         }
-        .navigationTitle(String(localized: "security.history.title"))
+        .navigationTitle(String(localized: "security_history_title"))
         .task { await loadEvents() }
     }
 

@@ -925,6 +925,7 @@
     <string name="common_error">Lỗi</string>
     <string name="common_hide_advanced">Hide Advanced</string>
     <string name="common_language">Ngôn ngữ</string>
+    <string name="common_load_more">Tải thêm</string>
     <string name="common_loading">Đang tải...</string>
     <string name="common_logout">Đăng xuất</string>
     <string name="common_next">Tiếp theo</string>
@@ -1759,6 +1760,7 @@
     <string name="nav_hubs">Hubs</string>
     <string name="nav_notes">Ghi chú cuộc gọi</string>
     <string name="nav_reports">Reports</string>
+    <string name="nav_security">Bảo mật</string>
     <string name="nav_settings">Cài đặt</string>
     <string name="nav_shifts">Ca trực</string>
     <string name="nav_triage">Phân loại</string>
@@ -2258,6 +2260,7 @@
     <string name="retry_registration">Retry Registration</string>
     <string name="role_admin">Admin</string>
     <string name="role_volunteer">Volunteer</string>
+    <string name="roles_all_permissions">Tất cả quyền</string>
     <string name="roles_create_role">Create Role</string>
     <string name="roles_created">Role created</string>
     <string name="roles_default">Default</string>

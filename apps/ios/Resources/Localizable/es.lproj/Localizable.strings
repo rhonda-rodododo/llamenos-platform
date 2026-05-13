@@ -922,6 +922,7 @@
 "common_error" = "Error";
 "common_hide_advanced" = "Hide Advanced";
 "common_language" = "Idioma";
+"common_load_more" = "Cargar más";
 "common_loading" = "Cargando...";
 "common_logout" = "Cerrar sesión";
 "common_next" = "Siguiente";
@@ -1756,6 +1757,7 @@
 "nav_hubs" = "Hubs";
 "nav_notes" = "Notas de llamadas";
 "nav_reports" = "Reports";
+"nav_security" = "Seguridad";
 "nav_settings" = "Configuración";
 "nav_shifts" = "Turnos";
 "nav_triage" = "Triaje";
@@ -2255,6 +2257,7 @@
 "retry_registration" = "Retry Registration";
 "role_admin" = "Admin";
 "role_volunteer" = "Volunteer";
+"roles_all_permissions" = "Todos los permisos";
 "roles_create_role" = "Create Role";
 "roles_created" = "Role created";
 "roles_default" = "Default";

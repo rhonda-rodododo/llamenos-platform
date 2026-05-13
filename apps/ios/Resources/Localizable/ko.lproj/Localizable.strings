@@ -922,6 +922,7 @@
 "common_error" = "오류";
 "common_hide_advanced" = "Hide Advanced";
 "common_language" = "언어";
+"common_load_more" = "더 보기";
 "common_loading" = "로딩 중...";
 "common_logout" = "로그아웃";
 "common_next" = "다음";
@@ -1756,6 +1757,7 @@
 "nav_hubs" = "Hubs";
 "nav_notes" = "통화 메모";
 "nav_reports" = "Reports";
+"nav_security" = "보안";
 "nav_settings" = "설정";
 "nav_shifts" = "교대";
 "nav_triage" = "트리아지";
@@ -2255,6 +2257,7 @@
 "retry_registration" = "Retry Registration";
 "role_admin" = "Admin";
 "role_volunteer" = "Volunteer";
+"roles_all_permissions" = "모든 권한";
 "roles_create_role" = "Create Role";
 "roles_created" = "Role created";
 "roles_default" = "Default";

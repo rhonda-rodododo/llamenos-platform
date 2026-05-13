@@ -925,6 +925,7 @@
     <string name="common_error">Fehler</string>
     <string name="common_hide_advanced">Hide Advanced</string>
     <string name="common_language">Sprache</string>
+    <string name="common_load_more">Mehr laden</string>
     <string name="common_loading">Laden...</string>
     <string name="common_logout">Abmelden</string>
     <string name="common_next">Weiter</string>
@@ -1759,6 +1760,7 @@
     <string name="nav_hubs">Hubs</string>
     <string name="nav_notes">Anrufnotizen</string>
     <string name="nav_reports">Reports</string>
+    <string name="nav_security">Sicherheit</string>
     <string name="nav_settings">Einstellungen</string>
     <string name="nav_shifts">Schichten</string>
     <string name="nav_triage">Triage</string>
@@ -2258,6 +2260,7 @@
     <string name="retry_registration">Retry Registration</string>
     <string name="role_admin">Admin</string>
     <string name="role_volunteer">Volunteer</string>
+    <string name="roles_all_permissions">Alle Berechtigungen</string>
     <string name="roles_create_role">Create Role</string>
     <string name="roles_created">Role created</string>
     <string name="roles_default">Default</string>

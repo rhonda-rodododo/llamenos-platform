@@ -925,6 +925,7 @@
     <string name="common_error">오류</string>
     <string name="common_hide_advanced">Hide Advanced</string>
     <string name="common_language">언어</string>
+    <string name="common_load_more">더 보기</string>
     <string name="common_loading">로딩 중...</string>
     <string name="common_logout">로그아웃</string>
     <string name="common_next">다음</string>
@@ -1759,6 +1760,7 @@
     <string name="nav_hubs">Hubs</string>
     <string name="nav_notes">통화 메모</string>
     <string name="nav_reports">Reports</string>
+    <string name="nav_security">보안</string>
     <string name="nav_settings">설정</string>
     <string name="nav_shifts">교대</string>
     <string name="nav_triage">트리아지</string>
@@ -2258,6 +2260,7 @@
     <string name="retry_registration">Retry Registration</string>
     <string name="role_admin">Admin</string>
     <string name="role_volunteer">Volunteer</string>
+    <string name="roles_all_permissions">모든 권한</string>
     <string name="roles_create_role">Create Role</string>
     <string name="roles_created">Role created</string>
     <string name="roles_default">Default</string>

@@ -922,6 +922,7 @@
 "common_error" = "Ошибка";
 "common_hide_advanced" = "Hide Advanced";
 "common_language" = "Язык";
+"common_load_more" = "Загрузить ещё";
 "common_loading" = "Загрузка...";
 "common_logout" = "Выйти";
 "common_next" = "Далее";
@@ -1756,6 +1757,7 @@
 "nav_hubs" = "Hubs";
 "nav_notes" = "Заметки о звонках";
 "nav_reports" = "Reports";
+"nav_security" = "Безопасность";
 "nav_settings" = "Настройки";
 "nav_shifts" = "Смены";
 "nav_triage" = "Сортировка";
@@ -2255,6 +2257,7 @@
 "retry_registration" = "Retry Registration";
 "role_admin" = "Admin";
 "role_volunteer" = "Volunteer";
+"roles_all_permissions" = "Все разрешения";
 "roles_create_role" = "Create Role";
 "roles_created" = "Role created";
 "roles_default" = "Default";

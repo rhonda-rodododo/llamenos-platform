@@ -17,6 +17,9 @@ import { requirePermission } from '../middleware/permission-guard'
 const devicesRoutes = new Hono<AppEnv>()
 
 /**
+ * GET /api/devices
+ * List all registered devices for the authenticated user.
+ */
 devicesRoutes.get('/',
   describeRoute({
     tags: ['Devices'],

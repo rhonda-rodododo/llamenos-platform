@@ -770,7 +770,8 @@
     "hideAdvanced": "Hide Advanced",
     "showAdvanced": "Show Advanced",
     "saved": "Saved",
-    "unauthorized": "Unauthorized"
+    "unauthorized": "Unauthorized",
+    "loadMore": "और लोड करें"
   },
   "confirm": {
     "backup": "Confirm Backup",
@@ -1436,7 +1437,8 @@
     "cases": "मामले",
     "events": "घटनाएँ",
     "triage": "ट्रायज",
-    "users": "स्वयंसेवक"
+    "users": "स्वयंसेवक",
+    "security": "सुरक्षा"
   },
   "navigation": {
     "back": "Back"
@@ -1890,7 +1892,8 @@
     "summary": "Summary",
     "system": "System",
     "title": "Roles & Permissions",
-    "updated": "Role updated"
+    "updated": "Role updated",
+    "allPermissions": "सभी अनुमतियाँ"
   },
   "save": "Save",
   "schema": {
@@ -3494,23 +3497,23 @@
       "title": "Security History",
       "export": "Export JSON",
       "events": {
-        "device_register": "Device registered",
-        "device_remove": "Device removed",
-        "device_rename": "Device renamed",
-        "session_create": "Session created",
-        "session_terminate": "Session terminated",
-        "session_terminate_all": "All sessions terminated",
-        "account_lockdown": "Account locked down",
-        "account_lockdown_complete": "Lockdown completed",
-        "webauthn_register": "Passkey registered",
-        "webauthn_authenticate": "Passkey authenticated",
-        "webauthn_remove": "Passkey removed",
-        "sigchain_append": "Sigchain updated",
-        "puk_rotate": "PUK rotated",
-        "hub_key_rotate": "Hub key rotated",
-        "device_fingerprint_verified": "Device verified",
-        "passkey_rename": "Passkey renamed",
-        "login_failed": "Login failed"
+        "deviceRegister": "Device registered",
+        "deviceRemove": "Device removed",
+        "deviceRename": "Device renamed",
+        "sessionCreate": "Session created",
+        "sessionTerminate": "Session terminated",
+        "sessionTerminateAll": "All sessions terminated",
+        "accountLockdown": "Account locked down",
+        "accountLockdownComplete": "Lockdown completed",
+        "webauthnRegister": "Passkey registered",
+        "webauthnAuthenticate": "Passkey authenticated",
+        "webauthnRemove": "Passkey removed",
+        "sigchainAppend": "Sigchain updated",
+        "pukRotate": "PUK rotated",
+        "hubKeyRotate": "Hub key rotated",
+        "deviceFingerprintVerified": "Device verified",
+        "passkeyRename": "Passkey renamed",
+        "loginFailed": "Login failed"
       }
     },
     "lockdown": {

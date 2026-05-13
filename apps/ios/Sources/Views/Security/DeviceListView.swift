@@ -15,7 +15,7 @@ struct DeviceListView: View {
                 }
             }
         }
-        .navigationTitle(String(localized: "security.devices.title"))
+        .navigationTitle(String(localized: "security_devices_title"))
         .task { await loadDevices() }
     }
 
