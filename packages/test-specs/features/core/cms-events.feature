@@ -1,41 +1,32 @@
 @backend
-Feature: CMS Events
-  Admins create events (protests, mass arrests) and link
-  case records and reports to them.
+Feature: CMS Events — Unified Entity System
+  Events are CMS records whose entity type has category='event'.
+  The /api/events routes are deprecated and return 301 redirects.
+  Event data uses 3-tier E2EE like all other records.
 
-  @events
-  Scenario: Create event record
+  @events @deprecated-api
+  Scenario: Deprecated /api/events returns 301 redirect
     Given case management is enabled
-    And an event entity type "protest_event" exists
-    When the admin creates an event of type "protest_event"
-    Then the event should have a generated UUID id
-    And the event should have a start date
+    When a client sends GET /api/events
+    Then the response status should be 301
+    And the response Location header should contain /api/records
+    And the response should include a Deprecation header
 
-  @events
-  Scenario: Link record to event
+  @events @entity-system
+  Scenario: Create event record via /api/records with event entity type
     Given case management is enabled
-    And an event entity type "link_event_type" exists
-    And an event of type "link_event_type" exists
-    And an entity type "event_case_type" exists
-    And a record of type "event_case_type" exists
-    When the admin links the record to the event
-    Then the event should have 1 linked record
+    And an entity type with category "event" exists for the hub
+    When the admin creates a record with that entity type
+    Then the record should be persisted
+    And the record entity type category should be "event"
+    And the record should use 3-tier encryption (summary + fields + pii tiers)
 
-  @events
-  Scenario: Link report to event
+  @events @blind-index
+  Scenario: Filter event records by date blind index token
     Given case management is enabled
-    And an event entity type "report_event_type" exists
-    And an event of type "report_event_type" exists
-    And a report exists
-    When the admin links the report to the event
-    Then the event should have 1 linked report
-
-  @events
-  Scenario: List records linked to event
-    Given case management is enabled
-    And an event entity type "list_link_event" exists
-    And an event of type "list_link_event" exists
-    And an entity type "list_link_case" exists
-    And 2 records of type "list_link_case" are linked to the event
-    When the admin lists records linked to the event
-    Then 2 record links should be returned
+    And an entity type with category "event" exists for the hub
+    And a record exists with blindIndexes containing "month:2026-05" for field "start_date"
+    And a record exists with blindIndexes containing "month:2026-06" for field "start_date"
+    When the admin lists records with blindIndexToken "month:2026-05" and field "start_date"
+    Then the result should contain 1 record
+    And that record's blind indexes should contain "month:2026-05"
