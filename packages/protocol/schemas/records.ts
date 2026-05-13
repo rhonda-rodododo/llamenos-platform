@@ -91,6 +91,7 @@ export const listRecordsQuerySchema = paginationSchema.extend({
   severityHash: z.string().optional(),
   assignedTo: z.string().optional(),
   parentRecordId: z.string().optional(),
+  crossHub: z.string().optional(), // 'true' | 'false' — string because query params are strings
 })
 
 export type ListRecordsQuery = z.infer<typeof listRecordsQuerySchema>

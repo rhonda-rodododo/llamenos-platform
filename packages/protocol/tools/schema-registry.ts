@@ -70,6 +70,9 @@ const EXCLUDED_SCHEMAS = new Set([
   // WebSocket message unions — discriminated unions not representable in quicktype
   'wsClientMessageSchema',
   'wsServerMessageSchema',
+
+  // Bulk contact action — discriminated union, inlined at call sites
+  'bulkContactActionSchema',
 ])
 
 export interface SchemaRegistryEntry {
