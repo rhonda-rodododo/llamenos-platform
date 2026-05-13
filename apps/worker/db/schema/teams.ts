@@ -11,6 +11,8 @@ import {
   timestamp,
   unique,
 } from 'drizzle-orm/pg-core'
+import { contacts } from './contacts'
+import { hubs } from './settings'
 import { users } from './users'
 
 // ---------------------------------------------------------------------------
@@ -21,7 +23,9 @@ export const teams = pgTable(
   'teams',
   {
     id: text('id').primaryKey(),
-    hubId: text('hub_id').notNull(),
+    hubId: text('hub_id')
+      .notNull()
+      .references(() => hubs.id, { onDelete: 'cascade' }),
     encryptedName: text('encrypted_name').notNull(),
     encryptedDescription: text('encrypted_description'),
     createdBy: text('created_by').notNull(),
@@ -71,7 +75,9 @@ export const contactTeamAssignments = pgTable(
     id: text('id')
       .primaryKey()
       .$defaultFn(() => crypto.randomUUID()),
-    contactId: text('contact_id').notNull(),
+    contactId: text('contact_id')
+      .notNull()
+      .references(() => contacts.id, { onDelete: 'cascade' }),
     teamId: text('team_id')
       .notNull()
       .references(() => teams.id, { onDelete: 'cascade' }),

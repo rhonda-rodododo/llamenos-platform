@@ -9,6 +9,7 @@ import {
   timestamp,
   unique,
 } from 'drizzle-orm/pg-core'
+import { hubs } from './settings'
 
 // ---------------------------------------------------------------------------
 // tags
@@ -18,7 +19,9 @@ export const tags = pgTable(
   'tags',
   {
     id: text('id').primaryKey(),
-    hubId: text('hub_id').notNull(),
+    hubId: text('hub_id')
+      .notNull()
+      .references(() => hubs.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
     encryptedLabel: text('encrypted_label').notNull(),
     color: text('color').notNull().default('#6b7280'),
