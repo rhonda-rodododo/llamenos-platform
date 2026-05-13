@@ -50,6 +50,8 @@ const EXCLUDED_SCHEMAS = new Set([
   'channelMetricsSchema',
   'coverageSlotSchema',
   'analyticsServiceStatusSchema',
+  'callHourBucketSchema',
+  'userStatEntrySchema',
 
   // Bare enum schemas used as building blocks (already inlined in parent schemas)
   'channelTypeSchema',
