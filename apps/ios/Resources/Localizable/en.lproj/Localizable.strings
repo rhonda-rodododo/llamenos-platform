@@ -1122,6 +1122,7 @@
 "crash_reporting_settings_description" = "Anonymous crash reporting and diagnostics";
 "crash_reporting_settings_title" = "Diagnostics";
 "crash_reporting_title" = "Crash Reporting";
+"create" = "Create role";
 "create_new_identity" = "Create New Identity";
 "cross_hub_cross_hub_description" = "When enabled, super-admins can see case numbers, statuses, and entity types for this hub. Field values and PII are NOT shared.";
 "cross_hub_cross_hub_disabled" = "Cross-hub sharing is disabled";
@@ -1211,6 +1212,8 @@
 "dashboard_view_calls" = "View Calls";
 "decrypting_keys" = "Decrypting keys...";
 "delete" = "Delete";
+"delete_confirm_description" = "Are you sure you want to delete \\\"%@\\\"? Users assigned this role will lose its permissions.";
+"delete_confirm_title" = "Delete role";
 "demo_admin" = "Admin";
 "demo_banner" = "Demo Mode";
 "demo_banner_text" = "You're exploring the Llamenos demo. Data resets daily.";
@@ -1664,6 +1667,11 @@
 "hubs_url_placeholder" = "https://hub.example.com";
 "hubs_your_hubs" = "Your Hubs";
 "identity_label" = "Identity";
+"import_dialog_description" = "Select roles to import from the template. Existing roles with the same slug will be skipped.";
+"import_dialog_import" = "Import selected";
+"import_dialog_no_templates" = "No templates available";
+"import_dialog_title" = "Import roles from template";
+"import_from_template" = "Import from template";
 "import_key" = "Import Key";
 "import_nav_title" = "Import Key";
 "import_nsec_label" = "Secret Key (nsec)";
@@ -1911,6 +1919,11 @@
 "panic_wipe_message" = "All data has been wiped";
 "panic_wipe_title" = "Emergency Data Wipe";
 "panic_wipe_wiping" = "Emergency wipe in progress...";
+"permissions_actions" = "Actions";
+"permissions_none" = "None";
+"permissions_scope" = "scope";
+"permissions_tiers" = "Data access tiers";
+"permissions_toggle_all" = "Toggle all %@ permissions";
 "phone_hint" = "Select country and enter number";
 "phone_invalid" = "Invalid phone number";
 "phone_no_country" = "No country found.";
@@ -2262,6 +2275,7 @@
 "roles_permission_count_one" = "1 permission";
 "roles_permissions" = "Permissions";
 "roles_slug" = "Slug";
+"roles_slug_placeholder" = "e.g. intake-coordinator";
 "roles_system" = "System";
 "save" = "Save";
 "save_credentials" = "Save Credentials";

@@ -2262,6 +2262,7 @@
 "roles_permission_count_one" = "1 permission";
 "roles_permissions" = "Permissions";
 "roles_slug" = "Slug";
+"roles_slug_placeholder" = "e.g. intake-coordinator";
 "roles_system" = "System";
 "save" = "Save";
 "save_credentials" = "Save Credentials";

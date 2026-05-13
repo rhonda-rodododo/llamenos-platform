@@ -2232,18 +2232,17 @@
     "tiers": "Data access tiers",
     "actions": "Actions"
   },
-    "create": "Create role",
-    "importFromTemplate": "Import from template",
-    "importDialog": {
-      "title": "Import roles from template",
-      "description": "Select roles to import from the template. Existing roles with the same slug will be skipped.",
-      "import": "Import selected",
-      "noTemplates": "No templates available"
-    },
-    "deleteConfirm": {
-      "title": "Delete role",
-      "description": "Are you sure you want to delete \"{{name}}\"? Users assigned this role will lose its permissions."
-    }
+  "create": "Create role",
+  "importFromTemplate": "Import from template",
+  "importDialog": {
+    "title": "Import roles from template",
+    "description": "Select roles to import from the template. Existing roles with the same slug will be skipped.",
+    "import": "Import selected",
+    "noTemplates": "No templates available"
+  },
+  "deleteConfirm": {
+    "title": "Delete role",
+    "description": "Are you sure you want to delete \"{{name}}\"? Users assigned this role will lose its permissions."
   },
   "save": "Save",
   "schema": {

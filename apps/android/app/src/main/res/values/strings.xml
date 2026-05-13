@@ -1125,6 +1125,7 @@
     <string name="crash_reporting_settings_description">Anonymous crash reporting and diagnostics</string>
     <string name="crash_reporting_settings_title">Diagnostics</string>
     <string name="crash_reporting_title">Crash Reporting</string>
+    <string name="create">Create role</string>
     <string name="create_new_identity">Create New Identity</string>
     <string name="cross_hub_cross_hub_description">When enabled, super-admins can see case numbers, statuses, and entity types for this hub. Field values and PII are NOT shared.</string>
     <string name="cross_hub_cross_hub_disabled">Cross-hub sharing is disabled</string>
@@ -1214,6 +1215,8 @@
     <string name="dashboard_view_calls">View Calls</string>
     <string name="decrypting_keys">Decrypting keys...</string>
     <string name="delete">Delete</string>
+    <string name="delete_confirm_description">Are you sure you want to delete \"%s\"? Users assigned this role will lose its permissions.</string>
+    <string name="delete_confirm_title">Delete role</string>
     <string name="demo_admin">Admin</string>
     <string name="demo_banner">Demo Mode</string>
     <string name="demo_banner_text">You\'re exploring the Llamenos demo. Data resets daily.</string>
@@ -1667,6 +1670,11 @@
     <string name="hubs_url_placeholder">https://hub.example.com</string>
     <string name="hubs_your_hubs">Your Hubs</string>
     <string name="identity_label">Identity</string>
+    <string name="import_dialog_description">Select roles to import from the template. Existing roles with the same slug will be skipped.</string>
+    <string name="import_dialog_import">Import selected</string>
+    <string name="import_dialog_no_templates">No templates available</string>
+    <string name="import_dialog_title">Import roles from template</string>
+    <string name="import_from_template">Import from template</string>
     <string name="import_key">Import Key</string>
     <string name="import_nav_title">Import Key</string>
     <string name="import_nsec_label">Secret Key (nsec)</string>
@@ -1914,6 +1922,11 @@
     <string name="panic_wipe_message">All data has been wiped</string>
     <string name="panic_wipe_title">Emergency Data Wipe</string>
     <string name="panic_wipe_wiping">Emergency wipe in progress...</string>
+    <string name="permissions_actions">Actions</string>
+    <string name="permissions_none">None</string>
+    <string name="permissions_scope">scope</string>
+    <string name="permissions_tiers">Data access tiers</string>
+    <string name="permissions_toggle_all">Toggle all %s permissions</string>
     <string name="phone_hint">Select country and enter number</string>
     <string name="phone_invalid">Invalid phone number</string>
     <string name="phone_no_country">No country found.</string>
@@ -2265,6 +2278,7 @@
     <string name="roles_permission_count_one">1 permission</string>
     <string name="roles_permissions">Permissions</string>
     <string name="roles_slug">Slug</string>
+    <string name="roles_slug_placeholder">e.g. intake-coordinator</string>
     <string name="roles_system">System</string>
     <string name="save">Save</string>
     <string name="save_credentials">Save Credentials</string>

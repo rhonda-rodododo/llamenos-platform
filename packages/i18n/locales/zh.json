@@ -751,15 +751,11 @@
     "submit": "提交",
     "success": "成功",
     "yes": "是",
-    "ok": "OK",
-    "create": "Create",
-    "all": "All",
-    "previous": "Previous",
     "comingSoon": "Coming soon",
     "hideAdvanced": "Hide Advanced",
     "showAdvanced": "Show Advanced",
     "saved": "Saved",
-"unauthorized": "Unauthorized"
+    "unauthorized": "Unauthorized"
   },
   "confirm": {
     "backup": "Confirm Backup",
@@ -1882,7 +1878,8 @@
     "deleteConfirm": {
       "title": "Delete role",
       "description": "Are you sure you want to delete \"{{name}}\"? Users assigned this role will lose its permissions."
-    }
+    },
+    "slugPlaceholder": "e.g. intake-coordinator"
   },
   "save": "Save",
   "schema": {

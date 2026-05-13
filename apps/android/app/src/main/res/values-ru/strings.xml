@@ -2265,6 +2265,7 @@
     <string name="roles_permission_count_one">1 permission</string>
     <string name="roles_permissions">Permissions</string>
     <string name="roles_slug">Slug</string>
+    <string name="roles_slug_placeholder">e.g. intake-coordinator</string>
     <string name="roles_system">System</string>
     <string name="save">Save</string>
     <string name="save_credentials">Save Credentials</string>
