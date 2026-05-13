@@ -199,7 +199,7 @@ The existing audit log (`audit_log` table) uses a SHA-256 hash chain for tamper 
 
 **This is a new behavior introduced by EP08.** Existing audit entries (created before EP08) have plaintext `details`. After EP08, new audit entries encrypt the `details` field with the actor's audit key.
 
-Each user gets an audit envelope key — a symmetric key (XChaCha20-Poly1305) used to encrypt the `details` JSONB within audit entries that reference this user:
+Each user gets an audit envelope key — a random 32-byte AES-256-GCM key used to encrypt the `details` JSONB within audit entries that reference this user:
 
 - Generated when the user is first created (or lazily on first audit entry post-EP08)
 - When an audit entry is created with `actorPubkey = X`, the `details` field is encrypted with user X's audit key before storage
@@ -378,7 +378,7 @@ New keys added to `packages/i18n/locales/` across all 13 locales:
 | `platformSettings.*` | ~15 | Platform settings section labels |
 | `deviceWipe.*` | ~5 | Revoked device screen |
 
-Total: ~67 new keys across 13 locales.
+Total: ~102 new keys across 13 locales.
 
 ### Section 8: New DB Tables Summary
 
