@@ -39,10 +39,6 @@ function getState_(world: Record<string, unknown>): EntityUnificationState {
   return getState<EntityUnificationState>(world, STATE_KEY)
 }
 
-Given('I am authenticated as admin', async ({ world }) => {
-  getState_(world).adminPubkey = seedHexToPubkey(ADMIN_SEED)
-})
-
 Given('an entity type with category {string} exists for the hub', async ({ request, world }, category: string) => {
   const state = getState_(world)
   const hubId = getScenarioState(world).hubId
@@ -283,11 +279,6 @@ Then('the record should use 3-tier encryption \\(summary fields pii\\)',
     expect(res.data).not.toHaveProperty('encryptedDetails')
   },
 )
-
-Then('the response status should be {int}', async ({ world }, status: number) => {
-  const state = getState_(world)
-  expect(state.lastResponse?.status).toBe(status)
-})
 
 Then('the response Location header should contain {string}', async ({ world }, path: string) => {
   const state = getState_(world)
