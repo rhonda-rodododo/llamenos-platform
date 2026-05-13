@@ -97,6 +97,7 @@
 "admin_nav_groups_operations" = "Operations";
 "admin_nav_groups_people" = "People";
 "admin_nav_groups_platform" = "Platform";
+"admin_nav_groups_scheduling" = "Scheduling";
 "admin_nav_items_analytics" = "Analytics";
 "admin_nav_items_audit" = "Audit";
 "admin_nav_items_bans" = "Bans";
@@ -122,6 +123,8 @@
 "admin_nav_items_rcs" = "RCS";
 "admin_nav_items_recovery_group" = "Recovery Group";
 "admin_nav_items_report_types" = "Report Types";
+"admin_nav_items_ring_groups" = "Ring Groups";
+"admin_nav_items_shift_overrides" = "Shift Overrides";
 "admin_nav_items_signal" = "Signal";
 "admin_nav_items_spam_protection" = "Spam Protection";
 "admin_nav_items_tags" = "Tags";

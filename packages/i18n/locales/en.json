@@ -3244,7 +3244,8 @@
       "callsVoice": "Calls & Voice",
       "channels": "Channels",
       "operations": "Operations",
-      "platform": "Platform"
+      "platform": "Platform",
+      "scheduling": "Scheduling"
     },
     "items": {
       "locationLookup": "Location Lookup",
@@ -3277,7 +3278,9 @@
       "platformAnalytics": "Analytics",
       "platformHealth": "Health",
       "platformSettings": "Platform Settings",
-      "gdprErasure": "GDPR Erasure"
+      "gdprErasure": "GDPR Erasure",
+      "ringGroups": "Ring Groups",
+      "shiftOverrides": "Shift Overrides"
     }
   },
   "providerSetup": {

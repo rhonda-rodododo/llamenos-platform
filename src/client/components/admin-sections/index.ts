@@ -28,6 +28,8 @@ import { HubsSection } from './hubs-section'
 import { PlatformRolesSection } from './platform-roles-section'
 import { PlatformSection } from './platform-section'
 import { GdprErasureSection } from './gdpr-erasure-section'
+import { RingGroupsSection } from './ring-groups-section'
+import { ShiftOverridesSection } from './shift-overrides-section'
 
 const sections: Record<string, ComponentType> = {
   'location-lookup': LocationLookupSection,
@@ -57,6 +59,8 @@ const sections: Record<string, ComponentType> = {
   'platform-roles': PlatformRolesSection,
   'platform-settings': PlatformSection,
   'gdpr-erasure': GdprErasureSection,
+  'ring-groups': RingGroupsSection,
+  'shift-overrides': ShiftOverridesSection,
 }
 
 for (const [slug, component] of Object.entries(sections)) {

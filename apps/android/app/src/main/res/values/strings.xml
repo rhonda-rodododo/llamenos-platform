@@ -99,6 +99,7 @@
     <string name="admin_nav_groups_operations">Operations</string>
     <string name="admin_nav_groups_people">People</string>
     <string name="admin_nav_groups_platform">Platform</string>
+    <string name="admin_nav_groups_scheduling">Scheduling</string>
     <string name="admin_nav_items_analytics">Analytics</string>
     <string name="admin_nav_items_audit">Audit</string>
     <string name="admin_nav_items_bans">Bans</string>
@@ -124,6 +125,8 @@
     <string name="admin_nav_items_rcs">RCS</string>
     <string name="admin_nav_items_recovery_group">Recovery Group</string>
     <string name="admin_nav_items_report_types">Report Types</string>
+    <string name="admin_nav_items_ring_groups">Ring Groups</string>
+    <string name="admin_nav_items_shift_overrides">Shift Overrides</string>
     <string name="admin_nav_items_signal">Signal</string>
     <string name="admin_nav_items_spam_protection">Spam Protection</string>
     <string name="admin_nav_items_tags">Tags</string>
