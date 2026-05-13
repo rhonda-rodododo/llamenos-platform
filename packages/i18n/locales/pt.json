@@ -3449,6 +3449,8 @@
   },
   "entityTemplates": {
     "title": "Entity Templates",
+    "description": "Tipos de entidade pré-configurados para casos de uso comuns.",
+    "noTemplates": "Nenhum modelo disponível.",
     "apply": "Apply Template",
     "applied": "Applied",
     "notApplied": "Not Applied",

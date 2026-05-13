@@ -3449,6 +3449,8 @@
   },
   "entityTemplates": {
     "title": "Entity Templates",
+    "description": "Types d'entités préconfigurés pour les cas d'utilisation courants.",
+    "noTemplates": "Aucun modèle disponible.",
     "apply": "Apply Template",
     "applied": "Applied",
     "notApplied": "Not Applied",

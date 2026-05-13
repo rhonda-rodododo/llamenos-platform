@@ -3449,6 +3449,8 @@
   },
   "entityTemplates": {
     "title": "Entity Templates",
+    "description": "أنواع الكيانات المُهيَّأة مسبقًا لحالات الاستخدام الشائعة.",
+    "noTemplates": "لا توجد قوالب متاحة.",
     "apply": "Apply Template",
     "applied": "Applied",
     "notApplied": "Not Applied",

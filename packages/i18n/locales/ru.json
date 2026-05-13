@@ -3449,6 +3449,8 @@
   },
   "entityTemplates": {
     "title": "Entity Templates",
+    "description": "Предварительно настроенные типы сущностей для распространённых случаев использования.",
+    "noTemplates": "Шаблоны отсутствуют.",
     "apply": "Apply Template",
     "applied": "Applied",
     "notApplied": "Not Applied",

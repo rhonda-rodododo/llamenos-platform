@@ -1054,6 +1054,8 @@
   "encryptingKeys": "Encrypting keys...",
   "entityTemplates": {
     "title": "Plantillas de Entidades",
+    "description": "Tipos de entidad preconfigurados para casos de uso comunes.",
+    "noTemplates": "No hay plantillas disponibles en la sección de entidades.",
     "apply": "Aplicar Plantilla",
     "applied": "Aplicada",
     "notApplied": "No Aplicada",

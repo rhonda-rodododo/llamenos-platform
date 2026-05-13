@@ -63,6 +63,8 @@ export interface ListCasesInput {
   assignedTo?: string
   entityTypeId?: string
   parentRecordId?: string
+  blindIndexToken?: string
+  blindIndexField?: string
 }
 
 export interface ListEventsInput {
@@ -311,6 +313,11 @@ export class CasesService {
       } else {
         conditions.push(eq(caseRecords.parentRecordId, input.parentRecordId))
       }
+    }
+    if (input.blindIndexToken && input.blindIndexField) {
+      conditions.push(
+        sql`${caseRecords.blindIndexes}->>${input.blindIndexField} @> to_jsonb(${input.blindIndexToken}::text)`,
+      )
     }
 
     const where = and(...conditions)

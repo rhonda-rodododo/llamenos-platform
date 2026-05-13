@@ -3449,6 +3449,8 @@
   },
   "entityTemplates": {
     "title": "Entity Templates",
+    "description": "Các loại thực thể được cấu hình sẵn cho các trường hợp sử dụng phổ biến.",
+    "noTemplates": "Không có mẫu nào.",
     "apply": "Apply Template",
     "applied": "Applied",
     "notApplied": "Not Applied",

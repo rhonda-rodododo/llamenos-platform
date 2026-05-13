@@ -3449,6 +3449,8 @@
   },
   "entityTemplates": {
     "title": "Entity Templates",
+    "description": "Tip antite pre-konfigire pou ka itilizasyon komen.",
+    "noTemplates": "Pa gen modèl disponib.",
     "apply": "Apply Template",
     "applied": "Applied",
     "notApplied": "Not Applied",

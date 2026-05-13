@@ -3449,6 +3449,8 @@
   },
   "entityTemplates": {
     "title": "Entity Templates",
+    "description": "सामान्य उपयोग के लिए पूर्व-कॉन्फ़िगर किए गए इकाई प्रकार।",
+    "noTemplates": "कोई टेम्पलेट उपलब्ध नहीं है।",
     "apply": "Apply Template",
     "applied": "Applied",
     "notApplied": "Not Applied",

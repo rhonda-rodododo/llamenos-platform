@@ -1328,6 +1328,8 @@
   "encryptingKeys": "Encrypting keys...",
   "entityTemplates": {
     "title": "Entity Templates",
+    "description": "Pre-configured entity types for common use cases.",
+    "noTemplates": "No templates available.",
     "apply": "Apply Template",
     "applied": "Applied",
     "notApplied": "Not Applied",

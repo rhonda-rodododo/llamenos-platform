@@ -3449,6 +3449,8 @@
   },
   "entityTemplates": {
     "title": "Entity Templates",
+    "description": "为常见用例预配置的实体类型。",
+    "noTemplates": "没有可用的模板。",
     "apply": "Apply Template",
     "applied": "Applied",
     "notApplied": "Not Applied",

@@ -3449,6 +3449,8 @@
   },
   "entityTemplates": {
     "title": "Entity Templates",
+    "description": "Mga pre-configured na uri ng entity para sa karaniwang paggamit.",
+    "noTemplates": "Walang magagamit na template.",
     "apply": "Apply Template",
     "applied": "Applied",
     "notApplied": "Not Applied",
