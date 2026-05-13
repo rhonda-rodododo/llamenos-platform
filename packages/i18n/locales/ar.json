@@ -751,15 +751,11 @@
     "submit": "إرسال",
     "success": "نجاح",
     "yes": "نعم",
-    "ok": "OK",
-    "create": "Create",
-    "all": "All",
-    "previous": "Previous",
     "comingSoon": "Coming soon",
     "hideAdvanced": "Hide Advanced",
     "showAdvanced": "Show Advanced",
     "saved": "Saved",
-"unauthorized": "Unauthorized"
+    "unauthorized": "Unauthorized"
   },
   "confirm": {
     "backup": "Confirm Backup",
@@ -1687,7 +1683,8 @@
     "serviceAccountKey": "Service Account Key (JSON)",
     "title": "RCS Channel",
     "webhookSecret": "Webhook Secret",
-    "webhookUrl": "Webhook URL"
+    "webhookUrl": "Webhook URL",
+    "agentSetup": "Agent Setup"
   },
   "recording": {
     "error": "Failed to load recording",
@@ -2425,7 +2422,8 @@
     "startRegistrationButton": "Start Registration",
     "verifyButton": "Verify",
     "unregisterButton": "Unregister",
-    "retryButton": "Retry"
+    "retryButton": "Retry",
+    "bridgeSetup": "Bridge Setup"
   },
   "spam": {
     "blockDuration": "مدة الحظر (دقائق)",
@@ -3443,5 +3441,121 @@
     "setupComplete": {
       "footer": "Webhook setup complete"
     }
+  },
+  "channels": {
+    "shared": {
+      "testing": "Testing...",
+      "testConnection": "Test Connection",
+      "testSuccess": "Connected",
+      "testFailed": "Connection Failed",
+      "enableChannel": "Enable {{channel}}",
+      "autoResponse": "Auto-Response",
+      "autoResponsePlaceholder": "Automatic reply sent to first-time contacts...",
+      "autoResponseHelp": "Sent once when a new contact messages for the first time.",
+      "afterHoursResponse": "After-Hours Response",
+      "afterHoursPlaceholder": "Reply sent outside shift hours...",
+      "afterHoursHelp": "Sent when no volunteers are on shift. Leave empty to disable.",
+      "security": {
+        "none": "No encryption",
+        "provider-encrypted": "Provider encrypted",
+        "e2ee-to-bridge": "E2EE to bridge",
+        "e2ee": "End-to-end encrypted"
+      }
+    },
+    "sms": {
+      "title": "SMS Channel",
+      "description": "Text messaging via your telephony provider.",
+      "providerNote": "SMS uses your telephony provider credentials and phone number. No separate SMS setup is required.",
+      "contentMode": "Content Mode",
+      "contentModeFull": "Full content",
+      "contentModeNotification": "Notification only",
+      "contentModeFullHelp": "SMS messages include full message text. Note: SMS has no transport encryption.",
+      "contentModeNotificationHelp": "SMS messages contain only a notification to check the app. Message content stays encrypted."
+    },
+    "whatsapp": {
+      "title": "WhatsApp Channel",
+      "description": "WhatsApp Business messaging via Twilio or direct Meta API.",
+      "integrationMode": "Integration Mode",
+      "modeTwilio": "Via Twilio",
+      "modeDirect": "Direct Meta API",
+      "modeTwilioHelp": "Uses your existing Twilio telephony provider credentials. No additional setup needed.",
+      "modeDirectHelp": "Connect directly to the Meta WhatsApp Business API. Requires a Meta developer account.",
+      "phoneNumberId": "Phone Number ID",
+      "businessAccountId": "Business Account ID",
+      "accessToken": "Access Token",
+      "verifyToken": "Verify Token",
+      "appSecret": "App Secret",
+      "twilioNote": "WhatsApp is configured through your Twilio account. Ensure WhatsApp is enabled for your Twilio number.",
+      "directCredentials": "Meta API Credentials"
+    },
+    "telegram": {
+      "title": "Telegram Channel",
+      "description": "Telegram Bot messaging for inbound conversations.",
+      "botToken": "Bot Token",
+      "botTokenHelp": "Create a bot via @BotFather on Telegram and paste the token here.",
+      "botUsername": "Bot Username",
+      "webhookUrl": "Webhook URL",
+      "webhookSecret": "Webhook Secret",
+      "botSetup": "Bot Setup"
+    },
+    "a2p": {
+      "title": "A2P 10DLC Registration",
+      "description": "US carriers require A2P 10DLC registration for business SMS. Register your brand and campaign to ensure deliverability.",
+      "brandStatus": "Brand: {{status}}",
+      "campaignStatus": "Campaign: {{status}}",
+      "status": {
+        "notSubmitted": "Not submitted",
+        "pending": "Pending review",
+        "approved": "Approved",
+        "failed": "Failed",
+        "skipped": "Skipped"
+      },
+      "approved": "A2P Approved",
+      "statusSkipped": "A2P Skipped",
+      "statusFailed": "Registration Failed",
+      "statusPending": "Pending Review",
+      "statusNotSubmitted": "Not Registered",
+      "submitBrand": "Register Brand",
+      "resubmitBrand": "Re-submit Brand",
+      "submitCampaign": "Register Campaign",
+      "resubmitCampaign": "Re-submit Campaign",
+      "skip": "Skip A2P",
+      "brandSubmitted": "Brand registration submitted",
+      "brandError": "Failed to submit brand registration",
+      "campaignSubmitted": "Campaign registration submitted",
+      "campaignError": "Failed to submit campaign registration",
+      "skipped": "A2P registration skipped",
+      "approvedMessage": "A2P registration is approved. SMS messages will be sent using your registered brand and campaign.",
+      "brandSid": "Brand SID",
+      "campaignSid": "Campaign SID",
+      "brandFormTitle": "Brand Registration",
+      "campaignFormTitle": "Campaign Registration",
+      "entityType": "Entity Type",
+      "entityTypes": {
+        "PRIVATE_PROFIT": "Private for-profit",
+        "PUBLIC_PROFIT": "Public for-profit",
+        "NON_PROFIT": "Non-profit",
+        "GOVERNMENT": "Government"
+      },
+      "companyName": "Company Name",
+      "ein": "EIN / Tax ID",
+      "phone": "Phone",
+      "email": "Email",
+      "street": "Street Address",
+      "city": "City",
+      "state": "State",
+      "postalCode": "Postal Code",
+      "country": "Country",
+      "useCase": "Use Case",
+      "campaignDescription": "Campaign Description",
+      "helpMessage": "Help Message",
+      "optinMessage": "Opt-in Message",
+      "optoutMessage": "Opt-out Message",
+      "sampleMessages": "Sample Messages",
+      "sampleMessagePlaceholder": "Sample message {{num}}",
+      "addSampleMessage": "Add sample message",
+      "address": "Address"
+    },
+    "title": "Messaging Channels"
   }
 }
