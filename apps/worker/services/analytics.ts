@@ -214,6 +214,140 @@ export class AnalyticsService {
   }
 
   // =========================================================================
+  // Per-User Stats
+  // =========================================================================
+
+  async getUserStats(
+    hubId: string | undefined,
+    range?: Partial<DateRange>,
+  ): Promise<{
+    users: Array<{
+      pubkey: string
+      displayName: string | null
+      callsAnswered: number
+      avgDurationSeconds: number
+      notesCreated: number
+    }>
+  }> {
+    const { from, to } = { ...defaultRange(), ...range }
+
+    const callStats = await this.db
+      .select({
+        pubkey: callRecords.answeredBy,
+        displayName: users.displayName,
+        callsAnswered: count(),
+        avgDuration: sql<number>`COALESCE(AVG(${callRecords.duration}), 0)`.mapWith(Number),
+      })
+      .from(callRecords)
+      .leftJoin(users, eq(callRecords.answeredBy, users.pubkey))
+      .where(
+        and(
+          hubId ? eq(callRecords.hubId, hubId) : undefined,
+          eq(callRecords.status, 'completed'),
+          gte(callRecords.startedAt, from),
+          lte(callRecords.startedAt, to),
+          sql`${callRecords.answeredBy} IS NOT NULL`,
+        ),
+      )
+      .groupBy(callRecords.answeredBy, users.displayName)
+      .orderBy(sql`COUNT(*) DESC`)
+
+    const noteCounts = await this.db
+      .select({
+        authorPubkey: notes.authorPubkey,
+        notesCount: count(),
+      })
+      .from(notes)
+      .where(
+        and(
+          hubId ? eq(notes.hubId, hubId) : undefined,
+          gte(notes.createdAt, from),
+          lte(notes.createdAt, to),
+        ),
+      )
+      .groupBy(notes.authorPubkey)
+
+    const noteMap = new Map(noteCounts.map((n) => [n.authorPubkey, n.notesCount]))
+
+    return {
+      users: callStats.map((row) => ({
+        pubkey: row.pubkey!,
+        displayName: row.displayName ?? null,
+        callsAnswered: row.callsAnswered,
+        avgDurationSeconds: Math.round(row.avgDuration),
+        notesCreated: noteMap.get(row.pubkey!) ?? 0,
+      })),
+    }
+  }
+
+  // =========================================================================
+  // Personal Stats
+  // =========================================================================
+
+  async getPersonalStats(
+    hubId: string,
+    userPubkey: string,
+    range?: Partial<DateRange>,
+  ): Promise<{
+    callsToday: number
+    callsThisPeriod: number
+    avgDurationSeconds: number
+    notesCreatedThisPeriod: number
+  }> {
+    const { from, to } = { ...defaultRange(), ...range }
+
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+
+    const [todayRow] = await this.db
+      .select({ callsToday: count() })
+      .from(callRecords)
+      .where(
+        and(
+          eq(callRecords.hubId, hubId),
+          eq(callRecords.answeredBy, userPubkey),
+          eq(callRecords.status, 'completed'),
+          gte(callRecords.startedAt, todayStart),
+        ),
+      )
+
+    const [periodRow] = await this.db
+      .select({
+        callsInPeriod: count(),
+        avgDuration: sql<number>`COALESCE(AVG(${callRecords.duration}), 0)`.mapWith(Number),
+      })
+      .from(callRecords)
+      .where(
+        and(
+          eq(callRecords.hubId, hubId),
+          eq(callRecords.answeredBy, userPubkey),
+          eq(callRecords.status, 'completed'),
+          gte(callRecords.startedAt, from),
+          lte(callRecords.startedAt, to),
+        ),
+      )
+
+    const [notesRow] = await this.db
+      .select({ notesCount: count() })
+      .from(notes)
+      .where(
+        and(
+          eq(notes.hubId, hubId),
+          eq(notes.authorPubkey, userPubkey),
+          gte(notes.createdAt, from),
+          lte(notes.createdAt, to),
+        ),
+      )
+
+    return {
+      callsToday: todayRow?.callsToday ?? 0,
+      callsThisPeriod: periodRow?.callsInPeriod ?? 0,
+      avgDurationSeconds: Math.round(periodRow?.avgDuration ?? 0),
+      notesCreatedThisPeriod: notesRow?.notesCount ?? 0,
+    }
+  }
+
+  // =========================================================================
   // Conversation Metrics
   // =========================================================================
 

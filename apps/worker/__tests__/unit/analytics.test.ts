@@ -4,7 +4,7 @@ import { createMockDb } from './mock-db'
 
 describe('AnalyticsService', () => {
   function setup() {
-    const { db } = createMockDb(['callRecords', 'conversations', 'shifts', 'activeCalls', 'users'])
+    const { db } = createMockDb(['callRecords', 'conversations', 'shifts', 'activeCalls', 'users', 'notes'])
     const service = new AnalyticsService(db as any)
     return { db, service }
   }
@@ -127,6 +127,83 @@ describe('AnalyticsService', () => {
       })
       expect(result.buckets[12]).toEqual({ hour: 12, count: 8 })
       expect(result.totalCalls).toBe(8)
+    })
+  })
+
+  describe('getUserStats', () => {
+    it('returns per-user stats sorted by calls answered desc', async () => {
+      const { db, service } = setup()
+      db.$setSelectResults([
+        [
+          { pubkey: 'pk-alice', displayName: 'Alice', callsAnswered: 15, avgDuration: 180 },
+          { pubkey: 'pk-bob', displayName: 'Bob', callsAnswered: 8, avgDuration: 120 },
+        ],
+        [
+          { authorPubkey: 'pk-alice', notesCount: 10 },
+          { authorPubkey: 'pk-bob', notesCount: 3 },
+        ],
+      ])
+      const result = await service.getUserStats('hub-1', {
+        from: new Date('2026-05-01'),
+        to: new Date('2026-05-07'),
+      })
+      expect(result.users).toHaveLength(2)
+      expect(result.users[0]).toEqual({
+        pubkey: 'pk-alice',
+        displayName: 'Alice',
+        callsAnswered: 15,
+        avgDurationSeconds: 180,
+        notesCreated: 10,
+      })
+      expect(result.users[1].callsAnswered).toBe(8)
+    })
+
+    it('handles users with no notes', async () => {
+      const { db, service } = setup()
+      db.$setSelectResults([
+        [{ pubkey: 'pk-carol', displayName: null, callsAnswered: 5, avgDuration: 90 }],
+        [],
+      ])
+      const result = await service.getUserStats('hub-1', {
+        from: new Date('2026-05-01'),
+        to: new Date('2026-05-07'),
+      })
+      expect(result.users[0].notesCreated).toBe(0)
+      expect(result.users[0].displayName).toBeNull()
+    })
+  })
+
+  describe('getPersonalStats', () => {
+    it('returns personal stats for a single user', async () => {
+      const { db, service } = setup()
+      db.$setSelectResults([
+        [{ callsToday: 3 }],
+        [{ callsInPeriod: 25, avgDuration: 210 }],
+        [{ notesCount: 12 }],
+      ])
+      const result = await service.getPersonalStats('hub-1', 'pk-alice', {
+        from: new Date('2026-05-01'),
+        to: new Date('2026-05-07'),
+      })
+      expect(result).toEqual({
+        callsToday: 3,
+        callsThisPeriod: 25,
+        avgDurationSeconds: 210,
+        notesCreatedThisPeriod: 12,
+      })
+    })
+
+    it('returns zeros when user has no activity', async () => {
+      const { db, service } = setup()
+      db.$setSelectResults([
+        [{ callsToday: 0 }],
+        [{ callsInPeriod: 0, avgDuration: 0 }],
+        [{ notesCount: 0 }],
+      ])
+      const result = await service.getPersonalStats('hub-1', 'pk-newuser')
+      expect(result.callsToday).toBe(0)
+      expect(result.callsThisPeriod).toBe(0)
+      expect(result.notesCreatedThisPeriod).toBe(0)
     })
   })
 })

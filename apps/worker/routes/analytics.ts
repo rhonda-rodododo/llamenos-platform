@@ -16,6 +16,9 @@ import {
   conversationMetricsResponseSchema,
   shiftMetricsResponseSchema,
   analyticsSystemHealthResponseSchema,
+  hourlyDistributionResponseSchema,
+  userStatsResponseSchema,
+  personalStatsResponseSchema,
 } from '@protocol/schemas/analytics'
 
 const analytics = new Hono<AppEnv>()

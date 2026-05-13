@@ -45,6 +45,8 @@ import { Route as AdminFirehoseRouteImport } from './routes/admin/firehose'
 import { Route as AdminCaseManagementRedirectRouteImport } from './routes/admin/case-management-redirect'
 import { Route as AdminCaseManagementRouteImport } from './routes/admin/case-management'
 import { Route as AdminSectionRouteImport } from './routes/admin/$section'
+import { Route as AdminAnalyticsRouteImport } from './routes/admin/analytics'
+import { Route as AdminPlatformAnalyticsRouteImport } from './routes/admin/platform-analytics'
 
 const UsersRoute = UsersRouteImport.update({
   id: '/users',
@@ -227,6 +229,16 @@ const AdminSectionRoute = AdminSectionRouteImport.update({
   path: '/$section',
   getParentRoute: () => AdminRouteRoute,
 } as any)
+const AdminAnalyticsRoute = AdminAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
+const AdminPlatformAnalyticsRoute = AdminPlatformAnalyticsRouteImport.update({
+  id: '/platform-analytics',
+  path: '/platform-analytics',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -265,6 +277,8 @@ export interface FileRoutesByFullPath {
   '/admin/system': typeof AdminSystemRoute
   '/users/$pubkey': typeof UsersPubkeyRoute
   '/admin/': typeof AdminIndexRoute
+  '/admin/analytics': typeof AdminAnalyticsRoute
+  '/admin/platform-analytics': typeof AdminPlatformAnalyticsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -302,6 +316,8 @@ export interface FileRoutesByTo {
   '/admin/system': typeof AdminSystemRoute
   '/users/$pubkey': typeof UsersPubkeyRoute
   '/admin': typeof AdminIndexRoute
+  '/admin/analytics': typeof AdminAnalyticsRoute
+  '/admin/platform-analytics': typeof AdminPlatformAnalyticsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -341,6 +357,8 @@ export interface FileRoutesById {
   '/admin/system': typeof AdminSystemRoute
   '/users_/$pubkey': typeof UsersPubkeyRoute
   '/admin/': typeof AdminIndexRoute
+  '/admin/analytics': typeof AdminAnalyticsRoute
+  '/admin/platform-analytics': typeof AdminPlatformAnalyticsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -381,6 +399,8 @@ export interface FileRouteTypes {
     | '/admin/system'
     | '/users/$pubkey'
     | '/admin/'
+    | '/admin/analytics'
+    | '/admin/platform-analytics'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -418,6 +438,8 @@ export interface FileRouteTypes {
     | '/admin/system'
     | '/users/$pubkey'
     | '/admin'
+    | '/admin/analytics'
+    | '/admin/platform-analytics'
   id:
     | '__root__'
     | '/'
@@ -456,6 +478,8 @@ export interface FileRouteTypes {
     | '/admin/system'
     | '/users_/$pubkey'
     | '/admin/'
+    | '/admin/analytics'
+    | '/admin/platform-analytics'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -740,6 +764,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminSectionRouteImport
       parentRoute: typeof AdminRouteRoute
     }
+    '/admin/analytics': {
+      id: '/admin/analytics'
+      path: '/analytics'
+      fullPath: '/admin/analytics'
+      preLoaderRoute: typeof AdminAnalyticsRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
+    '/admin/platform-analytics': {
+      id: '/admin/platform-analytics'
+      path: '/platform-analytics'
+      fullPath: '/admin/platform-analytics'
+      preLoaderRoute: typeof AdminPlatformAnalyticsRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
   }
 }
 
@@ -754,6 +792,8 @@ interface AdminRouteRouteChildren {
   AdminHubsRedirectRoute: typeof AdminHubsRedirectRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
   AdminSystemRoute: typeof AdminSystemRoute
+  AdminAnalyticsRoute: typeof AdminAnalyticsRoute
+  AdminPlatformAnalyticsRoute: typeof AdminPlatformAnalyticsRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
 
