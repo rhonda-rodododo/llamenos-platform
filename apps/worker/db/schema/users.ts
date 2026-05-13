@@ -167,6 +167,11 @@ export const devices = pgTable(
       .notNull()
       .defaultNow(),
     lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
+    deviceName: text('device_name'),
+    deviceModel: text('device_model'),
+    osVersion: text('os_version'),
+    appVersion: text('app_version'),
+    lastIpHash: text('last_ip_hash'),
   },
   (table) => [index('devices_pubkey_idx').on(table.pubkey)],
 )
