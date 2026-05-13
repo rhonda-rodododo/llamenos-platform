@@ -751,15 +751,11 @@
     "submit": "إرسال",
     "success": "نجاح",
     "yes": "نعم",
-    "ok": "OK",
-    "create": "Create",
-    "all": "All",
-    "previous": "Previous",
     "comingSoon": "Coming soon",
     "hideAdvanced": "Hide Advanced",
     "showAdvanced": "Show Advanced",
     "saved": "Saved",
-"unauthorized": "Unauthorized"
+    "unauthorized": "Unauthorized"
   },
   "confirm": {
     "backup": "Confirm Backup",
@@ -3442,6 +3438,61 @@
     },
     "setupComplete": {
       "footer": "Webhook setup complete"
+    }
+  },
+  "analytics": {
+    "title": "التحليلات",
+    "description": "حجم المكالمات وأوقات الاستجابة ونشاط المتطوعين",
+    "nav": "التحليلات",
+    "summary": {
+      "totalCalls": "إجمالي المكالمات",
+      "answerRate": "معدل الرد",
+      "avgDuration": "متوسط المدة",
+      "totalConversations": "إجمالي المحادثات"
+    },
+    "callVolume": {
+      "title": "حجم المكالمات",
+      "answered": "مُجاب",
+      "unanswered": "غير مُجاب",
+      "abandoned": "مُهمل",
+      "noData": "لا توجد بيانات مكالمات لهذه الفترة"
+    },
+    "hours": {
+      "title": "التوزيع الساعي",
+      "noData": "لا توجد بيانات لهذه الفترة"
+    },
+    "conversations": {
+      "title": "المحادثات",
+      "avgResponseTime": "متوسط وقت الاستجابة",
+      "avgMessages": "متوسط الرسائل",
+      "noData": "لا توجد بيانات محادثات لهذه الفترة"
+    },
+    "shifts": {
+      "title": "تغطية الوردية",
+      "noData": "لا توجد بيانات وردية"
+    },
+    "users": {
+      "title": "نشاط المتطوعين",
+      "name": "الاسم",
+      "callsAnswered": "المكالمات المُجابة",
+      "avgDuration": "متوسط المدة",
+      "notesCreated": "الملاحظات المُنشأة",
+      "noData": "لا توجد بيانات متطوعين لهذه الفترة"
+    },
+    "personal": {
+      "callsToday": "مكالمات اليوم",
+      "callsThisPeriod": "مكالمات هذه الفترة",
+      "avgDuration": "متوسط المدة",
+      "notesCreated": "الملاحظات المُنشأة"
+    },
+    "platform": {
+      "title": "تحليلات المنصة",
+      "crossHub": "عبر الهابات"
+    },
+    "dateRange": {
+      "7days": "٧ أيام",
+      "30days": "٣٠ يومًا",
+      "custom": "مخصص"
     }
   }
 }
