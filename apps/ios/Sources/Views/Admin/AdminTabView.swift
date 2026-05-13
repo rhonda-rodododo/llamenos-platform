@@ -107,6 +107,30 @@ struct AdminTabView: View {
                 .accessibilityIdentifier("admin-signal-registration")
             }
 
+            // MARK: - Recovery Section
+
+            Section(header: Text(NSLocalizedString("admin_nav_items_recovery_group", comment: "Recovery Group"))) {
+                NavigationLink {
+                    RecoveryTeamConfigView(viewModel: vm)
+                } label: {
+                    Label(
+                        NSLocalizedString("recovery_group_title", comment: "Recovery Team"),
+                        systemImage: "person.badge.shield.checkmark.fill"
+                    )
+                }
+                .accessibilityIdentifier("admin-recovery-team")
+
+                NavigationLink {
+                    RecoveryRequestsView(viewModel: vm)
+                } label: {
+                    Label(
+                        NSLocalizedString("recovery_group_requests_title", comment: "Recovery Requests"),
+                        systemImage: "arrow.counterclockwise.circle.fill"
+                    )
+                }
+                .accessibilityIdentifier("admin-recovery-requests")
+            }
+
             // MARK: - Settings Section
 
             Section(header: Text(NSLocalizedString("admin_settings_section", comment: "Settings"))) {
