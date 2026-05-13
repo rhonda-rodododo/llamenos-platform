@@ -141,6 +141,13 @@
       "when": 1778568679164,
       "tag": "0019_provider_templates_and_onboarding",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1778694129859,
+      "tag": "0020_exotic_naoko",
+      "breakpoints": true
     }
   ]
 }
