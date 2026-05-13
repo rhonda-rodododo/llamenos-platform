@@ -9,13 +9,13 @@ import {
 } from '../permissions'
 
 describe('new system:view-* permissions', () => {
-  const newPerms = [
+  const newPerms: string[] = [
     'system:view-platform',
     'system:view-bans',
     'system:view-audit',
     'system:view-analytics',
     'system:view-health',
-  ] as const
+  ]
 
   test.each(newPerms)('%s exists in PERMISSION_CATALOG', (perm) => {
     expect(perm in PERMISSION_CATALOG).toBe(true)

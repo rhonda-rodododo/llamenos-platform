@@ -201,6 +201,32 @@ export const PERMISSION_CATALOG = {
 
 export type Permission = keyof typeof PERMISSION_CATALOG
 
+/** Human-readable labels for permission domains, used in the permission picker UI. */
+export const PERMISSION_GROUP_LABELS: Record<string, string> = {
+  audit: 'Audit',
+  bans: 'Bans',
+  blasts: 'Blasts',
+  calls: 'Calls',
+  cases: 'Cases',
+  contacts: 'Contacts',
+  conversations: 'Conversations',
+  events: 'Events',
+  evidence: 'Evidence',
+  files: 'Files',
+  firehose: 'Firehose',
+  hubs: 'Hubs',
+  invites: 'Invites',
+  messaging: 'Messaging',
+  metrics: 'Metrics',
+  notes: 'Notes',
+  reports: 'Reports',
+  settings: 'Settings',
+  shifts: 'Shifts',
+  system: 'System',
+  telephony: 'Telephony',
+  users: 'Users',
+}
+
 /** All permission domains (first part before the colon) */
 export type PermissionDomain = Permission extends `${infer D}:${string}` ? D : never
 
