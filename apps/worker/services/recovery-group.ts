@@ -1,4 +1,6 @@
 import { eq, and, sql } from 'drizzle-orm'
+import { ed25519Verify } from '@llamenos/crypto/ffi'
+import { hexToBytes, utf8ToBytes } from '@shared/encoding'
 import type { Database } from '../db'
 import {
   hubRecoveryGroups,
@@ -222,7 +224,7 @@ export class RecoveryGroupService {
     }
 
     logger.info('Recovery session initiated', { sessionId, hubId })
-    return { sessionId, verificationSent: true }
+    return { sessionId, verificationSent }
   }
 
   async verifyInitiation(params: {
@@ -246,6 +248,14 @@ export class RecoveryGroupService {
 
     if (session.status !== 'pending') {
       throw new RecoveryGroupError('Session is not in pending state', 400)
+    }
+
+    if (new Date() > session.expiresAt) {
+      await this.db
+        .update(recoverySessions)
+        .set({ status: 'expired' })
+        .where(eq(recoverySessions.sessionId, sessionId))
+      throw new RecoveryGroupError('Session has expired', 400)
     }
 
     if (session.verificationAttempts >= MAX_VERIFICATION_ATTEMPTS) {
@@ -330,57 +340,60 @@ export class RecoveryGroupService {
       throw new RecoveryGroupError('Contributor is not a share holder for this hub', 403)
     }
 
-    const existing = await this.db
-      .select({ contributorPubkey: recoverySessionContributions.contributorPubkey })
-      .from(recoverySessionContributions)
-      .where(
-        and(
-          eq(recoverySessionContributions.sessionId, sessionId),
-          eq(recoverySessionContributions.contributorPubkey, contributorPubkey),
-        ),
-      )
-      .limit(1)
-
-    if (existing.length > 0) {
-      throw new RecoveryGroupError('Duplicate contribution — already submitted', 409)
-    }
-
-    await this.db.insert(recoverySessionContributions).values({
-      sessionId,
-      contributorPubkey,
-      encryptedShare,
-      contributorSignature,
-    })
-
-    const countResult = await this.db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(recoverySessionContributions)
-      .where(eq(recoverySessionContributions.sessionId, sessionId))
-
-    const contributionCount = countResult[0]?.count ?? 0
-
-    const group = await this.db
-      .select({ threshold: hubRecoveryGroups.threshold })
-      .from(hubRecoveryGroups)
-      .where(eq(hubRecoveryGroups.hubId, session.hubId))
-      .limit(1)
-
-    const threshold = group[0]?.threshold ?? 2
+    let contributionCount = 0
     let newStatus = session.status
 
-    if (contributionCount >= threshold && session.status === 'verified') {
-      newStatus = 'active'
-      await this.db
-        .update(recoverySessions)
-        .set({ status: 'active' })
-        .where(eq(recoverySessions.sessionId, sessionId))
-    }
+    await this.db.transaction(async (tx) => {
+      const existing = await tx
+        .select({ contributorPubkey: recoverySessionContributions.contributorPubkey })
+        .from(recoverySessionContributions)
+        .where(
+          and(
+            eq(recoverySessionContributions.sessionId, sessionId),
+            eq(recoverySessionContributions.contributorPubkey, contributorPubkey),
+          ),
+        )
+        .limit(1)
+
+      if (existing.length > 0) {
+        throw new RecoveryGroupError('Duplicate contribution — already submitted', 409)
+      }
+
+      await tx.insert(recoverySessionContributions).values({
+        sessionId,
+        contributorPubkey,
+        encryptedShare,
+        contributorSignature,
+      })
+
+      const countResult = await tx
+        .select({ count: sql<number>`count(*)::int` })
+        .from(recoverySessionContributions)
+        .where(eq(recoverySessionContributions.sessionId, sessionId))
+
+      contributionCount = countResult[0]?.count ?? 0
+
+      const group = await tx
+        .select({ threshold: hubRecoveryGroups.threshold })
+        .from(hubRecoveryGroups)
+        .where(eq(hubRecoveryGroups.hubId, session.hubId))
+        .limit(1)
+
+      const threshold = group[0]?.threshold ?? 2
+
+      if (contributionCount >= threshold && session.status === 'verified') {
+        newStatus = 'active'
+        await tx
+          .update(recoverySessions)
+          .set({ status: 'active' })
+          .where(eq(recoverySessions.sessionId, sessionId))
+      }
+    })
 
     logger.info('Share contribution received', {
       sessionId,
       contributorPubkey,
       contributionCount,
-      threshold,
       newStatus,
     })
 
@@ -677,6 +690,25 @@ export class RecoveryGroupService {
         `Cannot apply emergency override to session in '${session.status}' state`,
         400,
       )
+    }
+
+    if (approverPubkey === session.userPubkey) {
+      throw new RecoveryGroupError('Approver cannot be the recovering user', 403)
+    }
+
+    // Verify the approver's Ed25519 signature over the sessionId
+    let signatureValid: boolean
+    try {
+      signatureValid = ed25519Verify(
+        hexToBytes(approverPubkey),
+        utf8ToBytes(sessionId),
+        hexToBytes(signature),
+      )
+    } catch {
+      signatureValid = false
+    }
+    if (!signatureValid) {
+      throw new RecoveryGroupError('Invalid approver signature', 403)
     }
 
     const group = await this.db

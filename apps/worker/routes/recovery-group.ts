@@ -5,7 +5,8 @@
  *   POST   /enroll                  — Configure recovery group (recovery:manage)
  *   GET    /:hubId                  — Get recovery group config (recovery:view)
  *   POST   /session/:id/contribute  — Submit share contribution (recovery:hold-share)
- *   GET    /session/:id             — Get session status (recovery:view)
+ *   GET    /session/:id             — Get session status (recovery:view, hub-scoped)
+ *   POST   /session/:id/emergency   — Emergency override (recovery:approve)
  *   POST   /session/:id/cancel      — Cancel session (auth required)
  *   POST   /user-envelope           — Store user recovery envelope (auth required)
  *   POST   /shares/liveness         — Submit liveness proof (recovery:hold-share)
@@ -36,6 +37,7 @@ import {
   userRecoveryEnvelopeSchema,
   shareLivenessProofSchema,
   recoveryCancelResponseSchema,
+  recoveryEmergencyOverrideSchema,
 } from '@protocol/schemas/recovery-group'
 import { okResponseSchema } from '@protocol/schemas/common'
 
@@ -193,11 +195,63 @@ authenticatedRoutes.get('/session/:id',
   requirePermission('recovery:view'),
   async (c) => {
     const sessionId = c.req.param('id')
+    const user = c.get('user')
     const services = c.get('services')
 
     try {
       const session = await services.recoveryGroup.getSession(sessionId)
+
+      // Enforce hub-scoping: caller must be a member of the session's hub.
+      // Global admins (no hubRoles) have unrestricted access.
+      const hubRoles = user.hubRoles ?? []
+      if (hubRoles.length > 0 && !hubRoles.some((hr) => hr.hubId === session.hubId)) {
+        return c.json({ error: 'Session not found' }, 404)
+      }
+
       return c.json(session)
+    } catch (err) {
+      if (err instanceof RecoveryGroupError) {
+        return c.json({ error: err.message }, err.status)
+      }
+      throw err
+    }
+  },
+)
+
+// POST /session/:id/emergency — Emergency override (shortcut delay timer)
+authenticatedRoutes.post('/session/:id/emergency',
+  describeRoute({
+    tags: ['Recovery Group'],
+    summary: 'Apply emergency override to a recovery session',
+    description: 'An approver with recovery:approve permission can bypass the delay timer. Requires a valid Ed25519 signature from the approver over the sessionId. Approver must not be the recovering user.',
+    responses: {
+      200: {
+        description: 'Emergency override applied',
+        content: {
+          'application/json': {
+            schema: resolver(okResponseSchema),
+          },
+        },
+      },
+      ...authErrors,
+      ...notFoundError,
+    },
+  }),
+  requirePermission('recovery:approve'),
+  validator('json', recoveryEmergencyOverrideSchema),
+  async (c) => {
+    const sessionId = c.req.param('id')
+    const body = c.req.valid('json')
+    const services = c.get('services')
+
+    try {
+      await services.recoveryGroup.applyEmergencyOverride({
+        sessionId,
+        approverPubkey: body.approverPubkey,
+        justification: body.justification,
+        signature: body.signature,
+      })
+      return c.json({ ok: true })
     } catch (err) {
       if (err instanceof RecoveryGroupError) {
         return c.json({ error: err.message }, err.status)
@@ -378,8 +432,8 @@ publicRoutes.post('/initiate',
 
     // Signal notifier function — sends verification code via sidecar
     const signalNotifierFn = async (identifierHash: string, code: string): Promise<boolean> => {
-      const notifierUrl = c.env.NOTIFIER_URL || 'http://localhost:3100'
-      const notifierToken = c.env.NOTIFIER_API_KEY || ''
+      const notifierUrl = c.env.SIGNAL_NOTIFIER_URL || 'http://localhost:3100'
+      const notifierToken = c.env.SIGNAL_NOTIFIER_BEARER_TOKEN || ''
 
       try {
         const res = await fetch(`${notifierUrl}/api/send`, {

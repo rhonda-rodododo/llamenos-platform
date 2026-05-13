@@ -4,7 +4,7 @@
 // Types with extra storage-only fields (encryptedSecretKey, callerNumber, etc.)
 // are defined here as server-internal storage types.
 
-import type { MessagingChannelType, RecipientEnvelope, KeyEnvelope } from '@shared/types'
+import type { MessagingChannelType, RecipientEnvelope } from '@shared/types'
 
 // ---------------------------------------------------------------------------
 // Re-exports of entity types whose schema matches storage shape exactly
@@ -73,8 +73,12 @@ export interface Env {
   SIP_BRIDGE_URL?: string         // HTTP base URL of the asterisk-bridge sidecar (e.g. http://asterisk-bridge:3000)
 
   // Signal notifier sidecar (signal notification service)
-  NOTIFIER_URL?: string           // HTTP base URL of the signal-notifier sidecar
-  NOTIFIER_API_KEY?: string       // Shared bearer token for server→sidecar API auth
+  SIGNAL_NOTIFIER_URL?: string         // HTTP base URL of the signal-notifier sidecar (canonical)
+  SIGNAL_NOTIFIER_BEARER_TOKEN?: string // Shared bearer token for server→sidecar API auth (canonical)
+  /** @deprecated Use SIGNAL_NOTIFIER_URL */
+  NOTIFIER_URL?: string
+  /** @deprecated Use SIGNAL_NOTIFIER_BEARER_TOKEN */
+  NOTIFIER_API_KEY?: string
   NOTIFIER_TOKEN_SECRET?: string  // HMAC secret for signing client registration tokens (falls back to HMAC_SECRET)
 
   // GlitchTip/Sentry DSN for client-side crash reporting (Epic 293)

@@ -18,6 +18,7 @@ import {
   timestamp,
 } from 'drizzle-orm/pg-core'
 import { jsonb } from '../bun-jsonb'
+import { hubs } from './settings'
 
 // ---------------------------------------------------------------------------
 // hub_recovery_groups
@@ -100,7 +101,7 @@ export const userRecoveryEnvelopes = pgTable(
   'user_recovery_envelopes',
   {
     userPubkey: text('user_pubkey').notNull(),
-    hubId: text('hub_id').notNull(),
+    hubId: text('hub_id').notNull().references(() => hubs.id, { onDelete: 'cascade' }),
     envelope: text('envelope').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()

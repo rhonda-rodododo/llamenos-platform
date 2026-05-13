@@ -136,3 +136,10 @@ export const recoveryCancelResponseSchema = z.object({
   ok: z.boolean(),
 })
 export type RecoveryCancelResponse = z.infer<typeof recoveryCancelResponseSchema>
+
+export const recoveryEmergencyOverrideSchema = z.object({
+  approverPubkey: z.string(),
+  justification: z.string().min(1),
+  signature: z.string(),
+})
+export type RecoveryEmergencyOverride = z.infer<typeof recoveryEmergencyOverrideSchema>
