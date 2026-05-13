@@ -113,19 +113,11 @@ function RootLayout() {
     }
   }, [isLoading, isAuthenticated, profileCompleted, webauthnEnrollmentRequired, location.pathname, navigate])
 
-  const [wiped, setWiped] = useState<{ reason: 'user-erasure' | 'device-revocation' | 'admin-erasure' } | null>(() => {
-    try {
-      const stored = sessionStorage.getItem('device-wiped')
-      return stored ? JSON.parse(stored) : null
-    } catch {
-      return null
-    }
-  })
+  const [wiped, setWiped] = useState<{ reason: 'user-erasure' | 'device-revocation' | 'admin-erasure' } | null>(null)
 
   useEffect(() => {
     function onWipe(e: CustomEvent<{ reason: string }>) {
       const data = { reason: e.detail.reason as 'user-erasure' | 'device-revocation' | 'admin-erasure' }
-      try { sessionStorage.setItem('device-wiped', JSON.stringify(data)) } catch { /* storage unavailable */ }
       setWiped(data)
     }
     window.addEventListener('device:wiped', onWipe as EventListener)
