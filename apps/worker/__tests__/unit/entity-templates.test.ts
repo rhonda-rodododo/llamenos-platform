@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'bun:test'
+import { describe, it, expect } from 'vitest'
 import { EntityTemplatesService } from '../../services/entity-templates'
 
 function makeService() {

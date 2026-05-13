@@ -7,6 +7,11 @@ import type { Services } from '@worker/services'
 // The real ffi.ts uses bun:ffi to load a native .so — unavailable in the Vitest environment.
 import '@worker/__tests__/mocks/llamenos-crypto-ffi'
 
+// Top-level mock ensures the telephony route always gets the mocked service-factories,
+// regardless of module cache state from parallel test files.
+vi.mock('@worker/lib/service-factories')
+import { getTelephonyFromService, getHubTelephonyFromService } from '@worker/lib/service-factories'
+
 function makeMockAdapter(overrides?: Partial<TelephonyAdapter>): TelephonyAdapter {
   return {
     handleLanguageMenu: vi.fn().mockResolvedValue({ contentType: 'text/xml', body: '<Response><Gather/></Response>' }),
@@ -35,7 +40,7 @@ function makeMockAdapter(overrides?: Partial<TelephonyAdapter>): TelephonyAdapte
   } as TelephonyAdapter
 }
 
-function makeServices(adapter: TelephonyAdapter): Services {
+function makeServices(): Services {
   return {
     settings: {
       getTelephonyProvider: vi.fn().mockResolvedValue(null),
@@ -108,9 +113,8 @@ function makeEnv(overrides?: Record<string, unknown>): AppEnv['Bindings'] {
 }
 
 async function createTestApp(adapter: TelephonyAdapter, services: Services, envOverrides?: Record<string, unknown>) {
-  const factories = await import('@worker/lib/service-factories')
-  vi.spyOn(factories, 'getTelephonyFromService').mockResolvedValue(adapter)
-  vi.spyOn(factories, 'getHubTelephonyFromService').mockResolvedValue(adapter)
+  vi.mocked(getTelephonyFromService).mockResolvedValue(adapter)
+  vi.mocked(getHubTelephonyFromService).mockResolvedValue(adapter)
 
   const { default: telephony } = await import('@worker/routes/telephony')
   const app = new Hono<AppEnv>()
@@ -140,7 +144,7 @@ describe('Telephony routes', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     adapter = makeMockAdapter()
-    services = makeServices(adapter)
+    services = makeServices()
   })
 
   describe('webhook validation middleware', () => {
@@ -172,9 +176,8 @@ describe('Telephony routes', () => {
     })
 
     it('returns 404 when no telephony adapter is configured', async () => {
-      const factories = await import('@worker/lib/service-factories')
-      vi.spyOn(factories, 'getTelephonyFromService').mockResolvedValue(null)
-      vi.spyOn(factories, 'getHubTelephonyFromService').mockResolvedValue(null)
+      vi.mocked(getTelephonyFromService).mockResolvedValue(null)
+      vi.mocked(getHubTelephonyFromService).mockResolvedValue(null)
       const { default: telephony } = await import('@worker/routes/telephony')
       const app = new Hono<AppEnv>()
       app.use('*', async (c, next) => {
@@ -481,7 +484,7 @@ describe('Telephony routes', () => {
       for (const status of ['busy', 'no-answer', 'failed'] as const) {
         vi.clearAllMocks()
         adapter = makeMockAdapter()
-        services = makeServices(adapter)
+        services = makeServices()
         services.calls.resolveCallToken = vi.fn().mockResolvedValue({
           callSid: 'CA-parent',
           volunteerPubkey: 'pk-vol-1',
