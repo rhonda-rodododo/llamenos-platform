@@ -32,22 +32,47 @@ use crate::errors::CryptoError;
 /// AES irreducible polynomial: x^8 + x^4 + x^3 + x + 1 = 0x11B
 const GF256_MODULUS: u16 = 0x11B;
 
-/// Multiplication in GF(2^8) using Russian peasant multiplication with reduction.
-#[inline]
-fn gf256_mul(mut a: u8, mut b: u8) -> u8 {
+/// Compile-time GF(2^8) multiplication (Russian peasant, used only for table generation).
+const fn gf256_mul_ct(a: u8, b: u8) -> u8 {
+    let mut aa = a;
+    let mut bb = b;
     let mut result: u8 = 0;
-    while b > 0 {
-        if b & 1 != 0 {
-            result ^= a;
+    let mut i = 0;
+    while i < 8 {
+        if bb & 1 != 0 {
+            result ^= aa;
         }
-        let carry = a & 0x80;
-        a <<= 1;
+        let carry = aa & 0x80;
+        aa <<= 1;
         if carry != 0 {
-            a ^= GF256_MODULUS as u8; // reduce mod polynomial (low 8 bits of 0x11B = 0x1B)
+            aa ^= GF256_MODULUS as u8;
         }
-        b >>= 1;
+        bb >>= 1;
+        i += 1;
     }
     result
+}
+
+/// 256x256 constant lookup table for GF(2^8) multiplication.
+/// Generated at compile time — eliminates all data-dependent branching at runtime.
+static GF256_MUL_TABLE: [[u8; 256]; 256] = {
+    let mut table = [[0u8; 256]; 256];
+    let mut a = 0usize;
+    while a < 256 {
+        let mut b = 0usize;
+        while b < 256 {
+            table[a][b] = gf256_mul_ct(a as u8, b as u8);
+            b += 1;
+        }
+        a += 1;
+    }
+    table
+};
+
+/// Constant-time multiplication in GF(2^8) via lookup table.
+#[inline]
+fn gf256_mul(a: u8, b: u8) -> u8 {
+    GF256_MUL_TABLE[a as usize][b as usize]
 }
 
 /// Addition in GF(2^8) — XOR.
@@ -96,9 +121,13 @@ fn gf256_inv(a: u8) -> u8 {
 
 /// Division in GF(2^8): a / b = a * b^(-1).
 #[inline]
-fn gf256_div(a: u8, b: u8) -> u8 {
-    debug_assert!(b != 0, "division by zero in GF(2^8)");
-    gf256_mul(a, gf256_inv(b))
+fn gf256_div(a: u8, b: u8) -> Result<u8, CryptoError> {
+    if b == 0 {
+        return Err(CryptoError::InvalidInput(
+            "division by zero in GF(2^8)".to_string(),
+        ));
+    }
+    Ok(gf256_mul(a, gf256_inv(b)))
 }
 
 // =============================================================================
@@ -215,15 +244,20 @@ pub fn split(secret: &[u8], total: u8, threshold: u8) -> Result<Vec<Share>, Cryp
 
 /// Reconstruct the secret from a set of shares using Lagrange interpolation.
 ///
-/// Requires at least `threshold` shares (the original threshold from splitting).
-/// Providing fewer than threshold shares will produce an incorrect result
-/// (information-theoretic security — no error is raised, the output is simply wrong).
+/// Requires at least `threshold` shares. Returns an error if fewer shares are provided.
 ///
 /// Providing more shares than the threshold is allowed and will produce the correct secret
 /// as long as the shares are consistent.
-pub fn combine(shares: &[Share]) -> Result<Vec<u8>, CryptoError> {
+pub fn combine(shares: &[Share], threshold: u8) -> Result<Vec<u8>, CryptoError> {
     if shares.is_empty() {
         return Err(CryptoError::InvalidInput("no shares provided".to_string()));
+    }
+
+    if (shares.len() as u8) < threshold {
+        return Err(CryptoError::InvalidInput(format!(
+            "insufficient shares: got {}, need at least {threshold}",
+            shares.len()
+        )));
     }
 
     // Verify all shares have the same y length
@@ -279,7 +313,7 @@ pub fn combine(shares: &[Share]) -> Result<Vec<u8>, CryptoError> {
                 denominator = gf256_mul(denominator, gf256_add(xi, xj)); // product of (x_i XOR x_j)
             }
 
-            let lagrange_coeff = gf256_div(numerator, denominator);
+            let lagrange_coeff = gf256_div(numerator, denominator)?;
             let term = gf256_mul(yi, lagrange_coeff);
             value = gf256_add(value, term);
         }
@@ -440,12 +474,12 @@ mod tests {
         // Any 2 shares should reconstruct correctly
         for combo in &[[0, 1], [0, 2], [1, 2]] {
             let subset: Vec<Share> = combo.iter().map(|&i| shares[i].clone()).collect();
-            let recovered = combine(&subset).unwrap();
+            let recovered = combine(&subset, 2).unwrap();
             assert_eq!(recovered, secret, "failed with shares {:?}", combo);
         }
 
         // All 3 shares should also work
-        let recovered = combine(&shares).unwrap();
+        let recovered = combine(&shares, 2).unwrap();
         assert_eq!(recovered, secret);
     }
 
@@ -456,7 +490,7 @@ mod tests {
         assert_eq!(shares.len(), 4);
 
         let subset = vec![shares[1].clone(), shares[3].clone()];
-        let recovered = combine(&subset).unwrap();
+        let recovered = combine(&subset, 2).unwrap();
         assert_eq!(recovered, secret);
     }
 
@@ -467,7 +501,7 @@ mod tests {
         assert_eq!(shares.len(), 5);
 
         let subset = vec![shares[0].clone(), shares[4].clone()];
-        let recovered = combine(&subset).unwrap();
+        let recovered = combine(&subset, 2).unwrap();
         assert_eq!(recovered, secret);
     }
 
@@ -475,7 +509,7 @@ mod tests {
     fn roundtrip_3_of_3() {
         let secret = random_secret(32);
         let shares = split(&secret, 3, 3).unwrap();
-        let recovered = combine(&shares).unwrap();
+        let recovered = combine(&shares, 3).unwrap();
         assert_eq!(recovered, secret);
     }
 
@@ -492,7 +526,7 @@ mod tests {
                 .filter(|(i, _)| *i != skip)
                 .map(|(_, s)| s.clone())
                 .collect();
-            let recovered = combine(&subset).unwrap();
+            let recovered = combine(&subset, 3).unwrap();
             assert_eq!(recovered, secret, "failed when skipping share {skip}");
         }
     }
@@ -503,7 +537,7 @@ mod tests {
         let shares = split(&secret, 5, 3).unwrap();
 
         let subset = vec![shares[0].clone(), shares[2].clone(), shares[4].clone()];
-        let recovered = combine(&subset).unwrap();
+        let recovered = combine(&subset, 3).unwrap();
         assert_eq!(recovered, secret);
     }
 
@@ -511,7 +545,7 @@ mod tests {
     fn roundtrip_4_of_4() {
         let secret = random_secret(32);
         let shares = split(&secret, 4, 4).unwrap();
-        let recovered = combine(&shares).unwrap();
+        let recovered = combine(&shares, 4).unwrap();
         assert_eq!(recovered, secret);
     }
 
@@ -521,7 +555,7 @@ mod tests {
         let shares = split(&secret, 5, 4).unwrap();
 
         let subset: Vec<Share> = shares[0..4].to_vec();
-        let recovered = combine(&subset).unwrap();
+        let recovered = combine(&subset, 4).unwrap();
         assert_eq!(recovered, secret);
     }
 
@@ -529,40 +563,41 @@ mod tests {
     fn roundtrip_5_of_5() {
         let secret = random_secret(32);
         let shares = split(&secret, 5, 5).unwrap();
-        let recovered = combine(&shares).unwrap();
+        let recovered = combine(&shares, 5).unwrap();
         assert_eq!(recovered, secret);
     }
 
     // =========================================================================
-    // Below-threshold produces wrong output
+    // Below-threshold is now rejected
     // =========================================================================
 
     #[test]
-    fn below_threshold_produces_wrong_output() {
+    fn below_threshold_rejected() {
         let secret = random_secret(32);
         let shares = split(&secret, 5, 3).unwrap();
 
-        // 2 shares (below threshold of 3) should produce wrong output
+        // 2 shares (below threshold of 3) should be rejected
         let subset = vec![shares[0].clone(), shares[1].clone()];
-        let wrong = combine(&subset).unwrap();
-        assert_ne!(
-            wrong, secret,
-            "below-threshold reconstruction should not match secret"
-        );
+        let result = combine(&subset, 3);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("insufficient shares"));
     }
 
     #[test]
-    fn single_share_reveals_nothing() {
+    fn single_share_below_threshold_rejected() {
         let secret = random_secret(32);
         let shares = split(&secret, 3, 2).unwrap();
 
-        // A single share should produce wrong output
         let subset = vec![shares[0].clone()];
-        let wrong = combine(&subset).unwrap();
-        // With threshold=2, a single share is just the polynomial evaluated at x.
-        // It's not equal to the secret (except by astronomically unlikely coincidence).
-        // For a 32-byte secret, the probability of accidental match is 2^(-256).
-        assert_ne!(wrong, secret, "single share should not reveal the secret");
+        let result = combine(&subset, 2);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("insufficient shares"));
     }
 
     // =========================================================================
@@ -701,7 +736,7 @@ mod tests {
 
     #[test]
     fn empty_shares_rejected() {
-        let result = combine(&[]);
+        let result = combine(&[], 2);
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
@@ -712,7 +747,7 @@ mod tests {
     #[test]
     fn duplicate_x_rejected() {
         let share = Share { x: 1, y: vec![42] };
-        let result = combine(&[share.clone(), share]);
+        let result = combine(&[share.clone(), share], 2);
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
@@ -729,7 +764,7 @@ mod tests {
         let secret = vec![0xAB];
         let shares = split(&secret, 3, 2).unwrap();
         let subset = vec![shares[0].clone(), shares[2].clone()];
-        let recovered = combine(&subset).unwrap();
+        let recovered = combine(&subset, 2).unwrap();
         assert_eq!(recovered, secret);
     }
 
@@ -738,7 +773,7 @@ mod tests {
         let secret = random_secret(1024);
         let shares = split(&secret, 3, 2).unwrap();
         let subset = vec![shares[0].clone(), shares[1].clone()];
-        let recovered = combine(&subset).unwrap();
+        let recovered = combine(&subset, 2).unwrap();
         assert_eq!(recovered, secret);
     }
 
@@ -747,7 +782,7 @@ mod tests {
         let secret = vec![0u8; 32];
         let shares = split(&secret, 3, 2).unwrap();
         let subset = vec![shares[0].clone(), shares[1].clone()];
-        let recovered = combine(&subset).unwrap();
+        let recovered = combine(&subset, 2).unwrap();
         assert_eq!(recovered, secret);
     }
 
@@ -756,7 +791,7 @@ mod tests {
         let secret = vec![0xFFu8; 32];
         let shares = split(&secret, 3, 2).unwrap();
         let subset = vec![shares[1].clone(), shares[2].clone()];
-        let recovered = combine(&subset).unwrap();
+        let recovered = combine(&subset, 2).unwrap();
         assert_eq!(recovered, secret);
     }
 

@@ -141,7 +141,7 @@ fn full_recovery_ceremony_flow() {
 
     // --- Step 7: Combine shares to reconstruct recovery group private key ---
 
-    let reconstructed_sk_bytes = combine(&contributed_shares).unwrap();
+    let reconstructed_sk_bytes = combine(&contributed_shares, 2).unwrap();
     let reconstructed_sk_hex = hex::encode(&reconstructed_sk_bytes);
 
     // --- Step 8: Use reconstructed key to decrypt PUK seed ---

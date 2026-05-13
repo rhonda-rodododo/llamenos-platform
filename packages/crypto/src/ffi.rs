@@ -6,6 +6,9 @@
 //! These are the only versions visible to Swift/Kotlin via UniFFI bindings.
 //! The original functions remain available for direct Rust consumers (Tauri, WASM).
 
+use std::collections::HashMap;
+use std::sync::Mutex;
+
 use crate::encryption::{
     decrypt_call_record, decrypt_message, derive_kek_from_pin, encrypt_message, encrypt_note,
     random_bytes_32, EncryptedMessage, EncryptedNote, KeyEnvelope, RecipientKeyEnvelope,
@@ -14,6 +17,14 @@ use crate::errors::CryptoError;
 use crate::hpke_envelope;
 use crate::labels::{SAS_INFO, SAS_SALT};
 use zeroize::Zeroize;
+
+/// Internal store for recovery group private keys, keyed by opaque handle.
+/// Keys are zeroized and removed after Shamir splitting.
+static RECOVERY_KEY_STORE: std::sync::LazyLock<Mutex<HashMap<u64, zeroize::Zeroizing<String>>>> =
+    std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
+
+/// Monotonically increasing handle counter for recovery group keys.
+static NEXT_HANDLE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 
 /// Generate 32 random bytes, returned as a hex string.
 #[uniffi::export]
@@ -510,10 +521,16 @@ mod tests {
 // Recovery Group — Shamir Secret Sharing
 // =============================================================================
 
-/// Recovery group X25519 keypair for UniFFI export.
+/// Recovery group public key result for UniFFI export.
+///
+/// The private key is never returned over the FFI boundary. It is stored internally
+/// and must be immediately split via `mobile_shamir_split` using the returned `handle`
+/// to reference it. After splitting, the internal copy is zeroized.
 #[derive(uniffi::Record)]
 pub struct RecoveryGroupKeypair {
-    pub private_key_hex: String,
+    /// Opaque handle to the internally-stored private key. Pass to
+    /// `mobile_recovery_group_split_private_key` to Shamir-split it.
+    pub handle: u64,
     pub public_key_hex: String,
 }
 
@@ -533,16 +550,18 @@ pub fn mobile_shamir_split(
 
 /// Combine Shamir shares to reconstruct the secret.
 ///
+/// `threshold`: the minimum number of shares required (K from the original split).
 /// Returns the reconstructed secret as a hex string.
 #[uniffi::export]
 pub fn mobile_shamir_combine(
     shares: Vec<crate::shamir::ShamirShare>,
+    threshold: u8,
 ) -> Result<String, CryptoError> {
     let shares: Vec<crate::shamir::Share> = shares
         .into_iter()
         .map(|s| s.to_share())
         .collect::<Result<Vec<_>, _>>()?;
-    let secret = crate::shamir::combine(&shares)?;
+    let secret = crate::shamir::combine(&shares, threshold)?;
     Ok(hex::encode(secret))
 }
 
@@ -550,9 +569,9 @@ pub fn mobile_shamir_combine(
 ///
 /// Returns the 32-byte commitment as a hex string.
 #[uniffi::export]
-pub fn mobile_shamir_commit(share: &crate::shamir::ShamirShare) -> String {
-    let share = share.to_share().expect("invalid hex in ShamirShare");
-    hex::encode(crate::shamir::commit(&share))
+pub fn mobile_shamir_commit(share: &crate::shamir::ShamirShare) -> Result<String, CryptoError> {
+    let share = share.to_share()?;
+    Ok(hex::encode(crate::shamir::commit(&share)))
 }
 
 /// Verify a Shamir share against a hex-encoded commitment.
@@ -576,12 +595,45 @@ pub fn mobile_shamir_verify(
 
 /// Generate an X25519 keypair for a recovery group.
 ///
-/// Returns (secret_key_hex, public_key_hex).
+/// The private key is stored internally and never crosses the FFI boundary.
+/// Use `mobile_recovery_group_split_private_key` with the returned handle
+/// to Shamir-split the private key, after which it is zeroized from memory.
 #[uniffi::export]
 pub fn mobile_recovery_group_generate_keypair() -> RecoveryGroupKeypair {
     let (sk, pk) = crate::shamir::generate_recovery_group_keypair();
+    let handle = NEXT_HANDLE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    RECOVERY_KEY_STORE
+        .lock()
+        .expect("recovery key store lock poisoned")
+        .insert(handle, sk);
     RecoveryGroupKeypair {
-        private_key_hex: sk.to_string(),
+        handle,
         public_key_hex: pk,
     }
+}
+
+/// Shamir-split the recovery group private key referenced by `handle`.
+///
+/// The private key is removed from internal storage and zeroized after splitting.
+/// This function can only be called once per handle.
+#[uniffi::export]
+pub fn mobile_recovery_group_split_private_key(
+    handle: u64,
+    total: u8,
+    threshold: u8,
+) -> Result<Vec<crate::shamir::ShamirShare>, CryptoError> {
+    let mut sk = RECOVERY_KEY_STORE
+        .lock()
+        .expect("recovery key store lock poisoned")
+        .remove(&handle)
+        .ok_or_else(|| {
+            CryptoError::InvalidInput(
+                "invalid or already-consumed recovery group handle".to_string(),
+            )
+        })?;
+    let secret = hex::decode(&*sk).map_err(CryptoError::HexError)?;
+    // Zeroize the hex string now that we have the bytes
+    sk.zeroize();
+    let shares = crate::shamir::split(&secret, total, threshold)?;
+    Ok(shares.into_iter().map(|s| s.to_shamir_share()).collect())
 }
