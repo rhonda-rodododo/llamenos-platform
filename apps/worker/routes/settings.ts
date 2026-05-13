@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { describeRoute, resolver, validator } from 'hono-openapi'
+import { z } from 'zod'
 import type { AppEnv } from '../types'
 import { requirePermission, checkPermission } from '../middleware/permission-guard'
 import {
@@ -9,6 +10,7 @@ import {
   telephonyProviderSchema,
   createRoleSchema,
   updateRoleSchema,
+  addRoleEnvelopesSchema,
   webauthnSettingsSchema,
   transcriptionSettingsSchema,
   ivrLanguagesSchema,
@@ -899,6 +901,64 @@ settings.delete('/roles/:id',
     const result = await services.settings.deleteRole(id)
     invalidateRolesCache()
     await audit(services.audit, 'roleDeleted', pubkey, { roleId: id })
+    return c.json(result)
+  },
+)
+
+settings.post('/roles/:id/envelopes',
+  describeRoute({
+    tags: ['Settings'],
+    summary: 'Add or update HPKE envelopes for a platform role',
+    responses: {
+      200: {
+        description: 'Envelopes updated',
+        content: {
+          'application/json': {
+            schema: resolver(okResponseSchema),
+          },
+        },
+      },
+      ...authErrors,
+    },
+  }),
+  requirePermission('system:manage-roles'),
+  validator('json', addRoleEnvelopesSchema),
+  async (c) => {
+    const pubkey = c.get('pubkey')
+    const id = c.req.param('id')
+    const body = c.req.valid('json')
+    const services = c.get('services')
+    const result = await services.settings.addRoleEnvelopes(id, body.envelopes)
+    invalidateRolesCache()
+    await audit(services.audit, 'roleEnvelopesUpdated', pubkey, { roleId: id, count: body.envelopes.length })
+    return c.json(result)
+  },
+)
+
+settings.get('/users/:id/effective-permissions',
+  describeRoute({
+    tags: ['Settings'],
+    summary: 'Get effective permissions for a user',
+    responses: {
+      200: {
+        description: 'Effective permissions',
+        content: {
+          'application/json': {
+            schema: resolver(z.object({
+              userId: z.string(),
+              permissions: z.array(z.string()),
+            })),
+          },
+        },
+      },
+      ...authErrors,
+    },
+  }),
+  requirePermission('users:read'),
+  async (c) => {
+    const id = c.req.param('id')
+    const services = c.get('services')
+    const result = await services.settings.getEffectivePermissions(id)
     return c.json(result)
   },
 )

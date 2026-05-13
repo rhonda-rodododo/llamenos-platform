@@ -15,6 +15,7 @@ import {
   hubStorageSettings,
   hubStorageCredentials,
   roles as rolesTable,
+  platformRoleEnvelopes,
   customFieldDefinitions,
   entityTypeDefinitions,
   relationshipTypeDefinitions,
@@ -1264,6 +1265,21 @@ export class SettingsService {
       return { roles: _rolesCache.roles }
     }
     const rows = await this.db.select().from(rolesTable)
+    const envelopesRows = await this.db.select().from(platformRoleEnvelopes)
+    const envelopesByRole = new Map<string, typeof envelopesRows>()
+    for (const e of envelopesRows) {
+      const list = envelopesByRole.get(e.roleId) ?? []
+      list.push(e)
+      envelopesByRole.set(e.roleId, list)
+    }
+    const userCounts = await this.db
+      .select({ roleId: sql<string>`jsonb_array_elements_text(${users.roles})`, count: sql<number>`count(*)` })
+      .from(users)
+      .groupBy(sql`jsonb_array_elements_text(${users.roles})`)
+    const countByRole = new Map<string, number>()
+    for (const uc of userCounts) {
+      countByRole.set(uc.roleId, Number(uc.count))
+    }
     const rolesList: Role[] = rows.map((r) => ({
       id: r.id,
       name: r.name,
@@ -1272,6 +1288,14 @@ export class SettingsService {
       isDefault: r.isDefault ?? false,
       isSystem: r.isSystem ?? false,
       description: r.description,
+      encryptedName: r.encryptedName ?? null,
+      encryptedDescription: r.encryptedDescription ?? null,
+      envelopes: (envelopesByRole.get(r.id) ?? []).map((e) => ({
+        adminPubkey: e.adminPubkey,
+        encryptedName: e.encryptedName,
+        encryptedDescription: e.encryptedDescription,
+      })),
+      assignedUserCount: countByRole.get(r.id) ?? 0,
       createdAt: r.createdAt.toISOString(),
       updatedAt: r.updatedAt.toISOString(),
     }))
@@ -1279,15 +1303,15 @@ export class SettingsService {
     return { roles: rolesList }
   }
 
-  async createRole(data: Partial<Role>): Promise<Role> {
+  async createRole(data: Partial<Role> & { encryptedName?: string; encryptedDescription?: string; envelopes?: Array<{ adminPubkey: string; encryptedName: string; encryptedDescription: string }> }): Promise<Role> {
     if (!data || typeof data !== 'object') {
       throw new ServiceError(400, 'Invalid request')
     }
-    const { name, slug, permissions, description } = data
-    if (!name || !slug || !permissions || !description) {
+    const { name, slug, permissions, description, encryptedName, encryptedDescription, envelopes } = data
+    if (!slug || !permissions) {
       throw new ServiceError(
         400,
-        'name, slug, permissions, and description are required',
+        'slug and permissions are required',
       )
     }
     if (!/^[a-z0-9-]+$/.test(slug)) {
@@ -1310,28 +1334,50 @@ export class SettingsService {
     }
 
     const now = new Date()
-    const id = `role-${crypto.randomUUID()}`
+    const id = data.id ?? `role-${crypto.randomUUID()}`
+
+    const roleName = name ?? ''
+    const roleDescription = description ?? ''
 
     await this.db.insert(rolesTable).values({
       id,
-      name,
+      name: roleName,
       slug,
       permissions: permissions as string[],
       isDefault: false,
       isSystem: false,
-      description,
+      description: roleDescription,
+      encryptedName: encryptedName ?? null,
+      encryptedDescription: encryptedDescription ?? null,
       createdAt: now,
       updatedAt: now,
     })
 
+    if (envelopes && envelopes.length > 0) {
+      for (const env of envelopes) {
+        await this.db.insert(platformRoleEnvelopes).values({
+          roleId: id,
+          adminPubkey: env.adminPubkey,
+          encryptedName: env.encryptedName,
+          encryptedDescription: env.encryptedDescription,
+          createdAt: now,
+          updatedAt: now,
+        })
+      }
+    }
+
     return {
       id,
-      name,
+      name: roleName,
       slug,
       permissions: permissions as string[],
       isDefault: false,
       isSystem: false,
-      description,
+      description: roleDescription,
+      encryptedName: encryptedName ?? null,
+      encryptedDescription: encryptedDescription ?? null,
+      envelopes: envelopes ?? [],
+      assignedUserCount: 0,
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),
     }
@@ -1392,6 +1438,63 @@ export class SettingsService {
 
     await this.db.delete(rolesTable).where(eq(rolesTable.id, id))
     return { ok: true }
+  }
+
+  async addRoleEnvelopes(
+    roleId: string,
+    envelopes: Array<{ adminPubkey: string; encryptedName: string; encryptedDescription: string }>,
+  ): Promise<{ ok: true }> {
+    const [existing] = await this.db
+      .select()
+      .from(rolesTable)
+      .where(eq(rolesTable.id, roleId))
+    if (!existing) {
+      throw new ServiceError(404, 'Role not found')
+    }
+
+    const now = new Date()
+    for (const env of envelopes) {
+      await this.db
+        .insert(platformRoleEnvelopes)
+        .values({
+          roleId,
+          adminPubkey: env.adminPubkey,
+          encryptedName: env.encryptedName,
+          encryptedDescription: env.encryptedDescription,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: [platformRoleEnvelopes.roleId, platformRoleEnvelopes.adminPubkey],
+          set: {
+            encryptedName: env.encryptedName,
+            encryptedDescription: env.encryptedDescription,
+            updatedAt: now,
+          },
+        })
+    }
+    return { ok: true }
+  }
+
+  async getEffectivePermissions(userId: string): Promise<{ userId: string; permissions: string[] }> {
+    const [user] = await this.db
+      .select()
+      .from(users)
+      .where(eq(users.pubkey, userId))
+    if (!user) {
+      throw new ServiceError(404, 'User not found')
+    }
+
+    const { resolveHubPermissions } = await import('@shared/permissions')
+    const allRoles = await this.getRoles()
+    const hubRoles = Array.isArray(user.hubRoles) ? user.hubRoles as Array<{ hubId: string; roleIds: string[] }> : []
+    const permissions = resolveHubPermissions(
+      user.roles ?? [],
+      hubRoles,
+      allRoles.roles,
+      '',
+    )
+    return { userId, permissions }
   }
 
   // =========================================================================

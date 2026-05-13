@@ -108,10 +108,6 @@ export const hubKeys = pgTable(
   (t) => [primaryKey({ columns: [t.hubId, t.recipientPubkey] })],
 )
 
-// ---------------------------------------------------------------------------
-// roles
-// ---------------------------------------------------------------------------
-
 export const roles = pgTable('roles', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
@@ -123,6 +119,8 @@ export const roles = pgTable('roles', {
   isDefault: boolean('is_default').default(false),
   isSystem: boolean('is_system').default(false),
   description: text('description').notNull().default(''),
+  encryptedName: text('encrypted_name'),
+  encryptedDescription: text('encrypted_description'),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -130,6 +128,26 @@ export const roles = pgTable('roles', {
     .notNull()
     .defaultNow(),
 })
+
+export const platformRoleEnvelopes = pgTable(
+  'platform_role_envelopes',
+  {
+    id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+    roleId: text('role_id')
+      .notNull()
+      .references(() => roles.id, { onDelete: 'cascade' }),
+    adminPubkey: text('admin_pubkey').notNull(),
+    encryptedName: text('encrypted_name').notNull(),
+    encryptedDescription: text('encrypted_description').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [unique().on(table.roleId, table.adminPubkey)],
+)
 
 // ---------------------------------------------------------------------------
 // custom_field_definitions

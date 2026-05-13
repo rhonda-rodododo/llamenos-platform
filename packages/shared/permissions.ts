@@ -251,6 +251,10 @@ export interface Role {
   isDefault: boolean   // ships with system
   isSystem: boolean    // can't be modified at all (super-admin)
   description: string
+  encryptedName?: string | null
+  encryptedDescription?: string | null
+  envelopes?: Array<{ adminPubkey: string; encryptedName: string; encryptedDescription: string }>
+  assignedUserCount?: number
   createdAt: string
   updatedAt: string
 }
