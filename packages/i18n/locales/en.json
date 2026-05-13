@@ -610,7 +610,20 @@
     "typeOrganization": "Organization",
     "typeServiceProvider": "Service Provider",
     "viewTimeline": "View Timeline",
-    "loading": "Loading contact..."
+    "loading": "Loading contact...",
+    "groups": "Groups",
+    "allContacts": "All Contacts",
+    "groupsLoadError": "Failed to load groups",
+    "groupCreateError": "Failed to create group",
+    "groupDeleteError": "Failed to delete group",
+    "groupNamePlaceholder": "Group name",
+    "addRelationship": "Add Relationship",
+    "contactIdPlaceholder": "Contact ID",
+    "relationshipCreateError": "Failed to create relationship",
+    "relationshipDeleteError": "Failed to delete relationship",
+    "editContact": "Edit Contact",
+    "updated": "Contact updated",
+    "editError": "Failed to update contact"
   },
   "cases": {
     "accessAdmin": "Admin only",
@@ -3437,5 +3450,22 @@
     "setupComplete": {
       "footer": "Webhook setup complete"
     }
+  },
+  "cms": {
+    "addField": "Add Field",
+    "fieldLabel": "Label",
+    "fieldLabelPlaceholder": "Display label",
+    "fieldName": "Field name",
+    "fieldNamePlaceholder": "snake_case_name",
+    "fieldType": "Type",
+    "fieldSection": "Section",
+    "fieldSectionPlaceholder": "Optional grouping",
+    "required": "Required",
+    "fileAttached": "File attached",
+    "chooseFile": "Choose File",
+    "uploading": "Uploading…",
+    "fileUploadError": "Upload failed",
+    "fileTooLarge": "File exceeds maximum size",
+    "fileTypeNotAllowed": "File type not allowed"
   }
 }

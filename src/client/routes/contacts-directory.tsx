@@ -1,6 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
-import { useAuth } from '@/lib/auth'
 import { useToast } from '@/lib/toast'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
@@ -15,17 +14,18 @@ import {
   type ContactIdentifier,
 } from '@/lib/api'
 import { decryptMessage } from '@/lib/platform'
-import * as keyManager from '@/lib/key-manager'
 import { ContactCard } from '@/components/contacts/contact-card'
 import { ContactProfile } from '@/components/contacts/contact-profile'
 import { CreateContactDialog } from '@/components/contacts/create-contact-dialog'
+import { EditContactDialog } from '@/components/contacts/edit-contact-dialog'
+import { AffinityGroupsSidebar } from '@/components/contacts/affinity-groups-sidebar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
-  Users, Plus, Search, Loader2, Lock,
+  Users, Plus, Search, Loader2, Lock, Pencil,
 } from 'lucide-react'
 
 export const Route = createFileRoute('/contacts-directory')({
@@ -116,7 +116,6 @@ async function decryptContact(raw: RawContact): Promise<DirectoryContact> {
 
 function ContactDirectoryPage() {
   const { t } = useTranslation()
-  const { hasNsec } = useAuth()
   const { toast } = useToast()
 
   const [contacts, setContacts] = useState<DirectoryContact[]>([])
@@ -126,6 +125,8 @@ function ContactDirectoryPage() {
   const [selectedContact, setSelectedContact] = useState<DirectoryContact | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [showEditDialog, setShowEditDialog] = useState(false)
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('')
@@ -269,6 +270,14 @@ function ContactDirectoryPage() {
         </Card>
       ) : (
         <div className="flex h-[calc(100vh-12rem)] gap-4">
+          {/* Groups sidebar */}
+          <div className="w-40 shrink-0 overflow-hidden rounded-lg border border-border bg-card hidden lg:flex flex-col">
+            <AffinityGroupsSidebar
+              selectedGroupId={selectedGroupId}
+              onGroupSelect={setSelectedGroupId}
+            />
+          </div>
+
           {/* Left pane: contact list */}
           <div
             data-testid="contact-list"
@@ -359,7 +368,23 @@ function ContactDirectoryPage() {
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 </div>
               ) : (
-                <ContactProfile contact={selectedContact} />
+                <div className="flex flex-col h-full">
+                  {selectedContact.canDecrypt && (
+                    <div className="flex justify-end px-3 pt-2 shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="gap-1.5"
+                        onClick={() => setShowEditDialog(true)}
+                        data-testid="edit-contact-button"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        {t('common.edit', { defaultValue: 'Edit' })}
+                      </Button>
+                    </div>
+                  )}
+                  <ContactProfile contact={selectedContact} />
+                </div>
               )
             ) : (
               <div className="flex flex-1 flex-col items-center justify-center text-muted-foreground">
@@ -376,6 +401,17 @@ function ContactDirectoryPage() {
         onOpenChange={setShowCreateDialog}
         onCreated={handleContactCreated}
       />
+
+      {selectedContact && (
+        <EditContactDialog
+          contact={selectedContact}
+          open={showEditDialog}
+          onOpenChange={setShowEditDialog}
+          onUpdated={(raw) => {
+            setContacts(prev => prev.map(c => c.id === raw.id ? { ...c, _raw: raw } : c))
+          }}
+        />
+      )}
     </div>
   )
 }
