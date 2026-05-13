@@ -183,6 +183,11 @@ Then('the template should have relationship types', async ({ world }) => {
   expect(relTypes.length).toBeGreaterThan(0)
 })
 
+Given('the {string} template is applied', async ({ request, world }, templateId: string) => {
+  const hubId = getScenarioState(world).hubId
+  await applyTemplateViaApi(request, templateId, undefined, hubId)
+})
+
 When('the admin applies template {string}', async ({ request, world }, templateId: string) => {
   const hubId = getScenarioState(world).hubId
   const result = await applyTemplateViaApi(request, templateId, undefined, hubId)

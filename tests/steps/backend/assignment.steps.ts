@@ -18,6 +18,8 @@ import {
   apiPost,
   createUserViaApi,
   createRecordViaApi,
+  createShiftViaApi,
+  listEntityTypesViaApi,
   uniqueName,
 } from '../../api-helpers'
 
@@ -96,6 +98,32 @@ Then('the entity type should have autoAssignThreshold {int}', async ({ world }, 
   if (!details) return
   const et = (details.entityType ?? details) as Record<string, unknown>
   expect(et.autoAssignThreshold).toBe(threshold)
+})
+
+// ── Case and volunteer setup for score breakdown scenario ──────────
+
+Given('an unassigned arrest case exists', async ({ request, world }) => {
+  const hubId = getScenarioState(world).hubId
+  const types = await listEntityTypesViaApi(request, hubId)
+  // jail-support template creates 'arrest_case'; fall back to first case type
+  const entityType = types.find(t => t.name === 'arrest_case') ?? types.find(t => t.category === 'case')
+  if (!entityType) return
+  const record = await createRecordViaApi(request, entityType.id as string, { hubId })
+  getAssignmentState(world).recordId = (record as Record<string, unknown>).id as string
+})
+
+Given('on-shift volunteers exist', async ({ request, world }) => {
+  const hubId = getScenarioState(world).hubId
+  const vol1 = await createUserViaApi(request, { name: uniqueName('ScoreVol1') })
+  const vol2 = await createUserViaApi(request, { name: uniqueName('ScoreVol2') })
+  await createShiftViaApi(request, {
+    name: uniqueName('ScoreShift'),
+    startTime: '00:00',
+    endTime: '23:59',
+    days: [0, 1, 2, 3, 4, 5, 6],
+    userPubkeys: [vol1.pubkey, vol2.pubkey],
+    hubId,
+  })
 })
 
 // ── Score breakdown assertions ─────────────────────────────────────
