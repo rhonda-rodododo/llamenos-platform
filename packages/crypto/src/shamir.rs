@@ -7,9 +7,9 @@
 //   x : u8   — evaluation point (1..=255, never 0)
 //   y : Vec<u8> — one y-coordinate per secret byte
 
-use rand::{RngCore, rngs::OsRng};
-use sha2::{Sha256, Digest};
+use rand::{rngs::OsRng, RngCore};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 use crate::errors::CryptoError;
 
@@ -64,11 +64,7 @@ fn eval_poly(coefficients: &[u8], x: u8) -> u8 {
 
 /// Split `secret` into `total` shares requiring `threshold` to reconstruct.
 /// Returns (x_point, y_bytes) pairs where y_bytes has one entry per secret byte.
-pub fn split(
-    secret: &[u8],
-    total: u8,
-    threshold: u8,
-) -> Result<Vec<(u8, Vec<u8>)>, CryptoError> {
+pub fn split(secret: &[u8], total: u8, threshold: u8) -> Result<Vec<(u8, Vec<u8>)>, CryptoError> {
     if threshold < 2 {
         return Err(CryptoError::InvalidInput(
             "threshold must be at least 2".into(),

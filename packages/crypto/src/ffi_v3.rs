@@ -726,7 +726,10 @@ pub fn mobile_shamir_split(
 
     Ok(raw_shares
         .into_iter()
-        .map(|(x, y)| FfiShamirShare { x, y: hex::encode(y) })
+        .map(|(x, y)| FfiShamirShare {
+            x,
+            y: hex::encode(y),
+        })
         .collect())
 }
 
