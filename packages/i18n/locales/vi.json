@@ -751,15 +751,11 @@
     "submit": "Gửi",
     "success": "Thành công",
     "yes": "Có",
-    "ok": "OK",
-    "create": "Create",
-    "all": "All",
-    "previous": "Previous",
     "comingSoon": "Coming soon",
     "hideAdvanced": "Hide Advanced",
     "showAdvanced": "Show Advanced",
     "saved": "Saved",
-"unauthorized": "Unauthorized"
+    "unauthorized": "Unauthorized"
   },
   "confirm": {
     "backup": "Confirm Backup",
@@ -795,7 +791,19 @@
     "report": "Báo cáo",
     "search": "Tìm liên hệ...",
     "searchPrompt": "Tìm theo mã định danh...",
-    "title": "Liên hệ"
+    "title": "Liên hệ",
+    "createTitle": "New Contact",
+    "editTitle": "Edit Contact",
+    "displayName": "Display Name",
+    "phone": "Phone",
+    "email": "Email",
+    "sectionBasic": "Basic Info",
+    "sectionNotes": "Notes",
+    "groups": "Groups",
+    "createGroup": "New Group",
+    "groupName": "Group name",
+    "members": "members",
+    "addToGroup": "Add to Group"
   },
   "conversation": {
     "loading": "Loading messages...",
@@ -2710,7 +2718,20 @@
     "typeOrganization": "Tổ chức",
     "typeServiceProvider": "Nhà cung cấp dịch vụ",
     "viewTimeline": "View Timeline",
-    "loading": "Loading contact..."
+    "loading": "Loading contact...",
+    "groups": "Groups",
+    "allContacts": "All Contacts",
+    "groupsLoadError": "Failed to load groups",
+    "groupCreateError": "Failed to create group",
+    "groupDeleteError": "Failed to delete group",
+    "groupNamePlaceholder": "Group name",
+    "addRelationship": "Add Relationship",
+    "contactIdPlaceholder": "Contact ID",
+    "relationshipCreateError": "Failed to create relationship",
+    "relationshipDeleteError": "Failed to delete relationship",
+    "editContact": "Edit Contact",
+    "updated": "Contact updated",
+    "editError": "Failed to update contact"
   },
   "cases": {
     "title": "Hồ sơ",
@@ -3443,5 +3464,37 @@
     "setupComplete": {
       "footer": "Webhook setup complete"
     }
+  },
+  "cms": {
+    "addField": "Add Field",
+    "editField": "Edit Field",
+    "fieldLabel": "Label",
+    "fieldLabelPlaceholder": "Display label",
+    "fieldName": "Field name",
+    "fieldNamePlaceholder": "snake_case_name",
+    "fieldType": "Type",
+    "fieldSection": "Section",
+    "fieldSectionPlaceholder": "Optional grouping",
+    "fields": "Fields",
+    "editFields": "Edit Fields",
+    "required": "Required",
+    "fileAttached": "File attached",
+    "chooseFile": "Choose File",
+    "choosePhoto": "Choose Photo",
+    "uploading": "Uploading…",
+    "fileUploadError": "Upload failed",
+    "fileTooLarge": "File exceeds maximum size",
+    "fileTypeNotAllowed": "File type not allowed",
+    "locationPlaceholder": "Search address or use GPS"
+  },
+  "adminEntityTypes": {
+    "title": "Entity Types"
+  },
+  "adminEntityType": {
+    "label": "Label",
+    "labelPlural": "Plural label",
+    "showInNavigation": "Show in navigation",
+    "edit": "Edit Entity Type",
+    "sectionGeneral": "General"
   }
 }

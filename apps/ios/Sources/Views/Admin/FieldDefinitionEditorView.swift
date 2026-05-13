@@ -29,7 +29,7 @@ struct FieldDefinitionEditorView: View {
                     }
                     Spacer()
                     if field.required {
-                        Text(String(localized: "cms.required"))
+                        Text(NSLocalizedString("cms_required", comment: "Required"))
                             .font(.caption2)
                             .foregroundStyle(.red)
                     }
@@ -79,30 +79,30 @@ struct FieldPropertyEditorSheet: View {
         NavigationStack {
             Form {
                 Section {
-                    TextField(String(localized: "cms.fieldLabel"), text: $label)
-                    TextField(String(localized: "cms.fieldName"), text: $name)
+                    TextField(NSLocalizedString("cms_field_label", comment: "Label"), text: $label)
+                    TextField(NSLocalizedString("cms_field_name", comment: "Field name"), text: $name)
                         .autocapitalization(.none)
-                    Picker(String(localized: "cms.fieldType"), selection: $type) {
+                    Picker(NSLocalizedString("cms_field_type", comment: "Type"), selection: $type) {
                         ForEach(fieldTypes, id: \.self) { Text($0).tag($0) }
                     }
-                    Toggle(String(localized: "cms.required"), isOn: $required)
+                    Toggle(NSLocalizedString("cms_required", comment: "Required"), isOn: $required)
                 }
                 if showEntityOptions {
                     Section {
-                        TextField(String(localized: "cms.fieldSection"), text: $section)
+                        TextField(NSLocalizedString("cms_field_section", comment: "Section"), text: $section)
                     }
                 }
             }
             .navigationTitle(field == nil
-                ? String(localized: "cms.addField")
-                : String(localized: "cms.editField"))
+                ? NSLocalizedString("cms_add_field", comment: "Add Field")
+                : NSLocalizedString("cms_edit_field", comment: "Edit Field"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(String(localized: "common.cancel")) { dismiss() }
+                    Button(NSLocalizedString("common_cancel", comment: "Cancel")) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(String(localized: "common.save")) {
+                    Button(NSLocalizedString("common_save", comment: "Save")) {
                         let f = EditableField(
                             id: field?.id ?? UUID().uuidString,
                             name: name.replacingOccurrences(of: " ", with: "_").lowercased(),

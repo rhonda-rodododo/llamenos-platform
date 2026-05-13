@@ -11,22 +11,22 @@ struct EntityTypeEditorView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section(String(localized: "admin.entityType.sectionGeneral")) {
-                    TextField(String(localized: "admin.entityType.label"), text: $entityType.label)
-                    TextField(String(localized: "admin.entityType.labelPlural"), text: Binding(
+                Section(NSLocalizedString("admin_entity_type_section_general", comment: "General")) {
+                    TextField(NSLocalizedString("admin_entity_type_label", comment: "Label"), text: $entityType.label)
+                    TextField(NSLocalizedString("admin_entity_type_label_plural", comment: "Plural label"), text: Binding(
                         get: { entityType.labelPlural ?? "" },
                         set: { entityType.labelPlural = $0.isEmpty ? nil : $0 }
                     ))
-                    Toggle(String(localized: "admin.entityType.showInNavigation"),
+                    Toggle(NSLocalizedString("admin_entity_type_show_in_navigation", comment: "Show in navigation"),
                            isOn: Binding(
                             get: { entityType.showInNavigation ?? true },
                             set: { entityType.showInNavigation = $0 }
                            ))
                 }
-                Section(String(localized: "cms.fields")) {
-                    NavigationLink(String(localized: "cms.editFields")) {
+                Section(NSLocalizedString("cms_fields", comment: "Fields")) {
+                    NavigationLink(NSLocalizedString("cms_edit_fields", comment: "Edit Fields")) {
                         FieldDefinitionEditorView(fields: $fields, showEntityOptions: true)
-                            .navigationTitle(String(localized: "cms.fields"))
+                            .navigationTitle(NSLocalizedString("cms_fields", comment: "Fields"))
                     }
                 }
                 if let err = saveError {
@@ -39,10 +39,10 @@ struct EntityTypeEditorView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(String(localized: "common.cancel")) { dismiss() }
+                    Button(NSLocalizedString("common_cancel", comment: "Cancel")) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(String(localized: "common.save")) { save() }
+                    Button(NSLocalizedString("common_save", comment: "Save")) { save() }
                         .disabled(isSaving || entityType.label.isEmpty)
                 }
             }

@@ -1078,7 +1078,19 @@
     "report": "Report",
     "search": "Search contacts...",
     "searchPrompt": "Search by identifier...",
-    "title": "Contacts"
+    "title": "Contacts",
+    "createTitle": "New Contact",
+    "editTitle": "Edit Contact",
+    "displayName": "Display Name",
+    "phone": "Phone",
+    "email": "Email",
+    "sectionBasic": "Basic Info",
+    "sectionNotes": "Notes",
+    "groups": "Groups",
+    "createGroup": "New Group",
+    "groupName": "Group name",
+    "members": "members",
+    "addToGroup": "Add to Group"
   },
   "conversation": {
     "loading": "Loading messages...",
@@ -3466,6 +3478,21 @@
     "uploading": "Uploading…",
     "fileUploadError": "Upload failed",
     "fileTooLarge": "File exceeds maximum size",
-    "fileTypeNotAllowed": "File type not allowed"
+    "fileTypeNotAllowed": "File type not allowed",
+    "editField": "Edit Field",
+    "fields": "Fields",
+    "editFields": "Edit Fields",
+    "choosePhoto": "Choose Photo",
+    "locationPlaceholder": "Search address or use GPS"
+  },
+  "adminEntityTypes": {
+    "title": "Entity Types"
+  },
+  "adminEntityType": {
+    "label": "Label",
+    "labelPlural": "Plural label",
+    "showInNavigation": "Show in navigation",
+    "edit": "Edit Entity Type",
+    "sectionGeneral": "General"
   }
 }

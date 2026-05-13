@@ -24,7 +24,7 @@ struct EntityTypeAdminView: View {
                 .accessibilityIdentifier("entity-type-row-\(et.id)")
             }
         }
-        .navigationTitle(String(localized: "admin.entityTypes.title"))
+        .navigationTitle(NSLocalizedString("admin_entity_types_title", comment: "Entity Types"))
         .task { await loadTypes() }
         .sheet(item: $editingType) { et in
             EntityTypeEditorView(entityType: et) { updated in
