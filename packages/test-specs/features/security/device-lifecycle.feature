@@ -54,3 +54,31 @@ Feature: Device Lifecycle
     Given the user registers a device with platform "ios"
     When the user registers a VoIP token
     Then the response status is 204
+
+  @backend
+  Scenario: Rename a device
+    Given the user registers a device with platform "ios"
+    And the user lists their devices
+    When the user renames the first device to "My Laptop"
+    Then the response status is 200
+    And the device name is "My Laptop"
+
+  @backend
+  Scenario: Rename a nonexistent device returns 404
+    When the user renames device "nonexistent-id" to "Ghost"
+    Then the response status is 404
+
+  @backend
+  Scenario: Revoke a device
+    Given the user registers a device with platform "ios"
+    And the user lists their devices
+    When the user revokes the first device
+    Then the response status is 200
+    And the user has 0 devices
+
+  @backend
+  Scenario: Revoke without confirm returns 400
+    Given the user registers a device with platform "ios"
+    And the user lists their devices
+    When the user revokes the first device without confirmation
+    Then the response status is 400
