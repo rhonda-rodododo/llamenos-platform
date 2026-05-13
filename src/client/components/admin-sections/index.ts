@@ -27,7 +27,10 @@ import { HealthSection } from './health-section'
 import { HubsSection } from './hubs-section'
 import { PlatformRolesSection } from './platform-roles-section'
 import { PlatformSection } from './platform-section'
-import { GdprErasureSection } from './gdpr-erasure-section'
+import { ErasureQueueSection } from './erasure-queue-section'
+import { ErasureConfigSection } from './erasure-config-section'
+import { RetentionSection } from './retention-section'
+import { PlatformBansSection } from './platform-bans-section'
 
 const sections: Record<string, ComponentType> = {
   'location-lookup': LocationLookupSection,
@@ -56,7 +59,10 @@ const sections: Record<string, ComponentType> = {
   'hubs': HubsSection,
   'platform-roles': PlatformRolesSection,
   'platform-settings': PlatformSection,
-  'gdpr-erasure': GdprErasureSection,
+  'erasure-queue': ErasureQueueSection,
+  'erasure-config': ErasureConfigSection,
+  'retention': RetentionSection,
+  'platform-bans': PlatformBansSection,
 }
 
 for (const [slug, component] of Object.entries(sections)) {

@@ -751,15 +751,11 @@
     "submit": "Absenden",
     "success": "Erfolg",
     "yes": "Ja",
-    "ok": "OK",
-    "create": "Create",
-    "all": "All",
-    "previous": "Previous",
     "comingSoon": "Coming soon",
     "hideAdvanced": "Hide Advanced",
     "showAdvanced": "Show Advanced",
     "saved": "Saved",
-"unauthorized": "Unauthorized"
+    "unauthorized": "Unauthorized"
   },
   "confirm": {
     "backup": "Confirm Backup",
@@ -3224,7 +3220,10 @@
       "platformAnalytics": "Analytics",
       "platformHealth": "Health",
       "platformSettings": "Platform Settings",
-      "gdprErasure": "GDPR Erasure"
+      "gdprErasure": "GDPR Erasure",
+      "erasureConfig": "Erasure Settings",
+      "erasureQueue": "Erasure Queue",
+      "retention": "Data Retention"
     }
   },
   "providerSetup": {
@@ -3443,5 +3442,173 @@
     "setupComplete": {
       "footer": "Webhook setup complete"
     }
+  },
+  "erasure": {
+    "selfService": {
+      "title": "Account Erasure",
+      "description": "Request permanent deletion of your account and all associated data.",
+      "warning": "This action is irreversible. All your data will be permanently deleted after the delay period.",
+      "requestButton": "Request Account Erasure",
+      "statusPending": "Erasure pending",
+      "scheduledFor": "Scheduled for {{date}}",
+      "pendingDescription": "Your erasure request is scheduled. You may cancel it before the deadline.",
+      "cancel": "Cancel Erasure Request",
+      "confirmTitle": "Request Account Erasure?",
+      "confirmDescription": "Your account and all associated data will be permanently deleted after the configured delay period. This cannot be undone.",
+      "confirmButton": "Request Erasure",
+      "cancelConfirmTitle": "Cancel Erasure Request?",
+      "cancelConfirmDescription": "Your erasure request will be cancelled and your account will remain active.",
+      "cancelConfirmButton": "Cancel Request",
+      "requestCreated": "Erasure request submitted. You will be notified of the scheduled date.",
+      "requestCancelled": "Erasure request cancelled."
+    },
+    "admin": {
+      "title": "Erasure Queue",
+      "filterAll": "All",
+      "noRequests": "No erasure requests found.",
+      "noPending": "No pending requests",
+      "pendingCount": "{{count}} pending",
+      "requestedAt": "Requested {{date}}",
+      "executesAt": "executes {{date}}",
+      "emergencyOverride": "Emergency Override",
+      "immediateErase": "Erase User Now",
+      "remoteWipe": "Remote Device Wipe",
+      "reEncryptionJobs": "Re-encryption Jobs",
+      "noReEncryptionJobs": "No re-encryption jobs.",
+      "jobUser": "User: {{userId}}",
+      "jobProgress": "{{processed}} / {{total}} envelopes",
+      "eraseDialogTitle": "Immediate User Erasure",
+      "eraseDialogWarning": "This will permanently and immediately erase all data for the specified user. This cannot be undone.",
+      "wipeDialogTitle": "Remote Device Wipe",
+      "wipeDialogWarning": "This will remotely wipe the cryptographic keys on the target device. The device will be locked out immediately.",
+      "userId": "User ID",
+      "userIdPlaceholder": "Enter user ID or public key",
+      "justification": "Justification",
+      "justificationPlaceholder": "Legal basis or reason for immediate erasure",
+      "devicePubkey": "Device Public Key",
+      "confirmErase": "Erase User",
+      "confirmWipe": "Wipe Device",
+      "eraseSuccess": "User erasure initiated.",
+      "wipeSuccess": "Remote wipe command sent.",
+      "jobStatus": {
+        "queued": "Queued",
+        "running": "Running",
+        "completed": "Completed",
+        "failed": "Failed"
+      }
+    },
+    "config": {
+      "title": "Erasure Settings",
+      "description": "Configure the erasure delay period and emergency override for this hub.",
+      "delayHours": "Erasure Delay",
+      "delayHelp": "Hours between request and execution ({{min}}–{{max}} hours).",
+      "hours": "hours",
+      "platformFloor": "Platform minimum: {{hours}} hours",
+      "belowFloor": "Delay must be at least {{min}} hours (platform minimum).",
+      "emergencyOverride": "Allow Emergency Override",
+      "emergencyOverrideHelp": "Permit super-admins to bypass the delay period for legal or safety reasons.",
+      "delayStatus": "{{hours}}h delay"
+    },
+    "status": {
+      "pending": "Pending",
+      "cancelled": "Cancelled",
+      "executing": "Executing",
+      "completed": "Completed",
+      "failed": "Failed"
+    }
+  },
+  "retention": {
+    "title": "Data Retention",
+    "description": "Configure how long each category of data is retained before automatic purge.",
+    "categories": {
+      "notes": "Notes",
+      "messages": "Messages",
+      "callRecords": "Call Records",
+      "auditLog": "Audit Log"
+    },
+    "platformFloor": "Min: {{days}} days",
+    "days": "days",
+    "noPurge": "No purge",
+    "belowFloor": "Must be at least {{min}} days (platform minimum).",
+    "configuredCount": "{{count}} categories configured",
+    "noneConfigured": "No retention configured"
+  },
+  "platformBans": {
+    "title": "Platform Bans",
+    "description": "Manage platform-wide bans by hashed phone number. These bans apply across all hubs.",
+    "noBans": "No platform bans.",
+    "totalCount": "{{count}} total bans",
+    "searchPlaceholder": "Search by phone hash...",
+    "searchResults": "{{count}} results",
+    "noResults": "No bans found for this hash.",
+    "clearSearch": "Clear",
+    "promotedFrom": "Promoted from hub",
+    "createBan": "Add Ban",
+    "bulkImport": "Bulk Import",
+    "createDialogTitle": "Add Platform Ban",
+    "bulkDialogTitle": "Bulk Import Bans",
+    "phoneHash": "Phone Hash",
+    "phoneHashPlaceholder": "SHA-256 hash of phone number",
+    "phoneHashList": "Phone Hashes (one per line)",
+    "bulkPlaceholder": "hash1\nhash2\nhash3",
+    "reason": "Reason",
+    "reasonPlaceholder": "Reason for ban",
+    "confirmCreate": "Add Ban",
+    "confirmBulkImport": "Import",
+    "created": "Platform ban added.",
+    "deleted": "Platform ban removed.",
+    "bulkImported": "{{count}} bans imported."
+  },
+  "platformSettings": {
+    "title": "Platform Settings",
+    "featureFlags": {
+      "title": "Feature Flags",
+      "mls": "MLS Group Messaging",
+      "mlsHelp": "Enable MLS-based encrypted group messaging across hubs.",
+      "transcription": "Call Transcription",
+      "transcriptionHelp": "Enable WASM-based client-side call transcription.",
+      "caseManagement": "Case Management",
+      "caseManagementHelp": "Enable case management features for tracking and follow-up.",
+      "crossHubSharing": "Cross-Hub Sharing",
+      "crossHubSharingHelp": "Allow volunteers to share resources across hubs."
+    },
+    "branding": {
+      "title": "Branding",
+      "instanceName": "Instance Name",
+      "supportEmail": "Support Email",
+      "privacyPolicyUrl": "Privacy Policy URL"
+    },
+    "sessionPolicy": {
+      "title": "Session Policy",
+      "maxSessionDuration": "Max Session Duration",
+      "maxSessionDurationHelp": "Maximum hours a session can remain active.",
+      "maxInactive": "Max Inactive Period",
+      "maxInactiveHelp": "Hours before an inactive session expires.",
+      "hours": "hours"
+    },
+    "erasureFloor": {
+      "title": "Erasure Platform Floor",
+      "description": "Minimum erasure delay enforced across all hubs. Hub admins cannot set a shorter delay.",
+      "minDelay": "Minimum Delay",
+      "minDelayHelp": "Minimum hours between erasure request and execution (4–168).",
+      "hours": "hours"
+    },
+    "retentionPurge": {
+      "title": "Retention Purge Schedule",
+      "enabled": "Enable Automatic Purge",
+      "enabledHelp": "Run the retention purge job on schedule.",
+      "cronHour": "Purge Hour (UTC)",
+      "cronHourHelp": "Hour of day (UTC) when the purge job runs (0–23).",
+      "utc": "UTC"
+    }
+  },
+  "deviceWipe": {
+    "title": "Device Revoked",
+    "reason": {
+      "user-erasure": "Your account has been scheduled for erasure. This device has been locked.",
+      "device-revocation": "This device has been remotely revoked by an administrator.",
+      "admin-erasure": "An administrator has initiated an erasure of your account."
+    },
+    "explanation": "All cryptographic keys have been cleared from this device. Please contact support if you believe this was done in error."
   }
 }

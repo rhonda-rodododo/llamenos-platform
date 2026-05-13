@@ -20,6 +20,7 @@ import { PanicWipeIndicator } from '@/components/panic-wipe-indicator'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { OfflineBanner } from '@/components/offline-banner'
 import { UpdateRequiredScreen } from '@/components/update-required-screen'
+import { DeviceWipeScreen } from '@/components/device-wipe-screen'
 import { HubSwitcher } from '@/components/hub-switcher'
 import {
   LayoutDashboard,
@@ -58,9 +59,9 @@ export const Route = createRootRoute({
 
 function RootLayout() {
   const { t } = useTranslation()
-  const { isAuthenticated, isAdmin, signOut, name, isLoading, profileCompleted, hasPermission, primaryRoleName, webauthnEnrollmentRequired } = useAuth()
-  const { hotlineName, needsBootstrap, demoMode, isLoading: configLoading } = useConfig()
-  const { theme, setTheme } = useTheme()
+  const { isAuthenticated, isLoading, profileCompleted, webauthnEnrollmentRequired } = useAuth()
+  const { needsBootstrap, demoMode, isLoading: configLoading } = useConfig()
+  useTheme()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -111,6 +112,29 @@ function RootLayout() {
       }
     }
   }, [isLoading, isAuthenticated, profileCompleted, webauthnEnrollmentRequired, location.pathname, navigate])
+
+  const [wiped, setWiped] = useState<{ reason: 'user-erasure' | 'device-revocation' | 'admin-erasure' } | null>(() => {
+    try {
+      const stored = sessionStorage.getItem('device-wiped')
+      return stored ? JSON.parse(stored) : null
+    } catch {
+      return null
+    }
+  })
+
+  useEffect(() => {
+    function onWipe(e: CustomEvent<{ reason: string }>) {
+      const data = { reason: e.detail.reason as 'user-erasure' | 'device-revocation' | 'admin-erasure' }
+      try { sessionStorage.setItem('device-wiped', JSON.stringify(data)) } catch { /* storage unavailable */ }
+      setWiped(data)
+    }
+    window.addEventListener('device:wiped', onWipe as EventListener)
+    return () => window.removeEventListener('device:wiped', onWipe as EventListener)
+  }, [])
+
+  if (wiped) {
+    return <DeviceWipeScreen reason={wiped.reason} />
+  }
 
   // PanicWipeIndicator renders at root level unconditionally so it persists
   // across auth state changes during a wipe (when keyManager.wipeKey() fires,
