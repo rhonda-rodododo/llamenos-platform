@@ -39,6 +39,7 @@ import { RCSChannelSection } from '@/components/admin-settings/rcs-channel-secti
 import { SignalChannelSection } from '@/components/admin-settings/signal-channel-section'
 import { MigrationStatusSection } from '@/components/admin-settings/migration-status-section'
 import { ReportTypesSection } from '@/components/admin-settings/report-types-section'
+import { EventsMigrationPanel } from '@/components/admin-settings/events-migration-panel'
 
 export const Route = createFileRoute('/admin/settings')({
   component: AdminSettingsPage,
@@ -291,6 +292,8 @@ function AdminSettingsPage() {
           statusSummary={messagingConfig.signal ? t('common.configured', { defaultValue: 'Configured' }) : t('settings.notConfigured', { defaultValue: 'Not configured' })}
         />
       )}
+
+      <EventsMigrationPanel />
 
       <MigrationStatusSection
         expanded={expanded.has('migrations')}

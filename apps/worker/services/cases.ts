@@ -34,7 +34,6 @@ import { ServiceError } from './settings'
 import type { CreateRecordBody } from '@protocol/schemas/records'
 import type { CreateEventBody } from '@protocol/schemas/events'
 import type { CreateInteractionBody } from '@protocol/schemas/interactions'
-import type { EvidenceMetadata } from '@protocol/schemas/evidence'
 
 // ---------------------------------------------------------------------------
 // Inferred row types from Drizzle schema
@@ -1523,6 +1522,33 @@ export class CasesService {
       entityTypeId: rows[0].entityTypeId,
       hubId: rows[0].hubId,
     }
+  }
+
+  // =========================================================================
+  // Events Migration (EP06-A1)
+  // =========================================================================
+
+  async getEventsMigrationCount(hubId: string): Promise<number> {
+    const result = await this.db
+      .select({ count: sql<number>`count(*)` })
+      .from(events)
+      .where(and(
+        eq(events.hubId, hubId),
+        isNull(events.deprecatedAt),
+      ))
+    return Number(result[0]?.count ?? 0)
+  }
+
+  async migrateEvents(hubId: string): Promise<number> {
+    const result = await this.db
+      .update(events)
+      .set({ deprecatedAt: new Date() })
+      .where(and(
+        eq(events.hubId, hubId),
+        isNull(events.deprecatedAt),
+      ))
+      .returning({ id: events.id })
+    return result.length
   }
 
   // =========================================================================

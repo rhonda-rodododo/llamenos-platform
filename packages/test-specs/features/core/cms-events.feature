@@ -19,7 +19,7 @@ Feature: CMS Events — Unified Entity System
     When the admin creates a record with that entity type
     Then the record should be persisted
     And the record entity type category should be "event"
-    And the record should use 3-tier encryption (summary + fields + pii tiers)
+    And the record should use 3-tier encryption (summary fields pii)
 
   @events @blind-index
   Scenario: Filter event records by date blind index token

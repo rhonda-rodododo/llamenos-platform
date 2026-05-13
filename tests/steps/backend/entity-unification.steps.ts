@@ -45,7 +45,7 @@ Given('I am authenticated as admin', async ({ world }) => {
 
 Given('an entity type with category {string} exists for the hub', async ({ request, world }, category: string) => {
   const state = getState_(world)
-  const hubId = (getState<{ hubId: string } | undefined>(world, 'common') ?? { hubId: '' }).hubId
+  const hubId = getScenarioState(world).hubId
   const res = await apiPost<{ id: string }>(request, '/settings/cms/entity-types', {
     name: `test_${category}_type_${Date.now()}`,
     label: `Test ${category} Type`,
@@ -86,7 +86,7 @@ Given('the builtin template {string} has been applied', async ({ request, world 
 Given('an event entity type exists with start_date field \\(indexType=date\\)',
   async ({ request, world }) => {
     const state = getState_(world)
-    const hubId = getScenarioState({ hubId: '' } as Record<string, unknown>).hubId
+    const hubId = getScenarioState(world).hubId
     const res = await apiPost<{ id: string }>(request, '/settings/cms/entity-types', {
       name: `event_date_type_${Date.now()}`,
       label: 'Event Date Type',
@@ -142,7 +142,7 @@ Given('a user has permission {string} but not {string}',
 Given('{int} events exist without deprecated_at set', async ({ request, world }, count: number) => {
   const state = getState_(world)
   if (!state.entityTypeId) {
-    const hubId = (getState<{ hubId: string } | undefined>(world, 'common') ?? { hubId: '' }).hubId
+    const hubId = getScenarioState(world).hubId
     const res = await apiPost<{ id: string }>(request, '/settings/cms/entity-types', {
       name: `event_migration_type_${Date.now()}`,
       label: 'Event Migration Type',
@@ -258,6 +258,13 @@ When('I POST \\/api\\/admin\\/events\\/migrate', async ({ request, world }) => {
   }
 })
 
+Then('the record should be persisted', async ({ request, world }) => {
+  const state = getState_(world)
+  expect(state.recordId).toBeDefined()
+  const res = await apiGet(request, `/records/${state.recordId}`)
+  expect(res.status).toBe(200)
+})
+
 Then('the record entity type category should be {string}', async ({ request, world }, category: string) => {
   const state = getState_(world)
   const res = await apiGet<{ entityTypeId: string }>(request, `/records/${state.recordId}`)
@@ -266,7 +273,7 @@ Then('the record entity type category should be {string}', async ({ request, wor
   expect(etRes.data.category).toBe(category)
 })
 
-Then('the record should use 3-tier encryption \\(summary \\+ fields \\+ pii tiers\\)',
+Then('the record should use 3-tier encryption \\(summary fields pii\\)',
   async ({ request, world }) => {
     const state = getState_(world)
     const res = await apiGet<Record<string, unknown>>(request, `/records/${state.recordId}`)
