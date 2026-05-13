@@ -148,6 +148,13 @@
       "when": 1747181400000,
       "tag": "0020_ep07_shifts",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1778694153897,
+      "tag": "0021_omniscient_steel_serpent",
+      "breakpoints": true
     }
   ]
 }

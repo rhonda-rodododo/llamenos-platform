@@ -32,6 +32,7 @@ export const shifts = pgTable('shifts', {
     .array()
     .notNull()
     .default(sql`'{}'::text[]`),
+  createdBy: text('created_by'),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
     .defaultNow(),

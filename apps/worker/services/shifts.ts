@@ -8,7 +8,8 @@
 import { eq, and, sql } from 'drizzle-orm'
 import type { Database } from '../db'
 import { shifts, pushRemindersSent } from '../db/schema'
-import { ServiceError, SettingsService } from './settings'
+import { ServiceError } from './settings'
+import { permissionGranted } from '@shared/permissions'
 
 /** Validate HH:MM format (00:00-23:59) */
 function isValidTimeFormat(time: string): boolean {
@@ -26,7 +27,7 @@ function isShiftActive(
 ): boolean {
   if (!shift.days.includes(currentDay)) return false
 
-  const startsBeforeEnds = shift.startTime <= shift.endTime
+  const startsBeforeEnds = shift.startTime < shift.endTime
   if (startsBeforeEnds) {
     return currentTime >= shift.startTime && currentTime < shift.endTime
   }
@@ -40,7 +41,8 @@ function utcTimeNow(now: Date = new Date()): string {
 }
 
 type ShiftRow = typeof shifts.$inferSelect
-type ShiftInsert = Omit<typeof shifts.$inferInsert, 'id' | 'createdAt' | 'hubId'>
+type ShiftInsert = Omit<typeof shifts.$inferInsert, 'id' | 'createdAt' | 'hubId' | 'createdBy'>
+type CallerContext = { callerPubkey: string; permissions: string[] }
 
 export class ShiftsService {
   constructor(
@@ -62,7 +64,7 @@ export class ShiftsService {
   }
 
   /** Create a new shift, return the created row */
-  async create(hubId: string, data: ShiftInsert): Promise<ShiftRow> {
+  async create(hubId: string, data: ShiftInsert, caller?: CallerContext): Promise<ShiftRow> {
     if (!isValidTimeFormat(data.startTime) || !isValidTimeFormat(data.endTime)) {
       throw new ServiceError(400, 'Invalid time format — expected HH:MM (00:00-23:59)')
     }
@@ -72,6 +74,7 @@ export class ShiftsService {
       .values({
         ...data,
         hubId,
+        createdBy: caller?.callerPubkey ?? null,
       } as typeof shifts.$inferInsert)
       .returning()
 
@@ -83,12 +86,30 @@ export class ShiftsService {
     hubId: string,
     shiftId: string,
     data: Partial<Pick<ShiftInsert, 'encryptedName' | 'startTime' | 'endTime' | 'days' | 'userPubkeys'>>,
+    caller?: CallerContext,
   ): Promise<ShiftRow> {
     if (data.startTime && !isValidTimeFormat(data.startTime)) {
       throw new ServiceError(400, 'Invalid time format — expected HH:MM (00:00-23:59)')
     }
     if (data.endTime && !isValidTimeFormat(data.endTime)) {
       throw new ServiceError(400, 'Invalid time format — expected HH:MM (00:00-23:59)')
+    }
+
+    if (caller) {
+      const [existing] = await this.db
+        .select({ createdBy: shifts.createdBy })
+        .from(shifts)
+        .where(and(eq(shifts.id, shiftId), eq(shifts.hubId, hubId)))
+        .limit(1)
+
+      if (!existing) {
+        throw new ServiceError(404, 'Shift not found')
+      }
+
+      const isAdmin = permissionGranted(caller.permissions, 'shifts:manage')
+      if (existing.createdBy !== caller.callerPubkey && !isAdmin) {
+        throw new ServiceError(403, 'Only the shift creator or an admin can modify this shift')
+      }
     }
 
     const [row] = await this.db
@@ -105,7 +126,24 @@ export class ShiftsService {
   }
 
   /** Delete a shift */
-  async delete(hubId: string, shiftId: string): Promise<{ ok: true }> {
+  async delete(hubId: string, shiftId: string, caller?: CallerContext): Promise<{ ok: true }> {
+    if (caller) {
+      const [existing] = await this.db
+        .select({ createdBy: shifts.createdBy })
+        .from(shifts)
+        .where(and(eq(shifts.id, shiftId), eq(shifts.hubId, hubId)))
+        .limit(1)
+
+      if (!existing) {
+        throw new ServiceError(404, 'Shift not found')
+      }
+
+      const isAdmin = permissionGranted(caller.permissions, 'shifts:manage')
+      if (existing.createdBy !== caller.callerPubkey && !isAdmin) {
+        throw new ServiceError(403, 'Only the shift creator or an admin can modify this shift')
+      }
+    }
+
     const result = await this.db
       .delete(shifts)
       .where(and(eq(shifts.id, shiftId), eq(shifts.hubId, hubId)))

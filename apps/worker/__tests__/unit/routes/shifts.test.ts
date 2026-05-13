@@ -235,7 +235,7 @@ describe('shifts routes', () => {
       })
 
       expect(res.status).toBe(201)
-      expect(createSpy).toHaveBeenCalledWith('hub-1', { id: '550e8400-e29b-41d4-a716-446655440000', encryptedName: 'Morning', startTime: '09:00', endTime: '12:00', days: [1, 2, 3], ringGroupId: null, userPubkeys: ['b'.repeat(64)] })
+      expect(createSpy).toHaveBeenCalledWith('hub-1', { id: '550e8400-e29b-41d4-a716-446655440000', encryptedName: 'Morning', startTime: '09:00', endTime: '12:00', days: [1, 2, 3], ringGroupId: null, userPubkeys: ['b'.repeat(64)] }, expect.objectContaining({ callerPubkey: expect.any(String), permissions: expect.any(Array) }))
     })
 
     it('requires shifts:create permission', async () => {
@@ -278,7 +278,7 @@ describe('shifts routes', () => {
       })
 
       expect(res.status).toBe(200)
-      expect(updateSpy).toHaveBeenCalledWith('hub-1', 's1', { encryptedName: 'Evening' })
+      expect(updateSpy).toHaveBeenCalledWith('hub-1', 's1', { encryptedName: 'Evening' }, expect.objectContaining({ callerPubkey: expect.any(String), permissions: expect.any(Array) }))
     })
 
     it('requires shifts:update permission', async () => {
@@ -307,7 +307,7 @@ describe('shifts routes', () => {
 
       const res = await app.request('/shifts/s1', { method: 'DELETE' })
       expect(res.status).toBe(200)
-      expect(deleteSpy).toHaveBeenCalledWith('hub-1', 's1')
+      expect(deleteSpy).toHaveBeenCalledWith('hub-1', 's1', expect.objectContaining({ callerPubkey: expect.any(String), permissions: expect.any(Array) }))
     })
 
     it('requires shifts:delete permission', async () => {
