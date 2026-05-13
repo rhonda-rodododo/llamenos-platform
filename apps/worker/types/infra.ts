@@ -4,7 +4,7 @@
 // Types with extra storage-only fields (encryptedSecretKey, callerNumber, etc.)
 // are defined here as server-internal storage types.
 
-import type { MessagingChannelType, RecipientEnvelope, KeyEnvelope } from '@shared/types'
+import type { MessagingChannelType, RecipientEnvelope } from '@shared/types'
 
 // ---------------------------------------------------------------------------
 // Re-exports of entity types whose schema matches storage shape exactly
