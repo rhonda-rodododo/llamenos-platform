@@ -191,6 +191,12 @@ export const PERMISSION_CATALOG = {
   'system:manage-hubs': 'Create/manage hubs',
   'system:create-hub': 'Create new hubs (self-serve hub creation)',
   'system:manage-instance': 'Instance-level settings',
+  // System (new — platform nav gating)
+  'system:view-platform': 'View platform settings',
+  'system:view-bans': 'View platform-wide ban list',
+  'system:view-audit': 'View platform-wide audit log',
+  'system:view-analytics': 'View platform-wide analytics',
+  'system:view-health': 'View platform health status',
 } as const
 
 export type Permission = keyof typeof PERMISSION_CATALOG
