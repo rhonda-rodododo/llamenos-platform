@@ -1,17 +1,9 @@
 import { test, expect } from '@playwright/test'
+import { loginAsAdmin } from '../helpers'
 
 async function goToAdminSection(page: import('@playwright/test').Page, section: string) {
   await page.goto(`/admin/${section}`)
   await page.waitForSelector('[data-testid]', { timeout: 10_000 })
-}
-
-async function loginAsAdmin(page: import('@playwright/test').Page) {
-  await page.goto('/login')
-  await page.waitForSelector('[data-testid="pin-input"]', { timeout: 10_000 })
-  const pinInput = page.locator('[data-testid="pin-input"] input').first()
-  await pinInput.fill('testpin123')
-  await pinInput.press('Enter')
-  await page.waitForURL('/', { timeout: 15_000 })
 }
 
 test.describe('Recovery Group - Admin Configuration', () => {
