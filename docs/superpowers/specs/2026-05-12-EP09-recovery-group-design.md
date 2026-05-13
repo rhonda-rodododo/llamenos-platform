@@ -118,6 +118,8 @@ All Llámenos users are required to use Signal. Recovery initiation uses Signal 
 
 This closes the distributed attacker gap identified in research — IP rate limiting alone is insufficient. Signal verification leverages the existing trusted channel without adding new infrastructure. The `signal-notifier` sidecar already handles HMAC-hashed contact resolution (zero-knowledge — no plaintext phone numbers stored).
 
+**Identifier-to-pubkey mapping:** The server maps the user-provided identifier (email/phone) to an internal pubkey using HMAC-based blind indexes (same pattern as contact lookup). The plaintext identifier is processed in memory only — HMAC'd with the hub's key, matched against stored blind indexes, then discarded. The server never stores plaintext identifiers. The Signal verification code is sent via the `signal-notifier` sidecar which resolves contacts by HMAC-hashed phone numbers, maintaining zero-knowledge end-to-end.
+
 WebAuthn is part of the normal authentication flow but cannot be used for recovery initiation (the user has lost their device and WebAuthn credentials with it).
 
 ### D8: Permission Model
@@ -128,7 +130,7 @@ All operations gated by permissions, never by role names.
 |---|---|---|
 | `recovery:manage` | hub | Configure/rotate recovery groups, assign share holders, cancel sessions |
 | `recovery:hold-share` | hub | Hold a Shamir share (gates UI for share contribution) |
-| `recovery:initiate` | hub | Initiate recovery for another user (admin-side) |
+| `recovery:initiate` | hub | Initiate recovery on behalf of another user (admin-side — bypasses Signal verification, uses admin's authenticated session instead) |
 | `recovery:approve` | hub | Act as emergency override second approver |
 | `recovery:view` | hub | View recovery group status and recovery request dashboard |
 
@@ -138,22 +140,24 @@ The user-initiated recovery endpoint requires Signal verification, not permissio
 
 The recovery group public key is anchored to the hub's sigchain to prevent server-side key substitution (inspired by Keybase's sigchain anchoring and Proton's Key Transparency).
 
+**Scope:** Recovery group sigchain links are published on the enrolling user's personal sigchain (EP02 defines per-user sigchains; hub-scoped sigchains do not exist). The link references the hub ID, so clients following any share holder's sigchain can discover and verify the recovery group pubkey. All share holders must also publish a `recovery-group-accept` link on their own sigchain, creating a web of cross-references.
+
 At enrollment:
-1. The enrolling user creates a sigchain link of type `recovery-group-enroll` containing the recovery group X25519 public key and share holder pubkeys
-2. All share holders verify the sigchain link before accepting their shares
-3. Users verify the recovery group pubkey from the sigchain before allowing auto-enrollment of their PUK seed
+1. The enrolling user creates a sigchain link of type `recovery-group-enroll` containing: hub ID, recovery group X25519 public key, share holder pubkeys, threshold, total
+2. Each share holder creates a `recovery-group-accept` link on their own sigchain referencing the enroll link hash
+3. Users verify the recovery group pubkey by checking that at least K share holders have published matching `recovery-group-accept` links before allowing auto-enrollment of their PUK seed
 
 At rotation:
-1. A new sigchain link of type `recovery-group-rotate` is created with the new public key
-2. The old link is not deleted (sigchain is append-only) — clients verify the latest link
+1. A new `recovery-group-enroll` link is created with the new public key (sigchain is append-only — old link remains)
+2. Share holders publish new `recovery-group-accept` links for the rotated group
 
-If the server attempts to substitute a malicious recovery group key, the sigchain entry would be missing or inconsistent, and clients would refuse to enroll.
+If the server attempts to substitute a malicious recovery group key, the cross-referencing sigchain entries from multiple independent share holders would be missing or inconsistent, and clients would refuse to enroll. An attacker would need to compromise K share holder sigchains simultaneously to forge a convincing substitution.
 
 ### D10: Duress Detection
 
 Against nation-state adversaries who may coerce share holders, the system includes duress-aware mechanisms:
 
-1. **Duress share:** Each share holder can optionally register a "duress commitment" — a second SHA-256 commitment for a fake share that, when contributed, produces a recognizably-wrong secret. If the recovery fails with a duress-flagged share, the system logs a coercion alert visible to other share holders.
+1. **Duress share:** Each share holder can optionally register a "duress commitment" — a second SHA-256 commitment for a pre-generated fake share. The duress commitments are stored alongside real commitments in `hub_recovery_groups.duressCommitments`. Detection mechanism: when the recovering device receives a share, it checks the share against BOTH the real commitment AND the duress commitment for that share holder. If the share matches the duress commitment instead of the real one, the device flags a coercion alert (sent to other share holders via the API, visible in the recovery dashboard). The device does NOT attempt to combine shares when a duress share is detected — the ceremony is paused and other share holders are warned. This is an opt-in feature per share holder; holders without duress shares have `null` in the duress commitments array.
 2. **Geographic distribution guidance:** The admin UI recommends distributing share holders across different jurisdictions. A warning is shown if all share holders are in the same geographic region.
 3. **Out-of-band verification requirement:** The UI strongly prompts share holders to verify recovery requests through a separate channel (phone call, in-person) before contributing. This is UX guidance, not a technical enforcement.
 4. **Canary check-in:** Share holders are periodically prompted (configurable interval) to confirm they still have access to their share and are not under duress. A missed check-in triggers an alert to other share holders and recommends group rotation.
@@ -241,7 +245,9 @@ Added to `packages/protocol/crypto-labels.json`, generated to TS/Swift/Kotlin vi
 | `LABEL_RECOVERY_GROUP_SHARE_WRAP` | `llamenos:recovery-group:share-wrap:v1` | HPKE wrapping each share holder's Shamir share at rest |
 | `LABEL_RECOVERY_PUK_SEED_WRAP` | `llamenos:recovery-group:puk-seed-wrap:v1` | HPKE wrapping user's PUK seed under recovery group pubkey |
 | `LABEL_RECOVERY_SHARE_CONTRIBUTE` | `llamenos:recovery-group:share-contribute:v1` | HPKE wrapping share contribution to user's new device during ceremony |
-| `LABEL_RECOVERY_LIVENESS_PROOF` | `llamenos:recovery-group:liveness-proof:v1` | Domain separation for share liveness proofs |
+| `LABEL_RECOVERY_LIVENESS_PROOF` | `llamenos:recovery-group:liveness-proof:v1` | Ed25519 signature domain separation for share liveness proofs (not HPKE) |
+
+Note: The existing `RECOVERY_SALT` label (`llamenos:recovery`) is for PIN-based recovery key PBKDF2 derivation (v1 legacy pattern). It is unrelated to recovery group operations and remains in use for the PIN lockout hardening plan.
 
 ### Recovery Group Keypair
 
@@ -292,9 +298,9 @@ Triggered on share holder departure or periodic policy:
 
 1. User installs app on new device, generates fresh Ed25519/X25519 device keys
 2. User taps "Account recovery" → enters their identifier (email/phone) + selects hub
-3. `POST /initiate` — server sends verification code via Signal (`signal-notifier` sidecar)
+3. `POST /initiate` — server creates session (`status: pending`), sends verification code via Signal (`signal-notifier` sidecar)
 4. User enters verification code on new device → `POST /initiate/verify`
-5. Server creates recovery session (`status: pending`, delay starts), stores new device pubkey
+5. On successful verification: session status → `verified`, `expiresAt` set to `now + hub's configured delay` (delay timer starts HERE, not at session creation)
 6. Server notifies share holders (push notification / in-app alert via Signal)
 7. Rate limited: 10 req / 5 min per IP (defense-in-depth, in addition to Signal verification)
 8. Anti-enumeration: response shape and timing identical whether user exists or not
@@ -328,7 +334,7 @@ After delay elapsed + threshold contributions received:
 4. New device combines verified shares → reconstructs recovery group X25519 private key
 5. Private key decrypts user's PUK seed envelope (`LABEL_RECOVERY_PUK_SEED_WRAP`)
 6. PUK seed loaded into new device's CryptoState
-7. New device creates sigchain entry (recovery link type) to authorize itself
+7. New device creates a self-authorizing sigchain entry of type `recovery-device-add`. This link type is special: it is signed by the new device's own Ed25519 key (not an existing device), and its authorization proof is the successful HPKE decryption of the PUK seed envelope using the reconstructed recovery group private key. The link includes the session ID and contributing share holder pubkeys as evidence. Verifiers accept this link type only when the referenced recovery session is in `completed` status with ≥ K contributions.
 8. PUK re-wrapped (HPKE) to new device's pubkey
 9. Recovery group private key zeroized immediately
 10. Recovery event logged to hash-chained audit log
@@ -351,6 +357,7 @@ After delay elapsed + threshold contributions received:
 | Compromised single share holder | Has one share — information-theoretically useless below threshold. Cannot complete ceremony alone. |
 | Coerced share holders | Time delay (default 24h) gives window to alert. Duress share detection (D10). Geographic distribution guidance. Canary check-ins. |
 | Stolen new device during ceremony | Attacker needs new device's private key (PIN-protected in CryptoState) to decrypt HPKE share contributions. |
+| New device trusting server for sigchain | The recovering device must fetch sigchain data from the server to verify contributor identities. A compromised server could serve fake sigchains. Mitigation: sigchains are hash-chained and Ed25519-signed — tampering requires controlling the chain from genesis. Cross-referencing `recovery-group-accept` links from multiple independent share holders' sigchains makes forgery require compromising K sigchains simultaneously. This is defense-in-depth, not absolute — a fully compromised server with K compromised holders defeats this (but that already defeats the Shamir threshold too). |
 | Replay attack with old shares | AAD binding `(sessionId, contributorPubkey)` on HPKE contributions prevents replay across sessions. Share commitments bound to specific enrollment. |
 | Race condition (real user + attacker) | Signal verification for initiation. 24h delay. Cancellation by any authenticated device. Signal notification to user on session creation. |
 | Malicious hub admin (cross-hub) | Per-hub groups — compromised user in Hub A cannot escalate to Hub B. Hub is the trust boundary. (D2) |
@@ -358,6 +365,7 @@ After delay elapsed + threshold contributions received:
 | DoS on initiate endpoint | Per-IP rate limit (10/5min) + Signal verification (prevents automated abuse). |
 | Threshold bricking | DB constraint: `threshold ≤ totalShares`. Cannot create unrecoverable groups. |
 | Orphan shares on rotation | Atomic rotation (D13): old shares deleted in same transaction as new group creation. |
+| Colluding K share holders | If K holders collude, they can reconstruct the recovery group private key and decrypt ALL users' PUK seeds in that hub (not just one). Mitigation: this is inherent to threshold schemes — choose K and share holders carefully. Geographic distribution (D10) and organizational vetting reduce collusion risk. Per-hub scope (D2) limits blast radius to one hub. |
 | Stale shares (holder lost device) | Periodic liveness verification (D14): holders prove they can decrypt their share without revealing it. |
 | Re-enrollment guess counter reset | Recovery sessions are bound to a specific user + hub + session ID. Creating a new session does not reset any security counters — each session has its own independent delay. (Informed by WhatsApp HSM re-initialization attack research.) |
 
@@ -415,7 +423,7 @@ Composite PK: `(userPubkey, hubId)`
 | `newDevicePubkey` | text | New device's X25519 pubkey |
 | `signalVerified` | boolean | Whether Signal verification was completed |
 | `status` | enum | pending / verified / active / completed / expired / cancelled |
-| `expiresAt` | timestamp | createdAt + hub's configured delay |
+| `expiresAt` | timestamp | nullable — set at verification time (verifiedAt + hub delay), NOT at creation |
 | `completedAt` | timestamp | nullable |
 | `cancelledAt` | timestamp | nullable |
 | `cancelledBy` | text | nullable, pubkey of canceller |
@@ -442,7 +450,7 @@ The `encryptedShare` column stores HPKE ciphertext that only the recovering user
 
 ## API Endpoints
 
-Eight endpoints under `/api/recovery-group/*`:
+Nine endpoints under `/api/recovery-group/*`:
 
 ### Authenticated
 
@@ -477,6 +485,13 @@ Eight endpoints under `/api/recovery-group/*`:
 - Auth required — must be the recovering user (from another device) or user with `recovery:manage`
 - Sets status → `cancelled`, records `cancelledBy`
 - Response: `{ok: true}`
+
+**`POST /session/:id/emergency`** — Apply emergency override to a session
+- Permission: `recovery:approve`
+- Body: `{justification, approverSignature}` — justification (min 16 chars) + Ed25519 signature over session ID
+- Validates: approver is different from all contributors, session is `verified` or `active`, signature is valid against approver's sigchain
+- Sets `emergencyOverride` JSONB on session, recalculates `expiresAt` using emergency floor
+- Response: `{ok: true, newExpiresAt}`
 
 **`POST /shares/liveness`** — Submit share liveness proof
 - Permission: `recovery:hold-share`
@@ -710,7 +725,7 @@ New namespace `recoveryGroup.*` across all 13 locales (~55 keys). All via `packa
 ### Adversarial / Security Tests
 
 - Commitment mismatch rejection (tampered share)
-- Duress share detection (if implemented — produces wrong secret, triggers alert)
+- Duress share detection: share matching duress commitment pauses ceremony and alerts other share holders
 - Session expiry after configured delay with incomplete approvals
 - Urgent recovery without valid second approver signature rejected
 - Rate limit enforcement on unauthenticated endpoint
@@ -718,6 +733,9 @@ New namespace `recoveryGroup.*` across all 13 locales (~55 keys). All via `packa
 - Anti-enumeration: response timing constant regardless of user existence
 - Below-threshold combination produces incorrect secret (verified by commitment failure)
 - Cross-hub isolation: recovery in Hub A does not affect Hub B
+- Concurrent sessions: two sessions for same user — both can proceed independently, no interference
+- Canary check-in: missed liveness check triggers stale warning in admin UI
+- Colluding threshold: K share holders reconstructing private key can decrypt any user's PUK seed in the hub (acknowledged risk — test confirms behavior)
 - Replay attack: contribution from session A rejected in session B (AAD binding)
 - Sigchain verification: user rejects enrollment if recovery group pubkey not in sigchain
 - Server key substitution: mismatched sigchain → enrollment refused
