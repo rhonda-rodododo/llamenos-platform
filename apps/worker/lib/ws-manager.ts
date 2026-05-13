@@ -278,6 +278,26 @@ export class ConnectionManager {
   }
 
   /**
+   * Sign a device:wipe payload with the server Ed25519 key and send to all
+   * connections of a specific user.
+   *
+   * Clients verify the signature against the known server pubkey before
+   * acting on the wipe command.
+   *
+   * Signature covers: `${WS_PROTOCOL_VERSION}:device:wipe:${targetUserId}:${ts}`
+   */
+  sendSignedWipeToUser(
+    targetUserId: string,
+    payload: Record<string, unknown>,
+  ): number {
+    const ts = Date.now()
+    const sigMessage = `${WS_PROTOCOL_VERSION}:device:wipe:${targetUserId}:${ts}`
+    const sig = bytesToHex(ed25519Sign(this.serverKey, utf8ToBytes(sigMessage)))
+    const signedMessage = JSON.stringify({ ...payload, sig, ts })
+    return this.sendToUser(targetUserId, signedMessage)
+  }
+
+  /**
    * Terminate all connections for a user.
    * Called after erasure execution to force disconnect.
    */

@@ -1,0 +1,1 @@
+ALTER TABLE "bans" DROP COLUMN "phone_plain";

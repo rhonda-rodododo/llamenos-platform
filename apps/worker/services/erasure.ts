@@ -23,6 +23,9 @@ import {
 } from '../db/schema'
 import { ServiceError } from './settings'
 import type { AuditService } from './audit'
+import { ed25519Verify } from '@llamenos/crypto/ffi'
+import { hexToBytes, utf8ToBytes } from '@shared/encoding'
+import { LABEL_ERASURE_OVERRIDE_SIG } from '@shared/crypto-labels'
 
 // Emergency override minimum floor — hard-coded, not configurable
 const EMERGENCY_MIN_HOURS = 4
@@ -142,6 +145,26 @@ export class ErasureService {
       if (emergency.coApproverPubkey === userId) {
         throw new ServiceError(400, 'Co-approver cannot be the same user as the requester')
       }
+
+      // Verify co-approver Ed25519 signature over canonical message
+      // Message: LABEL:userId:timestamp
+      const sigMessage = utf8ToBytes(
+        `${LABEL_ERASURE_OVERRIDE_SIG}:${userId}:${emergency.timestamp}`,
+      )
+      let sigValid = false
+      try {
+        sigValid = ed25519Verify(
+          hexToBytes(emergency.coApproverPubkey),
+          sigMessage,
+          hexToBytes(emergency.coApproverSignature),
+        )
+      } catch {
+        // invalid hex or malformed key — treat as verification failure
+      }
+      if (!sigValid) {
+        throw new ServiceError(400, 'Co-approver signature verification failed')
+      }
+
       effectiveDelayHours = EMERGENCY_MIN_HOURS
       isEmergency = true
     }
@@ -225,11 +248,13 @@ export class ErasureService {
     justification: string,
     auditService: AuditService,
   ): Promise<{ reEncryptionJobIds: string[] }> {
-    // Log the audit entry BEFORE crypto-shredding (so it's recorded with the user's key)
-    await auditService.log('userErasureExecuted', executedBy, {
-      targetUserId: userId,
-      justification,
-    })
+    // CRIT-5: Fetch hub memberships BEFORE the transaction so we still have
+    // hub_keys rows available. hub_keys are deleted inside the transaction.
+    const hubMembershipsRows = await this.db.execute(sql`
+      SELECT DISTINCT hub_id FROM hub_keys WHERE recipient_pubkey = ${userId}
+      UNION
+      SELECT DISTINCT hub_id FROM notes WHERE author_pubkey = ${userId}
+    `)
 
     const reEncryptionJobIds: string[] = []
 
@@ -298,16 +323,17 @@ export class ErasureService {
         AND details IS NOT NULL
         AND jsonb_typeof(details) != 'null'
       `)
+
+      // CRIT-1: Audit log recorded INSIDE transaction — only committed if erasure succeeds
+      await auditService.log('userErasureExecuted', executedBy, {
+        targetUserId: userId,
+        justification,
+      })
     })
 
     // Phase 4: Queue re-encryption jobs (outside transaction — these are background)
-    const hubMemberships = await this.db.execute(sql`
-      SELECT DISTINCT hub_id FROM hub_keys WHERE recipient_pubkey = ${userId}
-      UNION
-      SELECT DISTINCT hub_id FROM notes WHERE author_pubkey = ${userId}
-    `)
 
-    for (const row of hubMemberships as { hub_id: string }[]) {
+    for (const row of hubMembershipsRows as { hub_id: string }[]) {
       if (!row.hub_id) continue
       const [job] = await this.db
         .insert(reEncryptionJobs)
@@ -353,11 +379,17 @@ export class ErasureService {
       )
   }
 
-  async markExecuting(requestId: string): Promise<void> {
-    await this.db
+  /**
+   * Atomically claim a pending request for execution.
+   * Returns true if this caller won the race; false if already claimed by another worker.
+   */
+  async markExecuting(requestId: string): Promise<boolean> {
+    const rows = await this.db
       .update(erasureRequests)
       .set({ status: 'executing' })
-      .where(eq(erasureRequests.id, requestId))
+      .where(and(eq(erasureRequests.id, requestId), eq(erasureRequests.status, 'pending')))
+      .returning({ id: erasureRequests.id })
+    return rows.length > 0
   }
 
   async markFailed(requestId: string): Promise<void> {

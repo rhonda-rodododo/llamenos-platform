@@ -60,7 +60,6 @@ export interface CreateReplyInput {
 export interface AddBanInput {
   hubId?: string
   phone: string
-  phonePlain?: string
   reason: string
   bannedBy: string
 }
@@ -258,7 +257,6 @@ export class RecordsService {
       .values({
         hubId: input.hubId || null,  // normalize empty string to null
         phone: input.phone,
-        phonePlain: input.phonePlain ?? null,
         reason: input.reason,
         bannedBy: input.bannedBy,
       })
@@ -280,7 +278,7 @@ export class RecordsService {
           .orderBy(desc(bans.bannedAt))
     return {
       bans: rows.map(r => ({
-        phone: r.phonePlain ?? r.phone,  // return plain phone for display; fall back to hash
+        phone: r.phone,
         reason: r.reason,
         bannedBy: r.bannedBy,
         bannedAt: r.bannedAt,
@@ -293,7 +291,6 @@ export class RecordsService {
     reason: string,
     bannedBy: string,
     hubId?: string,
-    plainPhones?: string[],
   ): Promise<number> {
     // Get existing phones to avoid duplicates
     const existingRows = await this.db
@@ -308,11 +305,9 @@ export class RecordsService {
     const existingPhones = new Set(existingRows.map((r) => r.phone))
     // Deduplicate within the input array AND exclude already-banned phones
     const seen = new Set<string>()
-    const newIndices: number[] = []
-    const newPhones = phones.filter((p, i) => {
+    const newPhones = phones.filter((p) => {
       if (existingPhones.has(p) || seen.has(p)) return false
       seen.add(p)
-      newIndices.push(i)
       return true
     })
 
@@ -321,10 +316,9 @@ export class RecordsService {
     await this.db
       .insert(bans)
       .values(
-        newPhones.map((phone, idx) => ({
+        newPhones.map((phone) => ({
           hubId: hubId || null,  // normalize empty string to null
           phone,
-          phonePlain: plainPhones ? (plainPhones[newIndices[idx]] ?? null) : null,
           reason,
           bannedBy,
         })),

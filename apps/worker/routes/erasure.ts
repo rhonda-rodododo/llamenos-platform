@@ -299,13 +299,12 @@ erasure.post(
 
     const wsManager = getConnectionManager()
     if (wsManager) {
-      const wipePayload = JSON.stringify({
+      wsManager.sendSignedWipeToUser(targetUserId, {
         type: 'device:wipe',
         targetUserId,
         reason: 'admin-erasure',
         timestamp: new Date().toISOString(),
       })
-      wsManager.sendToUser(targetUserId, wipePayload)
       wsManager.terminateUser(targetUserId)
     }
 
@@ -343,13 +342,12 @@ erasure.post(
 
     const wsManager = getConnectionManager()
     if (wsManager) {
-      const wipePayload = JSON.stringify({
+      wsManager.sendSignedWipeToUser(targetUserId, {
         type: 'device:wipe',
         targetDevicePubkey,
         reason: 'device-revocation',
         timestamp: new Date().toISOString(),
       })
-      wsManager.sendToUser(targetUserId, wipePayload)
     }
 
     await audit(services.audit, 'deviceWipeSent', pubkey, {

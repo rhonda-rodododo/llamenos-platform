@@ -157,3 +157,8 @@ export const LABEL_SERVER_SIGNING_INFO = 'llamenos:server-signing-key-info:v1'
 
 /** Challenge-response auth message binding for WebSocket relay */
 export const LABEL_WS_CHALLENGE = 'llamenos:ws-auth:v1'
+
+// --- Erasure ---
+
+/** Ed25519 message binding for emergency erasure co-approver signature */
+export const LABEL_ERASURE_OVERRIDE_SIG = 'llamenos:erasure-override-sig:v1'

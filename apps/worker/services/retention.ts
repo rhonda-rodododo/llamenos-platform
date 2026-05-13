@@ -4,7 +4,7 @@
  * Per-hub retention settings with platform-enforced minimums.
  * Daily purge deletes records older than the configured retention period.
  */
-import { eq, and, sql, lt } from 'drizzle-orm'
+import { eq, and, sql, lt, inArray } from 'drizzle-orm'
 import type { Database } from '../db'
 import {
   retentionSettings,
@@ -137,12 +137,15 @@ export class RetentionService {
 
       switch (setting.category) {
         case 'call_records': {
+          // Only purge terminal-state records — never delete active/ringing calls
+          const TERMINAL_STATUSES = ['ended', 'missed', 'no-answer', 'rejected']
           const result = await this.db
             .delete(callRecords)
             .where(
               and(
                 eq(callRecords.hubId, setting.hubId),
                 lt(callRecords.createdAt, cutoff),
+                inArray(callRecords.status, TERMINAL_STATUSES),
               ),
             )
             .returning()

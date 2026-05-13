@@ -37,7 +37,6 @@ export const bulkBanBodySchema = z.looseObject({
 export const platformBanResponseSchema = z.object({
   id: z.string(),
   phoneHash: z.string(),
-  phonePlain: z.string().nullable(),
   reason: z.string().nullable(),
   bannedBy: z.string().nullable(),
   bannedAt: z.string(),
@@ -74,7 +73,6 @@ export const searchBansResponseSchema = z.object({
       id: z.string(),
       hubId: z.string().nullable(),
       phoneHash: z.string(),
-      phonePlain: z.string().nullable(),
       reason: z.string().nullable(),
       bannedBy: z.string().nullable(),
       bannedAt: z.string(),

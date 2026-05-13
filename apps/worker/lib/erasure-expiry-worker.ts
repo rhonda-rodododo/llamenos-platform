@@ -35,7 +35,9 @@ export function startErasureExpiryWorker(opts: ErasureExpiryWorkerOpts): void {
 
       for (const request of expired) {
         try {
-          await opts.erasureService.markExecuting(request.id)
+          // IMP-2: CAS claim — skip if another worker already claimed it
+          const claimed = await opts.erasureService.markExecuting(request.id)
+          if (!claimed) continue
 
           const { reEncryptionJobIds } =
             await opts.erasureService.executeErasure(
@@ -47,13 +49,12 @@ export function startErasureExpiryWorker(opts: ErasureExpiryWorkerOpts): void {
 
           const wsManager = getConnectionManager()
           if (wsManager) {
-            const wipePayload = JSON.stringify({
+            wsManager.sendSignedWipeToUser(request.userId, {
               type: 'device:wipe',
               targetUserId: request.userId,
               reason: 'user-erasure',
               timestamp: new Date().toISOString(),
             })
-            wsManager.sendToUser(request.userId, wipePayload)
             wsManager.terminateUser(request.userId)
           }
 

@@ -46,7 +46,6 @@ platformBans.get(
       bans: rows.map((b) => ({
         id: b.id,
         phoneHash: b.phone,
-        phonePlain: b.phonePlain,
         reason: b.reason,
         bannedBy: b.bannedBy,
         bannedAt: b.bannedAt?.toISOString() ?? '',
@@ -88,7 +87,6 @@ platformBans.post(
     const phoneHash = hashPhone(body.phone, c.env.HMAC_SECRET)
     await services.records.addBan({
       phone: phoneHash,
-      phonePlain: body.phone,
       reason: body.reason ?? '',
       bannedBy: pubkey,
     })
@@ -141,8 +139,6 @@ platformBans.post(
       hashedPhones,
       body.reason ?? '',
       pubkey,
-      undefined,
-      body.phones,
     )
     await audit(services.audit, 'platformBanBulkImport', pubkey, {
       count: body.phones.length,
@@ -222,7 +218,6 @@ platformBans.get(
         id: b.id,
         hubId: b.hubId,
         phoneHash: b.phone,
-        phonePlain: b.phonePlain,
         reason: b.reason,
         bannedBy: b.bannedBy,
         bannedAt: b.bannedAt?.toISOString() ?? '',
@@ -266,7 +261,6 @@ platformBans.post(
 
     await services.records.addBan({
       phone: sourceBan.phone,
-      phonePlain: sourceBan.phonePlain ?? undefined,
       reason: sourceBan.reason ?? '',
       bannedBy: pubkey,
     })
