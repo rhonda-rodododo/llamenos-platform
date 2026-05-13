@@ -95,4 +95,38 @@ describe('AnalyticsService', () => {
       expect(result.services).toContainEqual(expect.objectContaining({ name: 'postgres', status: 'ok' }))
     })
   })
+
+  describe('getHourlyDistribution', () => {
+    it('returns 24 buckets with counts, filling zeros for missing hours', async () => {
+      const { db, service } = setup()
+      // Mock returns rows for hours 9, 10, 14 only
+      db.$setSelectResults([
+        [
+          { hour: 9, count: 5 },
+          { hour: 10, count: 12 },
+          { hour: 14, count: 3 },
+        ],
+      ])
+      const result = await service.getHourlyDistribution('hub-1', {
+        from: new Date('2026-05-01'),
+        to: new Date('2026-05-07'),
+      })
+      expect(result.buckets).toHaveLength(24)
+      expect(result.buckets[9]).toEqual({ hour: 9, count: 5 })
+      expect(result.buckets[10]).toEqual({ hour: 10, count: 12 })
+      expect(result.buckets[0]).toEqual({ hour: 0, count: 0 })
+      expect(result.totalCalls).toBe(20)
+    })
+
+    it('aggregates across hubs when hubId is undefined', async () => {
+      const { db, service } = setup()
+      db.$setSelectResults([[{ hour: 12, count: 8 }]])
+      const result = await service.getHourlyDistribution(undefined, {
+        from: new Date('2026-05-01'),
+        to: new Date('2026-05-07'),
+      })
+      expect(result.buckets[12]).toEqual({ hour: 12, count: 8 })
+      expect(result.totalCalls).toBe(8)
+    })
+  })
 })

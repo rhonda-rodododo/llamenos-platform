@@ -5,7 +5,7 @@
  */
 import { and, count, eq, gte, lte, sql, sum } from 'drizzle-orm'
 import type { Database } from '../db'
-import { activeCalls, callRecords, conversations, shifts, users } from '../db/schema'
+import { activeCalls, callRecords, conversations, notes, shifts, users } from '../db/schema'
 
 export interface DateRange {
   from: Date
@@ -172,6 +172,45 @@ export class AnalyticsService {
       unanswered: r.unanswered ?? 0,
       abandoned: r.abandoned ?? 0,
     }))
+  }
+
+  // =========================================================================
+  // Hourly Distribution
+  // =========================================================================
+
+  async getHourlyDistribution(
+    hubId: string | undefined,
+    range?: Partial<DateRange>,
+  ): Promise<{
+    totalCalls: number
+    buckets: Array<{ hour: number; count: number }>
+  }> {
+    const { from, to } = { ...defaultRange(), ...range }
+
+    const rows = await this.db
+      .select({
+        hour: sql<number>`EXTRACT(HOUR FROM ${callRecords.startedAt})::int`,
+        count: count(),
+      })
+      .from(callRecords)
+      .where(
+        and(
+          hubId ? eq(callRecords.hubId, hubId) : undefined,
+          gte(callRecords.startedAt, from),
+          lte(callRecords.startedAt, to),
+        ),
+      )
+      .groupBy(sql`EXTRACT(HOUR FROM ${callRecords.startedAt})`)
+      .orderBy(sql`EXTRACT(HOUR FROM ${callRecords.startedAt})`)
+
+    const hourMap = new Map(rows.map((r) => [r.hour, r.count]))
+    const buckets = Array.from({ length: 24 }, (_, hour) => ({
+      hour,
+      count: hourMap.get(hour) ?? 0,
+    }))
+    const totalCalls = rows.reduce((sum, r) => sum + r.count, 0)
+
+    return { totalCalls, buckets }
   }
 
   // =========================================================================
