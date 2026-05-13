@@ -63,7 +63,7 @@ export const entityFieldDefinitionSchema = z.object({
 
   // Blind index configuration
   indexable: z.boolean().optional().default(false),
-  indexType: z.enum(['exact', 'none']).optional().default('none'),
+  indexType: z.enum(['exact', 'date', 'location', 'none']).optional().default('none'),
 
   // Access control
   accessLevel: z.enum(['all', 'admin', 'assigned', 'custom']).optional().default('all'),

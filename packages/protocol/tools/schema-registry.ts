@@ -67,6 +67,9 @@ const EXCLUDED_SCHEMAS = new Set([
   'digestCadenceSchema',
   'notificationChannelSchema',
 
+  // Entity template sub-schemas (inlined in parent response)
+  'entityTemplateCategorySchema',
+
   // WebSocket message unions — discriminated unions not representable in quicktype
   'wsClientMessageSchema',
   'wsServerMessageSchema',

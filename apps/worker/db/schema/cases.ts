@@ -118,6 +118,7 @@ export const events = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
+    deprecatedAt: timestamp('deprecated_at', { withTimezone: true }),
   },
   (table) => [
     index('events_hub_id_idx').on(table.hubId),
