@@ -16,9 +16,7 @@ use llamenos_core::encryption::{
     hpke_unwrap_key, hpke_wrap_key, EncryptedKeyData, EncryptedMessage, EncryptedNote, KeyEnvelope,
     RecipientKeyEnvelope,
 };
-use llamenos_core::keys::generate_keypair;
 use llamenos_core::labels::*;
-use llamenos_core::nostr::{finalize_nostr_event, SignedNostrEvent};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fs;
@@ -26,8 +24,7 @@ use x25519_dalek::{PublicKey as X25519PublicKey, StaticSecret as X25519StaticSec
 
 /// Well-known test keypair (NEVER use in production).
 /// These 32-byte hex secrets serve as both X25519 private keys (for HPKE) and
-/// Ed25519 seeds (for auth tokens / Nostr signing). For secp256k1 Nostr tests,
-/// these also serve as secp256k1 secret keys.
+/// Ed25519 seeds (for auth tokens).
 const TEST_SECRET_KEY: &str = "7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f";
 
 /// Second test keypair for multi-recipient tests.
@@ -47,11 +44,6 @@ fn x25519_pubkey(secret_hex: &str) -> String {
     let secret = X25519StaticSecret::from(sk_bytes);
     let pubkey = X25519PublicKey::from(&secret);
     hex::encode(pubkey.as_bytes())
-}
-
-/// Derive secp256k1 x-only public key hex (for Nostr / legacy tests).
-fn secp256k1_pubkey(secret_hex: &str) -> String {
-    llamenos_core::keys::get_public_key(secret_hex).unwrap()
 }
 
 // ─── Top-Level Struct ────────────────────────────────────────
@@ -91,9 +83,6 @@ struct TestVectors {
     /// Hub key wrapping vectors (hub key HPKE distribution)
     hub_key: HubKeyVectors,
 
-    /// Nostr event signing vectors (NIP-01)
-    nostr_event: NostrEventVectors,
-
     /// Export encryption vectors (HKDF + base64)
     export_encryption: ExportEncryptionVectors,
 
@@ -115,13 +104,8 @@ struct KeyVectors {
     secret_key_hex: String,
     /// X25519 public key for HPKE encryption
     x25519_pubkey_hex: String,
-    /// secp256k1 x-only public key (for Nostr / legacy)
-    secp256k1_pubkey_hex: String,
-    nsec: String,
-    npub: String,
     admin_secret_key_hex: String,
     admin_x25519_pubkey_hex: String,
-    admin_secp256k1_pubkey_hex: String,
     wrong_secret_key_hex: String,
     wrong_x25519_pubkey_hex: String,
 }
@@ -232,14 +216,6 @@ struct HubKeyVectors {
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct NostrEventVectors {
-    event: SignedNostrEvent,
-    /// The canonical JSON used to compute the event ID (for debugging)
-    canonical_json: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 struct ExportEncryptionVectors {
     plaintext_json: String,
     secret_key_hex: String,
@@ -327,12 +303,6 @@ fn generate_and_verify_test_vectors() {
     let author_x25519 = x25519_pubkey(TEST_SECRET_KEY);
     let admin_x25519 = x25519_pubkey(TEST_ADMIN_SECRET_KEY);
     let wrong_x25519 = x25519_pubkey(TEST_WRONG_SECRET_KEY);
-    // secp256k1 pubkeys for Nostr signing
-    let author_secp = secp256k1_pubkey(TEST_SECRET_KEY);
-    let admin_secp = secp256k1_pubkey(TEST_ADMIN_SECRET_KEY);
-
-    // Use a generated keypair for nsec-related tests (PIN encryption needs valid nsec)
-    let test_kp = generate_keypair();
 
     // --- HPKE wrap/unwrap roundtrip ---
     let original_key = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
@@ -384,9 +354,11 @@ fn generate_and_verify_test_vectors() {
     assert!(valid);
 
     // --- PIN encryption roundtrip ---
-    let pin_encrypted = encrypt_with_pin(&test_kp.nsec, TEST_PIN, &test_kp.public_key).unwrap();
+    let test_nsec = "nsec1test1234567890abcdef1234567890abcdef1234567890";
+    let test_pubkey = &author_x25519;
+    let pin_encrypted = encrypt_with_pin(test_nsec, TEST_PIN, test_pubkey).unwrap();
     let pin_decrypted = decrypt_with_pin(&pin_encrypted, TEST_PIN).unwrap();
-    assert_eq!(pin_decrypted, test_kp.nsec);
+    assert_eq!(pin_decrypted, test_nsec);
 
     // --- Draft encryption roundtrip ---
     let draft_text = "Draft note content for interop test";
@@ -440,35 +412,7 @@ fn generate_and_verify_test_vectors() {
     .unwrap();
     assert_eq!(hex::encode(&admin_hub), hub_key_hex);
 
-    // ─── NEW v2: Nostr event signing ─────────────────────────
-    let nostr_event = finalize_nostr_event(
-        20001,
-        1700000000,
-        vec![
-            vec!["d".into(), "test-hub-id".into()],
-            vec!["t".into(), "llamenos:event".into()],
-        ],
-        "encrypted-payload-for-interop",
-        TEST_SECRET_KEY,
-    )
-    .unwrap();
-
-    // Reconstruct canonical JSON for inclusion in vectors
-    let canonical_json = serde_json::to_string(&serde_json::json!([
-        0,
-        &nostr_event.pubkey,
-        nostr_event.created_at,
-        nostr_event.kind,
-        &nostr_event.tags,
-        &nostr_event.content,
-    ]))
-    .unwrap();
-
-    // Verify event ID matches canonical JSON hash
-    let expected_id = hex::encode(Sha256::digest(canonical_json.as_bytes()));
-    assert_eq!(nostr_event.id, expected_id);
-
-    // ─── NEW v2: Export encryption ───────────────────────────
+    // ─── Export encryption ───────────────────────────
     let export_json =
         r#"{"notes":[{"id":"abc","text":"test"}],"exportedAt":"2024-01-01T00:00:00Z"}"#;
     let export_encrypted = encrypt_export(export_json, TEST_SECRET_KEY).unwrap();
@@ -572,12 +516,8 @@ fn generate_and_verify_test_vectors() {
         keys: KeyVectors {
             secret_key_hex: TEST_SECRET_KEY.to_string(),
             x25519_pubkey_hex: author_x25519.clone(),
-            secp256k1_pubkey_hex: author_secp.clone(),
-            nsec: test_kp.nsec.clone(),
-            npub: test_kp.npub.clone(),
             admin_secret_key_hex: TEST_ADMIN_SECRET_KEY.to_string(),
             admin_x25519_pubkey_hex: admin_x25519.clone(),
-            admin_secp256k1_pubkey_hex: admin_secp.clone(),
             wrong_secret_key_hex: TEST_WRONG_SECRET_KEY.to_string(),
             wrong_x25519_pubkey_hex: wrong_x25519.clone(),
         },
@@ -605,8 +545,8 @@ fn generate_and_verify_test_vectors() {
         },
         pin_encryption: PinEncryptionVectors {
             pin: TEST_PIN.to_string(),
-            nsec: test_kp.nsec.clone(),
-            pubkey_hex: test_kp.public_key.clone(),
+            nsec: test_nsec.to_string(),
+            pubkey_hex: test_pubkey.clone(),
             encrypted: pin_encrypted,
             decryptable: true,
         },
@@ -658,10 +598,6 @@ fn generate_and_verify_test_vectors() {
             member_pubkeys: hub_member_pubkeys,
             wrapped_envelopes: vec![hub_envelope_vol, hub_envelope_admin],
             label: LABEL_HUB_KEY_WRAP.to_string(),
-        },
-        nostr_event: NostrEventVectors {
-            event: nostr_event,
-            canonical_json,
         },
         export_encryption: ExportEncryptionVectors {
             plaintext_json: export_json.to_string(),
@@ -833,8 +769,9 @@ fn auth_token_deterministic_verification() {
 
 #[test]
 fn pin_encryption_format_consistency() {
-    let kp = generate_keypair();
-    let encrypted = encrypt_with_pin(&kp.nsec, "56789012", &kp.public_key).unwrap();
+    let test_nsec = "nsec1testformatconsistency1234567890abcdef12345";
+    let test_pubkey = &x25519_pubkey(TEST_SECRET_KEY);
+    let encrypted = encrypt_with_pin(test_nsec, "56789012", test_pubkey).unwrap();
 
     assert!(!encrypted.salt.is_empty(), "salt must be present");
     assert!(!encrypted.nonce.is_empty(), "nonce must be present");
@@ -856,7 +793,7 @@ fn pin_encryption_format_consistency() {
     );
 
     let decrypted = decrypt_with_pin(&encrypted, "56789012").unwrap();
-    assert_eq!(decrypted, kp.nsec);
+    assert_eq!(decrypted, test_nsec);
 
     let result = decrypt_with_pin(&encrypted, "99999999");
     assert!(result.is_err(), "Wrong credential must fail");
@@ -964,48 +901,6 @@ fn hub_key_multi_recipient_wrap() {
 
     // Wrong label fails
     assert!(hpke_unwrap_key(&vol_env, TEST_SECRET_KEY, LABEL_NOTE_KEY).is_err());
-}
-
-#[test]
-fn nostr_event_signing_interop() {
-    let event = finalize_nostr_event(
-        20001,
-        1700000000,
-        vec![
-            vec!["d".into(), "hub-123".into()],
-            vec!["t".into(), "llamenos:event".into()],
-        ],
-        "test-content",
-        TEST_SECRET_KEY,
-    )
-    .unwrap();
-
-    // Event ID is deterministic (same inputs → same ID)
-    let canonical = serde_json::to_string(&serde_json::json!([
-        0,
-        &event.pubkey,
-        event.created_at,
-        event.kind,
-        &event.tags,
-        &event.content,
-    ]))
-    .unwrap();
-    let expected_id = hex::encode(Sha256::digest(canonical.as_bytes()));
-    assert_eq!(event.id, expected_id);
-
-    // Pubkey matches
-    let expected_pubkey = secp256k1_pubkey(TEST_SECRET_KEY);
-    assert_eq!(event.pubkey, expected_pubkey);
-
-    // Signature is valid (verify pre-hashed with k256)
-    use k256::ecdsa::signature::hazmat::PrehashVerifier;
-    use k256::schnorr::VerifyingKey;
-    let pk_bytes = hex::decode(&event.pubkey).unwrap();
-    let vk = VerifyingKey::from_bytes(pk_bytes.as_slice().try_into().unwrap()).unwrap();
-    let sig_bytes = hex::decode(&event.sig).unwrap();
-    let sig = k256::schnorr::Signature::try_from(sig_bytes.as_slice()).unwrap();
-    let id_bytes = hex::decode(&event.id).unwrap();
-    vk.verify_prehash(&id_bytes, &sig).unwrap();
 }
 
 #[test]

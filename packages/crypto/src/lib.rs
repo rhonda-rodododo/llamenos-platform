@@ -27,7 +27,7 @@
 #[cfg(feature = "mobile")]
 uniffi::setup_scaffolding!();
 
-// === New v3 modules (Ed25519/X25519 + HPKE) ===
+// === Core modules (Ed25519/X25519 + HPKE) ===
 pub mod auth;
 pub mod device_keys;
 pub mod hpke_envelope;
@@ -43,18 +43,11 @@ pub mod blind_index;
 pub mod errors;
 pub mod padding;
 
-// === New v3 encryption module (HPKE + AES-256-GCM) ===
+// === Encryption module (HPKE + AES-256-GCM) ===
 pub mod encryption;
 
-// === Legacy modules (secp256k1 — kept for mobile ECIES, removed when HPKE migration completes) ===
-pub mod ecies;
-pub mod encryption_legacy;
-pub mod keys_legacy;
-pub mod legacy;
-pub mod nostr;
+// === Device provisioning (X25519 ECDH + HKDF + AES-256-GCM) ===
 pub mod provisioning;
-
-pub use keys_legacy as keys;
 
 #[cfg(feature = "mobile")]
 mod ffi;
@@ -65,7 +58,7 @@ mod ffi_v3;
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub mod ffi_server;
 
-// Re-export core types (new v3 API)
+// Re-export core types
 pub use auth::AuthToken;
 pub use device_keys::{DeviceKeyState, EncryptedDeviceKeys};
 pub use errors::CryptoError;
@@ -74,11 +67,7 @@ pub use labels::*;
 pub use puk::PukState;
 pub use sigchain::{SigchainLink, SigchainVerifiedState};
 
-// Re-export new v3 types
+// Re-export encryption types
 pub use encryption::{
     EncryptedKeyData, EncryptedMessage, EncryptedNote, KeyEnvelope, RecipientKeyEnvelope,
 };
-
-// Re-export legacy types for backward compatibility during transition
-pub use keys_legacy::KeyPair;
-pub use nostr::SignedNostrEvent;

@@ -8,8 +8,6 @@ subtitle: Sa ki pwoteje, sa ki vizib, ak sa ki ka jwenn anba sibpena — òganiz
 | Yo KAPAB bay | Yo PA KAPAB bay |
 |------------------|---------------------|
 | Metadata apèl/mesaj (lè, dire) | Kontni nòt, transkripsyon, kò rapò |
-| Evènman an tan reyèl | Wi (pa hub, kle k ap woule) | Non | Sèlman tèks chifre |
-| Chèn User-Agent | SHA-256 hache | Hash sèlman | Hash (pa ranvèsab) |
 | Blòb baz done chifre | Non vòlontè (chifre de-bout-an-bout) |
 | Ki vòlontè ki te aktif ak lè | Dosye repètwa kontak (chifre de-bout-an-bout) |
 | | Kontni mesaj (chifre lè li rive, estoke kòm tèks chifre) |
@@ -102,9 +100,11 @@ Amelyorasyon sa yo disponib jodi a :
 
 ## Toujou Planifye
 
-| Fonksyon | Benefis vi prive |
-|---------|-----------------|
-| Aplikasyon natif pou resevwa apèl | Pa gen nimewo telefòn pèsonèl ekspoze |
+| Fonksyon | Benefis vi prive | Estati |
+|---------|-----------------|--------|
+| Aplikasyon natif pou resevwa apèl | Pa gen nimewo telefòn pèsonèl ekspoze | An devlopman |
+| Fiksasyon sètifika (mobil) | Defans kont entèsepsyon TLS pa yon otorite sètifikasyon fwod | Estrikti fini; fiksasyon ap tann premye deplwaman |
+| Chifreman medya vwa SFrame | Apèl vwa chifre de-bout-an-bout | Derivasyon kle fini; chifreman pa kad planifye |
 
 ---
 
@@ -121,6 +121,8 @@ Amelyorasyon sa yo disponib jodi a :
 | Metadata ekip/wòl | Wi (chifre) | Non | Sèlman tèks chifre |
 | Definisyon chan pèsonalize | Wi (chifre) | Non | Sèlman tèks chifre |
 | Kontni SMS/WhatsApp/Signal | Wi (sou sèvè ou) | Non | Tèks chifre sou sèvè ou; founisè ka gen orijinal |
+| Evènman an tan reyèl | Wi (pa hub, kle ki woule) | Non | Sèlman tèks chifre |
+| Chèn User-Agent | SHA-256 hache | Hash sèlman | Hash (pa ranvèsab) |
 | Metadata apèl | Non | Wi | Wi |
 | Hash telefòn moun k ap rele | HMAC hache | Hash sèlman | Hash (pa ranvèsab san sekrè ou) |
 
@@ -130,9 +132,10 @@ Amelyorasyon sa yo disponib jodi a :
 
 Dokimantasyon teknik :
 
-- [Espesifikasyon Protokòl](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/protocol/llamenos-protocol.md)
+- [Espesifikasyon Protokòl](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/protocol/PROTOCOL.md)
 - [Modèl Menas](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/THREAT_MODEL.md)
 - [Klasifikasyon Done](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/DATA_CLASSIFICATION.md)
+- [Twou Sekirite ak Fèy Wout](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/SECURITY_GAPS_AND_ROADMAP.md)
 - [Odit Sekirite](https://github.com/rhonda-rodododo/llamenos-platform/tree/main/docs/security)
 - [Dokimantasyon API](/api/docs)
 

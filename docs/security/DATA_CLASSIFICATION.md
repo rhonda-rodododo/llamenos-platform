@@ -1,7 +1,7 @@
 # Data Classification Reference
 
-**Version:** 2.1
-**Date:** 2026-05-03
+**Version:** 2.3
+**Date:** 2026-05-12
 
 Complete inventory of all data stored and processed by Llamenos, with classification levels for security audits, legal review, and GDPR compliance.
 
@@ -35,6 +35,8 @@ Complete inventory of all data stored and processed by Llamenos, with classifica
 | `lastSeen` | Plaintext | Updated on activity | Last API request timestamp |
 | `webauthnCredentials` | Encrypted-at-Rest | Account lifetime | Passkey credential IDs and public keys |
 | `sessionTokens` | Encrypted-at-Rest | 8-hour TTL | Active session tokens |
+
+> **Legacy field:** `encryptedSecretKey` (legacy nsec) still exists in the `users` table for Phase 6 migration. New users use per-device keys in the `devices` table.
 
 #### Sigchain Entries
 
@@ -80,6 +82,8 @@ Complete inventory of all data stored and processed by Llamenos, with classifica
 | `transcription.encryptedContent` | **E2EE** | Indefinite | Encrypted transcript text |
 | `transcription.authorEnvelope` | **E2EE** | Indefinite | HPKE-wrapped key (label: `LABEL_TRANSCRIPTION`) |
 | `transcription.adminEnvelopes[]` | **E2EE** | Indefinite | HPKE-wrapped key (per admin) |
+
+> **Note on envelope tiers:** Notes use a 2-envelope model (author + admin). A 3-tier model (summary/fields/pii) exists for CMS entity records (cases/contacts) but is not used for notes. See [Security Gaps](SECURITY_GAPS_AND_ROADMAP.md#14-3-tier-envelope-encryption-low).
 
 #### Call Record Metadata
 
@@ -164,6 +168,8 @@ Hash-chained for tamper detection.
 
 **Note**: Country/region is explicitly **not collected** — the audit service omits it entirely ("privacy cost outweighs operational value"). Prior deployments that stored country should remove it on next migration.
 
+> **Note:** Audit log chain integrity can be independently verified via `GET /api/audit/verify`, which walks the full hash chain and reports any integrity violations.
+
 ---
 
 ### Client-Side Storage
@@ -177,6 +183,8 @@ Hash-chained for tamper detection.
 | All platforms | Local/app storage | UI preferences | Plaintext | Non-sensitive settings |
 | All platforms | Local/app storage | Hub key cache | **E2EE** | Encrypted with device key; zeroed on lock |
 | All platforms | Local/app storage | PUK seed cache | **E2EE** | HPKE-wrapped; zeroed on lock |
+
+> **Note on Tauri Stronghold:** The Stronghold plugin is initialized but device keys are currently stored via `tauri-plugin-store`. See [Security Gaps](SECURITY_GAPS_AND_ROADMAP.md#12-tauri-stronghold-vs-store-medium).
 
 **Important**: Device private keys are NEVER stored in plaintext. They exist only:
 1. Encrypted in platform secure storage (PIN-protected)
@@ -246,73 +254,57 @@ Data stored in PostgreSQL (migrated from SQLite for durability and column encryp
 
 ### Note Encryption Flow
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ CLIENT APP (Tauri / iOS / Android)                              │
-│ ┌─────────────┐    ┌──────────────┐    ┌──────────────────────┐ │
-│ │ Note Text   │───▶│ Generate     │───▶│ AES-256-GCM          │ │
-│ │ + Fields    │    │ noteKey (32B)│    │ encrypt(noteKey,     │ │
-│ └─────────────┘    └──────────────┘    │ nonce, plaintext)    │ │
-│                           │            └──────────┬───────────┘ │
-│                           │                       │             │
-│                           ▼                       ▼             │
-│              ┌────────────────────┐    ┌──────────────────────┐ │
-│              │ HPKE wrap for     │    │ encryptedContent     │ │
-│              │ author X25519 key │    │ (ciphertext)         │ │
-│              │ (LABEL_NOTE_KEY)  │    │                      │ │
-│              └────────┬───────────┘    └──────────────────────┘ │
-│                       │                           │             │
-│              ┌────────┴───────────┐               │             │
-│              │ HPKE wrap for     │               │             │
-│              │ each admin X25519 │               │             │
-│              │ (LABEL_NOTE_KEY)  │               │             │
-│              └────────┬───────────┘               │             │
-│                       │                           │             │
-│                       ▼                           ▼             │
-│              ┌────────────────────────────────────────────────┐ │
-│              │ { encryptedContent, authorEnvelope,           │ │
-│              │   adminEnvelopes[], authorPubkey, createdAt }  │ │
-│              └──────────────────────┬─────────────────────────┘ │
-└─────────────────────────────────────┼───────────────────────────┘
-                                      │ HTTPS
-                                      ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ SERVER (no access to plaintext)                                 │
-│ ┌─────────────────────────────────────────────────────────────┐ │
-│ │ PostgreSQL stores encrypted note as-is                      │ │
-│ │ Server can see: authorPubkey, createdAt, callId            │ │
-│ │ Server cannot see: note text, custom field values          │ │
-│ └─────────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph Client["CLIENT APP (Tauri / iOS / Android)"]
+        direction TB
+        NoteText["Note Text + Fields"]
+        GenKey["Generate noteKey (32B)"]
+        AesGcm["AES-256-GCM encrypt(noteKey, nonce, plaintext)"]
+        EncContent["encryptedContent (ciphertext)"]
+        AuthorWrap["HPKE wrap for author X25519 key (LABEL_NOTE_KEY)"]
+        AdminWrap["HPKE wrap for each admin X25519 (LABEL_NOTE_KEY)"]
+        Payload["{ encryptedContent, authorEnvelope, adminEnvelopes[], authorPubkey, createdAt }"]
+    end
+
+    subgraph Server["SERVER (no access to plaintext)"]
+        direction TB
+        Postgres["PostgreSQL stores encrypted note as-is"]
+        ServerCan["Server can see: authorPubkey, createdAt, callId"]
+        ServerCant["Server cannot see: note text, custom field values"]
+    end
+
+    NoteText --> GenKey
+    GenKey --> AesGcm
+    AesGcm --> EncContent
+    GenKey --> AuthorWrap
+    GenKey --> AdminWrap
+    AuthorWrap --> Payload
+    AdminWrap --> Payload
+    EncContent --> Payload
+    Payload -->|HTTPS| Postgres
+    Postgres --- ServerCan
+    Postgres --- ServerCant
 ```
 
 ### Caller Phone Number Flow
 
-```
-┌─────────────┐     ┌─────────────┐     ┌─────────────────────────┐
-│ PSTN Call   │────▶│ Telephony   │────▶│ SERVER                  │
-│ from Caller │     │ Provider    │     │                         │
-└─────────────┘     └─────────────┘     │ 1. Webhook received     │
-                                        │    (full phone in body) │
-                                        │                         │
-                                        │ 2. Extract last 4 digits│
-                                        │    callerLast4 = "1234" │
-                                        │                         │
-                                        │ 3. Hash full number     │
-                                        │    HMAC-SHA256(secret,  │
-                                        │    "llamenos:phone:" +  │
-                                        │    fullPhone)           │
-                                        │                         │
-                                        │ 4. Check ban list       │
-                                        │    (hash comparison)    │
-                                        │                         │
-                                        │ 5. Store: hash + last4  │
-                                        │    Discard: full number │
-                                        │                         │
-                                        │ 6. WebSocket event:   │
-                                        │    callerLast4 only     │
-                                        │    (hub-key encrypted)  │
-                                        └─────────────────────────┘
+```mermaid
+flowchart LR
+    PSTN["PSTN Call from Caller"] --> Provider["Telephony Provider"]
+    Provider --> Server["SERVER"]
+
+    subgraph ServerSteps[" " ]
+        direction TB
+        S1["1. Webhook received (full phone in body)"]
+        S2["2. Extract last 4 digits: callerLast4 = '1234'"]
+        S3["3. Hash full number: HMAC-SHA256(secret, 'llamenos:phone:' + fullPhone)"]
+        S4["4. Check ban list (hash comparison)"]
+        S5["5. Store: hash + last4 | Discard: full number"]
+        S6["6. WebSocket event: callerLast4 only (hub-key encrypted)"]
+    end
+
+    Server --> ServerSteps
 ```
 
 ---
@@ -350,6 +342,8 @@ Note: Llamenos does not currently enforce automated retention policies. Operator
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-05-12 | 2.3 | Updated audit log chain verification note — `GET /api/audit/verify` endpoint now available (PR #288) |
+| 2026-05-11 | 2.2 | Added legacy field note (`encryptedSecretKey`); added 3-tier envelope clarification; added Stronghold/Store note; added audit log verification note; added Security Gaps cross-references |
 | 2026-05-03 | 2.1 | Post-hardening: added `ua` (SHA-256 hashed) field to audit logs; noted country is not collected; updated WebSocket events (epoch-rotating per-hub key, power-of-2 padding, server-only publishing) |
 | 2026-05-02 | 2.0 | Complete rewrite: HPKE replaces ECIES for all key wrapping, per-device Ed25519/X25519 keys replace nsec, added sigchain/PUK/CLKR entries, added CMS data, added hub key distribution, added blind indexes, updated client storage to Tauri Store/Keychain/Keystore (not localStorage), updated WebSocket event data, added signal-notifier sidecar, removed Durable Objects/Cloudflare references |
 | 2026-02-25 | 1.1 | ZK Architecture Overhaul: Updated ConversationDO to E2EE, ShiftManagerDO encrypted details, AuditDO hash chain, client-side transcription |

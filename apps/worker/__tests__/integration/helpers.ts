@@ -108,8 +108,7 @@ export function createMockEnv(overrides?: Partial<Env>): Env {
     TWILIO_ACCOUNT_SID: 'AC-test',
     TWILIO_AUTH_TOKEN: 'test-auth-token',
     TWILIO_PHONE_NUMBER: '+15551234567',
-    // secp256k1 x-only pubkey of private key 0x01 (generator point x-coord)
-    // Needed by encryptCallRecordForStorage / encryptMessageForStorage ECIES
+    // X25519 pubkey used for HPKE encryption in tests
     ADMIN_PUBKEY: '79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
     HOTLINE_NAME: 'Test Hotline',
     ENVIRONMENT: 'test',

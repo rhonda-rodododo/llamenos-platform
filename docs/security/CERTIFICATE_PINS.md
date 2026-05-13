@@ -12,6 +12,26 @@ Certificate pinning infrastructure exists on both iOS and Android but is not yet
 | **Android** | `apps/android/app/src/main/java/org/llamenos/hotline/api/ApiService.kt` | `CertificatePinner` (OkHttp) | Scaffolding exists; placeholder `sha256/REPLACE_AFTER_DEPLOYMENT` values |
 | **Desktop (Tauri)** | N/A | N/A | Not applicable — Tauri uses system TLS; cert pinning impractical for desktop web apps |
 
+## Known TODOs
+
+### Android Placeholder Pins
+
+**Location:** `apps/android/app/src/main/java/org/llamenos/hotline/api/ApiService.kt:66`
+
+**TODO:** "Replace placeholder pins after first production deployment to app.llamenos.org"
+
+**Impact:** Android app uses standard TLS validation without certificate pinning. A rogue CA or national-level MITM could intercept HTTPS traffic.
+
+**Action Required:** After first production deployment, extract actual certificate pins and replace placeholders.
+
+### iOS Certificate Pinning Delegate
+
+**Location:** `apps/ios/Sources/Services/APIService.swift`
+
+**Status:** `CertificatePinningDelegate` class exists but no hashes are configured. Falls back to standard `URLSession` TLS validation.
+
+**Action Required:** Configure `sha256/...` pins in the pinning delegate after production deployment.
+
 ## Extracting Pins
 
 After first production deployment, extract pins from the live domain:
@@ -45,12 +65,46 @@ openssl s_client -connect app.llamenos.org:443 -servername app.llamenos.org -sho
 
 - `*.llamenos.org` (API, app)
 
+## Automated Pipeline
+
+Two scripts automate pin extraction and injection into mobile source files:
+
+### Extract pins only
+
+```bash
+bun run cert-pins:extract app.llamenos.org
+# Output:
+#   LEAF=<base64 hash>
+#   INTERMEDIATE=<base64 hash>
+```
+
+The extraction script (`scripts/extract-cert-pins.sh`) connects to the domain over TLS, extracts SHA-256 SPKI hashes from the leaf and intermediate certificates, validates the output format, and prints both pins.
+
+### Extract and inject into mobile apps
+
+```bash
+bun run cert-pins:inject app.llamenos.org
+```
+
+The injection script (`scripts/inject-cert-pins.ts`) calls `extract-cert-pins.sh`, then updates both:
+
+- **Android**: replaces `CertificatePinner.Builder()` entries in `apps/android/.../ApiService.kt`
+- **iOS**: replaces `cloudflareHashes` array in `apps/ios/.../APIService.swift`
+
+The script is idempotent -- re-running it replaces existing pins with fresh values from the live domain. Review the diff (`git diff apps/android apps/ios`) before committing.
+
+### When to re-run
+
+- After first production deployment (to populate placeholder pins)
+- After TLS certificate rotation on the deployment domain
+- When migrating to a new domain or CDN provider
+
 ## Rotation Procedure
 
-1. Extract new pins using the commands above
+1. Run `bun run cert-pins:inject <domain>` to extract and inject new pins
 2. Update this file with new pin values
-3. Update iOS: `apps/ios/Sources/Services/APIService.swift` (`CertificatePinningDelegate`)
-4. Update Android: `apps/android/app/src/main/java/org/llamenos/hotline/api/ApiService.kt` (`CertificatePinner`)
+3. Review diffs: `git diff apps/android apps/ios`
+4. Build and test both iOS and Android
 5. Deploy mobile updates before certificate rotation takes effect
 6. Keep the old pin as backup for at least one release cycle
 
@@ -68,3 +122,12 @@ For the desktop (Tauri) client, HSTS preload + SRI hashing provide the equivalen
 The API server's built-in WebSocket endpoint (`/ws`) uses the same TLS certificate as the API. Certificate pinning on mobile clients covers WebSocket connections automatically since they share the `*.llamenos.org` domain.
 
 Clients authenticate to the WebSocket using the same session token or signed auth token used for REST API requests. The server handles all event publishing — clients receive only. Even if a MITM attacker intercepts the WebSocket connection, they cannot inject fake events (server-only publishing) and cannot read event content (encrypted with epoch-rotating per-hub keys).
+
+---
+
+## Revision History
+
+| Date | Version | Changes |
+|------|---------|---------|
+| 2026-05-11 | 1.1 | Added known TODOs section with Android placeholder and iOS delegate status; added action required notes |
+| 2026-05-02 | 1.0 | Initial document |

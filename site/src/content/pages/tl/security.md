@@ -28,8 +28,6 @@ Ang iyong privacy exposure ay depende sa kung aling mga channel ang ine-enable m
 | Kung gumagamit ka ng... | Maa-access ng third party | Maa-access ng server | End-to-end encrypted na content |
 |-------------------------|---------------------------|----------------------|--------------------------------|
 | Twilio/SignalWire/Vonage/Plivo | Call audio (live), call records | Call metadata | Notes, transcripts |
-| Real-time events | Oo (per-hub, rotating keys) | Hindi | Ciphertext lang |
-| User-Agent strings | SHA-256 hashed | Hash lang | Hash (hindi mare-reverse) |
 | Self-hosted Asterisk | Wala (ikaw ang may kontrol) | Call metadata | Notes, transcripts |
 | Browser-to-browser (WebRTC) | Wala | Call metadata | Notes, transcripts |
 
@@ -102,9 +100,11 @@ Ang mga pagpapabuti na ito ay live na ngayon:
 
 ## Naplano pa
 
-| Feature | Privacy benefit |
-|---------|-----------------|
-| Native call-receiving apps | Walang personal phone number ang malelantad |
+| Feature | Benepisyo sa privacy | Katayuan |
+|---------|----------------------|----------|
+| Native na app para sa pagtanggap ng tawag | Walang personal na phone number na mailalantad | Ginagawa na |
+| Certificate pinning (mobile) | Depensa laban sa TLS interception ng pekeng certificate authority | Estruktura kumpleto; pinning naghihintay sa unang deployment |
+| SFrame voice media encryption | End-to-end encrypted na voice calls | Key derivation kumpleto; per-frame encryption naplano |
 
 ---
 
@@ -121,6 +121,8 @@ Ang mga pagpapabuti na ito ay live na ngayon:
 | Team/role metadata | Oo (encrypted) | Hindi | Ciphertext lang |
 | Custom field definitions | Oo (encrypted) | Hindi | Ciphertext lang |
 | SMS/WhatsApp/Signal content | Oo (sa iyong server) | Hindi | Ciphertext mula sa iyong server; maaaring nasa provider ang orihinal |
+| Mga real-time event | Oo (per-hub, umiikot na key) | Hindi | Ciphertext lang |
+| Mga User-Agent string | SHA-256 hashed | Hash lang | Hash (hindi mare-reverse) |
 | Call metadata | Hindi | Oo | Oo |
 | Caller phone hashes | HMAC hashed | Hash lang | Hash (hindi mare-reverse nang wala ang iyong secret) |
 
@@ -130,10 +132,11 @@ Ang mga pagpapabuti na ito ay live na ngayon:
 
 Technical documentation:
 
-- [Protocol Specification](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/protocol/llamenos-protocol.md)
-- [Threat Model](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/THREAT_MODEL.md)
-- [Data Classification](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/DATA_CLASSIFICATION.md)
-- [Security Audits](https://github.com/rhonda-rodododo/llamenos-platform/tree/main/docs/security)
-- [API Documentation](/api/docs)
+- [Espesipikasyon ng Protokol](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/protocol/PROTOCOL.md)
+- [Modelo ng Banta](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/THREAT_MODEL.md)
+- [Klasipikasyon ng Data](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/DATA_CLASSIFICATION.md)
+- [Mga Butas sa Seguridad at Roadmap](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/SECURITY_GAPS_AND_ROADMAP.md)
+- [Mga Audit ng Seguridad](https://github.com/rhonda-rodododo/llamenos-platform/tree/main/docs/security)
+- [Dokumentasyon ng API](/api/docs)
 
 Open source ang Llamenos: [github.com/rhonda-rodododo/llamenos-platform](https://github.com/rhonda-rodododo/llamenos-platform)

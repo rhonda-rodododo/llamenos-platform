@@ -23,14 +23,14 @@ describe('Crypto domain separation labels', () => {
     expect(unique.size).toBe(values.length)
   })
 
-  it('has ECIES key wrapping labels', () => {
+  it('has HPKE key wrapping labels', () => {
     expect(labels.LABEL_NOTE_KEY).toBe('llamenos:note-key')
     expect(labels.LABEL_FILE_KEY).toBe('llamenos:file-key')
     expect(labels.LABEL_FILE_METADATA).toBe('llamenos:file-metadata')
     expect(labels.LABEL_HUB_KEY_WRAP).toBe('llamenos:hub-key-wrap')
   })
 
-  it('has ECIES content encryption labels', () => {
+  it('has HPKE content encryption labels', () => {
     expect(labels.LABEL_TRANSCRIPTION).toBe('llamenos:transcription')
     expect(labels.LABEL_MESSAGE).toBe('llamenos:message')
     expect(labels.LABEL_CALL_META).toBe('llamenos:call-meta')

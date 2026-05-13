@@ -1,7 +1,7 @@
 # Cryptographic Architecture
 
-**Version:** 1.1
-**Date:** 2026-05-03
+**Version:** 1.3
+**Date:** 2026-05-12
 
 Authoritative reference for all cryptographic primitives, key hierarchies, and protocols used in Llamenos. All crypto operations are implemented once in `packages/crypto/` (Rust), compiled to native (Tauri desktop), WASM (browser testing), and UniFFI (iOS/Android). There is no separate JS crypto implementation for production use.
 
@@ -10,6 +10,7 @@ Authoritative reference for all cryptographic primitives, key hierarchies, and p
 - [Threat Model](THREAT_MODEL.md) — Adversary profiles and trust boundaries
 - [Data Classification](DATA_CLASSIFICATION.md) — What data is encrypted and how
 - [Key Revocation Runbook](KEY_REVOCATION_RUNBOOK.md) — Operational key management
+- [Security Gaps and Roadmap](SECURITY_GAPS_AND_ROADMAP.md) — Known gaps and planned improvements
 
 ---
 
@@ -41,35 +42,59 @@ Authoritative reference for all cryptographic primitives, key hierarchies, and p
 
 ## Key Hierarchy
 
-```
-Device Keys (per-device, generated on first use)
-├── Ed25519 Signing Key ─── auth tokens, sigchain entries
-├── X25519 Encryption Key ── HPKE decapsulation (notes, messages, hub key, PUK seed)
-│
-User Identity (sigchain)
-├── Sigchain ─── append-only log of device authorizations
-│   └── Each entry: Ed25519-signed, hash-chained, references device pubkey
-│
-├── PUK (Per-User Key) ─── user-level key hierarchy
-│   ├── PUK Seed (32 bytes, random)
-│   │   ├── PUK Signing Subkey (HMAC derive, label: LABEL_PUK_SIGN)
-│   │   ├── PUK DH Subkey (HMAC derive, label: LABEL_PUK_DH)
-│   │   └── PUK Secretbox Key (HMAC derive, label: LABEL_PUK_SECRETBOX)
-│   │
-│   ├── Items Key (HKDF export from PUK, label: LABEL_ITEMS_KEY_EXPORT)
-│   │   └── Per-Note Epoch Key (HKDF derive, label: LABEL_NOTE_EPOCH_KEY)
-│   │
-│   └── CLKR Chain (Cascading Lazy Key Rotation)
-│       └── Each link: AES-256-GCM encrypted previous-gen seed
-│           (key: secretbox_key, label: LABEL_PUK_PREVIOUS_GEN)
-│
-Hub Key (per-hub, random 32 bytes)
-├── HPKE-wrapped per member (label: LABEL_HUB_KEY_WRAP)
-├── Hub Event Key (HKDF from hub key, label: LABEL_HUB_EVENT) ── WebSocket event encryption
-└── Hub PTK (derived via MLS export or HKDF, label: LABEL_HUB_PTK)
-    └── SFrame Call Secrets (per-call, label: LABEL_SFRAME_CALL_SECRET)
-        └── SFrame Base Key (label: LABEL_SFRAME_BASE_KEY)
-            └── Per-participant Send Keys (HKDF with participant index)
+```mermaid
+flowchart TD
+    DeviceKeys["Device Keys (per-device, generated on first use)"]
+    EdSign["Ed25519 Signing Key"]
+    X25519Enc["X25519 Encryption Key"]
+
+    DeviceKeys --- EdSign
+    DeviceKeys --- X25519Enc
+
+    EdSign -->|used for| AuthTokens["auth tokens, sigchain entries"]
+    X25519Enc -->|used for| HpkeDecap["HPKE decapsulation (notes, messages, hub key, PUK seed)"]
+
+    Sigchain["Sigchain (append-only log of device authorizations)"]
+    SigchainEntry["Each entry: Ed25519-signed, hash-chained, references device pubkey"]
+    Sigchain --- SigchainEntry
+
+    PUK["PUK (Per-User Key) — user-level key hierarchy"]
+    PukSeed["PUK Seed (32 bytes, random)"]
+    PukSign["PUK Signing Subkey (HMAC derive, LABEL_PUK_SIGN)"]
+    PukDh["PUK DH Subkey (HMAC derive, LABEL_PUK_DH)"]
+    PukSecretbox["PUK Secretbox Key (HMAC derive, LABEL_PUK_SECRETBOX)"]
+
+    PUK --- PukSeed
+    PukSeed --- PukSign
+    PukSeed --- PukDh
+    PukSeed --- PukSecretbox
+
+    ItemsKey["Items Key (HKDF export from PUK, LABEL_ITEMS_KEY_EXPORT)"]
+    NoteEpoch["Per-Note Epoch Key (HKDF derive, LABEL_NOTE_EPOCH_KEY)"]
+    PukSeed --- ItemsKey
+    ItemsKey --- NoteEpoch
+
+    Clkr["CLKR Chain (Cascading Lazy Key Rotation)"]
+    ClkrLink["Each link: AES-256-GCM encrypted previous-gen seed (key: secretbox_key, LABEL_PUK_PREVIOUS_GEN)"]
+    PUK --- Clkr
+    Clkr --- ClkrLink
+
+    HubKey["Hub Key (per-hub, random 32 bytes)"]
+    HubWrap["HPKE-wrapped per member (LABEL_HUB_KEY_WRAP)"]
+    HubEvent["Hub Event Key (HKDF from hub key, LABEL_HUB_EVENT) — WebSocket event encryption"]
+    HubPtk["Hub PTK (derived via MLS export or HKDF, LABEL_HUB_PTK)"]
+
+    HubKey --- HubWrap
+    HubKey --- HubEvent
+    HubKey --- HubPtk
+
+    Sframe["SFrame Call Secrets (per-call, LABEL_SFRAME_CALL_SECRET)"]
+    SframeBase["SFrame Base Key (LABEL_SFRAME_BASE_KEY)"]
+    SframeSend["Per-participant Send Keys (HKDF with participant index)"]
+
+    HubPtk --- Sframe
+    Sframe --- SframeBase
+    SframeBase --- SframeSend
 ```
 
 ### PIN-Protected Device Key Storage
@@ -81,6 +106,8 @@ Device private keys are stored encrypted at rest on each platform:
 | Desktop (Tauri) | Tauri Store (plugin-store) | Argon2id (64MB/3/4) → AES-256-GCM |
 | iOS | Keychain (kSecAttrAccessibleWhenUnlockedThisDeviceOnly) | Argon2id → AES-256-GCM + Secure Enclave |
 | Android | EncryptedSharedPreferences (Keystore-backed) | Argon2id → AES-256-GCM + Android Keystore |
+
+> **Note on Tauri Stronghold**: The Tauri Stronghold plugin (`tauri-plugin-stronghold`) is initialized in `apps/desktop/src/lib.rs` but the **actual device key storage uses `tauri-plugin-store`** (`keys.json`). Stronghold is loaded as a plugin but device keys are currently stored via the Store plugin. See [Security Gaps](SECURITY_GAPS_AND_ROADMAP.md#12-tauri-stronghold-vs-store-medium).
 
 PIN/passphrase requirements: minimum 8 decimal digits (numeric PIN) or alphanumeric passphrase (8+ characters with at least one letter). Old 6-digit PINs are no longer accepted by `is_valid_credential()` in `packages/crypto/src/device_keys.rs`.
 
@@ -144,9 +171,9 @@ This prevents cross-context key reuse attacks (e.g., using a note key envelope t
 
 ---
 
-## Domain Separation Labels (57 Total)
+## Domain Separation Labels (69 Total)
 
-All labels are defined in `packages/protocol/crypto-labels.json` (source of truth) and generated to TypeScript, Swift, and Kotlin via codegen. Labels are registered in `packages/crypto/src/labels.rs` with stable numeric IDs (indices never reordered).
+All 69 labels are defined in `packages/protocol/crypto-labels.json` (source of truth) and generated to TypeScript, Swift, Kotlin, and Rust via codegen. Labels are registered in `packages/crypto/src/labels.rs` with stable numeric IDs (indices 0-68, never reordered).
 
 | Range | Category | Examples |
 |-------|----------|----------|
@@ -167,7 +194,9 @@ All labels are defined in `packages/protocol/crypto-labels.json` (source of trut
 | 49 | Hub PTK | `LABEL_HUB_PTK_PREV_GEN` |
 | 50–51 | SFrame | `LABEL_SFRAME_CALL_SECRET`, `LABEL_SFRAME_BASE_KEY` |
 | 52 | MLS | `LABEL_MLS_PROVISION` |
-| 53–56 | Salts/derivation | `LABEL_ECIES_V2_SALT`, `LABEL_PROVISIONING_SALT`, `LABEL_HUB_PTK`, etc. |
+| 53 | *(tombstone)* | Removed — was `LABEL_ECIES_V2_SALT` |
+| 54–56 | Salts/derivation | `LABEL_PROVISIONING_SALT`, `LABEL_BLIND_INDEX_FIELD`, `LABEL_HUB_PTK` |
+| 57–68 | Server/hub/misc | `LABEL_WS_CHALLENGE`, `LABEL_SERVER_SIGNING_KEY`, `LABEL_SERVER_EVENT_ENCRYPTION_KEY`, `LABEL_HUB_EVENT_EPOCH`, etc. |
 
 **Rule**: Never use raw string literals for crypto contexts. Always use the generated label constants.
 
@@ -207,6 +236,8 @@ Each user has a sigchain — an append-only, hash-chained log of device authoriz
 | `add-device` | Authorize a new device (signing + encryption pubkeys) |
 | `remove-device` | Deauthorize a device (revocation) |
 | `rotate-puk` | Record PUK generation rotation |
+
+> **Note:** The backend enforces sequence monotonicity, prevHash linkage, **and Ed25519 signature verification** on each sigchain entry before accepting it.
 
 ---
 
@@ -253,6 +284,8 @@ Derived from PUK via HKDF export (`LABEL_ITEMS_KEY_EXPORT`). Used as an intermed
 
 **Forward secrecy**: Each note uses a unique random key. Compromising a device key does not reveal note content without also obtaining the per-note HPKE envelopes.
 
+> **Note on 3-tier envelopes:** A 3-tier envelope model (`summary`/`fields`/`pii`) exists in `apps/worker/lib/envelope-recipients.ts` for entity records (cases/contacts), but **notes use the simpler 2-envelope model** (author + admin). See [Security Gaps](SECURITY_GAPS_AND_ROADMAP.md#14-3-tier-envelope-encryption-low).
+
 ### Per-Message Encryption
 
 Same pattern as notes but with label `LABEL_MESSAGE`. Server encrypts inbound webhook messages (SMS/WhatsApp/Signal) immediately on receipt, discards plaintext.
@@ -280,6 +313,8 @@ For encrypted voice channels:
 2. Derive SFrame base key (label: `LABEL_SFRAME_BASE_KEY`)
 3. Derive per-participant send keys using participant index
 
+> **Note:** SFrame key derivation is fully implemented, but **actual media frame encryption** (AES-128-CTR + HMAC-SHA256 per frame) is **not yet implemented**. See [Security Gaps](SECURITY_GAPS_AND_ROADMAP.md#13-sframe-voice-e2ee-low).
+
 ---
 
 ## MLS (RFC 9420)
@@ -290,6 +325,8 @@ MLS group management is compiled unconditionally using OpenMLS 0.8. The `mls` fe
 - **Operations**: Group creation, member add/remove, self-update, epoch secret export
 - **Hub PTK derivation**: `derive_hub_ptk(export_secret, hub_id)` for hub-specific symmetric keys
 - **SFrame integration**: MLS exporter secrets feed into SFrame key derivation for voice E2EE
+
+> **Note:** MLS is implemented in the crypto crate and backend routes exist, but **client-side MLS integration** (automatic group creation on hub create, key package upload) may not be fully active. See [Security Gaps](SECURITY_GAPS_AND_ROADMAP.md#22-mls-client-side-integration-low).
 
 ---
 
@@ -407,5 +444,7 @@ All dependencies use `Cargo.lock` for reproducible builds. The `packages/crypto/
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-05-12 | 1.3 | All 69 domain separation labels now in Rust registry (was 57); sigchain server-side Ed25519 validation now implemented; updated section headers and notes to reflect PR #288 fixes |
+| 2026-05-11 | 1.2 | Updated domain separation label count (69 defined, 57 in Rust registry); added Stronghold/Store clarification; added SFrame completeness note; added 3-tier envelope clarification; added sigchain server-side validation note; added MLS client integration note; added Security Gaps cross-references |
 | 2026-05-03 | 1.1 | Post-hardening update: Argon2id (64MB/3/4) replaces PBKDF2 for PIN/passphrase; min 8 digits or alphanumeric passphrase; XChaCha20-Poly1305 for hub events (was misattributed); per-hub epoch-based event key rotation (24h); power-of-2 payload padding section; WebSocket auth + built-in endpoint; WebSocket signing/encryption key separation; MLS always-on (feature flag removed) |
 | 2026-05-02 | 1.0 | Initial document — consolidated from protocol spec, crate source, and CLAUDE.md |

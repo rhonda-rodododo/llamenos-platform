@@ -93,6 +93,8 @@
     "load:all": "tests/load/run.sh all",
     "worktree-setup": "bash scripts/worktree-setup.sh",
     "setup": "bash scripts/setup.sh",
+    "cert-pins:extract": "bash scripts/extract-cert-pins.sh",
+    "cert-pins:inject": "bun scripts/inject-cert-pins.ts",
     "lint": "eslint src/ apps/worker/",
     "supervisors": "scripts/supervisors.sh",
     "supervisors:kill": "scripts/supervisors.sh --kill"
@@ -114,6 +116,7 @@
     "@tauri-apps/api": "^2.10.1",
     "@tauri-apps/plugin-process": "^2.3.1",
     "@tauri-apps/plugin-store": "^2.4.2",
+    "@tauri-apps/plugin-stronghold": "^2.3.1",
     "@tauri-apps/plugin-updater": "^2.10.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

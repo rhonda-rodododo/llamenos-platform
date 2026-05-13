@@ -160,7 +160,13 @@ export async function unlockWithPin(
       return await tauriInvoke<DeviceKeyState>('unlock_with_pin', { data, pin })
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
-      if (msg.includes('Locked out') || msg.includes('Keys wiped')) {
+      if (msg.includes('Keys wiped')) {
+        // Rust signals key wipe — clear encrypted keys from Stronghold
+        const store = await getSecureStore()
+        await store.delete(STORE_KEY)
+        throw new Error(msg)
+      }
+      if (msg.includes('Locked out')) {
         throw new Error(msg)
       }
       return null
@@ -493,13 +499,61 @@ export async function sframeDeriveKey(
 // ── Key persistence ─────────────────────────────────────────────────
 
 const STORE_KEY = 'llamenos-encrypted-device-keys'
+const STRONGHOLD_CLIENT = 'llamenos'
 
-/** Get the Tauri Store or a localStorage-based fallback for browser. */
-async function getStore() {
+/**
+ * Get the Stronghold store for encrypted device key persistence.
+ *
+ * In Tauri: uses Stronghold encrypted vault (PBKDF2-SHA256 key derivation).
+ * In test/browser: localStorage fallback.
+ *
+ * The Stronghold vault is initialized in lib.rs with LABEL_STRONGHOLD domain
+ * separation. This replaces the previous tauri-plugin-store (keys.json)
+ * approach, providing encrypted-at-rest storage instead of plain JSON.
+ */
+async function getSecureStore() {
   if (useTauri) {
-    const { Store } = await import('@tauri-apps/plugin-store')
-    return Store.load('keys.json')
+    const { Stronghold } = await import('@tauri-apps/plugin-stronghold')
+    const { appDataDir } = await import('@tauri-apps/api/path')
+    const vaultPath = `${await appDataDir()}/vault.hold`
+    const stronghold = await Stronghold.load(vaultPath, 'llamenos-device-keys')
+
+    let client
+    try {
+      client = await stronghold.loadClient(STRONGHOLD_CLIENT)
+    } catch {
+      client = await stronghold.createClient(STRONGHOLD_CLIENT)
+    }
+
+    const store = client.getStore()
+
+    return {
+      async get<T>(key: string): Promise<T | null> {
+        try {
+          const data = await store.get(key)
+          if (!data || data.length === 0) return null
+          const json = new TextDecoder().decode(new Uint8Array(data))
+          return JSON.parse(json) as T
+        } catch {
+          return null
+        }
+      },
+      async set(key: string, value: unknown): Promise<void> {
+        const encoded = new TextEncoder().encode(JSON.stringify(value))
+        await store.insert(key, Array.from(encoded))
+        await stronghold.save()
+      },
+      async delete(key: string): Promise<void> {
+        try {
+          await store.remove(key)
+          await stronghold.save()
+        } catch {
+          // Key may not exist — ignore
+        }
+      },
+    }
   }
+  // Test/browser fallback — localStorage
   return {
     async get<T>(key: string): Promise<T | null> {
       const raw = localStorage.getItem(`llamenos:${key}`)
@@ -512,9 +566,6 @@ async function getStore() {
     async delete(key: string): Promise<void> {
       localStorage.removeItem(`llamenos:${key}`)
     },
-    async save(): Promise<void> {
-      // No-op — localStorage persists automatically
-    },
   }
 }
 
@@ -526,9 +577,8 @@ export async function persistAndUnlockDeviceKeys(
   encrypted: EncryptedDeviceKeys,
   pin: string,
 ): Promise<DeviceKeyState | null> {
-  const store = await getStore()
+  const store = await getSecureStore()
   await store.set(STORE_KEY, encrypted)
-  await store.save()
   return unlockWithPin(encrypted, pin)
 }
 
@@ -537,7 +587,7 @@ export async function persistAndUnlockDeviceKeys(
  * Returns null for wrong PIN, throws on lockout/wipe.
  */
 export async function unlockStoredKeys(pin: string): Promise<DeviceKeyState | null> {
-  const store = await getStore()
+  const store = await getSecureStore()
   const data = await store.get<EncryptedDeviceKeys>(STORE_KEY)
   if (!data) return null
   return unlockWithPin(data, pin)
@@ -545,28 +595,24 @@ export async function unlockStoredKeys(pin: string): Promise<DeviceKeyState | nu
 
 /** Check if encrypted device keys exist in store. */
 export async function hasStoredKey(): Promise<boolean> {
-  const store = await getStore()
+  const store = await getSecureStore()
   const data = await store.get(STORE_KEY)
   return data !== null && data !== undefined
 }
 
 /** Clear encrypted keys from store and lock CryptoState. */
 export async function clearStoredKey(): Promise<void> {
-  const store = await getStore()
+  const store = await getSecureStore()
   await store.delete(STORE_KEY)
-  await store.save()
   await lockCrypto()
 }
 
 // ══════════════════════════════════════════════════════════════════════
-// Backward-compatibility layer — transitional exports for callers that
-// still use the v2 (secp256k1/ECIES/Schnorr) API names.
-//
-// These will be removed once all callers are migrated to the v3 API.
-// Functions that cannot be meaningfully mapped throw at runtime.
+// Convenience types and wrappers for callers that need wire-format
+// KeyEnvelope (hex-encoded enc/ct) rather than raw HpkeEnvelope.
 // ══════════════════════════════════════════════════════════════════════
 
-// --- Legacy type re-exports ---
+// --- Wire-format type re-exports ---
 
 import type {
   KeyEnvelope as _KeyEnvelope,
@@ -608,17 +654,6 @@ export interface EphemeralKeyPair {
   nsec: string
   /** Raw 32-byte Ed25519 seed as hex (64 chars). Use this for deviceImportAndLoad. */
   seedHex: string
-}
-
-/** @deprecated Removed in v3 — use Ed25519 signing. */
-export interface SignedNostrEvent {
-  id: string
-  pubkey: string
-  created_at: number
-  kind: number
-  tags: string[][]
-  content: string
-  sig: string
 }
 
 /** @deprecated High-level encryption results. */
@@ -750,8 +785,12 @@ async function resolveEncryptionPubkey(signingOrEncPubkey: string): Promise<stri
   return signingOrEncPubkey
 }
 
-/** @deprecated Use hpkeSealKey instead. */
-export async function eciesWrapKey(
+/**
+ * Wrap a symmetric key for a recipient using HPKE.
+ * Resolves signing pubkey to encryption pubkey if needed,
+ * and returns hex-encoded enc/ct wire format.
+ */
+export async function hpkeWrapKey(
   keyHex: string,
   recipientPubkey: string,
   label: string,
@@ -759,14 +798,6 @@ export async function eciesWrapKey(
   const encPubkey = await resolveEncryptionPubkey(recipientPubkey)
   const envelope = await hpkeSealKey(keyHex, encPubkey, label, '')
   return { enc: base64urlToHex(envelope.enc), ct: envelope.ct }
-}
-
-/** @deprecated Use hpkeOpenKeyFromState instead. */
-export async function eciesUnwrapKey(
-  _envelope: KeyEnvelope,
-  _label: string,
-): Promise<string> {
-  throw new Error('eciesUnwrapKey removed in v3 — use hpkeOpenKeyFromState with HpkeEnvelope')
 }
 
 /**

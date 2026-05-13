@@ -25,7 +25,7 @@ export const VALID_SIGNATURE = 'c'.repeat(128)
 /** Valid 64-char hex SHA-256 hash */
 export const VALID_HASH = 'd'.repeat(64)
 
-/** Valid compressed secp256k1 pubkey (33 bytes hex) */
+/** Valid compressed pubkey (33 bytes hex) */
 export const VALID_COMPRESSED_PUBKEY = '02' + 'a'.repeat(64)
 
 /** Valid HPKE enc value (64-char hex, 32-byte X25519 encapsulated key) */

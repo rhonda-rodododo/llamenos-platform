@@ -97,7 +97,7 @@ sigchainRoutes.post('/',
   describeRoute({
     tags: ['Sigchain'],
     summary: 'Append a signed sigchain link',
-    description: 'Users may only append to their own sigchain. The server validates hash-chain continuity.',
+    description: 'Users may only append to their own sigchain. The server validates hash-chain continuity (seqNo, prevHash) and Ed25519 signature integrity before persisting.',
     responses: {
       201: {
         description: 'Link appended',

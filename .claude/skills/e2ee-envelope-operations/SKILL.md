@@ -300,7 +300,7 @@ If no envelope matches your pubkey, decryption fails with `DecryptionFailed`.
 
 | File | Purpose |
 |------|---------|
-| `packages/protocol/crypto-labels.json` | Source of truth for all 69 domain separation labels |
+| `packages/protocol/crypto-labels.json` | Source of truth for all 68 domain separation labels |
 | `packages/crypto/src/labels.rs` | Rust label constants (must match JSON) |
 | `packages/crypto/src/hpke.rs` | HPKE wrap/unwrap implementation (RFC 9180) |
 | `packages/crypto/src/encryption.rs` | High-level encrypt/decrypt for notes, messages, call records, drafts, exports |

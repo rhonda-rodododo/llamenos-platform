@@ -5,7 +5,7 @@
  *   - App server stores only the HMAC hash of the Signal identifier.
  *   - The plaintext identifier is registered in the signal-notifier sidecar's PostgreSQL store.
  *   - The sidecar resolves hash → plaintext for delivery, keeping plaintext off the main DB.
- *   - ECIES ciphertext + per-user envelopes let the volunteer recover their identifier.
+ *   - HPKE ciphertext + per-user envelopes let the volunteer recover their identifier.
  *
  * HMAC key derivation: HMAC-SHA-256(serverHmacSecret, "signal-contact:" + userPubkey)
  * This gives each user a distinct HMAC context so hash leakage from one user

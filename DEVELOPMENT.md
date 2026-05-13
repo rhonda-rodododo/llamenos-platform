@@ -97,7 +97,7 @@ packages/
   crypto/             # Shared Rust crypto crate (native + WASM + UniFFI)
   protocol/           # JSON Schema definitions + codegen (TS/Swift/Kotlin)
     schemas/          # 42+ Zod schema files — source of truth for all types
-    crypto-labels.json # 69 domain separation constants
+    crypto-labels.json # 68 domain separation constants
   shared/             # Cross-boundary TypeScript types and config
   i18n/               # Localization files + iOS/Android string codegen
 src/
