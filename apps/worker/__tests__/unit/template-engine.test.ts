@@ -166,6 +166,10 @@ describe('applyTemplate', () => {
       showInDashboard: false,
       isArchived: false,
       isSystem: false,
+      autoAssign: false,
+      autoAssignThreshold: 30,
+      requiredSpecializations: [],
+      notifyContactsOnStatusChange: false,
       createdAt: '2026-01-01T00:00:00Z',
       updatedAt: '2026-01-01T00:00:00Z',
     }]

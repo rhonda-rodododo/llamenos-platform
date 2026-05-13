@@ -751,15 +751,11 @@
     "submit": "Отправить",
     "success": "Успешно",
     "yes": "Да",
-    "ok": "OK",
-    "create": "Create",
-    "all": "All",
-    "previous": "Previous",
     "comingSoon": "Coming soon",
     "hideAdvanced": "Hide Advanced",
     "showAdvanced": "Show Advanced",
     "saved": "Saved",
-"unauthorized": "Unauthorized"
+    "unauthorized": "Unauthorized"
   },
   "confirm": {
     "backup": "Confirm Backup",
@@ -1525,7 +1521,16 @@
     "statusDenied": "Notifications are blocked. Update your browser's site settings to enable them.",
     "statusGranted": "Notifications are enabled.",
     "statusUnsupported": "Your browser does not support notifications.",
-    "unsupported": "Not supported"
+    "unsupported": "Not supported",
+    "title": "Notify Contacts?",
+    "description": "Send a status update to linked contacts. Messages are rendered on your device.",
+    "statusChangeTemplate": "Your case {{caseNumber}} at {{hubName}} has been updated. New status: {{status}}.",
+    "noContacts": "No linked contacts found.",
+    "send": "Send",
+    "skip": "Skip",
+    "sent": "Notifications sent",
+    "sendError": "Failed to send notifications",
+    "contactsSection": "Contacts"
   },
   "nsec": {
     "displayLabel": "Your secret key",
@@ -3026,7 +3031,16 @@
     "untitled": "Untitled Report",
     "detailInfo": "Triage Detail",
     "loading": "Loading...",
-    "errorTitle": "Unable to Load"
+    "errorTitle": "Unable to Load",
+    "converted": "Converted to entity",
+    "convertError": "Failed to convert report",
+    "convertToEntity": "Convert to Entity",
+    "statusReviewing": "Reviewing",
+    "statusConverted": "Converted",
+    "statusDismissed": "Dismissed",
+    "noReportsHint": "No reports match this filter.",
+    "reportDetail": "Report Detail",
+    "filter": "Filter"
   },
   "searchUsers": "Search volunteers...",
   "userProfile": {
@@ -3443,5 +3457,15 @@
     "setupComplete": {
       "footer": "Webhook setup complete"
     }
+  },
+  "assignment": {
+    "title": "Assign Volunteer",
+    "workloadLabel": "Workload score",
+    "specializationLabel": "Specialization match",
+    "languageMatch": "Language match",
+    "noVolunteers": "No available volunteers found",
+    "noVolunteersHint": "Make sure volunteers are on-shift and have capacity.",
+    "assignBtn": "Assign",
+    "assignedSuccess": "Volunteer assigned"
   }
 }

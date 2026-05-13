@@ -6,13 +6,19 @@ import Foundation
 enum TriageStatusFilter: String, CaseIterable, Sendable {
     case all
     case pending
+    case reviewing
+    case converted
+    case dismissed
     case inProgress = "in_progress"
     case completed
 
     var displayName: String {
         switch self {
         case .all: return NSLocalizedString("triage_filter_all", comment: "All")
-        case .pending: return NSLocalizedString("triage_filter_pending", comment: "Pending")
+        case .pending: return NSLocalizedString("triage_status_pending", comment: "Pending")
+        case .reviewing: return NSLocalizedString("triage_status_reviewing", comment: "Reviewing")
+        case .converted: return NSLocalizedString("triage_status_converted", comment: "Converted")
+        case .dismissed: return NSLocalizedString("triage_status_dismissed", comment: "Dismissed")
         case .inProgress: return NSLocalizedString("triage_filter_in_progress", comment: "In Progress")
         case .completed: return NSLocalizedString("triage_filter_completed", comment: "Completed")
         }
@@ -117,32 +123,28 @@ final class TriageViewModel {
 
     /// Convert a triage report to a case record.
     ///
-    /// - Creates a new record via `POST /api/records` with fields pre-filled from the report.
-    /// - Links the report to the new record.
-    /// - Updates the report's conversion status to `completed`.
+    /// Convert a triage report to a full entity record using the atomic conversion endpoint.
     ///
-    /// - Parameter report: The report to convert.
+    /// - Parameters:
+    ///   - report: The report to convert.
+    ///   - entityTypeId: The target entity type ID selected by the user.
     /// - Returns: `true` if conversion succeeded.
     @discardableResult
-    func convertToCase(report: ClientReportResponse) async -> Bool {
+    func convertToEntity(report: ClientReportResponse, entityTypeId: String) async -> Bool {
         isActionInProgress = true
         errorMessage = nil
 
         do {
-            // Step 1: Create a new record from the report
-            let createBody = ConvertReportToCaseRequest(
+            let body = ConvertFromReportBody(
                 reportId: report.id,
-                title: report.reportTitle,
-                reportTypeId: report.reportTypeId
+                entityTypeId: entityTypeId,
+                additionalFields: nil
             )
-
-            let _: ConvertReportToCaseResponse = try await apiService.request(
+            let _: ConvertFromReportResponse = try await apiService.request(
                 method: "POST",
-                path: apiService.hp("/api/reports/\(report.id)/convert-to-case"),
-                body: createBody
+                path: apiService.hp("/api/records/convert-from-report"),
+                body: body
             )
-
-            // Reload triage queue
             await refresh()
             isActionInProgress = false
             return true
@@ -163,13 +165,17 @@ final class TriageViewModel {
 
 // MARK: - Request/Response Types
 
-struct ConvertReportToCaseRequest: Encodable, Sendable {
+struct ConvertFromReportBody: Encodable, Sendable {
     let reportId: String
-    let title: String
-    let reportTypeId: String?
+    let entityTypeId: String
+    let additionalFields: [String: String]?
 }
 
-struct ConvertReportToCaseResponse: Codable, Sendable {
+struct ConvertFromReportResponse: Codable, Sendable {
     let recordId: String
     let reportId: String
+    let entityTypeId: String
+    let caseNumber: String?
+    let autoAssigned: Bool
+    let assignedTo: [String]
 }

@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Loader2, UserPlus, Star, Users, Globe } from 'lucide-react'
+import { Loader2, UserPlus, Star, Users, Globe, BookOpen } from 'lucide-react'
 
 interface AssignmentDialogProps {
   open: boolean
@@ -114,26 +114,31 @@ export function AssignmentDialog({
                       </Badge>
                     </div>
                     <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                      {/* Workload indicator */}
                       <span
                         data-testid="workload-indicator"
                         className="flex items-center gap-1 text-[10px] text-muted-foreground"
+                        title={t('assignment.workloadLabel', { defaultValue: 'Workload score' })}
                       >
                         <Users className="h-2.5 w-2.5" />
                         {s.activeCaseCount}/{s.maxCases}
                       </span>
-                      {/* Match reasons */}
-                      {s.reasons.map((reason, i) => (
+                      {(s.specializationScore ?? 0) > 0 && (
                         <Badge
-                          key={i}
-                          data-testid="match-reason"
+                          data-testid="specialization-score"
                           variant="outline"
                           className="text-[10px]"
+                          title={t('assignment.specializationLabel', { defaultValue: 'Specialization match' })}
                         >
-                          {reason.includes('Speaks') && <Globe className="h-2.5 w-2.5 mr-0.5" />}
-                          {reason}
+                          <BookOpen className="h-2.5 w-2.5 mr-0.5" />
+                          {s.specializationScore}/25 spec
                         </Badge>
-                      ))}
+                      )}
+                      {(s.languageScore ?? 0) > 0 && (
+                        <Badge data-testid="language-match" variant="outline" className="text-[10px]">
+                          <Globe className="h-2.5 w-2.5 mr-0.5" />
+                          {t('assignment.languageMatch', { defaultValue: 'Language match' })}
+                        </Badge>
+                      )}
                     </div>
                   </div>
                   <Button

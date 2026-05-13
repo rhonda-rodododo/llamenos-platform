@@ -1850,6 +1850,52 @@ export async function setAutoAssignment(enabled: boolean) {
   })
 }
 
+// --- Report-to-entity atomic conversion (EP06-A3) ---
+
+export interface ConvertFromReportParams {
+  reportId: string
+  entityTypeId: string
+  additionalFields?: Record<string, unknown>
+}
+
+export interface ConvertFromReportResult {
+  recordId: string
+  reportId: string
+  entityTypeId: string
+  caseNumber?: string
+  autoAssigned: boolean
+  assignedTo: string[]
+}
+
+export async function convertReportToEntity(params: ConvertFromReportParams): Promise<ConvertFromReportResult> {
+  return request<ConvertFromReportResult>(hp('/records/convert-from-report'), {
+    method: 'POST',
+    body: JSON.stringify({
+      reportId: params.reportId,
+      entityTypeId: params.entityTypeId,
+      additionalFields: params.additionalFields ?? {},
+    }),
+  })
+}
+
+// --- Contact notification dispatch (EP06-A3) ---
+
+export interface NotifyContactParams {
+  recordId: string
+  notifications: Array<{
+    recipientHash: string
+    channel: 'sms' | 'signal' | 'whatsapp' | 'telegram'
+    message: string
+  }>
+}
+
+export async function notifyContacts(params: NotifyContactParams): Promise<{ results: Array<{ recipientHash: string; success: boolean; error?: string }> }> {
+  return request(hp(`/records/${params.recordId}/notify-contacts`), {
+    method: 'POST',
+    body: JSON.stringify({ notifications: params.notifications }),
+  })
+}
+
 export async function getRecordEnvelopeRecipients(params: {
   entityTypeId: string
   assignedTo?: string[]

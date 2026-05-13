@@ -14,11 +14,8 @@ import {
   apiPost,
   apiPatch,
   createCmsReportTypeViaApi,
-  createVolunteerViaApi,
   generateTestKeypair,
   uniqueName,
-  uniquePhone,
-  ADMIN_NSEC,
 } from '../../api-helpers'
 
 // ── Local State ──────────────────────────────────────────────────
@@ -85,7 +82,7 @@ Given('a CMS report type with allowCaseConversion disabled exists', async ({ req
 
 Given('a report of the conversion-enabled type exists', async ({ request, world }) => {
   const kp = generateTestKeypair()
-  const { data, status } = await apiPost<{ id?: string; report?: { id: string } }>(
+  const { data } = await apiPost<{ id?: string; report?: { id: string } }>(
     request,
     '/reports',
     {
@@ -291,11 +288,9 @@ Then('the report should have {int} linked case record', async ({ request, world 
 // ── Permission Steps ─────────────────────────────────────────────
 
 Given('a volunteer exists with cases:create permission only', async ({ request, world }) => {
-  const vol = await createVolunteerViaApi(request, {
-    name: uniqueName('Triage Limited Vol'),
-    roleIds: ['role-volunteer'],
-  })
-  getTriageState(world).volunteerNsec = vol.nsec
+  const { createUserViaApi } = await import('../../api-helpers')
+  const vol = await createUserViaApi(request, { name: uniqueName('Triage Limited Vol') })
+  getTriageState(world).volunteerNsec = vol.seedHex
 })
 
 When('the volunteer lists reports with conversionEnabled true', async ({ request, world }) => {
@@ -312,3 +307,152 @@ Then('the request should be forbidden', async ({ world }) => {
   expect(getSharedState(world).lastResponse).toBeDefined()
   expect(getSharedState(world).lastResponse!.status).toBe(403)
 })
+
+// ── Atomic Conversion Steps (EP06-A3) ────────────────────────────
+
+When('the admin converts the report to an entity using the atomic endpoint', async ({ request, world }) => {
+  const state = getTriageState(world)
+  expect(state.reportId).toBeDefined()
+
+  // Resolve entity type ID if not set
+  if (!state.entityTypeId) {
+    const { listEntityTypesViaApi } = await import('../../api-helpers')
+    const hubId = getScenarioState(world).hubId
+    const types = await listEntityTypesViaApi(request, hubId)
+    const et = types.find(t =>
+      t.name?.toString().includes('triage') ||
+      t.name?.toString().includes('auto_assign') ||
+      t.name?.toString().includes('no_assign') ||
+      t.category === 'case'
+    )
+    if (et) state.entityTypeId = et.id as string
+  }
+
+  const res = await apiPost<Record<string, unknown>>(
+    request,
+    '/records/convert-from-report',
+    {
+      reportId: state.reportId,
+      entityTypeId: state.entityTypeId,
+      additionalFields: {},
+    },
+  )
+  setLastResponse(world, res)
+  if (res.status === 201) {
+    state.caseRecordId = (res.data as Record<string, unknown>)?.recordId as string
+  }
+})
+
+When('the volunteer converts the report using the atomic endpoint', async ({ request, world }) => {
+  const state = getTriageState(world)
+  expect(state.reportId).toBeDefined()
+
+  const res = await apiPost<Record<string, unknown>>(
+    request,
+    '/records/convert-from-report',
+    {
+      reportId: state.reportId,
+      entityTypeId: state.entityTypeId ?? 'fake-entity-type-id',
+      additionalFields: {},
+    },
+    state.volunteerNsec!,
+  )
+  setLastResponse(world, res)
+})
+
+Then('the response should include a {string}', async ({ world }, field: string) => {
+  const res = getSharedState(world).lastResponse
+  expect(res).toBeDefined()
+  expect(res!.data).toBeTruthy()
+  expect((res!.data as Record<string, unknown>)[field]).toBeTruthy()
+})
+
+Then('the response should include {string} matching the original report', async ({ world }, field: string) => {
+  const res = getSharedState(world).lastResponse
+  expect(res).toBeDefined()
+  const value = (res!.data as Record<string, unknown>)[field]
+  expect(value).toBe(getTriageState(world).reportId)
+})
+
+Then('the report conversionStatus should be {string}', async ({ request, world }, expectedStatus: string) => {
+  const state = getTriageState(world)
+  expect(state.reportId).toBeDefined()
+  const { data } = await apiGet<Record<string, unknown>>(request, `/reports/${state.reportId}`)
+  const meta = parseMetadata(data as Record<string, unknown>)
+  expect(meta.conversionStatus).toBe(expectedStatus)
+})
+
+Then('the response should have {string} true', async ({ world }, field: string) => {
+  const res = getSharedState(world).lastResponse
+  expect((res!.data as Record<string, unknown>)[field]).toBe(true)
+})
+
+Then('the response should have {string} false', async ({ world }, field: string) => {
+  const res = getSharedState(world).lastResponse
+  expect((res!.data as Record<string, unknown>)[field]).toBe(false)
+})
+
+Then('the response {string} should be non-empty', async ({ world }, field: string) => {
+  const res = getSharedState(world).lastResponse
+  const value = (res!.data as Record<string, unknown>)[field]
+  expect(Array.isArray(value) ? value.length > 0 : Boolean(value)).toBe(true)
+})
+
+Given('an entity type {string} with autoAssign enabled exists', async ({ request, world }, name: string) => {
+  const hubId = getScenarioState(world).hubId
+  const label = name.replace(/_/g, ' ')
+  const { data, status } = await apiPost<Record<string, unknown>>(
+    request,
+    hubId ? `/hubs/${hubId}/settings/cms/entity-types` : '/settings/cms/entity-types',
+    {
+      name,
+      label,
+      labelPlural: `${label}s`,
+      description: `Auto-assign test entity type ${name}`,
+      category: 'case',
+      hubId: hubId ?? '',
+      statuses: [
+        { value: 'open', label: 'Open', order: 0 },
+        { value: 'closed', label: 'Closed', order: 1 },
+      ],
+      defaultStatus: 'open',
+      closedStatuses: ['closed'],
+      fields: [],
+      autoAssign: true,
+      autoAssignThreshold: 30,
+    },
+  )
+  if (status < 300) getTriageState(world).entityTypeId = (data as Record<string, unknown>).id as string
+})
+
+Given('an entity type {string} with autoAssign disabled exists', async ({ request, world }, name: string) => {
+  const hubId = getScenarioState(world).hubId
+  const label = name.replace(/_/g, ' ')
+  const { data, status } = await apiPost<Record<string, unknown>>(
+    request,
+    hubId ? `/hubs/${hubId}/settings/cms/entity-types` : '/settings/cms/entity-types',
+    {
+      name,
+      label,
+      labelPlural: `${label}s`,
+      description: `No-auto-assign test entity type ${name}`,
+      category: 'case',
+      hubId: hubId ?? '',
+      statuses: [
+        { value: 'open', label: 'Open', order: 0 },
+        { value: 'closed', label: 'Closed', order: 1 },
+      ],
+      defaultStatus: 'open',
+      closedStatuses: ['closed'],
+      fields: [],
+      autoAssign: false,
+    },
+  )
+  if (status < 300) getTriageState(world).entityTypeId = (data as Record<string, unknown>).id as string
+})
+
+Given('an on-shift volunteer with capacity exists', async ({ request }) => {
+  const { createUserViaApi } = await import('../../api-helpers')
+  await createUserViaApi(request, { name: uniqueName('AutoAssign Vol') })
+})
+

@@ -69,3 +69,49 @@ Feature: CMS Triage Queue
     When the admin updates the report conversionStatus to "in_progress"
     And the admin fetches the report
     Then the report metadata should include conversionStatus "in_progress"
+
+  # --- Atomic report-to-entity conversion (EP06-A3) ---
+
+  @triage @backend
+  Scenario: POST /records/convert-from-report creates a case record atomically
+    Given case management is enabled
+    And an entity type "triage_entity_type" exists
+    And a CMS report type with allowCaseConversion enabled exists
+    And a report of the conversion-enabled type exists
+    When the admin converts the report to an entity using the atomic endpoint
+    Then the response status should be 201
+    And the response should include a "recordId"
+    And the response should include "reportId" matching the original report
+    And the report conversionStatus should be "completed"
+
+  @triage @backend
+  Scenario: Atomic conversion auto-assigns when entity type has autoAssign enabled
+    Given case management is enabled
+    And an entity type "auto_assign_entity_type" with autoAssign enabled exists
+    And a CMS report type with allowCaseConversion enabled exists
+    And a report of the conversion-enabled type exists
+    And an on-shift volunteer with capacity exists
+    When the admin converts the report to an entity using the atomic endpoint
+    Then the response status should be 201
+    And the response should have "autoAssigned" true
+    And the response "assignedTo" should be non-empty
+
+  @triage @backend
+  Scenario: Atomic conversion without autoAssign does not assign
+    Given case management is enabled
+    And an entity type "no_assign_entity_type" with autoAssign disabled exists
+    And a CMS report type with allowCaseConversion enabled exists
+    And a report of the conversion-enabled type exists
+    When the admin converts the report to an entity using the atomic endpoint
+    Then the response status should be 201
+    And the response should have "autoAssigned" false
+
+  @triage @backend @permissions
+  Scenario: Volunteer without reports:triage cannot use atomic conversion
+    Given case management is enabled
+    And an entity type "triage_entity_type" exists
+    And a CMS report type with allowCaseConversion enabled exists
+    And a report of the conversion-enabled type exists
+    And a volunteer exists with cases:create permission only
+    When the volunteer converts the report using the atomic endpoint
+    Then the request should be forbidden

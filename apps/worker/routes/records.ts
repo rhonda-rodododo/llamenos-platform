@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { describeRoute, resolver, validator } from 'hono-openapi'
-import type { AppEnv, User } from '../types'
-import { scoreVolunteers } from '../lib/volunteer-scoring'
+import type { AppEnv } from '../types'
+import { scoreVolunteers } from '../lib/assignment-scorer'
 import { getMessagingAdapterFromService } from '../lib/service-factories'
 import { requirePermission, checkPermission } from '../middleware/permission-guard'
 import {
@@ -18,8 +18,9 @@ import {
   envelopeRecipientsResponseSchema,
   suggestAssigneesResponseSchema,
   recordsByContactResponseSchema,
+  convertFromReportBodySchema,
+  convertFromReportResponseSchema,
 } from '@protocol/schemas/records'
-import type { CaseRecord } from '@protocol/schemas/records'
 import { createInteractionBodySchema, listInteractionsQuerySchema, caseInteractionSchema, interactionListResponseSchema, sourceInteractionLookupResponseSchema } from '@protocol/schemas/interactions'
 import { linkReportToCaseBodySchema, reportCaseLinkSchema, reportCaseLinkListResponseSchema } from '@protocol/schemas/report-links'
 import { notifyContactsBodySchema } from '@protocol/schemas/notifications'
@@ -365,6 +366,74 @@ records.get('/:id/envelope-recipients',
   },
 )
 
+// --- Convert report to entity (atomic, EP06-A3) ---
+records.post('/convert-from-report',
+  describeRoute({
+    tags: ['Records'],
+    summary: 'Atomically convert a triage report to a case entity',
+    responses: {
+      201: {
+        description: 'Entity created from report',
+        content: {
+          'application/json': {
+            schema: resolver(convertFromReportResponseSchema),
+          },
+        },
+      },
+      ...authErrors,
+      404: { description: 'Report not found' },
+    },
+  }),
+  requirePermission('reports:triage'),
+  validator('json', convertFromReportBodySchema),
+  async (c) => {
+    const pubkey = c.get('pubkey')
+    const services = c.get('services')
+    const body = c.req.valid('json')
+
+    // Fetch entity type for numbering and default status
+    let caseNumber: string | undefined
+    let defaultStatusHash: string | undefined
+    try {
+      const entityType = await services.settings.getEntityTypeById(body.entityTypeId)
+      defaultStatusHash = entityType.defaultStatus || 'pending'
+      if (entityType.numberingEnabled && entityType.numberPrefix) {
+        const result = await services.settings.generateCaseNumber({
+          prefix: entityType.numberPrefix,
+          hubId: c.get('hubId') ?? '',
+        })
+        caseNumber = result.number
+      }
+    } catch {
+      // Entity type not found — proceed with defaults
+    }
+
+    const result = await services.cases.convertFromReport({
+      ...body,
+      hubId: c.get('hubId') ?? '',
+      createdBy: pubkey,
+      caseNumber,
+      defaultStatusHash,
+    })
+
+    publishEvent(c.env, KIND_RECORD_CREATED, {
+      type: 'record:created',
+      recordId: result.recordId,
+      entityTypeId: result.entityTypeId,
+      caseNumber: result.caseNumber,
+      fromReport: body.reportId,
+    })
+
+    await audit(services.audit, 'recordCreatedFromReport', pubkey, {
+      recordId: result.recordId,
+      reportId: body.reportId,
+      entityTypeId: body.entityTypeId,
+    })
+
+    return c.json(result, 201)
+  },
+)
+
 // --- Create record ---
 records.post('/',
   describeRoute({
@@ -391,8 +460,9 @@ records.post('/',
 
     // Generate case number if entity type has numbering enabled
     let caseNumber: string | undefined
+    let entityType: Awaited<ReturnType<typeof services.settings.getEntityTypeById>> | undefined
     try {
-      const entityType = await services.settings.getEntityTypeById(body.entityTypeId)
+      entityType = await services.settings.getEntityTypeById(body.entityTypeId)
       if (entityType.numberingEnabled && entityType.numberPrefix) {
         const result = await services.settings.generateCaseNumber({
           prefix: entityType.numberPrefix,
@@ -401,7 +471,7 @@ records.post('/',
         caseNumber = result.number
       }
     } catch {
-      // Entity type not found — proceed without case number
+      // Entity type not found — proceed without case number or auto-assignment
     }
 
     const record = await services.cases.create({
@@ -410,6 +480,42 @@ records.post('/',
       createdBy: pubkey,
       caseNumber,
     })
+
+    // Auto-assignment (EP06-A3): if entityType.autoAssign is enabled, score and assign
+    if (entityType?.autoAssign) {
+      try {
+        const threshold = entityType.autoAssignThreshold ?? 30
+        const hubId = c.get('hubId') ?? ''
+        const onShiftPubkeys = await services.shifts.getCurrentVolunteers(hubId)
+        const { users: allUsers } = await services.identity.getUsers()
+        const activeCaseCounts = new Map<string, number>()
+        for (const vol of allUsers) {
+          if (!vol.active || vol.onBreak) continue
+          const { count } = await services.cases.countByAssignment(vol.pubkey)
+          activeCaseCounts.set(vol.pubkey, count)
+        }
+        const suggestions = scoreVolunteers({
+          allUsers,
+          onShiftPubkeys,
+          alreadyAssigned: record.assignedTo ?? [],
+          activeCaseCounts,
+          requiredSpecializations: entityType.requiredSpecializations ?? [],
+        })
+        const best = suggestions[0]
+        if (best && best.score >= threshold) {
+          await services.cases.assign(record.id, [best.pubkey])
+          publishEvent(c.env, KIND_RECORD_ASSIGNED, {
+            type: 'record:assigned',
+            recordId: record.id,
+            pubkeys: [best.pubkey],
+            autoAssigned: true,
+          })
+        }
+      } catch {
+        // Auto-assignment is best-effort — never fail record creation
+        logger.warn('Auto-assignment failed for record', { recordId: record.id })
+      }
+    }
 
     // Publish Nostr event
     publishEvent(c.env, KIND_RECORD_CREATED, {
@@ -668,13 +774,25 @@ records.get('/:id/suggest-assignees',
       activeCaseCounts.set(vol.pubkey, count)
     }
 
-    // 5. Score eligible volunteers via extracted pure function
+    // 5. Fetch entity type for requiredSpecializations
+    let requiredSpecializations: string[] = []
+    if (record.entityTypeId) {
+      try {
+        const entityType = await services.settings.getEntityTypeById(record.entityTypeId)
+        requiredSpecializations = entityType.requiredSpecializations ?? []
+      } catch {
+        // Entity type not found — proceed with no specialization requirements
+      }
+    }
+
+    // 6. Score eligible volunteers via extracted pure function
     const suggestions = scoreVolunteers({
       allUsers,
       onShiftPubkeys,
       alreadyAssigned: record.assignedTo,
       activeCaseCounts,
       languageNeed: c.req.query('language'),
+      requiredSpecializations,
     })
 
     return c.json({ suggestions })
@@ -707,13 +825,16 @@ records.post('/:id/assign',
     const services = c.get('services')
     const body = c.req.valid('json')
 
+    const record = await services.cases.get(id)
     const result = await services.cases.assign(id, body.pubkeys)
 
-    // Publish assignment event
+    // Publish assignment event with enriched context (EP06-A3)
     publishEvent(c.env, KIND_RECORD_ASSIGNED, {
       type: 'record:assigned',
       recordId: id,
       pubkeys: body.pubkeys,
+      hubId: c.get('hubId') ?? '',
+      entityTypeId: record.entityTypeId,
     })
 
     await audit(services.audit, 'recordAssigned', pubkey, {
@@ -751,13 +872,16 @@ records.post('/:id/unassign',
     const services = c.get('services')
     const body = c.req.valid('json')
 
+    const unassignRecord = await services.cases.get(id)
     const result = await services.cases.unassign(id, body.pubkey)
 
-    // Publish assignment change event
+    // Publish assignment change event with enriched context (EP06-A3)
     publishEvent(c.env, KIND_RECORD_ASSIGNED, {
       type: 'record:unassigned',
       recordId: id,
       pubkey: body.pubkey,
+      hubId: c.get('hubId') ?? '',
+      entityTypeId: unassignRecord.entityTypeId,
     })
 
     await audit(services.audit, 'recordUnassigned', pubkey, {

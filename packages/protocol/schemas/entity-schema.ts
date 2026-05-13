@@ -140,6 +140,12 @@ export const entityTypeDefinitionSchema = z.object({
   isArchived: z.boolean().optional().default(false),
   isSystem: z.boolean().optional().default(false),
 
+  // Assignment intelligence (EP06-A3)
+  autoAssign: z.boolean().optional().default(false),
+  autoAssignThreshold: z.number().int().min(10).max(50).optional().default(30),
+  requiredSpecializations: z.array(z.string().max(100)).max(20).optional().default([]),
+  notifyContactsOnStatusChange: z.boolean().optional().default(false),
+
   createdAt: z.string().optional().default(''),
   updatedAt: z.string().optional().default(''),
 })
@@ -222,6 +228,11 @@ export const createEntityTypeBodySchema = z.looseObject({
 
   templateId: z.string().optional(),
   templateVersion: z.string().optional(),
+
+  autoAssign: z.boolean().optional().default(false),
+  autoAssignThreshold: z.number().int().min(10).max(50).optional().default(30),
+  requiredSpecializations: z.array(z.string().max(100)).max(20).optional().default([]),
+  notifyContactsOnStatusChange: z.boolean().optional().default(false),
 })
 
 export const updateEntityTypeBodySchema = z.looseObject({
@@ -261,6 +272,11 @@ export const updateEntityTypeBodySchema = z.looseObject({
   editRoles: z.array(z.string()).optional(),
 
   isArchived: z.boolean().optional(),
+
+  autoAssign: z.boolean().optional(),
+  autoAssignThreshold: z.number().int().min(10).max(50).optional(),
+  requiredSpecializations: z.array(z.string().max(100)).max(20).optional(),
+  notifyContactsOnStatusChange: z.boolean().optional(),
 })
 
 export const createRelationshipTypeBodySchema = z.looseObject({

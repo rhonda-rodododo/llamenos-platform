@@ -4,6 +4,7 @@ import { useAuth } from '@/lib/auth'
 import { useToast } from '@/lib/toast'
 import {
   createCaseFromReport,
+  convertReportToEntity,
   listEntityTypes,
   type EntityTypeDefinition,
   type CreateRecordBody,
@@ -14,7 +15,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { SchemaForm, type SchemaFieldValues } from './schema-form'
-import { Lock, Loader2, Plus } from 'lucide-react'
+import { Lock, Loader2, Plus, ArrowRight } from 'lucide-react'
 
 interface TriageCaseCreationPanelProps {
   reportId: string
@@ -35,6 +36,7 @@ export function TriageCaseCreationPanel({ reportId, onCaseCreated }: TriageCaseC
   const [title, setTitle] = useState('')
   const [fieldValues, setFieldValues] = useState<SchemaFieldValues>({})
   const [submitting, setSubmitting] = useState(false)
+  const [converting, setConverting] = useState(false)
   const [loadingTypes, setLoadingTypes] = useState(true)
 
   const selectedType = entityTypes.find(et => et.id === selectedTypeId)
@@ -109,6 +111,23 @@ export function TriageCaseCreationPanel({ reportId, onCaseCreated }: TriageCaseC
       setSubmitting(false)
     }
   }, [selectedType, title, fieldValues, hasNsec, publicKey, adminDecryptionPubkey, reportId, toast, t, onCaseCreated])
+
+  const handleAtomicConvert = useCallback(async () => {
+    if (!selectedTypeId) return
+    setConverting(true)
+    try {
+      const result = await convertReportToEntity({
+        reportId,
+        entityTypeId: selectedTypeId,
+      })
+      toast(t('triage.converted', { defaultValue: 'Converted to entity' }), 'success')
+      onCaseCreated(result.recordId)
+    } catch {
+      toast(t('triage.convertError', { defaultValue: 'Failed to convert report' }), 'error')
+    } finally {
+      setConverting(false)
+    }
+  }, [selectedTypeId, reportId, toast, t, onCaseCreated])
 
   return (
     <div data-testid="triage-create-case-panel" className="space-y-4 rounded-lg border border-border bg-card p-4">
@@ -211,10 +230,26 @@ export function TriageCaseCreationPanel({ reportId, onCaseCreated }: TriageCaseC
               )}
 
               <Button
+                data-testid="convert-to-entity-btn"
+                size="sm"
+                variant="default"
+                onClick={handleAtomicConvert}
+                disabled={converting || submitting || !selectedTypeId}
+                className="w-full"
+              >
+                {converting ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <ArrowRight className="h-3.5 w-3.5" />
+                )}
+                {t('triage.convertToEntity', { defaultValue: 'Convert to Entity' })}
+              </Button>
+              <Button
                 data-testid="triage-create-case-btn"
                 size="sm"
+                variant="outline"
                 onClick={handleSubmit}
-                disabled={submitting || !title.trim() || !selectedTypeId}
+                disabled={submitting || converting || !title.trim() || !selectedTypeId}
                 className="w-full"
               >
                 {submitting ? (
@@ -222,7 +257,7 @@ export function TriageCaseCreationPanel({ reportId, onCaseCreated }: TriageCaseC
                 ) : (
                   <Plus className="h-3.5 w-3.5" />
                 )}
-                {t('triage.createCaseBtn', { defaultValue: 'Create Case' })}
+                {t('triage.createCaseBtn', { defaultValue: 'Create Case (E2EE)' })}
               </Button>
             </>
           )}
