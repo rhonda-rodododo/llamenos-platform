@@ -1,3 +1,4 @@
+@backend
 Feature: Channel Configuration
   As a hub admin
   I want to configure messaging channels
