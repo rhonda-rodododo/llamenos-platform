@@ -1,0 +1,73 @@
+import Foundation
+
+// MARK: - Volunteer suggestion model
+
+struct VolunteerSuggestion: Decodable, Identifiable, Sendable {
+    var id: String { pubkey }
+    let pubkey: String
+    let score: Int
+    let workloadScore: Int
+    let languageScore: Int
+    let specializationScore: Int
+    let availabilityScore: Int
+    let reasons: [String]
+    let activeCaseCount: Int
+    let maxCases: Int
+    let matchedSpecializations: [String]
+}
+
+struct SuggestAssigneesResponse: Decodable, Sendable {
+    let suggestions: [VolunteerSuggestion]
+}
+
+// MARK: - AssignmentViewModel
+
+@Observable
+final class AssignmentViewModel {
+    private let apiService: APIService
+
+    var suggestions: [VolunteerSuggestion] = []
+    var isLoading = false
+    var isAssigning = false
+    var errorMessage: String?
+
+    init(apiService: APIService) {
+        self.apiService = apiService
+    }
+
+    func loadSuggestions(for recordId: String, language: String? = nil) async {
+        guard !isLoading else { return }
+        isLoading = true
+        errorMessage = nil
+        do {
+            var path = apiService.hp("/api/records/\(recordId)/suggest-assignees")
+            if let lang = language {
+                path += "?language=\(lang)"
+            }
+            let response: SuggestAssigneesResponse = try await apiService.request(method: "GET", path: path)
+            suggestions = response.suggestions
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isLoading = false
+    }
+
+    func assign(recordId: String, pubkey: String) async -> Bool {
+        isAssigning = true
+        errorMessage = nil
+        do {
+            let body = ["pubkeys": [pubkey]]
+            let _: CaseRecord = try await apiService.request(
+                method: "POST",
+                path: apiService.hp("/api/records/\(recordId)/assign"),
+                body: body
+            )
+            isAssigning = false
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            isAssigning = false
+            return false
+        }
+    }
+}
