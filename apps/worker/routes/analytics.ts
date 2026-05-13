@@ -185,6 +185,7 @@ analytics.get(
 )
 
 // ── GET /api/analytics/me ──
+// Intentionally no requirePermission — any authenticated user may view their own stats
 
 analytics.get(
   '/me',
