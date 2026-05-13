@@ -1890,6 +1890,27 @@ export async function createCaseFromReportViaApi(
 }
 
 /**
+ * Upload an entity field file (encrypted blob) via POST /uploads/entity-file.
+ * Returns the fileId and uploadedAt on success (201).
+ */
+export async function uploadEntityFileViaApi(
+  request: APIRequestContext,
+  blobSizeBytes: number = 1024,
+  seedHex: string = ADMIN_SEED,
+): Promise<{ fileId: string; uploadedAt: string }> {
+  const fullPath = '/api/uploads/entity-file'
+  const blob = new Blob([new Uint8Array(blobSizeBytes).fill(0xab)], { type: 'application/octet-stream' })
+  const formData = new FormData()
+  formData.append('file', blob, 'entity-field.bin')
+  const res = await request.post(fullPath, {
+    headers: authHeaders(seedHex, 'POST', fullPath),
+    multipart: { file: { name: 'entity-field.bin', mimeType: 'application/octet-stream', buffer: Buffer.alloc(blobSizeBytes, 0xab) } },
+  })
+  if (res.status() !== 201) throw new Error(`uploadEntityFileViaApi failed: ${res.status()}`)
+  return res.json() as Promise<{ fileId: string; uploadedAt: string }>
+}
+
+/**
  * Enable messaging channels (SMS by default) via the settings API.
  * This is needed so the conversations page renders the conversation list
  * instead of the "No messaging channels enabled" empty state.
