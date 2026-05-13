@@ -257,6 +257,14 @@ pub const LABEL_SERVER_SIGNING_INFO: &str = "llamenos:server-signing-key-info:v1
 /// WebSocket authentication challenge label
 pub const LABEL_WS_CHALLENGE: &str = "llamenos:ws-auth:v1";
 
+// --- EP08: Account Lifecycle ---
+
+/// Audit user key wrapping — per-user symmetric key HPKE-wrapped to admin pubkeys
+pub const LABEL_AUDIT_USER_KEY_WRAP: &str = "llamenos:audit-user-key-wrap:v1";
+
+/// Erasure override co-approver signature — Ed25519 sig over (targetUserId || timestamp || justification)
+pub const LABEL_ERASURE_OVERRIDE_SIG: &str = "llamenos:erasure-override-sig:v1";
+
 // =============================================================================
 // LABEL REGISTRY — maps numeric IDs (u8) to label strings.
 //
@@ -359,6 +367,9 @@ pub const LABEL_REGISTRY: &[&str] = &[
     LABEL_SERVER_SIGNING_KEY,               // 66
     LABEL_SERVER_SIGNING_INFO,              // 67
     LABEL_WS_CHALLENGE,                     // 68
+    // 69-70: EP08 Account Lifecycle
+    LABEL_AUDIT_USER_KEY_WRAP,  // 69
+    LABEL_ERASURE_OVERRIDE_SIG, // 70
 ];
 
 /// Look up a label string by its numeric ID.
@@ -467,6 +478,8 @@ mod tests {
             "llamenos:server-signing-key-info:v1"
         );
         assert_eq!(LABEL_WS_CHALLENGE, "llamenos:ws-auth:v1");
+        assert_eq!(LABEL_AUDIT_USER_KEY_WRAP, "llamenos:audit-user-key-wrap:v1");
+        assert_eq!(LABEL_ERASURE_OVERRIDE_SIG, "llamenos:erasure-override-sig:v1");
     }
 
     /// Verify registry index stability.
@@ -498,6 +511,8 @@ mod tests {
         assert_eq!(id_to_label(66), Some(LABEL_SERVER_SIGNING_KEY));
         assert_eq!(id_to_label(67), Some(LABEL_SERVER_SIGNING_INFO));
         assert_eq!(id_to_label(68), Some(LABEL_WS_CHALLENGE));
+        assert_eq!(id_to_label(69), Some(LABEL_AUDIT_USER_KEY_WRAP));
+        assert_eq!(id_to_label(70), Some(LABEL_ERASURE_OVERRIDE_SIG));
     }
 
     /// Verify bidirectional lookup (skipping tombstoned indices).
