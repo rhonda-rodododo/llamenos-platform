@@ -23,7 +23,9 @@ use crate::device_keys::{self, DeviceKeyState, DeviceSecrets, EncryptedDeviceKey
 use crate::errors::CryptoError;
 use crate::hpke_envelope::{self, HpkeEnvelope};
 use crate::puk::{self, PukState, RotatePukResult};
+use crate::shamir;
 use crate::sigchain::{self, SigchainLink, SigchainVerifiedState};
+use x25519_dalek::{PublicKey as X25519PublicKey, StaticSecret as X25519StaticSecret};
 use zeroize::Zeroize;
 
 // ── Static mobile state ────────────────────────────────────────────
@@ -694,6 +696,122 @@ pub fn mobile_clear_server_event_keys() {
         k.zeroize();
     }
     guard.server_event_previous_key = None;
+}
+
+// ── Shamir Secret Sharing ─────────────────────────────────────────────────
+
+/// A Shamir secret share.
+/// `x` is the evaluation point (1..=255); `y` is hex-encoded y-coordinates
+/// (one byte per secret byte, so 64 hex chars for a 32-byte secret).
+#[derive(uniffi::Record, serde::Serialize, serde::Deserialize)]
+pub struct FfiShamirShare {
+    pub x: u8,
+    pub y: String,
+}
+
+/// Split `secret_hex` into `total` shares requiring `threshold` to reconstruct.
+///
+/// Returns a list of [FfiShamirShare] with `total` entries.
+/// Each `y` field is the hex-encoded y-coordinates for that share index.
+#[uniffi::export]
+pub fn mobile_shamir_split(
+    secret_hex: String,
+    total: u8,
+    threshold: u8,
+) -> Result<Vec<FfiShamirShare>, CryptoError> {
+    let secret = hex::decode(&secret_hex)
+        .map_err(|_| CryptoError::InvalidInput("secret_hex is not valid hex".into()))?;
+
+    let raw_shares = shamir::split(&secret, total, threshold)?;
+
+    Ok(raw_shares
+        .into_iter()
+        .map(|(x, y)| FfiShamirShare { x, y: hex::encode(y) })
+        .collect())
+}
+
+/// Reconstruct the secret from a JSON array of [FfiShamirShare].
+///
+/// `shares_json` must be a JSON array: `[{"x":1,"y":"aabbcc..."},...]`
+/// Returns the reconstructed secret as a hex string.
+#[uniffi::export]
+pub fn mobile_shamir_combine(shares_json: String) -> Result<String, CryptoError> {
+    let wire: Vec<shamir::ShamirShareJson> = serde_json::from_str(&shares_json)
+        .map_err(|e| CryptoError::InvalidInput(format!("invalid shares JSON: {e}")))?;
+
+    let shares: Vec<(u8, Vec<u8>)> = wire
+        .into_iter()
+        .map(|s| {
+            let y = hex::decode(&s.y).map_err(|_| {
+                CryptoError::InvalidInput(format!("share y is not valid hex for x={}", s.x))
+            })?;
+            Ok((s.x, y))
+        })
+        .collect::<Result<Vec<_>, CryptoError>>()?;
+
+    let secret = shamir::combine(&shares)?;
+    Ok(hex::encode(secret))
+}
+
+/// Compute a SHA-256 commitment for a share.
+///
+/// `share_json` must be a JSON object: `{"x":1,"y":"aabbcc..."}`.
+/// Returns the commitment as a hex string.
+#[uniffi::export]
+pub fn mobile_shamir_commit(share_json: String) -> Result<String, CryptoError> {
+    let wire: shamir::ShamirShareJson = serde_json::from_str(&share_json)
+        .map_err(|e| CryptoError::InvalidInput(format!("invalid share JSON: {e}")))?;
+
+    let y = hex::decode(&wire.y)
+        .map_err(|_| CryptoError::InvalidInput("share y is not valid hex".into()))?;
+
+    let commitment = shamir::commit(wire.x, &y);
+    Ok(hex::encode(commitment))
+}
+
+/// Verify a share against a previously computed commitment.
+///
+/// Returns `true` if the share matches the commitment.
+#[uniffi::export]
+pub fn mobile_shamir_verify(
+    share_json: String,
+    commitment_hex: String,
+) -> Result<bool, CryptoError> {
+    let wire: shamir::ShamirShareJson = serde_json::from_str(&share_json)
+        .map_err(|e| CryptoError::InvalidInput(format!("invalid share JSON: {e}")))?;
+
+    let y = hex::decode(&wire.y)
+        .map_err(|_| CryptoError::InvalidInput("share y is not valid hex".into()))?;
+
+    let commitment = hex::decode(&commitment_hex)
+        .map_err(|_| CryptoError::InvalidInput("commitment_hex is not valid hex".into()))?;
+
+    Ok(shamir::verify(wire.x, &y, &commitment))
+}
+
+// ── Recovery Group Keypair ────────────────────────────────────────────────
+
+/// An X25519 keypair for use as a recovery group key.
+/// The private key is returned so that the caller can split it via Shamir.
+/// Callers MUST zeroize the private key after splitting.
+#[derive(uniffi::Record)]
+pub struct RecoveryGroupKeypair {
+    pub public_key_hex: String,
+    pub private_key_hex: String,
+}
+
+/// Generate an X25519 keypair for the recovery group.
+///
+/// The returned private key MUST be split via Shamir immediately and then
+/// zeroized. It must never be stored or transmitted as-is.
+#[uniffi::export]
+pub fn mobile_recovery_group_generate_keypair() -> Result<RecoveryGroupKeypair, CryptoError> {
+    let secret = X25519StaticSecret::random_from_rng(rand::rngs::OsRng);
+    let public = X25519PublicKey::from(&secret);
+    Ok(RecoveryGroupKeypair {
+        public_key_hex: hex::encode(public.as_bytes()),
+        private_key_hex: hex::encode(secret.as_bytes()),
+    })
 }
 
 #[cfg(test)]

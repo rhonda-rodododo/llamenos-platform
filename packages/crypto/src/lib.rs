@@ -49,6 +49,9 @@ pub mod encryption;
 // === Device provisioning (X25519 ECDH + HKDF + AES-256-GCM) ===
 pub mod provisioning;
 
+// === Shamir Secret Sharing over GF(2^8) ===
+pub mod shamir;
+
 #[cfg(feature = "mobile")]
 mod ffi;
 #[cfg(feature = "mobile")]
