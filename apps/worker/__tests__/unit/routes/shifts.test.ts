@@ -77,7 +77,7 @@ describe('shifts routes', () => {
     it('returns shift status for current user', async () => {
       const getMyStatusSpy = vi.fn().mockResolvedValue({
         onShift: true,
-        currentShift: { name: 'Morning', startTime: '09:00', endTime: '12:00' },
+        currentShift: { id: 's1', encryptedName: 'Morning', startTime: '09:00', endTime: '12:00' },
         nextShift: null,
       })
       const { app } = createTestApp({
@@ -184,7 +184,7 @@ describe('shifts routes', () => {
   describe('GET /shifts', () => {
     it('lists shifts', async () => {
       const listSpy = vi.fn().mockResolvedValue({
-        shifts: [{ id: 's1', name: 'Morning', startTime: '09:00', endTime: '12:00', days: [1, 2, 3], userPubkeys: ['b'.repeat(64)] }],
+        shifts: [{ id: 's1', encryptedName: 'Morning', startTime: '09:00', endTime: '12:00', days: [1, 2, 3], userPubkeys: ['b'.repeat(64)], ringGroupId: null, createdAt: new Date().toISOString() }],
       })
       const { app } = createTestApp({
         permissions: ['shifts:read'],
@@ -214,11 +214,13 @@ describe('shifts routes', () => {
     it('creates a shift', async () => {
       const createSpy = vi.fn().mockResolvedValue({
         id: 's1',
-        name: 'Morning',
+        encryptedName: 'Morning',
         startTime: '09:00',
         endTime: '12:00',
         days: [1, 2, 3],
+        ringGroupId: null,
         userPubkeys: ['b'.repeat(64)],
+        createdAt: new Date().toISOString(),
       })
       const { app } = createTestApp({
         permissions: ['shifts:create'],
@@ -229,11 +231,11 @@ describe('shifts routes', () => {
       const res = await app.request('/shifts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'Morning', startTime: '09:00', endTime: '12:00', days: [1, 2, 3], userPubkeys: ['b'.repeat(64)] }),
+        body: JSON.stringify({ id: '550e8400-e29b-41d4-a716-446655440000', encryptedName: 'Morning', startTime: '09:00', endTime: '12:00', days: [1, 2, 3], userPubkeys: ['b'.repeat(64)] }),
       })
 
       expect(res.status).toBe(201)
-      expect(createSpy).toHaveBeenCalledWith('hub-1', { name: 'Morning', startTime: '09:00', endTime: '12:00', days: [1, 2, 3], userPubkeys: ['b'.repeat(64)] })
+      expect(createSpy).toHaveBeenCalledWith('hub-1', { id: '550e8400-e29b-41d4-a716-446655440000', encryptedName: 'Morning', startTime: '09:00', endTime: '12:00', days: [1, 2, 3], ringGroupId: null, userPubkeys: ['b'.repeat(64)] })
     })
 
     it('requires shifts:create permission', async () => {
@@ -241,7 +243,7 @@ describe('shifts routes', () => {
       const res = await app.request('/shifts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'Morning', startTime: '09:00', endTime: '12:00', days: [1, 2, 3], userPubkeys: ['b'.repeat(64)] }),
+        body: JSON.stringify({ id: '550e8400-e29b-41d4-a716-446655440000', encryptedName: 'Morning', startTime: '09:00', endTime: '12:00', days: [1, 2, 3], userPubkeys: ['b'.repeat(64)] }),
       })
       expect(res.status).toBe(403)
     })
@@ -255,11 +257,13 @@ describe('shifts routes', () => {
     it('updates a shift', async () => {
       const updateSpy = vi.fn().mockResolvedValue({
         id: 's1',
-        name: 'Evening',
+        encryptedName: 'Evening',
         startTime: '18:00',
         endTime: '21:00',
         days: [1, 2],
+        ringGroupId: null,
         userPubkeys: ['b'.repeat(64)],
+        createdAt: new Date().toISOString(),
       })
       const { app } = createTestApp({
         permissions: ['shifts:update'],
@@ -270,11 +274,11 @@ describe('shifts routes', () => {
       const res = await app.request('/shifts/s1', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'Evening' }),
+        body: JSON.stringify({ encryptedName: 'Evening' }),
       })
 
       expect(res.status).toBe(200)
-      expect(updateSpy).toHaveBeenCalledWith('hub-1', 's1', { name: 'Evening' })
+      expect(updateSpy).toHaveBeenCalledWith('hub-1', 's1', { encryptedName: 'Evening' })
     })
 
     it('requires shifts:update permission', async () => {
@@ -282,7 +286,7 @@ describe('shifts routes', () => {
       const res = await app.request('/shifts/s1', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'Evening' }),
+        body: JSON.stringify({ encryptedName: 'Evening' }),
       })
       expect(res.status).toBe(403)
     })

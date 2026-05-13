@@ -150,6 +150,7 @@ const ALLOWED_HUB_SETTINGS = new Set([
   'usage',
   'subAccountEnabled',
   'subAccountConfigId',
+  'heartbeatTimeout',
 ])
 
 const VALID_PROVIDER_TYPES = [

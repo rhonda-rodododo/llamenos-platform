@@ -13,6 +13,8 @@ import {
   type Shift,
   type User,
 } from '@/lib/api'
+import { z } from 'zod'
+import { createShiftBodySchema } from '@protocol/schemas/shifts'
 import { useToast } from '@/lib/toast'
 import { CalendarPlus, Clock, Users, Pencil, Trash2, LifeBuoy, LogIn, LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -101,7 +103,7 @@ function ShiftsPage() {
                 const res = await updateShift(editingShift.id, data)
                 setShifts(prev => prev.map(s => s.id === editingShift.id ? res : s))
               } else {
-                const res = await createShift(data as Omit<Shift, 'id'>)
+                const res = await createShift({ ...data, id: crypto.randomUUID() } as z.infer<typeof createShiftBodySchema>)
                 setShifts(prev => [...prev, res])
               }
               setShowForm(false)
@@ -148,7 +150,7 @@ function ShiftsPage() {
               <CardContent>
                 <div className="flex items-start justify-between">
                   <div>
-                    <h3 className="font-medium">{shift.name}</h3>
+                    <h3 className="font-medium">{shift.encryptedName}</h3>
                     <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
                       <Clock className="h-3.5 w-3.5" />
                       {shift.startTime} - {shift.endTime}
@@ -222,7 +224,7 @@ function ShiftForm({ shift, users, onSave, onCancel }: {
   onCancel: () => void
 }) {
   const { t } = useTranslation()
-  const [name, setName] = useState(shift?.name || '')
+  const [encryptedName, setEncryptedName] = useState(shift?.encryptedName || '')
   const [startTime, setStartTime] = useState(shift?.startTime || '09:00')
   const [endTime, setEndTime] = useState(shift?.endTime || '17:00')
   const [days, setDays] = useState<number[]>(shift?.days || [1, 2, 3, 4, 5])
@@ -233,7 +235,7 @@ function ShiftForm({ shift, users, onSave, onCancel }: {
     e.preventDefault()
     setSaving(true)
     try {
-      await onSave({ name, startTime, endTime, days, userPubkeys: selectedVolunteers })
+      await onSave({ encryptedName, startTime, endTime, days, userPubkeys: selectedVolunteers })
     } finally {
       setSaving(false)
     }
@@ -254,8 +256,8 @@ function ShiftForm({ shift, users, onSave, onCancel }: {
             <Input
               id="shift-name"
               data-testid="shift-name-input"
-              value={name}
-              onChange={e => setName(e.target.value)}
+              value={encryptedName}
+              onChange={e => setEncryptedName(e.target.value)}
               required
             />
           </div>

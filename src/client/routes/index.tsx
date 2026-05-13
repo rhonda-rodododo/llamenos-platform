@@ -123,12 +123,12 @@ function DashboardPage() {
               </p>
               {onShift && currentShift && !currentCall && (
                 <p className="text-xs text-muted-foreground">
-                  {currentShift.name} — {currentShift.startTime}–{currentShift.endTime}
+                  {currentShift.encryptedName} — {currentShift.startTime}–{currentShift.endTime}
                 </p>
               )}
               {!onShift && nextShift && !currentCall && (
                 <p className="text-xs text-muted-foreground">
-                  {t('shifts.nextShift')}: {nextShift.name} {t('shifts.startsAt')} {nextShift.startTime}
+                  {t('shifts.nextShift')}: {nextShift.encryptedName} {t('shifts.startsAt')} {nextShift.startTime}
                 </p>
               )}
             </div>

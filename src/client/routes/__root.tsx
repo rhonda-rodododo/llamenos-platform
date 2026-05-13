@@ -270,9 +270,9 @@ function AuthenticatedLayout() {
                   <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${onShift ? 'bg-green-500' : 'bg-gray-400'}`} />
                   <span className="text-xs text-muted-foreground">
                     {onShift && currentShift
-                      ? `${currentShift.name} — ${t('shifts.until')} ${currentShift.endTime}`
+                      ? `${currentShift.encryptedName} — ${t('shifts.until')} ${currentShift.endTime}`
                       : nextShift
-                        ? `${t('shifts.nextShift')}: ${nextShift.name} ${t('shifts.days.' + DAY_NAMES[nextShift.day])} ${nextShift.startTime}`
+                        ? `${t('shifts.nextShift')}: ${nextShift.encryptedName} ${t('shifts.days.' + DAY_NAMES[nextShift.day])} ${nextShift.startTime}`
                         : t('shifts.noShiftsAssigned')
                     }
                   </span>
