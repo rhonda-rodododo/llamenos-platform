@@ -20,6 +20,7 @@ import {
   rolesFromTemplateResponseSchema,
   enabledResponseSchema,
   createRolesFromTemplateBodySchema,
+  entityTemplateCustomizeBodySchema,
 } from '@protocol/schemas/entity-schema'
 import {
   createCmsReportTypeBodySchema,
@@ -231,6 +232,33 @@ const entityTypeRouter = createEntityRouter({
   },
 })
 entitySchema.route('/entity-types', entityTypeRouter)
+
+// Hub-level customization of a template-sourced entity type (EP06-A2)
+entitySchema.patch('/entity-types/:id/customize',
+  describeRoute({
+    tags: ['Case Management'],
+    summary: 'Apply hub-level label/appearance overrides to a template-sourced entity type',
+    responses: {
+      200: {
+        description: 'Customization saved',
+        content: { 'application/json': { schema: resolver(entityTypeDefinitionSchema) } },
+      },
+      ...authErrors,
+      ...notFoundError,
+    },
+  }),
+  requirePermission('cases:manage-types'),
+  validator('json', entityTemplateCustomizeBodySchema),
+  async (c) => {
+    const id = c.req.param('id')
+    const body = c.req.valid('json')
+    const services = c.get('services')
+    const pubkey = c.get('pubkey')
+    const updated = await services.settings.updateEntityType(id, body as Record<string, unknown>)
+    await audit(services.audit, 'entityTypeCustomized', pubkey, { entityTypeId: id, fields: Object.keys(body) })
+    return c.json(updated)
+  },
+)
 
 // --- Relationship Types ---
 
