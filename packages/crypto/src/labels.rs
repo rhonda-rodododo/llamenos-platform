@@ -371,9 +371,9 @@ pub const LABEL_REGISTRY: &[&str] = &[
     LABEL_SERVER_SIGNING_INFO,              // 67
     LABEL_WS_CHALLENGE,                     // 68
     // 69-71: Role encryption labels
-    LABEL_PLATFORM_ROLE_NAME_ENCRYPT,       // 69
-    LABEL_PLATFORM_ROLE_DESC_ENCRYPT,       // 70
-    LABEL_HUB_ROLE_ENCRYPT,                 // 71
+    LABEL_PLATFORM_ROLE_NAME_ENCRYPT, // 69
+    LABEL_PLATFORM_ROLE_DESC_ENCRYPT, // 70
+    LABEL_HUB_ROLE_ENCRYPT,           // 71
 ];
 
 /// Look up a label string by its numeric ID.
@@ -482,8 +482,14 @@ mod tests {
             "llamenos:server-signing-key-info:v1"
         );
         assert_eq!(LABEL_WS_CHALLENGE, "llamenos:ws-auth:v1");
-        assert_eq!(LABEL_PLATFORM_ROLE_NAME_ENCRYPT, "llamenos:platform-role-name-encrypt");
-        assert_eq!(LABEL_PLATFORM_ROLE_DESC_ENCRYPT, "llamenos:platform-role-desc-encrypt");
+        assert_eq!(
+            LABEL_PLATFORM_ROLE_NAME_ENCRYPT,
+            "llamenos:platform-role-name-encrypt"
+        );
+        assert_eq!(
+            LABEL_PLATFORM_ROLE_DESC_ENCRYPT,
+            "llamenos:platform-role-desc-encrypt"
+        );
         assert_eq!(LABEL_HUB_ROLE_ENCRYPT, "llamenos:hub-role-encrypt");
     }
 
