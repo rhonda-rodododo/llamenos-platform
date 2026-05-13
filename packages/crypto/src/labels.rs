@@ -265,6 +265,12 @@ pub const LABEL_AUDIT_USER_KEY_WRAP: &str = "llamenos:audit-user-key-wrap:v1";
 /// Erasure override co-approver signature — Ed25519 sig over (targetUserId || timestamp || justification)
 pub const LABEL_ERASURE_OVERRIDE_SIG: &str = "llamenos:erasure-override-sig:v1";
 
+/// Audit entry details content encryption (AES-256-GCM AAD prefix)
+pub const LABEL_AUDIT_DETAILS: &str = "llamenos:audit-details:v1";
+
+/// Device wipe command signature — Ed25519 sig over (targetDevicePubkey || timestamp || reason)
+pub const LABEL_DEVICE_WIPE_SIG: &str = "llamenos:device-wipe-sig:v1";
+
 // =============================================================================
 // LABEL REGISTRY — maps numeric IDs (u8) to label strings.
 //
@@ -370,6 +376,9 @@ pub const LABEL_REGISTRY: &[&str] = &[
     // 69-70: EP08 Account Lifecycle
     LABEL_AUDIT_USER_KEY_WRAP,  // 69
     LABEL_ERASURE_OVERRIDE_SIG, // 70
+    // 71-72: EP08 new labels
+    LABEL_AUDIT_DETAILS,   // 71
+    LABEL_DEVICE_WIPE_SIG, // 72
 ];
 
 /// Look up a label string by its numeric ID.
@@ -483,6 +492,8 @@ mod tests {
             LABEL_ERASURE_OVERRIDE_SIG,
             "llamenos:erasure-override-sig:v1"
         );
+        assert_eq!(LABEL_AUDIT_DETAILS, "llamenos:audit-details:v1");
+        assert_eq!(LABEL_DEVICE_WIPE_SIG, "llamenos:device-wipe-sig:v1");
     }
 
     /// Verify registry index stability.
@@ -516,6 +527,8 @@ mod tests {
         assert_eq!(id_to_label(68), Some(LABEL_WS_CHALLENGE));
         assert_eq!(id_to_label(69), Some(LABEL_AUDIT_USER_KEY_WRAP));
         assert_eq!(id_to_label(70), Some(LABEL_ERASURE_OVERRIDE_SIG));
+        assert_eq!(id_to_label(71), Some(LABEL_AUDIT_DETAILS));
+        assert_eq!(id_to_label(72), Some(LABEL_DEVICE_WIPE_SIG));
     }
 
     /// Verify bidirectional lookup (skipping tombstoned indices).

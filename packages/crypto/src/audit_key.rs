@@ -16,7 +16,7 @@ use zeroize::Zeroizing;
 
 use crate::errors::CryptoError;
 use crate::hpke_envelope::{hpke_open_key, hpke_seal_key, HpkeEnvelope};
-use crate::labels::LABEL_AUDIT_USER_KEY_WRAP;
+use crate::labels::{LABEL_AUDIT_DETAILS, LABEL_AUDIT_USER_KEY_WRAP};
 
 /// An admin envelope: the audit key HPKE-wrapped to one admin's X25519 public key.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -102,12 +102,14 @@ pub fn unwrap_audit_key(
 ///
 /// - `audit_key`: the 32-byte AES-256-GCM key
 /// - `details_json`: the plaintext `details` JSONB as bytes
-/// - `entry_id`: the audit log entry ID (used as part of the nonce derivation context)
+/// - `user_pubkey_hex`: the user's Ed25519 signing pubkey (binds ciphertext to user)
+/// - `entry_id`: the audit log entry ID (binds ciphertext to specific entry)
 ///
 /// Returns: `nonce_hex:ciphertext_hex` (colon-separated)
 pub fn encrypt_audit_details(
     audit_key: &[u8; 32],
     details_json: &[u8],
+    user_pubkey_hex: &str,
     entry_id: &str,
 ) -> Result<String, CryptoError> {
     let cipher = Aes256Gcm::new_from_slice(audit_key)
@@ -117,8 +119,8 @@ pub fn encrypt_audit_details(
     getrandom::getrandom(&mut nonce_bytes).expect("getrandom failed");
     let nonce = Nonce::from_slice(&nonce_bytes);
 
-    // AAD binds ciphertext to the specific audit entry
-    let aad = format!("{}:{}", LABEL_AUDIT_USER_KEY_WRAP, entry_id);
+    // AAD binds ciphertext to the specific user and audit entry
+    let aad = format!("{}:{}:{}", LABEL_AUDIT_DETAILS, user_pubkey_hex, entry_id);
 
     let ciphertext = cipher
         .encrypt(
@@ -141,12 +143,14 @@ pub fn encrypt_audit_details(
 ///
 /// - `audit_key`: the 32-byte AES-256-GCM key
 /// - `encrypted`: the `nonce_hex:ciphertext_hex` string from `encrypt_audit_details`
+/// - `user_pubkey_hex`: the user's Ed25519 signing pubkey (must match what was used during encryption)
 /// - `entry_id`: the audit log entry ID (must match what was used during encryption)
 ///
 /// Returns the plaintext `details` JSONB bytes.
 pub fn decrypt_audit_details(
     audit_key: &[u8; 32],
     encrypted: &str,
+    user_pubkey_hex: &str,
     entry_id: &str,
 ) -> Result<Vec<u8>, CryptoError> {
     let parts: Vec<&str> = encrypted.splitn(2, ':').collect();
@@ -160,14 +164,17 @@ pub fn decrypt_audit_details(
     let ciphertext = hex::decode(parts[1]).map_err(CryptoError::HexError)?;
 
     if nonce_bytes.len() != 12 {
-        return Err(CryptoError::InvalidNonce);
+        return Err(CryptoError::InvalidFormat(format!(
+            "expected 12-byte nonce, got {} bytes",
+            nonce_bytes.len()
+        )));
     }
 
     let cipher = Aes256Gcm::new_from_slice(audit_key)
         .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
     let nonce = Nonce::from_slice(&nonce_bytes);
 
-    let aad = format!("{}:{}", LABEL_AUDIT_USER_KEY_WRAP, entry_id);
+    let aad = format!("{}:{}:{}", LABEL_AUDIT_DETAILS, user_pubkey_hex, entry_id);
 
     let plaintext = cipher
         .decrypt(
@@ -274,9 +281,10 @@ mod tests {
     fn encrypt_decrypt_audit_details_roundtrip() {
         let audit_key = generate_audit_user_key();
         let details = br#"{"action":"note:create","noteId":"n-123"}"#;
+        let user_pubkey = "aa".repeat(32);
         let entry_id = "audit-entry-456";
 
-        let encrypted = encrypt_audit_details(&audit_key, details, entry_id).unwrap();
+        let encrypted = encrypt_audit_details(&audit_key, details, &user_pubkey, entry_id).unwrap();
 
         // Verify format is nonce_hex:ciphertext_hex
         let parts: Vec<&str> = encrypted.splitn(2, ':').collect();
@@ -284,7 +292,8 @@ mod tests {
         assert_eq!(hex::decode(parts[0]).unwrap().len(), 12); // 12-byte nonce
         assert!(hex::decode(parts[1]).unwrap().len() > details.len()); // ciphertext + tag
 
-        let decrypted = decrypt_audit_details(&audit_key, &encrypted, entry_id).unwrap();
+        let decrypted =
+            decrypt_audit_details(&audit_key, &encrypted, &user_pubkey, entry_id).unwrap();
         assert_eq!(decrypted, details);
     }
 
@@ -293,10 +302,11 @@ mod tests {
         let audit_key = generate_audit_user_key();
         let wrong_key = generate_audit_user_key();
         let details = b"secret details";
+        let user_pubkey = "aa".repeat(32);
         let entry_id = "entry-789";
 
-        let encrypted = encrypt_audit_details(&audit_key, details, entry_id).unwrap();
-        let result = decrypt_audit_details(&wrong_key, &encrypted, entry_id);
+        let encrypted = encrypt_audit_details(&audit_key, details, &user_pubkey, entry_id).unwrap();
+        let result = decrypt_audit_details(&wrong_key, &encrypted, &user_pubkey, entry_id);
         assert!(result.is_err());
     }
 
@@ -304,11 +314,24 @@ mod tests {
     fn decrypt_with_wrong_entry_id_fails() {
         let audit_key = generate_audit_user_key();
         let details = b"secret details";
+        let user_pubkey = "aa".repeat(32);
         let entry_id = "entry-aaa";
 
-        let encrypted = encrypt_audit_details(&audit_key, details, entry_id).unwrap();
-        let result = decrypt_audit_details(&audit_key, &encrypted, "entry-bbb");
+        let encrypted = encrypt_audit_details(&audit_key, details, &user_pubkey, entry_id).unwrap();
+        let result = decrypt_audit_details(&audit_key, &encrypted, &user_pubkey, "entry-bbb");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn decrypt_with_wrong_user_pubkey_fails_aad() {
+        let audit_key = generate_audit_user_key();
+        let details = b"secret details";
+        let user_pubkey = "aa".repeat(32);
+        let entry_id = "entry-bind";
+
+        let encrypted = encrypt_audit_details(&audit_key, details, &user_pubkey, entry_id).unwrap();
+        let result = decrypt_audit_details(&audit_key, &encrypted, &"bb".repeat(32), entry_id);
+        assert!(result.is_err(), "wrong user pubkey in AAD must fail");
     }
 
     #[test]
@@ -320,20 +343,22 @@ mod tests {
 
         // Encrypt some audit details
         let details = br#"{"action":"call:answer","callId":"c-999"}"#;
-        let encrypted = encrypt_audit_details(&audit_key, details, "entry-1").unwrap();
+        let encrypted =
+            encrypt_audit_details(&audit_key, details, &user_pubkey, "entry-1").unwrap();
 
         // Wrap to admin
         let envelopes = wrap_audit_key_to_admins(&audit_key, &[&admin_pk], &user_pubkey).unwrap();
 
         // Admin can still decrypt via unwrap
         let recovered = unwrap_audit_key(&envelopes[0], &admin_sk, &user_pubkey).unwrap();
-        let decrypted = decrypt_audit_details(&recovered, &encrypted, "entry-1").unwrap();
+        let decrypted =
+            decrypt_audit_details(&recovered, &encrypted, &user_pubkey, "entry-1").unwrap();
         assert_eq!(decrypted, details);
 
         // After erasure: key row is deleted. Without the key, decryption is impossible.
         // We simulate this by using a random wrong key.
         let destroyed_key = generate_audit_user_key();
-        let result = decrypt_audit_details(&destroyed_key, &encrypted, "entry-1");
+        let result = decrypt_audit_details(&destroyed_key, &encrypted, &user_pubkey, "entry-1");
         assert!(
             result.is_err(),
             "crypto-shredding: decryption must fail after key destruction"
@@ -343,24 +368,28 @@ mod tests {
     #[test]
     fn encrypt_audit_details_empty_payload() {
         let audit_key = generate_audit_user_key();
-        let encrypted = encrypt_audit_details(&audit_key, b"", "entry-empty").unwrap();
-        let decrypted = decrypt_audit_details(&audit_key, &encrypted, "entry-empty").unwrap();
+        let user_pubkey = "aa".repeat(32);
+        let encrypted =
+            encrypt_audit_details(&audit_key, b"", &user_pubkey, "entry-empty").unwrap();
+        let decrypted =
+            decrypt_audit_details(&audit_key, &encrypted, &user_pubkey, "entry-empty").unwrap();
         assert_eq!(decrypted, b"");
     }
 
     #[test]
     fn decrypt_invalid_format_rejected() {
         let audit_key = generate_audit_user_key();
+        let user_pubkey = "aa".repeat(32);
 
         // Missing colon separator
-        let result = decrypt_audit_details(&audit_key, "no_colon_here", "entry-x");
+        let result = decrypt_audit_details(&audit_key, "no_colon_here", &user_pubkey, "entry-x");
         assert!(matches!(
             result,
             Err(CryptoError::InvalidFormat(_)) | Err(CryptoError::HexError(_))
         ));
 
         // Empty string
-        let result = decrypt_audit_details(&audit_key, "", "entry-x");
+        let result = decrypt_audit_details(&audit_key, "", &user_pubkey, "entry-x");
         assert!(result.is_err());
     }
 }
