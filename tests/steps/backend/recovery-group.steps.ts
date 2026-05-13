@@ -13,7 +13,12 @@ import {
   createUserViaApi,
   createRoleViaApi,
   ADMIN_SEED,
+  seedHexToPubkey,
 } from '../../api-helpers'
+
+// Admin pubkey derived from ADMIN_SEED — used to enroll admin as a share holder
+// so liveness proof tests can authenticate correctly.
+const ADMIN_PUBKEY = seedHexToPubkey(ADMIN_SEED)
 
 // ── State ──────────────────────────────────────────────────────────
 
@@ -36,7 +41,7 @@ function getS(world: Record<string, unknown>): RecoveryGroupState {
   return getState<RecoveryGroupState>(world, STATE_KEY)
 }
 
-const BASE_URL = (typeof Bun !== 'undefined' ? Bun.env.TEST_HUB_URL : undefined) ?? 'http://localhost:3000'
+const BASE_URL = process.env.TEST_HUB_URL ?? 'http://localhost:3000'
 
 Before({ tags: '@backend' }, async ({ world }) => {
   setState<RecoveryGroupState>(world, STATE_KEY, {
@@ -194,12 +199,15 @@ Given('a recovery group is enrolled for the hub', async ({ request, world }) => 
   const s = getS(world)
   expect(s.hubId).toBeDefined()
 
+  // Include admin pubkey as first holder so liveness proof tests can authenticate
+  // as admin (who has '*' permission and is a registered holder in the DB).
   const holderPubkeys = [
-    'f'.repeat(64),
+    ADMIN_PUBKEY,
     '0'.repeat(63) + '1',
     '0'.repeat(63) + '2',
   ]
   s.holderPubkeys = holderPubkeys
+  s.holderSeeds = [s.adminSeed]
 
   const { status } = await enrollRecoveryGroup(request, s.hubId!, s.adminSeed, {
     shareHolderPubkeys: holderPubkeys,
@@ -319,12 +327,12 @@ When('a share holder submits a liveness proof for the hub', async ({ request, wo
   const s = getS(world)
   expect(s.hubId).toBeDefined()
 
-  // Admin is not a registered share holder — this will return 403
-  // confirming the endpoint is live and enforcing holder membership checks
+  // Use the first enrolled holder's seed (admin, who is also a registered holder)
+  const holderSeed = s.holderSeeds[0] ?? s.adminSeed
   const { status, data } = await apiPost(request, '/recovery-group/shares/liveness', {
     hubId: s.hubId!,
     proof: 'a'.repeat(128),
-  }, s.adminSeed)
+  }, holderSeed)
 
   s.lastStatus = status
   s.lastBody = data as Record<string, unknown>
