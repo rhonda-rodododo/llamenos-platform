@@ -2,7 +2,7 @@
  * Session management API routes.
  *
  * GET    /api/sessions                  — List current user's active sessions.
- * DELETE /api/sessions/:token           — Terminate a specific session.
+ * DELETE /api/sessions/:id             — Terminate a specific session by UUID.
  * POST   /api/sessions/terminate-others — Terminate all sessions except current.
  */
 
@@ -34,7 +34,7 @@ sessionRoutes.get('/',
     const userSessions = await services.identity.listSessions(pubkey)
     return c.json({
       sessions: userSessions.map(s => ({
-        token: s.token.slice(0, 8) + '...',
+        id: s.id,
         deviceId: (s.deviceInfo as Record<string, unknown>)?.deviceId ?? null,
         platform: (s.deviceInfo as Record<string, unknown>)?.platform ?? null,
         userAgent: (s.deviceInfo as Record<string, unknown>)?.userAgent ?? null,
@@ -75,10 +75,10 @@ sessionRoutes.post('/terminate-others',
   })
 
 /**
- * DELETE /api/sessions/:token
- * Terminate a specific session. Only the session owner can terminate their sessions.
+ * DELETE /api/sessions/:id
+ * Terminate a specific session by UUID. Only the session owner can terminate their sessions.
  */
-sessionRoutes.delete('/:token',
+sessionRoutes.delete('/:id',
   describeRoute({
     tags: ['Sessions'],
     summary: 'Terminate a specific session',
@@ -90,14 +90,14 @@ sessionRoutes.delete('/:token',
   }),
   async (c) => {
     const pubkey = c.get('pubkey')
-    const targetToken = c.req.param('token')
+    const sessionId = c.req.param('id')
     const services = c.get('services')
 
-    const deleted = await services.identity.terminateSession(pubkey, targetToken)
+    const deleted = await services.identity.terminateSessionById(pubkey, sessionId)
     if (!deleted) return c.json({ error: 'Session not found' }, 404)
 
     await services.identity.emitSecurityEvent(pubkey, 'session_terminate', null, {
-      terminatedToken: targetToken.slice(0, 8),
+      terminatedSessionId: sessionId,
     })
 
     return c.body(null, 204)

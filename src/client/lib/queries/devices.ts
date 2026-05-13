@@ -19,7 +19,7 @@ export interface DeviceDetail {
 }
 
 export interface SessionInfo {
-  token: string
+  id: string
   deviceId: string | null
   platform: string | null
   userAgent: string | null
@@ -131,8 +131,8 @@ export function useSessions() {
   return { data, isLoading, error, refetch: load }
 }
 
-export async function terminateSession(token: string) {
-  await request(`/sessions/${encodeURIComponent(token)}`, { method: 'DELETE' })
+export async function terminateSession(sessionId: string) {
+  await request(`/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' })
 }
 
 export async function terminateOtherSessions() {

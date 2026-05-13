@@ -148,6 +148,13 @@
       "when": 1778651799744,
       "tag": "0020_mute_black_panther",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1778694298835,
+      "tag": "0021_workable_kingpin",
+      "breakpoints": true
     }
   ]
 }

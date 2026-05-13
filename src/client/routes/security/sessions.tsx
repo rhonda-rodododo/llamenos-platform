@@ -17,7 +17,7 @@ function SessionsPage() {
   const { data: sessions, isLoading, refetch } = useSessions()
   const [showLockdown, setShowLockdown] = useState(false)
   const [showTerminateAll, setShowTerminateAll] = useState(false)
-  const [terminateLoading, setTerminateLoading] = useState(false)
+  const [_terminateLoading, setTerminateLoading] = useState(false)
 
   if (isLoading) return <div className="animate-pulse">{t('common.loading')}</div>
 
@@ -34,8 +34,8 @@ function SessionsPage() {
     }
   }
 
-  async function handleTerminate(token: string) {
-    await terminateSession(token)
+  async function handleTerminate(sessionId: string) {
+    await terminateSession(sessionId)
     refetch()
   }
 
@@ -72,9 +72,9 @@ function SessionsPage() {
 
           return (
             <div
-              key={session.token}
+              key={session.id}
               className="flex items-center gap-3 p-3 rounded-md border"
-              data-testid={`session-${session.token}`}
+              data-testid={`session-${session.id}`}
             >
               <Icon className="h-5 w-5 text-muted-foreground" />
               <div className="flex-1 min-w-0">
@@ -98,7 +98,7 @@ function SessionsPage() {
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => handleTerminate(session.token)}
+                  onClick={() => handleTerminate(session.id)}
                 >
                   <LogOut className="h-4 w-4" />
                 </Button>

@@ -16,7 +16,6 @@ export const securityEvents = pgTable(
       .primaryKey()
       .$defaultFn(() => crypto.randomUUID()),
     userPubkey: text('user_pubkey')
-      .notNull()
       .references(() => users.pubkey, { onDelete: 'set null' }),
     eventType: text('event_type').notNull(),
     deviceId: text('device_id'),

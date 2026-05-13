@@ -825,6 +825,10 @@ export class IdentityService {
     ed25519Pubkey?: string
     /** Phase 6: X25519 key-agreement public key (hex, optional for legacy clients) */
     x25519Pubkey?: string
+    deviceName?: string
+    deviceModel?: string
+    osVersion?: string
+    appVersion?: string
   }): Promise<void> {
     const now = new Date()
 
@@ -843,6 +847,10 @@ export class IdentityService {
           wakeKeyPublic: data.wakeKeyPublic,
           ...(data.ed25519Pubkey !== undefined && { ed25519Pubkey: data.ed25519Pubkey }),
           ...(data.x25519Pubkey !== undefined && { x25519Pubkey: data.x25519Pubkey }),
+          ...(data.deviceName !== undefined && { deviceName: data.deviceName }),
+          ...(data.deviceModel !== undefined && { deviceModel: data.deviceModel }),
+          ...(data.osVersion !== undefined && { osVersion: data.osVersion }),
+          ...(data.appVersion !== undefined && { appVersion: data.appVersion }),
           lastSeenAt: now,
         })
         .where(eq(devices.id, decision.deviceId))
@@ -861,6 +869,10 @@ export class IdentityService {
       wakeKeyPublic: data.wakeKeyPublic,
       ed25519Pubkey: data.ed25519Pubkey,
       x25519Pubkey: data.x25519Pubkey,
+      deviceName: data.deviceName,
+      deviceModel: data.deviceModel,
+      osVersion: data.osVersion,
+      appVersion: data.appVersion,
       registeredAt: now,
       lastSeenAt: now,
     })
@@ -1220,6 +1232,17 @@ export class IdentityService {
   // Session Management (EP02)
   // =========================================================================
 
+  async getSessionDeviceId(token: string): Promise<string | null> {
+    const rows = await this.db
+      .select({ deviceInfo: sessions.deviceInfo })
+      .from(sessions)
+      .where(eq(sessions.token, token))
+      .limit(1)
+    if (rows.length === 0) return null
+    const info = rows[0].deviceInfo as Record<string, unknown> | null
+    return (info?.deviceId as string | undefined) ?? null
+  }
+
   async listSessions(pubkey: string) {
     return this.db
       .select()
@@ -1232,6 +1255,14 @@ export class IdentityService {
     const result = await this.db
       .delete(sessions)
       .where(and(eq(sessions.token, token), eq(sessions.pubkey, pubkey)))
+      .returning({ token: sessions.token })
+    return result.length > 0
+  }
+
+  async terminateSessionById(pubkey: string, id: string): Promise<boolean> {
+    const result = await this.db
+      .delete(sessions)
+      .where(and(eq(sessions.id, id), eq(sessions.pubkey, pubkey)))
       .returning({ token: sessions.token })
     return result.length > 0
   }

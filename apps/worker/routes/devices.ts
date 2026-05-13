@@ -38,8 +38,17 @@ devicesRoutes.get('/',
   }),
   async (c) => {
     const pubkey = c.get('pubkey')
+    const sessionToken = c.get('sessionToken')
     const services = c.get('services')
     const deviceList = await services.identity.listDevices(pubkey)
+
+    // Determine which device ID belongs to the current session
+    let currentDeviceId: string | null = null
+    if (sessionToken) {
+      const sessionInfo = await services.identity.getSessionDeviceId(sessionToken)
+      currentDeviceId = sessionInfo
+    }
+
     return c.json({
       devices: deviceList.map(d => ({
         id: d.id,
@@ -53,7 +62,7 @@ devicesRoutes.get('/',
         registeredAt: d.registeredAt.toISOString(),
         lastSeenAt: d.lastSeenAt?.toISOString() ?? null,
         lastIpHash: d.lastIpHash ?? null,
-        isCurrent: false,
+        isCurrent: currentDeviceId !== null && d.id === currentDeviceId,
       })),
     })
   })
@@ -85,6 +94,10 @@ devicesRoutes.post('/register',
       wakeKeyPublic: body.wakeKeyPublic,
       ed25519Pubkey: body.ed25519Pubkey,
       x25519Pubkey: body.x25519Pubkey,
+      deviceName: body.deviceName,
+      deviceModel: body.deviceModel,
+      osVersion: body.osVersion,
+      appVersion: body.appVersion,
     })
 
     // Emit security event

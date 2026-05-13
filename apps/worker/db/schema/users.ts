@@ -66,6 +66,9 @@ export const users = pgTable('users', {
 export const sessions = pgTable(
   'sessions',
   {
+    id: text('id')
+      .notNull()
+      .$defaultFn(() => crypto.randomUUID()),
     token: text('token').primaryKey(),
     pubkey: text('pubkey')
       .notNull()
