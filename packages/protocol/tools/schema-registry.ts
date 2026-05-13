@@ -67,6 +67,9 @@ const EXCLUDED_SCHEMAS = new Set([
   'digestCadenceSchema',
   'notificationChannelSchema',
 
+  // Recovery group — bare enum schema used as building block
+  'recoverySessionStatusSchema',
+
   // WebSocket message unions — discriminated unions not representable in quicktype
   'wsClientMessageSchema',
   'wsServerMessageSchema',
