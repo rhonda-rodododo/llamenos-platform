@@ -189,7 +189,22 @@
     "users": "Volunteers",
     "schemaBrowser": "Schema Browser",
     "providerSetup": "Provider Setup",
-    "signalRegistration": "Signal Registration"
+    "signalRegistration": "Signal Registration",
+    "devices": {
+      "title": "Device Overview",
+      "devices": "devices",
+      "verified": "Verified",
+      "unverified": "Unverified",
+      "verify": "Verify",
+      "verifyTitle": "Verify {{name}}",
+      "verifyDescription": "Compare the emojis below with the device owner. Both parties must see the same 7 emojis.",
+      "verifyInstruction": "Read these emojis aloud to the device owner and confirm they see the same sequence.",
+      "nonce": "Session nonce",
+      "newNonce": "New nonce",
+      "noMatch": "No match",
+      "match": "Emojis match",
+      "verifySuccess": "Device verified successfully"
+    }
   },
   "announcement": "Announcement",
   "announcementBody": "Announcement body",
@@ -751,15 +766,11 @@
     "submit": "Isumite",
     "success": "Tagumpay",
     "yes": "Oo",
-    "ok": "OK",
-    "create": "Create",
-    "all": "All",
-    "previous": "Previous",
     "comingSoon": "Coming soon",
     "hideAdvanced": "Hide Advanced",
     "showAdvanced": "Show Advanced",
     "saved": "Saved",
-"unauthorized": "Unauthorized"
+    "unauthorized": "Unauthorized"
   },
   "confirm": {
     "backup": "Confirm Backup",
@@ -3442,6 +3453,73 @@
     },
     "setupComplete": {
       "footer": "Webhook setup complete"
+    }
+  },
+  "security": {
+    "tabs": {
+      "devices": "Devices",
+      "sessions": "Sessions",
+      "passkeys": "Passkeys",
+      "history": "History"
+    },
+    "devices": {
+      "title": "Your Devices",
+      "limit": "devices",
+      "current": "This device",
+      "lastSeen": "Last seen",
+      "revokeTitle": "Remove device",
+      "revokeDescription": "Remove {{name}}? It will lose access to all encrypted content.",
+      "revokeConfirm": "Remove device"
+    },
+    "sessions": {
+      "title": "Active Sessions",
+      "current": "Current session",
+      "unknown": "Unknown device",
+      "created": "Created",
+      "expires": "Expires",
+      "endOthers": "End all other sessions",
+      "endOthersTitle": "End all other sessions?",
+      "endOthersDescription": "This will sign out {{count}} other sessions.",
+      "endOthersConfirm": "End sessions",
+      "lockdown": "Emergency lockdown"
+    },
+    "passkeys": {
+      "title": "Passkeys",
+      "register": "Add passkey",
+      "unnamed": "Unnamed passkey",
+      "backedUp": "Backed up",
+      "lastUsed": "Last used"
+    },
+    "history": {
+      "title": "Security History",
+      "export": "Export JSON",
+      "events": {
+        "device_register": "Device registered",
+        "device_remove": "Device removed",
+        "device_rename": "Device renamed",
+        "session_create": "Session created",
+        "session_terminate": "Session terminated",
+        "session_terminate_all": "All sessions terminated",
+        "account_lockdown": "Account locked down",
+        "account_lockdown_complete": "Lockdown completed",
+        "webauthn_register": "Passkey registered",
+        "webauthn_authenticate": "Passkey authenticated",
+        "webauthn_remove": "Passkey removed",
+        "sigchain_append": "Sigchain updated",
+        "puk_rotate": "PUK rotated",
+        "hub_key_rotate": "Hub key rotated",
+        "device_fingerprint_verified": "Device verified",
+        "passkey_rename": "Passkey renamed",
+        "login_failed": "Login failed"
+      }
+    },
+    "lockdown": {
+      "title": "Emergency Lockdown",
+      "description": "This will terminate all other sessions and trigger key rotation for all your hubs.",
+      "warning": "This action cannot be undone. All other devices will be signed out immediately.",
+      "inProgress": "Terminating sessions and rotating keys...",
+      "complete": "Lockdown complete. {{sessions}} sessions terminated, {{hubs}} hub keys queued for rotation.",
+      "confirm": "Lock down now"
     }
   }
 }

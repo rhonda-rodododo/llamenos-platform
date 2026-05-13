@@ -11,14 +11,12 @@ import { Hono } from 'hono'
 import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { authErrors } from '../openapi/helpers'
-import { registerDeviceBodySchema, voipTokenBodySchema, deviceListResponseSchema } from '@protocol/schemas/devices'
+import { registerDeviceBodySchema, voipTokenBodySchema, deviceDetailListResponseSchema, renameDeviceBodySchema, revokeDeviceBodySchema, verifyDeviceBodySchema } from '@protocol/schemas/devices'
+import { requirePermission } from '../middleware/permission-guard'
 
 const devicesRoutes = new Hono<AppEnv>()
 
 /**
- * GET /api/devices
- * List all registered devices for the authenticated user.
- */
 devicesRoutes.get('/',
   describeRoute({
     tags: ['Devices'],
@@ -28,7 +26,7 @@ devicesRoutes.get('/',
         description: 'List of registered devices',
         content: {
           'application/json': {
-            schema: resolver(deviceListResponseSchema),
+            schema: resolver(deviceDetailListResponseSchema),
           },
         },
       },
@@ -43,11 +41,16 @@ devicesRoutes.get('/',
       devices: deviceList.map(d => ({
         id: d.id,
         platform: d.platform,
-        wakeKeyPublic: d.wakeKeyPublic,
+        deviceName: d.deviceName ?? null,
+        deviceModel: d.deviceModel ?? null,
+        osVersion: d.osVersion ?? null,
+        appVersion: d.appVersion ?? null,
         ed25519Pubkey: d.ed25519Pubkey,
         x25519Pubkey: d.x25519Pubkey,
         registeredAt: d.registeredAt.toISOString(),
         lastSeenAt: d.lastSeenAt?.toISOString() ?? null,
+        lastIpHash: d.lastIpHash ?? null,
+        isCurrent: false,
       })),
     })
   })
@@ -79,6 +82,11 @@ devicesRoutes.post('/register',
       wakeKeyPublic: body.wakeKeyPublic,
       ed25519Pubkey: body.ed25519Pubkey,
       x25519Pubkey: body.x25519Pubkey,
+    })
+
+    // Emit security event
+    await services.identity.emitSecurityEvent(pubkey, 'device_register', null, {
+      platform: body.platform,
     })
 
     return c.body(null, 204)
@@ -136,6 +144,117 @@ devicesRoutes.delete('/voip-token',
     await services.identity.deleteVoipToken(pubkey)
 
     return c.body(null, 204)
+  })
+
+/**
+ * PATCH /api/devices/:id
+ * Rename a device. Only the device owner can rename their own devices.
+ */
+devicesRoutes.patch('/:id',
+  describeRoute({
+    tags: ['Devices'],
+    summary: 'Rename a device',
+    responses: {
+      200: { description: 'Device renamed' },
+      404: { description: 'Device not found or not owned by caller' },
+      ...authErrors,
+    },
+  }),
+  validator('json', renameDeviceBodySchema),
+  async (c) => {
+    const pubkey = c.get('pubkey')
+    const deviceId = c.req.param('id')
+    const { deviceName } = c.req.valid('json')
+    const services = c.get('services')
+
+    const updated = await services.identity.renameDevice(pubkey, deviceId, deviceName)
+    if (!updated) return c.json({ error: 'Device not found' }, 404)
+
+    // Emit security event
+    await services.identity.emitSecurityEvent(pubkey, 'device_rename', deviceId, {
+      newName: deviceName,
+    })
+
+    return c.json({ id: deviceId, deviceName })
+  })
+
+/**
+ * POST /api/devices/:id/revoke
+ * Revoke a device — atomically: delete device, create security event,
+ * return hub IDs for client-side key rotation.
+ */
+devicesRoutes.post('/:id/revoke',
+  describeRoute({
+    tags: ['Devices'],
+    summary: 'Revoke a device with sigchain + PUK rotation signal',
+    responses: {
+      ...authErrors,
+      200: { description: 'Device revoked, hub key rotation needed' },
+      400: { description: 'Confirmation required' },
+      404: { description: 'Device not found or not owned by caller' },
+    },
+  }),
+  validator('json', revokeDeviceBodySchema),
+  async (c) => {
+    const pubkey = c.get('pubkey')
+    const deviceId = c.req.param('id')
+    const body = c.req.valid('json')
+    const services = c.get('services')
+
+    if (!body.confirm) {
+      return c.json({ error: 'Confirmation required' }, 400)
+    }
+
+    const result = await services.identity.revokeDevice(pubkey, deviceId, {
+      signature: body.signature,
+      sigchainHash: body.sigchainHash,
+      sigchainSeqNo: body.sigchainSeqNo,
+      sigchainPrevHash: body.sigchainPrevHash,
+    })
+
+    if (!result) return c.json({ error: 'Device not found' }, 404)
+
+    return c.json({
+      revoked: true,
+      deviceId,
+      hubIdsRequiringKeyRotation: result.hubIds,
+    })
+  })
+
+/**
+ * POST /api/devices/:id/verify
+ * Store SAS emoji verification result. Admin only (users:manage-devices).
+ */
+devicesRoutes.post('/:id/verify',
+  describeRoute({
+    tags: ['Devices'],
+    summary: 'Record SAS verification of a device',
+    responses: {
+      200: { description: 'Verification recorded' },
+      404: { description: 'Device not found' },
+      ...authErrors,
+    },
+  }),
+  requirePermission('users:manage-devices'),
+  validator('json', verifyDeviceBodySchema),
+  async (c) => {
+    const verifierPubkey = c.get('pubkey')
+    const deviceId = c.req.param('id')
+    const { signedAuditEntry } = c.req.valid('json')
+    const services = c.get('services')
+
+    const result = await services.identity.verifyDevice(
+      verifierPubkey,
+      deviceId,
+      signedAuditEntry,
+    )
+
+    if (!result) return c.json({ error: 'Device not found' }, 404)
+
+    return c.json({
+      verified: true,
+      verificationId: result.id,
+    })
   })
 
 /**

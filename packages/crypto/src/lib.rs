@@ -49,6 +49,9 @@ pub mod encryption;
 // === Device provisioning (X25519 ECDH + HKDF + AES-256-GCM) ===
 pub mod provisioning;
 
+// === SAS emoji verification (HKDF-SHA256) ===
+pub mod sas;
+
 #[cfg(feature = "mobile")]
 mod ffi;
 #[cfg(feature = "mobile")]

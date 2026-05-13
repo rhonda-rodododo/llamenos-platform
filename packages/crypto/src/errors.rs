@@ -59,4 +59,7 @@ pub enum CryptoError {
 
     #[error("invalid format: {0}")]
     InvalidFormat(String),
+
+    #[error("HKDF expand failed")]
+    HkdfExpandError,
 }

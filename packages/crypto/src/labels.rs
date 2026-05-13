@@ -257,6 +257,11 @@ pub const LABEL_SERVER_SIGNING_INFO: &str = "llamenos:server-signing-key-info:v1
 /// WebSocket authentication challenge label
 pub const LABEL_WS_CHALLENGE: &str = "llamenos:ws-auth:v1";
 
+// --- SAS Derivation ---
+
+/// Domain separation for SAS emoji derivation (device verification ceremony)
+pub const LABEL_SAS_DERIVE: &str = "llamenos:sas-derive:v1";
+
 // =============================================================================
 // LABEL REGISTRY — maps numeric IDs (u8) to label strings.
 //
@@ -359,6 +364,8 @@ pub const LABEL_REGISTRY: &[&str] = &[
     LABEL_SERVER_SIGNING_KEY,               // 66
     LABEL_SERVER_SIGNING_INFO,              // 67
     LABEL_WS_CHALLENGE,                     // 68
+    // 69: SAS derivation
+    LABEL_SAS_DERIVE,                       // 69
 ];
 
 /// Look up a label string by its numeric ID.
@@ -467,6 +474,7 @@ mod tests {
             "llamenos:server-signing-key-info:v1"
         );
         assert_eq!(LABEL_WS_CHALLENGE, "llamenos:ws-auth:v1");
+        assert_eq!(LABEL_SAS_DERIVE, "llamenos:sas-derive:v1");
     }
 
     /// Verify registry index stability.
@@ -498,6 +506,7 @@ mod tests {
         assert_eq!(id_to_label(66), Some(LABEL_SERVER_SIGNING_KEY));
         assert_eq!(id_to_label(67), Some(LABEL_SERVER_SIGNING_INFO));
         assert_eq!(id_to_label(68), Some(LABEL_WS_CHALLENGE));
+        assert_eq!(id_to_label(69), Some(LABEL_SAS_DERIVE));
     }
 
     /// Verify bidirectional lookup (skipping tombstoned indices).

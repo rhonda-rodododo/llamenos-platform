@@ -16,6 +16,8 @@ import {
   devices,
   provisionRooms,
   systemSettings,
+  securityEvents,
+  deviceVerifications,
 } from '../db/schema'
 import type {
   User,
@@ -559,7 +561,10 @@ export class IdentityService {
   /**
    * Create a new session for a pubkey (8h expiry).
    */
-  async createSession(pubkey: string): Promise<ServerSession> {
+  async createSession(
+    pubkey: string,
+    opts?: { deviceId?: string; platform?: string; userAgent?: string; ipHash?: string },
+  ): Promise<ServerSession> {
     const token = randomHexToken(32)
     const now = new Date()
     const expiresAt = new Date(now.getTime() + SESSION_DURATION_MS)
@@ -569,6 +574,12 @@ export class IdentityService {
       pubkey,
       createdAt: now,
       expiresAt,
+      deviceInfo: opts ? {
+        deviceId: opts.deviceId ?? null,
+        platform: opts.platform ?? null,
+        userAgent: opts.userAgent ?? null,
+        ipHash: opts.ipHash ?? null,
+      } : null,
     }).returning()
 
     return rowToSession(row)
@@ -882,15 +893,102 @@ export class IdentityService {
   }
 
   /**
-   * Deregister a single device by ID (owner-only — caller must verify ownership).
-   * Returns true if a device was deleted, false if not found.
+   * Rename a device. Only the device owner can rename their own devices.
    */
-  async deleteDeviceById(pubkey: string, deviceId: string): Promise<boolean> {
-    const deleted = await this.db
-      .delete(devices)
-      .where(and(eq(devices.pubkey, pubkey), eq(devices.id, deviceId)))
+  async renameDevice(pubkey: string, deviceId: string, deviceName: string): Promise<boolean> {
+    const result = await this.db
+      .update(devices)
+      .set({ deviceName })
+      .where(and(eq(devices.id, deviceId), eq(devices.pubkey, pubkey)))
       .returning({ id: devices.id })
-    return deleted.length > 0
+    return result.length > 0
+  }
+
+  /**
+   * Revoke a device — atomically delete device and emit security event.
+   * Returns hub IDs for client-side key rotation.
+   */
+  async revokeDevice(
+    pubkey: string,
+    deviceId: string,
+    sigchainData?: {
+      signature?: string
+      sigchainHash?: string
+      sigchainSeqNo?: number
+      sigchainPrevHash?: string
+    },
+  ): Promise<{ hubIds: string[] } | null> {
+    // Verify device belongs to caller
+    const [device] = await this.db
+      .select()
+      .from(devices)
+      .where(and(eq(devices.id, deviceId), eq(devices.pubkey, pubkey)))
+      .limit(1)
+
+    if (!device) return null
+
+    // Get user's hub memberships for key rotation
+    const [user] = await this.db
+      .select({ hubRoles: users.hubRoles })
+      .from(users)
+      .where(eq(users.pubkey, pubkey))
+      .limit(1)
+
+    const hubIds = user?.hubRoles
+      ? (user.hubRoles as Array<{ hubId: string }>).map(hr => hr.hubId)
+      : []
+
+    // Atomic: delete device + emit security event
+    await this.db.transaction(async (tx) => {
+      await tx.delete(devices).where(eq(devices.id, deviceId))
+
+      await tx.insert(securityEvents).values({
+        userPubkey: pubkey,
+        eventType: 'device_remove',
+        deviceId,
+        metadata: { revokedDeviceId: deviceId, platform: device.platform },
+      })
+    })
+
+    return { hubIds }
+  }
+
+  /**
+   * Verify a device (SAS emoji verification). Admin only.
+   */
+  async verifyDevice(
+    verifierPubkey: string,
+    deviceId: string,
+    signedAuditEntry: string,
+  ): Promise<{ id: string } | null> {
+    // Look up device to get target pubkey
+    const [device] = await this.db
+      .select({ ed25519Pubkey: devices.ed25519Pubkey, pubkey: devices.pubkey })
+      .from(devices)
+      .where(eq(devices.id, deviceId))
+      .limit(1)
+
+    if (!device || !device.ed25519Pubkey) return null
+
+    const [verification] = await this.db
+      .insert(deviceVerifications)
+      .values({
+        verifierPubkey,
+        targetDeviceId: deviceId,
+        targetPubkey: device.ed25519Pubkey,
+        signedAuditEntry,
+      })
+      .returning({ id: deviceVerifications.id })
+
+    // Emit security event for device owner
+    await this.db.insert(securityEvents).values({
+      userPubkey: device.pubkey,
+      eventType: 'device_fingerprint_verified',
+      deviceId,
+      metadata: { verifierPubkey },
+    })
+
+    return verification
   }
 
   /**
@@ -1098,6 +1196,181 @@ export class IdentityService {
         status: 'ready',
       })
       .where(eq(provisionRooms.roomId, id))
+  }
+
+  // =========================================================================
+  // Session Management (EP02)
+  // =========================================================================
+
+  async listSessions(pubkey: string) {
+    return this.db
+      .select()
+      .from(sessions)
+      .where(eq(sessions.pubkey, pubkey))
+      .orderBy(sessions.createdAt)
+  }
+
+  async terminateSession(pubkey: string, token: string): Promise<boolean> {
+    const result = await this.db
+      .delete(sessions)
+      .where(and(eq(sessions.token, token), eq(sessions.pubkey, pubkey)))
+      .returning({ token: sessions.token })
+    return result.length > 0
+  }
+
+  async terminateOtherSessions(pubkey: string, currentToken: string): Promise<number> {
+    const result = await this.db
+      .delete(sessions)
+      .where(
+        and(
+          eq(sessions.pubkey, pubkey),
+          sql`${sessions.token} != ${currentToken}`,
+        ),
+      )
+      .returning({ token: sessions.token })
+    return result.length
+  }
+
+  async emitSecurityEvent(
+    userPubkey: string,
+    eventType: string,
+    deviceId: string | null,
+    metadata: Record<string, unknown> = {},
+  ): Promise<void> {
+    await this.db.insert(securityEvents).values({
+      userPubkey,
+      eventType,
+      deviceId,
+      metadata,
+    })
+  }
+
+  // =========================================================================
+  // Security Events (EP02)
+  // =========================================================================
+
+  async listSecurityEvents(pubkey: string, limit: number, offset: number) {
+    const [countResult] = await this.db
+      .select({ count: sql<number>`count(*)` })
+      .from(securityEvents)
+      .where(eq(securityEvents.userPubkey, pubkey))
+
+    const events = await this.db
+      .select()
+      .from(securityEvents)
+      .where(eq(securityEvents.userPubkey, pubkey))
+      .orderBy(sql`${securityEvents.createdAt} desc`)
+      .limit(limit)
+      .offset(offset)
+
+    return { events, total: Number(countResult.count) }
+  }
+
+  async listAllSecurityEvents(limit: number, offset: number) {
+    const [countResult] = await this.db
+      .select({ count: sql<number>`count(*)` })
+      .from(securityEvents)
+
+    const events = await this.db
+      .select()
+      .from(securityEvents)
+      .orderBy(sql`${securityEvents.createdAt} desc`)
+      .limit(limit)
+      .offset(offset)
+
+    return { events, total: Number(countResult.count) }
+  }
+
+  // =========================================================================
+  // Account Management (EP02)
+  // =========================================================================
+
+  async getUserHubIds(pubkey: string): Promise<string[]> {
+    const [user] = await this.db
+      .select({ hubRoles: users.hubRoles })
+      .from(users)
+      .where(eq(users.pubkey, pubkey))
+      .limit(1)
+
+    if (!user?.hubRoles) return []
+    return (user.hubRoles as Array<{ hubId: string }>).map(hr => hr.hubId)
+  }
+
+  // =========================================================================
+  // Admin Device Overview (EP02)
+  // =========================================================================
+
+  async getAdminDeviceOverview(
+    hubId: string | undefined,
+    limit: number,
+    offset: number,
+  ) {
+    // Get users with their devices, optionally filtered by hub membership
+    let userQuery = this.db
+      .select({
+        pubkey: users.pubkey,
+        displayName: users.displayName,
+        hubRoles: users.hubRoles,
+      })
+      .from(users)
+      .where(eq(users.active, true))
+
+    const allUsers = await userQuery
+
+    // Filter by hub membership if hubId provided
+    const filteredUsers = hubId
+      ? allUsers.filter(u => {
+          const roles = u.hubRoles as Array<{ hubId: string }> | null
+          return roles?.some(hr => hr.hubId === hubId)
+        })
+      : allUsers
+
+    const total = filteredUsers.length
+    const pagedUsers = filteredUsers.slice(offset, offset + limit)
+
+    // Get devices and verification status for each user
+    const entries = await Promise.all(
+      pagedUsers.map(async (u) => {
+        const userDevices = await this.db
+          .select()
+          .from(devices)
+          .where(eq(devices.pubkey, u.pubkey))
+
+        const verifications = await this.db
+          .select({ targetDeviceId: deviceVerifications.targetDeviceId })
+          .from(deviceVerifications)
+
+        const verifiedDeviceIds = new Set(verifications.map(v => v.targetDeviceId))
+
+        return {
+          userPubkey: u.pubkey,
+          displayName: u.displayName,
+          deviceCount: userDevices.length,
+          lastSeenAt: userDevices
+            .map(d => d.lastSeenAt)
+            .filter(Boolean)
+            .sort()
+            .pop()?.toISOString() ?? null,
+          verified: userDevices.length > 0 && userDevices.every(d => verifiedDeviceIds.has(d.id)),
+          devices: userDevices.map(d => ({
+            id: d.id,
+            platform: d.platform,
+            deviceName: d.deviceName,
+            deviceModel: d.deviceModel,
+            osVersion: d.osVersion,
+            appVersion: d.appVersion,
+            ed25519Pubkey: d.ed25519Pubkey,
+            x25519Pubkey: d.x25519Pubkey,
+            registeredAt: d.registeredAt.toISOString(),
+            lastSeenAt: d.lastSeenAt?.toISOString() ?? null,
+            lastIpHash: d.lastIpHash,
+            isCurrent: false,
+          })),
+        }
+      }),
+    )
+
+    return { entries, total }
   }
 
   // =========================================================================

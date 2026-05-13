@@ -361,6 +361,8 @@ export type AppEnv = {
     hubPermissions?: string[]
     /** Unique request ID for correlation (set by request-id middleware) */
     requestId: string
+    /** Current session token (set by auth middleware for session-based auth) */
+    sessionToken?: string
     /** Service registry — replaces DO stubs */
     services: import('../services').Services
   }
