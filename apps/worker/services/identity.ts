@@ -33,7 +33,7 @@ import { DEMO_ACCOUNTS } from '@shared/demo-accounts'
 // ---------------------------------------------------------------------------
 
 import { SESSION_DURATION_MS, RENEWAL_THRESHOLD_MS } from '../lib/session-renewal'
-import { decideDeviceRegistration, MAX_DEVICES_PER_VOLUNTEER } from '../lib/device-eviction'
+import { decideDeviceRegistration } from '../lib/device-eviction'
 const INVITE_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 const CHALLENGE_TTL_MS = 5 * 60 * 1000 // 5 minutes
 const PROVISION_ROOM_TTL_MS = 5 * 60 * 1000 // 5 minutes
@@ -77,7 +77,6 @@ function rowToUser(row: typeof users.$inferSelect): User {
     messagingEnabled: row.messagingEnabled ?? undefined,
     specializations: row.specializations ?? [],
     maxCaseAssignments: row.maxCaseAssignments ?? undefined,
-    teamId: row.teamId ?? undefined,
     supervisorPubkey: row.supervisorPubkey ?? undefined,
   }
 }
@@ -281,7 +280,6 @@ export class IdentityService {
     encryptedSecretKey: string
     specializations?: string[]
     maxCaseAssignments?: number
-    teamId?: string
     supervisorPubkey?: string
   }): Promise<{ volunteer: ReturnType<typeof sanitizeUser> }> {
     const roles = data.roleIds ?? data.roles ?? ['role-volunteer']
@@ -300,7 +298,6 @@ export class IdentityService {
       callPreference: 'phone',
       specializations: data.specializations ?? [],
       maxCaseAssignments: data.maxCaseAssignments,
-      teamId: data.teamId,
       supervisorPubkey: data.supervisorPubkey,
     }).returning()
 
@@ -344,7 +341,6 @@ export class IdentityService {
         case 'messagingEnabled': updates.messagingEnabled = value as boolean; break
         case 'specializations': updates.specializations = value as string[]; break
         case 'maxCaseAssignments': updates.maxCaseAssignments = value as number; break
-        case 'teamId': updates.teamId = value as string; break
         case 'supervisorPubkey': updates.supervisorPubkey = value as string; break
       }
     }

@@ -58,7 +58,7 @@ users.post('/',
       // Epic 340: User profile extensions
       ...(body.specializations && { specializations: body.specializations }),
       ...(body.maxCaseAssignments !== undefined && { maxCaseAssignments: body.maxCaseAssignments }),
-      ...(body.teamId && { teamId: body.teamId }),
+      ...(body.supervisorPubkey && { supervisorPubkey: body.supervisorPubkey }),
       ...(body.supervisorPubkey && { supervisorPubkey: body.supervisorPubkey }),
     })
 
