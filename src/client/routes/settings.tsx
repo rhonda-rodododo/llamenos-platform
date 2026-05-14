@@ -45,7 +45,7 @@ import { ConfirmDialog } from '@/components/confirm-dialog'
 export const Route = createFileRoute('/settings')({
   component: SettingsPage,
   validateSearch: (search: Record<string, unknown>) => ({
-    section: (search.section as string) || '',
+    section: (search.section as string) || undefined,
   }),
 })
 
@@ -598,7 +598,6 @@ function NotificationPermissionStatus() {
 
 function LinkDeviceSection() {
   const { t } = useTranslation()
-  const { toast } = useToast()
   const [linkCode, setLinkCode] = useState('')
   const [status, setStatus] = useState<'idle' | 'linking' | 'verify-sas' | 'success' | 'error'>('idle')
   const [statusMessage, setStatusMessage] = useState('')
