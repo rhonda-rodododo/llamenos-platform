@@ -307,14 +307,14 @@ When('I fetch platform-scoped call metrics', async ({ request, world }) => {
 Then('I receive 24 hour buckets', async ({ world }) => {
   const { lastStatus, lastData } = getAnalyticsState(world)
   expect(lastStatus).toBe(200)
-  const data = lastData as { hours: Array<{ hour: number; count: number }> }
-  expect(data.hours).toHaveLength(24)
+  const data = lastData as { buckets: Array<{ hour: number; count: number }> }
+  expect(data.buckets).toHaveLength(24)
 })
 
 Then('the total across buckets matches the call count', async ({ world }) => {
   const { lastData, callCount } = getAnalyticsState(world)
-  const data = lastData as { hours: Array<{ hour: number; count: number }> }
-  const total = data.hours.reduce((sum, h) => sum + h.count, 0)
+  const data = lastData as { buckets: Array<{ hour: number; count: number }> }
+  const total = data.buckets.reduce((sum, h) => sum + h.count, 0)
   expect(total).toBeGreaterThanOrEqual(callCount)
 })
 

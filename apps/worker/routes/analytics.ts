@@ -23,14 +23,14 @@ import {
 
 const analytics = new Hono<AppEnv>()
 
-function parseDateRange(query: { from?: string; to?: string }): {
-  from?: Date
-  to?: Date
-} {
-  return {
-    from: query.from ? new Date(query.from) : undefined,
-    to: query.to ? new Date(query.to) : undefined,
-  }
+function parseDateRange(query: { from?: string; to?: string }): Partial<{
+  from: Date
+  to: Date
+}> {
+  const result: Partial<{ from: Date; to: Date }> = {}
+  if (query.from) result.from = new Date(query.from)
+  if (query.to) result.to = new Date(query.to)
+  return result
 }
 
 async function getAnalyticsService(): Promise<AnalyticsService> {
