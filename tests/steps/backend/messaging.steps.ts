@@ -7,10 +7,9 @@ import { Given, When, Then } from './fixtures'
 import { getScenarioState } from './common.steps'
 import {
   simulateIncomingMessage,
-  simulateDeliveryStatus,
   uniqueCallerNumber,
 } from '../../simulation-helpers'
-import { apiGet, apiPost, apiPatch } from '../../api-helpers'
+import { apiGet, apiPatch } from '../../api-helpers'
 
 // ── Message Simulation ────────────────────────────────────────────
 
@@ -20,6 +19,7 @@ Given('a new phone number sends an SMS', async ({ request, world }) => {
     senderNumber: sender,
     body: 'Hello, I need help',
     channel: 'sms',
+    hubId: getScenarioState(world).hubId,
   })
   getScenarioState(world).conversationId = result.conversationId
   getScenarioState(world).messageId = result.messageId
@@ -31,6 +31,7 @@ Given('an existing conversation with a phone number', async ({ request, world })
     senderNumber: sender,
     body: 'First message',
     channel: 'sms',
+    hubId: getScenarioState(world).hubId,
   })
   getScenarioState(world).conversationId = result.conversationId
   // Store the sender for reuse in the next step
@@ -50,6 +51,7 @@ When('a new message arrives from the same number', async ({ request, world }) =>
     senderNumber,
     body: 'Follow-up message',
     channel: 'sms',
+    hubId: getScenarioState(world).hubId,
   })
   // Should reuse the same conversation
   getScenarioState(world).messageId = result.messageId
@@ -80,6 +82,7 @@ Given('a new conversation arrives', async ({ request, world }) => {
     senderNumber: sender,
     body: 'New conversation for assignment',
     channel: 'sms',
+    hubId: getScenarioState(world).hubId,
   })
   getScenarioState(world).conversationId = result.conversationId
 })
@@ -117,7 +120,7 @@ Then('the conversation should be assigned to a volunteer', async ({ request, wor
 
 Given(
   '{int} volunteers with {int}, {int}, and {int} active conversations',
-  async ({ request, world }, count: number, _load1: number, _load2: number, _load3: number) => {
+  async ({ request, world }, count: number) => {
     const { createVolunteerViaApi, createShiftViaApi } = await import('../../api-helpers')
     const hubId = getScenarioState(world).hubId
     // Create volunteers if needed
@@ -142,7 +145,7 @@ Given(
 
 Then(
   'it should be assigned to the volunteer with {int} conversation',
-  async ({ request, world }, _expectedLoad: number) => {
+  async ({ request, world }) => {
     // Verify the conversation was assigned (load balancing logic is server-side)
     expect(getScenarioState(world).conversationId).toBeDefined()
     const { status, data } = await apiGet<{ assignedTo?: string }>(
@@ -157,15 +160,18 @@ Then(
 // ── Channel Type ────────────────────────────────────────────────
 
 Given('messages from SMS and WhatsApp channels', async ({ request, world }) => {
+  const hubId = getScenarioState(world).hubId
   const smsResult = await simulateIncomingMessage(request, {
     senderNumber: uniqueCallerNumber(),
     body: 'SMS message',
     channel: 'sms',
+    hubId,
   })
   const waResult = await simulateIncomingMessage(request, {
     senderNumber: uniqueCallerNumber(),
     body: 'WhatsApp message',
     channel: 'whatsapp',
+    hubId,
   })
   getScenarioState(world).lastApiResponse = {
     status: 200,
@@ -200,6 +206,7 @@ Given('a conversation with status {string}', async ({ request, world }, targetSt
     senderNumber: sender,
     body: 'Conversation to be closed',
     channel: 'sms',
+    hubId: getScenarioState(world).hubId,
   })
   getScenarioState(world).conversationId = result.conversationId
 
@@ -217,6 +224,7 @@ When('a new inbound message arrives', async ({ request, world }) => {
     senderNumber,
     body: 'Reopen message',
     channel: 'sms',
+    hubId: getScenarioState(world).hubId,
   })
   getScenarioState(world).conversationId = result.conversationId
 })
