@@ -647,6 +647,33 @@ pub fn mobile_random_bytes_hex() -> String {
     hex::encode(bytes)
 }
 
+// ── Device linking ephemeral keypair ────────────────────────────────
+
+/// Ephemeral X25519 keypair for device-linking ECDH provisioning.
+///
+/// Unlike identity keys, the secret IS exposed — provisioning is a one-shot
+/// flow where the new device must perform ECDH with the primary device, and
+/// the ephemeral secret only lives in client memory for the duration of the
+/// linking handshake. Callers must zero or drop the secret immediately after
+/// the SAS verification step.
+#[derive(uniffi::Record)]
+pub struct EphemeralKeyPair {
+    /// hex-encoded 32-byte secret key (caller is responsible for clearing)
+    pub secret_key_hex: String,
+    /// hex-encoded 32-byte x-only public key
+    pub public_key: String,
+}
+
+/// Generate an ephemeral X25519 keypair for device-linking ECDH provisioning.
+#[uniffi::export]
+pub fn generate_ephemeral_keypair_mobile() -> EphemeralKeyPair {
+    let (sk, pk) = hpke_envelope::generate_x25519_keypair();
+    EphemeralKeyPair {
+        secret_key_hex: (*sk).clone(),
+        public_key: pk,
+    }
+}
+
 /// Try to decrypt an event by trial-decrypting with all cached hub keys.
 ///
 /// Returns `[hub_id, plaintext_json]` for the first key that succeeds,
