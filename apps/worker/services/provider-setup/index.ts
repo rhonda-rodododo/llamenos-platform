@@ -1,4 +1,4 @@
-import { eq, and, desc } from 'drizzle-orm'
+import { eq, and, desc, sql } from 'drizzle-orm'
 import { randomBytes } from 'node:crypto'
 import type { Database } from '../../db'
 import { providerConfigs, oauthStates, signalRegistrations, a2pRegistrations } from '../../db/schema'
@@ -271,15 +271,13 @@ export class ProviderSetup {
 
   private async getProviderConfigRow(
     provider: TelephonyProviderType,
-    hubId?: string,
+    hubId?: string | null,
   ): Promise<typeof providerConfigs.$inferSelect | null> {
-    if (hubId === null || hubId === undefined) {
-      throw new ProviderApiError(
-        'hubId is required for provider config lookup',
-        400,
-        'Missing hubId',
-      )
-    }
+    // When hubId is provided, look up hub-scoped config.
+    // When hubId is undefined/null, look up global config (hub_id IS NULL).
+    const hubCondition = hubId
+      ? eq(providerConfigs.hubId, hubId)
+      : sql`${providerConfigs.hubId} IS NULL`
 
     const [row] = await this.db
       .select()
@@ -287,7 +285,7 @@ export class ProviderSetup {
       .where(
         and(
           eq(providerConfigs.providerType, provider),
-          eq(providerConfigs.hubId, hubId),
+          hubCondition,
         ),
       )
       .orderBy(desc(providerConfigs.createdAt))

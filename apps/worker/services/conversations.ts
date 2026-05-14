@@ -13,9 +13,9 @@ import {
   files,
   contactIdentifiers,
 } from '../db/schema'
-import type { Conversation, EncryptedMessage, ConversationStatus, MessageDeliveryStatus } from '../types'
+import type { ConversationStatus, MessageDeliveryStatus } from '../types'
 import type { IncomingMessage, MessageStatusUpdate } from '../messaging/adapter'
-import type { MessagingChannelType, FileRecord, FileKeyEnvelope } from '@shared/types'
+import type { MessagingChannelType, FileKeyEnvelope } from '@shared/types'
 import type { RecipientEnvelope } from '@shared/types'
 import { encryptMessageForStorage, encryptContactIdentifier, decryptContactIdentifier } from '../lib/crypto'
 import { ServiceError } from './settings'
@@ -231,9 +231,7 @@ export class ConversationsService {
   }
 
   async update(id: string, input: UpdateConversationInput): Promise<ConversationRow> {
-    const existing = await this.getById(id)
-    const prevAssignedTo = existing.assignedTo
-
+    await this.getById(id) // throws 404 if not found
     const updates: Record<string, unknown> = {
       updatedAt: new Date(),
     }
@@ -286,8 +284,8 @@ export class ConversationsService {
   // --- Messages ---
 
   async addMessage(input: AddMessageInput): Promise<MessageRow> {
-    // Verify conversation exists
-    const conv = await this.getById(input.conversationId)
+    // Verify conversation exists (throws 404 if not found)
+    await this.getById(input.conversationId)
 
     const [msg] = await this.db
       .insert(messages)
@@ -416,6 +414,7 @@ export class ConversationsService {
   async handleIncoming(
     incoming: IncomingMessage,
     adminDecryptionPubkey: string,
+    hubId?: string,
   ): Promise<{
     conversationId: string
     messageId: string
@@ -426,17 +425,23 @@ export class ConversationsService {
       throw new ServiceError(500, 'HMAC secret not configured')
     }
 
-    // Find existing conversation from this sender on this channel
+    // Find existing conversation from this sender on this channel.
+    // hubId scoping prevents cross-worker bleed in parallel test execution.
+    const whereConditions = [
+      eq(conversations.channelType, incoming.channelType),
+      eq(conversations.contactIdentifierHash, incoming.senderIdentifierHash),
+      sql`${conversations.status} IN ('active', 'waiting', 'closed')`,
+    ]
+    if (hubId) {
+      whereConditions.push(eq(conversations.hubId, hubId))
+    } else {
+      whereConditions.push(sql`${conversations.hubId} IS NULL`)
+    }
+
     const [existingConv] = await this.db
       .select()
       .from(conversations)
-      .where(
-        and(
-          eq(conversations.channelType, incoming.channelType),
-          eq(conversations.contactIdentifierHash, incoming.senderIdentifierHash),
-          sql`${conversations.status} IN ('active', 'waiting', 'closed')`,
-        ),
-      )
+      .where(and(...whereConditions))
       .orderBy(desc(conversations.updatedAt))
       .limit(1)
 
@@ -462,6 +467,7 @@ export class ConversationsService {
       const [created] = await this.db
         .insert(conversations)
         .values({
+          hubId: hubId ?? null,
           channelType: incoming.channelType,
           contactIdentifierHash: incoming.senderIdentifierHash,
           contactLast4: last4,

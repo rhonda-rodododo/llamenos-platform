@@ -21,16 +21,41 @@ import { getProviderCapability } from '../services/provider-setup/registry'
 import { ProviderApiError } from '../services/provider-setup/types'
 import { SignalRegistrationError } from '../services/provider-setup/signal-registration'
 import { A2pRegistrationError } from '../services/provider-setup/a2p-registration'
+import { permissionGranted, resolvePermissions, resolveHubPermissions } from '@shared/permissions'
 
-/** Extract hubId from context or request body, returning non-optional string.
- *  Throws 400 if hubId is not available from either source. */
-function resolveHubId(c: Context<AppEnv>, bodyHubId?: string): string {
+/**
+ * When a non-hub-scoped route receives hubId from the request body/query,
+ * validate that the user has access to that hub (either super-admin or hub member
+ * with appropriate permissions). Returns the validated hubId or null if no hubId.
+ * Throws ProviderApiError(403) if the user lacks access.
+ */
+function validateBodyHubAccess(c: Context<AppEnv>, bodyHubId?: string, requiredPermission?: string): string | undefined {
   const hubId = c.get('hubId') ?? bodyHubId
-  if (!hubId) {
-    throw new ProviderApiError('hubId is required', 400, 'Missing hubId')
+  if (!hubId) return undefined
+
+  // If hubId comes from hub context middleware, it's already validated
+  if (c.get('hubId')) return hubId
+
+  // hubId came from request body — validate access
+  const user = c.get('user')
+  const allRoles = c.get('allRoles')
+
+  // Super-admin bypasses hub membership checks
+  const globalPerms = resolvePermissions(user.roles, allRoles)
+  if (permissionGranted(globalPerms, '*')) return hubId
+
+  // Non-super-admin must have hub membership with the required permission
+  const hubPerms = resolveHubPermissions(user.roles, user.hubRoles || [], allRoles, hubId)
+  if (hubPerms.length === 0) {
+    throw new ProviderApiError('Access denied', 403, 'No hub access')
   }
+  if (requiredPermission && !permissionGranted(hubPerms, requiredPermission)) {
+    throw new ProviderApiError('Insufficient permissions', 403, 'Missing hub permission')
+  }
+
   return hubId
 }
+
 
 /** Read OAuth client_id from environment for a provider. */
 function getOAuthClientId(provider: string): string {
@@ -404,13 +429,13 @@ providerSetup.post('/configure',
   async (c) => {
     const body = c.req.valid('json')
     const services = c.get('services')
-    const hubId = c.get('hubId')
 
     try {
+      const hubId = validateBodyHubAccess(c, body.hubId, 'telephony:manage-providers')
       await services.providerSetup.configure(
         body.provider,
         body.credentials ?? {},
-        hubId ?? body.hubId,
+        hubId,
         body.phoneNumber,
       )
       return c.json({ ok: true })
@@ -451,11 +476,11 @@ providerSetup.post('/test',
   async (c) => {
     const body = c.req.valid('json')
     const services = c.get('services')
-    const hubId = resolveHubId(c, body.hubId)
+    const hubId = c.get('hubId')
 
     const result = await services.providerSetup.testConnection(
       body.provider as Parameters<typeof services.providerSetup.testConnection>[0],
-      hubId,
+      hubId ?? body.hubId,
     )
     return c.json(result)
   },
@@ -478,7 +503,7 @@ providerSetup.get('/status/:provider',
   async (c) => {
     const provider = c.req.param('provider')
     const services = c.get('services')
-    const hubId = resolveHubId(c)
+    const hubId = c.get('hubId')
 
     const result = await services.providerSetup.getProviderStatus(
       provider as Parameters<typeof services.providerSetup.getProviderStatus>[0],
@@ -505,7 +530,7 @@ providerSetup.get('/phone-numbers',
   async (c) => {
     const provider = c.req.query('provider')
     const services = c.get('services')
-    const hubId = resolveHubId(c, c.req.query('hubId'))
+    const hubId = c.get('hubId') ?? c.req.query('hubId')
 
     if (!provider) {
       return c.json({ error: 'provider query param required' }, 400)
@@ -545,10 +570,10 @@ providerSetup.post('/phone-numbers/search',
   async (c) => {
     const pubkey = c.get('pubkey')
     const services = c.get('services')
-    const hubId = resolveHubId(c)
+    const hubId = c.get('hubId')
     const body = c.req.valid('json')
 
-    const limited = await checkRateLimit(services.settings, `provider-search:${hubId}:${pubkey}`, 5)
+    const limited = await checkRateLimit(services.settings, `provider-search:${hubId ?? 'global'}:${pubkey}`, 5)
     if (limited) {
       return c.json({ error: 'Rate limit exceeded' }, 429)
     }
@@ -588,10 +613,10 @@ providerSetup.post('/phone-numbers/provision',
   async (c) => {
     const pubkey = c.get('pubkey')
     const services = c.get('services')
-    const hubId = resolveHubId(c, c.req.valid('json').hubId)
+    const hubId = c.get('hubId')
     const body = c.req.valid('json')
 
-    const limited = await checkRateLimit(services.settings, `provider-provision:${hubId}:${pubkey}`, 1)
+    const limited = await checkRateLimit(services.settings, `provider-provision:${hubId ?? 'global'}:${pubkey}`, 1)
     if (limited) {
       return c.json({ error: 'Rate limit exceeded' }, 429)
     }
@@ -600,7 +625,7 @@ providerSetup.post('/phone-numbers/provision',
       const number = await services.providerSetup.provisionNumber(
         body.providerType,
         body,
-        hubId,
+        hubId ?? body.hubId,
       )
 
       let webhookWarning: string | undefined
@@ -609,7 +634,7 @@ providerSetup.post('/phone-numbers/provision',
           await services.providerSetup.configureWebhooks(
             body.providerType,
             number.id,
-            { hubId },
+            { hubId: hubId ?? body.hubId ?? '' },
           )
         } catch (webhookErr) {
           webhookWarning = webhookErr instanceof Error ? webhookErr.message : 'Webhook configuration failed'
@@ -649,7 +674,7 @@ providerSetup.post('/configure-webhooks',
       await services.providerSetup.configureWebhooks(
         body.provider as Parameters<typeof services.providerSetup.configureWebhooks>[0],
         body.numberId,
-        { enableSms: body.enableSms, hubId: resolveHubId(c, body.hubId) },
+        { enableSms: body.enableSms, hubId: c.get('hubId') ?? body.hubId ?? '' },
       )
       return c.json({ ok: true })
     } catch (err) {
@@ -694,7 +719,7 @@ providerSetup.post('/create-sip-trunk',
       const trunk = await services.providerSetup.createSipTrunk(
         body.provider as Parameters<typeof services.providerSetup.createSipTrunk>[0],
         body.domain,
-        resolveHubId(c, body.hubId),
+        c.get('hubId') ?? body.hubId ?? '',
       )
       // Never return sipPassword in the response — credentials are stored encrypted server-side
       return c.json({
