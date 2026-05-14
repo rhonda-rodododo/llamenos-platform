@@ -257,6 +257,20 @@ pub const LABEL_SERVER_SIGNING_INFO: &str = "llamenos:server-signing-key-info:v1
 /// WebSocket authentication challenge label
 pub const LABEL_WS_CHALLENGE: &str = "llamenos:ws-auth:v1";
 
+// --- Recovery Group ---
+
+/// HPKE wrapping each share holder's Shamir share at rest
+pub const LABEL_RECOVERY_GROUP_SHARE_WRAP: &str = "llamenos:recovery-group:share-wrap:v1";
+
+/// HPKE wrapping user's PUK seed under recovery group pubkey
+pub const LABEL_RECOVERY_PUK_SEED_WRAP: &str = "llamenos:recovery-group:puk-seed-wrap:v1";
+
+/// HPKE wrapping share contribution to user's new device during ceremony
+pub const LABEL_RECOVERY_SHARE_CONTRIBUTE: &str = "llamenos:recovery-group:share-contribute:v1";
+
+/// Domain separation for share liveness proofs
+pub const LABEL_RECOVERY_LIVENESS_PROOF: &str = "llamenos:recovery-group:liveness-proof:v1";
+
 // --- Role Encryption ---
 
 /// Platform role name encryption (per-admin HPKE envelope)
@@ -278,6 +292,8 @@ pub const LABEL_HUB_ROLE_ENCRYPT: &str = "llamenos:hub-role-encrypt:v1";
 // Indices 36-46: new v3 labels (PUK, device auth, items key, SFrame, MLS)
 // Index 53: TOMBSTONE (was LABEL_ECIES_V2_SALT — ECIES removed, index reserved)
 // Indices 57-68: labels synced from crypto-labels.json
+// Indices 69-72: Recovery Group (EP09-P1)
+// Indices 73-75: Role Encryption (EP01)
 // =============================================================================
 
 pub const LABEL_REGISTRY: &[&str] = &[
@@ -370,10 +386,15 @@ pub const LABEL_REGISTRY: &[&str] = &[
     LABEL_SERVER_SIGNING_KEY,               // 66
     LABEL_SERVER_SIGNING_INFO,              // 67
     LABEL_WS_CHALLENGE,                     // 68
-    // 69-71: Role encryption labels
-    LABEL_PLATFORM_ROLE_NAME_ENCRYPT, // 69
-    LABEL_PLATFORM_ROLE_DESC_ENCRYPT, // 70
-    LABEL_HUB_ROLE_ENCRYPT,           // 71
+    // 69-72: Recovery Group (EP09-P1)
+    LABEL_RECOVERY_GROUP_SHARE_WRAP, // 69
+    LABEL_RECOVERY_PUK_SEED_WRAP,    // 70
+    LABEL_RECOVERY_SHARE_CONTRIBUTE, // 71
+    LABEL_RECOVERY_LIVENESS_PROOF,   // 72
+    // 73-75: Role Encryption (EP01)
+    LABEL_PLATFORM_ROLE_NAME_ENCRYPT, // 73
+    LABEL_PLATFORM_ROLE_DESC_ENCRYPT, // 74
+    LABEL_HUB_ROLE_ENCRYPT,           // 75
 ];
 
 /// Look up a label string by its numeric ID.
@@ -483,6 +504,22 @@ mod tests {
         );
         assert_eq!(LABEL_WS_CHALLENGE, "llamenos:ws-auth:v1");
         assert_eq!(
+            LABEL_RECOVERY_GROUP_SHARE_WRAP,
+            "llamenos:recovery-group:share-wrap:v1"
+        );
+        assert_eq!(
+            LABEL_RECOVERY_PUK_SEED_WRAP,
+            "llamenos:recovery-group:puk-seed-wrap:v1"
+        );
+        assert_eq!(
+            LABEL_RECOVERY_SHARE_CONTRIBUTE,
+            "llamenos:recovery-group:share-contribute:v1"
+        );
+        assert_eq!(
+            LABEL_RECOVERY_LIVENESS_PROOF,
+            "llamenos:recovery-group:liveness-proof:v1"
+        );
+        assert_eq!(
             LABEL_PLATFORM_ROLE_NAME_ENCRYPT,
             "llamenos:platform-role-name-encrypt:v1"
         );
@@ -522,9 +559,13 @@ mod tests {
         assert_eq!(id_to_label(66), Some(LABEL_SERVER_SIGNING_KEY));
         assert_eq!(id_to_label(67), Some(LABEL_SERVER_SIGNING_INFO));
         assert_eq!(id_to_label(68), Some(LABEL_WS_CHALLENGE));
-        assert_eq!(id_to_label(69), Some(LABEL_PLATFORM_ROLE_NAME_ENCRYPT));
-        assert_eq!(id_to_label(70), Some(LABEL_PLATFORM_ROLE_DESC_ENCRYPT));
-        assert_eq!(id_to_label(71), Some(LABEL_HUB_ROLE_ENCRYPT));
+        assert_eq!(id_to_label(69), Some(LABEL_RECOVERY_GROUP_SHARE_WRAP));
+        assert_eq!(id_to_label(70), Some(LABEL_RECOVERY_PUK_SEED_WRAP));
+        assert_eq!(id_to_label(71), Some(LABEL_RECOVERY_SHARE_CONTRIBUTE));
+        assert_eq!(id_to_label(72), Some(LABEL_RECOVERY_LIVENESS_PROOF));
+        assert_eq!(id_to_label(73), Some(LABEL_PLATFORM_ROLE_NAME_ENCRYPT));
+        assert_eq!(id_to_label(74), Some(LABEL_PLATFORM_ROLE_DESC_ENCRYPT));
+        assert_eq!(id_to_label(75), Some(LABEL_HUB_ROLE_ENCRYPT));
     }
 
     /// Verify bidirectional lookup (skipping tombstoned indices).
