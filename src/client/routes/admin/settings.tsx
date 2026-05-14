@@ -43,7 +43,7 @@ import { ReportTypesSection } from '@/components/admin-settings/report-types-sec
 export const Route = createFileRoute('/admin/settings')({
   component: AdminSettingsPage,
   validateSearch: (search: Record<string, unknown>) => ({
-    section: (search.section as string) || '',
+    section: (search.section as string) || undefined,
   }),
 })
 

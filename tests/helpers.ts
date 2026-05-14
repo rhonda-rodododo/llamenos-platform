@@ -114,9 +114,11 @@ export async function navigateAfterLogin(page: Page, url: string, expectAccessDe
     // Restricted page — assert "Access Denied" is shown (no page-title testid on these pages).
     await expect(page.getByText('Access Denied', { exact: true })).toBeVisible({ timeout: Timeouts.ELEMENT })
   } else {
-    // Normal page — assert page-title is visible. This catches bugs where a page
-    // silently renders an access-denied message it shouldn't.
-    await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+    // Normal page — assert a heading is visible. Admin section pages use
+    // 'admin-section-heading' instead of 'page-title', so check both.
+    await expect(
+      page.getByTestId(TestIds.PAGE_TITLE).or(page.getByTestId('admin-section-heading'))
+    ).toBeVisible({ timeout: Timeouts.ELEMENT })
   }
 }
 
