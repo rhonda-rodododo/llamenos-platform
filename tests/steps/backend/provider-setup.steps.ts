@@ -294,10 +294,12 @@ When('I POST to search phone numbers with providerType {string} and countryCode 
   setState(world, KEY, ps)
 })
 
-When('I POST to search phone numbers 6 times in quick succession', async ({ request, world }) => {
+When('I POST to search phone numbers 6 times in quick succession', async ({ request, world, workerHub }) => {
+  // Use hub-scoped endpoint so each parallel worker gets its own rate limit bucket
+  // (the rate limit key includes hubId — without it, all workers share 'global')
   const statuses: number[] = []
   for (let i = 0; i < 6; i++) {
-    const { status } = await apiPost(request, '/provider-setup/phone-numbers/search', {
+    const { status } = await apiPost(request, `/hubs/${workerHub}/provider-setup/phone-numbers/search`, {
       providerType: 'twilio',
       countryCode: 'US',
     }, ADMIN_SEED)

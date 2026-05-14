@@ -54,7 +54,7 @@ function getIS(world: Record<string, unknown>): IsolationState {
 
 // ── Hooks ──────────────────────────────────────────────────────────
 
-Before(async ({ request, world }) => {
+Before({ tags: '@hub-isolation' }, async ({ request, world }) => {
   // Create two isolated hubs with separate admin users
   const hubAId = await createHubViaApi(request, `bdd-iso-a-${Date.now()}`)
   const hubBId = await createHubViaApi(request, `bdd-iso-b-${Date.now()}`)
@@ -83,11 +83,11 @@ Before(async ({ request, world }) => {
 
   const adminA = await createUserViaApi(request, {
     name: uniqueName('admin-a'),
-    roleIds: [roleA.id],
+    roleIds: [],
   })
   const adminB = await createUserViaApi(request, {
     name: uniqueName('admin-b'),
-    roleIds: [roleB.id],
+    roleIds: [],
   })
 
   // Add each admin as member of their respective hub
@@ -106,7 +106,7 @@ Before(async ({ request, world }) => {
   actor.hubMap.set('hub-b', hubBId)
 })
 
-After(async ({ request, world }) => {
+After({ tags: '@hub-isolation' }, async ({ request, world }) => {
   const state = getIS(world)
   await deleteHubViaApi(request, state.hubA.hubId).catch(() => {})
   await deleteHubViaApi(request, state.hubB.hubId).catch(() => {})

@@ -176,6 +176,9 @@ export class HubOnboardService {
 
     if (nextStep) {
       updates.currentStep = nextStep
+      if (nextStep === 'completion') {
+        updates.isComplete = true
+      }
     } else {
       updates.currentStep = 'completion'
       updates.isComplete = true
@@ -294,20 +297,24 @@ export class HubOnboardService {
 
   async enableChannel(hubId: string, channel: string): Promise<ChannelConfig> {
     const hubSettings = await this.settings.getHubSettings(hubId)
-    const channels = { ...(hubSettings.channels as ChannelConfig) }
-    if (channel in channels) {
-      channels[channel as keyof ChannelConfig] = true
+    const defaultChannels: ChannelConfig = {
+      voice: false, sms: false, email: false, signal: false,
+      whatsapp: false, telegram: false, rcs: false,
     }
+    const channels = { ...defaultChannels, ...(hubSettings.channels as ChannelConfig) }
+    channels[channel as keyof ChannelConfig] = true
     await this.settings.updateHubSettings(hubId, { ...hubSettings, channels })
     return channels
   }
 
   async disableChannel(hubId: string, channel: string): Promise<ChannelConfig> {
     const hubSettings = await this.settings.getHubSettings(hubId)
-    const channels = { ...(hubSettings.channels as ChannelConfig) }
-    if (channel in channels) {
-      channels[channel as keyof ChannelConfig] = false
+    const defaultChannels: ChannelConfig = {
+      voice: false, sms: false, email: false, signal: false,
+      whatsapp: false, telegram: false, rcs: false,
     }
+    const channels = { ...defaultChannels, ...(hubSettings.channels as ChannelConfig) }
+    channels[channel as keyof ChannelConfig] = false
     await this.settings.updateHubSettings(hubId, { ...hubSettings, channels })
     return channels
   }
