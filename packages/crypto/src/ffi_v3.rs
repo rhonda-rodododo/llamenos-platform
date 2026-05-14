@@ -674,6 +674,28 @@ pub fn generate_ephemeral_keypair_mobile() -> EphemeralKeyPair {
     }
 }
 
+/// Derive the X25519 public key from a hex-encoded 32-byte secret key.
+///
+/// Used by WakeKeyService to obtain the registration public key from a stored private key,
+/// without re-generating the keypair. The wake key lifecycle requires the private key to
+/// persist in the Keychain while only the public key is sent to the server at registration.
+#[uniffi::export]
+pub fn get_public_key(secret_key_hex: String) -> Result<String, CryptoError> {
+    use x25519_dalek::{PublicKey as X25519PublicKey, StaticSecret as X25519StaticSecret};
+
+    let sk_bytes = hex::decode(&secret_key_hex).map_err(CryptoError::HexError)?;
+    if sk_bytes.len() != 32 {
+        return Err(CryptoError::InvalidSecretKey);
+    }
+    let mut sk_arr = [0u8; 32];
+    sk_arr.copy_from_slice(&sk_bytes);
+    let secret = X25519StaticSecret::from(sk_arr);
+    let public_key = X25519PublicKey::from(&secret);
+    let result = hex::encode(public_key.as_bytes());
+    sk_arr.zeroize();
+    Ok(result)
+}
+
 /// Try to decrypt an event by trial-decrypting with all cached hub keys.
 ///
 /// Returns `[hub_id, plaintext_json]` for the first key that succeeds,
