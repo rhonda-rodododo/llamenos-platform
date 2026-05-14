@@ -563,7 +563,7 @@ dev.post('/test-simulate/incoming-message', async (c) => {
     senderIdentifierHash: senderHash,
     body: body.body,
     timestamp: new Date().toISOString(),
-  }, adminDecryptionPubkey)
+  }, adminDecryptionPubkey, body.hubId)
 
   // Publish Nostr event (mirrors real messaging webhook flow)
   // Messaging events use empty hubId — conversations span all hubs
