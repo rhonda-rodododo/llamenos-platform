@@ -15,6 +15,7 @@ import {
   apiPost,
   createUserViaApi,
   createRoleViaApi,
+  addHubMemberViaApi,
   uniqueName,
 } from '../../api-helpers'
 
@@ -62,6 +63,7 @@ Given('I am a hub admin', async ({ world }) => {
 
 Given('I am a hub admin for hub {string}', async ({ request, world }, hubName: string) => {
   const actor = getHubActor(world)
+  // Create a role with hub-admin-level permissions
   const role = await createRoleViaApi(request, {
     name: uniqueName(`hub-admin-${hubName}`),
     slug: `hub-admin-${hubName}-${Date.now()}`,
@@ -72,10 +74,16 @@ Given('I am a hub admin for hub {string}', async ({ request, world }, hubName: s
       'hubs:configure',
     ],
   })
+  // Create user WITHOUT global roles — permissions come from hub membership only
   const user = await createUserViaApi(request, {
     name: uniqueName(`admin-${hubName}`),
-    roleIds: [role.id],
+    roleIds: [],
   })
+  // Add user as hub member with the role (hub-scoped, not global)
+  const hubId = actor.hubMap.get(hubName)
+  if (hubId) {
+    await addHubMemberViaApi(request, hubId, user.pubkey, [role.id])
+  }
   actor.actorSeed = user.seedHex
   actor.isSuperAdmin = false
 })

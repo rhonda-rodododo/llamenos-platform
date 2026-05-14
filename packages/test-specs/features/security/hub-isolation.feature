@@ -1,4 +1,4 @@
-@backend @security
+@backend @security @hub-isolation
 Feature: Multi-Hub Isolation
   As a security-conscious admin
   I want complete data separation between hubs

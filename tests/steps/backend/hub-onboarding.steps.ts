@@ -150,7 +150,7 @@ Given('hub {string} has quota maxPhoneNumbers set to {int}', async ({ request, w
   await apiPut(
     request,
     `/hubs/${state.hubId}/onboard/quotas`,
-    { maxPhoneNumbers: max },
+    { maxPhoneNumbers: max, maxSubAccounts: max },
   )
 })
 
