@@ -404,6 +404,149 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add E2E tests for device linking and fix /link-device public path
 
 
+## 0.19.7 (2026-05-14)
+
+### Features
+
+- integrate Nostr event decrypt via UniFFI CryptoService (#143)
+- add ios-e2e workflow with 4 parallel shards and hub separation (#163)
+- add wasm-pack toolchain and enable WASM crypto interop tests
+- add data deletion page required for Google Play data safety (#183)
+- add contributor infrastructure — templates, SECURITY.md, CODEOWNERS, labels, badges (#191)
+- mise integration and contributor onboarding overhaul (#189)
+- add missing response schemas for cross-platform codegen (#199)
+- add Play Store assets and submission checklist (#182)
+- add 6 domain supervisor agents with proper dispatch integration
+- generate supervisor agent instructions
+- add migration drift detection hook and CI check (#215)
+- port v1 realistic bootstrap and per-role fixtures (#220)
+- add full-featured blog with OG images, RSS, tags (#227)
+- Rust FFI server bridge + Ed25519 auth purge (#225)
+- add provider auto-config schemas, DB tables, PBAC permissions (Phase 1) (#257)
+- add provider capability registry + 8 provider implementations (Phase 2) (#258)
+- add provider auto-config HTTP routes + BDD tests (Phase 3) (#259)
+- add Signal registration + A2P compliance flows (Phase 4) (#260)
+- add provider auto-configuration UI (Phase 6 - Android)
+- add provider auto-configuration UI (Phase 6 - iOS)
+- automated workspace bootstrap with mise setup and postinstall hook
+- port admin sidebar UX from v1 to v2 (#283)
+- Phase 7 Hub Self-Service Provider Auto-Configuration (#285)
+
+### Fixes
+
+- update all GitHub URLs to llamenos-hotline (#148)
+- URGENT correct GitHub URLs to llamenos-platform (#150)
+- correct GitHub URLs to llamenos-platform (reverts #148 direction) (#151)
+- add missing iOS strings — error_credential_too_short, pin_placeholder
+- SBOM crash on .mcp.json + remove phantom v0.19.6 changelog (#149)
+- add STRFRY_ALLOWED_PUBKEY to all Docker Compose .env steps
+- resolve 5 independent CI failures
+- remove invalid openmls_rust_crypto js feature, fix sip-bridge Docker typecheck
+- resolve remaining 3 CI failures (#153)
+- ios-build-test runs unit tests only, not E2E (#161)
+- install Playwright chromium in backend-bdd job (#162)
+- iOS argon2 params + signal-notifier postgres auth (#160)
+- structured test reporters for machine-readable CI logs (#165)
+- regenerated UniFFI bindings + CryptoServiceTests PIN fixes (verified on M4) (#167)
+- skip UITests build in ios-build-test (#168)
+- regenerate UniFFI bindings and update Kotlin layer for Argon2id
+- update CryptoServiceTest for Argon2 params (iterations → kdfVersion/argon2MCost/argon2TCost/argon2PCost)
+- update PIN input selectors after PinInput refactor to single field
+- add STRFRY_ALLOWED_PUBKEY + deterministic secret to desktop-e2e.yml
+- await Nostr event publishing in simulation endpoints
+- exclude backend-bdd from desktop e2e jobs, bump timeout to 60min
+- update PIN selectors after PinInput refactor to single field
+- fix records-architecture reply count and strict mode violations
+- enable crypto interop tests by generating test vectors in CI
+- fix Hilt EntryPoint ClassCastException and native crypto loading
+- start server after migration to prevent restart loop (#186)
+- fix backend BDD test failures — hubs 201, bans, shifts
+- fix desktop BDD step definitions — button mapping, reports, CMS
+- resolve backend BDD test failures
+- fix auth/PIN BDD step definitions
+- resolve all backend BDD test failures (#203)
+- prevent main branch CI runs from being cancelled (#204)
+- clarify dispatch-one.sh timeout is in seconds, not minutes
+- document all available models in supervisor-common.md
+- restore bun run supervisors aliases, fix zsh local output noise
+- files
+- backend-bdd does not depend on tauri build
+- 3 bugs found in backend core unit test audit (#211)
+- security and logic bugs found in backend unit test audit (#212)
+- bugs found during unit test audit of PRs #206-209 (#210)
+- add 9 missing table migrations for fresh DB (#205)
+- stabilize circuit-breaker half_open timing test
+- add missing reported_by column to active_calls (#214)
+- restore migration-drift job definition dropped by #213 merge (#216)
+- add WASM build step to test-desktop.sh (#217)
+- hub isolation + CI reliability for desktop E2E (#218)
+- fix Android active-call E2E tests — hub URL routing, deserialization, refresh (#198)
+- rewrite admin BDD step definitions for behavioral correctness (#221)
+- remove networkidle waits from bootstrap spec
+- core BDD fixes — notes, messaging, reports (#219)
+- resolve active call card never rendering in E2E tests (#224)
+- add missing BDD step definitions for 27 skipped scenarios (#226)
+- CI logcat capture, hub-scoped CMS data, fail-fast hooks (#228)
+- guard c.env access with optional chaining in hub middleware (#230)
+- seed default roles + fix hub navigation (#229)
+- resolve desktop BDD step definition failures (#233)
+- clarify XCFramework cache key scope comment (#235)
+- recover BDD fixes for notes, messaging, reports (#236)
+- prevent ci-status hang + increase Playwright workers to 4 (#239)
+- resolve desktop auth cascade failures (#240)
+- resolve 14 remaining backend BDD failures (#241)
+- recover unmerged Android fixes — E2E, Argon2, schema, Play Store (#237)
+- cherry-pick safe unit tests and bug fixes from closed #238 (#242)
+- cherry-pick safe DX, site, and test fixes from closed #234 (#243)
+- restructure desktop-e2e workflow to eliminate build timeout (#244)
+- add TOKEN_MAX_AGE_MS and audit env parity (#247)
+- add graceful skip for sidecar-dependent health checks (#246)
+- get desktop BDD E2E tests running in CI (#248)
+- resolve CI E2E failures and eliminate test duplication (#254)
+- ansible templates
+- sync i18n locale keys + resolve migration drift (#265)
+- add missing provider-setup desktop string keys + codegen (#266)
+- convert dotted top-level keys to nested objects (#267)
+- handle dotted keys in Kotlin I18n codegen (#268)
+- Signal + A2P BDD test failures on main (#271)
+- complete deployment templates and fix deployment issues (#256)
+- address code review findings across Phases 1-5 (#262)
+- update telephony provider persistence test for credential masking
+- fix iOS E2E artifact digest mismatch (#273)
+- address code review findings — duplicate import, OAuth state, async nav, encapsulation
+- add missing i18n keys, fix build and crypto label issues
+- address code review findings — OAuth CSRF state, credential clearing, ephemeral session
+- add missing i18n keys and use crypto label constants
+- fix 9 failing E2E tests — hub management and triage queue
+- add fallback to download MinIO binary directly in iOS E2E shard job
+- make 0010 idempotent for fresh databases
+- worktree script, bun lockfile
+- worktree setup
+- move Docker Compose teardown from composite action to calling workflows
+- align ARI password and add missing sip-bridge config for sidecar integration
+- forward csrf_state in OAuth deep link callback
+- remove Nostr references from backend unit tests and system health
+- add bootstrap-backend action, fix ARI password and sip-bridge config
+- use Playwright .or() combinator for reports screen assertion
+- use Playwright .or() combinator for reports screen assertion
+- remove remaining Nostr/strfry/MinIO references across codebase
+- update remaining SERVER_NOSTR_SECRET refs in tests, docs, and site content
+- delete strfry write-policy test (source script already removed)
+- scope telephony provider config to active hub to prevent parallel test interference
+- restore ARI_PASSWORD=changeme to match asterisk config
+- restore EP01 full spec (rebase conflict resolution error)
+- close 13/14 security gaps from PR #286 audit
+- plan self-review fixes across all 4 phases
+- spec self-review (17 issues) + plan cross-review errata
+- resolve 62+ BDD failures from hub self-service PR #285
+- check hub permissions in requirePermission middleware
+- add EphemeralKeyPair + generate_ephemeral_keypair_mobile to Rust FFI
+- use hub-scoped endpoint in rate limit test to prevent cross-worker flake
+- resolve all E2E test failures (557 passing, 0 failing)
+- add get_public_key FFI export for WakeKeyService
+- pass hubId in test connection and fix recovery test flakiness
+- scope messaging conversations and CMS report types to workerHub
+
 ## 0.19.5 (2026-04-29)
 
 ### Features
