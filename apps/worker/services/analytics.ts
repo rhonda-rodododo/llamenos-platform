@@ -342,10 +342,10 @@ export class AnalyticsService {
       )
 
     return {
-      callsToday: todayRow?.callsToday ?? 0,
-      callsThisPeriod: periodRow?.callsInPeriod ?? 0,
+      callsToday: Number(todayRow?.callsToday ?? 0),
+      callsThisPeriod: Number(periodRow?.callsInPeriod ?? 0),
       avgDurationSeconds: Math.round(periodRow?.avgDuration ?? 0),
-      notesCreatedThisPeriod: notesRow?.notesCount ?? 0,
+      notesCreatedThisPeriod: Number(notesRow?.notesCount ?? 0),
     }
   }
 
