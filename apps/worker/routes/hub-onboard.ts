@@ -266,8 +266,15 @@ hubOnboardRoute.post('/sub-account',
     const hubId = c.get('hubId')!
     const body = c.req.valid('json')
 
-    const result = await services.hubOnboard.provisionSubAccount(hubId, body.masterConfigId)
-    return c.json(result)
+    try {
+      const result = await services.hubOnboard.provisionSubAccount(hubId, body.masterConfigId)
+      return c.json(result)
+    } catch (err) {
+      if (err instanceof ProviderApiError) {
+        return c.json({ error: err.message }, err.statusCode as 400 | 404 | 429 | 500)
+      }
+      throw err
+    }
   },
 )
 
