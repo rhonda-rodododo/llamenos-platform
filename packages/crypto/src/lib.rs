@@ -33,6 +33,7 @@ pub mod device_keys;
 pub mod hpke_envelope;
 pub mod labels;
 pub mod puk;
+pub mod shamir;
 pub mod sigchain;
 
 pub mod mls;
@@ -80,3 +81,6 @@ pub use encryption::{
 
 // Re-export audit key types
 pub use audit_key::AuditKeyAdminEnvelope;
+
+// Re-export Shamir types
+pub use shamir::Share;

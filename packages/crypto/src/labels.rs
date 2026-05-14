@@ -271,6 +271,20 @@ pub const LABEL_AUDIT_DETAILS: &str = "llamenos:audit-details:v1";
 /// Device wipe command signature — Ed25519 sig over (targetDevicePubkey || timestamp || reason)
 pub const LABEL_DEVICE_WIPE_SIG: &str = "llamenos:device-wipe-sig:v1";
 
+// --- Recovery Group ---
+
+/// HPKE wrapping each share holder's Shamir share at rest
+pub const LABEL_RECOVERY_GROUP_SHARE_WRAP: &str = "llamenos:recovery-group:share-wrap:v1";
+
+/// HPKE wrapping user's PUK seed under recovery group pubkey
+pub const LABEL_RECOVERY_PUK_SEED_WRAP: &str = "llamenos:recovery-group:puk-seed-wrap:v1";
+
+/// HPKE wrapping share contribution to user's new device during ceremony
+pub const LABEL_RECOVERY_SHARE_CONTRIBUTE: &str = "llamenos:recovery-group:share-contribute:v1";
+
+/// Domain separation for share liveness proofs
+pub const LABEL_RECOVERY_LIVENESS_PROOF: &str = "llamenos:recovery-group:liveness-proof:v1";
+
 // =============================================================================
 // LABEL REGISTRY — maps numeric IDs (u8) to label strings.
 //
@@ -373,12 +387,16 @@ pub const LABEL_REGISTRY: &[&str] = &[
     LABEL_SERVER_SIGNING_KEY,               // 66
     LABEL_SERVER_SIGNING_INFO,              // 67
     LABEL_WS_CHALLENGE,                     // 68
-    // 69-70: EP08 Account Lifecycle
+    // 69-72: EP08 Account Lifecycle
     LABEL_AUDIT_USER_KEY_WRAP,  // 69
     LABEL_ERASURE_OVERRIDE_SIG, // 70
-    // 71-72: EP08 new labels
-    LABEL_AUDIT_DETAILS,   // 71
-    LABEL_DEVICE_WIPE_SIG, // 72
+    LABEL_AUDIT_DETAILS,        // 71
+    LABEL_DEVICE_WIPE_SIG,      // 72
+    // 73-76: Recovery Group
+    LABEL_RECOVERY_GROUP_SHARE_WRAP, // 73
+    LABEL_RECOVERY_PUK_SEED_WRAP,    // 74
+    LABEL_RECOVERY_SHARE_CONTRIBUTE, // 75
+    LABEL_RECOVERY_LIVENESS_PROOF,   // 76
 ];
 
 /// Look up a label string by its numeric ID.
@@ -494,6 +512,22 @@ mod tests {
         );
         assert_eq!(LABEL_AUDIT_DETAILS, "llamenos:audit-details:v1");
         assert_eq!(LABEL_DEVICE_WIPE_SIG, "llamenos:device-wipe-sig:v1");
+        assert_eq!(
+            LABEL_RECOVERY_GROUP_SHARE_WRAP,
+            "llamenos:recovery-group:share-wrap:v1"
+        );
+        assert_eq!(
+            LABEL_RECOVERY_PUK_SEED_WRAP,
+            "llamenos:recovery-group:puk-seed-wrap:v1"
+        );
+        assert_eq!(
+            LABEL_RECOVERY_SHARE_CONTRIBUTE,
+            "llamenos:recovery-group:share-contribute:v1"
+        );
+        assert_eq!(
+            LABEL_RECOVERY_LIVENESS_PROOF,
+            "llamenos:recovery-group:liveness-proof:v1"
+        );
     }
 
     /// Verify registry index stability.
@@ -529,6 +563,10 @@ mod tests {
         assert_eq!(id_to_label(70), Some(LABEL_ERASURE_OVERRIDE_SIG));
         assert_eq!(id_to_label(71), Some(LABEL_AUDIT_DETAILS));
         assert_eq!(id_to_label(72), Some(LABEL_DEVICE_WIPE_SIG));
+        assert_eq!(id_to_label(73), Some(LABEL_RECOVERY_GROUP_SHARE_WRAP));
+        assert_eq!(id_to_label(74), Some(LABEL_RECOVERY_PUK_SEED_WRAP));
+        assert_eq!(id_to_label(75), Some(LABEL_RECOVERY_SHARE_CONTRIBUTE));
+        assert_eq!(id_to_label(76), Some(LABEL_RECOVERY_LIVENESS_PROOF));
     }
 
     /// Verify bidirectional lookup (skipping tombstoned indices).

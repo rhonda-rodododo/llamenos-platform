@@ -75,6 +75,10 @@
     "LABEL_AUDIT_USER_KEY_WRAP": "llamenos:audit-user-key-wrap:v1",
     "LABEL_ERASURE_OVERRIDE_SIG": "llamenos:erasure-override-sig:v1",
     "LABEL_AUDIT_DETAILS": "llamenos:audit-details:v1",
-    "LABEL_DEVICE_WIPE_SIG": "llamenos:device-wipe-sig:v1"
+    "LABEL_DEVICE_WIPE_SIG": "llamenos:device-wipe-sig:v1",
+    "LABEL_RECOVERY_GROUP_SHARE_WRAP": "llamenos:recovery-group:share-wrap:v1",
+    "LABEL_RECOVERY_PUK_SEED_WRAP": "llamenos:recovery-group:puk-seed-wrap:v1",
+    "LABEL_RECOVERY_SHARE_CONTRIBUTE": "llamenos:recovery-group:share-contribute:v1",
+    "LABEL_RECOVERY_LIVENESS_PROOF": "llamenos:recovery-group:liveness-proof:v1"
   }
 }
