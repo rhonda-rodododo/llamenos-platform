@@ -18,7 +18,7 @@ import { TemplateBrowser } from '@/components/admin-settings/template-browser'
 export const Route = createFileRoute('/admin/case-management')({
   component: CaseManagementPage,
   validateSearch: (search: Record<string, unknown>) => ({
-    section: (search.section as string) || '',
+    section: (search.section as string) || undefined,
   }),
 })
 
