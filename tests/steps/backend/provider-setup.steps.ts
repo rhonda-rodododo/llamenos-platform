@@ -295,6 +295,13 @@ When('I POST to search phone numbers with providerType {string} and countryCode 
 })
 
 When('I POST to search phone numbers 6 times in quick succession', async ({ request, world }) => {
+  // Clear rate limits to avoid cross-scenario bleed from parallel workers
+  const testSecret = process.env.DEV_RESET_SECRET || process.env.E2E_TEST_SECRET || 'test-reset-secret'
+  const baseUrl = process.env.TEST_HUB_URL || 'http://localhost:3000'
+  await request.delete(`${baseUrl}/api/test-rate-limits`, {
+    headers: { 'X-Test-Secret': testSecret },
+  }).catch(() => {})
+
   const statuses: number[] = []
   for (let i = 0; i < 6; i++) {
     const { status } = await apiPost(request, '/provider-setup/phone-numbers/search', {
