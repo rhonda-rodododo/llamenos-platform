@@ -310,7 +310,20 @@
     "statusCancelled": "Cancelled",
     "statusDraft": "Draft",
     "statusScheduled": "Scheduled",
-    "statusSent": "Sent"
+    "statusSent": "Sent",
+    "composerTitle": "New Broadcast Message",
+    "recipientCount": "{{count}} recipients",
+    "recipientCountOne": "1 recipient",
+    "retryFailed": "Retry Failed",
+    "retryDelivery": "Retry",
+    "retryingAll": "Retrying all failed...",
+    "progressLabel": "Delivery Progress",
+    "deliveryStatus": "Delivery Status",
+    "deliveryStatusPending": "Pending",
+    "deliveryStatusSent": "Sent",
+    "deliveryStatusDelivered": "Delivered",
+    "deliveryStatusFailed": "Failed",
+    "deliveryStatusOptedOut": "Opted Out"
   },
   "caseManagement": {
     "title": "Case Management",
@@ -888,7 +901,24 @@
     "liveUpdating": "Updating live...",
     "optedOut": "Opted Out",
     "deliveryDetails": "Delivery Details",
-    "noDeliveries": "No deliveries"
+    "noDeliveries": "No deliveries",
+    "retryFailed": "Retry Failed",
+    "retryDelivery": "Retry",
+    "retryAll": "Retry All Failed",
+    "retriedCount": "Reset {{count}} deliveries",
+    "deliveriesTitle": "Delivery Status",
+    "deliveriesEmpty": "No deliveries yet",
+    "progressTitle": "Live Progress",
+    "progressPending": "Pending",
+    "progressDelivered": "Delivered",
+    "progressFailed": "Failed",
+    "progressSent": "Sent",
+    "progressOptedOut": "Opted Out",
+    "deliveryId": "Delivery ID",
+    "lastAttempt": "Last Attempt",
+    "errorDetail": "Error",
+    "closeSheet": "Close",
+    "retryingAll": "Retrying all failed..."
   },
   "callActions": {
     "banAndHangUp": "Ban & Hang Up",
@@ -1021,7 +1051,8 @@
     "comingSoon": "Coming soon",
     "hideAdvanced": "Hide Advanced",
     "showAdvanced": "Show Advanced",
-    "saved": "Saved"
+    "saved": "Saved",
+    "loadMore": "Load more"
   },
   "confirm": {
     "backup": "Confirm Backup",

@@ -72,6 +72,9 @@ const EXCLUDED_SCHEMAS = new Set([
   // WebSocket message unions — discriminated unions not representable in quicktype
   'wsClientMessageSchema',
   'wsServerMessageSchema',
+
+  // Blast progress sub-schema (inlined in parent)
+  'blastProgressDeliverySchema',
 ])
 
 export interface SchemaRegistryEntry {
