@@ -1855,28 +1855,32 @@
     "volunteer": "Volunteer"
   },
   "roles": {
-    "createRole": "Create Role",
-    "created": "Role created",
-    "default": "Default",
-    "deleteConfirm": "Are you sure you want to delete this role? Members will be reassigned to the default role.",
-    "deleteTitle": "Delete Role",
-    "deleted": "Role deleted",
-    "description": "Define roles and assign permissions to control access across your hotline.",
-    "descriptionLabel": "Description",
-    "descriptionPlaceholder": "Brief description of this role...",
-    "editRole": "Edit Role",
-    "locked": "Locked",
-    "name": "Name",
-    "namePlaceholder": "e.g. Team Lead",
-    "permissionCount": "permissions",
-    "permissions": "Permissions",
-    "selected": "selected",
-    "slug": "Slug",
-    "slugPlaceholder": "e.g. team-lead",
-    "summary": "Summary",
     "system": "System",
-    "title": "Roles & Permissions",
-    "updated": "Role updated"
+    "default": "Default",
+    "allPermissions": "All permissions",
+    "permissionCount": "{{count}} permissions",
+    "permissionCountOne": "1 permission",
+    "assignedUsers": "{{count}} users",
+    "assignedUsersOne": "1 user",
+    "name": "Role name",
+    "namePlaceholder": "e.g. Intake Coordinator",
+    "slug": "Slug",
+    "description": "Description",
+    "descriptionPlaceholder": "Brief description of this role's purpose",
+    "permissions": "Permissions",
+    "create": "Create role",
+    "importFromTemplate": "Import from template",
+    "importDialog": {
+      "title": "Import roles from template",
+      "description": "Select roles to import from the template. Existing roles with the same slug will be skipped.",
+      "import": "Import selected",
+      "noTemplates": "No templates available"
+    },
+    "deleteConfirm": {
+      "title": "Delete role",
+      "description": "Are you sure you want to delete \"{{name}}\"? Users assigned this role will lose its permissions."
+    },
+    "slugPlaceholder": "e.g. intake-coordinator"
   },
   "save": "Save",
   "schema": {
@@ -3557,5 +3561,59 @@
       "address": "Address"
     },
     "title": "Messaging Channels"
-  }
+  },
+  "analytics": {
+    "title": "विश्लेषण",
+    "description": "कॉल वॉल्यूम, प्रतिक्रिया समय और स्वयंसेवक गतिविधि",
+    "nav": "विश्लेषण",
+    "summary": {
+      "totalCalls": "कुल कॉल",
+      "answerRate": "उत्तर दर",
+      "avgDuration": "औसत अवधि",
+      "totalConversations": "कुल बातचीत"
+    },
+    "callVolume": {
+      "title": "कॉल वॉल्यूम",
+      "answered": "उत्तर दिया",
+      "unanswered": "अनुत्तरित",
+      "abandoned": "छोड़ा गया",
+      "noData": "इस अवधि के लिए कोई कॉल डेटा नहीं"
+    },
+    "hours": {
+      "title": "प्रति घंटा वितरण",
+      "noData": "इस अवधि के लिए कोई डेटा नहीं"
+    },
+    "conversations": {
+      "title": "बातचीत",
+      "avgResponseTime": "औसत प्रतिक्रिया समय",
+      "avgMessages": "औसत संदेश",
+      "noData": "इस अवधि के लिए कोई बातचीत डेटा नहीं"
+    },
+    "shifts": {
+      "title": "शिफ्ट कवरेज",
+      "noData": "कोई शिफ्ट डेटा उपलब्ध नहीं"
+    },
+    "users": {
+      "title": "स्वयंसेवक गतिविधि",
+      "name": "नाम",
+      "callsAnswered": "उत्तर दी गई कॉल",
+      "avgDuration": "औसत अवधि",
+      "notesCreated": "बनाए गए नोट्स",
+      "noData": "इस अवधि के लिए कोई स्वयंसेवक डेटा नहीं"
+    },
+    "personal": {
+      "callsToday": "आज की कॉल",
+      "callsThisPeriod": "इस अवधि की कॉल",
+      "avgDuration": "औसत अवधि",
+      "notesCreated": "बनाए गए नोट्स"
+    },
+    "platform": {
+      "title": "प्लेटफ़ॉर्म विश्लेषण",
+      "crossHub": "क्रॉस-हब"
+    },
+    "dateRange": {
+      "7days": "7 दिन",
+      "30days": "30 दिन",
+      "custom": "कस्टम"
+    }  }
 }

@@ -41,21 +41,9 @@ function makeAuth(overrides: Partial<NavAuthContext> = {}): NavAuthContext {
 // ---------------------------------------------------------------------------
 
 describe('canSeeItem', () => {
-  it('returns true when no permissions or role required', () => {
+  it('returns true when no permissions required', () => {
     const item = makeItem({ requiredPermissions: [] })
     const auth = makeAuth()
-    expect(canSeeItem(item, auth)).toBe(true)
-  })
-
-  it('returns false when required role is missing', () => {
-    const item = makeItem({ requiredRole: 'role-super-admin', requiredPermissions: [] })
-    const auth = makeAuth({ roles: ['role-admin'] })
-    expect(canSeeItem(item, auth)).toBe(false)
-  })
-
-  it('returns true when required role is present and no permissions needed', () => {
-    const item = makeItem({ requiredRole: 'role-super-admin', requiredPermissions: [] })
-    const auth = makeAuth({ roles: ['role-super-admin'] })
     expect(canSeeItem(item, auth)).toBe(true)
   })
 
@@ -71,12 +59,19 @@ describe('canSeeItem', () => {
     expect(canSeeItem(item, auth)).toBe(false)
   })
 
-  it('returns false when role matches but permissions do not', () => {
+  it('shows platform item to user with matching permission (not role)', () => {
     const item = makeItem({
-      requiredRole: 'role-super-admin',
       requiredPermissions: ['system:manage-hubs'],
     })
-    const auth = makeAuth({ roles: ['role-super-admin'], hasPermission: () => false })
+    const auth = makeAuth({ roles: ['role-admin'], hasPermission: (p) => p === 'system:manage-hubs' })
+    expect(canSeeItem(item, auth)).toBe(true)
+  })
+
+  it('hides platform item from user without matching permission', () => {
+    const item = makeItem({
+      requiredPermissions: ['system:manage-hubs'],
+    })
+    const auth = makeAuth({ roles: ['role-admin'], hasPermission: () => false })
     expect(canSeeItem(item, auth)).toBe(false)
   })
 })
@@ -86,19 +81,22 @@ describe('canSeeItem', () => {
 // ---------------------------------------------------------------------------
 
 describe('canSeeGroup', () => {
-  it('hides platform groups from non-super-admins', () => {
-    const group = makeGroup({ scope: 'platform' })
-    const auth = makeAuth({ roles: ['role-admin'] })
-    expect(canSeeGroup(group, auth)).toBe(false)
-  })
-
-  it('shows platform groups to super-admins when items are visible', () => {
+  it('shows platform groups when any item is visible via permissions', () => {
     const group = makeGroup({
       scope: 'platform',
-      items: [makeItem({ requiredPermissions: [] })],
+      items: [makeItem({ requiredPermissions: ['system:manage-hubs'] })],
     })
-    const auth = makeAuth({ roles: ['role-super-admin'] })
+    const auth = makeAuth({ hasPermission: (p) => p === 'system:manage-hubs' })
     expect(canSeeGroup(group, auth)).toBe(true)
+  })
+
+  it('hides platform groups when no items are visible', () => {
+    const group = makeGroup({
+      scope: 'platform',
+      items: [makeItem({ requiredPermissions: ['system:manage-hubs'] })],
+    })
+    const auth = makeAuth({ hasPermission: () => false })
+    expect(canSeeGroup(group, auth)).toBe(false)
   })
 
   it('hides groups where no items are visible', () => {
@@ -128,40 +126,48 @@ describe('canSeeGroup', () => {
 // ---------------------------------------------------------------------------
 
 describe('getVisibleGroups', () => {
-  it('filters correctly for hub-admin vs super-admin', () => {
+  it('filters correctly based on permissions only', () => {
     const groups = [
       makeGroup({ groupSlug: 'hub-ops', scope: 'this-hub', items: [makeItem({ requiredPermissions: [] })] }),
-      makeGroup({ groupSlug: 'platform-ops', scope: 'platform', items: [makeItem({ requiredPermissions: [] })] }),
+      makeGroup({ groupSlug: 'platform-ops', scope: 'platform', items: [makeItem({ requiredPermissions: ['system:manage-hubs'] })] }),
     ]
 
-    const hubAdmin = makeAuth({ roles: ['role-admin'] })
-    const superAdmin = makeAuth({ roles: ['role-super-admin'] })
+    const noPlatform = makeAuth({ hasPermission: () => false })
+    const withPlatform = makeAuth({ hasPermission: (p) => p === 'system:manage-hubs' })
 
-    const hubResult = getVisibleGroups(groups, hubAdmin)
+    const hubResult = getVisibleGroups(groups, noPlatform)
     expect(hubResult).toHaveLength(1)
     expect(hubResult[0].groupSlug).toBe('hub-ops')
 
-    const superResult = getVisibleGroups(groups, superAdmin)
+    const superResult = getVisibleGroups(groups, withPlatform)
     expect(superResult).toHaveLength(2)
   })
 
-  it('works with the real adminNavConfig for a super-admin with all permissions', () => {
+  it('works with the real adminNavConfig for a user with all permissions', () => {
     const superAdmin = makeAuth({
-      roles: ['role-super-admin'],
       hasPermission: () => true,
     })
     const visible = getVisibleGroups(adminNavConfig.groups, superAdmin)
     expect(visible.length).toBe(adminNavConfig.groups.length)
   })
 
-  it('hides platform group from hub admin using real config', () => {
+  it('hides platform group from user without platform permissions using real config', () => {
     const hubAdmin = makeAuth({
-      roles: ['role-admin'],
-      hasPermission: () => true,
+      hasPermission: (p) => !p.startsWith('system:'),
     })
     const visible = getVisibleGroups(adminNavConfig.groups, hubAdmin)
     const platformGroups = visible.filter((g) => g.scope === 'platform')
     expect(platformGroups).toHaveLength(0)
+  })
+
+  it('shows platform items to user with specific system permissions', () => {
+    const admin = makeAuth({
+      hasPermission: (p) => p === 'system:view-platform',
+    })
+    const visible = getVisibleGroups(adminNavConfig.groups, admin)
+    const platformGroup = visible.find((g) => g.scope === 'platform')
+    expect(platformGroup).toBeDefined()
+    expect(platformGroup?.items.some((i) => i.slug === 'platform-settings')).toBe(true)
   })
 })
 
@@ -196,20 +202,19 @@ describe('getFirstAccessibleSlug', () => {
     expect(getFirstAccessibleSlug(groups, auth)).toBeNull()
   })
 
-  it('skips platform groups for non-super-admins', () => {
+  it('skips platform groups when user lacks platform permissions', () => {
     const groups = [
       makeGroup({
         scope: 'platform',
-        items: [makeItem({ slug: 'platform-item', requiredPermissions: [] })],
+        items: [makeItem({ slug: 'platform-item', requiredPermissions: ['system:manage-hubs'] })],
       }),
     ]
-    const auth = makeAuth({ roles: ['role-admin'] })
+    const auth = makeAuth({ hasPermission: () => false })
     expect(getFirstAccessibleSlug(groups, auth)).toBeNull()
   })
 
   it('returns first slug from real config for a hub admin', () => {
     const hubAdmin = makeAuth({
-      roles: ['role-admin'],
       hasPermission: () => true,
     })
     const slug = getFirstAccessibleSlug(adminNavConfig.groups, hubAdmin)

@@ -12,8 +12,8 @@ import {
   ADMIN_NSEC,
 } from '../../api-helpers'
 import { sha256 } from '@noble/hashes/sha2.js'
-import { bytesToHex } from '@shared/encoding'
-import { utf8ToBytes } from '@shared/encoding'
+import { bytesToHex, hexToBytes, utf8ToBytes } from '@shared/encoding'
+import { ed25519 } from '@noble/curves/ed25519.js'
 
 // ── State ──────────────────────��────────────────────────────────────
 
@@ -42,10 +42,6 @@ function computeLinkHash(prevHash: string, linkType: string, seqNo: number, payl
   return bytesToHex(sha256(utf8ToBytes(canonical)))
 }
 
-function fakeSignature(): string {
-  return bytesToHex(crypto.getRandomValues(new Uint8Array(64)))
-}
-
 async function appendLink(
   request: import('@playwright/test').APIRequestContext,
   nsec: string,
@@ -54,7 +50,8 @@ async function appendLink(
 ) {
   const payload = opts.payload ?? { devicePubkey: bytesToHex(crypto.getRandomValues(new Uint8Array(32))) }
   const hash = opts.hash ?? computeLinkHash(opts.prevHash, opts.linkType, opts.seqNo, payload)
-  const signature = opts.signature ?? fakeSignature()
+  // Generate a real Ed25519 signature over the link hash — server verifies this
+  const signature = opts.signature ?? bytesToHex(ed25519.sign(hexToBytes(hash), hexToBytes(nsec)))
   return apiPost(request, `/users/${targetPubkey}/sigchain`, {
     seqNo: opts.seqNo, linkType: opts.linkType, payload, signature, prevHash: opts.prevHash, hash,
   }, nsec)
