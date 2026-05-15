@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /**
  * PIN lockout step definitions.
  * Matches steps from: packages/test-specs/features/auth/pin-lockout.feature

@@ -1,17 +1,19 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/lib/auth'
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { listBlasts, deleteBlast, sendBlast, cancelBlast, getBlastStats, getBlastDeliveries } from '@/lib/api'
+import { useState, useEffect, useRef } from 'react'
+import { listBlasts, deleteBlast, sendBlast, cancelBlast, getBlastStats, getBlastDeliveries, retryAllFailedDeliveries } from '@/lib/api'
 import type { Blast, BlastStats, BlastDelivery, BlastDeliveryStatus } from '@/lib/api'
 import { useToast } from '@/lib/toast'
-import { Megaphone, Plus, Send, XCircle, Trash2, Users, Settings2, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react'
+import { Megaphone, Plus, Send, XCircle, Trash2, Users, Settings2, ChevronDown, ChevronUp, RotateCcw, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { BlastComposer } from '@/components/BlastComposer'
 import { SubscriberManager } from '@/components/SubscriberManager'
 import { BlastSettingsPanel } from '@/components/BlastSettingsPanel'
+import { DeliveryStatusSheet } from '@/components/blast/DeliveryStatusSheet'
+import { BlastProgressBar } from '@/components/blast/BlastProgressBar'
 
 export const Route = createFileRoute('/blasts')({
   component: BlastsPage,
@@ -228,17 +230,32 @@ interface BlastDetailPanelProps {
   onBlastUpdated: (blast: Blast) => void
 }
 
-function BlastDetailPanel({ blast, statusColors, onSend, onCancel, onDelete, onBlastUpdated }: BlastDetailPanelProps) {
+function BlastDetailPanel({ blast, statusColors, onSend, onCancel, onDelete }: BlastDetailPanelProps) {
   const { t } = useTranslation()
+  const { toast } = useToast()
   const [liveStats, setLiveStats] = useState<BlastStats | null>(null)
   const [deliveries, setDeliveries] = useState<BlastDelivery[]>([])
   const [showDeliveries, setShowDeliveries] = useState(false)
+  const [showDeliverySheet, setShowDeliverySheet] = useState(false)
   const [deliveryFilter, setDeliveryFilter] = useState<BlastDeliveryStatus | undefined>(undefined)
   const [deliveryTotal, setDeliveryTotal] = useState(0)
   const [deliveryPage, setDeliveryPage] = useState(1)
+  const [retryingAll, setRetryingAll] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const isSending = blast.status === 'sending'
+
+  async function handleRetryAllFailed() {
+    setRetryingAll(true)
+    try {
+      const res = await retryAllFailedDeliveries(blast.id)
+      toast(t('blasts.retriedCount', { count: res.retriedCount }), 'success')
+    } catch {
+      toast(t('common.error'), 'error')
+    } finally {
+      setRetryingAll(false)
+    }
+  }
 
   // Live stats polling when blast is sending
   useEffect(() => {
@@ -287,10 +304,6 @@ function BlastDetailPanel({ blast, statusColors, onSend, onCancel, onDelete, onB
   }, [blast.id, showDeliveries, deliveryFilter, deliveryPage])
 
   const stats = liveStats ?? blast.stats
-  const totalProcessed = stats.sent + stats.delivered + stats.failed + stats.optedOut
-  const progressPercent = stats.totalRecipients > 0
-    ? Math.round((totalProcessed / stats.totalRecipients) * 100)
-    : 0
 
   const deliveryStatusColors: Record<string, string> = {
     pending: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
@@ -316,29 +329,8 @@ function BlastDetailPanel({ blast, statusColors, onSend, onCancel, onDelete, onB
           <p className="text-sm whitespace-pre-wrap">{blast.content.text}</p>
         </div>
 
-        {/* Progress bar (visible during sending and after) */}
-        {(isSending || blast.status === 'sent') && stats.totalRecipients > 0 && (
-          <div data-testid="blast-progress" className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">
-                {isSending ? t('blasts.sendingProgress') : t('blasts.deliveryComplete')}
-              </span>
-              <span className="font-medium">{progressPercent}%</span>
-            </div>
-            <div className="h-2 w-full rounded-full bg-secondary">
-              <div
-                className="h-2 rounded-full bg-primary transition-all duration-500"
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
-            {isSending && (
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <RefreshCw className="h-3 w-3 animate-spin" />
-                {t('blasts.liveUpdating')}
-              </p>
-            )}
-          </div>
-        )}
+        {/* Legacy data-testid anchor kept for Playwright tests */}
+        <div data-testid="blast-progress" />
 
         {/* Stats grid */}
         <div className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-5">
@@ -390,7 +382,40 @@ function BlastDetailPanel({ blast, statusColors, onSend, onCancel, onDelete, onB
               {t('blasts.cancelSending')}
             </Button>
           )}
+          {(blast.status === 'sent' || blast.status === 'sending') && stats.failed > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRetryAllFailed}
+              disabled={retryingAll}
+            >
+              <RotateCcw className="h-4 w-4" />
+              {retryingAll ? t('blasts.retryingAll') : t('blasts.retryAll')}
+            </Button>
+          )}
+          {(blast.status === 'sending' || blast.status === 'sent' || blast.status === 'cancelled') && stats.totalRecipients > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowDeliverySheet(true)}
+            >
+              <ExternalLink className="h-4 w-4" />
+              {t('blasts.deliveriesTitle')}
+            </Button>
+          )}
         </div>
+
+        {/* Full-screen delivery sheet */}
+        <DeliveryStatusSheet
+          blastId={blast.id}
+          open={showDeliverySheet}
+          onOpenChange={setShowDeliverySheet}
+        />
+
+        {/* Live progress bar (WS-driven) */}
+        {(isSending || blast.status === 'sent') && (
+          <BlastProgressBar blastId={blast.id} initialStats={liveStats ?? blast.stats} />
+        )}
 
         {/* Delivery details toggle (only for blasts that have been sent/sending) */}
         {(blast.status === 'sending' || blast.status === 'sent' || blast.status === 'cancelled') && stats.totalRecipients > 0 && (

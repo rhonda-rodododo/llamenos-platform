@@ -1,10 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { createHmac } from 'node:crypto'
 import {
   renderAlertMessage,
   formatDisappearingTimerSeconds,
   UserNotificationsService,
-  type AlertInput,
   type UserNotificationsConfig,
 } from '../../services/user-notifications'
 
@@ -199,6 +198,12 @@ describe('getSidecarUrl', () => {
 // ---------------------------------------------------------------------------
 
 describe('sendAlert', () => {
+  const originalFetch = globalThis.fetch
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch
+  })
+
   function makeDeps(overrides?: {
     notificationChannel?: string
     digestCadence?: string

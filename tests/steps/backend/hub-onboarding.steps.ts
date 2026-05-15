@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /**
  * Backend BDD step definitions for hub onboarding (hub-onboarding.feature).
  *

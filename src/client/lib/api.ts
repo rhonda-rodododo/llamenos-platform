@@ -1543,6 +1543,18 @@ export async function getBlastDeliveries(id: string, opts?: { status?: BlastDeli
   )
 }
 
+export async function retryBlastDelivery(blastId: string, deliveryId: string) {
+  return request<{ ok: boolean; delivery: BlastDelivery }>(hp(`/blasts/${blastId}/deliveries/${deliveryId}/retry`), {
+    method: 'POST',
+  })
+}
+
+export async function retryAllFailedDeliveries(blastId: string) {
+  return request<{ ok: boolean; retriedCount: number }>(hp(`/blasts/${blastId}/retry-failed`), {
+    method: 'POST',
+  })
+}
+
 export async function getBlastSettings() {
   return request<BlastSettings>(hp('/blasts/settings'))
 }

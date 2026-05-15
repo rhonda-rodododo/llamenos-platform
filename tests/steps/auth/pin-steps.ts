@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /**
  * PIN setup and unlock step definitions.
  * Matches steps from:
