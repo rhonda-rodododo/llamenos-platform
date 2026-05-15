@@ -157,6 +157,7 @@ export interface User {
   // Volunteer profile extensions (Epic 340)
   specializations?: string[]        // e.g., ["immigration", "domestic_violence", "legal_observer"]
   maxCaseAssignments?: number       // Capacity limit (0 = unlimited, default: 0)
+  teamId?: string                   // Primary team assignment (e.g., "team-alpha")
   supervisorPubkey?: string         // Who reviews this volunteer's cases
 }
 

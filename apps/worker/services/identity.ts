@@ -77,6 +77,7 @@ function rowToUser(row: typeof users.$inferSelect): User {
     messagingEnabled: row.messagingEnabled ?? undefined,
     specializations: row.specializations ?? [],
     maxCaseAssignments: row.maxCaseAssignments ?? undefined,
+    teamId: row.teamId ?? undefined,
     supervisorPubkey: row.supervisorPubkey ?? undefined,
   }
 }
@@ -341,6 +342,7 @@ export class IdentityService {
         case 'messagingEnabled': updates.messagingEnabled = value as boolean; break
         case 'specializations': updates.specializations = value as string[]; break
         case 'maxCaseAssignments': updates.maxCaseAssignments = value as number; break
+        case 'teamId': updates.teamId = value as string; break
         case 'supervisorPubkey': updates.supervisorPubkey = value as string; break
       }
     }

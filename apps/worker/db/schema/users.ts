@@ -49,6 +49,7 @@ export const users = pgTable('users', {
     .notNull()
     .default(sql`'{}'::text[]`),
   maxCaseAssignments: integer('max_case_assignments'),
+  teamId: text('team_id'),
   supervisorPubkey: text('supervisor_pubkey'),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
