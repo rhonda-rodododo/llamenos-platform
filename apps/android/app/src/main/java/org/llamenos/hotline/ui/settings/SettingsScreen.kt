@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.PersonRemove
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.NavigateNext
 import androidx.compose.material.icons.filled.PhoneAndroid
@@ -157,6 +158,7 @@ fun SettingsScreen(
     onClearCache: () -> Unit,
     onNavigateToAdmin: () -> Unit,
     onNavigateToDeviceLink: () -> Unit,
+    onNavigateToErasure: () -> Unit = {},
     crashReportingEnabled: Boolean = false,
     onCrashReportingChange: (Boolean) -> Unit = {},
     pendingCrashReports: Int = 0,
@@ -819,6 +821,47 @@ fun SettingsScreen(
                         )
                         Text(
                             text = stringResource(R.string.settings_device_link_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.Filled.NavigateNext,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onNavigateToErasure)
+                    .testTag("settings-erasure-card"),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                ),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.PersonRemove,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(24.dp),
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.erasure_request_title),
+                            style = MaterialTheme.typography.titleSmall,
+                        )
+                        Text(
+                            text = stringResource(R.string.erasure_request_description),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

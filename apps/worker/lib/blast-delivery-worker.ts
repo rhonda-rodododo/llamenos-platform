@@ -158,7 +158,9 @@ async function processBlastBatch(blastId: string, hubId: string): Promise<void> 
     const { completed } = await deps.blastsService.syncBlastStats(blastId)
     if (completed) {
       logger.info(`Blast ${blastId} completed`)
-      deps.onStatusChange?.(blastId, 'sent')
+      if (hubId) {
+        deps.onStatusChange?.(blastId, 'sent')
+      }
     }
     return
   }
@@ -245,11 +247,16 @@ async function processBlastBatch(blastId: string, hubId: string): Promise<void> 
 
   // Sync stats after batch
   const { stats, completed } = await deps.blastsService.syncBlastStats(blastId)
-  deps.onProgress?.(blastId, stats)
+
+  if (hubId) {
+    deps.onProgress?.(blastId, stats)
+  }
 
   if (completed) {
     logger.info(`Blast ${blastId} completed — ${stats.sent + stats.delivered} sent, ${stats.failed} failed`)
-    deps.onStatusChange?.(blastId, 'sent')
+    if (hubId) {
+      deps.onStatusChange?.(blastId, 'sent')
+    }
   }
 }
 

@@ -9,7 +9,7 @@ import { encryptNote, encryptMessage, decryptNote, decryptLegacyNote, decryptTra
 import * as keyManager from '@/lib/key-manager'
 import { useToast } from '@/lib/toast'
 import type { NotePayload } from '@shared/types'
-import { StickyNote, Plus, Pencil, Lock, Mic, Save, X, Search, ChevronLeft, ChevronRight, Download, MessageCircle, Send } from 'lucide-react'
+import { StickyNote, Plus, Pencil, Lock, Mic, X, Search, ChevronLeft, ChevronRight, Download, MessageCircle, Send } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'

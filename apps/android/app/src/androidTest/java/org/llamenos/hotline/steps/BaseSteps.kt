@@ -99,10 +99,9 @@ abstract class BaseSteps : SemanticsNodeInteractionsProvider {
             Log.d(TAG, "navigateToMainScreen: returning user, entering PIN")
             enterPin("12345678")
         }
-        // Key generation (Argon2id: 64MB, 3 iterations, 4 lanes) + navigation can be
-        // very slow on CI emulators with software rendering (swiftshader). Real devices
-        // complete in 2-4s, but emulators may need 30-60s. Allow 120s to avoid flakes.
-        waitForNode("dashboard-title", timeoutMillis = 120_000)
+        // With test-kdf feature flag, Argon2id uses fast params (8KB, 1 iter, 1 lane)
+        // so key generation completes in <1s even on CI emulators. 15s covers navigation.
+        waitForNode("dashboard-title", timeoutMillis = 15_000)
         onNodeWithTag("dashboard-title").assertIsDisplayed()
     }
 

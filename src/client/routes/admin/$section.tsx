@@ -1,6 +1,8 @@
 import { AdminShell } from '@/components/admin-shell/admin-shell'
 import { findNavItem } from '@/components/admin-shell/admin-nav-config'
 import { getSectionComponent } from '@/components/admin-sections/registry'
+// Side-effect import: registers all admin section components in the registry
+import '@/components/admin-sections'
 import { createFileRoute, notFound } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/admin/$section')({

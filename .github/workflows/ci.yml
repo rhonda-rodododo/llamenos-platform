@@ -36,6 +36,7 @@ jobs:
       app: ${{ steps.filter.outputs.app }}
       docs_only: ${{ steps.filter.outputs.docs_only }}
       ansible: ${{ steps.filter.outputs.ansible }}
+      android: ${{ steps.filter.outputs.android }}
 
     steps:
       - name: Checkout
@@ -52,6 +53,7 @@ jobs:
 
           DOCS_ONLY="true"
           ANSIBLE_CHANGED="false"
+          ANDROID_CHANGED="false"
           while IFS= read -r file; do
             [[ -z "$file" ]] && continue
             if ! echo "$file" | grep -qE "\.md$|^site/"; then
@@ -62,12 +64,17 @@ jobs:
               ANSIBLE_CHANGED="true"
               echo "Ansible file changed: $file"
             fi
+            if echo "$file" | grep -qE "^apps/android/|^packages/crypto/|^packages/protocol/|^packages/i18n/|^apps/worker/|^packages/shared/"; then
+              ANDROID_CHANGED="true"
+              echo "Android-relevant file changed: $file"
+            fi
           done <<< "$CHANGED"
 
           {
             echo "app=$([ "$DOCS_ONLY" = "false" ] && echo true || echo false)"
             echo "docs_only=$DOCS_ONLY"
             echo "ansible=$ANSIBLE_CHANGED"
+            echo "android=$ANDROID_CHANGED"
           } >> "$GITHUB_OUTPUT"
 
   # ─── Build & Validate ──────────────────────────────────────
@@ -186,7 +193,12 @@ jobs:
     needs: [changes, build]
     if: needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: true
+      matrix:
+        shard: [1, 2]
 
     steps:
       - name: Checkout
@@ -252,7 +264,7 @@ jobs:
           done
 
       - name: Run E2E tests
-        run: bunx playwright test --project=bootstrap --project=bdd
+        run: bunx playwright test --project=bootstrap --project=bdd --shard=${{ matrix.shard }}/2
         env:
           CI: "true"
           PLAYWRIGHT_BASE_URL: "http://localhost:8788"
@@ -302,7 +314,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: e2e-results
+          name: e2e-results-shard-${{ matrix.shard }}
           path: |
             playwright-report/
             test-results/
@@ -532,14 +544,14 @@ jobs:
   # ─── Android Instrumented Tests (Cucumber BDD on emulator) ──
   android-e2e:
     needs: [changes]
-    if: needs.changes.outputs.docs_only != 'true'
+    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.android == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 45
 
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
-        shard: [0, 1]
+        shard: [0, 1, 2, 3]
 
     steps:
       - name: Checkout
@@ -577,7 +589,7 @@ jobs:
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
           path: apps/android/app/src/main/jniLibs/x86_64/libllamenos_core.so
-          key: android-crypto-x86_64-${{ runner.os }}-${{ hashFiles('packages/crypto/src/**/*.rs', 'packages/crypto/Cargo.toml', 'packages/crypto/Cargo.lock') }}
+          key: android-crypto-x86_64-test-kdf-${{ runner.os }}-${{ hashFiles('packages/crypto/src/**/*.rs', 'packages/crypto/Cargo.toml', 'packages/crypto/Cargo.lock') }}
 
       - name: Install Rust stable (for crypto build)
         if: steps.crypto-cache.outputs.cache-hit != 'true'
@@ -605,7 +617,7 @@ jobs:
           mkdir -p ../../apps/android/app/src/main/jniLibs
           cargo ndk -t x86_64 --platform 24 \
             -o ../../apps/android/app/src/main/jniLibs \
-            build --release --features mobile
+            build --release --features mobile,test-kdf
 
       - name: Verify crypto .so exists
         run: |
@@ -656,7 +668,7 @@ jobs:
           SHARD_ID=${{ matrix.shard }}
           IDX=0
           while IFS= read -r file; do
-            if [ $((IDX % 2)) -eq "$SHARD_ID" ]; then
+            if [ $((IDX % 4)) -eq "$SHARD_ID" ]; then
               # Prepend "features/" to match the Android asset path:
               # Gradle copies packages/test-specs/features/platform/mobile/**
               # to src/androidTest/assets/features/platform/mobile/**
@@ -1029,7 +1041,7 @@ jobs:
           echo "Signed: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${DIGEST}"
 
   ci-status:
-    needs: [build, audit, crypto-tests, e2e, backend-bdd, backend-unit, desktop-unit, android-build-test, ios-build-test, crypto-guardrails, migration-drift, ansible-validate]
+    needs: [build, audit, crypto-tests, e2e, backend-bdd, backend-unit, desktop-unit, android-build-test, android-e2e, ios-build-test, crypto-guardrails, migration-drift, ansible-validate]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -1051,6 +1063,7 @@ jobs:
           check_job "backend-unit" "${{ needs.backend-unit.result }}"
           check_job "desktop-unit" "${{ needs.desktop-unit.result }}"
           check_job "android-build-test" "${{ needs.android-build-test.result }}"
+          check_job "android-e2e" "${{ needs.android-e2e.result }}"
           check_job "ios-build-test" "${{ needs.ios-build-test.result }}"
           check_job "crypto-guardrails" "${{ needs.crypto-guardrails.result }}"
           check_job "migration-drift" "${{ needs.migration-drift.result }}"

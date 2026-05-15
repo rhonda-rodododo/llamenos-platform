@@ -1,7 +1,6 @@
 import { createMiddleware } from 'hono/factory'
-import type { AppEnv, User } from '../types'
+import type { AppEnv } from '../types'
 import { authenticateRequest, parseAuthHeader, parseSessionHeader, validateToken } from '../lib/auth'
-import type { Role } from '@shared/permissions'
 import { resolvePermissions, permissionGranted } from '@shared/permissions'
 import { createLogger } from '../lib/logger'
 import { incError } from '../lib/error-counter'
@@ -14,6 +13,13 @@ export const auth = createMiddleware<AppEnv>(async (c, next) => {
   const reqLog = requestId ? log.child({ requestId }) : log
 
   let authResult = await authenticateRequest(c.req.raw, services.identity)
+
+  // Store session token if session-based auth was used
+  const authHeader = c.req.header('Authorization') ?? null
+  const sessionToken = parseSessionHeader(authHeader)
+  if (sessionToken) {
+    c.set('sessionToken', sessionToken)
+  }
 
   // Dev-mode signature bypass: when ENVIRONMENT=development and Schnorr verification
   // fails, fall back to pubkey-only auth for REGISTERED volunteers only.

@@ -6,7 +6,8 @@ pre-commit:
       stage_fixed: true
     lint:
       glob: "{src,apps/worker}/**/*.{ts,tsx}"
-      run: bunx eslint {staged_files}
+      files: git diff --cached --diff-filter=d --name-only
+      run: bunx eslint {files}
       stage_fixed: true
     codegen-freshness:
       glob: "packages/protocol/schemas/*.ts"

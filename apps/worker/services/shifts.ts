@@ -8,7 +8,8 @@
 import { eq, and, sql } from 'drizzle-orm'
 import type { Database } from '../db'
 import { shifts, pushRemindersSent } from '../db/schema'
-import { ServiceError, SettingsService } from './settings'
+import { ServiceError } from './settings'
+import { permissionGranted } from '@shared/permissions'
 
 /** Validate HH:MM format (00:00-23:59) */
 function isValidTimeFormat(time: string): boolean {
@@ -26,7 +27,7 @@ function isShiftActive(
 ): boolean {
   if (!shift.days.includes(currentDay)) return false
 
-  const startsBeforeEnds = shift.startTime <= shift.endTime
+  const startsBeforeEnds = shift.startTime < shift.endTime
   if (startsBeforeEnds) {
     return currentTime >= shift.startTime && currentTime < shift.endTime
   }
@@ -40,7 +41,8 @@ function utcTimeNow(now: Date = new Date()): string {
 }
 
 type ShiftRow = typeof shifts.$inferSelect
-type ShiftInsert = Omit<typeof shifts.$inferInsert, 'id' | 'createdAt'>
+type ShiftInsert = Omit<typeof shifts.$inferInsert, 'id' | 'createdAt' | 'hubId' | 'createdBy'>
+type CallerContext = { callerPubkey: string; permissions: string[] }
 
 export class ShiftsService {
   constructor(
@@ -62,7 +64,7 @@ export class ShiftsService {
   }
 
   /** Create a new shift, return the created row */
-  async create(hubId: string, data: ShiftInsert): Promise<ShiftRow> {
+  async create(hubId: string, data: ShiftInsert, caller?: CallerContext): Promise<ShiftRow> {
     if (!isValidTimeFormat(data.startTime) || !isValidTimeFormat(data.endTime)) {
       throw new ServiceError(400, 'Invalid time format — expected HH:MM (00:00-23:59)')
     }
@@ -72,7 +74,8 @@ export class ShiftsService {
       .values({
         ...data,
         hubId,
-      })
+        createdBy: caller?.callerPubkey ?? null,
+      } as typeof shifts.$inferInsert)
       .returning()
 
     return row
@@ -82,13 +85,31 @@ export class ShiftsService {
   async update(
     hubId: string,
     shiftId: string,
-    data: Partial<Pick<ShiftInsert, 'name' | 'startTime' | 'endTime' | 'days' | 'userPubkeys'>>,
+    data: Partial<Pick<ShiftInsert, 'encryptedName' | 'startTime' | 'endTime' | 'days' | 'userPubkeys'>>,
+    caller?: CallerContext,
   ): Promise<ShiftRow> {
     if (data.startTime && !isValidTimeFormat(data.startTime)) {
       throw new ServiceError(400, 'Invalid time format — expected HH:MM (00:00-23:59)')
     }
     if (data.endTime && !isValidTimeFormat(data.endTime)) {
       throw new ServiceError(400, 'Invalid time format — expected HH:MM (00:00-23:59)')
+    }
+
+    if (caller) {
+      const [existing] = await this.db
+        .select({ createdBy: shifts.createdBy })
+        .from(shifts)
+        .where(and(eq(shifts.id, shiftId), eq(shifts.hubId, hubId)))
+        .limit(1)
+
+      if (!existing) {
+        throw new ServiceError(404, 'Shift not found')
+      }
+
+      const isAdmin = permissionGranted(caller.permissions, 'shifts:manage')
+      if (existing.createdBy !== caller.callerPubkey && !isAdmin) {
+        throw new ServiceError(403, 'Only the shift creator or an admin can modify this shift')
+      }
     }
 
     const [row] = await this.db
@@ -105,7 +126,24 @@ export class ShiftsService {
   }
 
   /** Delete a shift */
-  async delete(hubId: string, shiftId: string): Promise<{ ok: true }> {
+  async delete(hubId: string, shiftId: string, caller?: CallerContext): Promise<{ ok: true }> {
+    if (caller) {
+      const [existing] = await this.db
+        .select({ createdBy: shifts.createdBy })
+        .from(shifts)
+        .where(and(eq(shifts.id, shiftId), eq(shifts.hubId, hubId)))
+        .limit(1)
+
+      if (!existing) {
+        throw new ServiceError(404, 'Shift not found')
+      }
+
+      const isAdmin = permissionGranted(caller.permissions, 'shifts:manage')
+      if (existing.createdBy !== caller.callerPubkey && !isAdmin) {
+        throw new ServiceError(403, 'Only the shift creator or an admin can modify this shift')
+      }
+    }
+
     const result = await this.db
       .delete(shifts)
       .where(and(eq(shifts.id, shiftId), eq(shifts.hubId, hubId)))
@@ -128,8 +166,8 @@ export class ShiftsService {
    */
   async getMyStatus(hubId: string, pubkey: string): Promise<{
     onShift: boolean
-    currentShift: { name: string; startTime: string; endTime: string } | null
-    nextShift: { name: string; startTime: string; endTime: string; day: number } | null
+    currentShift: { id: string; encryptedName: string; startTime: string; endTime: string } | null
+    nextShift: { id: string; encryptedName: string; startTime: string; endTime: string; day: number } | null
   }> {
     const { shifts: allShifts } = await this.list(hubId)
     const now = new Date()
@@ -140,16 +178,16 @@ export class ShiftsService {
     const myShifts = allShifts.filter(s => s.userPubkeys.includes(pubkey))
 
     // Find current active shift
-    let currentShift: { id: string; name: string; startTime: string; endTime: string } | null = null
+    let currentShift: { id: string; encryptedName: string; startTime: string; endTime: string } | null = null
     for (const shift of myShifts) {
       if (isShiftActive(shift, currentDay, currentTime)) {
-        currentShift = { id: shift.id, name: shift.name, startTime: shift.startTime, endTime: shift.endTime }
+        currentShift = { id: shift.id, encryptedName: shift.encryptedName, startTime: shift.startTime, endTime: shift.endTime }
         break
       }
     }
 
     // Find next upcoming shift
-    let nextShift: { name: string; startTime: string; endTime: string; day: number } | null = null
+    let nextShift: { id: string; encryptedName: string; startTime: string; endTime: string; day: number } | null = null
     if (myShifts.length > 0) {
       let bestMinutesAway = Infinity
       const currentMinutes = now.getUTCHours() * 60 + now.getUTCMinutes()
@@ -168,7 +206,7 @@ export class ShiftsService {
             // Skip if this is the currently active shift
             if (currentShift && shift.id === currentShift.id && daysAway === 0) continue
             bestMinutesAway = minutesAway
-            nextShift = { name: shift.name, startTime: shift.startTime, endTime: shift.endTime, day }
+            nextShift = { id: shift.id, encryptedName: shift.encryptedName, startTime: shift.startTime, endTime: shift.endTime, day }
           }
         }
       }

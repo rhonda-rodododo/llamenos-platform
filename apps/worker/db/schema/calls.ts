@@ -56,6 +56,7 @@ export const callRecords = pgTable(
     startedAt: timestamp('started_at', { withTimezone: true }).notNull(),
     endedAt: timestamp('ended_at', { withTimezone: true }),
     duration: integer('duration'),
+    answeredBy: text('answered_by'),
     status: text('status').notNull(),
     hasTranscription: boolean('has_transcription').default(false),
     hasVoicemail: boolean('has_voicemail').default(false),

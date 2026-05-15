@@ -1,0 +1,1 @@
+ALTER TABLE "user_recovery_envelopes" ADD CONSTRAINT "user_recovery_envelopes_hub_id_hubs_id_fk" FOREIGN KEY ("hub_id") REFERENCES "public"."hubs"("id") ON DELETE cascade ON UPDATE no action;

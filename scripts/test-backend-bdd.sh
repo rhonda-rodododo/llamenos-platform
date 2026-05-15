@@ -60,9 +60,9 @@ reporter_record_suite "health-check" 1 0 0
 bunx bddgen 2>&1
 
 # Step 4: Run backend BDD tests via Playwright
-# --workers=1: backend tests share server state (test-reset clears all DOs)
-# so all spec files must run serially to avoid cross-test interference
-if reporter_run_step "backend-bdd" bunx playwright test --project=backend-bdd --workers=1; then
+# Backend BDD tests use per-scenario hub isolation (workerHub fixture).
+# Worker count is controlled by playwright.config.ts (CI=4, local=3).
+if reporter_run_step "backend-bdd" bunx playwright test --project=backend-bdd; then
   parse_playwright_results "$REPORTER_LOG_FILE"
   reporter_record_suite "backend-bdd" "$PARSED_PASSED" "$PARSED_FAILED" "$PARSED_SKIPPED"
 else

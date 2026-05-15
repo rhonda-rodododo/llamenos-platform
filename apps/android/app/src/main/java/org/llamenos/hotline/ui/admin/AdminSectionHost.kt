@@ -119,7 +119,10 @@ fun AdminSectionHost(
             "platform-analytics" -> Text(stringResource(R.string.admin_nav_items_platform_analytics))
             "platform-health" -> SystemHealthTab(viewModel = viewModel)
             "platform-settings" -> Text(stringResource(R.string.admin_nav_items_platform_settings))
-            "gdpr-erasure" -> Text(stringResource(R.string.admin_nav_items_gdpr_erasure))
+            "gdpr-erasure" -> ErasureQueueTab(viewModel = viewModel)
+            "erasure-queue" -> ErasureQueueTab(viewModel = viewModel)
+            "retention" -> RetentionSettingsTab(viewModel = viewModel)
+            "platform-bans-manage" -> PlatformBansTab(viewModel = viewModel)
             else -> Text(stringResource(R.string.common_loading))
         }
     }
