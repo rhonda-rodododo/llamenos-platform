@@ -257,6 +257,20 @@ pub const LABEL_SERVER_SIGNING_INFO: &str = "llamenos:server-signing-key-info:v1
 /// WebSocket authentication challenge label
 pub const LABEL_WS_CHALLENGE: &str = "llamenos:ws-auth:v1";
 
+// --- EP08: Account Lifecycle ---
+
+/// Audit user key wrapping — per-user symmetric key HPKE-wrapped to admin pubkeys
+pub const LABEL_AUDIT_USER_KEY_WRAP: &str = "llamenos:audit-user-key-wrap:v1";
+
+/// Erasure override co-approver signature — Ed25519 sig over (targetUserId || timestamp || justification)
+pub const LABEL_ERASURE_OVERRIDE_SIG: &str = "llamenos:erasure-override-sig:v1";
+
+/// Audit entry details content encryption (AES-256-GCM AAD prefix)
+pub const LABEL_AUDIT_DETAILS: &str = "llamenos:audit-details:v1";
+
+/// Device wipe command signature — Ed25519 sig over (targetDevicePubkey || timestamp || reason)
+pub const LABEL_DEVICE_WIPE_SIG: &str = "llamenos:device-wipe-sig:v1";
+
 // --- Recovery Group ---
 
 /// HPKE wrapping each share holder's Shamir share at rest
@@ -373,11 +387,16 @@ pub const LABEL_REGISTRY: &[&str] = &[
     LABEL_SERVER_SIGNING_KEY,               // 66
     LABEL_SERVER_SIGNING_INFO,              // 67
     LABEL_WS_CHALLENGE,                     // 68
-    // 69-72: Recovery Group
-    LABEL_RECOVERY_GROUP_SHARE_WRAP, // 69
-    LABEL_RECOVERY_PUK_SEED_WRAP,    // 70
-    LABEL_RECOVERY_SHARE_CONTRIBUTE, // 71
-    LABEL_RECOVERY_LIVENESS_PROOF,   // 72
+    // 69-72: EP08 Account Lifecycle
+    LABEL_AUDIT_USER_KEY_WRAP,  // 69
+    LABEL_ERASURE_OVERRIDE_SIG, // 70
+    LABEL_AUDIT_DETAILS,        // 71
+    LABEL_DEVICE_WIPE_SIG,      // 72
+    // 73-76: Recovery Group
+    LABEL_RECOVERY_GROUP_SHARE_WRAP, // 73
+    LABEL_RECOVERY_PUK_SEED_WRAP,    // 74
+    LABEL_RECOVERY_SHARE_CONTRIBUTE, // 75
+    LABEL_RECOVERY_LIVENESS_PROOF,   // 76
 ];
 
 /// Look up a label string by its numeric ID.
@@ -486,6 +505,13 @@ mod tests {
             "llamenos:server-signing-key-info:v1"
         );
         assert_eq!(LABEL_WS_CHALLENGE, "llamenos:ws-auth:v1");
+        assert_eq!(LABEL_AUDIT_USER_KEY_WRAP, "llamenos:audit-user-key-wrap:v1");
+        assert_eq!(
+            LABEL_ERASURE_OVERRIDE_SIG,
+            "llamenos:erasure-override-sig:v1"
+        );
+        assert_eq!(LABEL_AUDIT_DETAILS, "llamenos:audit-details:v1");
+        assert_eq!(LABEL_DEVICE_WIPE_SIG, "llamenos:device-wipe-sig:v1");
         assert_eq!(
             LABEL_RECOVERY_GROUP_SHARE_WRAP,
             "llamenos:recovery-group:share-wrap:v1"
@@ -533,10 +559,14 @@ mod tests {
         assert_eq!(id_to_label(66), Some(LABEL_SERVER_SIGNING_KEY));
         assert_eq!(id_to_label(67), Some(LABEL_SERVER_SIGNING_INFO));
         assert_eq!(id_to_label(68), Some(LABEL_WS_CHALLENGE));
-        assert_eq!(id_to_label(69), Some(LABEL_RECOVERY_GROUP_SHARE_WRAP));
-        assert_eq!(id_to_label(70), Some(LABEL_RECOVERY_PUK_SEED_WRAP));
-        assert_eq!(id_to_label(71), Some(LABEL_RECOVERY_SHARE_CONTRIBUTE));
-        assert_eq!(id_to_label(72), Some(LABEL_RECOVERY_LIVENESS_PROOF));
+        assert_eq!(id_to_label(69), Some(LABEL_AUDIT_USER_KEY_WRAP));
+        assert_eq!(id_to_label(70), Some(LABEL_ERASURE_OVERRIDE_SIG));
+        assert_eq!(id_to_label(71), Some(LABEL_AUDIT_DETAILS));
+        assert_eq!(id_to_label(72), Some(LABEL_DEVICE_WIPE_SIG));
+        assert_eq!(id_to_label(73), Some(LABEL_RECOVERY_GROUP_SHARE_WRAP));
+        assert_eq!(id_to_label(74), Some(LABEL_RECOVERY_PUK_SEED_WRAP));
+        assert_eq!(id_to_label(75), Some(LABEL_RECOVERY_SHARE_CONTRIBUTE));
+        assert_eq!(id_to_label(76), Some(LABEL_RECOVERY_LIVENESS_PROOF));
     }
 
     /// Verify bidirectional lookup (skipping tombstoned indices).
