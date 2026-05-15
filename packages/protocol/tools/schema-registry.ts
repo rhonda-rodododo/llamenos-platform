@@ -69,6 +69,9 @@ const EXCLUDED_SCHEMAS = new Set([
   'digestCadenceSchema',
   'notificationChannelSchema',
 
+  // Recovery group — bare enum schema used as building block
+  'recoverySessionStatusSchema',
+
   // Device management — query schemas and bare enums
   'listSecurityEventsQuerySchema',
   'adminDeviceOverviewQuerySchema',
