@@ -47,7 +47,7 @@ struct TriageDetailView: View {
             Button(NSLocalizedString("cancel", comment: "Cancel"), role: .cancel) {}
             Button(NSLocalizedString("triage_convert_confirm_action", comment: "Convert"), role: .none) {
                 Task {
-                    let success = await viewModel.convertToCase(report: report)
+                    let success = await viewModel.convertToEntity(report: report, entityTypeId: "case")
                     if success {
                         dismiss()
                     }
