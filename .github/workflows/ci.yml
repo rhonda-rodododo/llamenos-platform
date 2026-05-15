@@ -77,6 +77,60 @@ jobs:
             echo "android=$ANDROID_CHANGED"
           } >> "$GITHUB_OUTPUT"
 
+  # ─── Guard: No Generated Files In Git ────────────────────
+  no-generated-files-in-git:
+    name: No generated files in git
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Check for tracked generated files
+        run: |
+          # These paths must NEVER be tracked in git — they are generated on-the-fly
+          GENERATED_PATTERNS=(
+            "packages/protocol/generated/"
+            "packages/i18n/generated/"
+            "apps/ios/Resources/Localizable/"
+            "apps/android/app/src/main/res/values/strings.xml"
+            "apps/android/app/src/main/res/values-ar/strings.xml"
+            "apps/android/app/src/main/res/values-de/strings.xml"
+            "apps/android/app/src/main/res/values-es/strings.xml"
+            "apps/android/app/src/main/res/values-fr/strings.xml"
+            "apps/android/app/src/main/res/values-hi/strings.xml"
+            "apps/android/app/src/main/res/values-ht/strings.xml"
+            "apps/android/app/src/main/res/values-ko/strings.xml"
+            "apps/android/app/src/main/res/values-pt/strings.xml"
+            "apps/android/app/src/main/res/values-ru/strings.xml"
+            "apps/android/app/src/main/res/values-tl/strings.xml"
+            "apps/android/app/src/main/res/values-vi/strings.xml"
+            "apps/android/app/src/main/res/values-zh/strings.xml"
+            "apps/android/app/src/main/java/org/llamenos/i18n/I18n.kt"
+            "apps/ios/Sources/Generated/LlamenosCore.swift"
+            "apps/ios/LlamenosCoreFFI.xcframework/"
+            "apps/android/app/src/main/jniLibs/"
+          )
+
+          FOUND=""
+          for pattern in "${GENERATED_PATTERNS[@]}"; do
+            MATCHES=$(git ls-files "$pattern" 2>/dev/null)
+            if [ -n "$MATCHES" ]; then
+              FOUND="$FOUND\n$MATCHES"
+            fi
+          done
+
+          if [ -n "$FOUND" ]; then
+            echo "::error::Generated files are tracked in git! These must be gitignored:"
+            printf '%b\n' "$FOUND"
+            echo ""
+            echo "Fix: add these paths to .gitignore and run: git rm --cached <file>"
+            exit 1
+          fi
+
+          echo "No generated files tracked in git"
+
   # ─── Build & Validate ──────────────────────────────────────
   build:
     needs: changes
@@ -1044,7 +1098,7 @@ jobs:
           echo "Signed: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${DIGEST}"
 
   ci-status:
-    needs: [build, audit, crypto-tests, e2e, backend-bdd, backend-unit, desktop-unit, android-build-test, android-e2e, ios-build-test, crypto-guardrails, migration-drift, ansible-validate]
+    needs: [no-generated-files-in-git, build, audit, crypto-tests, e2e, backend-bdd, backend-unit, desktop-unit, android-build-test, android-e2e, ios-build-test, crypto-guardrails, migration-drift, ansible-validate]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -1058,6 +1112,7 @@ jobs:
               FAILED="$FAILED $1($2)"
             fi
           }
+          check_job "no-generated-files-in-git" "${{ needs.no-generated-files-in-git.result }}"
           check_job "build" "${{ needs.build.result }}"
           check_job "audit" "${{ needs.audit.result }}"
           check_job "crypto-tests" "${{ needs.crypto-tests.result }}"
