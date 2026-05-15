@@ -14,6 +14,8 @@ import {
   apiPost,
   apiPatch,
   createCmsReportTypeViaApi,
+  createShiftViaApi,
+  createUserViaApi,
   generateTestKeypair,
   uniqueName,
 } from '../../api-helpers'
@@ -328,9 +330,13 @@ When('the admin converts the report to an entity using the atomic endpoint', asy
     if (et) state.entityTypeId = et.id as string
   }
 
+  const hubId = getScenarioState(world).hubId
+  const path = hubId
+    ? `/hubs/${hubId}/records/convert-from-report`
+    : '/records/convert-from-report'
   const res = await apiPost<Record<string, unknown>>(
     request,
-    '/records/convert-from-report',
+    path,
     {
       reportId: state.reportId,
       entityTypeId: state.entityTypeId,
@@ -451,8 +457,15 @@ Given('an entity type {string} with autoAssign disabled exists', async ({ reques
   if (status < 300) getTriageState(world).entityTypeId = (data as Record<string, unknown>).id as string
 })
 
-Given('an on-shift volunteer with capacity exists', async ({ request }) => {
-  const { createUserViaApi } = await import('../../api-helpers')
-  await createUserViaApi(request, { name: uniqueName('AutoAssign Vol') })
+Given('an on-shift volunteer with capacity exists', async ({ request, workerHub }) => {
+  const vol = await createUserViaApi(request, { name: uniqueName('AutoAssign Vol') })
+  // Create an all-day, all-week shift so the volunteer is always on-shift
+  await createShiftViaApi(request, {
+    startTime: '00:00',
+    endTime: '23:59',
+    days: [0, 1, 2, 3, 4, 5, 6],
+    userPubkeys: [vol.pubkey],
+    hubId: workerHub,
+  })
 })
 

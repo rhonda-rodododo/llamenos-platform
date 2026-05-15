@@ -60,7 +60,7 @@ export interface CreateReplyInput {
 export interface AddBanInput {
   hubId?: string
   phone: string
-  phonePlain?: string
+  phoneDisplay?: string
   reason: string
   bannedBy: string
 }
@@ -198,7 +198,7 @@ export class RecordsService {
 
   async createReply(noteId: string, input: CreateReplyInput): Promise<NoteReplyRow> {
     // Verify the parent note exists
-    const note = await this.getNote(noteId)
+    await this.getNote(noteId)
 
     const [reply] = await this.db
       .insert(noteReplies)
@@ -258,7 +258,7 @@ export class RecordsService {
       .values({
         hubId: input.hubId || null,  // normalize empty string to null
         phone: input.phone,
-        phonePlain: input.phonePlain ?? null,
+        phoneDisplay: input.phoneDisplay ?? null,
         reason: input.reason,
         bannedBy: input.bannedBy,
       })
@@ -280,7 +280,7 @@ export class RecordsService {
           .orderBy(desc(bans.bannedAt))
     return {
       bans: rows.map(r => ({
-        phone: r.phonePlain ?? r.phone,  // return plain phone for display; fall back to hash
+        phone: r.phoneDisplay ?? r.phone,  // return plain phone for display; fall back to hash
         reason: r.reason,
         bannedBy: r.bannedBy,
         bannedAt: r.bannedAt,
@@ -324,7 +324,7 @@ export class RecordsService {
         newPhones.map((phone, idx) => ({
           hubId: hubId || null,  // normalize empty string to null
           phone,
-          phonePlain: plainPhones ? (plainPhones[newIndices[idx]] ?? null) : null,
+          phoneDisplay: plainPhones ? (plainPhones[newIndices[idx]] ?? null) : null,
           reason,
           bannedBy,
         })),

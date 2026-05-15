@@ -279,6 +279,106 @@ records.get('/interactions/by-source/:sourceId',
   },
 )
 
+// --- Convert report to entity (atomic, EP06-A3) ---
+records.post('/convert-from-report',
+  describeRoute({
+    tags: ['Records'],
+    summary: 'Atomically convert a triage report to a case entity',
+    responses: {
+      201: {
+        description: 'Entity created from report',
+        content: {
+          'application/json': {
+            schema: resolver(convertFromReportResponseSchema),
+          },
+        },
+      },
+      ...authErrors,
+      404: { description: 'Report not found' },
+    },
+  }),
+  requirePermission('reports:triage'),
+  validator('json', convertFromReportBodySchema),
+  async (c) => {
+    const pubkey = c.get('pubkey')
+    const services = c.get('services')
+    const body = c.req.valid('json')
+
+    // Fetch entity type for numbering, default status, and autoAssign
+    let caseNumber: string | undefined
+    let defaultStatusHash: string | undefined
+    let autoAssign = false
+    let requiredSpecializations: string[] = []
+    try {
+      const entityType = await services.settings.getEntityTypeById(body.entityTypeId)
+      defaultStatusHash = entityType.defaultStatus || 'pending'
+      autoAssign = entityType.autoAssign === true
+      requiredSpecializations = entityType.requiredSpecializations ?? []
+      if (entityType.numberingEnabled && entityType.numberPrefix) {
+        const result = await services.settings.generateCaseNumber({
+          prefix: entityType.numberPrefix,
+          hubId: c.get('hubId') ?? '',
+        })
+        caseNumber = result.number
+      }
+    } catch {
+      // Entity type not found — proceed with defaults
+    }
+
+    const hubId = c.get('hubId') ?? ''
+
+    const result = await services.cases.convertFromReport({
+      ...body,
+      hubId,
+      createdBy: pubkey,
+      caseNumber,
+      defaultStatusHash,
+    })
+
+    // Auto-assign if entity type has autoAssign enabled
+    let autoAssigned = false
+    let assignedTo: string[] = []
+    if (autoAssign) {
+      const onShiftPubkeys = await services.shifts.getCurrentVolunteers(hubId)
+      const { users: allUsers } = await services.identity.getUsers()
+      const activeCaseCounts = new Map<string, number>()
+      for (const vol of allUsers) {
+        if (!vol.active || vol.onBreak) continue
+        const { count } = await services.cases.countByAssignment(vol.pubkey)
+        activeCaseCounts.set(vol.pubkey, count)
+      }
+      const suggestions = scoreVolunteers({
+        allUsers,
+        onShiftPubkeys,
+        alreadyAssigned: [],
+        activeCaseCounts,
+        requiredSpecializations,
+      })
+      if (suggestions.length > 0) {
+        assignedTo = [suggestions[0].pubkey]
+        await services.cases.update(result.recordId, { assignedTo })
+        autoAssigned = true
+      }
+    }
+
+    publishEvent(c.env, KIND_RECORD_CREATED, {
+      type: 'record:created',
+      recordId: result.recordId,
+      entityTypeId: result.entityTypeId,
+      caseNumber: result.caseNumber,
+      fromReport: body.reportId,
+    })
+
+    await audit(services.audit, 'recordCreatedFromReport', pubkey, {
+      recordId: result.recordId,
+      reportId: body.reportId,
+      entityTypeId: body.entityTypeId,
+    })
+
+    return c.json({ ...result, autoAssigned, assignedTo }, 201)
+  },
+)
+
 // --- Get single record ---
 records.get('/:id',
   describeRoute({
@@ -363,74 +463,6 @@ records.get('/:id/envelope-recipients',
 
     const recipients = determineEnvelopeRecipients(entityType, record.assignedTo, hubMembers)
     return c.json(recipients)
-  },
-)
-
-// --- Convert report to entity (atomic, EP06-A3) ---
-records.post('/convert-from-report',
-  describeRoute({
-    tags: ['Records'],
-    summary: 'Atomically convert a triage report to a case entity',
-    responses: {
-      201: {
-        description: 'Entity created from report',
-        content: {
-          'application/json': {
-            schema: resolver(convertFromReportResponseSchema),
-          },
-        },
-      },
-      ...authErrors,
-      404: { description: 'Report not found' },
-    },
-  }),
-  requirePermission('reports:triage'),
-  validator('json', convertFromReportBodySchema),
-  async (c) => {
-    const pubkey = c.get('pubkey')
-    const services = c.get('services')
-    const body = c.req.valid('json')
-
-    // Fetch entity type for numbering and default status
-    let caseNumber: string | undefined
-    let defaultStatusHash: string | undefined
-    try {
-      const entityType = await services.settings.getEntityTypeById(body.entityTypeId)
-      defaultStatusHash = entityType.defaultStatus || 'pending'
-      if (entityType.numberingEnabled && entityType.numberPrefix) {
-        const result = await services.settings.generateCaseNumber({
-          prefix: entityType.numberPrefix,
-          hubId: c.get('hubId') ?? '',
-        })
-        caseNumber = result.number
-      }
-    } catch {
-      // Entity type not found — proceed with defaults
-    }
-
-    const result = await services.cases.convertFromReport({
-      ...body,
-      hubId: c.get('hubId') ?? '',
-      createdBy: pubkey,
-      caseNumber,
-      defaultStatusHash,
-    })
-
-    publishEvent(c.env, KIND_RECORD_CREATED, {
-      type: 'record:created',
-      recordId: result.recordId,
-      entityTypeId: result.entityTypeId,
-      caseNumber: result.caseNumber,
-      fromReport: body.reportId,
-    })
-
-    await audit(services.audit, 'recordCreatedFromReport', pubkey, {
-      recordId: result.recordId,
-      reportId: body.reportId,
-      entityTypeId: body.entityTypeId,
-    })
-
-    return c.json(result, 201)
   },
 )
 

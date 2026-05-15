@@ -59,12 +59,12 @@ bans.post('/',
     const ban = await services.records.addBan({
       hubId,
       phone: phoneHash,
-      phonePlain: body.phone,
+      phoneDisplay: body.phone,
       reason: body.reason ?? '',
       bannedBy: pubkey,
     })
     await audit(services.audit, 'numberBanned', pubkey, { phoneHash }, undefined, hubId ?? undefined)
-    return c.json({ ban: { phone: ban.phonePlain ?? ban.phone, reason: ban.reason, bannedBy: ban.bannedBy, bannedAt: ban.bannedAt } })
+    return c.json({ ban: { phone: ban.phoneDisplay ?? ban.phone, reason: ban.reason, bannedBy: ban.bannedBy, bannedAt: ban.bannedAt } })
   },
 )
 

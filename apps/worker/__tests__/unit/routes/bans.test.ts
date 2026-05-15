@@ -137,7 +137,7 @@ describe('bans routes', () => {
       expect(addBanSpy).toHaveBeenCalledWith({
         hubId: 'hub-1',
         phone: hashPhone('+12125551234', TEST_HMAC_SECRET),
-        phonePlain: '+12125551234',
+        phoneDisplay: '+12125551234',
         reason: 'Spam',
         bannedBy: 'a'.repeat(64),
       })

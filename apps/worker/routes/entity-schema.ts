@@ -218,7 +218,6 @@ const entityTypeRouter = createEntityRouter({
     delete: 'cases:manage-types',
   },
   disableList: true,
-  disableGet: true,
   methods: {
     create: 'createEntityType',
     update: 'updateEntityType',

@@ -217,6 +217,12 @@ export const entityTypeDefinitions = pgTable('entity_type_definitions', {
   showInDashboard: boolean('show_in_dashboard').default(true),
   accessRoles: text('access_roles').array().notNull().default(sql`'{}'::text[]`),
   editRoles: text('edit_roles').array().notNull().default(sql`'{}'::text[]`),
+  autoAssign: boolean('auto_assign').default(false),
+  autoAssignThreshold: integer('auto_assign_threshold').default(30),
+  requiredSpecializations: text('required_specializations')
+    .array()
+    .notNull()
+    .default(sql`'{}'::text[]`),
   isArchived: boolean('is_archived').default(false),
   isSystem: boolean('is_system').default(false),
   createdAt: timestamp('created_at', { withTimezone: true })
