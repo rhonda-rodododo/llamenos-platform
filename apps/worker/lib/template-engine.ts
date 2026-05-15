@@ -66,6 +66,16 @@ export function applyTemplate(
   // "contact" is a built-in sentinel
   entityNameToId.set('contact', 'contact')
 
+  // Pre-populate field name → ID maps per entity type for stable field IDs on re-application
+  const existingFieldIdsByEntityName = new Map<string, Map<string, string>>()
+  for (const existing of existingEntityTypes) {
+    const fieldMap = new Map<string, string>()
+    for (const field of existing.fields ?? []) {
+      fieldMap.set(field.name, field.id)
+    }
+    existingFieldIdsByEntityName.set(existing.name, fieldMap)
+  }
+
   const createdEntityTypes: EntityTypeDefinition[] = []
   const now = new Date().toISOString()
 
@@ -79,6 +89,7 @@ export function applyTemplate(
     const id = existingId || crypto.randomUUID()
     entityNameToId.set(templateET.name, id)
 
+    const existingFieldIds = existingFieldIdsByEntityName.get(templateET.name) ?? new Map<string, string>()
     const entityType: EntityTypeDefinition = {
       id,
       hubId,
@@ -92,7 +103,7 @@ export function applyTemplate(
       templateId: template.id,
       templateVersion: template.version,
       fields: templateET.fields.map((f, i): EntityFieldDefinition => ({
-        id: crypto.randomUUID(),
+        id: existingFieldIds.get(f.name) ?? crypto.randomUUID(),
         name: f.name,
         label: resolveLabel(f.label),
         type: f.type,

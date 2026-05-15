@@ -96,169 +96,190 @@
     {
       "idx": 13,
       "version": "7",
-      "when": 1773708416651,
+      "when": 1773708416650,
       "tag": "0013_add_reported_by_column",
       "breakpoints": true
     },
     {
       "idx": 14,
       "version": "7",
-      "when": 1773708416652,
+      "when": 1773708416650,
       "tag": "0014_hpke_hub_keys",
       "breakpoints": true
     },
     {
       "idx": 15,
       "version": "7",
-      "when": 1773708416653,
+      "when": 1773708416650,
       "tag": "0015_drop_nostr_outbox",
       "breakpoints": true
     },
     {
       "idx": 16,
       "version": "7",
-      "when": 1778427628314,
-      "tag": "0016_provider_auto_config",
+      "when": 1773708416650,
+      "tag": "0016_provider-setup-tables",
       "breakpoints": true
     },
     {
       "idx": 17,
       "version": "7",
-      "when": 1778427628314,
-      "tag": "0017_phase4_signal_a2p",
+      "when": 1773708416650,
+      "tag": "0016_provider_auto_config",
       "breakpoints": true
     },
     {
       "idx": 18,
       "version": "7",
-      "when": 1778428174585,
-      "tag": "0018_fix_provider_setup_fk_drift",
+      "when": 1773708416650,
+      "tag": "0017_phase4_signal_a2p",
       "breakpoints": true
     },
     {
       "idx": 19,
       "version": "7",
-      "when": 1778568679164,
-      "tag": "0019_provider_templates_and_onboarding",
+      "when": 1773708416650,
+      "tag": "0017_signal_registration_attempts",
       "breakpoints": true
     },
     {
       "idx": 20,
       "version": "7",
-      "when": 1778657558259,
-      "tag": "0020_add_call_records_answered_by",
+      "when": 1773708416650,
+      "tag": "0018_fix_provider_setup_fk_drift",
       "breakpoints": true
     },
     {
       "idx": 21,
       "version": "7",
-      "when": 1778675988856,
-      "tag": "0021_glossy_captain_america",
+      "when": 1773708416650,
+      "tag": "0019_provider_templates_and_onboarding",
       "breakpoints": true
     },
     {
       "idx": 22,
       "version": "7",
-      "when": 1778684043181,
-      "tag": "0022_sad_wildside",
+      "when": 1773708416650,
+      "tag": "0020_add_call_records_answered_by",
       "breakpoints": true
     },
     {
       "idx": 23,
       "version": "7",
-      "when": 1778694857510,
-      "tag": "0023_slow_mercury",
+      "when": 1773708416650,
+      "tag": "0021_glossy_captain_america",
       "breakpoints": true
     },
     {
       "idx": 24,
       "version": "7",
-      "when": 1778665593451,
-      "tag": "0024_ep03_teams_tags",
+      "when": 1773708416650,
+      "tag": "0022_sad_wildside",
       "breakpoints": true
     },
     {
       "idx": 25,
       "version": "7",
-      "when": 1778693745116,
-      "tag": "0025_rainy_rage",
+      "when": 1773708416650,
+      "tag": "0023_slow_mercury",
       "breakpoints": true
     },
     {
       "idx": 26,
       "version": "7",
-      "when": 1778821203665,
-      "tag": "0026_add-team-id-to-users",
+      "when": 1773708416650,
+      "tag": "0024_ep03_teams_tags",
       "breakpoints": true
     },
     {
       "idx": 27,
       "version": "7",
-      "when": 1778817329558,
-      "tag": "0027_blast-delivery-unique",
+      "when": 1773708416650,
+      "tag": "0025_rainy_rage",
       "breakpoints": true
     },
     {
       "idx": 28,
       "version": "7",
-      "when": 1778651799744,
-      "tag": "0028_mute_black_panther",
+      "when": 1773708416650,
+      "tag": "0026_add-team-id-to-users",
       "breakpoints": true
     },
     {
       "idx": 29,
       "version": "7",
-      "when": 1778694298835,
-      "tag": "0029_workable_kingpin",
+      "when": 1773708416650,
+      "tag": "0027_blast-delivery-unique",
       "breakpoints": true
     },
     {
       "idx": 30,
       "version": "7",
-      "when": 1778680139217,
-      "tag": "0030_clammy_rachel_grey",
+      "when": 1773708416650,
+      "tag": "0028_mute_black_panther",
       "breakpoints": true
     },
     {
       "idx": 31,
       "version": "7",
-      "when": 1778694615941,
-      "tag": "0031_cloudy_magus",
+      "when": 1773708416650,
+      "tag": "0029_workable_kingpin",
       "breakpoints": true
     },
     {
       "idx": 32,
       "version": "7",
-      "when": 1747181400000,
-      "tag": "0030_ep07_shifts",
+      "when": 1773708416650,
+      "tag": "0030_clammy_rachel_grey",
       "breakpoints": true
     },
     {
       "idx": 33,
       "version": "7",
-      "when": 1778694153897,
-      "tag": "0031_ep07_shifts_created_by",
+      "when": 1773708416650,
+      "tag": "0030_ep07_shifts",
       "breakpoints": true
     },
     {
       "idx": 34,
       "version": "7",
-      "when": 1778829817343,
-      "tag": "0032_post-merge-reconcile",
+      "when": 1773708416650,
+      "tag": "0031_cloudy_magus",
       "breakpoints": true
     },
     {
       "idx": 35,
       "version": "7",
-      "when": 1778839198695,
-      "tag": "0035_ep07-recovery-group-merge",
+      "when": 1773708416650,
+      "tag": "0031_ep07_shifts_created_by",
       "breakpoints": true
     },
     {
       "idx": 36,
       "version": "7",
+      "when": 1773708416650,
+      "tag": "0032_post-merge-reconcile",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1773708416650,
+      "tag": "0035_ep07-recovery-group-merge",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
       "when": 1778841614976,
       "tag": "0036_ep08-p1-merge",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1778841614977,
+      "tag": "0037_entity_templates_events_deprecation",
       "breakpoints": true
     }
   ]

@@ -69,6 +69,9 @@ const EXCLUDED_SCHEMAS = new Set([
   'digestCadenceSchema',
   'notificationChannelSchema',
 
+  // Entity template sub-schemas (inlined in parent response)
+  'entityTemplateCategorySchema',
+
   // Recovery group — bare enum schema used as building block
   'recoverySessionStatusSchema',
 

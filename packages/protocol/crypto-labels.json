@@ -89,6 +89,7 @@
     "LABEL_HUB_ROLE_ENCRYPT": "llamenos:hub-role-encrypt:v1",
     "LABEL_TEAM_ENCRYPT": "llamenos:team-field:v1",
     "LABEL_TAG_ENCRYPT": "llamenos:tag-field:v1",
-    "LABEL_SAS_DERIVE": "llamenos:sas-derive:v1"
+    "LABEL_SAS_DERIVE": "llamenos:sas-derive:v1",
+    "LABEL_ENTITY_TYPE_DEFINITION": "llamenos:entity-type-def:v1"
   }
 }

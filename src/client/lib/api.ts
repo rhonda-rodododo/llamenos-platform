@@ -2407,6 +2407,66 @@ export async function updateSecurityPrefs(patch: Partial<Omit<SecurityPrefs, 'up
   })
 }
 
+// =========================================================================
+// Entity Templates (EP06-A1)
+// =========================================================================
+
+export interface EntityTemplateListResponse {
+  templates: EntityTemplate[]
+  appliedTemplateIds: string[]
+}
+
+export interface EntityTemplate {
+  id: string
+  name: string
+  label: string
+  labelPlural: string
+  description: string
+  icon?: string
+  color?: string
+  category: 'case' | 'event' | 'incident_report' | 'contact_note'
+  version: string
+  fields: EntityTemplateField[]
+  statuses: Array<{ value: string; label: string; color?: string; isDefault?: boolean; isClosed?: boolean }>
+  defaultStatus: string
+  closedStatuses?: string[]
+  severities?: Array<{ value: string; label: string; color?: string }>
+  allowSubRecords?: boolean
+  allowFileAttachments?: boolean
+  allowInteractionLinks?: boolean
+  numberingEnabled?: boolean
+  numberPrefix?: string
+  tags?: string[]
+  isBuiltin?: boolean
+}
+
+export interface EntityTemplateField {
+  id: string
+  name: string
+  label: string
+  type: string
+  required?: boolean
+  indexable?: boolean
+  indexType?: 'exact' | 'date' | 'location' | 'none'
+  locationOptions?: {
+    maxPrecision?: string
+    allowGps?: boolean
+    allowAutocomplete?: boolean
+  }
+  order?: number
+}
+
+export async function listEntityTemplates(): Promise<EntityTemplateListResponse> {
+  return request('/settings/cms/templates')
+}
+
+export async function applyEntityTemplate(templateId: string): Promise<{ applied: boolean; entityTypeId: string }> {
+  return request('/settings/cms/templates/apply', {
+    method: 'POST',
+    body: JSON.stringify({ templateId }),
+  })
+}
+
 // ── Recovery Group ─────────────────────────────────────────────────────
 
 export interface RecoveryGroupInfo {

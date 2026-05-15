@@ -34,7 +34,7 @@ import adminDevicesRoutes from './routes/admin/devices'
 import contactsRoutes from './routes/contacts'
 import contactsV2Routes from './routes/contacts-v2'
 import recordsRoutes from './routes/records'
-import eventsRoutes from './routes/events'
+import eventsRoutes, { eventsAdminRouter } from './routes/events'
 import healthRoutes from './routes/health'
 import metricsRoutes from './routes/metrics'
 import systemRoutes from './routes/system'
@@ -204,6 +204,7 @@ authenticated.route('/contacts', contactsRoutes)
 authenticated.route('/directory', contactsV2Routes)
 authenticated.route('/records', recordsRoutes)
 authenticated.route('/events', eventsRoutes)
+authenticated.route('/admin/events', eventsAdminRouter)
 authenticated.route('/', evidenceRoutes)
 authenticated.route('/system', systemRoutes)
 authenticated.route('/geocoding', geocodingRoutes)

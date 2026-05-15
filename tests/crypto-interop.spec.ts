@@ -225,7 +225,10 @@ test.describe('Cross-platform crypto interop', () => {
   })
 
   test('JS can verify Nostr event produced by Rust', () => {
-    test.skip(!vectors.wsEvent, 'wsEvent vectors not generated — Rust interop test does not produce them yet')
+    if (!vectors.wsEvent) {
+      test.skip()
+      return
+    }
     const { event, canonicalJson } = vectors.wsEvent
 
     // Recompute event ID from canonical JSON
