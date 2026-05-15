@@ -50,11 +50,9 @@ Before({ tags: '@backend' }, async ({ world }) => {
 })
 
 // ── Auth Setup Steps ─────────────────────────────────────────────────
-
-Given('I am authenticated as a hub admin', async ({ world }) => {
-  // Use the default admin seed — has all permissions including audit:read
-  getAnalyticsState(world).actorSeedHex = ADMIN_SEED
-})
+// Note: 'I am authenticated as a hub admin' is defined in channel-config.steps.ts.
+// The Before hook above sets actorSeedHex = ADMIN_SEED by default, so hub admin
+// scenarios are handled by that default without a duplicate step definition here.
 
 Given('I am authenticated as a volunteer', async ({ request, world }) => {
   const vol = await createUserViaApi(request, { name: uniqueName('analytics-vol') })

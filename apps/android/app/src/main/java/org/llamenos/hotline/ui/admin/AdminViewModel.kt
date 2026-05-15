@@ -59,6 +59,23 @@ enum class AdminTab {
     SYSTEM_HEALTH,
 }
 
+data class ErasureRequestEntry(
+    val id: String,
+    val userId: String,
+    val status: String,
+    val requestedAt: String?,
+    val executeAt: String?,
+    val requestedBy: String?,
+    val justification: String?,
+    val emergencyOverride: Boolean = false,
+)
+
+data class RetentionCategoryEntry(
+    val category: String,
+    var retentionDays: Int?,
+    val minRetentionDays: Int? = null,
+)
+
 data class AdminUiState(
     val selectedTab: AdminTab = AdminTab.VOLUNTEERS,
     val selectedAdminSection: String = "location-lookup",
@@ -153,6 +170,24 @@ data class AdminUiState(
     val systemHealth: SystemHealth? = null,
     val isLoadingHealth: Boolean = false,
     val healthError: String? = null,
+
+    val erasureRequests: List<ErasureRequestEntry> = emptyList(),
+    val isLoadingErasure: Boolean = false,
+    val erasureError: String? = null,
+    val showImmediateErasureDialog: String? = null,
+    val immediateErasureJustification: String = "",
+
+    val retentionCategories: List<RetentionCategoryEntry> = emptyList(),
+    val isLoadingRetention: Boolean = false,
+    val retentionError: String? = null,
+    val isSavingRetention: Boolean = false,
+
+    val platformBans: List<BanEntry> = emptyList(),
+    val isLoadingPlatformBans: Boolean = false,
+    val platformBansError: String? = null,
+    val showAddPlatformBanDialog: Boolean = false,
+    val platformBanSearchQuery: String = "",
+    val platformBanSearchResults: List<BanEntry> = emptyList(),
 )
 
 /**
@@ -208,6 +243,9 @@ class AdminViewModel @Inject constructor(
             "bans", "platform-bans" -> loadBans()
             "audit", "platform-audit" -> loadAuditLog(page = 1)
             "health", "platform-health" -> loadSystemHealth()
+            "erasure-queue", "gdpr-erasure" -> loadErasureRequests()
+            "retention" -> loadRetentionSettings()
+            "platform-bans-manage" -> loadPlatformBans()
         }
     }
 
@@ -1076,5 +1114,266 @@ class AdminViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    fun loadErasureRequests() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingErasure = true, erasureError = null) }
+            try {
+                val response = apiService.request<Map<String, Any?>>(
+                    "GET", "/api/erasure/requests",
+                )
+                val requests = (response["requests"] as? List<*>)?.mapNotNull { entry ->
+                    entry as? Map<String, Any?>
+                    ErasureRequestEntry(
+                        id = entry?.get("id") as? String ?: "",
+                        userId = entry?.get("userId") as? String ?: "",
+                        status = entry?.get("status") as? String ?: "",
+                        requestedAt = entry?.get("requestedAt") as? String,
+                        executeAt = entry?.get("executeAt") as? String,
+                        requestedBy = entry?.get("requestedBy") as? String,
+                        justification = entry?.get("justification") as? String,
+                        emergencyOverride = entry?.get("emergencyOverride") as? Boolean ?: false,
+                    )
+                } ?: emptyList()
+                _uiState.update {
+                    it.copy(isLoadingErasure = false, erasureRequests = requests)
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isLoadingErasure = false,
+                        erasureError = e.message ?: "Failed to load erasure requests",
+                    )
+                }
+            }
+        }
+    }
+
+    fun showImmediateErasureDialog(userId: String) {
+        _uiState.update {
+            it.copy(
+                showImmediateErasureDialog = userId,
+                immediateErasureJustification = "",
+            )
+        }
+    }
+
+    fun dismissImmediateErasureDialog() {
+        _uiState.update { it.copy(showImmediateErasureDialog = null, immediateErasureJustification = "") }
+    }
+
+    fun updateImmediateErasureJustification(value: String) {
+        _uiState.update { it.copy(immediateErasureJustification = value) }
+    }
+
+    fun executeImmediateErasure() {
+        viewModelScope.launch {
+            val state = _uiState.value
+            val userId = state.showImmediateErasureDialog ?: return@launch
+            val justification = state.immediateErasureJustification.trim()
+
+            if (justification.isEmpty()) {
+                _uiState.update { it.copy(erasureError = "Justification is required") }
+                return@launch
+            }
+
+            _uiState.update { it.copy(erasureError = null) }
+            try {
+                apiService.requestNoContent(
+                    "POST",
+                    "/api/erasure/$userId",
+                    mapOf("justification" to justification),
+                )
+                _uiState.update {
+                    it.copy(
+                        showImmediateErasureDialog = null,
+                        immediateErasureJustification = "",
+                    )
+                }
+                loadErasureRequests()
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(erasureError = e.message ?: "Failed to execute erasure")
+                }
+            }
+        }
+    }
+
+    fun remoteWipeDevice(userId: String, devicePubkey: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(erasureError = null) }
+            try {
+                apiService.requestNoContent(
+                    "POST",
+                    "/api/erasure/$userId/wipe-device/$devicePubkey",
+                )
+                loadErasureRequests()
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(erasureError = e.message ?: "Failed to send remote wipe")
+                }
+            }
+        }
+    }
+
+    fun loadRetentionSettings() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingRetention = true, retentionError = null) }
+            try {
+                val response = apiService.request<Map<String, Any?>>(
+                    "GET", "/api/retention",
+                )
+                val categories = (response["categories"] as? List<*>)?.mapNotNull { entry ->
+                    entry as? Map<String, Any?>
+                    RetentionCategoryEntry(
+                        category = entry?.get("category") as? String ?: "",
+                        retentionDays = (entry?.get("retentionDays") as? Number)?.toInt(),
+                        minRetentionDays = (entry?.get("minRetentionDays") as? Number)?.toInt(),
+                    )
+                } ?: emptyList()
+                _uiState.update {
+                    it.copy(isLoadingRetention = false, retentionCategories = categories)
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isLoadingRetention = false,
+                        retentionError = e.message ?: "Failed to load retention settings",
+                    )
+                }
+            }
+        }
+    }
+
+    fun updateRetentionDays(category: String, days: Int?) {
+        _uiState.update { state ->
+            val updated = state.retentionCategories.map { entry ->
+                if (entry.category == category) entry.copy(retentionDays = days)
+                else entry
+            }
+            state.copy(retentionCategories = updated)
+        }
+    }
+
+    fun saveRetentionSettings() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSavingRetention = true, retentionError = null) }
+            try {
+                val body = mapOf("categories" to _uiState.value.retentionCategories)
+                apiService.requestNoContent("PATCH", "/api/retention", body)
+                _uiState.update { it.copy(isSavingRetention = false) }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isSavingRetention = false,
+                        retentionError = e.message ?: "Failed to save retention settings",
+                    )
+                }
+            }
+        }
+    }
+
+    fun loadPlatformBans() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingPlatformBans = true, platformBansError = null) }
+            try {
+                val bansResponse = apiService.request<BanListResponse>("GET", "/api/bans/platform")
+                _uiState.update {
+                    it.copy(
+                        isLoadingPlatformBans = false,
+                        platformBans = bansResponse.bans,
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isLoadingPlatformBans = false,
+                        platformBansError = e.message ?: "Failed to load platform bans",
+                    )
+                }
+            }
+        }
+    }
+
+    fun showAddPlatformBanDialog() {
+        _uiState.update { it.copy(showAddPlatformBanDialog = true) }
+    }
+
+    fun dismissAddPlatformBanDialog() {
+        _uiState.update { it.copy(showAddPlatformBanDialog = false) }
+    }
+
+    fun addPlatformBan(identifierHash: String, reason: String?) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(showAddPlatformBanDialog = false, platformBansError = null) }
+            try {
+                val body = AddBanRequest(
+                    identifier = identifierHash,
+                    reason = reason?.takeIf { it.isNotBlank() },
+                )
+                apiService.requestNoContent("POST", "/api/bans/platform", body)
+                loadPlatformBans()
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(platformBansError = e.message ?: "Failed to add platform ban")
+                }
+            }
+        }
+    }
+
+    fun removePlatformBan(banId: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(platformBansError = null) }
+            try {
+                apiService.requestNoContent("DELETE", "/api/bans/platform/$banId")
+                loadPlatformBans()
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(platformBansError = e.message ?: "Failed to remove platform ban")
+                }
+            }
+        }
+    }
+
+    fun searchPlatformBans(query: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(platformBansError = null) }
+            try {
+                val response = apiService.request<BanListResponse>(
+                    "GET", "/api/bans/platform/search?q=$query",
+                )
+                _uiState.update {
+                    it.copy(platformBanSearchResults = response.bans)
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(platformBansError = e.message ?: "Failed to search bans")
+                }
+            }
+        }
+    }
+
+    fun promoteBanToPlatform(banId: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(platformBansError = null) }
+            try {
+                val ban = _uiState.value.bans.firstOrNull { it.id == banId } ?: return@launch
+                val body = AddBanRequest(
+                    identifier = ban.identifierHash,
+                    reason = ban.reason,
+                )
+                apiService.requestNoContent("POST", "/api/bans/platform", body)
+                loadPlatformBans()
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(platformBansError = e.message ?: "Failed to promote ban")
+                }
+            }
+        }
+    }
+
+    fun setPlatformBanSearchQuery(query: String) {
+        _uiState.update { it.copy(platformBanSearchQuery = query) }
     }
 }

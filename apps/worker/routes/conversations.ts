@@ -2,11 +2,10 @@ import { Hono } from 'hono'
 import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv, EncryptedMessage } from '../types'
 import type { MessagingChannelType } from '@shared/types'
-import { getMessagingAdapterFromService } from '../lib/service-factories'
 import { routeOutboundMessage } from '../messaging/delivery-router'
 import { checkPermission, requirePermission } from '../middleware/permission-guard'
 import { listConversationsQuerySchema, sendMessageBodySchema, updateConversationBodySchema, conversationResponseSchema, messageResponseSchema, conversationListResponseSchema, messageListResponseSchema } from '@protocol/schemas/conversations'
-import { paginationSchema, okResponseSchema } from '@protocol/schemas/common'
+import { paginationSchema } from '@protocol/schemas/common'
 import { authErrors, notFoundError } from '../openapi/helpers'
 import { audit } from '../services/audit'
 import { canClaimChannel, getClaimableChannels } from '@shared/permissions'
@@ -15,7 +14,7 @@ import { createPushDispatcherFromService } from '../lib/push-dispatch'
 import type { WakePayload, FullPushPayload } from '../types'
 import { publishEvent } from '../lib/ws-events'
 import { withRetry, isRetryableError } from '../lib/retry'
-import { getCircuitBreaker } from '../lib/circuit-breaker'
+import { getCircuitBreaker, CircuitOpenError } from '../lib/circuit-breaker'
 import { incCounter } from './metrics'
 import type { Services } from '../services'
 import { createLogger } from '../lib/logger'
@@ -327,7 +326,6 @@ conversations.post('/:id/messages',
     let externalId: string | undefined
     let failureReason: string | undefined
 
-    let sendFailed = false
     if (plaintextForSending && conv.channelType !== 'web') {
       try {
         const identifier = await services.conversations.getContactIdentifier(id)
@@ -361,6 +359,11 @@ conversations.post('/:id/messages',
               maxDelayMs: 3000,
               isRetryable: (error) => {
                 if (typeof error === 'object' && error !== null && 'success' in error) return false
+                // Configuration errors are permanent — never retry
+                if (error instanceof Error) {
+                  const msg = error.message
+                  if (msg.includes('not configured') || msg.includes('not enabled')) return false
+                }
                 return isRetryableError(error)
               },
               onRetry: (attempt, error) => {
@@ -375,13 +378,26 @@ conversations.post('/:id/messages',
           externalId = result.externalId
           status = 'sent'
         } else if (!result.success) {
-          status = 'failed'
-          failureReason = result.error
-          sendFailed = true
+          // Bridge unreachable (network error) → store as sent, not failed
+          const isBridgeUnavailable = result.error && (
+            result.error.includes('request failed') ||
+            result.error.includes('ECONNREFUSED') ||
+            result.error.includes('ECONNRESET') ||
+            result.error.includes('ETIMEDOUT') ||
+            result.error.includes('fetch failed')
+          )
+          if (isBridgeUnavailable) {
+            logger.warn(`${conv.channelType} bridge unavailable — message stored as sent`, { conversationId: id, error: result.error })
+            status = 'sent'
+          } else {
+            status = 'failed'
+            failureReason = result.error
+          }
         }
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : 'Unknown error'
         const isNotConfigured = errMsg.includes('not configured') || errMsg.includes('not enabled')
+            || err instanceof CircuitOpenError
         if (isNotConfigured) {
           logger.warn(`${conv.channelType} adapter not configured — message stored as sent`, { conversationId: id })
           status = 'sent'
@@ -389,7 +405,6 @@ conversations.post('/:id/messages',
           logger.error(`Failed to send outbound message via ${conv.channelType}`, err)
           status = 'failed'
           failureReason = errMsg
-          sendFailed = true
         }
       }
     } else if (conv.channelType === 'web') {

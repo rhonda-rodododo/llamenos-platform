@@ -46,7 +46,7 @@ function camelToSnake(s: string): string {
 function flattenKeysSnake(obj: Record<string, unknown>, prefix = ''): Record<string, string> {
   const result: Record<string, string> = {}
   for (const [key, value] of Object.entries(obj)) {
-    const snakeKey = camelToSnake(key)
+    const snakeKey = camelToSnake(key).replace(/-/g, '_')
     const fullKey = prefix ? `${prefix}_${snakeKey}` : snakeKey
     if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
       Object.assign(result, flattenKeysSnake(value as Record<string, unknown>, fullKey))

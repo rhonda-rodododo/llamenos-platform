@@ -155,6 +155,24 @@ final class KeychainService: @unchecked Sendable {
         SecItemDelete(query as CFDictionary)
     }
 
+    /// Destroy all Keychain items for this app. Called during device wipe sequence.
+    func wipeAll() {
+        let keys = [
+            KeychainKey.encryptedKeys,
+            KeychainKey.hubURL,
+            KeychainKey.deviceID,
+            KeychainKey.biometricEnabled,
+            KeychainKey.pinHash,
+            KeychainKey.biometricPIN,
+            KeychainKey.pinLength,
+            KeychainKey.pinLockoutAttempts,
+            KeychainKey.pinLockoutUntil,
+        ]
+        for key in keys {
+            delete(key)
+        }
+    }
+
     /// Delete all items for this service. Used during account reset / logout.
     func deleteAll() {
         let query: [String: Any] = [
