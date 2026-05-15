@@ -1,7 +1,10 @@
 import { describe, it, expect, vi } from 'vitest'
 import { Hono } from 'hono'
 import calls from '@worker/routes/calls'
+import { hashPhone } from '@worker/lib/crypto'
 import type { AppEnv } from '@worker/types'
+
+const TEST_HMAC_SECRET = 'a'.repeat(64) // gitleaks:allow
 
 function createTestApp(opts: {
   permissions?: string[]
@@ -522,6 +525,7 @@ describe('Calls Routes', () => {
         permissions: ['bans:report'],
         pubkey,
         services,
+        env: { HMAC_SECRET: TEST_HMAC_SECRET } as AppEnv['Bindings'],
       })
 
       const res = await app.request('/call-1/ban', {
@@ -534,7 +538,8 @@ describe('Calls Routes', () => {
       expect(body.banned).toBe(true)
       expect(body.hungUp).toBe(true)
       expect(recordsSvc.addBan).toHaveBeenCalledWith({
-        phone: '+15551234567',
+        phone: hashPhone('+15551234567', TEST_HMAC_SECRET),
+        phoneDisplay: '+15551234567',
         reason: 'Harassment',
         bannedBy: pubkey,
         hubId: 'hub-1',
@@ -559,6 +564,7 @@ describe('Calls Routes', () => {
         permissions: ['bans:report'],
         pubkey,
         services,
+        env: { HMAC_SECRET: TEST_HMAC_SECRET } as AppEnv['Bindings'],
       })
 
       const res = await app.request('/call-1/ban', {
@@ -568,7 +574,7 @@ describe('Calls Routes', () => {
       })
       expect(res.status).toBe(200)
       expect(recordsSvc.addBan).toHaveBeenCalledWith(
-        expect.objectContaining({ reason: 'Banned during active call' }),
+        expect.objectContaining({ reason: 'Banned during active call', phoneDisplay: '+15551234567' }),
       )
     })
 

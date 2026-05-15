@@ -59,7 +59,8 @@ export interface CreateReplyInput {
 
 export interface AddBanInput {
   hubId?: string
-  phone: string
+  phone: string       // HMAC hash for lookup
+  phoneDisplay: string // Original E.164 for admin display
   reason: string
   bannedBy: string
 }
@@ -257,6 +258,7 @@ export class RecordsService {
       .values({
         hubId: input.hubId || null,  // normalize empty string to null
         phone: input.phone,
+        phoneDisplay: input.phoneDisplay,
         reason: input.reason,
         bannedBy: input.bannedBy,
       })
@@ -265,7 +267,7 @@ export class RecordsService {
     return ban
   }
 
-  async listBans(hubId?: string): Promise<{ bans: Array<{ phone: string; reason: string | null; bannedBy: string | null; bannedAt: Date }> }> {
+  async listBans(hubId?: string): Promise<{ bans: Array<{ phone: string; phoneHash: string; reason: string | null; bannedBy: string | null; bannedAt: Date }> }> {
     const rows = hubId
       ? await this.db
           .select()
@@ -278,7 +280,8 @@ export class RecordsService {
           .orderBy(desc(bans.bannedAt))
     return {
       bans: rows.map(r => ({
-        phone: r.phone,
+        phone: r.phoneDisplay ?? r.phone,  // display original phone; fall back to hash for legacy rows
+        phoneHash: r.phone,
         reason: r.reason,
         bannedBy: r.bannedBy,
         bannedAt: r.bannedAt,
@@ -287,7 +290,7 @@ export class RecordsService {
   }
 
   async bulkAddBans(
-    phones: string[],
+    entries: Array<{ phoneHash: string; phoneDisplay: string }>,
     reason: string,
     bannedBy: string,
     hubId?: string,
@@ -305,26 +308,27 @@ export class RecordsService {
     const existingPhones = new Set(existingRows.map((r) => r.phone))
     // Deduplicate within the input array AND exclude already-banned phones
     const seen = new Set<string>()
-    const newPhones = phones.filter((p) => {
-      if (existingPhones.has(p) || seen.has(p)) return false
-      seen.add(p)
+    const newEntries = entries.filter((e) => {
+      if (existingPhones.has(e.phoneHash) || seen.has(e.phoneHash)) return false
+      seen.add(e.phoneHash)
       return true
     })
 
-    if (newPhones.length === 0) return 0
+    if (newEntries.length === 0) return 0
 
     await this.db
       .insert(bans)
       .values(
-        newPhones.map((phone) => ({
+        newEntries.map((entry) => ({
           hubId: hubId || null,  // normalize empty string to null
-          phone,
+          phone: entry.phoneHash,
+          phoneDisplay: entry.phoneDisplay,
           reason,
           bannedBy,
         })),
       )
 
-    return newPhones.length
+    return newEntries.length
   }
 
   async removeBan(phone: string, hubId?: string): Promise<void> {

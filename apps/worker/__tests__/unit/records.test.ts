@@ -1,6 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
 import { RecordsService } from '@worker/services/records'
-import { ServiceError } from '@worker/services/settings'
 import { createMockDb } from './mock-db'
 
 describe('RecordsService', () => {
@@ -199,7 +198,7 @@ describe('RecordsService', () => {
       db.$setSelectResult([])
       db.$setInsertResult([ban])
 
-      const result = await service.addBan({ phone: '+15551234567', reason: 'spam', bannedBy: 'pk1' })
+      const result = await service.addBan({ phone: '+15551234567', phoneDisplay: '+15551234567', reason: 'spam', bannedBy: 'pk1' })
       expect(result.phone).toBe('+15551234567')
     })
 
@@ -208,7 +207,7 @@ describe('RecordsService', () => {
       const existing = { id: 'ban-1', phone: '+15551234567', reason: 'spam' }
       db.$setSelectResult([existing])
 
-      const result = await service.addBan({ phone: '+15551234567', reason: 'spam', bannedBy: 'pk1' })
+      const result = await service.addBan({ phone: '+15551234567', phoneDisplay: '+15551234567', reason: 'spam', bannedBy: 'pk1' })
       expect(result.id).toBe('ban-1')
     })
 
@@ -217,7 +216,7 @@ describe('RecordsService', () => {
       db.$setSelectResult([])
       db.$setInsertResult([{ id: 'ban-1', hubId: 'hub-1', phone: '+15551234567' }])
 
-      const result = await service.addBan({ hubId: 'hub-1', phone: '+15551234567', reason: 'spam', bannedBy: 'pk1' })
+      const result = await service.addBan({ hubId: 'hub-1', phone: '+15551234567', phoneDisplay: '+15551234567', reason: 'spam', bannedBy: 'pk1' })
       expect(result.hubId).toBe('hub-1')
     })
   })
@@ -246,7 +245,11 @@ describe('RecordsService', () => {
       db.$setSelectResult([])
 
       const count = await service.bulkAddBans(
-        ['+1111', '+2222', '+1111'],
+        [
+          { phoneHash: '+1111', phoneDisplay: '+1111' },
+          { phoneHash: '+2222', phoneDisplay: '+2222' },
+          { phoneHash: '+1111', phoneDisplay: '+1111' },
+        ],
         'spam',
         'pk1',
         'hub-1'
@@ -259,7 +262,14 @@ describe('RecordsService', () => {
       const { db, service } = setup()
       db.$setSelectResult([{ phone: '+1111' }])
 
-      const count = await service.bulkAddBans(['+1111', '+2222'], 'spam', 'pk1')
+      const count = await service.bulkAddBans(
+        [
+          { phoneHash: '+1111', phoneDisplay: '+1111' },
+          { phoneHash: '+2222', phoneDisplay: '+2222' },
+        ],
+        'spam',
+        'pk1',
+      )
       expect(count).toBe(1)
     })
   })

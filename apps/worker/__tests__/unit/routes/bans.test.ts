@@ -133,10 +133,11 @@ describe('bans routes', () => {
 
       expect(res.status).toBe(200)
       const json = await res.json()
-      expect(json.ban.phone).toBe(hashPhone('+12125551234', TEST_HMAC_SECRET))
+      expect(json.ban.phone).toBe('+12125551234')
       expect(addBanSpy).toHaveBeenCalledWith({
         hubId: 'hub-1',
         phone: hashPhone('+12125551234', TEST_HMAC_SECRET),
+        phoneDisplay: '+12125551234',
         reason: 'Spam',
         bannedBy: 'a'.repeat(64),
       })
@@ -192,7 +193,10 @@ describe('bans routes', () => {
       const json = await res.json()
       expect(json.count).toBe(2)
       expect(bulkAddBansSpy).toHaveBeenCalledWith(
-        [hashPhone('+12125551234', TEST_HMAC_SECRET), hashPhone('+12125555678', TEST_HMAC_SECRET)],
+        [
+          { phoneHash: hashPhone('+12125551234', TEST_HMAC_SECRET), phoneDisplay: '+12125551234' },
+          { phoneHash: hashPhone('+12125555678', TEST_HMAC_SECRET), phoneDisplay: '+12125555678' },
+        ],
         'Spam', 'a'.repeat(64), 'hub-1',
       )
       expect(auditLogSpy).toHaveBeenCalledOnce()

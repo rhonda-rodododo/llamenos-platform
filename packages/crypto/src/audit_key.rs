@@ -55,7 +55,7 @@ pub fn wrap_audit_key_to_admins(
         ));
     }
 
-    let aad = format!("{}:{}", LABEL_AUDIT_USER_KEY_WRAP, user_pubkey_hex);
+    let aad = format!("{LABEL_AUDIT_USER_KEY_WRAP}:{user_pubkey_hex}");
 
     let mut envelopes = Vec::with_capacity(admin_pubkeys_hex.len());
     for &admin_pk in admin_pubkeys_hex {
@@ -86,7 +86,7 @@ pub fn unwrap_audit_key(
     admin_secret_hex: &str,
     user_pubkey_hex: &str,
 ) -> Result<Zeroizing<[u8; 32]>, CryptoError> {
-    let aad = format!("{}:{}", LABEL_AUDIT_USER_KEY_WRAP, user_pubkey_hex);
+    let aad = format!("{LABEL_AUDIT_USER_KEY_WRAP}:{user_pubkey_hex}");
 
     let key = hpke_open_key(
         &admin_envelope.envelope,
@@ -120,7 +120,7 @@ pub fn encrypt_audit_details(
     let nonce = Nonce::from_slice(&nonce_bytes);
 
     // AAD binds ciphertext to the specific user and audit entry
-    let aad = format!("{}:{}:{}", LABEL_AUDIT_DETAILS, user_pubkey_hex, entry_id);
+    let aad = format!("{LABEL_AUDIT_DETAILS}:{user_pubkey_hex}:{entry_id}");
 
     let ciphertext = cipher
         .encrypt(
@@ -174,7 +174,7 @@ pub fn decrypt_audit_details(
         .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
     let nonce = Nonce::from_slice(&nonce_bytes);
 
-    let aad = format!("{}:{}:{}", LABEL_AUDIT_DETAILS, user_pubkey_hex, entry_id);
+    let aad = format!("{LABEL_AUDIT_DETAILS}:{user_pubkey_hex}:{entry_id}");
 
     let plaintext = cipher
         .decrypt(

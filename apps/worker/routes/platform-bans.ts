@@ -87,6 +87,7 @@ platformBans.post(
     const phoneHash = hashPhone(body.phone, c.env.HMAC_SECRET)
     await services.records.addBan({
       phone: phoneHash,
+      phoneDisplay: body.phone,
       reason: body.reason ?? '',
       bannedBy: pubkey,
     })
@@ -132,11 +133,12 @@ platformBans.post(
         400,
       )
     }
-    const hashedPhones = body.phones.map((p: string) =>
-      hashPhone(p, c.env.HMAC_SECRET),
-    )
+    const entries = body.phones.map((p: string) => ({
+      phoneHash: hashPhone(p, c.env.HMAC_SECRET),
+      phoneDisplay: p,
+    }))
     const added = await services.records.bulkAddBans(
-      hashedPhones,
+      entries,
       body.reason ?? '',
       pubkey,
     )
@@ -261,6 +263,7 @@ platformBans.post(
 
     await services.records.addBan({
       phone: sourceBan.phone,
+      phoneDisplay: sourceBan.phoneDisplay ?? '',
       reason: sourceBan.reason ?? '',
       bannedBy: pubkey,
     })
