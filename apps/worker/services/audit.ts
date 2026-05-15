@@ -39,7 +39,15 @@ const EVENT_CATEGORIES: Record<string, string[]> = {
     'ivrUpdated', 'customFieldsUpdated', 'spamSettingsUpdated',
     'callSettingsUpdated',
   ],
-  shifts: ['shiftCreated', 'shiftUpdated', 'shiftDeleted'],
+  shifts: [
+    'shiftCreated', 'shiftUpdated', 'shiftDeleted',
+    'shiftClockIn', 'shiftClockOut', 'shiftForceClockOut',
+    'shiftOverrideCreated', 'shiftOverrideDeleted',
+    'shiftJoinRequested', 'shiftJoinApproved', 'shiftJoinDenied',
+    'availabilityBlockCreated', 'availabilityBlockDeleted',
+    'ringGroupCreated', 'ringGroupUpdated', 'ringGroupDeleted',
+    'ringGroupMemberAdded', 'ringGroupMemberRemoved',
+  ],
   notes: ['noteCreated', 'noteUpdated'],
   messaging: [
     'messageSent', 'conversationClaimed', 'conversationClosed',

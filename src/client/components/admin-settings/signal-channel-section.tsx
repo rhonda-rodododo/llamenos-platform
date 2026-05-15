@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '@/lib/toast'
 import { SettingsSection } from '@/components/settings-section'
@@ -7,30 +7,21 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
-  Shield, Copy, Loader2, CheckCircle2, XCircle,
+  Shield, Copy, Loader2,
   Phone, KeyRound, AlertTriangle, RefreshCw, Activity,
 } from 'lucide-react'
 import {
   updateMessagingConfig,
-  testMessagingChannel,
-  getSignalAccountInfo,
   getSignalIdentities,
   updateSignalIdentityTrust,
   getSignalQueueStats,
-  type MessagingConfig,
   type SignalIdentityRecord,
   type SignalQueueStats,
 } from '@/lib/api'
 import { SignalRegistrationFlow } from '@/components/setup/SignalRegistrationFlow'
-import { ProviderStatusBadge } from '@/components/setup/ProviderStatusBadge'
-
-interface SignalChannelSectionProps {
-  config: MessagingConfig
-  onConfigChange: (config: MessagingConfig) => void
-  expanded: boolean
-  onToggle: (open: boolean) => void
-  statusSummary?: string
-}
+import { ConnectionTestButton } from '@/components/channel-config/connection-test-button'
+import { AutoResponseFields } from '@/components/channel-config/auto-response-fields'
+import type { ChannelConfigProps } from '@/components/channel-config/types'
 
 export function SignalChannelSection({
   config,
@@ -38,11 +29,9 @@ export function SignalChannelSection({
   expanded,
   onToggle,
   statusSummary,
-}: SignalChannelSectionProps) {
+}: ChannelConfigProps) {
   const { t } = useTranslation()
   const { toast } = useToast()
-  const [testing, setTesting] = useState(false)
-  const [testResult, setTestResult] = useState<boolean | null>(null)
   const [saving, setSaving] = useState(false)
 
   const signal = config.signal || {
@@ -67,7 +56,7 @@ export function SignalChannelSection({
         ...config,
         enabledChannels: config.enabledChannels.includes('signal')
           ? config.enabledChannels
-          : [...config.enabledChannels, 'signal'],
+          : [...config.enabledChannels, 'signal' as const],
         signal: { ...signal },
       })
       toast(t('common.success'), 'success')
@@ -75,19 +64,6 @@ export function SignalChannelSection({
       toast(t('common.error'), 'error')
     } finally {
       setSaving(false)
-    }
-  }
-
-  async function handleTest() {
-    setTesting(true)
-    setTestResult(null)
-    try {
-      const res = await testMessagingChannel('signal')
-      setTestResult(res.connected)
-    } catch {
-      setTestResult(false)
-    } finally {
-      setTesting(false)
     }
   }
 
@@ -167,36 +143,19 @@ export function SignalChannelSection({
           />
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="signal-auto-response">{t('signal.autoResponse', { defaultValue: 'Auto-Response' })}</Label>
-          <Input
-            id="signal-auto-response"
-            value={signal.autoResponse || ''}
-            onChange={(e) => updateSignal({ autoResponse: e.target.value })}
-            placeholder={t('setup.autoResponsePlaceholder')}
-          />
-        </div>
+        <AutoResponseFields
+          autoResponse={signal.autoResponse || ''}
+          afterHoursResponse={signal.afterHoursResponse || ''}
+          onAutoResponseChange={(v) => updateSignal({ autoResponse: v })}
+          onAfterHoursResponseChange={(v) => updateSignal({ afterHoursResponse: v })}
+          idPrefix="signal"
+        />
 
         <div className="flex items-center gap-2">
           <Button onClick={handleSave} disabled={saving || !signal.bridgeUrl}>
             {saving ? t('common.loading') : t('common.save')}
           </Button>
-          <Button variant="outline" onClick={handleTest} disabled={testing || !signal.bridgeUrl}>
-            {testing ? (
-              <><Loader2 className="h-4 w-4 animate-spin" /> {t('telephonyProvider.testing')}</>
-            ) : (
-              t('telephonyProvider.testConnection')
-            )}
-          </Button>
-          {testResult !== null && (
-            <Badge variant="outline" className={testResult ? 'text-green-600' : 'text-red-600'}>
-              {testResult ? (
-                <><CheckCircle2 className="h-3 w-3" /> {t('telephonyProvider.testSuccess')}</>
-              ) : (
-                <><XCircle className="h-3 w-3" /> {t('telephonyProvider.testFailed')}</>
-              )}
-            </Badge>
-          )}
+          <ConnectionTestButton channel="signal" disabled={!signal.bridgeUrl} />
         </div>
 
         {/* Registration Section */}
@@ -331,7 +290,6 @@ function SignalQueuePanel() {
     }
   }
 
-  const total = stats ? stats.pending + stats.processing + stats.failed + stats.dead : 0
 
   return (
     <div className="mt-6 space-y-3 border-t pt-4">

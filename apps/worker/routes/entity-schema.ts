@@ -534,7 +534,7 @@ entitySchema.post('/roles/from-template',
     const { roles: existingRoles } = await services.settings.getRoles()
     const existingSlugs = new Set(existingRoles.map(r => r.slug))
 
-    const created: Array<{ id: string; name: string }> = []
+    const created: Array<{ id: string; name: string | null }> = []
 
     for (const suggested of roles) {
       // Skip roles that already exist by slug

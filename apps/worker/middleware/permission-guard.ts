@@ -18,8 +18,13 @@ const logger = createLogger('middleware.permission-guard')
 export function requirePermission(...required: string[]) {
   return createMiddleware<AppEnv>(async (c, next) => {
     const permissions = c.get('permissions')
+    // For hub-scoped routes, also check hub-level permissions.
+    // Routes mounted under /hubs/:hubId go through hubContext middleware
+    // which sets hubPermissions — users may have permissions only at hub scope.
+    const hubPermissions = c.get('hubPermissions') as string[] | undefined
     for (const perm of required) {
-      if (!permissionGranted(permissions, perm)) {
+      if (!permissionGranted(permissions, perm) &&
+          !(hubPermissions && permissionGranted(hubPermissions, perm))) {
         return c.json({ error: 'Forbidden', required: perm }, 403)
       }
     }
@@ -37,7 +42,11 @@ export function requirePermission(...required: string[]) {
 export function requireAnyPermission(...anyOf: string[]) {
   return createMiddleware<AppEnv>(async (c, next) => {
     const permissions = c.get('permissions')
-    const hasAny = anyOf.some(perm => permissionGranted(permissions, perm))
+    const hubPermissions = c.get('hubPermissions') as string[] | undefined
+    const hasAny = anyOf.some(perm =>
+      permissionGranted(permissions, perm) ||
+      (hubPermissions != null && permissionGranted(hubPermissions, perm)),
+    )
     if (!hasAny) {
       return c.json({ error: 'Forbidden', required: anyOf }, 403)
     }
