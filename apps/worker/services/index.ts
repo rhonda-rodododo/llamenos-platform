@@ -30,6 +30,8 @@ import { A2pRegistrationService } from './provider-setup/a2p-registration'
 import { ProviderTemplateService } from './provider-setup/templates'
 import { HubOnboardService } from './provider-setup/hub-onboard'
 import { RecoveryGroupService } from './recovery-group'
+import { TeamsService } from './teams'
+import { TagsService } from './tags'
 
 export interface Services {
   identity: IdentityService
@@ -57,6 +59,8 @@ export interface Services {
   providerTemplates: ProviderTemplateService
   hubOnboard: HubOnboardService
   recoveryGroup: RecoveryGroupService
+  teams: TeamsService
+  tags: TagsService
 }
 
 export interface ServicesOpts {
@@ -111,6 +115,8 @@ export function createServices(db: Database, opts?: ServicesOpts): Services {
     providerTemplates: new ProviderTemplateService(db),
     hubOnboard: new HubOnboardService(db, providerSetup, settings),
     recoveryGroup: new RecoveryGroupService(db, audit),
+    teams: new TeamsService(db),
+    tags: new TagsService(db),
   }
 
   // Only create firehose agent if seal key is configured
@@ -131,6 +137,8 @@ export function createServices(db: Database, opts?: ServicesOpts): Services {
 
 // Re-export service classes for direct import
 export {
+  TeamsService,
+  TagsService,
   IdentityService,
   SettingsService,
   RecordsService,

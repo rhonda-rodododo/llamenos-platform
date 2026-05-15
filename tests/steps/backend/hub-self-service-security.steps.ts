@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /**
  * Backend BDD step definitions for hub self-service security
  * (hub-self-service-security.feature).
@@ -75,7 +76,7 @@ function resolveHub(world: Record<string, unknown>, hubName: string): string {
 
 // ── Hooks ──────────────────────────────────────────────────────────
 
-Before(async ({ request, world }) => {
+Before({ tags: '@hub-selfservice' }, async ({ request, world }) => {
   // Create two hubs for cross-hub security testing
   const ownHubId = await createHubViaApi(request, `bdd-sec-own-${Date.now()}`)
   const otherHubId = await createHubViaApi(request, `bdd-sec-other-${Date.now()}`)
@@ -94,7 +95,7 @@ Before(async ({ request, world }) => {
   actor.hubMap.set('test-hub', ownHubId)
 })
 
-After(async ({ request, world }) => {
+After({ tags: '@hub-selfservice' }, async ({ request, world }) => {
   const state = getSS(world)
   await deleteHubViaApi(request, state.ownHubId).catch(() => {})
   await deleteHubViaApi(request, state.otherHubId).catch(() => {})
@@ -172,9 +173,10 @@ When('I start OAuth for provider {string} under hub {string}', async ({ request,
   const state = getSS(world)
   const seed = getActorSeed(world)
   const hubId = resolveHub(world, hubName)
+  // Use hub-scoped route so hub membership grants access
   const res = await apiPost(
     request,
-    '/provider-setup/oauth/start',
+    `/hubs/${hubId}/provider-setup/oauth/start`,
     {
       provider,
       redirectUrl: 'http://localhost:3000/callback',

@@ -74,6 +74,10 @@ test.describe('Cross-platform crypto interop', () => {
     expect(labels.LABEL_SERVER_NOSTR_KEY_INFO).toBe(rustLabels.labelServerNostrKeyInfo)
     expect(labels.LABEL_PUSH_WAKE).toBe(rustLabels.labelPushWake)
     expect(labels.LABEL_PUSH_FULL).toBe(rustLabels.labelPushFull)
+    expect(labels.LABEL_AUDIT_USER_KEY_WRAP).toBe(rustLabels.labelAuditUserKeyWrap)
+    expect(labels.LABEL_ERASURE_OVERRIDE_SIG).toBe(rustLabels.labelErasureOverrideSig)
+    expect(labels.LABEL_AUDIT_DETAILS).toBe(rustLabels.labelAuditDetails)
+    expect(labels.LABEL_DEVICE_WIPE_SIG).toBe(rustLabels.labelDeviceWipeSig)
   })
 
   test('JS derives same X25519 pubkey from test secret key', () => {

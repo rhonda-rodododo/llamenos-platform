@@ -161,7 +161,7 @@ export interface User {
   // Volunteer profile extensions (Epic 340)
   specializations?: string[]        // e.g., ["immigration", "domestic_violence", "legal_observer"]
   maxCaseAssignments?: number       // Capacity limit (0 = unlimited, default: 0)
-  teamId?: string                   // Team/group membership
+  teamId?: string                   // Primary team assignment (e.g., "team-alpha")
   supervisorPubkey?: string         // Who reviews this volunteer's cases
 }
 
@@ -365,6 +365,8 @@ export type AppEnv = {
     hubPermissions?: string[]
     /** Unique request ID for correlation (set by request-id middleware) */
     requestId: string
+    /** Current session token (set by auth middleware for session-based auth) */
+    sessionToken?: string
     /** Service registry — replaces DO stubs */
     services: import('../services').Services
   }
