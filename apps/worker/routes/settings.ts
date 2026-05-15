@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { describeRoute, resolver, validator } from 'hono-openapi'
+import { z } from 'zod'
 import type { AppEnv } from '../types'
 import { requirePermission, checkPermission } from '../middleware/permission-guard'
 import {
@@ -41,7 +42,6 @@ import { audit } from '../services/audit'
 import { invalidateRolesCache } from '../services/settings'
 import { validateExternalUrl } from '../lib/ssrf-guard'
 import { getMessagingAdapterFromService } from '../lib/service-factories'
-import { z } from 'zod/v4'
 
 const settings = new Hono<AppEnv>()
 
