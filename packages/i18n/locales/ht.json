@@ -1856,28 +1856,32 @@
     "volunteer": "Volunteer"
   },
   "roles": {
-    "createRole": "Create Role",
-    "created": "Role created",
-    "default": "Default",
-    "deleteConfirm": "Are you sure you want to delete this role? Members will be reassigned to the default role.",
-    "deleteTitle": "Delete Role",
-    "deleted": "Role deleted",
-    "description": "Define roles and assign permissions to control access across your hotline.",
-    "descriptionLabel": "Description",
-    "descriptionPlaceholder": "Brief description of this role...",
-    "editRole": "Edit Role",
-    "locked": "Locked",
-    "name": "Name",
-    "namePlaceholder": "e.g. Team Lead",
-    "permissionCount": "permissions",
-    "permissions": "Permissions",
-    "selected": "selected",
-    "slug": "Slug",
-    "slugPlaceholder": "e.g. team-lead",
-    "summary": "Summary",
     "system": "System",
-    "title": "Roles & Permissions",
-    "updated": "Role updated"
+    "default": "Default",
+    "allPermissions": "All permissions",
+    "permissionCount": "{{count}} permissions",
+    "permissionCountOne": "1 permission",
+    "assignedUsers": "{{count}} users",
+    "assignedUsersOne": "1 user",
+    "name": "Role name",
+    "namePlaceholder": "e.g. Intake Coordinator",
+    "slug": "Slug",
+    "description": "Description",
+    "descriptionPlaceholder": "Brief description of this role's purpose",
+    "permissions": "Permissions",
+    "create": "Create role",
+    "importFromTemplate": "Import from template",
+    "importDialog": {
+      "title": "Import roles from template",
+      "description": "Select roles to import from the template. Existing roles with the same slug will be skipped.",
+      "import": "Import selected",
+      "noTemplates": "No templates available"
+    },
+    "deleteConfirm": {
+      "title": "Delete role",
+      "description": "Are you sure you want to delete \"{{name}}\"? Users assigned this role will lose its permissions."
+    },
+    "slugPlaceholder": "e.g. intake-coordinator"
   },
   "save": "Save",
   "schema": {
@@ -3471,5 +3475,60 @@
     "confirmDelete": "Delete this tag?",
     "empty": "No tags",
     "loading": "Loading tags..."
+  },
+  "analytics": {
+    "title": "Analitik",
+    "description": "Volim apèl, tan repon, ak aktivite volontè",
+    "nav": "Analitik",
+    "summary": {
+      "totalCalls": "Total Apèl",
+      "answerRate": "To Repon",
+      "avgDuration": "Dire Mwayèn",
+      "totalConversations": "Total Konvèsasyon"
+    },
+    "callVolume": {
+      "title": "Volim Apèl",
+      "answered": "Reponn",
+      "unanswered": "San Repon",
+      "abandoned": "Abandone",
+      "noData": "Pa gen done apèl pou peryòd sa a"
+    },
+    "hours": {
+      "title": "Distribisyon pa Èdtan",
+      "noData": "Pa gen done pou peryòd sa a"
+    },
+    "conversations": {
+      "title": "Konvèsasyon",
+      "avgResponseTime": "Tan Repon Mwayèn",
+      "avgMessages": "Mesaj Mwayèn",
+      "noData": "Pa gen done konvèsasyon pou peryòd sa a"
+    },
+    "shifts": {
+      "title": "Kouvèti Shift",
+      "noData": "Pa gen done shift disponib"
+    },
+    "users": {
+      "title": "Aktivite Volontè",
+      "name": "Non",
+      "callsAnswered": "Apèl Reponn",
+      "avgDuration": "Dire Mwayèn",
+      "notesCreated": "Nòt Kreye",
+      "noData": "Pa gen done volontè pou peryòd sa a"
+    },
+    "personal": {
+      "callsToday": "Apèl Jodi a",
+      "callsThisPeriod": "Apèl Peryòd Sa a",
+      "avgDuration": "Dire Mwayèn",
+      "notesCreated": "Nòt Kreye"
+    },
+    "platform": {
+      "title": "Analitik Platfòm",
+      "crossHub": "Cross-Hub"
+    },
+    "dateRange": {
+      "7days": "7 Jou",
+      "30days": "30 Jou",
+      "custom": "Pèsonalize"
+    }
   }
 }

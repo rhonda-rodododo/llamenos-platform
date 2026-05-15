@@ -1,4 +1,4 @@
-@backend @cases
+@backend @cases @cross-hub
 Feature: Cross-Hub Case Visibility
   Hub admins can opt-in to share case summaries with super-admins
   for cross-organization coordination.

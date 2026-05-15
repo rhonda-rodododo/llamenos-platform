@@ -30,11 +30,8 @@ Given('the app is freshly installed', async ({ page }) => {
 Given('no identity exists on the device', async ({ page }) => {
   // Ensure no encrypted key exists in storage (clear both current and legacy key names)
   await page.evaluate(() => {
+    localStorage.removeItem('stronghold:llamenos:llamenos-encrypted-device-keys')
     localStorage.removeItem('llamenos:llamenos-encrypted-device-keys')
-    localStorage.removeItem('llamenos:llamenos-encrypted-key')
-    localStorage.removeItem('llamenos-encrypted-key')
-    localStorage.removeItem('tauri-store:keys.json:llamenos-encrypted-device-keys')
-    localStorage.removeItem('tauri-store:keys.json:llamenos-encrypted-key')
   })
 })
 

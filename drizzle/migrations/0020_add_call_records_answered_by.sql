@@ -1,0 +1,1 @@
+ALTER TABLE "call_records" ADD COLUMN "answered_by" text;

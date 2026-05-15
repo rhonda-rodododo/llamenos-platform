@@ -191,6 +191,10 @@ struct LabelVectors {
     label_server_nostr_key_info: String,
     label_push_wake: String,
     label_push_full: String,
+    label_audit_user_key_wrap: String,
+    label_erasure_override_sig: String,
+    label_audit_details: String,
+    label_device_wipe_sig: String,
 }
 
 // ─── New v2 Structs ──────────────────────────────────────────
@@ -585,6 +589,10 @@ fn generate_and_verify_test_vectors() {
             label_server_nostr_key_info: LABEL_SERVER_NOSTR_KEY_INFO.to_string(),
             label_push_wake: LABEL_PUSH_WAKE.to_string(),
             label_push_full: LABEL_PUSH_FULL.to_string(),
+            label_audit_user_key_wrap: LABEL_AUDIT_USER_KEY_WRAP.to_string(),
+            label_erasure_override_sig: LABEL_ERASURE_OVERRIDE_SIG.to_string(),
+            label_audit_details: LABEL_AUDIT_DETAILS.to_string(),
+            label_device_wipe_sig: LABEL_DEVICE_WIPE_SIG.to_string(),
         },
         message_encryption: MessageEncryptionVectors {
             plaintext: msg_plaintext.to_string(),
@@ -830,14 +838,18 @@ fn label_count_matches_expected() {
         label_server_nostr_key_info: LABEL_SERVER_NOSTR_KEY_INFO.to_string(),
         label_push_wake: LABEL_PUSH_WAKE.to_string(),
         label_push_full: LABEL_PUSH_FULL.to_string(),
+        label_audit_user_key_wrap: LABEL_AUDIT_USER_KEY_WRAP.to_string(),
+        label_erasure_override_sig: LABEL_ERASURE_OVERRIDE_SIG.to_string(),
+        label_audit_details: LABEL_AUDIT_DETAILS.to_string(),
+        label_device_wipe_sig: LABEL_DEVICE_WIPE_SIG.to_string(),
     };
 
     let json = serde_json::to_value(&label_vec).unwrap();
     let map = json.as_object().unwrap();
     assert_eq!(
         map.len(),
-        28,
-        "Expected 28 labels — update interop test if new labels were added"
+        32,
+        "Expected 32 labels — update interop test if new labels were added"
     );
 }
 

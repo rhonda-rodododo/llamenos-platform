@@ -1856,28 +1856,32 @@
     "volunteer": "Volunteer"
   },
   "roles": {
-    "createRole": "Create Role",
-    "created": "Role created",
-    "default": "Default",
-    "deleteConfirm": "Are you sure you want to delete this role? Members will be reassigned to the default role.",
-    "deleteTitle": "Delete Role",
-    "deleted": "Role deleted",
-    "description": "Define roles and assign permissions to control access across your hotline.",
-    "descriptionLabel": "Description",
-    "descriptionPlaceholder": "Brief description of this role...",
-    "editRole": "Edit Role",
-    "locked": "Locked",
-    "name": "Name",
-    "namePlaceholder": "e.g. Team Lead",
-    "permissionCount": "permissions",
-    "permissions": "Permissions",
-    "selected": "selected",
-    "slug": "Slug",
-    "slugPlaceholder": "e.g. team-lead",
-    "summary": "Summary",
     "system": "System",
-    "title": "Roles & Permissions",
-    "updated": "Role updated"
+    "default": "Default",
+    "allPermissions": "All permissions",
+    "permissionCount": "{{count}} permissions",
+    "permissionCountOne": "1 permission",
+    "assignedUsers": "{{count}} users",
+    "assignedUsersOne": "1 user",
+    "name": "Role name",
+    "namePlaceholder": "e.g. Intake Coordinator",
+    "slug": "Slug",
+    "description": "Description",
+    "descriptionPlaceholder": "Brief description of this role's purpose",
+    "permissions": "Permissions",
+    "create": "Create role",
+    "importFromTemplate": "Import from template",
+    "importDialog": {
+      "title": "Import roles from template",
+      "description": "Select roles to import from the template. Existing roles with the same slug will be skipped.",
+      "import": "Import selected",
+      "noTemplates": "No templates available"
+    },
+    "deleteConfirm": {
+      "title": "Delete role",
+      "description": "Are you sure you want to delete \"{{name}}\"? Users assigned this role will lose its permissions."
+    },
+    "slugPlaceholder": "e.g. intake-coordinator"
   },
   "save": "Save",
   "schema": {
@@ -3471,5 +3475,60 @@
     "confirmDelete": "Delete this tag?",
     "empty": "No tags",
     "loading": "Loading tags..."
+  },
+  "analytics": {
+    "title": "分析",
+    "description": "通话量、响应时间和志愿者活动",
+    "nav": "分析",
+    "summary": {
+      "totalCalls": "总通话数",
+      "answerRate": "接听率",
+      "avgDuration": "平均时长",
+      "totalConversations": "总对话数"
+    },
+    "callVolume": {
+      "title": "通话量",
+      "answered": "已接听",
+      "unanswered": "未接听",
+      "abandoned": "已放弃",
+      "noData": "该时段无通话数据"
+    },
+    "hours": {
+      "title": "每小时分布",
+      "noData": "该时段无数据"
+    },
+    "conversations": {
+      "title": "对话",
+      "avgResponseTime": "平均响应时间",
+      "avgMessages": "平均消息数",
+      "noData": "该时段无对话数据"
+    },
+    "shifts": {
+      "title": "班次覆盖",
+      "noData": "无班次数据"
+    },
+    "users": {
+      "title": "志愿者活动",
+      "name": "姓名",
+      "callsAnswered": "已接通话",
+      "avgDuration": "平均时长",
+      "notesCreated": "已创建笔记",
+      "noData": "该时段无志愿者数据"
+    },
+    "personal": {
+      "callsToday": "今日通话",
+      "callsThisPeriod": "本期通话",
+      "avgDuration": "平均时长",
+      "notesCreated": "已创建笔记"
+    },
+    "platform": {
+      "title": "平台分析",
+      "crossHub": "跨Hub"
+    },
+    "dateRange": {
+      "7days": "7天",
+      "30days": "30天",
+      "custom": "自定义"
+    }
   }
 }

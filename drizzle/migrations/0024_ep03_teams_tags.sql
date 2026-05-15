@@ -47,4 +47,5 @@ CREATE INDEX "contact_team_hub_idx" ON "contact_team_assignments" USING btree ("
 CREATE INDEX "team_members_user_idx" ON "team_members" USING btree ("user_pubkey");--> statement-breakpoint
 CREATE INDEX "teams_hub_idx" ON "teams" USING btree ("hub_id");--> statement-breakpoint
 CREATE INDEX "tags_hub_idx" ON "tags" USING btree ("hub_id");--> statement-breakpoint
-ALTER TABLE "users" DROP COLUMN "team_id";
+ALTER TABLE "users" DROP COLUMN "team_id";--> statement-breakpoint
+ALTER TABLE "users" DROP COLUMN IF EXISTS "team_id"
