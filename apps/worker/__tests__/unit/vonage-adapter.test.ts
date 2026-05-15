@@ -608,7 +608,8 @@ describe('VonageAdapter', () => {
     })
 
     it('rejects future timestamp (> 5 minutes ahead)', async () => {
-      const now = Math.floor(Date.now() / 1000) + 301
+      // Use 600s (10min) ahead to avoid flakiness from test-suite startup latency
+      const now = Math.floor(Date.now() / 1000) + 600
       const url = new URL('https://example.com/webhook')
       url.searchParams.set('timestamp', String(now))
       url.searchParams.set('foo', 'bar')
@@ -657,15 +658,21 @@ describe('VonageAdapter', () => {
     })
 
     it('accepts timestamp at exactly 5 minute boundary', async () => {
-      const now = Math.floor(Date.now() / 1000) - 299
-      const url = new URL('https://example.com/webhook')
-      url.searchParams.set('timestamp', String(now))
-      url.searchParams.set('foo', 'bar')
+      const fakeNow = 1700000000000 // fixed epoch ms
+      vi.useFakeTimers({ now: fakeNow })
+      try {
+        const ts = Math.floor(fakeNow / 1000) - 300 // exactly at boundary
+        const url = new URL('https://example.com/webhook')
+        url.searchParams.set('timestamp', String(ts))
+        url.searchParams.set('foo', 'bar')
 
-      const signedUrl = await signUrl(url, 'test-api-secret')
-      const request = new Request(signedUrl)
-      const result = await adapter.validateWebhook(request)
-      expect(result).toBe(true)
+        const signedUrl = await signUrl(url, 'test-api-secret')
+        const request = new Request(signedUrl)
+        const result = await adapter.validateWebhook(request)
+        expect(result).toBe(true)
+      } finally {
+        vi.useRealTimers()
+      }
     })
 
     it('validates with multiple query parameters', async () => {

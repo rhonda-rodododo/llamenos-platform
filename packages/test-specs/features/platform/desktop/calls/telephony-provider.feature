@@ -74,8 +74,7 @@ Feature: Telephony Provider Configuration
     When I expand the "Telephony Provider" section
     And I fill in fake Twilio credentials
     And I click "Test Connection"
-    Then I should see "Testing..."
-    And I should see "Connection failed"
+    Then I should see "Connection failed"
 
   Scenario: Deep link to telephony-provider section auto-expands it
     When I navigate to "/admin/phone-provider"

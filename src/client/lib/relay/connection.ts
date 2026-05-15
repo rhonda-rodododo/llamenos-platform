@@ -11,9 +11,9 @@
  */
 
 import { ed25519Sign, ed25519Verify, decryptServerEvent } from '../platform'
-import { bytesToHex, hexToBytes, utf8ToBytes } from '@shared/encoding'
+import { bytesToHex, utf8ToBytes } from '@shared/encoding'
 import { LABEL_WS_CHALLENGE } from '@shared/crypto-labels'
-import { wsServerMessageSchema, WS_PROTOCOL_VERSION } from '@protocol/schemas/ws-messages'
+import { wsServerMessageSchema } from '@protocol/schemas/ws-messages'
 import type { WsEventMessage, WsServerMessage } from '@protocol/schemas/ws-messages'
 import type { LlamenosEvent, RelayState, RelayEventHandler } from './types'
 
@@ -312,6 +312,13 @@ export class RelayConnection {
     const content = parseEventContent(decrypted)
     if (!content) return
 
+    // Handle device wipe command before routing to subscribers
+    if (content.type === 'device:wipe') {
+      const reason = (content as { type: string; reason?: string }).reason ?? 'admin-erasure'
+      this.handleDeviceWipe(reason as 'user-erasure' | 'device-revocation' | 'admin-erasure')
+      return
+    }
+
     // Route to matching subscribers
     for (const sub of this.subscriptions.values()) {
       if (sub.hubId === msg.hubId && sub.kinds.includes(msg.kind)) {
@@ -322,6 +329,29 @@ export class RelayConnection {
         }
       }
     }
+  }
+
+  private handleDeviceWipe(reason: 'user-erasure' | 'device-revocation' | 'admin-erasure'): void {
+    // Zero cryptographic keys immediately
+    import('../key-manager').then(({ wipeKey }) => {
+      try { wipeKey() } catch { /* already wiped or locked */ }
+    }).catch(() => {})
+
+    // Clear all storage
+    try { localStorage.clear() } catch { /* storage unavailable */ }
+    try { sessionStorage.clear() } catch { /* storage unavailable */ }
+
+    // Clear IndexedDB (fire-and-forget)
+    try {
+      if (typeof indexedDB !== 'undefined') {
+        indexedDB.databases?.().then(dbs => {
+          dbs.forEach(db => { if (db.name) indexedDB.deleteDatabase(db.name) })
+        }).catch(() => {})
+      }
+    } catch { /* IndexedDB unavailable */ }
+
+    // Notify the UI
+    window.dispatchEvent(new CustomEvent('device:wiped', { detail: { reason } }))
   }
 
   private sendSubscription(sub: Subscription): void {

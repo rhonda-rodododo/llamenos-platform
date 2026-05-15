@@ -20,6 +20,9 @@ struct AccountSettingsView: View {
 
             // Device linking section
             deviceLinkSection
+
+            // Account erasure section
+            erasureSection
         }
         .listStyle(.insetGrouped)
         .navigationTitle(NSLocalizedString("settings_account_title", comment: "Account"))
@@ -250,6 +253,25 @@ struct AccountSettingsView: View {
                 "settings_link_device_footer",
                 comment: "Scan a QR code from your desktop app to securely transfer your identity to this device."
             ))
+        }
+    }
+
+    // MARK: - Erasure Section
+
+    private var erasureSection: some View {
+        Section {
+            NavigationLink {
+                ErasureRequestView()
+            } label: {
+                Label(
+                    NSLocalizedString("erasure_request_title", comment: "Request Account Erasure"),
+                    systemImage: "person.crop.circle.badge.minus"
+                )
+                .foregroundStyle(Color.brandDestructive)
+            }
+            .accessibilityIdentifier("erasure-request-link")
+        } header: {
+            Text(NSLocalizedString("erasure_request_title", comment: "Account Erasure"))
         }
     }
 

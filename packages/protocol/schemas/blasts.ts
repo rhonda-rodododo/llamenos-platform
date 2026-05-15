@@ -163,3 +163,42 @@ export const messagingPreferencesBodySchema = z.looseObject({
   channels: z.array(z.enum(['sms', 'whatsapp', 'signal'])).optional(),
   language: z.string().max(10).optional(),
 })
+
+// --- Blast progress WS event ---
+
+export const blastProgressDeliverySchema = z.object({
+  deliveryId: z.string(),
+  subscriberHash: z.string(),
+  channel: z.string(),
+  status: z.string(),
+  error: z.string().optional(),
+})
+
+export const blastProgressEventSchema = z.object({
+  type: z.literal('blast:progress'),
+  hubId: z.string(),
+  blastId: z.string(),
+  stats: z.object({
+    pending: z.number(),
+    sent: z.number(),
+    delivered: z.number(),
+    failed: z.number(),
+    optedOut: z.number(),
+    total: z.number(),
+  }),
+  batch: z.array(blastProgressDeliverySchema),
+})
+
+export type BlastProgressEvent = z.infer<typeof blastProgressEventSchema>
+
+// --- Retry response ---
+
+export const retryDeliveryResponseSchema = z.object({
+  ok: z.boolean(),
+  delivery: blastDeliveryResponseSchema,
+})
+
+export const retryFailedResponseSchema = z.object({
+  ok: z.boolean(),
+  retriedCount: z.number(),
+})

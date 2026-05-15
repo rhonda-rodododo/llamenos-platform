@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { Timeouts } from './helpers'
+import { loginAsAdmin, Timeouts } from './helpers'
 
 /**
  * Mock API responses for a fully configured hub (post-onboarding state).
@@ -113,6 +113,7 @@ async function mockConfiguredHub(
 
 test.describe('Hub Provider Settings Panel', () => {
   test.beforeEach(async ({ page }) => {
+    await loginAsAdmin(page)
     await mockConfiguredHub(page)
     await page.goto('/admin/hub-communications')
   })
@@ -220,6 +221,7 @@ test.describe('Hub Provider Settings Panel', () => {
 
 test.describe('Hub Settings - Provider type variations', () => {
   test('shows correct provider label for signalwire', async ({ page }) => {
+    await loginAsAdmin(page)
     await mockConfiguredHub(page, { providerType: 'signalwire' })
     await page.goto('/admin/hub-communications')
 
@@ -231,6 +233,7 @@ test.describe('Hub Settings - Provider type variations', () => {
   })
 
   test('shows correct provider label for vonage', async ({ page }) => {
+    await loginAsAdmin(page)
     await mockConfiguredHub(page, { providerType: 'vonage' })
     await page.goto('/admin/hub-communications')
 
@@ -243,6 +246,7 @@ test.describe('Hub Settings - Provider type variations', () => {
 
 test.describe('Hub Settings - Channel configured/pending state', () => {
   test('shows configured channels with checkmark', async ({ page }) => {
+    await loginAsAdmin(page)
     await mockConfiguredHub(page, {
       channelsConfigured: ['voice', 'sms'],
       channelsPending: [],
@@ -254,6 +258,7 @@ test.describe('Hub Settings - Channel configured/pending state', () => {
   })
 
   test('shows pending channels with pending label', async ({ page }) => {
+    await loginAsAdmin(page)
     await mockConfiguredHub(page, {
       channelsConfigured: ['voice'],
       channelsPending: ['signal', 'whatsapp'],

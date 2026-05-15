@@ -27,6 +27,10 @@ import provisioningRoutes from './routes/provisioning'
 import hubRoutes from './routes/hubs'
 import blastsRoutes from './routes/blasts'
 import devicesRoutes from './routes/devices'
+import sessionRoutes from './routes/sessions'
+import securityEventsRoutes, { adminSecurityEventsRoutes } from './routes/security-events'
+import accountRoutes from './routes/account'
+import adminDevicesRoutes from './routes/admin/devices'
 import contactsRoutes from './routes/contacts'
 import contactsV2Routes from './routes/contacts-v2'
 import recordsRoutes from './routes/records'
@@ -47,6 +51,10 @@ import signalNotificationRoutes from './routes/signal-notification'
 import providerSetupRoutes from './routes/provider-setup'
 import providerTemplatesRoutes from './routes/provider-templates'
 import hubOnboardRoutes from './routes/hub-onboard'
+import ringGroupsRoutes from './routes/ring-groups'
+import recoveryGroupRoutes from './routes/recovery-group'
+import teamsRoutes from './routes/teams'
+import tagsRoutes from './routes/tags'
 import { hubContext } from './middleware/hub'
 import { requestId } from './middleware/request-id'
 import { requestLogger } from './middleware/request-logger'
@@ -109,6 +117,9 @@ api.route('/invites', invitesRoutes)
 
 // Device provisioning (mixed auth — room creation is public, payload submission is authenticated)
 api.route('/provision', provisioningRoutes)
+
+// Recovery group — unauthenticated endpoints (initiate + verify)
+api.route('/recovery-group', recoveryGroupRoutes.public)
 
 // Telephony webhooks (validated by Twilio signature, not our auth)
 api.route('/telephony', telephonyRoutes)
@@ -180,6 +191,11 @@ authenticated.route('/setup', setupRoutes)
 authenticated.route('/hubs', hubRoutes)
 authenticated.route('/blasts', blastsRoutes)
 authenticated.route('/devices', devicesRoutes)
+authenticated.route('/sessions', sessionRoutes)
+authenticated.route('/security-events', securityEventsRoutes)
+authenticated.route('/admin/security-events', adminSecurityEventsRoutes)
+authenticated.route('/account', accountRoutes)
+authenticated.route('/admin/devices', adminDevicesRoutes)
 authenticated.route('/contacts', contactsRoutes)
 authenticated.route('/directory', contactsV2Routes)
 authenticated.route('/records', recordsRoutes)
@@ -198,6 +214,8 @@ authenticated.route('/firehose', firehoseRoutes)
 authenticated.route('/signal-notification', signalNotificationRoutes)
 authenticated.route('/provider-setup', providerSetupRoutes)
 authenticated.route('/provider-templates', providerTemplatesRoutes)
+authenticated.route('/ring-groups', ringGroupsRoutes)
+authenticated.route('/recovery-group', recoveryGroupRoutes.authenticated)
 
 // Hub-scoped authenticated routes
 const hubScoped = new Hono<AppEnv>()
@@ -225,6 +243,9 @@ hubScoped.route('/', evidenceRoutes)
 hubScoped.route('/mls', mlsRoutes)
 hubScoped.route('/firehose', firehoseRoutes)
 hubScoped.route('/onboard', hubOnboardRoutes)
+hubScoped.route('/ring-groups', ringGroupsRoutes)
+hubScoped.route('/teams', teamsRoutes)
+hubScoped.route('/tags', tagsRoutes)
 
 authenticated.route('/hubs/:hubId', hubScoped)
 

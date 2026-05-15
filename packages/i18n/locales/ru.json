@@ -196,7 +196,22 @@
     "eventsMigrationComplete": "Events migration complete",
     "eventsMigrationError": "Migration failed",
     "checkingMigration": "Checking migration status...",
-    "eventsMigratingProgress": "Migrating... {{migrated}} of {{count}}"
+    "eventsMigratingProgress": "Migrating... {{migrated}} of {{count}}",
+    "devices": {
+      "devices": "devices",
+      "match": "Emojis match",
+      "newNonce": "New nonce",
+      "noMatch": "No match",
+      "nonce": "Session nonce",
+      "title": "Device Overview",
+      "unverified": "Unverified",
+      "verified": "Verified",
+      "verify": "Verify",
+      "verifyDescription": "Compare the emojis below with the device owner. Both parties must see the same 7 emojis.",
+      "verifyInstruction": "Read these emojis aloud to the device owner and confirm they see the same sequence.",
+      "verifySuccess": "Device verified successfully",
+      "verifyTitle": "Verify {{name}}"
+    }
   },
   "announcement": "Announcement",
   "announcementBody": "Announcement body",
@@ -312,7 +327,20 @@
     "statusCancelled": "Cancelled",
     "statusDraft": "Draft",
     "statusScheduled": "Scheduled",
-    "statusSent": "Sent"
+    "statusSent": "Sent",
+    "composerTitle": "New Broadcast Message",
+    "deliveryStatus": "Delivery Status",
+    "deliveryStatusDelivered": "Delivered",
+    "deliveryStatusFailed": "Failed",
+    "deliveryStatusOptedOut": "Opted Out",
+    "deliveryStatusPending": "Pending",
+    "deliveryStatusSent": "Sent",
+    "progressLabel": "Delivery Progress",
+    "recipientCount": "{{count}} recipients",
+    "recipientCountOne": "1 recipient",
+    "retryDelivery": "Retry",
+    "retryFailed": "Retry Failed",
+    "retryingAll": "Retrying all failed..."
   },
   "caseManagement": {
     "title": "Управление делами",
@@ -632,7 +660,24 @@
     "liveUpdating": "Updating live...",
     "optedOut": "Opted Out",
     "deliveryDetails": "Delivery Details",
-    "noDeliveries": "No deliveries"
+    "noDeliveries": "No deliveries",
+    "closeSheet": "Close",
+    "deliveriesEmpty": "No deliveries yet",
+    "deliveriesTitle": "Delivery Status",
+    "deliveryId": "Delivery ID",
+    "errorDetail": "Error",
+    "lastAttempt": "Last Attempt",
+    "progressDelivered": "Delivered",
+    "progressFailed": "Failed",
+    "progressOptedOut": "Opted Out",
+    "progressPending": "Pending",
+    "progressSent": "Sent",
+    "progressTitle": "Live Progress",
+    "retriedCount": "Reset {{count}} deliveries",
+    "retryAll": "Retry All Failed",
+    "retryDelivery": "Retry",
+    "retryFailed": "Retry Failed",
+    "retryingAll": "Retrying all failed..."
   },
   "callActions": {
     "banAndHangUp": "Ban & Hang Up",
@@ -762,7 +807,10 @@
     "hideAdvanced": "Hide Advanced",
     "showAdvanced": "Show Advanced",
     "saved": "Saved",
-    "unauthorized": "Unauthorized"
+    "unauthorized": "Unauthorized",
+    "deleted": "Deleted",
+    "loadMore": "Загрузить ещё",
+    "saving": "Saving..."
   },
   "confirm": {
     "backup": "Confirm Backup",
@@ -1428,7 +1476,8 @@
     "cases": "Дела",
     "events": "События",
     "triage": "Сортировка",
-    "users": "Волонтёры"
+    "users": "Волонтёры",
+    "security": "Безопасность"
   },
   "navigation": {
     "back": "Back"
@@ -1690,7 +1739,8 @@
     "serviceAccountKey": "Service Account Key (JSON)",
     "title": "RCS Channel",
     "webhookSecret": "Webhook Secret",
-    "webhookUrl": "Webhook URL"
+    "webhookUrl": "Webhook URL",
+    "agentSetup": "Agent Setup"
   },
   "recording": {
     "error": "Failed to load recording",
@@ -1882,7 +1932,19 @@
     "summary": "Summary",
     "system": "System",
     "title": "Roles & Permissions",
-    "updated": "Role updated"
+    "updated": "Role updated",
+    "allPermissions": "All permissions",
+    "assignedUsers": "{{count}} users",
+    "assignedUsersOne": "1 user",
+    "create": "Create role",
+    "importDialog": {
+      "description": "Select roles to import from the template. Existing roles with the same slug will be skipped.",
+      "import": "Import selected",
+      "noTemplates": "No templates available",
+      "title": "Import roles from template"
+    },
+    "importFromTemplate": "Import from template",
+    "permissionCountOne": "1 permission"
   },
   "save": "Save",
   "schema": {
@@ -2345,7 +2407,64 @@
     "noUsersFound": "Волонтёры не найдены",
     "removeUser": "Убрать {{name}}",
     "searchUsers": "Поиск волонтёров...",
-    "users": "Волонтёры"
+    "users": "Волонтёры",
+    "active": {
+      "empty": "No volunteers currently clocked in",
+      "heartbeat": "Last heartbeat {{time}}",
+      "since": "Clocked in since {{time}}",
+      "title": "Active Volunteers"
+    },
+    "availability": {
+      "create": "Add Availability Block",
+      "delete": "Remove Availability Block",
+      "deleteConfirm": "Are you sure you want to remove this availability block?",
+      "empty": "No availability blocks",
+      "emptySubtitle": "Add blocks to indicate when you are unavailable",
+      "endDate": "End Date",
+      "reason": "Reason (optional)",
+      "startDate": "Start Date",
+      "title": "Availability"
+    },
+    "overrides": {
+      "create": "Create Override",
+      "date": "Date",
+      "delete": "Delete Override",
+      "deleteConfirm": "Are you sure you want to delete this override?",
+      "empty": "No overrides",
+      "emptySubtitle": "Add overrides to modify shift assignments for specific dates",
+      "note": "Note",
+      "title": "Shift Overrides",
+      "type": "Override Type",
+      "typeCancel": "Cancel shift",
+      "typeSubstitute": "Substitute volunteers"
+    },
+    "requests": {
+      "approve": "Approve",
+      "create": "Request Shift Change",
+      "empty": "No pending requests",
+      "emptySubtitle": "Shift join/leave requests will appear here",
+      "reject": "Reject",
+      "statusApproved": "Approved",
+      "statusDenied": "Denied",
+      "statusPending": "Pending",
+      "title": "Shift Requests",
+      "typeJoin": "Join request",
+      "typeLeave": "Leave request"
+    },
+    "ringGroups": {
+      "addMembers": "Add Members",
+      "create": "Create Ring Group",
+      "delete": "Delete Ring Group",
+      "deleteConfirm": "Are you sure you want to delete this ring group?",
+      "edit": "Edit Ring Group",
+      "empty": "No ring groups",
+      "emptySubtitle": "Create a ring group to assign volunteers to shifts",
+      "memberCount": "{{count}} member(s)",
+      "members": "Members",
+      "name": "Ring Group Name",
+      "removeMembers": "Remove Members",
+      "title": "Ring Groups"
+    }
   },
   "shortcuts": {
     "answerCall": "Ответить на звонок",
@@ -2428,7 +2547,8 @@
     "startRegistrationButton": "Start Registration",
     "verifyButton": "Verify",
     "unregisterButton": "Unregister",
-    "retryButton": "Retry"
+    "retryButton": "Retry",
+    "bridgeSetup": "Bridge Setup"
   },
   "spam": {
     "blockDuration": "Длительность блокировки (минуты)",
@@ -3194,7 +3314,8 @@
       "callsVoice": "Calls & Voice",
       "channels": "Channels",
       "operations": "Operations",
-      "platform": "Platform"
+      "platform": "Platform",
+      "scheduling": "Scheduling"
     },
     "items": {
       "locationLookup": "Location Lookup",
@@ -3227,7 +3348,14 @@
       "platformAnalytics": "Analytics",
       "platformHealth": "Health",
       "platformSettings": "Platform Settings",
-      "gdprErasure": "GDPR Erasure"
+      "gdprErasure": "GDPR Erasure",
+      "erasureConfig": "Erasure Settings",
+      "erasureQueue": "Erasure Queue",
+      "platformBansNav": "Platform Bans",
+      "retention": "Data Retention",
+      "retentionSettings": "Data Retention",
+      "ringGroups": "Ring Groups",
+      "shiftOverrides": "Shift Overrides"
     }
   },
   "providerSetup": {
@@ -3506,5 +3634,573 @@
       "documented": "Documented",
       "archived": "Archived"
     }
+  },
+  "analytics": {
+    "callVolume": {
+      "abandoned": "Прервано",
+      "answered": "Отвечено",
+      "noData": "Нет данных о звонках за этот период",
+      "title": "Объём звонков",
+      "unanswered": "Без ответа"
+    },
+    "conversations": {
+      "avgMessages": "Сред. кол-во сообщений",
+      "avgResponseTime": "Сред. время ответа",
+      "noData": "Нет данных о разговорах за этот период",
+      "title": "Разговоры"
+    },
+    "dateRange": {
+      "30days": "30 дней",
+      "7days": "7 дней",
+      "custom": "Произвольный"
+    },
+    "description": "Объём звонков, время ответа и активность волонтёров",
+    "hours": {
+      "noData": "Нет данных за этот период",
+      "title": "Почасовое распределение"
+    },
+    "nav": "Аналитика",
+    "personal": {
+      "avgDuration": "Сред. длительность",
+      "callsThisPeriod": "Звонки за период",
+      "callsToday": "Звонки сегодня",
+      "notesCreated": "Создано заметок"
+    },
+    "platform": {
+      "crossHub": "Кросс-хаб",
+      "title": "Аналитика платформы"
+    },
+    "shifts": {
+      "noData": "Нет данных о сменах",
+      "title": "Охват смен"
+    },
+    "summary": {
+      "answerRate": "Процент ответов",
+      "avgDuration": "Сред. длительность",
+      "totalCalls": "Всего звонков",
+      "totalConversations": "Всего разговоров"
+    },
+    "title": "Аналитика",
+    "users": {
+      "avgDuration": "Сред. длительность",
+      "callsAnswered": "Отвечено звонков",
+      "name": "Имя",
+      "noData": "Нет данных о волонтёрах за этот период",
+      "notesCreated": "Создано заметок",
+      "title": "Активность волонтёров"
+    }
+  },
+  "channels": {
+    "a2p": {
+      "addSampleMessage": "Add sample message",
+      "address": "Address",
+      "approved": "A2P Approved",
+      "approvedMessage": "A2P registration is approved. SMS messages will be sent using your registered brand and campaign.",
+      "brandError": "Failed to submit brand registration",
+      "brandFormTitle": "Brand Registration",
+      "brandSid": "Brand SID",
+      "brandStatus": "Brand: {{status}}",
+      "brandSubmitted": "Brand registration submitted",
+      "campaignDescription": "Campaign Description",
+      "campaignError": "Failed to submit campaign registration",
+      "campaignFormTitle": "Campaign Registration",
+      "campaignSid": "Campaign SID",
+      "campaignStatus": "Campaign: {{status}}",
+      "campaignSubmitted": "Campaign registration submitted",
+      "city": "City",
+      "companyName": "Company Name",
+      "country": "Country",
+      "description": "US carriers require A2P 10DLC registration for business SMS. Register your brand and campaign to ensure deliverability.",
+      "ein": "EIN / Tax ID",
+      "email": "Email",
+      "entityType": "Entity Type",
+      "entityTypes": {
+        "GOVERNMENT": "Government",
+        "NON_PROFIT": "Non-profit",
+        "PRIVATE_PROFIT": "Private for-profit",
+        "PUBLIC_PROFIT": "Public for-profit"
+      },
+      "helpMessage": "Help Message",
+      "optinMessage": "Opt-in Message",
+      "optoutMessage": "Opt-out Message",
+      "phone": "Phone",
+      "postalCode": "Postal Code",
+      "resubmitBrand": "Re-submit Brand",
+      "resubmitCampaign": "Re-submit Campaign",
+      "sampleMessagePlaceholder": "Sample message {{num}}",
+      "sampleMessages": "Sample Messages",
+      "skip": "Skip A2P",
+      "skipped": "A2P registration skipped",
+      "state": "State",
+      "status": {
+        "approved": "Approved",
+        "failed": "Failed",
+        "notSubmitted": "Not submitted",
+        "pending": "Pending review",
+        "skipped": "Skipped"
+      },
+      "statusFailed": "Registration Failed",
+      "statusNotSubmitted": "Not Registered",
+      "statusPending": "Pending Review",
+      "statusSkipped": "A2P Skipped",
+      "street": "Street Address",
+      "submitBrand": "Register Brand",
+      "submitCampaign": "Register Campaign",
+      "title": "A2P 10DLC Registration",
+      "useCase": "Use Case"
+    },
+    "shared": {
+      "afterHoursHelp": "Sent when no volunteers are on shift. Leave empty to disable.",
+      "afterHoursPlaceholder": "Reply sent outside shift hours...",
+      "afterHoursResponse": "After-Hours Response",
+      "autoResponse": "Auto-Response",
+      "autoResponseHelp": "Sent once when a new contact messages for the first time.",
+      "autoResponsePlaceholder": "Automatic reply sent to first-time contacts...",
+      "enableChannel": "Enable {{channel}}",
+      "security": {
+        "e2ee": "End-to-end encrypted",
+        "e2ee-to-bridge": "E2EE to bridge",
+        "none": "No encryption",
+        "provider-encrypted": "Provider encrypted"
+      },
+      "testConnection": "Test Connection",
+      "testFailed": "Connection Failed",
+      "testSuccess": "Connected",
+      "testing": "Testing..."
+    },
+    "sms": {
+      "contentMode": "Content Mode",
+      "contentModeFull": "Full content",
+      "contentModeFullHelp": "SMS messages include full message text. Note: SMS has no transport encryption.",
+      "contentModeNotification": "Notification only",
+      "contentModeNotificationHelp": "SMS messages contain only a notification to check the app. Message content stays encrypted.",
+      "description": "Text messaging via your telephony provider.",
+      "providerNote": "SMS uses your telephony provider credentials and phone number. No separate SMS setup is required.",
+      "title": "SMS Channel"
+    },
+    "telegram": {
+      "botSetup": "Bot Setup",
+      "botToken": "Bot Token",
+      "botTokenHelp": "Create a bot via @BotFather on Telegram and paste the token here.",
+      "botUsername": "Bot Username",
+      "description": "Telegram Bot messaging for inbound conversations.",
+      "title": "Telegram Channel",
+      "webhookSecret": "Webhook Secret",
+      "webhookUrl": "Webhook URL"
+    },
+    "title": "Messaging Channels",
+    "whatsapp": {
+      "accessToken": "Access Token",
+      "appSecret": "App Secret",
+      "businessAccountId": "Business Account ID",
+      "description": "WhatsApp Business messaging via Twilio or direct Meta API.",
+      "directCredentials": "Meta API Credentials",
+      "integrationMode": "Integration Mode",
+      "modeDirect": "Direct Meta API",
+      "modeDirectHelp": "Connect directly to the Meta WhatsApp Business API. Requires a Meta developer account.",
+      "modeTwilio": "Via Twilio",
+      "modeTwilioHelp": "Uses your existing Twilio telephony provider credentials. No additional setup needed.",
+      "phoneNumberId": "Phone Number ID",
+      "title": "WhatsApp Channel",
+      "twilioNote": "WhatsApp is configured through your Twilio account. Ensure WhatsApp is enabled for your Twilio number.",
+      "verifyToken": "Verify Token"
+    }
+  },
+  "create": "Create role",
+  "deleteConfirm": {
+    "description": "Are you sure you want to delete \"{{name}}\"? Users assigned this role will lose its permissions.",
+    "title": "Delete role"
+  },
+  "deviceWipe": {
+    "contactAdmin": "Contact your hub administrator for assistance.",
+    "explanation": "All cryptographic keys have been cleared from this device. Please contact support if you believe this was done in error.",
+    "message": "Your access to this device has been revoked. All local data has been securely erased.",
+    "reason": "Reason: {{reason}}",
+    "reasonAdminErasure": "Account removed by administrator",
+    "reasonDeviceRevocation": "Device revoked by administrator",
+    "reasonUserErasure": "Account erasure",
+    "title": "Access Revoked",
+    "wipeComplete": "All local data erased",
+    "wiping": "Securely erasing local data..."
+  },
+  "erasure": {
+    "admin": {
+      "confirmErase": "Erase User",
+      "confirmWipe": "Wipe Device",
+      "devicePubkey": "Device Public Key",
+      "emergencyOverride": "Emergency Override",
+      "eraseDialogTitle": "Immediate User Erasure",
+      "eraseDialogWarning": "This will permanently and immediately erase all data for the specified user. This cannot be undone.",
+      "eraseSuccess": "User erasure initiated.",
+      "executesAt": "executes {{date}}",
+      "filterAll": "All",
+      "immediateErase": "Erase User Now",
+      "jobProgress": "{{processed}} / {{total}} envelopes",
+      "jobStatus": {
+        "completed": "Completed",
+        "failed": "Failed",
+        "queued": "Queued",
+        "running": "Running"
+      },
+      "jobUser": "User: {{userId}}",
+      "justification": "Justification",
+      "justificationPlaceholder": "Legal basis or reason for immediate erasure",
+      "noPending": "No pending requests",
+      "noReEncryptionJobs": "No re-encryption jobs.",
+      "noRequests": "No erasure requests found.",
+      "pendingCount": "{{count}} pending",
+      "reEncryptionJobs": "Re-encryption Jobs",
+      "remoteWipe": "Remote Device Wipe",
+      "requestedAt": "Requested {{date}}",
+      "title": "Erasure Queue",
+      "userId": "User ID",
+      "userIdPlaceholder": "Enter user ID or public key",
+      "wipeDialogTitle": "Remote Device Wipe",
+      "wipeDialogWarning": "This will remotely wipe the cryptographic keys on the target device. The device will be locked out immediately.",
+      "wipeSuccess": "Remote wipe command sent."
+    },
+    "adminDeviceWipeButton": "Remote Wipe Device",
+    "adminDeviceWipeConfirm": "This will remotely wipe all data on this device. Continue?",
+    "adminExecuteButton": "Execute Erasure",
+    "adminExecuteConfirmMessage": "This will permanently erase {{user}}'s account. This action cannot be undone.",
+    "adminExecuteConfirmTitle": "Confirm Immediate Erasure",
+    "adminExecuteDescription": "Permanently erase this user's account and all associated data immediately.",
+    "adminExecuteTitle": "Immediate Erasure",
+    "adminJustificationLabel": "Justification (required)",
+    "adminJustificationPlaceholder": "Reason for immediate erasure",
+    "adminQueueEmpty": "No pending erasure requests",
+    "adminQueueLoading": "Loading erasure requests...",
+    "adminQueueTitle": "Erasure Queue",
+    "cancelButton": "Cancel Erasure",
+    "cancelConfirmButton": "Yes, Cancel Erasure",
+    "cancelConfirmMessage": "Are you sure you want to cancel your account erasure request?",
+    "cancelConfirmTitle": "Cancel Erasure Request",
+    "config": {
+      "belowFloor": "Delay must be at least {{min}} hours (platform minimum).",
+      "delayHelp": "Hours between request and execution ({{min}}–{{max}} hours).",
+      "delayHours": "Erasure Delay",
+      "delayStatus": "{{hours}}h delay",
+      "description": "Configure the erasure delay period and emergency override for this hub.",
+      "emergencyOverride": "Allow Emergency Override",
+      "emergencyOverrideHelp": "Permit super-admins to bypass the delay period for legal or safety reasons.",
+      "hours": "hours",
+      "platformFloor": "Platform minimum: {{hours}} hours",
+      "title": "Erasure Settings"
+    },
+    "countdownDays": "{{count}} days",
+    "countdownHours": "{{count}} hours",
+    "countdownMessage": "Your account will be permanently erased in:",
+    "countdownMinutes": "{{count}} minutes",
+    "countdownTitle": "Account Erasure Scheduled",
+    "emergencyCoApproverLabel": "Co-approver",
+    "emergencyJustificationLabel": "Emergency justification",
+    "emergencyMinimumFloor": "Minimum delay: 4 hours (cannot be reduced)",
+    "emergencyOverrideDescription": "Requires co-approver signature. Reduces delay to 4 hours.",
+    "emergencyOverrideLabel": "Emergency Override",
+    "reEncryptionComplete": "Re-encryption complete",
+    "reEncryptionFailed": "Re-encryption failed — retry available",
+    "reEncryptionProcessed": "{{processed}} of {{total}} envelopes processed",
+    "reEncryptionProgress": "Re-encryption Progress",
+    "requestButton": "Request Erasure",
+    "requestConfirmButton": "Confirm Request",
+    "requestConfirmMessage": "Your account will be permanently erased after {{hours}} hours. You can cancel during this period.",
+    "requestConfirmTitle": "Confirm Erasure Request",
+    "requestDescription": "This will permanently delete your account and all associated data after a waiting period.",
+    "requestTitle": "Request Account Erasure",
+    "selfService": {
+      "cancel": "Cancel Erasure Request",
+      "cancelConfirmButton": "Cancel Request",
+      "cancelConfirmDescription": "Your erasure request will be cancelled and your account will remain active.",
+      "cancelConfirmTitle": "Cancel Erasure Request?",
+      "confirmButton": "Request Erasure",
+      "confirmDescription": "Your account and all associated data will be permanently deleted after the configured delay period. This cannot be undone.",
+      "confirmTitle": "Request Account Erasure?",
+      "description": "Request permanent deletion of your account and all associated data.",
+      "pendingDescription": "Your erasure request is scheduled. You may cancel it before the deadline.",
+      "requestButton": "Request Account Erasure",
+      "requestCancelled": "Erasure request cancelled.",
+      "requestCreated": "Erasure request submitted. You will be notified of the scheduled date.",
+      "scheduledFor": "Scheduled for {{date}}",
+      "statusPending": "Erasure pending",
+      "title": "Account Erasure",
+      "warning": "This action is irreversible. All your data will be permanently deleted after the delay period."
+    },
+    "status": {
+      "cancelled": "Cancelled",
+      "completed": "Completed",
+      "executing": "Executing",
+      "failed": "Failed",
+      "pending": "Pending"
+    },
+    "statusCancelled": "Cancelled",
+    "statusCompleted": "Completed",
+    "statusExecuting": "Executing",
+    "statusPending": "Pending",
+    "statusScheduled": "Scheduled"
+  },
+  "importDialog": {
+    "description": "Select roles to import from the template. Existing roles with the same slug will be skipped.",
+    "import": "Import selected",
+    "noTemplates": "No templates available",
+    "title": "Import roles from template"
+  },
+  "importFromTemplate": "Import from template",
+  "permissions": {
+    "actions": "Actions",
+    "groups": {
+      "audit": "Audit",
+      "bans": "Bans",
+      "blasts": "Blasts",
+      "calls": "Calls",
+      "cases": "Cases",
+      "contacts": "Contacts",
+      "conversations": "Conversations",
+      "events": "Events",
+      "evidence": "Evidence",
+      "files": "Files",
+      "firehose": "Firehose",
+      "hubs": "Hubs",
+      "invites": "Invites",
+      "messaging": "Messaging",
+      "metrics": "Metrics",
+      "notes": "Notes",
+      "reports": "Reports",
+      "settings": "Settings",
+      "shifts": "Shifts",
+      "system": "System",
+      "telephony": "Telephony",
+      "users": "Users"
+    },
+    "none": "None",
+    "scope": "scope",
+    "tiers": "Data access tiers",
+    "toggleAll": "Toggle all {{domain}} permissions"
+  },
+  "platformBans": {
+    "bulkDialogTitle": "Bulk Import Bans",
+    "bulkImport": "Bulk Import",
+    "bulkImportButton": "Bulk Import",
+    "bulkImportPlaceholder": "One identifier hash per line",
+    "bulkImportResult": "Imported {{count}} bans",
+    "bulkImportTitle": "Bulk Import Platform Bans",
+    "bulkImported": "{{count}} bans imported.",
+    "bulkPlaceholder": "hash1\nhash2\nhash3",
+    "clearSearch": "Clear",
+    "confirmBulkImport": "Import",
+    "confirmCreate": "Add Ban",
+    "createBan": "Add Ban",
+    "createButton": "Create Platform Ban",
+    "createDialogTitle": "Add Platform Ban",
+    "created": "Platform ban added.",
+    "deleted": "Platform ban removed.",
+    "description": "Bans that apply across all hubs",
+    "emptyState": "No platform-scoped bans",
+    "emptyStateDescription": "Platform bans block callers across all hubs.",
+    "noBans": "No platform bans.",
+    "noResults": "No bans found for this hash.",
+    "phoneHash": "Phone Hash",
+    "phoneHashList": "Phone Hashes (one per line)",
+    "phoneHashPlaceholder": "SHA-256 hash of phone number",
+    "promoteButton": "Promote to Platform",
+    "promoteConfirmMessage": "This will apply this ban across all hubs. Continue?",
+    "promoteConfirmTitle": "Promote Ban to Platform",
+    "promotedFrom": "Promoted from hub",
+    "reason": "Reason",
+    "reasonPlaceholder": "Reason for ban",
+    "scopeHub": "Hub",
+    "scopePlatform": "Platform",
+    "searchPlaceholder": "Search bans by identifier hash...",
+    "searchResults": "{{count}} results",
+    "searchTitle": "Search All Bans",
+    "title": "Platform Bans",
+    "totalCount": "{{count}} total bans"
+  },
+  "platformSettings": {
+    "branding": {
+      "instanceName": "Instance Name",
+      "privacyPolicyUrl": "Privacy Policy URL",
+      "supportEmail": "Support Email",
+      "title": "Branding"
+    },
+    "brandingTitle": "Branding",
+    "caseManagementEnabled": "Case Management",
+    "cronHourUtc": "Purge Hour (UTC)",
+    "crossHubSharingEnabled": "Cross-Hub Sharing",
+    "erasureFloor": {
+      "description": "Minimum erasure delay enforced across all hubs. Hub admins cannot set a shorter delay.",
+      "hours": "hours",
+      "minDelay": "Minimum Delay",
+      "minDelayHelp": "Minimum hours between erasure request and execution (4–168).",
+      "title": "Erasure Platform Floor"
+    },
+    "erasureFloorTitle": "Erasure Policy",
+    "featureFlags": {
+      "caseManagement": "Case Management",
+      "caseManagementHelp": "Enable case management features for tracking and follow-up.",
+      "crossHubSharing": "Cross-Hub Sharing",
+      "crossHubSharingHelp": "Allow volunteers to share resources across hubs.",
+      "mls": "MLS Group Messaging",
+      "mlsHelp": "Enable MLS-based encrypted group messaging across hubs.",
+      "title": "Feature Flags",
+      "transcription": "Call Transcription",
+      "transcriptionHelp": "Enable WASM-based client-side call transcription."
+    },
+    "featureFlagsTitle": "Feature Flags",
+    "instanceName": "Instance Name",
+    "instanceNamePlaceholder": "e.g. Crisis Network",
+    "maxInactiveHours": "Max Inactive Time (hours)",
+    "maxSessionDuration": "Max Session Duration (hours)",
+    "minDelayHours": "Minimum Erasure Delay (hours)",
+    "mlsEnabled": "MLS Group Messaging",
+    "privacyPolicyUrl": "Privacy Policy URL",
+    "purgeEnabled": "Purge Enabled",
+    "retentionPurge": {
+      "cronHour": "Purge Hour (UTC)",
+      "cronHourHelp": "Hour of day (UTC) when the purge job runs (0–23).",
+      "enabled": "Enable Automatic Purge",
+      "enabledHelp": "Run the retention purge job on schedule.",
+      "title": "Retention Purge Schedule",
+      "utc": "UTC"
+    },
+    "retentionPurgeTitle": "Retention Purge",
+    "saved": "Platform settings saved",
+    "sessionPolicy": {
+      "hours": "hours",
+      "maxInactive": "Max Inactive Period",
+      "maxInactiveHelp": "Hours before an inactive session expires.",
+      "maxSessionDuration": "Max Session Duration",
+      "maxSessionDurationHelp": "Maximum hours a session can remain active.",
+      "title": "Session Policy"
+    },
+    "sessionPolicyTitle": "Session Policy",
+    "supportEmail": "Support Email",
+    "title": "Platform Settings",
+    "transcriptionEnabled": "Transcription"
+  },
+  "retention": {
+    "belowFloor": "Must be at least {{min}} days (platform minimum).",
+    "belowFloorError": "Cannot set retention below platform minimum of {{count}} days",
+    "categories": {
+      "auditLog": "Audit Log",
+      "callRecords": "Call Records",
+      "messages": "Messages",
+      "notes": "Notes"
+    },
+    "categoryAuditLog": "Audit Log",
+    "categoryCallRecords": "Call Records",
+    "categoryMessages": "Messages",
+    "categoryNotes": "Notes",
+    "configuredCount": "{{count}} categories configured",
+    "days": "days",
+    "daysLabel": "{{count}} days",
+    "description": "Configure how long data is kept before automatic deletion",
+    "enablePurge": "Enable automatic purge",
+    "loading": "Loading retention settings...",
+    "minDays": "Minimum: {{count}} days (platform floor)",
+    "noPurge": "No automatic purge",
+    "noneConfigured": "No retention configured",
+    "platformFloor": "Min: {{days}} days",
+    "platformFloorDescription": "Minimum retention periods enforced across all hubs",
+    "platformFloorTitle": "Platform Retention Floors",
+    "retentionDays": "Retention Period (days)",
+    "saved": "Retention settings saved",
+    "title": "Data Retention"
+  },
+  "security": {
+    "devices": {
+      "current": "This device",
+      "lastSeen": "Last seen",
+      "limit": "devices",
+      "revokeConfirm": "Remove device",
+      "revokeDescription": "Remove {{name}}? It will lose access to all encrypted content.",
+      "revokeTitle": "Remove device",
+      "title": "Your Devices"
+    },
+    "history": {
+      "events": {
+        "accountLockdown": "Account locked down",
+        "accountLockdownComplete": "Lockdown completed",
+        "deviceFingerprintVerified": "Device verified",
+        "deviceRegister": "Device registered",
+        "deviceRemove": "Device removed",
+        "deviceRename": "Device renamed",
+        "hubKeyRotate": "Hub key rotated",
+        "loginFailed": "Login failed",
+        "passkeyRename": "Passkey renamed",
+        "pukRotate": "PUK rotated",
+        "sessionCreate": "Session created",
+        "sessionTerminate": "Session terminated",
+        "sessionTerminateAll": "All sessions terminated",
+        "sigchainAppend": "Sigchain updated",
+        "webauthnAuthenticate": "Passkey authenticated",
+        "webauthnRegister": "Passkey registered",
+        "webauthnRemove": "Passkey removed"
+      },
+      "export": "Export JSON",
+      "title": "Security History"
+    },
+    "lockdown": {
+      "complete": "Lockdown complete. {{sessions}} sessions terminated, {{hubs}} hub keys queued for rotation.",
+      "confirm": "Lock down now",
+      "description": "This will terminate all other sessions and trigger key rotation for all your hubs.",
+      "inProgress": "Terminating sessions and rotating keys...",
+      "title": "Emergency Lockdown",
+      "warning": "This action cannot be undone. All other devices will be signed out immediately."
+    },
+    "passkeys": {
+      "backedUp": "Backed up",
+      "lastUsed": "Last used",
+      "register": "Add passkey",
+      "title": "Passkeys",
+      "unnamed": "Unnamed passkey"
+    },
+    "sessions": {
+      "created": "Created",
+      "current": "Current session",
+      "endOthers": "End all other sessions",
+      "endOthersConfirm": "End sessions",
+      "endOthersDescription": "This will sign out {{count}} other sessions.",
+      "endOthersTitle": "End all other sessions?",
+      "expires": "Expires",
+      "lockdown": "Emergency lockdown",
+      "title": "Active Sessions",
+      "unknown": "Unknown device"
+    },
+    "tabs": {
+      "devices": "Devices",
+      "history": "History",
+      "passkeys": "Passkeys",
+      "sessions": "Sessions"
+    }
+  },
+  "tags": {
+    "confirmDelete": "Delete this tag?",
+    "createTag": "Create Tag",
+    "deleteTag": "Delete Tag",
+    "editTag": "Edit Tag",
+    "empty": "No tags",
+    "loading": "Loading tags...",
+    "noTags": "No tags yet. Create your first tag.",
+    "tagCategory": "Category",
+    "tagColor": "Color",
+    "tagLabel": "Display Label",
+    "tagName": "Tag Name (slug)",
+    "title": "Tags"
+  },
+  "teams": {
+    "addMembers": "Add Members",
+    "confirmDelete": "Delete this team? This will remove all member assignments.",
+    "createTeam": "Create Team",
+    "deleteTeam": "Delete Team",
+    "editTeam": "Edit Team",
+    "empty": "No teams",
+    "loading": "Loading teams...",
+    "memberCount": "{{count}} member(s)",
+    "members": "Members",
+    "noTeams": "No teams yet. Create your first team.",
+    "removeMember": "Remove Member",
+    "teamDescription": "Description",
+    "teamName": "Team Name",
+    "title": "Teams"
   }
 }

@@ -49,6 +49,8 @@ struct LlamenosApp: App {
                 // Force-update screen blocks the entire app
                 if appState.showForceUpdate {
                     UpdateRequiredView(hubURL: appState.authService.hubURL)
+                } else if appState.isDeviceWiped {
+                    DeviceWipeReceiptView(reason: appState.deviceWipeReason)
                 } else {
                     VStack(spacing: 0) {
                         // Soft-update banner (dismissible)

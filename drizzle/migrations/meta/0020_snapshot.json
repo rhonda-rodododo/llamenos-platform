@@ -1,5 +1,5 @@
 {
-  "id": "c06b497d-b124-4ca3-af56-789c84b66755",
+  "id": "1e5545e0-7eb2-4290-8ea8-334cd2034fff",
   "prevId": "ce2ffa33-fec9-496f-b6e6-04f51430c044",
   "version": "7",
   "dialect": "postgresql",
@@ -604,6 +604,12 @@
         "duration": {
           "name": "duration",
           "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "answered_by": {
+          "name": "answered_by",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
@@ -1545,12 +1551,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "deprecated_at": {
-          "name": "deprecated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {
@@ -2689,120 +2689,6 @@
           "onUpdate": "no action"
         }
       },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.entity_type_templates": {
-      "name": "entity_type_templates",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "template_key": {
-          "name": "template_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "version": {
-          "name": "version",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'1.0.0'"
-        },
-        "category": {
-          "name": "category",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "is_builtin": {
-          "name": "is_builtin",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "encrypted_definition": {
-          "name": "encrypted_definition",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "definition_envelope": {
-          "name": "definition_envelope",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "icon": {
-          "name": "icon",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "entity_type_templates_template_key_idx": {
-          "name": "entity_type_templates_template_key_idx",
-          "columns": [
-            {
-              "expression": "template_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "entity_type_templates_category_idx": {
-          "name": "entity_type_templates_category_idx",
-          "columns": [
-            {
-              "expression": "category",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},

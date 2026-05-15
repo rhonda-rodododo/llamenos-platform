@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useToast } from '@/lib/toast'
 import {
   updateTelephonyProvider,
-  testTelephonyProvider,
+  getActiveHub,
   type TelephonyProviderConfig,
   type TelephonyProviderType,
 } from '@/lib/api'
@@ -15,7 +15,7 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { PhoneInput } from '@/components/phone-input'
-import { Radio, Save, Loader2, CheckCircle2, XCircle, RefreshCw } from 'lucide-react'
+import { Radio, Save, Loader2, RefreshCw } from 'lucide-react'
 import { ProviderStatusBadge } from '@/components/setup/ProviderStatusBadge'
 import { WebhookConfirmation } from '@/components/setup/WebhookConfirmation'
 
@@ -45,7 +45,7 @@ export function TelephonyProviderSection({ config, draft, onConfigChange, onDraf
     setTesting(true)
     setTestResult(null)
     try {
-      const result = await testProviderConnection(draft.type || config?.type || 'twilio')
+      const result = await testProviderConnection(draft.type || config?.type || 'twilio', getActiveHub() ?? undefined)
       setTestResult({ ok: result.connected, error: result.error })
     } catch (err) {
       setTestResult({ ok: false, error: err instanceof Error ? err.message : String(err) })

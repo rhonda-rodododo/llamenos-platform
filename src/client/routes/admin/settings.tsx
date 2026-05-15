@@ -1,7 +1,9 @@
 import { createFileRoute, useSearch } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/lib/auth'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, Suspense } from 'react'
+import { Loader2 } from 'lucide-react'
+import { channelConfigRegistry, CHANNEL_ORDER } from '@/components/channel-config/registry'
 import {
   getSpamSettings,
   updateSpamSettings,
@@ -35,8 +37,6 @@ import { VoicePromptsSection } from '@/components/admin-settings/voice-prompts-s
 import { CustomFieldsSection } from '@/components/admin-settings/custom-fields-section'
 import { SpamSection } from '@/components/admin-settings/spam-section'
 import { RolesSection } from '@/components/admin-settings/roles-section'
-import { RCSChannelSection } from '@/components/admin-settings/rcs-channel-section'
-import { SignalChannelSection } from '@/components/admin-settings/signal-channel-section'
 import { MigrationStatusSection } from '@/components/admin-settings/migration-status-section'
 import { ReportTypesSection } from '@/components/admin-settings/report-types-section'
 import { EventsMigrationPanel } from '@/components/admin-settings/events-migration-panel'
@@ -45,7 +45,7 @@ import { EntityTemplatesSection } from '@/components/admin-settings/entity-templ
 export const Route = createFileRoute('/admin/settings')({
   component: AdminSettingsPage,
   validateSearch: (search: Record<string, unknown>) => ({
-    section: (search.section as string) || '',
+    section: (search.section as string) || undefined,
   }),
 })
 
@@ -198,7 +198,7 @@ function AdminSettingsPage() {
       <RolesSection
         expanded={expanded.has('roles')}
         onToggle={(open) => toggleSection('roles', open)}
-        statusSummary={t('roles.summary', { defaultValue: 'Manage roles' })}
+        statusSummary={t('roles.description', { defaultValue: 'Define roles and assign permissions to control access across your hotline.' })}
       />
 
       <TelephonyProviderSection
@@ -274,25 +274,31 @@ function AdminSettingsPage() {
         />
       )}
 
-      {messagingConfig && (
-        <RCSChannelSection
-          config={messagingConfig}
-          onConfigChange={setMessagingConfig}
-          expanded={expanded.has('rcs-channel')}
-          onToggle={(open) => toggleSection('rcs-channel', open)}
-          statusSummary={messagingConfig.rcs ? t('common.configured', { defaultValue: 'Configured' }) : t('settings.notConfigured', { defaultValue: 'Not configured' })}
-        />
-      )}
+      {messagingConfig && CHANNEL_ORDER.map((channelType) => {
+        const entry = channelConfigRegistry[channelType]
+        const ChannelComponent = entry.component
+        const channelConfig = messagingConfig[channelType as keyof typeof messagingConfig]
+        const isConfigured = channelConfig !== null && channelConfig !== undefined
+        const channelStatusSummary = isConfigured
+          ? t('common.configured', { defaultValue: 'Configured' })
+          : t('settings.notConfigured', { defaultValue: 'Not configured' })
 
-      {messagingConfig && (
-        <SignalChannelSection
-          config={messagingConfig}
-          onConfigChange={setMessagingConfig}
-          expanded={expanded.has('signal-channel')}
-          onToggle={(open) => toggleSection('signal-channel', open)}
-          statusSummary={messagingConfig.signal ? t('common.configured', { defaultValue: 'Configured' }) : t('settings.notConfigured', { defaultValue: 'Not configured' })}
-        />
-      )}
+        return (
+          <Suspense key={channelType} fallback={
+            <div className="flex items-center justify-center p-8">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          }>
+            <ChannelComponent
+              config={messagingConfig}
+              onConfigChange={setMessagingConfig}
+              expanded={expanded.has(`${channelType}-channel`)}
+              onToggle={(open: boolean) => toggleSection(`${channelType}-channel`, open)}
+              statusSummary={channelStatusSummary}
+            />
+          </Suspense>
+        )
+      })}
 
       <EventsMigrationPanel />
 
