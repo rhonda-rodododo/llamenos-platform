@@ -285,6 +285,17 @@ pub const LABEL_RECOVERY_SHARE_CONTRIBUTE: &str = "llamenos:recovery-group:share
 /// Domain separation for share liveness proofs
 pub const LABEL_RECOVERY_LIVENESS_PROOF: &str = "llamenos:recovery-group:liveness-proof:v1";
 
+// --- Role Encryption ---
+
+/// Platform role name encryption (per-admin HPKE envelope)
+pub const LABEL_PLATFORM_ROLE_NAME_ENCRYPT: &str = "llamenos:platform-role-name-encrypt:v1";
+
+/// Platform role description encryption (per-admin HPKE envelope)
+pub const LABEL_PLATFORM_ROLE_DESC_ENCRYPT: &str = "llamenos:platform-role-desc-encrypt:v1";
+
+/// Hub role encryption (hub key symmetric encryption)
+pub const LABEL_HUB_ROLE_ENCRYPT: &str = "llamenos:hub-role-encrypt:v1";
+
 // =============================================================================
 // LABEL REGISTRY — maps numeric IDs (u8) to label strings.
 //
@@ -295,6 +306,9 @@ pub const LABEL_RECOVERY_LIVENESS_PROOF: &str = "llamenos:recovery-group:livenes
 // Indices 36-46: new v3 labels (PUK, device auth, items key, SFrame, MLS)
 // Index 53: TOMBSTONE (was LABEL_ECIES_V2_SALT — ECIES removed, index reserved)
 // Indices 57-68: labels synced from crypto-labels.json
+// Indices 69-72: EP08 Account Lifecycle
+// Indices 73-76: Recovery Group (EP09-P1)
+// Indices 77-79: Role Encryption (EP01)
 // =============================================================================
 
 pub const LABEL_REGISTRY: &[&str] = &[
@@ -392,11 +406,15 @@ pub const LABEL_REGISTRY: &[&str] = &[
     LABEL_ERASURE_OVERRIDE_SIG, // 70
     LABEL_AUDIT_DETAILS,        // 71
     LABEL_DEVICE_WIPE_SIG,      // 72
-    // 73-76: Recovery Group
+    // 73-76: Recovery Group (EP09-P1)
     LABEL_RECOVERY_GROUP_SHARE_WRAP, // 73
     LABEL_RECOVERY_PUK_SEED_WRAP,    // 74
     LABEL_RECOVERY_SHARE_CONTRIBUTE, // 75
     LABEL_RECOVERY_LIVENESS_PROOF,   // 76
+    // 77-79: Role Encryption (EP01)
+    LABEL_PLATFORM_ROLE_NAME_ENCRYPT, // 77
+    LABEL_PLATFORM_ROLE_DESC_ENCRYPT, // 78
+    LABEL_HUB_ROLE_ENCRYPT,           // 79
 ];
 
 /// Look up a label string by its numeric ID.
@@ -528,6 +546,15 @@ mod tests {
             LABEL_RECOVERY_LIVENESS_PROOF,
             "llamenos:recovery-group:liveness-proof:v1"
         );
+        assert_eq!(
+            LABEL_PLATFORM_ROLE_NAME_ENCRYPT,
+            "llamenos:platform-role-name-encrypt:v1"
+        );
+        assert_eq!(
+            LABEL_PLATFORM_ROLE_DESC_ENCRYPT,
+            "llamenos:platform-role-desc-encrypt:v1"
+        );
+        assert_eq!(LABEL_HUB_ROLE_ENCRYPT, "llamenos:hub-role-encrypt:v1");
     }
 
     /// Verify registry index stability.
@@ -567,6 +594,9 @@ mod tests {
         assert_eq!(id_to_label(74), Some(LABEL_RECOVERY_PUK_SEED_WRAP));
         assert_eq!(id_to_label(75), Some(LABEL_RECOVERY_SHARE_CONTRIBUTE));
         assert_eq!(id_to_label(76), Some(LABEL_RECOVERY_LIVENESS_PROOF));
+        assert_eq!(id_to_label(77), Some(LABEL_PLATFORM_ROLE_NAME_ENCRYPT));
+        assert_eq!(id_to_label(78), Some(LABEL_PLATFORM_ROLE_DESC_ENCRYPT));
+        assert_eq!(id_to_label(79), Some(LABEL_HUB_ROLE_ENCRYPT));
     }
 
     /// Verify bidirectional lookup (skipping tombstoned indices).

@@ -61,9 +61,8 @@ export const Route = createRootRoute({
 
 function RootLayout() {
   const { t } = useTranslation()
-  const { isAuthenticated, isAdmin, signOut, name, isLoading, profileCompleted, hasPermission, primaryRoleName, webauthnEnrollmentRequired } = useAuth()
-  const { hotlineName, needsBootstrap, demoMode, isLoading: configLoading } = useConfig()
-  const { theme, setTheme } = useTheme()
+  const { isAuthenticated, isLoading, profileCompleted, webauthnEnrollmentRequired } = useAuth()
+  const { needsBootstrap, demoMode, isLoading: configLoading } = useConfig()
   const navigate = useNavigate()
   const location = useLocation()
 

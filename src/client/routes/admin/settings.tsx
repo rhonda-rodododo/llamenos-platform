@@ -196,7 +196,7 @@ function AdminSettingsPage() {
       <RolesSection
         expanded={expanded.has('roles')}
         onToggle={(open) => toggleSection('roles', open)}
-        statusSummary={t('roles.summary', { defaultValue: 'Manage roles' })}
+        statusSummary={t('roles.description', { defaultValue: 'Define roles and assign permissions to control access across your hotline.' })}
       />
 
       <TelephonyProviderSection

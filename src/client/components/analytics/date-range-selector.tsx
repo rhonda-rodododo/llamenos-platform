@@ -18,7 +18,7 @@ function daysAgo(days: number): DateRange {
   return { from: from.toISOString(), to: to.toISOString() }
 }
 
-export function DateRangeSelector({ value, onChange }: DateRangeSelectorProps) {
+export function DateRangeSelector({ onChange }: DateRangeSelectorProps) {
   const { t } = useTranslation()
   const [preset, setPreset] = useState<Preset>('30d')
   const [customFrom, setCustomFrom] = useState('')

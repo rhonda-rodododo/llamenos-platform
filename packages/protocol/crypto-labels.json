@@ -79,6 +79,9 @@
     "LABEL_RECOVERY_GROUP_SHARE_WRAP": "llamenos:recovery-group:share-wrap:v1",
     "LABEL_RECOVERY_PUK_SEED_WRAP": "llamenos:recovery-group:puk-seed-wrap:v1",
     "LABEL_RECOVERY_SHARE_CONTRIBUTE": "llamenos:recovery-group:share-contribute:v1",
-    "LABEL_RECOVERY_LIVENESS_PROOF": "llamenos:recovery-group:liveness-proof:v1"
+    "LABEL_RECOVERY_LIVENESS_PROOF": "llamenos:recovery-group:liveness-proof:v1",
+    "LABEL_PLATFORM_ROLE_NAME_ENCRYPT": "llamenos:platform-role-name-encrypt:v1",
+    "LABEL_PLATFORM_ROLE_DESC_ENCRYPT": "llamenos:platform-role-desc-encrypt:v1",
+    "LABEL_HUB_ROLE_ENCRYPT": "llamenos:hub-role-encrypt:v1"
   }
 }
