@@ -25,6 +25,7 @@ describe('users:manage-devices permission', () => {
   })
 })
 
+
 describe('new system:view-* permissions', () => {
   const newPerms: string[] = [
     'system:view-platform',

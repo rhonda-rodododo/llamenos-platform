@@ -1871,29 +1871,40 @@
     "volunteer": "Volunteer"
   },
   "roles": {
-    "createRole": "Create Role",
-    "created": "Role created",
+    "system": "System",
     "default": "Default",
-    "deleteConfirm": "Are you sure you want to delete this role? Members will be reassigned to the default role.",
-    "deleteTitle": "Delete Role",
-    "deleted": "Role deleted",
-    "description": "Define roles and assign permissions to control access across your hotline.",
-    "descriptionLabel": "Description",
-    "descriptionPlaceholder": "Brief description of this role...",
-    "editRole": "Edit Role",
-    "locked": "Locked",
+    "allPermissions": "Toutes les permissions",
+    "permissionCount": "permissions",
+    "permissionCountOne": "1 permission",
+    "assignedUsers": "{{count}} users",
+    "assignedUsersOne": "1 user",
     "name": "Name",
     "namePlaceholder": "e.g. Team Lead",
-    "permissionCount": "permissions",
-    "permissions": "Permissions",
-    "selected": "selected",
     "slug": "Slug",
+    "description": "Define roles and assign permissions to control access across your hotline.",
+    "descriptionPlaceholder": "Brief description of this role...",
+    "permissions": "Permissions",
+    "create": "Create role",
+    "importFromTemplate": "Import from template",
+    "importDialog": {
+      "title": "Import roles from template",
+      "description": "Select roles to import from the template. Existing roles with the same slug will be skipped.",
+      "import": "Import selected",
+      "noTemplates": "No templates available"
+    },
+    "deleteConfirm": "Are you sure you want to delete this role? Members will be reassigned to the default role.",
     "slugPlaceholder": "e.g. team-lead",
+    "createRole": "Create Role",
+    "created": "Role created",
+    "deleteTitle": "Delete Role",
+    "deleted": "Role deleted",
+    "descriptionLabel": "Description",
+    "editRole": "Edit Role",
+    "locked": "Locked",
+    "selected": "selected",
     "summary": "Summary",
-    "system": "System",
     "title": "Roles & Permissions",
-    "updated": "Role updated",
-    "allPermissions": "Toutes les permissions"
+    "updated": "Role updated"
   },
   "save": "Save",
   "schema": {
@@ -3458,6 +3469,61 @@
       "footer": "Webhook setup complete"
     }
   },
+  "analytics": {
+    "title": "Analytique",
+    "description": "Volume d'appels, temps de réponse et activité des bénévoles",
+    "nav": "Analytique",
+    "summary": {
+      "totalCalls": "Total des appels",
+      "answerRate": "Taux de réponse",
+      "avgDuration": "Durée moyenne",
+      "totalConversations": "Total des conversations"
+    },
+    "callVolume": {
+      "title": "Volume d'appels",
+      "answered": "Répondus",
+      "unanswered": "Sans réponse",
+      "abandoned": "Abandonnés",
+      "noData": "Aucune donnée d'appel pour cette période"
+    },
+    "hours": {
+      "title": "Distribution horaire",
+      "noData": "Aucune donnée pour cette période"
+    },
+    "conversations": {
+      "title": "Conversations",
+      "avgResponseTime": "Temps de réponse moyen",
+      "avgMessages": "Messages moyens",
+      "noData": "Aucune donnée de conversation pour cette période"
+    },
+    "shifts": {
+      "title": "Couverture des shifts",
+      "noData": "Aucune donnée de shift disponible"
+    },
+    "users": {
+      "title": "Activité des bénévoles",
+      "name": "Nom",
+      "callsAnswered": "Appels répondus",
+      "avgDuration": "Durée moyenne",
+      "notesCreated": "Notes créées",
+      "noData": "Aucune donnée de bénévole pour cette période"
+    },
+    "personal": {
+      "callsToday": "Appels aujourd'hui",
+      "callsThisPeriod": "Appels cette période",
+      "avgDuration": "Durée moyenne",
+      "notesCreated": "Notes créées"
+    },
+    "platform": {
+      "title": "Analytique de plateforme",
+      "crossHub": "Multi-hub"
+    },
+    "dateRange": {
+      "7days": "7 jours",
+      "30days": "30 jours",
+      "custom": "Personnalisé"
+    }
+  },
   "security": {
     "tabs": {
       "devices": "Devices",
@@ -3523,61 +3589,6 @@
       "inProgress": "Terminating sessions and rotating keys...",
       "complete": "Lockdown complete. {{sessions}} sessions terminated, {{hubs}} hub keys queued for rotation.",
       "confirm": "Lock down now"
-    }
-  },
-  "analytics": {
-    "title": "Analytique",
-    "description": "Volume d'appels, temps de réponse et activité des bénévoles",
-    "nav": "Analytique",
-    "summary": {
-      "totalCalls": "Total des appels",
-      "answerRate": "Taux de réponse",
-      "avgDuration": "Durée moyenne",
-      "totalConversations": "Total des conversations"
-    },
-    "callVolume": {
-      "title": "Volume d'appels",
-      "answered": "Répondus",
-      "unanswered": "Sans réponse",
-      "abandoned": "Abandonnés",
-      "noData": "Aucune donnée d'appel pour cette période"
-    },
-    "hours": {
-      "title": "Distribution horaire",
-      "noData": "Aucune donnée pour cette période"
-    },
-    "conversations": {
-      "title": "Conversations",
-      "avgResponseTime": "Temps de réponse moyen",
-      "avgMessages": "Messages moyens",
-      "noData": "Aucune donnée de conversation pour cette période"
-    },
-    "shifts": {
-      "title": "Couverture des shifts",
-      "noData": "Aucune donnée de shift disponible"
-    },
-    "users": {
-      "title": "Activité des bénévoles",
-      "name": "Nom",
-      "callsAnswered": "Appels répondus",
-      "avgDuration": "Durée moyenne",
-      "notesCreated": "Notes créées",
-      "noData": "Aucune donnée de bénévole pour cette période"
-    },
-    "personal": {
-      "callsToday": "Appels aujourd'hui",
-      "callsThisPeriod": "Appels cette période",
-      "avgDuration": "Durée moyenne",
-      "notesCreated": "Notes créées"
-    },
-    "platform": {
-      "title": "Analytique de plateforme",
-      "crossHub": "Multi-hub"
-    },
-    "dateRange": {
-      "7days": "7 jours",
-      "30days": "30 jours",
-      "custom": "Personnalisé"
     }
   }
 }

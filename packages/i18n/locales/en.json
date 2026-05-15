@@ -1778,11 +1778,11 @@
     "hubs": "Hubs",
     "notes": "Call Notes",
     "reports": "Reports",
-    "security": "Security",
     "settings": "Settings",
     "shifts": "Shifts",
     "triage": "Triage",
-    "users": "Volunteers"
+    "users": "Volunteers",
+    "security": "Security"
   },
   "navigation": {
     "back": "Back"
@@ -2215,35 +2215,86 @@
     "volunteer": "Volunteer"
   },
   "roles": {
-    "createRole": "Create Role",
-    "created": "Role created",
-    "default": "Default",
-    "deleteTitle": "Delete Role",
-    "deleted": "Role deleted",
-    "description": "Define roles and assign permissions to control access across your hotline.",
-    "descriptionLabel": "Description",
-    "descriptionPlaceholder": "Brief description of this role...",
-    "editRole": "Edit Role",
-    "locked": "Locked",
-    "name": "Name",
-    "namePlaceholder": "e.g. Team Lead",
-    "permissionCount": "permissions",
-    "permissions": "Permissions",
-    "selected": "selected",
-    "slug": "Slug",
-    "slugPlaceholder": "e.g. team-lead",
-    "summary": "Summary",
     "system": "System",
-    "title": "Roles & Permissions",
-    "updated": "Role updated",
+    "default": "Default",
     "allPermissions": "All permissions",
-    "create": "Create role",
+    "permissionCount": "permissions",
+    "permissionCountOne": "1 permission",
     "assignedUsers": "{{count}} users",
     "assignedUsersOne": "{{count}} user",
+    "name": "Name",
+    "namePlaceholder": "e.g. Team Lead",
+    "slug": "Slug",
+    "slugPlaceholder": "e.g. team-lead",
+    "description": "Define roles and assign permissions to control access across your hotline.",
+    "descriptionPlaceholder": "Brief description of this role...",
+    "permissions": "Permissions",
+    "create": "Create role",
+    "importFromTemplate": "Import from template",
+    "importDialog": {
+      "title": "Import roles from template",
+      "description": "Select roles to import from the template. Existing roles with the same slug will be skipped.",
+      "import": "Import selected",
+      "noTemplates": "No templates available"
+    },
     "deleteConfirm": {
       "title": "Delete role",
       "description": "Are you sure you want to delete \"{{name}}\"? Users assigned this role will lose its permissions."
+    },
+    "createRole": "Create Role",
+    "created": "Role created",
+    "deleteTitle": "Delete Role",
+    "deleted": "Role deleted",
+    "descriptionLabel": "Description",
+    "editRole": "Edit Role",
+    "locked": "Locked",
+    "selected": "selected",
+    "summary": "Summary",
+    "title": "Roles & Permissions",
+    "updated": "Role updated"
+  },
+  "permissions": {
+    "toggleAll": "Toggle all {{domain}} permissions",
+    "scope": "scope",
+    "none": "None",
+    "tiers": "Data access tiers",
+    "actions": "Actions",
+    "groups": {
+      "audit": "Audit",
+      "bans": "Bans",
+      "blasts": "Blasts",
+      "calls": "Calls",
+      "cases": "Cases",
+      "contacts": "Contacts",
+      "conversations": "Conversations",
+      "events": "Events",
+      "evidence": "Evidence",
+      "files": "Files",
+      "firehose": "Firehose",
+      "hubs": "Hubs",
+      "invites": "Invites",
+      "messaging": "Messaging",
+      "metrics": "Metrics",
+      "notes": "Notes",
+      "reports": "Reports",
+      "settings": "Settings",
+      "shifts": "Shifts",
+      "system": "System",
+      "telephony": "Telephony",
+      "users": "Users"
     }
+  },
+  "create": "Create role",
+  "importFromTemplate": "Import from template",
+  "importDialog": {
+    "title": "Import roles from template",
+    "description": "Select roles to import from the template. Existing roles with the same slug will be skipped.",
+    "import": "Import selected",
+    "noTemplates": "No templates available"
+  },
+  "deleteConfirm": {
+    "title": "Delete role",
+    "description": "Are you sure you want to delete \"{{name}}\"? Users assigned this role will lose its permissions."
   },
   "save": "Save",
   "schema": {
@@ -3462,6 +3513,61 @@
       "footer": "Webhook setup complete"
     }
   },
+  "analytics": {
+    "title": "Analytics",
+    "description": "Call volume, response times, and volunteer activity",
+    "nav": "Analytics",
+    "summary": {
+      "totalCalls": "Total Calls",
+      "answerRate": "Answer Rate",
+      "avgDuration": "Avg Duration",
+      "totalConversations": "Total Conversations"
+    },
+    "callVolume": {
+      "title": "Call Volume",
+      "answered": "Answered",
+      "unanswered": "Unanswered",
+      "abandoned": "Abandoned",
+      "noData": "No call data for this period"
+    },
+    "hours": {
+      "title": "Hourly Distribution",
+      "noData": "No data for this period"
+    },
+    "conversations": {
+      "title": "Conversations",
+      "avgResponseTime": "Avg Response Time",
+      "avgMessages": "Avg Messages",
+      "noData": "No conversation data for this period"
+    },
+    "shifts": {
+      "title": "Shift Coverage",
+      "noData": "No shift data available"
+    },
+    "users": {
+      "title": "Volunteer Activity",
+      "name": "Name",
+      "callsAnswered": "Calls Answered",
+      "avgDuration": "Avg Duration",
+      "notesCreated": "Notes Created",
+      "noData": "No volunteer data for this period"
+    },
+    "personal": {
+      "callsToday": "Calls Today",
+      "callsThisPeriod": "Calls This Period",
+      "avgDuration": "Avg Duration",
+      "notesCreated": "Notes Created"
+    },
+    "platform": {
+      "title": "Platform Analytics",
+      "crossHub": "Cross-Hub"
+    },
+    "dateRange": {
+      "7days": "7 Days",
+      "30days": "30 Days",
+      "custom": "Custom"
+    }
+  },
   "security": {
     "tabs": {
       "devices": "Devices",
@@ -3527,100 +3633,6 @@
       "inProgress": "Terminating sessions and rotating keys...",
       "complete": "Lockdown complete. {{sessions}} sessions terminated, {{hubs}} hub keys queued for rotation.",
       "confirm": "Lock down now"
-    }
-  },
-  "permissions": {
-    "toggleAll": "Toggle all {{domain}} permissions",
-    "scope": "scope",
-    "none": "None",
-    "tiers": "Data access tiers",
-    "actions": "Actions",
-    "groups": {
-      "audit": "Audit",
-      "bans": "Bans",
-      "blasts": "Blasts",
-      "calls": "Calls",
-      "cases": "Cases",
-      "contacts": "Contacts",
-      "conversations": "Conversations",
-      "events": "Events",
-      "evidence": "Evidence",
-      "files": "Files",
-      "firehose": "Firehose",
-      "hubs": "Hubs",
-      "invites": "Invites",
-      "messaging": "Messaging",
-      "metrics": "Metrics",
-      "notes": "Notes",
-      "reports": "Reports",
-      "settings": "Settings",
-      "shifts": "Shifts",
-      "system": "System",
-      "telephony": "Telephony",
-      "users": "Users"
-    }
-  },
-  "create": "Create role",
-  "importFromTemplate": "Import from template",
-  "importDialog": {
-    "title": "Import roles from template",
-    "description": "Select roles to import from the template. Existing roles with the same slug will be skipped.",
-    "import": "Import selected",
-    "noTemplates": "No templates available"
-  },
-  "analytics": {
-    "title": "Analytics",
-    "description": "Call volume, response times, and volunteer activity",
-    "nav": "Analytics",
-    "summary": {
-      "totalCalls": "Total Calls",
-      "answerRate": "Answer Rate",
-      "avgDuration": "Avg Duration",
-      "totalConversations": "Total Conversations"
-    },
-    "callVolume": {
-      "title": "Call Volume",
-      "answered": "Answered",
-      "unanswered": "Unanswered",
-      "abandoned": "Abandoned",
-      "noData": "No call data for this period"
-    },
-    "hours": {
-      "title": "Hourly Distribution",
-      "noData": "No data for this period"
-    },
-    "conversations": {
-      "title": "Conversations",
-      "avgResponseTime": "Avg Response Time",
-      "avgMessages": "Avg Messages",
-      "noData": "No conversation data for this period"
-    },
-    "shifts": {
-      "title": "Shift Coverage",
-      "noData": "No shift data available"
-    },
-    "users": {
-      "title": "Volunteer Activity",
-      "name": "Name",
-      "callsAnswered": "Calls Answered",
-      "avgDuration": "Avg Duration",
-      "notesCreated": "Notes Created",
-      "noData": "No volunteer data for this period"
-    },
-    "personal": {
-      "callsToday": "Calls Today",
-      "callsThisPeriod": "Calls This Period",
-      "avgDuration": "Avg Duration",
-      "notesCreated": "Notes Created"
-    },
-    "platform": {
-      "title": "Platform Analytics",
-      "crossHub": "Cross-Hub"
-    },
-    "dateRange": {
-      "7days": "7 Days",
-      "30days": "30 Days",
-      "custom": "Custom"
     }
   }
 }
