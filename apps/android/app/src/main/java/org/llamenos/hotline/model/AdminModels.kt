@@ -25,9 +25,9 @@ typealias User = org.llamenos.protocol.UserListResponseUser
 typealias UsersListResponse = org.llamenos.protocol.UserListResponse
 
 // ---- Ban List ----
-// Generated Ban has: phone, bannedBy, bannedAt, reason.
+// Generated BanResponse has: phone, bannedBy, bannedAt, reason.
 // Extension properties in Extensions.kt provide identifierHash, createdBy, createdAt.
-typealias BanEntry = org.llamenos.protocol.Ban
+typealias BanEntry = org.llamenos.protocol.BanResponse
 typealias BanListResponse = org.llamenos.protocol.BanListResponse
 typealias BulkBanRequest = org.llamenos.protocol.BulkBanBody
 
