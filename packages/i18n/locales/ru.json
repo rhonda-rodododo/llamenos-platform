@@ -3524,5 +3524,60 @@
       "complete": "Lockdown complete. {{sessions}} sessions terminated, {{hubs}} hub keys queued for rotation.",
       "confirm": "Lock down now"
     }
+  },
+  "analytics": {
+    "title": "Аналитика",
+    "description": "Объём звонков, время ответа и активность волонтёров",
+    "nav": "Аналитика",
+    "summary": {
+      "totalCalls": "Всего звонков",
+      "answerRate": "Процент ответов",
+      "avgDuration": "Сред. длительность",
+      "totalConversations": "Всего разговоров"
+    },
+    "callVolume": {
+      "title": "Объём звонков",
+      "answered": "Отвечено",
+      "unanswered": "Без ответа",
+      "abandoned": "Прервано",
+      "noData": "Нет данных о звонках за этот период"
+    },
+    "hours": {
+      "title": "Почасовое распределение",
+      "noData": "Нет данных за этот период"
+    },
+    "conversations": {
+      "title": "Разговоры",
+      "avgResponseTime": "Сред. время ответа",
+      "avgMessages": "Сред. кол-во сообщений",
+      "noData": "Нет данных о разговорах за этот период"
+    },
+    "shifts": {
+      "title": "Охват смен",
+      "noData": "Нет данных о сменах"
+    },
+    "users": {
+      "title": "Активность волонтёров",
+      "name": "Имя",
+      "callsAnswered": "Отвечено звонков",
+      "avgDuration": "Сред. длительность",
+      "notesCreated": "Создано заметок",
+      "noData": "Нет данных о волонтёрах за этот период"
+    },
+    "personal": {
+      "callsToday": "Звонки сегодня",
+      "callsThisPeriod": "Звонки за период",
+      "avgDuration": "Сред. длительность",
+      "notesCreated": "Создано заметок"
+    },
+    "platform": {
+      "title": "Аналитика платформы",
+      "crossHub": "Кросс-хаб"
+    },
+    "dateRange": {
+      "7days": "7 дней",
+      "30days": "30 дней",
+      "custom": "Произвольный"
+    }
   }
 }

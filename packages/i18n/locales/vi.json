@@ -3524,5 +3524,60 @@
       "complete": "Lockdown complete. {{sessions}} sessions terminated, {{hubs}} hub keys queued for rotation.",
       "confirm": "Lock down now"
     }
+  },
+  "analytics": {
+    "title": "Phân tích",
+    "description": "Lượng cuộc gọi, thời gian phản hồi và hoạt động tình nguyện viên",
+    "nav": "Phân tích",
+    "summary": {
+      "totalCalls": "Tổng cuộc gọi",
+      "answerRate": "Tỷ lệ trả lời",
+      "avgDuration": "Thời lượng TB",
+      "totalConversations": "Tổng hội thoại"
+    },
+    "callVolume": {
+      "title": "Lượng cuộc gọi",
+      "answered": "Đã trả lời",
+      "unanswered": "Không trả lời",
+      "abandoned": "Đã bỏ",
+      "noData": "Không có dữ liệu cuộc gọi cho kỳ này"
+    },
+    "hours": {
+      "title": "Phân phối theo giờ",
+      "noData": "Không có dữ liệu cho kỳ này"
+    },
+    "conversations": {
+      "title": "Hội thoại",
+      "avgResponseTime": "Thời gian phản hồi TB",
+      "avgMessages": "Tin nhắn TB",
+      "noData": "Không có dữ liệu hội thoại cho kỳ này"
+    },
+    "shifts": {
+      "title": "Phạm vi ca trực",
+      "noData": "Không có dữ liệu ca trực"
+    },
+    "users": {
+      "title": "Hoạt động tình nguyện viên",
+      "name": "Tên",
+      "callsAnswered": "Cuộc gọi đã trả lời",
+      "avgDuration": "Thời lượng TB",
+      "notesCreated": "Ghi chú đã tạo",
+      "noData": "Không có dữ liệu tình nguyện viên cho kỳ này"
+    },
+    "personal": {
+      "callsToday": "Cuộc gọi hôm nay",
+      "callsThisPeriod": "Cuộc gọi kỳ này",
+      "avgDuration": "Thời lượng TB",
+      "notesCreated": "Ghi chú đã tạo"
+    },
+    "platform": {
+      "title": "Phân tích nền tảng",
+      "crossHub": "Liên Hub"
+    },
+    "dateRange": {
+      "7days": "7 ngày",
+      "30days": "30 ngày",
+      "custom": "Tùy chỉnh"
+    }
   }
 }

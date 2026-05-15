@@ -77,9 +77,10 @@ export default async function globalSetup(_config: FullConfig): Promise<void> {
       if (i % 5 === 4) {
         console.log(`[global-setup] Backend returned ${res.status}, retrying... (${i + 1}/${maxAttempts})`)
       }
-    } catch {
+    } catch (err) {
       if (i % 5 === 4) {
-        console.log(`[global-setup] Backend not reachable, retrying... (${i + 1}/${maxAttempts})`)
+        const msg = err instanceof Error ? err.message : String(err)
+        console.log(`[global-setup] Backend not reachable, retrying... (${i + 1}/${maxAttempts}) — ${msg}`)
       }
     }
     await new Promise(r => setTimeout(r, retryDelayMs))

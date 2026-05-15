@@ -3524,5 +3524,60 @@
       "complete": "Lockdown complete. {{sessions}} sessions terminated, {{hubs}} hub keys queued for rotation.",
       "confirm": "Lock down now"
     }
+  },
+  "analytics": {
+    "title": "Pagsusuri",
+    "description": "Dami ng tawag, oras ng pagtugon, at aktibidad ng boluntaryo",
+    "nav": "Pagsusuri",
+    "summary": {
+      "totalCalls": "Kabuuang Tawag",
+      "answerRate": "Rate ng Pagtugon",
+      "avgDuration": "Karaniwang Tagal",
+      "totalConversations": "Kabuuang Pag-uusap"
+    },
+    "callVolume": {
+      "title": "Dami ng Tawag",
+      "answered": "Sinagot",
+      "unanswered": "Walang Sagot",
+      "abandoned": "Inabandona",
+      "noData": "Walang datos ng tawag para sa panahong ito"
+    },
+    "hours": {
+      "title": "Pamamahagi sa Bawat Oras",
+      "noData": "Walang datos para sa panahong ito"
+    },
+    "conversations": {
+      "title": "Pag-uusap",
+      "avgResponseTime": "Karaniwang Oras ng Pagtugon",
+      "avgMessages": "Karaniwang Mensahe",
+      "noData": "Walang datos ng pag-uusap para sa panahong ito"
+    },
+    "shifts": {
+      "title": "Saklaw ng Shift",
+      "noData": "Walang datos ng shift"
+    },
+    "users": {
+      "title": "Aktibidad ng Boluntaryo",
+      "name": "Pangalan",
+      "callsAnswered": "Mga Sinagot na Tawag",
+      "avgDuration": "Karaniwang Tagal",
+      "notesCreated": "Mga Nilikhang Tala",
+      "noData": "Walang datos ng boluntaryo para sa panahong ito"
+    },
+    "personal": {
+      "callsToday": "Mga Tawag Ngayon",
+      "callsThisPeriod": "Mga Tawag sa Panahong Ito",
+      "avgDuration": "Karaniwang Tagal",
+      "notesCreated": "Mga Nilikhang Tala"
+    },
+    "platform": {
+      "title": "Pagsusuri ng Platform",
+      "crossHub": "Cross-Hub"
+    },
+    "dateRange": {
+      "7days": "7 Araw",
+      "30days": "30 Araw",
+      "custom": "Pasadya"
+    }
   }
 }

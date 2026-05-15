@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /**
  * Authenticated API test helpers.
  *
@@ -462,13 +463,16 @@ export async function listRolesViaApi(
 
 export async function createRoleViaApi(
   request: APIRequestContext,
-  opts: { name: string; slug: string; permissions: string[]; description?: string },
+  opts: { name: string; slug: string; permissions: string[]; description?: string; encryptedName?: string; encryptedDescription?: string; envelopes?: Array<{ adminPubkey: string; encryptedName: string; encryptedDescription: string }> },
 ): Promise<RoleDefinition> {
   const { status, data } = await apiPost<RoleDefinition>(request, '/settings/roles', {
     name: opts.name,
     slug: opts.slug,
     permissions: opts.permissions,
     description: opts.description || `Custom role: ${opts.name}`,
+    encryptedName: opts.encryptedName,
+    encryptedDescription: opts.encryptedDescription,
+    envelopes: opts.envelopes,
   })
   if (status === 409) {
     // Role already exists (parallel test created it) — fetch and return it

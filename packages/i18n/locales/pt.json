@@ -3524,5 +3524,60 @@
       "complete": "Lockdown complete. {{sessions}} sessions terminated, {{hubs}} hub keys queued for rotation.",
       "confirm": "Lock down now"
     }
+  },
+  "analytics": {
+    "title": "Análise",
+    "description": "Volume de chamadas, tempos de resposta e atividade de voluntários",
+    "nav": "Análise",
+    "summary": {
+      "totalCalls": "Total de chamadas",
+      "answerRate": "Taxa de atendimento",
+      "avgDuration": "Duração média",
+      "totalConversations": "Total de conversas"
+    },
+    "callVolume": {
+      "title": "Volume de chamadas",
+      "answered": "Atendidas",
+      "unanswered": "Não atendidas",
+      "abandoned": "Abandonadas",
+      "noData": "Sem dados de chamadas para este período"
+    },
+    "hours": {
+      "title": "Distribuição por hora",
+      "noData": "Sem dados para este período"
+    },
+    "conversations": {
+      "title": "Conversas",
+      "avgResponseTime": "Tempo médio de resposta",
+      "avgMessages": "Mensagens médias",
+      "noData": "Sem dados de conversa para este período"
+    },
+    "shifts": {
+      "title": "Cobertura de turnos",
+      "noData": "Sem dados de turnos disponíveis"
+    },
+    "users": {
+      "title": "Atividade de voluntários",
+      "name": "Nome",
+      "callsAnswered": "Chamadas atendidas",
+      "avgDuration": "Duração média",
+      "notesCreated": "Notas criadas",
+      "noData": "Sem dados de voluntários para este período"
+    },
+    "personal": {
+      "callsToday": "Chamadas hoje",
+      "callsThisPeriod": "Chamadas neste período",
+      "avgDuration": "Duração média",
+      "notesCreated": "Notas criadas"
+    },
+    "platform": {
+      "title": "Análise de plataforma",
+      "crossHub": "Multi-hub"
+    },
+    "dateRange": {
+      "7days": "7 dias",
+      "30days": "30 dias",
+      "custom": "Personalizado"
+    }
   }
 }

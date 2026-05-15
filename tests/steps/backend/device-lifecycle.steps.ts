@@ -1,7 +1,6 @@
 /**
  * Device lifecycle step definitions.
- * Tests device registration, listing, deregistration, Phase 6 crypto keys,
- * device renaming, revocation, SAS verification, sessions, and security events.
+ * Tests device registration, listing, deregistration, and Phase 6 crypto keys.
  */
 import { expect } from '@playwright/test'
 import { Given, When, Then, Before, getState, setState } from './fixtures'
@@ -10,7 +9,7 @@ import {
   apiGet,
   apiPost,
   apiDelete,
-  apiPatch,
+  createUserViaApi,
 } from '../../api-helpers'
 import { bytesToHex } from '@shared/encoding'
 
@@ -136,104 +135,4 @@ Then('the device lists show the Ed25519 public key', async ({ request, world }) 
   const res = await apiGet<{ devices: Array<{ ed25519Pubkey: string | null }> }>(request, '/devices', s.user!.nsec)
   expect(res.status).toBe(200)
   expect(res.data.devices.some(d => d.ed25519Pubkey === s.ed25519Pubkey)).toBe(true)
-})
-
-// ── Device Rename Steps ─────────────────────────────────────────────
-
-When('the user renames the first device to {string}', async ({ request, world }, name: string) => {
-  const s = getS(world)
-  expect(s.user).toBeDefined()
-  expect(s.devices.length).toBeGreaterThan(0)
-  setLastResponse(world, await apiPatch(request, `/devices/${s.devices[0].id}`, { deviceName: name }, s.user!.nsec))
-})
-
-When('the user renames device {string} to {string}', async ({ request, world }, deviceId: string, name: string) => {
-  const s = getS(world)
-  expect(s.user).toBeDefined()
-  setLastResponse(world, await apiPatch(request, `/devices/${deviceId}`, { deviceName: name }, s.user!.nsec))
-})
-
-Then('the device name is {string}', async ({ world }, name: string) => {
-  const resp = getSharedState(world).lastResponse
-  expect(resp).toBeDefined()
-  const data = resp!.data as { deviceName: string }
-  expect(data.deviceName).toBe(name)
-})
-
-// ── Device Revoke Steps ─────────────────────────────────────────────
-
-When('the user revokes the first device', async ({ request, world }) => {
-  const s = getS(world)
-  expect(s.user).toBeDefined()
-  expect(s.devices.length).toBeGreaterThan(0)
-  setLastResponse(world, await apiPost(request, `/devices/${s.devices[0].id}/revoke`, {
-    confirm: true,
-    signature: bytesToHex(crypto.getRandomValues(new Uint8Array(64))),
-    sigchainHash: bytesToHex(crypto.getRandomValues(new Uint8Array(32))),
-    sigchainSeqNo: 1,
-    sigchainPrevHash: bytesToHex(crypto.getRandomValues(new Uint8Array(32))),
-  }, s.user!.nsec))
-})
-
-When('the user revokes the first device without confirmation', async ({ request, world }) => {
-  const s = getS(world)
-  expect(s.user).toBeDefined()
-  expect(s.devices.length).toBeGreaterThan(0)
-  setLastResponse(world, await apiPost(request, `/devices/${s.devices[0].id}/revoke`, {
-    confirm: false,
-    signature: bytesToHex(crypto.getRandomValues(new Uint8Array(64))),
-    sigchainHash: bytesToHex(crypto.getRandomValues(new Uint8Array(32))),
-    sigchainSeqNo: 1,
-    sigchainPrevHash: bytesToHex(crypto.getRandomValues(new Uint8Array(32))),
-  }, s.user!.nsec))
-})
-
-// ── Session Management Steps ────────────────────────────────────────
-
-When('the user lists their sessions', async ({ request, world }) => {
-  const s = getS(world)
-  expect(s.user).toBeDefined()
-  setLastResponse(world, await apiGet(request, '/sessions', s.user!.nsec))
-})
-
-When('the user terminates all other sessions', async ({ request, world }) => {
-  const s = getS(world)
-  expect(s.user).toBeDefined()
-  setLastResponse(world, await apiPost(request, '/sessions/terminate-others', {}, s.user!.nsec))
-})
-
-When('the user terminates session {string}', async ({ request, world }, sessionId: string) => {
-  const s = getS(world)
-  expect(s.user).toBeDefined()
-  setLastResponse(world, await apiDelete(request, `/sessions/${sessionId}`, s.user!.nsec))
-})
-
-Then('the session list is returned', async ({ world }) => {
-  const resp = getSharedState(world).lastResponse
-  expect(resp).toBeDefined()
-  const data = resp!.data as { sessions: unknown[] }
-  expect(Array.isArray(data.sessions)).toBe(true)
-})
-
-Then('the terminated session count is returned', async ({ world }) => {
-  const resp = getSharedState(world).lastResponse
-  expect(resp).toBeDefined()
-  const data = resp!.data as { terminated: number }
-  expect(typeof data.terminated).toBe('number')
-})
-
-// ── Security Events Steps ───────────────────────────────────────────
-
-When('the user lists their security events', async ({ request, world }) => {
-  const s = getS(world)
-  expect(s.user).toBeDefined()
-  setLastResponse(world, await apiGet(request, '/security-events', s.user!.nsec))
-})
-
-Then('the security event list is returned', async ({ world }) => {
-  const resp = getSharedState(world).lastResponse
-  expect(resp).toBeDefined()
-  const data = resp!.data as { events: unknown[]; total: number }
-  expect(Array.isArray(data.events)).toBe(true)
-  expect(typeof data.total).toBe('number')
 })

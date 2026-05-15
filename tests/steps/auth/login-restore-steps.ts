@@ -24,7 +24,10 @@ Given('I have a stored encrypted key', async ({ page }) => {
       ciphertext: 'cc'.repeat(32),
       state: { signingPubkeyHex: 'dd'.repeat(32) },
     })
-    localStorage.setItem('tauri-store:keys.json:llamenos-encrypted-device-keys', data)
+    // Stronghold mock stores as number[] (TextEncoder output), matching
+    // the MockStrongholdStore.insert() format used by platform.ts getSecureStore()
+    const encoded = Array.from(new TextEncoder().encode(data))
+    localStorage.setItem('stronghold:llamenos:llamenos-encrypted-device-keys', JSON.stringify(encoded))
   })
 })
 

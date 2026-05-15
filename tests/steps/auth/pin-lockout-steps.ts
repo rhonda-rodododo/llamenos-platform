@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /**
  * PIN lockout step definitions.
  * Matches steps from: packages/test-specs/features/auth/pin-lockout.feature
@@ -100,9 +101,8 @@ Then('the stored keys should be wiped', async ({ page }) => {
   await page.waitForTimeout(1000)
   const hasKey = await page.evaluate(() => {
     return (
-      localStorage.getItem('tauri-store:keys.json:llamenos-encrypted-device-keys') !== null ||
-      localStorage.getItem('llamenos:llamenos-encrypted-device-keys') !== null ||
-      localStorage.getItem('llamenos-encrypted-key') !== null
+      localStorage.getItem('stronghold:llamenos:llamenos-encrypted-device-keys') !== null ||
+      localStorage.getItem('llamenos:llamenos-encrypted-device-keys') !== null
     )
   })
   // Keys should be wiped OR the wipe message shown

@@ -3524,5 +3524,60 @@
       "complete": "Lockdown complete. {{sessions}} sessions terminated, {{hubs}} hub keys queued for rotation.",
       "confirm": "Lock down now"
     }
+  },
+  "analytics": {
+    "title": "Analytique",
+    "description": "Volume d'appels, temps de réponse et activité des bénévoles",
+    "nav": "Analytique",
+    "summary": {
+      "totalCalls": "Total des appels",
+      "answerRate": "Taux de réponse",
+      "avgDuration": "Durée moyenne",
+      "totalConversations": "Total des conversations"
+    },
+    "callVolume": {
+      "title": "Volume d'appels",
+      "answered": "Répondus",
+      "unanswered": "Sans réponse",
+      "abandoned": "Abandonnés",
+      "noData": "Aucune donnée d'appel pour cette période"
+    },
+    "hours": {
+      "title": "Distribution horaire",
+      "noData": "Aucune donnée pour cette période"
+    },
+    "conversations": {
+      "title": "Conversations",
+      "avgResponseTime": "Temps de réponse moyen",
+      "avgMessages": "Messages moyens",
+      "noData": "Aucune donnée de conversation pour cette période"
+    },
+    "shifts": {
+      "title": "Couverture des shifts",
+      "noData": "Aucune donnée de shift disponible"
+    },
+    "users": {
+      "title": "Activité des bénévoles",
+      "name": "Nom",
+      "callsAnswered": "Appels répondus",
+      "avgDuration": "Durée moyenne",
+      "notesCreated": "Notes créées",
+      "noData": "Aucune donnée de bénévole pour cette période"
+    },
+    "personal": {
+      "callsToday": "Appels aujourd'hui",
+      "callsThisPeriod": "Appels cette période",
+      "avgDuration": "Durée moyenne",
+      "notesCreated": "Notes créées"
+    },
+    "platform": {
+      "title": "Analytique de plateforme",
+      "crossHub": "Multi-hub"
+    },
+    "dateRange": {
+      "7days": "7 jours",
+      "30days": "30 jours",
+      "custom": "Personnalisé"
+    }
   }
 }

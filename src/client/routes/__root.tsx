@@ -1,5 +1,7 @@
 import { createRootRoute, Outlet, Link, useNavigate, useLocation } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
+import { QueryClientProvider } from '@tanstack/react-query'
+import { queryClient } from '@/lib/query-client'
 import { useAuth } from '@/lib/auth'
 import { useConfig, useHasMessaging } from '@/lib/config'
 import { useTheme } from '@/lib/theme'
@@ -51,6 +53,7 @@ import {
   Inbox,
   Radio,
   Shield,
+  BarChart3,
 } from 'lucide-react'
 
 export const Route = createRootRoute({
@@ -151,14 +154,14 @@ function RootLayout() {
   }
 
   return (
-    <>
+    <QueryClientProvider client={queryClient}>
       <UpdateRequiredScreen />
       <PanicWipeIndicator />
       <OfflineBanner />
       <ErrorBoundary scope="root">
         {content}
       </ErrorBoundary>
-    </>
+    </QueryClientProvider>
   )
 }
 
@@ -370,6 +373,12 @@ function AuthenticatedLayout() {
                 <NavLink to="/admin/hubs" icon={<Building2 className="h-4 w-4" />}>{t('nav.hubs', { defaultValue: 'Hubs' })}</NavLink>
               )}
               <NavLink to="/admin/system" icon={<Monitor className="h-4 w-4" />}>{t('admin.system.nav', { defaultValue: 'System Health' })}</NavLink>
+              <NavLink to="/admin/analytics" icon={<BarChart3 className="h-4 w-4" />}>{t('analytics.nav')}</NavLink>
+              {hasPermission('system:manage-hubs') && (
+                <NavLink to="/admin/platform-analytics" icon={<BarChart3 className="h-4 w-4" />}>
+                  {t('analytics.platform.title')}
+                </NavLink>
+              )}
               </div>
             </>
           )}

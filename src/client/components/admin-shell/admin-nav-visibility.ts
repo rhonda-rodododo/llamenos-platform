@@ -6,13 +6,11 @@ export interface NavAuthContext {
 }
 
 export function canSeeItem(item: AdminNavItem, auth: NavAuthContext): boolean {
-  if (item.requiredRole && !auth.roles.includes(item.requiredRole)) return false
   if (item.requiredPermissions.length === 0) return true
   return item.requiredPermissions.every((p) => auth.hasPermission(p))
 }
 
 export function canSeeGroup(group: AdminNavGroup, auth: NavAuthContext): boolean {
-  if (group.scope === 'platform' && !auth.roles.includes('role-super-admin')) return false
   return group.items.some((item) => canSeeItem(item, auth))
 }
 
