@@ -603,8 +603,7 @@ mod tests {
         let secrets = unlock_device_keys(&encrypted, "securepass1").unwrap();
         let msg = b"round-trip test";
         let sig = sign_bytes(&secrets, msg);
-        let valid =
-            verify_signature(msg, &sig, &encrypted.state.signing_pubkey_hex).unwrap();
+        let valid = verify_signature(msg, &sig, &encrypted.state.signing_pubkey_hex).unwrap();
         assert!(valid);
     }
 }
