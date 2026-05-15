@@ -44,7 +44,7 @@ export function HourlyChart({ data, loading }: HourlyChartProps) {
                 fontSize={11}
                 width={45}
               />
-              <Tooltip labelFormatter={(label) => formatHour(Number(label))} />
+              <Tooltip labelFormatter={(label: React.ReactNode) => formatHour(Number(label))} />
               <Bar dataKey="count" fill="#6366f1" radius={[0, 4, 4, 0]} />
             </BarChart>
           </ResponsiveContainer>

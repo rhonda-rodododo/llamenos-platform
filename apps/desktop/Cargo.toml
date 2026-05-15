@@ -30,6 +30,8 @@ hmac = "0.12"
 pbkdf2 = "0.12"
 hex = "0.4"
 aes-gcm = "0.10"
+rand = "0.8"
+x25519-dalek = { version = "2", features = ["static_secrets"] }
 
 [features]
 default = ["custom-protocol", "updater"]

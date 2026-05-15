@@ -2819,6 +2819,87 @@
     "options": "Recovery options",
     "title": "Account Recovery"
   },
+  "recoveryGroup": {
+    "title": "Recovery Team",
+    "description": "Configure trusted contacts who can recover your account if you lose access.",
+    "setup": "Set Up Recovery Team",
+    "rotate": "Rotate Recovery Team",
+    "setupSuccess": "Recovery team configured successfully.",
+    "rotateSuccess": "Recovery team rotated successfully.",
+    "requiredApprovals": "Required approvals",
+    "totalContacts": "Total contacts",
+    "delayConfig": "Recovery delay (hours)",
+    "emergencyFloorConfig": "Minimum emergency delay (hours)",
+    "contacts": "Recovery contacts",
+    "selected": "Selected",
+    "noContacts": "No eligible recovery contacts found.",
+    "geoWarning": "For best protection, choose contacts in different geographic locations.",
+    "contactHealth": "Contact health",
+    "deviceVerified": "Verified",
+    "deviceUnverified": "Unverified",
+    "livenessOk": "Active",
+    "livenessStale": "Inactive",
+    "lastRotated": "Last rotated",
+    "error": {
+      "thresholdExceedsTotal": "Required approvals cannot exceed total contacts.",
+      "notContact": "You are not a recovery contact for this account.",
+      "alreadyApproved": "You have already approved this recovery request.",
+      "commitmentFailed": "Share verification failed.",
+      "sessionExpired": "Recovery session has expired.",
+      "rateLimited": "Too many recovery attempts. Please try again later.",
+      "signalVerificationFailed": "Verification code is invalid or expired."
+    },
+    "requests": {
+      "title": "Account Recovery Requests",
+      "active": "Active requests",
+      "history": "History",
+      "none": "No active recovery requests.",
+      "approve": "Approve",
+      "cancel": "Cancel",
+      "cancelConfirm": "Cancel this recovery request?",
+      "timeRemaining": "Time remaining",
+      "approvalProgress": "{{count}}/{{required}} approvals",
+      "duressAlert": "This request was flagged for duress. Verify out of band before approving.",
+      "status": {
+        "pending": "Pending verification",
+        "verified": "Identity verified",
+        "active": "In progress",
+        "completed": "Completed",
+        "expired": "Expired",
+        "cancelled": "Cancelled"
+      }
+    },
+    "urgent": {
+      "enable": "Urgent recovery",
+      "description": "If the user is in immediate danger, two admins can approve an emergency override to reduce the waiting period.",
+      "justification": "Justification",
+      "justificationPlaceholder": "Describe the emergency situation...",
+      "secondApprover": "Second approver",
+      "selectApprover": "Enter approver name or pubkey",
+      "reducedDelay": "Emergency override will reduce delay to {{hours}} hours minimum."
+    },
+    "initiate": {
+      "title": "I lost my device",
+      "description": "Recover your account with help from your trusted contacts.",
+      "identifier": "Your email or phone number",
+      "selectHub": "Organization ID",
+      "submit": "Start recovery",
+      "signalVerification": "A verification code has been sent to your registered contact.",
+      "verificationCode": "Verification code",
+      "verify": "Verify",
+      "waiting": "Waiting for your trusted contacts to approve...",
+      "approvalsReceived": "{{count}} of {{required}} approvals received",
+      "delayCountdown": "Recovery window: {{time}}",
+      "restoring": "Restoring your account...",
+      "setPin": "Set a new PIN for your account",
+      "complete": "Account recovered",
+      "success": "Your account has been successfully restored. Sign in with your new PIN."
+    },
+    "status": {
+      "enrolled": "Recovery team configured (hub: {{hubId}})",
+      "notConfigured": "No recovery team configured."
+    }
+  },
   "report": {
     "bodyLabel": "Description",
     "categoryHeader": "Category",
