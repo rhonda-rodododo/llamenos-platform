@@ -26,7 +26,7 @@ export const ADMIN_NSEC = ADMIN_SEED
 
 // ── Ed25519 Authentication ───────────────────────────────────────
 
-function seedHexToPubkey(seedHex: string): string {
+export function seedHexToPubkey(seedHex: string): string {
   return bytesToHex(ed25519.getPublicKey(hexToBytes(seedHex)))
 }
 

@@ -34,6 +34,7 @@ import { ShiftOverridesService } from './shift-overrides'
 import { ActiveShiftsService } from './active-shifts'
 import { ShiftAvailabilityService } from './shift-availability'
 import { ShiftRequestsService } from './shift-requests'
+import { RecoveryGroupService } from './recovery-group'
 import { TeamsService } from './teams'
 import { TagsService } from './tags'
 
@@ -67,6 +68,7 @@ export interface Services {
   activeShifts: ActiveShiftsService
   shiftAvailability: ShiftAvailabilityService
   shiftRequests: ShiftRequestsService
+  recoveryGroup: RecoveryGroupService
   teams: TeamsService
   tags: TagsService
 }
@@ -127,6 +129,7 @@ export function createServices(db: Database, opts?: ServicesOpts): Services {
     activeShifts: new ActiveShiftsService(db),
     shiftAvailability: new ShiftAvailabilityService(db),
     shiftRequests: new ShiftRequestsService(db),
+    recoveryGroup: new RecoveryGroupService(db, audit),
     teams: new TeamsService(db),
     tags: new TagsService(db),
   }
@@ -179,4 +182,5 @@ export {
   ActiveShiftsService,
   ShiftAvailabilityService,
   ShiftRequestsService,
+  RecoveryGroupService,
 }

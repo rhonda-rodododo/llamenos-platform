@@ -2,7 +2,7 @@ import SwiftUI
 
 struct SessionListView: View {
     @Environment(AppState.self) private var appState
-    @State private var sessions: [SessionResponse] = []
+    @State private var sessions: [Session] = []
     @State private var loading = true
 
     var body: some View {
@@ -31,7 +31,7 @@ struct SessionListView: View {
 }
 
 struct SessionRow: View {
-    let session: SessionResponse
+    let session: Session
 
     var body: some View {
         HStack {
