@@ -11,11 +11,9 @@ final class ContactFormViewModel {
     var isSaving = false
     var error: String?
 
-    private let cryptoService: CryptoService
     private let apiService: ContactsAPIService
 
-    init(cryptoService: CryptoService = .shared, apiService: ContactsAPIService = .shared) {
-        self.cryptoService = cryptoService
+    init(apiService: ContactsAPIService = .shared) {
         self.apiService = apiService
     }
 
