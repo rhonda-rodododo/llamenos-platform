@@ -162,7 +162,7 @@ describe('getVisibleGroups', () => {
 
   it('shows platform items to user with specific system permissions', () => {
     const admin = makeAuth({
-      hasPermission: (p) => p === 'system:view-platform',
+      hasPermission: (p) => p === 'system:manage-instance',
     })
     const visible = getVisibleGroups(adminNavConfig.groups, admin)
     const platformGroup = visible.find((g) => g.scope === 'platform')

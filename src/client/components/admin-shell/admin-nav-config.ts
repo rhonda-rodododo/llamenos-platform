@@ -164,6 +164,18 @@ export const adminNavConfig: AdminNavConfig = {
           testid: 'admin-sidebar-item-bans',
         },
         {
+          slug: 'erasure-config',
+          labelKey: 'adminNav.items.erasureConfig',
+          requiredPermissions: ['erasure:admin'],
+          testid: 'admin-sidebar-item-erasure-config',
+        },
+        {
+          slug: 'retention',
+          labelKey: 'adminNav.items.retention',
+          requiredPermissions: ['retention:manage'],
+          testid: 'admin-sidebar-item-retention',
+        },
+        {
           slug: 'audit',
           labelKey: 'adminNav.items.audit',
           requiredPermissions: ['audit:read'],
@@ -228,14 +240,14 @@ export const adminNavConfig: AdminNavConfig = {
         {
           slug: 'platform-settings',
           labelKey: 'adminNav.items.platformSettings',
-          requiredPermissions: ['system:view-platform'],
+          requiredPermissions: ['system:manage-instance'],
           testid: 'admin-sidebar-item-platform-settings',
         },
         {
-          slug: 'gdpr-erasure',
-          labelKey: 'adminNav.items.gdprErasure',
+          slug: 'erasure-queue',
+          labelKey: 'adminNav.items.erasureQueue',
           requiredPermissions: ['system:manage-instance'],
-          testid: 'admin-sidebar-item-gdpr-erasure',
+          testid: 'admin-sidebar-item-erasure-queue',
         },
       ],
     },
