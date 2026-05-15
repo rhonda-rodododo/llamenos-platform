@@ -454,7 +454,7 @@ export function RolesSection({ expanded, onToggle, statusSummary }: Props) {
         title={t('roles.deleteTitle')}
         description={
           deleteTarget
-            ? t('roles.deleteConfirm')
+            ? t('roles.deleteConfirm.description')
             : ''
         }
         variant="destructive"

@@ -288,6 +288,13 @@
       "when": 1778854515703,
       "tag": "0040_bans-phone-display",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1778863897764,
+      "tag": "0042_ep06-a3-entity-autoassign",
+      "breakpoints": true
     }
   ]
 }

@@ -60,6 +60,10 @@ Given('the server is reset', async () => {
   // Data created in one worker never affects another.
 })
 
+// No-op: admin authentication is handled by the workerHub fixture + ADMIN_SEED.
+// This step exists so feature file backgrounds that document auth context compile.
+Given('the admin is authenticated', async () => {})
+
 // ── Volunteer Setup ────────────────────────────────────────────────
 
 Given('{int} volunteers are on shift', async ({ request, world }, count: number) => {

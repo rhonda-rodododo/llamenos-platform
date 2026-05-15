@@ -30,6 +30,8 @@ import {
   evidence,
   custodyEntries,
 } from '../db/schema'
+import { conversations } from '../db/schema/conversations'
+import type { ConvertFromReportResponse } from '@protocol/schemas/records'
 import { ServiceError } from './settings'
 import type { CreateRecordBody } from '@protocol/schemas/records'
 import type { CreateEventBody } from '@protocol/schemas/events'
@@ -1529,6 +1531,101 @@ export class CasesService {
       entityTypeId: rows[0].entityTypeId,
       hubId: rows[0].hubId,
     }
+  }
+
+  // =========================================================================
+  // Report-to-Entity Atomic Conversion (EP06-A3)
+  // =========================================================================
+
+  /**
+   * Atomically convert a triage report into a full entity record.
+   *
+   * All operations run in a single DB transaction:
+   * 1. Validate report exists
+   * 2. Create entity record (with empty encrypted content — client updates separately)
+   * 3. Link report to entity in report_cases
+   * 4. Update report conversionStatus to 'completed'
+   * 5. Create a caseInteraction linking the source report
+   */
+  async convertFromReport(params: {
+    reportId: string
+    entityTypeId: string
+    additionalFields: Record<string, unknown>
+    hubId: string
+    createdBy: string
+    caseNumber?: string
+    defaultStatusHash?: string
+  }): Promise<ConvertFromReportResponse> {
+    const { reportId, entityTypeId, hubId, createdBy, caseNumber, defaultStatusHash } = params
+
+    return await this.db.transaction(async (tx) => {
+      // 1. Fetch report — validates existence
+      const reportRows = await tx
+        .select()
+        .from(conversations)
+        .where(eq(conversations.id, reportId))
+        .limit(1)
+      if (reportRows.length === 0) {
+        throw new ServiceError(404, `Report not found: ${reportId}`)
+      }
+      const report = reportRows[0]
+
+      // 2. Create entity record (stub — client will update with encrypted content)
+      const [newRecord] = await tx
+        .insert(caseRecords)
+        .values({
+          hubId,
+          entityTypeId,
+          caseNumber: caseNumber ?? null,
+          statusHash: defaultStatusHash ?? 'pending',
+          assignedTo: [],
+          blindIndexes: {},
+          summaryEnvelopes: [],
+          contactCount: 0,
+          interactionCount: 0,
+          fileCount: 0,
+          reportCount: 1,
+          eventIds: [],
+          reportIds: [reportId],
+          createdBy,
+        })
+        .returning()
+
+      // 3. Link report to entity
+      await tx.insert(reportCases).values({
+        reportId,
+        caseId: newRecord.id,
+        linkedBy: createdBy,
+      })
+
+      // 4. Update report conversionStatus to 'completed'
+      const existingMeta = (report.metadata as Record<string, unknown>) ?? {}
+      await tx
+        .update(conversations)
+        .set({
+          metadata: { ...existingMeta, conversionStatus: 'completed' },
+          updatedAt: new Date(),
+        })
+        .where(eq(conversations.id, reportId))
+
+      // 5. Create a caseInteraction linking the source report
+      await tx.insert(caseInteractions).values({
+        caseId: newRecord.id,
+        interactionType: 'report_conversion',
+        sourceId: reportId,
+        authorPubkey: createdBy,
+        interactionTypeHash: `report_conversion:${reportId}`,
+      })
+
+      return {
+        recordId: newRecord.id,
+        reportId,
+        entityTypeId,
+        caseNumber: caseNumber,
+        autoAssigned: false,
+        assignedTo: [],
+      }
+    })
   }
 
   // =========================================================================

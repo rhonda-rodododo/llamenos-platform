@@ -115,6 +115,7 @@ describe('bans routes', () => {
     it('bans a valid phone number', async () => {
       const addBanSpy = vi.fn().mockResolvedValue({
         phone: hashPhone('+12125551234', TEST_HMAC_SECRET),
+        phoneDisplay: '+12125551234',
         reason: 'Spam',
         bannedBy: 'a'.repeat(64),
         bannedAt: new Date().toISOString(),

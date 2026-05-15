@@ -75,3 +75,22 @@ data class ConvertReportToCaseResponse(
     val recordId: String,
     val reportId: String,
 )
+
+// EP06-A3: Atomic report-to-entity conversion
+
+@Serializable
+data class ConvertFromReportBody(
+    val reportId: String,
+    val entityTypeId: String,
+    val additionalFields: Map<String, String> = emptyMap(),
+)
+
+@Serializable
+data class ConvertFromReportResponse(
+    val recordId: String,
+    val reportId: String,
+    val entityTypeId: String,
+    val caseNumber: String? = null,
+    val autoAssigned: Boolean,
+    val assignedTo: List<String> = emptyList(),
+)

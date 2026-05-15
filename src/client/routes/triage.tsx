@@ -19,7 +19,7 @@ import { TriageLinkedCases } from '@/components/cases/triage-linked-cases'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import {
-  Inbox, Loader2, Clock, FolderOpen,
+  Inbox, Loader2, Clock,
   ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -119,7 +119,7 @@ function TriagePage() {
     }
   }, [toast, t])
 
-  const handleCaseCreated = useCallback((recordId: string) => {
+  const handleCaseCreated = useCallback((_recordId: string) => {
     // Bump linked cases refresh and update conversion status
     setLinkedCasesRefreshKey(k => k + 1)
     if (selectedId) {

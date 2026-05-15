@@ -258,7 +258,7 @@ export class RecordsService {
       .values({
         hubId: input.hubId || null,  // normalize empty string to null
         phone: input.phone,
-        phoneDisplay: input.phoneDisplay,
+        phoneDisplay: input.phoneDisplay ?? null,
         reason: input.reason,
         bannedBy: input.bannedBy,
       })

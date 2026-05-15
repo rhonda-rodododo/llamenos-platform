@@ -140,6 +140,10 @@ export function applyTemplate(
       showInDashboard: templateET.showInDashboard ?? false,
       isArchived: false,
       isSystem: false,
+      autoAssign: false,
+      autoAssignThreshold: 30,
+      requiredSpecializations: [],
+      notifyContactsOnStatusChange: false,
       createdAt: existingId
         ? (existingEntityTypes.find(e => e.id === existingId)?.createdAt ?? now)
         : now,
