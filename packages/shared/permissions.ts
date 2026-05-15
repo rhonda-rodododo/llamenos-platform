@@ -206,6 +206,19 @@ export const PERMISSION_CATALOG = {
   'system:manage-hubs': 'Create/manage hubs',
   'system:create-hub': 'Create new hubs (self-serve hub creation)',
   'system:manage-instance': 'Instance-level settings',
+
+  // Erasure (EP08)
+  'erasure:request-self': 'Request own account erasure',
+  'erasure:admin': 'Manage erasure queue, execute immediate erasure, trigger remote wipe',
+
+  // Retention (EP08)
+  'retention:manage': 'Configure hub-level data retention periods',
+
+  // Bans — platform scope (EP08, extends existing bans domain)
+  'bans:read-platform': 'View bans across all hubs',
+  'bans:create-platform': 'Create bans that apply across all hubs',
+  'bans:delete-platform': 'Remove platform-scoped bans',
+
   // System (new — platform nav gating)
   'system:view-platform': 'View platform settings',
   'system:view-bans': 'View platform-wide ban list',
@@ -220,8 +233,8 @@ export type Permission = keyof typeof PERMISSION_CATALOG
 /** Permission group domain keys. Display labels live in i18n at permissions.groups.* */
 export const PERMISSION_GROUP_DOMAINS = [
   'audit', 'bans', 'blasts', 'calls', 'cases', 'contacts', 'conversations',
-  'events', 'evidence', 'files', 'firehose', 'hubs', 'invites', 'messaging',
-  'metrics', 'notes', 'reports', 'settings', 'shifts', 'system', 'tags', 'teams', 'telephony', 'users',
+  'erasure', 'events', 'evidence', 'files', 'firehose', 'hubs', 'invites', 'messaging',
+  'metrics', 'notes', 'reports', 'retention', 'settings', 'shifts', 'system', 'tags', 'teams', 'telephony', 'users',
 ] as const
 
 /** All permission domains (first part before the colon) */
@@ -285,6 +298,8 @@ export const DEFAULT_ROLES: Omit<Role, 'createdAt' | 'updatedAt'>[] = [
       'hubs:read', 'hubs:manage-members', 'hubs:manage-keys',
       'teams:*', 'tags:*',
       'metrics:read', 'system:view-roles',
+      'erasure:*', 'retention:manage',
+      'bans:read-platform', 'bans:create-platform', 'bans:delete-platform',
     ],
     isDefault: true,
     isSystem: false,
@@ -332,6 +347,7 @@ export const DEFAULT_ROLES: Omit<Role, 'createdAt' | 'updatedAt'>[] = [
       'cases:create', 'cases:read-own', 'cases:update-own',
       'events:read', 'evidence:upload',
       'hubs:read',
+      'erasure:request-self',
       'teams:read', 'tags:view',
     ],
     isDefault: true,
@@ -527,6 +543,8 @@ export const PERMISSION_GROUP_LABELS: Record<string, string> = {
   system: 'System',
   teams: 'Teams',
   tags: 'Tags',
+  erasure: 'Erasure',
+  retention: 'Retention',
 }
 
 // --- Permission Validation ---

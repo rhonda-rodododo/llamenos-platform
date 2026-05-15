@@ -451,13 +451,10 @@ export function RolesSection({ expanded, onToggle, statusSummary }: Props) {
       <ConfirmDialog
         open={!!deleteTarget}
         onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}
-        title={t('roles.deleteConfirm.title', { defaultValue: 'Delete role' })}
+        title={t('roles.deleteTitle')}
         description={
           deleteTarget
-            ? t('roles.deleteConfirm.description', {
-                defaultValue: `Are you sure you want to delete "${deleteTarget.name ?? deleteTarget.slug}"? Users assigned this role will lose its permissions.`,
-                name: deleteTarget.name ?? deleteTarget.slug,
-              })
+            ? t('roles.deleteConfirm')
             : ''
         }
         variant="destructive"

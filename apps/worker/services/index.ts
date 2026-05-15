@@ -29,6 +29,8 @@ import { SignalRegistrationService } from './provider-setup/signal-registration'
 import { A2pRegistrationService } from './provider-setup/a2p-registration'
 import { ProviderTemplateService } from './provider-setup/templates'
 import { HubOnboardService } from './provider-setup/hub-onboard'
+import { ErasureService } from './erasure'
+import { RetentionService } from './retention'
 import { RingGroupsService } from './ring-groups'
 import { ShiftOverridesService } from './shift-overrides'
 import { ActiveShiftsService } from './active-shifts'
@@ -63,6 +65,8 @@ export interface Services {
   a2pRegistration: A2pRegistrationService
   providerTemplates: ProviderTemplateService
   hubOnboard: HubOnboardService
+  erasure: ErasureService
+  retention: RetentionService
   ringGroups: RingGroupsService
   shiftOverrides: ShiftOverridesService
   activeShifts: ActiveShiftsService
@@ -124,6 +128,8 @@ export function createServices(db: Database, opts?: ServicesOpts): Services {
     a2pRegistration: new A2pRegistrationService(db, opts?.hmacSecret ?? ''),
     providerTemplates: new ProviderTemplateService(db),
     hubOnboard: new HubOnboardService(db, providerSetup, settings),
+    erasure: new ErasureService(db),
+    retention: new RetentionService(db),
     ringGroups: new RingGroupsService(db),
     shiftOverrides: new ShiftOverridesService(db),
     activeShifts: new ActiveShiftsService(db),
@@ -152,6 +158,8 @@ export function createServices(db: Database, opts?: ServicesOpts): Services {
 
 // Re-export service classes for direct import
 export {
+  ErasureService,
+  RetentionService,
   TeamsService,
   TagsService,
   IdentityService,

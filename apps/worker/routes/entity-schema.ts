@@ -214,13 +214,14 @@ const entityTypeRouter = createEntityRouter({
   createBodySchema: createEntityTypeBodySchema,
   updateBodySchema: updateEntityTypeBodySchema,
   permissionOverrides: {
+    get: 'settings:read',
     create: 'cases:manage-types',
     update: 'cases:manage-types',
     delete: 'cases:manage-types',
   },
   disableList: true,
-  disableGet: true,
   methods: {
+    get: 'getEntityTypeById',
     create: 'createEntityType',
     update: 'updateEntityType',
     delete: 'deleteEntityType',
@@ -362,6 +363,28 @@ entitySchema.get('/templates',
   },
 )
 
+entitySchema.get('/templates/updates',
+  describeRoute({
+    tags: ['Case Management'],
+    summary: 'Check for available template updates',
+    responses: {
+      200: {
+        description: 'Available updates',
+        content: { 'application/json': { schema: resolver(templateUpdatesResponseSchema) } },
+      },
+      ...authErrors,
+    },
+  }),
+  requirePermission('settings:read'),
+  async (c) => {
+    const services = c.get('services')
+    const { appliedTemplates = [] } = await services.settings.getAppliedTemplates() as { appliedTemplates: AppliedTemplateRecord[] }
+    const available = await loadBundledTemplates()
+    const updates = detectTemplateUpdates(appliedTemplates, available)
+    return c.json({ updates })
+  },
+)
+
 entitySchema.get('/templates/:id',
   describeRoute({
     tags: ['Case Management'],
@@ -399,12 +422,11 @@ entitySchema.post('/templates/apply',
     },
   }),
   requirePermission('cases:manage-types'),
-  validator('json', z.object({ templateId: z.string(), hubId: z.string().optional() })),
+  validator('json', z.object({ templateId: z.string() })),
   async (c) => {
-    const { templateId, hubId: bodyHubId } = c.req.valid('json')
+    const { templateId } = c.req.valid('json')
     const services = c.get('services')
-    // Prefer hubId from body (allows explicit hub targeting), fall back to middleware context
-    const hubId = bodyHubId ?? c.get('hubId') ?? ''
+    const hubId = c.get('hubId') ?? ''
 
     // Load template
     const templates = await loadBundledTemplates()
@@ -468,33 +490,12 @@ entitySchema.post('/templates/apply',
 
     return c.json({
       applied: true,
+      entityTypeId: result.entityTypes[0]?.id,
       entityTypes: result.entityTypes.length,
       relationshipTypes: result.relationshipTypes.length,
       reportTypes: result.reportTypes.length,
       suggestedRoles: template.suggestedRoles,
     }, 201)
-  },
-)
-
-entitySchema.get('/templates/updates',
-  describeRoute({
-    tags: ['Case Management'],
-    summary: 'Check for available template updates',
-    responses: {
-      200: {
-        description: 'Available updates',
-        content: { 'application/json': { schema: resolver(templateUpdatesResponseSchema) } },
-      },
-      ...authErrors,
-    },
-  }),
-  requirePermission('settings:read'),
-  async (c) => {
-    const services = c.get('services')
-    const { appliedTemplates = [] } = await services.settings.getAppliedTemplates() as { appliedTemplates: AppliedTemplateRecord[] }
-    const available = await loadBundledTemplates()
-    const updates = detectTemplateUpdates(appliedTemplates, available)
-    return c.json({ updates })
   },
 )
 

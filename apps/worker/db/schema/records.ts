@@ -2,7 +2,6 @@
  * Records domain tables: notes, note replies, bans,
  * contact metadata, and audit log.
  */
-import { sql } from 'drizzle-orm'
 import {
   index,
   integer,
@@ -85,7 +84,6 @@ export const bans = pgTable(
       .$defaultFn(() => crypto.randomUUID()),
     hubId: text('hub_id'),
     phone: text('phone_hash').notNull(),  // HMAC-SHA256 of raw phone number (used for matching)
-    phonePlain: text('phone_plain'),      // Original E.164 phone number (for admin display)
     reason: text('reason'),
     bannedBy: text('banned_by'),
     bannedAt: timestamp('banned_at', { withTimezone: true })
@@ -138,6 +136,7 @@ export const auditLog = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
+    erasedAt: timestamp('erased_at', { withTimezone: true }),
   },
   (table) => [
     index('audit_log_hub_id_created_at_idx').on(
