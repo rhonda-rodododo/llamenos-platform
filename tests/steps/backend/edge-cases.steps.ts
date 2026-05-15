@@ -162,7 +162,9 @@ When('an admin bans phone {string} again', async ({ request, world }, phone: str
 Then('the ban list should contain exactly {int} entry for {string}', async ({request, world}, count: number, phone: string) => {
   const hubId = getScenarioState(world).hubId
   const bans = await listBansViaApi(request, hubId)
-  const matches = bans.filter(b => b.phone === phone)
+  const phoneHash = getScenarioState(world).phoneHashMap[phone]
+  expect(phoneHash).toBeDefined()
+  const matches = bans.filter(b => b.phone === phoneHash)
   expect(matches.length).toBe(count)
 })
 

@@ -57,6 +57,10 @@ const LABEL_MAP: Record<string, number> = {
   'llamenos:sframe-call-secret:v1': 50,
   'llamenos:sframe-base-key:v1': 51,
   'llamenos:mls-provision:v1': 52,
+  'llamenos:recovery-group:share-wrap:v1': 60,
+  'llamenos:recovery-group:puk-seed-wrap:v1': 61,
+  'llamenos:recovery-group:share-contribute:v1': 62,
+  'llamenos:recovery-group:liveness-proof:v1': 63,
 }
 
 function labelToId(label: string): number {
@@ -317,6 +321,34 @@ function hpkeOpenMock(
   // AES-256-GCM decrypt with AAD
   const cipher = gcm(aesKey, nonce, aad)
   return cipher.decrypt(ct)
+}
+
+// ── GF(2^8) helpers for Shamir SSS mock ──────────────────────────────
+
+function gf256Mul(a: number, b: number): number {
+  let result = 0
+  let aa = a
+  let bb = b
+  for (let i = 0; i < 8; i++) {
+    if (bb & 1) result ^= aa
+    const carry = aa & 0x80
+    aa = (aa << 1) & 0xff
+    if (carry) aa ^= 0x1b // irreducible polynomial x^8 + x^4 + x^3 + x + 1
+    bb >>= 1
+  }
+  return result
+}
+
+function gf256Inv(a: number): number {
+  if (a === 0) throw new Error('Cannot invert zero in GF(256)')
+  // a^254 = a^(-1) in GF(2^8) by Fermat's little theorem
+  let result = a
+  for (let i = 0; i < 6; i++) {
+    result = gf256Mul(result, result)
+    result = gf256Mul(result, a)
+  }
+  result = gf256Mul(result, result)
+  return result
 }
 
 // ── Types ─────────────────────────────────────────────────────────────
@@ -804,6 +836,100 @@ const commands: Record<string, CommandHandler> = {
       encryptionPubkeyHex: state.encryptionPubkeyHex,
       encryptedPayload: bytesToHex(secrets.signingSeed), // Mock: not actually encrypted
     })
+  },
+
+  // --- Shamir secret sharing (GF(2^8)) ---
+
+  shamir_split: (a) => {
+    const secretHex = a.secretHex as string
+    const total = a.total as number
+    const threshold = a.threshold as number
+
+    if (threshold < 2 || threshold > 5) throw new Error('Threshold must be 2-5')
+    if (total < 3 || total > 5) throw new Error('Total must be 3-5')
+    if (threshold > total) throw new Error('Threshold cannot exceed total')
+
+    const secret = hexToBytes(secretHex)
+
+    // Random polynomial coefficients (degree threshold-1, constant = secret)
+    const coefficients: Uint8Array[] = []
+    for (let c = 0; c < threshold - 1; c++) {
+      coefficients.push(randomBytes(secret.length))
+    }
+
+    const shares: Array<{ x: number; y: string }> = []
+    for (let i = 1; i <= total; i++) {
+      const y = new Uint8Array(secret.length)
+      for (let byteIdx = 0; byteIdx < secret.length; byteIdx++) {
+        let val = secret[byteIdx]
+        let xPow = i
+        for (const coeff of coefficients) {
+          val ^= gf256Mul(coeff[byteIdx], xPow)
+          xPow = gf256Mul(xPow, i)
+        }
+        y[byteIdx] = val
+      }
+      shares.push({ x: i, y: bytesToHex(y) })
+    }
+
+    const commitments = shares.map(s => {
+      const data = new Uint8Array([s.x, ...hexToBytes(s.y)])
+      return bytesToHex(sha256(data))
+    })
+
+    return { shares, commitments }
+  },
+
+  shamir_combine: (a) => {
+    const shareObjs = JSON.parse(a.sharesJson as string) as Array<{ x: number; y: string }>
+    if (shareObjs.length < 2) throw new Error('Need at least 2 shares')
+
+    const shares = shareObjs.map(s => ({ x: s.x, y: hexToBytes(s.y) }))
+    const secretLen = shares[0].y.length
+    const result = new Uint8Array(secretLen)
+
+    for (let byteIdx = 0; byteIdx < secretLen; byteIdx++) {
+      let val = 0
+      for (let i = 0; i < shares.length; i++) {
+        let lagrange = 1
+        for (let j = 0; j < shares.length; j++) {
+          if (i === j) continue
+          const xi = shares[i].x
+          const xj = shares[j].x
+          const den = xi ^ xj
+          if (den === 0) throw new Error('Duplicate share x values')
+          lagrange = gf256Mul(lagrange, gf256Mul(xj, gf256Inv(den)))
+        }
+        val ^= gf256Mul(shares[i].y[byteIdx], lagrange)
+      }
+      result[byteIdx] = val
+    }
+
+    return bytesToHex(result)
+  },
+
+  shamir_commit: (a) => {
+    const x = a.x as number
+    const yHex = a.yHex as string
+    const data = new Uint8Array([x, ...hexToBytes(yHex)])
+    return bytesToHex(sha256(data))
+  },
+
+  shamir_verify: (a) => {
+    const x = a.x as number
+    const yHex = a.yHex as string
+    const commitmentHex = a.commitmentHex as string
+    const data = new Uint8Array([x, ...hexToBytes(yHex)])
+    return bytesToHex(sha256(data)) === commitmentHex
+  },
+
+  recovery_group_generate_keypair: () => {
+    const privateKey = randomBytes(32)
+    const publicKey = x25519.getPublicKey(privateKey)
+    return {
+      publicKeyHex: bytesToHex(publicKey),
+      privateKeyHex: bytesToHex(privateKey),
+    }
   },
 
   // --- Test-only commands (PIN lockout seeding) ---

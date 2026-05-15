@@ -104,9 +104,13 @@ fun MainScreen(
     onNavigateToBlasts: () -> Unit,
     onNavigateToHelp: () -> Unit,
     onNavigateToDeviceLink: () -> Unit,
+    onNavigateToErasure: () -> Unit = {},
     onNavigateToHubs: () -> Unit = {},
     onNavigateToEvents: () -> Unit = {},
     onNavigateToTriage: () -> Unit = {},
+    onNavigateToSecurityDevices: () -> Unit = {},
+    onNavigateToSecuritySessions: () -> Unit = {},
+    onNavigateToSecurityEvents: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
@@ -256,6 +260,10 @@ fun MainScreen(
                         onPanicWipe = onPanicWipe,
                         onNavigateToAdmin = onNavigateToAdmin,
                         onNavigateToDeviceLink = onNavigateToDeviceLink,
+                        onNavigateToErasure = onNavigateToErasure,
+                        onNavigateToSecurityDevices = onNavigateToSecurityDevices,
+                        onNavigateToSecuritySessions = onNavigateToSecuritySessions,
+                        onNavigateToSecurityEvents = onNavigateToSecurityEvents,
                     )
                 }
             }

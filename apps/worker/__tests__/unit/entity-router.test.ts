@@ -343,7 +343,7 @@ describe('createEntityRouter', () => {
         body: JSON.stringify({ name: 'New Thing' }),
       })
       expect(res.status).toBe(201)
-      expect(createSpy).toHaveBeenCalledWith({ name: 'New Thing' })
+      expect(createSpy).toHaveBeenCalledWith({ name: 'New Thing' }, expect.objectContaining({ callerPubkey: expect.any(String), permissions: expect.any(Array) }))
     })
 
     it('passes hubId first when hubScoped is true', async () => {
@@ -366,7 +366,7 @@ describe('createEntityRouter', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'Hub Thing' }),
       })
-      expect(createSpy).toHaveBeenCalledWith('hub-42', { name: 'Hub Thing' })
+      expect(createSpy).toHaveBeenCalledWith('hub-42', { name: 'Hub Thing' }, expect.objectContaining({ callerPubkey: expect.any(String), permissions: expect.any(Array) }))
     })
 
     it('applies domain:create permission', async () => {
@@ -465,7 +465,7 @@ describe('createEntityRouter', () => {
         body: JSON.stringify({ name: 'Updated' }),
       })
       expect(res.status).toBe(200)
-      expect(updateSpy).toHaveBeenCalledWith('abc', { name: 'Updated' })
+      expect(updateSpy).toHaveBeenCalledWith('abc', { name: 'Updated' }, expect.objectContaining({ callerPubkey: expect.any(String), permissions: expect.any(Array) }))
     })
 
     it('passes hubId first when hubScoped is true', async () => {
@@ -488,7 +488,7 @@ describe('createEntityRouter', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'Hub Updated' }),
       })
-      expect(updateSpy).toHaveBeenCalledWith('hub-7', 'abc', { name: 'Hub Updated' })
+      expect(updateSpy).toHaveBeenCalledWith('hub-7', 'abc', { name: 'Hub Updated' }, expect.objectContaining({ callerPubkey: expect.any(String), permissions: expect.any(Array) }))
     })
   })
 
@@ -512,7 +512,7 @@ describe('createEntityRouter', () => {
 
       const res = await app.request('/test/abc', { method: 'DELETE' })
       expect(res.status).toBe(200)
-      expect(deleteSpy).toHaveBeenCalledWith('abc')
+      expect(deleteSpy).toHaveBeenCalledWith('abc', expect.objectContaining({ callerPubkey: expect.any(String), permissions: expect.any(Array) }))
     })
 
     it('is NOT registered when disableDelete is true', async () => {
@@ -547,7 +547,7 @@ describe('createEntityRouter', () => {
       )
 
       await app.request('/test/abc', { method: 'DELETE' })
-      expect(deleteSpy).toHaveBeenCalledWith('hub-del', 'abc')
+      expect(deleteSpy).toHaveBeenCalledWith('hub-del', 'abc', expect.objectContaining({ callerPubkey: expect.any(String), permissions: expect.any(Array) }))
     })
   })
 

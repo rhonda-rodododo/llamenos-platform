@@ -7,10 +7,14 @@ import {
   updateMyProfile,
   getTranscriptionSettings,
   getWebRtcStatus,
+  getMyErasureRequest,
+  createMyErasureRequest,
+  cancelMyErasureRequest,
+  type ErasureRequest,
 } from '@/lib/api'
 import * as keyManager from '@/lib/key-manager'
 import { useToast } from '@/lib/toast'
-import { Settings2, Mic, Bell, User, Globe, Fingerprint, KeyRound, Trash2, Plus, Phone, Monitor, PhoneCall, Smartphone, Loader2, CheckCircle2, Bug, Send, MessageSquare, LogOut, Lock } from 'lucide-react'
+import { Settings2, Mic, Bell, User, Globe, Fingerprint, KeyRound, Trash2, Plus, Phone, Monitor, PhoneCall, Smartphone, Loader2, CheckCircle2, Bug, Send, MessageSquare, LogOut, Lock, AlertTriangle, Clock } from 'lucide-react'
 import { isWebAuthnAvailable, registerCredential, listCredentials, deleteCredential, type WebAuthnCredentialInfo } from '@/lib/webauthn'
 import { PhoneInput } from '@/components/phone-input'
 import {
@@ -40,12 +44,14 @@ import {
   clearPendingReports,
 } from '@/lib/crash-reporting'
 import { SignalNotificationSection } from '@/components/signal-notification-section'
+import { RecoveryStatusSection } from '@/components/recovery-status-section'
 import { ConfirmDialog } from '@/components/confirm-dialog'
+import { SectionBanner } from '@/components/admin-shell/section-layout'
 
 export const Route = createFileRoute('/settings')({
   component: SettingsPage,
   validateSearch: (search: Record<string, unknown>) => ({
-    section: (search.section as string) || '',
+    section: (search.section as string) || undefined,
   }),
 })
 
@@ -66,6 +72,10 @@ function SettingsPage() {
   const [currentCallPref, setCurrentCallPref] = useState<'phone' | 'browser' | 'both'>(callPreference)
   const [webrtcAvailable, setWebrtcAvailable] = useState(false)
   const [showLogoutDialog, setShowLogoutDialog] = useState(false)
+  const [erasureRequest, setErasureRequest] = useState<ErasureRequest | null>(null)
+  const [erasureLoading, setErasureLoading] = useState(true)
+  const [showErasureConfirm, setShowErasureConfirm] = useState(false)
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false)
 
   // Collapsible state — persisted in sessionStorage, profile expanded by default
   const { expanded, toggleSection } = usePersistedExpanded(
@@ -122,6 +132,13 @@ function SettingsPage() {
   useEffect(() => {
     setCurrentCallPref(callPreference)
   }, [callPreference])
+
+  useEffect(() => {
+    getMyErasureRequest()
+      .then(({ request }) => setErasureRequest(request))
+      .catch(() => {})
+      .finally(() => setErasureLoading(false))
+  }, [])
 
   async function handleUpdateProfile() {
     setProfileError('')
@@ -486,6 +503,9 @@ function SettingsPage() {
         <SignalNotificationSection />
       </SettingsSection>
 
+      {/* Social Recovery Status */}
+      <RecoveryStatusSection />
+
       {/* Crash Reporting / Diagnostics */}
       <SettingsSection
         id="diagnostics"
@@ -497,6 +517,92 @@ function SettingsPage() {
       >
         <CrashReportingSettings />
       </SettingsSection>
+
+      {/* Account Erasure */}
+      <SettingsSection
+        id="account-erasure"
+        title={t('erasure.selfService.title')}
+        icon={<Trash2 className="h-5 w-5 text-destructive" />}
+        expanded={expanded.has('account-erasure')}
+        onToggle={(open) => toggleSection('account-erasure', open)}
+        statusSummary={erasureRequest?.status === 'pending' ? t('erasure.selfService.statusPending') : undefined}
+      >
+        {erasureLoading ? (
+          <div className="text-muted-foreground">{t('common.loading')}</div>
+        ) : erasureRequest?.status === 'pending' ? (
+          <div className="space-y-4" data-testid="erasure-pending">
+            <SectionBanner tone="warn">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                <span>{t('erasure.selfService.scheduledFor', { date: new Date(erasureRequest.executeAt).toLocaleString() })}</span>
+              </div>
+            </SectionBanner>
+            <p className="text-sm text-muted-foreground">{t('erasure.selfService.pendingDescription')}</p>
+            <Button
+              variant="outline"
+              data-testid="erasure-cancel-btn"
+              onClick={() => setShowCancelConfirm(true)}
+            >
+              {t('erasure.selfService.cancel')}
+            </Button>
+          </div>
+        ) : erasureRequest?.status === 'completed' || erasureRequest?.status === 'executing' ? (
+          <div data-testid="erasure-completed">
+            <Badge variant="secondary">{t(`erasure.status.${erasureRequest.status}`)}</Badge>
+          </div>
+        ) : (
+          <div className="space-y-4" data-testid="erasure-available">
+            <p className="text-sm text-muted-foreground">{t('erasure.selfService.description')}</p>
+            <SectionBanner tone="danger">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                <span>{t('erasure.selfService.warning')}</span>
+              </div>
+            </SectionBanner>
+            <Button
+              variant="destructive"
+              data-testid="erasure-request-btn"
+              onClick={() => setShowErasureConfirm(true)}
+            >
+              {t('erasure.selfService.requestButton')}
+            </Button>
+          </div>
+        )}
+      </SettingsSection>
+
+      <ConfirmDialog
+        open={showErasureConfirm}
+        onOpenChange={setShowErasureConfirm}
+        title={t('erasure.selfService.confirmTitle')}
+        description={t('erasure.selfService.confirmDescription')}
+        confirmLabel={t('erasure.selfService.confirmButton')}
+        variant="destructive"
+        onConfirm={async () => {
+          try {
+            const { request } = await createMyErasureRequest()
+            setErasureRequest(request)
+            toast(t('erasure.selfService.requestCreated'), 'success')
+          } catch {
+            toast(t('common.error'), 'error')
+          }
+        }}
+      />
+      <ConfirmDialog
+        open={showCancelConfirm}
+        onOpenChange={setShowCancelConfirm}
+        title={t('erasure.selfService.cancelConfirmTitle')}
+        description={t('erasure.selfService.cancelConfirmDescription')}
+        confirmLabel={t('erasure.selfService.cancelConfirmButton')}
+        onConfirm={async () => {
+          try {
+            await cancelMyErasureRequest()
+            setErasureRequest(null)
+            toast(t('erasure.selfService.requestCancelled'), 'success')
+          } catch {
+            toast(t('common.error'), 'error')
+          }
+        }}
+      />
 
       {/* Lock & Logout */}
       <div className="flex flex-col gap-2 pt-2">
@@ -598,7 +704,6 @@ function NotificationPermissionStatus() {
 
 function LinkDeviceSection() {
   const { t } = useTranslation()
-  const { toast } = useToast()
   const [linkCode, setLinkCode] = useState('')
   const [status, setStatus] = useState<'idle' | 'linking' | 'verify-sas' | 'success' | 'error'>('idle')
   const [statusMessage, setStatusMessage] = useState('')

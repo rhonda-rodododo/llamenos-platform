@@ -92,6 +92,8 @@ object AdminNavConfig {
         AdminNavItem("rcs", R.string.admin_nav_items_rcs, "admin-sidebar-item-rcs", listOf("settings:read")),
         AdminNavItem("signal", R.string.admin_nav_items_signal, "admin-sidebar-item-signal", listOf("settings:read")),
         AdminNavItem("bans", R.string.admin_nav_items_bans, "admin-sidebar-item-bans", listOf("bans:read")),
+        AdminNavItem("erasure-queue", R.string.admin_nav_items_erasure_queue, "admin-sidebar-item-erasure-queue", listOf("erasure:admin")),
+        AdminNavItem("retention", R.string.admin_nav_items_retention_settings, "admin-sidebar-item-retention", listOf("retention:manage")),
         AdminNavItem("audit", R.string.admin_nav_items_audit, "admin-sidebar-item-audit", listOf("audit:read")),
         AdminNavItem("analytics", R.string.admin_nav_items_analytics, "admin-sidebar-item-analytics", listOf("calls:read-history", "audit:read")),
         AdminNavItem("health", R.string.admin_nav_items_health, "admin-sidebar-item-health", listOf("settings:read")),

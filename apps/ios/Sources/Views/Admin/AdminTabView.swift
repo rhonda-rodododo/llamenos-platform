@@ -195,6 +195,26 @@ struct AdminTabView: View {
                 .accessibilityIdentifier("admin-spam-settings")
 
                 NavigationLink {
+                    ErasureQueueView(viewModel: vm)
+                } label: {
+                    Label(
+                        NSLocalizedString("erasure_admin_queue_title", comment: "Erasure Queue"),
+                        systemImage: "person.crop.circle.badge.minus"
+                    )
+                }
+                .accessibilityIdentifier("admin-erasure-queue")
+
+                NavigationLink {
+                    RetentionSettingsView(viewModel: vm)
+                } label: {
+                    Label(
+                        NSLocalizedString("retention_title", comment: "Data Retention"),
+                        systemImage: "clock.arrow.circlepath"
+                    )
+                }
+                .accessibilityIdentifier("admin-retention-settings")
+
+                NavigationLink {
                     SystemHealthView(viewModel: vm)
                 } label: {
                     Label(

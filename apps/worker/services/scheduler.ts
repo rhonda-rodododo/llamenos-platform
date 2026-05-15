@@ -7,8 +7,6 @@
 import type { Database } from '../db'
 import type { BlastsService } from './blasts'
 import type { SettingsService } from './settings'
-import type { MessagingChannelType } from '@shared/types'
-import type { MessagingAdapter } from '../messaging/adapter'
 import {
   startBlastWorker,
   stopBlastWorker,
@@ -20,6 +18,21 @@ import {
   startScheduledBlastPoller,
   stopScheduledBlastPoller,
 } from '../lib/blast-scheduled-poller'
+import {
+  startRetentionPurgeWorker,
+  stopRetentionPurgeWorker,
+} from '../lib/retention-purge-worker'
+import {
+  startErasureExpiryWorker,
+  stopErasureExpiryWorker,
+} from '../lib/erasure-expiry-worker'
+import {
+  startReEncryptionWorker,
+  stopReEncryptionWorker,
+} from '../lib/re-encryption-worker'
+import type { RetentionService } from './retention'
+import type { ErasureService } from './erasure'
+import type { AuditService } from './audit'
 import { createLogger } from '../lib/logger'
 
 const logger = createLogger('services.scheduler')
@@ -31,6 +44,9 @@ export interface TaskSchedulerDeps {
   resolveIdentifier: (subscriberId: string) => Promise<string | null>
   onBlastProgress?: BlastProgressCallback
   onBlastStatusChange?: BlastStatusCallback
+  retentionService?: RetentionService
+  auditService?: AuditService
+  erasureService?: ErasureService
 }
 
 export class TaskScheduler {
@@ -59,6 +75,27 @@ export class TaskScheduler {
 
       // Start scheduled blast poller
       startScheduledBlastPoller(deps.blastsService)
+
+      if (deps.retentionService && deps.auditService) {
+        startRetentionPurgeWorker({
+          retentionService: deps.retentionService,
+          auditService: deps.auditService,
+          settingsService: deps.settingsService,
+        })
+      }
+
+      if (deps.erasureService && deps.auditService) {
+        startErasureExpiryWorker({
+          erasureService: deps.erasureService,
+          auditService: deps.auditService,
+        })
+      }
+
+      if (deps.erasureService) {
+        startReEncryptionWorker({
+          erasureService: deps.erasureService,
+        })
+      }
     }
 
     logger.info('Started')
@@ -73,6 +110,9 @@ export class TaskScheduler {
 
     stopBlastWorker()
     stopScheduledBlastPoller()
+    stopRetentionPurgeWorker()
+    stopErasureExpiryWorker()
+    stopReEncryptionWorker()
 
     logger.info('Stopped')
   }

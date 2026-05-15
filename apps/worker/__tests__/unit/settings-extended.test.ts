@@ -5,7 +5,7 @@
  * IVR audio, roles CRUD, captcha, TTL overrides, cleanup metrics, archiveHub, deleteHub.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { SettingsService, ServiceError, invalidateRolesCache } from '@worker/services/settings'
+import { SettingsService, invalidateRolesCache } from '@worker/services/settings'
 import { createMockDb } from './mock-db'
 
 // ---------------------------------------------------------------------------
@@ -306,7 +306,7 @@ describe('SettingsService.updateIvrLanguages', () => {
   })
 
   it('accepts valid language codes', async () => {
-    const { db, service } = setup()
+    const { service } = setup()
 
     const result = await service.updateIvrLanguages({ enabledLanguages: ['en', 'es'] })
     expect(result.enabledLanguages).toContain('en')
@@ -988,8 +988,9 @@ describe('SettingsService.getRoles', () => {
     await service.getRoles()
     await service.getRoles()
 
-    // DB should only be queried once due to cache
-    expect(db.select).toHaveBeenCalledTimes(1)
+    // DB is queried 3 times on the first call (roles, envelopes, user counts),
+    // then 0 times on the cached second call — total = 3
+    expect(db.select).toHaveBeenCalledTimes(3)
   })
 
   it('returns empty roles list when no roles in DB', async () => {

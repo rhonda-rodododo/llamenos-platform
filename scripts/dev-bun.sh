@@ -13,6 +13,7 @@ set -euo pipefail
 COMPOSE_FILE="deploy/docker/docker-compose.dev.yml"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$PROJECT_DIR"
+COMPOSE="docker compose --project-directory $PROJECT_DIR -f $COMPOSE_FILE"
 
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -23,19 +24,19 @@ warn() { echo -e "${YELLOW}[dev:server]${NC} $*"; }
 
 cmd_stop() {
   log "Stopping backing services..."
-  docker compose -f "$COMPOSE_FILE" down
+  $COMPOSE down
   log "Services stopped"
 }
 
 cmd_logs() {
-  docker compose -f "$COMPOSE_FILE" logs -f
+  $COMPOSE logs -f
 }
 
 cmd_start() {
   # Ensure Docker Compose services are running
-  if ! docker compose -f "$COMPOSE_FILE" ps --status running 2>/dev/null | grep -q postgres; then
+  if ! $COMPOSE ps --status running 2>/dev/null | grep -q postgres; then
     log "Starting backing services (PostgreSQL, RustFS)..."
-    docker compose -f "$COMPOSE_FILE" up -d --wait
+    $COMPOSE up -d --wait
     log "Backing services ready"
   else
     log "Backing services already running"

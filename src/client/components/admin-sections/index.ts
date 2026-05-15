@@ -4,6 +4,7 @@ import { registerSection } from './registry'
 import { LocationLookupSection } from './location-lookup-section'
 import { PasskeyPolicySection } from './passkey-policy-section'
 import { RecoveryGroupSection } from './recovery-group-section'
+import { RecoveryRequestsAdminSection } from './recovery-requests-section'
 import { DevicesSection } from './devices-section'
 import { HubRolesSection } from './hub-roles-section'
 import { TeamsSection } from './teams-section'
@@ -27,12 +28,18 @@ import { HealthSection } from './health-section'
 import { HubsSection } from './hubs-section'
 import { PlatformRolesSection } from './platform-roles-section'
 import { PlatformSection } from './platform-section'
-import { GdprErasureSection } from './gdpr-erasure-section'
+import { RingGroupsSection } from './ring-groups-section'
+import { ShiftOverridesSection } from './shift-overrides-section'
+import { ErasureQueueSection } from './erasure-queue-section'
+import { ErasureConfigSection } from './erasure-config-section'
+import { RetentionSection } from './retention-section'
+import { PlatformBansSection } from './platform-bans-section'
 
 const sections: Record<string, ComponentType> = {
   'location-lookup': LocationLookupSection,
   'passkey-policy': PasskeyPolicySection,
   'recovery-group': RecoveryGroupSection,
+  'recovery-requests': RecoveryRequestsAdminSection,
   'devices': DevicesSection,
   'hub-roles': HubRolesSection,
   'teams': TeamsSection,
@@ -56,7 +63,12 @@ const sections: Record<string, ComponentType> = {
   'hubs': HubsSection,
   'platform-roles': PlatformRolesSection,
   'platform-settings': PlatformSection,
-  'gdpr-erasure': GdprErasureSection,
+  'ring-groups': RingGroupsSection,
+  'shift-overrides': ShiftOverridesSection,
+  'erasure-queue': ErasureQueueSection,
+  'erasure-config': ErasureConfigSection,
+  'retention': RetentionSection,
+  'platform-bans': PlatformBansSection,
 }
 
 for (const [slug, component] of Object.entries(sections)) {

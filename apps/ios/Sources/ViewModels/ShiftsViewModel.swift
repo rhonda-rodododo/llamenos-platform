@@ -210,7 +210,7 @@ final class ShiftsViewModel {
 
             successMessage = String(
                 format: NSLocalizedString("shifts_signed_up", comment: "Signed up for %@"),
-                shift.name ?? shift.timeRangeDisplay
+                shift.encryptedName.isEmpty ? shift.timeRangeDisplay : shift.encryptedName
             )
 
             // Reload to show updated volunteer count

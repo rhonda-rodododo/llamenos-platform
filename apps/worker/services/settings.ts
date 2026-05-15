@@ -15,6 +15,7 @@ import {
   hubStorageSettings,
   hubStorageCredentials,
   roles as rolesTable,
+  platformRoleEnvelopes,
   customFieldDefinitions,
   entityTypeDefinitions,
   relationshipTypeDefinitions,
@@ -24,7 +25,6 @@ import {
   captchas,
   caseNumberSequences,
   // Hub deletion — all tables with hub-scoped data
-  users,
   notes,
   noteReplies,
   bans,
@@ -51,12 +51,14 @@ import {
   reportCases,
   events as hubCaseEvents,
   providerConfigs,
+  users,
 } from '../db/schema'
 import type { SpamSettings, CallSettings } from '../types'
 import type {
   CustomFieldDefinition,
   TelephonyProviderConfig,
   MessagingConfig,
+  MessagingChannelType,
   SetupState,
   EnabledChannels,
   Hub,
@@ -150,6 +152,7 @@ const ALLOWED_HUB_SETTINGS = new Set([
   'usage',
   'subAccountEnabled',
   'subAccountConfigId',
+  'heartbeatTimeout',
 ])
 
 const VALID_PROVIDER_TYPES = [
@@ -701,6 +704,17 @@ export class SettingsService {
     const current = await this.getMessagingConfig()
     const updated = { ...current, ...data }
 
+    // Derive enabledChannels from individual channel configs unless caller set it explicitly
+    if (!('enabledChannels' in data)) {
+      const derived: MessagingChannelType[] = []
+      if (updated.sms?.enabled) derived.push('sms')
+      if (updated.whatsapp) derived.push('whatsapp')
+      if (updated.signal) derived.push('signal')
+      if (updated.rcs) derived.push('rcs')
+      if (updated.telegram?.enabled) derived.push('telegram')
+      updated.enabledChannels = derived
+    }
+
     if (updated.inactivityTimeout < 5 || updated.inactivityTimeout > 1440) {
       throw new ServiceError(
         400,
@@ -1140,7 +1154,7 @@ export class SettingsService {
    * This legacy method stores credentials in plaintext and will be removed in a future release.
    */
   async updateTelephonyProvider(
-    _data: TelephonyProviderConfig,
+    _config: TelephonyProviderConfig,
   ): Promise<never> {
     throw new ServiceError(
       400,
@@ -1264,6 +1278,21 @@ export class SettingsService {
       return { roles: _rolesCache.roles }
     }
     const rows = await this.db.select().from(rolesTable)
+    const envelopesRows = await this.db.select().from(platformRoleEnvelopes)
+    const envelopesByRole = new Map<string, typeof envelopesRows>()
+    for (const e of envelopesRows) {
+      const list = envelopesByRole.get(e.roleId) ?? []
+      list.push(e)
+      envelopesByRole.set(e.roleId, list)
+    }
+    const userCounts = await this.db
+      .select({ roleId: sql<string>`unnest(${users.roles})`, count: sql<number>`count(*)` })
+      .from(users)
+      .groupBy(sql`unnest(${users.roles})`)
+    const countByRole = new Map<string, number>()
+    for (const uc of userCounts) {
+      countByRole.set(uc.roleId, Number(uc.count))
+    }
     const rolesList: Role[] = rows.map((r) => ({
       id: r.id,
       name: r.name,
@@ -1272,6 +1301,14 @@ export class SettingsService {
       isDefault: r.isDefault ?? false,
       isSystem: r.isSystem ?? false,
       description: r.description,
+      encryptedName: r.encryptedName ?? null,
+      encryptedDescription: r.encryptedDescription ?? null,
+      envelopes: (envelopesByRole.get(r.id) ?? []).map((e) => ({
+        adminPubkey: e.adminPubkey,
+        encryptedName: e.encryptedName,
+        encryptedDescription: e.encryptedDescription,
+      })),
+      assignedUserCount: countByRole.get(r.id) ?? 0,
       createdAt: r.createdAt.toISOString(),
       updatedAt: r.updatedAt.toISOString(),
     }))
@@ -1279,15 +1316,15 @@ export class SettingsService {
     return { roles: rolesList }
   }
 
-  async createRole(data: Partial<Role>): Promise<Role> {
+  async createRole(data: Partial<Role> & { encryptedName?: string; encryptedDescription?: string; envelopes?: Array<{ adminPubkey: string; encryptedName: string; encryptedDescription: string }> }): Promise<Role> {
     if (!data || typeof data !== 'object') {
       throw new ServiceError(400, 'Invalid request')
     }
-    const { name, slug, permissions, description } = data
-    if (!name || !slug || !permissions || !description) {
+    const { slug, permissions, description, encryptedName, encryptedDescription, envelopes } = data
+    if (!slug || !permissions) {
       throw new ServiceError(
         400,
-        'name, slug, permissions, and description are required',
+        'slug and permissions are required',
       )
     }
     if (!/^[a-z0-9-]+$/.test(slug)) {
@@ -1310,28 +1347,49 @@ export class SettingsService {
     }
 
     const now = new Date()
-    const id = `role-${crypto.randomUUID()}`
+    const id = data.id ?? `role-${crypto.randomUUID()}`
+
+    const roleDescription = description ?? ''
 
     await this.db.insert(rolesTable).values({
       id,
-      name,
+      name: data.name ?? null,
       slug,
       permissions: permissions as string[],
       isDefault: false,
       isSystem: false,
-      description,
+      description: roleDescription,
+      encryptedName: encryptedName ?? null,
+      encryptedDescription: encryptedDescription ?? null,
       createdAt: now,
       updatedAt: now,
     })
 
+    if (envelopes && envelopes.length > 0) {
+      for (const env of envelopes) {
+        await this.db.insert(platformRoleEnvelopes).values({
+          roleId: id,
+          adminPubkey: env.adminPubkey,
+          encryptedName: env.encryptedName,
+          encryptedDescription: env.encryptedDescription,
+          createdAt: now,
+          updatedAt: now,
+        })
+      }
+    }
+
     return {
       id,
-      name,
+      name: data.name ?? null,
       slug,
       permissions: permissions as string[],
       isDefault: false,
       isSystem: false,
-      description,
+      description: roleDescription,
+      encryptedName: encryptedName ?? null,
+      encryptedDescription: encryptedDescription ?? null,
+      envelopes: envelopes ?? [],
+      assignedUserCount: 0,
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),
     }
@@ -1350,8 +1408,8 @@ export class SettingsService {
     }
 
     const now = new Date()
+    // Never store plaintext name for non-system roles — name column stays null
     const updates: Record<string, unknown> = { updatedAt: now }
-    if (data.name) updates.name = data.name
     if (data.description) updates.description = data.description
     if (data.permissions) updates.permissions = data.permissions as string[]
 
@@ -1392,6 +1450,72 @@ export class SettingsService {
 
     await this.db.delete(rolesTable).where(eq(rolesTable.id, id))
     return { ok: true }
+  }
+
+  async addRoleEnvelopes(
+    roleId: string,
+    envelopes: Array<{ adminPubkey: string; encryptedName: string; encryptedDescription: string }>,
+  ): Promise<{ ok: true }> {
+    const [existing] = await this.db
+      .select()
+      .from(rolesTable)
+      .where(eq(rolesTable.id, roleId))
+    if (!existing) {
+      throw new ServiceError(404, 'Role not found')
+    }
+
+    const now = new Date()
+    for (const env of envelopes) {
+      await this.db
+        .insert(platformRoleEnvelopes)
+        .values({
+          roleId,
+          adminPubkey: env.adminPubkey,
+          encryptedName: env.encryptedName,
+          encryptedDescription: env.encryptedDescription,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: [platformRoleEnvelopes.roleId, platformRoleEnvelopes.adminPubkey],
+          set: {
+            encryptedName: env.encryptedName,
+            encryptedDescription: env.encryptedDescription,
+            updatedAt: now,
+          },
+        })
+    }
+    return { ok: true }
+  }
+
+  async getEffectivePermissions(userId: string, hubId?: string): Promise<{ userId: string; permissions: string[] }> {
+    const [user] = await this.db
+      .select()
+      .from(users)
+      .where(eq(users.pubkey, userId))
+    if (!user) {
+      throw new ServiceError(404, 'User not found')
+    }
+
+    const { resolveHubPermissions, resolvePermissions } = await import('@shared/permissions')
+    const allRoles = await this.getRoles()
+    const hubRoles = Array.isArray(user.hubRoles) ? user.hubRoles as Array<{ hubId: string; roleIds: string[] }> : []
+
+    let permissions: string[]
+    if (hubId) {
+      // Resolve for a specific hub (global + that hub's roles)
+      permissions = resolveHubPermissions(user.roles ?? [], hubRoles, allRoles.roles, hubId)
+    } else {
+      // Union global permissions with all hub-scoped permissions
+      const allPerms = new Set<string>(resolvePermissions(user.roles ?? [], allRoles.roles))
+      for (const assignment of hubRoles) {
+        for (const p of resolveHubPermissions(user.roles ?? [], hubRoles, allRoles.roles, assignment.hubId)) {
+          allPerms.add(p)
+        }
+      }
+      permissions = Array.from(allPerms)
+    }
+    return { userId, permissions }
   }
 
   // =========================================================================
@@ -3087,5 +3211,77 @@ export class SettingsService {
       createdAt: r.createdAt.toISOString(),
       updatedAt: r.updatedAt.toISOString(),
     } as ReportTypeDefinition
+  }
+
+  // ---------------------------------------------------------------------------
+  // Platform Settings (EP08)
+  // ---------------------------------------------------------------------------
+
+  async getPlatformSettings(): Promise<Record<string, unknown>> {
+    const [row] = await this.db
+      .select({ platformSettings: systemSettings.platformSettings })
+      .from(systemSettings)
+      .where(eq(systemSettings.id, SINGLETON_ID))
+      .limit(1)
+
+    if (!row) {
+      return {
+        featureFlags: {
+          mlsEnabled: false,
+          transcriptionEnabled: true,
+          caseManagementEnabled: false,
+          crossHubSharingEnabled: false,
+        },
+        branding: {
+          instanceName: 'Llamenos',
+          supportEmail: '',
+          privacyPolicyUrl: '',
+        },
+        sessionPolicy: {
+          maxSessionDurationHours: 720,
+          maxInactiveHours: 168,
+        },
+        erasurePlatformFloor: {
+          minDelayHours: 24,
+        },
+        retentionPurge: {
+          cronHourUtc: 3,
+          enabled: true,
+        },
+      }
+    }
+
+    return (row.platformSettings ?? {}) as Record<string, unknown>
+  }
+
+  async updatePlatformSettings(
+    updates: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    const current = await this.getPlatformSettings()
+
+    const merged: Record<string, unknown> = { ...current }
+    for (const [section, value] of Object.entries(updates)) {
+      if (
+        value &&
+        typeof value === 'object' &&
+        !Array.isArray(value) &&
+        current[section] &&
+        typeof current[section] === 'object'
+      ) {
+        merged[section] = {
+          ...(current[section] as Record<string, unknown>),
+          ...(value as Record<string, unknown>),
+        }
+      } else if (value !== undefined) {
+        merged[section] = value
+      }
+    }
+
+    await this.db
+      .update(systemSettings)
+      .set({ platformSettings: merged })
+      .where(eq(systemSettings.id, SINGLETON_ID))
+
+    return merged
   }
 }

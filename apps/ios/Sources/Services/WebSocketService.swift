@@ -90,6 +90,7 @@ enum HubEventType: String, Sendable {
     case conversationNew = "conversation:new"
     case conversationAssigned = "conversation:assigned"
     case conversationClosed = "conversation:closed"
+    case deviceWipe = "device:wipe"
     case unknown
 }
 

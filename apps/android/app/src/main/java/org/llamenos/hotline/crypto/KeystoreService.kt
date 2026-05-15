@@ -201,6 +201,27 @@ class KeystoreService @Inject constructor(
     }
 
     /**
+     * Destroy all encrypted storage. Called during remote device wipe.
+     * Removes all EncryptedSharedPreferences entries and invalidates the MasterKey.
+     */
+    fun wipeAll() {
+        val keys = listOf(
+            KEY_ENCRYPTED_KEYS,
+            KEY_HUB_URL,
+            KEY_DEVICE_ID,
+            KEY_BIOMETRIC_ENABLED,
+            "pin-verification",
+            "biometric-pin",
+            "pin-length",
+            "pin-lockout-attempts",
+            "pin-lockout-until",
+        )
+        val editor = prefs.edit()
+        keys.forEach { editor.remove(it) }
+        editor.apply()
+    }
+
+    /**
      * Wipe all stored keys. Called when max PIN attempts are exceeded.
      * This is a destructive, irrecoverable operation.
      */

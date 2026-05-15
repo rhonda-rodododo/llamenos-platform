@@ -13,7 +13,7 @@
 
 use std::sync::Mutex;
 
-use llamenos_core::{auth, device_keys, hpke_envelope, puk, sigchain};
+use llamenos_core::{auth, device_keys, hpke_envelope, puk, sas, sigchain};
 
 use aes_gcm::{
     aead::{Aead, KeyInit, Payload},
@@ -480,6 +480,183 @@ pub fn decrypt_hub_event(
         .map_err(|_| "Hub event decryption failed (wrong key or corrupted data)".to_string())?;
 
     String::from_utf8(plaintext).map_err(|e| format!("Invalid UTF-8 in decrypted content: {e}"))
+}
+
+// ── Shamir Secret Sharing (GF(2^8)) ────────────────────────────────
+
+/// GF(2^8) multiply using irreducible polynomial x^8 + x^4 + x^3 + x + 1.
+fn gf256_mul(a: u8, b: u8) -> u8 {
+    let mut result: u8 = 0;
+    let mut aa = a;
+    let mut bb = b;
+    for _ in 0..8 {
+        if bb & 1 != 0 {
+            result ^= aa;
+        }
+        let carry = aa & 0x80;
+        aa = aa.wrapping_shl(1);
+        if carry != 0 {
+            aa ^= 0x1b;
+        }
+        bb >>= 1;
+    }
+    result
+}
+
+/// GF(2^8) modular inverse via Fermat's little theorem: a^254 in GF(2^8).
+fn gf256_inv(a: u8) -> u8 {
+    assert!(a != 0, "Cannot invert zero in GF(256)");
+    let mut result = a;
+    for _ in 0..6 {
+        result = gf256_mul(result, result);
+        result = gf256_mul(result, a);
+    }
+    result = gf256_mul(result, result);
+    result
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+pub struct ShamirShareJson {
+    pub x: u8,
+    pub y: String, // hex
+}
+
+#[derive(serde::Serialize)]
+pub struct ShamirSplitResult {
+    pub shares: Vec<ShamirShareJson>,
+    pub commitments: Vec<String>, // SHA-256 hex
+}
+
+/// Shamir split: split a hex-encoded secret into N shares with threshold K.
+/// Returns Vec of {x, y_hex} share objects and Vec of SHA-256 commitment hex strings.
+#[tauri::command]
+pub fn shamir_split(
+    secret_hex: String,
+    total: u8,
+    threshold: u8,
+) -> Result<ShamirSplitResult, String> {
+    if threshold < 2 || threshold > 5 {
+        return Err("Threshold must be 2-5".into());
+    }
+    if total < 3 || total > 5 {
+        return Err("Total must be 3-5".into());
+    }
+    if threshold > total {
+        return Err("Threshold cannot exceed total".into());
+    }
+
+    let secret = hex::decode(&secret_hex).map_err(|e| e.to_string())?;
+    let secret_len = secret.len();
+
+    // Random polynomial coefficients for each byte (degree = threshold - 1)
+    // coefficients[i] are the non-constant-term coefficients for the i-th degree
+    let mut coefficients: Vec<Vec<u8>> = Vec::new();
+    for _ in 0..threshold - 1 {
+        let mut coeff = vec![0u8; secret_len];
+        rand::RngCore::fill_bytes(&mut rand::rngs::OsRng, &mut coeff);
+        coefficients.push(coeff);
+    }
+
+    let mut shares = Vec::new();
+    for i in 1..=total {
+        let mut y = vec![0u8; secret_len];
+        for byte_idx in 0..secret_len {
+            let mut val = secret[byte_idx];
+            let mut x_pow = i;
+            for coeff in &coefficients {
+                val ^= gf256_mul(coeff[byte_idx], x_pow);
+                x_pow = gf256_mul(x_pow, i);
+            }
+            y[byte_idx] = val;
+        }
+        shares.push(ShamirShareJson { x: i, y: hex::encode(&y) });
+    }
+
+    // SHA-256 commitments: hash(x || y)
+    use sha2::Digest;
+    let commitments: Vec<String> = shares.iter().map(|s| {
+        let y_bytes = hex::decode(&s.y).unwrap_or_default();
+        let mut hasher = sha2::Sha256::new();
+        hasher.update([s.x]);
+        hasher.update(&y_bytes);
+        hex::encode(hasher.finalize())
+    }).collect();
+
+    Ok(ShamirSplitResult { shares, commitments })
+}
+
+/// Shamir combine: reconstruct the secret from >= threshold shares.
+#[tauri::command]
+pub fn shamir_combine(shares_json: String) -> Result<String, String> {
+    let share_objs: Vec<ShamirShareJson> =
+        serde_json::from_str(&shares_json).map_err(|e| e.to_string())?;
+    if share_objs.len() < 2 {
+        return Err("Need at least 2 shares".into());
+    }
+
+    let shares: Vec<(u8, Vec<u8>)> = share_objs.iter().map(|s| {
+        let y = hex::decode(&s.y).unwrap_or_default();
+        (s.x, y)
+    }).collect();
+
+    let secret_len = shares[0].1.len();
+    let mut result = vec![0u8; secret_len];
+
+    for byte_idx in 0..secret_len {
+        let mut val: u8 = 0;
+        for i in 0..shares.len() {
+            let yi = shares[i].1[byte_idx];
+            let xi = shares[i].0;
+            let mut lagrange: u8 = 1;
+            for j in 0..shares.len() {
+                if i == j {
+                    continue;
+                }
+                let xj = shares[j].0;
+                let num = xj;
+                let den = xi ^ xj;
+                if den == 0 {
+                    return Err("Duplicate share x values".into());
+                }
+                lagrange = gf256_mul(lagrange, gf256_mul(num, gf256_inv(den)));
+            }
+            val ^= gf256_mul(yi, lagrange);
+        }
+        result[byte_idx] = val;
+    }
+
+    Ok(hex::encode(result))
+}
+
+/// Shamir commit: compute SHA-256 commitment for a share.
+#[tauri::command]
+pub fn shamir_commit(x: u8, y_hex: String) -> Result<String, String> {
+    use sha2::Digest;
+    let y = hex::decode(&y_hex).map_err(|e| e.to_string())?;
+    let mut hasher = sha2::Sha256::new();
+    hasher.update([x]);
+    hasher.update(&y);
+    Ok(hex::encode(hasher.finalize()))
+}
+
+/// Shamir verify: check a share against its SHA-256 commitment.
+#[tauri::command]
+pub fn shamir_verify(x: u8, y_hex: String, commitment_hex: String) -> Result<bool, String> {
+    let computed = shamir_commit(x, y_hex)?;
+    Ok(computed == commitment_hex)
+}
+
+/// Generate an X25519 recovery group keypair. Returns {publicKeyHex, privateKeyHex}.
+/// The caller MUST split the private key with shamir_split and zeroize it immediately.
+#[tauri::command]
+pub fn recovery_group_generate_keypair() -> Result<serde_json::Value, String> {
+    use x25519_dalek::{PublicKey, StaticSecret};
+    let secret = StaticSecret::random_from_rng(rand::rngs::OsRng);
+    let public = PublicKey::from(&secret);
+    Ok(serde_json::json!({
+        "publicKeyHex": hex::encode(public.as_bytes()),
+        "privateKeyHex": hex::encode(secret.as_bytes()),
+    }))
 }
 
 /// Decrypt a server-published relay event using the epoch-keyed server event key.

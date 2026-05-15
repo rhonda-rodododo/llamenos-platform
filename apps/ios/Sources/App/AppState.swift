@@ -56,6 +56,12 @@ final class AppState {
     /// Total unread conversation count for the tab badge.
     var unreadConversationCount: Int = 0
 
+    /// Whether this device has been remotely wiped. Once true, shows non-dismissable receipt.
+    var isDeviceWiped: Bool = false
+
+    /// Reason for the device wipe, passed to DeviceWipeReceiptView.
+    var deviceWipeReason: String = ""
+
     /// Result of the on-launch version compatibility check against the server.
     var versionStatus: VersionStatus = .unknown
 
@@ -322,6 +328,27 @@ final class AppState {
         connectWebSocketIfConfigured()
         fetchUserRole()
         offlineQueue.startMonitoring()
+    }
+
+    /// Handle a device wipe command from the server.
+    func handleDeviceWipe(reason: String) {
+        // 1. Destroy keys
+        keychainService.wipeAll()
+
+        // 2. Clear crypto state
+        cryptoService.clearState()
+
+        // 3. Clear UserDefaults app data
+        if let bundleId = Bundle.main.bundleIdentifier {
+            UserDefaults.standard.removePersistentDomain(forName: bundleId)
+        }
+
+        // 4. Set wiped state (triggers UI)
+        deviceWipeReason = reason
+        isDeviceWiped = true
+
+        // 5. Disconnect
+        webSocketService.disconnect()
     }
 
     /// Called when the user logs out / resets identity.

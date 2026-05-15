@@ -25,7 +25,8 @@ export const users = pgTable('users', {
     .default(sql`'{"role-volunteer"}'::text[]`),
   displayName: text('display_name'),
   phone: text('phone'),
-  status: text('status').notNull().default('active'),
+    // Valid values: 'active', 'inactive', 'erased' (EP08: set on account erasure)
+    status: text('status').notNull().default('active'),
   hubRoles: jsonb('hub_roles').notNull().default([]),
   availability: text('availability').notNull().default('unavailable'),
   onBreak: boolean('on_break').default(false),
@@ -66,6 +67,9 @@ export const users = pgTable('users', {
 export const sessions = pgTable(
   'sessions',
   {
+    id: text('id')
+      .notNull()
+      .$defaultFn(() => crypto.randomUUID()),
     token: text('token').primaryKey(),
     pubkey: text('pubkey')
       .notNull()
@@ -167,6 +171,11 @@ export const devices = pgTable(
       .notNull()
       .defaultNow(),
     lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
+    deviceName: text('device_name'),
+    deviceModel: text('device_model'),
+    osVersion: text('os_version'),
+    appVersion: text('app_version'),
+    lastIpHash: text('last_ip_hash'),
   },
   (table) => [index('devices_pubkey_idx').on(table.pubkey)],
 )

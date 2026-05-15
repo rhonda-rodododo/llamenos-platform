@@ -649,6 +649,55 @@ pub fn mobile_random_bytes_hex() -> String {
     hex::encode(bytes)
 }
 
+// ── Device linking ephemeral keypair ────────────────────────────────
+
+/// Ephemeral X25519 keypair for device-linking ECDH provisioning.
+///
+/// Unlike identity keys, the secret IS exposed — provisioning is a one-shot
+/// flow where the new device must perform ECDH with the primary device, and
+/// the ephemeral secret only lives in client memory for the duration of the
+/// linking handshake. Callers must zero or drop the secret immediately after
+/// the SAS verification step.
+#[derive(uniffi::Record)]
+pub struct EphemeralKeyPair {
+    /// hex-encoded 32-byte secret key (caller is responsible for clearing)
+    pub secret_key_hex: String,
+    /// hex-encoded 32-byte x-only public key
+    pub public_key: String,
+}
+
+/// Generate an ephemeral X25519 keypair for device-linking ECDH provisioning.
+#[uniffi::export]
+pub fn generate_ephemeral_keypair_mobile() -> EphemeralKeyPair {
+    let (sk, pk) = hpke_envelope::generate_x25519_keypair();
+    EphemeralKeyPair {
+        secret_key_hex: (*sk).clone(),
+        public_key: pk,
+    }
+}
+
+/// Derive the X25519 public key from a hex-encoded 32-byte secret key.
+///
+/// Used by WakeKeyService to obtain the registration public key from a stored private key,
+/// without re-generating the keypair. The wake key lifecycle requires the private key to
+/// persist in the Keychain while only the public key is sent to the server at registration.
+#[uniffi::export]
+pub fn get_public_key(secret_key_hex: String) -> Result<String, CryptoError> {
+    use x25519_dalek::{PublicKey as X25519PublicKey, StaticSecret as X25519StaticSecret};
+
+    let sk_bytes = hex::decode(&secret_key_hex).map_err(CryptoError::HexError)?;
+    if sk_bytes.len() != 32 {
+        return Err(CryptoError::InvalidSecretKey);
+    }
+    let mut sk_arr = [0u8; 32];
+    sk_arr.copy_from_slice(&sk_bytes);
+    let secret = X25519StaticSecret::from(sk_arr);
+    let public_key = X25519PublicKey::from(&secret);
+    let result = hex::encode(public_key.as_bytes());
+    sk_arr.zeroize();
+    Ok(result)
+}
+
 /// Try to decrypt an event by trial-decrypting with all cached hub keys.
 ///
 /// Returns `[hub_id, plaintext_json]` for the first key that succeeds,
@@ -700,19 +749,18 @@ pub fn mobile_clear_server_event_keys() {
 
 // ── Shamir Secret Sharing ─────────────────────────────────────────────────
 
-/// A Shamir secret share.
-/// `x` is the evaluation point (1..=255); `y` is hex-encoded y-coordinates
+/// A Shamir secret share (FFI-friendly).
+/// `x` is the evaluation point (1..=255); `y_hex` is hex-encoded y-coordinates
 /// (one byte per secret byte, so 64 hex chars for a 32-byte secret).
 #[derive(uniffi::Record, serde::Serialize, serde::Deserialize)]
 pub struct FfiShamirShare {
     pub x: u8,
-    pub y: String,
+    pub y_hex: String,
 }
 
 /// Split `secret_hex` into `total` shares requiring `threshold` to reconstruct.
 ///
 /// Returns a list of [FfiShamirShare] with `total` entries.
-/// Each `y` field is the hex-encoded y-coordinates for that share index.
 #[uniffi::export]
 pub fn mobile_shamir_split(
     secret_hex: String,
@@ -722,54 +770,60 @@ pub fn mobile_shamir_split(
     let secret = hex::decode(&secret_hex)
         .map_err(|_| CryptoError::InvalidInput("secret_hex is not valid hex".into()))?;
 
-    let raw_shares = shamir::split(&secret, total, threshold)?;
+    let shares = shamir::split(&secret, total, threshold)?;
 
-    Ok(raw_shares
+    Ok(shares
         .into_iter()
-        .map(|(x, y)| FfiShamirShare {
-            x,
-            y: hex::encode(y),
+        .map(|s| {
+            let ss = s.to_shamir_share();
+            FfiShamirShare {
+                x: ss.x,
+                y_hex: ss.y_hex,
+            }
         })
         .collect())
 }
 
-/// Reconstruct the secret from a JSON array of [FfiShamirShare].
+/// Reconstruct the secret from a JSON array of shares.
 ///
-/// `shares_json` must be a JSON array: `[{"x":1,"y":"aabbcc..."},...]`
+/// `shares_json` must be a JSON array: `[{"x":1,"y_hex":"aabbcc..."},...]`
 /// Returns the reconstructed secret as a hex string.
 #[uniffi::export]
-pub fn mobile_shamir_combine(shares_json: String) -> Result<String, CryptoError> {
-    let wire: Vec<shamir::ShamirShareJson> = serde_json::from_str(&shares_json)
+pub fn mobile_shamir_combine(shares_json: String, threshold: u8) -> Result<String, CryptoError> {
+    let wire: Vec<FfiShamirShare> = serde_json::from_str(&shares_json)
         .map_err(|e| CryptoError::InvalidInput(format!("invalid shares JSON: {e}")))?;
 
-    let shares: Vec<(u8, Vec<u8>)> = wire
+    let shares: Vec<shamir::Share> = wire
         .into_iter()
         .map(|s| {
-            let y = hex::decode(&s.y).map_err(|_| {
-                CryptoError::InvalidInput(format!("share y is not valid hex for x={}", s.x))
-            })?;
-            Ok((s.x, y))
+            shamir::ShamirShare {
+                x: s.x,
+                y_hex: s.y_hex,
+            }
+            .to_share()
         })
         .collect::<Result<Vec<_>, CryptoError>>()?;
 
-    let secret = shamir::combine(&shares)?;
+    let secret = shamir::combine(&shares, threshold)?;
     Ok(hex::encode(secret))
 }
 
 /// Compute a SHA-256 commitment for a share.
 ///
-/// `share_json` must be a JSON object: `{"x":1,"y":"aabbcc..."}`.
+/// `share_json` must be a JSON object: `{"x":1,"y_hex":"aabbcc..."}`.
 /// Returns the commitment as a hex string.
 #[uniffi::export]
 pub fn mobile_shamir_commit(share_json: String) -> Result<String, CryptoError> {
-    let wire: shamir::ShamirShareJson = serde_json::from_str(&share_json)
+    let wire: FfiShamirShare = serde_json::from_str(&share_json)
         .map_err(|e| CryptoError::InvalidInput(format!("invalid share JSON: {e}")))?;
 
-    let y = hex::decode(&wire.y)
-        .map_err(|_| CryptoError::InvalidInput("share y is not valid hex".into()))?;
+    let share = shamir::ShamirShare {
+        x: wire.x,
+        y_hex: wire.y_hex,
+    }
+    .to_share()?;
 
-    let commitment = shamir::commit(wire.x, &y);
-    Ok(hex::encode(commitment))
+    Ok(hex::encode(shamir::commit(&share)))
 }
 
 /// Verify a share against a previously computed commitment.
@@ -780,16 +834,27 @@ pub fn mobile_shamir_verify(
     share_json: String,
     commitment_hex: String,
 ) -> Result<bool, CryptoError> {
-    let wire: shamir::ShamirShareJson = serde_json::from_str(&share_json)
+    let wire: FfiShamirShare = serde_json::from_str(&share_json)
         .map_err(|e| CryptoError::InvalidInput(format!("invalid share JSON: {e}")))?;
 
-    let y = hex::decode(&wire.y)
-        .map_err(|_| CryptoError::InvalidInput("share y is not valid hex".into()))?;
+    let share = shamir::ShamirShare {
+        x: wire.x,
+        y_hex: wire.y_hex,
+    }
+    .to_share()?;
 
-    let commitment = hex::decode(&commitment_hex)
+    let commitment_bytes = hex::decode(&commitment_hex)
         .map_err(|_| CryptoError::InvalidInput("commitment_hex is not valid hex".into()))?;
+    if commitment_bytes.len() != 32 {
+        return Err(CryptoError::InvalidInput(format!(
+            "commitment must be 32 bytes, got {}",
+            commitment_bytes.len()
+        )));
+    }
+    let mut commitment = [0u8; 32];
+    commitment.copy_from_slice(&commitment_bytes);
 
-    Ok(shamir::verify(wire.x, &y, &commitment))
+    Ok(shamir::verify(&share, &commitment))
 }
 
 // ── Recovery Group Keypair ────────────────────────────────────────────────

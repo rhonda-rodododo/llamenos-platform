@@ -237,6 +237,54 @@ final class AdminViewModel {
     /// Whether system health is loading.
     var isLoadingHealth: Bool = false
 
+    // MARK: - Erasure Queue State
+
+    /// Pending erasure requests from the API.
+    var erasureRequests: [AdminErasureRequest] = []
+
+    /// Whether erasure requests are loading.
+    var isLoadingErasure: Bool = false
+
+    /// Filter for erasure queue (nil = all).
+    var erasureStatusFilter: String?
+
+    /// Whether the immediate erasure dialog is showing.
+    var showImmediateErasureDialog: Bool = false
+
+    /// Target user for immediate erasure.
+    var immediateErasureTargetId: String?
+
+    /// Justification text for immediate erasure.
+    var immediateErasureJustification: String = ""
+
+    // MARK: - Retention Settings State
+
+    /// Per-hub retention settings (category -> days).
+    var retentionSettings: [RetentionCategory] = []
+
+    /// Whether retention settings are loading.
+    var isLoadingRetention: Bool = false
+
+    /// Whether retention settings are being saved.
+    var isSavingRetention: Bool = false
+
+    // MARK: - Platform Bans State
+
+    /// Platform-scoped bans from the API.
+    var platformBans: [AppBanEntry] = []
+
+    /// Whether platform bans are loading.
+    var isLoadingPlatformBans: Bool = false
+
+    /// Whether the add platform ban sheet is showing.
+    var showAddPlatformBanSheet: Bool = false
+
+    /// Search query for cross-hub ban search.
+    var platformBanSearchQuery: String = ""
+
+    /// Search results from cross-hub search.
+    var platformBanSearchResults: [AppBanEntry] = []
+
     // MARK: - Shared State
 
     /// Error message from the last failed operation.
@@ -914,6 +962,251 @@ final class AdminViewModel {
         isLoadingHealth = false
     }
 
+    // MARK: - Erasure Queue
+
+    /// Load erasure requests from the API.
+    func loadErasureRequests() async {
+        guard !isLoadingErasure else { return }
+        isLoadingErasure = true
+        errorMessage = nil
+
+        do {
+            var path = "/api/erasure/requests"
+            if let filter = erasureStatusFilter {
+                path += "?status=\(filter)"
+            }
+            let response: ErasureQueueResponse = try await apiService.request(
+                method: "GET",
+                path: path
+            )
+            erasureRequests = response.requests.sorted {
+                ($0.requestedAt ?? Date.distantPast) > ($1.requestedAt ?? Date.distantPast)
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+
+        isLoadingErasure = false
+    }
+
+    /// Execute immediate erasure for a user.
+    func executeImmediateErasure(userId: String, justification: String) async {
+        errorMessage = nil
+        successMessage = nil
+
+        do {
+            let body = ImmediateErasureRequest(justification: justification)
+            try await apiService.request(
+                method: "POST",
+                path: "/api/erasure/\(userId)",
+                body: body
+            )
+
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.success)
+
+            immediateErasureTargetId = nil
+            immediateErasureJustification = ""
+            showImmediateErasureDialog = false
+            successMessage = NSLocalizedString("erasure_status_completed", comment: "Erasure completed")
+            await loadErasureRequests()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Trigger remote device wipe for a specific device.
+    func remoteWipeDevice(userId: String, devicePubkey: String) async {
+        errorMessage = nil
+        successMessage = nil
+
+        do {
+            try await apiService.request(
+                method: "POST",
+                path: "/api/erasure/\(userId)/wipe-device/\(devicePubkey)"
+            )
+
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.success)
+
+            successMessage = NSLocalizedString("device_wipe_wipe_complete", comment: "Device wipe sent")
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    // MARK: - Retention Settings
+
+    /// Load retention settings from the API.
+    func loadRetentionSettings() async {
+        guard !isLoadingRetention else { return }
+        isLoadingRetention = true
+        errorMessage = nil
+
+        do {
+            let response: RetentionSettingsResponse = try await apiService.request(
+                method: "GET",
+                path: "/api/retention"
+            )
+            retentionSettings = response.categories
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+
+        isLoadingRetention = false
+    }
+
+    /// Save retention settings to the API.
+    func saveRetentionSettings() async {
+        isSavingRetention = true
+        errorMessage = nil
+        successMessage = nil
+
+        do {
+            let body = UpdateRetentionRequest(categories: retentionSettings)
+            try await apiService.request(
+                method: "PATCH",
+                path: "/api/retention",
+                body: body
+            )
+
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.success)
+
+            successMessage = NSLocalizedString("retention_saved", comment: "Retention settings saved")
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+
+        isSavingRetention = false
+    }
+
+    // MARK: - Platform Bans
+
+    /// Load platform-scoped bans.
+    func loadPlatformBans() async {
+        guard !isLoadingPlatformBans else { return }
+        isLoadingPlatformBans = true
+        errorMessage = nil
+
+        do {
+            let response: AppBanListResponse = try await apiService.request(
+                method: "GET",
+                path: "/api/bans/platform"
+            )
+            platformBans = response.bans.sorted {
+                ($0.createdDate ?? Date.distantPast) > ($1.createdDate ?? Date.distantPast)
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+
+        isLoadingPlatformBans = false
+    }
+
+    /// Create a platform-scoped ban.
+    func addPlatformBan() async {
+        let hash = newBanIdentifierHash.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !hash.isEmpty else {
+            errorMessage = NSLocalizedString("admin_ban_hash_required", comment: "Identifier hash is required")
+            return
+        }
+
+        errorMessage = nil
+        successMessage = nil
+
+        do {
+            let reason = newBanReason.trimmingCharacters(in: .whitespacesAndNewlines)
+            let request = CreateBanRequest(
+                identifierHash: hash,
+                reason: reason.isEmpty ? nil : reason
+            )
+            try await apiService.request(
+                method: "POST",
+                path: "/api/bans/platform",
+                body: request
+            )
+
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.success)
+
+            newBanIdentifierHash = ""
+            newBanReason = ""
+            showAddPlatformBanSheet = false
+            successMessage = NSLocalizedString("admin_ban_added", comment: "Ban entry added")
+            await loadPlatformBans()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Remove a platform-scoped ban.
+    func removePlatformBan(id: String) async {
+        errorMessage = nil
+        successMessage = nil
+
+        do {
+            try await apiService.request(
+                method: "DELETE",
+                path: "/api/bans/platform/\(id)"
+            )
+
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.success)
+
+            successMessage = NSLocalizedString("admin_ban_removed", comment: "Ban entry removed")
+            await loadPlatformBans()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Search bans across all hubs by phone hash.
+    func searchPlatformBans() async {
+        let query = platformBanSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return }
+
+        errorMessage = nil
+
+        do {
+            let response: AppBanListResponse = try await apiService.request(
+                method: "GET",
+                path: "/api/bans/platform/search?q=\(query)"
+            )
+            platformBanSearchResults = response.bans
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Promote a hub-scoped ban to platform scope.
+    func promoteBanToPlatform(banId: String) async {
+        errorMessage = nil
+        successMessage = nil
+
+        guard let ban = bans.first(where: { $0.id == banId }) else { return }
+
+        do {
+            let request = CreateBanRequest(
+                identifierHash: ban.identifierHash,
+                reason: ban.reason
+            )
+            try await apiService.request(
+                method: "POST",
+                path: "/api/bans/platform",
+                body: request
+            )
+
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.success)
+
+            successMessage = NSLocalizedString("platform_bans_promote_button", comment: "Promoted to platform ban")
+            await loadPlatformBans()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     // MARK: - Recording URL
 
     /// Build a streaming URL for a recording.
@@ -940,6 +1233,8 @@ final class AdminViewModel {
             await removeBan(id: id)
         case .reportCategory:
             await deleteReportCategory(id: id)
+        case .erasure:
+            break // Handled separately
         }
 
         pendingDeleteId = nil
@@ -961,4 +1256,53 @@ final class AdminViewModel {
 enum DeleteType: Sendable {
     case ban
     case reportCategory
+    case erasure
+}
+
+// MARK: - Erasure Models
+
+struct AdminErasureRequest: Codable, Identifiable, Sendable {
+    let id: String
+    let userId: String
+    let status: String
+    let requestedAt: Date?
+    let executeAt: Date?
+    let requestedBy: String?
+    let justification: String?
+    let emergencyOverride: Bool?
+}
+
+struct ErasureQueueResponse: Codable, Sendable {
+    let requests: [AdminErasureRequest]
+}
+
+struct ImmediateErasureRequest: Codable, Sendable {
+    let justification: String
+}
+
+// MARK: - Retention Models
+
+struct RetentionCategory: Codable, Identifiable, Sendable {
+    var id: String { category }
+    let category: String
+    var retentionDays: Int?
+    let minRetentionDays: Int?
+
+    var categoryDisplay: String {
+        switch category {
+        case "call_records": return NSLocalizedString("retention_category_call_records", comment: "Call Records")
+        case "notes": return NSLocalizedString("retention_category_notes", comment: "Notes")
+        case "messages": return NSLocalizedString("retention_category_messages", comment: "Messages")
+        case "audit_log": return NSLocalizedString("retention_category_audit_log", comment: "Audit Log")
+        default: return category
+        }
+    }
+}
+
+struct RetentionSettingsResponse: Codable, Sendable {
+    let categories: [RetentionCategory]
+}
+
+struct UpdateRetentionRequest: Codable, Sendable {
+    let categories: [RetentionCategory]
 }

@@ -1,7 +1,7 @@
 package org.llamenos.hotline.model
 
 import org.llamenos.protocol.ActiveCallsResponseCall
-import org.llamenos.protocol.Ban
+import org.llamenos.protocol.BanResponse
 import org.llamenos.protocol.CallHistoryResponseCall
 import org.llamenos.protocol.CallRecordResponse
 import org.llamenos.protocol.Calls
@@ -42,19 +42,19 @@ val UserListResponseUser.status: String
 // ── Ban (typealias BanEntry) ───────────────────────────────────────────────
 
 /** Use phone hash as unique key (generated Ban has no `id` field). */
-val Ban.id: String
+val BanResponse.id: String
     get() = phone
 
 /** The hashed identifier — maps to `phone` in the generated type. */
-val Ban.identifierHash: String
+val BanResponse.identifierHash: String
     get() = phone
 
 /** Who created the ban — maps to `bannedBy` in the generated type. */
-val Ban.createdBy: String
+val BanResponse.createdBy: String
     get() = bannedBy
 
 /** When the ban was created — maps to `bannedAt` in the generated type. */
-val Ban.createdAt: String
+val BanResponse.createdAt: String
     get() = bannedAt
 
 // ── Entry (typealias AuditEntry) ───────────────────────────────────────────

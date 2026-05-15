@@ -13,11 +13,11 @@ describe('ShiftsService', () => {
     return { db, service }
   }
 
-  function makeShift(overrides: Partial<{ id: string; hubId: string; name: string; startTime: string; endTime: string; days: number[]; userPubkeys: string[] }> = {}) {
+  function makeShift(overrides: Partial<{ id: string; hubId: string; encryptedName: string; startTime: string; endTime: string; days: number[]; userPubkeys: string[] }> = {}) {
     return {
       id: 'shift-1',
       hubId: 'hub-1',
-      name: 'Morning',
+      encryptedName: 'Morning',
       startTime: '08:00',
       endTime: '12:00',
       days: [1, 2, 3, 4, 5],
@@ -34,20 +34,20 @@ describe('ShiftsService', () => {
       db.$setInsertResult([shift])
 
       const result = await service.create('hub-1', {
-        name: 'Morning',
+        encryptedName: 'Morning',
         startTime: '08:00',
         endTime: '12:00',
         days: [1, 2, 3, 4, 5],
         userPubkeys: ['pk1', 'pk2'],
       })
 
-      expect(result.name).toBe('Morning')
+      expect(result.encryptedName).toBe('Morning')
     })
 
     it('rejects invalid time format', async () => {
       const { service } = setup()
       await expect(service.create('hub-1', {
-        name: 'Bad',
+        encryptedName: 'Bad',
         startTime: '8:00',
         endTime: '12:00',
         days: [1],
@@ -58,7 +58,7 @@ describe('ShiftsService', () => {
     it('rejects 24:00', async () => {
       const { service } = setup()
       await expect(service.create('hub-1', {
-        name: 'Bad',
+        encryptedName: 'Bad',
         startTime: '24:00',
         endTime: '12:00',
         days: [1],
@@ -69,7 +69,7 @@ describe('ShiftsService', () => {
     it('rejects invalid minutes', async () => {
       const { service } = setup()
       await expect(service.create('hub-1', {
-        name: 'Bad',
+        encryptedName: 'Bad',
         startTime: '08:60',
         endTime: '12:00',
         days: [1],
@@ -81,18 +81,18 @@ describe('ShiftsService', () => {
   describe('update', () => {
     it('updates a shift', async () => {
       const { db, service } = setup()
-      const updated = makeShift({ name: 'Updated' })
+      const updated = makeShift({ encryptedName: 'Updated' })
       db.$setUpdateResult([updated])
 
-      const result = await service.update('hub-1', 'shift-1', { name: 'Updated' })
-      expect(result.name).toBe('Updated')
+      const result = await service.update('hub-1', 'shift-1', { encryptedName: 'Updated' })
+      expect(result.encryptedName).toBe('Updated')
     })
 
     it('throws 404 if shift not found', async () => {
       const { db, service } = setup()
       db.$setUpdateResult([])
 
-      await expect(service.update('hub-1', 'shift-1', { name: 'Updated' }))
+      await expect(service.update('hub-1', 'shift-1', { encryptedName: 'Updated' }))
         .rejects.toThrow('Shift not found')
     })
 
