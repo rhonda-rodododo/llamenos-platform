@@ -1907,11 +1907,10 @@ export async function uploadEntityFileViaApi(
   seedHex: string = ADMIN_SEED,
 ): Promise<{ fileId: string; uploadedAt: string }> {
   const fullPath = '/api/uploads/entity-file'
-  const blob = new Blob([new Uint8Array(blobSizeBytes).fill(0xab)], { type: 'application/octet-stream' })
-  const formData = new FormData()
-  formData.append('file', blob, 'entity-field.bin')
+  // Use auth headers without Content-Type — Playwright sets multipart/form-data automatically
+  const { 'Content-Type': _ct, ...headers } = authHeaders(seedHex, 'POST', fullPath)
   const res = await request.post(fullPath, {
-    headers: authHeaders(seedHex, 'POST', fullPath),
+    headers,
     multipart: { file: { name: 'entity-field.bin', mimeType: 'application/octet-stream', buffer: Buffer.alloc(blobSizeBytes, 0xab) } },
   })
   if (res.status() !== 201) throw new Error(`uploadEntityFileViaApi failed: ${res.status()}`)

@@ -6,7 +6,8 @@
  * and "a contact exists with identifier hash" from cms.steps.ts.
  */
 import { expect } from '@playwright/test'
-import { When, Then, getState, setState } from './fixtures'
+import { Before, When, Then, getState, setState } from './fixtures'
+import { getScenarioState } from './common.steps'
 import {
   updateContactViaApi,
   uploadEntityFileViaApi,
@@ -21,6 +22,10 @@ interface ContactWriteState {
 
 const CONTACT_WRITE_KEY = 'contactWrite'
 
+Before({ tags: '@contact-write' }, async ({ world }) => {
+  setState<ContactWriteState>(world, CONTACT_WRITE_KEY, {})
+})
+
 function getCwState(world: Record<string, unknown>): ContactWriteState {
   return getState<ContactWriteState>(world, CONTACT_WRITE_KEY)
 }
@@ -33,10 +38,11 @@ When('the admin updates the contact\'s encrypted profile', async ({ request, wor
   const cmsState = getState<{ lastContact?: Record<string, unknown> }>(world, 'cms')
   const contactId = cmsState.lastContact?.id as string
   if (!contactId) throw new Error('No contact in cms state to update')
+  const hubId = getScenarioState(world).hubId
   const updated = await updateContactViaApi(request, contactId, {
     encryptedSummary: btoa(JSON.stringify({ displayName: 'Updated Profile', contactType: 'individual', tags: [] })),
     identifierHashes: [`updated_${Date.now()}`],
-  })
+  }, hubId)
   const cwState = getCwState(world)
   cwState.updatedContact = updated
   setState(world, CONTACT_WRITE_KEY, cwState)

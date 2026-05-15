@@ -3,7 +3,7 @@ import { describeRoute, resolver, validator } from 'hono-openapi'
 import { z } from 'zod'
 import type { AppEnv } from '../types'
 import { getTelephonyFromService } from '../lib/service-factories'
-import { hashPhone } from '../lib/crypto'
+
 import { audit } from '../services/audit'
 import { requirePermission, checkPermission } from '../middleware/permission-guard'
 import { callHistoryQuerySchema, callPresenceResponseSchema, banCallerBodySchema, activeCallsResponseSchema, todayCountResponseSchema, callerIdentifyResponseSchema, callActionResponseSchema, banCallResponseSchema, callHistoryResponseSchema } from '@protocol/schemas/calls'
@@ -405,8 +405,8 @@ calls.post('/:callId/ban',
     let banned = false
     try {
       await services.records.addBan({
-        phone: hashPhone(call.callerNumber, c.env.HMAC_SECRET),
-        phoneDisplay: call.callerNumber,
+        phone: call.callerNumber, // already HMAC-hashed at call ingestion
+        phoneDisplay: call.callerLast4 ? `***${call.callerLast4}` : undefined,
         reason: body.reason || 'Banned during active call',
         bannedBy: pubkey,
         hubId: call.hubId ?? hubId ?? undefined,
