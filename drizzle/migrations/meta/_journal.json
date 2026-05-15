@@ -281,6 +281,13 @@
       "when": 1778841614977,
       "tag": "0037_entity_templates_events_deprecation",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1778854515703,
+      "tag": "0040_bans-phone-display",
+      "breakpoints": true
     }
   ]
 }

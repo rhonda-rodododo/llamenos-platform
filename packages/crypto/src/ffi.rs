@@ -248,7 +248,7 @@ pub fn compute_sas_code(shared_x_hex: &str) -> Result<String, CryptoError> {
     let num =
         ((okm[0] as u32) << 24 | (okm[1] as u32) << 16 | (okm[2] as u32) << 8 | (okm[3] as u32))
             % 1_000_000;
-    let code = format!("{:06}", num);
+    let code = format!("{num:06}");
     Ok(format!("{} {}", &code[..3], &code[3..]))
 }
 

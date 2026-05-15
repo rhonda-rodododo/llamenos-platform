@@ -1,0 +1,1 @@
+ALTER TABLE "bans" ADD COLUMN "phone_display" text;
