@@ -162,3 +162,24 @@ enum ContactEventType: String, CaseIterable, Sendable {
         }
     }
 }
+
+// MARK: - Directory Contact Summary
+// Client-only: returned after create/update operations on encrypted contacts.
+
+struct DirectoryContactSummary: Codable, Identifiable, Sendable {
+    let id: String
+    let displayName: String
+    let contactType: String?
+    let createdAt: String
+}
+
+// MARK: - Contact Profile
+// Client-only: plaintext contact profile assembled before encryption.
+
+struct ContactProfile: Codable, Sendable {
+    let displayName: String
+    let phone: String?
+    let email: String?
+    let tags: [String]
+    let notes: String?
+}
