@@ -1,9 +1,11 @@
 import SwiftUI
 
 struct EntityTypeAdminView: View {
-    @State private var entityTypes: [EntityTypeDefinition] = []
+    @Environment(AppState.self) private var appState
+
+    @State private var entityTypes: [CaseEntityTypeDefinition] = []
     @State private var loading = true
-    @State private var editingType: EntityTypeDefinition?
+    @State private var editingType: CaseEntityTypeDefinition?
     @State private var loadError: String?
 
     var body: some View {
@@ -12,9 +14,7 @@ struct EntityTypeAdminView: View {
                 HStack {
                     VStack(alignment: .leading) {
                         Text(et.label).fontWeight(.medium)
-                        if let plural = et.labelPlural {
-                            Text(plural).font(.caption).foregroundStyle(.secondary)
-                        }
+                        Text(et.labelPlural).font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
                     Image(systemName: "chevron.right").foregroundStyle(.tertiary)
@@ -32,6 +32,7 @@ struct EntityTypeAdminView: View {
                     entityTypes[i] = updated
                 }
             }
+            .environment(appState)
         }
         .overlay {
             if loading {
@@ -46,7 +47,10 @@ struct EntityTypeAdminView: View {
         loading = true
         loadError = nil
         do {
-            entityTypes = try await EntitySchemaAPIService.shared.listEntityTypes()
+            let response: EntityTypesResponse = try await appState.apiService.request(
+                method: "GET", path: "/api/settings/cms/entity-types"
+            )
+            entityTypes = response.entityTypes.filter { $0.isArchived != true }
         } catch {
             loadError = error.localizedDescription
         }

@@ -1,27 +1,33 @@
 import SwiftUI
 
+private struct EntityTypeCustomizeBody: Codable {
+    let label: String
+    let labelPlural: String
+    let showInNavigation: Bool
+}
+
 struct EntityTypeEditorView: View {
+    @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
-    @State var entityType: EntityTypeDefinition
-    var onSave: (EntityTypeDefinition) -> Void
+    @State var entityType: CaseEntityTypeDefinition
+    var onSave: (CaseEntityTypeDefinition) -> Void
     @State private var isSaving = false
     @State private var fields: [EditableField] = []
     @State private var saveError: String?
+
+    // Mutable copies for editing (CaseEntityTypeDefinition has let properties)
+    @State private var editLabel: String = ""
+    @State private var editLabelPlural: String = ""
+    @State private var editShowInNav: Bool = true
 
     var body: some View {
         NavigationStack {
             Form {
                 Section(NSLocalizedString("admin_entity_type_section_general", comment: "General")) {
-                    TextField(NSLocalizedString("admin_entity_type_label", comment: "Label"), text: $entityType.label)
-                    TextField(NSLocalizedString("admin_entity_type_label_plural", comment: "Plural label"), text: Binding(
-                        get: { entityType.labelPlural ?? "" },
-                        set: { entityType.labelPlural = $0.isEmpty ? nil : $0 }
-                    ))
+                    TextField(NSLocalizedString("admin_entity_type_label", comment: "Label"), text: $editLabel)
+                    TextField(NSLocalizedString("admin_entity_type_label_plural", comment: "Plural label"), text: $editLabelPlural)
                     Toggle(NSLocalizedString("admin_entity_type_show_in_navigation", comment: "Show in navigation"),
-                           isOn: Binding(
-                            get: { entityType.showInNavigation ?? true },
-                            set: { entityType.showInNavigation = $0 }
-                           ))
+                           isOn: $editShowInNav)
                 }
                 Section(NSLocalizedString("cms_fields", comment: "Fields")) {
                     NavigationLink(NSLocalizedString("cms_edit_fields", comment: "Edit Fields")) {
@@ -35,7 +41,7 @@ struct EntityTypeEditorView: View {
                     }
                 }
             }
-            .navigationTitle(entityType.label)
+            .navigationTitle(editLabel)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -43,8 +49,13 @@ struct EntityTypeEditorView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(NSLocalizedString("common_save", comment: "Save")) { save() }
-                        .disabled(isSaving || entityType.label.isEmpty)
+                        .disabled(isSaving || editLabel.isEmpty)
                 }
+            }
+            .onAppear {
+                editLabel = entityType.label
+                editLabelPlural = entityType.labelPlural
+                editShowInNav = entityType.showInNavigation ?? true
             }
         }
     }
@@ -54,12 +65,15 @@ struct EntityTypeEditorView: View {
         saveError = nil
         Task {
             do {
-                let api = EntitySchemaAPIService.shared
-                let updated = try await api.customizeEntityType(
-                    id: entityType.id,
-                    label: entityType.label,
-                    labelPlural: entityType.labelPlural,
-                    showInNavigation: entityType.showInNavigation
+                let body = EntityTypeCustomizeBody(
+                    label: editLabel,
+                    labelPlural: editLabelPlural,
+                    showInNavigation: editShowInNav
+                )
+                let updated: CaseEntityTypeDefinition = try await appState.apiService.request(
+                    method: "PATCH",
+                    path: "/api/settings/cms/entity-types/\(entityType.id)/customize",
+                    body: body
                 )
                 await MainActor.run { onSave(updated); dismiss() }
             } catch {
