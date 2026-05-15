@@ -311,6 +311,7 @@ export const updateVolunteerViaApi = updateUserViaApi
 
 export interface CreateBanResult {
   phone: string
+  phoneHash: string
   reason: string
 }
 
@@ -321,11 +322,11 @@ export async function createBanViaApi(
   const phone = options?.phone ?? uniquePhone()
   const reason = options?.reason ?? 'E2E test ban'
 
-  const { status } = await apiPost(request, hubPath('/bans', options?.hubId), { phone, reason })
+  const { status, data } = await apiPost<{ ban: { phone: string; reason: string } }>(request, hubPath('/bans', options?.hubId), { phone, reason })
   if (status !== 200 && status !== 201) {
     throw new Error(`Failed to create ban: ${status}`)
   }
-  return { phone, reason }
+  return { phone, phoneHash: data.ban.phone, reason }
 }
 
 export async function removeBanViaApi(
@@ -1894,6 +1895,26 @@ export async function createCaseFromReportViaApi(
   if (status !== 201 && status !== 200) throw new Error(`Failed to link case to report: ${status}`)
   const linkData = data as Record<string, unknown>
   return { recordId, linkId: (linkData.id ?? linkData.caseId ?? recordId) as string }
+}
+
+/**
+ * Upload an entity field file (encrypted blob) via POST /uploads/entity-file.
+ * Returns the fileId and uploadedAt on success (201).
+ */
+export async function uploadEntityFileViaApi(
+  request: APIRequestContext,
+  blobSizeBytes: number = 1024,
+  seedHex: string = ADMIN_SEED,
+): Promise<{ fileId: string; uploadedAt: string }> {
+  const fullPath = '/api/uploads/entity-file'
+  // Use auth headers without Content-Type — Playwright sets multipart/form-data automatically
+  const { 'Content-Type': _ct, ...headers } = authHeaders(seedHex, 'POST', fullPath)
+  const res = await request.post(fullPath, {
+    headers,
+    multipart: { file: { name: 'entity-field.bin', mimeType: 'application/octet-stream', buffer: Buffer.alloc(blobSizeBytes, 0xab) } },
+  })
+  if (res.status() !== 201) throw new Error(`uploadEntityFileViaApi failed: ${res.status()}`)
+  return res.json() as Promise<{ fileId: string; uploadedAt: string }>
 }
 
 /**

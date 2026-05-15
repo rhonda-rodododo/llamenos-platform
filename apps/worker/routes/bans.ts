@@ -95,8 +95,8 @@ bans.post('/bulk',
     if (invalidPhones.length > 0) {
       return c.json({ error: `Invalid phone number(s): ${invalidPhones[0]}. Use E.164 format (e.g. +12125551234)` }, 400)
     }
-    const hashedPhones = body.phones.map(p => hashPhone(p, c.env.HMAC_SECRET))
-    const added = await services.records.bulkAddBans(hashedPhones, body.reason ?? '', pubkey, hubId, body.phones)
+    const entries = body.phones.map(p => ({ phoneHash: hashPhone(p, c.env.HMAC_SECRET), phoneDisplay: p }))
+    const added = await services.records.bulkAddBans(entries, body.reason ?? '', pubkey, hubId)
     await audit(services.audit, 'numberBanned', pubkey, { count: body.phones.length, bulk: true }, undefined, hubId ?? undefined)
     return c.json({ count: added })
   },

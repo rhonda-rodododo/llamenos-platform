@@ -258,6 +258,65 @@ export class ConnectionManager {
     return count
   }
 
+  /**
+   * Send a message to all connections of a specific user.
+   * Used for device:wipe events.
+   */
+  sendToUser(pubkey: string, message: string): number {
+    const conns = this.connections.get(pubkey)
+    if (!conns) return 0
+    let sent = 0
+    for (const conn of conns) {
+      try {
+        conn.ws.send(message)
+        sent++
+      } catch {
+        log.debug('Failed to send to connection', { pubkey })
+      }
+    }
+    return sent
+  }
+
+  /**
+   * Sign a device:wipe payload with the server Ed25519 key and send to all
+   * connections of a specific user.
+   *
+   * Clients verify the signature against the known server pubkey before
+   * acting on the wipe command.
+   *
+   * Signature covers: `${WS_PROTOCOL_VERSION}:device:wipe:${targetUserId}:${ts}`
+   */
+  sendSignedWipeToUser(
+    targetUserId: string,
+    payload: Record<string, unknown>,
+  ): number {
+    const ts = Date.now()
+    const sigMessage = `${WS_PROTOCOL_VERSION}:device:wipe:${targetUserId}:${ts}`
+    const sig = bytesToHex(ed25519Sign(this.serverKey, utf8ToBytes(sigMessage)))
+    const signedMessage = JSON.stringify({ ...payload, sig, ts })
+    return this.sendToUser(targetUserId, signedMessage)
+  }
+
+  /**
+   * Terminate all connections for a user.
+   * Called after erasure execution to force disconnect.
+   */
+  terminateUser(pubkey: string): void {
+    const conns = this.connections.get(pubkey)
+    if (!conns) return
+    for (const conn of conns) {
+      for (const hubId of conn.subscribedHubs) {
+        this.removeSubscription(pubkey, hubId)
+      }
+      try {
+        conn.ws.close(4001, 'account_erased')
+      } catch {
+        // Already closed
+      }
+    }
+    this.connections.delete(pubkey)
+  }
+
   private removeSubscription(pubkey: string, hubId: string): void {
     const hubSubs = this.hubSubscriptions.get(hubId)
     if (hubSubs) {

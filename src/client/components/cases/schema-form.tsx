@@ -12,6 +12,9 @@ import { ChevronDown, Lock, Shield, Users } from 'lucide-react'
 import { HelpTooltip } from '@/components/ui/help-tooltip'
 import { cn } from '@/lib/utils'
 import type { EntityTypeDefinition, EntityFieldDefinition } from '@/lib/api'
+import { LocationField, type LocationFieldValue } from '@/components/ui/location-field'
+import { EntityFileField } from './entity-file-field'
+import type { FileFieldValue } from '@protocol/schemas/entity-schema'
 
 export type SchemaFieldValues = Record<string, string | number | boolean | string[]>
 
@@ -214,7 +217,6 @@ function SchemaFieldRenderer({
   showAccessIndicator: boolean
   disabled: boolean
 }) {
-  const { t } = useTranslation()
   const isVisible = evaluateShowWhen(field, values)
 
   if (!isVisible) return null
@@ -424,6 +426,54 @@ function FieldInput({
           className={cn(readOnly && 'bg-muted/50')}
         />
       )
+
+    case 'location': {
+      const locVal = value
+        ? (typeof value === 'string' ? JSON.parse(value) as LocationFieldValue : null)
+        : null
+      if (readOnly) {
+        return (
+          <Input
+            id={fieldId}
+            data-testid={`input-${field.name}`}
+            value={locVal?.address ?? ''}
+            readOnly
+            disabled={disabled}
+            className="bg-muted/50"
+          />
+        )
+      }
+      return (
+        <LocationField
+          value={locVal}
+          onChange={loc => onChange(loc ? JSON.stringify(loc) : '')}
+          maxPrecision={field.locationOptions?.maxPrecision ?? 'exact'}
+          allowAutocomplete={field.locationOptions?.allowAutocomplete ?? true}
+          placeholder={field.placeholder}
+          disabled={disabled}
+        />
+      )
+    }
+
+    case 'file': {
+      const fileVal = value
+        ? (typeof value === 'string' ? JSON.parse(value) as FileFieldValue : (value as unknown) as FileFieldValue)
+        : null
+      if (readOnly) {
+        return (
+          <p id={fieldId} className="text-sm text-muted-foreground" data-testid={`input-${field.name}`}>
+            {fileVal ? '— file attached —' : '—'}
+          </p>
+        )
+      }
+      return (
+        <EntityFileField
+          value={fileVal}
+          onChange={(fv: FileFieldValue | null) => onChange(fv ? JSON.stringify(fv) : '')}
+          disabled={disabled}
+        />
+      )
+    }
 
     default:
       return (

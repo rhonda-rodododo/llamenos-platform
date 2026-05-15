@@ -1,6 +1,5 @@
 import { Hono } from 'hono'
 import { describeRoute, resolver, validator } from 'hono-openapi'
-import { z } from 'zod'
 import type { AppEnv } from '../types'
 import { requirePermission } from '../middleware/permission-guard'
 import {
@@ -18,14 +17,40 @@ import {
 } from '@protocol/schemas/events'
 import { okResponseSchema } from '@protocol/schemas/common'
 import { authErrors, notFoundError } from '../openapi/helpers'
-import { createLogger } from '../lib/logger'
-
-const logger = createLogger('routes.events')
 import { audit } from '../services/audit'
 import { KIND_RECORD_CREATED, KIND_RECORD_UPDATED } from '@shared/event-kinds'
 import { publishEvent } from '../lib/ws-events'
 
 const events = new Hono<AppEnv>()
+
+// =========================================================================
+// Admin events migration endpoints (EP06-A1)
+// Mounted on the authenticated router at /admin/events in app.ts
+// =========================================================================
+
+export const eventsAdminRouter = new Hono<AppEnv>()
+
+// GET /admin/events/migration-status — count of non-deprecated events
+eventsAdminRouter.get('/migration-status',
+  requirePermission('admin:settings'),
+  async (c) => {
+    const services = c.get('services')
+    const hubId = c.get('hubId') ?? ''
+    const pendingCount = await services.cases.getEventsMigrationCount(hubId)
+    return c.json({ pendingCount })
+  },
+)
+
+// POST /admin/events/migrate — mark all non-deprecated events as deprecated
+eventsAdminRouter.post('/migrate',
+  requirePermission('admin:settings'),
+  async (c) => {
+    const services = c.get('services')
+    const hubId = c.get('hubId') ?? ''
+    const migrated = await services.cases.migrateEvents(hubId)
+    return c.json({ migrated })
+  },
+)
 
 // --- List events (paginated, with filters) ---
 events.get('/',

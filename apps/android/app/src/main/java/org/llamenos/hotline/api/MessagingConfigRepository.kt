@@ -88,18 +88,19 @@ data class A2pRegistrationDto(
 
 @Singleton
 class MessagingConfigRepository @Inject constructor(
-    private val apiClient: ApiClient,
+    private val apiService: ApiService,
 ) {
     suspend fun getConfig(): MessagingConfigDto {
-        return apiClient.get("/settings/messaging")
+        return apiService.request("GET", "/settings/messaging")
     }
 
     suspend fun updateConfig(updates: Map<String, Any?>): MessagingConfigDto {
-        return apiClient.patch("/settings/messaging", updates)
+        return apiService.request("PATCH", "/settings/messaging", updates)
     }
 
     suspend fun testChannel(channel: String): Boolean {
-        val result: ConnectionTestDto = apiClient.post(
+        val result: ConnectionTestDto = apiService.request(
+            "POST",
             "/settings/messaging/test",
             mapOf("channel" to channel),
         )
@@ -108,14 +109,14 @@ class MessagingConfigRepository @Inject constructor(
 
     suspend fun getA2pStatus(hubId: String): A2pRegistrationDto? {
         return try {
-            apiClient.get("/provider-setup/a2p/status?hubId=$hubId")
+            apiService.request("GET", "/provider-setup/a2p/status?hubId=$hubId")
         } catch (_: Exception) {
             null
         }
     }
 
     suspend fun submitBrand(hubId: String, brandInfo: Map<String, Any>): A2pRegistrationDto {
-        return apiClient.post("/provider-setup/a2p/brand", mapOf(
+        return apiService.request("POST", "/provider-setup/a2p/brand", mapOf(
             "hubId" to hubId,
             "brandInfo" to brandInfo,
         ))
@@ -126,7 +127,7 @@ class MessagingConfigRepository @Inject constructor(
         hubId: String,
         campaignInfo: Map<String, Any>,
     ): A2pRegistrationDto {
-        return apiClient.post("/provider-setup/a2p/campaign", mapOf(
+        return apiService.request("POST", "/provider-setup/a2p/campaign", mapOf(
             "registrationId" to registrationId,
             "hubId" to hubId,
             "campaignInfo" to campaignInfo,
@@ -134,6 +135,6 @@ class MessagingConfigRepository @Inject constructor(
     }
 
     suspend fun skipA2p(hubId: String): A2pRegistrationDto {
-        return apiClient.post("/provider-setup/a2p/skip", mapOf("hubId" to hubId))
+        return apiService.request("POST", "/provider-setup/a2p/skip", mapOf("hubId" to hubId))
     }
 }

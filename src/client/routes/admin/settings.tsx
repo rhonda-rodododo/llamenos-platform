@@ -39,6 +39,8 @@ import { SpamSection } from '@/components/admin-settings/spam-section'
 import { RolesSection } from '@/components/admin-settings/roles-section'
 import { MigrationStatusSection } from '@/components/admin-settings/migration-status-section'
 import { ReportTypesSection } from '@/components/admin-settings/report-types-section'
+import { EventsMigrationPanel } from '@/components/admin-settings/events-migration-panel'
+import { EntityTemplatesSection } from '@/components/admin-settings/entity-templates-section'
 
 export const Route = createFileRoute('/admin/settings')({
   component: AdminSettingsPage,
@@ -297,6 +299,14 @@ function AdminSettingsPage() {
           </Suspense>
         )
       })}
+
+      <EventsMigrationPanel />
+
+      <EntityTemplatesSection
+        expanded={expanded.has('entity-templates')}
+        onToggle={(open) => toggleSection('entity-templates', open)}
+        statusSummary={t('entityTemplates.title', { defaultValue: 'Entity Templates' })}
+      />
 
       <MigrationStatusSection
         expanded={expanded.has('migrations')}

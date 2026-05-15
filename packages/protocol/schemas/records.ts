@@ -91,6 +91,8 @@ export const listRecordsQuerySchema = paginationSchema.extend({
   severityHash: z.string().optional(),
   assignedTo: z.string().optional(),
   parentRecordId: z.string().optional(),
+  blindIndexToken: z.string().optional(),
+  blindIndexField: z.string().optional(),
 })
 
 export type ListRecordsQuery = z.infer<typeof listRecordsQuerySchema>

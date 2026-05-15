@@ -2,6 +2,12 @@ import { z } from 'zod'
 import { recipientEnvelopeSchema, paginationSchema } from './common'
 import { locationPrecisionSchema } from './geocoding'
 
+/**
+ * @deprecated Events are now records whose entity type has category='event'.
+ * These schemas are retained for the migration period only.
+ * Use packages/protocol/schemas/records.ts and entity-schema.ts for new code.
+ */
+
 // --- Location Precision (re-exported from geocoding.ts) ---
 
 export { locationPrecisionSchema } from './geocoding'

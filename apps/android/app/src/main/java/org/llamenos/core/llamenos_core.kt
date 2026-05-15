@@ -721,9 +721,19 @@ internal object IntegrityCheckingUniffiLib {
     ): Short
     external fun uniffi_llamenos_core_checksum_func_mobile_random_bytes_hex(
     ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_recovery_group_generate_keypair(
+    ): Short
     external fun uniffi_llamenos_core_checksum_func_mobile_set_hub_key(
     ): Short
     external fun uniffi_llamenos_core_checksum_func_mobile_set_server_event_keys(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_shamir_combine(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_shamir_commit(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_shamir_split(
+    ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_shamir_verify(
     ): Short
     external fun uniffi_llamenos_core_checksum_func_mobile_sigchain_create_link(
     ): Short
@@ -848,13 +858,23 @@ external fun uniffi_llamenos_core_fn_func_mobile_puk_rotate(`oldSeedHex`: RustBu
 ): RustBuffer.ByValue
 external fun uniffi_llamenos_core_fn_func_mobile_puk_unwrap_seed(`envelope`: RustBuffer.ByValue,`expectedLabel`: RustBuffer.ByValue,`aadHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
-external fun uniffi_llamenos_core_fn_func_mobile_random_bytes_hex(uniffi_out_err: UniffiRustCallStatus, 
+external fun uniffi_llamenos_core_fn_func_mobile_random_bytes_hex(uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
-external fun uniffi_llamenos_core_fn_func_mobile_set_hub_key(`hubId`: RustBuffer.ByValue,`keyHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+external fun uniffi_llamenos_core_fn_func_mobile_recovery_group_generate_keypair(uniffi_out_err: UniffiRustCallStatus,
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_set_hub_key(`hubId`: RustBuffer.ByValue,`keyHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
 ): Unit
-external fun uniffi_llamenos_core_fn_func_mobile_set_server_event_keys(`currentHex`: RustBuffer.ByValue,`previousHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+external fun uniffi_llamenos_core_fn_func_mobile_set_server_event_keys(`currentHex`: RustBuffer.ByValue,`previousHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
 ): Unit
-external fun uniffi_llamenos_core_fn_func_mobile_sigchain_create_link(`id`: RustBuffer.ByValue,`seq`: Long,`prevHash`: RustBuffer.ByValue,`timestamp`: RustBuffer.ByValue,`payloadJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+external fun uniffi_llamenos_core_fn_func_mobile_shamir_combine(`sharesJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_shamir_commit(`shareJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_shamir_split(`secretHex`: RustBuffer.ByValue,`total`: Byte,`threshold`: Byte,uniffi_out_err: UniffiRustCallStatus,
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_shamir_verify(`shareJson`: RustBuffer.ByValue,`commitmentHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+): Byte
+external fun uniffi_llamenos_core_fn_func_mobile_sigchain_create_link(`id`: RustBuffer.ByValue,`seq`: Long,`prevHash`: RustBuffer.ByValue,`timestamp`: RustBuffer.ByValue,`payloadJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
 ): RustBuffer.ByValue
 external fun uniffi_llamenos_core_fn_func_mobile_sigchain_verify(`linksJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
@@ -1126,6 +1146,21 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_llamenos_core_checksum_func_mobile_random_bytes_hex() != 24092.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_recovery_group_generate_keypair() != 50192.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_shamir_combine() != 17864.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_shamir_commit() != 52194.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_shamir_split() != 65088.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_shamir_verify() != 37674.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_llamenos_core_checksum_func_mobile_set_hub_key() != 25956.toShort()) {
@@ -2794,6 +2829,93 @@ public object FfiConverterSequenceTypeRecipientKeyEnvelope: FfiConverterRustBuff
         }
     }
 }
+data class FfiShamirShare (
+    val `x`: kotlin.UByte
+    ,
+    val `y`: kotlin.String
+
+){
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeFfiShamirShare: FfiConverterRustBuffer<FfiShamirShare> {
+    override fun read(buf: ByteBuffer): FfiShamirShare {
+        return FfiShamirShare(
+            FfiConverterUByte.read(buf),
+            FfiConverterString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: FfiShamirShare) = (
+            FfiConverterUByte.allocationSize(value.`x`) +
+            FfiConverterString.allocationSize(value.`y`)
+    )
+
+    override fun write(value: FfiShamirShare, buf: ByteBuffer) {
+            FfiConverterUByte.write(value.`x`, buf)
+            FfiConverterString.write(value.`y`, buf)
+    }
+}
+
+data class RecoveryGroupKeypair (
+    val `publicKeyHex`: kotlin.String
+    ,
+    val `privateKeyHex`: kotlin.String
+
+){
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeRecoveryGroupKeypair: FfiConverterRustBuffer<RecoveryGroupKeypair> {
+    override fun read(buf: ByteBuffer): RecoveryGroupKeypair {
+        return RecoveryGroupKeypair(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: RecoveryGroupKeypair) = (
+            FfiConverterString.allocationSize(value.`publicKeyHex`) +
+            FfiConverterString.allocationSize(value.`privateKeyHex`)
+    )
+
+    override fun write(value: RecoveryGroupKeypair, buf: ByteBuffer) {
+            FfiConverterString.write(value.`publicKeyHex`, buf)
+            FfiConverterString.write(value.`privateKeyHex`, buf)
+    }
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeFfiShamirShare: FfiConverterRustBuffer<List<FfiShamirShare>> {
+    override fun read(buf: ByteBuffer): List<FfiShamirShare> {
+        val len = buf.getInt()
+        return List<FfiShamirShare>(len) {
+            FfiConverterTypeFfiShamirShare.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<FfiShamirShare>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeFfiShamirShare.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<FfiShamirShare>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeFfiShamirShare.write(it, buf)
+        }
+    }
+}
+
         /**
          * Decrypt a draft.
          */
@@ -3430,6 +3552,23 @@ public object FfiConverterSequenceTypeRecipientKeyEnvelope: FfiConverterRustBuff
     
 
         /**
+         * Generate an X25519 keypair for the recovery group.
+         *
+         * The returned private key MUST be split via Shamir immediately and then
+         * zeroized. It must never be stored or transmitted as-is.
+         */
+    @Throws(CryptoException::class) fun `mobileRecoveryGroupGenerateKeypair`(): RecoveryGroupKeypair {
+            return FfiConverterTypeRecoveryGroupKeypair.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_recovery_group_generate_keypair(
+
+        _status)
+}
+    )
+    }
+
+
+        /**
          * Store a hub symmetric key in Rust memory (never exposed to Swift/Kotlin).
          */
     @Throws(CryptoException::class) fun `mobileSetHubKey`(`hubId`: kotlin.String, `keyHex`: kotlin.String)
@@ -3454,6 +3593,73 @@ public object FfiConverterSequenceTypeRecipientKeyEnvelope: FfiConverterRustBuff
 }
     
     
+
+        /**
+         * Reconstruct the secret from a JSON array of [FfiShamirShare].
+         *
+         * `shares_json` must be a JSON array: `[{"x":1,"y":"aabbcc..."},...]`
+         * Returns the reconstructed secret as a hex string.
+         */
+    @Throws(CryptoException::class) fun `mobileShamirCombine`(`sharesJson`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_shamir_combine(
+
+        FfiConverterString.lower(`sharesJson`),_status)
+}
+    )
+    }
+
+
+        /**
+         * Compute a SHA-256 commitment for a share.
+         *
+         * `share_json` must be a JSON object: `{"x":1,"y":"aabbcc..."}`.
+         * Returns the commitment as a hex string.
+         */
+    @Throws(CryptoException::class) fun `mobileShamirCommit`(`shareJson`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_shamir_commit(
+
+        FfiConverterString.lower(`shareJson`),_status)
+}
+    )
+    }
+
+
+        /**
+         * Split `secret_hex` into `total` shares requiring `threshold` to reconstruct.
+         *
+         * Returns a list of [FfiShamirShare] with `total` entries.
+         * Each `y` field is the hex-encoded y-coordinates for that share index.
+         */
+    @Throws(CryptoException::class) fun `mobileShamirSplit`(`secretHex`: kotlin.String, `total`: kotlin.UByte, `threshold`: kotlin.UByte): List<FfiShamirShare> {
+            return FfiConverterSequenceTypeFfiShamirShare.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_shamir_split(
+
+        FfiConverterString.lower(`secretHex`),FfiConverterUByte.lower(`total`),FfiConverterUByte.lower(`threshold`),_status)
+}
+    )
+    }
+
+
+        /**
+         * Verify a share against a previously computed commitment.
+         *
+         * Returns `true` if the share matches the commitment.
+         */
+    @Throws(CryptoException::class) fun `mobileShamirVerify`(`shareJson`: kotlin.String, `commitmentHex`: kotlin.String): kotlin.Boolean {
+            return FfiConverterBoolean.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_shamir_verify(
+
+        FfiConverterString.lower(`shareJson`),FfiConverterString.lower(`commitmentHex`),_status)
+}
+    )
+    }
+
 
         /**
          * Create a new sigchain link using the device's Ed25519 key from mobile state.

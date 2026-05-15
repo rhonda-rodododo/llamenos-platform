@@ -705,10 +705,11 @@ export async function decryptWithPin(pin: string): Promise<string | null> {
 
 /** @deprecated No more nsec-based key import in v3. */
 export async function encryptWithPin(
-  _nsec: string,
-  _pin: string,
-  _pubkeyHex: string,
+  nsec: string,
+  pin: string,
+  pubkeyHex: string,
 ): Promise<void> {
+  void [nsec, pin, pubkeyHex]
   throw new Error('encryptWithPin removed in v3 — use deviceGenerateAndLoad instead')
 }
 
@@ -865,8 +866,9 @@ export async function decryptNote(
 
 /** @deprecated No more legacy note format. */
 export async function decryptLegacyNote(
-  _packed: string,
+  packed: string,
 ): Promise<import('@shared/types').NotePayload | null> {
+  void packed
   return null
 }
 
@@ -961,24 +963,28 @@ export async function decryptCallRecord(
 
 /** @deprecated Use hpkeOpenFromState instead. */
 export async function decryptTranscription(
-  _packed: string,
-  _ephemeralPubkeyHex: string,
+  packed: string,
+  ephemeralPubkeyHex: string,
 ): Promise<string | null> {
+  void [packed, ephemeralPubkeyHex]
   throw new Error('decryptTranscription removed in v3 — use hpkeOpenFromState')
 }
 
 /** @deprecated Drafts need v3 migration. */
-export async function encryptDraft(_plaintext: string): Promise<string> {
+export async function encryptDraft(plaintext: string): Promise<string> {
+  void plaintext
   throw new Error('encryptDraft removed in v3 — needs migration to HPKE')
 }
 
 /** @deprecated Drafts need v3 migration. */
-export async function decryptDraft(_packed: string): Promise<string | null> {
+export async function decryptDraft(packed: string): Promise<string | null> {
+  void packed
   return null
 }
 
 /** @deprecated Export encryption needs v3 migration. */
-export async function encryptExport(_jsonString: string): Promise<string> {
+export async function encryptExport(jsonString: string): Promise<string> {
+  void jsonString
   throw new Error('encryptExport removed in v3 — needs migration to HPKE')
 }
 
@@ -986,32 +992,36 @@ export async function encryptExport(_jsonString: string): Promise<string> {
 
 /** @deprecated Use hpkeOpenFromState with LABEL_FILE_METADATA. */
 export async function decryptFileMetadata(
-  _encryptedContentHex: string,
-  _ephemeralPubkeyHex: string,
+  encryptedContentHex: string,
+  ephemeralPubkeyHex: string,
 ): Promise<string | null> {
+  void [encryptedContentHex, ephemeralPubkeyHex]
   throw new Error('decryptFileMetadata removed in v3 — use hpkeOpenFromState')
 }
 
 /** @deprecated Use hpkeOpenKeyFromState with LABEL_FILE_KEY. */
 export async function unwrapFileKey(
-  _envelope: KeyEnvelope,
+  envelope: KeyEnvelope,
 ): Promise<string> {
+  void envelope
   throw new Error('unwrapFileKey removed in v3 — use hpkeOpenKeyFromState with LABEL_FILE_KEY')
 }
 
 /** @deprecated Use hpkeOpenKeyFromState with LABEL_HUB_KEY_WRAP. */
 export async function unwrapHubKey(
-  _envelope: KeyEnvelope,
+  envelope: KeyEnvelope,
 ): Promise<string> {
+  void envelope
   throw new Error('unwrapHubKey removed in v3 — use hpkeOpenKeyFromState with LABEL_HUB_KEY_WRAP')
 }
 
 /** @deprecated Use hpkeOpenKeyFromState + hpkeSealKey composition. */
 export async function rewrapFileKey(
-  _encryptedFileKeyHex: string,
-  _ephemeralPubkeyHex: string,
-  _newRecipientPubkeyHex: string,
+  encryptedFileKeyHex: string,
+  ephemeralPubkeyHex: string,
+  newRecipientPubkeyHex: string,
 ): Promise<RecipientEnvelope> {
+  void [encryptedFileKeyHex, ephemeralPubkeyHex, newRecipientPubkeyHex]
   throw new Error('rewrapFileKey removed in v3 — compose hpkeOpenKeyFromState + hpkeSealKey')
 }
 
@@ -1056,8 +1066,9 @@ export interface ProvisioningDecryptResult {
 
 /** @deprecated Device provisioning needs v3 migration. */
 export async function encryptNsecForProvisioning(
-  _ephemeralPubkeyHex: string,
+  ephemeralPubkeyHex: string,
 ): Promise<ProvisioningEncryptResult> {
+  void ephemeralPubkeyHex
   throw new Error('encryptNsecForProvisioning removed in v3')
 }
 
@@ -1068,10 +1079,75 @@ export async function generateProvisioningEphemeral(): Promise<string> {
 
 /** @deprecated Device provisioning needs v3 migration. */
 export async function decryptProvisionedNsec(
-  _encryptedHex: string,
-  _primaryPubkeyHex: string,
+  encryptedHex: string,
+  primaryPubkeyHex: string,
 ): Promise<ProvisioningDecryptResult> {
+  void [encryptedHex, primaryPubkeyHex]
   throw new Error('decryptProvisionedNsec removed in v3')
+}
+
+// ── Recovery group crypto ─────────────────────────────────────────────
+
+/** A Shamir secret share: x-index and y-value as hex. */
+export interface ShamirShare {
+  x: number
+  y: string // hex
+}
+
+/** Result of Shamir splitting a secret. */
+export interface ShamirSplitResult {
+  shares: ShamirShare[]
+  commitments: string[] // SHA-256 hex commitments
+}
+
+/** X25519 recovery group keypair. */
+export interface RecoveryGroupKeypair {
+  publicKeyHex: string
+  privateKeyHex: string
+}
+
+/** Split a secret (hex) into N shares with threshold K using Shamir SSS. */
+export async function shamirSplit(
+  secretHex: string,
+  total: number,
+  threshold: number,
+): Promise<ShamirSplitResult> {
+  if (useTauri) {
+    return tauriInvoke<ShamirSplitResult>('shamir_split', { secretHex, total, threshold })
+  }
+  throw new Error('WASM shamir split not yet implemented')
+}
+
+/** Combine >= threshold Shamir shares to reconstruct the secret. */
+export async function shamirCombine(shares: ShamirShare[]): Promise<string> {
+  if (useTauri) {
+    return tauriInvoke<string>('shamir_combine', { sharesJson: JSON.stringify(shares) })
+  }
+  throw new Error('WASM shamir combine not yet implemented')
+}
+
+/** Compute SHA-256 commitment for a Shamir share. */
+export async function shamirCommit(x: number, yHex: string): Promise<string> {
+  if (useTauri) {
+    return tauriInvoke<string>('shamir_commit', { x, yHex })
+  }
+  throw new Error('WASM shamir commit not yet implemented')
+}
+
+/** Verify a Shamir share against its SHA-256 commitment. */
+export async function shamirVerify(x: number, yHex: string, commitmentHex: string): Promise<boolean> {
+  if (useTauri) {
+    return tauriInvoke<boolean>('shamir_verify', { x, yHex, commitmentHex })
+  }
+  throw new Error('WASM shamir verify not yet implemented')
+}
+
+/** Generate an X25519 recovery group keypair. Caller MUST split privateKeyHex and zeroize. */
+export async function recoveryGroupGenerateKeypair(): Promise<RecoveryGroupKeypair> {
+  if (useTauri) {
+    return tauriInvoke<RecoveryGroupKeypair>('recovery_group_generate_keypair')
+  }
+  throw new Error('WASM recovery group keypair not yet implemented')
 }
 
 // ── Updater platform support ─────────────────────────────────────────

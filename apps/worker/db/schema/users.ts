@@ -25,7 +25,8 @@ export const users = pgTable('users', {
     .default(sql`'{"role-volunteer"}'::text[]`),
   displayName: text('display_name'),
   phone: text('phone'),
-  status: text('status').notNull().default('active'),
+    // Valid values: 'active', 'inactive', 'erased' (EP08: set on account erasure)
+    status: text('status').notNull().default('active'),
   hubRoles: jsonb('hub_roles').notNull().default([]),
   availability: text('availability').notNull().default('unavailable'),
   onBreak: boolean('on_break').default(false),

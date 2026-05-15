@@ -21,6 +21,8 @@ import {
   convertFromReportBodySchema,
   convertFromReportResponseSchema,
 } from '@protocol/schemas/records'
+
+
 import { createInteractionBodySchema, listInteractionsQuerySchema, caseInteractionSchema, interactionListResponseSchema, sourceInteractionLookupResponseSchema } from '@protocol/schemas/interactions'
 import { linkReportToCaseBodySchema, reportCaseLinkSchema, reportCaseLinkListResponseSchema } from '@protocol/schemas/report-links'
 import { notifyContactsBodySchema } from '@protocol/schemas/notifications'
@@ -30,9 +32,6 @@ import { okResponseSchema } from '@protocol/schemas/common'
 import { authErrors, notFoundError } from '../openapi/helpers'
 import { audit } from '../services/audit'
 import { KIND_RECORD_CREATED, KIND_RECORD_UPDATED, KIND_RECORD_ASSIGNED } from '@shared/event-kinds'
-import { createLogger } from '../lib/logger'
-
-const logger = createLogger('routes.records')
 import { publishEvent } from '../lib/ws-events'
 import { resolvePermissions } from '@shared/permissions'
 import { determineEnvelopeRecipients } from '../lib/envelope-recipients'
@@ -111,6 +110,8 @@ records.get('/',
       limit: query.limit,
       entityTypeId: query.entityTypeId,
       parentRecordId: query.parentRecordId,
+      blindIndexToken: query.blindIndexToken,
+      blindIndexField: query.blindIndexField,
     }
 
     // Scoped read: non-admin users filter by assignment
@@ -545,7 +546,7 @@ records.post('/',
         }
       } catch {
         // Auto-assignment is best-effort — never fail record creation
-        logger.warn('Auto-assignment failed for record', { recordId: record.id })
+        console.warn('[records] Auto-assignment failed for record', record.id)
       }
     }
 

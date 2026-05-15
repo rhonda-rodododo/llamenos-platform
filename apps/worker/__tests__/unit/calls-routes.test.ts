@@ -1,7 +1,10 @@
 import { describe, it, expect, vi } from 'vitest'
 import { Hono } from 'hono'
 import calls from '@worker/routes/calls'
+import { hashPhone } from '@worker/lib/crypto'
 import type { AppEnv } from '@worker/types'
+
+const TEST_HMAC_SECRET = 'a'.repeat(64) // gitleaks:allow
 
 function createTestApp(opts: {
   permissions?: string[]
@@ -505,10 +508,12 @@ describe('Calls Routes', () => {
       const auditSvc = makeMockAuditService()
       const pubkey = 'a'.repeat(64)
 
+      const hashedPhone = hashPhone('+15551234567', TEST_HMAC_SECRET)
       callsSvc.getActiveCallByCallId.mockResolvedValue({
         callId: 'call-1',
         answeredBy: pubkey,
-        callerNumber: '+15551234567',
+        callerNumber: hashedPhone, // already HMAC-hashed at call ingestion
+        callerLast4: '4567',
         hubId: 'hub-1',
       })
       callsSvc.endCall.mockResolvedValue({ callId: 'call-1', status: 'completed' })
@@ -522,6 +527,7 @@ describe('Calls Routes', () => {
         permissions: ['bans:report'],
         pubkey,
         services,
+        env: { HMAC_SECRET: TEST_HMAC_SECRET } as AppEnv['Bindings'],
       })
 
       const res = await app.request('/call-1/ban', {
@@ -534,7 +540,8 @@ describe('Calls Routes', () => {
       expect(body.banned).toBe(true)
       expect(body.hungUp).toBe(true)
       expect(recordsSvc.addBan).toHaveBeenCalledWith({
-        phone: '+15551234567',
+        phone: hashedPhone,
+        phoneDisplay: '***4567',
         reason: 'Harassment',
         bannedBy: pubkey,
         hubId: 'hub-1',
@@ -547,11 +554,13 @@ describe('Calls Routes', () => {
       const recordsSvc = makeMockRecordsService()
       const pubkey = 'a'.repeat(64)
 
+      const hashedPhone = hashPhone('+15551234567', TEST_HMAC_SECRET)
       callsSvc.getActiveCallByCallId.mockResolvedValue({
         callId: 'call-1',
         answeredBy: pubkey,
-        callerNumber: '+15551234567',
+        callerNumber: hashedPhone, // already HMAC-hashed at call ingestion
         hubId: 'hub-1',
+        // no callerLast4 — phoneDisplay should be undefined
       })
 
       const services = makeServices({ calls: callsSvc, records: recordsSvc })
@@ -559,6 +568,7 @@ describe('Calls Routes', () => {
         permissions: ['bans:report'],
         pubkey,
         services,
+        env: { HMAC_SECRET: TEST_HMAC_SECRET } as AppEnv['Bindings'],
       })
 
       const res = await app.request('/call-1/ban', {
@@ -568,7 +578,7 @@ describe('Calls Routes', () => {
       })
       expect(res.status).toBe(200)
       expect(recordsSvc.addBan).toHaveBeenCalledWith(
-        expect.objectContaining({ reason: 'Banned during active call' }),
+        expect.objectContaining({ reason: 'Banned during active call', phoneDisplay: undefined }),
       )
     })
 

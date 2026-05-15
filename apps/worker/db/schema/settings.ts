@@ -57,6 +57,7 @@ export const systemSettings = pgTable('system_settings', {
   ivrAudioMeta: jsonb('ivr_audio_meta').notNull().default([]),
   cleanupMetrics: jsonb('cleanup_metrics').notNull().default({}),
   geocodingConfig: jsonb('geocoding_config').notNull().default({}),
+  platformSettings: jsonb('platform_settings').notNull().default({}),
 })
 
 // ---------------------------------------------------------------------------
