@@ -31,6 +31,8 @@ import { ProviderTemplateService } from './provider-setup/templates'
 import { HubOnboardService } from './provider-setup/hub-onboard'
 import { ErasureService } from './erasure'
 import { RetentionService } from './retention'
+import { TeamsService } from './teams'
+import { TagsService } from './tags'
 
 export interface Services {
   identity: IdentityService
@@ -59,6 +61,8 @@ export interface Services {
   hubOnboard: HubOnboardService
   erasure: ErasureService
   retention: RetentionService
+  teams: TeamsService
+  tags: TagsService
 }
 
 export interface ServicesOpts {
@@ -114,6 +118,8 @@ export function createServices(db: Database, opts?: ServicesOpts): Services {
     hubOnboard: new HubOnboardService(db, providerSetup, settings),
     erasure: new ErasureService(db),
     retention: new RetentionService(db),
+    teams: new TeamsService(db),
+    tags: new TagsService(db),
   }
 
   // Only create firehose agent if seal key is configured
@@ -134,6 +140,10 @@ export function createServices(db: Database, opts?: ServicesOpts): Services {
 
 // Re-export service classes for direct import
 export {
+  ErasureService,
+  RetentionService,
+  TeamsService,
+  TagsService,
   IdentityService,
   SettingsService,
   RecordsService,

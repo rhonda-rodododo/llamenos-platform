@@ -2,11 +2,13 @@ import { Hono } from 'hono'
 import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { requirePermission } from '../middleware/permission-guard'
-import { listBlastsQuerySchema, createBlastBodySchema, updateBlastBodySchema, scheduleBlastBodySchema, importSubscribersBodySchema, updateBlastSettingsBodySchema, blastResponseSchema, subscriberStatsResponseSchema, blastSettingsResponseSchema, subscriberListResponseSchema, blastListResponseSchema, blastDeliveryListResponseSchema, importSubscribersResponseSchema } from '@protocol/schemas/blasts'
+import { listBlastsQuerySchema, createBlastBodySchema, updateBlastBodySchema, scheduleBlastBodySchema, importSubscribersBodySchema, updateBlastSettingsBodySchema, blastResponseSchema, subscriberStatsResponseSchema, blastSettingsResponseSchema, subscriberListResponseSchema, blastListResponseSchema, blastDeliveryListResponseSchema, importSubscribersResponseSchema, blastDeliveryResponseSchema } from '@protocol/schemas/blasts'
 import { okResponseSchema } from '@protocol/schemas/common'
 import { authErrors } from '../openapi/helpers'
 import { createLogger } from '../lib/logger'
 import { backgroundTask } from '../lib/hono-compat'
+import { publishEvent } from '../lib/ws-events'
+import { KIND_BLAST_PROGRESS } from '@shared/event-kinds'
 
 const logger = createLogger('routes.blasts')
 
@@ -475,6 +477,75 @@ blasts.get('/:id/deliveries',
     })
 
     return c.json({ deliveries: result.deliveries, total: result.total, page, limit })
+  },
+)
+
+blasts.post('/:id/deliveries/:deliveryId/retry',
+  describeRoute({
+    tags: ['Blasts'],
+    summary: 'Retry a single failed delivery',
+    responses: {
+      200: {
+        description: 'Delivery reset to pending',
+        content: {
+          'application/json': {
+            schema: resolver(blastDeliveryResponseSchema),
+          },
+        },
+      },
+      ...authErrors,
+    },
+  }),
+  requirePermission('blasts:send'),
+  async (c) => {
+    const blastId = c.req.param('id')
+    const deliveryId = c.req.param('deliveryId')
+    const hubId = c.get('hubId')
+    const services = c.get('services')
+    const delivery = await services.blasts.retryDelivery(blastId, deliveryId)
+    // Emit progress event so UI updates in real-time
+    backgroundTask(c,
+      services.blasts.computeBlastStats(blastId).then((stats) => {
+        publishEvent(c.env, KIND_BLAST_PROGRESS, { type: 'blast:progress', hubId, blastId, stats, batch: [] }, hubId)
+      }).catch((err) => {
+        logger.warn('Failed to emit blast progress after retryDelivery', err)
+      })
+    )
+    return c.json({ ok: true, delivery })
+  },
+)
+
+blasts.post('/:id/retry-failed',
+  describeRoute({
+    tags: ['Blasts'],
+    summary: 'Retry all failed deliveries for a blast',
+    responses: {
+      200: {
+        description: 'Failed deliveries reset to pending',
+        content: {
+          'application/json': {
+            schema: resolver(okResponseSchema),
+          },
+        },
+      },
+      ...authErrors,
+    },
+  }),
+  requirePermission('blasts:send'),
+  async (c) => {
+    const blastId = c.req.param('id')
+    const hubId = c.get('hubId')
+    const services = c.get('services')
+    const retriedCount = await services.blasts.retryFailedDeliveries(blastId)
+    // Emit progress event so UI updates in real-time
+    backgroundTask(c,
+      services.blasts.computeBlastStats(blastId).then((stats) => {
+        publishEvent(c.env, KIND_BLAST_PROGRESS, { type: 'blast:progress', hubId, blastId, stats, batch: [] }, hubId)
+      }).catch((err) => {
+        logger.warn('Failed to emit blast progress after retryFailedDeliveries', err)
+      })
+    )
+    return c.json({ ok: true, retriedCount })
   },
 )
 

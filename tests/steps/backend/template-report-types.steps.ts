@@ -6,8 +6,8 @@
  * steps from other step files.
  */
 import { expect } from '@playwright/test'
-import { Given, When, Then, Before, getState, setState } from './fixtures'
-import { getSharedState, setLastResponse } from './shared-state'
+import { When, Then, Before, getState, setState } from './fixtures'
+import { setLastResponse } from './shared-state'
 import { getScenarioState } from './common.steps'
 import {
   listCmsReportTypesViaApi,
@@ -15,8 +15,6 @@ import {
   createCmsReportTypeViaApi,
   updateCmsReportTypeViaApi,
   deleteCmsReportTypeViaApi,
-  applyTemplateViaApi,
-  apiPost,
 } from '../../api-helpers'
 
 // ── Local State ────────────────────────────────────────────────────
@@ -46,8 +44,9 @@ Before({ tags: '@cms' }, async ({ world }) => {
 async function findCmsReportTypeByName(
   request: import('@playwright/test').APIRequestContext,
   name: string,
+  hubId?: string,
 ): Promise<Record<string, unknown> | undefined> {
-  const types = await listCmsReportTypesViaApi(request)
+  const types = await listCmsReportTypesViaApi(request, hubId)
   return types.find(t => t.name === name)
 }
 
@@ -56,22 +55,25 @@ async function findCmsReportTypeByName(
 // ============================================================
 
 Then('CMS report type {string} should exist', async ({ request, world }, name: string) => {
-  const rt = await findCmsReportTypeByName(request, name)
+  const hubId = getScenarioState(world).hubId
+  const rt = await findCmsReportTypeByName(request, name, hubId)
   expect(rt).toBeTruthy()
   getReportTypeState(world).lastReportType = rt
   getReportTypeState(world).lastReportTypeId = rt!.id as string
 })
 
 Then('CMS report type {string} should have {string} enabled', async ({ request, world }, name: string, flag: string) => {
+  const hubId = getScenarioState(world).hubId
   const rt = getReportTypeState(world).lastReportType?.name === name
     ? getReportTypeState(world).lastReportType
-    : await findCmsReportTypeByName(request, name)
+    : await findCmsReportTypeByName(request, name, hubId)
   expect(rt).toBeTruthy()
   expect(rt![flag]).toBe(true)
 })
 
 When('the admin lists CMS report types', async ({ request, world }) => {
-  getReportTypeState(world).reportTypes = await listCmsReportTypesViaApi(request)
+  const hubId = getScenarioState(world).hubId
+  getReportTypeState(world).reportTypes = await listCmsReportTypesViaApi(request, hubId)
 })
 
 Then('{int} CMS report types should be returned', async ({ world }, count: number) => {
@@ -80,7 +82,8 @@ Then('{int} CMS report types should be returned', async ({ world }, count: numbe
 })
 
 When('the admin gets CMS report type {string}', async ({ request, world }, name: string) => {
-  const rt = await findCmsReportTypeByName(request, name)
+  const hubId = getScenarioState(world).hubId
+  const rt = await findCmsReportTypeByName(request, name, hubId)
   expect(rt).toBeTruthy()
   getReportTypeState(world).lastReportType = await getCmsReportTypeViaApi(request, rt!.id as string)
   getReportTypeState(world).lastReportTypeId = rt!.id as string

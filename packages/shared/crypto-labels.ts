@@ -153,12 +153,29 @@ export const LABEL_SERVER_SIGNING_KEY = 'llamenos:server-signing-key:v1'
 /** HKDF info for server signing key derivation */
 export const LABEL_SERVER_SIGNING_INFO = 'llamenos:server-signing-key-info:v1'
 
+// --- Server Identity (Nostr) ---
+
+/** Server Nostr key derivation salt */
+export const LABEL_SERVER_NOSTR_KEY = 'llamenos:server-nostr-key'
+
+/** Server Nostr key info parameter */
+export const LABEL_SERVER_NOSTR_KEY_INFO = 'llamenos:server-nostr-key:v1'
+
 // --- WebSocket Auth ---
 
 /** Challenge-response auth message binding for WebSocket relay */
 export const LABEL_WS_CHALLENGE = 'llamenos:ws-auth:v1'
 
-// --- Erasure ---
+// --- EP08: Account Lifecycle ---
 
-/** Ed25519 message binding for emergency erasure co-approver signature */
+/** Audit user key wrapping — per-user symmetric key HPKE-wrapped to admin pubkeys */
+export const LABEL_AUDIT_USER_KEY_WRAP = 'llamenos:audit-user-key-wrap:v1'
+
+/** Erasure override co-approver signature — Ed25519 sig over (targetUserId || timestamp || justification) */
 export const LABEL_ERASURE_OVERRIDE_SIG = 'llamenos:erasure-override-sig:v1'
+
+/** Audit entry details content encryption (AES-256-GCM AAD prefix) */
+export const LABEL_AUDIT_DETAILS = 'llamenos:audit-details:v1'
+
+/** Device wipe command signature — Ed25519 sig over (targetDevicePubkey || timestamp || reason) */
+export const LABEL_DEVICE_WIPE_SIG = 'llamenos:device-wipe-sig:v1'

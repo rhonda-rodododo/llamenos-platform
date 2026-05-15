@@ -27,6 +27,10 @@ import provisioningRoutes from './routes/provisioning'
 import hubRoutes from './routes/hubs'
 import blastsRoutes from './routes/blasts'
 import devicesRoutes from './routes/devices'
+import sessionRoutes from './routes/sessions'
+import securityEventsRoutes, { adminSecurityEventsRoutes } from './routes/security-events'
+import accountRoutes from './routes/account'
+import adminDevicesRoutes from './routes/admin/devices'
 import contactsRoutes from './routes/contacts'
 import contactsV2Routes from './routes/contacts-v2'
 import recordsRoutes from './routes/records'
@@ -51,6 +55,8 @@ import erasureRoutes from './routes/erasure'
 import retentionRoutes from './routes/retention'
 import platformBansRoutes from './routes/platform-bans'
 import platformSettingsRoutes from './routes/platform-settings'
+import teamsRoutes from './routes/teams'
+import tagsRoutes from './routes/tags'
 import { hubContext } from './middleware/hub'
 import { requestId } from './middleware/request-id'
 import { requestLogger } from './middleware/request-logger'
@@ -184,6 +190,11 @@ authenticated.route('/setup', setupRoutes)
 authenticated.route('/hubs', hubRoutes)
 authenticated.route('/blasts', blastsRoutes)
 authenticated.route('/devices', devicesRoutes)
+authenticated.route('/sessions', sessionRoutes)
+authenticated.route('/security-events', securityEventsRoutes)
+authenticated.route('/admin/security-events', adminSecurityEventsRoutes)
+authenticated.route('/account', accountRoutes)
+authenticated.route('/admin/devices', adminDevicesRoutes)
 authenticated.route('/contacts', contactsRoutes)
 authenticated.route('/directory', contactsV2Routes)
 authenticated.route('/records', recordsRoutes)
@@ -233,6 +244,8 @@ hubScoped.route('/', evidenceRoutes)
 hubScoped.route('/mls', mlsRoutes)
 hubScoped.route('/firehose', firehoseRoutes)
 hubScoped.route('/onboard', hubOnboardRoutes)
+hubScoped.route('/teams', teamsRoutes)
+hubScoped.route('/tags', tagsRoutes)
 
 authenticated.route('/hubs/:hubId', hubScoped)
 

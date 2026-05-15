@@ -252,6 +252,7 @@ export class CallsService {
           startedAt: call.startedAt,
           endedAt,
           duration,
+          answeredBy: call.answeredBy ?? null,
           status: finalStatus,
           hasTranscription: call.hasTranscription ?? false,
           hasVoicemail: call.hasVoicemail ?? false,

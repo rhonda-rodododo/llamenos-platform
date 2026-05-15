@@ -89,8 +89,8 @@ Given('the crypto service is locked', async ({ page }) => {
 Given('a stored identity exists', async ({ page }) => {
   let hasKey = await page.evaluate(() => {
     return (
-      localStorage.getItem('llamenos-encrypted-key') !== null ||
-      localStorage.getItem('tauri-store:keys.json:llamenos-encrypted-key') !== null
+      localStorage.getItem('stronghold:llamenos:llamenos-encrypted-device-keys') !== null ||
+      localStorage.getItem('llamenos:llamenos-encrypted-device-keys') !== null
     )
   })
   if (!hasKey) {
