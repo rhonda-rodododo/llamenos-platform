@@ -1,5 +1,5 @@
 {
-  "id": "f6270863-5f7b-4de4-90a4-9899940f1b16",
+  "id": "1e5545e0-7eb2-4290-8ea8-334cd2034fff",
   "prevId": "ce2ffa33-fec9-496f-b6e6-04f51430c044",
   "version": "7",
   "dialect": "postgresql",
@@ -607,6 +607,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "answered_by": {
+          "name": "answered_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "status": {
           "name": "status",
           "type": "text",
@@ -1154,12 +1160,6 @@
         },
         "parent_record_id": {
           "name": "parent_record_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "merged_into_id": {
-          "name": "merged_into_id",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -2126,18 +2126,6 @@
         },
         "last_interaction_at": {
           "name": "last_interaction_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "merged_into_id": {
-          "name": "merged_into_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "deleted_at": {
-          "name": "deleted_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false

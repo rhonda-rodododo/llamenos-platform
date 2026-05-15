@@ -7,7 +7,7 @@
  */
 import { expect } from '@playwright/test'
 import { When, Then, Given, Before } from './fixtures'
-import { getSharedState, setLastResponse } from './shared-state'
+import { setLastResponse } from './shared-state'
 import {
   apiGet,
   apiPost,
@@ -139,7 +139,8 @@ When('an admin creates a volunteer with valid data', async ({ request, world }) 
 
 When('an admin creates a shift with valid data', async ({ request, world }) => {
   setLastResponse(world, await apiPost(request, '/shifts', {
-    name: uniqueName('Contract Shift'),
+    id: crypto.randomUUID(),
+    encryptedName: uniqueName('Contract Shift'),
     startTime: '09:00',
     endTime: '17:00',
     days: [1, 2, 3, 4, 5],

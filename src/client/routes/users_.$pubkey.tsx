@@ -33,7 +33,6 @@ import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
-import { LANGUAGES } from '@shared/languages'
 
 const MESSAGING_CHANNELS = ['sms', 'whatsapp', 'signal', 'rcs', 'web'] as const
 
@@ -121,8 +120,6 @@ function UserProfilePage() {
     return phone.slice(0, 3) + '\u2022'.repeat(phone.length - 5) + phone.slice(-2)
   }
 
-  const langMap = new Map(LANGUAGES.map(l => [l.code, l]))
-
   return (
     <div className="space-y-6">
       {/* Back link */}
@@ -202,7 +199,7 @@ function UserProfilePage() {
             <div className="divide-y divide-border">
               {assignedShifts.map(shift => (
                 <div key={shift.id} className="flex flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
-                  <span className="text-sm font-medium">{shift.name}</span>
+                  <span className="text-sm font-medium">{shift.encryptedName}</span>
                   <span className="text-xs text-muted-foreground">
                     {shift.startTime} – {shift.endTime}
                   </span>

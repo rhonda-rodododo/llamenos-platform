@@ -21,7 +21,6 @@ import {
   generateTestKeypair,
   uniquePhone,
   uniqueName,
-  ADMIN_NSEC,
 } from '../../api-helpers'
 
 const BASE_URL = process.env.TEST_HUB_URL || 'http://localhost:3000'
@@ -159,7 +158,7 @@ When('the {string} user sends {string} to {string}', async ({ request, world }, 
   getSharedState(world).lastResponse = await sendRequest(request, method, path, user.nsec)
 })
 
-When('the {string} user sends {string} to {string} with valid volunteer body', async ({ request, world }, role: string, method: string, _path: string) => {
+When('the {string} user sends {string} to {string} with valid volunteer body', async ({ request, world }, role: string, _method: string, _path: string) => {
   const user = getPermMatrixState(world).roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
@@ -192,8 +191,10 @@ When('the {string} user sends {string} to {string} with valid shift body', async
   const user = getPermMatrixState(world).roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
-  getSharedState(world).lastResponse = await apiPost(request, '/shifts', {
-    name: uniqueName('PM Shift'),
+  const hubId = getScenarioState(world).hubId
+  getSharedState(world).lastResponse = await apiPost(request, hubId ? `/hubs/${hubId}/shifts` : '/shifts', {
+    id: crypto.randomUUID(),
+    encryptedName: uniqueName('PM Shift'),
     startTime: '09:00',
     endTime: '17:00',
     days: [1, 2, 3, 4, 5],
@@ -207,7 +208,7 @@ When('the {string} user sends {string} to the test shift endpoint with shift upd
 
   const hubId = getScenarioState(world).hubId
   getSharedState(world).lastResponse = await apiPatch(request, `/hubs/${hubId}/shifts/${getPermMatrixState(world).testShiftId}`, {
-    name: uniqueName('PM Shift Updated'),
+    encryptedName: uniqueName('PM Shift Updated'),
   }, user.nsec)
 })
 
@@ -410,7 +411,7 @@ When('the {string} user sends {string} to {string} with valid role body', async 
   }, user.nsec)
 })
 
-When('the {string} user sends {string} to {string} with share body', async ({ request, world }, role: string, _method: string, path: string) => {
+When('the {string} user sends {string} to {string} with share body', async ({ request, world }, role: string, _method: string, _path: string) => {
   const user = getPermMatrixState(world).roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 

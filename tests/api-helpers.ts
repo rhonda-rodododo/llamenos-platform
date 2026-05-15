@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /**
  * Authenticated API test helpers.
  *
@@ -25,7 +26,7 @@ export const ADMIN_NSEC = ADMIN_SEED
 
 // ── Ed25519 Authentication ───────────────────────────────────────
 
-function seedHexToPubkey(seedHex: string): string {
+export function seedHexToPubkey(seedHex: string): string {
   return bytesToHex(ed25519.getPublicKey(hexToBytes(seedHex)))
 }
 
@@ -360,7 +361,7 @@ export async function bulkAddBansViaApi(
 
 export interface CreateShiftResult {
   id: string
-  name: string
+  encryptedName: string
 }
 
 /** Resolve hub-scoped path prefix. Hub-scoped resources live at /hubs/:id/resource. */
@@ -371,6 +372,8 @@ function hubPath(base: string, hubId?: string): string {
 export async function createShiftViaApi(
   request: APIRequestContext,
   options?: {
+    encryptedName?: string
+    /** @deprecated use encryptedName */
     name?: string
     startTime?: string
     endTime?: string
@@ -379,19 +382,20 @@ export async function createShiftViaApi(
     hubId?: string
   },
 ): Promise<CreateShiftResult> {
-  const name = options?.name ?? uniqueName('TestShift')
+  const id = crypto.randomUUID()
+  const encryptedName = options?.encryptedName ?? options?.name ?? uniqueName('TestShift')
   const startTime = options?.startTime ?? '09:00'
   const endTime = options?.endTime ?? '17:00'
   const days = options?.days ?? [1, 2, 3, 4, 5]
   const userPubkeys = options?.userPubkeys ?? []
 
   const { status, data } = await apiPost<{ id: string }>(request, hubPath('/shifts', options?.hubId), {
-    name, startTime, endTime, days, userPubkeys,
+    id, encryptedName, startTime, endTime, days, userPubkeys,
   })
   if (status !== 200 && status !== 201) {
     throw new Error(`Failed to create shift: ${status}`)
   }
-  return { id: data.id, name }
+  return { id: data.id, encryptedName }
 }
 
 export async function deleteShiftViaApi(
@@ -406,8 +410,8 @@ export async function deleteShiftViaApi(
 export async function listShiftsViaApi(
   request: APIRequestContext,
   hubId?: string,
-): Promise<Array<{ id: string; name: string; startTime: string; endTime: string; days: number[]; userPubkeys: string[] }>> {
-  const { status, data } = await apiGet<{ shifts: Array<{ id: string; name: string; startTime: string; endTime: string; days: number[]; userPubkeys: string[] }> }>(request, hubPath('/shifts', hubId))
+): Promise<Array<{ id: string; encryptedName: string; startTime: string; endTime: string; days: number[]; userPubkeys: string[] }>> {
+  const { status, data } = await apiGet<{ shifts: Array<{ id: string; encryptedName: string; startTime: string; endTime: string; days: number[]; userPubkeys: string[] }> }>(request, hubPath('/shifts', hubId))
   if (status !== 200) throw new Error(`Failed to list shifts: ${status}`)
   return data.shifts
 }
@@ -415,7 +419,7 @@ export async function listShiftsViaApi(
 export async function updateShiftViaApi(
   request: APIRequestContext,
   id: string,
-  updates: { name?: string; startTime?: string; endTime?: string; days?: number[]; userPubkeys?: string[] },
+  updates: { encryptedName?: string; startTime?: string; endTime?: string; days?: number[]; userPubkeys?: string[] },
   hubId?: string,
 ): Promise<void> {
   const { status } = await apiPatch(request, hubPath(`/shifts/${id}`, hubId), updates)
@@ -462,13 +466,16 @@ export async function listRolesViaApi(
 
 export async function createRoleViaApi(
   request: APIRequestContext,
-  opts: { name: string; slug: string; permissions: string[]; description?: string },
+  opts: { name: string; slug: string; permissions: string[]; description?: string; encryptedName?: string; encryptedDescription?: string; envelopes?: Array<{ adminPubkey: string; encryptedName: string; encryptedDescription: string }> },
 ): Promise<RoleDefinition> {
   const { status, data } = await apiPost<RoleDefinition>(request, '/settings/roles', {
     name: opts.name,
     slug: opts.slug,
     permissions: opts.permissions,
     description: opts.description || `Custom role: ${opts.name}`,
+    encryptedName: opts.encryptedName,
+    encryptedDescription: opts.encryptedDescription,
+    envelopes: opts.envelopes,
   })
   if (status === 409) {
     // Role already exists (parallel test created it) — fetch and return it

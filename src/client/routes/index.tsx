@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/lib/auth'
 import { useEffect, useState } from 'react'
 import { useCalls, useCallTimer, useShiftStatus } from '@/lib/hooks'
-import { createNote, banAndHangup, getCallsTodayCount, getUserPresence, listUsers, type ActiveCall, type UserPresence, type User } from '@/lib/api'
+import { createNote, banAndHangup, getUserPresence, listUsers, type ActiveCall, type UserPresence, type User } from '@/lib/api'
+import { usePersonalStats } from '@/lib/queries/analytics'
 import { encryptNote } from '@/lib/platform'
 import { useTranscription } from '@/lib/transcription'
 
@@ -44,29 +45,15 @@ function DashboardPage() {
   const navigate = useNavigate()
   const { calls, currentCall, answerCall, hangupCall, reportSpam, ringingCalls, activeCalls } = useCalls()
   const { onShift, currentShift, nextShift } = useShiftStatus()
-  const [callsToday, setCallsToday] = useState<number | null>(null)
   const [presence, setPresence] = useState<UserPresence[]>([])
   const [users, setUsers] = useState<User[]>([])
+  const personalStats = usePersonalStats(isAuthenticated)
 
   useEffect(() => {
     if (!isAuthenticated) {
       navigate({ to: '/login' })
     }
   }, [isAuthenticated, navigate])
-
-  // Fetch calls today count on mount + refresh every 60s
-  useEffect(() => {
-    if (!isAuthenticated) return
-    let mounted = true
-    const fetch = () => {
-      getCallsTodayCount().then(r => { if (mounted) setCallsToday(r.count) }).catch(() => {
-        if (mounted) toast(t('common.error'), 'error')
-      })
-    }
-    fetch()
-    const interval = setInterval(fetch, 60_000)
-    return () => { mounted = false; clearInterval(interval) }
-  }, [isAuthenticated])
 
   // Fetch volunteer presence (admin only) with periodic refresh
   useEffect(() => {
@@ -123,12 +110,12 @@ function DashboardPage() {
               </p>
               {onShift && currentShift && !currentCall && (
                 <p className="text-xs text-muted-foreground">
-                  {currentShift.name} — {currentShift.startTime}–{currentShift.endTime}
+                  {currentShift.encryptedName} — {currentShift.startTime}–{currentShift.endTime}
                 </p>
               )}
               {!onShift && nextShift && !currentCall && (
                 <p className="text-xs text-muted-foreground">
-                  {t('shifts.nextShift')}: {nextShift.name} {t('shifts.startsAt')} {nextShift.startTime}
+                  {t('shifts.nextShift')}: {nextShift.encryptedName} {t('shifts.startsAt')} {nextShift.startTime}
                 </p>
               )}
             </div>
@@ -141,11 +128,38 @@ function DashboardPage() {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">{t('dashboard.callsToday')}</p>
-              <p className="text-2xl font-bold">{callsToday ?? '-'}</p>
+              <p className="text-2xl font-bold">{personalStats.data?.callsToday ?? '-'}</p>
             </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Personal stats */}
+      {personalStats.data && (
+        <Card data-testid="personal-stats-card">
+          <CardContent className="flex items-center gap-4 p-4">
+            <div className="text-center">
+              <p className="text-3xl font-bold">{personalStats.data.callsToday}</p>
+              <p className="text-xs text-muted-foreground">{t('analytics.personal.callsToday')}</p>
+            </div>
+            <div className="h-8 border-l" />
+            <div className="text-center">
+              <p className="text-lg font-semibold">{personalStats.data.callsThisPeriod}</p>
+              <p className="text-xs text-muted-foreground">{t('analytics.personal.callsThisPeriod')}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-lg font-semibold">
+                {Math.floor(personalStats.data.avgDurationSeconds / 60)}m {personalStats.data.avgDurationSeconds % 60}s
+              </p>
+              <p className="text-xs text-muted-foreground">{t('analytics.personal.avgDuration')}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-lg font-semibold">{personalStats.data.notesCreatedThisPeriod}</p>
+              <p className="text-xs text-muted-foreground">{t('analytics.personal.notesCreated')}</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Shift action */}
       {!currentCall && (
@@ -340,7 +354,6 @@ function ActiveCallPanel({ call, onHangup, onReportSpam, onBanNumber, authorPubk
       startTranscription()
     }
     return () => { cancelTranscription() }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function handleSaveNote() {

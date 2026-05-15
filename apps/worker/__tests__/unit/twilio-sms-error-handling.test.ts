@@ -11,6 +11,7 @@ const HMAC_SECRET = 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f
 describe('TwilioSMSAdapter — error handling (bug fixes)', () => {
   let adapter: TwilioSMSAdapter
   let fetchMock: ReturnType<typeof vi.fn>
+  const originalFetch = globalThis.fetch
 
   beforeEach(() => {
     adapter = new TwilioSMSAdapter('AC-account-123', 'auth-token-abc', '+15551234567', HMAC_SECRET)
@@ -19,6 +20,7 @@ describe('TwilioSMSAdapter — error handling (bug fixes)', () => {
   })
 
   afterEach(() => {
+    globalThis.fetch = originalFetch
     vi.restoreAllMocks()
   })
 

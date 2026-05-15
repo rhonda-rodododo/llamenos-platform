@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { Timeouts } from './helpers'
+import { loginAsAdmin, Timeouts } from './helpers'
 
 /**
  * Hub-specific API mock that returns different data depending on the hub ID
@@ -108,7 +108,7 @@ async function mockMultiHubApis(
 /**
  * Extract hub ID from a URL path like /api/hubs/{hubId}/onboard/...
  */
-function extractHubId(url: string, suffix: string): string {
+function extractHubId(url: string, _suffix: string): string {
   const match = url.match(/\/api\/hubs\/([^/]+)\//)
   return match ? decodeURIComponent(match[1]) : 'unknown'
 }
@@ -163,6 +163,7 @@ const HUB_B_DATA = {
 
 test.describe('Multi-Hub Navigation', () => {
   test('each hub displays its own provider type', async ({ page }) => {
+    await loginAsAdmin(page)
     // Mock with hub-specific data
     await mockMultiHubApis(page, {
       'hub-a': HUB_A_DATA,
@@ -178,6 +179,7 @@ test.describe('Multi-Hub Navigation', () => {
   })
 
   test('each hub displays its own usage data', async ({ page }) => {
+    await loginAsAdmin(page)
     await mockMultiHubApis(page, {
       'hub-a': HUB_A_DATA,
       'hub-b': HUB_B_DATA,
@@ -191,6 +193,7 @@ test.describe('Multi-Hub Navigation', () => {
   })
 
   test('unconfigured hub shows wizard while configured hub shows settings', async ({ page }) => {
+    await loginAsAdmin(page)
     await mockMultiHubApis(page, {
       'hub-a': HUB_A_DATA,
       'hub-b': {
@@ -217,6 +220,7 @@ test.describe('Multi-Hub Navigation', () => {
 
 test.describe('Multi-Hub Data Isolation', () => {
   test('hub data does not leak between different hub contexts', async ({ page }) => {
+    await loginAsAdmin(page)
     // Set up two hubs with very different usage numbers
     await mockMultiHubApis(page, {
       'hub-a': {

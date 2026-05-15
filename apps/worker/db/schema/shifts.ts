@@ -9,6 +9,7 @@ import {
   text,
   timestamp,
 } from 'drizzle-orm/pg-core'
+import { ringGroups } from './ring-groups'
 
 // ---------------------------------------------------------------------------
 // shifts
@@ -19,17 +20,19 @@ export const shifts = pgTable('shifts', {
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
   hubId: text('hub_id'),
-  name: text('name').notNull(),
+  encryptedName: text('encrypted_name').notNull(),
   startTime: text('start_time').notNull(),
   endTime: text('end_time').notNull(),
   days: integer('days')
     .array()
     .notNull()
     .default(sql`'{}'::int[]`),
+  ringGroupId: text('ring_group_id').references(() => ringGroups.id, { onDelete: 'restrict' }),
   userPubkeys: text('user_pubkeys')
     .array()
     .notNull()
     .default(sql`'{}'::text[]`),
+  createdBy: text('created_by'),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
     .defaultNow(),

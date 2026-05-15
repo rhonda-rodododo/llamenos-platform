@@ -233,10 +233,12 @@ export function createEntityRouter<
         const services = c.get('services')
         const svc = getSvc(services)
         const pubkey = c.get('pubkey')
+        const permissions = c.get('permissions') ?? []
         const body = c.req.valid('json' as never)
         const args: unknown[] = []
         if (hubScoped) args.push(getHubId(c))
         args.push(body)
+        args.push({ callerPubkey: pubkey, permissions })
         const result = await (svc[createMethod] as ServiceMethod)(...args)
         if (auditEvents.created) {
           const auditHubId = hubScoped ? getHubId(c) || undefined : undefined
@@ -271,12 +273,14 @@ export function createEntityRouter<
         const services = c.get('services')
         const svc = getSvc(services)
         const pubkey = c.get('pubkey')
+        const permissions = c.get('permissions') ?? []
         const id = c.req.param(idParam)
         const body = c.req.valid('json' as never)
         const args: unknown[] = []
         if (hubScoped) args.push(getHubId(c))
         args.push(id)
         args.push(body)
+        args.push({ callerPubkey: pubkey, permissions })
         const result = await (svc[updateMethod] as ServiceMethod)(...args)
         if (auditEvents.updated) {
           const auditHubId = hubScoped ? getHubId(c) || undefined : undefined
@@ -311,10 +315,12 @@ export function createEntityRouter<
         const services = c.get('services')
         const svc = getSvc(services)
         const pubkey = c.get('pubkey')
+        const permissions = c.get('permissions') ?? []
         const id = c.req.param(idParam)
         const args: unknown[] = []
         if (hubScoped) args.push(getHubId(c))
         args.push(id)
+        args.push({ callerPubkey: pubkey, permissions })
         const result = await (svc[deleteMethod] as ServiceMethod)(...args)
         if (auditEvents.deleted) {
           const auditHubId = hubScoped ? getHubId(c) || undefined : undefined

@@ -11,8 +11,6 @@ export interface AdminNavItem {
   labelKey: string
   /** Permission strings the user must hold (ALL must match). Empty = no permission gate. */
   requiredPermissions: string[]
-  /** Role gate — if set, user must have this role in auth.roles. */
-  requiredRole?: 'role-super-admin'
   /** data-testid applied to the sidebar link element. */
   testid: string
 }

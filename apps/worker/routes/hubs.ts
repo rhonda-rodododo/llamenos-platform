@@ -110,6 +110,17 @@ routes.post('/',
       return c.json({ error: message }, 500)
     }
 
+    // Auto-add the creator as hub admin
+    try {
+      await services.identity.setHubRole({
+        pubkey,
+        hubId: hub.id,
+        roleIds: ['role-hub-admin'],
+      })
+    } catch (hubRoleErr) {
+      console.warn(`[hubs] Failed to add creator as hub admin for ${hub.id}:`, hubRoleErr)
+    }
+
     // Provision hub-scoped storage buckets and IAM
     const storageManager = (c.env as unknown as Record<string, unknown>).STORAGE_MANAGER as StorageManager | undefined
     if (storageManager) {

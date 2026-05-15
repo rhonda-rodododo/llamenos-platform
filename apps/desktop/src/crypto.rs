@@ -13,7 +13,7 @@
 
 use std::sync::Mutex;
 
-use llamenos_core::{auth, device_keys, hpke_envelope, puk, sigchain};
+use llamenos_core::{auth, device_keys, hpke_envelope, puk, sas, sigchain};
 
 use aes_gcm::{
     aead::{Aead, KeyInit, Payload},
