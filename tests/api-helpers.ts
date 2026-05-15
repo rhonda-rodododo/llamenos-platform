@@ -382,6 +382,7 @@ export async function createShiftViaApi(
     hubId?: string
   },
 ): Promise<CreateShiftResult> {
+  const id = crypto.randomUUID()
   const encryptedName = options?.encryptedName ?? options?.name ?? uniqueName('TestShift')
   const startTime = options?.startTime ?? '09:00'
   const endTime = options?.endTime ?? '17:00'
@@ -389,7 +390,7 @@ export async function createShiftViaApi(
   const userPubkeys = options?.userPubkeys ?? []
 
   const { status, data } = await apiPost<{ id: string }>(request, hubPath('/shifts', options?.hubId), {
-    encryptedName, startTime, endTime, days, userPubkeys,
+    id, encryptedName, startTime, endTime, days, userPubkeys,
   })
   if (status !== 200 && status !== 201) {
     throw new Error(`Failed to create shift: ${status}`)
