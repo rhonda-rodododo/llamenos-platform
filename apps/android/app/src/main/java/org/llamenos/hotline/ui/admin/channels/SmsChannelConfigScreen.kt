@@ -29,7 +29,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import org.llamenos.i18n.I18n
+import androidx.compose.ui.res.stringResource
+import org.llamenos.hotline.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,7 +53,7 @@ fun SmsChannelConfigScreen(
     }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text(I18n.channels_sms_title) }) },
+        topBar = { TopAppBar(title = { Text(stringResource(R.string.channels_sms_title)) }) },
     ) { padding ->
         Column(
             modifier = Modifier
@@ -67,25 +68,25 @@ fun SmsChannelConfigScreen(
                         onCheckedChange = { enabled = it },
                         modifier = Modifier.testTag("sms-enabled-toggle"),
                     )
-                    Text(I18n.channels_sms_providerNote, style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.channels_sms_provider_note), style = MaterialTheme.typography.bodySmall)
                 }
             }
 
             Spacer(Modifier.height(16.dp))
 
-            Text(I18n.channels_sms_contentMode, style = MaterialTheme.typography.titleSmall)
+            Text(stringResource(R.string.channels_sms_content_mode), style = MaterialTheme.typography.titleSmall)
             Spacer(Modifier.height(8.dp))
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth().testTag("sms-content-mode")) {
                 SegmentedButton(
                     selected = contentMode == "full",
                     onClick = { contentMode = "full" },
                     shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-                ) { Text(I18n.channels_sms_contentModeFull) }
+                ) { Text(stringResource(R.string.channels_sms_content_mode_full)) }
                 SegmentedButton(
                     selected = contentMode == "notification-only",
                     onClick = { contentMode = "notification-only" },
                     shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-                ) { Text(I18n.channels_sms_contentModeNotification) }
+                ) { Text(stringResource(R.string.channels_sms_content_mode_notification)) }
             }
 
             Spacer(Modifier.height(16.dp))
@@ -120,7 +121,7 @@ fun SmsChannelConfigScreen(
                     ))
                 },
                 modifier = Modifier.fillMaxWidth().testTag("sms-save-btn"),
-            ) { Text(I18n.common_save) }
+            ) { Text(stringResource(R.string.common_save)) }
 
             Spacer(Modifier.height(16.dp))
 

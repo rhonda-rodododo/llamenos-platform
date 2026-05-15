@@ -100,7 +100,7 @@ class ShiftsViewModelTest {
 
     private fun mockShift(id: String) = org.llamenos.protocol.Shift(
         id = id,
-        name = "Test Shift",
+        encryptedName = "Test Shift",
         startTime = "09:00",
         endTime = "17:00",
         days = listOf(1.0, 2.0, 3.0),

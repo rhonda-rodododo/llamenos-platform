@@ -181,6 +181,7 @@ fun ContactNotificationSheet(
                 Spacer(Modifier.width(8.dp))
 
                 val anySelected = selected.values.any { it }
+                val sendErrorText = stringResource(R.string.notifications_send_error)
                 Button(
                     onClick = {
                         scope.launch {
@@ -205,8 +206,7 @@ fun ContactNotificationSheet(
                                 isSending = false
                                 onDismiss()
                             } catch (e: Exception) {
-                                error = e.message
-                                    ?: stringResource(R.string.notifications_send_error)
+                                error = e.message ?: sendErrorText
                                 isSending = false
                             }
                         }

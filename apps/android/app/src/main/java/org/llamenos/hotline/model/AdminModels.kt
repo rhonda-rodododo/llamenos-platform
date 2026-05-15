@@ -25,16 +25,16 @@ typealias User = org.llamenos.protocol.UserListResponseUser
 typealias UsersListResponse = org.llamenos.protocol.UserListResponse
 
 // ---- Ban List ----
-// Generated BanResponse has: phone, bannedBy, bannedAt, reason.
+// Generated BanListResponseBan has: phone, bannedBy, bannedAt, reason.
 // Extension properties in Extensions.kt provide identifierHash, createdBy, createdAt.
-typealias BanEntry = org.llamenos.protocol.BanResponse
+typealias BanEntry = org.llamenos.protocol.BanListResponseBan
 typealias BanListResponse = org.llamenos.protocol.BanListResponse
 typealias BulkBanRequest = org.llamenos.protocol.BulkBanBody
 
 // ---- Audit Log ----
-// Generated Entry has: id, action, actorPubkey, details (JsonObject), entryHash?, previousEntryHash?, createdAt.
+// Generated AuditListResponseEntry has: id, action, actorPubkey, details (JsonObject), entryHash?, previousEntryHash?, createdAt.
 // Extension properties in Extensions.kt provide detailsString and timestamp.
-typealias AuditEntry = org.llamenos.protocol.Entry
+typealias AuditEntry = org.llamenos.protocol.AuditListResponseEntry
 typealias AuditLogResponse = org.llamenos.protocol.AuditListResponse
 
 // ---- Invites ----

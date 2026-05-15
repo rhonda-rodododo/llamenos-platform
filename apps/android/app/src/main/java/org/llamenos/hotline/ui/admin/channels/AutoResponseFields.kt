@@ -11,7 +11,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import org.llamenos.i18n.I18n
+import androidx.compose.ui.res.stringResource
+import org.llamenos.hotline.R
 
 @Composable
 fun AutoResponseFields(
@@ -26,8 +27,8 @@ fun AutoResponseFields(
         OutlinedTextField(
             value = autoResponse,
             onValueChange = onAutoResponseChange,
-            label = { Text(I18n.channels_shared_autoResponse) },
-            supportingText = { Text(I18n.channels_shared_autoResponseHelp, style = MaterialTheme.typography.bodySmall) },
+            label = { Text(stringResource(R.string.channels_shared_auto_response)) },
+            supportingText = { Text(stringResource(R.string.channels_shared_auto_response_help), style = MaterialTheme.typography.bodySmall) },
             modifier = Modifier.fillMaxWidth().testTag("$idPrefix-auto-response"),
             minLines = 2,
         )
@@ -37,8 +38,8 @@ fun AutoResponseFields(
         OutlinedTextField(
             value = afterHoursResponse,
             onValueChange = onAfterHoursResponseChange,
-            label = { Text(I18n.channels_shared_afterHoursResponse) },
-            supportingText = { Text(I18n.channels_shared_afterHoursHelp, style = MaterialTheme.typography.bodySmall) },
+            label = { Text(stringResource(R.string.channels_shared_after_hours_response)) },
+            supportingText = { Text(stringResource(R.string.channels_shared_after_hours_help), style = MaterialTheme.typography.bodySmall) },
             modifier = Modifier.fillMaxWidth().testTag("$idPrefix-after-hours"),
             minLines = 2,
         )

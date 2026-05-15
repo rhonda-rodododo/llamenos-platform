@@ -447,7 +447,13 @@ function postProcessKotlin(
           if (typeof defaultVal === 'boolean') {
             kotlinDefault = String(defaultVal)
           } else if (typeof defaultVal === 'number') {
-            kotlinDefault = typeDecl.includes('Long') ? `${defaultVal}L` : String(defaultVal)
+            if (typeDecl.includes('Long')) {
+              kotlinDefault = `${defaultVal}L`
+            } else if (typeDecl.includes('Double') || typeDecl.includes('Float')) {
+              kotlinDefault = Number.isInteger(defaultVal) ? `${defaultVal}.0` : String(defaultVal)
+            } else {
+              kotlinDefault = String(defaultVal)
+            }
           } else if (typeof defaultVal === 'string') {
             const typeOnly = typeDecl.replace(/^:\s*/, '').replace(/[,\s].*$/, '')
             if (typeOnly === 'String' || typeOnly === 'String?') {
