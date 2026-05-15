@@ -1,6 +1,6 @@
 {
-  "id": "7ba48e12-c0d1-4e5a-b320-ep03teamstags",
-  "prevId": "404ba4dd-f765-4193-ac2e-4ffb16b92c3e",
+  "id": "8cd59f23-d1e2-5f6b-c431-ep03fkconstraint",
+  "prevId": "7ba48e12-c0d1-4e5a-b320-ep03teamstags",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -7517,7 +7517,34 @@
           "with": {}
         }
       },
-      "foreignKeys": {},
+      "foreignKeys": {
+        "contact_team_assignments_contact_id_contacts_id_fk": {
+          "name": "contact_team_assignments_contact_id_contacts_id_fk",
+          "tableFrom": "contact_team_assignments",
+          "tableTo": "contacts",
+          "columnsFrom": [
+            "contact_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "contact_team_assignments_team_id_teams_id_fk": {
+          "name": "contact_team_assignments_team_id_teams_id_fk",
+          "tableFrom": "contact_team_assignments",
+          "tableTo": "teams",
+          "columnsFrom": [
+            "team_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "contact_team_unique": {
@@ -7580,7 +7607,34 @@
           "with": {}
         }
       },
-      "foreignKeys": {},
+      "foreignKeys": {
+        "team_members_team_id_teams_id_fk": {
+          "name": "team_members_team_id_teams_id_fk",
+          "tableFrom": "team_members",
+          "tableTo": "teams",
+          "columnsFrom": [
+            "team_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "team_members_user_pubkey_users_pubkey_fk": {
+          "name": "team_members_user_pubkey_users_pubkey_fk",
+          "tableFrom": "team_members",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_pubkey"
+          ],
+          "columnsTo": [
+            "pubkey"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {
         "team_members_team_id_user_pubkey_pk": {
           "name": "team_members_team_id_user_pubkey_pk",
@@ -7661,7 +7715,21 @@
           "with": {}
         }
       },
-      "foreignKeys": {},
+      "foreignKeys": {
+        "teams_hub_id_hubs_id_fk": {
+          "name": "teams_hub_id_hubs_id_fk",
+          "tableFrom": "teams",
+          "tableTo": "hubs",
+          "columnsFrom": [
+            "hub_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -7740,7 +7808,21 @@
           "with": {}
         }
       },
-      "foreignKeys": {},
+      "foreignKeys": {
+        "tags_hub_id_hubs_id_fk": {
+          "name": "tags_hub_id_hubs_id_fk",
+          "tableFrom": "tags",
+          "tableTo": "hubs",
+          "columnsFrom": [
+            "hub_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "tags_hub_name_unique": {
