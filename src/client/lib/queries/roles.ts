@@ -6,7 +6,6 @@ import {
   deleteRole,
   getPermissionsCatalog,
 } from '@/lib/api'
-import type { RoleDefinition } from '@protocol/schemas/settings'
 
 export const roleKeys = {
   all: ['roles'] as const,
