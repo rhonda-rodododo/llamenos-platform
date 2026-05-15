@@ -51,6 +51,8 @@ import signalNotificationRoutes from './routes/signal-notification'
 import providerSetupRoutes from './routes/provider-setup'
 import providerTemplatesRoutes from './routes/provider-templates'
 import hubOnboardRoutes from './routes/hub-onboard'
+import teamsRoutes from './routes/teams'
+import tagsRoutes from './routes/tags'
 import { hubContext } from './middleware/hub'
 import { requestId } from './middleware/request-id'
 import { requestLogger } from './middleware/request-logger'
@@ -233,6 +235,8 @@ hubScoped.route('/', evidenceRoutes)
 hubScoped.route('/mls', mlsRoutes)
 hubScoped.route('/firehose', firehoseRoutes)
 hubScoped.route('/onboard', hubOnboardRoutes)
+hubScoped.route('/teams', teamsRoutes)
+hubScoped.route('/tags', tagsRoutes)
 
 authenticated.route('/hubs/:hubId', hubScoped)
 

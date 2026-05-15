@@ -1,6 +1,6 @@
 {
-  "id": "8cd59f23-d1e2-5f6b-c431-ep03fkconstraint",
-  "prevId": "7ba48e12-c0d1-4e5a-b320-ep03teamstags",
+  "id": "f8e4820d-f3e3-44a0-a6a9-d061cf00f296",
+  "prevId": "8cd59f23-d1e2-5f6b-c431-ep03fkconstraint",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -607,6 +607,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "answered_by": {
+          "name": "answered_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "status": {
           "name": "status",
           "type": "text",
@@ -659,12 +665,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "answered_by": {
-          "name": "answered_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {
@@ -3630,6 +3630,12 @@
         "max_case_assignments": {
           "name": "max_case_assignments",
           "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "team_id": {
+          "name": "team_id",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },

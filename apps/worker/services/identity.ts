@@ -283,7 +283,6 @@ export class IdentityService {
     encryptedSecretKey: string
     specializations?: string[]
     maxCaseAssignments?: number
-    teamId?: string
     supervisorPubkey?: string
   }): Promise<{ volunteer: ReturnType<typeof sanitizeUser> }> {
     const roles = data.roleIds ?? data.roles ?? ['role-volunteer']
@@ -302,7 +301,6 @@ export class IdentityService {
       callPreference: 'phone',
       specializations: data.specializations ?? [],
       maxCaseAssignments: data.maxCaseAssignments,
-      teamId: data.teamId,
       supervisorPubkey: data.supervisorPubkey,
     }).returning()
 

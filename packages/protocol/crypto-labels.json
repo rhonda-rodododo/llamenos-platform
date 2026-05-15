@@ -83,6 +83,8 @@
     "LABEL_PLATFORM_ROLE_NAME_ENCRYPT": "llamenos:platform-role-name-encrypt:v1",
     "LABEL_PLATFORM_ROLE_DESC_ENCRYPT": "llamenos:platform-role-desc-encrypt:v1",
     "LABEL_HUB_ROLE_ENCRYPT": "llamenos:hub-role-encrypt:v1",
+    "LABEL_TEAM_ENCRYPT": "llamenos:team-field:v1",
+    "LABEL_TAG_ENCRYPT": "llamenos:tag-field:v1",
     "LABEL_SAS_DERIVE": "llamenos:sas-derive:v1"
   }
 }
