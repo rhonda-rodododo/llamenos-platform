@@ -169,7 +169,7 @@ final class KeychainService: @unchecked Sendable {
             KeychainKey.pinLockoutUntil,
         ]
         for key in keys {
-            delete(key)
+            delete(key: key)
         }
     }
 
