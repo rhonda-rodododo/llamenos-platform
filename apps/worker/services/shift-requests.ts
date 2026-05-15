@@ -6,9 +6,9 @@
  * from the shift's (or ring group's) user list.
  * All state is stored in PostgreSQL via Drizzle ORM.
  */
-import { eq, and, inArray } from 'drizzle-orm'
+import { eq, and } from 'drizzle-orm'
 import type { Database } from '../db'
-import { shiftJoinRequests, shifts, ringGroupMembers, ringGroups } from '../db/schema'
+import { shiftJoinRequests, shifts, ringGroupMembers } from '../db/schema'
 import { ServiceError } from './settings'
 
 // ---------------------------------------------------------------------------

@@ -1,0 +1,223 @@
+/**
+ * RetentionService — manages data retention configuration and purge execution.
+ *
+ * Per-hub retention settings with platform-enforced minimums.
+ * Daily purge deletes records older than the configured retention period.
+ */
+import { eq, and, sql, lt, inArray } from 'drizzle-orm'
+import type { Database } from '../db'
+import {
+  retentionSettings,
+  retentionPlatformFloors,
+  callRecords,
+  notes,
+  auditLog,
+} from '../db/schema'
+import { ServiceError } from './settings'
+import type { AuditService } from './audit'
+import { createLogger } from '../lib/logger'
+
+const logger = createLogger('services.retention')
+
+const VALID_CATEGORIES = ['call_records', 'notes', 'messages', 'audit_log'] as const
+type RetentionCategory = (typeof VALID_CATEGORIES)[number]
+
+function isValidCategory(cat: string): cat is RetentionCategory {
+  return (VALID_CATEGORIES as readonly string[]).includes(cat)
+}
+
+export class RetentionService {
+  constructor(protected db: Database) {}
+
+  // ---------------------------------------------------------------------------
+  // Hub retention settings
+  // ---------------------------------------------------------------------------
+
+  async getSettings(hubId: string): Promise<(typeof retentionSettings.$inferSelect)[]> {
+    return this.db
+      .select()
+      .from(retentionSettings)
+      .where(eq(retentionSettings.hubId, hubId))
+  }
+
+  async upsertSettings(
+    hubId: string,
+    settings: { category: string; retentionDays: number }[],
+    updatedBy: string,
+  ): Promise<void> {
+    for (const s of settings) {
+      if (!isValidCategory(s.category)) {
+        throw new ServiceError(400, `Invalid retention category: ${s.category}`)
+      }
+    }
+
+    const floors = await this.getFloors()
+    for (const s of settings) {
+      const floor = floors.find((f) => f.category === s.category)
+      if (floor && s.retentionDays < floor.minRetentionDays) {
+        throw new ServiceError(
+          400,
+          `Retention for ${s.category} cannot be less than platform floor (${floor.minRetentionDays} days)`,
+        )
+      }
+    }
+
+    for (const s of settings) {
+      await this.db
+        .insert(retentionSettings)
+        .values({
+          hubId,
+          category: s.category,
+          retentionDays: s.retentionDays,
+          updatedAt: new Date(),
+          updatedBy,
+        })
+        .onConflictDoUpdate({
+          target: [retentionSettings.hubId, retentionSettings.category],
+          set: {
+            retentionDays: s.retentionDays,
+            updatedAt: new Date(),
+            updatedBy,
+          },
+        })
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Platform floors
+  // ---------------------------------------------------------------------------
+
+  async getFloors(): Promise<(typeof retentionPlatformFloors.$inferSelect)[]> {
+    return this.db.select().from(retentionPlatformFloors)
+  }
+
+  async upsertFloors(
+    floors: { category: string; minRetentionDays: number }[],
+    updatedBy: string,
+  ): Promise<void> {
+    for (const f of floors) {
+      if (!isValidCategory(f.category)) {
+        throw new ServiceError(400, `Invalid retention category: ${f.category}`)
+      }
+      await this.db
+        .insert(retentionPlatformFloors)
+        .values({
+          category: f.category,
+          minRetentionDays: f.minRetentionDays,
+          updatedAt: new Date(),
+          updatedBy,
+        })
+        .onConflictDoUpdate({
+          target: retentionPlatformFloors.category,
+          set: {
+            minRetentionDays: f.minRetentionDays,
+            updatedAt: new Date(),
+            updatedBy,
+          },
+        })
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Purge execution
+  // ---------------------------------------------------------------------------
+
+  async executePurge(
+    auditService: AuditService,
+  ): Promise<{ hubId: string; category: string; deletedCount: number }[]> {
+    const allSettings = await this.db.select().from(retentionSettings)
+    const results: { hubId: string; category: string; deletedCount: number }[] = []
+
+    for (const setting of allSettings) {
+      const cutoff = new Date(
+        Date.now() - setting.retentionDays * 24 * 60 * 60 * 1000,
+      )
+
+      let deletedCount = 0
+
+      switch (setting.category) {
+        case 'call_records': {
+          // Only purge terminal-state records — never delete active/ringing calls
+          const TERMINAL_STATUSES = ['ended', 'missed', 'no-answer', 'rejected']
+          const result = await this.db
+            .delete(callRecords)
+            .where(
+              and(
+                eq(callRecords.hubId, setting.hubId),
+                lt(callRecords.createdAt, cutoff),
+                inArray(callRecords.status, TERMINAL_STATUSES),
+              ),
+            )
+            .returning()
+          deletedCount = result.length
+          break
+        }
+        case 'notes': {
+          const result = await this.db
+            .delete(notes)
+            .where(
+              and(
+                eq(notes.hubId, setting.hubId),
+                lt(notes.createdAt, cutoff),
+              ),
+            )
+            .returning()
+          deletedCount = result.length
+          break
+        }
+        case 'messages': {
+          const result = await this.db.execute(sql`
+            DELETE FROM messages
+            WHERE conversation_id IN (
+              SELECT id FROM conversations WHERE hub_id = ${setting.hubId}
+            )
+            AND created_at < ${cutoff.toISOString()}::timestamptz
+            RETURNING id
+          `)
+          deletedCount = (result as unknown[]).length
+          break
+        }
+        case 'audit_log': {
+          const result = await this.db
+            .delete(auditLog)
+            .where(
+              and(
+                eq(auditLog.hubId, setting.hubId),
+                lt(auditLog.createdAt, cutoff),
+              ),
+            )
+            .returning()
+          deletedCount = result.length
+          break
+        }
+      }
+
+      if (deletedCount > 0) {
+        results.push({
+          hubId: setting.hubId,
+          category: setting.category,
+          deletedCount,
+        })
+
+        await auditService.log(
+          'retentionPurgeExecuted',
+          'system',
+          {
+            hubId: setting.hubId,
+            category: setting.category,
+            deletedCount,
+            retentionDays: setting.retentionDays,
+          },
+          setting.hubId,
+        )
+      }
+    }
+
+    logger.info('Retention purge complete', {
+      hubsProcessed: allSettings.length,
+      totalDeleted: results.reduce((sum, r) => sum + r.deletedCount, 0),
+    })
+
+    return results
+  }
+}

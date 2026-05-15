@@ -51,6 +51,10 @@ import signalNotificationRoutes from './routes/signal-notification'
 import providerSetupRoutes from './routes/provider-setup'
 import providerTemplatesRoutes from './routes/provider-templates'
 import hubOnboardRoutes from './routes/hub-onboard'
+import erasureRoutes from './routes/erasure'
+import retentionRoutes from './routes/retention'
+import platformBansRoutes from './routes/platform-bans'
+import platformSettingsRoutes from './routes/platform-settings'
 import ringGroupsRoutes from './routes/ring-groups'
 import recoveryGroupRoutes from './routes/recovery-group'
 import teamsRoutes from './routes/teams'
@@ -213,6 +217,10 @@ authenticated.route('/firehose', firehoseRoutes)
 authenticated.route('/signal-notification', signalNotificationRoutes)
 authenticated.route('/provider-setup', providerSetupRoutes)
 authenticated.route('/provider-templates', providerTemplatesRoutes)
+authenticated.route('/erasure', erasureRoutes)
+authenticated.route('/bans/platform', platformBansRoutes)
+authenticated.route('/retention', retentionRoutes)
+authenticated.route('/settings/platform', platformSettingsRoutes)
 authenticated.route('/ring-groups', ringGroupsRoutes)
 authenticated.route('/recovery-group', recoveryGroupRoutes.authenticated)
 
@@ -237,6 +245,7 @@ hubScoped.route('/settings', settingsRoutes)
 hubScoped.route('/analytics', analyticsRoutes)
 hubScoped.route('/messaging/signal', signalRoutes)
 hubScoped.route('/provider-setup', providerSetupRoutes)
+hubScoped.route('/retention', retentionRoutes)
 hubScoped.route('/', evidenceRoutes)
 // Phase 6: MLS handshake message routing (hub-scoped)
 hubScoped.route('/mls', mlsRoutes)

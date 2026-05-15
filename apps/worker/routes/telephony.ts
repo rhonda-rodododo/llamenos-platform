@@ -56,7 +56,7 @@ telephony.use('*', async (c, next) => {
     const isValid = await adapter.validateWebhook(c.req.raw)
     if (!isValid) {
       logger.error(`Webhook signature FAILED for ${url.pathname}`)
-      return new Response('Forbidden', { status: 403 })
+      return c.text('Forbidden', 403)
     }
   }
   await next()

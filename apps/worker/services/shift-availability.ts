@@ -5,7 +5,7 @@
  * unavailable for shifts (e.g., vacation, sick leave, personal time).
  * All state is stored in PostgreSQL via Drizzle ORM.
  */
-import { eq, and, gte, lte, or } from 'drizzle-orm'
+import { eq, and, gte, lte } from 'drizzle-orm'
 import type { Database } from '../db'
 import { userAvailabilityBlocks } from '../db/schema'
 import { ServiceError } from './settings'

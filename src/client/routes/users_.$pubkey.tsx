@@ -33,8 +33,6 @@ import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
-import { LANGUAGES } from '@shared/languages'
-
 const MESSAGING_CHANNELS = ['sms', 'whatsapp', 'signal', 'rcs', 'web'] as const
 
 export const Route = createFileRoute('/users_/$pubkey')({
@@ -120,8 +118,6 @@ function UserProfilePage() {
     if (!phone || phone.length < 6) return phone
     return phone.slice(0, 3) + '\u2022'.repeat(phone.length - 5) + phone.slice(-2)
   }
-
-  const langMap = new Map(LANGUAGES.map(l => [l.code, l]))
 
   return (
     <div className="space-y-6">
