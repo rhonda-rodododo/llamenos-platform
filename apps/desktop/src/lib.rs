@@ -173,6 +173,12 @@ pub fn run() {
             crypto::set_server_event_keys,
             crypto::decrypt_hub_event,
             crypto::decrypt_server_event,
+            // Shamir secret sharing (recovery group)
+            crypto::shamir_split,
+            crypto::shamir_combine,
+            crypto::shamir_commit,
+            crypto::shamir_verify,
+            crypto::recovery_group_generate_keypair,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

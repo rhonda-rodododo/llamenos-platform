@@ -271,8 +271,15 @@
     {
       "idx": 38,
       "version": "7",
-      "when": 1773708416650,
-      "tag": "0036_entity_templates_events_deprecation",
+      "when": 1778841614976,
+      "tag": "0036_ep08-p1-merge",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1778841614977,
+      "tag": "0037_entity_templates_events_deprecation",
       "breakpoints": true
     }
   ]

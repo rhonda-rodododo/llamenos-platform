@@ -29,6 +29,8 @@ export interface ScenarioState {
   messageId?: string
   lastApiResponse?: { status: number; data: unknown }
   banPhones: string[]
+  /** Maps plaintext phone → server-hashed phone (from ban API responses) */
+  phoneHashMap: Record<string, string>
   relayCapture?: RelayCapture
   hubId: string
 }
@@ -43,6 +45,7 @@ Before(async ({ world, workerHub }) => {
     volunteers: [],
     shiftIds: [],
     banPhones: [],
+    phoneHashMap: {},
     hubId: workerHub,
   }
   setState(world, STATE_KEY, s)
