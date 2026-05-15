@@ -1,4 +1,4 @@
-@desktop @ios @android
+@backend
 Feature: Platform-Scoped Ban Management
   As a super admin
   I want to manage platform-wide bans

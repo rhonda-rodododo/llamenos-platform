@@ -1,4 +1,4 @@
-@desktop @ios @android
+@backend
 Feature: Account Erasure
   As a user or admin
   I want to request and process account erasure

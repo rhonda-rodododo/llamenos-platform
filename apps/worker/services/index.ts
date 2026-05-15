@@ -31,6 +31,7 @@ import { ProviderTemplateService } from './provider-setup/templates'
 import { HubOnboardService } from './provider-setup/hub-onboard'
 import { ErasureService } from './erasure'
 import { RetentionService } from './retention'
+import { RecoveryGroupService } from './recovery-group'
 import { TeamsService } from './teams'
 import { TagsService } from './tags'
 
@@ -61,6 +62,7 @@ export interface Services {
   hubOnboard: HubOnboardService
   erasure: ErasureService
   retention: RetentionService
+  recoveryGroup: RecoveryGroupService
   teams: TeamsService
   tags: TagsService
 }
@@ -118,6 +120,7 @@ export function createServices(db: Database, opts?: ServicesOpts): Services {
     hubOnboard: new HubOnboardService(db, providerSetup, settings),
     erasure: new ErasureService(db),
     retention: new RetentionService(db),
+    recoveryGroup: new RecoveryGroupService(db, audit),
     teams: new TeamsService(db),
     tags: new TagsService(db),
   }
@@ -167,4 +170,5 @@ export {
   A2pRegistrationService,
   ProviderTemplateService,
   HubOnboardService,
+  RecoveryGroupService,
 }

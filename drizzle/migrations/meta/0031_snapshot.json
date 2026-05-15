@@ -1,6 +1,6 @@
 {
-  "id": "e7fe07a3-fe80-42ad-b964-b29deb21185c",
-  "prevId": "4565d8c3-a4e1-4811-94d0-bfcbf72f4d4b",
+  "id": "bf70ca57-e0e3-4c7f-a1c9-12d533785fd5",
+  "prevId": "9f958b1a-907f-42b7-b588-3f002f738a5f",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -5273,6 +5273,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "phone_plain": {
+          "name": "phone_plain",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "reason": {
           "name": "reason",
           "type": "text",
@@ -8082,21 +8088,107 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.erasure_requests": {
-      "name": "erasure_requests",
+    "public.user_recovery_envelopes": {
+      "name": "user_recovery_envelopes",
       "schema": "",
       "columns": {
-        "id": {
-          "name": "id",
+        "user_pubkey": {
+          "name": "user_pubkey",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hub_id": {
+          "name": "hub_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "envelope": {
+          "name": "envelope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "user_recovery_envelopes_hub_id_hubs_id_fk": {
+          "name": "user_recovery_envelopes_hub_id_hubs_id_fk",
+          "tableFrom": "user_recovery_envelopes",
+          "tableTo": "hubs",
+          "columnsFrom": [
+            "hub_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "user_recovery_envelopes_user_pubkey_hub_id_pk": {
+          "name": "user_recovery_envelopes_user_pubkey_hub_id_pk",
+          "columns": [
+            "user_pubkey",
+            "hub_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.recovery_sessions": {
+      "name": "recovery_sessions",
+      "schema": "",
+      "columns": {
+        "session_id": {
+          "name": "session_id",
           "type": "text",
           "primaryKey": true,
           "notNull": true
         },
-        "user_id": {
-          "name": "user_id",
+        "hub_id": {
+          "name": "hub_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "user_pubkey": {
+          "name": "user_pubkey",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "new_device_pubkey": {
+          "name": "new_device_pubkey",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "signal_verified": {
+          "name": "signal_verified",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "status": {
           "name": "status",
@@ -8105,53 +8197,28 @@
           "notNull": true,
           "default": "'pending'"
         },
-        "requested_by": {
-          "name": "requested_by",
+        "verification_code_hash": {
+          "name": "verification_code_hash",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "verification_attempts": {
+          "name": "verification_attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true
         },
-        "requested_at": {
-          "name": "requested_at",
+        "completed_at": {
+          "name": "completed_at",
           "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "execute_at": {
-          "name": "execute_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "executed_at": {
-          "name": "executed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "justification": {
-          "name": "justification",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "emergency_override": {
-          "name": "emergency_override",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "co_approver_pubkey": {
-          "name": "co_approver_pubkey",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "co_approver_signature": {
-          "name": "co_approver_signature",
-          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
@@ -8160,14 +8227,33 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
+        },
+        "cancelled_by": {
+          "name": "cancelled_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "emergency_override": {
+          "name": "emergency_override",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
         }
       },
       "indexes": {
-        "erasure_requests_user_id_idx": {
-          "name": "erasure_requests_user_id_idx",
+        "recovery_sessions_hub_id_idx": {
+          "name": "recovery_sessions_hub_id_idx",
           "columns": [
             {
-              "expression": "user_id",
+              "expression": "hub_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -8178,8 +8264,23 @@
           "method": "btree",
           "with": {}
         },
-        "erasure_requests_status_idx": {
-          "name": "erasure_requests_status_idx",
+        "recovery_sessions_user_pubkey_idx": {
+          "name": "recovery_sessions_user_pubkey_idx",
+          "columns": [
+            {
+              "expression": "user_pubkey",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "recovery_sessions_status_idx": {
+          "name": "recovery_sessions_status_idx",
           "columns": [
             {
               "expression": "status",
@@ -8192,21 +8293,6 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "erasure_requests_execute_at_idx": {
-          "name": "erasure_requests_execute_at_idx",
-          "columns": [
-            {
-              "expression": "execute_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
         }
       },
       "foreignKeys": {},
@@ -8216,52 +8302,116 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.retention_platform_floors": {
-      "name": "retention_platform_floors",
+    "public.recovery_session_contributions": {
+      "name": "recovery_session_contributions",
       "schema": "",
       "columns": {
-        "category": {
-          "name": "category",
+        "session_id": {
+          "name": "session_id",
           "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "min_retention_days": {
-          "name": "min_retention_days",
-          "type": "integer",
           "primaryKey": false,
           "notNull": true
         },
-        "updated_at": {
-          "name": "updated_at",
+        "contributor_pubkey": {
+          "name": "contributor_pubkey",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "encrypted_share": {
+          "name": "encrypted_share",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "contributor_signature": {
+          "name": "contributor_signature",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "contributed_at": {
+          "name": "contributed_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "updated_by": {
-          "name": "updated_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
         }
       },
       "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "foreignKeys": {
+        "recovery_session_contributions_session_id_recovery_sessions_session_id_fk": {
+          "name": "recovery_session_contributions_session_id_recovery_sessions_session_id_fk",
+          "tableFrom": "recovery_session_contributions",
+          "tableTo": "recovery_sessions",
+          "columnsFrom": [
+            "session_id"
+          ],
+          "columnsTo": [
+            "session_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "recovery_session_contributions_session_id_contributor_pubkey_pk": {
+          "name": "recovery_session_contributions_session_id_contributor_pubkey_pk",
+          "columns": [
+            "session_id",
+            "contributor_pubkey"
+          ]
+        }
+      },
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.erasure_config": {
-      "name": "erasure_config",
+    "public.hub_recovery_groups": {
+      "name": "hub_recovery_groups",
       "schema": "",
       "columns": {
         "hub_id": {
           "name": "hub_id",
           "type": "text",
           "primaryKey": true,
+          "notNull": true
+        },
+        "group_public_key": {
+          "name": "group_public_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "threshold": {
+          "name": "threshold",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "total_shares": {
+          "name": "total_shares",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "share_commitments": {
+          "name": "share_commitments",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "duress_commitments": {
+          "name": "duress_commitments",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sigchain_link_hash": {
+          "name": "sigchain_link_hash",
+          "type": "text",
+          "primaryKey": false,
           "notNull": true
         },
         "delay_hours": {
@@ -8269,27 +8419,27 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "default": 72
+          "default": 24
         },
-        "emergency_override_enabled": {
-          "name": "emergency_override_enabled",
-          "type": "boolean",
+        "emergency_floor_hours": {
+          "name": "emergency_floor_hours",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "default": true
+          "default": 4
         },
-        "updated_at": {
-          "name": "updated_at",
+        "created_at": {
+          "name": "created_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
         },
-        "updated_by": {
-          "name": "updated_by",
-          "type": "text",
+        "rotated_at": {
+          "name": "rotated_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         }
       },
       "indexes": {},
@@ -8297,60 +8447,58 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "threshold_range": {
+          "name": "threshold_range",
+          "value": "\"hub_recovery_groups\".\"threshold\" >= 2 AND \"hub_recovery_groups\".\"threshold\" <= 5"
+        },
+        "total_shares_range": {
+          "name": "total_shares_range",
+          "value": "\"hub_recovery_groups\".\"total_shares\" >= 3 AND \"hub_recovery_groups\".\"total_shares\" <= 5"
+        },
+        "threshold_lte_total": {
+          "name": "threshold_lte_total",
+          "value": "\"hub_recovery_groups\".\"threshold\" <= \"hub_recovery_groups\".\"total_shares\""
+        },
+        "delay_hours_range": {
+          "name": "delay_hours_range",
+          "value": "\"hub_recovery_groups\".\"delay_hours\" >= 4 AND \"hub_recovery_groups\".\"delay_hours\" <= 168"
+        },
+        "emergency_floor_range": {
+          "name": "emergency_floor_range",
+          "value": "\"hub_recovery_groups\".\"emergency_floor_hours\" >= 1 AND \"hub_recovery_groups\".\"emergency_floor_hours\" <= 24"
+        },
+        "emergency_lte_delay": {
+          "name": "emergency_lte_delay",
+          "value": "\"hub_recovery_groups\".\"emergency_floor_hours\" <= \"hub_recovery_groups\".\"delay_hours\""
+        }
+      },
       "isRLSEnabled": false
     },
-    "public.re_encryption_jobs": {
-      "name": "re_encryption_jobs",
+    "public.hub_recovery_group_shares": {
+      "name": "hub_recovery_group_shares",
       "schema": "",
       "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
         "hub_id": {
           "name": "hub_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "status": {
-          "name": "status",
+        "holder_pubkey": {
+          "name": "holder_pubkey",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "default": "'queued'"
+          "notNull": true
         },
-        "total_envelopes": {
-          "name": "total_envelopes",
-          "type": "integer",
+        "share_envelope": {
+          "name": "share_envelope",
+          "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "default": 0
+          "notNull": true
         },
-        "processed_envelopes": {
-          "name": "processed_envelopes",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "started_at": {
-          "name": "started_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "completed_at": {
-          "name": "completed_at",
+        "last_liveness_proof": {
+          "name": "last_liveness_proof",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
@@ -8363,128 +8511,28 @@
           "default": "now()"
         }
       },
-      "indexes": {
-        "re_encryption_jobs_user_id_idx": {
-          "name": "re_encryption_jobs_user_id_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "re_encryption_jobs_status_idx": {
-          "name": "re_encryption_jobs_status_idx",
-          "columns": [
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.audit_user_keys": {
-      "name": "audit_user_keys",
-      "schema": "",
-      "columns": {
-        "user_pubkey": {
-          "name": "user_pubkey",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "encrypted_key": {
-          "name": "encrypted_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "admin_envelopes": {
-          "name": "admin_envelopes",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'[]'::jsonb"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
       "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.retention_settings": {
-      "name": "retention_settings",
-      "schema": "",
-      "columns": {
-        "hub_id": {
-          "name": "hub_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "category": {
-          "name": "category",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "retention_days": {
-          "name": "retention_days",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_by": {
-          "name": "updated_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
+      "foreignKeys": {
+        "hub_recovery_group_shares_hub_id_hub_recovery_groups_hub_id_fk": {
+          "name": "hub_recovery_group_shares_hub_id_hub_recovery_groups_hub_id_fk",
+          "tableFrom": "hub_recovery_group_shares",
+          "tableTo": "hub_recovery_groups",
+          "columnsFrom": [
+            "hub_id"
+          ],
+          "columnsTo": [
+            "hub_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
-      "indexes": {},
-      "foreignKeys": {},
       "compositePrimaryKeys": {
-        "retention_settings_hub_id_category_pk": {
-          "name": "retention_settings_hub_id_category_pk",
+        "hub_recovery_group_shares_hub_id_holder_pubkey_pk": {
+          "name": "hub_recovery_group_shares_hub_id_holder_pubkey_pk",
           "columns": [
             "hub_id",
-            "category"
+            "holder_pubkey"
           ]
         }
       },
