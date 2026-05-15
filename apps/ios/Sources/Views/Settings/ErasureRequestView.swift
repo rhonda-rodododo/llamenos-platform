@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Self-service erasure request view. Shows countdown if request is active,
 /// or the request form if not. Accessible from Account Settings.
-struct AppErasureRequestView: View {
+struct ErasureRequestView: View {
     @Environment(AppState.self) private var appState
     @State private var viewModel: ErasureViewModel?
 
