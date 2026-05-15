@@ -68,6 +68,17 @@ data class EncryptedMessage(
     val envelopes: List<RecipientEnvelope>,
 )
 
+@kotlinx.serialization.Serializable
+data class ShamirShare(
+    val x: Int,
+    val y: String,
+)
+
+data class RecoveryGroupKeypair(
+    val publicKeyHex: String,
+    val privateKeyHex: String,
+)
+
 class CryptoException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
 /**
@@ -635,6 +646,77 @@ class CryptoService @Inject constructor() {
             null
         }
     }
+
+    // ---- Shamir Secret Sharing ----
+
+    suspend fun shamirSplit(secretHex: String, total: Int, threshold: Int): List<ShamirShare> =
+        withContext(computeDispatcher) {
+            check(nativeLibLoaded) { "Native crypto library not loaded." }
+            try {
+                val ffiShares = org.llamenos.core.mobileShamirSplit(
+                    secretHex = secretHex,
+                    total = total.toUByte(),
+                    threshold = threshold.toUByte(),
+                )
+                ffiShares.map { share ->
+                    ShamirShare(x = share.x.toInt(), y = share.y)
+                }
+            } catch (e: Exception) {
+                throw CryptoException("Shamir split failed: ${e.message}", e)
+            }
+        }
+
+    suspend fun shamirCombine(shares: List<ShamirShare>): String =
+        withContext(computeDispatcher) {
+            check(nativeLibLoaded) { "Native crypto library not loaded." }
+            try {
+                val sharesJson = json.encodeToString(
+                    kotlinx.serialization.builtins.ListSerializer(ShamirShare.serializer()),
+                    shares,
+                )
+                org.llamenos.core.mobileShamirCombine(sharesJson = sharesJson)
+            } catch (e: Exception) {
+                throw CryptoException("Shamir combine failed: ${e.message}", e)
+            }
+        }
+
+    suspend fun shamirCommit(share: ShamirShare): String =
+        withContext(computeDispatcher) {
+            check(nativeLibLoaded) { "Native crypto library not loaded." }
+            try {
+                val shareJson = json.encodeToString(ShamirShare.serializer(), share)
+                org.llamenos.core.mobileShamirCommit(shareJson = shareJson)
+            } catch (e: Exception) {
+                throw CryptoException("Shamir commit failed: ${e.message}", e)
+            }
+        }
+
+    suspend fun shamirVerify(share: ShamirShare, commitment: String): Boolean =
+        withContext(computeDispatcher) {
+            check(nativeLibLoaded) { "Native crypto library not loaded." }
+            try {
+                val shareJson = json.encodeToString(ShamirShare.serializer(), share)
+                org.llamenos.core.mobileShamirVerify(shareJson = shareJson, commitmentHex = commitment)
+            } catch (e: Exception) {
+                throw CryptoException("Shamir verify failed: ${e.message}", e)
+            }
+        }
+
+    // ---- Recovery Group ----
+
+    suspend fun recoveryGroupGenerateKeypair(): RecoveryGroupKeypair =
+        withContext(computeDispatcher) {
+            check(nativeLibLoaded) { "Native crypto library not loaded." }
+            try {
+                val ffiKeypair = org.llamenos.core.mobileRecoveryGroupGenerateKeypair()
+                RecoveryGroupKeypair(
+                    publicKeyHex = ffiKeypair.publicKeyHex,
+                    privateKeyHex = ffiKeypair.privateKeyHex,
+                )
+            } catch (e: Exception) {
+                throw CryptoException("Recovery group keypair generation failed: ${e.message}", e)
+            }
+        }
 
     // ---- Hex Utility ----
 

@@ -1228,8 +1228,12 @@
     "status": "Статус",
     "submit": "Отправить",
     "success": "Успешно",
-    "unauthorized": "Unauthorized",
-    "yes": "Да"
+    "yes": "Да",
+    "comingSoon": "Coming soon",
+    "hideAdvanced": "Hide Advanced",
+    "showAdvanced": "Show Advanced",
+    "saved": "Saved",
+    "unauthorized": "Unauthorized"
   },
   "confirm": {
     "backup": "Confirm Backup",
@@ -2818,6 +2822,91 @@
     "enterRecoveryKey": "Enter your recovery key",
     "options": "Recovery Options",
     "title": "Account Recovery"
+  },
+  "recoveryGroup": {
+    "title": "Recovery Team",
+    "description": "Set up a recovery team so users can recover their accounts if they lose access to their devices. Recovery contacts hold approval keys; a minimum number of approvals is required.",
+    "requiredApprovals": "Required approvals",
+    "totalContacts": "Total recovery contacts",
+    "setup": "Set up recovery team",
+    "settingUp": "Setting up…",
+    "setupSuccess": "Recovery team set up successfully.",
+    "rotate": "Rotate recovery team",
+    "rotating": "Rotating…",
+    "rotateSuccess": "Recovery team rotated successfully.",
+    "contacts": "Recovery contacts",
+    "noTeam": "No recovery team configured",
+    "lastRotated": "Last rotated",
+    "contactHealth": "Contact status",
+    "deviceVerified": "Device verified",
+    "deviceUnverified": "Device not verified",
+    "livenessOk": "Share verified",
+    "livenessStale": "Share verification overdue",
+    "delayConfig": "Recovery waiting period (hours)",
+    "emergencyFloorConfig": "Minimum urgent recovery period (hours)",
+    "geoWarning": "Consider distributing recovery contacts across different regions for better security",
+    "requests": {
+      "title": "Account Recovery Requests",
+      "active": "Active requests",
+      "history": "Request history",
+      "status": {
+        "pending": "Awaiting verification",
+        "verified": "Verified — waiting for approvals",
+        "active": "Approved — waiting period",
+        "completed": "Completed",
+        "expired": "Expired",
+        "cancelled": "Cancelled"
+      },
+      "approve": "Approve recovery",
+      "approving": "Approving…",
+      "approvalProgress": "{{count}} of {{required}} approvals",
+      "timeRemaining": "Time remaining",
+      "cancel": "Cancel request",
+      "cancelConfirm": "Are you sure? This will stop the recovery process.",
+      "duressAlert": "Warning: a potential coercion alert has been detected. Verify this request through a separate channel before proceeding."
+    },
+    "urgent": {
+      "title": "Urgent recovery",
+      "enable": "Enable urgent recovery",
+      "description": "Reduces the waiting period. Requires a second approver and a written reason.",
+      "justification": "Reason for urgency",
+      "justificationPlaceholder": "Explain why this recovery is urgent (min 16 characters)",
+      "secondApprover": "Second approver",
+      "selectApprover": "Select a second approver",
+      "reducedDelay": "Waiting period reduced to {{hours}} hours"
+    },
+    "initiate": {
+      "title": "Account recovery",
+      "description": "Lost access to your device? Your recovery contacts can help you regain access to your account.",
+      "identifier": "Your email or phone number",
+      "selectHub": "Select your organization",
+      "submit": "Start recovery",
+      "submitting": "Starting…",
+      "signalVerification": "Enter the verification code sent to your Signal",
+      "verificationCode": "Verification code",
+      "verify": "Verify",
+      "waiting": "Waiting for your recovery contacts to approve",
+      "approvalsReceived": "{{count}} of {{required}} approvals received",
+      "delayCountdown": "Access will be restored in {{time}}",
+      "complete": "Account recovered",
+      "setPin": "Set a PIN to protect your new device",
+      "success": "You're all set. Your account has been recovered."
+    },
+    "status": {
+      "enrolled": "Your account is recoverable in {{hubName}}",
+      "notConfigured": "No recovery team configured for this organization"
+    },
+    "error": {
+      "thresholdExceedsTotal": "Required approvals cannot exceed total contacts",
+      "rateLimited": "Too many requests. Please wait a few minutes.",
+      "sessionExpired": "This recovery request has expired",
+      "commitmentFailed": "Recovery data verification failed — contact your administrator",
+      "alreadyApproved": "You have already approved this request",
+      "notContact": "You are not a recovery contact for this organization",
+      "signalVerificationFailed": "Verification code is incorrect",
+      "signalVerificationExpired": "Verification code has expired. Please start over.",
+      "sigchainMismatch": "Recovery team configuration could not be verified. Contact your administrator."
+    }
   },
   "report": {
     "bodyLabel": "Description",

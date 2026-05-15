@@ -95,6 +95,28 @@ private func ffiGenerateEphemeralKeypair() -> EphemeralKeyPair {
     generateEphemeralKeypairMobile()
 }
 
+// V3 Shamir secret sharing (stateless — all ops are pure functions on share data)
+private func ffiMobileShamirSplit(secretHex: String, total: UInt8, threshold: UInt8) throws -> [ShamirShare] {
+    try mobileShamirSplit(secretHex: secretHex, total: total, threshold: threshold)
+}
+
+private func ffiMobileShamirCombine(sharesJson: String) throws -> String {
+    try mobileShamirCombine(sharesJson: sharesJson)
+}
+
+private func ffiMobileShamirCommit(shareJson: String) throws -> String {
+    try mobileShamirCommit(shareJson: shareJson)
+}
+
+private func ffiMobileShamirVerify(shareJson: String, commitmentHex: String) throws -> Bool {
+    try mobileShamirVerify(shareJson: shareJson, commitmentHex: commitmentHex)
+}
+
+// V3 Recovery group keypair generation (stateless — produces X25519 keypair)
+private func ffiMobileRecoveryGroupGenerateKeypair() throws -> RecoveryGroupKeypair {
+    try mobileRecoveryGroupGenerateKeypair()
+}
+
 // Hub key + server event key management (keys stored in Rust, never in Swift)
 private func ffiMobileSetHubKey(hubId: String, keyHex: String) throws {
     try mobileSetHubKey(hubId: hubId, keyHex: keyHex)
@@ -363,6 +385,45 @@ final class CryptoService: @unchecked Sendable {
     /// The key goes directly to Rust CryptoState — never stored in Swift memory.
     func storeServerEventKey(hubId: String, keyHex: String) {
         try? ffiMobileSetHubKey(hubId: hubId, keyHex: keyHex)
+    }
+
+    // MARK: - Shamir Secret Sharing
+
+    func shamirSplit(secretHex: String, total: UInt8, threshold: UInt8) throws -> [ShamirShare] {
+        try ffiMobileShamirSplit(secretHex: secretHex, total: total, threshold: threshold)
+    }
+
+    func shamirCombine(shares: [ShamirShare]) throws -> String {
+        let encoder = JSONEncoder()
+        let data = try encoder.encode(shares)
+        guard let json = String(data: data, encoding: .utf8) else {
+            throw CryptoServiceError.encryptionFailed("Failed to encode shares to JSON")
+        }
+        return try ffiMobileShamirCombine(sharesJson: json)
+    }
+
+    func shamirCommit(share: ShamirShare) throws -> String {
+        let encoder = JSONEncoder()
+        let data = try encoder.encode(share)
+        guard let json = String(data: data, encoding: .utf8) else {
+            throw CryptoServiceError.encryptionFailed("Failed to encode share to JSON")
+        }
+        return try ffiMobileShamirCommit(shareJson: json)
+    }
+
+    func shamirVerify(share: ShamirShare, commitment: String) throws -> Bool {
+        let encoder = JSONEncoder()
+        let data = try encoder.encode(share)
+        guard let json = String(data: data, encoding: .utf8) else {
+            throw CryptoServiceError.encryptionFailed("Failed to encode share to JSON")
+        }
+        return try ffiMobileShamirVerify(shareJson: json, commitmentHex: commitment)
+    }
+
+    // MARK: - Recovery Group
+
+    func recoveryGroupGenerateKeypair() throws -> RecoveryGroupKeypair {
+        try ffiMobileRecoveryGroupGenerateKeypair()
     }
 
     // MARK: - Hex Utility
