@@ -3648,5 +3648,48 @@
     "confirmDelete": "Delete this tag?",
     "empty": "No tags",
     "loading": "Loading tags..."
+  },
+  "permissions": {
+    "toggleAll": "Toggle all {{domain}} permissions",
+    "scope": "scope",
+    "none": "None",
+    "tiers": "Data access tiers",
+    "actions": "Actions",
+    "groups": {
+      "audit": "Audit",
+      "bans": "Bans",
+      "blasts": "Blasts",
+      "calls": "Calls",
+      "cases": "Cases",
+      "contacts": "Contacts",
+      "conversations": "Conversations",
+      "events": "Events",
+      "evidence": "Evidence",
+      "files": "Files",
+      "firehose": "Firehose",
+      "hubs": "Hubs",
+      "invites": "Invites",
+      "messaging": "Messaging",
+      "metrics": "Metrics",
+      "notes": "Notes",
+      "reports": "Reports",
+      "settings": "Settings",
+      "shifts": "Shifts",
+      "system": "System",
+      "telephony": "Telephony",
+      "users": "Users"
+    }
+  },
+  "create": "Create role",
+  "importFromTemplate": "Import from template",
+  "importDialog": {
+    "title": "Import roles from template",
+    "description": "Select roles to import from the template. Existing roles with the same slug will be skipped.",
+    "import": "Import selected",
+    "noTemplates": "No templates available"
+  },
+  "deleteConfirm": {
+    "title": "Delete role",
+    "description": "Are you sure you want to delete \"{{name}}\"? Users assigned this role will lose its permissions."
   }
 }

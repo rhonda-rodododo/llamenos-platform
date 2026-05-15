@@ -971,9 +971,9 @@
     <string name="channels_shared_auto_response_placeholder">Automatic reply sent to first-time contacts...</string>
     <string name="channels_shared_enable_channel">Enable %s</string>
     <string name="channels_shared_security_e2ee">End-to-end encrypted</string>
-    <string name="channels_shared_security_e2ee-to-bridge">E2EE to bridge</string>
+    <string name="channels_shared_security_e2ee_to_bridge">E2EE to bridge</string>
     <string name="channels_shared_security_none">No encryption</string>
-    <string name="channels_shared_security_provider-encrypted">Provider encrypted</string>
+    <string name="channels_shared_security_provider_encrypted">Provider encrypted</string>
     <string name="channels_shared_test_connection">Test Connection</string>
     <string name="channels_shared_test_failed">Connection Failed</string>
     <string name="channels_shared_test_success">Connected</string>
@@ -2257,7 +2257,7 @@
     <string name="recovery_decrypt">Decrypt</string>
     <string name="recovery_decrypt_backup">Decrypt backup file</string>
     <string name="recovery_enter_recovery_key">Enter your recovery key</string>
-    <string name="recovery_options">Recovery Options</string>
+    <string name="recovery_options">Recovery options</string>
     <string name="recovery_title">Account Recovery</string>
     <string name="report_body_label">Description</string>
     <string name="report_category_header">Category</string>

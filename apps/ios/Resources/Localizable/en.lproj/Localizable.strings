@@ -968,9 +968,9 @@
 "channels_shared_auto_response_placeholder" = "Automatic reply sent to first-time contacts...";
 "channels_shared_enable_channel" = "Enable %@";
 "channels_shared_security_e2ee" = "End-to-end encrypted";
-"channels_shared_security_e2ee-to-bridge" = "E2EE to bridge";
+"channels_shared_security_e2ee_to_bridge" = "E2EE to bridge";
 "channels_shared_security_none" = "No encryption";
-"channels_shared_security_provider-encrypted" = "Provider encrypted";
+"channels_shared_security_provider_encrypted" = "Provider encrypted";
 "channels_shared_test_connection" = "Test Connection";
 "channels_shared_test_failed" = "Connection Failed";
 "channels_shared_test_success" = "Connected";
@@ -2254,7 +2254,7 @@
 "recovery_decrypt" = "Decrypt";
 "recovery_decrypt_backup" = "Decrypt backup file";
 "recovery_enter_recovery_key" = "Enter your recovery key";
-"recovery_options" = "Recovery Options";
+"recovery_options" = "Recovery options";
 "recovery_title" = "Account Recovery";
 "report_body_label" = "Description";
 "report_category_header" = "Category";
