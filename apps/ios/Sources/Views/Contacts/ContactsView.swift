@@ -5,6 +5,7 @@ import SwiftUI
 struct ContactsView: View {
     @Environment(AppState.self) private var appState
     @State private var viewModel: ContactsViewModel?
+    @State private var showCreateContact = false
 
     var body: some View {
         let vm = resolvedViewModel
@@ -25,6 +26,19 @@ struct ContactsView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 contactTypeFilterMenu(vm: vm)
+            }
+            ToolbarItem(placement: .secondaryAction) {
+                Button {
+                    showCreateContact = true
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .accessibilityIdentifier("contacts-add-button")
+            }
+        }
+        .sheet(isPresented: $showCreateContact) {
+            CreateContactView { _ in
+                Task { await vm.refresh() }
             }
         }
         .searchable(

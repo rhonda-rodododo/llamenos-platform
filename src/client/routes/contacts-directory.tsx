@@ -18,13 +18,15 @@ import { ContactCard } from '@/components/contacts/contact-card'
 import { ContactProfile } from '@/components/contacts/contact-profile'
 import { CreateContactDialog } from '@/components/contacts/create-contact-dialog'
 import { ContactImportDialog } from '@/components/contact-import-dialog'
+import { EditContactDialog } from '@/components/contacts/edit-contact-dialog'
+import { AffinityGroupsSidebar } from '@/components/contacts/affinity-groups-sidebar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
-  Users, Plus, Search, Loader2, Lock, Upload,
+  Users, Plus, Search, Loader2, Lock, Upload, Pencil,
 } from 'lucide-react'
 
 export const Route = createFileRoute('/contacts-directory')({
@@ -125,6 +127,8 @@ function ContactDirectoryPage() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showImportDialog, setShowImportDialog] = useState(false)
+  const [showEditDialog, setShowEditDialog] = useState(false)
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('')
@@ -279,6 +283,14 @@ function ContactDirectoryPage() {
         </Card>
       ) : (
         <div className="flex h-[calc(100vh-12rem)] gap-4">
+          {/* Groups sidebar */}
+          <div className="w-40 shrink-0 overflow-hidden rounded-lg border border-border bg-card hidden lg:flex flex-col">
+            <AffinityGroupsSidebar
+              selectedGroupId={selectedGroupId}
+              onGroupSelect={setSelectedGroupId}
+            />
+          </div>
+
           {/* Left pane: contact list */}
           <div
             data-testid="contact-list"
@@ -369,10 +381,26 @@ function ContactDirectoryPage() {
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 </div>
               ) : (
-                <ContactProfile
-                contact={selectedContact}
-                onContactMerged={() => { setSelectedId(null); loadContacts() }}
-              />
+                <div className="flex flex-col h-full">
+                  {selectedContact.canDecrypt && (
+                    <div className="flex justify-end px-3 pt-2 shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="gap-1.5"
+                        onClick={() => setShowEditDialog(true)}
+                        data-testid="edit-contact-button"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        {t('common.edit', { defaultValue: 'Edit' })}
+                      </Button>
+                    </div>
+                  )}
+                  <ContactProfile
+                    contact={selectedContact}
+                    onContactMerged={() => { setSelectedId(null); loadContacts() }}
+                  />
+                </div>
               )
             ) : (
               <div className="flex flex-1 flex-col items-center justify-center text-muted-foreground">
@@ -398,6 +426,17 @@ function ContactDirectoryPage() {
           loadContacts()
         }}
       />
+
+      {selectedContact && (
+        <EditContactDialog
+          contact={selectedContact}
+          open={showEditDialog}
+          onOpenChange={setShowEditDialog}
+          onUpdated={(raw) => {
+            setContacts(prev => prev.map(c => c.id === raw.id ? { ...c, _raw: raw } : c))
+          }}
+        />
+      )}
     </div>
   )
 }

@@ -13,6 +13,18 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.llamenos.hotline.crypto.KeyValueStore
 import org.llamenos.hotline.crypto.KeystoreService
 import org.llamenos.hotline.hub.ActiveHubState
+import org.llamenos.hotline.model.OkResponse
+import org.llamenos.hotline.model.RecoveryContributeRequest
+import org.llamenos.hotline.model.RecoveryContributeResponse
+import org.llamenos.hotline.model.RecoveryEnrollRequest
+import org.llamenos.hotline.model.RecoveryEnvelopeRequest
+import org.llamenos.hotline.model.RecoveryGroupInfo
+import org.llamenos.hotline.model.RecoveryInitiateRequest
+import org.llamenos.hotline.model.RecoveryInitiateResponse
+import org.llamenos.hotline.model.RecoveryLivenessRequest
+import org.llamenos.hotline.model.RecoverySessionStatus
+import org.llamenos.hotline.model.RecoveryVerifyRequest
+import org.llamenos.hotline.model.RecoveryVerifyResponse
 import org.llamenos.hotline.service.OfflineQueue
 import org.llamenos.protocol.HubKeyEnvelopeResponse
 import java.io.IOException
@@ -271,6 +283,38 @@ class ApiService @Inject constructor(
     suspend fun getHubKey(hubId: String): HubKeyEnvelopeResponse {
         return request("GET", "/api/hubs/$hubId/key")
     }
+
+    // ---- Recovery Group API ----
+
+    suspend fun enrollRecoveryGroup(body: RecoveryEnrollRequest): OkResponse =
+        request("POST", "/api/recovery-group/enroll", body)
+
+    suspend fun getRecoveryGroup(hubId: String): RecoveryGroupInfo =
+        request("GET", "/api/recovery-group/$hubId")
+
+    suspend fun initiateRecovery(body: RecoveryInitiateRequest): RecoveryInitiateResponse =
+        request("POST", "/api/recovery-group/initiate", body)
+
+    suspend fun verifyRecoveryCode(body: RecoveryVerifyRequest): RecoveryVerifyResponse =
+        request("POST", "/api/recovery-group/initiate/verify", body)
+
+    suspend fun getRecoverySession(sessionId: String): RecoverySessionStatus =
+        request("GET", "/api/recovery-group/session/$sessionId")
+
+    suspend fun contributeRecoveryShare(
+        sessionId: String,
+        body: RecoveryContributeRequest,
+    ): RecoveryContributeResponse =
+        request("POST", "/api/recovery-group/session/$sessionId/contribute", body)
+
+    suspend fun cancelRecoverySession(sessionId: String): OkResponse =
+        request("POST", "/api/recovery-group/session/$sessionId/cancel")
+
+    suspend fun storeUserRecoveryEnvelope(body: RecoveryEnvelopeRequest): OkResponse =
+        request("POST", "/api/recovery-group/user-envelope", body)
+
+    suspend fun submitShareLivenessProof(body: RecoveryLivenessRequest): OkResponse =
+        request("POST", "/api/recovery-group/shares/liveness", body)
 
     /**
      * Get the configured hub URL from secure storage.

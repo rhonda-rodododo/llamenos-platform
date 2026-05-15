@@ -27,11 +27,8 @@ pub fn build_erasure_override_message(
     timestamp_ms: u64,
     justification: &str,
 ) -> Vec<u8> {
-    format!(
-        "{}:{}:{}:{}",
-        LABEL_ERASURE_OVERRIDE_SIG, target_user_id, timestamp_ms, justification
-    )
-    .into_bytes()
+    format!("{LABEL_ERASURE_OVERRIDE_SIG}:{target_user_id}:{timestamp_ms}:{justification}")
+        .into_bytes()
 }
 
 /// Sign an erasure override as a co-approver using Ed25519 device secrets.
@@ -90,11 +87,7 @@ pub fn build_device_wipe_message(
     timestamp_ms: u64,
     reason: &str,
 ) -> Vec<u8> {
-    format!(
-        "{}:{}:{}:{}",
-        LABEL_DEVICE_WIPE_SIG, target_device_pubkey, timestamp_ms, reason
-    )
-    .into_bytes()
+    format!("{LABEL_DEVICE_WIPE_SIG}:{target_device_pubkey}:{timestamp_ms}:{reason}").into_bytes()
 }
 
 /// Sign a device wipe command using the server's Ed25519 key.

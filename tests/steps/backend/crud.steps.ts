@@ -51,6 +51,7 @@ interface CrudState {
   banPhone?: string
   bulkBanPhones: string[]
   bulkBanCount?: number
+  preBulkBanCount?: number
   noteId?: string
   noteCallIds: string[]
   inviteCode?: string
@@ -195,20 +196,25 @@ Then('the shift should include the volunteer in its roster', async ({ request, w
 
 When('an admin bans phone {string}', async ({ request, world }, phone: string) => {
   const hubId = getScenarioState(world).hubId
-  await createBanViaApi(request, { phone, reason: 'CRUD test', hubId })
+  const result = await createBanViaApi(request, { phone, reason: 'CRUD test', hubId })
   getCrudState(world).banPhone = phone
+  getScenarioState(world).phoneHashMap[phone] = result.phoneHash
 })
 
 Then('the ban list should contain {string}', async ({request, world}, phone: string) => {
   const hubId = getScenarioState(world).hubId
   const bans = await listBansViaApi(request, hubId)
-  expect(bans.some(b => b.phone === phone)).toBeTruthy()
+  const phoneHash = getScenarioState(world).phoneHashMap[phone]
+  expect(phoneHash).toBeDefined()
+  expect(bans.some(b => b.phone === phoneHash)).toBeTruthy()
 })
 
 Then('the ban list should not contain {string}', async ({request, world}, phone: string) => {
   const hubId = getScenarioState(world).hubId
   const bans = await listBansViaApi(request, hubId)
-  expect(bans.some(b => b.phone === phone)).toBeFalsy()
+  const phoneHash = getScenarioState(world).phoneHashMap[phone]
+  expect(phoneHash).toBeDefined()
+  expect(bans.some(b => b.phone === phoneHash)).toBeFalsy()
 })
 
 When('the admin removes the ban for {string}', async ({request, world}, phone: string) => {
@@ -223,16 +229,19 @@ When('an admin bulk imports bans for {int} phone numbers', async ({ request, wor
     phones.push(uniquePhone())
   }
   getCrudState(world).bulkBanPhones = phones
+  // Record pre-import count to verify delta
+  const preBans = await listBansViaApi(request, hubId)
+  getCrudState(world).preBulkBanCount = preBans.length
   const result = await bulkAddBansViaApi(request, phones, 'CRUD bulk test', hubId)
   getCrudState(world).bulkBanCount = result.count
 })
 
-Then('the ban list should contain all {int} numbers', async ({ request, world }, _count: number) => {
+Then('the ban list should contain all {int} numbers', async ({ request, world }, count: number) => {
   const hubId = getScenarioState(world).hubId
   const bans = await listBansViaApi(request, hubId)
-  for (const phone of getCrudState(world).bulkBanPhones) {
-    expect(bans.some(b => b.phone === phone)).toBeTruthy()
-  }
+  const preBulkCount = getCrudState(world).preBulkBanCount ?? 0
+  // Verify that the ban list grew by exactly the bulk import count
+  expect(bans.length).toBe(preBulkCount + count)
 })
 
 Then('the bulk import should report {int} created', async ({ world }, count: number) => {

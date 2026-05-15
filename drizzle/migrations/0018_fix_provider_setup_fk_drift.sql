@@ -2,6 +2,8 @@
 
 ALTER TABLE "oauth_states" ADD COLUMN IF NOT EXISTS "hub_id" text;
 --> statement-breakpoint
+ALTER TABLE "oauth_states" DROP CONSTRAINT IF EXISTS "oauth_states_hub_id_hubs_id_fk";
+--> statement-breakpoint
 ALTER TABLE "oauth_states" ADD CONSTRAINT "oauth_states_hub_id_hubs_id_fk" FOREIGN KEY ("hub_id") REFERENCES "public"."hubs"("id") ON DELETE cascade ON UPDATE no action;
 --> statement-breakpoint
 

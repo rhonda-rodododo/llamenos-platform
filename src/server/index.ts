@@ -18,6 +18,7 @@ import { initConnectionManager } from '../../apps/worker/lib/ws-manager'
 import { deriveServerKeypair } from '../../apps/worker/lib/server-identity'
 import { createWsHandler, createConnectionData } from '../../apps/worker/routes/ws'
 import type { WsConnectionData } from '../../apps/worker/routes/ws'
+import type { AppEnv } from '../../apps/worker/types/infra'
 import { KIND_BLAST_PROGRESS, KIND_BLAST_STATUS } from '../../packages/shared/event-kinds'
 import type { MessagingChannelType } from '../../packages/shared/types'
 import type { Env } from '../../apps/worker/types/infra'
@@ -137,16 +138,21 @@ if (services.firehoseAgent) {
 // --- Build Hono app ---
 const { default: workerApp } = await import('../../apps/worker/app')
 
-const app = new Hono()
+const app = new Hono<AppEnv>()
 
 // Inject env bindings and services into every request
+/* eslint-disable @typescript-eslint/no-explicit-any -- Hono context type bridging across module boundaries */
 app.use('*', async (c, next) => {
-  ;(c as any).env = env
-  ;(c as any).set('services', services)
+  // Dev server bootstrap: env is built from process.env, not from Hono bindings
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(c as unknown as { env: Record<string, unknown> }).env = env
+  c.set('services', services)
   await next()
 })
+/* eslint-enable @typescript-eslint/no-explicit-any */
 
-app.route('/', workerApp as any)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+app.route('/', workerApp as unknown as Hono<AppEnv>)
 app.all('*', (c) => c.json({ error: 'Not Found' }, 404))
 
 const port = parseInt(process.env.PORT || '3000')

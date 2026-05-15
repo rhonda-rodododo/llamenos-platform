@@ -51,7 +51,7 @@ describe('template-loader', () => {
     const first = await loadBundledTemplates(importFn)
     const second = await loadBundledTemplates(importFn)
     expect(first).toBe(second)
-    expect(importFn).toHaveBeenCalledTimes(13)
+    expect(importFn).toHaveBeenCalledTimes(14)
   })
 
   it('silently skips missing template files', async () => {

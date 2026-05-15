@@ -4,7 +4,7 @@
  * Replaces the DO-backed RecordsDO. The service never decrypts note content —
  * it stores and retrieves opaque encrypted blobs with their HPKE envelopes.
  */
-import { eq, and, desc, asc, sql, count } from 'drizzle-orm'
+import { eq, and, desc, asc, sql, count, isNull, or } from 'drizzle-orm'
 import type { Database } from '../db'
 import {
   notes,
@@ -59,8 +59,8 @@ export interface CreateReplyInput {
 
 export interface AddBanInput {
   hubId?: string
-  phone: string
-  phonePlain?: string
+  phone: string       // HMAC hash for lookup
+  phoneDisplay?: string // Original E.164 for admin display (may be absent for mid-call bans)
   reason: string
   bannedBy: string
 }
@@ -198,7 +198,7 @@ export class RecordsService {
 
   async createReply(noteId: string, input: CreateReplyInput): Promise<NoteReplyRow> {
     // Verify the parent note exists
-    const note = await this.getNote(noteId)
+    await this.getNote(noteId)
 
     const [reply] = await this.db
       .insert(noteReplies)
@@ -258,7 +258,7 @@ export class RecordsService {
       .values({
         hubId: input.hubId || null,  // normalize empty string to null
         phone: input.phone,
-        phonePlain: input.phonePlain ?? null,
+        phoneDisplay: input.phoneDisplay ?? null,
         reason: input.reason,
         bannedBy: input.bannedBy,
       })
@@ -267,7 +267,7 @@ export class RecordsService {
     return ban
   }
 
-  async listBans(hubId?: string): Promise<{ bans: Array<{ phone: string; reason: string | null; bannedBy: string | null; bannedAt: Date }> }> {
+  async listBans(hubId?: string): Promise<{ bans: Array<{ phone: string; phoneHash: string; reason: string | null; bannedBy: string | null; bannedAt: Date }> }> {
     const rows = hubId
       ? await this.db
           .select()
@@ -280,7 +280,8 @@ export class RecordsService {
           .orderBy(desc(bans.bannedAt))
     return {
       bans: rows.map(r => ({
-        phone: r.phonePlain ?? r.phone,  // return plain phone for display; fall back to hash
+        phone: r.phoneDisplay ?? r.phone,  // display original phone; fall back to hash for legacy rows
+        phoneHash: r.phone,
         reason: r.reason,
         bannedBy: r.bannedBy,
         bannedAt: r.bannedAt,
@@ -289,11 +290,10 @@ export class RecordsService {
   }
 
   async bulkAddBans(
-    phones: string[],
+    entries: Array<{ phoneHash: string; phoneDisplay: string }>,
     reason: string,
     bannedBy: string,
     hubId?: string,
-    plainPhones?: string[],
   ): Promise<number> {
     // Get existing phones to avoid duplicates
     const existingRows = await this.db
@@ -308,29 +308,27 @@ export class RecordsService {
     const existingPhones = new Set(existingRows.map((r) => r.phone))
     // Deduplicate within the input array AND exclude already-banned phones
     const seen = new Set<string>()
-    const newIndices: number[] = []
-    const newPhones = phones.filter((p, i) => {
-      if (existingPhones.has(p) || seen.has(p)) return false
-      seen.add(p)
-      newIndices.push(i)
+    const newEntries = entries.filter((e) => {
+      if (existingPhones.has(e.phoneHash) || seen.has(e.phoneHash)) return false
+      seen.add(e.phoneHash)
       return true
     })
 
-    if (newPhones.length === 0) return 0
+    if (newEntries.length === 0) return 0
 
     await this.db
       .insert(bans)
       .values(
-        newPhones.map((phone, idx) => ({
+        newEntries.map((entry) => ({
           hubId: hubId || null,  // normalize empty string to null
-          phone,
-          phonePlain: plainPhones ? (plainPhones[newIndices[idx]] ?? null) : null,
+          phone: entry.phoneHash,
+          phoneDisplay: entry.phoneDisplay,
           reason,
           bannedBy,
         })),
       )
 
-    return newPhones.length
+    return newEntries.length
   }
 
   async removeBan(phone: string, hubId?: string): Promise<void> {
@@ -347,17 +345,15 @@ export class RecordsService {
   }
 
   async checkBan(phone: string, hubId?: string): Promise<boolean> {
-    const conditions = [eq(bans.phone, phone)]
-    if (hubId) {
-      conditions.push(eq(bans.hubId, hubId))
-    } else {
-      conditions.push(sql`${bans.hubId} IS NULL`)
-    }
+    // Include platform-scoped bans (hubId IS NULL) in addition to hub-specific bans
+    const where = hubId
+      ? and(eq(bans.phone, phone), or(eq(bans.hubId, hubId), isNull(bans.hubId)))
+      : and(eq(bans.phone, phone), isNull(bans.hubId))
 
     const [row] = await this.db
       .select({ id: bans.id })
       .from(bans)
-      .where(and(...conditions))
+      .where(where)
       .limit(1)
 
     return !!row
@@ -465,5 +461,53 @@ export class RecordsService {
       noteCount: Number(noteCount),
       banCount: Number(banCount),
     }
+  }
+
+  // -----------------------------------------------------------------------
+  // Platform Bans (EP08)
+  // -----------------------------------------------------------------------
+
+  async listPlatformBans(
+    limit = 50,
+    offset = 0,
+  ): Promise<{ bans: BanRow[]; total: number }> {
+    const [rows, [{ total }]] = await Promise.all([
+      this.db
+        .select()
+        .from(bans)
+        .where(isNull(bans.hubId))
+        .orderBy(desc(bans.bannedAt))
+        .limit(limit)
+        .offset(offset),
+      this.db
+        .select({ total: count() })
+        .from(bans)
+        .where(isNull(bans.hubId)),
+    ])
+    return { bans: rows, total: Number(total) }
+  }
+
+  async searchBansByPhone(phoneHash: string): Promise<BanRow[]> {
+    return this.db
+      .select()
+      .from(bans)
+      .where(eq(bans.phone, phoneHash))
+  }
+
+  async deletePlatformBan(banId: string): Promise<BanRow | null> {
+    const [deleted] = await this.db
+      .delete(bans)
+      .where(and(eq(bans.id, banId), isNull(bans.hubId)))
+      .returning()
+    return deleted ?? null
+  }
+
+  async getBanById(banId: string): Promise<BanRow | null> {
+    const [row] = await this.db
+      .select()
+      .from(bans)
+      .where(eq(bans.id, banId))
+      .limit(1)
+    return row ?? null
   }
 }

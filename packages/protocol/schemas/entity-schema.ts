@@ -63,7 +63,7 @@ export const entityFieldDefinitionSchema = z.object({
 
   // Blind index configuration
   indexable: z.boolean().optional().default(false),
-  indexType: z.enum(['exact', 'none']).optional().default('none'),
+  indexType: z.enum(['exact', 'date', 'location', 'none']).optional().default('none'),
 
   // Access control
   accessLevel: z.enum(['all', 'admin', 'assigned', 'custom']).optional().default('all'),
@@ -142,6 +142,12 @@ export const entityTypeDefinitionSchema = z.object({
 
   isArchived: z.boolean().optional().default(false),
   isSystem: z.boolean().optional().default(false),
+
+  // Assignment intelligence (EP06-A3)
+  autoAssign: z.boolean().optional().default(false),
+  autoAssignThreshold: z.number().int().min(10).max(50).optional().default(30),
+  requiredSpecializations: z.array(z.string().max(100)).max(20).optional().default([]),
+  notifyContactsOnStatusChange: z.boolean().optional().default(false),
 
   createdAt: z.string().optional().default(''),
   updatedAt: z.string().optional().default(''),
@@ -225,6 +231,11 @@ export const createEntityTypeBodySchema = z.looseObject({
 
   templateId: z.string().optional(),
   templateVersion: z.string().optional(),
+
+  autoAssign: z.boolean().optional().default(false),
+  autoAssignThreshold: z.number().int().min(10).max(50).optional().default(30),
+  requiredSpecializations: z.array(z.string().max(100)).max(20).optional().default([]),
+  notifyContactsOnStatusChange: z.boolean().optional().default(false),
 })
 
 export const updateEntityTypeBodySchema = z.looseObject({
@@ -264,6 +275,11 @@ export const updateEntityTypeBodySchema = z.looseObject({
   editRoles: z.array(z.string()).optional(),
 
   isArchived: z.boolean().optional(),
+
+  autoAssign: z.boolean().optional(),
+  autoAssignThreshold: z.number().int().min(10).max(50).optional(),
+  requiredSpecializations: z.array(z.string().max(100)).max(20).optional(),
+  notifyContactsOnStatusChange: z.boolean().optional(),
 })
 
 export const createRelationshipTypeBodySchema = z.looseObject({
@@ -339,6 +355,7 @@ export const templateListResponseSchema = z.object({
 
 export const templateApplyResponseSchema = z.object({
   applied: z.boolean(),
+  entityTypeId: z.string().optional(),
   entityTypes: z.number(),
   relationshipTypes: z.number(),
   reportTypes: z.number(),
@@ -375,3 +392,37 @@ export const createRolesFromTemplateBodySchema = z.object({
     permissions: z.array(z.string()).min(1),
   })).min(1).max(50),
 })
+
+// --- Entity field file value (EP06-A2) ---
+
+export const fileFieldValueSchema = z.object({
+  fileId: z.uuid(),
+  encryptedName: z.string(),
+  encryptedMimeType: z.string(),
+  encryptedSize: z.string(),
+  recipientEnvelopes: z.array(z.object({
+    recipientPubkey: z.string(),
+    encryptedKey: z.string(),
+  })),
+  uploadedAt: z.iso.datetime(),
+})
+export type FileFieldValue = z.infer<typeof fileFieldValueSchema>
+
+export const entityFileUploadResponseSchema = z.object({
+  fileId: z.uuid(),
+  uploadedAt: z.iso.datetime(),
+})
+export type EntityFileUploadResponse = z.infer<typeof entityFileUploadResponseSchema>
+
+// --- Template customization (EP06-A2) ---
+
+export const entityTemplateCustomizeBodySchema = z.looseObject({
+  label: z.string().min(1).max(200).optional(),
+  labelPlural: z.string().min(1).max(200).optional(),
+  icon: z.string().max(50).optional(),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  showInNavigation: z.boolean().optional(),
+  showInDashboard: z.boolean().optional(),
+  isArchived: z.boolean().optional(),
+})
+export type EntityTemplateCustomizeBody = z.infer<typeof entityTemplateCustomizeBodySchema>

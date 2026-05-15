@@ -2389,6 +2389,9 @@ export class SettingsService {
       showInDashboard: (data.showInDashboard as boolean) ?? true,
       accessRoles: data.accessRoles as string[] | undefined,
       editRoles: data.editRoles as string[] | undefined,
+      autoAssign: (data.autoAssign as boolean) ?? false,
+      autoAssignThreshold: (data.autoAssignThreshold as number) ?? 30,
+      requiredSpecializations: (data.requiredSpecializations as string[]) ?? [],
       isArchived: false,
       isSystem: (data.isSystem as boolean) ?? false,
       createdAt: now,
@@ -2453,6 +2456,9 @@ export class SettingsService {
       showInDashboard: 'showInDashboard',
       accessRoles: 'accessRoles',
       editRoles: 'editRoles',
+      autoAssign: 'autoAssign',
+      autoAssignThreshold: 'autoAssignThreshold',
+      requiredSpecializations: 'requiredSpecializations',
       isArchived: 'isArchived',
       isSystem: 'isSystem',
       templateId: 'templateId',
@@ -3108,6 +3114,9 @@ export class SettingsService {
       showInDashboard: r.showInDashboard ?? true,
       accessRoles: r.accessRoles ?? undefined,
       editRoles: r.editRoles ?? undefined,
+      autoAssign: r.autoAssign ?? false,
+      autoAssignThreshold: r.autoAssignThreshold ?? 30,
+      requiredSpecializations: r.requiredSpecializations ?? [],
       isArchived: r.isArchived ?? false,
       isSystem: r.isSystem ?? false,
       createdAt: r.createdAt.toISOString(),
@@ -3211,5 +3220,77 @@ export class SettingsService {
       createdAt: r.createdAt.toISOString(),
       updatedAt: r.updatedAt.toISOString(),
     } as ReportTypeDefinition
+  }
+
+  // ---------------------------------------------------------------------------
+  // Platform Settings (EP08)
+  // ---------------------------------------------------------------------------
+
+  async getPlatformSettings(): Promise<Record<string, unknown>> {
+    const [row] = await this.db
+      .select({ platformSettings: systemSettings.platformSettings })
+      .from(systemSettings)
+      .where(eq(systemSettings.id, SINGLETON_ID))
+      .limit(1)
+
+    if (!row) {
+      return {
+        featureFlags: {
+          mlsEnabled: false,
+          transcriptionEnabled: true,
+          caseManagementEnabled: false,
+          crossHubSharingEnabled: false,
+        },
+        branding: {
+          instanceName: 'Llamenos',
+          supportEmail: '',
+          privacyPolicyUrl: '',
+        },
+        sessionPolicy: {
+          maxSessionDurationHours: 720,
+          maxInactiveHours: 168,
+        },
+        erasurePlatformFloor: {
+          minDelayHours: 24,
+        },
+        retentionPurge: {
+          cronHourUtc: 3,
+          enabled: true,
+        },
+      }
+    }
+
+    return (row.platformSettings ?? {}) as Record<string, unknown>
+  }
+
+  async updatePlatformSettings(
+    updates: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    const current = await this.getPlatformSettings()
+
+    const merged: Record<string, unknown> = { ...current }
+    for (const [section, value] of Object.entries(updates)) {
+      if (
+        value &&
+        typeof value === 'object' &&
+        !Array.isArray(value) &&
+        current[section] &&
+        typeof current[section] === 'object'
+      ) {
+        merged[section] = {
+          ...(current[section] as Record<string, unknown>),
+          ...(value as Record<string, unknown>),
+        }
+      } else if (value !== undefined) {
+        merged[section] = value
+      }
+    }
+
+    await this.db
+      .update(systemSettings)
+      .set({ platformSettings: merged })
+      .where(eq(systemSettings.id, SINGLETON_ID))
+
+    return merged
   }
 }

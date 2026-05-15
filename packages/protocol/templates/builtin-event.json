@@ -1,0 +1,230 @@
+{
+  "id": "builtin:event",
+  "version": "1.0.0",
+  "name": "Event Tracking",
+  "description": "General-purpose event tracking template. Records community events, meetings, actions, and gatherings with date and location fields. Designed for organizations that need to track events alongside case management.",
+  "author": "Llamenos Project",
+  "license": "CC-BY-SA-4.0",
+  "tags": [
+    "events",
+    "community",
+    "organizing"
+  ],
+  "extends": [],
+  "labels": {
+    "en": {
+      "community_event.label": "Event",
+      "community_event.labelPlural": "Events",
+      "community_event.description": "Track community events, meetings, and gatherings with date and location"
+    },
+    "es": {
+      "community_event.label": "Evento",
+      "community_event.labelPlural": "Eventos",
+      "community_event.description": "Seguimiento de eventos comunitarios, reuniones y encuentros con fecha y ubicación"
+    }
+  },
+  "entityTypes": [
+    {
+      "name": "community_event",
+      "label": "community_event.label",
+      "labelPlural": "community_event.labelPlural",
+      "description": "community_event.description",
+      "icon": "calendar",
+      "color": "#8b5cf6",
+      "category": "event",
+      "numberPrefix": "EV",
+      "numberingEnabled": true,
+      "defaultAccessLevel": "hub",
+      "piiFields": [],
+      "allowSubRecords": false,
+      "allowFileAttachments": true,
+      "allowInteractionLinks": true,
+      "showInNavigation": true,
+      "showInDashboard": true,
+      "statuses": [
+        {
+          "value": "planned",
+          "label": "Planned",
+          "color": "#f59e0b",
+          "order": 1,
+          "isDefault": true
+        },
+        {
+          "value": "confirmed",
+          "label": "Confirmed",
+          "color": "#3b82f6",
+          "order": 2
+        },
+        {
+          "value": "in_progress",
+          "label": "In Progress",
+          "color": "#10b981",
+          "order": 3
+        },
+        {
+          "value": "completed",
+          "label": "Completed",
+          "color": "#6b7280",
+          "order": 4,
+          "isClosed": true
+        },
+        {
+          "value": "cancelled",
+          "label": "Cancelled",
+          "color": "#ef4444",
+          "order": 5,
+          "isClosed": true
+        }
+      ],
+      "defaultStatus": "planned",
+      "closedStatuses": ["completed", "cancelled"],
+      "fields": [
+        {
+          "name": "start_date",
+          "label": "Start Date",
+          "type": "date",
+          "required": true,
+          "order": 1,
+          "indexable": true,
+          "indexType": "date",
+          "accessLevel": "all",
+          "visibleToUsers": true,
+          "editableByUsers": true,
+          "hubEditable": true
+        },
+        {
+          "name": "end_date",
+          "label": "End Date",
+          "type": "date",
+          "required": false,
+          "order": 2,
+          "indexable": true,
+          "indexType": "date",
+          "accessLevel": "all",
+          "visibleToUsers": true,
+          "editableByUsers": true,
+          "hubEditable": true
+        },
+        {
+          "name": "location",
+          "label": "Location",
+          "type": "location",
+          "required": false,
+          "order": 3,
+          "indexable": true,
+          "indexType": "location",
+          "accessLevel": "all",
+          "visibleToUsers": true,
+          "editableByUsers": true,
+          "hubEditable": true,
+          "locationOptions": {
+            "maxPrecision": "exact",
+            "allowGps": true,
+            "allowAutocomplete": true
+          }
+        },
+        {
+          "name": "event_type",
+          "label": "Event Type",
+          "type": "select",
+          "required": false,
+          "order": 4,
+          "options": [
+            { "key": "meeting", "label": "Meeting" },
+            { "key": "rally", "label": "Rally / Demonstration" },
+            { "key": "workshop", "label": "Workshop / Training" },
+            { "key": "action", "label": "Direct Action" },
+            { "key": "fundraiser", "label": "Fundraiser" },
+            { "key": "outreach", "label": "Community Outreach" },
+            { "key": "other", "label": "Other" }
+          ],
+          "indexable": false,
+          "indexType": "none",
+          "accessLevel": "all",
+          "visibleToUsers": true,
+          "editableByUsers": true,
+          "hubEditable": true
+        },
+        {
+          "name": "description",
+          "label": "Description",
+          "type": "textarea",
+          "required": false,
+          "order": 5,
+          "indexable": false,
+          "indexType": "none",
+          "accessLevel": "all",
+          "visibleToUsers": true,
+          "editableByUsers": true,
+          "hubEditable": true
+        },
+        {
+          "name": "expected_attendance",
+          "label": "Expected Attendance",
+          "type": "number",
+          "required": false,
+          "order": 6,
+          "indexable": false,
+          "indexType": "none",
+          "accessLevel": "all",
+          "visibleToUsers": true,
+          "editableByUsers": true,
+          "hubEditable": true,
+          "validation": {
+            "min": 0
+          }
+        }
+      ]
+    }
+  ],
+  "relationshipTypes": [
+    {
+      "sourceEntityTypeName": "contact",
+      "targetEntityTypeName": "community_event",
+      "cardinality": "M:N",
+      "label": "Event Participants",
+      "reverseLabel": "Contacts",
+      "sourceLabel": "attended",
+      "targetLabel": "includes",
+      "roles": [
+        {
+          "value": "organizer",
+          "label": "Organizer",
+          "order": 1
+        },
+        {
+          "value": "attendee",
+          "label": "Attendee",
+          "order": 2
+        },
+        {
+          "value": "speaker",
+          "label": "Speaker",
+          "order": 3
+        },
+        {
+          "value": "volunteer",
+          "label": "Volunteer",
+          "order": 4
+        }
+      ],
+      "defaultRole": "attendee"
+    }
+  ],
+  "suggestedRoles": [
+    {
+      "name": "Event Coordinator",
+      "slug": "event-coordinator",
+      "description": "Manages events, tracks attendance, and coordinates logistics",
+      "permissions": [
+        "cases:create",
+        "cases:read-assigned",
+        "cases:update-assigned",
+        "contacts:read",
+        "contacts:create",
+        "events:*",
+        "hubs:read"
+      ]
+    }
+  ]
+}

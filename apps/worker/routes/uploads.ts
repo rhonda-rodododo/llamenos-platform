@@ -1,10 +1,9 @@
 import { Hono } from 'hono'
 import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
-import type { FileRecord } from '@shared/types'
 import { requirePermission, checkPermission } from '../middleware/permission-guard'
 import { uploadInitBodySchema, uploadInitResponseSchema, chunkUploadResponseSchema, uploadCompleteResponseSchema, uploadStatusResponseSchema } from '@protocol/schemas/uploads'
-import { okResponseSchema } from '@protocol/schemas/common'
+import { entityFileUploadResponseSchema } from '@protocol/schemas/entity-schema'
 import { authErrors, notFoundError } from '../openapi/helpers'
 import { audit } from '../services/audit'
 import { withRetry, isRetryableError } from '../lib/retry'
@@ -19,6 +18,39 @@ const MAX_CHUNK_SIZE = 10 * 1024 * 1024    // 10 MB
 
 const uploads = new Hono<AppEnv>()
 uploads.use('*', requirePermission('files:upload'))
+
+// Single-shot entity field file upload (≤10 MB encrypted blob, EP06-A2)
+uploads.post('/entity-file',
+  describeRoute({
+    tags: ['Uploads'],
+    summary: 'Upload an encrypted file attached to an entity field',
+    responses: {
+      201: {
+        description: 'File stored',
+        content: { 'application/json': { schema: resolver(entityFileUploadResponseSchema) } },
+      },
+      ...authErrors,
+    },
+  }),
+  async (c) => {
+    const body = await c.req.parseBody()
+    const blob = body['file']
+    if (!(blob instanceof File)) return c.json({ error: 'file required' }, 400)
+    if (blob.size > MAX_CHUNK_SIZE) return c.json({ error: 'file too large (max 10 MB)' }, 413)
+
+    const pubkey = c.get('pubkey')
+    const services = c.get('services')
+    const buffer = await blob.arrayBuffer()
+
+    const fileId = crypto.randomUUID()
+    const uploadedAt = new Date().toISOString()
+
+    await c.env.R2_BUCKET.put(`entity-files/${fileId}`, buffer)
+    await audit(services.audit, 'entityFileUploaded', pubkey, { fileId, size: blob.size })
+
+    return c.json({ fileId, uploadedAt }, 201)
+  },
+)
 
 // Initialize an upload — returns uploadId and chunk upload URLs
 uploads.post('/init',

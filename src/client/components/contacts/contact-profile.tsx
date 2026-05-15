@@ -11,6 +11,8 @@ import {
   listDirectoryContactGroups,
   listDirectoryContactCases,
 } from '@/lib/api'
+import { useAuth } from '@/lib/auth'
+import { RelationshipWritePanel } from './relationship-write-panel'
 import { useToast } from '@/lib/toast'
 import { CONTACT_TYPE_CONFIG } from './contact-card'
 import { ContactMergeDialog } from '@/components/contact-merge-dialog'
@@ -290,6 +292,7 @@ function CasesTab({ contactId }: { contactId: string }) {
 function RelationshipsTab({ contactId }: { contactId: string }) {
   const { t } = useTranslation()
   const { toast } = useToast()
+  const { hasPermission } = useAuth()
   const [relationships, setRelationships] = useState<ContactRelationship[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -311,12 +314,25 @@ function RelationshipsTab({ contactId }: { contactId: string }) {
     return <LoadingPlaceholder />
   }
 
-  if (relationships.length === 0) {
+  const canWrite = hasPermission('contacts:manage-relationships')
+
+  if (relationships.length === 0 && !canWrite) {
     return (
       <div data-testid="contact-relationships-empty" className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
         <ArrowRight className="h-8 w-8 mb-2 opacity-40" />
         <p>{t('contactDirectory.noRelationships', { defaultValue: 'No relationships defined for this contact.' })}</p>
       </div>
+    )
+  }
+
+  if (canWrite) {
+    return (
+      <RelationshipWritePanel
+        contactId={contactId}
+        relationships={relationships}
+        onRelationshipsChange={setRelationships}
+        canWrite={canWrite}
+      />
     )
   }
 

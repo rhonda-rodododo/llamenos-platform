@@ -15,6 +15,8 @@ import kotlinx.coroutines.launch
 import org.llamenos.hotline.api.ApiService
 import org.llamenos.hotline.hub.ActiveHubState
 import org.llamenos.hotline.model.CmsReportTypesResponse
+import org.llamenos.hotline.model.ConvertFromReportBody
+import org.llamenos.hotline.model.ConvertFromReportResponse
 import org.llamenos.hotline.model.ConvertReportToCaseRequest
 import org.llamenos.hotline.model.ConvertReportToCaseResponse
 import org.llamenos.hotline.model.Report
@@ -42,6 +44,7 @@ data class TriageUiState(
     val reportTypes: List<ReportTypeDefinition> = emptyList(),
     val isConverting: Boolean = false,
     val selectedReport: Report? = null,
+    val lastConvertedRecordId: String? = null,
 )
 
 /**
@@ -159,6 +162,37 @@ class TriageViewModel @Inject constructor(
                 )
                 _uiState.update { it.copy(isConverting = false, selectedReport = null) }
                 // Reload the queue
+                loadTriageQueue()
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isConverting = false,
+                        error = e.message ?: "Failed to convert report",
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Convert a report to an entity record using the atomic conversion endpoint (EP06-A3).
+     */
+    fun convertToEntity(report: Report, entityTypeId: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isConverting = true, error = null) }
+            try {
+                val body = ConvertFromReportBody(
+                    reportId = report.id,
+                    entityTypeId = entityTypeId,
+                )
+                val response = apiService.request<ConvertFromReportResponse>(
+                    "POST",
+                    apiService.hp("/api/records/convert-from-report"),
+                    body = body,
+                )
+                _uiState.update {
+                    it.copy(isConverting = false, selectedReport = null, lastConvertedRecordId = response.recordId)
+                }
                 loadTriageQueue()
             } catch (e: Exception) {
                 _uiState.update {

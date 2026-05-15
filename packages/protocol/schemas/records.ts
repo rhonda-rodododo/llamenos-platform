@@ -92,6 +92,8 @@ export const listRecordsQuerySchema = paginationSchema.extend({
   assignedTo: z.string().optional(),
   parentRecordId: z.string().optional(),
   crossHub: z.string().optional(), // 'true' | 'false' — string because query params are strings
+  blindIndexToken: z.string().optional(),
+  blindIndexField: z.string().optional(),
 })
 
 export type ListRecordsQuery = z.infer<typeof listRecordsQuerySchema>
@@ -177,9 +179,14 @@ export const envelopeRecipientsResponseSchema = z.object({
 export const assignmentSuggestionSchema = z.object({
   pubkey: z.string(),
   score: z.number(),
+  workloadScore: z.number().optional().default(0),
+  languageScore: z.number().optional().default(0),
+  specializationScore: z.number().optional().default(0),
+  availabilityScore: z.number().optional().default(0),
   reasons: z.array(z.string()),
   activeCaseCount: z.number(),
   maxCases: z.number(),
+  matchedSpecializations: z.array(z.string()).optional().default([]),
 })
 
 export type AssignmentSuggestion = z.infer<typeof assignmentSuggestionSchema>
@@ -191,3 +198,23 @@ export const suggestAssigneesResponseSchema = z.object({
 export const recordsByContactResponseSchema = z.object({
   records: z.array(recordSchema),
 })
+
+// --- Report-to-entity atomic conversion (EP06-A3) ---
+
+export const convertFromReportBodySchema = z.object({
+  reportId: z.string().uuid(),
+  entityTypeId: z.string().uuid(),
+  additionalFields: z.record(z.string(), z.unknown()).optional().default({}),
+})
+
+export const convertFromReportResponseSchema = z.object({
+  recordId: z.string().uuid(),
+  reportId: z.string().uuid(),
+  entityTypeId: z.string().uuid(),
+  caseNumber: z.string().optional(),
+  autoAssigned: z.boolean(),
+  assignedTo: z.array(z.string()).optional().default([]),
+})
+
+export type ConvertFromReportBody = z.infer<typeof convertFromReportBodySchema>
+export type ConvertFromReportResponse = z.infer<typeof convertFromReportResponseSchema>

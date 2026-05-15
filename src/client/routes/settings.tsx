@@ -44,6 +44,7 @@ import {
   clearPendingReports,
 } from '@/lib/crash-reporting'
 import { SignalNotificationSection } from '@/components/signal-notification-section'
+import { RecoveryStatusSection } from '@/components/recovery-status-section'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { SectionBanner } from '@/components/admin-shell/section-layout'
 
@@ -501,6 +502,9 @@ function SettingsPage() {
       >
         <SignalNotificationSection />
       </SettingsSection>
+
+      {/* Social Recovery Status */}
+      <RecoveryStatusSection />
 
       {/* Crash Reporting / Diagnostics */}
       <SettingsSection

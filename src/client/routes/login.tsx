@@ -9,6 +9,7 @@ import { readBackupFile, restoreFromBackupWithPin, restoreFromBackupWithRecovery
 import * as keyManager from '@/lib/key-manager'
 import { isWebAuthnAvailable } from '@/lib/webauthn'
 import { DemoAccountPicker } from '@/components/demo-account-picker'
+import { AccountRecoveryFlow } from '@/components/account-recovery-flow'
 import { KeyRound, LogIn, Shield, Sun, Moon, Monitor, Fingerprint, Key, Smartphone, Upload, ArrowRight } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { LogoMark } from '@/components/logo-mark'
@@ -31,6 +32,7 @@ function LoginPage() {
   const navigate = useNavigate()
   const [validationError, setValidationError] = useState('')
   const [showRecovery, setShowRecovery] = useState(false)
+  const [showAccountRecovery, setShowAccountRecovery] = useState(false)
   const [passkeyLoading, setPasskeyLoading] = useState(false)
   const webauthnAvailable = isWebAuthnAvailable()
   const [storedKeyExists, setStoredKeyExists] = useState(false)
@@ -43,7 +45,7 @@ function LoginPage() {
   }, [])
 
   // Recovery state
-  const [recoveryMode, setRecoveryMode] = useState<'none' | 'nsec' | 'backup'>('none')
+  const [recoveryMode] = useState<'none' | 'nsec' | 'backup'>('none')
   const [nsec, setNsec] = useState('')
   const [backupFile, setBackupFile] = useState<import('@/lib/backup').BackupFile | null>(null)
   const [recoveryPin, setRecoveryPin] = useState('')
@@ -198,6 +200,15 @@ function LoginPage() {
     }
   }
 
+  // --- Account recovery flow (social recovery) ---
+  if (showAccountRecovery) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-4">
+        <AccountRecoveryFlow onBack={() => setShowAccountRecovery(false)} />
+      </div>
+    )
+  }
+
   // --- If stored key exists, show PIN entry as primary ---
   if (storedKeyExists && !showRecovery) {
     return (
@@ -235,7 +246,7 @@ function LoginPage() {
               ))}
             </div>
 
-            <PinUnlockInline onUnlock={handlePinUnlock} onWipe={handlePinWipe} />
+            <PinUnlockInline onUnlock={handlePinUnlock} />
 
             {(validationError || error) && (
               <p role="alert" className="flex items-center gap-1.5 text-sm text-destructive">
@@ -280,6 +291,17 @@ function LoginPage() {
             >
               <Key className="h-3.5 w-3.5" />
               {t('recovery.options', { defaultValue: 'Recovery options' })}
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full text-muted-foreground"
+              data-testid="lost-device-link"
+              onClick={() => setShowAccountRecovery(true)}
+            >
+              <Shield className="h-3.5 w-3.5" />
+              {t('recoveryGroup.initiate.title')}
             </Button>
 
             {demoMode && <DemoAccountPicker />}
@@ -576,7 +598,7 @@ function LoginPage() {
  * PIN attempt tracking is persisted server-side in the Tauri Store (Rust).
  * The component only displays errors returned by the backend.
  */
-function PinUnlockInline({ onUnlock, onWipe }: { onUnlock: (pin: string) => Promise<boolean>; onWipe: () => void }) {
+function PinUnlockInline({ onUnlock }: { onUnlock: (pin: string) => Promise<boolean> }) {
   const { t } = useTranslation()
   const [pin, setPin] = useState('')
   const [error, setError] = useState(false)

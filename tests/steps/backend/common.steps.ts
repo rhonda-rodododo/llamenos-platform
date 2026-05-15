@@ -29,6 +29,8 @@ export interface ScenarioState {
   messageId?: string
   lastApiResponse?: { status: number; data: unknown }
   banPhones: string[]
+  /** Maps plaintext phone → server-hashed phone (from ban API responses) */
+  phoneHashMap: Record<string, string>
   relayCapture?: RelayCapture
   hubId: string
 }
@@ -43,6 +45,7 @@ Before(async ({ world, workerHub }) => {
     volunteers: [],
     shiftIds: [],
     banPhones: [],
+    phoneHashMap: {},
     hubId: workerHub,
   }
   setState(world, STATE_KEY, s)
@@ -56,6 +59,10 @@ Given('the server is reset', async () => {
   // No-op: each Playwright worker uses an isolated hub (workerHub fixture).
   // Data created in one worker never affects another.
 })
+
+// No-op: admin authentication is handled by the workerHub fixture + ADMIN_SEED.
+// This step exists so feature file backgrounds that document auth context compile.
+Given('the admin is authenticated', async () => {})
 
 // ── Volunteer Setup ────────────────────────────────────────────────
 

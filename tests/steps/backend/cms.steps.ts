@@ -88,7 +88,7 @@ function getCmsState(world: Record<string, unknown>): CmsState {
 }
 
 
-Before({ tags: '@cases or @contacts or @events or @evidence or @templates or @reports' }, async ({ world }) => {
+Before({ tags: '@cases or @contacts or @contact-write or @events or @evidence or @templates or @reports' }, async ({ world }) => {
   const cms = {
     templateCatalog: [],
     contacts: [],
@@ -181,6 +181,11 @@ Then('the template should have relationship types', async ({ world }) => {
   expect(getCmsState(world).templateDetails).toBeTruthy()
   const relTypes = getCmsState(world).templateDetails!.relationshipTypes as unknown[]
   expect(relTypes.length).toBeGreaterThan(0)
+})
+
+Given('the {string} template is applied', async ({ request, world }, templateId: string) => {
+  const hubId = getScenarioState(world).hubId
+  await applyTemplateViaApi(request, templateId, undefined, hubId)
 })
 
 When('the admin applies template {string}', async ({ request, world }, templateId: string) => {

@@ -1785,6 +1785,16 @@ export async function updateEntityType(id: string, body: Partial<CreateEntityTyp
   })
 }
 
+export async function customizeEntityType(
+  id: string,
+  body: import('@protocol/schemas/entity-schema').EntityTemplateCustomizeBody,
+) {
+  return request<EntityTypeDefinition>(hp(`/settings/cms/entity-types/${id}/customize`), {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  })
+}
+
 export async function deleteEntityType(id: string) {
   return request<{ ok: boolean }>(hp(`/settings/cms/entity-types/${id}`), {
     method: 'DELETE',
@@ -2030,6 +2040,71 @@ export async function listDirectoryContactGroups(id: string) {
   return request<{ groups: ContactGroup[] }>(hp(`/directory/${id}/groups`))
 }
 
+// --- Relationship write functions (EP06-A2) ---
+
+export async function createContactRelationship(
+  contactId: string,
+  body: import('@protocol/schemas/contact-relationships').CreateRelationshipBody,
+) {
+  return request<ContactRelationship>(hp(`/directory/${contactId}/relationships`), {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function deleteContactRelationship(contactId: string, relId: string) {
+  return request<{ deleted: boolean }>(hp(`/directory/${contactId}/relationships/${relId}`), {
+    method: 'DELETE',
+  })
+}
+
+// --- Affinity group write functions (EP06-A2) ---
+
+export type AffinityGroup = import('@protocol/schemas/contact-relationships').AffinityGroup
+export type CreateAffinityGroupBody = import('@protocol/schemas/contact-relationships').CreateAffinityGroupBody
+export type UpdateAffinityGroupBody = import('@protocol/schemas/contact-relationships').UpdateAffinityGroupBody
+
+export async function listAffinityGroups() {
+  return request<{ groups: AffinityGroup[] }>(hp('/directory/groups'))
+}
+
+export async function createAffinityGroup(body: CreateAffinityGroupBody) {
+  return request<AffinityGroup>(hp('/directory/groups'), { method: 'POST', body: JSON.stringify(body) })
+}
+
+export async function updateAffinityGroup(groupId: string, body: UpdateAffinityGroupBody) {
+  return request<AffinityGroup>(hp(`/directory/groups/${groupId}`), { method: 'PATCH', body: JSON.stringify(body) })
+}
+
+export async function deleteAffinityGroup(groupId: string) {
+  return request<{ deleted: boolean }>(hp(`/directory/groups/${groupId}`), { method: 'DELETE' })
+}
+
+export async function addGroupMember(groupId: string, contactId: string, role?: string) {
+  return request<{ added: boolean }>(hp(`/directory/groups/${groupId}/members`), {
+    method: 'POST',
+    body: JSON.stringify({ contactId, role, isPrimary: false }),
+  })
+}
+
+export async function removeGroupMember(groupId: string, contactId: string) {
+  return request<{ removed: boolean }>(hp(`/directory/groups/${groupId}/members/${contactId}`), {
+    method: 'DELETE',
+  })
+}
+
+// --- Entity file upload (EP06-A2) ---
+
+export async function uploadEntityFile(file: File): Promise<{ fileId: string; uploadedAt: string }> {
+  const fd = new FormData()
+  fd.append('file', file)
+  return request<{ fileId: string; uploadedAt: string }>(hp('/uploads/entity-file'), {
+    method: 'POST',
+    body: fd,
+    headers: {},  // let browser set Content-Type with boundary
+  })
+}
+
 export async function listDirectoryContactCases(id: string) {
   return request<{ cases: ContactCaseLink[] }>(hp(`/directory/${id}/cases`))
 }
@@ -2064,6 +2139,52 @@ export async function setAutoAssignment(enabled: boolean) {
   return request<{ enabled: boolean }>(hp('/settings/cms/auto-assignment'), {
     method: 'PUT',
     body: JSON.stringify({ enabled }),
+  })
+}
+
+// --- Report-to-entity atomic conversion (EP06-A3) ---
+
+export interface ConvertFromReportParams {
+  reportId: string
+  entityTypeId: string
+  additionalFields?: Record<string, unknown>
+}
+
+export interface ConvertFromReportResult {
+  recordId: string
+  reportId: string
+  entityTypeId: string
+  caseNumber?: string
+  autoAssigned: boolean
+  assignedTo: string[]
+}
+
+export async function convertReportToEntity(params: ConvertFromReportParams): Promise<ConvertFromReportResult> {
+  return request<ConvertFromReportResult>(hp('/records/convert-from-report'), {
+    method: 'POST',
+    body: JSON.stringify({
+      reportId: params.reportId,
+      entityTypeId: params.entityTypeId,
+      additionalFields: params.additionalFields ?? {},
+    }),
+  })
+}
+
+// --- Contact notification dispatch (EP06-A3) ---
+
+export interface NotifyContactParams {
+  recordId: string
+  notifications: Array<{
+    recipientHash: string
+    channel: 'sms' | 'signal' | 'whatsapp' | 'telegram'
+    message: string
+  }>
+}
+
+export async function notifyContacts(params: NotifyContactParams): Promise<{ results: Array<{ recipientHash: string; success: boolean; error?: string }> }> {
+  return request(hp(`/records/${params.recordId}/notify-contacts`), {
+    method: 'POST',
+    body: JSON.stringify({ notifications: params.notifications }),
   })
 }
 
@@ -2408,6 +2529,216 @@ export async function updateSecurityPrefs(patch: Partial<Omit<SecurityPrefs, 'up
     method: 'PATCH',
     body: JSON.stringify(patch),
   })
+}
+
+// =========================================================================
+// Entity Templates (EP06-A1)
+// =========================================================================
+
+export interface EntityTemplateListResponse {
+  templates: EntityTemplate[]
+  appliedTemplateIds: string[]
+}
+
+export interface EntityTemplate {
+  id: string
+  name: string
+  label: string
+  labelPlural: string
+  description: string
+  icon?: string
+  color?: string
+  category: 'case' | 'event' | 'incident_report' | 'contact_note'
+  version: string
+  fields: EntityTemplateField[]
+  statuses: Array<{ value: string; label: string; color?: string; isDefault?: boolean; isClosed?: boolean }>
+  defaultStatus: string
+  closedStatuses?: string[]
+  severities?: Array<{ value: string; label: string; color?: string }>
+  allowSubRecords?: boolean
+  allowFileAttachments?: boolean
+  allowInteractionLinks?: boolean
+  numberingEnabled?: boolean
+  numberPrefix?: string
+  tags?: string[]
+  isBuiltin?: boolean
+}
+
+export interface EntityTemplateField {
+  id: string
+  name: string
+  label: string
+  type: string
+  required?: boolean
+  indexable?: boolean
+  indexType?: 'exact' | 'date' | 'location' | 'none'
+  locationOptions?: {
+    maxPrecision?: string
+    allowGps?: boolean
+    allowAutocomplete?: boolean
+  }
+  order?: number
+}
+
+export async function listEntityTemplates(): Promise<EntityTemplateListResponse> {
+  return request('/settings/cms/templates')
+}
+
+export async function applyEntityTemplate(templateId: string): Promise<{ applied: boolean; entityTypeId: string }> {
+  return request('/settings/cms/templates/apply', {
+    method: 'POST',
+    body: JSON.stringify({ templateId }),
+  })
+}
+
+// ── Recovery Group ─────────────────────────────────────────────────────
+
+export interface RecoveryGroupInfo {
+  publicKey: string
+  threshold: number
+  totalShares: number
+  commitments: string[]
+  sigchainLinkHash: string
+  delayHours: number
+  emergencyFloorHours: number
+  createdAt: string
+  rotatedAt: string | null
+  shareHolders: Array<{
+    holderPubkey: string
+    lastLivenessProof: string | null
+  }>
+}
+
+export interface RecoverySessionInfo {
+  sessionId: string
+  hubId: string
+  userPubkey: string
+  newDevicePubkey: string
+  signalVerified: boolean
+  status: 'pending' | 'verified' | 'active' | 'completed' | 'expired' | 'cancelled'
+  expiresAt: string
+  completedAt: string | null
+  cancelledAt: string | null
+  cancelledBy: string | null
+  emergencyOverride: {
+    justification: string
+    approverPubkey: string
+    approverSignature: string
+  } | null
+  createdAt: string
+  contributionCount: number
+  threshold: number
+  contributions: Array<{
+    contributorPubkey: string
+    encryptedShare: string
+    contributorSignature: string
+    contributedAt: string
+  }>
+}
+
+export interface RecoveryGroupEnrollBody {
+  hubId: string
+  threshold: number
+  totalShares: number
+  groupPublicKey: string
+  shareEnvelopes: Array<{ holderPubkey: string; envelope: string }>
+  shareCommitments: string[]
+  duressCommitments?: (string | null)[]
+  sigchainLinkHash: string
+  delayHours?: number
+  emergencyFloorHours?: number
+  rotate?: boolean
+}
+
+export async function getRecoveryGroup(hubId: string): Promise<RecoveryGroupInfo | null> {
+  try {
+    return await request<RecoveryGroupInfo>(`/hubs/${hubId}/recovery-group`)
+  } catch {
+    return null
+  }
+}
+
+export async function enrollRecoveryGroup(body: RecoveryGroupEnrollBody): Promise<void> {
+  await request('/recovery-group/enroll', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function getRecoverySessions(hubId: string): Promise<RecoverySessionInfo[]> {
+  return request<RecoverySessionInfo[]>(`/recovery-group/sessions?hubId=${hubId}`)
+}
+
+export async function getRecoverySession(sessionId: string): Promise<RecoverySessionInfo> {
+  return request<RecoverySessionInfo>(`/recovery-group/session/${sessionId}`)
+}
+
+export async function contributeShare(
+  sessionId: string,
+  encryptedShare: string,
+  contributorSignature: string,
+): Promise<{ ok: boolean; status: string; contributionCount: number }> {
+  return request(`/recovery-group/session/${sessionId}/contribute`, {
+    method: 'POST',
+    body: JSON.stringify({ encryptedShare, contributorSignature }),
+  })
+}
+
+export async function cancelRecoverySession(sessionId: string): Promise<void> {
+  await request(`/recovery-group/session/${sessionId}/cancel`, { method: 'POST' })
+}
+
+export async function initiateRecovery(
+  hubId: string,
+  userIdentifier: string,
+  newDevicePubkey: string,
+): Promise<{ sessionId: string; verificationSent: boolean }> {
+  const res = await fetch(`/api/recovery-group/initiate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ hubId, userIdentifier, newDevicePubkey }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Request failed' }))
+    throw new Error((err as { error?: string }).error || `HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function verifyRecoveryCode(
+  sessionId: string,
+  verificationCode: string,
+): Promise<{ ok: boolean; expiresAt: string }> {
+  const res = await fetch(`/api/recovery-group/initiate/verify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionId, verificationCode }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Verification failed' }))
+    throw new Error((err as { error?: string }).error || `HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
+export interface RecoveryGroupCandidate {
+  pubkey: string
+  displayName: string
+  encryptionPubkey: string
+  deviceVerified: boolean
+  lastSeen: string | null
+}
+
+export async function getRecoveryGroupCandidates(
+  hubId: string,
+): Promise<RecoveryGroupCandidate[]> {
+  try {
+    return await request<RecoveryGroupCandidate[]>(
+      `/hubs/${hubId}/recovery-group/candidates`,
+    )
+  } catch {
+    return []
+  }
 }
 
 // --- Contact Merge API ---

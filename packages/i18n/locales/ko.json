@@ -206,7 +206,14 @@
     "transcriptionSaved": "Transcription settings saved",
     "transcriptionSettings": "Transcription",
     "transcriptionVolunteerHeader": "Volunteer Opt-Out",
-    "users": "Volunteers"
+    "users": "Volunteers",
+    "eventsMigrationTitle": "Legacy Events Migration",
+    "eventsMigrationDesc": "{{count}} events need migration to the entity record system.",
+    "eventsMigrateBtn": "Migrate Events",
+    "eventsMigrationComplete": "Events migration complete",
+    "eventsMigrationError": "Migration failed",
+    "checkingMigration": "Checking migration status...",
+    "eventsMigratingProgress": "Migrating... {{migrated}} of {{count}}"
   },
   "adminNav": {
     "groups": {
@@ -1199,7 +1206,27 @@
     "mergeSecondaryId": "Secondary record",
     "mergeSecondaryIdPlaceholder": "Paste the ID of the record to merge...",
     "mergeSelected": "Selected",
-    "mergeWarning": "This action cannot be undone. All data from the secondary contact will be relinked to the primary."
+    "mergeWarning": "This action cannot be undone. All data from the secondary contact will be relinked to the primary.",
+    "addField": "Add Field",
+    "chooseFile": "Choose File",
+    "choosePhoto": "Choose Photo",
+    "editField": "Edit Field",
+    "editFields": "Edit Fields",
+    "fieldLabel": "Label",
+    "fieldLabelPlaceholder": "Display label",
+    "fieldName": "Field name",
+    "fieldNamePlaceholder": "snake_case_name",
+    "fieldSection": "Section",
+    "fieldSectionPlaceholder": "Optional grouping",
+    "fieldType": "Type",
+    "fields": "Fields",
+    "fileAttached": "File attached",
+    "fileTooLarge": "File exceeds maximum size",
+    "fileTypeNotAllowed": "File type not allowed",
+    "fileUploadError": "Upload failed",
+    "locationPlaceholder": "Search address or use GPS",
+    "required": "Required",
+    "uploading": "Uploading…"
   },
   "commandPalette": {
     "actions": "작업",
@@ -1261,8 +1288,10 @@
     "status": "상태",
     "submit": "제출",
     "success": "성공",
+    "yes": "예",
     "unauthorized": "Unauthorized",
-    "yes": "예"
+    "from": "부터",
+    "to": "까지"
   },
   "confirm": {
     "backup": "Confirm Backup",
@@ -1344,7 +1373,20 @@
     "typeLegalResource": "법률 자원",
     "typeOrganization": "조직",
     "typeServiceProvider": "서비스 제공자",
-    "viewTimeline": "View Timeline"
+    "viewTimeline": "View Timeline",
+    "addRelationship": "Add Relationship",
+    "allContacts": "All Contacts",
+    "contactIdPlaceholder": "Contact ID",
+    "editContact": "Edit Contact",
+    "editError": "Failed to update contact",
+    "groupCreateError": "Failed to create group",
+    "groupDeleteError": "Failed to delete group",
+    "groupNamePlaceholder": "Group name",
+    "groups": "Groups",
+    "groupsLoadError": "Failed to load groups",
+    "relationshipCreateError": "Failed to create relationship",
+    "relationshipDeleteError": "Failed to delete relationship",
+    "updated": "Contact updated"
   },
   "contactNotifications": {
     "channelPreference": "선호 채널",
@@ -1376,7 +1418,19 @@
     "report": "보고서",
     "search": "Search contacts...",
     "searchPrompt": "Search by identifier...",
-    "title": "연락처"
+    "title": "연락처",
+    "addToGroup": "Add to Group",
+    "createGroup": "New Group",
+    "createTitle": "New Contact",
+    "displayName": "Display Name",
+    "editTitle": "Edit Contact",
+    "email": "Email",
+    "groupName": "Group name",
+    "groups": "Groups",
+    "members": "members",
+    "phone": "Phone",
+    "sectionBasic": "Basic Info",
+    "sectionNotes": "Notes"
   },
   "containsLabel": "Contains",
   "continueButton": "Continue",
@@ -2403,7 +2457,16 @@
     "statusDenied": "Notifications are blocked. Update your browser's site settings to enable them.",
     "statusGranted": "Notifications are enabled.",
     "statusUnsupported": "Your browser does not support notifications.",
-    "unsupported": "Not supported"
+    "unsupported": "Not supported",
+    "title": "Notify Contacts?",
+    "description": "Send a status update to linked contacts. Messages are rendered on your device.",
+    "statusChangeTemplate": "Your case {{caseNumber}} at {{hubName}} has been updated. New status: {{status}}.",
+    "noContacts": "No linked contacts found.",
+    "send": "Send",
+    "skip": "Skip",
+    "sent": "Notifications sent",
+    "sendError": "Failed to send notifications",
+    "contactsSection": "Contacts"
   },
   "nsec": {
     "displayLabel": "Your secret key",
@@ -3999,7 +4062,16 @@
     "statusUpdated": "업데이트됨",
     "title": "트리아지",
     "titlePlaceholder": "사건 제목...",
-    "untitled": "Untitled Report"
+    "untitled": "Untitled Report",
+    "converted": "Converted to entity",
+    "convertError": "Failed to convert report",
+    "convertToEntity": "Convert to Entity",
+    "statusReviewing": "Reviewing",
+    "statusConverted": "Converted",
+    "statusDismissed": "Dismissed",
+    "noReportsHint": "No reports match this filter.",
+    "reportDetail": "Report Detail",
+    "filter": "Filter"
   },
   "unlock": {
     "biometricReason": "Unlock Llamenos",
@@ -4154,14 +4226,16 @@
       "url": "Voice URL"
     }
   },
-  "webhookConfirmation": {
-    "description": "Configure webhook URLs",
-    "smsWebhook": "SMS Webhook",
-    "title": "Webhook Confirmation",
-    "voiceIncomingWebhook": "Voice Incoming Webhook",
-    "voiceStatusWebhook": "Voice Status Webhook"
+  "assignment": {
+    "title": "Assign Volunteer",
+    "workloadLabel": "Workload score",
+    "specializationLabel": "Specialization match",
+    "languageMatch": "Language match",
+    "noVolunteers": "No available volunteers found",
+    "noVolunteersHint": "Make sure volunteers are on-shift and have capacity.",
+    "assignBtn": "Assign",
+    "assignedSuccess": "Volunteer assigned"
   },
-  "webhookDescription": "Configure webhook URLs",
   "ws": {
     "connected": "Connected",
     "connecting": "Connecting...",
@@ -4171,5 +4245,168 @@
   "yes": "Yes",
   "yourIdentity": "Your Identity",
   "yourPrivateKey": "Your Private Key",
-  "yourPublicKey": "Your Public Key"
+  "yourPublicKey": "Your Public Key",
+  "adminEntityType": {
+    "edit": "Edit Entity Type",
+    "label": "Label",
+    "labelPlural": "Plural label",
+    "sectionGeneral": "General",
+    "showInNavigation": "Show in navigation"
+  },
+  "adminEntityTypes": {
+    "title": "Entity Types"
+  },
+  "webhookConfirmation": {
+    "title": "Webhook Confirmation",
+    "description": "Configure webhook URLs",
+    "voiceIncomingWebhook": "Voice Incoming Webhook",
+    "voiceStatusWebhook": "Voice Status Webhook",
+    "smsWebhook": "SMS Webhook"
+  },
+  "webhookDescription": "Configure webhook URLs",
+  "entityTemplates": {
+    "title": "Entity Templates",
+    "description": "일반적인 사용 사례를 위한 사전 구성된 엔터티 유형.",
+    "noTemplates": "사용 가능한 템플릿이 없습니다.",
+    "apply": "Apply Template",
+    "applied": "Applied",
+    "notApplied": "Not Applied",
+    "applyBtn": "Enable for this hub",
+    "applySuccess": "Template applied successfully",
+    "applyError": "Failed to apply template",
+    "builtinBadge": "Built-in",
+    "templates": {
+      "case": {
+        "label": "Case",
+        "labelPlural": "Cases",
+        "description": "General-purpose case for tracking incidents and follow-up."
+      },
+      "event": {
+        "label": "Event",
+        "labelPlural": "Events",
+        "description": "Time-bounded event with encrypted dates and location."
+      },
+      "incidentReport": {
+        "label": "Incident Report",
+        "labelPlural": "Incident Reports",
+        "description": "Triage-oriented incident documentation with severity tracking."
+      },
+      "contactNote": {
+        "label": "Contact Note",
+        "labelPlural": "Contact Notes",
+        "description": "Minimal note linked to a contact."
+      }
+    },
+    "fields": {
+      "startDate": "Start Date",
+      "endDate": "End Date",
+      "location": "Location",
+      "title": "Title",
+      "description": "Description",
+      "note": "Note",
+      "date": "Date",
+      "incidentDate": "Incident Date/Time",
+      "incidentLocation": "Incident Location",
+      "whatHappened": "What Happened"
+    },
+    "statuses": {
+      "open": "Open",
+      "inProgress": "In Progress",
+      "resolved": "Resolved",
+      "closed": "Closed",
+      "planned": "Planned",
+      "active": "Active",
+      "concluded": "Concluded",
+      "cancelled": "Cancelled",
+      "new": "New",
+      "underReview": "Under Review",
+      "documented": "Documented",
+      "archived": "Archived"
+    }
+  },
+  "recoveryGroup": {
+    "title": "Recovery Team",
+    "description": "Set up a recovery team so users can recover their accounts if they lose access to their devices. Recovery contacts hold approval keys; a minimum number of approvals is required.",
+    "requiredApprovals": "Required approvals",
+    "totalContacts": "Total recovery contacts",
+    "setup": "Set up recovery team",
+    "settingUp": "Setting up…",
+    "setupSuccess": "Recovery team set up successfully.",
+    "rotate": "Rotate recovery team",
+    "rotating": "Rotating…",
+    "rotateSuccess": "Recovery team rotated successfully.",
+    "contacts": "Recovery contacts",
+    "noTeam": "No recovery team configured",
+    "lastRotated": "Last rotated",
+    "contactHealth": "Contact status",
+    "deviceVerified": "Device verified",
+    "deviceUnverified": "Device not verified",
+    "livenessOk": "Share verified",
+    "livenessStale": "Share verification overdue",
+    "delayConfig": "Recovery waiting period (hours)",
+    "emergencyFloorConfig": "Minimum urgent recovery period (hours)",
+    "geoWarning": "Consider distributing recovery contacts across different regions for better security",
+    "requests": {
+      "title": "Account Recovery Requests",
+      "active": "Active requests",
+      "history": "Request history",
+      "status": {
+        "pending": "Awaiting verification",
+        "verified": "Verified — waiting for approvals",
+        "active": "Approved — waiting period",
+        "completed": "Completed",
+        "expired": "Expired",
+        "cancelled": "Cancelled"
+      },
+      "approve": "Approve recovery",
+      "approving": "Approving…",
+      "approvalProgress": "{{count}} of {{required}} approvals",
+      "timeRemaining": "Time remaining",
+      "cancel": "Cancel request",
+      "cancelConfirm": "Are you sure? This will stop the recovery process.",
+      "duressAlert": "Warning: a potential coercion alert has been detected. Verify this request through a separate channel before proceeding."
+    },
+    "urgent": {
+      "title": "Urgent recovery",
+      "enable": "Enable urgent recovery",
+      "description": "Reduces the waiting period. Requires a second approver and a written reason.",
+      "justification": "Reason for urgency",
+      "justificationPlaceholder": "Explain why this recovery is urgent (min 16 characters)",
+      "secondApprover": "Second approver",
+      "selectApprover": "Select a second approver",
+      "reducedDelay": "Waiting period reduced to {{hours}} hours"
+    },
+    "initiate": {
+      "title": "Account recovery",
+      "description": "Lost access to your device? Your recovery contacts can help you regain access to your account.",
+      "identifier": "Your email or phone number",
+      "selectHub": "Select your organization",
+      "submit": "Start recovery",
+      "submitting": "Starting…",
+      "signalVerification": "Enter the verification code sent to your Signal",
+      "verificationCode": "Verification code",
+      "verify": "Verify",
+      "waiting": "Waiting for your recovery contacts to approve",
+      "approvalsReceived": "{{count}} of {{required}} approvals received",
+      "delayCountdown": "Access will be restored in {{time}}",
+      "complete": "Account recovered",
+      "setPin": "Set a PIN to protect your new device",
+      "success": "You're all set. Your account has been recovered."
+    },
+    "status": {
+      "enrolled": "Your account is recoverable in {{hubName}}",
+      "notConfigured": "No recovery team configured for this organization"
+    },
+    "error": {
+      "thresholdExceedsTotal": "Required approvals cannot exceed total contacts",
+      "rateLimited": "Too many requests. Please wait a few minutes.",
+      "sessionExpired": "This recovery request has expired",
+      "commitmentFailed": "Recovery data verification failed — contact your administrator",
+      "alreadyApproved": "You have already approved this request",
+      "notContact": "You are not a recovery contact for this organization",
+      "signalVerificationFailed": "Verification code is incorrect",
+      "signalVerificationExpired": "Verification code has expired. Please start over.",
+      "sigchainMismatch": "Recovery team configuration could not be verified. Contact your administrator."
+    }
+  }
 }

@@ -75,3 +75,29 @@ Feature: Smart Case Assignment API
     When a new arrest case is created
     Then the case should have exactly 1 assignee
     And the assignee should be from the available volunteers
+
+  # --- Score breakdown fields (EP06-A3) ---
+
+  @backend
+  Scenario: Suggestion response includes per-component score breakdown
+    Given an unassigned arrest case exists
+    And on-shift volunteers exist
+    When I fetch suggest-assignees for the case
+    Then the response status should be 200
+    And each suggestion should include "workloadScore", "languageScore", "specializationScore", "availabilityScore"
+    And each suggestion should include "matchedSpecializations" array
+
+  @backend
+  Scenario: Entity type autoAssign field is persisted
+    Given an entity type with autoAssign enabled and threshold 35 exists
+    When I fetch the entity type
+    Then the entity type should have autoAssign true
+    And the entity type should have autoAssignThreshold 35
+
+  @backend
+  Scenario: Entity type requiredSpecializations is used in scoring
+    Given an arrest case linked to an entity type requiring specialization "crisis_counseling" exists
+    And volunteer A has specialization "crisis_counseling"
+    And volunteer B has no specializations
+    When I fetch suggest-assignees for the case
+    Then volunteer A should have a higher specializationScore than volunteer B
