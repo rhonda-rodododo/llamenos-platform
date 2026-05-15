@@ -755,7 +755,9 @@
     "hideAdvanced": "Hide Advanced",
     "showAdvanced": "Show Advanced",
     "saved": "Saved",
-    "unauthorized": "Unauthorized"
+    "unauthorized": "Unauthorized",
+    "saving": "Saving...",
+    "deleted": "Deleted"
   },
   "confirm": {
     "backup": "Confirm Backup",
@@ -3616,5 +3618,35 @@
       "30days": "30 дней",
       "custom": "Произвольный"
     }
+  },
+  "teams": {
+    "title": "Teams",
+    "createTeam": "Create Team",
+    "editTeam": "Edit Team",
+    "deleteTeam": "Delete Team",
+    "teamName": "Team Name",
+    "teamDescription": "Description",
+    "members": "Members",
+    "memberCount": "{{count}} member(s)",
+    "noTeams": "No teams yet. Create your first team.",
+    "confirmDelete": "Delete this team? This will remove all member assignments.",
+    "addMembers": "Add Members",
+    "removeMember": "Remove Member",
+    "empty": "No teams",
+    "loading": "Loading teams..."
+  },
+  "tags": {
+    "title": "Tags",
+    "createTag": "Create Tag",
+    "editTag": "Edit Tag",
+    "deleteTag": "Delete Tag",
+    "tagName": "Tag Name (slug)",
+    "tagLabel": "Display Label",
+    "tagColor": "Color",
+    "tagCategory": "Category",
+    "noTags": "No tags yet. Create your first tag.",
+    "confirmDelete": "Delete this tag?",
+    "empty": "No tags",
+    "loading": "Loading tags..."
   }
 }

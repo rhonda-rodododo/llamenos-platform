@@ -33,7 +33,7 @@ import { DEMO_ACCOUNTS } from '@shared/demo-accounts'
 // ---------------------------------------------------------------------------
 
 import { SESSION_DURATION_MS, RENEWAL_THRESHOLD_MS } from '../lib/session-renewal'
-import { decideDeviceRegistration, MAX_DEVICES_PER_VOLUNTEER } from '../lib/device-eviction'
+import { decideDeviceRegistration } from '../lib/device-eviction'
 const INVITE_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 const CHALLENGE_TTL_MS = 5 * 60 * 1000 // 5 minutes
 const PROVISION_ROOM_TTL_MS = 5 * 60 * 1000 // 5 minutes
@@ -281,7 +281,6 @@ export class IdentityService {
     encryptedSecretKey: string
     specializations?: string[]
     maxCaseAssignments?: number
-    teamId?: string
     supervisorPubkey?: string
   }): Promise<{ volunteer: ReturnType<typeof sanitizeUser> }> {
     const roles = data.roleIds ?? data.roles ?? ['role-volunteer']
@@ -300,7 +299,6 @@ export class IdentityService {
       callPreference: 'phone',
       specializations: data.specializations ?? [],
       maxCaseAssignments: data.maxCaseAssignments,
-      teamId: data.teamId,
       supervisorPubkey: data.supervisorPubkey,
     }).returning()
 

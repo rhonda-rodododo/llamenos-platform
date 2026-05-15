@@ -2265,3 +2265,106 @@ export async function updateSecurityPrefs(patch: Partial<Omit<SecurityPrefs, 'up
     body: JSON.stringify(patch),
   })
 }
+
+// ---------------------------------------------------------------------------
+// Teams API
+// ---------------------------------------------------------------------------
+
+export interface TeamResponse {
+  id: string
+  hubId: string
+  encryptedName: string
+  encryptedDescription: string | null
+  createdBy: string
+  memberCount: number
+  contactCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface TeamMemberResponse {
+  teamId: string
+  userPubkey: string
+  addedBy: string
+  createdAt: string
+}
+
+export async function listTeams(): Promise<{ teams: TeamResponse[] }> {
+  return request<{ teams: TeamResponse[] }>(hp('/teams'))
+}
+
+export async function createTeam(body: {
+  id: string
+  encryptedName: string
+  encryptedDescription?: string
+}): Promise<TeamResponse> {
+  return request<TeamResponse>(hp('/teams'), { method: 'POST', body: JSON.stringify(body) })
+}
+
+export async function getTeam(teamId: string): Promise<TeamResponse> {
+  return request<TeamResponse>(hp(`/teams/${teamId}`))
+}
+
+export async function updateTeam(teamId: string, body: {
+  encryptedName?: string
+  encryptedDescription?: string | null
+}): Promise<TeamResponse> {
+  return request<TeamResponse>(hp(`/teams/${teamId}`), { method: 'PATCH', body: JSON.stringify(body) })
+}
+
+export async function deleteTeam(teamId: string): Promise<{ ok: true }> {
+  return request<{ ok: true }>(hp(`/teams/${teamId}`), { method: 'DELETE' })
+}
+
+export async function listTeamMembers(teamId: string): Promise<{ members: TeamMemberResponse[] }> {
+  return request<{ members: TeamMemberResponse[] }>(hp(`/teams/${teamId}/members`))
+}
+
+export async function addTeamMembers(teamId: string, pubkeys: string[]): Promise<{ ok: true }> {
+  return request<{ ok: true }>(hp(`/teams/${teamId}/members`), { method: 'POST', body: JSON.stringify({ pubkeys }) })
+}
+
+export async function removeTeamMember(teamId: string, userPubkey: string): Promise<{ ok: true }> {
+  return request<{ ok: true }>(hp(`/teams/${teamId}/members/${encodeURIComponent(userPubkey)}`), { method: 'DELETE' })
+}
+
+// ---------------------------------------------------------------------------
+// Tags API
+// ---------------------------------------------------------------------------
+
+export interface TagResponse {
+  id: string
+  hubId: string
+  name: string
+  encryptedLabel: string
+  color: string
+  encryptedCategory: string | null
+  createdBy: string
+  createdAt: string
+}
+
+export async function listTags(): Promise<{ tags: TagResponse[] }> {
+  return request<{ tags: TagResponse[] }>(hp('/tags'))
+}
+
+export async function createTag(body: {
+  id: string
+  name: string
+  encryptedLabel: string
+  color?: string
+  encryptedCategory?: string
+}): Promise<TagResponse> {
+  return request<TagResponse>(hp('/tags'), { method: 'POST', body: JSON.stringify(body) })
+}
+
+export async function updateTag(tagId: string, body: {
+  encryptedLabel?: string
+  color?: string
+  encryptedCategory?: string | null
+}): Promise<TagResponse> {
+  return request<TagResponse>(hp(`/tags/${tagId}`), { method: 'PATCH', body: JSON.stringify(body) })
+}
+
+export async function deleteTag(tagId: string): Promise<{ removedFromContacts: number }> {
+  return request<{ removedFromContacts: number }>(hp(`/tags/${tagId}`), { method: 'DELETE' })
+}
