@@ -1,4 +1,4 @@
-@backend @security
+@backend @security @hub-selfservice
 Feature: Hub Self-Service Security
   As a security-conscious admin
   I want hub self-service endpoints to enforce strict isolation and zero-knowledge

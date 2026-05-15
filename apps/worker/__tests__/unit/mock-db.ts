@@ -105,11 +105,21 @@ export function createMockDb(tables: string[] = []) {
             })
           )
 
+          const leftJoinFn = vi.fn(() =>
+            makeChainable(result, {
+              where: whereFn,
+              limit: limitFn,
+              orderBy: orderByFn,
+              groupBy: groupByFn,
+            })
+          )
+
           return makeChainable(result, {
             where: whereFn,
             limit: limitFn,
             orderBy: orderByFn,
             groupBy: groupByFn,
+            leftJoin: leftJoinFn,
           })
         }),
       }

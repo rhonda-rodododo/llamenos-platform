@@ -446,7 +446,7 @@ pub fn encrypt_with_pin(
         .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
 
     // Hash pubkey for identification
-    let hash_input = format!("{}{}", HMAC_KEYID_PREFIX, pubkey_hex);
+    let hash_input = format!("{HMAC_KEYID_PREFIX}{pubkey_hex}");
     let pubkey_hash = {
         let mut hasher = Sha256::new();
         hasher.update(hash_input.as_bytes());

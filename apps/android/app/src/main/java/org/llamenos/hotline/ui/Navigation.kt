@@ -79,6 +79,11 @@ import org.llamenos.hotline.ui.providersetup.WebhookConfirmationScreen
 import org.llamenos.hotline.ui.triage.TriageScreen
 import org.llamenos.hotline.ui.triage.TriageDetailScreen
 import org.llamenos.hotline.ui.triage.TriageViewModel
+import org.llamenos.hotline.ui.security.DeviceListScreen
+import org.llamenos.hotline.ui.security.SessionListScreen
+import org.llamenos.hotline.ui.security.SecurityEventsScreen
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
 
 /**
  * Type-safe route definitions for the navigation graph.
@@ -349,6 +354,21 @@ sealed interface LlamenosRoute {
 
     data object DeviceWipe : LlamenosRoute {
         override val route = "device_wipe"
+    }
+
+    /** EP02: Device list (security tab). */
+    data object SecurityDevices : LlamenosRoute {
+        override val route = "security_devices"
+    }
+
+    /** EP02: Session list (security tab). */
+    data object SecuritySessions : LlamenosRoute {
+        override val route = "security_sessions"
+    }
+
+    /** EP02: Security events timeline. */
+    data object SecurityEvents : LlamenosRoute {
+        override val route = "security_events"
     }
 }
 
@@ -1044,6 +1064,30 @@ fun LlamenosNavigation(
             DeviceWipeReceiptScreen(
                 reason = "",
                 modifier = Modifier.padding(0.dp),
+            )
+        }
+
+        // EP02: Security screens
+
+        composable(LlamenosRoute.SecurityDevices.route) {
+            DeviceListScreen(
+                devices = emptyList(),
+                loading = true,
+            )
+        }
+
+        composable(LlamenosRoute.SecuritySessions.route) {
+            SessionListScreen(
+                sessions = emptyList(),
+                loading = true,
+            )
+        }
+
+        composable(LlamenosRoute.SecurityEvents.route) {
+            SecurityEventsScreen(
+                events = emptyList(),
+                loading = true,
+                total = 0,
             )
         }
     }

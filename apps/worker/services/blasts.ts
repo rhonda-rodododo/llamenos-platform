@@ -6,7 +6,7 @@
  * All state is stored in PostgreSQL via Drizzle ORM, unifying the
  * previously duplicated data stores from ConversationDO and BlastDO.
  */
-import { eq, and, desc, sql, count, inArray, lt, isNull } from 'drizzle-orm'
+import { eq, and, desc, sql, count, inArray } from 'drizzle-orm'
 import type { Database } from '../db'
 import {
   subscribers,
@@ -17,7 +17,6 @@ import {
 import type {
   MessagingChannelType,
   Subscriber,
-  Blast,
   BlastSettings,
   BlastContent,
   BlastDeliveryStatus,
@@ -25,7 +24,6 @@ import type {
   SubscriberChannel,
 } from '@shared/types'
 import { DEFAULT_BLAST_SETTINGS } from '@shared/types'
-import { BLAST_MAX_RETRIES } from '../types'
 import { computeRetryDecision } from '../lib/blast-delivery'
 import { hmac } from '@noble/hashes/hmac.js'
 import { sha256 } from '@noble/hashes/sha2.js'
@@ -1021,6 +1019,88 @@ export class BlastsService {
       .limit(1)
 
     return row ?? null
+  }
+
+  /**
+   * Retry a single failed delivery.
+   * Guards: delivery must be 'failed', blast must be 'sending' or 'sent'.
+   * Resets status to 'pending', increments attempts, clears error, sets nextRetryAt to now.
+   */
+  async retryDelivery(blastId: string, deliveryId: string): Promise<BlastDeliveryRow> {
+    const blast = await this.getBlast(blastId)
+    if (blast.status !== 'sending' && blast.status !== 'sent') {
+      throw new ServiceError(400, 'Blast must be in sending or sent state to retry')
+    }
+
+    const [delivery] = await this.db
+      .select()
+      .from(blastDeliveries)
+      .where(and(eq(blastDeliveries.id, deliveryId), eq(blastDeliveries.blastId, blastId)))
+      .limit(1)
+
+    if (!delivery) throw new ServiceError(404, 'Delivery not found')
+    if (delivery.status !== 'failed') {
+      throw new ServiceError(400, 'Only failed deliveries can be retried')
+    }
+
+    const [updated] = await this.db
+      .update(blastDeliveries)
+      .set({
+        status: 'pending',
+        attempts: delivery.attempts + 1,
+        error: null,
+        nextRetryAt: new Date(),
+      })
+      .where(eq(blastDeliveries.id, deliveryId))
+      .returning()
+
+    // If blast was 'sent' (completed), transition back to 'sending' so worker picks it up
+    if (blast.status === 'sent') {
+      await this.db
+        .update(blasts)
+        .set({ status: 'sending', completedAt: null, updatedAt: new Date() })
+        .where(eq(blasts.id, blastId))
+    }
+
+    return updated
+  }
+
+  /**
+   * Retry all failed deliveries for a blast.
+   * Guards: blast must be 'sending' or 'sent'.
+   * Returns the number of deliveries reset.
+   */
+  async retryFailedDeliveries(blastId: string): Promise<number> {
+    const blast = await this.getBlast(blastId)
+    if (blast.status !== 'sending' && blast.status !== 'sent') {
+      throw new ServiceError(400, 'Blast must be in sending or sent state to retry')
+    }
+
+    const result = await this.db
+      .update(blastDeliveries)
+      .set({
+        status: 'pending',
+        attempts: sql`${blastDeliveries.attempts} + 1`,
+        error: null,
+        nextRetryAt: new Date(),
+      })
+      .where(
+        and(
+          eq(blastDeliveries.blastId, blastId),
+          eq(blastDeliveries.status, 'failed'),
+        ),
+      )
+      .returning({ id: blastDeliveries.id })
+
+    // If blast was 'sent' (completed), transition back to 'sending' so worker picks it up
+    if (blast.status === 'sent' && result.length > 0) {
+      await this.db
+        .update(blasts)
+        .set({ status: 'sending', completedAt: null, updatedAt: new Date() })
+        .where(eq(blasts.id, blastId))
+    }
+
+    return result.length
   }
 
   /**

@@ -189,7 +189,22 @@
     "users": "Volunteers",
     "schemaBrowser": "Schema Browser",
     "providerSetup": "Provider Setup",
-    "signalRegistration": "Signal Registration"
+    "signalRegistration": "Signal Registration",
+    "devices": {
+      "title": "Device Overview",
+      "devices": "devices",
+      "verified": "Verified",
+      "unverified": "Unverified",
+      "verify": "Verify",
+      "verifyTitle": "Verify {{name}}",
+      "verifyDescription": "Compare the emojis below with the device owner. Both parties must see the same 7 emojis.",
+      "verifyInstruction": "Read these emojis aloud to the device owner and confirm they see the same sequence.",
+      "nonce": "Session nonce",
+      "newNonce": "New nonce",
+      "noMatch": "No match",
+      "match": "Emojis match",
+      "verifySuccess": "Device verified successfully"
+    }
   },
   "announcement": "Announcement",
   "announcementBody": "Announcement body",
@@ -305,7 +320,20 @@
     "statusCancelled": "Cancelled",
     "statusDraft": "Draft",
     "statusScheduled": "Scheduled",
-    "statusSent": "Sent"
+    "statusSent": "Sent",
+    "composerTitle": "New Broadcast Message",
+    "recipientCount": "{{count}} recipients",
+    "recipientCountOne": "1 recipient",
+    "retryFailed": "Retry Failed",
+    "retryDelivery": "Retry",
+    "retryingAll": "Retrying all failed...",
+    "progressLabel": "Delivery Progress",
+    "deliveryStatus": "Delivery Status",
+    "deliveryStatusPending": "Pending",
+    "deliveryStatusSent": "Sent",
+    "deliveryStatusDelivered": "Delivered",
+    "deliveryStatusFailed": "Failed",
+    "deliveryStatusOptedOut": "Opted Out"
   },
   "caseManagement": {
     "title": "사건 관리",
@@ -719,7 +747,24 @@
     "liveUpdating": "Updating live...",
     "optedOut": "Opted Out",
     "deliveryDetails": "Delivery Details",
-    "noDeliveries": "No deliveries"
+    "noDeliveries": "No deliveries",
+    "retryFailed": "Retry Failed",
+    "retryDelivery": "Retry",
+    "retryAll": "Retry All Failed",
+    "retriedCount": "Reset {{count}} deliveries",
+    "deliveriesTitle": "Delivery Status",
+    "deliveriesEmpty": "No deliveries yet",
+    "progressTitle": "Live Progress",
+    "progressPending": "Pending",
+    "progressDelivered": "Delivered",
+    "progressFailed": "Failed",
+    "progressSent": "Sent",
+    "progressOptedOut": "Opted Out",
+    "deliveryId": "Delivery ID",
+    "lastAttempt": "Last Attempt",
+    "errorDetail": "Error",
+    "closeSheet": "Close",
+    "retryingAll": "Retrying all failed..."
   },
   "callActions": {
     "banAndHangUp": "Ban & Hang Up",
@@ -849,7 +894,10 @@
     "hideAdvanced": "Hide Advanced",
     "showAdvanced": "Show Advanced",
     "saved": "Saved",
-    "unauthorized": "Unauthorized"
+    "unauthorized": "Unauthorized",
+    "loadMore": "더 보기",
+    "saving": "Saving...",
+    "deleted": "Deleted"
   },
   "confirm": {
     "backup": "Confirm Backup",
@@ -1515,7 +1563,8 @@
     "cases": "사건",
     "events": "이벤트",
     "triage": "트리아지",
-    "users": "자원봉사자"
+    "users": "자원봉사자",
+    "security": "보안"
   },
   "navigation": {
     "back": "Back"
@@ -1966,26 +2015,38 @@
     "volunteer": "Volunteer"
   },
   "roles": {
-    "createRole": "Create Role",
-    "created": "Role created",
+    "system": "System",
     "default": "Default",
-    "deleteConfirm": "Are you sure you want to delete this role? Members will be reassigned to the default role.",
-    "deleteTitle": "Delete Role",
-    "deleted": "Role deleted",
-    "description": "Define roles and assign permissions to control access across your hotline.",
-    "descriptionLabel": "Description",
-    "descriptionPlaceholder": "Brief description of this role...",
-    "editRole": "Edit Role",
-    "locked": "Locked",
+    "allPermissions": "모든 권한",
+    "permissionCount": "permissions",
+    "permissionCountOne": "1 permission",
+    "assignedUsers": "{{count}} users",
+    "assignedUsersOne": "1 user",
     "name": "Name",
     "namePlaceholder": "e.g. Team Lead",
-    "permissionCount": "permissions",
-    "permissions": "Permissions",
-    "selected": "selected",
     "slug": "Slug",
+    "description": "Define roles and assign permissions to control access across your hotline.",
+    "descriptionPlaceholder": "Brief description of this role...",
+    "permissions": "Permissions",
+    "create": "Create role",
+    "importFromTemplate": "Import from template",
+    "importDialog": {
+      "title": "Import roles from template",
+      "description": "Select roles to import from the template. Existing roles with the same slug will be skipped.",
+      "import": "Import selected",
+      "noTemplates": "No templates available"
+    },
+    "deleteConfirm": "Are you sure you want to delete this role? Members will be reassigned to the default role.",
     "slugPlaceholder": "e.g. team-lead",
+    "createRole": "Create Role",
+    "created": "Role created",
+    "deleteTitle": "Delete Role",
+    "deleted": "Role deleted",
+    "descriptionLabel": "Description",
+    "editRole": "Edit Role",
+    "locked": "Locked",
+    "selected": "selected",
     "summary": "Summary",
-    "system": "System",
     "title": "Roles & Permissions",
     "updated": "Role updated"
   },
@@ -3553,6 +3614,128 @@
     },
     "setupComplete": {
       "footer": "Webhook setup complete"
+    }
+  },
+  "analytics": {
+    "title": "분석",
+    "description": "통화량, 응답 시간 및 자원봉사자 활동",
+    "nav": "분석",
+    "summary": {
+      "totalCalls": "총 통화 수",
+      "answerRate": "응답률",
+      "avgDuration": "평균 통화 시간",
+      "totalConversations": "총 대화 수"
+    },
+    "callVolume": {
+      "title": "통화량",
+      "answered": "응답됨",
+      "unanswered": "미응답",
+      "abandoned": "포기됨",
+      "noData": "이 기간에 통화 데이터가 없습니다"
+    },
+    "hours": {
+      "title": "시간별 분포",
+      "noData": "이 기간에 데이터가 없습니다"
+    },
+    "conversations": {
+      "title": "대화",
+      "avgResponseTime": "평균 응답 시간",
+      "avgMessages": "평균 메시지 수",
+      "noData": "이 기간에 대화 데이터가 없습니다"
+    },
+    "shifts": {
+      "title": "교대 근무 커버리지",
+      "noData": "교대 근무 데이터가 없습니다"
+    },
+    "users": {
+      "title": "자원봉사자 활동",
+      "name": "이름",
+      "callsAnswered": "응답한 통화",
+      "avgDuration": "평균 통화 시간",
+      "notesCreated": "생성된 메모",
+      "noData": "이 기간에 자원봉사자 데이터가 없습니다"
+    },
+    "personal": {
+      "callsToday": "오늘의 통화",
+      "callsThisPeriod": "이 기간의 통화",
+      "avgDuration": "평균 통화 시간",
+      "notesCreated": "생성된 메모"
+    },
+    "platform": {
+      "title": "플랫폼 분석",
+      "crossHub": "크로스 허브"
+    },
+    "dateRange": {
+      "7days": "7일",
+      "30days": "30일",
+      "custom": "맞춤 설정"
+    }
+  },
+  "security": {
+    "tabs": {
+      "devices": "Devices",
+      "sessions": "Sessions",
+      "passkeys": "Passkeys",
+      "history": "History"
+    },
+    "devices": {
+      "title": "Your Devices",
+      "limit": "devices",
+      "current": "This device",
+      "lastSeen": "Last seen",
+      "revokeTitle": "Remove device",
+      "revokeDescription": "Remove {{name}}? It will lose access to all encrypted content.",
+      "revokeConfirm": "Remove device"
+    },
+    "sessions": {
+      "title": "Active Sessions",
+      "current": "Current session",
+      "unknown": "Unknown device",
+      "created": "Created",
+      "expires": "Expires",
+      "endOthers": "End all other sessions",
+      "endOthersTitle": "End all other sessions?",
+      "endOthersDescription": "This will sign out {{count}} other sessions.",
+      "endOthersConfirm": "End sessions",
+      "lockdown": "Emergency lockdown"
+    },
+    "passkeys": {
+      "title": "Passkeys",
+      "register": "Add passkey",
+      "unnamed": "Unnamed passkey",
+      "backedUp": "Backed up",
+      "lastUsed": "Last used"
+    },
+    "history": {
+      "title": "Security History",
+      "export": "Export JSON",
+      "events": {
+        "deviceRegister": "Device registered",
+        "deviceRemove": "Device removed",
+        "deviceRename": "Device renamed",
+        "sessionCreate": "Session created",
+        "sessionTerminate": "Session terminated",
+        "sessionTerminateAll": "All sessions terminated",
+        "accountLockdown": "Account locked down",
+        "accountLockdownComplete": "Lockdown completed",
+        "webauthnRegister": "Passkey registered",
+        "webauthnAuthenticate": "Passkey authenticated",
+        "webauthnRemove": "Passkey removed",
+        "sigchainAppend": "Sigchain updated",
+        "pukRotate": "PUK rotated",
+        "hubKeyRotate": "Hub key rotated",
+        "deviceFingerprintVerified": "Device verified",
+        "passkeyRename": "Passkey renamed",
+        "loginFailed": "Login failed"
+      }
+    },
+    "lockdown": {
+      "title": "Emergency Lockdown",
+      "description": "This will terminate all other sessions and trigger key rotation for all your hubs.",
+      "warning": "This action cannot be undone. All other devices will be signed out immediately.",
+      "inProgress": "Terminating sessions and rotating keys...",
+      "complete": "Lockdown complete. {{sessions}} sessions terminated, {{hubs}} hub keys queued for rotation.",
+      "confirm": "Lock down now"
     }
   }
 }
