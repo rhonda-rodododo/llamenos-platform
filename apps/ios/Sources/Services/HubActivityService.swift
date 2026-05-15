@@ -88,7 +88,7 @@ final class HubActivityService {
         case .conversationClosed:
             s.unreadConversationCount = max(0, s.unreadConversationCount - 1)
 
-        case .noteCreated, .voicemailNew, .presenceSummary, .presenceDetail, .unknown:
+        case .noteCreated, .voicemailNew, .presenceSummary, .presenceDetail, .deviceWipe, .unknown:
             break
         }
 

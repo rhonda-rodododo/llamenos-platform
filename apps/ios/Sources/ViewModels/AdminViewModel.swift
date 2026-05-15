@@ -260,7 +260,7 @@ final class AdminViewModel {
     // MARK: - Retention Settings State
 
     /// Per-hub retention settings (category -> days).
-    var retentionSettings: [RetentionCategory] = []
+    var retentionSettings: [AppRetentionCategory] = []
 
     /// Whether retention settings are loading.
     var isLoadingRetention: Bool = false
@@ -1282,7 +1282,7 @@ struct ImmediateErasureRequest: Codable, Sendable {
 
 // MARK: - Retention Models
 
-struct RetentionCategory: Codable, Identifiable, Sendable {
+struct AppRetentionCategory: Codable, Identifiable, Sendable {
     var id: String { category }
     let category: String
     var retentionDays: Int?
@@ -1300,9 +1300,9 @@ struct RetentionCategory: Codable, Identifiable, Sendable {
 }
 
 struct RetentionSettingsResponse: Codable, Sendable {
-    let categories: [RetentionCategory]
+    let categories: [AppRetentionCategory]
 }
 
 struct UpdateRetentionRequest: Codable, Sendable {
-    let categories: [RetentionCategory]
+    let categories: [AppRetentionCategory]
 }
