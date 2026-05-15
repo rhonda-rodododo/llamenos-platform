@@ -16,7 +16,7 @@ struct VolunteerSuggestion: Decodable, Identifiable, Sendable {
     let matchedSpecializations: [String]
 }
 
-struct SuggestAssigneesResponse: Decodable, Sendable {
+struct AppSuggestAssigneesResponse: Decodable, Sendable {
     let suggestions: [VolunteerSuggestion]
 }
 
@@ -44,7 +44,7 @@ final class AssignmentViewModel {
             if let lang = language {
                 path += "?language=\(lang)"
             }
-            let response: SuggestAssigneesResponse = try await apiService.request(method: "GET", path: path)
+            let response: AppSuggestAssigneesResponse = try await apiService.request(method: "GET", path: path)
             suggestions = response.suggestions
         } catch {
             errorMessage = error.localizedDescription

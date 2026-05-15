@@ -57,7 +57,7 @@ struct AppConfig: Decodable {
 
 // MARK: - Recovery Group Response Types
 
-struct RecoveryGroupInfo: Decodable {
+struct AppRecoveryGroupInfo: Decodable {
     let publicKey: String
     let threshold: Int
     let totalShares: Int
@@ -70,10 +70,6 @@ struct RecoveryGroupInfo: Decodable {
     let shareHolderLiveness: [ShareHolderLiveness]
 }
 
-struct ShareHolderLiveness: Decodable {
-    let holderPubkey: String
-    let lastLivenessProof: String?
-}
 
 struct RecoverySessionStatus: Decodable, Identifiable {
     let sessionId: String
@@ -87,7 +83,7 @@ struct RecoverySessionStatus: Decodable, Identifiable {
     let expiresAt: String
     let createdAt: String
     let contributions: [RecoveryContribution]?
-    let emergencyOverride: RecoveryEmergencyOverride?
+    let emergencyOverride: AppRecoveryEmergencyOverride?
 
     var id: String { sessionId }
 }
@@ -99,13 +95,13 @@ struct RecoveryContribution: Decodable {
     let contributedAt: String
 }
 
-struct RecoveryEmergencyOverride: Decodable {
+struct AppRecoveryEmergencyOverride: Decodable {
     let justification: String
     let approverPubkey: String
     let approverSignature: String
 }
 
-struct RecoveryInitiateResponse: Decodable {
+struct AppRecoveryInitiateResponse: Decodable {
     let sessionId: String
     let verificationSent: Bool
 }
@@ -472,11 +468,11 @@ final class APIService: @unchecked Sendable {
         return try await request(method: "POST", path: hp("/api/recovery-group/enroll"), rawBody: jsonData)
     }
 
-    func getRecoveryGroup(hubId: String) async throws -> RecoveryGroupInfo {
+    func getRecoveryGroup(hubId: String) async throws -> AppRecoveryGroupInfo {
         try await request(method: "GET", path: hp("/api/recovery-group/\(hubId)"))
     }
 
-    func initiateRecovery(hubId: String, userIdentifier: String, newDevicePubkey: String) async throws -> RecoveryInitiateResponse {
+    func initiateRecovery(hubId: String, userIdentifier: String, newDevicePubkey: String) async throws -> AppRecoveryInitiateResponse {
         let body: [String: String] = [
             "hubId": hubId,
             "userIdentifier": userIdentifier,
