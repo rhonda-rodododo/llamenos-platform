@@ -50,6 +50,8 @@ const EXCLUDED_SCHEMAS = new Set([
   'channelMetricsSchema',
   'coverageSlotSchema',
   'analyticsServiceStatusSchema',
+  'callHourBucketSchema',
+  'userStatEntrySchema',
 
   // Bare enum schemas used as building blocks (already inlined in parent schemas)
   'channelTypeSchema',
@@ -67,12 +69,20 @@ const EXCLUDED_SCHEMAS = new Set([
   'digestCadenceSchema',
   'notificationChannelSchema',
 
+  // Device management — query schemas and bare enums
+  'listSecurityEventsQuerySchema',
+  'adminDeviceOverviewQuerySchema',
+  'securityEventTypeSchema',
+
   // WebSocket message unions — discriminated unions not representable in quicktype
   'wsClientMessageSchema',
   'wsServerMessageSchema',
 
   // EP07 shift management — query schemas and bare enum building blocks
   'overrideQuerySchema',
+
+  // Blast progress sub-schema (inlined in parent)
+  'blastProgressDeliverySchema',
 ])
 
 export interface SchemaRegistryEntry {

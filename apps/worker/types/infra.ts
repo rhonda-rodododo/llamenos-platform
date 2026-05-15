@@ -4,7 +4,7 @@
 // Types with extra storage-only fields (encryptedSecretKey, callerNumber, etc.)
 // are defined here as server-internal storage types.
 
-import type { MessagingChannelType, RecipientEnvelope, KeyEnvelope } from '@shared/types'
+import type { MessagingChannelType, RecipientEnvelope } from '@shared/types'
 
 // ---------------------------------------------------------------------------
 // Re-exports of entity types whose schema matches storage shape exactly
@@ -157,7 +157,7 @@ export interface User {
   // Volunteer profile extensions (Epic 340)
   specializations?: string[]        // e.g., ["immigration", "domestic_violence", "legal_observer"]
   maxCaseAssignments?: number       // Capacity limit (0 = unlimited, default: 0)
-  teamId?: string                   // Team/group membership
+  teamId?: string                   // Primary team assignment (e.g., "team-alpha")
   supervisorPubkey?: string         // Who reviews this volunteer's cases
 }
 
@@ -361,6 +361,8 @@ export type AppEnv = {
     hubPermissions?: string[]
     /** Unique request ID for correlation (set by request-id middleware) */
     requestId: string
+    /** Current session token (set by auth middleware for session-based auth) */
+    sessionToken?: string
     /** Service registry — replaces DO stubs */
     services: import('../services').Services
   }

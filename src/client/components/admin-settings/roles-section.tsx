@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '@/lib/toast'
+import { useAuth } from '@/lib/auth'
 import {
   listRoles,
   createRole,
@@ -50,6 +51,8 @@ interface RoleFormData {
 export function RolesSection({ expanded, onToggle, statusSummary }: Props) {
   const { t } = useTranslation()
   const { toast } = useToast()
+  const { hasPermission } = useAuth()
+  const canManageRoles = hasPermission('system:manage-roles')
 
   const [roles, setRoles] = useState<RoleDefinition[]>([])
   const [catalog, setCatalog] = useState<PermissionCatalog | null>(null)
@@ -94,7 +97,7 @@ export function RolesSection({ expanded, onToggle, statusSummary }: Props) {
   function startEdit(role: RoleDefinition) {
     setEditingId(role.id)
     setForm({
-      name: role.name,
+      name: role.name ?? '',
       slug: role.slug,
       description: role.description,
       permissions: [...role.permissions],
@@ -174,7 +177,7 @@ export function RolesSection({ expanded, onToggle, statusSummary }: Props) {
           permissions: form.permissions,
         })
         setRoles(prev => [...prev, res.role])
-        toast(t('roles.created', { defaultValue: 'Role created' }), 'success')
+        toast(t('common.success', { defaultValue: 'Success' }), 'success')
       } else if (editingId) {
         const res = await updateRole(editingId, {
           name: form.name.trim(),
@@ -182,7 +185,7 @@ export function RolesSection({ expanded, onToggle, statusSummary }: Props) {
           permissions: form.permissions,
         })
         setRoles(prev => prev.map(r => r.id === editingId ? res.role : r))
-        toast(t('roles.updated', { defaultValue: 'Role updated' }), 'success')
+        toast(t('common.success', { defaultValue: 'Success' }), 'success')
       }
       cancelEdit()
     } catch {
@@ -197,7 +200,7 @@ export function RolesSection({ expanded, onToggle, statusSummary }: Props) {
     try {
       await deleteRole(deleteTarget.id)
       setRoles(prev => prev.filter(r => r.id !== deleteTarget.id))
-      toast(t('roles.deleted', { defaultValue: 'Role deleted' }), 'success')
+        toast(t('common.success', { defaultValue: 'Success' }), 'success')
       if (editingId === deleteTarget.id) cancelEdit()
     } catch {
       toast(t('common.error', { defaultValue: 'Error' }), 'error')
@@ -219,15 +222,15 @@ export function RolesSection({ expanded, onToggle, statusSummary }: Props) {
     return domain.charAt(0).toUpperCase() + domain.slice(1).replace(/-/g, ' ')
   }
 
-  const canEdit = (role: RoleDefinition) => !role.isSystem
-  const canDelete = (role: RoleDefinition) => !role.isSystem && !role.isDefault
+  const canEdit = (role: RoleDefinition) => canManageRoles && !role.isSystem
+  const canDelete = (role: RoleDefinition) => canManageRoles && !role.isSystem && !role.isDefault
 
   if (loading) return null
 
   return (
     <SettingsSection
       id="roles"
-      title={t('roles.title', { defaultValue: 'Roles & Permissions' })}
+      title={t('roles.permissions', { defaultValue: 'Permissions' })}
       description={t('roles.description', { defaultValue: 'Define roles and assign permissions to control access across your hotline.' })}
       icon={<ShieldCheck className="h-5 w-5 text-muted-foreground" />}
       expanded={expanded}
@@ -247,7 +250,7 @@ export function RolesSection({ expanded, onToggle, statusSummary }: Props) {
           >
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium truncate">{role.name}</span>
+                <span className="text-sm font-medium truncate">{role.name ?? role.slug}</span>
                 {role.isSystem && (
                   <Badge variant="secondary" className="text-[10px] gap-1">
                     <Lock className="h-2.5 w-2.5" />
@@ -293,7 +296,7 @@ export function RolesSection({ expanded, onToggle, statusSummary }: Props) {
               )}
               {role.isSystem && (
                 <span className="text-xs text-muted-foreground px-2">
-                  {t('roles.locked', { defaultValue: 'Locked' })}
+                  {t('roles.system', { defaultValue: 'System' })}
                 </span>
               )}
             </div>
@@ -306,8 +309,8 @@ export function RolesSection({ expanded, onToggle, statusSummary }: Props) {
         <div className="space-y-4 rounded-lg border border-primary/30 bg-primary/5 p-4">
           <h4 className="text-sm font-medium">
             {editingId === 'new'
-              ? t('roles.createRole', { defaultValue: 'Create Role' })
-              : t('roles.editRole', { defaultValue: 'Edit Role' })}
+              ? t('roles.create', { defaultValue: 'Create role' })
+              : t('common.edit', { defaultValue: 'Edit' })}
           </h4>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -333,7 +336,7 @@ export function RolesSection({ expanded, onToggle, statusSummary }: Props) {
                 <Input
                   value={form.slug}
                   onChange={e => setForm(prev => ({ ...prev, slug: e.target.value }))}
-                  placeholder={t('roles.slugPlaceholder', { defaultValue: 'e.g. team-lead' })}
+                  placeholder={t('roles.namePlaceholder', { defaultValue: 'e.g. Intake Coordinator' })}
                   maxLength={50}
                 />
               </div>
@@ -341,7 +344,7 @@ export function RolesSection({ expanded, onToggle, statusSummary }: Props) {
           </div>
 
           <div className="space-y-1">
-            <Label>{t('roles.descriptionLabel', { defaultValue: 'Description' })}</Label>
+            <Label>{t('roles.description', { defaultValue: 'Description' })}</Label>
             <Textarea
               value={form.description}
               onChange={e => setForm(prev => ({ ...prev, description: e.target.value }))}
@@ -355,7 +358,7 @@ export function RolesSection({ expanded, onToggle, statusSummary }: Props) {
           <div className="space-y-1">
             <Label>{t('roles.permissions', { defaultValue: 'Permissions' })}</Label>
             <p className="text-xs text-muted-foreground">
-              {form.permissions.length} {t('roles.selected', { defaultValue: 'selected' })}
+              {form.permissions.length} {t('roles.permissions', { defaultValue: 'Permissions' })}
             </p>
           </div>
 
@@ -437,10 +440,10 @@ export function RolesSection({ expanded, onToggle, statusSummary }: Props) {
       )}
 
       {/* Create button (shown when not editing) */}
-      {editingId === null && (
+      {editingId === null && canManageRoles && (
         <Button variant="outline" onClick={startCreate}>
           <Plus className="h-4 w-4" />
-          {t('roles.createRole', { defaultValue: 'Create Role' })}
+          {t('roles.create', { defaultValue: 'Create role' })}
         </Button>
       )}
 
@@ -448,12 +451,12 @@ export function RolesSection({ expanded, onToggle, statusSummary }: Props) {
       <ConfirmDialog
         open={!!deleteTarget}
         onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}
-        title={t('roles.deleteTitle', { defaultValue: 'Delete Role' })}
+        title={t('roles.deleteConfirm.title', { defaultValue: 'Delete role' })}
         description={
           deleteTarget
-            ? t('roles.deleteConfirm', {
-                defaultValue: `Are you sure you want to delete "${deleteTarget.name}"? This action cannot be undone. Volunteers assigned this role will lose its permissions.`,
-                name: deleteTarget.name,
+            ? t('roles.deleteConfirm.description', {
+                defaultValue: `Are you sure you want to delete "${deleteTarget.name ?? deleteTarget.slug}"? Users assigned this role will lose its permissions.`,
+                name: deleteTarget.name ?? deleteTarget.slug,
               })
             : ''
         }

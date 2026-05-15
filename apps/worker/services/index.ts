@@ -34,6 +34,8 @@ import { ShiftOverridesService } from './shift-overrides'
 import { ActiveShiftsService } from './active-shifts'
 import { ShiftAvailabilityService } from './shift-availability'
 import { ShiftRequestsService } from './shift-requests'
+import { TeamsService } from './teams'
+import { TagsService } from './tags'
 
 export interface Services {
   identity: IdentityService
@@ -65,6 +67,8 @@ export interface Services {
   activeShifts: ActiveShiftsService
   shiftAvailability: ShiftAvailabilityService
   shiftRequests: ShiftRequestsService
+  teams: TeamsService
+  tags: TagsService
 }
 
 export interface ServicesOpts {
@@ -123,6 +127,8 @@ export function createServices(db: Database, opts?: ServicesOpts): Services {
     activeShifts: new ActiveShiftsService(db),
     shiftAvailability: new ShiftAvailabilityService(db),
     shiftRequests: new ShiftRequestsService(db),
+    teams: new TeamsService(db),
+    tags: new TagsService(db),
   }
 
   // Only create firehose agent if seal key is configured
@@ -143,6 +149,8 @@ export function createServices(db: Database, opts?: ServicesOpts): Services {
 
 // Re-export service classes for direct import
 export {
+  TeamsService,
+  TagsService,
   IdentityService,
   SettingsService,
   RecordsService,

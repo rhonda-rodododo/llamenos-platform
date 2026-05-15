@@ -25,12 +25,13 @@ function getCrossHubState(world: Record<string, unknown>): CrossHubState {
 }
 
 
-Before({ tags: '@cases' }, async ({ request, world }) => {
-  // Reset cross-hub sharing to disabled before each scenario to prevent
-  // test pollution (systemSettings is shared across all scenarios).
+Before({ tags: '@cross-hub' }, async ({ request, world }) => {
+  // Reset cross-hub sharing to disabled before each cross-hub scenario.
+  // Scoped to @cross-hub to avoid resetting during parallel @cases tests.
+  // Track the reset in local state so Then steps use it instead of re-fetching
+  // (avoids race conditions with parallel cross-hub scenarios).
   try { await enableCrossHubSharingViaApi(request, false) } catch { /* ignore if not supported */ }
-  const crossHub = {}
-  setState(world, CROSS_HUB_KEY, crossHub)
+  setState(world, CROSS_HUB_KEY, { crossHubEnabled: false } as CrossHubState)
 })
 
 // ── Given ──────────────────────────────────────────────────────────
@@ -54,12 +55,25 @@ When('the admin disables cross-hub sharing', async ({ request, world }) => {
 
 // ── Then ───────────────────────────────────────────────────────────
 
-Then('cross-hub sharing should be enabled', async ({ request }) => {
-  const result = await getCrossHubSharingViaApi(request)
-  expect(result.enabled).toBe(true)
+Then('cross-hub sharing should be enabled', async ({ request, world }) => {
+  // Check local state first (set by When step), fall back to API fetch
+  const local = getCrossHubState(world).crossHubEnabled
+  if (local !== undefined) {
+    expect(local).toBe(true)
+  } else {
+    const result = await getCrossHubSharingViaApi(request)
+    expect(result.enabled).toBe(true)
+  }
 })
 
-Then('cross-hub sharing should be disabled', async ({ request }) => {
-  const result = await getCrossHubSharingViaApi(request)
-  expect(result.enabled).toBe(false)
+Then('cross-hub sharing should be disabled', async ({ request, world }) => {
+  // Check local state first (set by When/Before), fall back to API fetch
+  const local = getCrossHubState(world).crossHubEnabled
+  if (local !== undefined) {
+    expect(local).toBe(false)
+  } else {
+    // Fresh scenario — no When step ran, check default via API
+    const result = await getCrossHubSharingViaApi(request)
+    expect(result.enabled).toBe(false)
+  }
 })

@@ -112,6 +112,7 @@ export const blastDeliveries = pgTable(
     index('blast_deliveries_blast_status_idx').on(table.blastId, table.status),
     index('blast_deliveries_pending_idx').on(table.nextRetryAt).where(sql`status IN ('pending', 'sending')`),
     index('blast_deliveries_external_id_idx').on(table.externalId),
+    unique('blast_delivery_unique').on(table.blastId, table.subscriberId, table.channel),
   ],
 )
 

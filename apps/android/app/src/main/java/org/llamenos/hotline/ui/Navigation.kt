@@ -337,6 +337,21 @@ sealed interface LlamenosRoute {
     data object HubCommunications : LlamenosRoute {
         override val route = "hub_communications"
     }
+
+    /** EP02: Device list (security tab). */
+    data object SecurityDevices : LlamenosRoute {
+        override val route = "security_devices"
+    }
+
+    /** EP02: Session list (security tab). */
+    data object SecuritySessions : LlamenosRoute {
+        override val route = "security_sessions"
+    }
+
+    /** EP02: Security events timeline. */
+    data object SecurityEvents : LlamenosRoute {
+        override val route = "security_events"
+    }
 }
 
 /**
@@ -993,6 +1008,30 @@ fun LlamenosNavigation(
                 onNavigateToPhoneNumbers = { provider ->
                     navController.navigate("phone_numbers/$provider")
                 },
+            )
+        }
+
+        // EP02: Security screens
+
+        composable(LlamenosRoute.SecurityDevices.route) {
+            DeviceListScreen(
+                devices = emptyList(),
+                loading = true,
+            )
+        }
+
+        composable(LlamenosRoute.SecuritySessions.route) {
+            SessionListScreen(
+                sessions = emptyList(),
+                loading = true,
+            )
+        }
+
+        composable(LlamenosRoute.SecurityEvents.route) {
+            SecurityEventsScreen(
+                events = emptyList(),
+                loading = true,
+                total = 0,
             )
         }
     }

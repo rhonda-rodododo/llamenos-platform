@@ -1,56 +1,9 @@
 {
-  "id": "9ff6e71d-970f-4717-bd44-44e64230cac6",
-  "prevId": "07e09655-51b1-4b94-b94d-59cfca1884cd",
+  "id": "bc646cf9-0a63-45de-8824-88be5010a46d",
+  "prevId": "1e5545e0-7eb2-4290-8ea8-334cd2034fff",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
-    "public.active_shifts": {
-      "name": "active_shifts",
-      "schema": "",
-      "columns": {
-        "pubkey": {
-          "name": "pubkey",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "hub_id": {
-          "name": "hub_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "started_at": {
-          "name": "started_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "last_heartbeat": {
-          "name": "last_heartbeat",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {
-        "active_shifts_pubkey_hub_id_pk": {
-          "name": "active_shifts_pubkey_hub_id_pk",
-          "columns": [
-            "pubkey",
-            "hub_id"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.blast_deliveries": {
       "name": "blast_deliveries",
       "schema": "",
@@ -4510,6 +4463,86 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.platform_role_envelopes": {
+      "name": "platform_role_envelopes",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "role_id": {
+          "name": "role_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "admin_pubkey": {
+          "name": "admin_pubkey",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "encrypted_name": {
+          "name": "encrypted_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "encrypted_description": {
+          "name": "encrypted_description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "platform_role_envelopes_role_id_roles_id_fk": {
+          "name": "platform_role_envelopes_role_id_roles_id_fk",
+          "tableFrom": "platform_role_envelopes",
+          "tableTo": "roles",
+          "columnsFrom": [
+            "role_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "platform_role_envelopes_role_id_admin_pubkey_unique": {
+          "name": "platform_role_envelopes_role_id_admin_pubkey_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "role_id",
+            "admin_pubkey"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.rate_limits": {
       "name": "rate_limits",
       "schema": "",
@@ -4856,6 +4889,18 @@
           "primaryKey": false,
           "notNull": true,
           "default": "''"
+        },
+        "encrypted_name": {
+          "name": "encrypted_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "encrypted_description": {
+          "name": "encrypted_description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -5592,8 +5637,8 @@
           "primaryKey": false,
           "notNull": false
         },
-        "encrypted_name": {
-          "name": "encrypted_name",
+        "name": {
+          "name": "name",
           "type": "text",
           "primaryKey": false,
           "notNull": true
@@ -5617,24 +5662,12 @@
           "notNull": true,
           "default": "'{}'::int[]"
         },
-        "ring_group_id": {
-          "name": "ring_group_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "user_pubkeys": {
           "name": "user_pubkeys",
           "type": "text[]",
           "primaryKey": false,
           "notNull": true,
           "default": "'{}'::text[]"
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -5645,475 +5678,7 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {
-        "shifts_ring_group_id_ring_groups_id_fk": {
-          "name": "shifts_ring_group_id_ring_groups_id_fk",
-          "tableFrom": "shifts",
-          "tableTo": "ring_groups",
-          "columnsFrom": [
-            "ring_group_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.ring_group_members": {
-      "name": "ring_group_members",
-      "schema": "",
-      "columns": {
-        "ring_group_id": {
-          "name": "ring_group_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "user_pubkey": {
-          "name": "user_pubkey",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "added_by": {
-          "name": "added_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "ring_group_members_user_idx": {
-          "name": "ring_group_members_user_idx",
-          "columns": [
-            {
-              "expression": "user_pubkey",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "ring_group_members_ring_group_id_ring_groups_id_fk": {
-          "name": "ring_group_members_ring_group_id_ring_groups_id_fk",
-          "tableFrom": "ring_group_members",
-          "tableTo": "ring_groups",
-          "columnsFrom": [
-            "ring_group_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "ring_group_members_ring_group_id_user_pubkey_pk": {
-          "name": "ring_group_members_ring_group_id_user_pubkey_pk",
-          "columns": [
-            "ring_group_id",
-            "user_pubkey"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.ring_groups": {
-      "name": "ring_groups",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "hub_id": {
-          "name": "hub_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "encrypted_name": {
-          "name": "encrypted_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "ring_groups_hub_idx": {
-          "name": "ring_groups_hub_idx",
-          "columns": [
-            {
-              "expression": "hub_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.shift_overrides": {
-      "name": "shift_overrides",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "hub_id": {
-          "name": "hub_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "shift_id": {
-          "name": "shift_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "date": {
-          "name": "date",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "type": {
-          "name": "type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "user_pubkeys": {
-          "name": "user_pubkeys",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "encrypted_note": {
-          "name": "encrypted_note",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "shift_overrides_hub_date_idx": {
-          "name": "shift_overrides_hub_date_idx",
-          "columns": [
-            {
-              "expression": "hub_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "date",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "shift_overrides_shift_id_shifts_id_fk": {
-          "name": "shift_overrides_shift_id_shifts_id_fk",
-          "tableFrom": "shift_overrides",
-          "tableTo": "shifts",
-          "columnsFrom": [
-            "shift_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "shift_overrides_hub_shift_date": {
-          "name": "shift_overrides_hub_shift_date",
-          "nullsNotDistinct": false,
-          "columns": [
-            "hub_id",
-            "shift_id",
-            "date"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.user_availability_blocks": {
-      "name": "user_availability_blocks",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "hub_id": {
-          "name": "hub_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "user_pubkey": {
-          "name": "user_pubkey",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "start_date": {
-          "name": "start_date",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "end_date": {
-          "name": "end_date",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "encrypted_reason": {
-          "name": "encrypted_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "availability_blocks_hub_user_idx": {
-          "name": "availability_blocks_hub_user_idx",
-          "columns": [
-            {
-              "expression": "hub_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "user_pubkey",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "availability_blocks_hub_date_idx": {
-          "name": "availability_blocks_hub_date_idx",
-          "columns": [
-            {
-              "expression": "hub_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "start_date",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "end_date",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.shift_join_requests": {
-      "name": "shift_join_requests",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "hub_id": {
-          "name": "hub_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "shift_id": {
-          "name": "shift_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "user_pubkey": {
-          "name": "user_pubkey",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "type": {
-          "name": "type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'pending'"
-        },
-        "reviewed_by": {
-          "name": "reviewed_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "reviewed_at": {
-          "name": "reviewed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "shift_join_requests_hub_idx": {
-          "name": "shift_join_requests_hub_idx",
-          "columns": [
-            {
-              "expression": "hub_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "shift_join_requests_shift_id_shifts_id_fk": {
-          "name": "shift_join_requests_shift_id_shifts_id_fk",
-          "tableFrom": "shift_join_requests",
-          "tableTo": "shifts",
-          "columnsFrom": [
-            "shift_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
