@@ -336,7 +336,8 @@ final class AppState {
         keychainService.wipeAll()
 
         // 2. Clear crypto state
-        cryptoService.clearState()
+        cryptoService.clearHubKeys()
+        cryptoService.lock()
 
         // 3. Clear UserDefaults app data
         if let bundleId = Bundle.main.bundleIdentifier {
