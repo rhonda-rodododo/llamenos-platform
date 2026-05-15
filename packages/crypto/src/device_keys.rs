@@ -25,9 +25,20 @@ use crate::errors::CryptoError;
 const KDF_VERSION: u8 = 2;
 
 /// Argon2id parameters — tuned for GPU/ASIC resistance.
+/// The `test-kdf` feature uses minimal params so emulator tests finish in seconds.
+#[cfg(not(feature = "test-kdf"))]
 const ARGON2_M_COST_KIB: u32 = 65_536; // 64 MB
+#[cfg(not(feature = "test-kdf"))]
 const ARGON2_T_COST: u32 = 3; // 3 iterations
+#[cfg(not(feature = "test-kdf"))]
 const ARGON2_P_COST: u32 = 4; // 4 lanes
+
+#[cfg(feature = "test-kdf")]
+const ARGON2_M_COST_KIB: u32 = 1_024; // 1 MB
+#[cfg(feature = "test-kdf")]
+const ARGON2_T_COST: u32 = 1;
+#[cfg(feature = "test-kdf")]
+const ARGON2_P_COST: u32 = 1;
 
 /// Device key state exposed to callers (no secret material).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -560,5 +571,40 @@ mod tests {
         let kek2 = derive_kek("same", &salt).unwrap();
 
         assert_eq!(kek1, kek2);
+    }
+
+    #[cfg(not(feature = "test-kdf"))]
+    #[test]
+    fn default_build_uses_strong_params() {
+        assert_eq!(ARGON2_M_COST_KIB, 65_536);
+        assert_eq!(ARGON2_T_COST, 3);
+        assert_eq!(ARGON2_P_COST, 4);
+    }
+
+    #[cfg(feature = "test-kdf")]
+    #[test]
+    fn test_kdf_uses_weak_params() {
+        assert_eq!(ARGON2_M_COST_KIB, 1_024);
+        assert_eq!(ARGON2_T_COST, 1);
+        assert_eq!(ARGON2_P_COST, 1);
+    }
+
+    #[test]
+    fn encrypted_blob_records_active_params() {
+        let encrypted = generate_device_keys("dev-params", "12345678").unwrap();
+        assert_eq!(encrypted.argon2_m_cost, ARGON2_M_COST_KIB);
+        assert_eq!(encrypted.argon2_t_cost, ARGON2_T_COST);
+        assert_eq!(encrypted.argon2_p_cost, ARGON2_P_COST);
+    }
+
+    #[test]
+    fn round_trip_sign_verify_with_active_params() {
+        let encrypted = generate_device_keys("dev-rt", "securepass1").unwrap();
+        let secrets = unlock_device_keys(&encrypted, "securepass1").unwrap();
+        let msg = b"round-trip test";
+        let sig = sign_bytes(&secrets, msg);
+        let valid =
+            verify_signature(msg, &sig, &encrypted.state.signing_pubkey_hex).unwrap();
+        assert!(valid);
     }
 }
