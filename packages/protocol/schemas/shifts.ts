@@ -5,10 +5,11 @@ import { pubkeySchema } from './common'
 
 export const shiftResponseSchema = z.object({
   id: z.string(),
-  name: z.string(),
+  encryptedName: z.string(),
   startTime: z.string(),
   endTime: z.string(),
   days: z.array(z.number()),
+  ringGroupId: z.string().nullable(),
   userPubkeys: z.array(z.string()),
   createdAt: z.string(),
 })
@@ -17,11 +18,19 @@ export type Shift = z.infer<typeof shiftResponseSchema>
 
 export const myStatusResponseSchema = z.object({
   onShift: z.boolean(),
-  currentShift: z.object({ name: z.string(), startTime: z.string(), endTime: z.string() }).nullable(),
-  nextShift: z.object({ name: z.string(), startTime: z.string(), endTime: z.string(), day: z.number() }).nullable(),
+  currentShift: z.object({ id: z.string(), encryptedName: z.string(), startTime: z.string(), endTime: z.string() }).nullable(),
+  nextShift: z.object({ id: z.string(), encryptedName: z.string(), startTime: z.string(), endTime: z.string(), day: z.number() }).nullable(),
 })
 
 export type ShiftStatus = z.infer<typeof myStatusResponseSchema>
+
+export const clockStatusResponseSchema = z.object({
+  users: z.array(z.object({
+    pubkey: z.string(),
+    startedAt: z.string(),
+    lastHeartbeat: z.string(),
+  })),
+})
 
 // --- List/wrapper response schemas ---
 
@@ -32,18 +41,21 @@ export const shiftListResponseSchema = z.object({
 // --- Input schemas ---
 
 export const createShiftBodySchema = z.looseObject({
-  name: z.string().min(1).max(200),
+  id: z.string().uuid(),
+  encryptedName: z.string().min(1).max(200),
   startTime: z.string(),
   endTime: z.string(),
   days: z.array(z.number().int().min(0).max(6)),
+  ringGroupId: z.string().nullable().optional().default(null),
   userPubkeys: z.array(pubkeySchema),
 })
 
 export const updateShiftBodySchema = z.looseObject({
-  name: z.string().min(1).max(200).optional(),
+  encryptedName: z.string().min(1).max(200).optional(),
   startTime: z.string().optional(),
   endTime: z.string().optional(),
   days: z.array(z.number().int().min(0).max(6)).optional(),
+  ringGroupId: z.string().nullable().optional(),
   userPubkeys: z.array(pubkeySchema).optional(),
 })
 

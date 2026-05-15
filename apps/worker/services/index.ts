@@ -29,6 +29,11 @@ import { SignalRegistrationService } from './provider-setup/signal-registration'
 import { A2pRegistrationService } from './provider-setup/a2p-registration'
 import { ProviderTemplateService } from './provider-setup/templates'
 import { HubOnboardService } from './provider-setup/hub-onboard'
+import { RingGroupsService } from './ring-groups'
+import { ShiftOverridesService } from './shift-overrides'
+import { ActiveShiftsService } from './active-shifts'
+import { ShiftAvailabilityService } from './shift-availability'
+import { ShiftRequestsService } from './shift-requests'
 import { RecoveryGroupService } from './recovery-group'
 import { TeamsService } from './teams'
 import { TagsService } from './tags'
@@ -58,6 +63,11 @@ export interface Services {
   a2pRegistration: A2pRegistrationService
   providerTemplates: ProviderTemplateService
   hubOnboard: HubOnboardService
+  ringGroups: RingGroupsService
+  shiftOverrides: ShiftOverridesService
+  activeShifts: ActiveShiftsService
+  shiftAvailability: ShiftAvailabilityService
+  shiftRequests: ShiftRequestsService
   recoveryGroup: RecoveryGroupService
   teams: TeamsService
   tags: TagsService
@@ -114,6 +124,11 @@ export function createServices(db: Database, opts?: ServicesOpts): Services {
     a2pRegistration: new A2pRegistrationService(db, opts?.hmacSecret ?? ''),
     providerTemplates: new ProviderTemplateService(db),
     hubOnboard: new HubOnboardService(db, providerSetup, settings),
+    ringGroups: new RingGroupsService(db),
+    shiftOverrides: new ShiftOverridesService(db),
+    activeShifts: new ActiveShiftsService(db),
+    shiftAvailability: new ShiftAvailabilityService(db),
+    shiftRequests: new ShiftRequestsService(db),
     recoveryGroup: new RecoveryGroupService(db, audit),
     teams: new TeamsService(db),
     tags: new TagsService(db),
@@ -162,5 +177,10 @@ export {
   A2pRegistrationService,
   ProviderTemplateService,
   HubOnboardService,
+  RingGroupsService,
+  ShiftOverridesService,
+  ActiveShiftsService,
+  ShiftAvailabilityService,
+  ShiftRequestsService,
   RecoveryGroupService,
 }

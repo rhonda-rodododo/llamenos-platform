@@ -216,7 +216,8 @@
       "intake": "Intake",
       "operations": "Operations",
       "people": "People",
-      "platform": "Platform"
+      "platform": "Platform",
+      "scheduling": "Scheduling"
     },
     "items": {
       "analytics": "Analytics",
@@ -249,6 +250,8 @@
       "reportTypes": "Report Types",
       "retention": "Data Retention",
       "retentionSettings": "Data Retention",
+      "ringGroups": "Ring Groups",
+      "shiftOverrides": "Shift Overrides",
       "signal": "Signal",
       "spamProtection": "Spam Protection",
       "tags": "Tags",
@@ -3447,9 +3450,26 @@
     "whatsappVerifyToken": "Verify Token"
   },
   "shifts": {
+    "active": {
+      "empty": "No volunteers currently clocked in",
+      "heartbeat": "Last heartbeat {{time}}",
+      "since": "Clocked in since {{time}}",
+      "title": "Active Volunteers"
+    },
     "activeCalls": "%d active call(s)",
     "assignUsers": "자원봉사자 배정",
     "assigned": "Assigned",
+    "availability": {
+      "create": "Add Availability Block",
+      "delete": "Remove Availability Block",
+      "deleteConfirm": "Are you sure you want to remove this availability block?",
+      "empty": "No availability blocks",
+      "emptySubtitle": "Add blocks to indicate when you are unavailable",
+      "endDate": "End Date",
+      "reason": "Reason (optional)",
+      "startDate": "Start Date",
+      "title": "Availability"
+    },
     "available": "Available",
     "clockIn": "Clock In",
     "clockOut": "Clock Out",
@@ -3494,10 +3514,50 @@
     "notFound": "Shift not found",
     "offShift": "Off Shift",
     "onShift": "On Shift",
+    "overrides": {
+      "create": "Create Override",
+      "date": "Date",
+      "delete": "Delete Override",
+      "deleteConfirm": "Are you sure you want to delete this override?",
+      "empty": "No overrides",
+      "emptySubtitle": "Add overrides to modify shift assignments for specific dates",
+      "note": "Note",
+      "title": "Shift Overrides",
+      "type": "Override Type",
+      "typeCancel": "Cancel shift",
+      "typeSubstitute": "Substitute volunteers"
+    },
     "recurring": "반복",
     "reminder": "Shift Reminder",
     "reminderBody": "Your shift is starting soon",
     "removeUser": "{{name}} 제거",
+    "requests": {
+      "approve": "Approve",
+      "create": "Request Shift Change",
+      "empty": "No pending requests",
+      "emptySubtitle": "Shift join/leave requests will appear here",
+      "reject": "Reject",
+      "statusApproved": "Approved",
+      "statusDenied": "Denied",
+      "statusPending": "Pending",
+      "title": "Shift Requests",
+      "typeJoin": "Join request",
+      "typeLeave": "Leave request"
+    },
+    "ringGroups": {
+      "addMembers": "Add Members",
+      "create": "Create Ring Group",
+      "delete": "Delete Ring Group",
+      "deleteConfirm": "Are you sure you want to delete this ring group?",
+      "edit": "Edit Ring Group",
+      "empty": "No ring groups",
+      "emptySubtitle": "Create a ring group to assign volunteers to shifts",
+      "memberCount": "{{count}} member(s)",
+      "members": "Members",
+      "name": "Ring Group Name",
+      "removeMembers": "Remove Members",
+      "title": "Ring Groups"
+    },
     "saveAssignments": "Save Assignments",
     "schedule": "Schedule",
     "searchUsers": "자원봉사자 검색...",

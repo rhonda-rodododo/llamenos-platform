@@ -202,7 +202,7 @@ function UserProfilePage() {
             <div className="divide-y divide-border">
               {assignedShifts.map(shift => (
                 <div key={shift.id} className="flex flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
-                  <span className="text-sm font-medium">{shift.name}</span>
+                  <span className="text-sm font-medium">{shift.encryptedName}</span>
                   <span className="text-xs text-muted-foreground">
                     {shift.startTime} – {shift.endTime}
                   </span>

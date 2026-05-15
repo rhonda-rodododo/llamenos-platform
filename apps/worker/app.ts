@@ -51,6 +51,7 @@ import signalNotificationRoutes from './routes/signal-notification'
 import providerSetupRoutes from './routes/provider-setup'
 import providerTemplatesRoutes from './routes/provider-templates'
 import hubOnboardRoutes from './routes/hub-onboard'
+import ringGroupsRoutes from './routes/ring-groups'
 import recoveryGroupRoutes from './routes/recovery-group'
 import teamsRoutes from './routes/teams'
 import tagsRoutes from './routes/tags'
@@ -212,6 +213,7 @@ authenticated.route('/firehose', firehoseRoutes)
 authenticated.route('/signal-notification', signalNotificationRoutes)
 authenticated.route('/provider-setup', providerSetupRoutes)
 authenticated.route('/provider-templates', providerTemplatesRoutes)
+authenticated.route('/ring-groups', ringGroupsRoutes)
 authenticated.route('/recovery-group', recoveryGroupRoutes.authenticated)
 
 // Hub-scoped authenticated routes
@@ -240,6 +242,7 @@ hubScoped.route('/', evidenceRoutes)
 hubScoped.route('/mls', mlsRoutes)
 hubScoped.route('/firehose', firehoseRoutes)
 hubScoped.route('/onboard', hubOnboardRoutes)
+hubScoped.route('/ring-groups', ringGroupsRoutes)
 hubScoped.route('/teams', teamsRoutes)
 hubScoped.route('/tags', tagsRoutes)
 

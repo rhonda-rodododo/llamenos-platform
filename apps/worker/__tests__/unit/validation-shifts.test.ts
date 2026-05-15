@@ -26,7 +26,8 @@ describe('shifts route validation', () => {
   // -----------------------------------------------------------------------
   describe('POST /shifts', () => {
     const VALID_SHIFT = {
-      name: 'Morning Shift',
+      id: '550e8400-e29b-41d4-a716-446655440000',
+      encryptedName: 'Morning Shift',
       startTime: '08:00',
       endTime: '16:00',
       days: [1, 2, 3, 4, 5],
@@ -39,20 +40,20 @@ describe('shifts route validation', () => {
       expect(res.status).toBe(400)
     })
 
-    it('rejects empty name', async () => {
+    it('rejects empty encryptedName', async () => {
       const app = createApp()
       const res = await sendJSON(app, '/shifts', {
         ...VALID_SHIFT,
-        name: '',
+        encryptedName: '',
       })
       expect(res.status).toBe(400)
     })
 
-    it('rejects name that is too long', async () => {
+    it('rejects encryptedName that is too long', async () => {
       const app = createApp()
       const res = await sendJSON(app, '/shifts', {
         ...VALID_SHIFT,
-        name: 'x'.repeat(201),
+        encryptedName: 'x'.repeat(201),
       })
       expect(res.status).toBe(400)
     })
@@ -121,7 +122,7 @@ describe('shifts route validation', () => {
     it('accepts valid partial update', async () => {
       const app = createApp()
       const res = await sendJSON(app, '/shifts/shift-1', {
-        name: 'Evening Shift',
+        encryptedName: 'Evening Shift',
         days: [0, 6],
       }, 'PATCH')
       expect(res.status).not.toBe(400)

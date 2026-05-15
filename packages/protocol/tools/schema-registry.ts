@@ -81,6 +81,9 @@ const EXCLUDED_SCHEMAS = new Set([
   'wsClientMessageSchema',
   'wsServerMessageSchema',
 
+  // EP07 shift management — query schemas and bare enum building blocks
+  'overrideQuerySchema',
+
   // Blast progress sub-schema (inlined in parent)
   'blastProgressDeliverySchema',
 ])

@@ -153,6 +153,25 @@ export const adminNavConfig: AdminNavConfig = {
       ],
     },
     {
+      groupSlug: 'scheduling',
+      scope: 'this-hub',
+      labelKey: 'adminNav.groups.scheduling',
+      items: [
+        {
+          slug: 'ring-groups',
+          labelKey: 'adminNav.items.ringGroups',
+          requiredPermissions: ['settings:read'],
+          testid: 'admin-sidebar-item-ring-groups',
+        },
+        {
+          slug: 'shift-overrides',
+          labelKey: 'adminNav.items.shiftOverrides',
+          requiredPermissions: ['settings:read'],
+          testid: 'admin-sidebar-item-shift-overrides',
+        },
+      ],
+    },
+    {
       groupSlug: 'operations',
       scope: 'this-hub',
       labelKey: 'adminNav.groups.operations',
