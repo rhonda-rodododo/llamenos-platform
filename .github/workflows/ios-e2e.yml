@@ -86,7 +86,7 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
 
       - name: Install dependencies and run codegen
-        run: bun install --frozen-lockfile && bun run codegen
+        run: bun install --frozen-lockfile && bun run codegen && bun run i18n:codegen
 
       # Cache the XCFramework AND generated Swift bindings together.
       # Both must come from the same Rust build or checksums will mismatch.

@@ -65,6 +65,14 @@ jobs:
           ./scripts/build-mobile.sh android
           cp -r dist/android/jniLibs/* ../../apps/android/app/src/main/jniLibs/
 
+      - name: Setup Bun (for codegen)
+        uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2.0.2
+        with:
+          bun-version: "1.3.5"
+
+      - name: Install dependencies and run codegen
+        run: bun install --frozen-lockfile && bun run codegen && bun run i18n:codegen
+
       - name: Decode keystore
         if: env.HAS_KEYSTORE == 'true'
         env:
@@ -199,6 +207,14 @@ jobs:
           cd packages/crypto
           ./scripts/build-mobile.sh ios
           cp -r dist/ios/LlamenosCoreFFI.xcframework ../../apps/ios/
+
+      - name: Setup Bun (for codegen)
+        uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2.0.2
+        with:
+          bun-version: "1.3.5"
+
+      - name: Install dependencies and run codegen
+        run: bun install --frozen-lockfile && bun run codegen && bun run i18n:codegen
 
       - name: Install xcodegen
         run: brew install xcodegen
