@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { Timeouts } from './helpers'
+import { loginAsAdmin, Timeouts } from './helpers'
 
 /**
  * Mock API responses for hub onboarding endpoints.
@@ -168,6 +168,7 @@ async function mockOnboardingApis(
 
 test.describe('Hub Onboarding Wizard', () => {
   test.beforeEach(async ({ page }) => {
+    await loginAsAdmin(page)
     await mockOnboardingApis(page, { onboardingComplete: false })
     await page.goto('/admin/hub-communications')
   })
@@ -387,6 +388,7 @@ test.describe('Hub Onboarding Wizard', () => {
 
 test.describe('Hub Onboarding - API error handling', () => {
   test('shows error state when template loading fails', async ({ page }) => {
+    await loginAsAdmin(page)
     await page.route('**/api/provider-templates', async (route) => {
       await route.fulfill({ status: 500, body: 'Internal Server Error' })
     })

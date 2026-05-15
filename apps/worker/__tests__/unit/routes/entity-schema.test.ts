@@ -295,7 +295,7 @@ describe('entity-schema routes', () => {
       })
 
       expect(res.status).toBe(200)
-      expect(updateEntityTypeSpy).toHaveBeenCalledWith('et-1', { name: 'Updated' })
+      expect(updateEntityTypeSpy).toHaveBeenCalledWith('et-1', { name: 'Updated' }, expect.objectContaining({ callerPubkey: expect.any(String), permissions: expect.any(Array) }))
       expect(auditLogSpy).toHaveBeenCalledOnce()
     })
 
@@ -324,7 +324,7 @@ describe('entity-schema routes', () => {
 
       const res = await app.request('/cms/entity-types/et-1', { method: 'DELETE' })
       expect(res.status).toBe(200)
-      expect(deleteEntityTypeSpy).toHaveBeenCalledWith('et-1')
+      expect(deleteEntityTypeSpy).toHaveBeenCalledWith('et-1', expect.objectContaining({ callerPubkey: expect.any(String), permissions: expect.any(Array) }))
     })
 
     it('requires cases:manage-types permission', async () => {

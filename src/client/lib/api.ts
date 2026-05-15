@@ -413,6 +413,135 @@ export async function setFallbackGroup(volunteers: string[]) {
   })
 }
 
+// --- Ring Groups ---
+
+export async function listRingGroups() {
+  return request<{ ringGroups: Array<{ id: string; hubId: string; encryptedName: string; memberCount: number; createdAt: string }> }>(hp('/ring-groups'))
+}
+
+export async function getRingGroup(id: string) {
+  return request<{ id: string; hubId: string; encryptedName: string; members: Array<{ pubkey: string; addedBy: string; createdAt: string }>; createdAt: string }>(hp(`/ring-groups/${id}`))
+}
+
+export async function createRingGroup(data: { id: string; encryptedName: string }) {
+  return request<{ id: string; hubId: string; encryptedName: string; members: Array<{ pubkey: string; addedBy: string; createdAt: string }>; createdAt: string }>(hp('/ring-groups'), {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function updateRingGroup(id: string, data: { encryptedName: string }) {
+  return request<{ id: string; hubId: string; encryptedName: string; members: Array<{ pubkey: string; addedBy: string; createdAt: string }>; createdAt: string }>(hp(`/ring-groups/${id}`), {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function deleteRingGroup(id: string) {
+  return request<{ ok: true }>(hp(`/ring-groups/${id}`), { method: 'DELETE' })
+}
+
+export async function addRingGroupMembers(id: string, pubkeys: string[]) {
+  return request<{ id: string; hubId: string; encryptedName: string; members: Array<{ pubkey: string; addedBy: string; createdAt: string }>; createdAt: string }>(hp(`/ring-groups/${id}/members`), {
+    method: 'POST',
+    body: JSON.stringify({ pubkeys }),
+  })
+}
+
+export async function removeRingGroupMembers(id: string, pubkeys: string[]) {
+  return request<{ id: string; hubId: string; encryptedName: string; members: Array<{ pubkey: string; addedBy: string; createdAt: string }>; createdAt: string }>(hp(`/ring-groups/${id}/members`), {
+    method: 'DELETE',
+    body: JSON.stringify({ pubkeys }),
+  })
+}
+
+// --- Shift Clock-in / Clock-out / Heartbeat ---
+
+export async function clockIn() {
+  return request<{ ok: true }>(hp('/shifts/clock-in'), { method: 'POST' })
+}
+
+export async function clockOut() {
+  return request<{ ok: true }>(hp('/shifts/clock-out'), { method: 'POST' })
+}
+
+export async function sendHeartbeat() {
+  return request<{ ok: true }>(hp('/shifts/heartbeat'), { method: 'POST' })
+}
+
+export async function listActiveShifts() {
+  return request<{ activeShifts: Array<{ pubkey: string; hubId: string; startedAt: string; lastHeartbeat: string }> }>(hp('/shifts/active'))
+}
+
+// --- Shift Overrides ---
+
+export async function listShiftOverrides(from: string, to: string) {
+  return request<{ overrides: Array<{ id: string; hubId: string; shiftId: string | null; date: string; type: string; userPubkeys: string[] | null; encryptedNote: string | null; createdBy: string; createdAt: string }> }>(
+    hp(`/shifts/overrides?from=${from}&to=${to}`)
+  )
+}
+
+export async function createShiftOverride(data: { id: string; shiftId?: string | null; date: string; type: 'cancel' | 'substitute'; userPubkeys?: string[] | null; encryptedNote?: string | null }) {
+  return request<{ id: string; hubId: string; shiftId: string | null; date: string; type: string; userPubkeys: string[] | null; encryptedNote: string | null; createdBy: string; createdAt: string }>(hp('/shifts/overrides'), {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function deleteShiftOverride(id: string) {
+  return request<{ ok: true }>(hp(`/shifts/overrides/${id}`), { method: 'DELETE' })
+}
+
+// --- Availability Blocks ---
+
+export async function listAvailabilityBlocks(from: string, to: string) {
+  return request<{ blocks: Array<{ id: string; hubId: string; userPubkey: string; startDate: string; endDate: string; encryptedReason: string | null; createdAt: string }> }>(
+    hp(`/shifts/availability?from=${from}&to=${to}`)
+  )
+}
+
+export async function listMyAvailabilityBlocks() {
+  return request<{ blocks: Array<{ id: string; hubId: string; userPubkey: string; startDate: string; endDate: string; encryptedReason: string | null; createdAt: string }> }>(hp('/shifts/availability/my'))
+}
+
+export async function createAvailabilityBlock(data: { id: string; startDate: string; endDate: string; encryptedReason?: string | null }) {
+  return request<{ id: string; hubId: string; userPubkey: string; startDate: string; endDate: string; encryptedReason: string | null; createdAt: string }>(hp('/shifts/availability'), {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function deleteAvailabilityBlock(id: string) {
+  return request<{ ok: true }>(hp(`/shifts/availability/${id}`), { method: 'DELETE' })
+}
+
+// --- Shift Requests ---
+
+export async function listShiftRequests() {
+  return request<{ requests: Array<{ id: string; hubId: string; shiftId: string; userPubkey: string; type: string; status: string; reviewedBy: string | null; reviewedAt: string | null; createdAt: string }> }>(hp('/shifts/requests'))
+}
+
+export async function createShiftRequest(data: { shiftId: string; type: 'join' | 'leave' }) {
+  return request<{ id: string; hubId: string; shiftId: string; userPubkey: string; type: string; status: string; reviewedBy: string | null; reviewedAt: string | null; createdAt: string }>(hp('/shifts/requests'), {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function approveShiftRequest(id: string) {
+  return request<{ id: string; hubId: string; shiftId: string; userPubkey: string; type: string; status: string; reviewedBy: string | null; reviewedAt: string | null; createdAt: string }>(hp(`/shifts/requests/${id}/approve`), {
+    method: 'POST',
+    body: JSON.stringify({ status: 'approved' }),
+  })
+}
+
+export async function rejectShiftRequest(id: string) {
+  return request<{ id: string; hubId: string; shiftId: string; userPubkey: string; type: string; status: string; reviewedBy: string | null; reviewedAt: string | null; createdAt: string }>(hp(`/shifts/requests/${id}/reject`), {
+    method: 'POST',
+    body: JSON.stringify({ status: 'denied' }),
+  })
+}
+
 // --- Ban List ---
 
 export async function listBans() {
@@ -1031,6 +1160,79 @@ export async function testMessagingChannel(channel: string) {
   })
 }
 
+// --- A2P Registration ---
+
+export interface A2pRegistration {
+  id: string
+  hubId: string
+  providerType: string
+  brandStatus: 'not_submitted' | 'pending' | 'approved' | 'failed' | 'skipped'
+  campaignStatus: 'not_submitted' | 'pending' | 'approved' | 'failed' | 'skipped'
+  brandSidMasked: string | null
+  campaignSidMasked: string | null
+  error: string | null
+  submittedAt: string | null
+  approvedAt: string | null
+}
+
+export interface BrandInfo {
+  entityType: string
+  companyName: string
+  ein: string
+  phone: string
+  street: string
+  city: string
+  state: string
+  postalCode: string
+  country: string
+  email: string
+  website?: string
+  vertical?: string
+}
+
+export interface CampaignInfo {
+  useCase: string
+  description: string
+  helpMessage: string
+  optinMessage: string
+  optoutMessage: string
+  sampleMessages: string[]
+  embeddedLink?: boolean
+  embeddedPhone?: boolean
+  subscriberOptin?: boolean
+  subscriberOptout?: boolean
+  subscriberHelp?: boolean
+}
+
+export async function getA2pStatus(hubId: string): Promise<A2pRegistration | null> {
+  try {
+    return await request<A2pRegistration>(`/provider-setup/a2p/status?hubId=${hubId}`)
+  } catch {
+    return null
+  }
+}
+
+export async function submitA2pBrand(hubId: string, brandInfo: BrandInfo): Promise<A2pRegistration> {
+  return request<A2pRegistration>('/provider-setup/a2p/brand', {
+    method: 'POST',
+    body: JSON.stringify({ hubId, brandInfo }),
+  })
+}
+
+export async function submitA2pCampaign(registrationId: string, hubId: string, campaignInfo: CampaignInfo): Promise<A2pRegistration> {
+  return request<A2pRegistration>('/provider-setup/a2p/campaign', {
+    method: 'POST',
+    body: JSON.stringify({ registrationId, hubId, campaignInfo }),
+  })
+}
+
+export async function skipA2p(hubId: string): Promise<A2pRegistration> {
+  return request<A2pRegistration>('/provider-setup/a2p/skip', {
+    method: 'POST',
+    body: JSON.stringify({ hubId }),
+  })
+}
+
 // --- Setup State ---
 
 export type { SetupState } from '@shared/types'
@@ -1364,12 +1566,12 @@ export async function seedDemoData() {
   }
 
   // Create shifts
-  const maria = DEMO_ACCOUNTS.find(a => a.name === 'Maria Santos')!
-  const james = DEMO_ACCOUNTS.find(a => a.name === 'James Chen')!
+  const maria = DEMO_ACCOUNTS.find(a => a.name === 'Maria Santos') ?? DEMO_ACCOUNTS[0]
+  const james = DEMO_ACCOUNTS.find(a => a.name === 'James Chen') ?? DEMO_ACCOUNTS[1]
   const shifts = [
-    { name: 'Morning Team', startTime: '08:00', endTime: '16:00', days: [1, 2, 3, 4, 5], userPubkeys: [maria.pubkey, james.pubkey] },
-    { name: 'Evening Team', startTime: '16:00', endTime: '23:59', days: [1, 2, 3, 4, 5], userPubkeys: [maria.pubkey] },
-    { name: 'Weekend Coverage', startTime: '10:00', endTime: '18:00', days: [0, 6], userPubkeys: [james.pubkey] },
+    { id: crypto.randomUUID(), encryptedName: 'Morning Team', startTime: '08:00', endTime: '16:00', days: [1, 2, 3, 4, 5], userPubkeys: [maria.pubkey, james.pubkey], ringGroupId: null },
+    { id: crypto.randomUUID(), encryptedName: 'Evening Team', startTime: '16:00', endTime: '23:59', days: [1, 2, 3, 4, 5], userPubkeys: [maria.pubkey], ringGroupId: null },
+    { id: crypto.randomUUID(), encryptedName: 'Weekend Coverage', startTime: '10:00', endTime: '18:00', days: [0, 6], userPubkeys: [james.pubkey], ringGroupId: null },
   ]
   for (const shift of shifts) {
     try {
@@ -1468,6 +1670,18 @@ export async function getBlastDeliveries(id: string, opts?: { status?: BlastDeli
   return request<{ deliveries: BlastDelivery[]; total: number; page: number; limit: number }>(
     hp(`/blasts/${id}/deliveries${qs ? `?${qs}` : ''}`)
   )
+}
+
+export async function retryBlastDelivery(blastId: string, deliveryId: string) {
+  return request<{ ok: boolean; delivery: BlastDelivery }>(hp(`/blasts/${blastId}/deliveries/${deliveryId}/retry`), {
+    method: 'POST',
+  })
+}
+
+export async function retryAllFailedDeliveries(blastId: string) {
+  return request<{ ok: boolean; retriedCount: number }>(hp(`/blasts/${blastId}/retry-failed`), {
+    method: 'POST',
+  })
 }
 
 export async function getBlastSettings() {
@@ -2341,4 +2555,322 @@ export async function getRecoveryGroupCandidates(
   } catch {
     return []
   }
+}
+
+// --- EP08: Erasure, Retention, Bans, Platform Settings ---
+
+export interface ErasureRequest {
+  id: string
+  userId: string
+  userName?: string
+  status: 'pending' | 'cancelled' | 'executing' | 'completed' | 'failed'
+  requestedAt: string
+  executeAt: string
+  cancelledAt?: string
+  completedAt?: string
+  requestedBy: 'self' | 'admin'
+  justification?: string
+  emergencyOverride: boolean
+  coApproverPubkey?: string
+}
+
+export interface ErasureConfig {
+  hubId: string
+  delayHours: number
+  emergencyOverrideEnabled: boolean
+  updatedAt: string
+  updatedBy: string
+}
+
+export interface ReEncryptionJob {
+  id: string
+  userId: string
+  hubId: string
+  status: 'queued' | 'running' | 'completed' | 'failed'
+  totalEnvelopes: number
+  processedEnvelopes: number
+  startedAt?: string
+  completedAt?: string
+}
+
+export interface RetentionSetting {
+  hubId: string
+  category: 'call_records' | 'notes' | 'messages' | 'audit_log'
+  retentionDays: number
+  updatedAt: string
+  updatedBy: string
+}
+
+export interface RetentionPlatformFloor {
+  category: 'call_records' | 'notes' | 'messages' | 'audit_log'
+  minRetentionDays: number
+  updatedAt: string
+  updatedBy: string
+}
+
+export interface PlatformBan {
+  id: string
+  phoneHash: string
+  reason: string
+  createdAt: string
+  createdBy: string
+  sourceHubId?: string
+}
+
+export interface PlatformSettings {
+  featureFlags: {
+    mlsEnabled: boolean
+    transcriptionEnabled: boolean
+    caseManagementEnabled: boolean
+    crossHubSharingEnabled: boolean
+  }
+  branding: {
+    instanceName: string
+    supportEmail: string
+    privacyPolicyUrl: string
+  }
+  sessionPolicy: {
+    maxSessionDurationHours: number
+    maxInactiveHours: number
+  }
+  erasurePlatformFloor: {
+    minDelayHours: number
+  }
+  retentionPurge: {
+    cronHourUtc: number
+    enabled: boolean
+  }
+}
+
+// --- Erasure ---
+
+export async function getMyErasureRequest() {
+  return request<{ request: ErasureRequest | null }>(hp('/erasure/me'))
+}
+
+export async function createMyErasureRequest() {
+  return request<{ request: ErasureRequest }>(hp('/erasure/me'), { method: 'POST' })
+}
+
+export async function cancelMyErasureRequest() {
+  return request<{ ok: true }>(hp('/erasure/me'), { method: 'DELETE' })
+}
+
+export async function listErasureRequests(params?: { status?: string }) {
+  const qs = new URLSearchParams()
+  if (params?.status) qs.set('status', params.status)
+  const query = qs.toString()
+  return request<{ requests: ErasureRequest[] }>(hp(`/erasure/requests${query ? `?${query}` : ''}`))
+}
+
+export async function adminEraseUser(userId: string, justification: string) {
+  return request<{ ok: true }>(hp(`/erasure/${userId}`), {
+    method: 'POST',
+    body: JSON.stringify({ justification }),
+  })
+}
+
+export async function remoteWipeDevice(userId: string, devicePubkey: string) {
+  return request<{ ok: true }>(hp(`/erasure/${userId}/wipe-device/${encodeURIComponent(devicePubkey)}`), {
+    method: 'POST',
+  })
+}
+
+export async function getErasureConfig() {
+  return request<{ config: ErasureConfig }>(hp('/erasure/config'))
+}
+
+export async function updateErasureConfig(data: { delayHours?: number; emergencyOverrideEnabled?: boolean }) {
+  return request<{ config: ErasureConfig }>(hp('/erasure/config'), {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function listReEncryptionJobs(params?: { userId?: string }) {
+  const qs = new URLSearchParams()
+  if (params?.userId) qs.set('userId', params.userId)
+  const query = qs.toString()
+  return request<{ jobs: ReEncryptionJob[] }>(hp(`/erasure/re-encryption-jobs${query ? `?${query}` : ''}`))
+}
+
+// --- Retention ---
+
+export async function getRetentionSettings() {
+  return request<{ settings: RetentionSetting[] }>(hp('/retention'))
+}
+
+export async function updateRetentionSettings(data: { category: string; retentionDays: number }) {
+  return request<{ setting: RetentionSetting }>(hp('/retention'), {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function getRetentionPlatformFloors() {
+  return request<{ floors: RetentionPlatformFloor[] }>('/retention/platform-floors')
+}
+
+export async function updateRetentionPlatformFloor(data: { category: string; minRetentionDays: number }) {
+  return request<{ floor: RetentionPlatformFloor }>('/retention/platform-floors', {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
+// --- Platform Bans ---
+
+export async function listPlatformBans(params?: { page?: number; limit?: number }) {
+  const qs = new URLSearchParams()
+  if (params?.page) qs.set('page', String(params.page))
+  if (params?.limit) qs.set('limit', String(params.limit))
+  const query = qs.toString()
+  return request<{ bans: PlatformBan[]; total: number }>(`/bans/platform${query ? `?${query}` : ''}`)
+}
+
+export async function createPlatformBan(data: { phoneHash: string; reason: string }) {
+  return request<{ ban: PlatformBan }>('/bans/platform', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function deletePlatformBan(id: string) {
+  return request<{ ok: true }>(`/bans/platform/${id}`, { method: 'DELETE' })
+}
+
+export async function bulkImportPlatformBans(data: { phoneHashes: string[]; reason: string }) {
+  return request<{ count: number }>('/bans/platform/bulk', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function searchPlatformBans(phoneHash: string) {
+  return request<{ bans: (PlatformBan & { scope: 'hub' | 'platform' })[] }>(
+    `/bans/platform/search?phoneHash=${encodeURIComponent(phoneHash)}`
+  )
+}
+
+export async function promoteHubBan(hubBanId: string) {
+  return request<{ ban: PlatformBan }>('/bans/platform', {
+    method: 'POST',
+    body: JSON.stringify({ promoteFromHubBanId: hubBanId }),
+  })
+}
+
+// --- Platform Settings ---
+
+export async function getPlatformSettings() {
+  return request<{ settings: PlatformSettings }>('/settings/platform')
+}
+
+export async function updatePlatformSettings(data: Partial<PlatformSettings>) {
+  return request<{ settings: PlatformSettings }>('/settings/platform', {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Teams API
+// ---------------------------------------------------------------------------
+
+export interface TeamResponse {
+  id: string
+  hubId: string
+  encryptedName: string
+  encryptedDescription: string | null
+  createdBy: string
+  memberCount: number
+  contactCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface TeamMemberResponse {
+  teamId: string
+  userPubkey: string
+  addedBy: string
+  createdAt: string
+}
+
+export async function listTeams(): Promise<{ teams: TeamResponse[] }> {
+  return request<{ teams: TeamResponse[] }>(hp('/teams'))
+}
+
+export async function createTeam(body: {
+  id: string
+  encryptedName: string
+  encryptedDescription?: string
+}): Promise<TeamResponse> {
+  return request<TeamResponse>(hp('/teams'), { method: 'POST', body: JSON.stringify(body) })
+}
+
+export async function getTeam(teamId: string): Promise<TeamResponse> {
+  return request<TeamResponse>(hp(`/teams/${teamId}`))
+}
+
+export async function updateTeam(teamId: string, body: {
+  encryptedName?: string
+  encryptedDescription?: string | null
+}): Promise<TeamResponse> {
+  return request<TeamResponse>(hp(`/teams/${teamId}`), { method: 'PATCH', body: JSON.stringify(body) })
+}
+
+export async function deleteTeam(teamId: string): Promise<{ ok: true }> {
+  return request<{ ok: true }>(hp(`/teams/${teamId}`), { method: 'DELETE' })
+}
+
+export async function listTeamMembers(teamId: string): Promise<{ members: TeamMemberResponse[] }> {
+  return request<{ members: TeamMemberResponse[] }>(hp(`/teams/${teamId}/members`))
+}
+
+export async function addTeamMembers(teamId: string, pubkeys: string[]): Promise<{ ok: true }> {
+  return request<{ ok: true }>(hp(`/teams/${teamId}/members`), { method: 'POST', body: JSON.stringify({ pubkeys }) })
+}
+
+export async function removeTeamMember(teamId: string, userPubkey: string): Promise<{ ok: true }> {
+  return request<{ ok: true }>(hp(`/teams/${teamId}/members/${encodeURIComponent(userPubkey)}`), { method: 'DELETE' })
+}
+
+// ---------------------------------------------------------------------------
+// Tags API
+// ---------------------------------------------------------------------------
+
+export interface TagResponse {
+  id: string
+  hubId: string
+  name: string
+  encryptedLabel: string
+  color: string
+  encryptedCategory: string | null
+  createdBy: string
+  createdAt: string
+}
+
+export async function listTags(): Promise<{ tags: TagResponse[] }> {
+  return request<{ tags: TagResponse[] }>(hp('/tags'))
+}
+
+export async function createTag(body: {
+  id: string
+  name: string
+  encryptedLabel: string
+  color?: string
+  encryptedCategory?: string
+}): Promise<TagResponse> {
+  return request<TagResponse>(hp('/tags'), { method: 'POST', body: JSON.stringify(body) })
+}
+
+export async function updateTag(tagId: string, body: {
+  encryptedLabel?: string
+  color?: string
+  encryptedCategory?: string | null
+}): Promise<TagResponse> {
+  return request<TagResponse>(hp(`/tags/${tagId}`), { method: 'PATCH', body: JSON.stringify(body) })
+}
+
+export async function deleteTag(tagId: string): Promise<{ removedFromContacts: number }> {
+  return request<{ removedFromContacts: number }>(hp(`/tags/${tagId}`), { method: 'DELETE' })
 }

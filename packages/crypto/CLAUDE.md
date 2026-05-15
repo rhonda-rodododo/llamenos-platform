@@ -50,6 +50,7 @@ bun run crypto:fmt           # cargo fmt --check
 ## Feature Flags
 
 - `mobile` — Enable UniFFI scaffolding for iOS/Android. Required for library builds targeting mobile. Without it, the static archive has zero UniFFI symbols.
+- `test-kdf` — Use minimal Argon2id params (1MB/1iter/1lane) instead of production params (64MB/3iter/4lanes). For emulator/CI testing only — MUST NEVER be in `default` features or release builds.
 - `uniffi-bindgen` — Extends `mobile` with the `uniffi-bindgen` CLI tool.
 
 ## Crypto Architecture
