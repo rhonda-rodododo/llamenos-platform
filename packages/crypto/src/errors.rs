@@ -59,4 +59,10 @@ pub enum CryptoError {
 
     #[error("invalid format: {0}")]
     InvalidFormat(String),
+
+    #[error("Invalid signature")]
+    InvalidSignature,
+
+    #[error("Stale timestamp: message is older than allowed max age")]
+    StaleTimestamp,
 }
