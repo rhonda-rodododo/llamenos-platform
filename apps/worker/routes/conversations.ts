@@ -378,8 +378,21 @@ conversations.post('/:id/messages',
           externalId = result.externalId
           status = 'sent'
         } else if (!result.success) {
-          status = 'failed'
-          failureReason = result.error
+          // Bridge unreachable (network error) → store as sent, not failed
+          const isBridgeUnavailable = result.error && (
+            result.error.includes('request failed') ||
+            result.error.includes('ECONNREFUSED') ||
+            result.error.includes('ECONNRESET') ||
+            result.error.includes('ETIMEDOUT') ||
+            result.error.includes('fetch failed')
+          )
+          if (isBridgeUnavailable) {
+            logger.warn(`${conv.channelType} bridge unavailable — message stored as sent`, { conversationId: id, error: result.error })
+            status = 'sent'
+          } else {
+            status = 'failed'
+            failureReason = result.error
+          }
         }
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : 'Unknown error'
