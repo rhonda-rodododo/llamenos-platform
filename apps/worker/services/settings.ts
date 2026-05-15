@@ -1274,9 +1274,9 @@ export class SettingsService {
       envelopesByRole.set(e.roleId, list)
     }
     const userCounts = await this.db
-      .select({ roleId: sql<string>`jsonb_array_elements_text(${users.roles})`, count: sql<number>`count(*)` })
+      .select({ roleId: sql<string>`unnest(${users.roles})`, count: sql<number>`count(*)` })
       .from(users)
-      .groupBy(sql`jsonb_array_elements_text(${users.roles})`)
+      .groupBy(sql`unnest(${users.roles})`)
     const countByRole = new Map<string, number>()
     for (const uc of userCounts) {
       countByRole.set(uc.roleId, Number(uc.count))
