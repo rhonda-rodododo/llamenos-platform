@@ -89,6 +89,8 @@ enum AdminNavConfig {
         AdminNavItem(slug: "messaging-sms", labelKey: "admin_nav_items_messaging_sms", icon: "message.fill", requiredPermissions: ["settings:read"], requiredRole: nil, testid: "admin-sidebar-item-messaging-sms"),
         AdminNavItem(slug: "rcs", labelKey: "admin_nav_items_rcs", icon: "bubble.left.fill", requiredPermissions: ["settings:read"], requiredRole: nil, testid: "admin-sidebar-item-rcs"),
         AdminNavItem(slug: "signal", labelKey: "admin_nav_items_signal", icon: "bubble.right.fill", requiredPermissions: ["settings:read"], requiredRole: nil, testid: "admin-sidebar-item-signal"),
+        AdminNavItem(slug: "erasure-queue", labelKey: "admin_nav_items_erasure_queue", icon: "person.crop.circle.badge.minus", requiredPermissions: ["erasure:admin"], requiredRole: nil, testid: "admin-sidebar-item-erasure-queue"),
+        AdminNavItem(slug: "retention", labelKey: "admin_nav_items_retention_settings", icon: "clock.arrow.circlepath", requiredPermissions: ["retention:manage"], requiredRole: nil, testid: "admin-sidebar-item-retention"),
         AdminNavItem(slug: "bans", labelKey: "admin_nav_items_bans", icon: "hand.raised.fill", requiredPermissions: ["bans:read"], requiredRole: nil, testid: "admin-sidebar-item-bans"),
         AdminNavItem(slug: "audit", labelKey: "admin_nav_items_audit", icon: "list.clipboard.fill", requiredPermissions: ["audit:read"], requiredRole: nil, testid: "admin-sidebar-item-audit"),
         AdminNavItem(slug: "analytics", labelKey: "admin_nav_items_analytics", icon: "chart.bar.fill", requiredPermissions: ["calls:read-history", "audit:read"], requiredRole: nil, testid: "admin-sidebar-item-analytics"),
