@@ -47,6 +47,12 @@ pub mod padding;
 // === Encryption module (HPKE + AES-256-GCM) ===
 pub mod encryption;
 
+// === Audit key management (AES-256-GCM + HPKE wrapping) ===
+pub mod audit_key;
+
+// === Erasure override + device wipe signatures ===
+pub mod erasure;
+
 // === Device provisioning (X25519 ECDH + HKDF + AES-256-GCM) ===
 pub mod provisioning;
 
@@ -72,6 +78,9 @@ pub use sigchain::{SigchainLink, SigchainVerifiedState};
 pub use encryption::{
     EncryptedKeyData, EncryptedMessage, EncryptedNote, KeyEnvelope, RecipientKeyEnvelope,
 };
+
+// Re-export audit key types
+pub use audit_key::AuditKeyAdminEnvelope;
 
 // Re-export Shamir types
 pub use shamir::Share;
