@@ -64,7 +64,7 @@ jobs:
               ANSIBLE_CHANGED="true"
               echo "Ansible file changed: $file"
             fi
-            if echo "$file" | grep -qE "^apps/android/|^packages/crypto/|^packages/protocol/|^apps/worker/|^packages/shared/"; then
+            if echo "$file" | grep -qE "^apps/android/|^packages/crypto/|^packages/protocol/|^packages/i18n/|^apps/worker/|^packages/shared/"; then
               ANDROID_CHANGED="true"
               echo "Android-relevant file changed: $file"
             fi
