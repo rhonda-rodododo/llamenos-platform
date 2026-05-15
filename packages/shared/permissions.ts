@@ -78,6 +78,11 @@ export const PERMISSION_CATALOG = {
   'shifts:update': 'Modify shifts',
   'shifts:delete': 'Delete shifts',
   'shifts:manage-fallback': 'Manage fallback ring group',
+  'shifts:manage-overrides': 'Manage shift overrides',
+  'shifts:manage-ring-groups': 'Manage ring groups and membership',
+  'shifts:approve-requests': 'Approve/deny shift join/leave requests',
+  'shifts:request-join': 'Submit shift join/leave requests',
+  'shifts:set-availability': 'Set own availability blocks',
 
   // Bans
   'bans:report': 'Report/flag a number',

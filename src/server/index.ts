@@ -140,12 +140,15 @@ const { default: workerApp } = await import('../../apps/worker/app')
 const app = new Hono()
 
 // Inject env bindings and services into every request
+/* eslint-disable @typescript-eslint/no-explicit-any -- Hono context type bridging across module boundaries */
 app.use('*', async (c, next) => {
   ;(c as any).env = env
   ;(c as any).set('services', services)
   await next()
 })
+/* eslint-enable @typescript-eslint/no-explicit-any */
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- workerApp has different Hono env type
 app.route('/', workerApp as any)
 app.all('*', (c) => c.json({ error: 'Not Found' }, 404))
 

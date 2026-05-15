@@ -145,7 +145,7 @@ When('the admin changes the volunteer\'s role to {string}', async ({ request, wo
 
 When('an admin creates a shift named {string}', async ({ request, world }, name: string) => {
   const hubId = getScenarioState(world).hubId
-  const shift = await createShiftViaApi(request, { name, hubId })
+  const shift = await createShiftViaApi(request, { encryptedName: name, hubId })
   getCrudState(world).shiftId = shift.id
   getCrudState(world).shiftName = name
 })
@@ -153,18 +153,18 @@ When('an admin creates a shift named {string}', async ({ request, world }, name:
 Then('the shift list should contain {string}', async ({request, world}, name: string) => {
   const hubId = getScenarioState(world).hubId
   const shifts = await listShiftsViaApi(request, hubId)
-  expect(shifts.some(s => s.name === name)).toBeTruthy()
+  expect(shifts.some(s => s.encryptedName === name)).toBeTruthy()
 })
 
 Then('the shift list should not contain {string}', async ({request, world}, name: string) => {
   const hubId = getScenarioState(world).hubId
   const shifts = await listShiftsViaApi(request, hubId)
-  expect(shifts.some(s => s.name === name)).toBeFalsy()
+  expect(shifts.some(s => s.encryptedName === name)).toBeFalsy()
 })
 
 When('the admin updates the shift name to {string}', async ({ request, world }, name: string) => {
   const hubId = getScenarioState(world).hubId
-  await updateShiftViaApi(request, getCrudState(world).shiftId!, { name }, hubId)
+  await updateShiftViaApi(request, getCrudState(world).shiftId!, { encryptedName: name }, hubId)
   getCrudState(world).shiftName = name
 })
 

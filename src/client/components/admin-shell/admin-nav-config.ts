@@ -153,6 +153,25 @@ export const adminNavConfig: AdminNavConfig = {
       ],
     },
     {
+      groupSlug: 'scheduling',
+      scope: 'this-hub',
+      labelKey: 'adminNav.groups.scheduling',
+      items: [
+        {
+          slug: 'ring-groups',
+          labelKey: 'adminNav.items.ringGroups',
+          requiredPermissions: ['settings:read'],
+          testid: 'admin-sidebar-item-ring-groups',
+        },
+        {
+          slug: 'shift-overrides',
+          labelKey: 'adminNav.items.shiftOverrides',
+          requiredPermissions: ['settings:read'],
+          testid: 'admin-sidebar-item-shift-overrides',
+        },
+      ],
+    },
+    {
       groupSlug: 'operations',
       scope: 'this-hub',
       labelKey: 'adminNav.groups.operations',
@@ -162,6 +181,18 @@ export const adminNavConfig: AdminNavConfig = {
           labelKey: 'adminNav.items.bans',
           requiredPermissions: ['bans:read'],
           testid: 'admin-sidebar-item-bans',
+        },
+        {
+          slug: 'erasure-config',
+          labelKey: 'adminNav.items.erasureConfig',
+          requiredPermissions: ['erasure:admin'],
+          testid: 'admin-sidebar-item-erasure-config',
+        },
+        {
+          slug: 'retention',
+          labelKey: 'adminNav.items.retention',
+          requiredPermissions: ['retention:manage'],
+          testid: 'admin-sidebar-item-retention',
         },
         {
           slug: 'audit',
@@ -228,14 +259,14 @@ export const adminNavConfig: AdminNavConfig = {
         {
           slug: 'platform-settings',
           labelKey: 'adminNav.items.platformSettings',
-          requiredPermissions: ['system:view-platform'],
+          requiredPermissions: ['system:manage-instance'],
           testid: 'admin-sidebar-item-platform-settings',
         },
         {
-          slug: 'gdpr-erasure',
-          labelKey: 'adminNav.items.gdprErasure',
+          slug: 'erasure-queue',
+          labelKey: 'adminNav.items.erasureQueue',
           requiredPermissions: ['system:manage-instance'],
-          testid: 'admin-sidebar-item-gdpr-erasure',
+          testid: 'admin-sidebar-item-erasure-queue',
         },
       ],
     },

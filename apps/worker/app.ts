@@ -55,6 +55,7 @@ import erasureRoutes from './routes/erasure'
 import retentionRoutes from './routes/retention'
 import platformBansRoutes from './routes/platform-bans'
 import platformSettingsRoutes from './routes/platform-settings'
+import ringGroupsRoutes from './routes/ring-groups'
 import recoveryGroupRoutes from './routes/recovery-group'
 import teamsRoutes from './routes/teams'
 import tagsRoutes from './routes/tags'
@@ -220,6 +221,7 @@ authenticated.route('/erasure', erasureRoutes)
 authenticated.route('/bans/platform', platformBansRoutes)
 authenticated.route('/retention', retentionRoutes)
 authenticated.route('/settings/platform', platformSettingsRoutes)
+authenticated.route('/ring-groups', ringGroupsRoutes)
 authenticated.route('/recovery-group', recoveryGroupRoutes.authenticated)
 
 // Hub-scoped authenticated routes
@@ -249,6 +251,7 @@ hubScoped.route('/', evidenceRoutes)
 hubScoped.route('/mls', mlsRoutes)
 hubScoped.route('/firehose', firehoseRoutes)
 hubScoped.route('/onboard', hubOnboardRoutes)
+hubScoped.route('/ring-groups', ringGroupsRoutes)
 hubScoped.route('/teams', teamsRoutes)
 hubScoped.route('/tags', tagsRoutes)
 

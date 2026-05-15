@@ -362,7 +362,7 @@ export async function bulkAddBansViaApi(
 
 export interface CreateShiftResult {
   id: string
-  name: string
+  encryptedName: string
 }
 
 /** Resolve hub-scoped path prefix. Hub-scoped resources live at /hubs/:id/resource. */
@@ -373,6 +373,8 @@ function hubPath(base: string, hubId?: string): string {
 export async function createShiftViaApi(
   request: APIRequestContext,
   options?: {
+    encryptedName?: string
+    /** @deprecated use encryptedName */
     name?: string
     startTime?: string
     endTime?: string
@@ -381,19 +383,20 @@ export async function createShiftViaApi(
     hubId?: string
   },
 ): Promise<CreateShiftResult> {
-  const name = options?.name ?? uniqueName('TestShift')
+  const id = crypto.randomUUID()
+  const encryptedName = options?.encryptedName ?? options?.name ?? uniqueName('TestShift')
   const startTime = options?.startTime ?? '09:00'
   const endTime = options?.endTime ?? '17:00'
   const days = options?.days ?? [1, 2, 3, 4, 5]
   const userPubkeys = options?.userPubkeys ?? []
 
   const { status, data } = await apiPost<{ id: string }>(request, hubPath('/shifts', options?.hubId), {
-    name, startTime, endTime, days, userPubkeys,
+    id, encryptedName, startTime, endTime, days, userPubkeys,
   })
   if (status !== 200 && status !== 201) {
     throw new Error(`Failed to create shift: ${status}`)
   }
-  return { id: data.id, name }
+  return { id: data.id, encryptedName }
 }
 
 export async function deleteShiftViaApi(
@@ -408,8 +411,8 @@ export async function deleteShiftViaApi(
 export async function listShiftsViaApi(
   request: APIRequestContext,
   hubId?: string,
-): Promise<Array<{ id: string; name: string; startTime: string; endTime: string; days: number[]; userPubkeys: string[] }>> {
-  const { status, data } = await apiGet<{ shifts: Array<{ id: string; name: string; startTime: string; endTime: string; days: number[]; userPubkeys: string[] }> }>(request, hubPath('/shifts', hubId))
+): Promise<Array<{ id: string; encryptedName: string; startTime: string; endTime: string; days: number[]; userPubkeys: string[] }>> {
+  const { status, data } = await apiGet<{ shifts: Array<{ id: string; encryptedName: string; startTime: string; endTime: string; days: number[]; userPubkeys: string[] }> }>(request, hubPath('/shifts', hubId))
   if (status !== 200) throw new Error(`Failed to list shifts: ${status}`)
   return data.shifts
 }
@@ -417,7 +420,7 @@ export async function listShiftsViaApi(
 export async function updateShiftViaApi(
   request: APIRequestContext,
   id: string,
-  updates: { name?: string; startTime?: string; endTime?: string; days?: number[]; userPubkeys?: string[] },
+  updates: { encryptedName?: string; startTime?: string; endTime?: string; days?: number[]; userPubkeys?: string[] },
   hubId?: string,
 ): Promise<void> {
   const { status } = await apiPatch(request, hubPath(`/shifts/${id}`, hubId), updates)

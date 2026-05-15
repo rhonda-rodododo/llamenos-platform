@@ -152,6 +152,7 @@ const ALLOWED_HUB_SETTINGS = new Set([
   'usage',
   'subAccountEnabled',
   'subAccountConfigId',
+  'heartbeatTimeout',
 ])
 
 const VALID_PROVIDER_TYPES = [
@@ -1153,7 +1154,7 @@ export class SettingsService {
    * This legacy method stores credentials in plaintext and will be removed in a future release.
    */
   async updateTelephonyProvider(
-    _data: TelephonyProviderConfig,
+    _config: TelephonyProviderConfig,
   ): Promise<never> {
     throw new ServiceError(
       400,
