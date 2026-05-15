@@ -69,6 +69,7 @@ bech32 = "0.11"
 [features]
 default = []
 server = []
+test-kdf = []
 mobile = ["dep:uniffi"]
 uniffi-bindgen = ["mobile", "uniffi/cli"]
 # test-kdf: Use fast Argon2id parameters (m=8KB, t=1, p=1) instead of production
