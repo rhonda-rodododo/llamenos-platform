@@ -589,7 +589,7 @@ jobs:
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
           path: apps/android/app/src/main/jniLibs/x86_64/libllamenos_core.so
-          key: android-crypto-x86_64-${{ runner.os }}-${{ hashFiles('packages/crypto/src/**/*.rs', 'packages/crypto/Cargo.toml', 'packages/crypto/Cargo.lock') }}
+          key: android-crypto-x86_64-test-kdf-${{ runner.os }}-${{ hashFiles('packages/crypto/src/**/*.rs', 'packages/crypto/Cargo.toml', 'packages/crypto/Cargo.lock') }}
 
       - name: Install Rust stable (for crypto build)
         if: steps.crypto-cache.outputs.cache-hit != 'true'
@@ -617,7 +617,7 @@ jobs:
           mkdir -p ../../apps/android/app/src/main/jniLibs
           cargo ndk -t x86_64 --platform 24 \
             -o ../../apps/android/app/src/main/jniLibs \
-            build --release --features mobile
+            build --release --features mobile,test-kdf
 
       - name: Verify crypto .so exists
         run: |
