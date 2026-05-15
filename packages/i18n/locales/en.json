@@ -3484,5 +3484,60 @@
     "setupComplete": {
       "footer": "Webhook setup complete"
     }
+  },
+  "analytics": {
+    "title": "Analytics",
+    "description": "Call volume, response times, and volunteer activity",
+    "nav": "Analytics",
+    "summary": {
+      "totalCalls": "Total Calls",
+      "answerRate": "Answer Rate",
+      "avgDuration": "Avg Duration",
+      "totalConversations": "Total Conversations"
+    },
+    "callVolume": {
+      "title": "Call Volume",
+      "answered": "Answered",
+      "unanswered": "Unanswered",
+      "abandoned": "Abandoned",
+      "noData": "No call data for this period"
+    },
+    "hours": {
+      "title": "Hourly Distribution",
+      "noData": "No data for this period"
+    },
+    "conversations": {
+      "title": "Conversations",
+      "avgResponseTime": "Avg Response Time",
+      "avgMessages": "Avg Messages",
+      "noData": "No conversation data for this period"
+    },
+    "shifts": {
+      "title": "Shift Coverage",
+      "noData": "No shift data available"
+    },
+    "users": {
+      "title": "Volunteer Activity",
+      "name": "Name",
+      "callsAnswered": "Calls Answered",
+      "avgDuration": "Avg Duration",
+      "notesCreated": "Notes Created",
+      "noData": "No volunteer data for this period"
+    },
+    "personal": {
+      "callsToday": "Calls Today",
+      "callsThisPeriod": "Calls This Period",
+      "avgDuration": "Avg Duration",
+      "notesCreated": "Notes Created"
+    },
+    "platform": {
+      "title": "Platform Analytics",
+      "crossHub": "Cross-Hub"
+    },
+    "dateRange": {
+      "7days": "7 Days",
+      "30days": "30 Days",
+      "custom": "Custom"
+    }
   }
 }

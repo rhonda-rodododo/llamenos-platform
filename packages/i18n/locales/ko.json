@@ -3443,5 +3443,60 @@
     "setupComplete": {
       "footer": "Webhook setup complete"
     }
+  },
+  "analytics": {
+    "title": "분석",
+    "description": "통화량, 응답 시간 및 자원봉사자 활동",
+    "nav": "분석",
+    "summary": {
+      "totalCalls": "총 통화 수",
+      "answerRate": "응답률",
+      "avgDuration": "평균 통화 시간",
+      "totalConversations": "총 대화 수"
+    },
+    "callVolume": {
+      "title": "통화량",
+      "answered": "응답됨",
+      "unanswered": "미응답",
+      "abandoned": "포기됨",
+      "noData": "이 기간에 통화 데이터가 없습니다"
+    },
+    "hours": {
+      "title": "시간별 분포",
+      "noData": "이 기간에 데이터가 없습니다"
+    },
+    "conversations": {
+      "title": "대화",
+      "avgResponseTime": "평균 응답 시간",
+      "avgMessages": "평균 메시지 수",
+      "noData": "이 기간에 대화 데이터가 없습니다"
+    },
+    "shifts": {
+      "title": "교대 근무 커버리지",
+      "noData": "교대 근무 데이터가 없습니다"
+    },
+    "users": {
+      "title": "자원봉사자 활동",
+      "name": "이름",
+      "callsAnswered": "응답한 통화",
+      "avgDuration": "평균 통화 시간",
+      "notesCreated": "생성된 메모",
+      "noData": "이 기간에 자원봉사자 데이터가 없습니다"
+    },
+    "personal": {
+      "callsToday": "오늘의 통화",
+      "callsThisPeriod": "이 기간의 통화",
+      "avgDuration": "평균 통화 시간",
+      "notesCreated": "생성된 메모"
+    },
+    "platform": {
+      "title": "플랫폼 분석",
+      "crossHub": "크로스 허브"
+    },
+    "dateRange": {
+      "7days": "7일",
+      "30days": "30일",
+      "custom": "맞춤 설정"
+    }
   }
 }

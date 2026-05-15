@@ -1337,12 +1337,11 @@ export class SettingsService {
     const now = new Date()
     const id = data.id ?? `role-${crypto.randomUUID()}`
 
-    // Non-system roles: do not store plaintext name (only encrypted envelopes)
     const roleDescription = description ?? ''
 
     await this.db.insert(rolesTable).values({
       id,
-      // name intentionally omitted — will be NULL (zero-knowledge: stored only in encrypted envelopes)
+      name: data.name ?? null,
       slug,
       permissions: permissions as string[],
       isDefault: false,
@@ -1369,7 +1368,7 @@ export class SettingsService {
 
     return {
       id,
-      name: null,
+      name: data.name ?? null,
       slug,
       permissions: permissions as string[],
       isDefault: false,

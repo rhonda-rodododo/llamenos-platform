@@ -1,6 +1,6 @@
 {
-  "id": "07e6f5bf-5f47-48df-b091-611fbee3e8a0",
-  "prevId": "bc646cf9-0a63-45de-8824-88be5010a46d",
+  "id": "404ba4dd-f765-4193-ac2e-4ffb16b92c3e",
+  "prevId": "07e6f5bf-5f47-48df-b091-611fbee3e8a0",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -659,6 +659,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "answered_by": {
+          "name": "answered_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -4854,7 +4860,7 @@
           "name": "name",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "slug": {
           "name": "slug",
@@ -7329,7 +7335,7 @@
         },
         "encrypted_permissions": {
           "name": "encrypted_permissions",
-          "type": "jsonb",
+          "type": "text",
           "primaryKey": false,
           "notNull": true
         },

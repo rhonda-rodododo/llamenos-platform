@@ -3443,5 +3443,60 @@
     "setupComplete": {
       "footer": "Webhook setup complete"
     }
+  },
+  "analytics": {
+    "title": "विश्लेषण",
+    "description": "कॉल वॉल्यूम, प्रतिक्रिया समय और स्वयंसेवक गतिविधि",
+    "nav": "विश्लेषण",
+    "summary": {
+      "totalCalls": "कुल कॉल",
+      "answerRate": "उत्तर दर",
+      "avgDuration": "औसत अवधि",
+      "totalConversations": "कुल बातचीत"
+    },
+    "callVolume": {
+      "title": "कॉल वॉल्यूम",
+      "answered": "उत्तर दिया",
+      "unanswered": "अनुत्तरित",
+      "abandoned": "छोड़ा गया",
+      "noData": "इस अवधि के लिए कोई कॉल डेटा नहीं"
+    },
+    "hours": {
+      "title": "प्रति घंटा वितरण",
+      "noData": "इस अवधि के लिए कोई डेटा नहीं"
+    },
+    "conversations": {
+      "title": "बातचीत",
+      "avgResponseTime": "औसत प्रतिक्रिया समय",
+      "avgMessages": "औसत संदेश",
+      "noData": "इस अवधि के लिए कोई बातचीत डेटा नहीं"
+    },
+    "shifts": {
+      "title": "शिफ्ट कवरेज",
+      "noData": "कोई शिफ्ट डेटा उपलब्ध नहीं"
+    },
+    "users": {
+      "title": "स्वयंसेवक गतिविधि",
+      "name": "नाम",
+      "callsAnswered": "उत्तर दी गई कॉल",
+      "avgDuration": "औसत अवधि",
+      "notesCreated": "बनाए गए नोट्स",
+      "noData": "इस अवधि के लिए कोई स्वयंसेवक डेटा नहीं"
+    },
+    "personal": {
+      "callsToday": "आज की कॉल",
+      "callsThisPeriod": "इस अवधि की कॉल",
+      "avgDuration": "औसत अवधि",
+      "notesCreated": "बनाए गए नोट्स"
+    },
+    "platform": {
+      "title": "प्लेटफ़ॉर्म विश्लेषण",
+      "crossHub": "क्रॉस-हब"
+    },
+    "dateRange": {
+      "7days": "7 दिन",
+      "30days": "30 दिन",
+      "custom": "कस्टम"
+    }
   }
 }

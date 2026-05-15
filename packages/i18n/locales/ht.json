@@ -3443,5 +3443,60 @@
     "setupComplete": {
       "footer": "Webhook setup complete"
     }
+  },
+  "analytics": {
+    "title": "Analitik",
+    "description": "Volim apèl, tan repon, ak aktivite volontè",
+    "nav": "Analitik",
+    "summary": {
+      "totalCalls": "Total Apèl",
+      "answerRate": "To Repon",
+      "avgDuration": "Dire Mwayèn",
+      "totalConversations": "Total Konvèsasyon"
+    },
+    "callVolume": {
+      "title": "Volim Apèl",
+      "answered": "Reponn",
+      "unanswered": "San Repon",
+      "abandoned": "Abandone",
+      "noData": "Pa gen done apèl pou peryòd sa a"
+    },
+    "hours": {
+      "title": "Distribisyon pa Èdtan",
+      "noData": "Pa gen done pou peryòd sa a"
+    },
+    "conversations": {
+      "title": "Konvèsasyon",
+      "avgResponseTime": "Tan Repon Mwayèn",
+      "avgMessages": "Mesaj Mwayèn",
+      "noData": "Pa gen done konvèsasyon pou peryòd sa a"
+    },
+    "shifts": {
+      "title": "Kouvèti Shift",
+      "noData": "Pa gen done shift disponib"
+    },
+    "users": {
+      "title": "Aktivite Volontè",
+      "name": "Non",
+      "callsAnswered": "Apèl Reponn",
+      "avgDuration": "Dire Mwayèn",
+      "notesCreated": "Nòt Kreye",
+      "noData": "Pa gen done volontè pou peryòd sa a"
+    },
+    "personal": {
+      "callsToday": "Apèl Jodi a",
+      "callsThisPeriod": "Apèl Peryòd Sa a",
+      "avgDuration": "Dire Mwayèn",
+      "notesCreated": "Nòt Kreye"
+    },
+    "platform": {
+      "title": "Analitik Platfòm",
+      "crossHub": "Cross-Hub"
+    },
+    "dateRange": {
+      "7days": "7 Jou",
+      "30days": "30 Jou",
+      "custom": "Pèsonalize"
+    }
   }
 }

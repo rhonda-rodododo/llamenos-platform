@@ -3443,5 +3443,60 @@
     "setupComplete": {
       "footer": "Webhook setup complete"
     }
+  },
+  "analytics": {
+    "title": "Analyse",
+    "description": "Anrufvolumen, Reaktionszeiten und Freiwilligenaktivität",
+    "nav": "Analyse",
+    "summary": {
+      "totalCalls": "Anrufe gesamt",
+      "answerRate": "Annahmequote",
+      "avgDuration": "Ø Gesprächsdauer",
+      "totalConversations": "Unterhaltungen gesamt"
+    },
+    "callVolume": {
+      "title": "Anrufvolumen",
+      "answered": "Angenommen",
+      "unanswered": "Nicht angenommen",
+      "abandoned": "Abgebrochen",
+      "noData": "Keine Anrufdaten für diesen Zeitraum"
+    },
+    "hours": {
+      "title": "Stündliche Verteilung",
+      "noData": "Keine Daten für diesen Zeitraum"
+    },
+    "conversations": {
+      "title": "Unterhaltungen",
+      "avgResponseTime": "Ø Reaktionszeit",
+      "avgMessages": "Ø Nachrichten",
+      "noData": "Keine Gesprächsdaten für diesen Zeitraum"
+    },
+    "shifts": {
+      "title": "Schichtabdeckung",
+      "noData": "Keine Schichtdaten verfügbar"
+    },
+    "users": {
+      "title": "Freiwilligenaktivität",
+      "name": "Name",
+      "callsAnswered": "Beantwortete Anrufe",
+      "avgDuration": "Ø Gesprächsdauer",
+      "notesCreated": "Erstelle Notizen",
+      "noData": "Keine Freiwilligendaten für diesen Zeitraum"
+    },
+    "personal": {
+      "callsToday": "Anrufe heute",
+      "callsThisPeriod": "Anrufe in diesem Zeitraum",
+      "avgDuration": "Ø Gesprächsdauer",
+      "notesCreated": "Erstelle Notizen"
+    },
+    "platform": {
+      "title": "Plattformanalyse",
+      "crossHub": "Hub-übergreifend"
+    },
+    "dateRange": {
+      "7days": "7 Tage",
+      "30days": "30 Tage",
+      "custom": "Benutzerdefiniert"
+    }
   }
 }
