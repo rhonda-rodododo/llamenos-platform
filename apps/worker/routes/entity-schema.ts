@@ -213,13 +213,14 @@ const entityTypeRouter = createEntityRouter({
   createBodySchema: createEntityTypeBodySchema,
   updateBodySchema: updateEntityTypeBodySchema,
   permissionOverrides: {
+    get: 'settings:read',
     create: 'cases:manage-types',
     update: 'cases:manage-types',
     delete: 'cases:manage-types',
   },
   disableList: true,
-  disableGet: true,
   methods: {
+    get: 'getEntityTypeById',
     create: 'createEntityType',
     update: 'updateEntityType',
     delete: 'deleteEntityType',
@@ -461,6 +462,7 @@ entitySchema.post('/templates/apply',
 
     return c.json({
       applied: true,
+      entityTypeId: result.entityTypes[0]?.id,
       entityTypes: result.entityTypes.length,
       relationshipTypes: result.relationshipTypes.length,
       reportTypes: result.reportTypes.length,

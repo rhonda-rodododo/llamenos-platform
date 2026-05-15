@@ -13,6 +13,9 @@ function seedHexToPubkey(seedHex: string): string {
   return bytesToHex(ed25519.getPublicKey(hexToBytes(seedHex)))
 }
 
+/** Dummy 64-char hex value for HPKE enc field — satisfies hpkeEncSchema validation in tests */
+const DUMMY_ENC = '0'.repeat(64)
+
 interface EntityUnificationState {
   lastResponse?: { status: number; headers?: Record<string, string>; body: unknown }
   entityTypeId?: string
@@ -62,7 +65,7 @@ Given('a record exists with blindIndexes containing {string} for field {string}'
       entityTypeId: state.entityTypeId,
       statusHash: 'active',
       encryptedSummary: `enc-${token}`,
-      summaryEnvelopes: [{ pubkey: state.adminPubkey, enc: 'enc', ct: 'ct' }],
+      summaryEnvelopes: [{ pubkey: state.adminPubkey, enc: DUMMY_ENC, ct: 'ct' }],
       blindIndexes: { [field]: [token] },
     })
     expect(res.status).toBe(201)
@@ -114,7 +117,7 @@ Given('a record exists with start_date blind indexes for {string}',
       entityTypeId: state.entityTypeId,
       statusHash: 'active',
       encryptedSummary: `enc-${token}`,
-      summaryEnvelopes: [{ pubkey: state.adminPubkey, enc: 'enc', ct: 'ct' }],
+      summaryEnvelopes: [{ pubkey: state.adminPubkey, enc: DUMMY_ENC, ct: 'ct' }],
       blindIndexes: { start_date: [token] },
     })
     expect(res.status).toBe(201)
@@ -138,7 +141,6 @@ Given('a user has permission {string} but not {string}',
 Given('{int} events exist without deprecated_at set', async ({ request, world }, count: number) => {
   const state = getState_(world)
   if (!state.entityTypeId) {
-    const hubId = getScenarioState(world).hubId
     const res = await apiPost<{ id: string }>(request, '/settings/cms/entity-types', {
       name: `event_migration_type_${Date.now()}`,
       label: 'Event Migration Type',
@@ -151,12 +153,15 @@ Given('{int} events exist without deprecated_at set', async ({ request, world },
     expect(res.status).toBe(201)
     state.entityTypeId = res.data.id
   }
+  // Create events via the events API (writes to the events table, not case_records)
   for (let i = 0; i < count; i++) {
-    const res = await apiPost<{ id: string }>(request, '/records', {
+    const res = await apiPost<{ id: string }>(request, '/events', {
       entityTypeId: state.entityTypeId,
       statusHash: 'active',
-      encryptedSummary: `legacy-event-${Date.now()}-${i}`,
-      summaryEnvelopes: [{ pubkey: state.adminPubkey, enc: 'enc', ct: 'ct' }],
+      eventTypeHash: 'legacy',
+      startDate: new Date().toISOString(),
+      encryptedDetails: `legacy-event-${Date.now()}-${i}`,
+      detailEnvelopes: [{ pubkey: state.adminPubkey, enc: DUMMY_ENC, ct: 'ct' }],
     })
     expect(res.status).toBe(201)
     state.createdRecordIds ??= []
@@ -170,7 +175,7 @@ When('the admin creates a record with that entity type', async ({ request, world
     entityTypeId: state.entityTypeId,
     statusHash: 'active',
     encryptedSummary: 'encrypted-test-summary',
-    summaryEnvelopes: [{ pubkey: state.adminPubkey, enc: 'enc', ct: 'ct' }],
+    summaryEnvelopes: [{ pubkey: state.adminPubkey, enc: DUMMY_ENC, ct: 'ct' }],
   })
   expect(res.status).toBe(201)
   state.recordId = res.data.id

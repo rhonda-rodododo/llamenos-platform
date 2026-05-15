@@ -316,7 +316,7 @@ export class CasesService {
     }
     if (input.blindIndexToken && input.blindIndexField) {
       conditions.push(
-        sql`${caseRecords.blindIndexes}->>${input.blindIndexField} @> to_jsonb(${input.blindIndexToken}::text)`,
+        sql`${caseRecords.blindIndexes}->${input.blindIndexField} @> to_jsonb(${input.blindIndexToken}::text)`,
       )
     }
 

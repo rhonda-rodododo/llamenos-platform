@@ -336,6 +336,7 @@ export const templateListResponseSchema = z.object({
 
 export const templateApplyResponseSchema = z.object({
   applied: z.boolean(),
+  entityTypeId: z.string().optional(),
   entityTypes: z.number(),
   relationshipTypes: z.number(),
   reportTypes: z.number(),

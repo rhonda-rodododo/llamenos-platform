@@ -31,6 +31,7 @@ export async function loadBundledTemplates(
     'mutual-aid',
     'missing-persons',
     'kyr-training',
+    'builtin-event',
   ]
 
   const templates: CaseManagementTemplate[] = []
