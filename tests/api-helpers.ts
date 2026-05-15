@@ -311,6 +311,7 @@ export const updateVolunteerViaApi = updateUserViaApi
 
 export interface CreateBanResult {
   phone: string
+  phoneHash: string
   reason: string
 }
 
@@ -321,11 +322,11 @@ export async function createBanViaApi(
   const phone = options?.phone ?? uniquePhone()
   const reason = options?.reason ?? 'E2E test ban'
 
-  const { status } = await apiPost(request, hubPath('/bans', options?.hubId), { phone, reason })
+  const { status, data } = await apiPost<{ ban: { phone: string; reason: string } }>(request, hubPath('/bans', options?.hubId), { phone, reason })
   if (status !== 200 && status !== 201) {
     throw new Error(`Failed to create ban: ${status}`)
   }
-  return { phone, reason }
+  return { phone, phoneHash: data.ban.phone, reason }
 }
 
 export async function removeBanViaApi(

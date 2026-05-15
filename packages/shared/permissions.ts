@@ -293,7 +293,7 @@ export const DEFAULT_ROLES: Omit<Role, 'createdAt' | 'updatedAt'>[] = [
       'hubs:read', 'hubs:manage-members', 'hubs:manage-keys',
       'teams:*', 'tags:*',
       'metrics:read', 'system:view-roles',
-      'erasure:admin', 'retention:manage',
+      'erasure:*', 'retention:manage',
       'bans:read-platform', 'bans:create-platform', 'bans:delete-platform',
     ],
     isDefault: true,
