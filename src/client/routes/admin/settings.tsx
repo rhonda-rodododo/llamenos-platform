@@ -43,7 +43,7 @@ import { ReportTypesSection } from '@/components/admin-settings/report-types-sec
 export const Route = createFileRoute('/admin/settings')({
   component: AdminSettingsPage,
   validateSearch: (search: Record<string, unknown>) => ({
-    section: (search.section as string) || '',
+    section: (search.section as string) || undefined,
   }),
 })
 
@@ -196,7 +196,7 @@ function AdminSettingsPage() {
       <RolesSection
         expanded={expanded.has('roles')}
         onToggle={(open) => toggleSection('roles', open)}
-        statusSummary={t('roles.summary', { defaultValue: 'Manage roles' })}
+        statusSummary={t('roles.description', { defaultValue: 'Define roles and assign permissions to control access across your hotline.' })}
       />
 
       <TelephonyProviderSection

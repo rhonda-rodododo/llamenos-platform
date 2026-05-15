@@ -16,18 +16,21 @@ import {
   conversationMetricsResponseSchema,
   shiftMetricsResponseSchema,
   analyticsSystemHealthResponseSchema,
+  hourlyDistributionResponseSchema,
+  userStatsResponseSchema,
+  personalStatsResponseSchema,
 } from '@protocol/schemas/analytics'
 
 const analytics = new Hono<AppEnv>()
 
-function parseDateRange(query: { from?: string; to?: string }): {
-  from?: Date
-  to?: Date
-} {
-  return {
-    from: query.from ? new Date(query.from) : undefined,
-    to: query.to ? new Date(query.to) : undefined,
-  }
+function parseDateRange(query: { from?: string; to?: string }): Partial<{
+  from: Date
+  to: Date
+}> {
+  const result: Partial<{ from: Date; to: Date }> = {}
+  if (query.from) result.from = new Date(query.from)
+  if (query.to) result.to = new Date(query.to)
+  return result
 }
 
 async function getAnalyticsService(): Promise<AnalyticsService> {
@@ -53,10 +56,10 @@ analytics.get(
   requirePermission('audit:read'),
   validator('query', analyticsDateRangeQuerySchema),
   async (c) => {
-    const hubId = c.get('hubId') ?? ''
+    const hubId = c.get('hubId') ?? undefined
     const service = await getAnalyticsService()
     const range = parseDateRange(c.req.valid('query'))
-    return c.json(await service.getCallMetrics(hubId, range))
+    return c.json(await service.getCallMetrics(hubId ?? '', range))
   },
 )
 
@@ -78,10 +81,10 @@ analytics.get(
   requirePermission('audit:read'),
   validator('query', analyticsDateRangeQuerySchema),
   async (c) => {
-    const hubId = c.get('hubId') ?? ''
+    const hubId = c.get('hubId') ?? undefined
     const service = await getAnalyticsService()
     const range = parseDateRange(c.req.valid('query'))
-    return c.json(await service.getConversationMetrics(hubId, range))
+    return c.json(await service.getConversationMetrics(hubId ?? '', range))
   },
 )
 
@@ -102,9 +105,9 @@ analytics.get(
   }),
   requirePermission('audit:read'),
   async (c) => {
-    const hubId = c.get('hubId') ?? ''
+    const hubId = c.get('hubId') ?? undefined
     const service = await getAnalyticsService()
-    return c.json(await service.getShiftMetrics(hubId))
+    return c.json(await service.getShiftMetrics(hubId ?? ''))
   },
 )
 
@@ -125,9 +128,85 @@ analytics.get(
   }),
   requirePermission('audit:read'),
   async (c) => {
-    const hubId = c.get('hubId') ?? ''
+    const hubId = c.get('hubId') ?? undefined
     const service = await getAnalyticsService()
-    return c.json(await service.getSystemHealth(hubId))
+    return c.json(await service.getSystemHealth(hubId ?? ''))
+  },
+)
+
+// ── GET /api/analytics/hours ──
+
+analytics.get(
+  '/hours',
+  describeRoute({
+    tags: ['Analytics'],
+    summary: 'Hourly call distribution (24 buckets)',
+    responses: {
+      200: {
+        description: 'Call counts grouped by hour of day',
+        content: { 'application/json': { schema: resolver(hourlyDistributionResponseSchema) } },
+      },
+      ...authErrors,
+    },
+  }),
+  requirePermission('audit:read'),
+  validator('query', analyticsDateRangeQuerySchema),
+  async (c) => {
+    const hubId = c.get('hubId') ?? undefined
+    const service = await getAnalyticsService()
+    const range = parseDateRange(c.req.valid('query'))
+    return c.json(await service.getHourlyDistribution(hubId, range))
+  },
+)
+
+// ── GET /api/analytics/users ──
+
+analytics.get(
+  '/users',
+  describeRoute({
+    tags: ['Analytics'],
+    summary: 'Per-user call and note statistics',
+    responses: {
+      200: {
+        description: 'User activity stats sorted by calls answered',
+        content: { 'application/json': { schema: resolver(userStatsResponseSchema) } },
+      },
+      ...authErrors,
+    },
+  }),
+  requirePermission('audit:read'),
+  validator('query', analyticsDateRangeQuerySchema),
+  async (c) => {
+    const hubId = c.get('hubId') ?? undefined
+    const service = await getAnalyticsService()
+    const range = parseDateRange(c.req.valid('query'))
+    return c.json(await service.getUserStats(hubId, range))
+  },
+)
+
+// ── GET /api/analytics/me ──
+// Intentionally no requirePermission — any authenticated user may view their own stats
+
+analytics.get(
+  '/me',
+  describeRoute({
+    tags: ['Analytics'],
+    summary: 'Personal call and note stats for the authenticated user',
+    responses: {
+      200: {
+        description: 'Personal activity stats',
+        content: { 'application/json': { schema: resolver(personalStatsResponseSchema) } },
+      },
+      ...authErrors,
+    },
+  }),
+  validator('query', analyticsDateRangeQuerySchema),
+  async (c) => {
+    const hubId = c.get('hubId') ?? ''
+    const userPubkey = c.get('pubkey') ?? ''
+    const service = await getAnalyticsService()
+    const range = parseDateRange(c.req.valid('query'))
+    return c.json(await service.getPersonalStats(hubId, userPubkey, range))
   },
 )
 

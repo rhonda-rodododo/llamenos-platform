@@ -151,8 +151,7 @@ When('I see the error', async ({ page }) => {
 Then('the encrypted key data should be stored', async ({ page }) => {
   const hasKey = await page.evaluate(() => {
     return (
-      localStorage.getItem('tauri-store:keys.json:llamenos-encrypted-device-keys') !== null ||
-      localStorage.getItem('llamenos-encrypted-key') !== null ||
+      localStorage.getItem('stronghold:llamenos:llamenos-encrypted-device-keys') !== null ||
       localStorage.getItem('llamenos:llamenos-encrypted-device-keys') !== null
     )
   })
@@ -160,15 +159,19 @@ Then('the encrypted key data should be stored', async ({ page }) => {
 })
 
 Then('the pubkey should be stored for locked display', async ({ page }) => {
-  // Verify encrypted key data contains device state with pubkey info
+  // Verify encrypted key data contains device state with pubkey info.
+  // In test builds, Stronghold mock stores as JSON-encoded byte arrays at
+  // stronghold:llamenos:<key>. The real platform fallback uses llamenos:<key>.
   const stored = await page.evaluate(() => {
-    const key =
-      localStorage.getItem('tauri-store:keys.json:llamenos-encrypted-device-keys') ||
-      localStorage.getItem('llamenos:llamenos-encrypted-device-keys') ||
-      localStorage.getItem('llamenos-encrypted-key')
-    if (!key) return null
-    const parsed = JSON.parse(key)
-    // v3 format stores state.signingPubkeyHex
+    const strongholdRaw = localStorage.getItem('stronghold:llamenos:llamenos-encrypted-device-keys')
+    const fallbackRaw = localStorage.getItem('llamenos:llamenos-encrypted-device-keys')
+    const raw = strongholdRaw || fallbackRaw
+    if (!raw) return null
+    let parsed = JSON.parse(raw)
+    // Stronghold mock stores as number[] (TextEncoder output) — decode if needed
+    if (Array.isArray(parsed)) {
+      parsed = JSON.parse(new TextDecoder().decode(new Uint8Array(parsed)))
+    }
     return parsed.state?.signingPubkeyHex || parsed.pubkey
   })
   expect(stored).toBeTruthy()
@@ -178,9 +181,8 @@ Then('the npub should be stored for locked display', async ({ page }) => {
   // npub is derived from pubkey — just verify a key exists with state info
   const stored = await page.evaluate(() => {
     return (
-      localStorage.getItem('tauri-store:keys.json:llamenos-encrypted-device-keys') !== null ||
-      localStorage.getItem('llamenos:llamenos-encrypted-device-keys') !== null ||
-      localStorage.getItem('llamenos-encrypted-key') !== null
+      localStorage.getItem('stronghold:llamenos:llamenos-encrypted-device-keys') !== null ||
+      localStorage.getItem('llamenos:llamenos-encrypted-device-keys') !== null
     )
   })
   expect(stored).toBe(true)

@@ -54,14 +54,27 @@ export type CustomFieldDefinition = z.infer<typeof customFieldDefinitionSchema>
 
 // --- Response schemas ---
 
+export const roleEnvelopeSchema = z.object({
+  adminPubkey: z.string(),
+  encryptedName: z.string(),
+  encryptedDescription: z.string(),
+})
+
+export type RoleEnvelope = z.infer<typeof roleEnvelopeSchema>
+
 export const roleResponseSchema = z.object({
   id: z.string(),
-  name: z.string(),
+  /** null for non-system roles — plaintext name stored only in encrypted envelopes */
+  name: z.string().nullable(),
   slug: z.string(),
   permissions: z.array(z.string()),
   isDefault: z.boolean(),
   isSystem: z.boolean(),
   description: z.string(),
+  encryptedName: z.string().nullable().optional(),
+  encryptedDescription: z.string().nullable().optional(),
+  envelopes: z.array(roleEnvelopeSchema).optional(),
+  assignedUserCount: z.number().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 })
@@ -181,16 +194,24 @@ export const telephonyProviderSchema = z.looseObject({
 })
 
 export const createRoleSchema = z.looseObject({
+  id: z.string().optional(),
   name: z.string().min(1).max(100),
   slug: z.string().regex(/^[a-z0-9-]+$/, 'Slug must be lowercase alphanumeric with hyphens'),
   permissions: z.array(z.string()),
   description: z.string().min(1).max(500),
+  encryptedName: z.string().optional(),
+  encryptedDescription: z.string().optional(),
+  envelopes: z.array(roleEnvelopeSchema).optional(),
 })
 
 export const updateRoleSchema = z.looseObject({
   name: z.string().min(1).max(100).optional(),
   description: z.string().max(500).optional(),
   permissions: z.array(z.string()).optional(),
+})
+
+export const addRoleEnvelopesSchema = z.looseObject({
+  envelopes: z.array(roleEnvelopeSchema).min(1),
 })
 
 export const webauthnSettingsSchema = z.looseObject({

@@ -191,9 +191,23 @@ export const PERMISSION_CATALOG = {
   'system:manage-hubs': 'Create/manage hubs',
   'system:create-hub': 'Create new hubs (self-serve hub creation)',
   'system:manage-instance': 'Instance-level settings',
+  // System (new — platform nav gating)
+  'system:view-platform': 'View platform settings',
+  'system:view-bans': 'View platform-wide ban list',
+  'system:view-audit': 'View platform-wide audit log',
+  'system:view-analytics': 'View platform-wide analytics',
+  'system:view-health': 'View platform health status',
 } as const
 
 export type Permission = keyof typeof PERMISSION_CATALOG
+
+/** Human-readable labels for permission domains, used in the permission picker UI. */
+/** Permission group domain keys. Display labels live in i18n at permissions.groups.* */
+export const PERMISSION_GROUP_DOMAINS = [
+  'audit', 'bans', 'blasts', 'calls', 'cases', 'contacts', 'conversations',
+  'events', 'evidence', 'files', 'firehose', 'hubs', 'invites', 'messaging',
+  'metrics', 'notes', 'reports', 'settings', 'shifts', 'system', 'telephony', 'users',
+] as const
 
 /** All permission domains (first part before the colon) */
 export type PermissionDomain = Permission extends `${infer D}:${string}` ? D : never
@@ -213,12 +227,17 @@ export function getPermissionsByDomain(): Record<string, { key: Permission; labe
 
 export interface Role {
   id: string
-  name: string
+  /** null for non-system roles — plaintext name stored only in encrypted envelopes */
+  name: string | null
   slug: string
   permissions: string[]
   isDefault: boolean   // ships with system
   isSystem: boolean    // can't be modified at all (super-admin)
   description: string
+  encryptedName?: string | null
+  encryptedDescription?: string | null
+  envelopes?: Array<{ adminPubkey: string; encryptedName: string; encryptedDescription: string }>
+  assignedUserCount?: number
   createdAt: string
   updatedAt: string
 }
