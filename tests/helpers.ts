@@ -1,5 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { type Page, type APIRequestContext, expect } from '@playwright/test'
-import { TestIds, navTestIdMap } from './test-ids'
+import { TestIds } from './test-ids'
 
 export const ADMIN_SEED = 'f54a5851e9372b87810a8e60cdd2e7cfd80b6e31c7af18188f7db106ceda8be7'
 /** @deprecated Use ADMIN_SEED */

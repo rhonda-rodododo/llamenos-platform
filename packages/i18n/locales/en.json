@@ -189,7 +189,22 @@
     "users": "Volunteers",
     "schemaBrowser": "Schema Browser",
     "providerSetup": "Provider Setup",
-    "signalRegistration": "Signal Registration"
+    "signalRegistration": "Signal Registration",
+    "devices": {
+      "title": "Device Overview",
+      "devices": "devices",
+      "verified": "Verified",
+      "unverified": "Unverified",
+      "verify": "Verify",
+      "verifyTitle": "Verify {{name}}",
+      "verifyDescription": "Compare the emojis below with the device owner. Both parties must see the same 7 emojis.",
+      "verifyInstruction": "Read these emojis aloud to the device owner and confirm they see the same sequence.",
+      "nonce": "Session nonce",
+      "newNonce": "New nonce",
+      "noMatch": "No match",
+      "match": "Emojis match",
+      "verifySuccess": "Device verified successfully"
+    }
   },
   "announcement": "Announcement",
   "announcementBody": "Announcement body",
@@ -1052,7 +1067,7 @@
     "hideAdvanced": "Hide Advanced",
     "showAdvanced": "Show Advanced",
     "saved": "Saved",
-    "loadMore": "Load more"
+    "loadMore": "Load More"
   },
   "confirm": {
     "backup": "Confirm Backup",
@@ -1799,7 +1814,8 @@
     "settings": "Settings",
     "shifts": "Shifts",
     "triage": "Triage",
-    "users": "Volunteers"
+    "users": "Volunteers",
+    "security": "Security"
   },
   "navigation": {
     "back": "Back"
@@ -2075,7 +2091,7 @@
     "decrypt": "Decrypt",
     "decryptBackup": "Decrypt backup file",
     "enterRecoveryKey": "Enter your recovery key",
-    "options": "Recovery options",
+    "options": "Recovery Options",
     "title": "Account Recovery"
   },
   "report": {
@@ -2235,16 +2251,16 @@
     "system": "System",
     "default": "Default",
     "allPermissions": "All permissions",
-    "permissionCount": "{{count}} permissions",
+    "permissionCount": "permissions",
     "permissionCountOne": "1 permission",
     "assignedUsers": "{{count}} users",
-    "assignedUsersOne": "1 user",
-    "name": "Role name",
-    "namePlaceholder": "e.g. Intake Coordinator",
+    "assignedUsersOne": "{{count}} user",
+    "name": "Name",
+    "namePlaceholder": "e.g. Team Lead",
     "slug": "Slug",
-    "slugPlaceholder": "e.g. intake-coordinator",
-    "description": "Description",
-    "descriptionPlaceholder": "Brief description of this role's purpose",
+    "slugPlaceholder": "e.g. team-lead",
+    "description": "Define roles and assign permissions to control access across your hotline.",
+    "descriptionPlaceholder": "Brief description of this role...",
     "permissions": "Permissions",
     "create": "Create role",
     "importFromTemplate": "Import from template",
@@ -2257,7 +2273,18 @@
     "deleteConfirm": {
       "title": "Delete role",
       "description": "Are you sure you want to delete \"{{name}}\"? Users assigned this role will lose its permissions."
-    }
+    },
+    "createRole": "Create Role",
+    "created": "Role created",
+    "deleteTitle": "Delete Role",
+    "deleted": "Role deleted",
+    "descriptionLabel": "Description",
+    "editRole": "Edit Role",
+    "locked": "Locked",
+    "selected": "selected",
+    "summary": "Summary",
+    "title": "Roles & Permissions",
+    "updated": "Role updated"
   },
   "permissions": {
     "toggleAll": "Toggle all {{domain}} permissions",
@@ -3602,6 +3629,73 @@
       "7days": "7 Days",
       "30days": "30 Days",
       "custom": "Custom"
+    }
+  },
+  "security": {
+    "tabs": {
+      "devices": "Devices",
+      "sessions": "Sessions",
+      "passkeys": "Passkeys",
+      "history": "History"
+    },
+    "devices": {
+      "title": "Your Devices",
+      "limit": "devices",
+      "current": "This device",
+      "lastSeen": "Last seen",
+      "revokeTitle": "Remove device",
+      "revokeDescription": "Remove {{name}}? It will lose access to all encrypted content.",
+      "revokeConfirm": "Remove device"
+    },
+    "sessions": {
+      "title": "Active Sessions",
+      "current": "Current session",
+      "unknown": "Unknown device",
+      "created": "Created",
+      "expires": "Expires",
+      "endOthers": "End all other sessions",
+      "endOthersTitle": "End all other sessions?",
+      "endOthersDescription": "This will sign out {{count}} other sessions.",
+      "endOthersConfirm": "End sessions",
+      "lockdown": "Emergency lockdown"
+    },
+    "passkeys": {
+      "title": "Passkeys",
+      "register": "Add passkey",
+      "unnamed": "Unnamed passkey",
+      "backedUp": "Backed up",
+      "lastUsed": "Last used"
+    },
+    "history": {
+      "title": "Security History",
+      "export": "Export JSON",
+      "events": {
+        "deviceRegister": "Device registered",
+        "deviceRemove": "Device removed",
+        "deviceRename": "Device renamed",
+        "sessionCreate": "Session created",
+        "sessionTerminate": "Session terminated",
+        "sessionTerminateAll": "All sessions terminated",
+        "accountLockdown": "Account locked down",
+        "accountLockdownComplete": "Lockdown completed",
+        "webauthnRegister": "Passkey registered",
+        "webauthnAuthenticate": "Passkey authenticated",
+        "webauthnRemove": "Passkey removed",
+        "sigchainAppend": "Sigchain updated",
+        "pukRotate": "PUK rotated",
+        "hubKeyRotate": "Hub key rotated",
+        "deviceFingerprintVerified": "Device verified",
+        "passkeyRename": "Passkey renamed",
+        "loginFailed": "Login failed"
+      }
+    },
+    "lockdown": {
+      "title": "Emergency Lockdown",
+      "description": "This will terminate all other sessions and trigger key rotation for all your hubs.",
+      "warning": "This action cannot be undone. All other devices will be signed out immediately.",
+      "inProgress": "Terminating sessions and rotating keys...",
+      "complete": "Lockdown complete. {{sessions}} sessions terminated, {{hubs}} hub keys queued for rotation.",
+      "confirm": "Lock down now"
     }
   }
 }

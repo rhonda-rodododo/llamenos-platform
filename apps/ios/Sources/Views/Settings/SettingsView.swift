@@ -130,6 +130,12 @@ struct SettingsView: View {
                     PanicWipeConfirmationView()
                 case "reports":
                     ReportsView()
+                case "security-devices":
+                    DeviceListView()
+                case "security-sessions":
+                    SessionListView()
+                case "security-history":
+                    SecurityEventsView()
                 default:
                     EmptyView()
                 }
@@ -266,6 +272,40 @@ struct SettingsView: View {
                 }
                 .accessibilityIdentifier("settings-admin-link")
             }
+
+            // EP02: Security sub-pages
+            NavigationLink(value: "security-devices") {
+                Label {
+                    Text("Devices")
+                        .foregroundStyle(.primary)
+                } icon: {
+                    Image(systemName: "iphone")
+                        .foregroundStyle(Color.brandPrimary)
+                }
+            }
+            .accessibilityIdentifier("settings-security-devices-link")
+
+            NavigationLink(value: "security-sessions") {
+                Label {
+                    Text("Sessions")
+                        .foregroundStyle(.primary)
+                } icon: {
+                    Image(systemName: "key.fill")
+                        .foregroundStyle(Color.brandPrimary)
+                }
+            }
+            .accessibilityIdentifier("settings-security-sessions-link")
+
+            NavigationLink(value: "security-history") {
+                Label {
+                    Text("Security History")
+                        .foregroundStyle(.primary)
+                } icon: {
+                    Image(systemName: "clock.fill")
+                        .foregroundStyle(Color.brandPrimary)
+                }
+            }
+            .accessibilityIdentifier("settings-security-history-link")
 
             NavigationLink(value: "diagnostics") {
                 Label {

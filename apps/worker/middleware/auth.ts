@@ -15,6 +15,13 @@ export const auth = createMiddleware<AppEnv>(async (c, next) => {
 
   let authResult = await authenticateRequest(c.req.raw, services.identity)
 
+  // Store session token if session-based auth was used
+  const authHeader = c.req.header('Authorization') ?? null
+  const sessionToken = parseSessionHeader(authHeader)
+  if (sessionToken) {
+    c.set('sessionToken', sessionToken)
+  }
+
   // Dev-mode signature bypass: when ENVIRONMENT=development and Schnorr verification
   // fails, fall back to pubkey-only auth for REGISTERED volunteers only.
   // This handles mobile E2E tests where the Rust native crypto library may produce

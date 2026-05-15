@@ -197,6 +197,20 @@
       "when": 1778817329558,
       "tag": "0027_blast-delivery-unique",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1778651799744,
+      "tag": "0028_mute_black_panther",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1778694298835,
+      "tag": "0029_workable_kingpin",
+      "breakpoints": true
     }
   ]
 }

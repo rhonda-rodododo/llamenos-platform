@@ -52,6 +52,7 @@ import {
   Calendar,
   Inbox,
   Radio,
+  Shield,
   BarChart3,
 } from 'lucide-react'
 
@@ -340,6 +341,7 @@ function AuthenticatedLayout() {
               {isAdmin && (
                 <NavLink to="/calls" icon={<PhoneIncoming className="h-4 w-4" />}>{t('nav.callHistory')}</NavLink>
               )}
+              <NavLink to="/security" icon={<Shield className="h-4 w-4" />}>{t('nav.security')}</NavLink>
               <NavLink to="/settings" icon={<Settings className="h-4 w-4" />}>{t('nav.settings')}</NavLink>
             </>
           )}

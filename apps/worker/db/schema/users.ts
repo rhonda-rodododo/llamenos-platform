@@ -66,6 +66,9 @@ export const users = pgTable('users', {
 export const sessions = pgTable(
   'sessions',
   {
+    id: text('id')
+      .notNull()
+      .$defaultFn(() => crypto.randomUUID()),
     token: text('token').primaryKey(),
     pubkey: text('pubkey')
       .notNull()
@@ -167,6 +170,11 @@ export const devices = pgTable(
       .notNull()
       .defaultNow(),
     lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
+    deviceName: text('device_name'),
+    deviceModel: text('device_model'),
+    osVersion: text('os_version'),
+    appVersion: text('app_version'),
+    lastIpHash: text('last_ip_hash'),
   },
   (table) => [index('devices_pubkey_idx').on(table.pubkey)],
 )

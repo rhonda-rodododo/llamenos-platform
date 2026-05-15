@@ -296,6 +296,11 @@ pub const LABEL_PLATFORM_ROLE_DESC_ENCRYPT: &str = "llamenos:platform-role-desc-
 /// Hub role encryption (hub key symmetric encryption)
 pub const LABEL_HUB_ROLE_ENCRYPT: &str = "llamenos:hub-role-encrypt:v1";
 
+// --- SAS Derivation (EP02) ---
+
+/// Domain separation for SAS emoji derivation (device verification ceremony)
+pub const LABEL_SAS_DERIVE: &str = "llamenos:sas-derive:v1";
+
 // =============================================================================
 // LABEL REGISTRY — maps numeric IDs (u8) to label strings.
 //
@@ -309,6 +314,7 @@ pub const LABEL_HUB_ROLE_ENCRYPT: &str = "llamenos:hub-role-encrypt:v1";
 // Indices 69-72: EP08 Account Lifecycle
 // Indices 73-76: Recovery Group (EP09-P1)
 // Indices 77-79: Role Encryption (EP01)
+// Index 80: EP02 Device Identity
 // =============================================================================
 
 pub const LABEL_REGISTRY: &[&str] = &[
@@ -415,6 +421,8 @@ pub const LABEL_REGISTRY: &[&str] = &[
     LABEL_PLATFORM_ROLE_NAME_ENCRYPT, // 77
     LABEL_PLATFORM_ROLE_DESC_ENCRYPT, // 78
     LABEL_HUB_ROLE_ENCRYPT,           // 79
+    // 80: EP02 Device Identity
+    LABEL_SAS_DERIVE, // 80
 ];
 
 /// Look up a label string by its numeric ID.
@@ -555,6 +563,7 @@ mod tests {
             "llamenos:platform-role-desc-encrypt:v1"
         );
         assert_eq!(LABEL_HUB_ROLE_ENCRYPT, "llamenos:hub-role-encrypt:v1");
+        assert_eq!(LABEL_SAS_DERIVE, "llamenos:sas-derive:v1");
     }
 
     /// Verify registry index stability.
@@ -597,6 +606,7 @@ mod tests {
         assert_eq!(id_to_label(77), Some(LABEL_PLATFORM_ROLE_NAME_ENCRYPT));
         assert_eq!(id_to_label(78), Some(LABEL_PLATFORM_ROLE_DESC_ENCRYPT));
         assert_eq!(id_to_label(79), Some(LABEL_HUB_ROLE_ENCRYPT));
+        assert_eq!(id_to_label(80), Some(LABEL_SAS_DERIVE));
     }
 
     /// Verify bidirectional lookup (skipping tombstoned indices).

@@ -31,10 +31,15 @@ import { Route as CallsRouteImport } from './routes/calls'
 import { Route as BlastsRouteImport } from './routes/blasts'
 import { Route as BansRouteImport } from './routes/bans'
 import { Route as AuditRouteImport } from './routes/audit'
+import { Route as SecurityRouteRouteImport } from './routes/security/route'
 import { Route as AdminRouteRouteImport } from './routes/admin/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SecurityIndexRouteImport } from './routes/security/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as UsersPubkeyRouteImport } from './routes/users_.$pubkey'
+import { Route as SecuritySessionsRouteImport } from './routes/security/sessions'
+import { Route as SecurityPasskeysRouteImport } from './routes/security/passkeys'
+import { Route as SecurityHistoryRouteImport } from './routes/security/history'
 import { Route as AdminSystemRouteImport } from './routes/admin/system'
 import { Route as AdminSettingsRouteImport } from './routes/admin/settings'
 import { Route as AdminPlatformAnalyticsRouteImport } from './routes/admin/platform-analytics'
@@ -158,6 +163,11 @@ const AuditRoute = AuditRouteImport.update({
   path: '/audit',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SecurityRouteRoute = SecurityRouteRouteImport.update({
+  id: '/security',
+  path: '/security',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminRouteRoute = AdminRouteRouteImport.update({
   id: '/admin',
   path: '/admin',
@@ -168,6 +178,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SecurityIndexRoute = SecurityIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => SecurityRouteRoute,
+} as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -177,6 +192,21 @@ const UsersPubkeyRoute = UsersPubkeyRouteImport.update({
   id: '/users_/$pubkey',
   path: '/users/$pubkey',
   getParentRoute: () => rootRouteImport,
+} as any)
+const SecuritySessionsRoute = SecuritySessionsRouteImport.update({
+  id: '/sessions',
+  path: '/sessions',
+  getParentRoute: () => SecurityRouteRoute,
+} as any)
+const SecurityPasskeysRoute = SecurityPasskeysRouteImport.update({
+  id: '/passkeys',
+  path: '/passkeys',
+  getParentRoute: () => SecurityRouteRoute,
+} as any)
+const SecurityHistoryRoute = SecurityHistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
+  getParentRoute: () => SecurityRouteRoute,
 } as any)
 const AdminSystemRoute = AdminSystemRouteImport.update({
   id: '/system',
@@ -243,6 +273,7 @@ const AdminSectionRoute = AdminSectionRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteRouteWithChildren
+  '/security': typeof SecurityRouteRouteWithChildren
   '/audit': typeof AuditRoute
   '/bans': typeof BansRoute
   '/blasts': typeof BlastsRoute
@@ -277,8 +308,12 @@ export interface FileRoutesByFullPath {
   '/admin/platform-analytics': typeof AdminPlatformAnalyticsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/system': typeof AdminSystemRoute
+  '/security/history': typeof SecurityHistoryRoute
+  '/security/passkeys': typeof SecurityPasskeysRoute
+  '/security/sessions': typeof SecuritySessionsRoute
   '/users/$pubkey': typeof UsersPubkeyRoute
   '/admin/': typeof AdminIndexRoute
+  '/security/': typeof SecurityIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -316,13 +351,18 @@ export interface FileRoutesByTo {
   '/admin/platform-analytics': typeof AdminPlatformAnalyticsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/system': typeof AdminSystemRoute
+  '/security/history': typeof SecurityHistoryRoute
+  '/security/passkeys': typeof SecurityPasskeysRoute
+  '/security/sessions': typeof SecuritySessionsRoute
   '/users/$pubkey': typeof UsersPubkeyRoute
   '/admin': typeof AdminIndexRoute
+  '/security': typeof SecurityIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteRouteWithChildren
+  '/security': typeof SecurityRouteRouteWithChildren
   '/audit': typeof AuditRoute
   '/bans': typeof BansRoute
   '/blasts': typeof BlastsRoute
@@ -357,14 +397,19 @@ export interface FileRoutesById {
   '/admin/platform-analytics': typeof AdminPlatformAnalyticsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/system': typeof AdminSystemRoute
+  '/security/history': typeof SecurityHistoryRoute
+  '/security/passkeys': typeof SecurityPasskeysRoute
+  '/security/sessions': typeof SecuritySessionsRoute
   '/users_/$pubkey': typeof UsersPubkeyRoute
   '/admin/': typeof AdminIndexRoute
+  '/security/': typeof SecurityIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/admin'
+    | '/security'
     | '/audit'
     | '/bans'
     | '/blasts'
@@ -399,8 +444,12 @@ export interface FileRouteTypes {
     | '/admin/platform-analytics'
     | '/admin/settings'
     | '/admin/system'
+    | '/security/history'
+    | '/security/passkeys'
+    | '/security/sessions'
     | '/users/$pubkey'
     | '/admin/'
+    | '/security/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -438,12 +487,17 @@ export interface FileRouteTypes {
     | '/admin/platform-analytics'
     | '/admin/settings'
     | '/admin/system'
+    | '/security/history'
+    | '/security/passkeys'
+    | '/security/sessions'
     | '/users/$pubkey'
     | '/admin'
+    | '/security'
   id:
     | '__root__'
     | '/'
     | '/admin'
+    | '/security'
     | '/audit'
     | '/bans'
     | '/blasts'
@@ -478,13 +532,18 @@ export interface FileRouteTypes {
     | '/admin/platform-analytics'
     | '/admin/settings'
     | '/admin/system'
+    | '/security/history'
+    | '/security/passkeys'
+    | '/security/sessions'
     | '/users_/$pubkey'
     | '/admin/'
+    | '/security/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRouteRoute: typeof AdminRouteRouteWithChildren
+  SecurityRouteRoute: typeof SecurityRouteRouteWithChildren
   AuditRoute: typeof AuditRoute
   BansRoute: typeof BansRoute
   BlastsRoute: typeof BlastsRoute
@@ -666,6 +725,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuditRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/security': {
+      id: '/security'
+      path: '/security'
+      fullPath: '/security'
+      preLoaderRoute: typeof SecurityRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin': {
       id: '/admin'
       path: '/admin'
@@ -680,6 +746,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/security/': {
+      id: '/security/'
+      path: '/'
+      fullPath: '/security/'
+      preLoaderRoute: typeof SecurityIndexRouteImport
+      parentRoute: typeof SecurityRouteRoute
+    }
     '/admin/': {
       id: '/admin/'
       path: '/'
@@ -693,6 +766,27 @@ declare module '@tanstack/react-router' {
       fullPath: '/users/$pubkey'
       preLoaderRoute: typeof UsersPubkeyRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/security/sessions': {
+      id: '/security/sessions'
+      path: '/sessions'
+      fullPath: '/security/sessions'
+      preLoaderRoute: typeof SecuritySessionsRouteImport
+      parentRoute: typeof SecurityRouteRoute
+    }
+    '/security/passkeys': {
+      id: '/security/passkeys'
+      path: '/passkeys'
+      fullPath: '/security/passkeys'
+      preLoaderRoute: typeof SecurityPasskeysRouteImport
+      parentRoute: typeof SecurityRouteRoute
+    }
+    '/security/history': {
+      id: '/security/history'
+      path: '/history'
+      fullPath: '/security/history'
+      preLoaderRoute: typeof SecurityHistoryRouteImport
+      parentRoute: typeof SecurityRouteRoute
     }
     '/admin/system': {
       id: '/admin/system'
@@ -817,9 +911,28 @@ const AdminRouteRouteWithChildren = AdminRouteRoute._addFileChildren(
   AdminRouteRouteChildren,
 )
 
+interface SecurityRouteRouteChildren {
+  SecurityHistoryRoute: typeof SecurityHistoryRoute
+  SecurityPasskeysRoute: typeof SecurityPasskeysRoute
+  SecuritySessionsRoute: typeof SecuritySessionsRoute
+  SecurityIndexRoute: typeof SecurityIndexRoute
+}
+
+const SecurityRouteRouteChildren: SecurityRouteRouteChildren = {
+  SecurityHistoryRoute: SecurityHistoryRoute,
+  SecurityPasskeysRoute: SecurityPasskeysRoute,
+  SecuritySessionsRoute: SecuritySessionsRoute,
+  SecurityIndexRoute: SecurityIndexRoute,
+}
+
+const SecurityRouteRouteWithChildren = SecurityRouteRoute._addFileChildren(
+  SecurityRouteRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRouteRoute: AdminRouteRouteWithChildren,
+  SecurityRouteRoute: SecurityRouteRouteWithChildren,
   AuditRoute: AuditRoute,
   BansRoute: BansRoute,
   BlastsRoute: BlastsRoute,

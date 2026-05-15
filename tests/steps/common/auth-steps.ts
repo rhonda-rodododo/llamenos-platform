@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /**
  * Common authentication step definitions shared across features.
  * Reuses existing helpers from tests/helpers.ts.
