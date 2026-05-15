@@ -9,7 +9,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import org.llamenos.i18n.I18n
+import androidx.compose.ui.res.stringResource
+import org.llamenos.hotline.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,18 +32,18 @@ fun RcsChannelConfigScreen(
         }
     }
 
-    Scaffold(topBar = { TopAppBar(title = { Text(I18n.channels_rcs_title) }) }) { padding ->
+    Scaffold(topBar = { TopAppBar(title = { Text(stringResource(R.string.channels_rcs_title)) }) }) { padding ->
         Column(modifier = Modifier.padding(padding).padding(16.dp).verticalScroll(rememberScrollState())) {
-            OutlinedTextField(value = agentId, onValueChange = { agentId = it }, label = { Text(I18n.channels_rcs_agentId) }, modifier = Modifier.fillMaxWidth().testTag("rcs-agent-id"))
+            OutlinedTextField(value = agentId, onValueChange = { agentId = it }, label = { Text(stringResource(R.string.channels_rcs_agent_id)) }, modifier = Modifier.fillMaxWidth().testTag("rcs-agent-id"))
             Spacer(Modifier.height(8.dp))
-            OutlinedTextField(value = serviceAccountKey, onValueChange = { serviceAccountKey = it }, label = { Text(I18n.channels_rcs_serviceAccountKey) }, modifier = Modifier.fillMaxWidth().testTag("rcs-service-key"), minLines = 4)
+            OutlinedTextField(value = serviceAccountKey, onValueChange = { serviceAccountKey = it }, label = { Text(stringResource(R.string.channels_rcs_service_account_key)) }, modifier = Modifier.fillMaxWidth().testTag("rcs-service-key"), minLines = 4)
             Spacer(Modifier.height(8.dp))
-            OutlinedTextField(value = webhookSecret, onValueChange = { webhookSecret = it }, label = { Text(I18n.channels_rcs_webhookSecret) }, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(value = webhookSecret, onValueChange = { webhookSecret = it }, label = { Text(stringResource(R.string.channels_rcs_webhook_secret)) }, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(16.dp))
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(I18n.channels_rcs_fallbackToSms, style = MaterialTheme.typography.bodyMedium)
-                    Text(I18n.channels_rcs_fallbackToSmsDesc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.channels_rcs_fallback_to_sms), style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(R.string.channels_rcs_fallback_to_sms_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Switch(checked = fallbackToSms, onCheckedChange = { fallbackToSms = it })
             }
@@ -53,7 +54,7 @@ fun RcsChannelConfigScreen(
             Spacer(Modifier.height(16.dp))
             Button(onClick = {
                 viewModel.updateConfig(mapOf("rcs" to mapOf("agentId" to agentId, "serviceAccountKey" to serviceAccountKey, "webhookSecret" to webhookSecret, "fallbackToSms" to fallbackToSms, "autoResponse" to autoResponse, "afterHoursResponse" to afterHoursResponse)))
-            }, enabled = agentId.isNotEmpty(), modifier = Modifier.fillMaxWidth().testTag("rcs-save-btn")) { Text(I18n.common_save) }
+            }, enabled = agentId.isNotEmpty(), modifier = Modifier.fillMaxWidth().testTag("rcs-save-btn")) { Text(stringResource(R.string.common_save)) }
         }
     }
 }

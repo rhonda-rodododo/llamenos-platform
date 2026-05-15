@@ -1,11 +1,11 @@
 package org.llamenos.hotline.model
 
 import org.llamenos.protocol.ActiveCallsResponseCall
-import org.llamenos.protocol.BanResponse
+import org.llamenos.protocol.BanListResponseBan
 import org.llamenos.protocol.CallHistoryResponseCall
 import org.llamenos.protocol.CallRecordResponse
 import org.llamenos.protocol.Calls
-import org.llamenos.protocol.Entry
+import org.llamenos.protocol.AuditListResponseEntry
 import org.llamenos.protocol.HubResponse
 import org.llamenos.protocol.Invite
 import org.llamenos.protocol.Server
@@ -39,32 +39,32 @@ val UserListResponseUser.role: String
 val UserListResponseUser.status: String
     get() = if (active) "active" else "inactive"
 
-// ── Ban (typealias BanEntry) ───────────────────────────────────────────────
+// ── BanListResponseBan (typealias BanEntry) ───────────────────────────────
 
-/** Use phone hash as unique key (generated Ban has no `id` field). */
-val BanResponse.id: String
+/** Use phone hash as unique key (generated BanListResponseBan has no `id` field). */
+val BanListResponseBan.id: String
     get() = phone
 
 /** The hashed identifier — maps to `phone` in the generated type. */
-val BanResponse.identifierHash: String
+val BanListResponseBan.identifierHash: String
     get() = phone
 
 /** Who created the ban — maps to `bannedBy` in the generated type. */
-val BanResponse.createdBy: String
+val BanListResponseBan.createdBy: String
     get() = bannedBy
 
 /** When the ban was created — maps to `bannedAt` in the generated type. */
-val BanResponse.createdAt: String
+val BanListResponseBan.createdAt: String
     get() = bannedAt
 
-// ── Entry (typealias AuditEntry) ───────────────────────────────────────────
+// ── AuditListResponseEntry (typealias AuditEntry) ─────────────────────────
 
 /** Timestamp — maps to `createdAt` in the generated type. */
-val Entry.timestamp: String
+val AuditListResponseEntry.timestamp: String
     get() = createdAt
 
 /** Details as a display string (generated type uses `JsonObject`). */
-val Entry.detailsString: String?
+val AuditListResponseEntry.detailsString: String?
     get() = details.takeIf { it.isNotEmpty() }?.toString()
 
 // ── Invite ─────────────────────────────────────────────────────────────────

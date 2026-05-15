@@ -9,7 +9,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import org.llamenos.i18n.I18n
+import androidx.compose.ui.res.stringResource
+import org.llamenos.hotline.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,17 +32,17 @@ fun SignalChannelConfigScreen(
         }
     }
 
-    Scaffold(topBar = { TopAppBar(title = { Text(I18n.channels_signal_title) }) }) { padding ->
+    Scaffold(topBar = { TopAppBar(title = { Text(stringResource(R.string.channels_signal_title)) }) }) { padding ->
         Column(modifier = Modifier.padding(padding).padding(16.dp).verticalScroll(rememberScrollState())) {
-            Text(I18n.channels_signal_e2eeNote, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+            Text(stringResource(R.string.channels_signal_e2ee_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.height(16.dp))
-            OutlinedTextField(value = bridgeUrl, onValueChange = { bridgeUrl = it }, label = { Text(I18n.channels_signal_bridgeUrl) }, modifier = Modifier.fillMaxWidth().testTag("signal-bridge-url"))
+            OutlinedTextField(value = bridgeUrl, onValueChange = { bridgeUrl = it }, label = { Text(stringResource(R.string.channels_signal_bridge_url)) }, modifier = Modifier.fillMaxWidth().testTag("signal-bridge-url"))
             Spacer(Modifier.height(8.dp))
-            OutlinedTextField(value = bridgeApiKey, onValueChange = { bridgeApiKey = it }, label = { Text(I18n.channels_signal_bridgeApiKey) }, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(value = bridgeApiKey, onValueChange = { bridgeApiKey = it }, label = { Text(stringResource(R.string.channels_signal_bridge_api_key)) }, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
-            OutlinedTextField(value = webhookSecret, onValueChange = { webhookSecret = it }, label = { Text(I18n.channels_signal_webhookSecret) }, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(value = webhookSecret, onValueChange = { webhookSecret = it }, label = { Text(stringResource(R.string.channels_signal_webhook_secret)) }, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
-            OutlinedTextField(value = registeredNumber, onValueChange = { registeredNumber = it }, label = { Text(I18n.channels_signal_registeredNumber) }, modifier = Modifier.fillMaxWidth().testTag("signal-registered-number"))
+            OutlinedTextField(value = registeredNumber, onValueChange = { registeredNumber = it }, label = { Text(stringResource(R.string.channels_signal_registered_number)) }, modifier = Modifier.fillMaxWidth().testTag("signal-registered-number"))
             Spacer(Modifier.height(16.dp))
             AutoResponseFields(autoResponse = autoResponse, afterHoursResponse = afterHoursResponse, onAutoResponseChange = { autoResponse = it }, onAfterHoursResponseChange = { afterHoursResponse = it }, idPrefix = "signal")
             Spacer(Modifier.height(16.dp))
@@ -49,7 +50,7 @@ fun SignalChannelConfigScreen(
             Spacer(Modifier.height(16.dp))
             Button(onClick = {
                 viewModel.updateConfig(mapOf("signal" to mapOf("bridgeUrl" to bridgeUrl, "bridgeApiKey" to bridgeApiKey, "webhookSecret" to webhookSecret, "registeredNumber" to registeredNumber, "autoResponse" to autoResponse, "afterHoursResponse" to afterHoursResponse)))
-            }, enabled = bridgeUrl.isNotEmpty(), modifier = Modifier.fillMaxWidth().testTag("signal-save-btn")) { Text(I18n.common_save) }
+            }, enabled = bridgeUrl.isNotEmpty(), modifier = Modifier.fillMaxWidth().testTag("signal-save-btn")) { Text(stringResource(R.string.common_save)) }
         }
     }
 }

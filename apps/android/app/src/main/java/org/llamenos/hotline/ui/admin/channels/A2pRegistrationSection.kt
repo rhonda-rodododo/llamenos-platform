@@ -22,8 +22,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import org.llamenos.hotline.R
 import androidx.compose.ui.unit.dp
-import org.llamenos.i18n.I18n
 
 @Composable
 fun A2pRegistrationSection(
@@ -39,11 +40,11 @@ fun A2pRegistrationSection(
     Card(modifier = modifier.fillMaxWidth()) {
         Column(modifier = Modifier.fillMaxWidth().then(Modifier.Companion.run { Modifier })) {
             Text(
-                I18n.channels_a2p_title,
+                stringResource(R.string.channels_a2p_title),
                 style = MaterialTheme.typography.titleSmall,
             )
             Text(
-                I18n.channels_a2p_description,
+                stringResource(R.string.channels_a2p_description),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -67,7 +68,7 @@ fun A2pRegistrationSection(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.width(8.dp))
-                    Text(I18n.channels_a2p_approvedMessage, style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.channels_a2p_approved_message), style = MaterialTheme.typography.bodySmall)
                 }
             } else if (brandStatus == "not_submitted" || brandStatus == "failed") {
                 Button(
@@ -75,22 +76,22 @@ fun A2pRegistrationSection(
                     modifier = Modifier.testTag("a2p-start-brand"),
                 ) {
                     Text(
-                        if (brandStatus == "failed") I18n.channels_a2p_resubmitBrand
-                        else I18n.channels_a2p_submitBrand,
+                        if (brandStatus == "failed") stringResource(R.string.channels_a2p_resubmit_brand)
+                        else stringResource(R.string.channels_a2p_submit_brand),
                     )
                 }
                 Spacer(Modifier.height(8.dp))
                 TextButton(
                     onClick = { viewModel.skipA2p(registration?.hubId ?: "") },
-                ) { Text(I18n.channels_a2p_skip) }
+                ) { Text(stringResource(R.string.channels_a2p_skip)) }
             } else if (brandStatus == "approved" && (campaignStatus == "not_submitted" || campaignStatus == "failed")) {
                 Button(
                     onClick = { },
                     modifier = Modifier.testTag("a2p-start-campaign"),
                 ) {
                     Text(
-                        if (campaignStatus == "failed") I18n.channels_a2p_resubmitCampaign
-                        else I18n.channels_a2p_submitCampaign,
+                        if (campaignStatus == "failed") stringResource(R.string.channels_a2p_resubmit_campaign)
+                        else stringResource(R.string.channels_a2p_submit_campaign),
                     )
                 }
             }

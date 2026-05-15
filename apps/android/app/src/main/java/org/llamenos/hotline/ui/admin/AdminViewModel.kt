@@ -42,6 +42,8 @@ import org.llamenos.hotline.model.UpdateCustomFieldsRequest
 import org.llamenos.hotline.model.User
 import org.llamenos.hotline.model.UsersListResponse
 import org.llamenos.hotline.model.displayName
+import org.llamenos.hotline.model.id
+import org.llamenos.hotline.model.identifierHash
 import javax.inject.Inject
 
 /**
@@ -1123,17 +1125,17 @@ class AdminViewModel @Inject constructor(
                 val response = apiService.request<Map<String, Any?>>(
                     "GET", "/api/erasure/requests",
                 )
-                val requests = (response["requests"] as? List<*>)?.mapNotNull { entry ->
-                    entry as? Map<String, Any?>
+                val requests = (response["requests"] as? List<*>)?.mapNotNull { rawEntry ->
+                    val entry = rawEntry as? Map<*, *> ?: return@mapNotNull null
                     ErasureRequestEntry(
-                        id = entry?.get("id") as? String ?: "",
-                        userId = entry?.get("userId") as? String ?: "",
-                        status = entry?.get("status") as? String ?: "",
-                        requestedAt = entry?.get("requestedAt") as? String,
-                        executeAt = entry?.get("executeAt") as? String,
-                        requestedBy = entry?.get("requestedBy") as? String,
-                        justification = entry?.get("justification") as? String,
-                        emergencyOverride = entry?.get("emergencyOverride") as? Boolean ?: false,
+                        id = entry["id"] as? String ?: "",
+                        userId = entry["userId"] as? String ?: "",
+                        status = entry["status"] as? String ?: "",
+                        requestedAt = entry["requestedAt"] as? String,
+                        executeAt = entry["executeAt"] as? String,
+                        requestedBy = entry["requestedBy"] as? String,
+                        justification = entry["justification"] as? String,
+                        emergencyOverride = entry["emergencyOverride"] as? Boolean ?: false,
                     )
                 } ?: emptyList()
                 _uiState.update {
@@ -1224,12 +1226,12 @@ class AdminViewModel @Inject constructor(
                 val response = apiService.request<Map<String, Any?>>(
                     "GET", "/api/retention",
                 )
-                val categories = (response["categories"] as? List<*>)?.mapNotNull { entry ->
-                    entry as? Map<String, Any?>
+                val categories = (response["categories"] as? List<*>)?.mapNotNull { rawEntry ->
+                    val entry = rawEntry as? Map<*, *> ?: return@mapNotNull null
                     RetentionCategoryEntry(
-                        category = entry?.get("category") as? String ?: "",
-                        retentionDays = (entry?.get("retentionDays") as? Number)?.toInt(),
-                        minRetentionDays = (entry?.get("minRetentionDays") as? Number)?.toInt(),
+                        category = entry["category"] as? String ?: "",
+                        retentionDays = (entry["retentionDays"] as? Number)?.toInt(),
+                        minRetentionDays = (entry["minRetentionDays"] as? Number)?.toInt(),
                     )
                 } ?: emptyList()
                 _uiState.update {
