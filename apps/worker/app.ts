@@ -51,6 +51,7 @@ import signalNotificationRoutes from './routes/signal-notification'
 import providerSetupRoutes from './routes/provider-setup'
 import providerTemplatesRoutes from './routes/provider-templates'
 import hubOnboardRoutes from './routes/hub-onboard'
+import recoveryGroupRoutes from './routes/recovery-group'
 import teamsRoutes from './routes/teams'
 import tagsRoutes from './routes/tags'
 import { hubContext } from './middleware/hub'
@@ -115,6 +116,9 @@ api.route('/invites', invitesRoutes)
 
 // Device provisioning (mixed auth — room creation is public, payload submission is authenticated)
 api.route('/provision', provisioningRoutes)
+
+// Recovery group — unauthenticated endpoints (initiate + verify)
+api.route('/recovery-group', recoveryGroupRoutes.public)
 
 // Telephony webhooks (validated by Twilio signature, not our auth)
 api.route('/telephony', telephonyRoutes)
@@ -208,6 +212,7 @@ authenticated.route('/firehose', firehoseRoutes)
 authenticated.route('/signal-notification', signalNotificationRoutes)
 authenticated.route('/provider-setup', providerSetupRoutes)
 authenticated.route('/provider-templates', providerTemplatesRoutes)
+authenticated.route('/recovery-group', recoveryGroupRoutes.authenticated)
 
 // Hub-scoped authenticated routes
 const hubScoped = new Hono<AppEnv>()
