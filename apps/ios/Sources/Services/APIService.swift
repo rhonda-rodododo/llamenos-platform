@@ -55,6 +55,76 @@ struct AppConfig: Decodable {
     let minApiVersion: Int
 }
 
+// MARK: - Recovery Group Response Types
+
+struct RecoveryGroupInfo: Decodable {
+    let publicKey: String
+    let threshold: Int
+    let totalShares: Int
+    let commitments: [String]
+    let sigchainLinkHash: String
+    let delayHours: Int
+    let emergencyFloorHours: Int
+    let createdAt: String
+    let rotatedAt: String?
+    let shareHolderLiveness: [ShareHolderLiveness]
+}
+
+struct ShareHolderLiveness: Decodable {
+    let holderPubkey: String
+    let lastLivenessProof: String?
+}
+
+struct RecoverySessionStatus: Decodable, Identifiable {
+    let sessionId: String
+    let hubId: String
+    let userPubkey: String
+    let newDevicePubkey: String
+    let status: String
+    let contributionCount: Int
+    let threshold: Int
+    let delayRemainingMs: Int?
+    let expiresAt: String
+    let createdAt: String
+    let contributions: [RecoveryContribution]?
+    let emergencyOverride: RecoveryEmergencyOverride?
+
+    var id: String { sessionId }
+}
+
+struct RecoveryContribution: Decodable {
+    let contributorPubkey: String
+    let encryptedShare: String
+    let contributorSignature: String
+    let contributedAt: String
+}
+
+struct RecoveryEmergencyOverride: Decodable {
+    let justification: String
+    let approverPubkey: String
+    let approverSignature: String
+}
+
+struct RecoveryInitiateResponse: Decodable {
+    let sessionId: String
+    let verificationSent: Bool
+}
+
+struct RecoveryVerifyResponse: Decodable {
+    let ok: Bool
+    let expiresAt: String
+}
+
+struct OkResponse: Decodable {
+    let ok: Bool
+}
+
+struct ContributeResponse: Decodable {
+    let ok: Bool
+    let status: String
+    let contributionCount: Int
+}
+
 // MARK: - APIService
 
 /// URLSession-based REST client for the Llamenos hub API. Injects CryptoService to
@@ -393,6 +463,66 @@ final class APIService: @unchecked Sendable {
         } catch {
             return .unknown
         }
+    }
+
+    // MARK: - Recovery Group API
+
+    func enrollRecoveryGroup(_ body: [String: Any]) async throws -> OkResponse {
+        let jsonData = try JSONSerialization.data(withJSONObject: body)
+        return try await request(method: "POST", path: hp("/api/recovery-group/enroll"), rawBody: jsonData)
+    }
+
+    func getRecoveryGroup(hubId: String) async throws -> RecoveryGroupInfo {
+        try await request(method: "GET", path: hp("/api/recovery-group/\(hubId)"))
+    }
+
+    func initiateRecovery(hubId: String, userIdentifier: String, newDevicePubkey: String) async throws -> RecoveryInitiateResponse {
+        let body: [String: String] = [
+            "hubId": hubId,
+            "userIdentifier": userIdentifier,
+            "newDevicePubkey": newDevicePubkey,
+        ]
+        return try await request(method: "POST", path: "/api/recovery-group/initiate", body: body)
+    }
+
+    func verifyRecoveryCode(sessionId: String, verificationCode: String) async throws -> RecoveryVerifyResponse {
+        let body: [String: String] = [
+            "sessionId": sessionId,
+            "verificationCode": verificationCode,
+        ]
+        return try await request(method: "POST", path: "/api/recovery-group/initiate/verify", body: body)
+    }
+
+    func getRecoverySession(sessionId: String) async throws -> RecoverySessionStatus {
+        try await request(method: "GET", path: hp("/api/recovery-group/session/\(sessionId)"))
+    }
+
+    func contributeRecoveryShare(sessionId: String, encryptedShare: String, contributorSignature: String) async throws -> ContributeResponse {
+        let body: [String: String] = [
+            "encryptedShare": encryptedShare,
+            "contributorSignature": contributorSignature,
+        ]
+        return try await request(method: "POST", path: hp("/api/recovery-group/session/\(sessionId)/contribute"), body: body)
+    }
+
+    func cancelRecoverySession(sessionId: String) async throws -> OkResponse {
+        try await request(method: "POST", path: hp("/api/recovery-group/session/\(sessionId)/cancel"))
+    }
+
+    func storeUserRecoveryEnvelope(hubId: String, envelope: String) async throws -> OkResponse {
+        let body: [String: String] = [
+            "hubId": hubId,
+            "envelope": envelope,
+        ]
+        return try await request(method: "POST", path: hp("/api/recovery-group/user-envelope"), body: body)
+    }
+
+    func submitShareLivenessProof(hubId: String, proof: String) async throws -> OkResponse {
+        let body: [String: String] = [
+            "hubId": hubId,
+            "proof": proof,
+        ]
+        return try await request(method: "POST", path: hp("/api/recovery-group/shares/liveness"), body: body)
     }
 }
 
