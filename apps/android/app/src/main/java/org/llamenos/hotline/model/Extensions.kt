@@ -5,7 +5,7 @@ import org.llamenos.protocol.Ban
 import org.llamenos.protocol.CallHistoryResponseCall
 import org.llamenos.protocol.CallRecordResponse
 import org.llamenos.protocol.Calls
-import org.llamenos.protocol.Entry
+import org.llamenos.protocol.AuditEntryResponse
 import org.llamenos.protocol.HubResponse
 import org.llamenos.protocol.Invite
 import org.llamenos.protocol.Server
@@ -57,14 +57,14 @@ val Ban.createdBy: String
 val Ban.createdAt: String
     get() = bannedAt
 
-// ── Entry (typealias AuditEntry) ───────────────────────────────────────────
+// ── AuditEntryResponse (typealias AuditEntry) ────────────────────────────
 
 /** Timestamp — maps to `createdAt` in the generated type. */
-val Entry.timestamp: String
+val AuditEntryResponse.timestamp: String
     get() = createdAt
 
 /** Details as a display string (generated type uses `JsonObject`). */
-val Entry.detailsString: String?
+val AuditEntryResponse.detailsString: String?
     get() = details.takeIf { it.isNotEmpty() }?.toString()
 
 // ── Invite ─────────────────────────────────────────────────────────────────

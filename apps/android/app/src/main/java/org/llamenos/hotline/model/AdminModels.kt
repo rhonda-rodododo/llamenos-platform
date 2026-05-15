@@ -34,7 +34,7 @@ typealias BulkBanRequest = org.llamenos.protocol.BulkBanBody
 // ---- Audit Log ----
 // Generated Entry has: id, action, actorPubkey, details (JsonObject), entryHash?, previousEntryHash?, createdAt.
 // Extension properties in Extensions.kt provide detailsString and timestamp.
-typealias AuditEntry = org.llamenos.protocol.Entry
+typealias AuditEntry = org.llamenos.protocol.AuditEntryResponse
 typealias AuditLogResponse = org.llamenos.protocol.AuditListResponse
 
 // ---- Invites ----

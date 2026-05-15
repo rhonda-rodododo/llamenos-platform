@@ -390,7 +390,7 @@ export async function createShiftViaApi(
   const userPubkeys = options?.userPubkeys ?? []
 
   const { status, data } = await apiPost<{ id: string }>(request, hubPath('/shifts', options?.hubId), {
-    id, encryptedName, startTime, endTime, days, userPubkeys,
+    id, encryptedName, startTime, endTime, days, userPubkeys, ringGroupId: null,
   })
   if (status !== 200 && status !== 201) {
     throw new Error(`Failed to create shift: ${status}`)

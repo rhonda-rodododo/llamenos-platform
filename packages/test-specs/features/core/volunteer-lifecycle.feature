@@ -28,7 +28,7 @@ Feature: Volunteer Lifecycle
     And they should see "Notes" in the navigation
     And they should see "Settings" in the navigation
     But they should not see "Volunteers" in the navigation
-    And they should not see "Shifts" in the navigation
+    And they should see "Shifts" in the navigation
     And they should not see "Ban List" in the navigation
 
   @desktop @ios @android
@@ -46,11 +46,14 @@ Feature: Volunteer Lifecycle
     Then they should see "Access Denied"
 
   @desktop @ios @android
-  Scenario: Volunteer cannot access shifts page via URL
+  Scenario: Volunteer can access shifts page with limited tabs
     Given I am logged in as an admin
     And a volunteer is logged in and on the dashboard
     When they navigate to "/shifts" via SPA
-    Then they should see "Access Denied"
+    Then they should see the "Shifts" heading
+    And they should see "Schedule"
+    And they should see "Availability"
+    But they should not see "Ring Groups"
 
   @desktop @ios @android
   Scenario: Volunteer cannot access bans page via URL
