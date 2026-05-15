@@ -6,17 +6,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
-import { Badge } from '@/components/ui/badge'
-import { MessageSquare, Copy, Loader2, CheckCircle2, XCircle } from 'lucide-react'
-import { updateMessagingConfig, testMessagingChannel, type MessagingConfig } from '@/lib/api'
-
-interface RCSChannelSectionProps {
-  config: MessagingConfig
-  onConfigChange: (config: MessagingConfig) => void
-  expanded: boolean
-  onToggle: (open: boolean) => void
-  statusSummary?: string
-}
+import { MessageSquare, Copy } from 'lucide-react'
+import { updateMessagingConfig } from '@/lib/api'
+import { ConnectionTestButton } from '@/components/channel-config/connection-test-button'
+import { AutoResponseFields } from '@/components/channel-config/auto-response-fields'
+import type { ChannelConfigProps } from '@/components/channel-config/types'
 
 export function RCSChannelSection({
   config,
@@ -24,11 +18,9 @@ export function RCSChannelSection({
   expanded,
   onToggle,
   statusSummary,
-}: RCSChannelSectionProps) {
+}: ChannelConfigProps) {
   const { t } = useTranslation()
   const { toast } = useToast()
-  const [testing, setTesting] = useState(false)
-  const [testResult, setTestResult] = useState<boolean | null>(null)
   const [saving, setSaving] = useState(false)
 
   const rcs = config.rcs || {
@@ -54,7 +46,7 @@ export function RCSChannelSection({
         ...config,
         enabledChannels: config.enabledChannels.includes('rcs')
           ? config.enabledChannels
-          : [...config.enabledChannels, 'rcs'],
+          : [...config.enabledChannels, 'rcs' as const],
         rcs: { ...rcs },
       })
       toast(t('common.success'), 'success')
@@ -62,19 +54,6 @@ export function RCSChannelSection({
       toast(t('common.error'), 'error')
     } finally {
       setSaving(false)
-    }
-  }
-
-  async function handleTest() {
-    setTesting(true)
-    setTestResult(null)
-    try {
-      const res = await testMessagingChannel('rcs')
-      setTestResult(res.connected)
-    } catch {
-      setTestResult(false)
-    } finally {
-      setTesting(false)
     }
   }
 
@@ -151,36 +130,19 @@ export function RCSChannelSection({
           />
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="rcs-auto-response">{t('rcs.autoResponse', { defaultValue: 'Auto-Response' })}</Label>
-          <Input
-            id="rcs-auto-response"
-            value={rcs.autoResponse || ''}
-            onChange={(e) => updateRcs({ autoResponse: e.target.value })}
-            placeholder={t('setup.autoResponsePlaceholder')}
-          />
-        </div>
+        <AutoResponseFields
+          autoResponse={rcs.autoResponse || ''}
+          afterHoursResponse={rcs.afterHoursResponse || ''}
+          onAutoResponseChange={(v) => updateRcs({ autoResponse: v })}
+          onAfterHoursResponseChange={(v) => updateRcs({ afterHoursResponse: v })}
+          idPrefix="rcs"
+        />
 
         <div className="flex items-center gap-2">
           <Button data-testid="form-save-btn" onClick={handleSave} disabled={saving || !rcs.agentId}>
             {saving ? t('common.loading') : t('common.save')}
           </Button>
-          <Button variant="outline" onClick={handleTest} disabled={testing || !rcs.agentId}>
-            {testing ? (
-              <><Loader2 className="h-4 w-4 animate-spin" /> {t('telephonyProvider.testing')}</>
-            ) : (
-              t('telephonyProvider.testConnection')
-            )}
-          </Button>
-          {testResult !== null && (
-            <Badge variant="outline" className={testResult ? 'text-green-600' : 'text-red-600'}>
-              {testResult ? (
-                <><CheckCircle2 className="h-3 w-3" /> {t('telephonyProvider.testSuccess')}</>
-              ) : (
-                <><XCircle className="h-3 w-3" /> {t('telephonyProvider.testFailed')}</>
-              )}
-            </Badge>
-          )}
+          <ConnectionTestButton channel="rcs" disabled={!rcs.agentId} />
         </div>
       </div>
     </SettingsSection>

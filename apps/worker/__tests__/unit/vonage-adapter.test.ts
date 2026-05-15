@@ -608,7 +608,8 @@ describe('VonageAdapter', () => {
     })
 
     it('rejects future timestamp (> 5 minutes ahead)', async () => {
-      const now = Math.floor(Date.now() / 1000) + 301
+      // Use 600s (10min) ahead to avoid flakiness from test-suite startup latency
+      const now = Math.floor(Date.now() / 1000) + 600
       const url = new URL('https://example.com/webhook')
       url.searchParams.set('timestamp', String(now))
       url.searchParams.set('foo', 'bar')

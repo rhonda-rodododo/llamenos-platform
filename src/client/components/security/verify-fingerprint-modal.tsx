@@ -31,7 +31,7 @@ export function VerifyFingerprintModal({
   const { t } = useTranslation()
   const { toast } = useToast()
   const [emojiIndices, setEmojiIndices] = useState<number[] | null>(null)
-  const [emojiTable] = useState<string[]>(SAS_EMOJI_TABLE)
+  const emojiTable = SAS_EMOJI_TABLE
   const [step, setStep] = useState<'display' | 'confirming' | 'done'>('display')
 
   useEffect(() => {
