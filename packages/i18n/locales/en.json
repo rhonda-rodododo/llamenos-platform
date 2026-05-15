@@ -1066,7 +1066,6 @@
     "comingSoon": "Coming soon",
     "hideAdvanced": "Hide Advanced",
     "showAdvanced": "Show Advanced",
-    "saved": "Saved",
     "loadMore": "Load More"
   },
   "confirm": {
@@ -2077,7 +2076,8 @@
     "serviceAccountKey": "Service Account Key (JSON)",
     "title": "RCS Channel",
     "webhookSecret": "Webhook Secret",
-    "webhookUrl": "Webhook URL"
+    "webhookUrl": "Webhook URL",
+    "agentSetup": "Agent Setup"
   },
   "recording": {
     "error": "Failed to load recording",
@@ -2873,7 +2873,8 @@
     "startRegistrationButton": "Start Registration",
     "verifyButton": "Verify",
     "unregisterButton": "Unregister",
-    "retryButton": "Retry"
+    "retryButton": "Retry",
+    "bridgeSetup": "Bridge Setup"
   },
   "spam": {
     "blockDuration": "Block duration (minutes)",
@@ -3329,7 +3330,9 @@
       "gdprErasure": "GDPR Erasure",
       "erasureConfig": "Erasure Settings",
       "erasureQueue": "Erasure Queue",
-      "retention": "Data Retention"
+      "retention": "Data Retention",
+      "platformBansNav": "Platform Bans",
+      "retentionSettings": "Data Retention"
     }
   },
   "providerSetup": {
@@ -3621,7 +3624,48 @@
       "executing": "Executing",
       "completed": "Completed",
       "failed": "Failed"
-    }
+    },
+    "requestTitle": "Request Account Erasure",
+    "requestDescription": "This will permanently delete your account and all associated data after a waiting period.",
+    "requestButton": "Request Erasure",
+    "requestConfirmTitle": "Confirm Erasure Request",
+    "requestConfirmMessage": "Your account will be permanently erased after {{hours}} hours. You can cancel during this period.",
+    "requestConfirmButton": "Confirm Request",
+    "cancelButton": "Cancel Erasure",
+    "cancelConfirmTitle": "Cancel Erasure Request",
+    "cancelConfirmMessage": "Are you sure you want to cancel your account erasure request?",
+    "cancelConfirmButton": "Yes, Cancel Erasure",
+    "statusPending": "Pending",
+    "statusScheduled": "Scheduled",
+    "statusExecuting": "Executing",
+    "statusCompleted": "Completed",
+    "statusCancelled": "Cancelled",
+    "countdownTitle": "Account Erasure Scheduled",
+    "countdownMessage": "Your account will be permanently erased in:",
+    "countdownDays": "{{count}} days",
+    "countdownHours": "{{count}} hours",
+    "countdownMinutes": "{{count}} minutes",
+    "adminQueueTitle": "Erasure Queue",
+    "adminQueueEmpty": "No pending erasure requests",
+    "adminQueueLoading": "Loading erasure requests...",
+    "adminExecuteTitle": "Immediate Erasure",
+    "adminExecuteDescription": "Permanently erase this user's account and all associated data immediately.",
+    "adminExecuteButton": "Execute Erasure",
+    "adminExecuteConfirmTitle": "Confirm Immediate Erasure",
+    "adminExecuteConfirmMessage": "This will permanently erase {{user}}'s account. This action cannot be undone.",
+    "adminJustificationLabel": "Justification (required)",
+    "adminJustificationPlaceholder": "Reason for immediate erasure",
+    "adminDeviceWipeButton": "Remote Wipe Device",
+    "adminDeviceWipeConfirm": "This will remotely wipe all data on this device. Continue?",
+    "reEncryptionProgress": "Re-encryption Progress",
+    "reEncryptionProcessed": "{{processed}} of {{total}} envelopes processed",
+    "reEncryptionComplete": "Re-encryption complete",
+    "reEncryptionFailed": "Re-encryption failed — retry available",
+    "emergencyOverrideLabel": "Emergency Override",
+    "emergencyOverrideDescription": "Requires co-approver signature. Reduces delay to 4 hours.",
+    "emergencyCoApproverLabel": "Co-approver",
+    "emergencyJustificationLabel": "Emergency justification",
+    "emergencyMinimumFloor": "Minimum delay: 4 hours (cannot be reduced)"
   },
   "retention": {
     "title": "Data Retention",
@@ -3637,7 +3681,20 @@
     "noPurge": "No purge",
     "belowFloor": "Must be at least {{min}} days (platform minimum).",
     "configuredCount": "{{count}} categories configured",
-    "noneConfigured": "No retention configured"
+    "noneConfigured": "No retention configured",
+    "categoryCallRecords": "Call Records",
+    "categoryNotes": "Notes",
+    "categoryMessages": "Messages",
+    "categoryAuditLog": "Audit Log",
+    "daysLabel": "{{count}} days",
+    "enablePurge": "Enable automatic purge",
+    "retentionDays": "Retention Period (days)",
+    "minDays": "Minimum: {{count}} days (platform floor)",
+    "saved": "Retention settings saved",
+    "platformFloorTitle": "Platform Retention Floors",
+    "platformFloorDescription": "Minimum retention periods enforced across all hubs",
+    "loading": "Loading retention settings...",
+    "belowFloorError": "Cannot set retention below platform minimum of {{count}} days"
   },
   "platformBans": {
     "title": "Platform Bans",
@@ -3663,7 +3720,20 @@
     "confirmBulkImport": "Import",
     "created": "Platform ban added.",
     "deleted": "Platform ban removed.",
-    "bulkImported": "{{count}} bans imported."
+    "bulkImported": "{{count}} bans imported.",
+    "createButton": "Create Platform Ban",
+    "promoteButton": "Promote to Platform",
+    "promoteConfirmTitle": "Promote Ban to Platform",
+    "promoteConfirmMessage": "This will apply this ban across all hubs. Continue?",
+    "searchTitle": "Search All Bans",
+    "scopeHub": "Hub",
+    "scopePlatform": "Platform",
+    "bulkImportButton": "Bulk Import",
+    "bulkImportTitle": "Bulk Import Platform Bans",
+    "bulkImportPlaceholder": "One identifier hash per line",
+    "bulkImportResult": "Imported {{count}} bans",
+    "emptyState": "No platform-scoped bans",
+    "emptyStateDescription": "Platform bans block callers across all hubs."
   },
   "platformSettings": {
     "title": "Platform Settings",
@@ -3706,7 +3776,26 @@
       "cronHour": "Purge Hour (UTC)",
       "cronHourHelp": "Hour of day (UTC) when the purge job runs (0–23).",
       "utc": "UTC"
-    }
+    },
+    "featureFlagsTitle": "Feature Flags",
+    "mlsEnabled": "MLS Group Messaging",
+    "transcriptionEnabled": "Transcription",
+    "caseManagementEnabled": "Case Management",
+    "crossHubSharingEnabled": "Cross-Hub Sharing",
+    "brandingTitle": "Branding",
+    "instanceName": "Instance Name",
+    "instanceNamePlaceholder": "e.g. Crisis Network",
+    "supportEmail": "Support Email",
+    "privacyPolicyUrl": "Privacy Policy URL",
+    "sessionPolicyTitle": "Session Policy",
+    "maxSessionDuration": "Max Session Duration (hours)",
+    "maxInactiveHours": "Max Inactive Time (hours)",
+    "erasureFloorTitle": "Erasure Policy",
+    "minDelayHours": "Minimum Erasure Delay (hours)",
+    "retentionPurgeTitle": "Retention Purge",
+    "purgeEnabled": "Purge Enabled",
+    "cronHourUtc": "Purge Hour (UTC)",
+    "saved": "Platform settings saved"
   },
   "deviceWipe": {
     "title": "Device Revoked",
@@ -3715,7 +3804,14 @@
       "device-revocation": "This device has been remotely revoked by an administrator.",
       "admin-erasure": "An administrator has initiated an erasure of your account."
     },
-    "explanation": "All cryptographic keys have been cleared from this device. Please contact support if you believe this was done in error."
+    "explanation": "All cryptographic keys have been cleared from this device. Please contact support if you believe this was done in error.",
+    "message": "Your access to this device has been revoked. All local data has been securely erased.",
+    "reasonUserErasure": "Account erasure",
+    "reasonDeviceRevocation": "Device revoked by administrator",
+    "reasonAdminErasure": "Account removed by administrator",
+    "contactAdmin": "Contact your hub administrator for assistance.",
+    "wiping": "Securely erasing local data...",
+    "wipeComplete": "All local data erased"
   },
   "teams": {
     "title": "Teams",
@@ -3868,6 +3964,121 @@
       "complete": "Lockdown complete. {{sessions}} sessions terminated, {{hubs}} hub keys queued for rotation.",
       "confirm": "Lock down now"
     }
-
+  },
+  "channels": {
+    "title": "Messaging Channels",
+    "shared": {
+      "testing": "Testing...",
+      "testConnection": "Test Connection",
+      "testSuccess": "Connected",
+      "testFailed": "Connection Failed",
+      "enableChannel": "Enable {{channel}}",
+      "autoResponse": "Auto-Response",
+      "autoResponsePlaceholder": "Automatic reply sent to first-time contacts...",
+      "autoResponseHelp": "Sent once when a new contact messages for the first time.",
+      "afterHoursResponse": "After-Hours Response",
+      "afterHoursPlaceholder": "Reply sent outside shift hours...",
+      "afterHoursHelp": "Sent when no volunteers are on shift. Leave empty to disable.",
+      "security": {
+        "none": "No encryption",
+        "provider-encrypted": "Provider encrypted",
+        "e2ee-to-bridge": "E2EE to bridge",
+        "e2ee": "End-to-end encrypted"
+      }
+    },
+    "sms": {
+      "title": "SMS Channel",
+      "description": "Text messaging via your telephony provider.",
+      "providerNote": "SMS uses your telephony provider's credentials and phone number. No separate SMS setup is required.",
+      "contentMode": "Content Mode",
+      "contentModeFull": "Full content",
+      "contentModeNotification": "Notification only",
+      "contentModeFullHelp": "SMS messages include full message text. Note: SMS has no transport encryption.",
+      "contentModeNotificationHelp": "SMS messages contain only a notification to check the app. Message content stays encrypted."
+    },
+    "whatsapp": {
+      "title": "WhatsApp Channel",
+      "description": "WhatsApp Business messaging via Twilio or direct Meta API.",
+      "integrationMode": "Integration Mode",
+      "modeTwilio": "Via Twilio",
+      "modeDirect": "Direct Meta API",
+      "modeTwilioHelp": "Uses your existing Twilio telephony provider credentials. No additional setup needed.",
+      "modeDirectHelp": "Connect directly to the Meta WhatsApp Business API. Requires a Meta developer account.",
+      "directCredentials": "Meta API Credentials",
+      "phoneNumberId": "Phone Number ID",
+      "businessAccountId": "Business Account ID",
+      "accessToken": "Access Token",
+      "verifyToken": "Verify Token",
+      "appSecret": "App Secret",
+      "twilioNote": "WhatsApp is configured through your Twilio account. Ensure WhatsApp is enabled for your Twilio number."
+    },
+    "telegram": {
+      "title": "Telegram Channel",
+      "description": "Telegram Bot messaging for inbound conversations.",
+      "botToken": "Bot Token",
+      "botTokenHelp": "Create a bot via @BotFather on Telegram and paste the token here.",
+      "botSetup": "Bot Setup",
+      "botUsername": "Bot Username",
+      "webhookUrl": "Webhook URL",
+      "webhookSecret": "Webhook Secret"
+    },
+    "a2p": {
+      "title": "A2P 10DLC Registration",
+      "description": "US carriers require A2P 10DLC registration for business SMS. Register your brand and campaign to ensure deliverability.",
+      "brandStatus": "Brand: {{status}}",
+      "campaignStatus": "Campaign: {{status}}",
+      "status": {
+        "notSubmitted": "Not submitted",
+        "pending": "Pending review",
+        "approved": "Approved",
+        "failed": "Failed",
+        "skipped": "Skipped"
+      },
+      "approved": "A2P Approved",
+      "statusSkipped": "A2P Skipped",
+      "statusFailed": "Registration Failed",
+      "statusPending": "Pending Review",
+      "statusNotSubmitted": "Not Registered",
+      "submitBrand": "Register Brand",
+      "resubmitBrand": "Re-submit Brand",
+      "submitCampaign": "Register Campaign",
+      "resubmitCampaign": "Re-submit Campaign",
+      "skip": "Skip A2P",
+      "brandSubmitted": "Brand registration submitted",
+      "brandError": "Failed to submit brand registration",
+      "campaignSubmitted": "Campaign registration submitted",
+      "campaignError": "Failed to submit campaign registration",
+      "skipped": "A2P registration skipped",
+      "approvedMessage": "A2P registration is approved. SMS messages will be sent using your registered brand and campaign.",
+      "brandSid": "Brand SID",
+      "campaignSid": "Campaign SID",
+      "brandFormTitle": "Brand Registration",
+      "campaignFormTitle": "Campaign Registration",
+      "entityType": "Entity Type",
+      "entityTypes": {
+        "PRIVATE_PROFIT": "Private for-profit",
+        "PUBLIC_PROFIT": "Public for-profit",
+        "NON_PROFIT": "Non-profit",
+        "GOVERNMENT": "Government"
+      },
+      "companyName": "Company Name",
+      "ein": "EIN / Tax ID",
+      "phone": "Phone",
+      "email": "Email",
+      "address": "Address",
+      "street": "Street Address",
+      "city": "City",
+      "state": "State",
+      "postalCode": "Postal Code",
+      "country": "Country",
+      "useCase": "Use Case",
+      "campaignDescription": "Campaign Description",
+      "helpMessage": "Help Message",
+      "optinMessage": "Opt-in Message",
+      "optoutMessage": "Opt-out Message",
+      "sampleMessages": "Sample Messages",
+      "sampleMessagePlaceholder": "Sample message {{num}}",
+      "addSampleMessage": "Add sample message"
+    }
   }
 }
