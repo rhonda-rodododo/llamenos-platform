@@ -751,15 +751,11 @@
     "submit": "Enviar",
     "success": "Éxito",
     "yes": "Sí",
-    "ok": "OK",
-    "create": "Create",
-    "all": "All",
-    "previous": "Previous",
     "comingSoon": "Coming soon",
     "hideAdvanced": "Hide Advanced",
     "showAdvanced": "Show Advanced",
     "saved": "Saved",
-"unauthorized": "Unauthorized"
+    "unauthorized": "Unauthorized"
   },
   "confirm": {
     "backup": "Confirm Backup",
@@ -3442,6 +3438,61 @@
     },
     "setupComplete": {
       "footer": "Webhook setup complete"
+    }
+  },
+  "analytics": {
+    "title": "Análisis",
+    "description": "Volumen de llamadas, tiempos de respuesta y actividad de voluntarios",
+    "nav": "Análisis",
+    "summary": {
+      "totalCalls": "Total de llamadas",
+      "answerRate": "Tasa de respuesta",
+      "avgDuration": "Duración media",
+      "totalConversations": "Total de conversaciones"
+    },
+    "callVolume": {
+      "title": "Volumen de llamadas",
+      "answered": "Respondidas",
+      "unanswered": "Sin respuesta",
+      "abandoned": "Abandonadas",
+      "noData": "Sin datos de llamadas para este período"
+    },
+    "hours": {
+      "title": "Distribución horaria",
+      "noData": "Sin datos para este período"
+    },
+    "conversations": {
+      "title": "Conversaciones",
+      "avgResponseTime": "Tiempo medio de respuesta",
+      "avgMessages": "Mensajes medios",
+      "noData": "Sin datos de conversación para este período"
+    },
+    "shifts": {
+      "title": "Cobertura de turnos",
+      "noData": "Sin datos de turnos disponibles"
+    },
+    "users": {
+      "title": "Actividad de voluntarios",
+      "name": "Nombre",
+      "callsAnswered": "Llamadas atendidas",
+      "avgDuration": "Duración media",
+      "notesCreated": "Notas creadas",
+      "noData": "Sin datos de voluntarios para este período"
+    },
+    "personal": {
+      "callsToday": "Llamadas hoy",
+      "callsThisPeriod": "Llamadas en este período",
+      "avgDuration": "Duración media",
+      "notesCreated": "Notas creadas"
+    },
+    "platform": {
+      "title": "Análisis de plataforma",
+      "crossHub": "Entre hubs"
+    },
+    "dateRange": {
+      "7days": "7 días",
+      "30days": "30 días",
+      "custom": "Personalizado"
     }
   }
 }
