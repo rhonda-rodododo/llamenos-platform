@@ -17,6 +17,7 @@ import { decryptMessage } from '@/lib/platform'
 import { ContactCard } from '@/components/contacts/contact-card'
 import { ContactProfile } from '@/components/contacts/contact-profile'
 import { CreateContactDialog } from '@/components/contacts/create-contact-dialog'
+import { ContactImportDialog } from '@/components/contact-import-dialog'
 import { EditContactDialog } from '@/components/contacts/edit-contact-dialog'
 import { AffinityGroupsSidebar } from '@/components/contacts/affinity-groups-sidebar'
 import { Button } from '@/components/ui/button'
@@ -25,7 +26,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
-  Users, Plus, Search, Loader2, Lock, Pencil,
+  Users, Plus, Search, Loader2, Lock, Upload, Pencil,
 } from 'lucide-react'
 
 export const Route = createFileRoute('/contacts-directory')({
@@ -125,6 +126,7 @@ function ContactDirectoryPage() {
   const [selectedContact, setSelectedContact] = useState<DirectoryContact | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [showImportDialog, setShowImportDialog] = useState(false)
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
 
@@ -241,10 +243,21 @@ function ContactDirectoryPage() {
             </Badge>
           )}
         </div>
-        <Button size="sm" data-testid="new-contact-btn" onClick={() => setShowCreateDialog(true)}>
-          <Plus className="h-3.5 w-3.5" />
-          {t('contactDirectory.new', { defaultValue: 'New Contact' })}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            data-testid="import-contacts-btn"
+            onClick={() => setShowImportDialog(true)}
+          >
+            <Upload className="h-3.5 w-3.5" />
+            {t('cms.importContacts', { defaultValue: 'Import' })}
+          </Button>
+          <Button size="sm" data-testid="new-contact-btn" onClick={() => setShowCreateDialog(true)}>
+            <Plus className="h-3.5 w-3.5" />
+            {t('contactDirectory.new', { defaultValue: 'New Contact' })}
+          </Button>
+        </div>
       </div>
 
       {showEmptyState ? (
@@ -383,7 +396,10 @@ function ContactDirectoryPage() {
                       </Button>
                     </div>
                   )}
-                  <ContactProfile contact={selectedContact} />
+                  <ContactProfile
+                    contact={selectedContact}
+                    onContactMerged={() => { setSelectedId(null); loadContacts() }}
+                  />
                 </div>
               )
             ) : (
@@ -400,6 +416,15 @@ function ContactDirectoryPage() {
         open={showCreateDialog}
         onOpenChange={setShowCreateDialog}
         onCreated={handleContactCreated}
+      />
+
+      <ContactImportDialog
+        open={showImportDialog}
+        onOpenChange={setShowImportDialog}
+        onImported={(count) => {
+          toast(t('cms.importSuccess', { count }))
+          loadContacts()
+        }}
       />
 
       {selectedContact && (

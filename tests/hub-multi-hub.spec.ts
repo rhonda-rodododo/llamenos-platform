@@ -108,7 +108,7 @@ async function mockMultiHubApis(
 /**
  * Extract hub ID from a URL path like /api/hubs/{hubId}/onboard/...
  */
-function extractHubId(url: string, suffix: string): string {
+function extractHubId(url: string, _suffix: string): string {
   const match = url.match(/\/api\/hubs\/([^/]+)\//)
   return match ? decodeURIComponent(match[1]) : 'unknown'
 }

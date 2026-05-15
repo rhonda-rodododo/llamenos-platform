@@ -7,7 +7,7 @@
  */
 import { expect } from '@playwright/test'
 import { When, Then, Given, Before } from './fixtures'
-import { getSharedState, setLastResponse } from './shared-state'
+import { setLastResponse } from './shared-state'
 import {
   apiGet,
   apiPost,

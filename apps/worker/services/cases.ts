@@ -34,8 +34,10 @@ import { conversations } from '../db/schema/conversations'
 import type { ConvertFromReportResponse } from '@protocol/schemas/records'
 import { ServiceError } from './settings'
 import type { CreateRecordBody } from '@protocol/schemas/records'
+import type { MergeRecordsResponse } from '@protocol/schemas/entity-merge'
 import type { CreateEventBody } from '@protocol/schemas/events'
 import type { CreateInteractionBody } from '@protocol/schemas/interactions'
+
 
 // ---------------------------------------------------------------------------
 // Inferred row types from Drizzle schema
@@ -65,6 +67,8 @@ export interface ListCasesInput {
   assignedTo?: string
   entityTypeId?: string
   parentRecordId?: string
+  crossHub?: boolean
+  requestingPubkey?: string
   blindIndexToken?: string
   blindIndexField?: string
 }
@@ -279,6 +283,98 @@ export class CasesService {
     await this.db.delete(caseRecords).where(eq(caseRecords.id, id))
   }
 
+  // =========================================================================
+  // Merge records (server-side relinking)
+  // =========================================================================
+
+  async mergeRecords(
+    hubId: string,
+    primaryId: string,
+    secondaryId: string,
+  ): Promise<MergeRecordsResponse> {
+    const [primary, secondary] = await Promise.all([
+      this.db.select().from(caseRecords).where(
+        and(eq(caseRecords.id, primaryId), eq(caseRecords.hubId, hubId))
+      ).limit(1),
+      this.db.select().from(caseRecords).where(
+        and(eq(caseRecords.id, secondaryId), eq(caseRecords.hubId, hubId))
+      ).limit(1),
+    ])
+
+    if (!primary[0]) throw new ServiceError(404, 'primary record not found')
+    if (!secondary[0]) throw new ServiceError(404, 'secondary record not found')
+    if (secondary[0].hubId !== primary[0].hubId) throw new ServiceError(400, 'cross-hub merge not permitted')
+
+    const mergedAt = new Date()
+    let relinkedContacts = 0
+    let relinkedInteractions = 0
+    let relinkedEvidence = 0
+
+    await this.db.transaction(async (tx) => {
+      // Relink contacts
+      const contactRows = await tx.select({ id: caseContacts.contactId })
+        .from(caseContacts)
+        .where(eq(caseContacts.caseId, secondaryId))
+      relinkedContacts = contactRows.length
+      if (relinkedContacts > 0) {
+        await tx.update(caseContacts)
+          .set({ caseId: primaryId })
+          .where(eq(caseContacts.caseId, secondaryId))
+      }
+
+      // Relink interactions
+      const interactionRows = await tx.select({ id: caseInteractions.id })
+        .from(caseInteractions)
+        .where(eq(caseInteractions.caseId, secondaryId))
+      relinkedInteractions = interactionRows.length
+      if (relinkedInteractions > 0) {
+        await tx.update(caseInteractions)
+          .set({ caseId: primaryId })
+          .where(eq(caseInteractions.caseId, secondaryId))
+      }
+
+      // Relink evidence
+      const evidenceRows = await tx.select({ id: evidence.id })
+        .from(evidence)
+        .where(eq(evidence.caseId, secondaryId))
+      relinkedEvidence = evidenceRows.length
+      if (relinkedEvidence > 0) {
+        await tx.update(evidence)
+          .set({ caseId: primaryId })
+          .where(eq(evidence.caseId, secondaryId))
+      }
+
+      // Relink report links
+      await tx.update(reportCases)
+        .set({ caseId: primaryId })
+        .where(eq(reportCases.caseId, secondaryId))
+
+      // Soft-delete secondary with merge pointer
+      await tx.update(caseRecords)
+        .set({ mergedIntoId: primaryId, closedAt: mergedAt })
+        .where(eq(caseRecords.id, secondaryId))
+
+      // Update primary contact count
+      await tx.update(caseRecords)
+        .set({
+          contactCount: sql`${caseRecords.contactCount} + ${relinkedContacts}`,
+          interactionCount: sql`${caseRecords.interactionCount} + ${relinkedInteractions}`,
+          fileCount: sql`${caseRecords.fileCount} + ${relinkedEvidence}`,
+          updatedAt: mergedAt,
+        })
+        .where(eq(caseRecords.id, primaryId))
+    })
+
+    return {
+      primaryId,
+      secondaryId,
+      mergedAt: mergedAt.toISOString(),
+      relinkedContacts,
+      relinkedInteractions,
+      relinkedEvidence,
+    }
+  }
+
   async list(input: ListCasesInput): Promise<{
     records: CaseRecordRow[]
     total: number
@@ -290,7 +386,13 @@ export class CasesService {
     const limit = Math.min(input.limit ?? 20, 100)
     const offset = (page - 1) * limit
 
-    const conditions = [eq(caseRecords.hubId, input.hubId)]
+    // Cross-hub query: check if requesting pubkey appears in any summaryEnvelopes element
+    const conditions = input.crossHub && input.requestingPubkey
+      ? [sql`EXISTS (
+          SELECT 1 FROM jsonb_array_elements(${caseRecords.summaryEnvelopes}) AS el
+          WHERE el->>'pubkey' = ${input.requestingPubkey}
+        )`]
+      : [eq(caseRecords.hubId, input.hubId)]
 
     if (input.statusHash) {
       conditions.push(eq(caseRecords.statusHash, input.statusHash))

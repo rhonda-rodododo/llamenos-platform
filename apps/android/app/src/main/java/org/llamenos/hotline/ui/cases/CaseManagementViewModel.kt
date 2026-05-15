@@ -51,6 +51,15 @@ enum class CaseDetailTab {
 }
 
 /**
+ * Display type for the case list — table (default), calendar, or timeline.
+ */
+enum class CaseDisplayType {
+    TABLE,
+    CALENDAR,
+    TIMELINE,
+}
+
+/**
  * Sort order for timeline interactions.
  */
 enum class TimelineSortOrder {
@@ -87,6 +96,10 @@ data class CaseUiState(
     // Filters
     val selectedEntityTypeId: String? = null,
     val selectedStatusHash: String? = null,
+
+    // EP06-A4: display mode and cross-hub
+    val displayType: CaseDisplayType = CaseDisplayType.TABLE,
+    val crossHubEnabled: Boolean = false,
 
     // Selected record detail
     val selectedRecord: Record? = null,
@@ -259,6 +272,9 @@ class CaseManagementViewModel @Inject constructor(
                     }
                     if (statusHash != null) {
                         append("&statusHash=$statusHash")
+                    }
+                    if (_uiState.value.crossHubEnabled) {
+                        append("&crossHub=true")
                     }
                 }
                 val response = apiService.request<RecordsListResponse>("GET", query)
@@ -798,6 +814,21 @@ class CaseManagementViewModel @Inject constructor(
      */
     fun dismissError() {
         _uiState.update { it.copy(recordsError = null) }
+    }
+
+    /**
+     * Toggle cross-hub search and reload records.
+     */
+    fun toggleCrossHub() {
+        _uiState.update { it.copy(crossHubEnabled = !it.crossHubEnabled) }
+        loadRecords()
+    }
+
+    /**
+     * Set the display type (table, calendar, timeline).
+     */
+    fun setDisplayType(type: CaseDisplayType) {
+        _uiState.update { it.copy(displayType = type) }
     }
 
     /**

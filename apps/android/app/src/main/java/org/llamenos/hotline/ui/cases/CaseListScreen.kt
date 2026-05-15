@@ -289,24 +289,36 @@ fun CaseListScreen(
                         onRefresh = { viewModel.refresh() },
                         modifier = Modifier.fillMaxSize(),
                     ) {
-                        LazyColumn(
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 16.dp, vertical = 8.dp)
-                                .testTag("case-list"),
-                        ) {
-                            items(
-                                items = uiState.records,
-                                key = { it.id },
-                            ) { record ->
-                                CaseCard(
-                                    record = record,
-                                    entityType = uiState.entityTypes.find { it.id == record.entityTypeID },
-                                    decryptedTitle = uiState.decryptedRecordTitles[record.id],
-                                    onClick = { onNavigateToCaseDetail(record.id) },
-                                    modifier = Modifier.testTag("case-card-${record.id}"),
-                                )
+                        when (uiState.displayType) {
+                            CaseDisplayType.CALENDAR -> EntityCalendarContent(
+                                records = uiState.records,
+                                onRecordClick = onNavigateToCaseDetail,
+                                modifier = Modifier.fillMaxSize().testTag("entity-calendar-view"),
+                            )
+                            CaseDisplayType.TIMELINE -> EntityTimelineContent(
+                                records = uiState.records,
+                                onRecordClick = onNavigateToCaseDetail,
+                                modifier = Modifier.fillMaxSize().testTag("entity-timeline-view"),
+                            )
+                            CaseDisplayType.TABLE -> LazyColumn(
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                                    .testTag("case-list"),
+                            ) {
+                                items(
+                                    items = uiState.records,
+                                    key = { it.id },
+                                ) { record ->
+                                    CaseCard(
+                                        record = record,
+                                        entityType = uiState.entityTypes.find { it.id == record.entityTypeID },
+                                        decryptedTitle = uiState.decryptedRecordTitles[record.id],
+                                        onClick = { onNavigateToCaseDetail(record.id) },
+                                        modifier = Modifier.testTag("case-card-${record.id}"),
+                                    )
+                                }
                             }
                         }
                     }

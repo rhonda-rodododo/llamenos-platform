@@ -84,6 +84,9 @@ const EXCLUDED_SCHEMAS = new Set([
   'wsClientMessageSchema',
   'wsServerMessageSchema',
 
+  // Bulk contact action — discriminated union, inlined at call sites
+  'bulkContactActionSchema',
+
   // EP07 shift management — query schemas and bare enum building blocks
   'overrideQuerySchema',
 

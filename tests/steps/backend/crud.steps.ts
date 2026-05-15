@@ -12,8 +12,6 @@ import {
   apiGet,
   apiPost,
   apiPatch,
-  apiPut,
-  apiDelete,
   createVolunteerViaApi,
   createShiftViaApi,
   createBanViaApi,
@@ -21,7 +19,6 @@ import {
   listShiftsViaApi,
   listBansViaApi,
   updateVolunteerViaApi,
-  deleteVolunteerViaApi,
   deleteShiftViaApi,
   removeBanViaApi,
   bulkAddBansViaApi,
@@ -41,7 +38,6 @@ import {
   listRolesViaApi,
   deleteRoleViaApi,
   updateRoleViaApi,
-  ADMIN_NSEC,
 } from '../../api-helpers'
 
 // ── State ───────────────────────────────────────────────────────────
@@ -93,7 +89,7 @@ When('an admin creates a volunteer named {string}', async ({ request, world }, n
   getCrudState(world).volunteerName = name
 })
 
-Then('the volunteer list should contain {string}', async ({request, world}, name: string) => {
+Then('the volunteer list should contain {string}', async ({request}, name: string) => {
   const vols = await listVolunteersViaApi(request)
   expect(vols.some(v => v.name === name)).toBeTruthy()
 })
@@ -265,7 +261,7 @@ When('an admin creates a note with encrypted content', async ({ request, world }
     ?? ((data as Record<string, unknown>)?.note as Record<string, unknown>)?.id as string
 })
 
-Then('the note should appear in the notes list', async ({request, world}) => {
+Then('the note should appear in the notes list', async ({request}) => {
   const { notes } = await listNotesViaApi(request)
   expect(notes.length).toBeGreaterThan(0)
 })
@@ -355,7 +351,7 @@ When('an admin creates an invite for {string}', async ({ request, world }, name:
     ?? ((data as Record<string, unknown>)?.invite as Record<string, unknown>)?.code as string
 })
 
-Then('the invite list should contain {string}', async ({request, world}, name: string) => {
+Then('the invite list should contain {string}', async ({request}, name: string) => {
   const { data } = await apiGet<{ invites: Array<{ name: string; code: string }> }>(request, '/invites')
   const invites = (data as { invites?: Array<{ name: string }> })?.invites ?? []
   expect(invites.some(i => i.name === name)).toBeTruthy()
@@ -381,12 +377,12 @@ When('an admin creates a custom role {string} with permissions {string}', async 
   getCrudState(world).roleName = name
 })
 
-Then('the roles list should contain {string}', async ({request, world}, name: string) => {
+Then('the roles list should contain {string}', async ({request}, name: string) => {
   const roles = await listRolesViaApi(request)
   expect(roles.some(r => r.name === name)).toBeTruthy()
 })
 
-Then('the roles list should not contain {string}', async ({request, world}, name: string) => {
+Then('the roles list should not contain {string}', async ({request}, name: string) => {
   const roles = await listRolesViaApi(request)
   expect(roles.some(r => r.name === name)).toBeFalsy()
 })
@@ -413,7 +409,7 @@ When('an admin attempts to delete the system {string} role', async ({ request, w
 
 // ─── Custom Fields ──────────────────────────────────────────────────
 
-When('an admin sets custom fields with a {string} text field', async ({request, world}, fieldName: string) => {
+When('an admin sets custom fields with a {string} text field', async ({request}, fieldName: string) => {
   await updateCustomFieldsViaApi(request, [{
     id: `field-${Date.now()}`,
     name: fieldName,
@@ -422,12 +418,12 @@ When('an admin sets custom fields with a {string} text field', async ({request, 
   }])
 })
 
-Then('the custom fields should include {string}', async ({request, world}, fieldName: string) => {
+Then('the custom fields should include {string}', async ({request}, fieldName: string) => {
   const fields = await getCustomFieldsViaApi(request)
   expect(fields.some(f => f.name === fieldName)).toBeTruthy()
 })
 
-When('the admin updates custom fields adding a {string} select field', async ({request, world}, fieldName: string) => {
+When('the admin updates custom fields adding a {string} select field', async ({request}, fieldName: string) => {
   const existing = await getCustomFieldsViaApi(request)
   await updateCustomFieldsViaApi(request, [
     ...existing,
@@ -441,17 +437,17 @@ When('the admin updates custom fields adding a {string} select field', async ({r
   ])
 })
 
-Then('the custom fields should include both {string} and {string}', async ({request, world}, f1: string, f2: string) => {
+Then('the custom fields should include both {string} and {string}', async ({request}, f1: string, f2: string) => {
   const fields = await getCustomFieldsViaApi(request)
   expect(fields.some(f => f.name === f1)).toBeTruthy()
   expect(fields.some(f => f.name === f2)).toBeTruthy()
 })
 
-When('the admin removes all custom fields', async ({request, world}) => {
+When('the admin removes all custom fields', async ({request}) => {
   await updateCustomFieldsViaApi(request, [])
 })
 
-Then('the custom fields list should be empty', async ({request, world}) => {
+Then('the custom fields list should be empty', async ({request}) => {
   const fields = await getCustomFieldsViaApi(request)
   expect(fields.length).toBe(0)
 })
@@ -491,7 +487,7 @@ When('the reporter creates a report titled {string}', async ({ request, world },
   expect(getCrudState(world).reportId).toBeTruthy()
 })
 
-Then('the report should appear in the reports list', async ({request, world}) => {
+Then('the report should appear in the reports list', async ({request}) => {
   const { conversations } = await listReportsViaApi(request)
   expect(conversations.length).toBeGreaterThan(0)
 })

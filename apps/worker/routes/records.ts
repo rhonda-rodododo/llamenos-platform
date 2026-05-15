@@ -22,7 +22,6 @@ import {
   convertFromReportResponseSchema,
 } from '@protocol/schemas/records'
 
-
 import { createInteractionBodySchema, listInteractionsQuerySchema, caseInteractionSchema, interactionListResponseSchema, sourceInteractionLookupResponseSchema } from '@protocol/schemas/interactions'
 import { linkReportToCaseBodySchema, reportCaseLinkSchema, reportCaseLinkListResponseSchema } from '@protocol/schemas/report-links'
 import { notifyContactsBodySchema } from '@protocol/schemas/notifications'
@@ -31,6 +30,7 @@ import { notifyContactsResponseSchema } from '@protocol/schemas/notifications'
 import { okResponseSchema } from '@protocol/schemas/common'
 import { authErrors, notFoundError } from '../openapi/helpers'
 import { audit } from '../services/audit'
+import { mergeRecordsBodySchema, mergeRecordsResponseSchema } from '@protocol/schemas/entity-merge'
 import { KIND_RECORD_CREATED, KIND_RECORD_UPDATED, KIND_RECORD_ASSIGNED } from '@shared/event-kinds'
 import { publishEvent } from '../lib/ws-events'
 import { resolvePermissions } from '@shared/permissions'
@@ -104,21 +104,32 @@ records.get('/',
       return c.json({ error: 'Forbidden', required: 'cases:read-own' }, 403)
     }
 
+    const crossHub = query.crossHub === 'true'
+
+    // Cross-hub requires cases:read-cross-hub permission
+    if (crossHub && !checkPermission(permissions, 'cases:read-cross-hub')) {
+      return c.json({ error: 'Forbidden', required: 'cases:read-cross-hub' }, 403)
+    }
+
     const listInput: Parameters<typeof services.cases.list>[0] = {
       hubId,
       page: query.page,
       limit: query.limit,
       entityTypeId: query.entityTypeId,
       parentRecordId: query.parentRecordId,
+      crossHub,
+      requestingPubkey: crossHub ? pubkey : undefined,
       blindIndexToken: query.blindIndexToken,
       blindIndexField: query.blindIndexField,
     }
 
     // Scoped read: non-admin users filter by assignment
-    if (accessLevel !== 'all') {
-      listInput.assignedTo = pubkey
-    } else if (query.assignedTo) {
-      listInput.assignedTo = query.assignedTo
+    if (!crossHub) {
+      if (accessLevel !== 'all') {
+        listInput.assignedTo = pubkey
+      } else if (query.assignedTo) {
+        listInput.assignedTo = query.assignedTo
+      }
     }
 
     const result = await services.cases.list(listInput)
@@ -1265,6 +1276,35 @@ records.post('/:id/notify-contacts',
     })
 
     return c.json(response)
+  },
+)
+
+// POST /merge — server-side entity record merge
+records.post('/merge',
+  describeRoute({
+    tags: ['Records'],
+    summary: 'Merge two entity records (server-side relinking)',
+    responses: {
+      200: {
+        description: 'Records merged',
+        content: { 'application/json': { schema: resolver(mergeRecordsResponseSchema) } },
+      },
+      ...authErrors,
+      ...notFoundError,
+    },
+  }),
+  requirePermission('cases:update'),
+  validator('json', mergeRecordsBodySchema),
+  async (c) => {
+    const services = c.get('services')
+    const hubId = c.get('hubId') ?? ''
+    const { primaryId, secondaryId } = c.req.valid('json')
+    const pubkey = c.get('pubkey') ?? ''
+
+    const result = await services.cases.mergeRecords(hubId, primaryId, secondaryId)
+
+    await audit(services.audit, 'recordMerged', pubkey, { primaryId, secondaryId })
+    return c.json(result)
   },
 )
 

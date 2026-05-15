@@ -15,22 +15,26 @@ import { useAuth } from '@/lib/auth'
 import { RelationshipWritePanel } from './relationship-write-panel'
 import { useToast } from '@/lib/toast'
 import { CONTACT_TYPE_CONFIG } from './contact-card'
+import { ContactMergeDialog } from '@/components/contact-merge-dialog'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   User, Phone, Mail, MessageSquare, Lock, ArrowRight,
-  FileText, Users, Loader2, Shield,
+  FileText, Users, Loader2, Shield, GitMerge,
 } from 'lucide-react'
 
 type Tab = 'profile' | 'identifiers' | 'cases' | 'relationships' | 'groups'
 
 interface ContactProfileProps {
   contact: DirectoryContact
+  onContactMerged?: () => void
 }
 
-export function ContactProfile({ contact }: ContactProfileProps) {
+export function ContactProfile({ contact, onContactMerged }: ContactProfileProps) {
   const { t } = useTranslation()
   const [activeTab, setActiveTab] = useState<Tab>('profile')
+  const [showMergeDialog, setShowMergeDialog] = useState(false)
 
   // Reset tab when contact changes
   useEffect(() => {
@@ -78,8 +82,27 @@ export function ContactProfile({ contact }: ContactProfileProps) {
               ))}
             </div>
           </div>
+          <Button
+            size="sm"
+            variant="outline"
+            data-testid="contact-merge-btn"
+            onClick={() => setShowMergeDialog(true)}
+            className="shrink-0"
+          >
+            <GitMerge className="h-3.5 w-3.5" />
+            {t('cms.mergeContact', { defaultValue: 'Merge' })}
+          </Button>
         </div>
       </div>
+
+      {showMergeDialog && (
+        <ContactMergeDialog
+          open={showMergeDialog}
+          onOpenChange={setShowMergeDialog}
+          primaryContact={contact}
+          onMerged={() => { setShowMergeDialog(false); onContactMerged?.() }}
+        />
+      )}
 
       {/* Tab bar */}
       <div data-testid="contact-profile-tabs" className="flex border-b border-border bg-muted/30">

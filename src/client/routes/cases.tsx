@@ -5,7 +5,6 @@ import { useToast } from '@/lib/toast'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   listRecords,
-  getRecord,
   updateRecord,
   listEntityTypes,
   listRecordContacts,
@@ -33,11 +32,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   FolderOpen, Plus, Loader2, Clock, ArrowLeft, UserPlus, UserMinus,
   Users, FileText, MessageSquare, Link2, AlertTriangle, ToggleRight,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, GitMerge, Globe, CalendarDays, Table2,
 } from 'lucide-react'
 import { HelpTooltip } from '@/components/ui/help-tooltip'
 import { decryptMessage, encryptMessage } from '@/lib/platform'
 import * as keyManager from '@/lib/key-manager'
+import { EntityMergeDialog } from '@/components/entity-merge-dialog'
+import { EntityCalendarView } from '@/components/entity-calendar-view'
+import { EntityTimelineView } from '@/components/entity-timeline-view'
+import { listEntitiesCrossHub } from '@/lib/api'
 
 export const Route = createFileRoute('/cases')({
   component: CasesPage,
@@ -66,6 +69,12 @@ function CasesPage() {
   const pageSize = 50
   const [autoAssign, setAutoAssign] = useState(false)
   const [autoAssignLoading, setAutoAssignLoading] = useState(false)
+
+  // --- EP06-A4: merge, cross-hub, display type ---
+  const [showMergeDialog, setShowMergeDialog] = useState(false)
+  const [mergeSourceRecord, setMergeSourceRecord] = useState<CaseRecord | null>(null)
+  const [crossHub, setCrossHub] = useState(false)
+  const [displayType, setDisplayType] = useState<'table' | 'calendar' | 'timeline'>('table')
 
   const entityTypeMap = useMemo(
     () => new Map(entityTypes.map(et => [et.id, et])),
@@ -105,14 +114,18 @@ function CasesPage() {
     if (entityTypeFilter !== 'all') params.entityTypeId = entityTypeFilter
     if (statusFilter !== 'all') params.statusHash = statusFilter
 
-    listRecords(params)
-      .then(({ records: recs, total: t }) => {
+    const fetch = crossHub
+      ? listEntitiesCrossHub({ ...params, crossHub: true }).then(({ records: recs, total: tot }) => ({ records: recs as CaseRecord[], total: tot }))
+      : listRecords(params)
+
+    fetch
+      .then(({ records: recs, total: tot }) => {
         setRecords(recs)
-        setTotal(t)
+        setTotal(tot)
       })
       .catch(() => toast(t('cases.loadError', { defaultValue: 'Failed to load cases' }), 'error'))
       .finally(() => setLoading(false))
-  }, [entityTypeFilter, statusFilter, page, toast, t])
+  }, [entityTypeFilter, statusFilter, page, crossHub, toast, t])
 
   useEffect(() => { fetchRecords() }, [fetchRecords])
 
@@ -290,6 +303,42 @@ function CasesPage() {
               {t('cases.autoAssignActive', { defaultValue: 'Auto-assign active' })}
             </span>
           )}
+          {/* Cross-hub toggle */}
+          {hasPermission('cases:read-cross-hub') && (
+            <button
+              type="button"
+              data-testid="cross-hub-toggle"
+              onClick={() => { setCrossHub(!crossHub); setPage(1) }}
+              className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                crossHub
+                  ? 'border-primary/30 bg-primary/10 text-primary'
+                  : 'border-border bg-muted text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Globe className="h-3.5 w-3.5" />
+              {t('cms.crossHub', { defaultValue: 'All Hubs' })}
+            </button>
+          )}
+          {/* Display type picker */}
+          <div className="flex items-center rounded-md border border-border overflow-hidden">
+            {(['table', 'calendar', 'timeline'] as const).map((dt) => (
+              <button
+                key={dt}
+                type="button"
+                data-testid={`display-type-${dt}`}
+                onClick={() => setDisplayType(dt)}
+                className={`px-2 py-1.5 text-xs transition-colors ${
+                  displayType === dt
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                }`}
+              >
+                {dt === 'table' && <Table2 className="h-3.5 w-3.5" />}
+                {dt === 'calendar' && <CalendarDays className="h-3.5 w-3.5" />}
+                {dt === 'timeline' && <Clock className="h-3.5 w-3.5" />}
+              </button>
+            ))}
+          </div>
           {hasPermission('cases:create') && (
             <Button size="sm" data-testid="case-new-btn" onClick={() => setShowCreateDialog(true)}>
               <Plus className="h-3.5 w-3.5" />
@@ -361,6 +410,14 @@ function CasesPage() {
             )}
           </CardContent>
         </Card>
+      ) : displayType === 'calendar' ? (
+        <div data-testid="entity-calendar-view" className="rounded-lg border border-border bg-card overflow-y-auto max-h-[calc(100vh-14rem)]">
+          <EntityCalendarView records={records} onSelectRecord={setSelectedId} />
+        </div>
+      ) : displayType === 'timeline' ? (
+        <div data-testid="entity-timeline-view" className="rounded-lg border border-border bg-card overflow-y-auto max-h-[calc(100vh-14rem)]">
+          <EntityTimelineView records={records} onSelectRecord={setSelectedId} />
+        </div>
       ) : (
         <div className="flex h-[calc(100vh-14rem)] gap-4">
           {/* Cases list sidebar */}
@@ -463,7 +520,6 @@ function CasesPage() {
               <RecordDetail
                 record={selectedRecord}
                 entityType={selectedEntityType}
-                isAdmin={isAdmin}
                 hasPermission={hasPermission}
                 publicKey={publicKey}
                 hasNsec={hasNsec}
@@ -472,6 +528,7 @@ function CasesPage() {
                 onAssignToMe={handleAssignToMe}
                 onUnassign={handleUnassign}
                 onOpenAssignDialog={(id) => { setAssignDialogRecordId(id); setShowAssignDialog(true) }}
+                onMergeClick={(rec) => { setMergeSourceRecord(rec); setShowMergeDialog(true) }}
                 onBack={() => setSelectedId(null)}
               />
             ) : (
@@ -490,6 +547,15 @@ function CasesPage() {
         onCreated={handleRecordCreated}
         defaultEntityTypeId={entityTypeFilter !== 'all' ? entityTypeFilter : undefined}
       />
+
+      {mergeSourceRecord && (
+        <EntityMergeDialog
+          open={showMergeDialog}
+          onOpenChange={setShowMergeDialog}
+          primaryRecord={mergeSourceRecord}
+          onMerged={() => { setMergeSourceRecord(null); fetchRecords() }}
+        />
+      )}
 
       {assignDialogRecordId && (
         <AssignmentDialog
@@ -639,7 +705,6 @@ type DetailTab = 'details' | 'timeline' | 'contacts' | 'evidence' | 'related'
 function RecordDetail({
   record,
   entityType,
-  isAdmin,
   hasPermission,
   publicKey,
   hasNsec,
@@ -648,11 +713,11 @@ function RecordDetail({
   onAssignToMe,
   onUnassign,
   onOpenAssignDialog,
+  onMergeClick,
   onBack,
 }: {
   record: CaseRecord
   entityType: EntityTypeDefinition
-  isAdmin: boolean
   hasPermission: (p: string) => boolean
   publicKey: string | null
   hasNsec: boolean
@@ -661,6 +726,7 @@ function RecordDetail({
   onAssignToMe: (id: string) => void
   onUnassign: (id: string) => void
   onOpenAssignDialog?: (recordId: string) => void
+  onMergeClick?: (record: CaseRecord) => void
   onBack: () => void
 }) {
   const { t } = useTranslation()
@@ -689,8 +755,7 @@ function RecordDetail({
     return () => { cancelled = true }
   }, [record.id, record.encryptedSummary, hasNsec])
 
-  // Derive status / severity info
-  const statusDef = entityType.statuses.find(s => s.value === record.statusHash)
+  // Derive severity info
   const severityDef = record.severityHash
     ? entityType.severities?.find(s => s.value === record.severityHash)
     : undefined
@@ -828,6 +893,17 @@ function RecordDetail({
                 {t('cases.assign', { defaultValue: 'Assign' })}
               </Button>
             )}
+            {hasPermission('cases:update') && onMergeClick && (
+              <Button
+                size="sm"
+                variant="outline"
+                data-testid="case-merge-btn"
+                onClick={() => onMergeClick(record)}
+              >
+                <GitMerge className="h-3.5 w-3.5" />
+                {t('cms.mergeEntity', { defaultValue: 'Merge' })}
+              </Button>
+            )}
           </div>
         </div>
 
@@ -861,7 +937,6 @@ function RecordDetail({
           <DetailsTab
             record={record}
             entityType={entityType}
-            isAdmin={isAdmin}
             hasPermission={hasPermission}
             isAssigned={isAssigned}
             hasNsec={hasNsec}
@@ -904,7 +979,6 @@ function RecordDetail({
 function DetailsTab({
   record,
   entityType,
-  isAdmin,
   hasPermission,
   isAssigned,
   hasNsec,
@@ -913,7 +987,6 @@ function DetailsTab({
 }: {
   record: CaseRecord
   entityType: EntityTypeDefinition
-  isAdmin: boolean
   hasPermission: (p: string) => boolean
   isAssigned: boolean
   hasNsec: boolean

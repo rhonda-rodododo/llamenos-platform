@@ -51,6 +51,10 @@ final class CaseManagementViewModel {
     var currentPage: Int = 1
     let pageSize: Int = 50
 
+    // EP06-A4: cross-hub and display type
+    var crossHubEnabled: Bool = false
+    var displayType: CaseDisplayType = .table
+
     // Loading states
     var isLoading: Bool = false
     var isLoadingDetail: Bool = false
@@ -181,6 +185,9 @@ final class CaseManagementViewModel {
         }
         if let sFilter = statusFilter {
             path += "&statusHash=\(sFilter)"
+        }
+        if crossHubEnabled {
+            path += "&crossHub=true"
         }
 
         do {
@@ -514,6 +521,14 @@ final class CaseManagementViewModel {
         currentPage = 1
         await loadRecords()
     }
+}
+
+// MARK: - CaseDisplayType
+
+enum CaseDisplayType: String, CaseIterable, Sendable {
+    case table = "table"
+    case calendar = "calendar"
+    case timeline = "timeline"
 }
 
 // MARK: - DetailTab

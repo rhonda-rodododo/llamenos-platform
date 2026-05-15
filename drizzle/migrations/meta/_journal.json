@@ -295,6 +295,13 @@
       "when": 1778863897764,
       "tag": "0042_ep06-a3-entity-autoassign",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1778903799509,
+      "tag": "0043_add_merge_columns",
+      "breakpoints": true
     }
   ]
 }

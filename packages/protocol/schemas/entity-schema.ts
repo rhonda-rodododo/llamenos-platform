@@ -134,6 +134,9 @@ export const entityTypeDefinitionSchema = z.object({
   showInNavigation: z.boolean().optional().default(true),
   showInDashboard: z.boolean().optional().default(false),
 
+  displayTypes: z.array(z.enum(['table', 'calendar', 'timeline'])).optional(),
+  defaultDisplayType: z.enum(['table', 'calendar', 'timeline']).optional(),
+
   accessRoles: z.array(z.string()).optional(),
   editRoles: z.array(z.string()).optional(),
 
