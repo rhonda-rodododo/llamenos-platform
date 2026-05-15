@@ -60,7 +60,7 @@ export interface CreateReplyInput {
 export interface AddBanInput {
   hubId?: string
   phone: string       // HMAC hash for lookup
-  phoneDisplay: string // Original E.164 for admin display
+  phoneDisplay?: string // Original E.164 for admin display (may be absent for mid-call bans)
   reason: string
   bannedBy: string
 }

@@ -17,9 +17,12 @@ CREATE TABLE IF NOT EXISTS "provider_configs" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-ALTER TABLE "provider_configs"
-	ADD CONSTRAINT "provider_configs_hub_id_hubs_id_fk"
-	FOREIGN KEY ("hub_id") REFERENCES "public"."hubs"("id") ON DELETE cascade ON UPDATE no action;
+DO $$ BEGIN
+  ALTER TABLE "provider_configs"
+    ADD CONSTRAINT "provider_configs_hub_id_hubs_id_fk"
+    FOREIGN KEY ("hub_id") REFERENCES "public"."hubs"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "provider_configs_hub_id_idx" ON "provider_configs" USING btree ("hub_id");
 --> statement-breakpoint

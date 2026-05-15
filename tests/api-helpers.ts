@@ -1898,6 +1898,26 @@ export async function createCaseFromReportViaApi(
 }
 
 /**
+ * Upload an entity field file (encrypted blob) via POST /uploads/entity-file.
+ * Returns the fileId and uploadedAt on success (201).
+ */
+export async function uploadEntityFileViaApi(
+  request: APIRequestContext,
+  blobSizeBytes: number = 1024,
+  seedHex: string = ADMIN_SEED,
+): Promise<{ fileId: string; uploadedAt: string }> {
+  const fullPath = '/api/uploads/entity-file'
+  // Use auth headers without Content-Type — Playwright sets multipart/form-data automatically
+  const { 'Content-Type': _ct, ...headers } = authHeaders(seedHex, 'POST', fullPath)
+  const res = await request.post(fullPath, {
+    headers,
+    multipart: { file: { name: 'entity-field.bin', mimeType: 'application/octet-stream', buffer: Buffer.alloc(blobSizeBytes, 0xab) } },
+  })
+  if (res.status() !== 201) throw new Error(`uploadEntityFileViaApi failed: ${res.status()}`)
+  return res.json() as Promise<{ fileId: string; uploadedAt: string }>
+}
+
+/**
  * Enable messaging channels (SMS by default) via the settings API.
  * This is needed so the conversations page renders the conversation list
  * instead of the "No messaging channels enabled" empty state.

@@ -88,7 +88,7 @@ function getCmsState(world: Record<string, unknown>): CmsState {
 }
 
 
-Before({ tags: '@cases or @contacts or @events or @evidence or @templates or @reports' }, async ({ world }) => {
+Before({ tags: '@cases or @contacts or @contact-write or @events or @evidence or @templates or @reports' }, async ({ world }) => {
   const cms = {
     templateCatalog: [],
     contacts: [],

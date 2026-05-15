@@ -1782,6 +1782,16 @@ export async function updateEntityType(id: string, body: Partial<CreateEntityTyp
   })
 }
 
+export async function customizeEntityType(
+  id: string,
+  body: import('@protocol/schemas/entity-schema').EntityTemplateCustomizeBody,
+) {
+  return request<EntityTypeDefinition>(hp(`/settings/cms/entity-types/${id}/customize`), {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  })
+}
+
 export async function deleteEntityType(id: string) {
   return request<{ ok: boolean }>(hp(`/settings/cms/entity-types/${id}`), {
     method: 'DELETE',
@@ -2025,6 +2035,71 @@ export async function listDirectoryContactRelationships(id: string) {
 
 export async function listDirectoryContactGroups(id: string) {
   return request<{ groups: ContactGroup[] }>(hp(`/directory/${id}/groups`))
+}
+
+// --- Relationship write functions (EP06-A2) ---
+
+export async function createContactRelationship(
+  contactId: string,
+  body: import('@protocol/schemas/contact-relationships').CreateRelationshipBody,
+) {
+  return request<ContactRelationship>(hp(`/directory/${contactId}/relationships`), {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export async function deleteContactRelationship(contactId: string, relId: string) {
+  return request<{ deleted: boolean }>(hp(`/directory/${contactId}/relationships/${relId}`), {
+    method: 'DELETE',
+  })
+}
+
+// --- Affinity group write functions (EP06-A2) ---
+
+export type AffinityGroup = import('@protocol/schemas/contact-relationships').AffinityGroup
+export type CreateAffinityGroupBody = import('@protocol/schemas/contact-relationships').CreateAffinityGroupBody
+export type UpdateAffinityGroupBody = import('@protocol/schemas/contact-relationships').UpdateAffinityGroupBody
+
+export async function listAffinityGroups() {
+  return request<{ groups: AffinityGroup[] }>(hp('/directory/groups'))
+}
+
+export async function createAffinityGroup(body: CreateAffinityGroupBody) {
+  return request<AffinityGroup>(hp('/directory/groups'), { method: 'POST', body: JSON.stringify(body) })
+}
+
+export async function updateAffinityGroup(groupId: string, body: UpdateAffinityGroupBody) {
+  return request<AffinityGroup>(hp(`/directory/groups/${groupId}`), { method: 'PATCH', body: JSON.stringify(body) })
+}
+
+export async function deleteAffinityGroup(groupId: string) {
+  return request<{ deleted: boolean }>(hp(`/directory/groups/${groupId}`), { method: 'DELETE' })
+}
+
+export async function addGroupMember(groupId: string, contactId: string, role?: string) {
+  return request<{ added: boolean }>(hp(`/directory/groups/${groupId}/members`), {
+    method: 'POST',
+    body: JSON.stringify({ contactId, role, isPrimary: false }),
+  })
+}
+
+export async function removeGroupMember(groupId: string, contactId: string) {
+  return request<{ removed: boolean }>(hp(`/directory/groups/${groupId}/members/${contactId}`), {
+    method: 'DELETE',
+  })
+}
+
+// --- Entity file upload (EP06-A2) ---
+
+export async function uploadEntityFile(file: File): Promise<{ fileId: string; uploadedAt: string }> {
+  const fd = new FormData()
+  fd.append('file', file)
+  return request<{ fileId: string; uploadedAt: string }>(hp('/uploads/entity-file'), {
+    method: 'POST',
+    body: fd,
+    headers: {},  // let browser set Content-Type with boundary
+  })
 }
 
 export async function listDirectoryContactCases(id: string) {

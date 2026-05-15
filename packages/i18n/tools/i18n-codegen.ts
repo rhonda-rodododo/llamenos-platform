@@ -81,7 +81,7 @@ function toAndroidString(value: string): string {
   return value
     .replace(/\{\{(\w+)\}\}/g, () => {
       index++
-      return index === 1 ? '%s' : `%${index}$s`
+      return `%${index}$s`
     })
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')

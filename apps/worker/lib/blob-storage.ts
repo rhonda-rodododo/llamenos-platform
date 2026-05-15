@@ -7,6 +7,8 @@ import {
   PutObjectCommand,
   GetObjectCommand,
   DeleteObjectCommand,
+  CreateBucketCommand,
+  HeadBucketCommand,
 } from '@aws-sdk/client-s3'
 import type { BlobStorage } from '../types'
 
@@ -33,8 +35,25 @@ export function createBlobStorage(opts?: {
     forcePathStyle: true, // Required for S3-compatible storage (RustFS)
   })
 
+  // Ensure bucket exists (runs once, idempotent)
+  let bucketChecked = false
+  async function ensureBucket(): Promise<void> {
+    if (bucketChecked) return
+    try {
+      await client.send(new HeadBucketCommand({ Bucket: bucket }))
+    } catch {
+      try {
+        await client.send(new CreateBucketCommand({ Bucket: bucket }))
+      } catch {
+        // Bucket may have been created concurrently
+      }
+    }
+    bucketChecked = true
+  }
+
   return {
     async put(key: string, body: ReadableStream | ArrayBuffer | Uint8Array | string): Promise<void> {
+      await ensureBucket()
       let bodyBytes: Uint8Array | string
       if (body instanceof ArrayBuffer) {
         bodyBytes = new Uint8Array(body)
