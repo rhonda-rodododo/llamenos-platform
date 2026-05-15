@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Self-service erasure request view. Shows countdown if request is active,
 /// or the request form if not. Accessible from Account Settings.
-struct ErasureRequestView: View {
+struct AppErasureRequestView: View {
     @Environment(AppState.self) private var appState
     @State private var viewModel: ErasureViewModel?
 
@@ -62,7 +62,7 @@ struct ErasureRequestView: View {
 
     // MARK: - Active Request (Countdown)
 
-    private func activeRequestView(request: ErasureRequest, vm: ErasureViewModel) -> some View {
+    private func activeRequestView(request: AppErasureRequest, vm: ErasureViewModel) -> some View {
         ScrollView {
             VStack(spacing: 24) {
                 Image(systemName: "clock.badge.exclamationmark")

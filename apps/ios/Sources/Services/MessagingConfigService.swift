@@ -84,7 +84,7 @@ struct MessagingConfigResponse: Codable {
     var smsContentMode: String?
 }
 
-struct ConnectionTestResponse: Codable {
+struct AppConnectionTestResponse: Codable {
     let connected: Bool
 }
 
@@ -131,7 +131,7 @@ final class MessagingConfigService {
     }
 
     func testChannel(_ channel: String) async throws -> Bool {
-        let response: ConnectionTestResponse = try await api.post(
+        let response: AppConnectionTestResponse = try await api.post(
             "/settings/messaging/test",
             body: ["channel": channel]
         )

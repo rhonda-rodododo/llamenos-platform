@@ -1044,7 +1044,7 @@ final class AdminViewModel {
         errorMessage = nil
 
         do {
-            let response: RetentionSettingsResponse = try await apiService.request(
+            let response: AppRetentionSettingsResponse = try await apiService.request(
                 method: "GET",
                 path: "/api/retention"
             )
@@ -1299,7 +1299,7 @@ struct AppRetentionCategory: Codable, Identifiable, Sendable {
     }
 }
 
-struct RetentionSettingsResponse: Codable, Sendable {
+struct AppRetentionSettingsResponse: Codable, Sendable {
     let categories: [AppRetentionCategory]
 }
 
