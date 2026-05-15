@@ -58,6 +58,7 @@ import type {
   CustomFieldDefinition,
   TelephonyProviderConfig,
   MessagingConfig,
+  MessagingChannelType,
   SetupState,
   EnabledChannels,
   Hub,
@@ -701,6 +702,17 @@ export class SettingsService {
   ): Promise<MessagingConfig> {
     const current = await this.getMessagingConfig()
     const updated = { ...current, ...data }
+
+    // Derive enabledChannels from individual channel configs unless caller set it explicitly
+    if (!('enabledChannels' in data)) {
+      const derived: MessagingChannelType[] = []
+      if (updated.sms?.enabled) derived.push('sms')
+      if (updated.whatsapp) derived.push('whatsapp')
+      if (updated.signal) derived.push('signal')
+      if (updated.rcs) derived.push('rcs')
+      if (updated.telegram?.enabled) derived.push('telegram')
+      updated.enabledChannels = derived
+    }
 
     if (updated.inactivityTimeout < 5 || updated.inactivityTimeout > 1440) {
       throw new ServiceError(

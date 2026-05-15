@@ -41,6 +41,7 @@ import { authErrors } from '../openapi/helpers'
 import { audit } from '../services/audit'
 import { invalidateRolesCache } from '../services/settings'
 import { validateExternalUrl } from '../lib/ssrf-guard'
+import { getMessagingAdapterFromService } from '../lib/service-factories'
 
 const settings = new Hono<AppEnv>()
 
@@ -544,6 +545,35 @@ settings.patch('/messaging',
     const result = await services.settings.updateMessagingConfig(body)
     await audit(services.audit, 'messagingConfigUpdated', pubkey, body as Record<string, unknown>)
     return c.json(result)
+  },
+)
+
+settings.post('/messaging/test',
+  describeRoute({
+    tags: ['Settings'],
+    summary: 'Test messaging channel connectivity',
+    responses: {
+      200: { description: 'Channel connectivity result' },
+      ...authErrors,
+    },
+  }),
+  requirePermission('settings:manage-messaging'),
+  validator('json', z.object({ channel: z.string() })),
+  async (c) => {
+    const { channel } = c.req.valid('json')
+    const services = c.get('services')
+    const hmacSecret = c.env.HMAC_SECRET
+    try {
+      const adapter = await getMessagingAdapterFromService(
+        channel as import('@shared/types').MessagingChannelType,
+        services.settings,
+        hmacSecret,
+      )
+      const status = await adapter.getChannelStatus()
+      return c.json({ connected: status.connected, error: status.error })
+    } catch (err) {
+      return c.json({ connected: false, error: err instanceof Error ? err.message : String(err) })
+    }
   },
 )
 

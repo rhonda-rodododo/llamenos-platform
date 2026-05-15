@@ -273,6 +273,11 @@ class WebSocketService @Inject constructor(
                 "conversation:closed" -> LlamenosEvent.ConversationClosed(
                     obj["conversationId"]?.jsonPrimitive?.content ?: return null
                 )
+                "device:wipe" -> LlamenosEvent.DeviceWipe(
+                    targetDevicePubkey = obj["targetDevicePubkey"]?.jsonPrimitive?.content ?: "",
+                    reason = obj["reason"]?.jsonPrimitive?.content ?: "",
+                    serverSignature = obj["serverSignature"]?.jsonPrimitive?.content ?: "",
+                )
                 else -> LlamenosEvent.Unknown(type)
             }
         } catch (_: Exception) {

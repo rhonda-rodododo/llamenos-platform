@@ -1,7 +1,6 @@
 import { createMiddleware } from 'hono/factory'
-import type { AppEnv, User } from '../types'
+import type { AppEnv } from '../types'
 import { authenticateRequest, parseAuthHeader, parseSessionHeader, validateToken } from '../lib/auth'
-import type { Role } from '@shared/permissions'
 import { resolvePermissions, permissionGranted } from '@shared/permissions'
 import { createLogger } from '../lib/logger'
 import { incError } from '../lib/error-counter'
