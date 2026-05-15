@@ -5,7 +5,7 @@
  */
 import { and, count, eq, gte, lte, sql, sum } from 'drizzle-orm'
 import type { Database } from '../db'
-import { activeCalls, callRecords, conversations, shifts, users } from '../db/schema'
+import { activeCalls, callRecords, conversations, notes, shifts, users } from '../db/schema'
 
 export interface DateRange {
   from: Date
@@ -172,6 +172,181 @@ export class AnalyticsService {
       unanswered: r.unanswered ?? 0,
       abandoned: r.abandoned ?? 0,
     }))
+  }
+
+  // =========================================================================
+  // Hourly Distribution
+  // =========================================================================
+
+  async getHourlyDistribution(
+    hubId: string | undefined,
+    range?: Partial<DateRange>,
+  ): Promise<{
+    totalCalls: number
+    buckets: Array<{ hour: number; count: number }>
+  }> {
+    if (!hubId) throw new Error('hubId is required for analytics queries')
+    const { from, to } = { ...defaultRange(), ...range }
+
+    const rows = await this.db
+      .select({
+        hour: sql<number>`EXTRACT(HOUR FROM ${callRecords.startedAt})::int`,
+        count: count(),
+      })
+      .from(callRecords)
+      .where(
+        and(
+          hubId ? eq(callRecords.hubId, hubId) : undefined,
+          gte(callRecords.startedAt, from),
+          lte(callRecords.startedAt, to),
+        ),
+      )
+      .groupBy(sql`EXTRACT(HOUR FROM ${callRecords.startedAt})`)
+      .orderBy(sql`EXTRACT(HOUR FROM ${callRecords.startedAt})`)
+
+    const hourMap = new Map(rows.map((r) => [r.hour, r.count]))
+    const buckets = Array.from({ length: 24 }, (_, hour) => ({
+      hour,
+      count: hourMap.get(hour) ?? 0,
+    }))
+    const totalCalls = rows.reduce((sum, r) => sum + r.count, 0)
+
+    return { totalCalls, buckets }
+  }
+
+  // =========================================================================
+  // Per-User Stats
+  // =========================================================================
+
+  async getUserStats(
+    hubId: string | undefined,
+    range?: Partial<DateRange>,
+  ): Promise<{
+    users: Array<{
+      pubkey: string
+      displayName: string | null
+      callsAnswered: number
+      avgDurationSeconds: number
+      notesCreated: number
+    }>
+  }> {
+    if (!hubId) throw new Error('hubId is required for analytics queries')
+    const { from, to } = { ...defaultRange(), ...range }
+
+    const callStats = await this.db
+      .select({
+        pubkey: callRecords.answeredBy,
+        displayName: users.displayName,
+        callsAnswered: count(),
+        avgDuration: sql<number>`COALESCE(AVG(${callRecords.duration}), 0)`.mapWith(Number),
+      })
+      .from(callRecords)
+      .leftJoin(users, eq(callRecords.answeredBy, users.pubkey))
+      .where(
+        and(
+          hubId ? eq(callRecords.hubId, hubId) : undefined,
+          eq(callRecords.status, 'completed'),
+          gte(callRecords.startedAt, from),
+          lte(callRecords.startedAt, to),
+          sql`${callRecords.answeredBy} IS NOT NULL`,
+        ),
+      )
+      .groupBy(callRecords.answeredBy, users.displayName)
+      .orderBy(sql`COUNT(*) DESC`)
+
+    const noteCounts = await this.db
+      .select({
+        authorPubkey: notes.authorPubkey,
+        notesCount: count(),
+      })
+      .from(notes)
+      .where(
+        and(
+          hubId ? eq(notes.hubId, hubId) : undefined,
+          gte(notes.createdAt, from),
+          lte(notes.createdAt, to),
+        ),
+      )
+      .groupBy(notes.authorPubkey)
+
+    const noteMap = new Map(noteCounts.map((n) => [n.authorPubkey, n.notesCount]))
+
+    return {
+      users: callStats.map((row) => ({
+        pubkey: row.pubkey!,
+        displayName: row.displayName ?? null,
+        callsAnswered: row.callsAnswered,
+        avgDurationSeconds: Math.round(row.avgDuration),
+        notesCreated: noteMap.get(row.pubkey!) ?? 0,
+      })),
+    }
+  }
+
+  // =========================================================================
+  // Personal Stats
+  // =========================================================================
+
+  async getPersonalStats(
+    hubId: string,
+    userPubkey: string,
+    range?: Partial<DateRange>,
+  ): Promise<{
+    callsToday: number
+    callsThisPeriod: number
+    avgDurationSeconds: number
+    notesCreatedThisPeriod: number
+  }> {
+    const { from, to } = { ...defaultRange(), ...range }
+
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+
+    const [todayRow] = await this.db
+      .select({ callsToday: count() })
+      .from(callRecords)
+      .where(
+        and(
+          eq(callRecords.hubId, hubId),
+          eq(callRecords.answeredBy, userPubkey),
+          eq(callRecords.status, 'completed'),
+          gte(callRecords.startedAt, todayStart),
+        ),
+      )
+
+    const [periodRow] = await this.db
+      .select({
+        callsInPeriod: count(),
+        avgDuration: sql<number>`COALESCE(AVG(${callRecords.duration}), 0)`.mapWith(Number),
+      })
+      .from(callRecords)
+      .where(
+        and(
+          eq(callRecords.hubId, hubId),
+          eq(callRecords.answeredBy, userPubkey),
+          eq(callRecords.status, 'completed'),
+          gte(callRecords.startedAt, from),
+          lte(callRecords.startedAt, to),
+        ),
+      )
+
+    const [notesRow] = await this.db
+      .select({ notesCount: count() })
+      .from(notes)
+      .where(
+        and(
+          eq(notes.hubId, hubId),
+          eq(notes.authorPubkey, userPubkey),
+          gte(notes.createdAt, from),
+          lte(notes.createdAt, to),
+        ),
+      )
+
+    return {
+      callsToday: Number(todayRow?.callsToday ?? 0),
+      callsThisPeriod: Number(periodRow?.callsInPeriod ?? 0),
+      avgDurationSeconds: Math.round(periodRow?.avgDuration ?? 0),
+      notesCreatedThisPeriod: Number(notesRow?.notesCount ?? 0),
+    }
   }
 
   // =========================================================================

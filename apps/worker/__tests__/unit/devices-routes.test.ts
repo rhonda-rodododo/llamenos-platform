@@ -34,6 +34,10 @@ function createApp(pubkey = 'user-pk-1') {
       deleteAllDevices: vi.fn().mockResolvedValue(undefined),
       registerVoipToken: vi.fn().mockResolvedValue(undefined),
       deleteVoipToken: vi.fn().mockResolvedValue(undefined),
+      emitSecurityEvent: vi.fn().mockResolvedValue(undefined),
+      renameDevice: vi.fn().mockResolvedValue(true),
+      revokeDevice: vi.fn().mockResolvedValue({ hubIds: [] }),
+      verifyDevice: vi.fn().mockResolvedValue({ id: 'ver-1' }),
     },
   }
 

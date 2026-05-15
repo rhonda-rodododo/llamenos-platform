@@ -189,7 +189,22 @@
     "users": "Volunteers",
     "schemaBrowser": "Schema Browser",
     "providerSetup": "Provider Setup",
-    "signalRegistration": "Signal Registration"
+    "signalRegistration": "Signal Registration",
+    "devices": {
+      "title": "Device Overview",
+      "devices": "devices",
+      "verified": "Verified",
+      "unverified": "Unverified",
+      "verify": "Verify",
+      "verifyTitle": "Verify {{name}}",
+      "verifyDescription": "Compare the emojis below with the device owner. Both parties must see the same 7 emojis.",
+      "verifyInstruction": "Read these emojis aloud to the device owner and confirm they see the same sequence.",
+      "nonce": "Session nonce",
+      "newNonce": "New nonce",
+      "noMatch": "No match",
+      "match": "Emojis match",
+      "verifySuccess": "Device verified successfully"
+    }
   },
   "announcement": "Announcement",
   "announcementBody": "Announcement body",
@@ -305,7 +320,20 @@
     "statusCancelled": "Cancelled",
     "statusDraft": "Draft",
     "statusScheduled": "Scheduled",
-    "statusSent": "Sent"
+    "statusSent": "Sent",
+    "composerTitle": "New Broadcast Message",
+    "recipientCount": "{{count}} recipients",
+    "recipientCountOne": "1 recipient",
+    "retryFailed": "Retry Failed",
+    "retryDelivery": "Retry",
+    "retryingAll": "Retrying all failed...",
+    "progressLabel": "Delivery Progress",
+    "deliveryStatus": "Delivery Status",
+    "deliveryStatusPending": "Pending",
+    "deliveryStatusSent": "Sent",
+    "deliveryStatusDelivered": "Delivered",
+    "deliveryStatusFailed": "Failed",
+    "deliveryStatusOptedOut": "Opted Out"
   },
   "caseManagement": {
     "title": "إدارة القضايا",
@@ -625,7 +653,24 @@
     "liveUpdating": "Updating live...",
     "optedOut": "Opted Out",
     "deliveryDetails": "Delivery Details",
-    "noDeliveries": "No deliveries"
+    "noDeliveries": "No deliveries",
+    "retryFailed": "Retry Failed",
+    "retryDelivery": "Retry",
+    "retryAll": "Retry All Failed",
+    "retriedCount": "Reset {{count}} deliveries",
+    "deliveriesTitle": "Delivery Status",
+    "deliveriesEmpty": "No deliveries yet",
+    "progressTitle": "Live Progress",
+    "progressPending": "Pending",
+    "progressDelivered": "Delivered",
+    "progressFailed": "Failed",
+    "progressSent": "Sent",
+    "progressOptedOut": "Opted Out",
+    "deliveryId": "Delivery ID",
+    "lastAttempt": "Last Attempt",
+    "errorDetail": "Error",
+    "closeSheet": "Close",
+    "retryingAll": "Retrying all failed..."
   },
   "callActions": {
     "banAndHangUp": "Ban & Hang Up",
@@ -755,8 +800,10 @@
     "hideAdvanced": "Hide Advanced",
     "showAdvanced": "Show Advanced",
     "saved": "Saved",
-    "unauthorized": "Unauthorized"
-  },
+    "unauthorized": "Unauthorized",
+    "loadMore": "تحميل المزيد",
+    "saving": "Saving...",
+    "deleted": "Deleted"  },
   "confirm": {
     "backup": "Confirm Backup",
     "captchaDisable": "تعطيل CAPTCHA الصوتي؟ سيتم توصيل المتصلين مباشرة بدون تحقق.",
@@ -1421,7 +1468,8 @@
     "cases": "القضايا",
     "events": "الأحداث",
     "triage": "الفرز",
-    "users": "المتطوعون"
+    "users": "المتطوعون",
+    "security": "الأمان"
   },
   "navigation": {
     "back": "Back"
@@ -1854,26 +1902,38 @@
     "volunteer": "Volunteer"
   },
   "roles": {
-    "createRole": "Create Role",
-    "created": "Role created",
+    "system": "System",
     "default": "Default",
-    "deleteConfirm": "Are you sure you want to delete this role? Members will be reassigned to the default role.",
-    "deleteTitle": "Delete Role",
-    "deleted": "Role deleted",
-    "description": "Define roles and assign permissions to control access across your hotline.",
-    "descriptionLabel": "Description",
-    "descriptionPlaceholder": "Brief description of this role...",
-    "editRole": "Edit Role",
-    "locked": "Locked",
+    "allPermissions": "جميع الأذونات",
+    "permissionCount": "permissions",
+    "permissionCountOne": "1 permission",
+    "assignedUsers": "{{count}} users",
+    "assignedUsersOne": "1 user",
     "name": "Name",
     "namePlaceholder": "e.g. Team Lead",
-    "permissionCount": "permissions",
-    "permissions": "Permissions",
-    "selected": "selected",
     "slug": "Slug",
+    "description": "Define roles and assign permissions to control access across your hotline.",
+    "descriptionPlaceholder": "Brief description of this role...",
+    "permissions": "Permissions",
+    "create": "Create role",
+    "importFromTemplate": "Import from template",
+    "importDialog": {
+      "title": "Import roles from template",
+      "description": "Select roles to import from the template. Existing roles with the same slug will be skipped.",
+      "import": "Import selected",
+      "noTemplates": "No templates available"
+    },
+    "deleteConfirm": "Are you sure you want to delete this role? Members will be reassigned to the default role.",
     "slugPlaceholder": "e.g. team-lead",
+    "createRole": "Create Role",
+    "created": "Role created",
+    "deleteTitle": "Delete Role",
+    "deleted": "Role deleted",
+    "descriptionLabel": "Description",
+    "editRole": "Edit Role",
+    "locked": "Locked",
+    "selected": "selected",
     "summary": "Summary",
-    "system": "System",
     "title": "Roles & Permissions",
     "updated": "Role updated"
   },
@@ -3610,5 +3670,126 @@
       "admin-erasure": "An administrator has initiated an erasure of your account."
     },
     "explanation": "All cryptographic keys have been cleared from this device. Please contact support if you believe this was done in error."
-  }
+  },
+  "analytics": {
+    "title": "التحليلات",
+    "description": "حجم المكالمات وأوقات الاستجابة ونشاط المتطوعين",
+    "nav": "التحليلات",
+    "summary": {
+      "totalCalls": "إجمالي المكالمات",
+      "answerRate": "معدل الرد",
+      "avgDuration": "متوسط المدة",
+      "totalConversations": "إجمالي المحادثات"
+    },
+    "callVolume": {
+      "title": "حجم المكالمات",
+      "answered": "مُجاب",
+      "unanswered": "غير مُجاب",
+      "abandoned": "مُهمل",
+      "noData": "لا توجد بيانات مكالمات لهذه الفترة"
+    },
+    "hours": {
+      "title": "التوزيع الساعي",
+      "noData": "لا توجد بيانات لهذه الفترة"
+    },
+    "conversations": {
+      "title": "المحادثات",
+      "avgResponseTime": "متوسط وقت الاستجابة",
+      "avgMessages": "متوسط الرسائل",
+      "noData": "لا توجد بيانات محادثات لهذه الفترة"
+    },
+    "shifts": {
+      "title": "تغطية الوردية",
+      "noData": "لا توجد بيانات وردية"
+    },
+    "users": {
+      "title": "نشاط المتطوعين",
+      "name": "الاسم",
+      "callsAnswered": "المكالمات المُجابة",
+      "avgDuration": "متوسط المدة",
+      "notesCreated": "الملاحظات المُنشأة",
+      "noData": "لا توجد بيانات متطوعين لهذه الفترة"
+    },
+    "personal": {
+      "callsToday": "مكالمات اليوم",
+      "callsThisPeriod": "مكالمات هذه الفترة",
+      "avgDuration": "متوسط المدة",
+      "notesCreated": "الملاحظات المُنشأة"
+    },
+    "platform": {
+      "title": "تحليلات المنصة",
+      "crossHub": "عبر الهابات"
+    },
+    "dateRange": {
+      "7days": "٧ أيام",
+      "30days": "٣٠ يومًا",
+      "custom": "مخصص"
+    }
+  },
+  "security": {
+    "tabs": {
+      "devices": "Devices",
+      "sessions": "Sessions",
+      "passkeys": "Passkeys",
+      "history": "History"
+    },
+    "devices": {
+      "title": "Your Devices",
+      "limit": "devices",
+      "current": "This device",
+      "lastSeen": "Last seen",
+      "revokeTitle": "Remove device",
+      "revokeDescription": "Remove {{name}}? It will lose access to all encrypted content.",
+      "revokeConfirm": "Remove device"
+    },
+    "sessions": {
+      "title": "Active Sessions",
+      "current": "Current session",
+      "unknown": "Unknown device",
+      "created": "Created",
+      "expires": "Expires",
+      "endOthers": "End all other sessions",
+      "endOthersTitle": "End all other sessions?",
+      "endOthersDescription": "This will sign out {{count}} other sessions.",
+      "endOthersConfirm": "End sessions",
+      "lockdown": "Emergency lockdown"
+    },
+    "passkeys": {
+      "title": "Passkeys",
+      "register": "Add passkey",
+      "unnamed": "Unnamed passkey",
+      "backedUp": "Backed up",
+      "lastUsed": "Last used"
+    },
+    "history": {
+      "title": "Security History",
+      "export": "Export JSON",
+      "events": {
+        "deviceRegister": "Device registered",
+        "deviceRemove": "Device removed",
+        "deviceRename": "Device renamed",
+        "sessionCreate": "Session created",
+        "sessionTerminate": "Session terminated",
+        "sessionTerminateAll": "All sessions terminated",
+        "accountLockdown": "Account locked down",
+        "accountLockdownComplete": "Lockdown completed",
+        "webauthnRegister": "Passkey registered",
+        "webauthnAuthenticate": "Passkey authenticated",
+        "webauthnRemove": "Passkey removed",
+        "sigchainAppend": "Sigchain updated",
+        "pukRotate": "PUK rotated",
+        "hubKeyRotate": "Hub key rotated",
+        "deviceFingerprintVerified": "Device verified",
+        "passkeyRename": "Passkey renamed",
+        "loginFailed": "Login failed"
+      }
+    },
+    "lockdown": {
+      "title": "Emergency Lockdown",
+      "description": "This will terminate all other sessions and trigger key rotation for all your hubs.",
+      "warning": "This action cannot be undone. All other devices will be signed out immediately.",
+      "inProgress": "Terminating sessions and rotating keys...",
+      "complete": "Lockdown complete. {{sessions}} sessions terminated, {{hubs}} hub keys queued for rotation.",
+      "confirm": "Lock down now"
+    }  }
 }

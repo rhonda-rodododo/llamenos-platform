@@ -189,7 +189,22 @@
     "users": "Volunteers",
     "schemaBrowser": "Schema Browser",
     "providerSetup": "Provider Setup",
-    "signalRegistration": "Signal Registration"
+    "signalRegistration": "Signal Registration",
+    "devices": {
+      "title": "Device Overview",
+      "devices": "devices",
+      "verified": "Verified",
+      "unverified": "Unverified",
+      "verify": "Verify",
+      "verifyTitle": "Verify {{name}}",
+      "verifyDescription": "Compare the emojis below with the device owner. Both parties must see the same 7 emojis.",
+      "verifyInstruction": "Read these emojis aloud to the device owner and confirm they see the same sequence.",
+      "nonce": "Session nonce",
+      "newNonce": "New nonce",
+      "noMatch": "No match",
+      "match": "Emojis match",
+      "verifySuccess": "Device verified successfully"
+    }
   },
   "announcement": "Announcement",
   "announcementBody": "Announcement body",
@@ -310,7 +325,20 @@
     "statusCancelled": "Cancelled",
     "statusDraft": "Draft",
     "statusScheduled": "Scheduled",
-    "statusSent": "Sent"
+    "statusSent": "Sent",
+    "composerTitle": "New Broadcast Message",
+    "recipientCount": "{{count}} recipients",
+    "recipientCountOne": "1 recipient",
+    "retryFailed": "Retry Failed",
+    "retryDelivery": "Retry",
+    "retryingAll": "Retrying all failed...",
+    "progressLabel": "Delivery Progress",
+    "deliveryStatus": "Delivery Status",
+    "deliveryStatusPending": "Pending",
+    "deliveryStatusSent": "Sent",
+    "deliveryStatusDelivered": "Delivered",
+    "deliveryStatusFailed": "Failed",
+    "deliveryStatusOptedOut": "Opted Out"
   },
   "caseManagement": {
     "title": "Case Management",
@@ -888,7 +916,24 @@
     "liveUpdating": "Updating live...",
     "optedOut": "Opted Out",
     "deliveryDetails": "Delivery Details",
-    "noDeliveries": "No deliveries"
+    "noDeliveries": "No deliveries",
+    "retryFailed": "Retry Failed",
+    "retryDelivery": "Retry",
+    "retryAll": "Retry All Failed",
+    "retriedCount": "Reset {{count}} deliveries",
+    "deliveriesTitle": "Delivery Status",
+    "deliveriesEmpty": "No deliveries yet",
+    "progressTitle": "Live Progress",
+    "progressPending": "Pending",
+    "progressDelivered": "Delivered",
+    "progressFailed": "Failed",
+    "progressSent": "Sent",
+    "progressOptedOut": "Opted Out",
+    "deliveryId": "Delivery ID",
+    "lastAttempt": "Last Attempt",
+    "errorDetail": "Error",
+    "closeSheet": "Close",
+    "retryingAll": "Retrying all failed..."
   },
   "callActions": {
     "banAndHangUp": "Ban & Hang Up",
@@ -1004,6 +1049,9 @@
     "remove": "Remove",
     "retry": "Retry",
     "save": "Save",
+    "saved": "Saved",
+    "saving": "Saving...",
+    "deleted": "Deleted",
     "search": "Search",
     "settings": "Settings",
     "status": "Status",
@@ -1018,7 +1066,8 @@
     "comingSoon": "Coming soon",
     "hideAdvanced": "Hide Advanced",
     "showAdvanced": "Show Advanced",
-    "saved": "Saved"
+    "saved": "Saved",
+    "loadMore": "Load More"
   },
   "confirm": {
     "backup": "Confirm Backup",
@@ -1765,7 +1814,8 @@
     "settings": "Settings",
     "shifts": "Shifts",
     "triage": "Triage",
-    "users": "Volunteers"
+    "users": "Volunteers",
+    "security": "Security"
   },
   "navigation": {
     "back": "Back"
@@ -2198,28 +2248,86 @@
     "volunteer": "Volunteer"
   },
   "roles": {
-    "createRole": "Create Role",
-    "created": "Role created",
+    "system": "System",
     "default": "Default",
-    "deleteConfirm": "Are you sure you want to delete this role? Members will be reassigned to the default role.",
-    "deleteTitle": "Delete Role",
-    "deleted": "Role deleted",
-    "description": "Define roles and assign permissions to control access across your hotline.",
-    "descriptionLabel": "Description",
-    "descriptionPlaceholder": "Brief description of this role...",
-    "editRole": "Edit Role",
-    "locked": "Locked",
+    "allPermissions": "All permissions",
+    "permissionCount": "permissions",
+    "permissionCountOne": "1 permission",
+    "assignedUsers": "{{count}} users",
+    "assignedUsersOne": "{{count}} user",
     "name": "Name",
     "namePlaceholder": "e.g. Team Lead",
-    "permissionCount": "permissions",
-    "permissions": "Permissions",
-    "selected": "selected",
     "slug": "Slug",
     "slugPlaceholder": "e.g. team-lead",
+    "description": "Define roles and assign permissions to control access across your hotline.",
+    "descriptionPlaceholder": "Brief description of this role...",
+    "permissions": "Permissions",
+    "create": "Create role",
+    "importFromTemplate": "Import from template",
+    "importDialog": {
+      "title": "Import roles from template",
+      "description": "Select roles to import from the template. Existing roles with the same slug will be skipped.",
+      "import": "Import selected",
+      "noTemplates": "No templates available"
+    },
+    "deleteConfirm": {
+      "title": "Delete role",
+      "description": "Are you sure you want to delete \"{{name}}\"? Users assigned this role will lose its permissions."
+    },
+    "createRole": "Create Role",
+    "created": "Role created",
+    "deleteTitle": "Delete Role",
+    "deleted": "Role deleted",
+    "descriptionLabel": "Description",
+    "editRole": "Edit Role",
+    "locked": "Locked",
+    "selected": "selected",
     "summary": "Summary",
-    "system": "System",
     "title": "Roles & Permissions",
     "updated": "Role updated"
+  },
+  "permissions": {
+    "toggleAll": "Toggle all {{domain}} permissions",
+    "scope": "scope",
+    "none": "None",
+    "tiers": "Data access tiers",
+    "actions": "Actions",
+    "groups": {
+      "audit": "Audit",
+      "bans": "Bans",
+      "blasts": "Blasts",
+      "calls": "Calls",
+      "cases": "Cases",
+      "contacts": "Contacts",
+      "conversations": "Conversations",
+      "events": "Events",
+      "evidence": "Evidence",
+      "files": "Files",
+      "firehose": "Firehose",
+      "hubs": "Hubs",
+      "invites": "Invites",
+      "messaging": "Messaging",
+      "metrics": "Metrics",
+      "notes": "Notes",
+      "reports": "Reports",
+      "settings": "Settings",
+      "shifts": "Shifts",
+      "system": "System",
+      "telephony": "Telephony",
+      "users": "Users"
+    }
+  },
+  "create": "Create role",
+  "importFromTemplate": "Import from template",
+  "importDialog": {
+    "title": "Import roles from template",
+    "description": "Select roles to import from the template. Existing roles with the same slug will be skipped.",
+    "import": "Import selected",
+    "noTemplates": "No templates available"
+  },
+  "deleteConfirm": {
+    "title": "Delete role",
+    "description": "Are you sure you want to delete \"{{name}}\"? Users assigned this role will lose its permissions."
   },
   "save": "Save",
   "schema": {
@@ -3608,5 +3716,158 @@
       "admin-erasure": "An administrator has initiated an erasure of your account."
     },
     "explanation": "All cryptographic keys have been cleared from this device. Please contact support if you believe this was done in error."
+  },
+  "teams": {
+    "title": "Teams",
+    "createTeam": "Create Team",
+    "editTeam": "Edit Team",
+    "deleteTeam": "Delete Team",
+    "teamName": "Team Name",
+    "teamDescription": "Description",
+    "members": "Members",
+    "memberCount": "{{count}} member(s)",
+    "noTeams": "No teams yet. Create your first team.",
+    "confirmDelete": "Delete this team? This will remove all member assignments.",
+    "addMembers": "Add Members",
+    "removeMember": "Remove Member",
+    "empty": "No teams",
+    "loading": "Loading teams..."
+  },
+  "tags": {
+    "title": "Tags",
+    "createTag": "Create Tag",
+    "editTag": "Edit Tag",
+    "deleteTag": "Delete Tag",
+    "tagName": "Tag Name (slug)",
+    "tagLabel": "Display Label",
+    "tagColor": "Color",
+    "tagCategory": "Category",
+    "noTags": "No tags yet. Create your first tag.",
+    "confirmDelete": "Delete this tag?",
+    "empty": "No tags",
+    "loading": "Loading tags..."
+  },
+  "analytics": {
+    "title": "Analytics",
+    "description": "Call volume, response times, and volunteer activity",
+    "nav": "Analytics",
+    "summary": {
+      "totalCalls": "Total Calls",
+      "answerRate": "Answer Rate",
+      "avgDuration": "Avg Duration",
+      "totalConversations": "Total Conversations"
+    },
+    "callVolume": {
+      "title": "Call Volume",
+      "answered": "Answered",
+      "unanswered": "Unanswered",
+      "abandoned": "Abandoned",
+      "noData": "No call data for this period"
+    },
+    "hours": {
+      "title": "Hourly Distribution",
+      "noData": "No data for this period"
+    },
+    "conversations": {
+      "title": "Conversations",
+      "avgResponseTime": "Avg Response Time",
+      "avgMessages": "Avg Messages",
+      "noData": "No conversation data for this period"
+    },
+    "shifts": {
+      "title": "Shift Coverage",
+      "noData": "No shift data available"
+    },
+    "users": {
+      "title": "Volunteer Activity",
+      "name": "Name",
+      "callsAnswered": "Calls Answered",
+      "avgDuration": "Avg Duration",
+      "notesCreated": "Notes Created",
+      "noData": "No volunteer data for this period"
+    },
+    "personal": {
+      "callsToday": "Calls Today",
+      "callsThisPeriod": "Calls This Period",
+      "avgDuration": "Avg Duration",
+      "notesCreated": "Notes Created"
+    },
+    "platform": {
+      "title": "Platform Analytics",
+      "crossHub": "Cross-Hub"
+    },
+    "dateRange": {
+      "7days": "7 Days",
+      "30days": "30 Days",
+      "custom": "Custom"
+    }
+  },
+  "security": {
+    "tabs": {
+      "devices": "Devices",
+      "sessions": "Sessions",
+      "passkeys": "Passkeys",
+      "history": "History"
+    },
+    "devices": {
+      "title": "Your Devices",
+      "limit": "devices",
+      "current": "This device",
+      "lastSeen": "Last seen",
+      "revokeTitle": "Remove device",
+      "revokeDescription": "Remove {{name}}? It will lose access to all encrypted content.",
+      "revokeConfirm": "Remove device"
+    },
+    "sessions": {
+      "title": "Active Sessions",
+      "current": "Current session",
+      "unknown": "Unknown device",
+      "created": "Created",
+      "expires": "Expires",
+      "endOthers": "End all other sessions",
+      "endOthersTitle": "End all other sessions?",
+      "endOthersDescription": "This will sign out {{count}} other sessions.",
+      "endOthersConfirm": "End sessions",
+      "lockdown": "Emergency lockdown"
+    },
+    "passkeys": {
+      "title": "Passkeys",
+      "register": "Add passkey",
+      "unnamed": "Unnamed passkey",
+      "backedUp": "Backed up",
+      "lastUsed": "Last used"
+    },
+    "history": {
+      "title": "Security History",
+      "export": "Export JSON",
+      "events": {
+        "deviceRegister": "Device registered",
+        "deviceRemove": "Device removed",
+        "deviceRename": "Device renamed",
+        "sessionCreate": "Session created",
+        "sessionTerminate": "Session terminated",
+        "sessionTerminateAll": "All sessions terminated",
+        "accountLockdown": "Account locked down",
+        "accountLockdownComplete": "Lockdown completed",
+        "webauthnRegister": "Passkey registered",
+        "webauthnAuthenticate": "Passkey authenticated",
+        "webauthnRemove": "Passkey removed",
+        "sigchainAppend": "Sigchain updated",
+        "pukRotate": "PUK rotated",
+        "hubKeyRotate": "Hub key rotated",
+        "deviceFingerprintVerified": "Device verified",
+        "passkeyRename": "Passkey renamed",
+        "loginFailed": "Login failed"
+      }
+    },
+    "lockdown": {
+      "title": "Emergency Lockdown",
+      "description": "This will terminate all other sessions and trigger key rotation for all your hubs.",
+      "warning": "This action cannot be undone. All other devices will be signed out immediately.",
+      "inProgress": "Terminating sessions and rotating keys...",
+      "complete": "Lockdown complete. {{sessions}} sessions terminated, {{hubs}} hub keys queued for rotation.",
+      "confirm": "Lock down now"
+    }
+
   }
 }

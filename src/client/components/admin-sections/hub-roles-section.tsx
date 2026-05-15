@@ -8,7 +8,7 @@ export function HubRolesSection() {
     <RolesSectionInner
       expanded={true}
       onToggle={() => {}}
-      statusSummary={t('roles.summary', { defaultValue: 'Manage roles' })}
+      statusSummary={t('roles.description', { defaultValue: 'Define roles and assign permissions to control access across your hotline.' })}
     />
   )
 }

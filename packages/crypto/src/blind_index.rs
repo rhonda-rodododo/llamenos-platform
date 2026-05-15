@@ -23,7 +23,7 @@ type HmacSha256 = Hmac<Sha256>;
 pub fn derive_blind_index_key(hub_key: &[u8; 32], field_name: &str) -> [u8; 32] {
     let hkdf = Hkdf::<Sha256>::new(Some(LABEL_BLIND_INDEX_KEY.as_bytes()), hub_key);
     let mut okm = [0u8; 32];
-    let info = format!("{}{}", LABEL_BLIND_INDEX_FIELD, field_name);
+    let info = format!("{LABEL_BLIND_INDEX_FIELD}{field_name}");
     hkdf.expand(info.as_bytes(), &mut okm)
         .expect("HKDF expand failed");
     okm
@@ -65,16 +65,16 @@ pub fn date_blind_indexes(
 
     vec![
         (
-            format!("{}_day", field_name),
-            blind_index(hub_key, &format!("{}:day", field_name), date_str),
+            format!("{field_name}_day"),
+            blind_index(hub_key, &format!("{field_name}:day"), date_str),
         ),
         (
-            format!("{}_week", field_name),
-            blind_index(hub_key, &format!("{}:week", field_name), &week_str),
+            format!("{field_name}_week"),
+            blind_index(hub_key, &format!("{field_name}:week"), &week_str),
         ),
         (
-            format!("{}_month", field_name),
-            blind_index(hub_key, &format!("{}:month", field_name), month_str),
+            format!("{field_name}_month"),
+            blind_index(hub_key, &format!("{field_name}:month"), month_str),
         ),
     ]
 }
@@ -91,7 +91,7 @@ pub fn name_trigram_indexes(hub_key: &[u8; 32], field_name: &str, value: &str) -
         // For very short values, index the whole value
         return vec![blind_index(
             hub_key,
-            &format!("{}:trigram", field_name),
+            &format!("{field_name}:trigram"),
             &canonical,
         )];
     }
@@ -101,7 +101,7 @@ pub fn name_trigram_indexes(hub_key: &[u8; 32], field_name: &str, value: &str) -
         let trigram: String = chars[i..i + 3].iter().collect();
         tokens.push(blind_index(
             hub_key,
-            &format!("{}:trigram", field_name),
+            &format!("{field_name}:trigram"),
             &trigram,
         ));
     }

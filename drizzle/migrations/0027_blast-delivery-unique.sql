@@ -1,0 +1,1 @@
+ALTER TABLE "blast_deliveries" ADD CONSTRAINT "blast_delivery_unique" UNIQUE("blast_id","subscriber_id","channel");

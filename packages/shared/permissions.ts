@@ -69,6 +69,7 @@ export const PERMISSION_CATALOG = {
   'users:update': 'Update user profiles',
   'users:delete': 'Deactivate/delete users',
   'users:manage-roles': 'Assign/change user roles',
+  'users:manage-devices': 'View and manage user devices (admin device oversight, SAS verification)',
 
   // Shifts
   'shifts:read-own': 'Check own shift status',
@@ -185,15 +186,38 @@ export const PERMISSION_CATALOG = {
   // Hub Configuration
   'hubs:configure': 'Configure hub provisioning and setup wizard',
 
+  // Teams
+  'teams:read': 'View teams and membership',
+  'teams:manage': 'Create, edit, delete teams and manage membership',
+
+  // Tags
+  'tags:view': 'View tags in picker and on contacts',
+  'tags:create': 'Create new tags (inline or via admin UI)',
+  'tags:manage': 'Edit and delete existing tags',
+
   // System (super-admin only)
   'system:view-roles': 'View role definitions',
   'system:manage-roles': 'Create/edit/delete custom roles',
   'system:manage-hubs': 'Create/manage hubs',
   'system:create-hub': 'Create new hubs (self-serve hub creation)',
   'system:manage-instance': 'Instance-level settings',
+  // System (new — platform nav gating)
+  'system:view-platform': 'View platform settings',
+  'system:view-bans': 'View platform-wide ban list',
+  'system:view-audit': 'View platform-wide audit log',
+  'system:view-analytics': 'View platform-wide analytics',
+  'system:view-health': 'View platform health status',
 } as const
 
 export type Permission = keyof typeof PERMISSION_CATALOG
+
+/** Human-readable labels for permission domains, used in the permission picker UI. */
+/** Permission group domain keys. Display labels live in i18n at permissions.groups.* */
+export const PERMISSION_GROUP_DOMAINS = [
+  'audit', 'bans', 'blasts', 'calls', 'cases', 'contacts', 'conversations',
+  'events', 'evidence', 'files', 'firehose', 'hubs', 'invites', 'messaging',
+  'metrics', 'notes', 'reports', 'settings', 'shifts', 'system', 'tags', 'teams', 'telephony', 'users',
+] as const
 
 /** All permission domains (first part before the colon) */
 export type PermissionDomain = Permission extends `${infer D}:${string}` ? D : never
@@ -213,12 +237,17 @@ export function getPermissionsByDomain(): Record<string, { key: Permission; labe
 
 export interface Role {
   id: string
-  name: string
+  /** null for non-system roles — plaintext name stored only in encrypted envelopes */
+  name: string | null
   slug: string
   permissions: string[]
   isDefault: boolean   // ships with system
   isSystem: boolean    // can't be modified at all (super-admin)
   description: string
+  encryptedName?: string | null
+  encryptedDescription?: string | null
+  envelopes?: Array<{ adminPubkey: string; encryptedName: string; encryptedDescription: string }>
+  assignedUserCount?: number
   createdAt: string
   updatedAt: string
 }
@@ -249,6 +278,7 @@ export const DEFAULT_ROLES: Omit<Role, 'createdAt' | 'updatedAt'>[] = [
       'messaging:manage-signal',
       'hubs:configure',
       'hubs:read', 'hubs:manage-members', 'hubs:manage-keys',
+      'teams:*', 'tags:*',
       'metrics:read', 'system:view-roles',
     ],
     isDefault: true,
@@ -272,6 +302,7 @@ export const DEFAULT_ROLES: Omit<Role, 'createdAt' | 'updatedAt'>[] = [
       'cases:read-assigned', 'cases:update', 'cases:assign', 'cases:link', 'cases:unlink',
       'events:read', 'events:link', 'evidence:download',
       'hubs:read',
+      'teams:read', 'tags:view',
     ],
     isDefault: true,
     isSystem: false,
@@ -296,6 +327,7 @@ export const DEFAULT_ROLES: Omit<Role, 'createdAt' | 'updatedAt'>[] = [
       'cases:create', 'cases:read-own', 'cases:update-own',
       'events:read', 'evidence:upload',
       'hubs:read',
+      'teams:read', 'tags:view',
     ],
     isDefault: true,
     isSystem: false,
@@ -463,6 +495,37 @@ export const CHANNEL_CLAIM_PERMISSIONS: Record<string, string> = {
  * - conversations:claim-any (bypass channel restrictions)
  * - The specific channel claim permission (e.g., conversations:claim-sms)
  */
+// --- Permission Group Labels (for role editor UI) ---
+
+export const PERMISSION_GROUP_LABELS: Record<string, string> = {
+  calls: 'Calls',
+  notes: 'Notes',
+  contacts: 'Contacts',
+  reports: 'Reports',
+  conversations: 'Conversations',
+  users: 'Users',
+  shifts: 'Shifts',
+  bans: 'Bans',
+  invites: 'Invites',
+  settings: 'Settings',
+  audit: 'Audit',
+  blasts: 'Blasts',
+  files: 'Files',
+  cases: 'Cases',
+  events: 'Events',
+  evidence: 'Evidence',
+  hubs: 'Hubs',
+  firehose: 'Firehose',
+  metrics: 'Metrics',
+  telephony: 'Telephony',
+  messaging: 'Messaging',
+  system: 'System',
+  teams: 'Teams',
+  tags: 'Tags',
+}
+
+// --- Permission Validation ---
+
 /**
  * Check if a permission string exists in the PERMISSION_CATALOG.
  * Accepts exact permissions and domain wildcards (e.g. "cases:*").
