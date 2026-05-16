@@ -106,11 +106,17 @@ type ActiveShift = {
 
 function ShiftsPage() {
   const { t } = useTranslation()
-  const { isAdmin } = useAuth()
+  const { isAdmin, hasPermission } = useAuth()
   const { toast } = useToast()
   const [activeTab, setActiveTab] = useState<Tab>('schedule')
   const [clockedIn, setClockedIn] = useState(false)
   const [clockedInAt, setClockedInAt] = useState<Date | null>(null)
+
+  const canViewShifts = isAdmin || hasPermission('shifts:read')
+
+  if (!canViewShifts) {
+    return <div className="text-muted-foreground">{t('common.accessDenied')}</div>
+  }
 
   const tabs: Array<{ id: Tab; label: string; adminOnly?: boolean }> = [
     { id: 'schedule', label: t('shifts.schedule') },

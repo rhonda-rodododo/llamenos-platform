@@ -1013,7 +1013,14 @@ export async function listRoles() {
   return request<{ roles: RoleDefinition[] }>('/settings/roles')
 }
 
-export async function createRole(data: { name: string; slug: string; permissions: string[]; description: string }) {
+export async function createRole(data: {
+  id?: string
+  name?: string
+  slug: string
+  permissions: string[]
+  description: string
+  envelopes?: Array<{ adminPubkey: string; encryptedName: string; encryptedDescription: string }>
+}) {
   return request<{ role: RoleDefinition }>('/settings/roles', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -1029,6 +1036,13 @@ export async function updateRole(id: string, data: Partial<{ name: string; permi
 
 export async function deleteRole(id: string) {
   return request<{ ok: true }>(`/settings/roles/${id}`, { method: 'DELETE' })
+}
+
+export async function addRoleEnvelopes(roleId: string, envelopes: Array<{ adminPubkey: string; encryptedName: string; encryptedDescription: string }>) {
+  return request<{ ok: true }>(`/settings/roles/${roleId}/envelopes`, {
+    method: 'POST',
+    body: JSON.stringify({ envelopes }),
+  })
 }
 
 export async function getPermissionsCatalog() {
@@ -1812,6 +1826,22 @@ export async function applyTemplate(templateId: string) {
     method: 'POST',
     body: JSON.stringify({ templateId }),
     headers: { 'Content-Type': 'application/json' },
+  })
+}
+
+export async function getTemplateDetails(templateId: string) {
+  return request<{
+    id: string
+    name: string
+    description: string
+    suggestedRoles?: Array<{ name: string; slug: string; description: string; permissions: string[] }>
+  }>(hp(`/settings/cms/templates/${templateId}`))
+}
+
+export async function createRolesFromTemplate(roles: Array<{ name: string; slug: string; description: string; permissions: string[] }>) {
+  return request<{ created: Array<{ id: string; name: string }>; count: number }>(hp('/settings/entity-schema/roles/from-template'), {
+    method: 'POST',
+    body: JSON.stringify({ roles }),
   })
 }
 

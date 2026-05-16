@@ -3136,6 +3136,9 @@
   },
   "retry": "Retry",
   "retryRegistration": "Retry Registration",
+  "platformRoles": {
+    "description": "Manage platform-wide roles that apply across all hubs. Role names are end-to-end encrypted."
+  },
   "role": {
     "admin": "Admin",
     "volunteer": "Volunteer"
@@ -3164,7 +3167,10 @@
       "noTemplates": "No templates available",
       "title": "Import roles from template"
     },
+    "importAllExist": "All selected roles already exist",
     "importFromTemplate": "Import from template",
+    "importSelected": "Import {{count}} role(s)",
+    "importSuccess": "{{count}} role(s) imported",
     "locked": "Locked",
     "name": "Role name",
     "namePlaceholder": "e.g. Intake Coordinator",
@@ -3173,6 +3179,7 @@
     "permissions": "Permissions",
     "selected": "selected",
     "slug": "Slug",
+    "suggestedRoleCount": "{{count}} roles",
     "slugPlaceholder": "e.g. intake-coordinator",
     "summary": "Summary",
     "system": "System",

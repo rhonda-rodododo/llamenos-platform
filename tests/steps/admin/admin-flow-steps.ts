@@ -211,12 +211,17 @@ Then('the clear filters button should not be visible', async ({ page }) => {
 // --- Settings toggles ---
 
 Then('I should see at least one toggle switch', async ({ page }) => {
-  // Hub settings sections are collapsible — expand any collapsed sections to reveal switches
+  // Hub settings sections are collapsible — expand any collapsed sections to reveal switches.
+  // Use count() (DOM presence) rather than isVisible() to determine expansion state:
+  // Radix collapsible animates from height:0, so the [data-state="open"] element exists in
+  // the DOM immediately but has zero dimensions during animation — isVisible() would falsely
+  // return false and trigger a collapse of an already-expanded section.
   const sections = page.locator('[data-testid][data-settings-section]')
   const sectionCount = await sections.count()
   for (let i = 0; i < sectionCount; i++) {
     const section = sections.nth(i)
-    const isExpanded = await section.locator('[data-state="open"]').isVisible({ timeout: 500 }).catch(() => false)
+    const openCount = await section.locator('[data-state="open"]').count()
+    const isExpanded = openCount > 0
     if (!isExpanded) {
       // Click the trigger element using data-testid pattern "{id}-trigger"
       const sectionTestId = await section.getAttribute('data-testid')
