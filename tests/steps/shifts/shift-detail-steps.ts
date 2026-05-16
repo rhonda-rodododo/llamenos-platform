@@ -10,16 +10,19 @@ import { When, Then } from '../fixtures'
 import { TestIds } from '../../test-ids'
 import { Timeouts } from '../../helpers'
 import { listShiftsViaApi, createShiftViaApi } from '../../api-helpers'
-import { Navigation } from '../../pages/index'
+import { waitForApiAndUi } from '../../pages/index'
 
 When('I tap a shift card', async ({ page, backendRequest: request, workerHub }) => {
   // Ensure at least one shift exists so the tap has something to click.
   const existingShifts = await listShiftsViaApi(request, workerHub).catch(() => [])
   if (existingShifts.length === 0) {
     await createShiftViaApi(request, { name: `Auto-seeded Shift ${Date.now()}`, hubId: workerHub })
-    // Navigate away and back to refresh shift list
-    await Navigation.goToDashboard(page)
-    await Navigation.goToShifts(page)
+    // Hard navigation to /shifts to bypass React Query's staleTime cache.
+    // Soft navigation (goToDashboard + goToShifts) keeps the QueryClient alive, so the
+    // recently-cached empty shifts list is returned without a refetch (staleTime: 2 min).
+    await page.goto('/shifts')
+    await page.waitForLoadState('domcontentloaded')
+    await waitForApiAndUi(page)
   }
   const shiftCard = page.getByTestId(TestIds.SHIFT_CARD).first()
   await expect(shiftCard).toBeVisible({ timeout: Timeouts.ELEMENT })

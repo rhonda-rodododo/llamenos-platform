@@ -2,35 +2,43 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/lib/auth'
 import { useEffect, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { useRelaySubscription } from '@/lib/relay/hooks'
+import { useConfig } from '@/lib/config'
 import {
-  listShifts,
-  createShift,
-  updateShift,
-  deleteShift,
-  listUsers,
-  getFallbackGroup,
-  setFallbackGroup,
-  listRingGroups,
-  createRingGroup,
-  updateRingGroup,
-  deleteRingGroup,
-  addRingGroupMembers,
-  removeRingGroupMembers,
-  listActiveShifts,
-  listShiftOverrides,
-  createShiftOverride,
-  deleteShiftOverride,
-  listMyAvailabilityBlocks,
-  createAvailabilityBlock,
-  deleteAvailabilityBlock,
-  listShiftRequests,
-  approveShiftRequest,
-  rejectShiftRequest,
-  clockIn,
-  clockOut,
-  type Shift,
-  type User,
-} from '@/lib/api'
+  KIND_SHIFT_CLOCK_IN,
+  KIND_SHIFT_CLOCK_OUT,
+  KIND_SHIFT_OVERRIDE_CREATED,
+  KIND_SHIFT_REQUEST_RECEIVED,
+  KIND_SHIFT_REQUEST_REVIEWED,
+} from '@shared/event-kinds'
+import {
+  useShifts,
+  useFallbackGroup,
+  useRingGroups,
+  useShiftOverrides,
+  useMyAvailabilityBlocks,
+  useShiftRequests,
+  useActiveShifts,
+  useCreateShift,
+  useUpdateShift,
+  useDeleteShift,
+  useSetFallbackGroup,
+  useCreateRingGroup,
+  useDeleteRingGroup,
+  useAddRingGroupMembers,
+  useRemoveRingGroupMembers,
+  useClockIn,
+  useClockOut,
+  useCreateShiftOverride,
+  useDeleteShiftOverride,
+  useCreateAvailabilityBlock,
+  useDeleteAvailabilityBlock,
+  useApproveShiftRequest,
+  useRejectShiftRequest,
+  shiftKeys,
+} from '@/lib/queries/shifts'
+import { listUsers, type Shift, type User } from '@/lib/api'
 import { z } from 'zod'
 import { createShiftBodySchema } from '@protocol/schemas/shifts'
 import { useToast } from '@/lib/toast'
@@ -47,70 +55,44 @@ export const Route = createFileRoute('/shifts')({
 })
 
 const DAY_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const
+const SHIFT_KINDS = [KIND_SHIFT_CLOCK_IN, KIND_SHIFT_CLOCK_OUT, KIND_SHIFT_OVERRIDE_CREATED, KIND_SHIFT_REQUEST_RECEIVED, KIND_SHIFT_REQUEST_REVIEWED]
 
 type Tab = 'schedule' | 'ring-groups' | 'overrides' | 'availability' | 'requests' | 'active'
 
-type RingGroup = {
+type RingGroupDetail = {
   id: string
   hubId: string
   encryptedName: string
-  memberCount: number
-  createdAt: string
-}
-
-type RingGroupDetail = Omit<RingGroup, 'memberCount'> & {
-  memberCount: number
   members: Array<{ pubkey: string; addedBy: string; createdAt: string }>
-}
-
-type ShiftOverride = {
-  id: string
-  hubId: string
-  shiftId: string | null
-  date: string
-  type: string
-  userPubkeys: string[] | null
-  encryptedNote: string | null
-  createdBy: string
   createdAt: string
-}
-
-type AvailabilityBlock = {
-  id: string
-  hubId: string
-  userPubkey: string
-  startDate: string
-  endDate: string
-  encryptedReason: string | null
-  createdAt: string
-}
-
-type ShiftRequest = {
-  id: string
-  hubId: string
-  shiftId: string
-  userPubkey: string
-  type: string
-  status: string
-  reviewedBy: string | null
-  reviewedAt: string | null
-  createdAt: string
-}
-
-type ActiveShift = {
-  pubkey: string
-  hubId: string
-  startedAt: string
-  lastHeartbeat: string
 }
 
 function ShiftsPage() {
   const { t } = useTranslation()
   const { isAdmin, hasPermission } = useAuth()
   const { toast } = useToast()
+  const { currentHubId } = useConfig()
+  const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<Tab>('schedule')
   const [clockedIn, setClockedIn] = useState(false)
   const [clockedInAt, setClockedInAt] = useState<Date | null>(null)
+
+  const clockInMutation = useClockIn()
+  const clockOutMutation = useClockOut()
+
+  // WS-driven cache invalidation for all shift events
+  useRelaySubscription(currentHubId, SHIFT_KINDS, (_kind, content) => {
+    const type = content.type as string
+    if (type === 'shift:clockIn' || type === 'shift:clockOut') {
+      queryClient.invalidateQueries({ queryKey: shiftKeys.active() })
+      queryClient.invalidateQueries({ queryKey: shiftKeys.myStatus() })
+    } else if (type === 'shift:overrideCreated') {
+      queryClient.invalidateQueries({ queryKey: shiftKeys.all })
+    } else if (type === 'shift:requestReceived' || type === 'shift:requestReviewed') {
+      queryClient.invalidateQueries({ queryKey: shiftKeys.requests() })
+      queryClient.invalidateQueries({ queryKey: shiftKeys.list() })
+    }
+  })
 
   const canViewShifts = isAdmin || hasPermission('shifts:read')
 
@@ -132,11 +114,11 @@ function ShiftsPage() {
   async function handleClockToggle() {
     try {
       if (clockedIn) {
-        await clockOut()
+        await clockOutMutation.mutateAsync()
         setClockedIn(false)
         setClockedInAt(null)
       } else {
-        await clockIn()
+        await clockInMutation.mutateAsync()
         setClockedIn(true)
         setClockedInAt(new Date())
       }
@@ -202,26 +184,24 @@ function ShiftsPage() {
 // ============================================================================
 
 function ScheduleTab({ isAdmin, toast, t }: { isAdmin: boolean; toast: ReturnType<typeof useToast>['toast']; t: ReturnType<typeof useTranslation>['t'] }) {
-  const [shifts, setShifts] = useState<Shift[]>([])
   const [users, setUsers] = useState<User[]>([])
-  const [fallback, setFallback] = useState<string[]>([])
   const [showForm, setShowForm] = useState(false)
   const [editingShift, setEditingShift] = useState<Shift | null>(null)
-  const [loading, setLoading] = useState(true)
+
+  const { data: shifts = [], isLoading } = useShifts()
+  const { data: fallback = [] } = useFallbackGroup()
+  const createShiftMutation = useCreateShift()
+  const updateShiftMutation = useUpdateShift()
+  const deleteShiftMutation = useDeleteShift()
+  const setFallbackMutation = useSetFallbackGroup()
 
   useEffect(() => {
-    Promise.all([
-      listShifts().then(r => setShifts(r.shifts)),
-      listUsers().then(r => setUsers(r.users)),
-      isAdmin ? getFallbackGroup().then(r => setFallback(r.userPubkeys)) : Promise.resolve(),
-    ]).catch(() => toast(t('common.error'), 'error'))
-      .finally(() => setLoading(false))
-  }, [isAdmin])
+    listUsers().then(r => setUsers(r.users)).catch(() => {})
+  }, [])
 
   async function handleSaveFallback(selected: string[]) {
     try {
-      await setFallbackGroup(selected)
-      setFallback(selected)
+      await setFallbackMutation.mutateAsync(selected)
     } catch {
       toast(t('common.error'), 'error')
     }
@@ -245,11 +225,9 @@ function ScheduleTab({ isAdmin, toast, t }: { isAdmin: boolean; toast: ReturnTyp
           onSave={async (data) => {
             try {
               if (editingShift) {
-                const res = await updateShift(editingShift.id, data)
-                setShifts(prev => prev.map(s => s.id === editingShift.id ? res : s))
+                await updateShiftMutation.mutateAsync({ id: editingShift.id, data })
               } else {
-                const res = await createShift({ ...data, id: crypto.randomUUID() } as z.infer<typeof createShiftBodySchema>)
-                setShifts(prev => [...prev, res])
+                await createShiftMutation.mutateAsync({ ...data, id: crypto.randomUUID() } as z.infer<typeof createShiftBodySchema>)
               }
               setShowForm(false)
               setEditingShift(null)
@@ -264,7 +242,7 @@ function ScheduleTab({ isAdmin, toast, t }: { isAdmin: boolean; toast: ReturnTyp
       )}
 
       <div data-testid="shift-list" className="space-y-3">
-        {loading ? (
+        {isLoading ? (
           <div className="space-y-3">
             {Array.from({ length: 3 }).map((_, i) => (
               <Card key={i}><CardContent className="space-y-2">
@@ -314,8 +292,7 @@ function ScheduleTab({ isAdmin, toast, t }: { isAdmin: boolean; toast: ReturnTyp
                         aria-label={t('a11y.deleteItem')}
                         onClick={async () => {
                           try {
-                            await deleteShift(shift.id)
-                            setShifts(prev => prev.filter(s => s.id !== shift.id))
+                            await deleteShiftMutation.mutateAsync(shift.id)
                           } catch {
                             toast(t('common.error'), 'error')
                           }
@@ -359,43 +336,39 @@ function ScheduleTab({ isAdmin, toast, t }: { isAdmin: boolean; toast: ReturnTyp
 // ============================================================================
 
 function RingGroupsTab({ toast, t }: { toast: ReturnType<typeof useToast>['toast']; t: ReturnType<typeof useTranslation>['t'] }) {
-  const [groups, setGroups] = useState<RingGroup[]>([])
   const [users, setUsers] = useState<User[]>([])
-  const [loading, setLoading] = useState(true)
   const [editingGroup, setEditingGroup] = useState<RingGroupDetail | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [nameInput, setNameInput] = useState('')
-  const [saving, setSaving] = useState(false)
+
+  const { data: groups = [], isLoading } = useRingGroups()
+  const createMutation = useCreateRingGroup()
+  const deleteMutation = useDeleteRingGroup()
+  const addMembersMutation = useAddRingGroupMembers()
+  const removeMembersMutation = useRemoveRingGroupMembers()
 
   useEffect(() => {
-    Promise.all([
-      listRingGroups().then(r => setGroups(r.ringGroups)),
-      listUsers().then(r => setUsers(r.users)),
-    ]).catch(() => toast(t('common.error'), 'error'))
-      .finally(() => setLoading(false))
+    listUsers().then(r => setUsers(r.users)).catch(() => {})
   }, [])
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
     if (!nameInput.trim()) return
-    setSaving(true)
     try {
-      const res = await createRingGroup({ id: crypto.randomUUID(), encryptedName: nameInput.trim() })
-      setGroups(prev => [...prev, { ...res, memberCount: 0 }])
+      const res = await createMutation.mutateAsync({ id: crypto.randomUUID(), encryptedName: nameInput.trim() })
+      setEditingGroup({ ...res, members: res.members })
       setNameInput('')
       setShowForm(false)
       toast(t('common.success'), 'success')
     } catch {
       toast(t('common.error'), 'error')
-    } finally {
-      setSaving(false)
     }
   }
 
   async function handleDelete(id: string) {
     try {
-      await deleteRingGroup(id)
-      setGroups(prev => prev.filter(g => g.id !== id))
+      await deleteMutation.mutateAsync(id)
+      if (editingGroup?.id === id) setEditingGroup(null)
     } catch {
       toast(t('common.error'), 'error')
     }
@@ -403,9 +376,8 @@ function RingGroupsTab({ toast, t }: { toast: ReturnType<typeof useToast>['toast
 
   async function handleAddMembers(groupId: string, pubkeys: string[]) {
     try {
-      const res = await addRingGroupMembers(groupId, pubkeys)
-      setEditingGroup({ ...res, memberCount: res.members.length })
-      setGroups(prev => prev.map(g => g.id === groupId ? { ...g, memberCount: res.members.length } : g))
+      const res = await addMembersMutation.mutateAsync({ id: groupId, pubkeys })
+      setEditingGroup({ ...res, members: res.members })
     } catch {
       toast(t('common.error'), 'error')
     }
@@ -413,15 +385,14 @@ function RingGroupsTab({ toast, t }: { toast: ReturnType<typeof useToast>['toast
 
   async function handleRemoveMember(groupId: string, pubkey: string) {
     try {
-      const res = await removeRingGroupMembers(groupId, [pubkey])
-      setEditingGroup({ ...res, memberCount: res.members.length })
-      setGroups(prev => prev.map(g => g.id === groupId ? { ...g, memberCount: res.members.length } : g))
+      const res = await removeMembersMutation.mutateAsync({ id: groupId, pubkeys: [pubkey] })
+      setEditingGroup({ ...res, members: res.members })
     } catch {
       toast(t('common.error'), 'error')
     }
   }
 
-  if (loading) return <div className="py-8 text-center text-muted-foreground">{t('common.loading')}</div>
+  if (isLoading) return <div className="py-8 text-center text-muted-foreground">{t('common.loading')}</div>
 
   return (
     <div className="space-y-4">
@@ -443,7 +414,7 @@ function RingGroupsTab({ toast, t }: { toast: ReturnType<typeof useToast>['toast
                 placeholder={t('shifts.ringGroups.name')}
                 required
               />
-              <Button type="submit" disabled={saving}>{saving ? t('common.loading') : t('common.save')}</Button>
+              <Button type="submit" disabled={createMutation.isPending}>{createMutation.isPending ? t('common.loading') : t('common.save')}</Button>
               <Button type="button" variant="outline" onClick={() => setShowForm(false)}>{t('common.cancel')}</Button>
             </form>
           </CardContent>
@@ -477,8 +448,10 @@ function RingGroupsTab({ toast, t }: { toast: ReturnType<typeof useToast>['toast
                     data-testid="ring-group-edit-btn"
                     onClick={async () => {
                       try {
-                        const res = await updateRingGroup(group.id, { encryptedName: group.encryptedName })
-                        setEditingGroup({ ...res, memberCount: res.members.length })
+                        // Load detail view for member management
+                        const { getRingGroup } = await import('@/lib/api')
+                        const res = await getRingGroup(group.id)
+                        setEditingGroup(res)
                       } catch {
                         toast(t('common.error'), 'error')
                       }
@@ -551,39 +524,28 @@ function OverridesTab({ toast, t }: { toast: ReturnType<typeof useToast>['toast'
   const defaultTo = new Date(now.getFullYear(), now.getMonth() + 2, 0).toISOString().slice(0, 10)
   const [from, setFrom] = useState(defaultFrom)
   const [to, setTo] = useState(defaultTo)
-  const [overrides, setOverrides] = useState<ShiftOverride[]>([])
-  const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [formDate, setFormDate] = useState(defaultFrom)
   const [formType, setFormType] = useState<'cancel' | 'substitute'>('cancel')
-  const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
-    listShiftOverrides(from, to)
-      .then(r => setOverrides(r.overrides))
-      .catch(() => toast(t('common.error'), 'error'))
-      .finally(() => setLoading(false))
-  }, [from, to])
+  const { data: overrides = [], isLoading } = useShiftOverrides(from, to)
+  const createMutation = useCreateShiftOverride()
+  const deleteMutation = useDeleteShiftOverride()
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
-    setSaving(true)
     try {
-      const res = await createShiftOverride({ id: crypto.randomUUID(), date: formDate, type: formType })
-      setOverrides(prev => [...prev, res])
+      await createMutation.mutateAsync({ id: crypto.randomUUID(), date: formDate, type: formType })
       setShowForm(false)
       toast(t('common.success'), 'success')
     } catch {
       toast(t('common.error'), 'error')
-    } finally {
-      setSaving(false)
     }
   }
 
   async function handleDelete(id: string) {
     try {
-      await deleteShiftOverride(id)
-      setOverrides(prev => prev.filter(o => o.id !== id))
+      await deleteMutation.mutateAsync(id)
     } catch {
       toast(t('common.error'), 'error')
     }
@@ -628,7 +590,7 @@ function OverridesTab({ toast, t }: { toast: ReturnType<typeof useToast>['toast'
                 </div>
               </div>
               <div className="flex gap-2">
-                <Button type="submit" disabled={saving}>{saving ? t('common.loading') : t('common.save')}</Button>
+                <Button type="submit" disabled={createMutation.isPending}>{createMutation.isPending ? t('common.loading') : t('common.save')}</Button>
                 <Button type="button" variant="outline" onClick={() => setShowForm(false)}>{t('common.cancel')}</Button>
               </div>
             </form>
@@ -637,7 +599,7 @@ function OverridesTab({ toast, t }: { toast: ReturnType<typeof useToast>['toast'
       )}
 
       <div data-testid="override-list" className="space-y-2">
-        {loading ? (
+        {isLoading ? (
           <div className="py-4 text-center text-muted-foreground">{t('common.loading')}</div>
         ) : overrides.length === 0 ? (
           <Card><CardContent>
@@ -680,41 +642,30 @@ function OverridesTab({ toast, t }: { toast: ReturnType<typeof useToast>['toast'
 // ============================================================================
 
 function AvailabilityTab({ toast, t }: { toast: ReturnType<typeof useToast>['toast']; t: ReturnType<typeof useTranslation>['t'] }) {
-  const [blocks, setBlocks] = useState<AvailabilityBlock[]>([])
-  const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [formStart, setFormStart] = useState('')
   const [formEnd, setFormEnd] = useState('')
-  const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
-    listMyAvailabilityBlocks()
-      .then(r => setBlocks(r.blocks))
-      .catch(() => toast(t('common.error'), 'error'))
-      .finally(() => setLoading(false))
-  }, [])
+  const { data: blocks = [], isLoading } = useMyAvailabilityBlocks()
+  const createMutation = useCreateAvailabilityBlock()
+  const deleteMutation = useDeleteAvailabilityBlock()
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
-    setSaving(true)
     try {
-      const res = await createAvailabilityBlock({ id: crypto.randomUUID(), startDate: formStart, endDate: formEnd })
-      setBlocks(prev => [...prev, res])
+      await createMutation.mutateAsync({ id: crypto.randomUUID(), startDate: formStart, endDate: formEnd })
       setShowForm(false)
       setFormStart('')
       setFormEnd('')
       toast(t('common.success'), 'success')
     } catch {
       toast(t('common.error'), 'error')
-    } finally {
-      setSaving(false)
     }
   }
 
   async function handleDelete(id: string) {
     try {
-      await deleteAvailabilityBlock(id)
-      setBlocks(prev => prev.filter(b => b.id !== id))
+      await deleteMutation.mutateAsync(id)
     } catch {
       toast(t('common.error'), 'error')
     }
@@ -744,7 +695,7 @@ function AvailabilityTab({ toast, t }: { toast: ReturnType<typeof useToast>['toa
                 </div>
               </div>
               <div className="flex gap-2">
-                <Button type="submit" disabled={saving}>{saving ? t('common.loading') : t('common.save')}</Button>
+                <Button type="submit" disabled={createMutation.isPending}>{createMutation.isPending ? t('common.loading') : t('common.save')}</Button>
                 <Button type="button" variant="outline" onClick={() => setShowForm(false)}>{t('common.cancel')}</Button>
               </div>
             </form>
@@ -753,7 +704,7 @@ function AvailabilityTab({ toast, t }: { toast: ReturnType<typeof useToast>['toa
       )}
 
       <div data-testid="availability-list" className="space-y-2">
-        {loading ? (
+        {isLoading ? (
           <div className="py-4 text-center text-muted-foreground">{t('common.loading')}</div>
         ) : blocks.length === 0 ? (
           <Card><CardContent>
@@ -794,20 +745,13 @@ function AvailabilityTab({ toast, t }: { toast: ReturnType<typeof useToast>['toa
 // ============================================================================
 
 function RequestsTab({ toast, t }: { toast: ReturnType<typeof useToast>['toast']; t: ReturnType<typeof useTranslation>['t'] }) {
-  const [requests, setRequests] = useState<ShiftRequest[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    listShiftRequests()
-      .then(r => setRequests(r.requests))
-      .catch(() => toast(t('common.error'), 'error'))
-      .finally(() => setLoading(false))
-  }, [])
+  const { data: requests = [], isLoading } = useShiftRequests()
+  const approveMutation = useApproveShiftRequest()
+  const rejectMutation = useRejectShiftRequest()
 
   async function handleApprove(id: string) {
     try {
-      const res = await approveShiftRequest(id)
-      setRequests(prev => prev.map(r => r.id === id ? res : r))
+      await approveMutation.mutateAsync(id)
       toast(t('common.success'), 'success')
     } catch {
       toast(t('common.error'), 'error')
@@ -816,8 +760,7 @@ function RequestsTab({ toast, t }: { toast: ReturnType<typeof useToast>['toast']
 
   async function handleReject(id: string) {
     try {
-      const res = await rejectShiftRequest(id)
-      setRequests(prev => prev.map(r => r.id === id ? res : r))
+      await rejectMutation.mutateAsync(id)
       toast(t('common.success'), 'success')
     } catch {
       toast(t('common.error'), 'error')
@@ -827,7 +770,7 @@ function RequestsTab({ toast, t }: { toast: ReturnType<typeof useToast>['toast']
   return (
     <div className="space-y-4">
       <div data-testid="requests-list" className="space-y-2">
-        {loading ? (
+        {isLoading ? (
           <div className="py-4 text-center text-muted-foreground">{t('common.loading')}</div>
         ) : requests.length === 0 ? (
           <Card><CardContent>
@@ -889,21 +832,13 @@ function RequestsTab({ toast, t }: { toast: ReturnType<typeof useToast>['toast']
 // Active Volunteers Tab (admin view)
 // ============================================================================
 
-function ActiveTab({ toast, t }: { toast: ReturnType<typeof useToast>['toast']; t: ReturnType<typeof useTranslation>['t'] }) {
-  const [active, setActive] = useState<ActiveShift[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    listActiveShifts()
-      .then(r => setActive(r.activeShifts))
-      .catch(() => toast(t('common.error'), 'error'))
-      .finally(() => setLoading(false))
-  }, [])
+function ActiveTab({ t }: { toast: ReturnType<typeof useToast>['toast']; t: ReturnType<typeof useTranslation>['t'] }) {
+  const { data: active = [], isLoading } = useActiveShifts()
 
   return (
     <div className="space-y-4">
       <div data-testid="active-list" className="space-y-2">
-        {loading ? (
+        {isLoading ? (
           <div className="py-4 text-center text-muted-foreground">{t('common.loading')}</div>
         ) : active.length === 0 ? (
           <Card><CardContent>

@@ -53,6 +53,25 @@ export const KIND_FIREHOSE_REPORT = 1032
 
 // --- Ephemeral Events (not persisted, broadcast only) ---
 
+// --- Shift Events (regular, persisted) ---
+
+/** Volunteer clocked in to a shift */
+export const KIND_SHIFT_CLOCK_IN = 1040
+
+/** Volunteer clocked out of a shift */
+export const KIND_SHIFT_CLOCK_OUT = 1041
+
+/** Shift override created (cancel or substitute) */
+export const KIND_SHIFT_OVERRIDE_CREATED = 1042
+
+/** Shift join/leave request received */
+export const KIND_SHIFT_REQUEST_RECEIVED = 1043
+
+/** Shift join/leave request reviewed (approved or denied) */
+export const KIND_SHIFT_REQUEST_REVIEWED = 1044
+
+// --- Ephemeral Events (not persisted, broadcast only) ---
+
 /** Volunteer presence update — online counts, availability */
 export const KIND_PRESENCE_UPDATE = 20000
 
