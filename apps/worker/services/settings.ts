@@ -520,7 +520,7 @@ export class SettingsService {
         set: { timestamps: recent },
       })
 
-    return { limited: recent.length >= data.maxPerMinute }
+    return { limited: recent.length > data.maxPerMinute }
   }
 
   // =========================================================================
@@ -3036,9 +3036,14 @@ export class SettingsService {
   // Test Reset (demo/development only)
   // =========================================================================
 
-  /** Clear all rate limit counters — used in BDD tests to prevent cross-scenario bleed. */
-  async clearRateLimits(): Promise<void> {
-    await this.db.delete(rateLimits)
+  /** Clear rate limit counters — used in BDD tests to prevent cross-scenario bleed.
+   *  If prefix is provided, only clears keys starting with that prefix. */
+  async clearRateLimits(prefix?: string): Promise<void> {
+    if (prefix) {
+      await this.db.delete(rateLimits).where(sql`${rateLimits.key} LIKE ${prefix + '%'}`)
+    } else {
+      await this.db.delete(rateLimits)
+    }
   }
 
   async reset(env: {
