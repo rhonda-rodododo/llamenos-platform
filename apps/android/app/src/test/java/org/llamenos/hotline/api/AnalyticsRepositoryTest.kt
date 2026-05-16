@@ -1,7 +1,8 @@
 package org.llamenos.hotline.api
 
-import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -21,40 +22,35 @@ class AnalyticsRepositoryTest {
 
     // ── URL path construction ─────────────────────────────────────────
 
+    // Note: apiService.request() is an inline function and cannot be mocked by MockK.
+    // We short-circuit by having hp() throw before request() is ever called,
+    // then assert on the captured path argument.
+
     @Test
     fun `getPersonalStats constructs hub-prefixed analytics-me path`() = runTest {
-        var capturedPath = ""
-        coEvery { apiService.hp(any()) } answers {
-            capturedPath = firstArg()
-            firstArg()
-        }
-        repo.getPersonalStats()
-        assertTrue("Path should contain /analytics/me: $capturedPath",
-            capturedPath.contains("/analytics/me"))
+        val pathSlot = slot<String>()
+        every { apiService.hp(capture(pathSlot)) } throws RuntimeException("short-circuit")
+        try { repo.getPersonalStats() } catch (_: RuntimeException) {}
+        assertTrue("Path should contain /analytics/me: ${pathSlot.captured}",
+            pathSlot.captured.contains("/analytics/me"))
     }
 
     @Test
     fun `getCallMetrics constructs analytics-calls path`() = runTest {
-        var capturedPath = ""
-        coEvery { apiService.hp(any()) } answers {
-            capturedPath = firstArg()
-            firstArg()
-        }
-        repo.getCallMetrics()
-        assertTrue("Path should contain /analytics/calls: $capturedPath",
-            capturedPath.contains("/analytics/calls"))
+        val pathSlot = slot<String>()
+        every { apiService.hp(capture(pathSlot)) } throws RuntimeException("short-circuit")
+        try { repo.getCallMetrics() } catch (_: RuntimeException) {}
+        assertTrue("Path should contain /analytics/calls: ${pathSlot.captured}",
+            pathSlot.captured.contains("/analytics/calls"))
     }
 
     @Test
     fun `getCallMetrics passes date range as query params`() = runTest {
-        var capturedPath = ""
-        coEvery { apiService.hp(any()) } answers {
-            capturedPath = firstArg()
-            firstArg()
-        }
-        repo.getCallMetrics(from = "2026-05-01T00:00:00Z", to = "2026-05-07T23:59:59Z")
-        assertTrue("Path should contain from param: $capturedPath", capturedPath.contains("from="))
-        assertTrue("Path should contain to param: $capturedPath", capturedPath.contains("to="))
+        val pathSlot = slot<String>()
+        every { apiService.hp(capture(pathSlot)) } throws RuntimeException("short-circuit")
+        try { repo.getCallMetrics(from = "2026-05-01T00:00:00Z", to = "2026-05-07T23:59:59Z") } catch (_: RuntimeException) {}
+        assertTrue("Path should contain from param: ${pathSlot.captured}", pathSlot.captured.contains("from="))
+        assertTrue("Path should contain to param: ${pathSlot.captured}", pathSlot.captured.contains("to="))
     }
 
     // ── Formatting helpers ────────────────────────────────────────────
