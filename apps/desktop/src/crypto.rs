@@ -420,6 +420,47 @@ pub fn sframe_derive_key(
     Ok(hex::encode(key))
 }
 
+// ── SAS emoji verification ─────────────────────────────────────────
+
+/// Derive 7 SAS emoji indices from two Ed25519 public keys and a random nonce.
+/// Both parties compute the same result regardless of argument order.
+/// Returns an array of 7 indices (0-63) and the corresponding emoji strings.
+#[tauri::command]
+pub fn derive_sas(
+    pubkey_a_hex: String,
+    pubkey_b_hex: String,
+    nonce_hex: String,
+) -> Result<serde_json::Value, String> {
+    let pk_a_bytes = hex::decode(&pubkey_a_hex).map_err(err_str)?;
+    let pk_b_bytes = hex::decode(&pubkey_b_hex).map_err(err_str)?;
+    let nonce_bytes = hex::decode(&nonce_hex).map_err(err_str)?;
+
+    if pk_a_bytes.len() != 32 {
+        return Err(format!("pubkey_a must be 32 bytes, got {}", pk_a_bytes.len()));
+    }
+    if pk_b_bytes.len() != 32 {
+        return Err(format!("pubkey_b must be 32 bytes, got {}", pk_b_bytes.len()));
+    }
+    if nonce_bytes.len() != 32 {
+        return Err(format!("nonce must be 32 bytes, got {}", nonce_bytes.len()));
+    }
+
+    let mut pk_a = [0u8; 32];
+    let mut pk_b = [0u8; 32];
+    let mut nonce = [0u8; 32];
+    pk_a.copy_from_slice(&pk_a_bytes);
+    pk_b.copy_from_slice(&pk_b_bytes);
+    nonce.copy_from_slice(&nonce_bytes);
+
+    let indices = sas::derive_sas(&pk_a, &pk_b, &nonce).map_err(err_str)?;
+    let emojis: Vec<&str> = indices.iter().map(|&i| sas::sas_emoji(i)).collect();
+
+    Ok(serde_json::json!({
+        "indices": indices,
+        "emojis": emojis,
+    }))
+}
+
 // ── Hub event decryption (H2 hardening — symmetric key stays in Rust) ──
 
 /// Store a hub symmetric key in CryptoState. Called after unwrapping from HPKE envelope.
