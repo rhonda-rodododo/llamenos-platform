@@ -44,10 +44,18 @@ class ActiveCallSteps : BaseSteps() {
         val signingPubkey = getSigningPubkey() ?: "admin"
         Log.d("ActiveCallSteps", "Using pubkey for answer: ${signingPubkey.take(16)}...")
 
+        // Create a shift with this volunteer so call routing works
+        val hubId = ScenarioHooks.currentHubId
+        try {
+            SimulationClient.createShift(signingPubkey, hubId.ifEmpty { null })
+            Log.d("ActiveCallSteps", "Created test shift for ${signingPubkey.take(16)}... in hub $hubId")
+        } catch (e: Throwable) {
+            Log.w("ActiveCallSteps", "Shift creation failed: ${e.message}")
+        }
+
         // Simulate an incoming call and answer it via the test backend.
         // The call will then appear on the dashboard as an active call card.
         try {
-            val hubId = ScenarioHooks.currentHubId
             Log.d("ActiveCallSteps", "Simulating call in hub: $hubId")
             val callResult = SimulationClient.simulateIncomingCall(
                 callerNumber = "+15559${System.currentTimeMillis().toString().takeLast(6)}",

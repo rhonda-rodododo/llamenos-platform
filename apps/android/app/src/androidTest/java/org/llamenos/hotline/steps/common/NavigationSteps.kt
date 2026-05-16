@@ -1,12 +1,17 @@
 package org.llamenos.hotline.steps.common
 
+import android.util.Log
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import dagger.hilt.android.EntryPointAccessors
 import io.cucumber.java.en.Given
 import io.cucumber.java.en.Then
 import io.cucumber.java.en.When
+import org.llamenos.hotline.LlamenosApp
+import org.llamenos.hotline.di.CryptoEntryPoint
+import org.llamenos.hotline.helpers.SimulationClient
 import org.llamenos.hotline.steps.BaseSteps
 
 /**
@@ -145,6 +150,17 @@ class NavigationSteps : BaseSteps() {
     @Given("I am logged in as an admin")
     fun iAmLoggedInAsAnAdmin() {
         navigateToMainScreen()
+
+        // Promote to admin so admin-only UI is accessible
+        val signingPubkey = readSigningPubkey()
+        if (signingPubkey != null) {
+            try {
+                SimulationClient.promoteToAdmin(signingPubkey)
+                Log.d("NavigationSteps", "Promoted to admin: ${signingPubkey.take(16)}...")
+            } catch (e: Throwable) {
+                Log.w("NavigationSteps", "Admin promotion failed: ${e.message}")
+            }
+        }
     }
 
     @Given("I am logged in as a volunteer")
@@ -222,6 +238,21 @@ class NavigationSteps : BaseSteps() {
                 } catch (_: Throwable) { /* admin card may not exist */ }
             }
             else -> navigateToTab(NAV_DASHBOARD)
+        }
+    }
+
+    // ---- Helpers ----
+
+    private fun readSigningPubkey(): String? {
+        return try {
+            val entryPoint = EntryPointAccessors.fromApplication(
+                LlamenosApp.instance,
+                CryptoEntryPoint::class.java,
+            )
+            entryPoint.cryptoService().signingPubkeyHex
+        } catch (e: Throwable) {
+            Log.w("NavigationSteps", "readSigningPubkey failed: ${e.message}")
+            null
         }
     }
 

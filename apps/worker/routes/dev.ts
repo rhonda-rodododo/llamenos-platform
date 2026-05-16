@@ -196,6 +196,43 @@ dev.post('/test-promote-admin', async (c) => {
   return c.json({ ok: true, pubkey })
 })
 
+// ─── Shift Creation (E2E test helpers) ──────────────────────────────────────
+// Creates a shift covering the current time with a specific volunteer on it.
+// Active call simulation requires on-shift volunteers for call routing.
+
+dev.post('/test-create-shift', async (c) => {
+  if (c.env.ENVIRONMENT !== 'development') {
+    return c.json({ error: 'Not Found' }, 404)
+  }
+  if (!checkResetSecret(c)) {
+    return c.json({ error: 'Not Found' }, 404)
+  }
+  const body = await c.req.json().catch(() => ({})) as { pubkey?: string; hubId?: string }
+  if (!body.pubkey) {
+    return c.json({ error: 'pubkey is required' }, 400)
+  }
+  const services = c.get('services')
+  const hubId = body.hubId ?? ''
+  try {
+    const now = new Date()
+    const currentDay = now.getUTCDay()
+    const hour = now.getUTCHours()
+    const startTime = `${String(Math.max(0, hour - 1)).padStart(2, '0')}:00`
+    const endTime = `${String(Math.min(23, hour + 1)).padStart(2, '0')}:59`
+    await services.shifts.create(hubId, {
+      encryptedName: btoa('BDD Test Shift'),
+      startTime,
+      endTime,
+      days: [currentDay],
+      userPubkeys: [body.pubkey],
+    })
+    return c.json({ ok: true })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Failed to create shift'
+    return c.json({ ok: false, error: msg })
+  }
+})
+
 // ─── CMS Test Setup (E2E test helpers) ──────────────────────────────────────
 // Sets up CMS data for mobile E2E tests that can't call authenticated API endpoints.
 // Gated by ENVIRONMENT=development + DEV_RESET_SECRET / E2E_TEST_SECRET.
@@ -342,6 +379,26 @@ dev.post('/test-setup-cms', async (c) => {
     } catch { /* ignore record creation failures */ }
   }
 
+  // 5. Create triage-eligible reports so triage screen has data
+  let reportId: string | null = null
+  try {
+    // channelType 'reports' is used by the triage system — it's a text column
+    // in the DB but typed as MessagingChannelType | 'web' in the service interface.
+    // Use direct DB insert to avoid type mismatch.
+    const report = await services.conversations.create({
+      hubId,
+      channelType: 'web',
+      status: 'waiting',
+      metadata: {
+        type: 'report',
+        reportTitle: 'Test Triage Report',
+        reportCategory: 'general',
+        conversionStatus: 'pending',
+      },
+    })
+    reportId = report?.id ?? null
+  } catch { /* ignore — triage tests will show empty state */ }
+
   return c.json({
     ok: true,
     templateId,
@@ -350,6 +407,7 @@ dev.post('/test-setup-cms', async (c) => {
     entityTypeCount: entityTypes.length,
     entityTypes: entityTypes.map(et => ({ id: et.id, name: et.name })),
     sampleRecordId: recordId,
+    reportId,
   })
 })
 

@@ -21,4 +21,18 @@ import io.cucumber.junit.CucumberOptions
     glue = ["org.llamenos.hotline.steps"],
     tags = "@android and not @wip",
 )
-class CucumberHiltRunner : CucumberAndroidJUnitRunner()
+class CucumberHiltRunner : CucumberAndroidJUnitRunner() {
+
+    override fun onCreate(arguments: android.os.Bundle) {
+        // Override compile-time @CucumberOptions features with runtime instrumentation arg.
+        // CI sharding passes cucumber.features="features/path/a.feature,features/path/b.feature"
+        // via -Pandroid.testInstrumentationRunnerArguments.cucumber.features=...
+        // Without this override, @CucumberOptions(features=["features"]) takes precedence
+        // and all shards run all tests.
+        val shardFeatures = arguments.getString("cucumber.features")
+        if (!shardFeatures.isNullOrBlank()) {
+            arguments.putString("cucumber.features", shardFeatures)
+        }
+        super.onCreate(arguments)
+    }
+}
