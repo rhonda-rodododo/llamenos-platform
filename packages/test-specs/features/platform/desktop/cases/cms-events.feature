@@ -77,6 +77,7 @@ Feature: Event Management
     Given an event exists
     And arrest cases exist
     When I view the event detail
+    And I click the "Cases" tab
     And I click the "Link Case" button
     And I search for a case by number
     And I select the case from the search results
@@ -87,6 +88,7 @@ Feature: Event Management
     Given an event exists
     And a report exists
     When I view the event detail
+    And I click the "Reports" tab
     And I click the "Link Report" button
     And I select the report
     Then the report should appear in the event's linked reports
