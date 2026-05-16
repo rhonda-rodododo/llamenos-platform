@@ -252,6 +252,7 @@ export const TestIds = {
   SETTINGS_ENTITY_TYPES: 'entity-types',
   SETTINGS_TEMPLATES: 'templates',
   SETTINGS_REPORT_TYPES: 'report-types',
+  SETTINGS_ACCOUNT_ERASURE: 'account-erasure',
 
   // ============ Theme ============
   THEME_SYSTEM: 'theme-system',
@@ -351,6 +352,7 @@ export const sectionTestIdMap: Record<string, string> = {
   'Entity Types': TestIds.SETTINGS_ENTITY_TYPES,
   'Templates': TestIds.SETTINGS_TEMPLATES,
   'Report Types': TestIds.SETTINGS_REPORT_TYPES,
+  'Account Erasure': TestIds.SETTINGS_ACCOUNT_ERASURE,
 }
 
 /**

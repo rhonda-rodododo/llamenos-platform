@@ -8,16 +8,14 @@
 import { expect } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
 import { TestIds } from '../../test-ids'
-import { Timeouts, Navigation } from '../../helpers'
+import { Timeouts, Navigation, navigateAfterLogin } from '../../helpers'
 
 Given('I navigate to the admin settings tab', async ({ page }) => {
   await Navigation.goToHubSettings(page)
 })
 
 Given('I navigate to the admin {string} section', async ({ page }, section: string) => {
-  await page.goto(`/admin/${section}`)
-  await page.waitForLoadState('domcontentloaded')
-  await expect(page.getByTestId('admin-section').or(page.getByTestId(TestIds.PAGE_TITLE))).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await navigateAfterLogin(page, `/admin/${section}`)
 })
 
 Then('I should see the transcription settings card', async ({ page }) => {

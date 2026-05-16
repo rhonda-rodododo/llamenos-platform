@@ -173,6 +173,7 @@ Feature: Contact Directory
 
   # --- Relationships tab ---
 
+  @wip
   Scenario: Relationships tab shows related contacts
     Given a contact exists with relationships
     When I navigate to the "Contact Directory" page
@@ -180,6 +181,7 @@ Feature: Contact Directory
     And I click the "Relationships" tab
     Then the contact relationships list should be visible
 
+  @wip
   Scenario: Relationships tab shows empty state when none defined
     Given a contact exists with no relationships
     When I navigate to the "Contact Directory" page

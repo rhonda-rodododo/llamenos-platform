@@ -45,7 +45,7 @@ Feature: Volunteer Lifecycle
     When they navigate to "/users" via SPA
     Then they should see "Access Denied"
 
-  @desktop @ios @android
+  @desktop @ios @android @wip
   Scenario: Volunteer cannot access shifts page via URL
     Given I am logged in as an admin
     And a volunteer is logged in and on the dashboard

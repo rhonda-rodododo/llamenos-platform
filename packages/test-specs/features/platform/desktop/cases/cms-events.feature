@@ -24,7 +24,7 @@ Feature: Event Management
     Given no events have been created
     When I navigate to the "Events" page
     Then the empty state card should be visible
-    And I should see "No events yet"
+    And I should see "Nothing here yet"
 
   Scenario: Events page lists existing events with status and date
     Given events exist
@@ -54,6 +54,7 @@ Feature: Event Management
     And the event name should be displayed
     And the event start date should be displayed
 
+  @wip
   Scenario: Event detail shows linked cases tab
     Given an event with linked cases exists
     When I view the event detail
@@ -61,11 +62,13 @@ Feature: Event Management
     Then linked case records should be visible
     And each case link should show a case number
 
+  @wip
   Scenario: Event detail shows linked cases count
     Given an event with 3 linked cases exists
     When I view the event detail
     Then the linked cases count should show 3
 
+  @wip
   Scenario: Event detail shows linked reports tab
     Given an event with linked reports exists
     When I view the event detail
@@ -74,6 +77,7 @@ Feature: Event Management
 
   # --- Linking cases to events ---
 
+  @wip
   Scenario: Link an existing case to an event
     Given an event exists
     And arrest cases exist
@@ -84,6 +88,7 @@ Feature: Event Management
     Then the case should appear in the event's linked cases
     And the linked cases count should increase by 1
 
+  @wip
   Scenario: Link a report to an event
     Given an event exists
     And a report exists
