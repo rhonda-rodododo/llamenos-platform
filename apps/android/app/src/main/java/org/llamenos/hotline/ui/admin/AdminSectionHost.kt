@@ -13,6 +13,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import org.llamenos.hotline.R
+import org.llamenos.hotline.ui.analytics.AnalyticsScreen
 
 @Composable
 fun AdminSectionHost(
@@ -110,13 +111,13 @@ fun AdminSectionHost(
             "signal" -> Text(stringResource(R.string.admin_nav_items_signal))
             "bans" -> BanListTab(viewModel = viewModel)
             "audit" -> AuditLogTab(viewModel = viewModel)
-            "analytics" -> Text(stringResource(R.string.admin_nav_items_analytics))
+            "analytics" -> AnalyticsScreen()
             "health" -> SystemHealthTab(viewModel = viewModel)
             "hubs" -> Text(stringResource(R.string.admin_nav_items_hubs))
             "platform-roles" -> Text(stringResource(R.string.admin_nav_items_platform_roles))
             "platform-bans" -> BanListTab(viewModel = viewModel)
             "platform-audit" -> AuditLogTab(viewModel = viewModel)
-            "platform-analytics" -> Text(stringResource(R.string.admin_nav_items_platform_analytics))
+            "platform-analytics" -> AnalyticsScreen()
             "platform-health" -> SystemHealthTab(viewModel = viewModel)
             "platform-settings" -> Text(stringResource(R.string.admin_nav_items_platform_settings))
             "gdpr-erasure" -> ErasureQueueTab(viewModel = viewModel)

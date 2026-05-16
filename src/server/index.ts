@@ -178,6 +178,9 @@ async function lookupUserHubs(pubkey: string): Promise<{ hubs: string[] } | null
 
 export default {
   port,
+  // Disable idle timeout so long-running dev/test operations (e.g. DB reset) can complete.
+  // Default Bun HTTP idle timeout is 10s, which kills test-reset before it finishes.
+  idleTimeout: 0,
   fetch(req: Request, server: import('bun').Server<WsConnectionData>): Response | Promise<Response> {
     // Handle WebSocket upgrade requests
     const url = new URL(req.url)

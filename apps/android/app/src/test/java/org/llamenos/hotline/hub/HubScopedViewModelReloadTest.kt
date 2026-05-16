@@ -31,6 +31,7 @@ import org.llamenos.hotline.ui.calls.CallHistoryViewModel
 import org.llamenos.hotline.ui.cases.CaseManagementViewModel
 import org.llamenos.hotline.ui.contacts.ContactsViewModel
 import org.llamenos.hotline.ui.conversations.ConversationsViewModel
+import org.llamenos.hotline.api.AnalyticsRepository
 import org.llamenos.hotline.ui.dashboard.DashboardViewModel
 import org.llamenos.hotline.ui.events.EventsViewModel
 import org.llamenos.hotline.ui.messaging.BlastsViewModel
@@ -322,6 +323,7 @@ class HubScopedViewModelReloadTest {
                 makeApiService(activeHubState),
                 mockk<SessionState>(relaxed = true),
                 activeHubState,
+                mockk<AnalyticsRepository>(relaxed = true),
             )
             val getCount = countEmissionsInBackground(vm.uiState)
             assertTwoHubChangesProduceTwoLoadCycles(hubFlow, getCount, "DashboardViewModel")
