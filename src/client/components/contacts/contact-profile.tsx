@@ -351,23 +351,35 @@ function RelationshipsTab({ contactId }: { contactId: string }) {
 
   const canWrite = hasPermission('contacts:manage-relationships')
 
-  if (relationships.length === 0 && !canWrite) {
+  if (relationships.length === 0) {
     return (
       <div data-testid="contact-relationships-empty" className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
         <ArrowRight className="h-8 w-8 mb-2 opacity-40" />
         <p>{t('contactDirectory.noRelationships', { defaultValue: 'No relationships defined for this contact.' })}</p>
+        {canWrite && (
+          <div className="mt-4">
+            <RelationshipWritePanel
+              contactId={contactId}
+              relationships={relationships}
+              onRelationshipsChange={setRelationships}
+              canWrite={canWrite}
+            />
+          </div>
+        )}
       </div>
     )
   }
 
   if (canWrite) {
     return (
-      <RelationshipWritePanel
-        contactId={contactId}
-        relationships={relationships}
-        onRelationshipsChange={setRelationships}
-        canWrite={canWrite}
-      />
+      <div data-testid="contact-relationships-list">
+        <RelationshipWritePanel
+          contactId={contactId}
+          relationships={relationships}
+          onRelationshipsChange={setRelationships}
+          canWrite={canWrite}
+        />
+      </div>
     )
   }
 
