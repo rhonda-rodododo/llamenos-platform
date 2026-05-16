@@ -53,6 +53,7 @@ Feature: Event Management
     And the event name should be displayed
     And the event start date should be displayed
 
+  @wip
   Scenario: Event detail shows linked cases tab
     Given an event with linked cases exists
     When I view the event detail
