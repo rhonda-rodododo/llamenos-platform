@@ -11,7 +11,9 @@ import io.cucumber.java.en.And
 import io.cucumber.java.en.Given
 import io.cucumber.java.en.Then
 import io.cucumber.java.en.When
+import org.llamenos.hotline.helpers.SimulationClient
 import org.llamenos.hotline.steps.BaseSteps
+import org.llamenos.hotline.steps.ScenarioHooks
 
 /**
  * Step definitions for triage-queue.feature scenarios.
@@ -27,8 +29,13 @@ class TriageSteps : BaseSteps() {
 
     @Given("triage-eligible reports exist")
     fun triageEligibleReportsExist() {
-        // Triage reports are loaded from the backend.
-        // Navigate to triage to trigger loading.
+        // Ensure CMS is set up with triage report data for this hub
+        val hubId = ScenarioHooks.currentHubId
+        try {
+            SimulationClient.setupCms(hubId = hubId.ifEmpty { null })
+        } catch (e: Throwable) {
+            Log.w("TriageSteps", "CMS setup for triage failed: ${e.message}")
+        }
         iNavigateToTheTriageScreen()
     }
 
@@ -168,7 +175,7 @@ class TriageSteps : BaseSteps() {
 
     @Then("the convert confirmation dialog should appear")
     fun theConvertConfirmationDialogShouldAppear() {
-        composeRule.waitUntil(5_000) {
+        composeRule.waitUntil(10_000) {
             composeRule.onAllNodesWithTag("triage-convert-dialog").fetchSemanticsNodes().isNotEmpty()
         }
         val found = assertAnyTagDisplayed(

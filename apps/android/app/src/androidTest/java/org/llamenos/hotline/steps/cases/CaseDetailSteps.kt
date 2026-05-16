@@ -91,8 +91,8 @@ class CaseDetailSteps : BaseSteps() {
         } catch (_: Throwable) {
             // May already be on Details tab
         }
-        onNodeWithTag("case-assign-btn").performScrollTo()
-        onNodeWithTag("case-assign-btn").performClick()
+        onNodeWithTag("case-assign-btn-header").performScrollTo()
+        onNodeWithTag("case-assign-btn-header").performClick()
         composeRule.waitForIdle()
         // Wait for the assignment API call to complete
         composeRule.waitUntil(10_000) {
@@ -186,8 +186,8 @@ class CaseDetailSteps : BaseSteps() {
         } catch (_: Throwable) {
             // May already be on Details tab
         }
-        onNodeWithTag("case-assign-btn").performScrollTo()
-        onNodeWithTag("case-assign-btn").assertIsDisplayed()
+        onNodeWithTag("case-assign-btn-header").performScrollTo()
+        onNodeWithTag("case-assign-btn-header").assertIsDisplayed()
     }
 
     @Then("the case should be assigned to me")
