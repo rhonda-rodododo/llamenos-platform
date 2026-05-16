@@ -173,6 +173,8 @@ pub fn run() {
             crypto::set_server_event_keys,
             crypto::decrypt_hub_event,
             crypto::decrypt_server_event,
+            crypto::encrypt_hub_field,
+            crypto::decrypt_hub_field,
             // Shamir secret sharing (recovery group)
             crypto::shamir_split,
             crypto::shamir_combine,

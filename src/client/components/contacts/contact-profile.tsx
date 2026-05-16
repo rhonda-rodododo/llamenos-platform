@@ -16,12 +16,15 @@ import { RelationshipWritePanel } from './relationship-write-panel'
 import { useToast } from '@/lib/toast'
 import { CONTACT_TYPE_CONFIG } from './contact-card'
 import { ContactMergeDialog } from '@/components/contact-merge-dialog'
+import { TagBadge } from '@/components/tag-badge'
+import { TagInput } from '@/components/tag-input'
+import { useTags } from '@/lib/queries/tags'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   User, Phone, Mail, MessageSquare, Lock, ArrowRight,
-  FileText, Users, Loader2, Shield, GitMerge,
+  FileText, Users, Loader2, Shield, GitMerge, Tag,
 } from 'lucide-react'
 
 type Tab = 'profile' | 'identifiers' | 'cases' | 'relationships' | 'groups'
@@ -137,6 +140,12 @@ export function ContactProfile({ contact, onContactMerged }: ContactProfileProps
 
 function ProfileTab({ contact }: { contact: DirectoryContact }) {
   const { t } = useTranslation()
+  const { data: allTags = [] } = useTags()
+
+  // Map tag slugs from contact summary to tag IDs for TagInput
+  const contactTagIds = contact.tags
+    .map((slug) => allTags.find((tag) => tag.name === slug)?.id)
+    .filter((id): id is string => id !== undefined)
 
   if (!contact.canDecrypt) {
     return (
@@ -155,17 +164,43 @@ function ProfileTab({ contact }: { contact: DirectoryContact }) {
 
   const hasContent = sections.some(s => s.content)
 
-  if (!hasContent) {
-    return (
-      <div data-testid="contact-profile-empty" className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
-        <User className="h-8 w-8 mb-2 opacity-40" />
-        <p>{t('contactDirectory.noProfileData', { defaultValue: 'No profile details have been added yet.' })}</p>
-      </div>
-    )
-  }
-
   return (
     <div data-testid="contact-profile-content" className="space-y-4">
+      {/* Tags section */}
+      <Card>
+        <CardContent className="pt-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Tag className="h-4 w-4 text-muted-foreground" />
+            <h3 className="text-sm font-medium text-foreground">
+              {t('contactDirectory.tags', { defaultValue: 'Tags' })}
+            </h3>
+          </div>
+          {contactTagIds.length > 0 ? (
+            <div className="flex flex-wrap gap-1 mb-2">
+              {contactTagIds.map((tagId) => {
+                const tag = allTags.find((t) => t.id === tagId)
+                if (!tag) return null
+                return <TagBadge key={tagId} color={tag.color} label={tag.label} />
+              })}
+            </div>
+          ) : null}
+          <TagInput
+            value={contactTagIds}
+            onChange={() => {
+              // Tag assignment to contacts requires backend support for tagHashes
+              // This is display-only for now; editing is done via the edit dialog
+            }}
+          />
+        </CardContent>
+      </Card>
+
+      {!hasContent ? (
+        <div data-testid="contact-profile-empty" className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
+          <User className="h-8 w-8 mb-2 opacity-40" />
+          <p>{t('contactDirectory.noProfileData', { defaultValue: 'No profile details have been added yet.' })}</p>
+        </div>
+      ) : null}
+
       {sections.map(section => section.content ? (
         <Card key={section.key}>
           <CardContent className="pt-4">

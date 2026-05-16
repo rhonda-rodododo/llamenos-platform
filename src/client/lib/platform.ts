@@ -464,6 +464,34 @@ export async function decryptHubEvent(ciphertextHex: string): Promise<string | n
 }
 
 /**
+ * Encrypt a plaintext string with the hub key using label as AAD (domain separation).
+ * Returns hex-encoded nonce(12) + ciphertext (AES-256-GCM).
+ * Used for encrypting team/tag fields before sending to server.
+ */
+export async function encryptHubField(plaintext: string, label: string): Promise<string> {
+  if (useTauri) {
+    return tauriInvoke<string>('encrypt_hub_field', { plaintext, label })
+  }
+  throw new Error('WASM encrypt_hub_field not yet implemented')
+}
+
+/**
+ * Decrypt a hub-encrypted field using label as AAD.
+ * Input: hex-encoded nonce(12) + ciphertext (AES-256-GCM).
+ * Returns null on failure (hub key not loaded, wrong label, or corrupted data).
+ */
+export async function decryptHubField(ciphertextHex: string, label: string): Promise<string | null> {
+  if (useTauri) {
+    try {
+      return await tauriInvoke<string>('decrypt_hub_field', { ciphertextHex, label })
+    } catch {
+      return null
+    }
+  }
+  throw new Error('WASM decrypt_hub_field not yet implemented')
+}
+
+/**
  * Decrypt a server-published relay event using the epoch-keyed server event key
  * stored in Rust CryptoState.
  */

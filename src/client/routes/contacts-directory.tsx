@@ -25,6 +25,8 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useTags } from '@/lib/queries/tags'
+import { useTeams } from '@/lib/queries/teams'
 import {
   Users, Plus, Search, Loader2, Lock, Upload, Pencil,
 } from 'lucide-react'
@@ -137,6 +139,11 @@ function ContactDirectoryPage() {
 
   // Filter state
   const [typeFilter, setTypeFilter] = useState<string>('all')
+  const [tagFilter, setTagFilter] = useState<string>('all')
+  const [teamFilter, setTeamFilter] = useState<string>('all')
+
+  const { data: availableTags = [] } = useTags()
+  const { data: availableTeams = [] } = useTeams()
 
   // Load + decrypt contacts
   const loadContacts = useCallback(async () => {
@@ -225,6 +232,18 @@ function ContactDirectoryPage() {
     setTotal(prev => prev + 1)
     setSelectedId(contact.id)
   }, [])
+
+  // Client-side tag/team filter applied on top of server results
+  // Tag filter matches against the contact summary's tag slugs.
+  // Team filter is UI-only at this stage — full server-side filtering requires
+  // fetching contactTeamAssignments per contact which is deferred to a follow-up.
+  const filteredContacts = contacts.filter((c) => {
+    if (tagFilter !== 'all') {
+      const tag = availableTags.find((t) => t.id === tagFilter)
+      if (tag && !c.tags.includes(tag.name)) return false
+    }
+    return true
+  })
 
   const showEmptyState = !loading && contacts.length === 0 && !searchQuery
 
@@ -340,6 +359,50 @@ function ContactDirectoryPage() {
                   </SelectItem>
                 </SelectContent>
               </Select>
+
+              {/* Tag filter */}
+              {availableTags.length > 0 && (
+                <Select value={tagFilter} onValueChange={setTagFilter}>
+                  <SelectTrigger data-testid="contact-tag-filter" size="sm" className="w-full">
+                    <SelectValue placeholder={t('contactDirectory.filterByTag', { defaultValue: 'All tags' })} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">
+                      {t('contactDirectory.allTags', { defaultValue: 'All tags' })}
+                    </SelectItem>
+                    {availableTags.map((tag) => (
+                      <SelectItem key={tag.id} value={tag.id}>
+                        <span className="flex items-center gap-1.5">
+                          <span
+                            className="inline-block h-2 w-2 rounded-full"
+                            style={{ backgroundColor: tag.color }}
+                          />
+                          {tag.label}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {/* Team filter */}
+              {availableTeams.length > 0 && (
+                <Select value={teamFilter} onValueChange={setTeamFilter}>
+                  <SelectTrigger data-testid="contact-team-filter" size="sm" className="w-full">
+                    <SelectValue placeholder={t('contactDirectory.filterByTeam', { defaultValue: 'All teams' })} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">
+                      {t('contactDirectory.allTeams', { defaultValue: 'All teams' })}
+                    </SelectItem>
+                    {availableTeams.map((team) => (
+                      <SelectItem key={team.id} value={team.id}>
+                        {team.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             {/* Contact list */}
@@ -347,7 +410,7 @@ function ContactDirectoryPage() {
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
-            ) : contacts.length === 0 ? (
+            ) : filteredContacts.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center px-4">
                 <Search className="h-6 w-6 mb-2 text-muted-foreground/40" />
                 <p className="text-sm text-muted-foreground">
@@ -358,7 +421,7 @@ function ContactDirectoryPage() {
               </div>
             ) : (
               <div className="p-2 space-y-1.5">
-                {contacts.map(contact => (
+                {filteredContacts.map(contact => (
                   <ContactCard
                     key={contact.id}
                     contact={contact}

@@ -2,6 +2,8 @@ import { useTranslation } from 'react-i18next'
 import type { DirectoryContact, DirectoryContactType } from '@/lib/api'
 import { formatRelativeTime } from '@/lib/format'
 import { Badge } from '@/components/ui/badge'
+import { TagBadge } from '@/components/tag-badge'
+import { useTags } from '@/lib/queries/tags'
 import { Lock, User, Building2, Scale, Briefcase } from 'lucide-react'
 
 const CONTACT_TYPE_CONFIG: Record<DirectoryContactType, { icon: typeof User; label: string }> = {
@@ -21,6 +23,12 @@ export function ContactCard({ contact, isSelected, onSelect }: ContactCardProps)
   const { t } = useTranslation()
   const config = CONTACT_TYPE_CONFIG[contact.contactType] ?? CONTACT_TYPE_CONFIG.individual
   const TypeIcon = config.icon
+  const { data: allTags = [] } = useTags()
+
+  // Map tag slugs from contact summary to decrypted tag objects
+  const contactTagObjects = contact.tags.length > 0
+    ? allTags.filter((tag) => contact.tags.includes(tag.name))
+    : []
 
   const initials = contact.canDecrypt && contact.displayName
     ? contact.displayName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
@@ -61,7 +69,7 @@ export function ContactCard({ contact, isSelected, onSelect }: ContactCardProps)
                 : t('contactDirectory.restricted', { defaultValue: 'Restricted' })}
             </span>
           </div>
-          <div className="mt-0.5 flex items-center gap-2">
+          <div className="mt-0.5 flex flex-wrap items-center gap-1">
             <Badge variant="outline" className="text-[10px] gap-1">
               <TypeIcon className="h-2.5 w-2.5" />
               {t(config.label, { defaultValue: contact.contactType })}
@@ -71,6 +79,9 @@ export function ContactCard({ contact, isSelected, onSelect }: ContactCardProps)
                 {t('contactDirectory.caseCount', { count: contact.caseCount, defaultValue: '{{count}} cases' })}
               </span>
             )}
+            {contactTagObjects.slice(0, 3).map((tag) => (
+              <TagBadge key={tag.id} color={tag.color} label={tag.label} />
+            ))}
           </div>
         </div>
 
