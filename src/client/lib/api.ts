@@ -1957,6 +1957,33 @@ export async function deleteRecord(id: string) {
   return request<{ ok: boolean }>(hp(`/records/${id}`), { method: 'DELETE' })
 }
 
+// --- Event linking (cases ↔ events, reports ↔ events) ---
+
+export type EventRecordLink = { recordId: string; eventId: string; linkedAt: string; linkedBy: string }
+export type EventReportLink = { reportId: string; eventId: string; linkedAt: string; linkedBy: string }
+
+export async function listEventLinkedRecords(eventId: string) {
+  return request<{ links: EventRecordLink[] }>(hp(`/events/${eventId}/records`))
+}
+
+export async function listEventLinkedReports(eventId: string) {
+  return request<{ links: EventReportLink[] }>(hp(`/events/${eventId}/reports`))
+}
+
+export async function linkRecordToEvent(eventId: string, recordId: string) {
+  return request<EventRecordLink>(hp(`/events/${eventId}/records`), {
+    method: 'POST',
+    body: JSON.stringify({ recordId }),
+  })
+}
+
+export async function linkReportToEvent(eventId: string, reportId: string) {
+  return request<EventReportLink>(hp(`/events/${eventId}/reports`), {
+    method: 'POST',
+    body: JSON.stringify({ reportId }),
+  })
+}
+
 export async function listChildRecords(parentId: string) {
   const qs = new URLSearchParams()
   qs.set('parentRecordId', parentId)
