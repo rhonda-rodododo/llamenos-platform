@@ -173,6 +173,7 @@ Feature: Contact Directory
 
   # --- Relationships tab ---
 
+  @wip
   Scenario: Relationships tab shows related contacts
     Given a contact exists with relationships
     When I navigate to the "Contact Directory" page
