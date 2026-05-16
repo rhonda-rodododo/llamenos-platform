@@ -1788,7 +1788,12 @@
       "userIdPlaceholder": "Enter user ID or public key",
       "wipeDialogTitle": "Remote Device Wipe",
       "wipeDialogWarning": "This will remotely wipe the cryptographic keys on the target device. The device will be locked out immediately.",
-      "wipeSuccess": "Remote wipe command sent."
+      "wipeSuccess": "Remote wipe command sent.",
+      "coApprovalPending": "Awaiting co-approver",
+      "coApprovedBy": "Co-approved by {{pubkey}}…",
+      "coApproverHelp": "Enter the public key of another super-admin who will co-approve this action.",
+      "coApproverPlaceholder": "Co-approver public key",
+      "coApproverPubkey": "Co-approver"
     },
     "adminDeviceWipeButton": "Remote Wipe Device",
     "adminDeviceWipeConfirm": "This will remotely wipe all data on this device. Continue?",

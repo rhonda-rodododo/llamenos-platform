@@ -3,18 +3,43 @@ import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { SectionBody, SectionDescription } from '@/components/admin-shell/section-layout'
-import { Smartphone, Monitor, ShieldCheck, ShieldQuestion } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Smartphone, Monitor, ShieldCheck, ShieldQuestion, Loader2 } from 'lucide-react'
 import { useAdminDeviceOverview } from '@/lib/queries/devices'
 import { VerifyFingerprintModal } from '@/components/security/verify-fingerprint-modal'
+import { remoteWipeDevice } from '@/lib/api'
+import { useToast } from '@/lib/toast'
 
 export function DevicesSection() {
   const { t } = useTranslation()
-  const { data, isLoading } = useAdminDeviceOverview()
+  const { toast } = useToast()
+  const { data, isLoading, refetch } = useAdminDeviceOverview()
   const [verifyTarget, setVerifyTarget] = useState<{
     deviceId: string
     targetPubkey: string
     deviceName: string
   } | null>(null)
+  const [wipeTarget, setWipeTarget] = useState<{
+    userPubkey: string
+    devicePubkey: string
+    deviceName: string
+  } | null>(null)
+  const [wiping, setWiping] = useState(false)
+
+  async function handleConfirmWipe() {
+    if (!wipeTarget) return
+    setWiping(true)
+    try {
+      await remoteWipeDevice(wipeTarget.userPubkey, wipeTarget.devicePubkey)
+      toast(t('erasure.admin.wipeSuccess'), 'success')
+      setWipeTarget(null)
+      refetch()
+    } catch {
+      toast(t('common.error'), 'error')
+    } finally {
+      setWiping(false)
+    }
+  }
 
   if (isLoading) return <div className="animate-pulse">{t('common.loading')}</div>
 
@@ -51,20 +76,37 @@ export function DevicesSection() {
                       {device.deviceModel && (
                         <span className="text-xs text-muted-foreground">{device.deviceModel}</span>
                       )}
-                      {device.ed25519Pubkey && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="ml-auto text-xs"
-                          onClick={() => setVerifyTarget({
-                            deviceId: device.id,
-                            targetPubkey: device.ed25519Pubkey!,
-                            deviceName: device.deviceName ?? device.platform,
-                          })}
-                        >
-                          {t('admin.devices.verify')}
-                        </Button>
-                      )}
+                      <div className="ml-auto flex gap-1">
+                        {device.ed25519Pubkey && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-xs"
+                            onClick={() => setVerifyTarget({
+                              deviceId: device.id,
+                              targetPubkey: device.ed25519Pubkey!,
+                              deviceName: device.deviceName ?? device.platform,
+                            })}
+                          >
+                            {t('admin.devices.verify')}
+                          </Button>
+                        )}
+                        {device.ed25519Pubkey && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-xs text-destructive hover:text-destructive"
+                            data-testid={`wipe-device-${device.id}`}
+                            onClick={() => setWipeTarget({
+                              userPubkey: entry.userPubkey,
+                              devicePubkey: device.ed25519Pubkey!,
+                              deviceName: device.deviceName ?? device.platform,
+                            })}
+                          >
+                            {t('erasure.admin.remoteWipe')}
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   )
                 })}
@@ -82,6 +124,34 @@ export function DevicesSection() {
             targetDeviceName={verifyTarget.deviceName}
           />
         )}
+
+        <Dialog open={!!wipeTarget} onOpenChange={() => setWipeTarget(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{t('erasure.admin.wipeDialogTitle')}</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              {t('erasure.admin.wipeDialogWarning')}
+            </p>
+            {wipeTarget && (
+              <p className="text-sm font-medium">{wipeTarget.deviceName}</p>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setWipeTarget(null)}>
+                {t('common.cancel')}
+              </Button>
+              <Button
+                variant="destructive"
+                data-testid="wipe-confirm-btn"
+                onClick={handleConfirmWipe}
+                disabled={wiping}
+              >
+                {wiping && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {t('erasure.admin.confirmWipe')}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </SectionBody>
   )

@@ -27,9 +27,10 @@ interface Props {
   expanded: boolean
   onToggle: (open: boolean) => void
   statusSummary?: string
+  emergencyOverrideEnabled?: boolean
 }
 
-export function ErasureQueueSection({ requests, onRefresh, expanded, onToggle, statusSummary }: Props) {
+export function ErasureQueueSection({ requests, onRefresh, expanded, onToggle, statusSummary, emergencyOverrideEnabled }: Props) {
   const { t } = useTranslation()
   const { toast } = useToast()
   const [statusFilter, setStatusFilter] = useState<string>('all')
@@ -37,6 +38,7 @@ export function ErasureQueueSection({ requests, onRefresh, expanded, onToggle, s
   const [eraseUserId, setEraseUserId] = useState('')
   const [eraseJustification, setEraseJustification] = useState('')
   const [erasing, setErasing] = useState(false)
+  const [eraseCoApproverPubkey, setEraseCoApproverPubkey] = useState('')
   const [showWipeDialog, setShowWipeDialog] = useState(false)
   const [wipeUserId, setWipeUserId] = useState('')
   const [wipeDevicePubkey, setWipeDevicePubkey] = useState('')
@@ -57,6 +59,7 @@ export function ErasureQueueSection({ requests, onRefresh, expanded, onToggle, s
       setShowEraseDialog(false)
       setEraseUserId('')
       setEraseJustification('')
+      setEraseCoApproverPubkey('')
       onRefresh()
     } catch {
       toast(t('common.error'), 'error')
@@ -142,9 +145,20 @@ export function ErasureQueueSection({ requests, onRefresh, expanded, onToggle, s
                   {req.executeAt && ` — ${t('erasure.admin.executesAt', { date: new Date(req.executeAt).toLocaleString() })}`}
                 </div>
                 {req.emergencyOverride && (
-                  <Badge variant="outline" className="text-amber-600">
-                    {t('erasure.admin.emergencyOverride')}
-                  </Badge>
+                  <div className="flex flex-col gap-1">
+                    <Badge variant="outline" className="text-amber-600 w-fit">
+                      {t('erasure.admin.emergencyOverride')}
+                    </Badge>
+                    {req.coApproverPubkey ? (
+                      <span className="text-xs text-muted-foreground" data-testid={`coapprover-${req.id}`}>
+                        {t('erasure.admin.coApprovedBy', { pubkey: req.coApproverPubkey.slice(0, 16) })}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-amber-600" data-testid={`coapprover-pending-${req.id}`}>
+                        {t('erasure.admin.coApprovalPending')}
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
               <Badge
@@ -244,6 +258,21 @@ export function ErasureQueueSection({ requests, onRefresh, expanded, onToggle, s
                 rows={3}
               />
             </SectionField>
+            {emergencyOverrideEnabled && (
+              <SectionField
+                label={t('erasure.admin.coApproverPubkey')}
+                htmlFor="erase-coapprover"
+                help={t('erasure.admin.coApproverHelp')}
+              >
+                <Input
+                  id="erase-coapprover"
+                  data-testid="erase-coapprover-input"
+                  value={eraseCoApproverPubkey}
+                  onChange={(e) => setEraseCoApproverPubkey(e.target.value)}
+                  placeholder={t('erasure.admin.coApproverPlaceholder')}
+                />
+              </SectionField>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowEraseDialog(false)}>

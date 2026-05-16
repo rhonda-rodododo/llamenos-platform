@@ -19,6 +19,7 @@ import { DemoBanner } from '@/components/demo-banner'
 import { NotificationPromptBanner } from '@/components/notification-prompt-banner'
 import { UpdateChecker } from '@/components/UpdateChecker'
 import { PanicWipeIndicator } from '@/components/panic-wipe-indicator'
+import { DeviceWipeScreen } from '@/components/device-wipe-screen'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { OfflineBanner } from '@/components/offline-banner'
 import { UpdateRequiredScreen } from '@/components/update-required-screen'
@@ -59,6 +60,22 @@ import {
 export const Route = createRootRoute({
   component: RootLayout,
 })
+
+function DeviceWipeOverlay() {
+  const [wipeReason, setWipeReason] = useState<'user-erasure' | 'device-revocation' | 'admin-erasure' | null>(null)
+
+  useEffect(() => {
+    function onWiped(e: Event) {
+      const reason = (e as CustomEvent<{ reason: string }>).detail?.reason as 'user-erasure' | 'device-revocation' | 'admin-erasure'
+      setWipeReason(reason ?? 'admin-erasure')
+    }
+    window.addEventListener('device:wiped', onWiped)
+    return () => window.removeEventListener('device:wiped', onWiped)
+  }, [])
+
+  if (!wipeReason) return null
+  return <DeviceWipeScreen reason={wipeReason} />
+}
 
 function RootLayout() {
   const { t } = useTranslation()
@@ -157,6 +174,7 @@ function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <UpdateRequiredScreen />
       <PanicWipeIndicator />
+      <DeviceWipeOverlay />
       <OfflineBanner />
       <ErrorBoundary scope="root">
         {content}

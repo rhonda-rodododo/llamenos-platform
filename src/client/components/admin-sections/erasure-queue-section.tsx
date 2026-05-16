@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '@/lib/toast'
-import { listErasureRequests, type ErasureRequest } from '@/lib/api'
+import { listErasureRequests, getErasureConfig, type ErasureRequest } from '@/lib/api'
 import { ErasureQueueSection as ErasureQueueSectionInner } from '@/components/admin-settings/erasure-queue-section'
 
 export function ErasureQueueSection() {
@@ -9,11 +9,18 @@ export function ErasureQueueSection() {
   const { toast } = useToast()
   const [requests, setRequests] = useState<ErasureRequest[]>([])
   const [loading, setLoading] = useState(true)
+  const [emergencyOverrideEnabled, setEmergencyOverrideEnabled] = useState(false)
 
   function loadRequests() {
     setLoading(true)
-    listErasureRequests()
-      .then(({ requests }) => setRequests(requests))
+    Promise.all([
+      listErasureRequests(),
+      getErasureConfig().catch(() => null),
+    ])
+      .then(([{ requests }, configRes]) => {
+        setRequests(requests)
+        if (configRes) setEmergencyOverrideEnabled(configRes.config.emergencyOverrideEnabled)
+      })
       .catch(() => toast(t('common.error'), 'error'))
       .finally(() => setLoading(false))
   }
@@ -34,6 +41,7 @@ export function ErasureQueueSection() {
       expanded={true}
       onToggle={() => {}}
       statusSummary={statusSummary}
+      emergencyOverrideEnabled={emergencyOverrideEnabled}
     />
   )
 }

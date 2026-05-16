@@ -21,7 +21,11 @@ export function DeviceWipeScreen({ reason }: Props) {
           {t('deviceWipe.title')}
         </h1>
         <p className="text-muted-foreground" data-testid="device-wipe-reason">
-          {t(`deviceWipe.reason.${reason}`)}
+          {reason === 'admin-erasure'
+            ? t('deviceWipe.reasonAdminErasure')
+            : reason === 'device-revocation'
+              ? t('deviceWipe.reasonDeviceRevocation')
+              : t('deviceWipe.reasonUserErasure')}
         </p>
         <p className="text-sm text-muted-foreground">
           {t('deviceWipe.explanation')}
