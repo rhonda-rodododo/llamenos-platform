@@ -31,18 +31,18 @@ function getS(world: Record<string, unknown>): InviteTestState {
   return getState<InviteTestState>(world, STATE_KEY)
 }
 
+const BASE_URL = process.env.TEST_HUB_URL || 'http://localhost:3000'
+
 Before(async ({ request, world }) => {
   setState<InviteTestState>(world, STATE_KEY, { rateLimitResponses: [] })
-  // Clear rate limits before each scenario to prevent cross-scenario bleed.
-  // The invite validate endpoint rate-limits by IP; tests use 'unknown' IP, so
-  // without a reset, the 5/min limit gets exhausted across multiple scenarios.
+  // Clear invite-specific rate limits before each scenario to prevent cross-scenario bleed.
+  // Scoped to 'invite-validate' prefix so it doesn't interfere with concurrent rate-limit
+  // tests on other workers (e.g. provider-setup phone search).
   const testSecret = process.env.DEV_RESET_SECRET || process.env.E2E_TEST_SECRET || 'test-reset-secret'
-  await request.delete(`${BASE_URL}/api/test-rate-limits`, {
+  await request.delete(`${BASE_URL}/api/test-rate-limits?prefix=invite-validate`, {
     headers: { 'X-Test-Secret': testSecret },
-  }).catch(() => {}) // Ignore errors if endpoint not available
+  }).catch(() => {})
 })
-
-const BASE_URL = process.env.TEST_HUB_URL || 'http://localhost:3000'
 // ── Helpers ─────────────────────────────────────────────────────────
 
 function createRedeemAuth(seedHex: string): { pubkey: string; timestamp: number; token: string } {
@@ -139,6 +139,13 @@ When('the admin revokes the invite', async ({ request, world }) => {
 })
 
 When('a client floods invite validation {int} times', async ({ request, world }, count: number) => {
+  // Clear only invite-specific rate limits before flooding to prevent cross-scenario bleed.
+  // Uses prefix filter to avoid interfering with concurrent rate-limit tests on other
+  // workers (e.g. provider-setup phone search).
+  const testSecret = process.env.DEV_RESET_SECRET || process.env.E2E_TEST_SECRET || 'test-reset-secret'
+  await request.delete(`${BASE_URL}/api/test-rate-limits?prefix=invite-validate`, {
+    headers: { 'X-Test-Secret': testSecret },
+  }).catch(() => {})
   const s = getS(world)
   const shared = getSharedState(world)
   shared.floodResponses = []

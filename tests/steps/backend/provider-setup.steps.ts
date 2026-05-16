@@ -295,6 +295,11 @@ When('I POST to search phone numbers with providerType {string} and countryCode 
 })
 
 When('I POST to search phone numbers 6 times in quick succession', async ({ request, world, workerHub }) => {
+  // Clear provider-search rate limits for this hub to prevent cross-scenario bleed
+  const testSecret = process.env.DEV_RESET_SECRET || process.env.E2E_TEST_SECRET || 'test-reset-secret'
+  await request.delete(`/api/test-rate-limits?prefix=provider-search:${workerHub}`, {
+    headers: { 'X-Test-Secret': testSecret },
+  }).catch(() => {})
   // Use hub-scoped endpoint so each parallel worker gets its own rate limit bucket
   // (the rate limit key includes hubId — without it, all workers share 'global')
   const statuses: number[] = []

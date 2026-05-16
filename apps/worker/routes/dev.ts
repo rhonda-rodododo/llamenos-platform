@@ -145,7 +145,8 @@ dev.post('/test-a2p-approve-brand', async (c) => {
 })
 
 // ─── Rate Limit Reset (BDD test helper) ─────────────────────────────────────
-// Clears all rate limit counters — prevents cross-scenario bleed in BDD tests.
+// Clears rate limit counters — prevents cross-scenario bleed in BDD tests.
+// Accepts optional ?prefix= query param to clear only matching keys (safer for parallel tests).
 
 dev.delete('/test-rate-limits', async (c) => {
   if (c.env.ENVIRONMENT !== 'development') {
@@ -154,8 +155,9 @@ dev.delete('/test-rate-limits', async (c) => {
   if (!checkResetSecret(c)) {
     return c.json({ error: 'Not Found' }, 404)
   }
+  const prefix = c.req.query('prefix')
   const services = c.get('services')
-  await services.settings.clearRateLimits()
+  await services.settings.clearRateLimits(prefix || undefined)
   return c.json({ ok: true })
 })
 

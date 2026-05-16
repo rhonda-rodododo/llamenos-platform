@@ -288,6 +288,12 @@ Then('the response should include CORS headers', async ({ world }) => {
 // ─── Rate Limiting ──────────────────────────────────────────────────
 
 When('{int} invite validation requests are sent rapidly', async ({ request, world }, count: number) => {
+  // Clear invite rate limits to prevent cross-scenario bleed (uses prefix to avoid
+  // interfering with concurrent rate-limit tests on other workers).
+  const testSecret = process.env.DEV_RESET_SECRET || process.env.E2E_TEST_SECRET || 'test-reset-secret'
+  await request.delete(`${BASE_URL}/api/test-rate-limits?prefix=invite-validate`, {
+    headers: { 'X-Test-Secret': testSecret },
+  }).catch(() => {})
   getEdgeState(world).rateLimit429Count = 0
   for (let i = 0; i < count; i++) {
     const res = await request.get(`${BASE_URL}/api/invites/validate/fake-code-${i}`, {

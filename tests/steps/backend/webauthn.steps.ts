@@ -86,6 +86,11 @@ When('the client submits a fabricated login assertion', async ({ request, world 
 })
 
 When('a client floods WebAuthn login options {int} times', async ({ request, world }, count: number) => {
+  // Clear webauthn rate limits to prevent cross-scenario bleed
+  const testSecret = process.env.DEV_RESET_SECRET || process.env.E2E_TEST_SECRET || 'test-reset-secret'
+  await request.delete(`${BASE_URL}/api/test-rate-limits?prefix=webauthn-login`, {
+    headers: { 'X-Test-Secret': testSecret },
+  }).catch(() => {})
   const s = getS(world)
   const shared = getSharedState(world)
   shared.floodResponses = []
