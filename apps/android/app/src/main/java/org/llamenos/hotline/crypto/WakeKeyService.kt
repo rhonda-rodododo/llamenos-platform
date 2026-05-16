@@ -134,43 +134,13 @@ class WakeKeyService @Inject constructor(
         }
 
     /**
-     * Decrypt a wake-tier push notification payload using legacy ECIES.
+     * Decrypt a wake-tier push notification payload.
      *
-     * The push data contains [packedHex] (nonce + ciphertext, hex) and
-     * [ephemeralPubkeyHex] (the server's ephemeral ECIES public key, hex).
-     * Returns the decoded [WakePayload] or null if decryption fails.
+     * Accepts an HPKE envelope JSON string. Delegates to [decryptWakePayloadHpke].
+     * Legacy ECIES path removed — all push envelopes use HPKE.
      */
-    suspend fun decryptWakePayload(
-        packedHex: String,
-        ephemeralPubkeyHex: String,
-    ): WakePayload? =
-        withContext(Dispatchers.Default) {
-            val secretHex = keystoreService.retrieve(KEY_WAKE_SECRET)
-                ?: return@withContext null
-
-            if (nativeLibLoaded) {
-                return@withContext try {
-                    val plaintext = org.llamenos.core.eciesDecryptContentHex(
-                        packedHex = packedHex,
-                        ephemeralPubkeyHex = ephemeralPubkeyHex,
-                        secretKeyHex = secretHex,
-                        label = LABEL_PUSH_WAKE,
-                    )
-                    json.decodeFromString<WakePayload>(plaintext)
-                } catch (_: Exception) {
-                    null
-                }
-            }
-
-            // Placeholder: try to decode the hex as UTF-8 JSON
-            try {
-                val bytes = packedHex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-                val plaintext = String(bytes, Charsets.UTF_8)
-                json.decodeFromString<WakePayload>(plaintext)
-            } catch (_: Exception) {
-                null
-            }
-        }
+    suspend fun decryptWakePayload(envelopeJson: String): WakePayload? =
+        decryptWakePayloadHpke(envelopeJson)
 
     private fun hexToBytes(hex: String): ByteArray {
         require(hex.length % 2 == 0) { "Hex string has odd length" }

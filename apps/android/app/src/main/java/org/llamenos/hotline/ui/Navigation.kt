@@ -584,6 +584,9 @@ fun LlamenosNavigation(
                 onNavigateToAdmin = {
                     navController.navigate(LlamenosRoute.Admin.route)
                 },
+                onNavigateToCommunications = {
+                    navController.navigate(LlamenosRoute.HubCommunications.route)
+                },
                 onNavigateToCallHistory = {
                     navController.navigate(LlamenosRoute.CallHistory.route)
                 },

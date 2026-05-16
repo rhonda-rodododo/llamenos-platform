@@ -109,13 +109,11 @@ class PushService : FirebaseMessagingService() {
         Log.d(TAG, "FCM message received: type=$type, keys=${data.keys}")
 
         // Try wake-tier decryption first (available without PIN unlock)
-        // Server sends ECIES-encrypted payload as two fields:
-        // wake_payload = hex(nonce + ciphertext), wake_ephemeral = hex(compressed pubkey)
-        val wakeEncrypted = data["wake_payload"]
-        val wakeEphemeral = data["wake_ephemeral"]
-        if (wakeEncrypted != null && wakeEphemeral != null) {
+        // Server sends HPKE-encrypted payload as a single JSON envelope field.
+        val wakeEnvelope = data["wake_envelope"]
+        if (wakeEnvelope != null) {
             serviceScope.launch {
-                val wakePayload = wakeKeyService.decryptWakePayload(wakeEncrypted, wakeEphemeral)
+                val wakePayload = wakeKeyService.decryptWakePayload(wakeEnvelope)
                 if (wakePayload != null) {
                     Log.d(TAG, "Wake payload decrypted: type=${wakePayload.type}")
                     val router = PushNotificationRouter(linphoneService)
@@ -135,7 +133,7 @@ class PushService : FirebaseMessagingService() {
         // If app is unlocked, use full-tier handling for richer notifications
         if (cryptoService.isUnlocked) {
             dispatchByType(data, type)
-        } else if (wakeEncrypted == null) {
+        } else if (wakeEnvelope == null) {
             // No wake payload and app is locked — show generic notification
             dispatchByType(data, type)
         }

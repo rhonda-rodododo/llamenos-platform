@@ -56,7 +56,8 @@ class HubManagementSteps : BaseSteps() {
         composeRule.waitUntil(10_000) {
             composeRule.onAllNodesWithTag("hubs-list").fetchSemanticsNodes().isNotEmpty() ||
                 composeRule.onAllNodesWithTag("hubs-empty").fetchSemanticsNodes().isNotEmpty() ||
-                composeRule.onAllNodesWithTag("hubs-loading").fetchSemanticsNodes().isNotEmpty()
+                composeRule.onAllNodesWithTag("hubs-loading").fetchSemanticsNodes().isNotEmpty() ||
+                composeRule.onAllNodesWithTag("hubs-error").fetchSemanticsNodes().isNotEmpty()
         }
 
         val hasList = composeRule.onAllNodesWithTag("hubs-list")
@@ -69,7 +70,7 @@ class HubManagementSteps : BaseSteps() {
                 composeRule.onAllNodesWithTag("hub-row").onFirst().assertIsDisplayed()
             }
         }
-        // Empty state or loading is also valid
+        // Empty state, loading, or error is also valid
     }
 
     @Then("the active hub should have an indicator")

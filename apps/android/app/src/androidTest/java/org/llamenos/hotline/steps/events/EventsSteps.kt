@@ -10,7 +10,9 @@ import io.cucumber.java.en.And
 import io.cucumber.java.en.Given
 import io.cucumber.java.en.Then
 import io.cucumber.java.en.When
+import org.llamenos.hotline.helpers.SimulationClient
 import org.llamenos.hotline.steps.BaseSteps
+import org.llamenos.hotline.steps.ScenarioHooks
 
 /**
  * Step definitions for event-management.feature scenarios.
@@ -26,8 +28,13 @@ class EventsSteps : BaseSteps() {
 
     @Given("events exist in the system")
     fun eventsExistInTheSystem() {
-        // Events are loaded from the backend by the ViewModel.
-        // Navigate to events to trigger loading.
+        // Ensure CMS is set up with event data for this hub
+        val hubId = ScenarioHooks.currentHubId
+        try {
+            SimulationClient.setupCms(hubId = hubId.ifEmpty { null })
+        } catch (e: Throwable) {
+            Log.w("EventsSteps", "CMS setup for events failed: ${e.message}")
+        }
         iNavigateToTheEventsScreen()
     }
 
@@ -49,16 +56,23 @@ class EventsSteps : BaseSteps() {
 
     @When("I tap the first event card")
     fun iTapTheFirstEventCard() {
-        composeRule.waitUntil(10_000) {
+        // Wait for either event cards or empty/error state
+        composeRule.waitUntil(15_000) {
             composeRule.onAllNodes(hasTestTagPrefix("event-card-"))
-                .fetchSemanticsNodes().isNotEmpty()
+                .fetchSemanticsNodes().isNotEmpty() ||
+                composeRule.onAllNodesWithTag("events-empty").fetchSemanticsNodes().isNotEmpty() ||
+                composeRule.onAllNodesWithTag("events-error").fetchSemanticsNodes().isNotEmpty() ||
+                composeRule.onAllNodesWithTag("events-cms-disabled").fetchSemanticsNodes().isNotEmpty()
         }
-        try {
-            onAllNodes(hasTestTagPrefix("event-card-")).onFirst().performClick()
-            composeRule.waitForIdle()
-        } catch (_: Throwable) {
-            Log.w("EventsSteps", "No event cards available to tap")
+
+        val hasCards = composeRule.onAllNodes(hasTestTagPrefix("event-card-"))
+            .fetchSemanticsNodes().isNotEmpty()
+        check(hasCards) {
+            "No event cards found — events may not have been seeded by setupCms"
         }
+
+        onAllNodes(hasTestTagPrefix("event-card-")).onFirst().performClick()
+        composeRule.waitForIdle()
 
         // Wait for event detail to load
         composeRule.waitUntil(10_000) {

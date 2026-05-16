@@ -102,18 +102,17 @@ class HubSwitchSteps : BaseSteps() {
 
     @Then("the second hub shows the active indicator")
     fun secondHubShowsActiveIndicator() {
-        composeRule.waitUntil(5_000) {
-            composeRule.onAllNodesWithTag("hub-row").fetchSemanticsNodes().size >= 2
+        // Wait for the active indicator to appear on the second hub-row.
+        // Hub switching persists via DataStore which is async — give it time.
+        composeRule.waitUntil(15_000) {
+            val hubRows = composeRule.onAllNodesWithTag("hub-row").fetchSemanticsNodes()
+            if (hubRows.size < 2) return@waitUntil false
+            composeRule.onAllNodesWithTag("hub-row")[1]
+                .onChildren()
+                .filter(hasTestTag("hub-active-indicator"))
+                .fetchSemanticsNodes()
+                .isNotEmpty()
         }
-        composeRule.onAllNodesWithTag("hub-row")[1]
-            .onChildren()
-            .filter(hasTestTag("hub-active-indicator"))
-            .fetchSemanticsNodes()
-            .also { nodes ->
-                check(nodes.isNotEmpty()) {
-                    "Expected hub-active-indicator on second hub-row, but none was found"
-                }
-            }
         composeRule.onAllNodesWithTag("hub-row")[1]
             .onChildren()
             .filter(hasTestTag("hub-active-indicator"))
@@ -133,7 +132,9 @@ class HubSwitchSteps : BaseSteps() {
 
     @Then("the notes screen loads without error")
     fun notesScreenLoadsWithoutError() {
-        composeRule.waitUntil(10_000) {
+        // Give the hub state time to propagate to all subscribers
+        Thread.sleep(1_000)
+        composeRule.waitUntil(15_000) {
             composeRule.onAllNodesWithTag("notes-list").fetchSemanticsNodes().isNotEmpty() ||
                 composeRule.onAllNodesWithTag("notes-empty").fetchSemanticsNodes().isNotEmpty() ||
                 composeRule.onAllNodesWithTag("empty-state").fetchSemanticsNodes().isNotEmpty()

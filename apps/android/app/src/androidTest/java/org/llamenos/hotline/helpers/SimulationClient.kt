@@ -183,6 +183,22 @@ object SimulationClient {
         return json.decodeFromString<StatusResponse>(responseText)
     }
 
+    // ─── Shift Management ──────────────────────────────────────────
+
+    /**
+     * Create a shift covering the current time with the given volunteer.
+     * Active call simulation requires on-shift volunteers for call routing.
+     *
+     * Corresponds to `POST /api/test-create-shift`.
+     */
+    fun createShift(pubkey: String, hubId: String? = null): StatusResponse {
+        val fields = mutableListOf("\"pubkey\":\"${escapeJson(pubkey)}\"")
+        if (hubId != null) fields.add("\"hubId\":\"${escapeJson(hubId)}\"")
+        val body = "{${fields.joinToString(",")}}"
+        val responseText = post("/api/test-create-shift", body)
+        return json.decodeFromString<StatusResponse>(responseText)
+    }
+
     // ─── Hub Management ───────────────────────────────────────────
 
     @Serializable
