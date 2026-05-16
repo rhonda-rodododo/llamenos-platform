@@ -6,8 +6,9 @@ import { uint8ArrayToBase64URL, checkRateLimit } from '../lib/helpers'
 import { hashIP } from '../lib/crypto'
 import { generateRegOptions, verifyRegResponse, generateAuthOptions, verifyAuthResponse } from '../lib/webauthn'
 import { auth as authMiddleware } from '../middleware/auth'
+import { rateLimit } from '../middleware/rate-limit'
 import { audit } from '../services/audit'
-import { authenticateBodySchema, addCredentialBodySchema, registerCredentialBodySchema, webauthnCredentialResponseSchema, webauthnOptionsResponseSchema, webauthnLoginResponseSchema, webauthnCredentialsListResponseSchema } from '@protocol/schemas/webauthn'
+import { authenticateBodySchema, addCredentialBodySchema, registerCredentialBodySchema, webauthnOptionsResponseSchema, webauthnLoginResponseSchema, webauthnCredentialsListResponseSchema } from '@protocol/schemas/webauthn'
 import { okResponseSchema } from '@protocol/schemas/common'
 import { publicErrors, authErrors } from '../openapi/helpers'
 
@@ -126,11 +127,12 @@ webauthn.post('/register/options',
     },
   }),
   validator('json', addCredentialBodySchema),
+  rateLimit(3, 3_600_000, 'webauthn-register'),
   async (c) => {
     const services = c.get('services')
     const pubkey = c.get('pubkey')
     const user = c.get('user')
-    const body = c.req.valid('json')
+    c.req.valid('json') // validated but not destructured — addCredentialBodySchema is a guard only
     const rpID = new URL(c.req.url).hostname
     const rpName = c.env.HOTLINE_NAME || 'Hotline'
     const { credentials: existing } = await services.identity.getWebAuthnCredentials(pubkey)
@@ -158,6 +160,7 @@ webauthn.post('/register/verify',
     },
   }),
   validator('json', registerCredentialBodySchema),
+  rateLimit(3, 3_600_000, 'webauthn-register'),
   async (c) => {
     const services = c.get('services')
     const pubkey = c.get('pubkey')

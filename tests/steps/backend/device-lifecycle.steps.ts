@@ -8,6 +8,7 @@ import { setLastResponse, getSharedState } from './shared-state'
 import {
   apiGet,
   apiPost,
+  apiPatch,
   apiDelete,
   createUserViaApi,
 } from '../../api-helpers'
@@ -104,6 +105,41 @@ When('the user registers a VoIP token', async ({ request, world }) => {
   }, s.user!.nsec))
 })
 
+When('the user renames the first device to {string}', async ({ request, world }, newName: string) => {
+  const s = getS(world)
+  expect(s.user).toBeDefined()
+  expect(s.devices.length).toBeGreaterThan(0)
+  setLastResponse(world, await apiPatch(request, `/devices/${s.devices[0].id}`, {
+    deviceName: newName,
+  }, s.user!.nsec))
+})
+
+When('the user renames device {string} to {string}', async ({ request, world }, deviceId: string, newName: string) => {
+  const s = getS(world)
+  expect(s.user).toBeDefined()
+  setLastResponse(world, await apiPatch(request, `/devices/${deviceId}`, {
+    deviceName: newName,
+  }, s.user!.nsec))
+})
+
+When('the user revokes the first device', async ({ request, world }) => {
+  const s = getS(world)
+  expect(s.user).toBeDefined()
+  expect(s.devices.length).toBeGreaterThan(0)
+  setLastResponse(world, await apiPost(request, `/devices/${s.devices[0].id}/revoke`, {
+    confirm: true,
+  }, s.user!.nsec))
+})
+
+When('the user revokes the first device without confirmation', async ({ request, world }) => {
+  const s = getS(world)
+  expect(s.user).toBeDefined()
+  expect(s.devices.length).toBeGreaterThan(0)
+  setLastResponse(world, await apiPost(request, `/devices/${s.devices[0].id}/revoke`, {
+    confirm: false,
+  }, s.user!.nsec))
+})
+
 // ── Then ────────────────────────────────────────────────────────────
 
 Then('{int} devices are listed', async ({ world }, count: number) => {
@@ -126,6 +162,13 @@ Then('the user has {int} devices', async ({ request, world }, count: number) => 
   const res = await apiGet<{ devices: unknown[] }>(request, '/devices', s.user!.nsec)
   expect(res.status).toBe(200)
   expect(res.data.devices).toHaveLength(count)
+})
+
+Then('the device name is {string}', async ({ world }, expectedName: string) => {
+  const resp = getSharedState(world).lastResponse
+  expect(resp).toBeDefined()
+  const data = resp!.data as { deviceName: string }
+  expect(data.deviceName).toBe(expectedName)
 })
 
 Then('the device lists show the Ed25519 public key', async ({ request, world }) => {

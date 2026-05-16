@@ -9,6 +9,7 @@ import { Hono } from 'hono'
 import { validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { requirePermission } from '../middleware/permission-guard'
+import { rateLimit } from '../middleware/rate-limit'
 import { listSecurityEventsQuerySchema } from '@protocol/schemas/devices'
 
 const securityEventsRoutes = new Hono<AppEnv>()
@@ -18,6 +19,7 @@ const securityEventsRoutes = new Hono<AppEnv>()
  * List security events for the authenticated user (own events only).
  */
 securityEventsRoutes.get('/',
+  rateLimit(30, 60_000, 'security-events'),
   validator('query', listSecurityEventsQuerySchema),
   async (c) => {
     const pubkey = c.get('pubkey')
@@ -46,6 +48,7 @@ export default securityEventsRoutes
 export const adminSecurityEventsRoutes = new Hono<AppEnv>()
 
 adminSecurityEventsRoutes.get('/',
+  rateLimit(10, 60_000, 'admin-security-events'),
   requirePermission('audit:read'),
   validator('query', listSecurityEventsQuerySchema),
   async (c) => {
