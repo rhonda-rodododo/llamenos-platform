@@ -3131,6 +3131,9 @@
   },
   "retry": "Retry",
   "retryRegistration": "Retry Registration",
+  "platformRoles": {
+    "description": "Manage platform-wide roles that apply across all hubs. Role names are end-to-end encrypted."
+  },
   "role": {
     "admin": "Admin",
     "volunteer": "Volunteer"
