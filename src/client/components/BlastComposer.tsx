@@ -55,13 +55,13 @@ export function BlastComposer({ onCreated, onCancel }: BlastComposerProps) {
     setSaving(true)
     try {
       const content = {
-        text: text.trim(),
+        body: text.trim(),
         ...(mediaUrl ? { mediaUrl: mediaUrl.trim() } : {}),
       }
       const res = await createBlast({
         name: name.trim(),
         content,
-        targetChannels: channels,
+        channels,
         ...(scheduledAt ? { scheduledAt } : {}),
       })
       onCreated(res.blast)

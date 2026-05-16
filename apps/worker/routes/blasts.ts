@@ -248,14 +248,17 @@ blasts.post('/',
     const hubId = c.get('hubId')
     const pubkey = c.get('pubkey')
     const body = c.req.valid('json')
-    const blast = await services.blasts.createBlast({
+    let blast = await services.blasts.createBlast({
       hubId,
       name: body.name,
       content: { text: body.content.body, mediaUrl: body.content.mediaUrl },
       targetChannels: body.channels,
       createdBy: pubkey,
     })
-    return c.json(blast, 201)
+    if (body.scheduledAt) {
+      blast = await services.blasts.schedule(blast.id, body.scheduledAt)
+    }
+    return c.json({ blast }, 201)
   },
 )
 
@@ -312,7 +315,7 @@ blasts.patch('/:id',
     if (body.content !== undefined) updateInput.content = { text: body.content.body, mediaUrl: body.content.mediaUrl }
     if (body.channels !== undefined) updateInput.targetChannels = body.channels
     const blast = await services.blasts.updateBlast(id, updateInput)
-    return c.json(blast)
+    return c.json({ blast })
   },
 )
 
@@ -371,7 +374,7 @@ blasts.post('/:id/send',
       })
     )
 
-    return c.json(blast)
+    return c.json({ blast })
   },
 )
 
@@ -398,7 +401,7 @@ blasts.post('/:id/schedule',
     const services = c.get('services')
     const body = c.req.valid('json')
     const blast = await services.blasts.schedule(id, body.scheduledAt)
-    return c.json(blast)
+    return c.json({ blast })
   },
 )
 
@@ -423,7 +426,7 @@ blasts.post('/:id/cancel',
     const id = c.req.param('id')
     const services = c.get('services')
     const blast = await services.blasts.cancel(id)
-    return c.json(blast)
+    return c.json({ blast })
   },
 )
 

@@ -628,10 +628,27 @@ Then('I should be able to select all volunteers', async ({ page }) => {
 })
 
 When('I set a future send time', async ({ page }) => {
-  const dateInput = page.locator('input[type="datetime-local"], input[type="date"]').first()
-  if (await dateInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-    const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 16)
-    await dateInput.fill(tomorrow)
+  // Prefer the testid-anchored schedule input; fall back to any datetime-local
+  const dateInput = page.getByTestId('blast-schedule-input').or(
+    page.locator('input[type="datetime-local"]').first()
+  )
+  if (await dateInput.first().isVisible({ timeout: 2000 }).catch(() => false)) {
+    // tomorrow in local datetime-local format (YYYY-MM-DDTHH:mm)
+    const d = new Date(Date.now() + 86400000)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const tomorrow = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+    const input = dateInput.first()
+    // Set value via JS to reliably trigger React's onChange on controlled datetime-local inputs
+    await input.evaluate((el: HTMLInputElement, val: string) => {
+      const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set
+      if (nativeSetter) {
+        nativeSetter.call(el, val)
+      } else {
+        el.value = val
+      }
+      el.dispatchEvent(new Event('input', { bubbles: true }))
+      el.dispatchEvent(new Event('change', { bubbles: true }))
+    }, tomorrow)
   }
 })
 
