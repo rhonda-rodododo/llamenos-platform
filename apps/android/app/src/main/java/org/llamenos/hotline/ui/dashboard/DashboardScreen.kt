@@ -515,6 +515,13 @@ fun DashboardScreen(
                     }
                 }
 
+                // Personal analytics stat cards (calls today, answer rate, avg duration)
+                AnalyticsStatCards(
+                    callsToday = uiState.callsToday,
+                    answerRate = uiState.answerRate,
+                    avgDurationSeconds = uiState.avgDurationSeconds,
+                )
+
                 // Quick actions grid (2x2)
                 Row(
                     modifier = Modifier

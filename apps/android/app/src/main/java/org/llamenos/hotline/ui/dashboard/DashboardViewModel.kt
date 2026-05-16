@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.llamenos.hotline.R
+import org.llamenos.hotline.api.AnalyticsRepository
 import org.llamenos.hotline.api.ApiService
 import org.llamenos.hotline.api.SessionState
 import org.llamenos.hotline.api.WebSocketService
@@ -34,6 +35,8 @@ data class DashboardUiState(
     val shiftStartedAt: String? = null,
     val activeCallCount: Int = 0,
     val callsToday: Int = 0,
+    val answerRate: Float? = null,
+    val avgDurationSeconds: Int? = null,
     val currentCall: ActiveCall? = null,
     val isHangingUp: Boolean = false,
     val isReportingSpam: Boolean = false,
@@ -59,6 +62,7 @@ class DashboardViewModel @Inject constructor(
     private val apiService: ApiService,
     private val sessionState: SessionState,
     private val activeHubState: ActiveHubState,
+    private val analyticsRepository: AnalyticsRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DashboardUiState())
@@ -345,6 +349,26 @@ class DashboardViewModel @Inject constructor(
     }
 
     /**
+     * Load analytics stats (answer rate, avg duration) for the dashboard stat cards.
+     * Non-fatal — stat cards stay hidden if the fetch fails.
+     */
+    private suspend fun loadAnalyticsStats() {
+        try {
+            val callMetrics = analyticsRepository.getCallMetrics()
+            val personalStats = analyticsRepository.getPersonalStats()
+            _uiState.update {
+                it.copy(
+                    answerRate = callMetrics.answerRate.toFloat(),
+                    avgDurationSeconds = personalStats.avgDurationSeconds.toInt(),
+                    callsToday = personalStats.callsToday.toInt().coerceAtLeast(it.callsToday),
+                )
+            }
+        } catch (_: Exception) {
+            // Non-fatal: stat cards simply won't show until next refresh
+        }
+    }
+
+    /**
      * Pull-to-refresh on the dashboard.
      */
     fun refresh() {
@@ -356,6 +380,7 @@ class DashboardViewModel @Inject constructor(
                 _uiState.update { it.copy(errorRes = R.string.dashboard_error_refresh) }
             }
             fetchActiveCall()
+            loadAnalyticsStats()
             android.util.Log.d("DashboardViewModel", "refresh() done, currentCall=${_uiState.value.currentCall?.id}")
             _uiState.update { it.copy(isRefreshing = false) }
         }

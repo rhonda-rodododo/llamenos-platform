@@ -1,7 +1,9 @@
 /**
- * Analytics routes — admin-only dashboard metrics.
+ * Analytics routes — admin dashboard metrics.
  *
- * All endpoints are hub-scoped and require `audit:read` permission.
+ * Mounted at both hub-scoped (/api/hubs/:hubId/analytics/*) and platform-scoped (/api/analytics/*).
+ * Hub-scoped routes filter by hubId; platform-scoped routes aggregate cross-hub (hubId = undefined).
+ * Most endpoints require `audit:read` permission. Platform-scoped access requires super-admin (*).
  * Date range via `?from=ISO&to=ISO` query params (default: last 30 days).
  */
 import { Hono } from 'hono'
