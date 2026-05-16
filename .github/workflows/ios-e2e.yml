@@ -16,6 +16,7 @@ on:
       - 'packages/i18n/**'
       - 'apps/worker/**'
       - 'packages/shared/**'
+      - '.github/workflows/ios-e2e.yml'
   pull_request:
     paths:
       - 'apps/ios/**'
@@ -24,6 +25,7 @@ on:
       - 'packages/i18n/**'
       - 'apps/worker/**'
       - 'packages/shared/**'
+      - '.github/workflows/ios-e2e.yml'
 
 concurrency:
   group: ${{ github.event_name == 'pull_request' && format('ios-e2e-pr-{0}', github.ref) || format('ios-e2e-push-{0}', github.sha) }}
@@ -179,15 +181,6 @@ jobs:
       - name: Build backend bundle
         run: bun run build:server
 
-      - name: Download RustFS binary
-        env:
-          RUSTFS_VERSION: "v1.2.0"
-          RUSTFS_SHA256: "7c3b3039b76e55a1b80935848ed83998d5e8d317374f87851f46a019ff5c0aa4"
-        run: |
-          curl -sSfL "https://github.com/rustfs/rustfs/releases/download/${RUSTFS_VERSION}/rustfs-darwin-arm64" -o .tmp-rustfs
-          echo "${RUSTFS_SHA256}  .tmp-rustfs" | shasum -a 256 -c -
-          chmod +x .tmp-rustfs
-
       - name: Upload backend bundle + tools
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -198,7 +191,6 @@ jobs:
             node_modules/
             bun.lockb
             package.json
-            .tmp-rustfs
           retention-days: 1
           compression-level: 1
           if-no-files-found: error
