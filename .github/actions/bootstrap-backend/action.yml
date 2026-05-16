@@ -25,6 +25,16 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Set up timeout command (macOS compatibility)
+      shell: bash
+      run: |
+        if [ "$RUNNER_OS" = "macOS" ]; then
+          brew install coreutils
+          echo "TIMEOUT_CMD=gtimeout" >> "$GITHUB_ENV"
+        else
+          echo "TIMEOUT_CMD=timeout" >> "$GITHUB_ENV"
+        fi
+
     - name: Create .env for Docker Compose
       shell: bash
       run: |
@@ -49,7 +59,7 @@ runs:
     - name: Build and start Docker Compose (core services)
       shell: bash
       run: |
-        timeout 600 docker compose --env-file .env \
+        $TIMEOUT_CMD 600 docker compose --env-file .env \
           -f deploy/docker/docker-compose.yml \
           -f deploy/docker/docker-compose.test.yml \
           up -d --build --wait app
@@ -58,7 +68,7 @@ runs:
       if: inputs.with_sidecars == 'true'
       shell: bash
       run: |
-        timeout 300 docker compose --env-file .env \
+        $TIMEOUT_CMD 300 docker compose --env-file .env \
           --profile signal --profile asterisk \
           -f deploy/docker/docker-compose.yml \
           -f deploy/docker/docker-compose.test.yml \
