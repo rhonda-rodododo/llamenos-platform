@@ -10,6 +10,7 @@ import { Hono } from 'hono'
 import { describeRoute } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { authErrors } from '../openapi/helpers'
+import { rateLimit } from '../middleware/rate-limit'
 
 const sessionRoutes = new Hono<AppEnv>()
 
@@ -52,11 +53,13 @@ sessionRoutes.get('/',
  * NOTE: Literal routes MUST come before parameterized routes.
  */
 sessionRoutes.post('/terminate-others',
+  rateLimit(10, 3_600_000, 'session-terminate'),
   describeRoute({
     tags: ['Sessions'],
     summary: 'Terminate all other sessions',
     responses: {
       200: { description: 'Other sessions terminated' },
+      429: { description: 'Rate limit exceeded (10/hour)' },
       ...authErrors,
     },
   }),
@@ -79,12 +82,14 @@ sessionRoutes.post('/terminate-others',
  * Terminate a specific session by UUID. Only the session owner can terminate their sessions.
  */
 sessionRoutes.delete('/:id',
+  rateLimit(10, 3_600_000, 'session-terminate'),
   describeRoute({
     tags: ['Sessions'],
     summary: 'Terminate a specific session',
     responses: {
       204: { description: 'Session terminated' },
       404: { description: 'Session not found' },
+      429: { description: 'Rate limit exceeded (10/hour)' },
       ...authErrors,
     },
   }),

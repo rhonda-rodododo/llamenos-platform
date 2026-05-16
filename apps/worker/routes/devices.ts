@@ -13,6 +13,7 @@ import type { AppEnv } from '../types'
 import { authErrors } from '../openapi/helpers'
 import { registerDeviceBodySchema, voipTokenBodySchema, deviceDetailListResponseSchema, renameDeviceBodySchema, revokeDeviceBodySchema, verifyDeviceBodySchema } from '@protocol/schemas/devices'
 import { requirePermission } from '../middleware/permission-guard'
+import { rateLimit } from '../middleware/rate-limit'
 
 const devicesRoutes = new Hono<AppEnv>()
 
@@ -78,11 +79,13 @@ devicesRoutes.post('/register',
     summary: 'Register or update device push token and crypto keys',
     responses: {
       204: { description: 'Device registered' },
+      429: { description: 'Rate limit exceeded (5/hour)' },
       500: { description: 'Failed to register device' },
       ...authErrors,
     },
   }),
   validator('json', registerDeviceBodySchema),
+  rateLimit(5, 3_600_000, 'device-register'),
   async (c) => {
     const pubkey = c.get('pubkey')
     const body = c.req.valid('json')
@@ -208,9 +211,11 @@ devicesRoutes.post('/:id/revoke',
       200: { description: 'Device revoked, hub key rotation needed' },
       400: { description: 'Confirmation required' },
       404: { description: 'Device not found or not owned by caller' },
+      429: { description: 'Rate limit exceeded (3/hour)' },
     },
   }),
   validator('json', revokeDeviceBodySchema),
+  rateLimit(3, 3_600_000, 'device-revoke'),
   async (c) => {
     const pubkey = c.get('pubkey')
     const deviceId = c.req.param('id')
@@ -234,6 +239,7 @@ devicesRoutes.post('/:id/revoke',
       revoked: true,
       deviceId,
       hubIdsRequiringKeyRotation: result.hubIds,
+      pukRotationNeeded: result.pukRotationNeeded,
     })
   })
 

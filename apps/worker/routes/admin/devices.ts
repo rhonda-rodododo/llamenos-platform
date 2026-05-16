@@ -8,6 +8,7 @@ import { Hono } from 'hono'
 import { validator } from 'hono-openapi'
 import type { AppEnv } from '../../types'
 import { requirePermission } from '../../middleware/permission-guard'
+import { rateLimit } from '../../middleware/rate-limit'
 import { adminDeviceOverviewQuerySchema } from '@protocol/schemas/devices'
 
 const adminDevicesRoutes = new Hono<AppEnv>()
@@ -17,6 +18,7 @@ const adminDevicesRoutes = new Hono<AppEnv>()
  * Paginated hub-scoped aggregate device stats per user.
  */
 adminDevicesRoutes.get('/overview',
+  rateLimit(10, 60_000, 'admin-device-overview'),
   requirePermission('users:manage-devices'),
   validator('query', adminDeviceOverviewQuerySchema),
   async (c) => {

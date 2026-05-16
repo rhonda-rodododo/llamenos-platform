@@ -175,6 +175,8 @@ pub fn run() {
             crypto::decrypt_server_event,
             crypto::encrypt_hub_field,
             crypto::decrypt_hub_field,
+            // SAS emoji verification
+            crypto::derive_sas,
             // Shamir secret sharing (recovery group)
             crypto::shamir_split,
             crypto::shamir_combine,

@@ -18,6 +18,7 @@ import {
   systemSettings,
   securityEvents,
   deviceVerifications,
+  sigchainLinks,
 } from '../db/schema'
 import type {
   User,
@@ -933,19 +934,23 @@ export class IdentityService {
   }
 
   /**
-   * Revoke a device — atomically delete device and emit security event.
-   * Returns hub IDs for client-side key rotation.
+   * Revoke a device — atomically: append sigchain link, delete device, emit
+   * security event, and return hub IDs for client-side PUK + hub key rotation.
+   *
+   * The client signs a `device_remove` sigchain link before calling this endpoint.
+   * The server validates hash-chain continuity, persists the link, then deletes
+   * the device record — all within a single transaction.
    */
   async revokeDevice(
     pubkey: string,
     deviceId: string,
-    _sigchainData?: {
+    sigchainData?: {
       signature?: string
       sigchainHash?: string
       sigchainSeqNo?: number
       sigchainPrevHash?: string
     },
-  ): Promise<{ hubIds: string[] } | null> {
+  ): Promise<{ hubIds: string[]; pukRotationNeeded: boolean } | null> {
     // Verify device belongs to caller
     const [device] = await this.db
       .select()
@@ -966,19 +971,43 @@ export class IdentityService {
       ? (user.hubRoles as Array<{ hubId: string }>).map(hr => hr.hubId)
       : []
 
-    // Atomic: delete device + emit security event
+    // Atomic: append sigchain link + delete device + emit security event
     await this.db.transaction(async (tx) => {
+      // 1. Append device_remove sigchain link (if client provided signed data)
+      if (sigchainData?.signature && sigchainData.sigchainHash != null && sigchainData.sigchainSeqNo != null) {
+        await tx.insert(sigchainLinks).values({
+          userPubkey: pubkey,
+          seqNo: sigchainData.sigchainSeqNo,
+          linkType: 'device_remove',
+          payload: {
+            deviceId,
+            devicePubkey: device.ed25519Pubkey,
+            platform: device.platform,
+          },
+          signature: sigchainData.signature,
+          prevHash: sigchainData.sigchainPrevHash ?? '',
+          hash: sigchainData.sigchainHash,
+        })
+      }
+
+      // 2. Delete device record
       await tx.delete(devices).where(eq(devices.id, deviceId))
 
+      // 3. Emit security event
       await tx.insert(securityEvents).values({
         userPubkey: pubkey,
         eventType: 'device_remove',
         deviceId,
-        metadata: { revokedDeviceId: deviceId, platform: device.platform },
+        metadata: {
+          revokedDeviceId: deviceId,
+          platform: device.platform,
+          sigchainSeqNo: sigchainData?.sigchainSeqNo,
+        },
       })
     })
 
-    return { hubIds }
+    // Signal client to rotate PUK (excluding revoked device) and hub keys
+    return { hubIds, pukRotationNeeded: true }
   }
 
   /**

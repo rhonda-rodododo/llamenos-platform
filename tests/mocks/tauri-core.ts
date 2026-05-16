@@ -61,6 +61,7 @@ const LABEL_MAP: Record<string, number> = {
   'llamenos:recovery-group:puk-seed-wrap:v1': 61,
   'llamenos:recovery-group:share-contribute:v1': 62,
   'llamenos:recovery-group:liveness-proof:v1': 63,
+  'llamenos:sas-derive:v1': 80,
 }
 
 function labelToId(label: string): number {
@@ -933,6 +934,74 @@ const commands: Record<string, CommandHandler> = {
       publicKeyHex: bytesToHex(publicKey),
       privateKeyHex: bytesToHex(privateKey),
     }
+  },
+
+  // --- SAS emoji verification ---
+
+  derive_sas: (a) => {
+    const pubkeyAHex = a.pubkeyAHex as string
+    const pubkeyBHex = a.pubkeyBHex as string
+    const nonceHex = a.nonceHex as string
+
+    const pkA = hexToBytes(pubkeyAHex)
+    const pkB = hexToBytes(pubkeyBHex)
+    const nonceBuf = hexToBytes(nonceHex)
+
+    if (pkA.length !== 32) throw new Error(`pubkey_a must be 32 bytes, got ${pkA.length}`)
+    if (pkB.length !== 32) throw new Error(`pubkey_b must be 32 bytes, got ${pkB.length}`)
+    if (nonceBuf.length !== 32) throw new Error(`nonce must be 32 bytes, got ${nonceBuf.length}`)
+
+    // Canonical ordering: min first (matches Rust)
+    let first: Uint8Array, second: Uint8Array
+    let aFirst = true
+    for (let i = 0; i < 32; i++) {
+      if (pkA[i] < pkB[i]) { aFirst = true; break }
+      if (pkA[i] > pkB[i]) { aFirst = false; break }
+    }
+    first = aFirst ? pkA : pkB
+    second = aFirst ? pkB : pkA
+
+    // Input key material: min_pubkey || max_pubkey || nonce
+    const ikm = new Uint8Array(96)
+    ikm.set(first, 0)
+    ikm.set(second, 32)
+    ikm.set(nonceBuf, 64)
+
+    // HKDF-SHA256: extract then expand with LABEL_SAS_DERIVE
+    const output = hkdf(sha256, ikm, new Uint8Array(0), utf8ToBytes('llamenos:sas-derive:v1'), 6)
+
+    // Extract seven 6-bit values from 48 bits
+    const bits = (BigInt(output[0]) << 40n) | (BigInt(output[1]) << 32n) |
+      (BigInt(output[2]) << 24n) | (BigInt(output[3]) << 16n) |
+      (BigInt(output[4]) << 8n) | BigInt(output[5])
+
+    const indices: number[] = []
+    for (let i = 0; i < 7; i++) {
+      indices.push(Number((bits >> BigInt(42 - 6 * i)) & 0x3Fn))
+    }
+
+    const SAS_EMOJI_TABLE = [
+      '\u{1F436}', '\u{1F431}', '\u{1F434}', '\u{1F437}',
+      '\u{1F430}', '\u{1F43B}', '\u{1F42F}', '\u{1F428}',
+      '\u{1F43C}', '\u{1F981}', '\u{1F984}', '\u{1F422}',
+      '\u{1F420}', '\u{1F419}', '\u{1F98B}', '\u{1F33B}',
+      '\u{1F332}', '\u{1F335}', '\u{1F344}', '\u{1F30D}',
+      '\u{1F319}', '\u{2B50}',  '\u{26A1}',  '\u{1F525}',
+      '\u{1F4A7}', '\u{2744}\u{FE0F}', '\u{1F308}', '\u{2600}\u{FE0F}',
+      '\u{2601}\u{FE0F}', '\u{1F30A}', '\u{1F3D4}\u{FE0F}', '\u{1F3DD}\u{FE0F}',
+      '\u{1F680}', '\u{2708}\u{FE0F}', '\u{1F6A2}', '\u{1F3E0}',
+      '\u{1F3F0}', '\u{1F3A8}', '\u{1F3B5}', '\u{1F3B2}',
+      '\u{1F3C6}', '\u{1F48E}', '\u{1F511}', '\u{1F6E1}\u{FE0F}',
+      '\u{2764}\u{FE0F}', '\u{1F31F}', '\u{1F3AF}', '\u{1F52E}',
+      '\u{1F9E9}', '\u{1F3C0}', '\u{26BD}',  '\u{1F3B3}',
+      '\u{1F40C}', '\u{1F98A}', '\u{1F427}', '\u{1F989}',
+      '\u{1F99C}', '\u{1F982}', '\u{1F980}', '\u{1F41D}',
+      '\u{1F33F}', '\u{1F34E}', '\u{1F352}', '\u{1F349}',
+    ]
+
+    const emojis = indices.map(i => SAS_EMOJI_TABLE[i] ?? '\u{2753}')
+
+    return { indices, emojis }
   },
 
   // --- Test-only commands (PIN lockout seeding) ---

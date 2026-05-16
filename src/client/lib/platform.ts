@@ -524,6 +524,34 @@ export async function sframeDeriveKey(
   throw new Error('WASM sframe derive key not yet implemented')
 }
 
+// ── SAS emoji verification ──────────────────────────────────────────
+
+/** SAS derivation result — 7 emoji indices and their display strings. */
+export interface SasResult {
+  indices: number[]
+  emojis: string[]
+}
+
+/**
+ * Derive 7 SAS emoji indices from two Ed25519 public keys and a random nonce.
+ * Both parties compute the same result regardless of argument order (canonical pubkey ordering).
+ * Uses HKDF-SHA256 with LABEL_SAS_DERIVE for domain separation.
+ */
+export async function deriveSas(
+  pubkeyAHex: string,
+  pubkeyBHex: string,
+  nonceHex: string,
+): Promise<SasResult> {
+  if (useTauri) {
+    return tauriInvoke<SasResult>('derive_sas', {
+      pubkeyAHex,
+      pubkeyBHex,
+      nonceHex,
+    })
+  }
+  throw new Error('WASM deriveSas not yet implemented')
+}
+
 // ── Key persistence ─────────────────────────────────────────────────
 
 const STORE_KEY = 'llamenos-encrypted-device-keys'
