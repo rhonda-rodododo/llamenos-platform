@@ -10,7 +10,6 @@ import { When, Then } from '../fixtures'
 import { TestIds } from '../../test-ids'
 import { Timeouts } from '../../helpers'
 import { listShiftsViaApi, createShiftViaApi } from '../../api-helpers'
-import { waitForApiAndUi } from '../../pages/index'
 
 When('I tap a shift card', async ({ page, backendRequest: request, workerHub }) => {
   // Ensure at least one shift exists so the tap has something to click.
@@ -18,13 +17,50 @@ When('I tap a shift card', async ({ page, backendRequest: request, workerHub }) 
   if (existingShifts.length === 0) {
     await createShiftViaApi(request, { name: `Auto-seeded Shift ${Date.now()}`, hubId: workerHub })
   }
-  // Hard navigation to /shifts to bypass React Query's staleTime cache.
-  // Soft navigation (sidebar click) keeps the QueryClient alive, so the
-  // recently-cached empty shifts list may be returned without a refetch (staleTime: 2 min).
-  // Always navigate to ensure fresh data regardless of whether a shift was just created.
-  await page.goto('/shifts')
-  await page.waitForLoadState('domcontentloaded')
-  await waitForApiAndUi(page)
+  // Navigate to /shifts using React Router (soft SPA navigation) so the React app stays
+  // alive and the key manager remains unlocked.
+  // page.goto('/shifts') would cause a full browser reload which evicts the in-memory
+  // key manager state, landing the user on the PIN entry screen instead of /shifts.
+  const navLink = page.getByTestId(TestIds.NAV_SHIFTS)
+  const navVisible = await navLink.isVisible({ timeout: 3000 }).catch(() => false)
+  if (navVisible) {
+    await navLink.click()
+  } else {
+    // Fallback: use the exposed router for soft navigation if sidebar is collapsed.
+    await page.evaluate(() => {
+      const w = window as unknown as { __TEST_ROUTER?: { navigate: (opts: { to: string }) => void } }
+      w.__TEST_ROUTER?.navigate({ to: '/shifts' })
+    })
+  }
+  await page.waitForURL('**/shifts', { timeout: Timeouts.NAVIGATION })
+
+  // Set up response waiter BEFORE triggering the invalidation so we don't miss the
+  // response if the refetch fires synchronously in the next microtask.
+  // This is required because the shifts query may have cached stale/empty data from a
+  // prior fetch (if the component mounted before setActiveHub() was called by
+  // ConfigProvider, the query used a null hub prefix and returned empty results).
+  const shiftsResponse = page.waitForResponse(
+    r => {
+      const url = r.url()
+      return (
+        url.includes('/shifts') &&
+        !url.includes('/active') &&
+        !url.includes('/fallback') &&
+        !url.includes('/requests') &&
+        !url.includes('/availability') &&
+        !url.includes('/overrides') &&
+        r.status() === 200
+      )
+    },
+    { timeout: Timeouts.API },
+  )
+  // Invalidate the shifts list so React Query re-fetches with the correct hub.
+  await page.evaluate(() => {
+    const w = window as unknown as { __TEST_QUERY_CLIENT?: { invalidateQueries: (opts: { queryKey: string[] }) => void } }
+    w.__TEST_QUERY_CLIENT?.invalidateQueries({ queryKey: ['shifts', 'list'] })
+  })
+  // Wait for the HTTP response to confirm the hub-scoped data has been fetched.
+  await shiftsResponse
   const shiftCard = page.getByTestId(TestIds.SHIFT_CARD).first()
   await expect(shiftCard).toBeVisible({ timeout: Timeouts.ELEMENT })
   // Desktop: click the edit button on the shift card to open the inline edit form
