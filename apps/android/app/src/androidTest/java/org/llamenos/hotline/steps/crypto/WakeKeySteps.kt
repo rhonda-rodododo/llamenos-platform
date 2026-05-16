@@ -104,17 +104,13 @@ class WakeKeySteps : BaseSteps() {
 
     @When("I attempt to decrypt a wake payload with a malformed ephemeral key")
     fun iAttemptToDecryptAWakePayloadWithAMalformedEphemeralKey() {
-        // A malformed ephemeral public key: too short, not valid hex
-        val malformedEphemeralKey = "deadbeef"  // Only 8 hex chars instead of 64
-        val validPackedHex = "00".repeat(64)    // Dummy ciphertext
+        // Malformed HPKE envelope JSON — invalid enc field
+        val malformedEnvelope = """{"v":1,"labelId":60,"enc":"deadbeef","ct":"${"00".repeat(64)}"}"""
         try {
             val result = runBlocking {
-                wakeKeyService.decryptWakePayload(
-                    packedHex = validPackedHex,
-                    ephemeralPubkeyHex = malformedEphemeralKey,
-                )
+                wakeKeyService.decryptWakePayload(malformedEnvelope)
             }
-            assertNull("Decryption with malformed ephemeral key should return null", result)
+            assertNull("Decryption with malformed envelope should return null", result)
         } catch (_: Throwable) {
             // Expected: decryption fails with malformed input
         }
@@ -122,15 +118,11 @@ class WakeKeySteps : BaseSteps() {
 
     @When("I attempt to decrypt a wake payload with truncated ciphertext")
     fun iAttemptToDecryptAWakePayloadWithTruncatedCiphertext() {
-        // Valid-length ephemeral key but truncated ciphertext
-        val validEphemeralKey = "a".repeat(64)  // 64 hex chars
-        val truncatedPackedHex = "ff"            // Just 1 byte — too short for nonce + ciphertext
+        // HPKE envelope with truncated ciphertext
+        val truncatedEnvelope = """{"v":1,"labelId":60,"enc":"${"aa".repeat(32)}","ct":"ff"}"""
         try {
             val result = runBlocking {
-                wakeKeyService.decryptWakePayload(
-                    packedHex = truncatedPackedHex,
-                    ephemeralPubkeyHex = validEphemeralKey,
-                )
+                wakeKeyService.decryptWakePayload(truncatedEnvelope)
             }
             assertNull("Decryption with truncated ciphertext should return null", result)
         } catch (_: Throwable) {

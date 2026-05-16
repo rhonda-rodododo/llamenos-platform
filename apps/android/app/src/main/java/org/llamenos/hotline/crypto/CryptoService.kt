@@ -72,11 +72,21 @@ data class EncryptedMessage(
 data class ShamirShare(
     val x: Int,
     val y: String,
-)
+) {
+    /** Convert to FFI ShamirShare type. */
+    fun toFfi(): org.llamenos.core.ShamirShare =
+        org.llamenos.core.ShamirShare(x = x.toUByte(), yHex = y)
+
+    companion object {
+        /** Convert from FFI ShamirShare type. */
+        fun fromFfi(ffi: org.llamenos.core.ShamirShare): ShamirShare =
+            ShamirShare(x = ffi.x.toInt(), y = ffi.yHex)
+    }
+}
 
 data class RecoveryGroupKeypair(
     val publicKeyHex: String,
-    val privateKeyHex: String,
+    val handle: ULong = 0u,
 )
 
 class CryptoException(message: String, cause: Throwable? = null) : Exception(message, cause)
@@ -658,23 +668,20 @@ class CryptoService @Inject constructor() {
                     total = total.toUByte(),
                     threshold = threshold.toUByte(),
                 )
-                ffiShares.map { share ->
-                    ShamirShare(x = share.x.toInt(), y = share.y)
-                }
+                ffiShares.map { ShamirShare.fromFfi(it) }
             } catch (e: Exception) {
                 throw CryptoException("Shamir split failed: ${e.message}", e)
             }
         }
 
-    suspend fun shamirCombine(shares: List<ShamirShare>): String =
+    suspend fun shamirCombine(shares: List<ShamirShare>, threshold: Int = shares.size): String =
         withContext(computeDispatcher) {
             check(nativeLibLoaded) { "Native crypto library not loaded." }
             try {
-                val sharesJson = json.encodeToString(
-                    kotlinx.serialization.builtins.ListSerializer(ShamirShare.serializer()),
-                    shares,
+                org.llamenos.core.mobileShamirCombine(
+                    shares = shares.map { it.toFfi() },
+                    threshold = threshold.toUByte(),
                 )
-                org.llamenos.core.mobileShamirCombine(sharesJson = sharesJson)
             } catch (e: Exception) {
                 throw CryptoException("Shamir combine failed: ${e.message}", e)
             }
@@ -684,8 +691,7 @@ class CryptoService @Inject constructor() {
         withContext(computeDispatcher) {
             check(nativeLibLoaded) { "Native crypto library not loaded." }
             try {
-                val shareJson = json.encodeToString(ShamirShare.serializer(), share)
-                org.llamenos.core.mobileShamirCommit(shareJson = shareJson)
+                org.llamenos.core.mobileShamirCommit(share = share.toFfi())
             } catch (e: Exception) {
                 throw CryptoException("Shamir commit failed: ${e.message}", e)
             }
@@ -695,8 +701,7 @@ class CryptoService @Inject constructor() {
         withContext(computeDispatcher) {
             check(nativeLibLoaded) { "Native crypto library not loaded." }
             try {
-                val shareJson = json.encodeToString(ShamirShare.serializer(), share)
-                org.llamenos.core.mobileShamirVerify(shareJson = shareJson, commitmentHex = commitment)
+                org.llamenos.core.mobileShamirVerify(share = share.toFfi(), commitmentHex = commitment)
             } catch (e: Exception) {
                 throw CryptoException("Shamir verify failed: ${e.message}", e)
             }
@@ -711,7 +716,7 @@ class CryptoService @Inject constructor() {
                 val ffiKeypair = org.llamenos.core.mobileRecoveryGroupGenerateKeypair()
                 RecoveryGroupKeypair(
                     publicKeyHex = ffiKeypair.publicKeyHex,
-                    privateKeyHex = ffiKeypair.privateKeyHex,
+                    handle = ffiKeypair.handle,
                 )
             } catch (e: Exception) {
                 throw CryptoException("Recovery group keypair generation failed: ${e.message}", e)
