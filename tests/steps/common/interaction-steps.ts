@@ -238,8 +238,10 @@ When('I expand the {string} section', async ({ page }, sectionName: string) => {
   const section = page.getByTestId(testId)
   const el = section.first()
   await el.scrollIntoViewIfNeeded()
-  // Check if already expanded
-  const isExpanded = await el.locator('[data-state="open"]').isVisible({ timeout: 500 }).catch(() => false)
+  // Use count() (DOM presence) not isVisible() — Radix animates from height:0 so the element
+  // exists in DOM immediately with data-state="open" but has zero dimensions during animation.
+  const openCount = await el.locator('[data-state="open"]').count()
+  const isExpanded = openCount > 0
   if (!isExpanded) {
     // Click the trigger element (CardHeader with data-testid="{id}-trigger")
     const trigger = page.getByTestId(`${testId}-trigger`)
