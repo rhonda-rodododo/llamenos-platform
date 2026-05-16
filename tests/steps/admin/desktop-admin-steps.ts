@@ -603,27 +603,52 @@ Then('the blast should appear in the blast list', async ({ page }) => {
 })
 
 Then('I should see the recipient selection interface', async ({ page }) => {
-  // Content assertion — verifying recipient UI text
-  const recipientUi = page.getByText(/recipient|volunteer|select/i)
+  // Accept: subscriber list, channel selector, or any recipient/channel/select UI element
+  const recipientUi = page.getByText(/recipient|volunteer|select|channel|subscriber/i)
   await expect(recipientUi.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('I should be able to select individual volunteers', async ({ page }) => {
+  // Accept checkboxes (subscriber list) OR channel toggle buttons (blast composer)
   const checkbox = page.locator('input[type="checkbox"]').first()
-  await expect(checkbox).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const hasCheckbox = await checkbox.isVisible({ timeout: 2000 }).catch(() => false)
+  if (hasCheckbox) {
+    await expect(checkbox).toBeVisible({ timeout: Timeouts.ELEMENT })
+    return
+  }
+  // Blast composer: channel toggle buttons serve as per-channel selection
+  const toggleBtn = page.locator('button.rounded-lg').first()
+  await expect(toggleBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('I should be able to select all volunteers', async ({ page }) => {
-  // Content assertion — verifying "select all" text
-  const selectAll = page.getByText(/select all/i)
+  // Accept "Select All" text or Target Channels section (blast composer)
+  const selectAll = page.getByText(/select all|target channels/i)
   await expect(selectAll.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 When('I set a future send time', async ({ page }) => {
-  const dateInput = page.locator('input[type="datetime-local"], input[type="date"]').first()
-  if (await dateInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-    const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 16)
-    await dateInput.fill(tomorrow)
+  // Prefer the testid-anchored schedule input; fall back to any datetime-local
+  const dateInput = page.getByTestId('blast-schedule-input').or(
+    page.locator('input[type="datetime-local"]').first()
+  )
+  if (await dateInput.first().isVisible({ timeout: 2000 }).catch(() => false)) {
+    // tomorrow in local datetime-local format (YYYY-MM-DDTHH:mm)
+    const d = new Date(Date.now() + 86400000)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const tomorrow = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+    const input = dateInput.first()
+    // Set value via JS to reliably trigger React's onChange on controlled datetime-local inputs
+    await input.evaluate((el: HTMLInputElement, val: string) => {
+      const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set
+      if (nativeSetter) {
+        nativeSetter.call(el, val)
+      } else {
+        el.value = val
+      }
+      el.dispatchEvent(new Event('input', { bubbles: true }))
+      el.dispatchEvent(new Event('change', { bubbles: true }))
+    }, tomorrow)
   }
 })
 

@@ -7,7 +7,6 @@ Feature: Blast Campaign
   Background:
     Given I am logged in as an admin
 
-  @wip
   Scenario: Create a blast message
     When I navigate to the "Blasts" page
     And I click "New Blast"
@@ -16,7 +15,6 @@ Feature: Blast Campaign
     And I click "Send"
     Then the blast should appear in the blast list
 
-  @wip
   Scenario: Blast recipient selection
     When I navigate to the "Blasts" page
     And I click "New Blast"
@@ -24,13 +22,12 @@ Feature: Blast Campaign
     And I should be able to select individual volunteers
     And I should be able to select all volunteers
 
-  @wip
   Scenario: Schedule a blast
     When I navigate to the "Blasts" page
     And I click "New Blast"
     And I compose a blast message
     And I set a future send time
-    And I click "Schedule"
+    And I click "Schedule Send"
     Then the blast should appear as "Scheduled"
 
   Scenario: Blast delivery status

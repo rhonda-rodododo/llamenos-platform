@@ -242,7 +242,7 @@ describe('blasts routes', () => {
       const res = await app.request('/blasts/blast-1/send', { method: 'POST' })
       expect(res.status).toBe(200)
       const json = await res.json()
-      expect(json.status).toBe('sending')
+      expect((json as { blast: { status: string } }).blast.status).toBe('sending')
       expect(sendSpy).toHaveBeenCalledWith('blast-1', 'hub-1')
     })
 
@@ -274,7 +274,7 @@ describe('blasts routes', () => {
 
       expect(res.status).toBe(200)
       const json = await res.json()
-      expect(json.status).toBe('scheduled')
+      expect((json as { blast: { status: string } }).blast.status).toBe('scheduled')
       expect(scheduleSpy).toHaveBeenCalledWith('blast-1', scheduledAt)
     })
 
@@ -304,7 +304,7 @@ describe('blasts routes', () => {
       const res = await app.request('/blasts/blast-1/cancel', { method: 'POST' })
       expect(res.status).toBe(200)
       const json = await res.json()
-      expect(json.status).toBe('cancelled')
+      expect((json as { blast: { status: string } }).blast.status).toBe('cancelled')
       expect(cancelSpy).toHaveBeenCalledWith('blast-1')
     })
 

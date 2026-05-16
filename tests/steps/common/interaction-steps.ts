@@ -39,6 +39,8 @@ const buttonTextToTestIdMap: Record<string, string> = {
   'Add Field': 'custom-field-add-btn',
   'Add Volunteer': TestIds.VOLUNTEER_ADD_BTN,
   'Recovery options': TestIds.RECOVERY_OPTIONS_BTN,
+  'Schedule Send': 'blast-schedule-btn',
+  'New Blast': TestIds.BLAST_NEW_BTN,
   'Ban Number': TestIds.BAN_ADD_BTN,
   'Import': TestIds.BAN_IMPORT_BTN,
   'Invite Volunteer': TestIds.INVITE_BTN,
@@ -65,13 +67,19 @@ async function clickByTextOrTestId(page: import('@playwright/test').Page, text: 
   if (text === 'Send') {
     const noConvo = await page.evaluate(() => (window as Record<string, unknown>).__test_no_conversation).catch(() => false)
     if (noConvo) return
-    // Also check if the send button is visible within a short window before committing
-    // to the full Timeouts.ELEMENT wait — avoids 10s delay when messaging is disabled.
+    // Check conversation send button first
     const sendBtn = page.getByTestId('conv-send-btn')
     const hasSend = await sendBtn.isVisible({ timeout: 3000 }).catch(() => false)
     if (hasSend) {
       await expect(sendBtn).toBeEnabled({ timeout: Timeouts.ELEMENT })
       await sendBtn.click()
+      return
+    }
+    // Fallback: blast send button (draft blast detail panel)
+    const blastSendBtn = page.getByTestId('blast-send-btn')
+    const hasBlastSend = await blastSendBtn.isVisible({ timeout: 3000 }).catch(() => false)
+    if (hasBlastSend) {
+      await blastSendBtn.click()
     }
     return
   }
