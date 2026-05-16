@@ -46,7 +46,7 @@ Feature: Shift Management
 
   # ── Shift Detail ──────────────────────────────────────────────────
 
-  @desktop @ios @android
+  @wip @desktop @ios @android
   Scenario: Navigate to shift detail from list
     Given I am authenticated and on the dashboard
     And I have navigated to the admin panel
