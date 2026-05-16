@@ -31,11 +31,18 @@ function getS(world: Record<string, unknown>): InviteTestState {
   return getState<InviteTestState>(world, STATE_KEY)
 }
 
-Before(async ({ world }) => {
-  setState<InviteTestState>(world, STATE_KEY, { rateLimitResponses: [] })
-})
-
 const BASE_URL = process.env.TEST_HUB_URL || 'http://localhost:3000'
+
+Before(async ({ request, world }) => {
+  setState<InviteTestState>(world, STATE_KEY, { rateLimitResponses: [] })
+  // Clear invite-specific rate limits before each scenario to prevent cross-scenario bleed.
+  // Scoped to 'invite-validate' prefix so it doesn't interfere with concurrent rate-limit
+  // tests on other workers (e.g. provider-setup phone search).
+  const testSecret = process.env.DEV_RESET_SECRET || process.env.E2E_TEST_SECRET || 'test-reset-secret'
+  await request.delete(`${BASE_URL}/api/test-rate-limits?prefix=invite-validate`, {
+    headers: { 'X-Test-Secret': testSecret },
+  }).catch(() => {})
+})
 // ── Helpers ─────────────────────────────────────────────────────────
 
 function createRedeemAuth(seedHex: string): { pubkey: string; timestamp: number; token: string } {
