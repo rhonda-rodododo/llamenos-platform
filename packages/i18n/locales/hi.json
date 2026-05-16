@@ -3316,7 +3316,11 @@
     "summary": "Summary",
     "system": "System",
     "title": "Roles & Permissions",
-    "updated": "Role updated"
+    "updated": "Role updated",
+    "importAllExist": "All selected roles already exist",
+    "importSelected": "Import {{count}} role(s)",
+    "importSuccess": "{{count}} role(s) imported",
+    "suggestedRoleCount": "{{count}} roles"
   },
   "save": "Save",
   "saveCredentials": "Save Credentials",

@@ -1829,6 +1829,22 @@ export async function applyTemplate(templateId: string) {
   })
 }
 
+export async function getTemplateDetails(templateId: string) {
+  return request<{
+    id: string
+    name: string
+    description: string
+    suggestedRoles?: Array<{ name: string; slug: string; description: string; permissions: string[] }>
+  }>(hp(`/settings/cms/templates/${templateId}`))
+}
+
+export async function createRolesFromTemplate(roles: Array<{ name: string; slug: string; description: string; permissions: string[] }>) {
+  return request<{ created: Array<{ id: string; name: string }>; count: number }>(hp('/settings/entity-schema/roles/from-template'), {
+    method: 'POST',
+    body: JSON.stringify({ roles }),
+  })
+}
+
 // --- CMS Report Type Definitions (Epic 343) ---
 
 export type ReportTypeDefinition = z.infer<typeof reportTypeDefinitionSchema>
