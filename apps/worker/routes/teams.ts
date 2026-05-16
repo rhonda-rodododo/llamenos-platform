@@ -14,6 +14,7 @@ import {
 } from '@protocol/schemas/team'
 import { okResponseSchema } from '@protocol/schemas/common'
 import { authErrors, notFoundError } from '../openapi/helpers'
+import { audit } from '../services/audit'
 
 const teams = new Hono<AppEnv>()
 
@@ -80,6 +81,8 @@ teams.post('/',
       createdBy: pubkey,
     })
 
+    await audit(services.audit, 'teamCreated', pubkey, { teamId: team.id }, undefined, hubId)
+
     return c.json({
       ...team,
       createdAt: team.createdAt.toISOString(),
@@ -145,7 +148,9 @@ teams.patch('/:teamId',
     const teamId = c.req.param('teamId')
     const body = c.req.valid('json')
 
+    const pubkey = c.get('pubkey')
     const team = await services.teams.updateTeam(teamId, hubId, body)
+    await audit(services.audit, 'teamUpdated', pubkey, { teamId }, undefined, hubId)
     return c.json({
       ...team,
       createdAt: team.createdAt.toISOString(),
@@ -175,9 +180,11 @@ teams.delete('/:teamId',
   async (c) => {
     const services = c.get('services')
     const hubId = c.get('hubId') ?? ''
+    const pubkey = c.get('pubkey')
     const teamId = c.req.param('teamId')
 
     await services.teams.deleteTeam(teamId, hubId)
+    await audit(services.audit, 'teamDeleted', pubkey, { teamId }, undefined, hubId)
     return c.json({ ok: true })
   },
 )
@@ -242,6 +249,7 @@ teams.post('/:teamId/members',
     const { pubkeys } = c.req.valid('json')
 
     await services.teams.addMembers(teamId, hubId, pubkeys, pubkey)
+    await audit(services.audit, 'teamMemberAdded', pubkey, { teamId, count: pubkeys.length }, undefined, hubId)
     return c.json({ ok: true })
   },
 )
@@ -267,10 +275,12 @@ teams.delete('/:teamId/members/:userPubkey',
   async (c) => {
     const services = c.get('services')
     const hubId = c.get('hubId') ?? ''
+    const pubkey = c.get('pubkey')
     const teamId = c.req.param('teamId')
     const userPubkey = c.req.param('userPubkey')
 
     await services.teams.removeMember(teamId, hubId, userPubkey)
+    await audit(services.audit, 'teamMemberRemoved', pubkey, { teamId }, undefined, hubId)
     return c.json({ ok: true })
   },
 )
@@ -335,6 +345,7 @@ teams.post('/:teamId/contacts',
     const { contactIds } = c.req.valid('json')
 
     await services.teams.assignContacts(teamId, hubId, contactIds, pubkey)
+    await audit(services.audit, 'teamContactAssigned', pubkey, { teamId, count: contactIds.length }, undefined, hubId)
     return c.json({ ok: true })
   },
 )
@@ -360,10 +371,12 @@ teams.delete('/:teamId/contacts/:contactId',
   async (c) => {
     const services = c.get('services')
     const hubId = c.get('hubId') ?? ''
+    const pubkey = c.get('pubkey')
     const teamId = c.req.param('teamId')
     const contactId = c.req.param('contactId')
 
     await services.teams.unassignContact(teamId, hubId, contactId)
+    await audit(services.audit, 'teamContactUnassigned', pubkey, { teamId, contactId }, undefined, hubId)
     return c.json({ ok: true })
   },
 )

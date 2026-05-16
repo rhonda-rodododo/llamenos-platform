@@ -3061,6 +3061,26 @@ export async function removeTeamMember(teamId: string, userPubkey: string): Prom
   return request<{ ok: true }>(hp(`/teams/${teamId}/members/${encodeURIComponent(userPubkey)}`), { method: 'DELETE' })
 }
 
+export interface ContactTeamAssignmentResponse {
+  teamId: string
+  contactId: string
+  hubId: string
+  assignedBy: string
+  createdAt: string
+}
+
+export async function listTeamContacts(teamId: string): Promise<{ assignments: ContactTeamAssignmentResponse[] }> {
+  return request<{ assignments: ContactTeamAssignmentResponse[] }>(hp(`/teams/${teamId}/contacts`))
+}
+
+export async function assignTeamContacts(teamId: string, contactIds: string[]): Promise<{ ok: true }> {
+  return request<{ ok: true }>(hp(`/teams/${teamId}/contacts`), { method: 'POST', body: JSON.stringify({ contactIds }) })
+}
+
+export async function unassignTeamContact(teamId: string, contactId: string): Promise<{ ok: true }> {
+  return request<{ ok: true }>(hp(`/teams/${teamId}/contacts/${contactId}`), { method: 'DELETE' })
+}
+
 // ---------------------------------------------------------------------------
 // Tags API
 // ---------------------------------------------------------------------------

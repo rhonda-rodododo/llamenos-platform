@@ -179,3 +179,11 @@ export const LABEL_AUDIT_DETAILS = 'llamenos:audit-details:v1'
 
 /** Device wipe command signature — Ed25519 sig over (targetDevicePubkey || timestamp || reason) */
 export const LABEL_DEVICE_WIPE_SIG = 'llamenos:device-wipe-sig:v1'
+
+// --- EP03: Teams & Tags ---
+
+/** Hub-scoped AES-256-GCM encryption for team name and description fields */
+export const LABEL_TEAM_ENCRYPT = 'llamenos:team-field:v1'
+
+/** Hub-scoped AES-256-GCM encryption for tag label and category fields */
+export const LABEL_TAG_ENCRYPT = 'llamenos:tag-field:v1'

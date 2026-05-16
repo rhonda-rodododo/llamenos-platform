@@ -54,6 +54,14 @@ const EVENT_CATEGORIES: Record<string, string[]> = {
     'conversationUpdated', 'reportCreated', 'reportAssigned',
     'reportUpdated',
   ],
+  teams: [
+    'teamCreated', 'teamUpdated', 'teamDeleted',
+    'teamMemberAdded', 'teamMemberRemoved',
+    'teamContactAssigned', 'teamContactUnassigned',
+  ],
+  tags: [
+    'tagCreated', 'tagUpdated', 'tagDeleted',
+  ],
 }
 
 // ---------------------------------------------------------------------------

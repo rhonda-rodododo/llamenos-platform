@@ -482,6 +482,66 @@ pub fn decrypt_hub_event(
     String::from_utf8(plaintext).map_err(|e| format!("Invalid UTF-8 in decrypted content: {e}"))
 }
 
+/// Encrypt a plaintext string with the hub key using an arbitrary label as AAD.
+/// Input: plaintext string, AAD label string.
+/// Output: hex-encoded nonce(12) + ciphertext (AES-256-GCM).
+/// Used for team/tag field encryption with domain-separated labels.
+#[tauri::command]
+pub fn encrypt_hub_field(
+    state: tauri::State<'_, CryptoState>,
+    plaintext: String,
+    label: String,
+) -> Result<String, String> {
+    let hub_key = state.hub_key.lock().unwrap();
+    let key = hub_key.as_ref().ok_or("Hub key not loaded")?;
+
+    let mut nonce_bytes = [0u8; 12];
+    rand::RngCore::fill_bytes(&mut rand::rngs::OsRng, &mut nonce_bytes);
+    let nonce = Nonce::from_slice(&nonce_bytes);
+
+    let cipher = Aes256Gcm::new_from_slice(key)
+        .map_err(|e| format!("Invalid hub key: {e}"))?;
+    let ciphertext = cipher.encrypt(nonce, Payload {
+        msg: plaintext.as_bytes(),
+        aad: label.as_bytes(),
+    })
+        .map_err(|e| format!("Encryption failed: {e}"))?;
+
+    let mut packed = Vec::with_capacity(12 + ciphertext.len());
+    packed.extend_from_slice(&nonce_bytes);
+    packed.extend_from_slice(&ciphertext);
+    Ok(hex::encode(packed))
+}
+
+/// Decrypt a hub-encrypted field using an arbitrary label as AAD.
+/// Input: hex-encoded nonce(12) + ciphertext (AES-256-GCM), AAD label string.
+/// Used for team/tag field decryption with domain-separated labels.
+#[tauri::command]
+pub fn decrypt_hub_field(
+    state: tauri::State<'_, CryptoState>,
+    ciphertext_hex: String,
+    label: String,
+) -> Result<String, String> {
+    let hub_key = state.hub_key.lock().unwrap();
+    let key = hub_key.as_ref().ok_or("Hub key not loaded")?;
+
+    let data = hex::decode(&ciphertext_hex).map_err(err_str)?;
+    if data.len() < 28 {
+        return Err("Ciphertext too short (need at least 12-byte nonce + 16-byte tag)".into());
+    }
+
+    let nonce = Nonce::from_slice(&data[..12]);
+    let cipher = Aes256Gcm::new_from_slice(key)
+        .map_err(|e| format!("Invalid hub key: {e}"))?;
+    let plaintext = cipher.decrypt(nonce, Payload {
+        msg: &data[12..],
+        aad: label.as_bytes(),
+    })
+        .map_err(|_| "Hub field decryption failed (wrong key, label, or corrupted data)".to_string())?;
+
+    String::from_utf8(plaintext).map_err(|e| format!("Invalid UTF-8 in decrypted content: {e}"))
+}
+
 // ── Shamir Secret Sharing (GF(2^8)) ────────────────────────────────
 
 /// GF(2^8) multiply using irreducible polynomial x^8 + x^4 + x^3 + x + 1.

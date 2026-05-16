@@ -1386,7 +1386,12 @@
     "groupsLoadError": "Failed to load groups",
     "relationshipCreateError": "Failed to create relationship",
     "relationshipDeleteError": "Failed to delete relationship",
-    "updated": "Contact updated"
+    "updated": "Contact updated",
+    "tags": "Tags",
+    "allTags": "All tags",
+    "filterByTag": "Filter by tag",
+    "allTeams": "All teams",
+    "filterByTeam": "Filter by team"
   },
   "contactNotifications": {
     "channelPreference": "القناة المفضلة",
@@ -3873,7 +3878,14 @@
     "tagColor": "Color",
     "tagLabel": "Display Label",
     "tagName": "Tag Name (slug)",
-    "title": "Tags"
+    "title": "Tags",
+    "addTag": "Add tag...",
+    "searchTags": "Search tags...",
+    "createTagNamed": "Create \"{{name}}\"",
+    "noTagsFound": "No tags found.",
+    "uncategorized": "General",
+    "preview": "Preview:",
+    "slugPreview": "Slug: {{slug}}"
   },
   "teams": {
     "addMembers": "Add Members",
@@ -3889,7 +3901,16 @@
     "removeMember": "Remove Member",
     "teamDescription": "Description",
     "teamName": "Team Name",
-    "title": "Teams"
+    "title": "Teams",
+    "membersAdded": "Members added",
+    "memberRemoved": "Member removed",
+    "noMembers": "No members yet",
+    "selectMembers": "Select members...",
+    "contacts": "Contacts",
+    "contactId": "Contact ID...",
+    "contactAssigned": "Contact assigned",
+    "contactUnassigned": "Contact removed",
+    "contactCount": "{{count}} contacts"
   },
   "telephonyCrm": {
     "activeCases": "القضايا النشطة",

@@ -91,6 +91,9 @@ type KeyType = 'ed25519' | 'secp256k1'
 let currentKeyType: KeyType = 'ed25519'
 let schnorrSecretBytes: Uint8Array | null = null // secp256k1 secret for Schnorr auth
 
+// ── Hub key mock state ───────────────────────────────────────────────
+let mockHubKey: Uint8Array | null = null
+
 // ── PIN lockout tracking ─────────────────────────────────────────────
 // Mirrors Rust-side lockout logic: escalating lockouts at thresholds, wipe at 10.
 // Persisted to localStorage to survive page reloads (simulates Rust-side vault storage).
@@ -957,6 +960,41 @@ const commands: Record<string, CommandHandler> = {
   expire_pin_lockout: () => {
     pinLockoutState.lockoutUntil = 0
     saveLockoutState()
+  },
+
+  // --- Hub key management ---
+
+  set_hub_key: (a) => {
+    const hubKeyHex = a.hubKeyHex as string
+    mockHubKey = hexToBytes(hubKeyHex)
+  },
+
+  encrypt_hub_field: (a) => {
+    if (!mockHubKey) throw new Error('Hub key not loaded')
+    const plaintext = a.plaintext as string
+    const label = a.label as string
+    const nonce = randomBytes(12)
+    const aad = utf8ToBytes(label)
+    const cipher = gcm(mockHubKey, nonce, aad)
+    const ciphertext = cipher.encrypt(utf8ToBytes(plaintext))
+    const packed = new Uint8Array(12 + ciphertext.length)
+    packed.set(nonce)
+    packed.set(ciphertext, 12)
+    return bytesToHex(packed)
+  },
+
+  decrypt_hub_field: (a) => {
+    if (!mockHubKey) throw new Error('Hub key not loaded')
+    const ciphertextHex = a.ciphertextHex as string
+    const label = a.label as string
+    const data = hexToBytes(ciphertextHex)
+    if (data.length < 28) throw new Error('Ciphertext too short')
+    const nonce = data.slice(0, 12)
+    const ciphertext = data.slice(12)
+    const aad = utf8ToBytes(label)
+    const cipher = gcm(mockHubKey, nonce, aad)
+    const plaintext = cipher.decrypt(ciphertext)
+    return new TextDecoder().decode(plaintext)
   },
 }
 
