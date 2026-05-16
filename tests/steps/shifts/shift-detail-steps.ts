@@ -17,13 +17,14 @@ When('I tap a shift card', async ({ page, backendRequest: request, workerHub }) 
   const existingShifts = await listShiftsViaApi(request, workerHub).catch(() => [])
   if (existingShifts.length === 0) {
     await createShiftViaApi(request, { name: `Auto-seeded Shift ${Date.now()}`, hubId: workerHub })
-    // Hard navigation to /shifts to bypass React Query's staleTime cache.
-    // Soft navigation (goToDashboard + goToShifts) keeps the QueryClient alive, so the
-    // recently-cached empty shifts list is returned without a refetch (staleTime: 2 min).
-    await page.goto('/shifts')
-    await page.waitForLoadState('domcontentloaded')
-    await waitForApiAndUi(page)
   }
+  // Hard navigation to /shifts to bypass React Query's staleTime cache.
+  // Soft navigation (sidebar click) keeps the QueryClient alive, so the
+  // recently-cached empty shifts list may be returned without a refetch (staleTime: 2 min).
+  // Always navigate to ensure fresh data regardless of whether a shift was just created.
+  await page.goto('/shifts')
+  await page.waitForLoadState('domcontentloaded')
+  await waitForApiAndUi(page)
   const shiftCard = page.getByTestId(TestIds.SHIFT_CARD).first()
   await expect(shiftCard).toBeVisible({ timeout: Timeouts.ELEMENT })
   // Desktop: click the edit button on the shift card to open the inline edit form

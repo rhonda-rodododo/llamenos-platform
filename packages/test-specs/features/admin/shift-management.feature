@@ -46,7 +46,7 @@ Feature: Shift Management
 
   # ── Shift Detail ──────────────────────────────────────────────────
 
-  @wip @desktop @ios @android
+  @desktop @ios @android
   Scenario: Navigate to shift detail from list
     Given I am authenticated and on the dashboard
     And I have navigated to the admin panel
@@ -54,7 +54,7 @@ Feature: Shift Management
     When I tap a shift card
     Then I should see the shift detail screen
 
-  @wip @desktop @ios @android
+  @desktop @ios @android
   Scenario: Shift info card shows name and time
     Given I am authenticated and on the dashboard
     And I have navigated to the admin panel
@@ -62,7 +62,7 @@ Feature: Shift Management
     When I tap a shift card
     Then I should see the shift info card
 
-  @wip @desktop @ios @android
+  @desktop @ios @android
   Scenario: Volunteer assignment list is displayed
     Given I am authenticated and on the dashboard
     And I have navigated to the admin panel
@@ -70,7 +70,7 @@ Feature: Shift Management
     When I tap a shift card
     Then I should see the volunteer assignment section
 
-  @wip @desktop @ios @android
+  @desktop @ios @android
   Scenario: Toggle volunteer assignment
     Given I am authenticated and on the dashboard
     And I have navigated to the admin panel
@@ -79,7 +79,7 @@ Feature: Shift Management
     And I tap a volunteer assignment card
     Then the volunteer assignment should toggle
 
-  @wip @desktop @ios @android
+  @desktop @ios @android
   Scenario: Navigate back from shift detail
     Given I am authenticated and on the dashboard
     And I have navigated to the admin panel
