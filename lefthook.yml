@@ -36,6 +36,24 @@ pre-commit:
     test-specs-validate:
       glob: "{packages/test-specs/features/**/*.feature,tests/steps/**/*.ts}"
       run: bun run test-specs:validate
+    i18n-codegen-freshness:
+      glob: "packages/i18n/locales/*.json"
+      run: bun run i18n:codegen && git diff --exit-code apps/ios/Resources/Localizable/ apps/android/app/src/main/res/values*/strings.xml apps/android/app/src/main/java/org/llamenos/i18n/I18n.kt
+    no-generated-files:
+      glob: "{apps/ios/Resources/Localizable/**/*.strings,apps/android/app/src/main/res/values*/strings.xml,apps/android/app/src/main/java/org/llamenos/i18n/I18n.kt,apps/ios/Sources/Generated/LlamenosCore.swift,packages/protocol/generated/**}"
+      run: |
+        # Only block additions/modifications of generated files, not deletions (git rm --cached is fine)
+        added=$(git diff --cached --diff-filter=d --name-only -- \
+          'apps/ios/Resources/Localizable/' \
+          'apps/android/app/src/main/res/values*/strings.xml' \
+          'apps/android/app/src/main/java/org/llamenos/i18n/I18n.kt' \
+          'apps/ios/Sources/Generated/LlamenosCore.swift' \
+          'packages/protocol/generated/' || true)
+        if [ -n "$added" ]; then
+          echo "ERROR - Generated files should not be committed. Run bun run codegen / bun run i18n:codegen instead."
+          echo "Staged: $added"
+          exit 1
+        fi
     block-env-files:
       run: |
         # Block actual .env files (which may contain secrets) but allow .env.example (template)

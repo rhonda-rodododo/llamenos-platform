@@ -36,7 +36,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import org.llamenos.i18n.I18n
+import androidx.compose.ui.res.stringResource
+import org.llamenos.hotline.R
 
 private fun channelIcon(type: ChannelType): ImageVector = when (type) {
     ChannelType.SMS -> Icons.Default.Phone
@@ -58,7 +59,7 @@ fun ChannelConfigListScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text(I18n.channels_title) })
+            TopAppBar(title = { Text(stringResource(R.string.channels_title)) })
         },
     ) { padding ->
         if (state.isLoading) {
@@ -73,7 +74,7 @@ fun ChannelConfigListScreen(
                         headlineContent = { Text(channel.displayName) },
                         supportingContent = {
                             Text(
-                                if (isEnabled) I18n.common_enabled else I18n.common_disabled,
+                                if (isEnabled) stringResource(R.string.common_enabled) else stringResource(R.string.common_disabled),
                                 color = if (isEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         },

@@ -9,7 +9,7 @@ final class ErasureViewModel {
     // MARK: - State
 
     /// Current erasure request status, nil if no active request.
-    var activeRequest: ErasureRequest?
+    var activeRequest: AppErasureRequest?
 
     /// Whether the request is loading.
     var isLoading: Bool = false
@@ -127,7 +127,7 @@ final class ErasureViewModel {
 
 // MARK: - Models
 
-struct ErasureRequest: Codable, Sendable {
+struct AppErasureRequest: Codable, Sendable {
     let id: String
     let status: String
     let requestedAt: Date?
@@ -146,5 +146,5 @@ struct ErasureRequest: Codable, Sendable {
 }
 
 struct ErasureStatusResponse: Codable, Sendable {
-    let request: ErasureRequest?
+    let request: AppErasureRequest?
 }

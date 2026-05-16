@@ -84,7 +84,7 @@ struct MessagingConfigResponse: Codable {
     var smsContentMode: String?
 }
 
-struct ConnectionTestResponse: Codable {
+struct AppConnectionTestResponse: Codable {
     let connected: Bool
 }
 
@@ -118,7 +118,7 @@ final class MessagingConfigService {
         isLoading = true
         error = nil
         do {
-            config = try await api.get("/settings/messaging")
+            config = try await api.request(method: "GET", path: "/settings/messaging")
             isLoading = false
         } catch {
             self.error = error.localizedDescription
@@ -127,41 +127,47 @@ final class MessagingConfigService {
     }
 
     func updateConfig(_ updates: [String: Any]) async throws {
-        config = try await api.patch("/settings/messaging", body: updates)
+        let rawBody = try JSONSerialization.data(withJSONObject: updates)
+        config = try await api.request(method: "PATCH", path: "/settings/messaging", rawBody: rawBody)
     }
 
     func testChannel(_ channel: String) async throws -> Bool {
-        let response: ConnectionTestResponse = try await api.post(
-            "/settings/messaging/test",
-            body: ["channel": channel]
+        let rawBody = try JSONSerialization.data(withJSONObject: ["channel": channel])
+        let response: AppConnectionTestResponse = try await api.request(
+            method: "POST", path: "/settings/messaging/test", rawBody: rawBody
         )
         return response.connected
     }
 
     func loadA2pStatus(hubId: String) async {
         do {
-            a2pRegistration = try await api.get("/provider-setup/a2p/status?hubId=\(hubId)")
+            a2pRegistration = try await api.request(
+                method: "GET", path: "/provider-setup/a2p/status?hubId=\(hubId)"
+            )
         } catch {
             a2pRegistration = nil
         }
     }
 
     func submitBrand(hubId: String, brandInfo: [String: Any]) async throws -> A2pRegistrationResponse {
-        return try await api.post("/provider-setup/a2p/brand", body: [
+        let rawBody = try JSONSerialization.data(withJSONObject: [
             "hubId": hubId,
             "brandInfo": brandInfo,
         ])
+        return try await api.request(method: "POST", path: "/provider-setup/a2p/brand", rawBody: rawBody)
     }
 
     func submitCampaign(registrationId: String, hubId: String, campaignInfo: [String: Any]) async throws -> A2pRegistrationResponse {
-        return try await api.post("/provider-setup/a2p/campaign", body: [
+        let rawBody = try JSONSerialization.data(withJSONObject: [
             "registrationId": registrationId,
             "hubId": hubId,
             "campaignInfo": campaignInfo,
         ])
+        return try await api.request(method: "POST", path: "/provider-setup/a2p/campaign", rawBody: rawBody)
     }
 
     func skipA2p(hubId: String) async throws -> A2pRegistrationResponse {
-        return try await api.post("/provider-setup/a2p/skip", body: ["hubId": hubId])
+        let rawBody = try JSONSerialization.data(withJSONObject: ["hubId": hubId])
+        return try await api.request(method: "POST", path: "/provider-setup/a2p/skip", rawBody: rawBody)
     }
 }

@@ -102,6 +102,7 @@ struct AppBanEntry: Codable, Identifiable, Sendable {
     let reason: String?
     let createdBy: String
     let createdAt: String
+    let hubId: String?
 
     /// Truncated identifier hash for display.
     var truncatedHash: String {

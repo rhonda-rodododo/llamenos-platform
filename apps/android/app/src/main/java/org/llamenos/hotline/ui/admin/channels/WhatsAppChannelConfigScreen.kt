@@ -9,7 +9,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import org.llamenos.i18n.I18n
+import androidx.compose.ui.res.stringResource
+import org.llamenos.hotline.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,31 +40,31 @@ fun WhatsAppChannelConfigScreen(
         }
     }
 
-    Scaffold(topBar = { TopAppBar(title = { Text(I18n.channels_whatsapp_title) }) }) { padding ->
+    Scaffold(topBar = { TopAppBar(title = { Text(stringResource(R.string.channels_whatsapp_title)) }) }) { padding ->
         Column(
             modifier = Modifier.padding(padding).padding(16.dp).verticalScroll(rememberScrollState()),
         ) {
-            Text(I18n.channels_whatsapp_integrationMode, style = MaterialTheme.typography.titleSmall)
+            Text(stringResource(R.string.channels_whatsapp_integration_mode), style = MaterialTheme.typography.titleSmall)
             Spacer(Modifier.height(8.dp))
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth().testTag("whatsapp-integration-mode")) {
-                SegmentedButton(selected = integrationMode == "twilio", onClick = { integrationMode = "twilio" }, shape = SegmentedButtonDefaults.itemShape(0, 2)) { Text(I18n.channels_whatsapp_modeTwilio) }
-                SegmentedButton(selected = integrationMode == "direct", onClick = { integrationMode = "direct" }, shape = SegmentedButtonDefaults.itemShape(1, 2)) { Text(I18n.channels_whatsapp_modeDirect) }
+                SegmentedButton(selected = integrationMode == "twilio", onClick = { integrationMode = "twilio" }, shape = SegmentedButtonDefaults.itemShape(0, 2)) { Text(stringResource(R.string.channels_whatsapp_mode_twilio)) }
+                SegmentedButton(selected = integrationMode == "direct", onClick = { integrationMode = "direct" }, shape = SegmentedButtonDefaults.itemShape(1, 2)) { Text(stringResource(R.string.channels_whatsapp_mode_direct)) }
             }
 
             if (integrationMode == "direct") {
                 Spacer(Modifier.height(16.dp))
-                OutlinedTextField(value = phoneNumberId, onValueChange = { phoneNumberId = it }, label = { Text(I18n.channels_whatsapp_phoneNumberId) }, modifier = Modifier.fillMaxWidth().testTag("whatsapp-phone-number-id"))
+                OutlinedTextField(value = phoneNumberId, onValueChange = { phoneNumberId = it }, label = { Text(stringResource(R.string.channels_whatsapp_phone_number_id)) }, modifier = Modifier.fillMaxWidth().testTag("whatsapp-phone-number-id"))
                 Spacer(Modifier.height(8.dp))
-                OutlinedTextField(value = businessAccountId, onValueChange = { businessAccountId = it }, label = { Text(I18n.channels_whatsapp_businessAccountId) }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = businessAccountId, onValueChange = { businessAccountId = it }, label = { Text(stringResource(R.string.channels_whatsapp_business_account_id)) }, modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(8.dp))
-                OutlinedTextField(value = accessToken, onValueChange = { accessToken = it }, label = { Text(I18n.channels_whatsapp_accessToken) }, modifier = Modifier.fillMaxWidth().testTag("whatsapp-access-token"))
+                OutlinedTextField(value = accessToken, onValueChange = { accessToken = it }, label = { Text(stringResource(R.string.channels_whatsapp_access_token)) }, modifier = Modifier.fillMaxWidth().testTag("whatsapp-access-token"))
                 Spacer(Modifier.height(8.dp))
-                OutlinedTextField(value = verifyToken, onValueChange = { verifyToken = it }, label = { Text(I18n.channels_whatsapp_verifyToken) }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = verifyToken, onValueChange = { verifyToken = it }, label = { Text(stringResource(R.string.channels_whatsapp_verify_token)) }, modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(8.dp))
-                OutlinedTextField(value = appSecret, onValueChange = { appSecret = it }, label = { Text(I18n.channels_whatsapp_appSecret) }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = appSecret, onValueChange = { appSecret = it }, label = { Text(stringResource(R.string.channels_whatsapp_app_secret)) }, modifier = Modifier.fillMaxWidth())
             } else {
                 Spacer(Modifier.height(8.dp))
-                Text(I18n.channels_whatsapp_twilioNote, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.channels_whatsapp_twilio_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
 
             Spacer(Modifier.height(16.dp))
@@ -75,7 +76,7 @@ fun WhatsAppChannelConfigScreen(
                 val updates = mutableMapOf<String, Any?>("integrationMode" to integrationMode, "autoResponse" to autoResponse, "afterHoursResponse" to afterHoursResponse)
                 if (integrationMode == "direct") { updates["phoneNumberId"] = phoneNumberId; updates["businessAccountId"] = businessAccountId; updates["accessToken"] = accessToken; updates["verifyToken"] = verifyToken; updates["appSecret"] = appSecret }
                 viewModel.updateConfig(mapOf("whatsapp" to updates))
-            }, modifier = Modifier.fillMaxWidth().testTag("whatsapp-save-btn")) { Text(I18n.common_save) }
+            }, modifier = Modifier.fillMaxWidth().testTag("whatsapp-save-btn")) { Text(stringResource(R.string.common_save)) }
         }
     }
 }

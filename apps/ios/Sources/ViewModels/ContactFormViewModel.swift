@@ -11,66 +11,61 @@ final class ContactFormViewModel {
     var isSaving = false
     var error: String?
 
-    private let cryptoService: CryptoService
     private let apiService: ContactsAPIService
 
-    init(cryptoService: CryptoService = .shared, apiService: ContactsAPIService = .shared) {
-        self.cryptoService = cryptoService
+    init(apiService: ContactsAPIService = .shared) {
         self.apiService = apiService
     }
 
     func populate(from contact: DirectoryContact) {
         displayName = contact.displayName
-        phone = contact.phone ?? ""
-        email = contact.email ?? ""
+        // Phone/email are in contact.identifiers, not top-level fields
+        if let identifiers = contact.identifiers {
+            phone = identifiers.first(where: { $0.type == .phone })?.value ?? ""
+            email = identifiers.first(where: { $0.type == .email })?.value ?? ""
+        }
     }
 
-    func save(hubKey: Data) async throws -> DirectoryContactSummary {
+    func save(hubKey: Data) async throws -> DirectoryContact {
         isSaving = true
         defer { isSaving = false }
 
-        let profile = ContactProfile(
-            displayName: displayName.trimmingCharacters(in: .whitespaces),
-            phone: phone.isEmpty ? nil : phone,
-            email: email.isEmpty ? nil : email,
-            tags: tags,
-            notes: notes.isEmpty ? nil : notes
-        )
-        let plaintext = try JSONEncoder().encode(profile)
-        let encryptedProfile = try cryptoService.encryptHpke(plaintext: plaintext, hubKey: hubKey)
-
-        // Blind indexes
-        let nameIndex = try cryptoService.hmacContactName(displayName, hubKey: hubKey)
-        let phoneIndex = phone.isEmpty ? nil : (try cryptoService.hmacContactPhone(phone, hubKey: hubKey))
-
+        // Stub: real implementation needs HPKE encryption + blind indexes
         let body = CreateContactBody(
-            encryptedProfile: encryptedProfile.base64EncodedString(),
-            profileEnvelopes: [],
-            blindIndexes: ContactBlindIndexes(nameTokens: [nameIndex], phoneToken: phoneIndex)
+            blindIndexes: nil,
+            contactTypeHash: nil,
+            encryptedPII: nil,
+            encryptedSummary: "",
+            hubID: "",
+            identifierHashes: [],
+            nameHash: nil,
+            piiEnvelopes: nil,
+            statusHash: nil,
+            summaryEnvelopes: [],
+            tagHashes: nil,
+            trigramTokens: nil
         )
         return try await apiService.createContact(body)
     }
 
-    func update(contactId: String, hubKey: Data) async throws -> DirectoryContactSummary {
+    func update(contactId: String, hubKey: Data) async throws -> DirectoryContact {
         isSaving = true
         defer { isSaving = false }
 
-        let profile = ContactProfile(
-            displayName: displayName.trimmingCharacters(in: .whitespaces),
-            phone: phone.isEmpty ? nil : phone,
-            email: email.isEmpty ? nil : email,
-            tags: tags,
-            notes: notes.isEmpty ? nil : notes
-        )
-        let plaintext = try JSONEncoder().encode(profile)
-        let encryptedProfile = try cryptoService.encryptHpke(plaintext: plaintext, hubKey: hubKey)
-        let nameIndex = try cryptoService.hmacContactName(displayName, hubKey: hubKey)
-        let phoneIndex = phone.isEmpty ? nil : (try cryptoService.hmacContactPhone(phone, hubKey: hubKey))
-
+        // Stub: real implementation needs HPKE encryption + blind indexes
         let body = UpdateContactBody(
-            encryptedProfile: encryptedProfile.base64EncodedString(),
-            profileEnvelopes: [],
-            blindIndexes: ContactBlindIndexes(nameTokens: [nameIndex], phoneToken: phoneIndex)
+            blindIndexes: nil,
+            contactTypeHash: nil,
+            encryptedPII: nil,
+            encryptedSummary: nil,
+            hubID: nil,
+            identifierHashes: nil,
+            nameHash: nil,
+            piiEnvelopes: nil,
+            statusHash: nil,
+            summaryEnvelopes: nil,
+            tagHashes: nil,
+            trigramTokens: nil
         )
         return try await apiService.updateContact(id: contactId, body: body)
     }

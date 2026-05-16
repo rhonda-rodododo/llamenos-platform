@@ -56,7 +56,7 @@ struct PlatformBansView: View {
         List {
             if !viewModel.platformBanSearchResults.isEmpty {
                 Section(header: Text(NSLocalizedString("platform_bans_search_title", comment: "Search Results"))) {
-                    ForEach(viewModel.platformBanSearchResults) { ban in
+                    ForEach(viewModel.platformBanSearchResults) { (ban: AppBanEntry) in
                         BanRowView(ban: ban) {}
                             .overlay(alignment: .topTrailing) {
                                 BadgeView(

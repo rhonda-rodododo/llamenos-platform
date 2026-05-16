@@ -52,6 +52,9 @@ jobs:
       - name: Run codegen
         run: bun run codegen
 
+      - name: Run i18n codegen
+        run: bun run i18n:codegen
+
       - name: Typecheck
         run: bun run typecheck
 

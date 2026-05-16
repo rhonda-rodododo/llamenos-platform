@@ -1181,6 +1181,22 @@
       "title": "WhatsApp Channel",
       "twilioNote": "WhatsApp is configured through your Twilio account. Ensure WhatsApp is enabled for your Twilio number.",
       "verifyToken": "Verify Token"
+    },
+    "signal": {
+      "title": "Signal Channel",
+      "e2eeNote": "Messages are end-to-end encrypted via a self-hosted Signal bridge.",
+      "bridgeUrl": "Bridge URL",
+      "bridgeApiKey": "API Key",
+      "webhookSecret": "Webhook Secret",
+      "registeredNumber": "Registered Phone Number"
+    },
+    "rcs": {
+      "title": "RCS Channel",
+      "agentId": "Agent ID",
+      "serviceAccountKey": "Service Account Key",
+      "webhookSecret": "Webhook Secret",
+      "fallbackToSms": "Fallback to SMS",
+      "fallbackToSmsDesc": "Send SMS when RCS is unavailable for the recipient."
     }
   },
   "cms": {

@@ -62,7 +62,7 @@ struct ErasureRequestView: View {
 
     // MARK: - Active Request (Countdown)
 
-    private func activeRequestView(request: ErasureRequest, vm: ErasureViewModel) -> some View {
+    private func activeRequestView(request: AppErasureRequest, vm: ErasureViewModel) -> some View {
         ScrollView {
             VStack(spacing: 24) {
                 Image(systemName: "clock.badge.exclamationmark")

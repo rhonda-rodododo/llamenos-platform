@@ -4,7 +4,7 @@ struct CreateContactView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(HubKeyStore.self) private var hubKeyStore
     @State private var vm = ContactFormViewModel()
-    var onCreated: (DirectoryContactSummary) -> Void
+    var onCreated: (DirectoryContact) -> Void
 
     var body: some View {
         NavigationStack {

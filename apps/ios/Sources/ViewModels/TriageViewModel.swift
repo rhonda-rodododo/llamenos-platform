@@ -135,12 +135,12 @@ final class TriageViewModel {
         errorMessage = nil
 
         do {
-            let body = ConvertFromReportBody(
+            let body = AppConvertFromReportBody(
                 reportId: report.id,
                 entityTypeId: entityTypeId,
                 additionalFields: nil
             )
-            let _: ConvertFromReportResponse = try await apiService.request(
+            let _: AppConvertFromReportResponse = try await apiService.request(
                 method: "POST",
                 path: apiService.hp("/api/records/convert-from-report"),
                 body: body
@@ -165,13 +165,13 @@ final class TriageViewModel {
 
 // MARK: - Request/Response Types
 
-struct ConvertFromReportBody: Encodable, Sendable {
+struct AppConvertFromReportBody: Encodable, Sendable {
     let reportId: String
     let entityTypeId: String
     let additionalFields: [String: String]?
 }
 
-struct ConvertFromReportResponse: Codable, Sendable {
+struct AppConvertFromReportResponse: Codable, Sendable {
     let recordId: String
     let reportId: String
     let entityTypeId: String

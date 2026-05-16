@@ -81,6 +81,12 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Run codegen
+        run: bun run codegen
+
+      - name: Run i18n codegen
+        run: bun run i18n:codegen
+
       # Sync version from tag into tauri.conf.json and package.json
       - name: Sync version from dispatch input
         shell: bash

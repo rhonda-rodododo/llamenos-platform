@@ -36,8 +36,7 @@ struct ChannelConfigListView: View {
             channelConfigView(for: channel)
         }
         .task {
-            guard let api = appState.apiService else { return }
-            let service = MessagingConfigService(api: api)
+            let service = MessagingConfigService(api: appState.apiService)
             messagingService = service
             await service.loadConfig()
         }

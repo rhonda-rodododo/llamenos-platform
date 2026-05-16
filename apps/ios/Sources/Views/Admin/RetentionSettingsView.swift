@@ -50,7 +50,7 @@ struct RetentionSettingsView: View {
             }
 
             ForEach($viewModel.retentionSettings) { $category in
-                RetentionCategoryRow(category: $category)
+                AppRetentionCategoryRow(category: $category)
             }
 
             if let error = viewModel.errorMessage {
@@ -72,10 +72,10 @@ struct RetentionSettingsView: View {
     }
 }
 
-// MARK: - RetentionCategoryRow
+// MARK: - AppRetentionCategoryRow
 
-struct RetentionCategoryRow: View {
-    @Binding var category: RetentionCategory
+struct AppRetentionCategoryRow: View {
+    @Binding var category: AppRetentionCategory
 
     @State private var isEnabled: Bool = false
     @State private var daysText: String = ""

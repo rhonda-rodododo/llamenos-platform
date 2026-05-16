@@ -261,9 +261,6 @@ fun MainScreen(
                         onNavigateToAdmin = onNavigateToAdmin,
                         onNavigateToDeviceLink = onNavigateToDeviceLink,
                         onNavigateToErasure = onNavigateToErasure,
-                        onNavigateToSecurityDevices = onNavigateToSecurityDevices,
-                        onNavigateToSecuritySessions = onNavigateToSecuritySessions,
-                        onNavigateToSecurityEvents = onNavigateToSecurityEvents,
                     )
                 }
             }

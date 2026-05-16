@@ -5,7 +5,7 @@ struct EditContactView: View {
     @Environment(HubKeyStore.self) private var hubKeyStore
     @State private var vm = ContactFormViewModel()
     let contact: DirectoryContact
-    var onUpdated: (DirectoryContactSummary) -> Void
+    var onUpdated: (DirectoryContact) -> Void
 
     var body: some View {
         NavigationStack {

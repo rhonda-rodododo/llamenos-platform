@@ -54,9 +54,9 @@ struct EvidenceCustodyChainView: View {
         isLoading = true
         defer { isLoading = false }
         do {
-            let response = try await appState.apiService.get(
-                "/evidence/\(evidenceId)/custody",
-                as: CustodyChainResponse.self
+            let response: AppCustodyChainResponse = try await appState.apiService.request(
+                method: "GET",
+                path: "/evidence/\(evidenceId)/custody"
             )
             entries = response.custodyChain
         } catch {
@@ -65,9 +65,9 @@ struct EvidenceCustodyChainView: View {
     }
 }
 
-// MARK: - CustodyChainResponse
+// MARK: - AppCustodyChainResponse
 
-private struct CustodyChainResponse: Decodable {
+private struct AppCustodyChainResponse: Decodable {
     let custodyChain: [CustodyChainEntry]
     let total: Int
 }
@@ -198,7 +198,7 @@ private struct CalendarRecordRow: View {
                     .fontDesign(.monospaced)
             }
             Spacer()
-            Text(record.statusHash?.prefix(6) ?? "")
+            Text(record.statusHash.prefix(6))
                 .font(.caption2)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
@@ -264,8 +264,8 @@ private struct TimelineRecordRow: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Spacer()
-                        if let status = record.statusHash?.prefix(6) {
-                            Text(status)
+                        if !record.statusHash.isEmpty {
+                            Text(record.statusHash.prefix(6))
                                 .font(.caption2)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)

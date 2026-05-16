@@ -23,7 +23,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
-import org.llamenos.i18n.I18n
+import androidx.compose.ui.res.stringResource
+import org.llamenos.hotline.R
 
 @Composable
 fun ConnectionTestButton(
@@ -52,9 +53,9 @@ fun ConnectionTestButton(
             if (testing) {
                 CircularProgressIndicator(modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(8.dp))
-                Text(I18n.channels_shared_testing)
+                Text(stringResource(R.string.channels_shared_testing))
             } else {
-                Text(I18n.channels_shared_testConnection)
+                Text(stringResource(R.string.channels_shared_test_connection))
             }
         }
 
@@ -68,7 +69,7 @@ fun ConnectionTestButton(
             )
             Spacer(Modifier.width(4.dp))
             Text(
-                text = if (connected) I18n.channels_shared_testSuccess else I18n.channels_shared_testFailed,
+                text = if (connected) stringResource(R.string.channels_shared_test_success) else stringResource(R.string.channels_shared_test_failed),
                 style = MaterialTheme.typography.bodySmall,
                 color = if (connected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
             )

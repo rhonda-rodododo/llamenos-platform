@@ -17,7 +17,7 @@ struct RecoveryTeamConfigView: View {
     @State private var isLoading = true
     @State private var isSaving = false
     @State private var errorMessage: String?
-    @State private var groupInfo: RecoveryGroupInfo?
+    @State private var groupInfo: AppRecoveryGroupInfo?
     @State private var showRotateConfirmation = false
 
     var body: some View {
@@ -117,7 +117,7 @@ struct RecoveryTeamConfigView: View {
 
     // MARK: - Configured State
 
-    private func configuredState(info: RecoveryGroupInfo) -> some View {
+    private func configuredState(info: AppRecoveryGroupInfo) -> some View {
         List {
             // Status section
             Section {
