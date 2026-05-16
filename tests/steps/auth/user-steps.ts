@@ -17,6 +17,7 @@ import {
   navigateAfterLogin,
 } from '../../helpers'
 import { Navigation } from '../../pages/index'
+import { updateUserViaApi, seedHexToPubkey } from '../../api-helpers'
 
 // --- Volunteer lifecycle ---
 
@@ -265,8 +266,8 @@ When('the volunteer logs in and navigates to {string}', async ({ page }, path: s
 
 // "a volunteer with the {string} role exists" is defined in roles-extended-steps.ts (API-based)
 
-Given('a reporter has been invited and onboarded', async ({ page }) => {
-  // Create a reporter via volunteer creation flow
+Given('a reporter has been invited and onboarded', async ({ page, backendRequest }) => {
+  // Create a user via the volunteer creation flow, then assign the reporter role via API
   await Navigation.goToVolunteers(page)
   const name = `Reporter ${Date.now()}`
   const phone = `+1212${Date.now().toString().slice(-7)}`
@@ -275,9 +276,12 @@ Given('a reporter has been invited and onboarded', async ({ page }) => {
     (window as Record<string, unknown>).__test_reporter_nsec = n
   }, nsec)
   await dismissNsecCard(page)
+  // Assign role-reporter so the user has reports:create permission
+  const pubkey = seedHexToPubkey(nsec)
+  await updateUserViaApi(backendRequest, pubkey, { roles: ['role-reporter'] })
 })
 
-Given('a reporter is logged in', async ({ page }) => {
+Given('a reporter is logged in', async ({ page, backendRequest }) => {
   // Check if a reporter nsec was set by a previous step (e.g., "a reporter has been invited and onboarded")
   let nsec = (await page.evaluate(() => (window as Record<string, unknown>).__test_reporter_nsec)) as string | undefined
   if (!nsec) {
@@ -293,11 +297,14 @@ Given('a reporter is logged in', async ({ page }) => {
     const phone = `+1212${Date.now().toString().slice(-7)}`
     nsec = await createUserAndGetNsec(page, name, phone)
     await dismissNsecCard(page)
+    // Assign role-reporter so the user has reports:create permission
+    const pubkey = seedHexToPubkey(nsec)
+    await updateUserViaApi(backendRequest, pubkey, { roles: ['role-reporter'] })
   }
   await loginAsVolunteer(page, nsec)
 })
 
-When('the reporter logs in', async ({ page }) => {
+When('the reporter logs in', async ({ page, backendRequest }) => {
   let nsec = (await page.evaluate(() => (window as Record<string, unknown>).__test_reporter_nsec)) as string | undefined
   if (!nsec) {
     // Reporter wasn't set up yet — create one (loginAsAdmin first to access volunteers)
@@ -307,6 +314,9 @@ When('the reporter logs in', async ({ page }) => {
     const phone = `+1212${Date.now().toString().slice(-7)}`
     nsec = await createUserAndGetNsec(page, name, phone)
     await dismissNsecCard(page)
+    // Assign role-reporter so the user has reports:create permission
+    const pubkey = seedHexToPubkey(nsec)
+    await updateUserViaApi(backendRequest, pubkey, { roles: ['role-reporter'] })
   }
   await loginAsVolunteer(page, nsec)
 })
