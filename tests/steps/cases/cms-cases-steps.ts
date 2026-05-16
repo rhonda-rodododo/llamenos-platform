@@ -884,3 +884,37 @@ Then('the case list should reload with new records', async ({ page }) => {
   const caseList = page.getByTestId('case-list')
   await expect(caseList).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
+
+// --- Related tab ---
+
+Given('a parent case with child records exists', async ({ backendRequest: request, casesWorld, workerHub }) => {
+  const entityTypes = await listEntityTypesViaApi(request, workerHub)
+  const entityTypeId = (entityTypes[0] as { id: string }).id
+
+  // Create parent record
+  const parent = await createRecordViaApi(request, entityTypeId, { statusHash: 'reported', hubId: workerHub })
+  casesWorld.lastCreatedRecordId = (parent as { id: string }).id
+
+  // Create child record linked to parent
+  await createRecordViaApi(request, entityTypeId, {
+    statusHash: 'reported',
+    hubId: workerHub,
+    parentRecordId: casesWorld.lastCreatedRecordId,
+  })
+})
+
+When('I click the parent case card', async ({ page }) => {
+  const card = page.getByTestId('case-card').first()
+  await expect(card).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await card.click()
+})
+
+Then('the related tab empty state should be visible', async ({ page }) => {
+  const tab = page.getByTestId('case-related-tab')
+  await expect(tab).toBeVisible({ timeout: Timeouts.ELEMENT })
+})
+
+Then('at least one related record card should be visible', async ({ page }) => {
+  const card = page.getByTestId('related-record-card').first()
+  await expect(card).toBeVisible({ timeout: Timeouts.ELEMENT })
+})

@@ -1957,6 +1957,13 @@ export async function deleteRecord(id: string) {
   return request<{ ok: boolean }>(hp(`/records/${id}`), { method: 'DELETE' })
 }
 
+export async function listChildRecords(parentId: string) {
+  const qs = new URLSearchParams()
+  qs.set('parentRecordId', parentId)
+  qs.set('limit', '50')
+  return request<{ records: CaseRecord[]; total: number; page: number; limit: number; hasMore: boolean }>(hp(`/records?${qs}`))
+}
+
 export async function listRecordContacts(id: string) {
   return request<{ contacts: RecordContact[] }>(hp(`/records/${id}/contacts`))
 }

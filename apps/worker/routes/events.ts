@@ -24,33 +24,22 @@ import { publishEvent } from '../lib/ws-events'
 const events = new Hono<AppEnv>()
 
 // =========================================================================
-// Admin events migration endpoints (EP06-A1)
-// Mounted on the authenticated router at /admin/events in app.ts
+// Deprecation middleware — all /events/* endpoints are deprecated.
+// Clients should use /records with entityType category:"event" filter.
 // =========================================================================
 
+const SUNSET_DATE = '2026-07-01'
+
+events.use('*', async (c, next) => {
+  await next()
+  c.header('Deprecation', 'true')
+  c.header('Sunset', SUNSET_DATE)
+  c.header('Link', '</api/records?category=event>; rel="successor-version"')
+})
+
+// Admin events migration endpoints removed — migration is complete.
+// All events are now accessible as records with category:"event" entity types.
 export const eventsAdminRouter = new Hono<AppEnv>()
-
-// GET /admin/events/migration-status — count of non-deprecated events
-eventsAdminRouter.get('/migration-status',
-  requirePermission('admin:settings'),
-  async (c) => {
-    const services = c.get('services')
-    const hubId = c.get('hubId') ?? ''
-    const pendingCount = await services.cases.getEventsMigrationCount(hubId)
-    return c.json({ pendingCount })
-  },
-)
-
-// POST /admin/events/migrate — mark all non-deprecated events as deprecated
-eventsAdminRouter.post('/migrate',
-  requirePermission('admin:settings'),
-  async (c) => {
-    const services = c.get('services')
-    const hubId = c.get('hubId') ?? ''
-    const migrated = await services.cases.migrateEvents(hubId)
-    return c.json({ migrated })
-  },
-)
 
 // --- List events (paginated, with filters) ---
 events.get('/',

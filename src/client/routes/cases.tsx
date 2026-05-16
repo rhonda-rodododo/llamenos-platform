@@ -8,6 +8,8 @@ import {
   updateRecord,
   listEntityTypes,
   listRecordContacts,
+  listChildRecords,
+  getRecord,
   assignRecord as apiAssignRecord,
   unassignRecord as apiUnassignRecord,
   getCaseManagementEnabled,
@@ -968,7 +970,7 @@ function RecordDetail({
             readerPubkeys={publicKey ? [publicKey] : []}
           />
         )}
-        {activeTab === 'related' && <RelatedPlaceholder />}
+        {activeTab === 'related' && <RelatedTab record={record} />}
       </div>
     </>
   )
@@ -1172,15 +1174,106 @@ function ContactsTab({
   )
 }
 
-// --- Placeholder tabs ---
+// --- Related tab: shows parent, children, and sibling records ---
 
-function RelatedPlaceholder() {
+function RelatedTab({ record }: { record: CaseRecord }) {
+  const { t } = useTranslation()
+  const [parentRecord, setParentRecord] = useState<CaseRecord | null>(null)
+  const [childRecords, setChildRecords] = useState<CaseRecord[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    setLoading(true)
+    const tasks: Promise<void>[] = []
+
+    if (record.parentRecordId) {
+      tasks.push(
+        getRecord(record.parentRecordId)
+          .then(r => setParentRecord(r))
+          .catch(() => setParentRecord(null)),
+      )
+    } else {
+      setParentRecord(null)
+    }
+
+    tasks.push(
+      listChildRecords(record.id)
+        .then(({ records }) => setChildRecords(records))
+        .catch(() => setChildRecords([])),
+    )
+
+    Promise.all(tasks).finally(() => setLoading(false))
+  }, [record.id, record.parentRecordId])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  const hasRelated = parentRecord || childRecords.length > 0
+
+  if (!hasRelated) {
+    return (
+      <div data-testid="case-related-tab" className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+        <Link2 className="h-8 w-8 mb-2 text-muted-foreground/40" />
+        <p className="text-sm font-medium">{t('cases.noRelated', { defaultValue: 'No related records' })}</p>
+        <p className="text-xs mt-1">{t('cases.noRelatedHint', { defaultValue: 'Child and parent records will appear here.' })}</p>
+      </div>
+    )
+  }
+
+  return (
+    <div data-testid="case-related-tab" className="space-y-4">
+      {parentRecord && (
+        <div className="space-y-2">
+          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+            {t('cases.parentRecord', { defaultValue: 'Parent Record' })}
+          </h4>
+          <RelatedRecordCard record={parentRecord} />
+        </div>
+      )}
+
+      {childRecords.length > 0 && (
+        <div className="space-y-2">
+          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+            {t('cases.childRecords', { defaultValue: 'Child Records' })} ({childRecords.length})
+          </h4>
+          {childRecords.map(child => (
+            <RelatedRecordCard key={child.id} record={child} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function RelatedRecordCard({ record }: { record: CaseRecord }) {
   const { t } = useTranslation()
   return (
-    <div data-testid="case-related-tab" className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-      <MessageSquare className="h-8 w-8 mb-2 text-muted-foreground/40" />
-      <p className="text-sm font-medium">{t('cases.relatedPlaceholder', { defaultValue: 'Related' })}</p>
-      <p className="text-xs mt-1">{t('cases.relatedHint', { defaultValue: 'Related cases and linked records will appear here.' })}</p>
+    <div
+      data-testid="related-record-card"
+      className="flex items-center gap-3 rounded-md border border-border px-3 py-2 hover:bg-accent/30 transition-colors"
+    >
+      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
+        <FileText className="h-4 w-4" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium truncate">
+          {record.caseNumber || record.id.slice(0, 8)}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          {t('cases.createdAt', {
+            defaultValue: 'Created {{time}}',
+            time: formatRelativeTime(record.createdAt, t),
+          })}
+        </p>
+      </div>
+      <Badge variant="secondary" className="text-[10px]">
+        {record.statusHash.slice(0, 8)}
+      </Badge>
     </div>
   )
 }
