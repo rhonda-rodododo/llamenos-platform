@@ -11,12 +11,21 @@ import { hexToBytes, bytesToHex, utf8ToBytes } from '@shared/encoding'
 import { LABEL_MESSAGE, LABEL_CALL_META, LABEL_CONTACT_ID, LABEL_STORAGE_CREDENTIAL_WRAP, HMAC_PHONE_PREFIX, HMAC_IP_PREFIX } from '@shared/crypto-labels'
 import type { RecipientEnvelope } from '@shared/types'
 
+/** Decode a secret string as hex bytes if valid hex, else as UTF-8 bytes. */
+function secretToKey(secret: string): Uint8Array {
+  try {
+    return hexToBytes(secret)
+  } catch {
+    return utf8ToBytes(secret)
+  }
+}
+
 /**
  * Hash a phone number for storage (one-way — compare by re-hashing).
  * Uses HMAC-SHA256 with a server secret to prevent precomputation attacks.
  */
 export function hashPhone(phone: string, secret: string): string {
-  const key = hexToBytes(secret)
+  const key = secretToKey(secret)
   const input = utf8ToBytes(`${HMAC_PHONE_PREFIX}${phone}`)
   return bytesToHex(hmacSha256(key, input))
 }
@@ -26,7 +35,7 @@ export function hashPhone(phone: string, secret: string): string {
  * Uses HMAC-SHA256 with a server secret, truncated to 96 bits.
  */
 export function hashIP(ip: string, secret: string): string {
-  const key = hexToBytes(secret)
+  const key = secretToKey(secret)
   const input = utf8ToBytes(`${HMAC_IP_PREFIX}${ip}`)
   return bytesToHex(hmacSha256(key, input)).slice(0, 24)
 }

@@ -1782,6 +1782,7 @@
     "applySuccess": "Template applied successfully",
     "applyError": "Failed to apply template",
     "builtinBadge": "Built-in",
+    "entityTypes": "实体类型",
     "templates": {
       "case": {
         "label": "Case",

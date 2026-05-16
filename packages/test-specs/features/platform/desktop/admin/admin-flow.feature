@@ -73,7 +73,6 @@ Feature: Admin Flow
     Then I should see "Voice CAPTCHA"
     And I should see "Rate Limiting"
 
-  @wip
   Scenario: Admin settings toggles work
     When I navigate to the "Hub Settings" page
     And I expand the "Transcription" section

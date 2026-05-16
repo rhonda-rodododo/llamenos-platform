@@ -8,7 +8,7 @@
  * steps, we fall back to role-based lookup (acceptable for BDD parameterization).
  */
 import { expect } from '@playwright/test'
-import { Given, When, Then } from '../fixtures'
+import { When, Then } from '../fixtures'
 import { TestIds, navTestIdMap, sectionTestIdMap } from '../../test-ids'
 import { Timeouts, navigateViaSpa } from '../../helpers'
 
@@ -248,7 +248,11 @@ When('I expand the {string} section', async ({ page }, sectionName: string) => {
   await el.scrollIntoViewIfNeeded()
   // Use count() (DOM presence) not isVisible() — Radix animates from height:0 so the element
   // exists in DOM immediately with data-state="open" but has zero dimensions during animation.
-  const openCount = await el.locator('[data-state="open"]').count()
+  // Target CollapsibleContent specifically via data-slot to avoid strict mode violations:
+  // both CollapsibleTrigger and CollapsibleContent carry data-state, so [data-state="open"]
+  // resolves to 2 elements when open, failing Playwright strict mode.
+  const contentSelector = '[data-slot="collapsible-content"][data-state="open"]'
+  const openCount = await el.locator(contentSelector).count()
   const isExpanded = openCount > 0
   if (!isExpanded) {
     // Click the trigger element (CardHeader with data-testid="{id}-trigger")
@@ -259,6 +263,10 @@ When('I expand the {string} section', async ({ page }, sectionName: string) => {
       // Fallback: click the first heading/title within the section
       await el.locator('h3, [class*="CardTitle"]').first().click()
     }
+    // Wait for CollapsibleContent to appear in DOM with data-state="open".
+    // Without this wait, the next step may run before React processes the state update,
+    // see the section as still-closed (count=0), and click the trigger again — collapsing it.
+    await el.locator(contentSelector).waitFor({ state: 'attached', timeout: Timeouts.ELEMENT })
   }
   await expect(page.getByTestId(testId)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })

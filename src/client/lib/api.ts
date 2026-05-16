@@ -2604,44 +2604,18 @@ export interface EntityTemplateListResponse {
   appliedTemplateIds: string[]
 }
 
+// Summary returned by GET /settings/cms/templates (not full template detail)
 export interface EntityTemplate {
   id: string
   name: string
-  label: string
-  labelPlural: string
   description: string
-  icon?: string
-  color?: string
-  category: 'case' | 'event' | 'incident_report' | 'contact_note'
   version: string
-  fields: EntityTemplateField[]
-  statuses: Array<{ value: string; label: string; color?: string; isDefault?: boolean; isClosed?: boolean }>
-  defaultStatus: string
-  closedStatuses?: string[]
-  severities?: Array<{ value: string; label: string; color?: string }>
-  allowSubRecords?: boolean
-  allowFileAttachments?: boolean
-  allowInteractionLinks?: boolean
-  numberingEnabled?: boolean
-  numberPrefix?: string
   tags?: string[]
-  isBuiltin?: boolean
-}
-
-export interface EntityTemplateField {
-  id: string
-  name: string
-  label: string
-  type: string
-  required?: boolean
-  indexable?: boolean
-  indexType?: 'exact' | 'date' | 'location' | 'none'
-  locationOptions?: {
-    maxPrecision?: string
-    allowGps?: boolean
-    allowAutocomplete?: boolean
-  }
-  order?: number
+  entityTypeCount: number
+  reportTypeCount: number
+  totalFieldCount: number
+  suggestedRoleCount: number
+  extends?: string
 }
 
 export async function listEntityTemplates(): Promise<EntityTemplateListResponse> {
