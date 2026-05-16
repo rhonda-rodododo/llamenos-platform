@@ -118,14 +118,24 @@ describe('AnalyticsService', () => {
       expect(result.totalCalls).toBe(20)
     })
 
-    it('throws when hubId is undefined', async () => {
-      const { service } = setup()
-      await expect(
-        service.getHourlyDistribution(undefined, {
-          from: new Date('2026-05-01'),
-          to: new Date('2026-05-07'),
-        }),
-      ).rejects.toThrow('hubId is required for analytics queries')
+    it('returns cross-hub aggregate data when hubId is undefined', async () => {
+      const { db, service } = setup()
+      // EP04: undefined hubId triggers platform-scope aggregation across all hubs
+      db.$setSelectResults([
+        [
+          { hour: 8, count: 4 },
+          { hour: 16, count: 7 },
+        ],
+      ])
+      const result = await service.getHourlyDistribution(undefined, {
+        from: new Date('2026-05-01'),
+        to: new Date('2026-05-07'),
+      })
+      expect(result.buckets).toHaveLength(24)
+      expect(result.buckets[8]).toEqual({ hour: 8, count: 4 })
+      expect(result.buckets[16]).toEqual({ hour: 16, count: 7 })
+      expect(result.buckets[0]).toEqual({ hour: 0, count: 0 })
+      expect(result.totalCalls).toBe(11)
     })
   })
 
