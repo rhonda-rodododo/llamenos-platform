@@ -26,6 +26,8 @@ import {
   listShiftRequests,
   approveShiftRequest,
   rejectShiftRequest,
+  clockIn,
+  clockOut,
   type Shift,
   type User,
 } from '@/lib/api'
@@ -104,9 +106,11 @@ type ActiveShift = {
 
 function ShiftsPage() {
   const { t } = useTranslation()
-  const { isAdmin, onBreak, toggleBreak } = useAuth()
+  const { isAdmin } = useAuth()
   const { toast } = useToast()
   const [activeTab, setActiveTab] = useState<Tab>('schedule')
+  const [clockedIn, setClockedIn] = useState(false)
+  const [clockedInAt, setClockedInAt] = useState<Date | null>(null)
 
   const tabs: Array<{ id: Tab; label: string; adminOnly?: boolean }> = [
     { id: 'schedule', label: t('shifts.schedule') },
@@ -119,6 +123,22 @@ function ShiftsPage() {
 
   const visibleTabs = tabs.filter(tab => !tab.adminOnly || isAdmin)
 
+  async function handleClockToggle() {
+    try {
+      if (clockedIn) {
+        await clockOut()
+        setClockedIn(false)
+        setClockedInAt(null)
+      } else {
+        await clockIn()
+        setClockedIn(true)
+        setClockedInAt(new Date())
+      }
+    } catch {
+      toast(t('common.error'), 'error')
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -126,22 +146,21 @@ function ShiftsPage() {
           <Clock className="h-6 w-6 text-primary" />
           <h1 data-testid="page-title" className="text-xl font-bold sm:text-2xl">{t('shifts.title')}</h1>
         </div>
-        <Button
-          variant={onBreak ? 'default' : 'outline'}
-          size="sm"
-          data-testid="break-toggle-btn"
-          onClick={async () => {
-            try {
-              await toggleBreak()
-            } catch {
-              toast(t('common.error'), 'error')
-            }
-          }}
-          className={onBreak ? 'bg-yellow-600 hover:bg-yellow-700' : ''}
-        >
-          {onBreak ? <LogIn className="h-3.5 w-3.5" /> : <LogOut className="h-3.5 w-3.5" />}
-          {onBreak ? t('dashboard.clockIn', { defaultValue: 'Clock In' }) : t('dashboard.clockOut', { defaultValue: 'Clock Out' })}
-        </Button>
+        <div className="flex items-center gap-2">
+          {clockedIn && clockedInAt && (
+            <ShiftTimer startedAt={clockedInAt} />
+          )}
+          <Button
+            variant={clockedIn ? 'default' : 'outline'}
+            size="sm"
+            data-testid="break-toggle-btn"
+            onClick={handleClockToggle}
+            className={clockedIn ? 'bg-green-600 hover:bg-green-700' : ''}
+          >
+            {clockedIn ? <LogOut className="h-3.5 w-3.5" /> : <LogIn className="h-3.5 w-3.5" />}
+            {clockedIn ? t('dashboard.clockOut', { defaultValue: 'Clock Out' }) : t('dashboard.clockIn', { defaultValue: 'Clock In' })}
+          </Button>
+        </div>
       </div>
 
       {/* Tab bar */}
@@ -910,6 +929,33 @@ function ActiveTab({ toast, t }: { toast: ReturnType<typeof useToast>['toast']; 
         ))}
       </div>
     </div>
+  )
+}
+
+// ============================================================================
+// Shift Timer (shows elapsed time since clock-in)
+// ============================================================================
+
+function ShiftTimer({ startedAt }: { startedAt: Date }) {
+  const [elapsed, setElapsed] = useState('')
+
+  useEffect(() => {
+    function update() {
+      const diff = Math.floor((Date.now() - startedAt.getTime()) / 1000)
+      const h = Math.floor(diff / 3600)
+      const m = Math.floor((diff % 3600) / 60)
+      const s = diff % 60
+      setElapsed(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`)
+    }
+    update()
+    const id = setInterval(update, 1000)
+    return () => clearInterval(id)
+  }, [startedAt])
+
+  return (
+    <span data-testid="shift-timer" className="font-mono text-sm text-muted-foreground">
+      {elapsed}
+    </span>
   )
 }
 
