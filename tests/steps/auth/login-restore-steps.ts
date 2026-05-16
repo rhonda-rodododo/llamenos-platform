@@ -15,7 +15,10 @@ import { Timeouts } from '../../helpers'
 Given('I have a stored encrypted key', async ({ page }) => {
   await page.goto('/login')
   // Inject a fake encrypted key blob to trigger the PIN entry UI.
-  // The Tauri store mock uses prefix `tauri-store:keys.json:` + STORE_KEY `llamenos-encrypted-device-keys`.
+  // In test builds (PLAYWRIGHT_TEST=true), useTauri is true and getSecureStore() goes through
+  // the Stronghold mock (@tauri-apps/plugin-stronghold aliased to tests/mocks/tauri-stronghold.ts).
+  // The mock stores at `stronghold:{client}:{key}` with values as JSON-encoded number[].
+  // We also set the `llamenos:` prefixed key as a fallback for the localStorage-only path.
   await page.evaluate(() => {
     const data = JSON.stringify({
       salt: 'aa'.repeat(16),
@@ -24,10 +27,11 @@ Given('I have a stored encrypted key', async ({ page }) => {
       ciphertext: 'cc'.repeat(32),
       state: { signingPubkeyHex: 'dd'.repeat(32) },
     })
-    // Stronghold mock stores as number[] (TextEncoder output), matching
-    // the MockStrongholdStore.insert() format used by platform.ts getSecureStore()
+    // Stronghold mock format: number[] (TextEncoder output)
     const encoded = Array.from(new TextEncoder().encode(data))
+    // Set both prefixes to cover Stronghold mock path and localStorage fallback path
     localStorage.setItem('stronghold:llamenos:llamenos-encrypted-device-keys', JSON.stringify(encoded))
+    localStorage.setItem('llamenos:llamenos-encrypted-device-keys', data)
   })
 })
 

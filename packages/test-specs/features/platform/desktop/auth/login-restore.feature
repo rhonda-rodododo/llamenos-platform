@@ -37,7 +37,8 @@ Feature: Login Page Restore
   Scenario: Recovery options switches to recovery view
     Given I have a stored encrypted key
     When I visit the login page
-    And I click "Recovery Options"
+    Then I should see the PIN digit inputs
+    When I click "Recovery Options"
     Then I should see the nsec input
     And I should see the "Log in" button
 
