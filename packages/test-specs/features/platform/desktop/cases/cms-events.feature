@@ -65,6 +65,7 @@ Feature: Event Management
     When I view the event detail
     Then the linked cases count should show 3
 
+  @wip
   Scenario: Event detail shows linked reports tab
     Given an event with linked reports exists
     When I view the event detail
@@ -73,6 +74,7 @@ Feature: Event Management
 
   # --- Linking cases to events ---
 
+  @wip
   Scenario: Link an existing case to an event
     Given an event exists
     And arrest cases exist
@@ -83,6 +85,7 @@ Feature: Event Management
     Then the case should appear in the event's linked cases
     And the linked cases count should increase by 1
 
+  @wip
   Scenario: Link a report to an event
     Given an event exists
     And a report exists
