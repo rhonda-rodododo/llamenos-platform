@@ -8,22 +8,23 @@
 import { expect } from '@playwright/test'
 import { When, Then } from '../fixtures'
 import { TestIds } from '../../test-ids'
-import { Timeouts } from '../../helpers'
+import { Timeouts, reenterPinAfterReload } from '../../helpers'
 import { listShiftsViaApi, createShiftViaApi } from '../../api-helpers'
-import { waitForApiAndUi } from '../../pages/index'
 
 When('I tap a shift card', async ({ page, backendRequest: request, workerHub }) => {
   // Ensure at least one shift exists so the tap has something to click.
   const existingShifts = await listShiftsViaApi(request, workerHub).catch(() => [])
   if (existingShifts.length === 0) {
     await createShiftViaApi(request, { name: `Auto-seeded Shift ${Date.now()}`, hubId: workerHub })
-    // Hard navigation to /shifts to bypass React Query's staleTime cache.
-    // Soft navigation (goToDashboard + goToShifts) keeps the QueryClient alive, so the
-    // recently-cached empty shifts list is returned without a refetch (staleTime: 2 min).
-    await page.goto('/shifts')
-    await page.waitForLoadState('domcontentloaded')
-    await waitForApiAndUi(page)
   }
+  // Navigate to /shifts and force a fresh data fetch.
+  // We use page.goto() which causes a full reload — this evicts the in-memory key
+  // manager, so we re-enter PIN afterwards. This guarantees React Query fetches fresh
+  // shift data from the server instead of serving a stale/empty cache entry.
+  await page.goto('/shifts')
+  await reenterPinAfterReload(page)
+  await page.waitForURL('**/shifts', { timeout: Timeouts.NAVIGATION })
+
   const shiftCard = page.getByTestId(TestIds.SHIFT_CARD).first()
   await expect(shiftCard).toBeVisible({ timeout: Timeouts.ELEMENT })
   // Desktop: click the edit button on the shift card to open the inline edit form
