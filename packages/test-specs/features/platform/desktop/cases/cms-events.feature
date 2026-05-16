@@ -3,9 +3,8 @@ Feature: Event Management
   Coordinators and admins track events (protests, mass arrests)
   and link case records and reports to them.
 
-  Note: The events page does not yet have a desktop route.
-  These scenarios define the target behavior for when
-  the /events route is implemented.
+  Events are displayed via the /events route which filters records
+  by event category entity types using EntityTypeFilteredRecordList.
 
   Background:
     Given I am logged in as an admin
@@ -62,7 +61,6 @@ Feature: Event Management
     Then linked case records should be visible
     And each case link should show a case number
 
-  @wip
   Scenario: Event detail shows linked cases count
     Given an event with 3 linked cases exists
     When I view the event detail

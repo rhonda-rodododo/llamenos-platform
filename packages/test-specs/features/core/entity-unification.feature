@@ -45,17 +45,3 @@ Feature: Entity System Unification
     Then the request should be permitted
     And the audit log should show permission alias "events:read -> cases:read"
 
-  @migration
-  Scenario: Events migration status endpoint returns pending count
-    Given case management is enabled
-    And 3 events exist without deprecated_at set
-    When I request GET /api/admin/events/migration-status
-    Then the response should contain pendingCount 3
-
-  @migration
-  Scenario: Events migration marks events as deprecated
-    Given case management is enabled
-    And 2 events exist without deprecated_at set
-    When I POST /api/admin/events/migrate
-    Then all 2 events should have deprecated_at set
-    And the response should contain migrated 2

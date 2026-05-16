@@ -113,6 +113,20 @@ Feature: Case Management
     And I should see the "Evidence" tab
     And I should see the "Related" tab
 
+  Scenario: Related tab shows empty state when no linked records exist
+    Given an arrest case exists
+    When I navigate to the "Cases" page
+    And I click the first case card
+    And I click the "Related" tab
+    Then the related tab empty state should be visible
+
+  Scenario: Related tab shows child records when they exist
+    Given a parent case with child records exists
+    When I navigate to the "Cases" page
+    And I click the parent case card
+    And I click the "Related" tab
+    Then at least one related record card should be visible
+
   Scenario: Details tab renders schema-driven fields with access indicators
     Given an arrest case exists
     When I navigate to the "Cases" page
