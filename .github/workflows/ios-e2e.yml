@@ -16,6 +16,7 @@ on:
       - 'packages/i18n/**'
       - 'apps/worker/**'
       - 'packages/shared/**'
+      - '.github/workflows/ios-e2e.yml'
   pull_request:
     paths:
       - 'apps/ios/**'
@@ -24,6 +25,7 @@ on:
       - 'packages/i18n/**'
       - 'apps/worker/**'
       - 'packages/shared/**'
+      - '.github/workflows/ios-e2e.yml'
 
 concurrency:
   group: ${{ github.event_name == 'pull_request' && format('ios-e2e-pr-{0}', github.ref) || format('ios-e2e-push-{0}', github.sha) }}
