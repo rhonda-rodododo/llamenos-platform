@@ -185,6 +185,7 @@ export class AnalyticsService {
     totalCalls: number
     buckets: Array<{ hour: number; count: number }>
   }> {
+    if (!hubId) throw new Error('hubId is required for analytics queries')
     const { from, to } = { ...defaultRange(), ...range }
 
     const rows = await this.db

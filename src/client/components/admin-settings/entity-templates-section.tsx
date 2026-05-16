@@ -89,12 +89,7 @@ export function EntityTemplatesSection({ expanded, onToggle, statusSummary }: Pr
               >
                 <div className="flex-1 space-y-0.5">
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium">{template.label}</p>
-                    {template.isBuiltin && (
-                      <Badge variant="secondary" className="text-[10px]">
-                        {t('entityTemplates.builtinBadge', { defaultValue: 'Built-in' })}
-                      </Badge>
-                    )}
+                    <p className="text-sm font-medium">{template.name}</p>
                     {isApplied && (
                       <Badge variant="outline" className="text-[10px] gap-1">
                         <Check className="h-2.5 w-2.5" />
@@ -105,14 +100,13 @@ export function EntityTemplatesSection({ expanded, onToggle, statusSummary }: Pr
                   <p className="text-xs text-muted-foreground">{template.description}</p>
                   <div className="flex items-center gap-2 mt-1">
                     <Badge variant="outline" className="text-[10px]">
-                      {template.category}
+                      {template.entityTypeCount} {t('entityTemplates.entityTypes', { defaultValue: 'entity types' })}
                     </Badge>
-                    <Badge variant="outline" className="text-[10px]">
-                      {template.fields.length} {t('caseManagement.fields')}
-                    </Badge>
-                    <Badge variant="outline" className="text-[10px]">
-                      {template.statuses.length} {t('caseManagement.statuses')}
-                    </Badge>
+                    {template.totalFieldCount > 0 && (
+                      <Badge variant="outline" className="text-[10px]">
+                        {template.totalFieldCount} {t('caseManagement.fields')}
+                      </Badge>
+                    )}
                   </div>
                 </div>
                 <Button

@@ -1781,6 +1781,7 @@
     "applySuccess": "Template applied successfully",
     "applyError": "Failed to apply template",
     "builtinBadge": "Built-in",
+    "entityTypes": "Entitätstypen",
     "templates": {
       "case": {
         "label": "Case",

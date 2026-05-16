@@ -1781,6 +1781,7 @@
     "applySuccess": "Plantilla aplicada con éxito",
     "applyError": "Error al aplicar la plantilla",
     "builtinBadge": "Integrada",
+    "entityTypes": "tipos de entidad",
     "templates": {
       "case": {
         "label": "Caso",
