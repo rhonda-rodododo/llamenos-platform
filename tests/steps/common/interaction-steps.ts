@@ -259,6 +259,10 @@ When('I expand the {string} section', async ({ page }, sectionName: string) => {
       // Fallback: click the first heading/title within the section
       await el.locator('h3, [class*="CardTitle"]').first().click()
     }
+    // Wait for CollapsibleContent to appear in DOM with data-state="open".
+    // Without this wait, the next step may run before React processes the state update,
+    // see the section as still-closed (count=0), and click the trigger again — collapsing it.
+    await el.locator('[data-state="open"]').waitFor({ state: 'attached', timeout: Timeouts.ELEMENT })
   }
   await expect(page.getByTestId(testId)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
