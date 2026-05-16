@@ -92,6 +92,39 @@ export interface MessageStatusEvent extends LlamenosEvent {
   status: string
 }
 
+/** Volunteer clocked in */
+export interface ShiftClockInEvent extends LlamenosEvent {
+  type: 'shift:clockIn'
+  pubkey: string
+}
+
+/** Volunteer clocked out */
+export interface ShiftClockOutEvent extends LlamenosEvent {
+  type: 'shift:clockOut'
+  pubkey: string
+}
+
+/** Shift override created */
+export interface ShiftOverrideCreatedEvent extends LlamenosEvent {
+  type: 'shift:overrideCreated'
+  overrideId: string
+}
+
+/** Shift join/leave request received */
+export interface ShiftRequestReceivedEvent extends LlamenosEvent {
+  type: 'shift:requestReceived'
+  requestId: string
+  shiftId: string
+  requestType: 'join' | 'leave'
+}
+
+/** Shift join/leave request reviewed */
+export interface ShiftRequestReviewedEvent extends LlamenosEvent {
+  type: 'shift:requestReviewed'
+  requestId: string
+  status: 'approved' | 'denied'
+}
+
 /** Relay connection state */
 export type RelayState = 'disconnected' | 'connecting' | 'connected' | 'authenticating'
 
