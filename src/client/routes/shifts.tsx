@@ -26,13 +26,15 @@ import {
   listShiftRequests,
   approveShiftRequest,
   rejectShiftRequest,
+  clockIn,
+  clockOut,
   type Shift,
   type User,
 } from '@/lib/api'
 import { z } from 'zod'
 import { createShiftBodySchema } from '@protocol/schemas/shifts'
 import { useToast } from '@/lib/toast'
-import { CalendarPlus, Clock, Users, Pencil, Trash2, LifeBuoy, UserPlus, UserMinus, ShieldCheck, CalendarX, CalendarOff, Activity, CheckCircle, XCircle } from 'lucide-react'
+import { CalendarPlus, Clock, Users, Pencil, Trash2, LifeBuoy, UserPlus, UserMinus, ShieldCheck, CalendarX, CalendarOff, Activity, CheckCircle, XCircle, LogIn, LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -107,6 +109,8 @@ function ShiftsPage() {
   const { isAdmin } = useAuth()
   const { toast } = useToast()
   const [activeTab, setActiveTab] = useState<Tab>('schedule')
+  const [clockedIn, setClockedIn] = useState(false)
+  const [clockedInAt, setClockedInAt] = useState<Date | null>(null)
 
   const tabs: Array<{ id: Tab; label: string; adminOnly?: boolean }> = [
     { id: 'schedule', label: t('shifts.schedule') },
@@ -119,11 +123,44 @@ function ShiftsPage() {
 
   const visibleTabs = tabs.filter(tab => !tab.adminOnly || isAdmin)
 
+  async function handleClockToggle() {
+    try {
+      if (clockedIn) {
+        await clockOut()
+        setClockedIn(false)
+        setClockedInAt(null)
+      } else {
+        await clockIn()
+        setClockedIn(true)
+        setClockedInAt(new Date())
+      }
+    } catch {
+      toast(t('common.error'), 'error')
+    }
+  }
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <Clock className="h-6 w-6 text-primary" />
-        <h1 data-testid="page-title" className="text-xl font-bold sm:text-2xl">{t('shifts.title')}</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Clock className="h-6 w-6 text-primary" />
+          <h1 data-testid="page-title" className="text-xl font-bold sm:text-2xl">{t('shifts.title')}</h1>
+        </div>
+        <div className="flex items-center gap-2">
+          {clockedIn && clockedInAt && (
+            <ShiftTimer startedAt={clockedInAt} />
+          )}
+          <Button
+            variant={clockedIn ? 'default' : 'outline'}
+            size="sm"
+            data-testid="break-toggle-btn"
+            onClick={handleClockToggle}
+            className={clockedIn ? 'bg-green-600 hover:bg-green-700' : ''}
+          >
+            {clockedIn ? <LogOut className="h-3.5 w-3.5" /> : <LogIn className="h-3.5 w-3.5" />}
+            {clockedIn ? t('dashboard.clockOut', { defaultValue: 'Clock Out' }) : t('dashboard.clockIn', { defaultValue: 'Clock In' })}
+          </Button>
+        </div>
       </div>
 
       {/* Tab bar */}
@@ -892,6 +929,33 @@ function ActiveTab({ toast, t }: { toast: ReturnType<typeof useToast>['toast']; 
         ))}
       </div>
     </div>
+  )
+}
+
+// ============================================================================
+// Shift Timer (shows elapsed time since clock-in)
+// ============================================================================
+
+function ShiftTimer({ startedAt }: { startedAt: Date }) {
+  const [elapsed, setElapsed] = useState('')
+
+  useEffect(() => {
+    function update() {
+      const diff = Math.floor((Date.now() - startedAt.getTime()) / 1000)
+      const h = Math.floor(diff / 3600)
+      const m = Math.floor((diff % 3600) / 60)
+      const s = diff % 60
+      setElapsed(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`)
+    }
+    update()
+    const id = setInterval(update, 1000)
+    return () => clearInterval(id)
+  }, [startedAt])
+
+  return (
+    <span data-testid="shift-timer" className="font-mono text-sm text-muted-foreground">
+      {elapsed}
+    </span>
   )
 }
 
