@@ -1193,6 +1193,22 @@
       "title": "WhatsApp Channel",
       "twilioNote": "WhatsApp is configured through your Twilio account. Ensure WhatsApp is enabled for your Twilio number.",
       "verifyToken": "Verify Token"
+    },
+    "rcs": {
+      "agentId": "Agent ID",
+      "fallbackToSms": "Fallback to SMS",
+      "fallbackToSmsDesc": "Send SMS when RCS is unavailable for the recipient.",
+      "serviceAccountKey": "Service Account Key",
+      "title": "RCS Channel",
+      "webhookSecret": "Webhook Secret"
+    },
+    "signal": {
+      "bridgeApiKey": "API Key",
+      "bridgeUrl": "Bridge URL",
+      "e2eeNote": "Messages are end-to-end encrypted via a self-hosted Signal bridge.",
+      "registeredNumber": "Registered Phone Number",
+      "title": "Signal Channel",
+      "webhookSecret": "Webhook Secret"
     }
   },
   "cms": {
@@ -1824,7 +1840,12 @@
       "userIdPlaceholder": "Enter user ID or public key",
       "wipeDialogTitle": "Remote Device Wipe",
       "wipeDialogWarning": "This will remotely wipe the cryptographic keys on the target device. The device will be locked out immediately.",
-      "wipeSuccess": "Remote wipe command sent."
+      "wipeSuccess": "Remote wipe command sent.",
+      "coApprovalPending": "Awaiting co-approver",
+      "coApprovedBy": "Co-approved by {{pubkey}}…",
+      "coApproverHelp": "Enter the public key of another super-admin who will co-approve this action.",
+      "coApproverPlaceholder": "Co-approver public key",
+      "coApproverPubkey": "Co-approver"
     },
     "adminDeviceWipeButton": "Remote Wipe Device",
     "adminDeviceWipeConfirm": "This will remotely wipe all data on this device. Continue?",
@@ -3043,7 +3064,8 @@
       "timeRemaining": "Time remaining",
       "cancel": "Cancel request",
       "cancelConfirm": "Are you sure? This will stop the recovery process.",
-      "duressAlert": "Warning: a potential coercion alert has been detected. Verify this request through a separate channel before proceeding."
+      "duressAlert": "Warning: a potential coercion alert has been detected. Verify this request through a separate channel before proceeding.",
+      "none": "No active recovery requests."
     },
     "urgent": {
       "title": "Urgent recovery",
@@ -3070,7 +3092,8 @@
       "delayCountdown": "Access will be restored in {{time}}",
       "complete": "Account recovered",
       "setPin": "Set a PIN to protect your new device",
-      "success": "You're all set. Your account has been recovered."
+      "success": "You're all set. Your account has been recovered.",
+      "restoring": "Restoring your account…"
     },
     "status": {
       "enrolled": "Your account is recoverable in {{hubName}}",
@@ -3086,7 +3109,9 @@
       "signalVerificationFailed": "Verification code is incorrect",
       "signalVerificationExpired": "Verification code has expired. Please start over.",
       "sigchainMismatch": "Recovery team configuration could not be verified. Contact your administrator."
-    }
+    },
+    "noContacts": "No eligible recovery contacts found.",
+    "selected": "Selected"
   },
   "report": {
     "bodyLabel": "Description",
