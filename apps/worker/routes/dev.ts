@@ -817,6 +817,40 @@ dev.post('/test-simulate/push-dispatch', async (c) => {
   return c.json({ ok: true, wake })
 })
 
+// ─── Test Hub Member Addition (dev/test isolation helper) ───────────────────
+// Adds a pubkey as a member (super-admin role) of an existing hub so that
+// hub-switching tests can call getHubKey for hub2 without a permission error.
+
+dev.post('/test-add-hub-member', async (c) => {
+  const denied = simulationGuard(c)
+  if (denied) return denied
+
+  const body = await c.req.json().catch(() => ({})) as { pubkey?: string; hubId?: string }
+  if (!body.pubkey || !body.hubId) {
+    return c.json({ error: 'pubkey and hubId are required' }, 400)
+  }
+
+  let pubkey: string
+  try {
+    pubkey = decodePubkey(body.pubkey)
+  } catch (e) {
+    return c.json({ error: `Invalid pubkey: ${e instanceof Error ? e.message : String(e)}` }, 400)
+  }
+
+  const services = c.get('services')
+  try {
+    await services.identity.setHubRole({
+      pubkey,
+      hubId: body.hubId,
+      roleIds: ['role-super-admin'],
+    })
+    return c.json({ ok: true, pubkey, hubId: body.hubId })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to add hub member'
+    return c.json({ error: message }, 500)
+  }
+})
+
 // ─── Test Hub Creation (dev/test isolation helper) ──────────────────────────
 // Creates an isolated hub for a single test run.
 // Gated by ENVIRONMENT=development + DEV_RESET_SECRET / E2E_TEST_SECRET.

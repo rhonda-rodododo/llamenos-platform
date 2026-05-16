@@ -223,6 +223,23 @@ object SimulationClient {
         return json.decodeFromString<HubResponse>(responseText)
     }
 
+    // ─── Hub Membership ───────────────────────────────────────────────
+
+    /**
+     * Add a pubkey as a super-admin member of an existing hub.
+     *
+     * Required for hub-switching tests: [HubRepository.switchHub] calls
+     * [ApiService.getHubKey] which is gated on hub membership. Without this,
+     * the test user cannot switch to hub2 even if they have a global super-admin role.
+     *
+     * Corresponds to `POST /api/test-add-hub-member`.
+     */
+    fun addHubMember(pubkey: String, hubId: String): StatusResponse {
+        val body = """{"pubkey":"${escapeJson(pubkey)}","hubId":"${escapeJson(hubId)}"}"""
+        val responseText = post("/api/test-add-hub-member", body)
+        return json.decodeFromString<StatusResponse>(responseText)
+    }
+
     // ─── CMS Setup ────────────────────────────────────────────────
 
     /**

@@ -89,13 +89,30 @@ class TriageSteps : BaseSteps() {
 
     @When("I tap the convert to case button")
     fun iTapTheConvertToCaseButton() {
+        // Wait for the convert button to appear. The button is conditionally rendered
+        // (status != "closed"), so we must wait rather than immediately try to scroll.
+        val hasButton = try {
+            composeRule.waitUntil(10_000) {
+                composeRule.onAllNodesWithTag("triage-convert-button").fetchSemanticsNodes().isNotEmpty()
+            }
+            true
+        } catch (_: Throwable) {
+            false
+        }
+
+        if (!hasButton) {
+            Log.w("TriageSteps", "Convert to case button not available — report may be closed or detail not loaded")
+            return
+        }
+
+        // Button is in a verticalScroll Column — scroll to bring it into view then click.
         try {
             onNodeWithTag("triage-convert-button").performScrollTo()
-            onNodeWithTag("triage-convert-button").performClick()
-            composeRule.waitForIdle()
         } catch (_: Throwable) {
-            Log.w("TriageSteps", "Convert to case button not available")
+            // Already visible or scroll ancestor not resolvable — proceed with click anyway
         }
+        onNodeWithTag("triage-convert-button").performClick()
+        composeRule.waitForIdle()
     }
 
     // ---- Then ----

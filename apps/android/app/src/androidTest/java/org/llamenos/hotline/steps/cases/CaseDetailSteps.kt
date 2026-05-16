@@ -5,7 +5,6 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import io.cucumber.java.en.And
 import io.cucumber.java.en.Given
 import io.cucumber.java.en.Then
@@ -91,7 +90,6 @@ class CaseDetailSteps : BaseSteps() {
         } catch (_: Throwable) {
             // May already be on Details tab
         }
-        onNodeWithTag("case-assign-btn-header").performScrollTo()
         onNodeWithTag("case-assign-btn-header").performClick()
         composeRule.waitForIdle()
         // Wait for the assignment API call to complete
@@ -186,7 +184,6 @@ class CaseDetailSteps : BaseSteps() {
         } catch (_: Throwable) {
             // May already be on Details tab
         }
-        onNodeWithTag("case-assign-btn-header").performScrollTo()
         onNodeWithTag("case-assign-btn-header").assertIsDisplayed()
     }
 
