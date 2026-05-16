@@ -23,6 +23,7 @@ function createTestApp(opts: {
   const services: Record<string, unknown> = {
     shifts: serviceMock.shifts || {},
     settings: serviceMock.settings || {},
+    activeShifts: serviceMock.activeShifts || {},
     audit: serviceMock.audit || { log: vi.fn().mockResolvedValue(undefined) },
   }
 
@@ -313,6 +314,123 @@ describe('shifts routes', () => {
     it('requires shifts:delete permission', async () => {
       const { app } = createTestApp({ permissions: ['shifts:read'] })
       const res = await app.request('/shifts/s1', { method: 'DELETE' })
+      expect(res.status).toBe(403)
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  // POST /shifts/clock-in — Clock in to active roster
+  // -------------------------------------------------------------------------
+
+  describe('POST /shifts/clock-in', () => {
+    it('clocks in a volunteer and returns { ok: true }', async () => {
+      const now = new Date()
+      const clockInSpy = vi.fn().mockResolvedValue({
+        pubkey: 'a'.repeat(64),
+        hubId: 'hub-1',
+        startedAt: now,
+        lastHeartbeat: now,
+      })
+      const { app } = createTestApp({
+        permissions: ['shifts:set-availability'],
+        hubId: 'hub-1',
+        serviceMock: { activeShifts: { clockIn: clockInSpy } },
+      })
+
+      const res = await app.request('/shifts/clock-in', { method: 'POST' })
+      expect(res.status).toBe(200)
+      const json = await res.json()
+      expect(json).toEqual({ ok: true })
+      expect(clockInSpy).toHaveBeenCalledWith('a'.repeat(64), 'hub-1')
+    })
+
+    it('clock-in is idempotent — already-clocked-in volunteer still returns { ok: true }', async () => {
+      const now = new Date()
+      // clockIn is an upsert; calling it again just updates lastHeartbeat
+      const clockInSpy = vi.fn().mockResolvedValue({
+        pubkey: 'a'.repeat(64),
+        hubId: 'hub-1',
+        startedAt: now,
+        lastHeartbeat: now,
+      })
+      const { app } = createTestApp({
+        permissions: ['shifts:set-availability'],
+        hubId: 'hub-1',
+        serviceMock: { activeShifts: { clockIn: clockInSpy } },
+      })
+
+      // First call
+      await app.request('/shifts/clock-in', { method: 'POST' })
+      // Second call — should succeed again (upsert semantics)
+      const res = await app.request('/shifts/clock-in', { method: 'POST' })
+      expect(res.status).toBe(200)
+      expect((await res.json())).toEqual({ ok: true })
+      expect(clockInSpy).toHaveBeenCalledTimes(2)
+    })
+
+    it('requires shifts:set-availability permission', async () => {
+      const { app } = createTestApp({ permissions: ['shifts:read'] })
+      const res = await app.request('/shifts/clock-in', { method: 'POST' })
+      expect(res.status).toBe(403)
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  // POST /shifts/clock-out — Clock out of active roster
+  // -------------------------------------------------------------------------
+
+  describe('POST /shifts/clock-out', () => {
+    it('clocks out a clocked-in volunteer and returns { ok: true }', async () => {
+      const clockOutSpy = vi.fn().mockResolvedValue({ ok: true })
+      const { app } = createTestApp({
+        permissions: ['shifts:set-availability'],
+        hubId: 'hub-1',
+        serviceMock: { activeShifts: { clockOut: clockOutSpy } },
+      })
+
+      const res = await app.request('/shifts/clock-out', { method: 'POST' })
+      expect(res.status).toBe(200)
+      const json = await res.json()
+      expect(json).toEqual({ ok: true })
+      expect(clockOutSpy).toHaveBeenCalledWith('a'.repeat(64), 'hub-1')
+    })
+
+    it('requires shifts:set-availability permission', async () => {
+      const { app } = createTestApp({ permissions: ['shifts:read'] })
+      const res = await app.request('/shifts/clock-out', { method: 'POST' })
+      expect(res.status).toBe(403)
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  // POST /shifts/heartbeat — Liveness heartbeat while clocked in
+  // -------------------------------------------------------------------------
+
+  describe('POST /shifts/heartbeat', () => {
+    it('records heartbeat for a clocked-in volunteer and returns { ok: true }', async () => {
+      const now = new Date()
+      const heartbeatSpy = vi.fn().mockResolvedValue({
+        pubkey: 'a'.repeat(64),
+        hubId: 'hub-1',
+        startedAt: now,
+        lastHeartbeat: now,
+      })
+      const { app } = createTestApp({
+        permissions: ['shifts:set-availability'],
+        hubId: 'hub-1',
+        serviceMock: { activeShifts: { heartbeat: heartbeatSpy } },
+      })
+
+      const res = await app.request('/shifts/heartbeat', { method: 'POST' })
+      expect(res.status).toBe(200)
+      const json = await res.json()
+      expect(json).toEqual({ ok: true })
+      expect(heartbeatSpy).toHaveBeenCalledWith('a'.repeat(64), 'hub-1')
+    })
+
+    it('requires shifts:set-availability permission', async () => {
+      const { app } = createTestApp({ permissions: ['shifts:read'] })
+      const res = await app.request('/shifts/heartbeat', { method: 'POST' })
       expect(res.status).toBe(403)
     })
   })
