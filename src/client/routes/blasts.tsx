@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/lib/auth'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { listBlasts, deleteBlast, sendBlast, cancelBlast, getBlastStats, getBlastDeliveries, retryAllFailedDeliveries } from '@/lib/api'
 import type { Blast, BlastStats, BlastDelivery, BlastDeliveryStatus } from '@/lib/api'
 import { useToast } from '@/lib/toast'
@@ -14,6 +14,11 @@ import { SubscriberManager } from '@/components/SubscriberManager'
 import { BlastSettingsPanel } from '@/components/BlastSettingsPanel'
 import { DeliveryStatusSheet } from '@/components/blast/DeliveryStatusSheet'
 import { BlastProgressBar } from '@/components/blast/BlastProgressBar'
+import { useRelaySubscription } from '@/lib/relay/hooks'
+import { useRelayState } from '@/lib/relay/context'
+import { useConfig } from '@/lib/config'
+import { KIND_BLAST_PROGRESS, KIND_BLAST_STATUS } from '@shared/event-kinds'
+import type { LlamenosEvent } from '@/lib/relay/types'
 
 export const Route = createFileRoute('/blasts')({
   component: BlastsPage,
@@ -233,6 +238,8 @@ interface BlastDetailPanelProps {
 function BlastDetailPanel({ blast, statusColors, onSend, onCancel, onDelete }: BlastDetailPanelProps) {
   const { t } = useTranslation()
   const { toast } = useToast()
+  const { currentHubId } = useConfig()
+  const relayState = useRelayState()
   const [liveStats, setLiveStats] = useState<BlastStats | null>(null)
   const [deliveries, setDeliveries] = useState<BlastDelivery[]>([])
   const [showDeliveries, setShowDeliveries] = useState(false)
@@ -242,6 +249,7 @@ function BlastDetailPanel({ blast, statusColors, onSend, onCancel, onDelete }: B
   const [deliveryPage, setDeliveryPage] = useState(1)
   const [retryingAll, setRetryingAll] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const wsActive = relayState === 'connected'
 
   const isSending = blast.status === 'sending'
 
@@ -257,9 +265,21 @@ function BlastDetailPanel({ blast, statusColors, onSend, onCancel, onDelete }: B
     }
   }
 
-  // Live stats polling when blast is sending
+  // WS subscription for real-time blast progress events
+  const blastKinds = [KIND_BLAST_PROGRESS, KIND_BLAST_STATUS]
+  useRelaySubscription(currentHubId, blastKinds, useCallback((_kind: number, content: LlamenosEvent) => {
+    const event = content as LlamenosEvent & { blastId?: string; stats?: BlastStats; status?: string }
+    if (event.blastId !== blast.id) return
+    if (event.type === 'blast:progress' && event.stats) {
+      setLiveStats(event.stats)
+    }
+  }, [blast.id]), isSending)
+
+  // Polling fallback: 5s when sending AND WS is disconnected
   useEffect(() => {
-    if (!isSending) {
+    const shouldPoll = isSending && !wsActive
+
+    if (!shouldPoll) {
       if (pollRef.current) {
         clearInterval(pollRef.current)
         pollRef.current = null
@@ -283,7 +303,7 @@ function BlastDetailPanel({ blast, statusColors, onSend, onCancel, onDelete }: B
         pollRef.current = null
       }
     }
-  }, [blast.id, isSending])
+  }, [blast.id, isSending, wsActive])
 
   // Load deliveries when toggled
   useEffect(() => {
@@ -360,7 +380,7 @@ function BlastDetailPanel({ blast, statusColors, onSend, onCancel, onDelete }: B
         <div className="flex gap-2">
           {blast.status === 'draft' && (
             <>
-              <Button onClick={() => onSend(blast.id)}>
+              <Button data-testid="blast-send-btn" onClick={() => onSend(blast.id)}>
                 <Send className="h-4 w-4" />
                 {t('blasts.sendNow')}
               </Button>

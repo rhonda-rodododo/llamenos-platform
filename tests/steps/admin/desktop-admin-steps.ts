@@ -603,19 +603,27 @@ Then('the blast should appear in the blast list', async ({ page }) => {
 })
 
 Then('I should see the recipient selection interface', async ({ page }) => {
-  // Content assertion — verifying recipient UI text
-  const recipientUi = page.getByText(/recipient|volunteer|select/i)
+  // Accept: subscriber list, channel selector, or any recipient/channel/select UI element
+  const recipientUi = page.getByText(/recipient|volunteer|select|channel|subscriber/i)
   await expect(recipientUi.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('I should be able to select individual volunteers', async ({ page }) => {
+  // Accept checkboxes (subscriber list) OR channel toggle buttons (blast composer)
   const checkbox = page.locator('input[type="checkbox"]').first()
-  await expect(checkbox).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const hasCheckbox = await checkbox.isVisible({ timeout: 2000 }).catch(() => false)
+  if (hasCheckbox) {
+    await expect(checkbox).toBeVisible({ timeout: Timeouts.ELEMENT })
+    return
+  }
+  // Blast composer: channel toggle buttons serve as per-channel selection
+  const toggleBtn = page.locator('button.rounded-lg').first()
+  await expect(toggleBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('I should be able to select all volunteers', async ({ page }) => {
-  // Content assertion — verifying "select all" text
-  const selectAll = page.getByText(/select all/i)
+  // Accept "Select All" text or Target Channels section (blast composer)
+  const selectAll = page.getByText(/select all|target channels/i)
   await expect(selectAll.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 

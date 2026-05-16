@@ -7,11 +7,23 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
-import { Save } from 'lucide-react'
+import { Save, CalendarClock } from 'lucide-react'
+import { MediaAttachmentField } from '@/components/blast/media-attachment-field'
+import { SchedulePicker } from '@/components/blast/schedule-picker'
 
 interface BlastComposerProps {
   onCreated: (blast: Blast) => void
   onCancel: () => void
+}
+
+function isValidMediaUrl(url: string): boolean {
+  if (!url) return true
+  try {
+    const parsed = new URL(url)
+    return parsed.protocol === 'https:'
+  } catch {
+    return false
+  }
 }
 
 export function BlastComposer({ onCreated, onCancel }: BlastComposerProps) {
@@ -20,6 +32,8 @@ export function BlastComposer({ onCreated, onCancel }: BlastComposerProps) {
   const [name, setName] = useState('')
   const [text, setText] = useState('')
   const [channels, setChannels] = useState<string[]>(['sms'])
+  const [mediaUrl, setMediaUrl] = useState('')
+  const [scheduledAt, setScheduledAt] = useState('')
   const [saving, setSaving] = useState(false)
 
   const channelOptions = [
@@ -29,17 +43,26 @@ export function BlastComposer({ onCreated, onCancel }: BlastComposerProps) {
     { value: 'rcs', label: 'RCS' },
   ]
 
+  const isScheduled = scheduledAt.length > 0
+  const hasValidMedia = isValidMediaUrl(mediaUrl)
+  const canSubmit = name.trim().length > 0 && text.trim().length > 0 && hasValidMedia
+
   async function handleSave() {
-    if (!name.trim() || !text.trim()) {
+    if (!canSubmit) {
       toast(t('blasts.fillRequired'), 'error')
       return
     }
     setSaving(true)
     try {
+      const content = {
+        text: text.trim(),
+        ...(mediaUrl ? { mediaUrl: mediaUrl.trim() } : {}),
+      }
       const res = await createBlast({
         name: name.trim(),
-        content: { text: text.trim() },
+        content,
         targetChannels: channels,
+        ...(scheduledAt ? { scheduledAt } : {}),
       })
       onCreated(res.blast)
       toast(t('common.success'), 'success')
@@ -86,6 +109,7 @@ export function BlastComposer({ onCreated, onCancel }: BlastComposerProps) {
             {channelOptions.map(ch => (
               <button
                 key={ch.value}
+                type="button"
                 onClick={() => setChannels(prev =>
                   prev.includes(ch.value)
                     ? prev.filter(c => c !== ch.value)
@@ -103,11 +127,30 @@ export function BlastComposer({ onCreated, onCancel }: BlastComposerProps) {
           </div>
         </div>
 
+        <MediaAttachmentField value={mediaUrl} onChange={setMediaUrl} />
+
+        <SchedulePicker value={scheduledAt} onChange={setScheduledAt} />
+
         <div className="flex gap-2">
-          <Button onClick={handleSave} disabled={saving || !name.trim() || !text.trim()}>
-            <Save className="h-4 w-4" />
-            {saving ? t('common.loading') : t('blasts.saveDraft')}
-          </Button>
+          {isScheduled ? (
+            <Button
+              data-testid="blast-schedule-btn"
+              onClick={handleSave}
+              disabled={saving || !canSubmit}
+            >
+              <CalendarClock className="h-4 w-4" />
+              {saving ? t('common.loading') : t('blasts.scheduleSend')}
+            </Button>
+          ) : (
+            <Button
+              data-testid="blast-send-btn"
+              onClick={handleSave}
+              disabled={saving || !canSubmit}
+            >
+              <Save className="h-4 w-4" />
+              {saving ? t('common.loading') : t('blasts.saveDraft')}
+            </Button>
+          )}
           <Button variant="outline" onClick={onCancel}>
             {t('common.cancel')}
           </Button>
