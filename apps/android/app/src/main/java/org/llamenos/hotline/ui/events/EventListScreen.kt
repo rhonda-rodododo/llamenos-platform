@@ -136,8 +136,11 @@ fun EventListScreen(
             return@Scaffold
         }
 
-        // Loading initial state
-        if (uiState.cmsEnabled == null || (uiState.isLoading && uiState.events.isEmpty() && uiState.isLoadingEntityTypes)) {
+        // Loading initial state — show spinner while CMS check or entity types are in-flight
+        // and we have no events to display yet. Without the isLoadingEntityTypes check,
+        // the screen briefly flashes "events-empty" before entity types finish loading
+        // and trigger the event record fetch.
+        if (uiState.cmsEnabled == null || ((uiState.isLoading || uiState.isLoadingEntityTypes) && uiState.events.isEmpty())) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()

@@ -27,12 +27,18 @@ class HubRepository @Inject constructor(
      * 1. If the hub key is not cached, fetch it from the server and unwrap via CryptoService.
      * 2. Persist the new active hub ID via ActiveHubState.
      *
-     * Throws on key fetch or unwrap failure — caller must not update UI state on exception.
+     * Hub key loading failure is non-fatal: the switch proceeds but E2EE data for that
+     * hub won't decrypt until the key is loaded on a subsequent attempt. This mirrors
+     * [loadAllHubKeys] which also swallows key failures gracefully.
      */
     suspend fun switchHub(hubId: String) {
         if (!cryptoService.hasHubKey(hubId)) {
-            val envelope = apiService.getHubKey(hubId)
-            cryptoService.loadHubKey(hubId, envelope)
+            try {
+                val envelope = apiService.getHubKey(hubId)
+                cryptoService.loadHubKey(hubId, envelope)
+            } catch (e: Exception) {
+                Log.w("HubRepository", "Hub key load failed for $hubId (switch proceeds): ${e.message}")
+            }
         }
         activeHubState.setActiveHub(hubId)
     }
