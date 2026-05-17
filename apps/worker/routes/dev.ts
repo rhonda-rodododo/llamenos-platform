@@ -376,7 +376,7 @@ dev.post('/test-seed', async (c) => {
           'files:upload', 'files:download-own',
           'cases:create', 'cases:read-all', 'cases:update', 'cases:assign',
           'events:read', 'events:create', 'evidence:upload', 'evidence:download',
-          'hubs:read',
+          'settings:read', 'hubs:read',
         ],
       })
     } catch (e) {
