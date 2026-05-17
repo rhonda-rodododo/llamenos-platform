@@ -119,16 +119,22 @@ class HubSwitchSteps : BaseSteps() {
     fun secondHubShowsActiveIndicator() {
         // Wait for the active indicator to appear on the second hub-row.
         // Hub switching persists via DataStore which is async — give it time.
+        //
+        // Use useUnmergedTree = true because HubCard's Card has .clickable()
+        // which sets mergeDescendants = true. In the merged tree, child testTags
+        // (like hub-active-indicator) are absorbed into the Card node and
+        // onChildren().filter() returns nothing.
         composeRule.waitUntil(15_000) {
-            val hubRows = composeRule.onAllNodesWithTag("hub-row").fetchSemanticsNodes()
+            val hubRows = composeRule.onAllNodesWithTag("hub-row", useUnmergedTree = true)
+                .fetchSemanticsNodes()
             if (hubRows.size < 2) return@waitUntil false
-            composeRule.onAllNodesWithTag("hub-row")[1]
+            composeRule.onAllNodesWithTag("hub-row", useUnmergedTree = true)[1]
                 .onChildren()
                 .filter(hasTestTag("hub-active-indicator"))
                 .fetchSemanticsNodes()
                 .isNotEmpty()
         }
-        composeRule.onAllNodesWithTag("hub-row")[1]
+        composeRule.onAllNodesWithTag("hub-row", useUnmergedTree = true)[1]
             .onChildren()
             .filter(hasTestTag("hub-active-indicator"))
             .also { it[0].assertIsDisplayed() }
@@ -136,7 +142,7 @@ class HubSwitchSteps : BaseSteps() {
 
     @And("the first hub no longer shows the active indicator")
     fun firstHubNoLongerShowsActiveIndicator() {
-        val indicatorNodes = composeRule.onAllNodesWithTag("hub-row")[0]
+        val indicatorNodes = composeRule.onAllNodesWithTag("hub-row", useUnmergedTree = true)[0]
             .onChildren()
             .filter(hasTestTag("hub-active-indicator"))
             .fetchSemanticsNodes()

@@ -75,7 +75,11 @@ fun HubOnboardingFlow(
     modifier: Modifier = Modifier,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var currentStep by remember(onboardingState) {
+    // Derive initial step from onboardingState, but do NOT re-key on
+    // onboardingState changes. The local currentStep drives wizard navigation;
+    // onCompleteStep() updates onboardingState asynchronously, and re-keying
+    // on that change would reset the user back to the previous step.
+    var currentStep by remember {
         mutableStateOf(
             OnboardingStep.entries.find { it.key == onboardingState?.currentStep }
                 ?: OnboardingStep.TEMPLATE

@@ -118,8 +118,11 @@ fun EventListScreen(
         },
         modifier = modifier,
     ) { paddingValues ->
-        // CMS not enabled
-        if (uiState.cmsEnabled == false) {
+        // CMS not enabled — only show disabled state when entity types have also
+        // finished loading and returned empty. This prevents a false-positive "CMS
+        // disabled" when the settings check fails (network/auth issue) but entity
+        // types loaded successfully (proving CMS IS enabled).
+        if (uiState.cmsEnabled == false && !uiState.isLoadingEntityTypes && uiState.eventEntityTypes.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()

@@ -143,9 +143,13 @@ class EventsViewModel @Inject constructor(
                 }
                 // Now load events for the first event entity type
                 loadEvents()
-            } catch (_: Exception) {
-                _uiState.update { it.copy(isLoadingEntityTypes = false) }
-                // Entity types unavailable — likely CMS not configured
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isLoadingEntityTypes = false,
+                        error = e.message ?: "Failed to load entity types",
+                    )
+                }
             }
         }
     }
