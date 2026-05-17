@@ -47,7 +47,9 @@ class ActiveCallSteps : BaseSteps() {
         // Create a shift with this volunteer so call routing works
         val hubId = ScenarioHooks.currentHubId
         try {
-            SimulationClient.createShift(signingPubkey, hubId.ifEmpty { null })
+            val client = ScenarioHooks.apiClient
+                ?: error("TestApiClient not initialized")
+            client.createShift(signingPubkey, hubId)
             Log.d("ActiveCallSteps", "Created test shift for ${signingPubkey.take(16)}... in hub $hubId")
         } catch (e: Throwable) {
             Log.w("ActiveCallSteps", "Shift creation failed: ${e.message}")

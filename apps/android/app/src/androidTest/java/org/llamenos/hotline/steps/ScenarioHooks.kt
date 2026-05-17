@@ -12,6 +12,7 @@ import org.llamenos.hotline.crypto.CryptoService
 import org.llamenos.hotline.crypto.KeystoreService
 import org.llamenos.hotline.di.ActiveHubEntryPoint
 import org.llamenos.hotline.helpers.SimulationClient
+import org.llamenos.hotline.helpers.TestApiClient
 import org.llamenos.hotline.hub.ActiveHubState
 
 /**
@@ -31,6 +32,13 @@ class ScenarioHooks {
         private const val TAG = "ScenarioHooks"
 
         /**
+         * Fixed admin pubkey for test API client authentication.
+         * Registered as role-admin via test-secret in each scenario's hub.
+         * 64-char hex string (32 bytes) — same pattern as backend BDD tests.
+         */
+        private const val ADMIN_PUBKEY = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+        /**
          * The hub ID created for the current scenario.
          * Set in @Before(order = 1), readable by step definitions via ScenarioHooks.currentHubId.
          *
@@ -39,6 +47,15 @@ class ScenarioHooks {
          */
         @Volatile
         var currentHubId: String = ""
+            private set
+
+        /**
+         * Admin-authenticated API client for real API data seeding.
+         * Bootstrapped after hub creation in @Before(order = 1).
+         * Accessible to all step definitions via ScenarioHooks.apiClient.
+         */
+        @Volatile
+        var apiClient: TestApiClient? = null
             private set
     }
 
@@ -87,6 +104,17 @@ class ScenarioHooks {
                 if (response.id.isNotEmpty()) {
                     currentHubId = response.id
                     Log.i(TAG, "Created test hub: ${response.id} (${response.name}) [attempt $attempt]")
+                    // Bootstrap admin-authenticated API client for real API calls
+                    try {
+                        apiClient = TestApiClient.bootstrapAdmin(
+                            baseUrl = SimulationClient.hubUrl,
+                            testSecret = SimulationClient.testSecret,
+                            hubId = response.id,
+                            adminPubkey = ADMIN_PUBKEY,
+                        )
+                    } catch (e: Exception) {
+                        Log.w(TAG, "TestApiClient bootstrap failed (non-fatal): ${e.message}")
+                    }
                     return
                 } else {
                     val msg = "createTestHub returned empty ID — error: ${response.error} [attempt $attempt]"

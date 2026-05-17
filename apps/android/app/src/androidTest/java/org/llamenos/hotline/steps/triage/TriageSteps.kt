@@ -11,7 +11,6 @@ import io.cucumber.java.en.And
 import io.cucumber.java.en.Given
 import io.cucumber.java.en.Then
 import io.cucumber.java.en.When
-import org.llamenos.hotline.helpers.SimulationClient
 import org.llamenos.hotline.steps.BaseSteps
 import org.llamenos.hotline.steps.ScenarioHooks
 
@@ -29,13 +28,15 @@ class TriageSteps : BaseSteps() {
 
     @Given("triage-eligible reports exist")
     fun triageEligibleReportsExist() {
-        // Ensure CMS is set up with triage report data for this hub.
+        // Ensure CMS is set up with triage report data for this hub via real API.
         // MUST NOT swallow errors — if seeding fails, triage cards won't render
         // and subsequent steps will timeout with misleading errors.
         val hubId = ScenarioHooks.currentHubId
-        val result = SimulationClient.setupCms(hubId = hubId.ifEmpty { null })
+        val client = ScenarioHooks.apiClient
+            ?: error("TestApiClient not initialized — hub creation may have failed")
+        val result = client.setupCmsViaApi(hubId = hubId)
         check(result.ok) {
-            "setupCms for triage failed: ok=${result.ok}, error=${result.error}"
+            "setupCmsViaApi for triage failed: ok=${result.ok}, entityTypes=${result.entityTypeCount}"
         }
         Log.d("TriageSteps", "CMS setup for triage: entityTypes=${result.entityTypeCount}, record=${result.sampleRecordId}")
         iNavigateToTheTriageScreen()

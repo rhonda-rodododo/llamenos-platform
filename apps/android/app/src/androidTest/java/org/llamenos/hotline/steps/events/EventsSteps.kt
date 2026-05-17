@@ -10,7 +10,6 @@ import io.cucumber.java.en.And
 import io.cucumber.java.en.Given
 import io.cucumber.java.en.Then
 import io.cucumber.java.en.When
-import org.llamenos.hotline.helpers.SimulationClient
 import org.llamenos.hotline.steps.BaseSteps
 import org.llamenos.hotline.steps.ScenarioHooks
 
@@ -28,13 +27,15 @@ class EventsSteps : BaseSteps() {
 
     @Given("events exist in the system")
     fun eventsExistInTheSystem() {
-        // Ensure CMS is set up with event records for this hub.
+        // Ensure CMS is set up with event records for this hub via real API.
         // MUST NOT swallow errors — if seeding fails, event cards won't render
         // and subsequent steps will timeout with misleading errors.
         val hubId = ScenarioHooks.currentHubId
-        val result = SimulationClient.setupCms(hubId = hubId.ifEmpty { null })
+        val client = ScenarioHooks.apiClient
+            ?: error("TestApiClient not initialized — hub creation may have failed")
+        val result = client.setupCmsViaApi(hubId = hubId)
         check(result.ok) {
-            "setupCms failed for events: ok=${result.ok}, error=${result.error}, entityTypes=${result.entityTypeCount}"
+            "setupCmsViaApi failed for events: ok=${result.ok}, entityTypes=${result.entityTypeCount}"
         }
         Log.d("EventsSteps", "CMS setup for events: entityTypes=${result.entityTypeCount}, record=${result.sampleRecordId}")
     }

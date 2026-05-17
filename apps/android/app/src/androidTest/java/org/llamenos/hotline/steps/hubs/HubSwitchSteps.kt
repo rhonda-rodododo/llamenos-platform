@@ -18,6 +18,7 @@ import org.llamenos.hotline.LlamenosApp
 import org.llamenos.hotline.di.CryptoEntryPoint
 import org.llamenos.hotline.helpers.SimulationClient
 import org.llamenos.hotline.steps.BaseSteps
+import org.llamenos.hotline.steps.ScenarioHooks
 
 /**
  * Step definitions for hub-switch.feature scenarios.
@@ -72,11 +73,10 @@ class HubSwitchSteps : BaseSteps() {
         // envelope (avoids device-table lookup race condition — device may not be
         // registered yet or may have a stale key from a previous test run).
         val encryptionPubkey = entryPoint.cryptoService().encryptionPubkeyHex
-        val memberResult = SimulationClient.addHubMember(signingPubkey, hub2.id, encryptionPubkey)
-        Log.d("HubSwitchSteps", "Added as hub2 member: ok=${memberResult.ok}, error=${memberResult.error}")
-        check(memberResult.ok) {
-            "Adding hub2 member failed: ok=${memberResult.ok}, error=${memberResult.error}"
-        }
+        val client = ScenarioHooks.apiClient
+            ?: error("TestApiClient not initialized")
+        client.addHubMember(signingPubkey, hub2.id, encryptionPubkey)
+        Log.d("HubSwitchSteps", "Added as hub2 member via real API")
     }
 
     @Given("I am on the hub management screen")

@@ -35,16 +35,15 @@ class CaseListSteps : BaseSteps() {
     @Given("the app is launched and authenticated as admin")
     fun theAppIsLaunchedAndAuthenticatedAsAdmin() {
         val hubId = ScenarioHooks.currentHubId
+        val client = ScenarioHooks.apiClient
         Log.i("CaseListSteps", "=== theAppIsLaunchedAndAuthenticatedAsAdmin: hubId=$hubId ===")
 
-        // Phase 1: Set up CMS on backend BEFORE app launch.
-        // This enables CMS, applies jail-support template, grants the default
-        // volunteer role cases:read permission, and creates a sample record.
-        // Pass hubId so records are created in the scenario's hub (otherwise
-        // hub-scoped queries return empty results).
+        // Phase 1: Set up CMS on backend BEFORE app launch via real API.
+        // This enables CMS, grants volunteer role CMS permissions, creates entity types,
+        // and creates sample records scoped to the scenario hub.
         try {
-            val result = SimulationClient.setupCms(hubId = hubId.ifEmpty { null })
-            Log.d("CaseListSteps", "CMS setup: ok=${result.ok}, entityTypes=${result.entityTypeCount}, record=${result.sampleRecordId}")
+            val result = client?.setupCmsViaApi(hubId = hubId)
+            Log.d("CaseListSteps", "CMS setup: ok=${result?.ok}, entityTypes=${result?.entityTypeCount}, record=${result?.sampleRecordId}")
         } catch (e: Throwable) {
             Log.w("CaseListSteps", "CMS setup failed: ${e.message}")
         }
@@ -59,14 +58,13 @@ class CaseListSteps : BaseSteps() {
         val npub = readNpubFromSettings()
         if (npub != null) {
             try {
-                // promoteToAdmin accepts npub bech32 — the backend decodes it to hex
+                // promoteToAdmin — keep using test endpoint for bootstrap admin promotion
                 val promoteResult = SimulationClient.promoteToAdmin(npub)
                 Log.d("CaseListSteps", "Promote to admin: ok=${promoteResult.ok}, error=${promoteResult.error}")
 
-                // Re-run CMS setup with the pubkey so the sample record is assigned
-                // to this user AND scoped to the scenario hub
-                val cmsResult = SimulationClient.setupCms(npub, hubId = hubId.ifEmpty { null })
-                Log.d("CaseListSteps", "CMS re-setup with pubkey: ok=${cmsResult.ok}, entityTypes=${cmsResult.entityTypeCount}")
+                // Re-run CMS setup with the pubkey so records are assigned to this user
+                val cmsResult = client?.setupCmsViaApi(pubkey = npub, hubId = hubId)
+                Log.d("CaseListSteps", "CMS re-setup with pubkey: ok=${cmsResult?.ok}, entityTypes=${cmsResult?.entityTypeCount}")
             } catch (e: Throwable) {
                 Log.w("CaseListSteps", "Post-launch setup failed: ${e.message}")
             }

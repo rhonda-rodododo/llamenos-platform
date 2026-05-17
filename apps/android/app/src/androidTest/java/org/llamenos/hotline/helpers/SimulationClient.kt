@@ -183,22 +183,6 @@ object SimulationClient {
         return json.decodeFromString<StatusResponse>(responseText)
     }
 
-    // ─── Shift Management ──────────────────────────────────────────
-
-    /**
-     * Create a shift covering the current time with the given volunteer.
-     * Active call simulation requires on-shift volunteers for call routing.
-     *
-     * Corresponds to `POST /api/test-create-shift`.
-     */
-    fun createShift(pubkey: String, hubId: String? = null): StatusResponse {
-        val fields = mutableListOf("\"pubkey\":\"${escapeJson(pubkey)}\"")
-        if (hubId != null) fields.add("\"hubId\":\"${escapeJson(hubId)}\"")
-        val body = "{${fields.joinToString(",")}}"
-        val responseText = post("/api/test-create-shift", body)
-        return json.decodeFromString<StatusResponse>(responseText)
-    }
-
     // ─── Hub Management ───────────────────────────────────────────
 
     @Serializable
@@ -221,31 +205,6 @@ object SimulationClient {
         val body = """{"name":"${escapeJson(hubName)}"}"""
         val responseText = post("/api/test-create-hub", body)
         return json.decodeFromString<HubResponse>(responseText)
-    }
-
-    // ─── Hub Membership ───────────────────────────────────────────────
-
-    /**
-     * Add a pubkey as a super-admin member of an existing hub.
-     *
-     * Required for hub-switching tests: [HubRepository.switchHub] calls
-     * [ApiService.getHubKey] which is gated on hub membership. Without this,
-     * the test user cannot switch to hub2 even if they have a global super-admin role.
-     *
-     * [x25519Pubkey] is optional but recommended — if provided, the backend uses it
-     * directly to seal a real HPKE hub key envelope (avoids device-table lookup race).
-     *
-     * Corresponds to `POST /api/test-add-hub-member`.
-     */
-    fun addHubMember(pubkey: String, hubId: String, x25519Pubkey: String? = null): StatusResponse {
-        val fields = mutableListOf(
-            "\"pubkey\":\"${escapeJson(pubkey)}\"",
-            "\"hubId\":\"${escapeJson(hubId)}\"",
-        )
-        if (x25519Pubkey != null) fields.add("\"x25519Pubkey\":\"${escapeJson(x25519Pubkey)}\"")
-        val body = "{${fields.joinToString(",")}}"
-        val responseText = post("/api/test-add-hub-member", body)
-        return json.decodeFromString<StatusResponse>(responseText)
     }
 
     // ─── Identity Registration ──────────────────────────────────────
@@ -273,40 +232,6 @@ object SimulationClient {
         val body = "{${fields.joinToString(",")}}"
         val responseText = post("/api/test-register-identity", body)
         return json.decodeFromString<StatusResponse>(responseText)
-    }
-
-    // ─── CMS Setup ────────────────────────────────────────────────
-
-    /**
-     * Response from the CMS test setup endpoint.
-     */
-    @Serializable
-    data class CmsSetupResponse(
-        val ok: Boolean = false,
-        val templateId: String = "",
-        val entityTypeCount: Int = 0,
-        val sampleRecordId: String? = null,
-        val error: String? = null,
-    )
-
-    /**
-     * Set up CMS for E2E testing: enables case management, applies the
-     * jail-support template, creates a sample record, and optionally
-     * registers a pubkey as admin so the test identity can access CMS data.
-     *
-     * [hubId] scopes sample records to a specific hub so they appear in hub-scoped
-     * API queries (`/api/hubs/{hubId}/records`). Without this, records are created
-     * with empty hubId and invisible to the app.
-     *
-     * Corresponds to `POST /api/test-setup-cms`.
-     */
-    fun setupCms(pubkey: String? = null, hubId: String? = null): CmsSetupResponse {
-        val fields = mutableListOf<String>()
-        if (pubkey != null) fields.add("\"pubkey\":\"${escapeJson(pubkey)}\"")
-        if (hubId != null) fields.add("\"hubId\":\"${escapeJson(hubId)}\"")
-        val body = "{${fields.joinToString(",")}}"
-        val responseText = post("/api/test-setup-cms", body)
-        return json.decodeFromString<CmsSetupResponse>(responseText)
     }
 
     // ─── HTTP Helpers ───────────────────────────────────────────────

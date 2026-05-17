@@ -10,7 +10,6 @@ import io.cucumber.java.en.Given
 import io.cucumber.java.en.Then
 import io.cucumber.java.en.When
 import android.util.Log
-import org.llamenos.hotline.helpers.SimulationClient
 import org.llamenos.hotline.steps.BaseSteps
 import org.llamenos.hotline.steps.ScenarioHooks
 
@@ -47,14 +46,15 @@ class CaseDetailSteps : BaseSteps() {
     fun anUnassignedCaseDetailIsOpen() {
         // The assign button only renders when the current user is NOT in assignedTo.
         // The Background step's setupCms(pubkey) creates assigned records, so we
-        // need a fresh unassigned record. Call setupCms WITHOUT pubkey — the newest
+        // need a fresh unassigned record. Call setupCmsViaApi WITHOUT pubkey — the newest
         // record (sorted by createdAt DESC) will appear first in the case list.
         val hubId = ScenarioHooks.currentHubId
+        val client = ScenarioHooks.apiClient
         try {
-            SimulationClient.setupCms(hubId = hubId.ifEmpty { null })
+            client?.setupCmsViaApi(hubId = hubId)
             Log.d("CaseDetailSteps", "Created unassigned case record for hub=$hubId")
         } catch (e: Throwable) {
-            Log.w("CaseDetailSteps", "setupCms for unassigned case failed: ${e.message}")
+            Log.w("CaseDetailSteps", "setupCmsViaApi for unassigned case failed: ${e.message}")
         }
         navigateToMainScreen()
         navigateViaDashboardCard("cases-card")
