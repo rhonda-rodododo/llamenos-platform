@@ -401,7 +401,7 @@ dev.post('/test-seed', async (c) => {
 
   // ── Entity Types + Records ───────────────────────────────────────────────
   const entityTypeIds: Array<{ id: string; name: string; category: string }> = []
-  const recordIds: string[] = []
+  const recordIds: Array<{ id: string; entityTypeId: string; caseNumber?: string }> = []
 
   for (const etSpec of spec.entityTypes) {
     const tmpl = entityTypeTemplate(etSpec.template)
@@ -449,7 +449,7 @@ dev.post('/test-seed', async (c) => {
           createdBy: adminSeed,
           hubId,
         })
-        recordIds.push(record.id)
+        recordIds.push({ id: record.id, entityTypeId, caseNumber: record.caseNumber ?? undefined })
       } catch (e) {
         warnings.push(`record ${tmpl.name}[${i}]: ${e instanceof Error ? e.message : String(e)}`)
       }
@@ -457,8 +457,8 @@ dev.post('/test-seed', async (c) => {
   }
 
   // ── Report Types + Triage Reports ────────────────────────────────────────
-  const reportTypeIds: string[] = []
-  const triageReportIds: string[] = []
+  const reportTypeIds: Array<{ id: string; name: string }> = []
+  const triageReportIds: Array<{ id: string }> = []
 
   for (const rtSpec of spec.reportTypes) {
     try {
@@ -467,7 +467,7 @@ dev.post('/test-seed', async (c) => {
         description: 'BDD test report type',
         isDefault: true,
       })
-      reportTypeIds.push(reportType.id)
+      reportTypeIds.push({ id: reportType.id, name: reportType.name })
 
       // Create triage reports as conversations with report metadata
       for (let i = 0; i < rtSpec.triageReports; i++) {
@@ -483,7 +483,7 @@ dev.post('/test-seed', async (c) => {
               conversionStatus: 'pending',
             },
           })
-          triageReportIds.push(report.id)
+          triageReportIds.push({ id: report.id })
         } catch (e) {
           warnings.push(`triageReport[${i}]: ${e instanceof Error ? e.message : String(e)}`)
         }
@@ -494,7 +494,7 @@ dev.post('/test-seed', async (c) => {
   }
 
   // ── Shifts ───────────────────────────────────────────────────────────────
-  const shiftIds: string[] = []
+  const shiftIds: Array<{ id: string }> = []
 
   for (const shiftSpec of spec.shifts) {
     try {
@@ -519,14 +519,14 @@ dev.post('/test-seed', async (c) => {
         days: [currentDay],
         userPubkeys: [shiftSpec.pubkey],
       })
-      shiftIds.push(shift.id)
+      shiftIds.push({ id: shift.id })
     } catch (e) {
       warnings.push(`shift ${shiftSpec.pubkey.slice(0, 8)}...: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
 
   // ── Contacts ─────────────────────────────────────────────────────────────
-  const contactIds: string[] = []
+  const contactIds: Array<{ id: string }> = []
   const dummyEnvelope = { pubkey: adminSeed, ct: 'a'.repeat(64), enc: adminSeed }
 
   for (const contactSpec of spec.contacts) {
@@ -538,7 +538,7 @@ dev.post('/test-seed', async (c) => {
         summaryEnvelopes: [dummyEnvelope],
         contactTypeHash: contactSpec.contactType,
       })
-      contactIds.push(contact.id)
+      contactIds.push({ id: contact.id })
     } catch (e) {
       warnings.push(`contact ${contactSpec.displayName}: ${e instanceof Error ? e.message : String(e)}`)
     }
