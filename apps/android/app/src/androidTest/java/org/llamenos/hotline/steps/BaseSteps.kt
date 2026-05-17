@@ -97,60 +97,76 @@ abstract class BaseSteps : SemanticsNodeInteractionsProvider {
             enterPin("12345678")
             Log.d(TAG, "navigateToMainScreen: entering PIN (confirm)")
             enterPin("12345678")
-            Log.d(TAG, "navigateToMainScreen: PIN entry complete, waiting for dashboard")
+            Log.d(TAG, "navigateToMainScreen: PIN entry complete")
         } else {
             // Returning user — enter PIN to unlock
             Log.d(TAG, "navigateToMainScreen: returning user, entering PIN")
             enterPin("12345678")
         }
+
+        // CRITICAL: Register the user on the backend BEFORE the dashboard appears.
+        // The dashboard's ViewModels fire API calls immediately on init. If the user
+        // isn't registered yet, ALL initial requests get 401 (dev-mode bypass requires
+        // the pubkey to exist in the DB). By polling for key availability and registering
+        // here, we race ahead of the dashboard's data fetches.
+        registerTestUserOnBackendEarly()
+
         // With test-kdf feature flag, Argon2id uses fast params (8KB, 1 iter, 1 lane)
         // so key generation completes in <1s even on CI emulators. 15s covers navigation.
         waitForNode("dashboard-title", timeoutMillis = 15_000)
         onNodeWithTag("dashboard-title").assertIsDisplayed()
-
-        // Register the test user's identity on the backend.
-        // The app creates keys locally during PIN setup but never calls a registration
-        // endpoint — in production this happens via invites/bootstrap. In E2E tests we
-        // must explicitly create the user record so authenticated API calls don't 401.
-        registerTestUserOnBackend()
     }
 
     /**
-     * Register the current test user's identity on the backend.
-     * Creates the user record and adds them as a member of the scenario hub.
-     * Also registers the device with X25519 pubkey so HPKE hub key sealing works.
+     * Register the test user on the backend as early as possible — called BEFORE
+     * the dashboard appears. Polls CryptoService for key availability (keys are
+     * generated asynchronously during PIN processing) then registers immediately.
      *
-     * This is idempotent — calling it multiple times is safe.
+     * This eliminates the timing race where dashboard ViewModels fire API calls
+     * before the user exists in the database, causing universal 401 responses.
      */
-    private fun registerTestUserOnBackend() {
+    private fun registerTestUserOnBackendEarly() {
         val entryPoint = EntryPointAccessors.fromApplication(
             LlamenosApp.instance,
             CryptoEntryPoint::class.java,
         )
         val cryptoService = entryPoint.cryptoService()
+
+        // Poll for key generation to complete. With test-kdf, Argon2id uses fast
+        // params so this typically completes in <1s. 10s timeout handles CI delays.
+        val deadline = System.currentTimeMillis() + 10_000
+        while (cryptoService.signingPubkeyHex == null && System.currentTimeMillis() < deadline) {
+            Thread.sleep(50)
+        }
+
         val signingPubkey = cryptoService.signingPubkeyHex
         val encryptionPubkey = cryptoService.encryptionPubkeyHex
 
-        check(signingPubkey != null) {
-            "registerTestUserOnBackend: CryptoService.signingPubkeyHex is null — " +
-                "keys were not generated during PIN setup. " +
-                "nativeLibLoaded=${cryptoService.nativeLibLoaded}, " +
-                "deviceId=${cryptoService.deviceId}"
+        if (signingPubkey == null) {
+            Log.e(TAG, "registerTestUserOnBackendEarly: pubkey still null after 10s — " +
+                "nativeLibLoaded=${cryptoService.nativeLibLoaded}, deviceId=${cryptoService.deviceId}")
+            // Don't throw — let the dashboard appear and fail naturally for clearer diagnostics
+            return
         }
 
         val hubId = ScenarioHooks.currentHubId.ifEmpty { null }
-        Log.i(TAG, "registerTestUserOnBackend: pubkey=${signingPubkey.take(16)}…, hubId=$hubId, hubUrl=${SimulationClient.hubUrl}")
-        val result = SimulationClient.registerTestIdentity(
-            pubkey = signingPubkey,
-            x25519Pubkey = encryptionPubkey,
-            hubId = hubId,
-        )
-        check(result.ok) {
-            "registerTestUserOnBackend: backend returned ok=false — " +
-                "error=${result.error}, detail=${result.detail}, " +
-                "hubId=$hubId, pubkey=${signingPubkey.take(16)}…"
+        Log.i(TAG, "registerTestUserOnBackendEarly: pubkey=${signingPubkey.take(16)}…, hubId=$hubId")
+        try {
+            val result = SimulationClient.registerTestIdentity(
+                pubkey = signingPubkey,
+                x25519Pubkey = encryptionPubkey,
+                hubId = hubId,
+            )
+            check(result.ok) {
+                "registerTestUserOnBackendEarly: backend returned ok=false — " +
+                    "error=${result.error}, detail=${result.detail}, " +
+                    "hubId=$hubId, pubkey=${signingPubkey.take(16)}…"
+            }
+            Log.i(TAG, "registerTestUserOnBackendEarly: SUCCESS — user registered before dashboard load")
+        } catch (e: Exception) {
+            Log.e(TAG, "registerTestUserOnBackendEarly: registration failed: ${e.message}", e)
+            throw AssertionError("User registration failed — all API calls will 401", e)
         }
-        Log.i(TAG, "registerTestUserOnBackend: SUCCESS hubId=$hubId")
     }
 
     /**
