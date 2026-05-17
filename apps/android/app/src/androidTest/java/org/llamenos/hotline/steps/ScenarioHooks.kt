@@ -12,6 +12,7 @@ import org.llamenos.hotline.crypto.CryptoService
 import org.llamenos.hotline.crypto.KeystoreService
 import org.llamenos.hotline.di.ActiveHubEntryPoint
 import org.llamenos.hotline.helpers.SimulationClient
+import org.llamenos.hotline.helpers.TestApiClient
 import org.llamenos.hotline.hub.ActiveHubState
 
 /**
@@ -39,6 +40,16 @@ class ScenarioHooks {
          */
         @Volatile
         var currentHubId: String = ""
+            private set
+
+        /**
+         * Admin seed for test seeding (used in SeedSpec.adminSeed).
+         * 64-char hex — matches ADMIN_SEED in tests/api-helpers.ts.
+         */
+        const val ADMIN_SEED = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+        @Volatile
+        var apiClient: TestApiClient? = null
             private set
     }
 
@@ -87,6 +98,12 @@ class ScenarioHooks {
                 if (response.id.isNotEmpty()) {
                     currentHubId = response.id
                     Log.i(TAG, "Created test hub: ${response.id} (${response.name}) [attempt $attempt]")
+
+                    // Create thin API client (uses X-Test-Secret, no admin bootstrap needed)
+                    apiClient = TestApiClient(
+                        baseUrl = SimulationClient.hubUrl,
+                        testSecret = SimulationClient.testSecret,
+                    )
                     return
                 } else {
                     val msg = "createTestHub returned empty ID — error: ${response.error} [attempt $attempt]"
