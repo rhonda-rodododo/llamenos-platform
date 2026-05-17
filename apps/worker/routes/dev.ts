@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { z } from 'zod'
 import type { AppEnv } from '../types'
 import type { Hub, MessagingChannelType } from '@shared/types'
 import { hashPhone } from '../lib/crypto'
@@ -233,6 +234,325 @@ dev.post('/test-create-shift', async (c) => {
     const msg = e instanceof Error ? e.message : 'Failed to create shift'
     return c.json({ ok: false, error: msg })
   }
+})
+
+// ─── Declarative Test Seeding (cross-platform E2E helper) ─────────────────
+// Single endpoint that creates all test data from a declarative spec.
+// Replaces per-platform reimplementations (TestApiClient.kt, etc.)
+
+const seedEntityTypeSchema = z.object({
+  template: z.enum(['arrest_case', 'protest_event']),
+  records: z.number().int().min(0).max(50).optional().default(0),
+  assignTo: z.array(z.string()).optional().default([]),
+})
+
+const seedReportTypeSchema = z.object({
+  template: z.enum(['general_report']),
+  triageReports: z.number().int().min(0).max(50).optional().default(0),
+})
+
+const seedShiftSchema = z.object({
+  pubkey: z.string().min(64).max(64),
+  allDay: z.boolean().optional().default(true),
+})
+
+const seedMemberSchema = z.object({
+  pubkey: z.string().min(64).max(64),
+  roleIds: z.array(z.string()).optional().default(['role-volunteer']),
+})
+
+const seedContactSchema = z.object({
+  displayName: z.string().min(1),
+  contactType: z.string().optional().default('person'),
+})
+
+const seedSpecSchema = z.object({
+  hubId: z.string().uuid(),
+  adminSeed: z.string().length(64).regex(/^[0-9a-f]+$/),
+  permissions: z.object({
+    grantVolunteerCms: z.boolean().optional().default(false),
+    enableCaseManagement: z.boolean().optional().default(false),
+  }).optional().default({ grantVolunteerCms: false, enableCaseManagement: false }),
+  entityTypes: z.array(seedEntityTypeSchema).optional().default([]),
+  reportTypes: z.array(seedReportTypeSchema).optional().default([]),
+  shifts: z.array(seedShiftSchema).optional().default([]),
+  members: z.array(seedMemberSchema).optional().default([]),
+  contacts: z.array(seedContactSchema).optional().default([]),
+})
+
+function entityTypeTemplate(name: 'arrest_case' | 'protest_event') {
+  if (name === 'arrest_case') {
+    return {
+      id: crypto.randomUUID(),
+      name: 'arrest_case',
+      label: 'Arrest Case',
+      labelPlural: 'Arrest Cases',
+      description: 'BDD test entity type',
+      category: 'case' as const,
+      color: '#ef4444',
+      statuses: [
+        { value: 'reported', label: 'Reported', color: '#f59e0b', order: 1 },
+        { value: 'confirmed', label: 'Confirmed', color: '#3b82f6', order: 2 },
+        { value: 'in_custody', label: 'In Custody', color: '#ef4444', order: 3 },
+        { value: 'released', label: 'Released', color: '#22c55e', order: 4 },
+        { value: 'case_closed', label: 'Case Closed', color: '#6b7280', order: 5, isClosed: true },
+      ],
+      defaultStatus: 'reported',
+      closedStatuses: ['case_closed'],
+      fields: [
+        { id: crypto.randomUUID(), name: 'arrest_datetime', label: 'Arrest Date/Time', type: 'date', required: true, order: 1, accessLevel: 'all', indexable: false, indexType: 'none', visibleToUsers: true, editableByUsers: true, hubEditable: true },
+        { id: crypto.randomUUID(), name: 'location', label: 'Location', type: 'text', required: false, order: 2, accessLevel: 'all', indexable: false, indexType: 'none', visibleToUsers: true, editableByUsers: true, hubEditable: true },
+        { id: crypto.randomUUID(), name: 'charges', label: 'Charges', type: 'textarea', required: false, order: 3, accessLevel: 'all', indexable: false, indexType: 'none', visibleToUsers: true, editableByUsers: true, hubEditable: true },
+      ],
+      numberPrefix: 'JS',
+      numberingEnabled: true,
+    }
+  }
+  return {
+    id: crypto.randomUUID(),
+    name: 'protest_event',
+    label: 'Protest Event',
+    labelPlural: 'Protest Events',
+    description: 'BDD test event entity type',
+    category: 'event' as const,
+    color: '#3b82f6',
+    statuses: [
+      { value: 'planned', label: 'Planned', color: '#f59e0b', order: 1 },
+      { value: 'active', label: 'Active', color: '#22c55e', order: 2 },
+      { value: 'completed', label: 'Completed', color: '#6b7280', order: 3, isClosed: true },
+    ],
+    defaultStatus: 'planned',
+    closedStatuses: ['completed'],
+    fields: [
+      { id: crypto.randomUUID(), name: 'event_date', label: 'Event Date', type: 'date', required: true, order: 1, accessLevel: 'all', indexable: false, indexType: 'none', visibleToUsers: true, editableByUsers: true, hubEditable: true },
+      { id: crypto.randomUUID(), name: 'location', label: 'Location', type: 'text', required: false, order: 2, accessLevel: 'all', indexable: false, indexType: 'none', visibleToUsers: true, editableByUsers: true, hubEditable: true },
+    ],
+    numberPrefix: 'EVT',
+    numberingEnabled: true,
+  }
+}
+
+dev.post('/test-seed', async (c) => {
+  if (c.env.ENVIRONMENT !== 'development') {
+    return c.json({ error: 'Not Found' }, 404)
+  }
+  if (!checkResetSecret(c)) {
+    return c.json({ error: 'Not Found' }, 404)
+  }
+
+  const rawBody = await c.req.json().catch(() => ({}))
+  const parsed = seedSpecSchema.safeParse(rawBody)
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid seed spec', details: parsed.error.issues }, 400)
+  }
+  const spec = parsed.data
+  const { hubId, adminSeed } = spec
+  const services = c.get('services')
+  const warnings: string[] = []
+
+  // Ensure default roles/settings exist (CI fresh database)
+  await services.settings.ensureInit({ ENVIRONMENT: c.env.ENVIRONMENT })
+
+  // ── Permissions ──────────────────────────────────────────────────────────
+  if (spec.permissions.enableCaseManagement) {
+    try {
+      await services.settings.setCaseManagementEnabled({ enabled: true }, hubId)
+    } catch (e) {
+      warnings.push(`setCaseManagementEnabled: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
+  if (spec.permissions.grantVolunteerCms) {
+    try {
+      await services.settings.updateRole('role-volunteer', {
+        permissions: [
+          'calls:answer', 'calls:read-active',
+          'notes:create', 'notes:read-own', 'notes:update-own', 'notes:reply',
+          'conversations:claim', 'conversations:send', 'conversations:read-assigned',
+          'conversations:claim-sms', 'conversations:claim-whatsapp',
+          'conversations:claim-signal', 'conversations:claim-rcs', 'conversations:claim-web',
+          'shifts:read-own', 'bans:report',
+          'reports:read-assigned', 'reports:send-message',
+          'files:upload', 'files:download-own',
+          'cases:create', 'cases:read-all', 'cases:update', 'cases:assign',
+          'events:read', 'events:create', 'evidence:upload', 'evidence:download',
+          'hubs:read',
+        ],
+      })
+    } catch (e) {
+      warnings.push(`grantVolunteerCms: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
+  // ── Members ──────────────────────────────────────────────────────────────
+  const memberIds: Array<{ pubkey: string }> = []
+  for (const m of spec.members) {
+    try {
+      await services.identity.setHubRole({
+        pubkey: m.pubkey,
+        hubId,
+        roleIds: m.roleIds,
+      })
+      memberIds.push({ pubkey: m.pubkey })
+    } catch (e) {
+      warnings.push(`member ${m.pubkey.slice(0, 8)}...: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
+  // ── Entity Types + Records ───────────────────────────────────────────────
+  const entityTypeIds: Array<{ id: string; name: string; category: string }> = []
+  const recordIds: string[] = []
+
+  for (const etSpec of spec.entityTypes) {
+    const tmpl = entityTypeTemplate(etSpec.template)
+    let entityTypeId: string
+
+    try {
+      const created = await services.settings.createEntityType({ ...tmpl, hubId })
+      entityTypeId = created.id
+    } catch (e) {
+      // If already exists (409), look it up
+      if (e instanceof Error && e.message.includes('already exists')) {
+        const { entityTypes } = await services.settings.getEntityTypes(hubId)
+        const existing = entityTypes.find(et => et.name === tmpl.name)
+        if (existing) {
+          entityTypeId = existing.id
+        } else {
+          warnings.push(`entityType ${tmpl.name}: already exists but not found on lookup`)
+          continue
+        }
+      } else {
+        warnings.push(`entityType ${tmpl.name}: ${e instanceof Error ? e.message : String(e)}`)
+        continue
+      }
+    }
+
+    entityTypeIds.push({ id: entityTypeId, name: tmpl.name, category: tmpl.category })
+
+    // Create records for this entity type
+    const dummyEnvelope = { pubkey: adminSeed, ct: 'a'.repeat(64), enc: adminSeed }
+    for (let i = 0; i < etSpec.records; i++) {
+      try {
+        const isEvent = tmpl.category === 'event'
+        const record = await services.cases.create({
+          entityTypeId,
+          statusHash: tmpl.defaultStatus,
+          assignedTo: etSpec.assignTo,
+          blindIndexes: {},
+          encryptedSummary: btoa(isEvent
+            ? `{"title":"Test Event ${i + 1}","summary":"Seeded event"}`
+            : `{"title":"Test Case ${i + 1}","summary":"Seeded case"}`),
+          summaryEnvelopes: [dummyEnvelope],
+          createdBy: adminSeed,
+          hubId,
+        })
+        recordIds.push(record.id)
+      } catch (e) {
+        warnings.push(`record ${tmpl.name}[${i}]: ${e instanceof Error ? e.message : String(e)}`)
+      }
+    }
+  }
+
+  // ── Report Types + Triage Reports ────────────────────────────────────────
+  const reportTypeIds: string[] = []
+  const triageReportIds: string[] = []
+
+  for (const rtSpec of spec.reportTypes) {
+    try {
+      const reportType = await services.settings.createReportType({
+        name: rtSpec.template === 'general_report' ? 'General Report' : rtSpec.template,
+        description: 'BDD test report type',
+        isDefault: true,
+      })
+      reportTypeIds.push(reportType.id)
+
+      // Create triage reports as conversations with report metadata
+      for (let i = 0; i < rtSpec.triageReports; i++) {
+        try {
+          const report = await services.conversations.create({
+            hubId,
+            channelType: 'web',
+            status: 'waiting',
+            metadata: {
+              type: 'report',
+              reportTitle: `Test Triage Report ${i + 1}`,
+              reportCategory: 'general',
+              conversionStatus: 'pending',
+            },
+          })
+          triageReportIds.push(report.id)
+        } catch (e) {
+          warnings.push(`triageReport[${i}]: ${e instanceof Error ? e.message : String(e)}`)
+        }
+      }
+    } catch (e) {
+      warnings.push(`reportType ${rtSpec.template}: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
+  // ── Shifts ───────────────────────────────────────────────────────────────
+  const shiftIds: string[] = []
+
+  for (const shiftSpec of spec.shifts) {
+    try {
+      const now = new Date()
+      const currentDay = now.getUTCDay()
+      let startTime: string
+      let endTime: string
+
+      if (shiftSpec.allDay) {
+        startTime = '00:00'
+        endTime = '23:59'
+      } else {
+        const hour = now.getUTCHours()
+        startTime = `${String(Math.max(0, hour - 1)).padStart(2, '0')}:00`
+        endTime = `${String(Math.min(23, hour + 1)).padStart(2, '0')}:59`
+      }
+
+      const shift = await services.shifts.create(hubId, {
+        encryptedName: btoa('Seeded Shift'),
+        startTime,
+        endTime,
+        days: [currentDay],
+        userPubkeys: [shiftSpec.pubkey],
+      })
+      shiftIds.push(shift.id)
+    } catch (e) {
+      warnings.push(`shift ${shiftSpec.pubkey.slice(0, 8)}...: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
+  // ── Contacts ─────────────────────────────────────────────────────────────
+  const contactIds: string[] = []
+  const dummyEnvelope = { pubkey: adminSeed, ct: 'a'.repeat(64), enc: adminSeed }
+
+  for (const contactSpec of spec.contacts) {
+    try {
+      const contact = await services.contacts.create({
+        hubId,
+        identifierHashes: [contactSpec.displayName.toLowerCase().replace(/\s+/g, '-')],
+        encryptedSummary: btoa(JSON.stringify({ displayName: contactSpec.displayName })),
+        summaryEnvelopes: [dummyEnvelope],
+        contactTypeHash: contactSpec.contactType,
+      })
+      contactIds.push(contact.id)
+    } catch (e) {
+      warnings.push(`contact ${contactSpec.displayName}: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
+  return c.json({
+    ok: true,
+    hubId,
+    entityTypes: entityTypeIds,
+    records: recordIds,
+    reportTypes: reportTypeIds,
+    triageReports: triageReportIds,
+    shifts: shiftIds,
+    members: memberIds,
+    contacts: contactIds,
+    warnings: warnings.length > 0 ? warnings : undefined,
+  })
 })
 
 // ─── CMS Test Setup (E2E test helpers) ──────────────────────────────────────
