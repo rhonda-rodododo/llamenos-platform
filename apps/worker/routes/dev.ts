@@ -460,10 +460,17 @@ dev.post('/test-seed', async (c) => {
 
   for (const rtSpec of spec.reportTypes) {
     try {
-      const reportType = await services.settings.createReportType({
-        name: rtSpec.template === 'general_report' ? 'General Report' : rtSpec.template,
+      const reportTypeName = rtSpec.template === 'general_report' ? 'General Report' : rtSpec.template
+      const reportType = await services.settings.createCmsReportType({
+        hubId,
+        name: reportTypeName,
+        label: reportTypeName,
         description: 'BDD test report type',
-        isDefault: true,
+        allowCaseConversion: true,
+        fields: [],
+        statuses: [],
+        defaultStatus: '',
+        closedStatuses: [],
       })
       reportTypeIds.push({ id: reportType.id, name: reportType.name })
 
@@ -478,6 +485,7 @@ dev.post('/test-seed', async (c) => {
               type: 'report',
               reportTitle: `Test Triage Report ${i + 1}`,
               reportCategory: 'general',
+              reportTypeId: reportType.id,
               conversionStatus: 'pending',
             },
           })
