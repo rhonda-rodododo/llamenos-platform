@@ -58,7 +58,7 @@ class TestApiClient(
             SimulationClient.registerTestIdentity(
                 pubkey = adminPubkey,
                 hubId = hubId,
-                role = "role-admin",
+                role = "role-super-admin",
             )
 
             client.adminPubkeyHex = adminPubkey

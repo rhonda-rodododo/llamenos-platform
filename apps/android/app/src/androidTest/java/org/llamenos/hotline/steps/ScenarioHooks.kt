@@ -33,7 +33,7 @@ class ScenarioHooks {
 
         /**
          * Fixed admin pubkey for test API client authentication.
-         * Registered as role-admin via test-secret in each scenario's hub.
+         * Registered as role-super-admin via test-secret in each scenario's hub.
          * 64-char hex string (32 bytes) — same pattern as backend BDD tests.
          */
         private const val ADMIN_PUBKEY = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
