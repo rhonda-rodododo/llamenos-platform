@@ -41,32 +41,16 @@ run_codegen_guard() {
     errors+=("i18n codegen failed")
   fi
 
-  # Step 3: Check for uncommitted changes in generated files
-  local stale_files=()
-  local generated_dirs=(
-    "apps/ios/Sources/Generated"
-    "apps/android/app/src/main/java/org/llamenos/app/generated"
-    "apps/ios/Sources/Resources"
-    "apps/android/app/src/main/res/values"
+  # Step 3: Verify generated output exists (not tracked — regenerated on the fly)
+  local missing=()
+  local expected_dirs=(
+    "packages/protocol/generated/swift"
+    "packages/protocol/generated/kotlin"
   )
 
-  for dir in "${generated_dirs[@]}"; do
-    if [[ -d "$dir" ]]; then
-      local changed
-      changed="$(git diff --name-only -- "$dir" 2>/dev/null || true)"
-      if [[ -n "$changed" ]]; then
-        while IFS= read -r f; do
-          stale_files+=("$f")
-        done <<< "$changed"
-      fi
-      # Also check untracked files
-      local untracked
-      untracked="$(git ls-files --others --exclude-standard -- "$dir" 2>/dev/null || true)"
-      if [[ -n "$untracked" ]]; then
-        while IFS= read -r f; do
-          stale_files+=("$f (untracked)")
-        done <<< "$untracked"
-      fi
+  for dir in "${expected_dirs[@]}"; do
+    if [[ ! -d "$dir" ]]; then
+      missing+=("$dir")
     fi
   done
 
@@ -83,15 +67,13 @@ run_codegen_guard() {
     return 1
   fi
 
-  if [[ ${#stale_files[@]} -gt 0 ]]; then
-    echo -e "\n${YELLOW}WARNING: Generated files differ from committed versions${RESET}"
-    echo -e "${DIM}The following files were modified by codegen:${RESET}"
-    for f in "${stale_files[@]}"; do
-      echo -e "  ${YELLOW}*${RESET} $f"
+  if [[ ${#missing[@]} -gt 0 ]]; then
+    echo -e "\n${RED}CODEGEN GUARD FAILED: expected output directories missing${RESET}"
+    for d in "${missing[@]}"; do
+      echo -e "  ${RED}*${RESET} $d"
     done
-    echo ""
-    echo -e "${DIM}This means codegen output is stale in git. Tests will use the freshly generated files.${RESET}"
-    echo -e "${DIM}Consider committing the updated generated files.${RESET}"
+    echo -e "${DIM}Generated files are gitignored — run 'bun run codegen' and 'bun run i18n:codegen' to regenerate.${RESET}"
+    return 1
   fi
 
   echo -e "  ${GREEN}Codegen guard passed${RESET} (${duration}s)"
