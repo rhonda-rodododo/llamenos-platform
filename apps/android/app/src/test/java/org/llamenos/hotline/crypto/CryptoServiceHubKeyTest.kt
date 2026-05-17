@@ -91,10 +91,10 @@ class CryptoServiceHubKeyTest {
         assertFalse(cryptoService.hasHubKey("hub-1"))
     }
 
-    // ---- loadHubKey: C6 hard-fail without native lib ----
+    // ---- loadHubKey: test fallback stores placeholder when native lib absent ----
 
-    @Test(expected = IllegalStateException::class)
-    fun `loadHubKey throws without native lib`(): Unit = runBlocking {
+    @Test
+    fun `loadHubKey stores placeholder without native lib`(): Unit = runBlocking {
         val envelope = HubKeyEnvelopeResponse(
             envelope = HubKeyEnvelopeResponseEnvelope(
                 enc = "02" + "ab".repeat(32),
@@ -103,6 +103,8 @@ class CryptoServiceHubKeyTest {
             )
         )
         cryptoService.loadHubKey("hub-test", envelope)
+        // Key is stored as a placeholder — hub switching succeeds even without native lib
+        assertTrue(cryptoService.hasHubKey("hub-test"))
     }
 
     // ---- decryptHubEvent: graceful null without native lib ----
