@@ -5,6 +5,9 @@ import { hashPhone } from '../lib/crypto'
 import { publishEvent } from '../lib/ws-events'
 import { KIND_CALL_RING, KIND_CALL_UPDATE, KIND_CALL_VOICEMAIL, KIND_MESSAGE_NEW, KIND_PRESENCE_UPDATE } from '@shared/event-kinds'
 import { getTestPushLog, clearTestPushLog } from '../lib/push-dispatch'
+import { hpkeSeal, randomBytes } from '@llamenos/crypto/ffi'
+import { hexToBytes, bytesToHex } from '@shared/encoding'
+import { LABEL_HUB_KEY_WRAP } from '@shared/crypto-labels'
 
 /**
  * Decode a pubkey (hex only — npub1 bech32 encoding is no longer supported).
@@ -287,6 +290,10 @@ dev.post('/test-setup-cms', async (c) => {
         'events:read', 'events:create', 'evidence:upload', 'evidence:download',
         // Hub permissions: volunteers need hubs:read to access their hub key envelope (CRIT-H1)
         'hubs:read',
+        // Settings permissions: needed for CMS enabled check and entity type listing
+        'settings:read',
+        // Hub onboarding permissions: needed for communications setup E2E tests
+        'hubs:configure', 'telephony:view-providers',
       ],
     })
     roleOk = true
@@ -845,18 +852,36 @@ dev.post('/test-add-hub-member', async (c) => {
       roleIds: ['role-super-admin'],
     })
 
-    // Seed a dummy hub key envelope so getHubKey doesn't 404.
-    // In test builds, Android uses mock crypto that accepts any envelope values.
-    // Without this, HubRepository.switchHub() throws because GET /hubs/:id/key
-    // returns 404 "No key envelope for this user".
+    // Seed a real HPKE-sealed hub key envelope so getHubKey returns a decryptable
+    // envelope. The Android CryptoService uses real HPKE decryption via native FFI,
+    // so random bytes would fail at mobileHpkeOpenKey().
     try {
-      await services.settings.setHubKeyEnvelopes(body.hubId, {
-        envelopes: [{
-          pubkey,
-          enc: Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64'),
-          ct: Buffer.from(crypto.getRandomValues(new Uint8Array(48))).toString('base64'),
-        }],
-      })
+      // Look up the user's X25519 encryption pubkey from their device record
+      const userDevices = await services.identity.listDevices(pubkey)
+      const x25519Pubkey = userDevices.find(d => d.x25519Pubkey)?.x25519Pubkey
+      if (x25519Pubkey) {
+        // Create a real HPKE envelope: seal a random 32-byte hub key to the device's X25519 pubkey
+        const hubKey = randomBytes(32)
+        const labelBytes = new TextEncoder().encode(LABEL_HUB_KEY_WRAP)
+        const aad = new Uint8Array(0)
+        const sealed = hpkeSeal(hexToBytes(x25519Pubkey), hubKey, labelBytes, aad)
+        await services.settings.setHubKeyEnvelopes(body.hubId, {
+          envelopes: [{
+            pubkey,
+            enc: bytesToHex(sealed.subarray(0, 32)),
+            ct: bytesToHex(sealed.subarray(32)),
+          }],
+        })
+      } else {
+        // Fallback: device hasn't registered X25519 key yet — seed placeholder
+        await services.settings.setHubKeyEnvelopes(body.hubId, {
+          envelopes: [{
+            pubkey,
+            enc: bytesToHex(randomBytes(32)),
+            ct: bytesToHex(randomBytes(48)),
+          }],
+        })
+      }
     } catch {
       // Non-fatal: hub key seeding failed but membership was set
     }

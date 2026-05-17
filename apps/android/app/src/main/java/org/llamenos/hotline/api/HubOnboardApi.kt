@@ -37,16 +37,31 @@ data class CompleteStepRequest(
     val data: Map<String, String> = emptyMap(),
 )
 
+@Serializable
+data class OnboardingResponse(
+    val onboarding: HubOnboardingState,
+)
+
+@Serializable
+data class OnboardingStatusResponse(
+    val onboarding: HubOnboardingState? = null,
+)
+
+@Serializable
+data class ProviderStatusResponse(
+    val status: HubSetupStatus,
+)
+
 /**
  * Repository for hub onboarding and communications management.
  *
- * Wraps the hub self-service API endpoints:
+ * Wraps the hub self-service API endpoints (all under /api/hubs/:hubId/onboard):
  * - GET/POST /api/hubs/:hubId/onboard — start/resume onboarding
  * - GET /api/hubs/:hubId/onboard/status — get progress
  * - PUT /api/hubs/:hubId/onboard/step — complete step
- * - GET /api/hubs/:hubId/provider-status — provider status
- * - GET /api/hubs/:hubId/usage — usage stats
- * - PUT /api/hubs/:hubId/channels — enable/disable channels
+ * - GET /api/hubs/:hubId/onboard/provider-status — provider status
+ * - GET /api/hubs/:hubId/onboard/usage — usage stats
+ * - PUT /api/hubs/:hubId/onboard/channels — enable/disable channels
  * - GET /api/provider-templates — list templates
  */
 @Singleton
@@ -69,21 +84,24 @@ class HubOnboardApi @Inject constructor(
             val body = buildMap<String, Any?> {
                 if (templateId != null) put("templateId", templateId)
             }
-            apiService.request("POST", "/api/hubs/$hubId/onboard", body)
+            val response: OnboardingResponse = apiService.request("POST", "/api/hubs/$hubId/onboard", body)
+            response.onboarding
         }
     }
 
     suspend fun getOnboarding(): Result<HubOnboardingState> = withContext(Dispatchers.IO) {
         runCatching {
             val hubId = requireHubId()
-            apiService.request("GET", "/api/hubs/$hubId/onboard")
+            val response: OnboardingResponse = apiService.request("GET", "/api/hubs/$hubId/onboard")
+            response.onboarding
         }
     }
 
-    suspend fun getOnboardingStatus(): Result<HubSetupStatus> = withContext(Dispatchers.IO) {
+    suspend fun getOnboardingStatus(): Result<HubOnboardingState?> = withContext(Dispatchers.IO) {
         runCatching {
             val hubId = requireHubId()
-            apiService.request("GET", "/api/hubs/$hubId/onboard/status")
+            val response: OnboardingStatusResponse = apiService.request("GET", "/api/hubs/$hubId/onboard/status")
+            response.onboarding
         }
     }
 
@@ -93,11 +111,12 @@ class HubOnboardApi @Inject constructor(
     ): Result<HubOnboardingState> = withContext(Dispatchers.IO) {
         runCatching {
             val hubId = requireHubId()
-            apiService.request(
+            val response: OnboardingResponse = apiService.request(
                 "PUT",
                 "/api/hubs/$hubId/onboard/step",
                 CompleteStepRequest(step = step, data = data),
             )
+            response.onboarding
         }
     }
 
@@ -106,14 +125,15 @@ class HubOnboardApi @Inject constructor(
     suspend fun getProviderStatus(): Result<HubSetupStatus> = withContext(Dispatchers.IO) {
         runCatching {
             val hubId = requireHubId()
-            apiService.request("GET", "/api/hubs/$hubId/provider-status")
+            val response: ProviderStatusResponse = apiService.request("GET", "/api/hubs/$hubId/onboard/provider-status")
+            response.status
         }
     }
 
     suspend fun getUsage(): Result<HubUsageResponse> = withContext(Dispatchers.IO) {
         runCatching {
             val hubId = requireHubId()
-            apiService.request("GET", "/api/hubs/$hubId/usage")
+            apiService.request("GET", "/api/hubs/$hubId/onboard/usage")
         }
     }
 
@@ -126,7 +146,7 @@ class HubOnboardApi @Inject constructor(
             val hubId = requireHubId()
             apiService.requestNoContent(
                 "PUT",
-                "/api/hubs/$hubId/channels",
+                "/api/hubs/$hubId/onboard/channels",
                 UpdateChannelsRequest(channels = channels),
             )
         }
