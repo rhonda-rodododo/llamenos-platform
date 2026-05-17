@@ -4,6 +4,7 @@ import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import org.llamenos.hotline.crypto.CryptoService
+import org.llamenos.hotline.crypto.KeystoreService
 import org.llamenos.hotline.hub.ActiveHubState
 
 /**
@@ -12,6 +13,7 @@ import org.llamenos.hotline.hub.ActiveHubState
  * These are used by:
  * - Instrumentation test hooks (ScenarioHooks) to set the active hub
  * - Test step definitions to read the signing pubkey for admin promotion
+ * - ScenarioHooks clearIdentityState to clear the singleton keystore between scenarios
  *
  * Entry points are defined in main source (not androidTest) because the
  * production Dagger component must implement them. @EntryPoint interfaces
@@ -27,4 +29,10 @@ interface ActiveHubEntryPoint {
 @InstallIn(SingletonComponent::class)
 interface CryptoEntryPoint {
     fun cryptoService(): CryptoService
+}
+
+@EntryPoint
+@InstallIn(SingletonComponent::class)
+interface KeystoreEntryPoint {
+    fun keystoreService(): KeystoreService
 }

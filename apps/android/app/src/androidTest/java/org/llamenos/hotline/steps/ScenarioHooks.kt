@@ -11,6 +11,8 @@ import org.llamenos.hotline.LlamenosApp
 import org.llamenos.hotline.crypto.CryptoService
 import org.llamenos.hotline.crypto.KeystoreService
 import org.llamenos.hotline.di.ActiveHubEntryPoint
+import org.llamenos.hotline.di.CryptoEntryPoint
+import org.llamenos.hotline.di.KeystoreEntryPoint
 import org.llamenos.hotline.helpers.SimulationClient
 import org.llamenos.hotline.helpers.TestApiClient
 import org.llamenos.hotline.hub.ActiveHubState
@@ -59,10 +61,19 @@ class ScenarioHooks {
             private set
     }
 
-    private val keystoreService = KeystoreService(
-        InstrumentationRegistry.getInstrumentation().targetContext
-    )
-    private val cryptoService = CryptoService()
+    private val cryptoService: CryptoService by lazy {
+        EntryPointAccessors.fromApplication(
+            LlamenosApp.instance,
+            CryptoEntryPoint::class.java,
+        ).cryptoService()
+    }
+
+    private val keystoreService: KeystoreService by lazy {
+        EntryPointAccessors.fromApplication(
+            LlamenosApp.instance,
+            KeystoreEntryPoint::class.java,
+        ).keystoreService()
+    }
 
     /**
      * Grant runtime permissions before each scenario to prevent system dialogs
@@ -178,10 +189,13 @@ class ScenarioHooks {
 
     @After(order = 9000)
     fun clearIdentityState() {
-        Log.d(TAG, "clearIdentityState: clearing keystore and crypto lock")
+        Log.d(TAG, "clearIdentityState: clearing keystore and crypto state (Hilt singletons)")
         try {
             keystoreService.clear()
-            cryptoService.lock()
+            // clearAllState() clears pubkey fields + locks Rust secrets.
+            // This ensures the next scenario's registerTestUserOnBackendEarly() poll
+            // waits for genuinely new keys instead of finding stale ones from this scenario.
+            cryptoService.clearAllState()
         } catch (t: Throwable) {
             Log.w(TAG, "clearIdentityState failed (best-effort): ${t.message}")
         }

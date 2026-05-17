@@ -241,6 +241,21 @@ class CryptoService @Inject constructor() {
         testHubKeys.clear()
     }
 
+    /**
+     * Clear all in-memory key state and lock Rust secrets.
+     * Unlike [lock], this also clears public key fields so subsequent polls
+     * for key availability wait for genuinely new keys.
+     *
+     * Used by instrumentation test hooks between Cucumber scenarios to ensure
+     * each scenario starts with a clean crypto state.
+     */
+    internal fun clearAllState() {
+        lock()
+        signingPubkeyHex = null
+        encryptionPubkeyHex = null
+        deviceId = null
+    }
+
     // ---- Auth Token (Ed25519) ----
 
     /**
