@@ -118,14 +118,18 @@ describe('AnalyticsService', () => {
       expect(result.totalCalls).toBe(20)
     })
 
-    it('throws when hubId is undefined', async () => {
-      const { service } = setup()
-      await expect(
-        service.getHourlyDistribution(undefined, {
-          from: new Date('2026-05-01'),
-          to: new Date('2026-05-07'),
-        }),
-      ).rejects.toThrow('hubId is required for analytics queries')
+    it('returns results when hubId is undefined (no hub filter)', async () => {
+      const { db, service } = setup()
+      db.$setSelectResults([
+        [{ hour: 12, count: 7 }],
+      ])
+      const result = await service.getHourlyDistribution(undefined, {
+        from: new Date('2026-05-01'),
+        to: new Date('2026-05-07'),
+      })
+      expect(result.buckets).toHaveLength(24)
+      expect(result.buckets[12]).toEqual({ hour: 12, count: 7 })
+      expect(result.totalCalls).toBe(7)
     })
   })
 
