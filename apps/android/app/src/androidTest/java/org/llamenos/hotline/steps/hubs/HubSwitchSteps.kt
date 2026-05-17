@@ -68,8 +68,11 @@ class HubSwitchSteps : BaseSteps() {
         // Add the test user as a member of hub2 so HubRepository.switchHub() can
         // call getHubKey(hub2.id) without a permission error. Global super-admin role
         // alone is not sufficient — hub key distribution requires hub membership.
-        // The backend also seeds a hub key envelope so getHubKey doesn't 404.
-        val memberResult = SimulationClient.addHubMember(signingPubkey, hub2.id)
+        // Pass x25519Pubkey directly so the backend can seal a real HPKE hub key
+        // envelope (avoids device-table lookup race condition — device may not be
+        // registered yet or may have a stale key from a previous test run).
+        val encryptionPubkey = entryPoint.cryptoService().encryptionPubkeyHex
+        val memberResult = SimulationClient.addHubMember(signingPubkey, hub2.id, encryptionPubkey)
         Log.d("HubSwitchSteps", "Added as hub2 member: ok=${memberResult.ok}, error=${memberResult.error}")
         check(memberResult.ok) {
             "Adding hub2 member failed: ok=${memberResult.ok}, error=${memberResult.error}"

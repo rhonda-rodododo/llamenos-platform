@@ -307,10 +307,12 @@ dev.post('/test-setup-cms', async (c) => {
 
   // 2. Create a test entity type directly (bypassing template engine which requires
   //    loading bundled template JSON files that may not be available in all environments).
+  //    Entity types are hub-scoped — pass hubId so they're visible via hub-scoped queries.
   const entityTypeId = crypto.randomUUID()
   try {
     await services.settings.createEntityType({
       id: entityTypeId,
+      hubId,
       name: 'arrest_case',
       label: 'Arrest Case',
       labelPlural: 'Arrest Cases',
@@ -334,13 +336,14 @@ dev.post('/test-setup-cms', async (c) => {
       numberPrefix: 'JS',
       numberingEnabled: true,
     })
-  } catch { /* ignore entity type creation failures */ }
+  } catch { /* ignore entity type creation failures (e.g., duplicate name in same hub) */ }
 
   // 2b. Create an event entity type so EventsViewModel (category === 'event') has data
   const eventEntityTypeId = crypto.randomUUID()
   try {
     await services.settings.createEntityType({
       id: eventEntityTypeId,
+      hubId,
       name: 'protest_event',
       label: 'Protest Event',
       labelPlural: 'Protest Events',
@@ -361,10 +364,10 @@ dev.post('/test-setup-cms', async (c) => {
       numberPrefix: 'EVT',
       numberingEnabled: true,
     })
-  } catch { /* ignore event entity type creation failures */ }
+  } catch { /* ignore event entity type creation failures (e.g., duplicate name in same hub) */ }
 
-  // 3. Get entity types to verify creation
-  const { entityTypes } = await services.settings.getEntityTypes()
+  // 3. Get entity types to verify creation (filter by hubId to get only this hub's types)
+  const { entityTypes } = await services.settings.getEntityTypes(hubId || undefined)
 
   // 4. Create sample records for both case and event entity types
   let recordId: string | null = null
@@ -824,6 +827,107 @@ dev.post('/test-simulate/push-dispatch', async (c) => {
   return c.json({ ok: true, wake })
 })
 
+// ─── Test Identity Registration (dev/test isolation helper) ────────────────
+// Creates a user identity, adds them as a member of a hub, and optionally
+// registers a device with x25519 pubkey. Called by Android E2E tests after
+// the app creates keys locally — the backend needs a user record for auth to work.
+
+dev.post('/test-register-identity', async (c) => {
+  const denied = simulationGuard(c)
+  if (denied) return denied
+
+  const body = await c.req.json().catch(() => ({})) as {
+    pubkey?: string
+    hubId?: string
+    x25519Pubkey?: string
+    role?: string
+  }
+  if (!body.pubkey) {
+    return c.json({ error: 'pubkey is required' }, 400)
+  }
+
+  let pubkey: string
+  try {
+    pubkey = decodePubkey(body.pubkey)
+  } catch (e) {
+    return c.json({ error: `Invalid pubkey: ${e instanceof Error ? e.message : String(e)}` }, 400)
+  }
+
+  const services = c.get('services')
+  const roleId = body.role || 'role-volunteer'
+
+  // 1. Create or update user identity
+  try {
+    await services.identity.updateUser(pubkey, { roles: [roleId] }, true)
+  } catch {
+    // User doesn't exist — create
+    try {
+      await services.identity.createUser({
+        pubkey,
+        name: 'E2E Test User',
+        phone: '',
+        roleIds: [roleId],
+        encryptedSecretKey: '',
+      })
+    } catch (e) {
+      return c.json({ error: `Failed to create identity: ${e instanceof Error ? e.message : String(e)}` }, 500)
+    }
+  }
+
+  // 2. Add to hub if specified
+  if (body.hubId) {
+    try {
+      await services.identity.setHubRole({
+        pubkey,
+        hubId: body.hubId,
+        roleIds: [roleId],
+      })
+    } catch {
+      // Non-fatal — hub role assignment failed but identity was created
+    }
+  }
+
+  // 3. Register device with x25519 pubkey if provided
+  if (body.x25519Pubkey) {
+    try {
+      await services.identity.registerDevice(pubkey, {
+        platform: 'android',
+        pushToken: `test-push-${pubkey.slice(0, 8)}`,
+        wakeKeyPublic: '',
+        ed25519Pubkey: pubkey,
+        x25519Pubkey: body.x25519Pubkey,
+        deviceName: 'E2E Test Device',
+        deviceModel: 'Emulator',
+        osVersion: 'Android 14',
+        appVersion: 'test',
+      })
+    } catch {
+      // Non-fatal — device registration failed but identity exists
+    }
+  }
+
+  // 4. Seed hub key envelope if both hubId and x25519Pubkey provided
+  if (body.hubId && body.x25519Pubkey) {
+    try {
+      const hubKey = randomBytes(32)
+      const labelBytes = new TextEncoder().encode(LABEL_HUB_KEY_WRAP)
+      const aad = new Uint8Array(0)
+      const sealed = hpkeSeal(hexToBytes(body.x25519Pubkey), hubKey, labelBytes, aad)
+      await services.settings.setHubKeyEnvelopes(body.hubId, {
+        envelopes: [{
+          pubkey,
+          enc: bytesToHex(sealed.subarray(0, 32)),
+          ct: bytesToHex(sealed.subarray(32)),
+        }],
+      })
+    } catch {
+      // Non-fatal — hub key seeding failed
+    }
+  }
+
+  return c.json({ ok: true, pubkey, hubId: body.hubId || null })
+})
+
 // ─── Test Hub Member Addition (dev/test isolation helper) ───────────────────
 // Adds a pubkey as a member (super-admin role) of an existing hub so that
 // hub-switching tests can call getHubKey for hub2 without a permission error.
@@ -832,7 +936,7 @@ dev.post('/test-add-hub-member', async (c) => {
   const denied = simulationGuard(c)
   if (denied) return denied
 
-  const body = await c.req.json().catch(() => ({})) as { pubkey?: string; hubId?: string }
+  const body = await c.req.json().catch(() => ({})) as { pubkey?: string; hubId?: string; x25519Pubkey?: string }
   if (!body.pubkey || !body.hubId) {
     return c.json({ error: 'pubkey and hubId are required' }, 400)
   }
@@ -856,9 +960,13 @@ dev.post('/test-add-hub-member', async (c) => {
     // envelope. The Android CryptoService uses real HPKE decryption via native FFI,
     // so random bytes would fail at mobileHpkeOpenKey().
     try {
-      // Look up the user's X25519 encryption pubkey from their device record
-      const userDevices = await services.identity.listDevices(pubkey)
-      const x25519Pubkey = userDevices.find(d => d.x25519Pubkey)?.x25519Pubkey
+      // Use x25519Pubkey from request body first (avoids device lookup race condition),
+      // then fall back to device table lookup.
+      let x25519Pubkey: string | undefined = body.x25519Pubkey ?? undefined
+      if (!x25519Pubkey) {
+        const userDevices = await services.identity.listDevices(pubkey)
+        x25519Pubkey = userDevices.find(d => d.x25519Pubkey)?.x25519Pubkey ?? undefined
+      }
       if (x25519Pubkey) {
         // Create a real HPKE envelope: seal a random 32-byte hub key to the device's X25519 pubkey
         const hubKey = randomBytes(32)
@@ -873,7 +981,7 @@ dev.post('/test-add-hub-member', async (c) => {
           }],
         })
       } else {
-        // Fallback: device hasn't registered X25519 key yet — seed placeholder
+        // Fallback: no X25519 key available — seed placeholder (will fail at decrypt)
         await services.settings.setHubKeyEnvelopes(body.hubId, {
           envelopes: [{
             pubkey,

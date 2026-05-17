@@ -232,11 +232,46 @@ object SimulationClient {
      * [ApiService.getHubKey] which is gated on hub membership. Without this,
      * the test user cannot switch to hub2 even if they have a global super-admin role.
      *
+     * [x25519Pubkey] is optional but recommended — if provided, the backend uses it
+     * directly to seal a real HPKE hub key envelope (avoids device-table lookup race).
+     *
      * Corresponds to `POST /api/test-add-hub-member`.
      */
-    fun addHubMember(pubkey: String, hubId: String): StatusResponse {
-        val body = """{"pubkey":"${escapeJson(pubkey)}","hubId":"${escapeJson(hubId)}"}"""
+    fun addHubMember(pubkey: String, hubId: String, x25519Pubkey: String? = null): StatusResponse {
+        val fields = mutableListOf(
+            "\"pubkey\":\"${escapeJson(pubkey)}\"",
+            "\"hubId\":\"${escapeJson(hubId)}\"",
+        )
+        if (x25519Pubkey != null) fields.add("\"x25519Pubkey\":\"${escapeJson(x25519Pubkey)}\"")
+        val body = "{${fields.joinToString(",")}}"
         val responseText = post("/api/test-add-hub-member", body)
+        return json.decodeFromString<StatusResponse>(responseText)
+    }
+
+    // ─── Identity Registration ──────────────────────────────────────
+
+    /**
+     * Register the test user's identity on the backend and add them as a member
+     * of the specified hub. Must be called after identity creation (keys generated
+     * locally) so the backend knows about this user.
+     *
+     * Without this, all authenticated API calls from the app return 401 because
+     * the user record doesn't exist in the database.
+     *
+     * Corresponds to `POST /api/test-register-identity`.
+     */
+    fun registerTestIdentity(
+        pubkey: String,
+        x25519Pubkey: String? = null,
+        hubId: String? = null,
+        role: String? = null,
+    ): StatusResponse {
+        val fields = mutableListOf("\"pubkey\":\"${escapeJson(pubkey)}\"")
+        if (x25519Pubkey != null) fields.add("\"x25519Pubkey\":\"${escapeJson(x25519Pubkey)}\"")
+        if (hubId != null) fields.add("\"hubId\":\"${escapeJson(hubId)}\"")
+        if (role != null) fields.add("\"role\":\"${escapeJson(role)}\"")
+        val body = "{${fields.joinToString(",")}}"
+        val responseText = post("/api/test-register-identity", body)
         return json.decodeFromString<StatusResponse>(responseText)
     }
 

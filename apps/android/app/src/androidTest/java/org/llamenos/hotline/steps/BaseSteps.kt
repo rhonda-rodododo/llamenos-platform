@@ -13,6 +13,10 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.platform.app.InstrumentationRegistry
+import dagger.hilt.android.EntryPointAccessors
+import org.llamenos.hotline.LlamenosApp
+import org.llamenos.hotline.di.CryptoEntryPoint
+import org.llamenos.hotline.helpers.SimulationClient
 
 /**
  * Base class for UI step definitions.
@@ -103,6 +107,46 @@ abstract class BaseSteps : SemanticsNodeInteractionsProvider {
         // so key generation completes in <1s even on CI emulators. 15s covers navigation.
         waitForNode("dashboard-title", timeoutMillis = 15_000)
         onNodeWithTag("dashboard-title").assertIsDisplayed()
+
+        // Register the test user's identity on the backend.
+        // The app creates keys locally during PIN setup but never calls a registration
+        // endpoint — in production this happens via invites/bootstrap. In E2E tests we
+        // must explicitly create the user record so authenticated API calls don't 401.
+        registerTestUserOnBackend()
+    }
+
+    /**
+     * Register the current test user's identity on the backend.
+     * Creates the user record and adds them as a member of the scenario hub.
+     * Also registers the device with X25519 pubkey so HPKE hub key sealing works.
+     *
+     * This is idempotent — calling it multiple times is safe.
+     */
+    private fun registerTestUserOnBackend() {
+        try {
+            val entryPoint = EntryPointAccessors.fromApplication(
+                LlamenosApp.instance,
+                CryptoEntryPoint::class.java,
+            )
+            val cryptoService = entryPoint.cryptoService()
+            val signingPubkey = cryptoService.signingPubkeyHex
+            val encryptionPubkey = cryptoService.encryptionPubkeyHex
+
+            if (signingPubkey == null) {
+                Log.w(TAG, "registerTestUserOnBackend: no signing pubkey — skipping")
+                return
+            }
+
+            val hubId = ScenarioHooks.currentHubId.ifEmpty { null }
+            val result = SimulationClient.registerTestIdentity(
+                pubkey = signingPubkey,
+                x25519Pubkey = encryptionPubkey,
+                hubId = hubId,
+            )
+            Log.i(TAG, "registerTestUserOnBackend: ok=${result.ok}, error=${result.error}, hubId=$hubId")
+        } catch (e: Exception) {
+            Log.w(TAG, "registerTestUserOnBackend failed (non-fatal): ${e.message}")
+        }
     }
 
     /**
