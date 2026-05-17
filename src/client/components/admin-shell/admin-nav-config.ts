@@ -27,6 +27,12 @@ export const adminNavConfig: AdminNavConfig = {
           testid: 'admin-sidebar-item-recovery-group',
         },
         {
+          slug: 'recovery-requests',
+          labelKey: 'adminNav.items.recoveryRequests',
+          requiredPermissions: ['recovery:manage'],
+          testid: 'admin-sidebar-item-recovery-requests',
+        },
+        {
           slug: 'devices',
           labelKey: 'adminNav.items.devices',
           requiredPermissions: ['settings:read'],

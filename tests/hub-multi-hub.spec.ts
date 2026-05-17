@@ -210,14 +210,10 @@ test.describe('Multi-Hub Navigation', () => {
 
     // Page should render either wizard or settings depending on active hub
     // At minimum, the page should load without errors
-    const wizard = page.getByTestId('hub-onboarding-wizard')
-    const settings = page.getByTestId('hub-provider-settings')
     const pageTitle = page.getByTestId('page-title')
 
-    // One of these should be visible depending on which hub is active
-    await expect(
-      wizard.or(settings).or(pageTitle),
-    ).toBeVisible({ timeout: Timeouts.ELEMENT })
+    // Wait for page to render — page-title is always present
+    await expect(pageTitle).toBeVisible({ timeout: Timeouts.ELEMENT })
   })
 })
 
@@ -251,14 +247,10 @@ test.describe('Multi-Hub Data Isolation', () => {
 
     // The page should display data for exactly one hub (the active one).
     // We check that it doesn't show data from both hubs simultaneously.
-    const usageCard = page.getByTestId('hub-usage-card')
-    const settings = page.getByTestId('hub-provider-settings')
     const pageTitle = page.getByTestId('page-title')
 
     // Wait for page to render
-    await expect(
-      usageCard.or(settings).or(pageTitle),
-    ).toBeVisible({ timeout: Timeouts.ELEMENT })
+    await expect(pageTitle).toBeVisible({ timeout: Timeouts.ELEMENT })
 
     // Should not show both 999 and 1 at the same time in usage
     // (which would indicate data leakage between hubs)

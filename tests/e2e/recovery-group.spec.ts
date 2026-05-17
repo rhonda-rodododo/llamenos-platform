@@ -9,25 +9,23 @@ async function goToAdminSection(page: import('@playwright/test').Page, section: 
 async function mockRecoveryGroupApis(page: import('@playwright/test').Page) {
   await page.route('**/api/hubs/*/recovery-group', async (route) => {
     await route.fulfill({
-      status: 200,
+      status: 404,
       contentType: 'application/json',
-      body: JSON.stringify({
-        group: null,
-      }),
+      body: JSON.stringify({ error: 'No recovery group configured' }),
     })
   })
   await page.route('**/api/hubs/*/recovery-group/candidates', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ candidates: [] }),
+      body: JSON.stringify([]),
     })
   })
   await page.route('**/api/hubs/*/recovery-group/requests', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ requests: [] }),
+      body: JSON.stringify([]),
     })
   })
   await page.route('**/recovery-group/sessions*', async (route) => {
@@ -159,9 +157,16 @@ test.describe('Recovery Group - Account Recovery Flow', () => {
 })
 
 test.describe('Recovery Group - IPC Mock Verification', () => {
-  test('shamir split and combine round-trips correctly', async ({ page }) => {
+  async function waitForInvoke(page: import('@playwright/test').Page) {
     await page.goto('/login')
-    await page.waitForLoadState('domcontentloaded')
+    await page.waitForFunction(
+      () => typeof (window as any)[Symbol.for('llamenos_test_invoke')] === 'function',
+      { timeout: 15_000 },
+    )
+  }
+
+  test('shamir split and combine round-trips correctly', async ({ page }) => {
+    await waitForInvoke(page)
 
     const result = await page.evaluate(async () => {
       const invoke = (window as any)[Symbol.for('llamenos_test_invoke')] as
@@ -208,8 +213,7 @@ test.describe('Recovery Group - IPC Mock Verification', () => {
   })
 
   test('recovery group keypair generation produces valid hex keys', async ({ page }) => {
-    await page.goto('/login')
-    await page.waitForLoadState('domcontentloaded')
+    await waitForInvoke(page)
 
     const result = await page.evaluate(async () => {
       const invoke = (window as any)[Symbol.for('llamenos_test_invoke')] as
@@ -233,8 +237,7 @@ test.describe('Recovery Group - IPC Mock Verification', () => {
   })
 
   test('shamir verify rejects invalid commitment', async ({ page }) => {
-    await page.goto('/login')
-    await page.waitForLoadState('domcontentloaded')
+    await waitForInvoke(page)
 
     const result = await page.evaluate(async () => {
       const invoke = (window as any)[Symbol.for('llamenos_test_invoke')] as

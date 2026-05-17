@@ -16,6 +16,12 @@
 const useTauri = typeof window !== 'undefined' &&
   ('__TAURI_INTERNALS__' in window || !!import.meta.env.PLAYWRIGHT_TEST)
 
+// Eagerly load the Tauri IPC mock in test builds so that
+// window[Symbol.for('llamenos_test_invoke')] is available immediately.
+if (import.meta.env.PLAYWRIGHT_TEST) {
+  import('@tauri-apps/api/core')
+}
+
 // ── Tauri IPC wrapper (desktop only) ─────────────────────────────────
 
 async function tauriInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
