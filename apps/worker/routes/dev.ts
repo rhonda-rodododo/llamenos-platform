@@ -428,20 +428,22 @@ dev.post('/test-seed', async (c) => {
     entityTypeIds.push({ id: entityTypeId, name: tmpl.name, category: tmpl.category })
 
     // Create records for this entity type
-    // Match the pattern from the old test-setup-cms: summaryEnvelopes as empty array,
-    // since the service layer (unlike the API route) doesn't validate min(1).
+    // Use a dummy HPKE envelope so the app can find a readable envelope.
+    // Without this, records exist in DB but the app filters them out
+    // (no envelope matching the user's pubkey).
+    const dummyEnvelope = { pubkey: adminSeed, ct: 'a'.repeat(64), enc: adminSeed }
     for (let i = 0; i < etSpec.records; i++) {
       try {
         const isEvent = tmpl.category === 'event'
         const record = await services.cases.create({
           entityTypeId,
           statusHash: tmpl.defaultStatus,
-          assignedTo: etSpec.assignTo.length > 0 ? etSpec.assignTo : [],
+          assignedTo: etSpec.assignTo,
           blindIndexes: {},
           encryptedSummary: btoa(isEvent
             ? `{"title":"Test Event ${i + 1}","summary":"Seeded event"}`
             : `{"title":"Test Case ${i + 1}","summary":"Seeded case"}`),
-          summaryEnvelopes: [],
+          summaryEnvelopes: [dummyEnvelope],
           createdBy: adminSeed,
           hubId,
         })
