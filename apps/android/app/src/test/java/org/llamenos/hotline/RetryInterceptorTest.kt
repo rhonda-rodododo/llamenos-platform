@@ -39,12 +39,21 @@ class RetryInterceptorTest {
     }
 
     @Test
-    fun `401 unauthorized is not retried`() {
-        val chain = FakeChain(listOf(401))
+    fun `401 unauthorized is retried with short backoff`() {
+        val chain = FakeChain(listOf(401, 200))
+        val response = interceptor.intercept(chain)
+
+        assertEquals(200, response.code)
+        assertEquals(2, chain.callCount)
+    }
+
+    @Test
+    fun `401 exhausts retries and returns 401`() {
+        val chain = FakeChain(listOf(401, 401, 401))
         val response = interceptor.intercept(chain)
 
         assertEquals(401, response.code)
-        assertEquals(1, chain.callCount)
+        assertEquals(3, chain.callCount)
     }
 
     @Test
