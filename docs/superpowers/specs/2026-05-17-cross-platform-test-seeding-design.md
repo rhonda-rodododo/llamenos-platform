@@ -208,3 +208,4 @@ Android E2E tests become the integration test — if the app sees the seeded dat
 - Desktop migration to `/api/test-seed` (optional, `api-helpers.ts` already works)
 - Custom entity type definitions in seed spec (templates only for now — extensible later)
 - Real HPKE envelope construction (dummy envelopes are sufficient for E2E visibility tests)
+
