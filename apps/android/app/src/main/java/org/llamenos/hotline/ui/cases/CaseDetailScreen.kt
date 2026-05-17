@@ -556,9 +556,9 @@ private fun DetailsTab(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        // Assign / unassign button
+        // Assign / unassign buttons
         Row(
-            horizontalArrangement = Arrangement.End,
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
             modifier = Modifier.fillMaxWidth(),
         ) {
             if (isCurrentUserAssigned) {
@@ -582,28 +582,27 @@ private fun DetailsTab(
                     Spacer(Modifier.width(4.dp))
                     Text("Unassign", style = MaterialTheme.typography.labelSmall)
                 }
-            } else {
-                Button(
-                    onClick = onAssignToMe,
-                    enabled = !isAssigning,
-                    modifier = Modifier.testTag("case-assign-btn-header"),
-                ) {
-                    if (isAssigning) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(14.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.onPrimary,
-                        )
-                        Spacer(Modifier.width(6.dp))
-                    }
-                    Icon(
-                        imageVector = Icons.Filled.PersonAdd,
-                        contentDescription = null,
+            }
+            Button(
+                onClick = onAssignToMe,
+                enabled = !isAssigning && !isCurrentUserAssigned,
+                modifier = Modifier.testTag("case-assign-btn-header"),
+            ) {
+                if (isAssigning) {
+                    CircularProgressIndicator(
                         modifier = Modifier.size(14.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary,
                     )
-                    Spacer(Modifier.width(4.dp))
-                    Text("Assign to me", style = MaterialTheme.typography.labelSmall)
+                    Spacer(Modifier.width(6.dp))
                 }
+                Icon(
+                    imageVector = Icons.Filled.PersonAdd,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                )
+                Spacer(Modifier.width(4.dp))
+                Text("Assign to me", style = MaterialTheme.typography.labelSmall)
             }
         }
 

@@ -37,7 +37,7 @@ enum class TriageStatusFilter(val apiValue: String?) {
 data class TriageUiState(
     val reports: List<Report> = emptyList(),
     val total: Int = 0,
-    val isLoading: Boolean = false,
+    val isLoading: Boolean = true,
     val isRefreshing: Boolean = false,
     val error: String? = null,
     val selectedFilter: TriageStatusFilter = TriageStatusFilter.PENDING,
