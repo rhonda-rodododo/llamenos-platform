@@ -247,6 +247,10 @@ jobs:
           echo "device=$SIM" >> "$GITHUB_OUTPUT"
           echo "Using simulator: $SIM"
 
+      # ─── Docker (not pre-installed on macOS runners) ───────────
+      - name: Setup Docker
+        uses: docker/setup-docker-action@e43656e248c0bd0647d3f5c195d116aacf6fcaf4 # v4
+
       # ─── Start Backend Services ────────────────────────────────
       - name: Bootstrap backend
         uses: ./.github/actions/bootstrap-backend
