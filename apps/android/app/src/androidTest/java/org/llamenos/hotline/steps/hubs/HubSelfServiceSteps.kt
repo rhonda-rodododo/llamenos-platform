@@ -89,7 +89,9 @@ class HubSelfServiceSteps : BaseSteps() {
 
     @Then("the onboarding bottom sheet should appear")
     fun theOnboardingBottomSheetShouldAppear() {
-        composeRule.waitUntil(10_000) {
+        // The bottom sheet renders after async template loading + ViewModel state
+        // update. On CI with software rendering this can take >10s.
+        composeRule.waitUntil(20_000) {
             composeRule.onAllNodesWithTag("hub-onboarding-sheet").fetchSemanticsNodes().isNotEmpty()
         }
         onNodeWithTag("hub-onboarding-sheet").assertIsDisplayed()

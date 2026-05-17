@@ -29,13 +29,15 @@ class TriageSteps : BaseSteps() {
 
     @Given("triage-eligible reports exist")
     fun triageEligibleReportsExist() {
-        // Ensure CMS is set up with triage report data for this hub
+        // Ensure CMS is set up with triage report data for this hub.
+        // MUST NOT swallow errors — if seeding fails, triage cards won't render
+        // and subsequent steps will timeout with misleading errors.
         val hubId = ScenarioHooks.currentHubId
-        try {
-            SimulationClient.setupCms(hubId = hubId.ifEmpty { null })
-        } catch (e: Throwable) {
-            Log.w("TriageSteps", "CMS setup for triage failed: ${e.message}")
+        val result = SimulationClient.setupCms(hubId = hubId.ifEmpty { null })
+        check(result.ok) {
+            "setupCms for triage failed: ok=${result.ok}, error=${result.error}"
         }
+        Log.d("TriageSteps", "CMS setup for triage: entityTypes=${result.entityTypeCount}, record=${result.sampleRecordId}")
         iNavigateToTheTriageScreen()
     }
 
@@ -59,7 +61,7 @@ class TriageSteps : BaseSteps() {
     @When("I tap the first triage report card")
     fun iTapTheFirstTriageReportCard() {
         // Wait for either report cards or the empty/error state
-        composeRule.waitUntil(10_000) {
+        composeRule.waitUntil(15_000) {
             composeRule.onAllNodes(hasTestTagPrefix("triage-card-"))
                 .fetchSemanticsNodes().isNotEmpty() ||
                 composeRule.onAllNodesWithTag("triage-empty").fetchSemanticsNodes().isNotEmpty() ||
@@ -67,19 +69,15 @@ class TriageSteps : BaseSteps() {
         }
         val hasCards = composeRule.onAllNodes(hasTestTagPrefix("triage-card-"))
             .fetchSemanticsNodes().isNotEmpty()
-        if (!hasCards) {
-            Log.w("TriageSteps", "No triage report cards available — empty or error state")
-            return
-        }
-        try {
-            onAllNodes(hasTestTagPrefix("triage-card-")).onFirst().performClick()
-            composeRule.waitForIdle()
-        } catch (_: Throwable) {
-            Log.w("TriageSteps", "No triage report cards available to tap")
+        check(hasCards) {
+            "No triage report cards found — setupCms may have failed to seed triage reports"
         }
 
-        // Wait for triage detail to load
-        composeRule.waitUntil(10_000) {
+        onAllNodes(hasTestTagPrefix("triage-card-")).onFirst().performClick()
+        composeRule.waitForIdle()
+
+        // Wait for triage detail to load (content, not just loading spinner)
+        composeRule.waitUntil(15_000) {
             composeRule.onAllNodesWithTag("triage-detail-title").fetchSemanticsNodes().isNotEmpty() ||
                 composeRule.onAllNodesWithTag("triage-detail-report-title").fetchSemanticsNodes().isNotEmpty() ||
                 composeRule.onAllNodesWithTag("triage-not-found").fetchSemanticsNodes().isNotEmpty() ||

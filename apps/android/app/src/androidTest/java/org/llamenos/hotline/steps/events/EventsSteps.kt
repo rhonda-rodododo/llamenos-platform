@@ -28,18 +28,15 @@ class EventsSteps : BaseSteps() {
 
     @Given("events exist in the system")
     fun eventsExistInTheSystem() {
-        // The background step (theAppIsLaunchedAndAuthenticatedAsAdmin) already calls
-        // setupCms with the user's pubkey, creating event entity types and hub-scoped
-        // event records. This step is a data precondition only — navigation happens
-        // in the subsequent "When I navigate to the Events screen" step, which creates
-        // a fresh EventsViewModel that loads the data. Navigating here too would cause
-        // double navigation and destroy/recreate the ViewModel unnecessarily.
+        // Ensure CMS is set up with event records for this hub.
+        // MUST NOT swallow errors — if seeding fails, event cards won't render
+        // and subsequent steps will timeout with misleading errors.
         val hubId = ScenarioHooks.currentHubId
-        try {
-            SimulationClient.setupCms(hubId = hubId.ifEmpty { null })
-        } catch (e: Throwable) {
-            Log.w("EventsSteps", "CMS setup for events failed: ${e.message}")
+        val result = SimulationClient.setupCms(hubId = hubId.ifEmpty { null })
+        check(result.ok) {
+            "setupCms failed for events: ok=${result.ok}, error=${result.error}, entityTypes=${result.entityTypeCount}"
         }
+        Log.d("EventsSteps", "CMS setup for events: entityTypes=${result.entityTypeCount}, record=${result.sampleRecordId}")
     }
 
     // ---- When ----

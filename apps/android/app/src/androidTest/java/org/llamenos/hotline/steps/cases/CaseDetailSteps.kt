@@ -9,7 +9,10 @@ import io.cucumber.java.en.And
 import io.cucumber.java.en.Given
 import io.cucumber.java.en.Then
 import io.cucumber.java.en.When
+import android.util.Log
+import org.llamenos.hotline.helpers.SimulationClient
 import org.llamenos.hotline.steps.BaseSteps
+import org.llamenos.hotline.steps.ScenarioHooks
 
 /**
  * Step definitions for the CMS case detail screen.
@@ -42,9 +45,22 @@ class CaseDetailSteps : BaseSteps() {
 
     @Given("an unassigned case detail is open")
     fun anUnassignedCaseDetailIsOpen() {
-        // Open a case — the assign button is always visible on the Details tab
-        // (it doesn't check current assignment in the button visibility logic)
-        aCaseDetailIsOpen()
+        // The assign button only renders when the current user is NOT in assignedTo.
+        // The Background step's setupCms(pubkey) creates assigned records, so we
+        // need a fresh unassigned record. Call setupCms WITHOUT pubkey — the newest
+        // record (sorted by createdAt DESC) will appear first in the case list.
+        val hubId = ScenarioHooks.currentHubId
+        try {
+            SimulationClient.setupCms(hubId = hubId.ifEmpty { null })
+            Log.d("CaseDetailSteps", "Created unassigned case record for hub=$hubId")
+        } catch (e: Throwable) {
+            Log.w("CaseDetailSteps", "setupCms for unassigned case failed: ${e.message}")
+        }
+        navigateToMainScreen()
+        navigateViaDashboardCard("cases-card")
+        waitForCaseListOrEmpty()
+        openFirstCaseOrCreate()
+        waitForDetailLoaded()
     }
 
     // ---- When ----
@@ -184,6 +200,12 @@ class CaseDetailSteps : BaseSteps() {
         } catch (_: Throwable) {
             // May already be on Details tab
         }
+        // The assign button only renders when record != null AND the user is not
+        // already assigned. Wait for it to appear after the API response loads.
+        composeRule.waitUntil(15_000) {
+            composeRule.onAllNodesWithTag("case-assign-btn-header")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
         onNodeWithTag("case-assign-btn-header").assertIsDisplayed()
     }
 
@@ -242,13 +264,14 @@ class CaseDetailSteps : BaseSteps() {
     }
 
     /**
-     * Wait for the case detail to finish loading.
+     * Wait for the case detail to finish loading (content or error rendered).
+     * Does NOT accept loading-spinner as success — the assign button and other
+     * content only render after record != null.
      */
     private fun waitForDetailLoaded() {
-        composeRule.waitUntil(10_000) {
+        composeRule.waitUntil(15_000) {
             composeRule.onAllNodesWithTag("case-detail-header").fetchSemanticsNodes().isNotEmpty() ||
-                composeRule.onAllNodesWithTag("case-detail-error").fetchSemanticsNodes().isNotEmpty() ||
-                composeRule.onAllNodesWithTag("case-detail-loading").fetchSemanticsNodes().isNotEmpty()
+                composeRule.onAllNodesWithTag("case-detail-error").fetchSemanticsNodes().isNotEmpty()
         }
     }
 }

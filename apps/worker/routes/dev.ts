@@ -844,6 +844,23 @@ dev.post('/test-add-hub-member', async (c) => {
       hubId: body.hubId,
       roleIds: ['role-super-admin'],
     })
+
+    // Seed a dummy hub key envelope so getHubKey doesn't 404.
+    // In test builds, Android uses mock crypto that accepts any envelope values.
+    // Without this, HubRepository.switchHub() throws because GET /hubs/:id/key
+    // returns 404 "No key envelope for this user".
+    try {
+      await services.settings.setHubKeyEnvelopes(body.hubId, {
+        envelopes: [{
+          pubkey,
+          enc: Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64'),
+          ct: Buffer.from(crypto.getRandomValues(new Uint8Array(48))).toString('base64'),
+        }],
+      })
+    } catch {
+      // Non-fatal: hub key seeding failed but membership was set
+    }
+
     return c.json({ ok: true, pubkey, hubId: body.hubId })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to add hub member'

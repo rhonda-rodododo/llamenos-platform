@@ -61,17 +61,18 @@ class HubSwitchSteps : BaseSteps() {
         // Promote to global super-admin so GET /api/hubs returns ALL hubs in the list.
         val promoteResult = SimulationClient.promoteToAdmin(signingPubkey)
         Log.d("HubSwitchSteps", "Promoted to admin: ok=${promoteResult.ok}, error=${promoteResult.error}")
-        check(promoteResult.ok || promoteResult.error == null) {
-            "Admin promotion failed: ${promoteResult.error}"
+        check(promoteResult.ok) {
+            "Admin promotion failed: ok=${promoteResult.ok}, error=${promoteResult.error}"
         }
 
         // Add the test user as a member of hub2 so HubRepository.switchHub() can
         // call getHubKey(hub2.id) without a permission error. Global super-admin role
         // alone is not sufficient — hub key distribution requires hub membership.
+        // The backend also seeds a hub key envelope so getHubKey doesn't 404.
         val memberResult = SimulationClient.addHubMember(signingPubkey, hub2.id)
         Log.d("HubSwitchSteps", "Added as hub2 member: ok=${memberResult.ok}, error=${memberResult.error}")
-        check(memberResult.ok || memberResult.error == null) {
-            "Adding hub2 member failed: ${memberResult.error}"
+        check(memberResult.ok) {
+            "Adding hub2 member failed: ok=${memberResult.ok}, error=${memberResult.error}"
         }
     }
 
