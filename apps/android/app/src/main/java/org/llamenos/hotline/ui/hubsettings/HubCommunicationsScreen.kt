@@ -197,15 +197,18 @@ fun HubCommunicationsScreen(
                     )
                 }
 
-                // Channel settings
-                item {
-                    ChannelChecklist(
-                        channels = uiState.channels,
-                        onToggle = { channel, enabled ->
-                            viewModel.toggleChannel(channel, enabled)
-                        },
-                        enabled = !uiState.isSavingChannels,
-                    )
+                // Channel settings — hidden when the onboarding sheet is open to avoid
+                // duplicate "channel-checklist" test tags (the onboarding flow renders its own).
+                if (!uiState.showOnboarding) {
+                    item {
+                        ChannelChecklist(
+                            channels = uiState.channels,
+                            onToggle = { channel, enabled ->
+                                viewModel.toggleChannel(channel, enabled)
+                            },
+                            enabled = !uiState.isSavingChannels,
+                        )
+                    }
                 }
 
                 // Usage card
