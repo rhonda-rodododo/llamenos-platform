@@ -1986,7 +1986,7 @@ export async function seedViaApi(
   const { status, data } = await apiPost<SeedResult>(
     request,
     '/test-seed',
-    spec,
+    spec as unknown as Record<string, unknown>,
     spec.adminSeed,
   )
   if (status !== 200) throw new Error(`test-seed failed: HTTP ${status}`)
