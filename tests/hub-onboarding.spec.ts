@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { loginAsAdmin, Timeouts } from './helpers'
+import { loginAsAdmin, mockConfigWithHub, navigateViaSpa, Timeouts } from './helpers'
 
 /**
  * Mock API responses for hub onboarding endpoints.
@@ -168,9 +168,10 @@ async function mockOnboardingApis(
 
 test.describe('Hub Onboarding Wizard', () => {
   test.beforeEach(async ({ page }) => {
+    await mockConfigWithHub(page)
     await loginAsAdmin(page)
     await mockOnboardingApis(page, { onboardingComplete: false })
-    await page.goto('/admin/hub-communications')
+    await navigateViaSpa(page, '/admin/hub-communications')
   })
 
   test('renders onboarding wizard for unconfigured hub', async ({ page }) => {
@@ -378,8 +379,11 @@ test.describe('Hub Onboarding Wizard', () => {
   test('step 1: empty templates list still shows scratch option', async ({ page }) => {
     // Re-mock with empty templates
     await page.unrouteAll()
+    await mockConfigWithHub(page)
     await mockOnboardingApis(page, { onboardingComplete: false, templates: [] })
-    await page.reload()
+    // Re-navigate via SPA to trigger refetch (page.reload() would drop auth state)
+    await navigateViaSpa(page, '/')
+    await navigateViaSpa(page, '/admin/hub-communications')
 
     const scratchCard = page.getByTestId('template-card-scratch')
     await expect(scratchCard).toBeVisible({ timeout: Timeouts.ELEMENT })
@@ -388,6 +392,7 @@ test.describe('Hub Onboarding Wizard', () => {
 
 test.describe('Hub Onboarding - API error handling', () => {
   test('shows error state when template loading fails', async ({ page }) => {
+    await mockConfigWithHub(page)
     await loginAsAdmin(page)
     await page.route('**/api/provider-templates', async (route) => {
       await route.fulfill({ status: 500, body: 'Internal Server Error' })
@@ -435,7 +440,7 @@ test.describe('Hub Onboarding - API error handling', () => {
       })
     })
 
-    await page.goto('/admin/hub-communications')
+    await navigateViaSpa(page, '/admin/hub-communications')
 
     // Wizard should still render (error is in template loading, not in rendering)
     const wizard = page.getByTestId('hub-onboarding-wizard')

@@ -1,14 +1,49 @@
 import { test, expect } from '@playwright/test'
-import { loginAsAdmin } from '../helpers'
+import { loginAsAdmin, mockConfigWithHub, navigateViaSpa } from '../helpers'
 
 async function goToAdminSection(page: import('@playwright/test').Page, section: string) {
-  await page.goto(`/admin/${section}`)
+  await navigateViaSpa(page, `/admin/${section}`)
   await page.waitForSelector('[data-testid]', { timeout: 10_000 })
+}
+
+async function mockRecoveryGroupApis(page: import('@playwright/test').Page) {
+  await page.route('**/api/hubs/*/recovery-group', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        group: null,
+      }),
+    })
+  })
+  await page.route('**/api/hubs/*/recovery-group/candidates', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ candidates: [] }),
+    })
+  })
+  await page.route('**/api/hubs/*/recovery-group/requests', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ requests: [] }),
+    })
+  })
+  await page.route('**/recovery-group/sessions*', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([]),
+    })
+  })
 }
 
 test.describe('Recovery Group - Admin Configuration', () => {
   test.beforeEach(async ({ page }) => {
+    await mockConfigWithHub(page)
     await loginAsAdmin(page)
+    await mockRecoveryGroupApis(page)
   })
 
   test('should display recovery team configuration section', async ({ page }) => {
@@ -41,7 +76,9 @@ test.describe('Recovery Group - Admin Configuration', () => {
 
 test.describe('Recovery Group - Recovery Requests Dashboard', () => {
   test.beforeEach(async ({ page }) => {
+    await mockConfigWithHub(page)
     await loginAsAdmin(page)
+    await mockRecoveryGroupApis(page)
   })
 
   test('should display recovery requests section', async ({ page }) => {
@@ -124,9 +161,11 @@ test.describe('Recovery Group - Account Recovery Flow', () => {
 test.describe('Recovery Group - IPC Mock Verification', () => {
   test('shamir split and combine round-trips correctly', async ({ page }) => {
     await page.goto('/login')
+    await page.waitForLoadState('domcontentloaded')
 
     const result = await page.evaluate(async () => {
-      const { invoke } = await import('@tauri-apps/api/core')
+      const invoke = (window as any)[Symbol.for('llamenos_test_invoke')] as
+        (cmd: string, args?: Record<string, unknown>) => Promise<unknown>
 
       const secretHex =
         'deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
@@ -170,9 +209,11 @@ test.describe('Recovery Group - IPC Mock Verification', () => {
 
   test('recovery group keypair generation produces valid hex keys', async ({ page }) => {
     await page.goto('/login')
+    await page.waitForLoadState('domcontentloaded')
 
     const result = await page.evaluate(async () => {
-      const { invoke } = await import('@tauri-apps/api/core')
+      const invoke = (window as any)[Symbol.for('llamenos_test_invoke')] as
+        (cmd: string, args?: Record<string, unknown>) => Promise<unknown>
 
       const keypair = (await invoke('recovery_group_generate_keypair')) as {
         publicKeyHex: string
@@ -193,9 +234,11 @@ test.describe('Recovery Group - IPC Mock Verification', () => {
 
   test('shamir verify rejects invalid commitment', async ({ page }) => {
     await page.goto('/login')
+    await page.waitForLoadState('domcontentloaded')
 
     const result = await page.evaluate(async () => {
-      const { invoke } = await import('@tauri-apps/api/core')
+      const invoke = (window as any)[Symbol.for('llamenos_test_invoke')] as
+        (cmd: string, args?: Record<string, unknown>) => Promise<unknown>
 
       const splitResult = (await invoke('shamir_split', {
         secretHex: 'aabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaabbccdd',

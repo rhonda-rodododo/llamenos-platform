@@ -488,3 +488,32 @@ export async function resetTestState(request: APIRequestContext) {
     throw new Error(`test-reset failed with status ${res.status()}: ${await res.text()}`)
   }
 }
+
+/**
+ * Mock /api/config to include a hub, ensuring currentHubId is set in ConfigProvider.
+ * Must be called BEFORE loginAsAdmin() since login loads the page which fetches config.
+ * Tests that depend on hub-scoped routes (hub-communications, etc.) need this.
+ */
+export async function mockConfigWithHub(page: Page, hubId = 'test-hub-1'): Promise<void> {
+  await page.route('**/api/config', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        hotlineName: 'Test Hotline',
+        hotlineNumber: '+15551234567',
+        channels: { voice: true, sms: true, whatsapp: false, signal: true, rcs: false, telegram: false, reports: true },
+        setupCompleted: true,
+        demoMode: false,
+        demoResetSchedule: null,
+        needsBootstrap: false,
+        hubs: [{ id: hubId, name: 'Test Hub', slug: 'test-hub', description: '', status: 'active', createdBy: 'test', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' }],
+        defaultHubId: hubId,
+        serverPubkey: 'bfaca2c5f99ed9d65db5f522a68820c458ae9ccfe00327c64bc66ccde06e5703',
+        wsRelayUrl: '/ws',
+        apiVersion: 1,
+        minApiVersion: 1,
+      }),
+    })
+  })
+}
