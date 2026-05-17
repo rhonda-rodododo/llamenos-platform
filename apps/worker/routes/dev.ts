@@ -302,8 +302,11 @@ dev.post('/test-setup-cms', async (c) => {
     roleOk = false
   }
 
-  // 1. Enable case management
+  // 1. Enable case management (both globally and hub-scoped so hub-scoped API calls see it)
   await services.settings.setCaseManagementEnabled({ enabled: true })
+  if (hubId) {
+    await services.settings.setCaseManagementEnabled({ enabled: true }, hubId)
+  }
 
   // 2. Create a test entity type directly (bypassing template engine which requires
   //    loading bundled template JSON files that may not be available in all environments).

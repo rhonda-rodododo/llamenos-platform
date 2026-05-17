@@ -117,7 +117,7 @@ class TriageViewModel @Inject constructor(
         try {
             val response = apiService.request<CmsReportTypesResponse>(
                 "GET",
-                "/api/settings/cms/report-types",
+                apiService.hp("/api/settings/cms/report-types"),
             )
             _uiState.update { it.copy(reportTypes = response.reportTypes) }
         } catch (_: Exception) {

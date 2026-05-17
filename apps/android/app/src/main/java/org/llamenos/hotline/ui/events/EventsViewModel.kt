@@ -114,7 +114,7 @@ class EventsViewModel @Inject constructor(
 
                 val response = apiService.request<CmsStatusResponse>(
                     "GET",
-                    "/api/settings/cms/case-management",
+                    apiService.hp("/api/settings/cms/case-management"),
                 )
                 _uiState.update { it.copy(cmsEnabled = response.enabled) }
             } catch (_: Exception) {
@@ -133,7 +133,7 @@ class EventsViewModel @Inject constructor(
             try {
                 val response = apiService.request<EntityTypesResponse>(
                     "GET",
-                    "/api/settings/cms/entity-types",
+                    apiService.hp("/api/settings/cms/entity-types"),
                 )
                 _uiState.update {
                     it.copy(

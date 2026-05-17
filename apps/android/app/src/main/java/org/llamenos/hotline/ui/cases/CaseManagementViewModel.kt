@@ -222,7 +222,7 @@ class CaseManagementViewModel @Inject constructor(
             try {
                 val response = apiService.request<EntityTypesResponse>(
                     "GET",
-                    "/api/settings/cms/entity-types",
+                    apiService.hp("/api/settings/cms/entity-types"),
                 )
                 _uiState.update {
                     it.copy(
