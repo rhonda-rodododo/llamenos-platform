@@ -282,7 +282,7 @@ dev.post('/test-setup-cms', async (c) => {
         'conversations:claim-sms', 'conversations:claim-whatsapp',
         'conversations:claim-signal', 'conversations:claim-rcs', 'conversations:claim-web',
         'shifts:read-own', 'bans:report',
-        'reports:read-assigned', 'reports:send-message',
+        'reports:read-all', 'reports:read-assigned', 'reports:send-message',
         'files:upload', 'files:download-own',
         // CMS permissions for E2E testing: full access to cases
         // Note: contacts:view intentionally omitted — volunteers are denied contacts per permission-matrix spec
@@ -391,12 +391,44 @@ dev.post('/test-setup-cms', async (c) => {
     } catch { /* ignore record creation failures */ }
   }
 
-  // 5. Create triage-eligible reports so triage screen has data
+  // 5. Create a report type with allowCaseConversion so the triage queue
+  //    (which filters by conversionEnabled=true) can find reports.
+  let reportTypeId: string | null = null
+  try {
+    const rt = await services.settings.createCmsReportType({
+      hubId,
+      name: 'general_report',
+      label: 'General Report',
+      labelPlural: 'General Reports',
+      description: 'BDD test report type',
+      allowCaseConversion: true,
+      mobileOptimized: true,
+      statuses: [
+        { value: 'new', label: 'New', color: '#f59e0b', order: 1 },
+        { value: 'reviewed', label: 'Reviewed', color: '#3b82f6', order: 2 },
+        { value: 'closed', label: 'Closed', color: '#6b7280', order: 3, isClosed: true },
+      ],
+      defaultStatus: 'new',
+      closedStatuses: ['closed'],
+      fields: [],
+    })
+    reportTypeId = rt.id
+  } catch { /* ignore duplicate report type */ }
+
+  // If creation failed (duplicate), try to find the existing report type
+  if (!reportTypeId) {
+    try {
+      const { reportTypes } = await services.settings.getCmsReportTypes(hubId || undefined)
+      const existing = reportTypes.find(rt => rt.name === 'general_report' && !rt.isArchived)
+      if (existing) reportTypeId = existing.id
+    } catch { /* ignore */ }
+  }
+
+  // 6. Create triage-eligible reports so triage screen has data.
+  //    Must include reportTypeId matching a report type with allowCaseConversion,
+  //    otherwise the conversionEnabled=true filter excludes the report.
   let reportId: string | null = null
   try {
-    // channelType 'reports' is used by the triage system — it's a text column
-    // in the DB but typed as MessagingChannelType | 'web' in the service interface.
-    // Use direct DB insert to avoid type mismatch.
     const report = await services.conversations.create({
       hubId,
       channelType: 'web',
@@ -405,6 +437,7 @@ dev.post('/test-setup-cms', async (c) => {
         type: 'report',
         reportTitle: 'Test Triage Report',
         reportCategory: 'general',
+        reportTypeId: reportTypeId ?? undefined,
         conversionStatus: 'pending',
       },
     })
