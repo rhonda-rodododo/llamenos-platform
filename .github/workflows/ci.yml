@@ -769,6 +769,25 @@ jobs:
             wait $LOGCAT_PID 2>/dev/null || true
             exit $EXIT_CODE
 
+      - name: Dump backend logs (diagnostics)
+        if: always()
+        run: |
+          echo "::group::Backend container logs (last 100 lines)"
+          docker compose --env-file .env \
+            -f deploy/docker/docker-compose.yml \
+            -f deploy/docker/docker-compose.test.yml \
+            logs --tail=100 app 2>/dev/null || echo "No container logs available"
+          echo "::endgroup::"
+          echo "::group::Registration-related logs"
+          docker compose --env-file .env \
+            -f deploy/docker/docker-compose.yml \
+            -f deploy/docker/docker-compose.test.yml \
+            logs app 2>/dev/null | grep -iE "test-register|identity|register" | tail -20 || echo "No registration logs found"
+          echo "::endgroup::"
+          echo "::group::Logcat registration/crypto lines"
+          grep -iE "registerTestUser|CryptoService|nativeLibLoaded|SimulationClient" /tmp/logcat.txt | tail -30 || echo "No matching logcat lines"
+          echo "::endgroup::"
+
       - name: Tear down Docker Compose
         if: always()
         run: |

@@ -340,9 +340,8 @@ object SimulationClient {
                 val errorBody = try {
                     conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
                 } catch (_: IOException) { "" }
-                Log.w(TAG, "POST $path returned HTTP $code: $errorBody")
-                // Return the error body so the caller can parse the `error` field
-                errorBody.ifBlank { """{"ok":false,"error":"HTTP $code"}""" }
+                Log.e(TAG, "POST $path returned HTTP $code: $errorBody")
+                throw SimulationException("POST $path failed with HTTP $code: $errorBody")
             }
 
             Log.d(TAG, "Response ($code): ${body.take(500)}")

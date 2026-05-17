@@ -123,30 +123,34 @@ abstract class BaseSteps : SemanticsNodeInteractionsProvider {
      * This is idempotent — calling it multiple times is safe.
      */
     private fun registerTestUserOnBackend() {
-        try {
-            val entryPoint = EntryPointAccessors.fromApplication(
-                LlamenosApp.instance,
-                CryptoEntryPoint::class.java,
-            )
-            val cryptoService = entryPoint.cryptoService()
-            val signingPubkey = cryptoService.signingPubkeyHex
-            val encryptionPubkey = cryptoService.encryptionPubkeyHex
+        val entryPoint = EntryPointAccessors.fromApplication(
+            LlamenosApp.instance,
+            CryptoEntryPoint::class.java,
+        )
+        val cryptoService = entryPoint.cryptoService()
+        val signingPubkey = cryptoService.signingPubkeyHex
+        val encryptionPubkey = cryptoService.encryptionPubkeyHex
 
-            if (signingPubkey == null) {
-                Log.w(TAG, "registerTestUserOnBackend: no signing pubkey — skipping")
-                return
-            }
-
-            val hubId = ScenarioHooks.currentHubId.ifEmpty { null }
-            val result = SimulationClient.registerTestIdentity(
-                pubkey = signingPubkey,
-                x25519Pubkey = encryptionPubkey,
-                hubId = hubId,
-            )
-            Log.i(TAG, "registerTestUserOnBackend: ok=${result.ok}, error=${result.error}, hubId=$hubId")
-        } catch (e: Exception) {
-            Log.w(TAG, "registerTestUserOnBackend failed (non-fatal): ${e.message}")
+        check(signingPubkey != null) {
+            "registerTestUserOnBackend: CryptoService.signingPubkeyHex is null — " +
+                "keys were not generated during PIN setup. " +
+                "nativeLibLoaded=${cryptoService.nativeLibLoaded}, " +
+                "deviceId=${cryptoService.deviceId}"
         }
+
+        val hubId = ScenarioHooks.currentHubId.ifEmpty { null }
+        Log.i(TAG, "registerTestUserOnBackend: pubkey=${signingPubkey.take(16)}…, hubId=$hubId, hubUrl=${SimulationClient.hubUrl}")
+        val result = SimulationClient.registerTestIdentity(
+            pubkey = signingPubkey,
+            x25519Pubkey = encryptionPubkey,
+            hubId = hubId,
+        )
+        check(result.ok) {
+            "registerTestUserOnBackend: backend returned ok=false — " +
+                "error=${result.error}, detail=${result.detail}, " +
+                "hubId=$hubId, pubkey=${signingPubkey.take(16)}…"
+        }
+        Log.i(TAG, "registerTestUserOnBackend: SUCCESS hubId=$hubId")
     }
 
     /**
