@@ -61,6 +61,26 @@ async function verifyAdminAccess(baseUrl: string): Promise<void> {
   }
 }
 
+async function ensureDefaultHub(baseUrl: string): Promise<void> {
+  const secret = loadDevVarsSecret()
+  if (!secret) return
+  // Check if a hub already exists
+  const configRes = await fetch(`${baseUrl}/api/config`)
+  if (!configRes.ok) return
+  const config = await configRes.json() as { hubs?: Array<{ id: string }> }
+  if (config.hubs && config.hubs.length > 0) return
+  // Create a default hub for tests that need currentHubId
+  const res = await fetch(`${baseUrl}/api/test-create-hub`, {
+    method: 'POST',
+    headers: { 'X-Test-Secret': secret, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: 'Default Test Hub' }),
+  })
+  if (!res.ok) {
+    const text = await res.text()
+    console.warn(`[global-setup] Hub creation failed (non-fatal): ${res.status} ${text}`)
+  }
+}
+
 export default async function globalSetup(_config: FullConfig): Promise<void> {
   const maxAttempts = process.env.CI ? 30 : 10
   const retryDelayMs = process.env.CI ? 3000 : 2000
@@ -72,6 +92,7 @@ export default async function globalSetup(_config: FullConfig): Promise<void> {
         await resetTestState(BACKEND_URL)
         await bootstrapAdmin(BACKEND_URL)
         await verifyAdminAccess(BACKEND_URL)
+        await ensureDefaultHub(BACKEND_URL)
         return
       }
       if (i % 5 === 4) {

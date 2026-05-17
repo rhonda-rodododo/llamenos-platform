@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { loginAsAdmin, Timeouts } from './helpers'
+import { loginAsAdmin, mockConfigWithHub, navigateViaSpa, Timeouts } from './helpers'
 
 /**
  * Hub-specific API mock that returns different data depending on the hub ID
@@ -163,6 +163,7 @@ const HUB_B_DATA = {
 
 test.describe('Multi-Hub Navigation', () => {
   test('each hub displays its own provider type', async ({ page }) => {
+    await mockConfigWithHub(page, 'hub-a')
     await loginAsAdmin(page)
     // Mock with hub-specific data
     await mockMultiHubApis(page, {
@@ -170,7 +171,7 @@ test.describe('Multi-Hub Navigation', () => {
       'hub-b': HUB_B_DATA,
     })
 
-    await page.goto('/admin/hub-communications')
+    await navigateViaSpa(page, '/admin/hub-communications')
 
     // The page loads with the current hub from ConfigProvider.
     // We verify the settings panel renders with provider info.
@@ -179,13 +180,14 @@ test.describe('Multi-Hub Navigation', () => {
   })
 
   test('each hub displays its own usage data', async ({ page }) => {
+    await mockConfigWithHub(page, 'hub-a')
     await loginAsAdmin(page)
     await mockMultiHubApis(page, {
       'hub-a': HUB_A_DATA,
       'hub-b': HUB_B_DATA,
     })
 
-    await page.goto('/admin/hub-communications')
+    await navigateViaSpa(page, '/admin/hub-communications')
 
     // Usage card should be visible with data from the active hub
     const usageCard = page.getByTestId('hub-usage-card')
@@ -193,6 +195,7 @@ test.describe('Multi-Hub Navigation', () => {
   })
 
   test('unconfigured hub shows wizard while configured hub shows settings', async ({ page }) => {
+    await mockConfigWithHub(page, 'hub-a')
     await loginAsAdmin(page)
     await mockMultiHubApis(page, {
       'hub-a': HUB_A_DATA,
@@ -203,23 +206,20 @@ test.describe('Multi-Hub Navigation', () => {
       },
     })
 
-    await page.goto('/admin/hub-communications')
+    await navigateViaSpa(page, '/admin/hub-communications')
 
     // Page should render either wizard or settings depending on active hub
     // At minimum, the page should load without errors
-    const wizard = page.getByTestId('hub-onboarding-wizard')
-    const settings = page.getByTestId('hub-provider-settings')
     const pageTitle = page.getByTestId('page-title')
 
-    // One of these should be visible depending on which hub is active
-    await expect(
-      wizard.or(settings).or(pageTitle),
-    ).toBeVisible({ timeout: Timeouts.ELEMENT })
+    // Wait for page to render — page-title is always present
+    await expect(pageTitle).toBeVisible({ timeout: Timeouts.ELEMENT })
   })
 })
 
 test.describe('Multi-Hub Data Isolation', () => {
   test('hub data does not leak between different hub contexts', async ({ page }) => {
+    await mockConfigWithHub(page, 'hub-a')
     await loginAsAdmin(page)
     // Set up two hubs with very different usage numbers
     await mockMultiHubApis(page, {
@@ -243,18 +243,14 @@ test.describe('Multi-Hub Data Isolation', () => {
       },
     })
 
-    await page.goto('/admin/hub-communications')
+    await navigateViaSpa(page, '/admin/hub-communications')
 
     // The page should display data for exactly one hub (the active one).
     // We check that it doesn't show data from both hubs simultaneously.
-    const usageCard = page.getByTestId('hub-usage-card')
-    const settings = page.getByTestId('hub-provider-settings')
     const pageTitle = page.getByTestId('page-title')
 
     // Wait for page to render
-    await expect(
-      usageCard.or(settings).or(pageTitle),
-    ).toBeVisible({ timeout: Timeouts.ELEMENT })
+    await expect(pageTitle).toBeVisible({ timeout: Timeouts.ELEMENT })
 
     // Should not show both 999 and 1 at the same time in usage
     // (which would indicate data leakage between hubs)

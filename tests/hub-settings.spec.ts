@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { loginAsAdmin, Timeouts } from './helpers'
+import { loginAsAdmin, mockConfigWithHub, navigateViaSpa, Timeouts } from './helpers'
 
 /**
  * Mock API responses for a fully configured hub (post-onboarding state).
@@ -113,9 +113,10 @@ async function mockConfiguredHub(
 
 test.describe('Hub Provider Settings Panel', () => {
   test.beforeEach(async ({ page }) => {
+    await mockConfigWithHub(page)
     await loginAsAdmin(page)
     await mockConfiguredHub(page)
-    await page.goto('/admin/hub-communications')
+    await navigateViaSpa(page, '/admin/hub-communications')
   })
 
   test('renders settings page with page title for configured hub', async ({ page }) => {
@@ -133,8 +134,11 @@ test.describe('Hub Provider Settings Panel', () => {
 
   test('provider settings card shows disconnected status', async ({ page }) => {
     await page.unrouteAll()
+    await mockConfigWithHub(page)
     await mockConfiguredHub(page, { providerConnected: false })
-    await page.reload()
+    // Re-navigate via SPA to trigger refetch (page.reload() would drop auth state)
+    await navigateViaSpa(page, '/')
+    await navigateViaSpa(page, '/admin/hub-communications')
 
     const settings = page.getByTestId('hub-provider-settings')
     await expect(settings).toBeVisible({ timeout: Timeouts.ELEMENT })
@@ -173,8 +177,10 @@ test.describe('Hub Provider Settings Panel', () => {
 
   test('provider settings card hides A2P section when status is null', async ({ page }) => {
     await page.unrouteAll()
+    await mockConfigWithHub(page)
     await mockConfiguredHub(page, { a2pStatus: null })
-    await page.reload()
+    await navigateViaSpa(page, '/')
+    await navigateViaSpa(page, '/admin/hub-communications')
 
     const settings = page.getByTestId('hub-provider-settings')
     await expect(settings).toBeVisible({ timeout: Timeouts.ELEMENT })
@@ -196,6 +202,7 @@ test.describe('Hub Provider Settings Panel', () => {
 
   test('usage card shows zero values correctly', async ({ page }) => {
     await page.unrouteAll()
+    await mockConfigWithHub(page)
     await mockConfiguredHub(page, {
       usage: {
         callsReceived: 0,
@@ -204,12 +211,13 @@ test.describe('Hub Provider Settings Panel', () => {
         whatsAppMessagesSent: 0,
       },
     })
-    await page.reload()
+    await navigateViaSpa(page, '/')
+    await navigateViaSpa(page, '/admin/hub-communications')
 
     const usageCard = page.getByTestId('hub-usage-card')
     await expect(usageCard).toBeVisible({ timeout: Timeouts.ELEMENT })
 
-    await expect(usageCard.getByText('0 / 500')).toBeVisible()
+    await expect(usageCard.getByText('0 / 500').first()).toBeVisible()
     await expect(usageCard.getByText('0 / 1000')).toBeVisible()
   })
 
@@ -221,9 +229,10 @@ test.describe('Hub Provider Settings Panel', () => {
 
 test.describe('Hub Settings - Provider type variations', () => {
   test('shows correct provider label for signalwire', async ({ page }) => {
+    await mockConfigWithHub(page)
     await loginAsAdmin(page)
     await mockConfiguredHub(page, { providerType: 'signalwire' })
-    await page.goto('/admin/hub-communications')
+    await navigateViaSpa(page, '/admin/hub-communications')
 
     const settings = page.getByTestId('hub-provider-settings')
     await expect(settings).toBeVisible({ timeout: Timeouts.ELEMENT })
@@ -233,9 +242,10 @@ test.describe('Hub Settings - Provider type variations', () => {
   })
 
   test('shows correct provider label for vonage', async ({ page }) => {
+    await mockConfigWithHub(page)
     await loginAsAdmin(page)
     await mockConfiguredHub(page, { providerType: 'vonage' })
-    await page.goto('/admin/hub-communications')
+    await navigateViaSpa(page, '/admin/hub-communications')
 
     const settings = page.getByTestId('hub-provider-settings')
     await expect(settings).toBeVisible({ timeout: Timeouts.ELEMENT })
@@ -246,18 +256,20 @@ test.describe('Hub Settings - Provider type variations', () => {
 
 test.describe('Hub Settings - Channel configured/pending state', () => {
   test('shows configured channels with checkmark', async ({ page }) => {
+    await mockConfigWithHub(page)
     await loginAsAdmin(page)
     await mockConfiguredHub(page, {
       channelsConfigured: ['voice', 'sms'],
       channelsPending: [],
     })
-    await page.goto('/admin/hub-communications')
+    await navigateViaSpa(page, '/admin/hub-communications')
 
     const settings = page.getByTestId('hub-provider-settings')
     await expect(settings).toBeVisible({ timeout: Timeouts.ELEMENT })
   })
 
   test('shows pending channels with pending label', async ({ page }) => {
+    await mockConfigWithHub(page)
     await loginAsAdmin(page)
     await mockConfiguredHub(page, {
       channelsConfigured: ['voice'],
@@ -272,7 +284,7 @@ test.describe('Hub Settings - Channel configured/pending state', () => {
         rcs: false,
       },
     })
-    await page.goto('/admin/hub-communications')
+    await navigateViaSpa(page, '/admin/hub-communications')
 
     const settings = page.getByTestId('hub-provider-settings')
     await expect(settings).toBeVisible({ timeout: Timeouts.ELEMENT })

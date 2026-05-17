@@ -274,7 +274,8 @@
       "tags": "Tags",
       "teams": "Teams",
       "transcription": "Transcription",
-      "voicePrompts": "Voice Prompts"
+      "voicePrompts": "Voice Prompts",
+      "recoveryRequests": "Recovery Requests"
     },
     "openMenu": "Open menu",
     "scopes": {
