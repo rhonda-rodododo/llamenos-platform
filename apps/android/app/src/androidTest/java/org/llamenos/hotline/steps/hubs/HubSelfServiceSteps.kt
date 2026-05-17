@@ -163,24 +163,29 @@ class HubSelfServiceSteps : BaseSteps() {
 
     @And("I proceed to the phone number step")
     fun iProceedToThePhoneNumberStep() {
-        // On the provider step, click "Next" to go to phone number
-        val providerNextNodes = composeRule.onAllNodesWithTag("onboarding-phone-numbers")
-            .fetchSemanticsNodes()
-
-        if (providerNextNodes.isEmpty()) {
-            // Need to click the navigation button within the provider step
-            // The provider step has a row with back/next buttons
-            // The "next" button text is the phone number step label
-            composeRule.waitUntil(10_000) {
-                composeRule.onAllNodesWithTag("onboarding-phone-numbers").fetchSemanticsNodes().isNotEmpty()
-            }
+        // Click the "Next" button on the provider step to advance to phone number
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithTag("onboarding-next-phone").fetchSemanticsNodes().isNotEmpty()
         }
-
+        onNodeWithTag("onboarding-next-phone").performClick()
         composeRule.waitForIdle()
+
+        // Wait for the phone number step to render
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithTag("onboarding-phone-numbers").fetchSemanticsNodes().isNotEmpty()
+        }
     }
 
     @And("I complete the onboarding summary")
     fun iCompleteTheOnboardingSummary() {
+        // Advance from phone number step to summary step
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithTag("onboarding-next-summary").fetchSemanticsNodes().isNotEmpty()
+        }
+        onNodeWithTag("onboarding-next-summary").performClick()
+        composeRule.waitForIdle()
+
+        // Now click the "Complete" button on the summary step
         composeRule.waitUntil(10_000) {
             composeRule.onAllNodesWithTag("onboarding-complete").fetchSemanticsNodes().isNotEmpty()
         }

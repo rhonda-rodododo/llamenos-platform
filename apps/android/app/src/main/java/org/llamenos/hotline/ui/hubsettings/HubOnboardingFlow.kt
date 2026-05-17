@@ -206,7 +206,9 @@ fun HubOnboardingFlow(
                                     onCompleteStep("provider_connection", emptyMap())
                                     currentStep = OnboardingStep.PHONE_NUMBER
                                 },
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("onboarding-next-phone"),
                                 enabled = !isCompletingStep,
                             ) {
                                 Text(stringResource(R.string.hub_onboarding_step_phone_number))
@@ -254,7 +256,9 @@ fun HubOnboardingFlow(
                                     onCompleteStep("phone_number", emptyMap())
                                     currentStep = OnboardingStep.SUMMARY
                                 },
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("onboarding-next-summary"),
                                 enabled = !isCompletingStep,
                             ) {
                                 Text(stringResource(R.string.hub_onboarding_step_summary))
