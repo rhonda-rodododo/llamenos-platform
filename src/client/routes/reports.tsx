@@ -182,13 +182,16 @@ function ReportsPage() {
   }, [selectedId, hasNsec, publicKey, adminDecryptionPubkey, toast, t])
 
   const handleReportCreated = useCallback((reportId: string) => {
-    // Refresh reports list and select the new one
+    // Refresh reports list and select the new one.
+    // Set loading so the list panel stays rendered (not empty state) while fetching.
+    setLoading(true)
     listReports()
       .then(({ conversations }) => {
         setReports(conversations)
         setSelectedId(reportId)
       })
       .catch(() => toast(t('common.error'), 'error'))
+      .finally(() => setLoading(false))
   }, [t, toast])
 
   const showEmptyState = !loading && reports.length === 0
