@@ -75,7 +75,11 @@ fun HubOnboardingFlow(
     modifier: Modifier = Modifier,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var currentStep by remember(onboardingState) {
+    // Do NOT key on onboardingState — when the server responds to completeStep(),
+    // we advance the step locally before the response arrives. Re-keying on
+    // onboardingState would reset currentStep to the server's value, causing the
+    // UI to flicker back and the next step's content to disappear (timeout on CI).
+    var currentStep by remember {
         mutableStateOf(
             OnboardingStep.entries.find { it.key == onboardingState?.currentStep }
                 ?: OnboardingStep.TEMPLATE
@@ -134,6 +138,7 @@ fun HubOnboardingFlow(
                         onToggle = onToggleChannel,
                         title = stringResource(R.string.hub_onboarding_channel_checklist_title),
                         description = stringResource(R.string.hub_onboarding_channel_checklist_description),
+                        testTag = "onboarding-channel-checklist",
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -206,7 +211,9 @@ fun HubOnboardingFlow(
                                     onCompleteStep("provider_connection", emptyMap())
                                     currentStep = OnboardingStep.PHONE_NUMBER
                                 },
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("onboarding-next-phone"),
                                 enabled = !isCompletingStep,
                             ) {
                                 Text(stringResource(R.string.hub_onboarding_step_phone_number))
@@ -254,7 +261,9 @@ fun HubOnboardingFlow(
                                     onCompleteStep("phone_number", emptyMap())
                                     currentStep = OnboardingStep.SUMMARY
                                 },
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("onboarding-next-summary"),
                                 enabled = !isCompletingStep,
                             ) {
                                 Text(stringResource(R.string.hub_onboarding_step_summary))

@@ -37,7 +37,7 @@ enum class TriageStatusFilter(val apiValue: String?) {
 data class TriageUiState(
     val reports: List<Report> = emptyList(),
     val total: Int = 0,
-    val isLoading: Boolean = false,
+    val isLoading: Boolean = true,
     val isRefreshing: Boolean = false,
     val error: String? = null,
     val selectedFilter: TriageStatusFilter = TriageStatusFilter.PENDING,
@@ -202,6 +202,36 @@ class TriageViewModel @Inject constructor(
                     )
                 }
             }
+        }
+    }
+
+    /**
+     * Load a single report by ID (for detail screen navigation).
+     * Fetches the report from the API and adds it to the reports list
+     * so the detail screen can find it.
+     */
+    fun loadReportById(reportId: String) {
+        viewModelScope.launch {
+            if (_uiState.value.reports.any { it.id == reportId }) return@launch
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            try {
+                val path = apiService.hp("/api/reports/$reportId")
+                val report = apiService.request<Report>("GET", path)
+                _uiState.update {
+                    it.copy(
+                        reports = it.reports + report,
+                        isLoading = false,
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = e.message ?: "Failed to load report",
+                    )
+                }
+            }
+            fetchReportTypes()
         }
     }
 

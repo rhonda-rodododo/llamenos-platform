@@ -12,6 +12,7 @@ import org.llamenos.hotline.crypto.CryptoService
 import org.llamenos.hotline.crypto.KeystoreService
 import org.llamenos.hotline.di.ActiveHubEntryPoint
 import org.llamenos.hotline.helpers.SimulationClient
+import org.llamenos.hotline.helpers.TestApiClient
 import org.llamenos.hotline.hub.ActiveHubState
 
 /**
@@ -39,6 +40,16 @@ class ScenarioHooks {
          */
         @Volatile
         var currentHubId: String = ""
+            private set
+
+        /**
+         * Admin seed for test seeding (used in SeedSpec.adminSeed).
+         * 64-char hex — matches ADMIN_SEED in tests/api-helpers.ts.
+         */
+        const val ADMIN_SEED = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+        @Volatile
+        var apiClient: TestApiClient? = null
             private set
     }
 
@@ -87,6 +98,12 @@ class ScenarioHooks {
                 if (response.id.isNotEmpty()) {
                     currentHubId = response.id
                     Log.i(TAG, "Created test hub: ${response.id} (${response.name}) [attempt $attempt]")
+
+                    // Create thin API client (uses X-Test-Secret, no admin bootstrap needed)
+                    apiClient = TestApiClient(
+                        baseUrl = SimulationClient.hubUrl,
+                        testSecret = SimulationClient.testSecret,
+                    )
                     return
                 } else {
                     val msg = "createTestHub returned empty ID — error: ${response.error} [attempt $attempt]"
@@ -150,12 +167,33 @@ class ScenarioHooks {
 
     @After(order = 9000)
     fun clearIdentityState() {
-        Log.d(TAG, "clearIdentityState: clearing keystore and crypto lock")
+        Log.d(TAG, "clearIdentityState: clearing keystore, crypto lock, and app data")
         try {
             keystoreService.clear()
             cryptoService.lock()
         } catch (t: Throwable) {
-            Log.w(TAG, "clearIdentityState failed (best-effort): ${t.message}")
+            Log.w(TAG, "clearIdentityState keystore/crypto failed (best-effort): ${t.message}")
+        }
+        // Clear DataStore and SharedPreferences so the next scenario starts fresh
+        // (hub URL, PIN hash, active hub ID). Without this, the app shows a
+        // "returning user" PIN screen instead of the fresh-install flow.
+        try {
+            val context = InstrumentationRegistry.getInstrumentation().targetContext
+            // Clear all SharedPreferences files
+            context.filesDir.parentFile?.resolve("shared_prefs")?.let { prefsDir ->
+                if (prefsDir.exists()) {
+                    prefsDir.listFiles()?.forEach { it.delete() }
+                }
+            }
+            // Clear DataStore files
+            context.filesDir.resolve("datastore")?.let { dsDir ->
+                if (dsDir.exists()) {
+                    dsDir.listFiles()?.forEach { it.delete() }
+                }
+            }
+            Log.d(TAG, "clearIdentityState: app data cleared")
+        } catch (t: Throwable) {
+            Log.w(TAG, "clearIdentityState data clearing failed (best-effort): ${t.message}")
         }
     }
 

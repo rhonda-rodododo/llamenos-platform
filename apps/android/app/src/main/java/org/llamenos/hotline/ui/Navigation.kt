@@ -849,6 +849,9 @@ fun LlamenosNavigation(
         ) { backStackEntry ->
             val reportId = backStackEntry.arguments?.getString("reportId") ?: ""
             val triageViewModel: TriageViewModel = hiltViewModel()
+            LaunchedEffect(reportId) {
+                triageViewModel.loadReportById(reportId)
+            }
             TriageDetailScreen(
                 viewModel = triageViewModel,
                 reportId = reportId,

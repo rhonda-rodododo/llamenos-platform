@@ -1,6 +1,7 @@
 package org.llamenos.hotline.ui.triage
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -119,6 +120,20 @@ fun TriageDetailScreen(
         },
         modifier = modifier,
     ) { paddingValues ->
+        if (report == null && uiState.isLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.testTag("triage-detail-loading"),
+                )
+            }
+            return@Scaffold
+        }
+
         if (report == null) {
             org.llamenos.hotline.ui.components.EmptyState(
                 icon = Icons.Filled.FolderOpen,

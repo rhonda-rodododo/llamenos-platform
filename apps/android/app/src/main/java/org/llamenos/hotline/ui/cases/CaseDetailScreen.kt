@@ -195,12 +195,6 @@ fun CaseDetailScreen(
                         isNewCase = isNewCase,
                         decryptedSummary = uiState.decryptedSummary,
                         onStatusClick = { showStatusSheet = true },
-                        onAssignToMe = { record?.let { viewModel.assignToMe(it.id) } },
-                        onUnassignFromMe = { record?.let { viewModel.unassignFromMe(it.id) } },
-                        isAssigning = uiState.isAssigning,
-                        isCurrentUserAssigned = record?.assignedTo?.contains(
-                            viewModel.currentUserPubkey
-                        ) == true,
                     )
 
                     // Tab row
@@ -245,6 +239,12 @@ fun CaseDetailScreen(
                                 decryptedSummary = uiState.decryptedSummary,
                                 decryptedFields = uiState.decryptedFields,
                                 isDecryptingFields = uiState.isDecryptingFields,
+                                onAssignToMe = { viewModel.assignToMe(record.id) },
+                                onUnassignFromMe = { viewModel.unassignFromMe(record.id) },
+                                isAssigning = uiState.isAssigning,
+                                isCurrentUserAssigned = record.assignedTo.contains(
+                                    viewModel.currentUserPubkey,
+                                ),
                             )
                             CaseDetailTab.TIMELINE -> TimelineTab(
                                 interactions = uiState.sortedInteractions,
@@ -326,10 +326,6 @@ private fun CaseDetailHeader(
     isNewCase: Boolean = false,
     decryptedSummary: DecryptedSummary? = null,
     onStatusClick: () -> Unit,
-    onAssignToMe: () -> Unit = {},
-    onUnassignFromMe: () -> Unit = {},
-    isAssigning: Boolean = false,
-    isCurrentUserAssigned: Boolean = false,
 ) {
     val statusOption = record?.let { r ->
         entityType?.statuses?.find { it.value == r.statusHash }
@@ -424,87 +420,38 @@ private fun CaseDetailHeader(
 
         // Severity + assignment info
         if (record != null) {
-            Spacer(Modifier.height(6.dp))
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                // Severity badge
-                val severityOption = record.severityHash?.let { hash ->
-                    entityType?.severities?.find { it.value == hash }
-                }
-                if (severityOption != null) {
-                    val sevColor = severityOption.color?.let { parseHexColor(it) }
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = (sevColor ?: MaterialTheme.colorScheme.errorContainer)
-                                .copy(alpha = 0.15f),
-                        ),
-                    ) {
+            val severityOption = record.severityHash?.let { hash ->
+                entityType?.severities?.find { it.value == hash }
+            }
+            if (severityOption != null || record.assignedTo.isNotEmpty()) {
+                Spacer(Modifier.height(6.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (severityOption != null) {
+                        val sevColor = severityOption.color?.let { parseHexColor(it) }
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = (sevColor ?: MaterialTheme.colorScheme.errorContainer)
+                                    .copy(alpha = 0.15f),
+                            ),
+                        ) {
+                            Text(
+                                text = severityOption.label,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = sevColor ?: MaterialTheme.colorScheme.error,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                            )
+                        }
+                    }
+
+                    if (record.assignedTo.isNotEmpty()) {
                         Text(
-                            text = severityOption.label,
+                            text = "${record.assignedTo.size} assigned",
                             style = MaterialTheme.typography.labelSmall,
-                            color = sevColor ?: MaterialTheme.colorScheme.error,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                         )
-                    }
-                }
-
-                // Assignment count
-                if (record.assignedTo.isNotEmpty()) {
-                    Text(
-                        text = "${record.assignedTo.size} assigned",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                    )
-                }
-
-                Spacer(Modifier.weight(1f))
-
-                // Assign / unassign button
-                if (isCurrentUserAssigned) {
-                    OutlinedButton(
-                        onClick = onUnassignFromMe,
-                        enabled = !isAssigning,
-                        modifier = Modifier.testTag("case-unassign-btn"),
-                    ) {
-                        if (isAssigning) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(14.dp),
-                                strokeWidth = 2.dp,
-                            )
-                            Spacer(Modifier.width(6.dp))
-                        }
-                        Icon(
-                            imageVector = Icons.Outlined.PersonOff,
-                            contentDescription = null,
-                            modifier = Modifier.size(14.dp),
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text("Unassign", style = MaterialTheme.typography.labelSmall)
-                    }
-                } else {
-                    Button(
-                        onClick = onAssignToMe,
-                        enabled = !isAssigning,
-                        modifier = Modifier.testTag("case-assign-btn-header"),
-                    ) {
-                        if (isAssigning) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(14.dp),
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.onPrimary,
-                            )
-                            Spacer(Modifier.width(6.dp))
-                        }
-                        Icon(
-                            imageVector = Icons.Filled.PersonAdd,
-                            contentDescription = null,
-                            modifier = Modifier.size(14.dp),
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text("Assign to me", style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }
@@ -597,6 +544,10 @@ private fun DetailsTab(
     decryptedSummary: DecryptedSummary? = null,
     decryptedFields: Map<String, String> = emptyMap(),
     isDecryptingFields: Boolean = false,
+    onAssignToMe: () -> Unit = {},
+    onUnassignFromMe: () -> Unit = {},
+    isAssigning: Boolean = false,
+    isCurrentUserAssigned: Boolean = false,
 ) {
     Column(
         modifier = Modifier
@@ -605,6 +556,56 @@ private fun DetailsTab(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        // Assign / unassign buttons
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            if (isCurrentUserAssigned) {
+                OutlinedButton(
+                    onClick = onUnassignFromMe,
+                    enabled = !isAssigning,
+                    modifier = Modifier.testTag("case-unassign-btn"),
+                ) {
+                    if (isAssigning) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(14.dp),
+                            strokeWidth = 2.dp,
+                        )
+                        Spacer(Modifier.width(6.dp))
+                    }
+                    Icon(
+                        imageVector = Icons.Outlined.PersonOff,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text("Unassign", style = MaterialTheme.typography.labelSmall)
+                }
+            }
+            Button(
+                onClick = onAssignToMe,
+                enabled = !isAssigning && !isCurrentUserAssigned,
+                modifier = Modifier.testTag("case-assign-btn-header"),
+            ) {
+                if (isAssigning) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(14.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                    )
+                    Spacer(Modifier.width(6.dp))
+                }
+                Icon(
+                    imageVector = Icons.Filled.PersonAdd,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                )
+                Spacer(Modifier.width(4.dp))
+                Text("Assign to me", style = MaterialTheme.typography.labelSmall)
+            }
+        }
+
         // Summary section
         Card(
             colors = CardDefaults.cardColors(
