@@ -15,11 +15,11 @@ This audit examined the two core components of the Llamenos platform: the shared
 
 | Severity | Count | Components Affected |
 |----------|-------|---------------------|
-| HIGH | 6 | Crypto (2), Worker (4) |
+| HIGH | 8 | Crypto (2), Worker (6) |
 | MEDIUM | 15 | Crypto (5), Worker (10) |
 | LOW | 10 | Crypto (3), Worker (7) |
 | INFO | 2 | Crypto (1), Worker (1) |
-| **Total** | **33** | |
+| **Total** | **35** | |
 
 ### Top Priority Issues
 
@@ -125,6 +125,26 @@ Of the original 58 findings from the 2026-03-21 audit, this audit re-verified 18
 **Description**: The records by-contact endpoint does not verify the requesting user has access to the specific contact's records. Any authenticated user with `records:read` permission can query records for any contact identifier across the hub.
 **Impact**: Cross-user data access within a hub. A volunteer could see records created by other volunteers for a specific contact, potentially violating the isolation guarantees (volunteers should only see their own notes).
 **Recommendation**: Filter results to records the requesting user created or has explicit access to, unless the user has admin-level permissions.
+
+---
+
+### HIGH-W5: Account Lockdown Missing Elevated Auth
+
+**Component**: Worker — Account Routes
+**File(s)**: `apps/worker/routes/account.ts:20`
+**Description**: The `POST /lockdown` and `POST /lockdown/complete` routes claim to require "elevated auth (fresh PIN or WebAuthn assertion)" per code comments, but no such elevated auth check exists. Any authenticated session can trigger emergency lockdown, which terminates all other sessions and signals key rotation.
+**Impact**: A compromised session token can trigger lockdown as a denial-of-service vector against legitimate admin sessions. For a crisis hotline where availability is critical, this is significant.
+**Recommendation**: Add elevated auth verification (WebAuthn assertion or fresh PIN challenge) before allowing lockdown execution.
+
+---
+
+### HIGH-W6: Recovery Group Emergency Override Accepts Untrusted `approverPubkey`
+
+**Component**: Worker — Recovery Group Routes
+**File(s)**: `apps/worker/routes/recovery-group.ts:222-262`
+**Description**: `POST /session/:id/emergency` accepts `approverPubkey` from the request body rather than using the authenticated caller's pubkey from `c.get('pubkey')`. A user with `recovery:approve` permission could specify a different approver pubkey, potentially impersonating another approver.
+**Impact**: If the service layer validates the signature against the provided (untrusted) `approverPubkey` rather than the authenticated caller, the approval attribution is unreliable.
+**Recommendation**: Enforce `body.approverPubkey === c.get('pubkey')` in the route handler, or pass `c.get('pubkey')` directly to the service.
 
 ---
 
@@ -523,6 +543,8 @@ Cross-referencing the 9 open gaps as of v1.1 (2026-05-12):
 4. **HIGH-W2**: Remove bare Bearer token bypass in dev endpoint gate
 5. **HIGH-W3**: Hash ban list phone numbers (HMAC-SHA256)
 6. **HIGH-W4**: Add access control to records by-contact endpoint
+7. **HIGH-W5**: Add elevated auth to lockdown endpoints
+8. **HIGH-W6**: Enforce approverPubkey matches authenticated caller
 
 ### Short-Term (Next Sprint)
 
@@ -548,4 +570,4 @@ Cross-referencing the 9 open gaps as of v1.1 (2026-05-12):
 
 | Date | Version | Changes |
 |------|---------|---------|
-| 2026-05-18 | 1.0 | Initial core audit: 33 findings (6 HIGH, 15 MEDIUM, 10 LOW, 2 INFO). 18 previous findings re-verified as FIXED. Gap 2.1 confirmed RESOLVED. |
+| 2026-05-18 | 1.0 | Initial core audit: 35 findings (8 HIGH, 15 MEDIUM, 10 LOW, 2 INFO). 18 previous findings re-verified as FIXED. Gap 2.1 confirmed RESOLVED. |
