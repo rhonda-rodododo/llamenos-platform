@@ -16,6 +16,15 @@ The 2026-05-18 audit identified supply chain and infrastructure hardening gaps t
 
 ## Findings
 
+### Strategic Decision: Watchtower (User-Confirmed 2026-05-18)
+- **Keep Watchtower** with Docker socket proxy for restricted API access.
+- Use `tecnativa/docker-socket-proxy` with minimal permissions (no exec, no run, limited container list/inspect).
+- Watchtower connects to proxy, NOT directly to docker.sock.
+- Pin Watchtower image to digest.
+- This is the most secure option despite added complexity.
+
+---
+
 ### H34 — Watchtower mounts raw `/var/run/docker.sock`
 
 **File**: `deploy/docker/docker-compose.production.yml:235`
