@@ -16,10 +16,10 @@ This audit examined the two core components of the Llamenos platform: the shared
 | Severity | Count | Components Affected |
 |----------|-------|---------------------|
 | HIGH | 6 | Crypto (2), Worker (4) |
-| MEDIUM | 13 | Crypto (5), Worker (8) |
+| MEDIUM | 15 | Crypto (5), Worker (10) |
 | LOW | 10 | Crypto (3), Worker (7) |
 | INFO | 2 | Crypto (1), Worker (1) |
-| **Total** | **31** | |
+| **Total** | **33** | |
 
 ### Top Priority Issues
 
@@ -258,7 +258,27 @@ Of the original 58 findings from the 2026-03-21 audit, this audit re-verified 18
 
 ---
 
-### MED-W8: Panic Paths on RNG and Mutex Failures in Crypto Crate
+### MED-W8: Session Tokens Stored as Plaintext in Database
+
+**Component**: Worker — Identity Service
+**File(s)**: `apps/worker/services/identity.ts:591-604`
+**Description**: Session tokens are stored as plaintext hex in the database and looked up via direct SQL equality comparison. If the database is compromised, all active session tokens are immediately usable.
+**Impact**: Database compromise directly yields all active sessions. For a crisis hotline with nation-state adversary threat model, this is significant.
+**Recommendation**: Store SHA-256(token) in the database. On validation, hash the incoming token and compare against the hash.
+
+---
+
+### MED-W9: Dual-Mounted Routes Risk Cross-Hub Data Leakage
+
+**Component**: Worker — Route Architecture
+**File(s)**: `apps/worker/app.ts:229-258`
+**Description**: Many route modules are mounted both under the global authenticated scope and under the hub-scoped scope (`/hubs/:hubId/`). The same route handler runs in both contexts. Routes that should only be accessible in a hub context can also be accessed via the non-hub-scoped path, where `hubPermissions` is undefined and `hubId` is unset. If service implementations don't independently filter by hubId, data from multiple hubs could be returned.
+**Impact**: A user with global `audit:read` could read audit entries without specifying a hub, potentially seeing cross-hub data.
+**Recommendation**: Audit each dual-mounted route's service layer to verify it filters by hubId. Routes that should only work in hub context should not be mounted in the global scope.
+
+---
+
+### MED-W10: Panic Paths on RNG and Mutex Failures in Crypto Crate
 
 **Component**: Crypto — Error Handling
 **File(s)**: `packages/crypto/src/encryption.rs`, `packages/crypto/src/padding.rs`, `packages/crypto/src/mls.rs`, `packages/crypto/src/ffi_v3.rs`
@@ -509,8 +529,10 @@ Cross-referencing the 9 open gaps as of v1.1 (2026-05-12):
 7. **MED-W1**: Make SSRF guard fail-closed on DNS errors
 8. **MED-W2**: Use `timingSafeEqual` for recovery code comparison
 9. **MED-W4**: Refuse plaintext WS events when `SERVER_SECRET` missing
-10. **MED-C3**: Add AAD binding to `encrypt_with_pin`
-11. **MED-C4**: Make `DeviceSecrets` fields private
+10. **MED-W8**: Hash session tokens before storing in database
+11. **MED-W9**: Audit dual-mounted routes for cross-hub data leakage
+12. **MED-C3**: Add AAD binding to `encrypt_with_pin`
+13. **MED-C4**: Make `DeviceSecrets` fields private
 
 ### Medium-Term (Next Month)
 
@@ -526,4 +548,4 @@ Cross-referencing the 9 open gaps as of v1.1 (2026-05-12):
 
 | Date | Version | Changes |
 |------|---------|---------|
-| 2026-05-18 | 1.0 | Initial core audit: 31 findings (6 HIGH, 13 MEDIUM, 10 LOW, 2 INFO). 18 previous findings re-verified as FIXED. Gap 2.1 confirmed RESOLVED. |
+| 2026-05-18 | 1.0 | Initial core audit: 33 findings (6 HIGH, 15 MEDIUM, 10 LOW, 2 INFO). 18 previous findings re-verified as FIXED. Gap 2.1 confirmed RESOLVED. |
