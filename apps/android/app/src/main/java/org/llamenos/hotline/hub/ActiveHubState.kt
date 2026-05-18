@@ -6,12 +6,12 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import org.llamenos.hotline.di.ApplicationScope
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -22,8 +22,10 @@ import javax.inject.Singleton
  * Both ApiService and HubRepository inject this to break the circular dependency
  * that would arise if either owned the other. Neither owns this class.
  *
- * Persists to DataStore Preferences. StateFlow backed by DataStore ensures
- * all collectors receive the latest value immediately on collect.
+ * Uses an in-memory MutableStateFlow for immediate UI updates on hub switch,
+ * with DataStore persistence in the background. This avoids the latency of
+ * waiting for DataStore disk I/O before the UI recomposes (critical on slow
+ * CI emulators with swiftshader where disk ops take hundreds of milliseconds).
  */
 @Singleton
 class ActiveHubState @Inject constructor(
@@ -34,9 +36,22 @@ class ActiveHubState @Inject constructor(
         private val ACTIVE_HUB_KEY = stringPreferencesKey("activeHubId")
     }
 
-    val activeHubId: StateFlow<String?> = dataStore.data
-        .map { prefs -> prefs[ACTIVE_HUB_KEY] }
-        .stateIn(scope, SharingStarted.Eagerly, null)
+    private val _activeHubId = MutableStateFlow<String?>(null)
+
+    val activeHubId: StateFlow<String?> = _activeHubId
+
+    init {
+        // Hydrate from DataStore on startup, then keep in-memory state as source of truth.
+        scope.launch {
+            dataStore.data
+                .map { prefs -> prefs[ACTIVE_HUB_KEY] }
+                .collect { persisted ->
+                    // Only update from DataStore if we haven't set a value yet (startup hydration)
+                    // or if an external process changed it.
+                    _activeHubId.compareAndSet(null, persisted)
+                }
+        }
+    }
 
     private val _refreshTrigger = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
@@ -51,6 +66,9 @@ class ActiveHubState @Inject constructor(
     val refreshTrigger: SharedFlow<Unit> = _refreshTrigger.asSharedFlow()
 
     suspend fun setActiveHub(hubId: String) {
+        // Update in-memory state immediately for instant UI recomposition.
+        _activeHubId.value = hubId
+        // Persist to DataStore in the background (non-blocking for the caller).
         dataStore.edit { prefs -> prefs[ACTIVE_HUB_KEY] = hubId }
     }
 
@@ -63,6 +81,7 @@ class ActiveHubState @Inject constructor(
     }
 
     suspend fun clearActiveHub() {
+        _activeHubId.value = null
         dataStore.edit { prefs -> prefs.remove(ACTIVE_HUB_KEY) }
     }
 }

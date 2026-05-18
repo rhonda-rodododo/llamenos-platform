@@ -25,8 +25,10 @@ import javax.inject.Inject
  * UI state for hub communications settings and onboarding.
  */
 data class HubCommunicationsUiState(
-    // Overall loading
+    // Overall loading — only true on first load when no data is available yet.
+    // Subsequent refreshes don't set this, so the channel checklist remains visible.
     val isLoading: Boolean = false,
+    val isRefreshing: Boolean = false,
     val error: String? = null,
 
     // Provider status
@@ -81,10 +83,22 @@ class HubCommunicationsViewModel @Inject constructor(
      *
      * Does NOT auto-show the onboarding sheet — that is triggered explicitly
      * by the user clicking "Start Setup" via [showOnboarding].
+     *
+     * Uses isLoading only on first load (no prior data). Subsequent calls use
+     * isRefreshing so the channel checklist and other content remain visible
+     * during data fetch — prevents assertions failing because content is hidden
+     * behind a full-screen loading spinner.
      */
     fun loadAll() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
+            val isFirstLoad = _uiState.value.setupStatus == null
+            _uiState.update {
+                it.copy(
+                    isLoading = isFirstLoad,
+                    isRefreshing = !isFirstLoad,
+                    error = null,
+                )
+            }
 
             // Fetch provider status and usage in parallel to avoid sequential latency.
             coroutineScope {
@@ -123,7 +137,7 @@ class HubCommunicationsViewModel @Inject constructor(
                 )
             }
 
-            _uiState.update { it.copy(isLoading = false) }
+            _uiState.update { it.copy(isLoading = false, isRefreshing = false) }
         }
     }
 

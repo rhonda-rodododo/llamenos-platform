@@ -75,7 +75,11 @@ fun HubOnboardingFlow(
     modifier: Modifier = Modifier,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var currentStep by remember(onboardingState) {
+    // Do NOT key on onboardingState — when the server responds to completeStep(),
+    // we advance the step locally before the response arrives. Re-keying on
+    // onboardingState would reset currentStep to the server's value, causing the
+    // UI to flicker back and the next step's content to disappear (timeout on CI).
+    var currentStep by remember {
         mutableStateOf(
             OnboardingStep.entries.find { it.key == onboardingState?.currentStep }
                 ?: OnboardingStep.TEMPLATE
