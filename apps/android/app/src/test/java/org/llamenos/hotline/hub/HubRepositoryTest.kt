@@ -29,7 +29,7 @@ class HubRepositoryTest {
         )
 
     @Test
-    fun `switchHub fetches key then persists hub ID`() = runTest {
+    fun `switchHub persists hub ID immediately then fetches key`() = runTest {
         val envelope = makeEnvelope()
         coEvery { apiService.getHubKey("hub-uuid-001") } returns envelope
         coEvery { activeHubState.setActiveHub(any()) } returns Unit
@@ -37,8 +37,12 @@ class HubRepositoryTest {
 
         repo.switchHub("hub-uuid-001")
 
-        coVerify(exactly = 1) { cryptoService.loadHubKey("hub-uuid-001", envelope) }
-        coVerify(exactly = 1) { activeHubState.setActiveHub("hub-uuid-001") }
+        // Hub ID is persisted first so the UI updates immediately.
+        // Key fetch happens after — it's only needed for E2EE operations.
+        coVerify(ordering = io.mockk.Ordering.ORDERED) {
+            activeHubState.setActiveHub("hub-uuid-001")
+            cryptoService.loadHubKey("hub-uuid-001", envelope)
+        }
     }
 
     @Test

@@ -134,6 +134,7 @@ fun HubOnboardingFlow(
                         onToggle = onToggleChannel,
                         title = stringResource(R.string.hub_onboarding_channel_checklist_title),
                         description = stringResource(R.string.hub_onboarding_channel_checklist_description),
+                        testTag = "onboarding-channel-checklist",
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))

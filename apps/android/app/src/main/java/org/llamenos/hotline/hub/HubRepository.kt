@@ -24,12 +24,14 @@ class HubRepository @Inject constructor(
     /**
      * Switch to a different hub.
      *
-     * 1. If the hub key is not cached, attempt to fetch it from the server and unwrap via CryptoService.
-     *    Key fetch failures are logged but do not block the switch — the hub key is only required
-     *    for E2EE operations (note decryption), not for hub switching itself.
-     * 2. Persist the new active hub ID via ActiveHubState.
+     * 1. Persist the new active hub ID via ActiveHubState immediately so the UI updates without delay.
+     * 2. If the hub key is not cached, fetch it in the background. Key fetch failures are logged
+     *    but do not block the switch — the hub key is only required for E2EE operations (note
+     *    decryption), not for hub switching itself.
      */
     suspend fun switchHub(hubId: String) {
+        // Set active hub first — UI should update immediately, key fetch is secondary.
+        activeHubState.setActiveHub(hubId)
         if (!cryptoService.hasHubKey(hubId)) {
             try {
                 val envelope = apiService.getHubKey(hubId)
@@ -38,7 +40,6 @@ class HubRepository @Inject constructor(
                 Log.w("HubRepository", "Hub key fetch failed for $hubId (non-fatal): ${e.message}")
             }
         }
-        activeHubState.setActiveHub(hubId)
     }
 
     /**

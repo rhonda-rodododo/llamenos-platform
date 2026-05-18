@@ -62,11 +62,12 @@ fun ChannelChecklist(
     enabled: Boolean = true,
     title: String? = null,
     description: String? = null,
+    testTag: String = "channel-checklist",
 ) {
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .testTag("channel-checklist"),
+            .testTag(testTag),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         ),

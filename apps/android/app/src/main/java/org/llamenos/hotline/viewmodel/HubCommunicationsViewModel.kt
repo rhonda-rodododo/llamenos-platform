@@ -3,6 +3,8 @@ package org.llamenos.hotline.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -75,48 +77,51 @@ class HubCommunicationsViewModel @Inject constructor(
     }
 
     /**
-     * Load provider status, usage, and onboarding state in parallel.
+     * Load provider status and usage in parallel.
+     *
+     * Does NOT auto-show the onboarding sheet — that is triggered explicitly
+     * by the user clicking "Start Setup" via [showOnboarding].
      */
     fun loadAll() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
 
-            // Load provider status
-            val statusResult = hubOnboardApi.getProviderStatus()
-            statusResult.fold(
-                onSuccess = { status ->
-                    _uiState.update {
-                        it.copy(
-                            setupStatus = status,
-                            providerConnected = status.providerConnected,
-                            channels = channelConfigFromStatus(status),
-                            showOnboarding = !status.onboardingComplete && !status.providerConnected,
-                        )
-                    }
-                },
-                onFailure = { e ->
-                    _uiState.update {
-                        it.copy(
-                            error = e.message ?: "Failed to load provider status",
-                            showOnboarding = true,
-                        )
-                    }
-                },
-            )
+            // Fetch provider status and usage in parallel to avoid sequential latency.
+            coroutineScope {
+                val statusDeferred = async { hubOnboardApi.getProviderStatus() }
+                val usageDeferred = async { hubOnboardApi.getUsage() }
 
-            // Load usage
-            val usageResult = hubOnboardApi.getUsage()
-            usageResult.fold(
-                onSuccess = { response ->
-                    _uiState.update {
-                        it.copy(
-                            currentUsage = response.usage.firstOrNull(),
-                            quotas = response.quotas,
-                        )
-                    }
-                },
-                onFailure = { /* Usage is optional — don't fail the whole screen */ },
-            )
+                val statusResult = statusDeferred.await()
+                statusResult.fold(
+                    onSuccess = { status ->
+                        _uiState.update {
+                            it.copy(
+                                setupStatus = status,
+                                providerConnected = status.providerConnected,
+                                channels = channelConfigFromStatus(status),
+                            )
+                        }
+                    },
+                    onFailure = { e ->
+                        _uiState.update {
+                            it.copy(error = e.message ?: "Failed to load provider status")
+                        }
+                    },
+                )
+
+                val usageResult = usageDeferred.await()
+                usageResult.fold(
+                    onSuccess = { response ->
+                        _uiState.update {
+                            it.copy(
+                                currentUsage = response.usage.firstOrNull(),
+                                quotas = response.quotas,
+                            )
+                        }
+                    },
+                    onFailure = { /* Usage is optional — don't fail the whole screen */ },
+                )
+            }
 
             _uiState.update { it.copy(isLoading = false) }
         }
