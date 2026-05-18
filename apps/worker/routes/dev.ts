@@ -199,6 +199,53 @@ dev.post('/test-promote-admin', async (c) => {
   return c.json({ ok: true, pubkey })
 })
 
+// ─── Hub Membership (E2E test helpers) ─────────────────────────────────────
+// Adds a user as a member of a hub with a given role.
+// Needed by hub-switch E2E tests so the test user can see specific hubs
+// without being promoted to super-admin (which would show ALL hubs).
+
+dev.post('/test-add-hub-member', async (c) => {
+  if (c.env.ENVIRONMENT !== 'development') {
+    return c.json({ error: 'Not Found' }, 404)
+  }
+  if (!checkResetSecret(c)) {
+    return c.json({ error: 'Not Found' }, 404)
+  }
+  const body = await c.req.json().catch(() => ({})) as { pubkey?: string; hubId?: string; roleIds?: string[] }
+  if (!body.pubkey) {
+    return c.json({ error: 'pubkey is required' }, 400)
+  }
+  if (!body.hubId) {
+    return c.json({ error: 'hubId is required' }, 400)
+  }
+  let pubkey: string
+  try {
+    pubkey = decodePubkey(body.pubkey)
+  } catch (e) {
+    return c.json({ error: `Invalid pubkey: ${e instanceof Error ? e.message : String(e)}` }, 400)
+  }
+  const services = c.get('services')
+  const roleIds = body.roleIds ?? ['role-admin']
+  try {
+    await services.identity.setHubRole({ pubkey, hubId: body.hubId, roleIds })
+  } catch {
+    // User may not exist yet — create with the hub role
+    try {
+      await services.identity.createUser({
+        pubkey,
+        name: 'BDD Test User',
+        phone: '+15550000002',
+        roleIds: ['role-volunteer'],
+        encryptedSecretKey: '',
+      })
+      await services.identity.setHubRole({ pubkey, hubId: body.hubId, roleIds })
+    } catch (e2) {
+      return c.json({ error: `setHubRole failed: ${e2 instanceof Error ? e2.message : String(e2)}` }, 500)
+    }
+  }
+  return c.json({ ok: true, pubkey, hubId: body.hubId })
+})
+
 // ─── Shift Creation (E2E test helpers) ──────────────────────────────────────
 // Creates a shift covering the current time with a specific volunteer on it.
 // Active call simulation requires on-shift volunteers for call routing.

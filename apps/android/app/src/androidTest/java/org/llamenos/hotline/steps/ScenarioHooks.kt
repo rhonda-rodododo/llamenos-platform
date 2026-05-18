@@ -167,12 +167,33 @@ class ScenarioHooks {
 
     @After(order = 9000)
     fun clearIdentityState() {
-        Log.d(TAG, "clearIdentityState: clearing keystore and crypto lock")
+        Log.d(TAG, "clearIdentityState: clearing keystore, crypto lock, and app data")
         try {
             keystoreService.clear()
             cryptoService.lock()
         } catch (t: Throwable) {
-            Log.w(TAG, "clearIdentityState failed (best-effort): ${t.message}")
+            Log.w(TAG, "clearIdentityState keystore/crypto failed (best-effort): ${t.message}")
+        }
+        // Clear DataStore and SharedPreferences so the next scenario starts fresh
+        // (hub URL, PIN hash, active hub ID). Without this, the app shows a
+        // "returning user" PIN screen instead of the fresh-install flow.
+        try {
+            val context = InstrumentationRegistry.getInstrumentation().targetContext
+            // Clear all SharedPreferences files
+            context.filesDir.parentFile?.resolve("shared_prefs")?.let { prefsDir ->
+                if (prefsDir.exists()) {
+                    prefsDir.listFiles()?.forEach { it.delete() }
+                }
+            }
+            // Clear DataStore files
+            context.filesDir.resolve("datastore")?.let { dsDir ->
+                if (dsDir.exists()) {
+                    dsDir.listFiles()?.forEach { it.delete() }
+                }
+            }
+            Log.d(TAG, "clearIdentityState: app data cleared")
+        } catch (t: Throwable) {
+            Log.w(TAG, "clearIdentityState data clearing failed (best-effort): ${t.message}")
         }
     }
 

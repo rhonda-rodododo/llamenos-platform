@@ -199,6 +199,22 @@ object SimulationClient {
         return json.decodeFromString<StatusResponse>(responseText)
     }
 
+    // ─── Hub Membership ──────────────────────────────────────────
+
+    /**
+     * Add a user as a member of a hub with a given role.
+     *
+     * Corresponds to `POST /api/test-add-hub-member`.
+     * Used by hub-switch tests to give the test user membership in specific hubs
+     * without promoting to super-admin (which would show ALL hubs).
+     */
+    fun addHubMember(pubkey: String, hubId: String, roleIds: List<String> = listOf("role-admin")): StatusResponse {
+        val roleIdsJson = roleIds.joinToString(",") { "\"${escapeJson(it)}\"" }
+        val body = """{"pubkey":"${escapeJson(pubkey)}","hubId":"${escapeJson(hubId)}","roleIds":[$roleIdsJson]}"""
+        val responseText = post("/api/test-add-hub-member", body)
+        return json.decodeFromString<StatusResponse>(responseText)
+    }
+
     // ─── Hub Management ───────────────────────────────────────────
 
     @Serializable
