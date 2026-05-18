@@ -3,7 +3,7 @@
 # NOTE: Using Node.js instead of Bun because the VPS CPU lacks AVX support
 
 # Stage 1: Install runtime deps
-FROM node:20-slim AS deps
+FROM node:26-slim AS deps
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl unzip && rm -rf /var/lib/apt/lists/*
 COPY package.json bun.lockb ./
@@ -27,7 +27,7 @@ RUN cargo build --release --manifest-path packages/crypto/Cargo.toml --features 
     && cp packages/crypto/target/release/libllamenos_core.so packages/crypto/dist/server/
 
 # Stage 3: Production
-FROM node:20-slim
+FROM node:26-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 RUN groupadd -r llamenos && useradd -r -g llamenos -d /app -s /sbin/nologin llamenos
 WORKDIR /app
