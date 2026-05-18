@@ -167,25 +167,30 @@ Then('I should see the reports title', async ({ page }) => {
 
 Then('I should see the {string} report status filter', async ({ page, backendRequest, workerHub }, filterName: string) => {
   // Filters only render when reports exist (not in empty state) and user is admin.
-  // Always ensure at least one report exists BEFORE checking visibility.
-  const existing = await listReportsViaApi(backendRequest, { hubId: workerHub }).catch(() => ({ conversations: [], total: 0 }))
-  if (existing.conversations.length === 0) {
-    await createReportViaApi(backendRequest, { title: `Seed for filter ${Date.now()}`, hubId: workerHub })
-  }
-
-  // SPA re-navigate to refresh the reports list so the seeded report appears.
-  // Use Navigation helper (handles auth state) instead of clicking nav links directly,
-  // which can time out if the sidebar isn't visible (e.g., session not yet fully loaded).
-  const { Navigation } = await import('../../pages/index')
-  await Navigation.goToDashboard(page)
-  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
-  await Navigation.goToReports(page)
-  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
-
-  // Wait for the report list to load (report cards appear = data loaded, not empty state)
-  await expect(page.getByTestId(TestIds.REPORT_CARD).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // This step is called multiple times consecutively (All, Active, Waiting, Closed).
+  // Only seed data and re-navigate if we're not already on the reports page with data.
 
   const filterArea = page.getByTestId(TestIds.REPORT_FILTER_AREA)
+  const alreadyHasFilter = await filterArea.isVisible({ timeout: 2000 }).catch(() => false)
+
+  if (!alreadyHasFilter) {
+    // Ensure at least one report exists BEFORE checking visibility.
+    const existing = await listReportsViaApi(backendRequest, { hubId: workerHub }).catch(() => ({ conversations: [], total: 0 }))
+    if (existing.conversations.length === 0) {
+      await createReportViaApi(backendRequest, { title: `Seed for filter ${Date.now()}`, hubId: workerHub })
+    }
+
+    // SPA re-navigate to refresh the reports list so the seeded report appears.
+    const { Navigation } = await import('../../pages/index')
+    await Navigation.goToDashboard(page)
+    await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+    await Navigation.goToReports(page)
+    await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+
+    // Wait for the report list to load (report cards appear = data loaded, not empty state)
+    await expect(page.getByTestId(TestIds.REPORT_CARD).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  }
+
   await expect(filterArea).toBeVisible({ timeout: Timeouts.ELEMENT })
 
   // Click the status filter trigger to open dropdown and verify the option exists
@@ -197,11 +202,14 @@ Then('I should see the {string} report status filter', async ({ page, backendReq
   const optionSlug = filterName.toLowerCase()
   const option = page.getByTestId(`report-status-option-${optionSlug}`)
   await expect(option).toBeVisible({ timeout: Timeouts.ELEMENT })
+
+  // Close the dropdown by pressing Escape and confirming it closed.
   await page.keyboard.press('Escape')
+  await expect(option).not.toBeVisible({ timeout: 3000 })
 })
 
 When('I tap the {string} report status filter', async ({ page, backendRequest, workerHub }, filterName: string) => {
-  // Filters only render when reports exist. Seed if needed.
+  // Filters only render when reports exist. Seed and navigate only if filter area isn't visible.
   const filterArea = page.getByTestId(TestIds.REPORT_FILTER_AREA)
   const isFilterVisible = await filterArea.isVisible({ timeout: 3000 }).catch(() => false)
   if (!isFilterVisible) {
@@ -210,8 +218,6 @@ When('I tap the {string} report status filter', async ({ page, backendRequest, w
       if (existing.conversations.length === 0) {
         await createReportViaApi(backendRequest, { title: `Seed for filter ${Date.now()}`, hubId: workerHub })
       }
-      // SPA re-navigate to refresh the reports list.
-      // Use Navigation helper (handles auth state) instead of clicking nav links directly.
       const { Navigation } = await import('../../pages/index')
       await Navigation.goToDashboard(page)
       await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
@@ -220,9 +226,6 @@ When('I tap the {string} report status filter', async ({ page, backendRequest, w
     } catch (e) {
       console.warn('[reports] Seeding failed:', e)
     }
-    // Wait for a report card to appear — confirms the list has loaded with seeded data.
-    // This is more reliable than waitForLoadState('networkidle') which doesn't guarantee
-    // that the React state has been updated with the fetched reports.
     await expect(page.getByTestId(TestIds.REPORT_CARD).first()).toBeVisible({ timeout: Timeouts.ELEMENT }).catch(() => {})
   }
 
@@ -236,6 +239,9 @@ When('I tap the {string} report status filter', async ({ page, backendRequest, w
   const option = page.getByTestId(`report-status-option-${optionSlug}`)
   await expect(option).toBeVisible({ timeout: Timeouts.ELEMENT })
   await option.click()
+
+  // Wait for the selection to register (dropdown closes after click)
+  await expect(option).not.toBeVisible({ timeout: 3000 }).catch(() => {})
 })
 
 Then('the {string} report status filter should be selected', async ({ page }, filterName: string) => {
