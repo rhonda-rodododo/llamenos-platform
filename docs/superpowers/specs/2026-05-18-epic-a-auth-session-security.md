@@ -121,6 +121,13 @@ RETURNING count, window_start;
 
 **Rollback**: Revert to in-memory implementation. No data loss — rate limit table can be dropped.
 
+### Strategic Decision: Rate Limit Tiers (User-Confirmed 2026-05-18)
+- Auth/login/provisioning endpoints: **5 requests/minute per IP** (strict — prevent brute force)
+- Write endpoints (create/update/delete): **30 requests/minute per user**
+- Read endpoints: **120 requests/minute per user**
+- Webhook endpoints: **300 requests/minute per IP** (provider retries)
+- Hard fail: Return 429 with Retry-After header. No silent degradation.
+
 ---
 
 ### H06 — Session Sliding Expiry with No Absolute Max Lifetime (HIGH)
