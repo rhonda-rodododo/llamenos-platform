@@ -89,23 +89,38 @@ build_android() {
   echo "Using NDK: $ndk_path"
   export ANDROID_NDK_HOME="$ndk_path"
 
-  local android_dist="$DIST_DIR/android/jniLibs"
-  mkdir -p "$android_dist"
+  local android_debug_dist="$DIST_DIR/android/jniLibs-debug"
+  local android_release_dist="$DIST_DIR/android/jniLibs-release"
+  mkdir -p "$android_debug_dist" "$android_release_dist"
+
+  # Debug variant: test-kdf params (1MB/1iter/1lane) for emulator testing.
+  # x86_64 only — emulators run on x86_64; no need for ARM in debug.
+  echo ""
+  echo "Building debug variant (test-kdf, x86_64 emulator only)..."
+  cargo ndk \
+    -t x86_64 \
+    --platform 24 \
+    -o "$android_debug_dist" \
+    build --release --features mobile,test-kdf
 
   echo ""
-  echo "Building all Android architectures (API 24, --release)..."
+  echo "Debug .so files:"
+  find "$android_debug_dist" -name "*.so" -type f | sort
+
+  # Release variant: production Argon2id params (64MB/3iter/4lanes) for real devices.
+  # arm64-v8a + armeabi-v7a — physical device architectures only.
+  echo ""
+  echo "Building release variant (production, arm64-v8a + armeabi-v7a)..."
   cargo ndk \
     -t arm64-v8a \
     -t armeabi-v7a \
-    -t x86 \
-    -t x86_64 \
     --platform 24 \
-    -o "$android_dist" \
+    -o "$android_release_dist" \
     build --release --features mobile
 
   echo ""
-  echo "Android .so files:"
-  find "$android_dist" -name "*.so" -type f | sort
+  echo "Release .so files:"
+  find "$android_release_dist" -name "*.so" -type f | sort
 
   # Generate Kotlin bindings
   echo ""
@@ -265,9 +280,17 @@ echo "=============================="
 
 if [[ "$PLATFORM" == "android" || "$PLATFORM" == "all" ]]; then
   echo ""
-  echo "Android:"
-  if [[ -d "$DIST_DIR/android/jniLibs" ]]; then
-    find "$DIST_DIR/android/jniLibs" -name "*.so" -type f | while read -r f; do
+  echo "Android (debug — test-kdf, x86_64 emulator):"
+  if [[ -d "$DIST_DIR/android/jniLibs-debug" ]]; then
+    find "$DIST_DIR/android/jniLibs-debug" -name "*.so" -type f | while read -r f; do
+      size=$(du -h "$f" | cut -f1)
+      echo "  $size  $(echo "$f" | sed "s|$DIST_DIR/||")"
+    done
+  fi
+  echo ""
+  echo "Android (release — production, arm64-v8a + armeabi-v7a):"
+  if [[ -d "$DIST_DIR/android/jniLibs-release" ]]; then
+    find "$DIST_DIR/android/jniLibs-release" -name "*.so" -type f | while read -r f; do
       size=$(du -h "$f" | cut -f1)
       echo "  $size  $(echo "$f" | sed "s|$DIST_DIR/||")"
     done

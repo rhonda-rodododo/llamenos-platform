@@ -235,18 +235,30 @@ copy_android_artifacts() {
     return 0
   fi
 
-  local crypto_dist="$PROJECT_ROOT/packages/crypto/dist/android/jniLibs"
-  local android_jni="$PROJECT_ROOT/apps/android/app/src/main/jniLibs"
+  local debug_dist="$PROJECT_ROOT/packages/crypto/dist/android/jniLibs-debug"
+  local release_dist="$PROJECT_ROOT/packages/crypto/dist/android/jniLibs-release"
+  local android_debug_jni="$PROJECT_ROOT/apps/android/app/src/debug/jniLibs"
+  local android_release_jni="$PROJECT_ROOT/apps/android/app/src/release/jniLibs"
 
-  if [[ ! -d "$crypto_dist" ]]; then
-    warn "Android JNI libs not found in dist — skipping copy"
-    return 0
+  local copied=false
+  if [[ -d "$debug_dist" ]]; then
+    info "Copying Android debug artifacts..."
+    mkdir -p "$android_debug_jni"
+    cp -R "$debug_dist"/* "$android_debug_jni/"
+    copied=true
+  fi
+  if [[ -d "$release_dist" ]]; then
+    info "Copying Android release artifacts..."
+    mkdir -p "$android_release_jni"
+    cp -R "$release_dist"/* "$android_release_jni/"
+    copied=true
   fi
 
-  info "Copying Android artifacts..."
-  mkdir -p "$android_jni"
-  cp -R "$crypto_dist"/* "$android_jni/"
-  ok "Android artifacts copied"
+  if [[ "$copied" == true ]]; then
+    ok "Android artifacts copied"
+  else
+    warn "Android JNI libs not found in dist — skipping copy"
+  fi
 }
 
 main() {

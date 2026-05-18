@@ -33,9 +33,6 @@ android {
 
         testInstrumentationRunner = "org.llamenos.hotline.CucumberHiltRunner"
 
-        ndk {
-            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
-        }
     }
 
     // Signing credentials resolution order:
@@ -73,10 +70,16 @@ android {
             if (hasCredentials) {
                 signingConfig = signingConfigs.getByName("release")
             }
+            ndk {
+                abiFilters += listOf("armeabi-v7a", "arm64-v8a")
+            }
         }
         debug {
             isMinifyEnabled = false
             applicationIdSuffix = ".debug"
+            ndk {
+                abiFilters += listOf("x86_64")
+            }
         }
     }
 
@@ -92,10 +95,13 @@ android {
 
     sourceSets {
         getByName("main") {
-            jniLibs.directories.add("src/main/jniLibs")
             // Include generated protocol types from codegen
             kotlin.srcDir("${rootProject.projectDir}/../../packages/protocol/generated/kotlin")
         }
+        // JNI .so files are in build-type source sets:
+        //   src/debug/jniLibs/   — test-kdf params (x86_64 emulator)
+        //   src/release/jniLibs/ — production params (arm64-v8a + armeabi-v7a)
+        // Gradle discovers these automatically — no explicit config needed.
     }
 
     packaging {

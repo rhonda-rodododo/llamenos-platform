@@ -44,7 +44,10 @@ bun run crypto:fmt           # cargo fmt --check
 
 # Mobile build:
 ./scripts/build-mobile.sh ios      # Build iOS XCFramework
-./scripts/build-mobile.sh android  # Build Android JNI .so files
+./scripts/build-mobile.sh android  # Build Android JNI .so files (debug + release variants)
+# Android outputs:
+#   dist/android/jniLibs-debug/   — test-kdf (x86_64 emulator)
+#   dist/android/jniLibs-release/ — production (arm64-v8a + armeabi-v7a)
 ```
 
 ## Feature Flags
