@@ -199,6 +199,22 @@ object SimulationClient {
         return json.decodeFromString<StatusResponse>(responseText)
     }
 
+    // ─── Hub Membership ──────────────────────────────────────────
+
+    /**
+     * Add a user as a member of a hub with a given role.
+     *
+     * Corresponds to `POST /api/test-add-hub-member`.
+     * Used by hub-switch tests to give the test user membership in specific hubs
+     * without promoting to super-admin (which would show ALL hubs).
+     */
+    fun addHubMember(pubkey: String, hubId: String, roleIds: List<String> = listOf("role-admin")): StatusResponse {
+        val roleIdsJson = roleIds.joinToString(",") { "\"${escapeJson(it)}\"" }
+        val body = """{"pubkey":"${escapeJson(pubkey)}","hubId":"${escapeJson(hubId)}","roleIds":[$roleIdsJson]}"""
+        val responseText = post("/api/test-add-hub-member", body)
+        return json.decodeFromString<StatusResponse>(responseText)
+    }
+
     // ─── Hub Management ───────────────────────────────────────────
 
     @Serializable
@@ -221,40 +237,6 @@ object SimulationClient {
         val body = """{"name":"${escapeJson(hubName)}"}"""
         val responseText = post("/api/test-create-hub", body)
         return json.decodeFromString<HubResponse>(responseText)
-    }
-
-    // ─── CMS Setup ────────────────────────────────────────────────
-
-    /**
-     * Response from the CMS test setup endpoint.
-     */
-    @Serializable
-    data class CmsSetupResponse(
-        val ok: Boolean = false,
-        val templateId: String = "",
-        val entityTypeCount: Int = 0,
-        val sampleRecordId: String? = null,
-        val error: String? = null,
-    )
-
-    /**
-     * Set up CMS for E2E testing: enables case management, applies the
-     * jail-support template, creates a sample record, and optionally
-     * registers a pubkey as admin so the test identity can access CMS data.
-     *
-     * [hubId] scopes sample records to a specific hub so they appear in hub-scoped
-     * API queries (`/api/hubs/{hubId}/records`). Without this, records are created
-     * with empty hubId and invisible to the app.
-     *
-     * Corresponds to `POST /api/test-setup-cms`.
-     */
-    fun setupCms(pubkey: String? = null, hubId: String? = null): CmsSetupResponse {
-        val fields = mutableListOf<String>()
-        if (pubkey != null) fields.add("\"pubkey\":\"${escapeJson(pubkey)}\"")
-        if (hubId != null) fields.add("\"hubId\":\"${escapeJson(hubId)}\"")
-        val body = "{${fields.joinToString(",")}}"
-        val responseText = post("/api/test-setup-cms", body)
-        return json.decodeFromString<CmsSetupResponse>(responseText)
     }
 
     // ─── HTTP Helpers ───────────────────────────────────────────────

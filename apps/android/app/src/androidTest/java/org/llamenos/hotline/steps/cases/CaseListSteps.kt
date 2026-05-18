@@ -16,6 +16,7 @@ import io.cucumber.java.en.Then
 import io.cucumber.java.en.When
 import org.llamenos.hotline.di.CryptoEntryPoint
 import org.llamenos.hotline.helpers.SimulationClient
+import org.llamenos.hotline.helpers.TestApiClient
 import org.llamenos.hotline.steps.BaseSteps
 import org.llamenos.hotline.steps.ScenarioHooks
 
@@ -38,13 +39,27 @@ class CaseListSteps : BaseSteps() {
         Log.i("CaseListSteps", "=== theAppIsLaunchedAndAuthenticatedAsAdmin: hubId=$hubId ===")
 
         // Phase 1: Set up CMS on backend BEFORE app launch.
-        // This enables CMS, applies jail-support template, grants the default
-        // volunteer role cases:read permission, and creates a sample record.
+        // This enables CMS, applies entity type templates, grants the default
+        // volunteer role cases:read permission, and creates sample records.
         // Pass hubId so records are created in the scenario's hub (otherwise
         // hub-scoped queries return empty results).
+        val client = ScenarioHooks.apiClient
         try {
-            val result = SimulationClient.setupCms(hubId = hubId.ifEmpty { null })
-            Log.d("CaseListSteps", "CMS setup: ok=${result.ok}, entityTypes=${result.entityTypeCount}, record=${result.sampleRecordId}")
+            val result = client?.seed(
+                TestApiClient.SeedSpec(
+                    hubId = hubId,
+                    adminSeed = ScenarioHooks.ADMIN_SEED,
+                    permissions = TestApiClient.SeedPermissions(
+                        grantVolunteerCms = true,
+                        enableCaseManagement = true,
+                    ),
+                    entityTypes = listOf(
+                        TestApiClient.SeedEntityType(template = "arrest_case", records = 1),
+                        TestApiClient.SeedEntityType(template = "protest_event", records = 1),
+                    ),
+                )
+            )
+            Log.d("CaseListSteps", "CMS setup: ok=${result?.ok}, entityTypes=${result?.entityTypes?.size}, records=${result?.records?.size}")
         } catch (e: Throwable) {
             Log.w("CaseListSteps", "CMS setup failed: ${e.message}")
         }
@@ -63,10 +78,22 @@ class CaseListSteps : BaseSteps() {
                 val promoteResult = SimulationClient.promoteToAdmin(npub)
                 Log.d("CaseListSteps", "Promote to admin: ok=${promoteResult.ok}, error=${promoteResult.error}")
 
-                // Re-run CMS setup with the pubkey so the sample record is assigned
+                // Re-run seed with the pubkey so the sample record is assigned
                 // to this user AND scoped to the scenario hub
-                val cmsResult = SimulationClient.setupCms(npub, hubId = hubId.ifEmpty { null })
-                Log.d("CaseListSteps", "CMS re-setup with pubkey: ok=${cmsResult.ok}, entityTypes=${cmsResult.entityTypeCount}")
+                val cmsResult = client?.seed(
+                    TestApiClient.SeedSpec(
+                        hubId = hubId,
+                        adminSeed = ScenarioHooks.ADMIN_SEED,
+                        entityTypes = listOf(
+                            TestApiClient.SeedEntityType(
+                                template = "arrest_case",
+                                records = 1,
+                                assignTo = listOf(npub),
+                            ),
+                        ),
+                    )
+                )
+                Log.d("CaseListSteps", "CMS re-setup with pubkey: ok=${cmsResult?.ok}, entityTypes=${cmsResult?.entityTypes?.size}")
             } catch (e: Throwable) {
                 Log.w("CaseListSteps", "Post-launch setup failed: ${e.message}")
             }

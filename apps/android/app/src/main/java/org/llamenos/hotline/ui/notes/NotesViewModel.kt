@@ -17,6 +17,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import org.llamenos.hotline.api.ApiException
 import org.llamenos.hotline.api.ApiService
 import org.llamenos.hotline.api.SessionState
 import org.llamenos.hotline.crypto.CryptoService
@@ -153,6 +154,28 @@ class NotesViewModel @Inject constructor(
                         totalNotes = response.total.toInt(),
                         hasMorePages = allNotes.size < response.total.toInt(),
                     )
+                }
+            } catch (e: ApiException) {
+                // Hub-scoped 404/403 means the hub has no notes or user lacks
+                // per-hub access — treat as empty rather than a user-facing error.
+                if (e.code in listOf(403, 404)) {
+                    _uiState.update {
+                        it.copy(
+                            notes = if (page == 1) emptyList() else it.notes,
+                            isLoading = false,
+                            isRefreshing = false,
+                            totalNotes = 0,
+                            hasMorePages = false,
+                        )
+                    }
+                } else {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            isRefreshing = false,
+                            error = e.message ?: "Failed to load notes",
+                        )
+                    }
                 }
             } catch (e: Exception) {
                 _uiState.update {

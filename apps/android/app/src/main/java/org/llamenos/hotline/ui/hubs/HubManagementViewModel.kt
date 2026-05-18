@@ -4,10 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.llamenos.hotline.api.ApiService
@@ -56,7 +54,6 @@ class HubManagementViewModel @Inject constructor(
 
     /** The currently active hub ID, driven by persisted ActiveHubState. */
     val activeHubId: StateFlow<String?> = activeHubState.activeHubId
-        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     init {
         loadHubs()
