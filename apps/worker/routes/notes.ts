@@ -3,7 +3,6 @@ import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { requirePermission, checkPermission } from '../middleware/permission-guard'
 import { listNotesQuerySchema, createNoteBodySchema, updateNoteBodySchema, createReplyBodySchema, noteResponseSchema, noteListResponseSchema, noteRepliesResponseSchema } from '@protocol/schemas/notes'
-import { okResponseSchema } from '@protocol/schemas/common'
 import { authErrors, notFoundError } from '../openapi/helpers'
 import { audit } from '../services/audit'
 import { createLogger } from '../lib/logger'
@@ -38,7 +37,12 @@ notes.get('/',
     const canReadAll = checkPermission(permissions, 'notes:read-all')
     const query = c.req.valid('query')
 
+    // When accessed via hub-scoped route (/api/hubs/:hubId/notes),
+    // hubId is set by hubContext middleware — scope results to that hub.
+    const hubId = c.get('hubId') as string | undefined
+
     const result = await services.records.listNotes({
+      hubId,
       callId: query.callId,
       conversationId: query.conversationId,
       contactHash: query.contactHash,

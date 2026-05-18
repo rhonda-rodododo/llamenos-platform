@@ -128,105 +128,113 @@ fun HubCommunicationsScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         modifier = modifier,
     ) { paddingValues ->
-        if (uiState.isLoading) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-                contentAlignment = Alignment.Center,
-            ) {
-                CircularProgressIndicator(
-                    modifier = Modifier.testTag("hub-communications-loading"),
+        // Always render the content (including channel checklist) even during first load.
+        // This prevents the channel switches from being hidden behind a full-screen spinner
+        // on slow CI emulators where the API fetch takes longer than the test assertion timeout.
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            // Inline loading indicator (not full-screen blocking)
+            if (uiState.isLoading) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.testTag("hub-communications-loading"),
+                        )
+                    }
+                }
+            }
+
+            // Description
+            item {
+                Text(
+                    text = stringResource(R.string.hub_onboarding_settings_description),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag("hub-communications-description"),
                 )
             }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                // Description
-                item {
-                    Text(
-                        text = stringResource(R.string.hub_onboarding_settings_description),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.testTag("hub-communications-description"),
-                    )
-                }
 
-                // Error message
-                uiState.error?.let { error ->
-                    item {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.errorContainer,
-                            ),
+            // Error message
+            uiState.error?.let { error ->
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                        ),
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Row(
-                                modifier = Modifier.padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Error,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onErrorContainer,
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = error,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onErrorContainer,
-                                )
-                            }
+                            Icon(
+                                imageVector = Icons.Filled.Error,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onErrorContainer,
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = error,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                            )
                         }
                     }
                 }
+            }
 
-                // Provider status card
+            // Provider status card
+            item {
+                ProviderStatusCard(
+                    providerConnected = uiState.providerConnected,
+                    providerType = uiState.setupStatus?.providerType,
+                    numbersProvisioned = uiState.setupStatus?.numbersProvisioned ?: 0L,
+                    onStartSetup = { viewModel.showOnboarding() },
+                    onNavigateToProviderSetup = onNavigateToProviderSetup,
+                )
+            }
+
+            // Channel settings — always visible on the main screen.
+            // The onboarding flow uses a separate ChannelChecklist instance
+            // inside the BottomSheet, scoped to the CHANNELS step only.
+            item {
+                ChannelChecklist(
+                    channels = uiState.channels,
+                    onToggle = { channel, enabled ->
+                        viewModel.toggleChannel(channel, enabled)
+                    },
+                    enabled = !uiState.isSavingChannels,
+                )
+            }
+
+            // Usage card
+            item {
+                HubUsageCard(
+                    usage = uiState.currentUsage,
+                    quotas = uiState.quotas,
+                )
+            }
+
+            // Quota limits card
+            uiState.quotas?.let { quotas ->
                 item {
-                    ProviderStatusCard(
-                        providerConnected = uiState.providerConnected,
-                        providerType = uiState.setupStatus?.providerType,
-                        numbersProvisioned = uiState.setupStatus?.numbersProvisioned ?: 0L,
-                        onStartSetup = { viewModel.showOnboarding() },
-                        onNavigateToProviderSetup = onNavigateToProviderSetup,
-                    )
+                    QuotaCard(quotas = quotas)
                 }
+            }
 
-                // Channel settings
-                item {
-                    ChannelChecklist(
-                        channels = uiState.channels,
-                        onToggle = { channel, enabled ->
-                            viewModel.toggleChannel(channel, enabled)
-                        },
-                        enabled = !uiState.isSavingChannels,
-                    )
-                }
-
-                // Usage card
-                item {
-                    HubUsageCard(
-                        usage = uiState.currentUsage,
-                        quotas = uiState.quotas,
-                    )
-                }
-
-                // Quota limits card
-                uiState.quotas?.let { quotas ->
-                    item {
-                        QuotaCard(quotas = quotas)
-                    }
-                }
-
-                // Bottom spacing
-                item {
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
+            // Bottom spacing
+            item {
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
 

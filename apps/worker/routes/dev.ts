@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { z } from 'zod'
 import type { AppEnv } from '../types'
 import type { Hub, MessagingChannelType } from '@shared/types'
 import { hashPhone } from '../lib/crypto'
@@ -198,6 +199,53 @@ dev.post('/test-promote-admin', async (c) => {
   return c.json({ ok: true, pubkey })
 })
 
+// ─── Hub Membership (E2E test helpers) ─────────────────────────────────────
+// Adds a user as a member of a hub with a given role.
+// Needed by hub-switch E2E tests so the test user can see specific hubs
+// without being promoted to super-admin (which would show ALL hubs).
+
+dev.post('/test-add-hub-member', async (c) => {
+  if (c.env.ENVIRONMENT !== 'development') {
+    return c.json({ error: 'Not Found' }, 404)
+  }
+  if (!checkResetSecret(c)) {
+    return c.json({ error: 'Not Found' }, 404)
+  }
+  const body = await c.req.json().catch(() => ({})) as { pubkey?: string; hubId?: string; roleIds?: string[] }
+  if (!body.pubkey) {
+    return c.json({ error: 'pubkey is required' }, 400)
+  }
+  if (!body.hubId) {
+    return c.json({ error: 'hubId is required' }, 400)
+  }
+  let pubkey: string
+  try {
+    pubkey = decodePubkey(body.pubkey)
+  } catch (e) {
+    return c.json({ error: `Invalid pubkey: ${e instanceof Error ? e.message : String(e)}` }, 400)
+  }
+  const services = c.get('services')
+  const roleIds = body.roleIds ?? ['role-admin']
+  try {
+    await services.identity.setHubRole({ pubkey, hubId: body.hubId, roleIds })
+  } catch {
+    // User may not exist yet — create with the hub role
+    try {
+      await services.identity.createUser({
+        pubkey,
+        name: 'BDD Test User',
+        phone: '+15550000002',
+        roleIds: ['role-volunteer'],
+        encryptedSecretKey: '',
+      })
+      await services.identity.setHubRole({ pubkey, hubId: body.hubId, roleIds })
+    } catch (e2) {
+      return c.json({ error: `setHubRole failed: ${e2 instanceof Error ? e2.message : String(e2)}` }, 500)
+    }
+  }
+  return c.json({ ok: true, pubkey, hubId: body.hubId })
+})
+
 // ─── Shift Creation (E2E test helpers) ──────────────────────────────────────
 // Creates a shift covering the current time with a specific volunteer on it.
 // Active call simulation requires on-shift volunteers for call routing.
@@ -235,80 +283,59 @@ dev.post('/test-create-shift', async (c) => {
   }
 })
 
-// ─── CMS Test Setup (E2E test helpers) ──────────────────────────────────────
-// Sets up CMS data for mobile E2E tests that can't call authenticated API endpoints.
-// Gated by ENVIRONMENT=development + DEV_RESET_SECRET / E2E_TEST_SECRET.
+// ─── Declarative Test Seeding (cross-platform E2E helper) ─────────────────
+// Single endpoint that creates all test data from a declarative spec.
+// Replaces per-platform reimplementations (TestApiClient.kt, etc.)
 
-dev.post('/test-setup-cms', async (c) => {
-  if (c.env.ENVIRONMENT !== 'development') {
-    return c.json({ error: 'Not Found' }, 404)
-  }
-  if (!checkResetSecret(c)) {
-    return c.json({ error: 'Not Found' }, 404)
-  }
+const seedEntityTypeSchema = z.object({
+  template: z.enum(['arrest_case', 'protest_event']),
+  records: z.number().int().min(0).max(50).optional().default(0),
+  assignTo: z.array(z.string()).optional().default([]),
+})
 
-  const body = await c.req.json().catch(() => ({})) as { pubkey?: string; hubId?: string }
-  let pubkey: string | undefined
-  if (body.pubkey) {
-    try {
-      pubkey = decodePubkey(body.pubkey)
-    } catch {
-      pubkey = body.pubkey // Fall back to raw value if decode fails
-    }
-  }
-  const hubId = body.hubId ?? ''
-  const services = c.get('services')
-  const templateId = 'jail-support'
+const seedReportTypeSchema = z.object({
+  template: z.enum(['general_report']),
+  triageReports: z.number().int().min(0).max(50).optional().default(0),
+})
 
-  // Seed default roles if empty — the server doesn't call ensureInit() at startup,
-  // so the roles table may be empty in CI (Docker Compose fresh database).
-  // Without roles, resolvePermissions returns [] for all users → "Access denied" everywhere.
-  await services.settings.ensureInit({ ENVIRONMENT: c.env.ENVIRONMENT })
+const seedShiftSchema = z.object({
+  pubkey: z.string().min(64).max(64),
+  allDay: z.boolean().optional().default(true),
+})
 
-  // 0. Grant the default volunteer role cases:read permission so test
-  //    identities (who register as volunteers during onboarding) can see
-  //    all records without explicit assignment.
-  let roleOk = false
-  let roleStatus = 500
-  try {
-    await services.settings.updateRole('role-volunteer', {
-      permissions: [
-        'calls:answer', 'calls:read-active',
-        'notes:create', 'notes:read-own', 'notes:update-own', 'notes:reply',
-        'conversations:claim', 'conversations:send', 'conversations:read-assigned',
-        'conversations:claim-sms', 'conversations:claim-whatsapp',
-        'conversations:claim-signal', 'conversations:claim-rcs', 'conversations:claim-web',
-        'shifts:read-own', 'bans:report',
-        'reports:read-assigned', 'reports:send-message',
-        'files:upload', 'files:download-own',
-        // CMS permissions for E2E testing: full access to cases
-        // Note: contacts:view intentionally omitted — volunteers are denied contacts per permission-matrix spec
-        'cases:create', 'cases:read-all', 'cases:update', 'cases:assign',
-        'events:read', 'events:create', 'evidence:upload', 'evidence:download',
-        // Hub permissions: volunteers need hubs:read to access their hub key envelope (CRIT-H1)
-        'hubs:read',
-      ],
-    })
-    roleOk = true
-    roleStatus = 200
-  } catch {
-    roleOk = false
-  }
+const seedMemberSchema = z.object({
+  pubkey: z.string().min(64).max(64),
+  roleIds: z.array(z.string()).optional().default(['role-volunteer']),
+})
 
-  // 1. Enable case management
-  await services.settings.setCaseManagementEnabled({ enabled: true })
+const seedContactSchema = z.object({
+  displayName: z.string().min(1),
+  contactType: z.string().optional().default('person'),
+})
 
-  // 2. Create a test entity type directly (bypassing template engine which requires
-  //    loading bundled template JSON files that may not be available in all environments).
-  const entityTypeId = crypto.randomUUID()
-  try {
-    await services.settings.createEntityType({
-      id: entityTypeId,
+const seedSpecSchema = z.object({
+  hubId: z.string().uuid(),
+  adminSeed: z.string().length(64).regex(/^[0-9a-f]+$/),
+  permissions: z.object({
+    grantVolunteerCms: z.boolean().optional().default(false),
+    enableCaseManagement: z.boolean().optional().default(false),
+  }).optional().default({ grantVolunteerCms: false, enableCaseManagement: false }),
+  entityTypes: z.array(seedEntityTypeSchema).optional().default([]),
+  reportTypes: z.array(seedReportTypeSchema).optional().default([]),
+  shifts: z.array(seedShiftSchema).optional().default([]),
+  members: z.array(seedMemberSchema).optional().default([]),
+  contacts: z.array(seedContactSchema).optional().default([]),
+})
+
+function entityTypeTemplate(name: 'arrest_case' | 'protest_event') {
+  if (name === 'arrest_case') {
+    return {
+      id: crypto.randomUUID(),
       name: 'arrest_case',
       label: 'Arrest Case',
       labelPlural: 'Arrest Cases',
       description: 'BDD test entity type',
-      category: 'case',
+      category: 'case' as const,
       color: '#ef4444',
       statuses: [
         { value: 'reported', label: 'Reported', color: '#f59e0b', order: 1 },
@@ -326,92 +353,266 @@ dev.post('/test-setup-cms', async (c) => {
       ],
       numberPrefix: 'JS',
       numberingEnabled: true,
-    })
-  } catch { /* ignore entity type creation failures */ }
+    }
+  }
+  return {
+    id: crypto.randomUUID(),
+    name: 'protest_event',
+    label: 'Protest Event',
+    labelPlural: 'Protest Events',
+    description: 'BDD test event entity type',
+    category: 'event' as const,
+    color: '#3b82f6',
+    statuses: [
+      { value: 'planned', label: 'Planned', color: '#f59e0b', order: 1 },
+      { value: 'active', label: 'Active', color: '#22c55e', order: 2 },
+      { value: 'completed', label: 'Completed', color: '#6b7280', order: 3, isClosed: true },
+    ],
+    defaultStatus: 'planned',
+    closedStatuses: ['completed'],
+    fields: [
+      { id: crypto.randomUUID(), name: 'event_date', label: 'Event Date', type: 'date', required: true, order: 1, accessLevel: 'all', indexable: false, indexType: 'none', visibleToUsers: true, editableByUsers: true, hubEditable: true },
+      { id: crypto.randomUUID(), name: 'location', label: 'Location', type: 'text', required: false, order: 2, accessLevel: 'all', indexable: false, indexType: 'none', visibleToUsers: true, editableByUsers: true, hubEditable: true },
+    ],
+    numberPrefix: 'EVT',
+    numberingEnabled: true,
+  }
+}
 
-  // 2b. Create an event entity type so EventsViewModel (category === 'event') has data
-  const eventEntityTypeId = crypto.randomUUID()
-  try {
-    await services.settings.createEntityType({
-      id: eventEntityTypeId,
-      name: 'protest_event',
-      label: 'Protest Event',
-      labelPlural: 'Protest Events',
-      description: 'BDD test event entity type',
-      category: 'event',
-      color: '#3b82f6',
-      statuses: [
-        { value: 'planned', label: 'Planned', color: '#f59e0b', order: 1 },
-        { value: 'active', label: 'Active', color: '#22c55e', order: 2 },
-        { value: 'completed', label: 'Completed', color: '#6b7280', order: 3, isClosed: true },
-      ],
-      defaultStatus: 'planned',
-      closedStatuses: ['completed'],
-      fields: [
-        { id: crypto.randomUUID(), name: 'event_date', label: 'Event Date', type: 'date', required: true, order: 1, accessLevel: 'all', indexable: false, indexType: 'none', visibleToUsers: true, editableByUsers: true, hubEditable: true },
-        { id: crypto.randomUUID(), name: 'location', label: 'Location', type: 'text', required: false, order: 2, accessLevel: 'all', indexable: false, indexType: 'none', visibleToUsers: true, editableByUsers: true, hubEditable: true },
-      ],
-      numberPrefix: 'EVT',
-      numberingEnabled: true,
-    })
-  } catch { /* ignore event entity type creation failures */ }
-
-  // 3. Get entity types to verify creation
-  const { entityTypes } = await services.settings.getEntityTypes()
-
-  // 4. Create sample records for both case and event entity types
-  let recordId: string | null = null
-  const assignedTo = pubkey ? [pubkey] : []
-  for (const et of entityTypes) {
-    try {
-      const isEvent = et.category === 'event'
-      const record = await services.cases.create({
-        entityTypeId: et.id,
-        statusHash: et.defaultStatus || (isEvent ? 'planned' : 'reported'),
-        assignedTo,
-        blindIndexes: {},
-        encryptedSummary: btoa(isEvent
-          ? '{"title":"Test Event","summary":"BDD test event"}'
-          : '{"title":"Test Case","summary":"BDD test case"}'),
-        summaryEnvelopes: [],
-        createdBy: pubkey ?? '',
-        hubId,
-      })
-      if (!recordId) recordId = record.id
-    } catch { /* ignore record creation failures */ }
+dev.post('/test-seed', async (c) => {
+  if (c.env.ENVIRONMENT !== 'development') {
+    return c.json({ error: 'Not Found' }, 404)
+  }
+  if (!checkResetSecret(c)) {
+    return c.json({ error: 'Not Found' }, 404)
   }
 
-  // 5. Create triage-eligible reports so triage screen has data
-  let reportId: string | null = null
-  try {
-    // channelType 'reports' is used by the triage system — it's a text column
-    // in the DB but typed as MessagingChannelType | 'web' in the service interface.
-    // Use direct DB insert to avoid type mismatch.
-    const report = await services.conversations.create({
-      hubId,
-      channelType: 'web',
-      status: 'waiting',
-      metadata: {
-        type: 'report',
-        reportTitle: 'Test Triage Report',
-        reportCategory: 'general',
-        conversionStatus: 'pending',
-      },
-    })
-    reportId = report?.id ?? null
-  } catch { /* ignore — triage tests will show empty state */ }
+  const rawBody = await c.req.json().catch(() => ({}))
+  const parsed = seedSpecSchema.safeParse(rawBody)
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid seed spec', details: parsed.error.issues }, 400)
+  }
+  const spec = parsed.data
+  const { hubId, adminSeed } = spec
+  const services = c.get('services')
+  const warnings: string[] = []
+
+  // Ensure default roles/settings exist (CI fresh database)
+  await services.settings.ensureInit({ ENVIRONMENT: c.env.ENVIRONMENT })
+
+  // ── Permissions ──────────────────────────────────────────────────────────
+  if (spec.permissions.enableCaseManagement) {
+    try {
+      await services.settings.setCaseManagementEnabled({ enabled: true }, hubId)
+    } catch (e) {
+      warnings.push(`setCaseManagementEnabled: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
+  if (spec.permissions.grantVolunteerCms) {
+    try {
+      await services.settings.updateRole('role-volunteer', {
+        permissions: [
+          'calls:answer', 'calls:read-active',
+          'notes:create', 'notes:read-own', 'notes:update-own', 'notes:reply',
+          'conversations:claim', 'conversations:send', 'conversations:read-assigned',
+          'conversations:claim-sms', 'conversations:claim-whatsapp',
+          'conversations:claim-signal', 'conversations:claim-rcs', 'conversations:claim-web',
+          'shifts:read-own', 'bans:report',
+          'reports:read-assigned', 'reports:send-message',
+          'files:upload', 'files:download-own',
+          'cases:create', 'cases:read-all', 'cases:update', 'cases:assign',
+          'events:read', 'events:create', 'evidence:upload', 'evidence:download',
+          'settings:read', 'hubs:read',
+        ],
+      })
+    } catch (e) {
+      warnings.push(`grantVolunteerCms: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
+  // ── Members ──────────────────────────────────────────────────────────────
+  const memberIds: Array<{ pubkey: string }> = []
+  for (const m of spec.members) {
+    try {
+      await services.identity.setHubRole({
+        pubkey: m.pubkey,
+        hubId,
+        roleIds: m.roleIds,
+      })
+      memberIds.push({ pubkey: m.pubkey })
+    } catch (e) {
+      warnings.push(`member ${m.pubkey.slice(0, 8)}...: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
+  // ── Entity Types + Records ───────────────────────────────────────────────
+  const entityTypeIds: Array<{ id: string; name: string; category: string }> = []
+  const recordIds: Array<{ id: string; entityTypeId: string; caseNumber?: string }> = []
+
+  for (const etSpec of spec.entityTypes) {
+    const tmpl = entityTypeTemplate(etSpec.template)
+    let entityTypeId: string
+
+    try {
+      const created = await services.settings.createEntityType({ ...tmpl, hubId })
+      entityTypeId = created.id
+    } catch (e) {
+      // If already exists (409), look it up
+      if (e instanceof Error && e.message.includes('already exists')) {
+        const { entityTypes } = await services.settings.getEntityTypes(hubId)
+        const existing = entityTypes.find(et => et.name === tmpl.name)
+        if (existing) {
+          entityTypeId = existing.id
+        } else {
+          warnings.push(`entityType ${tmpl.name}: already exists but not found on lookup`)
+          continue
+        }
+      } else {
+        warnings.push(`entityType ${tmpl.name}: ${e instanceof Error ? e.message : String(e)}`)
+        continue
+      }
+    }
+
+    entityTypeIds.push({ id: entityTypeId, name: tmpl.name, category: tmpl.category })
+
+    // Create records for this entity type
+    // Use a dummy HPKE envelope so the app can find a readable envelope.
+    // Without this, records exist in DB but the app filters them out
+    // (no envelope matching the user's pubkey).
+    const dummyEnvelope = { pubkey: adminSeed, ct: 'a'.repeat(64), enc: adminSeed }
+    for (let i = 0; i < etSpec.records; i++) {
+      try {
+        const isEvent = tmpl.category === 'event'
+        const record = await services.cases.create({
+          entityTypeId,
+          statusHash: tmpl.defaultStatus,
+          assignedTo: etSpec.assignTo,
+          blindIndexes: {},
+          encryptedSummary: btoa(isEvent
+            ? `{"title":"Test Event ${i + 1}","summary":"Seeded event"}`
+            : `{"title":"Test Case ${i + 1}","summary":"Seeded case"}`),
+          summaryEnvelopes: [dummyEnvelope],
+          createdBy: adminSeed,
+          hubId,
+        })
+        recordIds.push({ id: record.id, entityTypeId, caseNumber: record.caseNumber ?? undefined })
+      } catch (e) {
+        warnings.push(`record ${tmpl.name}[${i}]: ${e instanceof Error ? e.message : String(e)}`)
+      }
+    }
+  }
+
+  // ── Report Types + Triage Reports ────────────────────────────────────────
+  const reportTypeIds: Array<{ id: string; name: string }> = []
+  const triageReportIds: Array<{ id: string }> = []
+
+  for (const rtSpec of spec.reportTypes) {
+    try {
+      const reportTypeName = rtSpec.template === 'general_report' ? 'General Report' : rtSpec.template
+      const reportType = await services.settings.createCmsReportType({
+        hubId,
+        name: reportTypeName,
+        label: reportTypeName,
+        description: 'BDD test report type',
+        allowCaseConversion: true,
+        fields: [],
+        statuses: [],
+        defaultStatus: '',
+        closedStatuses: [],
+      })
+      reportTypeIds.push({ id: reportType.id, name: reportType.name })
+
+      // Create triage reports as conversations with report metadata
+      for (let i = 0; i < rtSpec.triageReports; i++) {
+        try {
+          const report = await services.conversations.create({
+            hubId,
+            channelType: 'web',
+            status: 'waiting',
+            metadata: {
+              type: 'report',
+              reportTitle: `Test Triage Report ${i + 1}`,
+              reportCategory: 'general',
+              reportTypeId: reportType.id,
+              conversionStatus: 'pending',
+            },
+          })
+          triageReportIds.push({ id: report.id })
+        } catch (e) {
+          warnings.push(`triageReport[${i}]: ${e instanceof Error ? e.message : String(e)}`)
+        }
+      }
+    } catch (e) {
+      warnings.push(`reportType ${rtSpec.template}: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
+  // ── Shifts ───────────────────────────────────────────────────────────────
+  const shiftIds: Array<{ id: string }> = []
+
+  for (const shiftSpec of spec.shifts) {
+    try {
+      const now = new Date()
+      const currentDay = now.getUTCDay()
+      let startTime: string
+      let endTime: string
+
+      if (shiftSpec.allDay) {
+        startTime = '00:00'
+        endTime = '23:59'
+      } else {
+        const hour = now.getUTCHours()
+        startTime = `${String(Math.max(0, hour - 1)).padStart(2, '0')}:00`
+        endTime = `${String(Math.min(23, hour + 1)).padStart(2, '0')}:59`
+      }
+
+      const shift = await services.shifts.create(hubId, {
+        encryptedName: btoa('Seeded Shift'),
+        startTime,
+        endTime,
+        days: [currentDay],
+        userPubkeys: [shiftSpec.pubkey],
+      })
+      shiftIds.push({ id: shift.id })
+    } catch (e) {
+      warnings.push(`shift ${shiftSpec.pubkey.slice(0, 8)}...: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
+  // ── Contacts ─────────────────────────────────────────────────────────────
+  const contactIds: Array<{ id: string }> = []
+  const dummyEnvelope = { pubkey: adminSeed, ct: 'a'.repeat(64), enc: adminSeed }
+
+  for (const contactSpec of spec.contacts) {
+    try {
+      const contact = await services.contacts.create({
+        hubId,
+        identifierHashes: [contactSpec.displayName.toLowerCase().replace(/\s+/g, '-')],
+        encryptedSummary: btoa(JSON.stringify({ displayName: contactSpec.displayName })),
+        summaryEnvelopes: [dummyEnvelope],
+        contactTypeHash: contactSpec.contactType,
+      })
+      contactIds.push({ id: contact.id })
+    } catch (e) {
+      warnings.push(`contact ${contactSpec.displayName}: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
 
   return c.json({
     ok: true,
-    templateId,
-    rolePatched: roleOk,
-    roleStatus,
-    entityTypeCount: entityTypes.length,
-    entityTypes: entityTypes.map(et => ({ id: et.id, name: et.name })),
-    sampleRecordId: recordId,
-    reportId,
+    hubId,
+    entityTypes: entityTypeIds,
+    records: recordIds,
+    reportTypes: reportTypeIds,
+    triageReports: triageReportIds,
+    shifts: shiftIds,
+    members: memberIds,
+    contacts: contactIds,
+    warnings: warnings.length > 0 ? warnings : undefined,
   })
 })
+
 
 // ─── Simulation Endpoints (E2E test helpers) ───────────────────────────────
 // These bypass TelephonyAdapter entirely — they proxy directly to service calls.

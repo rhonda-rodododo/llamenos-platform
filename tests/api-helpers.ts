@@ -1934,3 +1934,61 @@ export async function enableMessagingViaApi(
     throw new Error(`Failed to enable messaging channels: ${status}`)
   }
 }
+
+// ── Declarative Test Seeding ─────────────────────────────────────
+
+export interface SeedSpec {
+  hubId: string
+  adminSeed: string
+  permissions?: {
+    grantVolunteerCms?: boolean
+    enableCaseManagement?: boolean
+  }
+  entityTypes?: Array<{
+    template: 'arrest_case' | 'protest_event'
+    records?: number
+    assignTo?: string[]
+  }>
+  reportTypes?: Array<{
+    template: 'general_report'
+    triageReports?: number
+  }>
+  shifts?: Array<{
+    pubkey: string
+    allDay?: boolean
+  }>
+  members?: Array<{
+    pubkey: string
+    roleIds?: string[]
+  }>
+  contacts?: Array<{
+    displayName: string
+    contactType?: string
+  }>
+}
+
+export interface SeedResult {
+  ok: boolean
+  entityTypes: Array<{ id: string; name: string; category: string; defaultStatus: string }>
+  records: Array<{ id: string; entityTypeId: string; caseNumber?: string }>
+  reportTypes: Array<{ id: string; name: string }>
+  triageReports: Array<{ id: string }>
+  shifts: Array<{ id: string }>
+  contacts: Array<{ id: string }>
+  members: Array<{ pubkey: string }>
+  errors: string[]
+}
+
+export async function seedViaApi(
+  request: APIRequestContext,
+  spec: SeedSpec,
+): Promise<SeedResult> {
+  const { status, data } = await apiPost<SeedResult>(
+    request,
+    '/test-seed',
+    spec as unknown as Record<string, unknown>,
+    spec.adminSeed,
+  )
+  if (status !== 200) throw new Error(`test-seed failed: HTTP ${status}`)
+  return data
+}
