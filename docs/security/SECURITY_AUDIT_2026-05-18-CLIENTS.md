@@ -14,11 +14,11 @@ This audit covers all three Llamenos client platforms following significant feat
 
 | Severity | Count | Platforms Affected |
 |----------|-------|-------------------|
-| HIGH | 6 | Desktop (5), iOS (1) |
-| MEDIUM | 8 | Desktop (4), iOS (2), Android (2) |
+| HIGH | 7 | Desktop (5), iOS (2) |
+| MEDIUM | 11 | Desktop (4), iOS (5), Android (2) |
 | LOW | 8 | Desktop (3), iOS (2), Android (3) |
 | INFO | 4 | Desktop (1), iOS (1), Android (2) |
-| **Total** | **26** | |
+| **Total** | **30** | |
 
 ### Gap Status Updates (from 2026-05-12)
 
@@ -239,7 +239,55 @@ Standard Xcode release builds exclude `#if DEBUG` code. The risk is misconfigure
 
 ---
 
-### MEDIUM-I2: WakeKeyService Still Uses Legacy secp256k1 (Gap 3.1 — OPEN)
+### HIGH-I2: `createAuthTokenStatic` Accepts Raw Signing Key in Release Builds
+
+**Severity**: HIGH
+**File(s)**: `apps/ios/Sources/Services/CryptoService.swift:327-329`
+**Description**: `createAuthTokenStatic(secretHex:method:path:)` is a public static method that takes a raw Ed25519 signing key hex string and produces a signed auth token. Critically, this method is **NOT** gated by `#if DEBUG`. While its current callers are all within `#if DEBUG` blocks in AppState, the method itself is callable from any code path in release builds. In a compromised dependency scenario, this function provides a clean API for signing arbitrary auth tokens if a signing key is obtained.
+
+**Impact**: Any code in the app (including third-party SDKs) can forge auth tokens if they obtain a signing key hex. This bypasses the CryptoService isolation model where signing should only happen through the FFI layer.
+
+**Recommended Fix**: Gate this method behind `#if DEBUG` or move it to a test-only target that is never linked into release builds.
+
+---
+
+### MEDIUM-I4: iOS Certificate Pinning Not Active (Empty Pin Hashes)
+
+**Severity**: MEDIUM
+**File(s)**: `apps/ios/Sources/App/APIService.swift:556-567`
+**Description**: `CertificatePins.cloudflareHashes` is an empty array. The `CertificatePinningDelegate` checks `isEnabled` and falls through to default TLS validation when no pins are configured. Certificate pinning provides zero protection in the current build. A network-level adversary with a rogue CA certificate (nation-state threat model) can MITM all API traffic.
+
+**Impact**: No protection against CA compromise or rogue certificates for the iOS client.
+
+**Recommended Fix**: Populate pin hashes before production release. Add a build-time check that fails if the pin array is empty in Release configuration.
+
+---
+
+### MEDIUM-I5: Decrypted Sensitive Data Copied to Pasteboard Without Expiration
+
+**Severity**: MEDIUM
+**File(s)**: `apps/ios/Sources/Views/Components/CopyableField.swift:25`
+**Description**: `UIPasteboard.general.string = value` copies data to the system pasteboard with no expiration. This is used for public keys (acceptable) but also for decrypted note text and live transcription text — the most sensitive data in the app. The system pasteboard is accessible by all apps (iOS 16+ shows a paste notification, but data persists).
+
+**Impact**: Decrypted E2EE note content and transcriptions persist in the shared pasteboard indefinitely, accessible to any app.
+
+**Recommended Fix**: Use `UIPasteboard.general.setItems([...], options: [.expirationDate: ...])` with a short TTL (60 seconds) for any decrypted content. Consider warning the user before copying sensitive data.
+
+---
+
+### MEDIUM-I6: Hub Key Briefly Transits Swift Memory During loadHubKey
+
+**Severity**: MEDIUM
+**File(s)**: `apps/ios/Sources/Services/CryptoService.swift:340-346`
+**Description**: In `loadHubKey()`, the HPKE-unwrapped hub key is returned as a hex string to Swift (`let keyHex = try ffiMobileHpkeOpenKey(...)`) before being passed back into Rust via `ffiMobileSetHubKey()`. The comment says "Hub key never enters Swift memory — goes directly from HPKE open to Rust storage" but this is **incorrect**: the key hex exists as a Swift String between those two calls.
+
+**Impact**: Hub symmetric key briefly exists in Swift memory where it cannot be reliably zeroized.
+
+**Recommended Fix**: Add a single FFI function `mobileUnwrapAndStoreHubKey(hubId:, envelope:, label:)` that performs both operations atomically in Rust.
+
+---
+
+### MEDIUM-I7: WakeKeyService Still Uses Legacy secp256k1 (Gap 3.1 — OPEN)
 
 **Severity**: MEDIUM
 **File(s)**: `apps/ios/Sources/Services/WakeKeyService.swift:259-266`
@@ -255,7 +303,7 @@ This means push wake keys are derived on the wrong curve. The generated "X25519 
 
 ---
 
-### MEDIUM-I3: 40+ Files with `#if DEBUG` Blocks (Gap 4.0 — EXPANDED)
+### MEDIUM-I8: 40+ Files with `#if DEBUG` Blocks (Gap 4.0 — EXPANDED)
 
 **Severity**: MEDIUM
 **File(s)**: See enumeration below
