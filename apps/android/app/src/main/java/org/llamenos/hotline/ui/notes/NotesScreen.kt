@@ -155,7 +155,7 @@ fun NotesScreen(
                     }
                 }
 
-                uiState.notes.isEmpty() && !uiState.isLoading -> {
+                uiState.notes.isEmpty() && !uiState.isLoading && uiState.error == null -> {
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center,

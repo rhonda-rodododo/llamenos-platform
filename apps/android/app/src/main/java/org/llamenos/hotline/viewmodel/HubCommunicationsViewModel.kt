@@ -3,6 +3,8 @@ package org.llamenos.hotline.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,8 +25,10 @@ import javax.inject.Inject
  * UI state for hub communications settings and onboarding.
  */
 data class HubCommunicationsUiState(
-    // Overall loading
+    // Overall loading — only true on first load when no data is available yet.
+    // Subsequent refreshes don't set this, so the channel checklist remains visible.
     val isLoading: Boolean = false,
+    val isRefreshing: Boolean = false,
     val error: String? = null,
 
     // Provider status
@@ -35,6 +39,7 @@ data class HubCommunicationsUiState(
     val onboardingState: HubOnboardingState? = null,
     val showOnboarding: Boolean = false,
     val isCompletingStep: Boolean = false,
+    val isStartingOnboarding: Boolean = false,
 
     // Templates
     val templates: List<ProviderTemplate> = emptyList(),
@@ -75,50 +80,65 @@ class HubCommunicationsViewModel @Inject constructor(
     }
 
     /**
-     * Load provider status, usage, and onboarding state in parallel.
+     * Load provider status and usage in parallel.
+     *
+     * Does NOT auto-show the onboarding sheet — that is triggered explicitly
+     * by the user clicking "Start Setup" via [showOnboarding].
+     *
+     * Uses isLoading only on first load (no prior data). Subsequent calls use
+     * isRefreshing so the channel checklist and other content remain visible
+     * during data fetch — prevents assertions failing because content is hidden
+     * behind a full-screen loading spinner.
      */
     fun loadAll() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
+            val isFirstLoad = _uiState.value.setupStatus == null
+            _uiState.update {
+                it.copy(
+                    isLoading = isFirstLoad,
+                    isRefreshing = !isFirstLoad,
+                    error = null,
+                )
+            }
 
-            // Load provider status
-            val statusResult = hubOnboardApi.getProviderStatus()
-            statusResult.fold(
-                onSuccess = { status ->
-                    _uiState.update {
-                        it.copy(
-                            setupStatus = status,
-                            providerConnected = status.providerConnected,
-                            channels = channelConfigFromStatus(status),
-                            showOnboarding = !status.onboardingComplete && !status.providerConnected,
-                        )
-                    }
-                },
-                onFailure = { e ->
-                    _uiState.update {
-                        it.copy(
-                            error = e.message ?: "Failed to load provider status",
-                            showOnboarding = true,
-                        )
-                    }
-                },
-            )
+            // Fetch provider status and usage in parallel to avoid sequential latency.
+            coroutineScope {
+                val statusDeferred = async { hubOnboardApi.getProviderStatus() }
+                val usageDeferred = async { hubOnboardApi.getUsage() }
 
-            // Load usage
-            val usageResult = hubOnboardApi.getUsage()
-            usageResult.fold(
-                onSuccess = { response ->
-                    _uiState.update {
-                        it.copy(
-                            currentUsage = response.usage.firstOrNull(),
-                            quotas = response.quotas,
-                        )
-                    }
-                },
-                onFailure = { /* Usage is optional — don't fail the whole screen */ },
-            )
+                val statusResult = statusDeferred.await()
+                statusResult.fold(
+                    onSuccess = { status ->
+                        _uiState.update {
+                            it.copy(
+                                setupStatus = status,
+                                providerConnected = status.providerConnected,
+                                channels = channelConfigFromStatus(status),
+                            )
+                        }
+                    },
+                    onFailure = { e ->
+                        _uiState.update {
+                            it.copy(error = e.message ?: "Failed to load provider status")
+                        }
+                    },
+                )
 
-            _uiState.update { it.copy(isLoading = false) }
+                val usageResult = usageDeferred.await()
+                usageResult.fold(
+                    onSuccess = { response ->
+                        _uiState.update {
+                            it.copy(
+                                currentUsage = response.usage.firstOrNull(),
+                                quotas = response.quotas,
+                            )
+                        }
+                    },
+                    onFailure = { /* Usage is optional — don't fail the whole screen */ },
+                )
+            }
+
+            _uiState.update { it.copy(isLoading = false, isRefreshing = false) }
         }
     }
 
@@ -155,14 +175,17 @@ class HubCommunicationsViewModel @Inject constructor(
      */
     fun startOnboarding(templateId: String? = null) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isCompletingStep = true, saveError = null) }
+            // Use isStartingOnboarding instead of isCompletingStep so that
+            // step-advance buttons (e.g. "Next: Provider") remain enabled
+            // while the initial onboarding API call completes in the background.
+            _uiState.update { it.copy(isStartingOnboarding = true, saveError = null) }
             val result = hubOnboardApi.startOnboarding(templateId = templateId)
             result.fold(
                 onSuccess = { state ->
                     _uiState.update {
                         it.copy(
                             onboardingState = state,
-                            isCompletingStep = false,
+                            isStartingOnboarding = false,
                             channels = state.channelConfig.toChannelConfig(),
                         )
                     }
@@ -170,7 +193,7 @@ class HubCommunicationsViewModel @Inject constructor(
                 onFailure = { e ->
                     _uiState.update {
                         it.copy(
-                            isCompletingStep = false,
+                            isStartingOnboarding = false,
                             saveError = e.message ?: "Failed to start onboarding",
                         )
                     }

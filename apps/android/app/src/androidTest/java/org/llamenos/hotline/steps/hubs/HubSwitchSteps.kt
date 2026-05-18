@@ -3,12 +3,14 @@ package org.llamenos.hotline.steps.hubs
 import android.util.Log
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.filter
+import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onChildren
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import dagger.hilt.android.EntryPointAccessors
 import io.cucumber.java.en.And
 import io.cucumber.java.en.Given
@@ -28,8 +30,19 @@ import org.llamenos.hotline.steps.BaseSteps
  * ScenarioHooks @Before(order = 1) already creates one hub and sets
  * [ScenarioHooks.currentHubId]. This class creates a second hub so the
  * hub list contains two entries to switch between.
+ *
+ * Hub identification: Super-admin users see ALL hubs (including leftovers
+ * from prior test runs), so we identify hubs by name text via semantic
+ * matching rather than positional index. The LazyColumn is scrolled to
+ * the target hub using [performScrollToNode].
  */
 class HubSwitchSteps : BaseSteps() {
+
+    companion object {
+        private const val TAG = "HubSwitchSteps"
+    }
+
+    private var secondHubName: String = ""
 
     // ---- Given ----
 
@@ -37,18 +50,19 @@ class HubSwitchSteps : BaseSteps() {
     fun launchWithTwoHubs() {
         // ScenarioHooks @Before(order = 1) already created the first hub.
         // Create a second hub so the list has two entries.
-        val hub2 = SimulationClient.createTestHub("android-test-hub-2-${System.currentTimeMillis()}")
+        secondHubName = "android-test-hub-2-${System.currentTimeMillis()}"
+        val hub2 = SimulationClient.createTestHub(secondHubName)
         check(hub2.id.isNotEmpty()) {
             "Failed to create second test hub: ${hub2.error}"
         }
-        Log.d("HubSwitchSteps", "Created second hub: ${hub2.id}")
+        Log.d(TAG, "Created second hub: ${hub2.id} (name=$secondHubName)")
 
         // Launch the app (creates identity and navigates to dashboard).
         navigateToMainScreen()
 
-        // Promote the test user to super-admin so GET /api/hubs returns ALL hubs
-        // (non-super-admin users only see hubs they are members of, and
-        // test-create-hub doesn't add members).
+        // Promote the test user to super-admin so GET /api/hubs returns hubs
+        // (test-create-hub doesn't add the test user as member, and non-member
+        // users can't see hubs they don't belong to).
         val entryPoint = EntryPointAccessors.fromApplication(
             LlamenosApp.instance,
             CryptoEntryPoint::class.java,
@@ -58,7 +72,7 @@ class HubSwitchSteps : BaseSteps() {
             "No signing pubkey available — identity creation may have failed"
         }
         val result = SimulationClient.promoteToAdmin(signingPubkey)
-        Log.d("HubSwitchSteps", "Promoted to admin: ok=${result.ok}, error=${result.error}")
+        Log.d(TAG, "Promoted to admin: ok=${result.ok}, error=${result.error}")
         check(result.ok || result.error == null) {
             "Admin promotion failed: ${result.error}"
         }
@@ -69,8 +83,7 @@ class HubSwitchSteps : BaseSteps() {
         // Hub list is accessed via the "hubs-card" quick action on the Dashboard
         navigateViaDashboardCard("hubs-card")
 
-        // Wait for the hub list screen to load. Include "hubs-title" (TopAppBar)
-        // as it's always rendered immediately after navigation completes.
+        // Wait for the hub list screen to load.
         composeRule.waitUntil(20_000) {
             composeRule.onAllNodesWithTag("hubs-title").fetchSemanticsNodes().isNotEmpty() ||
                 composeRule.onAllNodesWithTag("hubs-list").fetchSemanticsNodes().isNotEmpty() ||
@@ -84,11 +97,42 @@ class HubSwitchSteps : BaseSteps() {
 
     @When("I tap the second hub in the list")
     fun tapSecondHub() {
-        // Wait for at least two hub-row nodes to appear
-        composeRule.waitUntil(10_000) {
-            composeRule.onAllNodesWithTag("hub-row").fetchSemanticsNodes().size >= 2
+        check(secondHubName.isNotEmpty()) {
+            "secondHubName not set — launchWithTwoHubs() must run first"
         }
-        composeRule.onAllNodesWithTag("hub-row")[1].performClick()
+
+        // Wait for the hubs-list LazyColumn to be present
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithTag("hubs-list").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Scroll the LazyColumn to the hub with our known name.
+        // Super-admin sees ALL hubs (including leftovers from prior runs),
+        // so positional indexing is unreliable. Use name-based matching.
+        val targetMatcher = hasText(secondHubName)
+        onNodeWithTag("hubs-list").performScrollToNode(targetMatcher)
+        composeRule.waitForIdle()
+
+        // Now find the hub-row card containing this name and click it.
+        // Use unmerged tree to see through merged semantics boundaries.
+        val hubCardMatcher = hasTestTag("hub-row") and hasAnyDescendant(hasText(secondHubName))
+        var found = composeRule.onAllNodes(hubCardMatcher, useUnmergedTree = true)
+            .fetchSemanticsNodes()
+        if (found.isEmpty()) {
+            // Fall back to merged tree
+            found = composeRule.onAllNodes(hubCardMatcher).fetchSemanticsNodes()
+        }
+        if (found.isEmpty()) {
+            // Debug: log what hub-rows are visible
+            val visibleRows = composeRule.onAllNodesWithTag("hub-row")
+                .fetchSemanticsNodes()
+            Log.e(TAG, "No hub-row found for '$secondHubName'. Visible hub-rows: ${visibleRows.size}")
+            for ((i, node) in visibleRows.withIndex()) {
+                Log.e(TAG, "  hub-row[$i]: ${node.config}")
+            }
+            error("Could not find hub-row with name '$secondHubName' after scrolling. ${visibleRows.size} hub-rows visible.")
+        }
+        composeRule.onAllNodes(hubCardMatcher, useUnmergedTree = true)[0].performClick()
         composeRule.waitForIdle()
     }
 
@@ -102,18 +146,36 @@ class HubSwitchSteps : BaseSteps() {
 
     @Then("the second hub shows the active indicator")
     fun secondHubShowsActiveIndicator() {
-        // Wait for the active indicator to appear on the second hub-row.
-        // Hub switching persists via DataStore which is async — give it time.
+        check(secondHubName.isNotEmpty()) {
+            "secondHubName not set — launchWithTwoHubs() must run first"
+        }
+
+        // After clicking a hub, the active hub changes. The hub list may need
+        // to be scrolled again to find our target hub (it may have moved
+        // due to recomposition after the state change).
+        //
+        // IMPORTANT: Must use useUnmergedTree = true because the Card's .clickable
+        // modifier sets mergeDescendants = true, which merges child testTags into
+        // the parent in the default (merged) tree. Without unmerged tree,
+        // onChildren().filter(hasTestTag("hub-active-indicator")) returns nothing.
+        val hubCardMatcher = hasTestTag("hub-row") and hasAnyDescendant(hasText(secondHubName))
+
         composeRule.waitUntil(15_000) {
-            val hubRows = composeRule.onAllNodesWithTag("hub-row").fetchSemanticsNodes()
-            if (hubRows.size < 2) return@waitUntil false
-            composeRule.onAllNodesWithTag("hub-row")[1]
+            // Ensure the hub is scrolled into view
+            try {
+                onNodeWithTag("hubs-list").performScrollToNode(hasText(secondHubName))
+            } catch (_: Throwable) { /* May already be visible */ }
+
+            val nodes = composeRule.onAllNodes(hubCardMatcher, useUnmergedTree = true)
+                .fetchSemanticsNodes()
+            if (nodes.isEmpty()) return@waitUntil false
+            composeRule.onAllNodes(hubCardMatcher, useUnmergedTree = true)[0]
                 .onChildren()
                 .filter(hasTestTag("hub-active-indicator"))
                 .fetchSemanticsNodes()
                 .isNotEmpty()
         }
-        composeRule.onAllNodesWithTag("hub-row")[1]
+        composeRule.onAllNodes(hubCardMatcher, useUnmergedTree = true)[0]
             .onChildren()
             .filter(hasTestTag("hub-active-indicator"))
             .also { it[0].assertIsDisplayed() }
@@ -121,12 +183,13 @@ class HubSwitchSteps : BaseSteps() {
 
     @And("the first hub no longer shows the active indicator")
     fun firstHubNoLongerShowsActiveIndicator() {
-        val indicatorNodes = composeRule.onAllNodesWithTag("hub-row")[0]
-            .onChildren()
-            .filter(hasTestTag("hub-active-indicator"))
+        // Verify exactly one hub-active-indicator exists in the entire tree.
+        // That indicator should be on the second hub (verified by prior step).
+        // Must use unmerged tree — merged tree hides child testTags inside clickable Cards.
+        val allIndicators = composeRule.onAllNodesWithTag("hub-active-indicator", useUnmergedTree = true)
             .fetchSemanticsNodes()
-        check(indicatorNodes.isEmpty()) {
-            "Expected no hub-active-indicator on first hub-row after switching, but found ${indicatorNodes.size}"
+        check(allIndicators.size == 1) {
+            "Expected exactly 1 hub-active-indicator (on second hub), found ${allIndicators.size}"
         }
     }
 
@@ -140,8 +203,24 @@ class HubSwitchSteps : BaseSteps() {
                 composeRule.onAllNodesWithTag("empty-state").fetchSemanticsNodes().isNotEmpty()
         }
         // Assert no error banner is present
-        val errorNodes = composeRule.onAllNodesWithTag("notes-error").fetchSemanticsNodes() +
-            composeRule.onAllNodesWithTag("error-message").fetchSemanticsNodes()
+        val errorNodes = composeRule.onAllNodesWithTag("notes-error", useUnmergedTree = true)
+            .fetchSemanticsNodes() +
+            composeRule.onAllNodesWithTag("error-message", useUnmergedTree = true)
+                .fetchSemanticsNodes()
+        if (errorNodes.isNotEmpty()) {
+            // Log the error text for diagnosis
+            for ((i, node) in errorNodes.withIndex()) {
+                Log.e(TAG, "Error node[$i]: ${node.config}")
+            }
+            // Also dump any text nodes in the error region
+            val allTexts = composeRule.onAllNodesWithTag("notes-error", useUnmergedTree = true)
+            try {
+                val children = allTexts[0].onChildren().fetchSemanticsNodes()
+                for ((i, child) in children.withIndex()) {
+                    Log.e(TAG, "Error child[$i]: ${child.config}")
+                }
+            } catch (_: Throwable) {}
+        }
         check(errorNodes.isEmpty()) {
             "Notes screen showed an error after hub switch (${errorNodes.size} error node(s) found)"
         }

@@ -11,7 +11,7 @@ import io.cucumber.java.en.And
 import io.cucumber.java.en.Given
 import io.cucumber.java.en.Then
 import io.cucumber.java.en.When
-import org.llamenos.hotline.helpers.SimulationClient
+import org.llamenos.hotline.helpers.TestApiClient
 import org.llamenos.hotline.steps.BaseSteps
 import org.llamenos.hotline.steps.ScenarioHooks
 
@@ -29,12 +29,29 @@ class TriageSteps : BaseSteps() {
 
     @Given("triage-eligible reports exist")
     fun triageEligibleReportsExist() {
-        // Ensure CMS is set up with triage report data for this hub
+        // Seed triage report data via declarative test-seed endpoint
+        val client = ScenarioHooks.apiClient
         val hubId = ScenarioHooks.currentHubId
-        try {
-            SimulationClient.setupCms(hubId = hubId.ifEmpty { null })
-        } catch (e: Throwable) {
-            Log.w("TriageSteps", "CMS setup for triage failed: ${e.message}")
+        if (client != null && hubId.isNotEmpty()) {
+            try {
+                val result = client.seed(
+                    TestApiClient.SeedSpec(
+                        hubId = hubId,
+                        adminSeed = ScenarioHooks.ADMIN_SEED,
+                        permissions = TestApiClient.SeedPermissions(
+                            grantVolunteerCms = true,
+                            enableCaseManagement = true,
+                        ),
+                        reportTypes = listOf(
+                            TestApiClient.SeedReportType(template = "general_report", triageReports = 2),
+                        ),
+                    )
+                )
+                check(result.ok) { "test-seed failed for triage: errors=${result.errors}" }
+                Log.i("TriageSteps", "Seeded ${result.reportTypes.size} report types, ${result.triageReports.size} reports")
+            } catch (e: Throwable) {
+                Log.w("TriageSteps", "test-seed for triage failed: ${e.message}")
+            }
         }
         iNavigateToTheTriageScreen()
     }
