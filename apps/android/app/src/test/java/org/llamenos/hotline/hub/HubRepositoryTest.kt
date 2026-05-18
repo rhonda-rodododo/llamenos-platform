@@ -29,7 +29,7 @@ class HubRepositoryTest {
         )
 
     @Test
-    fun `switchHub fetches key then persists hub ID`() = runTest {
+    fun `switchHub persists hub ID immediately then fetches key`() = runTest {
         val envelope = makeEnvelope()
         coEvery { apiService.getHubKey("hub-uuid-001") } returns envelope
         coEvery { activeHubState.setActiveHub(any()) } returns Unit
@@ -37,18 +37,24 @@ class HubRepositoryTest {
 
         repo.switchHub("hub-uuid-001")
 
-        coVerify(exactly = 1) { cryptoService.loadHubKey("hub-uuid-001", envelope) }
-        coVerify(exactly = 1) { activeHubState.setActiveHub("hub-uuid-001") }
+        // Hub ID is persisted first so the UI updates immediately.
+        // Key fetch happens after — it's only needed for E2EE operations.
+        coVerify(ordering = io.mockk.Ordering.ORDERED) {
+            activeHubState.setActiveHub("hub-uuid-001")
+            cryptoService.loadHubKey("hub-uuid-001", envelope)
+        }
     }
 
     @Test
-    fun `switchHub does not persist if key fetch throws`() = runTest {
+    fun `switchHub persists hub ID even if key fetch throws`() = runTest {
         every { cryptoService.hasHubKey(any()) } returns false
         coEvery { apiService.getHubKey(any()) } throws RuntimeException("network error")
+        coEvery { activeHubState.setActiveHub(any()) } returns Unit
 
-        runCatching { repo.switchHub("hub-uuid-001") }
+        repo.switchHub("hub-uuid-001")
 
-        coVerify(exactly = 0) { activeHubState.setActiveHub(any()) }
+        coVerify(exactly = 1) { activeHubState.setActiveHub("hub-uuid-001") }
+        coVerify(exactly = 0) { cryptoService.loadHubKey(any(), any()) }
     }
 
     @Test

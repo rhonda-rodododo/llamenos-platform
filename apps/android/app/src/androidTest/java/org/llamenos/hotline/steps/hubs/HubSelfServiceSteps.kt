@@ -152,38 +152,49 @@ class HubSelfServiceSteps : BaseSteps() {
         composeRule.waitUntil(10_000) {
             composeRule.onAllNodesWithTag("onboarding-next-provider").fetchSemanticsNodes().isNotEmpty()
         }
+        // On CI emulator the channel checklist can push this button below the
+        // bottom-sheet viewport. Scroll it into view so the click registers.
+        onNodeWithTag("onboarding-next-provider").performScrollTo()
         onNodeWithTag("onboarding-next-provider").performClick()
         composeRule.waitForIdle()
 
         // Wait for provider step to render
-        composeRule.waitUntil(10_000) {
+        composeRule.waitUntil(15_000) {
             composeRule.onAllNodesWithTag("onboarding-connect-provider").fetchSemanticsNodes().isNotEmpty()
         }
     }
 
     @And("I proceed to the phone number step")
     fun iProceedToThePhoneNumberStep() {
-        // On the provider step, click "Next" to go to phone number
-        val providerNextNodes = composeRule.onAllNodesWithTag("onboarding-phone-numbers")
-            .fetchSemanticsNodes()
-
-        if (providerNextNodes.isEmpty()) {
-            // Need to click the navigation button within the provider step
-            // The provider step has a row with back/next buttons
-            // The "next" button text is the phone number step label
-            composeRule.waitUntil(10_000) {
-                composeRule.onAllNodesWithTag("onboarding-phone-numbers").fetchSemanticsNodes().isNotEmpty()
-            }
+        // Click the "Next" button on the provider step to advance to phone number
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithTag("onboarding-next-phone").fetchSemanticsNodes().isNotEmpty()
         }
-
+        onNodeWithTag("onboarding-next-phone").performScrollTo()
+        onNodeWithTag("onboarding-next-phone").performClick()
         composeRule.waitForIdle()
+
+        // Wait for the phone number step to render
+        composeRule.waitUntil(15_000) {
+            composeRule.onAllNodesWithTag("onboarding-phone-numbers").fetchSemanticsNodes().isNotEmpty()
+        }
     }
 
     @And("I complete the onboarding summary")
     fun iCompleteTheOnboardingSummary() {
+        // Advance from phone number step to summary step
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithTag("onboarding-next-summary").fetchSemanticsNodes().isNotEmpty()
+        }
+        onNodeWithTag("onboarding-next-summary").performScrollTo()
+        onNodeWithTag("onboarding-next-summary").performClick()
+        composeRule.waitForIdle()
+
+        // Now click the "Complete" button on the summary step
         composeRule.waitUntil(10_000) {
             composeRule.onAllNodesWithTag("onboarding-complete").fetchSemanticsNodes().isNotEmpty()
         }
+        onNodeWithTag("onboarding-complete").performScrollTo()
         onNodeWithTag("onboarding-complete").performClick()
         composeRule.waitForIdle()
     }
@@ -239,6 +250,9 @@ class HubSelfServiceSteps : BaseSteps() {
         for (tag in channelTags) {
             val exists = composeRule.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty()
             if (exists) {
+                // Scroll into view first — on smaller CI emulator screens,
+                // lower channels (whatsapp, telegram, rcs) may be below the fold.
+                try { onNodeWithTag(tag).performScrollTo() } catch (_: Throwable) {}
                 onNodeWithTag(tag).assertIsDisplayed()
             }
         }

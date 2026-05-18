@@ -10,7 +10,7 @@ import io.cucumber.java.en.And
 import io.cucumber.java.en.Given
 import io.cucumber.java.en.Then
 import io.cucumber.java.en.When
-import org.llamenos.hotline.helpers.SimulationClient
+import org.llamenos.hotline.helpers.TestApiClient
 import org.llamenos.hotline.steps.BaseSteps
 import org.llamenos.hotline.steps.ScenarioHooks
 
@@ -28,12 +28,29 @@ class EventsSteps : BaseSteps() {
 
     @Given("events exist in the system")
     fun eventsExistInTheSystem() {
-        // Ensure CMS is set up with event data for this hub
+        // Seed event data via declarative test-seed endpoint
+        val client = ScenarioHooks.apiClient
         val hubId = ScenarioHooks.currentHubId
-        try {
-            SimulationClient.setupCms(hubId = hubId.ifEmpty { null })
-        } catch (e: Throwable) {
-            Log.w("EventsSteps", "CMS setup for events failed: ${e.message}")
+        if (client != null && hubId.isNotEmpty()) {
+            try {
+                val result = client.seed(
+                    TestApiClient.SeedSpec(
+                        hubId = hubId,
+                        adminSeed = ScenarioHooks.ADMIN_SEED,
+                        permissions = TestApiClient.SeedPermissions(
+                            grantVolunteerCms = true,
+                            enableCaseManagement = true,
+                        ),
+                        entityTypes = listOf(
+                            TestApiClient.SeedEntityType(template = "protest_event", records = 2),
+                        ),
+                    )
+                )
+                check(result.ok) { "test-seed failed for events: errors=${result.errors}" }
+                Log.i("EventsSteps", "Seeded ${result.entityTypes.size} entity types, ${result.records.size} records")
+            } catch (e: Throwable) {
+                Log.w("EventsSteps", "test-seed for events failed: ${e.message}")
+            }
         }
         iNavigateToTheEventsScreen()
     }
