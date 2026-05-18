@@ -63,7 +63,7 @@ jobs:
         run: |
           cd packages/crypto
           ./scripts/build-mobile.sh android
-          cp -r dist/android/jniLibs/* ../../apps/android/app/src/main/jniLibs/
+          cp -r dist/android/jniLibs-release/* ../../apps/android/app/src/release/jniLibs/
 
       - name: Setup Bun (for codegen)
         uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2.0.2

@@ -110,7 +110,7 @@ jobs:
             "apps/android/app/src/main/java/org/llamenos/i18n/I18n.kt"
             "apps/ios/Sources/Generated/LlamenosCore.swift"
             "apps/ios/LlamenosCoreFFI.xcframework/"
-            "apps/android/app/src/main/jniLibs/"
+            "apps/android/app/src/debug/jniLibs/"
           )
 
           FOUND=""
@@ -645,7 +645,7 @@ jobs:
         id: crypto-cache
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
-          path: apps/android/app/src/main/jniLibs/x86_64/libllamenos_core.so
+          path: apps/android/app/src/debug/jniLibs/x86_64/libllamenos_core.so
           key: android-crypto-x86_64-test-kdf-${{ runner.os }}-${{ hashFiles('packages/crypto/src/**/*.rs', 'packages/crypto/Cargo.toml', 'packages/crypto/Cargo.lock') }}
 
       - name: Install Rust stable (for crypto build)
@@ -671,15 +671,15 @@ jobs:
           cd packages/crypto
           export ANDROID_NDK_HOME="$(ls -1d $ANDROID_HOME/ndk/*/ 2>/dev/null | sort -V | tail -1)"
           echo "Using NDK: $ANDROID_NDK_HOME"
-          mkdir -p ../../apps/android/app/src/main/jniLibs
+          mkdir -p ../../apps/android/app/src/debug/jniLibs
           cargo ndk -t x86_64 --platform 24 \
-            -o ../../apps/android/app/src/main/jniLibs \
+            -o ../../apps/android/app/src/debug/jniLibs \
             build --release --features mobile,test-kdf
 
       - name: Verify crypto .so exists
         run: |
-          ls -la apps/android/app/src/main/jniLibs/x86_64/libllamenos_core.so
-          file apps/android/app/src/main/jniLibs/x86_64/libllamenos_core.so
+          ls -la apps/android/app/src/debug/jniLibs/x86_64/libllamenos_core.so
+          file apps/android/app/src/debug/jniLibs/x86_64/libllamenos_core.so
 
       # ── Start backend services ──────────────────────────────────
       # Android E2E tests need a running backend for hub creation,

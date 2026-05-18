@@ -12,9 +12,11 @@ Native Kotlin/Compose Android client for Llamenos (minSdk 26, Material 3, Hilt D
 
 ```bash
 bun run setup:android    # Install Android SDK components
-# Build Rust JNI libraries
+# Build Rust JNI libraries (produces debug + release variants)
 cd packages/crypto && ./scripts/build-mobile.sh android
-# Copy .so files to apps/android/app/src/main/jniLibs/
+# Copy to build-type source sets
+cp -r dist/android/jniLibs-debug/* ../../apps/android/app/src/debug/jniLibs/
+cp -r dist/android/jniLibs-release/* ../../apps/android/app/src/release/jniLibs/
 ```
 
 ## Commands
@@ -40,8 +42,11 @@ app/src/main/
     ui/           # Compose screens and navigation
     di/           # Hilt dependency injection modules
     service/      # Background services (push, call handling)
-  jniLibs/        # Rust .so files (gitignored — built from packages/crypto)
   res/            # Resources (layouts, strings, drawables)
+app/src/debug/
+  jniLibs/          # Debug .so files (test-kdf, x86_64 emulator — gitignored)
+app/src/release/
+  jniLibs/          # Release .so files (production Argon2, arm64/armv7 — gitignored)
 gradle/
   libs.versions.toml  # Version catalog
 ```
@@ -54,7 +59,15 @@ Build the Rust native libraries:
 ```bash
 cd packages/crypto && ./scripts/build-mobile.sh android
 ```
-Then copy the resulting `.so` files to `apps/android/app/src/main/jniLibs/`.
+This produces two variants:
+- `dist/android/jniLibs-debug/` — test-kdf params (1MB/1iter/1lane), x86_64 emulator only
+- `dist/android/jniLibs-release/` — production Argon2id params (64MB/3iter/4lanes), arm64-v8a + armeabi-v7a
+
+Copy to the corresponding Gradle build-type source sets:
+```bash
+cp -r dist/android/jniLibs-debug/* ../../apps/android/app/src/debug/jniLibs/
+cp -r dist/android/jniLibs-release/* ../../apps/android/app/src/release/jniLibs/
+```
 
 A placeholder mock crypto is active until the native libraries are linked (enables builds without a full Rust toolchain).
 
