@@ -42,13 +42,15 @@ class HubRepositoryTest {
     }
 
     @Test
-    fun `switchHub does not persist if key fetch throws`() = runTest {
+    fun `switchHub persists hub ID even if key fetch throws`() = runTest {
         every { cryptoService.hasHubKey(any()) } returns false
         coEvery { apiService.getHubKey(any()) } throws RuntimeException("network error")
+        coEvery { activeHubState.setActiveHub(any()) } returns Unit
 
-        runCatching { repo.switchHub("hub-uuid-001") }
+        repo.switchHub("hub-uuid-001")
 
-        coVerify(exactly = 0) { activeHubState.setActiveHub(any()) }
+        coVerify(exactly = 1) { activeHubState.setActiveHub("hub-uuid-001") }
+        coVerify(exactly = 0) { cryptoService.loadHubKey(any(), any()) }
     }
 
     @Test
