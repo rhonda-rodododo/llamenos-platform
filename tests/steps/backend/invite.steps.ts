@@ -33,15 +33,8 @@ function getS(world: Record<string, unknown>): InviteTestState {
 
 const BASE_URL = process.env.TEST_HUB_URL || 'http://localhost:3000'
 
-Before(async ({ request, world }) => {
+Before(async ({ world }) => {
   setState<InviteTestState>(world, STATE_KEY, { rateLimitResponses: [] })
-  // Clear invite-specific rate limits before each scenario to prevent cross-scenario bleed.
-  // Scoped to 'invite-validate' prefix so it doesn't interfere with concurrent rate-limit
-  // tests on other workers (e.g. provider-setup phone search).
-  const testSecret = process.env.DEV_RESET_SECRET || process.env.E2E_TEST_SECRET || 'test-reset-secret'
-  await request.delete(`${BASE_URL}/api/test-rate-limits?prefix=invite-validate`, {
-    headers: { 'X-Test-Secret': testSecret },
-  }).catch(() => {})
 })
 // ── Helpers ─────────────────────────────────────────────────────────
 
@@ -139,19 +132,15 @@ When('the admin revokes the invite', async ({ request, world }) => {
 })
 
 When('a client floods invite validation {int} times', async ({ request, world }, count: number) => {
-  // Clear only invite-specific rate limits before flooding to prevent cross-scenario bleed.
-  // Uses prefix filter to avoid interfering with concurrent rate-limit tests on other
-  // workers (e.g. provider-setup phone search).
-  const testSecret = process.env.DEV_RESET_SECRET || process.env.E2E_TEST_SECRET || 'test-reset-secret'
-  await request.delete(`${BASE_URL}/api/test-rate-limits?prefix=invite-validate`, {
-    headers: { 'X-Test-Secret': testSecret },
-  }).catch(() => {})
+  // Use a unique fake IP per scenario so each parallel worker gets its own rate limit bucket.
+  // The server rate-limits invite validation by hashed IP (CF-Connecting-IP header).
+  const fakeIp = `10.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`
   const s = getS(world)
   const shared = getSharedState(world)
   shared.floodResponses = []
   for (let i = 0; i < count; i++) {
     const res = await request.get(`${BASE_URL}/api/invites/validate/${crypto.randomUUID()}`, {
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': fakeIp },
     })
     s.rateLimitResponses.push(res.status())
     shared.floodResponses.push(res.status())
