@@ -152,11 +152,14 @@ class HubSelfServiceSteps : BaseSteps() {
         composeRule.waitUntil(10_000) {
             composeRule.onAllNodesWithTag("onboarding-next-provider").fetchSemanticsNodes().isNotEmpty()
         }
+        // On CI emulator the channel checklist can push this button below the
+        // bottom-sheet viewport. Scroll it into view so the click registers.
+        onNodeWithTag("onboarding-next-provider").performScrollTo()
         onNodeWithTag("onboarding-next-provider").performClick()
         composeRule.waitForIdle()
 
         // Wait for provider step to render
-        composeRule.waitUntil(10_000) {
+        composeRule.waitUntil(15_000) {
             composeRule.onAllNodesWithTag("onboarding-connect-provider").fetchSemanticsNodes().isNotEmpty()
         }
     }
@@ -167,11 +170,12 @@ class HubSelfServiceSteps : BaseSteps() {
         composeRule.waitUntil(10_000) {
             composeRule.onAllNodesWithTag("onboarding-next-phone").fetchSemanticsNodes().isNotEmpty()
         }
+        onNodeWithTag("onboarding-next-phone").performScrollTo()
         onNodeWithTag("onboarding-next-phone").performClick()
         composeRule.waitForIdle()
 
         // Wait for the phone number step to render
-        composeRule.waitUntil(10_000) {
+        composeRule.waitUntil(15_000) {
             composeRule.onAllNodesWithTag("onboarding-phone-numbers").fetchSemanticsNodes().isNotEmpty()
         }
     }
@@ -182,6 +186,7 @@ class HubSelfServiceSteps : BaseSteps() {
         composeRule.waitUntil(10_000) {
             composeRule.onAllNodesWithTag("onboarding-next-summary").fetchSemanticsNodes().isNotEmpty()
         }
+        onNodeWithTag("onboarding-next-summary").performScrollTo()
         onNodeWithTag("onboarding-next-summary").performClick()
         composeRule.waitForIdle()
 
@@ -189,6 +194,7 @@ class HubSelfServiceSteps : BaseSteps() {
         composeRule.waitUntil(10_000) {
             composeRule.onAllNodesWithTag("onboarding-complete").fetchSemanticsNodes().isNotEmpty()
         }
+        onNodeWithTag("onboarding-complete").performScrollTo()
         onNodeWithTag("onboarding-complete").performClick()
         composeRule.waitForIdle()
     }
