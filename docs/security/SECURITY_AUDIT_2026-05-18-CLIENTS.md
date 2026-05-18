@@ -14,11 +14,11 @@ This audit covers all three Llamenos client platforms following significant feat
 
 | Severity | Count | Platforms Affected |
 |----------|-------|-------------------|
-| HIGH | 7 | Desktop (5), iOS (2) |
-| MEDIUM | 11 | Desktop (4), iOS (5), Android (2) |
-| LOW | 8 | Desktop (3), iOS (2), Android (3) |
+| HIGH | 10 | Desktop (5), iOS (2), Android (3) |
+| MEDIUM | 17 | Desktop (4), iOS (5), Android (8) |
+| LOW | 10 | Desktop (3), iOS (2), Android (5) |
 | INFO | 4 | Desktop (1), iOS (1), Android (2) |
-| **Total** | **30** | |
+| **Total** | **41** | |
 
 ### Gap Status Updates (from 2026-05-12)
 
@@ -380,6 +380,90 @@ Two identical placeholder pins are configured. In production, `CertificatePinner
 
 ---
 
+### HIGH-A3: Ephemeral Secret Key Returned to Kotlin Layer (Not Zeroizable)
+
+**Severity**: HIGH
+**File(s)**: `apps/android/app/src/main/java/org/llamenos/hotline/crypto/CryptoService.kt:528-537`
+**Description**: `generateEphemeralKeypair()` returns a `Pair<String, String>` containing the raw ephemeral secret key hex as the first element. This secret is stored in `DeviceLinkViewModel.kt:64` as `ephemeralSecret: String?` — a JVM heap String that is immutable and cannot be zeroized. The stated invariant ("Device key material NEVER leaves this class or the Rust FFI layer") is violated for ephemeral keys. The shared secret derived from them protects device provisioning data.
+
+**Impact**: Ephemeral secret and shared secret recoverable from heap dumps or memory forensics on a seized device.
+
+**Recommended Fix**: Move the full ECDH flow into Rust. The FFI should hold the ephemeral secret, perform ECDH, and return only the SAS code and decrypted result — never the raw secret.
+
+---
+
+### HIGH-A4: Hardcoded HPKE Envelope Version and labelId in loadHubKey
+
+**Severity**: HIGH
+**File(s)**: `apps/android/app/src/main/java/org/llamenos/hotline/crypto/CryptoService.kt:607-612`
+**Description**: When constructing the `HpkeEnvelope` for hub key unwrapping, `v` is hardcoded to `3` and `labelId` is hardcoded to `0`, ignoring server-sent values. If the Rust side uses `labelId` from the envelope struct rather than the `expectedLabel` parameter, label enforcement is bypassed entirely. If the protocol version changes from 3, unwrapping fails silently.
+
+**Impact**: Potential domain separation bypass if Rust reads `labelId` from the envelope. Silent failure on protocol version changes.
+
+**Recommended Fix**: Either include `v` and `labelId` in the wire format so server values pass through, or confirm Rust exclusively uses the `expectedLabel` parameter. Document the decision.
+
+---
+
+### HIGH-A5: Wake Key Secret Stored Without Hardware Binding + Plaintext Fallback
+
+**Severity**: HIGH
+**File(s)**: `apps/android/app/src/main/java/org/llamenos/hotline/crypto/WakeKeyService.kt:80-95`
+**Description**: The wake key secret is stored as a hex string in EncryptedSharedPreferences. Unlike device identity keys (PIN-encrypted, held in Rust), the wake key secret is accessible to any code holding a `KeystoreService` reference. Additionally, lines 81-95 contain a plaintext fallback path generating random bytes as a "placeholder" when the native library is not loaded — this creates an invalid keypair (random bytes are not a valid secp256k1 public key) that silently fails to decrypt.
+
+**Impact**: Wake key secret accessible from JVM layer without PIN protection. Fallback path produces non-functional keypair.
+
+**Recommended Fix**: Generate and store wake keys exclusively in Rust memory. Remove the plaintext fallback path.
+
+---
+
+### MEDIUM-A6: Missing `dataExtractionRules` for Android 12+ Backup Control
+
+**Severity**: MEDIUM
+**File(s)**: `apps/android/app/src/main/AndroidManifest.xml:24-31`
+**Description**: While `android:allowBackup="false"` is set, Android 12+ (API 31+) introduced `android:dataExtractionRules` which supersedes `allowBackup` for device-to-device transfer. With `targetSdk = 36`, the app should specify `dataExtractionRules` to explicitly exclude encrypted keys from device-to-device transfer (a separate mechanism not controlled by `allowBackup=false` alone).
+
+**Impact**: Device-to-device transfer (e.g., via Google setup wizard) could copy EncryptedSharedPreferences files to a new device.
+
+**Recommended Fix**: Create `res/xml/data_extraction_rules.xml` with `<disallow>` rules for all files. Reference via `android:dataExtractionRules="@xml/data_extraction_rules"`.
+
+---
+
+### MEDIUM-A7: WebSocket Client Lacks Certificate Pinning
+
+**Severity**: MEDIUM
+**File(s)**: `apps/android/app/src/main/java/org/llamenos/hotline/api/WebSocketService.kt:104-107`
+**Description**: `WebSocketService` creates its own `OkHttpClient` instance without the `certificatePinner` configured in `ApiService`. Even when API pins are populated with real values, WebSocket connections to the relay will not be pinned. An attacker MITMing the WebSocket can inject or suppress real-time events (call rings, wipe commands).
+
+**Impact**: WebSocket relay connections are not certificate-pinned, even when the REST API is.
+
+**Recommended Fix**: Share the `CertificatePinner` configuration between API and WebSocket `OkHttpClient` instances, or create a shared client factory.
+
+---
+
+### MEDIUM-A8: FCM Token Partially Logged in Release Builds
+
+**Severity**: MEDIUM
+**File(s)**: `apps/android/app/src/main/java/org/llamenos/hotline/service/PushService.kt:78`
+**Description**: `Log.d(TAG, "FCM token refreshed: ${token.take(10)}...")` logs the first 10 characters of the FCM token. `Log.d` calls are NOT stripped by R8/ProGuard by default. The `proguard-rules.pro` does not contain rules to strip debug log calls. The FCM token combined with the Firebase project ID could be used to send push notifications to the device.
+
+**Impact**: Partial FCM token leaked to logcat in release builds, accessible to any app with READ_LOGS or via ADB.
+
+**Recommended Fix**: Add ProGuard rules: `-assumenosideeffects class android.util.Log { public static int d(...); public static int v(...); }`. Or gate logging behind `BuildConfig.DEBUG`.
+
+---
+
+### MEDIUM-A9: Hub Key Hex Passes Through JVM Memory Before Rust Storage
+
+**Severity**: MEDIUM
+**File(s)**: `apps/android/app/src/main/java/org/llamenos/hotline/crypto/CryptoService.kt:624-626`
+**Description**: In `loadHubKey()`, the unwrapped `keyHex` is returned from `mobileHpkeOpenKey()` as a Kotlin `String`, then passed to `mobileSetHubKey()`. Between these calls, the 32-byte hub key exists as an immutable JVM `String` that cannot be zeroized. The comment says "zeroize the local reference" but Kotlin `String` is immutable.
+
+**Impact**: Hub symmetric key persists in JVM heap until GC, recoverable via heap dump.
+
+**Recommended Fix**: Create a single Rust FFI function `mobileUnwrapAndStoreHubKey(hubId, envelope, expectedLabel)` that never returns the key across JNI.
+
+---
+
 ### MEDIUM-A2: `debuggable` Not Explicitly Set to `false` in Release Build
 
 **Severity**: MEDIUM
@@ -428,11 +512,33 @@ This is a developer's local IP address. While only present in debug builds, it r
 
 ---
 
-### LOW-A5: Release Build Lacks Explicit `debuggable false` Declaration
+### LOW-A10: No Root/Emulator Detection
 
 **Severity**: LOW
-**File(s)**: `apps/android/app/build.gradle.kts:59-76`
-**Description**: (See MEDIUM-A2 above — consolidated finding.)
+**File(s)**: `apps/android/app/src/main/AndroidManifest.xml`
+**Description**: The app does not implement root detection, emulator detection, or Play Integrity API checks. A rooted device could access EncryptedSharedPreferences data, hook JNI calls, or dump Rust memory. For a crisis hotline app protecting against nation-state adversaries, this is a defense-in-depth gap.
+
+**Recommended Fix**: Implement Play Integrity API checks. Warn users on compromised devices. Consider refusing to load keys on devices failing integrity checks.
+
+---
+
+### LOW-A11: No `FLAG_SECURE` on Main Activity
+
+**Severity**: LOW
+**File(s)**: `apps/android/app/src/main/java/org/llamenos/hotline/MainActivity.kt`
+**Description**: `FLAG_SECURE` is only set in `SecureText.kt` when sensitive text is actively displayed. The rest of the app (dashboard, notes list, call history, conversations) does not set `FLAG_SECURE`, meaning screenshots and screen recordings can capture sensitive UI content like note previews and call logs.
+
+**Recommended Fix**: Set `FLAG_SECURE` globally on `MainActivity`, or at minimum on all screens displaying decrypted content.
+
+---
+
+### LOW-A12: Release `.so` Files Not Explicitly Stripped
+
+**Severity**: LOW
+**File(s)**: `packages/crypto/scripts/build-mobile.sh:100-104`
+**Description**: The build script does not run `llvm-strip` on release `.so` files after cargo ndk builds them. Debug symbols would make reverse engineering the crypto implementation significantly easier.
+
+**Recommended Fix**: Add `llvm-strip --strip-all` after release build, or verify `[profile.release] strip = true` in the crypto crate's `Cargo.toml`.
 
 ---
 
