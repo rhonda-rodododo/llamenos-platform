@@ -14,11 +14,11 @@ This audit covers all three Llamenos client platforms following significant feat
 
 | Severity | Count | Platforms Affected |
 |----------|-------|-------------------|
-| HIGH | 3 | Desktop (2), iOS (1) |
-| MEDIUM | 5 | Desktop (1), iOS (2), Android (2) |
-| LOW | 7 | Desktop (2), iOS (2), Android (3) |
+| HIGH | 6 | Desktop (5), iOS (1) |
+| MEDIUM | 8 | Desktop (4), iOS (2), Android (2) |
+| LOW | 8 | Desktop (3), iOS (2), Android (3) |
 | INFO | 4 | Desktop (1), iOS (1), Android (2) |
-| **Total** | **19** | |
+| **Total** | **26** | |
 
 ### Gap Status Updates (from 2026-05-12)
 
@@ -105,6 +105,90 @@ This dual-path architecture means an XSS vulnerability can access the hub symmet
 **Impact**: Minimal in practice due to Tauri isolation pattern and strict connect-src limiting exfiltration paths. Required for Whisper WASM.
 
 **Recommended Fix**: No action needed currently. Document this as an accepted risk. If Whisper is removed, remove `wasm-unsafe-eval`.
+
+---
+
+### HIGH-D4: Raw String Crypto Labels Instead of Constants (Domain Separation Violation)
+
+**Severity**: HIGH
+**File(s)**: `src/client/lib/platform.ts:885,895,922,953,988,1018`
+**Description**: The `encryptNote`, `decryptNote`, `encryptMessage`, `decryptMessage`, and `decryptCallRecord` functions use raw string literals for HPKE label parameters (`'llamenos:note-key'`, `'llamenos:message'`, `'llamenos:call-meta'`) instead of importing typed constants from `@shared/crypto-labels`. If a label value is updated in `crypto-labels.json`, these raw strings will silently diverge, breaking cross-platform interop and potentially enabling cross-context decryption attacks (Albrecht defense bypass).
+
+**Impact**: Violation of the domain separation enforcement system. Label drift could allow note ciphertext to be opened as a message or vice versa.
+
+**Recommended Fix**: Import `LABEL_NOTE_KEY`, `LABEL_MESSAGE`, `LABEL_CALL_META` from `@shared/crypto-labels` and use them instead of string literals.
+
+---
+
+### HIGH-D5: `decrypt_server_event` Uses Wrong Label for AAD
+
+**Severity**: HIGH
+**File(s)**: `apps/desktop/src/crypto.rs:784`
+**Description**: The `decrypt_server_event` function constructs its AAD as `format!("{}:{}", llamenos_core::LABEL_HUB_EVENT, epoch)`, producing `"llamenos:hub-event:42"`. The doc comment says the AAD should be `"{LABEL_HUB_EVENT_EPOCH}:{epoch}"`, which would produce `"llamenos:hub-event-epoch:v1:42"`. `LABEL_HUB_EVENT_EPOCH` exists in `packages/crypto/src/labels.rs:245`. Either the code or the comment is wrong. If the server uses `LABEL_HUB_EVENT_EPOCH`, decryption silently fails. If both use `LABEL_HUB_EVENT`, then domain separation between hub events and epoch-keyed server events is broken.
+
+**Impact**: Broken domain separation between hub-scoped and epoch-keyed server events, or silent decryption failures.
+
+**Recommended Fix**: Use `llamenos_core::LABEL_HUB_EVENT_EPOCH` for the AAD and verify server-side matches.
+
+---
+
+### HIGH-D6: AES-GCM Content Encryption Without AAD (Missing Domain Separation)
+
+**Severity**: HIGH
+**File(s)**: `src/client/lib/platform.ts:813-834`
+**Description**: The `aesGcmEncrypt`/`aesGcmDecrypt` functions encrypt note/message content using AES-256-GCM with **no AAD** (no `additionalData` parameter). A ciphertext encrypted as a "note" can be presented as a "message" without detection, since the symmetric decryption has no domain binding. The Rust-side `encrypt_hub_field` correctly uses label-based AAD; this JS-side function does not.
+
+**Impact**: Cross-type ciphertext substitution — an attacker controlling the server could swap note and message ciphertexts without detection.
+
+**Recommended Fix**: Add a `label` parameter to `aesGcmEncrypt`/`aesGcmDecrypt` and pass it as `additionalData`. All callers should pass their domain-specific label.
+
+---
+
+### MEDIUM-D7: Hub Key and Server Event Keys Not Zeroized in Rust Memory
+
+**Severity**: MEDIUM
+**File(s)**: `apps/desktop/src/crypto.rs:41,44,60-66`
+**Description**: `hub_key` is `Mutex<Option<Vec<u8>>>` and `server_event_keys` is `Mutex<Vec<(u64, Vec<u8>)>>`. When cleared (lock/rotation), the old `Vec<u8>` is dropped by the allocator but bytes are NOT cryptographically zeroized — they remain in freed heap memory. By contrast, `DeviceSecrets` implements `Zeroize on Drop` (line 61).
+
+**Impact**: Symmetric key material (hub key, server event keys) persists in freed heap memory after lock/rotation, accessible to memory-dumping attacks.
+
+**Recommended Fix**: Use `zeroize::Zeroizing<Vec<u8>>` for `hub_key` and server event key bytes.
+
+---
+
+### MEDIUM-D8: Server Event Keys Transit Through React State
+
+**Severity**: MEDIUM
+**File(s)**: `src/client/lib/auth.tsx:34,83,175`
+**Description**: `serverEventKeyHex` and `serverEventKeyPrevHex` are stored in React state (`AuthState`) and flow through the component tree before being pushed to Rust `CryptoState`. These symmetric encryption keys sit in the React virtual DOM, are visible via React DevTools, and persist in JS memory across re-renders.
+
+**Impact**: Server event symmetric keys exposed in JS memory and React DevTools for the duration of the session.
+
+**Recommended Fix**: Push keys to Rust immediately in the API response handler. Store only a boolean "keys loaded" flag in React state.
+
+---
+
+### MEDIUM-D9: Device Provisioning Handles Secrets in Webview JS
+
+**Severity**: MEDIUM
+**File(s)**: `src/client/lib/provisioning.ts:166-186`
+**Description**: The `encryptNsecForDevice` function takes the nsec/device secret as a plaintext string and performs X25519 ECDH + AES-GCM encryption entirely in the webview. The primary device's `primarySecretKey` (X25519 seed) is also passed as `Uint8Array` in JS.
+
+**Impact**: Primary device secret key and nsec in webview heap during provisioning, subject to XSS exfiltration.
+
+**Recommended Fix**: Implement provisioning encryption as a Rust IPC command that takes the ephemeral pubkey and produces the encrypted blob without exposing secrets to JS.
+
+---
+
+### LOW-D10: `hpkeWrapKey` Passes Empty AAD
+
+**Severity**: LOW
+**File(s)**: `src/client/lib/platform.ts:862`
+**Description**: `hpkeWrapKey` always passes empty string `''` as `aadHex`. HPKE envelopes have no bound context data (like recipient identity). This prevents envelope transplant detection.
+
+**Impact**: HPKE envelopes can be reused across recipients without detection if the label matches.
+
+**Recommended Fix**: Accept an optional `aadHex` parameter, or bind the recipient pubkey as AAD by default.
 
 ---
 
