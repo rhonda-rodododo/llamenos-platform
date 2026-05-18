@@ -39,6 +39,7 @@ data class HubCommunicationsUiState(
     val onboardingState: HubOnboardingState? = null,
     val showOnboarding: Boolean = false,
     val isCompletingStep: Boolean = false,
+    val isStartingOnboarding: Boolean = false,
 
     // Templates
     val templates: List<ProviderTemplate> = emptyList(),
@@ -174,14 +175,17 @@ class HubCommunicationsViewModel @Inject constructor(
      */
     fun startOnboarding(templateId: String? = null) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isCompletingStep = true, saveError = null) }
+            // Use isStartingOnboarding instead of isCompletingStep so that
+            // step-advance buttons (e.g. "Next: Provider") remain enabled
+            // while the initial onboarding API call completes in the background.
+            _uiState.update { it.copy(isStartingOnboarding = true, saveError = null) }
             val result = hubOnboardApi.startOnboarding(templateId = templateId)
             result.fold(
                 onSuccess = { state ->
                     _uiState.update {
                         it.copy(
                             onboardingState = state,
-                            isCompletingStep = false,
+                            isStartingOnboarding = false,
                             channels = state.channelConfig.toChannelConfig(),
                         )
                     }
@@ -189,7 +193,7 @@ class HubCommunicationsViewModel @Inject constructor(
                 onFailure = { e ->
                     _uiState.update {
                         it.copy(
-                            isCompletingStep = false,
+                            isStartingOnboarding = false,
                             saveError = e.message ?: "Failed to start onboarding",
                         )
                     }

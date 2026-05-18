@@ -244,6 +244,9 @@ class HubSelfServiceSteps : BaseSteps() {
         for (tag in channelTags) {
             val exists = composeRule.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty()
             if (exists) {
+                // Scroll into view first — on smaller CI emulator screens,
+                // lower channels (whatsapp, telegram, rcs) may be below the fold.
+                try { onNodeWithTag(tag).performScrollTo() } catch (_: Throwable) {}
                 onNodeWithTag(tag).assertIsDisplayed()
             }
         }
