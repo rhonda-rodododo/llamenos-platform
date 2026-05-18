@@ -1,9 +1,9 @@
 # Llamenos Security Documentation
 
-**Last Updated:** 2026-05-12
-**Crypto Architecture:** HPKE (RFC 9180) + Ed25519/X25519 + AES-256-GCM
+**Last Updated:** 2026-05-18
+**Crypto Architecture:** HPKE (RFC 9180) + Ed25519/X25519 + AES-256-GCM + Shamir GF(2^8)
 **Audit Status:** Two historical audits (2026-02, 2026-03); docs updated for current architecture
-**Domain Separation Labels:** 69 defined (source of truth in `packages/protocol/crypto-labels.json`)
+**Domain Separation Labels:** 87 defined (source of truth in `packages/protocol/crypto-labels.json`)
 
 This directory contains security documentation for Llamenos, a crisis response hotline app designed to protect volunteer and caller identity against well-funded adversaries.
 
@@ -43,9 +43,10 @@ All cryptographic operations are implemented once in `packages/crypto/` (Rust), 
 | XChaCha20-Poly1305 | Hub event encryption (WebSocket events) |
 | Argon2id (64MB, 3 iterations, 4 parallelism) | PIN/passphrase-to-KEK derivation for device key storage |
 | HMAC-SHA256 | Phone/IP hashing, blind index generation |
-| **69 domain separation labels** | Albrecht defense — label enforced at decrypt |
+| **Shamir GF(2^8)** | Recovery group key escrow (K-of-N threshold, information-theoretic security) |
+| **87 domain separation labels** | Albrecht defense — label enforced at decrypt |
 
-> All 69 labels are defined in `packages/protocol/crypto-labels.json` (source of truth) and registered in the Rust `LABEL_REGISTRY` with stable indices 0-68.
+> All 87 labels are defined in `packages/protocol/crypto-labels.json` (source of truth) and registered in the Rust `LABEL_REGISTRY` with stable indices.
 
 ### End-to-End Encrypted (Zero-Knowledge for Content)
 
@@ -61,6 +62,16 @@ The server **cannot read** these, even under legal compulsion:
 | CMS contacts/cases | AES-256-GCM + HPKE wrapping | Yes |
 | Draft notes | AES-256-GCM (HKDF-derived key) | No (deterministic key, local-only) |
 | Device private keys | Argon2id + AES-256-GCM | N/A (platform secure storage) |
+| Role names/descriptions | AES-256-GCM + HPKE wrapping | Yes (per-admin for platform; hub-key for hub) |
+| Team names/descriptions | AES-256-GCM + hub-key encryption | N/A (hub-key symmetric) |
+| Tag labels/categories | AES-256-GCM + hub-key encryption | N/A (hub-key symmetric) |
+| Blast message content | AES-256-GCM + HPKE wrapping | Yes (per-blast key) |
+| Entity type definitions | AES-256-GCM + hub-key encryption | N/A (hub-key symmetric) |
+| Entity field values (3-tier) | AES-256-GCM + HPKE wrapping | Yes (per-entity key) |
+| Evidence chain metadata | AES-256-GCM + HPKE wrapping | Yes (per-evidence key) |
+| Shift/ring group names | AES-256-GCM + hub-key encryption | N/A (hub-key symmetric) |
+| Recovery group shares | AES-256-GCM + HPKE wrapping | Yes (per-share holder) |
+| PUK seed (recovery escrow) | AES-256-GCM + HPKE wrapping | Yes (under recovery group pubkey) |
 
 > **Note:** The server is zero-knowledge for note/message/file **content**. The server DOES see metadata (timestamps, routing, call durations) and processes plaintext momentarily during SMS/WhatsApp outbound sends. See [What We Do NOT Claim](#what-we-do-not-claim).
 
@@ -73,6 +84,10 @@ The server **cannot read** these, even under legal compulsion:
 - **MLS** (RFC 9420) — group state management (always compiled; no feature flag)
 - **Hub event epoch rotation** — server event key rotates every 24 hours for forward secrecy
 - **SFrame** — voice E2EE key derivation (media frame encryption planned — see [Security Gaps](SECURITY_GAPS_AND_ROADMAP.md#13-sframe-voice-e2ee-low))
+- **SAS emoji verification** (EP02) — out-of-band device identity confirmation (HKDF-derived 7-emoji sequence)
+- **Recovery groups** (EP09) — Shamir K-of-N key escrow with sigchain-anchored pubkey transparency
+- **Account erasure cascade** (EP08) — 4-phase cryptographic erasure with active re-encryption
+- **PBAC permission system** (EP01) — granular permission catalog with multi-role union model
 
 ### Server-Accessible Under Subpoena
 
@@ -95,13 +110,15 @@ The server **cannot read** these, even under legal compulsion:
 - **PIN brute-force resistance (offline) — now significantly improved**: Minimum 8 digits or alphanumeric passphrase (8+ chars); Argon2id (64MB, 3 iterations, 4 parallelism) replaces PBKDF2 for strong GPU/ASIC resistance. Seizure of encrypted blob requires defeating Argon2id in addition to guessing credential.
 - **Deletion verification**: Cannot cryptographically prove hosting provider deleted data
 - **SFrame voice media encryption**: Key derivation is implemented; per-frame AES-128-CTR + HMAC encryption is planned but not yet complete
+- **Blast message transport E2EE**: Bulk messages sent via SMS/WhatsApp/Telegram/RCS are visible to providers in transit; Signal-routed blasts are E2EE; content is E2EE at rest in the database
+- **Recovery share holder coercion resistance**: K-of-N Shamir prevents any single share holder from recovering data, but coordinated coercion of K holders can reconstruct the recovery key; mitigated by configurable delay and duress detection
 
 ## Known Security Gaps
 
 For a complete inventory of known gaps, incomplete implementations, and planned improvements, see [Security Gaps and Roadmap](SECURITY_GAPS_AND_ROADMAP.md).
 
 Highlights (9 open gaps remain, 5 resolved in PR #288):
-- ~~Domain separation label registry drift~~ — RESOLVED: all 69 labels now in Rust registry
+- ~~Domain separation label registry drift~~ — RESOLVED: all labels now in Rust registry (87 total after EP01-EP09)
 - ~~WebAuthn enforcement~~ — RESOLVED: server-side enforcement added
 - ~~Sigchain server-side signature validation~~ — RESOLVED: Ed25519 verification added
 - ~~Audit log chain verification~~ — RESOLVED: `GET /api/audit/verify` endpoint added
@@ -110,6 +127,17 @@ Highlights (9 open gaps remain, 5 resolved in PR #288):
 - **SFrame** has key derivation but no media frame encryption
 - **Certificate pinning** is scaffolding only (placeholder pins)
 - **iOS DEBUG blocks** in security-critical paths need production build verification
+
+### New Attack Surfaces (EP01-EP09)
+
+The threat model has been updated with attack surfaces from 9 major epics. Key areas requiring auditor attention:
+
+- **Blast/broadcast** (EP05): Bulk message delivery amplifies SMS/WhatsApp provider exposure; per-channel rate limiting is the primary control
+- **Recovery groups** (EP09): Shamir secret sharing introduces a new key escrow path; sigchain-anchored pubkey transparency prevents server substitution
+- **Account erasure** (EP08): 4-phase cryptographic cascade with active re-encryption; co-approver mechanism for emergency overrides
+- **Entity system** (EP06): 3-tier envelope model for granular decryption access; evidence custody chains with hash linking
+- **Permission system** (EP01): Role metadata encryption (platform roles: per-admin HPKE; hub roles: hub-key) protects organizational structure
+- **SAS verification** (EP02): Out-of-band emoji verification with HKDF derivation; nonce never relayed via server
 
 ## Reporting Security Issues
 
