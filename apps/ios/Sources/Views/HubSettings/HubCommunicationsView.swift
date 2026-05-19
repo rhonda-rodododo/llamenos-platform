@@ -105,7 +105,7 @@ struct HubCommunicationsView: View {
                     .padding(.horizontal, 32)
             }
 
-            if appState.isAdmin {
+            if appState.hasPermission("settings:manage-messaging") {
                 Button {
                     vm.showOnboardingSheet = true
                 } label: {

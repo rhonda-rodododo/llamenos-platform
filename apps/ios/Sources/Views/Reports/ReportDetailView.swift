@@ -202,7 +202,7 @@ struct ReportDetailView: View {
             }
 
             // Close button — visible when report is active and user is admin
-            if report.statusEnum == .active && appState.isAdmin {
+            if report.statusEnum == .active && appState.hasPermission("reports:update") {
                 Button(role: .destructive) {
                     showCloseConfirmation = true
                 } label: {

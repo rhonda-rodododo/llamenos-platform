@@ -233,7 +233,7 @@ struct DashboardView: View {
                 )
             }
 
-            if appState.isAdmin {
+            if appState.hasPermission("settings:read") {
                 GridRow {
                     quickActionCard(
                         title: NSLocalizedString("dashboard_contacts", comment: "Contacts"),
