@@ -32,6 +32,7 @@ final class AppState {
     let offlineQueue: OfflineQueue
     let hubActivityService: HubActivityService
     let linphoneService: LinphoneService
+    let wipeService: WipeService
 
     // MARK: - Auth State
 
@@ -103,6 +104,14 @@ final class AppState {
         self.offlineQueue = offline
         self.hubActivityService = hubActivity
         self.linphoneService = linphone
+        self.wipeService = WipeService(
+            keychainService: keychain,
+            cryptoService: crypto,
+            wakeKeyService: wake,
+            offlineQueue: offline,
+            crashReportingService: crashReporting,
+            webSocketService: ws
+        )
 
         // Wire offline queue into API service for automatic enqueue on network errors
         api.offlineQueue = offline
@@ -332,35 +341,16 @@ final class AppState {
 
     /// Handle a device wipe command from the server.
     func handleDeviceWipe(reason: String) {
-        // 1. Destroy keys
-        keychainService.wipeAll()
-
-        // 2. Clear crypto state
-        cryptoService.clearHubKeys()
-        cryptoService.lock()
-
-        // 3. Clear UserDefaults app data
-        if let bundleId = Bundle.main.bundleIdentifier {
-            UserDefaults.standard.removePersistentDomain(forName: bundleId)
-        }
-
-        // 4. Set wiped state (triggers UI)
+        wipeService.wipeAll()
         deviceWipeReason = reason
         isDeviceWiped = true
-
-        // 5. Disconnect
-        webSocketService.disconnect()
     }
 
     /// Called when the user logs out / resets identity.
     func didLogout() {
-        webSocketService.disconnect()
-        cryptoService.clearHubKeys()
+        wipeService.logout()
         eventListenerTask?.cancel()
         eventListenerTask = nil
-        wakeKeyService.cleanup()
-        offlineQueue.stopMonitoring()
-        offlineQueue.clear()
         authService.logout()
         isLocked = false
         authStatus = .unauthenticated

@@ -89,35 +89,14 @@ struct PanicWipeConfirmationView: View {
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(.warning)
 
-        // 1. Clear keychain
-        appState.keychainService.deleteAll()
+        // Delegate all cleanup to the centralized WipeService
+        appState.wipeService.wipeAll()
 
-        // 2. Lock crypto
-        appState.cryptoService.lock()
-
-        // 3. Clear UserDefaults
-        if let bundleId = Bundle.main.bundleIdentifier {
-            UserDefaults.standard.removePersistentDomain(forName: bundleId)
-        }
-
-        // 4. Disconnect WebSocket
-        appState.webSocketService.disconnect()
-
-        // 5. Clear wake key
-        appState.wakeKeyService.cleanup()
-
-        // 6. Reset app state
+        // Reset UI state
         appState.isLocked = false
         appState.authStatus = .unauthenticated
         appState.userRole = .volunteer
         appState.unreadConversationCount = 0
-
-        // 7. Clear URL cache
-        URLCache.shared.removeAllCachedResponses()
-
-        // 8. Clear cookies
-        let storage = HTTPCookieStorage.shared
-        storage.cookies?.forEach { storage.deleteCookie($0) }
     }
 }
 
