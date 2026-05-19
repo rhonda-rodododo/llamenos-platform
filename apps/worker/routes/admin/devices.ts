@@ -18,7 +18,7 @@ const adminDevicesRoutes = new Hono<AppEnv>()
  * Paginated hub-scoped aggregate device stats per user.
  */
 adminDevicesRoutes.get('/overview',
-  rateLimit(10, 60_000, 'admin-device-overview'),
+  rateLimit('read'),
   requirePermission('users:manage-devices'),
   validator('query', adminDeviceOverviewQuerySchema),
   async (c) => {

@@ -650,24 +650,20 @@ describe('IdentityService — Sessions', () => {
 
 describe('IdentityService — WebAuthn Challenges', () => {
   describe('getWebAuthnChallenge', () => {
-    it('returns and consumes a valid challenge', async () => {
+    it('returns and consumes a valid challenge atomically', async () => {
       const challenge = {
         challengeId: 'ch-1',
         challenge: 'random-challenge-data',
         createdAt: new Date(), // just created
       }
+      // Atomic DELETE...WHERE(eq AND gt)...RETURNING succeeds
       const deleteFn = vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue(undefined),
+        where: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([challenge]),
+        }),
       })
 
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([challenge]),
-            }),
-          }),
-        }),
         delete: deleteFn,
       }
 
@@ -675,11 +671,19 @@ describe('IdentityService — WebAuthn Challenges', () => {
       const result = await svc.getWebAuthnChallenge('ch-1')
 
       expect(result.challenge).toBe('random-challenge-data')
-      expect(deleteFn).toHaveBeenCalled() // one-time use
+      expect(deleteFn).toHaveBeenCalled() // consumed atomically
     })
 
     it('throws 404 for unknown challenge', async () => {
+      // Atomic delete returns empty, stale lookup also returns empty
+      const deleteFn = vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([]),
+        }),
+      })
+
       const db = {
+        delete: deleteFn,
         select: vi.fn().mockReturnValue({
           from: vi.fn().mockReturnValue({
             where: vi.fn().mockReturnValue({
@@ -699,16 +703,33 @@ describe('IdentityService — WebAuthn Challenges', () => {
         challenge: 'old-data',
         createdAt: new Date(Date.now() - 10 * 60 * 1000), // 10 min ago
       }
+      // Atomic delete returns empty (gt check fails for expired challenge)
+      // Then select finds the stale row, and delete cleans it up
+      let deleteCallCount = 0
+      const deleteFn = vi.fn().mockImplementation(() => {
+        deleteCallCount++
+        if (deleteCallCount === 1) {
+          // First call: atomic consume attempt — returns empty
+          return {
+            where: vi.fn().mockReturnValue({
+              returning: vi.fn().mockResolvedValue([]),
+            }),
+          }
+        }
+        // Second call: cleanup of stale row
+        return {
+          where: vi.fn().mockResolvedValue(undefined),
+        }
+      })
+
       const db = {
+        delete: deleteFn,
         select: vi.fn().mockReturnValue({
           from: vi.fn().mockReturnValue({
             where: vi.fn().mockReturnValue({
               limit: vi.fn().mockResolvedValue([expired]),
             }),
           }),
-        }),
-        delete: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue(undefined),
         }),
       }
 

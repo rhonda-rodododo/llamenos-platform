@@ -3,6 +3,7 @@ import type { AppEnv } from './types'
 import { cors } from './middleware/cors'
 import { apiVersion } from './middleware/api-version'
 import { auth } from './middleware/auth'
+import { createMiddleware } from 'hono/factory'
 import configRoutes from './routes/config'
 import devRoutes from './routes/dev'
 import authRoutes from './routes/auth'
@@ -111,6 +112,15 @@ api.use('*', async (c, next) => {
 })
 
 api.use('*', apiVersion)
+
+// Dev route guard — only available when ENVIRONMENT=development AND DEV_ROUTES_ENABLED=true (H04)
+const devGuard = createMiddleware<AppEnv>(async (c, next) => {
+  if (c.env.ENVIRONMENT !== 'development' || c.env.DEV_ROUTES_ENABLED !== 'true') {
+    return c.json({ error: 'Not Found' }, 404)
+  }
+  return next()
+})
+api.use('/test-*', devGuard)
 
 // Public routes (no auth)
 api.route('/config', configRoutes)

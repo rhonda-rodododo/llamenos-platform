@@ -3,9 +3,8 @@
  * Targets: deleteUser, hub roles, invites CRUD, redeemInvite, sessions, WebAuthn credentials/challenges/settings,
  * devices (register/list/delete/cleanup/voip), createProvisionRoom.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { IdentityService } from '@worker/services/identity'
-import { ServiceError } from '@worker/services/settings'
 import { createMockDb } from './mock-db'
 
 // ---------------------------------------------------------------------------
@@ -548,6 +547,9 @@ describe('IdentityService.storeWebAuthnChallenge', () => {
 describe('IdentityService.getWebAuthnChallenge', () => {
   it('throws 404 when challenge not found', async () => {
     const { db, service } = setup()
+    // Atomic delete returns empty (no valid challenge found)
+    db.$setDeleteResult([])
+    // Stale lookup also returns empty
     db.$setSelectResult([])
 
     await expect(
@@ -558,6 +560,9 @@ describe('IdentityService.getWebAuthnChallenge', () => {
   it('throws 410 when challenge is expired', async () => {
     const { db, service } = setup()
     const oldDate = new Date(Date.now() - 10 * 60 * 1000) // 10 min ago
+    // Atomic delete returns empty (challenge is expired, gt check fails)
+    db.$setDeleteResult([])
+    // Stale lookup finds the expired row
     db.$setSelectResult([makeChallengeRow({ createdAt: oldDate })])
 
     await expect(
@@ -565,13 +570,14 @@ describe('IdentityService.getWebAuthnChallenge', () => {
     ).rejects.toMatchObject({ status: 410 })
   })
 
-  it('returns challenge and deletes it (one-time use)', async () => {
+  it('returns challenge and deletes it atomically (one-time use)', async () => {
     const { db, service } = setup()
-    db.$setSelectResult([makeChallengeRow()])
+    // Atomic DELETE...RETURNING succeeds with the valid challenge
+    db.$setDeleteResult([makeChallengeRow()])
 
     const result = await service.getWebAuthnChallenge('challenge-1')
     expect(result.challenge).toBe('random-challenge-bytes')
-    expect(db.delete).toHaveBeenCalled() // consumed
+    expect(db.delete).toHaveBeenCalled() // consumed atomically
   })
 })
 
@@ -771,7 +777,7 @@ describe('IdentityService.createProvisionRoom', () => {
   })
 
   it('generates unique roomId and token on each call', async () => {
-    const { db, service } = setup()
+    const { service } = setup()
 
     const r1 = await service.createProvisionRoom('key-1')
     const r2 = await service.createProvisionRoom('key-2')
