@@ -18,7 +18,7 @@ These security patterns from v1 have been successfully carried forward:
 | SSRF guard (full CIDR blocklist: IPv4, IPv6, mapped) | ✅ Ported | `apps/worker/lib/ssrf-guard.ts` |
 | Per-note forward secrecy (random key per note) | ✅ Ported | `packages/crypto/src/encryption.rs`, HPKE envelopes |
 | Hub key rotation on member departure | ✅ Ported | `apps/worker/routes/hubs.ts:269-283`, Key Revocation Runbook |
-| 57 domain separation labels (Albrecht defense) | ✅ Ported | `packages/protocol/crypto-labels.json`, `packages/crypto/src/labels.rs` |
+| Domain separation labels (Albrecht defense) | ✅ Ported | `packages/protocol/crypto-labels.json`, `packages/crypto/src/labels.rs` |
 | Ed25519 auth tokens bound to method+path | ✅ Ported | `apps/worker/lib/auth.ts` |
 | DEV_RESET_SECRET gate on test endpoints | ✅ Ported | `apps/worker/routes/dev.ts` |
 | Bun audit in CI pipeline | ✅ Ported | `.github/workflows/ci.yml` |
@@ -226,7 +226,7 @@ These are non-negotiable for all implementation work:
 
 6. **Per-device keys, not nsec** — Users have Ed25519+X25519 device keys authorized via sigchain. The nsec/npub is a legacy Nostr concept being phased out.
 
-7. **Domain separation always** — 57 labels in `crypto-labels.json`. Never use raw string literals.
+7. **Domain separation always** — See `crypto-labels.json` for all labels. Never use raw string literals.
 
 8. **Device keys never in webview** — All private key operations in Rust CryptoState (desktop) or MobileState (iOS/Android).
 

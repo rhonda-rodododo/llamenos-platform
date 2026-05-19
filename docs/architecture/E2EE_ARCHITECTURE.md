@@ -13,7 +13,7 @@
 > - Auth uses **Ed25519 signatures** (Schnorr retained for WebSocket event signing only)
 > - Backend is **Bun + PostgreSQL** (not Cloudflare Workers / Durable Objects)
 > - Mobile clients are **native SwiftUI (iOS) and Kotlin/Compose (Android)** (not React Native)
-> - Domain separation constants expanded from 25 to **57 labels** (`packages/protocol/crypto-labels.json`)
+> - Domain separation constants consolidated in `packages/protocol/crypto-labels.json` (see file for current count)
 > - Crypto crate absorbed into monorepo as `packages/crypto/` (was external `llamenos-core` repo)
 > - PBKDF2 replaced by **Argon2id** (64MB/3/4) for PIN/passphrase key derivation
 
@@ -356,7 +356,7 @@ Server nsec (secp256k1) — SERVER IDENTITY ONLY
 
 ## Domain Separation Labels (Historical Subset)
 
-> **Note:** This table shows 10 of the original Epic 76.0 labels. The full set of 57 labels is defined in `packages/protocol/crypto-labels.json` and documented in `docs/protocol/PROTOCOL.md` Section 2.1.
+> **Note:** This table shows a subset of the original Epic 76.0 labels. The full set is defined in `packages/protocol/crypto-labels.json` and documented in `docs/protocol/PROTOCOL.md` Section 2.1.
 
 | Label | Purpose | Used By |
 | ----- | ------- | ------- |

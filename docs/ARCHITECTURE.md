@@ -73,7 +73,7 @@ WebSocket Relay (WebSocket relay)     RustFS (encrypted file storage)
 - **Symmetric**: XChaCha20-Poly1305 (24-byte nonce, 16-byte tag) for hub events
 - **KDF**: HKDF-SHA-256, PBKDF2-SHA-256 600K iterations (PINs)
 - **Signing**: Ed25519 (device auth, sigchain) + BIP-340 Schnorr (WebSocket identity)
-- **Domain separation**: 57 labeled contexts in `packages/protocol/crypto-labels.json`
+- **Domain separation**: All labeled contexts defined in `packages/protocol/crypto-labels.json` (source of truth; see file for current count)
 
 All crypto is implemented once in Rust (`packages/crypto/`), compiled to:
 - Native library (Tauri desktop, path dep from `apps/desktop/Cargo.toml`)
