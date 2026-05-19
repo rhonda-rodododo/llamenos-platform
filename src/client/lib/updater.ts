@@ -9,6 +9,48 @@
  *
  * The updater config (endpoints, pubkey) lives in tauri.conf.json.
  * This module only controls _when_ and _how_ the frontend reacts.
+ *
+ * ## Update Threat Model
+ *
+ * The app protects volunteers and callers from nation-state adversaries.
+ * The auto-update channel is a high-value target: a compromised update
+ * can backdoor every installation silently.
+ *
+ * Defense layers:
+ *
+ * 1. **Artifact signatures (minisign)**: Every updater artifact (.tar.gz,
+ *    .nsis.zip) has a .sig file signed with a minisign Ed25519 key. The
+ *    public key is compiled into the binary (tauri.conf.json → pubkey).
+ *    Tauri's updater plugin verifies the signature before applying. A
+ *    compromised endpoint serving unsigned/mis-signed payloads is rejected.
+ *
+ * 2. **Dual update endpoints**: tauri.conf.json lists two endpoints —
+ *    updates.llamenos.org (CDN/proxy) and releases.llamenos.org (RustFS
+ *    origin). Tauri tries them in order. If the primary is compromised or
+ *    down, the secondary is used. Both serve the same manifest; the
+ *    minisign signature (not the endpoint) is the trust anchor.
+ *
+ * 3. **Anti-rollback (__VERSION_FLOOR__)**: The build-time constant
+ *    __VERSION_FLOOR__ is set to the current version at compile time
+ *    (vite.config.ts). Any update whose version is < __VERSION_FLOOR__ is
+ *    rejected. This prevents downgrade attacks where a compromised endpoint
+ *    serves an older, vulnerable build. The floor is per-binary, not
+ *    per-endpoint, so it cannot be bypassed by switching sources.
+ *
+ * 4. **CHECKSUMS.txt + cosign + SLSA provenance**: CI generates
+ *    SHA-256 checksums, cosign keyless signatures, and SLSA build
+ *    provenance attestations for all release artifacts. These are
+ *    published to the llamenos-releases repo and GitHub Releases for
+ *    independent out-of-band verification.
+ *
+ * What is NOT defended here (accepted risks):
+ * - Manifest content (latest.json) is not separately signed — the
+ *   manifest can be tampered to point to a different version, but the
+ *   artifact signature check will reject any payload not signed with
+ *   the embedded minisign key.
+ * - A compromised build environment (CI runner) could sign malicious
+ *   artifacts with the real key. This is mitigated by SLSA provenance
+ *   and reproducible builds (SOURCE_DATE_EPOCH, content-hashed names).
  */
 
 import type { Update } from '@tauri-apps/plugin-updater'
