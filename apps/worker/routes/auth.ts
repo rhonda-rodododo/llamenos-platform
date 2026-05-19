@@ -52,13 +52,13 @@ auth.post('/login',
     // Verify Schnorr signature before returning any user information
     const url = new URL(c.req.url)
     const isValid = await verifyAuthToken({ pubkey: body.pubkey, timestamp: body.timestamp, token: body.token }, c.req.method, url.pathname)
-    if (!isValid) return c.json({ error: 'Invalid credentials' }, 401)
+    if (!isValid) return c.json({ error: 'Authentication failed' }, 401)
 
     try {
       const volunteer = await services.identity.getUser(body.pubkey)
       return c.json({ ok: true, roles: volunteer.roles })
     } catch {
-      return c.json({ error: 'Invalid credentials' }, 401)
+      return c.json({ error: 'Authentication failed' }, 401)
     }
   },
 )
@@ -98,7 +98,7 @@ auth.post('/bootstrap',
     // Verify Schnorr signature — proves caller owns the private key
     const bootstrapUrl = new URL(c.req.url)
     const isValid = await verifyAuthToken({ pubkey: body.pubkey, timestamp: body.timestamp, token: body.token }, c.req.method, bootstrapUrl.pathname)
-    if (!isValid) return c.json({ error: 'Invalid signature' }, 401)
+    if (!isValid) return c.json({ error: 'Authentication failed' }, 401)
 
     // Check if admin already exists
     const { hasAdmin } = await services.identity.hasAdmin()

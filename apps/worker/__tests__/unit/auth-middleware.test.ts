@@ -117,7 +117,7 @@ describe('auth middleware', () => {
     const res = await req(app, '/test')
     expect(res.status).toBe(401)
     const body = await res.json()
-    expect(body.error).toBe('Unauthorized')
+    expect(body.error).toBe('Authentication failed')
   })
 
   it('returns 401 for invalid auth token', async () => {
@@ -163,7 +163,25 @@ describe('auth middleware', () => {
   })
 
   describe('dev-mode signature bypass', () => {
-    it('falls back to dev bypass when ENVIRONMENT=development and auth fails', async () => {
+    it('falls back to dev bypass when DEV_AUTH_BYPASS=true and auth fails', async () => {
+      mockAuthenticateRequest.mockResolvedValue(null)
+      const user = makeUser()
+      mockParseAuthHeader.mockReturnValue({ pubkey: user.pubkey, timestamp: Date.now(), token: 'abc' })
+      mockValidateToken.mockReturnValue(true)
+
+      const { app, services } = createApp()
+      ;(services.identity.getUserInternal as ReturnType<typeof vi.fn>).mockResolvedValue(user)
+
+      const res = await req(app, '/test',
+        { Authorization: 'Bearer {"pubkey":"aabbccdd11223344","timestamp":1234,"token":"abc"}' },
+        { ENVIRONMENT: 'development', DEV_AUTH_BYPASS: 'true' },
+      )
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(body.pubkey).toBe(user.pubkey)
+    })
+
+    it('does NOT use dev bypass when DEV_AUTH_BYPASS is not set (even in development)', async () => {
       mockAuthenticateRequest.mockResolvedValue(null)
       const user = makeUser()
       mockParseAuthHeader.mockReturnValue({ pubkey: user.pubkey, timestamp: Date.now(), token: 'abc' })
@@ -176,18 +194,16 @@ describe('auth middleware', () => {
         { Authorization: 'Bearer {"pubkey":"aabbccdd11223344","timestamp":1234,"token":"abc"}' },
         { ENVIRONMENT: 'development' },
       )
-      expect(res.status).toBe(200)
-      const body = await res.json()
-      expect(body.pubkey).toBe(user.pubkey)
+      expect(res.status).toBe(401)
     })
 
-    it('does NOT use dev bypass in production', async () => {
+    it('does NOT use dev bypass in production even with DEV_AUTH_BYPASS=true', async () => {
       mockAuthenticateRequest.mockResolvedValue(null)
       const { app } = createApp()
 
       const res = await req(app, '/test',
         { Authorization: 'Bearer {"pubkey":"abc","timestamp":1234,"token":"def"}' },
-        { ENVIRONMENT: 'production' },
+        { ENVIRONMENT: 'production', DEV_AUTH_BYPASS: 'true' },
       )
       expect(res.status).toBe(401)
     })
@@ -203,7 +219,7 @@ describe('auth middleware', () => {
 
       const res = await req(app, '/test',
         { Authorization: 'Bearer {"pubkey":"aabbccdd11223344","timestamp":1234,"token":"abc"}' },
-        { ENVIRONMENT: 'development' },
+        { ENVIRONMENT: 'development', DEV_AUTH_BYPASS: 'true' },
       )
       expect(res.status).toBe(401)
     })
@@ -218,7 +234,7 @@ describe('auth middleware', () => {
 
       const res = await req(app, '/test',
         { Authorization: 'Bearer {"pubkey":"unknown","timestamp":1234,"token":"abc"}' },
-        { ENVIRONMENT: 'development' },
+        { ENVIRONMENT: 'development', DEV_AUTH_BYPASS: 'true' },
       )
       expect(res.status).toBe(401)
     })
@@ -232,7 +248,7 @@ describe('auth middleware', () => {
 
       const res = await req(app, '/test',
         { Authorization: 'Bearer {"pubkey":"abc","timestamp":1234,"token":"abc"}' },
-        { ENVIRONMENT: 'development' },
+        { ENVIRONMENT: 'development', DEV_AUTH_BYPASS: 'true' },
       )
       expect(res.status).toBe(401)
     })

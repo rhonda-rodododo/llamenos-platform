@@ -49,15 +49,11 @@ telephony.use('*', async (c, next) => {
     }, 404)
   }
 
-  const isDev = env.ENVIRONMENT === 'development'
-  // Epic 258 C7: Only trust CF-Connecting-IP, never controllable hostname
-  const isLocal = isDev && c.req.header('CF-Connecting-IP') === '127.0.0.1'
-  if (!isLocal) {
-    const isValid = await adapter.validateWebhook(c.req.raw)
-    if (!isValid) {
-      logger.error(`Webhook signature FAILED for ${url.pathname}`)
-      return c.text('Forbidden', 403)
-    }
+  // H05: Always validate webhook signatures — no localhost bypass
+  const isValid = await adapter.validateWebhook(c.req.raw)
+  if (!isValid) {
+    logger.error(`Webhook signature FAILED for ${url.pathname}`)
+    return c.text('Forbidden', 403)
   }
   await next()
 })

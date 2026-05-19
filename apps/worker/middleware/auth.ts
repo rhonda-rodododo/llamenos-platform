@@ -21,21 +21,21 @@ export const auth = createMiddleware<AppEnv>(async (c, next) => {
     c.set('sessionToken', sessionToken)
   }
 
-  // Dev-mode signature bypass: when ENVIRONMENT=development and Schnorr verification
-  // fails, fall back to pubkey-only auth for REGISTERED volunteers only.
-  // This handles mobile E2E tests where the Rust native crypto library may produce
-  // signatures that fail verification due to cross-architecture interop differences
-  // (e.g., x86_64 emulator vs. backend).
+  // Dev-mode signature bypass: explicit opt-in via DEV_AUTH_BYPASS=true env var.
+  // Only active when ENVIRONMENT=development AND DEV_AUTH_BYPASS=true.
+  // Handles mobile E2E tests where cross-architecture crypto may fail verification.
   // Still validates token format and freshness — only bypasses signature verification.
   // Does NOT auto-register unknown pubkeys — unregistered keys still get 401.
-  if (!authResult && c.env.ENVIRONMENT === 'development') {
+  if (!authResult && c.env.ENVIRONMENT === 'development' && c.env.DEV_AUTH_BYPASS === 'true') {
     const devAuthHeader = c.req.header('Authorization') ?? null
     const authPayload = parseAuthHeader(devAuthHeader)
     if (authPayload?.pubkey && validateToken(authPayload)) {
       const user = await services.identity.getUserInternal(authPayload.pubkey)
       if (user && user.active !== false) {
         authResult = { pubkey: authPayload.pubkey, user }
-        reqLog.info('Dev-mode signature bypass', { pubkeyPrefix: authPayload.pubkey.slice(0, 8) })
+        reqLog.warn('DEV_AUTH_BYPASS active — signature verification skipped', {
+          pubkeyPrefix: authPayload.pubkey.slice(0, 8),
+        })
       }
     }
   }
@@ -58,7 +58,7 @@ export const auth = createMiddleware<AppEnv>(async (c, next) => {
     })
 
     incError('auth')
-    return c.json({ error: 'Unauthorized' }, 401)
+    return c.json({ error: 'Authentication failed' }, 401)
   }
 
   // Load all roles from SettingsService

@@ -85,7 +85,7 @@ devicesRoutes.post('/register',
     },
   }),
   validator('json', registerDeviceBodySchema),
-  rateLimit(5, 3_600_000, 'device-register'),
+  rateLimit('strict'),
   async (c) => {
     const pubkey = c.get('pubkey')
     const body = c.req.valid('json')
@@ -215,7 +215,7 @@ devicesRoutes.post('/:id/revoke',
     },
   }),
   validator('json', revokeDeviceBodySchema),
-  rateLimit(3, 3_600_000, 'device-revoke'),
+  rateLimit('strict'),
   async (c) => {
     const pubkey = c.get('pubkey')
     const deviceId = c.req.param('id')

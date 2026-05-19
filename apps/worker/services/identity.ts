@@ -35,7 +35,11 @@ import { DEMO_ACCOUNTS } from '@shared/demo-accounts'
 // Constants
 // ---------------------------------------------------------------------------
 
-import { SESSION_DURATION_MS, RENEWAL_THRESHOLD_MS } from '../lib/session-renewal'
+import {
+  SESSION_DURATION_MS,
+  RENEWAL_THRESHOLD_MS,
+  decideSessionRenewal,
+} from '../lib/session-renewal'
 import { decideDeviceRegistration } from '../lib/device-eviction'
 const INVITE_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 const CHALLENGE_TTL_MS = 5 * 60 * 1000 // 5 minutes
@@ -595,7 +599,20 @@ export class IdentityService {
     if (rows.length === 0) throw new ServiceError(401, 'Invalid session')
     const row = rows[0]
 
-    if (row.expiresAt < new Date()) {
+    const decision = decideSessionRenewal(
+      row.expiresAt,
+      new Date(),
+      RENEWAL_THRESHOLD_MS,
+      SESSION_DURATION_MS,
+      row.createdAt,
+    )
+
+    if (decision.action === 'max_lifetime_exceeded') {
+      await this.db.delete(sessions).where(eq(sessions.token, token))
+      throw new ServiceError(401, 'Session max lifetime exceeded')
+    }
+
+    if (decision.action === 'expired') {
       await this.db.delete(sessions).where(eq(sessions.token, token))
       throw new ServiceError(401, 'Session expired')
     }
@@ -604,12 +621,10 @@ export class IdentityService {
     // renew a still-alive session. If the session was concurrently revoked
     // (deleted) between the SELECT and this UPDATE, the WHERE clause
     // `expiresAt > NOW()` prevents silent renewal of a ghost session.
-    const remaining = row.expiresAt.getTime() - Date.now()
-    if (remaining < RENEWAL_THRESHOLD_MS) {
-      const newExpiry = new Date(Date.now() + SESSION_DURATION_MS)
+    if (decision.action === 'renew') {
       const [updated] = await this.db
         .update(sessions)
-        .set({ expiresAt: newExpiry })
+        .set({ expiresAt: decision.newExpiresAt })
         .where(
           and(
             eq(sessions.token, token),
@@ -619,7 +634,7 @@ export class IdentityService {
         .returning()
 
       if (!updated) throw new ServiceError(401, 'Session expired or revoked')
-      return { ...rowToSession(row), expiresAt: newExpiry.toISOString() }
+      return { ...rowToSession(row), expiresAt: decision.newExpiresAt.toISOString() }
     }
 
     return rowToSession(row)
@@ -765,8 +780,25 @@ export class IdentityService {
       )
       .returning()
 
-    if (!row) throw new ServiceError(404, 'Challenge not found or expired')
-    return { challenge: row.challenge }
+    if (row) return { challenge: row.challenge }
+
+    // No row deleted — either doesn't exist or expired. Check which case
+    // to return the appropriate error code (H08 error differentiation).
+    const [stale] = await this.db
+      .select()
+      .from(webauthnChallenges)
+      .where(eq(webauthnChallenges.challengeId, id))
+      .limit(1)
+
+    if (stale) {
+      // Expired — clean up the stale row
+      await this.db
+        .delete(webauthnChallenges)
+        .where(eq(webauthnChallenges.challengeId, id))
+      throw new ServiceError(410, 'Challenge expired')
+    }
+
+    throw new ServiceError(404, 'Challenge not found')
   }
 
   // =========================================================================
@@ -1009,7 +1041,15 @@ export class IdentityService {
       // 2. Delete device record
       await tx.delete(devices).where(eq(devices.id, deviceId))
 
-      // 3. Emit security event
+      // 3. Delete all sessions for this device (C02 — atomic with device deletion)
+      await tx.delete(sessions).where(
+        and(
+          eq(sessions.pubkey, pubkey),
+          sql`${sessions.deviceInfo}->>'deviceId' = ${deviceId}`,
+        ),
+      )
+
+      // 4. Emit security event
       await tx.insert(securityEvents).values({
         userPubkey: pubkey,
         eventType: 'device_remove',

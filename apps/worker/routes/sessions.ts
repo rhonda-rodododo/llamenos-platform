@@ -53,7 +53,7 @@ sessionRoutes.get('/',
  * NOTE: Literal routes MUST come before parameterized routes.
  */
 sessionRoutes.post('/terminate-others',
-  rateLimit(10, 3_600_000, 'session-terminate'),
+  rateLimit('write'),
   describeRoute({
     tags: ['Sessions'],
     summary: 'Terminate all other sessions',
@@ -82,7 +82,7 @@ sessionRoutes.post('/terminate-others',
  * Terminate a specific session by UUID. Only the session owner can terminate their sessions.
  */
 sessionRoutes.delete('/:id',
-  rateLimit(10, 3_600_000, 'session-terminate'),
+  rateLimit('write'),
   describeRoute({
     tags: ['Sessions'],
     summary: 'Terminate a specific session',

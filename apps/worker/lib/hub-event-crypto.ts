@@ -35,6 +35,9 @@ import {
   LABEL_SERVER_EVENT_ENCRYPTION_KEY_INFO,
   LABEL_HUB_EVENT_EPOCH,
 } from '@shared/crypto-labels'
+import { createLogger } from './logger'
+
+const logger = createLogger('hub-event-crypto')
 
 const MIN_BUCKET_SIZE = 512
 
@@ -159,5 +162,16 @@ export function decryptHubEvent(hex: string, eventKey: Uint8Array, epoch?: numbe
   const cipher = gcm(eventKey, nonce, aad)
   const padded = cipher.decrypt(ciphertext)
   const plaintext = unpadFromBucket(padded)
-  return JSON.parse(new TextDecoder().decode(plaintext)) as Record<string, unknown>
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(new TextDecoder().decode(plaintext))
+  } catch {
+    logger.warn('Hub event decryption produced non-JSON payload', { epoch })
+    throw new Error('Hub event decryption produced invalid payload')
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    logger.warn('Hub event decryption produced non-object payload', { epoch })
+    throw new Error('Hub event decryption produced invalid payload')
+  }
+  return parsed as Record<string, unknown>
 }

@@ -87,10 +87,10 @@ webauthn.post('/login/verify',
 
     const { credentials } = await services.identity.getAllWebAuthnCredentials()
     const matched = credentials.find(cr => cr.id === assertion.id)
-    if (!matched) return c.json({ error: 'Unknown credential' }, 401)
+    if (!matched) return c.json({ error: 'Authentication failed' }, 401)
     try {
       const verification = await verifyAuthResponse(assertion, matched, challengeData.challenge, origin, rpID)
-      if (!verification.verified) return c.json({ error: 'Verification failed' }, 401)
+      if (!verification.verified) return c.json({ error: 'Authentication failed' }, 401)
       await services.identity.updateWebAuthnCounter({
         pubkey: matched.ownerPubkey,
         credId: matched.id,
@@ -101,7 +101,7 @@ webauthn.post('/login/verify',
       await audit(services.audit, 'webauthnLogin', matched.ownerPubkey, { credId: matched.id }, { request: c.req.raw, hmacSecret: c.env.HMAC_SECRET })
       return c.json({ token: session.token, pubkey: session.pubkey })
     } catch {
-      return c.json({ error: 'Verification failed' }, 401)
+      return c.json({ error: 'Authentication failed' }, 401)
     }
   })
 
@@ -127,7 +127,7 @@ webauthn.post('/register/options',
     },
   }),
   validator('json', addCredentialBodySchema),
-  rateLimit(3, 3_600_000, 'webauthn-register'),
+  rateLimit('strict'),
   async (c) => {
     const services = c.get('services')
     const pubkey = c.get('pubkey')
@@ -161,7 +161,7 @@ webauthn.post('/register/verify',
     },
   }),
   validator('json', registerCredentialBodySchema),
-  rateLimit(3, 3_600_000, 'webauthn-register'),
+  rateLimit('strict'),
   async (c) => {
     const services = c.get('services')
     const pubkey = c.get('pubkey')

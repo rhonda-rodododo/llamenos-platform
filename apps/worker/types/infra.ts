@@ -58,6 +58,8 @@ export interface Env {
   METRICS_SCRAPE_TOKEN?: string
   E2E_TEST_SECRET?: string
   DEV_RESET_SECRET?: string
+  DEV_AUTH_BYPASS?: string           // "true" to skip Schnorr signature verification (dev only)
+  DEV_ROUTES_ENABLED?: string        // "true" to enable /test-* dev routes (dev only)
 
   // Demo mode (CF Cron Trigger resets all DOs on schedule)
   DEMO_MODE?: string              // "true" to enable

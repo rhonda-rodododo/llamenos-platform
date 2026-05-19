@@ -20,9 +20,13 @@ on:
         type: string
         default: '1'
 
+permissions: {}  # deny-all; per-job permissions below
+
 jobs:
   load-test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     timeout-minutes: 60
 
     services:

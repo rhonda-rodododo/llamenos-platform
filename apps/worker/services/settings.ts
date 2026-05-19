@@ -22,6 +22,7 @@ import {
   reportTypeDefinitions,
   ivrAudio,
   rateLimits,
+  apiRateLimits,
   captchas,
   caseNumberSequences,
   // Hub deletion — all tables with hub-scoped data
@@ -521,6 +522,69 @@ export class SettingsService {
       })
 
     return { limited: recent.length > data.maxPerMinute }
+  }
+
+  // =========================================================================
+  // API Rate Limiting — fixed-window counters (Epic A / C03)
+  // =========================================================================
+
+  /**
+   * Atomic fixed-window rate limit check. Returns whether the request is limited
+   * and the Retry-After value in seconds.
+   */
+  async checkApiRateLimit(
+    key: string,
+    maxRequests: number,
+    windowMs: number,
+  ): Promise<{ limited: boolean; retryAfterSeconds: number }> {
+    const windowInterval = `${windowMs / 1000} seconds`
+
+    const result = await this.db.execute<{ count: number; window_start: Date }>(sql`
+      INSERT INTO api_rate_limits (key, count, window_start)
+      VALUES (${key}, 1, NOW())
+      ON CONFLICT (key) DO UPDATE
+      SET count = CASE
+        WHEN api_rate_limits.window_start < NOW() - ${windowInterval}::interval
+        THEN 1
+        ELSE api_rate_limits.count + 1
+      END,
+      window_start = CASE
+        WHEN api_rate_limits.window_start < NOW() - ${windowInterval}::interval
+        THEN NOW()
+        ELSE api_rate_limits.window_start
+      END
+      RETURNING count, window_start
+    `)
+
+    const row = result[0]
+    const count = Number(row?.count ?? 0)
+    const windowStart = row?.window_start
+
+    if (count > maxRequests) {
+      const windowStartMs = windowStart instanceof Date
+        ? windowStart.getTime()
+        : new Date(String(windowStart)).getTime()
+      const windowEndMs = windowStartMs + windowMs
+      const retryAfterSeconds = Math.max(1, Math.ceil((windowEndMs - Date.now()) / 1000))
+      return { limited: true, retryAfterSeconds }
+    }
+
+    return { limited: false, retryAfterSeconds: 0 }
+  }
+
+  /** Clear API rate limit counters (new fixed-window table). */
+  async clearApiRateLimits(prefix?: string): Promise<void> {
+    if (prefix) {
+      await this.db.delete(apiRateLimits).where(sql`${apiRateLimits.key} LIKE ${prefix + '%'}`)
+    } else {
+      await this.db.delete(apiRateLimits)
+    }
+  }
+
+  /** Clear expired API rate limit windows (older than 10 minutes). */
+  async clearExpiredApiRateLimits(): Promise<void> {
+    await this.db.delete(apiRateLimits)
+      .where(sql`${apiRateLimits.windowStart} < NOW() - INTERVAL '10 minutes'`)
   }
 
   // =========================================================================
