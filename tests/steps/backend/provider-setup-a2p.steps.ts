@@ -11,10 +11,11 @@ import {
   ADMIN_SEED,
   apiGet,
   apiPost,
+  devPost,
   createUserViaApi,
   uniqueName,
 } from '../../api-helpers'
-import { TestDB } from '../../db-helpers'
+
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -99,13 +100,9 @@ Given('an A2P brand is in approved state', async ({ request, world, workerHub })
   if (status !== 200) throw new Error(`Failed to submit brand: ${status} ${JSON.stringify(data)}`)
   const registrationId = (data as Record<string, string>).id
 
-  // Directly approve the brand via test helper (no real Twilio poll needed)
-  const { status: approveStatus } = await apiPost(
-    request,
-    '/test-a2p-approve-brand',
-    { registrationId },
-    ADMIN_SEED,
-  )
+  // Directly approve the brand via dev-only test helper (no real Twilio poll needed).
+  // Dev routes require X-Test-Secret header, not Bearer auth.
+  const { status: approveStatus } = await devPost(request, '/test-a2p-approve-brand', { registrationId })
   if (approveStatus !== 200) throw new Error(`Failed to approve brand: ${approveStatus}`)
 
   const state = getA2P(world)

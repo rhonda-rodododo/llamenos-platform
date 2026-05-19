@@ -43,6 +43,8 @@ class WakeKeyServiceTest {
         val keystoreService = mockk<KeystoreService>(relaxed = true)
         val service = WakeKeyService(keystoreService)
         // Just verify the method is callable — result depends on test environment.
-        val _ = service.isNativeLoaded()
+        val loaded = service.isNativeLoaded()
+        // Use the value to suppress unused-variable warning
+        loaded.toString()
     }
 }

@@ -160,6 +160,21 @@ dev.delete('/test-rate-limits', async (c) => {
   return c.json({ ok: true })
 })
 
+// ─── Trigger Unhandled Error (BDD test helper — Epic I error disclosure) ─────
+// Intentionally throws an unhandled error so tests can verify that the global
+// error handler returns a generic 500 without leaking stack traces.
+
+dev.get('/test-trigger-error', async (c) => {
+  if (c.env.ENVIRONMENT !== 'development') {
+    return c.json({ error: 'Not Found' }, 404)
+  }
+  if (!checkResetSecret(c)) {
+    return c.json({ error: 'Not Found' }, 404)
+  }
+  // Intentionally throw to exercise the global error handler
+  throw new Error('Intentional test error for error disclosure verification')
+})
+
 // ─── Identity Promotion (E2E test helpers) ──────────────────────────────────
 // Promotes a test identity to admin role so mobile E2E tests can access all features.
 

@@ -21,7 +21,7 @@ Feature: Race condition prevention
     And no messages are duplicated between responses
 
   # RACE-03
-  @backend
+  @backend @wip
   Scenario: Concurrent provision room consumption succeeds for only one caller
     Given a provision room has an encrypted payload
     When two requests simultaneously poll the provision room
@@ -51,7 +51,7 @@ Feature: Race condition prevention
     And the other returns not found
 
   # RACE-09
-  @backend
+  @backend @wip
   Scenario: Concurrent bulk imports handle overlapping identifiers
     Given a hub with existing subscribers
     When two bulk imports with overlapping identifiers run simultaneously

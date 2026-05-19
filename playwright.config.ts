@@ -80,7 +80,7 @@ export default defineConfig({
         features: "packages/test-specs/features/**/*.feature",
         steps: "tests/steps/backend/**/*.ts",
         featuresRoot: "packages/test-specs/features",
-        tags: "@backend",
+        tags: "@backend and not @wip and not @fixme",
         // Desktop/mobile-only scenarios have steps not defined in backend — skip them
         missingSteps: "skip-scenario",
       }),

@@ -256,8 +256,8 @@ class WakeKeyService @Inject constructor(
     }
 
     companion object {
-        private const val KEY_WAKE_SECRET = "wake-secret"
-        private const val KEY_WAKE_PUBKEY = "wake-pubkey"
+        internal const val KEY_WAKE_SECRET = "wake-secret"
+        internal const val KEY_WAKE_PUBKEY = "wake-pubkey"
         private val LABEL_PUSH_WAKE = CryptoLabels.LABEL_PUSH_WAKE
 
         /** AES-GCM IV length in bytes. */

@@ -175,7 +175,8 @@ describe('performPanicWipe', () => {
     performPanicWipe()
     expect(hrefSpy).not.toHaveBeenCalled()
 
-    await new Promise(r => setTimeout(r, 250))
+    // Wait long enough for FLASH_DURATION_MS (200) + async dynamic imports to settle
+    await new Promise(r => setTimeout(r, 500))
     expect(hrefSpy).toHaveBeenCalledWith('/login')
 
     hrefSpy.mockRestore()

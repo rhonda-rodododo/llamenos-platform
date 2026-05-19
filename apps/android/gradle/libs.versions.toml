@@ -71,6 +71,7 @@ robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 espresso = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espresso" }
 test-runner = { group = "androidx.test", name = "runner", version = "1.7.0" }
+test-ext-junit = { group = "androidx.test.ext", name = "junit-ktx", version = "1.2.1" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
