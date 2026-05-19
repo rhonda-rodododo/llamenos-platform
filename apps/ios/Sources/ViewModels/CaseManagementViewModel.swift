@@ -410,9 +410,9 @@ final class CaseManagementViewModel {
 
             let envelopes = encrypted.envelopes.map { env in
                 CaseEnvelope(
-                    pubkey: env.pubkey,
+                    ct: env.ct,
                     enc: env.enc,
-                    ct: env.ct
+                    pubkey: env.pubkey
                 )
             }
 
