@@ -50,7 +50,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.LaunchedEffect
 import org.llamenos.hotline.model.EntityTypeDefinition
-import org.llamenos.hotline.model.EnumOption
+import org.llamenos.protocol.EntityTypeDefinitionStatus
 import org.llamenos.protocol.Record
 import org.llamenos.hotline.util.DateFormatUtils
 
@@ -91,7 +91,7 @@ fun CaseListScreen(
     }
 
     // Status options for the selected entity type
-    val statusOptions: List<EnumOption> = remember(uiState.selectedEntityTypeId, uiState.entityTypes) {
+    val statusOptions: List<EntityTypeDefinitionStatus> = remember(uiState.selectedEntityTypeId, uiState.entityTypes) {
         if (uiState.selectedEntityTypeId != null) {
             uiState.entityTypes.find { it.id == uiState.selectedEntityTypeId }?.statuses
                 ?: emptyList()

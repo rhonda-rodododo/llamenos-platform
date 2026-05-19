@@ -55,7 +55,6 @@ import androidx.compose.ui.unit.sp
 import org.llamenos.hotline.R
 import org.llamenos.hotline.model.EntityFieldDefinition
 import org.llamenos.hotline.model.EntityTypeDefinition
-import org.llamenos.hotline.model.EnumOption
 
 /**
  * Read-only entity type detail screen with tabs for Fields, Statuses, and Config.
@@ -175,8 +174,8 @@ private fun OverviewCard(
             Spacer(Modifier.height(8.dp))
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (entityType.category.isNotEmpty()) {
-                    DetailChip(text = entityType.category)
+                if (entityType.category.value.isNotEmpty()) {
+                    DetailChip(text = entityType.category.value)
                 }
                 DetailChip(text = "${entityType.fields.size} fields")
                 DetailChip(text = "${entityType.statuses.size} statuses")
@@ -244,7 +243,7 @@ private fun FieldsTab(
 
                             // Type chip
                             Text(
-                                text = field.type,
+                                text = field.type.value,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Medium,
                                 fontFamily = FontFamily.Monospace,
@@ -271,8 +270,8 @@ private fun FieldsTab(
                                 OptionalBadge()
                             }
 
-                            if (field.accessLevel != "all") {
-                                AccessLevelBadge(level = field.accessLevel)
+                            if (field.accessLevel != org.llamenos.protocol.AccessLevel.All) {
+                                AccessLevelBadge(level = field.accessLevel.value)
                             }
 
                             if (field.section != null) {
@@ -320,7 +319,9 @@ private fun StatusesTab(
 
         entityType.statuses.forEach { status ->
             StatusRow(
-                option = status,
+                value = status.value,
+                label = status.label,
+                color = status.color,
                 isDefault = status.value == entityType.defaultStatus,
                 isClosed = entityType.closedStatuses.contains(status.value) || status.isClosed == true,
             )
@@ -340,7 +341,9 @@ private fun StatusesTab(
 
             severities.forEach { severity ->
                 StatusRow(
-                    option = severity,
+                    value = severity.value,
+                    label = severity.label,
+                    color = severity.color,
                     isDefault = severity.value == entityType.defaultSeverity,
                     isClosed = false,
                 )
@@ -386,7 +389,9 @@ private fun StatusesTab(
 
 @Composable
 private fun StatusRow(
-    option: EnumOption,
+    value: String,
+    label: String,
+    color: String?,
     isDefault: Boolean,
     isClosed: Boolean,
     modifier: Modifier = Modifier,
@@ -395,7 +400,7 @@ private fun StatusRow(
         modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp)
-            .testTag("schema-status-${option.value}"),
+            .testTag("schema-status-$value"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Color dot
@@ -404,14 +409,14 @@ private fun StatusRow(
                 .size(10.dp)
                 .clip(CircleShape)
                 .background(
-                    parseHexColorLocal(option.color) ?: MaterialTheme.colorScheme.primary,
+                    parseHexColorLocal(color) ?: MaterialTheme.colorScheme.primary,
                 ),
         )
 
         Spacer(Modifier.width(10.dp))
 
         Text(
-            text = option.label,
+            text = label,
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.weight(1f),
         )
@@ -498,7 +503,7 @@ private fun ConfigTab(
 
         ConfigRow(
             label = stringResource(R.string.schema_access_level),
-            value = entityType.defaultAccessLevel,
+            value = entityType.defaultAccessLevel.value,
         )
         HorizontalDivider()
 
@@ -507,7 +512,7 @@ private fun ConfigTab(
             value = entityType.labelPlural,
         )
 
-        val templateId = entityType.templateId
+        val templateId = entityType.templateID
         if (templateId != null) {
             HorizontalDivider()
             ConfigRow(
