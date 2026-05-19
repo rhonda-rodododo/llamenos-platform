@@ -4,7 +4,6 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
-import android.util.Log
 import androidx.core.app.NotificationCompat
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -78,7 +77,6 @@ class PushService : MessagingReceiver() {
      * so the server can target this device for push delivery via ntfy.
      */
     override fun onNewEndpoint(context: Context, endpoint: PushEndpoint, instance: String) {
-        Log.d(TAG, "UnifiedPush endpoint registered: ${endpoint.url.take(40)}...")
         keystoreService.store(KEY_PUSH_ENDPOINT, endpoint.url)
 
         // Ensure a wake key exists for push encryption
@@ -94,7 +92,6 @@ class PushService : MessagingReceiver() {
      * Clean up the stored endpoint and notify the backend.
      */
     override fun onUnregistered(context: Context, instance: String) {
-        Log.d(TAG, "UnifiedPush endpoint unregistered")
         keystoreService.delete(KEY_PUSH_ENDPOINT)
 
         // TODO: Notify backend to remove this device's push endpoint
@@ -115,13 +112,11 @@ class PushService : MessagingReceiver() {
      */
     override fun onMessage(context: Context, message: PushMessage, instance: String) {
         val messageStr = message.content.decodeToString()
-        Log.d(TAG, "UnifiedPush message received: ${messageStr.take(40)}...")
 
         // Try to parse as JSON envelope
         val data = try {
             parseJsonPayload(messageStr)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to parse push payload: ${e.message}")
             return
         }
 
@@ -138,7 +133,7 @@ class PushService : MessagingReceiver() {
     }
 
     override fun onRegistrationFailed(context: Context, reason: FailedReason, instance: String) {
-        Log.e(TAG, "UnifiedPush registration failed: $reason")
+        // Registration failure is silent — the backend will retry on next auth
     }
 
     /**
@@ -148,8 +143,6 @@ class PushService : MessagingReceiver() {
     private fun handleVoipPush(context: Context, data: Map<String, String>) {
         val callId = data["call-id"] ?: ""
         val hubId = data["hub-id"] ?: ""
-
-        Log.d(TAG, "VoIP push: callId=$callId hubId=${hubId.take(8)}...")
 
         if (callId.isNotEmpty() && hubId.isNotEmpty()) {
             linphoneService.storePendingCallHub(callId, hubId)
@@ -188,7 +181,6 @@ class PushService : MessagingReceiver() {
             serviceScope.launch {
                 val wakePayload = wakeKeyService.decryptWakePayload(wakeEnvelope)
                 if (wakePayload != null) {
-                    Log.d(TAG, "Wake payload decrypted: type=${wakePayload.type}")
                     val router = PushNotificationRouter(linphoneService)
                     router.routeWakePayload(
                         type = wakePayload.type,
@@ -219,7 +211,7 @@ class PushService : MessagingReceiver() {
             "call_ended" -> handleCallEnded(context)
             "shift_reminder" -> handleShiftReminder(context, data)
             "announcement" -> handleAnnouncement(context, data)
-            else -> Log.d(TAG, "Unknown message type: $type")
+            else -> {}
         }
     }
 
@@ -291,8 +283,6 @@ class PushService : MessagingReceiver() {
     }
 
     private fun handleIncomingCall(context: Context, data: Map<String, String>) {
-        Log.d(TAG, "Incoming call notification received")
-
         val callId = data["call-id"] ?: ""
         val hubId = data["hub-id"] ?: ""
         if (callId.isNotEmpty() && hubId.isNotEmpty()) {
@@ -322,13 +312,11 @@ class PushService : MessagingReceiver() {
     }
 
     private fun handleCallEnded(context: Context) {
-        Log.d(TAG, "Call ended notification received")
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.cancel(NOTIFICATION_ID_CALL)
     }
 
     private fun handleShiftReminder(context: Context, data: Map<String, String>) {
-        Log.d(TAG, "Shift reminder notification received")
         ensureNotificationChannel(
             context,
             CHANNEL_SHIFTS,
@@ -349,7 +337,6 @@ class PushService : MessagingReceiver() {
     }
 
     private fun handleAnnouncement(context: Context, data: Map<String, String>) {
-        Log.d(TAG, "Announcement notification received")
         ensureNotificationChannel(
             context,
             CHANNEL_GENERAL,
@@ -402,13 +389,12 @@ class PushService : MessagingReceiver() {
                 result[key] = strValue
             }
         } catch (e: Exception) {
-            Log.e(TAG, "JSON parse error: ${e.message}")
+            // Ignore malformed payloads
         }
         return result
     }
 
     companion object {
-        private const val TAG = "LlamenosPush"
         private const val KEY_PUSH_ENDPOINT = "push-endpoint"
 
         private const val CHANNEL_CALLS = "llamenos_calls"

@@ -554,9 +554,8 @@ private fun QRScannerContent(
                                 preview,
                                 imageAnalysis,
                             )
-                        } catch (e: Exception) {
+                        } catch (_: Exception) {
                             // Camera unavailable (e.g. emulator without camera config)
-                            android.util.Log.w("DeviceLink", "Camera init failed: ${e.message}")
                         }
                     }, ContextCompat.getMainExecutor(ctx))
 

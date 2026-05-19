@@ -229,10 +229,7 @@ final class AppState {
 
         // Step 1: Bootstrap admin using key injected via XCTEST_ADMIN_SECRET env var
         let adminSecretHex = ProcessInfo.processInfo.environment["XCTEST_ADMIN_SECRET"] ?? ""
-        guard !adminSecretHex.isEmpty else {
-            print("[DEBUG] XCTEST_ADMIN_SECRET not set — skipping admin bootstrap")
-            return
-        }
+        guard !adminSecretHex.isEmpty else { return }
         bootstrapAdmin(baseURL: baseURL, adminSecretHex: adminSecretHex)
 
         // Step 2: Create user using admin auth

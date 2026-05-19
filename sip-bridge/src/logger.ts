@@ -24,28 +24,37 @@ function formatMessage(level: LogLevel, prefix: string, message: string): string
   return `[${ts}] [${level.toUpperCase()}] ${prefix} ${message}`
 }
 
+function formatError(err: unknown): string {
+  if (err instanceof Error) return err.message
+  return String(err)
+}
+
 export const logger = {
-  debug(prefix: string, message: string): void {
+  debug(prefix: string, message: string, err?: unknown): void {
     if (shouldLog('debug')) {
-      console.debug(formatMessage('debug', prefix, message))
+      const full = err !== undefined ? `${message} — ${formatError(err)}` : message
+      console.debug(formatMessage('debug', prefix, full))
     }
   },
 
-  info(prefix: string, message: string): void {
+  info(prefix: string, message: string, err?: unknown): void {
     if (shouldLog('info')) {
-      console.info(formatMessage('info', prefix, message))
+      const full = err !== undefined ? `${message} — ${formatError(err)}` : message
+      console.info(formatMessage('info', prefix, full))
     }
   },
 
-  warn(prefix: string, message: string): void {
+  warn(prefix: string, message: string, err?: unknown): void {
     if (shouldLog('warn')) {
-      console.warn(formatMessage('warn', prefix, message))
+      const full = err !== undefined ? `${message} — ${formatError(err)}` : message
+      console.warn(formatMessage('warn', prefix, full))
     }
   },
 
-  error(prefix: string, message: string): void {
+  error(prefix: string, message: string, err?: unknown): void {
     if (shouldLog('error')) {
-      console.error(formatMessage('error', prefix, message))
+      const full = err !== undefined ? `${message} — ${formatError(err)}` : message
+      console.error(formatMessage('error', prefix, full))
     }
   },
 }

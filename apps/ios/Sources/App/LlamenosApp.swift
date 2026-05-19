@@ -84,9 +84,7 @@ struct LlamenosApp: App {
                 // Initialize Linphone SIP core for VoIP call handling
                 do {
                     try appState.linphoneService.initialize(hubContext: hubContext)
-                } catch {
-                    print("[Linphone] Core initialization failed: \(error.localizedDescription)")
-                }
+                } catch {}
             }
             .onOpenURL { url in
                 handleDeepLink(url)
@@ -114,7 +112,6 @@ struct LlamenosApp: App {
     private func requestPushNotificationPermission() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
             if let error {
-                print("[APNs] Authorization error: \(error.localizedDescription)")
                 return
             }
             if granted {
@@ -250,14 +247,14 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
     ) {
         let tokenHex = deviceToken.map { String(format: "%02x", $0) }.joined()
-        print("[APNs] Device token registered: \(tokenHex.prefix(12))...")
+        // APNs token is sensitive — never log even a prefix in production.
 
         guard let appState else { return }
         Task {
             do {
                 try await appState.wakeKeyService.registerDevice(pushToken: tokenHex)
             } catch {
-                print("[APNs] Device registration failed: \(error.localizedDescription)")
+                // non-fatal
             }
         }
     }
@@ -266,7 +263,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         _ application: UIApplication,
         didFailToRegisterForRemoteNotificationsWithError error: Error
     ) {
-        print("[APNs] Registration failed: \(error.localizedDescription)")
+        // non-fatal
     }
 
     func application(
@@ -341,7 +338,6 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 
             completionHandler(.newData)
         } catch {
-            print("[APNs] Wake payload decryption failed: \(error.localizedDescription)")
             completionHandler(.failed)
         }
     }

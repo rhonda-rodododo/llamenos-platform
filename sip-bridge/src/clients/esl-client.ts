@@ -5,6 +5,7 @@ import type {
   BridgeOptions,
   OriginateParams,
 } from '../bridge-client'
+import { logger } from '../logger'
 
 export interface EslConfig {
   host: string
@@ -76,9 +77,7 @@ export class EslClient implements BridgeClient {
     this.shouldReconnect = true
     if (!this.hasConnected) {
       this.connectionDeadline = Date.now() + this.connectionTimeoutMs
-      console.log(
-        `[esl] Will exit if FreeSWITCH is not reachable within ${Math.round(this.connectionTimeoutMs / 1000)}s`
-      )
+      logger.info('[esl]', `Will exit if FreeSWITCH is not reachable within ${Math.round(this.connectionTimeoutMs / 1000)}s`)
     }
     await this.doConnect()
   }
@@ -104,7 +103,7 @@ export class EslClient implements BridgeClient {
 
   private async doConnect(): Promise<void> {
     return new Promise((resolve, reject) => {
-      console.log(`[esl] Connecting to ${this.config.host}:${this.config.port}...`)
+      logger.info('[esl]', `Connecting to ${this.config.host}:${this.config.port}...`)
 
       const self = this
 
@@ -113,7 +112,7 @@ export class EslClient implements BridgeClient {
         port: this.config.port,
         socket: {
           open(socket) {
-            console.log('[esl] TCP connected')
+            logger.info('[esl]', 'TCP connected')
             self.socket = socket as unknown as ReturnType<typeof Bun.connect>
           },
           data(_socket, data) {
@@ -121,7 +120,7 @@ export class EslClient implements BridgeClient {
             self.processBuffer(resolve, reject)
           },
           close() {
-            console.log('[esl] TCP disconnected')
+            logger.info('[esl]', 'TCP disconnected')
             self.connected = false
             self.socket = null
             if (self.shouldReconnect) {
@@ -129,12 +128,12 @@ export class EslClient implements BridgeClient {
             }
           },
           error(_socket, error) {
-            console.error('[esl] TCP error:', error)
+            logger.error('[esl]', 'TCP error', error)
             self.connected = false
             if (!self.hasConnected) reject(error)
           },
           connectError(_socket, error) {
-            console.error('[esl] TCP connect error:', error)
+            logger.error('[esl]', 'TCP connect error', error)
             reject(error)
           },
         },
@@ -242,7 +241,7 @@ export class EslClient implements BridgeClient {
             try {
               handler(bridgeEvent)
             } catch (err) {
-              console.error('[esl] Event handler error:', err)
+              logger.error('[esl]', 'Event handler error', err)
             }
           }
         }
@@ -261,7 +260,7 @@ export class EslClient implements BridgeClient {
         this.connected = true
         this.reconnectDelay = 1000
         this.connectionDeadline = null
-        console.log('[esl] Connected and subscribed to events')
+        logger.info('[esl]', 'Connected and subscribed to events')
         resolve?.(undefined)
       }
     }
@@ -269,7 +268,7 @@ export class EslClient implements BridgeClient {
 
   private sendRaw(text: string): void {
     if (!this.socket) {
-      console.warn('[esl] sendRaw called with no socket')
+      logger.warn('[esl]', 'sendRaw called with no socket')
       return
     }
     const sock = this.socket as unknown as { write: (data: string | Uint8Array) => void }
@@ -285,29 +284,27 @@ export class EslClient implements BridgeClient {
 
   private scheduleReconnect(): void {
     if (this.connectionDeadline !== null && Date.now() >= this.connectionDeadline) {
-      console.error(
-        `[esl] FATAL: Could not connect to FreeSWITCH within ${Math.round(this.connectionTimeoutMs / 1000)}s — exiting.`
-      )
+      logger.error('[esl]', `FATAL: Could not connect to FreeSWITCH within ${Math.round(this.connectionTimeoutMs / 1000)}s — exiting.`)
       process.exit(1)
     }
 
     const remaining = this.connectionDeadline
       ? ` (${Math.round((this.connectionDeadline - Date.now()) / 1000)}s until timeout)`
       : ''
-    console.log(`[esl] Reconnecting in ${this.reconnectDelay}ms...${remaining}`)
+    logger.info('[esl]', `Reconnecting in ${this.reconnectDelay}ms...${remaining}`)
 
     this.reconnectTimer = setTimeout(async () => {
       this.reconnectTimer = null
 
       if (this.connectionDeadline !== null && Date.now() >= this.connectionDeadline) {
-        console.error(`[esl] FATAL: Connection timeout — exiting.`)
+        logger.error('[esl]', 'FATAL: Connection timeout — exiting.')
         process.exit(1)
       }
 
       try {
         await this.doConnect()
       } catch (err) {
-        console.error('[esl] Reconnection failed:', err)
+        logger.error('[esl]', 'Reconnection failed', err)
         this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.maxReconnectDelay)
         if (this.shouldReconnect) {
           this.scheduleReconnect()
@@ -401,7 +398,7 @@ export class EslClient implements BridgeClient {
     try {
       await this.sendCommand(`uuid_kill ${channelId}`)
     } catch (err) {
-      console.warn(`[esl] Failed to hangup channel ${channelId}:`, err)
+      logger.warn('[esl]', 'Failed to hangup channel', err)
     }
   }
 

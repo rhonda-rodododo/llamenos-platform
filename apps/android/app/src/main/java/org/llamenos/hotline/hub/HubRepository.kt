@@ -36,8 +36,8 @@ class HubRepository @Inject constructor(
             try {
                 val envelope = apiService.getHubKey(hubId)
                 cryptoService.loadHubKey(hubId, envelope)
-            } catch (e: Exception) {
-                Log.w("HubRepository", "Hub key fetch failed for $hubId (non-fatal): ${e.message}")
+            } catch (_: Exception) {
+                // Key fetch failure is non-fatal.
             }
         }
     }
@@ -55,8 +55,7 @@ class HubRepository @Inject constructor(
                         val envelope = apiService.getHubKey(hub.id)
                         cryptoService.loadHubKey(hub.id, envelope)
                     }
-                }.onFailure { e ->
-                    Log.w("HubRepository", "Failed to load key for hub ${hub.id}: ${e.message}")
+                }.onFailure { _ ->
                 }
             }
         }.forEach { it.await() }

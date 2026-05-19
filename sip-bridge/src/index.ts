@@ -3,6 +3,7 @@ import { createBridgeClient } from './client-factory'
 import { WebhookSender } from './webhook-sender'
 import { CommandHandler } from './command-handler'
 import { loadTtsConfigFromEnv } from './tts-engine'
+import { logger } from './logger'
 
 /** Load configuration from environment variables */
 function loadConfig(): BridgeConfig {
@@ -82,7 +83,7 @@ function verifyRequest(
   // Reject requests with timestamps older than 5 minutes (replay protection)
   const tsMs = parseInt(timestamp, 10)
   if (isNaN(tsMs) || Math.abs(Date.now() - tsMs) > 300_000) {
-    console.warn('[bridge] Rejected request with stale timestamp')
+    logger.warn('[bridge]', 'Rejected request with stale timestamp')
     return false
   }
 
@@ -91,7 +92,7 @@ function verifyRequest(
 
 async function main(): Promise<void> {
   const config = loadConfig()
-  console.log(`[bridge] Starting sip-bridge (PBX_TYPE=${config.pbxType})...`)
+  logger.info('[bridge]', `Starting sip-bridge (PBX_TYPE=${config.pbxType})...`)
 
   // Initialize components
   const client = createBridgeClient(config)
@@ -106,7 +107,7 @@ async function main(): Promise<void> {
   // Register bridge event handler
   client.onEvent((event) => {
     handler.handleEvent(event).catch((err) => {
-      console.error('[bridge] Event handler error:', err)
+      logger.error('[bridge]', 'Event handler error', err)
     })
   })
 
@@ -133,7 +134,7 @@ async function main(): Promise<void> {
             latencyMs: health.latencyMs,
           })
         } catch (err) {
-          console.error('[bridge] Health check error:', err)
+          logger.error('[bridge]', 'Health check error', err)
           return Response.json(
             { status: 'error', error: 'Command failed' },
             { status: 500 }
@@ -161,7 +162,7 @@ async function main(): Promise<void> {
             bridges: bridges.length,
           })
         } catch (err) {
-          console.error('[bridge] Status check error:', err)
+          logger.error('[bridge]', 'Status check error', err)
           return Response.json(
             { status: 'error', error: 'Command failed' },
             { status: 500 }
@@ -175,7 +176,7 @@ async function main(): Promise<void> {
       if (path === '/command' && method === 'POST') {
         const body = await request.text()
         if (!verifyRequest(webhook, request, url, body)) {
-          console.warn('[bridge] Invalid command signature')
+          logger.warn('[bridge]', 'Invalid command signature')
           return new Response('Forbidden', { status: 403 })
         }
 
@@ -189,7 +190,7 @@ async function main(): Promise<void> {
           const result = await handler.handleHttpCommand(data)
           return Response.json(result, { status: result.ok ? 200 : 400 })
         } catch (err) {
-          console.error('[bridge] Command handler error:', err)
+          logger.error('[bridge]', 'Command handler error', err)
           return Response.json({ ok: false, error: 'Command failed' }, { status: 500 })
         }
       }
@@ -220,12 +221,12 @@ async function main(): Promise<void> {
               })
               channelIds.push(channel.id)
             } catch (err) {
-              console.error(`[bridge] Failed to ring ${vol.pubkey}:`, err)
+              logger.error('[bridge]', 'Failed to ring volunteer', err)
             }
           }
           return Response.json({ ok: true, channelIds })
         } catch (err) {
-          console.error('[bridge] Ring error:', err)
+          logger.error('[bridge]', 'Ring error', err)
           return Response.json({ ok: false, error: 'Command failed' }, { status: 500 })
         }
       }
@@ -255,7 +256,7 @@ async function main(): Promise<void> {
           }
           return Response.json({ ok: true })
         } catch (err) {
-          console.error('[bridge] Cancel-ringing error:', err)
+          logger.error('[bridge]', 'Cancel-ringing error', err)
           return Response.json({ ok: false, error: 'Command failed' }, { status: 500 })
         }
       }
@@ -277,7 +278,7 @@ async function main(): Promise<void> {
           await client.hangup(data.channelId)
           return Response.json({ ok: true })
         } catch (err) {
-          console.error('[bridge] Hangup error:', err)
+          logger.error('[bridge]', 'Hangup error', err)
           return Response.json({ ok: false, error: 'Command failed' }, { status: 500 })
         }
       }
@@ -327,7 +328,7 @@ async function main(): Promise<void> {
             },
           })
         } catch (err) {
-          console.error('[bridge] Recording fetch error:', err)
+          logger.error('[bridge]', 'Recording fetch error', err)
           return Response.json({ error: 'Command failed' }, { status: 500 })
         }
       }
@@ -336,27 +337,25 @@ async function main(): Promise<void> {
     },
   })
 
-  console.log(`[bridge] HTTP server listening on ${config.bridgeHost}:${config.bridgePort}`)
+  logger.info('[bridge]', `HTTP server listening on ${config.bridgeHost}:${config.bridgePort}`)
 
   // Connect to PBX
   try {
     await client.connect()
-    console.log(`[bridge] Connected to ${config.pbxType}`)
+    logger.info('[bridge]', `Connected to ${config.pbxType}`)
   } catch (err) {
-    console.error(`[bridge] Failed to connect to ${config.pbxType}:`, err)
-    console.log('[bridge] Will retry connection...')
+    logger.error('[bridge]', `Failed to connect to ${config.pbxType}`, err)
+    logger.info('[bridge]', 'Will retry connection...')
   }
 
   // Log startup info
-  console.log(`[bridge] sip-bridge is running (PBX_TYPE=${config.pbxType})`)
-  console.log(`[bridge] Webhook target: ${config.workerWebhookUrl}`)
-  console.log(
-    `[bridge] TTS engine: ${config.ttsConfig?.engine ?? 'none'} (cache: ${config.ttsConfig?.cacheDir ?? 'disabled'})`
-  )
+  logger.info('[bridge]', `sip-bridge is running (PBX_TYPE=${config.pbxType})`)
+  logger.info('[bridge]', `Webhook target: ${config.workerWebhookUrl}`)
+  logger.info('[bridge]', `TTS engine: ${config.ttsConfig?.engine ?? 'none'} (cache: ${config.ttsConfig?.cacheDir ?? 'disabled'})`)
 
   // Handle graceful shutdown
   const shutdown = () => {
-    console.log('[bridge] Shutting down...')
+    logger.info('[bridge]', 'Shutting down...')
     handler.dispose()
     client.disconnect()
     server.stop()
@@ -383,6 +382,6 @@ function getEndpointForPbx(pbxType: BridgeConfig['pbxType'], phone: string): str
 }
 
 main().catch((err) => {
-  console.error('[bridge] Fatal error:', err)
+  logger.error('[bridge]', 'Fatal error', err)
   process.exit(1)
 })

@@ -33,7 +33,6 @@ class DeepLinkActivity : ComponentActivity() {
 
         val data = intent?.data
         if (data == null || !DeepLinkValidator.isAllowed(data)) {
-            Log.w(TAG, "Deep link rejected — not in allowlist or invalid: $data")
             finish()
             return
         }
@@ -71,7 +70,6 @@ class DeepLinkActivity : ComponentActivity() {
     private fun handleCallDeepLink(uri: android.net.Uri) {
         val callId = uri.getQueryParameter("callId")
         if (callId != null) {
-            Log.d(TAG, "Call deep link: callId=$callId")
             // TODO: route to active call screen via MainActivity intent
         }
         finish()
@@ -80,7 +78,6 @@ class DeepLinkActivity : ComponentActivity() {
     private fun handleHubDeepLink(uri: android.net.Uri) {
         val hubId = uri.getQueryParameter("hubId")
         if (hubId != null) {
-            Log.d(TAG, "Hub deep link: hubId=$hubId")
             // TODO: call hubRepository.switchToHub(hubId) after user confirmation
             // Hub switch must be driven by explicit user action (confirmation dialog above),
             // never by automatic background processing.
@@ -93,7 +90,6 @@ class DeepLinkActivity : ComponentActivity() {
         val expectedState = pendingOAuthState
 
         if (expectedState == null || incomingState != expectedState) {
-            Log.w(TAG, "OAuth state mismatch — possible CSRF. Expected=$expectedState, got=$incomingState")
             setResult(RESULT_CANCELED, Intent().apply {
                 putExtra("status", "error")
                 putExtra("message", "OAuth state validation failed")
@@ -106,8 +102,6 @@ class DeepLinkActivity : ComponentActivity() {
 
         val status = uri.getQueryParameter("status")
         val message = uri.getQueryParameter("message")
-
-        Log.d(TAG, "OAuth callback: status=$status")
 
         when (status) {
             "success" -> {

@@ -9,6 +9,7 @@ import type {
 } from './types'
 import { type CallMode, SframeModeDispatcher, parseStasisArgs } from './sframe-mode-dispatcher'
 import { type TtsEngine, createTtsEngine, formatMediaPath } from './tts-engine'
+import { logger } from './logger'
 
 /** TTL for recording callbacks — entries older than this are pruned */
 const RECORDING_CALLBACK_TTL_MS = 5 * 60 * 1000 // 5 minutes
@@ -147,7 +148,7 @@ export class CommandHandler {
       }
     }
     if (pruned > 0) {
-      console.log(`[handler] Pruned ${pruned} stale recording callback(s)`)
+      logger.debug('[handler]', `Pruned ${pruned} stale recording callback(s)`)
     }
   }
 
@@ -186,9 +187,7 @@ export class CommandHandler {
   private async onChannelCreate(event: BridgeEvent & { type: 'channel_create' }): Promise<void> {
     const args = event.args ?? []
 
-    console.log(
-      `[handler] channel_create id=${event.channelId} caller=${event.callerNumber} args=${args.join(',')}`
-    )
+    logger.debug('[handler]', `channel_create caller=${event.callerNumber}`)
 
     // Check if this is a volunteer outbound leg (originated by us for ringing)
     if (args[0] === 'dialed') {
@@ -238,9 +237,7 @@ export class CommandHandler {
 
   /** channel_hangup — channel destroyed */
   private async onChannelHangup(event: BridgeEvent & { type: 'channel_hangup' }): Promise<void> {
-    console.log(
-      `[handler] channel_hangup id=${event.channelId} cause=${event.cause} (${event.causeText})`
-    )
+    logger.debug('[handler]', `channel_hangup cause=${event.cause}`)
 
     // Send call-status webhook for volunteer calls before cleanup
     const parentSid = this.ringingMap.get(event.channelId)
@@ -291,7 +288,7 @@ export class CommandHandler {
 
   /** DTMF digit received */
   private async onDtmfReceived(event: BridgeEvent & { type: 'dtmf_received' }): Promise<void> {
-    console.log(`[handler] dtmf_received id=${event.channelId} digit=${event.digit}`)
+    logger.debug('[handler]', 'dtmf_received')
 
     const call = this.calls.get(event.channelId)
     if (!call) return
@@ -335,9 +332,7 @@ export class CommandHandler {
   private async onRecordingComplete(
     event: BridgeEvent & { type: 'recording_complete' }
   ): Promise<void> {
-    console.log(
-      `[handler] recording_complete name=${event.recordingName} duration=${event.duration}`
-    )
+    logger.debug('[handler]', 'recording_complete')
 
     const callback = this.recordingCallbacks.get(event.recordingName)
     if (callback) {
@@ -359,7 +354,7 @@ export class CommandHandler {
   private async onRecordingFailed(
     event: BridgeEvent & { type: 'recording_failed' }
   ): Promise<void> {
-    console.log(`[handler] recording_failed name=${event.recordingName}`)
+    logger.debug('[handler]', 'recording_failed')
 
     const callback = this.recordingCallbacks.get(event.recordingName)
     if (callback) {
@@ -416,9 +411,7 @@ export class CommandHandler {
     parentCallSid: string,
     pubkey: string
   ): Promise<void> {
-    console.log(
-      `[handler] Volunteer answered channel=${volunteerChannelId} parent=${parentCallSid} pubkey=${pubkey}`
-    )
+    logger.info('[handler]', 'Volunteer answered call')
 
     const parentCall = this.calls.get(parentCallSid)
     const payload: WebhookPayload = {
@@ -463,7 +456,7 @@ export class CommandHandler {
       try {
         await this.executeCommand(cmd)
       } catch (err) {
-        console.error(`[handler] Command failed:`, cmd.action, err)
+        logger.error('[handler]', `Command failed: ${cmd.action}`, err)
       }
     }
   }
@@ -508,7 +501,7 @@ export class CommandHandler {
     try {
       await this.client.playMedia(cmd.channelId, media)
     } catch (err) {
-      console.warn(`[handler] Playback failed:`, err)
+      logger.warn('[handler]', 'Playback failed', err)
     }
   }
 
@@ -560,7 +553,7 @@ export class CommandHandler {
       try {
         await this.client.playMedia(cmd.channelId, media, `gather-${cmd.channelId}`)
       } catch (err) {
-        console.warn(`[handler] Gather playback failed:`, err)
+        logger.warn('[handler]', 'Gather playback failed', err)
         // Start timeout even if playback fails
         call.activeGather.timeoutTimer = setTimeout(async () => {
           if (call.activeGather) {
@@ -606,9 +599,7 @@ export class CommandHandler {
       callerChannelId = queuedCallerId
     }
 
-    console.log(
-      `[handler] Bridging caller=${callerChannelId} volunteer=${cmd.volunteerChannelId}`
-    )
+    logger.info('[handler]', 'Bridging caller and volunteer')
 
     // Stop hold music on the caller
     const callerCall = this.calls.get(callerChannelId)
@@ -650,7 +641,7 @@ export class CommandHandler {
       try {
         this.sframeDispatcher.assertRecordingAllowed(guardMode)
       } catch (err) {
-        console.warn('[handler] Skipping bridge recording (Tier 5 SFrame):', err)
+        logger.warn('[handler]', 'Skipping bridge recording (Tier 5 SFrame)', err)
         return
       }
 
@@ -670,20 +661,20 @@ export class CommandHandler {
           })
         }
       } catch (err) {
-        console.error('[handler] Failed to start bridge recording:', err)
+        logger.error('[handler]', 'Failed to start bridge recording', err)
       }
     }
   }
 
   /** Hang up a channel */
   private async execHangup(cmd: HangupCommand): Promise<void> {
-    console.log(`[handler] Hangup channel=${cmd.channelId}`)
+    logger.info('[handler]', 'Hangup channel')
     await this.client.hangup(cmd.channelId)
   }
 
   /** Record a channel — enforces Tier 5 SFrame recording ban */
   private async execRecord(cmd: RecordCommand): Promise<void> {
-    console.log(`[handler] Recording channel=${cmd.channelId} name=${cmd.name}`)
+    logger.info('[handler]', 'Recording channel')
 
     // Tier 5 voice E2EE guard — look up the call's mode and refuse to record
     // SFrame calls. Default to mode='pstn' for untracked channels so the
@@ -693,7 +684,7 @@ export class CommandHandler {
     try {
       this.sframeDispatcher.assertRecordingAllowed(guardMode)
     } catch (err) {
-      console.warn('[handler] Skipping channel recording (Tier 5 SFrame):', err)
+      logger.warn('[handler]', 'Skipping channel recording (Tier 5 SFrame)', err)
       return
     }
 
@@ -721,13 +712,13 @@ export class CommandHandler {
         createdAt: Date.now(),
       })
     } catch (err) {
-      console.error('[handler] Failed to start recording:', err)
+      logger.error('[handler]', 'Failed to start recording', err)
     }
   }
 
   /** Originate an outbound call (ring a volunteer) */
   private async execRing(cmd: RingCommand): Promise<void> {
-    console.log(`[handler] Ringing ${cmd.endpoint} for call`)
+    logger.info('[handler]', 'Ringing volunteer')
 
     try {
       const channel = await this.client.originate({
@@ -747,9 +738,9 @@ export class CommandHandler {
         }
       }
 
-      console.log(`[handler] Originated channel=${channel.id} for ${cmd.endpoint}`)
+      logger.info('[handler]', 'Originated call')
     } catch (err) {
-      console.error(`[handler] Failed to originate call to ${cmd.endpoint}:`, err)
+      logger.error('[handler]', 'Failed to originate call', err)
     }
   }
 
@@ -758,7 +749,7 @@ export class CommandHandler {
     const call = this.calls.get(cmd.channelId)
     if (!call) return
 
-    console.log(`[handler] Queuing channel=${cmd.channelId}`)
+    logger.info('[handler]', 'Queuing channel')
 
     // Register this channel as the queue for its callSid
     this.queues.set(cmd.channelId, cmd.channelId)
@@ -767,7 +758,7 @@ export class CommandHandler {
     try {
       await this.client.startMoh(cmd.channelId, cmd.musicOnHold ?? 'default')
     } catch (err) {
-      console.warn('[handler] Failed to start MOH:', err)
+      logger.warn('[handler]', 'Failed to start MOH', err)
     }
 
     // Set up periodic wait callback
@@ -809,7 +800,7 @@ export class CommandHandler {
             }
           }
         } catch (err) {
-          console.error('[handler] Wait callback failed:', err)
+          logger.error('[handler]', 'Wait callback failed', err)
         }
       }, (cmd.waitCallbackInterval ?? 10) * 1000) as unknown as ReturnType<typeof setTimeout>
     }
@@ -817,7 +808,7 @@ export class CommandHandler {
 
   /** Reject a call */
   private async execReject(cmd: RejectCommand): Promise<void> {
-    console.log(`[handler] Rejecting channel=${cmd.channelId}`)
+    logger.info('[handler]', 'Rejecting channel')
     await this.client.hangup(cmd.channelId)
   }
 
@@ -828,7 +819,7 @@ export class CommandHandler {
       return
     }
 
-    console.log(`[handler] Redirect channel=${cmd.channelId} to ${cmd.path}`)
+    logger.info('[handler]', 'Redirect channel')
 
     const call = this.calls.get(cmd.channelId)
     const payload: WebhookPayload = {
@@ -902,7 +893,7 @@ export class CommandHandler {
           return { ok: false, error: `Unknown action: ${action}` }
       }
     } catch (err) {
-      console.error('[handler] HTTP command failed:', err)
+      logger.error('[handler]', 'HTTP command failed', err)
       return { ok: false, error: 'Command failed' }
     }
   }

@@ -75,11 +75,7 @@ final class HubManagementViewModel {
                     do {
                         let envelope = try await self.apiService.getHubKey(hub.id)
                         try self.cryptoService.loadHubKey(hubId: hub.id, envelope: envelope)
-                    } catch {
-                        // Individual key fetch errors do not propagate — log and continue
-                        // so that the hub list remains usable even if some keys fail.
-                        print("[HubManagementViewModel] Failed to eager-load key for hub \(hub.id): \(error)")
-                    }
+                    } catch {}
                 }
             }
         }
