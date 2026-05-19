@@ -107,6 +107,52 @@ describe('blasts route validation', () => {
       })
       expect(res.status).not.toBe(400)
     })
+
+    // H02: control character sanitization
+    it('rejects content.body with null bytes (H02)', async () => {
+      const app = createApp()
+      const res = await sendJSON(app, '/blasts', {
+        ...VALID_BLAST,
+        content: { body: 'hello\x00world' },
+      })
+      expect(res.status).toBe(400)
+    })
+
+    it('rejects content.body with BEL control character (H02)', async () => {
+      const app = createApp()
+      const res = await sendJSON(app, '/blasts', {
+        ...VALID_BLAST,
+        content: { body: 'hello\x07world' },
+      })
+      expect(res.status).toBe(400)
+    })
+
+    it('rejects content.body with backspace control character (H02)', async () => {
+      const app = createApp()
+      const res = await sendJSON(app, '/blasts', {
+        ...VALID_BLAST,
+        content: { body: 'hello\x08world' },
+      })
+      expect(res.status).toBe(400)
+    })
+
+    it('accepts content.body with newlines (normal SMS formatting)', async () => {
+      const app = createApp()
+      const res = await sendJSON(app, '/blasts', {
+        ...VALID_BLAST,
+        content: { body: 'Line 1\nLine 2\nLine 3' },
+      })
+      expect(res.status).not.toBe(400)
+    })
+
+    it('accepts content.body with tabs', async () => {
+      const app = createApp()
+      const res = await sendJSON(app, '/blasts', {
+        ...VALID_BLAST,
+        content: { body: 'Col1\tCol2\tCol3' },
+      })
+      expect(res.status).not.toBe(400)
+    })
   })
 
   // -----------------------------------------------------------------------
