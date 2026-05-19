@@ -4191,6 +4191,13 @@
     "updateRequiredTitle": "Update Required",
     "versionChange": "{{current}} → {{new}}"
   },
+  "biometricUnlockTitle": "Unlock Llamenos",
+  "biometricUnlockSubtitle": "Use your fingerprint or face to unlock",
+  "usePinInstead": "Use PIN",
+  "deepLinkConfirmTitle": "Open link?",
+  "deepLinkConfirmMessage": "Llamenos wants to perform a %s action.",
+  "deepLinkConfirmProceed": "Proceed",
+  "deepLinkConfirmCancel": "Cancel",
   "useBiometric": "Use Biometric",
   "userProfile": {
     "activity": "Activity",

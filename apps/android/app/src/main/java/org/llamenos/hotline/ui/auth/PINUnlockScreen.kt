@@ -38,10 +38,15 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.biometric.BiometricPrompt
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import kotlinx.coroutines.delay
 import org.llamenos.hotline.R
 import org.llamenos.hotline.ui.components.LoadingOverlay
 import org.llamenos.hotline.ui.components.PINPad
+import org.llamenos.hotline.ui.components.SecureWindowEffect
 
 /**
  * PIN unlock screen for returning users with stored keys.
@@ -57,8 +62,12 @@ fun PINUnlockScreen(
     onResetIdentity: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    SecureWindowEffect()
+
     val uiState by viewModel.uiState.collectAsState()
     var localPin by remember { mutableStateOf("") }
+    val context = LocalContext.current
+    val hasBiometricPIN = remember { viewModel.hasBiometricPIN() }
 
     // Staggered entrance animation
     var showLogo by remember { mutableStateOf(false) }
@@ -166,24 +175,58 @@ fun PINUnlockScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        // Use biometric button (when available)
-                        OutlinedButton(
-                            onClick = {
-                                // Biometric authentication will be implemented when
-                                // the biometric prompt integration is added.
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(48.dp)
-                                .testTag("biometric-unlock"),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Fingerprint,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
-                            )
-                            Spacer(Modifier.size(8.dp))
-                            Text(stringResource(R.string.use_biometric))
+                        // Use biometric button (when biometric-protected PIN is configured)
+                        if (hasBiometricPIN) {
+                            OutlinedButton(
+                                onClick = {
+                                    val decryptCipher = viewModel.getBiometricDecryptCipher()
+                                        ?: return@OutlinedButton
+                                    val executor = ContextCompat.getMainExecutor(context)
+                                    val biometricPrompt = BiometricPrompt(
+                                        context as FragmentActivity,
+                                        executor,
+                                        object : BiometricPrompt.AuthenticationCallback() {
+                                            override fun onAuthenticationSucceeded(
+                                                result: BiometricPrompt.AuthenticationResult,
+                                            ) {
+                                                val cipher = result.cryptoObject?.cipher ?: return
+                                                viewModel.onBiometricSuccess(cipher)
+                                            }
+                                            override fun onAuthenticationError(
+                                                errorCode: Int,
+                                                errString: CharSequence,
+                                            ) {
+                                                // User cancelled or hardware unavailable —
+                                                // PIN pad still showing, nothing to do.
+                                            }
+                                            override fun onAuthenticationFailed() {
+                                                // Single attempt failed — system shows retry UI.
+                                            }
+                                        }
+                                    )
+                                    val promptInfo = BiometricPrompt.PromptInfo.Builder()
+                                        .setTitle(context.getString(R.string.biometric_unlock_title))
+                                        .setSubtitle(context.getString(R.string.biometric_unlock_subtitle))
+                                        .setNegativeButtonText(context.getString(R.string.use_pin_instead))
+                                        .build()
+                                    biometricPrompt.authenticate(
+                                        promptInfo,
+                                        BiometricPrompt.CryptoObject(decryptCipher),
+                                    )
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp)
+                                    .testTag("biometric-unlock"),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Fingerprint,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                                Spacer(Modifier.size(8.dp))
+                                Text(stringResource(R.string.use_biometric))
+                            }
                         }
 
                         Spacer(Modifier.height(12.dp))

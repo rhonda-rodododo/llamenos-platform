@@ -54,11 +54,26 @@
             android:theme="@android:style/Theme.NoDisplay"
             android:noHistory="true"
             android:excludeFromRecents="true">
-            <intent-filter>
+            <!-- OAuth callbacks: llamenos://oauth/callback -->
+            <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="llamenos" android:host="oauth" android:pathPrefix="/callback" />
+            </intent-filter>
+            <!-- Call deep links: llamenos://call/answer -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="llamenos" android:host="call" />
+            </intent-filter>
+            <!-- Hub switch deep links: llamenos://hub/switch (requires user confirmation) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="llamenos" android:host="hub" />
             </intent-filter>
         </activity>
 

@@ -352,4 +352,33 @@ class AuthViewModel @Inject constructor(
         keystoreService.clear()
         _uiState.value = AuthUiState()
     }
+
+    // ── Biometric unlock helpers ────────────────────────────────────────────
+
+    /**
+     * Whether a biometric-protected PIN is stored and ready for decryption.
+     * Returns false if KeystoreService is not the real implementation (test environment).
+     */
+    fun hasBiometricPIN(): Boolean {
+        return (keystoreService as? KeystoreService)?.hasBiometricPIN() ?: false
+    }
+
+    /**
+     * Get a Cipher initialized for decryption using the stored biometric key IV.
+     * Pass this as the BiometricPrompt.CryptoObject to authenticate.
+     * Returns null if biometric PIN is not configured or KeystoreService unavailable.
+     */
+    fun getBiometricDecryptCipher(): javax.crypto.Cipher? {
+        return (keystoreService as? KeystoreService)?.getBiometricDecryptCipher()
+    }
+
+    /**
+     * Called when biometric prompt succeeds and the biometric-protected Cipher is available.
+     * Decrypts the stored PIN and uses it to unlock device keys.
+     */
+    fun onBiometricSuccess(cipher: javax.crypto.Cipher) {
+        val ks = keystoreService as? KeystoreService ?: return
+        val pin = ks.decryptPINWithBiometric(cipher) ?: return
+        unlockWithPin(pin)
+    }
 }
