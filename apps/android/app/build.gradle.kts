@@ -217,4 +217,5 @@ dependencies {
     androidTestImplementation(libs.compose.ui.test.junit4)
     androidTestImplementation(libs.test.runner)
     androidTestImplementation(libs.cucumber.android)
+    androidTestImplementation(kotlin("test"))
 }

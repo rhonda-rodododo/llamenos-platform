@@ -41,6 +41,13 @@ export function rateLimit(tier: RateLimitTier): MiddlewareHandler<AppEnv> {
   const config = RATE_LIMIT_TIERS[tier]
 
   return async (c, next) => {
+    // Skip rate limiting in development/test environments — BDD and E2E tests
+    // make many rapid API calls for setup that would hit strict limits.
+    // Production rate limiting is unaffected.
+    if (c.env?.ENVIRONMENT === 'development') {
+      return next()
+    }
+
     // Determine key: IP-based for strict/webhook, pubkey-based for write/read
     let identifier: string | undefined
     if (tier === 'strict' || tier === 'webhook') {

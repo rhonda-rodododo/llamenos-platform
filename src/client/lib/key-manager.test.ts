@@ -86,7 +86,7 @@ describe('lock/unlock state', () => {
 
   it('wipeKey locks and clears stored key', async () => {
     markUnlocked('aabbccdd')
-    await expect(wipeKey()).rejects.toThrow('WASM lock not yet implemented')
+    await expect(wipeKey()).rejects.toThrow('Vault wipe unavailable — Tauri required')
     expect(isUnlocked()).toBe(false)
   })
 })

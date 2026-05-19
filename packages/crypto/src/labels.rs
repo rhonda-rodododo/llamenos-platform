@@ -333,6 +333,14 @@ pub const LABEL_SFRAME_NONCE: &str = "llamenos:sframe-nonce:v1";
 /// Shamir share commitment domain prefix
 pub const LABEL_SHAMIR_COMMIT: &str = "llamenos:shamir-commit:v1";
 
+// --- Desktop Key Management (Security Audit) ---
+
+/// HKDF info for backup key derivation from recovery key (versioned)
+pub const LABEL_BACKUP_HKDF_INFO: &str = "llamenos:backup:v1";
+
+/// HKDF info for deriving X25519 encryption seed from Ed25519 signing seed
+pub const LABEL_DEVICE_ENCRYPTION_SEED: &str = "llamenos:device-encryption-seed:v1";
+
 // --- SAS Derivation (EP02) ---
 
 /// Domain separation for SAS emoji derivation (device verification ceremony)
@@ -473,6 +481,9 @@ pub const LABEL_REGISTRY: &[&str] = &[
     // 88-89: Epic B Crypto Fixes
     LABEL_SFRAME_NONCE,  // 88
     LABEL_SHAMIR_COMMIT, // 89
+    // 90-91: Desktop Key Management (Security Audit)
+    LABEL_BACKUP_HKDF_INFO,       // 90
+    LABEL_DEVICE_ENCRYPTION_SEED, // 91
 ];
 
 /// Look up a label string by its numeric ID.
@@ -633,6 +644,11 @@ mod tests {
         assert_eq!(LABEL_ENTITY_TYPE_DEFINITION, "llamenos:entity-type-def:v1");
         assert_eq!(LABEL_SFRAME_NONCE, "llamenos:sframe-nonce:v1");
         assert_eq!(LABEL_SHAMIR_COMMIT, "llamenos:shamir-commit:v1");
+        assert_eq!(LABEL_BACKUP_HKDF_INFO, "llamenos:backup:v1");
+        assert_eq!(
+            LABEL_DEVICE_ENCRYPTION_SEED,
+            "llamenos:device-encryption-seed:v1"
+        );
     }
 
     /// Verify registry index stability.
@@ -685,6 +701,8 @@ mod tests {
         assert_eq!(id_to_label(87), Some(LABEL_ENTITY_TYPE_DEFINITION));
         assert_eq!(id_to_label(88), Some(LABEL_SFRAME_NONCE));
         assert_eq!(id_to_label(89), Some(LABEL_SHAMIR_COMMIT));
+        assert_eq!(id_to_label(90), Some(LABEL_BACKUP_HKDF_INFO));
+        assert_eq!(id_to_label(91), Some(LABEL_DEVICE_ENCRYPTION_SEED));
     }
 
     /// Verify bidirectional lookup (skipping tombstoned indices).

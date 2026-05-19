@@ -13,7 +13,11 @@
 
 use std::sync::Mutex;
 
-use llamenos_core::{auth, device_keys, hpke_envelope, puk, sas, sigchain};
+use llamenos_core::{
+    auth, device_keys, hpke_envelope,
+    labels::{LABEL_BACKUP_HKDF_INFO, LABEL_DEVICE_ENCRYPTION_SEED},
+    puk, sas, sigchain,
+};
 use tauri::Manager;
 
 use aes_gcm::{
@@ -1034,7 +1038,7 @@ pub fn generate_backup_from_state(
     let recovery_key_bytes = hex::decode(&recovery_key).map_err(err_str)?;
     let hk = hkdf::Hkdf::<sha2::Sha256>::new(None, &recovery_key_bytes);
     let mut backup_key = [0u8; 32];
-    hk.expand(b"llamenos:backup:v1", &mut backup_key)
+    hk.expand(LABEL_BACKUP_HKDF_INFO.as_bytes(), &mut backup_key)
         .map_err(|e| format!("HKDF expand failed: {e}"))?;
 
     // AES-256-GCM encrypt
@@ -1102,7 +1106,7 @@ pub fn wipe_keys(
 fn derive_encryption_seed_from_signing(signing_seed: &[u8; 32]) -> [u8; 32] {
     let hk = hkdf::Hkdf::<sha2::Sha256>::new(None, signing_seed);
     let mut encryption_seed = [0u8; 32];
-    hk.expand(b"llamenos:device-encryption-seed:v1", &mut encryption_seed)
+    hk.expand(LABEL_DEVICE_ENCRYPTION_SEED.as_bytes(), &mut encryption_seed)
         .expect("HKDF expand for encryption seed failed");
     encryption_seed
 }
