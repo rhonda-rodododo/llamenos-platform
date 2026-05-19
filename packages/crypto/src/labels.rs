@@ -296,6 +296,33 @@ pub const LABEL_PLATFORM_ROLE_DESC_ENCRYPT: &str = "llamenos:platform-role-desc-
 /// Hub role encryption (hub key symmetric encryption)
 pub const LABEL_HUB_ROLE_ENCRYPT: &str = "llamenos:hub-role-encrypt:v1";
 
+// --- Shift/Availability Encryption (EP07) ---
+
+/// Availability reason encryption
+pub const LABEL_AVAILABILITY_REASON: &str = "llamenos:availability-reason";
+
+/// Ring group name encryption
+pub const LABEL_RING_GROUP_NAME: &str = "llamenos:ring-group-name";
+
+/// Shift name encryption
+pub const LABEL_SHIFT_NAME: &str = "llamenos:shift-name";
+
+/// Shift override note encryption
+pub const LABEL_SHIFT_OVERRIDE_NOTE: &str = "llamenos:shift-override-note";
+
+// --- Team/Tag Encryption (EP03) ---
+
+/// Team field encryption (hub key symmetric encryption)
+pub const LABEL_TEAM_ENCRYPT: &str = "llamenos:team-field:v1";
+
+/// Tag field encryption (hub key symmetric encryption)
+pub const LABEL_TAG_ENCRYPT: &str = "llamenos:tag-field:v1";
+
+// --- Entity Type (EP06) ---
+
+/// Entity type definition encryption
+pub const LABEL_ENTITY_TYPE_DEFINITION: &str = "llamenos:entity-type-def:v1";
+
 // --- SAS Derivation (EP02) ---
 
 /// Domain separation for SAS emoji derivation (device verification ceremony)
@@ -423,6 +450,16 @@ pub const LABEL_REGISTRY: &[&str] = &[
     LABEL_HUB_ROLE_ENCRYPT,           // 79
     // 80: EP02 Device Identity
     LABEL_SAS_DERIVE, // 80
+    // 81-84: Shift/Availability (EP07)
+    LABEL_AVAILABILITY_REASON, // 81
+    LABEL_RING_GROUP_NAME,     // 82
+    LABEL_SHIFT_NAME,          // 83
+    LABEL_SHIFT_OVERRIDE_NOTE, // 84
+    // 85-86: Teams/Tags (EP03)
+    LABEL_TEAM_ENCRYPT, // 85
+    LABEL_TAG_ENCRYPT,  // 86
+    // 87: Entity Type (EP06)
+    LABEL_ENTITY_TYPE_DEFINITION, // 87
 ];
 
 /// Look up a label string by its numeric ID.
@@ -564,6 +601,13 @@ mod tests {
         );
         assert_eq!(LABEL_HUB_ROLE_ENCRYPT, "llamenos:hub-role-encrypt:v1");
         assert_eq!(LABEL_SAS_DERIVE, "llamenos:sas-derive:v1");
+        assert_eq!(LABEL_AVAILABILITY_REASON, "llamenos:availability-reason");
+        assert_eq!(LABEL_RING_GROUP_NAME, "llamenos:ring-group-name");
+        assert_eq!(LABEL_SHIFT_NAME, "llamenos:shift-name");
+        assert_eq!(LABEL_SHIFT_OVERRIDE_NOTE, "llamenos:shift-override-note");
+        assert_eq!(LABEL_TEAM_ENCRYPT, "llamenos:team-field:v1");
+        assert_eq!(LABEL_TAG_ENCRYPT, "llamenos:tag-field:v1");
+        assert_eq!(LABEL_ENTITY_TYPE_DEFINITION, "llamenos:entity-type-def:v1");
     }
 
     /// Verify registry index stability.
@@ -607,6 +651,13 @@ mod tests {
         assert_eq!(id_to_label(78), Some(LABEL_PLATFORM_ROLE_DESC_ENCRYPT));
         assert_eq!(id_to_label(79), Some(LABEL_HUB_ROLE_ENCRYPT));
         assert_eq!(id_to_label(80), Some(LABEL_SAS_DERIVE));
+        assert_eq!(id_to_label(81), Some(LABEL_AVAILABILITY_REASON));
+        assert_eq!(id_to_label(82), Some(LABEL_RING_GROUP_NAME));
+        assert_eq!(id_to_label(83), Some(LABEL_SHIFT_NAME));
+        assert_eq!(id_to_label(84), Some(LABEL_SHIFT_OVERRIDE_NOTE));
+        assert_eq!(id_to_label(85), Some(LABEL_TEAM_ENCRYPT));
+        assert_eq!(id_to_label(86), Some(LABEL_TAG_ENCRYPT));
+        assert_eq!(id_to_label(87), Some(LABEL_ENTITY_TYPE_DEFINITION));
     }
 
     /// Verify bidirectional lookup (skipping tombstoned indices).
@@ -652,5 +703,59 @@ mod tests {
             }
             assert!(seen.insert(label), "duplicate label in registry: {label}");
         }
+    }
+
+    /// CI GUARD: Every label in crypto-labels.json must exist in LABEL_REGISTRY and vice versa.
+    /// This prevents the drift that has been found 4 times — if you add a label to one place,
+    /// this test forces you to add it to the other.
+    #[test]
+    fn label_registry_matches_json() {
+        let json_str = include_str!("../../../packages/protocol/crypto-labels.json");
+        let json: serde_json::Value =
+            serde_json::from_str(json_str).expect("crypto-labels.json is valid JSON");
+        let labels_obj = json["labels"]
+            .as_object()
+            .expect("crypto-labels.json has 'labels' object");
+
+        // Every label in JSON must exist in LABEL_REGISTRY with the correct value
+        for (key, value) in labels_obj {
+            let expected_value = value
+                .as_str()
+                .unwrap_or_else(|| panic!("label {key} value is not a string"));
+            let found = LABEL_REGISTRY.iter().any(|&l| l == expected_value);
+            assert!(
+                found,
+                "Label {key} = \"{expected_value}\" exists in crypto-labels.json but NOT in LABEL_REGISTRY"
+            );
+        }
+
+        // Every non-tombstone label in LABEL_REGISTRY must exist in JSON
+        for (idx, &label) in LABEL_REGISTRY.iter().enumerate() {
+            if label.is_empty() {
+                continue;
+            } // tombstone
+            let found = labels_obj.values().any(|v| v.as_str() == Some(label));
+            assert!(
+                found,
+                "Label at index {idx} = \"{label}\" exists in LABEL_REGISTRY but NOT in crypto-labels.json"
+            );
+        }
+    }
+
+    /// CI GUARD: Label count in LABEL_REGISTRY (excluding tombstones) must match JSON count.
+    #[test]
+    fn label_count_matches_json() {
+        let json_str = include_str!("../../../packages/protocol/crypto-labels.json");
+        let json: serde_json::Value =
+            serde_json::from_str(json_str).expect("crypto-labels.json is valid JSON");
+        let json_count = json["labels"]
+            .as_object()
+            .expect("crypto-labels.json has 'labels' object")
+            .len();
+        let registry_count = LABEL_REGISTRY.iter().filter(|l| !l.is_empty()).count();
+        assert_eq!(
+            registry_count, json_count,
+            "LABEL_REGISTRY has {registry_count} labels but crypto-labels.json has {json_count}"
+        );
     }
 }
