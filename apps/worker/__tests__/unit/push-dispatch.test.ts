@@ -19,9 +19,12 @@ vi.mock('@worker/lib/push-encryption', () => ({
   encryptFullPayload: () => 'encrypted-full',
 }))
 
-vi.mock('@worker/lib/fcm-client', () => ({
-  FcmClient: vi.fn(),
-}))
+vi.mock('@worker/lib/ntfy-client', () => {
+  const NtfyClient = vi.fn()
+  NtfyClient.prototype.send = vi.fn().mockResolvedValue(true)
+  NtfyClient.prototype.publishToTopic = vi.fn().mockResolvedValue(true)
+  return { NtfyClient }
+})
 
 // ---------------------------------------------------------------------------
 // Test push log
@@ -115,10 +118,10 @@ describe('createPushDispatcherFromService', () => {
     expect(typeof dispatcher.sendToVolunteer).toBe('function')
   })
 
-  it('returns ServicePushDispatcher when FCM credentials are present', () => {
+  it('returns ServicePushDispatcher when ntfy URL is configured', () => {
     const env = {
       ENVIRONMENT: 'production',
-      FCM_SERVICE_ACCOUNT_KEY: '{"key": "value"}',
+      NTFY_URL: 'http://ntfy:80',
     } as Env
     const dispatcher = createPushDispatcherFromService(env, mockIdentityService, mockShiftsService)
     expect(dispatcher).toBeDefined()

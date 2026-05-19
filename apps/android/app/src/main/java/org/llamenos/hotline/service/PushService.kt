@@ -2,12 +2,12 @@ package org.llamenos.hotline.service
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.content.Context
 import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import com.google.firebase.messaging.FirebaseMessagingService
-import com.google.firebase.messaging.RemoteMessage
 import dagger.hilt.android.AndroidEntryPoint
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -19,17 +19,21 @@ import org.llamenos.hotline.crypto.KeystoreService
 import org.llamenos.hotline.crypto.WakeKeyService
 import org.llamenos.hotline.hub.ActiveHubState
 import org.llamenos.hotline.telephony.LinphoneService
+import org.unifiedpush.android.connector.MessagingReceiver
 import javax.inject.Inject
 
 /**
- * Firebase Cloud Messaging service for push notifications.
+ * UnifiedPush message receiver for push notifications.
+ *
+ * Replaces Firebase Cloud Messaging — uses self-hosted ntfy as the
+ * UnifiedPush distributor. No Google/Firebase dependency.
  *
  * Handles:
  * - Incoming call alerts (parallel ringing)
  * - Shift reminders
  * - Admin announcements
  *
- * All push notification content is encrypted — the FCM payload contains
+ * All push notification content is encrypted — the ntfy payload contains
  * only an opaque envelope that the app decrypts locally. Two decryption
  * tiers are supported:
  *
@@ -40,10 +44,10 @@ import javax.inject.Inject
  * 2. **Full tier** (via [CryptoService]): Requires the app to be unlocked.
  *    Shows detailed caller context when the volunteer's nsec is available.
  *
- * Firebase/Google never see the notification content in plaintext.
+ * ntfy/UnifiedPush never see the notification content in plaintext.
  */
 @AndroidEntryPoint
-class PushService : FirebaseMessagingService() {
+class PushService : MessagingReceiver() {
 
     @Inject
     lateinit var keystoreService: KeystoreService
@@ -63,54 +67,121 @@ class PushService : FirebaseMessagingService() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /**
-     * Called when a new FCM registration token is generated.
+     * Called when a new UnifiedPush endpoint is assigned.
      *
-     * This occurs on:
-     * - First app launch (initial token generation)
-     * - Token refresh (Google rotates tokens periodically)
-     * - App data cleared or reinstalled
+     * This occurs when:
+     * - The user selects a UnifiedPush distributor (ntfy)
+     * - The distributor assigns or rotates the endpoint URL
      *
-     * The token is stored locally and will be sent to the llamenos backend
-     * so the server can target this device for push delivery.
+     * The endpoint URL is stored locally and sent to the llamenos backend
+     * so the server can target this device for push delivery via ntfy.
      */
-    override fun onNewToken(token: String) {
-        super.onNewToken(token)
-        Log.d(TAG, "FCM token refreshed: ${token.take(10)}...")
-        keystoreService.store(KEY_FCM_TOKEN, token)
+    override fun onNewEndpoint(context: Context, endpoint: String, instance: String) {
+        Log.d(TAG, "UnifiedPush endpoint registered: ${endpoint.take(40)}...")
+        keystoreService.store(KEY_PUSH_ENDPOINT, endpoint)
 
         // Ensure a wake key exists for push encryption
         wakeKeyService.getOrCreateWakePublicKey()
-    }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        serviceScope.cancel()
+        // TODO: Send endpoint to backend via API call
+        // The endpoint URL is the full ntfy topic URL that the backend
+        // will POST encrypted payloads to.
     }
 
     /**
-     * Called when a push message is received while the app is in the foreground,
-     * or when a data-only message arrives (regardless of app state).
-     *
-     * Message types from the llamenos backend:
-     * - `incoming_call`: Trigger parallel ring UI, play ringtone
-     * - `call_ended`: Stop ringing (another volunteer answered)
-     * - `shift_reminder`: Upcoming shift notification
-     * - `announcement`: Admin announcement
-     *
-     * Each message may contain an encrypted `wake_payload` (decryptable without
-     * user PIN) and/or an encrypted `full_payload` (requires unlocked app).
+     * Called when this instance is unregistered from UnifiedPush.
+     * Clean up the stored endpoint and notify the backend.
      */
-    override fun onMessageReceived(message: RemoteMessage) {
-        super.onMessageReceived(message)
+    override fun onUnregistered(context: Context, instance: String) {
+        Log.d(TAG, "UnifiedPush endpoint unregistered")
+        keystoreService.delete(KEY_PUSH_ENDPOINT)
 
-        val data = message.data
-        val type = data["type"] ?: "unknown"
+        // TODO: Notify backend to remove this device's push endpoint
+    }
 
-        Log.d(TAG, "FCM message received: type=$type, keys=${data.keys}")
+    /**
+     * Called when a push message is received via UnifiedPush/ntfy.
+     *
+     * The message body is an opaque encrypted payload from the llamenos backend.
+     * It may contain a JSON envelope with:
+     * - `encrypted`: HPKE-encrypted wake-tier payload
+     * - `encryptedFull`: HPKE-encrypted full-tier payload
+     *
+     * Or for VoIP:
+     * - `type`: "incoming_call"
+     * - `call-id`: Call identifier
+     * - `hub-id`: Hub identifier
+     */
+    override fun onMessage(context: Context, message: ByteArray, instance: String) {
+        val messageStr = message.decodeToString()
+        Log.d(TAG, "UnifiedPush message received: ${messageStr.take(40)}...")
 
+        // Try to parse as JSON envelope
+        val data = try {
+            parseJsonPayload(messageStr)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to parse push payload: ${e.message}")
+            return
+        }
+
+        val type = data["type"] ?: ""
+
+        // Handle VoIP push (minimal unencrypted payload for call wakeup)
+        if (type == "incoming_call") {
+            handleVoipPush(data)
+            return
+        }
+
+        // Handle encrypted push payload (wake + full tiers)
+        handleEncryptedPush(data)
+    }
+
+    override fun onRegistrationFailed(context: Context, instance: String) {
+        Log.e(TAG, "UnifiedPush registration failed")
+    }
+
+    /**
+     * Handle VoIP push — minimal payload for incoming call wakeup.
+     * No PII in payload; the app fetches details from the server.
+     */
+    private fun handleVoipPush(data: Map<String, String>) {
+        val callId = data["call-id"] ?: ""
+        val hubId = data["hub-id"] ?: ""
+
+        Log.d(TAG, "VoIP push: callId=$callId hubId=${hubId.take(8)}...")
+
+        if (callId.isNotEmpty() && hubId.isNotEmpty()) {
+            linphoneService.storePendingCallHub(callId, hubId)
+        }
+        // Multi-hub axiom: do NOT call setActiveHub here.
+        // Hub context switch happens in LinphoneService.onCallStateChanged
+
+        ensureNotificationChannel(
+            CHANNEL_CALLS,
+            context.getString(R.string.notification_channel_calls),
+            NotificationManager.IMPORTANCE_HIGH,
+        )
+
+        val notification = NotificationCompat.Builder(context, CHANNEL_CALLS)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(context.getString(R.string.incoming_call))
+            .setContentText(context.getString(R.string.incoming_call_body))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_CALL)
+            .setAutoCancel(true)
+            .setVibrate(longArrayOf(0, 500, 200, 500))
+            .build()
+
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.notify(NOTIFICATION_ID_CALL, notification)
+    }
+
+    /**
+     * Handle encrypted push payload with wake + full tiers.
+     */
+    private fun handleEncryptedPush(data: Map<String, String>) {
         // Try wake-tier decryption first (available without PIN unlock)
-        // Server sends HPKE-encrypted payload as a single JSON envelope field.
-        val wakeEnvelope = data["wake_envelope"]
+        val wakeEnvelope = data["encrypted"]
         if (wakeEnvelope != null) {
             serviceScope.launch {
                 val wakePayload = wakeKeyService.decryptWakePayload(wakeEnvelope)
@@ -130,11 +201,12 @@ class PushService : FirebaseMessagingService() {
             }
         }
 
-        // If app is unlocked, use full-tier handling for richer notifications
+        // If app is unlocked, dispatch with full-tier content
         if (cryptoService.isUnlocked) {
+            val type = data["type"] ?: "unknown"
             dispatchByType(data, type)
         } else if (wakeEnvelope == null) {
-            // No wake payload and app is locked — show generic notification
+            val type = data["type"] ?: "unknown"
             dispatchByType(data, type)
         }
     }
@@ -158,56 +230,56 @@ class PushService : FirebaseMessagingService() {
             "incoming_call" -> {
                 ensureNotificationChannel(
                     CHANNEL_CALLS,
-                    getString(R.string.notification_channel_calls),
+                    context.getString(R.string.notification_channel_calls),
                     NotificationManager.IMPORTANCE_HIGH,
                 )
-                val notification = NotificationCompat.Builder(this, CHANNEL_CALLS)
+                val notification = NotificationCompat.Builder(context, CHANNEL_CALLS)
                     .setSmallIcon(R.drawable.ic_notification)
-                    .setContentTitle(getString(R.string.incoming_call))
-                    .setContentText(message ?: getString(R.string.incoming_call_body))
+                    .setContentTitle(context.getString(R.string.incoming_call))
+                    .setContentText(message ?: context.getString(R.string.incoming_call_body))
                     .setPriority(NotificationCompat.PRIORITY_HIGH)
                     .setCategory(NotificationCompat.CATEGORY_CALL)
                     .setAutoCancel(true)
                     .setVibrate(longArrayOf(0, 500, 200, 500))
                     .build()
 
-                val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+                val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                 notificationManager.notify(NOTIFICATION_ID_CALL, notification)
             }
 
             "shift_reminder" -> {
                 ensureNotificationChannel(
                     CHANNEL_SHIFTS,
-                    getString(R.string.notification_channel_shifts),
+                    context.getString(R.string.notification_channel_shifts),
                     NotificationManager.IMPORTANCE_DEFAULT,
                 )
-                val notification = NotificationCompat.Builder(this, CHANNEL_SHIFTS)
+                val notification = NotificationCompat.Builder(context, CHANNEL_SHIFTS)
                     .setSmallIcon(R.drawable.ic_notification)
-                    .setContentTitle(getString(R.string.shifts_reminder))
-                    .setContentText(message ?: getString(R.string.shifts_reminder_body))
+                    .setContentTitle(context.getString(R.string.shifts_reminder))
+                    .setContentText(message ?: context.getString(R.string.shifts_reminder_body))
                     .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                     .setAutoCancel(true)
                     .build()
 
-                val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+                val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                 notificationManager.notify(NOTIFICATION_ID_SHIFT, notification)
             }
 
             else -> {
                 ensureNotificationChannel(
                     CHANNEL_GENERAL,
-                    getString(R.string.notification_channel_general),
+                    context.getString(R.string.notification_channel_general),
                     NotificationManager.IMPORTANCE_DEFAULT,
                 )
-                val notification = NotificationCompat.Builder(this, CHANNEL_GENERAL)
+                val notification = NotificationCompat.Builder(context, CHANNEL_GENERAL)
                     .setSmallIcon(R.drawable.ic_notification)
-                    .setContentTitle(getString(R.string.app_name))
-                    .setContentText(message ?: getString(R.string.announcement_body))
+                    .setContentTitle(context.getString(R.string.app_name))
+                    .setContentText(message ?: context.getString(R.string.announcement_body))
                     .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                     .setAutoCancel(true)
                     .build()
 
-                val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+                val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                 notificationManager.notify(NOTIFICATION_ID_ANNOUNCEMENT, notification)
             }
         }
@@ -222,33 +294,30 @@ class PushService : FirebaseMessagingService() {
             linphoneService.storePendingCallHub(callId, hubId)
         }
         // Multi-hub axiom: do NOT call setActiveHub here.
-        // Hub context switch happens in LinphoneService.onCallStateChanged (IncomingReceived)
-        // when the SIP call is actually received — the correct moment for setActiveHub.
-        // Background push handlers must never switch the active hub.
 
         ensureNotificationChannel(
             CHANNEL_CALLS,
-            getString(R.string.notification_channel_calls),
+            context.getString(R.string.notification_channel_calls),
             NotificationManager.IMPORTANCE_HIGH,
         )
 
-        val notification = NotificationCompat.Builder(this, CHANNEL_CALLS)
+        val notification = NotificationCompat.Builder(context, CHANNEL_CALLS)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(getString(R.string.incoming_call))
-            .setContentText(getString(R.string.incoming_call_body))
+            .setContentTitle(context.getString(R.string.incoming_call))
+            .setContentText(context.getString(R.string.incoming_call_body))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_CALL)
             .setAutoCancel(true)
             .setVibrate(longArrayOf(0, 500, 200, 500))
             .build()
 
-        val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(NOTIFICATION_ID_CALL, notification)
     }
 
     private fun handleCallEnded() {
         Log.d(TAG, "Call ended notification received")
-        val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.cancel(NOTIFICATION_ID_CALL)
     }
 
@@ -256,19 +325,19 @@ class PushService : FirebaseMessagingService() {
         Log.d(TAG, "Shift reminder notification received")
         ensureNotificationChannel(
             CHANNEL_SHIFTS,
-            getString(R.string.notification_channel_shifts),
+            context.getString(R.string.notification_channel_shifts),
             NotificationManager.IMPORTANCE_DEFAULT,
         )
 
-        val notification = NotificationCompat.Builder(this, CHANNEL_SHIFTS)
+        val notification = NotificationCompat.Builder(context, CHANNEL_SHIFTS)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(getString(R.string.shifts_reminder))
-            .setContentText(getString(R.string.shifts_reminder_body))
+            .setContentTitle(context.getString(R.string.shifts_reminder))
+            .setContentText(context.getString(R.string.shifts_reminder_body))
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
             .build()
 
-        val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(NOTIFICATION_ID_SHIFT, notification)
     }
 
@@ -276,19 +345,19 @@ class PushService : FirebaseMessagingService() {
         Log.d(TAG, "Announcement notification received")
         ensureNotificationChannel(
             CHANNEL_GENERAL,
-            getString(R.string.notification_channel_general),
+            context.getString(R.string.notification_channel_general),
             NotificationManager.IMPORTANCE_DEFAULT,
         )
 
-        val notification = NotificationCompat.Builder(this, CHANNEL_GENERAL)
+        val notification = NotificationCompat.Builder(context, CHANNEL_GENERAL)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(getString(R.string.announcement))
-            .setContentText(data["body"] ?: getString(R.string.announcement_body))
+            .setContentTitle(context.getString(R.string.announcement))
+            .setContentText(data["body"] ?: context.getString(R.string.announcement_body))
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
             .build()
 
-        val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(NOTIFICATION_ID_ANNOUNCEMENT, notification)
     }
 
@@ -299,14 +368,41 @@ class PushService : FirebaseMessagingService() {
     ) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(channelId, channelName, importance)
-            val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.createNotificationChannel(channel)
         }
     }
 
+    /**
+     * Parse a JSON string into a flat key-value map.
+     * Handles the envelope format from the backend: { "encrypted": "...", "encryptedFull": "..." }
+     * and VoIP format: { "type": "incoming_call", "call-id": "...", "hub-id": "..." }
+     */
+    private fun parseJsonPayload(json: String): Map<String, String> {
+        val result = mutableMapOf<String, String>()
+        // Simple JSON parsing without external dependency
+        val trimmed = json.trim()
+        if (!trimmed.startsWith("{")) return result
+
+        // Use kotlinx.serialization for reliable parsing
+        try {
+            val map = kotlinx.serialization.json.Json.decodeFromString<Map<String, kotlinx.serialization.json.JsonElement>>(trimmed)
+            for ((key, value) in map) {
+                val strValue = when {
+                    value is kotlinx.serialization.json.JsonPrimitive -> value.content
+                    else -> value.toString()
+                }
+                result[key] = strValue
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "JSON parse error: ${e.message}")
+        }
+        return result
+    }
+
     companion object {
         private const val TAG = "LlamenosPush"
-        private const val KEY_FCM_TOKEN = "fcm-token"
+        private const val KEY_PUSH_ENDPOINT = "push-endpoint"
 
         private const val CHANNEL_CALLS = "llamenos_calls"
         private const val CHANNEL_SHIFTS = "llamenos_shifts"

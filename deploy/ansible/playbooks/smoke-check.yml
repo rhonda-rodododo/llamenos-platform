@@ -147,6 +147,25 @@
 
 
 
+    - name: Check ntfy health endpoint (if push profile enabled)
+      ansible.builtin.uri:
+        url: "http://localhost:2586/v1/health"
+        method: GET
+        status_code: 200
+        return_content: true
+      register: ntfy_check
+      retries: 2
+      delay: 3
+      ignore_errors: true
+      when: llamenos_ntfy_enabled | default(false) | bool
+      tags: always
+
+    - name: Record ntfy result
+      ansible.builtin.set_fact:
+        smoke_results: "{{ smoke_results + [{'check': 'ntfy health endpoint (200)', 'status': 'PASS' if ntfy_check is succeeded else 'FAIL' if ntfy_check is failed else 'SKIP'}] }}"
+      when: llamenos_ntfy_enabled | default(false) | bool
+      tags: always
+
     - name: Check Caddy is serving HTTPS
       ansible.builtin.uri:
         url: "https://shared.{{ domain }}/api/health"

@@ -95,8 +95,9 @@ export interface Env {
   APNS_KEY_ID?: string       // Key ID from Apple Developer Portal
   APNS_TEAM_ID?: string      // Apple Developer Team ID
 
-  // Push notifications (Epic 86) — FCM (Android)
-  FCM_SERVICE_ACCOUNT_KEY?: string  // Google Cloud service account JSON
+  // Push notifications (Epic 86) — ntfy/UnifiedPush (Android)
+  NTFY_URL?: string           // Self-hosted ntfy instance URL (e.g. http://ntfy:80)
+  NTFY_AUTH_TOKEN?: string    // Bearer token for ntfy authentication
 
   // Connection manager for WebSocket relay (initialized in server bootstrap)
   WS_MANAGER?: import('../lib/ws-manager').ConnectionManager

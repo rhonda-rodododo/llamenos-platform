@@ -16,8 +16,8 @@ vi.mock('@fivesheepco/cloudflare-apns2', () => ({
   Priority: { immediate: 10 },
 }))
 
-vi.mock('@worker/lib/fcm-client', () => ({
-  FcmClient: vi.fn().mockImplementation(() => ({
+vi.mock('@worker/lib/ntfy-client', () => ({
+  NtfyClient: vi.fn().mockImplementation(() => ({
     send: vi.fn().mockResolvedValue(true),
   })),
 }))
@@ -49,7 +49,7 @@ function makeEnv(overrides: Partial<Env> = {}): Env {
     APNS_KEY_P8: 'key',
     APNS_KEY_ID: 'kid',
     APNS_TEAM_ID: 'team',
-    FCM_SERVICE_ACCOUNT_KEY: '{}',
+    NTFY_URL: 'http://ntfy:80',
     ...overrides,
   } as Env
 }
@@ -84,7 +84,7 @@ describe('dispatchVoipPushFromService', () => {
       'call-1',
       'Caller',
       'hub-1',
-      { ENVIRONMENT: 'production' } as Env,  // No APNs or FCM
+      { ENVIRONMENT: 'production' } as Env,  // No APNs or ntfy
       identity,
     )
 

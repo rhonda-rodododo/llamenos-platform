@@ -1,10 +1,9 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   recordTestPushPayload,
   getTestPushLog,
   clearTestPushLog,
   createPushDispatcherFromService,
-  type PushDispatcher,
 } from '@worker/lib/push-dispatch'
 import type { WakePayload, FullPushPayload } from '@worker/types'
 
@@ -141,10 +140,10 @@ describe('createPushDispatcherFromService', () => {
     expect(dispatcher).toBeDefined()
   })
 
-  it('returns ServicePushDispatcher when FCM credentials are set', () => {
+  it('returns ServicePushDispatcher when ntfy URL is configured', () => {
     const dispatcher = createPushDispatcherFromService(
       {
-        FCM_SERVICE_ACCOUNT_KEY: '{"type":"service_account"}',
+        NTFY_URL: 'http://ntfy:80',
       } as any,
       mockIdentityService as any,
       mockShiftsService as any,

@@ -183,7 +183,7 @@ dependencies {
     implementation(libs.security.crypto)
     implementation(libs.androidx.biometric)
 
-    implementation(libs.firebase.messaging)
+    implementation(libs.unifiedpush)
 
     // CameraX for QR code scanning (device linking)
     implementation(libs.camerax.core)
