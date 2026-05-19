@@ -62,8 +62,8 @@ extension ReportTypeStatus: Equatable {
 
 extension ReportTypeStatus {
     /// Convenience init matching the old `CaseEnumOption` / `StatusOption` argument order.
-    init(value: String, label: String, color: String? = nil, order: Int = 0,
-         isClosed: Bool? = nil, isDefault: Bool? = nil, isDeprecated: Bool? = nil, icon: String? = nil) {
+    init(value: String, label: String, color: String? = nil, icon: String? = nil,
+         order: Int = 0, isDefault: Bool? = nil, isClosed: Bool? = nil, isDeprecated: Bool? = nil) {
         self.init(color: color, icon: icon, isClosed: isClosed, isDefault: isDefault,
                   isDeprecated: isDeprecated, label: label, order: order, value: value)
     }

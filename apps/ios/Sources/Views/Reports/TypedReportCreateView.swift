@@ -837,7 +837,7 @@ struct TypedReportCreateView: View {
                     lookupId: nil
                 ),
             ],
-            statuses: [StatusOption(value: "open", label: "Open", color: nil, order: 0, isClosed: nil, isDefault: true, isDeprecated: nil, icon: nil)],
+            statuses: [StatusOption(value: "open", label: "Open", color: nil, icon: nil, order: 0, isDefault: true, isClosed: nil, isDeprecated: nil)],
             defaultStatus: "open",
             allowFileAttachments: true, allowCaseConversion: true,
             mobileOptimized: true, isArchived: false,
