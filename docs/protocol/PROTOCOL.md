@@ -976,6 +976,8 @@ decryptNote(packed_hex, secret_key[32]):
 
 ### 2.13 Transcription Decryption
 
+> **Legacy Model:** This section describes the original ECIES-based transcription encryption (secp256k1 ECDH + XChaCha20-Poly1305). Retained for decrypting existing transcriptions. New implementations should use HPKE (Section 2.2).
+
 Server-encrypted transcriptions use ECIES with a per-transcription ephemeral key. The server wraps the ciphertext for the answering volunteer's pubkey.
 
 ```

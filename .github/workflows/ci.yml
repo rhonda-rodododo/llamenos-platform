@@ -1030,6 +1030,20 @@ jobs:
       - name: Check migration drift
         run: bun run migration:check --ci
 
+  docs-guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Check label counts
+        run: bash scripts/check-label-count.sh
+
+      - name: Check ECIES in active sections
+        run: bash scripts/check-ecies-active.sh
+
   docker-canary:
     needs: ci-status
     if: github.ref == 'refs/heads/main' && needs.ci-status.result == 'success'
@@ -1098,7 +1112,7 @@ jobs:
           echo "Signed: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${DIGEST}"
 
   ci-status:
-    needs: [no-generated-files-in-git, build, audit, crypto-tests, e2e, backend-bdd, backend-unit, desktop-unit, android-build-test, android-e2e, ios-build-test, crypto-guardrails, migration-drift, ansible-validate]
+    needs: [no-generated-files-in-git, build, audit, crypto-tests, e2e, backend-bdd, backend-unit, desktop-unit, android-build-test, android-e2e, ios-build-test, crypto-guardrails, migration-drift, ansible-validate, docs-guard]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 2
