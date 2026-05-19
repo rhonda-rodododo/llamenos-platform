@@ -7,7 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.llamenos.protocol.HubKeyEnvelopeResponse
-import org.llamenos.protocol.HubKeyEnvelopeResponseEnvelope
+import org.llamenos.hotline.model.HubKeyEnvelopeResponseEnvelope
 
 /**
  * Unit tests for CryptoService hub key management and event decryption.

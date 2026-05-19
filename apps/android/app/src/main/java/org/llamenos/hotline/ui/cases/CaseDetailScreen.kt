@@ -64,9 +64,9 @@ import org.llamenos.hotline.R
 import org.llamenos.hotline.model.EntityTypeDefinition
 import org.llamenos.hotline.model.EntityFieldDefinition
 import org.llamenos.protocol.Evidence
-import org.llamenos.protocol.EvidenceClassification
+import org.llamenos.hotline.model.EvidenceClassification
 import org.llamenos.protocol.Interaction
-import org.llamenos.protocol.InteractionType
+import org.llamenos.hotline.model.InteractionType
 import org.llamenos.protocol.Record
 import org.llamenos.protocol.RecordContact
 import org.llamenos.hotline.util.DateFormatUtils

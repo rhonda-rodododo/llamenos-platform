@@ -13,7 +13,7 @@ import kotlinx.serialization.json.JsonObject
 import org.junit.Rule
 import org.junit.Test
 import org.llamenos.protocol.ChannelConfig
-import org.llamenos.protocol.ChannelConfigClass
+import org.llamenos.hotline.model.ChannelConfigClass
 import org.llamenos.protocol.HubChannelType
 import org.llamenos.protocol.HubOnboardingState
 import org.llamenos.protocol.HubQuota

@@ -29,10 +29,10 @@ import org.llamenos.hotline.model.NoteRepliesResponse
 import org.llamenos.hotline.model.NoteReply
 import org.llamenos.hotline.model.NotesListResponse
 import org.llamenos.protocol.CreateNoteBody
-import org.llamenos.protocol.CreateNoteBodyAdminEnvelope
-import org.llamenos.protocol.CreateNoteBodyAuthorEnvelope
+import org.llamenos.hotline.model.CreateNoteBodyAdminEnvelope
+import org.llamenos.hotline.model.CreateNoteBodyAuthorEnvelope
 import org.llamenos.protocol.CreateReplyBody
-import org.llamenos.protocol.CreateReplyBodyReaderEnvelope
+import org.llamenos.hotline.model.CreateReplyBodyReaderEnvelope
 import org.llamenos.protocol.Note
 import org.llamenos.protocol.NoteResponse
 import org.llamenos.protocol.RecipientEnvelope
