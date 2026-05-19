@@ -114,7 +114,7 @@ function envelopeEncrypt(
 
 ## Domain Separation (Label Enforcement)
 
-All 57 labels from `crypto-labels.json` continue to be enforced. The label is passed as:
+All labels from `crypto-labels.json` (see file for current count) continue to be enforced. The label is passed as:
 - HPKE `info` parameter (binds the key schedule to the purpose)
 - AES-256-GCM `aad` parameter (binds ciphertext to the purpose)
 
