@@ -143,7 +143,7 @@ All cryptographic operations in Llamenos use domain separation constants to prev
 
 Every HPKE/ECIES derivation, HKDF context, HMAC key, and signature binding uses a unique context string from this list. Clients MUST use these exact strings. Using raw string literals instead of these constants is a protocol violation.
 
-> **Note:** The authoritative source of truth for all 57 domain separation constants is `packages/protocol/crypto-labels.json`. The tables below list the most commonly used labels. Refer to the source file for the complete set.
+> **Note:** The authoritative source of truth for all domain separation constants is `packages/protocol/crypto-labels.json`. The tables below list the most commonly used labels. Refer to the source file for the complete and current count.
 
 #### Device Authentication
 
@@ -152,7 +152,7 @@ Every HPKE/ECIES derivation, HKDF context, HMAC key, and signature binding uses 
 | `LABEL_DEVICE_AUTH` | `llamenos:device-auth:v1` | Ed25519 device auth token message prefix (Phase 6) |
 | `AUTH_PREFIX` | `llamenos:auth:` | Schnorr auth token message prefix (legacy) |
 
-#### HPKE / ECIES Key Wrapping Labels
+#### HPKE Key Wrapping Labels
 
 | Constant | Value | Purpose |
 |----------|-------|---------|
