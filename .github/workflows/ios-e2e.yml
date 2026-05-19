@@ -31,6 +31,8 @@ concurrency:
   group: ${{ github.event_name == 'pull_request' && format('ios-e2e-pr-{0}', github.ref) || format('ios-e2e-push-{0}', github.sha) }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+permissions: {}  # deny-all; per-job permissions below
+
 env:
   BUN_VERSION: "1.3.5"
   TEST_ADMIN_PUBKEY: "79215a4c04f08fcd817c6f820c87169beb8cddf96dfa590a1315556b78af9183"
@@ -39,6 +41,8 @@ jobs:
   # ─── Detect Changed Files ─────────────────────────────────────
   changes:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
 
     outputs:
@@ -73,6 +77,8 @@ jobs:
     needs: changes
     if: needs.changes.outputs.ios_related == 'true'
     runs-on: macos-latest
+    permissions:
+      contents: read
     timeout-minutes: 45
 
     outputs:
@@ -200,6 +206,8 @@ jobs:
     needs: [changes, ios-e2e-build]
     if: needs.changes.outputs.ios_related == 'true'
     runs-on: macos-latest
+    permissions:
+      contents: read
     timeout-minutes: 60
 
     strategy:

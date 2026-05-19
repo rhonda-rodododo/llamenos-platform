@@ -103,7 +103,7 @@ packages/
     tools/schema-registry.ts  # Maps 85+ Zod schemas to named JSON Schemas
     openapi-snapshot.json     # OpenAPI spec snapshot (written by dev server on startup)
     generated/        # Auto-generated types — GITIGNORED (typescript/, swift/, kotlin/)
-    crypto-labels.json # 68 domain separation constants (source of truth)
+    crypto-labels.json # Domain separation constants (source of truth; see file for current count)
   i18n/               # Localization package
     locales/          # 13 locale JSON files (en, es, zh, tl, vi, ar, fr, ht, ko, ru, hi, pt, de)
     languages.ts      # Language config (codes, labels, Twilio voice IDs)
@@ -138,7 +138,7 @@ docs/
 - **Shift routing**: Automated, recurring schedule with ring groups. Fallback group if no schedule is defined.
 - **E2EE notes**: Per-note forward secrecy — unique random key per note, HPKE-wrapped for each reader via PUK (Per-User Key). PUK → items_key → per-note content key (cascading lazy key rotation). Dual-encrypted: one copy for volunteer, one for each admin (multi-admin envelopes).
 - **E2EE messaging**: Per-message envelope encryption — random symmetric key, HPKE-wrapped for assigned volunteer + each admin. Server encrypts inbound on webhook receipt, discards plaintext immediately.
-- **HPKE crypto**: RFC 9180 X25519-HKDF-SHA256-AES256-GCM replaces secp256k1 ECIES everywhere. Ed25519/X25519 per-device keys (no more single nsec per user). Label enforcement at decrypt (Albrecht defense — 68 domain separation labels).
+- **HPKE crypto**: RFC 9180 X25519-HKDF-SHA256-AES256-GCM replaces secp256k1 ECIES everywhere. Ed25519/X25519 per-device keys (no more single nsec per user). Label enforcement at decrypt (Albrecht defense — domain separation labels defined in `packages/protocol/crypto-labels.json`).
 - **User sigchain**: Append-only hash-chained, Ed25519-signed device authorization records. PUK (Per-User Key) with Cascading Lazy Key Rotation. MLS via OpenMLS (behind `mls` feature flag) for hub state.
 - **SFrame voice E2EE**: Key derivation integrated into `packages/crypto` for encrypted voice channel media.
 - **Platform abstraction**: `src/client/lib/platform.ts` is Tauri-only — all crypto calls route through Rust via IPC. Device private keys NEVER enter the webview. Always import from `platform.ts`, never from `@tauri-apps/*` directly.
@@ -155,7 +155,7 @@ docs/
 - **Client-side transcription**: WASM Whisper via `@huggingface/transformers` ONNX runtime. AudioWorklet ring buffer → Web Worker isolation. Audio never leaves the browser.
 - **Reproducible builds**: `Dockerfile.build` with `SOURCE_DATE_EPOCH`, content-hashed filenames. `CHECKSUMS.txt` in GitHub Releases. SLSA provenance + SBOM + cosign. knope manages release PRs automatically — never manually bump versions. Verification via `scripts/verify-build.sh`.
 - **Hash-chained audit log**: SHA-256 chain with `previousEntryHash` + `entryHash` for tamper detection (Epic 77).
-- **Domain separation**: All 69 crypto context constants defined in `packages/protocol/crypto-labels.json` (source of truth), generated to TS/Swift/Kotlin via codegen. NEVER use raw string literals for crypto contexts. Label enforced at decrypt (Albrecht defense).
+- **Domain separation**: All crypto context constants defined in `packages/protocol/crypto-labels.json` (source of truth; see file for current count), generated to TS/Swift/Kotlin via codegen. NEVER use raw string literals for crypto contexts. Label enforced at decrypt (Albrecht defense).
 - **Blast/Broadcast service**: PostgreSQL-backed delivery queue with per-channel rate limiting. Manages batched delivery of bulk messages (SMS/WhatsApp/Signal/Telegram/RCS) with per-recipient status tracking and retry logic.
 - **Kubernetes health probes**: `/health/ready` and `/health/live` endpoints. Prometheus ServiceMonitor configured. Caddyfile.production with security headers. Ansible preflight + smoke-check playbooks.
 - **Key management**: PIN-encrypted per-device Ed25519/X25519 keys stored in Tauri Store (desktop), iOS Keychain, or Android Keystore (EncryptedSharedPreferences). Rust CryptoState holds device private key; UI only sees pubkey. Device linking via ephemeral ECDH provisioning rooms. User sigchain authorizes new devices.
@@ -165,7 +165,7 @@ docs/
 - **Client-side transcription**: WASM Whisper via `@huggingface/transformers` ONNX runtime. AudioWorklet ring buffer → Web Worker isolation. Audio never leaves the browser.
 - **Reproducible builds**: `Dockerfile.build` with `SOURCE_DATE_EPOCH`, content-hashed filenames. `CHECKSUMS.txt` in GitHub Releases. SLSA provenance + SBOM + cosign. knope manages release PRs automatically — never manually bump versions. Verification via `scripts/verify-build.sh`.
 - **Hash-chained audit log**: SHA-256 chain with `previousEntryHash` + `entryHash` for tamper detection (Epic 77).
-- **Domain separation**: All 69 crypto context constants defined in `packages/protocol/crypto-labels.json` (source of truth), generated to TS/Swift/Kotlin via codegen. NEVER use raw string literals for crypto contexts. Label enforced at decrypt (Albrecht defense).
+- **Domain separation**: All crypto context constants defined in `packages/protocol/crypto-labels.json` (source of truth; see file for current count), generated to TS/Swift/Kotlin via codegen. NEVER use raw string literals for crypto contexts. Label enforced at decrypt (Albrecht defense).
 - **Blast/Broadcast service**: PostgreSQL-backed delivery queue with per-channel rate limiting. Manages batched delivery of bulk messages (SMS/WhatsApp/Signal/Telegram/RCS) with per-recipient status tracking and retry logic.
 - **Kubernetes health probes**: `/health/ready` and `/health/live` endpoints. Prometheus ServiceMonitor configured. Caddyfile.production with security headers. Ansible preflight + smoke-check playbooks.
 

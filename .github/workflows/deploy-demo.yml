@@ -57,13 +57,14 @@ jobs:
         run: |
           printf '%s' "$DEMO_VARS" > deploy/ansible/demo_vars.yml
 
-      - name: Write SSH private key
+      - name: Load SSH key into agent
         env:
           SSH_KEY: ${{ secrets.DEMO_SSH_PRIVATE_KEY }}
         run: |
-          mkdir -p ~/.ssh
-          printf '%s' "$SSH_KEY" > ~/.ssh/llamenos_demo_deploy
-          chmod 600 ~/.ssh/llamenos_demo_deploy
+          eval "$(ssh-agent -s)"
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> "$GITHUB_ENV"
+          echo "$SSH_KEY" | ssh-add -
           ssh-keyscan -H "$(grep ansible_host deploy/ansible/inventory-demo.yml | head -1 | awk '{print $2}')" >> ~/.ssh/known_hosts 2>/dev/null || true
 
       - name: Deploy demo instance
@@ -72,6 +73,7 @@ jobs:
           ansible-playbook playbooks/deploy-demo.yml \
             -i inventory-demo.yml \
             --vault-password-file /tmp/vault-pass
+        # Ansible picks up SSH_AUTH_SOCK automatically
 
       - name: Reset demo data
         if: ${{ inputs.reset_data }}
@@ -81,10 +83,13 @@ jobs:
             -i inventory-demo.yml \
             --vault-password-file /tmp/vault-pass
 
+      - name: Stop SSH agent
+        if: always()
+        run: ssh-agent -k || true
+
       - name: Clean up secrets
         if: always()
         run: |
           rm -f /tmp/vault-pass
-          rm -f ~/.ssh/llamenos_demo_deploy
           rm -f deploy/ansible/inventory-demo.yml
           rm -f deploy/ansible/demo_vars.yml

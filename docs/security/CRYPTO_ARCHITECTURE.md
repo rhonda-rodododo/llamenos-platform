@@ -201,9 +201,9 @@ This prevents cross-context key reuse attacks (e.g., using a note key envelope t
 
 ---
 
-## Domain Separation Labels (87 Defined)
+## Domain Separation Labels
 
-All 87 labels are defined in `packages/protocol/crypto-labels.json` (source of truth) and generated to TypeScript, Swift, Kotlin, and Rust via codegen. Labels are registered in `packages/crypto/src/labels.rs` with stable numeric IDs (indices 0-80, never reordered). Index 53 is a tombstone (removed `LABEL_ECIES_V2_SALT`). The Rust registry currently has 80 active labels; 7 newer labels in the JSON source are not yet wired into the Rust registry (they use string-based lookup only).
+All domain separation labels are defined in `packages/protocol/crypto-labels.json` (source of truth) and generated to TypeScript, Swift, Kotlin, and Rust via codegen. Labels are registered in `packages/crypto/src/labels.rs` with stable numeric IDs (never reordered). Index 53 is a tombstone (removed `LABEL_ECIES_V2_SALT`). Some newer labels in the JSON source use string-based lookup only. See the JSON file for the current count.
 
 | Range | Category | Examples |
 |-------|----------|----------|

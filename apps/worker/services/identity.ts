@@ -35,7 +35,11 @@ import { DEMO_ACCOUNTS } from '@shared/demo-accounts'
 // Constants
 // ---------------------------------------------------------------------------
 
-import { SESSION_DURATION_MS, RENEWAL_THRESHOLD_MS } from '../lib/session-renewal'
+import {
+  SESSION_DURATION_MS,
+  RENEWAL_THRESHOLD_MS,
+  decideSessionRenewal,
+} from '../lib/session-renewal'
 import { decideDeviceRegistration } from '../lib/device-eviction'
 const INVITE_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 const CHALLENGE_TTL_MS = 5 * 60 * 1000 // 5 minutes
@@ -316,13 +320,9 @@ export class IdentityService {
     data: Partial<User>,
     isAdmin: boolean,
   ): Promise<{ volunteer: ReturnType<typeof sanitizeUser> }> {
-    // Verify volunteer exists
-    const existing = await this.db
-      .select()
-      .from(users)
-      .where(eq(users.pubkey, pubkey))
-      .limit(1)
-    if (existing.length === 0) throw new ServiceError(404, 'Not found')
+    // RACE-11: Removed redundant SELECT — the UPDATE...RETURNING below handles
+    // the "not found" case. The old SELECT was a read-before-write pattern that
+    // added latency without value.
 
     // Build update payload — map User fields to DB columns
     const updates: Partial<typeof users.$inferInsert> = {}
@@ -367,6 +367,7 @@ export class IdentityService {
       .where(eq(users.pubkey, pubkey))
       .returning()
 
+    if (!row) throw new ServiceError(404, 'Not found')
     return { volunteer: sanitizeUser(rowToUser(row)) }
   }
 
@@ -509,22 +510,22 @@ export class IdentityService {
     volunteer: ReturnType<typeof sanitizeUser>
   }> {
     return this.db.transaction(async (tx) => {
-      const rows = await tx
-        .select()
-        .from(inviteCodes)
-        .where(eq(inviteCodes.code, data.code))
-        .limit(1)
-
-      if (rows.length === 0) throw new ServiceError(400, 'Invalid invite code')
-      const invite = rows[0]
-      if (invite.usedAt) throw new ServiceError(400, 'Invite already used')
-      if (invite.expiresAt < new Date()) throw new ServiceError(400, 'Invite expired')
-
-      // Mark invite as used
-      await tx
+      // RACE-01: Atomic claim — single UPDATE collapses read+check+write.
+      // PostgreSQL's row-level lock on UPDATE ensures only one concurrent
+      // redemption matches the WHERE clause.
+      const [invite] = await tx
         .update(inviteCodes)
         .set({ usedAt: new Date(), usedBy: data.pubkey })
-        .where(eq(inviteCodes.code, data.code))
+        .where(
+          and(
+            eq(inviteCodes.code, data.code),
+            sql`${inviteCodes.usedAt} IS NULL`,
+            sql`${inviteCodes.expiresAt} > NOW()`,
+          ),
+        )
+        .returning()
+
+      if (!invite) throw new ServiceError(400, 'Invalid, expired, or already-used invite code')
 
       // Create volunteer
       const [volRow] = await tx.insert(users).values({
@@ -598,20 +599,42 @@ export class IdentityService {
     if (rows.length === 0) throw new ServiceError(401, 'Invalid session')
     const row = rows[0]
 
-    if (row.expiresAt < new Date()) {
+    const decision = decideSessionRenewal(
+      row.expiresAt,
+      new Date(),
+      RENEWAL_THRESHOLD_MS,
+      SESSION_DURATION_MS,
+      row.createdAt,
+    )
+
+    if (decision.action === 'max_lifetime_exceeded') {
+      await this.db.delete(sessions).where(eq(sessions.token, token))
+      throw new ServiceError(401, 'Session max lifetime exceeded')
+    }
+
+    if (decision.action === 'expired') {
       await this.db.delete(sessions).where(eq(sessions.token, token))
       throw new ServiceError(401, 'Session expired')
     }
 
-    // Sliding expiry — renew when less than 1h remaining
-    const remaining = row.expiresAt.getTime() - Date.now()
-    if (remaining < RENEWAL_THRESHOLD_MS) {
-      const newExpiry = new Date(Date.now() + SESSION_DURATION_MS)
-      await this.db
+    // RACE-06: Sliding expiry — atomic conditional update ensures we only
+    // renew a still-alive session. If the session was concurrently revoked
+    // (deleted) between the SELECT and this UPDATE, the WHERE clause
+    // `expiresAt > NOW()` prevents silent renewal of a ghost session.
+    if (decision.action === 'renew') {
+      const [updated] = await this.db
         .update(sessions)
-        .set({ expiresAt: newExpiry })
-        .where(eq(sessions.token, token))
-      return { ...rowToSession(row), expiresAt: newExpiry.toISOString() }
+        .set({ expiresAt: decision.newExpiresAt })
+        .where(
+          and(
+            eq(sessions.token, token),
+            sql`${sessions.expiresAt} > NOW()`,
+          ),
+        )
+        .returning()
+
+      if (!updated) throw new ServiceError(401, 'Session expired or revoked')
+      return { ...rowToSession(row), expiresAt: decision.newExpiresAt.toISOString() }
     }
 
     return rowToSession(row)
@@ -731,10 +754,11 @@ export class IdentityService {
   /**
    * Store a WebAuthn challenge (5-minute TTL, consumed on read).
    */
-  async storeWebAuthnChallenge(id: string, challenge: string): Promise<void> {
+  async storeWebAuthnChallenge(id: string, challenge: string, pubkey?: string): Promise<void> {
     await this.db.insert(webauthnChallenges).values({
       challengeId: id,
       challenge,
+      pubkey: pubkey ?? null,
     })
   }
 
@@ -742,26 +766,39 @@ export class IdentityService {
    * Retrieve and consume a WebAuthn challenge. Throws if not found or expired.
    */
   async getWebAuthnChallenge(id: string): Promise<{ challenge: string }> {
-    const rows = await this.db
+    // RACE-08: Atomic consume — DELETE...RETURNING with TTL in WHERE clause.
+    // Fixes two issues: (1) concurrent consume race, (2) delete-before-validate
+    // bug where expired challenges were deleted then errored, wasting the entry.
+    const ttlSeconds = Math.floor(CHALLENGE_TTL_MS / 1000)
+    const [row] = await this.db
+      .delete(webauthnChallenges)
+      .where(
+        and(
+          eq(webauthnChallenges.challengeId, id),
+          sql`${webauthnChallenges.createdAt} > NOW() - INTERVAL '${sql.raw(String(ttlSeconds))} seconds'`,
+        ),
+      )
+      .returning()
+
+    if (row) return { challenge: row.challenge }
+
+    // No row deleted — either doesn't exist or expired. Check which case
+    // to return the appropriate error code (H08 error differentiation).
+    const [stale] = await this.db
       .select()
       .from(webauthnChallenges)
       .where(eq(webauthnChallenges.challengeId, id))
       .limit(1)
 
-    if (rows.length === 0) throw new ServiceError(404, 'Challenge not found')
-    const row = rows[0]
-
-    // Delete immediately (one-time use)
-    await this.db
-      .delete(webauthnChallenges)
-      .where(eq(webauthnChallenges.challengeId, id))
-
-    // Check expiry
-    if (Date.now() - row.createdAt.getTime() > CHALLENGE_TTL_MS) {
+    if (stale) {
+      // Expired — clean up the stale row
+      await this.db
+        .delete(webauthnChallenges)
+        .where(eq(webauthnChallenges.challengeId, id))
       throw new ServiceError(410, 'Challenge expired')
     }
 
-    return { challenge: row.challenge }
+    throw new ServiceError(404, 'Challenge not found')
   }
 
   // =========================================================================
@@ -829,51 +866,62 @@ export class IdentityService {
     osVersion?: string
     appVersion?: string
   }): Promise<void> {
-    const now = new Date()
+    // RACE-05: Row locking — lock the user row with FOR UPDATE to serialize
+    // concurrent device registrations. Without this, two concurrent registrations
+    // could both see room for one more device and exceed the max limit.
+    await this.db.transaction(async (tx) => {
+      const [user] = await tx
+        .select({ pubkey: users.pubkey })
+        .from(users)
+        .where(eq(users.pubkey, pubkey))
+        .for('update')
+        .limit(1)
 
-    // Fetch all devices for this user to make the eviction decision
-    const allDevices = await this.db
-      .select({ id: devices.id, lastSeenAt: devices.lastSeenAt, pushToken: devices.pushToken })
-      .from(devices)
-      .where(eq(devices.pubkey, pubkey))
+      if (!user) throw new ServiceError(404, 'User not found')
 
-    const decision = decideDeviceRegistration(allDevices, data.pushToken)
+      const now = new Date()
+      const allDevices = await tx
+        .select({ id: devices.id, lastSeenAt: devices.lastSeenAt, pushToken: devices.pushToken })
+        .from(devices)
+        .where(eq(devices.pubkey, pubkey))
 
-    if (decision.action === 'update_existing') {
-      await this.db
-        .update(devices)
-        .set({
-          wakeKeyPublic: data.wakeKeyPublic,
-          ...(data.ed25519Pubkey !== undefined && { ed25519Pubkey: data.ed25519Pubkey }),
-          ...(data.x25519Pubkey !== undefined && { x25519Pubkey: data.x25519Pubkey }),
-          ...(data.deviceName !== undefined && { deviceName: data.deviceName }),
-          ...(data.deviceModel !== undefined && { deviceModel: data.deviceModel }),
-          ...(data.osVersion !== undefined && { osVersion: data.osVersion }),
-          ...(data.appVersion !== undefined && { appVersion: data.appVersion }),
-          lastSeenAt: now,
-        })
-        .where(eq(devices.id, decision.deviceId))
-      return
-    }
+      const decision = decideDeviceRegistration(allDevices, data.pushToken)
 
-    if (decision.evictDeviceId) {
-      await this.db.delete(devices).where(eq(devices.id, decision.evictDeviceId))
-    }
+      if (decision.action === 'update_existing') {
+        await tx
+          .update(devices)
+          .set({
+            wakeKeyPublic: data.wakeKeyPublic,
+            ...(data.ed25519Pubkey !== undefined && { ed25519Pubkey: data.ed25519Pubkey }),
+            ...(data.x25519Pubkey !== undefined && { x25519Pubkey: data.x25519Pubkey }),
+            ...(data.deviceName !== undefined && { deviceName: data.deviceName }),
+            ...(data.deviceModel !== undefined && { deviceModel: data.deviceModel }),
+            ...(data.osVersion !== undefined && { osVersion: data.osVersion }),
+            ...(data.appVersion !== undefined && { appVersion: data.appVersion }),
+            lastSeenAt: now,
+          })
+          .where(eq(devices.id, decision.deviceId))
+        return
+      }
 
-    // Insert new device
-    await this.db.insert(devices).values({
-      pubkey,
-      platform: data.platform,
-      pushToken: data.pushToken,
-      wakeKeyPublic: data.wakeKeyPublic,
-      ed25519Pubkey: data.ed25519Pubkey,
-      x25519Pubkey: data.x25519Pubkey,
-      deviceName: data.deviceName,
-      deviceModel: data.deviceModel,
-      osVersion: data.osVersion,
-      appVersion: data.appVersion,
-      registeredAt: now,
-      lastSeenAt: now,
+      if (decision.evictDeviceId) {
+        await tx.delete(devices).where(eq(devices.id, decision.evictDeviceId))
+      }
+
+      await tx.insert(devices).values({
+        pubkey,
+        platform: data.platform,
+        pushToken: data.pushToken,
+        wakeKeyPublic: data.wakeKeyPublic,
+        ed25519Pubkey: data.ed25519Pubkey,
+        x25519Pubkey: data.x25519Pubkey,
+        deviceName: data.deviceName,
+        deviceModel: data.deviceModel,
+        osVersion: data.osVersion,
+        appVersion: data.appVersion,
+        registeredAt: now,
+        lastSeenAt: now,
+      })
     })
   }
 
@@ -993,7 +1041,15 @@ export class IdentityService {
       // 2. Delete device record
       await tx.delete(devices).where(eq(devices.id, deviceId))
 
-      // 3. Emit security event
+      // 3. Delete all sessions for this device (C02 — atomic with device deletion)
+      await tx.delete(sessions).where(
+        and(
+          eq(sessions.pubkey, pubkey),
+          sql`${sessions.deviceInfo}->>'deviceId' = ${deviceId}`,
+        ),
+      )
+
+      // 4. Emit security event
       await tx.insert(securityEvents).values({
         userPubkey: pubkey,
         eventType: 'device_remove',
@@ -1192,33 +1248,46 @@ export class IdentityService {
     encryptedNsec?: string
     primaryPubkey?: string
   }> {
-    const rows = await this.db
+    // RACE-03: Atomic consume — attempt DELETE...RETURNING for ready rooms first.
+    // Only one concurrent caller can delete the row; others fall through to the
+    // SELECT path which distinguishes waiting/expired/not-found.
+    const [consumed] = await this.db
+      .delete(provisionRooms)
+      .where(
+        and(
+          eq(provisionRooms.roomId, id),
+          eq(provisionRooms.token, token),
+          sql`${provisionRooms.encryptedNsec} IS NOT NULL`,
+          sql`${provisionRooms.expiresAt} > NOW()`,
+        ),
+      )
+      .returning()
+
+    if (consumed) {
+      return {
+        status: 'ready',
+        ephemeralPubkey: consumed.ephemeralPubkey,
+        encryptedNsec: consumed.encryptedNsec!,
+        primaryPubkey: consumed.primaryPubkey ?? undefined,
+      }
+    }
+
+    // Fall back to SELECT to distinguish waiting/expired/not-found
+    const [existing] = await this.db
       .select()
       .from(provisionRooms)
       .where(eq(provisionRooms.roomId, id))
       .limit(1)
 
-    if (rows.length === 0) throw new ServiceError(404, 'Room not found')
-    const room = rows[0]
-    if (room.token !== token) throw new ServiceError(403, 'Invalid token')
+    if (!existing) throw new ServiceError(404, 'Room not found')
+    if (existing.token !== token) throw new ServiceError(403, 'Invalid token')
 
-    if (room.expiresAt < new Date()) {
+    if (existing.expiresAt < new Date()) {
       await this.db.delete(provisionRooms).where(eq(provisionRooms.roomId, id))
       return { status: 'expired' }
     }
 
-    if (room.encryptedNsec) {
-      // Consume the room
-      await this.db.delete(provisionRooms).where(eq(provisionRooms.roomId, id))
-      return {
-        status: 'ready',
-        ephemeralPubkey: room.ephemeralPubkey,
-        encryptedNsec: room.encryptedNsec,
-        primaryPubkey: room.primaryPubkey ?? undefined,
-      }
-    }
-
-    return { status: 'waiting', ephemeralPubkey: room.ephemeralPubkey }
+    return { status: 'waiting', ephemeralPubkey: existing.ephemeralPubkey }
   }
 
   /**

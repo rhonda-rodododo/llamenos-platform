@@ -6,7 +6,7 @@
  *   - PUK envelopes: HPKE-encrypted PUK seed distribution
  *   - MLS messages: pending handshake message delivery
  */
-import { and, asc, desc, eq, max } from 'drizzle-orm'
+import { and, asc, desc, eq } from 'drizzle-orm'
 import type { Database } from '../db'
 import { sigchainLinks, pukEnvelopes, mlsPendingMessages } from '../db/schema'
 import { ed25519Verify } from '@llamenos/crypto/ffi'
@@ -213,19 +213,9 @@ export class CryptoKeysService {
     userPubkey: string,
     deviceId: string,
   ): Promise<PukEnvelopeRecord | null> {
-    // Get the maximum generation for this device
-    const [maxRow] = await this.db
-      .select({ maxGen: max(pukEnvelopes.generation) })
-      .from(pukEnvelopes)
-      .where(
-        and(
-          eq(pukEnvelopes.userPubkey, userPubkey),
-          eq(pukEnvelopes.deviceId, deviceId),
-        ),
-      )
-
-    if (maxRow.maxGen === null) return null
-
+    // RACE-07: Single query — ORDER BY generation DESC LIMIT 1 replaces the
+    // two-query MAX(generation) + SELECT pattern. A PUK rotation between the
+    // old two queries could return stale data; this is immune.
     const [row] = await this.db
       .select()
       .from(pukEnvelopes)
@@ -233,9 +223,9 @@ export class CryptoKeysService {
         and(
           eq(pukEnvelopes.userPubkey, userPubkey),
           eq(pukEnvelopes.deviceId, deviceId),
-          eq(pukEnvelopes.generation, maxRow.maxGen),
         ),
       )
+      .orderBy(desc(pukEnvelopes.generation))
       .limit(1)
 
     if (!row) return null
@@ -285,20 +275,9 @@ export class CryptoKeysService {
     hubId: string,
     deviceId: string,
   ): Promise<MlsMessageRecord[]> {
+    // RACE-02: Atomic fetch-and-delete — DELETE...RETURNING guarantees each
+    // message is consumed by exactly one caller.
     const rows = await this.db
-      .select()
-      .from(mlsPendingMessages)
-      .where(
-        and(
-          eq(mlsPendingMessages.hubId, hubId),
-          eq(mlsPendingMessages.recipientDeviceId, deviceId),
-        ),
-      )
-
-    if (rows.length === 0) return []
-
-    // Delete fetched messages
-    await this.db
       .delete(mlsPendingMessages)
       .where(
         and(
@@ -306,6 +285,7 @@ export class CryptoKeysService {
           eq(mlsPendingMessages.recipientDeviceId, deviceId),
         ),
       )
+      .returning()
 
     return rows.map(r => ({
       id: r.id,

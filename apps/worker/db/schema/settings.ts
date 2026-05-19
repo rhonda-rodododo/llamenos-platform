@@ -327,6 +327,18 @@ export const rateLimits = pgTable('rate_limits', {
 })
 
 // ---------------------------------------------------------------------------
+// api_rate_limits — fixed-window counters for API rate limiting (Epic A / C03)
+// ---------------------------------------------------------------------------
+
+export const apiRateLimits = pgTable('api_rate_limits', {
+  key: text('key').primaryKey(),
+  count: integer('count').notNull().default(1),
+  windowStart: timestamp('window_start', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+})
+
+// ---------------------------------------------------------------------------
 // captchas
 // ---------------------------------------------------------------------------
 

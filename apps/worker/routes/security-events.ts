@@ -19,7 +19,7 @@ const securityEventsRoutes = new Hono<AppEnv>()
  * List security events for the authenticated user (own events only).
  */
 securityEventsRoutes.get('/',
-  rateLimit(30, 60_000, 'security-events'),
+  rateLimit('read'),
   validator('query', listSecurityEventsQuerySchema),
   async (c) => {
     const pubkey = c.get('pubkey')
@@ -48,7 +48,7 @@ export default securityEventsRoutes
 export const adminSecurityEventsRoutes = new Hono<AppEnv>()
 
 adminSecurityEventsRoutes.get('/',
-  rateLimit(10, 60_000, 'admin-security-events'),
+  rateLimit('read'),
   requirePermission('audit:read'),
   validator('query', listSecurityEventsQuerySchema),
   async (c) => {

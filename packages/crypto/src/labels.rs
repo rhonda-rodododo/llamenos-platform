@@ -323,6 +323,16 @@ pub const LABEL_TAG_ENCRYPT: &str = "llamenos:tag-field:v1";
 /// Entity type definition encryption
 pub const LABEL_ENTITY_TYPE_DEFINITION: &str = "llamenos:entity-type-def:v1";
 
+// --- SFrame Nonce (Epic B) ---
+
+/// SFrame nonce derivation (replaces raw `b"sframe nonce"`)
+pub const LABEL_SFRAME_NONCE: &str = "llamenos:sframe-nonce:v1";
+
+// --- Shamir Commitment (Epic B) ---
+
+/// Shamir share commitment domain prefix
+pub const LABEL_SHAMIR_COMMIT: &str = "llamenos:shamir-commit:v1";
+
 // --- SAS Derivation (EP02) ---
 
 /// Domain separation for SAS emoji derivation (device verification ceremony)
@@ -460,6 +470,9 @@ pub const LABEL_REGISTRY: &[&str] = &[
     LABEL_TAG_ENCRYPT,  // 86
     // 87: Entity Type (EP06)
     LABEL_ENTITY_TYPE_DEFINITION, // 87
+    // 88-89: Epic B Crypto Fixes
+    LABEL_SFRAME_NONCE,  // 88
+    LABEL_SHAMIR_COMMIT, // 89
 ];
 
 /// Look up a label string by its numeric ID.
@@ -618,6 +631,8 @@ mod tests {
         assert_eq!(LABEL_TEAM_ENCRYPT, "llamenos:team-field:v1");
         assert_eq!(LABEL_TAG_ENCRYPT, "llamenos:tag-field:v1");
         assert_eq!(LABEL_ENTITY_TYPE_DEFINITION, "llamenos:entity-type-def:v1");
+        assert_eq!(LABEL_SFRAME_NONCE, "llamenos:sframe-nonce:v1");
+        assert_eq!(LABEL_SHAMIR_COMMIT, "llamenos:shamir-commit:v1");
     }
 
     /// Verify registry index stability.
@@ -668,6 +683,8 @@ mod tests {
         assert_eq!(id_to_label(85), Some(LABEL_TEAM_ENCRYPT));
         assert_eq!(id_to_label(86), Some(LABEL_TAG_ENCRYPT));
         assert_eq!(id_to_label(87), Some(LABEL_ENTITY_TYPE_DEFINITION));
+        assert_eq!(id_to_label(88), Some(LABEL_SFRAME_NONCE));
+        assert_eq!(id_to_label(89), Some(LABEL_SHAMIR_COMMIT));
     }
 
     /// Verify bidirectional lookup (skipping tombstoned indices).

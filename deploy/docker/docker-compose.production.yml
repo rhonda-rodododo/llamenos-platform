@@ -228,13 +228,55 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # ── Docker Socket Proxy — restricts Watchtower's daemon access ──
+  # Watchtower connects to this proxy instead of the raw docker.sock.
+  # Whitelist: CONTAINERS + IMAGES only. All exec/write APIs blocked.
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:latest@sha256:1f3a6f303320723d199d2316a3e82b2e2685d86c275d5e3deeaf182573b47476  # pinned 2026-05-18
+    restart: unless-stopped
+    privileged: true  # required: needs read access to host docker.sock
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      # Allow only what Watchtower needs: list containers + pull/update images
+      - CONTAINERS=1
+      - IMAGES=1
+      # Deny everything else (explicit for auditing — all default to 0)
+      - AUTH=0
+      - BUILD=0
+      - COMMIT=0
+      - CONFIGS=0
+      - DISTRIBUTION=0
+      - EXEC=0
+      - GRPC=0
+      - INFO=0
+      - NETWORKS=0
+      - NODES=0
+      - PLUGINS=0
+      - POST=0
+      - SECRETS=0
+      - SERVICES=0
+      - SESSION=0
+      - SWARM=0
+      - SYSTEM=0
+      - TASKS=0
+      - VOLUMES=0
+    networks:
+      - docker-proxy
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
   # ── Watchtower: automated image update checks ─────────────
   watchtower:
-    image: containrrr/watchtower:1.7.1
+    image: containrrr/watchtower:1.7.1@sha256:6dd50763bbd632a83cb154d5451700530d1e44200b268a4e9488fefdfcf2b038  # pinned 2026-05-18
     restart: unless-stopped
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+    # No docker.sock volume — connects via docker-socket-proxy instead
     environment:
+      # Point Watchtower at the restricted socket proxy
+      - DOCKER_HOST=tcp://docker-socket-proxy:2375
       # Only watch containers with the watchtower.enable=true label
       - WATCHTOWER_LABEL_ENABLE=true
       # Cron schedule for update checks (default: 04:00 UTC daily)
@@ -248,8 +290,17 @@ services:
       # Optional: shoutrrr URL for update notifications
       # e.g. slack://token-a/token-b/token-c or discord://token@id
       - WATCHTOWER_NOTIFICATION_URL=${WATCHTOWER_NOTIFICATION_URL:-}
+    networks:
+      - docker-proxy  # only needs proxy network, not web or internal
+    depends_on:
+      - docker-socket-proxy
     logging:
       driver: json-file
       options:
         max-size: "5m"
         max-file: "3"
+
+networks:
+  docker-proxy:
+    driver: bridge
+    internal: true  # isolated network — only docker-socket-proxy and watchtower

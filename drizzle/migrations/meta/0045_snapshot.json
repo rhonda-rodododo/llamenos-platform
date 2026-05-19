@@ -1,6 +1,6 @@
 {
-  "id": "0044_webauthn_challenge_pubkey",
-  "prevId": "c0459aff-ae21-490d-bd69-701b6e5ee291",
+  "id": "0044_webhook_nonces",
+  "prevId": "0044_webauthn_challenge_pubkey",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1221,6 +1221,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "merged_into_id": {
+          "name": "merged_into_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_by": {
           "name": "created_by",
           "type": "text",
@@ -1244,12 +1250,6 @@
         "closed_at": {
           "name": "closed_at",
           "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "merged_into_id": {
-          "name": "merged_into_id",
-          "type": "text",
           "primaryKey": false,
           "notNull": false
         }
@@ -2199,6 +2199,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "merged_into_id": {
+          "name": "merged_into_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -2212,18 +2224,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "merged_into_id": {
-          "name": "merged_into_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "deleted_at": {
-          "name": "deleted_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {
@@ -4236,18 +4236,18 @@
           "primaryKey": false,
           "notNull": true
         },
+        "pubkey": {
+          "name": "pubkey",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "pubkey": {
-          "name": "pubkey",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {
@@ -4568,6 +4568,39 @@
           "onUpdate": "no action"
         }
       },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.api_rate_limits": {
+      "name": "api_rate_limits",
+      "schema": "",
+      "columns": {
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "count": {
+          "name": "count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "window_start": {
+          "name": "window_start",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -9673,32 +9706,53 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.api_rate_limits": {
-      "name": "api_rate_limits",
+    "public.webhook_nonces": {
+      "name": "webhook_nonces",
       "schema": "",
       "columns": {
-        "key": {
-          "name": "key",
+        "nonce_hash": {
+          "name": "nonce_hash",
           "type": "text",
           "primaryKey": true,
           "notNull": true
         },
-        "count": {
-          "name": "count",
-          "type": "integer",
+        "provider": {
+          "name": "provider",
+          "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "default": 1
+          "notNull": true
         },
-        "window_start": {
-          "name": "window_start",
+        "received_at": {
+          "name": "received_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
         }
       },
-      "indexes": {},
+      "indexes": {
+        "idx_webhook_nonces_expires": {
+          "name": "idx_webhook_nonces_expires",
+          "columns": [
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},

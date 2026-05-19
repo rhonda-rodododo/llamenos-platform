@@ -23,7 +23,7 @@ name: llamenos-dev
 
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgres:17-alpine@sha256:3430fe182f5065a6ea505c3d432d2c7fff18fbab954df8f277c1dbf4c70124af  # pinned 2026-05-18
     ports:
       - "5432:5432"
     environment:
@@ -39,7 +39,7 @@ services:
       retries: 5
 
   rustfs:
-    image: rustfs/rustfs:latest
+    image: rustfs/rustfs:latest@sha256:0725587f6fcca83c1898f321424327d6e6da5e01ea20382905dd258ed5af3be4  # pinned 2026-05-18
     ports:
       - "9000:9000"
     environment:
@@ -58,7 +58,7 @@ services:
   # ── Optional: Signal notifications (for local dev with Signal)
   # Start with: docker compose -f deploy/docker/docker-compose.dev.yml --profile signal up -d
   signal-cli:
-    image: bbernhard/signal-cli-rest-api:0.92
+    image: bbernhard/signal-cli-rest-api:0.92@sha256:702db336aa1a87611595e66755c9ccf65b24c25589857301eabef1d46056b3c5  # pinned 2026-05-18
     profiles: ["signal"]
     ports:
       - "8090:8080"
@@ -104,7 +104,7 @@ services:
   # ── Optional: Ollama local inference (inference profile) ──
   # Start with: docker compose -f deploy/docker/docker-compose.dev.yml --profile inference up -d
   ollama:
-    image: ollama/ollama:0.6
+    image: ollama/ollama:0.6  # TODO: pin digest — run scripts/update-image-digests.sh once tag is published
     profiles: ["inference"]
     ports:
       - "11434:11434"

@@ -5,7 +5,7 @@ Cross-platform type definitions and codegen pipeline for Llamenos.
 ## What it provides
 
 - **80+ Zod schemas** (`schemas/`) — single source of truth for all API request/response types
-- **`crypto-labels.json`** — 57 domain separation constants (source of truth for all platforms)
+- **`crypto-labels.json`** — All domain separation constants (source of truth for all platforms; see file for current count)
 - **Codegen tool** (`tools/codegen.ts`) — generates Swift Codable structs and Kotlin `@Serializable` data classes via `toJSONSchema()` + quicktype-core
 - **Schema registry** (`tools/schema-registry.ts`) — maps 85+ schemas to named types for codegen
 - **OpenAPI snapshot** (`openapi-snapshot.json`) — written by dev server on startup
@@ -30,7 +30,7 @@ Zod schemas in `schemas/` are the **authoritative** type definitions. Worker rou
 
 ## Crypto labels
 
-`crypto-labels.json` is the source of truth for all 57 domain separation constants. The codegen tool generates:
+`crypto-labels.json` is the source of truth for all domain separation constants (see file for current count). The codegen tool generates:
 - TypeScript constants (`packages/shared/crypto-labels.ts`)
 - Swift constants (generated Swift file)
 - Kotlin constants (generated Kotlin file)

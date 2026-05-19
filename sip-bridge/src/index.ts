@@ -133,7 +133,7 @@ async function main(): Promise<void> {
         } catch (err) {
           console.error('[bridge] Health check error:', err)
           return Response.json(
-            { status: 'error', error: 'Health check failed', ...handler.getStatus() },
+            { status: 'error', error: 'Command failed' },
             { status: 500 }
           )
         }
@@ -161,7 +161,7 @@ async function main(): Promise<void> {
         } catch (err) {
           console.error('[bridge] Status check error:', err)
           return Response.json(
-            { status: 'error', error: 'Status check failed', bridge: handler.getStatus() },
+            { status: 'error', error: 'Command failed' },
             { status: 500 }
           )
         }
@@ -177,17 +177,17 @@ async function main(): Promise<void> {
           return new Response('Forbidden', { status: 403 })
         }
 
+        let data: Record<string, unknown>
         try {
-          let data: Record<string, unknown>
-          try {
-            data = JSON.parse(body) as Record<string, unknown>
-          } catch {
-            return Response.json({ ok: false, error: 'Invalid request' }, { status: 400 })
-          }
+          data = JSON.parse(body) as Record<string, unknown>
+        } catch {
+          return Response.json({ ok: false, error: 'Invalid request' }, { status: 400 })
+        }
+        try {
           const result = await handler.handleHttpCommand(data)
           return Response.json(result, { status: result.ok ? 200 : 400 })
         } catch (err) {
-          console.error('[bridge] Command execution error:', err)
+          console.error('[bridge] Command handler error:', err)
           return Response.json({ ok: false, error: 'Command failed' }, { status: 500 })
         }
       }
@@ -199,13 +199,13 @@ async function main(): Promise<void> {
           return new Response('Forbidden', { status: 403 })
         }
 
+        let data: { callSid: string; callerNumber: string; volunteers: Array<{ pubkey: string; phone: string }> }
         try {
-          const data = JSON.parse(body) as {
-            callSid: string
-            callerNumber: string
-            volunteers: Array<{ pubkey: string; phone: string }>
-          }
-
+          data = JSON.parse(body) as typeof data
+        } catch {
+          return Response.json({ ok: false, error: 'Invalid request' }, { status: 400 })
+        }
+        try {
           const channelIds: string[] = []
           for (const vol of data.volunteers) {
             const endpoint = getEndpointForPbx(config.pbxType, vol.phone)
@@ -221,7 +221,6 @@ async function main(): Promise<void> {
               console.error(`[bridge] Failed to ring ${vol.pubkey}:`, err)
             }
           }
-
           return Response.json({ ok: true, channelIds })
         } catch (err) {
           console.error('[bridge] Ring error:', err)
@@ -236,8 +235,13 @@ async function main(): Promise<void> {
           return new Response('Forbidden', { status: 403 })
         }
 
+        let data: { channelIds: string[]; exceptId?: string }
         try {
-          const data = JSON.parse(body) as { channelIds: string[]; exceptId?: string }
+          data = JSON.parse(body) as typeof data
+        } catch {
+          return Response.json({ ok: false, error: 'Invalid request' }, { status: 400 })
+        }
+        try {
           for (const id of data.channelIds) {
             if (id !== data.exceptId) {
               try {
@@ -261,8 +265,13 @@ async function main(): Promise<void> {
           return new Response('Forbidden', { status: 403 })
         }
 
+        let data: { channelId: string }
         try {
-          const data = JSON.parse(body) as { channelId: string }
+          data = JSON.parse(body) as typeof data
+        } catch {
+          return Response.json({ ok: false, error: 'Invalid request' }, { status: 400 })
+        }
+        try {
           await client.hangup(data.channelId)
           return Response.json({ ok: true })
         } catch (err) {
@@ -316,8 +325,8 @@ async function main(): Promise<void> {
             },
           })
         } catch (err) {
-          console.error('[bridge] Recording retrieval error:', err)
-          return Response.json({ error: 'Recording retrieval failed' }, { status: 500 })
+          console.error('[bridge] Recording fetch error:', err)
+          return Response.json({ error: 'Command failed' }, { status: 500 })
         }
       }
 

@@ -41,6 +41,8 @@ concurrency:
   group: security-audit-${{ github.ref }}
   cancel-in-progress: true
 
+permissions: {}  # deny-all; per-job permissions below
+
 env:
   BUN_VERSION: "1.3.5"
 
@@ -48,6 +50,8 @@ jobs:
   # ─── JavaScript/TypeScript Dependency Audit ─────────────────
   dependency-audit:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     timeout-minutes: 10
 
     steps:
@@ -72,6 +76,8 @@ jobs:
   # ─── Rust Dependency Audit ─────────────────────────────────
   rust-audit:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     timeout-minutes: 15
 
     steps:

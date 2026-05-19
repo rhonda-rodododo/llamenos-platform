@@ -97,7 +97,7 @@ packages/
   crypto/             # Shared Rust crypto crate (native + WASM + UniFFI)
   protocol/           # JSON Schema definitions + codegen (TS/Swift/Kotlin)
     schemas/          # 42+ Zod schema files — source of truth for all types
-    crypto-labels.json # 68 domain separation constants
+    crypto-labels.json # Domain separation constants (see file for current count)
   shared/             # Cross-boundary TypeScript types and config
   i18n/               # Localization files + iOS/Android string codegen
 src/
@@ -164,7 +164,7 @@ All crypto is implemented in `packages/crypto/` (Rust), compiled to:
 - **Symmetric**: XChaCha20-Poly1305 (hub events)
 - **KDF**: HKDF-SHA-256, Argon2id (PINs, 64MB/3/4)
 - **Signing**: Ed25519 (device auth, sigchain) + BIP-340 Schnorr (legacy, being phased out)
-- **Domain separation**: 69 labeled contexts in `packages/protocol/crypto-labels.json`
+- **Domain separation**: All labeled contexts defined in `packages/protocol/crypto-labels.json` (source of truth; see file for current count)
 
 **Key model**: Each device has its own Ed25519 (signing) + X25519 (encryption) keypair. Device keys never enter the webview — all crypto calls go through Rust via Tauri IPC. The `platform.ts` abstraction is the only correct way to invoke crypto from the frontend.
 

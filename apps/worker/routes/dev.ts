@@ -27,11 +27,8 @@ const dev = new Hono<AppEnv>()
 function checkResetSecret(c: { env: { DEV_RESET_SECRET?: string; E2E_TEST_SECRET?: string }; req: { header(name: string): string | undefined } }): boolean {
   const secret = c.env.DEV_RESET_SECRET || c.env.E2E_TEST_SECRET
   if (!secret) return false // No secret configured — deny by default
-  // Accept X-Test-Secret header (simulation helpers) OR valid Bearer auth token (apiPost helpers)
+  // Accept X-Test-Secret header only — Bearer tokens are not sufficient for destructive dev endpoints
   if (c.req.header('X-Test-Secret') === secret) return true
-  // Also allow if the request has a valid Authorization header (authenticated test clients)
-  const authHeader = c.req.header('Authorization')
-  if (authHeader?.startsWith('Bearer ')) return true
   return false
 }
 
@@ -159,6 +156,7 @@ dev.delete('/test-rate-limits', async (c) => {
   const prefix = c.req.query('prefix')
   const services = c.get('services')
   await services.settings.clearRateLimits(prefix || undefined)
+  await services.settings.clearApiRateLimits(prefix || undefined)
   return c.json({ ok: true })
 })
 
