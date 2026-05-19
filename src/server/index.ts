@@ -7,7 +7,8 @@
  */
 import 'reflect-metadata' // Required by @peculiar/x509 → tsyringe (transitive dep of @simplewebauthn/server)
 import { Hono } from 'hono'
-import { createDatabase, closeDb } from '../../apps/worker/db'
+import { createDatabase, closeDb, getDb } from '../../apps/worker/db'
+import { cleanupExpiredNonces } from '../../apps/worker/services/webhook-replay'
 import { createServices, type Services } from '../../apps/worker/services'
 import { createBlobStorage } from '../../apps/worker/lib/blob-storage'
 import { createTranscriptionService } from '../../apps/worker/lib/transcription-client'
@@ -126,6 +127,15 @@ services.scheduler.start({
     })
   },
 })
+
+// --- Periodic webhook nonce cleanup (every 60s) ---
+setInterval(async () => {
+  try {
+    await cleanupExpiredNonces(getDb())
+  } catch (e) {
+    console.error('[llamenos] Failed to cleanup webhook nonces:', e)
+  }
+}, 60_000)
 
 // --- Initialize firehose agents (if seal key is configured) ---
 if (services.firehoseAgent) {

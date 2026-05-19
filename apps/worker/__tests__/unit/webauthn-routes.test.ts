@@ -163,7 +163,7 @@ describe('webauthn routes', () => {
 
       expect(res.status).toBe(401)
       const body = await res.json()
-      expect(body.error).toBe('Unknown credential')
+      expect(body.error).toBe('Authentication failed')
     })
 
     it('returns 400 for expired challenge', async () => {

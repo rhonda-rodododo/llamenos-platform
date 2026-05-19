@@ -1,3 +1,4 @@
+import { safeFetch } from '../../lib/safe-fetch'
 import type {
   MessagingAdapter,
   IncomingMessage,
@@ -202,7 +203,7 @@ export class PlivoSMSAdapter implements MessagingAdapter {
   // --- Helpers ---
 
   private async plivoApi(path: string, init: RequestInit): Promise<Response> {
-    return fetch(
+    return safeFetch(
       `https://api.plivo.com/v1/Account/${this.authId}${path}`,
       {
         ...init,

@@ -1,13 +1,11 @@
 import type {
   OwnedNumber,
   AvailableNumber,
-  NumberSearchQuery,
-  NumberProvisionRequest,
 } from '@protocol/schemas/provider-setup'
-import type { ProviderCapabilityImpl, ConnectionTestResult, SipTrunkConfig, WebhookUrls } from '../types'
+import type { ProviderCapabilityImpl, ConnectionTestResult, SipTrunkConfig } from '../types'
 import { ProviderApiError } from '../types'
 import { isInternalAddress } from '../../../lib/ssrf-guard'
-import { nowISO } from '../utils'
+import { safeFetch } from '../../../lib/safe-fetch'
 
 /**
  * Determine ESL base URL. Defaults to HTTPS unless eslUseTls is explicitly false
@@ -43,13 +41,13 @@ export const freeswitchProvider: ProviderCapabilityImpl = {
     const baseUrl = getEslBaseUrl(credentials)
     const start = Date.now()
     try {
-      const res = await fetch(`${baseUrl}/api/sofia?status`, {
+      const res = await safeFetch(`${baseUrl}/api/sofia?status`, {
         headers: {
           Authorization: `Basic ${btoa(`:${eslPassword}`)}`,
         },
       })
       if (!res.ok) {
-        const text = await res.text()
+        await res.text()
         return {
           connected: false,
           latencyMs: Date.now() - start,
@@ -97,7 +95,7 @@ export const freeswitchProvider: ProviderCapabilityImpl = {
       .join('')
       .slice(0, 32)
 
-    const res = await fetch(`${baseUrl}/api/bgapi`, {
+    const res = await safeFetch(`${baseUrl}/api/bgapi`, {
       method: 'POST',
       headers: {
         Authorization: `Basic ${btoa(`:${eslPassword}`)}`,

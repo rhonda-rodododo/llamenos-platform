@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 use x25519_dalek::{PublicKey as X25519PublicKey, StaticSecret as X25519Secret};
 use zeroize::Zeroize;
 
+use crate::ct_hex_eq;
 use crate::errors::CryptoError;
 
 /// KDF version byte stored in encrypted key material for future-proofing.
@@ -209,9 +210,13 @@ pub fn unlock_device_keys(
     let derived_signing_pubkey = hex::encode(secrets.signing_pubkey().to_bytes());
     let derived_encryption_pubkey = hex::encode(secrets.encryption_pubkey().to_bytes());
 
-    if derived_signing_pubkey != encrypted.state.signing_pubkey_hex
-        || derived_encryption_pubkey != encrypted.state.encryption_pubkey_hex
-    {
+    let sign_match = ct_hex_eq(&derived_signing_pubkey, &encrypted.state.signing_pubkey_hex);
+    let enc_match = ct_hex_eq(
+        &derived_encryption_pubkey,
+        &encrypted.state.encryption_pubkey_hex,
+    );
+
+    if !(sign_match && enc_match) {
         return Err(CryptoError::InvalidFormat(
             "derived public keys do not match stored state".into(),
         ));

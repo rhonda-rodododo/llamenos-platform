@@ -1,3 +1,4 @@
+import { safeFetch } from '../../lib/safe-fetch'
 import type {
   MessagingAdapter,
   IncomingMessage,
@@ -157,7 +158,7 @@ export class TwilioSMSAdapter implements MessagingAdapter {
 
   async getChannelStatus(): Promise<ChannelStatus> {
     try {
-      const res = await fetch(
+      const res = await safeFetch(
         `${this.getApiBaseUrl()}.json`,
         {
           method: 'GET',
@@ -198,7 +199,7 @@ export class TwilioSMSAdapter implements MessagingAdapter {
    * Throws if the deletion request fails.
    */
   async deleteMessage(messageSid: string): Promise<void> {
-    const res = await fetch(
+    const res = await safeFetch(
       `${this.getApiBaseUrl()}/Messages/${messageSid}.json`,
       {
         method: 'DELETE',
@@ -265,7 +266,7 @@ export class TwilioSMSAdapter implements MessagingAdapter {
   }
 
   protected async twilioMessagesApi(body: URLSearchParams): Promise<Response> {
-    return fetch(
+    return safeFetch(
       `${this.getApiBaseUrl()}/Messages.json`,
       {
         method: 'POST',

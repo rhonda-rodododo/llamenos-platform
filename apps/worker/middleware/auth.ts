@@ -58,7 +58,7 @@ export const auth = createMiddleware<AppEnv>(async (c, next) => {
     })
 
     incError('auth')
-    return c.json({ error: 'Unauthorized' }, 401)
+    return c.json({ error: 'Authentication failed' }, 401)
   }
 
   // Load all roles from SettingsService

@@ -7,6 +7,7 @@ import type {
 import type { ProviderCapabilityImpl, ConnectionTestResult, SipTrunkConfig, WebhookUrls } from '../types'
 import { ProviderApiError } from '../types'
 import { basicAuth, nowISO } from '../utils'
+import { safeFetch } from '../../../lib/safe-fetch'
 
 /** Detect test/mock credentials used in BDD and unit tests. */
 function isTestCredentials(credentials: Record<string, unknown>): boolean {
@@ -28,7 +29,7 @@ export const twilioProvider: ProviderCapabilityImpl = {
     const authToken = String(credentials.authToken ?? '')
     const start = Date.now()
     try {
-      const res = await fetch(
+      const res = await safeFetch(
         `https://api.twilio.com/2010-04-01/Accounts/${accountSid}.json`,
         { headers: { Authorization: basicAuth(accountSid, authToken) } },
       )
@@ -60,7 +61,7 @@ export const twilioProvider: ProviderCapabilityImpl = {
     if (isTestCredentials(credentials)) return []
     const accountSid = String(credentials.accountSid ?? credentials.authId ?? '')
     const authToken = String(credentials.authToken ?? '')
-    const res = await fetch(
+    const res = await safeFetch(
       `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/IncomingPhoneNumbers.json`,
       { headers: { Authorization: basicAuth(accountSid, authToken) } },
     )
@@ -103,7 +104,7 @@ export const twilioProvider: ProviderCapabilityImpl = {
     if (query.areaCode) params.set('AreaCode', query.areaCode)
     if (query.contains) params.set('Contains', query.contains)
 
-    const res = await fetch(
+    const res = await safeFetch(
       `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/AvailablePhoneNumbers/${query.countryCode ?? 'US'}/Local.json?${params.toString()}`,
       { headers: { Authorization: basicAuth(accountSid, authToken) } },
     )
@@ -155,7 +156,7 @@ export const twilioProvider: ProviderCapabilityImpl = {
     const params = new URLSearchParams()
     if (request.phoneNumber) params.set('PhoneNumber', request.phoneNumber)
 
-    const res = await fetch(
+    const res = await safeFetch(
       `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/IncomingPhoneNumbers.json`,
       {
         method: 'POST',
@@ -205,7 +206,7 @@ export const twilioProvider: ProviderCapabilityImpl = {
       params.set('SmsMethod', 'POST')
     }
 
-    const res = await fetch(
+    const res = await safeFetch(
       `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/IncomingPhoneNumbers/${numberId}.json`,
       {
         method: 'POST',
@@ -238,7 +239,7 @@ export const twilioProvider: ProviderCapabilityImpl = {
     const authToken = String(credentials.authToken ?? '')
     const auth = basicAuth(accountSid, authToken)
 
-    const trunkRes = await fetch('https://trunking.twilio.com/v1/Trunks', {
+    const trunkRes = await safeFetch('https://trunking.twilio.com/v1/Trunks', {
       method: 'POST',
       headers: {
         Authorization: auth,
@@ -254,7 +255,7 @@ export const twilioProvider: ProviderCapabilityImpl = {
     }
     const trunk = (await trunkRes.json()) as { sid: string }
 
-    const originationRes = await fetch(
+    const originationRes = await safeFetch(
       `https://trunking.twilio.com/v1/Trunks/${trunk.sid}/OriginationUrls`,
       {
         method: 'POST',

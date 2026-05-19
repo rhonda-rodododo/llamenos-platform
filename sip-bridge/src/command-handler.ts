@@ -889,7 +889,7 @@ export class CommandHandler {
       }
     } catch (err) {
       console.error('[handler] HTTP command failed:', err)
-      return { ok: false, error: String(err) }
+      return { ok: false, error: 'Command failed' }
     }
   }
 

@@ -4,6 +4,7 @@
  * Implements the TranscriptionService interface.
  */
 import type { TranscriptionService } from '../types'
+import { safeFetch } from './safe-fetch'
 
 /**
  * Validate that the Whisper URL points to a trusted internal host.
@@ -49,7 +50,7 @@ export function createTranscriptionService(opts?: {
       formData.append('model', model || 'Systran/faster-whisper-base')
       formData.append('response_format', 'json')
 
-      const response = await fetch(whisperUrl, {
+      const response = await safeFetch(whisperUrl, {
         method: 'POST',
         body: formData,
       })

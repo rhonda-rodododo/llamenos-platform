@@ -1,8 +1,9 @@
-import type { MessagingAdapter, SendMessageParams, SendMediaParams, SendResult } from './adapter'
-import type { MessagingChannelType, MessagingConfig } from '@shared/types'
+import type { SendMessageParams, SendResult } from './adapter'
+import type { MessagingChannelType } from '@shared/types'
 import { getMessagingAdapterFromService } from '../lib/service-factories'
 import type { SettingsService } from '../services/settings'
 import { createLogger } from '../lib/logger'
+import { safeFetch } from '../lib/safe-fetch'
 
 const logger = createLogger('delivery-router')
 
@@ -21,10 +22,11 @@ async function checkSignalAvailability(
   identifierHash: string
 ): Promise<boolean> {
   try {
-    const res = await fetch(
+    const res = await safeFetch(
       `${notifierUrl.replace(/\/+$/, '')}/api/check/${encodeURIComponent(identifierHash)}`,
       {
         headers: { authorization: `Bearer ${notifierApiKey}` },
+        timeoutMs: 10_000,
       }
     )
     if (!res.ok) return false

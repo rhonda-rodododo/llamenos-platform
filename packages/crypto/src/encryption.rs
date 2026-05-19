@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use zeroize::{Zeroize, Zeroizing};
 
+use crate::ct_hex_eq;
 use crate::errors::CryptoError;
 use crate::hpke_envelope::{self, HpkeEnvelope};
 use crate::labels::*;
@@ -261,10 +262,16 @@ pub fn decrypt_message(
     secret_key_hex: &str,
     reader_pubkey: &str,
 ) -> Result<String, CryptoError> {
-    let envelope = reader_envelopes
-        .iter()
-        .find(|e| e.pubkey == reader_pubkey)
-        .ok_or(CryptoError::DecryptionFailed)?;
+    let envelope = {
+        let mut found: Option<&RecipientKeyEnvelope> = None;
+        for e in reader_envelopes.iter() {
+            if ct_hex_eq(&e.pubkey, reader_pubkey) {
+                found = Some(e);
+            }
+            // Continue iterating — do NOT break
+        }
+        found.ok_or(CryptoError::DecryptionFailed)?
+    };
 
     let key_envelope = KeyEnvelope {
         enc: envelope.enc.clone(),
@@ -291,10 +298,16 @@ pub fn decrypt_call_record(
     secret_key_hex: &str,
     reader_pubkey: &str,
 ) -> Result<String, CryptoError> {
-    let envelope = admin_envelopes
-        .iter()
-        .find(|e| e.pubkey == reader_pubkey)
-        .ok_or(CryptoError::DecryptionFailed)?;
+    let envelope = {
+        let mut found: Option<&RecipientKeyEnvelope> = None;
+        for e in admin_envelopes.iter() {
+            if ct_hex_eq(&e.pubkey, reader_pubkey) {
+                found = Some(e);
+            }
+            // Continue iterating — do NOT break
+        }
+        found.ok_or(CryptoError::DecryptionFailed)?
+    };
 
     let key_envelope = KeyEnvelope {
         enc: envelope.enc.clone(),

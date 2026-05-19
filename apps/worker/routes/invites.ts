@@ -71,7 +71,7 @@ invites.post('/redeem',
     const inviteUrl = new URL(c.req.url)
     const isValid = await verifyAuthToken({ pubkey: body.pubkey, timestamp: body.timestamp, token: body.token }, c.req.method, inviteUrl.pathname)
     if (!isValid) {
-      return c.json({ error: 'Invalid signature' }, 401)
+      return c.json({ error: 'Authentication failed' }, 401)
     }
 
     // Rate limit redemption attempts

@@ -131,8 +131,9 @@ async function main(): Promise<void> {
             latencyMs: health.latencyMs,
           })
         } catch (err) {
+          console.error('[bridge] Health check error:', err)
           return Response.json(
-            { status: 'error', error: String(err), ...handler.getStatus() },
+            { status: 'error', error: 'Health check failed', ...handler.getStatus() },
             { status: 500 }
           )
         }
@@ -158,8 +159,9 @@ async function main(): Promise<void> {
             bridges: bridges.length,
           })
         } catch (err) {
+          console.error('[bridge] Status check error:', err)
           return Response.json(
-            { status: 'error', error: String(err), bridge: handler.getStatus() },
+            { status: 'error', error: 'Status check failed', bridge: handler.getStatus() },
             { status: 500 }
           )
         }
@@ -176,11 +178,17 @@ async function main(): Promise<void> {
         }
 
         try {
-          const data = JSON.parse(body) as Record<string, unknown>
+          let data: Record<string, unknown>
+          try {
+            data = JSON.parse(body) as Record<string, unknown>
+          } catch {
+            return Response.json({ ok: false, error: 'Invalid request' }, { status: 400 })
+          }
           const result = await handler.handleHttpCommand(data)
           return Response.json(result, { status: result.ok ? 200 : 400 })
         } catch (err) {
-          return Response.json({ ok: false, error: String(err) }, { status: 500 })
+          console.error('[bridge] Command execution error:', err)
+          return Response.json({ ok: false, error: 'Command failed' }, { status: 500 })
         }
       }
 
@@ -216,7 +224,8 @@ async function main(): Promise<void> {
 
           return Response.json({ ok: true, channelIds })
         } catch (err) {
-          return Response.json({ ok: false, error: String(err) }, { status: 500 })
+          console.error('[bridge] Ring error:', err)
+          return Response.json({ ok: false, error: 'Command failed' }, { status: 500 })
         }
       }
 
@@ -240,7 +249,8 @@ async function main(): Promise<void> {
           }
           return Response.json({ ok: true })
         } catch (err) {
-          return Response.json({ ok: false, error: String(err) }, { status: 500 })
+          console.error('[bridge] Cancel-ringing error:', err)
+          return Response.json({ ok: false, error: 'Command failed' }, { status: 500 })
         }
       }
 
@@ -256,7 +266,8 @@ async function main(): Promise<void> {
           await client.hangup(data.channelId)
           return Response.json({ ok: true })
         } catch (err) {
-          return Response.json({ ok: false, error: String(err) }, { status: 500 })
+          console.error('[bridge] Hangup error:', err)
+          return Response.json({ ok: false, error: 'Command failed' }, { status: 500 })
         }
       }
 
@@ -305,7 +316,8 @@ async function main(): Promise<void> {
             },
           })
         } catch (err) {
-          return Response.json({ error: String(err) }, { status: 500 })
+          console.error('[bridge] Recording retrieval error:', err)
+          return Response.json({ error: 'Recording retrieval failed' }, { status: 500 })
         }
       }
 

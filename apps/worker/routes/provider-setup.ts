@@ -1,3 +1,4 @@
+import { safeFetch } from '../lib/safe-fetch'
 import { Hono, type Context } from 'hono'
 import { describeRoute, resolver, validator } from 'hono-openapi'
 import { z } from 'zod'
@@ -239,7 +240,7 @@ providerSetup.post('/oauth/callback',
     try {
       const clientId = getOAuthClientId(stateRow.provider)
       const clientSecret = getOAuthClientSecret(stateRow.provider)
-      const tokenRes = await fetch(oauthConfig.tokenUrl, {
+      const tokenRes = await safeFetch(oauthConfig.tokenUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
@@ -334,7 +335,7 @@ providerSetup.get('/oauth/callback',
     try {
       const clientId = getOAuthClientId(stateRow.provider)
       const clientSecret = getOAuthClientSecret(stateRow.provider)
-      const tokenRes = await fetch(oauthConfig.tokenUrl, {
+      const tokenRes = await safeFetch(oauthConfig.tokenUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({

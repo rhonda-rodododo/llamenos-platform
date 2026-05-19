@@ -1,3 +1,4 @@
+import { safeFetch } from '../lib/safe-fetch'
 import type {
   TelephonyAdapter,
   IncomingCallParams,
@@ -72,7 +73,7 @@ function hubXmlParam(hubId?: string): string {
 }
 
 /** Build hub query param suffix for non-XML URLs */
-function hubQueryParam(hubId?: string): string {
+function _hubQueryParam(hubId?: string): string {
   return hubId ? `&hub=${encodeURIComponent(hubId)}` : ''
 }
 
@@ -342,12 +343,13 @@ export class TwilioAdapter implements TelephonyAdapter {
     if (!data.recordings?.length) return null
 
     const recordingSid = data.recordings[0].sid
-    const audioRes = await fetch(
+    const audioRes = await safeFetch(
       `${this.getRecordingBaseUrl()}/Recordings/${recordingSid}.wav`,
       {
         headers: {
           'Authorization': 'Basic ' + btoa(`${this.accountSid}:${this.authToken}`),
         },
+        timeoutMs: 60_000,
       }
     )
 
@@ -356,12 +358,13 @@ export class TwilioAdapter implements TelephonyAdapter {
   }
 
   async getRecordingAudio(recordingSid: string): Promise<ArrayBuffer | null> {
-    const audioRes = await fetch(
+    const audioRes = await safeFetch(
       `${this.getRecordingBaseUrl()}/Recordings/${recordingSid}.wav`,
       {
         headers: {
           'Authorization': 'Basic ' + btoa(`${this.accountSid}:${this.authToken}`),
         },
+        timeoutMs: 60_000,
       }
     )
     if (!audioRes.ok) return null
@@ -476,7 +479,7 @@ export class TwilioAdapter implements TelephonyAdapter {
   }
 
   protected async twilioApi(path: string, init: RequestInit): Promise<Response> {
-    return fetch(
+    return safeFetch(
       `${this.getApiBaseUrl()}${path}`,
       {
         ...init,

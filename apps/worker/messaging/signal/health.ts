@@ -1,5 +1,6 @@
 import type { SignalConfig } from '@shared/types'
 import type { SignalAboutResponse } from './types'
+import { safeFetch } from '../../lib/safe-fetch'
 
 export interface BridgeHealthStatus {
   connected: boolean
@@ -19,11 +20,12 @@ export async function checkBridgeHealth(config: SignalConfig): Promise<BridgeHea
   const lastChecked = new Date().toISOString()
 
   try {
-    const response = await fetch(`${bridgeUrl}/v1/about`, {
+    const response = await safeFetch(`${bridgeUrl}/v1/about`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${config.bridgeApiKey}`,
       },
+      timeoutMs: 10_000,
     })
 
     if (!response.ok) {
@@ -34,7 +36,7 @@ export async function checkBridgeHealth(config: SignalConfig): Promise<BridgeHea
       }
     }
 
-    const about: SignalAboutResponse = await response.json()
+    const about = await response.json() as SignalAboutResponse
 
     return {
       connected: true,
@@ -64,13 +66,14 @@ export async function checkRegistrationStatus(config: SignalConfig): Promise<{
   const bridgeUrl = config.bridgeUrl.replace(/\/+$/, '')
 
   try {
-    const response = await fetch(
+    const response = await safeFetch(
       `${bridgeUrl}/v1/accounts/${encodeURIComponent(config.registeredNumber)}`,
       {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${config.bridgeApiKey}`,
         },
+        timeoutMs: 10_000,
       },
     )
 

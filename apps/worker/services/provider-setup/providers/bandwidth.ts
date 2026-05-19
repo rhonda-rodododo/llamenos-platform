@@ -7,6 +7,7 @@ import type {
 import type { ProviderCapabilityImpl, ConnectionTestResult, WebhookUrls } from '../types'
 import { ProviderApiError } from '../types'
 import { basicAuth, nowISO } from '../utils'
+import { safeFetch } from '../../../lib/safe-fetch'
 
 /** Escape special characters for safe XML interpolation. */
 function escapeXml(str: string): string {
@@ -28,11 +29,11 @@ export const bandwidthProvider: ProviderCapabilityImpl = {
     const password = String(credentials.password ?? credentials.authToken ?? '')
     const start = Date.now()
     try {
-      const res = await fetch(`https://dashboard.bandwidth.com/api/accounts/${accountId}`, {
+      const res = await safeFetch(`https://dashboard.bandwidth.com/api/accounts/${accountId}`, {
         headers: { Authorization: basicAuth(username, password) },
       })
       if (!res.ok) {
-        const text = await res.text()
+        await res.text()
         return {
           connected: false,
           latencyMs: Date.now() - start,
@@ -55,7 +56,7 @@ export const bandwidthProvider: ProviderCapabilityImpl = {
     const accountId = String(credentials.accountId ?? credentials.authId ?? '')
     const username = String(credentials.username ?? '')
     const password = String(credentials.password ?? credentials.authToken ?? '')
-    const res = await fetch(
+    const res = await safeFetch(
       `https://dashboard.bandwidth.com/api/accounts/${accountId}/phonenumbers?page=1&size=100`,
       { headers: { Authorization: basicAuth(username, password) } },
     )
@@ -99,7 +100,7 @@ export const bandwidthProvider: ProviderCapabilityImpl = {
     })
     if (query.areaCode) params.set('areaCode', query.areaCode)
 
-    const res = await fetch(
+    const res = await safeFetch(
       `https://dashboard.bandwidth.com/api/accounts/${accountId}/availableNumbers?${params.toString()}`,
       { headers: { Authorization: basicAuth(username, password) } },
     )
@@ -137,7 +138,7 @@ export const bandwidthProvider: ProviderCapabilityImpl = {
       throw new ProviderApiError('Bandwidth provision requires a specific phoneNumber', 400, 'Missing phoneNumber')
     }
 
-    const res = await fetch(
+    const res = await safeFetch(
       `https://dashboard.bandwidth.com/api/accounts/${accountId}/orders`,
       {
         method: 'POST',
@@ -185,7 +186,7 @@ export const bandwidthProvider: ProviderCapabilityImpl = {
       throw new ProviderApiError('Bandwidth applicationId is required for webhook configuration', 400, 'Missing applicationId')
     }
 
-    const res = await fetch(
+    const res = await safeFetch(
       `https://dashboard.bandwidth.com/api/accounts/${accountId}/applications/${applicationId}`,
       {
         method: 'POST',

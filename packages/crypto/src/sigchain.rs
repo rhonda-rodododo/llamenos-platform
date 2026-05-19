@@ -23,6 +23,7 @@ use ed25519_dalek::{Signer, Verifier, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use crate::ct_hex_eq;
 use crate::device_keys::DeviceSecrets;
 use crate::errors::CryptoError;
 
@@ -151,8 +152,8 @@ pub fn verify_sigchain_link(
     link: &SigchainLink,
     expected_signer_pubkey: &str,
 ) -> Result<bool, CryptoError> {
-    // Check signer pubkey matches expected
-    if link.signer_pubkey != expected_signer_pubkey {
+    // Check signer pubkey matches expected (constant-time)
+    if !ct_hex_eq(&link.signer_pubkey, expected_signer_pubkey) {
         return Ok(false);
     }
 
@@ -166,7 +167,7 @@ pub fn verify_sigchain_link(
         &link.payload_json,
     )?;
 
-    if expected_hash != link.entry_hash {
+    if !ct_hex_eq(&expected_hash, &link.entry_hash) {
         return Ok(false);
     }
 
@@ -260,9 +261,9 @@ pub fn verify_sigchain(links: &[SigchainLink]) -> Result<SigchainVerifiedState, 
             )));
         }
 
-        // Check prevHash linkage
+        // Check prevHash linkage (constant-time)
         match &link.prev_hash {
-            Some(ph) if ph == &prev_hash => {}
+            Some(ph) if ct_hex_eq(ph, &prev_hash) => {}
             _ => {
                 return Err(CryptoError::InvalidInput(format!(
                     "prevHash mismatch at seq {}",
@@ -587,6 +588,16 @@ mod tests {
 
         let result = verify_sigchain(&[link1, link3]);
         assert!(matches!(result, Err(CryptoError::InvalidInput(_))));
+    }
+
+    #[test]
+    fn ct_hex_eq_works() {
+        use crate::ct_hex_eq;
+        let hash_a = "aa".repeat(32);
+        let hash_b = "bb".repeat(32);
+        assert!(ct_hex_eq(&hash_a, &hash_a.clone()));
+        assert!(!ct_hex_eq(&hash_a, &hash_b));
+        assert!(!ct_hex_eq("aabb", "aabbcc"));
     }
 
     #[test]
