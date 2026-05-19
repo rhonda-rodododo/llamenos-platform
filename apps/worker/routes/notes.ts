@@ -83,7 +83,12 @@ notes.post('/',
     const pubkey = c.get('pubkey')
     const body = c.req.valid('json')
 
+    // When accessed via hub-scoped route (/api/hubs/:hubId/notes),
+    // hubId is set by hubContext middleware — scope the note to that hub.
+    const hubId = c.get('hubId') as string | undefined
+
     const note = await services.records.createNote({
+      hubId,
       authorPubkey: pubkey,
       encryptedContent: body.encryptedContent,
       callId: body.callId,
