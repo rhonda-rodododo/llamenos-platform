@@ -201,27 +201,34 @@ export async function reenterPinAfterReload(page: Page): Promise<void> {
 }
 
 /**
- * Login as admin: imports the legacy secp256k1 nsec via the IPC mock,
- * persists to store, then enters PIN to unlock. Uses Schnorr auth
- * (backward-compatible with the bootstrap flow).
+ * Login as admin using ADMIN_SEED deterministic keys.
+ *
+ * Bootstrap creates admin via UI with random keys (saved in admin.json), but
+ * global-setup + resetTestState() re-seed admin from ADMIN_PUBKEY (= ADMIN_SEED's
+ * pubkey). Since loginAsAdmin() is only called by post-bootstrap tests (chromium/BDD),
+ * admin.json is always stale — loading it wastes a PBKDF2 round and produces delayed
+ * 401s that trigger onAuthExpired after ADMIN_SEED login succeeds.
+ *
+ * Bootstrap tests themselves use unlockAndNavigateToDashboard() with admin.json
+ * directly — they don't call this function.
  */
 export async function loginAsAdmin(page: Page) {
-  // Always use ADMIN_SEED deterministic keys. The bootstrap project saves
-  // admin.json with random keys generated during UI bootstrap, but resetTestState()
-  // in bootstrap's afterAll re-seeds admin from ADMIN_PUBKEY (= ADMIN_SEED's pubkey).
-  // Attempting admin.json first poisons the browser with 401 responses from the stale
-  // keys — those delayed 401s trigger onAuthExpired AFTER the ADMIN_SEED fallback
-  // succeeds, causing mid-test auth loss and redirect to /login.
+  // Navigate to about:blank first to abort any in-flight requests from a prior test,
+  // then clear all client state. This prevents stale 401s from a previous session
+  // from triggering onAuthExpired mid-login.
+  await page.goto('about:blank')
+  await page.context().clearCookies()
+
   await page.goto('/login')
   await page.waitForLoadState('domcontentloaded')
 
+  // Clear all client state to prevent stale data from interfering.
   // Reset PIN lockout counter to prevent accumulation across serial tests.
   await page.evaluate(() => {
     localStorage.removeItem('__test_pin_lockout_state')
     sessionStorage.clear()
     localStorage.clear()
   })
-  await page.context().clearCookies()
   await page.evaluate(async () => {
     const dbs = await window.indexedDB.databases?.().catch(() => [] as Array<{ name?: string }>) ?? []
     for (const db of dbs) {
@@ -246,6 +253,17 @@ export async function loginAsAdmin(page: Page) {
   await enterPin(page, TEST_PIN)
 
   await page.waitForURL(url => !url.toString().includes('/login'), { timeout: Timeouts.AUTH })
+
+  // Handle profile-setup if redirected there after first login
+  if (page.url().includes('profile-setup')) {
+    await completeProfileSetup(page)
+  }
+
+  await waitForAdminAuth(page)
+}
+
+/** Shared post-login assertions for loginAsAdmin — waits for hub context and admin sidebar. */
+async function waitForAdminAuth(page: Page) {
   // Ensure hub context is ready before asserting page content — prevents race
   // where components fetch data before ConfigProvider sets activeHubId.
   await page.waitForFunction(() => {
