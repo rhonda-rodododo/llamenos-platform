@@ -85,12 +85,4 @@ data class ConvertFromReportBody(
     val additionalFields: Map<String, String> = emptyMap(),
 )
 
-@Serializable
-data class ConvertFromReportResponse(
-    val recordId: String,
-    val reportId: String,
-    val entityTypeId: String,
-    val caseNumber: String? = null,
-    val autoAssigned: Boolean,
-    val assignedTo: List<String> = emptyList(),
-)
+typealias ConvertFromReportResponse = org.llamenos.protocol.ConvertFromReportResponse
