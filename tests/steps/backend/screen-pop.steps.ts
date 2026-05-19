@@ -125,7 +125,8 @@ When('the admin looks up identifier hash {string}', async ({ request, world }, h
 
 When('the admin lists records for the contact', async ({ request, world }) => {
   const contactId = getScreenPopState(world).lastContact!.id as string
-  getScreenPopState(world).contactRecords = await listRecordsByContactViaApi(request, contactId)
+  const hubId = getScenarioState(world).hubId
+  getScreenPopState(world).contactRecords = await listRecordsByContactViaApi(request, contactId, undefined, hubId)
 })
 
 // ── Then Steps ─────────────────────────────────────────────────────

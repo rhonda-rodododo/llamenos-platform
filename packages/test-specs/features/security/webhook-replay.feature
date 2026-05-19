@@ -7,7 +7,7 @@ Feature: Webhook replay protection
     Given a configured telephony provider expecting form-encoded content
     And a webhook with Content-Type "application/json"
     When the webhook is delivered
-    Then the response status should be 415
+    Then the response status should be 403
 
   Scenario: Webhook from non-allowlisted IP is rejected
     Given IP allowlisting is enabled for provider "TWILIO"

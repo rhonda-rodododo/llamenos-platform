@@ -56,7 +56,12 @@ describe('aesGcmEncrypt / aesGcmDecrypt roundtrip', () => {
     const plaintext = 'Secret'
 
     const encrypted = await aesGcmEncrypt(plaintext, keyHex)
-    const tampered = encrypted.slice(0, -2) + 'ff'
+    // Flip a byte in the middle of the ciphertext (past the 12-byte IV = 24 hex chars)
+    // to ensure the AES-GCM authentication tag check fails reliably
+    const midpoint = 24 + Math.floor((encrypted.length - 24) / 2)
+    const originalByte = parseInt(encrypted.slice(midpoint, midpoint + 2), 16)
+    const flippedByte = (originalByte ^ 0xff).toString(16).padStart(2, '0')
+    const tampered = encrypted.slice(0, midpoint) + flippedByte + encrypted.slice(midpoint + 2)
 
     await expect(aesGcmDecrypt(tampered, keyHex)).rejects.toThrow()
   })

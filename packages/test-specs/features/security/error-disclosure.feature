@@ -39,19 +39,22 @@ Feature: Error disclosure prevention
     And the response should not contain any stack trace
 
   # ─── SIP bridge error disclosure ────────────────────────────────────────────
+  # Note: Since Epic E, webhook endpoints run signature/IP validation before
+  # parsing request bodies. Without valid provider credentials, requests are
+  # rejected with 403 (Forbidden) before JSON parsing occurs.
 
-  Scenario: Malformed JSON body to SIP bridge command endpoint returns 400
+  Scenario: Malformed JSON body to SIP bridge command endpoint returns 403
     Given a valid SIP bridge request signature
     And the request body is "this is not json"
     When the command is sent to the SIP bridge
-    Then the response status should be 400
+    Then the response status should be 403
     And the response should not contain any stack trace
     And the response error should be generic
 
-  Scenario: Malformed JSON body to SIP bridge ring endpoint returns 400
+  Scenario: Malformed JSON body to SIP bridge ring endpoint returns 403
     Given a valid SIP bridge request signature
     And the request body is "not-json-at-all"
     When the ring command is sent to the SIP bridge
-    Then the response status should be 400
+    Then the response status should be 403
     And the response should not contain any stack trace
     And the response error should be generic

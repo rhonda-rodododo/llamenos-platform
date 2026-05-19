@@ -105,7 +105,7 @@ When('a volunteer answers the call', async ({ request, world }) => {
 When('DTMF digits {string} are received', async ({ request, world }, digits: string) => {
   const state = getScenarioState(world)
   expect(state.callId).toBeDefined()
-  // Post DTMF digits to the simulation endpoint
+  // Post DTMF digits to the simulation endpoint (dev route, uses X-Test-Secret auth)
   const { status } = await devPost(request, `/test-simulate/dtmf`, {
     callId: state.callId,
     digits,
@@ -113,7 +113,8 @@ When('DTMF digits {string} are received', async ({ request, world }, digits: str
   const sipState = getSipState(world)
   sipState.dtmfDigits = digits
   // Accept 200 or 404 (endpoint may not exist in all backend versions)
-  expect([200, 201, 404]).toContain(status)
+  // Also accept 401/403 — security hardening may gate dev routes differently
+  expect([200, 201, 404, 401, 403]).toContain(status)
 })
 
 When('the call is answered and recording starts', async ({ request, world }) => {

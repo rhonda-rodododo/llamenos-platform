@@ -1605,10 +1605,15 @@ export async function listRecordsByContactViaApi(
   request: APIRequestContext,
   contactId: string,
   seedHex = ADMIN_SEED,
+  hubId?: string,
 ): Promise<{ records: Record<string, unknown>[]; total: number }> {
+  // Hub isolation (Epic E): use hub-scoped path when hubId is provided
+  const path = hubId
+    ? `/hubs/${hubId}/records/by-contact/${contactId}`
+    : `/records/by-contact/${contactId}`
   const { status, data } = await apiGet<{ records: Record<string, unknown>[]; total: number }>(
     request,
-    `/records/by-contact/${contactId}`,
+    path,
     seedHex,
   )
   if (status !== 200) throw new Error(`Failed to list records by contact: ${status}`)

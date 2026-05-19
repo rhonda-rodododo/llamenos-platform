@@ -84,16 +84,12 @@ When('the request is sent to a protected endpoint', async ({ request, world }) =
 
 When('a request triggers an unhandled server error', async ({ request, world }) => {
   const state = getEDState(world)
-  const pubkey = bytesToHex(ed25519.getPublicKey(hexToBytes(ADMIN_SEED)))
-  const timestamp = Date.now()
-  const path = '/api/dev/trigger-error'
-  const message = utf8ToBytes(`${LABEL_DEVICE_AUTH}:${pubkey}:${timestamp}:GET:${path}`)
-  const sig = ed25519.sign(message, hexToBytes(ADMIN_SEED))
-  const token = JSON.stringify({ pubkey, timestamp, token: bytesToHex(sig) })
+  // Hit the dev test-trigger-error endpoint which intentionally throws.
+  // This endpoint is gated by DEV_ROUTES_ENABLED + X-Test-Secret (not Bearer auth).
+  const path = '/api/test-trigger-error'
 
   const res = await request.get(`${BASE_URL}${path}`, {
     headers: {
-      Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
       'X-Test-Secret': process.env.DEV_RESET_SECRET || 'test-reset-secret',
     },
