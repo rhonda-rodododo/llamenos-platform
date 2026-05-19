@@ -3,7 +3,7 @@ WORKDIR /app
 
 # Install dependencies
 COPY package.json bun.lock* ./
-RUN bun install --frozen-lockfile 2>/dev/null || bun install
+RUN bun install --frozen-lockfile
 
 # Copy source code (exclude test files via .dockerignore)
 COPY src/ src/
