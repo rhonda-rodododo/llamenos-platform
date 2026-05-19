@@ -19,8 +19,8 @@ class PINScreenFlagSecureTest {
     fun pinUnlockScreenHasFlagSecure() {
         // Verify FLAG_SECURE is set on the window when PINUnlockScreen is shown.
         // FLAG_SECURE prevents screenshots and screen recording of PIN/key material.
-        activityRule.scenario.onActivity { activity ->
-            val flags = activity.window.attributes.flags
+        activityRule.scenario.onActivity { activity: MainActivity ->
+            val flags: Int = activity.window.attributes.flags
             assertTrue(
                 (flags and WindowManager.LayoutParams.FLAG_SECURE) != 0,
                 "PIN unlock screen must have FLAG_SECURE set to prevent screenshots of sensitive material"
