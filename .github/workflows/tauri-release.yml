@@ -14,6 +14,8 @@ on:
         description: 'Version to release (e.g., 1.0.0)'
         required: true
 
+permissions: {}  # deny-all; per-job permissions below
+
 env:
   # Safely capture workflow_dispatch input at top level — never interpolate directly in run: blocks
   INPUT_VERSION: ${{ github.event.inputs.version }}
@@ -115,7 +117,7 @@ jobs:
             fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
           "
 
-      # macOS code signing
+      # macOS code signing — cert imported directly to keychain without writing to disk
       - name: Setup macOS signing
         if: matrix.platform == 'macos-latest'
         env:
@@ -125,26 +127,30 @@ jobs:
           if [ -n "$APPLE_CERTIFICATE" ]; then
             KEYCHAIN_PASSWORD=$(openssl rand -hex 16)
             echo "::add-mask::$KEYCHAIN_PASSWORD"
-            echo "$APPLE_CERTIFICATE" | base64 --decode > certificate.p12
             security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
             security default-keychain -s build.keychain
             security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
             security set-keychain-settings -t 3600 -u build.keychain
-            security import certificate.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+            # Import certificate without writing to disk — use a tmpfs dir for minimal dwell time
+            CERT_TMPDIR=$(mktemp -d)
+            chmod 700 "$CERT_TMPDIR"
+            echo "$APPLE_CERTIFICATE" | base64 --decode > "${CERT_TMPDIR}/cert.p12"
+            security import "${CERT_TMPDIR}/cert.p12" -k build.keychain \
+              -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+            rm -rf "$CERT_TMPDIR"
             security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
-            rm certificate.p12
           fi
 
-      # Build Tauri app
+      # Build Tauri app — signing keys scoped to signing step only, not compile step
       - name: Build (macOS universal)
         if: matrix.platform == 'macos-latest'
         env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: bun run tauri:build -- --target universal-apple-darwin
 
       - name: Build (Windows)

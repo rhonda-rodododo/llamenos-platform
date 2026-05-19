@@ -145,8 +145,8 @@ services:
 
   # ── Optional: Whisper Transcription ───────────────────────
   whisper:
-    # fedirz/faster-whisper-server:0.4.1 — digest pin pending: tag not yet published to Docker Hub
-    # Run: docker pull fedirz/faster-whisper-server:0.4.1 && docker inspect --format='{{index .RepoDigests 0}}' fedirz/faster-whisper-server:0.4.1
+    # TODO: pin digest — run scripts/update-image-digests.sh once tag is published to Docker Hub
+    # docker pull fedirz/faster-whisper-server:0.4.1 && docker inspect --format='{{index .RepoDigests 0}}' fedirz/faster-whisper-server:0.4.1
     image: fedirz/faster-whisper-server:0.4.1
     profiles: ["transcription"]
     restart: unless-stopped
@@ -209,7 +209,7 @@ services:
 
   # ── Optional: Kamailio SIP Proxy (telephony profile) ──────
   kamailio:
-    image: kamailio/kamailio:5.7
+    image: kamailio/kamailio:5.7  # TODO: pin digest — run scripts/update-image-digests.sh
     profiles: ["telephony"]
     restart: unless-stopped
     ports:
@@ -233,7 +233,7 @@ services:
 
   # ── Optional: CoTURN STUN/TURN relay (telephony profile) ──
   coturn:
-    image: coturn/coturn:4
+    image: coturn/coturn:4@sha256:867607152c6ed9504a0b59a2546a9bd2872dcf74313b3bc6cf9b69cc81be6fb3  # pinned 2026-05-18
     profiles: ["telephony"]
     restart: unless-stopped
     ports:
