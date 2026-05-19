@@ -44,7 +44,7 @@ struct AppBlastsListResponse: Codable, Sendable {
 // Generated `ProtocolBlastStatus` has: draft, sent, scheduled, cancelled, sending.
 // We add UI display properties (icon, color, displayName) as extensions.
 
-extension ProtocolBlastStatus: @retroactive CaseIterable {
+extension ProtocolBlastStatus: CaseIterable {
     public static var allCases: [ProtocolBlastStatus] {
         [.draft, .sent, .scheduled, .cancelled, .sending]
     }
