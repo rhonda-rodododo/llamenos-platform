@@ -5,7 +5,6 @@ import { HUB_CHANNEL_TYPES } from '@protocol/schemas/provider-setup'
 import type {
   ProviderTemplate,
   ChannelConfig,
-  HubOnboardingState,
 } from '@protocol/schemas/provider-setup'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -75,6 +74,7 @@ export function HubOnboardingWizard({ hubId, hubName, onComplete }: HubOnboardin
 
   const setupData = useMemo<SetupData>(() => ({
     hotlineName: hubName,
+    hubUrl: '',
     organization: '',
     language: 'en',
     selectedChannels: Object.entries(channelConfig)

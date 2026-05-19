@@ -30,6 +30,7 @@ const TOTAL_STEPS = 6
 
 export interface SetupData {
   hotlineName: string
+  hubUrl: string
   organization: string
   language: string
   selectedChannels: ChannelType[]
@@ -46,6 +47,7 @@ export interface SetupData {
 
 const DEFAULT_SETUP_DATA: SetupData = {
   hotlineName: '',
+  hubUrl: '',
   organization: '',
   language: 'en',
   selectedChannels: [],
@@ -58,6 +60,30 @@ const DEFAULT_SETUP_DATA: SetupData = {
   providerValidated: false,
   whatsappValidated: false,
   signalValidated: false,
+}
+
+/** Returns true if the URL is valid HTTPS (or empty — hub URL is optional). */
+function isValidHubUrl(url: string): boolean {
+  if (!url.trim()) return true
+  try {
+    const parsed = new URL(url)
+    return parsed.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+/** Returns a validation error key if the URL is invalid, or null if OK. */
+export function validateHubUrl(url: string): string | null {
+  if (!url.trim()) return null
+  try {
+    const parsed = new URL(url)
+    if (parsed.protocol === 'http:') return 'errors.hubUrlInsecure'
+    if (parsed.protocol !== 'https:') return 'errors.hubUrlInsecure'
+    return null
+  } catch {
+    return 'errors.hubUrlRequired'
+  }
 }
 
 export function SetupWizard({ needsBootstrap = false }: { needsBootstrap?: boolean }) {
@@ -121,11 +147,11 @@ export function SetupWizard({ needsBootstrap = false }: { needsBootstrap?: boole
 
   const canProceed = useCallback(() => {
     switch (step) {
-      case 0: return data.hotlineName.trim().length > 0
+      case 0: return data.hotlineName.trim().length > 0 && (!data.hubUrl || isValidHubUrl(data.hubUrl))
       case 1: return data.selectedChannels.length > 0
       default: return true
     }
-  }, [step, data.hotlineName, data.selectedChannels])
+  }, [step, data.hotlineName, data.hubUrl, data.selectedChannels])
 
   async function handleNext() {
     if (step === TOTAL_STEPS - 1) return
