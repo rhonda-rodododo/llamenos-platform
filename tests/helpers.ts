@@ -206,105 +206,44 @@ export async function reenterPinAfterReload(page: Page): Promise<void> {
  * (backward-compatible with the bootstrap flow).
  */
 export async function loginAsAdmin(page: Page) {
-  const storagePath = 'tests/storage/admin.json'
-  let storageState: { origins: Array<{ origin: string; localStorage: Array<{ name: string; value: string }> }> } | null = null
-
-  try {
-    const fs = await import('fs/promises')
-    const content = await fs.readFile(storagePath, 'utf-8')
-    storageState = JSON.parse(content)
-  } catch {
-    storageState = null
-  }
-
+  // Always use ADMIN_SEED deterministic keys. The bootstrap project saves
+  // admin.json with random keys generated during UI bootstrap, but resetTestState()
+  // in bootstrap's afterAll re-seeds admin from ADMIN_PUBKEY (= ADMIN_SEED's pubkey).
+  // Attempting admin.json first poisons the browser with 401 responses from the stale
+  // keys — those delayed 401s trigger onAuthExpired AFTER the ADMIN_SEED fallback
+  // succeeds, causing mid-test auth loss and redirect to /login.
   await page.goto('/login')
   await page.waitForLoadState('domcontentloaded')
 
   // Reset PIN lockout counter to prevent accumulation across serial tests.
-  // In serial mode the browser context is reused, so failed PIN attempts from
-  // stale cached storage compound across tests. Without this reset, the mock's
-  // escalating lockout triggers a 10-minute lockout after ~9 loginAsAdmin calls.
   await page.evaluate(() => {
     localStorage.removeItem('__test_pin_lockout_state')
+    sessionStorage.clear()
+    localStorage.clear()
   })
-
-  let usingLegacy = false
-  if (storageState) {
-    await page.evaluate((state) => {
-      sessionStorage.clear()
-      localStorage.clear()
-      for (const origin of state.origins || []) {
-        for (const item of origin.localStorage || []) {
-          localStorage.setItem(item.name, item.value)
-        }
-      }
-    }, storageState)
-
-    await page.reload()
-    await page.waitForLoadState('domcontentloaded')
-    await enterPin(page, TEST_PIN)
-
-    const url = page.url()
-    if (url.includes('/login')) {
-      console.log('[TEST] Bootstrap admin keys stale (test-reset cleared sessions). Falling back to ADMIN_SEED.')
-      usingLegacy = true
-      try {
-        const fs = await import('fs/promises')
-        await fs.unlink(storagePath)
-      } catch {}
-      await page.evaluate(() => {
-        sessionStorage.clear()
-        localStorage.clear()
-        localStorage.removeItem('llamenos:llamenos-encrypted-device-keys')
-        localStorage.removeItem('llamenos:llamenos-encrypted-key')
-        localStorage.removeItem('llamenos-encrypted-key')
-      })
-      await page.context().clearCookies()
-      await page.evaluate(async () => {
-        const dbs = await window.indexedDB.databases?.().catch(() => [] as Array<{ name?: string }>) ?? []
-        for (const db of dbs) {
-          if (db.name) window.indexedDB.deleteDatabase(db.name)
-        }
-      })
-      await page.reload()
-      await page.waitForLoadState('domcontentloaded')
+  await page.context().clearCookies()
+  await page.evaluate(async () => {
+    const dbs = await window.indexedDB.databases?.().catch(() => [] as Array<{ name?: string }>) ?? []
+    for (const db of dbs) {
+      if (db.name) window.indexedDB.deleteDatabase(db.name)
     }
-  } else {
-    usingLegacy = true
-  }
+  })
+  await page.reload()
+  await page.waitForLoadState('domcontentloaded')
 
-  if (usingLegacy) {
-    await page.evaluate(() => {
-      sessionStorage.clear()
-      localStorage.clear()
-      localStorage.removeItem('llamenos:llamenos-encrypted-device-keys')
-      localStorage.removeItem('llamenos:llamenos-encrypted-key')
-      localStorage.removeItem('llamenos-encrypted-key')
-    })
-    await page.context().clearCookies()
-    await page.evaluate(async () => {
-      const dbs = await window.indexedDB.databases?.().catch(() => [] as Array<{ name?: string }>) ?? []
-      for (const db of dbs) {
-        if (db.name) window.indexedDB.deleteDatabase(db.name)
-      }
-    })
-    await page.reload()
-    await page.waitForLoadState('domcontentloaded')
+  await page.waitForFunction(() => !!(window as any).__TEST_PLATFORM, { timeout: 10000 })
 
-    await page.waitForFunction(() => !!(window as any).__TEST_PLATFORM, { timeout: 10000 })
+  const secretHex = ADMIN_SEED
+  await page.evaluate(async ({ secretHex, pin }) => {
+    const platform = (window as any).__TEST_PLATFORM
+    const encrypted = await platform.deviceImportAndLoad(secretHex, pin, crypto.randomUUID())
+    await platform.persistAndUnlockDeviceKeys(encrypted, pin)
+    await platform.lockCrypto()
+  }, { secretHex, pin: TEST_PIN })
 
-    const secretHex = ADMIN_SEED
-    await page.evaluate(async ({ secretHex, pin }) => {
-      const platform = (window as any).__TEST_PLATFORM
-      const encrypted = await platform.deviceImportAndLoad(secretHex, pin, crypto.randomUUID())
-      await platform.persistAndUnlockDeviceKeys(encrypted, pin)
-      await platform.lockCrypto()
-    }, { secretHex, pin: TEST_PIN })
-
-    await page.reload()
-    await page.waitForLoadState('domcontentloaded')
-    await enterPin(page, TEST_PIN)
-  }
+  await page.reload()
+  await page.waitForLoadState('domcontentloaded')
+  await enterPin(page, TEST_PIN)
 
   await page.waitForURL(url => !url.toString().includes('/login'), { timeout: Timeouts.AUTH })
   // Ensure hub context is ready before asserting page content — prevents race

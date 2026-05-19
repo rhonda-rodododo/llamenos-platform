@@ -49,11 +49,39 @@ Given('the note has no replies', async () => {
   // Precondition: a fresh note with no replies — verified by subsequent assertions
 })
 
-Given('I am on the notes list', async ({ page }) => {
+Given('I am on the notes list', async ({ page, backendRequest: request, workerHub }) => {
+  // Check if notes exist via API; if not, create one through the UI
+  let hasNotes = false
+  try {
+    const { notes } = await listNotesViaApi(request, { hubId: workerHub })
+    hasNotes = notes.length > 0
+  } catch {
+    // API not available — will check UI
+  }
+
   await Navigation.goToNotes(page)
   const pageTitle = page.getByTestId(TestIds.PAGE_TITLE)
   await expect(pageTitle).toBeVisible({ timeout: Timeouts.ELEMENT })
   await expect(pageTitle).toContainText(/notes/i)
+
+  if (!hasNotes) {
+    // No notes in this worker's hub — create one through the UI so note cards render
+    const newBtn = page.getByTestId(TestIds.NOTE_NEW_BTN)
+    const hasFab = await newBtn.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+    if (hasFab) {
+      await newBtn.click()
+      await fillCallId(page, `CALL-${Date.now()}`)
+      const contentField = page.getByTestId(TestIds.NOTE_CONTENT)
+      await expect(contentField).toBeVisible({ timeout: Timeouts.ELEMENT })
+      await contentField.fill('Seeded note for reply badge test')
+      const saveBtn = page.getByTestId(TestIds.FORM_SAVE_BTN)
+      await expect(saveBtn).toBeEnabled({ timeout: 5000 })
+      await saveBtn.click({ timeout: Timeouts.ELEMENT })
+      // Navigate back to notes list after creating
+      await Navigation.goToNotes(page)
+      await expect(pageTitle).toBeVisible({ timeout: Timeouts.ELEMENT })
+    }
+  }
 })
 
 Then('I should see the thread replies section', async ({ page }) => {

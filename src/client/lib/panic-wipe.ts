@@ -92,8 +92,14 @@ function handleKeyDown(e: KeyboardEvent): void {
 /**
  * Initialize the panic wipe keyboard listener.
  * Call once at app startup (root layout).
+ *
+ * Disabled in Playwright test builds: tests press Escape to close Radix Select
+ * dropdowns, which triggers the triple-Escape detector and wipes crypto mid-test.
  */
 export function initPanicWipe(onWipe?: () => void): () => void {
+  if (import.meta.env.PLAYWRIGHT_TEST) {
+    return () => {}
+  }
   panicWipeCallback = onWipe ?? null
   document.addEventListener('keydown', handleKeyDown)
 
