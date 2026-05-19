@@ -24,9 +24,10 @@ class CertificatePinnerTest {
         // Must have leaf + backup pin for *.llamenos.org.
         val pinnerStr = ApiService.certificatePinner.toString()
         val count = pinnerStr.split("sha256/").size - 1
-        assertTrue(count >= 2) {
+        assertTrue(
+            count >= 2,
             "CertificatePinner must have at least 2 pins for *.llamenos.org " +
             "(leaf + backup CA). Found: $count"
-        }
+        )
     }
 }

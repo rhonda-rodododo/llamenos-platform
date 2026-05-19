@@ -100,13 +100,13 @@ Given('an A2P brand is in approved state', async ({ request, world, workerHub })
   const registrationId = (data as Record<string, string>).id
 
   // Directly approve the brand via test helper (no real Twilio poll needed)
-  const { status: approveStatus } = await apiPost(
-    request,
-    '/test-a2p-approve-brand',
-    { registrationId },
-    ADMIN_SEED,
-  )
-  if (approveStatus !== 200) throw new Error(`Failed to approve brand: ${approveStatus}`)
+  // Uses X-Test-Secret header (not Bearer auth) because this is a dev-only endpoint
+  const testSecret = process.env.DEV_RESET_SECRET || process.env.E2E_TEST_SECRET || 'test-reset-secret'
+  const approveRes = await request.post('/api/test-a2p-approve-brand', {
+    headers: { 'X-Test-Secret': testSecret, 'Content-Type': 'application/json' },
+    data: { registrationId },
+  })
+  if (approveRes.status() !== 200) throw new Error(`Failed to approve brand: ${approveRes.status()}`)
 
   const state = getA2P(world)
   state.registrationId = registrationId
