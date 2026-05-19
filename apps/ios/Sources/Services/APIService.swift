@@ -111,6 +111,17 @@ struct RecoveryVerifyResponse: Decodable {
     let expiresAt: String
 }
 
+struct ShareHolderLiveness: Decodable {
+    let holderPubkey: String
+    let lastLivenessProof: String?
+    let createdAt: String
+}
+
+struct ShareEnvelopeResponse: Decodable {
+    let shareEnvelope: String
+    let shareCommitment: String?
+}
+
 struct OkResponse: Decodable {
     let ok: Bool
 }
@@ -487,6 +498,17 @@ final class APIService: @unchecked Sendable {
             "verificationCode": verificationCode,
         ]
         return try await request(method: "POST", path: "/api/recovery-group/initiate/verify", body: body)
+    }
+
+    func listRecoverySessions() async throws -> [RecoverySessionStatus] {
+        guard let hubId = hubContext.activeHubId else { throw APIError.noBaseURL }
+        return try await request(method: "GET", path: hp("/api/recovery-group/sessions?hubId=\(hubId)"))
+    }
+
+    /// Fetch the current user's share envelope from the recovery group.
+    /// Returns the HPKE-encrypted Shamir share and its commitment.
+    func getMyShareEnvelope(hubId: String) async throws -> ShareEnvelopeResponse {
+        try await request(method: "GET", path: hp("/api/recovery-group/shares/my"))
     }
 
     func getRecoverySession(sessionId: String) async throws -> RecoverySessionStatus {
