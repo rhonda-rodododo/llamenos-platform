@@ -1,9 +1,9 @@
 import SwiftUI
 
 // MARK: - AppBlast
-// Client-only: generated `Blast` uses structured `BlastContent` and `BlastStats`
-// nested types, while this client model uses inline `[String: [String: String]]`
-// for content (matching the actual API response shape for multi-language/channel).
+// Client-only: generated `Blast` uses structured `BlastContent` (body + mediaUrl)
+// while the actual API response uses `[String: [String: String]]` for multi-language/channel
+// content. Kept as client model until API aligns with schema.
 
 /// Client-side blast model with UI-specific fields and computed properties.
 /// Named `AppBlast` to avoid conflict with generated `Blast` from protocol codegen.
@@ -19,7 +19,7 @@ struct AppBlast: Identifiable, Codable, Sendable {
     let sentAt: String?
     let scheduledAt: String?
 
-    var statusEnum: BlastStatus { BlastStatus(rawValue: status) ?? .draft }
+    var statusEnum: ProtocolBlastStatus { ProtocolBlastStatus(rawValue: status) ?? .draft }
 
     var messagePreview: String {
         // Extract first available message text
@@ -33,21 +33,21 @@ struct AppBlast: Identifiable, Codable, Sendable {
 }
 
 /// Client-side API response for the blast list.
-/// Named `AppBlastsListResponse` to avoid conflict with generated `BlastListResponse`.
+/// Named `AppBlastsListResponse` to avoid conflict with generated `BlastListResponse`
+/// which uses `Double` for pagination fields.
 struct AppBlastsListResponse: Codable, Sendable {
     let blasts: [AppBlast]
     let total: Int
 }
 
-// MARK: - Blast Status
-// Client-only: UI display properties (icon, color, displayName).
-// Generated `ProtocolBlastStatus` has the same cases plus `sending`.
+// MARK: - ProtocolBlastStatus UI Extensions
+// Generated `ProtocolBlastStatus` has: draft, sent, scheduled, cancelled, sending.
+// We add UI display properties (icon, color, displayName) as extensions.
 
-enum BlastStatus: String, CaseIterable, Sendable {
-    case draft
-    case sent
-    case scheduled
-    case cancelled
+extension ProtocolBlastStatus: @retroactive CaseIterable {
+    public static var allCases: [ProtocolBlastStatus] {
+        [.draft, .sent, .scheduled, .cancelled, .sending]
+    }
 
     var icon: String {
         switch self {
@@ -55,6 +55,7 @@ enum BlastStatus: String, CaseIterable, Sendable {
         case .sent: return "paperplane.fill"
         case .scheduled: return "clock.fill"
         case .cancelled: return "xmark.circle.fill"
+        case .sending: return "arrow.up.circle.fill"
         }
     }
 
@@ -64,6 +65,7 @@ enum BlastStatus: String, CaseIterable, Sendable {
         case .sent: return .statusActive
         case .scheduled: return .brandAccent
         case .cancelled: return .brandDestructive
+        case .sending: return .brandPrimary
         }
     }
 
@@ -73,6 +75,7 @@ enum BlastStatus: String, CaseIterable, Sendable {
         case .sent: return NSLocalizedString("blast_status_sent", comment: "Sent")
         case .scheduled: return NSLocalizedString("blast_status_scheduled", comment: "Scheduled")
         case .cancelled: return NSLocalizedString("blast_status_cancelled", comment: "Cancelled")
+        case .sending: return NSLocalizedString("blast_status_sending", comment: "Sending")
         }
     }
 }
@@ -94,7 +97,8 @@ struct ScheduleBlastRequest: Codable, Sendable {
 }
 
 // MARK: - Subscriber Stats
-// Generated `SubscriberStatsResponse` available but has different field shapes.
+// Generated `SubscriberStatsResponse` uses `[String: Double]` for byChannel/byStatus
+// with `Double` total — different shape from this flat Int model.
 
 struct BlastSubscriberStats: Codable, Sendable {
     let total: Int
