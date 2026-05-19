@@ -177,6 +177,9 @@ fun PINUnlockScreen(
                     ) {
                         // Use biometric button (when biometric-protected PIN is configured)
                         if (hasBiometricPIN) {
+                            val biometricTitle = stringResource(R.string.biometric_unlock_title)
+                            val biometricSubtitle = stringResource(R.string.biometric_unlock_subtitle)
+                            val usePinText = stringResource(R.string.use_pin_instead)
                             OutlinedButton(
                                 onClick = {
                                     val decryptCipher = viewModel.getBiometricDecryptCipher()
@@ -205,9 +208,9 @@ fun PINUnlockScreen(
                                         }
                                     )
                                     val promptInfo = BiometricPrompt.PromptInfo.Builder()
-                                        .setTitle(context.getString(R.string.biometric_unlock_title))
-                                        .setSubtitle(context.getString(R.string.biometric_unlock_subtitle))
-                                        .setNegativeButtonText(context.getString(R.string.use_pin_instead))
+                                        .setTitle(biometricTitle)
+                                        .setSubtitle(biometricSubtitle)
+                                        .setNegativeButtonText(usePinText)
                                         .build()
                                     biometricPrompt.authenticate(
                                         promptInfo,
