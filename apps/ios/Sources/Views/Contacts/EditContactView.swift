@@ -2,34 +2,70 @@ import SwiftUI
 
 struct EditContactView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppState.self) private var appState
     @Environment(HubKeyStore.self) private var hubKeyStore
-    @State private var vm = ContactFormViewModel()
+    @State private var vm: ContactFormViewModel?
+
     let contact: DirectoryContact
-    var onUpdated: (DirectoryContact) -> Void
+    var onUpdated: (Contact) -> Void
 
     var body: some View {
         NavigationStack {
-            ContactFormFields(vm: vm)
-                .navigationTitle(NSLocalizedString("contacts_edit_title", comment: "Edit Contact"))
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button(NSLocalizedString("common_cancel", comment: "Cancel")) { dismiss() }
+            if let vm {
+                ContactFormFields(vm: vm)
+                    .navigationTitle(NSLocalizedString("contacts_edit_title", comment: "Edit Contact"))
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button(NSLocalizedString("common_cancel", comment: "Cancel")) { dismiss() }
+                        }
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button(NSLocalizedString("common_save", comment: "Save")) { update() }
+                                .disabled(vm.displayName.trimmingCharacters(in: .whitespaces).isEmpty || vm.isSaving)
+                        }
                     }
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button(NSLocalizedString("common_save", comment: "Save")) { update() }
-                            .disabled(vm.displayName.trimmingCharacters(in: .whitespaces).isEmpty || vm.isSaving)
-                    }
-                }
+            }
         }
-        .onAppear { vm.populate(from: contact) }
+        .onAppear {
+            if vm == nil {
+                let newVM = ContactFormViewModel(cryptoService: appState.cryptoService)
+                newVM.populate(from: contact)
+                vm = newVM
+            }
+        }
     }
 
     private func update() {
-        guard let hubKey = hubKeyStore.currentHubKey else { return }
+        guard let vm else { return }
+        guard let hubKey = hubKeyStore.currentHubKey else {
+            vm.error = NSLocalizedString("error_no_hub_key", comment: "Hub key not available")
+            return
+        }
+        guard let hubId = appState.hubContext.activeHubId else {
+            vm.error = NSLocalizedString("error_no_hub_selected", comment: "No hub selected")
+            return
+        }
+
+        var readerPubkeys: [String] = []
+        if let pubkey = appState.cryptoService.encryptionPubkeyHex {
+            readerPubkeys.append(pubkey)
+        }
+        if let adminPubkey = appState.adminDecryptionPubkey,
+           !readerPubkeys.contains(adminPubkey) {
+            readerPubkeys.append(adminPubkey)
+        }
+
+        let contactsAPI = ContactsAPIService(apiService: appState.apiService)
+
         Task {
             do {
-                let updated = try await vm.update(contactId: contact.id, hubKey: hubKey)
+                let updated = try await vm.update(
+                    contactId: contact.id,
+                    hubId: hubId,
+                    hubKey: hubKey,
+                    readerPubkeys: readerPubkeys,
+                    apiService: contactsAPI
+                )
                 await MainActor.run { onUpdated(updated); dismiss() }
             } catch {
                 vm.error = error.localizedDescription
