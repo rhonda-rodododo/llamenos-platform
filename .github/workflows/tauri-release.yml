@@ -1,9 +1,14 @@
 # CI workflow for desktop (Tauri) release builds.
-# Builds signed desktop apps for macOS, Windows, and Linux (AppImage, deb, Flatpak).
+# Builds signed desktop apps for macOS, Windows, and Linux (AppImage, deb).
 # Generates latest.json manifest for auto-updater.
 #
-# Trigger: push to tags matching v* or manual dispatch.
+# Trigger: workflow_dispatch from release.yml with version input.
 # Epics 87, 97: Desktop Auto-Updater & Release Pipeline.
+#
+# Flatpak: TODO — offline sources (cargo-sources.json, node-sources.json)
+# need to be generated before Flatpak builds can work in CI. See
+# flatpak/org.llamenos.Hotline.yml for the manifest. Re-add the
+# build-flatpak job once offline source generation is automated.
 
 name: Desktop Release
 
@@ -141,7 +146,12 @@ jobs:
             security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
           fi
 
-      # Build Tauri app — signing keys scoped to signing step only, not compile step
+      # Build Tauri app — signing keys scoped to signing step only, not compile step.
+      #
+      # macOS notarization: Tauri v2 automatically submits to Apple's notary service
+      # and staples the ticket when APPLE_ID + APPLE_PASSWORD + APPLE_TEAM_ID env vars
+      # are set. The APPLE_PASSWORD must be an app-specific password, not the account
+      # password. Tauri uses `notarytool submit --wait` internally.
       - name: Build (macOS universal)
         if: matrix.platform == 'macos-latest'
         env:
@@ -152,6 +162,32 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: bun run tauri:build -- --target universal-apple-darwin
+
+      # Verify notarization succeeded — fail the build if the .app is not notarized.
+      # This catches silent notarization failures (wrong credentials, Apple outage).
+      - name: Verify macOS notarization
+        if: matrix.platform == 'macos-latest'
+        run: |
+          APP_PATH=$(find apps/desktop/target/universal-apple-darwin/release/bundle -name '*.app' -maxdepth 3 | head -1)
+          if [ -z "$APP_PATH" ]; then
+            echo "::error::No .app bundle found after build"
+            exit 1
+          fi
+          echo "Checking notarization for: ${APP_PATH}"
+
+          # spctl --assess exits 0 if the app is properly signed and notarized
+          if spctl --assess --type exec --verbose=4 "$APP_PATH" 2>&1; then
+            echo "Notarization verified successfully."
+          else
+            echo "::warning::spctl assessment failed — notarization may not have completed."
+            echo "Checking staple status..."
+            if xcrun stapler validate "$APP_PATH" 2>&1; then
+              echo "Staple is valid — notarization OK despite spctl warning."
+            else
+              echo "::error::Notarization staple validation failed. Check APPLE_ID/APPLE_PASSWORD/APPLE_TEAM_ID secrets."
+              exit 1
+            fi
+          fi
 
       - name: Build (Windows)
         if: matrix.platform == 'windows-latest'
@@ -178,50 +214,20 @@ jobs:
             apps/desktop/target/**/release/bundle/**/*.dmg
             apps/desktop/target/**/release/bundle/**/*.nsis.zip
             apps/desktop/target/**/release/bundle/**/*.nsis.zip.sig
-            apps/desktop/target/**/release/bundle/**/*.AppImage
-            apps/desktop/target/**/release/bundle/**/*.AppImage.sig
+            apps/desktop/target/**/release/bundle/**/*.AppImage.tar.gz
+            apps/desktop/target/**/release/bundle/**/*.AppImage.tar.gz.sig
             apps/desktop/target/**/release/bundle/**/*.deb
-          retention-days: 5
-
-  # ─── Flatpak Build ────────────────────────────────────────────
-  build-flatpak:
-    runs-on: ubuntu-latest
-    name: Build (Flatpak)
-    permissions:
-      contents: read
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
-      # Note: Flatpak manifest builds from the monorepo — packages/crypto is in-repo.
-
-      - name: Build Flatpak
-        uses: flatpak/flatpak-github-actions/flatpak-builder@401fe28a8384095fc1531b9d320b292f0ee45adb # v6.7
-        with:
-          bundle: llamenos-platform.flatpak
-          manifest-path: flatpak/org.llamenos.Hotline.yml
-          cache-key: flatpak-builder-${{ github.sha }}
-
-      - name: Upload Flatpak bundle
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: tauri-Flatpak
-          path: llamenos-platform.flatpak
           retention-days: 5
 
   # ─── Publish to RustFS + Metadata Repo ───────────────────────────
   release:
-    needs: [build, build-flatpak]
+    needs: [build]
     runs-on: ubuntu-latest
     name: Publish to RustFS
     permissions:
       contents: write
       id-token: write
       attestations: write
-
-    # Run even if Flatpak fails (it's a new build target, may have issues)
-    if: always() && needs.build.result == 'success'
 
     steps:
       - name: Checkout
@@ -250,8 +256,8 @@ jobs:
           find artifacts -type f \( \
             -name '*.tar.gz' -o -name '*.tar.gz.sig' \
             -o -name '*.nsis.zip' -o -name '*.nsis.zip.sig' \
-            -o -name '*.AppImage' -o -name '*.AppImage.sig' \
-            -o -name '*.dmg' -o -name '*.deb' -o -name '*.flatpak' \
+            -o -name '*.AppImage.tar.gz' -o -name '*.AppImage.tar.gz.sig' \
+            -o -name '*.dmg' -o -name '*.deb' \
           \) -exec cp {} flat-artifacts/ \;
           echo "--- Artifacts ---"
           ls -la flat-artifacts/
@@ -297,8 +303,7 @@ jobs:
             "platforms": {
               "macos": "universal-apple-darwin",
               "windows": "x86_64-pc-windows-msvc",
-              "linux": "x86_64-unknown-linux-gnu",
-              "flatpak": "x86_64"
+              "linux": "x86_64-unknown-linux-gnu"
             }
           }
           BUILDEOF
@@ -314,7 +319,7 @@ jobs:
 
       # ── Generate update manifest ────────────────────────────────
       - name: Generate latest.json
-        run: ./scripts/generate-update-manifest.sh flat-artifacts
+        run: VERSION="${VERSION}" ./scripts/generate-update-manifest.sh flat-artifacts
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -411,10 +416,9 @@ jobs:
 
           | Platform | Download |
           |----------|----------|
-          | macOS (Universal) | [DMG](https://releases.llamenos.org/desktop/v${VERSION}/llamenos_${VERSION}_universal.dmg) |
-          | Windows (x64) | [NSIS Installer](https://releases.llamenos.org/desktop/v${VERSION}/llamenos_${VERSION}_x64-setup.nsis.zip) |
-          | Linux (x64) | [AppImage](https://releases.llamenos.org/desktop/v${VERSION}/llamenos_${VERSION}_amd64.AppImage) \| [deb](https://releases.llamenos.org/desktop/v${VERSION}/llamenos_${VERSION}_amd64.deb) |
-          | Linux (Flatpak) | [Flatpak](https://releases.llamenos.org/desktop/v${VERSION}/llamenos-platform.flatpak) |
+          | macOS (Universal) | [DMG](https://releases.llamenos.org/desktop/v${VERSION}/Hotline.dmg) |
+          | Windows (x64) | [NSIS Installer](https://releases.llamenos.org/desktop/v${VERSION}/Hotline_${VERSION}_x64-setup.nsis.zip) |
+          | Linux (x64) | [AppImage](https://releases.llamenos.org/desktop/v${VERSION}/hotline_${VERSION}_amd64.AppImage.tar.gz) \| [deb](https://releases.llamenos.org/desktop/v${VERSION}/hotline_${VERSION}_amd64.deb) |
 
           ### Verification
 

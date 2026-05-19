@@ -6,6 +6,9 @@
  * at the configured endpoint(s). Reads version from package.json and
  * produces platform-specific entries for macOS, Linux, and Windows.
  *
+ * CI builds a universal macOS binary (--target universal-apple-darwin),
+ * so both darwin-aarch64 and darwin-x86_64 keys point to the same file.
+ *
  * Usage:
  *   bun run scripts/generate-update-manifest.ts \
  *     --version 0.18.0 \
@@ -79,33 +82,48 @@ interface UpdateManifest {
   platforms: Record<string, PlatformEntry>
 }
 
-// Tauri platform identifiers → artifact filenames
-const PLATFORMS: Record<string, { artifact: string; sigFile: string }> = {
-  // macOS (Apple Silicon + Intel universal)
-  'darwin-aarch64': {
-    artifact: 'Hotline.app.tar.gz',
-    sigFile: 'Hotline.app.tar.gz.sig',
-  },
-  'darwin-x86_64': {
-    artifact: 'Hotline.app.tar.gz',
-    sigFile: 'Hotline.app.tar.gz.sig',
-  },
-  // Linux
-  'linux-x86_64': {
-    artifact: 'hotline_amd64.AppImage.tar.gz',
-    sigFile: 'hotline_amd64.AppImage.tar.gz.sig',
-  },
-  // Windows
-  'windows-x86_64': {
-    artifact: 'Hotline_x64_en-US.msi.zip',
-    sigFile: 'Hotline_x64_en-US.msi.zip.sig',
-  },
+// Tauri v2 artifact naming with productName "Hotline":
+//   macOS universal: Hotline.app.tar.gz (single file for both archs)
+//   Linux:           hotline_<ver>_amd64.AppImage.tar.gz
+//   Windows:         Hotline_<ver>_x64-setup.nsis.zip
+//
+// Both darwin-aarch64 and darwin-x86_64 point to the same universal binary.
+interface PlatformDef {
+  /** Candidate artifact filenames in priority order */
+  artifacts: string[]
+  /** Candidate signature filenames in priority order */
+  sigFiles: string[]
+}
+
+function platformDefs(version: string): Record<string, PlatformDef> {
+  return {
+    // macOS universal — both arch keys map to the same file
+    'darwin-aarch64': {
+      artifacts: ['Hotline.app.tar.gz'],
+      sigFiles: ['Hotline.app.tar.gz.sig'],
+    },
+    'darwin-x86_64': {
+      artifacts: ['Hotline.app.tar.gz'],
+      sigFiles: ['Hotline.app.tar.gz.sig'],
+    },
+    // Linux
+    'linux-x86_64': {
+      artifacts: [`hotline_${version}_amd64.AppImage.tar.gz`, 'hotline_amd64.AppImage.tar.gz'],
+      sigFiles: [`hotline_${version}_amd64.AppImage.tar.gz.sig`, 'hotline_amd64.AppImage.tar.gz.sig'],
+    },
+    // Windows
+    'windows-x86_64': {
+      artifacts: [`Hotline_${version}_x64-setup.nsis.zip`, 'Hotline_x64_en-US.msi.zip'],
+      sigFiles: [`Hotline_${version}_x64-setup.nsis.zip.sig`, 'Hotline_x64_en-US.msi.zip.sig'],
+    },
+  }
 }
 
 // ── Main ─────────────────────────────────────────────────────────
 
 function main() {
   const config = parseArgs()
+  const defs = platformDefs(config.version)
 
   console.log(`Generating update manifest for v${config.version}`)
   console.log(`  URL base: ${config.urlBase}`)
@@ -113,21 +131,29 @@ function main() {
 
   const platforms: Record<string, PlatformEntry> = {}
 
-  for (const [platform, { artifact, sigFile }] of Object.entries(PLATFORMS)) {
-    // Try to read signature from .sig file
+  for (const [platform, def] of Object.entries(defs)) {
+    // Try to read signature from .sig file (first match wins)
     let signature = ''
+    let artifactName = def.artifacts[0]
 
     if (config.sigDir) {
-      const sigPath = join(config.sigDir, sigFile)
-      if (existsSync(sigPath)) {
-        signature = readFileSync(sigPath, 'utf8').trim()
-        console.log(`  ${platform}: signature loaded from ${sigPath}`)
-      } else {
-        console.warn(`  ${platform}: signature file not found at ${sigPath}`)
+      for (const sigFile of def.sigFiles) {
+        const sigPath = join(config.sigDir, sigFile)
+        if (existsSync(sigPath)) {
+          signature = readFileSync(sigPath, 'utf8').trim()
+          // Use corresponding artifact name
+          const idx = def.sigFiles.indexOf(sigFile)
+          artifactName = def.artifacts[idx] ?? def.artifacts[0]
+          console.log(`  ${platform}: signature loaded from ${sigPath}`)
+          break
+        }
+      }
+      if (!signature) {
+        console.warn(`  ${platform}: no signature file found in ${config.sigDir}`)
       }
     }
 
-    // If no sig file, check for individual platform env vars
+    // Fallback: check for individual platform env vars
     const envKey = `TAURI_SIG_${platform.replace('-', '_').toUpperCase()}`
     if (!signature && process.env[envKey]) {
       signature = process.env[envKey]!
@@ -139,7 +165,7 @@ function main() {
     }
 
     platforms[platform] = {
-      url: `${config.urlBase}/${artifact}`,
+      url: `${config.urlBase}/${artifactName}`,
       signature,
     }
   }
