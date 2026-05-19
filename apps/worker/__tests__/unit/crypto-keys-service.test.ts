@@ -446,11 +446,11 @@ describe('CryptoKeysService — PUK Envelopes', () => {
         },
       ]
 
+      const returning = vi.fn().mockResolvedValue(insertedRows)
+      const onConflictDoUpdate = vi.fn().mockReturnValue({ returning })
       const db = {
         insert: vi.fn().mockReturnValue({
-          values: vi.fn().mockReturnValue({
-            returning: vi.fn().mockResolvedValue(insertedRows),
-          }),
+          values: vi.fn().mockReturnValue({ onConflictDoUpdate }),
         }),
       }
 

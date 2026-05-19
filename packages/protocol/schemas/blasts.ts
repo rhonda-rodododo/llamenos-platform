@@ -107,6 +107,21 @@ export const importSubscribersResponseSchema = z.object({
 
 // --- Input schemas ---
 
+/**
+ * Blast body string validator — rejects control characters that corrupt SMS
+ * encoding or exploit downstream parsers. Null bytes (\x00) break PostgreSQL
+ * text storage. BEL, BS, and other C0 controls (except \t, \n, \r) are blocked.
+ * Newlines and tabs are permitted (normal message formatting).
+ */
+const blastBodyString = (maxLen: number) =>
+  z.string()
+    .min(1)
+    .max(maxLen)
+    .refine(
+      (s) => !/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(s),
+      'Blast content must not contain control characters (null bytes, BEL, BS, etc.)',
+    )
+
 export const listBlastsQuerySchema = paginationSchema.extend({
   status: z.enum(['draft', 'scheduled', 'sending', 'sent', 'cancelled']).optional(),
 })
@@ -119,7 +134,7 @@ export const listSubscribersQuerySchema = paginationSchema.extend({
 export const createBlastBodySchema = z.looseObject({
   name: z.string().min(1).max(200),
   content: z.object({
-    body: z.string().min(1).max(1600),
+    body: blastBodyString(1600),
     mediaUrl: z.url().optional(),
   }),
   channels: z.array(z.enum(['sms', 'whatsapp', 'signal'])).min(1),
@@ -129,7 +144,7 @@ export const createBlastBodySchema = z.looseObject({
 export const updateBlastBodySchema = z.looseObject({
   name: z.string().min(1).max(200).optional(),
   content: z.object({
-    body: z.string().min(1).max(1600),
+    body: blastBodyString(1600),
     mediaUrl: z.url().optional(),
   }).optional(),
   channels: z.array(z.enum(['sms', 'whatsapp', 'signal'])).min(1).optional(),

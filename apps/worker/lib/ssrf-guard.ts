@@ -135,13 +135,19 @@ export async function validateExternalUrlWithDns(url: string, label = 'URL'): Pr
     if (ipv4Results.status === 'fulfilled') ips.push(...ipv4Results.value)
     if (ipv6Results.status === 'fulfilled') ips.push(...ipv6Results.value)
 
+    // H07: fail-closed — if both DNS lookups failed/returned nothing, block
+    if (ips.length === 0) {
+      return `${label} DNS resolution failed — cannot verify address safety`
+    }
+
     for (const ip of ips) {
       if (isInternalAddress(ip)) {
         return `${label} resolves to internal address (DNS rebinding protection)`
       }
     }
   } catch {
-    // DNS resolution failed — allow the request (fail-open for non-resolvable hosts)
+    // H07: DNS resolution failed — block the request (fail-closed: unknown is untrusted)
+    return `${label} DNS resolution failed — cannot verify address safety`
   }
 
   return null

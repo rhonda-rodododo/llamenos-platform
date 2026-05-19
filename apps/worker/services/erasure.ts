@@ -23,6 +23,7 @@ import {
 } from '../db/schema'
 import { ServiceError } from './settings'
 import type { AuditService } from './audit'
+import type { IdentityService } from './identity'
 import { ed25519Verify } from '@llamenos/crypto/ffi'
 import { hexToBytes, utf8ToBytes } from '@shared/encoding'
 import { LABEL_ERASURE_OVERRIDE_SIG } from '@shared/crypto-labels'
@@ -30,8 +31,13 @@ import { LABEL_ERASURE_OVERRIDE_SIG } from '@shared/crypto-labels'
 // Emergency override minimum floor — hard-coded, not configurable
 const EMERGENCY_MIN_HOURS = 4
 
+const ADMIN_ROLES = ['role-super-admin', 'role-admin', 'role-hub-admin'] as const
+
 export class ErasureService {
-  constructor(protected db: Database) {}
+  constructor(
+    protected db: Database,
+    private readonly identity?: Pick<IdentityService, 'getUserInternal'>,
+  ) {}
 
   // ---------------------------------------------------------------------------
   // Erasure Config (per-hub)
@@ -163,6 +169,13 @@ export class ErasureService {
       }
       if (!sigValid) {
         throw new ServiceError(400, 'Co-approver signature verification failed')
+      }
+
+      // H01: Verify co-approver is a registered admin device
+      const coApproverUser = await this.identity?.getUserInternal(emergency.coApproverPubkey) ?? null
+      const isAdmin = coApproverUser?.roles.some(r => (ADMIN_ROLES as readonly string[]).includes(r)) ?? false
+      if (!isAdmin) {
+        throw new ServiceError(403, 'Co-approver must be a registered admin device')
       }
 
       effectiveDelayHours = EMERGENCY_MIN_HOURS

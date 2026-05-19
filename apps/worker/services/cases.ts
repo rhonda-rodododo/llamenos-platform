@@ -470,7 +470,7 @@ export class CasesService {
   // Get by contact (screen pop — active cases only)
   // =========================================================================
 
-  async listByContact(contactId: string): Promise<{
+  async listByContact(contactId: string, hubId: string): Promise<{
     records: CaseRecordRow[]
     total: number
   }> {
@@ -493,6 +493,8 @@ export class CasesService {
             sql.raw(','),
           )}]::text[])`,
           isNull(caseRecords.closedAt),
+          // IDOR fix: only return records from the caller's hub
+          eq(caseRecords.hubId, hubId),
         ),
       )
       .orderBy(desc(caseRecords.updatedAt))

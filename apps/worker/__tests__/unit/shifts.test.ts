@@ -7,7 +7,7 @@ describe('ShiftsService', () => {
   function setup(opts: { fallbackPubkeys?: string[] } = {}) {
     const { db } = createMockDb(['shifts', 'pushRemindersSent'])
     const settingsService = opts.fallbackPubkeys
-      ? { getFallbackGroup: async () => ({ userPubkeys: opts.fallbackPubkeys! }) }
+      ? { getFallbackGroup: async () => ({ userPubkeys: opts.fallbackPubkeys as string[] }) }
       : undefined
     const service = new ShiftsService(db as any, settingsService)
     return { db, service }

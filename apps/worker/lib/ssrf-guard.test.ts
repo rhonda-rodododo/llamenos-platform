@@ -4,8 +4,15 @@
  * Covers isInternalAddress and validateExternalUrl.
  */
 
-import { describe, it, expect } from 'vitest'
-import { isInternalAddress, validateExternalUrl } from './ssrf-guard'
+import { describe, it, expect, vi } from 'vitest'
+import { isInternalAddress, validateExternalUrl, validateExternalUrlWithDns } from './ssrf-guard'
+
+// Mock node:dns/promises so the DNS-failure test doesn't make real network calls.
+// Both resolve4 and resolve6 are set to reject to simulate NXDOMAIN / network failure.
+vi.mock('node:dns/promises', () => ({
+  resolve4: vi.fn().mockRejectedValue(new Error('ENOTFOUND test.invalid')),
+  resolve6: vi.fn().mockRejectedValue(new Error('ENOTFOUND test.invalid')),
+}))
 
 // ---------------------------------------------------------------------------
 // isInternalAddress
@@ -112,5 +119,19 @@ describe('validateExternalUrl', () => {
 
   it('blocks 127.0.0.1', () => {
     expect(validateExternalUrl('http://127.0.0.1:9200/')).not.toBeNull()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// validateExternalUrlWithDns — H07 fail-closed on DNS failure
+// ---------------------------------------------------------------------------
+
+describe('validateExternalUrlWithDns — DNS failure behavior (H07)', () => {
+  it('blocks request when both DNS lookups fail (fail-closed)', async () => {
+    // The module-level vi.mock above makes resolve4/resolve6 reject,
+    // simulating NXDOMAIN or a network outage.
+    const result = await validateExternalUrlWithDns('https://nonexistent.example.invalid/path')
+    expect(result).not.toBeNull()
+    expect(result).toContain('DNS')
   })
 })

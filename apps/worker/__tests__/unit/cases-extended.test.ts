@@ -8,9 +8,8 @@
  * createInteraction/listInteractions, addEvidence/getEvidence/listEvidence/deleteEvidence,
  * addCustodyEntry/listCustodyEntries.
  */
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { CasesService } from '@worker/services/cases'
-import { ServiceError } from '@worker/services/settings'
 import { createMockDb } from './mock-db'
 
 // ---------------------------------------------------------------------------
@@ -96,7 +95,7 @@ function makeCaseEventRow(overrides: Record<string, unknown> = {}) {
   }
 }
 
-function makeInteractionRow(overrides: Record<string, unknown> = {}) {
+function _makeInteractionRow(overrides: Record<string, unknown> = {}) {
   return {
     id: 'interaction-1',
     caseId: 'case-1',
@@ -112,7 +111,7 @@ function makeInteractionRow(overrides: Record<string, unknown> = {}) {
   }
 }
 
-function makeEvidenceRow(overrides: Record<string, unknown> = {}) {
+function _makeEvidenceRow(overrides: Record<string, unknown> = {}) {
   return {
     id: 'evidence-1',
     caseId: 'case-1',
@@ -127,7 +126,7 @@ function makeEvidenceRow(overrides: Record<string, unknown> = {}) {
   }
 }
 
-function makeCustodyEntryRow(overrides: Record<string, unknown> = {}) {
+function _makeCustodyEntryRow(overrides: Record<string, unknown> = {}) {
   return {
     id: 'custody-1',
     evidenceId: 'evidence-1',
@@ -277,7 +276,7 @@ describe('CasesService.listByContact', () => {
     const { db, service } = setup()
     db.$setSelectResult([]) // no contact links
 
-    const result = await service.listByContact('contact-1')
+    const result = await service.listByContact('contact-1', 'hub-1')
     expect(result.records).toEqual([])
     expect(result.total).toBe(0)
   })
@@ -289,7 +288,7 @@ describe('CasesService.listByContact', () => {
       [makeCaseRow()], // open cases only (closedAt IS NULL)
     ])
 
-    const result = await service.listByContact('contact-1')
+    const result = await service.listByContact('contact-1', 'hub-1')
     expect(result.records).toHaveLength(1)
     expect(result.total).toBe(1)
   })

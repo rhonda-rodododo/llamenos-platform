@@ -131,3 +131,31 @@ describe('PUK routes', () => {
     })
   })
 })
+
+// ---------------------------------------------------------------------------
+// H09: concurrent envelope distribution (upsert idempotency)
+// ---------------------------------------------------------------------------
+
+describe('PUK envelope upsert idempotency (H09)', () => {
+  it('handles concurrent distribution of the same generation — both requests succeed', async () => {
+    const { app, services } = createApp()
+    const stored = [
+      { id: 'env-1', userPubkey: 'user-pk-1', deviceId: 'dev-1', generation: 2, envelope: 'enc-v2', createdAt: '2026-01-01' },
+    ]
+    // Both concurrent requests return the same record (upsert semantics: idempotent)
+    services.cryptoKeys.distributePukEnvelopes
+      .mockResolvedValueOnce(stored)
+      .mockResolvedValueOnce(stored)
+
+    const envelope = [{ deviceId: 'dev-1', generation: 2, envelope: 'enc-v2' }]
+    const makeRequest = () => app.request('/puk/envelopes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ envelopes: envelope }),
+    })
+
+    const [res1, res2] = await Promise.all([makeRequest(), makeRequest()])
+    expect(res1.status).toBe(201)
+    expect(res2.status).toBe(201)
+  })
+})

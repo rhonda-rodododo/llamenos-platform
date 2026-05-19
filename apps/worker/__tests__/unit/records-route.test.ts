@@ -397,3 +397,31 @@ describe('POST /records/:id/interactions', () => {
     expect(res.status).toBe(403)
   })
 })
+
+// ---------------------------------------------------------------------------
+// GET /records/by-contact/:contactId — IDOR hub isolation
+// ---------------------------------------------------------------------------
+
+describe('GET /records/by-contact/:contactId — IDOR hub isolation', () => {
+  it('passes hubId to listByContact so results are scoped to caller hub', async () => {
+    const { app, mockCases } = makeApp({ hubId: 'hub-A' })
+    mockCases.listByContact.mockResolvedValue({ records: [{ id: 'rec-1', hubId: 'hub-A' }], total: 1 })
+
+    const res = await app.request('/by-contact/contact-1')
+    expect(res.status).toBe(200)
+
+    expect(mockCases.listByContact).toHaveBeenCalledWith('contact-1', 'hub-A')
+  })
+
+  it('returns empty list when caller hub has no records for that contact', async () => {
+    const { app, mockCases } = makeApp({ hubId: 'hub-B' })
+    mockCases.listByContact.mockResolvedValue({ records: [], total: 0 })
+
+    const res = await app.request('/by-contact/contact-1')
+    expect(res.status).toBe(200)
+    const body = await res.json() as { records: unknown[] }
+    expect(body.records).toHaveLength(0)
+    // listByContact must have been called with hub-B, not hub-A
+    expect(mockCases.listByContact).toHaveBeenCalledWith('contact-1', 'hub-B')
+  })
+})

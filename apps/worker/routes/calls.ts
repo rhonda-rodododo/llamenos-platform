@@ -170,7 +170,7 @@ calls.get('/identify/:identifierHash',
     let recentCases: Array<{ id: string; caseNumber?: string; status: string }> = []
 
     try {
-      const casesResult = await services.cases.listByContact(contact.id)
+      const casesResult = await services.cases.listByContact(contact.id, hubId)
       activeCaseCount = casesResult.total
       recentCases = casesResult.records.slice(0, 5).map(r => ({
         id: r.id,
