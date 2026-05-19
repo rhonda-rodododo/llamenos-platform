@@ -6,11 +6,11 @@
  * no if(visible) guards hiding failures, no .or(PAGE_TITLE) fallbacks.
  */
 import { expect } from '@playwright/test'
-import { Given, When, Then } from '../fixtures'
+import { Given, Then } from '../fixtures'
 import { TestIds } from '../../test-ids'
 import { Timeouts, fillCallId } from '../../helpers'
 import { Navigation } from '../../pages/index'
-import { listNotesViaApi } from '../../api-helpers'
+import { listNotesViaApi, apiPost, generateTestKeypair } from '../../api-helpers'
 
 Given('I am on the note detail screen', async ({ page, backendRequest: request, workerHub }) => {
   // Try API to check for existing notes
@@ -87,10 +87,34 @@ Then('I should see the send reply button', async ({ page }) => {
   await expect(page.getByTestId(TestIds.NOTE_REPLY_SEND)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
-Then('notes with replies should show a reply count badge', async ({ page }) => {
-  const noteCards = page.getByTestId(TestIds.NOTE_CARD)
-  await expect(noteCards.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
-  // If notes have replies, they should show a badge — verify at least one note card exists
-  const count = await noteCards.count()
-  expect(count).toBeGreaterThan(0)
+Then('notes with replies should show a reply count badge', async ({ page, backendRequest: request, workerHub }) => {
+  // Seed a note with a reply via API so the badge has data to render
+  const callId = `call-badge-${Date.now()}`
+  const noteRes = await apiPost<{ note?: { id: string }; id?: string }>(request, `/hubs/${workerHub}/notes`, {
+    encryptedContent: 'badge-test-note',
+    callId,
+  })
+  expect(noteRes.status).toBeLessThan(300)
+  const noteId = noteRes.data.note?.id ?? noteRes.data.id
+  expect(noteId).toBeTruthy()
+
+  // Add a reply to bump replyCount
+  const kp = generateTestKeypair()
+  const replyRes = await apiPost(request, `/hubs/${workerHub}/notes/${noteId}/replies`, {
+    encryptedContent: 'badge-test-reply',
+    readerEnvelopes: [{ pubkey: kp.pubkey, ct: 'fake-ct', enc: kp.pubkey }],
+  })
+  expect(replyRes.status).toBeLessThan(300)
+
+  // Navigate away and back to force notes list to re-fetch with the seeded data
+  await page.getByTestId(TestIds.NAV_DASHBOARD).click()
+  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await Navigation.goToNotes(page)
+
+  // Wait for notes list to load
+  await expect(page.getByTestId(TestIds.NOTE_LIST)).toBeVisible({ timeout: Timeouts.ELEMENT })
+
+  // Verify at least one reply button shows a count (e.g., "1 replies")
+  const replyBtnWithCount = page.getByTestId(TestIds.NOTE_REPLY_BTN).filter({ hasText: /\d+\s*repl/i })
+  await expect(replyBtnWithCount.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
