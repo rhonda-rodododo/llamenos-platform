@@ -499,6 +499,15 @@ final class CryptoService: @unchecked Sendable {
         return try ffiMobileSign(messageHex: messageHex)
     }
 
+    // MARK: - Symmetric Encryption (AES-256-GCM)
+
+    /// Encrypt data with a random AES-256-GCM key. Returns (ciphertextHex, keyHex).
+    func symmetricEncrypt(plaintextHex: String) throws -> (ciphertextHex: String, keyHex: String) {
+        guard isUnlocked else { throw CryptoServiceError.noKeyLoaded }
+        let result = try ffiMobileSymmetricEncrypt(plaintextHex: plaintextHex)
+        return (ciphertextHex: result[0], keyHex: result[1])
+    }
+
     // MARK: - Recovery Group
 
     func recoveryGroupGenerateKeypair() -> RecoveryGroupKeypair {

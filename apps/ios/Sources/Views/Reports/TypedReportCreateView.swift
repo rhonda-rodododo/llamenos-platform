@@ -1,4 +1,18 @@
 import SwiftUI
+import UniformTypeIdentifiers
+
+// MARK: - FileAttachment
+
+/// Tracks the state of a file selected for upload in a report form.
+struct FileAttachment {
+    let fileName: String
+    let fileSize: Int
+    let mimeType: String
+    var isUploading: Bool = false
+    var uploadedFileId: String?
+    var fileKeyHex: String?
+    var error: String?
+}
 
 // MARK: - TypedReportCreateView
 
@@ -17,6 +31,7 @@ struct TypedReportCreateView: View {
     let onSubmit: (String, [String: AnyCodableValue]) async -> Bool
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppState.self) private var appState
 
     @State private var fieldValues: [String: AnyCodableValue] = [:]
     @State private var multiselectValues: [String: Set<String>] = [:]
@@ -25,6 +40,10 @@ struct TypedReportCreateView: View {
     @State private var errorMessage: String?
     @State private var validationErrors: [String: String] = [:]
     @State private var hasInitializedDefaults: Bool = false
+    @State private var fileAttachments: [String: FileAttachment] = [:]
+    @State private var activeFileFieldName: String?
+    @State private var showFilePicker: Bool = false
+    @State private var isUploadingFile: Bool = false
 
     /// Fields sorted by order, grouped by section.
     private var sortedFields: [ClientReportFieldDefinition] {
@@ -120,6 +139,13 @@ struct TypedReportCreateView: View {
                 message: NSLocalizedString("report_create_saving", comment: "Encrypting & submitting...")
             )
             .interactiveDismissDisabled(isSaving)
+            .fileImporter(
+                isPresented: $showFilePicker,
+                allowedContentTypes: [.data, .image, .movie, .audio, .pdf],
+                allowsMultipleSelection: false
+            ) { result in
+                handleFileSelection(result)
+            }
             .onAppear {
                 initializeDefaults()
             }
@@ -264,8 +290,7 @@ struct TypedReportCreateView: View {
                 dateField(for: field)
 
             case .file:
-                // File fields shown as placeholder — full media attach is a future epic
-                fileFieldPlaceholder(for: field)
+                fileAttachmentField(for: field)
             }
 
             // Help text
@@ -478,21 +503,131 @@ struct TypedReportCreateView: View {
         }
     }
 
-    // MARK: - File Placeholder
+    // MARK: - File Attachment Field
 
     @ViewBuilder
-    private func fileFieldPlaceholder(for field: ClientReportFieldDefinition) -> some View {
-        HStack {
-            Image(systemName: "paperclip")
-                .foregroundStyle(Color.brandMutedForeground)
-            Text(field.label)
-                .font(.brand(.body))
-                .foregroundStyle(Color.brandMutedForeground)
-            Spacer()
-            Text(NSLocalizedString("report_file_coming_soon", comment: "Coming soon"))
-                .font(.brand(.caption))
-                .foregroundStyle(Color.brandMutedForeground)
+    private func fileAttachmentField(for field: ClientReportFieldDefinition) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 2) {
+                Text(field.label)
+                    .font(.brand(.subheadline))
+                    .foregroundStyle(.secondary)
+                if field.required {
+                    Text("*")
+                        .foregroundStyle(Color.brandDestructive)
+                }
+            }
+
+            if let attachment = fileAttachments[field.name] {
+                // Show selected file
+                HStack(spacing: 10) {
+                    Image(systemName: fileIcon(for: attachment.mimeType))
+                        .font(.title3)
+                        .foregroundStyle(Color.brandPrimary)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(attachment.fileName)
+                            .font(.brand(.subheadline))
+                            .lineLimit(1)
+                        Text(formatFileSize(attachment.fileSize))
+                            .font(.brand(.caption2))
+                            .foregroundStyle(.secondary)
+                        if attachment.isUploading {
+                            HStack(spacing: 4) {
+                                ProgressView()
+                                    .scaleEffect(0.7)
+                                Text(NSLocalizedString("report_file_encrypting", comment: "Encrypting..."))
+                                    .font(.brand(.caption2))
+                                    .foregroundStyle(.secondary)
+                            }
+                        } else if let fileId = attachment.uploadedFileId {
+                            HStack(spacing: 4) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(.green)
+                                Text(NSLocalizedString("report_file_uploaded", comment: "Encrypted & uploaded"))
+                                    .font(.brand(.caption2))
+                                    .foregroundStyle(.secondary)
+                            }
+                            .onAppear {
+                                // Store file ID in field values for submission
+                                fieldValues[field.name] = .string(fileId)
+                            }
+                        } else if let error = attachment.error {
+                            Text(error)
+                                .font(.brand(.caption2))
+                                .foregroundStyle(Color.brandDestructive)
+                        }
+                    }
+
+                    Spacer()
+
+                    // Remove button
+                    Button {
+                        fileAttachments.removeValue(forKey: field.name)
+                        fieldValues.removeValue(forKey: field.name)
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("field-\(field.name)-remove-file")
+                }
+                .padding(10)
+                .background(Color.brandCard)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            } else {
+                // Tap to select file
+                Button {
+                    activeFileFieldName = field.name
+                    showFilePicker = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "paperclip")
+                            .font(.body)
+                        Text(NSLocalizedString("report_file_select", comment: "Select file..."))
+                            .font(.brand(.body))
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .foregroundStyle(Color.brandPrimary)
+                    .padding(10)
+                    .background(Color.brandCard)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.brandBorder, lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("field-\(field.name)-select-file")
+            }
+
+            // E2EE note
+            HStack(spacing: 4) {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 9))
+                Text(NSLocalizedString("report_file_e2ee", comment: "Files are encrypted before upload"))
+                    .font(.brand(.caption2))
+            }
+            .foregroundStyle(.secondary)
         }
+    }
+
+    private func fileIcon(for mimeType: String) -> String {
+        if mimeType.hasPrefix("image/") { return "photo" }
+        if mimeType.hasPrefix("video/") { return "video" }
+        if mimeType.hasPrefix("audio/") { return "waveform" }
+        if mimeType.contains("pdf") { return "doc.richtext" }
+        return "doc"
+    }
+
+    private func formatFileSize(_ bytes: Int) -> String {
+        if bytes < 1024 { return "\(bytes) B" }
+        if bytes < 1024 * 1024 { return String(format: "%.1f KB", Double(bytes) / 1024.0) }
+        return String(format: "%.1f MB", Double(bytes) / (1024.0 * 1024.0))
     }
 
     // MARK: - Field Bindings
@@ -641,6 +776,102 @@ struct TypedReportCreateView: View {
                 fieldValues[name] = .string(formatter.string(from: newValue))
             }
         )
+    }
+
+    // MARK: - File Handling
+
+    private func handleFileSelection(_ result: Result<[URL], Error>) {
+        guard let fieldName = activeFileFieldName else { return }
+        activeFileFieldName = nil
+
+        switch result {
+        case .success(let urls):
+            guard let url = urls.first else { return }
+
+            // Start accessing security-scoped resource
+            guard url.startAccessingSecurityScopedResource() else {
+                fileAttachments[fieldName] = FileAttachment(
+                    fileName: url.lastPathComponent,
+                    fileSize: 0,
+                    mimeType: "application/octet-stream",
+                    error: NSLocalizedString("report_file_access_denied", comment: "Cannot access this file")
+                )
+                return
+            }
+            defer { url.stopAccessingSecurityScopedResource() }
+
+            do {
+                let data = try Data(contentsOf: url)
+                let mimeType = UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "application/octet-stream"
+                let fileName = url.lastPathComponent
+
+                fileAttachments[fieldName] = FileAttachment(
+                    fileName: fileName,
+                    fileSize: data.count,
+                    mimeType: mimeType,
+                    isUploading: true
+                )
+
+                // Upload in background
+                Task {
+                    await uploadEncryptedFile(fieldName: fieldName, data: data, fileName: fileName, mimeType: mimeType)
+                }
+            } catch {
+                fileAttachments[fieldName] = FileAttachment(
+                    fileName: url.lastPathComponent,
+                    fileSize: 0,
+                    mimeType: "application/octet-stream",
+                    error: error.localizedDescription
+                )
+            }
+
+        case .failure(let error):
+            fileAttachments[fieldName] = FileAttachment(
+                fileName: "",
+                fileSize: 0,
+                mimeType: "application/octet-stream",
+                error: error.localizedDescription
+            )
+        }
+    }
+
+    @MainActor
+    private func uploadEncryptedFile(fieldName: String, data: Data, fileName: String, mimeType: String) async {
+        do {
+            // Encrypt the file content with a random AES-256-GCM key
+            let plaintextHex = data.map { String(format: "%02x", $0) }.joined()
+            let (ciphertextHex, fileKeyHex) = try appState.cryptoService.symmetricEncrypt(plaintextHex: plaintextHex)
+
+            // Convert ciphertext hex back to Data for upload
+            let encryptedData = hexToData(ciphertextHex)
+
+            // Upload encrypted data
+            let response = try await appState.apiService.uploadEntityFile(
+                encryptedData: encryptedData,
+                fileName: fileName
+            )
+
+            fileAttachments[fieldName]?.uploadedFileId = response.fileId
+            fileAttachments[fieldName]?.fileKeyHex = fileKeyHex
+            fileAttachments[fieldName]?.isUploading = false
+
+        } catch {
+            fileAttachments[fieldName]?.error = error.localizedDescription
+            fileAttachments[fieldName]?.isUploading = false
+        }
+    }
+
+    private func hexToData(_ hex: String) -> Data {
+        var data = Data(capacity: hex.count / 2)
+        var index = hex.startIndex
+        while index < hex.endIndex {
+            let nextIndex = hex.index(index, offsetBy: 2)
+            if let byte = UInt8(hex[index..<nextIndex], radix: 16) {
+                data.append(byte)
+            }
+            index = nextIndex
+        }
+        return data
     }
 
     // MARK: - Submit

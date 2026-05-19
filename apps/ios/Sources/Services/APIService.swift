@@ -544,6 +544,53 @@ final class APIService: @unchecked Sendable {
     }
 }
 
+// MARK: - Entity File Upload
+
+struct EntityFileUploadResponse: Decodable {
+    let fileId: String
+    let uploadedAt: String
+}
+
+extension APIService {
+    /// Upload encrypted file data as multipart/form-data to the entity-file endpoint.
+    func uploadEntityFile(encryptedData: Data, fileName: String) async throws -> EntityFileUploadResponse {
+        guard let baseURL else { throw APIError.noBaseURL }
+
+        let boundary = UUID().uuidString
+        var body = Data()
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(fileName)\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: application/octet-stream\r\n\r\n".data(using: .utf8)!)
+        body.append(encryptedData)
+        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+
+        let path = hp("/api/uploads/entity-file")
+        let fullURL = baseURL.appendingPathComponent(path)
+        var urlRequest = URLRequest(url: fullURL)
+        urlRequest.httpMethod = "POST"
+        urlRequest.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Accept")
+        urlRequest.httpBody = body
+
+        if cryptoService.isUnlocked {
+            let token = try cryptoService.createAuthToken(method: "POST", path: path)
+            let authJSON = """
+            {"pubkey":"\(token.pubkey)","timestamp":\(token.timestamp),"token":"\(token.token)"}
+            """
+            urlRequest.setValue("Bearer \(authJSON)", forHTTPHeaderField: "Authorization")
+        }
+
+        let (data, response) = try await session.data(for: urlRequest)
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200...299).contains(httpResponse.statusCode) else {
+            let bodyString = String(data: data, encoding: .utf8) ?? "<binary>"
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            throw APIError.requestFailed(statusCode: code, body: bodyString)
+        }
+        return try decoder.decode(EntityFileUploadResponse.self, from: data)
+    }
+}
+
 // MARK: - Helper Types
 
 /// Type-erased Encodable wrapper for passing heterogeneous body types.
