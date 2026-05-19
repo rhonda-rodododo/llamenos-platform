@@ -33,6 +33,7 @@ final class AppState {
     let hubActivityService: HubActivityService
     let linphoneService: LinphoneService
     let wipeService: WipeService
+    let permissionService: PermissionService
 
     // MARK: - Auth State
 
@@ -52,7 +53,13 @@ final class AppState {
     var userRole: UserRole = .volunteer
 
     /// Whether the current user has admin privileges.
-    var isAdmin: Bool { userRole == .admin }
+    /// Delegates to PermissionService for fine-grained PBAC.
+    var isAdmin: Bool { permissionService.isAdmin }
+
+    /// Check if the current user has a specific permission.
+    func hasPermission(_ permission: String) -> Bool {
+        permissionService.hasPermission(permission)
+    }
 
     /// Total unread conversation count for the tab badge.
     var unreadConversationCount: Int = 0
@@ -92,6 +99,7 @@ final class AppState {
         let offline = OfflineQueue(apiService: api)
         let hubActivity = HubActivityService()
         let linphone = LinphoneService()
+        let permission = PermissionService()
 
         self.cryptoService = crypto
         self.keychainService = keychain
@@ -104,6 +112,7 @@ final class AppState {
         self.offlineQueue = offline
         self.hubActivityService = hubActivity
         self.linphoneService = linphone
+        self.permissionService = permission
         self.wipeService = WipeService(
             keychainService: keychain,
             cryptoService: crypto,
@@ -352,6 +361,7 @@ final class AppState {
         isLocked = false
         authStatus = .unauthenticated
         userRole = .volunteer
+        permissionService.clear()
         unreadConversationCount = 0
     }
 
@@ -394,7 +404,7 @@ final class AppState {
         }
     }
 
-    /// Fetch the current user's role from the API after authentication.
+    /// Fetch the current user's role and permissions from the API after authentication.
     func fetchUserRole() {
         Task {
             do {
@@ -403,9 +413,13 @@ final class AppState {
                     path: "/api/auth/me"
                 )
                 await MainActor.run {
-                    // Check if any role contains "admin" (e.g. "role-super-admin", "role-admin")
-                    let isAdmin = response.roles.contains { $0.contains("admin") }
-                    self.userRole = isAdmin ? .admin : .volunteer
+                    // Store fine-grained permissions from the server
+                    self.permissionService.update(permissions: response.permissions ?? [])
+
+                    // Legacy role field — kept for backward compat with views that
+                    // haven't migrated to hasPermission() yet
+                    let hasAdminRole = response.roles.contains { $0.contains("admin") }
+                    self.userRole = hasAdminRole ? .admin : .volunteer
 
                     // Store admin decryption pubkey for E2EE envelope encryption
                     self.adminDecryptionPubkey = response.adminDecryptionPubkey
@@ -421,6 +435,7 @@ final class AppState {
                 // Default to volunteer if role fetch fails
                 await MainActor.run {
                     self.userRole = .volunteer
+                    self.permissionService.clear()
                 }
             }
         }
@@ -466,6 +481,7 @@ final class AppState {
 struct AuthMeResponse: Decodable {
     let pubkey: String
     let roles: [String]
+    let permissions: [String]?
     let name: String?
     let profileCompleted: Bool?
     let onBreak: Bool?
