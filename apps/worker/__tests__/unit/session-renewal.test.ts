@@ -3,6 +3,7 @@ import {
   decideSessionRenewal,
   SESSION_DURATION_MS,
   RENEWAL_THRESHOLD_MS,
+  MAX_SESSION_LIFETIME_MS,
 } from '../../lib/session-renewal'
 
 describe('decideSessionRenewal', () => {
@@ -62,5 +63,49 @@ describe('decideSessionRenewal', () => {
   it('uses correct constant values', () => {
     expect(SESSION_DURATION_MS).toBe(8 * 60 * 60 * 1000) // 8 hours
     expect(RENEWAL_THRESHOLD_MS).toBe(1 * 60 * 60 * 1000) // 1 hour
+    expect(MAX_SESSION_LIFETIME_MS).toBe(7 * 24 * 60 * 60 * 1000) // 7 days
+  })
+
+  // --- H06: Absolute max session lifetime ---
+
+  it('max_lifetime_exceeded when createdAt is 7+ days ago', () => {
+    const createdAt = new Date(now.getTime() - 8 * 24 * oneHour) // 8 days ago
+    const expiresAt = new Date(now.getTime() + 2 * oneHour) // still has time
+    const decision = decideSessionRenewal(expiresAt, now, RENEWAL_THRESHOLD_MS, SESSION_DURATION_MS, createdAt)
+    expect(decision.action).toBe('max_lifetime_exceeded')
+  })
+
+  it('renew when createdAt is 6 days ago and remaining < 1h', () => {
+    const createdAt = new Date(now.getTime() - 6 * 24 * oneHour) // 6 days ago
+    const expiresAt = new Date(now.getTime() + 30 * 60 * 1000) // 30 min remaining
+    const decision = decideSessionRenewal(expiresAt, now, RENEWAL_THRESHOLD_MS, SESSION_DURATION_MS, createdAt)
+    expect(decision.action).toBe('renew')
+  })
+
+  it('valid when createdAt is within 7 days', () => {
+    const createdAt = new Date(now.getTime() - 3 * 24 * oneHour) // 3 days ago
+    const expiresAt = new Date(now.getTime() + 4 * oneHour) // 4h remaining
+    const decision = decideSessionRenewal(expiresAt, now, RENEWAL_THRESHOLD_MS, SESSION_DURATION_MS, createdAt)
+    expect(decision.action).toBe('valid')
+  })
+
+  it('max lifetime check takes precedence over renewal check', () => {
+    const createdAt = new Date(now.getTime() - 7 * 24 * oneHour) // exactly 7 days
+    const expiresAt = new Date(now.getTime() + 30 * 60 * 1000) // would normally renew
+    const decision = decideSessionRenewal(expiresAt, now, RENEWAL_THRESHOLD_MS, SESSION_DURATION_MS, createdAt)
+    expect(decision.action).toBe('max_lifetime_exceeded')
+  })
+
+  it('createdAt undefined skips max lifetime check (backward compat)', () => {
+    const expiresAt = new Date(now.getTime() + 2 * oneHour)
+    const decision = decideSessionRenewal(expiresAt, now, RENEWAL_THRESHOLD_MS, SESSION_DURATION_MS, undefined)
+    expect(decision.action).toBe('valid')
+  })
+
+  it('session at exactly 7 days is rejected', () => {
+    const createdAt = new Date(now.getTime() - MAX_SESSION_LIFETIME_MS) // exactly 7 days
+    const expiresAt = new Date(now.getTime() + 4 * oneHour)
+    const decision = decideSessionRenewal(expiresAt, now, RENEWAL_THRESHOLD_MS, SESSION_DURATION_MS, createdAt)
+    expect(decision.action).toBe('max_lifetime_exceeded')
   })
 })
