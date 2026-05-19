@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
  * JVM — the real Android URI parser is needed for scheme/host extraction.
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(manifest = Config.NONE)
+@Config(sdk = [34], manifest = Config.NONE)
 class DeepLinkValidatorTest {
 
     @Test

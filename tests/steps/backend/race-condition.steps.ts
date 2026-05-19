@@ -178,7 +178,7 @@ Given('a provision room has an encrypted payload', async ({ request, world }) =>
   s.provisionToken = createData.token
 
   // Send payload (authenticated endpoint)
-  const payloadRes = await apiPost(request, `/provisioning/rooms/${createData.id}/payload`, {
+  const payloadRes = await apiPost(request, `/provision/rooms/${createData.id}/payload`, {
     encryptedPayload: bytesToHex(crypto.getRandomValues(new Uint8Array(64))),
   }, ADMIN_SEED)
   expect(payloadRes.status).toBe(200)
@@ -432,8 +432,9 @@ Then('no duplicate subscribers are created', async ({ request, world }) => {
 
   // At least one import should succeed; the other may fail with 500 (constraint violation)
   // due to concurrent overlapping identifiers — this is expected behavior.
-  const successes = s.importResults!.filter(r => r.status === 200)
-  expect(successes.length).toBeGreaterThanOrEqual(1)
+  const successes = s.importResults!.filter(r => r.status === 200 || r.status === 201)
+  const statuses = s.importResults!.map(r => r.status)
+  expect(successes.length, `Expected at least 1 success, got statuses: ${JSON.stringify(statuses)}`).toBeGreaterThanOrEqual(1)
 
   // Verify no duplicates by listing subscribers
   const listRes = await apiGet<{ subscribers: Array<{ identifier: string }> }>(
