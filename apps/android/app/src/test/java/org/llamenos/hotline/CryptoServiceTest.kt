@@ -122,6 +122,21 @@ class CryptoServiceTest {
         cryptoService.deriveSASCode("a".repeat(64))
     }
 
+    @Test(expected = IllegalStateException::class)
+    fun `verifySigchainLink throws without native lib`(): Unit = runBlocking {
+        cryptoService.verifySigchainLink("{}", "a".repeat(64))
+    }
+
+    @Test(expected = IllegalStateException::class)
+    fun `verifySigchain throws without native lib`(): Unit = runBlocking {
+        cryptoService.verifySigchain("[]")
+    }
+
+    @Test(expected = IllegalStateException::class)
+    fun `rotatePuk throws without native lib`(): Unit = runBlocking {
+        cryptoService.rotatePuk("seed", 1u, "[]")
+    }
+
     // ---- State management (no native lib needed) ----
 
     @Test
