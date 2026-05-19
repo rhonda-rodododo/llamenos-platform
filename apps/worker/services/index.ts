@@ -105,8 +105,10 @@ export function createServices(db: Database, opts?: ServicesOpts): Services {
   const digestCron = new DigestCronService(db, userNotifications, securityPrefs)
   const providerSetup = new ProviderSetup(db, opts?.hmacSecret ?? '', opts?.env?.DOMAIN ?? 'localhost')
 
+  const identity = new IdentityService(db)
+
   const services: Services = {
-    identity: new IdentityService(db),
+    identity,
     settings,
     records: new RecordsService(db, audit),
     audit,
@@ -128,7 +130,7 @@ export function createServices(db: Database, opts?: ServicesOpts): Services {
     a2pRegistration: new A2pRegistrationService(db, opts?.hmacSecret ?? ''),
     providerTemplates: new ProviderTemplateService(db),
     hubOnboard: new HubOnboardService(db, providerSetup, settings),
-    erasure: new ErasureService(db),
+    erasure: new ErasureService(db, identity),
     retention: new RetentionService(db),
     ringGroups: new RingGroupsService(db),
     shiftOverrides: new ShiftOverridesService(db),
