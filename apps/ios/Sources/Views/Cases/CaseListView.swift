@@ -89,7 +89,13 @@ struct CaseListView: View {
                 get: { vm.showCreateSheet },
                 set: { vm.showCreateSheet = $0 }
             )) {
-                CreateCasePlaceholderSheet(entityTypes: vm.entityTypes)
+                CreateCaseSheet(
+                    entityTypes: vm.entityTypes,
+                    appState: appState
+                ) { recordId in
+                    vm.showCreateSheet = false
+                    Task { await vm.refresh() }
+                }
             }
         }
     }
@@ -460,45 +466,124 @@ private struct CaseCardRow: View {
     }
 }
 
-// MARK: - CreateCasePlaceholderSheet
+// MARK: - CreateCaseSheet
 
-/// Placeholder sheet for creating a new case. Will be replaced by a full create form
-/// once the create-record flow is implemented in a future epic.
-private struct CreateCasePlaceholderSheet: View {
+/// Form for creating a new case record. Encrypts summary data (title, description,
+/// default status/severity) and POSTs to `/api/records`.
+private struct CreateCaseSheet: View {
     let entityTypes: [CaseEntityTypeDefinition]
+    let appState: AppState
+    let onCreated: (String) -> Void
+
     @Environment(\.dismiss) private var dismiss
+
+    @State private var selectedTypeId: String = ""
+    @State private var title: String = ""
+    @State private var description: String = ""
+    @State private var isSubmitting: Bool = false
+    @State private var errorMessage: String?
+
+    private var selectedType: CaseEntityTypeDefinition? {
+        entityTypes.first(where: { $0.id == selectedTypeId })
+    }
+
+    private var isFormValid: Bool {
+        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !selectedTypeId.isEmpty
+    }
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 16) {
-                Image(systemName: "folder.badge.plus")
-                    .font(.system(size: 40))
-                    .foregroundStyle(.secondary)
-                Text(NSLocalizedString("cases_create_coming_soon", comment: "Case creation will be available in a future update."))
-                    .font(.brand(.body))
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
+            Form {
+                // Entity type selection
+                if entityTypes.count > 1 {
+                    Section {
+                        Picker(NSLocalizedString("cases_entity_type", comment: "Case Type"), selection: $selectedTypeId) {
+                            Text(NSLocalizedString("cases_select_type", comment: "Select a type..."))
+                                .tag("")
+                            ForEach(entityTypes) { et in
+                                HStack(spacing: 6) {
+                                    if let color = et.color {
+                                        Circle()
+                                            .fill(Color(hex: color) ?? .gray)
+                                            .frame(width: 8, height: 8)
+                                    }
+                                    Text(et.label)
+                                }
+                                .tag(et.id)
+                            }
+                        }
+                        .accessibilityIdentifier("case-type-picker")
 
-                if !entityTypes.isEmpty {
-                    Text(NSLocalizedString("cases_available_types", comment: "Available entity types:"))
-                        .font(.brand(.caption))
-                        .foregroundStyle(.secondary)
-                    ForEach(entityTypes) { et in
+                        if let desc = selectedType?.description, !desc.isEmpty {
+                            Text(desc)
+                                .font(.brand(.caption))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                } else if let singleType = entityTypes.first {
+                    Section {
                         HStack(spacing: 6) {
-                            if let color = et.color {
+                            if let color = singleType.color {
                                 Circle()
                                     .fill(Color(hex: color) ?? .gray)
                                     .frame(width: 8, height: 8)
                             }
-                            Text(et.label)
-                                .font(.brand(.subheadline))
+                            Text(singleType.label)
+                                .font(.brand(.body))
+                                .fontWeight(.medium)
                         }
                     }
                 }
 
-                Spacer()
+                // Title and description
+                if !selectedTypeId.isEmpty {
+                    Section {
+                        TextField(
+                            NSLocalizedString("cases_title_placeholder", comment: "Brief case description"),
+                            text: $title
+                        )
+                        .font(.brand(.body))
+                        .accessibilityIdentifier("case-title-input")
+                    } header: {
+                        HStack(spacing: 2) {
+                            Text(NSLocalizedString("cases_title_label", comment: "Title"))
+                            Text("*").foregroundStyle(Color.brandDestructive)
+                        }
+                    }
+
+                    Section {
+                        TextEditor(text: $description)
+                            .frame(minHeight: 80)
+                            .font(.brand(.body))
+                            .accessibilityIdentifier("case-description-input")
+                    } header: {
+                        Text(NSLocalizedString("cases_description_label", comment: "Description"))
+                    }
+
+                    // E2EE indicator
+                    Section {
+                        HStack(spacing: 6) {
+                            Image(systemName: "lock.fill")
+                                .font(.caption)
+                                .foregroundStyle(Color.brandPrimary)
+                            Text(NSLocalizedString("cases_encrypted_note", comment: "Case data is encrypted end-to-end"))
+                                .font(.brand(.caption))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                // Error display
+                if let error = errorMessage {
+                    Section {
+                        Text(error)
+                            .font(.brand(.footnote))
+                            .foregroundStyle(Color.brandDestructive)
+                    }
+                    .accessibilityIdentifier("case-create-error")
+                }
             }
-            .padding()
+            .tint(Color.brandPrimary)
             .navigationTitle(NSLocalizedString("cases_new", comment: "New Case"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -506,10 +591,103 @@ private struct CreateCasePlaceholderSheet: View {
                     Button(NSLocalizedString("common_cancel", comment: "Cancel")) {
                         dismiss()
                     }
+                    .disabled(isSubmitting)
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button {
+                        Task { await submitCase() }
+                    } label: {
+                        if isSubmitting {
+                            ProgressView()
+                        } else {
+                            Text(NSLocalizedString("cases_create", comment: "Create"))
+                                .fontWeight(.semibold)
+                        }
+                    }
+                    .disabled(!isFormValid || isSubmitting)
+                    .accessibilityIdentifier("case-create-submit")
+                }
+            }
+            .loadingOverlay(
+                isPresented: isSubmitting,
+                message: NSLocalizedString("report_create_saving", comment: "Encrypting & submitting...")
+            )
+            .interactiveDismissDisabled(isSubmitting)
+            .onAppear {
+                // Auto-select if only one type
+                if entityTypes.count == 1 {
+                    selectedTypeId = entityTypes[0].id
                 }
             }
         }
         .accessibilityIdentifier("create-case-sheet")
+    }
+
+    // MARK: - Submit
+
+    private func submitCase() async {
+        guard let entityType = selectedType else { return }
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedTitle.isEmpty else { return }
+
+        isSubmitting = true
+        errorMessage = nil
+
+        do {
+            let cryptoService = appState.cryptoService
+            guard cryptoService.isUnlocked,
+                  let encPubkey = cryptoService.encryptionPubkeyHex else {
+                errorMessage = NSLocalizedString("cases_error_no_key", comment: "Encryption key not available")
+                isSubmitting = false
+                return
+            }
+
+            // Build reader pubkeys: self + admin
+            var readerPubkeys = [encPubkey]
+            if let adminPubkey = appState.adminDecryptionPubkey, adminPubkey != encPubkey {
+                readerPubkeys.append(adminPubkey)
+            }
+
+            // Build summary JSON
+            let defaultStatus = entityType.statuses.first(where: { $0.isDefault == true })
+                ?? entityType.statuses.first(where: { $0.value == entityType.defaultStatus })
+            let summary: [String: Any] = [
+                "title": trimmedTitle,
+                "description": description.trimmingCharacters(in: .whitespacesAndNewlines),
+                "status": defaultStatus?.label ?? entityType.defaultStatus,
+            ]
+            let summaryJSON = String(data: try JSONSerialization.data(withJSONObject: summary), encoding: .utf8)!
+
+            // Encrypt summary with HPKE envelopes for each reader
+            let encrypted = try cryptoService.encryptNote(payload: summaryJSON, recipientPubkeys: readerPubkeys)
+
+            // Build envelopes in the format the API expects
+            let summaryEnvelopes: [[String: String]] = encrypted.envelopes.map { env in
+                ["pubkey": env.pubkey, "enc": env.envelope.enc, "ct": env.envelope.ct]
+            }
+
+            // Build the request body
+            let body: [String: Any] = [
+                "entityTypeId": entityType.id,
+                "statusHash": entityType.defaultStatus,
+                "encryptedSummary": encrypted.ciphertextHex,
+                "summaryEnvelopes": summaryEnvelopes,
+                "assignedTo": [encPubkey],
+            ]
+
+            let jsonData = try JSONSerialization.data(withJSONObject: body)
+            let response: CaseRecord = try await appState.apiService.request(
+                method: "POST",
+                path: appState.apiService.hp("/api/records"),
+                rawBody: jsonData
+            )
+
+            onCreated(response.id)
+        } catch {
+            errorMessage = error.localizedDescription
+            isSubmitting = false
+        }
     }
 }
 
