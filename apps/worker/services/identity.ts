@@ -5,7 +5,7 @@
  * devices, provisioning rooms, hub roles, and admin bootstrap.
  * All state is stored in PostgreSQL via Drizzle ORM.
  */
-import { eq, and, lt, sql, inArray } from 'drizzle-orm'
+import { eq, and, lt, gt, sql, inArray } from 'drizzle-orm'
 import type { Database } from '../db'
 import {
   users,
@@ -35,7 +35,11 @@ import { DEMO_ACCOUNTS } from '@shared/demo-accounts'
 // Constants
 // ---------------------------------------------------------------------------
 
-import { SESSION_DURATION_MS, RENEWAL_THRESHOLD_MS } from '../lib/session-renewal'
+import {
+  SESSION_DURATION_MS,
+  RENEWAL_THRESHOLD_MS,
+  decideSessionRenewal,
+} from '../lib/session-renewal'
 import { decideDeviceRegistration } from '../lib/device-eviction'
 const INVITE_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 const CHALLENGE_TTL_MS = 5 * 60 * 1000 // 5 minutes
@@ -598,20 +602,30 @@ export class IdentityService {
     if (rows.length === 0) throw new ServiceError(401, 'Invalid session')
     const row = rows[0]
 
-    if (row.expiresAt < new Date()) {
+    const decision = decideSessionRenewal(
+      row.expiresAt,
+      new Date(),
+      RENEWAL_THRESHOLD_MS,
+      SESSION_DURATION_MS,
+      row.createdAt,
+    )
+
+    if (decision.action === 'max_lifetime_exceeded') {
+      await this.db.delete(sessions).where(eq(sessions.token, token))
+      throw new ServiceError(401, 'Session max lifetime exceeded')
+    }
+
+    if (decision.action === 'expired') {
       await this.db.delete(sessions).where(eq(sessions.token, token))
       throw new ServiceError(401, 'Session expired')
     }
 
-    // Sliding expiry — renew when less than 1h remaining
-    const remaining = row.expiresAt.getTime() - Date.now()
-    if (remaining < RENEWAL_THRESHOLD_MS) {
-      const newExpiry = new Date(Date.now() + SESSION_DURATION_MS)
+    if (decision.action === 'renew') {
       await this.db
         .update(sessions)
-        .set({ expiresAt: newExpiry })
+        .set({ expiresAt: decision.newExpiresAt })
         .where(eq(sessions.token, token))
-      return { ...rowToSession(row), expiresAt: newExpiry.toISOString() }
+      return { ...rowToSession(row), expiresAt: decision.newExpiresAt.toISOString() }
     }
 
     return rowToSession(row)
@@ -742,26 +756,39 @@ export class IdentityService {
    * Retrieve and consume a WebAuthn challenge. Throws if not found or expired.
    */
   async getWebAuthnChallenge(id: string): Promise<{ challenge: string }> {
-    const rows = await this.db
+    const cutoff = new Date(Date.now() - CHALLENGE_TTL_MS)
+
+    // H08: Atomic consume — DELETE only if not expired, RETURNING the challenge
+    const deleted = await this.db
+      .delete(webauthnChallenges)
+      .where(
+        and(
+          eq(webauthnChallenges.challengeId, id),
+          gt(webauthnChallenges.createdAt, cutoff),
+        ),
+      )
+      .returning()
+
+    if (deleted.length > 0) {
+      return { challenge: deleted[0].challenge }
+    }
+
+    // No row deleted — either doesn't exist or expired
+    const [stale] = await this.db
       .select()
       .from(webauthnChallenges)
       .where(eq(webauthnChallenges.challengeId, id))
       .limit(1)
 
-    if (rows.length === 0) throw new ServiceError(404, 'Challenge not found')
-    const row = rows[0]
-
-    // Delete immediately (one-time use)
-    await this.db
-      .delete(webauthnChallenges)
-      .where(eq(webauthnChallenges.challengeId, id))
-
-    // Check expiry
-    if (Date.now() - row.createdAt.getTime() > CHALLENGE_TTL_MS) {
+    if (stale) {
+      // Expired — clean up the stale row
+      await this.db
+        .delete(webauthnChallenges)
+        .where(eq(webauthnChallenges.challengeId, id))
       throw new ServiceError(410, 'Challenge expired')
     }
 
-    return { challenge: row.challenge }
+    throw new ServiceError(404, 'Challenge not found')
   }
 
   // =========================================================================
@@ -993,7 +1020,15 @@ export class IdentityService {
       // 2. Delete device record
       await tx.delete(devices).where(eq(devices.id, deviceId))
 
-      // 3. Emit security event
+      // 3. Delete all sessions for this device (C02 — atomic with device deletion)
+      await tx.delete(sessions).where(
+        and(
+          eq(sessions.pubkey, pubkey),
+          sql`${sessions.deviceInfo}->>'deviceId' = ${deviceId}`,
+        ),
+      )
+
+      // 4. Emit security event
       await tx.insert(securityEvents).values({
         userPubkey: pubkey,
         eventType: 'device_remove',

@@ -160,7 +160,7 @@ describe('Telephony routes', () => {
       expect(await res.text()).toBe('Forbidden')
     })
 
-    it('skips validation in dev mode for 127.0.0.1', async () => {
+    it('rejects localhost requests with invalid signature (H05 — no bypass)', async () => {
       adapter.validateWebhook = vi.fn().mockResolvedValue(false)
       const app = await createTestApp(adapter, services, { ENVIRONMENT: 'development' })
       const res = await app.request('/api/telephony/incoming', {
@@ -171,8 +171,7 @@ describe('Telephony routes', () => {
         },
         body: 'CallSid=CA123',
       })
-      expect(res.status).not.toBe(403)
-      expect(adapter.parseIncomingWebhook).toHaveBeenCalled()
+      expect(res.status).toBe(403)
     })
 
     it('returns 404 when no telephony adapter is configured', async () => {
