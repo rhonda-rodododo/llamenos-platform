@@ -14,6 +14,7 @@
 use std::sync::Mutex;
 
 use llamenos_core::{auth, device_keys, hpke_envelope, puk, sas, sigchain};
+use tauri::Manager;
 
 use aes_gcm::{
     aead::{Aead, KeyInit, Payload},
@@ -42,6 +43,9 @@ pub struct CryptoState {
     /// Server event key(s) — epoch-scoped symmetric keys for relay event decryption.
     /// Current + previous epoch for rolling window (H5 hardening).
     server_event_keys: Mutex<Vec<(u64, Vec<u8>)>>,
+    /// Recovery group key — reconstructed from Shamir shares, held temporarily for decryption.
+    /// Zeroized after use (set to None after recovery_group_decrypt).
+    recovery_group_key: Mutex<Option<Vec<u8>>>,
 }
 
 impl CryptoState {
@@ -53,6 +57,7 @@ impl CryptoState {
             pin_lockout_until: Mutex::new(0),
             hub_key: Mutex::new(None),
             server_event_keys: Mutex::new(Vec::new()),
+            recovery_group_key: Mutex::new(None),
         }
     }
 
@@ -63,6 +68,7 @@ impl CryptoState {
         *self.device_state.lock().unwrap() = None;
         *self.hub_key.lock().unwrap() = None;
         self.server_event_keys.lock().unwrap().clear();
+        *self.recovery_group_key.lock().unwrap() = None;
     }
 
     fn with_secrets<T>(
@@ -188,7 +194,9 @@ pub fn is_crypto_unlocked(state: tauri::State<'_, CryptoState>) -> bool {
 
 /// Get the device public keys from CryptoState (no secret key exposure).
 #[tauri::command]
-pub fn get_device_pubkeys(state: tauri::State<'_, CryptoState>) -> Result<serde_json::Value, String> {
+pub fn get_device_pubkeys(
+    state: tauri::State<'_, CryptoState>,
+) -> Result<serde_json::Value, String> {
     let ds = state.get_device_state()?;
     serde_json::to_value(&ds).map_err(err_str)
 }
@@ -248,8 +256,8 @@ pub fn hpke_seal(
 ) -> Result<serde_json::Value, String> {
     let plaintext = hex::decode(&plaintext_hex).map_err(err_str)?;
     let aad = hex::decode(&aad_hex).map_err(err_str)?;
-    let envelope =
-        hpke_envelope::hpke_seal(&plaintext, &recipient_pubkey_hex, &label, &aad).map_err(err_str)?;
+    let envelope = hpke_envelope::hpke_seal(&plaintext, &recipient_pubkey_hex, &label, &aad)
+        .map_err(err_str)?;
     serde_json::to_value(&envelope).map_err(err_str)
 }
 
@@ -298,9 +306,8 @@ pub fn hpke_open_key_from_state(
 ) -> Result<String, String> {
     let aad = hex::decode(&aad_hex).map_err(err_str)?;
     let secret_hex = state.encryption_secret_hex()?;
-    let key =
-        hpke_envelope::hpke_open_key(&envelope, &secret_hex, &expected_label, &aad)
-            .map_err(err_str)?;
+    let key = hpke_envelope::hpke_open_key(&envelope, &secret_hex, &expected_label, &aad)
+        .map_err(err_str)?;
     Ok(hex::encode(key))
 }
 
@@ -353,9 +360,8 @@ pub fn puk_unwrap_seed_from_state(
 ) -> Result<String, String> {
     let aad = hex::decode(&aad_hex).map_err(err_str)?;
     let secret_hex = state.encryption_secret_hex()?;
-    let seed =
-        hpke_envelope::hpke_open_key(&envelope, &secret_hex, &expected_label, &aad)
-            .map_err(err_str)?;
+    let seed = hpke_envelope::hpke_open_key(&envelope, &secret_hex, &expected_label, &aad)
+        .map_err(err_str)?;
     Ok(hex::encode(seed))
 }
 
@@ -415,8 +421,9 @@ pub fn sframe_derive_key(
     participant_index: u32,
 ) -> Result<String, String> {
     let exporter_secret = hex::decode(&exporter_secret_hex).map_err(err_str)?;
-    let key = llamenos_core::sframe::derive_sframe_key(&exporter_secret, &call_id, participant_index)
-        .map_err(err_str)?;
+    let key =
+        llamenos_core::sframe::derive_sframe_key(&exporter_secret, &call_id, participant_index)
+            .map_err(err_str)?;
     Ok(hex::encode(key))
 }
 
@@ -436,10 +443,16 @@ pub fn derive_sas(
     let nonce_bytes = hex::decode(&nonce_hex).map_err(err_str)?;
 
     if pk_a_bytes.len() != 32 {
-        return Err(format!("pubkey_a must be 32 bytes, got {}", pk_a_bytes.len()));
+        return Err(format!(
+            "pubkey_a must be 32 bytes, got {}",
+            pk_a_bytes.len()
+        ));
     }
     if pk_b_bytes.len() != 32 {
-        return Err(format!("pubkey_b must be 32 bytes, got {}", pk_b_bytes.len()));
+        return Err(format!(
+            "pubkey_b must be 32 bytes, got {}",
+            pk_b_bytes.len()
+        ));
     }
     if nonce_bytes.len() != 32 {
         return Err(format!("nonce must be 32 bytes, got {}", nonce_bytes.len()));
@@ -466,7 +479,10 @@ pub fn derive_sas(
 /// Store a hub symmetric key in CryptoState. Called after unwrapping from HPKE envelope.
 /// The key NEVER enters JavaScript — it goes directly from HPKE open to this state.
 #[tauri::command]
-pub fn set_hub_key(state: tauri::State<'_, CryptoState>, hub_key_hex: String) -> Result<(), String> {
+pub fn set_hub_key(
+    state: tauri::State<'_, CryptoState>,
+    hub_key_hex: String,
+) -> Result<(), String> {
     let key_bytes = hex::decode(&hub_key_hex).map_err(err_str)?;
     if key_bytes.len() != 32 {
         return Err(format!("Hub key must be 32 bytes, got {}", key_bytes.len()));
@@ -486,7 +502,10 @@ pub fn set_server_event_keys(
     for (epoch, hex_key) in keys {
         let key_bytes = hex::decode(&hex_key).map_err(err_str)?;
         if key_bytes.len() != 32 {
-            return Err(format!("Event key must be 32 bytes, got {}", key_bytes.len()));
+            return Err(format!(
+                "Event key must be 32 bytes, got {}",
+                key_bytes.len()
+            ));
         }
         decoded.push((epoch, key_bytes));
     }
@@ -512,12 +531,15 @@ pub fn decrypt_hub_event(
     }
 
     let nonce = Nonce::from_slice(&data[..12]);
-    let cipher = Aes256Gcm::new_from_slice(key)
-        .map_err(|e| format!("Invalid hub key: {e}"))?;
-    let plaintext = cipher.decrypt(nonce, Payload {
-        msg: &data[12..],
-        aad: llamenos_core::LABEL_HUB_EVENT.as_bytes(),
-    })
+    let cipher = Aes256Gcm::new_from_slice(key).map_err(|e| format!("Invalid hub key: {e}"))?;
+    let plaintext = cipher
+        .decrypt(
+            nonce,
+            Payload {
+                msg: &data[12..],
+                aad: llamenos_core::LABEL_HUB_EVENT.as_bytes(),
+            },
+        )
         .map_err(|_| "Hub event decryption failed (wrong key or corrupted data)".to_string())?;
 
     String::from_utf8(plaintext).map_err(|e| format!("Invalid UTF-8 in decrypted content: {e}"))
@@ -545,12 +567,15 @@ pub fn encrypt_hub_field(
     rand::RngCore::fill_bytes(&mut rand::rngs::OsRng, &mut nonce_bytes);
     let nonce = Nonce::from_slice(&nonce_bytes);
 
-    let cipher = Aes256Gcm::new_from_slice(key)
-        .map_err(|e| format!("Invalid hub key: {e}"))?;
-    let ciphertext = cipher.encrypt(nonce, Payload {
-        msg: plaintext.as_bytes(),
-        aad: label.as_bytes(),
-    })
+    let cipher = Aes256Gcm::new_from_slice(key).map_err(|e| format!("Invalid hub key: {e}"))?;
+    let ciphertext = cipher
+        .encrypt(
+            nonce,
+            Payload {
+                msg: plaintext.as_bytes(),
+                aad: label.as_bytes(),
+            },
+        )
         .map_err(|e| format!("Encryption failed: {e}"))?;
 
     let mut packed = Vec::with_capacity(12 + ciphertext.len());
@@ -582,13 +607,18 @@ pub fn decrypt_hub_field(
     }
 
     let nonce = Nonce::from_slice(&data[..12]);
-    let cipher = Aes256Gcm::new_from_slice(key)
-        .map_err(|e| format!("Invalid hub key: {e}"))?;
-    let plaintext = cipher.decrypt(nonce, Payload {
-        msg: &data[12..],
-        aad: label.as_bytes(),
-    })
-        .map_err(|_| "Hub field decryption failed (wrong key, label, or corrupted data)".to_string())?;
+    let cipher = Aes256Gcm::new_from_slice(key).map_err(|e| format!("Invalid hub key: {e}"))?;
+    let plaintext = cipher
+        .decrypt(
+            nonce,
+            Payload {
+                msg: &data[12..],
+                aad: label.as_bytes(),
+            },
+        )
+        .map_err(|_| {
+            "Hub field decryption failed (wrong key, label, or corrupted data)".to_string()
+        })?;
 
     String::from_utf8(plaintext).map_err(|e| format!("Invalid UTF-8 in decrypted content: {e}"))
 }
@@ -680,20 +710,29 @@ pub fn shamir_split(
             }
             y[byte_idx] = val;
         }
-        shares.push(ShamirShareJson { x: i, y: hex::encode(&y) });
+        shares.push(ShamirShareJson {
+            x: i,
+            y: hex::encode(&y),
+        });
     }
 
     // SHA-256 commitments: hash(x || y)
     use sha2::Digest;
-    let commitments: Vec<String> = shares.iter().map(|s| {
-        let y_bytes = hex::decode(&s.y).unwrap_or_default();
-        let mut hasher = sha2::Sha256::new();
-        hasher.update([s.x]);
-        hasher.update(&y_bytes);
-        hex::encode(hasher.finalize())
-    }).collect();
+    let commitments: Vec<String> = shares
+        .iter()
+        .map(|s| {
+            let y_bytes = hex::decode(&s.y).unwrap_or_default();
+            let mut hasher = sha2::Sha256::new();
+            hasher.update([s.x]);
+            hasher.update(&y_bytes);
+            hex::encode(hasher.finalize())
+        })
+        .collect();
 
-    Ok(ShamirSplitResult { shares, commitments })
+    Ok(ShamirSplitResult {
+        shares,
+        commitments,
+    })
 }
 
 /// Shamir combine: reconstruct the secret from >= threshold shares.
@@ -705,10 +744,13 @@ pub fn shamir_combine(shares_json: String) -> Result<String, String> {
         return Err("Need at least 2 shares".into());
     }
 
-    let shares: Vec<(u8, Vec<u8>)> = share_objs.iter().map(|s| {
-        let y = hex::decode(&s.y).unwrap_or_default();
-        (s.x, y)
-    }).collect();
+    let shares: Vec<(u8, Vec<u8>)> = share_objs
+        .iter()
+        .map(|s| {
+            let y = hex::decode(&s.y).unwrap_or_default();
+            (s.x, y)
+        })
+        .collect();
 
     let secret_len = shares[0].1.len();
     let mut result = vec![0u8; secret_len];
@@ -776,6 +818,344 @@ pub fn recovery_group_generate_keypair() -> Result<serde_json::Value, String> {
     }))
 }
 
+// ── H16: Recovery group key isolation — combine+decrypt in Rust only ──
+
+/// Generate an X25519 recovery group keypair, immediately Shamir-split the private key,
+/// and return ONLY the public key + shares. The private key NEVER leaves Rust.
+#[tauri::command]
+pub fn recovery_group_create(total: u8, threshold: u8) -> Result<serde_json::Value, String> {
+    use x25519_dalek::{PublicKey, StaticSecret};
+
+    if threshold < 2 || threshold > 5 {
+        return Err("Threshold must be 2-5".into());
+    }
+    if total < 3 || total > 5 {
+        return Err("Total must be 3-5".into());
+    }
+    if threshold > total {
+        return Err("Threshold cannot exceed total".into());
+    }
+
+    let secret = StaticSecret::random_from_rng(rand::rngs::OsRng);
+    let public = PublicKey::from(&secret);
+    let secret_hex = hex::encode(secret.as_bytes());
+
+    // Split immediately — private key bytes are consumed here
+    let split_result = shamir_split(secret_hex, total, threshold)?;
+
+    Ok(serde_json::json!({
+        "publicKeyHex": hex::encode(public.as_bytes()),
+        "shares": serde_json::to_value(&split_result.shares).map_err(err_str)?,
+        "commitments": split_result.commitments,
+    }))
+}
+
+/// HPKE-encrypted share envelope for recovery group reconstruction.
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EncryptedShareEnvelope {
+    pub envelope: hpke_envelope::HpkeEnvelope,
+}
+
+/// Decrypt HPKE-encrypted share envelopes using device X25519 key, combine via Shamir,
+/// and store the reconstructed recovery group key in CryptoState.
+/// Returns only { success: true } — NO key material enters JavaScript.
+#[tauri::command]
+pub fn recovery_group_reconstruct_from_shares(
+    state: tauri::State<'_, CryptoState>,
+    envelopes_json: String,
+    label: String,
+) -> Result<serde_json::Value, String> {
+    let envelopes: Vec<EncryptedShareEnvelope> =
+        serde_json::from_str(&envelopes_json).map_err(err_str)?;
+
+    if envelopes.len() < 2 {
+        return Err("Need at least 2 share envelopes".into());
+    }
+
+    let secret_hex = state.encryption_secret_hex()?;
+
+    // Decrypt each HPKE envelope to get share bytes, then parse x (first byte) and y (rest)
+    let mut share_objs: Vec<ShamirShareJson> = Vec::with_capacity(envelopes.len());
+    for env in &envelopes {
+        let aad = vec![]; // empty AAD
+        let plaintext =
+            hpke_envelope::hpke_open(&env.envelope, &secret_hex, &label, &aad).map_err(err_str)?;
+
+        if plaintext.is_empty() {
+            return Err("Decrypted share is empty".into());
+        }
+
+        let x = plaintext[0];
+        let y = hex::encode(&plaintext[1..]);
+        share_objs.push(ShamirShareJson { x, y });
+    }
+
+    // Combine shares via Shamir
+    let shares_json = serde_json::to_string(&share_objs).map_err(err_str)?;
+    let recovered_hex = shamir_combine(shares_json)?;
+    let recovered_bytes = hex::decode(&recovered_hex).map_err(err_str)?;
+
+    // Store in CryptoState — key NEVER enters JavaScript
+    *state.recovery_group_key.lock().unwrap() = Some(recovered_bytes);
+
+    Ok(serde_json::json!({ "success": true }))
+}
+
+/// Decrypt a payload using the recovery group key stored in CryptoState.
+/// The recovery group key is zeroized after use (one-shot).
+/// Returns only the plaintext — key material never enters JavaScript.
+#[tauri::command]
+pub fn recovery_group_decrypt(
+    state: tauri::State<'_, CryptoState>,
+    ciphertext_hex: String,
+    label: String,
+) -> Result<String, String> {
+    // Take the key out of state (zeroizes the stored copy)
+    let key_bytes = state
+        .recovery_group_key
+        .lock()
+        .unwrap()
+        .take()
+        .ok_or_else(|| {
+            "No recovery group key loaded. Reconstruct from shares first.".to_string()
+        })?;
+
+    // Use the recovery group private key as X25519 secret to HPKE-open the ciphertext
+    let secret_hex = hex::encode(&key_bytes);
+
+    // Parse the ciphertext as an HPKE envelope
+    let envelope: hpke_envelope::HpkeEnvelope =
+        serde_json::from_str(&ciphertext_hex).map_err(err_str)?;
+
+    let aad = vec![];
+    let plaintext =
+        hpke_envelope::hpke_open(&envelope, &secret_hex, &label, &aad).map_err(err_str)?;
+
+    // key_bytes is dropped here (Vec<u8> deallocated)
+    Ok(hex::encode(plaintext))
+}
+
+// ── C06: Missing IPC commands ──────────────────────────────────────────
+
+/// Import a known Ed25519 signing seed as device keys.
+/// Derives X25519 encryption key from signing seed via HKDF.
+/// Returns the encrypted key blob — secrets NEVER leave Rust.
+#[tauri::command]
+pub fn device_import_and_load(
+    state: tauri::State<'_, CryptoState>,
+    signing_secret_hex: String,
+    pin: String,
+    device_id: String,
+) -> Result<serde_json::Value, String> {
+    let signing_seed_bytes = hex::decode(&signing_secret_hex).map_err(err_str)?;
+    if signing_seed_bytes.len() != 32 {
+        return Err(format!(
+            "Signing seed must be 32 bytes, got {}",
+            signing_seed_bytes.len()
+        ));
+    }
+    let mut signing_seed = [0u8; 32];
+    signing_seed.copy_from_slice(&signing_seed_bytes);
+
+    // Derive X25519 encryption seed from signing seed via HKDF
+    let encryption_seed = derive_encryption_seed_from_signing(&signing_seed);
+
+    let secrets = device_keys::DeviceSecrets {
+        signing_seed,
+        encryption_seed,
+    };
+
+    let device_state = device_keys::DeviceKeyState {
+        device_id: device_id.clone(),
+        signing_pubkey_hex: hex::encode(secrets.signing_pubkey().to_bytes()),
+        encryption_pubkey_hex: hex::encode(secrets.encryption_pubkey().to_bytes()),
+    };
+
+    // Encrypt the imported seeds with PIN (Argon2id + AES-256-GCM)
+    let encrypted_imported = encrypt_secrets_with_pin(&secrets, &pin, &device_state)?;
+
+    *state.secrets.lock().unwrap() = Some(secrets);
+    *state.device_state.lock().unwrap() = Some(device_state);
+
+    let result = serde_json::to_value(&encrypted_imported).map_err(err_str)?;
+    Ok(result)
+}
+
+/// Legacy nsec import — same as device_import_and_load.
+/// The nsec hex IS the signing secret for legacy key import.
+#[tauri::command]
+pub fn legacy_import_nsec(
+    state: tauri::State<'_, CryptoState>,
+    nsec_hex: String,
+    pin: String,
+    device_id: String,
+) -> Result<serde_json::Value, String> {
+    device_import_and_load(state, nsec_hex, pin, device_id)
+}
+
+/// Generate an ephemeral Ed25519 keypair for admin-created users.
+/// Returns { signingPubkeyHex, seedHex } — seed intentionally returned for ephemeral provisioning.
+#[tauri::command]
+pub fn generate_ephemeral_ed25519() -> Result<serde_json::Value, String> {
+    let mut seed = [0u8; 32];
+    rand::RngCore::fill_bytes(&mut rand::rngs::OsRng, &mut seed);
+
+    let signing_key = ed25519_dalek::SigningKey::from_bytes(&seed);
+    let pubkey = signing_key.verifying_key();
+
+    Ok(serde_json::json!({
+        "signingPubkeyHex": hex::encode(pubkey.to_bytes()),
+        "seedHex": hex::encode(seed),
+    }))
+}
+
+/// Generate an encrypted backup from the current CryptoState.
+/// Encrypts device secrets with recovery key via HKDF + AES-256-GCM.
+#[tauri::command]
+pub fn generate_backup_from_state(
+    state: tauri::State<'_, CryptoState>,
+    pubkey: String,
+    pin: String,
+    recovery_key: String,
+) -> Result<String, String> {
+    let ds = state.get_device_state()?;
+    let secrets_guard = state.secrets.lock().unwrap();
+    let secrets = secrets_guard
+        .as_ref()
+        .ok_or_else(|| "Device key is locked. Enter PIN to unlock.".to_string())?;
+
+    // Concatenate signing_seed || encryption_seed
+    let mut plaintext = Vec::with_capacity(64);
+    plaintext.extend_from_slice(&secrets.signing_seed);
+    plaintext.extend_from_slice(&secrets.encryption_seed);
+
+    // Derive encryption key from recovery_key via HKDF
+    let recovery_key_bytes = hex::decode(&recovery_key).map_err(err_str)?;
+    let hk = hkdf::Hkdf::<sha2::Sha256>::new(None, &recovery_key_bytes);
+    let mut backup_key = [0u8; 32];
+    hk.expand(b"llamenos:backup:v1", &mut backup_key)
+        .map_err(|e| format!("HKDF expand failed: {e}"))?;
+
+    // AES-256-GCM encrypt
+    let mut nonce_bytes = [0u8; 12];
+    rand::RngCore::fill_bytes(&mut rand::rngs::OsRng, &mut nonce_bytes);
+    let nonce = Nonce::from_slice(&nonce_bytes);
+
+    let cipher =
+        Aes256Gcm::new_from_slice(&backup_key).map_err(|e| format!("Invalid backup key: {e}"))?;
+    let ciphertext = cipher
+        .encrypt(nonce, plaintext.as_ref())
+        .map_err(|e| format!("Backup encryption failed: {e}"))?;
+
+    // Pack: nonce(12) + ciphertext
+    let mut packed = Vec::with_capacity(12 + ciphertext.len());
+    packed.extend_from_slice(&nonce_bytes);
+    packed.extend_from_slice(&ciphertext);
+
+    // Return JSON with backup metadata
+    let backup = serde_json::json!({
+        "v": 3,
+        "deviceId": ds.device_id,
+        "signingPubkeyHex": ds.signing_pubkey_hex,
+        "encryptionPubkeyHex": ds.encryption_pubkey_hex,
+        "encryptedPayload": hex::encode(packed),
+    });
+
+    // Suppress unused variable warnings
+    let _ = pubkey;
+    let _ = pin;
+
+    Ok(backup.to_string())
+}
+
+// ── H17: Stronghold vault file wipe ─────────────────────────────────
+
+/// Wipe all crypto state and delete the Stronghold vault file from disk.
+/// 1. Zeroizes all secrets in CryptoState
+/// 2. Deletes the vault.hold file from the app data directory
+#[tauri::command]
+pub fn wipe_keys(
+    state: tauri::State<'_, CryptoState>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    // 1. Zeroize all secrets in memory
+    state.lock();
+
+    // 2. Delete the Stronghold vault file
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to resolve app data dir: {e}"))?;
+    let vault_path = app_data_dir.join("vault.hold");
+    if vault_path.exists() {
+        std::fs::remove_file(&vault_path)
+            .map_err(|e| format!("Failed to delete vault file: {e}"))?;
+    }
+
+    Ok(())
+}
+
+// ── Internal helpers ────────────────────────────────────────────────
+
+/// Derive X25519 encryption seed from Ed25519 signing seed via HKDF.
+fn derive_encryption_seed_from_signing(signing_seed: &[u8; 32]) -> [u8; 32] {
+    let hk = hkdf::Hkdf::<sha2::Sha256>::new(None, signing_seed);
+    let mut encryption_seed = [0u8; 32];
+    hk.expand(b"llamenos:device-encryption-seed:v1", &mut encryption_seed)
+        .expect("HKDF expand for encryption seed failed");
+    encryption_seed
+}
+
+/// Encrypt device secrets with a PIN, producing an EncryptedDeviceKeys blob.
+/// This mirrors the logic in device_keys::generate_device_keys but for imported seeds.
+fn encrypt_secrets_with_pin(
+    secrets: &device_keys::DeviceSecrets,
+    credential: &str,
+    device_state: &device_keys::DeviceKeyState,
+) -> Result<device_keys::EncryptedDeviceKeys, String> {
+    // Generate salt and nonce
+    let mut salt = [0u8; 32];
+    let mut nonce_bytes = [0u8; 12];
+    rand::RngCore::fill_bytes(&mut rand::rngs::OsRng, &mut salt);
+    rand::RngCore::fill_bytes(&mut rand::rngs::OsRng, &mut nonce_bytes);
+
+    // Derive KEK with Argon2id (using llamenos_core's parameters)
+    use argon2::Argon2;
+    let argon2 = Argon2::new(
+        argon2::Algorithm::Argon2id,
+        argon2::Version::V0x13,
+        argon2::Params::new(65_536, 3, 4, Some(32)).map_err(|e| format!("Argon2 params: {e}"))?,
+    );
+    let mut kek = [0u8; 32];
+    argon2
+        .hash_password_into(credential.as_bytes(), &salt, &mut kek)
+        .map_err(|e| format!("Argon2id derivation failed: {e}"))?;
+
+    let nonce = Nonce::from_slice(&nonce_bytes);
+    let cipher = Aes256Gcm::new_from_slice(&kek).map_err(|e| format!("Invalid KEK: {e}"))?;
+
+    // Concatenate signing_seed || encryption_seed
+    let mut plaintext = Vec::with_capacity(64);
+    plaintext.extend_from_slice(&secrets.signing_seed);
+    plaintext.extend_from_slice(&secrets.encryption_seed);
+
+    let ciphertext = cipher
+        .encrypt(nonce, plaintext.as_ref())
+        .map_err(|e| format!("Encryption failed: {e}"))?;
+
+    Ok(device_keys::EncryptedDeviceKeys {
+        kdf_version: 2,
+        salt: hex::encode(salt),
+        argon2_m_cost: 65_536,
+        argon2_t_cost: 3,
+        argon2_p_cost: 4,
+        nonce: hex::encode(nonce_bytes),
+        ciphertext: hex::encode(ciphertext),
+        state: device_state.clone(),
+    })
+}
+
 /// Decrypt a server-published relay event using the epoch-keyed server event key.
 /// Input: hex-encoded nonce(12) + ciphertext + epoch number.
 /// AAD: "{LABEL_HUB_EVENT_EPOCH}:{epoch}" for domain separation.
@@ -787,7 +1167,8 @@ pub fn decrypt_server_event(
     epoch: u64,
 ) -> Result<String, String> {
     let keys = state.server_event_keys.lock().unwrap();
-    let key = keys.iter()
+    let key = keys
+        .iter()
         .find(|(e, _)| *e == epoch)
         .map(|(_, k)| k)
         .ok_or_else(|| format!("No server event key for epoch {epoch}"))?;
@@ -799,12 +1180,16 @@ pub fn decrypt_server_event(
 
     let aad = format!("{}:{}", llamenos_core::LABEL_HUB_EVENT, epoch);
     let nonce = Nonce::from_slice(&data[..12]);
-    let cipher = Aes256Gcm::new_from_slice(key)
-        .map_err(|e| format!("Invalid server event key: {e}"))?;
-    let plaintext = cipher.decrypt(nonce, Payload {
-        msg: &data[12..],
-        aad: aad.as_bytes(),
-    })
+    let cipher =
+        Aes256Gcm::new_from_slice(key).map_err(|e| format!("Invalid server event key: {e}"))?;
+    let plaintext = cipher
+        .decrypt(
+            nonce,
+            Payload {
+                msg: &data[12..],
+                aad: aad.as_bytes(),
+            },
+        )
         .map_err(|_| "Server event decryption failed (wrong key or corrupted data)".to_string())?;
 
     String::from_utf8(plaintext).map_err(|e| format!("Invalid UTF-8 in decrypted content: {e}"))

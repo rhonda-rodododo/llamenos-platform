@@ -10,10 +10,9 @@ import {
 import {
   deviceGenerateAndLoad,
   getDevicePubkeys,
-  shamirCombine,
-  hpkeOpenFromState,
-  type ShamirShare,
+  recoveryGroupReconstructFromShares,
   type HpkeEnvelope,
+  type EncryptedShareEnvelope,
 } from '@/lib/platform'
 import { PinInput } from '@/components/pin-input'
 import { Button } from '@/components/ui/button'
@@ -99,21 +98,18 @@ export function AccountRecoveryFlow({ onBack }: Props) {
     async function complete() {
       if (!session) return
       try {
-        const shares: ShamirShare[] = []
-        for (const contribution of session.contributions) {
-          const envelope = JSON.parse(contribution.encryptedShare) as HpkeEnvelope
-          const shareHex = await hpkeOpenFromState(
-            envelope,
-            'llamenos:recovery-group:share-contribute:v1',
-            '',
-          )
-          const x = parseInt(shareHex.slice(0, 2), 16)
-          const yHex = shareHex.slice(2)
-          shares.push({ x, y: yHex })
-        }
+        // H16: Pass all encrypted envelopes to Rust in one IPC call.
+        // The private key is reconstructed inside Rust and NEVER enters JavaScript.
+        const envelopes: EncryptedShareEnvelope[] = session.contributions.map(
+          (contribution) => ({
+            envelope: JSON.parse(contribution.encryptedShare) as HpkeEnvelope,
+          }),
+        )
 
-        // Combine shares to reconstruct recovery group private key
-        await shamirCombine(shares)
+        await recoveryGroupReconstructFromShares(
+          envelopes,
+          'llamenos:recovery-group:share-contribute:v1',
+        )
 
         setStep('set-pin')
       } catch (err) {

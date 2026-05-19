@@ -615,20 +615,9 @@ async function getSecureStore() {
       },
     }
   }
-  // Test/browser fallback — localStorage
-  return {
-    async get<T>(key: string): Promise<T | null> {
-      const raw = localStorage.getItem(`llamenos:${key}`)
-      if (raw === null) return null
-      return JSON.parse(raw) as T
-    },
-    async set(key: string, value: unknown): Promise<void> {
-      localStorage.setItem(`llamenos:${key}`, JSON.stringify(value))
-    },
-    async delete(key: string): Promise<void> {
-      localStorage.removeItem(`llamenos:${key}`)
-    },
-  }
+  // H21: No localStorage fallback — Tauri Stronghold is required for device key storage.
+  // Test builds have __TAURI_INTERNALS__ registered so useTauri is true.
+  throw new Error('Secure storage unavailable — Tauri Stronghold required for device key storage')
 }
 
 /**
@@ -667,6 +656,18 @@ export async function clearStoredKey(): Promise<void> {
   const store = await getSecureStore()
   await store.delete(STORE_KEY)
   await lockCrypto()
+}
+
+/**
+ * H17: Wipe the Stronghold vault file from disk and zeroize all CryptoState.
+ * This is the secure wipe path — deletes the encrypted vault file entirely.
+ */
+export async function wipeVaultFile(): Promise<void> {
+  if (useTauri) {
+    await tauriInvoke<void>('wipe_keys')
+    return
+  }
+  throw new Error('Vault wipe unavailable — Tauri required')
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -1210,6 +1211,69 @@ export async function recoveryGroupGenerateKeypair(): Promise<RecoveryGroupKeypa
     return tauriInvoke<RecoveryGroupKeypair>('recovery_group_generate_keypair')
   }
   throw new Error('WASM recovery group keypair not yet implemented')
+}
+
+// ── H16: Recovery group key isolation (combine+decrypt stays in Rust) ──
+
+/** Result of recovery_group_create — private key NEVER leaves Rust. */
+export interface RecoveryGroupCreateResult {
+  publicKeyHex: string
+  shares: ShamirShare[]
+  commitments: string[]
+}
+
+/**
+ * Generate an X25519 recovery group keypair and immediately Shamir-split it.
+ * The private key is split inside Rust and NEVER enters JavaScript.
+ */
+export async function recoveryGroupCreate(
+  total: number,
+  threshold: number,
+): Promise<RecoveryGroupCreateResult> {
+  if (useTauri) {
+    return tauriInvoke<RecoveryGroupCreateResult>('recovery_group_create', { total, threshold })
+  }
+  throw new Error('WASM recovery group create not yet implemented')
+}
+
+/** Encrypted share envelope for recovery group reconstruction. */
+export interface EncryptedShareEnvelope {
+  envelope: HpkeEnvelope
+}
+
+/**
+ * Decrypt HPKE-encrypted share envelopes and combine via Shamir in Rust.
+ * The reconstructed key is stored in CryptoState — it NEVER enters JavaScript.
+ */
+export async function recoveryGroupReconstructFromShares(
+  envelopes: EncryptedShareEnvelope[],
+  label: string,
+): Promise<{ success: boolean }> {
+  if (useTauri) {
+    return tauriInvoke<{ success: boolean }>('recovery_group_reconstruct_from_shares', {
+      envelopesJson: JSON.stringify(envelopes),
+      label,
+    })
+  }
+  throw new Error('WASM recovery group reconstruct not yet implemented')
+}
+
+/**
+ * Decrypt a payload using the recovery group key stored in CryptoState.
+ * The key is zeroized after use (one-shot).
+ * Returns only the decrypted plaintext hex — key material never enters JS.
+ */
+export async function recoveryGroupDecrypt(
+  ciphertextJson: string,
+  label: string,
+): Promise<string> {
+  if (useTauri) {
+    return tauriInvoke<string>('recovery_group_decrypt', {
+      ciphertextHex: ciphertextJson,
+      label,
+    })
+  }
+  throw new Error('WASM recovery group decrypt not yet implemented')
 }
 
 // ── Updater platform support ─────────────────────────────────────────

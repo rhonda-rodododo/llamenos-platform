@@ -262,3 +262,101 @@ test.describe('Recovery Group - IPC Mock Verification', () => {
     expect(result.rejected).toBe(false)
   })
 })
+
+test.describe('Epic C - Key Isolation & Wipe Completeness', () => {
+  async function waitForInvoke(page: import('@playwright/test').Page) {
+    await page.goto('/login')
+    await page.waitForFunction(
+      () => typeof (window as any)[Symbol.for('llamenos_test_invoke')] === 'function',
+      { timeout: 15_000 },
+    )
+  }
+
+  test('recovery group create does not expose private key to webview', async ({ page }) => {
+    await waitForInvoke(page)
+
+    const result = await page.evaluate(async () => {
+      const invoke = (window as any)[Symbol.for('llamenos_test_invoke')] as
+        (cmd: string, args?: Record<string, unknown>) => Promise<unknown>
+
+      const createResult = (await invoke('recovery_group_create', {
+        total: 3,
+        threshold: 2,
+      })) as { publicKeyHex: string; shares: Array<{ x: number; y: string }>; commitments: string[] }
+
+      // The result should contain publicKeyHex, shares, and commitments but NO privateKeyHex
+      const resultJson = JSON.stringify(createResult)
+      return {
+        hasPublicKey: createResult.publicKeyHex.length === 64,
+        hasShares: createResult.shares.length === 3,
+        hasCommitments: createResult.commitments.length === 3,
+        noPrivateKeyField: !('privateKeyHex' in createResult),
+        noPrivateKeyInJson: !resultJson.includes('privateKeyHex'),
+      }
+    })
+
+    expect(result.hasPublicKey).toBe(true)
+    expect(result.hasShares).toBe(true)
+    expect(result.hasCommitments).toBe(true)
+    expect(result.noPrivateKeyField).toBe(true)
+    expect(result.noPrivateKeyInJson).toBe(true)
+  })
+
+  test('device wipe clears mock vault state', async ({ page }) => {
+    await waitForInvoke(page)
+
+    const result = await page.evaluate(async () => {
+      const invoke = (window as any)[Symbol.for('llamenos_test_invoke')] as
+        (cmd: string, args?: Record<string, unknown>) => Promise<unknown>
+
+      // Generate keys first
+      await invoke('device_generate_and_load', {
+        pin: '12345678',
+        deviceId: 'test-device-wipe',
+      })
+
+      // Confirm unlocked
+      const unlockedBefore = (await invoke('is_crypto_unlocked')) as boolean
+
+      // Wipe
+      await invoke('wipe_keys')
+
+      // Confirm locked
+      const unlockedAfter = (await invoke('is_crypto_unlocked')) as boolean
+
+      // Attempting to get pubkeys should fail
+      let pubkeyError = false
+      try {
+        await invoke('get_device_pubkeys')
+      } catch {
+        pubkeyError = true
+      }
+
+      return { unlockedBefore, unlockedAfter, pubkeyError }
+    })
+
+    expect(result.unlockedBefore).toBe(true)
+    expect(result.unlockedAfter).toBe(false)
+    expect(result.pubkeyError).toBe(true)
+  })
+
+  test('no localStorage fallback for device keys', async ({ page }) => {
+    await waitForInvoke(page)
+
+    const result = await page.evaluate(() => {
+      // Check that no llamenos:-prefixed keys exist in localStorage
+      const llamenosKeys: string[] = []
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i)
+        if (key && key.startsWith('llamenos:')) {
+          llamenosKeys.push(key)
+        }
+      }
+      // Filter out test infrastructure keys (lockout state)
+      const deviceKeys = llamenosKeys.filter(k => !k.includes('__test_'))
+      return { deviceKeyCount: deviceKeys.length, keys: deviceKeys }
+    })
+
+    expect(result.deviceKeyCount).toBe(0)
+  })
+})

@@ -95,6 +95,9 @@ let schnorrSecretBytes: Uint8Array | null = null // secp256k1 secret for Schnorr
 // ── Hub key mock state ───────────────────────────────────────────────
 let mockHubKey: Uint8Array | null = null
 
+// ── Recovery group key mock state ───────────────────────────────────
+let mockRecoveryGroupKey: Uint8Array | null = null
+
 // ── PIN lockout tracking ─────────────────────────────────────────────
 // Mirrors Rust-side lockout logic: escalating lockouts at thresholds, wipe at 10.
 // Persisted to localStorage to survive page reloads (simulates Rust-side vault storage).
@@ -934,6 +937,95 @@ const commands: Record<string, CommandHandler> = {
       publicKeyHex: bytesToHex(publicKey),
       privateKeyHex: bytesToHex(privateKey),
     }
+  },
+
+  // H16: Recovery group key isolation — create with immediate Shamir split
+  recovery_group_create: (a) => {
+    const total = a.total as number
+    const threshold = a.threshold as number
+
+    if (threshold < 2 || threshold > 5) throw new Error('Threshold must be 2-5')
+    if (total < 3 || total > 5) throw new Error('Total must be 3-5')
+    if (threshold > total) throw new Error('Threshold cannot exceed total')
+
+    const privateKey = randomBytes(32)
+    const publicKey = x25519.getPublicKey(privateKey)
+    const secretHex = bytesToHex(privateKey)
+
+    // Split immediately — private key never returned to JS
+    const splitResult = commands.shamir_split({ secretHex, total, threshold }) as {
+      shares: Array<{ x: number; y: string }>
+      commitments: string[]
+    }
+
+    return {
+      publicKeyHex: bytesToHex(publicKey),
+      shares: splitResult.shares,
+      commitments: splitResult.commitments,
+    }
+  },
+
+  // H16: Reconstruct recovery group key from HPKE-encrypted share envelopes
+  recovery_group_reconstruct_from_shares: (a) => {
+    const envelopes = JSON.parse(a.envelopesJson as string) as Array<{
+      envelope: { v: number; labelId: number; enc: string; ct: string }
+    }>
+    const label = a.label as string
+
+    if (envelopes.length < 2) throw new Error('Need at least 2 share envelopes')
+
+    const secrets = requireSecrets()
+    const secretHex = bytesToHex(secrets.encryptionSeed)
+
+    // Decrypt each envelope to get share bytes
+    const shareObjs: Array<{ x: number; y: string }> = []
+    for (const env of envelopes) {
+      const plaintext = hpkeOpenMock(env.envelope, secretHex, label, new Uint8Array(0))
+      const x = plaintext[0]
+      const yHex = bytesToHex(plaintext.slice(1))
+      shareObjs.push({ x, y: yHex })
+    }
+
+    // Combine via Shamir
+    const recoveredHex = commands.shamir_combine({
+      sharesJson: JSON.stringify(shareObjs),
+    }) as string
+
+    // Store in mock state (key never enters JS in real Tauri)
+    mockRecoveryGroupKey = hexToBytes(recoveredHex)
+
+    return { success: true }
+  },
+
+  // H16: Decrypt using stored recovery group key (one-shot, zeroized after)
+  recovery_group_decrypt: (a) => {
+    if (!mockRecoveryGroupKey) {
+      throw new Error('No recovery group key loaded. Reconstruct from shares first.')
+    }
+    const ciphertextHex = a.ciphertextHex as string
+    const label = a.label as string
+
+    const envelope = JSON.parse(ciphertextHex) as { v: number; labelId: number; enc: string; ct: string }
+    const secretHex = bytesToHex(mockRecoveryGroupKey)
+
+    const plaintext = hpkeOpenMock(envelope, secretHex, label, new Uint8Array(0))
+
+    // Zeroize after use
+    mockRecoveryGroupKey = null
+
+    return bytesToHex(plaintext)
+  },
+
+  // H17: Wipe all keys and vault
+  wipe_keys: () => {
+    mockSecrets = null
+    mockDeviceState = null
+    mockEncryptedKeys = null
+    mockHubKey = null
+    mockRecoveryGroupKey = null
+    schnorrSecretBytes = null
+    // In test mode, also clear lockout state
+    resetPinLockout()
   },
 
   // --- SAS emoji verification ---

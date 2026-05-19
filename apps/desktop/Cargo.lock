@@ -3167,7 +3167,10 @@ name = "llamenos-desktop"
 version = "0.18.0"
 dependencies = [
  "aes-gcm",
+ "argon2",
+ "ed25519-dalek",
  "hex",
+ "hkdf",
  "hmac",
  "llamenos-core",
  "pbkdf2",
