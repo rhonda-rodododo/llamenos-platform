@@ -134,8 +134,9 @@ enum ReportFieldType: String, Sendable {
 }
 
 // MARK: - FieldOption
-// Client-only: structurally identical to generated `PurpleOption`/`CunningOption`
-// but kept with a clean name for readability.
+// Client-only: structurally identical to many generated `*Option` types
+// (IndigoOption, PurpleOption, etc.) but uses a stable, readable name
+// since quicktype names change when schemas are added/removed.
 
 /// Key-label pair for select and multiselect field options.
 struct FieldOption: Codable, Equatable, Sendable {
@@ -144,9 +145,8 @@ struct FieldOption: Codable, Equatable, Sendable {
 }
 
 // MARK: - FieldDefaultValue
-// Structurally identical to generated `FieldValue` (same Codable shape).
-// Kept as separate type because call sites use `FieldDefaultValue` extensively
-// and the generated name `FieldValue` would conflict with other uses.
+// Client-only: structurally similar to generated `FieldValue` but uses a
+// clean enum with associated values rather than quicktype's class-based approach.
 
 /// Type-erased default value for a field definition. Matches the backend's
 /// `defaultValue` which can be a string, number, or boolean.
@@ -213,21 +213,10 @@ struct FieldShowWhen: Codable, Equatable, Sendable {
 }
 
 // MARK: - StatusOption
-// Structurally identical to generated `ReportTypeStatus` / `ReportTypeDefinitionStatus`.
-// Kept with `Identifiable` + `Equatable` conformances for SwiftUI compatibility.
+// Typealias to generated `ReportTypeStatus` (= CaseEnumOption) — identical fields:
+// {value, label, color?, icon?, order, isClosed?, isDefault?, isDeprecated?}.
 
-/// Status option with display metadata, used in report type definitions.
-struct StatusOption: Codable, Identifiable, Equatable, Sendable {
-    var id: String { value }
-    let value: String
-    let label: String
-    let color: String?
-    let order: Int
-    let isClosed: Bool?
-    let isDefault: Bool?
-    let isDeprecated: Bool?
-    let icon: String?
-}
+typealias StatusOption = ReportTypeStatus
 
 // MARK: - ClientReportTypesResponse
 
