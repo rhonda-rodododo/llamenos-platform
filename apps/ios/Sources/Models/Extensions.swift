@@ -18,6 +18,22 @@ typealias NoteRecipientEnvelope = RecipientEnvelope
 /// Previously `EncryptedNoteResponse` — now uses generated `NoteResponse`.
 typealias EncryptedNoteResponse = NoteResponse
 
+// MARK: - Codegen Deduplication Aliases
+// The protocol codegen now deduplicates identical anonymous inline schemas
+// into shared top-level types. These aliases map old type names to the new shared names.
+
+/// `EvidenceClassification` → `SharedClassification` (deduplicated across Evidence/EvidenceMetadata).
+typealias EvidenceClassification = SharedClassification
+
+/// `EventType` → `SharedEventType` (deduplicated across SecurityEvent/SecurityEventListResponseEvent).
+typealias EventType = SharedEventType
+
+/// `ChannelConfigClass` → `SharedChannelConfig` (deduplicated channel config inner type).
+typealias ChannelConfigClass = SharedChannelConfig
+
+/// `DeviceDetailListResponseDevice` → `SharedDevice` (deduplicated device inner type).
+typealias DeviceDetailListResponseDevice = SharedDevice
+
 // MARK: - NotePayload
 
 /// Decrypted note content matching the protocol spec (Appendix B).

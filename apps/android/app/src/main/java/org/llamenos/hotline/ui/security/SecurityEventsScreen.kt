@@ -15,7 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import org.llamenos.protocol.SecurityEventListResponseEvent
-import org.llamenos.protocol.EventType
+import org.llamenos.hotline.model.EventType
 
 @Composable
 fun SecurityEventsScreen(

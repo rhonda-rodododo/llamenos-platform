@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.llamenos.hotline.api.HubOnboardApi
 import org.llamenos.protocol.ChannelConfig
-import org.llamenos.protocol.ChannelConfigClass
+import org.llamenos.hotline.model.ChannelConfigClass
 import org.llamenos.protocol.HubChannelType
 import org.llamenos.protocol.HubOnboardingState
 import org.llamenos.protocol.HubQuota
