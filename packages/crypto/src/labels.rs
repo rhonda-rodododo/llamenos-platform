@@ -451,13 +451,13 @@ pub const LABEL_REGISTRY: &[&str] = &[
     // 80: EP02 Device Identity
     LABEL_SAS_DERIVE, // 80
     // 81-84: Shift/Availability (EP07)
-    LABEL_AVAILABILITY_REASON,  // 81
-    LABEL_RING_GROUP_NAME,      // 82
-    LABEL_SHIFT_NAME,           // 83
-    LABEL_SHIFT_OVERRIDE_NOTE,  // 84
+    LABEL_AVAILABILITY_REASON, // 81
+    LABEL_RING_GROUP_NAME,     // 82
+    LABEL_SHIFT_NAME,          // 83
+    LABEL_SHIFT_OVERRIDE_NOTE, // 84
     // 85-86: Teams/Tags (EP03)
-    LABEL_TEAM_ENCRYPT,         // 85
-    LABEL_TAG_ENCRYPT,          // 86
+    LABEL_TEAM_ENCRYPT, // 85
+    LABEL_TAG_ENCRYPT,  // 86
     // 87: Entity Type (EP06)
     LABEL_ENTITY_TYPE_DEFINITION, // 87
 ];
@@ -607,10 +607,7 @@ mod tests {
         assert_eq!(LABEL_SHIFT_OVERRIDE_NOTE, "llamenos:shift-override-note");
         assert_eq!(LABEL_TEAM_ENCRYPT, "llamenos:team-field:v1");
         assert_eq!(LABEL_TAG_ENCRYPT, "llamenos:tag-field:v1");
-        assert_eq!(
-            LABEL_ENTITY_TYPE_DEFINITION,
-            "llamenos:entity-type-def:v1"
-        );
+        assert_eq!(LABEL_ENTITY_TYPE_DEFINITION, "llamenos:entity-type-def:v1");
     }
 
     /// Verify registry index stability.
