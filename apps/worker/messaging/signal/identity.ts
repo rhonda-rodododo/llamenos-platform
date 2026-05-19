@@ -19,6 +19,7 @@ import type { Database } from '../../db'
 import { signalIdentities } from '../../db/schema'
 import type { SignalConfig, SignalTrustMode } from '@shared/types'
 import { createLogger } from '../../lib/logger'
+import { safeFetch } from '../../lib/safe-fetch'
 
 const logger = createLogger('signal-identity')
 
@@ -205,7 +206,7 @@ export class SignalIdentityService {
         body.verified_safety_number = params.verifiedSafetyNumber
       }
 
-      const response = await fetch(
+      const response = await safeFetch(
         `${bridgeUrl}/v1/identities/${encodeURIComponent(config.registeredNumber)}/trust/${encodeURIComponent(params.number)}`,
         {
           method: 'PUT',
@@ -214,6 +215,7 @@ export class SignalIdentityService {
             'Authorization': `Bearer ${config.bridgeApiKey}`,
           },
           body: JSON.stringify(body),
+          timeoutMs: 10_000,
         },
       )
 

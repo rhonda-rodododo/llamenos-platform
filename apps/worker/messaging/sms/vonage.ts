@@ -1,3 +1,4 @@
+import { safeFetch } from '../../lib/safe-fetch'
 import type {
   MessagingAdapter,
   IncomingMessage,
@@ -107,7 +108,7 @@ export class VonageSMSAdapter implements MessagingAdapter {
     }
 
     try {
-      const res = await fetch('https://rest.nexmo.com/sms/json', {
+      const res = await safeFetch('https://rest.nexmo.com/sms/json', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -152,7 +153,7 @@ export class VonageSMSAdapter implements MessagingAdapter {
     }
 
     try {
-      const res = await fetch('https://api.nexmo.com/v1/messages', {
+      const res = await safeFetch('https://api.nexmo.com/v1/messages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -182,7 +183,7 @@ export class VonageSMSAdapter implements MessagingAdapter {
   async getChannelStatus(): Promise<ChannelStatus> {
     try {
       // Check account balance as a health indicator
-      const res = await fetch(
+      const res = await safeFetch(
         `https://rest.nexmo.com/account/get-balance?api_key=${this.apiKey}&api_secret=${this.apiSecret}`,
         { method: 'GET' }
       )

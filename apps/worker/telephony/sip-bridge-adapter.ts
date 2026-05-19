@@ -1,3 +1,4 @@
+import { safeFetch } from '../lib/safe-fetch'
 import type {
   TelephonyAdapter,
   IncomingCallParams,
@@ -267,7 +268,7 @@ export abstract class SipBridgeAdapter implements TelephonyAdapter {
     const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payload))
     const signature = btoa(String.fromCharCode(...new Uint8Array(sig)))
 
-    const response = await fetch(url, {
+    const response = await safeFetch(url, {
       method,
       headers: {
         'Content-Type': 'application/json',
@@ -275,6 +276,7 @@ export abstract class SipBridgeAdapter implements TelephonyAdapter {
         'X-Bridge-Timestamp': timestamp,
       },
       body: bodyStr || undefined,
+      timeoutMs: 10_000,
     })
 
     if (!response.ok) {

@@ -1,3 +1,4 @@
+import { safeFetch } from '../../lib/safe-fetch'
 import type { TwilioSendMessageResponse } from './types'
 
 const TWILIO_API_BASE = 'https://api.twilio.com/2010-04-01/Accounts'
@@ -104,7 +105,7 @@ export class TwilioWhatsAppClient {
    */
   async checkHealth(): Promise<{ ok: boolean; error?: string }> {
     try {
-      const res = await fetch(
+      const res = await safeFetch(
         `${TWILIO_API_BASE}/${this.accountSid}.json`,
         {
           headers: {
@@ -127,7 +128,7 @@ export class TwilioWhatsAppClient {
   private async postMessage(
     params: URLSearchParams,
   ): Promise<TwilioSendMessageResponse> {
-    const res = await fetch(
+    const res = await safeFetch(
       `${TWILIO_API_BASE}/${this.accountSid}/Messages.json`,
       {
         method: 'POST',

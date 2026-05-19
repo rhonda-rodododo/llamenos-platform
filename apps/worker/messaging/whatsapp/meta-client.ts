@@ -1,3 +1,4 @@
+import { safeFetch } from '../../lib/safe-fetch'
 import type {
   MetaSendTextRequest,
   MetaSendMediaRequest,
@@ -140,7 +141,7 @@ export class MetaDirectClient {
    */
   async downloadMedia(mediaId: string): Promise<{ data: ArrayBuffer; mimeType: string }> {
     // Step 1: Get the media URL
-    const urlRes = await fetch(`${GRAPH_API_BASE}/${mediaId}`, {
+    const urlRes = await safeFetch(`${GRAPH_API_BASE}/${mediaId}`, {
       headers: { Authorization: `Bearer ${this.accessToken}` },
     })
 
@@ -152,8 +153,9 @@ export class MetaDirectClient {
     const mediaInfo = await urlRes.json() as MetaMediaUrlResponse
 
     // Step 2: Download the actual media binary
-    const mediaRes = await fetch(mediaInfo.url, {
+    const mediaRes = await safeFetch(mediaInfo.url, {
       headers: { Authorization: `Bearer ${this.accessToken}` },
+      timeoutMs: 60_000,
     })
 
     if (!mediaRes.ok) {
@@ -212,7 +214,7 @@ export class MetaDirectClient {
    */
   async checkHealth(): Promise<{ ok: boolean; error?: string }> {
     try {
-      const res = await fetch(
+      const res = await safeFetch(
         `${GRAPH_API_BASE}/${this.phoneNumberId}`,
         { headers: { Authorization: `Bearer ${this.accessToken}` } },
       )
@@ -231,7 +233,7 @@ export class MetaDirectClient {
   private async postMessage(
     payload: MetaSendTextRequest | MetaSendMediaRequest | MetaSendTemplateRequest,
   ): Promise<MetaSendResponse> {
-    const res = await fetch(
+    const res = await safeFetch(
       `${GRAPH_API_BASE}/${this.phoneNumberId}/messages`,
       {
         method: 'POST',

@@ -1,3 +1,4 @@
+import { safeFetch } from '../../lib/safe-fetch'
 import type { ChannelStatus } from '../adapter'
 import { TwilioSMSAdapter } from './twilio'
 
@@ -59,7 +60,7 @@ export class SignalWireSMSAdapter extends TwilioSMSAdapter {
 
   override async getChannelStatus(): Promise<ChannelStatus> {
     try {
-      const res = await fetch(
+      const res = await safeFetch(
         `${this.getApiBaseUrl()}.json`,
         {
           method: 'GET',

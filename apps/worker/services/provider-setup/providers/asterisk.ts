@@ -1,13 +1,11 @@
 import type {
   OwnedNumber,
   AvailableNumber,
-  NumberSearchQuery,
-  NumberProvisionRequest,
 } from '@protocol/schemas/provider-setup'
-import type { ProviderCapabilityImpl, ConnectionTestResult, SipTrunkConfig, WebhookUrls } from '../types'
+import type { ProviderCapabilityImpl, ConnectionTestResult, SipTrunkConfig } from '../types'
 import { ProviderApiError } from '../types'
 import { validateExternalUrl } from '../../../lib/ssrf-guard'
-import { nowISO } from '../utils'
+import { safeFetch } from '../../../lib/safe-fetch'
 
 export const asteriskProvider: ProviderCapabilityImpl = {
   providerType: 'asterisk',
@@ -23,13 +21,13 @@ export const asteriskProvider: ProviderCapabilityImpl = {
     }
     const start = Date.now()
     try {
-      const res = await fetch(`${ariUrl}/ari/asterisk/info`, {
+      const res = await safeFetch(`${ariUrl}/ari/asterisk/info`, {
         headers: {
           Authorization: `Basic ${btoa(`${ariUsername}:${ariPassword}`)}`,
         },
       })
       if (!res.ok) {
-        const text = await res.text()
+        await res.text()
         return {
           connected: false,
           latencyMs: Date.now() - start,
@@ -83,7 +81,7 @@ export const asteriskProvider: ProviderCapabilityImpl = {
       .join('')
       .slice(0, 32)
 
-    const res = await fetch(`${ariUrl}/ari/asterisk/config/dynamic/res_pjsip/auth/${sipUsername}`, {
+    const res = await safeFetch(`${ariUrl}/ari/asterisk/config/dynamic/res_pjsip/auth/${sipUsername}`, {
       method: 'PUT',
       headers: {
         Authorization: auth,

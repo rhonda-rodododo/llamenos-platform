@@ -1,10 +1,9 @@
 import { Hono } from 'hono'
-import type { AppEnv, Env, User } from '../types'
-import type { MessagingChannelType, MessagingConfig, WhatsAppConfig } from '@shared/types'
-import type { MessagingAdapter, IncomingMessage, MessageStatusUpdate } from './adapter'
+import type { AppEnv, Env } from '../types'
+import type { MessagingChannelType, WhatsAppConfig } from '@shared/types'
+import type { MessagingAdapter, IncomingMessage } from './adapter'
 import { getMessagingAdapterFromService } from '../lib/service-factories'
 import { audit } from '../services/audit'
-import { canClaimChannel } from '@shared/permissions'
 import { KIND_MESSAGE_NEW, KIND_CONVERSATION_ASSIGNED, KIND_MESSAGE_REACTION, KIND_TYPING_INDICATOR } from '@shared/event-kinds'
 import { publishEvent } from '../lib/ws-events'
 import { createPushDispatcherFromService } from '../lib/push-dispatch'
@@ -132,7 +131,7 @@ messaging.post('/:channel/webhook', async (c) => {
   // Signal-specific: handle reactions and typing indicators
   if (channel === 'signal' && adapter instanceof SignalAdapter) {
     try {
-      const signalPayload: SignalWebhookPayload = await c.req.raw.clone().json()
+      const signalPayload = await c.req.raw.clone().json() as SignalWebhookPayload
 
       // Handle typing indicators — broadcast as ephemeral event
       const typing = adapter.parseTypingIndicator(signalPayload)

@@ -18,6 +18,7 @@ import type {
 } from './types'
 import { hashPhone } from '../../lib/crypto'
 import { timingSafeEqual } from 'node:crypto'
+import { safeFetch } from '../../lib/safe-fetch'
 
 /**
  * SignalAdapter — MessagingAdapter implementation for the Signal channel.
@@ -48,7 +49,7 @@ export class SignalAdapter implements MessagingAdapter {
    * Parse an incoming signal-cli-rest-api webhook into a normalized IncomingMessage.
    */
   async parseIncomingMessage(request: Request): Promise<IncomingMessage> {
-    const payload: SignalWebhookPayload = await request.json()
+    const payload = await request.json() as SignalWebhookPayload
     const { envelope } = payload
 
     const source = envelope.source
@@ -135,13 +136,14 @@ export class SignalAdapter implements MessagingAdapter {
     }
 
     try {
-      const response = await fetch(`${this.bridgeUrl}/v2/send`, {
+      const response = await safeFetch(`${this.bridgeUrl}/v2/send`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${this.bridgeApiKey}`,
         },
         body: JSON.stringify(sendRequest),
+        timeoutMs: 10_000,
       })
 
       if (!response.ok) {
@@ -152,7 +154,7 @@ export class SignalAdapter implements MessagingAdapter {
         }
       }
 
-      const result: SignalSendResponse = await response.json()
+      const result = await response.json() as SignalSendResponse
       return {
         success: true,
         externalId: String(result.timestamp),
@@ -173,7 +175,7 @@ export class SignalAdapter implements MessagingAdapter {
   async sendMediaMessage(params: SendMediaParams): Promise<SendResult> {
     try {
       // Download the media from the provided URL
-      const mediaResponse = await fetch(params.mediaUrl)
+      const mediaResponse = await safeFetch(params.mediaUrl, { timeoutMs: 60_000, ssrfGuard: true })
       if (!mediaResponse.ok) {
         return {
           success: false,
@@ -194,13 +196,14 @@ export class SignalAdapter implements MessagingAdapter {
         base64_attachments: [base64Attachment],
       }
 
-      const response = await fetch(`${this.bridgeUrl}/v2/send`, {
+      const response = await safeFetch(`${this.bridgeUrl}/v2/send`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${this.bridgeApiKey}`,
         },
         body: JSON.stringify(sendRequest),
+        timeoutMs: 10_000,
       })
 
       if (!response.ok) {
@@ -211,7 +214,7 @@ export class SignalAdapter implements MessagingAdapter {
         }
       }
 
-      const result: SignalSendResponse = await response.json()
+      const result = await response.json() as SignalSendResponse
       return {
         success: true,
         externalId: String(result.timestamp),
@@ -229,11 +232,12 @@ export class SignalAdapter implements MessagingAdapter {
    */
   async getChannelStatus(): Promise<ChannelStatus> {
     try {
-      const response = await fetch(`${this.bridgeUrl}/v1/about`, {
+      const response = await safeFetch(`${this.bridgeUrl}/v1/about`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${this.bridgeApiKey}`,
         },
+        timeoutMs: 10_000,
       })
 
       if (!response.ok) {
@@ -243,7 +247,7 @@ export class SignalAdapter implements MessagingAdapter {
         }
       }
 
-      const about: SignalAboutResponse = await response.json()
+      const about = await response.json() as SignalAboutResponse
       return {
         connected: true,
         details: {
@@ -270,7 +274,7 @@ export class SignalAdapter implements MessagingAdapter {
    */
   async parseStatusWebhook(request: Request): Promise<MessageStatusUpdate[]> {
     try {
-      const payload: SignalWebhookPayload = await request.clone().json()
+      const payload = await request.clone().json() as SignalWebhookPayload
       const { envelope } = payload
 
       // Handle receipt messages (delivery/read receipts)
@@ -348,7 +352,7 @@ export class SignalAdapter implements MessagingAdapter {
     remove?: boolean
   }): Promise<SendResult> {
     try {
-      const response = await fetch(`${this.bridgeUrl}/v1/reactions/${encodeURIComponent(this.registeredNumber)}`, {
+      const response = await safeFetch(`${this.bridgeUrl}/v1/reactions/${encodeURIComponent(this.registeredNumber)}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -361,6 +365,7 @@ export class SignalAdapter implements MessagingAdapter {
           timestamp: params.targetTimestamp,
           remove: params.remove ?? false,
         }),
+        timeoutMs: 10_000,
       })
 
       if (!response.ok) {
@@ -389,7 +394,7 @@ export class SignalAdapter implements MessagingAdapter {
     type?: 'read' | 'viewed'
   }): Promise<SendResult> {
     try {
-      const response = await fetch(`${this.bridgeUrl}/v1/receipts/${encodeURIComponent(this.registeredNumber)}`, {
+      const response = await safeFetch(`${this.bridgeUrl}/v1/receipts/${encodeURIComponent(this.registeredNumber)}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -400,6 +405,7 @@ export class SignalAdapter implements MessagingAdapter {
           timestamps: params.targetTimestamps,
           receipt_type: params.type ?? 'read',
         }),
+        timeoutMs: 10_000,
       })
 
       if (!response.ok) {

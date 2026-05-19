@@ -1,3 +1,4 @@
+import { safeFetch } from '../lib/safe-fetch'
 import { Hono } from 'hono'
 import { describeRoute, resolver } from 'hono-openapi'
 import type { AppEnv } from '../types'
@@ -39,7 +40,7 @@ async function checkStorage(env: Record<string, unknown>): Promise<CheckResult> 
     // RustFS returns 403 on unauthenticated paths — this still proves reachability.
     // A 403 still proves the server is running and reachable.
     const url = `${endpoint.replace(/\/$/, '')}/`
-    const res = await fetch(url, { signal: AbortSignal.timeout(3000) })
+    const res = await safeFetch(url, { timeoutMs: 5_000 })
     if (res.ok || res.status === 403) return { status: 'ok', latencyMs: Date.now() - t0 }
     return { status: 'failing', latencyMs: Date.now() - t0, detail: `HTTP ${res.status}` }
   } catch (err) {
@@ -60,7 +61,7 @@ async function checkSipBridge(env: Record<string, unknown>): Promise<CheckResult
   if (!bridgeUrl) return null  // Not configured — skip
   const t0 = Date.now()
   try {
-    const res = await fetch(`${bridgeUrl.replace(/\/$/, '')}/health`, { signal: AbortSignal.timeout(3000) })
+    const res = await safeFetch(`${bridgeUrl.replace(/\/$/, '')}/health`, { timeoutMs: 5_000 })
     if (!res.ok) return { status: 'failing', latencyMs: Date.now() - t0, detail: `HTTP ${res.status}` }
     return { status: 'ok', latencyMs: Date.now() - t0 }
   } catch (err) {

@@ -533,9 +533,9 @@ pub fn encrypt_hub_field(
     plaintext: String,
     label: String,
 ) -> Result<String, String> {
-    // Validate label against registry — reject unknown labels
-    if llamenos_core::labels::label_to_id(&label).is_none() {
-        return Err(format!("Unknown crypto label: {label}. Labels must be registered in the label registry."));
+    use llamenos_core::labels::label_to_id;
+    if label_to_id(&label).is_none() {
+        return Err("Unknown crypto label: not in LABEL_REGISTRY".into());
     }
 
     let hub_key = state.hub_key.lock().unwrap();
@@ -568,9 +568,9 @@ pub fn decrypt_hub_field(
     ciphertext_hex: String,
     label: String,
 ) -> Result<String, String> {
-    // Validate label against registry — reject unknown labels
-    if llamenos_core::labels::label_to_id(&label).is_none() {
-        return Err(format!("Unknown crypto label: {label}. Labels must be registered in the label registry."));
+    use llamenos_core::labels::label_to_id;
+    if label_to_id(&label).is_none() {
+        return Err("Unknown crypto label: not in LABEL_REGISTRY".into());
     }
 
     let hub_key = state.hub_key.lock().unwrap();
@@ -750,11 +750,17 @@ pub fn shamir_commit(x: u8, y_hex: String) -> Result<String, String> {
     Ok(hex::encode(hasher.finalize()))
 }
 
-/// Shamir verify: check a share against its SHA-256 commitment.
+/// Shamir verify: check a share against its SHA-256 commitment (constant-time).
 #[tauri::command]
 pub fn shamir_verify(x: u8, y_hex: String, commitment_hex: String) -> Result<bool, String> {
     let computed = shamir_commit(x, y_hex)?;
-    Ok(computed == commitment_hex)
+    let computed_bytes = hex::decode(&computed).map_err(|e| e.to_string())?;
+    let expected_bytes = hex::decode(&commitment_hex).map_err(|e| e.to_string())?;
+    if computed_bytes.len() != expected_bytes.len() {
+        return Ok(false);
+    }
+    use subtle::ConstantTimeEq;
+    Ok(computed_bytes.ct_eq(&expected_bytes).into())
 }
 
 /// Generate an X25519 recovery group keypair. Returns {publicKeyHex, privateKeyHex}.

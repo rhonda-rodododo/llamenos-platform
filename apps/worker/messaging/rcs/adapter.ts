@@ -9,7 +9,7 @@
  */
 
 import { timingSafeEqual } from 'node:crypto'
-import { HMAC_PHONE_PREFIX } from '@shared/crypto-labels'
+
 import type { RCSConfig } from '@shared/types'
 import { hashPhone } from '../../lib/crypto'
 import { createLogger } from '../../lib/logger'
@@ -276,7 +276,7 @@ export class RCSAdapter implements MessagingAdapter {
    */
   async parseStatusWebhook(request: Request): Promise<MessageStatusUpdate | MessageStatusUpdate[] | null> {
     try {
-      const payload: RBMWebhookPayload = await request.clone().json()
+      const payload = await request.clone().json() as RBMWebhookPayload
 
       if (!payload.event) {
         return null

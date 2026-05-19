@@ -29,6 +29,7 @@ import { bytesToHex } from '@noble/hashes/utils.js'
 import { createLogger } from './logger'
 import type { StorageAdminClient } from './storage-admin'
 import { buildBucketPolicy } from './storage-admin'
+import { safeFetch } from './safe-fetch'
 
 const log = createLogger('lib.storage-manager')
 
@@ -394,11 +395,8 @@ export function createStorageManager(opts?: StorageManagerOptions): StorageManag
 
       async healthy(): Promise<boolean> {
         try {
-          const controller = new AbortController()
-          const timeout = setTimeout(() => controller.abort(), 5000)
           const healthUrl = `${endpoint}/health`
-          const response = await fetch(healthUrl, { signal: controller.signal })
-          clearTimeout(timeout)
+          const response = await safeFetch(healthUrl, { timeoutMs: 10_000 })
           return response.ok
         } catch {
           return false

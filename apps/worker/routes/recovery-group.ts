@@ -40,6 +40,7 @@ import {
   recoveryEmergencyOverrideSchema,
 } from '@protocol/schemas/recovery-group'
 import { okResponseSchema } from '@protocol/schemas/common'
+import { safeFetch } from '../lib/safe-fetch'
 
 // ---------------------------------------------------------------------------
 // Authenticated routes
@@ -436,7 +437,7 @@ publicRoutes.post('/initiate',
       const notifierToken = c.env.SIGNAL_NOTIFIER_BEARER_TOKEN || ''
 
       try {
-        const res = await fetch(`${notifierUrl}/api/send`, {
+        const res = await safeFetch(`${notifierUrl}/api/send`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -446,6 +447,7 @@ publicRoutes.post('/initiate',
             identifierHash,
             message: `Your Llamenos recovery verification code is: ${code}\n\nIf you did not request account recovery, please contact your administrator immediately.`,
           }),
+          timeoutMs: 10_000,
         })
         return res.ok
       } catch {

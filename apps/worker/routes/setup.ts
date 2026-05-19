@@ -1,3 +1,4 @@
+import { safeFetch } from '../lib/safe-fetch'
 import { Hono } from 'hono'
 import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
@@ -156,16 +157,13 @@ setup.post('/test/signal', requirePermission('settings:manage-messaging'),
     }
 
     try {
-      const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 10000)
       const headers: Record<string, string> = {}
       if (body.bridgeApiKey) headers['Authorization'] = `Bearer ${body.bridgeApiKey}`
 
-      const res = await fetch(`${body.bridgeUrl}/v1/about`, {
+      const res = await safeFetch(`${body.bridgeUrl}/v1/about`, {
         headers,
-        signal: controller.signal,
+        timeoutMs: 10_000,
       })
-      clearTimeout(timeout)
 
       if (res.ok) {
         return c.json({ ok: true })
@@ -199,16 +197,12 @@ setup.post('/test/whatsapp', requirePermission('settings:manage-messaging'),
     const body = c.req.valid('json')
 
     try {
-      const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 10000)
-      const res = await fetch(
+      const res = await safeFetch(
         `https://graph.facebook.com/v18.0/${encodeURIComponent(body.phoneNumberId)}`,
         {
           headers: { 'Authorization': `Bearer ${body.accessToken}` },
-          signal: controller.signal,
         }
       )
-      clearTimeout(timeout)
 
       if (res.ok) {
         return c.json({ ok: true })

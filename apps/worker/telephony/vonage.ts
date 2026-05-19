@@ -1,3 +1,4 @@
+import { safeFetch } from '../lib/safe-fetch'
 import type {
   TelephonyAdapter,
   IncomingCallParams,
@@ -106,7 +107,7 @@ export class VonageAdapter implements TelephonyAdapter {
     // Vonage Voice API uses JWT auth; for simplicity, use Basic auth with api_key:api_secret
     // Full JWT auth requires private key signing (RS256)
     const auth = btoa(`${this.apiKey}:${this.apiSecret}`)
-    return fetch(`https://api.nexmo.com${path}`, {
+    return safeFetch(`https://api.nexmo.com${path}`, {
       ...init,
       headers: {
         'Authorization': `Basic ${auth}`,
@@ -348,7 +349,7 @@ export class VonageAdapter implements TelephonyAdapter {
     const timestamp = url.searchParams.get('timestamp')
     if (!timestamp) return false
     const ts = parseInt(timestamp, 10)
-    if (isNaN(ts) || Math.abs(Date.now() / 1000 - ts) > 300) return false
+    if (isNaN(ts) || Math.abs(Date.now() / 1000 - ts) > 60) return false
 
     const sig = url.searchParams.get('sig')
     if (!sig) return false
@@ -396,8 +397,9 @@ export class VonageAdapter implements TelephonyAdapter {
     const data = await res.json() as { recording_url?: string }
     if (!data.recording_url) return null
 
-    const audioRes = await fetch(data.recording_url, {
+    const audioRes = await safeFetch(data.recording_url, {
       headers: { 'Authorization': `Basic ${btoa(`${this.apiKey}:${this.apiSecret}`)}` },
+      timeoutMs: 60_000,
     })
     if (!audioRes.ok) return null
     return audioRes.arrayBuffer()
@@ -405,8 +407,9 @@ export class VonageAdapter implements TelephonyAdapter {
 
   async getRecordingAudio(recordingSid: string): Promise<ArrayBuffer | null> {
     // Vonage recording URLs are full URLs, not SIDs
-    const audioRes = await fetch(recordingSid, {
+    const audioRes = await safeFetch(recordingSid, {
       headers: { 'Authorization': `Basic ${btoa(`${this.apiKey}:${this.apiSecret}`)}` },
+      timeoutMs: 60_000,
     })
     if (!audioRes.ok) return null
     return audioRes.arrayBuffer()

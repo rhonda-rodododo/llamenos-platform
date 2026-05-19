@@ -6,6 +6,7 @@
  *
  * Methods POST JSON to `https://api.telegram.org/bot{token}/{method}`.
  */
+import { safeFetch } from '../../lib/safe-fetch'
 import type {
   TelegramFile,
   TelegramGetFileResponse,
@@ -30,14 +31,13 @@ export class TelegramBotClient {
     chatId: number | string,
     text: string,
   ): Promise<{ ok: boolean; result?: TelegramMessage; error?: string }> {
-    const res = await fetch(`${this.baseUrl}/sendMessage`, {
+    const res = await safeFetch(`${this.baseUrl}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chat_id: chatId, text }),
-      signal: AbortSignal.timeout(10_000),
     })
 
-    const data: TelegramSendMessageResponse = await res.json()
+    const data = await res.json() as TelegramSendMessageResponse
     if (!data.ok) {
       return { ok: false, error: data.description ?? `HTTP ${res.status}` }
     }
@@ -58,14 +58,13 @@ export class TelegramBotClient {
     const body: Record<string, unknown> = { chat_id: chatId, photo }
     if (caption) body.caption = caption
 
-    const res = await fetch(`${this.baseUrl}/sendPhoto`, {
+    const res = await safeFetch(`${this.baseUrl}/sendPhoto`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(15_000),
     })
 
-    const data: TelegramSendMessageResponse = await res.json()
+    const data = await res.json() as TelegramSendMessageResponse
     if (!data.ok) {
       return { ok: false, error: data.description ?? `HTTP ${res.status}` }
     }
@@ -82,14 +81,13 @@ export class TelegramBotClient {
     chatId: number | string,
     voiceUrl: string,
   ): Promise<{ ok: boolean; result?: TelegramMessage; error?: string }> {
-    const res = await fetch(`${this.baseUrl}/sendVoice`, {
+    const res = await safeFetch(`${this.baseUrl}/sendVoice`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chat_id: chatId, voice: voiceUrl }),
-      signal: AbortSignal.timeout(15_000),
     })
 
-    const data: TelegramSendMessageResponse = await res.json()
+    const data = await res.json() as TelegramSendMessageResponse
     if (!data.ok) {
       return { ok: false, error: data.description ?? `HTTP ${res.status}` }
     }
@@ -108,14 +106,13 @@ export class TelegramBotClient {
     const body: Record<string, unknown> = { chat_id: chatId, document: documentUrl }
     if (caption) body.caption = caption
 
-    const res = await fetch(`${this.baseUrl}/sendDocument`, {
+    const res = await safeFetch(`${this.baseUrl}/sendDocument`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(15_000),
     })
 
-    const data: TelegramSendMessageResponse = await res.json()
+    const data = await res.json() as TelegramSendMessageResponse
     if (!data.ok) {
       return { ok: false, error: data.description ?? `HTTP ${res.status}` }
     }
@@ -127,12 +124,11 @@ export class TelegramBotClient {
    * https://core.telegram.org/bots/api#getme
    */
   async getMe(): Promise<{ ok: boolean; result?: TelegramUser; error?: string }> {
-    const res = await fetch(`${this.baseUrl}/getMe`, {
+    const res = await safeFetch(`${this.baseUrl}/getMe`, {
       method: 'GET',
-      signal: AbortSignal.timeout(10_000),
     })
 
-    const data: TelegramGetMeResponse = await res.json()
+    const data = await res.json() as TelegramGetMeResponse
     if (!data.ok) {
       return { ok: false, error: data.description ?? `HTTP ${res.status}` }
     }
@@ -150,11 +146,10 @@ export class TelegramBotClient {
     const body: Record<string, unknown> = { url }
     if (secret) body.secret_token = secret
 
-    const res = await fetch(`${this.baseUrl}/setWebhook`, {
+    const res = await safeFetch(`${this.baseUrl}/setWebhook`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(10_000),
     })
 
     const data = (await res.json()) as { ok: boolean; description?: string }
@@ -172,14 +167,13 @@ export class TelegramBotClient {
    * https://api.telegram.org/file/bot{token}/{file_path}
    */
   async getFile(fileId: string): Promise<{ ok: boolean; result?: TelegramFile; error?: string }> {
-    const res = await fetch(`${this.baseUrl}/getFile`, {
+    const res = await safeFetch(`${this.baseUrl}/getFile`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ file_id: fileId }),
-      signal: AbortSignal.timeout(10_000),
     })
 
-    const data: TelegramGetFileResponse = await res.json()
+    const data = await res.json() as TelegramGetFileResponse
     if (!data.ok) {
       return { ok: false, error: data.description ?? `HTTP ${res.status}` }
     }
@@ -193,7 +187,7 @@ export class TelegramBotClient {
    */
   async downloadFile(filePath: string): Promise<ArrayBuffer> {
     const url = `https://api.telegram.org/file/bot${this.botToken}/${filePath}`
-    const res = await fetch(url, { signal: AbortSignal.timeout(30_000) })
+    const res = await safeFetch(url, { timeoutMs: 60_000 })
     if (!res.ok) {
       throw new Error(`Failed to download Telegram file: HTTP ${res.status}`)
     }

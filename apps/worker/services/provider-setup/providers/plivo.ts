@@ -7,6 +7,7 @@ import type {
 import type { ProviderCapabilityImpl, ConnectionTestResult, WebhookUrls } from '../types'
 import { ProviderApiError } from '../types'
 import { basicAuth, nowISO } from '../utils'
+import { safeFetch } from '../../../lib/safe-fetch'
 
 export const plivoProvider: ProviderCapabilityImpl = {
   providerType: 'plivo',
@@ -17,11 +18,11 @@ export const plivoProvider: ProviderCapabilityImpl = {
     const authToken = String(credentials.authToken ?? '')
     const start = Date.now()
     try {
-      const res = await fetch(`https://api.plivo.com/v1/Account/${authId}/`, {
+      const res = await safeFetch(`https://api.plivo.com/v1/Account/${authId}/`, {
         headers: { Authorization: basicAuth(authId, authToken) },
       })
       if (!res.ok) {
-        const text = await res.text()
+        await res.text()
         return {
           connected: false,
           latencyMs: Date.now() - start,
@@ -43,7 +44,7 @@ export const plivoProvider: ProviderCapabilityImpl = {
   async listOwnedNumbers(credentials: Record<string, unknown>): Promise<OwnedNumber[]> {
     const authId = String(credentials.authId ?? '')
     const authToken = String(credentials.authToken ?? '')
-    const res = await fetch(`https://api.plivo.com/v1/Account/${authId}/Number/`, {
+    const res = await safeFetch(`https://api.plivo.com/v1/Account/${authId}/Number/`, {
       headers: { Authorization: basicAuth(authId, authToken) },
     })
     if (!res.ok) {
@@ -80,7 +81,7 @@ export const plivoProvider: ProviderCapabilityImpl = {
     const authId = String(credentials.authId ?? '')
     const authToken = String(credentials.authToken ?? '')
     const countryIso = query.countryCode ?? 'US'
-    const res = await fetch(
+    const res = await safeFetch(
       `https://api.plivo.com/v1/Account/${authId}/PhoneNumber/?country_iso=${countryIso}&limit=${Math.min(query.limit ?? 20, 50)}&type=local`,
       { headers: { Authorization: basicAuth(authId, authToken) } },
     )
@@ -110,7 +111,7 @@ export const plivoProvider: ProviderCapabilityImpl = {
 
     if (request.phoneNumber) {
       const numStr = request.phoneNumber.replace('+', '')
-      const buyRes = await fetch(
+      const buyRes = await safeFetch(
         `https://api.plivo.com/v1/Account/${authId}/PhoneNumber/${numStr}/`,
         { method: 'POST', headers: { Authorization: auth } },
       )
@@ -129,7 +130,7 @@ export const plivoProvider: ProviderCapabilityImpl = {
     }
 
     const countryIso = 'US'
-    const searchRes = await fetch(
+    const searchRes = await safeFetch(
       `https://api.plivo.com/v1/Account/${authId}/PhoneNumber/?country_iso=${countryIso}&limit=1&type=local`,
       { headers: { Authorization: auth } },
     )
@@ -145,7 +146,7 @@ export const plivoProvider: ProviderCapabilityImpl = {
     }
     const phoneNumber = searchData.objects[0].number
 
-    const buyRes = await fetch(
+    const buyRes = await safeFetch(
       `https://api.plivo.com/v1/Account/${authId}/PhoneNumber/${phoneNumber}/`,
       { method: 'POST', headers: { Authorization: auth } },
     )
@@ -185,7 +186,7 @@ export const plivoProvider: ProviderCapabilityImpl = {
       appBody.message_method = 'POST'
     }
 
-    const appRes = await fetch(`https://api.plivo.com/v1/Account/${authId}/Application/`, {
+    const appRes = await safeFetch(`https://api.plivo.com/v1/Account/${authId}/Application/`, {
       method: 'POST',
       headers: {
         Authorization: auth,
@@ -200,7 +201,7 @@ export const plivoProvider: ProviderCapabilityImpl = {
     const appData = (await appRes.json()) as { app_id: string }
 
     const numStr = number.replace('+', '')
-    const numRes = await fetch(`https://api.plivo.com/v1/Account/${authId}/Number/${numStr}/`, {
+    const numRes = await safeFetch(`https://api.plivo.com/v1/Account/${authId}/Number/${numStr}/`, {
       method: 'POST',
       headers: {
         Authorization: auth,

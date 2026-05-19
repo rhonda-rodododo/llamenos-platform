@@ -7,6 +7,7 @@ import type {
 import type { ProviderCapabilityImpl, ConnectionTestResult, WebhookUrls } from '../types'
 import { ProviderApiError } from '../types'
 import { basicAuth, nowISO } from '../utils'
+import { safeFetch } from '../../../lib/safe-fetch'
 
 export const vonageProvider: ProviderCapabilityImpl = {
   providerType: 'vonage',
@@ -17,11 +18,11 @@ export const vonageProvider: ProviderCapabilityImpl = {
     const apiSecret = String(credentials.apiSecret ?? '')
     const start = Date.now()
     try {
-      const res = await fetch('https://api.nexmo.com/v2/applications?page_size=1', {
+      const res = await safeFetch('https://api.nexmo.com/v2/applications?page_size=1', {
         headers: { Authorization: basicAuth(apiKey, apiSecret) },
       })
       if (!res.ok) {
-        const text = await res.text()
+        await res.text()
         return {
           connected: false,
           latencyMs: Date.now() - start,
@@ -43,7 +44,7 @@ export const vonageProvider: ProviderCapabilityImpl = {
   async listOwnedNumbers(credentials: Record<string, unknown>): Promise<OwnedNumber[]> {
     const apiKey = String(credentials.apiKey ?? '')
     const apiSecret = String(credentials.apiSecret ?? '')
-    const res = await fetch('https://rest.nexmo.com/account/numbers', {
+    const res = await safeFetch('https://rest.nexmo.com/account/numbers', {
       headers: { Authorization: basicAuth(apiKey, apiSecret) },
     })
     if (!res.ok) {
@@ -85,7 +86,7 @@ export const vonageProvider: ProviderCapabilityImpl = {
       size: String(Math.min(query.limit ?? 20, 50)),
     })
 
-    const res = await fetch(`https://rest.nexmo.com/number/search?${params.toString()}`, {
+    const res = await safeFetch(`https://rest.nexmo.com/number/search?${params.toString()}`, {
       headers: { Authorization: basicAuth(apiKey, apiSecret) },
     })
     if (!res.ok) {
@@ -124,7 +125,7 @@ export const vonageProvider: ProviderCapabilityImpl = {
       msisdn,
     })
 
-    const buyRes = await fetch('https://rest.nexmo.com/number/buy', {
+    const buyRes = await safeFetch('https://rest.nexmo.com/number/buy', {
       method: 'POST',
       headers: {
         Authorization: basicAuth(apiKey, apiSecret),
@@ -176,7 +177,7 @@ export const vonageProvider: ProviderCapabilityImpl = {
       }
     }
 
-    const appRes = await fetch('https://api.nexmo.com/v2/applications', {
+    const appRes = await safeFetch('https://api.nexmo.com/v2/applications', {
       method: 'POST',
       headers: {
         Authorization: authHeader,
@@ -197,7 +198,7 @@ export const vonageProvider: ProviderCapabilityImpl = {
       app_id: appData.id,
     })
 
-    const linkRes = await fetch('https://rest.nexmo.com/number/update', {
+    const linkRes = await safeFetch('https://rest.nexmo.com/number/update', {
       method: 'POST',
       headers: {
         Authorization: basicAuth(apiKey, apiSecret),
