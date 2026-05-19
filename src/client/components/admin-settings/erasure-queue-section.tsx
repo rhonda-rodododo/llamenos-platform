@@ -17,9 +17,8 @@ import {
   adminEraseUser,
   remoteWipeDevice,
   listReEncryptionJobs,
-  type ErasureRequest,
-  type ReEncryptionJob,
 } from '@/lib/api'
+import type { ErasureRequest, ReEncryptionJob } from '@protocol/schemas'
 
 interface Props {
   requests: ErasureRequest[]
@@ -139,7 +138,7 @@ export function ErasureQueueSection({ requests, onRefresh, expanded, onToggle, s
               data-testid={`erasure-request-${req.id}`}
             >
               <div className="space-y-0.5">
-                <div className="text-sm font-medium">{req.userName ?? req.userId}</div>
+                <div className="text-sm font-medium">{req.userId}</div>
                 <div className="text-xs text-muted-foreground">
                   {t('erasure.admin.requestedAt', { date: new Date(req.requestedAt).toLocaleString() })}
                   {req.executeAt && ` — ${t('erasure.admin.executesAt', { date: new Date(req.executeAt).toLocaleString() })}`}

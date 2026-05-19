@@ -1,11 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '@/lib/toast'
-import {
-  listEntityTemplates,
-  applyEntityTemplate,
-  type EntityTemplate,
-} from '@/lib/api'
+import { listEntityTemplates, applyEntityTemplate } from '@/lib/api'
+import type { EntityTemplate } from '@protocol/schemas'
 import { SettingsSection } from '@/components/settings-section'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -99,12 +96,9 @@ export function EntityTemplatesSection({ expanded, onToggle, statusSummary }: Pr
                   </div>
                   <p className="text-xs text-muted-foreground">{template.description}</p>
                   <div className="flex items-center gap-2 mt-1">
-                    <Badge variant="outline" className="text-[10px]">
-                      {template.entityTypeCount} {t('entityTemplates.entityTypes', { defaultValue: 'entity types' })}
-                    </Badge>
-                    {template.totalFieldCount > 0 && (
+                    {template.fields.length > 0 && (
                       <Badge variant="outline" className="text-[10px]">
-                        {template.totalFieldCount} {t('caseManagement.fields')}
+                        {template.fields.length} {t('caseManagement.fields')}
                       </Badge>
                     )}
                   </div>

@@ -90,13 +90,7 @@ export async function loginWithPasskey(): Promise<{ token: string; pubkey: strin
   return verifyRes.json() as Promise<{ token: string; pubkey: string }>
 }
 
-export interface WebAuthnCredentialInfo {
-  id: string
-  label: string
-  backedUp: boolean
-  createdAt: string
-  lastUsedAt: string
-}
+import type { WebAuthnCredentialInfo } from '@protocol/schemas/webauthn'
 
 /**
  * List registered credentials for the current user.

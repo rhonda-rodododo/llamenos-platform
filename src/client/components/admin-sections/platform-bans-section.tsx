@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '@/lib/toast'
-import { listPlatformBans, type PlatformBan } from '@/lib/api'
+import { listPlatformBans } from '@/lib/api'
+import type { PlatformBan } from '@protocol/schemas'
 import { PlatformBansSection as PlatformBansSectionInner } from '@/components/admin-settings/platform-bans-section'
 
 export function PlatformBansSection() {
