@@ -1,7 +1,7 @@
 # Deployment Hardening Guide
 
-**Version:** 2.1
-**Date:** 2026-05-03
+**Version:** 2.2
+**Date:** 2026-05-18
 
 Security-focused deployment recommendations for Llamenos operators. Since Llamenos is self-hosted open-source software, the operator is responsible for infrastructure security. This document covers two deployment architectures.
 
@@ -215,17 +215,15 @@ automountServiceAccountToken: false
 ```
 App pod:
   Ingress: from ingress controller on 3000/tcp
-  Egress: DNS, RustFS (9000), Strfry (7777), Whisper (8080),
-          PostgreSQL (external, 5432), External HTTPS (443)
+  Egress: DNS (53/udp+tcp), RustFS (9000, if enabled), Whisper (8080, if enabled),
+          PostgreSQL (external, configurable port), External HTTPS (443)
 
 RustFS pod:
   Ingress: from app pod only (9000/tcp)
   Egress: none
-
-Strfry pod:
-  Ingress: from app pod (7777/tcp) + ingress controller (/WebSocket)
-  Egress: none
 ```
+
+> **Note:** The Strfry/Nostr relay pod was removed. The WebSocket event relay is now built into the app server at `/ws`. There is no separate relay service or pod. The Helm chart's `networkpolicy.yaml` reflects this — no Strfry rules exist.
 
 ### Health Probes
 
@@ -347,6 +345,26 @@ Clients authenticate to the WebSocket using the same session token or signed aut
 - **Auth verification**: All connections must authenticate before receiving events
 - **Hub scoping**: Events are filtered server-side — clients only receive events for hubs they are members of
 
+### Blast/Broadcast Rate Limiting
+
+The blast system sends bulk messages to subscriber lists. Rate limiting is configured per-hub via the admin UI (stored in `blast_settings` table) with the following defaults:
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `maxBlastsPerDay` | 10 | Maximum blast sends per hub per calendar day |
+| `rateLimitPerSecond` | 10 | Global message send rate (across all channels) |
+| `rateLimits.sms` | 10/s | Per-channel send rate |
+| `rateLimits.whatsapp` | 25/s | Per-channel send rate |
+| `rateLimits.signal` | 15/s | Per-channel send rate |
+| `rateLimits.rcs` | 10/s | Per-channel send rate |
+| `rateLimits.telegram` | 20/s | Per-channel send rate |
+
+**Security guidance**:
+- Keep `maxBlastsPerDay` at the minimum necessary for your operational needs. Lower values reduce the blast radius if an admin account is compromised.
+- Ensure telephony provider accounts have sending limits configured independently (Twilio messaging limits, etc.) as a defense-in-depth measure.
+- `doubleOptIn: false` is the default but **enable double opt-in** for subscriber lists containing sensitive demographics to reduce spoofed subscriptions.
+- Monitor `blast_deliveries` table for unexpected delivery spikes — anomalous patterns indicate possible abuse.
+
 ### Signal-First Delivery Configuration
 
 The messaging delivery router (`apps/worker/messaging/delivery-router.ts`) supports two configuration keys in hub messaging config:
@@ -450,6 +468,7 @@ Trust anchor is the **GitHub Release** (not the running application). CI generat
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-05-18 | 2.2 | EP01–EP09 update: removed stale Strfry/Nostr relay pod from Kubernetes NetworkPolicy section (relay is now built-in WebSocket at /ws, no separate pod); added blast/broadcast rate limiting configuration guidance (maxBlastsPerDay, per-channel limits, security recommendations) |
 | 2026-05-03 | 2.1 | Post-hardening: updated WebSocket section for built-in endpoint (no separate relay); corrected event age limits (300s, not 24h); Signal-first delivery and SMS notification-only mode config; updated hub event encryption cipher (XChaCha20-Poly1305 + epoch rotation) |
 | 2026-05-02 | 2.0 | Complete rewrite: removed Cloudflare Workers section (backend is Bun+PostgreSQL, not CF Workers), updated to match actual deploy/ configs (Ansible roles, Docker Compose overlays, Helm templates, Caddyfile.production), HPKE replaces ECIES, device keys replace nsec, added sigchain/PUK references, added split-origin production Caddyfile, added internal TLS, added security scanning role |
 | 2026-02-25 | 1.2 | Added Caddy section, WebSocket operations, reproducible builds |

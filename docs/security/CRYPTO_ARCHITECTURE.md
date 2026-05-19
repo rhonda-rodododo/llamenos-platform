@@ -1,7 +1,7 @@
 # Cryptographic Architecture
 
-**Version:** 1.3
-**Date:** 2026-05-12
+**Version:** 1.4
+**Date:** 2026-05-18
 
 Authoritative reference for all cryptographic primitives, key hierarchies, and protocols used in Llamenos. All crypto operations are implemented once in `packages/crypto/` (Rust), compiled to native (Tauri desktop), WASM (browser testing), and UniFFI (iOS/Android). There is no separate JS crypto implementation for production use.
 
@@ -18,16 +18,26 @@ Authoritative reference for all cryptographic primitives, key hierarchies, and p
 
 | Primitive | Implementation | Usage |
 |-----------|---------------|-------|
-| **HPKE** (RFC 9180) | `hpke` crate 0.13 — DHKEM(X25519, HKDF-SHA256) + AES-256-GCM | All key wrapping (notes, messages, files, hub key, PUK) |
-| **Ed25519** | `ed25519-dalek` v2 | Device signing keys, auth tokens, sigchain signatures |
+| **HPKE** (RFC 9180) | `hpke` crate 0.13 — DHKEM(X25519, HKDF-SHA256) + AES-256-GCM | All key wrapping (notes, messages, files, hub key, PUK, audit keys, recovery shares) |
+| **Ed25519** | `ed25519-dalek` v2 | Device signing keys, auth tokens, sigchain signatures, device wipe authorizations |
 | **X25519** | `x25519-dalek` v2 | Device encryption keys, HPKE decapsulation |
-| **AES-256-GCM** | `aes-gcm` 0.10 | Symmetric encryption (items_key, CLKR chain links, HPKE AEAD) |
+| **AES-256-GCM** | `aes-gcm` 0.10 | Symmetric encryption (items_key, CLKR chain links, HPKE AEAD, audit log details) |
 | **XChaCha20-Poly1305** | `chacha20poly1305` 0.10 | Hub event encryption (WebSocket events, `hub-event-crypto.ts`) |
-| **HKDF-SHA256** | `hkdf` 0.12 | Key derivation with domain separation |
+| **HKDF-SHA256** | `hkdf` 0.12 | Key derivation with domain separation, SAS emoji derivation |
 | **Argon2id** | `argon2` crate — 64MB memory, 3 iterations, 4 parallelism | PIN/passphrase-to-KEK derivation for device key storage (replaces PBKDF2) |
 | **HMAC-SHA256** | `hmac` 0.12 | Phone/IP hashing, blind index generation, PUK subkey derivation |
-| **SHA-256** | `sha2` 0.10 | Hashing, hash-chained audit logs, User-Agent hashing in audit |
+| **SHA-256** | `sha2` 0.10 | Hashing, hash-chained audit logs, User-Agent hashing in audit, Shamir share commitments |
+| **Shamir Secret Sharing** | `packages/crypto/src/shamir.rs` — GF(2^8) polynomial, AES irreducible polynomial 0x11B | Recovery group key splitting (EP09): splits recovery PUK seed into N shares, K-of-N threshold reconstruct |
 | **BIP-340 Schnorr** | `k256` 0.13 (legacy) | WebSocket event signing only — being phased out for non-WebSocket auth |
+
+### New Modules (EP01–EP09)
+
+| Module | File | Purpose |
+|--------|------|---------|
+| **Shamir Secret Sharing** | `packages/crypto/src/shamir.rs` | GF(2^8) threshold secret sharing for recovery groups (K-of-N, K∈[2,5], N∈[3,5]). Constraints: `threshold ≤ total`. Random coefficients from OS CSPRNG; evaluation points 1-indexed (x=0 is the secret). SHA-256 commitments for tamper detection. Secret bytes zeroized after splitting. |
+| **Audit Key** | `packages/crypto/src/audit_key.rs` | Per-user symmetric key (32 bytes, AES-256-GCM) encrypting the `details` JSONB field in audit log entries. HPKE-wrapped to each admin's X25519 pubkey (`LABEL_AUDIT_USER_KEY_WRAP`). On account erasure, the `audit_user_keys` row is deleted — crypto-shredding renders all associated audit details permanently undecryptable. |
+| **SAS Emoji Verification** | `packages/crypto/src/sas.rs` | Seven emoji indices (0-63) derived from two Ed25519 device pubkeys and a session nonce via HKDF-SHA256 (`LABEL_SAS_DERIVE`). Used for out-of-band device identity verification (EP02). Canonical ordering `min(pk_a, pk_b) ∥ max(pk_a, pk_b) ∥ nonce` prevents role-confusion attacks. |
+| **Erasure** | `packages/crypto/src/erasure.rs` | Crypto-shredding helpers: wipes key material on account erasure and device wipe. `LABEL_ERASURE_OVERRIDE_SIG` and `LABEL_DEVICE_WIPE_SIG` authenticate emergency override and wipe authorization signatures respectively. |
 
 ### Legacy Primitives (Scheduled for Removal)
 
@@ -95,6 +105,26 @@ flowchart TD
     HubPtk --- Sframe
     Sframe --- SframeBase
     SframeBase --- SframeSend
+
+    RecoveryGroup["Recovery Group (EP09) — K-of-N Shamir threshold"]
+    RecoveryShares["N shares of PUK seed, each HPKE-wrapped to a holder (LABEL_RECOVERY_GROUP_SHARE_WRAP)"]
+    RecoveryPukWrap["Reconstructed PUK seed HPKE-wrapped to recovering user (LABEL_RECOVERY_PUK_SEED_WRAP)"]
+    RecoveryLiveness["Holder liveness proof (Ed25519-signed, LABEL_RECOVERY_LIVENESS_PROOF)"]
+    RecoveryContribute["Share contribution in session (Ed25519-signed, LABEL_RECOVERY_SHARE_CONTRIBUTE)"]
+
+    PUK --- RecoveryGroup
+    RecoveryGroup --- RecoveryShares
+    RecoveryGroup --- RecoveryPukWrap
+    RecoveryGroup --- RecoveryLiveness
+    RecoveryGroup --- RecoveryContribute
+
+    AuditKey["Audit User Key (per-user, 32 bytes, AES-256-GCM)"]
+    AuditKeyWrap["HPKE-wrapped to each admin (LABEL_AUDIT_USER_KEY_WRAP)"]
+    AuditDetails["Audit log details JSONB (LABEL_AUDIT_DETAILS) — crypto-shredded on erasure"]
+
+    DeviceKeys --- AuditKey
+    AuditKey --- AuditKeyWrap
+    AuditKey --- AuditDetails
 ```
 
 ### PIN-Protected Device Key Storage
@@ -171,9 +201,9 @@ This prevents cross-context key reuse attacks (e.g., using a note key envelope t
 
 ---
 
-## Domain Separation Labels (69 Total)
+## Domain Separation Labels (87 Defined)
 
-All 69 labels are defined in `packages/protocol/crypto-labels.json` (source of truth) and generated to TypeScript, Swift, Kotlin, and Rust via codegen. Labels are registered in `packages/crypto/src/labels.rs` with stable numeric IDs (indices 0-68, never reordered).
+All 87 labels are defined in `packages/protocol/crypto-labels.json` (source of truth) and generated to TypeScript, Swift, Kotlin, and Rust via codegen. Labels are registered in `packages/crypto/src/labels.rs` with stable numeric IDs (indices 0-80, never reordered). Index 53 is a tombstone (removed `LABEL_ECIES_V2_SALT`). The Rust registry currently has 80 active labels; 7 newer labels in the JSON source are not yet wired into the Rust registry (they use string-based lookup only).
 
 | Range | Category | Examples |
 |-------|----------|----------|
@@ -197,6 +227,12 @@ All 69 labels are defined in `packages/protocol/crypto-labels.json` (source of t
 | 53 | *(tombstone)* | Removed — was `LABEL_ECIES_V2_SALT` |
 | 54–56 | Salts/derivation | `LABEL_PROVISIONING_SALT`, `LABEL_BLIND_INDEX_FIELD`, `LABEL_HUB_PTK` |
 | 57–68 | Server/hub/misc | `LABEL_WS_CHALLENGE`, `LABEL_SERVER_SIGNING_KEY`, `LABEL_SERVER_EVENT_ENCRYPTION_KEY`, `LABEL_HUB_EVENT_EPOCH`, etc. |
+| 69–71 | Audit keys | `LABEL_AUDIT_USER_KEY_WRAP`, `LABEL_ERASURE_OVERRIDE_SIG`, `LABEL_AUDIT_DETAILS` |
+| 72 | Device wipe | `LABEL_DEVICE_WIPE_SIG` |
+| 73–76 | Recovery group (EP09) | `LABEL_RECOVERY_GROUP_SHARE_WRAP`, `LABEL_RECOVERY_PUK_SEED_WRAP`, `LABEL_RECOVERY_SHARE_CONTRIBUTE`, `LABEL_RECOVERY_LIVENESS_PROOF` |
+| 77–79 | Role/hub/team encryption | `LABEL_PLATFORM_ROLE_NAME_ENCRYPT`, `LABEL_PLATFORM_ROLE_DESC_ENCRYPT`, `LABEL_HUB_ROLE_ENCRYPT` |
+| 80 | SAS emoji (EP02) | `LABEL_SAS_DERIVE` |
+| (JSON only) | Org structure encryption | `LABEL_TEAM_ENCRYPT`, `LABEL_TAG_ENCRYPT`, `LABEL_ENTITY_TYPE_DEFINITION` — in JSON source, not yet in Rust numeric registry |
 
 **Rule**: Never use raw string literals for crypto contexts. Always use the generated label constants.
 
@@ -411,6 +447,37 @@ New device onboarding uses ephemeral ECDH with SAS (Short Authentication String)
 
 ---
 
+## SAS Emoji Verification (EP02)
+
+Separate from provisioning SAS, the emoji verification flow is used to confirm that two devices are communicating with each other's genuine Ed25519 signing keys — not an impersonator. This is relevant during device linking, admin verification, and recovery group enrollment.
+
+### Protocol
+
+1. Both parties exchange their Ed25519 signing pubkeys and agree on a random session nonce
+2. Each party independently computes:
+   ```
+   key_material = HKDF-SHA256(
+     ikm    = min(pk_a, pk_b) ∥ max(pk_a, pk_b) ∥ nonce,
+     salt   = <empty>,
+     info   = LABEL_SAS_DERIVE,
+     length = 7 bytes
+   )
+   ```
+3. Each byte maps to an index 0-63, selecting an emoji from the 64-entry table (animals, plants, celestial objects)
+4. Both parties display the same 7-emoji sequence; user visually confirms they match
+
+### Security Properties
+
+- **Canonical ordering**: `min(pk) ∥ max(pk)` prevents role-confusion attacks — both parties produce the same input regardless of which initiated the session
+- **64-entry table**: 7 indices from 64 emoji = 42 bits of entropy (264 trillion possible sequences)
+- **Out-of-band**: Comparison must happen over a trusted channel (in-person, video call) — the protocol cannot verify itself
+
+### Emoji Table
+
+The 64-entry table is defined as a constant in `packages/crypto/src/sas.rs` (`SAS_EMOJI_TABLE`). The table uses unambiguous emoji with distinct appearances (no lookalikes). Generated constants are available in all platforms via codegen.
+
+---
+
 ## Auth Token Format (Ed25519)
 
 ```json
@@ -444,6 +511,7 @@ All dependencies use `Cargo.lock` for reproducible builds. The `packages/crypto/
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-05-18 | 1.4 | EP01–EP09 update: added Shamir secret sharing primitive (recovery groups); added audit_key.rs module (per-user AES-256-GCM audit key, crypto-shredding on erasure); added erasure.rs module (LABEL_ERASURE_OVERRIDE_SIG, LABEL_DEVICE_WIPE_SIG); added SAS emoji verification section (EP02, LABEL_SAS_DERIVE, 7 emoji from 64-entry table); updated key hierarchy diagram with recovery group keys and audit keys; updated label count to 87 (JSON source) / 80 active Rust registry (indices 0-80, tombstone at 53); added label rows 69-80 and JSON-only labels to domain separation table |
 | 2026-05-12 | 1.3 | All 69 domain separation labels now in Rust registry (was 57); sigchain server-side Ed25519 validation now implemented; updated section headers and notes to reflect PR #288 fixes |
 | 2026-05-11 | 1.2 | Updated domain separation label count (69 defined, 57 in Rust registry); added Stronghold/Store clarification; added SFrame completeness note; added 3-tier envelope clarification; added sigchain server-side validation note; added MLS client integration note; added Security Gaps cross-references |
 | 2026-05-03 | 1.1 | Post-hardening update: Argon2id (64MB/3/4) replaces PBKDF2 for PIN/passphrase; min 8 digits or alphanumeric passphrase; XChaCha20-Poly1305 for hub events (was misattributed); per-hub epoch-based event key rotation (24h); power-of-2 payload padding section; WebSocket auth + built-in endpoint; WebSocket signing/encryption key separation; MLS always-on (feature flag removed) |

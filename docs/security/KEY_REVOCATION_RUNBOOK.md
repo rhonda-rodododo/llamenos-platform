@@ -1,7 +1,7 @@
 # Key Revocation Runbook
 
-**Version:** 2.1
-**Date:** 2026-05-03
+**Version:** 2.2
+**Date:** 2026-05-18
 
 Operational procedures for emergency key revocation, rotation, and compromise response in Llamenos deployments.
 
@@ -25,7 +25,10 @@ Operational procedures for emergency key revocation, rotation, and compromise re
 4. [Hub Key Rotation Ceremony](#4-hub-key-rotation-ceremony)
 5. [Hub Event Key Epoch Rotation](#5-hub-event-key-epoch-rotation)
 6. [PUK Rotation on Departure](#6-puk-rotation-on-departure)
-7. [Response Timeframe Summary](#7-response-timeframe-summary)
+7. [Device Wipe (EP08)](#7-device-wipe-ep08)
+8. [Account Erasure and Platform Ban Key Handling (EP08)](#8-account-erasure-and-platform-ban-key-handling-ep08)
+9. [Recovery Group Key Rotation (EP09)](#9-recovery-group-key-rotation-ep09)
+10. [Response Timeframe Summary](#10-response-timeframe-summary)
 
 ---
 
@@ -354,7 +357,155 @@ When a user departs or a device is compromised, the PUK must be rotated so the d
 
 ---
 
-## 7. Response Timeframe Summary
+## 7. Device Wipe (EP08)
+
+A device wipe forcibly clears a device's local key material without requiring the user to be present. This is appropriate when a device is suspected compromised, has been surrendered, or is subject to organizational policy enforcement.
+
+**Responsible party**: An administrator (or the user on their own device).
+
+### 7.1 How Device Wipe Works
+
+1. **Admin issues a wipe command** via the admin UI for a specific device (identified by device ID and user pubkey).
+2. **The wipe authorization** is an Ed25519-signed payload (label: `LABEL_DEVICE_WIPE_SIG`) binding:
+   - target device ID
+   - target user pubkey
+   - timestamp
+   - admin pubkey (signer)
+3. **The wipe command** is delivered to the target device via WebSocket push event.
+4. **On receipt**, the client app calls `mobile_lock()` (mobile) or equivalent (desktop), zeroizing all in-memory key material, then deletes the local key store (Keychain / EncryptedSharedPreferences / Tauri Store).
+5. **If the device is offline**: The wipe command is queued and delivered on next connection.
+
+### 7.2 Post-Wipe Steps
+
+6. **Deauthorize the device via sigchain** (`remove-device` entry) — this prevents re-authentication even if key material is somehow recovered.
+7. **Rotate the hub key** (Section 4) — the wiped device held a copy of the hub key.
+8. **If the device belonged to a recovery group holder**: Rotate the recovery group (Section 9).
+
+### 7.3 Verification Checklist
+
+- [ ] Wipe command delivered and acknowledged (check audit log)
+- [ ] Device deauthorized via sigchain
+- [ ] No active sessions remain for the wiped device
+- [ ] Hub key rotated
+- [ ] Recovery group rotation initiated if applicable
+
+---
+
+## 8. Account Erasure and Platform Ban Key Handling (EP08)
+
+Account erasure is a permanent, irreversible operation that removes a user's data and destroys their key material. Platform bans additionally prevent re-registration.
+
+**Responsible party**: Administrator (for admin erasure) or the user themselves (self-service, subject to configurable delay).
+
+### 8.1 Erasure Types
+
+| Type | Initiator | Delay | Override |
+|------|-----------|-------|----------|
+| Self-service | User | Configurable (default: 72h) | User can cancel before delay expires |
+| Emergency self-service | User | Immediate | Requires signed override token |
+| Admin erasure | Admin | Immediate | N/A |
+
+### 8.2 Cryptographic Cascade
+
+On erasure execution, the following crypto cascade occurs in order:
+
+1. **Audit user key deletion** (`audit_user_keys` row deleted): All audit log `details` fields for this user are permanently undecryptable (crypto-shredding). The actual ciphertext rows remain for regulatory compliance; only the decryption key is destroyed.
+
+2. **PUK envelope deletion**: All HPKE envelopes for this user's devices are deleted. The user cannot derive future items keys or note epoch keys.
+
+3. **Device key deauthorization**: All sigchain entries for this user's devices are superseded by `remove-device` entries. All sessions invalidated.
+
+4. **Hub key exclusion**: The departed user's X25519 pubkey is excluded from future hub key distribution. If immediate revocation is required, rotate the hub key now (Section 4).
+
+5. **WebAuthn credentials revoked**: All WebAuthn credentials for the account are deleted.
+
+6. **Provisioning rooms cleared**: Any open provisioning rooms associated with this account are closed.
+
+### 8.3 Platform Ban Key Handling
+
+When a platform ban is issued (cross-hub, admin-only), additional handling applies:
+
+1. Phone number hash is added to the platform ban list (`platform_bans` table). Checked before call routing.
+2. Existing hub bans are superseded — the platform ban applies across all hubs on the instance.
+3. **No key material is created for banned accounts** — bans operate on HMAC-hashed identifiers, never plaintext.
+
+### 8.4 Erasure Override Authentication
+
+Emergency erasure overrides (to bypass the delay timer) require an Ed25519 signature over a nonce using the requesting user's device key (label: `LABEL_ERASURE_OVERRIDE_SIG`). The server verifies this signature before executing immediate erasure. The minimum delay floor (`EMERGENCY_MIN_HOURS = 4`) cannot be bypassed by any client-provided override — this is enforced server-side in `ErasureService`.
+
+### 8.5 Verification Checklist
+
+- [ ] `audit_user_keys` row deleted (audit details crypto-shredded)
+- [ ] PUK envelopes deleted
+- [ ] All devices deauthorized via sigchain
+- [ ] Sessions invalidated
+- [ ] WebAuthn credentials deleted
+- [ ] Hub key rotated (if immediate exclusion needed)
+- [ ] Recovery group rotation initiated (if user was a recovery group holder)
+- [ ] Platform ban entry created (if applicable)
+- [ ] GDPR deletion acknowledged in audit log
+
+---
+
+## 9. Recovery Group Key Rotation (EP09)
+
+A recovery group holds K-of-N Shamir shares of a user's PUK seed, enabling account recovery when the user loses access to all their devices. The group must be rotated when a holder departs, is compromised, or when the PUK is rotated.
+
+**Responsible party**: The hub admin or the user themselves (with `recovery:manage` permission).
+
+### 9.1 When Rotation is Required
+
+- A recovery group holder departs the organization or is removed
+- A holder's device is seized or compromised
+- The protected user's PUK is rotated (new PUK generation = new shares needed)
+- Routine rotation per organizational policy (annually recommended)
+- The recovery group's signing key is compromised
+
+### 9.2 Rotation Steps
+
+1. **Generate new PUK seed** (if the existing seed is also being rotated — usually done simultaneously with user PUK rotation per Section 6).
+
+2. **Split the secret**: Using `shamir.rs`, split the PUK seed (or recovery key material) into N shares with threshold K (K∈[2,5], N∈[3,5], K≤N). Constraints enforced in the crate; choose K≥N/2+1 for majority quorum.
+
+3. **HPKE-wrap each share** for the corresponding holder's X25519 pubkey (label: `LABEL_RECOVERY_GROUP_SHARE_WRAP`). One HPKE envelope per holder.
+
+4. **Generate SHA-256 commitments** for each share (`shamir.rs` `generate_commitments()`). Published with the group enrollment so holders can verify they received a valid share.
+
+5. **Submit duress commitments** (optional): Alternative share values that, if combined, produce a duress signal rather than the actual secret. Used for coercion scenarios.
+
+6. **Publish enrollment via** `POST /recovery/enroll`:
+   - `threshold` (K), `totalShares` (N)
+   - `shareEnvelopes[]` — one HPKE-wrapped share per holder
+   - `shareCommitments[]` — SHA-256 commitments
+   - `sigchainLinkHash` — binds this enrollment to a specific PUK generation
+
+7. **Notify holders**: Each holder receives their envelope and commits a liveness proof (signed Ed25519 message, label: `LABEL_RECOVERY_LIVENESS_PROOF`) periodically to prove they still have access to their share.
+
+8. **Decommission old group**: Old share envelopes should be explicitly invalidated in the database.
+
+### 9.3 Recovery Session Key Handling
+
+When a recovery session is initiated:
+
+1. User initiates via Signal verification (out-of-band identity check)
+2. Each holder submits their share contribution, signed with `LABEL_RECOVERY_SHARE_CONTRIBUTE`
+3. Once K contributions are received, the server reconstructs the PUK seed via Lagrange interpolation over GF(2^8)
+4. Reconstructed seed is HPKE-wrapped to the recovering user's new device (label: `LABEL_RECOVERY_PUK_SEED_WRAP`)
+5. Plaintext seed is immediately discarded from server memory
+
+### 9.4 Verification Checklist
+
+- [ ] New shares generated and HPKE-distributed to all new holders
+- [ ] SHA-256 commitments match published values
+- [ ] All old share envelopes deleted
+- [ ] Sigchain link hash matches current PUK generation
+- [ ] At least one holder confirms they can decrypt their share envelope
+- [ ] Old holders excluded from new group
+- [ ] Enrollment recorded in audit log
+
+---
+
+## 10. Response Timeframe Summary
 
 | Scenario | Action | Maximum Timeframe |
 |----------|--------|-------------------|
@@ -369,6 +520,11 @@ When a user departs or a device is compromised, the PUK must be rotated so the d
 | Routine hub key rotation | Scheduled | Per organizational policy (quarterly recommended) |
 | Hub event key epoch rotation | Automatic | Every 24 hours — no operator action required |
 | SERVER_SECRET compromise | Emergency rotation | Immediately — rotate secret, redeploy |
+| Device wipe issued | Wipe + sigchain deauthorize + hub key rotation | 1 hour |
+| Account erasure (admin) | Crypto cascade + audit key deletion + sessions | Immediate |
+| Account erasure (self-service) | Crypto cascade after delay | Per hub config (default: 72h, min: 4h override) |
+| Recovery group holder departure | Recovery group rotation | Same day |
+| Recovery group compromise | Rotate recovery group + PUK | Immediately |
 
 ---
 
@@ -376,6 +532,7 @@ When a user departs or a device is compromised, the PUK must be rotated so the d
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-05-18 | 2.2 | EP08–EP09 update: added Section 7 (device wipe — LABEL_DEVICE_WIPE_SIG, admin-initiated remote wipe via signed authorization); added Section 8 (account erasure + platform ban — crypto-shredding cascade, audit key deletion, emergency override auth via LABEL_ERASURE_OVERRIDE_SIG, 4h minimum floor); added Section 9 (recovery group key rotation — Shamir threshold, HPKE share distribution, liveness proofs, session reconstruction); updated Table of Contents; extended timeframe summary |
 | 2026-05-03 | 2.1 | Post-hardening: added Section 5 (hub event key epoch rotation + SERVER_SECRET emergency rotation); updated Section 3.3 to reflect Argon2id + min 8-digit/alphanumeric credential; updated response timeframes table |
 | 2026-05-02 | 2.0 | Complete rewrite: HPKE replaces ECIES for all key wrapping, sigchain-based device deauthorization replaces nsec revocation, added PUK rotation section, added CLKR chain references, updated device storage (Tauri Store/Keychain/Keystore not localStorage), removed Cloudflare Workers references, updated panic wipe to platform-native lock |
 | 2026-02-25 | 1.0 | Initial version |
