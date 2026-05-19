@@ -296,13 +296,15 @@ describe('IdentityService.redeemInvite', () => {
   it('throws 400 when invite not found', async () => {
     const { db, service } = setup()
 
+    // RACE-01: Atomic claim — UPDATE...WHERE(usedAt IS NULL)...RETURNING
     const tx = {
-      select: vi.fn().mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({ limit: vi.fn().mockResolvedValue([]) }),
+      update: vi.fn().mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([]),
+          }),
         }),
       }),
-      update: vi.fn(),
       insert: vi.fn(),
     }
     ;(db as any).transaction = vi.fn().mockImplementation((fn: (tx: unknown) => Promise<unknown>) => fn(tx))
@@ -315,15 +317,15 @@ describe('IdentityService.redeemInvite', () => {
   it('throws 400 when invite already used', async () => {
     const { db, service } = setup()
 
+    // RACE-01: Atomic claim returns empty (usedAt IS NULL check fails for used invite)
     const tx = {
-      select: vi.fn().mockReturnValue({
-        from: vi.fn().mockReturnValue({
+      update: vi.fn().mockReturnValue({
+        set: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([makeInviteRow({ usedAt: new Date() })]),
+            returning: vi.fn().mockResolvedValue([]),
           }),
         }),
       }),
-      update: vi.fn(),
       insert: vi.fn(),
     }
     ;(db as any).transaction = vi.fn().mockImplementation((fn: (tx: unknown) => Promise<unknown>) => fn(tx))
@@ -338,17 +340,13 @@ describe('IdentityService.redeemInvite', () => {
     const invite = makeInviteRow()
     const newUser = makeUserRow({ pubkey: 'pk-new', displayName: invite.name })
 
+    // RACE-01: Atomic claim succeeds — returns the invite row
     const tx = {
-      select: vi.fn().mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([invite]),
-          }),
-        }),
-      }),
       update: vi.fn().mockReturnValue({
         set: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([]),
+          where: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([invite]),
+          }),
         }),
       }),
       insert: vi.fn().mockReturnValue({
@@ -361,7 +359,7 @@ describe('IdentityService.redeemInvite', () => {
 
     const result = await service.redeemInvite({ code: 'invite-code-abc', pubkey: 'pk-new' })
     expect(result.volunteer.pubkey).toBe('pk-new')
-    expect(tx.update).toHaveBeenCalled() // marked used
+    expect(tx.update).toHaveBeenCalled() // atomic claim
     expect(tx.insert).toHaveBeenCalled() // user created
   })
 })
@@ -795,7 +793,10 @@ describe('IdentityService.validateSession - sliding expiry', () => {
     const { db, service } = setup()
     // Session expiring in 30 minutes (< 1h threshold)
     const expiresAt = new Date(Date.now() + 30 * 60 * 1000)
-    db.$setSelectResult([makeSessionRow({ expiresAt })])
+    const sessionRow = makeSessionRow({ expiresAt })
+    db.$setSelectResult([sessionRow])
+    // RACE-06: atomic update with .returning() needs a result to confirm renewal
+    db.$setUpdateResult([sessionRow])
 
     const result = await service.validateSession('tok-abc123')
     // Should have extended the expiry

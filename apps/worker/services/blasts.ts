@@ -227,60 +227,61 @@ export class BlastsService {
     let imported = 0
     let skipped = 0
 
+    // RACE-09 + RACE-13: INSERT...ON CONFLICT DO UPDATE replaces the
+    // SELECT→check→INSERT/UPDATE pattern. Concurrent imports with overlapping
+    // identifiers are handled atomically at the database level. Channel merge
+    // uses SQL-level jsonb_agg to avoid read-modify-write races.
     for (const entry of entries) {
       const identifierHash = this.hashIdentifier(entry.identifier)
-
-      const existing = await this.getSubscriberByIdentifierHash(identifierHash, hubId)
-      if (existing) {
-        // Merge channels and tags
-        const channels = (existing.channels ?? []) as SubscriberChannel[]
-        const tags = existing.tags ?? []
-        let changed = false
-
-        const hasChannel = channels.some((ch: SubscriberChannel) => ch.type === entry.channel)
-        if (!hasChannel) {
-          channels.push({ type: entry.channel, verified: false })
-          changed = true
-        }
-        if (entry.tags) {
-          const newTags = entry.tags.filter((t) => !tags.includes(t))
-          if (newTags.length > 0) {
-            tags.push(...newTags)
-            changed = true
-          }
-        }
-
-        if (changed) {
-          await this.db
-            .update(subscribers)
-            .set({
-              channels: channels,
-              tags,
-            })
-            .where(eq(subscribers.id, existing.id))
-        }
-        skipped++
-        continue
-      }
-
       const preferenceToken = this.generatePreferenceToken(identifierHash)
       const encrypted = this.hmacSecret
         ? encryptContactIdentifier(entry.identifier, this.hmacSecret)
         : null
-      await this.db
+      const newChannels = [{ type: entry.channel, verified: false }]
+      const entryTags = entry.tags ?? []
+
+      const [result] = await this.db
         .insert(subscribers)
         .values({
           hubId,
           identifierHash,
           encryptedIdentifier: encrypted,
-          channels: [{ type: entry.channel, verified: false }],
-          tags: entry.tags ?? [],
+          channels: newChannels,
+          tags: entryTags,
           language: entry.language ?? 'en',
           status: 'active',
           doubleOptInConfirmed: false,
           preferenceToken,
         })
-      imported++
+        .onConflictDoUpdate({
+          target: [subscribers.hubId, subscribers.identifierHash],
+          set: {
+            // Merge channels atomically at the SQL level
+            channels: sql`(
+              SELECT jsonb_agg(DISTINCT elem)
+              FROM (
+                SELECT elem FROM jsonb_array_elements(${subscribers.channels}) elem
+                UNION ALL
+                SELECT elem FROM jsonb_array_elements(${JSON.stringify(newChannels)}::jsonb) elem
+              ) combined
+            )`,
+            // Merge tags atomically at the SQL level
+            tags: entryTags.length > 0
+              ? sql`(
+                  SELECT COALESCE(array_agg(DISTINCT t), '{}')
+                  FROM unnest(${subscribers.tags} || ARRAY[${sql.join(entryTags.map(t => sql`${t}`), sql`,`)}]::text[]) t
+                )`
+              : subscribers.tags,
+          },
+        })
+        .returning({ id: subscribers.id, xmax: sql<string>`xmax` })
+
+      // xmax=0 means a fresh insert; non-zero means an update (conflict)
+      if (result.xmax === '0') {
+        imported++
+      } else {
+        skipped++
+      }
     }
 
     return { imported, skipped, total: imported + skipped }
@@ -558,12 +559,8 @@ export class BlastsService {
   // --- Blast lifecycle ---
 
   async send(id: string, hubId?: string): Promise<BlastRow> {
+    // RACE-04 Part A: Rate limit check still reads the blast for hubId context
     const blast = await this.getBlast(id)
-    if (blast.status !== 'draft' && blast.status !== 'scheduled') {
-      throw new ServiceError(400, 'Blast is not in a sendable state')
-    }
-
-    // Enforce maxBlastsPerDay limit
     const effectiveHubId = hubId ?? blast.hubId ?? ''
     const settings = await this.getBlastSettings(effectiveHubId)
     const today = new Date()
@@ -584,6 +581,8 @@ export class BlastsService {
       throw new ServiceError(429, 'Daily blast limit reached')
     }
 
+    // RACE-04: Atomic status transition — WHERE clause ensures only draft/scheduled
+    // blasts can be sent. Two concurrent send() calls: only one matches.
     const [row] = await this.db
       .update(blasts)
       .set({
@@ -598,9 +597,15 @@ export class BlastsService {
           optedOut: 0,
         },
       })
-      .where(eq(blasts.id, id))
+      .where(
+        and(
+          eq(blasts.id, id),
+          sql`${blasts.status} IN ('draft', 'scheduled')`,
+        ),
+      )
       .returning()
 
+    if (!row) throw new ServiceError(400, 'Blast is not in a sendable state (may already be sending)')
     return row
   }
 
@@ -754,11 +759,12 @@ export class BlastsService {
       }
     }
 
-    // Batch insert deliveries (chunks of 500 to avoid query size limits)
+    // RACE-04 Part B: Batch insert with ON CONFLICT DO NOTHING — retries
+    // or concurrent expansions cannot create duplicate delivery rows.
     const BATCH_SIZE = 500
     for (let i = 0; i < deliveryValues.length; i += BATCH_SIZE) {
       const batch = deliveryValues.slice(i, i + BATCH_SIZE)
-      await this.db.insert(blastDeliveries).values(batch)
+      await this.db.insert(blastDeliveries).values(batch).onConflictDoNothing()
     }
 
     // Update blast stats with actual delivery count

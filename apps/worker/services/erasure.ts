@@ -324,41 +324,42 @@ export class ErasureService {
         AND jsonb_typeof(details) != 'null'
       `)
 
+      // RACE-10: Phase 4 — re-encryption job inserts INSIDE transaction.
+      // If the process crashes after Phase 2+3 but before Phase 4, jobs would
+      // be lost. Moving them inside ensures atomicity.
+      for (const row of hubMembershipsRows as { hub_id: string }[]) {
+        if (!row.hub_id) continue
+        const [job] = await tx
+          .insert(reEncryptionJobs)
+          .values({
+            userId,
+            hubId: row.hub_id,
+            status: 'queued',
+          })
+          .returning()
+        reEncryptionJobIds.push(job.id)
+      }
+
+      // Update erasure request status INSIDE transaction
+      await tx
+        .update(erasureRequests)
+        .set({
+          status: 'completed',
+          executedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(erasureRequests.userId, userId),
+            eq(erasureRequests.status, 'executing'),
+          ),
+        )
+
       // CRIT-1: Audit log recorded INSIDE transaction — only committed if erasure succeeds
       await auditService.log('userErasureExecuted', executedBy, {
         targetUserId: userId,
         justification,
       })
     })
-
-    // Phase 4: Queue re-encryption jobs (outside transaction — these are background)
-
-    for (const row of hubMembershipsRows as { hub_id: string }[]) {
-      if (!row.hub_id) continue
-      const [job] = await this.db
-        .insert(reEncryptionJobs)
-        .values({
-          userId,
-          hubId: row.hub_id,
-          status: 'queued',
-        })
-        .returning()
-      reEncryptionJobIds.push(job.id)
-    }
-
-    // Update erasure request status to completed (if there was one)
-    await this.db
-      .update(erasureRequests)
-      .set({
-        status: 'completed',
-        executedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(erasureRequests.userId, userId),
-          eq(erasureRequests.status, 'executing'),
-        ),
-      )
 
     return { reEncryptionJobIds }
   }
