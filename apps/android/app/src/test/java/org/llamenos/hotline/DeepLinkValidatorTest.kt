@@ -1,5 +1,6 @@
 package org.llamenos.hotline
 
+import android.app.Application
 import android.net.Uri
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -11,11 +12,11 @@ import kotlin.test.assertTrue
 /**
  * Tests for [DeepLinkValidator] URI allowlist enforcement.
  *
- * Requires Robolectric because [android.net.Uri.parse] returns null on a plain
- * JVM — the real Android URI parser is needed for scheme/host extraction.
+ * Uses Robolectric for real [Uri.parse] support. The plain `Application` class
+ * avoids loading the app's Hilt-injected Application (which triggers JNI).
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], manifest = Config.NONE)
+@Config(sdk = [34], application = Application::class)
 class DeepLinkValidatorTest {
 
     @Test
