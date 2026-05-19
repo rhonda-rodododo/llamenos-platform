@@ -12,11 +12,15 @@ import java.security.SecureRandom
 import javax.inject.Inject
 
 /**
- * Handles OAuth callback deep links from the provider setup flow.
+ * Handles deep links into the app.
  *
- * Registered in AndroidManifest.xml with an intent filter for
- * `llamenos://oauth/callback`. Parses the callback URL and updates
- * the provider setup state accordingly.
+ * All incoming URIs are validated against [DeepLinkValidator] before processing.
+ * Sensitive actions (e.g. hub switching) require user confirmation.
+ *
+ * Registered in AndroidManifest.xml with intent filters for:
+ * - `llamenos://oauth/callback` (OAuth provider callbacks)
+ * - `llamenos://call/answer` (call deep links)
+ * - `llamenos://hub/switch` (hub switch deep links, user confirmation required)
  */
 @AndroidEntryPoint
 class DeepLinkActivity : ComponentActivity() {
@@ -28,11 +32,60 @@ class DeepLinkActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         val data = intent?.data
-        if (data != null && data.scheme == "llamenos" && data.host == "oauth") {
-            handleOAuthCallback(data)
-        } else {
+        if (data == null || !DeepLinkValidator.isAllowed(data)) {
+            Log.w(TAG, "Deep link rejected — not in allowlist or invalid: $data")
             finish()
+            return
         }
+
+        if (DeepLinkValidator.requiresConfirmation(data)) {
+            showConfirmationDialog(data)
+        } else {
+            routeDeepLink(data)
+        }
+    }
+
+    private fun showConfirmationDialog(uri: android.net.Uri) {
+        android.app.AlertDialog.Builder(this)
+            .setTitle(getString(R.string.deep_link_confirm_title))
+            .setMessage(getString(R.string.deep_link_confirm_message, uri.host))
+            .setPositiveButton(getString(R.string.deep_link_confirm_proceed)) { _, _ ->
+                routeDeepLink(uri)
+            }
+            .setNegativeButton(getString(R.string.deep_link_confirm_cancel)) { _, _ ->
+                finish()
+            }
+            .setOnCancelListener { finish() }
+            .show()
+    }
+
+    private fun routeDeepLink(uri: android.net.Uri) {
+        when (uri.host) {
+            "oauth" -> handleOAuthCallback(uri)
+            "call" -> handleCallDeepLink(uri)
+            "hub" -> handleHubDeepLink(uri)
+            else -> finish()
+        }
+    }
+
+    private fun handleCallDeepLink(uri: android.net.Uri) {
+        val callId = uri.getQueryParameter("callId")
+        if (callId != null) {
+            Log.d(TAG, "Call deep link: callId=$callId")
+            // TODO: route to active call screen via MainActivity intent
+        }
+        finish()
+    }
+
+    private fun handleHubDeepLink(uri: android.net.Uri) {
+        val hubId = uri.getQueryParameter("hubId")
+        if (hubId != null) {
+            Log.d(TAG, "Hub deep link: hubId=$hubId")
+            // TODO: call hubRepository.switchToHub(hubId) after user confirmation
+            // Hub switch must be driven by explicit user action (confirmation dialog above),
+            // never by automatic background processing.
+        }
+        finish()
     }
 
     private fun handleOAuthCallback(uri: android.net.Uri) {

@@ -221,14 +221,10 @@ class PushService : FirebaseMessagingService() {
         if (callId.isNotEmpty() && hubId.isNotEmpty()) {
             linphoneService.storePendingCallHub(callId, hubId)
         }
-
-        // App-unlocked path: context switch is intentional here because the user
-        // is actively using the app and about to answer a call. This is distinct
-        // from the wake-payload coroutine above, which runs in the background
-        // for any notification type including non-call events.
-        if (hubId.isNotEmpty()) {
-            serviceScope.launch { activeHubState.setActiveHub(hubId) }
-        }
+        // Multi-hub axiom: do NOT call setActiveHub here.
+        // Hub context switch happens in LinphoneService.onCallStateChanged (IncomingReceived)
+        // when the SIP call is actually received — the correct moment for setActiveHub.
+        // Background push handlers must never switch the active hub.
 
         ensureNotificationChannel(
             CHANNEL_CALLS,

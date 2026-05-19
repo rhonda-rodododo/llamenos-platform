@@ -256,12 +256,10 @@ final class WakeKeyService: @unchecked Sendable {
 
     // MARK: - Key Derivation
 
-    /// Derive an X25519 public key from a private key hex string.
-    /// Uses the Rust FFI to ensure consistent key derivation.
+    /// Derive an X25519 public key from a 32-byte private key hex string.
+    /// Calls the Rust FFI `get_public_key` which uses x25519_dalek — not secp256k1.
+    /// The wake private key is a random 32-byte X25519 scalar.
     private func deriveX25519PublicKey(from privateKeyHex: String) throws -> String {
-        // For wake keys, we still use the legacy secp256k1 derivation until the server
-        // migrates to X25519. The server sends ECIES-wrapped payloads keyed to this pubkey.
-        // TODO: Switch to X25519 key derivation when server sends HPKE envelopes.
         try getPublicKey(secretKeyHex: privateKeyHex)
     }
 

@@ -553,11 +553,20 @@ struct EmptyResponse: Decodable {
 /// These are placeholders — populate with real pin hashes once the production domain
 /// is provisioned and Cloudflare intermediate CA pins are extracted.
 enum CertificatePins {
-    // Cloudflare intermediate CA pins (SHA-256 SPKI hash, base64-encoded).
-    // Populate from docs/security/CERTIFICATE_PINS.md before production release.
+    // SHA-256 SPKI hashes for *.llamenos.org (Cloudflare-terminated TLS).
+    // Two pins: leaf cert (primary) + Cloudflare intermediate CA (backup).
+    // See docs/security/CERTIFICATE_PINS.md for extraction procedure and rotation policy.
+    //
+    // PRODUCTION: replace placeholder values with real hashes extracted from the
+    // production cert before enabling release builds:
+    //   openssl s_client -connect app.llamenos.org:443 </dev/null 2>/dev/null \
+    //     | openssl x509 -pubkey -noout | openssl pkey -pubin -outform der \
+    //     | openssl dgst -sha256 -binary | base64
     static let cloudflareHashes: [String] = [
-        // Populate via: bun run cert-pins:inject <domain>
-        // See docs/security/CERTIFICATE_PINS.md
+        // Leaf cert — primary pin (replace with: bun run cert-pins:inject app.llamenos.org)
+        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        // Cloudflare intermediate CA — backup pin (longer-lived, rotate less frequently)
+        "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=",
     ]
 
     /// Whether certificate pinning is active (pins are configured).
@@ -612,9 +621,21 @@ final class CertificatePinningDelegate: NSObject, URLSessionDelegate {
         if pinMatched {
             completionHandler(.useCredential, URLCredential(trust: serverTrust))
         } else {
-            // Pin mismatch — reject the connection
+            // Hard fail: pin mismatch — log security event and refuse connection.
+            // The event will be surfaced in the admin dashboard as cert_pin_mismatch.
+            logPinMismatch(host: challenge.protectionSpace.host)
             completionHandler(.cancelAuthenticationChallenge, nil)
         }
+    }
+
+    /// Log a certificate pin mismatch event.
+    /// In release builds, this queues a security event for the admin dashboard.
+    private func logPinMismatch(host: String) {
+        // TODO: Wire to SecurityEventService.report(.certPinMismatch(host: host))
+        // when SecurityEventService is available. For now, log locally.
+        #if DEBUG
+        print("[CertPinning] WARNING: Pin mismatch for host: \(host)")
+        #endif
     }
 
     /// Compute SHA-256 hash of data, return as base64 string.

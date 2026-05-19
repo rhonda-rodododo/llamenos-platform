@@ -2,9 +2,16 @@ package org.llamenos.hotline.crypto
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyProperties
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.security.KeyStore
+import javax.crypto.Cipher
+import javax.crypto.KeyGenerator
+import javax.crypto.SecretKey
+import javax.crypto.spec.GCMParameterSpec
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -226,6 +233,86 @@ class KeystoreService @Inject constructor(
         prefs.edit().clear().apply()
     }
 
+    // ── Biometric-protected PIN storage ─────────────────────────────────────
+
+    /**
+     * Store the PIN encrypted with a biometric-protected AndroidKeystore key.
+     * The caller must pass the [Cipher] from a successful [BiometricPrompt] auth
+     * (in encryption mode) and the [pin] to encrypt.
+     *
+     * Call this during biometric enrollment (when the user first enables biometric unlock).
+     */
+    fun storePINForBiometric(cipher: Cipher, pin: String) {
+        val encrypted = cipher.doFinal(pin.toByteArray(Charsets.UTF_8))
+        val iv = cipher.iv
+        prefs.edit()
+            .putString(KEY_BIOMETRIC_ENCRYPTED_PIN, android.util.Base64.encodeToString(encrypted, android.util.Base64.NO_WRAP))
+            .putString(KEY_BIOMETRIC_PIN_IV, android.util.Base64.encodeToString(iv, android.util.Base64.NO_WRAP))
+            .apply()
+    }
+
+    /**
+     * Decrypt the stored PIN using the [Cipher] from a successful [BiometricPrompt] auth
+     * (in decryption mode). Returns null if no biometric PIN has been stored.
+     */
+    fun decryptPINWithBiometric(cipher: Cipher): String? {
+        val encryptedB64 = prefs.getString(KEY_BIOMETRIC_ENCRYPTED_PIN, null) ?: return null
+        val encrypted = android.util.Base64.decode(encryptedB64, android.util.Base64.NO_WRAP)
+        return String(cipher.doFinal(encrypted), Charsets.UTF_8)
+    }
+
+    /**
+     * Whether a biometric-protected PIN is stored.
+     */
+    fun hasBiometricPIN(): Boolean = prefs.contains(KEY_BIOMETRIC_ENCRYPTED_PIN)
+
+    /**
+     * Create (or get existing) the AndroidKeystore AES-256-GCM key for biometric PIN encryption.
+     * The key requires biometric authentication to use.
+     */
+    fun getOrCreateBiometricKey(): SecretKey {
+        val ks = KeyStore.getInstance("AndroidKeyStore").also { it.load(null) }
+        ks.getKey(BIOMETRIC_KEY_ALIAS, null)?.let { return it as SecretKey }
+
+        val keyGen = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
+        keyGen.init(
+            KeyGenParameterSpec.Builder(
+                BIOMETRIC_KEY_ALIAS,
+                KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
+            )
+                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                .setKeySize(BIOMETRIC_KEY_SIZE)
+                .setUserAuthenticationRequired(true)
+                .setInvalidatedByBiometricEnrollment(true)
+                .build()
+        )
+        return keyGen.generateKey()
+    }
+
+    /**
+     * Get a [Cipher] initialized for encryption with the biometric key.
+     * Pass this Cipher as the [BiometricPrompt.CryptoObject] for biometric enrollment.
+     */
+    fun getBiometricEncryptCipher(): Cipher {
+        val key = getOrCreateBiometricKey()
+        return Cipher.getInstance(BIOMETRIC_TRANSFORMATION).also { it.init(Cipher.ENCRYPT_MODE, key) }
+    }
+
+    /**
+     * Get a [Cipher] initialized for decryption using the stored IV.
+     * Pass this Cipher as the [BiometricPrompt.CryptoObject] for biometric unlock.
+     * Returns null if no biometric PIN IV is stored.
+     */
+    fun getBiometricDecryptCipher(): Cipher? {
+        val ivB64 = prefs.getString(KEY_BIOMETRIC_PIN_IV, null) ?: return null
+        val iv = android.util.Base64.decode(ivB64, android.util.Base64.NO_WRAP)
+        val key = getOrCreateBiometricKey()
+        return Cipher.getInstance(BIOMETRIC_TRANSFORMATION).also {
+            it.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(BIOMETRIC_GCM_TAG_LENGTH, iv))
+        }
+    }
+
     companion object {
         private const val PREFS_FILE_NAME = "llamenos_secure_prefs"
 
@@ -246,5 +333,13 @@ class KeystoreService @Inject constructor(
 
         /** AndroidKeyStore alias for the wake key encryption key. */
         const val WAKE_KEY_ALIAS = "llamenos-wake-key"
+
+        // Biometric PIN storage keys and config
+        const val BIOMETRIC_KEY_ALIAS = "llamenos_biometric_pin_key"
+        const val KEY_BIOMETRIC_ENCRYPTED_PIN = "biometric_encrypted_pin"
+        const val KEY_BIOMETRIC_PIN_IV = "biometric_pin_iv"
+        private const val BIOMETRIC_TRANSFORMATION = "AES/GCM/NoPadding"
+        private const val BIOMETRIC_KEY_SIZE = 256
+        private const val BIOMETRIC_GCM_TAG_LENGTH = 128
     }
 }

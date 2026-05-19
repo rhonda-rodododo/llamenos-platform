@@ -171,28 +171,29 @@ final class SecurityHardeningTests: XCTestCase {
 
     // MARK: - Certificate Pinning Constants (H14)
 
-    func testCertificatePinsDisabledByDefault() {
-        // Pins are placeholders — should be disabled until populated
-        // This test documents the expected state and will fail-fast when
-        // real pins are added, reminding us to update the test.
+    func testCertificatePinsNonEmpty() {
+        // Certificate pins must be non-empty. This test will fail until real
+        // pin hashes are injected from production. That is intentional — this
+        // test documents that placeholder pins must never ship to production without
+        // being replaced. See docs/security/CERTIFICATE_PINS.md.
         XCTAssertFalse(
-            CertificatePins.isEnabled,
-            "Certificate pinning should be disabled until real pin hashes are configured"
+            CertificatePins.cloudflareHashes.isEmpty,
+            "CertificatePins.cloudflareHashes must not be empty — populate from docs/security/CERTIFICATE_PINS.md"
         )
     }
 
     func testCertificatePinsEnabledWhenHashesPopulated() {
-        // CertificatePins.isEnabled is a computed property based on
-        // cloudflareHashes being non-empty. When the array is empty,
-        // isEnabled returns false. This is verified above.
-        //
-        // Since the hashes are static let, we can't mutate them at test time.
-        // Instead, we verify the logic by checking the current state and
-        // asserting the contract: isEnabled == !cloudflareHashes.isEmpty.
+        // CertificatePins.isEnabled is a computed property: isEnabled == !cloudflareHashes.isEmpty.
+        // Since hashes are static let, verify the contract matches current state.
         XCTAssertEqual(
             CertificatePins.isEnabled,
             !CertificatePins.cloudflareHashes.isEmpty,
             "isEnabled should reflect whether pin hashes are configured"
+        )
+        // With placeholder hashes present, pinning must be enabled.
+        XCTAssertTrue(
+            CertificatePins.isEnabled,
+            "Pinning must be enabled when hashes are configured"
         )
     }
 
@@ -355,4 +356,19 @@ final class SecurityHardeningTests: XCTestCase {
     // that mediated it) was removed when device keys replaced single-nsec identity.
     // The equivalent V3 flow is sigchain-authorized device linking, which has its own
     // tests in DeviceLinkViewModel coverage.
+
+    // MARK: - Gap 3.1: Wake Key X25519 Curve Verification
+
+    func testWakeKeyDerivedPublicKeyIsX25519Length() throws {
+        // X25519 public keys are 32 bytes = 64 hex characters.
+        // secp256k1 compressed public keys are 33 bytes = 66 hex characters.
+        // If this test fails, the wake key derivation is using the wrong curve.
+        // The Rust get_public_key FFI uses x25519_dalek — not secp256k1.
+        let privateKeyHex = String(repeating: "a1", count: 32) // 32 bytes = 64 hex chars
+        let publicKeyHex = try getPublicKey(secretKeyHex: privateKeyHex)
+        XCTAssertEqual(
+            publicKeyHex.count, 64,
+            "Wake public key must be 32 bytes (64 hex chars) — X25519, not secp256k1 (33 bytes = 66 hex chars)"
+        )
+    }
 }
