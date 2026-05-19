@@ -404,6 +404,196 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add E2E tests for device linking and fix /link-device public path
 
 
+## 0.19.8 (2026-05-19)
+
+### Features
+
+- add teams/tags permissions and domain separation labels
+- add users:manage-devices permission + LABEL_SAS_DERIVE crypto label
+- add device metadata columns, security_events and device_verifications tables
+- EP09-P1 Shamir secret sharing + recovery group crypto foundation
+- add device management schemas (rename, revoke, verify, sessions, security events, lockdown, admin overview)
+- protocol schema extensions, entity templates, DB migration
+- add hourly distribution, user stats, and personal stats analytics schemas
+- add LABEL_AUDIT_USER_KEY_WRAP and LABEL_ERASURE_OVERRIDE_SIG to crypto-labels.json
+- add EP08 erasure, retention, bans, device wipe strings across 13 locales
+- add audit_key module — generate, wrap, unwrap, encrypt/decrypt details
+- add system:view-* permissions and PERMISSION_GROUP_LABELS
+- add blast progress event and retry response schemas
+- add entity template labels across all 13 locales
+- add EntityTemplate interfaces and listEntityTemplates/applyEntityTemplate functions
+- rewrite events.tsx as EntityTypeFilteredRecordList filtered to category=event
+- add admin events migration endpoints (GET status, POST migrate) and EventsMigrationPanel UI
+- add teams, teamMembers, contactTeamAssignments, tags tables; drop users.team_id
+- add domain separation labels for role encryption
+- add team and tag Zod schemas for API request/response types
+- EP08-P4 iOS/Android views for erasure, retention, bans, device wipe
+- add retryDelivery and retryFailedDeliveries to BlastsService
+- add user_role_envelopes table, fix en.json, propagate i18n
+- implement teams & tags backend services, routes, i18n, and desktop admin UI
+- wire up device security backend routes and desktop UI
+- shift management — ring groups, overrides, availability, requests, clock-in
+- EP05a channel configuration UI
+- add hourly, user stats, and personal stats endpoints
+- add i18n strings across 13 locales + codegen outputs
+- i18n + admin UI for ring groups & shift overrides
+- desktop UI — erasure queue, retention, platform bans, settings
+- blast delivery enhancements — retry routes WS events, delivery sheet, progress bar, i18n
+- wire recovery-group routes + BDD tests
+- account lifecycle backend — erasure, retention, platform bans
+- add entity file upload and template customize schemas (EP06-A2)
+- entity field file upload endpoint + contact-write BDD (EP06-A2)
+- hub-level entity type customization endpoint (EP06-A2)
+- client write functions for relationships, groups, files, templates (EP06-A2)
+- add recovery group mobile UI (iOS/Android) and i18n strings
+- contact edit, relationship UI, affinity groups, file/location fields, FieldDefinitionEditor (EP06-A2)
+- contact create/edit views + entity type admin views with FieldDefinitionEditor (EP06-A2)
+- social recovery desktop UI — admin config, request dashboard, account recovery flow
+- add cms, contacts form, entity type admin keys across 13 locales + codegen (EP06-A2)
+- CMS intelligence — scorer, auto-assign, triage conversion, mobile UIs
+- remaining platform changes — protocol schemas, i18n, android/ios updates, worker fixes
+- add contact-merge, entity-merge, bulk-contact schemas; displayTypes + crossHub
+- contact merge, entity merge, bulk ops, batch import, cross-hub entity query
+- blind index filtering, EntityTemplatesSection, and i18n fixes
+- CMS advanced ops — merge, bulk, import, cross-hub, views
+- add BDD feature file and backend step definitions
+- add test-kdf feature flag for fast Argon2id in emulator tests
+- implement platform roles CRUD with HPKE envelope encryption
+- add template role import dialog to hub roles section
+- BlastComposer media/schedule, WS progress events, BDD fixes, i18n, E2E tests
+- tags & teams desktop components + backend audit
+- tags & teams desktop components + backend audit
+- wire SAS emoji derivation through Tauri IPC
+- sigchain device revocation, rate limiting, BDD steps
+- SAS emoji verification, sigchain revocation, rate limiting
+- platform role envelopes, CRUD, template import, i18n
+- deprecate events API, implement Related tab, fix @wip BDD scenarios
+- BlastComposer media/schedule, WS progress, BDD fixes, i18n, E2E
+- device wipe UI, co-approver selection, i18n completion
+- platform analytics verification + Android analytics screens
+- platform settings, device wipe UI, co-approver selection
+- platform analytics verification + Android analytics
+- add React Query hooks + WS cache invalidation for shifts
+- CMS entity system — events deprecation, related tab, evidence chain, BDD fixes
+- React Query cache invalidation + WS shift events
+- event linking + contact relationships UI (6 @wip scenarios) (#339)
+- cross-platform declarative E2E test seeding + Android E2E fixes (#346)
+- separate debug/release crypto .so builds (#355)
+- add check-label-count.sh to catch hardcoded domain separation counts
+- auth hardening + session security + test updates (Epic A)
+- apply rate limiting as default middleware on all routes (Epic A / H03)
+- Epic I Phases 2-5 — error disclosure, side channels, safeFetch, webhook replay
+- certificate pinning hard-fail + biometric unlock wiring + X25519 comment fix (C05, H25, Gap 3.1)
+- mobile platform hardening — cert pinning, biometric unlock, FLAG_SECURE, multi-hub axiom, deep link validation (H29, H30, H31, H33, MOB-02, Gap 3.1)
+- key isolation & wipe completeness (Epic C Phase 1)
+- centralized WipeService for comprehensive wipe (Epic C Phase 2)
+- wipe completeness & key hardening (Epic C Phase 3)
+
+### Fixes
+
+- correct indentation in puk.rs after clippy autofix
+- apply cargo fmt to labels.rs
+- proper drizzle migration + remove @android tags from shift features
+- add FK constraints for hubId, contactId
+- remove sessionStorage persistence of device-wipe state
+- address PR review — session termination, lockdown mount, schema constraint, isCurrent, device metadata
+- address PR #289 review — domain separation, AAD binding, signature verification
+- unique delivery constraint, null hubId WS guard
+- ownership check, 24h shift edge case
+- address PR #290 review — FFI safety, constant-time GF mul, threshold enforcement
+- address review — cross-hub escalation, field ID stability, route ordering
+- address review — expiry, atomicity, hub-scoping, emergency route, env vars
+- address review — audit ordering, signature verification, plaintext phone, purge safety
+- address PR #293 review — hubId threading, plaintext removal, label versioning, i18n
+- hub-scope guard, /me permission documentation
+- remove orphaned items, fix gdpr permission, dedup canSeeGroup
+- use shared loginAsAdmin helper in recovery-group E2E tests
+- correct liveness proof BDD test — enroll admin as share holder
+- update shift API helpers and steps to use encryptedName
+- update ScreenshotTests Shift constructors to use encryptedName
+- CI test fixes (round 1)
+- CI test fixes (round 1)
+- CI test fixes (round 1)
+- CI test fixes (round 1)
+- CI test fixes (round 1)
+- CI test fixes (round 1)
+- add EP08 labels to TS + interop tests, fix missing LABEL_SERVER_NOSTR_KEY
+- align BDD step assertions with API response shape
+- populate answeredBy in call_records and coerce count types
+- use unnest() instead of jsonb_array_elements_text() for text[] roles column
+- restore Playwright browser install in backend-bdd job
+- add teamId to users table, identity service, and User interface
+- prevent circuit breaker cascade on unconfigured messaging channels
+- sanitize hyphens in Android resource names + add missing i18n keys
+- treat signal bridge network errors as retryable, not failed
+- remove stale eslint-disable-line for unused-vars in updateTelephonyProvider
+- use BanResponse instead of non-existent Ban type
+- update shift test helpers for EP07 schema changes
+- resolve test failures from EP05a/EP08-P4 merge
+- correct permission in admin-nav-visibility test
+- resolve 5 BDD failures (ban hashing, invite perms, feature tags)
+- resolve build failures — ApiClient→ApiService, EntityTypeDefinition→CaseEntityTypeDefinition, positional format strings
+- entity system BDD — event templates, blind index, migration
+- crypto test + ban route regressions on main
+- BDD fixes — ban call rejection + CMS contact write operations
+- BDD fixes — ban column rename, triage auto-assign hub scoping
+- CI green-up — codegen enforcement, iOS/Android builds, desktop e2e, shift tests
+- remove broken RustFS standalone binary download from iOS E2E
+- fix desktop E2E shard 2 — account erasure, login restore, admin nav, CMS events
+- add self-trigger path to ios-e2e workflow
+- fix channel-config tests — add auth, API mocks, client-side nav
+- regenerate UniFFI Kotlin bindings to match current Rust FFI
+- include regenerated llamenos_core.kt bindings
+- fix 17 failing Cucumber scenarios + shard filtering
+- fix 14 failing Cucumber scenarios across 5 clusters
+- un-wip 2 BDD scenarios with proper access control
+- fix admin toggles E2E regression — use count() not isVisible() for expansion check
+- re-add @wip to admin toggles test (pre-existing issue)
+- fix blast schedule E2E test
+- remove migration BDD scenarios — endpoints removed, migration complete
+- fix AnalyticsRepository unit test path assertions
+- re-add @wip to 3 event linking scenarios (not fully implemented)
+- fix shift card E2E interaction after React Query migration
+- @wip linked cases tab + relationships empty state (UI not fully wired)
+- @wip 4 shift detail scenarios (React Query cache race in E2E)
+- @wip relationships tab scenario (UI step not wired)
+- @wip navigate-to-shift-detail (same cache race)
+- analytics cross-hub test + reports e2e + rate-limit BDD isolation (#340)
+- shift detail @wip scenarios — cache invalidation (#336)
+- admin settings toggles @wip scenario (#338)
+- replace GNU timeout with cross-platform gtimeout for macOS runners (#341)
+- resolve desktop E2E failures (50/50 green) (#343)
+- add docker/setup-docker-action for macOS runners (#344)
+- resolve reports filter chip visibility flake (#357)
+- resolve rate limit BDD test flakes (#356)
+- add 7 missing labels + CI drift guard tests
+- Epic I Phase 1 — JSON parse safety and error disclosure (AST-01..03, W05-H01/M03/M05)
+- Epic F — supply chain & infrastructure hardening
+- Epic B Phases 2-5 — domain separation fixes, unified errors, label enforcement
+- prevent 13 race conditions with atomic DB operations (Epic G)
+- verify co-approver is a registered admin device (H01)
+- enforce hub isolation on by-contact lookup (IDOR)
+- require Schnorr re-auth for emergency lockdown
+- reject control characters in blast content (H02)
+- fail closed on DNS resolution failure (H07)
+- use upsert for PUK envelope distribution (H09)
+- resolve 5 CI failures from security audit PRs
+- resolve android compile errors, backend-bdd and e2e test failures
+- revert a2p test to apiPost, remove unused import
+- fix Android unit tests and BDD dev route auth
+- align tests with security hardening behavior changes
+- Robolectric sdk=34, provision room path, import diagnostics
+- use plain Application in Robolectric to avoid JNI load
+- remove autoVerify from custom scheme intent filter
+- use stringResource() for biometric prompt strings
+- add test-ext-junit dep, fix FLAG_SECURE test types
+- mark RACE-03 and RACE-09 scenarios as @wip
+- increase panic-wipe redirect wait for async imports
+- exclude @wip/@fixme from backend-bdd tag filter
+- disable auto-lock and panic-wipe in Playwright test builds (#393)
+- resolve reply count badge failure — pass hubId to createNote (#394)
+- tag unimplemented push notification scenario as @wip (#395)
+
 ## 0.19.7 (2026-05-14)
 
 ### Features
