@@ -56,9 +56,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import org.llamenos.hotline.R
 import org.llamenos.hotline.model.EntityTypeDefinition
 import org.llamenos.hotline.model.EntityFieldDefinition
 import org.llamenos.protocol.Evidence
@@ -139,7 +141,7 @@ fun CaseDetailScreen(
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
+                            contentDescription = stringResource(R.string.a11y_back),
                         )
                     }
                 },
