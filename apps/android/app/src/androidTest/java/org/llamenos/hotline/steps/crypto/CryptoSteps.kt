@@ -613,9 +613,10 @@ class CryptoSteps : BaseSteps() {
     @When("I generate an ephemeral keypair")
     fun iGenerateAnEphemeralKeypair() {
         try {
-            val (secret, public) = cryptoService.generateEphemeralKeypair()
-            keypairASigningPubkey = secret
-            keypairAEncryptionPubkey = public
+            cryptoService.generateEphemeralKeypair().use { keypair ->
+                keypairASigningPubkey = keypair.secretHex()
+                keypairAEncryptionPubkey = keypair.publicKeyHex
+            }
         } catch (_: Throwable) {
             // Ephemeral keypair generation may fail without native crypto
         }
@@ -634,9 +635,10 @@ class CryptoSteps : BaseSteps() {
     @Then("generating another keypair should produce different keys")
     fun generatingAnotherKeypairShouldProduceDifferentKeys() {
         try {
-            val (secret2, public2) = cryptoService.generateEphemeralKeypair()
-            assertNotEquals("Ephemeral keys should be unique", keypairASigningPubkey, secret2)
-            assertNotEquals("Ephemeral pubkeys should be unique", keypairAEncryptionPubkey, public2)
+            cryptoService.generateEphemeralKeypair().use { keypair2 ->
+                assertNotEquals("Ephemeral keys should be unique", keypairASigningPubkey, keypair2.secretHex())
+                assertNotEquals("Ephemeral pubkeys should be unique", keypairAEncryptionPubkey, keypair2.publicKeyHex)
+            }
         } catch (_: Throwable) {
             // Keypair generation may fail without native crypto
         }

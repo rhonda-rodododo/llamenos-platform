@@ -6,6 +6,7 @@ vi.mock('./platform', () => ({
   lockCrypto: vi.fn(async () => {}),
   decryptWithPin: vi.fn(async () => null),
   clearStoredKey: vi.fn(async () => {}),
+  wipeVaultFile: vi.fn(async () => {}),
 }))
 
 describe('initPanicWipe', () => {

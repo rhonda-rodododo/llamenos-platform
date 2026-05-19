@@ -62,8 +62,6 @@ class DeviceLinkViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(DeviceLinkUiState())
     val uiState: StateFlow<DeviceLinkUiState> = _uiState.asStateFlow()
 
-    private var ephemeralSecret: String? = null
-    private var ephemeralPublic: String? = null
     private var sharedSecret: String? = null
 
     /**
@@ -147,37 +145,38 @@ class DeviceLinkViewModel @Inject constructor(
     private fun connectToProvisioningRoom(roomId: String, relayUrl: String) {
         viewModelScope.launch {
             try {
-                // Generate our ephemeral keypair
-                val (secret, public) = cryptoService.generateEphemeralKeypair()
-                ephemeralSecret = secret
-                ephemeralPublic = public
+                // Generate our ephemeral keypair — secret is zeroized after use
+                cryptoService.generateEphemeralKeypair().use { keypair ->
+                    // In production, we would:
+                    // 1. Connect to the relay at relayUrl
+                    // 2. Subscribe to events in the provisioning room
+                    // 3. Send our ephemeral public key (keypair.publicKeyHex)
+                    // 4. Wait for the desktop's ephemeral public key
+                    // 5. Derive shared secret via ECDH
 
-                // In production, we would:
-                // 1. Connect to the relay at relayUrl
-                // 2. Subscribe to events in the provisioning room
-                // 3. Send our ephemeral public key
-                // 4. Wait for the desktop's ephemeral public key
-                // 5. Derive shared secret via ECDH
+                    // Simulate connection delay
+                    delay(1500)
 
-                // Simulate connection delay
-                delay(1500)
+                    // Mock: derive shared secret with a placeholder "desktop" key
+                    val mockDesktopPublic = ByteArray(32).apply {
+                        java.security.SecureRandom().nextBytes(this)
+                    }.joinToString("") { "%02x".format(it) }
 
-                // Mock: derive shared secret with a placeholder "desktop" key
-                val mockDesktopPublic = ByteArray(32).apply {
-                    java.security.SecureRandom().nextBytes(this)
-                }.joinToString("") { "%02x".format(it) }
-
-                val derivedSecret = cryptoService.deriveSharedSecret(secret, mockDesktopPublic)
-                sharedSecret = derivedSecret
-
-                // Derive SAS code
-                val sasCode = cryptoService.deriveSASCode(derivedSecret)
-
-                _uiState.update {
-                    it.copy(
-                        step = DeviceLinkStep.VERIFYING,
-                        sasCode = sasCode,
+                    val derivedSecret = cryptoService.deriveSharedSecret(
+                        keypair.secretHex(),
+                        mockDesktopPublic,
                     )
+                    sharedSecret = derivedSecret
+
+                    // Derive SAS code
+                    val sasCode = cryptoService.deriveSASCode(derivedSecret)
+
+                    _uiState.update {
+                        it.copy(
+                            step = DeviceLinkStep.VERIFYING,
+                            sasCode = sasCode,
+                        )
+                    }
                 }
             } catch (e: Exception) {
                 _uiState.update {
@@ -239,8 +238,6 @@ class DeviceLinkViewModel @Inject constructor(
      * Cancel the device linking process.
      */
     fun cancel() {
-        ephemeralSecret = null
-        ephemeralPublic = null
         sharedSecret = null
         _uiState.update { DeviceLinkUiState() }
     }
@@ -249,8 +246,6 @@ class DeviceLinkViewModel @Inject constructor(
      * Retry after an error.
      */
     fun retry() {
-        ephemeralSecret = null
-        ephemeralPublic = null
         sharedSecret = null
         _uiState.update { DeviceLinkUiState() }
     }

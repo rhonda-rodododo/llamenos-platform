@@ -15,9 +15,8 @@ import {
   lockCrypto,
   deviceImportAndLoad,
   persistAndUnlockDeviceKeys,
-  clearStoredKey as platformClearStoredKey,
+  wipeVaultFile,
   isValidSeedHex,
-  hasStoredKey as platformHasStoredKey,
 } from './platform'
 
 // --- Private state (closure-scoped, never exported) ---
@@ -26,8 +25,8 @@ let publicKey: string | null = null
 
 // --- Auto-lock ---
 let idleTimer: ReturnType<typeof setTimeout> | null = null
-let lockCallbacks: Set<() => void> = new Set()
-let unlockCallbacks: Set<() => void> = new Set()
+const lockCallbacks: Set<() => void> = new Set()
+const unlockCallbacks: Set<() => void> = new Set()
 const IDLE_TIMEOUT_MS = 5 * 60 * 1000 // 5 minutes
 let autoLockDisabled = false
 
@@ -192,7 +191,7 @@ export function onUnlock(cb: () => void): () => void {
  */
 export async function wipeKey() {
   lock()
-  await platformClearStoredKey()
+  await wipeVaultFile()
 }
 
 /**

@@ -48,11 +48,11 @@ export function performPanicWipe(): void {
 
   // 4. Defer redirect — gives React one frame to paint the overlay
   setTimeout(async () => {
-    // Clear Stronghold vault (encrypted device keys)
+    // H17: Wipe Stronghold vault file from disk (secure deletion)
     try {
-      const { clearStoredKey } = await import('./platform')
-      await clearStoredKey()
-    } catch { /* Stronghold may be unavailable */ }
+      const { wipeVaultFile } = await import('./platform')
+      await wipeVaultFile()
+    } catch { /* Vault wipe may be unavailable */ }
 
     // Clear Tauri Store (non-security preferences)
     try {
