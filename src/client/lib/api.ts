@@ -62,7 +62,6 @@ import type {
   IdentifierType,
   ContactIdentifier,
   ContactCaseLink,
-  EntityTemplateListResponse,
   RecoveryGroupInfo,
   ErasureRequest,
   ErasureConfig,
@@ -2614,7 +2613,7 @@ export async function updateSecurityPrefs(patch: Partial<Omit<SecurityPrefs, 'up
 
 
 
-export async function listEntityTemplates(): Promise<EntityTemplateListResponse> {
+export async function listEntityTemplates(): Promise<{ templates: TemplateSummary[]; appliedTemplateIds: string[] }> {
   return request('/settings/cms/templates')
 }
 
