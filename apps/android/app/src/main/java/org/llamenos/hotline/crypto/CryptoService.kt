@@ -46,7 +46,18 @@ data class HpkeEnvelope(
     val labelId: Int,
     val enc: String,
     val ct: String,
-)
+) {
+    companion object {
+        /** HPKE envelope version — must match Rust ENVELOPE_VERSION */
+        const val CURRENT_VERSION = 3
+
+        // Label registry IDs — must match LABEL_REGISTRY indices in labels.rs.
+        // These are the numeric wire-format IDs for each label.
+        const val LABEL_ID_NOTE_KEY = 0
+        const val LABEL_ID_MESSAGE = 5
+        const val LABEL_ID_HUB_KEY_WRAP = 3
+    }
+}
 
 /**
  * Result of encrypting a note/message.
@@ -605,8 +616,8 @@ class CryptoService @Inject constructor() {
             if (!isUnlocked) throw CryptoException("No key loaded")
 
             val ffiEnvelope = org.llamenos.core.HpkeEnvelope(
-                v = 3.toUByte(),
-                labelId = 0.toUByte(),
+                v = HpkeEnvelope.CURRENT_VERSION.toUByte(),
+                labelId = HpkeEnvelope.LABEL_ID_HUB_KEY_WRAP.toUByte(),
                 enc = envelope.envelope.enc,
                 ct = envelope.envelope.ct,
             )

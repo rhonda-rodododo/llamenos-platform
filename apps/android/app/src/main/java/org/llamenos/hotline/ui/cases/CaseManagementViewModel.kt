@@ -643,7 +643,7 @@ class CaseManagementViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isDecryptingSummary = true) }
             try {
-                val hpkeEnv = HpkeEnvelope(v = 3, labelId = 0, enc = envelope.enc, ct = envelope.ct)
+                val hpkeEnv = HpkeEnvelope(v = HpkeEnvelope.CURRENT_VERSION, labelId = HpkeEnvelope.LABEL_ID_MESSAGE, enc = envelope.enc, ct = envelope.ct)
                 val plaintext = cryptoService.decryptMessage(record.encryptedSummary, hpkeEnv)
                 if (plaintext != null) {
                     val jsonObj = json.decodeFromString<JsonObject>(plaintext)
@@ -681,7 +681,7 @@ class CaseManagementViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isDecryptingFields = true) }
             try {
-                val hpkeEnv = HpkeEnvelope(v = 3, labelId = 0, enc = envelope.enc, ct = envelope.ct)
+                val hpkeEnv = HpkeEnvelope(v = HpkeEnvelope.CURRENT_VERSION, labelId = HpkeEnvelope.LABEL_ID_MESSAGE, enc = envelope.enc, ct = envelope.ct)
                 val plaintext = cryptoService.decryptMessage(encryptedFields, hpkeEnv)
                 if (plaintext != null) {
                     val jsonObj = json.decodeFromString<JsonObject>(plaintext)
@@ -717,7 +717,7 @@ class CaseManagementViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                val hpkeEnv = HpkeEnvelope(v = 3, labelId = 0, enc = envelope.enc, ct = envelope.ct)
+                val hpkeEnv = HpkeEnvelope(v = HpkeEnvelope.CURRENT_VERSION, labelId = HpkeEnvelope.LABEL_ID_MESSAGE, enc = envelope.enc, ct = envelope.ct)
                 val plaintext = cryptoService.decryptMessage(encryptedContent, hpkeEnv)
                 if (plaintext != null) {
                     _uiState.update {
@@ -745,7 +745,7 @@ class CaseManagementViewModel @Inject constructor(
 
                 val envelope = record.summaryEnvelopes.find { it.pubkey == pubkey } ?: continue
                 try {
-                    val hpkeEnv = HpkeEnvelope(v = 3, labelId = 0, enc = envelope.enc, ct = envelope.ct)
+                    val hpkeEnv = HpkeEnvelope(v = HpkeEnvelope.CURRENT_VERSION, labelId = HpkeEnvelope.LABEL_ID_MESSAGE, enc = envelope.enc, ct = envelope.ct)
                     val plaintext = cryptoService.decryptMessage(record.encryptedSummary, hpkeEnv)
                     if (plaintext != null) {
                         val jsonObj = json.decodeFromString<JsonObject>(plaintext)
