@@ -247,6 +247,7 @@ records.get('/by-contact/:contactId',
   async (c) => {
     const contactId = c.req.param('contactId')
     const permissions = c.get('permissions')
+    const hubId = c.get('hubId') ?? ''
 
     const accessLevel = getAccessLevel(permissions)
     if (!accessLevel) {
@@ -254,7 +255,8 @@ records.get('/by-contact/:contactId',
     }
 
     const services = c.get('services')
-    const result = await services.cases.listByContact(contactId)
+    // IDOR fix: pass hubId so results are scoped to the caller's hub
+    const result = await services.cases.listByContact(contactId, hubId)
     return c.json(result)
   },
 )

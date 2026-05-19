@@ -87,7 +87,6 @@ describe('ErasureService.createSelfRequest — co-approver admin check (H01)', (
       coApproverSignature: 'sig',
       cancelledAt: null,
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(service as any).db = {
       insert: () => ({
         values: () => ({ returning: () => Promise.resolve([fakeRow]) }),
