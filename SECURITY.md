@@ -19,6 +19,11 @@ The following are in scope:
 - Telephony adapter webhook validation
 - API authorization and privilege escalation
 - Dependency vulnerabilities with known exploits affecting production builds
+- Blast/broadcast subscriber data protection and access controls
+- Entity and case record system (evidence chain integrity, field-level encryption)
+- Recovery group: Shamir secret sharing, threshold reconstruction, liveness proofs
+- Device wipe and account erasure (crypto-shredding, erasure override authentication)
+- SAS emoji device verification (HKDF derivation, role-confusion resistance)
 
 Out of scope: denial-of-service against self-hosted instances, issues requiring physical access to the server, social engineering.
 

@@ -1,7 +1,7 @@
 # Data Classification Reference
 
-**Version:** 2.3
-**Date:** 2026-05-12
+**Version:** 3.0
+**Date:** 2026-05-18
 
 Complete inventory of all data stored and processed by Llamenos, with classification levels for security audits, legal review, and GDPR compliance.
 
@@ -139,6 +139,195 @@ Complete inventory of all data stored and processed by Llamenos, with classifica
 | `hubKeyVersion` | Plaintext | Current | Key version counter |
 | `memberEnvelopes[]` | **E2EE** | Current | HPKE-wrapped hub key, one per member (label: `LABEL_HUB_KEY_WRAP`) |
 | `hubKeyHistory[]` | Client-side only | Indefinite | Clients retain old hub keys for historical decryption |
+
+#### Permission & Role Definitions (EP01)
+
+| Field | Classification | Retention | Notes |
+|-------|---------------|-----------|-------|
+| `platformRoles[].encryptedName` | **E2EE** | Indefinite | Per-admin HPKE envelopes (label: `LABEL_PLATFORM_ROLE_NAME_ENCRYPT`) |
+| `platformRoles[].encryptedDescription` | **E2EE** | Indefinite | Per-admin HPKE envelopes (label: `LABEL_PLATFORM_ROLE_DESC_ENCRYPT`) |
+| `platformRoles[].adminEnvelopes[]` | **E2EE** | Indefinite | HPKE-wrapped key, one per super-admin |
+| `platformRoles[].permissions` | Plaintext | Indefinite | Permission string array (not sensitive — defines capabilities, not identity) |
+| `hubRoles[].encryptedName` | **E2EE** | Indefinite | Hub-key encrypted (label: `LABEL_HUB_ROLE_ENCRYPT`) |
+| `hubRoles[].encryptedDescription` | **E2EE** | Indefinite | Hub-key encrypted (label: `LABEL_HUB_ROLE_ENCRYPT`) |
+| `hubRoles[].permissions` | Plaintext | Indefinite | Permission string array |
+| `hubRoles[].slug` | Plaintext | Indefinite | URL-safe identifier |
+| `userRoleAssignments` | Plaintext | Account lifetime | Array of role IDs per user (global and per-hub) |
+
+#### Device & Identity Management (EP02)
+
+| Field | Classification | Retention | Notes |
+|-------|---------------|-----------|-------|
+| `devices[].deviceId` | Plaintext | Account lifetime | UUID |
+| `devices[].deviceName` | Plaintext | Account lifetime | User-editable display name (auto-detected default) |
+| `devices[].deviceModel` | Plaintext | Account lifetime | Auto-detected hardware model |
+| `devices[].osVersion` | Plaintext | Account lifetime | Auto-detected OS version |
+| `devices[].appVersion` | Plaintext | Account lifetime | Auto-detected app version |
+| `devices[].signingPubkey` | Plaintext | Account lifetime | Ed25519 public key |
+| `devices[].encryptionPubkey` | Plaintext | Account lifetime | X25519 public key |
+| `device_verifications[].verifierPubkey` | Plaintext | Indefinite | Who performed SAS verification |
+| `device_verifications[].targetDeviceId` | Plaintext | Indefinite | Which device was verified |
+| `device_verifications[].targetPubkey` | Plaintext | Indefinite | Ed25519 pubkey of verified device |
+| `device_verifications[].verifiedAt` | Plaintext | Indefinite | Verification timestamp |
+| `device_verifications[].signedAuditEntry` | Plaintext | Indefinite | Ed25519-signed verification record |
+| `security_events[].eventType` | Plaintext | Configurable | Event type (login, lockdown, device_revoked, etc.) |
+| `security_events[].actorPubkey` | Plaintext | Configurable | Who triggered the event |
+| `security_events[].details` | Plaintext | Configurable | Event-specific metadata |
+| `security_events[].timestamp` | Plaintext | Configurable | Event timestamp |
+
+#### Teams (EP03)
+
+| Field | Classification | Retention | Notes |
+|-------|---------------|-----------|-------|
+| `teams[].id` | Plaintext | Indefinite | Client-generated UUID |
+| `teams[].hubId` | Plaintext | Indefinite | Hub scope |
+| `teams[].encryptedName` | **E2EE** | Indefinite | Hub-key encrypted (label: `LABEL_TEAM_ENCRYPT`) |
+| `teams[].encryptedDescription` | **E2EE** | Indefinite | Hub-key encrypted (label: `LABEL_TEAM_ENCRYPT`) |
+| `teams[].slug` | Plaintext | Indefinite | URL-safe identifier (server can see) |
+| `teamMembers[].teamId` | Plaintext | Indefinite | FK to teams |
+| `teamMembers[].userPubkey` | Plaintext | Indefinite | User public key |
+| `teamMembers[].addedBy` | Plaintext | Indefinite | Pubkey of admin who added |
+| `contactTeamAssignments[].contactId` | Plaintext | Indefinite | FK to contacts |
+| `contactTeamAssignments[].teamId` | Plaintext | Indefinite | FK to teams |
+
+#### Tags (EP03)
+
+| Field | Classification | Retention | Notes |
+|-------|---------------|-----------|-------|
+| `tags[].id` | Plaintext | Indefinite | Client-generated UUID |
+| `tags[].hubId` | Plaintext | Indefinite | Hub scope |
+| `tags[].encryptedLabel` | **E2EE** | Indefinite | Hub-key encrypted (label: `LABEL_TAG_ENCRYPT`) |
+| `tags[].encryptedCategory` | **E2EE** | Indefinite | Hub-key encrypted (label: `LABEL_TAG_ENCRYPT`); freeform text |
+| `tags[].slug` | Plaintext | Indefinite | Auto-generated URL-safe identifier |
+| `tags[].color` | Plaintext | Indefinite | Display color (not sensitive) |
+| Contact tag blind indexes | Hashed (HMAC-SHA256) | Indefinite | `HMAC_CONTACT_TAG` prefix; enables server-side tag filtering without revealing tag labels |
+
+#### Blast/Broadcast (EP05)
+
+| Field | Classification | Retention | Notes |
+|-------|---------------|-----------|-------|
+| `blasts[].id` | Plaintext | Indefinite | Blast identifier |
+| `blasts[].hubId` | Plaintext | Indefinite | Hub scope |
+| `blasts[].encryptedContent` | **E2EE** | Indefinite | HPKE envelope-encrypted message body |
+| `blasts[].contentEnvelopes[]` | **E2EE** | Indefinite | HPKE-wrapped content key (per admin) |
+| `blasts[].channel` | Plaintext | Indefinite | `sms`, `whatsapp`, `signal`, `telegram`, `rcs` |
+| `blasts[].status` | Plaintext | Indefinite | `pending`, `in_progress`, `completed`, `cancelled` |
+| `blasts[].createdBy` | Plaintext | Indefinite | Creator pubkey |
+| `blasts[].createdAt` | Plaintext | Indefinite | Creation timestamp |
+| `blasts[].scheduledAt` | Plaintext | Indefinite | Scheduled delivery time (null = immediate) |
+| `blast_deliveries[].deliveryId` | Plaintext | Indefinite | Per-recipient delivery ID |
+| `blast_deliveries[].recipientHash` | Hashed (HMAC-SHA256) | Indefinite | HMAC-hashed recipient identifier |
+| `blast_deliveries[].status` | Plaintext | Indefinite | `pending`, `sent`, `delivered`, `failed`, `opted_out` |
+| `blast_deliveries[].error` | Plaintext | Indefinite | Provider error message (if failed) |
+| `blast_deliveries[].sentAt` | Plaintext | Indefinite | Delivery timestamp |
+
+**Important**: Blast message content is E2EE in the database. However, during outbound delivery via SMS/WhatsApp/Telegram/RCS, the content passes through the messaging provider in plaintext. Signal-routed blasts are E2EE end-to-end. See [Threat Model: Blast/Broadcast Amplification Risk](THREAT_MODEL.md#blastbroadcast-amplification-risk-ep05).
+
+#### Entity System (EP06) — extends CMS Data
+
+| Field | Classification | Retention | Notes |
+|-------|---------------|-----------|-------|
+| `entity_types[].encryptedDefinition` | **E2EE** | Indefinite | Hub-key encrypted (label: `LABEL_ENTITY_TYPE_DEFINITION`); contains field names, types, options |
+| `entity_types[].category` | Plaintext | Indefinite | `case`, `event`, `incident`, etc. — structural category |
+| `entity_types[].slug` | Plaintext | Indefinite | URL-safe identifier |
+| `records[].encryptedSummary` | **E2EE** | Indefinite | Tier 1: case title/status display (label: `LABEL_CASE_SUMMARY`) |
+| `records[].encryptedFields` | **E2EE** | Indefinite | Tier 2: custom field values including dates and locations (label: `LABEL_CASE_FIELDS`) |
+| `records[].summaryEnvelopes[]` | **E2EE** | Indefinite | HPKE-wrapped summary key (per reader tier) |
+| `records[].fieldEnvelopes[]` | **E2EE** | Indefinite | HPKE-wrapped fields key (per reader tier) |
+| `records[].parentRecordId` | Plaintext | Indefinite | Parent-child hierarchy (sub-events, sub-cases) |
+| `records[].entityTypeId` | Plaintext | Indefinite | FK to entity type definition |
+| Date blind indexes | Hashed (HMAC-SHA256) | Indefinite | Day/week/month bucket tokens for encrypted date fields |
+| Location blind indexes | Hashed (HMAC-SHA256) | Indefinite | Region-level bucket tokens for encrypted location fields |
+| `evidence[].id` | Plaintext | Indefinite | Evidence entry UUID |
+| `evidence[].recordId` | Plaintext | Indefinite | FK to parent record |
+| `evidence[].encryptedMetadata` | **E2EE** | Indefinite | HPKE-wrapped evidence metadata (description, chain of custody notes) |
+| `evidence[].previousHash` | Plaintext | Indefinite | Hash chain link for custody integrity |
+| `evidence[].entryHash` | Plaintext | Indefinite | SHA-256 of this evidence entry |
+| `evidence[].addedBy` | Plaintext | Indefinite | Pubkey of user who added evidence |
+| `evidence[].addedAt` | Plaintext | Indefinite | Timestamp |
+
+> **Note on event dates/locations**: Previously stored in cleartext columns on the `events` table. After EP06 entity unification, event dates and locations are encrypted in entity `fieldEnvelopes` with blind index bucketing for server-side queries. This is a threat model improvement — protest dates and incident locations are no longer server-visible.
+
+#### Shift Management (EP07)
+
+| Field | Classification | Retention | Notes |
+|-------|---------------|-----------|-------|
+| `shifts[].encryptedName` | **E2EE** | Indefinite | Hub-key encrypted (replaces plaintext `name`; label: `LABEL_SHIFT_NAME`) |
+| `shifts[].startTime` | Plaintext | Indefinite | HH:MM UTC — routing requires plaintext |
+| `shifts[].endTime` | Plaintext | Indefinite | HH:MM UTC — routing requires plaintext |
+| `shifts[].days` | Plaintext | Indefinite | Day-of-week array — routing requires plaintext |
+| `shifts[].userPubkeys` | Plaintext | Indefinite | Assigned volunteer pubkeys — routing requires plaintext |
+| `shifts[].ringGroupId` | Plaintext | Indefinite | FK to ring_groups (nullable) |
+| `ring_groups[].encryptedName` | **E2EE** | Indefinite | Hub-key encrypted (label: `LABEL_RING_GROUP_NAME`) |
+| `ring_group_members[].userPubkey` | Plaintext | Indefinite | Member pubkey |
+| `ring_group_members[].addedBy` | Plaintext | Indefinite | Admin pubkey who added |
+| `shift_overrides[].encryptedNote` | **E2EE** | Indefinite | Hub-key encrypted admin note (label: `LABEL_SHIFT_OVERRIDE_NOTE`) |
+| `shift_overrides[].type` | Plaintext | Indefinite | `cancel` or `substitute` |
+| `shift_overrides[].date` | Plaintext | Indefinite | YYYY-MM-DD |
+| `active_shifts[].pubkey` | Plaintext | Session | Clocked-in user pubkey |
+| `active_shifts[].lastHeartbeat` | Plaintext | Session | Liveness timestamp (30s interval) |
+| `availability_blocks[].encryptedReason` | **E2EE** | Indefinite | Hub-key encrypted (label: `LABEL_AVAILABILITY_REASON`) |
+| `availability_blocks[].startDate` | Plaintext | Indefinite | Date range start |
+| `availability_blocks[].endDate` | Plaintext | Indefinite | Date range end |
+| `shift_requests[].type` | Plaintext | Indefinite | `join` or `leave` |
+| `shift_requests[].status` | Plaintext | Indefinite | `pending`, `approved`, `rejected` |
+
+#### Account Lifecycle & Erasure (EP08)
+
+| Field | Classification | Retention | Notes |
+|-------|---------------|-----------|-------|
+| `erasure_requests[].id` | Plaintext | Until executed | Request UUID |
+| `erasure_requests[].targetPubkey` | Plaintext | Until executed | User being erased |
+| `erasure_requests[].requestedBy` | Plaintext | Until executed | Self or admin pubkey |
+| `erasure_requests[].requestedAt` | Plaintext | Until executed | Request timestamp |
+| `erasure_requests[].scheduledFor` | Plaintext | Until executed | Execution timestamp (after delay) |
+| `erasure_requests[].status` | Plaintext | Until executed | `pending`, `cancelled`, `executed` |
+| `erasure_requests[].justification` | Plaintext | Until executed | Required for admin-immediate; stored in audit before crypto-shred |
+| `erasure_requests[].coApproverPubkey` | Plaintext | Until executed | Co-approver for emergency override |
+| `erasure_requests[].coApproverSignature` | Plaintext | Until executed | Ed25519 signature over `(targetUserId \|\| timestamp \|\| justification)` |
+| `erasure_config[].hubId` | Plaintext | Indefinite | Hub scope |
+| `erasure_config[].delayHours` | Plaintext | Indefinite | 24–168 hours |
+| `erasure_config[].emergencyOverrideEnabled` | Plaintext | Indefinite | Boolean |
+| `re_encryption_jobs[].status` | Plaintext | Until completed | Job progress tracking |
+| `re_encryption_jobs[].processedEnvelopes` | Plaintext | Until completed | Counter |
+| `device_wipe_records[].deviceId` | Plaintext | Indefinite | Wiped device UUID |
+| `device_wipe_records[].wipedAt` | Plaintext | Indefinite | Wipe timestamp |
+| `device_wipe_records[].wipedBy` | Plaintext | Indefinite | Admin pubkey who triggered |
+| `device_wipe_records[].acknowledgment` | Plaintext | Indefinite | Signed wipe confirmation (`LABEL_DEVICE_WIPE_SIG`) |
+| `platform_bans[].phoneHash` | Hashed (HMAC-SHA256) | Indefinite | Cross-hub aggregated ban; HMAC-SHA256 with operator secret |
+| `platform_bans[].scope` | Plaintext | Indefinite | `hub` or `platform` |
+| `platform_bans[].reason` | Plaintext | Indefinite | Admin-provided reason |
+| `platform_bans[].createdBy` | Plaintext | Indefinite | Admin pubkey |
+| Per-user audit envelope key | **E2EE** | Account lifetime (destroyed on erasure) | HPKE-wrapped per admin (label: `LABEL_AUDIT_USER_KEY_WRAP`); destruction = crypto-shredding |
+
+#### Recovery Groups (EP09)
+
+| Field | Classification | Retention | Notes |
+|-------|---------------|-----------|-------|
+| `recovery_groups[].id` | Plaintext | Indefinite | Group UUID |
+| `recovery_groups[].hubId` | Plaintext | Indefinite | Hub scope (per-hub groups) |
+| `recovery_groups[].groupPubkey` | Plaintext | Indefinite | X25519 public key (anchored to user sigchain) |
+| `recovery_groups[].threshold` | Plaintext | Indefinite | K value (2–5) |
+| `recovery_groups[].totalShares` | Plaintext | Indefinite | N value (3–5) |
+| `recovery_groups[].createdAt` | Plaintext | Indefinite | Creation timestamp |
+| `recovery_share_envelopes[].shareHolderPubkey` | Plaintext | Indefinite | Which user holds this share |
+| `recovery_share_envelopes[].encryptedShare` | **E2EE** | Indefinite | HPKE-wrapped Shamir share (label: `LABEL_RECOVERY_GROUP_SHARE_WRAP`) |
+| `recovery_share_envelopes[].commitment` | Plaintext | Indefinite | SHA-256 commitment for tamper detection |
+| `user_recovery_envelopes[].userPubkey` | Plaintext | Indefinite | User whose PUK seed is escrowed |
+| `user_recovery_envelopes[].encryptedPukSeed` | **E2EE** | Indefinite | HPKE-wrapped PUK seed under recovery group pubkey (label: `LABEL_RECOVERY_PUK_SEED_WRAP`) |
+| `recovery_sessions[].id` | Plaintext | Session lifetime | Recovery ceremony session UUID |
+| `recovery_sessions[].targetPubkey` | Plaintext | Session lifetime | User being recovered |
+| `recovery_sessions[].newDevicePubkey` | Plaintext | Session lifetime | X25519 pubkey of user's new device |
+| `recovery_sessions[].status` | Plaintext | Session lifetime | `pending_verification`, `awaiting_shares`, `completed`, `cancelled`, `expired` |
+| `recovery_sessions[].createdAt` | Plaintext | Session lifetime | Session start timestamp |
+| `recovery_contributions[].sessionId` | Plaintext | Session lifetime | FK to recovery session |
+| `recovery_contributions[].contributorPubkey` | Plaintext | Session lifetime | Share holder who contributed |
+| `recovery_contributions[].encryptedShareForDevice` | **E2EE** | Session lifetime | HPKE-sealed share for recovering user's new device (label: `LABEL_RECOVERY_SHARE_CONTRIBUTE`) |
+| `recovery_contributions[].signature` | Plaintext | Session lifetime | Ed25519 signature over (ciphertext + session ID) |
+| `recovery_contributions[].contributedAt` | Plaintext | Session lifetime | Contribution timestamp |
+| Liveness proofs | Plaintext | Configurable | Ed25519-signed proofs from share holders (`LABEL_RECOVERY_LIVENESS_PROOF`) |
+
+**Important**: The Shamir secret (recovery group X25519 private key) is NEVER stored whole. It exists only transiently during the `split()` operation and is immediately zeroized after shares are distributed. Below-threshold shares reveal zero information about the secret (information-theoretic security).
 
 #### Application Configuration
 
@@ -315,9 +504,9 @@ flowchart LR
 |-------|----------------|
 | **Access** | Users can export their notes (decrypted client-side). Admins can export all metadata. |
 | **Rectification** | Users can edit their notes. Admins can update user profiles. |
-| **Erasure** | Admin can delete user accounts and notes. E2EE content is cryptographically inaccessible if device keys are deleted. |
-| **Portability** | Backup export includes encrypted device keys (PIN-protected). |
-| **Restriction** | Admin can deactivate accounts (revokes sessions, deauthorizes devices via sigchain). |
+| **Erasure** | Self-service erasure with configurable delay (24h–7d) or admin-immediate erasure. Full cryptographic cascade: sigchain revocation → hub key rotation → crypto-shredding (per-user audit key destroyed) → active re-encryption (envelope copies removed). E2EE content is both cryptographically inaccessible and actively cleaned. (EP08) |
+| **Portability** | Backup export includes encrypted device keys (PIN-protected). No bulk data export by design (leakage risk). |
+| **Restriction** | Admin can deactivate accounts (revokes sessions, deauthorizes devices via sigchain). Emergency lockdown terminates all sessions and triggers key rotations. (EP02) |
 
 ---
 
@@ -333,8 +522,17 @@ flowchart LR
 | User records | Account lifetime + 90 days | Post-departure access |
 | Sigchain entries | Indefinite | Identity integrity — chain must be complete |
 | PUK CLKR chain | Account lifetime | Required for historical note decryption |
+| Blast delivery records | 90 days | Delivery status tracking; content is E2EE |
+| Recovery group shares | Group lifetime | Shares invalidated on member departure or group rotation |
+| Entity evidence chains | Indefinite | Legal chain of custody integrity |
+| Device wipe records | 1 year | Security audit trail |
+| SAS verification records | Indefinite | Device trust history |
+| Team/tag assignments | Hub lifetime | Organizational metadata |
+| Platform ban records | Indefinite | Safety — ban persistence across hubs |
+| Erasure request records | Until executed + 30 days | Audit trail for erasure compliance |
+| Re-encryption job records | Until completed | Operational tracking |
 
-Note: Llamenos does not currently enforce automated retention policies. Operators should implement retention schedules appropriate to their jurisdiction.
+EP08 introduces per-hub data retention purge with platform-enforced minimums. Hub admins configure ciphertext TTLs; a daily cron job purges expired records. Platform admin sets a minimum floor to prevent evidence destruction.
 
 ---
 
@@ -342,6 +540,7 @@ Note: Llamenos does not currently enforce automated retention policies. Operator
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-05-18 | 3.0 | EP01-EP09 data classification overhaul: added permission/role definitions (EP01), device/SAS verification records (EP02), teams and tags (EP03), blast/broadcast delivery (EP05), entity system with evidence chains (EP06), shift management (EP07), account lifecycle/erasure/device wipe/platform bans (EP08), recovery groups/Shamir shares (EP09). Updated GDPR erasure to reflect EP08 crypto-cascade. Added 11 new retention recommendations. |
 | 2026-05-12 | 2.3 | Updated audit log chain verification note — `GET /api/audit/verify` endpoint now available (PR #288) |
 | 2026-05-11 | 2.2 | Added legacy field note (`encryptedSecretKey`); added 3-tier envelope clarification; added Stronghold/Store note; added audit log verification note; added Security Gaps cross-references |
 | 2026-05-03 | 2.1 | Post-hardening: added `ua` (SHA-256 hashed) field to audit logs; noted country is not collected; updated WebSocket events (epoch-rotating per-hub key, power-of-2 padding, server-only publishing) |
