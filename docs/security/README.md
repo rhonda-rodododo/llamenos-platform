@@ -3,7 +3,7 @@
 **Last Updated:** 2026-05-18
 **Crypto Architecture:** HPKE (RFC 9180) + Ed25519/X25519 + AES-256-GCM + Shamir GF(2^8)
 **Audit Status:** Two historical audits (2026-02, 2026-03); docs updated for current architecture
-**Domain Separation Labels:** 87 defined (source of truth in `packages/protocol/crypto-labels.json`)
+**Domain Separation Labels:** See `packages/protocol/crypto-labels.json` for current count (source of truth)
 
 This directory contains security documentation for Llamenos, a crisis response hotline app designed to protect volunteer and caller identity against well-funded adversaries.
 
@@ -44,9 +44,9 @@ All cryptographic operations are implemented once in `packages/crypto/` (Rust), 
 | Argon2id (64MB, 3 iterations, 4 parallelism) | PIN/passphrase-to-KEK derivation for device key storage |
 | HMAC-SHA256 | Phone/IP hashing, blind index generation |
 | **Shamir GF(2^8)** | Recovery group key escrow (K-of-N threshold, information-theoretic security) |
-| **87 domain separation labels** | Albrecht defense — label enforced at decrypt |
+| **Domain separation labels** (see `crypto-labels.json`) | Albrecht defense — label enforced at decrypt |
 
-> All 87 labels are defined in `packages/protocol/crypto-labels.json` (source of truth) and registered in the Rust `LABEL_REGISTRY` with stable indices.
+> All labels are defined in `packages/protocol/crypto-labels.json` (source of truth) and registered in the Rust `LABEL_REGISTRY` with stable indices. See the JSON file for the current count.
 
 ### End-to-End Encrypted (Zero-Knowledge for Content)
 
