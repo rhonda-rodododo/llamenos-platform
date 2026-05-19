@@ -8,6 +8,7 @@ import type {
   WebhookPayload,
 } from './types'
 import { type CallMode, SframeModeDispatcher, parseStasisArgs } from './sframe-mode-dispatcher'
+import { type TtsEngine, createTtsEngine, formatMediaPath } from './tts-engine'
 
 /** TTL for recording callbacks — entries older than this are pruned */
 const RECORDING_CALLBACK_TTL_MS = 5 * 60 * 1000 // 5 minutes
@@ -54,10 +55,14 @@ export class CommandHandler {
   /** Handle for the recording callback TTL sweep interval */
   private readonly recordingCallbackSweepTimer: ReturnType<typeof setInterval>
 
+  /** Optional TTS engine for synthesizing voice prompts */
+  private readonly ttsEngine: TtsEngine | null
+
   constructor(client: BridgeClient, webhook: WebhookSender, config: BridgeConfig) {
     this.client = client
     this.webhook = webhook
     this.config = config
+    this.ttsEngine = config.ttsConfig ? createTtsEngine(config.ttsConfig) : null
 
     // Start periodic TTL sweep for stale recording callbacks
     this.recordingCallbackSweepTimer = setInterval(() => {
@@ -498,28 +503,41 @@ export class CommandHandler {
 
   /** Play audio on a channel */
   private async execPlayback(cmd: PlaybackCommand): Promise<void> {
-    if (cmd.text) {
-      // TODO: implement TTS engine integration
-      // Currently plays a beep as a placeholder when TTS text is received.
-      // A real implementation would route to a PBX-specific TTS engine
-      // (e.g. Asterisk Festival/Flite, FreeSWITCH mod_tts) or an external
-      // TTS service (Google Cloud TTS, AWS Polly) and play the resulting audio.
-      console.warn(
-        `[handler] TTS engine not configured — playing beep instead of: "${cmd.text.substring(0, 80)}..." lang=${cmd.language}`
-      )
-      try {
-        await this.client.playMedia(cmd.channelId, `sound:beep`)
-      } catch (err) {
-        console.warn(`[handler] TTS playback failed, channel may be gone:`, err)
-      }
-    } else {
-      const media = cmd.media.startsWith('http') ? cmd.media : `sound:${cmd.media}`
-      try {
-        await this.client.playMedia(cmd.channelId, media)
-      } catch (err) {
-        console.warn(`[handler] Playback failed:`, err)
-      }
+    const media = await this.resolvePlaybackMedia(cmd)
+    if (!media) return
+    try {
+      await this.client.playMedia(cmd.channelId, media)
+    } catch (err) {
+      console.warn(`[handler] Playback failed:`, err)
     }
+  }
+
+  /**
+   * Resolve the media string to play for a command with optional text/media.
+   * If text is provided and a TTS engine is configured, synthesize speech.
+   * Falls back to beep if TTS is unavailable or fails.
+   */
+  private async resolvePlaybackMedia(cmd: {
+    text?: string
+    media?: string
+    language?: string
+  }): Promise<string | null> {
+    if (cmd.media) {
+      return cmd.media.startsWith('http') ? cmd.media : `sound:${cmd.media}`
+    }
+    if (cmd.text) {
+      if (this.ttsEngine) {
+        const audioPath = await this.ttsEngine.synthesize(cmd.text, cmd.language)
+        if (audioPath) {
+          return formatMediaPath(audioPath, this.config.pbxType)
+        }
+      }
+      console.warn(
+        `[handler] TTS unavailable — playing beep instead of: "${cmd.text.substring(0, 80)}..." lang=${cmd.language}`
+      )
+      return 'sound:beep'
+    }
+    return null
   }
 
   /** Gather DTMF digits */
@@ -537,12 +555,8 @@ export class CommandHandler {
     }
 
     // Play the prompt (if any)
-    if (cmd.text || cmd.media) {
-      const media = cmd.media
-        ? cmd.media.startsWith('http')
-          ? cmd.media
-          : `sound:${cmd.media}`
-        : 'sound:beep'
+    const media = await this.resolvePlaybackMedia(cmd)
+    if (media) {
       try {
         await this.client.playMedia(cmd.channelId, media, `gather-${cmd.channelId}`)
       } catch (err) {

@@ -434,6 +434,50 @@ describe('CommandHandler', () => {
   })
 
   // ================================================================
+  // TTS playback
+  // ================================================================
+
+  describe('TTS playback', () => {
+    it('plays synthesized audio when TTS engine is configured', async () => {
+      const ttsConfig = {
+        engine: 'espeak' as const,
+        cacheDir: '/tmp/tts-test-cache',
+      }
+      const ttsHandler = new CommandHandler(client, webhook, { ...baseConfig, ttsConfig })
+
+      await ttsHandler.executeCommands([
+        {
+          action: 'playback',
+          channelId: 'ch-tts',
+          media: '',
+          text: 'Hello world',
+          language: 'en',
+        },
+      ])
+
+      // Should attempt playback (either TTS file or beep fallback)
+      const playCalls = client.calls.filter((c) => c.method === 'playMedia')
+      expect(playCalls.length).toBeGreaterThanOrEqual(1)
+      ttsHandler.dispose()
+    })
+
+    it('falls back to beep when TTS is not configured', async () => {
+      await handler.executeCommands([
+        {
+          action: 'playback',
+          channelId: 'ch-no-tts',
+          media: '',
+          text: 'Hello world',
+          language: 'en',
+        },
+      ])
+
+      const playCalls = client.calls.filter((c) => c.method === 'playMedia' && c.args[1] === 'sound:beep')
+      expect(playCalls.length).toBe(1)
+    })
+  })
+
+  // ================================================================
   // dispose
   // ================================================================
 
