@@ -219,7 +219,7 @@ class HubScopedViewModelReloadTest {
     fun `CallHistoryViewModel triggers a new load on each hub change`() =
         runTest(UnconfinedTestDispatcher()) {
             val (activeHubState, hubFlow) = mockActiveHubState()
-            val vm = CallHistoryViewModel(makeApiService(activeHubState), activeHubState)
+            val vm = CallHistoryViewModel(makeApiService(activeHubState), activeHubState, mockk(relaxed = true))
             val getCount = countEmissionsInBackground(vm.uiState)
             assertTwoHubChangesProduceTwoLoadCycles(hubFlow, getCount, "CallHistoryViewModel")
         }

@@ -26,6 +26,7 @@ import org.llamenos.hotline.ui.auth.PINUnlockScreen
 import org.llamenos.hotline.ui.calls.CallHistoryScreen
 import org.llamenos.hotline.ui.calls.CallHistoryUiState
 import org.llamenos.hotline.ui.calls.CallHistoryViewModel
+import org.llamenos.hotline.ui.calls.DecryptedCallRecord
 import org.llamenos.hotline.ui.cases.CaseListScreen
 import org.llamenos.hotline.ui.cases.CaseManagementViewModel
 import org.llamenos.hotline.ui.cases.CaseUiState
@@ -531,7 +532,7 @@ class ScreenshotTests {
         val vm = mockk<CallHistoryViewModel>(relaxed = true)
         every { vm.uiState } returns MutableStateFlow(
             CallHistoryUiState(
-                calls = sampleCallRecords,
+                calls = sampleCallRecords.map { DecryptedCallRecord(it) },
                 total = sampleCallRecords.size,
             )
         )
