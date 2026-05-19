@@ -17,6 +17,9 @@ This document is the definitive wire-format specification for interoperating wit
 5. [Push Notification Protocol](#5-push-notification-protocol)
 6. [Device Provisioning Protocol](#6-device-provisioning-protocol)
 7. [Permission Model](#7-permission-model)
+- [Appendix A: Library Dependencies](#appendix-a-library-dependencies-for-implementors)
+- [Appendix B: Type Definitions Reference](#appendix-b-type-definitions-reference)
+- [Appendix C: Legacy Encryption (pre-v2 ECIES)](#appendix-c-legacy-encryption-pre-v2-ecies)
 
 ---
 
@@ -2786,3 +2789,36 @@ interface AuditLogEntry {
   entryHash?: string           // SHA-256 of this entry
 }
 ```
+
+---
+
+## Appendix C: Legacy Encryption (pre-v2 ECIES)
+
+> **Historical Reference Only.** This appendix documents the encryption primitives used before v2.0 (2026-Q1). They are retained so implementors can read data encrypted with the old scheme during migration. **DO NOT implement new encryption using these algorithms.**
+
+### C.1 ECIES Key Wrapping (Replaced by Section 2.2 HPKE)
+
+ECIES was the key-wrapping primitive in v1. It used secp256k1 ECDH + XChaCha20-Poly1305 instead of X25519 HPKE + AES-256-GCM.
+
+See Section 2.2.1 for the full ECIES algorithm specification (retained in the main body for backward-compat read path).
+
+### C.2 nsec-per-User Key Storage (Replaced by Section 2.11)
+
+v1 stored a single secp256k1 secret key (nsec, bech32-encoded) per user, PIN-encrypted with PBKDF2-SHA256 + XChaCha20-Poly1305. See Section 2.6 (marked Legacy) for the full algorithm.
+
+### C.3 Provisioning (secp256k1 ECDH + nsec Transfer)
+
+v1 provisioning used secp256k1 ECDH for the ephemeral key exchange and transferred the nsec directly (XChaCha20-Poly1305 encrypted). The SAS derivation used the compressed X coordinate (`sharedX = shared[1..33]`) instead of the raw 32-byte X25519 output. See the migration note in Section 6 for context.
+
+### C.4 XChaCha20-Poly1305 Wire Format (v1 encryptedContent)
+
+v1 content was encrypted with XChaCha20-Poly1305:
+
+```
+Offset  Length    Content
+------  ------    -------
+0       24        XChaCha20-Poly1305 nonce (random, 24 bytes)
+24      variable  Ciphertext + 16-byte Poly1305 authentication tag
+```
+
+The entire byte sequence was hex-encoded. v2 uses AES-256-GCM with a 12-byte IV (Section 2.3).
