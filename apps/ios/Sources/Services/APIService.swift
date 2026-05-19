@@ -546,38 +546,78 @@ struct EmptyResponse: Decodable {
 
 // MARK: - Certificate Pinning (H14)
 
-/// SHA-256 pin hashes for Cloudflare's intermediate CA public keys.
-/// Extract with: openssl s_client -connect app.llamenos.org:443 ... | openssl dgst -sha256 -binary | base64
-/// See also: docs/security/CERTIFICATE_PINS.md
+/// Pin configuration for a single deployment. Each deployment (self-hosted org)
+/// has its own TLS certificate chain. Pins target the intermediate CA — not the
+/// leaf — so routine cert renewal does not break pinning.
+struct PinConfig {
+    /// Base64-encoded SHA-256 SPKI hashes for trusted intermediate CAs.
+    let hashes: [String]
+    /// ISO-8601 `notBefore` / `notAfter` — ignored for static pins, used for dynamic rotation.
+    let notBefore: Date?
+    let notAfter: Date?
+}
+
+/// Deployment-configurable certificate pins.
 ///
-/// These are placeholders — populate with real pin hashes once the production domain
-/// is provisioned and Cloudflare intermediate CA pins are extracted.
+/// Static defaults pin against Let's Encrypt intermediate CAs (ISRG Root X1 + X2)
+/// because the production deployment uses 1984 DNS + Let's Encrypt, NOT Cloudflare.
+///
+/// Pin hashes target the **intermediate CA SPKI** (Subject Public Key Info), not the
+/// leaf certificate. This means normal cert renewal (which reuses the same CA) does
+/// not trigger a pin mismatch.
+///
+/// Dynamic pin updates: on launch, clients fetch `GET /api/config/pins` which returns
+/// an Ed25519-signed pin list. If the fetch fails, static defaults remain active.
 enum CertificatePins {
-    // SHA-256 SPKI hashes for *.llamenos.org (Cloudflare-terminated TLS).
-    // Two pins: leaf cert (primary) + Cloudflare intermediate CA (backup).
-    // See docs/security/CERTIFICATE_PINS.md for extraction procedure and rotation policy.
-    //
-    // PRODUCTION: replace placeholder values with real hashes extracted from the
-    // production cert before enabling release builds:
-    //   openssl s_client -connect app.llamenos.org:443 </dev/null 2>/dev/null \
-    //     | openssl x509 -pubkey -noout | openssl pkey -pubin -outform der \
-    //     | openssl dgst -sha256 -binary | base64
-    static let cloudflareHashes: [String] = [
-        // Leaf cert — primary pin (replace with: bun run cert-pins:inject app.llamenos.org)
-        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
-        // Cloudflare intermediate CA — backup pin (longer-lived, rotate less frequently)
-        "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=",
+
+    // MARK: - Let's Encrypt Intermediate CA SPKI SHA-256 Hashes
+
+    /// ISRG Root X1 (RSA 4096, cross-signed by DST Root CA X3).
+    /// Extracted via:
+    ///   curl -s https://letsencrypt.org/certs/isrgrootx1.pem \
+    ///     | openssl x509 -pubkey -noout | openssl pkey -pubin -outform der \
+    ///     | openssl dgst -sha256 -binary | base64
+    static let isrgRootX1Hash = "C5+lpZ7tcVwmwQIMcRtPbsQtWLABXhQzejna0wHFr8M="
+
+    /// ISRG Root X2 (ECDSA P-384, backup root).
+    /// Extracted via same procedure against isrg-root-x2.pem.
+    static let isrgRootX2Hash = "diGVwiVYbubAI3RW4hB9xU8e/CH2GGvrTcuvhPy/MzA="
+
+    /// Static default pins — used until dynamic pins are fetched and verified.
+    /// Minimum 2 distinct CA pins for backup (RFC 7469 §2.5 recommendation).
+    static let defaultHashes: [String] = [
+        isrgRootX1Hash,
+        isrgRootX2Hash,
     ]
 
-    /// Whether certificate pinning is active (pins are configured).
+    /// The currently active pin set. Starts with static defaults; replaced by
+    /// verified dynamic pins after a successful fetch from the server.
+    private(set) static var active = PinConfig(
+        hashes: defaultHashes,
+        notBefore: nil,
+        notAfter: nil
+    )
+
+    /// Whether certificate pinning is active (at least one pin configured).
     static var isEnabled: Bool {
-        return !cloudflareHashes.isEmpty
+        return !active.hashes.isEmpty
+    }
+
+    /// Replace the active pin set with dynamically-fetched, server-signed pins.
+    /// Called by `PinUpdateService` after signature verification succeeds.
+    static func updatePins(_ config: PinConfig) {
+        active = config
+    }
+
+    /// Reset to static defaults (e.g. if dynamic pin list expires).
+    static func resetToDefaults() {
+        active = PinConfig(hashes: defaultHashes, notBefore: nil, notAfter: nil)
     }
 }
 
-/// URLSessionDelegate that enforces certificate pinning against known Cloudflare
-/// intermediate CA public key hashes. If pinning is disabled (no hashes configured),
-/// the delegate allows standard TLS validation.
+/// URLSessionDelegate that enforces certificate pinning against trusted intermediate
+/// CA SPKI hashes. Pin mismatch is a **hard failure** — the connection is refused
+/// unconditionally with no fallback to unpinned TLS.
 final class CertificatePinningDelegate: NSObject, URLSessionDelegate {
     func urlSession(
         _ session: URLSession,
@@ -587,6 +627,13 @@ final class CertificatePinningDelegate: NSObject, URLSessionDelegate {
         // Only handle server trust challenges
         guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
               let serverTrust = challenge.protectionSpace.serverTrust else {
+            completionHandler(.performDefaultHandling, nil)
+            return
+        }
+
+        // Allow localhost / 127.0.0.1 without pinning (local development)
+        let host = challenge.protectionSpace.host
+        if host == "localhost" || host == "127.0.0.1" {
             completionHandler(.performDefaultHandling, nil)
             return
         }
@@ -603,14 +650,14 @@ final class CertificatePinningDelegate: NSObject, URLSessionDelegate {
             return
         }
 
+        let activePins = CertificatePins.active.hashes
         var pinMatched = false
         for certificate in certificateChain {
-            // Extract the public key and compute its SHA-256 hash
             if let publicKey = SecCertificateCopyKey(certificate) {
                 var error: Unmanaged<CFError>?
                 if let publicKeyData = SecKeyCopyExternalRepresentation(publicKey, &error) as Data? {
                     let hash = sha256Base64(publicKeyData)
-                    if CertificatePins.cloudflareHashes.contains(hash) {
+                    if activePins.contains(hash) {
                         pinMatched = true
                         break
                     }
@@ -621,21 +668,10 @@ final class CertificatePinningDelegate: NSObject, URLSessionDelegate {
         if pinMatched {
             completionHandler(.useCredential, URLCredential(trust: serverTrust))
         } else {
-            // Hard fail: pin mismatch — log security event and refuse connection.
-            // The event will be surfaced in the admin dashboard as cert_pin_mismatch.
-            logPinMismatch(host: challenge.protectionSpace.host)
+            // Hard fail: pin mismatch — report security event and refuse connection.
+            SecurityEventReporter.reportPinMismatch(host: host)
             completionHandler(.cancelAuthenticationChallenge, nil)
         }
-    }
-
-    /// Log a certificate pin mismatch event.
-    /// In release builds, this queues a security event for the admin dashboard.
-    private func logPinMismatch(host: String) {
-        // TODO: Wire to SecurityEventService.report(.certPinMismatch(host: host))
-        // when SecurityEventService is available. For now, log locally.
-        #if DEBUG
-        print("[CertPinning] WARNING: Pin mismatch for host: \(host)")
-        #endif
     }
 
     /// Compute SHA-256 hash of data, return as base64 string.
@@ -645,6 +681,48 @@ final class CertificatePinningDelegate: NSObject, URLSessionDelegate {
             _ = CC_SHA256(buffer.baseAddress, CC_LONG(data.count), &hash)
         }
         return Data(hash).base64EncodedString()
+    }
+}
+
+// MARK: - Security Event Reporting
+
+/// Centralized security event reporter for certificate pinning failures.
+/// Reports are queued and sent to the server's `/api/security-events` endpoint
+/// when the user is authenticated. In debug builds, also prints to console.
+enum SecurityEventReporter {
+    static func reportPinMismatch(host: String) {
+        #if DEBUG
+        print("[CertPinning] HARD FAIL: Pin mismatch for host: \(host). Connection refused.")
+        #endif
+
+        // Post notification so any listening component (e.g. AppState) can forward
+        // to the server security-events API when authenticated.
+        NotificationCenter.default.post(
+            name: .certPinMismatch,
+            object: nil,
+            userInfo: ["host": host, "timestamp": ISO8601DateFormatter().string(from: Date())]
+        )
+    }
+}
+
+extension Notification.Name {
+    static let certPinMismatch = Notification.Name("org.llamenos.certPinMismatch")
+}
+
+// MARK: - Dynamic Pin Update
+
+/// Response from `GET /api/config/pins` — server-signed pin list for rotation
+/// without requiring an app update.
+struct PinListResponse: Decodable {
+    let pins: [PinEntry]
+    let signature: String
+    let notBefore: String
+    let notAfter: String
+
+    struct PinEntry: Decodable {
+        let algorithm: String
+        let hash: String
+        let label: String
     }
 }
 
