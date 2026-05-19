@@ -118,19 +118,10 @@ struct PINUnlockView: View {
     // MARK: - Biometric Unlock
 
     private func handleBiometricUnlock() {
-        Task {
-            let success = await BiometricPrompt.authenticate()
-            if success {
-                // After biometric auth succeeds, the Keychain item protected with
-                // .biometryCurrentSet becomes accessible. In the current architecture,
-                // biometric verifies identity — the actual nsec decryption still
-                // requires the PIN. A production enhancement would store the PIN
-                // itself behind biometric protection in the Keychain.
-                //
-                // For now, biometric success is a convenience UX signal.
-                // The PIN entry still handles the actual crypto unlock.
-            }
-        }
+        // Delegate to PINViewModel.attemptBiometricUnlock() which retrieves the
+        // biometric-protected PIN from Keychain (via KeychainService.retrievePINWithBiometric)
+        // and uses it to decrypt device keys — no manual PIN entry needed.
+        resolvedPINViewModel.attemptBiometricUnlock()
     }
 
     // MARK: - Auto-Biometric on Appear

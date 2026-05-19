@@ -1,133 +1,44 @@
 # Certificate Pins
 
-**Status: Scaffolding only — pins are placeholder values (`REPLACE_AFTER_DEPLOYMENT`)**
+## Production SPKI Hashes
 
-Certificate pinning infrastructure exists on both iOS and Android but is not yet active. Pins will be populated after first production deployment to `app.llamenos.org`.
-
-## Implementation Status
-
-| Platform | File | Class | Status |
-|----------|------|-------|--------|
-| **iOS** | `apps/ios/Sources/Services/APIService.swift` | `CertificatePinningDelegate` (URLSessionDelegate) | Scaffolding exists; no hashes configured — falls back to standard TLS validation |
-| **Android** | `apps/android/app/src/main/java/org/llamenos/hotline/api/ApiService.kt` | `CertificatePinner` (OkHttp) | Scaffolding exists; placeholder `sha256/REPLACE_AFTER_DEPLOYMENT` values |
-| **Desktop (Tauri)** | N/A | N/A | Not applicable — Tauri uses system TLS; cert pinning impractical for desktop web apps |
-
-## Known TODOs
-
-### Android Placeholder Pins
-
-**Location:** `apps/android/app/src/main/java/org/llamenos/hotline/api/ApiService.kt:66`
-
-**TODO:** "Replace placeholder pins after first production deployment to app.llamenos.org"
-
-**Impact:** Android app uses standard TLS validation without certificate pinning. A rogue CA or national-level MITM could intercept HTTPS traffic.
-
-**Action Required:** After first production deployment, extract actual certificate pins and replace placeholders.
-
-### iOS Certificate Pinning Delegate
-
-**Location:** `apps/ios/Sources/Services/APIService.swift`
-
-**Status:** `CertificatePinningDelegate` class exists but no hashes are configured. Falls back to standard `URLSession` TLS validation.
-
-**Action Required:** Configure `sha256/...` pins in the pinning delegate after production deployment.
-
-## Extracting Pins
-
-After first production deployment, extract pins from the live domain:
-
+Extract with:
 ```bash
-# Primary pin — intermediate CA
-openssl s_client -connect app.llamenos.org:443 -servername app.llamenos.org < /dev/null 2>/dev/null \
+openssl s_client -connect app.llamenos.org:443 </dev/null 2>/dev/null \
   | openssl x509 -pubkey -noout \
-  | openssl pkey -pubin -outform DER \
+  | openssl pkey -pubin -outform der \
   | openssl dgst -sha256 -binary \
   | base64
+```
 
-# Backup pin — root CA
-openssl s_client -connect app.llamenos.org:443 -servername app.llamenos.org -showcerts < /dev/null 2>/dev/null \
-  | awk '/BEGIN CERTIFICATE/,/END CERTIFICATE/{print}' \
-  | tail -n +$(awk '/BEGIN CERTIFICATE/{n++}n==2{print NR;exit}' <(openssl s_client -connect app.llamenos.org:443 -servername app.llamenos.org -showcerts < /dev/null 2>/dev/null)) \
+For intermediate CA (pin this as backup, rotate leaf pin independently):
+```bash
+openssl s_client -connect app.llamenos.org:443 -showcerts </dev/null 2>/dev/null \
+  | awk '/BEGIN CERT/{c++} c==2{print}' \
   | openssl x509 -pubkey -noout \
-  | openssl pkey -pubin -outform DER \
+  | openssl pkey -pubin -outform der \
   | openssl dgst -sha256 -binary \
   | base64
 ```
 
 ## Current Pins
 
-| Purpose | SHA-256 Base64 |
-|---------|---------------|
-| Primary (intermediate CA) | `REPLACE_AFTER_DEPLOYMENT` |
-| Backup (root CA) | `REPLACE_AFTER_DEPLOYMENT` |
+| Domain | Type | Hash (base64 SHA-256 SPKI) | Expires |
+|--------|------|---------------------------|---------|
+| *.llamenos.org | Leaf cert | **REPLACE_BEFORE_PRODUCTION** | — |
+| *.llamenos.org | Cloudflare Intermediate CA | **REPLACE_BEFORE_PRODUCTION** | — |
 
-## Domains
+## Pin Rotation Procedure
 
-- `*.llamenos.org` (API, app)
+1. Extract new cert hashes (see above)
+2. Update `apps/ios/Sources/Services/APIService.swift` `cloudflareHashes`
+3. Update `apps/android/app/src/main/java/org/llamenos/hotline/api/ApiService.kt` `certificatePinner`
+4. Update `/api/config` endpoint `pinConfig` response (signed by server Ed25519 key)
+5. Deploy backend first (with both old + new pins in `pinConfig`)
+6. Ship mobile update with new `cloudflareHashes` (includes backup)
+7. After old certs expire: remove old pins from backend `pinConfig`
 
-## Automated Pipeline
+## Hard-Fail Policy
 
-Two scripts automate pin extraction and injection into mobile source files:
-
-### Extract pins only
-
-```bash
-bun run cert-pins:extract app.llamenos.org
-# Output:
-#   LEAF=<base64 hash>
-#   INTERMEDIATE=<base64 hash>
-```
-
-The extraction script (`scripts/extract-cert-pins.sh`) connects to the domain over TLS, extracts SHA-256 SPKI hashes from the leaf and intermediate certificates, validates the output format, and prints both pins.
-
-### Extract and inject into mobile apps
-
-```bash
-bun run cert-pins:inject app.llamenos.org
-```
-
-The injection script (`scripts/inject-cert-pins.ts`) calls `extract-cert-pins.sh`, then updates both:
-
-- **Android**: replaces `CertificatePinner.Builder()` entries in `apps/android/.../ApiService.kt`
-- **iOS**: replaces `cloudflareHashes` array in `apps/ios/.../APIService.swift`
-
-The script is idempotent -- re-running it replaces existing pins with fresh values from the live domain. Review the diff (`git diff apps/android apps/ios`) before committing.
-
-### When to re-run
-
-- After first production deployment (to populate placeholder pins)
-- After TLS certificate rotation on the deployment domain
-- When migrating to a new domain or CDN provider
-
-## Rotation Procedure
-
-1. Run `bun run cert-pins:inject <domain>` to extract and inject new pins
-2. Update this file with new pin values
-3. Review diffs: `git diff apps/android apps/ios`
-4. Build and test both iOS and Android
-5. Deploy mobile updates before certificate rotation takes effect
-6. Keep the old pin as backup for at least one release cycle
-
-## Security Note
-
-Certificate pinning is a defense-in-depth measure against TLS interception (rogue CAs, national-level MITM). It does NOT protect against:
-- Server compromise (attacker controls the server, not the network)
-- Client compromise (attacker has device access)
-- Supply chain attacks (compromised app update)
-
-For the desktop (Tauri) client, HSTS preload + SRI hashing provide the equivalent protection layer. Certificate pinning is impractical for webview-based apps.
-
-## WebSocket Relay Certificate Considerations
-
-The API server's built-in WebSocket endpoint (`/ws`) uses the same TLS certificate as the API. Certificate pinning on mobile clients covers WebSocket connections automatically since they share the `*.llamenos.org` domain.
-
-Clients authenticate to the WebSocket using the same session token or signed auth token used for REST API requests. The server handles all event publishing — clients receive only. Even if a MITM attacker intercepts the WebSocket connection, they cannot inject fake events (server-only publishing) and cannot read event content (encrypted with epoch-rotating per-hub keys).
-
----
-
-## Revision History
-
-| Date | Version | Changes |
-|------|---------|---------|
-| 2026-05-11 | 1.1 | Added known TODOs section with Android placeholder and iOS delegate status; added action required notes |
-| 2026-05-02 | 1.0 | Initial document |
+Pin mismatch → connection refused, no fallback. No soft-fail period.
+Pin failures are logged to admin dashboard as `cert_pin_mismatch` events.
