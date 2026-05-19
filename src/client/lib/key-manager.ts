@@ -66,6 +66,14 @@ export function getLockDelayMs(): number {
 }
 
 if (typeof document !== 'undefined') {
+  // In test builds (Playwright), disable auto-lock entirely. Headless Chromium with
+  // multiple parallel workers fires visibilitychange events when switching between
+  // pages, triggering the 30s tab-hide lock. This causes auth races where the crypto
+  // state locks mid-scenario, producing 401s and redirect-to-login flakes.
+  if (import.meta.env.PLAYWRIGHT_TEST) {
+    autoLockDisabled = true
+  }
+
   document.addEventListener('visibilitychange', () => {
     if (autoLockDisabled) return
     if (document.hidden && unlocked) {
