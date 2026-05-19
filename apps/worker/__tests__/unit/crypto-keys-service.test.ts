@@ -30,7 +30,7 @@ interface MockLink {
   createdAt: Date
 }
 
-interface MockPukEnvelope {
+interface _MockPukEnvelope {
   id: string
   userPubkey: string
   deviceId: string
@@ -39,7 +39,7 @@ interface MockPukEnvelope {
   createdAt: Date
 }
 
-interface MockMlsMessage {
+interface _MockMlsMessage {
   id: string
   hubId: string
   recipientDeviceId: string
@@ -463,11 +463,11 @@ describe('CryptoKeysService — PUK Envelopes', () => {
         },
       ]
 
+      const returning = vi.fn().mockResolvedValue(insertedRows)
+      const onConflictDoUpdate = vi.fn().mockReturnValue({ returning })
       const db = {
         insert: vi.fn().mockReturnValue({
-          values: vi.fn().mockReturnValue({
-            returning: vi.fn().mockResolvedValue(insertedRows),
-          }),
+          values: vi.fn().mockReturnValue({ onConflictDoUpdate }),
         }),
       }
 

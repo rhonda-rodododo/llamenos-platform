@@ -6,7 +6,7 @@
  *   - PUK envelopes: HPKE-encrypted PUK seed distribution
  *   - MLS messages: pending handshake message delivery
  */
-import { and, asc, desc, eq, max } from 'drizzle-orm'
+import { and, asc, desc, eq, max, sql } from 'drizzle-orm'
 import type { Database } from '../db'
 import { sigchainLinks, pukEnvelopes, mlsPendingMessages } from '../db/schema'
 import { ed25519Verify } from '@llamenos/crypto/ffi'
@@ -185,6 +185,10 @@ export class CryptoKeysService {
   ): Promise<PukEnvelopeRecord[]> {
     if (envelopes.length === 0) return []
 
+    // H09: use upsert to prevent race conditions when two clients rotate PUK
+    // simultaneously. If (deviceId, generation) already exists, update the
+    // envelope in-place — idempotent and safe because the envelope for a given
+    // generation is deterministic (same PUK seed encrypted to the same device key).
     const inserted = await this.db
       .insert(pukEnvelopes)
       .values(envelopes.map(e => ({
@@ -193,6 +197,13 @@ export class CryptoKeysService {
         generation: e.generation,
         envelope: e.envelope,
       })))
+      .onConflictDoUpdate({
+        target: [pukEnvelopes.deviceId, pukEnvelopes.generation],
+        set: {
+          envelope: sql`excluded.envelope`,
+          createdAt: sql`excluded.created_at`,
+        },
+      })
       .returning()
 
     return inserted.map(r => ({
