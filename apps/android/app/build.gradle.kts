@@ -181,6 +181,7 @@ dependencies {
     implementation(libs.datastore.preferences)
     implementation(libs.play.services.location)
     implementation(libs.security.crypto)
+    implementation(libs.androidx.biometric)
 
     implementation(libs.firebase.messaging)
 

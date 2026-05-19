@@ -16,3 +16,11 @@ Feature: Hub switching
     When I tap the second hub in the list
     And I navigate to the notes screen
     Then the notes screen loads without error
+
+  @android @security
+  Scenario: Background push notification does not switch active hub
+    Given I am authenticated and hub "hub-A" is the active hub
+    And I am also a member of hub "hub-B"
+    When an incoming call FCM push notification arrives for hub "hub-B"
+    Then hub "hub-A" remains the active hub
+    And the call notification is shown without switching hub context

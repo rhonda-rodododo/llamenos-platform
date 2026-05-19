@@ -261,3 +261,18 @@ Feature: Network Security
   Scenario: Upload size is capped at 10MB
     When uploading a file of 11MB
     Then the server should reject with 413 Payload Too Large
+
+  # ── Certificate Pinning ───────────────────────────────────────────
+
+  @android @ios @security
+  Scenario: App refuses connection to server with mismatched certificate
+    Given the app is configured with certificate pins for "*.llamenos.org"
+    When the app connects to a server presenting a certificate not matching any pin
+    Then the connection should be refused
+    And no data should be transmitted
+
+  @android @ios @security
+  Scenario: App succeeds when server certificate matches a configured pin
+    Given the app is configured with certificate pins for "*.llamenos.org"
+    When the app connects to a server presenting a certificate matching a pin
+    Then the connection should succeed

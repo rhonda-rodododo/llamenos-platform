@@ -78,21 +78,21 @@ class WakeKeyService @Inject constructor(
             return publicKeyHex
         }
 
-        // Placeholder: generate random keypair bytes
-        val random = SecureRandom()
-        val secretBytes = ByteArray(32)
-        random.nextBytes(secretBytes)
-        val secretHex = secretBytes.joinToString("") { "%02x".format(it) }
-
-        val pubBytes = ByteArray(32)
-        random.nextBytes(pubBytes)
-        val pubHex = pubBytes.joinToString("") { "%02x".format(it) }
-
-        keystoreService.store(KEY_WAKE_SECRET, secretHex)
-        keystoreService.store(KEY_WAKE_PUBKEY, pubHex)
-
-        return pubHex
+        // Native FFI unavailable — cannot generate a valid X25519 keypair.
+        // Do not fall back to random bytes: the public key must be derived
+        // from the private key for HPKE decryption to work. A random public key
+        // will silently produce a keypair the server cannot encrypt to.
+        // This should only occur on emulators/test environments without native libs.
+        // In production, native libs are always linked (see build-mobile.sh).
+        throw IllegalStateException(
+            "WakeKeyService: native crypto library not loaded. " +
+            "Cannot derive X25519 wake keypair without native FFI. " +
+            "Ensure jniLibs are present for this ABI."
+        )
     }
+
+    /** Exposed for testing only. */
+    internal fun isNativeLoaded(): Boolean = nativeLibLoaded
 
     /**
      * Check whether a wake keypair has been generated.

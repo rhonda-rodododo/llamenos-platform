@@ -70,6 +70,7 @@ targets:
           CODE_SIGN_ENTITLEMENTS: Sources/App/Llamenos.Debug.entitlements
         Release:
           CODE_SIGN_ENTITLEMENTS: Sources/App/Llamenos.Release.entitlements
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: RELEASE_HARDENED
     scheme:
       testTargets:
         - LlamenosTests
