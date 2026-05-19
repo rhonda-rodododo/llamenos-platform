@@ -100,6 +100,24 @@ data class RecoveryGroupKeypair(
     val handle: ULong = 0u,
 )
 
+/**
+ * Ephemeral keypair for device linking ECDH.
+ * Secret key material is held as a [ByteArray] and zeroized on [close].
+ * Always use within a `.use { }` block to ensure cleanup.
+ */
+class EphemeralKeypair(
+    val publicKeyHex: String,
+    private val secretBytes: ByteArray,
+) : AutoCloseable {
+    /** Return the secret key as a hex string. */
+    fun secretHex(): String = secretBytes.joinToString("") { "%02x".format(it) }
+
+    /** Zeroize the secret key material. */
+    override fun close() {
+        secretBytes.fill(0)
+    }
+}
+
 class CryptoException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
 /**
@@ -534,14 +552,19 @@ class CryptoService @Inject constructor() {
 
     /**
      * Generate an ephemeral secp256k1 keypair for device linking ECDH.
-     * @return Pair of (secretKeyHex, publicKeyHex)
+     *
+     * Returns an [EphemeralKeypair] that holds the secret as a [ByteArray].
+     * Always use within a `.use { }` block to ensure the secret is zeroized after use.
      */
-    fun generateEphemeralKeypair(): Pair<String, String> {
+    fun generateEphemeralKeypair(): EphemeralKeypair {
         check(nativeLibLoaded) { "Native crypto library not loaded." }
         return try {
             val secretKeyHex = org.llamenos.core.mobileRandomBytesHex()
             val publicKeyHex = org.llamenos.core.getPublicKey(secretKeyHex)
-            Pair(secretKeyHex, publicKeyHex)
+            val secretBytes = ByteArray(secretKeyHex.length / 2) { i ->
+                secretKeyHex.substring(i * 2, i * 2 + 2).toInt(16).toByte()
+            }
+            EphemeralKeypair(publicKeyHex, secretBytes)
         } catch (e: org.llamenos.core.CryptoException) {
             throw CryptoException("Ephemeral keypair generation failed: ${e.message}", e)
         }

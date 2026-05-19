@@ -348,6 +348,7 @@ class AuthViewModel @Inject constructor(
      * Reset all auth state (for logout or starting over).
      */
     fun resetAuthState() {
+        cryptoService.clearHubKeys()
         cryptoService.lock()
         keystoreService.clear()
         _uiState.value = AuthUiState()

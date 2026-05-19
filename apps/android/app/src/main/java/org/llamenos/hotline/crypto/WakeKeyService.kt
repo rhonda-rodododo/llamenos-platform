@@ -1,11 +1,18 @@
 package org.llamenos.hotline.crypto
 
+import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyProperties
+import android.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.llamenos.protocol.CryptoLabels
+import java.security.KeyStore
 import java.security.SecureRandom
+import javax.crypto.Cipher
+import javax.crypto.KeyGenerator
+import javax.crypto.spec.GCMParameterSpec
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -65,6 +72,10 @@ class WakeKeyService @Inject constructor(
     /**
      * Get the wake public key, generating a new keypair if none exists.
      * This key is registered with the server for push notification encryption.
+     *
+     * The wake secret is encrypted under a dedicated AndroidKeyStore AES-256-GCM key
+     * (alias [KeystoreService.WAKE_KEY_ALIAS]) before being stored. This provides
+     * hardware-backed protection even though the key is accessible without PIN/biometric.
      */
     fun getOrCreateWakePublicKey(): String {
         val existing = keystoreService.retrieve(KEY_WAKE_PUBKEY)
@@ -73,7 +84,8 @@ class WakeKeyService @Inject constructor(
         if (nativeLibLoaded) {
             val secretKeyHex = org.llamenos.core.mobileRandomBytesHex()
             val publicKeyHex = org.llamenos.core.getPublicKey(secretKeyHex)
-            keystoreService.store(KEY_WAKE_SECRET, secretKeyHex)
+            val secretBytes = hexToBytes(secretKeyHex)
+            storeWakeSecret(secretBytes)
             keystoreService.store(KEY_WAKE_PUBKEY, publicKeyHex)
             return publicKeyHex
         }
@@ -82,16 +94,107 @@ class WakeKeyService @Inject constructor(
         val random = SecureRandom()
         val secretBytes = ByteArray(32)
         random.nextBytes(secretBytes)
-        val secretHex = secretBytes.joinToString("") { "%02x".format(it) }
 
         val pubBytes = ByteArray(32)
         random.nextBytes(pubBytes)
         val pubHex = pubBytes.joinToString("") { "%02x".format(it) }
 
-        keystoreService.store(KEY_WAKE_SECRET, secretHex)
+        storeWakeSecret(secretBytes)
         keystoreService.store(KEY_WAKE_PUBKEY, pubHex)
 
         return pubHex
+    }
+
+    /**
+     * Store the wake secret encrypted under a dedicated AndroidKeyStore AES-256-GCM key.
+     * The input [secretBytes] is zeroized after encryption.
+     */
+    internal fun storeWakeSecret(secretBytes: ByteArray) {
+        try {
+            val keyStore = KeyStore.getInstance("AndroidKeyStore")
+            keyStore.load(null)
+
+            // Generate (or reuse) the hardware-backed AES key
+            if (!keyStore.containsAlias(KeystoreService.WAKE_KEY_ALIAS)) {
+                val keyGen = KeyGenerator.getInstance(
+                    KeyProperties.KEY_ALGORITHM_AES,
+                    "AndroidKeyStore",
+                )
+                keyGen.init(
+                    KeyGenParameterSpec.Builder(
+                        KeystoreService.WAKE_KEY_ALIAS,
+                        KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
+                    )
+                        .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                        .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                        .setKeySize(256)
+                        .build(),
+                )
+                keyGen.generateKey()
+            }
+
+            // Encrypt the secret
+            val secretKey = (keyStore.getEntry(KeystoreService.WAKE_KEY_ALIAS, null)
+                as KeyStore.SecretKeyEntry).secretKey
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            cipher.init(Cipher.ENCRYPT_MODE, secretKey)
+            val iv = cipher.iv
+            val ciphertext = cipher.doFinal(secretBytes)
+
+            // Store IV + ciphertext as Base64
+            val combined = iv + ciphertext
+            keystoreService.store(KEY_WAKE_SECRET, Base64.encodeToString(combined, Base64.NO_WRAP))
+        } finally {
+            // Zeroize the input
+            secretBytes.fill(0)
+        }
+    }
+
+    /**
+     * Load and decrypt the wake secret from EncryptedSharedPreferences,
+     * using the dedicated AndroidKeyStore AES key.
+     *
+     * @return Decrypted wake secret as ByteArray, or null if not available.
+     */
+    internal fun loadWakeSecret(): ByteArray? {
+        val stored = keystoreService.retrieve(KEY_WAKE_SECRET) ?: return null
+
+        return try {
+            val keyStore = KeyStore.getInstance("AndroidKeyStore")
+            keyStore.load(null)
+
+            if (!keyStore.containsAlias(KeystoreService.WAKE_KEY_ALIAS)) return null
+
+            val combined = Base64.decode(stored, Base64.NO_WRAP)
+            // AES-GCM IV is 12 bytes
+            if (combined.size <= GCM_IV_LENGTH) return null
+
+            val iv = combined.copyOfRange(0, GCM_IV_LENGTH)
+            val ciphertext = combined.copyOfRange(GCM_IV_LENGTH, combined.size)
+
+            val secretKey = (keyStore.getEntry(KeystoreService.WAKE_KEY_ALIAS, null)
+                as KeyStore.SecretKeyEntry).secretKey
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            cipher.init(Cipher.DECRYPT_MODE, secretKey, GCMParameterSpec(GCM_TAG_LENGTH, iv))
+            cipher.doFinal(ciphertext)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Clean up the wake key from both EncryptedSharedPreferences and AndroidKeyStore.
+     */
+    fun cleanup() {
+        keystoreService.delete(KEY_WAKE_SECRET)
+        keystoreService.delete(KEY_WAKE_PUBKEY)
+        try {
+            val keyStore = KeyStore.getInstance("AndroidKeyStore")
+            keyStore.load(null)
+            keyStore.deleteEntry(KeystoreService.WAKE_KEY_ALIAS)
+        } catch (_: Exception) {
+            // KeyStore may not be available
+        }
     }
 
     /**
@@ -107,12 +210,12 @@ class WakeKeyService @Inject constructor(
      */
     suspend fun decryptWakePayloadHpke(envelopeJson: String): WakePayload? =
         withContext(Dispatchers.Default) {
-            val secretHex = keystoreService.retrieve(KEY_WAKE_SECRET)
-                ?: return@withContext null
-
             if (!nativeLibLoaded) return@withContext null
 
+            val secretBytes = loadWakeSecret() ?: return@withContext null
             try {
+                // Secret bytes are loaded to verify availability and for potential
+                // future direct use. The FFI call uses internally loaded state.
                 val envelope = json.decodeFromString<HpkeEnvelopeJson>(envelopeJson)
                 val ffiEnvelope = org.llamenos.core.HpkeEnvelope(
                     v = envelope.v.toUByte(),
@@ -130,6 +233,9 @@ class WakeKeyService @Inject constructor(
                 json.decodeFromString<WakePayload>(plaintext)
             } catch (_: Exception) {
                 null
+            } finally {
+                // Zeroize the decrypted secret
+                secretBytes.fill(0)
             }
         }
 
@@ -153,6 +259,11 @@ class WakeKeyService @Inject constructor(
         private const val KEY_WAKE_SECRET = "wake-secret"
         private const val KEY_WAKE_PUBKEY = "wake-pubkey"
         private val LABEL_PUSH_WAKE = CryptoLabels.LABEL_PUSH_WAKE
+
+        /** AES-GCM IV length in bytes. */
+        private const val GCM_IV_LENGTH = 12
+        /** AES-GCM authentication tag length in bits. */
+        private const val GCM_TAG_LENGTH = 128
     }
 }
 

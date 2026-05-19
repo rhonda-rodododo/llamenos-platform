@@ -205,20 +205,17 @@ class KeystoreService @Inject constructor(
      * Removes all EncryptedSharedPreferences entries and invalidates the MasterKey.
      */
     fun wipeAll() {
-        val keys = listOf(
-            KEY_ENCRYPTED_KEYS,
-            KEY_HUB_URL,
-            KEY_DEVICE_ID,
-            KEY_BIOMETRIC_ENABLED,
-            "pin-verification",
-            "biometric-pin",
-            "pin-length",
-            "pin-lockout-attempts",
-            "pin-lockout-until",
-        )
-        val editor = prefs.edit()
-        keys.forEach { editor.remove(it) }
-        editor.apply()
+        // Clear ALL EncryptedSharedPreferences — no hardcoded key list
+        prefs.edit().clear().apply()
+        // Also delete the MasterKey and wake key from AndroidKeyStore
+        try {
+            val keyStore = java.security.KeyStore.getInstance("AndroidKeyStore")
+            keyStore.load(null)
+            keyStore.deleteEntry("_androidx_security_master_key_")
+            keyStore.deleteEntry(WAKE_KEY_ALIAS)
+        } catch (_: Exception) {
+            // KeyStore may not be available on all devices
+        }
     }
 
     /**
@@ -246,5 +243,8 @@ class KeystoreService @Inject constructor(
         // PIN lockout keys
         const val KEY_FAILED_ATTEMPTS = "failed_attempts"
         const val KEY_LOCKOUT_UNTIL = "lockout_until"
+
+        /** AndroidKeyStore alias for the wake key encryption key. */
+        const val WAKE_KEY_ALIAS = "llamenos-wake-key"
     }
 }
