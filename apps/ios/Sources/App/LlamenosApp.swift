@@ -79,8 +79,9 @@ struct LlamenosApp: App {
                 appState.crashReportingService.uploadPendingInBackground()
                 // Register for push notifications
                 requestPushNotificationPermission()
-                // Inject appState into the delegate so it can forward push tokens
+                // Inject appState and router into the delegate so it can forward push tokens and deep link
                 appDelegate.appState = appState
+                appDelegate.router = router
                 // Initialize Linphone SIP core for VoIP call handling
                 do {
                     try appState.linphoneService.initialize(hubContext: hubContext)
@@ -226,6 +227,8 @@ struct LlamenosApp: App {
 final class AppDelegate: NSObject, UIApplicationDelegate {
     /// Injected by LlamenosApp on appear so the delegate can forward push tokens.
     var appState: AppState?
+    /// Injected by LlamenosApp on appear for notification tap → deep link navigation.
+    var router: Router?
 
     #if DEBUG
     /// Overrides wake-payload decryption in unit tests. If set, the closure is called
@@ -372,9 +375,21 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         if let deepLinkType = userInfo["deepLinkType"] as? String,
            let entityId = userInfo["deepLinkEntityId"] as? String {
             Task { @MainActor in
-                // TODO: navigate via router — requires router access from AppDelegate.
-                // LlamenosApp posts a Notification or uses a shared NavigationBus to bridge this.
-                _ = (deepLinkType, entityId)
+                guard let router else { return }
+                switch deepLinkType {
+                case "incoming_call", "call":
+                    router.navigate(to: .callDetail(id: entityId))
+                case "message", "conversation":
+                    router.navigate(to: .conversationDetail(id: entityId))
+                case "note":
+                    router.navigate(to: .noteDetail(id: entityId))
+                case "report":
+                    router.navigate(to: .reportDetail(id: entityId))
+                case "case":
+                    router.navigate(to: .caseDetail(id: entityId))
+                default:
+                    break
+                }
             }
         }
     }
