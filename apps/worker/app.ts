@@ -3,6 +3,7 @@ import type { AppEnv } from './types'
 import { cors } from './middleware/cors'
 import { apiVersion } from './middleware/api-version'
 import { auth } from './middleware/auth'
+import { rateLimit } from './middleware/rate-limit'
 import { createMiddleware } from 'hono/factory'
 import configRoutes from './routes/config'
 import devRoutes from './routes/dev'
@@ -122,6 +123,18 @@ const devGuard = createMiddleware<AppEnv>(async (c, next) => {
 })
 api.use('/test-*', devGuard)
 
+// --- Rate limiting (H03) — applied per-tier before route handlers ---
+// Strict tier: auth/provisioning endpoints (by IP, 5 req/min)
+api.use('/auth/*', rateLimit('strict'))
+api.use('/webauthn/*', rateLimit('strict'))
+api.use('/invites/*', rateLimit('strict'))
+api.use('/provision/*', rateLimit('strict'))
+api.use('/recovery-group/*', rateLimit('strict'))
+
+// Webhook tier: provider callbacks (by IP, 300 req/min)
+api.use('/telephony/*', rateLimit('webhook'))
+api.use('/messaging/*', rateLimit('webhook'))
+
 // Public routes (no auth)
 api.route('/config', configRoutes)
 api.route('/', devRoutes)
@@ -188,6 +201,13 @@ api.get('/ivr-audio/:promptType/:language', async (c) => {
 // Authenticated routes
 const authenticated = new Hono<AppEnv>()
 authenticated.use('*', auth)
+// Default rate limiting: GET/HEAD/OPTIONS → read tier, mutations → write tier (H03)
+authenticated.use('*', async (c, next) => {
+  const method = c.req.method
+  const tier = (method === 'GET' || method === 'HEAD' || method === 'OPTIONS')
+    ? 'read' as const : 'write' as const
+  return rateLimit(tier)(c, next)
+})
 authenticated.route('/users', usersRoutes)
 authenticated.route('/shifts', shiftsRoutes)
 authenticated.route('/bans', bansRoutes)
