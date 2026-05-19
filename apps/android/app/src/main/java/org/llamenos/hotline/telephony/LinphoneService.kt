@@ -2,6 +2,7 @@ package org.llamenos.hotline.telephony
 
 import android.content.Context
 import android.util.Log
+import android.util.LruCache
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -32,10 +33,12 @@ class LinphoneService @Inject constructor(
 ) {
     private var core: Core? = null
     private val hubAccounts = ConcurrentHashMap<String, org.linphone.core.Account>()
-    // TODO: Add eviction (e.g. LruCache) for entries that are never consumed
-    // (call push arrives but Linphone never connects). Low risk for now given
-    // low per-session call volume on a crisis line.
-    private val pendingCallHubIds = ConcurrentHashMap<String, String>()  // callId → hubId
+    private val pendingCallHubIds = LruCache<String, String>(MAX_PENDING_CALLS)  // callId → hubId
+
+    companion object {
+        /** Max pending call→hub mappings retained. Evicts oldest entries to bound memory. */
+        private const val MAX_PENDING_CALLS = 100
+    }
 
     fun initialize() {
         try {
@@ -84,7 +87,7 @@ class LinphoneService @Inject constructor(
     }
 
     fun storePendingCallHub(callId: String, hubId: String) {
-        pendingCallHubIds[callId] = hubId
+        pendingCallHubIds.put(callId, hubId)
     }
 
     private fun setupCoreListener(core: Core) {
@@ -111,6 +114,6 @@ class LinphoneService @Inject constructor(
         })
     }
 
-    internal fun pendingCallHubIdForTesting(callId: String): String? = pendingCallHubIds[callId]
+    internal fun pendingCallHubIdForTesting(callId: String): String? = pendingCallHubIds.get(callId)
     internal fun consumePendingCallHubForTesting(callId: String) { pendingCallHubIds.remove(callId) }
 }

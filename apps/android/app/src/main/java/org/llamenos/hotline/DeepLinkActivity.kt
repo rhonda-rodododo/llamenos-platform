@@ -8,6 +8,8 @@ import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import org.llamenos.hotline.api.ProviderSetupRepository
+import org.llamenos.hotline.hub.HubRepository
+import org.llamenos.hotline.ui.DeepLinkDestination
 import java.security.SecureRandom
 import javax.inject.Inject
 
@@ -27,6 +29,9 @@ class DeepLinkActivity : ComponentActivity() {
 
     @Inject
     lateinit var providerSetupRepository: ProviderSetupRepository
+
+    @Inject
+    lateinit var hubRepository: HubRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -70,7 +75,12 @@ class DeepLinkActivity : ComponentActivity() {
     private fun handleCallDeepLink(uri: android.net.Uri) {
         val callId = uri.getQueryParameter("callId")
         if (callId != null) {
-            // TODO: route to active call screen via MainActivity intent
+            Log.d(TAG, "Call deep link: callId=$callId")
+            val intent = Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                data = android.net.Uri.parse("llamenos://calls/$callId")
+            }
+            startActivity(intent)
         }
         finish()
     }
@@ -78,9 +88,18 @@ class DeepLinkActivity : ComponentActivity() {
     private fun handleHubDeepLink(uri: android.net.Uri) {
         val hubId = uri.getQueryParameter("hubId")
         if (hubId != null) {
-            // TODO: call hubRepository.switchToHub(hubId) after user confirmation
-            // Hub switch must be driven by explicit user action (confirmation dialog above),
-            // never by automatic background processing.
+            Log.d(TAG, "Hub deep link: hubId=$hubId")
+            // Hub switch was already confirmed via showConfirmationDialog() before reaching here.
+            // This is an explicit user action (tap → confirmation dialog → proceed), not background processing.
+            lifecycleScope.launch {
+                hubRepository.switchHub(hubId)
+                val intent = Intent(this@DeepLinkActivity, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                }
+                startActivity(intent)
+                finish()
+            }
+            return
         }
         finish()
     }
