@@ -302,6 +302,20 @@
       "when": 1778903799509,
       "tag": "0043_add_merge_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1779153275272,
+      "tag": "0043_webauthn_challenge_pubkey",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1779153155219,
+      "tag": "0044_webauthn_challenge_pubkey",
+      "breakpoints": true
     }
   ]
 }

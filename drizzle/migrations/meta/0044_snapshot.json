@@ -1,6 +1,6 @@
 {
-  "id": "0043_add_merge_columns",
-  "prevId": "ea486a35-1572-45d6-9e9f-9b8c5460a4a9",
+  "id": "0044_webauthn_challenge_pubkey",
+  "prevId": "0043_add_merge_columns",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -4242,9 +4242,31 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "pubkey": {
+          "name": "pubkey",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "webauthn_challenges_pubkey_idx": {
+          "name": "webauthn_challenges_pubkey_idx",
+          "columns": [
+            {
+              "expression": "pubkey",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},

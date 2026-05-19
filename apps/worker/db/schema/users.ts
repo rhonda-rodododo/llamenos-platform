@@ -139,13 +139,21 @@ export const webauthnCredentials = pgTable(
 // webauthn_challenges
 // ---------------------------------------------------------------------------
 
-export const webauthnChallenges = pgTable('webauthn_challenges', {
-  challengeId: text('challenge_id').primaryKey(),
-  challenge: text('challenge').notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-})
+export const webauthnChallenges = pgTable(
+  'webauthn_challenges',
+  {
+    challengeId: text('challenge_id').primaryKey(),
+    challenge: text('challenge').notNull(),
+    // RACE-08 Phase 2: Bind challenges to users to prevent cross-user consumption
+    pubkey: text('pubkey'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index('webauthn_challenges_pubkey_idx').on(table.pubkey),
+  ],
+)
 
 // ---------------------------------------------------------------------------
 // devices

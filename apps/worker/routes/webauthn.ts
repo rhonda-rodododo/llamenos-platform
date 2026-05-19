@@ -138,7 +138,8 @@ webauthn.post('/register/options',
     const { credentials: existing } = await services.identity.getWebAuthnCredentials(pubkey)
     const options = await generateRegOptions({ pubkey, name: user.name }, existing, rpID, rpName)
     const challengeId = crypto.randomUUID()
-    await services.identity.storeWebAuthnChallenge(challengeId, options.challenge)
+    // RACE-08 Phase 2: Bind challenge to authenticated user
+    await services.identity.storeWebAuthnChallenge(challengeId, options.challenge, pubkey)
     return c.json({ ...options, challengeId })
   })
 
