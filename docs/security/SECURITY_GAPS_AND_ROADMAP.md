@@ -1,7 +1,7 @@
 # Security Gaps and Improvement Roadmap
 
-**Version:** 1.1
-**Date:** 2026-05-12
+**Version:** 1.2
+**Date:** 2026-05-18
 **Status:** Living document — updated as gaps are closed and new ones identified
 
 This document provides an honest inventory of known security gaps, incomplete implementations, and planned improvements in the Llamenos platform. It is intended for security auditors, cryptographers, and developers to understand what is fully implemented versus what remains work-in-progress.
@@ -10,6 +10,8 @@ This document provides an honest inventory of known security gaps, incomplete im
 - [Security Overview](README.md) — Entry point for security auditors
 - [Crypto Architecture](CRYPTO_ARCHITECTURE.md) — Cryptographic primitives and key hierarchy
 - [Threat Model](THREAT_MODEL.md) — Adversary profiles and trust boundaries
+- [Core Audit 2026-05-18](SECURITY_AUDIT_2026-05-18.md) — Latest audit (crypto crate + worker backend)
+- [Full Audit 2026-03-21](SECURITY_AUDIT_2026-03-21.md) — Historical full-platform audit
 
 ---
 
@@ -18,10 +20,11 @@ This document provides an honest inventory of known security gaps, incomplete im
 | Category | Count | Resolved | Open | Severity Distribution |
 |----------|-------|----------|------|----------------------|
 | Documentation/Implementation Mismatches | 6 | 2 | 4 | 1 Medium, 3 Low (1 Medium + 1 Low resolved) |
-| Incomplete Implementations | 4 | 2 | 2 | 1 Medium, 1 Low (2 Low resolved) |
+| Incomplete Implementations | 4 | 3 | 1 | 1 Medium (3 Low resolved) |
 | Code TODOs (Security-Critical) | 3 | 1 | 2 | 2 Medium (1 Low resolved) |
 | iOS Debug Code in Production Paths | 1 | 0 | 1 | Medium |
-| **Total** | **14** | **5** | **9** | |
+| New Findings (Core Audit 2026-05-18) | 5 | 0 | 5 | 3 High, 2 Medium |
+| **Total** | **19** | **6** | **13** | |
 
 ---
 
@@ -36,6 +39,8 @@ These are cases where the documentation claims something that the implementation
 **Original issue:** `packages/protocol/crypto-labels.json` contained 69 labels but the Rust `LABEL_REGISTRY` in `packages/crypto/src/labels.rs` only had 57 entries (indices 0-56).
 
 **Resolution:** All 12 missing labels were added to the Rust `LABEL_REGISTRY` with stable indices 57-68. The registry now has 69 entries matching the JSON source of truth. Additionally, a value collision was discovered and fixed: `LABEL_SERVER_NOSTR_KEY` and `LABEL_SERVER_SIGNING_KEY` had identical values (`llamenos:server:nostr-key`). `LABEL_SERVER_SIGNING_KEY` was corrected to `llamenos:server:signing-key` and its JSON Schema description updated.
+
+**2026-05-18 Update:** Label drift has recurred. `crypto-labels.json` now has 82 labels, but `labels.rs` has 81 entries (including 1 tombstone). 7 labels are missing from Rust — see new gap 9.2. A CI drift check is needed.
 
 **Files changed:**
 - `packages/crypto/src/labels.rs` (registry now has 69 entries, indices 0-68)
@@ -111,7 +116,7 @@ These are cases where the documentation claims something that the implementation
 **Reality:** This is **mostly true** for notes/messages/files. However, the server DOES see:
 - Call routing metadata (timestamps, durations, who answered)
 - Caller phone hashes (HMAC-SHA256, reversible with HMAC secret)
-- Contact metadata for ban lists
+- Contact metadata for ban lists — **2026-05-18 Update:** ban list contacts store plaintext phone numbers (see new gap 9.4)
 - Message plaintext momentarily during SMS/WhatsApp outbound send
 - Server-encrypted credentials (telephony provider API keys)
 
@@ -123,18 +128,13 @@ These are cases where the documentation claims something that the implementation
 
 ## 2. Incomplete Implementations
 
-### 2.1 Legacy ECIES/secp256k1 Modules (LOW)
+### 2.1 Legacy ECIES/secp256k1 Modules — RESOLVED
 
-**Status:** Legacy modules retained for backward compatibility during Phase 6 migration.
+**Status:** Resolved. Confirmed removed in core audit 2026-05-18.
 
-**Files:**
-- `packages/crypto/src/ecies.rs`
-- `packages/crypto/src/encryption_legacy.rs`
-- `packages/crypto/src/keys_legacy.rs`
-- `packages/crypto/src/legacy.rs`
-- `packages/crypto/src/nostr.rs`
+**Original issue:** Legacy crypto modules (`ecies.rs`, `encryption_legacy.rs`, `keys_legacy.rs`, `legacy.rs`, `nostr.rs`) were retained for backward compatibility.
 
-**Plan:** Remove after all users have migrated to Ed25519/X25519 device keys. The `users` table still has `encryptedSecretKey` (legacy nsec) and `devices` table stores `ed25519Pubkey`/`x25519Pubkey` as optional fields.
+**Resolution:** All legacy modules are confirmed absent from the source tree. No secp256k1 dependencies remain in `Cargo.toml`. The `users` table still has the `encryptedSecretKey` field (`.default('')`) — this should be removed via migration (see new gap 9.5).
 
 ---
 
@@ -267,27 +267,91 @@ These are cases where the documentation claims something that the implementation
 
 ---
 
-## 6. Historical Audit Findings (Still Relevant)
+## 6. New Findings from Core Audit 2026-05-18
 
-### 6.1 Security Audit 2026-03-21 (58 findings)
+These findings were identified during the core-layer security audit of `packages/crypto/` and `apps/worker/`. Full details in [Security Audit 2026-05-18](SECURITY_AUDIT_2026-05-18.md).
 
-**Status:** Historical document marked as point-in-time snapshot.
+### 9.1 FFI Server HPKE Bypasses Albrecht Defense (HIGH)
 
-**Potentially still relevant findings** (require verification):
-- Certificate pinning scaffolding (not yet active)
-- iOS/Android debug code paths
-- WebAuthn enforcement wiring
-- SFrame media encryption completeness
+**Location:** `packages/crypto/src/ffi_server.rs`
+
+**Issue:** `ffi_hpke_seal`/`ffi_hpke_open` accept raw info bytes from the Bun server FFI caller, completely bypassing the label registry and domain separation enforcement in `hpke_envelope.rs`.
+
+**Impact:** An application-layer bug could pass the wrong label or empty info, producing ciphertexts that decrypt under unintended contexts — undermining the entire domain separation architecture.
+
+**Fix:** Route FFI server HPKE through `hpke_envelope::hpke_wrap`/`hpke_unwrap`, or add label-ID-based C ABI. At minimum, reject empty `info` buffers.
+
+---
+
+### 9.2 Label Registry Drift — 7 Labels Missing from Rust (HIGH)
+
+**Location:** `packages/crypto/src/labels.rs` vs `packages/protocol/crypto-labels.json`
+
+**Issue:** `crypto-labels.json` defines 82 labels but `labels.rs` has 81 entries (including 1 tombstone). 7 labels are absent: `LABEL_AVAILABILITY_REASON`, `LABEL_RING_GROUP_NAME`, `LABEL_SHIFT_NAME`, `LABEL_SHIFT_OVERRIDE_NOTE`, `LABEL_ENTITY_TYPE_DEFINITION`, `LABEL_TEAM_ENCRYPT`, `LABEL_TAG_ENCRYPT`.
+
+**Impact:** TypeScript/Swift/Kotlin codegen can produce ciphertexts with these labels that Rust cannot decrypt.
+
+**Fix:** Add 7 missing labels to `LABEL_REGISTRY` (indices 81-87). Add CI check that fails on drift.
+
+---
+
+### 9.3 MLS Message Fetch Lacks Device Ownership Verification (HIGH)
+
+**Location:** `apps/worker/routes/mls.ts:160-171`
+
+**Issue:** `GET /mls/messages` accepts a `deviceId` query parameter with no validation that the authenticated user owns that device. Fetch-and-clear semantics.
+
+**Impact:** Any authenticated user can fetch and delete MLS handshake messages destined for another user's device, disrupting E2EE group key establishment.
+
+**Fix:** Verify `deviceId` belongs to the authenticated user's pubkey before fetching.
+
+---
+
+### 9.4 Plaintext Phone Numbers in Ban List Records (HIGH)
+
+**Location:** `apps/worker/routes/ban-list.ts`
+
+**Issue:** Ban list contacts store phone numbers as cleartext in the database, contradicting the zero-knowledge server claim.
+
+**Impact:** Database breach exposes banned caller phone numbers. These are particularly sensitive (flagged individuals).
+
+**Fix:** Store as HMAC-SHA256 hashes, consistent with Signal notifier pattern.
+
+---
+
+### 9.5 SSRF Guard Fails Open on DNS Resolution Failure (MEDIUM)
+
+**Location:** `apps/worker/lib/ssrf-guard.ts:143-145`
+
+**Issue:** `validateExternalUrlWithDns` catches DNS resolution errors and allows the request through ("fail-open for non-resolvable hosts").
+
+**Impact:** Potential SSRF bypass via DNS timing or rebinding attacks.
+
+**Fix:** Fail closed on DNS resolution failure. Add 1-2 retries before rejecting.
+
+---
+
+## 7. Historical Audit Findings (Still Relevant)
+
+### 7.1 Security Audit 2026-03-21 (58 findings)
+
+**Status:** Historical document marked as point-in-time snapshot. Core-scope findings (18 of 58) re-verified in the 2026-05-18 audit — all confirmed FIXED.
+
+**Potentially still relevant findings** (out of core scope, require separate audit):
+- Certificate pinning scaffolding (not yet active) — Android scope
+- iOS/Android debug code paths — mobile scope
+- SFrame media encryption completeness — crypto scope (confirmed still incomplete)
 
 **No longer relevant** (addressed in current architecture):
 - ECIES replaced with HPKE
 - PBKDF2 replaced with Argon2id
 - Per-device keys replace nsec
 - Cloudflare Workers references removed
+- WebAuthn enforcement wired (PR #288)
 
 ---
 
-## 7. Recommended Priority Order
+## 8. Recommended Priority Order
 
 ### Completed (PR #288)
 - ~~Fix crypto-label registry drift (add 12 missing labels to Rust)~~ — RESOLVED: all 69 labels registered; label collision fixed
@@ -296,28 +360,38 @@ These are cases where the documentation claims something that the implementation
 - ~~Add sigchain server-side signature validation~~ — RESOLVED: Ed25519 verification in `appendSigchainLink`
 - ~~Wire Signal notification HPKE encryption~~ — RESOLVED: ECIES TODO replaced with HPKE via platform.ts
 
-### Immediate (Next Sprint)
-1. Verify iOS DEBUG blocks are excluded from production builds
-2. Replace Android placeholder certificate pins
-3. Clarify Stronghold vs. Store in documentation
+### Completed (Confirmed in Core Audit 2026-05-18)
+- ~~Remove legacy ECIES modules~~ — RESOLVED: all legacy modules absent from source tree
+
+### Immediate (Before Production — HIGH findings)
+1. Route FFI server HPKE through label registry (Gap 9.1)
+2. Add 7 missing labels to Rust LABEL_REGISTRY + CI drift check (Gap 9.2)
+3. Verify device ownership in MLS message fetch (Gap 9.3)
+4. Hash ban list phone numbers with HMAC-SHA256 (Gap 9.4)
+5. Make SSRF guard fail-closed on DNS errors (Gap 9.5)
+
+### Immediate (Next Sprint — existing gaps)
+6. Verify iOS DEBUG blocks are excluded from production builds
+7. Replace Android placeholder certificate pins
+8. Clarify Stronghold vs. Store in documentation
 
 ### Short-Term (Next Month)
-4. Wire iOS WakeKeyService X25519 migration
-5. Document 3-tier envelope status (notes vs. cases)
+9. Wire iOS WakeKeyService X25519 migration
+10. Document 3-tier envelope status (notes vs. cases)
+11. Remove `encryptedSecretKey` legacy field from users table
 
 ### Medium-Term (Next Quarter)
-6. Implement SFrame media frame encryption
-7. Migrate device key storage to Stronghold (or update docs)
-8. Remove legacy ECIES modules (after migration complete)
+12. Implement SFrame media frame encryption
+13. Migrate device key storage to Stronghold (or update docs)
 
 ### Long-Term (Ongoing)
-9. Traffic analysis resistance (dummy traffic)
-10. External audit log anchoring
-11. Nostr security hardening implementation
+14. Traffic analysis resistance (dummy traffic)
+15. External audit log anchoring
+16. Nostr security hardening implementation
 
 ---
 
-## 8. Verification Checklist
+## 9. Verification Checklist
 
 For each gap, verify closure with:
 
@@ -333,5 +407,6 @@ For each gap, verify closure with:
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-05-18 | 1.2 | Core audit 2026-05-18: marked Gap 2.1 (legacy ECIES) as RESOLVED — all legacy modules removed. Added 5 new gaps from core audit (9.1–9.5): FFI server HPKE label bypass (HIGH), label registry drift recurrence (HIGH), MLS device ownership (HIGH), ban list plaintext phones (HIGH), SSRF fail-open (MEDIUM). Updated Gap 1.6 with ban list finding. Updated priority order. Added reference to new audit document. |
 | 2026-05-12 | 1.1 | Marked 5 gaps as RESOLVED per PR #288: domain separation label count (1.1), WebAuthn enforcement (1.5), sigchain server-side validation (2.3), audit log chain verification (2.4), Signal notification HPKE wiring (3.3). Noted label collision fix (LABEL_SERVER_NOSTR_KEY / LABEL_SERVER_SIGNING_KEY). Updated summary counts and priority order. |
 | 2026-05-11 | 1.0 | Initial inventory: 14 gaps across 5 categories, with severity, impact, and recommended fixes |

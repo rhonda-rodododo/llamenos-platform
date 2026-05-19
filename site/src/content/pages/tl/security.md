@@ -3,140 +3,243 @@ title: Seguridad at Privacy
 subtitle: Ano ang protektado, ano ang nakikita, at ano ang maaaring makuha sa pamamagitan ng subpoena — inorganisa ayon sa mga feature na ginagamit mo.
 ---
 
-## Kung masubpoena ang iyong hosting provider
+## Kung ang iyong hosting provider ay makatanggap ng subpoena
 
-| Maaari nilang ibigay | HINDI nila maibibigay |
-|----------------------|------------------------|
-| Metadata ng tawag/mensahe (oras, tagal) | Nilalaman ng notes, transcripts, report bodies |
-| Encrypted na database blobs | Pangalan ng mga volunteer (end-to-end encrypted) |
-| Aling mga volunteer account ang aktibo noong | Mga contact directory record (end-to-end encrypted) |
-| | Nilalaman ng mensahe (naka-encrypt pagdating, naka-imbak bilang ciphertext) |
-| | Mga decryption key (protektado ng iyong PIN, identity provider account, at opsyonal na hardware security key) |
-| | Mga per-note encryption key (ephemeral — sinisira pagkatapos i-wrap) |
-| | Ang iyong HMAC secret para sa pag-reverse ng phone hashes |
+| Maaari nilang ibigay | HINDI nila maaaring ibigay |
+|---------------------|---------------------------|
+| Call/mensahe metadata (oras, tagal) | Nilalaman ng tala, transkripsyon, katawan ng ulat |
+| Naka-encrypt na database blobs | Mga pangalan ng boluntaryo (end-to-end na naka-encrypt) |
+| Kung aling mga account ng boluntaryo ang aktibo noong kailan | Mga rekord ng contact directory (end-to-end na naka-encrypt) |
+| Mga rekord ng paghahatid ng mass message | Nilalaman ng mensahe (naka-encrypt sa pagdating, nakaimbak bilang ciphertext) |
+| | Mga decryption key (protektado ng iyong PIN, identity provider, at opsyonal na hardware security key) |
+| | Mga encryption key bawat tala (pansamantala — nilipol pagkatapos ng pag-wrap) |
+| | Ang iyong HMAC secret para sa pag-reverse ng mga phone hash |
+| | Nilalaman ng mga recovery fragment (naka-encrypt, hindi mababasa ng server) |
 
-**Nag-iimbak ang server ng data na hindi nito mababasa.** Ang metadata (kailan, gaano katagal, aling mga account) ay nakikita. Ang content (ano ang sinabi, ano ang isinulat, sino ang iyong mga contact) ay hindi.
+**Nag-iimbak ang server ng data na hindi nito mababasa.** Ang metadata (kailan, gaano katagal, aling mga account) ay makikita. Ang nilalaman (ano ang sinabi, ano ang isinulat, sino ang iyong mga contact) ay hindi.
 
 ---
 
 ## Ayon sa feature
 
-Ang iyong privacy exposure ay depende sa kung aling mga channel ang ine-enable mo:
+Ang iyong privacy exposure ay depende sa kung aling mga channel ang iyong pinagana:
 
 ### Mga voice call
 
-| Kung gumagamit ka ng... | Maa-access ng third party | Maa-access ng server | End-to-end encrypted na content |
-|-------------------------|---------------------------|----------------------|--------------------------------|
-| Twilio/SignalWire/Vonage/Plivo | Call audio (live), call records | Call metadata | Notes, transcripts |
-| Self-hosted Asterisk | Wala (ikaw ang may kontrol) | Call metadata | Notes, transcripts |
-| Browser-to-browser (WebRTC) | Wala | Call metadata | Notes, transcripts |
+| Kung ginagamit mo... | Maaaring i-access ng mga third party | Maaaring i-access ng server | End-to-end na naka-encrypt na nilalaman |
+|---------------------|-------------------------------------|----------------------------|----------------------------------------|
+| Twilio/SignalWire/Vonage/Plivo | Call audio (live), mga rekord | Call metadata | Mga tala, transkripsyon |
+| Self-hosted na Asterisk | Wala (ikaw ang kumokontrol) | Call metadata | Mga tala, transkripsyon |
+| Browser-to-browser (WebRTC) | Wala | Call metadata | Mga tala, transkripsyon |
 
-**Subpoena sa telephony provider**: Meron silang call detail records (oras, phone number, tagal). WALA silang call notes o transcripts. Naka-disable ang recording bilang default.
+**Subpoena sa telephony provider**: Mayroon silang mga detalyadong rekord ng tawag (oras, numero, tagal). WALA silang mga tala ng tawag o transkripsyon. Ang recording ay disabled bilang default.
 
-**Transcription**: Nangyayari ang transcription nang buo sa iyong browser gamit ang on-device AI. **Hindi umaalis ang audio sa iyong device.** Ang encrypted transcript lang ang ini-store.
+**Transkripsyon**: Ang transkripsyon ay nangyayari nang buo sa iyong browser gamit ang lokal na AI. **Ang audio ay hindi kailanman umaalis sa iyong device.**
 
-### Text messaging
+### Text messaging (isa-isa)
 
-| Channel | Access ng provider | Storage sa server | Notes |
-|---------|--------------------|-------------------|-------|
-| SMS | Nababasa ng telephony provider mo ang lahat ng mensahe | **Encrypted** | Ang provider ay nag-iimbak ng orihinal na mensahe |
-| WhatsApp | Nababasa ng Meta ang lahat ng mensahe | **Encrypted** | Ang provider ay nag-iimbak ng orihinal na mensahe |
-| Signal | End-to-end encrypted ang Signal network; nire-re-encrypt ng bridge pagdating | **Encrypted** | Preferred na ruta kapag available |
+| Channel | Access ng provider | Imbakan ng server | Mga tala |
+|---------|-------------------|------------------|---------|
+| SMS | Binabasa ng iyong phone provider ang lahat ng mensahe | **Naka-encrypt** | Pinapanatili ng provider ang mga orihinal na mensahe |
+| WhatsApp | Binabasa ng Meta ang lahat ng mensahe | **Naka-encrypt** | Pinapanatili ng provider ang mga orihinal na mensahe |
+| Signal | Ang Signal network ay E2EE; ang bridge ay muling nag-e-encrypt sa pagdating | **Naka-encrypt** | Piniling ruta kapag available |
 
-**Signal-first na delivery**: Kapag may Signal ang recipient, awtomatikong niru-route ang mensahe sa Signal — hindi makikita ng telephony provider mo ang content. Para sa SMS, generic na "may bago kang mensahe" notification lang ang ipinapadala bilang default (walang message body), kaya walang sensitive na content sa logs ng provider mo.
+**Signal-first routing**: Kapag may Signal ang tatanggap, ang mga mensahe ay awtomatikong niru-route sa pamamagitan ng Signal. Para sa SMS, isang generic na abiso lamang ang ipinapadala bilang default (walang katawan ng mensahe).
 
-**Nae-encrypt ang mga mensahe pagdating sa iyong server.** Ciphertext lang ang ini-store ng server. Maaaring nasa provider pa rin ang orihinal na mensahe — limitasyon iyon ng mga platform na iyon, hindi natin mababago.
+**Ang mga mensahe ay naka-encrypt sa sandaling dumating sa iyong server.** Ang server ay nag-iimbak lamang ng ciphertext.
 
-**Subpoena sa messaging provider**: Ang mga SMS provider ay may buong content ng mga mensahe lamang kung eksplisitong i-enable mo ang full-content SMS mode. Sa default na notification-only mode, ang mga SMS body ay walang message content. Meron ang Meta ng WhatsApp content. Ang Signal messages ay end-to-end encrypted sa bridge, pero ang bridge (tumatakbo sa iyong server) ay nagde-decrypt bago mag-re-encrypt para sa storage. Sa lahat ng kaso, **ciphertext lang ang nasa iyong server** — hindi mababasa ng hosting provider ang message content.
+### Bulk at broadcast na mga mensahe
 
-### Notes, transcripts, at reports
+Maaaring magpadala ang mga admin ng bulk na mensahe sa mga subscriber sa pamamagitan ng SMS, WhatsApp, Signal, o RCS.
 
-Lahat ng content na sinulat ng volunteer ay end-to-end encrypted:
+**Mahalaga: ang mga papalabas na bulk na mensahe ay HINDI end-to-end na naka-encrypt sa server.** Para maihatid ang mensahe sa mga subscriber ng SMS o WhatsApp, ang server ay kailangang pansamantalang iproseso ang nilalaman sa plaintext at ipasa ito sa messaging provider.
 
-- Bawat note ay gumagamit ng **unique random key** (forward secrecy — ang pag-kompromiso ng isang note ay hindi nangangahulugang nakompromiso na rin ang iba)
-- Ang mga key ay hiwalay na naka-wrap para sa volunteer at bawat admin
-- Ciphertext lang ang ini-store ng server
-- Nangyayari ang decryption sa iyong device, sa isang secure na layer na hindi kailanman inilalantad ang mga key sa user interface
-- **Ang custom fields, report content, at file attachments ay lahat individually encrypted**
+| Channel | Access ng server sa pagpapadala | Access ng provider | Pagkatapos ng paghahatid |
+|---------|--------------------------------|--------------------|--------------------------|
+| SMS bulk | Plaintext (pansamantala, para sa paghahatid) | Buong nilalaman | Pinapanatili ng provider |
+| WhatsApp bulk | Plaintext (pansamantala, para sa paghahatid) | Buong nilalaman (Meta) | Pinapanatili ng provider |
+| Signal bulk | Plaintext (pansamantala, para sa paghahatid) | E2EE sa pamamagitan ng Signal network | Hindi pinapanatili ng provider |
+| RCS bulk | Plaintext (pansamantala, para sa paghahatid) | Maaaring makita ng Google ang nilalaman | Pinapanatili ng provider |
 
-**Pag-seize ng device**: Kung walang iyong PIN **at** access sa iyong identity provider account, ang makukuha ng attacker ay encrypted blob na protektado ng Argon2id — isang memory-hard key derivation function na ginagawang mas mahal nang maraming magnitude ang brute-force attacks gamit ang specialized hardware (GPU, ASIC) kumpara sa mga tradisyonal na paraan. Kung gumagamit ka rin ng hardware security key, **tatlong independent na factor** ang nagpoprotekta sa iyong data.
+**Ano ang ibig sabihin nito**: Ang mga bulk na mensahe ay hindi dapat maglaman ng sensitibong impormasyon ng tatawag. Gamitin ang mga ito para sa mga anunsyo at abiso — hindi para sa mga detalye ng kaso.
+
+Ang mga numero ng telepono ng subscriber ay nakaimbak bilang mga hashed na identifier — ang iyong database ay hindi kailanman naglalaman ng plaintext na listahan ng subscriber.
+
+### Mga tala, transkripsyon, at ulat
+
+Lahat ng nilalaman na isinulat ng mga boluntaryo ay end-to-end na naka-encrypt:
+
+- Ang bawat tala ay gumagamit ng **natatanging random na key** (forward secrecy — ang pagkompromiso sa isang tala ay hindi nakompromiso ang iba)
+- Ang mga key ay nakabalot nang hiwalay para sa boluntaryo at bawat admin
+- Ang server ay nag-iimbak lamang ng ciphertext
+- Ang pag-decrypt ay nangyayari sa iyong device, sa isang secure na layer na hindi kailanman nagbubunyag ng mga key sa interface ng app
+- **Ang mga custom field, nilalaman ng ulat, at mga file attachment ay lahat naka-encrypt nang isa-isa**
+
+**Mga rekord ng kaso at data ng entity**: Sumusunod sa parehong modelo ng encryption — ang bawat item ay naka-encrypt ng natatanging key.
+
+**Pagkumpiska ng device**: Nang walang iyong PIN **at** access sa iyong identity provider account, ang mga umaatake ay nakakakuha ng naka-encrypt na blob na protektado ng Argon2id. Sa isang hardware security key, **tatlong independent na factor** ang nagpoprotekta sa iyong data.
 
 ---
 
-## Privacy ng phone number ng volunteer
+## Ang iyong mga device
 
-Kapag tumatanggap ng tawag sa kanilang personal na phone ang mga volunteer, ang numero nila ay nakalantad sa iyong telephony provider.
+### Tingnan at bawiin ang mga device
 
-| Senaryo | Phone number nakikita ng |
-|---------|--------------------------|
-| PSTN call sa phone ng volunteer | Telephony provider, phone carrier |
-| Browser-to-browser (WebRTC) | Walang makakakita (nananatili ang audio sa browser) |
-| Self-hosted Asterisk + SIP phone | Ang iyong Asterisk server lang |
+Pinapanatili ng app ang isang listahan ng bawat device na naka-log in ka. Maaari mong tingnan ang listahang ito at bawiin ang anumang device na hindi mo nakikilala.
 
-**Para protektahan ang phone number ng volunteer**: Gumamit ng browser-based calling (WebRTC) o magbigay ng SIP phones na konektado sa self-hosted Asterisk.
+**Kapag binawi mo ang isang device:**
+- Ang device na iyon ay agad na naba-block mula sa pag-access sa iyong account
+- Ang iyong mga encryption key ay inuulit para hindi ma-decrypt ng binawing device ang mga nilalaman sa hinaharap
+- Ang pagbawi ay naitala sa kasaysayan ng seguridad ng iyong account
+
+### SAS emoji verification
+
+Para sa mga organisasyon na may mataas na pangangailangan sa seguridad, maaaring i-verify ng mga admin ang pagkakakilanlan ng isang device gamit ang SAS (Short Authentication String) na verification — ipinapakita bilang isang pagkakasunud-sunod ng 7 emoji.
+
+**Paano ito gumagana:**
+1. Ang admin at ang may-ari ng device ay nagkukumpara ng kanilang mga pagkakasunud-sunod ng emoji (personal, sa telepono, o sa pamamagitan ng pinagkakatiwalaang channel)
+2. Kung ang mga emoji ay magkakatugma, ang device ay nakumpirma bilang pag-aari ng nakarehistrong may-ari nito
+3. Ang pag-verify ay naitala — maaaring makita ng mga admin kung aling mga device ang na-verify
+
+Pinangangalagaan nito laban sa isang umaatake na nagrehistro ng pekeng device sa ilalim ng account ng ibang tao.
 
 ---
 
-## Kamakailan lang na-ship
+## Pagtanggal ng account
 
-Ang mga pagpapabuti na ito ay live na ngayon:
+### Self-service na pagtanggal
 
-| Feature | Privacy benefit |
-|---------|-----------------|
-| Argon2id key protection | Ang mga device key mo ay protektado ng memory-hard function na lumalaban sa brute-force attacks gamit ang GPU at specialized hardware |
-| Signal-first message routing | Ang mga mensahe ay awtomatikong i-route sa Signal kapag available, pinapanatiling malayo ang content sa SMS provider logs |
-| SMS notification-only mode | Ang mga SMS recipient ay nakakakita lang ng "may bago kang mensahe" — walang sensitibong content sa provider logs |
-| Traffic analysis resistance | Ang mga real-time event size ay pine-pad para hindi makilala ng mga observer ang maikling mensahe mula sa mahaba |
-| Walang plaintext phone number sa database | Ang mga caller number ay naka-store bilang irreversible hash — hindi kailanman naglalaman ng tunay na numero ang database |
-| Per-hub encryption na may forward secrecy | Ang real-time events ng bawat hub ay naka-encrypt gamit ang mga key na nagro-rotate bawat 24 oras — hindi ma-decrypt ng lumang key ang bagong events |
-| Cryptography sa Rust sa lahat ng platform | Desktop, iOS, at Android ay gumagamit ng parehong audited Rust cryptography library — hindi kailanman pumapasok ang mga key sa JavaScript, Swift, o Kotlin code |
-| Restricted relay access | Ang WebSocket relay mo ay tumatanggap ng events mula lamang sa server mo — walang outside party ang maka-inject ng pekeng notifications |
-| Encrypted message storage | Ang SMS, WhatsApp, at Signal messages ay naka-store bilang ciphertext sa iyong server |
-| On-device transcription | Hindi umaalis ang audio sa iyong browser — pinoproseso nang buo sa iyong device |
-| Multi-factor key protection | Ang iyong encryption keys ay protektado ng iyong PIN, identity provider, at opsyonal na hardware security key |
-| Hardware security keys | Ang physical key ay nagdadagdag ng third factor na hindi mako-kompromiso nang remote |
-| Reproducible builds | I-verify na ang deployed code ay tumutugma sa public source |
-| Encrypted contact directory | Ang contact records, relationships, at notes ay end-to-end encrypted |
+Maaari kang humiling ng permanenteng pagtanggal ng iyong account at lahat ng nauugnay na data. Bilang default, mayroong pagkaantala (ini-configure ng iyong hub admin, karaniwang 72 oras) bago makumpleto ang pagtanggal — nagbibigay ito sa iyo ng oras para kanselahin kung ang kahilingan ay ginawa sa ilalim ng pamimilit.
 
-## Naplano pa
+**Ang tinatanggal:**
+- Ang iyong mga device key (ginagawang permanenteng hindi mababasa ang lahat ng naka-encrypt na nilalaman, kahit mula sa mga backup)
+- Ang iyong rekord ng account, mga takdang papel, at kasaysayan ng shift
+- Ang iyong mga push notification token
+
+**Ano ang mangyayari sa mga naka-encrypt na nilalaman na iyong nilikha**: Ang mga tala at ulat na iyong isinulat ay muling naka-encrypt para sa mga natitirang awtorisadong mambabasa. Ang iyong kopya ng decryption key ay nililipol.
+
+**Mga audit log**: Ang iyong mga entry sa audit log ay "crypto-destroyed" — ang per-user encryption key ay nililipol, na ginagawang hindi mababasa ang iyong mga entry. Ang hash chain ay nananatiling buo.
+
+### Emergency na pagtanggal
+
+Kung naniniwala kang ang iyong account ay nasa agarang panganib, maaari kang humiling ng emergency na pagtanggal na may co-approver — binabawasan ang pagkaantala sa minimum na 4 na oras. Ang minimum na 4 na oras ay umiiral upang maprotektahan laban sa sapilitang pagtanggal.
+
+---
+
+## Mga recovery group
+
+Kung mawawala mo ang lahat ng iyong mga device, karaniwan kang mawawalan ng access sa lahat ng iyong naka-encrypt na data. Nilulutas ng mga recovery group ang problemang ito.
+
+### Paano gumagana ang recovery
+
+Nagtatalagang isang grupo ng mga pinagkakatiwalaang contact (karaniwang 3-5 tao) bilang iyong recovery group. Ang bawat contact ay nagtataglay ng isang "piraso" ng isang recovery key.
+
+**Para mabawi ang iyong account:**
+1. Nagrerehistro ka ng bagong device at nagpapasimula ng kahilingan sa recovery
+2. Ang iyong mga recovery contact ay nakakatanggap ng abiso
+3. Pagkatapos ng nako-configure na pagkaantala, isang threshold na bilang ng mga contact (hal., 2 sa 3) ang pumipirma sa kahilingan
+4. Ang bawat approving contact ay nagpapadala ng kanilang piraso, direktang naka-encrypt sa iyong bagong device
+5. Pinagsasama ng iyong bagong device ang mga piraso upang mabuo muli ang recovery key
+
+**Ano ang makikita ng server**: Nagre-relay ang server ng mga naka-encrypt na piraso sa pagitan ng mga device. Hindi nito mababasa ang mga piraso at hindi nito mabubuo muli ang recovery key nang mag-isa.
+
+### Mga katangian ng seguridad ng mga recovery group
+
+- **Threshold security**: Ang mga piraso sa ibaba ng threshold ay walang ibubunyag tungkol sa secret
+- **Walang partisipasyon ng server sa secret**: Ang mga piraso ay direktang naka-encrypt sa public key ng iyong bagong device
+- **Hub scope**: Ibinabalik ng recovery ang iyong access sa isang partikular na hub
+- **Cancellable delay**: Maaari kang kanselahin ang isang kahilingan sa recovery sa panahon ng pagkaantala
+- **Signal verification**: Ang mga kahilingan sa recovery ay na-verify sa pamamagitan ng Signal
+
+---
+
+## Privacy ng numero ng telepono ng boluntaryo
+
+Kapag natanggap ng mga boluntaryo ang mga tawag sa kanilang personal na mga telepono, ang kanilang mga numero ay nalantad sa iyong telephony provider.
+
+| Sitwasyon | Numero ng telepono na nakikita ng |
+|-----------|----------------------------------|
+| PSTN na tawag sa telepono ng boluntaryo | Telephony provider, carrier ng telepono |
+| Browser-to-browser (WebRTC) | Walang sinuman (nananatili ang audio sa browser) |
+| Self-hosted na Asterisk + SIP na telepono | Ang iyong Asterisk server lamang |
+
+**Upang maprotektahan ang mga numero ng telepono ng boluntaryo**: Gumamit ng browser-based na pagtawag (WebRTC) o magbigay ng mga SIP na telepono na konektado sa self-hosted na Asterisk.
+
+---
+
+## Kamakailan lang na nailabas
+
+Ang mga pagpapabuting ito ay available ngayon:
+
+| Feature | Benepisyo sa privacy |
+|---------|---------------------|
+| Pamamahala ng device | Tingnan at bawiin ang anumang naka-log in na device; ang pagbawi ay nagti-trigger ng key rotation |
+| SAS emoji device verification | Maaaring i-verify ng mga admin ang mga device nang personal gamit ang 7-emoji na cryptographic fingerprint |
+| Pagtanggal ng account na may pagkaantala | Humingi ng pagtanggal; ang nako-configure na pagkaantala ay nagbibigay-daan sa pagkansela sa ilalim ng pamimilit |
+| Emergency na pagtanggal | Mabilis na co-approved na pagtanggal na may minimum na 4 na oras |
+| Crypto-destruction sa pagtanggal | Ang mga encryption key ay nililipol muna, na ginagawang permanenteng hindi mababasa ang nilalaman |
+| Mga recovery group (Shamir) | Magtalagang mga pinagkakatiwalaang contact na makakatulong sa pag-recover kung mawala ang lahat ng device |
+| Bulk messaging na may tapat na disclosure | Maaaring magpadala ng bulk na mensahe ang mga admin; pansamantalang pinoproseso ng server ang plaintext para sa paghahatid |
+| Pag-hash ng subscriber | Ang mga numero ng telepono ng subscriber ay nakaimbak bilang hashed na identifier |
+| Proteksyon ng key ng Argon2id | Ang mga device key ay protektado ng memory-intensive na function |
+| Signal-first routing | Ang mga mensahe ay awtomatikong niru-route sa pamamagitan ng Signal kapag available |
+| SMS notification-only mode | Ang mga tatanggap ng SMS ay nakakakita lamang ng "mayroon kang bagong mensahe" |
+| Paglaban sa traffic analysis | Ang mga sukat ng event ay nilalagyan ng padding para hindi makilala ng mga observer |
+| Walang plaintext na numero ng telepono sa database | Ang mga numero ng tumatawag ay nakaimbak bilang mga hindi mababaligtad na hash |
+| Bawat-hub encryption na may forward secrecy | Ang mga key ay inuulit tuwing 24 na oras |
+| Cryptography sa Rust sa lahat ng platform | Ang parehong na-audit na Rust cryptography library sa desktop, iOS, at Android |
+| Limitadong relay access | Ang WebSocket relay ay tumatanggap ng mga event mula sa iyong server lamang |
+| Naka-encrypt na imbakan ng mensahe | Ang SMS, WhatsApp, at Signal ay nakaimbak bilang ciphertext |
+| Transkripsyon sa device | Ang audio ay hindi kailanman umaalis sa iyong device |
+| Multi-factor na proteksyon ng key | PIN, identity provider, at opsyonal na hardware security key |
+| Mga hardware security key | Ikatlong factor na hindi maaaring maikompromiso nang malayuan |
+| Mga reproducible build | I-verify na ang naka-deploy na code ay tumutugma sa pampublikong source |
+| Naka-encrypt na contact directory | Ang mga rekord ng contact, relasyon, at tala ay end-to-end na naka-encrypt |
+
+## Planado pa
 
 | Feature | Benepisyo sa privacy | Katayuan |
-|---------|----------------------|----------|
-| Native na app para sa pagtanggap ng tawag | Walang personal na phone number na mailalantad | Ginagawa na |
-| Certificate pinning (mobile) | Depensa laban sa TLS interception ng pekeng certificate authority | Estruktura kumpleto; pinning naghihintay sa unang deployment |
-| SFrame voice media encryption | End-to-end encrypted na voice calls | Key derivation kumpleto; per-frame encryption naplano |
+|---------|---------------------|---------|
+| Mga native na app sa pagtanggap ng tawag | Walang personal na numero ng telepono na nalantad | Sa pag-unlad |
+| Certificate pinning (mobile) | Depensa laban sa TLS interception ng rogue CA | Kumpleto ang scaffolding; mga pin ay nakabinbin |
+| SFrame voice media encryption | End-to-end na naka-encrypt na mga voice call | Kumpleto ang key derivation; naplanong per-frame encryption |
 
 ---
 
-## Summary table
+## Buod na talahanayan
 
-| Uri ng data | Encrypted | Nakikita ng server | Makukuha sa subpoena |
-|-------------|-----------|--------------------|-----------------------|
-| Call notes | Oo (end-to-end) | Hindi | Ciphertext lang |
-| Transcripts | Oo (end-to-end) | Hindi | Ciphertext lang |
-| Reports | Oo (end-to-end) | Hindi | Ciphertext lang |
-| File attachments | Oo (end-to-end) | Hindi | Ciphertext lang |
-| Contact records | Oo (end-to-end) | Hindi | Ciphertext lang |
-| Volunteer identities | Oo (end-to-end) | Hindi | Ciphertext lang |
-| Team/role metadata | Oo (encrypted) | Hindi | Ciphertext lang |
-| Custom field definitions | Oo (encrypted) | Hindi | Ciphertext lang |
-| SMS/WhatsApp/Signal content | Oo (sa iyong server) | Hindi | Ciphertext mula sa iyong server; maaaring nasa provider ang orihinal |
-| Mga real-time event | Oo (per-hub, umiikot na key) | Hindi | Ciphertext lang |
-| Mga User-Agent string | SHA-256 hashed | Hash lang | Hash (hindi mare-reverse) |
-| Call metadata | Hindi | Oo | Oo |
-| Caller phone hashes | HMAC hashed | Hash lang | Hash (hindi mare-reverse nang wala ang iyong secret) |
+| Uri ng data | Naka-encrypt | Nakikita ng server | Nakukuha sa ilalim ng subpoena |
+|-------------|-------------|-------------------|-------------------------------|
+| Mga tala ng tawag | Oo (dulo-sa-dulo) | Hindi | Ciphertext lamang |
+| Mga transkripsyon | Oo (dulo-sa-dulo) | Hindi | Ciphertext lamang |
+| Mga ulat | Oo (dulo-sa-dulo) | Hindi | Ciphertext lamang |
+| Mga rekord ng kaso / data ng entity | Oo (dulo-sa-dulo) | Hindi | Ciphertext lamang |
+| Mga file attachment | Oo (dulo-sa-dulo) | Hindi | Ciphertext lamang |
+| Mga rekord ng contact | Oo (dulo-sa-dulo) | Hindi | Ciphertext lamang |
+| Mga pagkakakilanlan ng boluntaryo | Oo (dulo-sa-dulo) | Hindi | Ciphertext lamang |
+| Metadata ng team/papel | Oo (naka-encrypt) | Hindi | Ciphertext lamang |
+| Mga kahulugan ng custom field | Oo (naka-encrypt) | Hindi | Ciphertext lamang |
+| Papasok na nilalaman ng SMS/WhatsApp/Signal | Oo (sa iyong server) | Hindi | Ciphertext mula sa server; maaaring may orihinal ang provider |
+| Papalabas na bulk na mensahe | **Hindi — plaintext sa panahon ng paghahatid** | **Oo, pansamantala** | Oo (plaintext sa oras ng pagpapadala) |
+| Mga recovery fragment | Oo (dulo-sa-dulo sa device) | Hindi | Ciphertext lamang |
+| Mga real-time na event | Oo (bawat hub, umuulit na mga key) | Hindi | Ciphertext lamang |
+| Metadata ng tawag | Hindi | Oo | Oo |
+| Mga rekord ng bulk na paghahatid | Hindi | Oo | Oo |
+| Mga hash ng numero ng tumatawag | HMAC hash | Hash lamang | Hash (hindi mababaligtad nang walang iyong secret) |
+| Mga hash ng numero ng subscriber | HMAC hash | Hash lamang | Hash (hindi mababaligtad nang walang iyong secret) |
+| Mga User-Agent string | SHA-256 hash | Hash lamang | Hash (hindi mababaligtad) |
 
 ---
 
 ## Para sa mga security auditor
 
-Technical documentation:
+Teknikal na dokumentasyon:
 
-- [Espesipikasyon ng Protokol](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/protocol/PROTOCOL.md)
-- [Modelo ng Banta](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/THREAT_MODEL.md)
-- [Klasipikasyon ng Data](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/DATA_CLASSIFICATION.md)
-- [Mga Butas sa Seguridad at Roadmap](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/SECURITY_GAPS_AND_ROADMAP.md)
-- [Mga Audit ng Seguridad](https://github.com/rhonda-rodododo/llamenos-platform/tree/main/docs/security)
-- [Dokumentasyon ng API](/api/docs)
+- [Protocol Specification](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/protocol/PROTOCOL.md)
+- [Threat Model](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/THREAT_MODEL.md)
+- [Data Classification](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/DATA_CLASSIFICATION.md)
+- [Security Gaps and Roadmap](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/security/SECURITY_GAPS_AND_ROADMAP.md)
+- [Security Audits](https://github.com/rhonda-rodododo/llamenos-platform/tree/main/docs/security)
+- [API Documentation](/api/docs)
 
-Open source ang Llamenos: [github.com/rhonda-rodododo/llamenos-platform](https://github.com/rhonda-rodododo/llamenos-platform)
+Ang Llamenos ay open source: [github.com/rhonda-rodododo/llamenos-platform](https://github.com/rhonda-rodododo/llamenos-platform)

@@ -1,7 +1,7 @@
 # Incident Response Runbook
 
-**Version:** 1.1
-**Date:** 2026-05-03
+**Version:** 1.2
+**Date:** 2026-05-18
 
 Procedures for responding to security incidents affecting a Llamenos deployment. For key-specific procedures (admin key compromise, device seizure, hub key rotation), see [Key Revocation Runbook](KEY_REVOCATION_RUNBOOK.md).
 
@@ -223,6 +223,136 @@ Record in the audit log:
 
 ---
 
+## 7. Blast/Broadcast Abuse
+
+The blast system sends bulk messages to subscriber lists across SMS, WhatsApp, Signal, Telegram, and RCS channels. An attacker who gains access to a hub admin account can misuse this to send malicious bulk messages to all subscribers.
+
+### Detection Signals
+
+- Unexpected blast creation or scheduling in audit log
+- Unusual message content in blast deliveries
+- Subscriber complaint volume spike
+- Rate limiter events on delivery channels (`rateLimits: { sms: 10/s, whatsapp: 25/s, ... }`)
+- `maxBlastsPerDay` (default: 10) limit triggered unexpectedly
+
+### Impact Assessment
+
+- Blast/broadcast abuse cannot expose E2EE note/message content (separate system)
+- Subscriber identifiers are HMAC-hashed — an attacker with DB access cannot reverse them without `HMAC_SECRET`
+- Blast content arrives in plaintext at carrier/provider — exposure is at the telco layer, not the Llamenos server
+
+### Response
+
+1. **Immediately deactivate the compromised admin account** via database:
+   ```bash
+   docker compose exec postgres psql -U llamenos -d llamenos -c "
+     UPDATE users SET active = false
+     WHERE signing_pubkey = '<admin_pubkey>';
+   "
+   ```
+
+2. **Cancel any pending blasts**:
+   ```bash
+   docker compose exec postgres psql -U llamenos -d llamenos -c "
+     UPDATE blasts SET status = 'cancelled'
+     WHERE status IN ('draft', 'scheduled')
+       AND hub_id = '<affected_hub_id>';
+   "
+   ```
+
+3. **Rotate telephony provider credentials** (Twilio/SignalWire/etc. dashboard) to prevent further delivery even if the blast job queue is still running.
+
+4. **Review audit log** for all blast-related actions in the compromise window:
+   ```sql
+   SELECT action, actor_pubkey, resource_type, resource_id, created_at
+   FROM audit_log
+   WHERE action LIKE '%blast%'
+     AND created_at > NOW() - INTERVAL '24 hours'
+   ORDER BY created_at DESC;
+   ```
+
+5. **Rotate the compromised admin's keys** (see [Key Revocation Runbook, Section 1](KEY_REVOCATION_RUNBOOK.md#1-admin-key-compromise-response)).
+
+6. **Notify subscribers** if harmful content was delivered. Use a separate communication channel (not the blast system).
+
+7. **Assess GDPR obligations**: If subscriber personal data (phone numbers, preferences) was accessed or exported, notify per Section 6 below.
+
+---
+
+## 8. Recovery Group Compromise
+
+A recovery group holder's device has been compromised or seized, potentially exposing their Shamir share of a user's PUK seed.
+
+### Severity Assessment
+
+A single compromised holder share reveals **zero information** about the PUK seed (information-theoretic security below threshold K). The scenario only becomes critical if K or more holders are compromised simultaneously.
+
+| Holders compromised | Risk level | Action |
+|--------------------|------------|--------|
+| < K (threshold) | Low — no secret derivable | Rotate recovery group, remove compromised holder |
+| ≥ K (threshold) | Critical — PUK seed reconstructible | Rotate PUK immediately + rotate recovery group |
+
+### Response
+
+1. **Remove the compromised holder** from the recovery group via admin UI.
+
+2. **If < K holders are compromised**: Rotate the recovery group (new shares, new holders) per [Key Revocation Runbook, Section 9](KEY_REVOCATION_RUNBOOK.md#9-recovery-group-key-rotation-ep09). The PUK itself may not need rotation.
+
+3. **If ≥ K holders are compromised** (critical path):
+   - Rotate the user's PUK immediately (new seed, new sigchain `rotate-puk` entry)
+   - Generate new Shamir shares of the new PUK seed
+   - Enroll a new recovery group with trusted holders
+
+4. **Audit recovery sessions**: Check if any recovery session was initiated during the compromise window:
+   ```sql
+   SELECT id, hub_id, status, initiated_at, completed_at
+   FROM recovery_sessions
+   WHERE created_at > NOW() - INTERVAL '7 days'
+   ORDER BY created_at DESC;
+   ```
+
+5. **Assess data exposure**: Even with PUK reconstruction, the attacker needs device keys to decrypt individual note envelopes. PUK alone enables future items key derivation but does not retroactively decrypt past notes unless device keys are also available.
+
+---
+
+## 9. Entity Evidence Chain Tampering
+
+Entity records (cases) support an evidence chain — a hash-chained custody log for attached evidence files. Tampering with the chain can obstruct legal proceedings or destroy forensic integrity.
+
+### Detection Signals
+
+- `verify_integrity` endpoint returns `integrityValid: false`
+- Missing or orphaned custody chain entries in audit log
+- File hashes in `evidence_metadata` don't match stored objects in RustFS
+- Unexpected `custody_chain` entries with anomalous `actor_pubkey` values
+
+### Impact Assessment
+
+- Evidence chain integrity does NOT affect E2EE properties of notes/messages
+- Tampering affects admissibility/reliability of case evidence, not user privacy
+- Server-side tampering is possible if an attacker has database write access (see Server Compromise scenario)
+
+### Response
+
+1. **Verify the chain** for affected records:
+   ```bash
+   curl -H "Authorization: Bearer <token>" \
+     "https://api.example.com/records/<case_id>/evidence/<evidence_id>/verify"
+   ```
+   The response includes `integrityValid`, `hashChainValid`, and per-entry verification status.
+
+2. **Preserve the original state**: Before any remediation, dump the current `custody_chain` table entries to an offline record.
+
+3. **Identify the tampered entries**: `integrityValid: false` entries will have a `lastValidEntryId` pointing to the last trusted entry.
+
+4. **If tampering was server-side** (database access): Treat as Server Compromise (Section 1). The attacker may have had write access to alter entry hashes.
+
+5. **If tampering was client-side** (fabricated custody entry submitted via API): Check audit log for the submitting `actor_pubkey` and revoke that device's access.
+
+6. **Notify affected parties**: Cases with compromised evidence chains should be flagged for legal review.
+
+---
+
 ## Post-Incident Review
 
 After every Critical or High severity incident:
@@ -239,5 +369,6 @@ After every Critical or High severity incident:
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-05-18 | 1.2 | EP01–EP09 update: added Section 7 (blast/broadcast abuse — cancel pending blasts, rotate telephony creds, audit blast log); added Section 8 (recovery group compromise — threshold analysis, holder removal, PUK rotation if ≥K compromised); added Section 9 (entity evidence chain tampering — integrity verification, chain preservation, remediation) |
 | 2026-05-03 | 1.1 | Added signal-notifier compromise scenario (Section 4); added key separation note (signing vs encryption keys); added Argon2id timeline guidance for device seizure; renumbered sections |
 | 2026-05-02 | 1.0 | Initial incident response runbook |
