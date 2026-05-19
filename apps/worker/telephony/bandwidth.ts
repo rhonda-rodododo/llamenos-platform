@@ -1,3 +1,4 @@
+import { safeFetch } from '../lib/safe-fetch'
 import type {
   TelephonyAdapter,
   IncomingCallParams,
@@ -105,13 +106,12 @@ export class BandwidthAdapter implements TelephonyAdapter {
 
   private async bandwidthApi(path: string, init: RequestInit): Promise<Response> {
     const auth = btoa(`${this.apiToken}:${this.apiSecret}`)
-    return fetch(`${this.getApiBaseUrl()}${path}`, {
+    return safeFetch(`${this.getApiBaseUrl()}${path}`, {
       ...init,
       headers: {
         Authorization: `Basic ${auth}`,
         ...init.headers,
       },
-      signal: AbortSignal.timeout(10000),
     })
   }
 

@@ -309,6 +309,20 @@
       "when": 1779153119423,
       "tag": "0043_epic-a-api-rate-limits",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1779153275272,
+      "tag": "0044_webauthn_challenge_pubkey",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1779321600000,
+      "tag": "0044_webhook_nonces",
+      "breakpoints": true
     }
   ]
 }

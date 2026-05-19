@@ -9,6 +9,7 @@
  */
 import { createHmac } from 'node:crypto'
 import { createLogger } from '../lib/logger'
+import { safeFetch } from '../lib/safe-fetch'
 import type { SignalContactsService } from './signal-contacts'
 import type { SecurityPrefsService } from './security-prefs'
 import type { AuditService } from './audit'
@@ -78,13 +79,14 @@ async function sendToNotifier(
   disappearingTimerSeconds: number
 ): Promise<{ ok: boolean; error?: string }> {
   try {
-    const res = await fetch(`${notifierUrl.replace(/\/+$/, '')}/api/notify`, {
+    const res = await safeFetch(`${notifierUrl.replace(/\/+$/, '')}/api/notify`, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
         authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({ identifierHash, message, disappearingTimerSeconds }),
+      timeoutMs: 10_000,
     })
     if (!res.ok) {
       return { ok: false, error: `Notifier ${res.status}` }
@@ -196,11 +198,12 @@ export class UserNotificationsService {
    */
   async unregisterFromSidecar(identifierHash: string): Promise<void> {
     try {
-      await fetch(
+      await safeFetch(
         `${this.config.notifierUrl.replace(/\/+$/, '')}/api/unregister/${encodeURIComponent(identifierHash)}`,
         {
           method: 'DELETE',
           headers: { authorization: `Bearer ${this.config.notifierApiKey}` },
+          timeoutMs: 10_000,
         }
       )
     } catch (err) {

@@ -1,3 +1,4 @@
+import { safeFetch } from '../lib/safe-fetch'
 import { Hono } from 'hono'
 import { describeRoute, resolver, validator } from 'hono-openapi'
 import { z } from 'zod'
@@ -476,18 +477,11 @@ settings.post('/telephony-provider/test',
           return Response.json({ ok: false, error: 'Unknown provider type' }, { status: 400 })
       }
 
-      const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 10000)
-      try {
-        const testRes = await fetch(testUrl, { headers: testHeaders, signal: controller.signal })
-        clearTimeout(timeout)
-        if (testRes.ok) {
-          return Response.json({ ok: true })
-        }
-        return Response.json({ ok: false, error: `Provider returned ${testRes.status}` }, { status: 400 })
-      } finally {
-        clearTimeout(timeout)
+      const testRes = await safeFetch(testUrl, { headers: testHeaders })
+      if (testRes.ok) {
+        return Response.json({ ok: true })
       }
+      return Response.json({ ok: false, error: `Provider returned ${testRes.status}` }, { status: 400 })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Connection failed'
       return Response.json({ ok: false, error: message }, { status: 400 })

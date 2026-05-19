@@ -11,6 +11,8 @@ on:
         description: 'Version to tag (e.g., 1.0.0)'
         required: true
 
+permissions: {}  # deny-all; per-job permissions below
+
 env:
   REGISTRY: docker.io
   IMAGE_NAME: llamenos

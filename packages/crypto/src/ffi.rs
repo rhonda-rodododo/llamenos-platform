@@ -8,6 +8,7 @@
 
 use std::collections::HashMap;
 use std::sync::Mutex;
+use std::time::Instant;
 
 use crate::encryption::{
     decrypt_call_record, decrypt_message, derive_kek_from_pin, encrypt_message, encrypt_note,
@@ -18,9 +19,21 @@ use crate::hpke_envelope;
 use crate::labels::{SAS_INFO, SAS_SALT};
 use zeroize::Zeroize;
 
+/// RACE-12: Recovery key entry with TTL tracking.
+struct KeyEntry {
+    key: zeroize::Zeroizing<String>,
+    created_at: Instant,
+}
+
+/// Maximum number of recovery keys stored concurrently.
+const MAX_STORE_ENTRIES: usize = 16;
+/// Keys expire after 5 minutes.
+const KEY_TTL_SECS: u64 = 300;
+
 /// Internal store for recovery group private keys, keyed by opaque handle.
 /// Keys are zeroized and removed after Shamir splitting.
-static RECOVERY_KEY_STORE: std::sync::LazyLock<Mutex<HashMap<u64, zeroize::Zeroizing<String>>>> =
+/// RACE-12: Entries are evicted after KEY_TTL_SECS or when MAX_STORE_ENTRIES is exceeded.
+static RECOVERY_KEY_STORE: std::sync::LazyLock<Mutex<HashMap<u64, KeyEntry>>> =
     std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
 
 /// Monotonically increasing handle counter for recovery group keys.
@@ -515,6 +528,33 @@ mod tests {
         let result = decrypt_server_event_hex(&short_hex, &key_hex);
         assert!(result.is_err());
     }
+
+    #[test]
+    fn recovery_group_generate_and_split() {
+        let kp = mobile_recovery_group_generate_keypair();
+        assert!(!kp.public_key_hex.is_empty());
+        let shares = mobile_recovery_group_split_private_key(kp.handle, 3, 2).unwrap();
+        assert_eq!(shares.len(), 3);
+        // Second split with same handle must fail (already consumed)
+        let err = mobile_recovery_group_split_private_key(kp.handle, 3, 2);
+        assert!(err.is_err());
+    }
+
+    #[test]
+    fn recovery_key_store_capacity_eviction() {
+        // Generate MAX_STORE_ENTRIES + 1 keypairs — oldest should be evicted
+        let mut handles = Vec::new();
+        for _ in 0..=MAX_STORE_ENTRIES {
+            let kp = mobile_recovery_group_generate_keypair();
+            handles.push(kp.handle);
+        }
+        // The first handle should have been evicted
+        let err = mobile_recovery_group_split_private_key(handles[0], 3, 2);
+        assert!(err.is_err());
+        // The last handle should still be valid
+        let shares = mobile_recovery_group_split_private_key(*handles.last().unwrap(), 3, 2);
+        assert!(shares.is_ok());
+    }
 }
 
 // =============================================================================
@@ -602,10 +642,33 @@ pub fn mobile_shamir_verify(
 pub fn mobile_recovery_group_generate_keypair() -> RecoveryGroupKeypair {
     let (sk, pk) = crate::shamir::generate_recovery_group_keypair();
     let handle = NEXT_HANDLE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    RECOVERY_KEY_STORE
+    let mut store = RECOVERY_KEY_STORE
         .lock()
-        .expect("recovery key store lock poisoned")
-        .insert(handle, sk);
+        .expect("recovery key store lock poisoned");
+
+    // RACE-12: Evict expired entries
+    let now = Instant::now();
+    store.retain(|_, entry| now.duration_since(entry.created_at).as_secs() < KEY_TTL_SECS);
+
+    // Cap maximum entries — remove oldest if at capacity
+    if store.len() >= MAX_STORE_ENTRIES {
+        if let Some(&oldest_handle) = store
+            .keys()
+            .min_by_key(|&&h| store.get(&h).map(|e| e.created_at).unwrap_or(now))
+        {
+            store.remove(&oldest_handle);
+        }
+    }
+
+    store.insert(
+        handle,
+        KeyEntry {
+            key: sk,
+            created_at: now,
+        },
+    );
+    drop(store);
+
     RecoveryGroupKeypair {
         handle,
         public_key_hex: pk,
@@ -622,15 +685,16 @@ pub fn mobile_recovery_group_split_private_key(
     total: u8,
     threshold: u8,
 ) -> Result<Vec<crate::shamir::ShamirShare>, CryptoError> {
-    let mut sk = RECOVERY_KEY_STORE
+    let entry = RECOVERY_KEY_STORE
         .lock()
         .expect("recovery key store lock poisoned")
         .remove(&handle)
         .ok_or_else(|| {
             CryptoError::InvalidInput(
-                "invalid or already-consumed recovery group handle".to_string(),
+                "invalid or already-consumed or expired recovery group handle".to_string(),
             )
         })?;
+    let mut sk = entry.key;
     let secret = hex::decode(&*sk).map_err(CryptoError::HexError)?;
     // Zeroize the hex string now that we have the bytes
     sk.zeroize();

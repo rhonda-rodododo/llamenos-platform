@@ -1,3 +1,4 @@
+import { safeFetch } from '../lib/safe-fetch'
 import type {
   TelephonyAdapter,
   IncomingCallParams,
@@ -19,7 +20,7 @@ import {
   DEFAULT_LANGUAGE,
   IVR_LANGUAGES,
 } from '@shared/languages'
-import { IVR_PROMPTS, getPrompt, getVoicemailThanks } from '@shared/voice-prompts'
+import { IVR_PROMPTS, getPrompt } from '@shared/voice-prompts'
 
 const TELNYX_API_BASE = 'https://api.telnyx.com/v2'
 
@@ -72,7 +73,7 @@ class TelnyxCallControlClient {
 
   async command(callControlId: string, action: string, body?: Record<string, unknown>): Promise<void> {
     const url = `${TELNYX_API_BASE}/calls/${encodeURIComponent(callControlId)}/actions/${action}`
-    const res = await fetch(url, {
+    const res = await safeFetch(url, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
@@ -107,7 +108,7 @@ class TelnyxCallControlClient {
     if (params.client_state) body.client_state = params.client_state
     if (params.timeout_secs) body.timeout_secs = params.timeout_secs
 
-    const res = await fetch(url, {
+    const res = await safeFetch(url, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
@@ -132,8 +133,9 @@ class TelnyxCallControlClient {
   }
 
   async getRecording(url: string): Promise<ArrayBuffer> {
-    const res = await fetch(url, {
+    const res = await safeFetch(url, {
       headers: { Authorization: `Bearer ${this.apiKey}` },
+      timeoutMs: 60_000,
     })
     if (!res.ok) {
       throw new Error(`Telnyx API error (getRecording): ${res.status}`)
@@ -143,7 +145,7 @@ class TelnyxCallControlClient {
 
   async getPublicKey(): Promise<string> {
     const url = `${TELNYX_API_BASE}/public_key`
-    const res = await fetch(url, {
+    const res = await safeFetch(url, {
       headers: { Authorization: `Bearer ${this.apiKey}` },
     })
     if (!res.ok) {
@@ -536,7 +538,7 @@ export class TelnyxAdapter implements TelephonyAdapter {
     const ts = Number.parseInt(timestamp, 10)
     if (Number.isNaN(ts)) return false
     const now = Math.floor(Date.now() / 1000)
-    if (Math.abs(now - ts) > 300) return false
+    if (Math.abs(now - ts) > 60) return false
 
     try {
       const rawBody = await request.clone().text()

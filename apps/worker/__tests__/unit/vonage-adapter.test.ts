@@ -657,11 +657,11 @@ describe('VonageAdapter', () => {
       expect(result).toBe(false)
     })
 
-    it('accepts timestamp at exactly 5 minute boundary', async () => {
+    it('accepts timestamp at exactly 60 second boundary', async () => {
       const fakeNow = 1700000000000 // fixed epoch ms
       vi.useFakeTimers({ now: fakeNow })
       try {
-        const ts = Math.floor(fakeNow / 1000) - 300 // exactly at boundary
+        const ts = Math.floor(fakeNow / 1000) - 60 // exactly at boundary
         const url = new URL('https://example.com/webhook')
         url.searchParams.set('timestamp', String(ts))
         url.searchParams.set('foo', 'bar')

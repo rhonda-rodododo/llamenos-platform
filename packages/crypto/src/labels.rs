@@ -323,6 +323,16 @@ pub const LABEL_TAG_ENCRYPT: &str = "llamenos:tag-field:v1";
 /// Entity type definition encryption
 pub const LABEL_ENTITY_TYPE_DEFINITION: &str = "llamenos:entity-type-def:v1";
 
+// --- SFrame Nonce (Epic B) ---
+
+/// SFrame nonce derivation (replaces raw `b"sframe nonce"`)
+pub const LABEL_SFRAME_NONCE: &str = "llamenos:sframe-nonce:v1";
+
+// --- Shamir Commitment (Epic B) ---
+
+/// Shamir share commitment domain prefix
+pub const LABEL_SHAMIR_COMMIT: &str = "llamenos:shamir-commit:v1";
+
 // --- SAS Derivation (EP02) ---
 
 /// Domain separation for SAS emoji derivation (device verification ceremony)
@@ -460,6 +470,9 @@ pub const LABEL_REGISTRY: &[&str] = &[
     LABEL_TAG_ENCRYPT,  // 86
     // 87: Entity Type (EP06)
     LABEL_ENTITY_TYPE_DEFINITION, // 87
+    // 88-89: Epic B Crypto Fixes
+    LABEL_SFRAME_NONCE,  // 88
+    LABEL_SHAMIR_COMMIT, // 89
 ];
 
 /// Look up a label string by its numeric ID.
@@ -472,6 +485,19 @@ pub fn id_to_label(id: u8) -> Option<&'static str> {
         .filter(|s| !s.is_empty())
 }
 
+use std::collections::HashMap;
+use std::sync::LazyLock;
+
+static LABEL_MAP: LazyLock<HashMap<&'static str, u8>> = LazyLock::new(|| {
+    let mut map = HashMap::with_capacity(LABEL_REGISTRY.len());
+    for (i, &label) in LABEL_REGISTRY.iter().enumerate() {
+        if !label.is_empty() {
+            map.insert(label, i as u8);
+        }
+    }
+    map
+});
+
 /// Look up the numeric ID for a label string.
 ///
 /// Empty strings (tombstoned indices) are never matched.
@@ -479,10 +505,7 @@ pub fn label_to_id(label: &str) -> Option<u8> {
     if label.is_empty() {
         return None;
     }
-    LABEL_REGISTRY
-        .iter()
-        .position(|&l| l == label)
-        .map(|i| i as u8)
+    LABEL_MAP.get(label).copied()
 }
 
 #[cfg(test)]
@@ -608,6 +631,8 @@ mod tests {
         assert_eq!(LABEL_TEAM_ENCRYPT, "llamenos:team-field:v1");
         assert_eq!(LABEL_TAG_ENCRYPT, "llamenos:tag-field:v1");
         assert_eq!(LABEL_ENTITY_TYPE_DEFINITION, "llamenos:entity-type-def:v1");
+        assert_eq!(LABEL_SFRAME_NONCE, "llamenos:sframe-nonce:v1");
+        assert_eq!(LABEL_SHAMIR_COMMIT, "llamenos:shamir-commit:v1");
     }
 
     /// Verify registry index stability.
@@ -658,6 +683,8 @@ mod tests {
         assert_eq!(id_to_label(85), Some(LABEL_TEAM_ENCRYPT));
         assert_eq!(id_to_label(86), Some(LABEL_TAG_ENCRYPT));
         assert_eq!(id_to_label(87), Some(LABEL_ENTITY_TYPE_DEFINITION));
+        assert_eq!(id_to_label(88), Some(LABEL_SFRAME_NONCE));
+        assert_eq!(id_to_label(89), Some(LABEL_SHAMIR_COMMIT));
     }
 
     /// Verify bidirectional lookup (skipping tombstoned indices).
@@ -691,6 +718,20 @@ mod tests {
     fn unknown_id_returns_none() {
         assert_eq!(id_to_label(255), None);
         assert_eq!(label_to_id("nonexistent:label"), None);
+    }
+
+    #[test]
+    fn label_lookup_is_hashmap_backed() {
+        // Round-trip all labels
+        for (i, &label) in LABEL_REGISTRY.iter().enumerate() {
+            if !label.is_empty() {
+                assert_eq!(label_to_id(label), Some(i as u8));
+                assert_eq!(id_to_label(i as u8), Some(label));
+            }
+        }
+        // Unknown labels
+        assert_eq!(label_to_id("llamenos:nonexistent:v1"), None);
+        assert_eq!(label_to_id(""), None);
     }
 
     /// Verify no duplicate labels in registry (tombstones excluded).

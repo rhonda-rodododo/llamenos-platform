@@ -17,6 +17,9 @@ This document is the definitive wire-format specification for interoperating wit
 5. [Push Notification Protocol](#5-push-notification-protocol)
 6. [Device Provisioning Protocol](#6-device-provisioning-protocol)
 7. [Permission Model](#7-permission-model)
+- [Appendix A: Library Dependencies](#appendix-a-library-dependencies-for-implementors)
+- [Appendix B: Type Definitions Reference](#appendix-b-type-definitions-reference)
+- [Appendix C: Legacy Encryption (pre-v2 ECIES)](#appendix-c-legacy-encryption-pre-v2-ecies)
 
 ---
 
@@ -143,7 +146,7 @@ All cryptographic operations in Llamenos use domain separation constants to prev
 
 Every HPKE/ECIES derivation, HKDF context, HMAC key, and signature binding uses a unique context string from this list. Clients MUST use these exact strings. Using raw string literals instead of these constants is a protocol violation.
 
-> **Note:** The authoritative source of truth for all 57 domain separation constants is `packages/protocol/crypto-labels.json`. The tables below list the most commonly used labels. Refer to the source file for the complete set.
+> **Note:** The authoritative source of truth for all domain separation constants is `packages/protocol/crypto-labels.json`. The tables below list the most commonly used labels. Refer to the source file for the complete and current count.
 
 #### Device Authentication
 
@@ -152,7 +155,7 @@ Every HPKE/ECIES derivation, HKDF context, HMAC key, and signature binding uses 
 | `LABEL_DEVICE_AUTH` | `llamenos:device-auth:v1` | Ed25519 device auth token message prefix (Phase 6) |
 | `AUTH_PREFIX` | `llamenos:auth:` | Schnorr auth token message prefix (legacy) |
 
-#### HPKE / ECIES Key Wrapping Labels
+#### HPKE Key Wrapping Labels
 
 | Constant | Value | Purpose |
 |----------|-------|---------|
@@ -411,7 +414,7 @@ Every note is encrypted with a unique random key, providing forward secrecy. Com
 #### Encryption
 
 ```
-encryptNoteV2(payload: NotePayload, author_pubkey_hex, admin_pubkeys_hex[]):
+encryptNoteV2(payload: NotePayload, author_x25519_pubkey_hex, admin_x25519_pubkey_hexes[]):
 
   1. Serialize payload:
      json_string = JSON.stringify(payload)
@@ -420,47 +423,69 @@ encryptNoteV2(payload: NotePayload, author_pubkey_hex, admin_pubkeys_hex[]):
   2. Generate per-note symmetric key:
      note_key = random(32)
 
-  3. Encrypt content:
-     nonce = random(24)
-     cipher = XChaCha20-Poly1305(note_key, nonce)
-     ciphertext = cipher.encrypt(UTF-8(json_string))
-     encrypted_content = hex(nonce || ciphertext)
+  3. Encrypt content with AES-256-GCM:
+     iv = random(12)
+     ciphertext_with_tag = AES-256-GCM.encrypt(note_key, iv, UTF-8(json_string))
+     // ciphertext_with_tag: variable length + 16-byte GCM tag appended
+     encrypted_content = hex(iv || ciphertext_with_tag)
 
-  4. Wrap note_key for the author:
-     author_envelope = eciesWrapKey(note_key, author_pubkey_hex, "llamenos:note-key")
+  4. Wrap note_key for the author via HPKE:
+     author_sealed = HPKE.Seal(
+       recipientPk = hex_to_bytes(author_x25519_pubkey_hex),
+       plaintext   = note_key,
+       info        = UTF-8("llamenos:note-key"),
+       aad         = empty
+     )
+     author_envelope = {
+       enc: hex(author_sealed[0..32]),   // 32-byte HPKE encapsulated key → 64 hex chars
+       ct:  hex(author_sealed[32..])     // AEAD ciphertext
+     }
 
-  5. Wrap note_key for each admin:
+  5. Wrap note_key for each admin via HPKE:
      admin_envelopes = []
-     for each admin_pubkey in admin_pubkeys_hex:
-       envelope = eciesWrapKey(note_key, admin_pubkey, "llamenos:note-key")
+     for each admin_x25519_pubkey_hex in admin_x25519_pubkey_hexes:
+       sealed = HPKE.Seal(
+         recipientPk = hex_to_bytes(admin_x25519_pubkey_hex),
+         plaintext   = note_key,
+         info        = UTF-8("llamenos:note-key"),
+         aad         = empty
+       )
        admin_envelopes.push({
-         pubkey: admin_pubkey,
-         wrappedKey: envelope.wrappedKey,
-         ephemeralPubkey: envelope.ephemeralPubkey
+         pubkey: admin_x25519_pubkey_hex,   // 64 hex chars
+         enc:    hex(sealed[0..32]),
+         ct:     hex(sealed[32..])
        })
 
   6. Return:
      EncryptedNoteV2 {
        encryptedContent: encrypted_content,   // hex string
-       authorEnvelope: author_envelope,        // KeyEnvelope
-       adminEnvelopes: admin_envelopes         // RecipientKeyEnvelope[]
+       authorEnvelope:   author_envelope,      // KeyEnvelope { enc, ct }
+       adminEnvelopes:   admin_envelopes        // RecipientEnvelope[] { pubkey, enc, ct }
      }
 ```
 
 #### Decryption
 
 ```
-decryptNoteV2(encrypted_content_hex, envelope: KeyEnvelope, secret_key[32]):
+decryptNoteV2(encrypted_content_hex, envelope: KeyEnvelope, device_x25519_secret_key[32]):
 
-  1. Unwrap the note key:
-     note_key = eciesUnwrapKey(envelope, secret_key, "llamenos:note-key")
+  1. Unwrap the note key via HPKE:
+     enc_bytes = hex_to_bytes(envelope.enc)   // 32 bytes
+     ct_bytes  = hex_to_bytes(envelope.ct)
+     note_key = HPKE.Open(
+       recipientSk = device_x25519_secret_key,
+       enc         = enc_bytes,
+       ciphertext  = ct_bytes,
+       info        = UTF-8("llamenos:note-key"),
+       aad         = empty
+     )
+     // note_key: 32 bytes
 
-  2. Decrypt content:
+  2. Decrypt content with AES-256-GCM:
      data = hex_to_bytes(encrypted_content_hex)
-     nonce = data[0..24]
-     ciphertext = data[24..]
-     cipher = XChaCha20-Poly1305(note_key, nonce)
-     plaintext = cipher.decrypt(ciphertext)
+     iv   = data[0..12]
+     ciphertext_with_tag = data[12..]
+     plaintext = AES-256-GCM.decrypt(note_key, iv, ciphertext_with_tag)
 
   3. Parse JSON:
      json_string = UTF-8_decode(plaintext)
@@ -474,11 +499,23 @@ decryptNoteV2(encrypted_content_hex, envelope: KeyEnvelope, secret_key[32]):
 ```
 Offset  Length    Content
 ------  ------    -------
-0       24        XChaCha20-Poly1305 nonce
-24      variable  Ciphertext (UTF-8 JSON + 16-byte auth tag)
+0       12        AES-256-GCM IV (random, 12 bytes)
+12      variable  Ciphertext + GCM tag (UTF-8 JSON payload + 16-byte GCM authentication tag)
 ```
 
 The entire byte sequence is hex-encoded for transport.
+
+#### Wire Format: Key Envelopes
+
+Author envelope (`authorEnvelope`):
+```json
+{ "enc": "<hex64 — 32-byte HPKE encapsulated key>", "ct": "<hex — AEAD ciphertext>" }
+```
+
+Admin envelope (`adminEnvelopes[i]`):
+```json
+{ "pubkey": "<hex64>", "enc": "<hex64>", "ct": "<hex>" }
+```
 
 ### 2.4 Per-Message Encryption
 
@@ -487,52 +524,73 @@ Messages (SMS, WhatsApp, Signal, web reports) use the same envelope pattern as n
 #### Encryption
 
 ```
-encryptMessage(plaintext_string, reader_pubkeys_hex[]):
+encryptMessage(plaintext_string, reader_x25519_pubkey_hexes[]):
 
   1. Generate per-message symmetric key:
      message_key = random(32)
 
-  2. Encrypt content:
-     nonce = random(24)
-     cipher = XChaCha20-Poly1305(message_key, nonce)
-     ciphertext = cipher.encrypt(UTF-8(plaintext_string))
-     encrypted_content = hex(nonce || ciphertext)
+  2. Encrypt content with AES-256-GCM:
+     iv = random(12)
+     ciphertext_with_tag = AES-256-GCM.encrypt(
+       key     = message_key,
+       iv      = iv,
+       aad     = UTF-8("llamenos:message"),
+       message = UTF-8(plaintext_string)
+     )
+     encrypted_content = hex(iv || ciphertext_with_tag)
 
-  3. Wrap message_key for each reader:
+  3. Wrap message_key for each reader via HPKE:
      reader_envelopes = []
-     for each reader_pubkey in reader_pubkeys_hex:
-       envelope = eciesWrapKey(message_key, reader_pubkey, "llamenos:message")
+     for each reader_x25519_pubkey_hex in reader_x25519_pubkey_hexes:
+       sealed = HPKE.Seal(
+         recipientPk = hex_to_bytes(reader_x25519_pubkey_hex),
+         plaintext   = message_key,
+         info        = UTF-8("llamenos:message"),
+         aad         = UTF-8("llamenos:message:key-wrap")
+       )
        reader_envelopes.push({
-         pubkey: reader_pubkey,
-         wrappedKey: envelope.wrappedKey,
-         ephemeralPubkey: envelope.ephemeralPubkey
+         pubkey: reader_x25519_pubkey_hex,   // 64 hex chars
+         enc:    hex(sealed[0..32]),
+         ct:     hex(sealed[32..])
        })
 
   4. Return:
      EncryptedMessagePayload {
        encryptedContent: encrypted_content,
-       readerEnvelopes: reader_envelopes
+       readerEnvelopes:  reader_envelopes     // RecipientEnvelope[] { pubkey, enc, ct }
      }
 ```
 
 #### Decryption
 
 ```
-decryptMessage(encrypted_content_hex, reader_envelopes[], secret_key[32], reader_pubkey_hex):
+decryptMessage(encrypted_content_hex, reader_envelopes[], device_x25519_secret_key[32], reader_pubkey_hex):
 
   1. Find matching envelope:
      envelope = reader_envelopes.find(e => e.pubkey === reader_pubkey_hex)
      // Return null if no matching envelope
 
-  2. Unwrap message key:
-     message_key = eciesUnwrapKey(envelope, secret_key, "llamenos:message")
+  2. Unwrap message key via HPKE:
+     enc_bytes = hex_to_bytes(envelope.enc)
+     ct_bytes  = hex_to_bytes(envelope.ct)
+     message_key = HPKE.Open(
+       recipientSk = device_x25519_secret_key,
+       enc         = enc_bytes,
+       ciphertext  = ct_bytes,
+       info        = UTF-8("llamenos:message"),
+       aad         = UTF-8("llamenos:message:key-wrap")
+     )
 
-  3. Decrypt content:
+  3. Decrypt content with AES-256-GCM:
      data = hex_to_bytes(encrypted_content_hex)
-     nonce = data[0..24]
-     ciphertext = data[24..]
-     cipher = XChaCha20-Poly1305(message_key, nonce)
-     plaintext = cipher.decrypt(ciphertext)
+     iv   = data[0..12]
+     ciphertext_with_tag = data[12..]
+     plaintext = AES-256-GCM.decrypt(
+       key        = message_key,
+       iv         = iv,
+       aad        = UTF-8("llamenos:message"),
+       ciphertext = ciphertext_with_tag
+     )
 
   4. Return UTF-8 string
 ```
@@ -542,8 +600,8 @@ decryptMessage(encrypted_content_hex, reader_envelopes[], secret_key[32], reader
 When the server receives an inbound message via a messaging webhook (SMS/WhatsApp/Signal), it encrypts the plaintext immediately using the same envelope pattern:
 
 1. Server generates a random `message_key`.
-2. Server encrypts the plaintext with XChaCha20-Poly1305.
-3. Server wraps `message_key` for each authorized reader (assigned volunteer + all admins) using `eciesWrapKeyServer()` with `LABEL_MESSAGE`.
+2. Server encrypts the plaintext with AES-256-GCM (AAD=`UTF-8(LABEL_MESSAGE)`).
+3. Server wraps `message_key` for each authorized reader (assigned volunteer + all admins) via HPKE with `LABEL_MESSAGE`. See `apps/worker/lib/crypto.ts` `encryptMessageForStorage()`.
 4. Plaintext is discarded from memory. The server cannot read stored messages after this point.
 
 ### 2.5 Call Record Metadata Encryption
@@ -568,25 +626,44 @@ hasVoicemail, hasRecording, recordingSid
 
 #### Algorithm
 
-Same as per-message encryption but using `LABEL_CALL_META`:
+Same envelope pattern as per-message encryption but using `LABEL_CALL_META` and admin-only recipients:
 
 ```
-encryptCallRecordForStorage(metadata_object, admin_pubkeys_hex[]):
+encryptCallRecordForStorage(metadata_object, admin_x25519_pubkey_hexes[]):
 
   1. record_key = random(32)
-  2. nonce = random(24)
-  3. cipher = XChaCha20-Poly1305(record_key, nonce)
-  4. ciphertext = cipher.encrypt(UTF-8(JSON.stringify(metadata_object)))
-  5. encrypted_content = hex(nonce || ciphertext)
-  6. admin_envelopes = admin_pubkeys_hex.map(pk =>
-       { pubkey: pk, ...eciesWrapKey(record_key, pk, "llamenos:call-meta") }
+  2. iv = random(12)
+  3. ciphertext_with_tag = AES-256-GCM.encrypt(
+       key     = record_key,
+       iv      = iv,
+       aad     = UTF-8("llamenos:call-meta"),
+       message = UTF-8(JSON.stringify(metadata_object))
      )
-  7. Return { encryptedContent, adminEnvelopes }
+  4. encrypted_content = hex(iv || ciphertext_with_tag)
+  5. admin_envelopes = admin_x25519_pubkey_hexes.map(pk => {
+       sealed = HPKE.Seal(
+         recipientPk = hex_to_bytes(pk),
+         plaintext   = record_key,
+         info        = UTF-8("llamenos:call-meta"),
+         aad         = UTF-8("llamenos:call-meta:key-wrap")
+       )
+       return {
+         pubkey: pk,
+         enc:    hex(sealed[0..32]),
+         ct:     hex(sealed[32..])
+       }
+     })
+  6. Return { encryptedContent, adminEnvelopes }
 ```
 
-Decryption uses `eciesUnwrapKey(envelope, secret_key, "llamenos:call-meta")`.
+Decryption: `HPKE.Open(device_x25519_secret_key, enc_bytes, ct_bytes, info=UTF-8("llamenos:call-meta"), aad=UTF-8("llamenos:call-meta:key-wrap"))` returns `record_key`. Then AES-256-GCM decrypt using `iv = data[0..12]`, `aad = UTF-8("llamenos:call-meta")`.
 
 ### 2.6 Key Storage (PIN-Encrypted)
+
+> **Legacy Model:** This section describes the original nsec-per-user key storage using XChaCha20-Poly1305.
+> The current system uses per-device Ed25519/X25519 keypairs stored with AES-256-GCM (Section 2.11).
+> Section 2.6 is retained for backward-compatibility reference only.
+> New client implementations MUST use the Section 2.11 model.
 
 The user's WebSocket secret key (nsec, bech32-encoded) is encrypted with a user-chosen PIN and stored in the client's local persistent storage (localStorage on web, secure storage on native).
 
@@ -674,18 +751,23 @@ hub_key = crypto.getRandomValues(new Uint8Array(32))
 
 #### Distribution
 
-The hub key is wrapped individually for each hub member using ECIES:
+The hub key is wrapped individually for each hub member using HPKE. Clients compute envelopes and upload them via `PUT /api/hubs/:hubId/key`:
 
 ```
-wrapHubKeyForMembers(hub_key[32], member_pubkeys_hex[]):
+wrapHubKeyForMembers(hub_key[32], member_x25519_pubkey_hexes[]):
 
   envelopes = []
-  for each member_pubkey in member_pubkeys_hex:
-    envelope = eciesWrapKey(hub_key, member_pubkey, "llamenos:hub-key-wrap")
+  for each member_x25519_pubkey_hex in member_x25519_pubkey_hexes:
+    sealed = HPKE.Seal(
+      recipientPk = hex_to_bytes(member_x25519_pubkey_hex),
+      plaintext   = hub_key,
+      info        = UTF-8("llamenos:hub-key-wrap"),
+      aad         = UTF-8("llamenos:hub-key-wrap:key-wrap")
+    )
     envelopes.push({
-      pubkey: member_pubkey,
-      wrappedKey: envelope.wrappedKey,
-      ephemeralPubkey: envelope.ephemeralPubkey
+      pubkey: member_x25519_pubkey_hex,   // 64 hex chars
+      enc:    hex(sealed[0..32]),
+      ct:     hex(sealed[32..])
     })
   return envelopes
 ```
@@ -693,8 +775,17 @@ wrapHubKeyForMembers(hub_key[32], member_pubkeys_hex[]):
 Members fetch their envelope from `GET /api/hubs/:hubId/key` and unwrap:
 
 ```
-unwrapHubKey(envelope, secret_key[32]):
-  return eciesUnwrapKey(envelope, secret_key, "llamenos:hub-key-wrap")
+unwrapHubKey(envelope: RecipientEnvelope, device_x25519_secret_key[32]):
+  enc_bytes = hex_to_bytes(envelope.enc)
+  ct_bytes  = hex_to_bytes(envelope.ct)
+  return HPKE.Open(
+    recipientSk = device_x25519_secret_key,
+    enc         = enc_bytes,
+    ciphertext  = ct_bytes,
+    info        = UTF-8("llamenos:hub-key-wrap"),
+    aad         = UTF-8("llamenos:hub-key-wrap:key-wrap")
+  )
+  // Returns hub_key: 32 bytes
 ```
 
 #### Hub-Wide Encryption / Decryption
@@ -763,18 +854,21 @@ deriveServerKeypair(server_secret_hex):
 
   secret_bytes = hex_to_bytes(server_secret_hex)  // 32 bytes
 
-  secret_key = HKDF(
+  // Use registered domain separation labels (LABEL_SERVER_SIGNING_KEY, LABEL_SERVER_SIGNING_INFO)
+  signing_seed = HKDF(
     hash = SHA-256,
     ikm  = secret_bytes,
-    salt = UTF-8("llamenos:server-event-key"),
-    info = UTF-8("llamenos:server-event-key:v1"),
+    salt = UTF-8(LABEL_SERVER_SIGNING_KEY),   // "llamenos:server:signing-key"
+    info = UTF-8(LABEL_SERVER_SIGNING_INFO),  // "llamenos:server:signing-info"
     length = 32
   )
 
-  pubkey = secp256k1.getPublicKey(secret_key)  // x-only, 32 bytes hex
+  pubkey = Ed25519.pubkeyFromSeed(signing_seed)  // 32-byte Ed25519 public key, hex-encoded
 
-  Return { secretKey, pubkey }
+  Return { secretKey: signing_seed, pubkeyHex }
 ```
+
+See `apps/worker/lib/server-identity.ts` `deriveServerKeypair()` for the implementation.
 
 The server's pubkey is distributed to clients via `GET /api/config` in the `serverWebSocketPubkey` field. Clients verify server-published WebSocket events against this pubkey.
 
@@ -799,9 +893,9 @@ hashIP(ip_string, hmac_secret_hex):
   // Truncated to 96 bits (24 hex chars)
 ```
 
-### 2.11 Per-Device Keys (Phase 6)
+### 2.11 Per-Device Key Storage (Current)
 
-Phase 6 replaces the single nsec-per-user model with per-device keypairs. Each device generates two independent keypairs on first launch:
+The current key model uses per-device keypairs — replacing the legacy single nsec-per-user scheme (Section 2.6). Each device generates two independent keypairs on first launch:
 
 ```
 Device Key Generation:
@@ -882,6 +976,8 @@ decryptNote(packed_hex, secret_key[32]):
 
 ### 2.13 Transcription Decryption
 
+> **Legacy Model:** This section describes the original ECIES-based transcription encryption (secp256k1 ECDH + XChaCha20-Poly1305). Retained for decrypting existing transcriptions. New implementations should use HPKE (Section 2.2).
+
 Server-encrypted transcriptions use ECIES with a per-transcription ephemeral key. The server wraps the ciphertext for the answering volunteer's pubkey.
 
 ```
@@ -955,9 +1051,9 @@ interface EncryptedFileMetadata {
 }
 
 interface RecipientEnvelope {
-  pubkey: string
-  encryptedFileKey: string     // ECIES-wrapped file key (LABEL_FILE_KEY)
-  ephemeralPubkey: string
+  pubkey: string   // recipient X25519 pubkey (hex)
+  enc: string      // HPKE encapsulated key (hex, 64 chars)
+  ct: string       // HPKE AEAD ciphertext — wraps the file key (LABEL_FILE_KEY)
 }
 ```
 
@@ -1023,7 +1119,7 @@ The `["d", "global"]` tag is used for hub-wide broadcasts. Hub-scoped events wou
 
 The `content` field is always encrypted:
 - **Hub-wide broadcasts**: Encrypted with the hub key (Section 2.8).
-- **Targeted messages**: Encrypted via NIP-44 for the specific recipient.
+- **Targeted messages**: Encrypted via HPKE (Section 2.2) targeted to the recipient's X25519 pubkey.
 
 The plaintext content is a JSON string with a `type` field identifying the event type:
 
@@ -1378,8 +1474,8 @@ Permission: notes:create
 Body: {
   "callId": string,
   "encryptedContent": hex,
-  "authorEnvelope"?: { "wrappedKey": hex, "ephemeralPubkey": hex },
-  "adminEnvelopes"?: RecipientKeyEnvelope[]
+  "authorEnvelope"?: { "enc": hex64, "ct": hex },         // KeyEnvelope (HPKE; no pubkey field)
+  "adminEnvelopes"?: { "pubkey": hex64, "enc": hex64, "ct": hex }[]  // RecipientEnvelope[]
 }
 Response: EncryptedNote
 
@@ -1387,8 +1483,8 @@ PATCH /api/notes/:id
 Permission: notes:update-own
 Body: {
   "encryptedContent": hex,
-  "authorEnvelope"?: { "wrappedKey": hex, "ephemeralPubkey": hex },
-  "adminEnvelopes"?: RecipientKeyEnvelope[]
+  "authorEnvelope"?: { "enc": hex64, "ct": hex },         // KeyEnvelope (HPKE; no pubkey field)
+  "adminEnvelopes"?: { "pubkey": hex64, "enc": hex64, "ct": hex }[]  // RecipientEnvelope[]
 }
 Response: EncryptedNote
 ```
@@ -1760,7 +1856,8 @@ Body: {
   "totalChunks": number,
   "conversationId": string,
   "recipientEnvelopes": RecipientEnvelope[],
-  "encryptedMetadata": [{ "pubkey": hex, "encryptedContent": hex, "ephemeralPubkey": hex }]
+  "encryptedMetadata": [{ "pubkey": hex64, "encryptedContent": hex, "enc": hex64, "ct": hex }]
+  // encryptedMetadata entries use encryptedMetadataEntrySchema — HPKE envelope fields
 }
 Response: { "uploadId": "uuid", "totalChunks": number }
 
@@ -1797,13 +1894,15 @@ Response: { "envelopes": RecipientEnvelope[] }
 
 GET /api/files/:id/metadata
 Permission: files:download-own or files:download-all
-Response: { "metadata": [{ "pubkey", "encryptedContent", "ephemeralPubkey" }] }
+Response: { "metadata": [{ "pubkey", "encryptedContent", "enc", "ct" }] }
+// encryptedMetadataEntrySchema — HPKE envelope fields
 
 POST /api/files/:id/share
 Permission: files:share
 Body: {
   "envelope": RecipientEnvelope,
-  "encryptedMetadata": { "pubkey", "encryptedContent", "ephemeralPubkey" }
+  "encryptedMetadata": { "pubkey", "encryptedContent", "enc", "ct" }
+  // encryptedMetadataEntrySchema — HPKE envelope fields
 }
 Response: { "ok": true }
 ```
@@ -2061,6 +2160,8 @@ All of the following routes are also available with a `/api/hubs/:hubId/` prefix
 
 When using hub-scoped routes, the `hubContext` middleware resolves hub-specific permissions for the user and scopes all queries to the specified hub.
 
+> **Note:** This section documents the core API surface. Additional endpoints for blasts, recovery groups, events, and entity management are implemented but not fully documented here. See `apps/worker/routes/` for the full route list.
+
 ---
 
 ## 5. Push Notification Protocol
@@ -2146,15 +2247,18 @@ This constraint preserves the multi-hub axiom: a user browsing Hub A must not ha
 
 ## 6. Device Provisioning Protocol
 
-New devices can be linked to an existing account using a Signal-style provisioning protocol with ephemeral ECDH key exchange and Short Authentication String (SAS) verification.
+New devices can be linked to an existing account using a Signal-style provisioning protocol with ephemeral X25519 ECDH key exchange and Short Authentication String (SAS) verification.
+
+> **Migration Note (v2.0):** The server currently accepts the `encryptedNsec` field for backward compatibility with pre-Phase-6 clients. The protocol described below reflects the Phase 6 target using per-device keypairs. New implementations MUST implement the Phase 6 protocol. The server field is named `encryptedNsec` but carries the Phase 6 device key bundle payload described here.
 
 ### 6.1 Protocol Flow
 
 ```
 New Device                          Server                     Primary Device
 -----------                         ------                     ---------------
-1. Generate ephemeral keypair
-   eSK, ePK = secp256k1.generateKey()
+1. Generate ephemeral keypair (X25519):
+   eSK, ePK = X25519.generateKey()
+   // eSK: 32 bytes (private), ePK: 32 bytes (public)
 
 2. POST /api/provision/rooms
    { ephemeralPubkey: hex(ePK) }
@@ -2174,12 +2278,14 @@ New Device                          Server                     Primary Device
                                                            ?token=<token>
                                                            <-- { ephemeralPubkey: hex(ePK) }
 
-                                                        6. Compute shared secret:
-                                                           shared = ECDH(primarySK, ePK)
-                                                           sharedX = shared[1..33]
+                                                        6. Compute shared secret (X25519):
+                                                           shared = X25519(primarySK, ePK)
+                                                           // shared: 32 bytes (raw X25519 output)
+                                                           // X25519 is symmetric: X25519(eSK, primaryPK)
+                                                           //   = X25519(primarySK, ePK)
 
                                                         7. Compute SAS:
-                                                           sasBytes = HKDF(SHA-256, sharedX,
+                                                           sasBytes = HKDF(SHA-256, shared,
                                                              salt=UTF-8("llamenos:sas"),
                                                              info=UTF-8("llamenos:provisioning-sas"),
                                                              length=4)
@@ -2188,47 +2294,81 @@ New Device                          Server                     Primary Device
                                                            code = (num % 1000000).padStart(6, '0')
                                                            Display: "XXX XXX"
 
-8. Also compute SAS:
-   shared = ECDH(eSK, primaryPK)
-   sharedX = shared[1..33]
-   Same HKDF derivation
+8. Also compute SAS (new device side):
+   shared = X25519(eSK, primaryPK)
+   // Same X25519 shared secret → same HKDF → same SAS
+   Same HKDF derivation → same code
    Display: "XXX XXX"
 
 9. User visually compares                                    User visually compares
    both codes match? -->                                     <-- both codes match?
 
-                                                        10. Derive symmetric key:
-                                                            label = UTF-8("llamenos:device-provision")
-                                                            key = SHA-256(label || sharedX)
+                                                        10. Derive provisioning key via HKDF:
+                                                            prov_key = HKDF(SHA-256, shared,
+                                                              salt=UTF-8("llamenos:provisioning:v1"),
+                                                              info=UTF-8("llamenos:provisioning:v1"),
+                                                              length=32)
+                                                            // Uses LABEL_PROVISIONING_SALT
 
-                                                        11. Encrypt nsec:
-                                                            nonce = random(24)
-                                                            cipher = XChaCha20-Poly1305(key, nonce)
-                                                            ciphertext = cipher.encrypt(UTF-8(nsec_bech32))
-                                                            encryptedNsec = hex(nonce || ciphertext)
+                                                        11. Build device key bundle:
+                                                            bundle = JSON.stringify({
+                                                              signingPubkey: hex(primary_ed25519_pubkey),
+                                                              encPubkey: hex(primary_x25519_pubkey),
+                                                              pukEncrypted: <HPKE-wrapped PUK seed for
+                                                                             new device's X25519 key>
+                                                            })
 
-                                                        12. POST /api/provision/rooms/:id/payload
+                                                        12. Encrypt device key bundle:
+                                                            iv = random(12)
+                                                            ct_with_tag = AES-256-GCM.encrypt(
+                                                              key = prov_key,
+                                                              iv  = iv,
+                                                              message = UTF-8(bundle)
+                                                            )
+                                                            encryptedPayload = hex(iv || ct_with_tag)
+
+                                                        13. POST /api/provision/rooms/:id/payload
                                                             Auth: Required (primary device)
-                                                            { token, encryptedNsec, primaryPubkey }
+                                                            {
+                                                              token,
+                                                              encryptedNsec: encryptedPayload,
+                                                              // Note: field named "encryptedNsec" for
+                                                              // backward compat; payload is device bundle
+                                                              primaryPubkey: hex(primary_ed25519_pubkey)
+                                                            }
 
-13. Poll returns status: "ready"
-    { encryptedNsec, primaryPubkey }
+14. Poll returns status: "ready"
+    { encryptedNsec: encryptedPayload, primaryPubkey }
 
-14. Derive symmetric key:
-    primaryCompressed = 0x02 || hex(primaryPubkey)
-    shared = ECDH(eSK, primaryCompressed)
-    sharedX = shared[1..33]
-    key = SHA-256(UTF-8("llamenos:device-provision") || sharedX)
+15. Derive provisioning key (same as step 10):
+    shared = X25519(eSK, primaryPK)
+    prov_key = HKDF(SHA-256, shared,
+      salt=UTF-8("llamenos:provisioning:v1"),
+      info=UTF-8("llamenos:provisioning:v1"),
+      length=32)
 
-15. Decrypt nsec:
-    data = hex_to_bytes(encryptedNsec)
-    nonce = data[0..24], ciphertext = data[24..]
-    cipher = XChaCha20-Poly1305(key, nonce)
-    nsec_bech32 = UTF-8_decode(cipher.decrypt(ciphertext))
+16. Decrypt device key bundle:
+    data = hex_to_bytes(encryptedPayload)
+    iv   = data[0..12]
+    ct   = data[12..]
+    bundle_json = UTF-8_decode(AES-256-GCM.decrypt(prov_key, iv, ct))
+    bundle = JSON.parse(bundle_json)
 
-16. Import nsec with user-chosen PIN
-    (Section 2.6 key storage)
+17. New device now has:
+    - Primary device's signing + encryption pubkeys (for sigchain verification)
+    - PUK (Per-User Key) encrypted for new device's X25519 key
+    New device decrypts PUK using its own X25519 secret key via HPKE.Open
+    with label LABEL_PUK_WRAP_TO_DEVICE.
+
+18. New device generates its own Ed25519 + X25519 keypairs (Section 2.11)
+    and registers via sigchain with primary device's authorization.
 ```
+
+#### Server Implementation
+
+Cross-reference: `apps/worker/routes/provisioning.ts`, `apps/worker/services/identity.ts`.
+
+The server stores only the ephemeral pubkey and encrypted payload — it cannot decrypt the payload. The `encryptedNsec` field in the server API carries the Phase 6 device key bundle described above.
 
 ### 6.2 QR Code Format
 
@@ -2656,3 +2796,36 @@ interface AuditLogEntry {
   entryHash?: string           // SHA-256 of this entry
 }
 ```
+
+---
+
+## Appendix C: Legacy Encryption (pre-v2 ECIES)
+
+> **Historical Reference Only.** This appendix documents the encryption primitives used before v2.0 (2026-Q1). They are retained so implementors can read data encrypted with the old scheme during migration. **DO NOT implement new encryption using these algorithms.**
+
+### C.1 ECIES Key Wrapping (Replaced by Section 2.2 HPKE)
+
+ECIES was the key-wrapping primitive in v1. It used secp256k1 ECDH + XChaCha20-Poly1305 instead of X25519 HPKE + AES-256-GCM.
+
+See Section 2.2.1 for the full ECIES algorithm specification (retained in the main body for backward-compat read path).
+
+### C.2 nsec-per-User Key Storage (Replaced by Section 2.11)
+
+v1 stored a single secp256k1 secret key (nsec, bech32-encoded) per user, PIN-encrypted with PBKDF2-SHA256 + XChaCha20-Poly1305. See Section 2.6 (marked Legacy) for the full algorithm.
+
+### C.3 Provisioning (secp256k1 ECDH + nsec Transfer)
+
+v1 provisioning used secp256k1 ECDH for the ephemeral key exchange and transferred the nsec directly (XChaCha20-Poly1305 encrypted). The SAS derivation used the compressed X coordinate (`sharedX = shared[1..33]`) instead of the raw 32-byte X25519 output. See the migration note in Section 6 for context.
+
+### C.4 XChaCha20-Poly1305 Wire Format (v1 encryptedContent)
+
+v1 content was encrypted with XChaCha20-Poly1305:
+
+```
+Offset  Length    Content
+------  ------    -------
+0       24        XChaCha20-Poly1305 nonce (random, 24 bytes)
+24      variable  Ciphertext + 16-byte Poly1305 authentication tag
+```
+
+The entire byte sequence was hex-encoded. v2 uses AES-256-GCM with a 12-byte IV (Section 2.3).

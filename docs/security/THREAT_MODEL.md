@@ -51,7 +51,7 @@ This document defines the threat model for Llamenos, a secure crisis response ho
 - Per-device Ed25519/X25519 keys — no single "identity key" to compromise; device deauthorization via sigchain
 - PIN-encrypted device keys — physical seizure requires PIN brute-force (Argon2id 64MB/3/4 — GPU/ASIC resistant)
 - Auto-lock on idle — limits physical access window
-- 87 domain separation labels — prevents cross-context key reuse (Albrecht defense)
+- Domain separation labels (see `packages/protocol/crypto-labels.json`) — prevents cross-context key reuse (Albrecht defense)
 - HPKE label enforcement at decrypt — label mismatch causes immediate rejection before decryption
 - Certificate pinning scaffolding (iOS/Android) — pins to be populated after first production deployment
 - Sigchain device revocation — compromised devices can be deauthorized without affecting other devices
@@ -246,7 +246,7 @@ flowchart TB
 | Auth token unforgeability | Ed25519 signatures | 128-bit security level |
 | Session token unpredictability | `crypto.getRandomValues(32)` | 256-bit |
 | Phone hash preimage resistance | HMAC-SHA256 with operator secret | Infeasible without HMAC secret |
-| Cross-context key reuse prevention | 87 domain separation labels + Albrecht defense | Label enforced at decrypt |
+| Cross-context key reuse prevention | Domain separation labels + Albrecht defense (see `crypto-labels.json`) | Label enforced at decrypt |
 | Recovery share secrecy | Shamir GF(2^8) — below-threshold shares reveal zero information | Information-theoretic |
 | Recovery group integrity | Group pubkey anchored to user sigchain + share holder cross-signatures | Tamper-evident, server cannot substitute |
 | Erasure completeness | Crypto-shredding — per-user audit key destroyed; active re-encryption removes departed envelopes | Forward-secure revocation |

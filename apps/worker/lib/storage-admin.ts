@@ -8,6 +8,7 @@
  * degrades gracefully: `available()` returns false. Callers should check before invoking.
  */
 import { createHmac } from 'node:crypto'
+import { safeFetch } from './safe-fetch'
 import { createLogger } from './logger'
 
 const log = createLogger('lib.storage-admin')
@@ -74,11 +75,11 @@ export function createStorageAdmin(opts: {
 
   async function adminFetch(path: string, method: string, body?: string): Promise<Response> {
     const url = `${endpoint}/admin/v3${path}`
-    const res = await fetch(url, {
+    const res = await safeFetch(url, {
       method,
       headers: authHeaders(),
       body,
-      signal: AbortSignal.timeout(10000),
+      timeoutMs: 10_000,
     })
     return res
   }

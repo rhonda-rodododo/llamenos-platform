@@ -87,10 +87,10 @@ webauthn.post('/login/verify',
 
     const { credentials } = await services.identity.getAllWebAuthnCredentials()
     const matched = credentials.find(cr => cr.id === assertion.id)
-    if (!matched) return c.json({ error: 'Unknown credential' }, 401)
+    if (!matched) return c.json({ error: 'Authentication failed' }, 401)
     try {
       const verification = await verifyAuthResponse(assertion, matched, challengeData.challenge, origin, rpID)
-      if (!verification.verified) return c.json({ error: 'Verification failed' }, 401)
+      if (!verification.verified) return c.json({ error: 'Authentication failed' }, 401)
       await services.identity.updateWebAuthnCounter({
         pubkey: matched.ownerPubkey,
         credId: matched.id,
@@ -101,7 +101,7 @@ webauthn.post('/login/verify',
       await audit(services.audit, 'webauthnLogin', matched.ownerPubkey, { credId: matched.id }, { request: c.req.raw, hmacSecret: c.env.HMAC_SECRET })
       return c.json({ token: session.token, pubkey: session.pubkey })
     } catch {
-      return c.json({ error: 'Verification failed' }, 401)
+      return c.json({ error: 'Authentication failed' }, 401)
     }
   })
 
@@ -138,7 +138,8 @@ webauthn.post('/register/options',
     const { credentials: existing } = await services.identity.getWebAuthnCredentials(pubkey)
     const options = await generateRegOptions({ pubkey, name: user.name }, existing, rpID, rpName)
     const challengeId = crypto.randomUUID()
-    await services.identity.storeWebAuthnChallenge(challengeId, options.challenge)
+    // RACE-08 Phase 2: Bind challenge to authenticated user
+    await services.identity.storeWebAuthnChallenge(challengeId, options.challenge, pubkey)
     return c.json({ ...options, challengeId })
   })
 

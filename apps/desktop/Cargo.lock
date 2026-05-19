@@ -1302,7 +1302,6 @@ dependencies = [
  "digest",
  "elliptic-curve",
  "rfc6979",
- "serdect",
  "signature",
  "spki",
 ]
@@ -1369,7 +1368,6 @@ dependencies = [
  "pkcs8",
  "rand_core 0.6.4",
  "sec1",
- "serdect",
  "subtle",
  "zeroize",
 ]
@@ -2782,9 +2780,7 @@ dependencies = [
  "ecdsa",
  "elliptic-curve",
  "once_cell",
- "serdect",
  "sha2",
- "signature",
 ]
 
 [[package]]
@@ -3145,16 +3141,13 @@ dependencies = [
  "argon2",
  "base64 0.22.1",
  "bech32",
- "chacha20poly1305",
  "chrono",
  "ed25519-dalek",
- "elliptic-curve",
  "getrandom 0.2.17",
  "hex",
  "hkdf",
  "hmac",
  "hpke",
- "k256",
  "openmls",
  "openmls_basic_credential",
  "openmls_rust_crypto",
@@ -3162,6 +3155,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "subtle",
  "thiserror 2.0.18",
  "unicode-normalization",
  "x25519-dalek",
@@ -3177,9 +3171,11 @@ dependencies = [
  "hmac",
  "llamenos-core",
  "pbkdf2",
+ "rand 0.8.6",
  "serde",
  "serde_json",
  "sha2",
+ "subtle",
  "tauri",
  "tauri-build",
  "tauri-plugin-log",
@@ -3190,6 +3186,7 @@ dependencies = [
  "tauri-plugin-stronghold",
  "tauri-plugin-updater",
  "tauri-plugin-window-state",
+ "x25519-dalek",
 ]
 
 [[package]]
@@ -4986,7 +4983,6 @@ dependencies = [
  "der",
  "generic-array",
  "pkcs8",
- "serdect",
  "subtle",
  "zeroize",
 ]
@@ -5195,16 +5191,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.117",
-]
-
-[[package]]
-name = "serdect"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a84f14a19e9a014bb9f4512488d9829a68e04ecabffb0f9904cd1ace94598177"
-dependencies = [
- "base16ct",
- "serde",
 ]
 
 [[package]]

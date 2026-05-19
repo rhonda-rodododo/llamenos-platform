@@ -69,15 +69,20 @@ import { openAPIRouteHandler } from 'hono-openapi'
 import { Scalar } from '@scalar/hono-api-reference'
 import { openAPIConfig } from './openapi/config'
 import { ServiceError } from './services/settings'
+import { createLogger } from './lib/logger'
+
+const logger = createLogger('app')
 
 const app = new Hono<AppEnv>()
 
-// --- Global error handler for ServiceError ---
+// --- Global error handler ---
 app.onError((err, c) => {
   if (err instanceof ServiceError) {
     return c.json({ error: err.message }, err.status as 400 | 401 | 403 | 404 | 409 | 410 | 429 | 500)
   }
-  throw err
+  // Log full error server-side — NEVER expose internals to clients
+  logger.error('Unhandled error', { error: err.message, stack: err.stack, path: c.req.path })
+  return c.json({ error: 'Internal server error' }, 500)
 })
 
 // --- API routes: CORS on all /api/* ---

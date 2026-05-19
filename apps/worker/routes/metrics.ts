@@ -260,11 +260,11 @@ metrics.get('/prometheus',
     if (scrapeToken) {
       const bearerToken = authHeader.replace(/^Bearer\s+/i, '')
       if (bearerToken !== scrapeToken) {
-        return c.json({ error: 'Unauthorized' }, 401)
+        return c.json({ error: 'Authentication failed' }, 401)
       }
     } else {
       const pubkey = c.get('pubkey')
-      if (!pubkey) return c.json({ error: 'Unauthorized' }, 401)
+      if (!pubkey) return c.json({ error: 'Authentication failed' }, 401)
       const permissions = c.get('permissions')
       if (!permissions?.includes('audit:read') && !permissions?.includes('*')) {
         return c.json({ error: 'Forbidden' }, 403)

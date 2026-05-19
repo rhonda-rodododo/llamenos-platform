@@ -1,8 +1,12 @@
 # Llámenos Cryptographic Protocol Specification
 
+> **⚠️ DEPRECATED.** This document describes Llamenos v1 cryptography (nsec, ECIES, secp256k1).
+> The canonical interoperability specification is `docs/protocol/PROTOCOL.md`.
+> This file is retained as historical reference only.
+
 **Version:** 2.0
 **Date:** 2026-02-25
-**Status:** Normative
+**Status:** DEPRECATED — historical reference only
 
 **Related Documents**:
 

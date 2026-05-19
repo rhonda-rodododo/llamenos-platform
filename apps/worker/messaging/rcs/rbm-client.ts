@@ -3,6 +3,7 @@
  * Handles JWT service account auth and RBM API calls.
  */
 
+import { safeFetch } from '../../lib/safe-fetch'
 import type {
   GoogleServiceAccountKey,
   GoogleOAuthTokenResponse,
@@ -79,7 +80,7 @@ export class RBMClient {
     }
 
     const jwt = await this.createJWT()
-    const res = await fetch(TOKEN_URL, {
+    const res = await safeFetch(TOKEN_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -112,7 +113,7 @@ export class RBMClient {
 
     const body: RBMSendMessageRequest = { contentMessage: content }
 
-    const res = await fetch(url, {
+    const res = await safeFetch(url, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -132,7 +133,7 @@ export class RBMClient {
     try {
       const token = await this.getAccessToken()
       const msisdn = phoneNumber.startsWith('+') ? phoneNumber.slice(1) : phoneNumber
-      const res = await fetch(`${RBM_API_BASE}/phones/${msisdn}/capabilities?agentId=${this.agentId}`, {
+      const res = await safeFetch(`${RBM_API_BASE}/phones/${msisdn}/capabilities?agentId=${this.agentId}`, {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${token}` },
       })
@@ -153,7 +154,7 @@ export class RBMClient {
   async checkStatus(): Promise<{ connected: boolean; error?: string; details?: Record<string, unknown> }> {
     try {
       const token = await this.getAccessToken()
-      const res = await fetch(`${RBM_API_BASE}/phones/+0/agentMessages?agentId=${this.agentId}`, {
+      const res = await safeFetch(`${RBM_API_BASE}/phones/+0/agentMessages?agentId=${this.agentId}`, {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${token}` },
       })

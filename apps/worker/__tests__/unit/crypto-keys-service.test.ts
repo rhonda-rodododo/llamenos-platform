@@ -30,23 +30,6 @@ interface MockLink {
   createdAt: Date
 }
 
-interface _MockPukEnvelope {
-  id: string
-  userPubkey: string
-  deviceId: string
-  generation: number
-  envelope: string
-  createdAt: Date
-}
-
-interface _MockMlsMessage {
-  id: string
-  hubId: string
-  recipientDeviceId: string
-  messageType: string
-  payload: unknown
-  createdAt: Date
-}
 
 function makeLink(overrides: Partial<MockLink> & { seqNo: number; hash: string }): MockLink {
   return {
@@ -486,10 +469,15 @@ describe('CryptoKeysService — PUK Envelopes', () => {
 
   describe('getPukEnvelopeForDevice', () => {
     it('returns null when no envelope exists', async () => {
+      // RACE-07: Single query — ORDER BY generation DESC LIMIT 1
       const db = {
         select: vi.fn().mockReturnValue({
           from: vi.fn().mockReturnValue({
-            where: vi.fn().mockResolvedValue([{ maxGen: null }]),
+            where: vi.fn().mockReturnValue({
+              orderBy: vi.fn().mockReturnValue({
+                limit: vi.fn().mockResolvedValue([]),
+              }),
+            }),
           }),
         }),
       }
@@ -509,20 +497,17 @@ describe('CryptoKeysService — PUK Envelopes', () => {
         createdAt: new Date(),
       }
 
+      // RACE-07: Single query — ORDER BY generation DESC LIMIT 1
       const db = {
-        select: vi.fn()
-          .mockReturnValueOnce({
-            from: vi.fn().mockReturnValue({
-              where: vi.fn().mockResolvedValue([{ maxGen: 3 }]),
-            }),
-          })
-          .mockReturnValueOnce({
-            from: vi.fn().mockReturnValue({
-              where: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              orderBy: vi.fn().mockReturnValue({
                 limit: vi.fn().mockResolvedValue([envRow]),
               }),
             }),
           }),
+        }),
       }
 
       const svc = new CryptoKeysService(db as never)
@@ -571,10 +556,11 @@ describe('CryptoKeysService — MLS Messages', () => {
 
   describe('fetchAndClearMlsMessages', () => {
     it('returns empty array when no messages pending', async () => {
+      // RACE-02: Atomic DELETE...RETURNING
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockResolvedValue([]),
+        delete: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([]),
           }),
         }),
       }
@@ -596,16 +582,14 @@ describe('CryptoKeysService — MLS Messages', () => {
         },
       ]
 
+      // RACE-02: Atomic DELETE...RETURNING fetches and deletes in one operation
       const deleteMock = vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue(undefined),
+        where: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue(messages),
+        }),
       })
 
       const db = {
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockResolvedValue(messages),
-          }),
-        }),
         delete: deleteMock,
       }
 
@@ -615,7 +599,7 @@ describe('CryptoKeysService — MLS Messages', () => {
       expect(result).toHaveLength(1)
       expect(result[0].messageType).toBe('welcome')
       expect(typeof result[0].createdAt).toBe('string') // ISO string
-      // Verify delete was called
+      // Verify delete was called (atomic consume)
       expect(deleteMock).toHaveBeenCalled()
     })
   })

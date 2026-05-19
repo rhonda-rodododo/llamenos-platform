@@ -13,6 +13,7 @@
 import type { SignalConfig } from '@shared/types'
 import type { SignalAboutResponse, SignalAccountInfo } from './types'
 import { createLogger } from '../../lib/logger'
+import { safeFetch } from '../../lib/safe-fetch'
 
 const logger = createLogger('signal-registration')
 
@@ -49,7 +50,7 @@ export async function startRegistration(params: StartRegistrationParams): Promis
   const bridgeUrl = params.bridgeUrl.replace(/\/+$/, '')
 
   try {
-    const response = await fetch(`${bridgeUrl}/v1/register/${encodeURIComponent(params.phoneNumber)}`, {
+    const response = await safeFetch(`${bridgeUrl}/v1/register/${encodeURIComponent(params.phoneNumber)}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -59,6 +60,7 @@ export async function startRegistration(params: StartRegistrationParams): Promis
         use_voice: params.useVoice ?? false,
         captcha: params.captcha,
       }),
+      timeoutMs: 10_000,
     })
 
     if (!response.ok) {
@@ -110,13 +112,14 @@ export async function verifyRegistration(params: VerifyRegistrationParams): Prom
   const bridgeUrl = params.bridgeUrl.replace(/\/+$/, '')
 
   try {
-    const response = await fetch(
+    const response = await safeFetch(
       `${bridgeUrl}/v1/register/${encodeURIComponent(params.phoneNumber)}/verify/${encodeURIComponent(params.verificationCode)}`,
       {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${params.bridgeApiKey}`,
         },
+        timeoutMs: 10_000,
       },
     )
 
@@ -155,13 +158,14 @@ export async function unregisterNumber(config: SignalConfig): Promise<{ success:
   const bridgeUrl = config.bridgeUrl.replace(/\/+$/, '')
 
   try {
-    const response = await fetch(
+    const response = await safeFetch(
       `${bridgeUrl}/v1/unregister/${encodeURIComponent(config.registeredNumber)}`,
       {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${config.bridgeApiKey}`,
         },
+        timeoutMs: 10_000,
       },
     )
 
@@ -198,8 +202,9 @@ export async function getAccountInfo(config: SignalConfig): Promise<{
 
   try {
     // Check the about endpoint for basic info
-    const aboutResponse = await fetch(`${bridgeUrl}/v1/about`, {
+    const aboutResponse = await safeFetch(`${bridgeUrl}/v1/about`, {
       headers: { 'Authorization': `Bearer ${config.bridgeApiKey}` },
+      timeoutMs: 10_000,
     })
 
     if (!aboutResponse.ok) {
@@ -210,13 +215,14 @@ export async function getAccountInfo(config: SignalConfig): Promise<{
       }
     }
 
-    const about: SignalAboutResponse = await aboutResponse.json()
+    const _about = await aboutResponse.json() as SignalAboutResponse
 
     // Check if the specific number is registered
-    const accountResponse = await fetch(
+    const accountResponse = await safeFetch(
       `${bridgeUrl}/v1/accounts/${encodeURIComponent(config.registeredNumber)}`,
       {
         headers: { 'Authorization': `Bearer ${config.bridgeApiKey}` },
+        timeoutMs: 10_000,
       },
     )
 
@@ -230,19 +236,20 @@ export async function getAccountInfo(config: SignalConfig): Promise<{
       }
     }
 
-    const accountInfo: Partial<SignalAccountInfo> = await accountResponse.json()
+    const accountInfo = await accountResponse.json() as Partial<SignalAccountInfo>
 
     // Try to get linked devices
     let devices: Array<{ id: number; name?: string }> | undefined
     try {
-      const devicesResponse = await fetch(
+      const devicesResponse = await safeFetch(
         `${bridgeUrl}/v1/devices/${encodeURIComponent(config.registeredNumber)}`,
         {
           headers: { 'Authorization': `Bearer ${config.bridgeApiKey}` },
+          timeoutMs: 10_000,
         },
       )
       if (devicesResponse.ok) {
-        devices = await devicesResponse.json()
+        devices = await devicesResponse.json() as Array<{ id: number; name?: string }>
       }
     } catch {
       // Devices endpoint may not exist on older bridge versions

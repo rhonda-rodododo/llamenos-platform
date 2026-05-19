@@ -13,6 +13,8 @@ on:
         description: 'Version to release (e.g., 1.0.0)'
         required: true
 
+permissions: {}  # deny-all; per-job permissions below
+
 env:
   # Safely capture workflow_dispatch input at top level
   INPUT_VERSION: ${{ github.event.inputs.version }}
@@ -252,11 +254,14 @@ jobs:
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
           security set-keychain-settings -t 3600 -u build.keychain
 
-          # Import certificate
-          echo "$APPLE_CERTIFICATE" | base64 --decode > certificate.p12
-          security import certificate.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          # Import certificate without writing to disk — minimal dwell time via tmpfs dir
+          CERT_TMPDIR=$(mktemp -d)
+          chmod 700 "$CERT_TMPDIR"
+          echo "$APPLE_CERTIFICATE" | base64 --decode > "${CERT_TMPDIR}/cert.p12"
+          security import "${CERT_TMPDIR}/cert.p12" -k build.keychain \
+            -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          rm -rf "$CERT_TMPDIR"
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
-          rm certificate.p12
 
           # Install provisioning profile
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles

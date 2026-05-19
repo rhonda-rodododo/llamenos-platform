@@ -8,6 +8,7 @@ import type { ProviderCapabilityImpl, ConnectionTestResult, WebhookUrls } from '
 import { ProviderApiError } from '../types'
 import { validateExternalUrl } from '../../../lib/ssrf-guard'
 import { basicAuth, nowISO } from '../utils'
+import { safeFetch } from '../../../lib/safe-fetch'
 
 export const signalwireProvider: ProviderCapabilityImpl = {
   providerType: 'signalwire',
@@ -24,11 +25,11 @@ export const signalwireProvider: ProviderCapabilityImpl = {
     }
     const start = Date.now()
     try {
-      const res = await fetch(fullUrl, {
+      const res = await safeFetch(fullUrl, {
         headers: { Authorization: basicAuth(projectId, apiToken) },
       })
       if (!res.ok) {
-        const text = await res.text()
+        await res.text()
         return {
           connected: false,
           latencyMs: Date.now() - start,
@@ -51,7 +52,7 @@ export const signalwireProvider: ProviderCapabilityImpl = {
     const projectId = String(credentials.projectId ?? '')
     const apiToken = String(credentials.apiToken ?? '')
     const spaceUrl = String(credentials.spaceUrl ?? credentials.signalwireSpace ?? '')
-    const res = await fetch(`https://${spaceUrl}/api/relay/rest/phone_numbers`, {
+    const res = await safeFetch(`https://${spaceUrl}/api/relay/rest/phone_numbers`, {
       headers: { Authorization: basicAuth(projectId, apiToken) },
     })
     if (!res.ok) {
@@ -91,7 +92,7 @@ export const signalwireProvider: ProviderCapabilityImpl = {
     const params = new URLSearchParams({ page_size: String(Math.min(query.limit ?? 20, 50)) })
     if (query.areaCode) params.set('area_code', query.areaCode)
 
-    const res = await fetch(
+    const res = await safeFetch(
       `https://${spaceUrl}/api/relay/rest/phone_numbers/available?${params.toString()}`,
       { headers: { Authorization: basicAuth(projectId, apiToken) } },
     )
@@ -123,7 +124,7 @@ export const signalwireProvider: ProviderCapabilityImpl = {
     const searchParams = new URLSearchParams({ page_size: '1' })
     if (request.phoneNumber) searchParams.set('contains', request.phoneNumber)
 
-    const searchRes = await fetch(
+    const searchRes = await safeFetch(
       `https://${spaceUrl}/api/relay/rest/phone_numbers/available?${searchParams.toString()}`,
       { headers: { Authorization: auth } },
     )
@@ -139,7 +140,7 @@ export const signalwireProvider: ProviderCapabilityImpl = {
     }
     const phoneNumber = searchData.data[0].number
 
-    const buyRes = await fetch(`https://${spaceUrl}/api/relay/rest/phone_numbers`, {
+    const buyRes = await safeFetch(`https://${spaceUrl}/api/relay/rest/phone_numbers`, {
       method: 'POST',
       headers: {
         Authorization: auth,
@@ -180,7 +181,7 @@ export const signalwireProvider: ProviderCapabilityImpl = {
       body.message_request_url = urls.sms
     }
 
-    const res = await fetch(`https://${spaceUrl}/api/relay/rest/phone_numbers/${numberId}`, {
+    const res = await safeFetch(`https://${spaceUrl}/api/relay/rest/phone_numbers/${numberId}`, {
       method: 'PUT',
       headers: {
         Authorization: basicAuth(projectId, apiToken),

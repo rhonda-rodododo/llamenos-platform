@@ -1,3 +1,4 @@
+import { safeFetch } from '../lib/safe-fetch'
 import type {
   TelephonyAdapter,
   IncomingCallParams,
@@ -74,7 +75,7 @@ function hubXmlParam(hubId?: string): string {
 }
 
 /** Build hub query param suffix for non-XML URLs */
-function hubQueryParam(hubId?: string): string {
+function _hubQueryParam(hubId?: string): string {
   return hubId ? `&hub=${encodeURIComponent(hubId)}` : ''
 }
 
@@ -111,7 +112,7 @@ export class PlivoAdapter implements TelephonyAdapter {
   }
 
   private async plivoApi(path: string, init: RequestInit): Promise<Response> {
-    return fetch(`https://api.plivo.com/v1/Account/${this.authId}${path}`, {
+    return safeFetch(`https://api.plivo.com/v1/Account/${this.authId}${path}`, {
       ...init,
       headers: {
         'Authorization': 'Basic ' + btoa(`${this.authId}:${this.authToken}`),
@@ -347,10 +348,11 @@ export class PlivoAdapter implements TelephonyAdapter {
     if (!data.objects?.length) return null
 
     const recordingUrl = data.objects[0].recording_url
-    const audioRes = await fetch(recordingUrl, {
+    const audioRes = await safeFetch(recordingUrl, {
       headers: {
         'Authorization': 'Basic ' + btoa(`${this.authId}:${this.authToken}`),
       },
+      timeoutMs: 60_000,
     })
     if (!audioRes.ok) return null
     return audioRes.arrayBuffer()
@@ -358,10 +360,11 @@ export class PlivoAdapter implements TelephonyAdapter {
 
   async getRecordingAudio(recordingSid: string): Promise<ArrayBuffer | null> {
     // Plivo recording URL is a full URL
-    const audioRes = await fetch(recordingSid, {
+    const audioRes = await safeFetch(recordingSid, {
       headers: {
         'Authorization': 'Basic ' + btoa(`${this.authId}:${this.authToken}`),
       },
+      timeoutMs: 60_000,
     })
     if (!audioRes.ok) return null
     return audioRes.arrayBuffer()

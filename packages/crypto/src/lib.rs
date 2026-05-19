@@ -87,3 +87,19 @@ pub use audit_key::AuditKeyAdminEnvelope;
 
 // Re-export Shamir types
 pub use shamir::Share;
+
+/// Constant-time comparison of two hex-encoded strings.
+/// Returns false if either string is not valid hex or lengths differ.
+pub fn ct_hex_eq(a: &str, b: &str) -> bool {
+    use subtle::ConstantTimeEq;
+    let Ok(a_bytes) = hex::decode(a) else {
+        return false;
+    };
+    let Ok(b_bytes) = hex::decode(b) else {
+        return false;
+    };
+    if a_bytes.len() != b_bytes.len() {
+        return false;
+    }
+    a_bytes.ct_eq(&b_bytes).into()
+}

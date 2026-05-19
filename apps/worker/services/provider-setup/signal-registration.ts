@@ -20,6 +20,7 @@ import type { Database } from '../../db'
 import { signalRegistrations } from '../../db/schema'
 import { encryptCredentials, decryptCredentials } from './crypto'
 import { validateExternalUrl } from '../../lib/ssrf-guard'
+import { safeFetch } from '../../lib/safe-fetch'
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -338,7 +339,7 @@ export class SignalRegistrationService {
     if (ssrfError) {
       throw new SignalRegistrationError(ssrfError, 400)
     }
-    return fetch(url, opts)
+    return safeFetch(url, { ...opts, timeoutMs: 10_000 })
   }
 
   private async loadRow(id: string) {
@@ -427,9 +428,9 @@ export class SignalRegistrationService {
   ): Promise<boolean> {
     const phone = this.decryptPhone(row.phoneNumber)
     try {
-      const res = await fetch(
+      const res = await safeFetch(
         `${bridgeUrl}/v1/register/${encodeURIComponent(phone)}/verify/${encodeURIComponent(params.code)}`,
-        { method: 'POST', headers: { 'Content-Type': 'application/json' } },
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, timeoutMs: 10_000 },
       )
       return res.ok
     } catch (err) {

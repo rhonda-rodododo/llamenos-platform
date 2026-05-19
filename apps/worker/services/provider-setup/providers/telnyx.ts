@@ -7,6 +7,7 @@ import type {
 import type { ProviderCapabilityImpl, ConnectionTestResult, SipTrunkConfig, WebhookUrls } from '../types'
 import { ProviderApiError } from '../types'
 import { nowISO } from '../utils'
+import { safeFetch } from '../../../lib/safe-fetch'
 
 export const telnyxProvider: ProviderCapabilityImpl = {
   providerType: 'telnyx',
@@ -16,11 +17,11 @@ export const telnyxProvider: ProviderCapabilityImpl = {
     const apiKey = String(credentials.apiKey ?? credentials.accessToken ?? '')
     const start = Date.now()
     try {
-      const res = await fetch('https://api.telnyx.com/v2/phone_numbers?page[size]=1', {
+      const res = await safeFetch('https://api.telnyx.com/v2/phone_numbers?page[size]=1', {
         headers: { Authorization: `Bearer ${apiKey}` },
       })
       if (!res.ok) {
-        const text = await res.text()
+        await res.text()
         return {
           connected: false,
           latencyMs: Date.now() - start,
@@ -41,7 +42,7 @@ export const telnyxProvider: ProviderCapabilityImpl = {
 
   async listOwnedNumbers(credentials: Record<string, unknown>): Promise<OwnedNumber[]> {
     const apiKey = String(credentials.apiKey ?? credentials.accessToken ?? '')
-    const res = await fetch('https://api.telnyx.com/v2/phone_numbers?page[size]=250', {
+    const res = await safeFetch('https://api.telnyx.com/v2/phone_numbers?page[size]=250', {
       headers: { Authorization: `Bearer ${apiKey}` },
     })
     if (!res.ok) {
@@ -75,7 +76,7 @@ export const telnyxProvider: ProviderCapabilityImpl = {
     const params = new URLSearchParams({ 'filter[limit]': String(Math.min(query.limit ?? 20, 50)) })
     if (query.areaCode) params.set('filter[national_destination_code]', query.areaCode)
 
-    const res = await fetch(
+    const res = await safeFetch(
       `https://api.telnyx.com/v2/available_phone_numbers?${params.toString()}`,
       { headers: { Authorization: `Bearer ${apiKey}` } },
     )
@@ -111,7 +112,7 @@ export const telnyxProvider: ProviderCapabilityImpl = {
       searchParams.set('filter[phone_number][starts_with]', request.phoneNumber)
     }
 
-    const searchRes = await fetch(
+    const searchRes = await safeFetch(
       `https://api.telnyx.com/v2/available_phone_numbers?${searchParams.toString()}`,
       { headers: { Authorization: `Bearer ${apiKey}` } },
     )
@@ -127,7 +128,7 @@ export const telnyxProvider: ProviderCapabilityImpl = {
     }
     const phoneNumber = searchData.data[0].phone_number
 
-    const orderRes = await fetch('https://api.telnyx.com/v2/number_orders', {
+    const orderRes = await safeFetch('https://api.telnyx.com/v2/number_orders', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -173,7 +174,7 @@ export const telnyxProvider: ProviderCapabilityImpl = {
       appBody.inbound_message_webhook_url = urls.sms
     }
 
-    const appRes = await fetch('https://api.telnyx.com/v2/call_control_applications', {
+    const appRes = await safeFetch('https://api.telnyx.com/v2/call_control_applications', {
       method: 'POST',
       headers,
       body: JSON.stringify(appBody),
@@ -184,7 +185,7 @@ export const telnyxProvider: ProviderCapabilityImpl = {
     }
     const appData = (await appRes.json()) as { data: { id: string } }
 
-    const patchRes = await fetch(`https://api.telnyx.com/v2/phone_numbers/${numberId}`, {
+    const patchRes = await safeFetch(`https://api.telnyx.com/v2/phone_numbers/${numberId}`, {
       method: 'PATCH',
       headers,
       body: JSON.stringify({ connection_id: appData.data.id }),
@@ -210,7 +211,7 @@ export const telnyxProvider: ProviderCapabilityImpl = {
       .join('')
       .slice(0, 32)
 
-    const res = await fetch('https://api.telnyx.com/v2/ip_connections', {
+    const res = await safeFetch('https://api.telnyx.com/v2/ip_connections', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
