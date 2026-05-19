@@ -1472,8 +1472,8 @@ Permission: notes:create
 Body: {
   "callId": string,
   "encryptedContent": hex,
-  "authorEnvelope"?: { "wrappedKey": hex, "ephemeralPubkey": hex },
-  "adminEnvelopes"?: RecipientKeyEnvelope[]
+  "authorEnvelope"?: { "enc": hex64, "ct": hex },         // KeyEnvelope (HPKE; no pubkey field)
+  "adminEnvelopes"?: { "pubkey": hex64, "enc": hex64, "ct": hex }[]  // RecipientEnvelope[]
 }
 Response: EncryptedNote
 
@@ -1481,8 +1481,8 @@ PATCH /api/notes/:id
 Permission: notes:update-own
 Body: {
   "encryptedContent": hex,
-  "authorEnvelope"?: { "wrappedKey": hex, "ephemeralPubkey": hex },
-  "adminEnvelopes"?: RecipientKeyEnvelope[]
+  "authorEnvelope"?: { "enc": hex64, "ct": hex },         // KeyEnvelope (HPKE; no pubkey field)
+  "adminEnvelopes"?: { "pubkey": hex64, "enc": hex64, "ct": hex }[]  // RecipientEnvelope[]
 }
 Response: EncryptedNote
 ```
@@ -1854,7 +1854,8 @@ Body: {
   "totalChunks": number,
   "conversationId": string,
   "recipientEnvelopes": RecipientEnvelope[],
-  "encryptedMetadata": [{ "pubkey": hex, "encryptedContent": hex, "ephemeralPubkey": hex }]
+  "encryptedMetadata": [{ "pubkey": hex64, "encryptedContent": hex, "enc": hex64, "ct": hex }]
+  // encryptedMetadata entries use encryptedMetadataEntrySchema — HPKE envelope fields
 }
 Response: { "uploadId": "uuid", "totalChunks": number }
 
@@ -1891,13 +1892,15 @@ Response: { "envelopes": RecipientEnvelope[] }
 
 GET /api/files/:id/metadata
 Permission: files:download-own or files:download-all
-Response: { "metadata": [{ "pubkey", "encryptedContent", "ephemeralPubkey" }] }
+Response: { "metadata": [{ "pubkey", "encryptedContent", "enc", "ct" }] }
+// encryptedMetadataEntrySchema — HPKE envelope fields
 
 POST /api/files/:id/share
 Permission: files:share
 Body: {
   "envelope": RecipientEnvelope,
-  "encryptedMetadata": { "pubkey", "encryptedContent", "ephemeralPubkey" }
+  "encryptedMetadata": { "pubkey", "encryptedContent", "enc", "ct" }
+  // encryptedMetadataEntrySchema — HPKE envelope fields
 }
 Response: { "ok": true }
 ```
@@ -2154,6 +2157,8 @@ All of the following routes are also available with a `/api/hubs/:hubId/` prefix
 ```
 
 When using hub-scoped routes, the `hubContext` middleware resolves hub-specific permissions for the user and scopes all queries to the specified hub.
+
+> **Note:** This section documents the core API surface. Additional endpoints for blasts, recovery groups, events, and entity management are implemented but not fully documented here. See `apps/worker/routes/` for the full route list.
 
 ---
 
