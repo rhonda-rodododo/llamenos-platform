@@ -52,6 +52,31 @@ function LinkDevicePage() {
     })
   }, [navigate])
 
+  // Test-only: allow Playwright tests to drive the component to the verify-sas step
+  // without a real backend provisioning room. The event carries pre-computed crypto data.
+  useEffect(() => {
+    if (!import.meta.env.PLAYWRIGHT_TEST) return
+    interface TestProvisionEvent {
+      sasCode: string
+      encryptedNsec: string
+      primaryPubkey: string
+      ephemeralSecretHex: string
+    }
+    const handler = (e: Event) => {
+      const { sasCode: code, encryptedNsec, primaryPubkey, ephemeralSecretHex } =
+        (e as CustomEvent<TestProvisionEvent>).detail
+      const ephemeralSecret = Uint8Array.from(
+        ephemeralSecretHex.match(/../g)!.map(h => parseInt(h, 16)),
+      )
+      setSasCode(code)
+      setEncryptedNsecData({ encryptedNsec, primaryPubkey })
+      setSession({ roomId: 'test-room', token: 'test-token', ephemeralSecret, ephemeralPubkey: primaryPubkey })
+      setStep('verify-sas')
+    }
+    window.addEventListener('test:provisioning-complete', handler)
+    return () => window.removeEventListener('test:provisioning-complete', handler)
+  }, [])
+
   async function startLinking() {
     try {
       setStep('waiting')

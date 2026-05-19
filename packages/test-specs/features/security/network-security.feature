@@ -73,7 +73,7 @@ Feature: Network Security
 
   # ── SAS Verification Gate ─────────────────────────────────────────
 
-  @wip
+  @desktop
   Scenario: Device linking shows SAS code on verify step
     Given I am authenticated
     And I navigate to the device link screen from settings
@@ -83,7 +83,7 @@ Feature: Network Security
     And I should see instructions to compare with the other device
     And I should see "Confirm" and "Reject" buttons
 
-  @wip
+  @desktop
   Scenario: SAS confirmation required before nsec import
     Given I am authenticated
     And I navigate to the device link screen from settings
@@ -94,7 +94,7 @@ Feature: Network Security
     Then the nsec should not be imported
     And the crypto service should not have a new key
 
-  @wip
+  @desktop
   Scenario: SAS confirmation allows nsec import
     Given I am authenticated
     And I navigate to the device link screen from settings
@@ -105,7 +105,7 @@ Feature: Network Security
     Then the nsec should be imported
     And I should see the import success state
 
-  @wip
+  @desktop
   Scenario: SAS rejection aborts device linking
     Given I am authenticated
     And I navigate to the device link screen from settings

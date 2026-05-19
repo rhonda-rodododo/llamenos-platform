@@ -123,17 +123,26 @@ Then('I should see {string} and {string} buttons', async ({ page }, btn1: string
     return
   }
 
-  const testIdMap: Record<string, string> = {
-    'Confirm': TestIds.CONFIRM_DIALOG_OK,
-    'Cancel': TestIds.CONFIRM_DIALOG_CANCEL,
-    'Lock App': TestIds.LOGOUT_BTN,
-    'Log Out': TestIds.LOGOUT_BTN,
+  // Maps button label to one or more testids to check (first match wins)
+  const testIdMap: Record<string, string[]> = {
+    'Confirm': [TestIds.CONFIRM_DIALOG_OK, 'sas-match'],  // SAS context uses sas-match
+    'Reject':  ['sas-mismatch'],
+    'Cancel':  [TestIds.CONFIRM_DIALOG_CANCEL],
+    'Lock App': [TestIds.LOGOUT_BTN],
+    'Log Out':  [TestIds.LOGOUT_BTN],
   }
   for (const btnText of [btn1, btn2]) {
-    const testId = testIdMap[btnText]
-    if (testId) {
-      const byTestId = page.getByTestId(testId)
-      if (await byTestId.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) continue
+    const testIds = testIdMap[btnText]
+    if (testIds) {
+      // Check each testid in priority order
+      let found = false
+      for (const tid of testIds) {
+        if (await page.getByTestId(tid).isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
+          found = true
+          break
+        }
+      }
+      if (found) continue
       const byRole = page.getByRole('button', { name: btnText })
       if (await byRole.isVisible({ timeout: 2000 }).catch(() => false)) continue
       // May be on login page (cascading failure)

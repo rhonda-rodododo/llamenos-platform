@@ -1,127 +1,193 @@
 /**
  * SAS verification step definitions.
- * Matches steps from: packages/test-specs/features/security/sas-verification.feature
+ * Matches steps from: packages/test-specs/features/security/network-security.feature
+ * (SAS-related @wip scenarios)
  *
  * These test the SAS (Short Authentication String) verification gate
- * during device linking. In the Playwright mock environment, we simulate
- * the provisioning room and key exchange via window events.
+ * during device linking. A Playwright test event ('test:provisioning-complete')
+ * drives the link-device component to the verify-sas step without needing a
+ * live backend provisioning room.
+ *
+ * Crypto setup mirrors the real provisioning.ts protocol:
+ *   new-device ephemeral secret ↔ primary device public key → X25519 shared secret
+ *   → HKDF → AES-256-GCM encrypt a mock nsec string.
  */
 import { expect } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
-import { Timeouts } from '../../helpers'
+import { x25519 } from '@noble/curves/ed25519.js'
+import { gcm } from '@noble/ciphers/aes.js'
+import { hkdf } from '@noble/hashes/hkdf.js'
+import { sha256 } from '@noble/hashes/sha2.js'
+import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
+import { utf8ToBytes } from '@noble/ciphers/utils.js'
+import {
+  LABEL_DEVICE_PROVISION,
+  LABEL_PROVISIONING_SALT,
+  SAS_SALT,
+  SAS_INFO,
+} from '@shared/crypto-labels'
 
-Given('a valid provisioning room is established', async ({ page }) => {
-  // Simulate provisioning room setup
-  await page.evaluate(() => {
-    (window as any).__test_provisioning = { established: true, sasCode: '123456', confirmed: false }
-  })
+function deriveProvisioningKey(sharedSecret: Uint8Array): Uint8Array {
+  return hkdf(sha256, sharedSecret, utf8ToBytes(LABEL_PROVISIONING_SALT), utf8ToBytes(LABEL_DEVICE_PROVISION), 32)
+}
+
+function computeSAS(sharedSecret: Uint8Array): string {
+  const sasBytes = hkdf(sha256, sharedSecret, utf8ToBytes(SAS_SALT), utf8ToBytes(SAS_INFO), 4)
+  const num = ((sasBytes[0] << 24) | (sasBytes[1] << 16) | (sasBytes[2] << 8) | sasBytes[3]) >>> 0
+  const code = (num % 1_000_000).toString().padStart(6, '0')
+  return `${code.slice(0, 3)} ${code.slice(3)}`
+}
+
+function encryptNsecForTest(nsec: string, ephemeralPubkeyHex: string, primarySecret: Uint8Array): string {
+  const shared = x25519.getSharedSecret(primarySecret, hexToBytes(ephemeralPubkeyHex))
+  const key = deriveProvisioningKey(shared)
+  const nonce = new Uint8Array(12) // deterministic zero nonce — test only
+  const aad = utf8ToBytes(LABEL_DEVICE_PROVISION)
+  const cipher = gcm(key, nonce, aad)
+  const ct = cipher.encrypt(utf8ToBytes(nsec))
+  const packed = new Uint8Array(nonce.length + ct.length)
+  packed.set(nonce)
+  packed.set(ct, nonce.length)
+  return bytesToHex(packed)
+}
+
+// ── Per-test state ────────────────────────────────────────────────
+
+interface SasTestState {
+  ephemeralSecret?: Uint8Array
+  ephemeralPubkey?: string
+  primarySecret?: Uint8Array
+  primaryPubkey?: string
+  sasCode?: string
+  encryptedNsec?: string
+  mockNsec?: string
+}
+
+const stateMap = new WeakMap<object, SasTestState>()
+function getSasState(world: object): SasTestState {
+  if (!stateMap.has(world)) stateMap.set(world, {})
+  return stateMap.get(world)!
+}
+
+// ── Steps ─────────────────────────────────────────────────────────
+
+Given('a valid provisioning room is established', ({ world }) => {
+  const state = getSasState(world)
+  // Generate real X25519 keypairs so the SAS + crypto ops all match
+  state.ephemeralSecret = crypto.getRandomValues(new Uint8Array(32))
+  state.ephemeralPubkey = bytesToHex(x25519.getPublicKey(state.ephemeralSecret))
+  state.primarySecret = crypto.getRandomValues(new Uint8Array(32))
+  state.primaryPubkey = bytesToHex(x25519.getPublicKey(state.primarySecret))
+  state.mockNsec = 'nsec1testmocksecretforplaywrighttest00000000000000000000000000000001'
+
+  // Pre-compute values used when the "key exchange" event fires
+  const shared = x25519.getSharedSecret(state.ephemeralSecret, state.primaryPubkey)
+  state.sasCode = computeSAS(shared)
+  // Encrypt the mock nsec as if the primary device sent it
+  state.encryptedNsec = encryptNsecForTest(state.mockNsec, state.ephemeralPubkey, state.primarySecret)
 })
 
 // Used as both Given and When — playwright-bdd matches Given/When/Then interchangeably
-Given('the ephemeral key exchange completes', async ({ page }) => {
-  await page.evaluate(() => {
-    const prov = (window as any).__test_provisioning || {}
-    prov.keyExchangeComplete = true
-    ;(window as any).__test_provisioning = prov
-  })
+Given('the ephemeral key exchange completes', async ({ page, world }) => {
+  const state = getSasState(world)
+  // Navigate to the link-device page (where the new-device SAS flow lives)
+  await page.goto('/link-device')
+  await page.waitForLoadState('domcontentloaded')
+
+  // Dispatch the test event that drives link-device.tsx to the verify-sas step
+  await page.evaluate(
+    ({ sasCode, encryptedNsec, primaryPubkey, ephemeralSecretHex }) => {
+      window.dispatchEvent(new CustomEvent('test:provisioning-complete', {
+        detail: { sasCode, encryptedNsec, primaryPubkey, ephemeralSecretHex },
+      }))
+    },
+    {
+      sasCode: state.sasCode!,
+      encryptedNsec: state.encryptedNsec!,
+      primaryPubkey: state.primaryPubkey!,
+      ephemeralSecretHex: bytesToHex(state.ephemeralSecret!),
+    },
+  )
+
+  // Wait for the verify-sas step to render
+  await page.getByTestId('sas-code').waitFor({ state: 'visible', timeout: 5000 })
 })
 
 Then('I should see a {int}-digit SAS code displayed', async ({ page }, digits: number) => {
-  // Look for a SAS code display (short-code test ID or text matching digit pattern)
-  const shortCode = page.getByTestId('short-code')
-  const isVisible = await shortCode.isVisible({ timeout: 5000 }).catch(() => false)
-  if (isVisible) {
-    const text = await shortCode.textContent()
-    const codeMatch = text?.match(/\d+/)
-    expect(codeMatch?.[0]?.length).toBe(digits)
-  }
-  // If the UI isn't showing yet, it's a soft pass — feature may not be fully wired
+  const sasEl = page.getByTestId('sas-code')
+  await expect(sasEl).toBeVisible({ timeout: 5000 })
+  const text = (await sasEl.textContent()) ?? ''
+  // Remove spaces — SAS is formatted as "XXX XXX"
+  const digits_only = text.replace(/\s/g, '')
+  expect(digits_only).toMatch(/^\d+$/)
+  expect(digits_only.length).toBe(digits)
 })
 
 Then('I should see instructions to compare with the other device', async ({ page }) => {
-  const instructions = page.locator('text=/compare|verify|match|other device/i')
-  const isVisible = await instructions.first().isVisible({ timeout: 3000 }).catch(() => false)
-  expect(isVisible || true).toBe(true)
+  // The verifySASDesc text contains "Compare this code" / compare wording
+  const instruction = page.locator('[data-testid="sas-code"]').locator('..')
+    .locator('text=/compare|verify|match|other device/i')
+  // Fallback to any visible compare text on the page
+  const pageText = page.getByText(/compare|verify.*code/i)
+  const found = await instruction.first().isVisible({ timeout: 3000 }).catch(() => false)
+    || await pageText.first().isVisible({ timeout: 3000 }).catch(() => false)
+  expect(found).toBe(true)
 })
 
-Given('an encrypted nsec is received from the other device', async ({ page }) => {
-  await page.evaluate(() => {
-    const prov = (window as any).__test_provisioning || {}
-    prov.nsecReceived = true
-    ;(window as any).__test_provisioning = prov
-  })
+Given('an encrypted nsec is received from the other device', ({ world }) => {
+  // Already set in 'a valid provisioning room is established'
+  expect(getSasState(world).encryptedNsec).toBeTruthy()
 })
 
 When('I have not yet confirmed the SAS code', async ({ page }) => {
-  // Ensure SAS is not confirmed
-  await page.evaluate(() => {
-    const prov = (window as any).__test_provisioning || {}
-    prov.confirmed = false
-    ;(window as any).__test_provisioning = prov
-  })
+  // We are in the verify-sas step — SAS has NOT been confirmed yet.
+  // Verify the confirm/mismatch buttons are visible (user is still deciding).
+  await expect(page.getByTestId('sas-match')).toBeVisible({ timeout: 3000 })
+  await expect(page.getByTestId('sas-mismatch')).toBeVisible({ timeout: 3000 })
 })
 
 Then('the nsec should not be imported', async ({ page }) => {
-  // Verify no key was imported — crypto state should not have changed
-  const hasNewKey = await page.evaluate(async () => {
-    const platform = (window as Record<string, unknown>).__TEST_PLATFORM as
-      { isCryptoUnlocked: () => Promise<boolean> } | undefined
-    if (!platform) return false
-    return platform.isCryptoUnlocked()
-  })
-  // In the context of device linking, the nsec should not be imported yet
-  // This is a soft assertion based on provisioning state
-  expect(true).toBe(true)
+  // Before confirmation, the pin-create step must NOT be visible
+  const pinCreateVisible = await page.getByTestId('pin-input').isVisible({ timeout: 500 }).catch(() => false)
+  expect(pinCreateVisible).toBe(false)
 })
 
-Then('the crypto service should not have a new key', async () => {
-  // Implicit — verified by nsec not being imported
+Then('the crypto service should not have a new key', async ({ page }) => {
+  // Verified implicitly: still on verify-sas step, no key import has happened
+  await expect(page.getByTestId('sas-code')).toBeVisible()
 })
 
 When('I confirm the SAS code matches', async ({ page }) => {
-  // Click the Confirm button in the SAS verification UI
-  const confirmBtn = page.getByRole('button', { name: /confirm/i })
-  const isVisible = await confirmBtn.isVisible({ timeout: 5000 }).catch(() => false)
-  if (isVisible) {
-    await confirmBtn.click()
-  }
-  await page.evaluate(() => {
-    const prov = (window as any).__test_provisioning || {}
-    prov.confirmed = true
-    ;(window as any).__test_provisioning = prov
-  })
+  await page.getByTestId('sas-match').click()
 })
 
-Then('the nsec should be imported', async () => {
-  // After SAS confirmation, nsec import proceeds
-  // Verified implicitly by the import success state
+Then('the nsec should be imported', async ({ page }) => {
+  // After SAS confirmation, decryptProvisionedNsec runs and (if successful)
+  // advances to pin-create. Both pin-create and done states indicate successful receipt.
+  const pinCreate = page.locator('[data-testid="pin-input"]')
+  const doneState = page.getByText(/success|linked|complete/i)
+  const advancedStep = await pinCreate.first().isVisible({ timeout: 5000 }).catch(() => false)
+    || await doneState.first().isVisible({ timeout: 5000 }).catch(() => false)
+  expect(advancedStep, 'Expected to advance past verify-sas after SAS confirmation').toBe(true)
 })
 
 Then('I should see the import success state', async ({ page }) => {
-  const successEl = page.locator('text=/success|imported|linked|complete/i')
-  const isVisible = await successEl.first().isVisible({ timeout: 5000 }).catch(() => false)
-  expect(isVisible || true).toBe(true)
+  // After decrypt: either pin-create (success) or done (after pin set).
+  // In tests, decryption success means we left the verify-sas step.
+  const stillOnSas = await page.getByTestId('sas-code').isVisible({ timeout: 500 }).catch(() => false)
+  expect(stillOnSas, 'Should have advanced past SAS verification step').toBe(false)
 })
 
 When('I reject the SAS code', async ({ page }) => {
-  const rejectBtn = page.getByRole('button', { name: /reject|cancel|deny/i })
-  const isVisible = await rejectBtn.isVisible({ timeout: 5000 }).catch(() => false)
-  if (isVisible) {
-    await rejectBtn.click()
-  }
-  await page.evaluate(() => {
-    const prov = (window as any).__test_provisioning || {}
-    prov.rejected = true
-    ;(window as any).__test_provisioning = prov
-  })
+  await page.getByTestId('sas-mismatch').click()
 })
 
-Then('the provisioning room should be closed', async () => {
-  // Verified implicitly — after rejection, the room is torn down
+Then('the provisioning room should be closed', async ({ page }) => {
+  // After rejection, the component sets step='error' — the verify-sas UI is gone
+  await expect(page.getByTestId('sas-code')).not.toBeVisible({ timeout: 5000 })
 })
 
 Then('I should see a {string} message', async ({ page }, text: string) => {
-  const msg = page.locator(`text=/${text}/i`)
-  const isVisible = await msg.first().isVisible({ timeout: 5000 }).catch(() => false)
-  expect(isVisible || true).toBe(true)
+  const msg = page.locator(`[role="alert"]`).or(page.getByText(new RegExp(text, 'i')))
+  await expect(msg.first()).toBeVisible({ timeout: 5000 })
 })
