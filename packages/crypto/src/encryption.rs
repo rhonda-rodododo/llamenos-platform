@@ -401,7 +401,7 @@ pub struct EncryptedKeyData {
     pub iterations: u32,
     /// hex, 12 bytes (AES-256-GCM nonce)
     pub nonce: String,
-    /// hex, encrypted nsec bech32 string
+    /// hex, encrypted device key material
     pub ciphertext: String,
     /// Truncated SHA-256 hash of pubkey (not plaintext) for identification
     pub pubkey: String,
@@ -419,10 +419,10 @@ pub fn derive_kek_from_pin(credential: &str, salt: &[u8]) -> [u8; 32] {
     kek
 }
 
-/// Encrypt an nsec bech32 string with a credential (PIN or passphrase).
+/// Encrypt device key material with a credential (PIN or passphrase).
 #[cfg_attr(feature = "mobile", uniffi::export)]
 pub fn encrypt_with_pin(
-    nsec: &str,
+    key_material: &str,
     pin: &str,
     pubkey_hex: &str,
 ) -> Result<EncryptedKeyData, CryptoError> {
@@ -442,10 +442,12 @@ pub fn encrypt_with_pin(
     let cipher = Aes256Gcm::new_from_slice(&kek)
         .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
     let ciphertext = cipher
-        .encrypt(nonce, nsec.as_bytes())
+        .encrypt(nonce, key_material.as_bytes())
         .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
 
-    // Hash pubkey for identification
+    // Truncated to 64 bits (8 bytes). This is an identification fingerprint,
+    // not a commitment — collision resistance beyond 2^32 keys is not needed.
+    // The full pubkey is the authentication primitive, not this hash.
     let hash_input = format!("{HMAC_KEYID_PREFIX}{pubkey_hex}");
     let pubkey_hash = {
         let mut hasher = Sha256::new();
@@ -465,7 +467,7 @@ pub fn encrypt_with_pin(
     })
 }
 
-/// Decrypt a stored nsec using a PIN. Returns the nsec bech32 string or error.
+/// Decrypt stored key material using a PIN. Returns the decrypted string or error.
 #[cfg_attr(feature = "mobile", uniffi::export)]
 pub fn decrypt_with_pin(data: &EncryptedKeyData, pin: &str) -> Result<String, CryptoError> {
     let salt = hex::decode(&data.salt).map_err(CryptoError::HexError)?;

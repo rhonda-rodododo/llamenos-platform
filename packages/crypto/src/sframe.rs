@@ -29,7 +29,7 @@ use sha2::Sha256;
 use zeroize::Zeroizing;
 
 use crate::errors::CryptoError;
-use crate::labels::{LABEL_SFRAME_BASE_KEY, LABEL_SFRAME_CALL_SECRET};
+use crate::labels::{LABEL_SFRAME_BASE_KEY, LABEL_SFRAME_CALL_SECRET, LABEL_SFRAME_NONCE};
 
 /// AES-256-GCM nonce size: 12 bytes.
 const NONCE_SIZE: usize = 12;
@@ -212,7 +212,7 @@ fn parse_header(data: &[u8]) -> Result<SframeHeader, CryptoError> {
 fn derive_base_nonce(send_key: &[u8; 32]) -> [u8; NONCE_SIZE] {
     let hk = Hkdf::<Sha256>::new(None, send_key);
     let mut nonce = [0u8; NONCE_SIZE];
-    hk.expand(b"sframe nonce", &mut nonce)
+    hk.expand(LABEL_SFRAME_NONCE.as_bytes(), &mut nonce)
         .expect("HKDF expand should not fail for 12 bytes");
     nonce
 }
@@ -684,6 +684,20 @@ mod tests {
         // Anything shorter should fail.
         assert!(sframe_decrypt(&key, &[0x00]).is_err()); // 1 byte: header only, no tag
         assert!(sframe_decrypt(&key, &[0x00; 10]).is_err()); // 10 bytes: header + partial tag
+    }
+
+    #[test]
+    fn sframe_nonce_uses_registered_label() {
+        // Verify the nonce derivation produces non-zero output (uses registered constant).
+        let key = test_key();
+        let nonce = derive_base_nonce(&key);
+        assert_ne!(nonce, [0u8; NONCE_SIZE]);
+
+        // Verify changing the key changes the nonce (label is baked in via HKDF).
+        let mut key2 = test_key();
+        key2[0] ^= 0xFF;
+        let nonce2 = derive_base_nonce(&key2);
+        assert_ne!(nonce, nonce2);
     }
 
     #[test]

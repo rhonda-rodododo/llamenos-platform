@@ -478,8 +478,8 @@ class ConversationsViewModel @Inject constructor(
 
         // Build HpkeEnvelope from wire format fields
         val hpkeEnvelope = org.llamenos.hotline.crypto.HpkeEnvelope(
-            v = 3,
-            labelId = 0,
+            v = org.llamenos.hotline.crypto.HpkeEnvelope.CURRENT_VERSION,
+            labelId = org.llamenos.hotline.crypto.HpkeEnvelope.LABEL_ID_MESSAGE,
             enc = envelope.enc,
             ct = envelope.ct,
         )

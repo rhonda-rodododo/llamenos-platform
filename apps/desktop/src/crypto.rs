@@ -533,6 +533,11 @@ pub fn encrypt_hub_field(
     plaintext: String,
     label: String,
 ) -> Result<String, String> {
+    // Validate label against registry — reject unknown labels
+    if llamenos_core::labels::label_to_id(&label).is_none() {
+        return Err(format!("Unknown crypto label: {label}. Labels must be registered in the label registry."));
+    }
+
     let hub_key = state.hub_key.lock().unwrap();
     let key = hub_key.as_ref().ok_or("Hub key not loaded")?;
 
@@ -563,6 +568,11 @@ pub fn decrypt_hub_field(
     ciphertext_hex: String,
     label: String,
 ) -> Result<String, String> {
+    // Validate label against registry — reject unknown labels
+    if llamenos_core::labels::label_to_id(&label).is_none() {
+        return Err(format!("Unknown crypto label: {label}. Labels must be registered in the label registry."));
+    }
+
     let hub_key = state.hub_key.lock().unwrap();
     let key = hub_key.as_ref().ok_or("Hub key not loaded")?;
 

@@ -535,14 +535,16 @@ class NotesViewModel @Inject constructor(
         val hpkeEnvelope: org.llamenos.hotline.crypto.HpkeEnvelope =
             if (reply.authorPubkey == ourPubkey && reply.authorEnvelope != null) {
                 org.llamenos.hotline.crypto.HpkeEnvelope(
-                    v = 3, labelId = 0,
+                    v = org.llamenos.hotline.crypto.HpkeEnvelope.CURRENT_VERSION,
+                    labelId = org.llamenos.hotline.crypto.HpkeEnvelope.LABEL_ID_NOTE_KEY,
                     enc = reply.authorEnvelope!!.enc,
                     ct = reply.authorEnvelope!!.ct,
                 )
             } else {
                 reply.adminEnvelopes?.find { it.pubkey == ourPubkey }?.let { adminEnv ->
                     org.llamenos.hotline.crypto.HpkeEnvelope(
-                        v = 3, labelId = 0,
+                        v = org.llamenos.hotline.crypto.HpkeEnvelope.CURRENT_VERSION,
+                        labelId = org.llamenos.hotline.crypto.HpkeEnvelope.LABEL_ID_NOTE_KEY,
                         enc = adminEnv.enc,
                         ct = adminEnv.ct,
                     )
@@ -577,14 +579,16 @@ class NotesViewModel @Inject constructor(
         val hpkeEnvelope: org.llamenos.hotline.crypto.HpkeEnvelope =
             if (note.authorPubkey == ourPubkey && note.authorEnvelope != null) {
                 org.llamenos.hotline.crypto.HpkeEnvelope(
-                    v = 3, labelId = 0,
+                    v = org.llamenos.hotline.crypto.HpkeEnvelope.CURRENT_VERSION,
+                    labelId = org.llamenos.hotline.crypto.HpkeEnvelope.LABEL_ID_NOTE_KEY,
                     enc = note.authorEnvelope!!.enc,
                     ct = note.authorEnvelope!!.ct,
                 )
             } else {
                 note.adminEnvelopes?.find { it.pubkey == ourPubkey }?.let { adminEnv ->
                     org.llamenos.hotline.crypto.HpkeEnvelope(
-                        v = 3, labelId = 0,
+                        v = org.llamenos.hotline.crypto.HpkeEnvelope.CURRENT_VERSION,
+                        labelId = org.llamenos.hotline.crypto.HpkeEnvelope.LABEL_ID_NOTE_KEY,
                         enc = adminEnv.enc,
                         ct = adminEnv.ct,
                     )

@@ -148,29 +148,29 @@ pub fn hpke_open(
         )));
     }
 
+    // Steps 2-4: All failures after version check return the same opaque error
+    // (DecryptionFailed) to prevent timing side-channels that could reveal
+    // whether the label, key, or ciphertext was wrong.
+
     // Step 2: Resolve labelId to label string
-    let resolved_label = id_to_label(envelope.label_id).ok_or_else(|| {
-        CryptoError::InvalidFormat(format!("unknown labelId: {}", envelope.label_id))
-    })?;
+    let resolved_label = id_to_label(envelope.label_id).ok_or(CryptoError::DecryptionFailed)?;
 
     // Step 3: Albrecht defense — check resolved label matches expected
     if resolved_label != expected_label {
-        return Err(CryptoError::InvalidFormat(format!(
-            "label mismatch: envelope has '{}' (id={}) but caller expected '{}'",
-            resolved_label, envelope.label_id, expected_label
-        )));
+        return Err(CryptoError::DecryptionFailed);
     }
 
     // Step 4: Parse secret key
-    let mut sk_bytes = hex::decode(recipient_secret_hex).map_err(CryptoError::HexError)?;
+    let mut sk_bytes =
+        hex::decode(recipient_secret_hex).map_err(|_| CryptoError::DecryptionFailed)?;
     if sk_bytes.len() != 32 {
         sk_bytes.zeroize();
-        return Err(CryptoError::InvalidSecretKey);
+        return Err(CryptoError::DecryptionFailed);
     }
 
     let sk = <Kem as KemTrait>::PrivateKey::from_bytes(&sk_bytes).map_err(|_| {
         sk_bytes.zeroize();
-        CryptoError::InvalidSecretKey
+        CryptoError::DecryptionFailed
     })?;
     sk_bytes.zeroize();
 
@@ -281,11 +281,11 @@ mod tests {
 
         let envelope = hpke_seal(plaintext, &pk_hex, LABEL_NOTE_KEY, aad).unwrap();
 
-        // Try to open with wrong expected label
+        // Try to open with wrong expected label — returns opaque DecryptionFailed
         let result = hpke_open(&envelope, &sk_hex, LABEL_FILE_KEY, aad);
         assert!(
-            matches!(result, Err(CryptoError::InvalidFormat(_))),
-            "expected label mismatch error, got: {result:?}"
+            matches!(result, Err(CryptoError::DecryptionFailed)),
+            "expected DecryptionFailed, got: {result:?}"
         );
     }
 
@@ -420,7 +420,28 @@ mod tests {
         envelope.label_id = 255;
 
         let result = hpke_open(&envelope, &sk_hex, LABEL_NOTE_KEY, aad);
-        assert!(matches!(result, Err(CryptoError::InvalidFormat(_))));
+        assert!(matches!(result, Err(CryptoError::DecryptionFailed)));
+    }
+
+    #[test]
+    fn all_decrypt_failures_return_same_error() {
+        let (sk_hex, pk_hex) = gen_keypair();
+        let (wrong_sk, _) = gen_keypair();
+        let envelope = hpke_seal(b"test", &pk_hex, LABEL_NOTE_KEY, b"aad").unwrap();
+
+        // Wrong label
+        let err1 = hpke_open(&envelope, &sk_hex, LABEL_FILE_KEY, b"aad");
+        // Unknown labelId
+        let mut bad_env = envelope.clone();
+        bad_env.label_id = 255;
+        let err2 = hpke_open(&bad_env, &sk_hex, LABEL_NOTE_KEY, b"aad");
+        // Wrong key
+        let err3 = hpke_open(&envelope, &wrong_sk, LABEL_NOTE_KEY, b"aad");
+
+        // All should be DecryptionFailed (not distinguishable)
+        assert!(matches!(err1, Err(CryptoError::DecryptionFailed)));
+        assert!(matches!(err2, Err(CryptoError::DecryptionFailed)));
+        assert!(matches!(err3, Err(CryptoError::DecryptionFailed)));
     }
 
     #[test]

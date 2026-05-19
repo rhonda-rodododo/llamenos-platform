@@ -24,6 +24,7 @@ use sha2::{Digest, Sha256};
 use zeroize::Zeroize;
 
 use crate::errors::CryptoError;
+use crate::labels::LABEL_SHAMIR_COMMIT;
 
 // =============================================================================
 // GF(2^8) Arithmetic
@@ -153,7 +154,10 @@ impl Drop for Share {
 ///
 /// This type is used by mobile bindings because `Vec<u8>` fields conflict
 /// with `Drop` when combined with `uniffi::Record`.
-#[derive(Clone, Debug)]
+///
+/// `Zeroize` is derived so callers can explicitly zeroize the secret share data.
+/// Custom `Drop` is not implemented because it conflicts with `uniffi::Record`.
+#[derive(Clone, Debug, Zeroize)]
 #[cfg_attr(feature = "mobile", derive(uniffi::Record))]
 pub struct ShamirShare {
     pub x: u8,
@@ -329,9 +333,10 @@ pub fn combine(shares: &[Share], threshold: u8) -> Result<Vec<u8>, CryptoError> 
 /// The commitment binds (x, y) together so that tampering with either value
 /// is detectable before attempting reconstruction.
 ///
-/// Format: SHA-256(x || y)
+/// Format: SHA-256(domain_prefix || x || y)
 pub fn commit(share: &Share) -> [u8; 32] {
     let mut hasher = Sha256::new();
+    hasher.update(LABEL_SHAMIR_COMMIT.as_bytes());
     hasher.update([share.x]);
     hasher.update(&share.y);
     hasher.finalize().into()
@@ -616,6 +621,23 @@ mod tests {
     }
 
     #[test]
+    fn commitment_includes_domain_prefix() {
+        let share = Share { x: 1, y: vec![42] };
+        let commitment = commit(&share);
+
+        // Raw SHA-256(1 || 42) without prefix should differ
+        let mut raw_hasher = Sha256::new();
+        raw_hasher.update([1u8]);
+        raw_hasher.update([42u8]);
+        let raw_hash: [u8; 32] = raw_hasher.finalize().into();
+
+        assert_ne!(
+            commitment, raw_hash,
+            "commitment must include domain prefix"
+        );
+    }
+
+    #[test]
     fn commitments_are_unique_per_share() {
         let secret = random_secret(32);
         let shares = split(&secret, 5, 3).unwrap();
@@ -819,6 +841,17 @@ mod tests {
     // =========================================================================
     // Recovery group keypair generation
     // =========================================================================
+
+    #[test]
+    fn shamir_share_zeroize() {
+        let mut share = ShamirShare {
+            x: 1,
+            y_hex: "deadbeef".to_string(),
+        };
+        share.zeroize();
+        assert!(share.y_hex.is_empty());
+        assert_eq!(share.x, 0);
+    }
 
     #[test]
     fn recovery_group_keypair_roundtrip_with_hpke() {
