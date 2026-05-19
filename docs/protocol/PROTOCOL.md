@@ -2237,15 +2237,18 @@ This constraint preserves the multi-hub axiom: a user browsing Hub A must not ha
 
 ## 6. Device Provisioning Protocol
 
-New devices can be linked to an existing account using a Signal-style provisioning protocol with ephemeral ECDH key exchange and Short Authentication String (SAS) verification.
+New devices can be linked to an existing account using a Signal-style provisioning protocol with ephemeral X25519 ECDH key exchange and Short Authentication String (SAS) verification.
+
+> **Migration Note (v2.0):** The server currently accepts the `encryptedNsec` field for backward compatibility with pre-Phase-6 clients. The protocol described below reflects the Phase 6 target using per-device keypairs. New implementations MUST implement the Phase 6 protocol. The server field is named `encryptedNsec` but carries the Phase 6 device key bundle payload described here.
 
 ### 6.1 Protocol Flow
 
 ```
 New Device                          Server                     Primary Device
 -----------                         ------                     ---------------
-1. Generate ephemeral keypair
-   eSK, ePK = secp256k1.generateKey()
+1. Generate ephemeral keypair (X25519):
+   eSK, ePK = X25519.generateKey()
+   // eSK: 32 bytes (private), ePK: 32 bytes (public)
 
 2. POST /api/provision/rooms
    { ephemeralPubkey: hex(ePK) }
@@ -2265,12 +2268,14 @@ New Device                          Server                     Primary Device
                                                            ?token=<token>
                                                            <-- { ephemeralPubkey: hex(ePK) }
 
-                                                        6. Compute shared secret:
-                                                           shared = ECDH(primarySK, ePK)
-                                                           sharedX = shared[1..33]
+                                                        6. Compute shared secret (X25519):
+                                                           shared = X25519(primarySK, ePK)
+                                                           // shared: 32 bytes (raw X25519 output)
+                                                           // X25519 is symmetric: X25519(eSK, primaryPK)
+                                                           //   = X25519(primarySK, ePK)
 
                                                         7. Compute SAS:
-                                                           sasBytes = HKDF(SHA-256, sharedX,
+                                                           sasBytes = HKDF(SHA-256, shared,
                                                              salt=UTF-8("llamenos:sas"),
                                                              info=UTF-8("llamenos:provisioning-sas"),
                                                              length=4)
@@ -2279,47 +2284,81 @@ New Device                          Server                     Primary Device
                                                            code = (num % 1000000).padStart(6, '0')
                                                            Display: "XXX XXX"
 
-8. Also compute SAS:
-   shared = ECDH(eSK, primaryPK)
-   sharedX = shared[1..33]
-   Same HKDF derivation
+8. Also compute SAS (new device side):
+   shared = X25519(eSK, primaryPK)
+   // Same X25519 shared secret → same HKDF → same SAS
+   Same HKDF derivation → same code
    Display: "XXX XXX"
 
 9. User visually compares                                    User visually compares
    both codes match? -->                                     <-- both codes match?
 
-                                                        10. Derive symmetric key:
-                                                            label = UTF-8("llamenos:device-provision")
-                                                            key = SHA-256(label || sharedX)
+                                                        10. Derive provisioning key via HKDF:
+                                                            prov_key = HKDF(SHA-256, shared,
+                                                              salt=UTF-8("llamenos:provisioning:v1"),
+                                                              info=UTF-8("llamenos:provisioning:v1"),
+                                                              length=32)
+                                                            // Uses LABEL_PROVISIONING_SALT
 
-                                                        11. Encrypt nsec:
-                                                            nonce = random(24)
-                                                            cipher = XChaCha20-Poly1305(key, nonce)
-                                                            ciphertext = cipher.encrypt(UTF-8(nsec_bech32))
-                                                            encryptedNsec = hex(nonce || ciphertext)
+                                                        11. Build device key bundle:
+                                                            bundle = JSON.stringify({
+                                                              signingPubkey: hex(primary_ed25519_pubkey),
+                                                              encPubkey: hex(primary_x25519_pubkey),
+                                                              pukEncrypted: <HPKE-wrapped PUK seed for
+                                                                             new device's X25519 key>
+                                                            })
 
-                                                        12. POST /api/provision/rooms/:id/payload
+                                                        12. Encrypt device key bundle:
+                                                            iv = random(12)
+                                                            ct_with_tag = AES-256-GCM.encrypt(
+                                                              key = prov_key,
+                                                              iv  = iv,
+                                                              message = UTF-8(bundle)
+                                                            )
+                                                            encryptedPayload = hex(iv || ct_with_tag)
+
+                                                        13. POST /api/provision/rooms/:id/payload
                                                             Auth: Required (primary device)
-                                                            { token, encryptedNsec, primaryPubkey }
+                                                            {
+                                                              token,
+                                                              encryptedNsec: encryptedPayload,
+                                                              // Note: field named "encryptedNsec" for
+                                                              // backward compat; payload is device bundle
+                                                              primaryPubkey: hex(primary_ed25519_pubkey)
+                                                            }
 
-13. Poll returns status: "ready"
-    { encryptedNsec, primaryPubkey }
+14. Poll returns status: "ready"
+    { encryptedNsec: encryptedPayload, primaryPubkey }
 
-14. Derive symmetric key:
-    primaryCompressed = 0x02 || hex(primaryPubkey)
-    shared = ECDH(eSK, primaryCompressed)
-    sharedX = shared[1..33]
-    key = SHA-256(UTF-8("llamenos:device-provision") || sharedX)
+15. Derive provisioning key (same as step 10):
+    shared = X25519(eSK, primaryPK)
+    prov_key = HKDF(SHA-256, shared,
+      salt=UTF-8("llamenos:provisioning:v1"),
+      info=UTF-8("llamenos:provisioning:v1"),
+      length=32)
 
-15. Decrypt nsec:
-    data = hex_to_bytes(encryptedNsec)
-    nonce = data[0..24], ciphertext = data[24..]
-    cipher = XChaCha20-Poly1305(key, nonce)
-    nsec_bech32 = UTF-8_decode(cipher.decrypt(ciphertext))
+16. Decrypt device key bundle:
+    data = hex_to_bytes(encryptedPayload)
+    iv   = data[0..12]
+    ct   = data[12..]
+    bundle_json = UTF-8_decode(AES-256-GCM.decrypt(prov_key, iv, ct))
+    bundle = JSON.parse(bundle_json)
 
-16. Import nsec with user-chosen PIN
-    (Section 2.6 key storage)
+17. New device now has:
+    - Primary device's signing + encryption pubkeys (for sigchain verification)
+    - PUK (Per-User Key) encrypted for new device's X25519 key
+    New device decrypts PUK using its own X25519 secret key via HPKE.Open
+    with label LABEL_PUK_WRAP_TO_DEVICE.
+
+18. New device generates its own Ed25519 + X25519 keypairs (Section 2.11)
+    and registers via sigchain with primary device's authorization.
 ```
+
+#### Server Implementation
+
+Cross-reference: `apps/worker/routes/provisioning.ts`, `apps/worker/services/identity.ts`.
+
+The server stores only the ephemeral pubkey and encrypted payload — it cannot decrypt the payload. The `encryptedNsec` field in the server API carries the Phase 6 device key bundle described above.
 
 ### 6.2 QR Code Format
 
