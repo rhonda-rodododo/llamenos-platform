@@ -166,7 +166,7 @@ describe('invites routes', () => {
 
       expect(res.status).toBe(401)
       const body = await res.json()
-      expect(body.error).toBe('Invalid signature')
+      expect(body.error).toBe('Authentication failed')
     })
 
     it('rate limits redemption attempts', async () => {

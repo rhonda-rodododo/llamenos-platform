@@ -117,7 +117,7 @@ describe('auth middleware', () => {
     const res = await req(app, '/test')
     expect(res.status).toBe(401)
     const body = await res.json()
-    expect(body.error).toBe('Unauthorized')
+    expect(body.error).toBe('Authentication failed')
   })
 
   it('returns 401 for invalid auth token', async () => {

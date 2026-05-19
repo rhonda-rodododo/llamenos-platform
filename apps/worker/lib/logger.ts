@@ -145,7 +145,7 @@ export function getCorrelation(): CorrelationContext {
 // ---------------------------------------------------------------------------
 
 const SENSITIVE_KEY_RE =
-  /phone|email|nsec|secret|token|ciphertext|encrypted|content|recovery|^pin$|password|credential|apikey|auth_token|access_key|secret_key|private_key|server_secret/i
+  /phone|email|nsec|secret|token|ciphertext|encrypted|content|recovery|^pin$|password|credential|apikey|auth_token|access_key|secret_key|private_key|server_secret|sid|signature|jwt|nonce|cookie|session|bearer/i
 
 const NAME_KEY_RE = /^(first|last|full|display|user)?name$/i
 

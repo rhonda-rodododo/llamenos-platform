@@ -164,7 +164,7 @@ describe('auth routes', () => {
 
       expect(res.status).toBe(401)
       const body = await res.json()
-      expect(body.error).toBe('Invalid credentials')
+      expect(body.error).toBe('Authentication failed')
     })
 
     it('returns 401 for unregistered pubkey', async () => {
