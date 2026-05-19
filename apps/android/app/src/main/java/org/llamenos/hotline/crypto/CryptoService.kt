@@ -54,10 +54,70 @@ data class HpkeEnvelope(
         // Label registry IDs — must match LABEL_REGISTRY indices in labels.rs.
         // These are the numeric wire-format IDs for each label.
         const val LABEL_ID_NOTE_KEY = 0
-        const val LABEL_ID_MESSAGE = 5
+        const val LABEL_ID_FILE_KEY = 1
+        const val LABEL_ID_FILE_METADATA = 2
         const val LABEL_ID_HUB_KEY_WRAP = 3
+        const val LABEL_ID_MESSAGE = 5
+        const val LABEL_ID_CALL_META = 6
     }
 }
+
+/** Data class for passing admin envelope data from API responses to crypto. */
+data class AdminEnvelopeData(
+    val pubkey: String,
+    val enc: String,
+    val ct: String,
+)
+
+/** Decrypted call metadata from E2EE envelope. */
+@kotlinx.serialization.Serializable
+data class CallMetadata(
+    val callerNumber: String,
+    val answeredBy: String? = null,
+)
+
+/** Result of encrypting a file with per-recipient HPKE envelopes. */
+data class EncryptedFile(
+    val encryptedContent: ByteArray,
+    val keyEnvelopes: List<FileKeyEnvelope>,
+    val metadataEnvelopes: List<EncryptedFileMetadataEnvelope>,
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is EncryptedFile) return false
+        return encryptedContent.contentEquals(other.encryptedContent) &&
+            keyEnvelopes == other.keyEnvelopes &&
+            metadataEnvelopes == other.metadataEnvelopes
+    }
+
+    override fun hashCode(): Int {
+        var result = encryptedContent.contentHashCode()
+        result = 31 * result + keyEnvelopes.hashCode()
+        result = 31 * result + metadataEnvelopes.hashCode()
+        return result
+    }
+}
+
+data class FileKeyEnvelope(
+    val pubkey: String,
+    val enc: String,
+    val ct: String,
+)
+
+data class EncryptedFileMetadataEnvelope(
+    val pubkey: String,
+    val encryptedContent: String,
+    val enc: String,
+    val ct: String,
+)
+
+@kotlinx.serialization.Serializable
+data class FileMetadata(
+    val originalName: String,
+    val mimeType: String,
+    val size: Long,
+    val checksum: String,
+)
 
 /**
  * Result of encrypting a note/message.
@@ -754,6 +814,238 @@ class CryptoService @Inject constructor() {
                 )
             } catch (e: Exception) {
                 throw CryptoException("Recovery group keypair generation failed: ${e.message}", e)
+            }
+        }
+
+    // ---- Call Metadata Decryption (HPKE) ----
+
+    /**
+     * Decrypt call metadata (callerNumber, answeredBy) from an E2EE admin envelope.
+     * Finds the envelope addressed to this device, HPKE-opens the symmetric key,
+     * then AES-GCM decrypts the call content.
+     * Returns null if no matching envelope is found or decryption fails.
+     */
+    suspend fun decryptCallMetadata(
+        encryptedContent: String,
+        adminEnvelopes: List<AdminEnvelopeData>,
+    ): CallMetadata? = withContext(computeDispatcher) {
+        if (!nativeLibLoaded || !isUnlocked) return@withContext null
+        val ourPubkey = encryptionPubkeyHex ?: return@withContext null
+
+        val myEnvelope = adminEnvelopes.find { it.pubkey == ourPubkey }
+            ?: return@withContext null
+
+        try {
+            val ffiEnvelope = org.llamenos.core.HpkeEnvelope(
+                v = HpkeEnvelope.CURRENT_VERSION.toUByte(),
+                labelId = HpkeEnvelope.LABEL_ID_CALL_META.toUByte(),
+                enc = myEnvelope.enc,
+                ct = myEnvelope.ct,
+            )
+            val keyHex = org.llamenos.core.mobileHpkeOpenKey(
+                envelope = ffiEnvelope,
+                expectedLabel = CryptoLabels.LABEL_CALL_META,
+                aadHex = "",
+            )
+            val plaintextHex = org.llamenos.core.mobileSymmetricDecrypt(
+                ciphertextHex = encryptedContent,
+                keyHex = keyHex,
+            )
+            val bytes = hexToBytes(plaintextHex)
+            val plaintext = String(bytes, Charsets.UTF_8)
+            json.decodeFromString<CallMetadata>(plaintext)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    // ---- File Encryption (HPKE) ----
+
+    /**
+     * Encrypt file data with per-recipient HPKE key wrapping.
+     *
+     * 1. Generate random symmetric key via mobileSymmetricEncrypt
+     * 2. AES-GCM encrypt file content
+     * 3. HPKE-seal the file key per recipient with LABEL_FILE_KEY
+     * 4. Encrypt metadata JSON per recipient with LABEL_FILE_METADATA
+     */
+    suspend fun encryptFile(
+        data: ByteArray,
+        fileName: String,
+        mimeType: String,
+        recipientPubkeys: List<String>,
+    ): EncryptedFile = withContext(computeDispatcher) {
+        check(nativeLibLoaded) { "Native crypto library not loaded." }
+        if (!isUnlocked) throw CryptoException("No key loaded")
+
+        try {
+            // SHA-256 checksum of plaintext
+            val digest = java.security.MessageDigest.getInstance("SHA-256")
+            val checksumBytes = digest.digest(data)
+            val checksum = checksumBytes.joinToString("") { "%02x".format(it) }
+
+            // Encrypt file content — mobileSymmetricEncrypt returns [ciphertextHex, keyHex]
+            val dataHex = data.joinToString("") { "%02x".format(it) }
+            val encResult = org.llamenos.core.mobileSymmetricEncrypt(plaintextHex = dataHex)
+            val encryptedContentHex = encResult[0]
+            val fileKeyHex = encResult[1]
+            val encryptedContent = hexToBytes(encryptedContentHex)
+
+            // HPKE-wrap file key for each recipient
+            val keyEnvelopes = recipientPubkeys.map { pubkey ->
+                val env = org.llamenos.core.mobileHpkeSealKey(
+                    keyHex = fileKeyHex,
+                    recipientPubkeyHex = pubkey,
+                    label = CryptoLabels.LABEL_FILE_KEY,
+                    aadHex = "",
+                )
+                FileKeyEnvelope(pubkey = pubkey, enc = env.enc, ct = env.ct)
+            }
+
+            // Build and encrypt metadata per recipient
+            val metadata = json.encodeToString(
+                kotlinx.serialization.serializer<FileMetadata>(),
+                FileMetadata(
+                    originalName = fileName,
+                    mimeType = mimeType,
+                    size = data.size.toLong(),
+                    checksum = checksum,
+                ),
+            )
+            val metaHex = metadata.toByteArray(Charsets.UTF_8)
+                .joinToString("") { "%02x".format(it) }
+
+            val metaEnvelopes = recipientPubkeys.map { pubkey ->
+                val metaResult = org.llamenos.core.mobileSymmetricEncrypt(plaintextHex = metaHex)
+                val encMetaHex = metaResult[0]
+                val metaKeyHex = metaResult[1]
+                val env = org.llamenos.core.mobileHpkeSealKey(
+                    keyHex = metaKeyHex,
+                    recipientPubkeyHex = pubkey,
+                    label = CryptoLabels.LABEL_FILE_METADATA,
+                    aadHex = "",
+                )
+                EncryptedFileMetadataEnvelope(
+                    pubkey = pubkey,
+                    encryptedContent = encMetaHex,
+                    enc = env.enc,
+                    ct = env.ct,
+                )
+            }
+
+            EncryptedFile(encryptedContent, keyEnvelopes, metaEnvelopes)
+        } catch (e: org.llamenos.core.CryptoException) {
+            throw CryptoException("File encryption failed: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Decrypt a file key from an HPKE envelope with LABEL_FILE_KEY.
+     */
+    suspend fun decryptFileKey(envelope: HpkeEnvelope): String = withContext(computeDispatcher) {
+        check(nativeLibLoaded) { "Native crypto library not loaded." }
+        if (!isUnlocked) throw CryptoException("No key loaded")
+
+        val ffiEnvelope = org.llamenos.core.HpkeEnvelope(
+            v = envelope.v.toUByte(),
+            labelId = envelope.labelId.toUByte(),
+            enc = envelope.enc,
+            ct = envelope.ct,
+        )
+        try {
+            org.llamenos.core.mobileHpkeOpenKey(
+                envelope = ffiEnvelope,
+                expectedLabel = CryptoLabels.LABEL_FILE_KEY,
+                aadHex = "",
+            )
+        } catch (e: org.llamenos.core.CryptoException) {
+            throw CryptoException("File key decryption failed: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Decrypt file metadata from an HPKE envelope with LABEL_FILE_METADATA.
+     */
+    suspend fun decryptFileMetadata(
+        encryptedContentHex: String,
+        envelope: HpkeEnvelope,
+    ): FileMetadata? = withContext(computeDispatcher) {
+        if (!nativeLibLoaded || !isUnlocked) return@withContext null
+
+        try {
+            val ffiEnvelope = org.llamenos.core.HpkeEnvelope(
+                v = envelope.v.toUByte(),
+                labelId = envelope.labelId.toUByte(),
+                enc = envelope.enc,
+                ct = envelope.ct,
+            )
+            val keyHex = org.llamenos.core.mobileHpkeOpenKey(
+                envelope = ffiEnvelope,
+                expectedLabel = CryptoLabels.LABEL_FILE_METADATA,
+                aadHex = "",
+            )
+            val plaintextHex = org.llamenos.core.mobileSymmetricDecrypt(
+                ciphertextHex = encryptedContentHex,
+                keyHex = keyHex,
+            )
+            val bytes = hexToBytes(plaintextHex)
+            json.decodeFromString<FileMetadata>(String(bytes, Charsets.UTF_8))
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Decrypt file content using a previously-unwrapped file key.
+     */
+    suspend fun decryptFileContent(
+        encryptedContentHex: String,
+        fileKeyHex: String,
+    ): ByteArray = withContext(computeDispatcher) {
+        check(nativeLibLoaded) { "Native crypto library not loaded." }
+        if (!isUnlocked) throw CryptoException("No key loaded")
+
+        try {
+            val plaintextHex = org.llamenos.core.mobileSymmetricDecrypt(
+                ciphertextHex = encryptedContentHex,
+                keyHex = fileKeyHex,
+            )
+            hexToBytes(plaintextHex)
+        } catch (e: org.llamenos.core.CryptoException) {
+            throw CryptoException("File content decryption failed: ${e.message}", e)
+        }
+    }
+
+    // ---- Draft Encryption ----
+
+    /**
+     * Encrypt a draft using the hub key for the given hub.
+     * Uses HKDF with HKDF_CONTEXT_DRAFTS to derive a draft-specific key from the hub key.
+     * Returns hex-encoded encrypted draft.
+     */
+    suspend fun encryptDraft(plaintext: String, hubId: String): String =
+        withContext(computeDispatcher) {
+            check(nativeLibLoaded) { "Native crypto library not loaded." }
+            if (!isUnlocked) throw CryptoException("No key loaded")
+            try {
+                org.llamenos.core.mobileEncryptDraft(plaintext = plaintext, hubId = hubId)
+            } catch (e: org.llamenos.core.CryptoException) {
+                throw CryptoException("Draft encryption failed: ${e.message}", e)
+            }
+        }
+
+    /**
+     * Decrypt a draft using the hub key for the given hub.
+     * Returns the plaintext string.
+     */
+    suspend fun decryptDraft(packedHex: String, hubId: String): String =
+        withContext(computeDispatcher) {
+            check(nativeLibLoaded) { "Native crypto library not loaded." }
+            if (!isUnlocked) throw CryptoException("No key loaded")
+            try {
+                org.llamenos.core.mobileDecryptDraft(packedHex = packedHex, hubId = hubId)
+            } catch (e: org.llamenos.core.CryptoException) {
+                throw CryptoException("Draft decryption failed: ${e.message}", e)
             }
         }
 

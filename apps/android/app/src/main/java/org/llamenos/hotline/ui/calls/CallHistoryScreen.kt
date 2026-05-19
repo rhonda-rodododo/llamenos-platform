@@ -62,7 +62,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.llamenos.hotline.R
-import org.llamenos.hotline.model.CallHistoryRecord
 import org.llamenos.protocol.ActiveCallResponseStatus
 import org.llamenos.hotline.model.durationSeconds
 import org.llamenos.hotline.model.hasRecordingFlag
@@ -218,11 +217,11 @@ fun CallHistoryScreen(
                         ) {
                             items(
                                 items = uiState.calls,
-                                key = { it.id },
-                            ) { call ->
+                                key = { it.record.id },
+                            ) { decryptedCall ->
                                 CallHistoryRecordCard(
-                                    call = call,
-                                    onAddNote = { onNavigateToNoteCreate(call.id) },
+                                    decryptedCall = decryptedCall,
+                                    onAddNote = { onNavigateToNoteCreate(decryptedCall.record.id) },
                                 )
                             }
 
@@ -261,14 +260,15 @@ fun CallHistoryScreen(
 
 /**
  * Card displaying a single call record with status icon, caller info,
- * duration, and metadata badges.
+ * duration, and metadata badges. Shows decrypted caller number when available.
  */
 @Composable
 private fun CallHistoryRecordCard(
-    call: CallHistoryRecord,
+    decryptedCall: DecryptedCallRecord,
     onAddNote: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    val call = decryptedCall.record
     val isUnanswered = call.status == ActiveCallResponseStatus.Unanswered
 
     Card(
@@ -315,12 +315,12 @@ private fun CallHistoryRecordCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
+                    // Prefer decrypted caller number, fall back to masked last-4
+                    val callerDisplay = decryptedCall.decryptedCallerNumber
+                        ?: call.callerLast4?.let { "***$it" }
+                        ?: stringResource(R.string.calls_unknown_caller)
                     Text(
-                        text = if (call.callerLast4 != null) {
-                            "***${call.callerLast4}"
-                        } else {
-                            stringResource(R.string.calls_unknown_caller)
-                        },
+                        text = callerDisplay,
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Medium,
                         modifier = Modifier.testTag("call-caller-id"),
@@ -333,6 +333,18 @@ private fun CallHistoryRecordCard(
                             color = MaterialTheme.colorScheme.error,
                         )
                     }
+                }
+
+                // Show decrypted answered-by volunteer name when available
+                if (decryptedCall.decryptedAnsweredBy != null) {
+                    Text(
+                        text = decryptedCall.decryptedAnsweredBy,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.testTag("call-answered-by"),
+                    )
                 }
 
                 Spacer(Modifier.height(4.dp))
