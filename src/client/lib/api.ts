@@ -1,19 +1,18 @@
-import { z } from 'zod'
 import * as keyManager from './key-manager'
 import { createAuthToken } from './platform'
 import { APP_API_VERSION, emitUpdateRequired } from './version'
 import { offlineQueue, isQueueableMethod, isNetworkError as isOfflineNetworkError } from './offline-queue'
 
 // --- Protocol schema imports (Epic 364) ---
-import { createShiftBodySchema } from '@protocol/schemas/shifts'
-import { recordSchema, recordContactSchema } from '@protocol/schemas/records'
-import { caseInteractionSchema } from '@protocol/schemas/interactions'
-import { reportTypeDefinitionSchema } from '@protocol/schemas/report-types'
-import { createEntityTypeBodySchema, templateSummarySchema } from '@protocol/schemas/entity-schema'
+import type { CreateShiftBody } from '@protocol/schemas/shifts'
+import type { CaseRecord, RecordContact } from '@protocol/schemas/records'
+import type { CaseInteraction } from '@protocol/schemas/interactions'
+import type { ReportTypeDefinition } from '@protocol/schemas/report-types'
+import type { CreateEntityTypeBody, TemplateSummary } from '@protocol/schemas/entity-schema'
 import type { MergeContactsBody, MergeContactsResponse } from '@protocol/schemas/contact-merge'
 import type { BulkContactAction, BulkContactActionResponse, BulkCreateContactBody, BulkCreateContactResponse } from '@protocol/schemas/contact-bulk'
 import type { MergeRecordsBody, MergeRecordsResponse } from '@protocol/schemas/entity-merge'
-import { contactRelationshipResponseSchema, contactGroupResponseSchema } from '@protocol/schemas/contact-relationships'
+import type { ContactRelationshipResponse, ContactGroupResponse } from '@protocol/schemas/contact-relationships'
 import type {
   SignalRegistrationState,
   SignalAccountInfo,
@@ -387,7 +386,7 @@ export async function listShifts() {
   return request<{ shifts: Shift[] }>(hp('/shifts'))
 }
 
-export async function createShift(data: z.infer<typeof createShiftBodySchema>) {
+export async function createShift(data: CreateShiftBody) {
   return request<Shift>(hp('/shifts'), {
     method: 'POST',
     body: JSON.stringify(data),
@@ -1783,7 +1782,7 @@ export async function listEntityTypes() {
   return request<{ entityTypes: EntityTypeDefinition[] }>(hp('/settings/cms/entity-types'))
 }
 
-export type CreateEntityTypeBody = z.input<typeof createEntityTypeBodySchema>
+export type { CreateEntityTypeBody }
 
 export async function createEntityType(body: CreateEntityTypeBody) {
   return request<EntityTypeDefinition>(hp('/settings/cms/entity-types'), {
@@ -1815,7 +1814,7 @@ export async function deleteEntityType(id: string) {
   })
 }
 
-export type TemplateSummary = z.infer<typeof templateSummarySchema>
+export type { TemplateSummary }
 
 export async function listTemplates() {
   return request<{ templates: TemplateSummary[]; appliedTemplateIds?: string[] }>(hp('/settings/cms/templates'))
@@ -1847,7 +1846,7 @@ export async function createRolesFromTemplate(roles: Array<{ name: string; slug:
 
 // --- CMS Report Type Definitions (Epic 343) ---
 
-export type ReportTypeDefinition = z.infer<typeof reportTypeDefinitionSchema>
+export type { ReportTypeDefinition }
 
 export async function listCmsReportTypes() {
   return request<{ reportTypes: ReportTypeDefinition[] }>(hp('/settings/cms/report-types'))
@@ -1911,11 +1910,7 @@ export async function deleteCmsReportType(id: string) {
 
 // --- Case Records (Epic 330) ---
 
-export type CaseRecord = z.infer<typeof recordSchema>
-
-export type RecordContact = z.infer<typeof recordContactSchema>
-
-export type { CreateRecordBody, UpdateRecordBody }
+export type { CaseRecord, RecordContact, CreateRecordBody, UpdateRecordBody }
 
 export async function listRecords(params?: {
   entityTypeId?: string
@@ -2021,9 +2016,8 @@ export type DirectoryContact = import('@protocol/schemas').DirectoryContact & {
   _raw?: RawContact
 }
 
-export type ContactRelationship = z.infer<typeof contactRelationshipResponseSchema>
-
-export type ContactGroup = z.infer<typeof contactGroupResponseSchema>
+export type ContactRelationship = ContactRelationshipResponse
+export type ContactGroup = ContactGroupResponse
 
 /** Fetch raw encrypted contacts from /directory (backend returns encrypted data) */
 export async function listRawContacts(params?: {
@@ -2277,7 +2271,7 @@ export async function getRecordEnvelopeRecipients(params: {
 
 export type InteractionType = CaseInteraction['interactionType']
 
-export type CaseInteraction = z.infer<typeof caseInteractionSchema>
+export type { CaseInteraction }
 
 export async function listInteractions(recordId: string, params?: {
   interactionTypeHash?: string
