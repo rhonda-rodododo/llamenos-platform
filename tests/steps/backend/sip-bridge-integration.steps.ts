@@ -18,7 +18,7 @@ import {
   simulateVoicemail,
   uniqueCallerNumber,
 } from '../../simulation-helpers'
-import { apiGet, apiPost } from '../../api-helpers'
+import { apiGet, apiPost, devPost } from '../../api-helpers'
 
 // ── Local State ──────────────────────────────────────────────────────
 
@@ -106,7 +106,7 @@ When('DTMF digits {string} are received', async ({ request, world }, digits: str
   const state = getScenarioState(world)
   expect(state.callId).toBeDefined()
   // Post DTMF digits to the simulation endpoint
-  const { status } = await apiPost(request, `/test-simulate/dtmf`, {
+  const { status } = await devPost(request, `/test-simulate/dtmf`, {
     callId: state.callId,
     digits,
   })

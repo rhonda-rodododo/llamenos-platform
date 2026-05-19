@@ -15,7 +15,7 @@ import {
   simulateIncomingMessage,
   uniqueCallerNumber,
 } from '../../simulation-helpers'
-import { apiGet, apiPost, apiPatch } from '../../api-helpers'
+import { apiGet, apiPost, apiPatch, devPost } from '../../api-helpers'
 
 // ── Local State ──────────────────────────────────────────────────────
 
@@ -168,8 +168,8 @@ When(
     const signalState = getSignalState(world)
     expect(signalState.conversationId).toBeDefined()
 
-    // Post a simulated Signal delivery receipt webhook payload
-    const { status } = await apiPost(request, `/test-simulate/signal-receipt`, {
+    // Post a simulated Signal delivery receipt webhook payload (dev route — X-Test-Secret auth)
+    const { status } = await devPost(request, `/test-simulate/signal-receipt`, {
       conversationId: signalState.conversationId,
       timestamp,
       receiptType: 'delivery',
@@ -183,7 +183,7 @@ When(
       )
       const msg = messages.messages.find(m => m.externalId === timestamp)
       if (msg) {
-        await apiPost(request, `/test-simulate/delivery-status`, {
+        await devPost(request, `/test-simulate/delivery-status`, {
           conversationId: signalState.conversationId,
           messageId: msg.id,
           status: 'delivered',
@@ -199,8 +199,8 @@ When(
   async ({ request, world }, emoji: string, targetTimestamp: string) => {
     const signalState = getSignalState(world)
     expect(signalState.conversationId).toBeDefined()
-    // Post a simulated Signal reaction event
-    const { status, data } = await apiPost<{ eventType?: string; payload?: Record<string, unknown> }>(
+    // Post a simulated Signal reaction event (dev route — X-Test-Secret auth)
+    const { status, data } = await devPost<{ eventType?: string; payload?: Record<string, unknown> }>(
       request,
       `/test-simulate/signal-reaction`,
       {
@@ -222,7 +222,7 @@ When(
   async ({ request, world }) => {
     const signalState = getSignalState(world)
     expect(signalState.conversationId).toBeDefined()
-    const { status, data } = await apiPost<{ eventType?: string; payload?: Record<string, unknown> }>(
+    const { status, data } = await devPost<{ eventType?: string; payload?: Record<string, unknown> }>(
       request,
       `/test-simulate/signal-typing`,
       {

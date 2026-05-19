@@ -77,6 +77,54 @@ async function safeJson(res: import('@playwright/test').APIResponse): Promise<un
   }
 }
 
+// ── Dev Route Request Primitives ─────────────────────────────────
+// Dev routes (/api/test-*) require X-Test-Secret header instead of Bearer auth.
+// These are gated by ENVIRONMENT=development + DEV_ROUTES_ENABLED=true + secret.
+
+const DEV_TEST_SECRET = process.env.DEV_RESET_SECRET || process.env.E2E_TEST_SECRET || 'test-reset-secret'
+
+function devHeaders(): Record<string, string> {
+  return { 'Content-Type': 'application/json', 'X-Test-Secret': DEV_TEST_SECRET }
+}
+
+export async function devPost<T = unknown>(
+  request: APIRequestContext,
+  path: string,
+  body: Record<string, unknown>,
+): Promise<{ status: number; data: T }> {
+  const fullPath = `/api${path}`
+  const res = await request.post(fullPath, {
+    headers: devHeaders(),
+    data: body,
+  })
+  const data = await safeJson(res)
+  return { status: res.status(), data: data as T }
+}
+
+export async function devGet<T = unknown>(
+  request: APIRequestContext,
+  path: string,
+): Promise<{ status: number; data: T }> {
+  const fullPath = `/api${path}`
+  const res = await request.get(fullPath, {
+    headers: devHeaders(),
+  })
+  const data = await safeJson(res)
+  return { status: res.status(), data: data as T }
+}
+
+export async function devDelete<T = unknown>(
+  request: APIRequestContext,
+  path: string,
+): Promise<{ status: number; data: T }> {
+  const fullPath = `/api${path}`
+  const res = await request.delete(fullPath, {
+    headers: devHeaders(),
+  })
+  const data = await safeJson(res)
+  return { status: res.status(), data: data as T }
+}
+
 // ── Authenticated Request Primitives ──────────────────────────────
 
 export async function apiGet<T = unknown>(
@@ -157,15 +205,10 @@ export async function createHubViaApi(
   // Use the test-create-hub endpoint (dev.ts) which bypasses permission checks
   // and only requires the X-Test-Secret header. The authenticated /api/hubs POST
   // requires system:manage-hubs which the bootstrap admin may not have.
-  const testSecret = process.env.DEV_RESET_SECRET || process.env.E2E_TEST_SECRET || 'test-reset-secret'
-  const res = await request.post('/api/test-create-hub', {
-    headers: { 'X-Test-Secret': testSecret },
-    data: { name },
-  })
-  if (!res.ok()) {
-    throw new Error(`Failed to create hub: ${res.status()}`)
+  const { status, data } = await devPost<{ id: string }>(request, '/test-create-hub', { name })
+  if (status !== 200) {
+    throw new Error(`Failed to create hub: ${status}`)
   }
-  const data = await res.json() as { id: string }
   return data.id
 }
 
@@ -1983,11 +2026,11 @@ export async function seedViaApi(
   request: APIRequestContext,
   spec: SeedSpec,
 ): Promise<SeedResult> {
-  const { status, data } = await apiPost<SeedResult>(
+  // test-seed is a dev route — requires X-Test-Secret, not Bearer auth
+  const { status, data } = await devPost<SeedResult>(
     request,
     '/test-seed',
     spec as unknown as Record<string, unknown>,
-    spec.adminSeed,
   )
   if (status !== 200) throw new Error(`test-seed failed: HTTP ${status}`)
   return data
