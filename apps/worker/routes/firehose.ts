@@ -3,14 +3,13 @@
  * notification opt-outs, and agent lifecycle control.
  */
 import { Hono } from 'hono'
-import { describeRoute, resolver, validator } from 'hono-openapi'
+import { describeRoute, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { requirePermission } from '../middleware/permission-guard'
 import { LABEL_FIREHOSE_AGENT_SEAL } from '@shared/crypto-labels'
 import {
   createFirehoseConnectionSchema,
   updateFirehoseConnectionSchema,
-  firehoseConnectionStatusSchema,
   type FirehoseConnectionStatus,
 } from '@protocol/schemas/firehose'
 import { authErrors } from '../openapi/helpers'
@@ -121,14 +120,23 @@ firehose.post('/',
       return c.json({ error: 'Firehose agent seal key not configured' }, 503)
     }
 
-    // Create connection with placeholder keypair, then generate real one
-    const raw = await services.firehose.createConnection(hubId, {
-      id: data.id,
+    // Use client-supplied ID or generate one for deterministic keypair derivation
+    const connectionId = data.id ?? crypto.randomUUID()
+
+    // Generate keypair before persisting — avoids orphaned 'pending' rows on failure
+    const { pubkey: agentPubkey, encryptedNsec } = generateAgentKeypair(
+      connectionId,
+      sealKey,
+      LABEL_FIREHOSE_AGENT_SEAL,
+    )
+
+    const row = await services.firehose.createConnection(hubId, {
+      id: connectionId,
       displayName: data.displayName?.trim() ?? '',
       encryptedDisplayName: data.encryptedDisplayName?.trim(),
       reportTypeId: data.reportTypeId,
-      agentPubkey: 'pending',
-      encryptedAgentNsec: 'pending',
+      agentPubkey,
+      encryptedAgentNsec: encryptedNsec,
       geoContext: data.geoContext ?? null,
       geoContextCountryCodes: data.geoContextCountryCodes ?? null,
       inferenceEndpoint: data.inferenceEndpoint ?? null,
@@ -139,22 +147,13 @@ firehose.post('/',
       status: 'pending',
     })
 
-    // Generate keypair bound to the real connection ID
-    const { pubkey: agentPubkey, encryptedNsec } = generateAgentKeypair(
-      raw.id,
-      sealKey,
-      LABEL_FIREHOSE_AGENT_SEAL,
-    )
-
-    const updated = await services.firehose.setAgentKeypair(raw.id, agentPubkey, encryptedNsec)
-
     backgroundTask(c,
       audit(services.audit, 'firehoseConnectionCreated', pubkey, {
-        connectionId: raw.id,
+        connectionId: row.id,
       }, undefined, hubId),
     )
 
-    return c.json({ connection: mapConnection(updated ?? raw) }, 201)
+    return c.json({ connection: mapConnection(row) }, 201)
   },
 )
 
