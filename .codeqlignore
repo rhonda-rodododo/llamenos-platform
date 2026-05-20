@@ -1,13 +1,17 @@
-# Vendored Ruby gems (iOS Fastlane deps — third-party code, not ours)
+# Vendored Ruby gems (iOS Fastlane)
 apps/ios/vendor/
 
-# Generated code (gitignored, rebuilt on-the-fly — not our source)
+# Codegen output (generated from Zod schemas)
 packages/protocol/generated/
+**/generated/
 
 # Build artifacts
 dist/
 build/
 
-# Node module caches
+# Dependencies
 node_modules/
 .bun/
+
+# Test fixtures with intentional mock patterns
+tests/mocks/

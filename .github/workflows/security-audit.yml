@@ -225,3 +225,71 @@ jobs:
           format: 'table'
           severity: 'CRITICAL,HIGH'
           exit-code: '0'
+
+  # ─── Crypto Guardrails (informational) ─────────────────────
+  crypto-guardrails:
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Check for raw unwrap() on crypto operations
+        run: |
+          echo "=== Checking for raw unwrap() in crypto crate ==="
+          # Flag unwrap() calls that aren't in test files
+          FINDINGS=$(grep -rn '\.unwrap()' packages/crypto/src/ apps/desktop/src/crypto.rs \
+            --include='*.rs' \
+            | grep -v '#\[cfg(test)\]' \
+            | grep -v '_test\.rs:' \
+            | grep -v 'tests\.rs:' \
+            | grep -v 'mod tests' \
+            || true)
+          if [ -n "$FINDINGS" ]; then
+            echo "::warning::Found unwrap() calls in crypto code (consider proper error handling):"
+            echo "$FINDINGS"
+          else
+            echo "No unwrap() calls found in production crypto code."
+          fi
+
+      - name: Check for non-cryptographic RNG usage
+        run: |
+          echo "=== Checking for non-cryptographic RNG in crypto crate ==="
+          FINDINGS=$(grep -rn 'use rand::' packages/crypto/src/ apps/desktop/src/crypto.rs \
+            --include='*.rs' \
+            | grep -v 'rand::rngs::OsRng' \
+            | grep -v 'rand::CryptoRng' \
+            | grep -v '_test\.rs:' \
+            | grep -v 'tests\.rs:' \
+            || true)
+          if [ -n "$FINDINGS" ]; then
+            echo "::warning::Found non-OsRng/non-CryptoRng rand usage in crypto code:"
+            echo "$FINDINGS"
+          else
+            echo "No suspicious RNG usage found."
+          fi
+
+      - name: Check for hardcoded keys outside tests
+        run: |
+          echo "=== Checking for hardcoded keys in crypto code ==="
+          FINDINGS=$(grep -rn -E '(0x[0-9a-fA-F]{32,}|\\x[0-9a-fA-F]{2}){8,}' \
+            packages/crypto/src/ apps/desktop/src/crypto.rs \
+            --include='*.rs' \
+            | grep -v '_test\.rs:' \
+            | grep -v 'tests\.rs:' \
+            | grep -v '#\[cfg(test)\]' \
+            | grep -v 'mod tests' \
+            || true)
+          if [ -n "$FINDINGS" ]; then
+            echo "::warning::Found potential hardcoded keys in production crypto code:"
+            echo "$FINDINGS"
+          else
+            echo "No hardcoded keys found in production crypto code."
+          fi
