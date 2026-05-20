@@ -31,6 +31,9 @@ typealias EventType = SharedEventType
 /// `ChannelConfigClass` → `SharedChannelConfig` (deduplicated channel config inner type).
 typealias ChannelConfigClass = SharedChannelConfig
 
+/// `Channels` → `SharedChannelConfig` (deduplicated channel toggle struct used in HubProviderSettings).
+typealias Channels = SharedChannelConfig
+
 /// `DeviceDetailListResponseDevice` → `SharedDevice` (deduplicated device inner type).
 typealias DeviceDetailListResponseDevice = SharedDevice
 
