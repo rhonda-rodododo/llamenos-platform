@@ -1,26 +1,26 @@
 ---
-title: "Tafatirka: Signal"
-description: Tafatir kanaalka fariimaha Signal iyada oo loo marayo signal-cli bridge si loogu dhowaad fariimaha gaarka ah.
+title: "Setup: Signal"
+description: Set up the Signal messaging channel via the signal-cli bridge for privacy-focused messaging.
 ---
 
-Llamenos waxay taageertaa fariimaha Signal iyada oo loo marayo [signal-cli-rest-api](https://github.com/bbernhard/signal-cli-rest-api) bridge oo gacanta lagu hayo. Signal wuxuu bixiyaa ilaalinta ugu xoogsan ee gaarka ah ee kanaal kasta oo fariimo ah, taasoo ka dhigaysa mid aad u habboon xaaladaha jawaab celinta dhibaatooyinka ee gaarka ah.
+Llamenos waxay taageertaa Signal messaging via self-hosted [signal-cli-rest-api](https://github.com/bbernhard/signal-cli-rest-api) bridge. Signal waxay bixisaa strongest privacy guarantees of any messaging channel, sidaas darteed waxay u habboon tahay sensitive crisis response scenarios.
 
-## Shuruudaha hore
+## Prerequisites
 
-- Server Linux ama VM bridge-ka (waxay noqon kartaa isla server-ka Asterisk, ama mid ka duwan)
-- Docker oo ku rakiban server-ka bridge-ka
-- Lambarka taleefan oo keliya oo loogu talagalay diiwaangelinta Signal
-- Helitaanka shabakadda bridge-ka ilaa server-kaaga Llamenos
+- Linux server ama VM for the bridge (waxay noqon kartaa isku server Asterisk, ama separate)
+- Docker installed on bridge server
+- Dedicated phone number for Signal registration
+- Network access from bridge to your Llamenos server
 
-## Qaab-dhismeedka
+## Architecture
 
 ![Signal Bridge Architecture](/diagrams/signal-bridge.svg)
 
-Bridge-ka signal-cli waxay ku shaqeysaa infrastructure-kaaga oo ay u gudbiyaan fariimaha server-kaaga via HTTP webhooks. Tani waxay macnaheedu yahay inaad maamusho dhammaan waddada fariimaha ee laga bilaabo Signal ilaa codsigaaga.
+signal-cli bridge-ka waxa uu shaqeeyaa on your infrastructure oo waxa uu gudbiyaa messages to your server via HTTP webhooks. Tani macnaheedu waa aad xakameysaa entire message path from Signal to your application.
 
-## 1. Soo saar bridge-ka signal-cli
+## 1. Deploy the signal-cli bridge
 
-Ordi container-ka signal-cli-rest-api Docker:
+Run signal-cli-rest-api Docker container:
 
 ```bash
 docker run -d \
@@ -32,21 +32,21 @@ docker run -d \
   bbernhard/signal-cli-rest-api:latest
 ```
 
-## 2. Diiwaangeli lambarka taleefanka
+## 2. Register a phone number
 
-Diiwaangeli bridge-ka iyada oo la isticmaalayo lambarka taleefan oo keliya:
+Register bridge-ka with dedicated phone number:
 
 ```bash
-# Codsiga koodhka xaqiijinta via SMS
+# Request verification code via SMS
 curl -X POST http://localhost:8080/v1/register/+1234567890
 
-# Xaqiiji iyada oo la isticmaalayo koodhkaad heshay
+# Verify with code aad heshay
 curl -X POST http://localhost:8080/v1/register/+1234567890/verify/123456
 ```
 
-## 3. Tafatir gudbinta webhook
+## 3. Configure webhook forwarding
 
-Habeey bridge-ka si uu u gudbiyo fariimaha soo gala server-kaaga:
+Setup bridge-ka si uu u gudbiyo incoming messages to your server:
 
 ```bash
 curl -X PUT http://localhost:8080/v1/about \
@@ -61,42 +61,42 @@ curl -X PUT http://localhost:8080/v1/about \
   }'
 ```
 
-## 4. Fur Signal goobaha maamulka
+## 4. Enable Signal in admin settings
 
-U gudub **Admin Settings > Messaging Channels** (ama isticmaal setup wizard) oo beddel **Signal** ON.
+Aad u guur **Admin Settings > Messaging Channels** (ama isticmaal setup wizard) oo toggle **Signal** on.
 
-Geli waxyaabaha soo socda:
-- **Bridge URL** — URL-ga bridge-kaaga signal-cli (tusaale, `https://signal-bridge.example.com:8080`)
-- **Bridge API Key** — bearer token si loo xaqiijiyo codsiyada bridge-ka
-- **Webhook Secret** — sirka loo isticmaalo in lagu xaqiijiyo webhooks soo gala (waa inuu waafaqsan yahay waxaad ku tafatirtay tallaabo 3)
-- **Registered Number** — lambarka taleefanka ee la diiwaangeliyay Signal
+Geli kuwan:
+- **Bridge URL** — URL-ga signal-cli bridge-kaaga (e.g., `https://signal-bridge.example.com:8080`)
+- **Bridge API Key** — bearer token for authenticating requests to the bridge
+- **Webhook Secret** — secret loo isticmaalo validating incoming webhooks (waa inuu iswaafaqsan yahay waxa aad configure gareysay in step 3)
+- **Registered Number** — phone number loo diiwaan geliyay Signal
 
-## 5. Tijaabi
+## 5. Test
 
-U dir fariimaha Signal lambarkaaga taleefanka ee la diiwaangeliyay. Wada hadalku waa inuu ka muuqdaa tab-ka **Conversations**.
+Send Signal message to registered phone number-kaaga. Wadahadku waa inuu soo muuqdaa in **Conversations** tab.
 
-## Kormeerka caafimaadka
+## Health monitoring
 
-Llamenos waxay kormeertaa caafimaadka bridge-ka signal-cli:
-- Hubin joogto ah oo ku saabsan endpoint-ka `/v1/about` ee bridge-ka
-- Hoos u dhaca qumman haddii bridge-ka aan la gaari karin — kanaalada kale way sii shaqeynayaan
-- Digniinada maamulka marka bridge-ka uu hoos u dhaco
+Llamenos waxay hubisaa health-ga signal-cli bridge:
+- Periodic health checks to bridge-ka `/v1/about` endpoint
+- Graceful degradation haddii bridge-ka la heli waayo — channels kale way sii shaqeynayaan
+- Admin alerts marka bridge-ka dhaco
 
-## Qoraalka fariimaha codka
+## Voice message transcription
 
-Fariimaha codka ee Signal waxay noqon karaan in lagu qoro si toos ah browser-ka isbitaallada iyada oo loo isticmaalo Whisper dhinaca client-ka (WASM via `@huggingface/transformers`). Codku marnaba ma ka tagayo device-ka — qoraalka waa inuu la fureeraa oo la kaydiyaa fariimaha codka ee muuqaalka wada hadalka. Isbitaalladu waxay awood u leeyihiin inay awood u yeelato ama ka joojiyaan qoraalka goobaha shakhsiyeed.
+Signal voice messages waxaa loo turjumi karaa directly in volunteer's browser iyadoo isticmaalayo client-side Whisper (WASM via `@huggingface/transformers`). Audio marnaba ma ka tagayo device-ka — transcript-ka waxaa loo encrypt gareeyaa oo waxaa lagu kaydiyaa alongside voice message in conversation view. Volunteers waxay awood u leeyihiin inay enable ama disable gareyaan transcription in their personal settings.
 
-## Xusuusinaha amniga
+## Security notes
 
-- Signal waxay bixisaa encryption u dhexeeya isticmaalaha iyo bridge-ka signal-cli
-- Bridge-ku wuxuu fureeraa fariimaha si uu u gudbiyo sida webhooks — server-ka bridge-ka wuxuu helaa plaintext
-- Xaqiijinta webhook waxay isticmaashaa bearer tokens iyada oo leh isbarbardhig waqti-ku-meel-gaar ah
-- Sii bridge-ka isla shabakadda server-kaaga Asterisk (haddii la heli karo) si loo yareeyo daahfurka
-- Bridge-ku waxay kaydsaa taariikhda fariimaha goobta Docker volume-ka — fiiri encryption marka la joogo
-- Si loo helo gaarka ugu sarreeya: isbitaalo gacanta ku haysa Asterisk (cod) iyo signal-cli (fariimo) infrastructure-kaaga
+- Signal waxay bixisaa end-to-end encryption between user and signal-cli bridge
+- Bridge-ka waxay decrypt gareysaa messages si ay u gudbiyaan as webhooks — bridge server-ka waxay heshaa plaintext access
+- Webhook authentication waxay isticmaashaa bearer tokens with constant-time comparison
+- Soo koob bridge on same network as your Asterisk server (haddii la jiro) for minimal exposure
+- Bridge-ka waxay kaydsan tahay message history locally in Docker volume — consider encryption at rest
+- For maximum privacy: self-host both Asterisk (voice) iyo signal-cli (messaging) on your own infrastructure
 
-## Xalinta dhibaatooyinka
+## Troubleshooting
 
-- **Bridge ma helin fariimo**: Hubi in lambarka taleefanka si sax ah loo diiwaangeliyay iyada oo la isticmaalayo `GET /v1/about`
-- **Khaladaadka gudbinta webhook**: Xaqiiji in URL-ga webhook uu ka mid yahay server-ka bridge-ka iyo in madaxa authorization uu waafaqsan yahay
-- **Dhibaatooyinka diiwaangelinta**: Qaar ka mid ah lambarrada taleefanka waxay u baahan yihiin in la ka saaro koontada Signal ee horey u jirtay marka hore
+- **Bridge not receiving messages**: Check in phone number si sax ah loo diiwaan geliyay with `GET /v1/about`
+- **Webhook delivery failures**: Verify webhook URL-ka la heli karo from bridge server oo authorization header uu iswaafaqsan yahay
+- **Registration issues**: Qaar phone numbers waxay u baahan yihiin inay ka go'aan existing Signal account first

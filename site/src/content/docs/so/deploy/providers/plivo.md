@@ -1,80 +1,80 @@
 ---
-title: "Deji: Plivo"
-description: Tilmaan tallaabo-tallaabo ah oo lagu qaabeeyo Plivo bixiyahaaga telefoonada.
+title: "Setup: Plivo"
+description: Step-by-step guide to configure Plivo as your telephony provider.
 ---
 
-Plivo waa bixiye telefoon oo kayd-saaxiibtinimo ah oo leh API toosan. Wuxuu isticmaalaa kontorool wicitaan XML-ku-saleysan oo la mid ah TwiML, taasoo ka dhigaysa is-dhexgalka Llámenos mid habsami leh.
+Plivo waa cloud telephony provider qiimo jaban with a straightforward API. Waxay isticmaashaa XML-based call control similar to TwiML, sidaas darteed integration with Llamenos waa mid fudud.
 
-## Waxyaabaha loo baahan yahay
+## Prerequisites
 
-- Akoon [Plivo](https://console.plivo.com/accounts/register/) (amaano tijaabo ah waa la heli karaa)
-- Matoorkaaga Llámenos oo la hawlgaliyay oo laga heli karo URL dadweyne
+- [Plivo account](https://console.plivo.com/accounts/register/) (trial credit available)
+- Your Llamenos instance deployed oo la heli karo via public URL
 
-## 1. Abuur akoon Plivo
+## 1. Create a Plivo account
 
-Ka diiwaan geli [console.plivo.com](https://console.plivo.com/accounts/register/). Ka dib xaqiijinta, waxaad ka heli kartaa **Auth ID** iyo **Auth Token** bogga weyn ee dashboard-ka.
+Isu diiwaan geli at [console.plivo.com](https://console.plivo.com/accounts/register/). Kadib verification, waxaad ka heli kartaa **Auth ID** iyo **Auth Token** on dashboard home page.
 
-## 2. Iibso lambar taleefan
+## 2. Buy a phone number
 
-1. Tag **Phone Numbers** > **Buy Numbers** Plivo Console-ka
-2. Dooro waddankaaga oo raadi lambarro leh awoodda codka
-3. Iibso lambar
+1. Aad u guur **Phone Numbers** > **Buy Numbers** in Plivo Console
+2. Dooro country-kaaga oo raadi numbers with voice capability
+3. Iibso number
 
-## 3. Abuur XML application
+## 3. Create an XML application
 
-Plivo wuxuu isticmaalaa "XML Applications" si uu u mariyo wicitaannada:
+Plivo waxay isticmaashaa "XML Applications" si ay u gudbiso calls:
 
-1. Tag **Voice** > **XML Applications**
+1. Aad u guur **Voice** > **XML Applications**
 2. Guji **Add New Application**
-3. Qaabee:
+3. Configure:
    - **Application Name**: Llamenos Hotline
    - **Answer URL**: `https://your-domain.com/api/telephony/incoming` (POST)
    - **Hangup URL**: `https://your-domain.com/api/telephony/status` (POST)
-4. Kaydi application-ka
+4. Keyd application-ka
 
-## 4. Ku xidh lambarka taleefanka
+## 4. Link the phone number
 
-1. Tag **Phone Numbers** > **Your Numbers**
-2. Guji lambarkaaga khadka gurmadka
-3. Hoos **Voice**, dooro XML Application-ka aad abuurtay tallaabada 3
-4. Kaydi
+1. Aad u guur **Phone Numbers** > **Your Numbers**
+2. Guji hotline number-kaaga
+3. Under **Voice**, dooro XML Application aad sameysay in step 3
+4. Keyd
 
-## 5. Ku qaabee Llámenos
+## 5. Configure in Llamenos
 
-1. Soo gal maamul ahaan
-2. Tag **Settings** > **Telephony Provider**
-3. Dooro **Plivo** hoos-u-dhaca bixiyaha
-4. Gali:
-   - **Auth ID**: Plivo Console dashboard-ka
-   - **Auth Token**: Plivo Console dashboard-ka
-   - **Phone Number**: lambarka aad iibsaty (qaabka E.164)
+1. Log in as admin
+2. Aad u guur **Settings** > **Telephony Provider**
+3. Dooro **Plivo** from provider dropdown
+4. Geli:
+   - **Auth ID**: from Plivo Console dashboard
+   - **Auth Token**: from Plivo Console dashboard
+   - **Phone Number**: number-ka aad iibsatey (E.164 format)
 5. Guji **Save**
 
-## 6. Tijaabi dejinta
+## 6. Test the setup
 
-U wac lambarkaaga khadka gurmadka. Waa inaad maqashaa liiska xulashada luqadda oo laguu mariyo habka wicitaanka caadiga ah.
+Wac hotline number-kaaga. Waa inaad maqashaa language selection menu oo aad u gudubto normal call flow.
 
-## Dejinta WebRTC (ikhtiyaar)
+## WebRTC setup (optional)
 
-Plivo WebRTC wuxuu isticmaalaa Browser SDK-ga oo leh aqoonsiyahaaga jira:
+Plivo WebRTC waxay isticmaashaa Browser SDK with your existing credentials:
 
-1. Tag **Voice** > **Endpoints** Plivo Console-ka
-2. Abuur endpoint cusub (tani waxay u shaqeysaa aqoonsiga taleefanka browser-ka)
-3. Llámenos, tag **Settings** > **Telephony Provider**
-4. Shid **WebRTC Calling**
+1. Aad u guur **Voice** > **Endpoints** in Plivo Console
+2. Create a new endpoint (tani waxay howl gelisaa browser phone identity)
+3. In Llamenos, aad u guur **Settings** > **Telephony Provider**
+4. Toggle **WebRTC Calling** on
 5. Guji **Save**
 
-Adapter-ku wuxuu soo saaraa calamada HMAC-ku-xiran ee wakhtiga-xaddidan oo ka yimid Auth ID iyo Auth Token xaqiijinta browser-ka ammaan ah.
+Adapter-ka waxay soo saartaa time-limited HMAC tokens from your Auth ID and Auth Token for secure browser authentication.
 
-## Plivo xusuus-qor
+## Plivo-specific notes
 
-- **XML vs TwiML**: Plivo wuxuu isticmaalaa qaabkiisa XML ee kontoroolka wicitaanka, kaas oo la mid ah laakiin aan la mid ahayn TwiML. Adapter-ka Llámenos wuxuu si toos ah u soo saaraa XML-ka saxda ah ee Plivo.
-- **Answer URL vs Hangup URL**: Plivo wuxuu kala saaraa maareeyaha wicitaanka bilowga ah (Answer URL) iyo maareeyaha dhammaadka wicitaanka (Hangup URL), si ka duwan Twilio oo isticmaala hal wicitaan heer.
-- **Xaddidaadda heerka**: Plivo wuxuu leeyahay xaddidaadda heerka API oo ku kala duwan heerka akoonka. Khadadka gurmadka ee mugga-sarreeya, la xiriir taageerada Plivo si aad u kordhiso xaddidaadda.
+- **XML vs TwiML**: Plivo waxay isticmaashaa XML format-kaaga u gaarka ah for call control, taas oo la mid laakiin aan isku mid ahayn TwiML. Llamenos adapter-ka waxay si otomaatig ah u soo saartaa saxda ah Plivo XML.
+- **Answer URL vs Hangup URL**: Plivo waxay kala saartaa initial call handler (Answer URL) from call end handler (Hangup URL), unlike Twilio oo isticmaasho single status callback.
+- **Rate limits**: Plivo waxay leedahay API rate limits ku kala duwan account tier. For high-volume hotlines, la xidhiidh Plivo support si aad u kordhiso limits.
 
-## Cillad-xallinta
+## Troubleshooting
 
-- **"Auth ID invalid"**: Auth ID-ku ma aha ciwaankaaga iimaylka. Ka hel Plivo Console dashboard-ka bogga weyn.
-- **Wicitaannada ma socdaan**: Xaqiiji in lambarka taleefanka uu ku xiran yahay XML Application-ka saxda ah.
-- **Qaladaadka Answer URL**: Plivo wuxuu filayaa jawaabo XML oo sax ah. Hubi log-yada server-kaaga qaladaadka jawaabta.
-- **Xaddidaadda wicitaanka kac-baxa**: Akoonada tijaabadu waxay leeyihiin xaddidaadyo wicitaanka kac-baxa. U cusboonaysii wax-soo-saarka.
+- **"Auth ID invalid"**: Auth ID ma aha email-kaaga. Hel on Plivo Console dashboard home page.
+- **Calls not routing**: Verify in phone number-ka uu isku xiran yahay XML Application saxda ah.
+- **Answer URL errors**: Plivo waxay expect gareysaa valid XML responses. Check your server logs for response errors.
+- **Outbound call restrictions**: Trial accounts waxay leeyihiin limitations on outbound calling. Upgrade for production use.

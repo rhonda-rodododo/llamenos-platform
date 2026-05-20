@@ -1,31 +1,31 @@
 ---
-title: "Deji: SMS"
-description: Ku shid farriimaha SMS ee soo-gala iyo gudbaha iyada oo loo marayo bixiyahaaga telefoonada.
+title: "Setup: SMS"
+description: Enable inbound and outbound SMS messaging via your telephony provider.
 ---
 
-Farriimaha SMS ee Llámenos waxay dib u isticmaalaan aqoonsiyahaaga bixiyaha telefoonada ee jira. Ma jiro adeeg SMS oo gooni ah oo loo baahan yahay — haddii aad hore u qaabaysay Twilio, SignalWire, Vonage, ama Plivo codka, SMS wuxuu la shaqeeyaa isla akoonka.
+SMS messaging in Llamenos waxay dib u isticmaashaa existing voice telephony provider credentials-kaaga. Ma u baahnato separate SMS service -- haddii horey uu configure gareysay Twilio, SignalWire, Vonage, ama Plivo for voice, SMS waxay shaqaysaa with the same account.
 
-## Bixiyeyaasha la taageero
+## Supported providers
 
-| Bixiyaha | Taageerada SMS | Xusuus |
-|---|---|---|
-| **Twilio** | Haa | SMS laba-jihood oo buuxda iyada oo loo marayo Twilio Messaging API |
-| **SignalWire** | Haa | La jaan-qaadi kara API Twilio — isla interface |
-| **Vonage** | Haa | SMS iyada oo loo marayo Vonage REST API |
-| **Plivo** | Haa | SMS iyada oo loo marayo Plivo Message API |
-| **Asterisk** | Maya | Asterisk ma taageero SMS dabiici ah |
+| Provider | SMS Support | Notes |
+|----------|------------|-------|
+| **Twilio** | Yes | Full two-way SMS via Twilio Messaging API |
+| **SignalWire** | Yes | Compatible with Twilio API -- same interface |
+| **Vonage** | Yes | SMS via Vonage REST API |
+| **Plivo** | Yes | SMS via Plivo Message API |
+| **Asterisk** | No | Asterisk ma taageerto native SMS |
 
-## 1. Ku shid SMS dejinta maamulka
+## 1. Enable SMS in admin settings
 
-Tag **Admin Settings > Messaging Channels** (ama isticmaal qalabka dejinta markaad marka hore soo gasho) oo shid **SMS**.
+Aad u guur **Admin Settings > Messaging Channels** (ama isticmaal setup wizard on first login) oo toggle **SMS** on.
 
-Qaabee dejinta SMS:
-- **Farriinta jawaabta tooska ah** — farriin soo dhaweyn ikhtiyaari ah oo loo diro xiriirrada marka koowaad
-- **Jawaabta saacadaha ka baxsan** — farriin ikhtiyaari ah oo loo diro wakhtiyada shifta ka baxsan
+Configure SMS settings:
+- **Auto-response message** — optional welcome message sent to first-time contacts
+- **After-hours response** — optional message sent outside shift hours
 
-## 2. Qaabee webhook-ka
+## 2. Configure the webhook
 
-U jeedi webhook-ka SMS-ka bixiyahaaga telefoonada server-kaaga:
+U jeedi SMS webhook-ka telephony provider-kaaga server-kaaga:
 
 ```
 POST https://your-domain.com/api/messaging/sms/webhook
@@ -33,39 +33,39 @@ POST https://your-domain.com/api/messaging/sms/webhook
 
 ### Twilio / SignalWire
 
-1. Tag Twilio Console > Phone Numbers > Active Numbers
-2. Dooro lambarkaaga taleefanka
-3. Hoos **Messaging**, ku deji xiriiriyaha webhook-ka "A message comes in" URL-ka sare
-4. Deji habka HTTP **POST**
+1. Aad u guur Twilio Console > Phone Numbers > Active Numbers
+2. Dooro phone number-kaaga
+3. Under **Messaging**, set webhook URL for "A message comes in" to URL above
+4. Set HTTP method to **POST**
 
 ### Vonage
 
-1. Tag Vonage API Dashboard > Applications
+1. Aad u guur Vonage API Dashboard > Applications
 2. Dooro application-kaaga
-3. Hoos **Messages**, ku deji Inbound URL-ka webhook URL-ka sare
+3. Under **Messages**, set Inbound URL to webhook URL above
 
 ### Plivo
 
-1. Tag Plivo Console > Messaging > Applications
-2. Abuur ama tafatir application farriimeed
-3. Deji Message URL-ka webhook URL-ka sare
-4. U qoondee application-ka lambarkaaga taleefanka
+1. Aad u guur Plivo Console > Messaging > Applications
+2. Create ama wax ka beddel messaging application
+3. Set Message URL to webhook URL above
+4. Assign application-ka to phone number-kaaga
 
-## 3. Tijaabi
+## 3. Test
 
-U dir SMS lambarkaaga taleefanka khadka gurmadka. Waa inaad aragtaa wada hadalka oo ka soo baxaya taabka **Conversations** qaybta maamulka.
+Send SMS to hotline phone number-kaaga. Waa inaad aragto wadahadka soo muuqda in **Conversations** tab in admin panel.
 
-## Sida ay u shaqeyso
+## How it works
 
-1. SMS waxay ku soo gaartaa bixiyahaaga, kaas oo u soo diraya webhook server-kaaga
-2. Server-ku wuxuu xaqiijiyaa saxiixa webhook-ka (HMAC bixiye-gaar ah)
-3. Farriinta waa la farsameeyaa waxaana lagu kaydiyaa ConversationService
-4. Tabaruceyaasha shifta ku jira waxaa loo ogeysiiyaa iyada oo loo marayo WebSocket relay events
-5. Tabaruceyaashu way ka jawaabaan taabka Conversations — jawaabaha waxaa dib loogu soo celiyaa iyada oo loo marayo API-ga SMS ee bixiyahaaga
+1. SMS wuxuu yimaadaa provider-kaaga, taasoo soo diraysa webhook to your server
+2. Server-ka waxay validate gareysaa webhook signature (provider-specific HMAC)
+3. Farriintu way parse gareysaa oo waxay ku kaydsan tahay ConversationService
+4. On-shift volunteers waxaa loo soo gudbinayaa via WebSocket relay events
+5. Volunteers ka jawaabayaan from Conversations tab — responses waxay la soo noqdaan via provider-kaaga SMS API
 
-## Xusuus-qor amniga
+## Security notes
 
-- Farriimaha SMS waxay ku socdaan shabakadda sidaha qoraal cad — bixiyahaaga iyo sidayaashu way aqrin karaan
-- Farriimaha soo gala waa la siriyay marka la helo waxaana lagu kaydiyaa kaydka xogta
-- Lambarrada taleefannada soo dirayaasha waa la hasheeyay ka hor kaydinta (asturnaanta)
-- Sahiixa webhook-ka waa la xaqiijiyaa bixiye kasta (HMAC-SHA1 Twilio, iwm)
+- SMS messages waxay marayaan carrier network in plaintext -- provider-kaaga iyo carriers waxay akhriyi karaan
+- Inbound messages waxaa loo encrypt gareeyaa on receipt oo waxaa lagu kaydiyaa database
+- Sender phone numbers waxaa loo hash gareeyaa before storage (privacy)
+- Webhook signatures waxaa la validate gareeyaa per-provider (HMAC-SHA1 for Twilio, etc.)

@@ -1,62 +1,62 @@
 ---
-title: Tixraaca API
- description: Tixraaca dhammaan REST API endpoint-yada ee soo bandhigaya server-ka Llamenos.
+title: API Reference
+description: Complete REST API endpoint reference for the Llamenos server.
 ---
 
-Warqaddani waxay sharxaysaa endpoint kasta oo REST API ah ee soo bandhigaya server-ka Llamenos. Dhammaan endpoint-yada waxay leeyihiin horey `/api`. Codsiyada iyo jawaabaha waxay isticmaalaan JSON haddii aan si kale loo sheegin. Dhammaan timestamps-ku waa strings ISO 8601.
+Document-gaani wuxuu sharxayaa every REST API endpoint exposed by Llamenos server. Dhammaan endpoints waxay ku bilaabmaan `/api`. Requests iyo responses waxay isticmaalaan JSON haddii aan si kale loo sheegin. Dhammaan timestamps waxay ahaan karaan ISO 8601 strings.
 
-API-gu waa isla mid haddii backend-ku uu ku shaqeeyo **Cloudflare Workers** (iyada oo leh Durable Objects) ama **self-hosted** (Node.js + PostgreSQL). Lixda Durable Objects — Identity, Settings, Records, ShiftManager, CallRouter, iyo Conversation — waxay u qaybsamaan domains-ka API-ga ee lagu sharxayo hoose.
+API-ga waa isku mid haddii backend-ka ku shaqeeyo **Cloudflare Workers** (with Durable Objects) ama **self-hosted** (Node.js + PostgreSQL). Lixda Durable Objects — Identity, Settings, Records, ShiftManager, CallRouter, iyo Conversation — waxay u dhigmaan logical API domains hoos ku sharxan.
 
-## Xaqiijinta
+## Authentication
 
-Llamenos waxay taageertaa laba hab oo xaqiijin ah. Dhammaan endpoint-yada xaqiijinta ayaa u baahan mid ka mid ah kuwan.
+Llamenos waxay taageertaa laba authentication mechanism. Dhammaan authenticated endpoints waxay u baahan yihiin mid ka mid ah kuwan.
 
-### Xaqiijinta saxiixa Schnorr (ugu weyn)
+### Schnorr signature auth (primary)
 
-Codsiga kasta oo xaqiijinta leh waxay wadataa token self-signed BIP-340 Schnorr oo la xidhan habka HTTP iyo waddada.
+Every authenticated request waxay wadataa self-signed BIP-340 Schnorr token bound to HTTP method iyo path.
 
-**Qaabka madaxa:**
+**Header format:**
 
 ```
 Authorization: Bearer {"pubkey":"<64_hex>","timestamp":<ms>,"token":"<128_hex>"}
 ```
 
-**Dhisida token-ka:**
+**Token construction:**
 
-1. Dhiso fariinta: `llamenos:auth:<pubkey>:<timestamp_ms>:<METHOD>:<path>`
-2. Hash iyada oo la isticmaalayo SHA-256
-3. Saxiix hash-ka iyada oo la isticmaalayo BIP-340 Schnorr iyada oo la isticmaalayo fure sirtaada secp256k1
-4. U codee sida inline JSON iyada oo leh fields-ka `pubkey`, `timestamp`, iyo `token` (saxiixa hex)
+1. Dhiso message-ka: `llamenos:auth:<pubkey>:<timestamp_ms>:<METHOD>:<path>`
+2. Hash with SHA-256
+3. Sign hash with BIP-340 Schnorr iyadoo isticmaalayo your secp256k1 secret key
+4. Encode as inline JSON with `pubkey`, `timestamp`, iyo `token` (hex signature) fields
 
-**Xeerarka xaqiijinta:**
+**Validation rules:**
 
-- Token cusub: `|now() - timestamp| <= 300,000 ms` (5 daqiiqo)
-- Saxiixa waxaa la xaqiijiyaa iyada oo loo marayo hash-ka fariinta la dhisay
-- Pubkey-ga waxaa loo eegaa kaydka aqoonta si loo helo diiwaanka isticmaalaha
+- Token freshness: `|now() - timestamp| <= 300,000 ms` (5-minute window)
+- Signature waxaa la verify gareeyaa against reconstructed message hash
+- Pubkey waxaa loo eegaa in identity store si loo resolve gareyo user record
 
-### Xaqiijinta token-ka xilliga (WebAuthn)
+### Session token auth (WebAuthn)
 
-Kadib xafladda xaqiijinta WebAuthn, server-ku wuxuu bixiyaa token xilliga ah oo 256-bit ah oo shaqeynaya 8 saacadood.
+Kadib WebAuthn authentication ceremony, server-ka waxay soo bixisaa random 256-bit session token valid for 8 hours.
 
 ```
 Authorization: Session <token_hex>
 ```
 
-Server-ku wuxuu hubiyaa `Session` auth marka hore. Haddii madaxu uu ku bilaabmo `Session `, xaqiijinta Schnorr lama isku dayo, iyo sidaas oo kale.
+Server-ka waxay eegtaa `Session` auth marka hore. Haddii header-ka uu ku bilaabmo `Session `, Schnorr auth ma isku daydo, iyo vice versa.
 
 ---
 
-## Endpoint-yada dadweynaha
+## Public endpoints
 
-Endpoint-yadan waxay u baahan yihiin xaqiijin ma jirto.
+Endpoint-yadan ma u baahnato authentication.
 
-### Hubinta caafimaadka
+### Health check
 
 ```
 GET /api/health
 ```
 
-**Jawaab:**
+**Response:**
 
 ```json
 { "status": "ok" }
@@ -68,9 +68,9 @@ GET /api/health
 GET /api/config
 ```
 
-Waxay soo celisaa config-ka hub-ka dadweynaha, kanaalada furan, iyo aqoonta server-ka.
+Soo celiyaa public hub configuration, enabled channels, iyo server identity.
 
-**Jawaab:**
+**Response:**
 
 ```json
 {
@@ -91,15 +91,15 @@ Waxay soo celisaa config-ka hub-ka dadweynaha, kanaalada furan, iyo aqoonta serv
 }
 ```
 
-### Xaqiijinta dhismaha
+### Build verification
 
 ```
 GET /api/config/verify
 ```
 
-Waxay soo celisaa metadata-ga dhismaha si loo xaqiijiyo in dhismuhu la soo celceli karo.
+Soo celiyaa build metadata for reproducible build verification.
 
-**Jawaab:**
+**Response:**
 
 ```json
 {
@@ -111,28 +111,28 @@ Waxay soo celisaa metadata-ga dhismaha si loo xaqiijiyo in dhismuhu la soo celce
 }
 ```
 
-### Codka IVR
+### IVR audio
 
 ```
 GET /api/ivr-audio/:promptType/:language
 ```
 
-Waxay soo celisaa faylasha codka ee bixiyeyaasha telephony ay soo qaadaan inta lagu jiro calls-ka.
+Soo celiyaa audio files fetched by telephony providers during calls.
 
 - `promptType`: `[a-z_-]+`
 - `language`: `[a-z]{2,5}(-[A-Z]{2})?`
-- **Jawaab:** `audio/wav` binary
+- **Response:** `audio/wav` binary
 
-### Doorashooyinka fariimaha
+### Messaging preferences
 
-Endpoint-yada dadweynaha ee la xaqiijiyay token-ka ee maareynta doorashooyinka qofka isdiiwaangeliyay.
+Token-validated public endpoints for subscriber preference management.
 
 ```
 GET  /api/messaging/preferences?token=<hmac_token>
 PATCH /api/messaging/preferences?token=<hmac_token>
 ```
 
-**Jirka PATCH:**
+**PATCH body:**
 
 ```json
 { "status": "active", "language": "es" }
@@ -140,49 +140,49 @@ PATCH /api/messaging/preferences?token=<hmac_token>
 
 ---
 
-## Endpoint-yada xaqiijinta
+## Authentication endpoints
 
-### Soo gal
+### Login
 
 ```
 POST /api/auth/login
 ```
 
-**Jirka:**
+**Body:**
 
 ```json
 { "pubkey": "hex64", "timestamp": 1709318400000, "token": "hex128" }
 ```
 
-**Jawaab:**
+**Response:**
 
 ```json
 { "ok": true, "roles": ["role-super-admin"] }
 ```
 
-Xaddidan: 10 isku day per IP. Waxay soo celisaa `401` marka aqoonsigu aan sax ahayn.
+Rate limited: 10 attempts per IP. Soo celiyaa `401` on invalid credentials.
 
-### Bootstrap (admin-ka ugu horreeya)
+### Bootstrap (first admin)
 
 ```
 POST /api/auth/bootstrap
 ```
 
-Diiwaangelinta admin-ka ugu horreeya. Waxay ku guuldaraysataa `403` haddii admin horey u jiro.
+Diiwaangeliyaa first admin account. Fails with `403` haddii admin hore uu jiro.
 
-**Jirka:** Isla sida login.
-**Jawaab:** Isla sida login.
-Xaddidan: 5 isku day per IP.
+**Body:** Same as login.
+**Response:** Same as login.
+Rate limited: 5 attempts per IP.
 
-### Hel isticmaalaha hadda
+### Get current user
 
 ```
 GET /api/auth/me
 ```
 
-**Auth:** Loo baahan yahay
+**Auth:** Required
 
-**Jawaab:**
+**Response:**
 
 ```json
 {
@@ -204,23 +204,23 @@ GET /api/auth/me
 }
 ```
 
-### Ka bax
+### Logout
 
 ```
 POST /api/auth/me/logout
 ```
 
-**Auth:** Loo baahan yahay. Haddii la isticmaalayo Session auth, token-ka waa la joojiyaa dhinaca server-ka.
+**Auth:** Required. Haddii isticmaalayo Session auth, token-ka waa la revoke gareeyaa server-side.
 
-### Cusbooneysiinta profile-ka
+### Update profile
 
 ```
 PATCH /api/auth/me/profile
 ```
 
-**Auth:** Loo baahan yahay
+**Auth:** Required
 
-**Jirka:**
+**Body:**
 
 ```json
 {
@@ -233,77 +233,77 @@ PATCH /api/auth/me/profile
 }
 ```
 
-Dhammaan fields-ka waa ikhtiyaar. `callPreference` waxay aqbashaa `"phone"`, `"browser"`, ama `"both"`.
+Dhammaan fields waa ikhtiyaar. `callPreference` waxay aqbashaa `"phone"`, `"browser"`, ama `"both"`.
 
-### Cusbooneysiinta diyaar garowga
+### Update availability
 
 ```
 PATCH /api/auth/me/availability
 ```
 
-**Auth:** Loo baahan yahay
+**Auth:** Required
 
-**Jirka:**
+**Body:**
 
 ```json
 { "onBreak": true }
 ```
 
-### Cusbooneysiinta doorashada qoraalka
+### Update transcription preference
 
 ```
 PATCH /api/auth/me/transcription
 ```
 
-**Auth:** Loo baahan yahay
+**Auth:** Required
 
-**Jirka:**
+**Body:**
 
 ```json
 { "enabled": false }
 ```
 
-Waxay soo celisaa `403` haddii ka tagida aan la oggolyn goobaha maamulka.
+Soo celiyaa `403` haddii opt-out aan la oggolaan by admin settings.
 
 ---
 
 ## WebAuthn
 
-### Dhaqanka soo galitaanka
+### Login flow
 
 ```
 POST /api/webauthn/login/options
 ```
 
-**Auth:** Ma jirto. Waxay soo celisaa `publicKeyCredentialRequestOptions` iyada oo leh `challengeId`.
+**Auth:** None. Soo celiyaa `publicKeyCredentialRequestOptions` with `challengeId`.
 
 ```
 POST /api/webauthn/login/verify
 ```
 
-**Auth:** Ma jirto
+**Auth:** None
 
-**Jirka:**
+**Body:**
 
 ```json
 { "assertion": {}, "challengeId": "uuid" }
 ```
 
-**Jawaab:**
+**Response:**
 
 ```json
 { "token": "hex64", "pubkey": "hex64" }
 ```
 
-### Dhaqanka diiwaangelinta
+### Registration flow
 
 ```
 POST /api/webauthn/register/options
 ```
 
-**Auth:** Loo baahan yahay
+**Auth:** Required
 
-**Jirka:**
+**Body:**
 
 ```json
 { "label": "My Phone" }
@@ -313,41 +313,41 @@ POST /api/webauthn/register/options
 POST /api/webauthn/register/verify
 ```
 
-**Auth:** Loo baahan yahay
+**Auth:** Required
 
-**Jirka:**
+**Body:**
 
 ```json
 { "attestation": {}, "label": "My Phone", "challengeId": "uuid" }
 ```
 
-### Maareynta aqoonsiga
+### Credential management
 
 ```
 GET /api/webauthn/credentials
 ```
 
-**Auth:** Loo baahan yahay. Waxay soo celisaa dhammaan aqoonsiyada la diiwaangeliyay.
+**Auth:** Required. Soo celiyaa dhammaan registered credentials.
 
 ```
 DELETE /api/webauthn/credentials/:credId
 ```
 
-**Auth:** Loo baahan yahay. Waxay ka saartaa aqoonsi.
+**Auth:** Required. Ka saartaa credential.
 
 ---
 
-## Martiqaadka
+## Invites
 
-### Dadweynaha
+### Public
 
 ```
 GET /api/invites/validate/:code
 ```
 
-Xaddidan: 5 isku day per IP.
+Rate limited: 5 attempts per IP.
 
-**Jawaab:**
+**Response:**
 
 ```json
 { "valid": true, "name": "...", "expiresAt": "..." }
@@ -357,29 +357,29 @@ Xaddidan: 5 isku day per IP.
 POST /api/invites/redeem
 ```
 
-**Jirka:**
+**Body:**
 
 ```json
 { "code": "...", "pubkey": "hex64", "timestamp": 1709318400000, "token": "hex128" }
 ```
 
-Xaddidan: 5 isku day per IP.
+Rate limited: 5 attempts per IP.
 
-### Xaqiijinta
+### Authenticated
 
 ```
 GET /api/invites
 ```
 
-**Ogolaanshaha:** `invites:read`
+**Permission:** `invites:read`
 
 ```
 POST /api/invites
 ```
 
-**Ogolaanshaha:** `invites:create`
+**Permission:** `invites:create`
 
-**Jirka:**
+**Body:**
 
 ```json
 { "name": "Jane Doe", "phone": "+1234567890", "roleIds": ["role-volunteer"] }
@@ -389,27 +389,27 @@ POST /api/invites
 DELETE /api/invites/:code
 ```
 
-**Ogolaanshaha:** `invites:revoke`
+**Permission:** `invites:revoke`
 
 ---
 
-## Isbitaallada
+## Volunteers
 
-Dhammaan endpoint-yada isbitaallada waxay u baahan yihiin `volunteers:read` sida ogolaanshaha aasaasiga ah.
+Dhammaan volunteer endpoints waxay u baahan yihiin `volunteers:read` as baseline permission.
 
 ```
 GET /api/volunteers
 ```
 
-**Ogolaanshaha:** `volunteers:read`
+**Permission:** `volunteers:read`
 
 ```
 POST /api/volunteers
 ```
 
-**Ogolaanshaha:** `volunteers:create`
+**Permission:** `volunteers:create`
 
-**Jirka:**
+**Body:**
 
 ```json
 { "name": "string", "phone": "string", "roleIds": ["string"], "pubkey": "string" }
@@ -419,39 +419,39 @@ POST /api/volunteers
 PATCH /api/volunteers/:targetPubkey
 ```
 
-**Ogolaanshaha:** `volunteers:update`
+**Permission:** `volunteers:update`
 
-**Jirka:** Fields-ka isbitaalka ee qaybta ka mid ah (`name`, `phone`, `roles`, `active`, iwm.)
+**Body:** Partial volunteer fields (`name`, `phone`, `roles`, `active`, etc.)
 
 ```
 DELETE /api/volunteers/:targetPubkey
 ```
 
-**Ogolaanshaha:** `volunteers:delete`
+**Permission:** `volunteers:delete`
 
 ---
 
-## Shift-yada
+## Shifts
 
 ```
 GET /api/shifts/my-status
 ```
 
-**Auth:** Loo baahan yahay (door kasta). Waxay soo celisaa xaaladda shift-ka isticmaalaha hadda.
+**Auth:** Required (any role). Soo celiyaa current user's shift status.
 
 ```
 GET /api/shifts
 ```
 
-**Ogolaanshaha:** `shifts:read`
+**Permission:** `shifts:read`
 
 ```
 POST /api/shifts
 ```
 
-**Ogolaanshaha:** `shifts:create`
+**Permission:** `shifts:create`
 
-**Jirka:**
+**Body:**
 
 ```json
 {
@@ -467,49 +467,49 @@ POST /api/shifts
 PATCH /api/shifts/:id
 ```
 
-**Ogolaanshaha:** `shifts:update`
+**Permission:** `shifts:update`
 
 ```
 DELETE /api/shifts/:id
 ```
 
-**Ogolaanshaha:** `shifts:delete`
+**Permission:** `shifts:delete`
 
-### Kooxda fallback ee dhawaaqaysa
+### Fallback ring group
 
 ```
 GET /api/shifts/fallback
 ```
 
-**Ogolaanshaha:** `shifts:manage-fallback`
+**Permission:** `shifts:manage-fallback`
 
 ```
 PUT /api/shifts/fallback
 ```
 
-**Ogolaanshaha:** `shifts:manage-fallback`
+**Permission:** `shifts:manage-fallback`
 
-**Jirka:**
+**Body:**
 
 ```json
 { "fallbackPubkeys": ["hex64", "hex64"] }
 ```
 
-Hub-scoped: Dhammaan endpoint-yada shift-yada waxay sidoo kale ku jiraan `/api/hubs/:hubId/shifts/*`.
+Hub-scoped: Dhammaan shift endpoints waxay sidoo kale la heli karaan at `/api/hubs/:hubId/shifts/*`.
 
 ---
 
-## Xusuusinaha
+## Notes
 
-Dhammaan endpoint-yada xusuusinaha waxay u baahan yihiin `notes:read-own` sida aasaasiga. Clients waa inay fureeraan xusuusinaha kahor inta aanay dirin (eeg [specification-ka protocol-ka](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/protocol/PROTOCOL.md) ee qaabka ECIES envelope).
+Dhammaan note endpoints waxay u baahan yihiin `notes:read-own` as baseline. Clients waa inay encrypt gareyaan notes ka hor inta aanay soo dirin (eeg [protocol specification](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/protocol/PROTOCOL.md) for ECIES envelope format).
 
 ```
 GET /api/notes?callId=...&page=1&limit=50
 ```
 
-**Ogolaanshaha:** `notes:read-own` (keliya taada) ama `notes:read-all` (dhammaan xusuusinaha)
+**Permission:** `notes:read-own` (own kaliya) ama `notes:read-all` (dhammaan notes)
 
-**Jawaab:**
+**Response:**
 
 ```json
 { "notes": [], "total": 0 }
@@ -519,9 +519,9 @@ GET /api/notes?callId=...&page=1&limit=50
 POST /api/notes
 ```
 
-**Ogolaanshaha:** `notes:create`
+**Permission:** `notes:create`
 
-**Jirka:**
+**Body:**
 
 ```json
 {
@@ -536,85 +536,85 @@ POST /api/notes
 PATCH /api/notes/:id
 ```
 
-**Ogolaanshaha:** `notes:update-own`
+**Permission:** `notes:update-own`
 
-**Jirka:** Isla qaabka POST (iyada oo la cusbooneysiiyay encrypted content iyo envelopes).
+**Body:** Same shape as POST (with updated encrypted content iyo envelopes).
 
 Hub-scoped: `/api/hubs/:hubId/notes/*`
 
 ---
 
-## Calls-ka
+## Calls
 
 ```
 GET /api/calls/active
 ```
 
-**Ogolaanshaha:** `calls:read-active` (macluumaadka qofka wiciyay la qariyay) ama `calls:read-active-full`
+**Permission:** `calls:read-active` (caller info redacted) ama `calls:read-active-full`
 
 ```
 GET /api/calls/today-count
 ```
 
-**Ogolaanshaha:** `calls:read-active`
+**Permission:** `calls:read-active`
 
 ```
 GET /api/calls/presence
 ```
 
-**Ogolaanshaha:** `calls:read-presence`. Waxay soo celisaa xaaladda online/buzy ee isbitaallada.
+**Permission:** `calls:read-presence`. Soo celiyaa volunteer online/busy status.
 
 ```
 GET /api/calls/history?page=1&limit=50&search=&dateFrom=&dateTo=
 ```
 
-**Ogolaanshaha:** `calls:read-history`
+**Permission:** `calls:read-history`
 
 ```
 POST /api/calls/:callId/answer
 ```
 
-**Ogolaanshaha:** `calls:answer`. Waxay soo celisaa `409` haddii call-kii horey loo jawaabay.
+**Permission:** `calls:answer`. Soo celiyaa `409` haddii call-ka horey loo jawaabay.
 
 ```
 POST /api/calls/:callId/hangup
 ```
 
-**Ogolaanshaha:** `calls:answer`. Waxay soo celisaa `403` haddii aanu ahayn call-kaaga.
+**Permission:** `calls:answer`. Soo celiyaa `403` haddii aan ahayn your call.
 
 ```
 POST /api/calls/:callId/spam
 ```
 
-**Ogolaanshaha:** `calls:answer`. Waxay calaamadeysaa call-ka sida spam.
+**Permission:** `calls:answer`. Flags call-ka as spam.
 
 ```
 GET /api/calls/:callId/recording
 ```
 
-**Ogolaanshaha:** `calls:read-recording` ama isbitaalkii jawaabay.
+**Permission:** `calls:read-recording` ama answering volunteer.
 
-**Jawaab:** `audio/wav` binary iyada oo leh `Cache-Control: private, no-store`.
+**Response:** `audio/wav` binary with `Cache-Control: private, no-store`.
 
 ```
 GET /api/calls/debug
 ```
 
-**Ogolaanshaha:** `calls:debug`. Waxay soo celisaa xaaladda gudaha ee call-ka si loo xaliyo dhibaatooyinka.
+**Permission:** `calls:debug`. Soo celiyaa internal call state for troubleshooting.
 
 Hub-scoped: `/api/hubs/:hubId/calls/*`
 
 ---
 
-## Wada hadallada
+## Conversations
 
 ```
 GET /api/conversations?status=&channel=&page=1&limit=50
 ```
 
-**Ogolaanshaha:** `conversations:read-all` ama `conversations:read-assigned` (taada + sugaya)
+**Permission:** `conversations:read-all` ama `conversations:read-assigned` (own + waiting)
 
-**Jawaab:**
+**Response:**
 
 ```json
 {
@@ -630,9 +630,9 @@ GET /api/conversations?status=&channel=&page=1&limit=50
 GET /api/conversations/stats
 ```
 
-**Auth:** Loo baahan yahay
+**Auth:** Required
 
-**Jawaab:**
+**Response:**
 
 ```json
 { "total": 0, "active": 0, "waiting": 0, "closed": 0 }
@@ -642,27 +642,27 @@ GET /api/conversations/stats
 GET /api/conversations/load
 ```
 
-**Ogolaanshaha:** `conversations:read-all`. Waxay soo celisaa tirada wada hadallada per isbitaale.
+**Permission:** `conversations:read-all`. Soo celiyaa per-volunteer conversation counts.
 
 ```
 GET /api/conversations/:id
 ```
 
-**Auth:** Loo baahan yahay (la hubiyaa helitaanka per wada hadal).
+**Auth:** Required (access-checked per conversation).
 
 ```
 GET /api/conversations/:id/messages?page=1&limit=50
 ```
 
-**Auth:** Loo baahan yahay (la hubiyaa helitaanka). Waxay soo celisaa fariimaha fureeran.
+**Auth:** Required (access-checked). Soo celiyaa encrypted messages.
 
 ```
 POST /api/conversations/:id/messages
 ```
 
-**Ogolaanshaha:** `conversations:send` ama `conversations:send-any`
+**Permission:** `conversations:send` ama `conversations:send-any`
 
-**Jirka:**
+**Body:**
 
 ```json
 {
@@ -672,15 +672,15 @@ POST /api/conversations/:id/messages
 }
 ```
 
-Field-ka `plaintextForSending` waxaa loo isticmaalaa kanaalada dibadda (SMS, WhatsApp, Signal). Server-ku wuxuu diraa fariinta via channel adapter kadibna wuu tuuraa plaintext-ka.
+`plaintextForSending` field waxaa loo isticmaalaa external channels (SMS, WhatsApp, Signal). Server-ka wuxuu soo dirayaa message via channel adapter kadibna wuu tirtirayaa plaintext.
 
 ```
 PATCH /api/conversations/:id
 ```
 
-**Ogolaanshaha:** `conversations:update` ama isbitaalka loo xilsaarnay
+**Permission:** `conversations:update` ama assigned volunteer
 
-**Jirka:**
+**Body:**
 
 ```json
 { "status": "closed", "assignedTo": "hex64" }
@@ -690,29 +690,29 @@ PATCH /api/conversations/:id
 POST /api/conversations/:id/claim
 ```
 
-**Ogolaanshaha:** `conversations:claim` + gaar kanaal (tusaale, `conversations:claim-sms`)
+**Permission:** `conversations:claim` + channel-specific (e.g., `conversations:claim-sms`)
 
 Hub-scoped: `/api/hubs/:hubId/conversations/*`
 
 ---
 
-## Warbixinnada
+## Reports
 
-Warbixinnadu waa nooc gaar ah oo wada hadal ah iyada oo leh `metadata.type = "report"`.
+Reports waa nooc gaar ah oo conversation ah with `metadata.type = "report"`.
 
 ```
 GET /api/reports?status=&category=&page=1&limit=50
 ```
 
-**Ogolaanshaha:** `reports:read-all`, `reports:read-assigned`, ama `reports:read-own`
+**Permission:** `reports:read-all`, `reports:read-assigned`, ama `reports:read-own`
 
 ```
 POST /api/reports
 ```
 
-**Ogolaanshaha:** `reports:create`
+**Permission:** `reports:create`
 
-**Jirka:**
+**Body:**
 
 ```json
 {
@@ -727,21 +727,21 @@ POST /api/reports
 GET /api/reports/:id
 ```
 
-**Ogolaanshaha:** `reports:read-all`, `reports:read-assigned`, ama warbixintaada
+**Permission:** `reports:read-all`, `reports:read-assigned`, ama own report
 
 ```
 GET /api/reports/:id/messages?page=1&limit=100
 ```
 
-**Auth:** Loo baahan yahay (la hubiyaa helitaanka)
+**Auth:** Required (access-checked)
 
 ```
 POST /api/reports/:id/messages
 ```
 
-**Ogolaanshaha:** `reports:send-message`, `reports:send-message-own`, ama kii loo xilsaarnay
+**Permission:** `reports:send-message`, `reports:send-message-own`, ama assigned
 
-**Jirka:**
+**Body:**
 
 ```json
 {
@@ -755,9 +755,9 @@ POST /api/reports/:id/messages
 POST /api/reports/:id/assign
 ```
 
-**Ogolaanshaha:** `reports:assign`
+**Permission:** `reports:assign`
 
-**Jirka:**
+**Body:**
 
 ```json
 { "assignedTo": "hex64" }
@@ -767,33 +767,33 @@ POST /api/reports/:id/assign
 PATCH /api/reports/:id
 ```
 
-**Ogolaanshaha:** `reports:update`
+**Permission:** `reports:update`
 
 ```
 GET /api/reports/categories
 ```
 
-**Auth:** Loo baahan yahay
+**Auth:** Required
 
 ```
 GET /api/reports/:id/files
 ```
 
-**Auth:** Loo baahan yahay (la hubiyaa helitaanka)
+**Auth:** Required (access-checked)
 
 Hub-scoped: `/api/hubs/:hubId/reports/*`
 
 ---
 
-## Mamnuucyada
+## Bans
 
 ```
 POST /api/bans
 ```
 
-**Ogolaanshaha:** `bans:report`
+**Permission:** `bans:report`
 
-**Jirka:**
+**Body:**
 
 ```json
 { "phone": "+1234567890", "reason": "Spam caller" }
@@ -803,15 +803,15 @@ POST /api/bans
 GET /api/bans
 ```
 
-**Ogolaanshaha:** `bans:read`
+**Permission:** `bans:read`
 
 ```
 POST /api/bans/bulk
 ```
 
-**Ogolaanshaha:** `bans:bulk-create`
+**Permission:** `bans:bulk-create`
 
-**Jirka:**
+**Body:**
 
 ```json
 { "phones": ["+1234567890", "+0987654321"], "reason": "Imported ban list" }
@@ -821,132 +821,132 @@ POST /api/bans/bulk
 DELETE /api/bans/:phone
 ```
 
-**Ogolaanshaha:** `bans:delete`
+**Permission:** `bans:delete`
 
-Parameter-ka `:phone` waa E.164 oo URL-encoded (tusaale, `%2B12125551234`).
+`:phone` parameter waa URL-encoded E.164 (e.g., `%2B12125551234`).
 
 Hub-scoped: `/api/hubs/:hubId/bans/*`
 
 ---
 
-## Goobaha
+## Settings
 
-### Bixiyaha telephony
+### Telephony provider
 
 ```
 GET /api/settings/telephony-provider
 ```
 
-**Ogolaanshaha:** `settings:manage-telephony`
+**Permission:** `settings:manage-telephony`
 
 ```
 PATCH /api/settings/telephony-provider
 ```
 
-**Ogolaanshaha:** `settings:manage-telephony`
+**Permission:** `settings:manage-telephony`
 
-**Jirka:** `TelephonyProviderConfig` (nooca bixiyaha + aqoonsiga)
+**Body:** `TelephonyProviderConfig` (provider type + credentials)
 
 ```
 POST /api/settings/telephony-provider/test
 ```
 
-**Ogolaanshaha:** `settings:manage-telephony`
+**Permission:** `settings:manage-telephony`
 
-Waxay tijaabisaa aqoonsiga bixiyaha kahor inta aan la kaydin.
+Tests provider credentials badal la'aan saving.
 
-### Fariimaha
+### Messaging
 
 ```
 GET /api/settings/messaging
 ```
 
-**Ogolaanshaha:** `settings:manage-messaging`
+**Permission:** `settings:manage-messaging`
 
 ```
 PATCH /api/settings/messaging
 ```
 
-**Ogolaanshaha:** `settings:manage-messaging`
+**Permission:** `settings:manage-messaging`
 
-### Yareynta spam-ka
+### Spam mitigation
 
 ```
 GET /api/settings/spam
 ```
 
-**Ogolaanshaha:** `settings:manage-spam`
+**Permission:** `settings:manage-spam`
 
 ```
 PATCH /api/settings/spam
 ```
 
-**Ogolaanshaha:** `settings:manage-spam`
+**Permission:** `settings:manage-spam`
 
-### Goobaha call-ka
+### Call settings
 
 ```
 GET /api/settings/call
 ```
 
-**Ogolaanshaha:** `settings:manage`
+**Permission:** `settings:manage`
 
 ```
 PATCH /api/settings/call
 ```
 
-**Ogolaanshaha:** `settings:manage`
+**Permission:** `settings:manage`
 
-### Luuqadaha IVR
+### IVR languages
 
 ```
 GET /api/settings/ivr-languages
 ```
 
-**Ogolaanshaha:** `settings:manage-ivr`
+**Permission:** `settings:manage-ivr`
 
 ```
 PATCH /api/settings/ivr-languages
 ```
 
-**Ogolaanshaha:** `settings:manage-ivr`
+**Permission:** `settings:manage-ivr`
 
-**Jirka:**
+**Body:**
 
 ```json
 { "enabledLanguages": ["en", "es", "zh"] }
 ```
 
-### Codka IVR
+### IVR audio
 
 ```
 GET /api/settings/ivr-audio
 ```
 
-**Ogolaanshaha:** `settings:manage-ivr`
+**Permission:** `settings:manage-ivr`
 
 ```
 PUT /api/settings/ivr-audio/:promptType/:language
 ```
 
-**Ogolaanshaha:** `settings:manage-ivr`
-**Content-Type:** `application/octet-stream` (bytes-ka codka tooska ah)
+**Permission:** `settings:manage-ivr`
+**Content-Type:** `application/octet-stream` (raw audio bytes)
 
 ```
 DELETE /api/settings/ivr-audio/:promptType/:language
 ```
 
-**Ogolaanshaha:** `settings:manage-ivr`
+**Permission:** `settings:manage-ivr`
 
-### Qoraalka
+### Transcription
 
 ```
 GET /api/settings/transcription
 ```
 
-**Auth:** Loo baahan yahay (door kasta)
+**Auth:** Required (any role)
 
-**Jawaab:**
+**Response:**
 
 ```json
 { "globalEnabled": true, "allowVolunteerOptOut": false }
@@ -956,63 +956,63 @@ GET /api/settings/transcription
 PATCH /api/settings/transcription
 ```
 
-**Ogolaanshaha:** `settings:manage-transcription`
+**Permission:** `settings:manage-transcription`
 
-### Fields-ka gaarka ah
+### Custom fields
 
 ```
 GET /api/settings/custom-fields
 ```
 
-**Auth:** Loo baahan yahay (waxay soo celisaa fields-ka la sifeeyay iyadoo ku saleysan door-ka)
+**Auth:** Required (soo celiyaa fields filtered by role)
 
 ```
 PUT /api/settings/custom-fields
 ```
 
-**Ogolaanshaha:** `settings:manage-fields`
+**Permission:** `settings:manage-fields`
 
-**Jirka:**
+**Body:**
 
 ```json
 { "fields": [{ "id": "uuid", "name": "severity", "label": "Severity Rating", "type": "select", "required": true, "options": ["low", "medium", "high"], "visibleToVolunteers": true, "editableByVolunteers": true, "context": "call-notes", "order": 0 }] }
 ```
 
-### Goobaha WebAuthn
+### WebAuthn settings
 
 ```
 GET /api/settings/webauthn
 ```
 
-**Ogolaanshaha:** `settings:manage`
+**Permission:** `settings:manage`
 
 ```
 PATCH /api/settings/webauthn
 ```
 
-**Ogolaanshaha:** `settings:manage`
+**Permission:** `settings:manage`
 
-**Jirka:**
+**Body:**
 
 ```json
 { "requireForAdmins": true, "requireForVolunteers": false }
 ```
 
-### Doorarka (PBAC)
+### Roles (PBAC)
 
 ```
 GET /api/settings/roles
 ```
 
-**Auth:** Loo baahan yahay
+**Auth:** Required
 
 ```
 POST /api/settings/roles
 ```
 
-**Ogolaanshaha:** `system:manage-roles`
+**Permission:** `system:manage-roles`
 
-**Jirka:**
+**Body:**
 
 ```json
 {
@@ -1027,53 +1027,53 @@ POST /api/settings/roles
 PATCH /api/settings/roles/:id
 ```
 
-**Ogolaanshaha:** `system:manage-roles`
+**Permission:** `system:manage-roles`
 
 ```
 DELETE /api/settings/roles/:id
 ```
 
-**Ogolaanshaha:** `system:manage-roles`
+**Permission:** `system:manage-roles`
 
-### Catalog-ga ogolaanshaha
+### Permissions catalog
 
 ```
 GET /api/settings/permissions
 ```
 
-**Ogolaanshaha:** `system:manage-roles`
+**Permission:** `system:manage-roles`
 
-Waxay soo celisaa dhammaan ogolaanshaha ee la heli karo oo la kala saaray iyadoo ku saleysan domain.
+Soo celiyaa dhammaan permissions la heli karo organized by domain.
 
-### Xaaladda setup-ka
+### Setup state
 
 ```
 GET /api/settings/setup
 ```
 
-**Ogolaanshaha:** `settings:manage`
+**Permission:** `settings:manage`
 
 ```
 PATCH /api/settings/setup
 ```
 
-**Ogolaanshaha:** `settings:manage`
+**Permission:** `settings:manage`
 
 ---
 
-## Faylasha
+## Files
 
-### Dhaqanka soo gelinta
+### Upload flow
 
-Soo gelin qayb-qayb ah oo loogu talagalay lifaaqayaasha faylasha fureeran.
+Chunked upload for encrypted file attachments.
 
 ```
 POST /api/uploads/init
 ```
 
-**Ogolaanshaha:** `files:upload`
+**Permission:** `files:upload`
 
-**Jirka:**
+**Body:**
 
 ```json
 {
@@ -1085,7 +1085,7 @@ POST /api/uploads/init
 }
 ```
 
-**Jawaab:**
+**Response:**
 
 ```json
 { "uploadId": "uuid", "totalChunks": 4 }
@@ -1095,10 +1095,10 @@ POST /api/uploads/init
 PUT /api/uploads/:id/chunks/:chunkIndex
 ```
 
-**Ogolaanshaha:** `files:upload`
-**Content-Type:** `application/octet-stream` (bytes-ka qaybta fureeran)
+**Permission:** `files:upload`
+**Content-Type:** `application/octet-stream` (raw encrypted chunk bytes)
 
-**Jawaab:**
+**Response:**
 
 ```json
 { "chunkIndex": 0, "completedChunks": 1, "totalChunks": 4 }
@@ -1108,85 +1108,85 @@ PUT /api/uploads/:id/chunks/:chunkIndex
 POST /api/uploads/:id/complete
 ```
 
-**Ogolaanshaha:** `files:upload`
+**Permission:** `files:upload`
 
-**Jawaab:**
+**Response:**
 
 ```json
 { "fileId": "uuid", "status": "complete" }
 ```
 
-Waxay soo celisaa `400` haddii aan dhammaan qaybaha la soo gelin.
+Soo celiyaa `400` haddii aan dhammaan chunks la upload-gareyn.
 
 ```
 GET /api/uploads/:id/status
 ```
 
-**Ogolaanshaha:** `files:upload`
+**Permission:** `files:upload`
 
-### Soo dejinta
+### Download
 
 ```
 GET /api/files/:id/content
 ```
 
-**Ogolaanshaha:** `files:download-own` (haddii qofka qaadata) ama `files:download-all`
+**Permission:** `files:download-own` (haddii recipient) ama `files:download-all`
 
-**Jawaab:** `application/octet-stream` (bytes-ka faylka fureeran)
+**Response:** `application/octet-stream` (encrypted file bytes)
 
 ```
 GET /api/files/:id/envelopes
 ```
 
-**Ogolaanshaha:** `files:download-own` ama `files:download-all`
+**Permission:** `files:download-own` ama `files:download-all`
 
-Isticmaalaha aan adminka ahayn waxay heli doontaa keliya envelope-kooda.
+Non-admin users waxay heshaa kaliya their own envelope.
 
 ```
 GET /api/files/:id/metadata
 ```
 
-**Ogolaanshaha:** `files:download-own` ama `files:download-all`
+**Permission:** `files:download-own` ama `files:download-all`
 
 ```
 POST /api/files/:id/share
 ```
 
-**Ogolaanshaha:** `files:share`
+**Permission:** `files:share`
 
-Waxay dib u fureysaa fure faylka qof cusub.
+Re-encrypts file key for a new recipient.
 
 ---
 
-## Blasts (faafinta fariimaha)
+## Blasts (message broadcasting)
 
-### Qofka isdiiwaangeliyay
+### Subscribers
 
 ```
 GET /api/blasts/subscribers?page=&limit=&tag=&status=
 ```
 
-**Auth:** Loo baahan yahay
+**Auth:** Required
 
 ```
 DELETE /api/blasts/subscribers/:id
 ```
 
-**Auth:** Loo baahan yahay
+**Auth:** Required
 
 ```
 GET /api/blasts/subscribers/stats
 ```
 
-**Auth:** Loo baahan yahay
+**Auth:** Required
 
 ```
 POST /api/blasts/subscribers/import
 ```
 
-**Auth:** Loo baahan yahay
+**Auth:** Required
 
-**Jirka:**
+**Body:**
 
 ```json
 { "subscribers": [{ "phone": "+1234567890", "tags": ["alerts"] }] }
@@ -1198,15 +1198,15 @@ POST /api/blasts/subscribers/import
 GET /api/blasts
 ```
 
-**Auth:** Loo baahan yahay
+**Auth:** Required
 
 ```
 POST /api/blasts
 ```
 
-**Auth:** Loo baahan yahay
+**Auth:** Required
 
-**Jirka:**
+**Body:**
 
 ```json
 {
@@ -1222,33 +1222,33 @@ POST /api/blasts
 GET /api/blasts/:id
 ```
 
-**Auth:** Loo baahan yahay
+**Auth:** Required
 
 ```
 PATCH /api/blasts/:id
 ```
 
-**Auth:** Loo baahan yahay
+**Auth:** Required
 
 ```
 DELETE /api/blasts/:id
 ```
 
-**Auth:** Loo baahan yahay
+**Auth:** Required
 
 ```
 POST /api/blasts/:id/send
 ```
 
-**Auth:** Loo baahan yahay. Waxay diraa blast-ka si toos ah.
+**Auth:** Required. Soo dirayaa blast-ka si toos ah.
 
 ```
 POST /api/blasts/:id/schedule
 ```
 
-**Auth:** Loo baahan yahay
+**Auth:** Required
 
-**Jirka:**
+**Body:**
 
 ```json
 { "scheduledAt": "2026-03-01T12:00:00Z" }
@@ -1258,43 +1258,43 @@ POST /api/blasts/:id/schedule
 POST /api/blasts/:id/cancel
 ```
 
-**Auth:** Loo baahan yahay. Waxay joojisaa blast la jadwalay.
+**Auth:** Required. Cancels a scheduled blast.
 
-### Goobaha blast-ka
+### Blast settings
 
 ```
 GET /api/blasts/settings
 ```
 
-**Auth:** Loo baahan yahay
+**Auth:** Required
 
 ```
 PATCH /api/blasts/settings
 ```
 
-**Auth:** Loo baahan yahay
+**Auth:** Required
 
 Hub-scoped: `/api/hubs/:hubId/blasts/*`
 
 ---
 
-## Hub-yada
+## Hubs
 
-Maareynta hub-yada multi-tenant.
+Multi-tenant hub management.
 
 ```
 GET /api/hubs
 ```
 
-**Auth:** Loo baahan yahay (la sifeeyay iyadoo ku saleysan xubinnimada; super admin waxay arki doontaa dhammaan)
+**Auth:** Required (filtered by membership; super admin arkaa dhammaan)
 
 ```
 POST /api/hubs
 ```
 
-**Ogolaanshaha:** `system:manage-hubs`
+**Permission:** `system:manage-hubs`
 
-**Jirka:**
+**Body:**
 
 ```json
 { "name": "NYC Hub", "slug": "nyc", "description": "New York City operations", "phoneNumber": "+1234567890" }
@@ -1304,23 +1304,23 @@ POST /api/hubs
 GET /api/hubs/:hubId
 ```
 
-**Auth:** Loo baahan yahay (la hubiyaa xubinnimada)
+**Auth:** Required (membership checked)
 
 ```
 PATCH /api/hubs/:hubId
 ```
 
-**Ogolaanshaha:** `system:manage-hubs`
+**Permission:** `system:manage-hubs`
 
-### Xubnaha hub-ka
+### Hub members
 
 ```
 POST /api/hubs/:hubId/members
 ```
 
-**Ogolaanshaha:** `volunteers:manage-roles`
+**Permission:** `volunteers:manage-roles`
 
-**Jirka:**
+**Body:**
 
 ```json
 { "pubkey": "hex64", "roleIds": ["role-volunteer"] }
@@ -1330,23 +1330,23 @@ POST /api/hubs/:hubId/members
 DELETE /api/hubs/:hubId/members/:pubkey
 ```
 
-**Ogolaanshaha:** `volunteers:manage-roles`
+**Permission:** `volunteers:manage-roles`
 
-### Maareynta fure ee hub-ka
+### Hub key management
 
 ```
 GET /api/hubs/:hubId/key
 ```
 
-**Auth:** Loo baahan yahay (xubin hub). Waxay soo celisaa keliya envelope-ka hub key-ka ECIES-wrapped ee isticmaalaha codsanaya.
+**Auth:** Required (hub member). Soo celiyaa kaliya requesting user's ECIES-wrapped hub key envelope.
 
 ```
 PUT /api/hubs/:hubId/key
 ```
 
-**Ogolaanshaha:** `system:manage-hubs`
+**Permission:** `system:manage-hubs`
 
-**Jirka:**
+**Body:**
 
 ```json
 { "envelopes": [{ "pubkey": "hex64", "wrappedKey": "hex", "ephemeralPubkey": "hex" }] }
@@ -1360,37 +1360,37 @@ PUT /api/hubs/:hubId/key
 GET /api/setup/state
 ```
 
-**Auth:** Loo baahan yahay
+**Auth:** Required
 
 ```
 PATCH /api/setup/state
 ```
 
-**Ogolaanshaha:** `settings:manage`
+**Permission:** `settings:manage`
 
 ```
 POST /api/setup/complete
 ```
 
-**Ogolaanshaha:** `settings:manage`
+**Permission:** `settings:manage`
 
-**Jirka:**
+**Body:**
 
 ```json
 { "demoMode": false }
 ```
 
-Waxay sidoo kale abuurtaa hub default haddii aanu jirin.
+Sidoo kale creates a default hub haddii aan jirin.
 
-### Tijaabada kanaalada
+### Channel tests
 
 ```
 POST /api/setup/test/signal
 ```
 
-**Ogolaanshaha:** `settings:manage-messaging`
+**Permission:** `settings:manage-messaging`
 
-**Jirka:**
+**Body:**
 
 ```json
 { "bridgeUrl": "http://signal-cli:8080", "bridgeApiKey": "secret" }
@@ -1400,9 +1400,9 @@ POST /api/setup/test/signal
 POST /api/setup/test/whatsapp
 ```
 
-**Ogolaanshaha:** `settings:manage-messaging`
+**Permission:** `settings:manage-messaging`
 
-**Jirka:**
+**Body:**
 
 ```json
 { "phoneNumberId": "123456", "accessToken": "EAAx..." }
@@ -1410,15 +1410,15 @@ POST /api/setup/test/whatsapp
 
 ---
 
-## Log-ka baaritaanka
+## Audit log
 
 ```
 GET /api/audit?page=1&limit=50&actorPubkey=&eventType=&dateFrom=&dateTo=&search=
 ```
 
-**Ogolaanshaha:** `audit:read`
+**Permission:** `audit:read`
 
-**Jawaab:**
+**Response:**
 
 ```json
 {
@@ -1435,7 +1435,7 @@ GET /api/audit?page=1&limit=50&actorPubkey=&eventType=&dateFrom=&dateTo=&search=
 }
 ```
 
-Log-ka baaritaanku waxay isticmaashaa hash chain SHA-256 (`previousEntryHash` + `entryHash`) si loo hubiyo inaan la wax beddelin.
+Audit log-ga waxa uu isticmaalaa SHA-256 hash chain (`previousEntryHash` + `entryHash`) for tamper detection.
 
 Hub-scoped: `/api/hubs/:hubId/audit/*`
 
@@ -1447,25 +1447,25 @@ Hub-scoped: `/api/hubs/:hubId/audit/*`
 GET /api/telephony/webrtc-token
 ```
 
-**Auth:** Loo baahan yahay
+**Auth:** Required
 
-Waxay soo celisaa token WebRTC ee gaarka ah ee bixiyaha si loo jawaabo call-ka browser-ka.
+Soo celiyaa provider-specific WebRTC token for in-browser call answering.
 
-**Jawaab:**
+**Response:**
 
 ```json
 { "token": "string", "provider": "twilio", "identity": "hex64" }
 ```
 
-Waxay soo celisaa `400` haddii doorashada call-ka ay tahay taleefan keliya.
+Soo celiyaa `400` haddii call preference la set gareeyay to phone kaliya.
 
 ```
 GET /api/telephony/webrtc-status
 ```
 
-**Auth:** Loo baahan yahay
+**Auth:** Required
 
-**Jawaab:**
+**Response:**
 
 ```json
 { "available": true, "provider": "twilio" }
@@ -1473,23 +1473,23 @@ GET /api/telephony/webrtc-status
 
 ---
 
-## Bixinta qalabka
+## Device provisioning
 
-Loogu talagalay in la isku xiro qalab cusub oo koontada horey u jirta via isbeddelka fudud ee ECDH.
+For linking new devices to an existing account via ephemeral ECDH key exchange.
 
 ```
 POST /api/provision/rooms
 ```
 
-**Auth:** Ma jirto (qalabka cusub ma leh xaqiijin)
+**Auth:** None (new device ma leh auth)
 
-**Jirka:**
+**Body:**
 
 ```json
 { "ephemeralPubkey": "hex66" }
 ```
 
-**Jawaab:**
+**Response:**
 
 ```json
 { "roomId": "uuid", "token": "random_string" }
@@ -1499,9 +1499,9 @@ POST /api/provision/rooms
 GET /api/provision/rooms/:id?token=<token>
 ```
 
-**Auth:** Ma jirto
+**Auth:** None
 
-**Jawaab:**
+**Response:**
 
 ```json
 {
@@ -1512,15 +1512,15 @@ GET /api/provision/rooms/:id?token=<token>
 }
 ```
 
-Xaaladda waxay u gudubtaa: `waiting` -> `ready` -> consumed. Rooms-ka way dhacaan kadib ~5 daqiiqo.
+Status transitions: `waiting` -> `ready` -> consumed. Rooms expire kadib ~5 minutes.
 
 ```
 POST /api/provision/rooms/:id/payload
 ```
 
-**Auth:** Loo baahan yahay (qalabka ugu weyn waa inuu xaqiijiyay)
+**Auth:** Required (primary device waa inuu authenticated yahay)
 
-**Jirka:**
+**Body:**
 
 ```json
 {
@@ -1532,15 +1532,15 @@ POST /api/provision/rooms/:id/payload
 
 ---
 
-## Digniinada push (mobile)
+## Push notifications (mobile)
 
 ```
 POST /api/devices/register
 ```
 
-**Auth:** Loo baahan yahay
+**Auth:** Required
 
-**Jirka:**
+**Body:**
 
 ```json
 {
@@ -1551,19 +1551,19 @@ POST /api/devices/register
 }
 ```
 
-**Jawaab:**
+**Response:**
 
 ```json
 { "deviceId": "uuid" }
 ```
 
-Digniinada push waxay isticmaalaan qaab encryption laba-heer ah: wake key (ma loo baahan PIN) ee metadata-ga digniinta, iyo fure aqoonta (PIN loo baahan yahay) ee macluumaadka gaarka ah.
+Push notifications waxay isticmaalaan two-tier encryption scheme: wake key (ma u baahnato PIN) for notification metadata, iyo identity key (PIN required) for sensitive content.
 
 ---
 
-## Webhooks-ka telephony
+## Telephony webhooks
 
-Endpoint-yadan waxaa yeedha bixiyeyaasha telephony, ma aha clients. Codsiga kasta waxaa xaqiijiyaa saxiixa webhook-ka bixiyaha.
+Endpoint-yadan waxaa soo wacaa telephony providers, ma aha clients. Each request waxaa validate gareeyaa by provider's webhook signature.
 
 ```
 POST /api/telephony/incoming
@@ -1578,27 +1578,27 @@ POST /api/telephony/call-recording
 POST /api/telephony/voicemail-recording
 ```
 
-Hub routing-ga waxaa lagu sameeyaa query parameter-ka `?hub=<hubId>`.
+Hub routing waxaa lagu sameeyaa via `?hub=<hubId>` query parameter.
 
 ---
 
-## Webhooks-ka fariimaha
+## Messaging webhooks
 
-Waxaa yeedha bixiyeyaasha fariimaha. Adapter kasta waxay xaqiijisaa saxiixeeda webhook.
+Waxaa soo wacaa messaging providers. Each adapter waxay validate gareysaa webhook signature-ka.
 
 ```
-GET  /api/messaging/whatsapp/webhook    (xaqiijinta webhook-ka Meta)
-GET  /api/messaging/rcs/webhook         (xaqiijinta webhook-ka Google RBM)
+GET  /api/messaging/whatsapp/webhook    (Meta webhook verification)
+GET  /api/messaging/rcs/webhook         (Google RBM webhook verification)
 POST /api/messaging/:channel/webhook?hub=<hubId>
 ```
 
-Kanaalada la taageero: `sms`, `whatsapp`, `signal`, `rcs`.
+Channels la taageero: `sms`, `whatsapp`, `signal`, `rcs`.
 
 ---
 
-## Waddooyinka hub-scoped
+## Hub-scoped routes
 
-Dhammaan waddooyinka soo socda waxay sidoo kale ku heli karaan horey `/api/hubs/:hubId/`, taasoo ay u qaybsanayaan hub gaar ah:
+Dhammaan routes-ka soo socda waxay sidoo kale la heli karaan with `/api/hubs/:hubId/` prefix, taasoo scope gareysa to a specific hub:
 
 - `/api/hubs/:hubId/shifts/*`
 - `/api/hubs/:hubId/bans/*`
@@ -1609,39 +1609,39 @@ Dhammaan waddooyinka soo socda waxay sidoo kale ku heli karaan horey `/api/hubs/
 - `/api/hubs/:hubId/reports/*`
 - `/api/hubs/:hubId/blasts/*`
 
-Marka la isticmaalayo waddooyinka hub-scoped, middleware-ka `hubContext` waxay xallisaa ogolaanshaha hub-ga ee gaarka ah ee isticmaalaha.
+Marka la isticmaalayo hub-scoped routes, `hubContext` middleware waxay resolve gareysaa hub-specific permissions for user.
 
 ---
 
-## Jawaabaha khaladaadka
+## Error responses
 
-Dhammaan jawaabaha khaladaadka waxay raacayaan qaabkan:
+Dhammaan error responses waxay raacayaan format-kan:
 
 ```json
-{ "error": "Fariin khalad oo la fahmi karo" }
+{ "error": "Human-readable error message" }
 ```
 
-Koodhayaasha HTTP-ga ee caanka ah:
+Common HTTP status codes:
 
-| Koodh | Macnaha |
+| Code | Macnaha |
 |------|---------|
-| `400` | Codsiga khaldan (jir qalalan, fields maqan, xaqiijin guuldaraysatay) |
-| `401` | Aan la oggolyn (token xaqiijin maqan ama khaldan) |
-| `403` | Rejisteysan (xaqiijin sax ah laakiin ogolaansho yar) |
-| `404` | Laga helin |
-| `409` | Isdiiddi (tusaale, call horey loo jawaabay, hantida horey u jirta) |
-| `429` | Codsiyo badan (xaddidan) |
-| `500` | Khalad gudaha server-ka |
+| `400` | Bad request (malformed body, missing fields, validation failure) |
+| `401` | Unauthorized (missing ama invalid auth token) |
+| `403` | Forbidden (valid auth laakiin permissions insufficient) |
+| `404` | Not found |
+| `409` | Conflict (e.g., call already answered, resource already exists) |
+| `429` | Too many requests (rate limited) |
+| `500` | Internal server error |
 
 ---
 
-## Tixraaca ogolaanshaha
+## Permission reference
 
-Ogolaanshaha waxay raacayaan qaabka `domain:action`. Isticmaalayaasha waxay lahaadaan doorar, oo door kasta waxay ku xiran tahay set ogolaanshaha. Ogolaanshaha dhabta ah waa isku darka dhammaan doorarka la bixiyay.
+Permissions waxay raacayaan `domain:action` format. Users waxay leeyihiin roles, iyo each role waxay bundle gareysaa set of permissions. Effective permissions waxay ahaan karaan union of all assigned roles.
 
-Wildcard `*` waxay bixisaa dhammaan ogolaanshaha. Wildcard domain-ka `domain:*` waxay bixisaa dhammaan ficillada domain-kaas.
+Wildcard `*` grants dhammaan permissions. Domain wildcard `domain:*` grants dhammaan actions in domain-kaas.
 
-| Domain | Ogolaanshaha |
+| Domain | Permissions |
 |--------|-------------|
 | **calls** | `answer`, `read-active`, `read-active-full`, `read-history`, `read-presence`, `read-recording`, `debug` |
 | **notes** | `create`, `read-own`, `read-all`, `read-assigned`, `update-own` |
@@ -1657,11 +1657,11 @@ Wildcard `*` waxay bixisaa dhammaan ogolaanshaha. Wildcard domain-ka `domain:*` 
 | **files** | `upload`, `download-own`, `download-all`, `share` |
 | **system** | `manage-roles`, `manage-hubs`, `manage-instance` |
 
-### Doorarka default-ka
+### Default roles
 
-| Door | Slug | Ogolaanshaha muhiimka ah |
+| Role | Slug | Key permissions |
 |------|------|-----------------|
-| **Super Admin** | `role-super-admin` | `*` (dhammaan ogolaanshaha) |
+| **Super Admin** | `role-super-admin` | `*` (dhammaan permissions) |
 | **Hub Admin** | `role-hub-admin` | `volunteers:*`, `shifts:*`, `settings:*`, `audit:read`, `bans:*`, `invites:*`, `notes:read-all`, `reports:*`, `conversations:*`, `calls:*`, `blasts:*`, `files:*` |
 | **Reviewer** | `role-reviewer` | `notes:read-assigned`, `reports:read-assigned`, `reports:assign`, `reports:update`, `conversations:read-assigned`, `conversations:send`, `files:download-own`, `files:upload` |
 | **Volunteer** | `role-volunteer` | `calls:answer`, `calls:read-active`, `notes:create`, `notes:read-own`, `notes:update-own`, `conversations:claim`, `conversations:send`, `conversations:read-assigned`, `bans:report`, `files:upload`, `files:download-own` |
@@ -1669,12 +1669,12 @@ Wildcard `*` waxay bixisaa dhammaan ogolaanshaha. Wildcard domain-ka `domain:*` 
 
 ---
 
-## Endpoint-yada horumarinta / tijaabada
+## Development / test endpoints
 
-La heli karaa kaliya deegaannada horumarinta.
+Available kaliya in development environments.
 
 ```
-POST /api/test-reset            (dib u bilaabida oo dhan, waxay u baahan tahay madaxa X-Test-Secret)
-POST /api/test-reset-no-admin   (dib u bilaabida admin la'aan)
-POST /api/test-reset-records    (dib u bilaabida fudud, ilaaliya aqoonta/goobaha)
+POST /api/test-reset            (full reset, requires X-Test-Secret header)
+POST /api/test-reset-no-admin   (reset without admin)
+POST /api/test-reset-records    (light reset, preserves identity/settings)
 ```

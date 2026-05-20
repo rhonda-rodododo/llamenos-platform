@@ -1,121 +1,121 @@
 ---
 title: WebRTC Browser Calling
-description: Fur in-browser call answering oo loogu talagalay isbitaallada iyada oo la isticmaalayo WebRTC.
+description: Enable in-browser call answering for volunteers using WebRTC.
 ---
 
-WebRTC (Web Real-Time Communication) waxay u oggolaanaysaa isbitaallada inay ka jawaabaan calls-ka hotline-ka si toos ah browser-kooda, iyada oo aan loo baahanayn taleefan. Tani waxay faa'iido u leedahay isbitaallada aan rabin inay la wadaagaan lambarkaaga taleefanka ama kuwa ka shaqeeya kombiyuutar.
+WebRTC (Web Real-Time Communication) waxay awood u siisaa volunteers inay jawaabayaan hotline calls directly in their browser, without needing a phone. Tani waxay fudud u tahay volunteers prefer not to share their phone number ama kuwa ku shaqeeya from a computer.
 
-## Sida uu u shaqeeyo
+## How it works
 
-1. Maamuluhu wuxuu furayaa WebRTC goobaha bixiyaha telephony
-2. Isbitaalladu waxay dejiyaan doorashadooda call-ka "Browser" profile-kooda
-3. Marka call uu yimaado, app-ka Llamenos wuxuu ku dhawaaqaa browser-ka iyada oo leh digniin
-4. Isbitaalku wuxuu gujiyaa "Answer" oo call-ku wuxuu isku xiraa browser-ka iyada oo la isticmaalayo mikrofoonkiisa
+1. Admin enable gareysaa WebRTC in telephony provider settings
+2. Volunteers set call preference-ka to "Browser" in their profile
+3. Marka call yimaado, Llamenos app-ka wuu dhex-muuqanayaa in browser with a notification
+4. Volunteer gujiyaa "Answer" oo call-ka wuu isku xiran yahay through browser iyadoo isticmaalayo microphone-ka
 
-Codka call-ka waxaa loo gudbiyaa bixiyaha telephony iyada oo loo marayo isku xirka WebRTC ilaa browser-ka isbitaalka. Tayada call-ka waxay ku xiran tahay isku xirka internet-ka isbitaalka.
+Call audio waxaa loo gudbinayaa from telephony provider through WebRTC connection to volunteer's browser. Call quality waxay ku xiran tahay internet connection-ka volunteer-ka.
 
-## Shuruudaha hore
+## Prerequisites
 
-### Tafatirka maamulka
+### Admin setup
 
-- Bixiye telephony oo taageero WebRTC leh (Twilio, SignalWire, Vonage, ama Plivo)
-- Aqoonsiga WebRTC ee gaarka ah ee bixiyaha (eeg hagga tafatirka bixiyaha)
-- WebRTC oo la beddelay ON **Settings** > **Telephony Provider**
+- Telephony provider supported with WebRTC enabled (Twilio, SignalWire, Vonage, ama Plivo)
+- Provider-specific WebRTC credentials configured (eeg provider setup guides)
+- WebRTC toggled on in **Settings** > **Telephony Provider**
 
-### Shuruudaha isbitaalka
+### Volunteer requirements
 
-- Browser cusub (Chrome, Firefox, Edge, ama Safari 14.1+)
-- Mikroofan shaqeeya
-- Isku xir internet oo adag (ugu yaraan 100 kbps kor/hoos)
-- Ogolaanshaha digniinada browser-ka la bixiyay
+- Modern browser (Chrome, Firefox, Edge, ama Safari 14.1+)
+- Microphone shaqeeya
+- Internet connection stable (ugu yaraan 100 kbps up/down)
+- Browser notification permissions granted
 
-## Tafatirka gaarka ah ee bixiyaha
+## Provider-specific setup
 
-Bixiye kasta oo telephony ah waxay u baahan tahay aqoonsi kala duwan oo WebRTC:
+Each telephony provider waxay u baahan tahay credentials kala duwan for WebRTC:
 
 ### Twilio / SignalWire
 
-1. Abuur **API Key** console-ka bixiyaha
-2. Abuur **TwiML/LaML Application** iyada oo Voice URL loo dejiyo `https://your-domain.com/api/telephony/webrtc-incoming`
-3. Llamenos, geli API Key SID, API Key Secret, iyo Application SID
+1. Create an **API Key** in provider console
+2. Create a **TwiML/LaML Application** with Voice URL set to `https://your-domain.com/api/telephony/webrtc-incoming`
+3. In Llamenos, geli API Key SID, API Key Secret, iyo Application SID
 
 ### Vonage
 
-1. Vonage Application-kaagu horeyba wuxuu leeyahay awood WebRTC
-2. Llamenos, ku dhaji **fure gaarka ah** ee Application-kaaga (format-ka PEM)
-3. Application ID waa horeyba loo habeeyay setup-ka ugu horreeya
+1. Your Vonage Application horey ayaa u jirta WebRTC capability
+2. In Llamenos, paste your Application's **private key** (PEM format)
+3. Application ID horey ayaa la configure gareeyay from initial setup
 
 ### Plivo
 
-1. Abuur **Endpoint** Plivo Console iyada oo loo jeediyo **Voice** > **Endpoints**
-2. WebRTC waxay isticmaashaa Auth ID iyo Auth Token-kaaga ee horey u jiray
-3. Fur WebRTC Llamenos — aqoonsi dheeraad ah ma loo baahan yahay
+1. Create an **Endpoint** in Plivo Console under **Voice** > **Endpoints**
+2. WebRTC waxay isticmaashaa your existing Auth ID and Auth Token
+3. Enable WebRTC in Llamenos -- ma u baahnato additional credentials
 
 ### Asterisk
 
-Asterisk WebRTC waxay u baahan tahay tafatirka SIP.js iyada oo loo marayo WebSocket transport. Tani waxay ka badan tahay bixiyeyaasha cloud:
+Asterisk WebRTC waxay u baahan tahay SIP.js configuration with WebSocket transport. Tani waxay ka badan tahay cloud providers:
 
-1. Fur WebSocket transport `http.conf` ee Asterisk
-2. Abuur PJSIP endpoints ee WebRTC clients iyada oo leh DTLS-SRTP
-3. Llamenos si otomaatig ah ayay u tafatirtaa SIP.js client marka Asterisk la doorto
+1. Enable WebSocket transport in Asterisk's `http.conf`
+2. Create PJSIP endpoints for WebRTC clients with DTLS-SRTP
+3. Llamenos auto-configure gareysaa SIP.js client marka Asterisk la doorato
 
-Eeg [hagga tafatirka Asterisk](/docs/deploy/providers/asterisk) si aad u hesho faahfaahin oo dhan.
+Eeg [Asterisk setup guide](/docs/deploy/providers/asterisk) for full details.
 
-## Tafatirka doorashada call-ka ee isbitaalka
+## Volunteer call preference setup
 
-Isbitaalladu waxay tafatiraan doorashadooda call-ka app-ka:
+Volunteers waxay configure gareyaan call preference-ka in app-ka:
 
-1. Soo gal Llamenos
-2. U gudub **Settings** (icon-ka gear)
-3. Hoos **Call Preferences**, dooro **Browser** halkii **Phone**
-4. Bixi ogolaanshaha mikroofanka iyo digniinta marka la weydiiyo
-5. Sii tab-ka Llamenos furan inta lagu jiro shift-kaaga
+1. Log in to Llamenos
+2. Aad u guur **Settings** (gear icon)
+3. Under **Call Preferences**, dooro **Browser** beddelka **Phone**
+4. Grant microphone and notification permissions marka la weydiiyo
+5. Soo koob Llamenos tab open during your shift
 
-Marka call uu yimaado, waxaad arki doontaa digniin browser-ka iyo calaamad dhawaaqaysa app-ka. Guji **Answer** si aad u isku xirto.
+Marka call yimaado, waxaad arki doontaa browser notification iyo in-app ringing indicator. Guji **Answer** si aad u connect gareyso.
 
-## Iswaafaqida browser-ka
+## Browser compatibility
 
-| Browser | Desktop | Mobile | Xusuusin |
+| Browser | Desktop | Mobile | Notes |
 |---|---|---|---|
-| Chrome | Haa | Haa | La talinayo |
-| Firefox | Haa | Haa | Taageerada oo dhan |
-| Edge | Haa | Haa | Ku salaysan Chromium, taageerada oo dhan |
-| Safari | Haa (14.1+) | Haa (14.1+) | Waxay u baahan tahay ficil isticmaale si codka u bilaawdo |
-| Brave | Haa | Xaddidan | Waxay u baahan tahay in shields-ka mikroofanka la joojiyo |
+| Chrome | Yes | Yes | Recommended |
+| Firefox | Yes | Yes | Full support |
+| Edge | Yes | Yes | Chromium-based, full support |
+| Safari | Yes (14.1+) | Yes (14.1+) | Requires user interaction si loo bilaabo audio |
+| Brave | Yes | Limited | Waxay u baahan tahay disabling shields for microphone |
 
-## Talooyinka tayada codka
+## Audio quality tips
 
-- Isticmaal headset ama earbuds si aad u yareysato dhago-dhac
-- Xidh apps-ka kale ee isticmaala mikroofanka
-- Isticmaal isku xir internet oo xadhig leh haddii suurtagal tahay
-- Jooji kordhinta browser-ka waxyeelo u geysan karta WebRTC (VPN extensions, ad blockers iyada oo leh WebRTC leak protection)
+- Isticmaal headset ama earbuds si aad uga hortagto echo
+- Xir applications kale oo isticmaala microphone
+- Isticmaal wired internet connection marka suurtagalka ah
+- Disable browser extensions kuwa interfere gareya WebRTC (VPN extensions, ad blockers with WebRTC leak protection)
 
-## Xalinta dhibaatooyinka
+## Troubleshooting
 
-### Ma jiro cod
+### No audio
 
-- **Hubi ogolaanshaha mikroofanka**: Guji icon-ka qufulka cinwaanka bar-ka oo hubi in helitaanka mikroofanku yahay "Allow"
-- **Tijaabi mikroofankaaga**: Isticmaal tijaabada codka ee browser-kaaga ama goob sida [webcamtest.com](https://webcamtest.com)
-- **Hubi soo saarista codka**: Hubi in speakers-kaaga ama headset-kaaga ay yihiin qalabka soo saarida ee la doortay
+- **Check microphone permissions**: Guji lock icon-ka in address bar oo hubi in microphone access uu yahay "Allow"
+- **Test your microphone**: Isticmaal browser-kaaga built-in audio test ama site sida [webcamtest.com](https://webcamtest.com)
+- **Check audio output**: Hubi in speakers-kaaga ama headset uu yahay selected as output device
 
-### Calls ma dhawaaqayaan browser-ka
+### Calls not ringing in browser
 
-- **Digniinada la xiray**: Hubi in digniinada browser-ka ay furan yihiin goobta Llamenos
-- **Tab ma shaqeynayo**: Tab-ka Llamenos waa inuu furan yahay (wuxuu ku jiri karaa dambe, laakiin tab-ku waa inuu jiraa)
-- **Doorashada call-ka**: Xaqiiji in doorashadaada call-ka ay tahay "Browser" goobaha
-- **WebRTC ma tafatirna**: Weydii maamulkaaga inuu xaqiijiyo in WebRTC uu furan yahay oo aqoonsiyadu ay deggan yihiin
+- **Notifications blocked**: Hubi in browser notifications enabled yihiin for Llamenos site
+- **Tab not active**: Llamenos tab waa inuu furan yahay (wuuna karaa inuu ahaado background, laakiin tab waa inuu jiraa)
+- **Call preference**: Verify in call preference-kaagu yahay "Browser" in Settings
+- **WebRTC not configured**: Weydiiso admin-kaaga inuu verify gareyo WebRTC enabled yahay oo credentials set yihiin
 
-### Dhibaatooyinka Firewall iyo NAT
+### Firewall and NAT issues
 
-WebRTC waxay isticmaashaa server-ka STUN/TURN si ay u gudbaan firewalls iyo NAT. Haddii calls-ka ay isku xiraan laakiin aadan maqlin cod:
+WebRTC waxay isticmaashaa STUN/TURN servers si ay u gudbaan firewalls iyo NAT. Haddii calls connect laakiin aadan maqlin audio:
 
-- **Firewalls-ka shirkadda**: Qaar ka mid ah firewalls-ka waxay xiraan traffic-ga UDP ee alaabada aan caanka ahayn. Weydii kooxdaaga IT inay u ogolaadaan traffic-ga UDP ee alaabada 3478 iyo 10000-60000
-- **Symmetric NAT**: Qaar ka mid ah routers-ka waxay isticmaalaan symmetric NAT taasoo ka hortagi karta isku xirka tooska ah. Server-ka TURN ee bixiyaha telephony waa inuu si otomaatig ah u maareeyaa
-- **Isdhexgalka VPN**: VPN-yadu waxay ka hortagi karaan isku xirka WebRTC. Isku day inaad ka go'do VPN-kaaga inta lagu jiro shift-ka
+- **Corporate firewalls**: Qaar firewalls waxay xirayaan UDP traffic on non-standard ports. Weydiiso IT team-kaaga inay oggolaadaan UDP traffic on ports 3478 and 10000-60000
+- **Symmetric NAT**: Qaar routers waxay isticmaalaan symmetric NAT taasoo ka hortagta direct peer connections. Telephony provider's TURN servers waxay ku maamuli karaan tani si otomaatig ah
+- **VPN interference**: VPNs waxay interfere gareyaan WebRTC connections. Isku day inaad ka go'daan VPN during shifts
 
-### Dhago-dhac ama soo celcelinta
+### Echo ama feedback
 
-- Isticmaal headphones halkii speakers
-- Yaree dareeraha mikroofanka goobaha codka OS-ka
-- Fur echo cancellation browser-kaaga (badanaa si toos ah u furan)
-- Ka fogow dabeecadaha adag, soo celcelinta leh
+- Isticmaal headphones beddelka speakers
+- Yaree microphone sensitivity in your OS audio settings
+- Enable echo cancellation in your browser (guud ahaan enabled by default)
+- Ka fogow hard, reflective surfaces

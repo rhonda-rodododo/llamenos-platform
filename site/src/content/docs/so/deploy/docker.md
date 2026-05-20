@@ -1,18 +1,18 @@
 ---
-title: "Hawlgeli: Docker Compose"
-description: Ku hawlgeli Llámenos server-kaaga gaarka ah iyadoo la isticmaalayo Docker Compose.
+title: "Deploy: Docker Compose"
+description: Deploy Llamenos on your own server with Docker Compose.
 ---
 
-Tilmaantani waxay kugu hagaysaa hawlgalka Llámenos iyadoo la isticmaalayo Docker Compose hal server. Waxaad heli doontaa khad gurmad oo gabi ahaanba shaqeeya oo leh HTTPS toos ah, PostgreSQL database, kaydinta shayga, WebSocket relay, iyo qoraal-qaadista ikhtiyaariga ah — dhammaantoodna waxaa maamula Docker Compose.
+Tilmaahan wuxuu kuu horseedaa sida loo dejiyo Llamenos iyadoo la isticmaalayo Docker Compose on a single server. Waxaad yeelan doontaa xotimo hotline oo shaqaysa oo dhamaystiran, iyadoo ku jira HTTPS is-dhaca, PostgreSQL xog ku meel gaar ah, kaydinta waxyaabaha, WebSocket relay, iyo tarjumaadda ikhtiyaarka ah — oo dhammaantood la maamulo by Docker Compose.
 
-## Waxyaabaha loo baahan yahay
+## Shuruudaha hore
 
-- Server Linux ah (Ubuntu 22.04+, Debian 12+, ama la mid ah)
-- [Docker Engine](https://docs.docker.com/engine/install/) v24+ oo leh Docker Compose v2
-- `openssl` (si horudhac ah ugu rakiban nidaamyada badankood)
-- Magac domain ah oo leh DNS ku tilmaamaya IP-ga server-kaaga
+- Linux server (Ubuntu 22.04+, Debian 12+, ama mid la mid ah)
+- [Docker Engine](https://docs.docker.com/engine/install/) v24+ with Docker Compose v2
+- `openssl` (pre-installed on most systems)
+- Magac domain oo DNS u jeeddo server-kaaga IP
 
-## Bilow degdeg ah (maxalli)
+## Quick start (local)
 
 ```bash
 git clone https://github.com/rhonda-rodododo/llamenos-platform.git
@@ -20,99 +20,99 @@ cd llamenos-platform
 ./scripts/docker-setup.sh
 ```
 
-Booqo **http://localhost:8000** oo raac qalabka dejinta.
+Booqo **http://localhost:8000** oo raac setup wizard.
 
-## Hawlgalka wax-soo-saarka
+## Production deployment
 
 ```bash
 ./scripts/docker-setup.sh --domain hotline.yourorg.com --email admin@yourorg.com
 ```
 
-Qoraalka dejinta:
-1. Wuxuu soo saaraa sirta xooggan oo random ah (dammaanadda database-ka, furaha HMAC, aqoonsiyaha kaydinta, sirta WebSocket relay)
-2. Wuxuu u qoraa `deploy/docker/.env`
-3. Wuxuu dhisaa oo bilaabaa dhammaan adeegyada iyadoo la isticmaalayo daboolka wax-soo-saarka
-4. Wuxuu sugaa ilaa abku caafimaad qabo
+Setup script-ka:
+1. Waxa uu soo saariyaa secrets xooggan oo random (database password, HMAC key, storage credentials, WebSocket relay secret)
+2. Waxa uu qoriyaa `deploy/docker/.env`
+3. Waxa uu dhisaa oo uu bilaabaa dhammaan adeegyada iyadoo la isticmaalayo production overlay
+4. Waxa uu sugiyaa app-ka inuu noqdo caafimaad qaba
 
-Daboolka wax-soo-saarka (`docker-compose.production.yml`) wuxuu ku daraa:
-- **Dhamaadka TLS** iyada oo loo marayo Let's Encrypt (Caddy)
-- **Wareejinta log-ga** dhammaan adeegyada (ugu badnaan 10 MB, 5 fayl)
-- **Xaddidaadda kheyraadka** (1 GB xusuusta abka)
-- **CSP adag** — oo keliya xiriirrada `wss://` WebSocket
+Production overlay-ka (`docker-compose.production.yml`) waxa uu ku darayaa:
+- **TLS termination** via Let's Encrypt (Caddy)
+- **Log rotation** for all services (10 MB max, 5 files)
+- **Resource limits** (1 GB memory for the app)
+- **Strict CSP** — only `wss://` WebSocket connections
 
-Booqo `https://hotline.yourorg.com` oo raac qalabka dejinta.
+Booqo `https://hotline.yourorg.com` oo raac setup wizard.
 
-### Dejinta gacanta
+### Manual setup
 
 ```bash
 cd deploy/docker
 cp .env.example .env
 ```
 
-Tafatir `.env` oo buuxi sirta loo baahan yahay:
+Wax ka beddel `.env` oo buuxi secrets-ka loo baahan yahay:
 
 ```bash
-# Sirta hex (HMAC_SECRET, SERVER_SECRET):
+# Hex secrets (HMAC_SECRET, SERVER_SECRET):
 openssl rand -hex 32
 
-# Dammaanadaha (PG_PASSWORD, STORAGE_ACCESS_KEY, STORAGE_SECRET_KEY):
+# Passwords (PG_PASSWORD, STORAGE_ACCESS_KEY, STORAGE_SECRET_KEY):
 openssl rand -base64 24
 ```
 
 ```env
 DOMAIN=hotline.yourorg.com
 ACME_EMAIL=admin@yourorg.com
-ADMIN_PUBKEY=your_hex_pubkey   # ka yimid bun run bootstrap-admin
+ADMIN_PUBKEY=your_hex_pubkey   # from bun run bootstrap-admin
 ```
 
-Ku bilow daboolka wax-soo-saarka:
+Bilow iyadoo la isticmaalayo production overlay:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.production.yml up -d
 ```
 
-## Faylasha Docker Compose
+## Docker Compose files
 
-| Faylka | Ujeeddo |
-|---|---|
-| `deploy/docker/docker-compose.yml` | Qaabeynta asaasiga — dhammaan adeegyada, shabakadaha, mugga |
-| `deploy/docker/docker-compose.production.yml` | Daboolka wax-soo-saarka — TLS Caddyfile, wareejinta log-ga, xaddidaadda kheyraadka |
-| `deploy/docker/docker-compose.dev.yml` | Daboolka horumarinta — wuxuu soo bandhigayaa port-ka abka, daawashada faylka |
-| `deploy/docker/docker-compose.ci.yml` | Daboolka CI — deegaan tijaabo oo go'aamiye ah |
+| File | Ujeeddo |
+|------|---------|
+| `deploy/docker/docker-compose.yml` | Base configuration — all services, networks, volumes |
+| `deploy/docker/docker-compose.production.yml` | Production overlay — TLS Caddyfile, log rotation, resource limits |
+| `deploy/docker/docker-compose.dev.yml` | Development overlay — exposes app port, file watching |
+| `deploy/docker/docker-compose.ci.yml` | CI overlay — deterministic test environment |
 
-**Horumarinta maxalliga ah** waxay isticmaashaa daboolka horumarinta. **Wax-soo-saarka** wuxuu saaraa daboolka wax-soo-saarka korka asaaska.
+**Local development** waxay isticmaashaa dev overlay. **Production** waxay dhisaan production overlay-ka korkiisa base-ka.
 
-## Adeegyada aasaasiga ah
+## Core services
 
-| Adeegga | Ujeeddo | Port |
-|---|---|---|
-| **app** | Abka Llámenos (Bun + Hono) | 3000 (gudaha) |
-| **postgres** | Kaydka xogta PostgreSQL | 5432 (gudaha) |
-| **caddy** | Reverse proxy + TLS toos ah | 8000 (maxalli), 80/443 (wax-soo-saar) |
-| **RustFS** | Kaydka faylka S3-compatible | 9000 (gudaha) |
-| **WebSocket relay** | WebSocket relay ee dhacdooyinka wakhtiga-dhabta ah | 7777 (gudaha) |
+| Adeeg | Ujeeddo | Port |
+|---------|---------|------|
+| **app** | Llamenos application (Bun + Hono) | 3000 (internal) |
+| **postgres** | PostgreSQL database | 5432 (internal) |
+| **caddy** | Reverse proxy + automatic TLS | 8000 (local), 80/443 (production) |
+| **RustFS** | S3-compatible file storage | 9000 (internal) |
+| **WebSocket relay** | WebSocket relay for real-time events | 7777 (internal) |
 
-## Profiles-ka ikhtiyaariga ah
+## Optional profiles
 
-Ku bilow adeegyada ikhtiyaariga ah `--profile`:
+Bilow adeegyada ikhtiyaarka ah iyadoo la isticmaalayo `--profile`:
 
 ```bash
 # Signal messaging sidecar
 docker compose -f docker-compose.yml -f docker-compose.production.yml --profile signal up -d
 
-# Asterisk/FreeSWITCH/Kamailio SIP bridge (PBX_TYPE wuxuu doortaa backend-ka)
+# Asterisk/FreeSWITCH/Kamailio SIP bridge (PBX_TYPE selects backend)
 docker compose -f docker-compose.yml -f docker-compose.production.yml --profile telephony up -d
 
-# Ollama/vLLM inference soo-saarka farriinta
+# Ollama/vLLM inference for message extraction
 docker compose -f docker-compose.yml -f docker-compose.production.yml --profile inference up -d
 
 # Prometheus + Grafana monitoring
 docker compose -f docker-compose.yml -f docker-compose.production.yml --profile monitoring up -d
 ```
 
-## Buundada SIP
+## SIP bridge
 
-Adeegga `sip-bridge` wuxuu ku xiraa Llámenos PBX is-hawlgabeysan. Ku deji `PBX_TYPE` `.env` si aad u doorato backend-ka:
+Adeegga `sip-bridge` waxa uu isku xiraa Llamenos to a self-hosted PBX. Set `PBX_TYPE` in `.env` si aad u doorato backend:
 
 ```env
 PBX_TYPE=asterisk      # Asterisk ARI
@@ -120,28 +120,28 @@ PBX_TYPE=asterisk      # Asterisk ARI
 # PBX_TYPE=kamailio    # Kamailio
 ```
 
-Sidoo kale loo baahan yahay: `ARI_PASSWORD` iyo `BRIDGE_SECRET`.
+Sidoo kale loo baahan yahay: `ARI_PASSWORD` and `BRIDGE_SECRET`.
 
 ## Signal notifier sidecar
 
-Adeegga `signal-notifier` wuxuu ku shaqeeyaa port 3100. Wuxuu xalliyaa xiriirrada Signal iyada oo loo marayo aqoonsiyeyaasha HMAC-lahasheeyay — marna kuma kaydiyo lambarrada taleefannada qoraalka cad. Qaabee:
+Adeegga `signal-notifier` waxa uu shaqeeyaa port 3100. Waxa uu ku xalliyaa Signal contacts via HMAC-hashed identifiers — marnaba ma kaydsado plaintext phone numbers. Configure:
 
 ```env
-SIGNAL_NOTIFIER_BEARER_TOKEN=your_shared_token  # waa inay ku mid tahay abka iyo sidecar-ka
+SIGNAL_NOTIFIER_BEARER_TOKEN=your_shared_token  # must match in both app and sidecar
 ```
 
-## Baaritaannada caafimaadka
+## Health checks
 
-Abku wuxuu soo bandhigaa:
-- `GET /health/ready` — diyaar marka DB ku xiran tahay oo migrations la dabaqay
-- `GET /health/live` — baaritaan noolaansho
+App-ka waxa uu soo bandhigayaa:
+- `GET /health/ready` — ready when DB connected and migrations applied
+- `GET /health/live` — alive check
 
 ```bash
 curl https://hotline.yourorg.com/health/ready
 # {"status":"ok"}
 ```
 
-## Xaqiiji hawlgalka
+## Verify deployment
 
 ```bash
 cd deploy/docker
@@ -150,19 +150,19 @@ docker compose -f docker-compose.yml -f docker-compose.production.yml logs app -
 curl https://hotline.yourorg.com/health/ready
 ```
 
-## Qaabee webhooks-ka
+## Configure webhooks
 
-U jeedi webhooks-ka bixiyahaaga telefoonada domain-kaaga:
+U jeedi webhooks-ka telephony provider-kaaga domain-kaaga:
 
 | Webhook | URL |
-|---|---|
-| Codka (soo-gala) | `https://hotline.yourorg.com/api/telephony/incoming` |
-| Codka (heerka) | `https://hotline.yourorg.com/api/telephony/status` |
+|---------|-----|
+| Voice (incoming) | `https://hotline.yourorg.com/api/telephony/incoming` |
+| Voice (status) | `https://hotline.yourorg.com/api/telephony/status` |
 | SMS | `https://hotline.yourorg.com/api/messaging/sms/webhook` |
 | WhatsApp | `https://hotline.yourorg.com/api/messaging/whatsapp/webhook` |
-| Signal | Hor u gudbi `https://hotline.yourorg.com/api/messaging/signal/webhook` |
+| Signal | Forward to `https://hotline.yourorg.com/api/messaging/signal/webhook` |
 
-## Cusboonaysiinta
+## Updating
 
 ```bash
 cd deploy/docker
@@ -171,73 +171,73 @@ docker compose -f docker-compose.yml -f docker-compose.production.yml build
 docker compose -f docker-compose.yml -f docker-compose.production.yml up -d
 ```
 
-Xogta waxay ku sii jirtaa mugga Docker (`postgres-data`, `RustFS-data`, iwm) dib-u-bilowga iyo dib-u-dhismayaasha.
+Data persists in Docker volumes (`postgres-data`, `RustFS-data`, etc.) across restarts and rebuilds.
 
-## Kaydka
+## Backups
 
 ### PostgreSQL
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.production.yml exec postgres \
-  pg_dump -U llamenos llamenos > kayd-$(date +%Y%m%d).sql
+  pg_dump -U llamenos llamenos > backup-$(date +%Y%m%d).sql
 ```
 
-Soo celi:
+Restore:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.production.yml exec -T postgres \
-  psql -U llamenos llamenos < kayd-20250101.sql
+  psql -U llamenos llamenos < backup-20250101.sql
 ```
 
-### Kaydka tooska ah (cron)
+### Automated backups (cron)
 
 ```bash
-# /etc/cron.d/llamenos-kayd
+# /etc/cron.d/llamenos-backup
 0 3 * * * root cd /opt/llamenos/deploy/docker && \
   docker compose -f docker-compose.yml -f docker-compose.production.yml exec -T postgres \
   pg_dump -U llamenos llamenos | gzip > /backups/llamenos-$(date +\%Y\%m\%d).sql.gz
 ```
 
-## Log-yada
+## Logs
 
 ```bash
 cd deploy/docker
 
-# Dhammaan adeegyada
+# All services
 docker compose -f docker-compose.yml -f docker-compose.production.yml logs -f
 
-# Adeeg gaar ah
+# Specific service
 docker compose -f docker-compose.yml -f docker-compose.production.yml logs -f app
 
-# 100 sadar ee ugu dambeeyay
+# Last 100 lines
 docker compose -f docker-compose.yml -f docker-compose.production.yml logs --tail 100 app
 ```
 
-## Cillad-xallinta
+## Troubleshooting
 
-### Abku ma bilaabmayo
+### App won't start
 
 ```bash
 docker compose logs app
-docker compose config   # xaqiiji .env la soo dajiyay
-docker compose ps       # hubi caafimaadka adeegga
+docker compose config   # verify .env loaded
+docker compose ps       # check service health
 ```
 
-### Arrimaha shahaadada
+### Certificate issues
 
-Caddy wuxuu u baahan yahay port-yada 80 iyo 443 inay furan yihiin ACME challenges:
+Caddy needs ports 80 and 443 open for ACME challenges:
 
 ```bash
 docker compose logs caddy
 curl -I http://hotline.yourorg.com
 ```
 
-## Qaab-dhismeedka adeegga
+## Service architecture
 
-![Qaab-dhismeedka Docker](/diagrams/docker-architecture.svg)
+![Docker Architecture](/diagrams/docker-architecture.svg)
 
-## Tallaabooyinka xiga
+## Next steps
 
-- [Hawlgalka Kubernetes](/docs/en/deploy/kubernetes) — baaxadaynta tooska ah ee Helm
-- [Hawlgalka Co-op Cloud](/docs/en/deploy/coopcloud) — martigelinta iskaashiga ah
-- [Bixiyeyaasha Telefoonada](/docs/en/deploy/providers/) — qaabee bixiyeyaasha codka
+- [Kubernetes Deployment](/docs/en/deploy/kubernetes) — horizontal scaling with Helm
+- [Co-op Cloud Deployment](/docs/en/deploy/coopcloud) — cooperative hosting
+- [Telephony Providers](/docs/en/deploy/providers/) — configure voice providers

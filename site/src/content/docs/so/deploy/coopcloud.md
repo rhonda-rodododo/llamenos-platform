@@ -1,105 +1,105 @@
 ---
-title: "Soo saar: Co-op Cloud"
-description: Soo saar Llamenos sidii Co-op Cloud recipe oo loogu talagalay kooxaha martigelinta iskaashi-ka.
+title: "Deploy: Co-op Cloud"
+description: Deploy Llamenos as a Co-op Cloud recipe for cooperative hosting collectives.
 ---
 
-Halkan waxaa ku qoran habka lagu soo saaro Llamenos sidii [Co-op Cloud](https://coopcloud.tech) recipe. Co-op Cloud waxay isticmaashaa Docker Swarm iyada oo Traefik uu ka dhigo TLS termination iyo `abra` CLI si loo maareeyo apps si isku mid ah — waxay u habboon tahay tech co-ops iyo kooxaha martigelinta yaryar.
+Tilmaahan wuxuu kuu horseedaa sida loo dejiyo Llamenos as a [Co-op Cloud](https://coopcloud.tech) recipe. Co-op Cloud waxa uu isticmaalaa Docker Swarm with Traefik for TLS termination iyo `abra` CLI for standardized app management — ku habboon tech co-ops iyo small hosting collectives.
 
-Recipe-ga waxaa lagu maareeyaa [repo gaar ah](https://github.com/rhonda-rodododo/llamenos-template).
+Recipe-ga waxaa lagu maamulaa [standalone repository](https://github.com/rhonda-rodododo/llamenos-template).
 
 ## Shuruudaha hore
 
-- Server leh [Docker Swarm](https://docs.docker.com/engine/swarm/) oo la bilaabay iyo [Traefik](https://doc.traefik.io/traefik/) oo u shaqeeya sidii reverse proxy
-- [`abra` CLI](https://docs.coopcloud.tech/abra/install/) oo ku rakiban mashiinkaaga
-- Magac domain oo DNS uu u jeediyo IP-ga server-ka
-- Helitaanka SSH ee server-ka
+- Server leh [Docker Swarm](https://docs.docker.com/engine/swarm/) initialized iyo [Traefik](https://doc.traefik.io/traefik/) running as reverse proxy
+- [`abra` CLI](https://docs.coopcloud.tech/abra/install/) installed on your local machine
+- Magac domain oo DNS u jeeddo server-kaaga IP
+- SSH access to the server
 
-Haddii aad cusub tahay Co-op Cloud, raac [hagga Co-op Cloud setup](https://docs.coopcloud.tech/intro/) marka hore.
+Haddii aad cusub tahay Co-op Cloud, raac [Co-op Cloud setup guide](https://docs.coopcloud.tech/intro/) first.
 
-## Bilow degdeg ah
+## Quick start
 
 ```bash
-# Ku dar server-ka (haddii aanu horey u jirin)
+# Add your server (haddii aan horey loo darin)
 abra server add hotline.example.com
 
-# Clone recipe-ga (abra waxay ka eegaysaa recipes-ka ~/.abra/recipes/)
+# Clone the recipe (abra waxay ka eegtaa recipes in ~/.abra/recipes/)
 git clone https://github.com/rhonda-rodododo/llamenos-template.git \
   ~/.abra/recipes/llamenos
 
-# Abuur app cusub oo Llamenos ah
+# Create a new Llamenos app
 abra app new llamenos --server hotline.example.com --domain hotline.example.com
 
-# Abuur dhammaan sirta
+# Generate all secrets
 abra app secret generate -a hotline.example.com
 
-# Soo saar
+# Deploy
 abra app deploy hotline.example.com
 ```
 
-Booqo `https://hotline.example.com` oo raac setup wizard si aad u abuurto akoonkaaga admin.
+Booqo `https://hotline.example.com` oo raac setup wizard si aad u sameyso admin account-kaaga.
 
-## Adeegyada aasaasiga ah
+## Core services
 
-Recipe-ga waxay soo saartaa shan adeeg:
+Recipe-ga waxa uu dejiyaa shan adeeg:
 
 | Adeeg | Image | Ujeeddo |
 |---------|-------|---------|
-| **web** | `nginx:1.27-alpine` | Reverse proxy iyada oo leh Traefik labels |
-| **app** | `ghcr.io/rhonda-rodododo/llamenos-platform` | Server-ka codsiga Bun |
-| **db** | `postgres:17-alpine` | Xogta PostgreSQL |
-| **RustFS** | `RustFS/RustFS` | Kaydinta faylasha ee la midka ah S3 |
-| **relay** | `dockurr/WebSocket relay` | WebSocket relay dhacdooyinka waqti-dhabta ah |
+| **web** | `nginx:1.27-alpine` | Reverse proxy with Traefik labels |
+| **app** | `ghcr.io/rhonda-rodododo/llamenos-platform` | Bun application server |
+| **db** | `postgres:17-alpine` | PostgreSQL database |
+| **RustFS** | `RustFS/RustFS` | S3-compatible file storage |
+| **relay** | `dockurr/WebSocket relay` | WebSocket relay for real-time events |
 
-## Sirta
+## Secrets
 
-Dhammaan sirta waxaa loo maareeyaa via Docker Swarm secrets (la tixgeliyay, aan la beddeli karin):
+Dhammaan secrets waxaa loo maamulaa via Docker Swarm secrets (versioned, immutable):
 
-| Sir | Nooca | Sharaxaad |
+| Secret | Nooc | Sharaxaad |
 |--------|------|-------------|
-| `hmac_secret` | hex (64 xaraf) | Fure saxiixa HMAC ee tokens-ka xilliga |
-| `server_WebSocket` | hex (64 xaraf) | Fure aqoonta WebSocket ee server-ka |
-| `db_password` | alnum (32 xaraf) | Furaha PostgreSQL |
-| `RustFS_access` | alnum (20 xaraf) | Fure helitaanka RustFS |
-| `RustFS_secret` | alnum (40 xaraf) | Fure sirta ah ee RustFS |
+| `hmac_secret` | hex (64 chars) | HMAC signing key for session tokens |
+| `server_WebSocket` | hex (64 chars) | Server WebSocket identity key |
+| `db_password` | alnum (32 chars) | PostgreSQL password |
+| `RustFS_access` | alnum (20 chars) | RustFS access key |
+| `RustFS_secret` | alnum (40 chars) | RustFS secret key |
 
-Abuur dhammaan sirta hal mar:
+Generate dhammaan secrets hal mar:
 
 ```bash
 abra app secret generate -a hotline.example.com
 ```
 
-Si aad u beddesho sir gaar ah:
+Si aad u rotate specific secret:
 
 ```bash
-# 1. Kic version-ka config-kaaga app-ka
+# 1. Bump version-ka in your app config
 abra app config hotline.example.com
-# Beddel SECRET_HMAC_SECRET_VERSION=v2
+# Change SECRET_HMAC_SECRET_VERSION=v2
 
-# 2. Abuur sir cusub
+# 2. Generate the new secret
 abra app secret generate hotline.example.com hmac_secret
 
-# 3. Dib u soo saar
+# 3. Redeploy
 abra app deploy hotline.example.com
 ```
 
 ## Configuration
 
-Tafatir config-ka app-ka:
+Wax ka beddel app configuration:
 
 ```bash
 abra app config hotline.example.com
 ```
 
-Goobaha muhiimka ah:
+Key settings:
 
 ```env
 DOMAIN=hotline.example.com
 LETS_ENCRYPT_ENV=production
 
-# Magaca muujinta ee lagu arko app-ka
+# Display name shown in the app
 HOTLINE_NAME=My Hotline
 
-# Bixiyaha telephony (tafatir kadib setup wizard)
+# Telephony provider (configure after setup wizard)
 # PBX_TYPE=twilio
 # TWILIO_ACCOUNT_SID=
 # TWILIO_AUTH_TOKEN=
@@ -112,7 +112,7 @@ HOTLINE_NAME=My Hotline
 # SIGNALWIRE_PHONE_NUMBER=
 # SIGNALWIRE_SPACE_URL=
 
-# Version-ka sirta (kic si aad u beddesho)
+# Secret versioning (bump to rotate)
 SECRET_HMAC_SECRET_VERSION=v1
 SECRET_SERVER_NOSTR_VERSION=v1
 SECRET_DB_PASSWORD_VERSION=v1
@@ -120,59 +120,59 @@ SECRET_STORAGE_ACCESS_VERSION=v1
 SECRET_STORAGE_SECRET_VERSION=v1
 ```
 
-## Soo galida ugu horreysa
+## First login
 
-Kadib soo saarista, fur domain-kaaga browser-ka oo raac setup wizard:
+Kadib deployment, fur domain-kaaga browser-ka oo raac setup wizard:
 
-1. **Abuur akoonkaaga admin** — deji magac muujin iyo PIN-kaaga
-2. **Magac bixi hotline-kaaga** — deji magaca muujinta ee lagu arko app-ka
-3. **Dooro kanaalada** — fur Voice, SMS, WhatsApp, Signal, iyo/ama Reports
-4. **Tafatir bixiyeyaasha** — geli aqoonsiga kanaal kasta oo la furay
-5. **Dib u eeg oo dhammeystir**
+1. **Create your admin account** — set display name and PIN-kaaga
+2. **Name your hotline** — set display name-ka lagu muujiyo app-ka
+3. **Choose channels** — enable Voice, SMS, WhatsApp, Signal, and/or Reports
+4. **Configure providers** — enter credentials for each enabled channel
+5. **Review and finish**
 
-## Tafatir webhooks
+## Configure webhooks
 
-U jeedi webhooks-ka bixiyahaaga telephony domain-kaaga:
+U jeedi webhooks-ka telephony provider-kaaga domain-kaaga:
 
-- **Voice (soo galaya)**: `https://hotline.example.com/api/telephony/incoming`
-- **Voice (xaaladda)**: `https://hotline.example.com/api/telephony/status`
+- **Voice (incoming)**: `https://hotline.example.com/api/telephony/incoming`
+- **Voice (status)**: `https://hotline.example.com/api/telephony/status`
 - **SMS**: `https://hotline.example.com/api/messaging/sms/webhook`
 - **WhatsApp**: `https://hotline.example.com/api/messaging/whatsapp/webhook`
-- **Signal**: Tafatir bridge si uu u gudbiyo `https://hotline.example.com/api/messaging/signal/webhook`
+- **Signal**: Configure bridge to forward to `https://hotline.example.com/api/messaging/signal/webhook`
 
-Eeg hagga bixiyaha gaarka ah: [Twilio](/docs/en/deploy/providers/twilio), [SignalWire](/docs/en/deploy/providers/signalwire), [Vonage](/docs/en/deploy/providers/vonage), [Plivo](/docs/en/deploy/providers/plivo).
+Eeg tilmaamayaasha la xidhiidha provider-ka: [Twilio](/docs/en/deploy/providers/twilio), [SignalWire](/docs/en/deploy/providers/signalwire), [Vonage](/docs/en/deploy/providers/vonage), [Plivo](/docs/en/deploy/providers/plivo).
 
-## Ikhtiyaar: Fur Signal sidecar
+## Optional: Enable Signal sidecar
 
-Farriimaha Signal (eeg [Signal setup](/docs/en/deploy/providers/signal)):
+Signal messaging (eeg [Signal setup](/docs/en/deploy/providers/signal)):
 
 ```bash
 abra app config hotline.example.com
 ```
 
-Deji:
+Set:
 
 ```env
 COMPOSE_FILE=compose.yml:compose.signal.yml
 SECRET_SIGNAL_NOTIFIER_TOKEN_VERSION=v1
 ```
 
-Abuur sir dheeraad ah oo dib u soo saar:
+Generate secret-ka dheeraadka ah oo redeploy:
 
 ```bash
 abra app secret generate hotline.example.com signal_notifier_token
 abra app deploy hotline.example.com
 ```
 
-## Ikhtiyaar: Fur SIP bridge
+## Optional: Enable SIP bridge
 
-Telephony SIP oo gacanta lagu hayo via Asterisk, FreeSWITCH, ama Kamailio:
+Self-hosted SIP telephony via Asterisk, FreeSWITCH, ama Kamailio:
 
 ```bash
 abra app config hotline.example.com
 ```
 
-Deji:
+Set:
 
 ```env
 COMPOSE_FILE=compose.yml:compose.telephony.yml
@@ -181,22 +181,22 @@ SECRET_ARI_PASSWORD_VERSION=v1
 SECRET_BRIDGE_SECRET_VERSION=v1
 ```
 
-Abuur sirta dheeraadka ah oo dib u soo saar:
+Generate secrets-ka dheeraadka ah oo redeploy:
 
 ```bash
 abra app secret generate hotline.example.com ari_password bridge_secret
 abra app deploy hotline.example.com
 ```
 
-## Ikhtiyaar: Fur transcription
+## Optional: Enable transcription
 
-Kudar transcription overlay (waxay u baahan tahay 4 GB+ RAM):
+Kudar transcription overlay (requires 4 GB+ RAM):
 
 ```bash
 abra app config hotline.example.com
 ```
 
-Deji:
+Set:
 
 ```env
 COMPOSE_FILE=compose.yml:compose.transcription.yml
@@ -204,7 +204,7 @@ WHISPER_MODEL=Systran/faster-whisper-base
 WHISPER_DEVICE=cpu
 ```
 
-Kadib dib u soo saar:
+Kadib redeploy:
 
 ```bash
 abra app deploy hotline.example.com
@@ -212,45 +212,45 @@ abra app deploy hotline.example.com
 
 Isticmaal `WHISPER_DEVICE=cuda` haddii server-kaagu leeyahay GPU.
 
-## Cusbooneysiinta
+## Updating
 
 ```bash
 abra app upgrade hotline.example.com
 ```
 
-Tani waxay soo jiidataa version-ka recipe ugu dambeeya oo dib u soo saartaa. Xogta waxaa lagu kaydiyaa Docker volumes oo way ka badbaadataa cusbooneysiinta.
+Tani waxay soo ceshataa latest recipe version oo redeploy. Xogtu way ku sii jirtaa Docker volumes oo way badbaadaa upgrades.
 
-## Kaydka xogta
+## Backups
 
-### Isdhexgalka backupbot
+### Backupbot integration
 
-Recipe-ga waxay ku jirto labels-ka [backupbot](https://docs.coopcloud.tech/backupbot/) si loo kaydiyo PostgreSQL iyo RustFS si otomaatig ah. Haddii server-kaagu uu ku shaqeeyo backupbot, kaydka xogtuu si otomaatig ah u dhacayaa.
+Recipe-ga waxa ku jira [backupbot](https://docs.coopcloud.tech/backupbot/) labels for automated PostgreSQL iyo RustFS backups. Haddii server-kaagu uu ku shaqeynayo backupbot, backups way dhacaan automatically.
 
-### Kayd gacan ku ah
+### Manual backup
 
-Isticmaal script-ka kaydka ee ku jira:
+Isticmaal backup script-ka ku jira:
 
 ```bash
-# Ka soo jeeda directory-ga recipe-ga
+# From the recipe directory
 ./pg_backup.sh <stack-name>
-./pg_backup.sh <stack-name> /backups    # directory gaar ah, 7-maalmood oo joogtayn
+./pg_backup.sh <stack-name> /backups    # custom directory, 7-day retention
 ```
 
-Ama kaydi si toos ah:
+Ama backup directly:
 
 ```bash
 # PostgreSQL
 docker exec $(docker ps -q -f name=<stack-name>_db) \
   pg_dump -U llamenos llamenos | gzip > backup-$(date +%Y%m%d).sql.gz
 
-# RustFS (kaydinta faylasha)
+# RustFS (object storage)
 docker run --rm \
   -v <stack-name>_RustFS-data:/data \
   -v /backups:/backups \
   alpine tar czf /backups/RustFS-$(date +%Y%m%d).tar.gz /data
 ```
 
-Soo celi PostgreSQL:
+Restore PostgreSQL:
 
 ```bash
 gunzip -c backup-20260101.sql.gz | \
@@ -258,17 +258,17 @@ gunzip -c backup-20260101.sql.gz | \
   psql -U llamenos llamenos
 ```
 
-## Kormeerka
+## Monitoring
 
-### Hubinta caafimaadka
+### Health checks
 
-Dhammaan adeegyadu waxay leeyihiin Docker health checks. Hubi xaaladda:
+Dhammaan adeegyada waxay leeyihiin Docker health checks. Check status:
 
 ```bash
 abra app ps hotline.example.com
 ```
 
-App-ku waxay soo bandhigaysaa endpoints-ka caafimaadka:
+App-ka waxa uu soo bandhigayaa health endpoints:
 
 ```bash
 curl https://hotline.example.com/health/ready
@@ -277,104 +277,104 @@ curl https://hotline.example.com/health/live
 # {"status":"ok"}
 ```
 
-### Log-yada
+### Logs
 
 ```bash
-# Dhammaan adeegyada
+# All services
 abra app logs hotline.example.com
 
-# Adeeg gaar ah
+# Specific service
 abra app logs hotline.example.com app
 
-# Raac log-yada waqti-dhabta ah
+# Follow logs in real time
 abra app logs -f hotline.example.com app
 
-# Raac dhammaan adeegyada
+# Follow all services
 abra app logs -f hotline.example.com
 ```
 
-## Tixraaca amarka abra
+## abra command reference
 
-| Amarka | Sharaxaad |
+| Command | Sharaxaad |
 |---------|-------------|
-| `abra app ps hotline.example.com` | Muuji containers-ka shaqeeya iyo caafimaadka |
-| `abra app logs [-f] hotline.example.com [service]` | Eeg (oo raac) log-yada |
-| `abra app config hotline.example.com` | Tafatir config-ka app-ka (furaya `$EDITOR`) |
-| `abra app secret ls hotline.example.com` | Liis sirta iyo version-yadooda |
-| `abra app secret generate hotline.example.com [name]` | Abuur hal ama dhammaan sirta |
-| `abra app deploy hotline.example.com` | Soo saar (ama dib u soo saar) app-ka |
-| `abra app upgrade hotline.example.com` | Soo jiid recipe ugu dambeeya oo dib u soo saar |
-| `abra app undeploy hotline.example.com` | Jooji oo ka saar app-ka (xogta way badbaadataa) |
-| `abra app run hotline.example.com app -- bun run ...` | Ordi amar hal mar ku jira container-ka app-ka |
+| `abra app ps hotline.example.com` | Show running containers and health |
+| `abra app logs [-f] hotline.example.com [service]` | View (and follow) logs |
+| `abra app config hotline.example.com` | Edit app config (opens `$EDITOR`) |
+| `abra app secret ls hotline.example.com` | List secrets and their versions |
+| `abra app secret generate hotline.example.com [name]` | Generate one or all secrets |
+| `abra app deploy hotline.example.com` | Deploy (ama redeploy) app-ka |
+| `abra app upgrade hotline.example.com` | Pull latest recipe and redeploy |
+| `abra app undeploy hotline.example.com` | Stop and remove the app (data preserved) |
+| `abra app run hotline.example.com app -- bun run ...` | Run a one-off command in the app container |
 
-## Qaab-dhismeedka adeegyada
+## Service architecture
 
 ![Co-op Cloud Architecture](/diagrams/coopcloud-architecture.svg)
 
-## Xalinta dhibaatooyinka
+## Troubleshooting
 
-### App ma bilaabmayo
+### App won't start
 
 ```bash
 abra app logs hotline.example.com app
 abra app ps hotline.example.com
 ```
 
-Hubi in dhammaan sirta la abuuray:
+Hubi in dhammaan secrets la soo saaro:
 
 ```bash
 abra app secret ls hotline.example.com
 ```
 
-Sirta maqan waxay u muuqanayaan version madhan. Abuur:
+Secrets maqan way muujinayaan version-ka oo madhan. Soo saar:
 
 ```bash
 abra app secret generate hotline.example.com
 ```
 
-### Dhibaatooyinka shahaadada
+### Certificate issues
 
-Traefik waxay maareysaa TLS. Hubi log-yada Traefik server-kaaga:
+Traefik waxa uu maamulaa TLS. Check Traefik logs on your server:
 
 ```bash
 docker service logs traefik
 ```
 
-Hubi in DNS-ga domain-kaagu uu u jeediyo server-ka iyo in alaabada 80/443 ay furan yihiin.
+Hubi in DNS domain-kaagu uu ku jiro server-ka iyo ports 80/443 ay furan yihiin.
 
-### Dhibaatooyinka isku xirka xogta
+### Database connection errors
 
-Hubi in container-ka app-ku uu gaari karo PostgreSQL:
+Check app container can reach PostgreSQL:
 
 ```bash
 abra app run hotline.example.com app -- \
   bun -e "const { sql } = await import('bun'); await sql\`SELECT 1\`; console.log('ok')"
 ```
 
-### Beddelka sirta
+### Secret rotation
 
-Haddii sir la qabsado:
+Haddii secret la jabsado:
 
-1. Kic version-ka config-ka app-ka: `abra app config hotline.example.com`
-   (tusaale, beddel `SECRET_HMAC_SECRET_VERSION=v2`)
-2. Abuur sir cusub: `abra app secret generate hotline.example.com hmac_secret`
-3. Dib u soo saar: `abra app deploy hotline.example.com`
+1. Bump version in app config: `abra app config hotline.example.com`
+   (e.g., change `SECRET_HMAC_SECRET_VERSION=v2`)
+2. Generate new secret: `abra app secret generate hotline.example.com hmac_secret`
+3. Redeploy: `abra app deploy hotline.example.com`
 
-### WebSocket relay ma isku xirayo
+### WebSocket relay not connecting
 
-Dhacdooyinka waqti-dhabta ah waxay u baahan yihiin WebSocket relay. Haddii aad aragto khaladaad WebSocket:
+Dhacdooyinka real-time waxay u baahan yihiin WebSocket relay. Haddii aad aragto WebSocket errors:
 
 ```bash
 abra app logs hotline.example.com relay
 abra app ps hotline.example.com
 ```
 
-Xaqiiji in Nginx config uu u gudbiyo `/WebSocket` relay container-ka ee alaabada 7777.
+Verify Nginx config routes `/WebSocket` to relay container on port 7777.
 
-## Tallaabooyinka xiga
+## Next steps
 
-- [Hagga Admin](/docs/en/guides/?audience=operator) — tafatir hotline-ka
-- [Guud ahaan Self-Hosting](/docs/en/deploy/self-hosting) — isbarbardhig xulashooyinka soo saarista
-- [Soo saarista Docker Compose](/docs/en/deploy/docker) — xulasho kale oo hal-server ah
-- [Recipe repository](https://github.com/rhonda-rodododo/llamenos-template) — isbitaalka Co-op Cloud recipe
-- [Co-op Cloud documentation](https://docs.coopcloud.tech/) — wax badan oo ku saabsan platform-ka
+- [Admin Guide](/docs/en/guides/?audience=operator) — configure the hotline
+- [Self-Hosting Overview](/docs/en/deploy/self-hosting) — compare deployment options
+- [Docker Compose deployment](/docs/en/deploy/docker) — alternative single-server deployment
+- [Recipe repository](https://github.com/rhonda-rodododo/llamenos-template) — Co-op Cloud recipe source
+- [Co-op Cloud documentation](https://docs.coopcloud.tech/) — learn more about the platform

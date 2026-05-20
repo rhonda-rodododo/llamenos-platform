@@ -1,82 +1,82 @@
 ---
-title: "Deji: Vonage"
-description: Tilmaan tallaabo-tallaabo ah oo lagu qaabeeyo Vonage bixiyahaaga telefoonada.
+title: "Setup: Vonage"
+description: Step-by-step guide to configure Vonage as your telephony provider.
 ---
 
-Vonage (hore Nexmo) wuxuu bixiyaa dabool caalami oo xooggan iyo qiimo tartan leh. Wuxuu isticmaalaa qaab API ka duwan Twilio — Vonage Applications ayaa kooxaysa lambarkaaga, webhooks-ka, iyo aqoonsiyaha.
+Vonage (horey loo yaqaan Nexmo) waxay bixisaa international coverage xooggan iyo qiimo tartami leh. Waxay isticmaashaa API model kala duwan Twilio -- Vonage Applications waxay ururiyaan number-kaaga, webhooks, iyo credentials-kaaga isku meel.
 
-## Waxyaabaha loo baahan yahay
+## Prerequisites
 
-- Akoon [Vonage](https://dashboard.nexmo.com/sign-up) (amaano bilaash ah waa la heli karaa)
-- Matoorkaaga Llámenos oo la hawlgaliyay oo laga heli karo URL dadweyne
+- [Vonage account](https://dashboard.nexmo.com/sign-up) (free credit available)
+- Your Llamenos instance deployed oo la heli karo via public URL
 
-## 1. Abuur akoon Vonage
+## 1. Create a Vonage account
 
-Ka diiwaan geli [Vonage API Dashboard](https://dashboard.nexmo.com/sign-up). Xaqiiji akoonkaaga oo qor **API Key** iyo **API Secret** bogga weyn ee dashboard-ka.
+Isu diiwaan geli at [Vonage API Dashboard](https://dashboard.nexmo.com/sign-up). Verify account-kaaga oo xasuusnow **API Key** iyo **API Secret** from dashboard home page.
 
-## 2. Iibso lambar taleefan
+## 2. Buy a phone number
 
-1. Tag **Numbers** > **Buy numbers** Vonage Dashboard-ka
-2. Dooro waddankaaga oo dooro lambar leh awoodda **Voice**
-3. Iibso lambarka
+1. Aad u guur **Numbers** > **Buy numbers** in Vonage Dashboard
+2. Dooro country-kaaga oo dooro number leh **Voice** capability
+3. Iibso number-ka
 
-## 3. Abuur Vonage Application
+## 3. Create a Vonage Application
 
-Vonage wuxuu kooxeeyaa qaabeynta "Applications":
+Vonage waxay ururisaa configuration into "Applications":
 
-1. Tag **Applications** > **Create a new application**
-2. Gali magac (tusaale, "Llamenos Hotline")
-3. Hoos **Voice**, shid oo ku deji:
+1. Aad u guur **Applications** > **Create a new application**
+2. Geli magac (e.g., "Llamenos Hotline")
+3. Under **Voice**, toggle it on oo set:
    - **Answer URL**: `https://your-domain.com/api/telephony/incoming` (POST)
    - **Event URL**: `https://your-domain.com/api/telephony/status` (POST)
 4. Guji **Generate new application**
-5. Kaydi **Application ID** bogga xaqiijinta
-6. Soo deji faylka **private key** — waxaad u baahan doontaa nuxurkiisa qaabeynta
+5. Keyd **Application ID** shown on confirmation page
+6. Download **private key** file -- waxaad u baahan doontaa contents-kiisa for configuration
 
-## 4. Ku xidh lambarka taleefanka
+## 4. Link the phone number
 
-1. Tag **Numbers** > **Your numbers**
-2. Guji summada gear-ka agagaarka lambarkaaga khadka gurmadka
-3. Hoos **Voice**, dooro Application-ka aad abuurtay tallaabada 3
+1. Aad u guur **Numbers** > **Your numbers**
+2. Guji gear icon-ka ku xiga hotline number-kaaga
+3. Under **Voice**, dooro Application aad sameysay in step 3
 4. Guji **Save**
 
-## 5. Ku qaabee Llámenos
+## 5. Configure in Llamenos
 
-1. Soo gal maamul ahaan
-2. Tag **Settings** > **Telephony Provider**
-3. Dooro **Vonage** hoos-u-dhaca bixiyaha
-4. Gali:
-   - **API Key**: Vonage Dashboard bogga weyn
-   - **API Secret**: Vonage Dashboard bogga weyn
-   - **Application ID**: tallaabada 3
-   - **Phone Number**: lambarka aad iibsaty (qaabka E.164)
+1. Log in as admin
+2. Aad u guur **Settings** > **Telephony Provider**
+3. Dooro **Vonage** from provider dropdown
+4. Geli:
+   - **API Key**: from Vonage Dashboard home page
+   - **API Secret**: from Vonage Dashboard home page
+   - **Application ID**: from step 3
+   - **Phone Number**: number-ka aad iibsatey (E.164 format)
 5. Guji **Save**
 
-## 6. Tijaabi dejinta
+## 6. Test the setup
 
-U wac lambarkaaga khadka gurmadka. Waa inaad maqashaa liiska xulashada luqadda. Xaqiiji in wicitaannada loo mariyo tabaruceyaasha shifta ku jira.
+Wac hotline number-kaaga. Waa inaad maqashaa language selection menu. Verify in calls u gudbaan to on-shift volunteers.
 
-## Dejinta WebRTC (ikhtiyaar)
+## WebRTC setup (optional)
 
-Vonage WebRTC wuxuu isticmaalaa aqoonsiyaha Application-ka aad hore u abuurtay:
+Vonage WebRTC waxay isticmaashaa Application credentials aad horey u sameysay:
 
-1. Llámenos, tag **Settings** > **Telephony Provider**
-2. Shid **WebRTC Calling**
-3. Gali nuxurka **Private Key** (qoraalka PEM buuxda ee faylka aad soo dejisay)
+1. In Llamenos, aad u guur **Settings** > **Telephony Provider**
+2. Toggle **WebRTC Calling** on
+3. Geli **Private Key** contents (full PEM text from file aad download-gareysay)
 4. Guji **Save**
 
-Application ID-ka waa hore loo qaabeyay. Vonage wuxuu soo saaraa JWT-yada RS256 isagoo isticmaalaya furaha gaarka ah ee xaqiijinta browser-ka.
+Application ID horey ayaa la configure gareeyay. Vonage waxay soo saartaa RS256 JWTs iyadoo isticmaashaa private key for browser authentication.
 
-## Vonage xusuus-qor
+## Vonage-specific notes
 
-- **NCCO vs TwiML**: Vonage wuxuu isticmaalaa NCCO (Nexmo Call Control Objects) qaabka JSON halkii XML. Adapter-ka Llámenos wuxuu si toos ah u soo saaraa qaabka saxda ah.
-- **Qaabka Answer URL**: Vonage wuxuu filayaa in answer URL-ku soo celiyo JSON (NCCO), ma aha XML. Tan waxaa maamula adapter-ka.
-- **Event URL**: Vonage wuxuu u diraa dhacdooyinka wicitaanka (dhawaq, laga jawaabay, dhammaystay) event URL-ka sida JSON POST requests.
-- **Amniga furaha gaarka ah**: Furaha gaarka ah waa la kaydiyaa isagoo sir ah. Marna kama baxo server-ka — waxaa loo isticmaalaa oo keliya in lagu soo saaro JWT-yada muddoda-gaaban.
+- **NCCO vs TwiML**: Vonage waxay isticmaashaa NCCO (Nexmo Call Control Objects) in JSON format beddelka XML markup. Llamenos adapter-ka waxay si otomaatig ah u soo saartaa format saxda ah.
+- **Answer URL format**: Vonage waxay expect gareysaa in answer URL uu soo celiyo JSON (NCCO), ma aha XML. Tani waxaa ku maamula adapter-ka.
+- **Event URL**: Vonage waxay soo diraysaa call events (ringing, answered, completed) to event URL as JSON POST requests.
+- **Private key security**: Private key-ga waxaa lagu kaydiyaa encrypted. Marnaba ma ka tagayo server-ka -- waxaa la isticmaalaa kaliya in lagu soo saaro short-lived JWT tokens.
 
-## Cillad-xallinta
+## Troubleshooting
 
-- **"Application not found"**: Xaqiiji in Application ID-ku si sax ah u waafaqsan yahay. Waxaad ka heli kartaa **Applications** Vonage Dashboard-ka.
-- **Ma jiraan wicitaanno soo gala**: Hubi in lambarka taleefanka uu ku xiran yahay Application-ka saxda ah (tallaabada 4).
-- **Qaladaadka furaha gaarka ah**: Ku dheji nuxurka PEM buuxda oo ay ku jiraan sadarrada `-----BEGIN PRIVATE KEY-----` iyo `-----END PRIVATE KEY-----`.
-- **Qaabaynta lambarka caalamiga ah**: Vonage wuxuu u baahan yahay qaabka E.164. Ku dar `+` iyo koodka waddanka.
+- **"Application not found"**: Verify in Application ID uu iswaafaqsan yahay si sax ah. Waxaad ka heli kartaa under **Applications** in Vonage Dashboard.
+- **No incoming calls**: Hubi in phone number-ka uu isku xiran yahay Application saxda ah (step 4).
+- **Private key errors**: Paste full PEM content including `-----BEGIN PRIVATE KEY-----` and `-----END PRIVATE KEY-----` lines.
+- **International number formatting**: Vonage waxay u baahan tahay E.164 format. Soo dar `+` and country code.

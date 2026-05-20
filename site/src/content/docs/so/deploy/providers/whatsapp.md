@@ -1,97 +1,97 @@
 ---
-title: "Deji: WhatsApp"
-description: Ku xir WhatsApp Business iyada oo loo marayo Meta Cloud API farriimaha sirta ah.
+title: "Setup: WhatsApp"
+description: Connect WhatsApp Business via the Meta Cloud API for encrypted messaging.
 ---
 
-Llámenos wuxuu taageeraa farriiminta WhatsApp Business iyada oo loo marayo Meta Cloud API (Graph API v21.0). WhatsApp wuxuu awood u siinayaa farriimo qani ah oo taageera qoraal, sawirro, dukumannti, maqal, iyo farriimo is-dhexgal ah.
+Llamenos waxay taageertaa WhatsApp Business messaging via Meta Cloud API (Graph API v21.0). WhatsApp waxay awood u siisaa rich messaging with support for text, images, documents, audio, iyo interactive messages.
 
-## Waxyaabaha loo baahan yahay
+## Prerequisites
 
-- Akoon [Meta Business](https://business.facebook.com)
-- Lambar taleefan oo WhatsApp Business API ah
-- App Meta developer oo leh badeecadda WhatsApp oo la shiday
+- [Meta Business account](https://business.facebook.com)
+- WhatsApp Business API phone number
+- Meta developer app with WhatsApp product enabled
 
-## Hababka is-dhexgalka
+## Integration modes
 
-Llámenos wuxuu taageeraa laba hab oo WhatsApp is-dhexgal:
+Llamenos waxay taageertaa laba WhatsApp integration mode:
 
-### Meta Direct (lagu taliyay)
+### Meta Direct (recommended)
 
-Ku xir si toos ah Meta Cloud API. Wuxuu bixiyaa kontorool buuxda iyo dhammaan astaamaha.
+Isku xir directly to Meta Cloud API. Bixisaa xakameyn oo dhan iyo dhammaan features.
 
-**Aqoonsiyaha loo baahan yahay:**
-- **Phone Number ID** — aqoonsiga lambarka taleefankaaga WhatsApp Business
-- **Business Account ID** — aqoonsiga akoonkaaga Meta Business
-- **Access Token** — calanka marin-u-helista Meta API ee muddada-dheer
-- **Verify Token** — xaraf gaar ah oo aad doorato xaqiijinta webhook-ka
-- **App Secret** — sirta app-kaaga Meta (xaqiijinta saxiixa webhook-ka)
+**Credentials loo baahan yahay:**
+- **Phone Number ID** — your WhatsApp Business phone number ID
+- **Business Account ID** — your Meta Business Account ID
+- **Access Token** — long-lived Meta API access token
+- **Verify Token** — custom string aad doorato for webhook verification
+- **App Secret** — your Meta app secret (for webhook signature validation)
 
-### Habka Twilio
+### Twilio mode
 
-Haddii aad hore u isticmaasho Twilio codka, waxaad u mari kartaa WhatsApp akoonkaaga Twilio. Dejin fudud, laakiin astaamaha qaar waa laga yaabaa inay xaddidan yihiin.
+Haddii horey uu isticmaalayso Twilio for voice, waxaad ku gudbi kartaa WhatsApp through your Twilio account. Setup fudud, laakiin qaar features waxay yaraan karaan.
 
-**Aqoonsiyaha loo baahan yahay:**
-- Twilio Account SID-kaaga jira, Auth Token, iyo soo-dirayaasha WhatsApp ee ku xiran Twilio
+**Credentials loo baahan yahay:**
+- Your existing Twilio Account SID, Auth Token, iyo Twilio-connected WhatsApp sender
 
-## 1. Abuur Meta app
+## 1. Create a Meta app
 
-1. Tag [developers.facebook.com](https://developers.facebook.com)
-2. Abuur app cusub (nooca: Business)
-3. Ku dar badeecadda **WhatsApp**
-4. WhatsApp > Getting Started, qor **Phone Number ID** iyo **Business Account ID**
-5. Abuur calan marin-u-helis joogto ah (Settings > Access Tokens)
+1. Aad u guur [developers.facebook.com](https://developers.facebook.com)
+2. Create a new app (nooc: Business)
+3. Kudar **WhatsApp** product
+4. In WhatsApp > Getting Started, xasuusnow **Phone Number ID** iyo **Business Account ID**
+5. Generate a permanent access token (Settings > Access Tokens)
 
-## 2. Qaabee webhook-ka
+## 2. Configure the webhook
 
-Meta developer dashboard-ka:
+In Meta developer dashboard:
 
-1. Tag WhatsApp > Configuration > Webhook
-2. Deji Callback URL-ka:
+1. Aad u guur WhatsApp > Configuration > Webhook
+2. Set Callback URL to:
    ```
    https://your-domain.com/api/messaging/whatsapp/webhook
    ```
-3. Deji Verify Token-ka isla xarafka aad gelin doonto dejinta maamulka Llámenos
-4. Subscribe gal goobta webhook-ka ee `messages`
+3. Set Verify Token to same string aad gelin doontaa in Llamenos admin settings
+4. Subscribe to `messages` webhook field
 
-Meta wuxuu soo dirayaa codsi GET si uu u xaqiijiyo webhook-ka. Server-kaagu wuxuu ka jawaabi doonaa caqabadda (challenge) haddii verify token-ku waafaqsanyahay.
+Meta waxay soo diraysaa GET request si ay u verify gareyso webhook. Server-kaagu wuu jawaabi doonaa with challenge haddii verify token uu iswaafaqsan yahay.
 
-## 3. Ku shid WhatsApp dejinta maamulka
+## 3. Enable WhatsApp in admin settings
 
-Tag **Admin Settings > Messaging Channels** (ama isticmaal qalabka dejinta) oo shid **WhatsApp**.
+Aad u guur **Admin Settings > Messaging Channels** (ama isticmaal setup wizard) oo toggle **WhatsApp** on.
 
-Dooro **Meta Direct** ama **Twilio** habka oo gali aqoonsiyaha loo baahan yahay.
+Dooro **Meta Direct** ama **Twilio** mode oo geli credentials-ka loo baahan yahay.
 
-Qaabee dejinta ikhtiyaariga ah:
-- **Farriinta jawaabta tooska ah** — loo diro xiriirrada marka koowaad
-- **Jawaabta saacadaha ka baxsan** — loo diro wakhtiyada shifta ka baxsan
+Configure optional settings:
+- **Auto-response message** — sent to first-time contacts
+- **After-hours response** — sent outside shift hours
 
-## 4. Tijaabi
+## 4. Test
 
-U dir farriin WhatsApp lambarkaaga taleefanka Business. Wada hadalku waa inuu ka soo baxaa taabka **Conversations**.
+Send WhatsApp message to Business phone number-kaaga. Wadahadku waa inuu soo muuqdaa in **Conversations** tab.
 
-## Daaqadda 24-saac ee farriiminta
+## 24-hour messaging window
 
-WhatsApp wuxuu dhaqangeliyay daaqad 24-saac oo farriimeed:
-- Waxaad uga jawaabi kartaa isticmaale 24 saac gudahood farriintoodii ugu dambeysay
-- 24 saac ka dib, waa inaad isticmaashaa **farriin qaabaysan** (template message) oo la ansixiyay si aad dib u bilaabato wada hadalka
-- Llámenos wuxuu tan si toos ah u maamulaa — haddii daaqaddu dhammaatay, wuxuu soo dirayaa farriin qaabaysan si uu dib u bilaabo wada hadalka
+WhatsApp waxay ku xirtaa 24-saacadood messaging window:
+- Waxaad u jawaabi kartaa user within 24 hours of their last message
+- Kadib 24 hours, waa inaad isticmaashaa approved **template message** si aad dib u bilaabto conversation
+- Llamenos waxay ku maamushan tani si otomaatig ah -- haddii window-ka dhacay, waxay soo dirtaa template message si ay dib u bilaabto conversation
 
-## Taageerada warbaahinta
+## Media support
 
-WhatsApp wuxuu taageeraa farriimaha warbaahinta qaniga ah:
-- **Sawirro** (JPEG, PNG)
-- **Dukumannti** (PDF, Word, iwm)
-- **Maqal** (MP3, OGG)
-- **Fiidiyoow** (MP4)
-- **Goobta** wadaagista
-- **Is-dhexgalka** badhamada iyo liisaska farriimaha
+WhatsApp waxay taageertaa rich media messages:
+- **Images** (JPEG, PNG)
+- **Documents** (PDF, Word, etc.)
+- **Audio** (MP3, OGG)
+- **Video** (MP4)
+- **Location** sharing
+- **Interactive** buttons and list messages
 
-Lifaaqyada warbaahintu waxay ka soo baxaan khadka wada hadalka.
+Media attachments way soo muuqanayaan inline in conversation view.
 
-## Xusuus-qor amniga
+## Security notes
 
-- WhatsApp wuxuu isticmaalaa sirta dhammaad-ilaa-dhammaad u dhexeeya isticmaalaha iyo kaabayaasha Meta
-- Meta si farsamo ahaan ayuu u heli karaa nuxurka farriimaha server-yadooda
-- Farriimaha waa la siriyay marka la helo waxaana lagu kaydiyaa kaydka xogta
-- Sahiixa webhook-ka waa la xaqiijiyaa iyadoo la isticmaalayo HMAC-SHA256 oo leh sirta app-kaaga
-- Asturnaanta ugu badan, ka fiirso isticmaalka Signal halkii WhatsApp
+- WhatsApp waxay isticmaashaa end-to-end encryption between user and Meta's infrastructure
+- Meta technically waxay awood u leedahay inay access gareyso message content on their servers
+- Messages waxaa loo encrypt gareeyaa on receipt oo waxaa lagu kaydiyaa database
+- Webhook signatures waxaa la validate gareeyaa iyadoo isticmaalayo HMAC-SHA256 with your app secret
+- For maximum privacy, consider isticmaalka Signal beddelka WhatsApp

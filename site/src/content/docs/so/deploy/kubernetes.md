@@ -1,20 +1,20 @@
 ---
-title: "Soo saar: Kubernetes (Helm)"
-description: Soo saar Llamenos Kubernetes iyada oo la isticmaalayo Helm chart-ka rasmiga ah.
+title: "Deploy: Kubernetes (Helm)"
+description: Deploy Llamenos to Kubernetes using the official Helm chart.
 ---
 
-Halkan waxaa ku qoran habka lagu soo saaro Llamenos cluster Kubernetes iyada oo la isticmaalayo Helm chart-ka rasmiga ah. Chart-ku waxay maareysaa codsiga, kaydinta RustFS, relay-ga WebSocket, iyo adeegyada ikhtiyaarka ah ee signal-notifier/sip-bridge sidii deployments kala duwan. Waxaad bixisaa xogta PostgreSQL.
+Tilmaahan wuxuu ku saabsan yahay sida loo dejiyo Llamenos to a Kubernetes cluster iyadoo la isticmaalayo official Helm chart. Chart-ka waxa uu maamulaa application-ka, RustFS storage, WebSocket relay, iyo adeegyada ikhtiyaarka ah ee signal-notifier/sip-bridge as separate deployments. Waxaad bixisaa PostgreSQL database.
 
 ## Shuruudaha hore
 
-- Cluster Kubernetes (v1.24+) — la maareeyo (EKS, GKE, AKS) ama gacanta lagu hayo
-- PostgreSQL 14+ instance (waxaa lagu talinayaa RDS/Cloud SQL la maareeyo, ama gacanta lagu hayo)
+- Kubernetes cluster (v1.24+) — managed (EKS, GKE, AKS) ama self-hosted
+- PostgreSQL 14+ instance (managed RDS/Cloud SQL recommended, ama self-hosted)
 - [Helm](https://helm.sh/) v3.10+
-- [kubectl](https://kubernetes.io/docs/tasks/tools/) oo loo habeeyay cluster-kaaga
-- Controller ingress (NGINX Ingress, Traefik, iwm.)
-- cert-manager (ikhtiyaar ah, shahaadado TLS otomaatig ah)
+- [kubectl](https://kubernetes.io/docs/tasks/tools/) configured for your cluster
+- Ingress controller (NGINX Ingress, Traefik, etc.)
+- cert-manager (ikhtiyaar, for automatic TLS certificates)
 
-## 1. Ku rakib chart-ka
+## 1. Install the chart
 
 ```bash
 helm install llamenos deploy/helm/llamenos/ \
@@ -29,7 +29,7 @@ helm install llamenos deploy/helm/llamenos/ \
   --set ingress.tls[0].hosts[0]=hotline.yourdomain.com
 ```
 
-Ama abuur fayl `values-production.yaml` si aad u soo saarto la soo celceli karo:
+Ama samee `values-production.yaml` file si aad u hesho reproducible deploys:
 
 ```yaml
 # values-production.yaml
@@ -61,7 +61,7 @@ secrets:
   postgresPassword: "your-strong-password"
   hmacSecret: "64-hex-chars-hmac-signing-key"
   serverWebSocketSecret: "64-hex-chars-WebSocket-identity-key"
-  # Telephony (oo ugu yaraan mid ayaa loo baahan yahay codka):
+  # Telephony (at least one required for voice):
   # twilioAccountSid: ""
   # twilioAuthToken: ""
   # twilioPhoneNumber: ""
@@ -93,10 +93,10 @@ WebSocket relay:
       memory: "128Mi"
 
 signalNotifier:
-  enabled: false   # beddel true si aad u furto signal-notifier sidecar
+  enabled: false   # set to true to enable the signal-notifier sidecar
 
 sipBridge:
-  enabled: false   # beddel true si aad u furto SIP bridge (Asterisk/FreeSWITCH/Kamailio)
+  enabled: false   # set to true to enable the SIP bridge (Asterisk/FreeSWITCH/Kamailio)
   # pbxType: asterisk
 
 monitoring:
@@ -123,45 +123,45 @@ ingress:
         - hotline.yourdomain.com
 ```
 
-Kadib ku rakib:
+Kadib install:
 
 ```bash
 helm install llamenos deploy/helm/llamenos/ -f values-production.yaml
 ```
 
-## 2. Xaqiiji soo saarista
+## 2. Verify the deployment
 
 ```bash
-# Hubi in pods-ka ay shaqeynayaan
+# Check pods are running
 kubectl get pods -l app.kubernetes.io/instance=llamenos
 
-# Hubi caafimaadka app-ka
+# Check the app health
 kubectl port-forward svc/llamenos 3000:3000
 curl http://localhost:3000/health/ready
 # -> {"status":"ok"}
 ```
 
-## 3. Tafatir DNS
+## 3. Configure DNS
 
-U jeedi domain-kaaga IP-ga dibadda ee controller-ka ingress ama load balancer-ka:
+U jeedi domain-kaaga external IP-ga ama load balancer-ka ingress controller-ka:
 
 ```bash
 kubectl get ingress llamenos
 ```
 
-## 4. Tafatirka ugu horreeya
+## 4. Initial setup
 
 Fur `https://hotline.yourdomain.com` browser-kaaga oo raac setup wizard:
 
-1. **Abuur akoonkaaga admin** — deji magac muujin iyo PIN-kaaga
-2. **Magac bixi hotline-kaaga** — deji magaca muujinta ee lagu arko app-ka
-3. **Dooro kanaalada** — fur Voice, SMS, WhatsApp, Signal, iyo/ama Reports
-4. **Tafatir bixiyeyaasha** — geli aqoonsiga kanaal kasta oo la furay
-5. **Dib u eeg oo dhammeystir**
+1. **Create your admin account** — set display name and PIN-kaaga
+2. **Name your hotline** — set display name-ka lagu muujiyo app-ka
+3. **Choose channels** — enable Voice, SMS, WhatsApp, Signal, and/or Reports
+4. **Configure providers** — enter credentials for each enabled channel
+5. **Review and finish**
 
-## Isdhexgalka cert-manager
+## cert-manager integration
 
-Haddii aad leedahay [cert-manager](https://cert-manager.io/) oo ku rakiban, tafatir cluster issuer si aad u hesho TLS otomaatig ah:
+Haddii aad leedahay [cert-manager](https://cert-manager.io/) installed, configure cluster issuer-ka automatic TLS:
 
 ```yaml
 # cluster-issuer.yaml
@@ -181,7 +181,7 @@ spec:
             class: nginx
 ```
 
-Celi, kadib tixraac annotations-ka ingress-kaaga (horeyba ku jira `values-production.yaml` ee kor ku qoran):
+Apply it, kadib reference it in your ingress annotations (already included in `values-production.yaml` above):
 
 ```yaml
 ingress:
@@ -189,13 +189,13 @@ ingress:
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
 ```
 
-cert-manager waxay si otomaatig ah u bixisaa oo dib u cusbooneysiisaa shahaadado TLS via Let's Encrypt.
+cert-manager waxa uu si otomaatig ah ugu soo saariyaa oo uu cusbooneysiiyaa TLS certificates via Let's Encrypt.
 
 ## External Secrets Operator
 
-Production-ka, ka fogaadi inaad sirta ku darto Helm values si toos ah. Isticmaal [External Secrets Operator](https://external-secrets.io/) si aad u isku xirto sirta kaydkaaga (AWS SSM, Vault, GCP Secret Manager, iwm.).
+Production-ka, ha ku qarin secrets directly in Helm values. Isticmaal [External Secrets Operator](https://external-secrets.io/) si aad u sync secrets from your secret store (AWS SSM, Vault, GCP Secret Manager, etc.).
 
-### 1. Abuur ExternalSecret
+### 1. Create an ExternalSecret
 
 ```yaml
 # llamenos-externalsecret.yaml
@@ -207,7 +207,7 @@ metadata:
 spec:
   refreshInterval: 1h
   secretStoreRef:
-    name: my-secret-store   # ClusterSecretStore-kaaga ama SecretStore
+    name: my-secret-store   # your ClusterSecretStore or SecretStore
     kind: ClusterSecretStore
   target:
     name: llamenos-secrets
@@ -230,14 +230,14 @@ spec:
         key: llamenos/RustFS-secret-key
 ```
 
-### 2. Tixraac Helm values
+### 2. Reference in Helm values
 
 ```yaml
 secrets:
   existingSecret: llamenos-secrets
 ```
 
-Xulasho kale, abuur sir gacan ku ah oo tixraac isla sidaas:
+Alternatively, samee secret-ka manually oo reference it the same way:
 
 ```bash
 kubectl create secret generic llamenos-secrets \
@@ -248,28 +248,28 @@ kubectl create secret generic llamenos-secrets \
   --from-literal=RustFS-secret-key=your_secret
 ```
 
-## Kormeerka Prometheus
+## Prometheus monitoring
 
 ### ServiceMonitor
 
-Haddii aad ku shaqeysato [Prometheus Operator](https://prometheus-operator.dev/), fur `ServiceMonitor` values-kaaga:
+Haddii aad ku shaqeyneysid [Prometheus Operator](https://prometheus-operator.dev/), enable `ServiceMonitor` in your values:
 
 ```yaml
 monitoring:
   enabled: true
   serviceMonitor:
-    namespace: monitoring    # namespace-ga meesha Prometheus uu ku rakiban yahay
+    namespace: monitoring    # namespace where Prometheus is installed
     interval: 30s
     scrapeTimeout: 10s
     labels:
       release: kube-prometheus-stack
 ```
 
-Chart-ku waxay soo bandhigaysaa `/metrics` adeegga app-ka oo ay u habeysaa `ServiceMonitor` si uu u waafaqsano doorsoome-kaaga Prometheus.
+Chart-ka waxa uu soo bandhigayaa `/metrics` on the app service oo uu configure gareeyaa `ServiceMonitor` inuu ku dhaco your Prometheus selector.
 
 ### Health probes
 
-Chart-ku waxay u habeysaa liveness, readiness, iyo startup probes iyaga oo loo jeediyo `/health/live` iyo `/health/ready`:
+Chart-ka waxa uu configure gareeyaa liveness, readiness, iyo startup probes against `/health/live` and `/health/ready`:
 
 ```yaml
 livenessProbe:
@@ -292,121 +292,121 @@ startupProbe:
   periodSeconds: 5
 ```
 
-### Log-yada
+### Logs
 
 ```bash
 kubectl logs -l app.kubernetes.io/instance=llamenos -c app -f
 ```
 
-## Tixraaca configuration-ka chart-ka
+## Chart configuration reference
 
-### Codsiga
+### Application
 
 | Parameter | Sharaxaad | Default |
 |-----------|-------------|---------|
-| `app.image.repository` | Image-ga container-ka | `ghcr.io/rhonda-rodododo/llamenos-platform` |
-| `app.image.tag` | Tag-ga image-ga | Chart appVersion |
-| `app.image.pullPolicy` | Siyaasadda pull-ka | `IfNotPresent` |
-| `app.port` | Alaabada codsiga | `3000` |
-| `app.replicas` | Replicas-ka pod-ka | `2` |
-| `app.resources` | Codsiyada CPU/memory iyo xadka | `{}` |
-| `app.env` | Doorsoomeyo deegaan dheeraad ah | `{}` |
+| `app.image.repository` | Container image | `ghcr.io/rhonda-rodododo/llamenos-platform` |
+| `app.image.tag` | Image tag | Chart appVersion |
+| `app.image.pullPolicy` | Pull policy | `IfNotPresent` |
+| `app.port` | Application port | `3000` |
+| `app.replicas` | Pod replicas | `2` |
+| `app.resources` | CPU/memory requests and limits | `{}` |
+| `app.env` | Extra environment variables | `{}` |
 
 ### PostgreSQL
 
 | Parameter | Sharaxaad | Default |
 |-----------|-------------|---------|
-| `postgres.host` | Magaca host-ka PostgreSQL (loo baahan yahay) | `""` |
-| `postgres.port` | Alaabada PostgreSQL | `5432` |
-| `postgres.database` | Magaca xogta | `llamenos` |
-| `postgres.user` | Isticmaalaha xogta | `llamenos` |
-| `postgres.poolSize` | Cabbirka pool-ka isku xirka | `10` |
+| `postgres.host` | PostgreSQL hostname (required) | `""` |
+| `postgres.port` | PostgreSQL port | `5432` |
+| `postgres.database` | Database name | `llamenos` |
+| `postgres.user` | Database user | `llamenos` |
+| `postgres.poolSize` | Connection pool size | `10` |
 
-### Sirta
+### Secrets
 
 | Parameter | Sharaxaad | Default |
 |-----------|-------------|---------|
-| `secrets.postgresPassword` | Furaha PostgreSQL (loo baahan yahay) | `""` |
-| `secrets.hmacSecret` | Fure saxiixa HMAC — 64 xaraf hex (loo baahan yahay) | `""` |
-| `secrets.serverWebSocketSecret` | Fure aqoonta WebSocket ee server-ka — 64 xaraf hex (loo baahan yahay) | `""` |
+| `secrets.postgresPassword` | PostgreSQL password (required) | `""` |
+| `secrets.hmacSecret` | HMAC signing key — 64 hex chars (required) | `""` |
+| `secrets.serverWebSocketSecret` | Server WebSocket identity key — 64 hex chars (required) | `""` |
 | `secrets.twilioAccountSid` | Twilio Account SID | `""` |
 | `secrets.twilioAuthToken` | Twilio Auth Token | `""` |
-| `secrets.twilioPhoneNumber` | Lambarka Twilio (E.164) | `""` |
-| `secrets.existingSecret` | Isticmaal Kubernetes Secret oo horey u jiray | `""` |
+| `secrets.twilioPhoneNumber` | Twilio phone number (E.164) | `""` |
+| `secrets.existingSecret` | Use an existing Kubernetes Secret | `""` |
 
-> **Talo**: Production-ka, isticmaal `secrets.existingSecret` iyada oo la wadaago External Secrets Operator, Sealed Secrets, ama Vault.
+> **Tip**: Production-ka, isticmaal `secrets.existingSecret` with External Secrets Operator, Sealed Secrets, ama Vault.
 
 ### RustFS
 
 | Parameter | Sharaxaad | Default |
 |-----------|-------------|---------|
-| `RustFS.enabled` | Soo saar RustFS | `true` |
-| `RustFS.image.repository` | Image-ga RustFS | `RustFS/RustFS` |
-| `RustFS.image.tag` | Tag-ga RustFS | `latest` |
-| `RustFS.persistence.size` | Cabbirka volume-ka xogta | `50Gi` |
-| `RustFS.persistence.storageClass` | Class-ga kaydka | `""` |
-| `RustFS.credentials.accessKey` | Isticmaalaha root-ka RustFS (loo baahan yahay) | `""` |
-| `RustFS.credentials.secretKey` | Furaha root-ka RustFS (loo baahan yahay) | `""` |
-| `RustFS.resources` | Codsiyada CPU/memory iyo xadka | `{}` |
+| `RustFS.enabled` | Deploy RustFS | `true` |
+| `RustFS.image.repository` | RustFS image | `RustFS/RustFS` |
+| `RustFS.image.tag` | RustFS tag | `latest` |
+| `RustFS.persistence.size` | Data volume size | `50Gi` |
+| `RustFS.persistence.storageClass` | Storage class | `""` |
+| `RustFS.credentials.accessKey` | RustFS root user (required) | `""` |
+| `RustFS.credentials.secretKey` | RustFS root password (required) | `""` |
+| `RustFS.resources` | CPU/memory requests and limits | `{}` |
 
 ### WebSocket relay (WebSocket relay)
 
 | Parameter | Sharaxaad | Default |
 |-----------|-------------|---------|
-| `WebSocket relay.enabled` | Soo saar WebSocket relay | `true` |
-| `WebSocket relay.image.repository` | Image-ga WebSocket relay | `dockurr/WebSocket relay` |
-| `WebSocket relay.image.tag` | Tag-ga WebSocket relay | `latest` |
-| `WebSocket relay.resources` | Codsiyada CPU/memory iyo xadka | `{}` |
+| `WebSocket relay.enabled` | Deploy WebSocket relay | `true` |
+| `WebSocket relay.image.repository` | WebSocket relay image | `dockurr/WebSocket relay` |
+| `WebSocket relay.image.tag` | WebSocket relay tag | `latest` |
+| `WebSocket relay.resources` | CPU/memory requests and limits | `{}` |
 
-> WebSocket relay waa adeeg aasaasi ah — dhacdooyinka waqti-dhabta ah (calls, fariimaha, xaaladda hub) ayaa u baahan. Sii `WebSocket relay.enabled: true`.
+> WebSocket relay waa adeeg aasaasi ah — real-time events (calls, notifications, hub state) waxay u baahan yihiin. Sii `WebSocket relay.enabled: true`.
 
 ### signal-notifier
 
 | Parameter | Sharaxaad | Default |
 |-----------|-------------|---------|
-| `signalNotifier.enabled` | Soo saar signal-notifier sidecar | `false` |
-| `signalNotifier.image.repository` | Image-ga signal-notifier | `ghcr.io/rhonda-rodododo/llamenos-signal-notifier` |
-| `signalNotifier.resources` | Codsiyada CPU/memory iyo xadka | `{}` |
+| `signalNotifier.enabled` | Deploy signal-notifier sidecar | `false` |
+| `signalNotifier.image.repository` | signal-notifier image | `ghcr.io/rhonda-rodododo/llamenos-signal-notifier` |
+| `signalNotifier.resources` | CPU/memory requests and limits | `{}` |
 
 ### SIP bridge
 
 | Parameter | Sharaxaad | Default |
 |-----------|-------------|---------|
-| `sipBridge.enabled` | Soo saar sip-bridge | `false` |
+| `sipBridge.enabled` | Deploy sip-bridge | `false` |
 | `sipBridge.pbxType` | Backend: `asterisk`, `freeswitch`, ama `kamailio` | `asterisk` |
-| `sipBridge.resources` | Codsiyada CPU/memory iyo xadka | `{}` |
+| `sipBridge.resources` | CPU/memory requests and limits | `{}` |
 
-### Kormeerka
+### Monitoring
 
 | Parameter | Sharaxaad | Default |
 |-----------|-------------|---------|
-| `monitoring.enabled` | Abuur ServiceMonitor | `false` |
-| `monitoring.serviceMonitor.interval` | Xilli-goorka scrape | `30s` |
+| `monitoring.enabled` | Create ServiceMonitor | `false` |
+| `monitoring.serviceMonitor.interval` | Scrape interval | `30s` |
 | `monitoring.serviceMonitor.scrapeTimeout` | Scrape timeout | `10s` |
-| `monitoring.serviceMonitor.namespace` | Namespace-ga ServiceMonitor | Isla sida release-ka |
-| `monitoring.serviceMonitor.labels` | Labels dheeraad ah oo doorsoome-ka Prometheus | `{}` |
+| `monitoring.serviceMonitor.namespace` | Namespace for ServiceMonitor | Same as release |
+| `monitoring.serviceMonitor.labels` | Additional labels for Prometheus selector | `{}` |
 
 ### Ingress
 
 | Parameter | Sharaxaad | Default |
 |-----------|-------------|---------|
-| `ingress.enabled` | Abuur Ingress resource | `true` |
-| `ingress.className` | Class-ka ingress | `nginx` |
+| `ingress.enabled` | Create Ingress resource | `true` |
+| `ingress.className` | Ingress class | `nginx` |
 | `ingress.annotations` | Ingress annotations | `{}` |
-| `ingress.hosts` | Xeerarka host-ka | Eeg values.yaml |
-| `ingress.tls` | Configuration-ka TLS | `[]` |
+| `ingress.hosts` | Host rules | See values.yaml |
+| `ingress.tls` | TLS configuration | `[]` |
 
 ### Service account
 
 | Parameter | Sharaxaad | Default |
 |-----------|-------------|---------|
-| `serviceAccount.create` | Abuur ServiceAccount | `true` |
-| `serviceAccount.annotations` | SA annotations (tusaale, IRSA AWS) | `{}` |
-| `serviceAccount.name` | Beddel magaca SA | `""` |
+| `serviceAccount.create` | Create a ServiceAccount | `true` |
+| `serviceAccount.annotations` | SA annotations (e.g., IRSA for AWS) | `{}` |
+| `serviceAccount.name` | Override SA name | `""` |
 
-## Isticmaalka kayd S3 dibadda
+## Using an external S3-compatible store
 
-Haddii aad horey u leedahay RustFS, RustFS, ama adeeg kale oo la midka ah S3, jooji RustFS-ka gudaha:
+Haddii hore uu kuu jiro RustFS, RustFS, ama kale S3-compatible service, disable built-in RustFS:
 
 ```yaml
 RustFS:
@@ -420,26 +420,26 @@ app:
     STORAGE_BUCKET: "llamenos"
 ```
 
-## Liiska xaqiijinta production-ka
+## Production hardening checklist
 
-Kahor inta aanad bilaabin:
+Ka hor inta aan la bilaabin:
 
-- [ ] **Sirta via ESO ama Sealed Secrets** — marnaba ha ku darto sirta faylalada values
-- [ ] **Codsiyada resources iyo xadka** oo lagu dejiyay dhammaan deployments-ka
-- [ ] **PodDisruptionBudget** oo la habeeyay (`minAvailable: 1`) si loo yareeyo waqti-dhaca drains-ka
-- [ ] **NetworkPolicy** oo xaddidaya ingress-ga app pod-ka oo kaliya ka yimid controller-ka ingress
-- [ ] **Read-only root filesystem** container-ka app-ka (`securityContext.readOnlyRootFilesystem: true`)
-- [ ] **Isticmaale aan root ahayn** container-ka (`securityContext.runAsNonRoot: true`)
-- [ ] **PostgreSQL TLS** oo la furay (deji `postgres.sslMode: require` values-ka)
-- [ ] **RustFS TLS** ama mTLS u dhexeeya app iyo RustFS
-- [ ] **cert-manager ClusterIssuer** oo la habeeyay si loo cusbooneysiiyo Let's Encrypt si otomaatig ah
-- [ ] **Prometheus ServiceMonitor** oo la furay oo scraping
-- [ ] **Liveness/readiness probes** oo la xaqiijiyay kadib soo saarista
-- [ ] **RBAC** — ServiceAccount iyada oo leh permissions ugu yaraan
-- [ ] **Siyaasadda pull-ka image-ga** oo lagu dejiyay `IfNotPresent` (ma aha `Always`) si soo saarista loo hubiyo
-- [ ] **Ingress rate limiting** annotations oo lagu dejiyay si loo yareeyo dhaqan xun
+- [ ] **Secrets via ESO or Sealed Secrets** — never commit secrets to values files
+- [ ] **Resource requests and limits** set on all deployments
+- [ ] **PodDisruptionBudget** configured (`minAvailable: 1`) for zero-downtime drains
+- [ ] **NetworkPolicy** restricting ingress to app pod from ingress controller only
+- [ ] **Read-only root filesystem** on app container (`securityContext.readOnlyRootFilesystem: true`)
+- [ ] **Non-root user** in container (`securityContext.runAsNonRoot: true`)
+- [ ] **PostgreSQL TLS** enabled (set `postgres.sslMode: require` in values)
+- [ ] **RustFS TLS** ama mTLS between app and RustFS
+- [ ] **cert-manager ClusterIssuer** configured for automatic Let's Encrypt renewal
+- [ ] **Prometheus ServiceMonitor** enabled and scraping
+- [ ] **Liveness/readiness probes** verified after deploy
+- [ ] **RBAC** — ServiceAccount with minimal permissions
+- [ ] **Image pull policy** set to `IfNotPresent` (ma aha `Always`) for predictable deploys
+- [ ] **Ingress rate limiting** annotations set to mitigate abuse
 
-Tusaale NetworkPolicy:
+Example NetworkPolicy:
 
 ```yaml
 apiVersion: networking.k8s.io/v1
@@ -461,67 +461,67 @@ spec:
         - port: 3000
 ```
 
-## Kordhinta
+## Scaling
 
-Deployment-ku waxay isticmaashaa siyaasadda `RollingUpdate` si loo hubiyo inaanu jirin waqti-dhac cusbooneysiinta. Kordhi replicas iyadoo ku saleysan traffic-kaaga:
+Deployment-ka waxa uu isticmaalaa `RollingUpdate` strategy for zero-downtime upgrades. Scale replicas based on your traffic:
 
 ```bash
 kubectl scale deployment llamenos --replicas=3
 ```
 
-Ama deji `app.replicas` faylkaaga values. PostgreSQL advisory locks waxay hubiyaan isku-xirka xogta ee dhexmara replicas.
+Ama set `app.replicas` in your values file. PostgreSQL advisory locks waxay hubiyaan data consistency across replicas.
 
-## Cusbooneysiinta
+## Upgrading
 
 ```bash
 helm upgrade llamenos deploy/helm/llamenos/ -f values-production.yaml
 ```
 
-Siyaasadda `RollingUpdate` waxay bixisaa cusbooneysiin aan waqti-dhac lahayn.
+`RollingUpdate` strategy waxay bixisaa zero-downtime upgrades.
 
-## Ka saarista
+## Uninstalling
 
 ```bash
 helm uninstall llamenos
 ```
 
-> **Xusuusin**: PersistentVolumeClaims ma laga tirtiro `helm uninstall`. Tirtir gacan ku haddii aad rabto inaad ka saarto dhammaan xogta:
+> **Note**: PersistentVolumeClaims ma la tirtiro by `helm uninstall`. Tirtir manually haddii aad rabto inaad ka saarto dhammaan xogta:
 > ```bash
 > kubectl delete pvc -l app.kubernetes.io/instance=llamenos
 > ```
 
-## Xalinta dhibaatooyinka
+## Troubleshooting
 
-### Pod ku jira CrashLoopBackOff
+### Pod stuck in CrashLoopBackOff
 
 ```bash
 kubectl logs llamenos-0 -c app --previous
 kubectl describe pod llamenos-0
 ```
 
-Sababaha caanka ah: sirta maqan (`hmacSecret`, `serverWebSocketSecret`), PostgreSQL aan la gaari karin, RustFS aan diyaar ahayn.
+Causes caadi ah: missing secrets (`hmacSecret`, `serverWebSocketSecret`), PostgreSQL unreachable, RustFS not ready.
 
-### Dhibaatooyinka isku xirka xogta
+### Database connection errors
 
-Xaqiiji in PostgreSQL uu ka mid yahay cluster-ka:
+Verify PostgreSQL is reachable from the cluster:
 
 ```bash
 kubectl run pg-test --rm -it --image=postgres:17-alpine -- \
   psql postgresql://llamenos:PASSWORD@PG_HOST:5432/llamenos -c "SELECT 1"
 ```
 
-### Ingress aan shaqeyn
+### Ingress not working
 
-Xaqiiji in controller-ka ingress uu shaqeynayo iyo in Ingress resource uu leeyahay cinwaan:
+Verify ingress controller is running and Ingress resource has an address:
 
 ```bash
 kubectl get ingress llamenos
 kubectl describe ingress llamenos
 ```
 
-### Shahaadada la bixin
+### Certificate not issued
 
-Hubi xaaladda shahaadada cert-manager:
+Check cert-manager certificate status:
 
 ```bash
 kubectl get certificate llamenos-tls
@@ -530,10 +530,10 @@ kubectl get certificaterequest
 kubectl describe certificaterequest
 ```
 
-Sababaha caanka ah: DNS ma aha inuu faafiyo, alaabada 80/443 ma fura, ClusterIssuer si khalad ah loo habeeyay.
+Causes caadi ah: DNS not yet propagated, ports 80/443 not open, ClusterIssuer misconfigured.
 
-## Tallaabooyinka xiga
+## Next steps
 
-- [Soo saarista Docker Compose](/docs/en/deploy/docker) — xulasho fudud oo hal-server ah
-- [Guud ahaan Self-Hosting](/docs/en/deploy/self-hosting) — isbarbardhig xulashooyinka soo saarista
-- [Bixiyeyaasha Telephony](/docs/en/deploy/providers/) — tafatir bixiyeyaasha codka
+- [Docker Compose Deployment](/docs/en/deploy/docker) — simpler single-server alternative
+- [Self-Hosting Overview](/docs/en/deploy/self-hosting) — compare deployment options
+- [Telephony Providers](/docs/en/deploy/providers/) — configure voice providers

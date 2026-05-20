@@ -1,86 +1,86 @@
 ---
-title: Dulmarka Is-hawlgabka
-description: Ku hawlgali Llámenos kaabayaashaaga gaarka ah iyadoo la isticmaalayo Docker Compose, Kubernetes, ama Co-op Cloud.
+title: Self-Hosting Overview
+description: Deploy Llamenos on your own infrastructure with Docker Compose, Kubernetes, or Co-op Cloud.
 ---
 
-Llámenos waxaa loogu talagalay inuu ku shaqeeyo kaabayaashaaga gaarka ah. Is-hawlgabku wuxuu ku siinayaa kontorool buuxda oo ku saabsan deganaanshaha xogta, goonida shabakadda, iyo doorashooyinka kaabayaasha — oo muhiim u ah ururrada ilaalinaya ka soo horjeeda cadawga si fiican u maalgeliyay.
+Llamenos waxa uu u sameysan yahay inuu ku shaqeeyo infrastructure-kaagaaga. Self-hosting waxay kuu siisaa xakameeyn dhamaan data residency, network isolation, iyo doorashooyinka infrastructure — muhiim u ah ururada ilaalinaya dagaalka la dagaallamayo.
 
-## Ikhtiyaarada hawlgalka
+## Deployment options
 
-| Ikhtiyaarka | Ugu wanaagsan | Kakanta | Baaxadaynta |
-|---|---|---|---|
-| [Docker Compose](/docs/en/deploy/docker) | Hal-server, bilawga lagu taliyay | Hoos | Hal node |
-| [Kubernetes (Helm)](/docs/en/deploy/kubernetes) | Isku-duubka adeegyada badan | Dhexdhexaad | Toos ah (nuqulo badan) |
-| [Co-op Cloud](/docs/en/deploy/coopcloud) | Kooxaha martigelinta iskaashiga ah | Hoos | Hal node (Swarm) |
+| Ikhtiyaar | Ugu fiican | Complexity | Scaling |
+|--------|----------|------------|---------|
+| [Docker Compose](/docs/en/deploy/docker) | Single-server, recommended start | Low | Single node |
+| [Kubernetes (Helm)](/docs/en/deploy/kubernetes) | Multi-service orchestration | Medium | Horizontal (multi-replica) |
+| [Co-op Cloud](/docs/en/deploy/coopcloud) | Co-op hosting collectives | Low | Single node (Swarm) |
 
-## Faylasha Docker Compose
+## Docker Compose files
 
-Docker Compose wuxuu isticmaalaa hab lakab leh:
+Docker Compose waxa uu isticmaalaa hab laabaan:
 
-| Faylka | Ujeeddo |
-|---|---|
-| `deploy/docker/docker-compose.yml` | Qaabeynta asaasiga — dhammaan adeegyada, shabakadaha, mugga |
-| `deploy/docker/docker-compose.production.yml` | Daboolka wax-soo-saarka — TLS iyada oo loo marayo Let's Encrypt, wareejinta log-ga, xaddidaadda kheyraadka, CSP adag |
-| `deploy/docker/docker-compose.dev.yml` | Daboolka horumarinta — daawashada faylka, port-yada la soo bandhigay |
-| `deploy/docker/docker-compose.ci.yml` | Daboolka CI — deegaan tijaabo oo go'aamiye ah |
+| File | Ujeeddo |
+|------|---------|
+| `deploy/docker/docker-compose.yml` | Base configuration — all services, networks, volumes |
+| `deploy/docker/docker-compose.production.yml` | Production overlay — TLS via Let's Encrypt, log rotation, resource limits, strict CSP |
+| `deploy/docker/docker-compose.dev.yml` | Development overlay — file watching, exposed ports |
+| `deploy/docker/docker-compose.ci.yml` | CI overlay — deterministic test environment |
 
-**Horumarinta maxalliga ah**, isticmaal daboolka horumarinta. **Wax-soo-saarka**, saar daboolka wax-soo-saarka:
+**Local development**, isticmaal dev overlay. **Production**, stack production overlay:
 
 ```bash
-# Maxalli (adeegyada taageerada oo keliya + bun run dev:server)
+# Local (backing services only + bun run dev:server)
 docker compose -f deploy/docker/docker-compose.dev.yml up -d
 
-# Wax-soo-saar
+# Production
 docker compose -f deploy/docker/docker-compose.yml -f deploy/docker/docker-compose.production.yml up -d
 ```
 
-Ama isticmaal qoraalka dejinta:
+Ama isticmaal setup script:
 
 ```bash
-./scripts/docker-setup.sh                                     # maxalli
-./scripts/docker-setup.sh --domain hotline.org --email a@b   # wax-soo-saar
+./scripts/docker-setup.sh                                     # local
+./scripts/docker-setup.sh --domain hotline.org --email a@b   # production
 ```
 
-## Adeegyada aasaasiga ah
+## Core services
 
-Dhammaan bartilmaameedyada hawlgalka waxay wadaan adeegyadan aasaasiga ah:
+Dhammaan deployment targets waxay ku shaqeynayaan core services-kaan:
 
-| Qaybta | Ujeeddo |
-|---|---|
-| **Bun application** | Hono API server + u adeegista faylasha taagan |
-| **PostgreSQL** | Kaydka xogta aasaasiga ah |
-| **RustFS** | Kaydka blob S3-compatible (farriimaha codka, lifaaqyada, dhoofinta) |
-| **WebSocket relay** | WebSocket relay ee dhacdooyinka wakhtiga-dhabta ah (had iyo jeer loo baahan yahay) |
-| **Caddy** | Reverse proxy + TLS toos ah (Docker Compose) |
+| Qayb | Ujeeddo |
+|-----------|---------|
+| **Bun application** | Hono API server + static file serving |
+| **PostgreSQL** | Primary database |
+| **RustFS** | S3-compatible blob storage (voicemail, attachments, exports) |
+| **WebSocket relay** | WebSocket relay for real-time events (always required) |
+| **Caddy** | Reverse proxy + automatic TLS (Docker Compose) |
 
-## Adeegyada ikhtiyaariga ah
+## Optional services
 
-| Qaybta | Profile | Ujeeddo |
-|---|---|---|
-| **signal-notifier** | `signal` | Signal notification sidecar eber-aqoon (port 3100) |
-| **sip-bridge** | `telephony` | Buundada SIP Asterisk/FreeSWITCH/Kamailio (PBX_TYPE wuxuu doortaa backend-ka) |
-| **Ollama/vLLM** | `inference` | Soo-saarka LLM soo-saarka farriinta |
-| **Prometheus + Grafana** | `monitoring` | Cabbirada iyo digniinta |
+| Qayb | Profile | Ujeeddo |
+|-----------|---------|---------|
+| **signal-notifier** | `signal` | Zero-knowledge Signal notification sidecar (port 3100) |
+| **sip-bridge** | `telephony` | SIP bridge for Asterisk/FreeSWITCH/Kamailio (PBX_TYPE selects backend) |
+| **Ollama/vLLM** | `inference` | LLM inference for message extraction |
+| **Prometheus + Grafana** | `monitoring` | Metrics and alerting |
 
-## Waxa aad u baahan tahay
+## What you need
 
-### Shuruudaha ugu yar
+### Minimum requirements
 
-- Server Linux ah (2 CPU core, 2 GB RAM ugu yar)
-- Docker iyo Docker Compose v2 (ama cluster Kubernetes Helm)
-- Magac domain ah oo tilmaamaya server-kaaga
-- `openssl` (soo-saarista sirta)
-- Ugu yaraan hal kanaal isgaadhsiineed oo la qaabeyay
+- Linux server (2 CPU cores, 2 GB RAM minimum)
+- Docker and Docker Compose v2 (ama Kubernetes cluster for Helm)
+- Magac domain pointing to your server
+- `openssl` (for generating secrets)
+- Ugu yaraan hal communication channel configured
 
-### Qaybaha ikhtiyaariga ah
+### Optional components
 
-- **Qoraal-qaadista** — WASM Whisper dhinaca macmiilka; ma jiro qayb server oo dheeri ah oo loo baahan yahay
-- **Buundada SIP** — PBX is-hawlgab (Asterisk/FreeSWITCH/Kamailio)
-- **Buundada Signal** — farriiminta Signal
+- **Transcription** — client-side WASM Whisper; ma u baahnato additional server component
+- **SIP bridge** — for self-hosted PBX (Asterisk/FreeSWITCH/Kamailio)
+- **Signal bridge** — for Signal messaging
 
-## Cloudflare Tunnels (ingress beddel ah)
+## Cloudflare Tunnels (alternative ingress)
 
-Halkii aad si toos ah u soo bandhigi lahayd port-yada 80/443, waxaad isticmaali kartaa [Cloudflare Tunnels](https://www.cloudflare.com/products/tunnel/) ingress-ka. Tani waxay qarisaa IP-ga server-kaaga waxayna bixisaa ilaalinta DDoS:
+Beddelka ah exposing ports 80/443 directly, waxaad isticmaali kartaa [Cloudflare Tunnels](https://www.cloudflare.com/products/tunnel/) for ingress. Tani waxay qarinaysaa server IP-gaaga oo waxay bixisaa DDoS protection:
 
 ```bash
 cloudflared tunnel create llamenos
@@ -88,33 +88,33 @@ cloudflared tunnel route dns llamenos hotline.yourorg.com
 cloudflared tunnel run llamenos
 ```
 
-Qaabee tunnel-ka inuu u gudbiyo `http://localhost:3000`.
+Configure tunnel-ka inuu u jeeddo `http://localhost:3000`.
 
-## Tixgelinta amniga
+## Security considerations
 
-Is-hawlgabku wuxuu ku siinayaa kontorool dheeri ah laakiin sidoo kale mas'uuliyad dheeri ah:
+Self-hosting waxay kuu siisaa xakameyn badan laakiin mas'uuliyad badan:
 
-- **Xogta inta la kaydinayo**: Xogta PostgreSQL waxaa loo kaydiyaa iyada oo aan la sirin sida caadiga ah. Isticmaal sirta saxanka-buuxa (LUKS, dm-crypt) server-kaaga. Qoraallada wicitaanka, qoraal-qaadista, iyo farriimaha waa E2EE — server-ku marna ma arko qoraal cad.
-- **Amniga shabakadda**: Isticmaal dab-damiya. Oo keliya port-yada 80/443 waa inay ahaadaan kuwa dadweynaha loo heli karo.
-- **Sirta**: Marna gelin sirta faylasha Docker Compose ama kontoroola noocyada. Isticmaal faylasha `.env` (gitignored) ama sirta Docker/Kubernetes.
-- **Cusboonaysiinta**: Si joogto ah u soo jiid sawirrada cusub. Daawado changelog-ka sixidda amniga.
-- **Kaydka**: Kaydi kaydka xogta PostgreSQL iyo kaydka RustFS si joogto ah.
+- **Data at rest**: PostgreSQL data is stored unencrypted by default. Isticmaal full-disk encryption (LUKS, dm-crypt) on your server. Call notes, transcriptions, iyo messages are E2EE — server-ka marnaba ma arko plaintext.
+- **Network security**: Isticmaal firewall. Ports 80/443 kaliya ayaa loo baahan yahay inay ahaadaan publicly accessible.
+- **Secrets**: Never put secrets in Docker Compose files ama version control. Isticmaal `.env` files (gitignored) ama Docker/Kubernetes secrets.
+- **Updates**: Pull new images regularly. Daawo changelog for security fixes.
+- **Backups**: Backup PostgreSQL database and RustFS storage regularly.
 
-## Heesaha Ansible
+## Ansible playbooks
 
-Buugga `deploy/ansible/` wuxuu ka kooban yahay heeso hubinta ka-hor-hawlgalka iyo ka-dib-hawlgalka (smoke-check):
+`deploy/ansible/` directory waxa ku jira preflight iyo smoke-check playbooks:
 
 ```bash
-# Xaqiijinta nidaamka ka hor hawlgalka
+# Pre-deployment system verification
 ansible-playbook deploy/ansible/preflight.yml -i your_inventory
 
-# Hubiska ka dib hawlgalka
+# Post-deployment smoke check
 ansible-playbook deploy/ansible/smoke-check.yml -i your_inventory
 ```
 
-## Tallaabooyinka xiga
+## Next steps
 
-- [Hawlgalka Docker Compose](/docs/en/deploy/docker) — tilmaanta hal-server
-- [Hawlgalka Kubernetes](/docs/en/deploy/kubernetes) — jaantuska Helm
-- [Hawlgalka Co-op Cloud](/docs/en/deploy/coopcloud) — martigelinta iskaashiga ah
-- [Bixiyeyaasha Telefoonada](/docs/en/deploy/providers/) — qaabee bixiyeyaasha codka
+- [Docker Compose Deployment](/docs/en/deploy/docker) — single-server guide
+- [Kubernetes Deployment](/docs/en/deploy/kubernetes) — Helm chart
+- [Co-op Cloud Deployment](/docs/en/deploy/coopcloud) — cooperative hosting
+- [Telephony Providers](/docs/en/deploy/providers/) — configure voice providers

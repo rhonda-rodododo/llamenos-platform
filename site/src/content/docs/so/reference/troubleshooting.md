@@ -1,267 +1,267 @@
 ---
-title: Xalinta dhibaatooyinka
- description: Xalal loogu talagalay dhibaatooyinka caanka ah ee la xiriira soo saarista, app-ka desktop-ka, app-ka mobile-ka, telephony, iyo ficillada cryptographic-ka.
+title: Troubleshooting
+description: Solutions for common issues with deployment, the desktop app, mobile app, telephony, and cryptographic operations.
 ---
 
-Halkan waxaa ku qoran dhibaatooyinka caanka ah iyo xalalkooda dhammaan hababka soo saarista Llamenos iyo platform-yada.
+Tilmaahan wuxuu qabtaa arrimaha caadiga ah iyo xalalkooda across all Llamenos deployment modes iyo platforms.
 
-## Dhibaatooyinka soo saarista Docker
+## Docker deployment issues
 
-### Containers-ka ma bilaabmaan
+### Containers fail to start
 
-**Doorsoomeyo deegaan maqan:**
+**Missing environment variables:**
 
-Docker Compose waxay xaqiijisaa dhammaan adeegyada marka la bilaabo, xitaa kuwa profile-ka leh. Haddii aad aragto khaladaad ku saabsan doorsoomeyo maqan, hubi in faylkaaga `.env` uu leeyahay dhammaan qiimayaasha loo baahan yahay:
+Docker Compose waxay validate gareysaa dhammaan adeegyada at startup, xitaa profiled ones. Haddii aad aragto errors about missing variables, hubi in `.env` file-kaagu uu ku jiro dhammaan values loo baahan yahay:
 
 ```bash
-# Loo baahan yahay .env Docker Compose
+# Required in .env for Docker Compose
 PG_PASSWORD=your_postgres_password
 STORAGE_ACCESS_KEY=your_rustfs_access_key
 STORAGE_SECRET_KEY=your_rustfs_secret_key
 HMAC_SECRET=your_hmac_secret
-ARI_PASSWORD=your_ari_password       # Loo baahan yahay xitaa haddii aan la isticmaalin Asterisk
-BRIDGE_SECRET=your_bridge_secret     # Loo baahan yahay xitaa haddii aan la isticmaalin Asterisk
+ARI_PASSWORD=your_ari_password       # Required xitaa haddii aan la isticmaalin Asterisk
+BRIDGE_SECRET=your_bridge_secret     # Required xitaa haddii aan la isticmaalin Asterisk
 ADMIN_PUBKEY=your_admin_hex_pubkey
 ```
 
-Xitaa haddii aadan isticmaalin bridge-ka Asterisk, Docker Compose waxay xaqiijisaa qeexidda adeegga oo waxay u baahan tahay in `ARI_PASSWORD` iyo `BRIDGE_SECRET` la dejiyo.
+Xitaa haddii aanad isticmaalin Asterisk bridge, Docker Compose waxay validate gareysaa service definition-kiisa oo waxay u baahan tahay `ARI_PASSWORD` iyo `BRIDGE_SECRET` in la set gareeyo.
 
-**Isdiiddiyada alaabada:**
+**Port conflicts:**
 
-Haddii alaabadu horey u isticmaashan:
+Haddii port uu horey u jiro in la isticmaalo, hubi which process holds it:
 
 ```bash
-# Hubi waxa isticmaalaya alaabada 8787 (Worker)
+# Check what's using port 8787 (Worker)
 sudo lsof -i :8787
 
-# Hubi waxa isticmaalaya alaabada 5432 (PostgreSQL)
+# Check what's using port 5432 (PostgreSQL)
 sudo lsof -i :5432
 
-# Hubi waxa isticmaalaya alaabada 9000 (RustFS)
+# Check what's using port 9000 (RustFS)
 sudo lsof -i :9000
 ```
 
-Jooji habka isdiidda ama beddel alaabada `docker-compose.yml`.
+Jooji process-ka is-haysta ama beddel port mapping in `docker-compose.yml`.
 
-### Dhibaatooyinka isku xirka xogta
+### Database connection errors
 
-Haddii app-ku uu ku xirmi waayo PostgreSQL:
+Haddii app-ka aan ku xiri karin PostgreSQL:
 
-- Xaqiiji in `PG_PASSWORD` ee `.env` uu waafaqsan yahay kan la isticmaalay marka container-ka ugu horreeyay la abuuray
-- Hubi in container-ka PostgreSQL uu caafimaad qaba: `docker compose ps`
-- Haddii furaha la beddelay, waxaad u baahan tahay inaad ka saarto volume-ka oo aad dib u abuurto: `docker compose down -v && docker compose up -d`
+- Verify `PG_PASSWORD` in `.env` uu iswaafaqsan yahay waxa la isticmaalay marka container-ka horey loo sameeyay
+- Hubi in PostgreSQL container caafimaad qabo: `docker compose ps`
+- Haddii password la beddelay, waxaad u baahan tahay inaad ka saarto volume oo aad dib u sameyso: `docker compose down -v && docker compose up -d`
 
-### Strfry relay ma isku xirayo
+### Strfry relay not connecting
 
-WebSocket relay (WebSocket relay) waa adeeg aasaasi ah, ma aha ikhtiyaar. Haddii relay-ka aanu shaqeyn:
+WebSocket relay (WebSocket relay) waa adeeg aasaasi ah, ma aha ikhtiyaar. Haddii relay aan shaqeyn:
 
 ```bash
-# Hubi xaaladda relay-ga
+# Check relay status
 docker compose logs WebSocket relay
 
-# Dib u bilaab relay-ga
+# Restart the relay
 docker compose restart WebSocket relay
 ```
 
-Haddii relay-ka uu ku guuldaraysto inuu bilaabo, hubi isdiidda alaabada 7777 ama ogolaanshaha yar ee directory-ga xogta.
+Haddii relay uu fail inuu bilaabo, hubi port 7777 conflicts ama permissions insufficient on data directory.
 
-### Khaladaadka kaydinta RustFS / S3
+### RustFS / S3 storage errors
 
-- Xaqiiji in `STORAGE_ACCESS_KEY` iyo `STORAGE_SECRET_KEY` ay yihiin kuwa saxda ah
-- Hubi in container-ka RustFS uu shaqeynayo: `docker compose ps rustfs`
-- Hel console-ka RustFS ee `http://localhost:9001` si aad u xaqiijiso abuurista bucket-ka
+- Verify `STORAGE_ACCESS_KEY` iyo `STORAGE_SECRET_KEY` sax yihiin
+- Hubi in RustFS container shaqeeya: `docker compose ps rustfs`
+- Access RustFS console at `http://localhost:9001` si aad u verify gareyso bucket creation
 
-## Dhibaatooyinka soo saarista Cloudflare
+## Cloudflare deployment issues
 
-### Khaladaadka Durable Object
+### Durable Object errors
 
-**"Durable Object laga helin" ama khaladaadka binding-ka:**
+**"Durable Object not found" ama binding errors:**
 
-- Ordi `bun run deploy` (marnaba `wrangler deploy` si toos ah) si aad u hubiso in DO bindings-ka ay yihiin kuwa saxda ah
-- Hubi `wrangler.jsonc` ee magacyada saxda ah ee class-ka DO iyo bindings-ka
-- Kadib marka la daroo DO cusub, waa inaad deploy si aad u hesho
+- Run `bun run deploy` (marnaba `wrangler deploy` directly) si aad u hubiso in DO bindings sax yihiin
+- Check `wrangler.jsonc` for correct DO class names iyo bindings
+- Kadib adding a new DO, waa inaad deploy gareysaa ka hor inta aanu noqon available
 
-**Xadidaadyada kaydinta DO:**
+**DO storage limits:**
 
-Cloudflare Durable Objects waxay leeyihiin xadidaad 128 KB per key-value pair. Haddii aad aragto khaladaad kaydinta:
+Cloudflare Durable Objects waxay leeyihiin 128 KB limit per key-value pair. Haddii aad aragto storage errors:
 
-- Hubi in macluumaadka xusuusinaha uusan ka badan xadidaadka (xusuusin aad u weyn iyada oo leh lifaaqo badan)
-- Hubi in ECIES envelopes aysan la duubin
+- Hubi in note content aan ka bixin limit-ka (notes aad u weyn with many attachments)
+- Hubi in ECIES envelopes aan la duplicatin
 
-### Khaladaadka Worker (jawaabaha 500)
+### Worker errors (500 responses)
 
-Hubi log-yada Worker:
+Check Worker logs:
 
 ```bash
 bunx wrangler tail
 ```
 
-Sababaha caanka ah:
-- Sirta maqan (isticmaal `bunx wrangler secret list` si aad u xaqiijiso)
-- Qaabka khaldan ee `ADMIN_PUBKEY` (waa inuu ahaadaa 64 xaraf hex, ma jiro horey `npub`)
-- Xaddidaadda tier-ka bilaasha (1,000 codsida/daqiiqo tier-ka Workers Free)
+Causes caadi ah:
+- Missing secrets (isticmaal `bunx wrangler secret list` si aad u verify gareyso)
+- Incorrect `ADMIN_PUBKEY` format (waa inuu ahaadaa 64 hex characters, ma jirto `npub` prefix)
+- Rate limiting on free tier (1,000 requests/minute on Workers Free)
 
-### Soo saarista waxay ku guuldaraysataa khaladaadka "Pages deploy"
+### Deployment fails with "Pages deploy" errors
 
-Marnaba ha oran `wrangler pages deploy` ama `wrangler deploy` si toos ah. Mar kasta isticmaal scripts-ka `package.json` ee root-ka:
+Marnaba run `wrangler pages deploy` ama `wrangler deploy` directly. Had iyo jeer isticmaal root `package.json` scripts:
 
 ```bash
-bun run deploy          # Soo saar wax kasta (app + goobka marketing-ka)
-bun run deploy:demo     # Soo saar app Worker keliya
-bun run deploy:site     # Soo saar goobka marketing-ka keliya
+bun run deploy          # Deploy dhammaan (app + marketing site)
+bun run deploy:demo     # Deploy app Worker kaliya
+bun run deploy:site     # Deploy marketing site kaliya
 ```
 
-Ordi `wrangler pages deploy dist` directory-ga khaldan waxay soo saartaa Vite app build ee Pages halkii Astro site, jebinaysa goobka marketing-ka khaladaadka 404.
+Running `wrangler pages deploy dist` from wrong directory waxay deploy gareysaa Vite app build to Pages beddelka Astro site, breaking marketing site with 404 errors.
 
-## Dhibaatooyinka app-ka desktop-ka
+## Desktop app issues
 
-### Cusbooneysiinta otomaatig ah ma shaqeynayso
+### Auto-update not working
 
-App-ka desktop-ku waxay isticmaashaa Tauri updater si ay u hubiyaan version-yada cusub. Haddii cusbooneysiinta aan la helin:
+Desktop app-ka waxa uu isticmaalaa Tauri updater si uu u hubiyo versions cusub. Haddii updates aan la ogaan:
 
-- Hubi isku xirkaaga internet-ka
-- Xaqiiji in endpoint-ka cusbooneysiinta uu la mid yahay: `https://github.com/rhonda-rodododo/llamenos-platform/releases/latest/download/latest.json`
-- Linux, AppImage cusbooneysiinta otomaatig ah waxay u baahan tahay in faylu leeyahay ogolaansho qoritaan directory-ga
-- macOS, app-ku waa inuu ku jiraa `/Applications` (ma aha inuu ka shaqeeyo DMG si toos ah)
+- Hubi internet connection-kaaga
+- Verify in update endpoint la heli karo: `https://github.com/rhonda-rodododo/llamenos-platform/releases/latest/download/latest.json`
+- On Linux, AppImage auto-update waxay u baahan tahay in file uu leeyahay write permissions in directory-kiisa
+- On macOS, app-ka waa inuu ku jiraa `/Applications` (ma aha running from DMG directly)
 
-Si aad u cusbooneysiiso gacan, soo deji version-ka ugu dambeeya ee [Bogga Soo Dejinta](/download).
+Si aad u update gareyso manually, download latest release from [Download](/download) page.
 
-### Fureynta PIN-ka ma shaqeynayso
+### PIN unlock fails
 
-Haddii PIN-kaaga la diido app-ka desktop-ka:
+Haddii PIN-kaaga la diido on desktop app:
 
-- Hubi inaad gelinayso PIN-ka saxda ah (ma jiro soo celcelin "illaa PIN-ka")
-- PIN-yadu waxay xaddidan yihiin haddii ay leeyihiin xarfayaal
-- Haddii aad illoobtay PIN-kaaga, waa inaad dib u gelisaa nsec-gaaga si aad u dejiso mid cusub. Xusuusinahaaga fureeran way sii wadaagaan waayo waxay ku xiran yihiin aqoontaada, ma aha PIN-kaaga
-- Tauri Stronghold waxay fureysaa nsec-gaaga iyada oo la isticmaalayo fure laga soo saaro PIN (PBKDF2). PIN khaldan waxay soo saartaa fureynta aan saxnayn, ma aha fariin khalad — app-ku waxay tan garto iyada oo la xaqiijiyo public key-ga laga soo saaro
+- Hubi inaad gelinayso PIN sax ah (ma jirto "forgot PIN" recovery)
+- PINs waxay ahaan karaan case-sensitive haddii ay contains letters
+- Haddii aad illowday PIN-kaaga, waa inaad dib u gelisaa nsec-kaaga si aad u set gareyso PIN cusub. Encrypted notes-kaaga way sii accessible yihiin sababtoo ah waxay ku xiran yihiin identity-kaaga, ma aha PIN-kaaga
+- Tauri Stronghold waxay encrypt gareysaa nsec-kaaga with PIN-derived key (PBKDF2). Wrong PIN waxay soo saartaa invalid decryption, ma aha error message — app-ka waxay detect gareysaa tani by verifying derived public key
 
-### Soo celinta furaha
+### Key recovery
 
-Haddii aad lumisay helitaanka qalabkaaga:
+Haddii aad lumisay access to your device:
 
-1. Isticmaal nsec-gaaga (oo aad u baahan tahay inaad kaydsato password manager) si aad u soo gasho qalab cusub
-2. Haddii aad diiwaangelisay passkey WebAuthn, waxaad isticmaali kartaa qalabka cusub halkii
-3. Xusuusinahaaga fureeran waxay ku kaydsan yihiin dhinaca server-ka — marka aad soo gasho iyada oo la isticmaalayo isla aqoonta, waxaad furi kartaa
-4. Haddii aad lumisay nsec-gaaga iyo passkey-gaaga, la xiriir admin-kaaga. Ma soo celin karaan nsec-gaaga, laakiin waxay abuuri karaan aqoonta cusub. Xusuusinaha loo fureeyay aqoontaada hore ma akhriyi doontid
+1. Isticmaal nsec-kaaga (waxaad keydshould have stored in a password manager) si aad u log in gareyso on a new device
+2. Haddii aad diiwaan gelisay WebAuthn passkey, waxaad isticmaali kartaa on new device beddelka
+3. Encrypted notes-kaaga waxay ku kaydsan yihiin server-side — marka aad log in gareyso with same identity, waxaad decrypt gareyi kartaa
+4. Haddii aad lumisay both nsec iyo passkey, la xidhiidh admin-kaaga. Ma soo celin karaan nsec-kaaga, laakiin waxay kuu sameyn karaan identity cusub. Notes encrypted for old identity ma ahaan doonaan readable by you
 
-### App-ku ma bilaabmo (daaqad madhan)
+### App does not start (blank window)
 
-- Hubi in nidaamkaagu uu buuxiyo shuruudaha ugu yar (eeg [Soo Dejinta](/download))
-- Linux, hubi in WebKitGTK uu ku rakiban yahay: `sudo apt install libwebkit2gtk-4.1-0` (Debian/Ubuntu) ama mid la mid ah
-- Isku day inaad ka bilaabto terminal-ka si aad u aragto fariimaha khaladaadka: `./llamenos` (AppImage) ama hubi log-yada nidaamka
-- Haddii aad isticmaalayo Wayland, isku day `GDK_BACKEND=x11` sida xal ugu dambeya
+- Hubi in system-kaagu buuxiyo minimum requirements (eeg [Download](/download))
+- On Linux, hubi in WebKitGTK installed yahay: `sudo apt install libwebkit2gtk-4.1-0` (Debian/Ubuntu) ama equivalent
+- Isku day inaad ka bilaabato terminal si aad u aragto error output: `./llamenos` (AppImage) ama check system logs
+- Haddii isticmaalayo Wayland, isku day with `GDK_BACKEND=x11` as fallback
 
-### Isdiidda single instance
+### Single instance conflict
 
-Llamenos waxay xakameysaa habka single-instance. Haddii app-ku sheego inuu horey u shaqeynayo laakiin aadan helin daaqadda:
+Llamenos waxay ku adag tahay single-instance mode. Haddii app-ka yiraahdo already running laakiin aadan heli karin window:
 
-- Hubi hababka dambe: `ps aux | grep llamenos`
-- Dil hababka aan la rabin: `pkill llamenos`
-- Linux, hubi fayl quful oo jira oo ka saar haddii app-ku dhacay
+- Hubi background processes: `ps aux | grep llamenos`
+- Dil any orphaned processes: `pkill llamenos`
+- On Linux, hubi stale lock file oo ka saar haddii app-ka crash gareeyay
 
-## Dhibaatooyinka app-ka mobile-ka
+## Mobile app issues
 
-### Khaladaadka provisioning-ka
+### Provisioning failures
 
-Eeg [Hagga Mobile-ka](/docs/mobile-guide#troubleshooting-mobile-issues) si aad u hesho faahfaahin oo ku saabsan xalinta dhibaatooyinka provisioning-ka.
+Eeg [Mobile Guide](/docs/mobile-guide#troubleshooting-mobile-issues) for detailed provisioning troubleshooting.
 
-Sababaha caanka ah:
-- QR code dhacay (tokens-ka way dhacaan kadib 5 daqiiqo)
-- Isku xir internet ma jiro labada qalab
-- App-ka desktop iyo app-ka mobile waxay ku shaqeeyaan version-yada protocol ee kala duwan
+Causes caadi ah:
+- Expired QR code (tokens expire kadib 5 minutes)
+- No internet connection on labada device
+- Desktop app iyo mobile app running different protocol versions
 
-### Digniinada push ma imaanayaan
+### Push notifications not arriving
 
-- Xaqiiji in ogolaanshaha digniinta la bixiyay goobaha OS-ka
-- Android, hubi in optimization-ka battery uusan dilin app-ka dambe
-- iOS, xaqiiji in Background App Refresh uu furan yahay Llamenos
-- Hubi inaad leedahay shift firfircoon oo aadan ku jirin nasasho
+- Verify notification permissions granted in OS settings
+- On Android, hubi in battery optimization aan ku dilin app-ka in background
+- On iOS, verify in Background App Refresh enabled yahay for Llamenos
+- Hubi inaad leedahay active shift oo aadan ahayn on break
 
-## Dhibaatooyinka telephony-ga
+## Telephony issues
 
-### Tafatirka webhook-ka Twilio
+### Twilio webhook configuration
 
-Haddii calls-ka aanu u gudbin isbitaallada:
+Haddii calls aan u gudbin volunteers:
 
-1. Xaqiiji in URL-yadaaga webhook ay yihiin kuwa saxda ah console-ka Twilio:
+1. Verify webhook URLs-kaaga sax yihiin in Twilio console:
    - Voice webhook: `https://your-worker.your-domain.com/telephony/incoming` (POST)
    - Status callback: `https://your-worker.your-domain.com/telephony/status` (POST)
-2. Hubi in aqoonsiga Twilio ee goobahaaga uu waafaqsan yahay console-ka:
+2. Hubi in Twilio credentials in your settings iswaafaqaqaan console:
    - Account SID
    - Auth Token
-   - Lambarka taleefanka (waa inuu leeyahay koodhka dalka, tusaale, `+1234567890`)
-3. Hubi debugger-ka Twilio khaladaadka: [twilio.com/console/debugger](https://www.twilio.com/console/debugger)
+   - Phone number (waa inuu includes country code, e.g., `+1234567890`)
+3. Hubi Twilio debugger for errors: [twilio.com/console/debugger](https://www.twilio.com/console/debugger)
 
-### Tafatirka lambarka
+### Number setup
 
-- Lambarka taleefanku waa inuu ahaadaa mid Twilio leedahay ama caller ID la xaqiijiyay
-- Horumarinta goobta, isticmaal Cloudflare Tunnel ama ngrok si aad u soo bandhigto Worker-kaaga gudaha Twilio
-- Xaqiiji in tafatirka Voice-ga lambarku uu u jeediyo URL-kaaga webhook, ma aha TwiML Bin-ka default-ka
+- Phone number waa inuu ahaadaa Twilio-owned number ama verified caller ID
+- For local development, isticmaal Cloudflare Tunnel ama ngrok si aad u expose gareyso your local Worker to Twilio
+- Verify number's Voice configuration u jeeddo your webhook URL, ma aha default TwiML Bin
 
-### Calls-ka ay isku xiraan laakiin ma jiro cod
+### Calls connect but no audio
 
-- Hubi in server-ka media ee bixiyaha telephony uu gaari karo taleefanka isbitaalka
-- Hubi dhibaatooyinka NAT/firewall ee xiraya traffic-ka RTP
-- Haddii aad isticmaalayo WebRTC, xaqiiji in server-ka STUN/TURN uu la habeeyay
-- Qaar ka mid ah VPN-yadu waxay xiraan traffic-ka VoIP — isku day iyada oo VPN la'aan
+- Hubi in telephony provider's media servers ka heli karaan volunteer's phone
+- Hubi NAT/firewall issues blocking RTP traffic
+- Haddii isticmaalayo WebRTC, verify in STUN/TURN servers configured correctly
+- Qaar VPNs block VoIP traffic — isku day without VPN
 
-### Fariimaha SMS/WhatsApp ma imaanayaan
+### SMS/WhatsApp messages not arriving
 
-- Xaqiiji in URL-yada webhook-ka fariimaha ay la habeysan yihiin console-ka bixiyahaaga
-- WhatsApp, hubi in token-ka xaqiijinta webhook-ka Meta uu waafaqsan yahay goobahaaga
-- Hubi in kanaalka fariimaha uu furan yahay **Admin Settings > Channels**
-- Signal, xaqiiji in bridge-ka signal-cli uu shaqeynayo oo uu u gudbiyo webhook-kaaga
+- Verify messaging webhook URLs configured correctly in your provider's console
+- For WhatsApp, hubi in Meta webhook verification token iswaafaqsan your settings
+- Hubi in messaging channel enabled in **Admin Settings > Channels**
+- For Signal, verify signal-cli bridge running oo configured to forward to your webhook
 
-## Khaladaadka crypto-ga
+## Crypto errors
 
-### Khaladaadka iswaafaqida furaha
+### Key mismatch errors
 
-**"Fureynta ma guulaysan" ama "Fure khaldan" marka la furayo xusuusinaha:**
+**"Failed to decrypt" ama "Invalid key" marka la furo notes:**
 
-- Tani macnaheedu waa xusuusintu waxay loo fureeyay aqoonta kale ee kan aad hadda ku jirto
-- Xaqiiji inaad isticmaalayo nsec-ga saxda ah (hubi npub-kaaga goobaha uu waafaqsan yahay kan admin-ku arka)
-- Haddii aad dib u abuuray aqoontaada, xusuusinaha hore ee loo fureeyay public key-kaaga hore ma furi doontid fure cusub
+- Tani guud ahaan macnaheedu waa note waxaa loo encrypt gareeyay different identity than one you are logged in with
+- Verify inaad isticmaalayso correct nsec (hubi npub-kaaga in Settings matches what admin sees)
+- Haddii aad recently re-created identity-kaaga, old notes encrypted for previous public key ma ahaan doonaan decryptable with new key
 
-**"Saxiixa khaldan" marka la soo galo:**
+**"Invalid signature" on login:**
 
-- Nsec-ga waxaa laga yaabaa inuu burburay — isku day inaad dib u geliso password manager-kaaga
-- Hubi in nsec-ga oo dhan la paste gareeyay (wuxuu ku bilaabmaa `nsec1`, 63 xaraf guud ahaan)
-- Hubi meelaha bannaan ama xariiqyo cusub
+- Nsec waxaa laga yaabaa inuu corrupted yahay — isku day inaad dib u geliso from your password manager
+- Hubi in full nsec la paste gareeyay (starts with `nsec1`, 63 characters total)
+- Hubi extra whitespace ama newline characters
 
-### Khaladaadka xaqiijinta saxiixa
+### Signature verification failures
 
-Haddii dhacdooyinka hub-ka ay guuldaraystaan xaqiijinta saxiixa:
+Haddii hub events fail signature verification:
 
-- Hubi in saacadda nidaamku ay isku xiran tahay (NTP). Isku dhac weyn ee saacadda waxay keeni kartaa dhibaatooyin timestamps-ka
-- Xaqiiji in WebSocket relay uusan u gudbin dhacdooyin pubkeys aan la aqoon
-- Dib u bilaab app-ka si aad dib u qaaddo liiska xubnaha hub-ka hadda jira
+- Hubi in system clock synchronized yahay (NTP). Large clock skew waxay keeni kartaa issues with event timestamps
+- Verify in WebSocket relay aan relaying events from unknown pubkeys
+- Restart app-ka si aad dib u fetch gareyso current hub member list
 
-### Khaladaadka ECIES envelope
+### ECIES envelope errors
 
-**"Furaha duubidda ma guulaysan" marka la furayo xusuusin:**
+**"Failed to unwrap key" on note decryption:**
 
-- ECIES envelope waxaa laga yaabaa inuu la sameeyay public key khaldan
-- Tani waxay dhici kartaa haddii admin-ku daray isbitaale iyada oo leh typo pubkey-ga
-- Admin-ku waa inuu xaqiijiyo pubkey-ga isbitaalka oo uu dib u martiqaado haddii loo baahan yahay
+- ECIES envelope waxaa laga yaabaa in la sameeyay with incorrect public key
+- Tani waxay dhici kartaa haddii admin uu daray volunteer with typo in pubkey
+- Admin waa inuu verify gareeyaa volunteer's public key oo dib u soo ceshadaa haddii loo baahdo
 
-**"Dhererka ciphertext-ka khaldan":**
+**"Invalid ciphertext length":**
 
-- Tani waxay muujinaysaa burbur xog, laga yaabee ka soo jeeda jawaab shabakad oo yaraatay
-- Isku day ficilka mar kale. Haddii uu sii wado, xogta fureeran waxaa laga yaabaa inay si joogto ah u burburtay
-- Hubi dhibaatooyinka proxy ama CDN ee laga yaabee inay yareeyaan jirka jawaabaha
+- Tani waxay muujinaysaa data corruption, laga yaabee from truncated network response
+- Isku day operation-ka mar kale. Haddii uu sii socdo, encrypted data waxaa laga yaabaa inuu permanently corrupted yahay
+- Hubi proxy ama CDN issues kuwa truncate gareya response bodies
 
-### Khaladaadka furaha hub-ka
+### Hub key errors
 
-**"Dhacdo hub-ka ma furi karo":**
+**"Failed to decrypt hub event":**
 
-- Hub key waxaa laga yaabaa inuu beddelay tan iyo markii ugu horreysay ee aad isku xirtay
-- Xidh oo dib u fur app-ka si aad u hesho hub key-ka ugu dambeeya
-- Haddii aad dhawaan ka saaranaa oo dib ugu soo biirtay hub-ka, fure-ka waxaa laga yaabaa inuu beddelay xilligaaga maqnaanshaha
+- Hub key waxaa laga yaabaa in la rotated since last connection
+- Xir oo fur app-ka si aad u fetch gareyso latest hub key
+- Haddii aad recently laga saaray oo dib loogu daray hub-ka, key waxaa laga yaabaa inuu rotated during your absence
 
-## Helitaanka caawimaad
+## Getting help
 
-Haddii dhibaatadaadu aanay ku jirin halkan:
+Haddii issue-gaagu aan ku jirin halkan:
 
-- Hubi [GitHub Issues](https://github.com/rhonda-rodododo/llamenos-platform/issues) khaladaadka la yaqaan iyo xalalka
-- Raadi issues-ka hore intaadan abuurin mid cusub
-- Marka aad sheegto khalad, ku dar: habka soo saaristaada (Cloudflare/Docker/Kubernetes), platform-kaaga (Desktop/Mobile), iyo fariimaha khaladaadka ee console-ka browser-ka ama terminal-ka
+- Hubi [GitHub Issues](https://github.com/rhonda-rodododo/llamenos-platform/issues) for known bugs iyo workarounds
+- Raadi issues hore inta aanad sameyn mid cusub
+- Marka aad report gareyso bug, ku dar: deployment mode-kaaga (Cloudflare/Docker/Kubernetes), platform-kaaga (Desktop/Mobile), iyo error messages from browser console ama terminal

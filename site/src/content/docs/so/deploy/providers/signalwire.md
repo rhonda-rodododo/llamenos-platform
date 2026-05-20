@@ -1,80 +1,80 @@
 ---
-title: "Deji: SignalWire"
-description: Tilmaan tallaabo-tallaabo ah oo lagu qaabeeyo SignalWire bixiyahaaga telefoonada.
+title: "Setup: SignalWire"
+description: Step-by-step guide to configure SignalWire as your telephony provider.
 ---
 
-SignalWire waa beddel ku-ool ah oo Twilio ah oo leh API la jaan-qaadi karo. Wuxuu isticmaalaa LaML (luqad calaamadayn u ah TwiML), markaa u gudubka Twilio iyo SignalWire waa mid toos ah.
+SignalWire waa ikhtiyaar qiimo fiican oo beddelka ah Twilio with a compatible API. Waxay isticmaashaa LaML (luuqad markup compatible with TwiML), sidaas darteed migrating between Twilio iyo SignalWire waa fudud.
 
-## Waxyaabaha loo baahan yahay
+## Prerequisites
 
-- Akoon [SignalWire](https://signalwire.com/signup) (tijaabo bilaash ah waa la heli karaa)
-- Matoorkaaga Llámenos oo la hawlgaliyay oo laga heli karo URL dadweyne
+- [SignalWire account](https://signalwire.com/signup) (free trial available)
+- Your Llamenos instance deployed oo la heli karo via public URL
 
-## 1. Abuur akoon SignalWire
+## 1. Create a SignalWire account
 
-Ka diiwaan geli [signalwire.com/signup](https://signalwire.com/signup). Inta lagu jiro diiwaangelinta, waxaad dooran doontaa **Space name** (tusaale, `myhotline`). Space URL-kaagu wuxuu noqonayaa `myhotline.signalwire.com`. Qor magacan — waxaad u baahan doontaa qaabeynta.
+Isu diiwaan geli at [signalwire.com/signup](https://signalwire.com/signup). Inta la sameynayo signup, waxaad dooran doontaa **Space name** (e.g., `myhotline`). Space URL-gaaga wuxuu noqon doonaa `myhotline.signalwire.com`. Xasuusnow magacan -- waxaad u baahan doontaa configuration-ka.
 
-## 2. Iibso lambar taleefan
+## 2. Buy a phone number
 
-1. SignalWire Dashboard-kaaga, tag **Phone Numbers**
+1. In your SignalWire Dashboard, aad u guur **Phone Numbers**
 2. Guji **Buy a Phone Number**
-3. Raadi lambar leh awoodda codka
-4. Iibso lambarka
+3. Raadi number leh voice capability
+4. Iibso number-ka
 
-## 3. Hel aqoonsiyahaaga
+## 3. Get your credentials
 
-1. Tag **API** SignalWire Dashboard-ka
-2. Ka hel **Project ID** (tani waxay u shaqeysaa Account SID)
-3. Abuur **API Token** cusub haddii aadan haysan — tani waxay u shaqeysaa Auth Token
+1. Aad u guur **API** in SignalWire Dashboard
+2. Hel **Project ID** (tani waxay howl gelisaa Account SID)
+3. Create a new **API Token** haddii aadan horey u lahayn -- tani waxay howl gelisaa Auth Token
 
-## 4. Qaabee webhooks-ka
+## 4. Configure webhooks
 
-1. Tag **Phone Numbers** dashboard-ka
-2. Guji lambarkaaga khadka gurmadka
-3. Hoos **Voice Settings**, ku deji:
+1. Aad u guur **Phone Numbers** in dashboard
+2. Guji hotline number-kaaga
+3. Under **Voice Settings**, set:
    - **Handle calls using**: LaML Webhooks
    - **When a call comes in**: `https://your-domain.com/api/telephony/incoming` (POST)
    - **Call status callback**: `https://your-domain.com/api/telephony/status` (POST)
 
-## 5. Ku qaabee Llámenos
+## 5. Configure in Llamenos
 
-1. Soo gal maamul ahaan
-2. Tag **Settings** > **Telephony Provider**
-3. Dooro **SignalWire** hoos-u-dhaca bixiyaha
-4. Gali:
-   - **Account SID**: Project ID-gaaga tallaabada 3
-   - **Auth Token**: API Token-kaaga tallaabada 3
-   - **SignalWire Space**: Space name-gaaga (magaca oo keliya, ma aha URL buuxda — tusaale, `myhotline`)
-   - **Phone Number**: lambarka aad iibsaty (qaabka E.164)
+1. Log in as admin
+2. Aad u guur **Settings** > **Telephony Provider**
+3. Dooro **SignalWire** from provider dropdown
+4. Geli:
+   - **Account SID**: your Project ID from step 3
+   - **Auth Token**: your API Token from step 3
+   - **SignalWire Space**: your Space name (magaca kaliya, ma aha full URL -- e.g., `myhotline`)
+   - **Phone Number**: number-ka aad iibsatey (E.164 format)
 5. Guji **Save**
 
-## 6. Tijaabi dejinta
+## 6. Test the setup
 
-U wac lambarkaaga khadka gurmadka. Waa inaad maqashaa liiska xulashada luqadda oo ay raacdo habka wicitaanka.
+Wac hotline number-kaaga. Waa inaad maqashaa language selection menu ka dibna call flow-ka.
 
-## Dejinta WebRTC (ikhtiyaar)
+## WebRTC setup (optional)
 
-SignalWire WebRTC wuxuu isticmaalaa isla qaabka furaha API sida Twilio:
+SignalWire WebRTC waxay isticmaashaa isku API key pattern-ka Twilio:
 
-1. SignalWire Dashboard-kaaga, abuur **API Key** hoos **API** > **Tokens**
-2. Abuur **LaML Application**:
-   - Tag **LaML** > **LaML Applications**
-   - Deji Voice URL-ka `https://your-domain.com/api/telephony/webrtc-incoming`
-   - Qor Application SID-ka
-3. Llámenos, tag **Settings** > **Telephony Provider**
-4. Shid **WebRTC Calling**
-5. Gali API Key SID, API Key Secret, iyo Application SID
+1. In your SignalWire Dashboard, create an **API Key** under **API** > **Tokens**
+2. Create a **LaML Application**:
+   - Aad u guur **LaML** > **LaML Applications**
+   - Set Voice URL to `https://your-domain.com/api/telephony/webrtc-incoming`
+   - Xasuusnow Application SID
+3. In Llamenos, aad u guur **Settings** > **Telephony Provider**
+4. Toggle **WebRTC Calling** on
+5. Geli API Key SID, API Key Secret, iyo Application SID
 6. Guji **Save**
 
-## Kala duwanaanshaha Twilio
+## Differences from Twilio
 
-- **LaML vs TwiML**: SignalWire wuxuu isticmaalaa LaML, oo shaqo ahaan la mid ah TwiML. Llámenos si toos ah ayuu u maamulaa tan.
-- **Space URL**: Wicitaannada API waxay u tagaan `{space}.signalwire.com` halkii `api.twilio.com`. Adapter-ku wuxuu tan u maamulaa Space name-ka aad bixiso.
-- **Qiimaynta**: SignalWire guud ahaan waa 30-40% ka jaban Twilio wicitaannada codka.
-- **Sinnaanta astaamaha**: Dhammaan astaamaha Llámenos (duubis, qoraal-qaadis, CAPTCHA, farriin cod) waxay si isku midah ugu shaqeeyaan SignalWire.
+- **LaML vs TwiML**: SignalWire waxay isticmaashaa LaML, taas oo shaqaysa isku mid ah TwiML. Llamenos waxay si otomaatig ah ula dhaqantaa.
+- **Space URL**: API calls waxay aadaan `{space}.signalwire.com` beddelka `api.twilio.com`. Adapter-ka waxay ku maamushan via Space name aad bixisay.
+- **Pricing**: SignalWire guud ahaan waxay tahay 30-40% cheaper than Twilio for voice calls.
+- **Feature parity**: Dhammaan features-ka Llamenos (recording, transcription, CAPTCHA, voicemail) waxay isku mid u shaqeeyaan SignalWire.
 
-## Cillad-xallinta
+## Troubleshooting
 
-- **Qaladaadka "Space not found"**: Laba jeer hubi Space name-ka (subdomain oo keliya, ma aha URL buuxda).
-- **Qaladaadka webhook-ka**: Hubi in URL-ka server-kaagu uu dadweyne yahay oo uu isticmaalo HTTPS.
-- **Arrimaha API token**: Calamada SignalWire way dhaci karaan. Abuur token cusub haddii aad hesho qaladaadka xaqiijinta.
+- **"Space not found" errors**: Hubi mar labaad Space name-ka (subdomain kaliya, ma aha full URL).
+- **Webhook failures**: Hubi in server URL-kaagu publicly accessible yahay oo isticmaalo HTTPS.
+- **API token issues**: SignalWire tokens way dhacayaan. Create a new token haddii aad hesho authentication errors.

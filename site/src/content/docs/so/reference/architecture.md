@@ -1,13 +1,13 @@
 ---
-title: Qaab-dhismeedka
- description: Guud ahaan qaab-dhismeedka nidaamka — kaydka, dhaqanka xogta, lakabada fureynta, iyo isgaarsiinta waqti-dhabta ah.
+title: Architecture
+description: System architecture overview — repositories, data flow, encryption layers, and real-time communication.
 ---
 
-Bogganani waxay sharxaysaa sida Llamenos uu u qaabeysan yahay, sida xogtu ugu dhex dhacdo nidaamka, iyo meesha encryption-ka lagu dabaqo.
+Boggan wuxuu sharxayaa sida Llamenos uu u qaabaysan yahay, sida data uu ugu dhaco system-ka, iyo halka encryption lagu dhex dhexaadiyo.
 
-## Qaab-dhismeedka kaydka
+## Repository structure
 
-Llamenos waxay u qaybsantahay saddex kayd oo wadaaga protocol iyo core cryptographic:
+Llamenos waxaa loo qaybiyay saddex repositories oo wadaaga common protocol and cryptographic core:
 
 ```
 llamenos              llamenos-core           llamenos-platform
@@ -23,46 +23,46 @@ llamenos              llamenos-core           llamenos-platform
        +------------------+      +-------------------+
 ```
 
-- **llamenos** — Codsiga desktop-ka (Tauri v2 iyada oo leh Vite + React webview), backend-ka Cloudflare Worker, iyo backend-ka self-hosted Node.js. Tani waa kaydka ugu weyn.
-- **llamenos-core** — Crate Rust oo la wadaago oo dhammaan ficillada cryptographic-ka ku dhaqma: ECIES envelope encryption, saxiixyada Schnorr, key derivation PBKDF2, HKDF, iyo XChaCha20-Poly1305. U compilation gudaha native code (Tauri), WASM (browser), iyo UniFFI bindings (mobile).
-- **llamenos-platform** — Codsiga mobile React Native ee iOS iyo Android. Waxay isticmaashaa UniFFI bindings si ay u yeeshaan ficillada Rust crypto isla.
+- **llamenos** — Desktop application-ka (Tauri v2 with Vite + React webview), Cloudflare Worker backend, iyo self-hosted Node.js backend. Tani waa primary repository.
+- **llamenos-core** — Shared Rust crate implementing dhammaan cryptographic operations: ECIES envelope encryption, Schnorr signatures, PBKDF2 key derivation, HKDF, iyo XChaCha20-Poly1305. Compiled to native code (for Tauri), WASM (for browser), iyo UniFFI bindings (for mobile).
+- **llamenos-platform** — React Native mobile application for iOS iyo Android. Isticmaalaa UniFFI bindings si ay u yeeshaan calls into same Rust crypto code.
 
-Dhammaan saddexda platform waxay dhaqmaan protocol isku mid ah oo lagu qeexay `docs/protocol/PROTOCOL.md`.
+Dhammaan saddexda platforms waxay implement gareyaan isku wire protocol defined in `docs/protocol/PROTOCOL.md`.
 
-## Dhaqanka xogta
+## Data flow
 
-### Call soo galaya
+### Incoming call
 
 ```
-Caller (taleefan)
+Caller (phone)
     |
     v
-Bixiye Telephony (Twilio / SignalWire / Vonage / Plivo / Asterisk)
+Telephony Provider (Twilio / SignalWire / Vonage / Plivo / Asterisk)
     |
     | HTTP webhook
     v
 Worker API  -->  CallRouterDO
     |                |
-    |                | Hubiyaa ShiftManagerDO ee isbitaallada shift-ka ku jira
-    |                | Bilaabida dhawaaq kala duwan ee dhammaan isbitaallada diyaarka ah
+    |                | Checks ShiftManagerDO for on-shift volunteers
+    |                | Initiates parallel ring to all available volunteers
     |                v
-    |           Bixiye Telephony (calls-ka dibadda ee taleefanada isbitaallada)
+    |           Telephony Provider (outbound calls to volunteer phones)
     |
-    | Isbitaalka ugu horreeya ee jawaaba
+    | First volunteer answers
     v
-CallRouterDO  -->  Isku xir caller iyo isbitaale
+CallRouterDO  -->  Connects caller and volunteer
     |
-    | Call-ku wuu dhacayaa
+    | Call ends
     v
-Client (browser/app-ka isbitaalka)
+Client (volunteer's browser/app)
     |
-    | Furee xusuusin iyada oo la isticmaalayo fure per-note
-    | Duubo fure via ECIES nafsiga + admin kasta
+    | Encrypts note with per-note key
+    | Wraps key via ECIES for self + each admin
     v
-Worker API  -->  RecordsDO  (kaydiya xusuusinta fureeran + furaha duuban)
+Worker API  -->  RecordsDO  (stores encrypted note + wrapped keys)
 ```
 
-### Fariimaha soo galaya (SMS / WhatsApp / Signal)
+### Incoming message (SMS / WhatsApp / Signal)
 
 ```
 Contact (SMS / WhatsApp / Signal)
@@ -71,153 +71,153 @@ Contact (SMS / WhatsApp / Signal)
     v
 Worker API  -->  ConversationDO
     |                |
-    |                | Furee macluumaadka fariinta si toos ah
-    |                | Duubo fure symmetric via ECIES ee isbitaalka loo xilsaarnay + admins
-    |                | Tuur plaintext-ka
+    |                | Encrypts message content immediately
+    |                | Wraps symmetric key via ECIES for assigned volunteer + admins
+    |                | Discards plaintext
     |                v
-    |           WebSocket relay (dhacdo hub fureeran oo digniinaya clients-ka online)
+    |           WebSocket relay (encrypted hub event notifies online clients)
     |
     v
-Client (browser/app-ka isbitaalka)
+Client (volunteer's browser/app)
     |
-    | Furee fariinta iyada oo la isticmaalayo fure sirtaada
-    | Samee jawaab, furee outbound
+    | Decrypts message with own private key
+    | Composes reply, encrypts outbound
     v
-Worker API  -->  ConversationDO  -->  Bixiye Messaging (dir jawaab)
+Worker API  -->  ConversationDO  -->  Messaging Provider (sends reply)
 ```
 
 ## Durable Objects
 
-Backend-ku waxay isticmaashaa lix Cloudflare Durable Objects (ama kuwa PostgreSQL ee la midka ah ee soo saarista gacanta):
+Backend-ka waxa uu isticmaalaa lix Cloudflare Durable Objects (ama PostgreSQL equivalents for self-hosted deployments):
 
-| Durable Object | Mas'uuliyadda |
+| Durable Object | Mas'uuliyad |
 |---|---|
-| **IdentityDO** | Maareynta aqoonta isbitaallada, furaha dadweynaha, magacyada muujinta, iyo aqoonsiyada WebAuthn. Maareynta abuurista iyo dib u qaadista martiqaadka. |
-| **SettingsDO** | Kaydinta tafatirka hotline-ka: magaca, kanaalada furan, aqoonsiga bixiyaha, fields-ka xusuusinta gaarka ah, goobaha yareynta spam, calaamadaha features-ka. |
-| **RecordsDO** | Kaydinta xusuusinta call-ka fureeran, warbixinnada fureeran, iyo metadata-ga lifaaqayaasha faylasha. Maareynta raadinta xusuusinaha (metadata-ga fureeran). |
-| **ShiftManagerDO** | Maareynta jadwalada shift-ka ee soo noqnoqda, kooxaha dhawaaqaya, xilsaarnada shift-ka isbitaallada. Go'aaminta kuwa shift-ka ku jira waqti kasta. |
-| **CallRouterDO** | Maareynta isku xirka call-ka waqti-dhabta ah: dhawaaq kala duwan, joojinta ugu horreeya, xaaladda nasashada, raadinta call-ka firfircoon. Abuurista jawaabaha TwiML/bixiyaha. |
-| **ConversationDO** | Maareynta wada hadallada fariimaha ee SMS, WhatsApp, iyo Signal. Maareynta fureynta fariimaha marka la soo geliyo, xilsaarnada wada hadalka, iyo jawaabaha dibadda. |
+| **IdentityDO** | Maamulaa volunteer identities, public keys, display names, iyo WebAuthn credentials. Handles invite creation iyo redemption. |
+| **SettingsDO** | Kaydiyaa hotline configuration: name, enabled channels, provider credentials, custom note fields, spam mitigation settings, feature flags. |
+| **RecordsDO** | Kaydiyaa encrypted call notes, encrypted reports, iyo file attachment metadata. Handles note search (over encrypted metadata). |
+| **ShiftManagerDO** | Maamulaa recurring shift schedules, ring groups, volunteer shift assignments. Determines who is on-shift at any given time. |
+| **CallRouterDO** | Orchestrates real-time call routing: parallel ringing, first-pickup termination, break status, active call tracking. Generates TwiML/provider responses. |
+| **ConversationDO** | Maamulaa threaded messaging conversations across SMS, WhatsApp, iyo Signal. Handles message encryption on ingest, conversation assignment, iyo outbound replies. |
 
-Dhammaan DO-yada waxaa laga helo sida singletons via `idFromName()` oo loo gudbiyo gudaha iyada oo la isticmaalayo `DORouter` fudud (hab + qaabka waddada).
+Dhammaan DOs waxaa la access gareeyaa as singletons via `idFromName()` oo routed internally iyadoo la isticmaalayo lightweight `DORouter` (method + path pattern matching).
 
-## Matrix-ga fureynta
+## Encryption matrix
 
-| Xogta | Fureeran? | Algorithm | Yaa furi kara |
+| Data | Encrypted? | Algorithm | Yaa decrypt gareya kara |
 |---|---|---|---|
-| Xusuusinaha call-ka | Haa (E2EE) | XChaCha20-Poly1305 + ECIES envelope | Qofka qoray + dhammaan admins |
-| Fields-ka xusuusinta gaarka ah | Haa (E2EE) | Isla sida xusuusinaha | Qofka qoray + dhammaan admins |
-| Warbixinnada | Haa (E2EE) | Isla sida xusuusinaha | Qofka qoray + dhammaan admins |
-| Lifaaqayaasha warbixinnada | Haa (E2EE) | XChaCha20-Poly1305 (streamed) | Qofka qoray + dhammaan admins |
-| Macluumaadka fariimaha | Haa (E2EE) | XChaCha20-Poly1305 + ECIES envelope | Isbitaalka loo xilsaarnay + dhammaan admins |
-| Qoraallada | Haa (marka la kaydiyo) | XChaCha20-Poly1305 | Abuuraha qoraalka + dhammaan admins |
-| Dhacdooyinka hub-ka (WebSocket) | Haa (symmetric) | XChaCha20-Poly1305 iyada oo la isticmaalayo hub key | Dhammaan xubnaha hub-ka hadda jira |
-| Volunteer nsec | Haa (marka la kaydiyo) | PBKDF2 + XChaCha20-Poly1305 (PIN) | Isbitaalka keliya |
-| Diiwaannada baaritaanka | Maya (ilaalinta integrity) | Hash chain SHA-256 | Admins (akhri), nidaamka (qor) |
-| Lambarrada taleefanka ee wiciyayaasha | Maya (dhinaca server-ka keliya) | N/A | Server + admins |
-| Lambarrada taleefanka ee isbitaallada | Kaydsan IdentityDO | N/A | Admins keliya |
+| Call notes | Yes (E2EE) | XChaCha20-Poly1305 + ECIES envelope | Note author + all admins |
+| Note custom fields | Yes (E2EE) | Same as notes | Note author + all admins |
+| Reports | Yes (E2EE) | Same as notes | Report author + all admins |
+| Report attachments | Yes (E2EE) | XChaCha20-Poly1305 (streamed) | Report author + all admins |
+| Message content | Yes (E2EE) | XChaCha20-Poly1305 + ECIES envelope | Assigned volunteer + all admins |
+| Transcripts | Yes (at-rest) | XChaCha20-Poly1305 | Transcript creator + all admins |
+| Hub events (WebSocket) | Yes (symmetric) | XChaCha20-Poly1305 with hub key | All current hub members |
+| Volunteer nsec | Yes (at-rest) | PBKDF2 + XChaCha20-Poly1305 (PIN) | Volunteer kaliya |
+| Audit log entries | No (integrity-protected) | SHA-256 hash chain | Admins (read), system (write) |
+| Caller phone numbers | No (server-side only) | N/A | Server + admins |
+| Volunteer phone numbers | Stored in IdentityDO | N/A | Admins kaliya |
 
-### Forward secrecy per-note
+### Per-note forward secrecy
 
-Xusuusin kasta ama fariin waxay heshaa fure symmetric oo keliya oo random ah. Fure-kaas waxaa duuban via ECIES (secp256k1 ephemeral key + HKDF + XChaCha20-Poly1305) si gaar ah qof kasta oo la oggolay. Haddii fure xusuusin la qabsado, waxba ma muujinayo kuwa kale. Ma jiraan furaha symmetric ee dheer jira ee loogu talagalay fureynta macluumaadka.
+Each note ama message waxay heshaa unique random symmetric key. Key-gaas waxaa lagu wrap via ECIES (secp256k1 ephemeral key + HKDF + XChaCha20-Poly1305) individually for each authorized reader. Compromising one note's key ma muujinayo waxba about notes kale. Ma jiraan long-lived symmetric keys for content encryption.
 
-### Lakabka furaha
+### Key hierarchy
 
 ```
 Volunteer nsec (BIP-340 Schnorr / secp256k1)
     |
-    +-- Soo saar npub (x-only public key, 32 bytes)
+    +-- Derives npub (x-only public key, 32 bytes)
     |
-    +-- Loo isticmaalaa isku xirka ECIES (ku dar 02 qaabka compressed)
+    +-- Used for ECIES key agreement (prepend 02 for compressed form)
     |
-    +-- Saxiixa dhacdooyinka WebSocket (saxiixa Schnorr)
+    +-- Signs WebSocket events (Schnorr signature)
 
-Hub key (32 bytes random, MA aha mid ka soo jeeda aqoonta)
+Hub key (random 32 bytes, NOT derived from any identity)
     |
-    +-- Furee dhacdooyinka WebSocket hub-ka waqti-dhabta ah
+    +-- Encrypts real-time WebSocket hub events
     |
-    +-- Duuban via ECIES per xubin iyada oo la isticmaalayo LABEL_HUB_KEY_WRAP
+    +-- ECIES-wrapped per member via LABEL_HUB_KEY_WRAP
     |
-    +-- Beddel marka xubin ka tagto
+    +-- Rotated on member departure
 
-Per-note key (32 bytes random)
+Per-note key (random 32 bytes)
     |
-    +-- Furee macluumaadka xusuusinaha via XChaCha20-Poly1305
+    +-- Encrypts note content via XChaCha20-Poly1305
     |
-    +-- Duuban via ECIES per akhriye (isbitaale + admin kasta)
+    +-- ECIES-wrapped per reader (volunteer + each admin)
     |
-    +-- Marnaba loo isticmaali maayo labo xusuusin
+    +-- Never reused across notes
 ```
 
-## Isgaarsiinta waqti-dhabta ah
+## Real-time communication
 
-Cusbooneysiinta waqti-dhabta ah (calls cusub, fariimaha, isbeddelada shift-ka, diyaar garowga) waxay marayaan WebSocket relay:
+Real-time updates (new calls, messages, shift changes, presence) waxay ku dhacaan through WebSocket relay:
 
-- **Self-hosted**: WebSocket relay relay oo ku shaqeeya app-ka gudaha Docker/Kubernetes
-- **Cloudflare**: Nosflare (relay ku salaysan Cloudflare Workers)
+- **Self-hosted**: WebSocket relay relay running alongside app-ka in Docker/Kubernetes
+- **Cloudflare**: Nosflare (Cloudflare Workers-based relay)
 
-Dhammaan dhacdooyinku waa kuwa dhaca (nooca 20001) oo fureeran iyada oo la isticmaalayo hub key. Dhacdooyinku waxay isticmaalaan tags-ka guud (`["t", "llamenos:event"]`) si relay-ka aanu kala saari karin noocyada dhacdooyinka. Field-ka content waxay ku jirtaa ciphertext XChaCha20-Poly1305.
+Dhammaan events waxay ahaan karaan ephemeral (kind 20001) oo encrypted with hub key. Events waxay isticmaalaan generic tags (`["t", "llamenos:event"]`) sidaas darteed relay ma garto event types. Content field waxay ku jirtaa XChaCha20-Poly1305 ciphertext.
 
-### Dhaqanka dhacdooyinka
+### Event flow
 
 ```
-Client A (ficil isbitaale)
+Client A (volunteer action)
     |
-    | Furee macluumaadka dhacdo iyada oo la isticmaalayo hub key
-    | Saxiix sida dhacdo WebSocket (Schnorr)
+    | Encrypt event content with hub key
+    | Sign as WebSocket event (Schnorr)
     v
 WebSocket relay (WebSocket relay / Nosflare)
     |
-    | U gudbi kuwa isdiiwaangeliyay
+    | Broadcast to subscribers
     v
 Client B, C, D...
     |
-    | Xaqiiji saxiixa Schnorr
-    | Furee macluumaadka iyada oo la isticmaalayo hub key
+    | Verify Schnorr signature
+    | Decrypt content with hub key
     v
-Cusbooneysii xaaladda UI-ga goobta
+Update local UI state
 ```
 
-Relay-gu waxay arkaa blobs fureeran iyo saxiixyo sax ah laakiin ma akhriyan karaan macluumaadka dhacdooyinka ama go'aamin ficillada la sameynayo.
+Relay-ga waxay aragtaa encrypted blobs iyo valid signatures laakiin ma akhriyi karaan event content ama determine what actions are being performed.
 
-## Lakabada amniga
+## Security layers
 
-### Lakabada gaadhsiinta
+### Transport layer
 
-- Dhammaan isgaarsiinta client-server iyada oo loo marayo HTTPS (TLS 1.3)
-- Isku xirka WebSocket ilaa WebSocket relay iyada oo loo marayo WSS
-- Content Security Policy (CSP) waxay xaddidayaa isbitaallada script-ka, isku xirka, iyo asxaabta frame
-- Tauri isolation pattern waxay kala saartaa IPC webview-ka
+- Dhammaan client-server communication over HTTPS (TLS 1.3)
+- WebSocket connections to WebSocket relay over WSS
+- Content Security Policy (CSP) xaddidaa script sources, connections, iyo frame ancestors
+- Tauri isolation pattern kala saaraa IPC from webview
 
-### Lakabada codsiga
+### Application layer
 
-- Xaqiijin via keypairs WebSocket (saxiixyada BIP-340 Schnorr)
-- Token-ka xilliga WebAuthn si loo fududeeyo qalab badan
-- Xakamaynta helitaanka ku salaysan door-ka (caller, isbitaale, warbixiye, admin)
-- Dhammaan 25 constants-ka domain separation ee lagu qeexay `crypto-labels.ts` waxay ka hortagayaan weerarada cross-protocol
+- Authentication via WebSocket keypairs (BIP-340 Schnorr signatures)
+- WebAuthn session tokens for multi-device convenience
+- Role-based access control (caller, volunteer, reporter, admin)
+- Dhammaan 25 cryptographic domain separation constants defined in `crypto-labels.ts` ka hortaga cross-protocol attacks
 
-### Fureynta marka la kaydiyo
+### At-rest encryption
 
-- Xusuusinaha call-ka, warbixinnada, fariimaha, iyo qoraallada waxaa loo fureeyaa kahor inta aan la kaydin
-- Furaha sirta ee isbitaallada waxaa loo fureeyaa iyada oo la isticmaalayo furaha laga soo saaro PIN (PBKDF2)
-- Tauri Stronghold waxay bixisaa kaydinta vault-ka fureeran desktop-ka
-- Integrity-ga log-ka baaritaanka waxaa ilaaliya hash chain SHA-256
+- Call notes, reports, messages, iyo transcripts encrypted before storage
+- Volunteer secret keys encrypted with PIN-derived keys (PBKDF2)
+- Tauri Stronghold bixisaa encrypted vault storage on desktop
+- Audit log integrity protected via SHA-256 hash chain
 
-### Xaqiijinta dhismaha
+### Build verification
 
-- Dhismayaal la soo celceli karo via `Dockerfile.build` iyada oo leh `SOURCE_DATE_EPOCH`
-- Magacyada faylasha ee hash-ku salaysan ee hantida frontend
-- `CHECKSUMS.txt` oo la daabacayo GitHub Releases
+- Reproducible builds via `Dockerfile.build` with `SOURCE_DATE_EPOCH`
+- Content-hashed filenames for frontend assets
+- `CHECKSUMS.txt` published with GitHub Releases
 - SLSA provenance attestations
-- Script-ka xaqiijinta: `scripts/verify-build.sh`
+- Verification script: `scripts/verify-build.sh`
 
-## Kala duwanaanshaha platform-yada
+## Platform differences
 
 | Feature | Desktop (Tauri) | Mobile (React Native) | Browser (Cloudflare) |
 |---|---|---|---|
-| Backend crypto | Native Rust (via IPC) | Native Rust (via UniFFI) | WASM (llamenos-core) |
-| Kaydinta furaha | Tauri Stronghold (fureeran) | Secure Enclave / Keystore | Browser localStorage (PIN-fureeran) |
-| Qoraalka | Client-side Whisper (WASM) | Ma heli karo | Client-side Whisper (WASM) |
-| Cusbooneysiinta otomaatig ah | Tauri updater | App Store / Play Store | Otomatig (CF Workers) |
-| Digniinada push | OS-native (Tauri notification) | OS-native (FCM/APNS) | Digniinada browser-ka |
-| Taageerada offline | Xaddidan (waxay u baahan tahay API) | Xaddidan (waxay u baahan tahay API) | Xaddidan (waxay u baahan tahay API) |
+| Crypto backend | Native Rust (via IPC) | Native Rust (via UniFFI) | WASM (llamenos-core) |
+| Key storage | Tauri Stronghold (encrypted) | Secure Enclave / Keystore | Browser localStorage (PIN-encrypted) |
+| Transcription | Client-side Whisper (WASM) | Not available | Client-side Whisper (WASM) |
+| Auto-update | Tauri updater | App Store / Play Store | Automatic (CF Workers) |
+| Push notifications | OS-native (Tauri notification) | OS-native (FCM/APNS) | Browser notifications |
+| Offline support | Limited (needs API) | Limited (needs API) | Limited (needs API) |
