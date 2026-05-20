@@ -490,6 +490,7 @@
     "statusCancelled": "Cancelled",
     "statusDraft": "Draft",
     "statusScheduled": "Scheduled",
+    "statusSending": "Sending",
     "statusSent": "Sent"
   },
   "blasts": {
