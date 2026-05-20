@@ -77,13 +77,16 @@
             </intent-filter>
         </activity>
 
-        <service
+        <receiver
             android:name=".service.PushService"
-            android:exported="false">
+            android:exported="true">
             <intent-filter>
-                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+                <action android:name="org.unifiedpush.android.connector.MESSAGE" />
+                <action android:name="org.unifiedpush.android.connector.UNREGISTERED" />
+                <action android:name="org.unifiedpush.android.connector.NEW_ENDPOINT" />
+                <action android:name="org.unifiedpush.android.connector.REGISTRATION_FAILED" />
             </intent-filter>
-        </service>
+        </receiver>
 
         <service
             android:name="org.linphone.core.tools.service.CoreService"

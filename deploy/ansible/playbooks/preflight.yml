@@ -278,6 +278,26 @@
         success_msg: "bridge_secret: [set, {{ bridge_secret | length }} chars]"
       when: llamenos_asterisk_enabled | default(false) | bool
 
+    - name: Assert ntfy_auth_token is set when ntfy is enabled
+      ansible.builtin.assert:
+        that:
+          - ntfy_auth_token is defined
+          - ntfy_auth_token | length > 0
+        fail_msg: |
+          REQUIRED: 'ntfy_auth_token' must be set when ntfy push relay is enabled.
+
+          Current value: {{ ntfy_auth_token | default('NOT SET') }}
+
+          To generate:
+            openssl rand -hex 32
+        success_msg: "ntfy_auth_token: [set, {{ ntfy_auth_token | length }} chars]"
+      when: llamenos_ntfy_enabled | default(false) | bool
+
+    - name: Warn if ntfy is not enabled
+      ansible.builtin.debug:
+        msg: "Note: ntfy push relay not enabled (Android push notifications via UnifiedPush disabled)"
+      when: not (llamenos_ntfy_enabled | default(false) | bool)
+
     - name: Warn if bridge_secret is not set but Asterisk is disabled
       ansible.builtin.debug:
         msg: "Note: bridge_secret not set (Asterisk is disabled, so this is OK)"

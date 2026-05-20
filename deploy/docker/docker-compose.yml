@@ -64,6 +64,9 @@ services:
       # Signal notification sidecar (profile: signal)
       - NOTIFIER_URL=${NOTIFIER_URL:-http://signal-notifier:3100}
       - NOTIFIER_API_KEY=${NOTIFIER_API_KEY:-}
+      # ntfy/UnifiedPush relay (profile: push)
+      - NTFY_URL=${NTFY_URL:-http://ntfy:80}
+      - NTFY_AUTH_TOKEN=${NTFY_AUTH_TOKEN:-}
     networks:
       - web
       - internal
@@ -141,6 +144,31 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
+
+  # ── Optional: ntfy push relay (UnifiedPush for Android) ───
+  ntfy:
+    image: binwiederhier/ntfy:v2.11.0@sha256:ce845e0f0e7eba0f75e553ed4b3c550e74c1e3ab0e89b21b89b85a7d2b67cd42
+    profiles: ["push"]
+    restart: unless-stopped
+    command: serve
+    environment:
+      - NTFY_BASE_URL=https://${NTFY_DOMAIN:-ntfy.localhost}
+      - NTFY_AUTH_DEFAULT_ACCESS=deny-all
+      - NTFY_BEHIND_PROXY=true
+      - NTFY_ENABLE_SIGNUP=false
+      - NTFY_ENABLE_LOGIN=false
+      # Bearer token for server→ntfy auth (must match NTFY_AUTH_TOKEN in app env)
+      - NTFY_AUTH_FILE=/var/lib/ntfy/auth.db
+    volumes:
+      - ntfy-data:/var/lib/ntfy
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--tries=1", "http://localhost:80/v1/health", "-O", "-"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
       start_period: 10s
 
   # ── Optional: Whisper Transcription ───────────────────────
@@ -374,6 +402,7 @@ volumes:
   caddy-config:
   rustfs-data:
   signal-data:
+  ntfy-data:
 
 networks:
   web:

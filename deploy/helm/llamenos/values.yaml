@@ -82,6 +82,23 @@ sipBridge:
   # REQUIRED: set a strong random secret
   bridgeSecret: ""
 
+# ntfy push relay (UnifiedPush for Android)
+ntfy:
+  enabled: false
+  image:
+    repository: binwiederhier/ntfy
+    tag: "v2.11.0@sha256:ce845e0f0e7eba0f75e553ed4b3c550e74c1e3ab0e89b21b89b85a7d2b67cd42"
+  persistence:
+    size: 1Gi
+    storageClass: ""
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 128Mi
+
 # Signal CLI messaging bridge
 signal:
   enabled: false

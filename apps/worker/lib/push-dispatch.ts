@@ -1,17 +1,19 @@
 /**
  * Push notification dispatch service (Epic 86).
  *
- * Sends encrypted push notifications to mobile devices via APNs (iOS) and FCM (Android).
- * Two-tier encryption: wake key for lock-screen display, device key for full content.
+ * Sends encrypted push notifications to mobile devices via APNs (iOS) and
+ * ntfy/UnifiedPush (Android). Two-tier encryption: wake key for lock-screen
+ * display, device key for full content.
  *
- * Direct APNs/FCM — no third-party intermediary (Expo Push Service not used).
+ * Android uses self-hosted ntfy (UnifiedPush) — no Google/Firebase dependency.
+ * iOS uses APNs (platform requirement) with wake-only encrypted payloads.
  */
 
 import type { Env, DeviceRecord, WakePayload, FullPushPayload } from '../types'
 import type { IdentityService } from '../services/identity'
 import type { ShiftsService } from '../services/shifts'
 import { encryptWakePayload, encryptFullPayload } from './push-encryption'
-import { FcmClient } from './fcm-client'
+import { NtfyClient } from './ntfy-client'
 
 // ── Test Push Log (dev/test environments only) ────────────────────────────────
 // In-memory store for the last dispatched WakePayload — used by BDD tests to
@@ -78,10 +80,10 @@ export function createPushDispatcherFromService(
   shiftsService: ShiftsService,
 ): PushDispatcher {
   const hasApns = !!(env.APNS_KEY_P8 && env.APNS_KEY_ID && env.APNS_TEAM_ID)
-  const hasFcm = !!env.FCM_SERVICE_ACCOUNT_KEY
+  const hasNtfy = !!env.NTFY_URL
   const isDev = env.ENVIRONMENT === 'development'
 
-  if (!hasApns && !hasFcm) {
+  if (!hasApns && !hasNtfy) {
     // In development, return a logging-only dispatcher so push payloads are recorded
     if (isDev) {
       return new LoggingPushDispatcher(identityService, shiftsService)
@@ -89,7 +91,7 @@ export function createPushDispatcherFromService(
     return new NoopPushDispatcher()
   }
 
-  return new ServicePushDispatcher(env, identityService, shiftsService, hasApns, hasFcm)
+  return new ServicePushDispatcher(env, identityService, shiftsService, hasApns, hasNtfy)
 }
 
 class NoopPushDispatcher implements PushDispatcher {
@@ -129,17 +131,17 @@ class LoggingPushDispatcher implements PushDispatcher {
  * Service-based push dispatcher — uses IdentityService and ShiftsService directly.
  */
 class ServicePushDispatcher implements PushDispatcher {
-  private fcmClient: FcmClient | null = null
+  private ntfyClient: NtfyClient | null = null
 
   constructor(
     private env: Env,
     private identityService: IdentityService,
     private shiftsService: ShiftsService,
     private hasApns: boolean,
-    private hasFcm: boolean,
+    private hasNtfy: boolean,
   ) {
-    if (hasFcm && env.FCM_SERVICE_ACCOUNT_KEY) {
-      this.fcmClient = new FcmClient(env.FCM_SERVICE_ACCOUNT_KEY)
+    if (hasNtfy && env.NTFY_URL) {
+      this.ntfyClient = new NtfyClient(env.NTFY_URL, env.NTFY_AUTH_TOKEN)
     }
   }
 
@@ -187,8 +189,8 @@ class ServicePushDispatcher implements PushDispatcher {
     if (device.platform === 'ios' && this.hasApns) {
       return this.sendApns(device.pushToken, encryptedWake, encryptedFull, wake)
     }
-    if (device.platform === 'android' && this.fcmClient) {
-      return this.sendFcm(device.pushToken, encryptedWake, encryptedFull, wake)
+    if (device.platform === 'android' && this.ntfyClient) {
+      return this.sendNtfy(device.pushToken, encryptedWake, encryptedFull, wake)
     }
     return true
   }
@@ -197,7 +199,7 @@ class ServicePushDispatcher implements PushDispatcher {
     deviceToken: string,
     encryptedWake: string,
     encryptedFull: string,
-    wake: WakePayload,
+    _wake: WakePayload,
   ): Promise<boolean> {
     const { ApnsClient, Notification } = await import(
       '@fivesheepco/cloudflare-apns2'
@@ -210,12 +212,14 @@ class ServicePushDispatcher implements PushDispatcher {
       defaultTopic: APNS_BUNDLE_ID,
     })
 
+    // Wake-only APNs payload: NO plaintext title/body/category.
+    // The encrypted payload contains all notification content.
+    // The app decrypts locally and posts a local notification.
     const notification = new Notification(deviceToken, {
-      alert: { title: notificationTitle(wake), body: notificationBody(wake) },
       badge: 1,
       sound: 'default',
       mutableContent: true,
-      category: notificationCategory(wake),
+      contentAvailable: true,
       data: {
         encrypted: encryptedWake,
         encryptedFull,
@@ -234,69 +238,35 @@ class ServicePushDispatcher implements PushDispatcher {
     }
   }
 
-  private async sendFcm(
-    deviceToken: string,
+  /**
+   * Send encrypted push payload via ntfy (UnifiedPush) to an Android device.
+   *
+   * The device's pushToken is the full UnifiedPush endpoint URL registered
+   * during device setup (e.g. https://ntfy.example.com/up-topic-xxx).
+   * ntfy sees only opaque ciphertext — zero plaintext metadata.
+   */
+  private async sendNtfy(
+    pushEndpoint: string,
     encryptedWake: string,
     encryptedFull: string,
     wake: WakePayload,
   ): Promise<boolean> {
-    if (!this.fcmClient) return true
+    if (!this.ntfyClient) return true
 
-    return this.fcmClient.send({
-      token: deviceToken,
-      data: {
-        encrypted: encryptedWake,
-        encryptedFull,
-        type: wake.type,
-      },
-      channelId: notificationChannel(wake),
-      title: notificationTitle(wake),
-      body: notificationBody(wake),
-      priority: wake.type === 'shift_reminder' ? 'normal' : 'high',
+    // Combine encrypted tiers into a single JSON envelope
+    const payload = JSON.stringify({
+      encrypted: encryptedWake,
+      encryptedFull,
+    })
+
+    return this.ntfyClient.send({
+      endpoint: pushEndpoint,
+      data: payload,
+      priority: wake.type === 'shift_reminder' ? 'default' : 'high',
     })
   }
 }
 
-// --- Notification content helpers (generic, not PII) ---
-
-function notificationTitle(wake: WakePayload): string {
-  switch (wake.type) {
-    case 'message': return 'New Message'
-    case 'voicemail': return 'New Voicemail'
-    case 'shift_reminder': return 'Shift Starting Soon'
-    case 'assignment': return 'Conversation Assigned'
-    default: return 'Notification'
-  }
-}
-
-function notificationBody(wake: WakePayload): string {
-  switch (wake.type) {
-    case 'message': return 'You have a new message in a conversation.'
-    case 'voicemail': return 'A voicemail was left on the hotline.'
-    case 'shift_reminder': return 'Your shift starts in 15 minutes.'
-    case 'assignment': return 'A conversation has been assigned to you.'
-    default: return 'Open the app for details.'
-  }
-}
-
-function notificationCategory(wake: WakePayload): string {
-  switch (wake.type) {
-    case 'message':
-    case 'assignment':
-      return 'message'
-    case 'voicemail': return 'voicemail'
-    case 'shift_reminder': return 'shift'
-    default: return 'default'
-  }
-}
-
-function notificationChannel(wake: WakePayload): string {
-  switch (wake.type) {
-    case 'message':
-    case 'assignment':
-      return 'messages'
-    case 'voicemail': return 'voicemail'
-    case 'shift_reminder': return 'shifts'
-    default: return 'messages'
-  }
-}
+// Notification content helpers removed — all push payloads are encrypted.
+// The app decrypts locally and generates notification content from the
+// wake-tier payload (title, body, category) on the device.
