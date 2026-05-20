@@ -10,6 +10,8 @@
  * Memory budget: ~96MB peak (WASM + model + ring buffer + in-flight chunk).
  */
 
+import i18next from 'i18next'
+
 export type TranscriptionModel = 'tiny' | 'tiny.en' | 'base' | 'base.en'
 
 export type TranscriptionStatus =
@@ -124,7 +126,7 @@ export class TranscriptionManager {
       this.setStatus('ready')
     } catch (error) {
       this.setStatus('error')
-      this.options.onError?.(error instanceof Error ? error.message : 'Initialization failed')
+      this.options.onError?.(error instanceof Error ? error.message : i18next.t('transcription.initializationFailed'))
       throw error
     }
   }
@@ -182,7 +184,7 @@ export class TranscriptionManager {
       this.setStatus('capturing')
     } catch (error) {
       this.setStatus('error')
-      this.options.onError?.(error instanceof Error ? error.message : 'Microphone access denied')
+      this.options.onError?.(error instanceof Error ? error.message : i18next.t('transcription.microphoneAccessDenied'))
       throw error
     }
   }

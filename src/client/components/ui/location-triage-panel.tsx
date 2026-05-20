@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { LocationField } from '@/components/ui/location-field'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -25,6 +26,7 @@ interface LocationTriagePanelProps {
 }
 
 export function LocationTriagePanel({ messageText, onConfirm, onCancel }: LocationTriagePanelProps) {
+  const { t } = useTranslation()
   const hint = extractLocationHint(messageText)
   const [location, setLocation] = useState<LocationFieldValue | null>(
     hint ? { address: hint } : null,
@@ -33,10 +35,10 @@ export function LocationTriagePanel({ messageText, onConfirm, onCancel }: Locati
   return (
     <Card className="w-full">
       <CardHeader>
-        <CardTitle className="text-sm">Add Location</CardTitle>
+        <CardTitle className="text-sm">{t('location.addLocation')}</CardTitle>
         {hint && (
           <p className="text-xs text-muted-foreground">
-            Detected: <span className="font-medium">{hint}</span>
+            {t('location.detected')} <span className="font-medium">{hint}</span>
           </p>
         )}
       </CardHeader>
@@ -44,12 +46,12 @@ export function LocationTriagePanel({ messageText, onConfirm, onCancel }: Locati
         <LocationField
           value={location}
           onChange={setLocation}
-          placeholder={hint ?? 'Search for an address…'}
+          placeholder={hint ?? t('location.searchPlaceholder')}
         />
         <div className="flex justify-end gap-2">
-          <Button variant="ghost" size="sm" onClick={onCancel}>Cancel</Button>
+          <Button variant="ghost" size="sm" onClick={onCancel}>{t('common.cancel')}</Button>
           <Button size="sm" disabled={!location} onClick={() => location && onConfirm(location)}>
-            Confirm Location
+            {t('location.confirmLocation')}
           </Button>
         </div>
       </CardContent>

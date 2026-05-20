@@ -120,7 +120,7 @@ export function SystemHealthPage() {
           <button
             onClick={refresh}
             className="rounded-md p-1.5 hover:bg-accent"
-            aria-label="Refresh"
+            aria-label={t('actionRefresh')}
           >
             <RefreshCw className="h-4 w-4" />
           </button>
@@ -164,7 +164,7 @@ export function SystemHealthPage() {
             />
           ))}
           {(!health?.services || health.services.length === 0) && (
-            <StatusRow label="Services" value="No data" />
+            <StatusRow label={t('admin.system.services')} value={t('admin.system.noData')} />
           )}
         </StatusCard>
 

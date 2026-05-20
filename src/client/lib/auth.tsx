@@ -1,11 +1,10 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   deviceImportAndLoad,
   isValidSeedHex,
   persistAndUnlockDeviceKeys,
-  lockCrypto,
   createAuthToken,
-  hasStoredKey,
 } from './platform'
 import * as keyManager from './key-manager'
 import { getMe, login, logout as apiLogout, updateMyAvailability, setOnAuthExpired, setOnApiActivity } from './api'
@@ -61,6 +60,7 @@ interface AuthContextValue extends AuthState {
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const { t } = useTranslation()
   const [state, setState] = useState<AuthState>({
     isKeyUnlocked: false,
     publicKey: null,
@@ -238,7 +238,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = useCallback(async (seedHex: string, pin: string) => {
     setState(s => ({ ...s, isLoading: true, error: null }))
     if (!isValidSeedHex(seedHex)) {
-      setState(s => ({ ...s, isLoading: false, error: 'Invalid secret key' }))
+      setState(s => ({ ...s, isLoading: false, error: t('auth.invalidKey') }))
       return
     }
     try {
@@ -283,7 +283,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setState(s => ({
         ...s,
         isLoading: false,
-        error: err instanceof Error ? err.message : 'Login failed',
+        error: err instanceof Error ? err.message : t('auth.loginFailed'),
       }))
     }
   }, [])
@@ -330,7 +330,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setState(s => ({
         ...s,
         isLoading: false,
-        error: err instanceof Error ? err.message : 'Login failed',
+        error: err instanceof Error ? err.message : t('auth.loginFailed'),
       }))
     }
   }, [])
@@ -418,7 +418,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setState(s => ({
         ...s,
         isLoading: false,
-        error: err instanceof Error ? err.message : 'Passkey login failed',
+        error: err instanceof Error ? err.message : t('auth.passkeyLoginFailed'),
       }))
     }
   }, [])
@@ -497,7 +497,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setState(s => ({ ...s, onBreak: newValue }))
     } catch {
       // ignore — toast handled by caller
-      throw new Error('Failed to update availability')
+      throw new Error(t('auth.failedUpdateAvailability'))
     }
   }, [state.onBreak])
 
