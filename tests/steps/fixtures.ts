@@ -39,6 +39,16 @@ export type CasesWorld = {
   triageReportId: string
 }
 
+export type SasWorld = {
+  ephemeralSecret?: Uint8Array
+  ephemeralPubkey?: string
+  primarySecret?: Uint8Array
+  primaryPubkey?: string
+  sasCode?: string
+  encryptedNsec?: string
+  mockNsec?: string
+}
+
 /**
  * Extended test fixture that monitors API responses and page errors.
  * Catches buried 401/403/500 errors and unhandled JS exceptions that
@@ -55,6 +65,7 @@ export const test = base.extend<
     adminWorld: AdminWorld
     rolesWorld: RolesWorld
     casesWorld: CasesWorld
+    sasWorld: SasWorld
   },
   {
     workerHub: string
@@ -130,6 +141,9 @@ export const test = base.extend<
       contactCarlosId: '', contactMariaId: '', contactWithDataId: '',
       triageReportTypeId: '', triageReportId: '',
     })
+  },
+  sasWorld: async ({}, use) => {
+    await use({})
   },
   // Worker-scoped hub: created once per Playwright worker process.
   // Each worker gets its own isolated hub so parallel tests don't share state.
