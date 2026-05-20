@@ -204,10 +204,12 @@ class RecoveryGroupTest {
         rotatedAt = null,
         shareHolderLiveness = listOf(
             ShareHolderLiveness(
+                createdAt = "2026-01-01T00:00:00Z",
                 holderPubkey = "holder1pubkey0011223344",
                 lastLivenessProof = "2026-01-10T00:00:00Z",
             ),
             ShareHolderLiveness(
+                createdAt = "2026-01-05T00:00:00Z",
                 holderPubkey = "holder2pubkey5566778899",
                 lastLivenessProof = null,
             ),
