@@ -7,11 +7,9 @@ import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import dagger.hilt.android.AndroidEntryPoint
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import org.llamenos.hotline.R
 import org.llamenos.hotline.crypto.CryptoService
@@ -19,7 +17,10 @@ import org.llamenos.hotline.crypto.KeystoreService
 import org.llamenos.hotline.crypto.WakeKeyService
 import org.llamenos.hotline.hub.ActiveHubState
 import org.llamenos.hotline.telephony.LinphoneService
+import org.unifiedpush.android.connector.FailedReason
 import org.unifiedpush.android.connector.MessagingReceiver
+import org.unifiedpush.android.connector.data.PushEndpoint
+import org.unifiedpush.android.connector.data.PushMessage
 import javax.inject.Inject
 
 /**
@@ -76,9 +77,9 @@ class PushService : MessagingReceiver() {
      * The endpoint URL is stored locally and sent to the llamenos backend
      * so the server can target this device for push delivery via ntfy.
      */
-    override fun onNewEndpoint(context: Context, endpoint: String, instance: String) {
-        Log.d(TAG, "UnifiedPush endpoint registered: ${endpoint.take(40)}...")
-        keystoreService.store(KEY_PUSH_ENDPOINT, endpoint)
+    override fun onNewEndpoint(context: Context, endpoint: PushEndpoint, instance: String) {
+        Log.d(TAG, "UnifiedPush endpoint registered: ${endpoint.url.take(40)}...")
+        keystoreService.store(KEY_PUSH_ENDPOINT, endpoint.url)
 
         // Ensure a wake key exists for push encryption
         wakeKeyService.getOrCreateWakePublicKey()
@@ -112,8 +113,8 @@ class PushService : MessagingReceiver() {
      * - `call-id`: Call identifier
      * - `hub-id`: Hub identifier
      */
-    override fun onMessage(context: Context, message: ByteArray, instance: String) {
-        val messageStr = message.decodeToString()
+    override fun onMessage(context: Context, message: PushMessage, instance: String) {
+        val messageStr = message.content.decodeToString()
         Log.d(TAG, "UnifiedPush message received: ${messageStr.take(40)}...")
 
         // Try to parse as JSON envelope
@@ -128,23 +129,23 @@ class PushService : MessagingReceiver() {
 
         // Handle VoIP push (minimal unencrypted payload for call wakeup)
         if (type == "incoming_call") {
-            handleVoipPush(data)
+            handleVoipPush(context, data)
             return
         }
 
         // Handle encrypted push payload (wake + full tiers)
-        handleEncryptedPush(data)
+        handleEncryptedPush(context, data)
     }
 
-    override fun onRegistrationFailed(context: Context, instance: String) {
-        Log.e(TAG, "UnifiedPush registration failed")
+    override fun onRegistrationFailed(context: Context, reason: FailedReason, instance: String) {
+        Log.e(TAG, "UnifiedPush registration failed: $reason")
     }
 
     /**
      * Handle VoIP push — minimal payload for incoming call wakeup.
      * No PII in payload; the app fetches details from the server.
      */
-    private fun handleVoipPush(data: Map<String, String>) {
+    private fun handleVoipPush(context: Context, data: Map<String, String>) {
         val callId = data["call-id"] ?: ""
         val hubId = data["hub-id"] ?: ""
 
@@ -157,6 +158,7 @@ class PushService : MessagingReceiver() {
         // Hub context switch happens in LinphoneService.onCallStateChanged
 
         ensureNotificationChannel(
+            context,
             CHANNEL_CALLS,
             context.getString(R.string.notification_channel_calls),
             NotificationManager.IMPORTANCE_HIGH,
@@ -179,7 +181,7 @@ class PushService : MessagingReceiver() {
     /**
      * Handle encrypted push payload with wake + full tiers.
      */
-    private fun handleEncryptedPush(data: Map<String, String>) {
+    private fun handleEncryptedPush(context: Context, data: Map<String, String>) {
         // Try wake-tier decryption first (available without PIN unlock)
         val wakeEnvelope = data["encrypted"]
         if (wakeEnvelope != null) {
@@ -195,7 +197,7 @@ class PushService : MessagingReceiver() {
                     )
                     // Use wake payload for notification content when app is locked
                     if (!cryptoService.isUnlocked) {
-                        showNotificationFromWakePayload(wakePayload.type, wakePayload.message)
+                        showNotificationFromWakePayload(context, wakePayload.type, wakePayload.message)
                     }
                 }
             }
@@ -204,19 +206,19 @@ class PushService : MessagingReceiver() {
         // If app is unlocked, dispatch with full-tier content
         if (cryptoService.isUnlocked) {
             val type = data["type"] ?: "unknown"
-            dispatchByType(data, type)
+            dispatchByType(context, data, type)
         } else if (wakeEnvelope == null) {
             val type = data["type"] ?: "unknown"
-            dispatchByType(data, type)
+            dispatchByType(context, data, type)
         }
     }
 
-    private fun dispatchByType(data: Map<String, String>, type: String) {
+    private fun dispatchByType(context: Context, data: Map<String, String>, type: String) {
         when (type) {
-            "incoming_call" -> handleIncomingCall(data)
-            "call_ended" -> handleCallEnded()
-            "shift_reminder" -> handleShiftReminder(data)
-            "announcement" -> handleAnnouncement(data)
+            "incoming_call" -> handleIncomingCall(context, data)
+            "call_ended" -> handleCallEnded(context)
+            "shift_reminder" -> handleShiftReminder(context, data)
+            "announcement" -> handleAnnouncement(context, data)
             else -> Log.d(TAG, "Unknown message type: $type")
         }
     }
@@ -225,10 +227,11 @@ class PushService : MessagingReceiver() {
      * Show a notification using wake-tier decrypted content.
      * Used when the app is locked and full-tier decryption is unavailable.
      */
-    private fun showNotificationFromWakePayload(type: String, message: String?) {
+    private fun showNotificationFromWakePayload(context: Context, type: String, message: String?) {
         when (type) {
             "incoming_call" -> {
                 ensureNotificationChannel(
+                    context,
                     CHANNEL_CALLS,
                     context.getString(R.string.notification_channel_calls),
                     NotificationManager.IMPORTANCE_HIGH,
@@ -249,6 +252,7 @@ class PushService : MessagingReceiver() {
 
             "shift_reminder" -> {
                 ensureNotificationChannel(
+                    context,
                     CHANNEL_SHIFTS,
                     context.getString(R.string.notification_channel_shifts),
                     NotificationManager.IMPORTANCE_DEFAULT,
@@ -267,6 +271,7 @@ class PushService : MessagingReceiver() {
 
             else -> {
                 ensureNotificationChannel(
+                    context,
                     CHANNEL_GENERAL,
                     context.getString(R.string.notification_channel_general),
                     NotificationManager.IMPORTANCE_DEFAULT,
@@ -285,7 +290,7 @@ class PushService : MessagingReceiver() {
         }
     }
 
-    private fun handleIncomingCall(data: Map<String, String>) {
+    private fun handleIncomingCall(context: Context, data: Map<String, String>) {
         Log.d(TAG, "Incoming call notification received")
 
         val callId = data["call-id"] ?: ""
@@ -296,6 +301,7 @@ class PushService : MessagingReceiver() {
         // Multi-hub axiom: do NOT call setActiveHub here.
 
         ensureNotificationChannel(
+            context,
             CHANNEL_CALLS,
             context.getString(R.string.notification_channel_calls),
             NotificationManager.IMPORTANCE_HIGH,
@@ -315,15 +321,16 @@ class PushService : MessagingReceiver() {
         notificationManager.notify(NOTIFICATION_ID_CALL, notification)
     }
 
-    private fun handleCallEnded() {
+    private fun handleCallEnded(context: Context) {
         Log.d(TAG, "Call ended notification received")
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.cancel(NOTIFICATION_ID_CALL)
     }
 
-    private fun handleShiftReminder(data: Map<String, String>) {
+    private fun handleShiftReminder(context: Context, data: Map<String, String>) {
         Log.d(TAG, "Shift reminder notification received")
         ensureNotificationChannel(
+            context,
             CHANNEL_SHIFTS,
             context.getString(R.string.notification_channel_shifts),
             NotificationManager.IMPORTANCE_DEFAULT,
@@ -341,9 +348,10 @@ class PushService : MessagingReceiver() {
         notificationManager.notify(NOTIFICATION_ID_SHIFT, notification)
     }
 
-    private fun handleAnnouncement(data: Map<String, String>) {
+    private fun handleAnnouncement(context: Context, data: Map<String, String>) {
         Log.d(TAG, "Announcement notification received")
         ensureNotificationChannel(
+            context,
             CHANNEL_GENERAL,
             context.getString(R.string.notification_channel_general),
             NotificationManager.IMPORTANCE_DEFAULT,
@@ -362,6 +370,7 @@ class PushService : MessagingReceiver() {
     }
 
     private fun ensureNotificationChannel(
+        context: Context,
         channelId: String,
         channelName: String,
         importance: Int,
@@ -380,11 +389,9 @@ class PushService : MessagingReceiver() {
      */
     private fun parseJsonPayload(json: String): Map<String, String> {
         val result = mutableMapOf<String, String>()
-        // Simple JSON parsing without external dependency
         val trimmed = json.trim()
         if (!trimmed.startsWith("{")) return result
 
-        // Use kotlinx.serialization for reliable parsing
         try {
             val map = kotlinx.serialization.json.Json.decodeFromString<Map<String, kotlinx.serialization.json.JsonElement>>(trimmed)
             for ((key, value) in map) {

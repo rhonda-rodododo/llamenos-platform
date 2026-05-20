@@ -183,7 +183,12 @@ dependencies {
     implementation(libs.security.crypto)
     implementation(libs.androidx.biometric)
 
-    implementation(libs.unifiedpush)
+    implementation(libs.unifiedpush) {
+        // UnifiedPush v3 depends on com.google.crypto.tink:tink which conflicts
+        // with tink-android pulled by security-crypto. Exclude the JVM variant;
+        // tink-android satisfies the same API on Android.
+        exclude(group = "com.google.crypto.tink", module = "tink")
+    }
 
     // CameraX for QR code scanning (device linking)
     implementation(libs.camerax.core)
