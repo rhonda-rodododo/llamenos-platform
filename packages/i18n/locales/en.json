@@ -1092,6 +1092,9 @@
     "interactionStatus": "Status change",
     "interactionUpload": "Upload",
     "loadError": "Failed to load cases",
+    "error": {
+      "noKey": "Encryption key not available"
+    },
     "loadTypesError": "Failed to load entity types",
     "metadata": "Record Info",
     "new": "New Case",
@@ -3096,7 +3099,12 @@
     "detailMessages": "Messages",
     "detailTitle": "Report",
     "detailUpdated": "Updated",
+    "fileAccessDenied": "Cannot access this file",
     "fileComingSoon": "Coming soon",
+    "fileE2ee": "Files are encrypted before upload",
+    "fileEncrypting": "Encrypting...",
+    "fileSelect": "Select file...",
+    "fileUploaded": "Encrypted & uploaded",
     "filterAll": "All",
     "filterAllTypes": "All Types",
     "statusActive": "Active",
