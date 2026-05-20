@@ -34,6 +34,9 @@ typealias ChannelConfigClass = SharedChannelConfig
 /// `DeviceDetailListResponseDevice` → `SharedDevice` (deduplicated device inner type).
 typealias DeviceDetailListResponseDevice = SharedDevice
 
+/// `ProviderType` → `SharedProviderType` (deduplicated across telephony schemas).
+typealias ProviderType = SharedProviderType
+
 // MARK: - NotePayload
 
 /// Decrypted note content matching the protocol spec (Appendix B).

@@ -28,7 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.llamenos.hotline.R
 import org.llamenos.hotline.model.EntityTypeDefinition
-import org.llamenos.protocol.EntityTypeDefinitionStatus
+import org.llamenos.hotline.model.EntityTypeDefinitionStatus
 
 /**
  * Quick status change bottom sheet.

@@ -52,7 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.LaunchedEffect
 import org.llamenos.hotline.R
 import org.llamenos.hotline.model.EntityTypeDefinition
-import org.llamenos.protocol.EntityTypeDefinitionStatus
+import org.llamenos.hotline.model.EntityTypeDefinitionStatus
 import org.llamenos.protocol.Record
 import org.llamenos.hotline.util.DateFormatUtils
 

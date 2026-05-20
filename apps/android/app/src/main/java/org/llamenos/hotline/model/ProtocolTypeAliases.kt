@@ -12,7 +12,10 @@ import org.llamenos.protocol.SharedCall
 import org.llamenos.protocol.SharedHub
 import org.llamenos.protocol.SharedNote
 import org.llamenos.protocol.SharedStatus
-import org.llamenos.protocol.SharedStatus7
+import org.llamenos.protocol.SharedHubDetailResponseStatus
+import org.llamenos.protocol.SharedProviderType
+import org.llamenos.protocol.SharedActiveCallResponseStatus
+import org.llamenos.protocol.SharedCustomFieldDefinitionType
 import org.llamenos.protocol.SharedAdminEnvelope
 import org.llamenos.protocol.SharedAuthorEnvelope
 import org.llamenos.protocol.SharedChannelConfig
@@ -27,8 +30,8 @@ import org.llamenos.protocol.SharedType
 typealias ActiveCallsResponseCall = SharedCall
 typealias CallHistoryResponseCall = SharedCall
 
-// Status enums — ActiveCallResponse.status deduplicated to SharedStatus
-typealias ActiveCallResponseStatus = SharedStatus
+// Status enums — ActiveCallResponse.status now has its own stable name
+typealias ActiveCallResponseStatus = SharedActiveCallResponseStatus
 
 // Envelope types — all admin/author/reader envelopes with same shape deduplicated
 typealias HubKeyEnvelopeResponseEnvelope = SharedAdminEnvelope
@@ -55,11 +58,22 @@ typealias DeviceDetailListResponseDevice = SharedDevice
 // Hub list inner type — HubListResponse.hubs[] deduplicated to SharedHub
 typealias HubListResponseHub = SharedHub
 
-// Hub status enum — HubResponse.status and SharedHub.status use SharedStatus7
-typealias HubStatus = SharedStatus7
+// Hub status enum — HubResponse.status and SharedHub.status use SharedHubDetailResponseStatus
+typealias HubStatus = SharedHubDetailResponseStatus
+
+// Provider type enum — deduplicated across telephony schemas
+typealias ProviderType = SharedProviderType
+
+// Custom field definition type enum — deduplicated across custom field schemas
+typealias CustomFieldDefinitionType = SharedCustomFieldDefinitionType
+
 
 // Message envelope — SendMessageBody.readerEnvelopes deduplicated to SharedAdminEnvelope
 typealias SendMessageBodyReaderEnvelope = SharedAdminEnvelope
 
+// Entity type definition status struct — EntityTypeDefinition.statuses[] deduplicated to SharedStatus
+typealias EntityTypeDefinitionStatus = SharedStatus
+
 // Note reply — NoteRepliesResponse.replies deduplicated to SharedNote
 typealias Reply = SharedNote
+typealias Note = SharedNote

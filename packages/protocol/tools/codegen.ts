@@ -88,18 +88,39 @@ function canonicalize(obj: unknown): string {
 }
 
 /**
+ * Singularize a PascalCase noun for array-item naming.
+ * Handles common English plural patterns found in our schemas.
+ */
+function singularize(name: string): string {
+  // Deliveries → Delivery, Categories → Category
+  if (name.endsWith('ies') && name.length > 3) {
+    return name.slice(0, -3) + 'y'
+  }
+  // Statuses → Status, Indexes → Index, Addresses → Address
+  if (name.endsWith('es') && name.length > 2) {
+    const stem = name.slice(0, -2)
+    if (/[sxz]$/i.test(stem) || /sh$/i.test(stem) || /ch$/i.test(stem)) {
+      return stem
+    }
+  }
+  // Envelopes → Envelope, Members → Member (but not "ss" words like Addresses)
+  if (name.endsWith('s') && !name.endsWith('ss') && name.length > 1) {
+    return name.slice(0, -1)
+  }
+  return name
+}
+
+/**
  * Derive a PascalCase $def name from the property path leading to the inline object.
  * e.g. "adminEnvelopes" → "AdminEnvelope" (strip trailing 's' for arrays),
- *      "locationOptions" → "LocationOptions"
+ *      "providerType" → "ProviderType"
+ *
+ * Prefixed with "Shared" to avoid conflicts with Swift/Kotlin built-in types
+ * (Error, Group, Location, etc.) and to signal these are extracted sub-schemas.
  */
 function defNameFromPath(propertyName: string, isArrayItem: boolean): string {
   let name = propertyName.charAt(0).toUpperCase() + propertyName.slice(1)
-  // If this is an array items schema, singularize the name
-  if (isArrayItem && name.endsWith('s') && !name.endsWith('ss')) {
-    name = name.slice(0, -1)
-  }
-  // Prefix with "Shared" to avoid conflicts with quicktype reserved names
-  // and to make it clear these are extracted sub-schemas
+  if (isArrayItem) name = singularize(name)
   return 'Shared' + name
 }
 
@@ -217,12 +238,28 @@ function deduplicateAnonymousSchemas(
   const usedDefNames = new Set(existingNames)
 
   for (const [, refs] of sortedGroups) {
+    // Sort refs by parent schema name for deterministic naming on collision
+    const sortedRefs = [...refs].sort((a, b) =>
+      schemas[a.schemaIdx].name.localeCompare(schemas[b.schemaIdx].name),
+    )
 
-    let baseName = defNameFromPath(refs[0].propertyName, refs[0].isArrayItem)
+    const baseName = defNameFromPath(sortedRefs[0].propertyName, sortedRefs[0].isArrayItem)
     let defName = baseName
-    let suffix = 2
-    while (usedDefNames.has(defName)) {
-      defName = baseName + suffix++
+
+    if (usedDefNames.has(defName)) {
+      // Disambiguate using parent schema name: SharedStatus → SharedActiveCallResponseStatus
+      // Try each parent (alphabetically) until we find a unique name
+      for (const ref of sortedRefs) {
+        const parentName = schemas[ref.schemaIdx].name
+        const propPart = baseName.replace(/^Shared/, '')
+        defName = 'Shared' + parentName + propPart
+        if (!usedDefNames.has(defName)) break
+      }
+      // Last resort: numeric suffix (should be rare)
+      let suffix = 2
+      while (usedDefNames.has(defName)) {
+        defName = baseName + suffix++
+      }
     }
     usedDefNames.add(defName)
 

@@ -3,7 +3,7 @@ import Foundation
 // MARK: - Hub types (from protocol codegen)
 // The protocol codegen generates:
 //   - `Hub` (simple: id, name, slug, status as String) — used in ConfigResponse.hubs
-//   - `SharedHub` (full: all fields including description, phoneNumber, dates, SharedStatus7)
+//   - `SharedHub` (full: all fields including description, phoneNumber, dates, SharedHubDetailResponseStatus)
 //   - `HubResponse` (same shape as SharedHub, used by single-hub endpoints)
 //   - `HubListResponse` with `hubs: [SharedHub]`
 //   - `HubDetailResponse` with `hub: SharedHub`
@@ -19,9 +19,9 @@ extension SharedHub: Equatable {
 
 // MARK: - HubStatus display extensions
 
-typealias HubStatus = SharedStatus7
+typealias HubStatus = SharedHubDetailResponseStatus
 
-extension SharedStatus7 {
+extension SharedHubDetailResponseStatus {
     var displayName: String {
         switch self {
         case .active:
