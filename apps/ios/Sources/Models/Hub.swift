@@ -1,21 +1,27 @@
 import Foundation
 
-// MARK: - Hub (from protocol codegen)
-// `HubResponse` is generated from packages/protocol/generated/swift/Types.swift.
-// We typealias it as `Hub` for convenience throughout the iOS app.
+// MARK: - Hub types (from protocol codegen)
+// The protocol codegen generates:
+//   - `Hub` (simple: id, name, slug, status as String) — used in ConfigResponse.hubs
+//   - `SharedHub` (full: all fields including description, phoneNumber, dates, SharedStatus7)
+//   - `HubResponse` (same shape as SharedHub, used by single-hub endpoints)
+//   - `HubListResponse` with `hubs: [SharedHub]`
+//   - `HubDetailResponse` with `hub: SharedHub`
+//
+// The iOS app uses SharedHub as its primary hub type since it needs the full fields.
 
-typealias Hub = HubResponse
-
-extension HubResponse: Identifiable {}
-extension HubResponse: Equatable {
-    public static func == (lhs: HubResponse, rhs: HubResponse) -> Bool {
+extension SharedHub: Identifiable {}
+extension SharedHub: Equatable {
+    public static func == (lhs: SharedHub, rhs: SharedHub) -> Bool {
         lhs.id == rhs.id
     }
 }
 
 // MARK: - HubStatus display extensions
 
-extension HubStatus {
+typealias HubStatus = SharedStatus7
+
+extension SharedStatus7 {
     var displayName: String {
         switch self {
         case .active:
@@ -39,14 +45,12 @@ extension HubStatus {
 // MARK: - API Responses
 
 /// API response wrapper for the hubs list.
-/// Uses `Hub` (= `HubResponse`) for each hub entry.
-struct HubsListResponse: Codable, Sendable {
-    let hubs: [Hub]
-}
+/// Uses the generated `HubListResponse` directly — `hubs: [SharedHub]`.
+typealias HubsListResponse = HubListResponse
 
-struct AppHubResponse: Codable, Sendable {
-    let hub: Hub
-}
+/// API response wrapper for a single hub (e.g. POST /api/hubs).
+/// Uses the generated `HubDetailResponse` — `hub: SharedHub`.
+typealias AppHubResponse = HubDetailResponse
 
 // MARK: - Request Bodies
 

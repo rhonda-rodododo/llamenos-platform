@@ -48,7 +48,7 @@ import org.llamenos.hotline.R
 import org.llamenos.hotline.model.Hub
 import org.llamenos.hotline.ui.components.EmptyState
 import org.llamenos.hotline.util.DateFormatUtils
-import org.llamenos.protocol.HubStatus
+import org.llamenos.hotline.model.HubStatus
 
 /**
  * Hub list screen showing all hubs with status indicators.

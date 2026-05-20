@@ -9,7 +9,7 @@ import kotlinx.serialization.Serializable
  * Uses the generated HubResponse type. Extension properties in Extensions.kt
  * provide statusString (HubStatus enum → String).
  */
-typealias Hub = org.llamenos.protocol.HubListResponseHub
+typealias Hub = org.llamenos.protocol.SharedHub
 
 /**
  * Response from GET /api/hubs.
@@ -23,7 +23,7 @@ typealias HubsListResponse = org.llamenos.protocol.HubListResponse
  */
 @Serializable
 data class CreateHubResponse(
-    val hub: org.llamenos.protocol.HubListResponseHub,
+    val hub: org.llamenos.protocol.SharedHub,
 )
 
 /**
@@ -37,7 +37,7 @@ typealias CreateHubRequest = org.llamenos.protocol.CreateHubBody
  */
 @Serializable
 data class UpdateHubResponse(
-    val hub: org.llamenos.protocol.HubListResponseHub,
+    val hub: org.llamenos.protocol.SharedHub,
 )
 
 /**

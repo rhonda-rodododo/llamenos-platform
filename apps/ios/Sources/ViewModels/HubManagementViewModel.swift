@@ -13,7 +13,7 @@ final class HubManagementViewModel {
 
     // MARK: - State
 
-    var hubs: [Hub] = []
+    var hubs: [SharedHub] = []
     var isLoading: Bool = false
     var isSaving: Bool = false
     var isSwitching: Bool = false
@@ -67,7 +67,7 @@ final class HubManagementViewModel {
 
     /// Pre-fetch and cache hub keys for all hubs in the background.
     /// Runs fetches in parallel; individual failures are logged and skipped.
-    func eagerLoadHubKeys(for hubs: [Hub]) async {
+    func eagerLoadHubKeys(for hubs: [SharedHub]) async {
         await withTaskGroup(of: Void.self) { group in
             for hub in hubs {
                 guard !cryptoService.hasHubKey(hubId: hub.id) else { continue }
@@ -95,7 +95,7 @@ final class HubManagementViewModel {
     /// 4. Update HubContext (persists to UserDefaults).
     ///
     /// On any error, HubContext is NOT updated — the active hub remains unchanged.
-    func switchHub(to hub: Hub) async {
+    func switchHub(to hub: SharedHub) async {
         guard hubContext.activeHubId != hub.id else { return }
         isSwitching = true
         error = nil
@@ -114,7 +114,7 @@ final class HubManagementViewModel {
     }
 
     /// Check if a hub is the currently active one. Compares by UUID, not slug.
-    func isActive(_ hub: Hub) -> Bool {
+    func isActive(_ hub: SharedHub) -> Bool {
         hub.id == hubContext.activeHubId
     }
 
