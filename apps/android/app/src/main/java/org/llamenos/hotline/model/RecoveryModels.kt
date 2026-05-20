@@ -16,11 +16,7 @@ data class RecoveryGroupInfo(
     val shareHolderLiveness: List<ShareHolderLiveness>,
 )
 
-@Serializable
-data class ShareHolderLiveness(
-    val holderPubkey: String,
-    val lastLivenessProof: String? = null,
-)
+typealias ShareHolderLiveness = org.llamenos.protocol.ShareHolderLiveness
 
 @Serializable
 data class RecoverySessionStatus(
@@ -38,20 +34,9 @@ data class RecoverySessionStatus(
     val emergencyOverride: RecoveryEmergencyOverride? = null,
 )
 
-@Serializable
-data class RecoveryContribution(
-    val contributorPubkey: String,
-    val encryptedShare: String,
-    val contributorSignature: String,
-    val contributedAt: String,
-)
+typealias RecoveryContribution = org.llamenos.protocol.Contribution
 
-@Serializable
-data class RecoveryEmergencyOverride(
-    val justification: String,
-    val approverPubkey: String,
-    val approverSignature: String,
-)
+typealias RecoveryEmergencyOverride = org.llamenos.protocol.RecoveryEmergencyOverride
 
 @Serializable
 data class RecoveryInitiateRequest(
@@ -60,11 +45,7 @@ data class RecoveryInitiateRequest(
     val newDevicePubkey: String,
 )
 
-@Serializable
-data class RecoveryInitiateResponse(
-    val sessionId: String,
-    val verificationSent: Boolean,
-)
+typealias RecoveryInitiateResponse = org.llamenos.protocol.RecoveryInitiateResponse
 
 @Serializable
 data class RecoveryVerifyRequest(

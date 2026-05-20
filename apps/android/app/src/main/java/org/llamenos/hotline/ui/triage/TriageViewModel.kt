@@ -191,7 +191,7 @@ class TriageViewModel @Inject constructor(
                     body = body,
                 )
                 _uiState.update {
-                    it.copy(isConverting = false, selectedReport = null, lastConvertedRecordId = response.recordId)
+                    it.copy(isConverting = false, selectedReport = null, lastConvertedRecordId = response.recordID)
                 }
                 loadTriageQueue()
             } catch (e: Exception) {

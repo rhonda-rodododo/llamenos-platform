@@ -540,6 +540,32 @@ class CryptoService @Inject constructor() {
         }
     }
 
+    /**
+     * Rotate the Per-User Key to a new generation.
+     *
+     * @param oldSeedHex Hex-encoded seed of the current PUK generation
+     * @param oldGen Current generation number
+     * @param remainingDevicesJson JSON array of remaining authorized devices
+     * @return New PUK state, HPKE envelopes for each device, and CLKR chain link
+     */
+    suspend fun rotatePuk(
+        oldSeedHex: String,
+        oldGen: UInt,
+        remainingDevicesJson: String,
+    ): org.llamenos.core.RotatePukResult = withContext(computeDispatcher) {
+        check(nativeLibLoaded) { "Native crypto library not loaded." }
+        if (!isUnlocked) throw CryptoException("No key loaded")
+        try {
+            org.llamenos.core.mobilePukRotate(
+                oldSeedHex = oldSeedHex,
+                oldGen = oldGen,
+                remainingDevicesJson = remainingDevicesJson,
+            )
+        } catch (e: org.llamenos.core.CryptoException) {
+            throw CryptoException("PUK rotation failed: ${e.message}", e)
+        }
+    }
+
     // ---- Sigchain Operations ----
 
     /** Create a new sigchain link signed by this device. */
@@ -562,6 +588,36 @@ class CryptoService @Inject constructor() {
             )
         } catch (e: org.llamenos.core.CryptoException) {
             throw CryptoException("Sigchain link creation failed: ${e.message}", e)
+        }
+    }
+
+    /** Verify a single sigchain link signature against the expected signer pubkey. */
+    suspend fun verifySigchainLink(
+        linkJson: String,
+        expectedSignerPubkey: String,
+    ): Boolean = withContext(computeDispatcher) {
+        check(nativeLibLoaded) { "Native crypto library not loaded." }
+        try {
+            org.llamenos.core.mobileSigchainVerifyLink(
+                linkJson = linkJson,
+                expectedSignerPubkey = expectedSignerPubkey,
+            )
+        } catch (e: org.llamenos.core.CryptoException) {
+            throw CryptoException("Sigchain link verification failed: ${e.message}", e)
+        }
+    }
+
+    /** Verify an entire sigchain and return the verified state. */
+    suspend fun verifySigchain(
+        linksJson: String,
+    ): org.llamenos.core.SigchainVerifiedState = withContext(computeDispatcher) {
+        check(nativeLibLoaded) { "Native crypto library not loaded." }
+        try {
+            org.llamenos.core.mobileSigchainVerify(
+                linksJson = linksJson,
+            )
+        } catch (e: org.llamenos.core.CryptoException) {
+            throw CryptoException("Sigchain verification failed: ${e.message}", e)
         }
     }
 

@@ -39,7 +39,7 @@ fun SessionListScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Icon(Icons.Default.Key, contentDescription = stringResource(R.string.a11y_session))
+                    Icon(Icons.Default.Key, contentDescription = stringResource(R.string.a11y_session_icon))
                     Column(modifier = Modifier.weight(1f)) {
                         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(
