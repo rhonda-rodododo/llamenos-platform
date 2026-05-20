@@ -168,18 +168,24 @@ Given('a provision room has an encrypted payload', async ({ request, world }) =>
   const s = getS(world)
 
   // Create a provision room (public endpoint — mounted at /api/provision)
+  const ephemeralPubkey = bytesToHex(crypto.getRandomValues(new Uint8Array(32)))
   const createRes = await request.post(`${BASE_URL}/api/provision/rooms`, {
     headers: { 'Content-Type': 'application/json' },
-    data: { ephemeralPubkey: bytesToHex(crypto.getRandomValues(new Uint8Array(32))) },
+    data: { ephemeralPubkey },
   })
   expect(createRes.status()).toBe(200)
-  const createData = await createRes.json() as { id: string; token: string }
-  s.provisionRoomId = createData.id
+  const createData = await createRes.json() as { roomId: string; token: string }
+  s.provisionRoomId = createData.roomId
   s.provisionToken = createData.token
 
-  // Send payload (authenticated endpoint)
-  const payloadRes = await apiPost(request, `/provision/rooms/${createData.id}/payload`, {
-    encryptedPayload: bytesToHex(crypto.getRandomValues(new Uint8Array(64))),
+  // Send payload (authenticated endpoint).
+  // Schema requires: token, encryptedNsec, primaryPubkey.
+  // primaryPubkey is the primary device's X25519 public key (32 bytes hex).
+  const primaryPubkey = bytesToHex(crypto.getRandomValues(new Uint8Array(32)))
+  const payloadRes = await apiPost(request, `/provision/rooms/${createData.roomId}/payload`, {
+    token: createData.token,
+    encryptedNsec: bytesToHex(crypto.getRandomValues(new Uint8Array(64))),
+    primaryPubkey,
   }, ADMIN_SEED)
   expect(payloadRes.status).toBe(200)
 })
@@ -204,8 +210,11 @@ When('two requests simultaneously poll the provision room', async ({ request, wo
 Then('exactly one response contains the encrypted payload', async ({ world }) => {
   const s = getS(world)
   expect(s.provisionPollResults).toBeDefined()
+  // The atomic DELETE...RETURNING means only one concurrent poll can consume the payload.
+  // That poll returns { status: 'ready', encryptedNsec: '...' }.
+  // The other poll finds the row gone and gets a 404 from the service.
   const withPayload = s.provisionPollResults!.filter(
-    r => r.status === 200 && (r.data as Record<string, unknown>)?.encryptedPayload,
+    r => r.status === 200 && (r.data as Record<string, unknown>)?.encryptedNsec,
   )
   expect(withPayload).toHaveLength(1)
 })
@@ -437,14 +446,14 @@ Then('no duplicate subscribers are created', async ({ request, world }) => {
   expect(successes.length, `Expected at least 1 success, got statuses: ${JSON.stringify(statuses)}`).toBeGreaterThanOrEqual(1)
 
   // Verify no duplicates by listing subscribers
-  const listRes = await apiGet<{ subscribers: Array<{ identifier: string }> }>(
+  const listRes = await apiGet<{ subscribers: Array<{ identifierHash: string }> }>(
     request,
     `/hubs/${s.hubId}/blasts/subscribers`,
     ADMIN_SEED,
   )
   expect(listRes.status).toBe(200)
 
-  const identifiers = listRes.data.subscribers.map(sub => sub.identifier)
+  const identifiers = listRes.data.subscribers.map(sub => sub.identifierHash)
   const uniqueIdentifiers = new Set(identifiers)
   expect(uniqueIdentifiers.size).toBe(identifiers.length)
 })

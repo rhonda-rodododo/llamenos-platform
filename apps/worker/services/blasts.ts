@@ -262,7 +262,7 @@ export class BlastsService {
               FROM (
                 SELECT elem FROM jsonb_array_elements(${subscribers.channels}) elem
                 UNION ALL
-                SELECT elem FROM jsonb_array_elements(${JSON.stringify(newChannels)}::jsonb) elem
+                SELECT elem FROM jsonb_array_elements(EXCLUDED."channels") elem
               ) combined
             )`,
             // Merge tags atomically at the SQL level

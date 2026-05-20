@@ -9,8 +9,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Building2, Globe, Type } from 'lucide-react'
+import { Building2, Globe, Link2, Type } from 'lucide-react'
 import type { SetupData } from './SetupWizard'
+import { validateHubUrl } from './SetupWizard'
 
 interface Props {
   data: SetupData
@@ -59,6 +60,29 @@ export function StepIdentity({ data, onChange, headingRef }: Props) {
             onChange={e => onChange({ organization: e.target.value })}
             placeholder={t('setup.organizationPlaceholder')}
           />
+        </div>
+
+        {/* Hub URL (optional) */}
+        <div className="space-y-2">
+          <Label htmlFor="hub-url" className="flex items-center gap-1.5">
+            <Link2 className="h-3.5 w-3.5 text-muted-foreground" />
+            {t('setup.hubUrlLabel')}
+            <span className="text-xs text-muted-foreground font-normal">({t('setup.optional')})</span>
+          </Label>
+          <Input
+            id="hub-url"
+            name="hubUrl"
+            value={data.hubUrl}
+            onChange={e => onChange({ hubUrl: e.target.value })}
+            placeholder={t('setup.hubUrlPlaceholder')}
+            aria-label="Hub URL"
+            aria-invalid={!!data.hubUrl && !!validateHubUrl(data.hubUrl)}
+          />
+          {data.hubUrl && validateHubUrl(data.hubUrl) && (
+            <p role="alert" className="text-sm text-destructive">
+              {t(validateHubUrl(data.hubUrl)!)}
+            </p>
+          )}
         </div>
 
         {/* Primary Language */}
