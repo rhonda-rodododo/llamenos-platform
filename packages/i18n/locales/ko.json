@@ -11,6 +11,7 @@
     "openMenu": "메뉴 열기",
     "removeItem": "제거",
     "searchButton": "검색",
+        "sessionIcon": "Session",
     "skipToContent": "콘텐츠로 건너뛰기",
     "switchToLanguage": "{{language}}(으)로 전환",
     "themeDark": "어두운 테마",

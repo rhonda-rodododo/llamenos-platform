@@ -11,6 +11,7 @@
     "openMenu": "Открыть меню",
     "removeItem": "Убрать",
     "searchButton": "Поиск",
+        "sessionIcon": "Session",
     "skipToContent": "Перейти к содержимому",
     "switchToLanguage": "Переключить на {{language}}",
     "themeDark": "Тёмная тема",

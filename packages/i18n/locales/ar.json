@@ -11,6 +11,7 @@
     "openMenu": "فتح القائمة",
     "removeItem": "إزالة",
     "searchButton": "بحث",
+        "sessionIcon": "Session",
     "skipToContent": "انتقل إلى المحتوى",
     "switchToLanguage": "التبديل إلى {{language}}",
     "themeDark": "سمة داكنة",

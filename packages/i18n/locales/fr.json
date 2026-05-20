@@ -11,6 +11,7 @@
     "openMenu": "Ouvrir le menu",
     "removeItem": "Retirer",
     "searchButton": "Rechercher",
+        "sessionIcon": "Session",
     "skipToContent": "Aller au contenu",
     "switchToLanguage": "Passer à {{language}}",
     "themeDark": "Thème sombre",

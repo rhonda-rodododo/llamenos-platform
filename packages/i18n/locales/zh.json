@@ -11,6 +11,7 @@
     "openMenu": "打开菜单",
     "removeItem": "移除",
     "searchButton": "搜索",
+        "sessionIcon": "Session",
     "skipToContent": "跳到内容",
     "switchToLanguage": "切换到{{language}}",
     "themeDark": "深色主题",
