@@ -13,7 +13,7 @@
  *   → HKDF → AES-256-GCM encrypt a mock nsec string.
  */
 import { expect } from '@playwright/test'
-import { Given, When, Then } from '../fixtures'
+import { Given, When, Then, type SasWorld } from '../fixtures'
 import { x25519 } from '@noble/curves/ed25519.js'
 import { gcm } from '@noble/ciphers/aes.js'
 import { hkdf } from '@noble/hashes/hkdf.js'
@@ -51,28 +51,10 @@ function encryptNsecForTest(nsec: string, ephemeralPubkeyHex: string, primarySec
   return bytesToHex(packed)
 }
 
-// ── Per-test state ────────────────────────────────────────────────
-
-interface SasTestState {
-  ephemeralSecret?: Uint8Array
-  ephemeralPubkey?: string
-  primarySecret?: Uint8Array
-  primaryPubkey?: string
-  sasCode?: string
-  encryptedNsec?: string
-  mockNsec?: string
-}
-
-const stateMap = new WeakMap<object, SasTestState>()
-function getSasState(world: object): SasTestState {
-  if (!stateMap.has(world)) stateMap.set(world, {})
-  return stateMap.get(world)!
-}
-
 // ── Steps ─────────────────────────────────────────────────────────
 
-Given('a valid provisioning room is established', ({ world }) => {
-  const state = getSasState(world)
+Given('a valid provisioning room is established', ({ sasWorld }) => {
+  const state: SasWorld = sasWorld
   // Generate real X25519 keypairs so the SAS + crypto ops all match
   state.ephemeralSecret = crypto.getRandomValues(new Uint8Array(32))
   state.ephemeralPubkey = bytesToHex(x25519.getPublicKey(state.ephemeralSecret))
@@ -88,8 +70,8 @@ Given('a valid provisioning room is established', ({ world }) => {
 })
 
 // Used as both Given and When — playwright-bdd matches Given/When/Then interchangeably
-Given('the ephemeral key exchange completes', async ({ page, world }) => {
-  const state = getSasState(world)
+Given('the ephemeral key exchange completes', async ({ page, sasWorld }) => {
+  const state = sasWorld
   // Navigate to the link-device page (where the new-device SAS flow lives)
   await page.goto('/link-device')
   await page.waitForLoadState('domcontentloaded')
@@ -134,9 +116,9 @@ Then('I should see instructions to compare with the other device', async ({ page
   expect(found).toBe(true)
 })
 
-Given('an encrypted nsec is received from the other device', ({ world }) => {
+Given('an encrypted nsec is received from the other device', ({ sasWorld }) => {
   // Already set in 'a valid provisioning room is established'
-  expect(getSasState(world).encryptedNsec).toBeTruthy()
+  expect(sasWorld.encryptedNsec).toBeTruthy()
 })
 
 When('I have not yet confirmed the SAS code', async ({ page }) => {
