@@ -1,6 +1,6 @@
 # Llamenos Interoperability Protocol Specification
 
-**Version:** 1.0.0
+**Version:** 1.1.0
 **Status:** Canonical reference for all client implementations
 **Audience:** Desktop (Tauri), Mobile (Native Swift/Kotlin), and any third-party client implementors
 
@@ -792,17 +792,19 @@ unwrapHubKey(envelope: RecipientEnvelope, device_x25519_secret_key[32]):
 
 ```
 encryptForHub(plaintext_string, hub_key[32]):
-  nonce = random(24)
-  cipher = XChaCha20-Poly1305(hub_key, nonce)
-  ciphertext = cipher.encrypt(UTF-8(plaintext_string))
-  return hex(nonce || ciphertext)
+  iv = random(12)
+  ciphertext_with_tag = AES-256-GCM.encrypt(
+    key     = hub_key,
+    iv      = iv,
+    message = UTF-8(plaintext_string)
+  )
+  return hex(iv || ciphertext_with_tag)
 
 decryptFromHub(packed_hex, hub_key[32]):
   data = hex_to_bytes(packed_hex)
-  nonce = data[0..24]
-  ciphertext = data[24..]
-  cipher = XChaCha20-Poly1305(hub_key, nonce)
-  plaintext = cipher.decrypt(ciphertext)
+  iv   = data[0..12]
+  ciphertext_with_tag = data[12..]
+  plaintext = AES-256-GCM.decrypt(hub_key, iv, ciphertext_with_tag)
   return UTF-8_decode(plaintext)
 ```
 
@@ -833,10 +835,13 @@ Step 1: Derive event encryption key
   )
 
 Step 2: Encrypt event content
-  nonce = random(24)
-  cipher = XChaCha20-Poly1305(event_key, nonce)
-  ciphertext = cipher.encrypt(UTF-8(json_content))
-  encrypted = hex(nonce || ciphertext)
+  iv = random(12)
+  ciphertext_with_tag = AES-256-GCM.encrypt(
+    key     = event_key,
+    iv      = iv,
+    message = UTF-8(json_content)
+  )
+  encrypted = hex(iv || ciphertext_with_tag)
 ```
 
 All hub members who possess the hub key can derive the same event key and decrypt.
@@ -910,13 +915,20 @@ Device Key Generation:
      // Used for: HPKE decapsulation, PUK envelope decryption
 ```
 
-Device private keys are stored encrypted with the user's PIN using AES-256-GCM (not XChaCha20-Poly1305 as in legacy nsec storage):
+Device private keys are stored encrypted with the user's PIN using AES-256-GCM:
 
 ```
 PIN Encryption (Phase 6):
-  KDF:    PBKDF2-SHA256, 600,000 iterations
+  KDF:    Argon2id
+    Memory:      65,536 KiB (64 MB)
+    Iterations:  3
+    Parallelism: 4 lanes
+    Version:     V0x13 (0x13)
+    Output:      32 bytes
   AEAD:   AES-256-GCM (12-byte nonce, 16-byte tag)
 ```
+
+> **Note on KDF choice:** Argon2id replaces the legacy PBKDF2-SHA256 (600,000 iterations) used in the pre-v2 single-nsec model. Argon2id is a memory-hard KDF that provides strictly superior resistance to PIN brute-force attacks on GPUs and ASICs compared to PBKDF2. The 64 MB memory cost forces attackers to use memory-bounded hardware, while the 3 iterations keep unlock latency low on client devices.
 
 #### Platform Storage
 
@@ -1010,10 +1022,9 @@ Local draft auto-save uses HKDF-derived keys with `HKDF_CONTEXT_DRAFTS` domain s
 encryptDraft(plaintext_string, secret_key[32]):
   salt = UTF-8("llamenos:hkdf-salt:v1")
   key = HKDF(SHA-256, secret_key, salt, UTF-8("llamenos:drafts"), 32)
-  nonce = random(24)
-  cipher = XChaCha20-Poly1305(key, nonce)
-  ciphertext = cipher.encrypt(UTF-8(plaintext_string))
-  return hex(nonce || ciphertext)
+  iv = random(12)
+  ciphertext_with_tag = AES-256-GCM.encrypt(key, iv, UTF-8(plaintext_string))
+  return hex(iv || ciphertext_with_tag)
 ```
 
 ### 2.15 Export Encryption
@@ -1024,10 +1035,9 @@ JSON export blobs are encrypted with an HKDF-derived key:
 encryptExport(json_string, secret_key[32]):
   salt = UTF-8("llamenos:hkdf-salt:v1")
   key = HKDF(SHA-256, secret_key, salt, UTF-8("llamenos:export"), 32)
-  nonce = random(24)
-  cipher = XChaCha20-Poly1305(key, nonce)
-  ciphertext = cipher.encrypt(UTF-8(json_string))
-  return nonce || ciphertext   // raw bytes, not hex
+  iv = random(12)
+  ciphertext_with_tag = AES-256-GCM.encrypt(key, iv, UTF-8(json_string))
+  return iv || ciphertext_with_tag   // raw bytes, not hex
 ```
 
 ### 2.16 Encrypted File Uploads
@@ -1035,7 +1045,7 @@ encryptExport(json_string, secret_key[32]):
 Files are encrypted client-side before upload. The encryption follows the envelope pattern:
 
 1. Generate random 32-byte file key.
-2. Encrypt file content with XChaCha20-Poly1305 (chunked).
+2. Encrypt file content with AES-256-GCM (chunked).
 3. Encrypt file metadata (original name, MIME type, size, dimensions, duration, plaintext SHA-256 checksum) using `LABEL_FILE_METADATA`.
 4. Wrap file key for each recipient using `LABEL_FILE_KEY`.
 5. Upload encrypted chunks, envelopes, and metadata to server.
@@ -1399,28 +1409,45 @@ Permission: invites:revoke
 Response: { "ok": true }
 ```
 
-### 4.5 Volunteers
+### 4.5 Users
 
-All volunteer endpoints require `volunteers:read` baseline permission.
+All user endpoints require `users:read` baseline permission.
 
 ```
-GET /api/volunteers
-Permission: volunteers:read
-Response: { "volunteers": Volunteer[] }
+GET /api/users
+Permission: users:read
+Response: { "users": User[] }
 
-POST /api/volunteers
-Permission: volunteers:create
+POST /api/users
+Permission: users:create
 Body: { "name": string, "phone": string, "roleIds": string[], "pubkey": string }
-Response: Volunteer
+Response: User
 
-PATCH /api/volunteers/:targetPubkey
-Permission: volunteers:update
+PATCH /api/users/:targetPubkey
+Permission: users:update
 Body: { "name"?, "phone"?, "roles"?, "active"?, ... }
-Response: Volunteer
+Response: User
 
-DELETE /api/volunteers/:targetPubkey
-Permission: volunteers:delete
+DELETE /api/users/:targetPubkey
+Permission: users:delete
 Response: { "ok": true }
+
+GET /api/users/:targetPubkey/cases
+Permission: users:read-cases
+Response: { "cases": Record[] }
+
+GET /api/users/:targetPubkey/metrics
+Permission: users:read-metrics
+Response: WorkloadMetrics
+
+GET /api/users/:targetPubkey/sigchain
+Permission: users:manage-devices (read) or own sigchain
+Response: { "entries": SigchainEntry[] }
+
+POST /api/users/:targetPubkey/sigchain
+Permission: users:manage-devices
+Body: { "signature": hex, "payload": SigchainPayload }
+Response: SigchainEntry
 ```
 
 ### 4.6 Shifts
@@ -2006,12 +2033,12 @@ Body: partial Hub
 Response: Hub
 
 POST /api/hubs/:hubId/members
-Permission: volunteers:manage-roles
+Permission: users:manage-roles
 Body: { "pubkey": hex64, "roleIds": string[] }
 Response: { "ok": true }
 
 DELETE /api/hubs/:hubId/members/:pubkey
-Permission: volunteers:manage-roles
+Permission: users:manage-roles
 Response: { "ok": true }
 
 GET /api/hubs/:hubId/key
@@ -2143,7 +2170,1362 @@ POST /api/test-reset-no-admin   (reset without admin)
 POST /api/test-reset-records    (light reset, preserves identity/settings)
 ```
 
-### 4.23 Hub-Scoped Routes
+### 4.23 Health Probes
+
+Kubernetes health probes. No auth required.
+
+```
+GET /api/health
+Response: { "status": "ok" | "degraded", "checks": { postgres, storage, relay, sipBridge }, "version": string }
+
+GET /api/health/live
+Response: { "status": "ok", "eventLoopLagMs": number, "heapUsedMb": number }
+
+GET /api/health/ready
+Response: { "status": "ok" | "degraded", "checks": { postgres, storage, relay, sipBridge }, "version": string }
+```
+
+### 4.24 Devices
+
+Device registration and push token management. All routes require auth.
+
+```
+GET    /api/devices
+Auth: Required
+Response: { "devices": DeviceDetail[] }
+
+POST   /api/devices/register
+Auth: Required
+Body: { "platform": "ios"|"android", "pushToken": string, "wakeKeyPublic": hex66, "ed25519Pubkey"?: hex64, "x25519Pubkey"?: hex64, "deviceName"?: string, "deviceModel"?: string, "osVersion"?: string, "appVersion"?: string }
+Response: 204 No Content
+Rate limit: strict (5/hour)
+
+POST   /api/devices/voip-token
+Auth: Required
+Body: { "platform": "ios"|"android", "voipToken": string }
+Response: 204 No Content
+
+DELETE /api/devices/voip-token
+Auth: Required
+Response: 204 No Content
+
+PATCH  /api/devices/:id
+Auth: Required
+Body: { "deviceName": string }
+Response: { "id": string, "deviceName": string }
+
+POST   /api/devices/:id/revoke
+Auth: Required
+Body: { "confirm": true, "signature"?: hex128, "sigchainHash"?: hex64, "sigchainSeqNo"?: number, "sigchainPrevHash"?: hex64 }
+Response: { "revoked": true, "deviceId": string, "hubIdsRequiringKeyRotation": string[], "pukRotationNeeded": boolean }
+Rate limit: strict (3/hour)
+
+POST   /api/devices/:id/verify
+Permission: users:manage-devices
+Body: { "signedAuditEntry": hex }
+Response: { "verified": true, "verificationId": string }
+
+DELETE /api/devices/:id
+Auth: Required
+Response: 204 No Content
+
+DELETE /api/devices
+Auth: Required
+Response: 204 No Content
+```
+
+### 4.25 Sessions
+
+Session management. All routes require auth.
+
+```
+GET    /api/sessions
+Auth: Required
+Response: { "sessions": SessionInfo[] }
+
+POST   /api/sessions/terminate-others
+Auth: Required
+Response: { "terminated": number }
+Rate limit: write (10/hour)
+
+DELETE /api/sessions/:id
+Auth: Required
+Response: 204 No Content
+Rate limit: write (10/hour)
+```
+
+### 4.26 Security Events
+
+Security event logging for device and session lifecycle.
+
+```
+GET /api/security-events
+Auth: Required (own events only)
+Query: ?limit=&offset=
+Response: { "events": SecurityEvent[], "total": number }
+
+GET /api/admin/security-events
+Permission: audit:read
+Query: ?limit=&offset=
+Response: { "events": SecurityEvent[], "total": number }
+```
+
+### 4.27 Account
+
+Emergency account lockdown and recovery reporting.
+
+```
+POST /api/account/lockdown
+Auth: Required (fresh auth — session token not accepted)
+Response: { "sessionsTerminated": number, "hubIds": string[] }
+
+POST /api/account/lockdown/complete
+Auth: Required
+Body: { "pukRotated": boolean, "hubKeysRotated": string[], "hubKeysFailed": string[] }
+Response: { "ok": true }
+```
+
+### 4.28 Admin Devices
+
+Admin device oversight.
+
+```
+GET /api/admin/devices/overview
+Permission: users:manage-devices
+Query: ?hubId=&limit=&offset=
+Response: AdminDeviceOverview
+```
+
+### 4.29 Contacts (Legacy)
+
+Legacy contact timeline aggregation. Hub-scoped.
+
+```
+GET /api/contacts
+Permission: contacts:view
+Query: ?page=&limit=
+Response: { "contacts": ContactTimeline[], "total": number }
+
+GET /api/contacts/:hash
+Permission: contacts:view
+Response: { "notes": EncryptedNote[], "conversations": Conversation[] }
+```
+
+Hub-scoped: `/api/hubs/:hubId/contacts/*`
+
+### 4.30 Contact Directory (v2)
+
+E2EE contact directory with affinity groups and relationships. Mounted at `/api/directory`. Hub-scoped only.
+
+```
+GET    /api/hubs/:hubId/directory
+Permission: contacts:view
+Query: ?page=&limit=&contactTypeHash=
+Response: { "contacts": Contact[], "total": number }
+
+GET    /api/hubs/:hubId/directory/lookup/:identifierHash
+Permission: contacts:view
+Response: { "contact": Contact | null }
+
+GET    /api/hubs/:hubId/directory/search?tokens=<comma-separated>
+Permission: contacts:view
+Response: { "contacts": Contact[] }
+
+POST   /api/hubs/:hubId/directory
+Permission: contacts:create
+Body: CreateContactBody
+Response: Contact (201)
+
+GET    /api/hubs/:hubId/directory/:id
+Permission: contacts:view
+Response: Contact
+
+PATCH  /api/hubs/:hubId/directory/:id
+Permission: contacts:edit
+Body: UpdateContactBody
+Response: Contact
+
+DELETE /api/hubs/:hubId/directory/:id
+Permission: contacts:delete
+Response: { "ok": true }
+
+POST   /api/hubs/:hubId/directory/:id/relationships
+Permission: contacts:manage-relationships
+Body: { "contactIdB": string, "relationshipType": string, "encryptedMetadata"?: hex }
+Response: ContactRelationship (201)
+
+DELETE /api/hubs/:hubId/directory/:id/relationships/:relId
+Permission: contacts:manage-relationships
+Response: { "ok": true }
+
+GET    /api/hubs/:hubId/directory/:id/relationships
+Permission: contacts:view
+Response: { "relationships": ContactRelationship[] }
+
+GET    /api/hubs/:hubId/directory/:id/groups
+Permission: contacts:view
+Response: { "groups": AffinityGroup[] }
+
+POST   /api/hubs/:hubId/directory/merge
+Permission: contacts:edit
+Body: { "primaryId": string, "secondaryId": string, "reEncryptedProfiles": {...} }
+Response: { "primaryId": string, "secondaryId": string }
+
+POST   /api/hubs/:hubId/directory/bulk
+Permission: contacts:edit
+Body: BulkContactActionBody
+Response: { "affected": number }
+
+POST   /api/hubs/:hubId/directory/bulk-create
+Permission: contacts:create
+Body: { "contacts": CreateContactBody[] }
+Response: { "created": number } (201)
+
+// Affinity Groups
+GET    /api/hubs/:hubId/directory/groups
+Permission: contacts:manage-groups
+Response: { "groups": AffinityGroup[] }
+
+POST   /api/hubs/:hubId/directory/groups
+Permission: contacts:manage-groups
+Body: { "encryptedName": hex, "members": [{ "contactId": string, "role"?: string }] }
+Response: AffinityGroup (201)
+
+GET    /api/hubs/:hubId/directory/groups/:groupId
+Permission: contacts:view
+Response: { ...AffinityGroup, "members": GroupMember[] }
+
+PATCH  /api/hubs/:hubId/directory/groups/:groupId
+Permission: contacts:manage-groups
+Body: { "encryptedName"?: hex }
+Response: AffinityGroup
+
+DELETE /api/hubs/:hubId/directory/groups/:groupId
+Permission: contacts:manage-groups
+Response: { "ok": true }
+
+POST   /api/hubs/:hubId/directory/groups/:groupId/members
+Permission: contacts:manage-groups
+Body: { "contactId": string, "role"?: string }
+Response: GroupMember (201)
+
+DELETE /api/hubs/:hubId/directory/groups/:groupId/members/:contactId
+Permission: contacts:manage-groups
+Response: { "ok": true }
+
+GET    /api/hubs/:hubId/directory/groups/:groupId/members
+Permission: contacts:view
+Response: { "members": GroupMember[] }
+```
+
+### 4.31 Records
+
+Case/entity record management (replaces legacy event system). Hub-scoped and global.
+
+```
+GET    /api/records
+Permission: cases:read-own | cases:read-assigned | cases:read-all
+Query: ?page=&limit=&entityTypeId=&parentRecordId=&assignedTo=&crossHub=&blindIndexToken=&blindIndexField=
+Response: { "records": Record[], "total": number }
+
+GET    /api/records/by-number/:number
+Permission: cases:read-* (access-checked)
+Response: Record
+
+GET    /api/records/envelope-recipients
+Permission: cases:read-*
+Query: ?entityTypeId=&assignedTo=
+Response: EnvelopeRecipientsResponse
+
+GET    /api/records/by-contact/:contactId
+Permission: cases:read-*
+Response: { "records": Record[] }
+
+GET    /api/records/interactions/by-source/:sourceId
+Permission: cases:read-*
+Response: { "linkedRecordId": string | null, "linkedRecordNumber": string | null }
+
+POST   /api/records/convert-from-report
+Permission: reports:triage
+Body: { "reportId": string, "entityTypeId": string }
+Response: { "recordId": string, "caseNumber"?: string, "autoAssigned": boolean, "assignedTo": string[] } (201)
+
+GET    /api/records/:id
+Permission: cases:read-* (access-checked)
+Response: Record
+
+GET    /api/records/:id/envelope-recipients
+Permission: cases:read-*
+Response: EnvelopeRecipientsResponse
+
+POST   /api/records
+Permission: cases:create
+Body: CreateRecordBody
+Response: Record (201)
+
+PATCH  /api/records/:id
+Permission: cases:update | cases:update-own
+Body: UpdateRecordBody
+Response: Record
+
+DELETE /api/records/:id
+Permission: cases:delete
+Response: { "ok": true }
+
+POST   /api/records/:id/contacts
+Permission: cases:link
+Body: { "contactId": string, "role": string }
+Response: RecordContact (201)
+
+DELETE /api/records/:id/contacts/:contactId
+Permission: cases:link
+Response: { "ok": true }
+
+GET    /api/records/:id/contacts
+Permission: cases:read-*
+Response: { "contacts": RecordContact[] }
+
+GET    /api/records/:id/suggest-assignees
+Permission: cases:assign
+Response: { "suggestions": AssigneeSuggestion[] }
+
+POST   /api/records/:id/assign
+Permission: cases:assign
+Body: { "pubkeys": string[] }
+Response: Record
+
+POST   /api/records/:id/unassign
+Permission: cases:assign
+Body: { "pubkey": string }
+Response: Record
+
+GET    /api/records/:id/interactions
+Permission: cases:read-*
+Query: ?page=&limit=&interactionTypeHash=&after=&before=
+Response: { "interactions": CaseInteraction[], "total": number }
+
+POST   /api/records/:id/interactions
+Permission: cases:update | cases:update-own
+Body: CreateInteractionBody
+Response: CaseInteraction (201)
+
+DELETE /api/records/:id/interactions/:interactionId
+Permission: cases:update
+Response: { "ok": true }
+
+POST   /api/records/:id/reports
+Permission: cases:link
+Body: { "reportId": string }
+Response: ReportCaseLink (201)
+
+DELETE /api/records/:id/reports/:reportId
+Permission: cases:link
+Response: { "ok": true }
+
+GET    /api/records/:id/reports
+Permission: cases:read-*
+Response: { "links": ReportCaseLink[] }
+
+POST   /api/records/:id/notify-contacts
+Permission: cases:update
+Body: { "recipients": [{ "identifier": string, "channel": string, "message": string }] }
+Response: { "recordId": string, "notified": number, "skipped": number, "results": NotificationResultItem[] }
+
+POST   /api/records/merge
+Permission: cases:update
+Body: { "primaryId": string, "secondaryId": string }
+Response: { "primaryId": string, "secondaryId": string, "mergedContacts": number }
+```
+
+Hub-scoped: `/api/hubs/:hubId/records/*`
+
+### 4.32 Events (Deprecated)
+
+> **Deprecation Notice:** The `/events` group is deprecated (Sunset: 2026-07-01). Successor: `/records` with `category:"event"` entity types. All responses include `Deprecation: true`, `Sunset: 2026-07-01`, and `Link: </api/records?category=event>; rel="successor-version"` headers.
+
+```
+GET    /api/events
+Permission: events:read
+Query: ?page=&limit=&eventTypeHash=&statusHash=&parentEventId=&startAfter=&startBefore=
+Response: { "events": Event[], "total": number }
+
+GET    /api/events/:id
+Permission: events:read
+Response: Event
+
+POST   /api/events
+Permission: events:create
+Body: CreateEventBody
+Response: Event (201)
+
+PATCH  /api/events/:id
+Permission: events:update
+Body: UpdateEventBody
+Response: Event
+
+DELETE /api/events/:id
+Permission: events:delete
+Response: { "ok": true }
+
+GET    /api/events/:id/subevents
+Permission: events:read
+Response: { "events": Event[], "total": number }
+
+POST   /api/events/:id/records
+Permission: events:link
+Body: { "recordId": string }
+Response: CaseEvent (201)
+
+DELETE /api/events/:id/records/:recordId
+Permission: events:link
+Response: { "ok": true }
+
+GET    /api/events/:id/records
+Permission: events:read
+Response: { "links": CaseEvent[] }
+
+POST   /api/events/:id/reports
+Permission: events:link
+Body: { "reportId": string }
+Response: ReportEvent (201)
+
+DELETE /api/events/:id/reports/:reportId
+Permission: events:link
+Response: { "ok": true }
+
+GET    /api/events/:id/reports
+Permission: events:read
+Response: { "links": ReportEvent[] }
+```
+
+Hub-scoped: `/api/hubs/:hubId/events/*`
+
+### 4.33 Evidence
+
+Evidence metadata and chain of custody. Mounted under `/records/:id/evidence` and `/evidence/:id`.
+
+```
+POST   /api/records/:id/evidence
+Permission: evidence:upload
+Body: { "fileId": string, "filename": string, "mimeType": string, "sizeBytes": number, "classification": string, "integrityHash": hex, "source": string, "sourceDescription"?: string, "encryptedDescription"?: hex, "descriptionEnvelopes"?: Envelope[], "interactionTypeHash"?: string }
+Response: EvidenceMetadata (201)
+
+GET    /api/records/:id/evidence
+Permission: evidence:download | evidence:upload | evidence:manage-custody
+Query: ?page=&limit=&classification=
+Response: { "evidence": EvidenceMetadata[], "total": number }
+
+GET    /api/evidence/:evidenceId
+Permission: evidence:download | evidence:manage-custody
+Response: EvidenceMetadata
+
+GET    /api/evidence/:evidenceId/custody
+Permission: evidence:manage-custody
+Response: { "entries": CustodyEntry[] }
+
+POST   /api/evidence/:evidenceId/access
+Permission: evidence:download
+Body: { "action": "view"|"download"|"share", "integrityHash"?: hex, "notes"?: string }
+Response: CustodyEntry (201)
+
+POST   /api/evidence/:evidenceId/verify
+Permission: evidence:download
+Body: { "currentHash": hex }
+Response: { "valid": boolean, "storedHash": hex, "currentHash": hex }
+```
+
+Hub-scoped: `/api/hubs/:hubId/records/:id/evidence/*`
+
+### 4.34 System Health
+
+Aggregated system health dashboard for admins.
+
+```
+GET /api/system/health
+Permission: system:manage-instance
+Response: SystemHealth { server, services, calls, storage, backup, users, timestamp }
+```
+
+### 4.35 Geocoding
+
+Address autocomplete and geocoding (rate-limited per user).
+
+```
+POST /api/geocoding/autocomplete
+Permission: notes:read-own
+Body: { "query": string, "limit"?: number }
+Response: LocationResult[]
+Rate limit: 60/min per user
+
+POST /api/geocoding/geocode
+Permission: notes:read-own
+Body: { "address": string }
+Response: LocationResult | null
+Rate limit: 20/min per user
+
+POST /api/geocoding/reverse
+Permission: notes:read-own
+Body: { "lat": number, "lon": number }
+Response: LocationResult | null
+Rate limit: 20/min per user
+```
+
+### 4.36 Analytics
+
+Admin dashboard metrics. Available at both global (`/api/analytics/*`) and hub-scoped (`/api/hubs/:hubId/analytics/*`). Platform-scoped access requires super-admin.
+
+```
+GET /api/analytics/calls
+Permission: audit:read
+Query: ?from=ISO8601&to=ISO8601
+Response: CallMetrics
+
+GET /api/analytics/conversations
+Permission: audit:read
+Query: ?from=ISO8601&to=ISO8601
+Response: ConversationMetrics
+
+GET /api/analytics/shifts
+Permission: audit:read
+Response: ShiftMetrics
+
+GET /api/analytics/health
+Permission: audit:read
+Response: AnalyticsSystemHealth
+
+GET /api/analytics/hours
+Permission: audit:read
+Query: ?from=ISO8601&to=ISO8601
+Response: HourlyDistribution
+
+GET /api/analytics/users
+Permission: audit:read
+Query: ?from=ISO8601&to=ISO8601
+Response: UserStats
+
+GET /api/analytics/me
+Auth: Required (any role)
+Query: ?from=ISO8601&to=ISO8601
+Response: PersonalStats
+```
+
+### 4.37 Sigchain
+
+Per-device key authorization sigchain (Phase 6).
+
+```
+GET  /api/users/:targetPubkey/sigchain
+Auth: Required (self or admin)
+Response: { "links": SigchainLink[] }
+
+POST /api/users/:targetPubkey/sigchain
+Auth: Required (self only)
+Body: { "seqNo": number, "linkType": "genesis"|"device_add"|"device_remove"|"key_rotate"|"puk_epoch", "payload": object, "signature": hex128, "prevHash": hex64|"", "hash": hex64 }
+Response: SigchainLink (201)
+Error: 409 on hash-chain continuity violation
+```
+
+### 4.38 PUK (Per-User Key)
+
+PUK envelope distribution and retrieval (Phase 6).
+
+```
+POST /api/puk/envelopes
+Auth: Required
+Body: { "envelopes": [{ "deviceId": string, "generation": number, "envelope": string }] }
+Response: { "distributed": number, "envelopes": PukEnvelope[] } (201)
+
+GET  /api/puk/envelopes/:deviceId
+Auth: Required (own device only)
+Response: PukEnvelope
+Error: 404 if no envelope found
+```
+
+### 4.39 MLS (Message Layer Security)
+
+Hub-scoped MLS handshake message routing (Phase 6). Only available under `/api/hubs/:hubId/mls/*`.
+
+```
+POST /api/hubs/:hubId/mls/commit
+Auth: Required (hub member)
+Body: { "recipientDeviceIds": string[], "payload": base64url }
+Response: 204 No Content
+
+POST /api/hubs/:hubId/mls/welcome
+Auth: Required (hub member)
+Body: { "recipientDeviceId": string, "payload": base64url }
+Response: 204 No Content
+
+GET  /api/hubs/:hubId/mls/messages
+Auth: Required (hub member)
+Query: ?deviceId=<deviceId>
+Response: { "messages": MlsMessage[] }
+Note: Fetch-and-clear semantics
+
+POST /api/hubs/:hubId/mls/key-packages
+Auth: Required (hub member)
+Query: ?deviceId=<deviceId>
+Body: { "keyPackages": base64url[] }
+Response: 204 No Content
+```
+
+### 4.40 Signal Admin
+
+Signal-specific admin routes for identity trust and queue monitoring.
+
+```
+GET /api/messaging/signal/identities
+Permission: settings:manage-messaging
+Query: ?hub=<hubId>
+Response: { "identities": SignalIdentityRecord[] }
+
+GET /api/messaging/signal/identities/untrusted
+Permission: settings:manage-messaging
+Query: ?hub=<hubId>
+Response: { "identities": SignalIdentityRecord[] }
+
+POST /api/messaging/signal/identities/trust
+Permission: settings:manage-messaging
+Body: { "uuid": string, "trustLevel": "trusted"|"untrusted"|"verified", "hubId"?: string }
+Response: { "success": boolean }
+
+GET /api/messaging/signal/queue/stats
+Permission: settings:manage-messaging
+Query: ?hub=<hubId>
+Response: SignalQueueStats
+
+GET /api/messaging/signal/queue/dead-letters
+Permission: settings:manage-messaging
+Query: ?hub=<hubId>
+Response: { "deadLetters": unknown[] }
+
+POST /api/messaging/signal/queue/retry/:id
+Permission: settings:manage-messaging
+Response: { "success": boolean }
+```
+
+### 4.41 Firehose
+
+Firehose connection management for inference agents. Hub-scoped and global.
+
+```
+GET    /api/firehose
+Permission: firehose:read
+Response: { "connections": FirehoseConnection[] }
+
+POST   /api/firehose
+Permission: firehose:manage
+Body: CreateFirehoseConnectionBody
+Response: { "connection": FirehoseConnection } (201)
+
+GET    /api/firehose/status
+Permission: firehose:read
+Response: { "statuses": FirehoseConnectionStatus[] }
+
+GET    /api/firehose/:id
+Permission: firehose:read
+Response: { "connection": FirehoseConnection }
+
+PATCH  /api/firehose/:id
+Permission: firehose:manage
+Body: UpdateFirehoseConnectionBody
+Response: { "connection": FirehoseConnection }
+
+DELETE /api/firehose/:id
+Permission: firehose:manage
+Response: { "ok": true }
+
+POST   /api/firehose/:id/activate
+Permission: firehose:manage
+Response: { "connection": FirehoseConnection }
+
+POST   /api/firehose/:id/pause
+Permission: firehose:manage
+Response: { "connection": FirehoseConnection }
+
+GET    /api/firehose/:id/buffer
+Permission: firehose:read
+Response: { "connectionId": string, "bufferSize": number, "agentRunning": boolean, "extractionIntervalSec": number, "bufferTtlDays": number }
+
+DELETE /api/firehose/:id/buffer
+Permission: firehose:manage
+Response: { "purged": number }
+
+POST   /api/firehose/:id/optout
+Permission: firehose:read
+Response: { "id": string, "connectionId": string, "userId": string, "optedOutAt": ISO8601 }
+
+DELETE /api/firehose/:id/optout
+Permission: firehose:read
+Response: { "ok": true }
+```
+
+Hub-scoped: `/api/hubs/:hubId/firehose/*`
+
+### 4.42 Signal Notifications
+
+Zero-knowledge Signal notification sidecar integration.
+
+```
+GET    /api/signal-notification/contact
+Auth: Required
+Response: { "identifierHash": hex, "identifierCiphertext": hex, "identifierEnvelope": hex, "identifierType": string, "verifiedAt"?: ISO8601, "updatedAt": ISO8601 }
+Error: 404 if not registered
+
+PUT    /api/signal-notification/contact
+Auth: Required
+Body: { "identifierHash": hex, "identifierCiphertext": hex, "identifierEnvelope": hex, "identifierType": string }
+Response: { "ok": true }
+
+POST   /api/signal-notification/contact/sidecar-token
+Auth: Required
+Response: { "token": string, "sidecarUrl": string }
+
+DELETE /api/signal-notification/contact
+Auth: Required
+Response: 204 No Content
+
+GET    /api/signal-notification/hmac-key
+Auth: Required
+Response: { "hmacKey": hex }
+
+GET    /api/signal-notification/security-prefs
+Auth: Required
+Response: SecurityPrefs
+
+PATCH  /api/signal-notification/security-prefs
+Auth: Required
+Body: SecurityPrefsPatch
+Response: SecurityPrefs
+
+POST   /api/signal-notification/digest/run
+Permission: system:admin
+Body: { "cadence"?: "daily"|"weekly" }
+Response: DigestResult
+```
+
+### 4.43 Provider Setup
+
+Telephony provider OAuth, configuration, and number management.
+
+```
+POST /api/provider-setup/oauth/start
+Permission: telephony:manage-providers
+Body: { "provider": string, "redirectUrl": string }
+Response: { "authUrl": string, "stateId": string, "expiresAt": ISO8601 }
+
+POST /api/provider-setup/oauth/callback
+Auth: None (state token is proof)
+Body: { "code"?: string, "state"?: string, "error"?: string }
+Response: 302 Redirect or JSON { "redirectUrl": string }
+
+GET  /api/provider-setup/oauth/callback
+Auth: None
+Query: ?code=&state=&error=
+Response: 302 Redirect or JSON { "redirectUrl": string }
+
+GET  /api/provider-setup/oauth/status/:state
+Permission: telephony:manage-providers
+Response: OAuthFlowState
+
+POST /api/provider-setup/configure
+Permission: telephony:manage-providers
+Body: { "provider": string, "credentials"?: object, "phoneNumber"?: string, "hubId"?: string }
+Response: { "ok": true }
+
+POST /api/provider-setup/test
+Permission: telephony:manage-providers
+Body: { "provider": string, "hubId"?: string }
+Response: { "connected": boolean, "latencyMs": number, "accountName"?: string, "error"?: string }
+
+GET  /api/provider-setup/status/:provider
+Permission: telephony:view-providers
+Response: ProviderStatus
+
+GET  /api/provider-setup/phone-numbers
+Permission: telephony:view-numbers
+Query: ?provider=&hubId=
+Response: { "numbers": OwnedNumber[] }
+
+POST /api/provider-setup/phone-numbers/search
+Permission: telephony:manage-numbers
+Body: NumberSearchQuery
+Response: { "numbers": AvailableNumber[] }
+Rate limit: 5/min
+
+POST /api/provider-setup/phone-numbers/provision
+Permission: telephony:manage-numbers
+Body: NumberProvisionRequest
+Response: { ...OwnedNumber, "webhookWarning"?: string }
+Rate limit: 1/min
+
+POST /api/provider-setup/configure-webhooks
+Permission: telephony:manage-providers
+Body: { "provider": string, "numberId": string, "enableSms"?: boolean, "hubId"?: string }
+Response: { "ok": true }
+
+POST /api/provider-setup/create-sip-trunk
+Permission: telephony:manage-providers
+Body: { "provider": string, "domain": string, "hubId"?: string }
+Response: { "sipProvider": string, "sipUsername": string, "credentialsStored": boolean, "trunkSid"?: string, "connectionId"?: string }
+
+// Signal Bridge Registration
+POST /api/provider-setup/signal/register
+Permission: messaging:manage-signal
+Body: { "bridgeUrl": string, "phoneNumber": string, "method"?: "sms"|"voice", "hubId"?: string }
+Response: SignalRegistration
+
+GET  /api/provider-setup/signal/status
+Permission: messaging:manage-signal
+Query: ?hubId=&registrationId=
+Response: SignalRegistrationStatus
+
+POST /api/provider-setup/signal/verify
+Permission: messaging:manage-signal
+Body: { "registrationId": string, "code": string }
+Response: SignalRegistrationStatus
+Rate limit: 5/min
+
+DELETE /api/provider-setup/signal/unregister
+Permission: messaging:manage-signal
+Query: ?registrationId=
+Response: { "ok": true }
+
+GET  /api/provider-setup/signal/account
+Permission: messaging:manage-signal
+Query: ?registrationId=
+Response: SignalAccountInfo
+
+// A2P Registration
+POST /api/provider-setup/a2p/brand
+Permission: telephony:manage-a2p
+Body: { "providerType"?: string, "brandInfo": object, "hubId"?: string }
+Response: A2pRegistration
+
+POST /api/provider-setup/a2p/campaign
+Permission: telephony:manage-a2p
+Body: { "registrationId": string, "campaignInfo": object }
+Response: A2pRegistration
+
+GET  /api/provider-setup/a2p/status
+Permission: telephony:manage-a2p
+Query: ?hubId=&registrationId=
+Response: A2pRegistrationStatus
+
+POST /api/provider-setup/a2p/skip
+Permission: telephony:manage-a2p
+Body: { "providerType"?: string, "hubId"?: string }
+Response: A2pRegistrationStatus
+```
+
+Hub-scoped: `/api/hubs/:hubId/provider-setup/*`
+
+### 4.44 Provider Templates
+
+Reusable provider configuration templates. Super-admin only for writes.
+
+```
+GET    /api/provider-templates
+Permission: telephony:view-providers
+Response: { "templates": ProviderTemplate[] }
+
+GET    /api/provider-templates/:id
+Permission: telephony:view-providers
+Response: { "template": ProviderTemplate }
+
+POST   /api/provider-templates
+Permission: system:manage-instance
+Body: CreateProviderTemplateBody
+Response: { "template": ProviderTemplate } (201)
+Rate limit: 5/min
+
+PUT    /api/provider-templates/:id
+Permission: system:manage-instance
+Body: UpdateProviderTemplateBody
+Response: { "template": ProviderTemplate }
+
+DELETE /api/provider-templates/:id
+Permission: system:manage-instance
+Response: { "ok": true }
+```
+
+### 4.45 Erasure
+
+GDPR/right-to-be-forgotten account erasure.
+
+```
+GET    /api/erasure/me
+Permission: erasure:request-self
+Response: { "request": ErasureRequest | null }
+
+POST   /api/erasure/me
+Permission: erasure:request-self
+Body: { "justification": string }
+Response: { "request": ErasureRequest }
+
+POST   /api/erasure/me/emergency
+Permission: erasure:request-self
+Body: { "justification": string, "coApproverPubkey": hex64, "coApproverSignature": hex128, "timestamp": number }
+Response: { "request": ErasureRequest }
+
+DELETE /api/erasure/me
+Permission: erasure:request-self
+Response: { "ok": true }
+
+GET    /api/erasure/requests
+Permission: erasure:admin
+Query: ?status=&limit=&offset=
+Response: { "requests": ErasureRequest[], "total": number }
+
+POST   /api/erasure/:userId
+Permission: erasure:admin
+Body: { "justification": string }
+Response: { "ok": true, "reEncryptionJobIds": string[] }
+
+POST   /api/erasure/:userId/wipe-device/:devicePubkey
+Permission: erasure:admin
+Body: { "reason"?: string }
+Response: { "ok": true }
+
+GET    /api/erasure/re-encryption-jobs
+Permission: erasure:admin
+Query: ?userId=
+Response: { "jobs": ReEncryptionJob[] }
+```
+
+### 4.46 Retention
+
+Data retention settings per hub and platform-wide floors.
+
+```
+GET    /api/retention
+Permission: retention:manage
+Response: { "settings": RetentionSetting[] }
+
+PATCH  /api/retention
+Permission: retention:manage
+Body: { "settings": [{ "category": string, "retentionDays": number }] }
+Response: { "settings": RetentionSetting[] }
+
+GET    /api/retention/platform-floors
+Permission: system:manage-instance
+Response: { "floors": RetentionFloor[] }
+
+PATCH  /api/retention/platform-floors
+Permission: system:manage-instance
+Body: { "floors": [{ "category": string, "minRetentionDays": number }] }
+Response: { "floors": RetentionFloor[] }
+```
+
+Hub-scoped: `/api/hubs/:hubId/retention/*`
+
+### 4.47 Platform Bans
+
+Platform-scoped bans (cross-hub). Requires `bans:*-platform` permissions.
+
+```
+GET    /api/bans/platform
+Permission: bans:read-platform
+Query: ?limit=&offset=
+Response: { "bans": PlatformBan[], "total": number }
+
+POST   /api/bans/platform
+Permission: bans:create-platform
+Body: { "phone": string (E.164), "reason": string }
+Response: { "ok": true }
+
+POST   /api/bans/platform/bulk
+Permission: bans:create-platform
+Body: { "phones": string[], "reason": string }
+Response: { "ok": true, "count": number }
+
+DELETE /api/bans/platform/:id
+Permission: bans:delete-platform
+Response: { "ok": true }
+
+GET    /api/bans/platform/search
+Permission: bans:read-platform
+Query: ?phone=<E.164>
+Response: { "bans": PlatformBan[] }
+
+POST   /api/bans/platform/promote
+Permission: bans:create-platform
+Body: { "banId": string }
+Response: { "ok": true }
+```
+
+### 4.48 Platform Settings
+
+Instance-level platform settings. Super-admin only.
+
+```
+GET   /api/settings/platform
+Permission: system:manage-instance
+Response: { "settings": PlatformSettings }
+
+PATCH /api/settings/platform
+Permission: system:manage-instance
+Body: UpdatePlatformSettingsBody
+Response: { "settings": PlatformSettings }
+```
+
+### 4.49 Ring Groups
+
+Encrypted ring groups for parallel call routing. Hub-scoped only.
+
+```
+GET    /api/hubs/:hubId/ring-groups
+Permission: shifts:manage-ring-groups
+Response: { "ringGroups": RingGroupSummary[] }
+
+POST   /api/hubs/:hubId/ring-groups
+Permission: shifts:manage-ring-groups
+Body: { "encryptedName": hex }
+Response: RingGroup
+
+GET    /api/hubs/:hubId/ring-groups/:id
+Permission: shifts:manage-ring-groups
+Response: RingGroup
+
+PUT    /api/hubs/:hubId/ring-groups/:id
+Permission: shifts:manage-ring-groups
+Body: { "encryptedName"?: hex }
+Response: RingGroup
+
+DELETE /api/hubs/:hubId/ring-groups/:id
+Permission: shifts:manage-ring-groups
+Response: { "ok": true }
+
+POST   /api/hubs/:hubId/ring-groups/:id/members
+Permission: shifts:manage-ring-groups
+Body: { "pubkeys": string[] }
+Response: RingGroup
+
+DELETE /api/hubs/:hubId/ring-groups/:id/members
+Permission: shifts:manage-ring-groups
+Body: { "pubkeys": string[] }
+Response: RingGroup
+```
+
+### 4.50 Recovery Group
+
+Social recovery with Shamir secret sharing. Mix of public and authenticated routes.
+
+**Unauthenticated (rate-limited):**
+```
+POST /api/recovery-group/initiate
+Body: { "hubId": string, "userIdentifier": string, "newDevicePubkey": hex64 }
+Response: RecoveryInitiateResponse
+Rate limit: 10/5min per IP
+
+POST /api/recovery-group/initiate/verify
+Body: { "sessionId": string, "verificationCode": string }
+Response: RecoveryInitiateVerifyResponse
+```
+
+**Authenticated:**
+```
+POST /api/recovery-group/enroll
+Permission: recovery:manage
+Body: RecoveryGroupEnrollBody
+Response: { "ok": true }
+
+GET  /api/recovery-group/:hubId
+Permission: recovery:view
+Response: RecoveryGroupInfo
+
+POST /api/recovery-group/session/:id/contribute
+Permission: recovery:hold-share
+Body: { "encryptedShare": hex, "contributorSignature": hex128 }
+Response: RecoveryContributeResponse
+
+GET  /api/recovery-group/session/:id
+Permission: recovery:view
+Response: RecoverySessionStatus
+
+POST /api/recovery-group/session/:id/emergency
+Permission: recovery:approve
+Body: { "approverPubkey": hex64, "justification": string, "signature": hex128 }
+Response: { "ok": true }
+
+POST /api/recovery-group/session/:id/cancel
+Auth: Required
+Response: { "ok": true }
+
+POST /api/recovery-group/user-envelope
+Auth: Required
+Body: { "hubId": string, "envelope": string }
+Response: { "ok": true }
+
+POST /api/recovery-group/shares/liveness
+Permission: recovery:hold-share
+Body: { "hubId": string, "proof": string }
+Response: { "ok": true }
+```
+
+### 4.51 Teams
+
+Hub-scoped team management for contact assignment.
+
+```
+GET    /api/hubs/:hubId/teams
+Permission: teams:read
+Response: { "teams": Team[] }
+
+POST   /api/hubs/:hubId/teams
+Permission: teams:manage
+Body: { "id"?: string, "encryptedName": hex, "encryptedDescription"?: hex }
+Response: Team
+
+GET    /api/hubs/:hubId/teams/:teamId
+Permission: teams:read
+Response: Team
+
+PATCH  /api/hubs/:hubId/teams/:teamId
+Permission: teams:manage
+Body: { "encryptedName"?: hex, "encryptedDescription"?: hex }
+Response: Team
+
+DELETE /api/hubs/:hubId/teams/:teamId
+Permission: teams:manage
+Response: { "ok": true }
+
+GET    /api/hubs/:hubId/teams/:teamId/members
+Permission: teams:read
+Response: { "members": TeamMember[] }
+
+POST   /api/hubs/:hubId/teams/:teamId/members
+Permission: teams:manage
+Body: { "pubkeys": string[] }
+Response: { "ok": true }
+
+DELETE /api/hubs/:hubId/teams/:teamId/members/:userPubkey
+Permission: teams:manage
+Response: { "ok": true }
+
+GET    /api/hubs/:hubId/teams/:teamId/contacts
+Permission: teams:read
+Response: { "assignments": ContactTeamAssignment[] }
+
+POST   /api/hubs/:hubId/teams/:teamId/contacts
+Permission: teams:manage
+Body: { "contactIds": string[] }
+Response: { "ok": true }
+
+DELETE /api/hubs/:hubId/teams/:teamId/contacts/:contactId
+Permission: teams:manage
+Response: { "ok": true }
+```
+
+### 4.52 Tags
+
+Hub-scoped tags for contact categorization.
+
+```
+GET    /api/hubs/:hubId/tags
+Permission: tags:view
+Response: { "tags": Tag[] }
+
+POST   /api/hubs/:hubId/tags
+Permission: tags:create
+Body: { "id"?: string, "name": string, "encryptedLabel": hex, "color"?: string, "encryptedCategory"?: hex }
+Response: Tag
+
+PATCH  /api/hubs/:hubId/tags/:tagId
+Permission: tags:manage
+Body: { "name"?: string, "encryptedLabel"?: hex, "color"?: string, "encryptedCategory"?: hex }
+Response: Tag
+
+DELETE /api/hubs/:hubId/tags/:tagId
+Permission: tags:manage
+Response: { "removedFromContacts": number }
+```
+
+### 4.53 Entity Schema (Case Management)
+
+Entity types, relationship types, report types, templates, and case numbering. Mounted at `/api/settings/cms`.
+
+```
+GET  /api/settings/cms/case-management
+Permission: settings:read
+Response: { "enabled": boolean }
+
+PUT  /api/settings/cms/case-management
+Permission: settings:manage-cms
+Body: { "enabled": boolean }
+Response: { "enabled": boolean }
+
+GET  /api/settings/cms/auto-assignment
+Permission: settings:read
+Response: { "enabled": boolean }
+
+PUT  /api/settings/cms/auto-assignment
+Permission: cases:manage
+Body: { "enabled": boolean }
+Response: { "enabled": boolean }
+
+GET  /api/settings/cms/cross-hub
+Permission: settings:read
+Response: { "enabled": boolean }
+
+PUT  /api/settings/cms/cross-hub
+Permission: settings:manage-cms
+Body: { "enabled": boolean }
+Response: { "enabled": boolean }
+
+// Entity Types
+GET    /api/settings/cms/entity-types
+Permission: settings:read | cases:read-own | cases:read-assigned | cases:create
+Query: ?hubId=
+Response: { "entityTypes": EntityTypeDefinition[] }
+
+POST   /api/settings/cms/entity-types
+Permission: cases:manage-types
+Body: CreateEntityTypeBody
+Response: EntityTypeDefinition
+
+GET    /api/settings/cms/entity-types/:id
+Permission: settings:read
+Response: EntityTypeDefinition
+
+PATCH  /api/settings/cms/entity-types/:id
+Permission: cases:manage-types
+Body: UpdateEntityTypeBody
+Response: EntityTypeDefinition
+
+DELETE /api/settings/cms/entity-types/:id
+Permission: cases:manage-types
+Response: { "ok": true }
+
+PATCH  /api/settings/cms/entity-types/:id/customize
+Permission: cases:manage-types
+Body: { "encryptedLabel"?: hex, "icon"?: string, "color"?: string }
+Response: EntityTypeDefinition
+
+// Relationship Types
+GET    /api/settings/cms/relationship-types
+Permission: settings:read
+Response: { "relationshipTypes": RelationshipTypeDefinition[] }
+
+POST   /api/settings/cms/relationship-types
+Permission: cases:manage-types
+Body: CreateRelationshipTypeBody
+Response: RelationshipTypeDefinition
+
+GET    /api/settings/cms/relationship-types/:id
+Permission: settings:read
+Response: RelationshipTypeDefinition
+
+PATCH  /api/settings/cms/relationship-types/:id
+Permission: cases:manage-types
+Body: UpdateRelationshipTypeBody
+Response: RelationshipTypeDefinition
+
+DELETE /api/settings/cms/relationship-types/:id
+Permission: cases:manage-types
+Response: { "ok": true }
+
+// Report Types
+GET    /api/settings/cms/report-types
+Permission: settings:read
+Query: ?hubId=
+Response: { "reportTypes": ReportTypeDefinition[] }
+
+POST   /api/settings/cms/report-types
+Permission: cases:manage-types
+Body: CreateCmsReportTypeBody
+Response: ReportTypeDefinition
+
+GET    /api/settings/cms/report-types/:id
+Permission: settings:read
+Response: ReportTypeDefinition
+
+PATCH  /api/settings/cms/report-types/:id
+Permission: cases:manage-types
+Body: UpdateCmsReportTypeBody
+Response: ReportTypeDefinition
+
+DELETE /api/settings/cms/report-types/:id
+Permission: cases:manage-types
+Response: { "ok": true }
+
+// Case Number Generation
+POST   /api/settings/cms/case-number
+Permission: cases:create
+Body: { "prefix": string, "year"?: number, "hubId"?: string }
+Response: { "number": string }
+
+// Templates
+GET    /api/settings/cms/templates
+Permission: settings:read
+Response: { "templates": TemplateSummary[], "appliedTemplateIds": string[] }
+
+GET    /api/settings/cms/templates/updates
+Permission: settings:read
+Response: { "updates": TemplateUpdate[] }
+
+GET    /api/settings/cms/templates/:id
+Permission: settings:read
+Response: TemplateDetail
+
+POST   /api/settings/cms/templates/apply
+Permission: cases:manage-types
+Body: { "templateId": string }
+Response: { "applied": true, "entityTypes": number, "relationshipTypes": number, "reportTypes": number, "suggestedRoles": SuggestedRole[] } (201)
+
+POST   /api/settings/cms/roles/from-template
+Permission: system:manage-roles
+Body: { "roles": SuggestedRole[] }
+Response: { "created": { "id": string, "name": string }[], "count": number } (201)
+```
+
+Hub-scoped: `/api/hubs/:hubId/settings/cms/*`
+
+### 4.54 Hub Onboarding
+
+Hub-specific onboarding and provider configuration. Hub-scoped only.
+
+```
+POST /api/hubs/:hubId/onboard
+Permission: hubs:configure
+Body: { "templateId"?: string }
+Response: { "onboarding": HubOnboardingState }
+Rate limit: 10/min
+
+GET  /api/hubs/:hubId/onboard/status
+Permission: telephony:view-providers
+Response: { "onboarding": HubOnboardingState | null }
+
+PUT  /api/hubs/:hubId/onboard/step
+Permission: hubs:configure
+Body: { "step": string, "data"?: { "channelConfig"?: ChannelConfig } }
+Response: { "onboarding": HubOnboardingState }
+
+GET  /api/hubs/:hubId/onboard/provider-status
+Permission: telephony:view-providers
+Response: { "status": HubSetupStatus }
+
+GET  /api/hubs/:hubId/onboard/usage
+Permission: telephony:view-providers
+Response: { "usage": HubUsage }
+
+PUT  /api/hubs/:hubId/onboard/quotas
+Permission: system:manage-instance
+Body: HubQuota
+Response: { "quotas": HubQuota }
+
+PUT  /api/hubs/:hubId/onboard/channels
+Permission: hubs:configure
+Body: { "channel": string, "enabled": boolean }
+Response: { "channels": ChannelConfig }
+
+POST /api/hubs/:hubId/onboard/sub-account
+Permission: hubs:configure
+Body: { "masterConfigId": string }
+Response: { "subAccountId": string }
+```
+
+### 4.55 Hub-Scoped Routes
 
 All of the following routes are also available with a `/api/hubs/:hubId/` prefix, which scopes them to a specific hub:
 
@@ -2156,11 +3538,726 @@ All of the following routes are also available with a `/api/hubs/:hubId/` prefix
 /api/hubs/:hubId/conversations/*
 /api/hubs/:hubId/reports/*
 /api/hubs/:hubId/blasts/*
+/api/hubs/:hubId/contacts/*
+/api/hubs/:hubId/directory/*
+/api/hubs/:hubId/records/*
+/api/hubs/:hubId/events/*
+/api/hubs/:hubId/settings/cms/*
+/api/hubs/:hubId/analytics/*
+/api/hubs/:hubId/messaging/signal/*
+/api/hubs/:hubId/provider-setup/*
+/api/hubs/:hubId/retention/*
+/api/hubs/:hubId/mls/*
+/api/hubs/:hubId/firehose/*
+/api/hubs/:hubId/onboard/*
+/api/hubs/:hubId/ring-groups/*
+/api/hubs/:hubId/teams/*
+/api/hubs/:hubId/tags/*
+```
+
+When using hub-scoped routes, the `hubContext` middleware resolves hub-specific permissions for the user and scopes all queries to the specified hub.
+/api/hubs/:hubId/messaging/signal/*
+/api/hubs/:hubId/provider-setup/*
+/api/hubs/:hubId/retention/*
+/api/hubs/:hubId/firehose/*
+/api/hubs/:hubId/mls/*
+/api/hubs/:hubId/onboard/*
+/api/hubs/:hubId/ring-groups/*
+/api/hubs/:hubId/teams/*
+/api/hubs/:hubId/tags/*
 ```
 
 When using hub-scoped routes, the `hubContext` middleware resolves hub-specific permissions for the user and scopes all queries to the specified hub.
 
 > **Note:** This section documents the core API surface. Additional endpoints for blasts, recovery groups, events, and entity management are implemented but not fully documented here. See `apps/worker/routes/` for the full route list.
+
+### 4.24 Contacts v2 (Contact Directory)
+
+```
+GET    /api/directory
+       Permission: contacts:view
+       Response: { "contacts": Contact[], "total": number }
+
+GET    /api/directory/:id
+       Permission: contacts:view
+       Response: Contact
+
+POST   /api/directory
+       Permission: contacts:create
+       Body: { "encryptedProfile": hex, "identifierHash": string, ... }
+       Response: Contact
+
+PATCH  /api/directory/:id
+       Permission: contacts:edit
+       Body: partial Contact
+       Response: Contact
+
+DELETE /api/directory/:id
+       Permission: contacts:delete
+       Response: { "ok": true }
+
+GET    /api/directory/lookup/:identifierHash
+       Permission: contacts:view
+       Response: { "contact": Contact | null }
+
+GET    /api/directory/search?tokens=
+       Permission: contacts:view
+       Response: { "contacts": Contact[] }
+
+POST   /api/directory/:id/relationships
+       Permission: contacts:manage-relationships
+       Body: { "contactIdB": string, "relationshipType": string }
+       Response: ContactRelationship
+
+GET    /api/directory/:id/relationships
+       Permission: contacts:view
+       Response: { "relationships": ContactRelationship[] }
+
+DELETE /api/directory/:id/relationships/:relId
+       Permission: contacts:manage-relationships
+       Response: { "ok": true }
+
+GET    /api/directory/groups
+       Permission: contacts:manage-groups
+       Response: { "groups": AffinityGroup[] }
+
+POST   /api/directory/groups
+       Permission: contacts:manage-groups
+       Body: { "name": string, "members": [...] }
+       Response: AffinityGroup
+
+GET    /api/directory/groups/:groupId
+       Permission: contacts:view
+       Response: AffinityGroup
+
+PATCH  /api/directory/groups/:groupId
+       Permission: contacts:manage-groups
+       Body: partial AffinityGroup
+       Response: AffinityGroup
+
+DELETE /api/directory/groups/:groupId
+       Permission: contacts:manage-groups
+       Response: { "ok": true }
+
+POST   /api/directory/groups/:groupId/members
+       Permission: contacts:manage-groups
+       Body: { "contactId": string }
+       Response: GroupMember
+
+DELETE /api/directory/groups/:groupId/members/:contactId
+       Permission: contacts:manage-groups
+       Response: { "ok": true }
+
+POST   /api/directory/merge
+       Permission: contacts:edit
+       Body: { "primaryId": string, "secondaryId": string }
+       Response: { "primaryId": string, "secondaryId": string }
+
+POST   /api/directory/bulk
+       Permission: contacts:edit
+       Body: { "action": string, "contactIds": string[] }
+       Response: { "affected": number }
+
+POST   /api/directory/bulk-create
+       Permission: contacts:create
+       Body: { "contacts": ContactInput[] }
+       Response: { "created": number }
+```
+
+Hub-scoped: `/api/hubs/:hubId/directory/*`
+
+### 4.25 Records (Case Management)
+
+```
+GET    /api/records?page=&limit=&entityTypeId=&assignedTo=&crossHub=
+       Permission: cases:read-all | cases:read-assigned | cases:read-own
+       Response: { "records": Record[], "total": number }
+
+GET    /api/records/:id
+       Permission: cases:read-* (access-checked)
+       Response: Record
+
+GET    /api/records/by-number/:number
+       Permission: cases:read-* (access-checked)
+       Response: Record
+
+GET    /api/records/by-contact/:contactId
+       Permission: cases:read-* (access-checked)
+       Response: { "records": Record[] }
+
+GET    /api/records/envelope-recipients?entityTypeId=&assignedTo=
+       Permission: cases:read-*
+       Response: { "required": string[], "optional": string[] }
+
+GET    /api/records/:id/envelope-recipients
+       Permission: cases:read-*
+       Response: { "required": string[], "optional": string[] }
+
+POST   /api/records
+       Permission: cases:create
+       Body: { "entityTypeId": string, "encryptedContent": hex, "readerEnvelopes": [...], "assignedTo"?: string[] }
+       Response: Record
+
+POST   /api/records/convert-from-report
+       Permission: reports:triage
+       Body: { "reportId": string, "entityTypeId": string }
+       Response: { "recordId": string, "autoAssigned": boolean }
+
+PATCH  /api/records/:id
+       Permission: cases:update | cases:update-own
+       Body: partial Record
+       Response: Record
+
+DELETE /api/records/:id
+       Permission: cases:delete
+       Response: { "ok": true }
+
+POST   /api/records/:id/assign
+       Permission: cases:assign
+       Body: { "pubkeys": string[] }
+       Response: Record
+
+POST   /api/records/:id/unassign
+       Permission: cases:assign
+       Body: { "pubkey": string }
+       Response: Record
+
+GET    /api/records/:id/suggest-assignees
+       Permission: cases:assign
+       Response: { "suggestions": AssigneeSuggestion[] }
+
+POST   /api/records/:id/contacts
+       Permission: cases:link
+       Body: { "contactId": string, "role": string }
+       Response: RecordContact
+
+DELETE /api/records/:id/contacts/:contactId
+       Permission: cases:link
+       Response: { "ok": true }
+
+GET    /api/records/:id/contacts
+       Permission: cases:read-*
+       Response: { "contacts": RecordContact[] }
+
+POST   /api/records/:id/interactions
+       Permission: cases:update | cases:update-own
+       Body: { "interactionType": string, "encryptedContent": hex, ... }
+       Response: CaseInteraction
+
+GET    /api/records/:id/interactions
+       Permission: cases:read-*
+       Response: { "interactions": CaseInteraction[], "total": number }
+
+DELETE /api/records/:id/interactions/:interactionId
+       Permission: cases:update
+       Response: { "ok": true }
+
+POST   /api/records/:id/reports
+       Permission: cases:link
+       Body: { "reportId": string }
+       Response: ReportCaseLink
+
+DELETE /api/records/:id/reports/:reportId
+       Permission: cases:link
+       Response: { "ok": true }
+
+GET    /api/records/:id/reports
+       Permission: cases:read-*
+       Response: { "links": ReportCaseLink[] }
+
+POST   /api/records/:id/notify-contacts
+       Permission: cases:update
+       Body: { "recipients": [{ "identifier": string, "channel": string, "message": string }] }
+       Response: { "notified": number, "skipped": number, "results": [...] }
+
+POST   /api/records/merge
+       Permission: cases:update
+       Body: { "primaryId": string, "secondaryId": string }
+       Response: { "primaryId": string, "secondaryId": string }
+```
+
+Hub-scoped: `/api/hubs/:hubId/records/*`
+
+### 4.26 Entity Schema (Case Management Configuration)
+
+Mounted at `/api/settings/cms`.
+
+```
+GET    /api/settings/cms/case-management
+       Permission: settings:read
+       Response: { "enabled": boolean }
+
+PUT    /api/settings/cms/case-management
+       Permission: settings:manage-cms
+       Body: { "enabled": boolean }
+       Response: { "enabled": boolean }
+
+GET    /api/settings/cms/auto-assignment
+       Permission: settings:read
+       Response: { "enabled": boolean }
+
+PUT    /api/settings/cms/auto-assignment
+       Permission: cases:manage
+       Body: { "enabled": boolean }
+       Response: { "enabled": boolean }
+
+GET    /api/settings/cms/cross-hub
+       Permission: settings:read
+       Response: { "enabled": boolean }
+
+PUT    /api/settings/cms/cross-hub
+       Permission: settings:manage-cms
+       Body: { "enabled": boolean }
+       Response: { "enabled": boolean }
+
+GET    /api/settings/cms/entity-types?hubId=
+       Permission: settings:read | cases:read-own | cases:read-assigned | cases:create
+       Response: { "entityTypes": EntityTypeDefinition[] }
+
+POST   /api/settings/cms/entity-types
+       Permission: cases:manage-types
+       Body: EntityTypeDefinition
+       Response: EntityTypeDefinition
+
+GET    /api/settings/cms/entity-types/:id
+       Permission: settings:read
+       Response: EntityTypeDefinition
+
+PATCH  /api/settings/cms/entity-types/:id
+       Permission: cases:manage-types
+       Body: partial EntityTypeDefinition
+       Response: EntityTypeDefinition
+
+DELETE /api/settings/cms/entity-types/:id
+       Permission: cases:manage-types
+       Response: { "ok": true }
+
+PATCH  /api/settings/cms/entity-types/:id/customize
+       Permission: cases:manage-types
+       Body: { "labelOverrides": Record<string, string>, ... }
+       Response: EntityTypeDefinition
+
+GET    /api/settings/cms/relationship-types
+       Permission: settings:read
+       Response: { "relationshipTypes": RelationshipTypeDefinition[] }
+
+POST   /api/settings/cms/relationship-types
+       Permission: cases:manage-types
+       Body: RelationshipTypeDefinition
+       Response: RelationshipTypeDefinition
+
+PATCH  /api/settings/cms/relationship-types/:id
+       Permission: cases:manage-types
+       Body: partial RelationshipTypeDefinition
+       Response: RelationshipTypeDefinition
+
+DELETE /api/settings/cms/relationship-types/:id
+       Permission: cases:manage-types
+       Response: { "ok": true }
+
+POST   /api/settings/cms/case-number
+       Permission: cases:create
+       Body: { "prefix": string, "year"?: number }
+       Response: { "number": string }
+
+GET    /api/settings/cms/templates
+       Permission: settings:read
+       Response: { "templates": Template[], "appliedTemplateIds": string[] }
+
+GET    /api/settings/cms/templates/updates
+       Permission: settings:read
+       Response: { "updates": TemplateUpdate[] }
+
+GET    /api/settings/cms/templates/:id
+       Permission: settings:read
+       Response: Template
+
+POST   /api/settings/cms/templates/apply
+       Permission: cases:manage-types
+       Body: { "templateId": string }
+       Response: { "applied": true, "entityTypes": number, ... }
+
+POST   /api/settings/cms/roles/from-template
+       Permission: system:manage-roles
+       Body: { "roles": SuggestedRole[] }
+       Response: { "created": Array<{ id, name }>, "count": number }
+
+GET    /api/settings/cms/report-types?hubId=
+       Permission: settings:read
+       Response: { "reportTypes": CmsReportTypeDefinition[] }
+
+POST   /api/settings/cms/report-types
+       Permission: cases:manage-types
+       Body: CmsReportTypeDefinition
+       Response: CmsReportTypeDefinition
+
+GET    /api/settings/cms/report-types/:id
+       Permission: settings:read
+       Response: CmsReportTypeDefinition
+
+PATCH  /api/settings/cms/report-types/:id
+       Permission: cases:manage-types
+       Body: partial CmsReportTypeDefinition
+       Response: CmsReportTypeDefinition
+
+DELETE /api/settings/cms/report-types/:id
+       Permission: cases:manage-types
+       Response: { "ok": true }
+```
+
+### 4.27 Recovery Group
+
+**Authenticated routes** (`/api/recovery-group/*`):
+
+```
+POST   /api/recovery-group/enroll
+       Permission: recovery:manage
+       Body: { "hubId": string, "threshold": number, "totalShares": number, "groupPublicKey": hex, "shareEnvelopes": [...], ... }
+       Response: { "ok": true }
+
+GET    /api/recovery-group/:hubId
+       Permission: recovery:view
+       Response: RecoveryGroupInfo
+
+POST   /api/recovery-group/session/:id/contribute
+       Permission: recovery:hold-share
+       Body: { "encryptedShare": hex, "contributorSignature": hex }
+       Response: { "contributions": number, "thresholdMet": boolean }
+
+GET    /api/recovery-group/session/:id
+       Permission: recovery:view
+       Response: RecoverySessionStatus
+
+POST   /api/recovery-group/session/:id/emergency
+       Permission: recovery:approve
+       Body: { "approverPubkey": hex, "justification": string, "signature": hex }
+       Response: { "ok": true }
+
+POST   /api/recovery-group/session/:id/cancel
+       Auth: Required
+       Response: { "ok": true }
+
+POST   /api/recovery-group/user-envelope
+       Auth: Required
+       Body: { "hubId": string, "envelope": hex }
+       Response: { "ok": true }
+
+POST   /api/recovery-group/shares/liveness
+       Permission: recovery:hold-share
+       Body: { "hubId": string, "proof": hex }
+       Response: { "ok": true }
+```
+
+**Unauthenticated routes** (rate-limited):
+
+```
+POST   /api/recovery-group/initiate
+       Body: { "hubId": string, "userIdentifier": string, "newDevicePubkey": hex }
+       Response: { "sessionId": string, "status": string }
+
+POST   /api/recovery-group/initiate/verify
+       Body: { "sessionId": string, "verificationCode": string }
+       Response: { "verified": boolean, "status": string }
+```
+
+### 4.28 Security Events
+
+```
+GET    /api/security-events?limit=&offset=
+       Auth: Required (own events only)
+       Response: { "events": SecurityEvent[], "total": number }
+
+GET    /api/admin/security-events?limit=&offset=
+       Permission: audit:read
+       Response: { "events": SecurityEvent[], "total": number }
+```
+
+### 4.29 Tags
+
+Hub-scoped: `/api/hubs/:hubId/tags/*`
+
+```
+GET    /api/hubs/:hubId/tags
+       Permission: tags:view
+       Response: { "tags": Tag[] }
+
+POST   /api/hubs/:hubId/tags
+       Permission: tags:create
+       Body: { "id": string, "name": string, "encryptedLabel": hex, "color": string, "encryptedCategory"?: hex }
+       Response: Tag
+
+PATCH  /api/hubs/:hubId/tags/:tagId
+       Permission: tags:manage
+       Body: partial Tag
+       Response: Tag
+
+DELETE /api/hubs/:hubId/tags/:tagId
+       Permission: tags:manage
+       Response: { "removedFromContacts": number }
+```
+
+### 4.30 Teams
+
+Hub-scoped: `/api/hubs/:hubId/teams/*`
+
+```
+GET    /api/hubs/:hubId/teams
+       Permission: teams:read
+       Response: { "teams": Team[] }
+
+POST   /api/hubs/:hubId/teams
+       Permission: teams:manage
+       Body: { "id": string, "encryptedName": hex, "encryptedDescription"?: hex }
+       Response: Team
+
+GET    /api/hubs/:hubId/teams/:teamId
+       Permission: teams:read
+       Response: Team
+
+PATCH  /api/hubs/:hubId/teams/:teamId
+       Permission: teams:manage
+       Body: partial Team
+       Response: Team
+
+DELETE /api/hubs/:hubId/teams/:teamId
+       Permission: teams:manage
+       Response: { "ok": true }
+
+GET    /api/hubs/:hubId/teams/:teamId/members
+       Permission: teams:read
+       Response: { "members": TeamMember[] }
+
+POST   /api/hubs/:hubId/teams/:teamId/members
+       Permission: teams:manage
+       Body: { "pubkeys": string[] }
+       Response: { "ok": true }
+
+DELETE /api/hubs/:hubId/teams/:teamId/members/:userPubkey
+       Permission: teams:manage
+       Response: { "ok": true }
+
+GET    /api/hubs/:hubId/teams/:teamId/contacts
+       Permission: teams:read
+       Response: { "assignments": ContactTeamAssignment[] }
+
+POST   /api/hubs/:hubId/teams/:teamId/contacts
+       Permission: teams:manage
+       Body: { "contactIds": string[] }
+       Response: { "ok": true }
+
+DELETE /api/hubs/:hubId/teams/:teamId/contacts/:contactId
+       Permission: teams:manage
+       Response: { "ok": true }
+```
+
+### 4.31 PUK (Per-User Key)
+
+```
+POST   /api/puk/envelopes
+       Auth: Required
+       Body: { "envelopes": [{ "deviceId": string, "generation": number, "envelope": hex }] }
+       Response: { "distributed": number, "envelopes": PukEnvelope[] }
+
+GET    /api/puk/envelopes/:deviceId
+       Auth: Required (own envelopes only)
+       Response: PukEnvelope
+```
+
+### 4.32 Sessions
+
+```
+GET    /api/sessions
+       Auth: Required
+       Response: { "sessions": Session[] }
+
+POST   /api/sessions/terminate-others
+       Auth: Required
+       Response: { "terminated": number }
+
+DELETE /api/sessions/:id
+       Auth: Required
+       Response: 204 No Content
+```
+
+### 4.33 Erasure (GDPR Right to be Forgotten)
+
+```
+GET    /api/erasure/me
+       Permission: erasure:request-self
+       Response: { "request": ErasureRequest | null }
+
+POST   /api/erasure/me
+       Permission: erasure:request-self
+       Body: { "justification": string }
+       Response: { "request": ErasureRequest }
+
+POST   /api/erasure/me/emergency
+       Permission: erasure:request-self
+       Body: { "justification": string, "coApproverPubkey": hex, "coApproverSignature": hex, "timestamp": number }
+       Response: { "request": ErasureRequest }
+
+DELETE /api/erasure/me
+       Permission: erasure:request-self
+       Response: { "ok": true }
+
+GET    /api/erasure/requests?status=&limit=&offset=
+       Permission: erasure:admin
+       Response: { "requests": ErasureRequest[], "total": number }
+
+POST   /api/erasure/:userId
+       Permission: erasure:admin
+       Body: { "justification": string }
+       Response: { "ok": true, "reEncryptionJobIds": string[] }
+
+POST   /api/erasure/:userId/wipe-device/:devicePubkey
+       Permission: erasure:admin
+       Body: { "reason": string }
+       Response: { "ok": true }
+
+GET    /api/erasure/re-encryption-jobs?userId=
+       Permission: erasure:admin
+       Response: { "jobs": ReEncryptionJob[] }
+```
+
+### 4.34 Retention
+
+```
+GET    /api/retention
+       Permission: retention:manage
+       Response: { "settings": RetentionSetting[] }
+
+PATCH  /api/retention
+       Permission: retention:manage
+       Body: { "settings": [{ "category": string, "retentionDays": number }] }
+       Response: { "settings": RetentionSetting[] }
+
+GET    /api/retention/platform-floors
+       Permission: system:manage-instance
+       Response: { "floors": RetentionFloor[] }
+
+PATCH  /api/retention/platform-floors
+       Permission: system:manage-instance
+       Body: { "floors": [{ "category": string, "minRetentionDays": number }] }
+       Response: { "floors": RetentionFloor[] }
+```
+
+Hub-scoped: `/api/hubs/:hubId/retention/*`
+
+### 4.35 Firehose (Inference Agent)
+
+```
+GET    /api/firehose
+       Permission: firehose:read
+       Response: { "connections": FirehoseConnection[] }
+
+POST   /api/firehose
+       Permission: firehose:manage
+       Body: FirehoseConnectionInput
+       Response: { "connection": FirehoseConnection }
+
+GET    /api/firehose/:id
+       Permission: firehose:read
+       Response: { "connection": FirehoseConnection }
+
+PATCH  /api/firehose/:id
+       Permission: firehose:manage
+       Body: partial FirehoseConnectionInput
+       Response: { "connection": FirehoseConnection }
+
+DELETE /api/firehose/:id
+       Permission: firehose:manage
+       Response: { "ok": true }
+
+POST   /api/firehose/:id/activate
+       Permission: firehose:manage
+       Response: { "connection": FirehoseConnection }
+
+POST   /api/firehose/:id/pause
+       Permission: firehose:manage
+       Response: { "connection": FirehoseConnection }
+
+GET    /api/firehose/:id/buffer
+       Permission: firehose:read
+       Response: { "connectionId": string, "bufferSize": number, "agentRunning": boolean }
+
+DELETE /api/firehose/:id/buffer
+       Permission: firehose:manage
+       Response: { "purged": number }
+
+POST   /api/firehose/:id/optout
+       Permission: firehose:read
+       Response: OptoutRecord
+
+DELETE /api/firehose/:id/optout
+       Permission: firehose:read
+       Response: { "ok": true }
+
+GET    /api/firehose/status
+       Permission: firehose:read
+       Response: { "statuses": FirehoseStatus[] }
+```
+
+Hub-scoped: `/api/hubs/:hubId/firehose/*`
+
+### 4.36 Geocoding
+
+```
+POST   /api/geocoding/autocomplete
+       Permission: notes:read-own (baseline volunteer access)
+       Body: { "query": string, "limit"?: number }
+       Response: LocationResult[]
+
+POST   /api/geocoding/geocode
+       Permission: notes:read-own
+       Body: { "address": string }
+       Response: LocationResult | null
+
+POST   /api/geocoding/reverse
+       Permission: notes:read-own
+       Body: { "lat": number, "lon": number }
+       Response: LocationResult | null
+```
+
+### 4.37 MLS (Message Layer Security)
+
+Hub-scoped: `/api/hubs/:hubId/mls/*`. Phase 6 feature for hub-state group messaging.
+
+```
+POST   /api/hubs/:hubId/mls/commit
+       Auth: Required (hub member)
+       Body: { "recipientDeviceIds": string[], "payload": base64url }
+       Response: 204 No Content
+
+POST   /api/hubs/:hubId/mls/welcome
+       Auth: Required (hub member)
+       Body: { "recipientDeviceId": string, "payload": base64url }
+       Response: 204 No Content
+
+GET    /api/hubs/:hubId/mls/messages?deviceId=
+       Auth: Required (hub member)
+       Response: { "messages": MlsMessage[] }
+
+POST   /api/hubs/:hubId/mls/key-packages?deviceId=
+       Auth: Required (hub member)
+       Body: { "keyPackages": base64url[] }
+       Response: 204 No Content
+```
+
+### 4.38 Additional Endpoints
+
+The following endpoints are also implemented. See `apps/worker/routes/` for full details:
+
+- **`/api/events/*`** and **`/api/admin/events/*`** — Event stream and admin event management
+- **`/api/system/*`** — System status and health diagnostics
+- **`/api/analytics/*`** — Usage analytics and metrics
+- **`/api/account/*`** — Account-level operations
+- **`/api/provider-setup/*`** — Telephony/messaging provider configuration
+- **`/api/provider-templates/*`** — Provider template management
+- **`/api/ring-groups/*`** — Call ring group management
+- **`/api/bans/platform/*`** — Platform-level ban management
+- **`/api/settings/platform/*`** — Platform-level settings
+- **`/api/signal-notification/*`** — Signal notifier integration
+- **`/api/hubs/:hubId/onboard/*`** — Hub onboarding flows
 
 ---
 
@@ -2504,15 +4601,18 @@ resolvePermissions(role_ids[], all_role_definitions[]):
 | `conversations:send-any` | Send messages in any conversation |
 | `conversations:update` | Reassign/close/reopen conversations |
 
-#### Volunteers
+#### Users
 
 | Permission | Description |
 |------------|-------------|
-| `volunteers:read` | List/view volunteer profiles |
-| `volunteers:create` | Create new volunteers |
-| `volunteers:update` | Update volunteer profiles |
-| `volunteers:delete` | Deactivate/delete volunteers |
-| `volunteers:manage-roles` | Assign/change volunteer roles |
+| `users:read` | List/view user profiles |
+| `users:create` | Create new users |
+| `users:update` | Update user profiles |
+| `users:delete` | Deactivate/delete users |
+| `users:manage-roles` | Assign/change user roles |
+| `users:read-cases` | View cases assigned to a user |
+| `users:read-metrics` | View user workload metrics |
+| `users:manage-devices` | Manage user devices and sigchain |
 
 #### Shifts
 
@@ -2603,13 +4703,13 @@ Full system access. Creates hubs, manages all settings and users.
 
 ```
 Permissions: [
-  "volunteers:*", "shifts:*", "settings:*", "audit:read",
+  "users:*", "shifts:*", "settings:*", "audit:read",
   "bans:*", "invites:*", "notes:read-all", "notes:create", "notes:update-own",
   "reports:*", "conversations:*", "calls:*", "blasts:*", "files:*"
 ]
 ```
 
-Full control within assigned hub(s). Manages volunteers, shifts, settings.
+Full control within assigned hub(s). Manages users, shifts, settings.
 
 #### Reviewer (`role-reviewer`)
 
@@ -2693,8 +4793,9 @@ Clients implementing this protocol need the following cryptographic capabilities
 | SHA-256 | `@noble/hashes/sha2` | SHA-256 |
 | HMAC | `@noble/hashes/hmac` | HMAC-SHA256 |
 | HKDF | `@noble/hashes/hkdf` | HKDF-SHA256 |
-| AEAD | `@noble/ciphers/chacha` | XChaCha20-Poly1305 |
-| PBKDF2 | Web Crypto API | PBKDF2-SHA256 |
+| AEAD | `@noble/ciphers/aes` | AES-256-GCM |
+| Argon2id | `argon2` (Rust) / `@noble/hashes/argon2` (JS) | Argon2id (64 MB, 3 iter, 4 lanes) |
+| PBKDF2 | Web Crypto API | PBKDF2-SHA256 (legacy backup/Stronghold only) |
 | Encoding | `@noble/hashes` | hex, utf8 |
 
 **Gotchas for non-JS implementations:**
@@ -2702,8 +4803,8 @@ Clients implementing this protocol need the following cryptographic capabilities
 - `schnorr` is a separate named export from secp256k1 (not the default).
 - WebSocket pubkeys are x-only (32 bytes) -- prepend `0x02` for ECDH compressed format.
 - `secp256k1.getSharedSecret()` returns 33 bytes; extract x-coordinate with `[1..33]`.
-- XChaCha20-Poly1305 uses a 24-byte nonce, not 12-byte (unlike standard ChaCha20-Poly1305).
-- The Poly1305 tag is 16 bytes, appended to the ciphertext by the AEAD implementation.
+- AES-256-GCM uses a 12-byte IV (nonce), not 24-byte.
+- The GCM authentication tag is 16 bytes, appended to the ciphertext by the AEAD implementation.
 
 ## Appendix B: Type Definitions Reference
 

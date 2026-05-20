@@ -23,10 +23,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import org.llamenos.hotline.R
 import org.llamenos.hotline.model.EntityTypeDefinition
-import org.llamenos.hotline.model.EnumOption
+import org.llamenos.protocol.EntityTypeDefinitionStatus
 
 /**
  * Quick status change bottom sheet.
@@ -105,7 +107,7 @@ fun QuickStatusSheet(
 
 @Composable
 private fun StatusOptionRow(
-    status: EnumOption,
+    status: EntityTypeDefinitionStatus,
     isSelected: Boolean,
     onClick: () -> Unit,
 ) {
@@ -147,7 +149,7 @@ private fun StatusOptionRow(
         if (isSelected) {
             Icon(
                 imageVector = Icons.Filled.Check,
-                contentDescription = "Current status",
+                contentDescription = stringResource(R.string.a11y_current_status),
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(20.dp),
             )

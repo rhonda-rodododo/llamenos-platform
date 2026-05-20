@@ -3,9 +3,9 @@ import { useTranslation } from 'react-i18next'
 import { useToast } from '@/lib/toast'
 import {
   enrollRecoveryGroup,
-  type RecoveryGroupInfo,
   type RecoveryGroupEnrollBody,
 } from '@/lib/api'
+import type { RecoveryGroupInfo } from '@protocol/schemas/recovery-group'
 import {
   shamirSplit,
   hpkeSeal,
@@ -62,7 +62,7 @@ export function RecoveryGroupSettingsSection({
   const [delayHours, setDelayHours] = useState(group?.delayHours ?? 24)
   const [emergencyFloorHours, setEmergencyFloorHours] = useState(group?.emergencyFloorHours ?? 4)
   const [selectedHolders, setSelectedHolders] = useState<string[]>(
-    group?.shareHolders.map((h) => h.holderPubkey) ?? [],
+    group?.shareHolderLiveness.map((h) => h.holderPubkey) ?? [],
   )
   const [saving, setSaving] = useState(false)
   const [showSaved, setShowSaved] = useState(false)
@@ -207,7 +207,7 @@ export function RecoveryGroupSettingsSection({
 
           <div className="space-y-2">
             <Label className="text-xs">{t('recoveryGroup.contactHealth')}</Label>
-            {group.shareHolders.map((holder) => {
+            {group.shareHolderLiveness.map((holder) => {
               const candidate = shareHolderCandidates.find(
                 (c) => c.pubkey === holder.holderPubkey,
               )

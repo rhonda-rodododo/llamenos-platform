@@ -72,23 +72,47 @@ class ApiService @Inject constructor(
 
     companion object {
         /**
-         * Certificate pinner for llamenos API domains.
+         * Let's Encrypt ISRG Root X1 — RSA 4096, cross-signed by DST Root CA X3.
+         * Pin targets the intermediate CA SPKI (not the leaf), so routine cert
+         * renewal does not break pinning.
          *
-         * Two pins per domain: leaf cert (primary) + Cloudflare intermediate CA (backup).
-         * See docs/security/CERTIFICATE_PINS.md for extraction procedure and rotation policy.
-         *
-         * PRODUCTION: replace placeholder values with real SHA-256 SPKI hashes before release.
-         * Extraction: bun run cert-pins:inject app.llamenos.org
+         * Extracted via:
+         *   curl -s https://letsencrypt.org/certs/isrgrootx1.pem \
+         *     | openssl x509 -pubkey -noout | openssl pkey -pubin -outform der \
+         *     | openssl dgst -sha256 -binary | base64
+         */
+        const val ISRG_ROOT_X1_HASH = "sha256/C5+lpZ7tcVwmwQIMcRtPbsQtWLABXhQzejna0wHFr8M="
+
+        /**
+         * Let's Encrypt ISRG Root X2 — ECDSA P-384 backup root.
+         * Minimum 2 distinct CA pins for backup (RFC 7469 §2.5 recommendation).
+         */
+        const val ISRG_ROOT_X2_HASH = "sha256/diGVwiVYbubAI3RW4hB9xU8e/CH2GGvrTcuvhPy/MzA="
+
+        /** Default pin hashes applied to whichever hub host the user configures. */
+        val DEFAULT_PIN_HASHES = listOf(ISRG_ROOT_X1_HASH, ISRG_ROOT_X2_HASH)
+
+        /**
+         * Build a [CertificatePinner] for the given hostname with the provided
+         * pin hashes. Used when the hub URL is configured or when dynamic pins
+         * are fetched from the server.
          *
          * Hard fail: OkHttp CertificatePinner rejects mismatches unconditionally.
          * No cleartext fallback. No soft-fail mode.
+         *
+         * @param hostname The hub server hostname (e.g. "app.example.org")
+         * @param hashes SHA-256 SPKI hashes prefixed with "sha256/"
          */
-        val certificatePinner: CertificatePinner = CertificatePinner.Builder()
-            // Leaf cert — primary pin (replace with output from cert-pins:inject)
-            .add("*.llamenos.org", "sha256/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
-            // Cloudflare intermediate CA — backup (longer-lived, rotate less often)
-            .add("*.llamenos.org", "sha256/BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=")
-            .build()
+        fun buildPinner(hostname: String, hashes: List<String> = DEFAULT_PIN_HASHES): CertificatePinner {
+            val builder = CertificatePinner.Builder()
+            for (hash in hashes) {
+                builder.add(hostname, hash)
+            }
+            return builder.build()
+        }
+
+        /** Initial no-op pinner — replaced when the hub URL is configured. */
+        val certificatePinner: CertificatePinner = CertificatePinner.DEFAULT
     }
 
     /**
@@ -97,6 +121,23 @@ class ApiService @Inject constructor(
      * automatically enqueued for replay when connectivity is restored.
      */
     var offlineQueue: OfflineQueue? = null
+
+    /**
+     * Rebuild the OkHttpClient with certificate pinning for the given hub hostname.
+     * Called when the hub URL is configured (e.g. during onboarding or hub switch).
+     *
+     * Skips pinning for localhost / 127.0.0.1 (local development).
+     *
+     * @param hostname The hub server hostname (e.g. "app.example.org")
+     * @param hashes Optional override pin hashes; defaults to Let's Encrypt CA pins
+     */
+    fun configurePinning(hostname: String, hashes: List<String> = DEFAULT_PIN_HASHES) {
+        val isLocalhost = hostname == "localhost" || hostname == "127.0.0.1"
+        val pinner = if (isLocalhost) CertificatePinner.DEFAULT else buildPinner(hostname, hashes)
+        client = client.newBuilder()
+            .certificatePinner(pinner)
+            .build()
+    }
 
     @PublishedApi
     internal val json: Json = Json {
@@ -322,12 +363,30 @@ class ApiService @Inject constructor(
     suspend fun submitShareLivenessProof(body: RecoveryLivenessRequest): OkResponse =
         request("POST", "/api/recovery-group/shares/liveness", body)
 
+    /** Tracks the hostname the pinner was last configured for. */
+    @PublishedApi
+    internal var pinnedHostname: String? = null
+
     /**
      * Get the configured hub URL from secure storage.
+     * Lazily configures certificate pinning on first call or when the hub URL changes.
      */
     @PublishedApi
     internal fun getBaseUrl(): String {
-        return keystoreService.retrieve(KeystoreService.KEY_HUB_URL)
+        val url = keystoreService.retrieve(KeystoreService.KEY_HUB_URL)
             ?: throw IllegalStateException("Hub URL not configured")
+
+        // Extract hostname and configure pinning if needed
+        val hostname = try {
+            java.net.URI(url).host ?: url
+        } catch (_: Exception) {
+            url
+        }
+        if (hostname != pinnedHostname) {
+            configurePinning(hostname)
+            pinnedHostname = hostname
+        }
+
+        return url
     }
 }
