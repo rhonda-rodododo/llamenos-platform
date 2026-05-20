@@ -2487,7 +2487,11 @@
   "ivr": {
     "atLeastOne": "Can it nhat mot ngon ngu duoc bat",
     "description": "Chon ngon ngu ma nguoi goi nghe trong menu dien thoai.",
-    "title": "Menu ngon ngu IVR"
+    "title": "Menu ngon ngu IVR",
+    "availableLanguages": "Available languages",
+    "enabledLanguages": "Enabled languages (ordered)",
+    "subMenu": "sub-menu",
+    "subMenuNote": "Languages after position 8 are in a sub-menu (caller presses 9 for more)."
   },
   "ivrAudio": {
     "delete": "Xóa",

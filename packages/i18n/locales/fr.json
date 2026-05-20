@@ -2487,7 +2487,11 @@
   "ivr": {
     "atLeastOne": "Au moins une langue doit être activée",
     "description": "Choisissez les langues que les appelants entendent dans le menu téléphonique.",
-    "title": "Menu vocal IVR"
+    "title": "Menu vocal IVR",
+    "availableLanguages": "Available languages",
+    "enabledLanguages": "Enabled languages (ordered)",
+    "subMenu": "sub-menu",
+    "subMenuNote": "Languages after position 8 are in a sub-menu (caller presses 9 for more)."
   },
   "ivrAudio": {
     "delete": "Supprimer",

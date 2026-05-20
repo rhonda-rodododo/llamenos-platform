@@ -2487,7 +2487,11 @@
   "ivr": {
     "atLeastOne": "कम से कम एक भाषा सक्षम होनी चाहिए",
     "description": "चुनें कि कॉल करने वाले फ़ोन मेनू में कौन सी भाषाएं सुनें।",
-    "title": "IVR भाषा मेनू"
+    "title": "IVR भाषा मेनू",
+    "availableLanguages": "Available languages",
+    "enabledLanguages": "Enabled languages (ordered)",
+    "subMenu": "sub-menu",
+    "subMenuNote": "Languages after position 8 are in a sub-menu (caller presses 9 for more)."
   },
   "ivrAudio": {
     "delete": "हटाएं",

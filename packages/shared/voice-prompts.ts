@@ -288,21 +288,21 @@ export const VOICE_PROMPTS: Record<string, Record<string, string>> = {
 /**
  * IVR language menu prompts -- each language announces itself in its native voice.
  * Keyed by language code, value is the phrase spoken in that language.
- * Languages not in IVR_LANGUAGES use [N] as a placeholder digit since their
- * position varies per hub configuration.
+ * [N] is a placeholder replaced at IVR generation time with the actual digit
+ * (varies per hub configuration).
  */
 export const IVR_PROMPTS: Record<string, string> = {
-  es: 'Para español, marque uno.',
-  en: 'For English, press two.',
-  zh: '如需中文服务，请按三。',
-  tl: 'Para sa Tagalog, pindutin ang apat.',
-  vi: 'Tiếng Việt, nhấn năm.',
-  ar: 'للعربية، اضغط ستة.',
-  fr: 'Pour le français, appuyez sur sept.',
-  ht: 'Pou Kreyòl, peze wit.',
-  ko: '한국어는 아홉 번을 눌러주세요.',
-  ru: 'Для русского языка нажмите ноль.',
-  hi: 'हिन्दी के लिए, [N] दबाएं।',
+  es: 'Para español, marque [N].',
+  en: 'For English, press [N].',
+  zh: '如需中文服务，请按[N]。',
+  tl: 'Para sa Tagalog, pindutin ang [N].',
+  vi: 'Tiếng Việt, nhấn [N].',
+  ar: 'للعربية، اضغط [N].',
+  fr: 'Pour le français, appuyez sur [N].',
+  ht: 'Pou Kreyòl, peze [N].',
+  ko: '한국어는 [N] 번을 눌러주세요.',
+  ru: 'Для русского языка нажмите [N].',
+  hi: 'हिन्दी के लिए, [N] दबाएँ।',
   pt: 'Para português, pressione [N].',
   de: 'Für Deutsch, drücken Sie [N].',
   uk: 'Для української мови натисніть [N].',
@@ -314,6 +314,23 @@ export const IVR_PROMPTS: Record<string, string> = {
   my: 'မြန်မာဘာသာအတွက် [N] နှိပ်ပါ။',
   quc: "Pa K'iche', tzukutij [N].",
   mix: "Tu'un savi ndáto, chu̱ʼun [N].",
+}
+
+/** "For more languages, press [N]" prompt for sub-menu overflow */
+export const IVR_MORE_PROMPTS: Record<string, string> = {
+  en: 'For more languages, press [N].',
+  es: 'Para más idiomas, marque [N].',
+}
+
+/** "To go back, press 0" prompt for sub-menu */
+export const IVR_BACK_PROMPTS: Record<string, string> = {
+  en: 'To go back, press 0.',
+  es: 'Para volver, marque 0.',
+}
+
+/** Replace [N] placeholder in an IVR prompt with the actual digit */
+export function resolveIvrPrompt(prompt: string, digit: string): string {
+  return prompt.replace(/\[N\]/g, digit)
 }
 
 /** Voicemail "thank you" messages, keyed by language code. */

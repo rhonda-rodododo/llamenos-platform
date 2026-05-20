@@ -2487,7 +2487,11 @@
   "ivr": {
     "atLeastOne": "Omwen yon lang dwe aktive",
     "description": "Chwazi ki lang moun k ap rele yo tande nan meni telefòn nan.",
-    "title": "Meni lang IVR"
+    "title": "Meni lang IVR",
+    "availableLanguages": "Available languages",
+    "enabledLanguages": "Enabled languages (ordered)",
+    "subMenu": "sub-menu",
+    "subMenuNote": "Languages after position 8 are in a sub-menu (caller presses 9 for more)."
   },
   "ivrAudio": {
     "delete": "Efase",

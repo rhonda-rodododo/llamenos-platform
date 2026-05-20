@@ -2487,7 +2487,11 @@
   "ivr": {
     "atLeastOne": "Kailangan ng kahit isang wikang naka-enable",
     "description": "Piliin kung aling mga wika ang maririnig ng tumatawag sa menu ng telepono.",
-    "title": "IVR Language Menu"
+    "title": "IVR Language Menu",
+    "availableLanguages": "Available languages",
+    "enabledLanguages": "Enabled languages (ordered)",
+    "subMenu": "sub-menu",
+    "subMenuNote": "Languages after position 8 are in a sub-menu (caller presses 9 for more)."
   },
   "ivrAudio": {
     "delete": "Tanggalin",

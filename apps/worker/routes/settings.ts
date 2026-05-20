@@ -260,7 +260,7 @@ settings.patch('/call',
 settings.get('/ivr-languages',
   describeRoute({
     tags: ['Settings'],
-    summary: 'Get IVR language settings',
+    summary: 'Get IVR language settings (optionally hub-scoped)',
     responses: {
       200: {
         description: 'IVR language settings',
@@ -276,7 +276,8 @@ settings.get('/ivr-languages',
   requirePermission('settings:manage-ivr'),
   async (c) => {
     const services = c.get('services')
-    const result = await services.settings.getIvrLanguages()
+    const hubId = c.req.query('hubId') || (c.get('hubId') as string | undefined)
+    const result = await services.settings.getIvrLanguages(hubId)
     return c.json(result)
   },
 )
@@ -284,7 +285,7 @@ settings.get('/ivr-languages',
 settings.patch('/ivr-languages',
   describeRoute({
     tags: ['Settings'],
-    summary: 'Update IVR language settings',
+    summary: 'Update IVR language settings (optionally hub-scoped)',
     responses: {
       200: {
         description: 'IVR language settings updated',
@@ -303,8 +304,9 @@ settings.patch('/ivr-languages',
     const pubkey = c.get('pubkey')
     const body = c.req.valid('json')
     const services = c.get('services')
-    const result = await services.settings.updateIvrLanguages(body as Parameters<typeof services.settings.updateIvrLanguages>[0])
-    await audit(services.audit, 'ivrLanguagesUpdated', pubkey, body as Record<string, unknown>)
+    const hubId = c.req.query('hubId') || (c.get('hubId') as string | undefined)
+    const result = await services.settings.updateIvrLanguages(body as Parameters<typeof services.settings.updateIvrLanguages>[0], hubId)
+    await audit(services.audit, 'ivrLanguagesUpdated', pubkey, { ...(body as Record<string, unknown>), hubId })
     return c.json(result)
   },
 )

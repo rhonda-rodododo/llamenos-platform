@@ -2431,7 +2431,11 @@
   "invitesEmpty": "No invites",
   "ivr": {
     "atLeastOne": "At least one language must be enabled",
-    "description": "Choose which languages callers hear in the phone menu. Disabled languages are skipped; digit mappings stay fixed.",
+    "availableLanguages": "Available languages",
+    "description": "Choose which languages callers hear in the phone menu and their order. Supports up to 22 languages with a sub-menu for overflow.",
+    "enabledLanguages": "Enabled languages (ordered)",
+    "subMenu": "sub-menu",
+    "subMenuNote": "Languages after position 8 are in a sub-menu (caller presses 9 for more).",
     "title": "IVR Language Menu"
   },
   "ivrAudio": {

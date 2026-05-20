@@ -2487,7 +2487,11 @@
   "ivr": {
     "atLeastOne": "يجب تفعيل لغة واحدة على الأقل",
     "description": "اختر اللغات التي يسمعها المتصلون في قائمة الهاتف.",
-    "title": "قائمة لغات IVR"
+    "title": "قائمة لغات IVR",
+    "availableLanguages": "Available languages",
+    "enabledLanguages": "Enabled languages (ordered)",
+    "subMenu": "sub-menu",
+    "subMenuNote": "Languages after position 8 are in a sub-menu (caller presses 9 for more)."
   },
   "ivrAudio": {
     "delete": "حذف",

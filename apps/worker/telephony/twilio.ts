@@ -18,9 +18,9 @@ import type {
 } from './adapter'
 import {
   DEFAULT_LANGUAGE,
-  IVR_LANGUAGES,
+  ivrIndexToDigit,
 } from '@shared/languages'
-import { IVR_PROMPTS, getPrompt, getVoicemailThanks } from '@shared/voice-prompts'
+import { IVR_PROMPTS, IVR_MORE_PROMPTS, getPrompt, getVoicemailThanks, resolveIvrPrompt } from '@shared/voice-prompts'
 
 /**
  * Twilio TwiML voice language codes, keyed by ISO 639-1 language code.
@@ -72,11 +72,6 @@ function hubXmlParam(hubId?: string): string {
   return hubId ? `&amp;hub=${escapeXml(encodeURIComponent(hubId))}` : ''
 }
 
-/** Build hub query param suffix for non-XML URLs */
-function _hubQueryParam(hubId?: string): string {
-  return hubId ? `&hub=${encodeURIComponent(hubId)}` : ''
-}
-
 /**
  * TwilioAdapter — Twilio implementation of TelephonyAdapter.
  */
@@ -92,14 +87,12 @@ export class TwilioAdapter implements TelephonyAdapter {
   }
 
   async handleLanguageMenu(params: LanguageMenuParams): Promise<TelephonyResponse> {
-    const enabled = params.enabledLanguages
+    const languages = params.enabledLanguages
     const hp = hubXmlParam(params.hubId)
-    // Filter IVR languages to only those enabled by admin
-    const activeLanguages = IVR_LANGUAGES.filter(code => enabled.includes(code))
 
     // If only 1 language enabled, skip the menu entirely
-    if (activeLanguages.length <= 1) {
-      const lang = activeLanguages[0] || DEFAULT_LANGUAGE
+    if (languages.length <= 1) {
+      const lang = languages[0] || DEFAULT_LANGUAGE
       return this.twiml(`
         <Response>
           <Redirect method="POST">/api/telephony/language-selected?auto=1&amp;forceLang=${lang}${hp}</Redirect>
@@ -107,18 +100,45 @@ export class TwilioAdapter implements TelephonyAdapter {
       `)
     }
 
-    // Build <Say> elements only for enabled languages, keeping fixed digit mapping
-    const sayElements = IVR_LANGUAGES.map((langCode) => {
-      if (!enabled.includes(langCode)) return ''
+    const hubParam = params.hubId ? `?hub=${escapeXml(encodeURIComponent(params.hubId))}` : ''
+
+    // >9 languages: two-level menu. First 8 get digits 1-8, digit 9 = "more", sub-menu has rest.
+    if (languages.length > 9) {
+      const mainMenu = languages.slice(0, 8)
+      const sayElements = mainMenu.map((langCode, i) => {
+        const digit = String(i + 1)
+        const voice = getTwilioVoice(langCode)
+        const prompt = IVR_PROMPTS[langCode]
+        if (!prompt) return ''
+        return `<Say language="${voice}">${escapeXml(resolveIvrPrompt(prompt, digit))}</Say>`
+      }).filter(Boolean).join('\n      ')
+
+      const morePrompt = IVR_MORE_PROMPTS[languages[0]] || IVR_MORE_PROMPTS['en']
+      const moreVoice = getTwilioVoice('en')
+
+      return this.twiml(`
+        <Response>
+          <Gather numDigits="1" action="/api/telephony/language-selected${hubParam}" method="POST" timeout="8">
+            ${sayElements}
+            <Say language="${moreVoice}">${escapeXml(resolveIvrPrompt(morePrompt, '9'))}</Say>
+          </Gather>
+          <Redirect method="POST">/api/telephony/language-selected?auto=1${hp}</Redirect>
+        </Response>
+      `)
+    }
+
+    // <=9 languages: single-level menu with digit assignment via ivrIndexToDigit
+    const sayElements = languages.map((langCode, i) => {
+      const digit = ivrIndexToDigit(i)
       const voice = getTwilioVoice(langCode)
       const prompt = IVR_PROMPTS[langCode]
       if (!prompt) return ''
-      return `<Say language="${voice}">${prompt}</Say>`
+      return `<Say language="${voice}">${escapeXml(resolveIvrPrompt(prompt, digit))}</Say>`
     }).filter(Boolean).join('\n      ')
 
     return this.twiml(`
       <Response>
-        <Gather numDigits="1" action="/api/telephony/language-selected${params.hubId ? `?hub=${escapeXml(encodeURIComponent(params.hubId))}` : ''}" method="POST" timeout="8">
+        <Gather numDigits="1" action="/api/telephony/language-selected${hubParam}" method="POST" timeout="8">
           ${sayElements}
         </Gather>
         <Redirect method="POST">/api/telephony/language-selected?auto=1${hp}</Redirect>

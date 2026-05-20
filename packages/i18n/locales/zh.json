@@ -2487,7 +2487,11 @@
   "ivr": {
     "atLeastOne": "至少需要启用一种语言",
     "description": "选择来电者在电话菜单中听到的语言。已禁用的语言将被跳过。",
-    "title": "IVR语言菜单"
+    "title": "IVR语言菜单",
+    "availableLanguages": "Available languages",
+    "enabledLanguages": "Enabled languages (ordered)",
+    "subMenu": "sub-menu",
+    "subMenuNote": "Languages after position 8 are in a sub-menu (caller presses 9 for more)."
   },
   "ivrAudio": {
     "delete": "删除",

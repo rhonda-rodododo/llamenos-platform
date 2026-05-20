@@ -2487,7 +2487,11 @@
   "ivr": {
     "atLeastOne": "Должен быть включен хотя бы один язык",
     "description": "Выберите языки, которые звонящие услышат в телефонном меню.",
-    "title": "Языковое меню IVR"
+    "title": "Языковое меню IVR",
+    "availableLanguages": "Available languages",
+    "enabledLanguages": "Enabled languages (ordered)",
+    "subMenu": "sub-menu",
+    "subMenuNote": "Languages after position 8 are in a sub-menu (caller presses 9 for more)."
   },
   "ivrAudio": {
     "delete": "Удалить",

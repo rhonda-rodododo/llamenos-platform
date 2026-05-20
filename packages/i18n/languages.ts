@@ -211,7 +211,8 @@ export const LANGUAGE_CODES = LANGUAGES.map(l => l.code)
 export const DEFAULT_LANGUAGE = 'en'
 
 /**
- * IVR language menu — ordered list of languages for phone keypad selection.
+ * IVR language menu — default ordered list of languages for phone keypad selection.
+ * This is the system-wide default, overridden by per-hub config in hub_settings.settings.ivrLanguages.
  * Digit assignment: index 0 → '1', index 1 → '2', ..., index 8 → '9', index 9 → '0'.
  * Languages not in this list rely on phone-prefix auto-detection.
  */
@@ -227,9 +228,10 @@ export function ivrIndexToDigit(index: number): string {
 }
 
 /** Look up language code from a caller's digit press. Returns undefined for invalid digits. */
-export function languageFromDigit(digit: string): string | undefined {
+export function languageFromDigit(digit: string, languages?: string[]): string | undefined {
+  const list = languages ?? IVR_LANGUAGES
   const index = digit === '0' ? 9 : parseInt(digit, 10) - 1
-  if (index >= 0 && index < IVR_LANGUAGES.length) return IVR_LANGUAGES[index]
+  if (index >= 0 && index < list.length) return list[index]
   return undefined
 }
 

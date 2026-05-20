@@ -29,8 +29,8 @@ describe('BandwidthAdapter', () => {
       expect(result.body).toContain('<Gather')
       expect(result.body).toContain('maxDigits="1"')
       expect(result.body).toContain('gatherUrl="/api/telephony/language-selected"')
-      expect(result.body).toContain('Para español, marque uno.')
-      expect(result.body).toContain('For English, press two.')
+      expect(result.body).toContain('Para español, marque 1.')
+      expect(result.body).toContain('For English, press 2.')
     })
 
     it('returns Redirect when only one language is enabled', async () => {
