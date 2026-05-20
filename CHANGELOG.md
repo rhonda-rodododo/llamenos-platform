@@ -404,6 +404,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add E2E tests for device linking and fix /link-device public path
 
 
+## 0.19.9 (2026-05-20)
+
+### Features
+
+- implement configurable TTS engine for IVR prompts (#409)
+- mobile E2EE — call metadata, file encryption, draft encryption (#400)
+- replace FCM with UnifiedPush/ntfy, strip APNs plaintext (#398)
+- fix 5 iOS feature stubs end-to-end (#417)
+
+### Fixes
+
+- fix desktop release pipeline — manifest, notarization, threat model (#396)
+- replace 7 hardcoded contentDescription strings with i18n a11y keys (#407)
+- replace z.infer type aliases with direct protocol schema imports (#413)
+- align EntityTypeDefinition, EntityFieldDefinition, and CustomFieldDef with protocol-generated types (#416)
+- replace placeholder cert pins with Let's Encrypt ISRG Root X1/X2 (#399)
+- i18n sweep + codegen migration cleanup (#402)
+- close backend gaps — volunteers alias, firehose atomic keypair, stale comments (#412)
+- add missing iOS string keys to unblock i18n:validate:all (#418)
+- replace ~38 hardcoded desktop strings with t() calls (#415)
+- implement contacts E2EE — HPKE encryption + blind indexes (#408)
+- resolve @wip security test scenarios (#414)
+- align types with codegen, add sigchain/PUK wrappers, fix i18n strings (#404)
+- wire deep links, sigchain verify, PUK rotation, LruCache (#411)
+- deduplicate schemas, fix integer types, add quicktype options (#406)
+- bulk rename Protocol* types to match codegen output (#419)
+- bulk rename Channels to SharedChannelConfig (#420)
+- resolve orphaned Category type and dedup envelope references (#421)
+- bulk rename all remaining typealias references to codegen names (#422)
+- rename HubKeyEnvelopeResponseEnvelope to SharedAdminEnvelope in tests
+- replace Cucumber world with sasWorld fixture in SAS verification steps (#423)
+- resolve all shard-2 test failures (#426)
+
 ## 0.19.8 (2026-05-19)
 
 ### Features
