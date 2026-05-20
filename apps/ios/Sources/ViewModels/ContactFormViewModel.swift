@@ -67,11 +67,11 @@ final class ContactFormViewModel {
         let trigramTokens = buildTrigramTokens(value: trimmedName, hubKey: hubKeyBytes)
 
         let summaryEnvelopes = summaryResult.envelopes.map {
-            CreateContactBodySummaryEnvelope(ct: $0.ct, enc: $0.enc, pubkey: $0.pubkey)
+            SharedAdminEnvelope(ct: $0.ct, enc: $0.enc, pubkey: $0.pubkey)
         }
 
         let piiEnvelopes = piiResult?.envelopes.map {
-            CreateContactBodyPiiEnvelope(ct: $0.ct, enc: $0.enc, pubkey: $0.pubkey)
+            SharedAdminEnvelope(ct: $0.ct, enc: $0.enc, pubkey: $0.pubkey)
         }
 
         let body = CreateContactBody(
@@ -130,11 +130,11 @@ final class ContactFormViewModel {
         let trigramTokens = buildTrigramTokens(value: trimmedName, hubKey: hubKeyBytes)
 
         let summaryEnvelopes = summaryResult.envelopes.map {
-            UpdateContactBodySummaryEnvelope(ct: $0.ct, enc: $0.enc, pubkey: $0.pubkey)
+            SharedAdminEnvelope(ct: $0.ct, enc: $0.enc, pubkey: $0.pubkey)
         }
 
         let piiEnvelopes = piiResult?.envelopes.map {
-            UpdateContactBodyPiiEnvelope(ct: $0.ct, enc: $0.enc, pubkey: $0.pubkey)
+            SharedAdminEnvelope(ct: $0.ct, enc: $0.enc, pubkey: $0.pubkey)
         }
 
         let body = UpdateContactBody(
