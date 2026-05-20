@@ -44,23 +44,23 @@ struct CaseRecord: Codable, Identifiable, Sendable {
 typealias CaseEnvelope = RecipientEnvelope
 
 // MARK: - CaseEnumOption
-// Typealias to generated `ReportTypeStatus` — identical fields:
+// Typealias to generated `EnumOption` — identical fields:
 // {value, label, color?, icon?, order, isClosed?, isDefault?, isDeprecated?}.
 // Used for statuses, severities, categories, and contact roles in entity type definitions.
 
-typealias CaseEnumOption = ReportTypeStatus
+typealias CaseEnumOption = EnumOption
 
-extension ReportTypeStatus: Identifiable {
+extension EnumOption: Identifiable {
     public var id: String { value }
 }
 
-extension ReportTypeStatus: Equatable {
-    public static func == (lhs: ReportTypeStatus, rhs: ReportTypeStatus) -> Bool {
+extension EnumOption: Equatable {
+    public static func == (lhs: EnumOption, rhs: EnumOption) -> Bool {
         lhs.value == rhs.value && lhs.label == rhs.label
     }
 }
 
-extension ReportTypeStatus {
+extension EnumOption {
     /// Convenience init matching the old `CaseEnumOption` / `StatusOption` argument order.
     init(value: String, label: String, color: String? = nil, icon: String? = nil,
          order: Int = 0, isDefault: Bool? = nil, isClosed: Bool? = nil, isDeprecated: Bool? = nil) {
@@ -73,7 +73,7 @@ extension ReportTypeStatus {
 // Client-only: generated `EntityTypeDefinition` uses typed enums for `category`,
 // `defaultAccessLevel`, non-optional booleans, `hubID` (CodingKey renamed), and
 // `EntityTypeDefinitionField` sub-types. This client model has iOS-specific optionality
-// and uses `CaseEnumOption` (= ReportTypeStatus) for all option arrays.
+// and uses `CaseEnumOption` (= EnumOption) for all option arrays.
 
 /// Template-driven schema defining a case type: fields, statuses, severities, numbering.
 struct CaseEntityTypeDefinition: Codable, Identifiable, Sendable {

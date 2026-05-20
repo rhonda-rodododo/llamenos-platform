@@ -213,10 +213,10 @@ struct FieldShowWhen: Codable, Equatable, Sendable {
 }
 
 // MARK: - StatusOption
-// Typealias to generated `ReportTypeStatus` (= CaseEnumOption) — identical fields:
+// Typealias to generated `EnumOption` (= CaseEnumOption) — identical fields:
 // {value, label, color?, icon?, order, isClosed?, isDefault?, isDeprecated?}.
 
-typealias StatusOption = ReportTypeStatus
+typealias StatusOption = EnumOption
 
 // MARK: - ClientReportTypesResponse
 
