@@ -10,12 +10,13 @@ import {
   getMyErasureRequest,
   createMyErasureRequest,
   cancelMyErasureRequest,
-  type ErasureRequest,
 } from '@/lib/api'
+import type { ErasureRequest } from '@protocol/schemas'
 import * as keyManager from '@/lib/key-manager'
 import { useToast } from '@/lib/toast'
 import { Settings2, Mic, Bell, User, Globe, Fingerprint, KeyRound, Trash2, Plus, Phone, Monitor, PhoneCall, Smartphone, Loader2, CheckCircle2, Bug, Send, MessageSquare, LogOut, Lock, AlertTriangle, Clock } from 'lucide-react'
-import { isWebAuthnAvailable, registerCredential, listCredentials, deleteCredential, type WebAuthnCredentialInfo } from '@/lib/webauthn'
+import { isWebAuthnAvailable, registerCredential, listCredentials, deleteCredential } from '@/lib/webauthn'
+import type { WebAuthnCredentialInfo } from '@protocol/schemas/webauthn'
 import { PhoneInput } from '@/components/phone-input'
 import {
   getProvisioningRoom,

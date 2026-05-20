@@ -9,7 +9,9 @@ import androidx.compose.material.icons.filled.Key
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import org.llamenos.hotline.R
 import org.llamenos.protocol.SessionResponse
 
 @Composable
@@ -37,7 +39,7 @@ fun SessionListScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Icon(Icons.Default.Key, contentDescription = "Session")
+                    Icon(Icons.Default.Key, contentDescription = stringResource(R.string.a11y_session))
                     Column(modifier = Modifier.weight(1f)) {
                         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(

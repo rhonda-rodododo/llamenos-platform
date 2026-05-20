@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '@/lib/toast'
-import { getErasureConfig, getPlatformSettings, type ErasureConfig } from '@/lib/api'
+import { getErasureConfig, getPlatformSettings } from '@/lib/api'
+import type { ErasureConfig } from '@protocol/schemas'
 import { ErasureConfigSection as ErasureConfigSectionInner } from '@/components/admin-settings/erasure-config-section'
 
 export function ErasureConfigSection() {

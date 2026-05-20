@@ -50,6 +50,8 @@ export const createShiftBodySchema = z.looseObject({
   userPubkeys: z.array(pubkeySchema),
 })
 
+export type CreateShiftBody = z.infer<typeof createShiftBodySchema>
+
 export const updateShiftBodySchema = z.looseObject({
   encryptedName: z.string().min(1).max(200).optional(),
   startTime: z.string().optional(),

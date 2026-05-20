@@ -56,6 +56,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.llamenos.hotline.R
 import org.llamenos.hotline.model.CustomFieldDef
+import org.llamenos.protocol.Context
+import org.llamenos.protocol.CustomFieldDefinitionType
 
 /**
  * Custom fields administration tab in the admin panel.
@@ -209,12 +211,12 @@ private fun CustomFieldCard(
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     AssistChip(
                         onClick = {},
-                        label = { Text(field.type, style = MaterialTheme.typography.labelSmall) },
+                        label = { Text(field.type.value, style = MaterialTheme.typography.labelSmall) },
                         modifier = Modifier.height(24.dp),
                     )
                     AssistChip(
                         onClick = {},
-                        label = { Text(field.context, style = MaterialTheme.typography.labelSmall) },
+                        label = { Text(field.context.value, style = MaterialTheme.typography.labelSmall) },
                         modifier = Modifier.height(24.dp),
                     )
                     if (field.required) {
@@ -252,18 +254,18 @@ private fun CustomFieldDialog(
     onSave: (CustomFieldDef) -> Unit,
 ) {
     var label by remember { mutableStateOf(existingField?.label ?: "") }
-    var type by remember { mutableStateOf(existingField?.type ?: "text") }
-    var context by remember { mutableStateOf(existingField?.context ?: "notes") }
+    var type by remember { mutableStateOf(existingField?.type?.value ?: "text") }
+    var context by remember { mutableStateOf(existingField?.context?.value ?: "all") }
     var required by remember { mutableStateOf(existingField?.required ?: false) }
-    var visibleToVolunteers by remember { mutableStateOf(existingField?.visibleToVolunteers ?: true) }
-    var editableByVolunteers by remember { mutableStateOf(existingField?.editableByVolunteers ?: true) }
+    var visibleToUsers by remember { mutableStateOf(existingField?.visibleToUsers ?: true) }
+    var editableByUsers by remember { mutableStateOf(existingField?.editableByUsers ?: true) }
     val options = remember { mutableStateListOf<String>().apply { existingField?.options?.let { addAll(it) } } }
     var newOption by remember { mutableStateOf("") }
     var typeExpanded by remember { mutableStateOf(false) }
     var contextExpanded by remember { mutableStateOf(false) }
 
     val fieldTypes = listOf("text", "number", "select", "checkbox", "textarea")
-    val contexts = listOf("notes", "reports", "all")
+    val contexts = listOf("all", "call-notes", "conversation-notes", "reports")
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -354,12 +356,12 @@ private fun CustomFieldDialog(
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(stringResource(R.string.field_visible_to_users), modifier = Modifier.weight(1f))
-                    Switch(checked = visibleToVolunteers, onCheckedChange = { visibleToVolunteers = it })
+                    Switch(checked = visibleToUsers, onCheckedChange = { visibleToUsers = it })
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(stringResource(R.string.field_editable_by_users), modifier = Modifier.weight(1f))
-                    Switch(checked = editableByVolunteers, onCheckedChange = { editableByVolunteers = it })
+                    Switch(checked = editableByUsers, onCheckedChange = { editableByUsers = it })
                 }
 
                 // Options for select type
@@ -406,18 +408,23 @@ private fun CustomFieldDialog(
             TextButton(
                 onClick = {
                     val slug = label.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
+                    val fieldType = CustomFieldDefinitionType.entries.find { it.value == type }
+                        ?: CustomFieldDefinitionType.Text
+                    val fieldContext = Context.entries.find { it.value == context }
+                        ?: Context.All
                     val field = CustomFieldDef(
                         id = existingField?.id ?: slug,
                         name = existingField?.name ?: slug,
                         label = label,
-                        type = type,
+                        type = fieldType,
                         required = required,
                         options = if (type == "select") options.toList() else null,
                         validation = null,
-                        visibleToVolunteers = visibleToVolunteers,
-                        editableByVolunteers = editableByVolunteers,
-                        context = context,
-                        order = existingField?.order ?: 0,
+                        visibleToUsers = visibleToUsers,
+                        editableByUsers = editableByUsers,
+                        context = fieldContext,
+                        order = existingField?.order ?: 0.0,
+                        createdAt = existingField?.createdAt ?: "",
                     )
                     onSave(field)
                 },

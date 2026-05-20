@@ -9,11 +9,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Loader2, Database } from 'lucide-react'
-import {
-  updateRetentionSettings,
-  type RetentionSetting,
-  type RetentionPlatformFloor,
-} from '@/lib/api'
+import { updateRetentionSettings } from '@/lib/api'
+import type { RetentionSetting, RetentionPlatformFloor } from '@protocol/schemas'
 
 const CATEGORIES = ['call_records', 'notes', 'messages', 'audit_log'] as const
 

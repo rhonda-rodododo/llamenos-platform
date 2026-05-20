@@ -17,8 +17,8 @@ import {
   deletePlatformBan,
   bulkImportPlatformBans,
   searchPlatformBans,
-  type PlatformBan,
 } from '@/lib/api'
+import type { PlatformBan } from '@protocol/schemas/bans'
 
 interface Props {
   bans: PlatformBan[]
@@ -189,10 +189,7 @@ export function PlatformBansSection({ bans, total, onRefresh, expanded, onToggle
                 <div className="font-mono text-xs">{ban.phoneHash.slice(0, 16)}...</div>
                 <div className="text-xs text-muted-foreground">{ban.reason}</div>
                 <div className="text-xs text-muted-foreground">
-                  {new Date(ban.createdAt).toLocaleDateString()}
-                  {ban.sourceHubId && (
-                    <Badge variant="outline" className="ml-2">{t('platformBans.promotedFrom')}</Badge>
-                  )}
+                  {new Date(ban.bannedAt).toLocaleDateString()}
                 </div>
               </div>
               <Button

@@ -90,10 +90,8 @@ jobs:
           echo "Building version: ${VERSION}"
           echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
 
-          # Update versionName in build.gradle.kts
-          sed -i "s/versionName = \"[^\"]*\"/versionName = \"${VERSION}\"/" apps/android/app/build.gradle.kts
-
-          # Increment versionCode based on run number (always increasing)
+          # versionName is managed by knope — do not patch here.
+          # versionCode is monotonic (GitHub run_number) for Play Store compliance.
           sed -i "s/versionCode = [0-9]*/versionCode = ${RUN_NUMBER}/" apps/android/app/build.gradle.kts
 
       - name: Build release AAB (Play Store)
@@ -234,10 +232,8 @@ jobs:
           echo "Building version: ${VERSION}"
           echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
 
-          # Update CFBundleShortVersionString in Info.plist
-          sed -i '' "s|<key>CFBundleShortVersionString</key>[[:space:]]*<string>[^<]*</string>|<key>CFBundleShortVersionString</key>\n\t<string>${VERSION}</string>|" apps/ios/Sources/App/Info.plist
-
-          # Use run number as build number
+          # CFBundleShortVersionString is managed by knope — do not patch here.
+          # CFBundleVersion (build number) is monotonic (GitHub run_number) for TestFlight.
           sed -i '' "s|<key>CFBundleVersion</key>[[:space:]]*<string>[^<]*</string>|<key>CFBundleVersion</key>\n\t<string>${RUN_NUMBER}</string>|" apps/ios/Sources/App/Info.plist
 
       - name: Setup Apple signing

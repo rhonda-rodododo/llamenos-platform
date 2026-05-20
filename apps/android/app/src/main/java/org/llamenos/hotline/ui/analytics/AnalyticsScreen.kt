@@ -114,7 +114,7 @@ fun AnalyticsScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.DateRange,
-                                contentDescription = "Custom date range",
+                                contentDescription = stringResource(R.string.a11y_custom_date_range),
                             )
                         }
                     }

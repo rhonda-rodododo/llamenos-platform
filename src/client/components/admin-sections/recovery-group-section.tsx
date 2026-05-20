@@ -5,9 +5,9 @@ import {
   getRecoveryGroup,
   getRecoveryGroupCandidates,
   getActiveHub,
-  type RecoveryGroupInfo,
   type RecoveryGroupCandidate,
 } from '@/lib/api'
+import type { RecoveryGroupInfo } from '@protocol/schemas/recovery-group'
 import { RecoveryGroupSettingsSection } from '@/components/admin-settings/recovery-group-section'
 
 export function RecoveryGroupSection() {

@@ -230,7 +230,7 @@ private fun EntityTypeCard(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    imageVector = categoryIcon(entityType.category),
+                    imageVector = categoryIcon(entityType.category.value),
                     contentDescription = null,
                     tint = parseHexColor(entityType.color) ?: MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(24.dp),
@@ -275,9 +275,9 @@ private fun EntityTypeCard(
                         icon = null,
                         dotColor = MaterialTheme.colorScheme.primary,
                     )
-                    if (entityType.category.isNotEmpty()) {
+                    if (entityType.category.value.isNotEmpty()) {
                         MetadataChip(
-                            text = entityType.category,
+                            text = entityType.category.value,
                             icon = Icons.Filled.Folder,
                         )
                     }
