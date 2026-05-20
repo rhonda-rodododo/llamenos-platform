@@ -446,14 +446,14 @@ Then('no duplicate subscribers are created', async ({ request, world }) => {
   expect(successes.length, `Expected at least 1 success, got statuses: ${JSON.stringify(statuses)}`).toBeGreaterThanOrEqual(1)
 
   // Verify no duplicates by listing subscribers
-  const listRes = await apiGet<{ subscribers: Array<{ identifier: string }> }>(
+  const listRes = await apiGet<{ subscribers: Array<{ identifierHash: string }> }>(
     request,
     `/hubs/${s.hubId}/blasts/subscribers`,
     ADMIN_SEED,
   )
   expect(listRes.status).toBe(200)
 
-  const identifiers = listRes.data.subscribers.map(sub => sub.identifier)
+  const identifiers = listRes.data.subscribers.map(sub => sub.identifierHash)
   const uniqueIdentifiers = new Set(identifiers)
   expect(uniqueIdentifiers.size).toBe(identifiers.length)
 })
