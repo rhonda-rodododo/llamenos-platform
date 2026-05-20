@@ -57,7 +57,7 @@ import androidx.compose.ui.unit.dp
 import org.llamenos.hotline.R
 import org.llamenos.hotline.model.CustomFieldDef
 import org.llamenos.protocol.Context
-import org.llamenos.protocol.CustomFieldDefinitionType
+import org.llamenos.hotline.model.CustomFieldDefinitionType
 
 /**
  * Custom fields administration tab in the admin panel.

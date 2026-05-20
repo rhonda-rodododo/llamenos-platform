@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 // ── Generated re-exports ────────────────────────────────────────────────────
 
 typealias SendMessageRequest = org.llamenos.protocol.SendMessageBody
-typealias CreateMessageEnvelope = org.llamenos.protocol.SendMessageBodyReaderEnvelope
+typealias CreateMessageEnvelope = org.llamenos.protocol.SharedAdminEnvelope
 
 // ── Client-specific types ───────────────────────────────────────────────────
 // The generated conversation types use different field names

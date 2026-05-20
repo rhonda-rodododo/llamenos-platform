@@ -56,8 +56,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import org.llamenos.hotline.R
-import org.llamenos.protocol.JoinFieldType
-import org.llamenos.protocol.ReportTypeDefinitionField
+import org.llamenos.hotline.model.JoinFieldType
+import org.llamenos.hotline.model.ReportTypeDefinitionField
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale

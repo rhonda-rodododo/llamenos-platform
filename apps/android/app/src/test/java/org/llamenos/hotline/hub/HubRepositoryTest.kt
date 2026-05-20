@@ -9,7 +9,7 @@ import org.junit.Test
 import org.llamenos.hotline.api.ApiService
 import org.llamenos.hotline.crypto.CryptoService
 import org.llamenos.protocol.HubKeyEnvelopeResponse
-import org.llamenos.protocol.HubKeyEnvelopeResponseEnvelope
+import org.llamenos.hotline.model.HubKeyEnvelopeResponseEnvelope
 
 class HubRepositoryTest {
 

@@ -270,7 +270,7 @@ private fun FieldsTab(
                                 OptionalBadge()
                             }
 
-                            if (field.accessLevel != org.llamenos.protocol.AccessLevel.All) {
+                            if (field.accessLevel != org.llamenos.protocol.SharedAccessLevel.All) {
                                 AccessLevelBadge(level = field.accessLevel.value)
                             }
 

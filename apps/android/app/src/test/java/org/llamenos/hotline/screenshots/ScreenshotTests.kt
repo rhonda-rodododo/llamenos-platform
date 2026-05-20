@@ -65,8 +65,8 @@ import org.llamenos.hotline.ui.triage.TriageUiState
 import org.llamenos.hotline.ui.triage.TriageViewModel
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import org.llamenos.protocol.ActiveCallResponseStatus
-import org.llamenos.protocol.CallHistoryResponseCall
+import org.llamenos.hotline.model.ActiveCallResponseStatus
+import org.llamenos.hotline.model.CallHistoryResponseCall
 import org.llamenos.protocol.Record
 import org.llamenos.protocol.Shift
 import org.robolectric.annotation.Config
@@ -371,8 +371,8 @@ class ScreenshotTests {
         label = "Support Case",
         labelPlural = "Support Cases",
         description = "Individual support case records",
-        category = org.llamenos.protocol.CreateEntityTypeBodyCategoryEnum.Case,
-        defaultAccessLevel = org.llamenos.protocol.DefaultAccessLevel.Assigned,
+        category = org.llamenos.protocol.SharedEntityTypeDefinitionCategory.Case,
+        defaultAccessLevel = org.llamenos.protocol.SharedDefaultAccessLevel.Assigned,
     )
 
     private val sampleUsers = listOf(
@@ -745,7 +745,7 @@ class ScreenshotTests {
         every { vm.uiState } returns MutableStateFlow(
             EventsUiState(
                 entityTypes = listOf(
-                    sampleEntityType.copy(category = org.llamenos.protocol.CreateEntityTypeBodyCategoryEnum.Event, label = "Event", labelPlural = "Events")
+                    sampleEntityType.copy(category = org.llamenos.protocol.SharedEntityTypeDefinitionCategory.Event, label = "Event", labelPlural = "Events")
                 ),
                 events = listOf(sampleRecord),
                 total = 1,

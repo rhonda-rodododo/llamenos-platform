@@ -1,8 +1,6 @@
 package org.llamenos.hotline.model
 
-import org.llamenos.protocol.ActiveCallsResponseCall
 import org.llamenos.protocol.BanListResponseBan
-import org.llamenos.protocol.CallHistoryResponseCall
 import org.llamenos.protocol.CallRecordResponse
 import org.llamenos.protocol.Calls
 import org.llamenos.protocol.AuditListResponseEntry

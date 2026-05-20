@@ -13,13 +13,13 @@ import kotlinx.serialization.json.JsonObject
 import org.junit.Rule
 import org.junit.Test
 import org.llamenos.protocol.ChannelConfig
-import org.llamenos.protocol.ChannelConfigClass
+import org.llamenos.hotline.model.ChannelConfigClass
 import org.llamenos.protocol.HubChannelType
 import org.llamenos.protocol.HubOnboardingState
 import org.llamenos.protocol.HubQuota
 import org.llamenos.protocol.HubUsage
 import org.llamenos.protocol.ProviderTemplate
-import org.llamenos.protocol.ProviderType
+import org.llamenos.hotline.model.ProviderType
 import org.llamenos.hotline.ui.hubsettings.ChannelChecklist
 import org.llamenos.hotline.ui.hubsettings.HubOnboardingFlow
 import org.llamenos.hotline.ui.hubsettings.HubUsageCard
@@ -79,19 +79,19 @@ class HubCommunicationsTest {
     )
 
     private val sampleUsage = HubUsage(
-        phoneNumbers = 2L,
-        smsSent = 150L,
-        callsReceived = 42L,
-        signalMessagesSent = 10L,
-        whatsAppMessagesSent = 25L,
+        phoneNumbers = 2,
+        smsSent = 150,
+        callsReceived = 42,
+        signalMessagesSent = 10,
+        whatsAppMessagesSent = 25,
     )
 
     private val sampleQuotas = HubQuota(
-        maxPhoneNumbers = 5L,
-        maxSMSPerMonth = 1000L,
-        maxCallsPerMonth = 500L,
-        maxSignalMessagesPerMonth = 500L,
-        maxWhatsAppMessagesPerMonth = 500L,
+        maxPhoneNumbers = 5,
+        maxSMSPerMonth = 1000,
+        maxCallsPerMonth = 500,
+        maxSignalMessagesPerMonth = 500,
+        maxWhatsAppMessagesPerMonth = 500,
     )
 
     // ── ProviderTemplateList ────────────────────────────────────────────────

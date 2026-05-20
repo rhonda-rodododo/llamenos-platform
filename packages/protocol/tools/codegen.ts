@@ -77,6 +77,427 @@ function stripAdditionalProperties(schema: object): object {
   return s
 }
 
+/**
+ * Canonical JSON representation for hashing: sorted keys, no whitespace.
+ */
+function canonicalize(obj: unknown): string {
+  if (obj === null || typeof obj !== 'object') return JSON.stringify(obj)
+  if (Array.isArray(obj)) return '[' + obj.map(canonicalize).join(',') + ']'
+  const sorted = Object.keys(obj as Record<string, unknown>).sort()
+  return '{' + sorted.map(k => JSON.stringify(k) + ':' + canonicalize((obj as Record<string, unknown>)[k])).join(',') + '}'
+}
+
+/**
+ * Singularize a PascalCase noun for array-item naming.
+ * Handles common English plural patterns found in our schemas.
+ */
+function singularize(name: string): string {
+  // Deliveries → Delivery, Categories → Category
+  if (name.endsWith('ies') && name.length > 3) {
+    return name.slice(0, -3) + 'y'
+  }
+  // Statuses → Status, Indexes → Index, Addresses → Address
+  if (name.endsWith('es') && name.length > 2) {
+    const stem = name.slice(0, -2)
+    if (/[sxz]$/i.test(stem) || /sh$/i.test(stem) || /ch$/i.test(stem)) {
+      return stem
+    }
+  }
+  // Envelopes → Envelope, Members → Member (but not "ss" words like Addresses)
+  if (name.endsWith('s') && !name.endsWith('ss') && name.length > 1) {
+    return name.slice(0, -1)
+  }
+  return name
+}
+
+/**
+ * Derive a PascalCase $def name from the property path leading to the inline object.
+ * e.g. "adminEnvelopes" → "AdminEnvelope" (strip trailing 's' for arrays),
+ *      "providerType" → "ProviderType"
+ *
+ * Prefixed with "Shared" to avoid conflicts with Swift/Kotlin built-in types
+ * (Error, Group, Location, etc.) and to signal these are extracted sub-schemas.
+ */
+function defNameFromPath(propertyName: string, isArrayItem: boolean): string {
+  let name = propertyName.charAt(0).toUpperCase() + propertyName.slice(1)
+  if (isArrayItem) name = singularize(name)
+  return 'Shared' + name
+}
+
+/**
+ * Deduplicate identical anonymous inline objects across all schemas.
+ *
+ * Walks each schema tree collecting inline `{ type: "object", properties: ... }` and
+ * inline `{ type: "string", enum: [...] }` sub-schemas. Groups them by canonical JSON hash.
+ * When duplicates are found (same shape appears in 2+ locations), extracts one copy as a
+ * new top-level schema entry and replaces all inline occurrences with `{ "$ref": "DefName" }`.
+ *
+ * quicktype's FlatSchemaStore resolves top-level `$ref` addresses by name, so these
+ * references produce stable named types instead of Purple/Fluffy invented names.
+ */
+function deduplicateAnonymousSchemas(
+  schemas: Array<{ name: string; schema: string }>,
+): Array<{ name: string; schema: string }> {
+  type InlineRef = {
+    schemaIdx: number
+    path: string[] // JSON pointer path segments
+    propertyName: string
+    isArrayItem: boolean
+    canonical: string
+  }
+
+  const parsed = schemas.map(s => JSON.parse(s.schema) as Record<string, unknown>)
+  const existingNames = new Set(schemas.map(s => s.name))
+  const inlinesByHash = new Map<string, InlineRef[]>()
+
+  function collectInlines(
+    node: Record<string, unknown>,
+    path: string[],
+    schemaIdx: number,
+  ) {
+    if (!node || typeof node !== 'object') return
+    const props = node['properties'] as Record<string, Record<string, unknown>> | undefined
+    if (!props) return
+
+    for (const [propName, propSchema] of Object.entries(props)) {
+      if (!propSchema || typeof propSchema !== 'object') continue
+      const propPath = [...path, 'properties', propName]
+
+      // Inline object with properties
+      if (propSchema['type'] === 'object' && propSchema['properties']) {
+        const canon = canonicalize(propSchema)
+        const ref: InlineRef = { schemaIdx, path: propPath, propertyName: propName, isArrayItem: false, canonical: canon }
+        if (!inlinesByHash.has(canon)) inlinesByHash.set(canon, [])
+        inlinesByHash.get(canon)!.push(ref)
+        collectInlines(propSchema, propPath, schemaIdx)
+      }
+
+      // Inline enum
+      if (propSchema['type'] === 'string' && Array.isArray(propSchema['enum'])) {
+        const canon = canonicalize(propSchema)
+        const ref: InlineRef = { schemaIdx, path: propPath, propertyName: propName, isArrayItem: false, canonical: canon }
+        if (!inlinesByHash.has(canon)) inlinesByHash.set(canon, [])
+        inlinesByHash.get(canon)!.push(ref)
+      }
+
+      // Array items
+      if (propSchema['type'] === 'array' && propSchema['items']) {
+        const items = propSchema['items'] as Record<string, unknown>
+        if (items['type'] === 'object' && items['properties']) {
+          const itemPath = [...propPath, 'items']
+          const canon = canonicalize(items)
+          const ref: InlineRef = { schemaIdx, path: itemPath, propertyName: propName, isArrayItem: true, canonical: canon }
+          if (!inlinesByHash.has(canon)) inlinesByHash.set(canon, [])
+          inlinesByHash.get(canon)!.push(ref)
+          collectInlines(items, itemPath, schemaIdx)
+        }
+      }
+
+      // anyOf/oneOf variants (e.g., nullable objects)
+      for (const combiner of ['anyOf', 'oneOf'] as const) {
+        const variants = propSchema[combiner] as Record<string, unknown>[] | undefined
+        if (!Array.isArray(variants)) continue
+        for (let i = 0; i < variants.length; i++) {
+          const variant = variants[i]
+          if (!variant || typeof variant !== 'object') continue
+          if (variant['type'] === 'object' && variant['properties']) {
+            const varPath = [...propPath, combiner, String(i)]
+            const canon = canonicalize(variant)
+            const ref: InlineRef = { schemaIdx, path: varPath, propertyName: propName, isArrayItem: false, canonical: canon }
+            if (!inlinesByHash.has(canon)) inlinesByHash.set(canon, [])
+            inlinesByHash.get(canon)!.push(ref)
+            collectInlines(variant, varPath, schemaIdx)
+          }
+          if (variant['type'] === 'string' && Array.isArray(variant['enum'])) {
+            const varPath = [...propPath, combiner, String(i)]
+            const canon = canonicalize(variant)
+            const ref: InlineRef = { schemaIdx, path: varPath, propertyName: propName, isArrayItem: false, canonical: canon }
+            if (!inlinesByHash.has(canon)) inlinesByHash.set(canon, [])
+            inlinesByHash.get(canon)!.push(ref)
+          }
+        }
+      }
+    }
+  }
+
+  for (let i = 0; i < parsed.length; i++) {
+    collectInlines(parsed[i], [], i)
+  }
+
+  // Phase 2: Extract duplicates as new top-level schemas, replace with $ref.
+  // Sort groups by deepest path first so inner schemas are replaced before their containers.
+  const sortedGroups = [...inlinesByHash.entries()]
+    .filter(([, refs]) => refs.length >= 2)
+    .sort(([, a], [, b]) => {
+      const maxA = Math.max(...a.map(r => r.path.length))
+      const maxB = Math.max(...b.map(r => r.path.length))
+      return maxB - maxA // deepest first
+    })
+
+  const extractedSchemas: Array<{ name: string; schema: string }> = []
+  const usedDefNames = new Set(existingNames)
+
+  for (const [, refs] of sortedGroups) {
+    // Sort refs by parent schema name for deterministic naming on collision
+    const sortedRefs = [...refs].sort((a, b) =>
+      schemas[a.schemaIdx].name.localeCompare(schemas[b.schemaIdx].name),
+    )
+
+    const baseName = defNameFromPath(sortedRefs[0].propertyName, sortedRefs[0].isArrayItem)
+    let defName = baseName
+
+    if (usedDefNames.has(defName)) {
+      // Disambiguate using parent schema name: SharedStatus → SharedActiveCallResponseStatus
+      // Try each parent (alphabetically) until we find a unique name
+      for (const ref of sortedRefs) {
+        const parentName = schemas[ref.schemaIdx].name
+        const propPart = baseName.replace(/^Shared/, '')
+        defName = 'Shared' + parentName + propPart
+        if (!usedDefNames.has(defName)) break
+      }
+      // Last resort: numeric suffix (should be rare)
+      let suffix = 2
+      while (usedDefNames.has(defName)) {
+        defName = baseName + suffix++
+      }
+    }
+    usedDefNames.add(defName)
+
+    // Register the extracted schema as a new top-level entry
+    extractedSchemas.push({ name: defName, schema: refs[0].canonical })
+
+    // Replace each inline occurrence with a store-level $ref
+    for (const ref of refs) {
+      const root = parsed[ref.schemaIdx]
+      let parent: Record<string, unknown> = root
+      let valid = true
+      for (let i = 0; i < ref.path.length - 1; i++) {
+        const next = parent[ref.path[i]]
+        if (!next || typeof next !== 'object') { valid = false; break }
+        parent = next as Record<string, unknown>
+      }
+      if (!valid) continue
+      const lastKey = ref.path[ref.path.length - 1]
+      parent[lastKey] = { '$ref': defName }
+    }
+  }
+
+  console.log(`  Deduplicated ${extractedSchemas.length} anonymous sub-schemas into top-level types`)
+
+  const updatedSchemas = parsed.map((p, i) => ({
+    name: schemas[i].name,
+    schema: JSON.stringify(p),
+  }))
+
+  return [...updatedSchemas, ...extractedSchemas]
+}
+
+/**
+ * Build integer field maps from JSON schemas.
+ * Returns:
+ *  - perType: Map<TypeName, Set<fieldName>> for per-type conversion
+ *  - alwaysInt: Set<fieldName> for fields that are ALWAYS integer across all schemas
+ *    (never appear as "type": "number"), safe for global conversion
+ */
+function buildIntegerFieldMaps(
+  schemas: Array<{ name: string; schema: string }>,
+): { perType: Map<string, Set<string>>; alwaysInt: Set<string> } {
+  const perType = new Map<string, Set<string>>()
+  // Track which fields appear as integer vs number globally
+  const asInt = new Map<string, number>()
+  const asNum = new Map<string, number>()
+
+  for (const { name, schema } of schemas) {
+    const parsed = JSON.parse(schema) as Record<string, unknown>
+    collectIntegerFieldsDeep(parsed, name, perType, asInt, asNum)
+  }
+
+  // Fields that are ALWAYS integer (never appear as number)
+  const alwaysInt = new Set<string>()
+  for (const [field, count] of asInt) {
+    if (count > 0 && !asNum.has(field)) {
+      alwaysInt.add(field)
+    }
+  }
+
+  return { perType, alwaysInt }
+}
+
+function collectIntegerFieldsDeep(
+  schema: Record<string, unknown>,
+  typeName: string,
+  perType: Map<string, Set<string>>,
+  asInt: Map<string, number>,
+  asNum: Map<string, number>,
+) {
+  const props = schema['properties'] as Record<string, Record<string, unknown>> | undefined
+  if (!props) return
+
+  for (const [propName, propSchema] of Object.entries(props)) {
+    if (!propSchema || typeof propSchema !== 'object') continue
+
+    if (propSchema['type'] === 'integer') {
+      if (!perType.has(typeName)) perType.set(typeName, new Set())
+      perType.get(typeName)!.add(propName)
+      asInt.set(propName, (asInt.get(propName) ?? 0) + 1)
+      continue
+    }
+
+    if (propSchema['type'] === 'number') {
+      asNum.set(propName, (asNum.get(propName) ?? 0) + 1)
+      continue
+    }
+
+    // Check anyOf/oneOf for nullable patterns
+    for (const combiner of ['anyOf', 'oneOf'] as const) {
+      const variants = propSchema[combiner] as Record<string, unknown>[] | undefined
+      if (!Array.isArray(variants)) continue
+      const hasInt = variants.some(v => v['type'] === 'integer')
+      const hasNum = variants.some(v => v['type'] === 'number')
+      if (hasInt) {
+        if (!perType.has(typeName)) perType.set(typeName, new Set())
+        perType.get(typeName)!.add(propName)
+        asInt.set(propName, (asInt.get(propName) ?? 0) + 1)
+      }
+      if (hasNum) {
+        asNum.set(propName, (asNum.get(propName) ?? 0) + 1)
+      }
+      // Also recurse into nullable objects
+      for (const v of variants) {
+        if (v && v['type'] === 'object' && v['properties']) {
+          collectIntegerFieldsDeep(v as Record<string, unknown>, typeName + propName.charAt(0).toUpperCase() + propName.slice(1), perType, asInt, asNum)
+        }
+      }
+    }
+
+    // Recurse into nested objects and array items
+    if (propSchema['type'] === 'object' && propSchema['properties']) {
+      collectIntegerFieldsDeep(
+        propSchema as Record<string, unknown>,
+        typeName + propName.charAt(0).toUpperCase() + propName.slice(1),
+        perType, asInt, asNum,
+      )
+    }
+    if (propSchema['type'] === 'array') {
+      const items = propSchema['items'] as Record<string, unknown> | undefined
+      if (items && items['type'] === 'object' && items['properties']) {
+        collectIntegerFieldsDeep(items, typeName + propName.charAt(0).toUpperCase() + propName.slice(1), perType, asInt, asNum)
+      }
+    }
+  }
+}
+
+/**
+ * Case-insensitive field name matching.
+ * quicktype's acronym-style may change casing (e.g., bufferTtlDays → bufferTTLDays),
+ * so compare lowercase to handle these discrepancies.
+ */
+function fieldMatchesSet(lowerFieldName: string, fieldSet: Set<string>): boolean {
+  for (const f of fieldSet) {
+    if (f.toLowerCase() === lowerFieldName) return true
+  }
+  return false
+}
+
+/**
+ * Post-process Swift output to fix integer types.
+ * Replace Double with Int for fields that are "type": "integer" in their source schema.
+ * Uses per-type mapping so a field named "limit" is only converted in types where it's
+ * declared as integer, not in types where it's declared as number.
+ */
+function fixSwiftIntegerTypes(
+  output: string,
+  integerPerType: Map<string, Set<string>>,
+  alwaysInt: Set<string>,
+): string {
+  if (integerPerType.size === 0 && alwaysInt.size === 0) return output
+
+  const lines = output.split('\n')
+  const result: string[] = []
+  let currentType: string | null = null
+
+  for (const line of lines) {
+    // Track which struct we're inside
+    const structMatch = line.match(/^struct (\w+):/)
+    if (structMatch) currentType = structMatch[1]
+    if (line === '}') currentType = null
+
+    if (currentType) {
+      const match = line.match(/^(\s+let\s+)([\w,\s]+)(:\s*)(Double)(\??\s*(?:$|\/\/.*$))/)
+      if (match) {
+        const [, prefix, fieldNames, colon, , suffix] = match
+        const names = fieldNames.split(',').map(n => n.trim())
+        // Try matching the current type name against the per-type map.
+        // quicktype may singularize names (e.g., CustomFieldsBodyField vs CustomFieldsBodyFields),
+        // so also check with 's' appended.
+        const typeIntFields = integerPerType.get(currentType)
+          ?? integerPerType.get(currentType + 's')
+
+        // Convert if ALL names on this line are integer:
+        // either in the per-type map for this type, or in the always-integer global set
+        const allAreIntegers = names.every(n => {
+          const lower = n.toLowerCase()
+          return fieldMatchesSet(lower, alwaysInt)
+            || (typeIntFields && fieldMatchesSet(lower, typeIntFields))
+        })
+        if (allAreIntegers) {
+          result.push(`${prefix}${fieldNames}${colon}Int${suffix}`)
+          continue
+        }
+      }
+    }
+
+    result.push(line)
+  }
+
+  return result.join('\n')
+}
+
+/**
+ * Post-process Kotlin output to fix integer types.
+ * Replace Long with Int for fields that are "type": "integer" in their source schema.
+ */
+function fixKotlinIntegerTypes(
+  output: string,
+  integerPerType: Map<string, Set<string>>,
+  alwaysInt: Set<string>,
+): string {
+  if (integerPerType.size === 0 && alwaysInt.size === 0) return output
+
+  const lines = output.split('\n')
+  const result: string[] = []
+  let currentType: string | null = null
+
+  for (const line of lines) {
+    const classMatch = line.match(/^data class (\w+)\s*\(/)
+    if (classMatch) currentType = classMatch[1]
+    if (line.trim() === ')' || line.trim() === ') {') currentType = null
+
+    if (currentType) {
+      const match = line.match(/^(\s+val\s+)(\w+)(:\s*)(Long)(\??(?:\s*=\s*.+?)?,?\s*$)/)
+      if (match) {
+        const [, prefix, fieldName, colon, , suffix] = match
+        const lowerField = fieldName.toLowerCase()
+        const typeIntFields = integerPerType.get(currentType)
+          ?? integerPerType.get(currentType + 's')
+        // Match field names case-insensitively because quicktype's acronym-style
+        // may change casing (e.g., bufferTtlDays → bufferTTLDays)
+        const isInt = fieldMatchesSet(lowerField, alwaysInt)
+          || (typeIntFields && fieldMatchesSet(lowerField, typeIntFields))
+        if (isInt) {
+          const fixedSuffix = suffix.replace(/(\s*=\s*)(\d+)L/g, '$1$2')
+          result.push(`${prefix}${fieldName}${colon}Int${fixedSuffix}`)
+          continue
+        }
+      }
+    }
+
+    result.push(line)
+  }
+
+  return result.join('\n')
+}
+
 // Generate types for a target language from all schemas
 async function generateForLanguage(
   language: LanguageName,
@@ -336,7 +757,7 @@ function postProcessKotlin(
   raw: string,
   schemas: Array<{ name: string; schema: string }>,
 ): string {
-  let output = raw.replace('package quicktype', 'package org.llamenos.protocol')
+  let output = raw
 
   // Build a map of schema defaults: { TypeName: { fieldName: defaultValue } }
   const defaultsMap = new Map<string, Map<string, unknown>>()
@@ -511,10 +932,18 @@ async function main() {
   console.log(`Found ${registry.length} schemas from Zod registry`)
 
   // Convert registry entries to JSON strings for quicktype
-  const allSchemas = registry.map(({ name, jsonSchema }) => ({
+  const strippedSchemas = registry.map(({ name, jsonSchema }) => ({
     name,
     schema: JSON.stringify(stripAdditionalProperties(jsonSchema)),
   }))
+
+  // Deduplicate identical anonymous inline objects into shared $defs
+  const allSchemas = deduplicateAnonymousSchemas(strippedSchemas)
+
+  // Build integer field maps for type post-processing
+  const { perType: integerPerType, alwaysInt: integerAlwaysInt } = buildIntegerFieldMaps(allSchemas)
+  const totalIntFields = [...integerPerType.values()].reduce((n, s) => n + s.size, 0)
+  console.log(`Found ${totalIntFields} integer fields across ${integerPerType.size} schemas (${integerAlwaysInt.size} always-integer)`)
 
   // Read crypto labels
   const cryptoLabelsData = JSON.parse(readFileSync(CRYPTO_LABELS_FILE, 'utf-8'))
@@ -528,19 +957,30 @@ async function main() {
       'swift-5-support': 'true',
       density: 'dense',
       'access-level': 'internal',
+      'acronym-style': 'pascal',
+      sendable: 'true',
     }),
     generateForLanguage('kotlin', allSchemas, {
       'just-types': 'true',
       framework: 'kotlinx',
+      'acronym-style': 'pascal',
+      package: 'org.llamenos.protocol',
     }),
   ])
 
   const header = '// Auto-generated by packages/protocol/tools/codegen.ts\n// Do not edit manually.\n\n'
 
-  // Post-process Swift: strip convenience initializer extensions, keep only types + CodingKeys.
-  // Also add Sendable conformance to all generated structs and enums.
-  const swiftContent = header + stripSwiftConvenienceExtensions(swiftLines) + '\n'
-  const kotlinContent = header + postProcessKotlin(kotlinLines.join('\n'), allSchemas) + '\n'
+  // Post-process Swift: strip convenience initializer extensions, fix integer types.
+  // Sendable conformance is now handled by quicktype's sendable renderer option.
+  let swiftOutput = stripSwiftConvenienceExtensions(swiftLines)
+  swiftOutput = fixSwiftIntegerTypes(swiftOutput, integerPerType, integerAlwaysInt)
+  const swiftContent = header + swiftOutput + '\n'
+
+  // Post-process Kotlin: inject defaults, fix integer types.
+  // Package name is now handled by quicktype's package renderer option.
+  let kotlinOutput = postProcessKotlin(kotlinLines.join('\n'), allSchemas)
+  kotlinOutput = fixKotlinIntegerTypes(kotlinOutput, integerPerType, integerAlwaysInt)
+  const kotlinContent = header + kotlinOutput + '\n'
 
   const swiftCryptoContent = generateSwiftCryptoLabels(cryptoLabels)
   const kotlinCryptoContent = generateKotlinCryptoLabels(cryptoLabels)

@@ -30,11 +30,11 @@ import org.llamenos.hotline.model.RecordsListResponse
 import org.llamenos.hotline.model.RecordContactsResponse
 import org.llamenos.hotline.model.UpdateRecordRequest
 import org.llamenos.protocol.CreateInteractionBody
-import org.llamenos.protocol.CreateInteractionBodyContentEnvelope
+import org.llamenos.hotline.model.CreateInteractionBodyContentEnvelope
 import org.llamenos.hotline.model.EntityTypeDefinition
 import org.llamenos.protocol.Evidence
 import org.llamenos.protocol.Interaction
-import org.llamenos.protocol.InteractionType
+import org.llamenos.hotline.model.InteractionType
 import org.llamenos.protocol.Record
 import org.llamenos.protocol.UnassignBody
 import org.llamenos.protocol.RecordContact

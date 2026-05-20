@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
 // ── Generated response types ────────────────────────────────────────────────
 
 typealias CallRecord = org.llamenos.protocol.CallRecordResponse
-typealias CallHistoryRecord = org.llamenos.protocol.CallHistoryResponseCall
+typealias CallHistoryRecord = org.llamenos.protocol.SharedCall
 
 /**
  * Active call — a call currently ringing or in progress.

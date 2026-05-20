@@ -13,7 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import org.llamenos.protocol.DeviceDetailListResponse
-import org.llamenos.protocol.DeviceDetailListResponseDevice
+import org.llamenos.hotline.model.DeviceDetailListResponseDevice
 
 @Composable
 fun DeviceListScreen(

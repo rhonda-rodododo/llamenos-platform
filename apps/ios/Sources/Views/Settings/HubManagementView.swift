@@ -129,7 +129,7 @@ struct HubManagementView: View {
 // MARK: - HubRow
 
 private struct HubRow: View {
-    let hub: Hub
+    let hub: SharedHub
     let isActive: Bool
     let onTap: () -> Void
 
