@@ -39,14 +39,14 @@ enum ClientChannelType: String, Codable, Sendable, CaseIterable {
     }
 }
 
-// MARK: - ProtocolConversationStatus UI Extensions
-// Generated `ProtocolConversationStatus` has: active, closed, waiting.
+// MARK: - SharedReportResponseStatus UI Extensions
+// Generated `SharedReportResponseStatus` has: active, closed, waiting.
 // We add displayName as an extension instead of maintaining a separate enum.
 
-typealias ConversationStatus = ProtocolConversationStatus
+typealias ConversationStatus = SharedReportResponseStatus
 
-extension ProtocolConversationStatus: CaseIterable {
-    public static var allCases: [ProtocolConversationStatus] {
+extension SharedReportResponseStatus: CaseIterable {
+    public static var allCases: [SharedReportResponseStatus] {
         [.active, .closed, .waiting]
     }
 
