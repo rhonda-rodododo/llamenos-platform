@@ -12,6 +12,8 @@ import org.linphone.core.Factory
 import org.linphone.core.MediaEncryption
 import org.llamenos.hotline.di.ApplicationScope
 import org.llamenos.hotline.hub.ActiveHubState
+import java.util.Collections
+import java.util.LinkedHashMap
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -32,10 +34,17 @@ class LinphoneService @Inject constructor(
 ) {
     private var core: Core? = null
     private val hubAccounts = ConcurrentHashMap<String, org.linphone.core.Account>()
-    // TODO: Add eviction (e.g. LruCache) for entries that are never consumed
-    // (call push arrives but Linphone never connects). Low risk for now given
-    // low per-session call volume on a crisis line.
-    private val pendingCallHubIds = ConcurrentHashMap<String, String>()  // callId → hubId
+    private val pendingCallHubIds: MutableMap<String, String> = Collections.synchronizedMap(
+        object : LinkedHashMap<String, String>(MAX_PENDING_CALLS + 1, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?): Boolean =
+                size > MAX_PENDING_CALLS
+        }
+    )
+
+    companion object {
+        /** Max pending call→hub mappings retained. Evicts oldest entries to bound memory. */
+        private const val MAX_PENDING_CALLS = 100
+    }
 
     fun initialize() {
         try {
