@@ -43,7 +43,9 @@ function LinkDevicePage() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // If user already has a stored key, redirect to login
+  // Skip in test builds — Playwright tests navigate here explicitly with existing keys
   useEffect(() => {
+    if (import.meta.env.PLAYWRIGHT_TEST) return
     hasStoredKey().then(exists => {
       if (exists) navigate({ to: '/login' })
     }).catch(() => {
@@ -74,7 +76,12 @@ function LinkDevicePage() {
       setStep('verify-sas')
     }
     window.addEventListener('test:provisioning-complete', handler)
-    return () => window.removeEventListener('test:provisioning-complete', handler)
+    // Signal to Playwright that the event listener is ready
+    document.body.setAttribute('data-test-provisioning-ready', 'true')
+    return () => {
+      window.removeEventListener('test:provisioning-complete', handler)
+      document.body.removeAttribute('data-test-provisioning-ready')
+    }
   }, [])
 
   async function startLinking() {

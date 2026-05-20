@@ -76,6 +76,9 @@ Given('the ephemeral key exchange completes', async ({ page, sasWorld }) => {
   await page.goto('/link-device')
   await page.waitForLoadState('domcontentloaded')
 
+  // Wait for the React useEffect to register the test:provisioning-complete listener
+  await page.locator('body[data-test-provisioning-ready="true"]').waitFor({ state: 'attached', timeout: 5000 })
+
   // Dispatch the test event that drives link-device.tsx to the verify-sas step
   await page.evaluate(
     ({ sasCode, encryptedNsec, primaryPubkey, ephemeralSecretHex }) => {
