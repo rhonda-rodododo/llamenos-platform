@@ -284,6 +284,53 @@ final class CryptoService: @unchecked Sendable {
         return result
     }
 
+    // MARK: - Contact Encryption (HPKE)
+
+    /// Encrypt contact data (summary or PII) for multiple readers.
+    /// Returns the ciphertext hex and per-reader HPKE envelopes.
+    ///
+    /// - Parameters:
+    ///   - jsonPayload: JSON string of the contact data to encrypt.
+    ///   - readerPubkeys: X25519 public keys of all intended readers.
+    ///   - label: Domain separation label (LABEL_CONTACT_PROFILE or LABEL_CONTACT_ID).
+    /// - Returns: Ciphertext hex and per-reader envelopes with pubkey, enc, ct.
+    func encryptContactData(jsonPayload: String, readerPubkeys: [String], label: String) throws -> (ciphertextHex: String, envelopes: [RecipientEnvelope]) {
+        guard let encPubkey = encryptionPubkeyHex else { throw CryptoServiceError.noKeyLoaded }
+        let allReaders = Array(Set([encPubkey] + readerPubkeys))
+        let plaintextHex = jsonPayload.data(using: .utf8)!.map { String(format: "%02x", $0) }.joined()
+        let result = try ffiMobileSymmetricEncrypt(plaintextHex: plaintextHex)
+        let ciphertextHex = result[0]
+        let keyHex = result[1]
+        var envelopes: [RecipientEnvelope] = []
+        for pubkey in allReaders {
+            let hpkeEnv = try ffiMobileHpkeSealKey(keyHex: keyHex, recipientPubkeyHex: pubkey, label: label, aadHex: "")
+            envelopes.append(RecipientEnvelope(ct: hpkeEnv.ct, enc: hpkeEnv.enc, pubkey: pubkey))
+        }
+        return (ciphertextHex, envelopes)
+    }
+
+    /// Decrypt contact data (summary or PII) using the device's HPKE key.
+    ///
+    /// - Parameters:
+    ///   - ciphertextHex: The encrypted contact data.
+    ///   - envelope: The HPKE envelope for this device.
+    ///   - label: Domain separation label (LABEL_CONTACT_PROFILE or LABEL_CONTACT_ID).
+    /// - Returns: Decrypted JSON string.
+    func decryptContactData(ciphertextHex: String, envelope: HpkeEnvelope, label: String) throws -> String {
+        guard isUnlocked else { throw CryptoServiceError.noKeyLoaded }
+        let keyHex = try ffiMobileHpkeOpenKey(envelope: envelope, expectedLabel: label, aadHex: "")
+        let plaintextHex = try ffiMobileSymmetricDecrypt(ciphertextHex: ciphertextHex, keyHex: keyHex)
+        guard let data = hexToData(plaintextHex), let result = String(data: data, encoding: .utf8) else {
+            throw CryptoServiceError.decryptionFailed("Invalid UTF-8 in decrypted contact data")
+        }
+        return result
+    }
+
+    /// Generate 32 random bytes as hex (for content keys, etc.).
+    func randomBytesHex() -> String {
+        ffiMobileRandomBytesHex()
+    }
+
     // MARK: - PUK Operations
 
     func createInitialPuk() throws -> String {
