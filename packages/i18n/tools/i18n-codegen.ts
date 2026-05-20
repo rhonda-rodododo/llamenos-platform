@@ -78,16 +78,23 @@ function escapeIOSString(s: string): string {
 // Convert i18next interpolation to Android format
 function toAndroidString(value: string): string {
   let index = 0
-  return value
-    .replace(/\{\{(\w+)\}\}/g, () => {
-      index++
-      return `%${index}$s`
-    })
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/'/g, "\\'")
-    .replace(/"/g, '\\"')
+  const interpolated = value.replace(/\{\{(\w+)\}\}/g, () => {
+    index++
+    return `%${index}$s`
+  })
+  // Single-pass XML/Android escaping avoids incomplete sanitization
+  // (chained .replace() with &→&amp; reintroduces the target character)
+  return interpolated.replace(/[&<>"'\\]/g, (ch) => {
+    switch (ch) {
+      case '&': return '&amp;'
+      case '<': return '&lt;'
+      case '>': return '&gt;'
+      case '"': return '\\"'
+      case "'": return "\\'"
+      case '\\': return '\\\\'
+      default: return ch
+    }
+  })
 }
 
 // Generate iOS Localizable.strings
@@ -113,7 +120,10 @@ function generateKotlinConstants(keys: Record<string, string>): string {
     .map(([key, value]) => {
       const constName = key.replace(/\./g, '_').toUpperCase()
       // Truncate long English values in comments
-      const sanitized = value.replace(/\n/g, '\\n').replace(/"/g, '\\"')
+      // Single-pass escaping for Kotlin string/comment content (backslash must be escaped first)
+      const sanitized = value.replace(/[\n\\"]/g, (ch) =>
+        ch === '\n' ? '\\n' : ch === '\\' ? '\\\\' : '\\"'
+      )
       const comment = sanitized.length > 60 ? sanitized.slice(0, 57) + '...' : sanitized
       return `    const val ${constName} = "${key}"  // "${comment}"`
     })
