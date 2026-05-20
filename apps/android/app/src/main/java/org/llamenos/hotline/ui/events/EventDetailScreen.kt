@@ -49,7 +49,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.llamenos.hotline.R
 import org.llamenos.hotline.model.EntityTypeDefinition
-import org.llamenos.hotline.model.EnumOption
 import org.llamenos.hotline.ui.cases.parseHexColor
 import org.llamenos.hotline.ui.components.EmptyState
 import org.llamenos.hotline.util.DateFormatUtils

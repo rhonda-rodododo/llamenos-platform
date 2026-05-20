@@ -142,8 +142,7 @@ data class FallbackGroupRequest(
 
 /**
  * Response from GET /api/admin/custom-fields.
- * Client-specific wrapper — uses the client CustomFieldDef type
- * (from CustomFieldModels.kt) which has String enum fields.
+ * CustomFieldDef is a typealias for the protocol-generated CustomFieldDefinition.
  */
 @Serializable
 data class CustomFieldsResponse(
