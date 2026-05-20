@@ -111,11 +111,7 @@ struct RecoveryVerifyResponse: Decodable {
     let expiresAt: String
 }
 
-struct ShareHolderLiveness: Decodable {
-    let holderPubkey: String
-    let lastLivenessProof: String?
-    let createdAt: String
-}
+// ShareHolderLiveness is now provided by protocol codegen (Types.swift)
 
 struct ShareEnvelopeResponse: Decodable {
     let shareEnvelope: String
@@ -546,14 +542,16 @@ final class APIService: @unchecked Sendable {
 
 // MARK: - Entity File Upload
 
-struct EntityFileUploadResponse: Decodable {
+/// Local API response type — distinct from the codegen EntityFileUploadResponse
+/// because the decoder uses convertFromSnakeCase and expects String dates (not Date).
+struct APIFileUploadResponse: Decodable {
     let fileId: String
     let uploadedAt: String
 }
 
 extension APIService {
     /// Upload encrypted file data as multipart/form-data to the entity-file endpoint.
-    func uploadEntityFile(encryptedData: Data, fileName: String) async throws -> EntityFileUploadResponse {
+    func uploadEntityFile(encryptedData: Data, fileName: String) async throws -> APIFileUploadResponse {
         guard let baseURL else { throw APIError.noBaseURL }
 
         let boundary = UUID().uuidString
@@ -587,7 +585,7 @@ extension APIService {
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
             throw APIError.requestFailed(statusCode: code, body: bodyString)
         }
-        return try decoder.decode(EntityFileUploadResponse.self, from: data)
+        return try decoder.decode(APIFileUploadResponse.self, from: data)
     }
 }
 
