@@ -12,13 +12,25 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.llamenos.hotline.api.ApiService
+import org.llamenos.hotline.crypto.AdminEnvelopeData
+import org.llamenos.hotline.crypto.CryptoService
 import org.llamenos.hotline.hub.ActiveHubState
 import org.llamenos.hotline.model.CallHistoryRecord
 import org.llamenos.hotline.model.CallHistoryResponse
 import javax.inject.Inject
 
+/**
+ * UI-facing wrapper around a call record with decrypted metadata.
+ * Admin users will see decrypted caller number and answered-by volunteer.
+ */
+data class DecryptedCallRecord(
+    val record: CallHistoryRecord,
+    val decryptedCallerNumber: String? = null,
+    val decryptedAnsweredBy: String? = null,
+)
+
 data class CallHistoryUiState(
-    val calls: List<CallHistoryRecord> = emptyList(),
+    val calls: List<DecryptedCallRecord> = emptyList(),
     val total: Int = 0,
     val currentPage: Int = 1,
     val isLoading: Boolean = false,
@@ -46,6 +58,7 @@ enum class CallStatusFilter(val queryParam: String?) {
 class CallHistoryViewModel @Inject constructor(
     private val apiService: ApiService,
     private val activeHubState: ActiveHubState,
+    private val cryptoService: CryptoService,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CallHistoryUiState())
@@ -89,9 +102,28 @@ class CallHistoryViewModel @Inject constructor(
                     }
                 }
                 val response = apiService.request<CallHistoryResponse>("GET", query)
+                val decryptedCalls = response.calls.map { call ->
+                    val meta = if (call.encryptedContent != null && call.adminEnvelopes != null) {
+                        val envelopes = call.adminEnvelopes!!.map { env ->
+                            AdminEnvelopeData(
+                                pubkey = env.pubkey,
+                                enc = env.enc,
+                                ct = env.ct,
+                            )
+                        }
+                        cryptoService.decryptCallMetadata(call.encryptedContent!!, envelopes)
+                    } else {
+                        null
+                    }
+                    DecryptedCallRecord(
+                        record = call,
+                        decryptedCallerNumber = meta?.callerNumber,
+                        decryptedAnsweredBy = meta?.answeredBy,
+                    )
+                }
                 _uiState.update {
                     it.copy(
-                        calls = if (page == 1) response.calls else it.calls + response.calls,
+                        calls = if (page == 1) decryptedCalls else it.calls + decryptedCalls,
                         total = response.total.toInt(),
                         currentPage = page,
                         isLoading = false,

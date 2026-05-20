@@ -234,9 +234,21 @@ final class DashboardViewModel {
                 path: apiService.hp("/api/calls/active")
             )
             if let first = response.calls.first {
+                // Attempt E2EE decryption of call metadata
+                var callerNumber = first.callerLast4
+                if let encryptedContent = first.encryptedContent,
+                   let envelopes = first.adminEnvelopes, !envelopes.isEmpty {
+                    let tuples = envelopes.map { (pubkey: $0.pubkey, enc: $0.enc, ct: $0.ct) }
+                    if let decrypted = cryptoService.decryptCallMetadata(
+                        encryptedContent: encryptedContent,
+                        adminEnvelopes: tuples
+                    ) {
+                        callerNumber = decrypted.callerNumber
+                    }
+                }
                 currentCall = ActiveCall(
                     id: first.id,
-                    callerNumber: first.callerLast4,
+                    callerNumber: callerNumber,
                     startedAt: DateFormatting.parseISO(first.startedAt) ?? Date(),
                     status: first.status?.rawValue ?? "unknown"
                 )
