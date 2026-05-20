@@ -42,12 +42,16 @@ export const webauthnLoginResponseSchema = z.object({
   pubkey: z.string(),
 })
 
+export const webauthnCredentialInfoSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  backedUp: z.boolean(),
+  createdAt: z.string(),
+  lastUsedAt: z.string(),
+})
+
+export type WebAuthnCredentialInfo = z.infer<typeof webauthnCredentialInfoSchema>
+
 export const webauthnCredentialsListResponseSchema = z.object({
-  credentials: z.array(z.object({
-    id: z.string(),
-    label: z.string().optional(),
-    backedUp: z.boolean().optional(),
-    createdAt: z.string().optional(),
-    lastUsedAt: z.string().optional(),
-  })),
+  credentials: z.array(webauthnCredentialInfoSchema),
 })

@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import org.llamenos.hotline.R
 import org.llamenos.hotline.model.CustomFieldDef
+import org.llamenos.protocol.CustomFieldDefinitionType
 import org.llamenos.hotline.service.TranscriptionService
 import org.llamenos.hotline.ui.components.LoadingOverlay
 
@@ -252,7 +253,7 @@ fun NoteCreateScreen(
 
                 // Dynamic custom fields
                 uiState.customFields.forEach { field ->
-                    if (field.editableByVolunteers) {
+                    if (field.editableByUsers) {
                         CustomFieldInput(
                             definition = field,
                             value = fieldValues[field.name] ?: "",
@@ -283,7 +284,7 @@ private fun CustomFieldInput(
     modifier: Modifier = Modifier,
 ) {
     when (definition.type) {
-        "text" -> {
+        CustomFieldDefinitionType.Text -> {
             OutlinedTextField(
                 value = value,
                 onValueChange = onValueChange,
@@ -296,7 +297,7 @@ private fun CustomFieldInput(
             )
         }
 
-        "number" -> {
+        CustomFieldDefinitionType.Number -> {
             OutlinedTextField(
                 value = value,
                 onValueChange = { newValue ->
@@ -315,7 +316,7 @@ private fun CustomFieldInput(
             )
         }
 
-        "select" -> {
+        CustomFieldDefinitionType.Select -> {
             var expanded by remember { mutableStateOf(false) }
 
             ExposedDropdownMenuBox(
@@ -354,7 +355,7 @@ private fun CustomFieldInput(
             }
         }
 
-        "checkbox" -> {
+        CustomFieldDefinitionType.Checkbox -> {
             Row(
                 modifier = modifier
                     .fillMaxWidth()
@@ -374,7 +375,7 @@ private fun CustomFieldInput(
             }
         }
 
-        "textarea" -> {
+        CustomFieldDefinitionType.Textarea -> {
             OutlinedTextField(
                 value = value,
                 onValueChange = onValueChange,

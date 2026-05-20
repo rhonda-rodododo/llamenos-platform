@@ -238,6 +238,8 @@ export const createEntityTypeBodySchema = z.looseObject({
   notifyContactsOnStatusChange: z.boolean().optional().default(false),
 })
 
+export type CreateEntityTypeBody = z.input<typeof createEntityTypeBodySchema>
+
 export const updateEntityTypeBodySchema = z.looseObject({
   label: z.string().min(1).max(200).optional(),
   labelPlural: z.string().min(1).max(200).optional(),

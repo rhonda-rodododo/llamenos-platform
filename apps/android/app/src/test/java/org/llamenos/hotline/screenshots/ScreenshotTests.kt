@@ -365,12 +365,13 @@ class ScreenshotTests {
 
     private val sampleEntityType = EntityTypeDefinition(
         id = "entity-type-001",
-        hubId = "hub-001",
+        hubID = "hub-001",
         name = "support_case",
         label = "Support Case",
         labelPlural = "Support Cases",
         description = "Individual support case records",
-        category = "case",
+        category = org.llamenos.protocol.CreateEntityTypeBodyCategoryEnum.Case,
+        defaultAccessLevel = org.llamenos.protocol.DefaultAccessLevel.Assigned,
     )
 
     private val sampleUsers = listOf(
@@ -743,7 +744,7 @@ class ScreenshotTests {
         every { vm.uiState } returns MutableStateFlow(
             EventsUiState(
                 entityTypes = listOf(
-                    sampleEntityType.copy(category = "event", label = "Event", labelPlural = "Events")
+                    sampleEntityType.copy(category = org.llamenos.protocol.CreateEntityTypeBodyCategoryEnum.Event, label = "Event", labelPlural = "Events")
                 ),
                 events = listOf(sampleRecord),
                 total = 1,
