@@ -591,33 +591,96 @@ class CryptoService @Inject constructor() {
         }
     }
 
-    /** Verify a single sigchain link signature against the expected signer pubkey. */
+    /** Verify a single sigchain link against an expected signer pubkey. */
     suspend fun verifySigchainLink(
         linkJson: String,
         expectedSignerPubkey: String,
     ): Boolean = withContext(computeDispatcher) {
         check(nativeLibLoaded) { "Native crypto library not loaded." }
         try {
-            org.llamenos.core.mobileSigchainVerifyLink(
-                linkJson = linkJson,
-                expectedSignerPubkey = expectedSignerPubkey,
-            )
+            org.llamenos.core.mobileSigchainVerifyLink(linkJson, expectedSignerPubkey)
         } catch (e: org.llamenos.core.CryptoException) {
             throw CryptoException("Sigchain link verification failed: ${e.message}", e)
         }
     }
 
-    /** Verify an entire sigchain and return the verified state. */
+    /** Verify a complete sigchain (all links). */
     suspend fun verifySigchain(
         linksJson: String,
     ): org.llamenos.core.SigchainVerifiedState = withContext(computeDispatcher) {
         check(nativeLibLoaded) { "Native crypto library not loaded." }
         try {
-            org.llamenos.core.mobileSigchainVerify(
-                linksJson = linksJson,
-            )
+            org.llamenos.core.mobileSigchainVerify(linksJson)
         } catch (e: org.llamenos.core.CryptoException) {
             throw CryptoException("Sigchain verification failed: ${e.message}", e)
+        }
+    }
+
+    // ---- PUK Rotation (CLKR) ----
+
+    /**
+     * Rotate the PUK to a new generation (Cascading Lazy Key Rotation).
+     * Called when membership or role changes require key rotation to exclude departed members.
+     *
+     * @param oldSeedHex Current PUK seed (hex)
+     * @param oldGen Current generation number
+     * @param remainingDevicesJson JSON array of [deviceId, encryptionPubkeyHex] tuples for remaining members
+     */
+    suspend fun rotatePuk(
+        oldSeedHex: String,
+        oldGen: Int,
+        remainingDevicesJson: String,
+    ): org.llamenos.core.RotatePukResult = withContext(computeDispatcher) {
+        check(nativeLibLoaded) { "Native crypto library not loaded." }
+        if (!isUnlocked) throw CryptoException("No key loaded")
+        try {
+            org.llamenos.core.mobilePukRotate(
+                oldSeedHex = oldSeedHex,
+                oldGen = oldGen.toUInt(),
+                remainingDevicesJson = remainingDevicesJson,
+            )
+        } catch (e: org.llamenos.core.CryptoException) {
+            throw CryptoException("PUK rotation failed: ${e.message}", e)
+        }
+    }
+
+    /** Unwrap a PUK seed from an HPKE envelope using the device's X25519 key. */
+    suspend fun unwrapPukSeed(
+        envelope: HpkeEnvelope,
+        expectedLabel: String,
+    ): String = withContext(computeDispatcher) {
+        check(nativeLibLoaded) { "Native crypto library not loaded." }
+        if (!isUnlocked) throw CryptoException("No key loaded")
+        try {
+            val ffiEnvelope = org.llamenos.core.HpkeEnvelope(
+                v = envelope.v.toUByte(),
+                labelId = envelope.labelId.toUByte(),
+                enc = envelope.enc,
+                ct = envelope.ct,
+            )
+            org.llamenos.core.mobilePukUnwrapSeed(
+                envelope = ffiEnvelope,
+                expectedLabel = expectedLabel,
+                aadHex = "",
+            )
+        } catch (e: org.llamenos.core.CryptoException) {
+            throw CryptoException("PUK seed unwrap failed: ${e.message}", e)
+        }
+    }
+
+    /** Derive PUK subkeys for a given seed + generation (stateless). */
+    suspend fun derivePukState(
+        seedHex: String,
+        generation: Int,
+    ): org.llamenos.core.PukState = withContext(computeDispatcher) {
+        check(nativeLibLoaded) { "Native crypto library not loaded." }
+        try {
+            org.llamenos.core.mobilePukDeriveState(
+                seedHex = seedHex,
+                generation = generation.toUInt(),
+            )
+        } catch (e: org.llamenos.core.CryptoException) {
+            throw CryptoException("PUK state derivation failed: ${e.message}", e)
         }
     }
 
