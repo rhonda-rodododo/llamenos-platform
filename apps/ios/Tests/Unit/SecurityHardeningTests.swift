@@ -172,25 +172,23 @@ final class SecurityHardeningTests: XCTestCase {
     // MARK: - Certificate Pinning Constants (H14)
 
     func testCertificatePinsNonEmpty() {
-        // Certificate pins must be non-empty. This test will fail until real
-        // pin hashes are injected from production. That is intentional — this
-        // test documents that placeholder pins must never ship to production without
-        // being replaced. See docs/security/CERTIFICATE_PINS.md.
+        // Static default pins must be non-empty — production uses Let's Encrypt CA pins
+        // (ISRG Root X1 + X2). Dynamic pins from /api/config/pins supplement these;
+        // static defaults remain active if the fetch fails.
         XCTAssertFalse(
-            CertificatePins.cloudflareHashes.isEmpty,
-            "CertificatePins.cloudflareHashes must not be empty — populate from docs/security/CERTIFICATE_PINS.md"
+            CertificatePins.defaultHashes.isEmpty,
+            "CertificatePins.defaultHashes must not be empty — must contain Let's Encrypt CA pins"
         )
     }
 
     func testCertificatePinsEnabledWhenHashesPopulated() {
-        // CertificatePins.isEnabled is a computed property: isEnabled == !cloudflareHashes.isEmpty.
-        // Since hashes are static let, verify the contract matches current state.
-        XCTAssertEqual(
-            CertificatePins.isEnabled,
-            !CertificatePins.cloudflareHashes.isEmpty,
-            "isEnabled should reflect whether pin hashes are configured"
+        // CertificatePins.isEnabled is a computed property: isEnabled == !active.hashes.isEmpty.
+        // Static defaults are always populated, so isEnabled must be true at launch.
+        XCTAssertFalse(
+            CertificatePins.defaultHashes.isEmpty,
+            "defaultHashes must be non-empty so pinning activates on launch"
         )
-        // With placeholder hashes present, pinning must be enabled.
+        // With default hashes loaded into active, pinning must be enabled.
         XCTAssertTrue(
             CertificatePins.isEnabled,
             "Pinning must be enabled when hashes are configured"
