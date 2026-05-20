@@ -25,7 +25,7 @@ final class MockHubAPIService: HubAPIServiceProtocol {
             // Return a valid stub envelope by default
             // HubKeyEnvelopeResponse is generated in packages/protocol/generated/swift/Types.swift
             return HubKeyEnvelopeResponse(
-                envelope: HubKeyEnvelopeResponseEnvelope(
+                envelope: SharedAdminEnvelope(
                     ct: "ddeeff",
                     enc: "112233",
                     pubkey: "aabbcc"

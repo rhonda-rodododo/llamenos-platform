@@ -18,7 +18,7 @@ final class TrackingHubAPIService: HubAPIServiceProtocol, @unchecked Sendable {
         lock.withLock { _fetchedHubIds.append(hubId) }
         if let error = hubKeyError { throw error }
         return HubKeyEnvelopeResponse(
-            envelope: HubKeyEnvelopeResponseEnvelope(
+            envelope: SharedAdminEnvelope(
                 ct: "112233",
                 enc: "aabbcc",
                 pubkey: "ddeeff"
