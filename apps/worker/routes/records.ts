@@ -1204,8 +1204,8 @@ records.get('/:id/reports',
  *
  * Requires cases:update permission.
  *
- * NOTE: getMessagingAdapter still uses DO stubs internally — this will be
- * migrated when MessagingAdapter is refactored to use services.
+ * Uses getMessagingAdapterFromService which resolves adapters via
+ * SettingsService (no Durable Objects dependency).
  */
 records.post('/:id/notify-contacts',
   describeRoute({

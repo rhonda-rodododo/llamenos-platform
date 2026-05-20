@@ -2,6 +2,7 @@ import type { BridgeConfig } from './types'
 import { createBridgeClient } from './client-factory'
 import { WebhookSender } from './webhook-sender'
 import { CommandHandler } from './command-handler'
+import { loadTtsConfigFromEnv } from './tts-engine'
 
 /** Load configuration from environment variables */
 function loadConfig(): BridgeConfig {
@@ -60,6 +61,7 @@ function loadConfig(): BridgeConfig {
     sipUsername: process.env.SIP_USERNAME,
     sipPassword: process.env.SIP_PASSWORD,
     connectionTimeoutMs,
+    ttsConfig: loadTtsConfigFromEnv(),
   }
 }
 
@@ -348,6 +350,9 @@ async function main(): Promise<void> {
   // Log startup info
   console.log(`[bridge] sip-bridge is running (PBX_TYPE=${config.pbxType})`)
   console.log(`[bridge] Webhook target: ${config.workerWebhookUrl}`)
+  console.log(
+    `[bridge] TTS engine: ${config.ttsConfig?.engine ?? 'none'} (cache: ${config.ttsConfig?.cacheDir ?? 'disabled'})`
+  )
 
   // Handle graceful shutdown
   const shutdown = () => {

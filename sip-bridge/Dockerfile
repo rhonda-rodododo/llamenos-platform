@@ -19,6 +19,9 @@ RUN bun build src/index.ts --outdir dist --target bun
 FROM oven/bun:1@sha256:856da45d07aeb62eb38ea3e7f9e1794c0143a4ff63efb00e6c4491b627e2a521
 WORKDIR /app
 
+# Install espeak-ng for local TTS support (used when TTS_ENGINE=espeak)
+RUN apt-get update && apt-get install -y --no-install-recommends espeak-ng && rm -rf /var/lib/apt/lists/*
+
 COPY --from=base /app/dist/ dist/
 COPY --from=base /app/package.json ./
 

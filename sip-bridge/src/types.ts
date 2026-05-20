@@ -357,4 +357,25 @@ export interface BridgeConfig {
   sipPassword?: string
   /** Maximum time (ms) to wait for initial PBX connection. Default 5 minutes. */
   connectionTimeoutMs: number
+  /** TTS engine configuration */
+  ttsConfig?: {
+    /** Selected engine: google | polly | espeak | none */
+    engine: 'google' | 'polly' | 'espeak' | 'none'
+    /** Directory for cached audio files */
+    cacheDir: string
+    /** Google Cloud API key */
+    googleApiKey?: string
+    /** Google Cloud voice name override */
+    googleVoiceName?: string
+    /** AWS access key ID */
+    awsAccessKeyId?: string
+    /** AWS secret access key */
+    awsSecretAccessKey?: string
+    /** AWS region */
+    awsRegion?: string
+    /** AWS Polly voice ID */
+    pollyVoiceId?: string
+    /** espeak-ng voice name */
+    espeakVoice?: string
+  }
 }
