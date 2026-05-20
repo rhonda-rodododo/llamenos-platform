@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { getRecoveryGroup, getActiveHub, type RecoveryGroupInfo } from '@/lib/api'
+import { getRecoveryGroup, getActiveHub } from '@/lib/api'
+import type { RecoveryGroupInfo } from '@protocol/schemas/recovery-group'
 import { SettingsSection, usePersistedExpanded } from '@/components/settings-section'
 import { Shield, ShieldOff } from 'lucide-react'
 

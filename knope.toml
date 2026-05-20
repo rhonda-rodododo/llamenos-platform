@@ -1,14 +1,19 @@
 [package]
-versioned_files = ["package.json", "apps/desktop/tauri.conf.json"]
+versioned_files = [
+    "package.json",
+    "apps/desktop/tauri.conf.json",
+    "apps/desktop/Cargo.toml",
+    { path = "apps/android/app/build.gradle.kts", regex = 'versionName = "(?<version>[0-9]+[.][0-9]+[.][0-9]+)"' },
+    { path = "apps/ios/Sources/App/Info.plist", regex = "<key>CFBundleShortVersionString</key>\n\t<string>(?<version>[0-9]+[.][0-9]+[.][0-9]+)</string>" },
+]
 changelog = "CHANGELOG.md"
 extra_changelog_sections = [
     { name = "Security", types = ["security"] },
     { name = "Performance", types = ["perf"] },
 ]
 
-# Rust crates are versioned separately — knope manages the JS/Tauri version.
-# packages/crypto has its own semver (0.x) and apps/desktop/Cargo.toml
-# tracks the Tauri shell version independently.
+# All platform versions are managed by knope — never manually edit version fields.
+# packages/crypto has its own semver (0.x) and is NOT managed here.
 
 [[workflows]]
 name = "prepare-release"

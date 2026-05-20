@@ -10,10 +10,8 @@ import {
   listTeamContacts,
   assignTeamContacts,
   unassignTeamContact,
-  type TeamResponse,
-  type TeamMemberResponse,
-  type ContactTeamAssignmentResponse,
 } from '@/lib/api'
+import type { TeamResponse, TeamMemberResponse, ContactTeamAssignmentResponse } from '@protocol/schemas'
 import { encryptHubField, decryptHubField } from '@/lib/platform'
 import { LABEL_TEAM_ENCRYPT } from '@shared/crypto-labels'
 

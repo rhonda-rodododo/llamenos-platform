@@ -4,9 +4,8 @@ import { useToast } from '@/lib/toast'
 import {
   getRetentionSettings,
   getRetentionPlatformFloors,
-  type RetentionSetting,
-  type RetentionPlatformFloor,
 } from '@/lib/api'
+import type { RetentionSetting, RetentionPlatformFloor } from '@protocol/schemas'
 import { RetentionSection as RetentionSectionInner } from '@/components/admin-settings/retention-section'
 
 export function RetentionSection() {

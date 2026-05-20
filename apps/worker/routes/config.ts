@@ -3,9 +3,11 @@ import { describeRoute, resolver } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { deriveServerKeypair } from '../lib/server-identity'
 import { CURRENT_API_VERSION, MIN_API_VERSION } from '../lib/api-versions'
-import type { EnabledChannels, Hub, SetupState } from '@shared/types'
-import { configResponseSchema, configVerifyResponseSchema } from '@protocol/schemas/config'
+import type { Hub, SetupState } from '@shared/types'
+import { configResponseSchema, configVerifyResponseSchema, configPinsResponseSchema } from '@protocol/schemas/config'
 import { publicErrors } from '../openapi/helpers'
+import { ed25519Sign } from '@llamenos/crypto/ffi'
+import { bytesToHex } from '@shared/encoding'
 
 const config = new Hono<AppEnv>()
 
@@ -132,6 +134,81 @@ config.get('/verify',
       verificationUrl: 'https://github.com/rhonda-rodododo/llamenos/releases',
       trustAnchor: 'GitHub Release checksums + SLSA provenance',
     })
+  })
+
+// MARK: - Certificate Pin List (H14)
+
+/** Let's Encrypt ISRG Root X1 — RSA 4096 intermediate CA SPKI SHA-256. */
+const ISRG_ROOT_X1_HASH = 'C5+lpZ7tcVwmwQIMcRtPbsQtWLABXhQzejna0wHFr8M='
+/** Let's Encrypt ISRG Root X2 — ECDSA P-384 backup root SPKI SHA-256. */
+const ISRG_ROOT_X2_HASH = 'diGVwiVYbubAI3RW4hB9xU8e/CH2GGvrTcuvhPy/MzA='
+
+/**
+ * GET /api/config/pins — Ed25519-signed certificate pin list.
+ *
+ * Clients fetch this on launch to support pin rotation without app updates.
+ * The response is signed with the server's Ed25519 key (derived from SERVER_SECRET)
+ * so clients can verify authenticity before trusting the pin list.
+ *
+ * The pin list contains SHA-256 SPKI hashes of intermediate CA public keys.
+ * Pinning against the intermediate (not the leaf) means routine cert renewal
+ * does not break pinning.
+ */
+config.get('/pins',
+  describeRoute({
+    tags: ['Config'],
+    summary: 'Get signed certificate pin list for TLS pinning',
+    responses: {
+      200: {
+        description: 'Signed certificate pin list',
+        content: {
+          'application/json': {
+            schema: resolver(configPinsResponseSchema),
+          },
+        },
+      },
+      ...publicErrors,
+    },
+  }),
+  (c) => {
+    const serverSecret = c.env.SERVER_SECRET
+    // Custom pins from env (comma-separated base64 hashes) or defaults
+    const envPins = c.env.CERT_PIN_HASHES
+    const pinHashes = envPins
+      ? envPins.split(',').map((h: string) => h.trim()).filter(Boolean)
+      : [ISRG_ROOT_X1_HASH, ISRG_ROOT_X2_HASH]
+
+    const now = new Date()
+    // Pin list valid for 30 days — clients should refresh periodically
+    const notAfter = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+
+    const pins = pinHashes.map((hash: string, i: number) => ({
+      algorithm: 'sha256',
+      hash,
+      label: i === 0 ? 'ISRG Root X1 (primary)' : i === 1 ? 'ISRG Root X2 (backup)' : `pin-${i}`,
+    }))
+
+    const payload = {
+      pins,
+      notBefore: now.toISOString(),
+      notAfter: notAfter.toISOString(),
+    }
+
+    // Sign the payload with the server's Ed25519 key for client verification
+    let signature = ''
+    if (serverSecret) {
+      try {
+        const keypair = deriveServerKeypair(serverSecret)
+        const message = new TextEncoder().encode(JSON.stringify(payload))
+        const sig = ed25519Sign(keypair.secretKey, message)
+        signature = bytesToHex(sig)
+      } catch {
+        // If signing fails, return unsigned — clients with the server pubkey
+        // will reject it, falling back to static pins (which is safe).
+      }
+    }
+
+    return c.json({ ...payload, signature })
   })
 
 export default config

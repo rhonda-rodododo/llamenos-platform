@@ -1,0 +1,21 @@
+[advisories]
+# RUSTSEC-2026-0124: Potential Panic on Overlong Ciphertext Buffer in
+# libcrux-chacha20poly1305 0.0.7
+#
+# Dependency chain: openmls -> openmls_rust_crypto -> hpke-rs -> hpke-rs-libcrux
+#   -> libcrux-aead -> libcrux-chacha20poly1305
+#
+# This is an indirect transitive dependency used in the MLS code path (behind the
+# `mls` feature flag). The vulnerability requires an adversarially crafted
+# overlong ciphertext buffer. In our HPKE-over-MLS usage, ciphertext buffers are
+# produced by the library itself (RFC 9180 outputs), not from untrusted external
+# input directly to this layer.
+#
+# No fix is available upstream: hpke-rs-libcrux 0.6.1 is the latest release and
+# hard-pins libcrux-aead = "=0.0.7" which in turn hard-pins
+# libcrux-chacha20poly1305 = "=0.0.7". We cannot force a patch without a new
+# upstream release.
+#
+# We will remove this ignore when hpke-rs-libcrux releases a version that depends
+# on libcrux-chacha20poly1305 >= 0.0.8.
+ignore = ["RUSTSEC-2026-0124"]
