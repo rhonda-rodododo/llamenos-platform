@@ -1,10 +1,10 @@
 import Foundation
 
 // MARK: - AppCaseEvent
-// Client-only: generated `ProtocolEvent`/`EventElement` use `BlindIndex` enum for
-// blind indexes, `Precision` enum for locationPrecision, `Double` for counts,
-// and `EventDetailEnvelope` for envelopes. This client model uses `AnyCodable` for
-// blind indexes and raw strings for simplicity.
+// Client-only: generated `EventListResponseEvent`/`ProtocolEvent` use `BlindIndex` enum
+// for blind indexes, `Precision` enum for locationPrecision, `Double` for counts,
+// and non-optional fields. This client model uses raw strings and optionals for
+// flexible API decoding.
 
 /// An event from the CMS — stored in CaseDO as a record with category='event'.
 /// Contains cleartext metadata (dates, location) plus E2EE encrypted details.
@@ -26,7 +26,7 @@ struct AppCaseEvent: Codable, Identifiable, Sendable {
     let statusHash: String
     let blindIndexes: [String: AnyCodable]?
 
-    // E2EE encrypted details
+    // E2EE encrypted details — uses CaseEnvelope (= RecipientEnvelope)
     let encryptedDetails: String?
     let detailEnvelopes: [CaseEnvelope]?
 
@@ -123,7 +123,8 @@ struct UpdateEventRequest: Codable, Sendable {
 }
 
 // MARK: - Linked Records/Reports
-// Client-only: generated link types use different field names and CodingKeys.
+// Client-only: generated `CaseEventListResponseLink` uses non-optional `linkedAt`/`linkedBy`
+// and CodingKey-renamed `eventID`/`recordID`. This client model uses camelCase and optionals.
 
 struct AppCaseEventLink: Codable, Sendable {
     let recordId: String

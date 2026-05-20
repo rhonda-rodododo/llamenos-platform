@@ -275,9 +275,9 @@ final class EventsViewModel {
             encryptedContent = result.encryptedContent
             envelopes = result.envelopes.map { env in
                 CaseEnvelope(
-                    pubkey: env.pubkey,
+                    ct: env.ct,
                     enc: env.enc,
-                    ct: env.ct
+                    pubkey: env.pubkey
                 )
             }
         } catch {

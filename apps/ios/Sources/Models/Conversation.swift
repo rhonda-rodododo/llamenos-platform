@@ -39,15 +39,16 @@ enum ClientChannelType: String, Codable, Sendable, CaseIterable {
     }
 }
 
-// MARK: - ConversationStatus
-// Client-only: UI display properties. Generated `ProtocolConversationStatus`
-// has same cases but no displayName.
+// MARK: - ProtocolConversationStatus UI Extensions
+// Generated `ProtocolConversationStatus` has: active, closed, waiting.
+// We add displayName as an extension instead of maintaining a separate enum.
 
-/// Conversation lifecycle states.
-enum ConversationStatus: String, Codable, Sendable, CaseIterable {
-    case active
-    case closed
-    case waiting
+typealias ConversationStatus = ProtocolConversationStatus
+
+extension ProtocolConversationStatus: CaseIterable {
+    public static var allCases: [ProtocolConversationStatus] {
+        [.active, .closed, .waiting]
+    }
 
     var displayName: String {
         switch self {
