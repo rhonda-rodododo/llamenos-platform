@@ -246,7 +246,7 @@ struct BlastRowView: View {
     }
 
     @ViewBuilder
-    private func statusBadge(_ status: ProtocolBlastStatus) -> some View {
+    private func statusBadge(_ status: SharedBlastListResponseStatus) -> some View {
         HStack(spacing: 4) {
             Image(systemName: status.icon)
                 .font(.brand(.caption))

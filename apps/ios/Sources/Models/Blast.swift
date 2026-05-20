@@ -19,7 +19,7 @@ struct AppBlast: Identifiable, Codable, Sendable {
     let sentAt: String?
     let scheduledAt: String?
 
-    var statusEnum: ProtocolBlastStatus { ProtocolBlastStatus(rawValue: status) ?? .draft }
+    var statusEnum: SharedBlastListResponseStatus { SharedBlastListResponseStatus(rawValue: status) ?? .draft }
 
     var messagePreview: String {
         // Extract first available message text
@@ -40,12 +40,12 @@ struct AppBlastsListResponse: Codable, Sendable {
     let total: Int
 }
 
-// MARK: - ProtocolBlastStatus UI Extensions
-// Generated `ProtocolBlastStatus` has: draft, sent, scheduled, cancelled, sending.
+// MARK: - SharedBlastListResponseStatus UI Extensions
+// Generated `SharedBlastListResponseStatus` has: draft, sent, scheduled, cancelled, sending.
 // We add UI display properties (icon, color, displayName) as extensions.
 
-extension ProtocolBlastStatus: CaseIterable {
-    public static var allCases: [ProtocolBlastStatus] {
+extension SharedBlastListResponseStatus: CaseIterable {
+    public static var allCases: [SharedBlastListResponseStatus] {
         [.draft, .sent, .scheduled, .cancelled, .sending]
     }
 
