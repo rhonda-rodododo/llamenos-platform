@@ -270,7 +270,8 @@ export interface SubscriberChannel {
 export interface Blast {
   id: string
   name: string
-  content: BlastContent
+  content: BlastContent | MultiBlastContent
+  defaultLanguage?: string        // fallback language code (default 'en')
   status: 'draft' | 'scheduled' | 'sending' | 'paused' | 'sent' | 'cancelled'
   targetChannels: MessagingChannelType[]
   targetTags: string[]            // empty = all subscribers
@@ -293,6 +294,34 @@ export interface BlastContent {
   smsText?: string
   whatsappTemplateId?: string
   rcsRichCard?: boolean
+}
+
+/** Multi-language blast content: Record<langCode, BlastContent> */
+export type MultiBlastContent = Record<string, BlastContent>
+
+/** Type guard: true if content is single-language (has `text` key directly, even if undefined) */
+export function isSingleBlastContent(content: BlastContent | MultiBlastContent): content is BlastContent {
+  return 'text' in content
+}
+
+/**
+ * Resolve the appropriate content for a subscriber's language.
+ * Fallback chain: subscriberLang -> defaultLang -> 'en' -> first available
+ */
+export function resolveBlastContent(
+  content: BlastContent | MultiBlastContent,
+  subscriberLang: string,
+  defaultLang = 'en',
+): BlastContent {
+  if (isSingleBlastContent(content)) return content
+
+  const multi = content as MultiBlastContent
+  return (
+    multi[subscriberLang] ??
+    multi[defaultLang] ??
+    multi['en'] ??
+    Object.values(multi)[0]
+  )
 }
 
 export type BlastDeliveryStatus = 'pending' | 'sent' | 'delivered' | 'failed' | 'opted_out' | 'skipped'

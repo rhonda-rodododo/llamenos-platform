@@ -19,6 +19,7 @@ import type {
   Subscriber,
   BlastSettings,
   BlastContent,
+  MultiBlastContent,
   BlastDeliveryStatus,
   BlastStats,
   SubscriberChannel,
@@ -49,7 +50,8 @@ export interface SubscriberFilters {
 export interface CreateBlastInput {
   hubId?: string
   name: string
-  content: BlastContent
+  content: BlastContent | MultiBlastContent
+  defaultLanguage?: string
   targetChannels: MessagingChannelType[]
   targetTags?: string[]
   targetLanguages?: string[]
@@ -58,7 +60,8 @@ export interface CreateBlastInput {
 
 export interface UpdateBlastInput {
   name?: string
-  content?: BlastContent
+  content?: BlastContent | MultiBlastContent
+  defaultLanguage?: string
   targetChannels?: MessagingChannelType[]
   targetTags?: string[]
   targetLanguages?: string[]
@@ -488,6 +491,7 @@ export class BlastsService {
         hubId: input.hubId,
         name: input.name,
         content: input.content,
+        defaultLanguage: input.defaultLanguage ?? 'en',
         status: 'draft',
         targetChannels: input.targetChannels,
         targetTags: input.targetTags ?? [],
@@ -531,6 +535,7 @@ export class BlastsService {
     const updates: Record<string, unknown> = { updatedAt: new Date() }
     if (input.name !== undefined) updates.name = input.name
     if (input.content !== undefined) updates.content = input.content
+    if (input.defaultLanguage !== undefined) updates.defaultLanguage = input.defaultLanguage
     if (input.targetChannels !== undefined) updates.targetChannels = input.targetChannels
     if (input.targetTags !== undefined) updates.targetTags = input.targetTags
     if (input.targetLanguages !== undefined) updates.targetLanguages = input.targetLanguages

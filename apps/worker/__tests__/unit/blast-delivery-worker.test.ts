@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
 // @ts-nocheck
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
@@ -17,6 +18,7 @@ function createMockBlastsService(overrides: Partial<BlastsService> = {}): Blasts
       hubId: 'hub-1',
       status: 'sending',
       content: { text: 'Hello world' } as BlastContent,
+      defaultLanguage: 'en',
       stats: { totalRecipients: 0, sent: 0, delivered: 0, failed: 0, optedOut: 0 },
     }),
     getBlastSettings: vi.fn().mockResolvedValue({
@@ -36,6 +38,7 @@ function createMockBlastsService(overrides: Partial<BlastsService> = {}): Blasts
       completed: true,
     }),
     isSubscriberActive: vi.fn().mockResolvedValue(true),
+    getSubscriberById: vi.fn().mockResolvedValue({ id: 'sub-1', language: 'en' }),
     markDeliverySent: vi.fn().mockResolvedValue(undefined),
     markDeliveryFailed: vi.fn().mockResolvedValue(undefined),
     markDeliveryOptedOut: vi.fn().mockResolvedValue(undefined),
@@ -108,6 +111,7 @@ describe('blast-delivery-worker', () => {
           hubId: 'hub-1',
           status: 'sending',
           content: { smsText: undefined, text: undefined } as unknown as BlastContent,
+          defaultLanguage: 'en',
         }),
         drainDeliveryBatch: vi.fn().mockResolvedValue([
           { id: 'del-1', subscriberId: 'sub-1', channel: 'sms', attempts: 0 },
@@ -155,6 +159,7 @@ describe('blast-delivery-worker', () => {
           hubId: 'hub-1',
           status: 'sending',
           content: { text: 'Default text', smsText: 'SMS override' } as BlastContent,
+          defaultLanguage: 'en',
         }),
         drainDeliveryBatch: vi.fn().mockResolvedValue([
           { id: 'del-1', subscriberId: 'sub-1', channel: 'sms', attempts: 0 },
@@ -200,6 +205,7 @@ describe('blast-delivery-worker', () => {
           hubId: 'hub-1',
           status: 'sending',
           content: { text: 'Default text' } as BlastContent,
+          defaultLanguage: 'en',
         }),
         drainDeliveryBatch: vi.fn().mockResolvedValue([
           { id: 'del-1', subscriberId: 'sub-1', channel: 'sms', attempts: 0 },
@@ -307,12 +313,21 @@ describe('blast-delivery-worker', () => {
             hubId: 'hub-1',
             status: 'sending',
             content: { text: 'Hello' } as BlastContent,
+            defaultLanguage: 'en',
+          })
+          .mockResolvedValueOnce({
+            id: 'blast-1',
+            hubId: 'hub-1',
+            status: 'sending',
+            content: { text: 'Hello' } as BlastContent,
+            defaultLanguage: 'en',
           })
           .mockResolvedValueOnce({
             id: 'blast-1',
             hubId: 'hub-1',
             status: 'cancelled',
             content: { text: 'Hello' } as BlastContent,
+            defaultLanguage: 'en',
           }),
         drainDeliveryBatch: vi.fn().mockResolvedValue([
           { id: 'del-1', subscriberId: 'sub-1', channel: 'sms', attempts: 0 },
@@ -482,6 +497,7 @@ describe('blast-delivery-worker', () => {
             mediaUrl: 'https://example.com/image.jpg',
             mediaType: 'image/jpeg',
           } as BlastContent,
+          defaultLanguage: 'en',
         }),
         drainDeliveryBatch: vi.fn().mockResolvedValue([
           { id: 'del-1', subscriberId: 'sub-1', channel: 'sms', attempts: 0 },

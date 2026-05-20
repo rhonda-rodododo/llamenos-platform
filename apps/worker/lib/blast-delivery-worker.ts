@@ -19,8 +19,8 @@
 import type { BlastsService } from '../services/blasts'
 import type { SettingsService } from '../services/settings'
 import type { MessagingAdapter, SendResult } from '../messaging/adapter'
-import type { MessagingChannelType, BlastContent, BlastSettings } from '@shared/types'
-import { DEFAULT_BLAST_SETTINGS } from '@shared/types'
+import type { MessagingChannelType, BlastContent, MultiBlastContent, BlastSettings } from '@shared/types'
+import { DEFAULT_BLAST_SETTINGS, resolveBlastContent } from '@shared/types'
 import { TokenBucketRateLimiter } from './rate-limiter'
 import { createLogger } from './logger'
 
@@ -148,7 +148,8 @@ async function processBlastBatch(blastId: string, hubId: string): Promise<void> 
 
   // Get the blast content + opt-out footer
   const blast = await deps.blastsService.getBlast(blastId)
-  const content = blast.content as BlastContent
+  const rawContent = blast.content as BlastContent | MultiBlastContent
+  const defaultLang = (blast as Record<string, unknown>).defaultLanguage as string | undefined ?? 'en'
   const optOutFooter = settings.optOutFooter ?? DEFAULT_BLAST_SETTINGS.optOutFooter
 
   // Drain a batch of pending deliveries
@@ -195,6 +196,11 @@ async function processBlastBatch(blastId: string, hubId: string): Promise<void> 
 
     const limiter = getRateLimiter(hubId, channel, settings)
     await limiter.waitForToken()
+
+    // Resolve subscriber language for multi-language content
+    const subscriberRow = await deps.blastsService.getSubscriberById(delivery.subscriberId)
+    const subscriberLang = subscriberRow?.language ?? 'en'
+    const content = resolveBlastContent(rawContent, subscriberLang, defaultLang)
 
     // Build message body with opt-out footer
     const messageBody = buildMessageBody(content, channel, optOutFooter, smsContentMode)

@@ -1652,7 +1652,7 @@ export async function listBlasts() {
   return request<{ blasts: Blast[] }>(hp('/blasts'))
 }
 
-export async function createBlast(data: { name: string; content: { body: string; mediaUrl?: string }; channels: string[]; targetTags?: string[]; targetLanguages?: string[]; scheduledAt?: string }) {
+export async function createBlast(data: { name: string; content: { body: string; mediaUrl?: string } | Record<string, { body: string; mediaUrl?: string }>; defaultLanguage?: string; channels: string[]; targetTags?: string[]; targetLanguages?: string[]; scheduledAt?: string }) {
   return request<{ blast: Blast }>(hp('/blasts'), {
     method: 'POST',
     body: JSON.stringify(data),

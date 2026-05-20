@@ -54,6 +54,7 @@ function mockBlast(status: string): typeof blasts.$inferSelect {
     hubId: 'hub-1',
     name: 'Test Blast',
     content: { text: 'Hello' },
+    defaultLanguage: 'en',
     status,
     targetChannels: ['sms'],
     targetTags: [],
