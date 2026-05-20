@@ -43,7 +43,9 @@ function LinkDevicePage() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // If user already has a stored key, redirect to login
+  // Skip in test builds — Playwright tests navigate here explicitly with existing keys
   useEffect(() => {
+    if (import.meta.env.PLAYWRIGHT_TEST) return
     hasStoredKey().then(exists => {
       if (exists) navigate({ to: '/login' })
     }).catch(() => {
@@ -74,7 +76,12 @@ function LinkDevicePage() {
       setStep('verify-sas')
     }
     window.addEventListener('test:provisioning-complete', handler)
-    return () => window.removeEventListener('test:provisioning-complete', handler)
+    // Signal to Playwright that the event listener is ready
+    document.body.setAttribute('data-test-provisioning-ready', 'true')
+    return () => {
+      window.removeEventListener('test:provisioning-complete', handler)
+      document.body.removeAttribute('data-test-provisioning-ready')
+    }
   }, [])
 
   async function startLinking() {
@@ -249,9 +256,9 @@ function LinkDevicePage() {
               <CardDescription>{t('deviceLink.verifySASDesc')}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="rounded-lg border-2 border-primary/20 bg-primary/5 p-6 text-center" data-testid="sas-code">
+              <div className="rounded-lg border-2 border-primary/20 bg-primary/5 p-6 text-center" data-testid="sas-code-container">
                 <p className="text-xs text-muted-foreground mb-2">{t('deviceLink.securityCode')}</p>
-                <p className="text-4xl font-mono font-bold tracking-[0.3em]">{sasCode}</p>
+                <p className="text-4xl font-mono font-bold tracking-[0.3em]" data-testid="sas-code">{sasCode}</p>
               </div>
               <p className="text-sm text-muted-foreground text-center">{t('deviceLink.compareCodes')}</p>
               <div className="flex gap-2">

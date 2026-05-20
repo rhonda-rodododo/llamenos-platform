@@ -100,7 +100,15 @@ export function SetupWizard({ needsBootstrap = false }: { needsBootstrap?: boole
   const [pinValue, setPinValue] = useState('')
   const [pinError, setPinError] = useState('')
   const [pinLoading, setPinLoading] = useState(false)
+  const [hasStoredKey, setHasStoredKey] = useState(false)
   const stepHeadingRef = useRef<HTMLHeadingElement>(null)
+
+  // Check for stored keys asynchronously (hasStoredKey is async)
+  useEffect(() => {
+    if (bootstrapComplete && !isKeyUnlocked) {
+      keyManager.hasStoredKey().then(setHasStoredKey)
+    }
+  }, [bootstrapComplete, isKeyUnlocked])
 
   // Focus step heading on step change
   useEffect(() => {
@@ -122,7 +130,7 @@ export function SetupWizard({ needsBootstrap = false }: { needsBootstrap?: boole
   }, [step])
 
   // After hard refresh, key is locked but stored — need PIN to re-authenticate
-  const needsPinUnlock = bootstrapComplete && !isKeyUnlocked && keyManager.hasStoredKey()
+  const needsPinUnlock = bootstrapComplete && !isKeyUnlocked && hasStoredKey
 
   async function handlePinUnlock(pin: string) {
     setPinLoading(true)

@@ -63,7 +63,7 @@ Given('a valid provisioning room is established', ({ sasWorld }) => {
   state.mockNsec = 'nsec1testmocksecretforplaywrighttest00000000000000000000000000000001'
 
   // Pre-compute values used when the "key exchange" event fires
-  const shared = x25519.getSharedSecret(state.ephemeralSecret, state.primaryPubkey)
+  const shared = x25519.getSharedSecret(state.ephemeralSecret, hexToBytes(state.primaryPubkey))
   state.sasCode = computeSAS(shared)
   // Encrypt the mock nsec as if the primary device sent it
   state.encryptedNsec = encryptNsecForTest(state.mockNsec, state.ephemeralPubkey, state.primarySecret)
@@ -75,6 +75,9 @@ Given('the ephemeral key exchange completes', async ({ page, sasWorld }) => {
   // Navigate to the link-device page (where the new-device SAS flow lives)
   await page.goto('/link-device')
   await page.waitForLoadState('domcontentloaded')
+
+  // Wait for the React useEffect to register the test:provisioning-complete listener
+  await page.locator('body[data-test-provisioning-ready="true"]').waitFor({ state: 'attached', timeout: 5000 })
 
   // Dispatch the test event that drives link-device.tsx to the verify-sas step
   await page.evaluate(
@@ -107,7 +110,7 @@ Then('I should see a {int}-digit SAS code displayed', async ({ page }, digits: n
 
 Then('I should see instructions to compare with the other device', async ({ page }) => {
   // The verifySASDesc text contains "Compare this code" / compare wording
-  const instruction = page.locator('[data-testid="sas-code"]').locator('..')
+  const instruction = page.locator('[data-testid="sas-code-container"]').locator('..')
     .locator('text=/compare|verify|match|other device/i')
   // Fallback to any visible compare text on the page
   const pageText = page.getByText(/compare|verify.*code/i)

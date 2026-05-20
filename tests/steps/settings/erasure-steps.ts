@@ -39,12 +39,9 @@ Then('I should see the erasure available state or pending state', async ({ page 
 })
 
 Then('the account erasure section should be visible', async ({ page }) => {
-  await page.waitForLoadState('domcontentloaded')
+  // Wait for the outer account-erasure Card — it is always rendered after the settings page
+  // finishes loading (loading=false). Use waitFor so we retry until visible rather than
+  // checking a one-shot snapshot that may catch the page mid-render.
   const section = page.getByTestId('account-erasure')
-  const available = page.getByTestId('erasure-available')
-  const pending = page.getByTestId('erasure-pending')
-  const isSection = await section.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  const isAvailable = await available.isVisible({ timeout: 2000 }).catch(() => false)
-  const isPending = await pending.isVisible({ timeout: 2000 }).catch(() => false)
-  expect(isSection || isAvailable || isPending).toBe(true)
+  await section.waitFor({ state: 'visible', timeout: Timeouts.ELEMENT })
 })
