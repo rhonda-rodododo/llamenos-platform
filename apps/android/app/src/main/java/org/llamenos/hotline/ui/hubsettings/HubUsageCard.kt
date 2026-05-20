@@ -98,8 +98,8 @@ fun HubUsageCard(
 @Composable
 private fun UsageRow(
     label: String,
-    current: Long,
-    max: Long?,
+    current: Int,
+    max: Int?,
     testTag: String,
 ) {
     Column(

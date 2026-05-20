@@ -46,7 +46,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import org.llamenos.hotline.R
 import org.llamenos.hotline.viewmodel.HubCommunicationsViewModel
 import org.llamenos.protocol.HubQuota
-import org.llamenos.protocol.ProviderType
+import org.llamenos.hotline.model.ProviderType
 
 /**
  * Hub communications settings screen.
@@ -198,7 +198,7 @@ fun HubCommunicationsScreen(
                 ProviderStatusCard(
                     providerConnected = uiState.providerConnected,
                     providerType = uiState.setupStatus?.providerType,
-                    numbersProvisioned = uiState.setupStatus?.numbersProvisioned ?: 0L,
+                    numbersProvisioned = uiState.setupStatus?.numbersProvisioned ?: 0,
                     onStartSetup = { viewModel.showOnboarding() },
                     onNavigateToProviderSetup = onNavigateToProviderSetup,
                 )
@@ -277,7 +277,7 @@ fun HubCommunicationsScreen(
 private fun ProviderStatusCard(
     providerConnected: Boolean,
     providerType: ProviderType?,
-    numbersProvisioned: Long,
+    numbersProvisioned: Int,
     onStartSetup: () -> Unit,
     onNavigateToProviderSetup: () -> Unit,
 ) {

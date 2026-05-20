@@ -23,7 +23,7 @@ import org.llamenos.hotline.api.SessionState
 import org.llamenos.hotline.crypto.CryptoService
 import org.llamenos.hotline.hub.ActiveHubState
 import org.llamenos.hotline.model.CustomFieldDef
-import org.llamenos.protocol.CustomFieldDefinitionType
+import org.llamenos.hotline.model.CustomFieldDefinitionType
 import org.llamenos.hotline.model.NotePayload
 import org.llamenos.hotline.model.NoteRepliesResponse
 import org.llamenos.hotline.model.NoteReply
@@ -33,7 +33,7 @@ import org.llamenos.hotline.model.CreateNoteBodyAdminEnvelope
 import org.llamenos.hotline.model.CreateNoteBodyAuthorEnvelope
 import org.llamenos.protocol.CreateReplyBody
 import org.llamenos.hotline.model.CreateReplyBodyReaderEnvelope
-import org.llamenos.protocol.Note
+import org.llamenos.hotline.model.Note
 import org.llamenos.protocol.NoteResponse
 import org.llamenos.protocol.RecipientEnvelope
 import javax.inject.Inject

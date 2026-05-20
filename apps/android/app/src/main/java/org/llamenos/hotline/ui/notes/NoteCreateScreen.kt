@@ -54,7 +54,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import org.llamenos.hotline.R
 import org.llamenos.hotline.model.CustomFieldDef
-import org.llamenos.protocol.CustomFieldDefinitionType
+import org.llamenos.hotline.model.CustomFieldDefinitionType
 import org.llamenos.hotline.service.TranscriptionService
 import org.llamenos.hotline.ui.components.LoadingOverlay
 

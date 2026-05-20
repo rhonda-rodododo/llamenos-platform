@@ -58,7 +58,7 @@ data class EventsUiState(
      * Event entity types only (category === "event").
      */
     val eventEntityTypes: List<EntityTypeDefinition>
-        get() = entityTypes.filter { it.category == org.llamenos.protocol.CreateEntityTypeBodyCategoryEnum.Event && !it.isArchived }
+        get() = entityTypes.filter { it.category == org.llamenos.protocol.SharedEntityTypeDefinitionCategory.Event && !it.isArchived }
 
     /**
      * Map of entity type ID to definition for quick lookup.

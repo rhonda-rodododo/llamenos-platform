@@ -12,7 +12,7 @@ import org.llamenos.protocol.AvailableNumber
 import org.llamenos.protocol.NumberProvisionRequest
 import org.llamenos.protocol.NumberSearchQuery
 import org.llamenos.protocol.OwnedNumber
-import org.llamenos.protocol.ProviderType
+import org.llamenos.hotline.model.ProviderType
 import javax.inject.Inject
 
 @HiltViewModel

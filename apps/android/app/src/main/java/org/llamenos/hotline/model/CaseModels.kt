@@ -25,7 +25,7 @@ typealias CreateInteractionRequest = CreateInteractionBody
 // EntityFieldDefinition is aliased to EntityTypeDefinitionField for backward compat.
 
 typealias EntityTypeDefinition = org.llamenos.protocol.EntityTypeDefinition
-typealias EntityFieldDefinition = org.llamenos.protocol.EntityTypeDefinitionField
+typealias EntityFieldDefinition = org.llamenos.protocol.SharedEntityTypeDefinitionField
 
 // ── API Response Wrappers ───────────────────────────────────────────────────
 
