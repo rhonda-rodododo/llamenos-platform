@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 // MARK: - File-level references to UniFFI global functions
@@ -115,6 +116,15 @@ private func ffiMobileShamirVerify(share: ShamirShare, commitmentHex: String) th
 // V3 Recovery group keypair generation (stateless — produces X25519 keypair)
 private func ffiMobileRecoveryGroupGenerateKeypair() -> RecoveryGroupKeypair {
     mobileRecoveryGroupGenerateKeypair()
+}
+
+// V3 Draft encryption (hub-key-based, secrets stay in Rust)
+private func ffiMobileEncryptDraft(plaintext: String, hubId: String) throws -> String {
+    try mobileEncryptDraft(plaintext: plaintext, hubId: hubId)
+}
+
+private func ffiMobileDecryptDraft(packedHex: String, hubId: String) throws -> String {
+    try mobileDecryptDraft(packedHex: packedHex, hubId: hubId)
 }
 
 // Hub key + server event key management (keys stored in Rust, never in Swift)
@@ -411,7 +421,183 @@ final class CryptoService: @unchecked Sendable {
         ffiMobileRecoveryGroupGenerateKeypair()
     }
 
+    // MARK: - Call Metadata Decryption (HPKE)
+
+    /// Decrypt call metadata (callerNumber, answeredBy) from E2EE envelope.
+    /// Returns nil if no matching envelope found or decryption fails.
+    func decryptCallMetadata(
+        encryptedContent: String,
+        adminEnvelopes: [(pubkey: String, enc: String, ct: String)]
+    ) -> (callerNumber: String, answeredBy: String?)? {
+        guard isUnlocked, let ourPubkey = encryptionPubkeyHex else { return nil }
+        guard let myEnv = adminEnvelopes.first(where: { $0.pubkey == ourPubkey }) else { return nil }
+
+        do {
+            let hpkeEnvelope = HpkeEnvelope(v: 3, labelId: 0, enc: myEnv.enc, ct: myEnv.ct)
+            let keyHex = try ffiMobileHpkeOpenKey(
+                envelope: hpkeEnvelope,
+                expectedLabel: CryptoLabels.LABEL_CALL_META,
+                aadHex: ""
+            )
+            let plaintextHex = try ffiMobileSymmetricDecrypt(
+                ciphertextHex: encryptedContent,
+                keyHex: keyHex
+            )
+            guard let data = hexToData(plaintextHex),
+                  let json = String(data: data, encoding: .utf8),
+                  let jsonData = json.data(using: .utf8),
+                  let dict = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] else {
+                return nil
+            }
+            let callerNumber = dict["callerNumber"] as? String ?? "Unknown"
+            let answeredBy = dict["answeredBy"] as? String
+            return (callerNumber, answeredBy)
+        } catch {
+            return nil
+        }
+    }
+
+    // MARK: - File Encryption (HPKE)
+
+    /// Encrypt file data for multiple recipients using HPKE envelope encryption.
+    /// Returns encrypted content, per-recipient key envelopes, and per-recipient metadata envelopes.
+    func encryptFile(
+        data: Data,
+        fileName: String,
+        mimeType: String,
+        recipientPubkeys: [String]
+    ) throws -> (
+        encryptedData: Data,
+        keyEnvelopes: [(pubkey: String, envelope: HpkeEnvelope)],
+        metadataEnvelopes: [(pubkey: String, encryptedContent: String, envelope: HpkeEnvelope)]
+    ) {
+        guard isUnlocked else { throw CryptoServiceError.noKeyLoaded }
+
+        // SHA-256 checksum of raw data
+        let checksum = sha256Hex(data)
+
+        // Build metadata JSON
+        let metadata: [String: Any] = [
+            "originalName": fileName,
+            "mimeType": mimeType,
+            "size": data.count,
+            "checksum": checksum
+        ]
+        let metadataData = try JSONSerialization.data(withJSONObject: metadata)
+        let metadataHex = metadataData.map { String(format: "%02x", $0) }.joined()
+
+        // Random 32-byte file key
+        let fileKeyHex = ffiMobileRandomBytesHex()
+
+        // AES-GCM encrypt file content with file key
+        let dataHex = data.map { String(format: "%02x", $0) }.joined()
+        let encryptedResult = try ffiMobileSymmetricEncrypt(plaintextHex: dataHex)
+        // symmetric_encrypt returns [ciphertextHex, randomKeyHex] — but we need to encrypt with our file key.
+        // Use the dedicated key-based encrypt: encrypt dataHex with fileKeyHex via symmetric_decrypt's inverse.
+        // Actually, mobile_symmetric_encrypt generates its own random key. We need to use the file key instead.
+        // The pattern: generate a random key via symmetric_encrypt, then re-wrap that key via HPKE.
+        // But for file encryption, the file key IS the random key. So we use the result directly.
+        let encryptedContentHex = encryptedResult[0]
+        let actualFileKeyHex = encryptedResult[1]
+        guard let encryptedData = hexToData(encryptedContentHex) else {
+            throw CryptoServiceError.encryptionFailed("Failed to convert encrypted content to Data")
+        }
+
+        // HPKE-wrap the file key for each recipient
+        var keyEnvelopes: [(pubkey: String, envelope: HpkeEnvelope)] = []
+        for pubkey in recipientPubkeys {
+            let envelope = try ffiMobileHpkeSealKey(
+                keyHex: actualFileKeyHex,
+                recipientPubkeyHex: pubkey,
+                label: CryptoLabels.LABEL_FILE_KEY,
+                aadHex: ""
+            )
+            keyEnvelopes.append((pubkey: pubkey, envelope: envelope))
+        }
+
+        // Encrypt metadata for each recipient with LABEL_FILE_METADATA
+        var metaEnvelopes: [(pubkey: String, encryptedContent: String, envelope: HpkeEnvelope)] = []
+        for pubkey in recipientPubkeys {
+            let metaEncResult = try ffiMobileSymmetricEncrypt(plaintextHex: metadataHex)
+            let encMetaHex = metaEncResult[0]
+            let metaKeyHex = metaEncResult[1]
+            let envelope = try ffiMobileHpkeSealKey(
+                keyHex: metaKeyHex,
+                recipientPubkeyHex: pubkey,
+                label: CryptoLabels.LABEL_FILE_METADATA,
+                aadHex: ""
+            )
+            metaEnvelopes.append((pubkey: pubkey, encryptedContent: encMetaHex, envelope: envelope))
+        }
+
+        return (encryptedData, keyEnvelopes, metaEnvelopes)
+    }
+
+    /// Decrypt a file's symmetric key from an HPKE envelope.
+    func decryptFileKey(envelope: HpkeEnvelope) throws -> String {
+        guard isUnlocked else { throw CryptoServiceError.noKeyLoaded }
+        return try ffiMobileHpkeOpenKey(
+            envelope: envelope,
+            expectedLabel: CryptoLabels.LABEL_FILE_KEY,
+            aadHex: ""
+        )
+    }
+
+    /// Decrypt file metadata from an HPKE envelope.
+    func decryptFileMetadata(
+        encryptedContentHex: String,
+        envelope: HpkeEnvelope
+    ) throws -> (originalName: String, mimeType: String, size: Int, checksum: String)? {
+        guard isUnlocked else { throw CryptoServiceError.noKeyLoaded }
+        let keyHex = try ffiMobileHpkeOpenKey(
+            envelope: envelope,
+            expectedLabel: CryptoLabels.LABEL_FILE_METADATA,
+            aadHex: ""
+        )
+        let plaintextHex = try ffiMobileSymmetricDecrypt(ciphertextHex: encryptedContentHex, keyHex: keyHex)
+        guard let data = hexToData(plaintextHex),
+              let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return nil
+        }
+        let originalName = dict["originalName"] as? String ?? "unknown"
+        let mimeType = dict["mimeType"] as? String ?? "application/octet-stream"
+        let size = dict["size"] as? Int ?? 0
+        let checksum = dict["checksum"] as? String ?? ""
+        return (originalName, mimeType, size, checksum)
+    }
+
+    /// Decrypt file content using a previously-unwrapped file key.
+    func decryptFileContent(encryptedContentHex: String, fileKeyHex: String) throws -> Data {
+        guard isUnlocked else { throw CryptoServiceError.noKeyLoaded }
+        let plaintextHex = try ffiMobileSymmetricDecrypt(ciphertextHex: encryptedContentHex, keyHex: fileKeyHex)
+        guard let data = hexToData(plaintextHex) else {
+            throw CryptoServiceError.decryptionFailed("Failed to convert decrypted hex to Data")
+        }
+        return data
+    }
+
+    // MARK: - Draft Encryption (hub-key-based)
+
+    /// Encrypt a draft note using the hub key stored in Rust.
+    /// The hub key never leaves Rust memory.
+    func encryptDraft(plaintext: String, hubId: String) throws -> String {
+        guard isUnlocked else { throw CryptoServiceError.noKeyLoaded }
+        return try ffiMobileEncryptDraft(plaintext: plaintext, hubId: hubId)
+    }
+
+    /// Decrypt a draft note using the hub key stored in Rust.
+    /// The hub key never leaves Rust memory.
+    func decryptDraft(packedHex: String, hubId: String) throws -> String {
+        guard isUnlocked else { throw CryptoServiceError.noKeyLoaded }
+        return try ffiMobileDecryptDraft(packedHex: packedHex, hubId: hubId)
+    }
+
     // MARK: - Hex Utility
+
+    private func sha256Hex(_ data: Data) -> String {
+        let digest = SHA256.hash(data: data)
+        return digest.map { String(format: "%02x", $0) }.joined()
+    }
 
     private func hexToData(_ hex: String) -> Data? {
         var data = Data(capacity: hex.count / 2)

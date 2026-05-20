@@ -51,6 +51,7 @@ struct CallHistoryEntry: Identifiable, Sendable {
 @Observable
 final class CallHistoryViewModel {
     private let apiService: APIService
+    private let cryptoService: CryptoService
 
     var calls: [CallHistoryEntry] = []
     var isLoading: Bool = false
@@ -63,8 +64,9 @@ final class CallHistoryViewModel {
         return calls.filter { $0.status == filter }
     }
 
-    init(apiService: APIService) {
+    init(apiService: APIService, cryptoService: CryptoService) {
         self.apiService = apiService
+        self.cryptoService = cryptoService
     }
 
     // MARK: - Data Loading
@@ -85,13 +87,30 @@ final class CallHistoryViewModel {
                 case .some(.completed), .some(.inProgress): status = .answered
                 default: status = .missed
                 }
+
+                // Attempt E2EE decryption of call metadata (admin envelope)
+                var callerNumber = dto.callerLast4
+                var answeredBy = dto.answeredBy
+
+                if let encryptedContent = dto.encryptedContent,
+                   let envelopes = dto.adminEnvelopes, !envelopes.isEmpty {
+                    let tuples = envelopes.map { (pubkey: $0.pubkey, enc: $0.enc, ct: $0.ct) }
+                    if let decrypted = cryptoService.decryptCallMetadata(
+                        encryptedContent: encryptedContent,
+                        adminEnvelopes: tuples
+                    ) {
+                        callerNumber = decrypted.callerNumber
+                        answeredBy = decrypted.answeredBy
+                    }
+                }
+
                 return CallHistoryEntry(
                     id: dto.id,
-                    callerNumber: dto.callerLast4,
+                    callerNumber: callerNumber,
                     status: status,
                     duration: dto.duration.map { Int($0) },
                     startedAt: DateFormatting.parseISO(dto.startedAt) ?? Date(),
-                    answeredBy: dto.answeredBy
+                    answeredBy: answeredBy
                 )
             }
         } catch {
@@ -118,6 +137,7 @@ final class CallHistoryViewModel {
 struct CallHistoryView: View {
     @Environment(AppState.self) private var appState
     @Environment(HubContext.self) private var hubContext
+    @Environment(CryptoService.self) private var cryptoService
     @State private var viewModel: CallHistoryViewModel?
 
     var body: some View {
@@ -281,7 +301,7 @@ struct CallHistoryView: View {
         if let vm = viewModel {
             return vm
         }
-        let vm = CallHistoryViewModel(apiService: appState.apiService)
+        let vm = CallHistoryViewModel(apiService: appState.apiService, cryptoService: cryptoService)
         DispatchQueue.main.async {
             self.viewModel = vm
         }
@@ -295,6 +315,8 @@ struct CallHistoryView: View {
 #Preview("Call History") {
     CallHistoryView()
         .environment(AppState(hubContext: HubContext()))
+        .environment(HubContext())
+        .environment(CryptoService())
         .environment(Router())
 }
 #endif

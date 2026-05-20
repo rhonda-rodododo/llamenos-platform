@@ -1674,7 +1674,7 @@ export class CasesService {
       }
       const report = reportRows[0]
 
-      // 2. Create entity record (stub — client will update with encrypted content)
+      // 2. Create entity record (server-side skeleton — client updates with encrypted content via PATCH)
       const [newRecord] = await tx
         .insert(caseRecords)
         .values({

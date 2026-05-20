@@ -731,6 +731,34 @@ pub fn mobile_decrypt_hub_event_trial(encrypted_hex: String) -> Result<Vec<Strin
     Err(CryptoError::DecryptionFailed)
 }
 
+/// Encrypt a draft using the stored hub key for the given hub.
+/// The hub key is looked up from MOBILE_STATE and passed to `encrypt_draft`.
+#[uniffi::export]
+pub fn mobile_encrypt_draft(plaintext: String, hub_id: String) -> Result<String, CryptoError> {
+    let guard_ = state().lock().unwrap();
+    let key = guard_
+        .hub_keys
+        .get(&hub_id)
+        .ok_or_else(|| CryptoError::InvalidInput(format!("No hub key for hub: {hub_id}")))?;
+    let key_hex = hex::encode(key);
+    drop(guard_);
+    crate::encryption::encrypt_draft(&plaintext, &key_hex)
+}
+
+/// Decrypt a draft using the stored hub key for the given hub.
+/// The hub key is looked up from MOBILE_STATE and passed to `decrypt_draft`.
+#[uniffi::export]
+pub fn mobile_decrypt_draft(packed_hex: String, hub_id: String) -> Result<String, CryptoError> {
+    let guard_ = state().lock().unwrap();
+    let key = guard_
+        .hub_keys
+        .get(&hub_id)
+        .ok_or_else(|| CryptoError::InvalidInput(format!("No hub key for hub: {hub_id}")))?;
+    let key_hex = hex::encode(key);
+    drop(guard_);
+    crate::encryption::decrypt_draft(&packed_hex, &key_hex)
+}
+
 /// Clear server event keys from Rust memory.
 #[uniffi::export]
 pub fn mobile_clear_server_event_keys() {
@@ -950,6 +978,29 @@ mod tests {
         // Clear
         mobile_clear_server_event_keys();
         assert!(mobile_decrypt_server_event(ct_key1).is_err());
+    }
+
+    #[test]
+    fn draft_encrypt_decrypt_with_hub_key() {
+        let mut key = [0u8; 32];
+        getrandom::getrandom(&mut key).unwrap();
+        let key_hex = hex::encode(&key);
+        let hub_id = "draft-hub-1";
+
+        mobile_set_hub_key(hub_id.into(), key_hex).unwrap();
+
+        let plaintext = "My draft note content";
+        let encrypted = mobile_encrypt_draft(plaintext.into(), hub_id.into()).unwrap();
+        assert!(!encrypted.is_empty());
+        assert_ne!(encrypted, hex::encode(plaintext.as_bytes()));
+
+        let decrypted = mobile_decrypt_draft(encrypted, hub_id.into()).unwrap();
+        assert_eq!(decrypted, plaintext);
+
+        // Wrong hub fails
+        assert!(mobile_decrypt_draft("aabbccdd".into(), "wrong-hub".into()).is_err());
+
+        mobile_clear_hub_keys();
     }
 
     #[test]

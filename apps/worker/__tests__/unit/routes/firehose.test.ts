@@ -4,7 +4,7 @@
  * Tests: permission enforcement, CRUD operations, agent lifecycle (activate/pause),
  * buffer stats, optout management, seal key requirement.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { Hono } from 'hono'
 import type { AppEnv } from '@worker/types'
 import firehoseRoutes from '@worker/routes/firehose'
@@ -169,12 +169,9 @@ describe('POST /firehose', () => {
     notifyViaSignal: true,
   }
 
-  it('creates connection and sets agent keypair', async () => {
+  it('creates connection with pre-generated keypair (atomic)', async () => {
     const { app, mockFirehose } = makeApp()
-    const rawConn = { ...baseConn, agentPubkey: 'pending', encryptedAgentNsec: 'pending' }
-    const updatedConn = { ...baseConn }
-    mockFirehose.createConnection.mockResolvedValue(rawConn)
-    mockFirehose.setAgentKeypair.mockResolvedValue(updatedConn)
+    mockFirehose.createConnection.mockResolvedValue({ ...baseConn })
 
     const res = await app.request('/', {
       method: 'POST',
@@ -187,11 +184,12 @@ describe('POST /firehose', () => {
     const conn = json.connection as Record<string, unknown>
     expect(conn.id).toBe('conn-1')
     expect(conn.agentPubkey).toBe('agent-pubkey-hex')
-    expect(mockFirehose.setAgentKeypair).toHaveBeenCalledWith(
-      rawConn.id,
-      'agent-pubkey-hex',
-      'encrypted-nsec-hex',
-    )
+    // Keypair is generated before createConnection — no setAgentKeypair call needed
+    expect(mockFirehose.setAgentKeypair).not.toHaveBeenCalled()
+    // Verify createConnection received the real keypair, not 'pending'
+    const createCall = mockFirehose.createConnection.mock.calls[0]
+    expect(createCall[1].agentPubkey).toBe('agent-pubkey-hex')
+    expect(createCall[1].encryptedAgentNsec).toBe('encrypted-nsec-hex')
   })
 
   it('returns 503 when seal key not configured', async () => {
