@@ -85,9 +85,7 @@ final class ShiftsViewModel {
     func onShiftStarted(hubId: String, sipParams: SipTokenResponse) async {
         do {
             try linphoneService.registerHubAccount(hubId: hubId, sipParams: sipParams)
-        } catch {
-            print("[LinphoneService] Failed to register SIP account for hub \(hubId): \(error.localizedDescription)")
-        }
+        } catch {}
     }
 
     /// Unregister the SIP account for the given hub. Called after clock-out succeeds.

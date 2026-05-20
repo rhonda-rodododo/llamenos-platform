@@ -181,15 +181,13 @@ class DashboardViewModel @Inject constructor(
     private suspend fun fetchServerEventKey() {
         try {
             val me = apiService.request<MeResponse>("GET", "/api/auth/me")
-            android.util.Log.d("DashboardViewModel", "fetchServerEventKey: success, hubKeys=${me.hubEventKeys?.size ?: 0}")
             val hubKeys = me.hubEventKeys ?: return
             val activeHubId = activeHubState.activeHubId.value
             val currentKey = if (activeHubId != null) hubKeys[activeHubId] else hubKeys.values.firstOrNull()
             currentKey ?: return
             webSocketService.setServerEventKeys(currentKey)
             sessionState.adminDecryptionPubkey = me.adminDecryptionPubkey
-        } catch (e: Exception) {
-            android.util.Log.w("DashboardViewModel", "fetchServerEventKey failed: ${e.message}")
+        } catch (_: Exception) {
             // Non-fatal — WebSocket will still connect but events won't decrypt.
             // The key will be retried on next refresh.
         }
@@ -337,13 +335,10 @@ class DashboardViewModel @Inject constructor(
     private suspend fun fetchActiveCall() {
         try {
             val path = apiService.hp("/api/calls/active")
-            android.util.Log.d("DashboardViewModel", "fetchActiveCall: GET $path")
             val response = apiService.request<ActiveCallsResponse>("GET", path)
             val call = response.calls.firstOrNull()
-            android.util.Log.d("DashboardViewModel", "fetchActiveCall: ${response.calls.size} calls, current=${call?.id}")
             _uiState.update { it.copy(currentCall = call) }
-        } catch (e: Exception) {
-            android.util.Log.w("DashboardViewModel", "fetchActiveCall failed: ${e.message}")
+        } catch (_: Exception) {
             // Non-fatal — active call will be updated on next event
         }
     }
@@ -373,7 +368,6 @@ class DashboardViewModel @Inject constructor(
      */
     fun refresh() {
         viewModelScope.launch {
-            android.util.Log.d("DashboardViewModel", "refresh() called, hubId=${activeHubState.activeHubId.value}")
             _uiState.update { it.copy(isRefreshing = true, errorRes = null) }
             val success = loadShiftStatus()
             if (!success) {
@@ -381,7 +375,6 @@ class DashboardViewModel @Inject constructor(
             }
             fetchActiveCall()
             loadAnalyticsStats()
-            android.util.Log.d("DashboardViewModel", "refresh() done, currentCall=${_uiState.value.currentCall?.id}")
             _uiState.update { it.copy(isRefreshing = false) }
         }
     }

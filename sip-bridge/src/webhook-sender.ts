@@ -1,5 +1,6 @@
 import { timingSafeEqual, createHmac } from 'node:crypto'
 import type { BridgeCommand, BridgeConfig, WebhookPayload } from './types'
+import { logger } from './logger'
 
 /**
  * WebhookSender — sends HMAC-SHA256 signed JSON webhooks to the Worker.
@@ -66,7 +67,7 @@ export class WebhookSender {
       'X-Bridge-Timestamp': timestamp,
     }
 
-    console.log(`[webhook] POST ${path} channelId=${payload.channelId}`)
+    logger.debug('[webhook]', `POST ${path}`)
 
     try {
       const response = await fetch(url, {
@@ -78,12 +79,12 @@ export class WebhookSender {
 
       if (!response.ok) {
         const text = await response.text()
-        console.error(`[webhook] ${path} returned ${response.status}: ${text}`)
+        logger.warn('[webhook]', `${path} returned ${response.status}: ${text}`)
       }
 
       return response
     } catch (err) {
-      console.error(`[webhook] Failed to send webhook to ${path}:`, err)
+      logger.error('[webhook]', `Failed to send webhook to ${path}`, err)
       throw err
     }
   }

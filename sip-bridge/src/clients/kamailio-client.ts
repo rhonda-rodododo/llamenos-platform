@@ -5,6 +5,7 @@ import type {
   BridgeOptions,
   OriginateParams,
 } from '../bridge-client'
+import { logger } from '../logger'
 
 export interface KamailioConfig {
   /** JSONRPC endpoint URL, e.g. http://kamailio:5060/jsonrpc */
@@ -51,7 +52,7 @@ export class KamailioClient implements BridgeClient {
         `[kamailio] Cannot connect: JSONRPC endpoint not reachable at ${this.config.jsonrpcUrl}`
       )
     }
-    console.log('[kamailio] JSONRPC endpoint reachable — connection verified')
+    logger.info('[kamailio]', 'JSONRPC endpoint reachable — connection verified')
   }
 
   disconnect(): void {

@@ -20,6 +20,7 @@ import type {
   RecordingFinishedEvent,
   StasisStartEvent,
 } from '../types'
+import { logger } from '../logger'
 
 type EventHandler = (event: BridgeEvent) => void
 type RawEventHandler = (event: AnyAriEvent) => void
@@ -88,9 +89,7 @@ export class AriClient implements BridgeClient {
     this.shouldReconnect = true
     if (!this.hasConnected) {
       this.connectionDeadline = Date.now() + this.connectionTimeoutMs
-      console.log(
-        `[ari] Will exit if Asterisk is not reachable within ${Math.round(this.connectionTimeoutMs / 1000)}s`
-      )
+      logger.info('[ari]', `Will exit if Asterisk is not reachable within ${Math.round(this.connectionTimeoutMs / 1000)}s`)
     }
     await this.doConnect()
   }
@@ -117,12 +116,12 @@ export class AriClient implements BridgeClient {
       }
 
       const wsUrl = `${this.config.ariUrl}?app=${this.config.stasisApp}&api_key=${this.config.ariUsername}:${this.config.ariPassword}`
-      console.log(`[ari] Connecting to ${this.config.ariUrl}...`)
+      logger.info('[ari]', `Connecting to ${this.config.ariUrl}...`)
 
       const ws = new WebSocket(wsUrl)
 
       ws.addEventListener('open', () => {
-        console.log('[ari] WebSocket connected')
+        logger.info('[ari]', 'WebSocket connected')
         this.reconnectDelay = 1000
         this.hasConnected = true
         this.connectionDeadline = null
@@ -144,7 +143,7 @@ export class AriClient implements BridgeClient {
             try {
               handler(data)
             } catch (err) {
-              console.error('[ari] Raw event handler error:', err)
+              logger.error('[ari]', 'Raw event handler error', err)
             }
           }
 
@@ -154,18 +153,18 @@ export class AriClient implements BridgeClient {
             for (const handler of snapshot) {
               try {
                 handler(bridgeEvent)
-              } catch (err) {
-                console.error('[ari] Event handler error:', err)
-              }
+            } catch (err) {
+              logger.error('[ari]', 'Event handler error', err)
+            }
             }
           }
         } catch (err) {
-          console.error('[ari] Failed to parse event:', err)
+          logger.error('[ari]', 'Failed to parse event', err)
         }
       })
 
       ws.addEventListener('close', (event) => {
-        console.log(`[ari] WebSocket closed: code=${event.code} reason=${event.reason}`)
+        logger.info('[ari]', `WebSocket closed: code=${event.code} reason=${event.reason}`)
         this.ws = null
         if (this.shouldReconnect) {
           this.scheduleReconnect()
@@ -173,7 +172,7 @@ export class AriClient implements BridgeClient {
       })
 
       ws.addEventListener('error', (event) => {
-        console.error('[ari] WebSocket error:', event)
+        logger.error('[ari]', 'WebSocket error', event)
         if (!this.ws) {
           reject(new Error('Failed to connect to ARI WebSocket'))
         }
@@ -270,31 +269,27 @@ export class AriClient implements BridgeClient {
 
   private scheduleReconnect(): void {
     if (this.connectionDeadline !== null && Date.now() >= this.connectionDeadline) {
-      console.error(
-        `[ari] FATAL: Could not connect to Asterisk within ${Math.round(this.connectionTimeoutMs / 1000)}s — exiting.`
-      )
+      logger.error('[ari]', `FATAL: Could not connect to Asterisk within ${Math.round(this.connectionTimeoutMs / 1000)}s — exiting.`)
       process.exit(1)
     }
 
     const remaining = this.connectionDeadline
       ? ` (${Math.round((this.connectionDeadline - Date.now()) / 1000)}s until timeout)`
       : ''
-    console.log(`[ari] Reconnecting in ${this.reconnectDelay}ms...${remaining}`)
+    logger.info('[ari]', `Reconnecting in ${this.reconnectDelay}ms...${remaining}`)
 
     this.reconnectTimer = setTimeout(async () => {
       this.reconnectTimer = null
 
       if (this.connectionDeadline !== null && Date.now() >= this.connectionDeadline) {
-        console.error(
-          `[ari] FATAL: Could not connect to Asterisk within ${Math.round(this.connectionTimeoutMs / 1000)}s — exiting.`
-        )
+        logger.error('[ari]', `FATAL: Could not connect to Asterisk within ${Math.round(this.connectionTimeoutMs / 1000)}s — exiting.`)
         process.exit(1)
       }
 
       try {
         await this.doConnect()
       } catch (err) {
-        console.error('[ari] Reconnection failed:', err)
+        logger.error('[ari]', 'Reconnection failed', err)
         this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.maxReconnectDelay)
         if (this.shouldReconnect) {
           this.scheduleReconnect()
@@ -405,7 +400,7 @@ export class AriClient implements BridgeClient {
     try {
       await this.request('DELETE', `/channels/${channelId}?reason=${reason}`)
     } catch (err) {
-      console.warn(`[ari] Failed to hangup channel ${channelId}:`, err)
+      logger.warn('[ari]', 'Failed to hangup channel', err)
     }
   }
 

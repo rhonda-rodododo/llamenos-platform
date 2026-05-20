@@ -52,17 +52,13 @@ class LinphoneService @Inject constructor(
             setupCoreListener(core)
             core.start()
             this.core = core
-            Log.i("LinphoneService", "Linphone Core initialized successfully")
-        } catch (e: Exception) {
-            Log.e("LinphoneService", "Failed to initialize Linphone Core: ${e.message}")
+        } catch (_: Exception) {
+            // Initialization failure is non-fatal.
         }
     }
 
     fun registerHubAccount(hubId: String, sipParams: SipTokenResponse) {
-        val core = this.core ?: run {
-            Log.w("LinphoneService", "Core not initialized — cannot register SIP account for $hubId")
-            return
-        }
+        val core = this.core ?: return
         try {
             val params = core.createAccountParams()
             val identity = Factory.instance().createAddress(
@@ -77,16 +73,14 @@ class LinphoneService @Inject constructor(
             val account = core.createAccount(params)
             core.addAccount(account)
             hubAccounts[hubId] = account
-            Log.i("LinphoneService", "Registered SIP account for hub $hubId")
-        } catch (e: Exception) {
-            Log.e("LinphoneService", "Failed to register SIP account for $hubId: ${e.message}")
+        } catch (_: Exception) {
+            // Registration failure is non-fatal.
         }
     }
 
     fun unregisterHubAccount(hubId: String) {
         val account = hubAccounts.remove(hubId) ?: return
         core?.removeAccount(account)
-        Log.i("LinphoneService", "Unregistered SIP account for hub $hubId")
     }
 
     fun storePendingCallHub(callId: String, hubId: String) {

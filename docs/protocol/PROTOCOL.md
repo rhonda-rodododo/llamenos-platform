@@ -792,19 +792,17 @@ unwrapHubKey(envelope: RecipientEnvelope, device_x25519_secret_key[32]):
 
 ```
 encryptForHub(plaintext_string, hub_key[32]):
-  iv = random(12)
-  ciphertext_with_tag = AES-256-GCM.encrypt(
-    key     = hub_key,
-    iv      = iv,
-    message = UTF-8(plaintext_string)
-  )
-  return hex(iv || ciphertext_with_tag)
+  nonce = random(12)
+  cipher = AES-256-GCM(hub_key, nonce)
+  ciphertext = cipher.encrypt(UTF-8(plaintext_string))
+  return hex(nonce || ciphertext)
 
 decryptFromHub(packed_hex, hub_key[32]):
   data = hex_to_bytes(packed_hex)
-  iv   = data[0..12]
-  ciphertext_with_tag = data[12..]
-  plaintext = AES-256-GCM.decrypt(hub_key, iv, ciphertext_with_tag)
+  nonce = data[0..12]
+  ciphertext = data[12..]
+  cipher = AES-256-GCM(hub_key, nonce)
+  plaintext = cipher.decrypt(ciphertext)
   return UTF-8_decode(plaintext)
 ```
 
@@ -835,13 +833,10 @@ Step 1: Derive event encryption key
   )
 
 Step 2: Encrypt event content
-  iv = random(12)
-  ciphertext_with_tag = AES-256-GCM.encrypt(
-    key     = event_key,
-    iv      = iv,
-    message = UTF-8(json_content)
-  )
-  encrypted = hex(iv || ciphertext_with_tag)
+  nonce = random(12)
+  cipher = AES-256-GCM(event_key, nonce)
+  ciphertext = cipher.encrypt(UTF-8(json_content))
+  encrypted = hex(nonce || ciphertext)
 ```
 
 All hub members who possess the hub key can derive the same event key and decrypt.
@@ -986,7 +981,7 @@ decryptNote(packed_hex, secret_key[32]):
      return parse_as_NotePayload(UTF-8_decode(plaintext))
 ```
 
-### 2.13 Transcription Decryption
+### 2.14 Transcription Decryption
 
 > **Legacy Model:** This section describes the original ECIES-based transcription encryption (secp256k1 ECDH + XChaCha20-Poly1305). Retained for decrypting existing transcriptions. New implementations should use HPKE (Section 2.2).
 
@@ -1014,7 +1009,7 @@ decryptTranscription(packed_hex, ephemeral_pubkey_hex, secret_key[32]):
   5. Return UTF-8_decode(plaintext)
 ```
 
-### 2.14 Draft Encryption
+### 2.15 Draft Encryption
 
 Local draft auto-save uses HKDF-derived keys with `HKDF_CONTEXT_DRAFTS` domain separation:
 
@@ -1022,12 +1017,13 @@ Local draft auto-save uses HKDF-derived keys with `HKDF_CONTEXT_DRAFTS` domain s
 encryptDraft(plaintext_string, secret_key[32]):
   salt = UTF-8("llamenos:hkdf-salt:v1")
   key = HKDF(SHA-256, secret_key, salt, UTF-8("llamenos:drafts"), 32)
-  iv = random(12)
-  ciphertext_with_tag = AES-256-GCM.encrypt(key, iv, UTF-8(plaintext_string))
-  return hex(iv || ciphertext_with_tag)
+  nonce = random(12)
+  cipher = AES-256-GCM(key, nonce)
+  ciphertext = cipher.encrypt(UTF-8(plaintext_string))
+  return hex(nonce || ciphertext)
 ```
 
-### 2.15 Export Encryption
+### 2.16 Export Encryption
 
 JSON export blobs are encrypted with an HKDF-derived key:
 
@@ -1035,12 +1031,13 @@ JSON export blobs are encrypted with an HKDF-derived key:
 encryptExport(json_string, secret_key[32]):
   salt = UTF-8("llamenos:hkdf-salt:v1")
   key = HKDF(SHA-256, secret_key, salt, UTF-8("llamenos:export"), 32)
-  iv = random(12)
-  ciphertext_with_tag = AES-256-GCM.encrypt(key, iv, UTF-8(json_string))
-  return iv || ciphertext_with_tag   // raw bytes, not hex
+  nonce = random(12)
+  cipher = AES-256-GCM(key, nonce)
+  ciphertext = cipher.encrypt(UTF-8(json_string))
+  return nonce || ciphertext   // raw bytes, not hex
 ```
 
-### 2.16 Encrypted File Uploads
+### 2.17 Encrypted File Uploads
 
 Files are encrypted client-side before upload. The encryption follows the envelope pattern:
 
@@ -1413,6 +1410,8 @@ Response: { "ok": true }
 
 All user endpoints require `users:read` baseline permission.
 
+> **Canonical Path:** `/api/users/` is the canonical path for user management. `/api/volunteers/` is maintained as an alias for backward compatibility and resolves to the same handlers.
+
 ```
 GET /api/users
 Permission: users:read
@@ -1448,6 +1447,12 @@ POST /api/users/:targetPubkey/sigchain
 Permission: users:manage-devices
 Body: { "signature": hex, "payload": SigchainPayload }
 Response: SigchainEntry
+```
+
+Hub-scoped variants:
+```
+GET /api/hubs/:hubId/users
+PATCH /api/hubs/:hubId/users/:targetPubkey
 ```
 
 ### 4.6 Shifts
@@ -3569,7 +3574,149 @@ When using hub-scoped routes, the `hubContext` middleware resolves hub-specific 
 
 When using hub-scoped routes, the `hubContext` middleware resolves hub-specific permissions for the user and scopes all queries to the specified hub.
 
-> **Note:** This section documents the core API surface. Additional endpoints for blasts, recovery groups, events, and entity management are implemented but not fully documented here. See `apps/worker/routes/` for the full route list.
+### 4.24 Additional Endpoints
+
+The following endpoints are implemented but documented here at a high level. For detailed request/response schemas, see `apps/worker/routes/` and the OpenAPI snapshot (`/api/openapi.json`).
+
+#### Contacts & Directory
+```
+GET    /api/contacts
+GET    /api/contacts/:id
+POST   /api/contacts
+PATCH  /api/contacts/:id
+DELETE /api/contacts/:id
+GET    /api/directory
+```
+
+#### Records & Entity Schema (CMS)
+```
+GET    /api/records
+POST   /api/records
+GET    /api/records/:id
+PATCH  /api/records/:id
+DELETE /api/records/:id
+POST   /api/records/:id/assign
+GET    /api/settings/cms         # entity schema definitions
+POST   /api/settings/cms
+```
+
+#### Recovery Groups
+```
+POST /api/recovery-group/initiate
+POST /api/recovery-group/verify
+POST /api/recovery-group/complete
+```
+
+#### PUK (Per-User Key) Management
+```
+GET  /api/puk
+POST /api/puk/rotate
+```
+
+#### Sessions
+```
+GET    /api/sessions
+DELETE /api/sessions/:id
+```
+
+#### Security Events
+```
+GET /api/security-events
+GET /api/admin/security-events
+```
+
+#### Tags
+```
+GET    /api/hubs/:hubId/tags
+POST   /api/hubs/:hubId/tags
+PATCH  /api/hubs/:hubId/tags/:id
+DELETE /api/hubs/:hubId/tags/:id
+```
+
+#### Teams
+```
+GET    /api/hubs/:hubId/teams
+POST   /api/hubs/:hubId/teams
+PATCH  /api/hubs/:hubId/teams/:id
+DELETE /api/hubs/:hubId/teams/:id
+```
+
+#### Ring Groups
+```
+GET    /api/ring-groups
+POST   /api/ring-groups
+PATCH  /api/ring-groups/:id
+DELETE /api/ring-groups/:id
+GET    /api/hubs/:hubId/ring-groups
+```
+
+#### Retention & Erasure
+```
+GET    /api/retention
+POST   /api/retention
+POST   /api/erasure/request
+GET    /api/erasure/status
+```
+
+#### MLS (Messaging Layer Security)
+```
+GET    /api/hubs/:hubId/mls/welcome
+POST   /api/hubs/:hubId/mls/commit
+GET    /api/hubs/:hubId/mls/group-info
+```
+
+#### Firehose (LLM Inference)
+```
+POST /api/firehose/extract
+GET  /api/firehose/status
+```
+
+#### Geocoding
+```
+GET /api/geocoding/forward?q=<address>
+GET /api/geocoding/reverse?lat=<>&lon=<>
+```
+
+#### Account Management
+```
+GET    /api/account
+PATCH  /api/account
+DELETE /api/account
+```
+
+#### Admin Devices
+```
+GET /api/admin/devices
+```
+
+#### Signal Messaging
+```
+POST /api/messaging/signal/send
+GET  /api/messaging/signal/status
+```
+
+#### Provider Setup & Templates
+```
+GET  /api/provider-setup
+POST /api/provider-setup
+GET  /api/provider-templates
+```
+
+#### Platform Settings & Bans
+```
+GET  /api/settings/platform
+PATCH /api/settings/platform
+GET  /api/bans/platform
+POST /api/bans/platform
+```
+
+#### System & Analytics
+```
+GET /api/system/status
+GET /api/analytics/overview
+GET /api/analytics/calls
+GET /api/analytics/messages
+```
 
 ### 4.24 Contacts v2 (Contact Directory)
 

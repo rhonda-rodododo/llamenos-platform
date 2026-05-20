@@ -1,6 +1,5 @@
 package org.llamenos.hotline.service
 
-import android.util.Log
 import org.llamenos.hotline.telephony.LinphoneService
 
 /**
@@ -20,22 +19,16 @@ import org.llamenos.hotline.telephony.LinphoneService
 class PushNotificationRouter(
     private val linphoneService: LinphoneService,
 ) {
-    companion object {
-        private const val TAG = "PushNotificationRouter"
-    }
+
 
     fun routeWakePayload(type: String, hubId: String, callId: String?) {
-        Log.d(TAG, "routeWakePayload: type=$type hubId=${hubId.take(8)}...")
         when (type) {
             "incoming_call" -> {
                 if (!callId.isNullOrEmpty() && hubId.isNotEmpty()) {
                     linphoneService.storePendingCallHub(callId, hubId)
-                    Log.d(TAG, "Stored pending call hub: callId=$callId hubId=${hubId.take(8)}...")
                 }
             }
-            else -> {
-                Log.d(TAG, "Non-call wake payload type=$type — no routing action")
-            }
+            else -> {}
         }
     }
 }
