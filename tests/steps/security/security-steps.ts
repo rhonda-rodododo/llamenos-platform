@@ -10,12 +10,25 @@ import { Given, When, Then } from '../fixtures'
 // ── HTTPS Enforcement ──────────────────────────────────────────────
 
 Given('I am on the setup or identity creation screen', async ({ page }) => {
+  // These tests validate hub URL input on the identity step — skip bootstrap
+  // and clear any stored device keys so the PIN-unlock gate doesn't block the wizard.
+  await page.addInitScript(() => {
+    sessionStorage.setItem('bootstrapComplete', '1')
+    // Clear mock Tauri store keys so hasStoredKey() returns false
+    for (const key of Object.keys(localStorage)) {
+      if (key.includes('encrypted') || key.includes('device-key')) {
+        localStorage.removeItem(key)
+      }
+    }
+  })
   await page.goto('/setup')
   await page.waitForLoadState('domcontentloaded')
+  // Wait for the setup wizard to render (past loading/bootstrap/PIN states)
+  await page.getByTestId('setup-wizard').waitFor({ state: 'visible', timeout: 10_000 })
 })
 
 When('I enter hub URL {string}', async ({ page }, url: string) => {
-  const hubInput = page.locator('input[name="hubUrl"]')
+  const hubInput = page.getByTestId('hub-url-input')
   await expect(hubInput).toBeVisible({ timeout: 5000 })
   await hubInput.fill(url)
 })
