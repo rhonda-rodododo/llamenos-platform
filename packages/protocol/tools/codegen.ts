@@ -703,6 +703,8 @@ function stripSwiftConvenienceExtensions(lines: string[]): string {
   output = output.replace(/^(enum |\/\/ MARK: - )Category:/gm, '$1ReportTypeCategory:')
   output = output.replace(/^(enum |\/\/ MARK: - )Category\b(?! *[A-Z])/gm, '$1ReportTypeCategory')
   output = output.replace(/\blet category: Category\b/g, 'let category: ReportTypeCategory')
+  // Catch remaining property references to `Category` (e.g., `let type: Category?` in SharedMetadata)
+  output = output.replace(/\b: Category\b/g, ': ReportTypeCategory')
 
   // `Operator` is near-identical to Swift keyword `operator` — rename to FieldOperator.
   output = output.replace(/^(enum |\/\/ MARK: - )Operator:/gm, '$1FieldOperator:')
