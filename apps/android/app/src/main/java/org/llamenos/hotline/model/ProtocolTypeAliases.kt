@@ -9,7 +9,10 @@ package org.llamenos.hotline.model
  */
 
 import org.llamenos.protocol.SharedCall
+import org.llamenos.protocol.SharedHub
+import org.llamenos.protocol.SharedNote
 import org.llamenos.protocol.SharedStatus
+import org.llamenos.protocol.SharedStatus7
 import org.llamenos.protocol.SharedAdminEnvelope
 import org.llamenos.protocol.SharedAuthorEnvelope
 import org.llamenos.protocol.SharedChannelConfig
@@ -48,3 +51,15 @@ typealias JoinFieldType = SharedType
 
 // Device list inner type
 typealias DeviceDetailListResponseDevice = SharedDevice
+
+// Hub list inner type — HubListResponse.hubs[] deduplicated to SharedHub
+typealias HubListResponseHub = SharedHub
+
+// Hub status enum — HubResponse.status and SharedHub.status use SharedStatus7
+typealias HubStatus = SharedStatus7
+
+// Message envelope — SendMessageBody.readerEnvelopes deduplicated to SharedAdminEnvelope
+typealias SendMessageBodyReaderEnvelope = SharedAdminEnvelope
+
+// Note reply — NoteRepliesResponse.replies deduplicated to SharedNote
+typealias Reply = SharedNote

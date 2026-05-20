@@ -20,7 +20,7 @@ typealias NotesListResponse = org.llamenos.protocol.NoteListResponse
 /**
  * Reply type from generated protocol.
  */
-typealias NoteReply = org.llamenos.protocol.Reply
+typealias NoteReply = org.llamenos.protocol.SharedNote
 
 /**
  * Note replies response from GET /api/notes/:id/replies.

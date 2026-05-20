@@ -65,8 +65,8 @@ final class MockHubCryptoService: HubCryptoServiceProtocol {
 
 // MARK: - Helper
 
-private func makeHub(id: String, slug: String = "test-hub") -> Hub {
-    Hub(
+private func makeHub(id: String, slug: String = "test-hub") -> SharedHub {
+    SharedHub(
         createdAt: "2026-01-01T00:00:00Z",
         createdBy: "pub001",
         description: nil,

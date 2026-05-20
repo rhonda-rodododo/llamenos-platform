@@ -360,7 +360,7 @@ final class AppState {
     /// Load hub keys for all hubs in parallel. Called after login.
     /// Full implementation added in Task 13 (requires APIService.getHubKey from Task 4
     /// and CryptoService.loadHubKey from Task 7).
-    func loadAllHubKeys(hubs: [Hub]) async {
+    func loadAllHubKeys(hubs: [SharedHub]) async {
         // Implemented in Task 13
     }
 

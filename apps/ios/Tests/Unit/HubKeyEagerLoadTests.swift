@@ -59,8 +59,8 @@ final class TrackingHubCryptoService: HubCryptoServiceProtocol, @unchecked Senda
 
 // MARK: - Helpers
 
-private func makeHub(id: String, slug: String = "hub") -> Hub {
-    Hub(
+private func makeHub(id: String, slug: String = "hub") -> SharedHub {
+    SharedHub(
         createdAt: "2026-01-01T00:00:00Z",
         createdBy: "pub001",
         description: nil,
