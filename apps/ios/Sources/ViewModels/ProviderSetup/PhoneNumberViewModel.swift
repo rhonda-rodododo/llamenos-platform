@@ -28,7 +28,7 @@ final class PhoneNumberViewModel {
 
     // MARK: - Actions
 
-    func loadOwnedNumbers(provider: ProviderType) async {
+    func loadOwnedNumbers(provider: SharedProviderType) async {
         isLoadingOwned = true
         error = nil
         defer { isLoadingOwned = false }
@@ -39,7 +39,7 @@ final class PhoneNumberViewModel {
         }
     }
 
-    func searchNumbers(provider: ProviderType) async {
+    func searchNumbers(provider: SharedProviderType) async {
         isSearching = true
         error = nil
         searchResults = []
@@ -59,7 +59,7 @@ final class PhoneNumberViewModel {
         }
     }
 
-    func provision(phoneNumber: String, provider: ProviderType) async -> OwnedNumber? {
+    func provision(phoneNumber: String, provider: SharedProviderType) async -> OwnedNumber? {
         isProvisioning = true
         error = nil
         defer { isProvisioning = false }

@@ -41,7 +41,7 @@ struct SecurityEventsView: View {
         loading = false
     }
 
-    private func iconForEventType(_ type: EventType) -> String {
+    private func iconForEventType(_ type: SharedEventType) -> String {
         switch type {
         case .deviceRegister, .deviceRemove, .deviceRename: return "iphone"
         case .sessionCreate, .sessionTerminate, .sessionTerminateAll: return "key.fill"

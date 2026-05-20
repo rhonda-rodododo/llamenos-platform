@@ -12,7 +12,7 @@ private enum PhoneNumberTab {
 /// Phone number picker: existing numbers or search & provision a new one.
 struct PhoneNumberSelectionView: View {
     @Bindable var viewModel: PhoneNumberViewModel
-    let provider: ProviderType
+    let provider: SharedProviderType
     let onSelected: (OwnedNumber) -> Void
 
     @State private var selectedTab: PhoneNumberTab = .owned

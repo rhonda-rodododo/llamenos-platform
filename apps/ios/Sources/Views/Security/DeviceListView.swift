@@ -2,7 +2,7 @@ import SwiftUI
 
 struct DeviceListView: View {
     @Environment(AppState.self) private var appState
-    @State private var devices: [DeviceDetailListResponseDevice] = []
+    @State private var devices: [SharedDevice] = []
     @State private var loading = true
 
     var body: some View {
@@ -31,7 +31,7 @@ struct DeviceListView: View {
 }
 
 struct DeviceRow: View {
-    let device: DeviceDetailListResponseDevice
+    let device: SharedDevice
 
     var body: some View {
         HStack {

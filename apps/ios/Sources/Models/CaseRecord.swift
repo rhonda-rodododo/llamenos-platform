@@ -182,7 +182,7 @@ extension RecordContact: Identifiable {
 }
 
 // MARK: - EvidenceItem
-// Client-only: generated `Evidence` uses typed enums (`EvidenceClassification`,
+// Client-only: generated `Evidence` uses typed enums (`SharedClassification`,
 // `HashAlgorithm`) while this client model uses raw strings for flexibility.
 
 /// Evidence metadata for a file attached to a case.

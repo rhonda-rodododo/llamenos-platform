@@ -262,17 +262,17 @@ final class CryptoService: @unchecked Sendable {
 
     // MARK: - Message Encryption (HPKE)
 
-    func encryptMessage(plaintext: String, readerPubkeys: [String]) throws -> (encryptedContent: String, envelopes: [NoteRecipientEnvelope]) {
+    func encryptMessage(plaintext: String, readerPubkeys: [String]) throws -> (encryptedContent: String, envelopes: [RecipientEnvelope]) {
         guard let encPubkey = encryptionPubkeyHex else { throw CryptoServiceError.noKeyLoaded }
         let allReaders = Array(Set([encPubkey] + readerPubkeys))
         let plaintextHex = plaintext.data(using: .utf8)!.map { String(format: "%02x", $0) }.joined()
         let result = try ffiMobileSymmetricEncrypt(plaintextHex: plaintextHex)
         let ciphertextHex = result[0]
         let keyHex = result[1]
-        var envelopes: [NoteRecipientEnvelope] = []
+        var envelopes: [RecipientEnvelope] = []
         for pubkey in allReaders {
             let hpkeEnv = try ffiMobileHpkeSealKey(keyHex: keyHex, recipientPubkeyHex: pubkey, label: CryptoLabels.LABEL_MESSAGE, aadHex: "")
-            envelopes.append(NoteRecipientEnvelope(ct: hpkeEnv.ct, enc: hpkeEnv.enc, pubkey: pubkey))
+            envelopes.append(RecipientEnvelope(ct: hpkeEnv.ct, enc: hpkeEnv.enc, pubkey: pubkey))
         }
         return (ciphertextHex, envelopes)
     }

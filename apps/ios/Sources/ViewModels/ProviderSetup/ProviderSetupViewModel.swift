@@ -5,7 +5,7 @@ import AuthenticationServices
 
 /// UI model describing a telephony provider and its capabilities.
 struct ProviderInfo: Identifiable {
-    let id: ProviderType
+    let id: SharedProviderType
     var displayName: String { id.displayName }
     var icon: String { id.iconName }
     let capabilities: [ProviderCapability]
@@ -23,9 +23,9 @@ struct ProviderInfo: Identifiable {
     ]
 }
 
-// MARK: - ProviderType + Display
+// MARK: - SharedProviderType + Display
 
-extension ProviderType {
+extension SharedProviderType {
     var displayName: String {
         switch self {
         case .twilio: return "Twilio"

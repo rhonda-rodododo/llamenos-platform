@@ -115,7 +115,7 @@ struct ProviderSetupView: View {
 
     // MARK: - Webhook configuration
 
-    private func configureWebhooks(for provider: ProviderType, number: OwnedNumber) {
+    private func configureWebhooks(for provider: SharedProviderType, number: OwnedNumber) {
         let service = ProviderSetupService(api: appState.apiService)
         Task {
             do {

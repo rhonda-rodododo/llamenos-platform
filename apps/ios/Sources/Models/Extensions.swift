@@ -5,35 +5,6 @@ import SwiftUI
 // Types with computed properties, custom Codable, or client-specific logic
 // that don't exist in the generated protocol types.
 
-// MARK: - Type Aliases (backward compatibility)
-// Map old hand-written names to generated protocol types.
-
-/// Previously `NoteKeyEnvelope` — now uses generated `ProtocolKeyEnvelope`.
-/// (Named ProtocolKeyEnvelope to avoid conflict with UniFFI's KeyEnvelope.)
-typealias NoteKeyEnvelope = ProtocolKeyEnvelope
-
-/// Previously `NoteRecipientEnvelope` — now uses generated `RecipientEnvelope`.
-typealias NoteRecipientEnvelope = RecipientEnvelope
-
-/// Previously `EncryptedNoteResponse` — now uses generated `NoteResponse`.
-typealias EncryptedNoteResponse = NoteResponse
-
-// MARK: - Codegen Deduplication Aliases
-// The protocol codegen now deduplicates identical anonymous inline schemas
-// into shared top-level types. These aliases map old type names to the new shared names.
-
-/// `EvidenceClassification` → `SharedClassification` (deduplicated across Evidence/EvidenceMetadata).
-typealias EvidenceClassification = SharedClassification
-
-/// `EventType` → `SharedEventType` (deduplicated across SecurityEvent/SecurityEventListResponseEvent).
-typealias EventType = SharedEventType
-
-/// `DeviceDetailListResponseDevice` → `SharedDevice` (deduplicated device inner type).
-typealias DeviceDetailListResponseDevice = SharedDevice
-
-/// `ProviderType` → `SharedProviderType` (deduplicated across telephony schemas).
-typealias ProviderType = SharedProviderType
-
 // MARK: - NotePayload
 
 /// Decrypted note content matching the protocol spec (Appendix B).
