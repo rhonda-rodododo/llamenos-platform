@@ -72,6 +72,7 @@ export function StepIdentity({ data, onChange, headingRef }: Props) {
           <Input
             id="hub-url"
             name="hubUrl"
+            data-testid="hub-url-input"
             value={data.hubUrl}
             onChange={e => onChange({ hubUrl: e.target.value })}
             placeholder={t('setup.hubUrlPlaceholder')}

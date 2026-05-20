@@ -63,7 +63,7 @@ Given('a valid provisioning room is established', ({ sasWorld }) => {
   state.mockNsec = 'nsec1testmocksecretforplaywrighttest00000000000000000000000000000001'
 
   // Pre-compute values used when the "key exchange" event fires
-  const shared = x25519.getSharedSecret(state.ephemeralSecret, state.primaryPubkey)
+  const shared = x25519.getSharedSecret(state.ephemeralSecret, hexToBytes(state.primaryPubkey))
   state.sasCode = computeSAS(shared)
   // Encrypt the mock nsec as if the primary device sent it
   state.encryptedNsec = encryptNsecForTest(state.mockNsec, state.ephemeralPubkey, state.primarySecret)
