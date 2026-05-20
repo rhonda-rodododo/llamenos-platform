@@ -2,7 +2,6 @@ package org.llamenos.hotline.telephony
 
 import android.content.Context
 import android.util.Log
-import android.util.LruCache
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -13,6 +12,8 @@ import org.linphone.core.Factory
 import org.linphone.core.MediaEncryption
 import org.llamenos.hotline.di.ApplicationScope
 import org.llamenos.hotline.hub.ActiveHubState
+import java.util.Collections
+import java.util.LinkedHashMap
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -33,7 +34,12 @@ class LinphoneService @Inject constructor(
 ) {
     private var core: Core? = null
     private val hubAccounts = ConcurrentHashMap<String, org.linphone.core.Account>()
-    private val pendingCallHubIds = LruCache<String, String>(MAX_PENDING_CALLS)  // callId → hubId
+    private val pendingCallHubIds: MutableMap<String, String> = Collections.synchronizedMap(
+        object : LinkedHashMap<String, String>(MAX_PENDING_CALLS + 1, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?): Boolean =
+                size > MAX_PENDING_CALLS
+        }
+    )
 
     companion object {
         /** Max pending call→hub mappings retained. Evicts oldest entries to bound memory. */
