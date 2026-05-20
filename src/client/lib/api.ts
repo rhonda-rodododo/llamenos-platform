@@ -61,6 +61,18 @@ import type {
   IdentifierType,
   ContactIdentifier,
   ContactCaseLink,
+  RecoveryGroupInfo,
+  ErasureRequest,
+  ErasureConfig,
+  ReEncryptionJob,
+  RetentionSetting,
+  RetentionPlatformFloor,
+  PlatformBan,
+  PlatformSettings,
+  TeamResponse,
+  TeamMemberResponse,
+  ContactTeamAssignmentResponse,
+  TagResponse,
 } from '@protocol/schemas'
 
 const API_BASE = '/api'
@@ -2593,26 +2605,9 @@ export async function updateSecurityPrefs(patch: Partial<Omit<SecurityPrefs, 'up
 // Entity Templates (EP06-A1)
 // =========================================================================
 
-export interface EntityTemplateListResponse {
-  templates: EntityTemplate[]
-  appliedTemplateIds: string[]
-}
 
-// Summary returned by GET /settings/cms/templates (not full template detail)
-export interface EntityTemplate {
-  id: string
-  name: string
-  description: string
-  version: string
-  tags?: string[]
-  entityTypeCount: number
-  reportTypeCount: number
-  totalFieldCount: number
-  suggestedRoleCount: number
-  extends?: string
-}
 
-export async function listEntityTemplates(): Promise<EntityTemplateListResponse> {
+export async function listEntityTemplates(): Promise<{ templates: TemplateSummary[]; appliedTemplateIds: string[] }> {
   return request('/settings/cms/templates')
 }
 
@@ -2625,21 +2620,7 @@ export async function applyEntityTemplate(templateId: string): Promise<{ applied
 
 // ── Recovery Group ─────────────────────────────────────────────────────
 
-export interface RecoveryGroupInfo {
-  publicKey: string
-  threshold: number
-  totalShares: number
-  commitments: string[]
-  sigchainLinkHash: string
-  delayHours: number
-  emergencyFloorHours: number
-  createdAt: string
-  rotatedAt: string | null
-  shareHolders: Array<{
-    holderPubkey: string
-    lastLivenessProof: string | null
-  }>
-}
+
 
 export interface RecoverySessionInfo {
   sessionId: string
@@ -2818,88 +2799,7 @@ export async function listEntitiesCrossHub(params: { crossHub?: boolean; page?: 
 
 // --- EP08: Erasure, Retention, Bans, Platform Settings ---
 
-export interface ErasureRequest {
-  id: string
-  userId: string
-  userName?: string
-  status: 'pending' | 'cancelled' | 'executing' | 'completed' | 'failed'
-  requestedAt: string
-  executeAt: string
-  cancelledAt?: string
-  completedAt?: string
-  requestedBy: 'self' | 'admin'
-  justification?: string
-  emergencyOverride: boolean
-  coApproverPubkey?: string
-}
 
-export interface ErasureConfig {
-  hubId: string
-  delayHours: number
-  emergencyOverrideEnabled: boolean
-  updatedAt: string
-  updatedBy: string
-}
-
-export interface ReEncryptionJob {
-  id: string
-  userId: string
-  hubId: string
-  status: 'queued' | 'running' | 'completed' | 'failed'
-  totalEnvelopes: number
-  processedEnvelopes: number
-  startedAt?: string
-  completedAt?: string
-}
-
-export interface RetentionSetting {
-  hubId: string
-  category: 'call_records' | 'notes' | 'messages' | 'audit_log'
-  retentionDays: number
-  updatedAt: string
-  updatedBy: string
-}
-
-export interface RetentionPlatformFloor {
-  category: 'call_records' | 'notes' | 'messages' | 'audit_log'
-  minRetentionDays: number
-  updatedAt: string
-  updatedBy: string
-}
-
-export interface PlatformBan {
-  id: string
-  phoneHash: string
-  reason: string
-  createdAt: string
-  createdBy: string
-  sourceHubId?: string
-}
-
-export interface PlatformSettings {
-  featureFlags: {
-    mlsEnabled: boolean
-    transcriptionEnabled: boolean
-    caseManagementEnabled: boolean
-    crossHubSharingEnabled: boolean
-  }
-  branding: {
-    instanceName: string
-    supportEmail: string
-    privacyPolicyUrl: string
-  }
-  sessionPolicy: {
-    maxSessionDurationHours: number
-    maxInactiveHours: number
-  }
-  erasurePlatformFloor: {
-    minDelayHours: number
-  }
-  retentionPurge: {
-    cronHourUtc: number
-    enabled: boolean
-  }
-}
 
 // --- Erasure ---
 
@@ -3035,25 +2935,6 @@ export async function updatePlatformSettings(data: Partial<PlatformSettings>) {
 // Teams API
 // ---------------------------------------------------------------------------
 
-export interface TeamResponse {
-  id: string
-  hubId: string
-  encryptedName: string
-  encryptedDescription: string | null
-  createdBy: string
-  memberCount: number
-  contactCount: number
-  createdAt: string
-  updatedAt: string
-}
-
-export interface TeamMemberResponse {
-  teamId: string
-  userPubkey: string
-  addedBy: string
-  createdAt: string
-}
-
 export async function listTeams(): Promise<{ teams: TeamResponse[] }> {
   return request<{ teams: TeamResponse[] }>(hp('/teams'))
 }
@@ -3093,14 +2974,6 @@ export async function removeTeamMember(teamId: string, userPubkey: string): Prom
   return request<{ ok: true }>(hp(`/teams/${teamId}/members/${encodeURIComponent(userPubkey)}`), { method: 'DELETE' })
 }
 
-export interface ContactTeamAssignmentResponse {
-  teamId: string
-  contactId: string
-  hubId: string
-  assignedBy: string
-  createdAt: string
-}
-
 export async function listTeamContacts(teamId: string): Promise<{ assignments: ContactTeamAssignmentResponse[] }> {
   return request<{ assignments: ContactTeamAssignmentResponse[] }>(hp(`/teams/${teamId}/contacts`))
 }
@@ -3116,17 +2989,6 @@ export async function unassignTeamContact(teamId: string, contactId: string): Pr
 // ---------------------------------------------------------------------------
 // Tags API
 // ---------------------------------------------------------------------------
-
-export interface TagResponse {
-  id: string
-  hubId: string
-  name: string
-  encryptedLabel: string
-  color: string
-  encryptedCategory: string | null
-  createdBy: string
-  createdAt: string
-}
 
 export async function listTags(): Promise<{ tags: TagResponse[] }> {
   return request<{ tags: TagResponse[] }>(hp('/tags'))

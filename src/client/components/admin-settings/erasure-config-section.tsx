@@ -12,7 +12,8 @@ import {
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Clock } from 'lucide-react'
-import { updateErasureConfig, type ErasureConfig } from '@/lib/api'
+import { updateErasureConfig } from '@/lib/api'
+import type { ErasureConfig } from '@protocol/schemas'
 
 interface Props {
   config: ErasureConfig
