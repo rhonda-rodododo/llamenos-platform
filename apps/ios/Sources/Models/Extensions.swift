@@ -28,9 +28,6 @@ typealias EvidenceClassification = SharedClassification
 /// `EventType` → `SharedEventType` (deduplicated across SecurityEvent/SecurityEventListResponseEvent).
 typealias EventType = SharedEventType
 
-/// `ChannelConfigClass` → `SharedChannelConfig` (deduplicated channel config inner type).
-typealias ChannelConfigClass = SharedChannelConfig
-
 /// `DeviceDetailListResponseDevice` → `SharedDevice` (deduplicated device inner type).
 typealias DeviceDetailListResponseDevice = SharedDevice
 
