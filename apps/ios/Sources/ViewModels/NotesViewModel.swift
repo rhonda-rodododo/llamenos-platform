@@ -40,7 +40,7 @@ final class NotesViewModel {
 
     private var currentPage: Int = 1
     private let pageSize: Int = 50
-    private var encryptedNotes: [EncryptedNoteResponse] = []
+    private var encryptedNotes: [NoteResponse] = []
 
     // MARK: - Initialization
 
@@ -149,7 +149,7 @@ final class NotesViewModel {
             adminEnvelopes: adminEnvelopes
         )
 
-        let _: EncryptedNoteResponse = try await apiService.request(
+        let _: NoteResponse = try await apiService.request(
             method: "POST",
             path: apiService.hp("/api/notes"),
             body: request
@@ -166,7 +166,7 @@ final class NotesViewModel {
     // MARK: - Note Decryption
 
     /// Find the matching envelope for our pubkey and decrypt the note using HPKE.
-    func decryptNote(_ encrypted: EncryptedNoteResponse) -> DecryptedNote? {
+    func decryptNote(_ encrypted: NoteResponse) -> DecryptedNote? {
         guard let ourPubkey = cryptoService.encryptionPubkeyHex else { return nil }
 
         // Find our envelope — check author envelope first (volunteer's own note)

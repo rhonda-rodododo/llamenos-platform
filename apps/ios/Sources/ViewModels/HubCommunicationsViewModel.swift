@@ -45,7 +45,7 @@ final class HubCommunicationsViewModel {
     var providerSetupComplete: Bool = false
 
     /// Current provider type (if configured).
-    var providerType: ProviderType?
+    var providerType: SharedProviderType?
 
     /// Provider connection status.
     var providerStatus: ProviderStatus = .disconnected

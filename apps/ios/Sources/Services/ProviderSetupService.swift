@@ -76,7 +76,7 @@ final class ProviderSetupService {
 
     // MARK: - OAuth
 
-    func startOAuth(provider: ProviderType, redirectURL: String, hubId: String?) async throws -> StartOAuthResponse {
+    func startOAuth(provider: SharedProviderType, redirectURL: String, hubId: String?) async throws -> StartOAuthResponse {
         let body = StartOAuthRequest(hubID: hubId, provider: provider, redirectURL: redirectURL)
         return try await api.request(method: "POST", path: "/provider-setup/oauth/start", body: body)
     }
@@ -90,17 +90,17 @@ final class ProviderSetupService {
 
     // MARK: - Configuration
 
-    func configureProvider(provider: ProviderType, credentials: [String: String], hubId: String?) async throws {
+    func configureProvider(provider: SharedProviderType, credentials: [String: String], hubId: String?) async throws {
         let body = ConfigureProviderRequest(credentials: credentials, hubID: hubId, phoneNumber: nil, provider: provider)
         let _: EmptyResponse = try await api.request(method: "POST", path: "/provider-setup/configure", body: body)
     }
 
-    func testProvider(provider: ProviderType, hubId: String?) async throws -> TestConnectionResult {
+    func testProvider(provider: SharedProviderType, hubId: String?) async throws -> TestConnectionResult {
         let body = TestConnectionRequest(provider: provider.rawValue, hubId: hubId)
         return try await api.request(method: "POST", path: "/provider-setup/test", body: body)
     }
 
-    func getProviderStatus(provider: ProviderType, hubId: String?) async throws -> ProviderStatusResponse {
+    func getProviderStatus(provider: SharedProviderType, hubId: String?) async throws -> ProviderStatusResponse {
         var path = "/provider-setup/status/\(provider.rawValue)"
         if let hubId {
             path += "?hubId=\(hubId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? hubId)"
@@ -110,7 +110,7 @@ final class ProviderSetupService {
 
     // MARK: - Phone Numbers
 
-    func listPhoneNumbers(provider: ProviderType, hubId: String?) async throws -> [OwnedNumber] {
+    func listPhoneNumbers(provider: SharedProviderType, hubId: String?) async throws -> [OwnedNumber] {
         var qs = "provider=\(provider.rawValue)"
         if let hubId { qs += "&hubId=\(hubId)" }
         let response: NumberListResponse = try await api.request(method: "GET", path: "/provider-setup/phone-numbers?\(qs)")
@@ -132,7 +132,7 @@ final class ProviderSetupService {
 
     // MARK: - Webhooks
 
-    func configureWebhooks(provider: ProviderType, numberId: String, enableSms: Bool, hubId: String?) async throws -> WebhookConfigState {
+    func configureWebhooks(provider: SharedProviderType, numberId: String, enableSms: Bool, hubId: String?) async throws -> WebhookConfigState {
         let body = WebhookConfigureRequest(
             provider: provider.rawValue,
             numberId: numberId,
@@ -170,7 +170,7 @@ final class ProviderSetupService {
 
     // MARK: - A2P
 
-    func submitA2PBrand(brandInfo: [String: String], providerType: ProviderType, hubId: String?) async throws -> A2PRegistrationState {
+    func submitA2PBrand(brandInfo: [String: String], providerType: SharedProviderType, hubId: String?) async throws -> A2PRegistrationState {
         let body = A2PBrandRequest(brandInfo: brandInfo, providerType: providerType.rawValue, hubId: hubId)
         return try await api.request(method: "POST", path: "/provider-setup/a2p/brand", body: body)
     }
@@ -181,7 +181,7 @@ final class ProviderSetupService {
         return try await api.request(method: "GET", path: path)
     }
 
-    func skipA2P(providerType: ProviderType, hubId: String?) async throws {
+    func skipA2P(providerType: SharedProviderType, hubId: String?) async throws {
         let body = A2PSkipRequest(providerType: providerType.rawValue, hubId: hubId)
         let _: EmptyResponse = try await api.request(method: "POST", path: "/provider-setup/a2p/skip", body: body)
     }

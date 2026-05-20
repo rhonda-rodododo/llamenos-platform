@@ -758,7 +758,7 @@ struct CaseDetailView: View {
         return "doc"
     }
 
-    private func evidenceColor(_ classification: EvidenceClassification) -> Color {
+    private func evidenceColor(_ classification: SharedClassification) -> Color {
         switch classification {
         case .photo: return .blue
         case .video: return .purple
