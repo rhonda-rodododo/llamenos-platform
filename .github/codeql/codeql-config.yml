@@ -1,0 +1,20 @@
+name: "Llamenos CodeQL Configuration"
+
+# Use security-extended suite for more thorough analysis
+queries:
+  - uses: security-extended
+
+paths-ignore:
+  # Vendored Ruby gems (iOS Fastlane)
+  - apps/ios/vendor
+  # Codegen output (generated from Zod schemas)
+  - packages/protocol/generated
+  - '**/generated'
+  # Build artifacts
+  - dist
+  - build
+  # Dependencies
+  - node_modules
+  - .bun
+  # Test fixtures with intentional mock patterns
+  - tests/mocks

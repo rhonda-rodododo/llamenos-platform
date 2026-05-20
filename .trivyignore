@@ -1,12 +1,7 @@
-# False positive: GCP service account detected in minified JS bundle.
-# Source: src/client/components/admin-settings/rcs-channel-section.tsx
-# The "gcp-service-account" pattern matches a UI form placeholder string:
-#   placeholder='{"type": "service_account", ...}'
-# This is a user-facing input field hint, not a real credential.
+# False positive: RCS channel config UI form field placeholder text
+# matches gcp-service-account pattern but is not a real credential
 gcp-service-account
 
-# False positive: Stripe secret token example in bun-types documentation.
-# Source: /build/.bun/install/cache/bun-types@*/docs/runtime/secrets.mdx
-# The pattern matches example/tutorial content showing what a Stripe secret
-# token looks like, not an actual secret.
+# False positive: bun-types documentation cache contains example
+# Stripe key patterns from documentation, not real secrets
 stripe-secret-token
