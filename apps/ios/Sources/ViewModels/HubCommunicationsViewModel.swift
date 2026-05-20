@@ -255,7 +255,7 @@ final class HubCommunicationsViewModel {
             try await onboardAPI.updateChannels(hubId: hubId, channels: config)
             // Also update provider settings channels locally
             if let settings = providerSettings {
-                let updatedChannels = Channels(
+                let updatedChannels = SharedChannelConfig(
                     email: channelEmail,
                     rcs: channelRcs,
                     signal: channelSignal,
@@ -281,7 +281,7 @@ final class HubCommunicationsViewModel {
 
     // MARK: - Private Helpers
 
-    private func syncChannelsFromSettings(_ channels: Channels) {
+    private func syncChannelsFromSettings(_ channels: SharedChannelConfig) {
         channelVoice = channels.voice
         channelSms = channels.sms
         channelEmail = channels.email
@@ -291,7 +291,7 @@ final class HubCommunicationsViewModel {
         channelRcs = channels.rcs
     }
 
-    private func syncChannelsFromOnboarding(_ config: ChannelConfigClass) {
+    private func syncChannelsFromOnboarding(_ config: SharedChannelConfig) {
         channelVoice = config.voice
         channelSms = config.sms
         channelEmail = config.email
