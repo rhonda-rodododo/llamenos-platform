@@ -256,9 +256,9 @@ function LinkDevicePage() {
               <CardDescription>{t('deviceLink.verifySASDesc')}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="rounded-lg border-2 border-primary/20 bg-primary/5 p-6 text-center" data-testid="sas-code">
+              <div className="rounded-lg border-2 border-primary/20 bg-primary/5 p-6 text-center" data-testid="sas-code-container">
                 <p className="text-xs text-muted-foreground mb-2">{t('deviceLink.securityCode')}</p>
-                <p className="text-4xl font-mono font-bold tracking-[0.3em]">{sasCode}</p>
+                <p className="text-4xl font-mono font-bold tracking-[0.3em]" data-testid="sas-code">{sasCode}</p>
               </div>
               <p className="text-sm text-muted-foreground text-center">{t('deviceLink.compareCodes')}</p>
               <div className="flex gap-2">

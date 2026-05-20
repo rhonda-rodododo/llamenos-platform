@@ -110,7 +110,7 @@ Then('I should see a {int}-digit SAS code displayed', async ({ page }, digits: n
 
 Then('I should see instructions to compare with the other device', async ({ page }) => {
   // The verifySASDesc text contains "Compare this code" / compare wording
-  const instruction = page.locator('[data-testid="sas-code"]').locator('..')
+  const instruction = page.locator('[data-testid="sas-code-container"]').locator('..')
     .locator('text=/compare|verify|match|other device/i')
   // Fallback to any visible compare text on the page
   const pageText = page.getByText(/compare|verify.*code/i)
