@@ -12,10 +12,8 @@ import {
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Settings2 } from 'lucide-react'
-import {
-  updatePlatformSettings,
-  type PlatformSettings,
-} from '@/lib/api'
+import { updatePlatformSettings } from '@/lib/api'
+import type { PlatformSettings } from '@protocol/schemas'
 
 interface Props {
   settings: PlatformSettings

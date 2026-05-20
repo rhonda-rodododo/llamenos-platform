@@ -36,10 +36,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.serialization.Serializable
+import org.llamenos.hotline.R
 import org.llamenos.hotline.api.ApiService
 import org.llamenos.protocol.Record
 
@@ -99,7 +101,7 @@ fun EvidenceCustodyChainScreen(
                 title = { Text("Chain of Custody") },
                 navigationIcon = {
                     androidx.compose.material3.IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Filled.Shield, contentDescription = "Back")
+                        Icon(Icons.Filled.Shield, contentDescription = stringResource(R.string.a11y_back))
                     }
                 },
             )

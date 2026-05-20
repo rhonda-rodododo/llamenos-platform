@@ -4,8 +4,8 @@ import {
   createTag,
   updateTag,
   deleteTag,
-  type TagResponse,
 } from '@/lib/api'
+import type { TagResponse } from '@protocol/schemas'
 import { encryptHubField, decryptHubField } from '@/lib/platform'
 import { LABEL_TAG_ENCRYPT } from '@shared/crypto-labels'
 

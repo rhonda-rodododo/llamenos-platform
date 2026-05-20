@@ -10,10 +10,14 @@
     "assignedSuccess": "Volunteer assigned"
   },
   "a11y": {
+    "back": "Back",
     "clearFilters": "Clear filters",
     "closeSidebar": "Close sidebar",
     "copyField": "Copy %@",
     "copyToClipboard": "Copy to clipboard",
+    "createCase": "Create case",
+    "currentStatus": "Current status",
+    "customDateRange": "Custom date range",
     "deleteItem": "Delete",
     "editItem": "Edit",
     "moveDown": "Move down",
@@ -21,6 +25,7 @@
     "openMenu": "Open menu",
     "removeItem": "Remove",
     "searchButton": "Search",
+    "session": "Session",
     "skipToContent": "Skip to content",
     "switchToLanguage": "Switch to {{language}}",
     "themeDark": "Dark theme",

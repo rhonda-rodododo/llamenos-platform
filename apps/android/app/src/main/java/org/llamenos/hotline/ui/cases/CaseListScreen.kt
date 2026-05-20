@@ -42,6 +42,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -49,8 +50,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.LaunchedEffect
+import org.llamenos.hotline.R
 import org.llamenos.hotline.model.EntityTypeDefinition
-import org.llamenos.hotline.model.EnumOption
+import org.llamenos.protocol.EntityTypeDefinitionStatus
 import org.llamenos.protocol.Record
 import org.llamenos.hotline.util.DateFormatUtils
 
@@ -91,7 +93,7 @@ fun CaseListScreen(
     }
 
     // Status options for the selected entity type
-    val statusOptions: List<EnumOption> = remember(uiState.selectedEntityTypeId, uiState.entityTypes) {
+    val statusOptions: List<EntityTypeDefinitionStatus> = remember(uiState.selectedEntityTypeId, uiState.entityTypes) {
         if (uiState.selectedEntityTypeId != null) {
             uiState.entityTypes.find { it.id == uiState.selectedEntityTypeId }?.statuses
                 ?: emptyList()
@@ -116,7 +118,7 @@ fun CaseListScreen(
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
+                            contentDescription = stringResource(R.string.a11y_back),
                         )
                     }
                 },
@@ -135,7 +137,7 @@ fun CaseListScreen(
             ) {
                 Icon(
                     imageVector = Icons.Filled.Add,
-                    contentDescription = "Create case",
+                    contentDescription = stringResource(R.string.a11y_create_case),
                 )
             }
         },

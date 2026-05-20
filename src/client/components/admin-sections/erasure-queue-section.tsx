@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '@/lib/toast'
-import { listErasureRequests, getErasureConfig, type ErasureRequest } from '@/lib/api'
+import { listErasureRequests, getErasureConfig } from '@/lib/api'
+import type { ErasureRequest } from '@protocol/schemas'
 import { ErasureQueueSection as ErasureQueueSectionInner } from '@/components/admin-settings/erasure-queue-section'
 
 export function ErasureQueueSection() {

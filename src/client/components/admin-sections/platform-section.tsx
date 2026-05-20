@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '@/lib/toast'
-import { getPlatformSettings, type PlatformSettings } from '@/lib/api'
+import { getPlatformSettings } from '@/lib/api'
+import type { PlatformSettings } from '@protocol/schemas'
 import { PlatformSettingsSection } from '@/components/admin-settings/platform-settings-section'
 
 export function PlatformSection() {

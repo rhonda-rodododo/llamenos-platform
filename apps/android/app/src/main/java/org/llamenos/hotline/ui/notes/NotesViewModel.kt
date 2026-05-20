@@ -23,6 +23,7 @@ import org.llamenos.hotline.api.SessionState
 import org.llamenos.hotline.crypto.CryptoService
 import org.llamenos.hotline.hub.ActiveHubState
 import org.llamenos.hotline.model.CustomFieldDef
+import org.llamenos.protocol.CustomFieldDefinitionType
 import org.llamenos.hotline.model.NotePayload
 import org.llamenos.hotline.model.NoteRepliesResponse
 import org.llamenos.hotline.model.NoteReply
@@ -218,7 +219,7 @@ class NotesViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         customFields = fields.filter {  field ->
-                            field.visibleToVolunteers && field.context == "note"
+                            field.visibleToUsers && field.context.value in setOf("all", "call-notes", "conversation-notes")
                         },
                     )
                 }
@@ -258,8 +259,8 @@ class NotesViewModel @Inject constructor(
                     fieldValues.mapValues { (name, value) ->
                         val fieldDef = _uiState.value.customFields.find { it.name == name }
                         when (fieldDef?.type) {
-                            "checkbox" -> JsonPrimitive(value.toBooleanStrictOrNull() ?: false)
-                            "number" -> {
+                            CustomFieldDefinitionType.Checkbox -> JsonPrimitive(value.toBooleanStrictOrNull() ?: false)
+                            CustomFieldDefinitionType.Number -> {
                                 val num = value.toIntOrNull()
                                 if (num != null) JsonPrimitive(num) else JsonPrimitive(value)
                             }
@@ -390,8 +391,8 @@ class NotesViewModel @Inject constructor(
                     fieldValues.mapValues { (name, value) ->
                         val fieldDef = _uiState.value.customFields.find { it.name == name }
                         when (fieldDef?.type) {
-                            "checkbox" -> JsonPrimitive(value.toBooleanStrictOrNull() ?: false)
-                            "number" -> {
+                            CustomFieldDefinitionType.Checkbox -> JsonPrimitive(value.toBooleanStrictOrNull() ?: false)
+                            CustomFieldDefinitionType.Number -> {
                                 val num = value.toIntOrNull()
                                 if (num != null) JsonPrimitive(num) else JsonPrimitive(value)
                             }

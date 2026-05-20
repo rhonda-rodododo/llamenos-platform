@@ -20,69 +20,12 @@ typealias UpdateRecordRequest = UpdateRecordBody
 typealias CreateInteractionRequest = CreateInteractionBody
 
 // ── Entity type definitions ─────────────────────────────────────────────────
-// The generated EntityTypeDefinition uses enum types (CreateEntityTypeBodyCategoryEnum,
-// DefaultAccessLevel, AccessLevel) and Long for order. These client types use
-// String for enums and Int for order for simpler UI construction.
+// These are now imported directly from the protocol-generated types.
+// EntityTypeDefinition is re-exported from org.llamenos.protocol.
+// EntityFieldDefinition is aliased to EntityTypeDefinitionField for backward compat.
 
-@Serializable
-data class EntityTypeDefinition(
-    val id: String,
-    val hubId: String = "",
-    val name: String = "",
-    val label: String = "",
-    val labelPlural: String = "",
-    val description: String = "",
-    val icon: String? = null,
-    val color: String? = null,
-    val category: String = "case",
-    val templateId: String? = null,
-    val templateVersion: String? = null,
-    val fields: List<EntityFieldDefinition> = emptyList(),
-    val statuses: List<EnumOption> = emptyList(),
-    val defaultStatus: String = "",
-    val closedStatuses: List<String> = emptyList(),
-    val severities: List<EnumOption>? = null,
-    val defaultSeverity: String? = null,
-    val contactRoles: List<EnumOption>? = null,
-    val numberPrefix: String? = null,
-    val numberingEnabled: Boolean = false,
-    val defaultAccessLevel: String = "assigned",
-    val piiFields: List<String> = emptyList(),
-    val allowSubRecords: Boolean = false,
-    val allowFileAttachments: Boolean = true,
-    val allowInteractionLinks: Boolean = true,
-    val showInNavigation: Boolean = true,
-    val showInDashboard: Boolean = false,
-    val isArchived: Boolean = false,
-    val isSystem: Boolean = false,
-    val createdAt: String = "",
-    val updatedAt: String = "",
-)
-
-@Serializable
-data class EnumOption(
-    val value: String,
-    val label: String,
-    val color: String? = null,
-    val icon: String? = null,
-    val order: Int = 0,
-    val isDefault: Boolean? = null,
-    val isClosed: Boolean? = null,
-    val isDeprecated: Boolean? = null,
-)
-
-@Serializable
-data class EntityFieldDefinition(
-    val id: String = "",
-    val name: String = "",
-    val label: String = "",
-    val type: String = "text",
-    val required: Boolean = false,
-    val section: String? = null,
-    val helpText: String? = null,
-    val order: Int = 0,
-    val accessLevel: String = "all",
-)
+typealias EntityTypeDefinition = org.llamenos.protocol.EntityTypeDefinition
+typealias EntityFieldDefinition = org.llamenos.protocol.EntityTypeDefinitionField
 
 // ── API Response Wrappers ───────────────────────────────────────────────────
 
