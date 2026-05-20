@@ -110,8 +110,13 @@ struct RecoveryRequestsView: View {
     // MARK: - Actions
 
     private func loadRecoveryRequests() async {
-        // Recovery requests would be loaded from the API
-        // For now, this is a placeholder implementation
+        do {
+            let fetched = try await appState.apiService.listRecoverySessions()
+            sessions = fetched
+        } catch {
+            // Non-fatal: show empty state rather than blocking the UI
+            print("[Recovery] Failed to load sessions: \(error.localizedDescription)")
+        }
         isLoading = false
     }
 
@@ -119,10 +124,87 @@ struct RecoveryRequestsView: View {
         isApproving = true
         errorMessage = nil
         do {
+            guard let session = sessions.first(where: { $0.sessionId == sessionId }) else {
+                errorMessage = NSLocalizedString("recovery_group_error_session_not_found", comment: "Session not found")
+                isApproving = false
+                return
+            }
+
+            let cryptoService = appState.cryptoService
+            guard cryptoService.isUnlocked,
+                  let signingPubkey = cryptoService.signingPubkeyHex else {
+                errorMessage = NSLocalizedString("recovery_group_error_device_locked", comment: "Device must be unlocked")
+                isApproving = false
+                return
+            }
+
+            // Check if we already contributed
+            if let contributions = session.contributions,
+               contributions.contains(where: { $0.contributorPubkey == signingPubkey }) {
+                errorMessage = NSLocalizedString("recovery_group_error_already_approved", comment: "Already approved")
+                isApproving = false
+                return
+            }
+
+            // Fetch our encrypted share envelope from the server
+            guard let hubId = hubContext.activeHubId else {
+                errorMessage = NSLocalizedString("error_no_hub_url", comment: "No hub selected")
+                isApproving = false
+                return
+            }
+
+            let shareData = try await appState.apiService.getMyShareEnvelope(hubId: hubId)
+
+            // Parse the HPKE envelope from the stored share
+            let envelopeData = shareData.shareEnvelope.data(using: .utf8) ?? Data()
+            let envelope = try JSONDecoder().decode(HpkeEnvelope.self, from: envelopeData)
+
+            // Decrypt our stored Shamir share using HPKE
+            let shareHex = try cryptoService.hpkeOpenKey(
+                envelope: envelope,
+                expectedLabel: CryptoLabels.LABEL_RECOVERY_GROUP_SHARE_WRAP,
+                aadHex: ""
+            )
+
+            // Verify share against commitment if available
+            if let commitment = shareData.shareCommitment {
+                // Parse share: first byte is x-coordinate, rest is y-value
+                let xByte = UInt8(shareHex.prefix(2), radix: 16) ?? 0
+                let yHex = String(shareHex.dropFirst(2))
+                let share = ShamirShare(x: xByte, yHex: yHex)
+                let valid = try cryptoService.shamirVerify(share: share, commitment: commitment)
+                if !valid {
+                    errorMessage = NSLocalizedString("recovery_group_error_commitment_failed", comment: "Share commitment verification failed")
+                    isApproving = false
+                    return
+                }
+            }
+
+            // HPKE-seal share to the recovering user's new device pubkey
+            // AAD = sessionId:contributorPubkey (hex-encoded UTF-8)
+            let aadString = "\(sessionId):\(signingPubkey)"
+            let aadHex = aadString.data(using: .utf8)!.map { String(format: "%02x", $0) }.joined()
+
+            let contribution = try cryptoService.hpkeSeal(
+                plaintextHex: shareHex,
+                recipientPubkeyHex: session.newDevicePubkey,
+                label: CryptoLabels.LABEL_RECOVERY_SHARE_CONTRIBUTE,
+                aadHex: aadHex
+            )
+
+            // Sign the contribution: ed25519Sign(JSON(envelope) + ":" + sessionId)
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = .sortedKeys
+            let contributionJSON = String(data: try encoder.encode(contribution), encoding: .utf8)!
+            let sigPayload = "\(contributionJSON):\(sessionId)"
+            let sigPayloadHex = sigPayload.data(using: .utf8)!.map { String(format: "%02x", $0) }.joined()
+            let signature = try cryptoService.ed25519Sign(messageHex: sigPayloadHex)
+
+            // Submit the contribution
             _ = try await appState.apiService.contributeRecoveryShare(
                 sessionId: sessionId,
-                encryptedShare: "", // Would be computed from CryptoService
-                contributorSignature: ""
+                encryptedShare: contributionJSON,
+                contributorSignature: signature
             )
             await loadRecoveryRequests()
         } catch {

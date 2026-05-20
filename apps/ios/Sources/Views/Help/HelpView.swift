@@ -11,13 +11,13 @@ struct HelpView: View {
         List {
             securityOverviewSection
             volunteerGuideSection
-            if appState.isAdmin {
+            if appState.hasPermission("settings:read") {
                 adminGuideSection
             }
             faqGettingStartedSection
             faqCallsSection
             faqNotesSection
-            if appState.isAdmin {
+            if appState.hasPermission("settings:read") {
                 faqAdminSection
             }
             footerSection

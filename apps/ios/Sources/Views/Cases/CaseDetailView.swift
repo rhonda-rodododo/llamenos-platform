@@ -185,7 +185,7 @@ struct CaseDetailView: View {
 
     private var statusPill: some View {
         let statusDef = entityType.statuses.first { $0.value == record.statusHash }
-        let canEdit = appState.isAdmin || appState.userRole == .admin
+        let canEdit = appState.hasPermission("cases:update")
 
         return Button {
             if canEdit {

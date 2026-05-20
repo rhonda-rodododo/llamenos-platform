@@ -111,6 +111,13 @@ struct RecoveryVerifyResponse: Decodable {
     let expiresAt: String
 }
 
+// ShareHolderLiveness is now provided by protocol codegen (Types.swift)
+
+struct ShareEnvelopeResponse: Decodable {
+    let shareEnvelope: String
+    let shareCommitment: String?
+}
+
 struct OkResponse: Decodable {
     let ok: Bool
 }
@@ -489,6 +496,17 @@ final class APIService: @unchecked Sendable {
         return try await request(method: "POST", path: "/api/recovery-group/initiate/verify", body: body)
     }
 
+    func listRecoverySessions() async throws -> [RecoverySessionStatus] {
+        guard let hubId = hubContext.activeHubId else { throw APIError.noBaseURL }
+        return try await request(method: "GET", path: hp("/api/recovery-group/sessions?hubId=\(hubId)"))
+    }
+
+    /// Fetch the current user's share envelope from the recovery group.
+    /// Returns the HPKE-encrypted Shamir share and its commitment.
+    func getMyShareEnvelope(hubId: String) async throws -> ShareEnvelopeResponse {
+        try await request(method: "GET", path: hp("/api/recovery-group/shares/my"))
+    }
+
     func getRecoverySession(sessionId: String) async throws -> RecoverySessionStatus {
         try await request(method: "GET", path: hp("/api/recovery-group/session/\(sessionId)"))
     }
@@ -519,6 +537,55 @@ final class APIService: @unchecked Sendable {
             "proof": proof,
         ]
         return try await request(method: "POST", path: hp("/api/recovery-group/shares/liveness"), body: body)
+    }
+}
+
+// MARK: - Entity File Upload
+
+/// Local API response type — distinct from the codegen EntityFileUploadResponse
+/// because the decoder uses convertFromSnakeCase and expects String dates (not Date).
+struct APIFileUploadResponse: Decodable {
+    let fileId: String
+    let uploadedAt: String
+}
+
+extension APIService {
+    /// Upload encrypted file data as multipart/form-data to the entity-file endpoint.
+    func uploadEntityFile(encryptedData: Data, fileName: String) async throws -> APIFileUploadResponse {
+        guard let baseURL else { throw APIError.noBaseURL }
+
+        let boundary = UUID().uuidString
+        var body = Data()
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(fileName)\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: application/octet-stream\r\n\r\n".data(using: .utf8)!)
+        body.append(encryptedData)
+        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+
+        let path = hp("/api/uploads/entity-file")
+        let fullURL = baseURL.appendingPathComponent(path)
+        var urlRequest = URLRequest(url: fullURL)
+        urlRequest.httpMethod = "POST"
+        urlRequest.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Accept")
+        urlRequest.httpBody = body
+
+        if cryptoService.isUnlocked {
+            let token = try cryptoService.createAuthToken(method: "POST", path: path)
+            let authJSON = """
+            {"pubkey":"\(token.pubkey)","timestamp":\(token.timestamp),"token":"\(token.token)"}
+            """
+            urlRequest.setValue("Bearer \(authJSON)", forHTTPHeaderField: "Authorization")
+        }
+
+        let (data, response) = try await session.data(for: urlRequest)
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200...299).contains(httpResponse.statusCode) else {
+            let bodyString = String(data: data, encoding: .utf8) ?? "<binary>"
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            throw APIError.requestFailed(statusCode: code, body: bodyString)
+        }
+        return try decoder.decode(APIFileUploadResponse.self, from: data)
     }
 }
 

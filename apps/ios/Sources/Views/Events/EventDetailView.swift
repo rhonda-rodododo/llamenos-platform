@@ -28,7 +28,7 @@ struct EventDetailView: View {
         .navigationTitle(displayTitle)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if appState.isAdmin {
+            if appState.hasPermission("events:update") {
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
                         Button {

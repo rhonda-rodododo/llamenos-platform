@@ -214,7 +214,7 @@ struct SettingsView: View {
             }
             .accessibilityIdentifier("settings-hubs-link")
 
-            if appState.isAdmin {
+            if appState.hasPermission("settings:read") {
                 NavigationLink(value: "communications") {
                     Label {
                         Text(NSLocalizedString("hub_onboarding_settings_title", comment: "Communications"))
@@ -260,7 +260,7 @@ struct SettingsView: View {
             }
             .accessibilityIdentifier("settings-transcription-link")
 
-            if appState.isAdmin {
+            if appState.hasPermission("audit:read") {
                 NavigationLink(value: "admin") {
                     Label {
                         Text(NSLocalizedString("settings_admin", comment: "Admin Panel"))

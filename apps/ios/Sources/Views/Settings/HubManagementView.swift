@@ -35,7 +35,7 @@ struct HubManagementView: View {
         .navigationTitle(NSLocalizedString("hubs_title", comment: "Hubs"))
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
-            if appState.isAdmin {
+            if appState.hasPermission("hubs:read") {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
                         showCreateHub = true
@@ -90,8 +90,8 @@ struct HubManagementView: View {
             icon: "building.2",
             title: NSLocalizedString("hubs_empty_title", comment: "No Hubs"),
             message: NSLocalizedString("hubs_empty_message", comment: "You are not a member of any hubs yet."),
-            action: appState.isAdmin ? { showCreateHub = true } : nil,
-            actionLabel: appState.isAdmin
+            action: appState.hasPermission("hubs:read") ? { showCreateHub = true } : nil,
+            actionLabel: appState.hasPermission("hubs:read")
                 ? NSLocalizedString("hubs_create_hub", comment: "Create Hub")
                 : nil,
             actionAccessibilityID: "hubs-empty-create-btn"

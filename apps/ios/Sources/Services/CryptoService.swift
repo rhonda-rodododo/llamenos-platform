@@ -127,6 +127,11 @@ private func ffiMobileDecryptDraft(packedHex: String, hubId: String) throws -> S
     try mobileDecryptDraft(packedHex: packedHex, hubId: hubId)
 }
 
+// V3 Ed25519 signing (stateful — uses device signing key)
+private func ffiMobileSign(messageHex: String) throws -> String {
+    try mobileSign(messageHex: messageHex)
+}
+
 // Hub key + server event key management (keys stored in Rust, never in Swift)
 private func ffiMobileSetHubKey(hubId: String, keyHex: String) throws {
     try mobileSetHubKey(hubId: hubId, keyHex: keyHex)
@@ -460,6 +465,47 @@ final class CryptoService: @unchecked Sendable {
 
     func shamirVerify(share: ShamirShare, commitment: String) throws -> Bool {
         try ffiMobileShamirVerify(share: share, commitmentHex: commitment)
+    }
+
+    // MARK: - General HPKE Operations
+
+    /// HPKE-seal arbitrary data to a recipient's public key with a domain label.
+    func hpkeSeal(plaintextHex: String, recipientPubkeyHex: String, label: String, aadHex: String) throws -> HpkeEnvelope {
+        try ffiMobileHpkeSeal(plaintextHex: plaintextHex, recipientPubkeyHex: recipientPubkeyHex, label: label, aadHex: aadHex)
+    }
+
+    /// HPKE-open an envelope using our device private key.
+    func hpkeOpen(envelope: HpkeEnvelope, expectedLabel: String, aadHex: String) throws -> String {
+        guard isUnlocked else { throw CryptoServiceError.noKeyLoaded }
+        return try ffiMobileHpkeOpen(envelope: envelope, expectedLabel: expectedLabel, aadHex: aadHex)
+    }
+
+    /// HPKE-seal a symmetric key to a recipient's public key with a domain label.
+    func hpkeSealKey(keyHex: String, recipientPubkeyHex: String, label: String, aadHex: String) throws -> HpkeEnvelope {
+        try ffiMobileHpkeSealKey(keyHex: keyHex, recipientPubkeyHex: recipientPubkeyHex, label: label, aadHex: aadHex)
+    }
+
+    /// HPKE-open a key envelope using our device private key.
+    func hpkeOpenKey(envelope: HpkeEnvelope, expectedLabel: String, aadHex: String) throws -> String {
+        guard isUnlocked else { throw CryptoServiceError.noKeyLoaded }
+        return try ffiMobileHpkeOpenKey(envelope: envelope, expectedLabel: expectedLabel, aadHex: aadHex)
+    }
+
+    // MARK: - Ed25519 Signing
+
+    /// Sign a hex-encoded message using the device's Ed25519 signing key.
+    func ed25519Sign(messageHex: String) throws -> String {
+        guard isUnlocked else { throw CryptoServiceError.noKeyLoaded }
+        return try ffiMobileSign(messageHex: messageHex)
+    }
+
+    // MARK: - Symmetric Encryption (AES-256-GCM)
+
+    /// Encrypt data with a random AES-256-GCM key. Returns (ciphertextHex, keyHex).
+    func symmetricEncrypt(plaintextHex: String) throws -> (ciphertextHex: String, keyHex: String) {
+        guard isUnlocked else { throw CryptoServiceError.noKeyLoaded }
+        let result = try ffiMobileSymmetricEncrypt(plaintextHex: plaintextHex)
+        return (ciphertextHex: result[0], keyHex: result[1])
     }
 
     // MARK: - Recovery Group
