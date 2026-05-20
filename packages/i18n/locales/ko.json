@@ -1101,7 +1101,10 @@
     "unassign": "할당 해제",
     "unassignError": "할당 해제 실패",
     "unassigned": "미할당",
-    "updated": "업데이트됨"
+    "updated": "업데이트됨",
+    "error": {
+      "noKey": "Encryption key not available"
+    }
   },
   "channels": {
     "a2p": {
@@ -3134,7 +3137,9 @@
       "notContact": "You are not a recovery contact for this organization",
       "signalVerificationFailed": "Verification code is incorrect",
       "signalVerificationExpired": "Verification code has expired. Please start over.",
-      "sigchainMismatch": "Recovery team configuration could not be verified. Contact your administrator."
+      "sigchainMismatch": "Recovery team configuration could not be verified. Contact your administrator.",
+      "sessionNotFound": "Session not found",
+      "deviceLocked": "Device must be unlocked"
     },
     "noContacts": "No eligible recovery contacts found.",
     "selected": "Selected"
@@ -3187,7 +3192,12 @@
       "titlePlaceholder": "Brief description of the report"
     },
     "untitled": "Untitled Report",
-    "validationErrors": "Please fix the errors above before submitting."
+    "validationErrors": "Please fix the errors above before submitting.",
+    "fileEncrypting": "Encrypting...",
+    "fileUploaded": "Encrypted & uploaded",
+    "fileSelect": "Select file...",
+    "fileE2ee": "Files are encrypted before upload",
+    "fileAccessDenied": "Cannot access this file"
   },
   "reportLinks": {
     "alreadyLinked": "이 보고서는 이미 이 사건에 연결되어 있습니다.",
