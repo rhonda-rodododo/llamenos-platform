@@ -1,0 +1,13 @@
+# Vendored Ruby gems (iOS Fastlane deps — third-party code, not ours)
+apps/ios/vendor/
+
+# Generated code (gitignored, rebuilt on-the-fly — not our source)
+packages/protocol/generated/
+
+# Build artifacts
+dist/
+build/
+
+# Node module caches
+node_modules/
+.bun/
