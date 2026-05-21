@@ -1,76 +1,76 @@
 ---
-title: API Reference
-description: Complete REST API endpoint reference for the Llamenos server.
+title: API Referansı
+description: Llamenos sunucusu için eksiksiz REST API uç noktası referansı.
 ---
 
-This document describes every REST API endpoint exposed by the Llamenos server. All endpoints are prefixed with `/api`. Requests and responses use JSON unless otherwise noted. All timestamps are ISO 8601 strings.
+Bu belge, Llamenos sunucusu tarafından sunulan her REST API uç noktasını açıklar. Tüm uç noktalar `/api` ile ön eklenir. Aksi belirtilmediği sürece istekler ve yanıtlar JSON kullanır. Tüm zaman damgaları ISO 8601 dizeleridir.
 
-The API is the same whether the backend runs on **Cloudflare Workers** (with Durable Objects) or **self-hosted** (Node.js + PostgreSQL). The six Durable Objects — Identity, Settings, Records, ShiftManager, CallRouter, and Conversation — map to logical API domains described below.
+API, arka uç ister **Cloudflare Workers** (Durable Objects ile) isterse **kendi kendine barındırılan** (Node.js + PostgreSQL) olsun aynıdır. Altı Durable Object — Identity, Settings, Records, ShiftManager, CallRouter ve Conversation — aşağıda açıklanan mantıksal API alanlarına karşılık gelir.
 
-## Authentication
+## Kimlik Doğrulama
 
-Llamenos supports two authentication mechanisms. All authenticated endpoints require one of these.
+Llamenos iki kimlik doğrulama mekanizmasını destekler. Tüm kimliği doğrulanmış uç noktalar bunlardan birini gerektirir.
 
-### Schnorr signature auth (primary)
+### Schnorr imzası ile kimlik doğrulama (birincil)
 
-Every authenticated request carries a self-signed BIP-340 Schnorr token bound to the HTTP method and path.
+Her kimliği doğrulanmış istek, HTTP yöntemine ve yola bağlı, kendi kendine imzalanmış bir BIP-340 Schnorr belirteci taşır.
 
-**Header format:**
+**Başlık formatı:**
 
 ```
 Authorization: Bearer {"pubkey":"<64_hex>","timestamp":<ms>,"token":"<128_hex>"}
 ```
 
-**Token construction:**
+**Belirteç oluşturma:**
 
-1. Build the message: `llamenos:auth:<pubkey>:<timestamp_ms>:<METHOD>:<path>`
-2. Hash with SHA-256
-3. Sign the hash with BIP-340 Schnorr using your secp256k1 secret key
-4. Encode as inline JSON with `pubkey`, `timestamp`, and `token` (hex signature) fields
+1. Mesajı oluşturun: `llamenos:auth:<pubkey>:<timestamp_ms>:<METHOD>:<path>`
+2. SHA-256 ile hashleyin
+3. Hash'i, secp256k1 gizli anahtarınızı kullanarak BIP-340 Schnorr ile imzalayın
+4. `pubkey`, `timestamp` ve `token` (onaltılık imza) alanlarıyla satır içi JSON olarak kodlayın
 
-**Validation rules:**
+**Doğrulama kuralları:**
 
-- Token freshness: `|now() - timestamp| <= 300,000 ms` (5-minute window)
-- Signature is verified against the reconstructed message hash
-- The pubkey is looked up in the identity store to resolve the user record
+- Belirteç tazeliği: `|now() - timestamp| <= 300.000 ms` (5 dakikalık pencere)
+- İmza, yeniden oluşturulan mesaj hash'ine karşı doğrulanır
+- Ortak anahtar, kullanıcı kaydını çözümlemek için kimlik deposunda aranır
 
-### Session token auth (WebAuthn)
+### Oturum belirteci ile kimlik doğrulama (WebAuthn)
 
-After a WebAuthn authentication ceremony, the server issues a random 256-bit session token valid for 8 hours.
+Bir WebAuthn kimlik doğrulama töreninden sonra sunucu, 8 saat geçerli rastgele 256 bitlik bir oturum belirteci yayınlar.
 
 ```
 Authorization: Session <token_hex>
 ```
 
-The server checks `Session` auth first. If the header starts with `Session `, Schnorr auth is not attempted, and vice versa.
+Sunucu önce `Session` kimlik doğrulamasını kontrol eder. Başlık `Session ` ile başlıyorsa Schnorr kimlik doğrulaması denenmez ve bunun tersi de geçerlidir.
 
 ---
 
-## Public endpoints
+## Genel uç noktalar
 
-These endpoints require no authentication.
+Bu uç noktalar herhangi bir kimlik doğrulama gerektirmez.
 
-### Health check
+### Sağlık kontrolü
 
 ```
 GET /api/health
 ```
 
-**Response:**
+**Yanıt:**
 
 ```json
 { "status": "ok" }
 ```
 
-### Configuration
+### Yapılandırma
 
 ```
 GET /api/config
 ```
 
-Returns public hub configuration, enabled channels, and server identity.
+Genel merkez yapılandırmasını, etkin kanalları ve sunucu kimliğini döndürür.
 
-**Response:**
+**Yanıt:**
 
 ```json
 {
@@ -91,15 +91,15 @@ Returns public hub configuration, enabled channels, and server identity.
 }
 ```
 
-### Build verification
+### Derleme doğrulama
 
 ```
 GET /api/config/verify
 ```
 
-Returns build metadata for reproducible build verification.
+Yeniden üretilebilir derleme doğrulaması için derleme meta verilerini döndürür.
 
-**Response:**
+**Yanıt:**
 
 ```json
 {
@@ -111,28 +111,28 @@ Returns build metadata for reproducible build verification.
 }
 ```
 
-### IVR audio
+### IVR ses
 
 ```
 GET /api/ivr-audio/:promptType/:language
 ```
 
-Returns audio files fetched by telephony providers during calls.
+Çağrılar sırasında telefon sağlayıcıları tarafından getirilen ses dosyalarını döndürür.
 
 - `promptType`: `[a-z_-]+`
 - `language`: `[a-z]{2,5}(-[A-Z]{2})?`
-- **Response:** `audio/wav` binary
+- **Yanıt:** `audio/wav` ikili
 
-### Messaging preferences
+### Mesajlaşma tercihleri
 
-Token-validated public endpoints for subscriber preference management.
+Abone tercih yönetimi için belirteçle doğrulanmış genel uç noktalar.
 
 ```
 GET  /api/messaging/preferences?token=<hmac_token>
 PATCH /api/messaging/preferences?token=<hmac_token>
 ```
 
-**PATCH body:**
+**PATCH gövdesi:**
 
 ```json
 { "status": "active", "language": "es" }
@@ -140,49 +140,49 @@ PATCH /api/messaging/preferences?token=<hmac_token>
 
 ---
 
-## Authentication endpoints
+## Kimlik doğrulama uç noktaları
 
-### Login
+### Giriş
 
 ```
 POST /api/auth/login
 ```
 
-**Body:**
+**Gövde:**
 
 ```json
 { "pubkey": "hex64", "timestamp": 1709318400000, "token": "hex128" }
 ```
 
-**Response:**
+**Yanıt:**
 
 ```json
 { "ok": true, "roles": ["role-super-admin"] }
 ```
 
-Rate limited: 10 attempts per IP. Returns `401` on invalid credentials.
+Hız sınırlı: IP başına 10 deneme. Geçersiz kimlik bilgilerinde `401` döndürür.
 
-### Bootstrap (first admin)
+### Önyükleme (ilk yönetici)
 
 ```
 POST /api/auth/bootstrap
 ```
 
-Registers the first admin account. Fails with `403` if an admin already exists.
+İlk yönetici hesabını kaydeder. Zaten bir yönetici varsa `403` ile başarısız olur.
 
-**Body:** Same as login.
-**Response:** Same as login.
-Rate limited: 5 attempts per IP.
+**Gövde:** Giriş ile aynı.
+**Yanıt:** Giriş ile aynı.
+Hız sınırlı: IP başına 5 deneme.
 
-### Get current user
+### Geçerli kullanıcıyı al
 
 ```
 GET /api/auth/me
 ```
 
-**Auth:** Required
+**Kimlik doğrulama:** Gerekli
 
-**Response:**
+**Yanıt:**
 
 ```json
 {
@@ -204,23 +204,23 @@ GET /api/auth/me
 }
 ```
 
-### Logout
+### Çıkış
 
 ```
 POST /api/auth/me/logout
 ```
 
-**Auth:** Required. If using Session auth, the token is revoked server-side.
+**Kimlik doğrulama:** Gerekli. Oturum kimlik doğrulaması kullanılıyorsa, belirteç sunucu tarafında iptal edilir.
 
-### Update profile
+### Profil güncelle
 
 ```
 PATCH /api/auth/me/profile
 ```
 
-**Auth:** Required
+**Kimlik doğrulama:** Gerekli
 
-**Body:**
+**Gövde:**
 
 ```json
 {
@@ -233,77 +233,77 @@ PATCH /api/auth/me/profile
 }
 ```
 
-All fields are optional. `callPreference` accepts `"phone"`, `"browser"`, or `"both"`.
+Tüm alanlar isteğe bağlıdır. `callPreference` şu değerleri alır: `"phone"`, `"browser"` veya `"both"`.
 
-### Update availability
+### Müsaitlik durumunu güncelle
 
 ```
 PATCH /api/auth/me/availability
 ```
 
-**Auth:** Required
+**Kimlik doğrulama:** Gerekli
 
-**Body:**
+**Gövde:**
 
 ```json
 { "onBreak": true }
 ```
 
-### Update transcription preference
+### Transkripsiyon tercihini güncelle
 
 ```
 PATCH /api/auth/me/transcription
 ```
 
-**Auth:** Required
+**Kimlik doğrulama:** Gerekli
 
-**Body:**
+**Gövde:**
 
 ```json
 { "enabled": false }
 ```
 
-Returns `403` if opt-out is not allowed by admin settings.
+Yönetici ayarları tarafından devre dışı bırakmaya izin verilmiyorsa `403` döndürür.
 
 ---
 
 ## WebAuthn
 
-### Login flow
+### Giriş akışı
 
 ```
 POST /api/webauthn/login/options
 ```
 
-**Auth:** None. Returns `publicKeyCredentialRequestOptions` with a `challengeId`.
+**Kimlik doğrulama:** Yok. Bir `challengeId` ile `publicKeyCredentialRequestOptions` döndürür.
 
 ```
 POST /api/webauthn/login/verify
 ```
 
-**Auth:** None
+**Kimlik doğrulama:** Yok
 
-**Body:**
+**Gövde:**
 
 ```json
 { "assertion": {}, "challengeId": "uuid" }
 ```
 
-**Response:**
+**Yanıt:**
 
 ```json
 { "token": "hex64", "pubkey": "hex64" }
 ```
 
-### Registration flow
+### Kayıt akışı
 
 ```
 POST /api/webauthn/register/options
 ```
 
-**Auth:** Required
+**Kimlik doğrulama:** Gerekli
 
-**Body:**
+**Gövde:**
 
 ```json
 { "label": "My Phone" }
@@ -313,41 +313,41 @@ POST /api/webauthn/register/options
 POST /api/webauthn/register/verify
 ```
 
-**Auth:** Required
+**Kimlik doğrulama:** Gerekli
 
-**Body:**
+**Gövde:**
 
 ```json
 { "attestation": {}, "label": "My Phone", "challengeId": "uuid" }
 ```
 
-### Credential management
+### Kimlik bilgisi yönetimi
 
 ```
 GET /api/webauthn/credentials
 ```
 
-**Auth:** Required. Returns all registered credentials.
+**Kimlik doğrulama:** Gerekli. Kayıtlı tüm kimlik bilgilerini döndürür.
 
 ```
 DELETE /api/webauthn/credentials/:credId
 ```
 
-**Auth:** Required. Removes a credential.
+**Kimlik doğrulama:** Gerekli. Bir kimlik bilgisini kaldırır.
 
 ---
 
-## Invites
+## Davetiyeler
 
-### Public
+### Genel
 
 ```
 GET /api/invites/validate/:code
 ```
 
-Rate limited: 5 attempts per IP.
+Hız sınırlı: IP başına 5 deneme.
 
-**Response:**
+**Yanıt:**
 
 ```json
 { "valid": true, "name": "...", "expiresAt": "..." }
@@ -357,29 +357,29 @@ Rate limited: 5 attempts per IP.
 POST /api/invites/redeem
 ```
 
-**Body:**
+**Gövde:**
 
 ```json
 { "code": "...", "pubkey": "hex64", "timestamp": 1709318400000, "token": "hex128" }
 ```
 
-Rate limited: 5 attempts per IP.
+Hız sınırlı: IP başına 5 deneme.
 
-### Authenticated
+### Kimliği doğrulanmış
 
 ```
 GET /api/invites
 ```
 
-**Permission:** `invites:read`
+**İzin:** `invites:read`
 
 ```
 POST /api/invites
 ```
 
-**Permission:** `invites:create`
+**İzin:** `invites:create`
 
-**Body:**
+**Gövde:**
 
 ```json
 { "name": "Jane Doe", "phone": "+1234567890", "roleIds": ["role-volunteer"] }
@@ -389,27 +389,27 @@ POST /api/invites
 DELETE /api/invites/:code
 ```
 
-**Permission:** `invites:revoke`
+**İzin:** `invites:revoke`
 
 ---
 
-## Volunteers
+## Gönüllüler
 
-All volunteer endpoints require `volunteers:read` as a baseline permission.
+Tüm gönüllü uç noktaları, temel izin olarak `volunteers:read` gerektirir.
 
 ```
 GET /api/volunteers
 ```
 
-**Permission:** `volunteers:read`
+**İzin:** `volunteers:read`
 
 ```
 POST /api/volunteers
 ```
 
-**Permission:** `volunteers:create`
+**İzin:** `volunteers:create`
 
-**Body:**
+**Gövde:**
 
 ```json
 { "name": "string", "phone": "string", "roleIds": ["string"], "pubkey": "string" }
@@ -419,39 +419,39 @@ POST /api/volunteers
 PATCH /api/volunteers/:targetPubkey
 ```
 
-**Permission:** `volunteers:update`
+**İzin:** `volunteers:update`
 
-**Body:** Partial volunteer fields (`name`, `phone`, `roles`, `active`, etc.)
+**Gövde:** Kısmi gönüllü alanları (`name`, `phone`, `roles`, `active`, vb.)
 
 ```
 DELETE /api/volunteers/:targetPubkey
 ```
 
-**Permission:** `volunteers:delete`
+**İzin:** `volunteers:delete`
 
 ---
 
-## Shifts
+## Vardiyalar
 
 ```
 GET /api/shifts/my-status
 ```
 
-**Auth:** Required (any role). Returns the current user's shift status.
+**Kimlik doğrulama:** Gerekli (herhangi bir rol). Geçerli kullanıcının vardiya durumunu döndürür.
 
 ```
 GET /api/shifts
 ```
 
-**Permission:** `shifts:read`
+**İzin:** `shifts:read`
 
 ```
 POST /api/shifts
 ```
 
-**Permission:** `shifts:create`
+**İzin:** `shifts:create`
 
-**Body:**
+**Gövde:**
 
 ```json
 {
@@ -467,49 +467,49 @@ POST /api/shifts
 PATCH /api/shifts/:id
 ```
 
-**Permission:** `shifts:update`
+**İzin:** `shifts:update`
 
 ```
 DELETE /api/shifts/:id
 ```
 
-**Permission:** `shifts:delete`
+**İzin:** `shifts:delete`
 
-### Fallback ring group
+### Yedek halka grubu
 
 ```
 GET /api/shifts/fallback
 ```
 
-**Permission:** `shifts:manage-fallback`
+**İzin:** `shifts:manage-fallback`
 
 ```
 PUT /api/shifts/fallback
 ```
 
-**Permission:** `shifts:manage-fallback`
+**İzin:** `shifts:manage-fallback`
 
-**Body:**
+**Gövde:**
 
 ```json
 { "fallbackPubkeys": ["hex64", "hex64"] }
 ```
 
-Hub-scoped: All shift endpoints are also available at `/api/hubs/:hubId/shifts/*`.
+Merkez kapsamlı: Tüm vardiya uç noktalarına `/api/hubs/:hubId/shifts/*` adresinden de erişilebilir.
 
 ---
 
-## Notes
+## Notlar
 
-All note endpoints require `notes:read-own` as a baseline. Clients must encrypt notes before sending (see the [protocol specification](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/protocol/PROTOCOL.md) for ECIES envelope format).
+Tüm not uç noktaları temel olarak `notes:read-own` gerektirir. İstemciler, göndermeden önce notları şifrelemelidir (ECIES zarf formatı için [protokol belirtimine](https://github.com/rhonda-rodododo/llamenos-platform/blob/main/docs/protocol/PROTOCOL.md) bakın).
 
 ```
 GET /api/notes?callId=...&page=1&limit=50
 ```
 
-**Permission:** `notes:read-own` (own only) or `notes:read-all` (all notes)
+**İzin:** `notes:read-own` (yalnızca kendi notları) veya `notes:read-all` (tüm notlar)
 
-**Response:**
+**Yanıt:**
 
 ```json
 { "notes": [], "total": 0 }
@@ -519,9 +519,9 @@ GET /api/notes?callId=...&page=1&limit=50
 POST /api/notes
 ```
 
-**Permission:** `notes:create`
+**İzin:** `notes:create`
 
-**Body:**
+**Gövde:**
 
 ```json
 {
@@ -536,85 +536,85 @@ POST /api/notes
 PATCH /api/notes/:id
 ```
 
-**Permission:** `notes:update-own`
+**İzin:** `notes:update-own`
 
-**Body:** Same shape as POST (with updated encrypted content and envelopes).
+**Gövde:** POST ile aynı yapı (güncellenmiş şifrelenmiş içerik ve zarflarla).
 
-Hub-scoped: `/api/hubs/:hubId/notes/*`
+Merkez kapsamlı: `/api/hubs/:hubId/notes/*`
 
 ---
 
-## Calls
+## Çağrılar
 
 ```
 GET /api/calls/active
 ```
 
-**Permission:** `calls:read-active` (caller info redacted) or `calls:read-active-full`
+**İzin:** `calls:read-active` (çağıran bilgisi gizlenir) veya `calls:read-active-full`
 
 ```
 GET /api/calls/today-count
 ```
 
-**Permission:** `calls:read-active`
+**İzin:** `calls:read-active`
 
 ```
 GET /api/calls/presence
 ```
 
-**Permission:** `calls:read-presence`. Returns volunteer online/busy status.
+**İzin:** `calls:read-presence`. Gönüllülerin çevrimiçi/meşgul durumunu döndürür.
 
 ```
 GET /api/calls/history?page=1&limit=50&search=&dateFrom=&dateTo=
 ```
 
-**Permission:** `calls:read-history`
+**İzin:** `calls:read-history`
 
 ```
 POST /api/calls/:callId/answer
 ```
 
-**Permission:** `calls:answer`. Returns `409` if the call was already answered.
+**İzin:** `calls:answer`. Çağrı daha önce yanıtlanmışsa `409` döndürür.
 
 ```
 POST /api/calls/:callId/hangup
 ```
 
-**Permission:** `calls:answer`. Returns `403` if not your call.
+**İzin:** `calls:answer`. Çağrı size ait değilse `403` döndürür.
 
 ```
 POST /api/calls/:callId/spam
 ```
 
-**Permission:** `calls:answer`. Flags the call as spam.
+**İzin:** `calls:answer`. Çağrıyı spam olarak işaretler.
 
 ```
 GET /api/calls/:callId/recording
 ```
 
-**Permission:** `calls:read-recording` or answering volunteer.
+**İzin:** `calls:read-recording` veya yanıtlayan gönüllü.
 
-**Response:** `audio/wav` binary with `Cache-Control: private, no-store`.
+**Yanıt:** `audio/wav` ikili, `Cache-Control: private, no-store` ile birlikte.
 
 ```
 GET /api/calls/debug
 ```
 
-**Permission:** `calls:debug`. Returns internal call state for troubleshooting.
+**İzin:** `calls:debug`. Sorun giderme için dahili çağrı durumunu döndürür.
 
-Hub-scoped: `/api/hubs/:hubId/calls/*`
+Merkez kapsamlı: `/api/hubs/:hubId/calls/*`
 
 ---
 
-## Conversations
+## Görüşmeler
 
 ```
 GET /api/conversations?status=&channel=&page=1&limit=50
 ```
 
-**Permission:** `conversations:read-all` or `conversations:read-assigned` (own + waiting)
+**İzin:** `conversations:read-all` veya `conversations:read-assigned` (kendine ait + bekleyenler)
 
-**Response:**
+**Yanıt:**
 
 ```json
 {
@@ -630,9 +630,9 @@ GET /api/conversations?status=&channel=&page=1&limit=50
 GET /api/conversations/stats
 ```
 
-**Auth:** Required
+**Kimlik doğrulama:** Gerekli
 
-**Response:**
+**Yanıt:**
 
 ```json
 { "total": 0, "active": 0, "waiting": 0, "closed": 0 }
@@ -642,27 +642,27 @@ GET /api/conversations/stats
 GET /api/conversations/load
 ```
 
-**Permission:** `conversations:read-all`. Returns per-volunteer conversation counts.
+**İzin:** `conversations:read-all`. Gönüllü başına görüşme sayılarını döndürür.
 
 ```
 GET /api/conversations/:id
 ```
 
-**Auth:** Required (access-checked per conversation).
+**Kimlik doğrulama:** Gerekli (görüşme başına erişim kontrolü yapılır).
 
 ```
 GET /api/conversations/:id/messages?page=1&limit=50
 ```
 
-**Auth:** Required (access-checked). Returns encrypted messages.
+**Kimlik doğrulama:** Gerekli (erişim kontrollü). Şifrelenmiş mesajları döndürür.
 
 ```
 POST /api/conversations/:id/messages
 ```
 
-**Permission:** `conversations:send` or `conversations:send-any`
+**İzin:** `conversations:send` veya `conversations:send-any`
 
-**Body:**
+**Gövde:**
 
 ```json
 {
@@ -672,15 +672,15 @@ POST /api/conversations/:id/messages
 }
 ```
 
-The `plaintextForSending` field is used for external channels (SMS, WhatsApp, Signal). The server sends the message via the channel adapter and then discards the plaintext.
+`plaintextForSending` alanı harici kanallar (SMS, WhatsApp, Signal) için kullanılır. Sunucu, mesajı kanal bağdaştırıcısı aracılığıyla gönderir ve ardından düz metni atar.
 
 ```
 PATCH /api/conversations/:id
 ```
 
-**Permission:** `conversations:update` or assigned volunteer
+**İzin:** `conversations:update` veya atanmış gönüllü
 
-**Body:**
+**Gövde:**
 
 ```json
 { "status": "closed", "assignedTo": "hex64" }
@@ -690,29 +690,29 @@ PATCH /api/conversations/:id
 POST /api/conversations/:id/claim
 ```
 
-**Permission:** `conversations:claim` + channel-specific (e.g., `conversations:claim-sms`)
+**İzin:** `conversations:claim` + kanala özgü (örn. `conversations:claim-sms`)
 
-Hub-scoped: `/api/hubs/:hubId/conversations/*`
+Merkez kapsamlı: `/api/hubs/:hubId/conversations/*`
 
 ---
 
-## Reports
+## Raporlar
 
-Reports are a specialized type of conversation with `metadata.type = "report"`.
+Raporlar, `metadata.type = "report"` olan özel bir görüşme türüdür.
 
 ```
 GET /api/reports?status=&category=&page=1&limit=50
 ```
 
-**Permission:** `reports:read-all`, `reports:read-assigned`, or `reports:read-own`
+**İzin:** `reports:read-all`, `reports:read-assigned` veya `reports:read-own`
 
 ```
 POST /api/reports
 ```
 
-**Permission:** `reports:create`
+**İzin:** `reports:create`
 
-**Body:**
+**Gövde:**
 
 ```json
 {
@@ -727,21 +727,21 @@ POST /api/reports
 GET /api/reports/:id
 ```
 
-**Permission:** `reports:read-all`, `reports:read-assigned`, or own report
+**İzin:** `reports:read-all`, `reports:read-assigned` veya kendi raporu
 
 ```
 GET /api/reports/:id/messages?page=1&limit=100
 ```
 
-**Auth:** Required (access-checked)
+**Kimlik doğrulama:** Gerekli (erişim kontrollü)
 
 ```
 POST /api/reports/:id/messages
 ```
 
-**Permission:** `reports:send-message`, `reports:send-message-own`, or assigned
+**İzin:** `reports:send-message`, `reports:send-message-own` veya atanmış
 
-**Body:**
+**Gövde:**
 
 ```json
 {
@@ -755,9 +755,9 @@ POST /api/reports/:id/messages
 POST /api/reports/:id/assign
 ```
 
-**Permission:** `reports:assign`
+**İzin:** `reports:assign`
 
-**Body:**
+**Gövde:**
 
 ```json
 { "assignedTo": "hex64" }
@@ -767,33 +767,33 @@ POST /api/reports/:id/assign
 PATCH /api/reports/:id
 ```
 
-**Permission:** `reports:update`
+**İzin:** `reports:update`
 
 ```
 GET /api/reports/categories
 ```
 
-**Auth:** Required
+**Kimlik doğrulama:** Gerekli
 
 ```
 GET /api/reports/:id/files
 ```
 
-**Auth:** Required (access-checked)
+**Kimlik doğrulama:** Gerekli (erişim kontrollü)
 
-Hub-scoped: `/api/hubs/:hubId/reports/*`
+Merkez kapsamlı: `/api/hubs/:hubId/reports/*`
 
 ---
 
-## Bans
+## Yasaklamalar
 
 ```
 POST /api/bans
 ```
 
-**Permission:** `bans:report`
+**İzin:** `bans:report`
 
-**Body:**
+**Gövde:**
 
 ```json
 { "phone": "+1234567890", "reason": "Spam caller" }
@@ -803,15 +803,15 @@ POST /api/bans
 GET /api/bans
 ```
 
-**Permission:** `bans:read`
+**İzin:** `bans:read`
 
 ```
 POST /api/bans/bulk
 ```
 
-**Permission:** `bans:bulk-create`
+**İzin:** `bans:bulk-create`
 
-**Body:**
+**Gövde:**
 
 ```json
 { "phones": ["+1234567890", "+0987654321"], "reason": "Imported ban list" }
@@ -821,132 +821,132 @@ POST /api/bans/bulk
 DELETE /api/bans/:phone
 ```
 
-**Permission:** `bans:delete`
+**İzin:** `bans:delete`
 
-The `:phone` parameter is URL-encoded E.164 (e.g., `%2B12125551234`).
+`:phone` parametresi URL kodlu E.164'tür (örn. `%2B12125551234`).
 
-Hub-scoped: `/api/hubs/:hubId/bans/*`
+Merkez kapsamlı: `/api/hubs/:hubId/bans/*`
 
 ---
 
-## Settings
+## Ayarlar
 
-### Telephony provider
+### Telefon sağlayıcısı
 
 ```
 GET /api/settings/telephony-provider
 ```
 
-**Permission:** `settings:manage-telephony`
+**İzin:** `settings:manage-telephony`
 
 ```
 PATCH /api/settings/telephony-provider
 ```
 
-**Permission:** `settings:manage-telephony`
+**İzin:** `settings:manage-telephony`
 
-**Body:** `TelephonyProviderConfig` (provider type + credentials)
+**Gövde:** `TelephonyProviderConfig` (sağlayıcı türü + kimlik bilgileri)
 
 ```
 POST /api/settings/telephony-provider/test
 ```
 
-**Permission:** `settings:manage-telephony`
+**İzin:** `settings:manage-telephony`
 
-Tests provider credentials without saving.
+Sağlayıcı kimlik bilgilerini kaydetmeden test eder.
 
-### Messaging
+### Mesajlaşma
 
 ```
 GET /api/settings/messaging
 ```
 
-**Permission:** `settings:manage-messaging`
+**İzin:** `settings:manage-messaging`
 
 ```
 PATCH /api/settings/messaging
 ```
 
-**Permission:** `settings:manage-messaging`
+**İzin:** `settings:manage-messaging`
 
-### Spam mitigation
+### Spam azaltma
 
 ```
 GET /api/settings/spam
 ```
 
-**Permission:** `settings:manage-spam`
+**İzin:** `settings:manage-spam`
 
 ```
 PATCH /api/settings/spam
 ```
 
-**Permission:** `settings:manage-spam`
+**İzin:** `settings:manage-spam`
 
-### Call settings
+### Çağrı ayarları
 
 ```
 GET /api/settings/call
 ```
 
-**Permission:** `settings:manage`
+**İzin:** `settings:manage`
 
 ```
 PATCH /api/settings/call
 ```
 
-**Permission:** `settings:manage`
+**İzin:** `settings:manage`
 
-### IVR languages
+### IVR dilleri
 
 ```
 GET /api/settings/ivr-languages
 ```
 
-**Permission:** `settings:manage-ivr`
+**İzin:** `settings:manage-ivr`
 
 ```
 PATCH /api/settings/ivr-languages
 ```
 
-**Permission:** `settings:manage-ivr`
+**İzin:** `settings:manage-ivr`
 
-**Body:**
+**Gövde:**
 
 ```json
 { "enabledLanguages": ["en", "es", "zh"] }
 ```
 
-### IVR audio
+### IVR ses
 
 ```
 GET /api/settings/ivr-audio
 ```
 
-**Permission:** `settings:manage-ivr`
+**İzin:** `settings:manage-ivr`
 
 ```
 PUT /api/settings/ivr-audio/:promptType/:language
 ```
 
-**Permission:** `settings:manage-ivr`
-**Content-Type:** `application/octet-stream` (raw audio bytes)
+**İzin:** `settings:manage-ivr`
+**Content-Type:** `application/octet-stream` (ham ses baytları)
 
 ```
 DELETE /api/settings/ivr-audio/:promptType/:language
 ```
 
-**Permission:** `settings:manage-ivr`
+**İzin:** `settings:manage-ivr`
 
-### Transcription
+### Transkripsiyon
 
 ```
 GET /api/settings/transcription
 ```
 
-**Auth:** Required (any role)
+**Kimlik doğrulama:** Gerekli (herhangi bir rol)
 
-**Response:**
+**Yanıt:**
 
 ```json
 { "globalEnabled": true, "allowVolunteerOptOut": false }
@@ -956,63 +956,63 @@ GET /api/settings/transcription
 PATCH /api/settings/transcription
 ```
 
-**Permission:** `settings:manage-transcription`
+**İzin:** `settings:manage-transcription`
 
-### Custom fields
+### Özel alanlar
 
 ```
 GET /api/settings/custom-fields
 ```
 
-**Auth:** Required (returns fields filtered by role)
+**Kimlik doğrulama:** Gerekli (role göre filtrelenmiş alanları döndürür)
 
 ```
 PUT /api/settings/custom-fields
 ```
 
-**Permission:** `settings:manage-fields`
+**İzin:** `settings:manage-fields`
 
-**Body:**
+**Gövde:**
 
 ```json
 { "fields": [{ "id": "uuid", "name": "severity", "label": "Severity Rating", "type": "select", "required": true, "options": ["low", "medium", "high"], "visibleToVolunteers": true, "editableByVolunteers": true, "context": "call-notes", "order": 0 }] }
 ```
 
-### WebAuthn settings
+### WebAuthn ayarları
 
 ```
 GET /api/settings/webauthn
 ```
 
-**Permission:** `settings:manage`
+**İzin:** `settings:manage`
 
 ```
 PATCH /api/settings/webauthn
 ```
 
-**Permission:** `settings:manage`
+**İzin:** `settings:manage`
 
-**Body:**
+**Gövde:**
 
 ```json
 { "requireForAdmins": true, "requireForVolunteers": false }
 ```
 
-### Roles (PBAC)
+### Roller (PBAC)
 
 ```
 GET /api/settings/roles
 ```
 
-**Auth:** Required
+**Kimlik doğrulama:** Gerekli
 
 ```
 POST /api/settings/roles
 ```
 
-**Permission:** `system:manage-roles`
+**İzin:** `system:manage-roles`
 
-**Body:**
+**Gövde:**
 
 ```json
 {
@@ -1027,53 +1027,53 @@ POST /api/settings/roles
 PATCH /api/settings/roles/:id
 ```
 
-**Permission:** `system:manage-roles`
+**İzin:** `system:manage-roles`
 
 ```
 DELETE /api/settings/roles/:id
 ```
 
-**Permission:** `system:manage-roles`
+**İzin:** `system:manage-roles`
 
-### Permissions catalog
+### İzin kataloğu
 
 ```
 GET /api/settings/permissions
 ```
 
-**Permission:** `system:manage-roles`
+**İzin:** `system:manage-roles`
 
-Returns all available permissions organized by domain.
+Alana göre düzenlenmiş tüm kullanılabilir izinleri döndürür.
 
-### Setup state
+### Kurulum durumu
 
 ```
 GET /api/settings/setup
 ```
 
-**Permission:** `settings:manage`
+**İzin:** `settings:manage`
 
 ```
 PATCH /api/settings/setup
 ```
 
-**Permission:** `settings:manage`
+**İzin:** `settings:manage`
 
 ---
 
-## Files
+## Dosyalar
 
-### Upload flow
+### Yükleme akışı
 
-Chunked upload for encrypted file attachments.
+Şifrelenmiş dosya ekleri için parçalı yükleme.
 
 ```
 POST /api/uploads/init
 ```
 
-**Permission:** `files:upload`
+**İzin:** `files:upload`
 
-**Body:**
+**Gövde:**
 
 ```json
 {
@@ -1085,7 +1085,7 @@ POST /api/uploads/init
 }
 ```
 
-**Response:**
+**Yanıt:**
 
 ```json
 { "uploadId": "uuid", "totalChunks": 4 }
@@ -1095,10 +1095,10 @@ POST /api/uploads/init
 PUT /api/uploads/:id/chunks/:chunkIndex
 ```
 
-**Permission:** `files:upload`
-**Content-Type:** `application/octet-stream` (raw encrypted chunk bytes)
+**İzin:** `files:upload`
+**Content-Type:** `application/octet-stream` (ham şifrelenmiş parça baytları)
 
-**Response:**
+**Yanıt:**
 
 ```json
 { "chunkIndex": 0, "completedChunks": 1, "totalChunks": 4 }
@@ -1108,105 +1108,105 @@ PUT /api/uploads/:id/chunks/:chunkIndex
 POST /api/uploads/:id/complete
 ```
 
-**Permission:** `files:upload`
+**İzin:** `files:upload`
 
-**Response:**
+**Yanıt:**
 
 ```json
 { "fileId": "uuid", "status": "complete" }
 ```
 
-Returns `400` if not all chunks have been uploaded.
+Tüm parçalar yüklenmemişse `400` döndürür.
 
 ```
 GET /api/uploads/:id/status
 ```
 
-**Permission:** `files:upload`
+**İzin:** `files:upload`
 
-### Download
+### İndirme
 
 ```
 GET /api/files/:id/content
 ```
 
-**Permission:** `files:download-own` (if recipient) or `files:download-all`
+**İzin:** `files:download-own` (alıcı ise) veya `files:download-all`
 
-**Response:** `application/octet-stream` (encrypted file bytes)
+**Yanıt:** `application/octet-stream` (şifrelenmiş dosya baytları)
 
 ```
 GET /api/files/:id/envelopes
 ```
 
-**Permission:** `files:download-own` or `files:download-all`
+**İzin:** `files:download-own` veya `files:download-all`
 
-Non-admin users receive only their own envelope.
+Yönetici olmayan kullanıcılar yalnızca kendi zarfını alır.
 
 ```
 GET /api/files/:id/metadata
 ```
 
-**Permission:** `files:download-own` or `files:download-all`
+**İzin:** `files:download-own` veya `files:download-all`
 
 ```
 POST /api/files/:id/share
 ```
 
-**Permission:** `files:share`
+**İzin:** `files:share`
 
-Re-encrypts the file key for a new recipient.
+Dosya anahtarını yeni bir alıcı için yeniden şifreler.
 
 ---
 
-## Blasts (message broadcasting)
+## Yayınlar (toplu mesaj)
 
-### Subscribers
+### Aboneler
 
 ```
 GET /api/blasts/subscribers?page=&limit=&tag=&status=
 ```
 
-**Auth:** Required
+**Kimlik doğrulama:** Gerekli
 
 ```
 DELETE /api/blasts/subscribers/:id
 ```
 
-**Auth:** Required
+**Kimlik doğrulama:** Gerekli
 
 ```
 GET /api/blasts/subscribers/stats
 ```
 
-**Auth:** Required
+**Kimlik doğrulama:** Gerekli
 
 ```
 POST /api/blasts/subscribers/import
 ```
 
-**Auth:** Required
+**Kimlik doğrulama:** Gerekli
 
-**Body:**
+**Gövde:**
 
 ```json
 { "subscribers": [{ "phone": "+1234567890", "tags": ["alerts"] }] }
 ```
 
-### Blasts
+### Yayınlar
 
 ```
 GET /api/blasts
 ```
 
-**Auth:** Required
+**Kimlik doğrulama:** Gerekli
 
 ```
 POST /api/blasts
 ```
 
-**Auth:** Required
+**Kimlik doğrulama:** Gerekli
 
-**Body:**
+**Gövde:**
 
 ```json
 {
@@ -1222,33 +1222,33 @@ POST /api/blasts
 GET /api/blasts/:id
 ```
 
-**Auth:** Required
+**Kimlik doğrulama:** Gerekli
 
 ```
 PATCH /api/blasts/:id
 ```
 
-**Auth:** Required
+**Kimlik doğrulama:** Gerekli
 
 ```
 DELETE /api/blasts/:id
 ```
 
-**Auth:** Required
+**Kimlik doğrulama:** Gerekli
 
 ```
 POST /api/blasts/:id/send
 ```
 
-**Auth:** Required. Sends the blast immediately.
+**Kimlik doğrulama:** Gerekli. Yayını hemen gönderir.
 
 ```
 POST /api/blasts/:id/schedule
 ```
 
-**Auth:** Required
+**Kimlik doğrulama:** Gerekli
 
-**Body:**
+**Gövde:**
 
 ```json
 { "scheduledAt": "2026-03-01T12:00:00Z" }
@@ -1258,43 +1258,43 @@ POST /api/blasts/:id/schedule
 POST /api/blasts/:id/cancel
 ```
 
-**Auth:** Required. Cancels a scheduled blast.
+**Kimlik doğrulama:** Gerekli. Zamanlanmış bir yayını iptal eder.
 
-### Blast settings
+### Yayın ayarları
 
 ```
 GET /api/blasts/settings
 ```
 
-**Auth:** Required
+**Kimlik doğrulama:** Gerekli
 
 ```
 PATCH /api/blasts/settings
 ```
 
-**Auth:** Required
+**Kimlik doğrulama:** Gerekli
 
-Hub-scoped: `/api/hubs/:hubId/blasts/*`
+Merkez kapsamlı: `/api/hubs/:hubId/blasts/*`
 
 ---
 
-## Hubs
+## Merkezler
 
-Multi-tenant hub management.
+Çok kiracılı merkez yönetimi.
 
 ```
 GET /api/hubs
 ```
 
-**Auth:** Required (filtered by membership; super admin sees all)
+**Kimlik doğrulama:** Gerekli (üyeliğe göre filtrelenir; süper yönetici tümünü görür)
 
 ```
 POST /api/hubs
 ```
 
-**Permission:** `system:manage-hubs`
+**İzin:** `system:manage-hubs`
 
-**Body:**
+**Gövde:**
 
 ```json
 { "name": "NYC Hub", "slug": "nyc", "description": "New York City operations", "phoneNumber": "+1234567890" }
@@ -1304,23 +1304,23 @@ POST /api/hubs
 GET /api/hubs/:hubId
 ```
 
-**Auth:** Required (membership checked)
+**Kimlik doğrulama:** Gerekli (üyelik kontrol edilir)
 
 ```
 PATCH /api/hubs/:hubId
 ```
 
-**Permission:** `system:manage-hubs`
+**İzin:** `system:manage-hubs`
 
-### Hub members
+### Merkez üyeleri
 
 ```
 POST /api/hubs/:hubId/members
 ```
 
-**Permission:** `volunteers:manage-roles`
+**İzin:** `volunteers:manage-roles`
 
-**Body:**
+**Gövde:**
 
 ```json
 { "pubkey": "hex64", "roleIds": ["role-volunteer"] }
@@ -1330,23 +1330,23 @@ POST /api/hubs/:hubId/members
 DELETE /api/hubs/:hubId/members/:pubkey
 ```
 
-**Permission:** `volunteers:manage-roles`
+**İzin:** `volunteers:manage-roles`
 
-### Hub key management
+### Merkez anahtar yönetimi
 
 ```
 GET /api/hubs/:hubId/key
 ```
 
-**Auth:** Required (hub member). Returns only the requesting user's ECIES-wrapped hub key envelope.
+**Kimlik doğrulama:** Gerekli (merkez üyesi). Yalnızca istekte bulunan kullanıcının HPKE ile sarılmış merkez anahtar zarfını döndürür.
 
 ```
 PUT /api/hubs/:hubId/key
 ```
 
-**Permission:** `system:manage-hubs`
+**İzin:** `system:manage-hubs`
 
-**Body:**
+**Gövde:**
 
 ```json
 { "envelopes": [{ "pubkey": "hex64", "wrappedKey": "hex", "ephemeralPubkey": "hex" }] }
@@ -1354,43 +1354,43 @@ PUT /api/hubs/:hubId/key
 
 ---
 
-## Setup wizard
+## Kurulum sihirbazı
 
 ```
 GET /api/setup/state
 ```
 
-**Auth:** Required
+**Kimlik doğrulama:** Gerekli
 
 ```
 PATCH /api/setup/state
 ```
 
-**Permission:** `settings:manage`
+**İzin:** `settings:manage`
 
 ```
 POST /api/setup/complete
 ```
 
-**Permission:** `settings:manage`
+**İzin:** `settings:manage`
 
-**Body:**
+**Gövde:**
 
 ```json
 { "demoMode": false }
 ```
 
-Also creates a default hub if none exists.
+Ayrıca hiçbiri yoksa varsayılan bir merkez oluşturur.
 
-### Channel tests
+### Kanal testleri
 
 ```
 POST /api/setup/test/signal
 ```
 
-**Permission:** `settings:manage-messaging`
+**İzin:** `settings:manage-messaging`
 
-**Body:**
+**Gövde:**
 
 ```json
 { "bridgeUrl": "http://signal-cli:8080", "bridgeApiKey": "secret" }
@@ -1400,9 +1400,9 @@ POST /api/setup/test/signal
 POST /api/setup/test/whatsapp
 ```
 
-**Permission:** `settings:manage-messaging`
+**İzin:** `settings:manage-messaging`
 
-**Body:**
+**Gövde:**
 
 ```json
 { "phoneNumberId": "123456", "accessToken": "EAAx..." }
@@ -1410,15 +1410,15 @@ POST /api/setup/test/whatsapp
 
 ---
 
-## Audit log
+## Denetim günlüğü
 
 ```
 GET /api/audit?page=1&limit=50&actorPubkey=&eventType=&dateFrom=&dateTo=&search=
 ```
 
-**Permission:** `audit:read`
+**İzin:** `audit:read`
 
-**Response:**
+**Yanıt:**
 
 ```json
 {
@@ -1435,9 +1435,9 @@ GET /api/audit?page=1&limit=50&actorPubkey=&eventType=&dateFrom=&dateTo=&search=
 }
 ```
 
-The audit log uses a SHA-256 hash chain (`previousEntryHash` + `entryHash`) for tamper detection.
+Denetim günlüğü, kurcalamayı tespit etmek için bir SHA-256 hash zinciri (`previousEntryHash` + `entryHash`) kullanır.
 
-Hub-scoped: `/api/hubs/:hubId/audit/*`
+Merkez kapsamlı: `/api/hubs/:hubId/audit/*`
 
 ---
 
@@ -1447,25 +1447,25 @@ Hub-scoped: `/api/hubs/:hubId/audit/*`
 GET /api/telephony/webrtc-token
 ```
 
-**Auth:** Required
+**Kimlik doğrulama:** Gerekli
 
-Returns a provider-specific WebRTC token for in-browser call answering.
+Tarayıcı içinden çağrı yanıtlamak için sağlayıcıya özgü bir WebRTC belirteci döndürür.
 
-**Response:**
+**Yanıt:**
 
 ```json
 { "token": "string", "provider": "twilio", "identity": "hex64" }
 ```
 
-Returns `400` if call preference is set to phone only.
+Çağrı tercihi yalnızca telefon olarak ayarlanmışsa `400` döndürür.
 
 ```
 GET /api/telephony/webrtc-status
 ```
 
-**Auth:** Required
+**Kimlik doğrulama:** Gerekli
 
-**Response:**
+**Yanıt:**
 
 ```json
 { "available": true, "provider": "twilio" }
@@ -1473,23 +1473,23 @@ GET /api/telephony/webrtc-status
 
 ---
 
-## Device provisioning
+## Cihaz sağlama
 
-For linking new devices to an existing account via ephemeral ECDH key exchange.
+Yeni cihazları geçici ECDH anahtar değişimi yoluyla mevcut bir hesaba bağlamak için.
 
 ```
 POST /api/provision/rooms
 ```
 
-**Auth:** None (new device has no auth)
+**Kimlik doğrulama:** Yok (yeni cihazın kimlik doğrulaması yoktur)
 
-**Body:**
+**Gövde:**
 
 ```json
 { "ephemeralPubkey": "hex66" }
 ```
 
-**Response:**
+**Yanıt:**
 
 ```json
 { "roomId": "uuid", "token": "random_string" }
@@ -1499,9 +1499,9 @@ POST /api/provision/rooms
 GET /api/provision/rooms/:id?token=<token>
 ```
 
-**Auth:** None
+**Kimlik doğrulama:** Yok
 
-**Response:**
+**Yanıt:**
 
 ```json
 {
@@ -1512,15 +1512,15 @@ GET /api/provision/rooms/:id?token=<token>
 }
 ```
 
-Status transitions: `waiting` -> `ready` -> consumed. Rooms expire after ~5 minutes.
+Durum geçişleri: `waiting` -> `ready` -> tüketildi. Odalar yaklaşık 5 dakika sonra sona erer.
 
 ```
 POST /api/provision/rooms/:id/payload
 ```
 
-**Auth:** Required (primary device must be authenticated)
+**Kimlik doğrulama:** Gerekli (birincil cihazın kimliği doğrulanmış olmalıdır)
 
-**Body:**
+**Gövde:**
 
 ```json
 {
@@ -1532,15 +1532,15 @@ POST /api/provision/rooms/:id/payload
 
 ---
 
-## Push notifications (mobile)
+## Push bildirimleri (mobil)
 
 ```
 POST /api/devices/register
 ```
 
-**Auth:** Required
+**Kimlik doğrulama:** Gerekli
 
-**Body:**
+**Gövde:**
 
 ```json
 {
@@ -1551,19 +1551,19 @@ POST /api/devices/register
 }
 ```
 
-**Response:**
+**Yanıt:**
 
 ```json
 { "deviceId": "uuid" }
 ```
 
-Push notifications use a two-tier encryption scheme: a wake key (no PIN required) for notification metadata, and the identity key (PIN required) for sensitive content.
+Push bildirimleri iki katmanlı bir şifreleme düzeni kullanır: bildirim meta verileri için bir uyandırma anahtarı (PIN gerektirmez) ve hassas içerik için kimlik anahtarı (PIN gerektirir).
 
 ---
 
-## Telephony webhooks
+## Telefon webhook'ları
 
-These endpoints are called by telephony providers, not by clients. Each request is validated by the provider's webhook signature.
+Bu uç noktalar istemciler tarafından değil, telefon sağlayıcıları tarafından çağrılır. Her istek, sağlayıcının webhook imzasıyla doğrulanır.
 
 ```
 POST /api/telephony/incoming
@@ -1571,34 +1571,34 @@ POST /api/telephony/language-selected
 POST /api/telephony/captcha
 POST /api/telephony/volunteer-answer
 POST /api/telephony/call-status
-POST /api/telephony/wait-music          (also GET)
+POST /api/telephony/wait-music          (ayrıca GET)
 POST /api/telephony/queue-exit
 POST /api/telephony/voicemail-complete
 POST /api/telephony/call-recording
 POST /api/telephony/voicemail-recording
 ```
 
-Hub routing is via the `?hub=<hubId>` query parameter.
+Merkez yönlendirmesi `?hub=<hubId>` sorgu parametresi ile yapılır.
 
 ---
 
-## Messaging webhooks
+## Mesajlaşma webhook'ları
 
-Called by messaging providers. Each adapter validates its own webhook signature.
+Mesajlaşma sağlayıcıları tarafından çağrılır. Her bağdaştırıcı kendi webhook imzasını doğrular.
 
 ```
-GET  /api/messaging/whatsapp/webhook    (Meta webhook verification)
-GET  /api/messaging/rcs/webhook         (Google RBM webhook verification)
+GET  /api/messaging/whatsapp/webhook    (Meta webhook doğrulaması)
+GET  /api/messaging/rcs/webhook         (Google RBM webhook doğrulaması)
 POST /api/messaging/:channel/webhook?hub=<hubId>
 ```
 
-Supported channels: `sms`, `whatsapp`, `signal`, `rcs`.
+Desteklenen kanallar: `sms`, `whatsapp`, `signal`, `rcs`.
 
 ---
 
-## Hub-scoped routes
+## Merkez kapsamlı yollar
 
-All of the following routes are also available with a `/api/hubs/:hubId/` prefix, which scopes them to a specific hub:
+Aşağıdaki yolların tümü, bunları belirli bir merkeze kapsamlandıran bir `/api/hubs/:hubId/` ön ekiyle de kullanılabilir:
 
 - `/api/hubs/:hubId/shifts/*`
 - `/api/hubs/:hubId/bans/*`
@@ -1609,39 +1609,39 @@ All of the following routes are also available with a `/api/hubs/:hubId/` prefix
 - `/api/hubs/:hubId/reports/*`
 - `/api/hubs/:hubId/blasts/*`
 
-When using hub-scoped routes, the `hubContext` middleware resolves hub-specific permissions for the user.
+Merkez kapsamlı yollar kullanılırken, `hubContext` ara yazılımı kullanıcı için merkeze özgü izinleri çözümler.
 
 ---
 
-## Error responses
+## Hata yanıtları
 
-All error responses follow this format:
+Tüm hata yanıtları şu formatı izler:
 
 ```json
 { "error": "Human-readable error message" }
 ```
 
-Common HTTP status codes:
+Yaygın HTTP durum kodları:
 
-| Code | Meaning |
-|------|---------|
-| `400` | Bad request (malformed body, missing fields, validation failure) |
-| `401` | Unauthorized (missing or invalid auth token) |
-| `403` | Forbidden (valid auth but insufficient permissions) |
-| `404` | Not found |
-| `409` | Conflict (e.g., call already answered, resource already exists) |
-| `429` | Too many requests (rate limited) |
-| `500` | Internal server error |
+| Kod | Anlamı |
+|------|--------|
+| `400` | Hatalı istek (hatalı gövde, eksik alanlar, doğrulama hatası) |
+| `401` | Yetkisiz (eksik veya geçersiz kimlik doğrulama belirteci) |
+| `403` | Yasak (geçerli kimlik doğrulama ancak yetersiz izinler) |
+| `404` | Bulunamadı |
+| `409` | Çakışma (örn. çağrı zaten yanıtlanmış, kaynak zaten mevcut) |
+| `429` | Çok fazla istek (hız sınırı) |
+| `500` | İç sunucu hatası |
 
 ---
 
-## Permission reference
+## İzin referansı
 
-Permissions follow the `domain:action` format. Users are assigned roles, and each role bundles a set of permissions. Effective permissions are the union of all assigned roles.
+İzinler `domain:action` formatını izler. Kullanıcılara roller atanır ve her rol bir dizi izni bir araya getirir. Etkin izinler, atanan tüm rollerin birleşimidir.
 
-Wildcard `*` grants all permissions. Domain wildcard `domain:*` grants all actions in that domain.
+Joker karakter `*` tüm izinleri verir. Alan joker karakteri `domain:*` o alandaki tüm eylemleri verir.
 
-| Domain | Permissions |
+| Alan | İzinler |
 |--------|-------------|
 | **calls** | `answer`, `read-active`, `read-active-full`, `read-history`, `read-presence`, `read-recording`, `debug` |
 | **notes** | `create`, `read-own`, `read-all`, `read-assigned`, `update-own` |
@@ -1657,24 +1657,24 @@ Wildcard `*` grants all permissions. Domain wildcard `domain:*` grants all actio
 | **files** | `upload`, `download-own`, `download-all`, `share` |
 | **system** | `manage-roles`, `manage-hubs`, `manage-instance` |
 
-### Default roles
+### Varsayılan roller
 
-| Role | Slug | Key permissions |
+| Rol | Slug | Anahtar izinler |
 |------|------|-----------------|
-| **Super Admin** | `role-super-admin` | `*` (all permissions) |
-| **Hub Admin** | `role-hub-admin` | `volunteers:*`, `shifts:*`, `settings:*`, `audit:read`, `bans:*`, `invites:*`, `notes:read-all`, `reports:*`, `conversations:*`, `calls:*`, `blasts:*`, `files:*` |
-| **Reviewer** | `role-reviewer` | `notes:read-assigned`, `reports:read-assigned`, `reports:assign`, `reports:update`, `conversations:read-assigned`, `conversations:send`, `files:download-own`, `files:upload` |
-| **Volunteer** | `role-volunteer` | `calls:answer`, `calls:read-active`, `notes:create`, `notes:read-own`, `notes:update-own`, `conversations:claim`, `conversations:send`, `conversations:read-assigned`, `bans:report`, `files:upload`, `files:download-own` |
-| **Reporter** | `role-reporter` | `reports:create`, `reports:read-own`, `reports:send-message-own`, `files:upload`, `files:download-own` |
+| **Süper Yönetici** | `role-super-admin` | `*` (tüm izinler) |
+| **Merkez Yöneticisi** | `role-hub-admin` | `volunteers:*`, `shifts:*`, `settings:*`, `audit:read`, `bans:*`, `invites:*`, `notes:read-all`, `reports:*`, `conversations:*`, `calls:*`, `blasts:*`, `files:*` |
+| **İncelemeci** | `role-reviewer` | `notes:read-assigned`, `reports:read-assigned`, `reports:assign`, `reports:update`, `conversations:read-assigned`, `conversations:send`, `files:download-own`, `files:upload` |
+| **Gönüllü** | `role-volunteer` | `calls:answer`, `calls:read-active`, `notes:create`, `notes:read-own`, `notes:update-own`, `conversations:claim`, `conversations:send`, `conversations:read-assigned`, `bans:report`, `files:upload`, `files:download-own` |
+| **Raporlayıcı** | `role-reporter` | `reports:create`, `reports:read-own`, `reports:send-message-own`, `files:upload`, `files:download-own` |
 
 ---
 
-## Development / test endpoints
+## Geliştirme / test uç noktaları
 
-Available only in development environments.
+Yalnızca geliştirme ortamlarında kullanılabilir.
 
 ```
-POST /api/test-reset            (full reset, requires X-Test-Secret header)
-POST /api/test-reset-no-admin   (reset without admin)
-POST /api/test-reset-records    (light reset, preserves identity/settings)
+POST /api/test-reset            (tam sıfırlama, X-Test-Secret başlığı gerektirir)
+POST /api/test-reset-no-admin   (yönetici olmadan sıfırlama)
+POST /api/test-reset-records    (hafif sıfırlama, kimlik/ayarları korur)
 ```

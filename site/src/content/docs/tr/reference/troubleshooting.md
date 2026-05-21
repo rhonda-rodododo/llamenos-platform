@@ -1,267 +1,267 @@
 ---
-title: Troubleshooting
-description: Solutions for common issues with deployment, the desktop app, mobile app, telephony, and cryptographic operations.
+title: Sorun Giderme
+description: Dağıtım, masaüstü uygulaması, mobil uygulama, telefon ve şifreleme işlemlerindeki yaygın sorunların çözümleri.
 ---
 
-This guide covers common issues and their solutions across all Llamenos deployment modes and platforms.
+Bu kılavuz, tüm Llamenos dağıtım modları ve platformlarındaki yaygın sorunları ve çözümlerini kapsar.
 
-## Docker deployment issues
+## Docker dağıtım sorunları
 
-### Containers fail to start
+### Konteynerler başlamıyor
 
-**Missing environment variables:**
+**Eksik ortam değişkenleri:**
 
-Docker Compose validates all services at startup, even profiled ones. If you see errors about missing variables, make sure your `.env` file includes all required values:
+Docker Compose, başlangıçta tüm servisleri doğrular, profilli olanlar bile. Eksik değişkenlerle ilgili hatalar görürseniz, `.env` dosyanızın tüm gerekli değerleri içerdiğinden emin olun:
 
 ```bash
-# Required in .env for Docker Compose
+# .env dosyasında gerekli olanlar
 PG_PASSWORD=your_postgres_password
 STORAGE_ACCESS_KEY=your_rustfs_access_key
 STORAGE_SECRET_KEY=your_rustfs_secret_key
 HMAC_SECRET=your_hmac_secret
-ARI_PASSWORD=your_ari_password       # Required even if not using Asterisk
-BRIDGE_SECRET=your_bridge_secret     # Required even if not using Asterisk
+ARI_PASSWORD=your_ari_password       # Asterisk kullanmasanız bile gerekli
+BRIDGE_SECRET=your_bridge_secret     # Asterisk kullanmasanız bile gerekli
 ADMIN_PUBKEY=your_admin_hex_pubkey
 ```
 
-Even if you are not using the Asterisk bridge, Docker Compose validates its service definition and requires `ARI_PASSWORD` and `BRIDGE_SECRET` to be set.
+Asterisk köprüsünü kullanmasanız bile, Docker Compose servis tanımını doğrular ve `ARI_PASSWORD` ile `BRIDGE_SECRET` ayarlarının yapılmış olmasını gerektirir.
 
-**Port conflicts:**
+**Port çakışmaları:**
 
-If a port is already in use, check which process holds it:
+Bir port zaten kullanımdaysa, hangi işlemin onu tuttuğunu kontrol edin:
 
 ```bash
-# Check what's using port 8787 (Worker)
+# Port 8787'yi (Worker) kullananı kontrol et
 sudo lsof -i :8787
 
-# Check what's using port 5432 (PostgreSQL)
+# Port 5432'yi (PostgreSQL) kullananı kontrol et
 sudo lsof -i :5432
 
-# Check what's using port 9000 (RustFS)
+# Port 9000'ı (RustFS) kullananı kontrol et
 sudo lsof -i :9000
 ```
 
-Stop the conflicting process or change the port mapping in `docker-compose.yml`.
+Çakışan işlemi durdurun veya `docker-compose.yml` içinde port eşlemesini değiştirin.
 
-### Database connection errors
+### Veritabanı bağlantı hataları
 
-If the app cannot connect to PostgreSQL:
+Uygulama PostgreSQL'e bağlanamıyorsa:
 
-- Verify the `PG_PASSWORD` in `.env` matches what was used when the container was first created
-- Check that the PostgreSQL container is healthy: `docker compose ps`
-- If the password was changed, you may need to remove the volume and recreate: `docker compose down -v && docker compose up -d`
+- `.env` dosyasındaki `PG_PASSWORD` ile konteyner ilk oluşturulurken kullanılan şifrenin eşleştiğini doğrulayın
+- PostgreSQL konteynerinin sağlıklı olduğunu kontrol edin: `docker compose ps`
+- Şifre değiştirildiyse, birimi kaldırıp yeniden oluşturmanız gerekebilir: `docker compose down -v && docker compose up -d`
 
-### Strfry relay not connecting
+### Strfry relay bağlanmıyor
 
-The WebSocket relay (WebSocket relay) is a core service, not optional. If the relay is not running:
+WebSocket relay (WebSocket relay) temel bir servistir, isteğe bağlı değildir. Relay çalışmıyorsa:
 
 ```bash
-# Check relay status
+# Relay durumunu kontrol et
 docker compose logs WebSocket relay
 
-# Restart the relay
+# Relay'i yeniden başlat
 docker compose restart WebSocket relay
 ```
 
-If the relay fails to start, check for port 7777 conflicts or insufficient permissions on the data directory.
+Relay başlatılamazsa, port 7777 çakışmalarını veya veri dizini üzerindeki yetersiz izinleri kontrol edin.
 
-### RustFS / S3 storage errors
+### RustFS / S3 depolama hataları
 
-- Verify `STORAGE_ACCESS_KEY` and `STORAGE_SECRET_KEY` are correct
-- Check that the RustFS container is running: `docker compose ps rustfs`
-- Access the RustFS console at `http://localhost:9001` to verify bucket creation
+- `STORAGE_ACCESS_KEY` ve `STORAGE_SECRET_KEY` değerlerinin doğru olduğunu doğrulayın
+- RustFS konteynerinin çalıştığını kontrol edin: `docker compose ps rustfs`
+- RustFS konsoluna `http://localhost:9001` adresinden erişerek kova oluşturmayı doğrulayın
 
-## Cloudflare deployment issues
+## Cloudflare dağıtım sorunları
 
-### Durable Object errors
+### Durable Object hataları
 
-**"Durable Object not found" or binding errors:**
+**"Durable Object bulunamadı" veya bağlama hataları:**
 
-- Run `bun run deploy` (never `wrangler deploy` directly) to ensure DO bindings are correct
-- Check `wrangler.jsonc` for correct DO class names and bindings
-- After adding a new DO, you must deploy before it becomes available
+- DO bağlamalarının doğru olduğundan emin olmak için `bun run deploy` çalıştırın (doğrudan `wrangler deploy` asla kullanmayın)
+- `wrangler.jsonc` dosyasındaki DO sınıf adlarını ve bağlamalarını kontrol edin
+- Yeni bir DO eklendikten sonra, kullanılabilir olmadan önce dağıtım yapmanız gerekir
 
-**DO storage limits:**
+**DO depolama limitleri:**
 
-Cloudflare Durable Objects have a 128 KB limit per key-value pair. If you see storage errors:
+Cloudflare Durable Objects, anahtar-değer çifti başına 128 KB limiti vardır. Depolama hataları görürseniz:
 
-- Ensure note content is not exceeding the limit (very large notes with many attachments)
-- Check that ECIES envelopes are not being duplicated
+- Not içeriğinin limiti aşmadığından emin olun (çok sayıda eklenti içeren çok büyük notlar)
+- ECIES zarfının çoğaltılmadığını kontrol edin
 
-### Worker errors (500 responses)
+### Worker hataları (500 yanıtları)
 
-Check Worker logs:
+Worker günlüklerini kontrol edin:
 
 ```bash
 bunx wrangler tail
 ```
 
-Common causes:
-- Missing secrets (use `bunx wrangler secret list` to verify)
-- Incorrect `ADMIN_PUBKEY` format (must be 64 hex characters, no `npub` prefix)
-- Rate limiting on free tier (1,000 requests/minute on Workers Free)
+Yaygın nedenler:
+- Eksik sırlar (doğrulamak için `bunx wrangler secret list` kullanın)
+- Yanlış `ADMIN_PUBKEY` formatı (64 onaltılık karakter olmalı, `npub` öneki olmamalı)
+- Ücretsiz katmanda hız sınırlaması (Workers Free'de dakikada 1.000 istek)
 
-### Deployment fails with "Pages deploy" errors
+### "Pages deploy" hatalarıyla dağıtım başarısız oluyor
 
-Never run `wrangler pages deploy` or `wrangler deploy` directly. Always use the root `package.json` scripts:
+`wrangler pages deploy` veya `wrangler deploy` komutlarını asla doğrudan çalıştırmayın. Her zaman kök `package.json` betiklerini kullanın:
 
 ```bash
-bun run deploy          # Deploy everything (app + marketing site)
-bun run deploy:demo     # Deploy app Worker only
-bun run deploy:site     # Deploy marketing site only
+bun run deploy          # Her şeyi dağıt (uygulama + pazarlama sitesi)
+bun run deploy:demo     # Sadece uygulama Worker'ını dağıt
+bun run deploy:site     # Sadece pazarlama sitesini dağıt
 ```
 
-Running `wrangler pages deploy dist` from the wrong directory deploys the Vite app build to Pages instead of the Astro site, breaking the marketing site with 404 errors.
+`wrangler pages deploy dist` komutunu yanlış dizinden çalıştırmak, Vite uygulama derlemesini Pages'e Astro sitesi yerine dağıtır ve pazarlama sitesini 404 hatalarıyla bozar.
 
-## Desktop app issues
+## Masaüstü uygulaması sorunları
 
-### Auto-update not working
+### Otomatik güncelleme çalışmıyor
 
-The desktop app uses the Tauri updater to check for new versions. If updates are not being detected:
+Masaüstü uygulaması, yeni sürümleri kontrol etmek için Tauri güncelleyicisini kullanır. Güncellemeler algılanmıyorsa:
 
-- Check your internet connection
-- Verify that the update endpoint is reachable: `https://github.com/rhonda-rodododo/llamenos-platform/releases/latest/download/latest.json`
-- On Linux, AppImage auto-update requires the file to have write permissions in its directory
-- On macOS, the app must be in `/Applications` (not running from the DMG directly)
+- İnternet bağlantınızı kontrol edin
+- Güncelleme uç noktasının erişilebilir olduğunu doğrulayın: `https://github.com/rhonda-rodododo/llamenos-platform/releases/latest/download/latest.json`
+- Linux'ta, AppImage otomatik güncelleme için dosyanın bulunduğu dizinde yazma izinlerine sahip olmasını gerektirir
+- macOS'ta, uygulama `/Applications` içinde olmalıdır (doğrudan DMG'den çalıştırılmamalı)
 
-To manually update, download the latest release from the [Download](/download) page.
+Manuel güncelleme için, [İndir](/download) sayfasından en son sürümü indirin.
 
-### PIN unlock fails
+### PIN kilidi açılmıyor
 
-If your PIN is rejected on the desktop app:
+PIN'iniz masaüstü uygulamasında reddedilirse:
 
-- Make sure you are entering the correct PIN (there is no "forgot PIN" recovery)
-- PINs are case-sensitive if they contain letters
-- If you have forgotten your PIN, you must re-enter your nsec to set a new one. Your encrypted notes remain accessible because they are tied to your identity, not your PIN
-- The Tauri Stronghold encrypts your nsec with the PIN-derived key (PBKDF2). A wrong PIN produces an invalid decryption, not an error message — the app detects this by verifying the derived public key
+- Doğru PIN'i girdiğinizden emin olun ("PIN'i unuttum" kurtarma seçeneği yoktur)
+- PIN'ler harf içeriyorsa büyük-küçük harfe duyarlıdır
+- PIN'inizi unuttuysanız, yeni bir PIN belirlemek için nsec'inizi yeniden girmeniz gerekir. Şifreli notlarınız kimliğinize bağlı olduğu için, PIN'inize değil, erişilebilir kalırlar
+- Tauri Stronghold, nsec'inizi PIN'den türetilen anahtarla (PBKDF2) şifreler. Yanlış PIN geçersiz bir şifre çözme üretir — hata mesajı vermez — uygulama, türetilen açık anahtarı doğrulayarak bunu tespit eder
 
-### Key recovery
+### Anahtar kurtarma
 
-If you have lost access to your device:
+Cihazınıza erişiminizi kaybettiyseniz:
 
-1. Use your nsec (which you should have stored in a password manager) to log in on a new device
-2. If you registered a WebAuthn passkey, you can use it on the new device instead
-3. Your encrypted notes are stored server-side — once you log in with the same identity, you can decrypt them
-4. If you have lost both your nsec and your passkey, contact your admin. They cannot recover your nsec, but they can create a new identity for you. Notes encrypted for your old identity will no longer be readable by you
+1. Yeni bir cihazda giriş yapmak için nsec'inizi (şifre yöneticinizde saklamış olmanız gereken) kullanın
+2. Bir WebAuthn passkey kaydettirdiyseniz, bunun yerine yeni cihazda kullanabilirsiniz
+3. Şifreli notlarınız sunucu tarafında saklanır — aynı kimlikle giriş yaptıktan sonra bunları şifre çözebilirsiniz
+4. Hem nsec'inizi hem de passkey'inizi kaybettiyseniz, yöneticinizle iletişime geçin. Nsec'inizi kurtaramazlar, ancak sizin için yeni bir kimlik oluşturabilirler. Eski kimliğiniz için şifrelenmiş notlar artık sizin tarafınızdan okunamaz
 
-### App does not start (blank window)
+### Uygulama başlamıyor (boş pencere)
 
-- Check that your system meets the minimum requirements (see [Download](/download))
-- On Linux, ensure WebKitGTK is installed: `sudo apt install libwebkit2gtk-4.1-0` (Debian/Ubuntu) or equivalent
-- Try launching from the terminal to see error output: `./llamenos` (AppImage) or check system logs
-- If using Wayland, try with `GDK_BACKEND=x11` as a fallback
+- Sisteminizin minimum gereksinimleri karşıladığını kontrol edin (bkz. [İndir](/download))
+- Linux'ta, WebKitGTK'nin kurulu olduğundan emin olun: `sudo apt install libwebkit2gtk-4.1-0` (Debian/Ubuntu) veya eşdeğeri
+- Uçbirimden başlatarak hata çıktısını görmeyi deneyin: `./llamenos` (AppImage) veya sistem günlüklerini kontrol edin
+- Wayland kullanıyorsanız, `GDK_BACKEND=x11` ile geri dönüş olarak deneyin
 
-### Single instance conflict
+### Tek örnek çakışması
 
-Llamenos enforces single-instance mode. If the app says it is already running but you cannot find the window:
+Llamenos tek örnek modunu zorunlu kılar. Uygulama zaten çalışıyor diyor ancak pencereyi bulamıyorsanız:
 
-- Check for background processes: `ps aux | grep llamenos`
-- Kill any orphaned processes: `pkill llamenos`
-- On Linux, check for a stale lock file and remove it if the app crashed
+- Arka plan işlemlerini kontrol edin: `ps aux | grep llamenos`
+- Yetim işlemleri sonlandırın: `pkill llamenos`
+- Linux'ta, uygulama çöktüyse eski bir kilit dosyası olup olmadığını kontrol edin ve kaldırın
 
-## Mobile app issues
+## Mobil uygulama sorunları
 
-### Provisioning failures
+### Hazırlık/üyelik açma başarısızlıkları
 
-See the [Mobile Guide](/docs/mobile-guide#troubleshooting-mobile-issues) for detailed provisioning troubleshooting.
+Ayrıntılı hazırlık sorun giderme için [Mobil Kılavuz](/docs/mobile-guide#troubleshooting-mobile-issues) sayfasına bakın.
 
-Common causes:
-- Expired QR code (tokens expire after 5 minutes)
-- No internet connection on either device
-- Desktop app and mobile app running different protocol versions
+Yaygın nedenler:
+- Süresi dolmuş QR kodu (tokenlar 5 dakika sonra geçersiz olur)
+- Her iki cihazda da internet bağlantısı yok
+- Masaüstü uygulaması ve mobil uygulama farklı protokol sürümleri çalıştırıyor
 
-### Push notifications not arriving
+### Push bildirimleri gelmiyor
 
-- Verify notification permissions are granted in OS settings
-- On Android, check that battery optimization is not killing the app in the background
-- On iOS, verify that Background App Refresh is enabled for Llamenos
-- Check that you have an active shift and are not on break
+- İşletim sistemi ayarlarında bildirim izinlerinin verildiğini doğrulayın
+- Android'de, pil optimizasyonunun uygulamayı arka planda sonlandırmadığını kontrol edin
+- iOS'ta, Llamenos için Arka Plan Uygulama Yenileme'nin etkin olduğunu doğrulayın
+- Aktif bir vardiyanız olduğunu ve molada olmadığınızı kontrol edin
 
-## Telephony issues
+## Telefon sorunları
 
-### Twilio webhook configuration
+### Twilio webhook yapılandırması
 
-If calls are not routing to volunteers:
+Çağrılar gönüllülere yönlendirilmiyorsa:
 
-1. Verify your webhook URLs are correct in the Twilio console:
-   - Voice webhook: `https://your-worker.your-domain.com/telephony/incoming` (POST)
-   - Status callback: `https://your-worker.your-domain.com/telephony/status` (POST)
-2. Check that the Twilio credentials in your settings match the console:
-   - Account SID
+1. Twilio konsolunda webhook URL'lerinizin doğru olduğunu doğrulayın:
+   - Ses webhook: `https://your-worker.your-domain.com/telephony/incoming` (POST)
+   - Durum geri çağrısı: `https://your-worker.your-domain.com/telephony/status` (POST)
+2. Ayarlarınızdaki Twilio kimlik bilgilerinin konsol ile eşleştiğini kontrol edin:
+   - Hesap SID
    - Auth Token
-   - Phone number (must include country code, e.g., `+1234567890`)
-3. Check the Twilio debugger for errors: [twilio.com/console/debugger](https://www.twilio.com/console/debugger)
+   - Telefon numarası (ülke kodu içermeli, örn. `+1234567890`)
+3. Twilio hata ayıklayıcısını kontrol edin: [twilio.com/console/debugger](https://www.twilio.com/console/debugger)
 
-### Number setup
+### Numara kurulumu
 
-- The phone number must be a Twilio-owned number or a verified caller ID
-- For local development, use a Cloudflare Tunnel or ngrok to expose your local Worker to Twilio
-- Verify the number's Voice configuration points to your webhook URL, not the default TwiML Bin
+- Telefon numarası Twilio'ya ait bir numara veya doğrulanmış bir arayan kimliği olmalıdır
+- Yerel geliştirme için, yerel Worker'ınızı Twilio'ya açmak için Cloudflare Tunnel veya ngrok kullanın
+- Numaranın Ses yapılandırmasının varsayılan TwiML Bin yerine webhook URL'nize işaret ettiğini doğrulayın
 
-### Calls connect but no audio
+### Çağrılar bağlanıyor ancak ses yok
 
-- Ensure the telephony provider's media servers can reach the volunteer's phone
-- Check for NAT/firewall issues blocking RTP traffic
-- If using WebRTC, verify that STUN/TURN servers are configured correctly
-- Some VPNs block VoIP traffic — try without the VPN
+- Telefon sağlayıcısının medya sunucularının gönüllünün telefonuna ulaşabildiğinden emin olun
+- RTP trafiğini engelleyen NAT/güvenlik duvarı sorunlarını kontrol edin
+- WebRTC kullanıyorsanız, STUN/TURN sunucularının doğru yapılandırıldığını doğrulayın
+- Bazı VPN'ler VoIP trafiğini engeller — VPN olmadan deneyin
 
-### SMS/WhatsApp messages not arriving
+### SMS/WhatsApp mesajları gelmiyor
 
-- Verify the messaging webhook URLs are configured correctly in your provider's console
-- For WhatsApp, ensure the Meta webhook verification token matches your settings
-- Check that the messaging channel is enabled in **Admin Settings > Channels**
-- For Signal, verify the signal-cli bridge is running and configured to forward to your webhook
+- Mesajlaşma webhook URL'lerinin sağlayıcınızın konsolunda doğru yapılandırıldığını doğrulayın
+- WhatsApp için, Meta webhook doğrulama tokeninin ayarlarınızla eşleştiğinden emin olun
+- Mesajlaşma kanalının **Yönetici Ayarları > Kanallar** bölümünde etkin olduğunu kontrol edin
+- Signal için, signal-cli köprüsünün çalıştığını ve webhook'unuza iletecek şekilde yapılandırıldığını doğrulayın
 
-## Crypto errors
+## Kripto hataları
 
-### Key mismatch errors
+### Anahtar uyumsuzluğu hataları
 
-**"Failed to decrypt" or "Invalid key" when opening notes:**
+**Notları açarken "Şifre çözme başarısız" veya "Geçersiz anahtar":**
 
-- This usually means the note was encrypted for a different identity than the one you are logged in with
-- Verify you are using the correct nsec (check your npub in Settings matches what the admin sees)
-- If you recently re-created your identity, old notes encrypted for your previous public key will not be decryptable with the new key
+- Bu genellikle notun, giriş yaptığınız kimlikten farklı bir kimlik için şifrelendiği anlamına gelir
+- Doğru nsec'i kullandığınızı doğrulayın (Ayarlar'daki npub'unuzun yöneticinin gördüğüyle eşleştiğini kontrol edin)
+- Yakın zamanda kimliğinizi yeniden oluşturduysanız, önceki açık anahtarınız için şifrelenmiş eski notlar yeni anahtarla şifre çözülemez
 
-**"Invalid signature" on login:**
+**Girişte "Geçersiz imza":**
 
-- The nsec may be corrupted — try re-entering it from your password manager
-- Ensure the full nsec is pasted (starts with `nsec1`, 63 characters total)
-- Check for extra whitespace or newline characters
+- Nsec bozulmuş olabilir — şifre yöneticinizden yeniden girmeyi deneyin
+- Tam nsec'in yapıştırıldığından emin olun (`nsec1` ile başlar, toplam 63 karakter)
+- Ekstra boşluk veya yeni satır karakterlerini kontrol edin
 
-### Signature verification failures
+### İmza doğrulama başarısızlıkları
 
-If hub events fail signature verification:
+Hub olayları imza doğrulamasından geçemezse:
 
-- Check that the system clock is synchronized (NTP). Large clock skew can cause issues with event timestamps
-- Verify that the WebSocket relay is not relaying events from unknown pubkeys
-- Restart the app to re-fetch the current hub member list
+- Sistem saatinin senkronize olduğunu kontrol edin (NTP). Büyük saat sapması, olay zaman damgalarıyla sorunlara neden olabilir
+- WebSocket relay'nin bilinmeyen pubkeys'ten olayları iletmediğini doğrulayın
+- Uygulamayı yeniden başlatarak mevcut hub üye listesini yeniden alın
 
-### ECIES envelope errors
+### ECIES zarf hataları
 
-**"Failed to unwrap key" on note decryption:**
+**Not şifre çözme sırasında "Anahtar açma başarısız":**
 
-- The ECIES envelope may have been created with an incorrect public key
-- This can happen if the admin added a volunteer with a typo in the pubkey
-- The admin should verify the volunteer's public key and re-invite if necessary
+- ECIES zarfı yanlış açık anahtarla oluşturulmuş olabilir
+- Bu, yöneticinin pubkeye yazım hatasıyla bir gönüllü eklediğinde olabilir
+- Yönetici, gönüllünün açık anahtarını doğrulamalı ve gerekirse yeniden davet etmelidir
 
-**"Invalid ciphertext length":**
+**"Geçersiz şifreli metin uzunluğu":**
 
-- This indicates data corruption, possibly from a truncated network response
-- Retry the operation. If it persists, the encrypted data may be permanently corrupted
-- Check for proxy or CDN issues that might truncate response bodies
+- Bu, muhtemelen kısaltılmış bir ağ yanıtından kaynaklanan veri bozulmasını gösterir
+- İşlemi yeniden deneyin. Devam ederse, şifreli veri kalıcı olarak bozulmuş olabilir
+- Yanıt gövdelerini kısaltabilecek proxy veya CDN sorunlarını kontrol edin
 
-### Hub key errors
+### Hub anahtarı hataları
 
-**"Failed to decrypt hub event":**
+**"Hub olayını şifre çözme başarısız":**
 
-- The hub key may have been rotated since you last connected
-- Close and reopen the app to fetch the latest hub key
-- If you were recently removed and re-added to the hub, the key may have rotated during your absence
+- Hub anahtarı, son bağlantınızdan bu yana döndürülmüş olabilir
+- En son hub anahtarını almak için uygulamayı kapatıp yeniden açın
+- Yakın zamanda hub'dan çıkarılıp yeniden eklendiyseniz, anahtar yokluğunuz sırasında döndürülmüş olabilir
 
-## Getting help
+## Yardım alma
 
-If your issue is not covered here:
+Sorununuz burada kapsanmıyorsa:
 
-- Check the [GitHub Issues](https://github.com/rhonda-rodododo/llamenos-platform/issues) for known bugs and workarounds
-- Search existing issues before creating a new one
-- When reporting a bug, include: your deployment mode (Cloudflare/Docker/Kubernetes), platform (Desktop/Mobile), and any error messages from the browser console or terminal
+- Bilinen hatalar ve geçici çözümler için [GitHub Issues](https://github.com/rhonda-rodododo/llamenos-platform/issues) sayfasını kontrol edin
+- Yeni bir sorun oluşturmadan önce mevcut sorunları arayın
+- Bir hata bildirirken şunları ekleyin: dağıtım modunuz (Cloudflare/Docker/Kubernetes), platformunuz (Masaüstü/Mobil) ve tarayıcı konsolundan veya uçbirimden aldığınız hata mesajları
