@@ -12,6 +12,15 @@ export const languages = {
   hi: { label: 'हिन्दी', dir: 'ltr' as const },
   pt: { label: 'Português', dir: 'ltr' as const },
   de: { label: 'Deutsch', dir: 'ltr' as const },
+  uk: { label: 'Українська', dir: 'ltr' as const },
+  fa: { label: 'فارسی', dir: 'rtl' as const },
+  tr: { label: 'Türkçe', dir: 'ltr' as const },
+  ku: { label: 'Kurdî', dir: 'ltr' as const },
+  so: { label: 'Soomaali', dir: 'ltr' as const },
+  am: { label: 'አማርኛ', dir: 'ltr' as const },
+  my: { label: 'မြန်မာ', dir: 'ltr' as const },
+  quc: { label: "K'iche'", dir: 'ltr' as const },
+  mix: { label: "Tu'un savi", dir: 'ltr' as const },
 } as const;
 
 export const defaultLang = 'en' as const;
