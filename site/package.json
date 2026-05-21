@@ -9,11 +9,11 @@
     "deploy": "astro build && bunx wrangler pages deploy dist --project-name llamenos-site"
   },
   "dependencies": {
-    "@astrojs/rss": "^4.0.11",
+    "@astrojs/rss": "^4.0.18",
     "@astrojs/sitemap": "^3.7.2",
     "@resvg/resvg-js": "^2.6.2",
     "@tailwindcss/vite": "^4.1.18",
-    "astro": "^5.7.0",
+    "astro": "^5.18.1",
     "astro-pagefind": "^1.8.6",
     "marked": "^18.0.2",
     "react": "^19.0.0",
