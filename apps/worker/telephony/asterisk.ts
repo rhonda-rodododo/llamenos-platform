@@ -10,9 +10,9 @@ import type {
 import { SipBridgeAdapter } from './sip-bridge-adapter'
 import {
   DEFAULT_LANGUAGE,
-  IVR_LANGUAGES,
+  ivrIndexToDigit,
 } from '@shared/languages'
-import { IVR_PROMPTS, getPrompt } from '@shared/voice-prompts'
+import { IVR_PROMPTS, IVR_MORE_PROMPTS, getPrompt, resolveIvrPrompt } from '@shared/voice-prompts'
 
 /**
  * ARI command types — JSON commands sent to the sip-bridge sidecar.
@@ -134,11 +134,10 @@ export class AsteriskAdapter extends SipBridgeAdapter {
   // --- IVR / Call flow ---
 
   async handleLanguageMenu(params: LanguageMenuParams): Promise<TelephonyResponse> {
-    const { enabledLanguages } = params
-    const activeLanguages = IVR_LANGUAGES.filter((code) => enabledLanguages.includes(code))
+    const languages = params.enabledLanguages
 
-    if (activeLanguages.length <= 1) {
-      const lang = activeLanguages[0] || DEFAULT_LANGUAGE
+    if (languages.length <= 1) {
+      const lang = languages[0] || DEFAULT_LANGUAGE
       return this.ariJson([
         this.ariSpeak(' ', lang),
         {
@@ -152,11 +151,21 @@ export class AsteriskAdapter extends SipBridgeAdapter {
     }
 
     const commands: AriCommand[] = []
-    for (const langCode of IVR_LANGUAGES) {
-      if (!enabledLanguages.includes(langCode)) continue
-      const prompt = IVR_PROMPTS[langCode]
-      if (!prompt) continue
-      commands.push(this.ariSpeak(prompt, langCode))
+    if (languages.length > 9) {
+      const mainMenu = languages.slice(0, 8)
+      for (let i = 0; i < mainMenu.length; i++) {
+        const prompt = IVR_PROMPTS[mainMenu[i]]
+        if (!prompt) continue
+        commands.push(this.ariSpeak(resolveIvrPrompt(prompt, String(i + 1)), mainMenu[i]))
+      }
+      const morePrompt = IVR_MORE_PROMPTS[languages[0]] || IVR_MORE_PROMPTS['en']
+      commands.push(this.ariSpeak(resolveIvrPrompt(morePrompt, '9'), 'en'))
+    } else {
+      for (let i = 0; i < languages.length; i++) {
+        const prompt = IVR_PROMPTS[languages[i]]
+        if (!prompt) continue
+        commands.push(this.ariSpeak(resolveIvrPrompt(prompt, ivrIndexToDigit(i)), languages[i]))
+      }
     }
 
     commands.push({

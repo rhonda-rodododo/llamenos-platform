@@ -2485,9 +2485,9 @@
   "inviteStatusExpired": "Expired",
   "invitesEmpty": "No invites",
   "ivr": {
-    "atLeastOne": "Can it nhat mot ngon ngu duoc bat",
-    "description": "Chon ngon ngu ma nguoi goi nghe trong menu dien thoai.",
-    "title": "Menu ngon ngu IVR"
+    "selfAnnouncement": "Tiếng Việt, nhấn [N].",
+    "moreLanguages": "For more languages, press [N].",
+    "goBack": "To go back, press 0."
   },
   "ivrAudio": {
     "delete": "Xóa",
@@ -4592,5 +4592,19 @@
     "registered": "Push notifications are active.",
     "registering": "Registering for push notifications…",
     "failed": "Push notification registration failed. Try again later."
+  },
+  "voice": {
+    "greeting": "Cảm ơn bạn đã gọi đến {name}.",
+    "rateLimited": "Chúng tôi hiện đang có lượng cuộc gọi cao. Vui lòng thử lại sau.",
+    "captchaPrompt": "Vui lòng nhập các chữ số sau:",
+    "captchaTimeout": "Chúng tôi không nhận được thông tin của bạn. Tạm biệt.",
+    "pleaseHold": "Xin vui lòng chờ trong khi chúng tôi kết nối bạn.",
+    "captchaSuccess": "Cảm ơn bạn. Xin vui lòng chờ trong khi chúng tôi kết nối bạn.",
+    "captchaFail": "Chúng tôi không thể kết nối cuộc gọi của bạn. Tạm biệt.",
+    "captchaRetry": "Không chính xác. Vui lòng thử lại.",
+    "waitMessage": "Cuộc gọi của bạn rất quan trọng với chúng tôi. Xin vui lòng chờ trong khi chúng tôi kết nối bạn với tình nguyện viên.",
+    "unavailableMessage": "Xin lỗi, hiện không có ai sẵn sàng nhận cuộc gọi của bạn. Vui lòng thử lại sau. Tạm biệt.",
+    "voicemailPrompt": "Hiện không có ai có thể nhận cuộc gọi của bạn. Vui lòng để lại tin nhắn sau tiếng bíp.",
+    "voicemailThanks": "Cảm ơn tin nhắn của bạn. Tạm biệt."
   }
 }

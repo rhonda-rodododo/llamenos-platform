@@ -91,7 +91,7 @@ import type {
   ReportTypeDefinition,
   ReportFieldDefinition,
 } from '@protocol/schemas/report-types'
-import { IVR_LANGUAGES } from '@shared/languages'
+import { IVR_LANGUAGES, LANGUAGE_CODES } from '@shared/languages'
 import type { Role } from '@shared/permissions'
 import { DEFAULT_ROLES } from '@shared/permissions'
 import {
@@ -154,6 +154,7 @@ const ALLOWED_HUB_SETTINGS = new Set([
   'subAccountEnabled',
   'subAccountConfigId',
   'heartbeatTimeout',
+  'ivrLanguages',
 ])
 
 const VALID_PROVIDER_TYPES = [
@@ -416,16 +417,34 @@ export class SettingsService {
   // IVR Languages
   // =========================================================================
 
-  async getIvrLanguages(): Promise<{ enabledLanguages: string[] }> {
+  async getIvrLanguages(hubId?: string): Promise<{ enabledLanguages: string[] }> {
+    if (hubId) {
+      const languages = await this.getHubIvrLanguages(hubId)
+      return { enabledLanguages: languages }
+    }
     const row = await getSettings(this.db)
     return {
       enabledLanguages: row.ivrLanguages ?? [...IVR_LANGUAGES],
     }
   }
 
+  /**
+   * Get the ordered IVR language list for a hub, with cascade fallback:
+   * hub_settings.ivrLanguages → system_settings.ivr_languages → IVR_LANGUAGES constant
+   */
+  async getHubIvrLanguages(hubId: string): Promise<string[]> {
+    const hubSettings = await this.getHubSettings(hubId)
+    const hubLangs = hubSettings.ivrLanguages
+    if (Array.isArray(hubLangs) && hubLangs.length > 0) {
+      return hubLangs as string[]
+    }
+    const row = await getSettings(this.db)
+    return row.ivrLanguages ?? [...IVR_LANGUAGES]
+  }
+
   async updateIvrLanguages(data: {
     enabledLanguages: string[]
-  }): Promise<{ enabledLanguages: string[] }> {
+  }, hubId?: string): Promise<{ enabledLanguages: string[] }> {
     if (
       !Array.isArray(data.enabledLanguages) ||
       data.enabledLanguages.length === 0
@@ -436,10 +455,14 @@ export class SettingsService {
       )
     }
     const valid = data.enabledLanguages.filter((code) =>
-      IVR_LANGUAGES.includes(code),
+      LANGUAGE_CODES.includes(code),
     )
     if (valid.length === 0) {
       throw new ServiceError(400, 'No valid IVR language codes provided')
+    }
+    if (hubId) {
+      await this.updateHubSettings(hubId, { ivrLanguages: valid })
+      return { enabledLanguages: valid }
     }
     await this.db
       .update(systemSettings)

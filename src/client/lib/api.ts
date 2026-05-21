@@ -791,12 +791,14 @@ export async function updateCallSettings(data: Partial<CallSettings>) {
 
 // --- IVR Language Settings ---
 
-export async function getIvrLanguages() {
-  return request<{ enabledLanguages: string[] }>('/settings/ivr-languages')
+export async function getIvrLanguages(hubId?: string) {
+  const qs = hubId ? `?hubId=${encodeURIComponent(hubId)}` : ''
+  return request<{ enabledLanguages: string[] }>(`/settings/ivr-languages${qs}`)
 }
 
-export async function updateIvrLanguages(data: { enabledLanguages: string[] }) {
-  return request<{ enabledLanguages: string[] }>('/settings/ivr-languages', {
+export async function updateIvrLanguages(data: { enabledLanguages: string[] }, hubId?: string) {
+  const qs = hubId ? `?hubId=${encodeURIComponent(hubId)}` : ''
+  return request<{ enabledLanguages: string[] }>(`/settings/ivr-languages${qs}`, {
     method: 'PATCH',
     body: JSON.stringify(data),
   })

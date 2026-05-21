@@ -18,9 +18,9 @@ import type {
 } from './adapter'
 import {
   DEFAULT_LANGUAGE,
-  IVR_LANGUAGES,
+  ivrIndexToDigit,
 } from '@shared/languages'
-import { IVR_PROMPTS, getPrompt } from '@shared/voice-prompts'
+import { IVR_PROMPTS, IVR_MORE_PROMPTS, getPrompt, resolveIvrPrompt } from '@shared/voice-prompts'
 
 const TELNYX_API_BASE = 'https://api.telnyx.com/v2'
 
@@ -225,8 +225,7 @@ export class TelnyxAdapter implements TelephonyAdapter {
   // --- IVR Methods ---
 
   async handleLanguageMenu(params: LanguageMenuParams): Promise<TelephonyResponse> {
-    const enabled = params.enabledLanguages
-    const activeLanguages = IVR_LANGUAGES.filter((code) => enabled.includes(code))
+    const languages = params.enabledLanguages
 
     const clientState = encodeClientState({
       hubId: params.hubId,
@@ -237,8 +236,8 @@ export class TelnyxAdapter implements TelephonyAdapter {
 
     await this.client.command(params.callSid, 'answer', { client_state: clientState })
 
-    if (activeLanguages.length <= 1) {
-      const lang = activeLanguages[0] || DEFAULT_LANGUAGE
+    if (languages.length <= 1) {
+      const lang = languages[0] || DEFAULT_LANGUAGE
       const skipState = encodeClientState({
         hubId: params.hubId,
         lang,
@@ -255,10 +254,19 @@ export class TelnyxAdapter implements TelephonyAdapter {
     }
 
     const promptParts: string[] = []
-    for (const langCode of IVR_LANGUAGES) {
-      if (!enabled.includes(langCode)) continue
-      const prompt = IVR_PROMPTS[langCode]
-      if (prompt) promptParts.push(prompt)
+    if (languages.length > 9) {
+      const mainMenu = languages.slice(0, 8)
+      for (let i = 0; i < mainMenu.length; i++) {
+        const prompt = IVR_PROMPTS[mainMenu[i]]
+        if (prompt) promptParts.push(resolveIvrPrompt(prompt, String(i + 1)))
+      }
+      const morePrompt = IVR_MORE_PROMPTS[languages[0]] || IVR_MORE_PROMPTS['en']
+      promptParts.push(resolveIvrPrompt(morePrompt, '9'))
+    } else {
+      for (let i = 0; i < languages.length; i++) {
+        const prompt = IVR_PROMPTS[languages[i]]
+        if (prompt) promptParts.push(resolveIvrPrompt(prompt, ivrIndexToDigit(i)))
+      }
     }
 
     const menuText = promptParts.join(' ')

@@ -1,345 +1,87 @@
 /**
- * Shared voice prompt data for all telephony adapters.
+ * Shared voice prompt accessors for all telephony adapters.
  *
- * This is the single source of truth for voice prompts, IVR menu prompts,
- * and voicemail thank-you messages. Each adapter imports from here instead
- * of maintaining its own copy.
- *
- * Provider-specific voice code mappings (VOICE_CODES, VONAGE_VOICE_CODES, etc.)
- * remain in their respective adapter files.
+ * Translations live in packages/i18n/locales/{lang}.json under the "voice"
+ * and "ivr" namespaces. This module builds lookup tables from that data so
+ * telephony adapters can continue using the same API (getPrompt, IVR_PROMPTS,
+ * etc.) without knowing about the i18n system.
  */
-import { DEFAULT_LANGUAGE } from './languages'
+import { getLocaleString } from '@llamenos/i18n'
+import { DEFAULT_LANGUAGE, LANGUAGE_CODES } from './languages'
 
-/**
- * Voice prompts for all supported languages.
- * Each prompt has a key-per-language with fallback to English.
- *
- * Future extension: admins can upload recorded audio per prompt+language.
- * The adapter would check for a custom audio URL first, falling back to
- * these TTS strings. TwiML would use <Play> for audio, <Say> for TTS.
- */
-export const VOICE_PROMPTS: Record<string, Record<string, string>> = {
-  greeting: {
-    en: 'Thank you for calling {name}.',
-    es: 'Gracias por llamar a {name}.',
-    zh: '感谢您致电{name}。',
-    tl: 'Salamat sa pagtawag sa {name}.',
-    vi: 'Cảm ơn bạn đã gọi đến {name}.',
-    ar: 'شكراً لاتصالك بـ {name}.',
-    fr: "Merci d'avoir appelé {name}.",
-    ht: 'Mèsi paske ou rele {name}.',
-    ko: '{name}에 전화해 주셔서 감사합니다.',
-    ru: 'Спасибо, что позвонили в {name}.',
-    hi: '{name} पर कॉल करने के लिए धन्यवाद।',
-    pt: 'Obrigado por ligar para {name}.',
-    de: 'Vielen Dank für Ihren Anruf bei {name}.',
-    uk: 'Дякуємо, що зателефонували до {name}.',
-    fa: 'از تماس شما با {name} سپاسگزاریم.',
-    tr: '{name} aramanız için teşekkür ederiz.',
-    ku: 'Spas ji bo ku we li {name} telefon kir.',
-    so: 'Waad ku mahadsan tahay waciddaada {name}.',
-    am: '{name} ስለደወሉ እናመሰግናለን።',
-    my: '{name} သို့ ဖုန်းခေါ်ဆိုမှုအတွက် ကျေးဇူးတင်ပါသည်။',
-    quc: "Maltiox rech ri ach'ab'al pa {name}.",
-    mix: 'Tàsi̱kó nuu̱ ni̱ ni̱ka̱ʼa̱n nuu̱ {name}.',
-  },
-  rateLimited: {
-    en: 'We are currently experiencing high call volume. Please try again later.',
-    es: 'Estamos experimentando un alto volumen de llamadas. Por favor, intente más tarde.',
-    zh: '我们目前通话量较大，请稍后再试。',
-    tl: 'Maraming tumatawag sa ngayon. Pakisubukan muli mamaya.',
-    vi: 'Chúng tôi hiện đang có lượng cuộc gọi cao. Vui lòng thử lại sau.',
-    ar: 'نحن نواجه حاليا حجم مكالمات كبير. يرجى المحاولة مرة أخرى لاحقا.',
-    fr: "Nous connaissons actuellement un volume d'appels élevé. Veuillez réessayer plus tard.",
-    ht: 'Nou gen anpil apèl kounye a. Tanpri eseye ankò pita.',
-    ko: '현재 통화량이 많습니다. 나중에 다시 시도해 주세요.',
-    ru: 'В настоящее время у нас большой объем звонков. Пожалуйста, перезвоните позже.',
-    hi: 'वर्तमान में कॉल की संख्या अधिक है। कृपया बाद में पुनः प्रयास करें।',
-    pt: 'Estamos com um alto volume de chamadas. Por favor, tente novamente mais tarde.',
-    de: 'Wir haben derzeit ein hohes Anrufaufkommen. Bitte versuchen Sie es später erneut.',
-    uk: 'Наразі у нас велика кількість дзвінків. Будь ласка, спробуйте пізніше.',
-    fa: 'در حال حاضر حجم تماس‌ها بسیار زیاد است. لطفاً بعداً دوباره تلاش کنید.',
-    tr: 'Şu anda yoğun çağrı hacmi yaşıyoruz. Lütfen daha sonra tekrar deneyin.',
-    ku: 'Niha em gelek bangên telefon distînin. Ji kerema xwe paşê dîsa biceribînin.',
-    so: 'Waxaan hadda la kulmayaa wicitaano badan. Fadlan dib u isku day habeenkii dambe.',
-    am: 'በአሁኑ ጊዜ ብዙ ጥሪዎች እየመጡ ናቸው። እባክዎ ቆየት ብለው ይሞክሩ።',
-    my: 'လောလောဆယ် ဖုန်းခေါ်ဆိုမှု အလွန်များနေပါသည်။ ကျေးဇူးပြု၍ နောက်မှ ထပ်ကြိုးစားပါ။',
-    quc: "K'o k'ïy taq oyonem kamik. Tab'ana' chi'l achajij jun chik mul.",
-    mix: 'Vi̱ʼi̱ kua̱ʼa̱ nuu̱ ni̱ka̱ʼa̱n. Koto naní inka̱ʼa̱n inka tuku.',
-  },
-  captchaPrompt: {
-    en: 'Please enter the following digits:',
-    es: 'Por favor, ingrese los siguientes dígitos:',
-    zh: '请输入以下数字：',
-    tl: 'Pakilagay ang mga sumusunod na numero:',
-    vi: 'Vui lòng nhập các chữ số sau:',
-    ar: 'يرجى إدخال الأرقام التالية:',
-    fr: 'Veuillez saisir les chiffres suivants :',
-    ht: 'Tanpri antre chif sa yo:',
-    ko: '다음 숫자를 입력해 주세요:',
-    ru: 'Пожалуйста, введите следующие цифры:',
-    hi: 'कृपया निम्नलिखित अंक दर्ज करें:',
-    pt: 'Por favor, digite os seguintes números:',
-    de: 'Bitte geben Sie die folgenden Ziffern ein:',
-    uk: 'Будь ласка, введіть наступні цифри:',
-    fa: 'لطفاً اعداد زیر را وارد کنید:',
-    tr: 'Lütfen aşağıdaki rakamları girin:',
-    ku: 'Ji kerema xwe jimareyên jêr binivîsin:',
-    so: 'Fadlan geli lambarada soo socda:',
-    am: 'እባክዎ የሚከተሉትን ቁጥሮች ያስገቡ:',
-    my: 'ကျေးဇူးပြု၍ အောက်ပါ ဂဏန်းများကို ထည့်ပါ:',
-    quc: "Tab'ana' tatz'ib'aj ri ajilab'äl re':",
-    mix: 'Koto chu̱ʼun número yóʼo:',
-  },
-  captchaTimeout: {
-    en: 'We did not receive your input. Goodbye.',
-    es: 'No recibimos su entrada. Adiós.',
-    zh: '我们未收到您的输入。再见。',
-    tl: 'Hindi namin natanggap ang iyong input. Paalam.',
-    vi: 'Chúng tôi không nhận được thông tin của bạn. Tạm biệt.',
-    ar: 'لم نتلق مدخلاتك. مع السلامة.',
-    fr: "Nous n'avons pas reçu votre saisie. Au revoir.",
-    ht: 'Nou pa resevwa repons ou. Orevwa.',
-    ko: '입력을 받지 못했습니다. 안녕히 계세요.',
-    ru: 'Мы не получили ваш ввод. До свидания.',
-    hi: 'हमें आपका इनपुट नहीं मिला। अलविदा।',
-    pt: 'Não recebemos sua entrada. Até logo.',
-    de: 'Wir haben Ihre Eingabe nicht erhalten. Auf Wiederhören.',
-    uk: 'Ми не отримали вашого введення. До побачення.',
-    fa: 'ورودی شما دریافت نشد. خداحافظ.',
-    tr: 'Girişinizi alamadık. Hoşça kalın.',
-    ku: 'Me têketina we wernegirt. Bi xatirê te.',
-    so: 'Ma helin waxaad gelisay. Nabad gelyo.',
-    am: 'ያስገቡትን አልተቀበልንም። ቸር ይግጠምዎ።',
-    my: 'သင်ထည့်သွင်းမှုကို မရရှိပါ။ ဂုဏ်ယူပါသည်။',
-    quc: "Man xqak'ül ta ri atz'ib'anïk. Chawila'.",
-    mix: 'Ña kúu ni̱kiʼin nuu̱ ni̱chu̱ʼun. Saá va̱ʼa.',
-  },
-  pleaseHold: {
-    en: 'Please hold while we connect you.',
-    es: 'Por favor, espere mientras lo conectamos.',
-    zh: '请稍候，我们正在为您转接。',
-    tl: 'Pakihintay habang kinokonekta ka namin.',
-    vi: 'Xin vui lòng chờ trong khi chúng tôi kết nối bạn.',
-    ar: 'يرجى الانتظار بينما نقوم بتوصيلك.',
-    fr: 'Veuillez patienter pendant que nous vous connectons.',
-    ht: 'Tanpri tann pandan n ap konekte ou.',
-    ko: '연결해 드릴 때까지 잠시만 기다려 주세요.',
-    ru: 'Пожалуйста, подождите, пока мы вас соединяем.',
-    hi: 'कृपया प्रतीक्षा करें, हम आपको कनेक्ट कर रहे हैं।',
-    pt: 'Por favor, aguarde enquanto conectamos você.',
-    de: 'Bitte warten Sie, während wir Sie verbinden.',
-    uk: "Будь ласка, зачекайте, поки ми вас з'єднаємо.",
-    fa: 'لطفاً صبر کنید تا شما را وصل کنیم.',
-    tr: 'Sizi bağlarken lütfen bekleyin.',
-    ku: 'Ji kerema xwe bisekinin dema em we girêdidin.',
-    so: 'Fadlan sug inta aan ku xireyno.',
-    am: 'እባክዎ እንዲገናኙ እስኪያደርጉ ድረስ ይጠብቁ።',
-    my: 'ကျေးဇူးပြု၍ ချိတ်ဆက်ပေးနေစဉ် ခဏစောင့်ပါ။',
-    quc: "Tab'ana' choyob'a' ka qak'äm awäch.",
-    mix: 'Koto kuñuʼún nuu̱ na̱ʼá nda̱tu̱ʼún.',
-  },
-  captchaSuccess: {
-    en: 'Thank you. Please hold while we connect you.',
-    es: 'Gracias. Por favor, espere mientras lo conectamos.',
-    zh: '谢谢。请稍候，我们正在为您转接。',
-    tl: 'Salamat. Pakihintay habang kinokonekta ka namin.',
-    vi: 'Cảm ơn bạn. Xin vui lòng chờ trong khi chúng tôi kết nối bạn.',
-    ar: 'شكرا لك. يرجى الانتظار بينما نقوم بتوصيلك.',
-    fr: 'Merci. Veuillez patienter pendant que nous vous connectons.',
-    ht: 'Mèsi. Tanpri tann pandan n ap konekte ou.',
-    ko: '감사합니다. 연결해 드릴 때까지 잠시만 기다려 주세요.',
-    ru: 'Спасибо. Пожалуйста, подождите, пока мы вас соединяем.',
-    hi: 'धन्यवाद। कृपया प्रतीक्षा करें, हम आपको कनेक्ट कर रहे हैं।',
-    pt: 'Obrigado. Por favor, aguarde enquanto conectamos você.',
-    de: 'Danke. Bitte warten Sie, während wir Sie verbinden.',
-    uk: "Дякуємо. Будь ласка, зачекайте, поки ми вас з'єднаємо.",
-    fa: 'متشکرم. لطفاً صبر کنید تا شما را وصل کنیم.',
-    tr: 'Teşekkürler. Sizi bağlarken lütfen bekleyin.',
-    ku: 'Spas. Ji kerema xwe bisekinin dema em we girêdidin.',
-    so: 'Mahadsanid. Fadlan sug inta aan ku xireyno.',
-    am: 'አመሰግናለሁ። እባክዎ እንዲገናኙ እስኪያደርጉ ድረስ ይጠብቁ።',
-    my: 'ကျေးဇူးတင်ပါသည်။ ကျေးဇူးပြု၍ ချိတ်ဆက်ပေးနေစဉ် ခဏစောင့်ပါ။',
-    quc: "Maltiox. Tab'ana' choyob'a' ka qak'äm awäch.",
-    mix: 'Tàsi̱kó. Koto kuñuʼún nuu̱ na̱ʼá nda̱tu̱ʼún.',
-  },
-  captchaRetry: {
-    en: 'That was incorrect. Please try again.',
-    es: 'Eso fue incorrecto. Por favor, intente de nuevo.',
-    zh: '输入不正确，请重试。',
-    tl: 'Hindi tama iyon. Pakisubukan muli.',
-    vi: 'Không chính xác. Vui lòng thử lại.',
-    ar: 'هذا غير صحيح. يرجى المحاولة مرة أخرى.',
-    fr: "C'était incorrect. Veuillez réessayer.",
-    ht: 'Sa pa kòrèk. Tanpri eseye ankò.',
-    ko: '잘못된 입력입니다. 다시 시도해 주세요.',
-    ru: 'Неверный ввод. Пожалуйста, попробуйте снова.',
-    hi: 'यह गलत था। कृपया पुनः प्रयास करें।',
-    pt: 'Isso estava incorreto. Por favor, tente novamente.',
-    de: 'Das war nicht korrekt. Bitte versuchen Sie es erneut.',
-    uk: 'Невірно. Будь ласка, спробуйте ще раз.',
-    fa: 'اشتباه بود. لطفاً دوباره تلاش کنید.',
-    tr: 'Yanlış giriş. Lütfen tekrar deneyin.',
-    ku: 'Ew ne rast bû. Ji kerema xwe dîsa biceribînin.',
-    so: 'Taasi waa khalad. Fadlan isku day mar kale.',
-    am: 'ትክክል አልነበረም። እባክዎ እንደገና ይሞክሩ።',
-    my: 'မှားနေပါသည်။ ကျေးဇူးပြု၍ ထပ်ကြိုးစားပါ။',
-    quc: "Man ütz ta ri'. Tab'ana' tachajij chik.",
-    mix: 'Ña va̱ʼa. Koto inka̱ʼa̱n inka tuku.',
-  },
-  captchaFail: {
-    en: 'We are unable to connect your call. Goodbye.',
-    es: 'No podemos conectar su llamada. Adiós.',
-    zh: '我们无法接通您的电话。再见。',
-    tl: 'Hindi namin makonekta ang iyong tawag. Paalam.',
-    vi: 'Chúng tôi không thể kết nối cuộc gọi của bạn. Tạm biệt.',
-    ar: 'لا يمكننا توصيل مكالمتك. مع السلامة.',
-    fr: 'Nous ne pouvons pas connecter votre appel. Au revoir.',
-    ht: 'Nou pa ka konekte apèl ou. Orevwa.',
-    ko: '전화를 연결할 수 없습니다. 안녕히 계세요.',
-    ru: 'Мы не можем соединить ваш звонок. До свидания.',
-    hi: 'हम आपकी कॉल कनेक्ट नहीं कर पा रहे हैं। अलविदा।',
-    pt: 'Não conseguimos conectar sua chamada. Até logo.',
-    de: 'Wir können Ihren Anruf nicht verbinden. Auf Wiederhören.',
-    uk: "Ми не можемо з'єднати ваш дзвінок. До побачення.",
-    fa: 'متاسفانه نمی‌توانیم تماس شما را وصل کنیم. خداحافظ.',
-    tr: 'Aramanızı bağlayamıyoruz. Hoşça kalın.',
-    ku: 'Em nikarin banga we girêbidin. Bi xatirê te.',
-    so: 'Ma awoodno inaan ku xirno wicitaankaaga. Nabad gelyo.',
-    am: 'ጥሪዎን ማገናኘት አልቻልንም። ቸር ይግጠምዎ።',
-    my: 'သင့်ဖုန်းခေါ်ဆိုမှုကို ချိတ်ဆက်၍ မရပါ။ ဂုဏ်ယူပါသည်။',
-    quc: "Man xojtajïk ta ri oyonem. Chawila'.",
-    mix: 'Ña kúu nda̱tu̱ʼún nuu̱ ni̱ka̱ʼa̱n. Saá va̱ʼa.',
-  },
-  waitMessage: {
-    en: 'Your call is important to us. Please hold while we connect you with a volunteer.',
-    es: 'Su llamada es importante para nosotros. Por favor, espere mientras lo conectamos con un voluntario.',
-    zh: '您的来电对我们非常重要。请稍候，我们正在为您转接志愿者。',
-    tl: 'Mahalaga sa amin ang iyong tawag. Pakihintay habang kinokonekta ka namin sa isang boluntaryo.',
-    vi: 'Cuộc gọi của bạn rất quan trọng với chúng tôi. Xin vui lòng chờ trong khi chúng tôi kết nối bạn với tình nguyện viên.',
-    ar: 'مكالمتك مهمة بالنسبة لنا. يرجى الانتظار بينما نقوم بتوصيلك بمتطوع.',
-    fr: 'Votre appel est important pour nous. Veuillez patienter pendant que nous vous connectons avec un bénévole.',
-    ht: 'Apèl ou enpòtan pou nou. Tanpri tann pandan n ap konekte ou ak yon volontè.',
-    ko: '귀하의 전화는 소중합니다. 자원봉사자와 연결해 드릴 때까지 잠시만 기다려 주세요.',
-    ru: 'Ваш звонок важен для нас. Пожалуйста, подождите, пока мы соединяем вас с волонтёром.',
-    hi: 'आपकी कॉल हमारे लिए महत्वपूर्ण है। कृपया प्रतीक्षा करें, हम आपको एक स्वयंसेवक से जोड़ रहे हैं।',
-    pt: 'Sua chamada é importante para nós. Por favor, aguarde enquanto conectamos você com um voluntário.',
-    de: 'Ihr Anruf ist uns wichtig. Bitte warten Sie, während wir Sie mit einem Freiwilligen verbinden.',
-    uk: "Ваш дзвінок важливий для нас. Будь ласка, зачекайте, поки ми з'єднаємо вас з волонтером.",
-    fa: 'تماس شما برای ما مهم است. لطفاً صبر کنید تا شما را به یک داوطلب وصل کنیم.',
-    tr: 'Aramanız bizim için önemlidir. Sizi bir gönüllüye bağlarken lütfen bekleyin.',
-    ku: 'Banga we ji bo me girîng e. Ji kerema xwe bisekinin dema em we bi dilxwazekî re girêdidin.',
-    so: 'Wicitaankaagu waa muhiim. Fadlan sug inta aan kugu xireyno mutadawac.',
-    am: 'ጥሪዎ ለእኛ ጠቃሚ ነው። እባክዎ ከበጎ ፈቃደኛ ጋር እስኪገናኙ ድረስ ይጠብቁ።',
-    my: 'သင့်ဖုန်းခေါ်ဆိုမှုသည် ကျွန်ုပ်တို့အတွက် အရေးကြီးပါသည်။ ကျေးဇူးပြု၍ စေတနာ့ဝန်ထမ်းနှင့် ချိတ်ဆက်ပေးနေစဉ် ခဏစောင့်ပါ။',
-    quc: "Nïm uq'ij ri oyonem awäch chiqawäch. Tab'ana' choyob'a' ka qak'äm awäch rik'in jun to'onël.",
-    mix: 'Nuu̱ ni̱ka̱ʼa̱n kúu iin ndívi̱. Koto kuñuʼún nuu̱ na̱ʼá nda̱tu̱ʼún xíʼín ñivi̱ chíndeé.',
-  },
-  unavailableMessage: {
-    en: 'We are sorry, no one is available to take your call at this time. Please try again later. Goodbye.',
-    es: 'Lo sentimos, no hay nadie disponible para atender su llamada en este momento. Por favor intente más tarde. Adiós.',
-    zh: '抱歉，目前没有人可以接听您的电话。请稍后再试。再见。',
-    tl: 'Paumanhin, walang available na sumagot sa iyong tawag sa ngayon. Pakisubukan muli mamaya. Paalam.',
-    vi: 'Xin lỗi, hiện không có ai sẵn sàng nhận cuộc gọi của bạn. Vui lòng thử lại sau. Tạm biệt.',
-    ar: 'نأسف، لا يوجد أحد متاح للرد على مكالمتك في الوقت الحالي. يرجى المحاولة مرة أخرى لاحقاً. مع السلامة.',
-    fr: "Désolé, personne n'est disponible pour prendre votre appel pour le moment. Veuillez réessayer plus tard. Au revoir.",
-    ht: 'Nou regrèt, pa gen moun disponib pou reponn apèl ou a kounye a. Tanpri eseye ankò pita. Orevwa.',
-    ko: '죄송합니다. 현재 전화를 받을 수 있는 사람이 없습니다. 나중에 다시 시도해 주세요. 안녕히 계세요.',
-    ru: 'Извините, сейчас никто не может ответить на ваш звонок. Пожалуйста, перезвоните позже. До свидания.',
-    hi: 'क्षमा करें, इस समय आपकी कॉल लेने के लिए कोई उपलब्ध नहीं है। कृपया बाद में पुनः प्रयास करें। अलविदा।',
-    pt: 'Desculpe, não há ninguém disponível para atender sua ligação no momento. Por favor, tente novamente mais tarde. Adeus.',
-    de: 'Es tut uns leid, im Moment ist niemand erreichbar. Bitte versuchen Sie es später erneut. Auf Wiederhören.',
-    uk: 'На жаль, зараз ніхто не може відповісти на ваш дзвінок. Будь ласка, спробуйте пізніше. До побачення.',
-    fa: 'متاسفانه در حال حاضر کسی برای پاسخگویی به تماس شما در دسترس نیست. لطفاً بعداً دوباره تلاش کنید. خداحافظ.',
-    tr: 'Üzgünüz, şu anda aramanızı yanıtlayacak kimse yok. Lütfen daha sonra tekrar deneyin. Hoşça kalın.',
-    ku: 'Bibore, niha kes tune ku banga we bibersivîne. Ji kerema xwe paşê dîsa biceribînin. Bi xatirê te.',
-    so: 'Waan ka xunnahay, hadda ma jiro cid wicitaankaaga qaadan kara. Fadlan dib u isku day habeenkii dambe. Nabad gelyo.',
-    am: 'ይቅርታ፣ በአሁኑ ጊዜ ጥሪዎን ለመቀበል ማንም የለም። እባክዎ ቆየት ብለው ይሞክሩ። ቸር ይግጠምዎ።',
-    my: 'ဝမ်းနည်းပါသည်၊ ယခု သင့်ဖုန်းကိုလက်ခံနိုင်သူ မရှိပါ။ ကျေးဇူးပြု၍ နောက်မှ ထပ်ကြိုးစားပါ။ ဂုဏ်ယူပါသည်။',
-    quc: "Kojonik, man k'o ta jun chik chuyak' ri oyonem awäch wakami. Tab'ana' tachajij jun chik mul. Chawila'.",
-    mix: 'Ndúʼú va̱ʼa, ña íyo ñivi̱ kaʼví nuu̱ ni̱ka̱ʼa̱n vitin. Koto naní inka̱ʼa̱n inka tuku. Saá va̱ʼa.',
-  },
-  voicemailPrompt: {
-    en: 'No one is available to take your call right now. Please leave a message after the tone and we will get back to you.',
-    es: 'No hay nadie disponible para atender su llamada en este momento. Por favor, deje un mensaje después del tono y nos pondremos en contacto con usted.',
-    zh: '目前没有人能接听您的电话。请在提示音后留言，我们会尽快回复您。',
-    tl: 'Walang available na makasagot ng iyong tawag ngayon. Mangyaring mag-iwan ng mensahe pagkatapos ng tono.',
-    vi: 'Hiện không có ai có thể nhận cuộc gọi của bạn. Vui lòng để lại tin nhắn sau tiếng bíp.',
-    ar: 'لا يوجد أحد متاح للرد على مكالمتك الآن. يرجى ترك رسالة بعد النغمة.',
-    fr: "Personne n'est disponible pour prendre votre appel pour le moment. Veuillez laisser un message après le bip.",
-    ht: 'Pa gen moun disponib pou pran apèl ou kounye a. Tanpri kite yon mesaj apre son an.',
-    ko: '현재 전화를 받을 수 있는 사람이 없습니다. 신호음 후 메시지를 남겨주세요.',
-    ru: 'В данный момент никто не может ответить на ваш звонок. Пожалуйста, оставьте сообщение после сигнала.',
-    hi: 'इस समय आपकी कॉल लेने के लिए कोई उपलब्ध नहीं है। कृपया बीप के बाद एक संदेश छोड़ें।',
-    pt: 'Ninguém está disponível para atender sua ligação no momento. Por favor, deixe uma mensagem após o sinal.',
-    de: 'Im Moment ist niemand verfügbar, um Ihren Anruf entgegenzunehmen. Bitte hinterlassen Sie eine Nachricht nach dem Signalton.',
-    uk: 'Зараз ніхто не може відповісти на ваш дзвінок. Будь ласка, залиште повідомлення після сигналу.',
-    fa: 'در حال حاضر کسی برای پاسخگویی به تماس شما در دسترس نیست. لطفاً بعد از صدای بوق پیام بگذارید.',
-    tr: 'Şu anda aramanızı yanıtlayacak kimse yok. Lütfen sinyal sesinden sonra mesajınızı bırakın.',
-    ku: 'Niha kes tune ku banga we bibersivîne. Ji kerema xwe piştî dengê bîpê peyamek bihêlin.',
-    so: 'Hadda ma jiro cid wicitaankaaga qaadan kara. Fadlan ka dib fariin dhig dhawaaqa kadib.',
-    am: 'በአሁኑ ጊዜ ጥሪዎን ለመቀበል ማንም የለም። እባክዎ ከድምፅ ምልክቱ በኋላ መልእክት ይተዉ።',
-    my: 'ယခု သင့်ဖုန်းကိုလက်ခံနိုင်သူ မရှိပါ။ ကျေးဇူးပြု၍ အသံမြည်ပြီးနောက် မက်ဆေ့ချ်ထားခဲ့ပါ။',
-    quc: "Man k'o ta jun chik chuyak' ri oyonem awäch wakami. Tab'ana' taya' jun tzijob'äl chirij ri ch'ab'äl.",
-    mix: 'Ña íyo ñivi̱ kaʼví nuu̱ ni̱ka̱ʼa̱n vitin. Koto sandaá iin tu̱ʼun saá ndi̱kaa̱ tono.',
-  },
+// ---------------------------------------------------------------------------
+// Voice prompts — built from locale "voice.*" keys
+// ---------------------------------------------------------------------------
+
+const VOICE_PROMPT_KEYS = [
+  'greeting',
+  'rateLimited',
+  'captchaPrompt',
+  'captchaTimeout',
+  'pleaseHold',
+  'captchaSuccess',
+  'captchaFail',
+  'captchaRetry',
+  'waitMessage',
+  'unavailableMessage',
+  'voicemailPrompt',
+] as const
+
+/** Voice prompts keyed by prompt name then language code. */
+export const VOICE_PROMPTS: Record<string, Record<string, string>> = {}
+
+for (const key of VOICE_PROMPT_KEYS) {
+  const byLang: Record<string, string> = {}
+  for (const lang of LANGUAGE_CODES) {
+    const val = getLocaleString(lang, `voice.${key}`)
+    if (val) byLang[lang] = val
+  }
+  VOICE_PROMPTS[key] = byLang
 }
 
-/**
- * IVR language menu prompts -- each language announces itself in its native voice.
- * Keyed by language code, value is the phrase spoken in that language.
- * Languages not in IVR_LANGUAGES use [N] as a placeholder digit since their
- * position varies per hub configuration.
- */
-export const IVR_PROMPTS: Record<string, string> = {
-  es: 'Para español, marque uno.',
-  en: 'For English, press two.',
-  zh: '如需中文服务，请按三。',
-  tl: 'Para sa Tagalog, pindutin ang apat.',
-  vi: 'Tiếng Việt, nhấn năm.',
-  ar: 'للعربية، اضغط ستة.',
-  fr: 'Pour le français, appuyez sur sept.',
-  ht: 'Pou Kreyòl, peze wit.',
-  ko: '한국어는 아홉 번을 눌러주세요.',
-  ru: 'Для русского языка нажмите ноль.',
-  hi: 'हिन्दी के लिए, [N] दबाएं।',
-  pt: 'Para português, pressione [N].',
-  de: 'Für Deutsch, drücken Sie [N].',
-  uk: 'Для української мови натисніть [N].',
-  fa: 'برای فارسی، [N] را فشار دهید.',
-  tr: 'Türkçe için [N] tuşuna basın.',
-  ku: 'Ji bo Kurdî, bişkoka [N] bixin.',
-  so: 'Soomaaliga, taabo [N].',
-  am: 'አማርኛ ለ፣ [N] ይጫኑ።',
-  my: 'မြန်မာဘာသာအတွက် [N] နှိပ်ပါ။',
-  quc: "Pa K'iche', tzukutij [N].",
-  mix: "Tu'un savi ndáto, chu̱ʼun [N].",
+// ---------------------------------------------------------------------------
+// IVR prompts — built from locale "ivr.*" keys
+// ---------------------------------------------------------------------------
+
+/** IVR self-announcement prompts keyed by language code. */
+export const IVR_PROMPTS: Record<string, string> = {}
+
+/** "For more languages, press [N]" keyed by language code. */
+export const IVR_MORE_PROMPTS: Record<string, string> = {}
+
+/** "To go back, press 0" keyed by language code. */
+export const IVR_BACK_PROMPTS: Record<string, string> = {}
+
+for (const lang of LANGUAGE_CODES) {
+  const self = getLocaleString(lang, 'ivr.selfAnnouncement')
+  if (self) IVR_PROMPTS[lang] = self
+
+  const more = getLocaleString(lang, 'ivr.moreLanguages')
+  if (more) IVR_MORE_PROMPTS[lang] = more
+
+  const back = getLocaleString(lang, 'ivr.goBack')
+  if (back) IVR_BACK_PROMPTS[lang] = back
 }
+
+// ---------------------------------------------------------------------------
+// Voicemail thanks — built from locale "voice.voicemailThanks" key
+// ---------------------------------------------------------------------------
 
 /** Voicemail "thank you" messages, keyed by language code. */
-export const VOICEMAIL_THANKS: Record<string, string> = {
-  en: 'Thank you for your message. Goodbye.',
-  es: 'Gracias por su mensaje. Adiós.',
-  zh: '感谢您的留言。再见。',
-  tl: 'Salamat sa iyong mensahe. Paalam.',
-  vi: 'Cảm ơn tin nhắn của bạn. Tạm biệt.',
-  ar: 'شكراً لرسالتك. مع السلامة.',
-  fr: 'Merci pour votre message. Au revoir.',
-  ht: 'Mèsi pou mesaj ou. Orevwa.',
-  ko: '메시지를 남겨 주셔서 감사합니다. 안녕히 계세요.',
-  ru: 'Спасибо за ваше сообщение. До свидания.',
-  hi: 'आपके संदेश के लिए धन्यवाद। अलविदा।',
-  pt: 'Obrigado pela sua mensagem. Até logo.',
-  de: 'Vielen Dank für Ihre Nachricht. Auf Wiederhören.',
-  uk: 'Дякуємо за ваше повідомлення. До побачення.',
-  fa: 'از پیام شما سپاسگزاریم. خداحافظ.',
-  tr: 'Mesajınız için teşekkür ederiz. Hoşça kalın.',
-  ku: 'Spas ji bo peyama we. Bi xatirê te.',
-  so: 'Waad ku mahadsan tahay fariintaada. Nabad gelyo.',
-  am: 'ለመልእክትዎ እናመሰግናለን። ቸር ይግጠምዎ።',
-  my: 'သင့်မက်ဆေ့ချ်အတွက် ကျေးဇူးတင်ပါသည်။ ဂုဏ်ယူပါသည်။',
-  quc: "Maltiox rech ri atzijob'äl. Chawila'.",
-  mix: 'Tàsi̱kó nuu̱ tu̱ʼun ni̱sandaá. Saá va̱ʼa.',
+export const VOICEMAIL_THANKS: Record<string, string> = {}
+
+for (const lang of LANGUAGE_CODES) {
+  const val = getLocaleString(lang, 'voice.voicemailThanks')
+  if (val) VOICEMAIL_THANKS[lang] = val
+}
+
+// ---------------------------------------------------------------------------
+// Public accessor functions (unchanged API)
+// ---------------------------------------------------------------------------
+
+/** Replace [N] placeholder in an IVR prompt with the actual digit */
+export function resolveIvrPrompt(prompt: string, digit: string): string {
+  return prompt.replace(/\[N\]/g, digit)
 }
 
 /** Get a voice prompt in the given language, falling back to English. */

@@ -2485,9 +2485,9 @@
   "inviteStatusExpired": "Expired",
   "invitesEmpty": "No invites",
   "ivr": {
-    "atLeastOne": "최소 하나의 언어가 활성화되어야 합니다",
-    "description": "발신자가 전화 메뉴에서 듣는 언어를 선택하세요.",
-    "title": "IVR 언어 메뉴"
+    "selfAnnouncement": "한국어는 [N] 번을 눌러주세요.",
+    "moreLanguages": "For more languages, press [N].",
+    "goBack": "To go back, press 0."
   },
   "ivrAudio": {
     "delete": "삭제",
@@ -4592,5 +4592,19 @@
     "registered": "Push notifications are active.",
     "registering": "Registering for push notifications…",
     "failed": "Push notification registration failed. Try again later."
+  },
+  "voice": {
+    "greeting": "{name}에 전화해 주셔서 감사합니다.",
+    "rateLimited": "현재 통화량이 많습니다. 나중에 다시 시도해 주세요.",
+    "captchaPrompt": "다음 숫자를 입력해 주세요:",
+    "captchaTimeout": "입력을 받지 못했습니다. 안녕히 계세요.",
+    "pleaseHold": "연결해 드릴 때까지 잠시만 기다려 주세요.",
+    "captchaSuccess": "감사합니다. 연결해 드릴 때까지 잠시만 기다려 주세요.",
+    "captchaFail": "전화를 연결할 수 없습니다. 안녕히 계세요.",
+    "captchaRetry": "잘못된 입력입니다. 다시 시도해 주세요.",
+    "waitMessage": "귀하의 전화는 소중합니다. 자원봉사자와 연결해 드릴 때까지 잠시만 기다려 주세요.",
+    "unavailableMessage": "죄송합니다. 현재 전화를 받을 수 있는 사람이 없습니다. 나중에 다시 시도해 주세요. 안녕히 계세요.",
+    "voicemailPrompt": "현재 전화를 받을 수 있는 사람이 없습니다. 신호음 후 메시지를 남겨주세요.",
+    "voicemailThanks": "메시지를 남겨 주셔서 감사합니다. 안녕히 계세요."
   }
 }

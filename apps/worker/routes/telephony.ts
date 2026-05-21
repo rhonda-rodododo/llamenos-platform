@@ -95,7 +95,7 @@ telephony.post('/incoming',
     return telephonyResponse(adapter.rejectCall())
   }
 
-  const { enabledLanguages } = await services.settings.getIvrLanguages()
+  const { enabledLanguages } = await services.settings.getIvrLanguages(hubId)
 
   const response = await adapter.handleLanguageMenu({
     callSid,
@@ -126,6 +126,9 @@ telephony.post('/language-selected',
   const { callSid, callerNumber, digits } = await adapter.parseLanguageWebhook(c.req.raw)
   const isAuto = url.searchParams.get('auto') === '1'
 
+  // Get hub's ordered language list for digit-to-language mapping
+  const { enabledLanguages: hubLanguages } = await services.settings.getIvrLanguages(hubId)
+
   let callerLanguage: string
   const forceLang = url.searchParams.get('forceLang')
   if (forceLang) {
@@ -133,7 +136,7 @@ telephony.post('/language-selected',
   } else if (isAuto) {
     callerLanguage = detectLanguageFromPhone(callerNumber)
   } else {
-    callerLanguage = languageFromDigit(digits) ?? detectLanguageFromPhone(callerNumber)
+    callerLanguage = languageFromDigit(digits, hubLanguages) ?? detectLanguageFromPhone(callerNumber)
   }
 
   const spamSettings = await services.settings.getSpamSettings()

@@ -236,6 +236,11 @@ export const ivrLanguagesSchema = z.looseObject({
   languages: z.array(z.string()).optional(),
 })
 
+/** Hub-scoped IVR language configuration (ordered list) */
+export const hubIvrLanguagesSchema = z.object({
+  ivrLanguages: z.array(z.string()),
+})
+
 export const setupStateSchema = z.looseObject({
   completed: z.boolean().optional(),
   step: z.string().optional(),

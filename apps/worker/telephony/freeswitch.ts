@@ -8,8 +8,8 @@ import type {
   AudioUrlMap,
 } from './adapter'
 import { SipBridgeAdapter } from './sip-bridge-adapter'
-import { IVR_LANGUAGES } from '@shared/languages'
-import { IVR_PROMPTS, getPrompt } from '@shared/voice-prompts'
+import { DEFAULT_LANGUAGE, ivrIndexToDigit } from '@shared/languages'
+import { IVR_PROMPTS, IVR_MORE_PROMPTS, getPrompt, resolveIvrPrompt } from '@shared/voice-prompts'
 
 /**
  * FreeSwitchAdapter — generates mod_httapi XML responses for FreeSWITCH.
@@ -88,11 +88,10 @@ export class FreeSwitchAdapter extends SipBridgeAdapter {
   // --- IVR / Call flow ---
 
   async handleLanguageMenu(params: LanguageMenuParams): Promise<TelephonyResponse> {
-    const { enabledLanguages, hubId } = params
-    const activeLanguages = IVR_LANGUAGES.filter((code) => enabledLanguages.includes(code))
+    const { enabledLanguages: languages, hubId } = params
 
-    if (activeLanguages.length <= 1) {
-      const lang = activeLanguages[0] || 'en'
+    if (languages.length <= 1) {
+      const lang = languages[0] || DEFAULT_LANGUAGE
       const setVars = [
         `\n    <execute application="set" data="caller_lang=${escapeXml(lang)}"/>`,
         `\n    <execute application="set" data="call_phase=language_selected"/>`,
@@ -108,11 +107,21 @@ export class FreeSwitchAdapter extends SipBridgeAdapter {
     }
 
     let promptXml = ''
-    for (const langCode of IVR_LANGUAGES) {
-      if (!enabledLanguages.includes(langCode)) continue
-      const prompt = IVR_PROMPTS[langCode]
-      if (!prompt) continue
-      promptXml += this.fsSpeak(prompt, langCode)
+    if (languages.length > 9) {
+      const mainMenu = languages.slice(0, 8)
+      for (let i = 0; i < mainMenu.length; i++) {
+        const prompt = IVR_PROMPTS[mainMenu[i]]
+        if (!prompt) continue
+        promptXml += this.fsSpeak(resolveIvrPrompt(prompt, String(i + 1)), mainMenu[i])
+      }
+      const morePrompt = IVR_MORE_PROMPTS[languages[0]] || IVR_MORE_PROMPTS['en']
+      promptXml += this.fsSpeak(resolveIvrPrompt(morePrompt, '9'), 'en')
+    } else {
+      for (let i = 0; i < languages.length; i++) {
+        const prompt = IVR_PROMPTS[languages[i]]
+        if (!prompt) continue
+        promptXml += this.fsSpeak(resolveIvrPrompt(prompt, ivrIndexToDigit(i)), languages[i])
+      }
     }
 
     const callbackUrl = this.buildCallbackUrl('/api/telephony/language-selected', hubId)

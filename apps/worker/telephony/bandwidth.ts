@@ -18,9 +18,9 @@ import type {
 } from './adapter'
 import {
   DEFAULT_LANGUAGE,
-  IVR_LANGUAGES,
+  ivrIndexToDigit,
 } from '@shared/languages'
-import { IVR_PROMPTS, getPrompt, getVoicemailThanks } from '@shared/voice-prompts'
+import { IVR_PROMPTS, IVR_MORE_PROMPTS, getPrompt, getVoicemailThanks, resolveIvrPrompt } from '@shared/voice-prompts'
 
 /**
  * Bandwidth voice language codes, keyed by ISO 639-1.
@@ -118,29 +118,41 @@ export class BandwidthAdapter implements TelephonyAdapter {
   // --- IVR Methods ---
 
   async handleLanguageMenu(params: LanguageMenuParams): Promise<TelephonyResponse> {
-    const enabled = params.enabledLanguages
+    const languages = params.enabledLanguages
     const hp = hubXmlParam(params.hubId)
-    const activeLanguages = IVR_LANGUAGES.filter((code) => enabled.includes(code))
 
-    if (activeLanguages.length <= 1) {
-      const lang = activeLanguages[0] || DEFAULT_LANGUAGE
+    if (languages.length <= 1) {
+      const lang = languages[0] || DEFAULT_LANGUAGE
       return this.bxml(`
         <Redirect redirectUrl="/api/telephony/language-selected?auto=1&amp;forceLang=${lang}${hp}"/>
       `)
     }
 
-    const speakElements = IVR_LANGUAGES.map((langCode) => {
-      if (!enabled.includes(langCode)) return ''
-      const { locale, gender } = getBandwidthVoice(langCode)
-      const prompt = IVR_PROMPTS[langCode]
-      if (!prompt) return ''
-      return `<SpeakSentence locale="${locale}" gender="${gender}">${prompt}</SpeakSentence>`
-    })
-      .filter(Boolean)
-      .join('\n      ')
+    const hubParam = params.hubId ? `?hub=${escapeXml(encodeURIComponent(params.hubId))}` : ''
+    let speakElements: string
+
+    if (languages.length > 9) {
+      const mainMenu = languages.slice(0, 8)
+      speakElements = mainMenu.map((langCode, i) => {
+        const { locale, gender } = getBandwidthVoice(langCode)
+        const prompt = IVR_PROMPTS[langCode]
+        if (!prompt) return ''
+        return `<SpeakSentence locale="${locale}" gender="${gender}">${escapeXml(resolveIvrPrompt(prompt, String(i + 1)))}</SpeakSentence>`
+      }).filter(Boolean).join('\n      ')
+      const morePrompt = IVR_MORE_PROMPTS[languages[0]] || IVR_MORE_PROMPTS['en']
+      const { locale: enLocale, gender: enGender } = getBandwidthVoice('en')
+      speakElements += `\n      <SpeakSentence locale="${enLocale}" gender="${enGender}">${escapeXml(resolveIvrPrompt(morePrompt, '9'))}</SpeakSentence>`
+    } else {
+      speakElements = languages.map((langCode, i) => {
+        const { locale, gender } = getBandwidthVoice(langCode)
+        const prompt = IVR_PROMPTS[langCode]
+        if (!prompt) return ''
+        return `<SpeakSentence locale="${locale}" gender="${gender}">${escapeXml(resolveIvrPrompt(prompt, ivrIndexToDigit(i)))}</SpeakSentence>`
+      }).filter(Boolean).join('\n      ')
+    }
 
     return this.bxml(`
-      <Gather maxDigits="1" gatherUrl="/api/telephony/language-selected${params.hubId ? `?hub=${escapeXml(encodeURIComponent(params.hubId))}` : ''}" firstDigitTimeout="8" repeatCount="1">
+      <Gather maxDigits="1" gatherUrl="/api/telephony/language-selected${hubParam}" firstDigitTimeout="8" repeatCount="1">
         ${speakElements}
       </Gather>
       <Redirect redirectUrl="/api/telephony/language-selected?auto=1${hp}"/>

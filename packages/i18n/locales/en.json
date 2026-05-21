@@ -1182,10 +1182,7 @@
     "unassign": "Unassign",
     "unassignError": "Failed to unassign",
     "unassigned": "Unassigned",
-    "updated": "Updated",
-    "error": {
-      "noKey": "Encryption key not available"
-    }
+    "updated": "Updated"
   },
   "channels": {
     "a2p": {
@@ -2430,9 +2427,16 @@
   "inviteStatusExpired": "Expired",
   "invitesEmpty": "No invites",
   "ivr": {
-    "atLeastOne": "At least one language must be enabled",
-    "description": "Choose which languages callers hear in the phone menu. Disabled languages are skipped; digit mappings stay fixed.",
-    "title": "IVR Language Menu"
+    "selfAnnouncement": "For English, press [N].",
+    "moreLanguages": "For more languages, press [N].",
+    "goBack": "To go back, press 0.",
+    "title": "IVR Language Menu",
+    "description": "Configure which languages callers can select from via keypad.",
+    "enabledLanguages": "Enabled languages (ordered)",
+    "subMenu": "sub-menu",
+    "subMenuNote": "Languages after position 8 are in a sub-menu (caller presses 9 for more).",
+    "availableLanguages": "Available languages",
+    "atLeastOne": "At least one language must be enabled."
   },
   "ivrAudio": {
     "delete": "Delete",
@@ -3141,12 +3145,7 @@
       "titlePlaceholder": "Brief description of the report"
     },
     "untitled": "Untitled Report",
-    "validationErrors": "Please fix the errors above before submitting.",
-    "fileEncrypting": "Encrypting...",
-    "fileUploaded": "Encrypted & uploaded",
-    "fileSelect": "Select file...",
-    "fileE2ee": "Files are encrypted before upload",
-    "fileAccessDenied": "Cannot access this file"
+    "validationErrors": "Please fix the errors above before submitting."
   },
   "reportLinks": {
     "alreadyLinked": "This report is already linked to this case.",
@@ -4622,5 +4621,19 @@
       "sessionNotFound": "Session not found",
       "deviceLocked": "Device must be unlocked"
     }
+  },
+  "voice": {
+    "greeting": "Thank you for calling {name}.",
+    "rateLimited": "We are currently experiencing high call volume. Please try again later.",
+    "captchaPrompt": "Please enter the following digits:",
+    "captchaTimeout": "We did not receive your input. Goodbye.",
+    "pleaseHold": "Please hold while we connect you.",
+    "captchaSuccess": "Thank you. Please hold while we connect you.",
+    "captchaFail": "We are unable to connect your call. Goodbye.",
+    "captchaRetry": "That was incorrect. Please try again.",
+    "waitMessage": "Your call is important to us. Please hold while we connect you with a volunteer.",
+    "unavailableMessage": "We are sorry, no one is available to take your call at this time. Please try again later. Goodbye.",
+    "voicemailPrompt": "No one is available to take your call right now. Please leave a message after the tone and we will get back to you.",
+    "voicemailThanks": "Thank you for your message. Goodbye."
   }
 }

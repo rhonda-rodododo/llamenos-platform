@@ -2485,9 +2485,9 @@
   "inviteStatusExpired": "Expired",
   "invitesEmpty": "No invites",
   "ivr": {
-    "atLeastOne": "至少需要启用一种语言",
-    "description": "选择来电者在电话菜单中听到的语言。已禁用的语言将被跳过。",
-    "title": "IVR语言菜单"
+    "selfAnnouncement": "如需中文服务，请按[N]。",
+    "moreLanguages": "For more languages, press [N].",
+    "goBack": "To go back, press 0."
   },
   "ivrAudio": {
     "delete": "删除",
@@ -4592,5 +4592,19 @@
     "registered": "Push notifications are active.",
     "registering": "Registering for push notifications…",
     "failed": "Push notification registration failed. Try again later."
+  },
+  "voice": {
+    "greeting": "感谢您致电{name}。",
+    "rateLimited": "我们目前通话量较大，请稍后再试。",
+    "captchaPrompt": "请输入以下数字：",
+    "captchaTimeout": "我们未收到您的输入。再见。",
+    "pleaseHold": "请稍候，我们正在为您转接。",
+    "captchaSuccess": "谢谢。请稍候，我们正在为您转接。",
+    "captchaFail": "我们无法接通您的电话。再见。",
+    "captchaRetry": "输入不正确，请重试。",
+    "waitMessage": "您的来电对我们非常重要。请稍候，我们正在为您转接志愿者。",
+    "unavailableMessage": "抱歉，目前没有人可以接听您的电话。请稍后再试。再见。",
+    "voicemailPrompt": "目前没有人能接听您的电话。请在提示音后留言，我们会尽快回复您。",
+    "voicemailThanks": "感谢您的留言。再见。"
   }
 }

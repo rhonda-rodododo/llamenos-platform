@@ -2485,9 +2485,9 @@
   "inviteStatusExpired": "Expired",
   "invitesEmpty": "No invites",
   "ivr": {
-    "atLeastOne": "Pelo menos um idioma deve estar ativado",
-    "description": "Escolha quais idiomas os chamadores ouvem no menu telefônico.",
-    "title": "Menu de idiomas IVR"
+    "selfAnnouncement": "Para português, pressione [N].",
+    "moreLanguages": "For more languages, press [N].",
+    "goBack": "To go back, press 0."
   },
   "ivrAudio": {
     "delete": "Excluir",
@@ -4592,5 +4592,19 @@
     "registered": "Push notifications are active.",
     "registering": "Registering for push notifications…",
     "failed": "Push notification registration failed. Try again later."
+  },
+  "voice": {
+    "greeting": "Obrigado por ligar para {name}.",
+    "rateLimited": "Estamos com um alto volume de chamadas. Por favor, tente novamente mais tarde.",
+    "captchaPrompt": "Por favor, digite os seguintes números:",
+    "captchaTimeout": "Não recebemos sua entrada. Até logo.",
+    "pleaseHold": "Por favor, aguarde enquanto conectamos você.",
+    "captchaSuccess": "Obrigado. Por favor, aguarde enquanto conectamos você.",
+    "captchaFail": "Não conseguimos conectar sua chamada. Até logo.",
+    "captchaRetry": "Isso estava incorreto. Por favor, tente novamente.",
+    "waitMessage": "Sua chamada é importante para nós. Por favor, aguarde enquanto conectamos você com um voluntário.",
+    "unavailableMessage": "Desculpe, não há ninguém disponível para atender sua ligação no momento. Por favor, tente novamente mais tarde. Adeus.",
+    "voicemailPrompt": "Ninguém está disponível para atender sua ligação no momento. Por favor, deixe uma mensagem após o sinal.",
+    "voicemailThanks": "Obrigado pela sua mensagem. Até logo."
   }
 }

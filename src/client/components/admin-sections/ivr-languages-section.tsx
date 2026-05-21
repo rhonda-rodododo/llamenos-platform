@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '@/lib/toast'
-import { getIvrLanguages } from '@/lib/api'
+import { getIvrLanguages, getActiveHub } from '@/lib/api'
 import { IvrLanguagesSection as IvrLanguagesSectionInner } from '@/components/admin-settings/ivr-languages-section'
 import { IVR_LANGUAGES } from '@shared/languages'
 
@@ -10,13 +10,14 @@ export function IvrLanguagesSection() {
   const { toast } = useToast()
   const [enabled, setEnabled] = useState<string[]>([...IVR_LANGUAGES])
   const [loading, setLoading] = useState(true)
+  const hubId = getActiveHub() ?? undefined
 
   useEffect(() => {
-    getIvrLanguages()
+    getIvrLanguages(hubId)
       .then(r => setEnabled(r.enabledLanguages))
       .catch(() => toast(t('common.error'), 'error'))
       .finally(() => setLoading(false))
-  }, [])
+  }, [hubId])
 
   if (loading) return <div className="text-muted-foreground">{t('common.loading')}</div>
 
@@ -29,6 +30,7 @@ export function IvrLanguagesSection() {
       expanded={true}
       onToggle={() => {}}
       statusSummary={statusSummary}
+      hubId={hubId}
     />
   )
 }

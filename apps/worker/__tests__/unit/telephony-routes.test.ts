@@ -249,6 +249,9 @@ describe('Telephony routes', () => {
 
   describe('POST /language-selected', () => {
     it('returns enqueue response for normal call', async () => {
+      // parseLanguageWebhook is mocked — override to return digit '2' matching the body.
+      // With hub languages ['en', 'es'], digit '2' (index 1) resolves to 'es'.
+      adapter.parseLanguageWebhook = vi.fn().mockResolvedValue({ callSid: 'CA-lang', callerNumber: '+15551111111', digits: '2' })
       const app = await createTestApp(adapter, services)
       const res = await app.request('/api/telephony/language-selected?hub=hub-1', {
         method: 'POST',

@@ -18,9 +18,9 @@ import type {
 } from './adapter'
 import {
   DEFAULT_LANGUAGE,
-  IVR_LANGUAGES,
+  ivrIndexToDigit,
 } from '@shared/languages'
-import { IVR_PROMPTS, getPrompt, getVoicemailThanks } from '@shared/voice-prompts'
+import { IVR_PROMPTS, IVR_MORE_PROMPTS, getPrompt, getVoicemailThanks, resolveIvrPrompt } from '@shared/voice-prompts'
 
 /**
  * Vonage voice language codes, keyed by ISO 639-1.
@@ -118,18 +118,13 @@ export class VonageAdapter implements TelephonyAdapter {
   }
 
   async handleLanguageMenu(params: LanguageMenuParams): Promise<TelephonyResponse> {
-    const enabled = params.enabledLanguages
+    const languages = params.enabledLanguages
     const hp = hubQP(params.hubId)
-    const activeLanguages = IVR_LANGUAGES.filter(code => enabled.includes(code))
 
-    if (activeLanguages.length <= 1) {
-      const lang = activeLanguages[0] || DEFAULT_LANGUAGE
-      // Redirect by returning NCCO that fetches from the language-selected endpoint
+    if (languages.length <= 1) {
+      const lang = languages[0] || DEFAULT_LANGUAGE
       return this.ncco([
-        {
-          action: 'talk',
-          text: ' ',
-        },
+        { action: 'talk', text: ' ' },
         {
           action: 'notify',
           payload: { lang, auto: true },
@@ -139,13 +134,23 @@ export class VonageAdapter implements TelephonyAdapter {
       ])
     }
 
-    // Build talk actions for each enabled language
     const talkActions: Record<string, unknown>[] = []
-    for (const langCode of IVR_LANGUAGES) {
-      if (!enabled.includes(langCode)) continue
-      const prompt = IVR_PROMPTS[langCode]
-      if (!prompt) continue
-      talkActions.push(talk(prompt, langCode, true))
+
+    if (languages.length > 9) {
+      const mainMenu = languages.slice(0, 8)
+      for (let i = 0; i < mainMenu.length; i++) {
+        const prompt = IVR_PROMPTS[mainMenu[i]]
+        if (!prompt) continue
+        talkActions.push(talk(resolveIvrPrompt(prompt, String(i + 1)), mainMenu[i], true))
+      }
+      const morePrompt = IVR_MORE_PROMPTS[languages[0]] || IVR_MORE_PROMPTS['en']
+      talkActions.push(talk(resolveIvrPrompt(morePrompt, '9'), 'en', true))
+    } else {
+      for (let i = 0; i < languages.length; i++) {
+        const prompt = IVR_PROMPTS[languages[i]]
+        if (!prompt) continue
+        talkActions.push(talk(resolveIvrPrompt(prompt, ivrIndexToDigit(i)), languages[i], true))
+      }
     }
 
     return this.ncco([
