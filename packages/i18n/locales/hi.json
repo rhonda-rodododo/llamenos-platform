@@ -2485,13 +2485,9 @@
   "inviteStatusExpired": "Expired",
   "invitesEmpty": "No invites",
   "ivr": {
-    "atLeastOne": "कम से कम एक भाषा सक्षम होनी चाहिए",
-    "description": "चुनें कि कॉल करने वाले फ़ोन मेनू में कौन सी भाषाएं सुनें।",
-    "title": "IVR भाषा मेनू",
-    "availableLanguages": "Available languages",
-    "enabledLanguages": "Enabled languages (ordered)",
-    "subMenu": "sub-menu",
-    "subMenuNote": "Languages after position 8 are in a sub-menu (caller presses 9 for more)."
+    "selfAnnouncement": "हिन्दी के लिए, [N] दबाएँ।",
+    "moreLanguages": "For more languages, press [N].",
+    "goBack": "To go back, press 0."
   },
   "ivrAudio": {
     "delete": "हटाएं",
@@ -4596,5 +4592,19 @@
     "registered": "Push notifications are active.",
     "registering": "Registering for push notifications…",
     "failed": "Push notification registration failed. Try again later."
+  },
+  "voice": {
+    "greeting": "{name} पर कॉल करने के लिए धन्यवाद।",
+    "rateLimited": "वर्तमान में कॉल की संख्या अधिक है। कृपया बाद में पुनः प्रयास करें।",
+    "captchaPrompt": "कृपया निम्नलिखित अंक दर्ज करें:",
+    "captchaTimeout": "हमें आपका इनपुट नहीं मिला। अलविदा।",
+    "pleaseHold": "कृपया प्रतीक्षा करें, हम आपको कनेक्ट कर रहे हैं।",
+    "captchaSuccess": "धन्यवाद। कृपया प्रतीक्षा करें, हम आपको कनेक्ट कर रहे हैं।",
+    "captchaFail": "हम आपकी कॉल कनेक्ट नहीं कर पा रहे हैं। अलविदा।",
+    "captchaRetry": "यह गलत था। कृपया पुनः प्रयास करें।",
+    "waitMessage": "आपकी कॉल हमारे लिए महत्वपूर्ण है। कृपया प्रतीक्षा करें, हम आपको एक स्वयंसेवक से जोड़ रहे हैं।",
+    "unavailableMessage": "क्षमा करें, इस समय आपकी कॉल लेने के लिए कोई उपलब्ध नहीं है। कृपया बाद में पुनः प्रयास करें। अलविदा।",
+    "voicemailPrompt": "इस समय आपकी कॉल लेने के लिए कोई उपलब्ध नहीं है। कृपया बीप के बाद एक संदेश छोड़ें।",
+    "voicemailThanks": "आपके संदेश के लिए धन्यवाद। अलविदा।"
   }
 }

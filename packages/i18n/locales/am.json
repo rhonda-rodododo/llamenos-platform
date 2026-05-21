@@ -731,9 +731,9 @@
     "yourHubs": "Your Hubs"
   },
   "ivr": {
-    "atLeastOne": "ቢያንስ አንድ ቋንቋ መነቃት አለበት",
-    "description": "ደዋዮች በስልክ ምናሌ ውስጥ የሚሰሙትን ቋንቋዎች ይምረጡ። የተሰናከሉ ቋንቋዎች ይዘለላሉ፤ የአሃዝ ካርታዎች ቋሚ ናቸው።",
-    "title": "የ IVR ቋንቋ ምናሌ"
+    "selfAnnouncement": "አማርኛ ለ፣ [N] ይጫኑ።",
+    "moreLanguages": "For more languages, press [N].",
+    "goBack": "To go back, press 0."
   },
   "ivrAudio": {
     "delete": "ሰርዝ",
@@ -4608,5 +4608,19 @@
   "yourPrivateKey": "Your Private Key",
   "adminEntityTypes": {
     "title": "Entity Types"
+  },
+  "voice": {
+    "greeting": "{name} ስለደወሉ እናመሰግናለን።",
+    "rateLimited": "በአሁኑ ጊዜ ብዙ ጥሪዎች እየመጡ ናቸው። እባክዎ ቆየት ብለው ይሞክሩ።",
+    "captchaPrompt": "እባክዎ የሚከተሉትን ቁጥሮች ያስገቡ:",
+    "captchaTimeout": "ያስገቡትን አልተቀበልንም። ቸር ይግጠምዎ።",
+    "pleaseHold": "እባክዎ እንዲገናኙ እስኪያደርጉ ድረስ ይጠብቁ።",
+    "captchaSuccess": "አመሰግናለሁ። እባክዎ እንዲገናኙ እስኪያደርጉ ድረስ ይጠብቁ።",
+    "captchaFail": "ጥሪዎን ማገናኘት አልቻልንም። ቸር ይግጠምዎ።",
+    "captchaRetry": "ትክክል አልነበረም። እባክዎ እንደገና ይሞክሩ።",
+    "waitMessage": "ጥሪዎ ለእኛ ጠቃሚ ነው። እባክዎ ከበጎ ፈቃደኛ ጋር እስኪገናኙ ድረስ ይጠብቁ።",
+    "unavailableMessage": "ይቅርታ፣ በአሁኑ ጊዜ ጥሪዎን ለመቀበል ማንም የለም። እባክዎ ቆየት ብለው ይሞክሩ። ቸር ይግጠምዎ።",
+    "voicemailPrompt": "በአሁኑ ጊዜ ጥሪዎን ለመቀበል ማንም የለም። እባክዎ ከድምፅ ምልክቱ በኋላ መልእክት ይተዉ።",
+    "voicemailThanks": "ለመልእክትዎ እናመሰግናለን። ቸር ይግጠምዎ።"
   }
 }

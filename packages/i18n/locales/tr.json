@@ -731,9 +731,9 @@
     "yourHubs": "Your Hubs"
   },
   "ivr": {
-    "atLeastOne": "En az bir dil etkinleştirilmelidir",
-    "description": "Arayanların telefon menüsünde hangi dilleri duyacağını seçin. Devre dışı bırakılan diller atlanır; tuş atamaları sabit kalır.",
-    "title": "IVR Dil Menüsü"
+    "selfAnnouncement": "Türkçe için [N] tuşuna basın.",
+    "moreLanguages": "For more languages, press [N].",
+    "goBack": "To go back, press 0."
   },
   "ivrAudio": {
     "delete": "Sil",
@@ -4608,5 +4608,19 @@
   "yourPrivateKey": "Your Private Key",
   "adminEntityTypes": {
     "title": "Entity Types"
+  },
+  "voice": {
+    "greeting": "{name} aramanız için teşekkür ederiz.",
+    "rateLimited": "Şu anda yoğun çağrı hacmi yaşıyoruz. Lütfen daha sonra tekrar deneyin.",
+    "captchaPrompt": "Lütfen aşağıdaki rakamları girin:",
+    "captchaTimeout": "Girişinizi alamadık. Hoşça kalın.",
+    "pleaseHold": "Sizi bağlarken lütfen bekleyin.",
+    "captchaSuccess": "Teşekkürler. Sizi bağlarken lütfen bekleyin.",
+    "captchaFail": "Aramanızı bağlayamıyoruz. Hoşça kalın.",
+    "captchaRetry": "Yanlış giriş. Lütfen tekrar deneyin.",
+    "waitMessage": "Aramanız bizim için önemlidir. Sizi bir gönüllüye bağlarken lütfen bekleyin.",
+    "unavailableMessage": "Üzgünüz, şu anda aramanızı yanıtlayacak kimse yok. Lütfen daha sonra tekrar deneyin. Hoşça kalın.",
+    "voicemailPrompt": "Şu anda aramanızı yanıtlayacak kimse yok. Lütfen sinyal sesinden sonra mesajınızı bırakın.",
+    "voicemailThanks": "Mesajınız için teşekkür ederiz. Hoşça kalın."
   }
 }

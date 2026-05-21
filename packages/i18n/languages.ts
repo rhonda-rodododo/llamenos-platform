@@ -7,9 +7,8 @@
  *
  * To add a new language:
  * 1. Add entry here with all fields
- * 2. Create src/client/locales/{code}.json with all translation keys
- * 3. Import and register it in src/client/lib/i18n.ts
- * 4. Add voice prompts in src/shared/voice-prompts.ts
+ * 2. Create packages/i18n/locales/{code}.json with all translation keys (including voice.* and ivr.*)
+ * 3. Import and register it in src/client/lib/i18n.ts and packages/i18n/index.ts
  */
 
 export interface LanguageConfig {

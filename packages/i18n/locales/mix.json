@@ -731,9 +731,9 @@
     "yourHubs": "Your Hubs"
   },
   "ivr": {
-    "atLeastOne": "Xíni̱ñúꞌú lo menos iin tu̱ꞌun xíni̱ñúꞌú",
-    "description": "Kaji ndáa tu̱ꞌun kúni̱ñúꞌú ña̱yivi kána nu̱ú menú teléfono. Tu̱ꞌun tási ña kúu; número ña nasama.",
-    "title": "Menú de Tu̱ꞌun IVR"
+    "selfAnnouncement": "Tu'un savi ndáto, chu̱ʼun [N].",
+    "moreLanguages": "For more languages, press [N].",
+    "goBack": "To go back, press 0."
   },
   "ivrAudio": {
     "delete": "Xíta",
@@ -4608,5 +4608,19 @@
   "yourPrivateKey": "Your Private Key",
   "adminEntityTypes": {
     "title": "Entity Types"
+  },
+  "voice": {
+    "greeting": "Tàsi̱kó nuu̱ ni̱ ni̱ka̱ʼa̱n nuu̱ {name}.",
+    "rateLimited": "Vi̱ʼi̱ kua̱ʼa̱ nuu̱ ni̱ka̱ʼa̱n. Koto naní inka̱ʼa̱n inka tuku.",
+    "captchaPrompt": "Koto chu̱ʼun número yóʼo:",
+    "captchaTimeout": "Ña kúu ni̱kiʼin nuu̱ ni̱chu̱ʼun. Saá va̱ʼa.",
+    "pleaseHold": "Koto kuñuʼún nuu̱ na̱ʼá nda̱tu̱ʼún.",
+    "captchaSuccess": "Tàsi̱kó. Koto kuñuʼún nuu̱ na̱ʼá nda̱tu̱ʼún.",
+    "captchaFail": "Ña kúu nda̱tu̱ʼún nuu̱ ni̱ka̱ʼa̱n. Saá va̱ʼa.",
+    "captchaRetry": "Ña va̱ʼa. Koto inka̱ʼa̱n inka tuku.",
+    "waitMessage": "Nuu̱ ni̱ka̱ʼa̱n kúu iin ndívi̱. Koto kuñuʼún nuu̱ na̱ʼá nda̱tu̱ʼún xíʼín ñivi̱ chíndeé.",
+    "unavailableMessage": "Ndúʼú va̱ʼa, ña íyo ñivi̱ kaʼví nuu̱ ni̱ka̱ʼa̱n vitin. Koto naní inka̱ʼa̱n inka tuku. Saá va̱ʼa.",
+    "voicemailPrompt": "Ña íyo ñivi̱ kaʼví nuu̱ ni̱ka̱ʼa̱n vitin. Koto sandaá iin tu̱ʼun saá ndi̱kaa̱ tono.",
+    "voicemailThanks": "Tàsi̱kó nuu̱ tu̱ʼun ni̱sandaá. Saá va̱ʼa."
   }
 }

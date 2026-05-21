@@ -731,9 +731,9 @@
     "yourHubs": "Your Hubs"
   },
   "ivr": {
-    "atLeastOne": "Rajawaxik jun ch'ab'al jaqatal",
-    "description": "Tacha' achike taq ch'ab'al keta'maj ri oyonela' pa ri ucholajil teléfono. Ri tztapital taq ch'ab'al ketzaqix; ri taq ajilab'al man kejalwachix ta.",
-    "title": "Ucholajil Ch'ab'al IVR"
+    "selfAnnouncement": "Pa K'iche', tzukutij [N].",
+    "moreLanguages": "For more languages, press [N].",
+    "goBack": "To go back, press 0."
   },
   "ivrAudio": {
     "delete": "Tiyuj",
@@ -4608,5 +4608,19 @@
   "yourPrivateKey": "Your Private Key",
   "adminEntityTypes": {
     "title": "Entity Types"
+  },
+  "voice": {
+    "greeting": "Maltiox rech ri ach'ab'al pa {name}.",
+    "rateLimited": "K'o k'ïy taq oyonem kamik. Tab'ana' chi'l achajij jun chik mul.",
+    "captchaPrompt": "Tab'ana' tatz'ib'aj ri ajilab'äl re':",
+    "captchaTimeout": "Man xqak'ül ta ri atz'ib'anïk. Chawila'.",
+    "pleaseHold": "Tab'ana' choyob'a' ka qak'äm awäch.",
+    "captchaSuccess": "Maltiox. Tab'ana' choyob'a' ka qak'äm awäch.",
+    "captchaFail": "Man xojtajïk ta ri oyonem. Chawila'.",
+    "captchaRetry": "Man ütz ta ri'. Tab'ana' tachajij chik.",
+    "waitMessage": "Nïm uq'ij ri oyonem awäch chiqawäch. Tab'ana' choyob'a' ka qak'äm awäch rik'in jun to'onël.",
+    "unavailableMessage": "Kojonik, man k'o ta jun chik chuyak' ri oyonem awäch wakami. Tab'ana' tachajij jun chik mul. Chawila'.",
+    "voicemailPrompt": "Man k'o ta jun chik chuyak' ri oyonem awäch wakami. Tab'ana' taya' jun tzijob'äl chirij ri ch'ab'äl.",
+    "voicemailThanks": "Maltiox rech ri atzijob'äl. Chawila'."
   }
 }

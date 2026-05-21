@@ -2485,13 +2485,9 @@
   "inviteStatusExpired": "Expired",
   "invitesEmpty": "No invites",
   "ivr": {
-    "atLeastOne": "Omwen yon lang dwe aktive",
-    "description": "Chwazi ki lang moun k ap rele yo tande nan meni telefòn nan.",
-    "title": "Meni lang IVR",
-    "availableLanguages": "Available languages",
-    "enabledLanguages": "Enabled languages (ordered)",
-    "subMenu": "sub-menu",
-    "subMenuNote": "Languages after position 8 are in a sub-menu (caller presses 9 for more)."
+    "selfAnnouncement": "Pou Kreyòl, peze [N].",
+    "moreLanguages": "For more languages, press [N].",
+    "goBack": "To go back, press 0."
   },
   "ivrAudio": {
     "delete": "Efase",
@@ -4596,5 +4592,19 @@
     "registered": "Push notifications are active.",
     "registering": "Registering for push notifications…",
     "failed": "Push notification registration failed. Try again later."
+  },
+  "voice": {
+    "greeting": "Mèsi paske ou rele {name}.",
+    "rateLimited": "Nou gen anpil apèl kounye a. Tanpri eseye ankò pita.",
+    "captchaPrompt": "Tanpri antre chif sa yo:",
+    "captchaTimeout": "Nou pa resevwa repons ou. Orevwa.",
+    "pleaseHold": "Tanpri tann pandan n ap konekte ou.",
+    "captchaSuccess": "Mèsi. Tanpri tann pandan n ap konekte ou.",
+    "captchaFail": "Nou pa ka konekte apèl ou. Orevwa.",
+    "captchaRetry": "Sa pa kòrèk. Tanpri eseye ankò.",
+    "waitMessage": "Apèl ou enpòtan pou nou. Tanpri tann pandan n ap konekte ou ak yon volontè.",
+    "unavailableMessage": "Nou regrèt, pa gen moun disponib pou reponn apèl ou a kounye a. Tanpri eseye ankò pita. Orevwa.",
+    "voicemailPrompt": "Pa gen moun disponib pou pran apèl ou kounye a. Tanpri kite yon mesaj apre son an.",
+    "voicemailThanks": "Mèsi pou mesaj ou. Orevwa."
   }
 }

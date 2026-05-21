@@ -2485,13 +2485,9 @@
   "inviteStatusExpired": "Expired",
   "invitesEmpty": "No invites",
   "ivr": {
-    "atLeastOne": "يجب تفعيل لغة واحدة على الأقل",
-    "description": "اختر اللغات التي يسمعها المتصلون في قائمة الهاتف.",
-    "title": "قائمة لغات IVR",
-    "availableLanguages": "Available languages",
-    "enabledLanguages": "Enabled languages (ordered)",
-    "subMenu": "sub-menu",
-    "subMenuNote": "Languages after position 8 are in a sub-menu (caller presses 9 for more)."
+    "selfAnnouncement": "للعربية، اضغط [N].",
+    "moreLanguages": "For more languages, press [N].",
+    "goBack": "To go back, press 0."
   },
   "ivrAudio": {
     "delete": "حذف",
@@ -4596,5 +4592,19 @@
     "registered": "Push notifications are active.",
     "registering": "Registering for push notifications…",
     "failed": "Push notification registration failed. Try again later."
+  },
+  "voice": {
+    "greeting": "شكراً لاتصالك بـ {name}.",
+    "rateLimited": "نحن نواجه حاليا حجم مكالمات كبير. يرجى المحاولة مرة أخرى لاحقا.",
+    "captchaPrompt": "يرجى إدخال الأرقام التالية:",
+    "captchaTimeout": "لم نتلق مدخلاتك. مع السلامة.",
+    "pleaseHold": "يرجى الانتظار بينما نقوم بتوصيلك.",
+    "captchaSuccess": "شكرا لك. يرجى الانتظار بينما نقوم بتوصيلك.",
+    "captchaFail": "لا يمكننا توصيل مكالمتك. مع السلامة.",
+    "captchaRetry": "هذا غير صحيح. يرجى المحاولة مرة أخرى.",
+    "waitMessage": "مكالمتك مهمة بالنسبة لنا. يرجى الانتظار بينما نقوم بتوصيلك بمتطوع.",
+    "unavailableMessage": "نأسف، لا يوجد أحد متاح للرد على مكالمتك في الوقت الحالي. يرجى المحاولة مرة أخرى لاحقاً. مع السلامة.",
+    "voicemailPrompt": "لا يوجد أحد متاح للرد على مكالمتك الآن. يرجى ترك رسالة بعد النغمة.",
+    "voicemailThanks": "شكراً لرسالتك. مع السلامة."
   }
 }

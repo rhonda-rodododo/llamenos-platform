@@ -731,9 +731,9 @@
     "yourHubs": "Your Hubs"
   },
   "ivr": {
-    "atLeastOne": "Ugu yaraan hal luqad waa in la shidaa",
-    "description": "Dooro luqadaha wacaha ku maqlo liiska taleefanka. Luqadaha la damiyay waa la ka boodo; lambarrada furaha waa ay sii jiraan.",
-    "title": "Liiska Luqadaha IVR"
+    "selfAnnouncement": "Soomaaliga, taabo [N].",
+    "moreLanguages": "For more languages, press [N].",
+    "goBack": "To go back, press 0."
   },
   "ivrAudio": {
     "delete": "Tirtir",
@@ -4608,5 +4608,19 @@
   "yourPrivateKey": "Your Private Key",
   "adminEntityTypes": {
     "title": "Entity Types"
+  },
+  "voice": {
+    "greeting": "Waad ku mahadsan tahay waciddaada {name}.",
+    "rateLimited": "Waxaan hadda la kulmayaa wicitaano badan. Fadlan dib u isku day habeenkii dambe.",
+    "captchaPrompt": "Fadlan geli lambarada soo socda:",
+    "captchaTimeout": "Ma helin waxaad gelisay. Nabad gelyo.",
+    "pleaseHold": "Fadlan sug inta aan ku xireyno.",
+    "captchaSuccess": "Mahadsanid. Fadlan sug inta aan ku xireyno.",
+    "captchaFail": "Ma awoodno inaan ku xirno wicitaankaaga. Nabad gelyo.",
+    "captchaRetry": "Taasi waa khalad. Fadlan isku day mar kale.",
+    "waitMessage": "Wicitaankaagu waa muhiim. Fadlan sug inta aan kugu xireyno mutadawac.",
+    "unavailableMessage": "Waan ka xunnahay, hadda ma jiro cid wicitaankaaga qaadan kara. Fadlan dib u isku day habeenkii dambe. Nabad gelyo.",
+    "voicemailPrompt": "Hadda ma jiro cid wicitaankaaga qaadan kara. Fadlan ka dib fariin dhig dhawaaqa kadib.",
+    "voicemailThanks": "Waad ku mahadsan tahay fariintaada. Nabad gelyo."
   }
 }

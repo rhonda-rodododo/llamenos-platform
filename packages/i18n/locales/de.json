@@ -2485,13 +2485,9 @@
   "inviteStatusExpired": "Expired",
   "invitesEmpty": "No invites",
   "ivr": {
-    "atLeastOne": "Mindestens eine Sprache muss aktiviert sein",
-    "description": "Wählen Sie, welche Sprachen Anrufer im Telefonmenü hören.",
-    "title": "IVR-Sprachmenü",
-    "availableLanguages": "Available languages",
-    "enabledLanguages": "Enabled languages (ordered)",
-    "subMenu": "sub-menu",
-    "subMenuNote": "Languages after position 8 are in a sub-menu (caller presses 9 for more)."
+    "selfAnnouncement": "Für Deutsch, drücken Sie [N].",
+    "moreLanguages": "For more languages, press [N].",
+    "goBack": "To go back, press 0."
   },
   "ivrAudio": {
     "delete": "Löschen",
@@ -4596,5 +4592,19 @@
     "registered": "Push notifications are active.",
     "registering": "Registering for push notifications…",
     "failed": "Push notification registration failed. Try again later."
+  },
+  "voice": {
+    "greeting": "Vielen Dank für Ihren Anruf bei {name}.",
+    "rateLimited": "Wir haben derzeit ein hohes Anrufaufkommen. Bitte versuchen Sie es später erneut.",
+    "captchaPrompt": "Bitte geben Sie die folgenden Ziffern ein:",
+    "captchaTimeout": "Wir haben Ihre Eingabe nicht erhalten. Auf Wiederhören.",
+    "pleaseHold": "Bitte warten Sie, während wir Sie verbinden.",
+    "captchaSuccess": "Danke. Bitte warten Sie, während wir Sie verbinden.",
+    "captchaFail": "Wir können Ihren Anruf nicht verbinden. Auf Wiederhören.",
+    "captchaRetry": "Das war nicht korrekt. Bitte versuchen Sie es erneut.",
+    "waitMessage": "Ihr Anruf ist uns wichtig. Bitte warten Sie, während wir Sie mit einem Freiwilligen verbinden.",
+    "unavailableMessage": "Es tut uns leid, im Moment ist niemand erreichbar. Bitte versuchen Sie es später erneut. Auf Wiederhören.",
+    "voicemailPrompt": "Im Moment ist niemand verfügbar, um Ihren Anruf entgegenzunehmen. Bitte hinterlassen Sie eine Nachricht nach dem Signalton.",
+    "voicemailThanks": "Vielen Dank für Ihre Nachricht. Auf Wiederhören."
   }
 }

@@ -731,9 +731,9 @@
     "yourHubs": "Your Hubs"
   },
   "ivr": {
-    "atLeastOne": "Herî kêm divê zimanek çalak be",
-    "description": "Hilbijêre ku bangker di menuya têlefonê de kîjan zimanan bibihîzin. Zimanên neçalak têne derbaskirin; nexşeya jimareyan sabit dimîne.",
-    "title": "Menuya Zimanên IVR"
+    "selfAnnouncement": "Ji bo Kurdî, bişkoka [N] bixin.",
+    "moreLanguages": "For more languages, press [N].",
+    "goBack": "To go back, press 0."
   },
   "ivrAudio": {
     "delete": "Jê Bibe",
@@ -4608,5 +4608,19 @@
   "yourPrivateKey": "Your Private Key",
   "adminEntityTypes": {
     "title": "Entity Types"
+  },
+  "voice": {
+    "greeting": "Spas ji bo ku we li {name} telefon kir.",
+    "rateLimited": "Niha em gelek bangên telefon distînin. Ji kerema xwe paşê dîsa biceribînin.",
+    "captchaPrompt": "Ji kerema xwe jimareyên jêr binivîsin:",
+    "captchaTimeout": "Me têketina we wernegirt. Bi xatirê te.",
+    "pleaseHold": "Ji kerema xwe bisekinin dema em we girêdidin.",
+    "captchaSuccess": "Spas. Ji kerema xwe bisekinin dema em we girêdidin.",
+    "captchaFail": "Em nikarin banga we girêbidin. Bi xatirê te.",
+    "captchaRetry": "Ew ne rast bû. Ji kerema xwe dîsa biceribînin.",
+    "waitMessage": "Banga we ji bo me girîng e. Ji kerema xwe bisekinin dema em we bi dilxwazekî re girêdidin.",
+    "unavailableMessage": "Bibore, niha kes tune ku banga we bibersivîne. Ji kerema xwe paşê dîsa biceribînin. Bi xatirê te.",
+    "voicemailPrompt": "Niha kes tune ku banga we bibersivîne. Ji kerema xwe piştî dengê bîpê peyamek bihêlin.",
+    "voicemailThanks": "Spas ji bo peyama we. Bi xatirê te."
   }
 }
