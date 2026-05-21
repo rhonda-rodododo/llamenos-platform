@@ -9,7 +9,7 @@
 
 # Stage 1: Install runtime deps
 FROM oven/bun:1@sha256:e10577f0db68676a7024391c6e5cb4b879ebd17188ab750cf10024a6d700e5c4 AS deps
-# oven/bun:1 pinned 2026-03-21 — update via Dependabot or on new minor release
+# oven/bun:1 pinned 2026-05-20 — update via Dependabot or on new minor release
 WORKDIR /app
 COPY package.json bun.lockb ./
 # Copy workspace package.json stubs so bun can resolve the workspace graph from the
@@ -26,7 +26,7 @@ COPY site/package.json site/package.json
 RUN bun install --frozen-lockfile --production --ignore-scripts
 
 # Stage 2: Build Rust crypto FFI (.so)
-FROM rust:1-slim AS rust-builder
+FROM rust:1-slim@sha256:a6bc7ce698c8c1025307bd85254b697c58c466f66e83012826a1a50937142cbe AS rust-builder
 RUN apt-get update && apt-get install -y --no-install-recommends pkg-config && rm -rf /var/lib/apt/lists/*
 WORKDIR /build
 COPY packages/crypto/ packages/crypto/
@@ -36,7 +36,7 @@ RUN cargo build --release --manifest-path packages/crypto/Cargo.toml --features 
 
 # Stage 3: Production
 FROM oven/bun:1-slim@sha256:d56a2534ffd262e92c12fd3249d3924d296d97086da773f821d7d0477435ea04
-# oven/bun:1-slim pinned 2026-03-21 — update via Dependabot
+# oven/bun:1-slim pinned 2026-05-20 — update via Dependabot
 
 # Create non-root user
 RUN groupadd -r llamenos && useradd -r -g llamenos -d /app -s /sbin/nologin llamenos
