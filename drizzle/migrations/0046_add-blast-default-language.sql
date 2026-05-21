@@ -1,0 +1,1 @@
+ALTER TABLE "blasts" ADD COLUMN "default_language" text DEFAULT 'en' NOT NULL;

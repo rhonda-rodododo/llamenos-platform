@@ -3,6 +3,7 @@ import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { requirePermission } from '../middleware/permission-guard'
 import { listBlastsQuerySchema, createBlastBodySchema, updateBlastBodySchema, scheduleBlastBodySchema, importSubscribersBodySchema, updateBlastSettingsBodySchema, blastResponseSchema, subscriberStatsResponseSchema, blastSettingsResponseSchema, subscriberListResponseSchema, blastListResponseSchema, blastDeliveryListResponseSchema, importSubscribersResponseSchema, blastDeliveryResponseSchema } from '@protocol/schemas/blasts'
+import type { BlastContent, MultiBlastContent } from '@shared/types'
 import { okResponseSchema } from '@protocol/schemas/common'
 import { authErrors } from '../openapi/helpers'
 import { createLogger } from '../lib/logger'
@@ -11,6 +12,25 @@ import { publishEvent } from '../lib/ws-events'
 import { KIND_BLAST_PROGRESS } from '@shared/event-kinds'
 
 const logger = createLogger('routes.blasts')
+
+/**
+ * Convert protocol schema content (uses `body` field) to shared type content (uses `text` field).
+ * Handles both single-language and multi-language formats.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function toStorageContent(input: any): BlastContent | MultiBlastContent {
+  if (input && typeof input.body === 'string') {
+    // Single-language: { body, mediaUrl? }
+    return { text: input.body, mediaUrl: input.mediaUrl }
+  }
+  // Multi-language: Record<langCode, { body, mediaUrl? }>
+  const result: MultiBlastContent = {}
+  for (const [lang, entry] of Object.entries(input)) {
+    const e = entry as { body: string; mediaUrl?: string }
+    result[lang] = { text: e.body, mediaUrl: e.mediaUrl }
+  }
+  return result
+}
 
 const blasts = new Hono<AppEnv>()
 
@@ -251,7 +271,8 @@ blasts.post('/',
     let blast = await services.blasts.createBlast({
       hubId,
       name: body.name,
-      content: { text: body.content.body, mediaUrl: body.content.mediaUrl },
+      content: toStorageContent(body.content),
+      defaultLanguage: body.defaultLanguage,
       targetChannels: body.channels,
       createdBy: pubkey,
     })
@@ -312,7 +333,8 @@ blasts.patch('/:id',
     const body = c.req.valid('json')
     const updateInput: import('../services/blasts').UpdateBlastInput = {}
     if (body.name !== undefined) updateInput.name = body.name
-    if (body.content !== undefined) updateInput.content = { text: body.content.body, mediaUrl: body.content.mediaUrl }
+    if (body.content !== undefined) updateInput.content = toStorageContent(body.content)
+    if (body.defaultLanguage !== undefined) updateInput.defaultLanguage = body.defaultLanguage
     if (body.channels !== undefined) updateInput.targetChannels = body.channels
     const blast = await services.blasts.updateBlast(id, updateInput)
     return c.json({ blast })

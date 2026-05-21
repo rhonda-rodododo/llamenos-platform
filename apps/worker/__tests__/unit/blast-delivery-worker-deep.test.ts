@@ -20,11 +20,12 @@ describe('BlastDeliveryWorker', () => {
     deps = {
       blastsService: {
         getSendingBlasts: vi.fn().mockResolvedValue([]),
-        getBlast: vi.fn().mockResolvedValue({ status: 'sending', content: { text: 'Hello' } }),
+        getBlast: vi.fn().mockResolvedValue({ status: 'sending', content: { text: 'Hello' }, defaultLanguage: 'en' }),
         getBlastSettings: vi.fn().mockResolvedValue({ rateLimitPerSecond: 10, optOutFooter: '\nReply STOP to unsubscribe' }),
         drainDeliveryBatch: vi.fn().mockResolvedValue([]),
         syncBlastStats: vi.fn().mockResolvedValue({ stats: { totalRecipients: 0, sent: 0, delivered: 0, failed: 0, optedOut: 0 }, completed: false }),
         isSubscriberActive: vi.fn().mockResolvedValue(true),
+        getSubscriberById: vi.fn().mockResolvedValue({ id: 'sub-1', language: 'en' }),
         markDeliverySent: vi.fn(),
         markDeliveryFailed: vi.fn(),
         markDeliveryOptedOut: vi.fn(),
@@ -210,10 +211,10 @@ describe('BlastDeliveryWorker', () => {
     // Call sequence: 1=pollForWork status check, 2=processBlastBatch content,
     // 3=first delivery check (sending), 4=second delivery check (cancelled)
     getBlast
-      .mockResolvedValueOnce({ status: 'sending', content: { text: 'Test' } }) // pollForWork
-      .mockResolvedValueOnce({ status: 'sending', content: { text: 'Test' } }) // processBlastBatch content
-      .mockResolvedValueOnce({ status: 'sending', content: { text: 'Test' } }) // 1st delivery check
-      .mockResolvedValueOnce({ status: 'cancelled', content: { text: 'Test' } }) // 2nd delivery check
+      .mockResolvedValueOnce({ status: 'sending', content: { text: 'Test' }, defaultLanguage: 'en' }) // pollForWork
+      .mockResolvedValueOnce({ status: 'sending', content: { text: 'Test' }, defaultLanguage: 'en' }) // processBlastBatch content
+      .mockResolvedValueOnce({ status: 'sending', content: { text: 'Test' }, defaultLanguage: 'en' }) // 1st delivery check
+      .mockResolvedValueOnce({ status: 'cancelled', content: { text: 'Test' }, defaultLanguage: 'en' }) // 2nd delivery check
 
     const drainBatch = deps.blastsService.drainDeliveryBatch as ReturnType<typeof vi.fn>
     drainBatch.mockResolvedValueOnce([
@@ -257,6 +258,7 @@ describe('BlastDeliveryWorker', () => {
     getBlast.mockResolvedValue({
       status: 'sending',
       content: { text: 'Full content here', smsText: 'SMS specific text' },
+      defaultLanguage: 'en',
     })
 
     const drainBatch = deps.blastsService.drainDeliveryBatch as ReturnType<typeof vi.fn>
@@ -286,6 +288,7 @@ describe('BlastDeliveryWorker', () => {
     getBlast.mockResolvedValue({
       status: 'sending',
       content: { text: 'Check this photo', mediaUrl: 'https://example.com/img.jpg', mediaType: 'image/jpeg' },
+      defaultLanguage: 'en',
     })
 
     const drainBatch = deps.blastsService.drainDeliveryBatch as ReturnType<typeof vi.fn>

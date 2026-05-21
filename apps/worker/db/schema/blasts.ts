@@ -55,6 +55,7 @@ export const blasts = pgTable('blasts', {
   hubId: text('hub_id'),
   name: text('name').notNull(),
   content: jsonb('content').notNull().default(sql`'{}'::jsonb`),
+  defaultLanguage: text('default_language').notNull().default('en'),
   status: text('status').notNull().default('draft'),
   targetChannels: text('target_channels')
     .array()

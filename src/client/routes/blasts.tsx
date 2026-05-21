@@ -19,6 +19,23 @@ import { useRelayState } from '@/lib/relay/context'
 import { useConfig } from '@/lib/config'
 import { KIND_BLAST_PROGRESS, KIND_BLAST_STATUS } from '@shared/event-kinds'
 import type { LlamenosEvent } from '@/lib/relay/types'
+import { isSingleBlastContent } from '@shared/types'
+import type { BlastContent, MultiBlastContent } from '@shared/types'
+import { LANGUAGES } from '@llamenos/i18n'
+
+/** Extract display text from blast content (single or multi-language) */
+function getBlastDisplayText(content: BlastContent | MultiBlastContent): string {
+  if (isSingleBlastContent(content)) return content.text
+  const entries = Object.entries(content)
+  if (entries.length === 0) return ''
+  return (entries[0][1] as BlastContent).text
+}
+
+/** Get language entries from multi-language content */
+function getContentLanguages(content: BlastContent | MultiBlastContent): string[] {
+  if (isSingleBlastContent(content)) return []
+  return Object.keys(content)
+}
 
 export const Route = createFileRoute('/blasts')({
   component: BlastsPage,
@@ -174,7 +191,7 @@ function BlastsPage() {
                         </Badge>
                       </div>
                       <p className="mt-1 text-xs text-muted-foreground truncate">
-                        {blast.content.text.slice(0, 60)}{blast.content.text.length > 60 ? '...' : ''}
+                        {getBlastDisplayText(blast.content).slice(0, 60)}{getBlastDisplayText(blast.content).length > 60 ? '...' : ''}
                       </p>
                       <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
                         <span>{blast.stats.totalRecipients} {t('blasts.recipients')}</span>
@@ -219,6 +236,59 @@ function BlastsPage() {
             </Card>
           )}
         </div>
+      </div>
+    </div>
+  )
+}
+
+// --- Blast Content Display (single or multi-language) ---
+
+function BlastContentDisplay({ content, defaultLanguage }: { content: BlastContent | MultiBlastContent; defaultLanguage?: string }) {
+  const { t } = useTranslation()
+  const [viewLang, setViewLang] = useState<string | null>(null)
+
+  if (isSingleBlastContent(content)) {
+    return (
+      <div className="rounded-lg border border-border p-4">
+        <p className="text-sm whitespace-pre-wrap">{content.text}</p>
+      </div>
+    )
+  }
+
+  const langs = getContentLanguages(content)
+  const activeLang = viewLang ?? defaultLanguage ?? langs[0] ?? 'en'
+  const activeContent = (content as MultiBlastContent)[activeLang]
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-1">
+        {langs.map(code => {
+          const lang = LANGUAGES.find(l => l.code === code)
+          return (
+            <button
+              key={code}
+              type="button"
+              onClick={() => setViewLang(code)}
+              className={`rounded-lg border px-2 py-1 text-xs transition-colors ${
+                activeLang === code
+                  ? 'border-primary bg-primary/10 text-primary font-medium'
+                  : 'border-border hover:border-primary/50'
+              }`}
+            >
+              {lang?.flag ?? code.toUpperCase()} {lang?.label ?? code}
+              {code === defaultLanguage && (
+                <span className="ml-1 text-[10px] text-muted-foreground">({t('blasts.default')})</span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+      <div className="rounded-lg border border-border p-4">
+        {activeContent ? (
+          <p className="text-sm whitespace-pre-wrap">{activeContent.text}</p>
+        ) : (
+          <p className="text-sm text-muted-foreground">{t('blast.noContent')}</p>
+        )}
       </div>
     </div>
   )
@@ -345,9 +415,7 @@ function BlastDetailPanel({ blast, statusColors, onSend, onCancel, onDelete }: B
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="rounded-lg border border-border p-4">
-          <p className="text-sm whitespace-pre-wrap">{blast.content.text}</p>
-        </div>
+        <BlastContentDisplay content={blast.content} defaultLanguage={blast.defaultLanguage} />
 
         {/* Legacy data-testid anchor kept for Playwright tests */}
         <div data-testid="blast-progress" />

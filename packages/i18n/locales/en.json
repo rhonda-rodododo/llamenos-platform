@@ -676,7 +676,13 @@
     "deliveryStatusOptedout": "Opted out",
     "deliveryStatusSkipped": "Skipped",
     "wsConnected": "Live updates active",
-    "wsDisconnected": "Live updates paused"
+    "wsDisconnected": "Live updates paused",
+    "languages": "Languages",
+    "addLanguage": "Add language",
+    "removeLanguage": "Remove language",
+    "default": "default",
+    "defaultLanguage": "Default Language",
+    "defaultLanguageHint": "Subscribers whose language is not included will receive this version"
   },
   "bridgeUrlLabel": "Bridge URL",
   "call": {
