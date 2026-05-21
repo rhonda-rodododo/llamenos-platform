@@ -109,7 +109,7 @@ Given('I navigate to the device link screen from settings', async ({ page }) => 
   const linkedDevicesSection = page.getByTestId('linked-devices')
   await linkedDevicesSection.scrollIntoViewIfNeeded()
   // SettingsSection uses CollapsibleTrigger asChild on CardHeader — click the trigger to expand
-  const isExpanded = await linkedDevicesSection.locator('[data-state="open"]').isVisible({ timeout: 1000 }).catch(() => false)
+  const isExpanded = await linkedDevicesSection.locator('[data-slot="collapsible-content"][data-state="open"]').count() > 0
   if (!isExpanded) {
     await linkedDevicesSection.getByTestId('linked-devices-trigger').click()
   }

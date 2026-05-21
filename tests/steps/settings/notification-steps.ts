@@ -16,7 +16,7 @@ Then('I should see the notification toggles', async ({ page }) => {
   const section = page.getByTestId('notifications')
   await expect(section).toBeVisible({ timeout: Timeouts.ELEMENT })
   // Expand the section if collapsed
-  const isExpanded = await section.locator('[data-state="open"]').isVisible({ timeout: 500 }).catch(() => false)
+  const isExpanded = await section.locator('[data-slot="collapsible-content"][data-state="open"]').count() > 0
   if (!isExpanded) {
     await section.getByTestId('notifications-trigger').click().catch(() => {})
   }
