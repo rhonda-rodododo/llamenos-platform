@@ -90,7 +90,7 @@ services:
       start_period: 30s
 
   postgres:
-    image: postgres:17-alpine@sha256:3430fe182f5065a6ea505c3d432d2c7fff18fbab954df8f277c1dbf4c70124af
+    image: postgres:17-alpine@sha256:979c4379dd698aba0b890599a6104e082035f98ef31d9b9291ec22f2b13059ca
     restart: unless-stopped
     volumes:
       - postgres-data:/var/lib/postgresql/data
@@ -128,7 +128,7 @@ services:
         condition: service_healthy
 
   rustfs:
-    image: rustfs/rustfs:latest@sha256:0725587f6fcca83c1898f321424327d6e6da5e01ea20382905dd258ed5af3be4
+    image: rustfs/rustfs:latest@sha256:378642b05b7dcb4849fb77ebe6aca4ced1c3f66e7e504247df95a5c9018d3358
     command: server /data --console-address ":9001"
     restart: unless-stopped
     volumes:
@@ -148,7 +148,7 @@ services:
 
   # ── Optional: ntfy push relay (UnifiedPush for Android) ───
   ntfy:
-    image: binwiederhier/ntfy:v2.11.0@sha256:ce845e0f0e7eba0f75e553ed4b3c550e74c1e3ab0e89b21b89b85a7d2b67cd42
+    image: binwiederhier/ntfy:v2.11.0@sha256:4a7d0f0adc6d5d9fc36e64ab55ef676e76e124a2bdd50ce115b6d9c1c7430294
     profiles: ["push"]
     restart: unless-stopped
     command: serve
@@ -287,7 +287,7 @@ services:
   # Sentry-compatible error tracking. Clients send crash reports here.
   # Enable with: docker compose --profile monitoring up -d
   glitchtip:
-    image: glitchtip/glitchtip:v4.1@sha256:6bfe449e0fa0fec0e9a41c8ee7c4d87c889f2e1cda1084ae31c0af99b4e73b0c
+    image: glitchtip/glitchtip:v4.1@sha256:0803e1820215905c305cd0e7c497e5bbdbb2c2c65fcbe6bdc131f4538b8ed048
     profiles: ["monitoring"]
     restart: unless-stopped
     environment:
@@ -315,7 +315,7 @@ services:
       start_period: 30s
 
   glitchtip-worker:
-    image: glitchtip/glitchtip:v4.1@sha256:6bfe449e0fa0fec0e9a41c8ee7c4d87c889f2e1cda1084ae31c0af99b4e73b0c
+    image: glitchtip/glitchtip:v4.1@sha256:0803e1820215905c305cd0e7c497e5bbdbb2c2c65fcbe6bdc131f4538b8ed048
     profiles: ["monitoring"]
     restart: unless-stopped
     command: ./bin/run-celery-with-beat.sh
@@ -336,7 +336,7 @@ services:
         condition: service_healthy
 
   glitchtip-redis:
-    image: redis:7-alpine@sha256:de15e464122c0f7614b968f33c6c3e0e3b0f3da563e3e5f3e9e19f9a4c4d8e1a
+    image: redis:7-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
     profiles: ["monitoring"]
     restart: unless-stopped
     networks:
