@@ -120,7 +120,6 @@ export const LANGUAGES: LanguageConfig[] = [
     flag: 'RU',
     phonePrefixes: [
       '+7',   // Russia & Kazakhstan
-      '+380', // Ukraine (many speak Russian)
       '+375', // Belarus
     ],
   },
@@ -141,6 +140,64 @@ export const LANGUAGES: LanguageConfig[] = [
       '+244', // Angola
       '+258', // Mozambique
     ],
+  },
+  // --- At-risk & diaspora communities ---
+  {
+    code: 'uk',
+    label: 'Українська',
+    flag: 'УК',
+    phonePrefixes: ['+380'], // Ukraine
+  },
+  {
+    code: 'fa',
+    label: 'فارسی',
+    flag: 'فا',
+    phonePrefixes: [
+      '+98', // Iran
+      '+93', // Afghanistan (Dari)
+    ],
+  },
+  {
+    code: 'tr',
+    label: 'Türkçe',
+    flag: 'TR',
+    phonePrefixes: ['+90'], // Turkey
+  },
+  {
+    code: 'ku',
+    label: 'Kurdî',
+    flag: 'KU',
+    phonePrefixes: [], // Stateless — no country prefix; detected via UI selection
+  },
+  {
+    code: 'so',
+    label: 'Soomaali',
+    flag: 'SO',
+    phonePrefixes: ['+252'], // Somalia
+  },
+  {
+    code: 'am',
+    label: 'አማርኛ',
+    flag: 'አማ',
+    phonePrefixes: ['+251'], // Ethiopia
+  },
+  {
+    code: 'my',
+    label: 'မြန်မာ',
+    flag: 'MY',
+    phonePrefixes: ['+95'], // Myanmar
+  },
+  {
+    code: 'quc',
+    label: "K'iche'",
+    flag: 'KI',
+    phonePrefixes: [], // Indigenous — no country prefix; detected via UI selection
+  },
+  {
+    code: 'mix',
+    label: "Tu'un savi",
+    flag: 'MX',
+    phonePrefixes: [], // Indigenous — no country prefix; detected via UI selection
   },
 ]
 

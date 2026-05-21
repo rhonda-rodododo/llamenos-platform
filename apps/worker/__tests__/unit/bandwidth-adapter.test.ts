@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { BandwidthAdapter } from '@worker/telephony/bandwidth'
 import { DEFAULT_LANGUAGE } from '@shared/languages'
-import { getPrompt, getVoicemailThanks } from '@shared/voice-prompts'
 
 describe('BandwidthAdapter', () => {
   let adapter: BandwidthAdapter
@@ -155,7 +154,7 @@ describe('BandwidthAdapter', () => {
         callerLanguage: 'en',
       })
       expect(result.contentType).toBe('application/xml')
-      expect(result.body).toContain('Invalid input. Goodbye.')
+      expect(result.body).toContain('We are unable to connect your call. Goodbye.')
       expect(result.body).toContain('<Hangup/>')
       expect(result.body).not.toContain('<Redirect')
     })
@@ -349,7 +348,7 @@ describe('BandwidthAdapter', () => {
 
     it('skips failed calls and returns only successful callIds', async () => {
       let callCount = 0
-      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(() => {
+      vi.spyOn(globalThis, 'fetch').mockImplementation(() => {
         callCount++
         if (callCount === 1) {
           return Promise.resolve(new Response(JSON.stringify({ callId: 'ok-1' }), { status: 201 }))
