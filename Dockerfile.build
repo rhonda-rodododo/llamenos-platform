@@ -13,7 +13,7 @@
 # CI sets SOURCE_DATE_EPOCH from git commit time for deterministic timestamps.
 # Local builds default to epoch 0 (1970-01-01) for full reproducibility.
 
-FROM oven/bun:1@sha256:856da45d07aeb62eb38ea3e7f9e1794c0143a4ff63efb00e6c4491b627e2a521
+FROM oven/bun:1@sha256:e10577f0db68676a7024391c6e5cb4b879ebd17188ab750cf10024a6d700e5c4
 
 # Consistent locale (prevents locale-dependent output differences)
 ENV LANG=C.UTF-8
