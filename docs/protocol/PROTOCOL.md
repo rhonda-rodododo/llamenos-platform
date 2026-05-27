@@ -818,6 +818,8 @@ On member departure:
 
 ### 2.8 WebSocket Event Encryption
 
+> **Note:** "Events" in this section refers to real-time WebSocket messages (call rings, presence updates, settings pushes). This is distinct from the deprecated `/api/events` REST endpoint group (Section 4.32), which was a calendar/scheduling data type now superseded by entity types with `category:"event"` in the Records API.
+
 #### Hub-Wide Broadcasts
 
 Hub-wide events (call rings, presence updates, settings changes) are encrypted with a key derived from the hub key:
@@ -2548,62 +2550,9 @@ Hub-scoped: `/api/hubs/:hubId/records/*`
 
 > **Deprecation Notice:** The `/events` group is deprecated (Sunset: 2026-07-01). Successor: `/records` with `category:"event"` entity types. All responses include `Deprecation: true`, `Sunset: 2026-07-01`, and `Link: </api/records?category=event>; rel="successor-version"` headers.
 
-```
-GET    /api/events
-Permission: events:read
-Query: ?page=&limit=&eventTypeHash=&statusHash=&parentEventId=&startAfter=&startBefore=
-Response: { "events": Event[], "total": number }
+Events are now configurable entity types with `category:"event"`. Use the Records API (Section 4.31) with an `entityTypeId` corresponding to an event entity type — dates, locations, and all other event fields are stored as encrypted record content.
 
-GET    /api/events/:id
-Permission: events:read
-Response: Event
-
-POST   /api/events
-Permission: events:create
-Body: CreateEventBody
-Response: Event (201)
-
-PATCH  /api/events/:id
-Permission: events:update
-Body: UpdateEventBody
-Response: Event
-
-DELETE /api/events/:id
-Permission: events:delete
-Response: { "ok": true }
-
-GET    /api/events/:id/subevents
-Permission: events:read
-Response: { "events": Event[], "total": number }
-
-POST   /api/events/:id/records
-Permission: events:link
-Body: { "recordId": string }
-Response: CaseEvent (201)
-
-DELETE /api/events/:id/records/:recordId
-Permission: events:link
-Response: { "ok": true }
-
-GET    /api/events/:id/records
-Permission: events:read
-Response: { "links": CaseEvent[] }
-
-POST   /api/events/:id/reports
-Permission: events:link
-Body: { "reportId": string }
-Response: ReportEvent (201)
-
-DELETE /api/events/:id/reports/:reportId
-Permission: events:link
-Response: { "ok": true }
-
-GET    /api/events/:id/reports
-Permission: events:read
-Response: { "links": ReportEvent[] }
-```
-
-Hub-scoped: `/api/hubs/:hubId/events/*`
+The deprecated `/api/events` and `/api/hubs/:hubId/events` endpoints remain available through the sunset date and return the sunset response headers listed above, but no new features will be added. Implementors encountering references to `/api/events` should migrate to Section 4.31 Records.
 
 ### 4.33 Evidence
 
@@ -3546,7 +3495,6 @@ All of the following routes are also available with a `/api/hubs/:hubId/` prefix
 /api/hubs/:hubId/contacts/*
 /api/hubs/:hubId/directory/*
 /api/hubs/:hubId/records/*
-/api/hubs/:hubId/events/*
 /api/hubs/:hubId/settings/cms/*
 /api/hubs/:hubId/analytics/*
 /api/hubs/:hubId/messaging/signal/*
@@ -3815,115 +3763,7 @@ Hub-scoped: `/api/hubs/:hubId/directory/*`
 
 ### 4.25 Records (Case Management)
 
-```
-GET    /api/records?page=&limit=&entityTypeId=&assignedTo=&crossHub=
-       Permission: cases:read-all | cases:read-assigned | cases:read-own
-       Response: { "records": Record[], "total": number }
-
-GET    /api/records/:id
-       Permission: cases:read-* (access-checked)
-       Response: Record
-
-GET    /api/records/by-number/:number
-       Permission: cases:read-* (access-checked)
-       Response: Record
-
-GET    /api/records/by-contact/:contactId
-       Permission: cases:read-* (access-checked)
-       Response: { "records": Record[] }
-
-GET    /api/records/envelope-recipients?entityTypeId=&assignedTo=
-       Permission: cases:read-*
-       Response: { "required": string[], "optional": string[] }
-
-GET    /api/records/:id/envelope-recipients
-       Permission: cases:read-*
-       Response: { "required": string[], "optional": string[] }
-
-POST   /api/records
-       Permission: cases:create
-       Body: { "entityTypeId": string, "encryptedContent": hex, "readerEnvelopes": [...], "assignedTo"?: string[] }
-       Response: Record
-
-POST   /api/records/convert-from-report
-       Permission: reports:triage
-       Body: { "reportId": string, "entityTypeId": string }
-       Response: { "recordId": string, "autoAssigned": boolean }
-
-PATCH  /api/records/:id
-       Permission: cases:update | cases:update-own
-       Body: partial Record
-       Response: Record
-
-DELETE /api/records/:id
-       Permission: cases:delete
-       Response: { "ok": true }
-
-POST   /api/records/:id/assign
-       Permission: cases:assign
-       Body: { "pubkeys": string[] }
-       Response: Record
-
-POST   /api/records/:id/unassign
-       Permission: cases:assign
-       Body: { "pubkey": string }
-       Response: Record
-
-GET    /api/records/:id/suggest-assignees
-       Permission: cases:assign
-       Response: { "suggestions": AssigneeSuggestion[] }
-
-POST   /api/records/:id/contacts
-       Permission: cases:link
-       Body: { "contactId": string, "role": string }
-       Response: RecordContact
-
-DELETE /api/records/:id/contacts/:contactId
-       Permission: cases:link
-       Response: { "ok": true }
-
-GET    /api/records/:id/contacts
-       Permission: cases:read-*
-       Response: { "contacts": RecordContact[] }
-
-POST   /api/records/:id/interactions
-       Permission: cases:update | cases:update-own
-       Body: { "interactionType": string, "encryptedContent": hex, ... }
-       Response: CaseInteraction
-
-GET    /api/records/:id/interactions
-       Permission: cases:read-*
-       Response: { "interactions": CaseInteraction[], "total": number }
-
-DELETE /api/records/:id/interactions/:interactionId
-       Permission: cases:update
-       Response: { "ok": true }
-
-POST   /api/records/:id/reports
-       Permission: cases:link
-       Body: { "reportId": string }
-       Response: ReportCaseLink
-
-DELETE /api/records/:id/reports/:reportId
-       Permission: cases:link
-       Response: { "ok": true }
-
-GET    /api/records/:id/reports
-       Permission: cases:read-*
-       Response: { "links": ReportCaseLink[] }
-
-POST   /api/records/:id/notify-contacts
-       Permission: cases:update
-       Body: { "recipients": [{ "identifier": string, "channel": string, "message": string }] }
-       Response: { "notified": number, "skipped": number, "results": [...] }
-
-POST   /api/records/merge
-       Permission: cases:update
-       Body: { "primaryId": string, "secondaryId": string }
-       Response: { "primaryId": string, "secondaryId": string }
-```
-
-Hub-scoped: `/api/hubs/:hubId/records/*`
+> See **Section 4.31 Records** for the full endpoint reference. Section 4.31 is the canonical and complete documentation for all `/api/records` endpoints.
 
 ### 4.26 Entity Schema (Case Management Configuration)
 
@@ -4394,7 +4234,8 @@ POST   /api/hubs/:hubId/mls/key-packages?deviceId=
 
 The following endpoints are also implemented. See `apps/worker/routes/` for full details:
 
-- **`/api/events/*`** and **`/api/admin/events/*`** — Event stream and admin event management
+- **`/api/admin/security-events`** — Admin security event log (see Section 4.26)
+- **`/api/events/*`** — Deprecated calendar/scheduling events (Sunset: 2026-07-01); migrate to Records API (Section 4.31)
 - **`/api/system/*`** — System status and health diagnostics
 - **`/api/analytics/*`** — Usage analytics and metrics
 - **`/api/account/*`** — Account-level operations
