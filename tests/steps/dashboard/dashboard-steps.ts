@@ -103,8 +103,8 @@ Then('a clock in\\/out button should be visible', async ({ page }) => {
 Then('the calls card should display a numeric call count', async ({ page }) => {
   const callsCard = page.getByTestId(TestIds.DASHBOARD_CALLS_TODAY)
   await expect(callsCard).toBeVisible({ timeout: Timeouts.ELEMENT })
-  const text = await callsCard.textContent()
-  expect(text).toMatch(/\d+/)
+  // Wait for analytics data to load — the card shows "-" as a loading placeholder
+  await expect(callsCard).toContainText(/\d+/, { timeout: Timeouts.ELEMENT })
 })
 
 Then('the count should be {string} for a fresh session', async ({ page }, count: string) => {

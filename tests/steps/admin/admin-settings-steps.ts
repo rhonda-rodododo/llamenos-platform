@@ -26,8 +26,11 @@ Then('I should see the transcription enabled toggle', async ({ page }) => {
   const section = page.getByTestId(TestIds.TRANSCRIPTION_SECTION)
   await expect(section).toBeVisible({ timeout: Timeouts.ELEMENT })
   // Expand the section if collapsed (CollapsibleContent hides children when closed)
-  // SettingsSection uses CardHeader with cursor-pointer as the CollapsibleTrigger
-  const isExpanded = await section.locator('[data-state="open"]').isVisible({ timeout: 1000 }).catch(() => false)
+  // Use count() instead of isVisible() — Radix Collapsible sets data-state="open" immediately
+  // but element has height:0 during animation, so isVisible() returns false and re-clicks
+  // the trigger, collapsing an already-expanding section.
+  const contentSelector = '[data-slot="collapsible-content"][data-state="open"]'
+  const isExpanded = await section.locator(contentSelector).count() > 0
   if (!isExpanded) {
     await section.getByTestId('transcription-trigger').click()
   }
@@ -43,8 +46,9 @@ Then('I should see the transcription opt-out toggle', async ({ page }) => {
 When('I toggle transcription on', async ({ page }) => {
   const section = page.getByTestId(TestIds.TRANSCRIPTION_SECTION)
   await expect(section).toBeVisible({ timeout: Timeouts.ELEMENT })
-  // Expand the section if collapsed
-  const isExpanded = await section.locator('[data-state="open"]').isVisible({ timeout: 1000 }).catch(() => false)
+  // Expand the section if collapsed — use count() not isVisible() (see comment above)
+  const contentSelector = '[data-slot="collapsible-content"][data-state="open"]'
+  const isExpanded = await section.locator(contentSelector).count() > 0
   if (!isExpanded) {
     await section.getByTestId('transcription-trigger').click()
   }

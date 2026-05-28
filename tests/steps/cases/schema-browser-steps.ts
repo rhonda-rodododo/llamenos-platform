@@ -22,7 +22,7 @@ Then('I should see a list of entity types from the template', async ({ page }) =
   const hasSect = await section.isVisible({ timeout: 5000 }).catch(() => false)
   if (hasSect) {
     // Check if section is collapsed — expand it
-    const isOpen = await section.locator('[data-state="open"]').isVisible({ timeout: 500 }).catch(() => false)
+    const isOpen = await section.locator('[data-slot="collapsible-content"][data-state="open"]').count() > 0
     if (!isOpen) {
       const trigger = page.getByTestId('entity-types-trigger')
       const hasTrigger = await trigger.isVisible({ timeout: 2000 }).catch(() => false)
