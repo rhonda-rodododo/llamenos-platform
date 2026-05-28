@@ -1,0 +1,104 @@
+name: Deploy Production
+
+# Manual-only workflow: deploy the Llamenos production VPS instance via Ansible.
+#
+# Required secrets (in the "production" GitHub Environment):
+#   PROD_INVENTORY_YML       — content of inventory-production.yml (Ansible inventory)
+#   ANSIBLE_VAULT_PASSWORD   — password for ansible-vault encrypted vars-production.yml
+#   PROD_VARS_YML_ENCRYPTED  — content of encrypted vars-production.yml
+#   PROD_SSH_PRIVATE_KEY     — SSH private key for the production VPS deploy user
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  deploy-prod:
+    name: Deploy to Production VPS
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install Ansible
+        run: |
+          pip install ansible
+          ansible-galaxy collection install community.docker
+
+      - name: Write Ansible inventory
+        env:
+          INVENTORY_YML: ${{ secrets.PROD_INVENTORY_YML }}
+        run: |
+          mkdir -p deploy/ansible
+          printf '%s' "$INVENTORY_YML" > deploy/ansible/inventory-production.yml
+
+      - name: Write Ansible vault password
+        env:
+          VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          printf '%s' "$VAULT_PASSWORD" > /tmp/vault-pass
+          chmod 600 /tmp/vault-pass
+
+      - name: Write encrypted production vars
+        env:
+          PROD_VARS: ${{ secrets.PROD_VARS_YML_ENCRYPTED }}
+        run: |
+          printf '%s' "$PROD_VARS" > deploy/ansible/vars-production.yml
+
+      - name: Load SSH key into agent
+        env:
+          SSH_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+        run: |
+          eval "$(ssh-agent -s)"
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> "$GITHUB_ENV"
+          echo "$SSH_KEY" | ssh-add -
+          ssh-keyscan -H "$(grep ansible_host deploy/ansible/inventory-production.yml | head -1 | awk '{print $2}')" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Run preflight
+        working-directory: deploy/ansible
+        run: |
+          ansible-playbook playbooks/preflight.yml \
+            -i inventory-production.yml \
+            -e "@vars-production.yml" \
+            -e "deployment_profile=official" \
+            --vault-password-file /tmp/vault-pass
+
+      - name: Deploy
+        working-directory: deploy/ansible
+        run: |
+          ansible-playbook setup.yml \
+            -i inventory-production.yml \
+            -e "@vars-production.yml" \
+            -e "deployment_profile=official" \
+            --vault-password-file /tmp/vault-pass
+
+      - name: Smoke check
+        working-directory: deploy/ansible
+        run: |
+          ansible-playbook playbooks/smoke-check.yml \
+            -i inventory-production.yml \
+            -e "@vars-production.yml" \
+            -e "deployment_profile=official" \
+            --vault-password-file /tmp/vault-pass
+
+      - name: Stop SSH agent
+        if: always()
+        run: ssh-agent -k || true
+
+      - name: Clean up secrets
+        if: always()
+        run: |
+          rm -f /tmp/vault-pass
+          rm -f deploy/ansible/inventory-production.yml
+          rm -f deploy/ansible/vars-production.yml

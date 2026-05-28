@@ -78,6 +78,11 @@
     - role: llamenos-signal
       tags: [signal, deploy]
       when: llamenos_signal_enabled | default(false)
+    - role: llamenos-update-server
+      tags: [update-server, deploy]
+      when:
+        - llamenos_update_server_enabled | default(false) | bool
+        - inventory_hostname in groups.get('llamenos_proxy', [])
 
 - name: Deploy auto-healing and maintenance
   hosts: llamenos_servers

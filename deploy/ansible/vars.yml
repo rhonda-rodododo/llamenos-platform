@@ -1,6 +1,6 @@
 ---
 # Llamenos Deployment Configuration
-# 
+#
 # This is a template configuration. Copy to vars.yml and customize for your deployment.
 # All values shown here are defaults — uncomment and modify as needed.
 #
@@ -9,6 +9,24 @@
 #   2. Subdomain mode (default): app.hotline.example.org, api.hotline.example.org
 #   3. Single domain: set use_subdomains: false
 #   4. Home/nip.io: domain = "192-168-1-100.nip.io" or local IP
+
+# ─── Deployment Profile ─────────────────────────────────────────
+# Deployment profile: "self-hoster" (default) or "official"
+# self-hoster: app + postgres + rustfs + caddy + hardening + backups
+# official: self-hoster + update server + monitoring + signal notifier + DNS validation
+deployment_profile: "self-hoster"
+
+# Official-profile feature flags (auto-enabled when deployment_profile == "official")
+# These can also be set independently for custom configurations
+llamenos_update_server_enabled: "{{ deployment_profile == 'official' }}"
+llamenos_monitoring_enabled: "{{ deployment_profile == 'official' }}"
+llamenos_signal_enabled: "{{ deployment_profile == 'official' }}"
+llamenos_dns_validation_enabled: "{{ deployment_profile == 'official' }}"
+
+# Update server configuration (only used when llamenos_update_server_enabled)
+updates_domain: "updates.{{ domain }}"
+releases_domain: "releases.{{ domain }}"
+update_artifacts_dir: "{{ app_dir }}/services/update-server/artifacts"
 
 # ─── Domain & TLS ────────────────────────────────────────────────
 # Your domain name. Can be:
@@ -59,8 +77,7 @@ llamenos_rustfs_enabled: true
 llamenos_transcription_enabled: false
 # Asterisk PBX — for self-hosted telephony
 llamenos_asterisk_enabled: false
-# Signal messaging bridge
-llamenos_signal_enabled: false
+# Signal messaging bridge (auto-enabled by deployment_profile == "official"; see Deployment Profile section)
 # Kamailio SIP proxy
 kamailio_enabled: false
 
@@ -162,6 +179,8 @@ ntp_servers:
   - "3.pool.ntp.org"
 
 # ─── Observability ──────────────────────────────────────────────
+# Auto-enabled when deployment_profile == "official" (via llamenos_monitoring_enabled)
+# Can also be enabled independently for self-hoster deployments
 observability_enabled: false
 prometheus_enabled: true
 grafana_enabled: true
