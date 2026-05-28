@@ -75,7 +75,9 @@ export const auth = createMiddleware<AppEnv>(async (c, next) => {
   // WebAuthn enforcement: if enabled, require passkey registration
   const webauthnSettings = await services.identity.getWebAuthnSettings()
   const isAdmin = permissionGranted(permissions, 'settings:manage')
-  const webauthnRequired = isAdmin ? webauthnSettings.requireForAdmins : webauthnSettings.requireForUsers
+  // Strict boolean check: DB may store {}, null values, or undefined fields — only enforce
+  // when the setting is explicitly `true`, not merely truthy.
+  const webauthnRequired = isAdmin ? webauthnSettings.requireForAdmins === true : webauthnSettings.requireForUsers === true
 
   if (webauthnRequired) {
     const { credentials } = await services.identity.getWebAuthnCredentials(authResult.pubkey)
