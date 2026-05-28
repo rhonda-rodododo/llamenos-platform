@@ -304,7 +304,11 @@ Given('a custom field {string} exists', async ({ page, request }, fieldLabel: st
   const section = page.getByTestId(TestIds.SETTINGS_CUSTOM_FIELDS)
   await expect(section).toBeVisible({ timeout: Timeouts.ELEMENT })
   await section.scrollIntoViewIfNeeded()
-  const isOpen = await section.locator('[data-state="open"]').isVisible({ timeout: 500 }).catch(() => false)
+  // Use count() instead of isVisible() — Radix Collapsible sets data-state="open" immediately
+  // but element has height:0 during animation, causing isVisible() to return false and
+  // re-click the trigger, collapsing an already-expanding section.
+  const contentSelector = '[data-slot="collapsible-content"][data-state="open"]'
+  const isOpen = await section.locator(contentSelector).count() > 0
   if (!isOpen) {
     const trigger = page.getByTestId(`${TestIds.SETTINGS_CUSTOM_FIELDS}-trigger`)
     await trigger.click()

@@ -8,22 +8,23 @@ import { AlertTriangle, Loader2 } from 'lucide-react'
 export function EventsMigrationPanel() {
   const { t } = useTranslation()
   const { toast } = useToast()
-  const [status, setStatus] = useState<'idle' | 'checking' | 'needed' | 'migrating' | 'done'>('checking')
+  const [status, setStatus] = useState<'idle' | 'checking' | 'needed' | 'migrating' | 'done'>('idle')
   const [count, setCount] = useState(0)
   const [migrated, setMigrated] = useState(0)
 
   useEffect(() => {
     fetch('/api/admin/events/migration-status')
-      .then(r => r.json() as Promise<{ pendingCount: number }>)
+      .then(r => {
+        if (!r.ok) return null
+        return r.json() as Promise<{ pendingCount: number }>
+      })
       .then((data) => {
-        if (data.pendingCount > 0) {
+        if (data && data.pendingCount > 0) {
           setCount(data.pendingCount)
           setStatus('needed')
-        } else {
-          setStatus('done')
         }
       })
-      .catch(() => setStatus('idle'))
+      .catch(() => {})
   }, [])
 
   const runMigration = async () => {

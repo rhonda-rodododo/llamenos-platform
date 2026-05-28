@@ -814,10 +814,12 @@ export class IdentityService {
       .from(systemSettings)
       .limit(1)
 
+    const defaults: WebAuthnSettings = { requireForAdmins: false, requireForUsers: false }
     if (rows.length === 0 || !rows[0].webauthnSettings) {
-      return { requireForAdmins: false, requireForUsers: false }
+      return defaults
     }
-    return rows[0].webauthnSettings as WebAuthnSettings
+    // DB stores {} when no settings have been explicitly set — merge with safe defaults
+    return { ...defaults, ...(rows[0].webauthnSettings as Partial<WebAuthnSettings>) }
   }
 
   /**
