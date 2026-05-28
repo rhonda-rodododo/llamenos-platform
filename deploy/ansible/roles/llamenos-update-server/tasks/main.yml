@@ -1,0 +1,65 @@
+---
+# llamenos-update-server: serves desktop update manifests and artifacts via Caddy
+# Only enabled in "official" deployment profile
+
+- name: Skip update-server if not enabled
+  ansible.builtin.meta: end_play
+  when: not (llamenos_update_server_enabled | default(false) | bool)
+
+- name: Create update server directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0755"
+  loop:
+    - "{{ update_artifacts_dir }}"
+    - "{{ update_artifacts_dir }}/desktop"
+    - "{{ app_dir }}/services/update-server"
+
+- name: Template update server Caddyfile
+  ansible.builtin.template:
+    src: caddy/Caddyfile.updates.j2
+    dest: "{{ app_dir }}/services/update-server/Caddyfile"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0644"
+  notify: Restart update-server
+
+- name: Template update server compose file
+  ansible.builtin.copy:
+    dest: "{{ app_dir }}/services/update-server/docker-compose.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0644"
+    content: |
+      services:
+        update-server:
+          image: caddy:2-alpine
+          restart: unless-stopped
+          ports:
+            - "127.0.0.1:3080:80"
+            - "127.0.0.1:3443:443"
+          volumes:
+            - ./Caddyfile:/etc/caddy/Caddyfile:ro
+            - {{ update_artifacts_dir }}:/srv/updates:ro
+            - caddy_data:/data
+            - caddy_config:/config
+          read_only: true
+          security_opt:
+            - no-new-privileges:true
+          healthcheck:
+            test: ["CMD", "wget", "--spider", "-q", "http://localhost:80/health"]
+            interval: 30s
+            timeout: 5s
+            retries: 3
+      volumes:
+        caddy_data:
+        caddy_config:
+  notify: Restart update-server
+
+- name: Start update server
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}/services/update-server"
+    state: present

@@ -166,6 +166,20 @@
       when: llamenos_ntfy_enabled | default(false) | bool
       tags: always
 
+    - name: Check update server health (official only)
+      ansible.builtin.uri:
+        url: "http://localhost:3080/health"
+        return_content: true
+      register: update_health
+      failed_when: update_health.content != "ok"
+      when: llamenos_update_server_enabled | default(false) | bool
+
+    - name: Record update server result
+      ansible.builtin.set_fact:
+        smoke_results: "{{ smoke_results + [{'check': 'Update server health', 'status': 'PASS' if update_health is succeeded else 'FAIL' if update_health is failed else 'SKIP'}] }}"
+      when: llamenos_update_server_enabled | default(false) | bool
+      tags: always
+
     - name: Check Caddy is serving HTTPS
       ansible.builtin.uri:
         url: "https://shared.{{ domain }}/api/health"

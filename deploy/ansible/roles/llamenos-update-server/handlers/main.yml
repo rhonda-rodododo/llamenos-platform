@@ -1,0 +1,6 @@
+---
+- name: Restart update-server
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}/services/update-server"
+    state: present
+    recreate: always

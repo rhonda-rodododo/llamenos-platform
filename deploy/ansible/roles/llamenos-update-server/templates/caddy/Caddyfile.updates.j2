@@ -1,0 +1,25 @@
+{{ updates_domain }}, {{ releases_domain }} {
+    root * /srv/updates/desktop
+
+    file_server {
+        browse
+    }
+
+    handle /health {
+        respond "ok" 200
+    }
+
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Cache-Control "public, max-age=60"
+    }
+
+    @manifest path /desktop/latest.json
+    header @manifest Cache-Control "public, max-age=30"
+
+    log {
+        output file /var/log/caddy/updates-access.log
+        format json
+    }
+}
