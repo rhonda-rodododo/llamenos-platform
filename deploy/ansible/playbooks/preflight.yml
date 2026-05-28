@@ -333,6 +333,44 @@
         success_msg: "backup_age_public_key: [valid age key]"
       when: backup_age_public_key | default('') | length > 0
 
+    # DNS validation (official profile only)
+    - name: Validate DNS records point to this server
+      when:
+        - llamenos_dns_validation_enabled | default(false) | bool
+      block:
+        - name: Resolve API domain
+          ansible.builtin.command: dig +short {{ api_subdomain }}.{{ domain }} A
+          register: api_dns
+          changed_when: false
+
+        - name: Resolve updates domain
+          ansible.builtin.command: dig +short {{ updates_domain }} A
+          register: updates_dns
+          changed_when: false
+
+        - name: Resolve releases domain
+          ansible.builtin.command: dig +short {{ releases_domain }} A
+          register: releases_dns
+          changed_when: false
+
+        - name: Get server public IP
+          ansible.builtin.command: curl -s https://ifconfig.me
+          register: server_ip
+          changed_when: false
+
+        - name: Assert DNS records match server IP
+          ansible.builtin.assert:
+            that:
+              - api_dns.stdout | trim == server_ip.stdout | trim
+              - updates_dns.stdout | trim == server_ip.stdout | trim
+              - releases_dns.stdout | trim == server_ip.stdout | trim
+            fail_msg: >-
+              DNS mismatch detected. Expected all domains to resolve to {{ server_ip.stdout | trim }}.
+              api={{ api_dns.stdout | trim }},
+              updates={{ updates_dns.stdout | trim }},
+              releases={{ releases_dns.stdout | trim }}.
+              Check 1984 DNS configuration.
+
     - name: Preflight checks passed
       ansible.builtin.debug:
         msg: |
