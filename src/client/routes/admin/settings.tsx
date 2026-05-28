@@ -1,8 +1,7 @@
 import { createFileRoute, useSearch } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/lib/auth'
-import { useEffect, useState, useRef, Suspense } from 'react'
-import { Loader2 } from 'lucide-react'
+import { useEffect, useState, useRef } from 'react'
 import { channelConfigRegistry, CHANNEL_ORDER } from '@/components/channel-config/registry'
 import {
   getSpamSettings,
@@ -283,19 +282,14 @@ function AdminSettingsPage() {
           : t('settings.notConfigured', { defaultValue: 'Not configured' })
 
         return (
-          <Suspense key={channelType} fallback={
-            <div className="flex items-center justify-center p-8">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            </div>
-          }>
-            <ChannelComponent
-              config={messagingConfig}
-              onConfigChange={setMessagingConfig}
-              expanded={expanded.has(`${channelType}-channel`)}
-              onToggle={(open: boolean) => toggleSection(`${channelType}-channel`, open)}
-              statusSummary={channelStatusSummary}
-            />
-          </Suspense>
+          <ChannelComponent
+            key={channelType}
+            config={messagingConfig}
+            onConfigChange={setMessagingConfig}
+            expanded={expanded.has(`${channelType}-channel`)}
+            onToggle={(open: boolean) => toggleSection(`${channelType}-channel`, open)}
+            statusSummary={channelStatusSummary}
+          />
         )
       })}
 

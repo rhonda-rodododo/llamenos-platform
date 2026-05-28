@@ -1,25 +1,12 @@
-import { lazy } from 'react'
 import { MessageSquare, Phone, Shield, Send, Smartphone } from 'lucide-react'
 import type { MessagingChannelType } from '@protocol/schemas/settings'
 import type { ChannelConfigEntry } from './types'
 import { CHANNEL_SECURITY, CHANNEL_LABELS } from '@shared/types'
-
-// Lazy-loaded channel config components
-const SMSChannelSection = lazy(() =>
-  import('./sms-channel-section').then(m => ({ default: m.SMSChannelSection }))
-)
-const WhatsAppChannelSection = lazy(() =>
-  import('./whatsapp-channel-section').then(m => ({ default: m.WhatsAppChannelSection }))
-)
-const TelegramChannelSection = lazy(() =>
-  import('./telegram-channel-section').then(m => ({ default: m.TelegramChannelSection }))
-)
-const SignalChannelSection = lazy(() =>
-  import('@/components/admin-settings/signal-channel-section').then(m => ({ default: m.SignalChannelSection }))
-)
-const RCSChannelSection = lazy(() =>
-  import('@/components/admin-settings/rcs-channel-section').then(m => ({ default: m.RCSChannelSection }))
-)
+import { SMSChannelSection } from './sms-channel-section'
+import { WhatsAppChannelSection } from './whatsapp-channel-section'
+import { TelegramChannelSection } from './telegram-channel-section'
+import { SignalChannelSection } from '@/components/admin-settings/signal-channel-section'
+import { RCSChannelSection } from '@/components/admin-settings/rcs-channel-section'
 
 export const channelConfigRegistry: Record<MessagingChannelType, ChannelConfigEntry> = {
   sms: {
