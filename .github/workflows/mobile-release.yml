@@ -7,11 +7,13 @@
 name: Mobile Release
 
 on:
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release (e.g., 1.0.0)'
-        required: true
+        description: "Version to release (e.g., 1.2.3)"
+        required: false
 
 permissions: {}  # deny-all; per-job permissions below
 
@@ -30,9 +32,11 @@ jobs:
       id-token: write
       attestations: write
 
+    environment: android-release
+
     env:
       HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
-      HAS_PLAY_SERVICE_ACCOUNT: ${{ secrets.PLAY_SERVICE_ACCOUNT != '' }}
+      HAS_PLAY_SERVICE_ACCOUNT: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON != '' }}
 
     steps:
       - name: Checkout
@@ -75,6 +79,20 @@ jobs:
       - name: Install dependencies and run codegen
         run: bun install --frozen-lockfile && bun run codegen && bun run i18n:codegen
 
+      - name: Resolve version
+        id: version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VER: ${{ inputs.version }}
+        run: |
+          if [[ "$EVENT_NAME" == "release" ]]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          elif [[ -n "$INPUT_VER" ]]; then
+            echo "version=${INPUT_VER}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Decode keystore
         if: env.HAS_KEYSTORE == 'true'
         env:
@@ -85,8 +103,9 @@ jobs:
         shell: bash
         env:
           RUN_NUMBER: ${{ github.run_number }}
+          RESOLVED_VERSION: ${{ steps.version.outputs.version }}
         run: |
-          VERSION="$INPUT_VERSION"
+          VERSION="$RESOLVED_VERSION"
           echo "Building version: ${VERSION}"
           echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
 
@@ -139,24 +158,29 @@ jobs:
             apps/android/app/build/outputs/mapping/release/mapping.txt
           retention-days: 30
 
-      - name: Upload to Play Store (internal track)
+      - name: Setup Ruby
         if: env.HAS_PLAY_SERVICE_ACCOUNT == 'true'
-        env:
-          PLAY_SERVICE_ACCOUNT: ${{ secrets.PLAY_SERVICE_ACCOUNT }}
-        uses: r0adkll/upload-google-play@935ef9c68bb393a8e6116b1575626a7f5be3a7fb # v1
+        uses: ruby/setup-ruby@13e7a03dc3ac6c3798f4570bfead2aed4d96abfb
         with:
-          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT }}
-          packageName: org.llamenos.hotline
-          releaseFiles: apps/android/app/build/outputs/bundle/release/*.aab
-          track: internal
-          status: completed
-          mappingFile: apps/android/app/build/outputs/mapping/release/mapping.txt
+          ruby-version: '3.3'
+          bundler-cache: true
+          working-directory: apps/android
+
+      - name: Upload to Play Console internal track
+        if: env.HAS_PLAY_SERVICE_ACCOUNT == 'true'
+        working-directory: apps/android
+        env:
+          GOOGLE_PLAY_JSON_KEY: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          echo "$GOOGLE_PLAY_JSON_KEY" > /tmp/play-key.json
+          SUPPLY_JSON_KEY=/tmp/play-key.json bundle exec fastlane android internal
+          rm -f /tmp/play-key.json
 
       - name: Upload Android artifacts to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG="v${INPUT_VERSION}"
+          TAG="v${VERSION}"
 
           # Find the APK and checksum
           APK=$(find apps/android/app/build/outputs/apk/release -name "*.apk" | head -1)
