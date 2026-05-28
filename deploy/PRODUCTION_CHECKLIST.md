@@ -2,6 +2,18 @@
 
 Pre-launch checklist for self-hosted Llamenos instances. Complete all items before accepting real calls.
 
+## Operational Runbooks
+
+Detailed procedures are in `docs/runbooks/`:
+
+- [Self-Hosted Deployment](../docs/runbooks/deploy-self-hosted.md) — first-time setup for self-hosters
+- [Official Deployment](../docs/runbooks/deploy-official.md) — production server deployment
+- [DNS Migration](../docs/runbooks/dns-migration.md) — Cloudflare to 1984 cutover
+- [Desktop Update Release](../docs/runbooks/desktop-update-release.md) — update server operations
+- [Android Release](../docs/runbooks/android-release.md) — Play Console procedures
+- [Rollback](../docs/runbooks/rollback.md) — rollback procedures
+- [Disaster Recovery](../docs/runbooks/disaster-recovery.md) — full server recovery
+
 ## Infrastructure
 
 - [ ] Server provisioned in Iceland (1984 Hosting) — GDPR compliance + privacy jurisdiction
@@ -31,6 +43,8 @@ Pre-launch checklist for self-hosted Llamenos instances. Complete all items befo
 
 ## TLS & Domain
 
+See [DNS Migration](../docs/runbooks/dns-migration.md) for DNS cutover procedures.
+
 - [ ] Domain DNS A record points to server IP
 - [ ] Caddy has auto-provisioned TLS certificate
 - [ ] HTTPS works end-to-end (test with `curl -I https://yourdomain.org`)
@@ -47,6 +61,8 @@ Pre-launch checklist for self-hosted Llamenos instances. Complete all items befo
 - [ ] Log rotation configured (≤50MB per file, ≤5 files)
 
 ## Backups
+
+See [Disaster Recovery](../docs/runbooks/disaster-recovery.md) for backup and restore procedures.
 
 - [ ] Automated daily backups configured and running
 - [ ] Backup encryption key generated and stored OFFLINE
@@ -65,6 +81,8 @@ Pre-launch checklist for self-hosted Llamenos instances. Complete all items befo
 - [ ] SSE (server-side encryption) enabled on all buckets
 
 ## Desktop Distribution
+
+See [Desktop Update Release](../docs/runbooks/desktop-update-release.md) for release artifact upload and updater configuration.
 
 - [ ] `downloads.{{ domain }}` DNS A record points to server IP
 - [ ] `updates.{{ domain }}` DNS A record points to server IP
@@ -118,5 +136,5 @@ Pre-launch checklist for self-hosted Llamenos instances. Complete all items befo
 - [ ] Verify calls work end-to-end (make a test call)
 - [ ] Verify backup runs on schedule
 - [ ] Set up uptime monitoring (e.g., UptimeRobot on `/api/health/ready`)
-- [ ] Document emergency procedures (restore, failover, key rotation)
+- [ ] Emergency procedures documented — see [Rollback](../docs/runbooks/rollback.md) and [Disaster Recovery](../docs/runbooks/disaster-recovery.md)
 - [ ] Schedule regular security review cadence
