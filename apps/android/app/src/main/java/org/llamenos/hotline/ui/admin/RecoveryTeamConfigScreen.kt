@@ -48,6 +48,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.llamenos.hotline.R
+import org.llamenos.hotline.ui.components.SecureWindowEffect
 import org.llamenos.hotline.model.RecoveryGroupInfo
 import org.llamenos.hotline.model.ShareHolderLiveness
 
@@ -67,6 +68,8 @@ fun RecoveryTeamConfigScreen(
     onRotate: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    SecureWindowEffect()
+
     if (isLoading) {
         Box(
             modifier = modifier.fillMaxSize(),

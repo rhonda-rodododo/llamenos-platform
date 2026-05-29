@@ -35,6 +35,7 @@ import kotlinx.coroutines.delay
 import org.llamenos.hotline.R
 import org.llamenos.hotline.ui.components.LoadingOverlay
 import org.llamenos.hotline.ui.components.PINPad
+import org.llamenos.hotline.ui.components.SecureWindowEffect
 
 /**
  * PIN set screen with enter + confirm flow.
@@ -52,6 +53,8 @@ fun PINSetScreen(
     onAuthenticated: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    SecureWindowEffect()
+
     val uiState by viewModel.uiState.collectAsState()
     var localPin by remember { mutableStateOf("") }
 

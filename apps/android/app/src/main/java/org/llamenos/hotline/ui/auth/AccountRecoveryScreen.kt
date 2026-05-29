@@ -44,6 +44,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import org.llamenos.hotline.R
+import org.llamenos.hotline.ui.components.SecureWindowEffect
 
 /**
  * Account recovery screen for unauthenticated users.
@@ -77,6 +78,8 @@ fun AccountRecoveryScreen(
     delayRemainingMs: Long?,
     modifier: Modifier = Modifier,
 ) {
+    SecureWindowEffect()
+
     Scaffold(modifier = modifier) { paddingValues ->
         Column(
             modifier = Modifier
