@@ -40,12 +40,9 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="llamenos" />
-            </intent-filter>
+            <!-- Deep links are handled by DeepLinkActivity (with allowlist validation).
+                 Do NOT add a llamenos:// intent filter here — it would bypass
+                 DeepLinkValidator and allow 0-click navigation to any screen (H33). -->
         </activity>
 
         <activity
@@ -55,7 +52,7 @@
             android:noHistory="true"
             android:excludeFromRecents="true">
             <!-- OAuth callbacks: llamenos://oauth/callback -->
-            <intent-filter>
+            <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
