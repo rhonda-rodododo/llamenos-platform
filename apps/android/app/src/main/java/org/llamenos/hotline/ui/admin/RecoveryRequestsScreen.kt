@@ -48,6 +48,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.llamenos.hotline.R
 import org.llamenos.hotline.model.RecoverySessionStatus
+import org.llamenos.hotline.ui.components.SecureWindowEffect
 
 /**
  * Admin screen for managing recovery requests.
@@ -66,6 +67,8 @@ fun RecoveryRequestsScreen(
     onUrgentOverride: (sessionId: String, justification: String, approverPubkey: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    SecureWindowEffect()
+
     var selectedTab by remember { mutableIntStateOf(0) }
     var showCancelDialog by remember { mutableStateOf<String?>(null) }
     var showUrgentDialog by remember { mutableStateOf<String?>(null) }
