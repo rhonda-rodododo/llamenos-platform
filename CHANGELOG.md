@@ -404,6 +404,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add E2E tests for device linking and fix /link-device public path
 
 
+## 0.19.10 (2026-05-29)
+
+### Features
+
+- harden scanning pipeline and add DOMPurify (#429)
+- port 9 languages to config and voice prompts (#430)
+- add locale files for 9 new languages (#434)
+- add multi-language content support (#433)
+- add documentation for 9 new languages (#435)
+- hub-configurable IVR language menus (#432)
+- production deployment profiles, update server, Android CI, runbooks (#448)
+- add 9 new locales (uk, fa, tr, ku, so, am, my, quc, mix) (#439)
+
+### Fixes
+
+- exclude vendored code from CodeQL scanning (#427)
+- resolve CodeQL sanitization alerts in codegen tools (#428)
+- upgrade container base images to resolve CVEs (#437)
+- upgrade vulnerable runtime dependencies (#436)
+- upgrade remaining vulnerable dependencies (#438)
+- fix Radix Collapsible expansion check in 5 test files (#440)
+- Epic D — mobile platform hardening (#449)
+
 ## 0.19.9 (2026-05-20)
 
 ### Features
