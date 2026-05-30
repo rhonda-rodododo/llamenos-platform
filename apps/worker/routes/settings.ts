@@ -46,7 +46,7 @@ import { getMessagingAdapterFromService } from '../lib/service-factories'
 
 const settings = new Hono<AppEnv>()
 
-// --- Transcription settings: readable by all authenticated, writable by settings:manage ---
+// --- Transcription settings: readable + writable by settings:manage-transcription ---
 settings.get('/transcription',
   describeRoute({
     tags: ['Settings'],
@@ -63,6 +63,7 @@ settings.get('/transcription',
       ...authErrors,
     },
   }),
+  requirePermission('settings:manage-transcription'),
   async (c) => {
     const services = c.get('services')
     const result = await services.settings.getTranscriptionSettings()
@@ -98,7 +99,7 @@ settings.patch('/transcription',
   },
 )
 
-// --- Custom fields: readable by all authenticated (filtered by permissions), writable by admin ---
+// --- Custom fields: readable by settings:read (filtered by manage-fields), writable by admin ---
 settings.get('/custom-fields',
   describeRoute({
     tags: ['Settings'],
@@ -115,6 +116,7 @@ settings.get('/custom-fields',
       ...authErrors,
     },
   }),
+  requirePermission('settings:read'),
   async (c) => {
     const permissions = c.get('permissions')
     const canManageFields = checkPermission(permissions, 'settings:manage-fields')
@@ -1124,7 +1126,7 @@ settings.get('/cleanup-metrics',
   },
 )
 
-// --- Geocoding config: readable by authenticated users, writable by settings:manage ---
+// --- Geocoding config: readable by settings:read (API key omitted), writable by settings:manage ---
 settings.get('/geocoding',
   describeRoute({
     tags: ['Settings'],
@@ -1134,6 +1136,7 @@ settings.get('/geocoding',
       ...authErrors,
     },
   }),
+  requirePermission('settings:read'),
   async (c) => {
     const config = await c.get('services').settings.getGeocodingConfig()
     return c.json(config)
