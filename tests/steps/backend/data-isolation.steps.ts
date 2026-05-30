@@ -95,9 +95,9 @@ Given(
       name: `${name} ${Date.now()}`,
     })
 
-    // Assign the right role
+    // Assign the right role — use role IDs (not slugs)
     if (role === 'reporter') {
-      await apiPatch(request, `/users/${vol.pubkey}`, { roles: ['reporter'] })
+      await apiPatch(request, `/users/${vol.pubkey}`, { roles: ['role-reporter'] })
     } else if (role === 'volunteer') {
       // Default role is volunteer — no change needed
     }
@@ -141,9 +141,11 @@ Given(
     }
 
     if (role === 'reporter') {
-      // Create a report as this reporter
+      // Create a report authenticated as this reporter so the server records their
+      // pubkey as the author — required for reporter-isolation filter in GET /reports
       const report = await createReportViaApi(request, {
         title: `${name}'s report ${Date.now()}`,
+        seedHex: vol.nsec,
       })
       user.reportIds.push(report.id)
     }
