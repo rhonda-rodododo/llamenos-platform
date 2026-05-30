@@ -634,6 +634,9 @@ private struct CreateCaseSheet: View {
         isSubmitting = true
         errorMessage = nil
 
+        // Ensure admin pubkey is loaded before encrypting
+        await appState.ensureAdminPubkeyLoaded()
+
         do {
             let cryptoService = appState.cryptoService
             guard cryptoService.isUnlocked,

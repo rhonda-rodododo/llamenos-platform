@@ -181,12 +181,13 @@ class DashboardViewModel @Inject constructor(
     private suspend fun fetchServerEventKey() {
         try {
             val me = apiService.request<MeResponse>("GET", "/api/auth/me")
+            // Always persist admin decryption pubkey regardless of hub event keys
+            sessionState.adminDecryptionPubkey = me.adminDecryptionPubkey
             val hubKeys = me.hubEventKeys ?: return
             val activeHubId = activeHubState.activeHubId.value
             val currentKey = if (activeHubId != null) hubKeys[activeHubId] else hubKeys.values.firstOrNull()
             currentKey ?: return
             webSocketService.setServerEventKeys(currentKey)
-            sessionState.adminDecryptionPubkey = me.adminDecryptionPubkey
         } catch (_: Exception) {
             // Non-fatal — WebSocket will still connect but events won't decrypt.
             // The key will be retried on next refresh.

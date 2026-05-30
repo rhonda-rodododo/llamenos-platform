@@ -39,6 +39,7 @@ enum KeychainKey {
     static let pinLength = "pin-length"
     static let pinLockoutAttempts = "pin-lockout-attempts"
     static let pinLockoutUntil = "pin-lockout-until"
+    static let adminDecryptionPubkey = "admin-decryption-pubkey"
 }
 
 // MARK: - KeychainService
@@ -167,6 +168,7 @@ final class KeychainService: @unchecked Sendable {
             KeychainKey.pinLength,
             KeychainKey.pinLockoutAttempts,
             KeychainKey.pinLockoutUntil,
+            KeychainKey.adminDecryptionPubkey,
         ]
         for key in keys {
             delete(key: key)

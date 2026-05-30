@@ -261,6 +261,7 @@ class ConversationsViewModel @Inject constructor(
             _uiState.update { it.copy(isSending = true, sendError = null) }
 
             try {
+                sessionState.ensureAdminPubkeyLoaded(apiService)
                 // Collect reader pubkeys: self + assigned volunteer (if different) + admins
                 val readerPubkeys = buildList {
                     cryptoService.encryptionPubkeyHex?.let { add(it) }
