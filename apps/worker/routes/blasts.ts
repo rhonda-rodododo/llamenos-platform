@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { requirePermission } from '../middleware/permission-guard'
-import { listBlastsQuerySchema, createBlastBodySchema, updateBlastBodySchema, scheduleBlastBodySchema, importSubscribersBodySchema, updateBlastSettingsBodySchema, blastResponseSchema, subscriberStatsResponseSchema, blastSettingsResponseSchema, subscriberListResponseSchema, blastListResponseSchema, blastDeliveryListResponseSchema, importSubscribersResponseSchema, blastDeliveryResponseSchema } from '@protocol/schemas/blasts'
+import { listBlastsQuerySchema, listSubscribersQuerySchema, listDeliveriesQuerySchema, createBlastBodySchema, updateBlastBodySchema, scheduleBlastBodySchema, importSubscribersBodySchema, updateBlastSettingsBodySchema, blastResponseSchema, subscriberStatsResponseSchema, blastSettingsResponseSchema, subscriberListResponseSchema, blastListResponseSchema, blastDeliveryListResponseSchema, importSubscribersResponseSchema, blastDeliveryResponseSchema } from '@protocol/schemas/blasts'
 import type { BlastContent, MultiBlastContent } from '@shared/types'
 import { okResponseSchema } from '@protocol/schemas/common'
 import { authErrors } from '../openapi/helpers'
@@ -104,23 +104,19 @@ blasts.get('/subscribers',
     },
   }),
   requirePermission('blasts:manage'),
+  validator('query', listSubscribersQuerySchema),
   async (c) => {
     const services = c.get('services')
     const hubId = c.get('hubId')
-    const url = new URL(c.req.url)
-    const tag = url.searchParams.get('tag') ?? undefined
-    const channel = url.searchParams.get('channel') as import('@shared/types').MessagingChannelType | undefined
-    const status = url.searchParams.get('status') as import('@shared/types').Subscriber['status'] | undefined
-    const page = parseInt(url.searchParams.get('page') ?? '1', 10)
-    const limit = parseInt(url.searchParams.get('limit') ?? '50', 10)
+    const query = c.req.valid('query')
 
     const result = await services.blasts.listSubscribers({
       hubId,
-      tag,
-      channel,
-      status,
-      limit,
-      offset: (page - 1) * limit,
+      tag: query.tag,
+      channel: query.channel,
+      status: query.status,
+      limit: query.limit,
+      offset: (query.page - 1) * query.limit,
     })
 
     return c.json(result)
@@ -487,21 +483,19 @@ blasts.get('/:id/deliveries',
     },
   }),
   requirePermission('blasts:read'),
+  validator('query', listDeliveriesQuerySchema),
   async (c) => {
     const id = c.req.param('id')
     const services = c.get('services')
-    const url = new URL(c.req.url)
-    const status = url.searchParams.get('status') as import('@shared/types').BlastDeliveryStatus | undefined
-    const page = parseInt(url.searchParams.get('page') ?? '1', 10)
-    const limit = parseInt(url.searchParams.get('limit') ?? '50', 10)
+    const query = c.req.valid('query')
 
     const result = await services.blasts.getDeliveries(id, {
-      status: status ?? undefined,
-      limit,
-      offset: (page - 1) * limit,
+      status: query.status,
+      limit: query.limit,
+      offset: (query.page - 1) * query.limit,
     })
 
-    return c.json({ deliveries: result.deliveries, total: result.total, page, limit })
+    return c.json({ deliveries: result.deliveries, total: result.total, page: query.page, limit: query.limit })
   },
 )
 

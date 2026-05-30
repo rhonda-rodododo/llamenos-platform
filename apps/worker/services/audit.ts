@@ -186,7 +186,10 @@ export class AuditService {
           details,
           previousEntryHash,
           entryHash,
-          createdAt: new Date(createdAt),
+          // Explicitly set createdAt to the same timestamp used for hash
+          // computation. Using sql`` avoids JS Date round-trip issues and
+          // ensures the stored value exactly matches the hashed value.
+          createdAt: sql`${createdAt}::timestamptz`,
         })
         .returning()
 

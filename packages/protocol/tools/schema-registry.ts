@@ -32,6 +32,7 @@ const EXCLUDED_SCHEMAS = new Set([
   'listNotesQuerySchema',
   'listReportsQuerySchema',
   'listSubscribersQuerySchema',
+  'listDeliveriesQuerySchema',
   'callHistoryQuerySchema',
   'analyticsDateRangeQuerySchema',
 

@@ -37,8 +37,8 @@ platformBans.get(
   requirePermission('bans:read-platform'),
   async (c) => {
     const services = c.get('services')
-    const limit = Math.min(Number(c.req.query('limit') ?? 50), 200)
-    const offset = Number(c.req.query('offset') ?? 0)
+    const limit = Math.max(1, Math.min(Number(c.req.query('limit') ?? 50) || 50, 200))
+    const offset = Math.max(0, Number(c.req.query('offset') ?? 0) || 0)
 
     const { bans: rows, total } = await services.records.listPlatformBans(limit, offset)
 

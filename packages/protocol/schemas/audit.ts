@@ -36,8 +36,8 @@ export const auditListResponseSchema = z.object({
 
 export const auditVerifyQuerySchema = z.object({
   hubId: z.string().optional(),
-  limit: z.coerce.number().int().positive().optional(),
-  offset: z.coerce.number().int().min(0).optional(),
+  limit: z.coerce.number().int().min(1).max(1000).optional().default(500),
+  offset: z.coerce.number().int().min(0).optional().default(0),
 })
 
 export const auditVerifyResponseSchema = z.object({

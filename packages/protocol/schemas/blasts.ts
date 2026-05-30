@@ -163,7 +163,12 @@ export const listBlastsQuerySchema = paginationSchema.extend({
 
 export const listSubscribersQuerySchema = paginationSchema.extend({
   channel: z.enum(['sms', 'whatsapp', 'signal']).optional(),
-  status: z.enum(['active', 'unsubscribed', 'pending']).optional(),
+  status: z.enum(['active', 'paused', 'unsubscribed']).optional(),
+  tag: z.string().optional(),
+})
+
+export const listDeliveriesQuerySchema = paginationSchema.extend({
+  status: z.enum(['pending', 'sent', 'delivered', 'failed', 'opted_out', 'skipped']).optional(),
 })
 
 export const createBlastBodySchema = z.looseObject({
