@@ -30,7 +30,7 @@ services:
     environment:
       - ENVIRONMENT=development
       - DEV_ROUTES_ENABLED=true
-      - DEV_RESET_SECRET=test-reset-secret
+      - DEV_RESET_SECRET=${DEV_RESET_SECRET:-test-reset-secret}
       - TOKEN_MAX_AGE_MS=${TOKEN_MAX_AGE_MS:-3600000}
       # Wire up sidecar services so integration tests can reach them
       - NOTIFIER_URL=http://signal-notifier:3100
@@ -90,7 +90,7 @@ services:
       - ARI_URL=ws://asterisk:8088/ari/events
       - ARI_REST_URL=http://asterisk:8088/ari
       - ARI_USERNAME=llamenos
-      - ARI_PASSWORD=${ARI_PASSWORD:-changeme}
+      - ARI_PASSWORD=${ARI_PASSWORD:-ci-ari-password}
       - WORKER_WEBHOOK_URL=http://app:3000
       - BRIDGE_SECRET=${BRIDGE_SECRET:-ci-test-bridge-secret}
       - CONNECTION_TIMEOUT_MS=60000

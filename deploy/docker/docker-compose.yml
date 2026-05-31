@@ -197,6 +197,8 @@ services:
     restart: unless-stopped
     volumes:
       - ./asterisk-config:/etc/asterisk:ro
+    environment:
+      - ARI_PASSWORD=${ARI_PASSWORD:?ARI_PASSWORD is required when asterisk profile is active}
     networks:
       - internal
     healthcheck:
@@ -271,7 +273,7 @@ services:
       --realm=${DOMAIN:-localhost}
       --fingerprint
       --lt-cred-mech
-      --user=llamenos:${TURN_SECRET:-changeme}
+      --user=llamenos:${TURN_SECRET:?TURN_SECRET is required when telephony profile is active — generate with openssl rand -hex 32}
       --no-tls
       --no-dtls
     networks:
