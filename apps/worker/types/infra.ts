@@ -242,6 +242,8 @@ export interface AuthPayload {
   pubkey: string
   timestamp: number
   token: string
+  /** Optional random nonce to prevent replay collisions in parallel requests */
+  nonce?: string
 }
 
 // ---------------------------------------------------------------------------

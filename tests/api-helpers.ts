@@ -41,24 +41,34 @@ export function seedHexToPubkey(seedHex: string): string {
  * Format: `{LABEL_DEVICE_AUTH}:{pubkey_hex}:{timestamp_ms}:{METHOD}:{path}`
  * MUST match apps/worker/lib/auth.ts::buildAuthMessage()
  */
-function buildAuthMessage(pubkey: string, timestamp: number, method: string, path: string): Uint8Array {
-  return utf8ToBytes(`${LABEL_DEVICE_AUTH}:${pubkey}:${timestamp}:${method}:${path}`)
+function buildAuthMessage(pubkey: string, timestamp: number, method: string, path: string, nonce?: string): Uint8Array {
+  const base = `${LABEL_DEVICE_AUTH}:${pubkey}:${timestamp}:${method}:${path}`
+  return utf8ToBytes(nonce ? `${base}:${nonce}` : base)
+}
+
+/** Generate a random 16-byte hex nonce for auth replay prevention */
+function randomNonce(): string {
+  const bytes = new Uint8Array(16)
+  crypto.getRandomValues(bytes)
+  return bytesToHex(bytes)
 }
 
 /**
  * Create an Ed25519 auth token for API calls.
  * Matches the format expected by apps/worker/lib/auth.ts.
+ * Includes a random nonce to prevent replay collisions in parallel test workers.
  */
 function createEd25519AuthToken(
   seedHex: string,
   method: string,
   path: string,
-): { pubkey: string; timestamp: number; token: string } {
+): { pubkey: string; timestamp: number; token: string; nonce: string } {
   const pubkey = seedHexToPubkey(seedHex)
   const timestamp = Date.now()
-  const message = buildAuthMessage(pubkey, timestamp, method, path)
+  const nonce = randomNonce()
+  const message = buildAuthMessage(pubkey, timestamp, method, path, nonce)
   const sig = ed25519.sign(message, hexToBytes(seedHex))
-  return { pubkey, timestamp, token: bytesToHex(sig) }
+  return { pubkey, timestamp, token: bytesToHex(sig), nonce }
 }
 
 function authHeaders(seedHex: string, method: string, path: string): Record<string, string> {

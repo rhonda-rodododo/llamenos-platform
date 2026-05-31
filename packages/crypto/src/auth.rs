@@ -31,16 +31,36 @@ pub struct AuthToken {
     pub pubkey: String,
     pub timestamp: u64,
     pub token: String,
+    /// Optional random nonce to prevent replay collisions in parallel requests.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nonce: Option<String>,
 }
 
 /// Build the canonical auth message bytes (UTF-8, no hashing).
 ///
-/// Format: `{LABEL_DEVICE_AUTH}:{pubkey_hex}:{timestamp_ms}:{METHOD}:{path}`
+/// Format (legacy): `{LABEL_DEVICE_AUTH}:{pubkey_hex}:{timestamp_ms}:{METHOD}:{path}`
+/// Format (nonce):  `{LABEL_DEVICE_AUTH}:{pubkey_hex}:{timestamp_ms}:{METHOD}:{path}:{nonce}`
 ///
 /// This is the EXACT byte sequence that gets signed/verified.
 /// Both Rust and TypeScript MUST produce identical bytes for interop.
 pub fn build_auth_message(pubkey_hex: &str, timestamp: u64, method: &str, path: &str) -> Vec<u8> {
     format!("{LABEL_DEVICE_AUTH}:{pubkey_hex}:{timestamp}:{method}:{path}").into_bytes()
+}
+
+/// Build auth message with an optional nonce for replay prevention.
+pub fn build_auth_message_with_nonce(
+    pubkey_hex: &str,
+    timestamp: u64,
+    method: &str,
+    path: &str,
+    nonce: Option<&str>,
+) -> Vec<u8> {
+    match nonce {
+        Some(n) => {
+            format!("{LABEL_DEVICE_AUTH}:{pubkey_hex}:{timestamp}:{method}:{path}:{n}").into_bytes()
+        }
+        None => build_auth_message(pubkey_hex, timestamp, method, path),
+    }
 }
 
 /// Create an Ed25519 auth token using device secrets.
@@ -64,6 +84,7 @@ pub fn create_auth_token(
         pubkey: pubkey_hex,
         timestamp,
         token: token_hex,
+        nonce: None,
     })
 }
 
@@ -97,6 +118,7 @@ pub fn create_auth_token_from_signing_key(
         pubkey: pubkey_hex,
         timestamp,
         token: token_hex,
+        nonce: None,
     })
 }
 
@@ -137,7 +159,13 @@ pub fn verify_auth_token(token: &AuthToken, method: &str, path: &str) -> Result<
     let verifying_key =
         VerifyingKey::from_bytes(&pubkey_arr).map_err(|_| CryptoError::InvalidPublicKey)?;
 
-    let message = build_auth_message(&token.pubkey, token.timestamp, method, path);
+    let message = build_auth_message_with_nonce(
+        &token.pubkey,
+        token.timestamp,
+        method,
+        path,
+        token.nonce.as_deref(),
+    );
 
     let sig_bytes = hex::decode(&token.token).map_err(CryptoError::HexError)?;
     if sig_bytes.len() != 64 {
@@ -297,6 +325,7 @@ mod tests {
             pubkey: "a".repeat(64),
             timestamp: 1708900000000,
             token: "abcd".to_string(),
+            nonce: None,
         };
         let result = verify_auth_token(&short_token, "GET", "/api/notes");
         assert!(result.is_err() || matches!(result, Ok(false)));
@@ -305,6 +334,7 @@ mod tests {
             pubkey: "a".repeat(64),
             timestamp: 1708900000000,
             token: "zzzz".repeat(32),
+            nonce: None,
         };
         let result = verify_auth_token(&nonhex_token, "GET", "/api/notes");
         assert!(result.is_err());
@@ -335,6 +365,7 @@ mod tests {
             pubkey: pubkey_hex.clone(),
             timestamp,
             token: hex::encode(signature.to_bytes()),
+            nonce: None,
         };
         assert!(verify_auth_token(&token, method, path).unwrap());
 
