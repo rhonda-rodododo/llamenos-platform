@@ -26,7 +26,7 @@ turbine = "1.2.0"
 mockk = "1.14.0"
 roborazzi = "1.60.0"
 robolectric = "4.15.1"
-biometric = "1.2.0-alpha05"
+biometric = "1.1.0"
 
 [libraries]
 compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "compose-bom" }
@@ -47,7 +47,7 @@ coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutin
 coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
 coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
 security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "security-crypto" }
-androidx-biometric = { group = "androidx.biometric", name = "biometric-ktx", version.ref = "biometric" }
+androidx-biometric = { group = "androidx.biometric", name = "biometric", version.ref = "biometric" }
 activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activity-compose" }
 lifecycle-viewmodel = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycle" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
