@@ -137,11 +137,11 @@ export class ConnectionManager {
   /** Unsubscribe a user from a hub entirely. */
   unsubscribe(pubkey: string, hubId: string): void {
     this.removeSubscription(pubkey, hubId)
-    // Remove from connection state tracking
+    // Remove from active subscription tracking (not from membership — hubs is set at auth)
     const conns = this.connections.get(pubkey)
     if (conns) {
       for (const conn of conns) {
-        conn.hubs.delete(hubId)
+        conn.subscribedHubs.delete(hubId)
       }
     }
   }
