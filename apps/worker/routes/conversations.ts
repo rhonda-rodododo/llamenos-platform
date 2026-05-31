@@ -4,7 +4,7 @@ import type { AppEnv, EncryptedMessage } from '../types'
 import type { MessagingChannelType } from '@shared/types'
 import { routeOutboundMessage } from '../messaging/delivery-router'
 import { checkPermission, requirePermission } from '../middleware/permission-guard'
-import { listConversationsQuerySchema, sendMessageBodySchema, updateConversationBodySchema, conversationResponseSchema, messageResponseSchema, conversationListResponseSchema, messageListResponseSchema } from '@protocol/schemas/conversations'
+import { listConversationsQuerySchema, sendMessageBodySchema, updateConversationBodySchema, conversationResponseSchema, messageResponseSchema, conversationListResponseSchema, messageListResponseSchema, conversationStatsResponseSchema, volunteerLoadResponseSchema } from '@protocol/schemas/conversations'
 import { paginationSchema } from '@protocol/schemas/common'
 import { authErrors, notFoundError } from '../openapi/helpers'
 import { audit } from '../services/audit'
@@ -145,7 +145,10 @@ conversations.get('/stats',
     tags: ['Conversations'],
     summary: 'Get conversation statistics',
     responses: {
-      200: { description: 'Conversation metrics' },
+      200: {
+        description: 'Conversation metrics',
+        content: { 'application/json': { schema: resolver(conversationStatsResponseSchema) } },
+      },
       ...authErrors,
     },
   }),
@@ -167,7 +170,10 @@ conversations.get('/load',
     tags: ['Conversations'],
     summary: 'Get volunteer conversation load counts',
     responses: {
-      200: { description: 'Volunteer load counts' },
+      200: {
+        description: 'Volunteer load counts',
+        content: { 'application/json': { schema: resolver(volunteerLoadResponseSchema) } },
+      },
       ...authErrors,
     },
   }),

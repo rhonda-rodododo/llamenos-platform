@@ -11,7 +11,7 @@ import { Hono } from 'hono'
 import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { authErrors } from '../openapi/helpers'
-import { registerDeviceBodySchema, voipTokenBodySchema, deviceDetailListResponseSchema, renameDeviceBodySchema, revokeDeviceBodySchema, verifyDeviceBodySchema, clearPushTokenBodySchema } from '@protocol/schemas/devices'
+import { registerDeviceBodySchema, voipTokenBodySchema, deviceDetailListResponseSchema, renameDeviceBodySchema, revokeDeviceBodySchema, verifyDeviceBodySchema, clearPushTokenBodySchema, renameDeviceResponseSchema, revokeDeviceResponseSchema, verifyDeviceResponseSchema } from '@protocol/schemas/devices'
 import { requirePermission } from '../middleware/permission-guard'
 import { rateLimit } from '../middleware/rate-limit'
 
@@ -200,7 +200,10 @@ devicesRoutes.patch('/:id',
     tags: ['Devices'],
     summary: 'Rename a device',
     responses: {
-      200: { description: 'Device renamed' },
+      200: {
+        description: 'Device renamed',
+        content: { 'application/json': { schema: resolver(renameDeviceResponseSchema) } },
+      },
       404: { description: 'Device not found or not owned by caller' },
       ...authErrors,
     },
@@ -234,7 +237,10 @@ devicesRoutes.post('/:id/revoke',
     summary: 'Revoke a device with sigchain + PUK rotation signal',
     responses: {
       ...authErrors,
-      200: { description: 'Device revoked, hub key rotation needed' },
+      200: {
+        description: 'Device revoked, hub key rotation needed',
+        content: { 'application/json': { schema: resolver(revokeDeviceResponseSchema) } },
+      },
       400: { description: 'Confirmation required' },
       404: { description: 'Device not found or not owned by caller' },
       429: { description: 'Rate limit exceeded (3/hour)' },
@@ -278,7 +284,10 @@ devicesRoutes.post('/:id/verify',
     tags: ['Devices'],
     summary: 'Record SAS verification of a device',
     responses: {
-      200: { description: 'Verification recorded' },
+      200: {
+        description: 'Verification recorded',
+        content: { 'application/json': { schema: resolver(verifyDeviceResponseSchema) } },
+      },
       404: { description: 'Device not found' },
       ...authErrors,
     },

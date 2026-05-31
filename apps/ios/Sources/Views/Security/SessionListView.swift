@@ -10,7 +10,7 @@ struct SessionListView: View {
             if loading {
                 ProgressView()
             } else {
-                ForEach(sessions, id: \.token) { session in
+                ForEach(sessions, id: \.id) { session in
                     SessionRow(session: session)
                 }
             }
