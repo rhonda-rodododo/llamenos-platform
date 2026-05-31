@@ -105,8 +105,8 @@ export class EventOutbox {
    * Returns number of deleted rows.
    */
   async cleanup(): Promise<number> {
-    const deliveredCutoff = new Date(Date.now() - DELIVERED_TTL_MS)
-    const failedCutoff = new Date(Date.now() - FAILED_TTL_MS)
+    const deliveredCutoff = new Date(Date.now() - DELIVERED_TTL_MS).toISOString()
+    const failedCutoff = new Date(Date.now() - FAILED_TTL_MS).toISOString()
 
     const result = await this.db.execute(sql`
       DELETE FROM event_outbox
