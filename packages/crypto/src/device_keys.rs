@@ -16,7 +16,7 @@ use argon2::Argon2;
 use ed25519_dalek::{SigningKey, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use x25519_dalek::{PublicKey as X25519PublicKey, StaticSecret as X25519Secret};
-use zeroize::Zeroize;
+use zeroize::{Zeroize, Zeroizing};
 
 use crate::ct_hex_eq;
 use crate::errors::CryptoError;
@@ -184,9 +184,11 @@ pub fn unlock_device_keys(
     let cipher = Aes256Gcm::new_from_slice(&kek)
         .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
 
-    let plaintext = cipher
-        .decrypt(nonce, ciphertext.as_ref())
-        .map_err(|_| CryptoError::WrongPin)?;
+    let plaintext = Zeroizing::new(
+        cipher
+            .decrypt(nonce, ciphertext.as_ref())
+            .map_err(|_| CryptoError::WrongPin)?,
+    );
 
     kek.zeroize();
 

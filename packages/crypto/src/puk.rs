@@ -248,9 +248,11 @@ pub fn decrypt_clkr_link(
         aad: aad_str.as_bytes(),
     };
 
-    let plaintext = cipher
-        .decrypt(nonce, payload)
-        .map_err(|_| CryptoError::DecryptionFailed)?;
+    let plaintext = Zeroizing::new(
+        cipher
+            .decrypt(nonce, payload)
+            .map_err(|_| CryptoError::DecryptionFailed)?,
+    );
 
     if plaintext.len() != 32 {
         return Err(CryptoError::InvalidFormat(

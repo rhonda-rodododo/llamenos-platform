@@ -88,14 +88,12 @@ pub fn unwrap_audit_key(
 ) -> Result<Zeroizing<[u8; 32]>, CryptoError> {
     let aad = format!("{LABEL_AUDIT_USER_KEY_WRAP}:{user_pubkey_hex}");
 
-    let key = hpke_open_key(
+    hpke_open_key(
         &admin_envelope.envelope,
         admin_secret_hex,
         LABEL_AUDIT_USER_KEY_WRAP,
         aad.as_bytes(),
-    )?;
-
-    Ok(Zeroizing::new(key))
+    )
 }
 
 /// Encrypt audit entry details using the user's audit key.

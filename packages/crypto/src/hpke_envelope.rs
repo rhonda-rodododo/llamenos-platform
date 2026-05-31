@@ -214,12 +214,13 @@ pub fn hpke_seal_key(
 /// Open an HPKE envelope containing a 32-byte symmetric key.
 ///
 /// Convenience wrapper around `hpke_open` that validates the decrypted length.
+/// Returns the key wrapped in `Zeroizing` so it is erased from memory on drop.
 pub fn hpke_open_key(
     envelope: &HpkeEnvelope,
     recipient_secret_hex: &str,
     expected_label: &str,
     aad: &[u8],
-) -> Result<[u8; 32], CryptoError> {
+) -> Result<Zeroizing<[u8; 32]>, CryptoError> {
     let plaintext = Zeroizing::new(hpke_open(
         envelope,
         recipient_secret_hex,
@@ -232,7 +233,7 @@ pub fn hpke_open_key(
             plaintext.len()
         )));
     }
-    let mut key = [0u8; 32];
+    let mut key = Zeroizing::new([0u8; 32]);
     key.copy_from_slice(&plaintext);
     Ok(key)
 }
@@ -352,7 +353,7 @@ mod tests {
 
         let envelope = hpke_seal_key(&key, &pk_hex, LABEL_NOTE_KEY, aad).unwrap();
         let recovered = hpke_open_key(&envelope, &sk_hex, LABEL_NOTE_KEY, aad).unwrap();
-        assert_eq!(key, recovered);
+        assert_eq!(key, *recovered);
     }
 
     #[test]

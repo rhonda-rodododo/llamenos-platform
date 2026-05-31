@@ -77,11 +77,12 @@ pub fn hpke_wrap_key(
 }
 
 /// Unwrap a 32-byte symmetric key from a wire-format `KeyEnvelope` using HPKE.
+/// Returns the key wrapped in `Zeroizing` so it is erased from memory on drop.
 pub fn hpke_unwrap_key(
     envelope: &KeyEnvelope,
     secret_key_hex: &str,
     label: &str,
-) -> Result<[u8; 32], CryptoError> {
+) -> Result<Zeroizing<[u8; 32]>, CryptoError> {
     let aad = format!("{label}:key-wrap");
     let enc_bytes = hex::decode(&envelope.enc).map_err(CryptoError::HexError)?;
     let ct_bytes = hex::decode(&envelope.ct).map_err(CryptoError::HexError)?;
@@ -340,7 +341,7 @@ fn derive_encryption_key(secret_key: &[u8; 32], label: &str) -> [u8; 32] {
 /// Encrypt a draft (local auto-save) with HKDF-derived key.
 #[cfg_attr(feature = "mobile", uniffi::export)]
 pub fn encrypt_draft(plaintext: &str, secret_key_hex: &str) -> Result<String, CryptoError> {
-    let sk_bytes = hex::decode(secret_key_hex).map_err(CryptoError::HexError)?;
+    let sk_bytes = Zeroizing::new(hex::decode(secret_key_hex).map_err(CryptoError::HexError)?);
     if sk_bytes.len() != 32 {
         return Err(CryptoError::InvalidSecretKey);
     }
@@ -359,7 +360,7 @@ pub fn encrypt_draft(plaintext: &str, secret_key_hex: &str) -> Result<String, Cr
 /// Decrypt a draft.
 #[cfg_attr(feature = "mobile", uniffi::export)]
 pub fn decrypt_draft(packed_hex: &str, secret_key_hex: &str) -> Result<String, CryptoError> {
-    let sk_bytes = hex::decode(secret_key_hex).map_err(CryptoError::HexError)?;
+    let sk_bytes = Zeroizing::new(hex::decode(secret_key_hex).map_err(CryptoError::HexError)?);
     if sk_bytes.len() != 32 {
         return Err(CryptoError::InvalidSecretKey);
     }
@@ -384,7 +385,7 @@ pub fn decrypt_draft(packed_hex: &str, secret_key_hex: &str) -> Result<String, C
 
 /// Encrypt a JSON export blob. Returns base64-encoded ciphertext.
 pub fn encrypt_export(json_string: &str, secret_key_hex: &str) -> Result<String, CryptoError> {
-    let sk_bytes = hex::decode(secret_key_hex).map_err(CryptoError::HexError)?;
+    let sk_bytes = Zeroizing::new(hex::decode(secret_key_hex).map_err(CryptoError::HexError)?);
     if sk_bytes.len() != 32 {
         return Err(CryptoError::InvalidSecretKey);
     }
