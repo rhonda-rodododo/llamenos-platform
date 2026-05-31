@@ -5,6 +5,14 @@
     HTTPS only — no cleartext traffic permitted.
     Debug builds use app/src/debug/res/xml/network_security_config.xml
     which adds localhost and LAN exceptions.
+
+    Certificate pinning strategy (dual-layer):
+    1. OS-level (this file): <pin-set> below pins ISRG Root X1/X2 for llamenos.org deployments.
+       Self-hosters MUST update the <domain> and pin hashes to match their TLS certificate chain.
+    2. App-level: ApiService.configurePinning() applies an OkHttp CertificatePinner for any
+       configured hub hostname, covering operator-customised deployments at runtime.
+
+    Both layers enforce hard-fail — no cleartext fallback, no soft-fail mode.
 -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="false">
@@ -12,4 +20,31 @@
             <certificates src="system" />
         </trust-anchors>
     </base-config>
+
+    <!--
+        Production certificate pins — Let's Encrypt ISRG Root X1 (RSA 4096) and
+        ISRG Root X2 (ECDSA P-384). Pinning root CAs means routine leaf-cert
+        renewals do not break pinning. Two independent roots provide backup in
+        case one root is deprecated (RFC 7469 §2.5 recommendation).
+
+        IMPORTANT FOR SELF-HOSTERS: Replace "llamenos.org" with your hub's
+        hostname and update the pin hashes to match your TLS chain's root CA.
+        Regenerate hashes via:
+          curl -s https://letsencrypt.org/certs/isrgrootx1.pem \
+            | openssl x509 -pubkey -noout | openssl pkey -pubin -outform der \
+            | openssl dgst -sha256 -binary | base64
+
+        Pin expiration: review and extend before 2027-01-01.
+          ISRG Root X1 certificate expires: 2035-06-04
+          ISRG Root X2 certificate expires: 2040-09-17
+    -->
+    <domain-config>
+        <domain includeSubdomains="true">llamenos.org</domain>
+        <pin-set expiration="2027-01-01">
+            <!-- ISRG Root X1 — RSA 4096 -->
+            <pin digest="SHA-256">C5+lpZ7tcVwmwQIMcRtPbsQtWLABXhQzejna0wHFr8M=</pin>
+            <!-- ISRG Root X2 — ECDSA P-384 backup root -->
+            <pin digest="SHA-256">diGVwiVYbubAI3RW4hB9xU8e/CH2GGvrTcuvhPy/MzA=</pin>
+        </pin-set>
+    </domain-config>
 </network-security-config>

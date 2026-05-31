@@ -23,20 +23,35 @@ openssl s_client -connect app.llamenos.org:443 -showcerts </dev/null 2>/dev/null
 
 ## Current Pins
 
+Pinning strategy: root CA pins (ISRG Root X1 + X2) so that routine leaf-cert
+renewal never breaks the app. Two independent CA roots for backup (RFC 7469 §2.5).
+
 | Domain | Type | Hash (base64 SHA-256 SPKI) | Expires |
 |--------|------|---------------------------|---------|
-| *.llamenos.org | Leaf cert | **REPLACE_BEFORE_PRODUCTION** | — |
-| *.llamenos.org | Cloudflare Intermediate CA | **REPLACE_BEFORE_PRODUCTION** | — |
+| *.llamenos.org | ISRG Root X1 (RSA 4096) | `C5+lpZ7tcVwmwQIMcRtPbsQtWLABXhQzejna0wHFr8M=` | 2035-06-04 |
+| *.llamenos.org | ISRG Root X2 (ECDSA P-384) | `diGVwiVYbubAI3RW4hB9xU8e/CH2GGvrTcuvhPy/MzA=` | 2040-09-17 |
+
+These hashes are identical in both enforcement layers:
+- `apps/android/app/src/main/java/org/llamenos/hotline/api/ApiService.kt`
+  (`ISRG_ROOT_X1_HASH`, `ISRG_ROOT_X2_HASH`)
+- `apps/android/app/src/main/res/xml/network_security_config.xml`
+  (`<pin-set expiration="2027-01-01">`)
+
+**Self-hosters**: If your hub is not hosted under `llamenos.org`, you must update the
+`<domain>` in `network_security_config.xml` and ensure your TLS chain leads back to these
+root CAs (or update the pin hashes accordingly).
 
 ## Pin Rotation Procedure
 
-1. Extract new cert hashes (see above)
-2. Update `apps/ios/Sources/Services/APIService.swift` `cloudflareHashes`
-3. Update `apps/android/app/src/main/java/org/llamenos/hotline/api/ApiService.kt` `certificatePinner`
-4. Update `/api/config` endpoint `pinConfig` response (signed by server Ed25519 key)
-5. Deploy backend first (with both old + new pins in `pinConfig`)
-6. Ship mobile update with new `cloudflareHashes` (includes backup)
-7. After old certs expire: remove old pins from backend `pinConfig`
+1. Extract new cert hashes (see extraction commands above)
+2. Update `apps/android/app/src/main/res/xml/network_security_config.xml` `<pin-set>`
+3. Update `apps/android/app/src/main/java/org/llamenos/hotline/api/ApiService.kt`
+   `ISRG_ROOT_X1_HASH` / `ISRG_ROOT_X2_HASH` constants
+4. Update `apps/ios/Sources/Services/APIService.swift` pin hashes
+5. Update `/api/config` endpoint `pinConfig` response (signed by server Ed25519 key)
+6. Deploy backend first (with both old + new pins in `pinConfig`)
+7. Ship mobile update with new pin hashes (keep old as backup until expiry)
+8. After old certs expire: remove old pins from backend `pinConfig`
 
 ## Hard-Fail Policy
 
