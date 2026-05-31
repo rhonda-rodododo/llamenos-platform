@@ -157,7 +157,7 @@ describe('Telephony routes', () => {
         body: 'CallSid=CA123',
       })
       expect(res.status).toBe(403)
-      expect(await res.text()).toBe('Forbidden')
+      expect(await res.json()).toEqual({ error: 'Forbidden' })
     })
 
     it('rejects localhost requests with invalid signature (H05 — no bypass)', async () => {
@@ -413,7 +413,7 @@ describe('Telephony routes', () => {
         body: '',
       })
       expect(res.status).toBe(403)
-      expect(await res.text()).toBe('Forbidden')
+      expect(await res.json()).toEqual({ error: 'Forbidden' })
     })
 
     it('bridges call and publishes events on valid token', async () => {
