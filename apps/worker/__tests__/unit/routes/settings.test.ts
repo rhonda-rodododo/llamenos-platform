@@ -94,12 +94,18 @@ describe('settings route', () => {
   })
 
   describe('transcription', () => {
-    it('GET /transcription returns settings for any authenticated user', async () => {
-      const app = createTestApp()
+    it('GET /transcription returns settings with manage-transcription permission', async () => {
+      const app = createTestApp({ permissions: ['settings:manage-transcription'] })
       const res = await app.request('/transcription')
       expect(res.status).toBe(200)
       const body = await res.json()
       expect(body.enabled).toBe(true)
+    })
+
+    it('GET /transcription requires manage-transcription permission', async () => {
+      const app = createTestApp({ permissions: ['settings:read'] })
+      const res = await app.request('/transcription')
+      expect(res.status).toBe(403)
     })
 
     it('PATCH /transcription requires manage-transcription permission', async () => {
@@ -132,7 +138,7 @@ describe('settings route', () => {
     it('GET /custom-fields returns fields filtered by role', async () => {
       const getSpy = vi.fn().mockResolvedValue([{ id: 'cf-1' }])
       const app = createTestApp({
-        permissions: ['settings:manage-fields'],
+        permissions: ['settings:manage-fields', 'settings:read'],
         services: { settings: { getCustomFields: getSpy } },
       })
       const res = await app.request('/custom-fields')
@@ -558,10 +564,11 @@ describe('settings route', () => {
   })
 
   describe('geocoding', () => {
-    it('GET /geocoding calls safe method (no apiKey) for any authenticated user', async () => {
+    it('GET /geocoding calls safe method (no apiKey) for users with settings:read', async () => {
       const getGeocodingConfig = vi.fn().mockResolvedValue({ provider: 'opencage', countries: ['US'], enabled: true })
       const getGeocodingConfigAdmin = vi.fn().mockResolvedValue({ provider: 'opencage', apiKey: 'secret', countries: ['US'], enabled: true })
       const app = createTestApp({
+        permissions: ['settings:read'],
         services: { settings: { getGeocodingConfig, getGeocodingConfigAdmin } },
       })
       const res = await app.request('/geocoding')
@@ -581,7 +588,7 @@ describe('settings route', () => {
         permissions: ['settings:manage'],
         services: { settings: { getGeocodingConfigAdmin } },
       })
-      const res = await app.request('/geocoding/test')
+      await app.request('/geocoding/test')
       // /geocoding/test uses getGeocodingConfigAdmin to look up the API key
       expect(getGeocodingConfigAdmin).toHaveBeenCalled()
     })

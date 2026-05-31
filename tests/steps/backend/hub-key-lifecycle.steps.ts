@@ -12,12 +12,14 @@ import {
   apiPost,
   createVolunteerViaApi,
 } from '../../api-helpers'
+import { generateContentKey, wrapKeyForRecipient, x25519PubkeyFromSeed } from '../../crypto-helpers'
+import { LABEL_HUB_KEY_WRAP } from '@shared/crypto-labels'
 
 // ── Local State ────────────────────────────────────────────────────
 
 interface HubMember {
   name: string
-  nsec: string
+  seedHex: string
   pubkey: string
 }
 
@@ -59,11 +61,12 @@ Before({ tags: '@crypto' }, async ({ world }) => {
 
 // ── Helpers ────────────────────────────────────────────────────────
 
-function generateMockEnvelopeEntry(pubkey: string, seed: string): EnvelopeEntry {
-  // ct encodes pubkey+seed so each member gets a DISTINCT value
-  const ct = Buffer.from(`wrapped:${pubkey}:${seed}`).toString('base64')
-  // enc must match pubkeySchema: ^[0-9a-f]{64}$ — real pubkeys satisfy this
-  return { pubkey, ct, enc: pubkey }
+async function generateRealEnvelopeEntry(pubkey: string, memberSeedHex: string): Promise<EnvelopeEntry> {
+  // Use real HPKE to wrap a random hub key for this member
+  const hubKey = generateContentKey()
+  const x25519Pub = x25519PubkeyFromSeed(memberSeedHex)
+  const envelope = await wrapKeyForRecipient(hubKey, x25519Pub, memberSeedHex, LABEL_HUB_KEY_WRAP)
+  return { pubkey, ct: envelope.ct, enc: envelope.enc }
 }
 
 async function createHub(request: import('@playwright/test').APIRequestContext): Promise<string> {
@@ -96,7 +99,7 @@ Given(
       await apiPost(request, `/hubs/${hubId}/members`, { pubkey: vol.pubkey, roleIds: ['role-volunteer'] })
       getHubKeyState(world).members.set(name, {
         name,
-        nsec: vol.nsec,
+        seedHex: vol.seedHex,
         pubkey: vol.pubkey,
       })
     }
@@ -112,7 +115,7 @@ When(
 
     const envelopes: EnvelopeEntry[] = []
     for (const [name, member] of getHubKeyState(world).members) {
-      const entry = generateMockEnvelopeEntry(member.pubkey, 'initial')
+      const entry = await generateRealEnvelopeEntry(member.pubkey, member.nsec)
       envelopes.push(entry)
       getHubKeyState(world).originalEnvelopes.set(name, entry.ct)
       getHubKeyState(world).currentEnvelopes.set(name, entry.ct)
@@ -132,7 +135,7 @@ Given('hub key envelopes are set for all {int} members', async ({ request, world
 
   const envelopes: EnvelopeEntry[] = []
   for (const [name, member] of getHubKeyState(world).members) {
-    const entry = generateMockEnvelopeEntry(member.pubkey, 'initial')
+    const entry = await generateRealEnvelopeEntry(member.pubkey, member.nsec)
     envelopes.push(entry)
     getHubKeyState(world).originalEnvelopes.set(name, entry.ct)
     getHubKeyState(world).currentEnvelopes.set(name, entry.ct)
@@ -158,7 +161,7 @@ Then(
     const res = await apiGet<{ envelope: { pubkey: string; ct: string; enc: string } }>(
       request,
       `/hubs/${getHubKeyState(world).hubId}/key`,
-      member!.nsec,
+      member!.seedHex,
     )
     expect(res.status).toBe(200)
     expect(res.data.envelope).toBeTruthy()
@@ -198,7 +201,7 @@ When(
     for (const name of [name1, name2]) {
       const member = getHubKeyState(world).members.get(name)
       expect(member).toBeTruthy()
-      const entry = generateMockEnvelopeEntry(member!.pubkey, 'rotated')
+      const entry = await generateRealEnvelopeEntry(member!.pubkey, member!.nsec)
       envelopes.push(entry)
       getHubKeyState(world).currentEnvelopes.set(name, entry.ct)
     }
@@ -225,7 +228,7 @@ Then(
     const res = await apiGet(
       request,
       `/hubs/${getHubKeyState(world).hubId}/key`,
-      member!.nsec,
+      member!.seedHex,
     )
     expect(res.status).toBe(expectedStatus)
     getHubKeyState(world).fetchResults.set(name, { status: res.status })
@@ -243,7 +246,7 @@ When(
     for (const [name, member] of getHubKeyState(world).members) {
       // Only wrap for members still tracked in currentEnvelopes (non-removed)
       if (getHubKeyState(world).currentEnvelopes.has(name)) {
-        const entry = generateMockEnvelopeEntry(member.pubkey, 'new-key')
+        const entry = await generateRealEnvelopeEntry(member.pubkey, member.nsec)
         envelopes.push(entry)
         getHubKeyState(world).currentEnvelopes.set(name, entry.ct)
       }
@@ -283,9 +286,9 @@ const AUTH_GUARD_KEY = 'hub_key_auth_guard'
 
 interface AuthGuardState {
   hubId?: string
-  memberNsec?: string
-  nonMemberNsec?: string
-  noEnvelopeMemberNsec?: string
+  memberSeedHex?: string
+  nonMemberSeedHex?: string
+  noEnvelopeMemberSeedHex?: string
   lastStatus?: number
 }
 
@@ -310,11 +313,11 @@ Given('a hub exists with a member {string}', async ({ request, world }, name: st
 
   const vol = await createVolunteerViaApi(request, { name: `${name} ${Date.now()}` })
   getAuthGuardState(world).hubId = hubId
-  getAuthGuardState(world).memberNsec = vol.nsec
+  getAuthGuardState(world).memberSeedHex = vol.seedHex
 
   // Store member pubkey for hub membership purposes — hub membership is implied by envelope presence
   getHubKeyState(world).hubId = hubId
-  getHubKeyState(world).members.set(name, { name, nsec: vol.nsec, pubkey: vol.pubkey })
+  getHubKeyState(world).members.set(name, { name, seedHex: vol.seedHex, pubkey: vol.pubkey })
 })
 
 Given('hub key envelopes are set for {string}', async ({ request, world }, name: string) => {
@@ -323,7 +326,7 @@ Given('hub key envelopes are set for {string}', async ({ request, world }, name:
   const member = getHubKeyState(world).members.get(name)
   expect(member).toBeTruthy()
 
-  const entry = generateMockEnvelopeEntry(member!.pubkey, 'initial')
+  const entry = await generateRealEnvelopeEntry(member!.pubkey, member!.nsec)
   const res = await apiPut(request, `/hubs/${hubId}/key`, { envelopes: [entry] })
   expect(res.status).toBe(200)
   getHubKeyState(world).originalEnvelopes.set(name, entry.ct)
@@ -332,7 +335,7 @@ Given('hub key envelopes are set for {string}', async ({ request, world }, name:
 
 Given('a volunteer {string} who is not a hub member', async ({ request, world }, name: string) => {
   const vol = await createVolunteerViaApi(request, { name: `${name} ${Date.now()}` })
-  getAuthGuardState(world).nonMemberNsec = vol.nsec
+  getAuthGuardState(world).nonMemberSeedHex = vol.seedHex
 })
 
 Given(
@@ -341,10 +344,10 @@ Given(
     // Create a volunteer but do NOT set their envelope — they're "in the hub" via hub roles
     // but the key server has no wrapped key for them
     const vol = await createVolunteerViaApi(request, { name: `${name} ${Date.now()}` })
-    getHubKeyState(world).members.set(name, { name, nsec: vol.nsec, pubkey: vol.pubkey })
+    getHubKeyState(world).members.set(name, { name, seedHex: vol.seedHex, pubkey: vol.pubkey })
     // Add them to the hub via hub membership (PUT envelopes with existing members only)
     // They won't have an envelope entry, so GET /hubs/:id/key will return 404 for them
-    getAuthGuardState(world).noEnvelopeMemberNsec = vol.nsec
+    getAuthGuardState(world).noEnvelopeMemberSeedHex = vol.seedHex
 
     // Add them as a hub member via hub membership API (hub membership = having a hub role)
     // But do NOT add their key envelope — so GET /hubs/:id/key returns 404 for them
@@ -367,17 +370,17 @@ When('{string} requests the hub key envelope', async ({ request, world }, name: 
   const hubId = getAuthGuardState(world).hubId
   expect(hubId).toBeTruthy()
 
-  // Determine which nsec to use based on the name
-  let nsec: string | undefined
+  // Determine which seed to use based on the name
+  let seedHex: string | undefined
   if (getHubKeyState(world).members.has(name)) {
     // Could be the no-envelope member
-    nsec = getAuthGuardState(world).noEnvelopeMemberNsec
-      ?? getHubKeyState(world).members.get(name)!.nsec
+    seedHex = getAuthGuardState(world).noEnvelopeMemberSeedHex
+      ?? getHubKeyState(world).members.get(name)!.seedHex
   } else {
-    nsec = getAuthGuardState(world).nonMemberNsec
+    seedHex = getAuthGuardState(world).nonMemberSeedHex
   }
 
-  const res = await apiGet(request, `/hubs/${hubId}/key`, nsec)
+  const res = await apiGet(request, `/hubs/${hubId}/key`, seedHex)
   getAuthGuardState(world).lastStatus = res.status
 })
 

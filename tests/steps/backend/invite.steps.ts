@@ -23,6 +23,8 @@ interface InviteTestState {
   inviteCode?: string
   rateLimitResponses: number[]
   volunteerNsec?: string
+  /** Unique per-scenario fake IP so validation calls don't share the 'unknown' rate limit bucket. */
+  scenarioIp: string
 }
 
 const STATE_KEY = 'invite_test'
@@ -34,7 +36,11 @@ function getS(world: Record<string, unknown>): InviteTestState {
 const BASE_URL = process.env.TEST_HUB_URL || 'http://localhost:3000'
 
 Before(async ({ world }) => {
-  setState<InviteTestState>(world, STATE_KEY, { rateLimitResponses: [] })
+  // Assign a unique fake IP per scenario so all validation calls use an isolated
+  // rate limit bucket instead of the shared 'unknown' bucket (which fills up across
+  // scenarios when CF-Connecting-IP is absent and causes spurious 429s).
+  const scenarioIp = `10.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`
+  setState<InviteTestState>(world, STATE_KEY, { rateLimitResponses: [], scenarioIp })
 })
 // ── Helpers ─────────────────────────────────────────────────────────
 
@@ -92,15 +98,16 @@ When('the invite code is validated', async ({ request, world }) => {
   const s = getS(world)
   expect(s.inviteCode).toBeDefined()
   const res = await request.get(`${BASE_URL}/api/invites/validate/${s.inviteCode}`, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': s.scenarioIp },
   })
   const data = res.ok() ? await res.json().catch(() => null) : null
   setLastResponse(world, { status: res.status(), data })
 })
 
 When('a random UUID is validated as an invite', async ({ request, world }) => {
+  const s = getS(world)
   const res = await request.get(`${BASE_URL}/api/invites/validate/${crypto.randomUUID()}`, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': s.scenarioIp },
   })
   const data = res.ok() ? await res.json().catch(() => null) : null
   setLastResponse(world, { status: res.status(), data })
@@ -196,7 +203,7 @@ Then('the invite code is no longer valid', async ({ request, world }) => {
   const s = getS(world)
   expect(s.inviteCode).toBeDefined()
   const res = await request.get(`${BASE_URL}/api/invites/validate/${s.inviteCode}`, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': s.scenarioIp },
   })
   const data = await res.json().catch(() => null)
   expect(data?.valid).toBe(false)

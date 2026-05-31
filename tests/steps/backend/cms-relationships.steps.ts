@@ -204,9 +204,10 @@ Then(
     // Verify via GET that the group persists
     const group = await getAffinityGroupViaApi(request, getRelState(world).lastGroup!.id)
     expect(group.id).toBe(getRelState(world).lastGroup!.id)
-    // The encrypted details contain the name (base64-encoded JSON)
-    const details = JSON.parse(atob(group.encryptedDetails))
-    expect(details.name).toBe(_name)
+    // encryptedDetails is AES-256-GCM ciphertext — verify it exists (non-empty)
+    expect(group.encryptedDetails).toBeTruthy()
+    expect(typeof group.encryptedDetails).toBe('string')
+    expect((group.encryptedDetails as string).length).toBeGreaterThan(0)
   },
 )
 

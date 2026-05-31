@@ -137,6 +137,60 @@ jobs:
 
           echo "No generated files tracked in git"
 
+  # ─── Guard: Updater Pubkey Must Be Set ───────────────────
+  verify-updater-config:
+    name: Updater pubkey is set
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 2
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Verify updater pubkey
+        run: |
+          # Reject empty string or known placeholder values.
+          # The pubkey must be a non-empty base64 string that decodes to a
+          # minisign public key (starts with "untrusted comment: minisign").
+          PUBKEY=$(node -e "
+            const fs = require('fs');
+            const conf = JSON.parse(fs.readFileSync('apps/desktop/tauri.conf.json', 'utf-8'));
+            process.stdout.write(conf?.plugins?.updater?.pubkey ?? '');
+          ")
+
+          if [[ -z "$PUBKEY" ]]; then
+            echo "::error::apps/desktop/tauri.conf.json: plugins.updater.pubkey is empty."
+            echo "::error::Run 'bunx tauri signer generate' and commit the public key."
+            exit 1
+          fi
+
+          PLACEHOLDERS=(
+            "REPLACE_WITH_PUBKEY_FROM_TAURI_SIGNER_GENERATE"
+            "YOUR_PUBLIC_KEY_HERE"
+            "TODO"
+          )
+          for p in "${PLACEHOLDERS[@]}"; do
+            if [[ "$PUBKEY" == "$p" ]]; then
+              echo "::error::apps/desktop/tauri.conf.json: pubkey is still a placeholder: $PUBKEY"
+              echo "::error::Generate a real key with 'bunx tauri signer generate' and commit it."
+              exit 1
+            fi
+          done
+
+          # Decode and verify it looks like a minisign public key
+          DECODED=$(echo "$PUBKEY" | base64 -d 2>/dev/null || true)
+          if ! echo "$DECODED" | grep -q "minisign public key"; then
+            echo "::error::apps/desktop/tauri.conf.json: pubkey does not decode to a valid minisign public key."
+            echo "::error::Expected base64-encoded minisign pubkey from 'bunx tauri signer generate'."
+            exit 1
+          fi
+
+          echo "Updater pubkey is set and valid."
+          KEY_ID=$(echo "$DECODED" | head -1 | grep -oE 'E[0-9A-F]+' || echo "unknown")
+          echo "  Key ID: $KEY_ID"
+
   # ─── Build & Validate ──────────────────────────────────────
   build:
     needs: changes
@@ -1144,7 +1198,7 @@ jobs:
           echo "Signed: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${DIGEST}"
 
   ci-status:
-    needs: [no-generated-files-in-git, build, audit, crypto-tests, e2e, backend-bdd, backend-unit, desktop-unit, android-build-test, android-e2e, ios-build-test, crypto-guardrails, migration-drift, ansible-validate, docs-guard]
+    needs: [no-generated-files-in-git, verify-updater-config, build, audit, crypto-tests, e2e, backend-bdd, backend-unit, desktop-unit, android-build-test, android-e2e, ios-build-test, crypto-guardrails, migration-drift, ansible-validate, docs-guard]
     if: always()
     runs-on: ubuntu-latest
     permissions:
@@ -1161,6 +1215,7 @@ jobs:
             fi
           }
           check_job "no-generated-files-in-git" "${{ needs.no-generated-files-in-git.result }}"
+          check_job "verify-updater-config" "${{ needs.verify-updater-config.result }}"
           check_job "build" "${{ needs.build.result }}"
           check_job "audit" "${{ needs.audit.result }}"
           check_job "crypto-tests" "${{ needs.crypto-tests.result }}"
