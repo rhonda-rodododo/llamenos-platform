@@ -814,19 +814,6 @@ pub fn shamir_verify(x: u8, y_hex: String, commitment_hex: String) -> Result<boo
     Ok(computed_bytes.ct_eq(&expected_bytes).into())
 }
 
-/// Generate an X25519 recovery group keypair. Returns {publicKeyHex, privateKeyHex}.
-/// The caller MUST split the private key with shamir_split and zeroize it immediately.
-#[tauri::command]
-pub fn recovery_group_generate_keypair() -> Result<serde_json::Value, String> {
-    use x25519_dalek::{PublicKey, StaticSecret};
-    let secret = StaticSecret::random_from_rng(rand::rngs::OsRng);
-    let public = PublicKey::from(&secret);
-    Ok(serde_json::json!({
-        "publicKeyHex": hex::encode(public.as_bytes()),
-        "privateKeyHex": hex::encode(secret.as_bytes()),
-    }))
-}
-
 // ── H16: Recovery group key isolation — combine+decrypt in Rust only ──
 
 /// Generate an X25519 recovery group keypair, immediately Shamir-split the private key,
@@ -989,18 +976,6 @@ pub fn device_import_and_load(
 
     let result = serde_json::to_value(&encrypted_imported).map_err(err_str)?;
     Ok(result)
-}
-
-/// Legacy nsec import — same as device_import_and_load.
-/// The nsec hex IS the signing secret for legacy key import.
-#[tauri::command]
-pub fn legacy_import_nsec(
-    state: tauri::State<'_, CryptoState>,
-    nsec_hex: String,
-    pin: String,
-    device_id: String,
-) -> Result<serde_json::Value, String> {
-    device_import_and_load(state, nsec_hex, pin, device_id)
 }
 
 /// Generate an ephemeral Ed25519 keypair for admin-created users.

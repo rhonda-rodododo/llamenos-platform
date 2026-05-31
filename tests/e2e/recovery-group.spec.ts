@@ -212,28 +212,31 @@ test.describe('Recovery Group - IPC Mock Verification', () => {
     expect(result.commitmentCount).toBe(3)
   })
 
-  test('recovery group keypair generation produces valid hex keys', async ({ page }) => {
+  test('recovery_group_create generates keypair and splits without leaking private key', async ({ page }) => {
     await waitForInvoke(page)
 
     const result = await page.evaluate(async () => {
       const invoke = (window as any)[Symbol.for('llamenos_test_invoke')] as
         (cmd: string, args?: Record<string, unknown>) => Promise<unknown>
 
-      const keypair = (await invoke('recovery_group_generate_keypair')) as {
+      const group = (await invoke('recovery_group_create', { total: 3, threshold: 2 })) as {
         publicKeyHex: string
-        privateKeyHex: string
+        shares: Array<{ x: number; y: string }>
+        commitments: string[]
       }
 
       return {
-        hasPublicKey: keypair.publicKeyHex.length === 64,
-        hasPrivateKey: keypair.privateKeyHex.length === 64,
-        keysAreDifferent: keypair.publicKeyHex !== keypair.privateKeyHex,
+        hasPublicKey: group.publicKeyHex.length === 64,
+        noPrivateKey: !('privateKeyHex' in group),
+        shareCount: group.shares.length,
+        commitmentCount: group.commitments.length,
       }
     })
 
     expect(result.hasPublicKey).toBe(true)
-    expect(result.hasPrivateKey).toBe(true)
-    expect(result.keysAreDifferent).toBe(true)
+    expect(result.noPrivateKey).toBe(true)
+    expect(result.shareCount).toBe(3)
+    expect(result.commitmentCount).toBe(3)
   })
 
   test('shamir verify rejects invalid commitment', async ({ page }) => {

@@ -14,7 +14,6 @@ if (!import.meta.env.PLAYWRIGHT_TEST) {
 
 import { ed25519 } from '@noble/curves/ed25519.js'
 import { x25519 } from '@noble/curves/ed25519.js'
-import { schnorr } from '@noble/curves/secp256k1.js'
 import { hkdf } from '@noble/hashes/hkdf.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { hmac } from '@noble/hashes/hmac.js'
@@ -86,11 +85,6 @@ interface MockDeviceKeyState {
 let mockSecrets: MockDeviceSecrets | null = null
 let mockDeviceState: MockDeviceKeyState | null = null
 let mockEncryptedKeys: unknown = null
-
-// Key type tracking for auth token generation
-type KeyType = 'ed25519' | 'secp256k1'
-let currentKeyType: KeyType = 'ed25519'
-let schnorrSecretBytes: Uint8Array | null = null // secp256k1 secret for Schnorr auth
 
 // ── Provisioning ephemeral key mock state ────────────────────────────
 let mockProvisioningEphemeral: Uint8Array | null = null
@@ -388,19 +382,17 @@ const commands: Record<string, CommandHandler> = {
 
     const encrypted = await encryptWithPin(signingSeed, encryptionSeed, pin)
 
-    const result = { ...encrypted, state, _keyType: 'ed25519' as string }
+    const result = { ...encrypted, state }
     mockSecrets = { signingSeed, encryptionSeed }
     mockDeviceState = state
     mockEncryptedKeys = result
-    currentKeyType = 'ed25519'
-    schnorrSecretBytes = null
 
     return result
   },
 
   unlock_with_pin: async (a) => {
     const data = (mockEncryptedKeys ?? a.data) as {
-      salt: string; nonce: string; ciphertext: string; state: MockDeviceKeyState; _keyType?: string
+      salt: string; nonce: string; ciphertext: string; state: MockDeviceKeyState
     }
     if (!data) throw new Error('No key stored. Complete onboarding first.')
 
@@ -428,15 +420,6 @@ const commands: Record<string, CommandHandler> = {
     mockSecrets = { signingSeed, encryptionSeed }
     mockDeviceState = data.state
 
-    // Restore key type for auth token generation
-    if (data._keyType === 'secp256k1') {
-      currentKeyType = 'secp256k1'
-      schnorrSecretBytes = signingSeed
-    } else {
-      currentKeyType = 'ed25519'
-      schnorrSecretBytes = null
-    }
-
     return data.state
   },
 
@@ -457,15 +440,6 @@ const commands: Record<string, CommandHandler> = {
     const timestamp = a.timestamp as number
     const method = a.method as string
     const path = a.path as string
-
-    if (currentKeyType === 'secp256k1' && schnorrSecretBytes) {
-      // Schnorr auth (secp256k1) for legacy nsec import
-      const pubkey = bytesToHex(schnorr.getPublicKey(schnorrSecretBytes))
-      const msgStr = `llamenos:auth:${pubkey}:${timestamp}:${method}:${path}`
-      const msgHash = sha256(utf8ToBytes(msgStr))
-      const sig = schnorr.sign(msgHash, schnorrSecretBytes)
-      return JSON.stringify({ pubkey, timestamp, token: bytesToHex(sig) })
-    }
 
     // Ed25519 auth (v3 device keys) — must match Rust build_auth_message() exactly:
     // Format: "llamenos:device-auth:v1:{pubkey}:{timestamp}:{method}:{path}"
@@ -777,47 +751,11 @@ const commands: Record<string, CommandHandler> = {
     }
 
     const encrypted = await encryptWithPin(signingSeed, encryptionSeed, pin)
-    const result = { ...encrypted, state, _keyType: 'ed25519' as string }
+    const result = { ...encrypted, state }
 
     mockSecrets = { signingSeed, encryptionSeed }
     mockDeviceState = state
     mockEncryptedKeys = result
-    currentKeyType = 'ed25519'
-    schnorrSecretBytes = null
-
-    return result
-  },
-
-  // --- Legacy nsec import (secp256k1 secret for Schnorr auth) ---
-
-  legacy_import_nsec: async (a) => {
-    const nsecHex = a.nsecHex as string
-    const pin = a.pin as string
-    const deviceId = a.deviceId as string
-
-    const secretBytes = hexToBytes(nsecHex)
-    const xOnlyPubkey = schnorr.getPublicKey(secretBytes)
-
-    // For secp256k1 legacy keys, we store the secret as "signingSeed"
-    // and derive a dummy encryption seed (not used for HPKE in legacy mode)
-    const encryptionSeed = hkdf(sha256, secretBytes, new Uint8Array(0),
-      utf8ToBytes('llamenos:legacy-encryption-seed:v1'), 32)
-    const encryptionPubkey = deriveX25519Pubkey(encryptionSeed)
-
-    const state: MockDeviceKeyState = {
-      deviceId,
-      signingPubkeyHex: bytesToHex(xOnlyPubkey),
-      encryptionPubkeyHex: bytesToHex(encryptionPubkey),
-    }
-
-    const encrypted = await encryptWithPin(secretBytes, encryptionSeed, pin)
-    const result = { ...encrypted, state, _keyType: 'secp256k1' as string }
-
-    mockSecrets = { signingSeed: secretBytes, encryptionSeed }
-    mockDeviceState = state
-    mockEncryptedKeys = result
-    currentKeyType = 'secp256k1'
-    schnorrSecretBytes = secretBytes
 
     return result
   },
@@ -933,15 +871,6 @@ const commands: Record<string, CommandHandler> = {
     return bytesToHex(sha256(data)) === commitmentHex
   },
 
-  recovery_group_generate_keypair: () => {
-    const privateKey = randomBytes(32)
-    const publicKey = x25519.getPublicKey(privateKey)
-    return {
-      publicKeyHex: bytesToHex(publicKey),
-      privateKeyHex: bytesToHex(privateKey),
-    }
-  },
-
   // H16: Recovery group key isolation — create with immediate Shamir split
   recovery_group_create: (a) => {
     const total = a.total as number
@@ -1027,7 +956,6 @@ const commands: Record<string, CommandHandler> = {
     mockHubKey = null
     mockRecoveryGroupKey = null
     mockProvisioningEphemeral = null
-    schnorrSecretBytes = null
     // Reset lockout state in memory without calling saveLockoutState().
     // localStorage.clear() has already run before wipe_keys is called (panic wipe
     // clears storage first, then calls wipeVaultFile which invokes this command).
@@ -1241,13 +1169,11 @@ const commands: Record<string, CommandHandler> = {
     }
 
     const encrypted = await encryptWithPin(signingSeed, encryptionSeed, pin)
-    const result = { ...encrypted, state, _keyType: 'ed25519' as string }
+    const result = { ...encrypted, state }
 
     mockSecrets = { signingSeed, encryptionSeed }
     mockDeviceState = state
     mockEncryptedKeys = result
-    currentKeyType = 'ed25519'
-    schnorrSecretBytes = null
     mockProvisioningEphemeral = null // Consumed
 
     return result

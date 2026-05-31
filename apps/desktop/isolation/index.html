@@ -55,7 +55,10 @@ window.__TAURI_ISOLATION_HOOK__ = (payload) => {
     'shamir_combine',
     'shamir_commit',
     'shamir_verify',
-    'recovery_group_generate_keypair',
+    // H16: Recovery group key isolation — private key never enters JS
+    'recovery_group_create',
+    'recovery_group_reconstruct_from_shares',
+    'recovery_group_decrypt',
     // Window plugin commands (window management + tray toggle)
     'plugin:window|is_visible',
     'plugin:window|show',
