@@ -637,6 +637,69 @@ pub fn mobile_decrypt_server_event(encrypted_hex: String) -> Result<String, Cryp
     Err(CryptoError::DecryptionFailed)
 }
 
+/// Decrypt a server-published event using the epoch-aware AAD and padding format.
+///
+/// The server pads plaintext to a power-of-2 bucket (min 512B) before encrypting:
+///   `[4-byte LE actual-length][plaintext JSON bytes][random padding]`
+/// AAD = `"llamenos:hub-event:{epoch}"` (includes epoch for domain separation).
+///
+/// Tries the stored current key first, then the previous key for epoch rotation.
+/// Returns the decrypted JSON string with padding stripped.
+#[uniffi::export]
+pub fn mobile_decrypt_server_event_with_epoch(
+    encrypted_hex: String,
+    epoch: u64,
+) -> Result<String, CryptoError> {
+    use aes_gcm::{
+        aead::{Aead, KeyInit, Payload},
+        Aes256Gcm, Nonce,
+    };
+    let guard = state().lock().unwrap();
+    let current = guard
+        .server_event_current_key
+        .as_ref()
+        .ok_or_else(|| CryptoError::InvalidInput("No server event key set".into()))?;
+    let data = hex::decode(&encrypted_hex).map_err(CryptoError::HexError)?;
+    if data.len() < 28 {
+        return Err(CryptoError::InvalidCiphertext);
+    }
+    let nonce = Nonce::from_slice(&data[..12]);
+    let ciphertext = &data[12..];
+    let aad = format!("{}:{}", crate::labels::LABEL_HUB_EVENT, epoch);
+    let aad_bytes = aad.as_bytes();
+
+    let try_decrypt = |key: &[u8]| -> Option<Vec<u8>> {
+        let cipher = Aes256Gcm::new_from_slice(key).ok()?;
+        cipher
+            .decrypt(nonce, Payload { msg: ciphertext, aad: aad_bytes })
+            .ok()
+    };
+
+    let unpad = |padded: Vec<u8>| -> Result<String, CryptoError> {
+        if padded.len() < 4 {
+            return Err(CryptoError::InvalidCiphertext);
+        }
+        let actual_len = u32::from_le_bytes(
+            padded[..4].try_into().map_err(|_| CryptoError::InvalidCiphertext)?,
+        ) as usize;
+        if actual_len + 4 > padded.len() {
+            return Err(CryptoError::InvalidCiphertext);
+        }
+        String::from_utf8(padded[4..4 + actual_len].to_vec())
+            .map_err(|_| CryptoError::DecryptionFailed)
+    };
+
+    if let Some(plaintext) = try_decrypt(current) {
+        return unpad(plaintext);
+    }
+    if let Some(previous) = guard.server_event_previous_key.as_ref() {
+        if let Some(plaintext) = try_decrypt(previous) {
+            return unpad(plaintext);
+        }
+    }
+    Err(CryptoError::DecryptionFailed)
+}
+
 // ── Utility ────────────────────────────────────────────────────────
 
 /// Generate 32 random bytes as hex (for nonces, IDs, etc.).

@@ -157,6 +157,10 @@ private func ffiMobileDecryptServerEvent(encryptedHex: String) throws -> String 
     try mobileDecryptServerEvent(encryptedHex: encryptedHex)
 }
 
+private func ffiMobileDecryptServerEventWithEpoch(encryptedHex: String, epoch: UInt64) throws -> String {
+    try mobileDecryptServerEventWithEpoch(encryptedHex: encryptedHex, epoch: epoch)
+}
+
 private func ffiMobileDecryptEventWithAttribution(ciphertextHex: String) throws -> [String] {
     try mobileDecryptEventWithAttribution(ciphertextHex: ciphertextHex)
 }
@@ -432,6 +436,12 @@ final class CryptoService: @unchecked Sendable {
     /// Tries current key first, falls back to previous key during epoch rotation.
     func decryptServerEventWithStoredKeys(encryptedHex: String) -> String? {
         return try? ffiMobileDecryptServerEvent(encryptedHex: encryptedHex)
+    }
+
+    /// Decrypt a server-published event using epoch-aware AAD and bucket-padding strip.
+    /// Uses stored server event keys (current + previous) in Rust — no key in Swift.
+    func decryptServerEvent(ciphertextHex: String, epoch: Int) -> String? {
+        return try? ffiMobileDecryptServerEventWithEpoch(encryptedHex: ciphertextHex, epoch: UInt64(epoch))
     }
 
     /// Try to decrypt a relay event against all stored hub keys in Rust.

@@ -2,75 +2,115 @@ import Foundation
 import Testing
 @testable import Llamenos
 
-// MARK: - WebSocketService Multi-Hub Attribution Tests
+// MARK: - WebSocketService Decryption & Attribution Tests
 
-/// Tests for `WebSocketService.decryptEvent(_:)` multi-hub key-trial attribution.
+/// Tests for `WebSocketService.decryptPayload(_:epoch:hubId:)`.
 ///
-/// The core invariant: when multiple hub keys are loaded, `decryptEvent` tries each
-/// one in Rust and attributes the resulting `AttributedHubEvent.hubId` to whichever
-/// hub's key successfully decrypts the event content.
+/// The core invariant: `decryptPayload` returns an `AttributedHubEvent` whose `hubId`
+/// matches the hub ID passed in from the server message (new protocol — hub is not inferred
+/// from key-trial, it is provided directly in the event envelope).
 ///
-/// Real XChaCha20-Poly1305 decryption happens in Rust via `decryptEventWithAttribution`.
+/// Real AES-256-GCM decryption happens in Rust via `CryptoService.decryptServerEvent`.
 /// These tests use `WebSocketService.decryptionHandler` — a `#if DEBUG` closure that
-/// replaces the CryptoService call — to return predetermined (hubId, json) pairs
-/// without requiring actual encrypted payloads.
+/// overrides the CryptoService call — to return predetermined plaintext JSON without
+/// requiring actual encrypted payloads or stored server event keys.
 @MainActor
 struct WebSocketServiceAttributionTests {
 
     // MARK: - Helpers
 
-    /// Create a `WebSocketService` with a fresh `CryptoService` and a mock decryption
-    /// closure that returns a fixed (hubId, json) for any ciphertext.
+    /// Create a `WebSocketService` with a mock decryption closure that returns a fixed
+    /// JSON string for any (ciphertext, epoch) pair, simulating successful decryption.
     private func makeService(
-        hubId: String,
         json: String = #"{"type":"call:ring","callSid":"CA123"}"#
     ) -> WebSocketService {
-        let crypto = CryptoService()
-        let ws = WebSocketService(cryptoService: crypto)
-        ws.decryptionHandler = { _ in (hubId: hubId, json: json) }
+        let ws = WebSocketService(cryptoService: CryptoService())
+        ws.decryptionHandler = { _, _ in json }
         return ws
     }
 
     // MARK: - Attribution Tests
 
-    /// `decryptEvent` attributes the event to the hub whose key decrypted it.
-    @Test func testDecryptEventAttributesToCorrectHub() {
-        let ws = makeService(hubId: "hub-2", json: #"{"type":"shift:update"}"#)
+    /// `decryptPayload` attributes the event to the hub ID provided in the call.
+    @Test func testDecryptPayloadAttributesToPassedHub() {
+        let ws = makeService(json: #"{"type":"shift:update"}"#)
 
-        let result = ws.decryptEvent("opaque-ciphertext")
+        let result = ws.decryptPayload("opaque-ciphertext", epoch: 1, hubId: "hub-2")
         #expect(result != nil)
         #expect(result?.hubId == "hub-2")
         #expect(result?.event == .shiftUpdate)
     }
 
-    /// `decryptEvent` returns `nil` when no loaded hub key successfully decrypts the content.
-    @Test func testDecryptEventReturnsNilWhenNoKeyMatches() {
-        let crypto = CryptoService()
-        let ws = WebSocketService(cryptoService: crypto)
-        // Mock: always fails — simulates wrong key or tampered ciphertext.
-        ws.decryptionHandler = { _ in nil }
+    /// `decryptPayload` returns `nil` when decryption fails (mock returns nil).
+    @Test func testDecryptPayloadReturnsNilWhenDecryptionFails() {
+        let ws = WebSocketService(cryptoService: CryptoService())
+        ws.decryptionHandler = { _, _ in nil }
 
-        let result = ws.decryptEvent("opaque-ciphertext")
+        let result = ws.decryptPayload("opaque-ciphertext", epoch: 1, hubId: "hub-1")
         #expect(result == nil)
     }
 
-    /// `decryptEvent` returns `nil` when no hub keys are loaded and no mock is set.
-    @Test func testDecryptEventReturnsNilWithNoHubKeys() {
-        let crypto = CryptoService()
-        let ws = WebSocketService(cryptoService: crypto)
-        // decryptionHandler defaults to { _ in nil }, and no Rust hub keys loaded.
+    /// `decryptPayload` returns `nil` when no server event key is loaded and no mock is set.
+    @Test func testDecryptPayloadReturnsNilWithNoKeyLoaded() {
+        let ws = WebSocketService(cryptoService: CryptoService())
+        // decryptionHandler defaults to { _, _ in nil }; no Rust server key loaded.
 
-        let result = ws.decryptEvent("opaque-ciphertext")
+        let result = ws.decryptPayload("opaque-ciphertext", epoch: 1, hubId: "hub-1")
         #expect(result == nil)
     }
 
-    /// `decryptEvent` parses a voicemail:new event type correctly via the attribution pipeline.
-    @Test func testDecryptEventParsesVoicemailNewType() {
-        let ws = makeService(hubId: "winner-hub", json: #"{"type":"voicemail:new"}"#)
+    /// `decryptPayload` parses a voicemail:new event type correctly.
+    @Test func testDecryptPayloadParsesVoicemailNewType() {
+        let ws = makeService(json: #"{"type":"voicemail:new"}"#)
 
-        let result = ws.decryptEvent("opaque-ciphertext")
+        let result = ws.decryptPayload("opaque-ciphertext", epoch: 42, hubId: "winner-hub")
         #expect(result != nil)
         #expect(result?.hubId == "winner-hub")
         #expect(result?.event == .voicemailNew)
+    }
+
+    /// `decryptPayload` correctly routes `call:answered` events.
+    @Test func testDecryptPayloadParsesCallAnsweredType() {
+        let ws = makeService(json: #"{"type":"call:answered","callSid":"CA999"}"#)
+
+        let result = ws.decryptPayload("encrypted-blob", epoch: 7, hubId: "hub-answered")
+        #expect(result != nil)
+        #expect(result?.event == .callAnswered)
+    }
+
+    /// `decryptPayload` correctly routes `presence:detail` events.
+    @Test func testDecryptPayloadParsesPresenceDetailType() {
+        let ws = makeService(json: #"{"type":"presence:detail","available":3,"onCall":1,"total":4}"#)
+
+        let result = ws.decryptPayload("enc-payload", epoch: 0, hubId: "hub-alpha")
+        #expect(result != nil)
+        #expect(result?.event == .presenceDetail)
+    }
+
+    /// `decryptPayload` correctly routes `conversation:new` events.
+    @Test func testDecryptPayloadParsesConversationNewType() {
+        let ws = makeService(json: #"{"type":"conversation:new","conversationId":"conv-1"}"#)
+
+        let result = ws.decryptPayload("enc-payload", epoch: 0, hubId: "hub-alpha")
+        #expect(result != nil)
+        #expect(result?.event == .conversationNew)
+    }
+
+    /// `decryptPayload` correctly routes `message:status` events.
+    @Test func testDecryptPayloadParsesMessageStatusType() {
+        let ws = makeService(json: #"{"type":"message:status","messageId":"msg-1","status":"delivered"}"#)
+
+        let result = ws.decryptPayload("enc-payload", epoch: 0, hubId: "hub-alpha")
+        #expect(result != nil)
+        #expect(result?.event == .messageStatus)
+    }
+
+    /// Unknown event type strings map to `.unknown` rather than nil.
+    @Test func testDecryptPayloadMapsUnknownTypeToUnknownCase() {
+        let ws = makeService(json: #"{"type":"future:event:type"}"#)
+
+        let result = ws.decryptPayload("enc", epoch: 0, hubId: "h")
+        #expect(result != nil)
+        #expect(result?.event == .unknown)
     }
 }

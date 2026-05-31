@@ -33,35 +33,11 @@ enum ConnectionState: Equatable, Sendable {
     }
 }
 
-// MARK: - NostrEvent
-
-/// A Nostr event received from the relay. Matches NIP-01 + custom Llamenos kinds.
-struct NostrEvent: Codable, Sendable, Identifiable {
-    let id: String
-    let pubkey: String
-    let createdAt: Int
-    let kind: Int
-    let tags: [[String]]
-    let content: String
-    let sig: String
-
-    enum CodingKeys: String, CodingKey {
-        case id, pubkey
-        case createdAt = "created_at"
-        case kind, tags, content, sig
-    }
-}
-
 // MARK: - AttributedHubEvent
 
-/// A decoded event paired with the hub ID whose key successfully decrypted it.
-///
-/// `WebSocketService` tries all loaded hub keys for each incoming event. The first
-/// key that decrypts successfully identifies the source hub. Downstream consumers
-/// (e.g. `HubActivityService`) use `hubId` to route the event to the correct hub's
-/// data model without maintaining their own connection-identity bookkeeping.
+/// A decoded event paired with the hub ID it was received from.
 struct AttributedHubEvent: Sendable {
-    /// The UUID of the hub whose key decrypted this event.
+    /// The UUID of the hub this event belongs to (provided directly in the event message).
     let hubId: String
     /// The hub event type decoded from the decrypted event content.
     let event: HubEventType
@@ -70,9 +46,6 @@ struct AttributedHubEvent: Sendable {
 // MARK: - HubEventType
 
 /// Known hub event types parsed from decrypted event content's `type` field.
-/// All events use the generic `["t", "llamenos:event"]` tag — the relay cannot
-/// distinguish event types. Actual type differentiation happens after decryption
-/// by reading the `content.type` JSON field.
 enum HubEventType: String, Sendable {
     case callRing = "call:ring"
     case callAnswered = "call:answered"
@@ -94,17 +67,32 @@ enum HubEventType: String, Sendable {
     case unknown
 }
 
+// MARK: - Wire message types (internal)
+
+private struct WsChallengeFields: Decodable {
+    let nonce: String
+}
+
+private struct WsEventMessage: Decodable, Sendable {
+    let v: Int
+    let hubId: String
+    let kind: Int
+    let payload: String
+    let epoch: Int
+    let ts: Int
+}
+
 // MARK: - WebSocketService
 
-/// Native WebSocket client for the Nostr relay connection. Uses `URLSessionWebSocketTask`
-/// for zero third-party dependencies. Provides events via `AsyncStream` and handles
-/// automatic reconnection with exponential backoff.
+/// Native WebSocket client for the Llamenos relay. Uses challenge-response Ed25519 auth,
+/// per-hub subscriptions, and epoch-aware AES-256-GCM event decryption.
 ///
 /// Usage:
 /// ```swift
 /// let ws = WebSocketService(cryptoService: cryptoService)
 /// await ws.connect(to: "wss://hub.example.org/relay")
-/// for await event in ws.events {
+/// ws.subscribe(hubId: hubId, kinds: [1000, 1001, 20000])
+/// for await event in ws.attributedEvents {
 ///     handleEvent(event)
 /// }
 /// ```
@@ -121,29 +109,11 @@ final class WebSocketService: @unchecked Sendable {
 
     // MARK: - Dependencies
 
-    /// CryptoService provides the hub key cache for multi-hub event attribution.
     private let cryptoService: CryptoService
 
-    // MARK: - Event Streams
-
-    /// Public async stream of raw Nostr events.
-    var events: AsyncStream<NostrEvent> {
-        AsyncStream { continuation in
-            let id = UUID()
-            continuationsLock.lock()
-            continuations[id] = continuation
-            continuationsLock.unlock()
-            continuation.onTermination = { [weak self] _ in
-                self?.continuationsLock.lock()
-                self?.continuations.removeValue(forKey: id)
-                self?.continuationsLock.unlock()
-            }
-        }
-    }
+    // MARK: - Event Stream
 
     /// Public async stream of decrypted, hub-attributed typed events.
-    /// Only emits events that were successfully decrypted by one of the loaded hub keys.
-    /// The `hubId` on each `AttributedHubEvent` identifies which hub's key decrypted it.
     var attributedEvents: AsyncStream<AttributedHubEvent> {
         AsyncStream { continuation in
             let id = UUID()
@@ -163,27 +133,22 @@ final class WebSocketService: @unchecked Sendable {
     private var webSocketTask: URLSessionWebSocketTask?
     private var session: URLSession
     private var relayURL: URL?
-    private var subscriptionId: String = ""
     private var reconnectAttempt: Int = 0
     private var isIntentionalDisconnect: Bool = false
     private var receiveTask: Task<Void, Never>?
     private var reconnectTask: Task<Void, Never>?
+    private var authenticated: Bool = false
 
-    /// Thread-safe storage for raw event stream continuations.
-    private var continuations: [UUID: AsyncStream<NostrEvent>.Continuation] = [:]
-    private let continuationsLock = NSLock()
+    /// Hub subscriptions: hubId → kind list. Retained across reconnects.
+    private var subscribedHubs: [String: [Int]] = [:]
+    /// Subscriptions buffered before auth completes; flushed in handleAuthenticated().
+    private var pendingSubscriptions: [(hubId: String, kinds: [Int])] = []
 
-    /// Thread-safe storage for typed event stream continuations.
     private var typedContinuations: [UUID: AsyncStream<AttributedHubEvent>.Continuation] = [:]
     private let typedContinuationsLock = NSLock()
 
-    /// Maximum reconnection attempts before giving up.
     private let maxReconnectAttempts = 10
-
-    /// Base delay for exponential backoff (seconds).
     private let baseReconnectDelay: TimeInterval = 1.0
-
-    /// Maximum backoff delay (seconds).
     private let maxReconnectDelay: TimeInterval = 60.0
 
     // MARK: - Initialization
@@ -197,8 +162,7 @@ final class WebSocketService: @unchecked Sendable {
 
     // MARK: - Connect
 
-    /// Connect to the Nostr relay at the given URL.
-    /// - Parameter urlString: WebSocket URL, e.g. `wss://hub.example.org/relay`
+    /// Connect to the relay at the given URL.
     func connect(to urlString: String) async {
         guard let url = URL(string: urlString) else { return }
         relayURL = url
@@ -207,13 +171,25 @@ final class WebSocketService: @unchecked Sendable {
         await performConnect()
     }
 
-    /// Internal connect that creates the WebSocket task and starts receiving.
+    /// Subscribe to events for a hub. Safe to call before or after authentication —
+    /// subscription messages are buffered and flushed after the auth handshake completes.
+    func subscribe(hubId: String, kinds: [Int]) {
+        subscribedHubs[hubId] = kinds
+        if authenticated {
+            sendSubscription(hubId: hubId, kinds: kinds)
+        } else {
+            // Remove any stale entry for this hub then re-add
+            pendingSubscriptions.removeAll { $0.hubId == hubId }
+            pendingSubscriptions.append((hubId: hubId, kinds: kinds))
+        }
+    }
+
     private func performConnect() async {
         guard let url = relayURL else { return }
 
-        // Cancel existing task
         webSocketTask?.cancel(with: .goingAway, reason: nil)
         receiveTask?.cancel()
+        authenticated = false
 
         connectionState = reconnectAttempt > 0
             ? .reconnecting(attempt: reconnectAttempt)
@@ -223,24 +199,7 @@ final class WebSocketService: @unchecked Sendable {
         webSocketTask = task
         task.resume()
 
-        // Generate a unique subscription ID
-        subscriptionId = "sub-\(UUID().uuidString.prefix(8))"
-
-        // Send Nostr REQ subscription
-        let reqMessage = """
-        ["REQ","\(subscriptionId)",{"kinds":[1000,1001,1002,1010,1011,20000],"#t":["\(CryptoLabels.NOSTR_EVENT_TAG)"]}]
-        """
-        do {
-            try await task.send(.string(reqMessage))
-            connectionState = .connected
-            reconnectAttempt = 0
-            eventCount = 0
-        } catch {
-            await handleDisconnect(error: error)
-            return
-        }
-
-        // Start receive loop
+        // Receive loop drives the entire auth + event pipeline
         receiveTask = Task { [weak self] in
             await self?.receiveLoop()
         }
@@ -253,15 +212,9 @@ final class WebSocketService: @unchecked Sendable {
         isIntentionalDisconnect = true
         reconnectTask?.cancel()
         receiveTask?.cancel()
-
-        // Close subscription
-        if let task = webSocketTask, connectionState.isConnected {
-            let closeMsg = "[\"CLOSE\",\"\(subscriptionId)\"]"
-            task.send(.string(closeMsg)) { _ in }
-        }
-
         webSocketTask?.cancel(with: .normalClosure, reason: nil)
         webSocketTask = nil
+        authenticated = false
         connectionState = .disconnected
     }
 
@@ -273,16 +226,15 @@ final class WebSocketService: @unchecked Sendable {
         while !Task.isCancelled {
             do {
                 let message = try await task.receive()
+                let text: String
                 switch message {
-                case .string(let text):
-                    parseRelayMessage(text)
-                case .data(let data):
-                    if let text = String(data: data, encoding: .utf8) {
-                        parseRelayMessage(text)
-                    }
-                @unknown default:
-                    break
+                case .string(let s): text = s
+                case .data(let d):
+                    guard let s = String(data: d, encoding: .utf8) else { continue }
+                    text = s
+                @unknown default: continue
                 }
+                handleServerMessage(text)
             } catch {
                 if !Task.isCancelled {
                     await handleDisconnect(error: error)
@@ -292,102 +244,163 @@ final class WebSocketService: @unchecked Sendable {
         }
     }
 
-    // MARK: - Message Parsing
+    // MARK: - Message Dispatch
 
-    /// Parse a raw Nostr relay message. Expected formats:
-    /// - `["EVENT", subscriptionId, event]` — a matching event
-    /// - `["EOSE", subscriptionId]` — end of stored events
-    /// - `["NOTICE", message]` — relay notice
-    private func parseRelayMessage(_ text: String) {
-        guard let data = text.data(using: .utf8) else { return }
+    private func handleServerMessage(_ text: String) {
+        guard let data = text.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let type = obj["type"] as? String else { return }
 
-        do {
-            guard let array = try JSONSerialization.jsonObject(with: data) as? [Any],
-                  let type = array.first as? String else { return }
+        switch type {
+        case "challenge":
+            guard let nonce = obj["nonce"] as? String else { return }
+            handleChallenge(nonce: nonce)
 
-            switch type {
-            case "EVENT":
-                guard array.count >= 3,
-                      let eventDict = array[2] as? [String: Any] else { return }
-                let eventData = try JSONSerialization.data(withJSONObject: eventDict)
-                let decoder = JSONDecoder()
-                let event = try decoder.decode(NostrEvent.self, from: eventData)
-                emitEvent(event)
+        case "authenticated":
+            handleAuthenticated()
 
-            case "EOSE":
-                // End of stored events — initial sync complete
-                break
+        case "event":
+            guard
+                let v = obj["v"] as? Int,
+                let hubId = obj["hubId"] as? String,
+                let kind = obj["kind"] as? Int,
+                let payload = obj["payload"] as? String,
+                let epoch = obj["epoch"] as? Int,
+                let ts = obj["ts"] as? Int
+            else { return }
+            let msg = WsEventMessage(v: v, hubId: hubId, kind: kind, payload: payload, epoch: epoch, ts: ts)
+            handleEvent(msg)
 
-            case "NOTICE":
-                // Relay notice — log but don't surface to UI
-                break
+        case "subscribed", "unsubscribed", "pong":
+            break
 
-            default:
-                break
+        case "error":
+            if (obj["code"] as? String) == "auth_failed" {
+                authenticated = false
             }
-        } catch {
-            // Silently ignore malformed messages
+
+        default:
+            break
         }
     }
 
-    /// Broadcast an event to all active continuations (raw + typed).
-    /// `internal` (not `private`) so unit tests can inject synthetic events via `@testable import`.
-    func emitEvent(_ event: NostrEvent) {
+    // MARK: - Auth Handshake
+
+    private func handleChallenge(nonce: String) {
+        guard let pubkey = cryptoService.signingPubkeyHex else { return }
+
+        let ts = Int(Date().timeIntervalSince1970 * 1000)
+        // Signed message format: "llamenos:ws-auth:v1:{pubkey}:{nonce}:{ts}"
+        let signedMessage = "llamenos:ws-auth:v1:\(pubkey):\(nonce):\(ts)"
+        guard
+            let msgData = signedMessage.data(using: .utf8),
+            let sig = try? cryptoService.ed25519Sign(
+                messageHex: msgData.map { String(format: "%02x", $0) }.joined()
+            )
+        else { return }
+
+        let authPayload: [String: Any] = [
+            "type": "auth",
+            "pubkey": pubkey,
+            "nonce": nonce,
+            "ts": ts,
+            "sig": sig,
+        ]
+        guard
+            let authData = try? JSONSerialization.data(withJSONObject: authPayload),
+            let authText = String(data: authData, encoding: .utf8),
+            let task = webSocketTask
+        else { return }
+
+        Task {
+            try? await task.send(.string(authText))
+        }
+    }
+
+    private func handleAuthenticated() {
+        authenticated = true
+        reconnectAttempt = 0
+        eventCount = 0
+        connectionState = .connected
+        flushPendingSubscriptions()
+    }
+
+    // MARK: - Subscriptions
+
+    private func flushPendingSubscriptions() {
+        // Send buffered subscriptions accumulated before auth
+        let pending = pendingSubscriptions
+        pendingSubscriptions = []
+        for sub in pending {
+            sendSubscription(hubId: sub.hubId, kinds: sub.kinds)
+        }
+        // Re-subscribe to all known hubs on reconnect (pending may not have them all)
+        for (hubId, kinds) in subscribedHubs {
+            if !pending.contains(where: { $0.hubId == hubId }) {
+                sendSubscription(hubId: hubId, kinds: kinds)
+            }
+        }
+    }
+
+    private func sendSubscription(hubId: String, kinds: [Int]) {
+        guard let task = webSocketTask else { return }
+        let msg: [String: Any] = ["type": "subscribe", "hubId": hubId, "kinds": kinds]
+        guard
+            let data = try? JSONSerialization.data(withJSONObject: msg),
+            let text = String(data: data, encoding: .utf8)
+        else { return }
+        Task { try? await task.send(.string(text)) }
+    }
+
+    // MARK: - Event Handling
+
+    private func handleEvent(_ msg: WsEventMessage) {
         eventCount += 1
-
-        // Emit raw event
-        continuationsLock.lock()
-        let activeContinuations = Array(continuations.values)
-        continuationsLock.unlock()
-        for continuation in activeContinuations {
-            continuation.yield(event)
-        }
-
-        // Try all loaded hub keys to decrypt the event. The first key that succeeds
-        // identifies the source hub. Events that no key can decrypt are silently dropped
-        // from the attributed stream — raw events are still delivered above.
-        if let attributed = decryptEvent(event.content) {
-            typedContinuationsLock.lock()
-            let activeTyped = Array(typedContinuations.values)
-            typedContinuationsLock.unlock()
-            for continuation in activeTyped {
-                continuation.yield(attributed)
-            }
+        if let attributed = decryptPayload(msg.payload, epoch: msg.epoch, hubId: msg.hubId) {
+            emit(attributed)
         }
     }
 
-    // MARK: - Event Decryption & Attribution
+    // MARK: - Decryption
 
     #if DEBUG
     /// Overridable decryption closure for unit testing.
-    /// Tests may inject a mock that returns predetermined (hubId, json) for a known ciphertext.
-    var decryptionHandler: (String) -> (hubId: String, json: String)? = { _ in nil }
+    /// Receives (ciphertextHex, epoch) and returns plaintext JSON string, or nil on failure.
+    var decryptionHandler: (String, Int) -> String? = { _, _ in nil }
     #endif
 
-    /// Tries all loaded hub keys in Rust and returns an `AttributedHubEvent` for the first key
-    /// that successfully decrypts the event content. Returns `nil` if no key matches.
-    ///
-    /// This is the core of multi-hub support: the hub whose key decrypts the event
-    /// is identified as the source hub, without requiring a separate per-hub connection.
-    /// Hub keys never leave Rust memory during this operation.
-    internal func decryptEvent(_ encryptedContent: String) -> AttributedHubEvent? {
-        let result: (hubId: String, json: String)?
+    /// Decrypt an event payload and return a typed attributed event.
+    /// In DEBUG builds, `decryptionHandler` is tried first to allow test injection.
+    internal func decryptPayload(_ payload: String, epoch: Int, hubId: String) -> AttributedHubEvent? {
+        let json: String?
         #if DEBUG
-        result = decryptionHandler(encryptedContent)
-            ?? cryptoService.decryptEventWithAttribution(ciphertextHex: encryptedContent)
+        json = decryptionHandler(payload, epoch)
+            ?? cryptoService.decryptServerEvent(ciphertextHex: payload, epoch: epoch)
         #else
-        result = cryptoService.decryptEventWithAttribution(ciphertextHex: encryptedContent)
+        json = cryptoService.decryptServerEvent(ciphertextHex: payload, epoch: epoch)
         #endif
-        guard let result, let eventType = parseHubEvent(result.json) else { return nil }
-        return AttributedHubEvent(hubId: result.hubId, event: eventType)
+        guard let json, let eventType = parseHubEvent(json) else { return nil }
+        return AttributedHubEvent(hubId: hubId, event: eventType)
     }
 
-    /// Parse decrypted JSON content into a `HubEventType` using the `type` field.
     private func parseHubEvent(_ json: String) -> HubEventType? {
-        guard let data = json.data(using: .utf8),
-              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let type = obj["type"] as? String else { return nil }
+        guard
+            let data = json.data(using: .utf8),
+            let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let type = obj["type"] as? String
+        else { return nil }
         return HubEventType(rawValue: type) ?? .unknown
+    }
+
+    // MARK: - Emission
+
+    private func emit(_ attributed: AttributedHubEvent) {
+        typedContinuationsLock.lock()
+        let active = Array(typedContinuations.values)
+        typedContinuationsLock.unlock()
+        for continuation in active {
+            continuation.yield(attributed)
+        }
     }
 
     // MARK: - Reconnection
@@ -398,6 +411,7 @@ final class WebSocketService: @unchecked Sendable {
             return
         }
 
+        authenticated = false
         reconnectAttempt += 1
 
         guard reconnectAttempt <= maxReconnectAttempts else {
@@ -407,33 +421,27 @@ final class WebSocketService: @unchecked Sendable {
 
         connectionState = .reconnecting(attempt: reconnectAttempt)
 
-        // Exponential backoff with jitter
         let delay = min(
             baseReconnectDelay * pow(2.0, Double(reconnectAttempt - 1)),
             maxReconnectDelay
         )
         let jitter = Double.random(in: 0...(delay * 0.3))
-        let totalDelay = delay + jitter
 
         reconnectTask = Task {
-            try? await Task.sleep(for: .seconds(totalDelay))
+            try? await Task.sleep(for: .seconds(delay + jitter))
             guard !Task.isCancelled, !isIntentionalDisconnect else { return }
+            // Re-queue all known subscriptions as pending before reconnect
+            pendingSubscriptions = subscribedHubs.map { (hubId: $0.key, kinds: $0.value) }
             await performConnect()
         }
     }
 
-    // MARK: - Event Type Extraction
+    // MARK: - Test Support
 
-    /// Check if a Nostr event has the llamenos event tag.
-    /// All llamenos events use the generic `["t", "llamenos:event"]` tag.
-    /// Content-based type parsing (into HubEventType) happens after decryption,
-    /// not from tags — the tag only serves as a relay filter marker.
-    static func isLlamenosEvent(_ event: NostrEvent) -> Bool {
-        for tag in event.tags {
-            if tag.count >= 2, tag[0] == "t", tag[1] == CryptoLabels.NOSTR_EVENT_TAG {
-                return true
-            }
-        }
-        return false
+    #if DEBUG
+    /// Inject a typed event directly into the attributed stream for unit testing.
+    internal func emitAttributedEvent(hubId: String, eventType: HubEventType) {
+        emit(AttributedHubEvent(hubId: hubId, event: eventType))
     }
+    #endif
 }
