@@ -42,7 +42,10 @@ function isAllowedOrigin(
   if (buildAllowedOrigins(env).has(origin)) return true
   // Development-only localhost origins — only when no explicit allowlist is set
   if (env.ENVIRONMENT === 'development' && !env.CORS_ALLOWED_ORIGINS) {
-    if (origin === 'http://localhost:5173' || origin === 'http://localhost:1420') return true
+    try {
+      const parsed = new URL(origin)
+      if (parsed.hostname === 'localhost' && (parsed.protocol === 'http:' || parsed.protocol === 'https:')) return true
+    } catch { /* not a valid URL */ }
   }
   return false
 }

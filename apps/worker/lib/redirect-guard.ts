@@ -36,8 +36,8 @@ export function isAllowedOAuthRedirectUrl(
     allowed.add('https://demo.llamenos-platform.com')
   }
   if (env.ENVIRONMENT === 'development' && !env.CORS_ALLOWED_ORIGINS) {
-    allowed.add('http://localhost:5173')
-    allowed.add('http://localhost:1420')
+    // In development, allow any localhost origin for OAuth redirects
+    if (parsed.hostname === 'localhost') return true
   }
 
   return allowed.has(parsed.origin)

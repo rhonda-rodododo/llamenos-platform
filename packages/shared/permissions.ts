@@ -333,7 +333,7 @@ export const DEFAULT_ROLES: Omit<Role, 'createdAt' | 'updatedAt'>[] = [
     name: 'Volunteer',
     slug: 'volunteer',
     permissions: [
-      'calls:answer', 'calls:read-active', 'calls:read-presence', 'calls:hangup', 'calls:report-spam',
+      'calls:answer', 'calls:read-active', 'calls:hangup', 'calls:report-spam',
       'calls:identify-caller',
       'notes:create', 'notes:read-own', 'notes:update-own', 'notes:reply',
       'contacts:search',
