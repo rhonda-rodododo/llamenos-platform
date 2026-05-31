@@ -671,7 +671,13 @@ pub fn mobile_decrypt_server_event_with_epoch(
     let try_decrypt = |key: &[u8]| -> Option<Vec<u8>> {
         let cipher = Aes256Gcm::new_from_slice(key).ok()?;
         cipher
-            .decrypt(nonce, Payload { msg: ciphertext, aad: aad_bytes })
+            .decrypt(
+                nonce,
+                Payload {
+                    msg: ciphertext,
+                    aad: aad_bytes,
+                },
+            )
             .ok()
     };
 
@@ -680,7 +686,9 @@ pub fn mobile_decrypt_server_event_with_epoch(
             return Err(CryptoError::InvalidCiphertext);
         }
         let actual_len = u32::from_le_bytes(
-            padded[..4].try_into().map_err(|_| CryptoError::InvalidCiphertext)?,
+            padded[..4]
+                .try_into()
+                .map_err(|_| CryptoError::InvalidCiphertext)?,
         ) as usize;
         if actual_len + 4 > padded.len() {
             return Err(CryptoError::InvalidCiphertext);
