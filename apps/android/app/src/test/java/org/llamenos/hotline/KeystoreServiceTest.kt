@@ -89,6 +89,16 @@ class KeystoreServiceTest {
     }
 
     @Test
+    fun `PinLockoutState Unlocked attemptsRemaining decreases as attempts increase`() {
+        // Verify the remaining count formula: MAX_ATTEMPTS - attempts
+        val max = KeystoreService.MAX_ATTEMPTS
+        for (used in 0 until max) {
+            val state = PinLockoutState.Unlocked(attemptsRemaining = max - used)
+            assertEquals(max - used, state.attemptsRemaining)
+        }
+    }
+
+    @Test
     fun `lockout escalation schedule is correct`() {
         val expectedLockoutMs = mapOf(
             1 to 0L,

@@ -41,6 +41,7 @@ import org.llamenos.hotline.R
  * @param onPinChange Called when the PIN changes (digit added or removed)
  * @param onComplete Called when the PIN reaches maxLength
  * @param errorMessage Optional error text to display below the PIN dots
+ * @param enabled Whether PIN input is enabled. Set to false during lockout.
  * @param modifier Layout modifier
  */
 @Composable
@@ -50,6 +51,7 @@ fun PINPad(
     onPinChange: (String) -> Unit,
     onComplete: (String) -> Unit,
     errorMessage: String? = null,
+    enabled: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val buttons = listOf(
@@ -126,10 +128,11 @@ fun PINPad(
                             // Backspace button
                             IconButton(
                                 onClick = {
-                                    if (pin.isNotEmpty()) {
+                                    if (enabled && pin.isNotEmpty()) {
                                         onPinChange(pin.dropLast(1))
                                     }
                                 },
+                                enabled = enabled,
                                 modifier = Modifier
                                     .size(72.dp)
                                     .testTag("pin-backspace"),
@@ -146,7 +149,7 @@ fun PINPad(
                             // Digit button
                             FilledTonalButton(
                                 onClick = {
-                                    if (pin.length < maxLength) {
+                                    if (enabled && pin.length < maxLength) {
                                         val newPin = pin + label
                                         onPinChange(newPin)
                                         if (newPin.length == maxLength) {
@@ -154,6 +157,7 @@ fun PINPad(
                                         }
                                     }
                                 },
+                                enabled = enabled,
                                 modifier = Modifier
                                     .size(72.dp)
                                     .testTag("pin-$label"),

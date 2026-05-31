@@ -47,6 +47,7 @@ import org.llamenos.hotline.R
 import org.llamenos.hotline.ui.components.LoadingOverlay
 import org.llamenos.hotline.ui.components.PINPad
 import org.llamenos.hotline.ui.components.SecureWindowEffect
+import kotlin.math.max
 
 /**
  * PIN unlock screen for returning users with stored keys.
@@ -68,6 +69,24 @@ fun PINUnlockScreen(
     var localPin by remember { mutableStateOf("") }
     val context = LocalContext.current
     val hasBiometricPIN = remember { viewModel.hasBiometricPIN() }
+
+    // Countdown ticker: fires every second while locked out
+    var lockoutSecondsRemaining by remember { mutableStateOf(0L) }
+    LaunchedEffect(uiState.isLockedOut, uiState.lockoutUntil) {
+        if (uiState.isLockedOut && uiState.lockoutUntil > 0) {
+            while (true) {
+                val remaining = (uiState.lockoutUntil - System.currentTimeMillis()) / 1000L
+                if (remaining <= 0) {
+                    lockoutSecondsRemaining = 0
+                    break
+                }
+                lockoutSecondsRemaining = remaining
+                delay(1_000L)
+            }
+        } else {
+            lockoutSecondsRemaining = 0
+        }
+    }
 
     // Staggered entrance animation
     var showLogo by remember { mutableStateOf(false) }
@@ -93,6 +112,52 @@ fun PINUnlockScreen(
         if (uiState.error != null) {
             localPin = ""
         }
+    }
+
+    // Key-wipe screen: shown when brute-force limit exceeded
+    if (uiState.isWiped) {
+        Scaffold(modifier = modifier) { paddingValues ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .padding(horizontal = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.PersonOff,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(48.dp),
+                )
+
+                Spacer(Modifier.height(24.dp))
+
+                Text(
+                    text = stringResource(R.string.lock_key_wiped),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.testTag("pin-wipe-message"),
+                )
+
+                Spacer(Modifier.height(32.dp))
+
+                OutlinedButton(
+                    onClick = {
+                        viewModel.resetAuthState()
+                        onResetIdentity()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("pin-wipe-reset"),
+                ) {
+                    Text(stringResource(R.string.reset_identity))
+                }
+            }
+        }
+        return
     }
 
     Scaffold(modifier = modifier) { paddingValues ->
@@ -145,7 +210,22 @@ fun PINUnlockScreen(
 
                 Spacer(Modifier.height(36.dp))
 
-                // PIN pad
+                // Lockout countdown message (replaces normal error during lockout)
+                if (uiState.isLockedOut && lockoutSecondsRemaining > 0) {
+                    Text(
+                        text = stringResource(
+                            R.string.pin_lockout_remaining,
+                            max(lockoutSecondsRemaining, 1L).toInt(),
+                        ),
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.testTag("pin-lockout-message"),
+                    )
+                    Spacer(Modifier.height(16.dp))
+                }
+
+                // PIN pad — disabled during lockout
                 AnimatedVisibility(
                     visible = showPad,
                     enter = fadeIn() + slideInVertically { it / 4 },
@@ -160,7 +240,8 @@ fun PINUnlockScreen(
                         onComplete = { completedPin ->
                             viewModel.unlockWithPin(completedPin)
                         },
-                        errorMessage = uiState.error,
+                        errorMessage = if (uiState.isLockedOut) null else uiState.error,
+                        enabled = !uiState.isLockedOut,
                     )
                 }
 
@@ -176,7 +257,7 @@ fun PINUnlockScreen(
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         // Use biometric button (when biometric-protected PIN is configured)
-                        if (hasBiometricPIN) {
+                        if (hasBiometricPIN && !uiState.isLockedOut) {
                             val biometricTitle = stringResource(R.string.biometric_unlock_title)
                             val biometricSubtitle = stringResource(R.string.biometric_unlock_subtitle)
                             val usePinText = stringResource(R.string.use_pin_instead)
