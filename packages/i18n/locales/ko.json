@@ -15,7 +15,13 @@
     "switchToLanguage": "{{language}}(으)로 전환",
     "themeDark": "어두운 테마",
     "themeLight": "밝은 테마",
-    "themeSystem": "시스템 테마"
+    "themeSystem": "시스템 테마",
+    "back": "Back",
+    "createCase": "Create case",
+    "currentStatus": "Current status",
+    "customDateRange": "Custom date range",
+    "session": "Session",
+    "sessionIcon": "Session key"
   },
   "accountNameLabel": "Account Name",
   "accountSidLabel": "Account SID",
@@ -267,7 +273,8 @@
       "agentStopped": "Stopped",
       "systemPromptSuffix": "System Prompt Suffix",
       "interval": "Interval (sec)",
-      "status": "Status"
+      "status": "Status",
+      "purgeError": "Failed to purge"
     },
     "geocoding": {
       "title": "Geocoding",
@@ -346,7 +353,8 @@
       "tags": "Tags",
       "teams": "Teams",
       "transcription": "Transcription",
-      "voicePrompts": "Voice Prompts"
+      "voicePrompts": "Voice Prompts",
+      "recoveryRequests": "Recovery Requests"
     },
     "openMenu": "Open menu",
     "scopes": {
@@ -678,7 +686,13 @@
     "deliveryStatusOptedout": "수신 거부",
     "deliveryStatusSkipped": "건너뜀",
     "wsConnected": "실시간 업데이트 활성",
-    "wsDisconnected": "실시간 업데이트 일시 중지"
+    "wsDisconnected": "실시간 업데이트 일시 중지",
+    "languages": "Languages",
+    "addLanguage": "Add language",
+    "removeLanguage": "Remove language",
+    "default": "default",
+    "defaultLanguage": "Default Language",
+    "defaultLanguageHint": "Subscribers whose language is not included will receive this version"
   },
   "bridgeUrlLabel": "Bridge URL",
   "call": {
@@ -2066,7 +2080,8 @@
     "title": "Error",
     "wakeDecryptFailed": "Wake decrypt failed: %@",
     "wakeKeyGeneration": "Failed to generate wake key",
-    "wakeRegisterFailed": "Device registration failed: %@"
+    "wakeRegisterFailed": "Device registration failed: %@",
+    "hubUrlInsecure": "Hub URL must use HTTPS for a secure connection"
   },
   "eventType": {
     "call": "통화",
@@ -2487,7 +2502,14 @@
   "ivr": {
     "selfAnnouncement": "한국어는 [N] 번을 눌러주세요.",
     "moreLanguages": "For more languages, press [N].",
-    "goBack": "To go back, press 0."
+    "goBack": "To go back, press 0.",
+    "title": "IVR Language Menu",
+    "description": "Configure which languages callers can select from via keypad.",
+    "enabledLanguages": "Enabled languages (ordered)",
+    "subMenu": "sub-menu",
+    "subMenuNote": "Languages after position 8 are in a sub-menu (caller presses 9 for more).",
+    "availableLanguages": "Available languages",
+    "atLeastOne": "At least one language must be enabled."
   },
   "ivrAudio": {
     "delete": "삭제",
@@ -3865,7 +3887,9 @@
     "whatsappProvider": "WhatsApp Integration",
     "whatsappTwilio": "Via Twilio",
     "whatsappTwilioNote": "WhatsApp messages will be handled through your existing Twilio telephony provider. No additional configuration needed.",
-    "whatsappVerifyToken": "Verify Token"
+    "whatsappVerifyToken": "Verify Token",
+    "hubUrlLabel": "Hub URL",
+    "hubUrlPlaceholder": "https://hub.example.org"
   },
   "shifts": {
     "active": {
@@ -4606,5 +4630,12 @@
     "unavailableMessage": "죄송합니다. 현재 전화를 받을 수 있는 사람이 없습니다. 나중에 다시 시도해 주세요. 안녕히 계세요.",
     "voicemailPrompt": "현재 전화를 받을 수 있는 사람이 없습니다. 신호음 후 메시지를 남겨주세요.",
     "voicemailThanks": "메시지를 남겨 주셔서 감사합니다. 안녕히 계세요."
-  }
+  },
+  "biometricUnlockTitle": "Unlock Llamenos",
+  "biometricUnlockSubtitle": "Use your fingerprint or face to unlock",
+  "usePinInstead": "Use PIN",
+  "deepLinkConfirmTitle": "Open link?",
+  "deepLinkConfirmMessage": "Llamenos wants to perform a %s action.",
+  "deepLinkConfirmProceed": "Proceed",
+  "deepLinkConfirmCancel": "Cancel"
 }

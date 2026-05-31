@@ -49,7 +49,7 @@ fun SessionListScreen(
                             if (session.isCurrent) {
                                 AssistChip(
                                     onClick = {},
-                                    label = { Text("Current", style = MaterialTheme.typography.labelSmall) },
+                                    label = { Text(stringResource(R.string.security_sessions_current), style = MaterialTheme.typography.labelSmall) },
                                 )
                             }
                         }
