@@ -25,6 +25,10 @@ export const voipTokenBodySchema = z.looseObject({
   voipToken: z.string().min(1, 'voipToken is required'),
 })
 
+export const clearPushTokenBodySchema = z.object({
+  pushToken: z.string().min(1, 'pushToken is required'),
+})
+
 export const renameDeviceBodySchema = z.object({
   deviceName: z.string().min(1).max(100),
 })
