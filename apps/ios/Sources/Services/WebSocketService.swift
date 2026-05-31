@@ -73,7 +73,7 @@ private struct WsChallengeFields: Decodable {
     let nonce: String
 }
 
-private struct WsEventMessage: Decodable, Sendable {
+private struct WsIncomingEvent: Decodable, Sendable {
     let v: Int
     let hubId: String
     let kind: Int
@@ -268,7 +268,7 @@ final class WebSocketService: @unchecked Sendable {
                 let epoch = obj["epoch"] as? Int,
                 let ts = obj["ts"] as? Int
             else { return }
-            let msg = WsEventMessage(v: v, hubId: hubId, kind: kind, payload: payload, epoch: epoch, ts: ts)
+            let msg = WsIncomingEvent(v: v, hubId: hubId, kind: kind, payload: payload, epoch: epoch, ts: ts)
             handleEvent(msg)
 
         case "subscribed", "unsubscribed", "pong":
@@ -354,7 +354,7 @@ final class WebSocketService: @unchecked Sendable {
 
     // MARK: - Event Handling
 
-    private func handleEvent(_ msg: WsEventMessage) {
+    private func handleEvent(_ msg: WsIncomingEvent) {
         eventCount += 1
         if let attributed = decryptPayload(msg.payload, epoch: msg.epoch, hubId: msg.hubId) {
             emit(attributed)
