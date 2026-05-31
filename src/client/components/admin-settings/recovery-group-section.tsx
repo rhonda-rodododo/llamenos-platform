@@ -7,9 +7,8 @@ import {
 } from '@/lib/api'
 import type { RecoveryGroupInfo } from '@protocol/schemas/recovery-group'
 import {
-  shamirSplit,
   hpkeSeal,
-  recoveryGroupGenerateKeypair,
+  recoveryGroupCreate,
   sigchainCreateLinkFromState,
   getDevicePubkeys,
 } from '@/lib/platform'
@@ -101,13 +100,10 @@ export function RecoveryGroupSettingsSection({
     if (hasErrors) return
     setSaving(true)
     try {
-      // 1. Generate recovery group keypair
-      const keypair = await recoveryGroupGenerateKeypair()
+      // 1. Generate recovery group keypair and split in Rust — private key NEVER enters JS
+      const { publicKeyHex, shares, commitments } = await recoveryGroupCreate(totalShares, threshold)
 
-      // 2. Split private key into Shamir shares
-      const { shares, commitments } = await shamirSplit(keypair.privateKeyHex, totalShares, threshold)
-
-      // 3. HPKE-seal each share to the corresponding holder's encryption pubkey
+      // 2. HPKE-seal each share to the corresponding holder's encryption pubkey
       const shareEnvelopes = await Promise.all(
         shares.map(async (share, idx) => {
           const holderPubkey = selectedHolders[idx]
@@ -131,7 +127,7 @@ export function RecoveryGroupSettingsSection({
 
       const sigchainPayload = JSON.stringify({
         type: isRotation ? 'recovery-group-rotate' : 'recovery-group-enroll',
-        groupPublicKey: keypair.publicKeyHex,
+        groupPublicKey: publicKeyHex,
         shareHolderPubkeys: selectedHolders,
         threshold,
         totalShares,
@@ -150,7 +146,7 @@ export function RecoveryGroupSettingsSection({
         hubId,
         threshold,
         totalShares,
-        groupPublicKey: keypair.publicKeyHex,
+        groupPublicKey: publicKeyHex,
         shareEnvelopes,
         shareCommitments: commitments,
         sigchainLinkHash: sigchainLink.entryHash,

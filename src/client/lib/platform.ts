@@ -137,22 +137,6 @@ export async function deviceImportAndLoad(
 }
 
 /**
- * @deprecated Use deviceImportAndLoad instead.
- * Import a legacy secp256k1 secret key (nsec hex) as device keys.
- * Kept only for Playwright test helpers during transition.
- */
-export async function legacyImportNsec(
-  nsecHex: string,
-  pin: string,
-  deviceId: string,
-): Promise<EncryptedDeviceKeys> {
-  if (useTauri) {
-    return tauriInvoke<EncryptedDeviceKeys>('legacy_import_nsec', { nsecHex, pin, deviceId })
-  }
-  throw new Error('WASM legacy import not yet implemented')
-}
-
-/**
  * Decrypt device keys from PIN-encrypted storage, load into CryptoState.
  * Returns only the device state (public keys) — secrets NEVER leave Rust.
  * Throws on lockout or key wipe. Returns null only for wrong PIN.
@@ -1203,12 +1187,6 @@ export interface ShamirSplitResult {
   commitments: string[] // SHA-256 hex commitments
 }
 
-/** X25519 recovery group keypair. */
-export interface RecoveryGroupKeypair {
-  publicKeyHex: string
-  privateKeyHex: string
-}
-
 /** Split a secret (hex) into N shares with threshold K using Shamir SSS. */
 export async function shamirSplit(
   secretHex: string,
@@ -1243,14 +1221,6 @@ export async function shamirVerify(x: number, yHex: string, commitmentHex: strin
     return tauriInvoke<boolean>('shamir_verify', { x, yHex, commitmentHex })
   }
   throw new Error('WASM shamir verify not yet implemented')
-}
-
-/** Generate an X25519 recovery group keypair. Caller MUST split privateKeyHex and zeroize. */
-export async function recoveryGroupGenerateKeypair(): Promise<RecoveryGroupKeypair> {
-  if (useTauri) {
-    return tauriInvoke<RecoveryGroupKeypair>('recovery_group_generate_keypair')
-  }
-  throw new Error('WASM recovery group keypair not yet implemented')
 }
 
 // ── H16: Recovery group key isolation (combine+decrypt stays in Rust) ──

@@ -396,9 +396,9 @@ export async function logout(page: Page) {
  *
  * The displayed nsec (bech32 "nsec1...") is only for user display. Internally,
  * the volunteer was created with an Ed25519 keypair. We return the raw seedHex
- * so that `loginAsVolunteer` uses `deviceImportAndLoad` (Ed25519), not
- * `legacyImportNsec` (secp256k1), which would derive a different pubkey and
- * break auth.
+ * so that `loginAsVolunteer` uses `deviceImportAndLoad` (Ed25519) —
+ * the removed `legacyImportNsec` (secp256k1) would derive a different pubkey
+ * and break auth.
  *
  * The seedHex is stored in `window.__last_vol_seed_hex` by users.tsx after
  * calling generateEphemeralKeypair().

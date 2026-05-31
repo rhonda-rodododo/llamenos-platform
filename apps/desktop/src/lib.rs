@@ -182,14 +182,12 @@ pub fn run() {
             crypto::shamir_combine,
             crypto::shamir_commit,
             crypto::shamir_verify,
-            crypto::recovery_group_generate_keypair,
             // H16: Recovery group key isolation (combine+decrypt in Rust only)
             crypto::recovery_group_create,
             crypto::recovery_group_reconstruct_from_shares,
             crypto::recovery_group_decrypt,
             // C06: Missing IPC commands
             crypto::device_import_and_load,
-            crypto::legacy_import_nsec,
             crypto::generate_ephemeral_ed25519,
             crypto::generate_backup_from_state,
             // Epic 355: Device provisioning (seed encrypted in Rust, never enters webview)
