@@ -80,10 +80,16 @@ export const deviceDetailListResponseSchema = z.object({
   devices: z.array(deviceDetailResponseSchema),
 })
 
+export const renameDeviceResponseSchema = z.object({
+  id: z.string(),
+  deviceName: z.string(),
+})
+
 export const revokeDeviceResponseSchema = z.object({
   revoked: z.boolean(),
   deviceId: z.string(),
   hubIdsRequiringKeyRotation: z.array(z.string()),
+  pukRotationNeeded: z.boolean().optional(),
 })
 
 export const verifyDeviceResponseSchema = z.object({
@@ -126,7 +132,7 @@ export const securityEventListResponseSchema = z.object({
 })
 
 export const sessionResponseSchema = z.object({
-  token: z.string(),
+  id: z.string(),
   deviceId: z.string().nullable(),
   platform: z.string().nullable(),
   userAgent: z.string().nullable(),

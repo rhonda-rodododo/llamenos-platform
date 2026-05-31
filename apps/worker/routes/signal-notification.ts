@@ -10,13 +10,19 @@
  * POST   /api/signal-notification/digest/run      — trigger digest (admin only)
  */
 import { Hono } from 'hono'
-import { describeRoute, validator } from 'hono-openapi'
+import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { authErrors } from '../openapi/helpers'
+import { okResponseSchema } from '@protocol/schemas/common'
 import {
   signalContactRegistrationSchema,
+  signalContactRecordSchema,
+  hmacKeyResponseSchema,
   securityPrefsPatchSchema,
   digestRunBodySchema,
+  securityPrefsResponseSchema,
+  sidecarTokenResponseSchema,
+  digestRunResponseSchema,
 } from '@protocol/schemas/signal-notification'
 const signalNotificationRoutes = new Hono<AppEnv>()
 
@@ -29,7 +35,10 @@ signalNotificationRoutes.get('/contact',
     tags: ['Signal Notifications'],
     summary: 'Get own Signal contact registration',
     responses: {
-      200: { description: 'Signal contact record (ciphertext + envelopes)' },
+      200: {
+        description: 'Signal contact record (ciphertext + envelopes)',
+        content: { 'application/json': { schema: resolver(signalContactRecordSchema) } },
+      },
       404: { description: 'No Signal contact registered' },
       ...authErrors,
     },
@@ -66,7 +75,10 @@ signalNotificationRoutes.put('/contact',
       'The plaintext is sent separately to the sidecar POST /api/register endpoint ' +
       'via the app server proxy.',
     responses: {
-      200: { description: 'Contact registered' },
+      200: {
+        description: 'Contact registered',
+        content: { 'application/json': { schema: resolver(okResponseSchema) } },
+      },
       502: { description: 'Sidecar registration failed' },
       ...authErrors,
     },
@@ -105,7 +117,10 @@ signalNotificationRoutes.post('/contact/sidecar-token',
       'The client calls POST {sidecarUrl}/api/register-client directly with the token ' +
       'and plaintext identifier. The app server never sees the plaintext.',
     responses: {
-      200: { description: 'Token issued' },
+      200: {
+        description: 'Token issued',
+        content: { 'application/json': { schema: resolver(sidecarTokenResponseSchema) } },
+      },
       ...authErrors,
     },
   }),
@@ -162,7 +177,10 @@ signalNotificationRoutes.get('/hmac-key',
     tags: ['Signal Notifications'],
     summary: 'Get per-user HMAC key for client-side identifier hashing',
     responses: {
-      200: { description: 'HMAC key (hex)' },
+      200: {
+        description: 'HMAC key (hex)',
+        content: { 'application/json': { schema: resolver(hmacKeyResponseSchema) } },
+      },
       ...authErrors,
     },
   }),
@@ -184,7 +202,10 @@ signalNotificationRoutes.get('/security-prefs',
     tags: ['Signal Notifications'],
     summary: 'Get security notification preferences',
     responses: {
-      200: { description: 'Security preferences' },
+      200: {
+        description: 'Security preferences',
+        content: { 'application/json': { schema: resolver(securityPrefsResponseSchema) } },
+      },
       ...authErrors,
     },
   }),
@@ -214,7 +235,10 @@ signalNotificationRoutes.patch('/security-prefs',
     tags: ['Signal Notifications'],
     summary: 'Update security notification preferences',
     responses: {
-      200: { description: 'Updated preferences' },
+      200: {
+        description: 'Updated preferences',
+        content: { 'application/json': { schema: resolver(securityPrefsResponseSchema) } },
+      },
       ...authErrors,
     },
   }),
@@ -246,7 +270,10 @@ signalNotificationRoutes.post('/digest/run',
     tags: ['Signal Notifications'],
     summary: 'Trigger a digest run (admin only)',
     responses: {
-      200: { description: 'Digest results' },
+      200: {
+        description: 'Digest results',
+        content: { 'application/json': { schema: resolver(digestRunResponseSchema) } },
+      },
       ...authErrors,
     },
   }),

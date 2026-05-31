@@ -551,7 +551,17 @@ settings.post('/messaging/test',
     tags: ['Settings'],
     summary: 'Test messaging channel connectivity',
     responses: {
-      200: { description: 'Channel connectivity result' },
+      200: {
+        description: 'Channel connectivity result',
+        content: {
+          'application/json': {
+            schema: resolver(z.object({
+              connected: z.boolean(),
+              error: z.string().optional(),
+            })),
+          },
+        },
+      },
       ...authErrors,
     },
   }),

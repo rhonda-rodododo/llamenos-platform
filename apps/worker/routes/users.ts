@@ -3,6 +3,7 @@ import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { requirePermission } from '../middleware/permission-guard'
 import { createUserBodySchema, adminUpdateUserBodySchema, userResponseSchema, userListResponseSchema, userMetricsResponseSchema } from '@protocol/schemas/users'
+import { recordListResponseSchema } from '@protocol/schemas/records'
 import { okResponseSchema } from '@protocol/schemas/common'
 import { authErrors, notFoundError } from '../openapi/helpers'
 import { audit } from '../services/audit'
@@ -152,7 +153,10 @@ users.get('/:targetPubkey/cases',
     tags: ['Users'],
     summary: 'List case records assigned to a user',
     responses: {
-      200: { description: 'Assigned records' },
+      200: {
+        description: 'Assigned records',
+        content: { 'application/json': { schema: resolver(recordListResponseSchema) } },
+      },
       ...authErrors,
       ...notFoundError,
     },

@@ -3,15 +3,17 @@
  * notification opt-outs, and agent lifecycle control.
  */
 import { Hono } from 'hono'
-import { describeRoute, validator } from 'hono-openapi'
+import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { requirePermission } from '../middleware/permission-guard'
 import { LABEL_FIREHOSE_AGENT_SEAL } from '@shared/crypto-labels'
 import {
   createFirehoseConnectionSchema,
   updateFirehoseConnectionSchema,
+  firehoseConnectionSchema,
   type FirehoseConnectionStatus,
 } from '@protocol/schemas/firehose'
+import { z } from 'zod'
 import { authErrors } from '../openapi/helpers'
 import { generateAgentKeypair } from '../lib/agent-identity'
 import { backgroundTask } from '../lib/hono-compat'
@@ -101,7 +103,10 @@ firehose.post('/',
     tags: ['Firehose'],
     summary: 'Create a firehose connection',
     responses: {
-      201: { description: 'Connection created' },
+      201: {
+        description: 'Connection created',
+        content: { 'application/json': { schema: resolver(z.object({ connection: firehoseConnectionSchema })) } },
+      },
       ...authErrors,
     },
   }),
@@ -184,7 +189,10 @@ firehose.patch('/:id',
     tags: ['Firehose'],
     summary: 'Update a firehose connection',
     responses: {
-      200: { description: 'Connection updated' },
+      200: {
+        description: 'Connection updated',
+        content: { 'application/json': { schema: resolver(z.object({ connection: firehoseConnectionSchema })) } },
+      },
       404: { description: 'Connection not found' },
       ...authErrors,
     },

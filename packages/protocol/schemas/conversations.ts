@@ -60,6 +60,18 @@ export const messageListResponseSchema = z.object({
   ...paginatedMeta,
 })
 
+export const conversationStatsResponseSchema = z.object({
+  waiting: z.number(),
+  active: z.number(),
+  closed: z.number(),
+  today: z.number(),
+  total: z.number(),
+})
+
+export const volunteerLoadResponseSchema = z.object({
+  loads: z.record(z.string(), z.number()),
+})
+
 // --- Input schemas ---
 
 export const listConversationsQuerySchema = paginationSchema.extend({

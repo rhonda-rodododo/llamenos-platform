@@ -148,9 +148,46 @@ export const signalContactRecordSchema = z.object({
 export type SignalContactRecord = z.infer<typeof signalContactRecordSchema>
 
 // ---------------------------------------------------------------------------
+// Sidecar registration token response — returned by POST /contact/sidecar-token
+// ---------------------------------------------------------------------------
+
+export const sidecarTokenResponseSchema = z.object({
+  token: z.string(),
+  sidecarUrl: z.string(),
+})
+
+export type SidecarTokenResponse = z.infer<typeof sidecarTokenResponseSchema>
+
+// ---------------------------------------------------------------------------
 // Digest run request body — POST /signal-notification/digest/run (admin)
 // ---------------------------------------------------------------------------
 
 export const digestRunBodySchema = z.object({
   cadence: z.enum(['daily', 'weekly']).optional(),
+})
+
+// ---------------------------------------------------------------------------
+// Digest run response — returned by POST /digest/run
+// ---------------------------------------------------------------------------
+
+export const digestRunResponseSchema = z.object({
+  sent: z.number(),
+  skipped: z.number(),
+  errors: z.number(),
+})
+
+export type DigestRunResponse = z.infer<typeof digestRunResponseSchema>
+
+// ---------------------------------------------------------------------------
+// Security prefs response — subset for API responses (includes updatedAt as string)
+// ---------------------------------------------------------------------------
+
+export const securityPrefsResponseSchema = z.object({
+  notificationChannel: notificationChannelSchema,
+  disappearingTimerDays: z.number().int(),
+  digestCadence: digestCadenceSchema,
+  alertOnNewDevice: z.boolean(),
+  alertOnPasskeyChange: z.boolean(),
+  alertOnPinChange: z.boolean(),
+  updatedAt: z.string(),
 })

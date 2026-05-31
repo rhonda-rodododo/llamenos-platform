@@ -70,6 +70,11 @@ const EXCLUDED_SCHEMAS = new Set([
   'digestCadenceSchema',
   'notificationChannelSchema',
 
+  // Signal notification — bare sub-schemas inlined at call sites
+  'signalTrustLevelSchema',
+  'signalRegistrationMethodSchema',
+  'signalRegistrationStatusSchema',
+
   // Entity template sub-schemas (inlined in parent response)
   'entityTemplateCategorySchema',
 
@@ -87,6 +92,10 @@ const EXCLUDED_SCHEMAS = new Set([
 
   // Bulk contact action — discriminated union, inlined at call sites
   'bulkContactActionSchema',
+
+  // Provider setup — bare enum building blocks
+  'a2pBrandStatusSchema',
+  'a2pCampaignStatusSchema',
 
   // EP07 shift management — query schemas and bare enum building blocks
   'overrideQuerySchema',

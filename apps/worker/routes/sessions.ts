@@ -7,8 +7,9 @@
  */
 
 import { Hono } from 'hono'
-import { describeRoute } from 'hono-openapi'
+import { describeRoute, resolver } from 'hono-openapi'
 import type { AppEnv } from '../types'
+import { sessionListResponseSchema, terminateSessionsResponseSchema } from '@protocol/schemas/devices'
 import { authErrors } from '../openapi/helpers'
 import { rateLimit } from '../middleware/rate-limit'
 
@@ -23,7 +24,10 @@ sessionRoutes.get('/',
     tags: ['Sessions'],
     summary: 'List active sessions',
     responses: {
-      200: { description: 'List of active sessions' },
+      200: {
+        description: 'List of active sessions',
+        content: { 'application/json': { schema: resolver(sessionListResponseSchema) } },
+      },
       ...authErrors,
     },
   }),
@@ -58,7 +62,10 @@ sessionRoutes.post('/terminate-others',
     tags: ['Sessions'],
     summary: 'Terminate all other sessions',
     responses: {
-      200: { description: 'Other sessions terminated' },
+      200: {
+        description: 'Other sessions terminated',
+        content: { 'application/json': { schema: resolver(terminateSessionsResponseSchema) } },
+      },
       429: { description: 'Rate limit exceeded (10/hour)' },
       ...authErrors,
     },
