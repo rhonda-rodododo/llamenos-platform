@@ -116,7 +116,7 @@ function stableJsonStringify(value: unknown): string {
   })
 }
 
-function computeEntryHash(entry: {
+export function computeEntryHash(entry: {
   id: string
   action: string
   actorPubkey: string

@@ -620,6 +620,33 @@ export async function listAuditLogViaApi(
   return data
 }
 
+export interface ChainVerificationResult {
+  valid: boolean
+  totalEntries: number
+  checkedEntries: number
+  firstBrokenEntry?: {
+    id: string
+    seqIndex: number
+    expected: string | null
+    actual: string | null
+    reason: string
+  }
+}
+
+export async function verifyAuditChainViaApi(
+  request: APIRequestContext,
+  params?: { hubId?: string; limit?: number; offset?: number },
+): Promise<ChainVerificationResult> {
+  const qs = new URLSearchParams()
+  if (params?.limit != null) qs.set('limit', String(params.limit))
+  if (params?.offset != null) qs.set('offset', String(params.offset))
+  const qsStr = qs.toString()
+  const path = hubPath('/audit/verify', params?.hubId) + (qsStr ? `?${qsStr}` : '')
+  const { status, data } = await apiGet<ChainVerificationResult>(request, path)
+  if (status !== 200) throw new Error(`Failed to verify audit chain: ${status}`)
+  return data
+}
+
 // ── Reports ───────────────────────────────────────────────────────
 
 export interface ReportRecord {

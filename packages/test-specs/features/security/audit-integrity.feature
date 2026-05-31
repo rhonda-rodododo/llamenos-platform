@@ -29,6 +29,23 @@ Feature: Audit Integrity
     And for entries 1 through 4, previousEntryHash should equal the prior entry's entryHash
     And the full chain should pass database-level verification
 
+  # ── API-Level Chain Verification ─────────────────────────────────
+
+  Scenario: Verify endpoint confirms an intact chain
+    Given an admin performs 5 sequential operations
+    When the audit chain is verified via the API endpoint
+    Then the verification result should be valid
+    And the verification result should report at least 5 checked entries
+
+  Scenario: Tampered entry is detected by the verify endpoint
+    Given an admin performs 3 sequential operations
+    When the audit chain is verified via the API endpoint
+    Then the verification result should be valid
+    When the action field of the latest audit entry is tampered in the database
+    And the audit chain is verified via the API endpoint
+    Then the verification result should be invalid
+    And the verification result should identify the broken entry
+
   # ── Tamper Detection ─────────────────────────────────────────────
 
   Scenario: Audit entries are tamper-detectable

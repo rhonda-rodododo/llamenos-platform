@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { AuditService, audit } from '@worker/services/audit'
+import { describe, it, expect, vi } from 'vitest'
+import { AuditService, audit, computeEntryHash } from '@worker/services/audit'
 import { ServiceError } from '@worker/services/settings'
 import { createMockDb } from './mock-db'
 
@@ -378,5 +378,155 @@ describe('audit() helper', () => {
 
     const callDetails = auditService.log.mock.calls[0][2]
     expect(callDetails.ip).toBeNull()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// computeEntryHash — hash chain integrity (regression for b5ea6b01 timestamp fix)
+// ---------------------------------------------------------------------------
+
+const HASH_FIXTURE = {
+  id: '00000000-0000-0000-0000-000000000001',
+  action: 'userAdded',
+  actorPubkey: 'a'.repeat(64),
+  createdAt: '2026-05-30T12:00:00.000Z',
+  details: { name: 'Test Volunteer' } as Record<string, unknown>,
+  previousEntryHash: null,
+}
+
+describe('computeEntryHash — output format', () => {
+  it('returns a 64-character lowercase hex SHA-256 string', () => {
+    const hash = computeEntryHash(HASH_FIXTURE)
+    expect(hash).toHaveLength(64)
+    expect(hash).toMatch(/^[0-9a-f]+$/)
+  })
+})
+
+describe('computeEntryHash — determinism', () => {
+  it('produces identical hashes for identical inputs', () => {
+    expect(computeEntryHash(HASH_FIXTURE)).toBe(computeEntryHash(HASH_FIXTURE))
+  })
+
+  it('produces identical hashes for separate object references with same values', () => {
+    const a = { ...HASH_FIXTURE, details: { name: 'Test Volunteer' } }
+    const b = { ...HASH_FIXTURE, details: { name: 'Test Volunteer' } }
+    expect(computeEntryHash(a)).toBe(computeEntryHash(b))
+  })
+
+  it('is key-order-invariant for details (matches PostgreSQL JSONB sort)', () => {
+    const ab = { ...HASH_FIXTURE, details: { alpha: 1, beta: 2 } }
+    const ba = { ...HASH_FIXTURE, details: { beta: 2, alpha: 1 } }
+    expect(computeEntryHash(ab)).toBe(computeEntryHash(ba))
+  })
+
+  it('treats null details the same as empty object', () => {
+    const withNull = { ...HASH_FIXTURE, details: null }
+    const withEmpty = { ...HASH_FIXTURE, details: {} }
+    expect(computeEntryHash(withNull)).toBe(computeEntryHash(withEmpty))
+  })
+})
+
+describe('computeEntryHash — field sensitivity', () => {
+  it('changes hash when id changes', () => {
+    const modified = { ...HASH_FIXTURE, id: '00000000-0000-0000-0000-000000000002' }
+    expect(computeEntryHash(HASH_FIXTURE)).not.toBe(computeEntryHash(modified))
+  })
+
+  it('changes hash when action changes', () => {
+    expect(computeEntryHash(HASH_FIXTURE)).not.toBe(
+      computeEntryHash({ ...HASH_FIXTURE, action: 'userRemoved' }),
+    )
+  })
+
+  it('changes hash when actorPubkey changes', () => {
+    expect(computeEntryHash(HASH_FIXTURE)).not.toBe(
+      computeEntryHash({ ...HASH_FIXTURE, actorPubkey: 'b'.repeat(64) }),
+    )
+  })
+
+  it('changes hash when createdAt changes (timestamp fix regression)', () => {
+    // Regression guard for b5ea6b01: audit.ts must use the same timestamp for
+    // hash computation and DB insertion; even a 1ms drift breaks verification.
+    expect(computeEntryHash(HASH_FIXTURE)).not.toBe(
+      computeEntryHash({ ...HASH_FIXTURE, createdAt: '2026-05-30T12:00:00.001Z' }),
+    )
+  })
+
+  it('changes hash when details values change', () => {
+    expect(computeEntryHash(HASH_FIXTURE)).not.toBe(
+      computeEntryHash({ ...HASH_FIXTURE, details: { name: 'Different Name' } }),
+    )
+  })
+
+  it('changes hash when previousEntryHash changes from null to a value', () => {
+    expect(computeEntryHash(HASH_FIXTURE)).not.toBe(
+      computeEntryHash({ ...HASH_FIXTURE, previousEntryHash: 'c'.repeat(64) }),
+    )
+  })
+})
+
+describe('computeEntryHash — chain linkage', () => {
+  it('builds a 3-entry chain where each entry links to the previous', () => {
+    const h1 = computeEntryHash({ ...HASH_FIXTURE, action: 'login', previousEntryHash: null })
+    const h2 = computeEntryHash({
+      ...HASH_FIXTURE,
+      id: '00000000-0000-0000-0000-000000000002',
+      action: 'userAdded',
+      createdAt: '2026-05-30T12:00:01.000Z',
+      previousEntryHash: h1,
+    })
+    const h3 = computeEntryHash({
+      ...HASH_FIXTURE,
+      id: '00000000-0000-0000-0000-000000000003',
+      action: 'shiftCreated',
+      createdAt: '2026-05-30T12:00:02.000Z',
+      previousEntryHash: h2,
+    })
+
+    // All hashes are distinct 64-char hex strings
+    expect(new Set([h1, h2, h3]).size).toBe(3)
+    for (const h of [h1, h2, h3]) {
+      expect(h).toHaveLength(64)
+      expect(h).toMatch(/^[0-9a-f]+$/)
+    }
+  })
+
+  it('produces a different downstream hash when an intermediate entry is tampered', () => {
+    const h1 = computeEntryHash({ ...HASH_FIXTURE, action: 'login', previousEntryHash: null })
+
+    const h2Legit = computeEntryHash({
+      ...HASH_FIXTURE,
+      id: '00000000-0000-0000-0000-000000000002',
+      action: 'userAdded',
+      createdAt: '2026-05-30T12:00:01.000Z',
+      previousEntryHash: h1,
+    })
+    const h2Tampered = computeEntryHash({
+      ...HASH_FIXTURE,
+      id: '00000000-0000-0000-0000-000000000002',
+      action: 'INJECTED',
+      createdAt: '2026-05-30T12:00:01.000Z',
+      previousEntryHash: h1,
+    })
+
+    expect(h2Legit).not.toBe(h2Tampered)
+
+    // Entry 3 on top of tampered chain differs from entry 3 on legit chain
+    const h3FromLegit = computeEntryHash({
+      ...HASH_FIXTURE,
+      id: '00000000-0000-0000-0000-000000000003',
+      action: 'shiftCreated',
+      createdAt: '2026-05-30T12:00:02.000Z',
+      previousEntryHash: h2Legit,
+    })
+    const h3FromTampered = computeEntryHash({
+      ...HASH_FIXTURE,
+      id: '00000000-0000-0000-0000-000000000003',
+      action: 'shiftCreated',
+      createdAt: '2026-05-30T12:00:02.000Z',
+      previousEntryHash: h2Tampered,
+    })
+
+    expect(h3FromLegit).not.toBe(h3FromTampered)
   })
 })
