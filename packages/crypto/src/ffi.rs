@@ -165,7 +165,8 @@ pub(crate) fn derive_kek_hex(credential: &str, salt_hex: &str) -> Result<String,
 
 /// Compute the X25519 shared secret for device provisioning.
 ///
-/// Uses X25519 ECDH for the provisioning protocol.
+/// X25519 public keys are always 32 bytes (x-only Montgomery-form u-coordinate).
+/// Rejects low-order points (all-zeros pubkey or all-zeros ECDH result).
 #[uniffi::export]
 pub fn compute_shared_x_hex(
     our_secret_hex: &str,
@@ -181,16 +182,16 @@ pub fn compute_shared_x_hex(
     sk_arr.copy_from_slice(&sk_bytes);
     let secret = X25519StaticSecret::from(sk_arr);
 
-    let pk_bytes = hex::decode(their_pubkey_hex).map_err(CryptoError::HexError)?;
-    if pk_bytes.len() != 32 {
-        return Err(CryptoError::InvalidPublicKey);
-    }
-    let mut pk_arr = [0u8; 32];
-    pk_arr.copy_from_slice(&pk_bytes);
-    let public_key = X25519PublicKey::from(pk_arr);
+    // Delegate to shared parse logic which validates format and rejects the identity point.
+    let public_key = crate::provisioning::parse_x25519_pubkey(their_pubkey_hex)?;
 
     let shared = secret.diffie_hellman(&public_key);
     let mut shared_bytes = *shared.as_bytes();
+    if shared_bytes == [0u8; 32] {
+        shared_bytes.zeroize();
+        sk_arr.zeroize();
+        return Err(CryptoError::EcdhFailed);
+    }
     let hex_out = hex::encode(shared_bytes);
     shared_bytes.zeroize();
     sk_arr.zeroize();
