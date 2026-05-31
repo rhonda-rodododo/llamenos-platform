@@ -24,10 +24,7 @@ use crate::errors::CryptoError;
 /// hedged randomness should use [`bip340_sign_prehash_with_aux_rand`]).
 ///
 /// Returns the 64-byte BIP-340 signature `(r ‖ s)`.
-pub fn bip340_sign_prehash(
-    secret_key: &[u8; 32],
-    msg: &[u8; 32],
-) -> Result<[u8; 64], CryptoError> {
+pub fn bip340_sign_prehash(secret_key: &[u8; 32], msg: &[u8; 32]) -> Result<[u8; 64], CryptoError> {
     let aux_rand = [0u8; 32];
     bip340_sign_prehash_with_aux_rand(secret_key, msg, &aux_rand)
 }
@@ -127,9 +124,9 @@ mod tests {
     struct SignVector {
         secret_key: &'static str,
         public_key: &'static str,
-        aux_rand:   &'static str,
-        msg:        &'static str,
-        signature:  &'static str,
+        aux_rand: &'static str,
+        msg: &'static str,
+        signature: &'static str,
     }
 
     const SIGN_VECTORS: &[SignVector] = &[
@@ -181,7 +178,7 @@ mod tests {
     #[test]
     fn bip340_sign_official_vectors() {
         for (i, v) in SIGN_VECTORS.iter().enumerate() {
-            let sk  = from_hex32(v.secret_key);
+            let sk = from_hex32(v.secret_key);
             let msg = from_hex32(v.msg);
             let aux = from_hex32(v.aux_rand);
             let expected_sig = from_hex64(v.signature);
@@ -195,7 +192,7 @@ mod tests {
     #[test]
     fn bip340_verify_official_vectors() {
         for (i, v) in SIGN_VECTORS.iter().enumerate() {
-            let pk  = from_hex32(v.public_key);
+            let pk = from_hex32(v.public_key);
             let msg = from_hex32(v.msg);
             let sig = from_hex64(v.signature);
 
@@ -209,21 +206,21 @@ mod tests {
 
     #[test]
     fn bip340_roundtrip_all_zero_message() {
-        let sk  = from_hex32("0000000000000000000000000000000000000000000000000000000000000003");
+        let sk = from_hex32("0000000000000000000000000000000000000000000000000000000000000003");
         let msg = [0u8; 32];
-        let pk  = bip340_pubkey_from_secret(&sk).unwrap();
+        let pk = bip340_pubkey_from_secret(&sk).unwrap();
         let sig = bip340_sign_prehash(&sk, &msg).unwrap();
-        let ok  = bip340_verify_prehash(&pk, &msg, &sig).unwrap();
+        let ok = bip340_verify_prehash(&pk, &msg, &sig).unwrap();
         assert!(ok, "all-zero message round-trip must verify");
     }
 
     #[test]
     fn bip340_roundtrip_all_ff_message() {
-        let sk  = from_hex32("0B432B2677937381AEF05BB02A66ECD012773062CF3FA2549E44F58ED2401710");
+        let sk = from_hex32("0B432B2677937381AEF05BB02A66ECD012773062CF3FA2549E44F58ED2401710");
         let msg = [0xffu8; 32];
-        let pk  = bip340_pubkey_from_secret(&sk).unwrap();
+        let pk = bip340_pubkey_from_secret(&sk).unwrap();
         let sig = bip340_sign_prehash(&sk, &msg).unwrap();
-        let ok  = bip340_verify_prehash(&pk, &msg, &sig).unwrap();
+        let ok = bip340_verify_prehash(&pk, &msg, &sig).unwrap();
         assert!(ok, "all-0xff message round-trip must verify");
     }
 
@@ -231,8 +228,8 @@ mod tests {
 
     #[test]
     fn bip340_wrong_message_fails() {
-        let sk  = from_hex32("0000000000000000000000000000000000000000000000000000000000000003");
-        let pk  = bip340_pubkey_from_secret(&sk).unwrap();
+        let sk = from_hex32("0000000000000000000000000000000000000000000000000000000000000003");
+        let pk = bip340_pubkey_from_secret(&sk).unwrap();
         let msg = [0u8; 32];
         let sig = bip340_sign_prehash(&sk, &msg).unwrap();
 
@@ -245,8 +242,8 @@ mod tests {
 
     #[test]
     fn bip340_wrong_pubkey_fails() {
-        let sk  = from_hex32("0000000000000000000000000000000000000000000000000000000000000003");
-        let pk  = bip340_pubkey_from_secret(&sk).unwrap();
+        let sk = from_hex32("0000000000000000000000000000000000000000000000000000000000000003");
+        let pk = bip340_pubkey_from_secret(&sk).unwrap();
         let msg = [0u8; 32];
         let sig = bip340_sign_prehash(&sk, &msg).unwrap();
 
@@ -259,8 +256,8 @@ mod tests {
 
     #[test]
     fn bip340_tampered_signature_fails() {
-        let sk  = from_hex32("B7E151628AED2A6ABF7158809CF4F3C762E7160F38B4DA56A784D9045190CFEF");
-        let pk  = bip340_pubkey_from_secret(&sk).unwrap();
+        let sk = from_hex32("B7E151628AED2A6ABF7158809CF4F3C762E7160F38B4DA56A784D9045190CFEF");
+        let pk = bip340_pubkey_from_secret(&sk).unwrap();
         let msg = from_hex32("243F6A8885A308D313198A2E03707344A4093822299F31D0082EFA98EC4E6C89");
         let sig = bip340_sign_prehash(&sk, &msg).unwrap();
 
@@ -273,10 +270,8 @@ mod tests {
 
     #[test]
     fn bip340_all_zero_signature_fails() {
-        let pk  =
-            from_hex32("DFF1D77F2A671C5F36183726DB2341BE58FEAE1DA2DECED843240F7B502BA659");
-        let msg =
-            from_hex32("243F6A8885A308D313198A2E03707344A4093822299F31D0082EFA98EC4E6C89");
+        let pk = from_hex32("DFF1D77F2A671C5F36183726DB2341BE58FEAE1DA2DECED843240F7B502BA659");
+        let msg = from_hex32("243F6A8885A308D313198A2E03707344A4093822299F31D0082EFA98EC4E6C89");
         let zero_sig = [0u8; 64];
 
         // r=0 is not a valid x-coordinate on the curve.  Must be rejected.
@@ -294,10 +289,10 @@ mod tests {
     // Each must be rejected by bip340_verify_prehash — either Ok(false) or Err.
 
     struct VerifyVector {
-        pubkey:    &'static str,
-        msg:       &'static str,
+        pubkey: &'static str,
+        msg: &'static str,
         signature: &'static str,
-        comment:   &'static str,
+        comment: &'static str,
     }
 
     const FALSE_VECTORS: &[VerifyVector] = &[
@@ -341,7 +336,7 @@ mod tests {
     #[test]
     fn bip340_false_vectors_rejected() {
         for v in FALSE_VECTORS {
-            let pk  = from_hex32(v.pubkey);
+            let pk = from_hex32(v.pubkey);
             let msg = from_hex32(v.msg);
             let sig = from_hex64(v.signature);
 
@@ -365,7 +360,7 @@ mod tests {
 
     #[test]
     fn bip340_different_aux_rand_produces_different_signatures() {
-        let sk  = from_hex32("B7E151628AED2A6ABF7158809CF4F3C762E7160F38B4DA56A784D9045190CFEF");
+        let sk = from_hex32("B7E151628AED2A6ABF7158809CF4F3C762E7160F38B4DA56A784D9045190CFEF");
         let msg = from_hex32("243F6A8885A308D313198A2E03707344A4093822299F31D0082EFA98EC4E6C89");
         let aux0 = [0u8; 32];
         let aux1 = [1u8; 32];
@@ -374,7 +369,10 @@ mod tests {
         let sig1 = bip340_sign_prehash_with_aux_rand(&sk, &msg, &aux1).unwrap();
 
         // Different aux_rand → different nonce → different R → different signature
-        assert_ne!(sig0, sig1, "different aux_rand must produce different signatures");
+        assert_ne!(
+            sig0, sig1,
+            "different aux_rand must produce different signatures"
+        );
 
         // Both must still verify
         let pk = bip340_pubkey_from_secret(&sk).unwrap();
