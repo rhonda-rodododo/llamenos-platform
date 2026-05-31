@@ -229,7 +229,7 @@ final class DashboardViewModel {
     /// Fetch the volunteer's active call (if any).
     private func fetchActiveCall() async {
         do {
-            let response: ActiveCallsResponse = try await apiService.request(
+            let response: ProtocolActiveCallsResponse = try await apiService.request(
                 method: "GET",
                 path: apiService.hp("/api/calls/active")
             )
