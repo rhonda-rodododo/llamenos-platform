@@ -939,7 +939,7 @@
     "description": "Bu işleme devam etmek için PIN kodunuzu girin.",
     "maxAttempts": "Maksimum deneme sayısı aşıldı. Anahtar silindi.",
     "title": "Kimliğinizi Doğrulayın",
-    "wrongPin": "Yanlış PIN. {{remaining}} deneme hakkı kaldı."
+    "wrongPin": "Incorrect PIN."
   },
   "preferences": {
     "invalidToken": "Geçersiz veya süresi dolmuş tercihler bağlantısı",

@@ -939,7 +939,7 @@
     "description": "PIN خود را برای ادامه این عملیات وارد کنید.",
     "maxAttempts": "حداکثر تلاش‌ها تمام شد. کلید پاک شد.",
     "title": "تایید هویت شما",
-    "wrongPin": "PIN اشتباه. {{remaining}} تلاش باقی مانده."
+    "wrongPin": "Incorrect PIN."
   },
   "preferences": {
     "invalidToken": "لینک ترجیحات نامعتبر یا منقضی شده",

@@ -939,7 +939,7 @@
     "description": "Geli PIN-kaaga si aad u sii waddo tallaabodan.",
     "maxAttempts": "Tijaabiyada ugu badnaan waa la dhaafay. Furahu waa la tirtiray.",
     "title": "Xaqiiji Aqoonsigaaga",
-    "wrongPin": "PIN-ka khaldan. {{remaining}} tijaabiyood ayaa hadhay."
+    "wrongPin": "Incorrect PIN."
   },
   "preferences": {
     "invalidToken": "Isku xirka doorashada waa khalad ama waa dhammaatay",

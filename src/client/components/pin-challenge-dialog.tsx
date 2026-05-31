@@ -12,20 +12,19 @@ import {
 import { Button } from '@/components/ui/button'
 import { ShieldCheck } from 'lucide-react'
 
-const MAX_ATTEMPTS = 3
-
 interface PinChallengeDialogProps {
   open: boolean
-  attempts: number
   error: boolean
+  /** Lockout message from Rust-side enforcement (e.g. "Locked out. Try again in 30 seconds"). */
+  lockoutMessage?: string | null
   onComplete: (pin: string) => Promise<void>
   onCancel: () => void
 }
 
 export function PinChallengeDialog({
   open,
-  attempts,
   error,
+  lockoutMessage,
   onComplete,
   onCancel,
 }: PinChallengeDialogProps) {
@@ -39,7 +38,7 @@ export function PinChallengeDialog({
       setPin('')
       setVerifying(false)
     }
-  }, [open, attempts])
+  }, [open, error])
 
   async function handlePinComplete(value: string) {
     setVerifying(true)
@@ -47,7 +46,7 @@ export function PinChallengeDialog({
     setVerifying(false)
   }
 
-  const remainingAttempts = MAX_ATTEMPTS - attempts
+  const isLockedOut = !!lockoutMessage
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onCancel() }}>
@@ -67,14 +66,20 @@ export function PinChallengeDialog({
             value={pin}
             onChange={setPin}
             onComplete={handlePinComplete}
-            disabled={verifying}
+            disabled={verifying || isLockedOut}
             error={error}
             autoFocus
           />
 
-          {error && (
+          {lockoutMessage && (
+            <p role="alert" className="mt-3 text-center text-sm text-destructive" data-testid="pin-challenge-lockout">
+              {lockoutMessage}
+            </p>
+          )}
+
+          {error && !lockoutMessage && (
             <p role="alert" className="mt-3 text-center text-sm text-destructive" data-testid="pin-challenge-error">
-              {t('pinChallenge.wrongPin', { remaining: remainingAttempts })}
+              {t('pinChallenge.wrongPin')}
             </p>
           )}
         </div>

@@ -15,12 +15,13 @@ Feature: PIN Challenge (Re-auth Step-up)
     Then the PIN challenge dialog should close
     And I should see the unmasked phone number
 
-  Scenario: Wrong PIN shows error, three failures wipes key
+  Scenario: Wrong PIN shows error and dialog stays open
     When I navigate to the "Volunteers" page
     And I click the phone visibility toggle
     Then I should see the PIN challenge dialog
     When I enter a wrong PIN three times
-    Then I should be redirected to the login page
+    Then I should see a wrong PIN error message
+    And the PIN challenge dialog should remain open
 
   Scenario: Cancel PIN challenge closes dialog
     When I navigate to the "Volunteers" page

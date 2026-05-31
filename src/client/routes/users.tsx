@@ -565,8 +565,8 @@ function UserRow({ user, roles, onUpdate, onDelete }: {
       />
       <PinChallengeDialog
         open={pinChallenge.isOpen}
-        attempts={pinChallenge.attempts}
         error={pinChallenge.error}
+        lockoutMessage={pinChallenge.lockoutMessage}
         onComplete={pinChallenge.handleComplete}
         onCancel={pinChallenge.handleCancel}
       />
