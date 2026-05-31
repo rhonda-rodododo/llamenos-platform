@@ -166,7 +166,7 @@ to native (Tauri), WASM, and UniFFI (iOS/Android).
 8. **Update Android crypto service** in `apps/android/app/src/main/kotlin/*/crypto/`
 9. Run `bun run crypto:test:mobile` to verify FFI bindings
 
-All crypto uses HPKE (RFC 9180 X25519-HKDF-SHA256-AES256-GCM). Never use raw secp256k1 ECIES for new operations.
+All crypto uses HPKE (RFC 9180 X25519-HKDF-SHA256-AES256-GCM) with Ed25519/X25519 device keys.
 
 ---
 
@@ -211,7 +211,7 @@ Run `bun run test:all` to orchestrate across all available platforms.
 - `cargo clippy -- -D warnings` must pass before committing
 - All sensitive data implements the `Zeroize` trait
 - Every new crypto operation needs a domain separation label from `packages/protocol/crypto-labels.json`
-- Never use secp256k1 ECIES — use HPKE (RFC 9180) for all new key wrapping
+- All key wrapping uses HPKE (RFC 9180 X25519-HKDF-SHA256-AES256-GCM)
 
 ### Tests
 
@@ -245,7 +245,6 @@ Version bumps are managed by `knope` automatically — never manually edit `pack
   history, which is permanent.
 - **No raw string literals for crypto contexts** — always use constants from
   `packages/protocol/crypto-labels.json` (generated to TS/Swift/Kotlin via codegen).
-- **No secp256k1 ECIES** in new code — use HPKE.
 - Private keys never enter the webview — all crypto operations route through Tauri IPC
   to Rust. Always import from `src/client/lib/platform.ts`, never from `@tauri-apps/*` directly.
 

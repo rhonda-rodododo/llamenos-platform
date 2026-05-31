@@ -33,8 +33,8 @@ typealias NoteRepliesResponse = org.llamenos.protocol.NoteRepliesResponse
 /**
  * Decrypted note payload — the plaintext content inside an encrypted note.
  *
- * This is NOT an API type — it's the plaintext content after ECIES unwrap +
- * XChaCha20-Poly1305 decryption.
+ * This is NOT an API type — it's the plaintext content after HPKE unwrap +
+ * AES-256-GCM decryption.
  */
 @Serializable
 data class NotePayload(

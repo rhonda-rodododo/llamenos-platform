@@ -19,7 +19,6 @@ import { fileURLToPath } from 'url'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { gcm } from '@noble/ciphers/aes.js'
 import { bytesToHex, hexToBytes, utf8ToBytes } from '@noble/hashes/utils.js'
-import { schnorr } from '@noble/curves/secp256k1.js'
 import { ed25519, x25519 } from '@noble/curves/ed25519.js'
 import { hkdf } from '@noble/hashes/hkdf.js'
 import { CipherSuite, KemId, KdfId, AeadId } from 'hpke-js'
@@ -222,30 +221,6 @@ test.describe('Cross-platform crypto interop', () => {
       label,
     )
     expect(bytesToHex(adminUnwrapped)).toBe(hubKeyHex)
-  })
-
-  test('JS can verify Nostr event produced by Rust', () => {
-    if (!vectors.wsEvent) {
-      test.skip()
-      return
-    }
-    const { event, canonicalJson } = vectors.wsEvent
-
-    // Recompute event ID from canonical JSON
-    const computedId = bytesToHex(sha256(utf8ToBytes(canonicalJson)))
-    expect(computedId).toBe(event.id)
-
-    // Verify BIP-340 Schnorr signature over the event ID
-    const idHash = hexToBytes(event.id)
-    const valid = schnorr.verify(hexToBytes(event.sig), idHash, hexToBytes(event.pubkey))
-    expect(valid).toBe(true)
-
-    // Verify canonical JSON structure matches NIP-01
-    const parsed = JSON.parse(canonicalJson)
-    expect(parsed[0]).toBe(0)
-    expect(parsed[1]).toBe(event.pubkey)
-    expect(parsed[2]).toBe(event.createdAt)
-    expect(parsed[3]).toBe(event.kind)
   })
 
   test('JS can decrypt export produced by Rust', () => {

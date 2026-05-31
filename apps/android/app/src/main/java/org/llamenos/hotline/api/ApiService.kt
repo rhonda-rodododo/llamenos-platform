@@ -345,7 +345,7 @@ class ApiService @Inject constructor(
     /**
      * Fetch the E2EE key envelope for a specific hub.
      * Used during hub selection to decrypt the hub key.
-     * Returns HubKeyEnvelopeResponse wrapping the ECIES envelope fields.
+     * Returns HubKeyEnvelopeResponse wrapping the HPKE envelope fields.
      */
     suspend fun getHubKey(hubId: String): HubKeyEnvelopeResponse {
         return request("GET", "/api/hubs/$hubId/key")

@@ -130,7 +130,7 @@ export interface WakePayload {
   startsAt?: string
 }
 
-/** Full-tier payload — decryptable only with volunteer's nsec */
+/** Full-tier payload — decryptable only with volunteer's device key */
 export interface FullPushPayload extends WakePayload {
   senderLast4?: string
   previewText?: string
@@ -157,7 +157,7 @@ export interface User {
   hubRoles?: { hubId: string; roleIds: string[] }[]  // Per-hub role assignments
   active: boolean
   createdAt: string
-  encryptedSecretKey: string // Admin-encrypted copy of the volunteer's nsec
+  encryptedSecretKey: string // Admin-encrypted copy of the volunteer's signing seed
   transcriptionEnabled: boolean
   spokenLanguages: string[]  // Languages volunteer can take calls in (e.g. ['en', 'es'])
   uiLanguage: string         // Preferred UI language

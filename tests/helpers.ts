@@ -201,9 +201,8 @@ export async function reenterPinAfterReload(page: Page): Promise<void> {
 }
 
 /**
- * Login as admin: imports the legacy secp256k1 nsec via the IPC mock,
- * persists to store, then enters PIN to unlock. Uses Schnorr auth
- * (backward-compatible with the bootstrap flow).
+ * Login as admin: imports the Ed25519 seed via the IPC mock,
+ * persists to store, then enters PIN to unlock.
  */
 export async function loginAsAdmin(page: Page) {
   const storagePath = 'tests/storage/admin.json'
@@ -351,7 +350,7 @@ export async function loginAsVolunteer(page: Page, seedHex: string) {
   // Wait for __TEST_PLATFORM to be loaded
   await page.waitForFunction(() => !!(window as any).__TEST_PLATFORM, { timeout: 10000 })
 
-  // Import Ed25519 seed (volunteers created via API use Ed25519, not legacy secp256k1)
+  // Import Ed25519 seed
   await page.evaluate(async ({ secretHex, pin }) => {
     const platform = (window as any).__TEST_PLATFORM
     const encrypted = await platform.deviceImportAndLoad(secretHex, pin, crypto.randomUUID())
@@ -394,11 +393,9 @@ export async function logout(page: Page) {
 /**
  * Create a volunteer via UI and return the raw Ed25519 seed hex for login.
  *
- * The displayed nsec (bech32 "nsec1...") is only for user display. Internally,
+ * The displayed seed is only for user display. Internally,
  * the volunteer was created with an Ed25519 keypair. We return the raw seedHex
- * so that `loginAsVolunteer` uses `deviceImportAndLoad` (Ed25519) —
- * the removed `legacyImportNsec` (secp256k1) would derive a different pubkey
- * and break auth.
+ * so that `loginAsVolunteer` uses `deviceImportAndLoad`.
  *
  * The seedHex is stored in `window.__last_vol_seed_hex` by users.tsx after
  * calling generateEphemeralKeypair().

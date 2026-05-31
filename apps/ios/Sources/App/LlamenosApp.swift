@@ -298,7 +298,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
             return
         }
 
-        // Decrypt the ECIES-encrypted wake payload if present
+        // Decrypt the HPKE-encrypted wake payload if present
         guard let encryptedHex = userInfo["encrypted"] as? String else {
             completionHandler(.noData)
             return

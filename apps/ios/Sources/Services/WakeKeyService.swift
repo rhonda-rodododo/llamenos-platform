@@ -284,9 +284,7 @@ final class WakeKeyService: @unchecked Sendable {
 
         // Use the HPKE open function with the wake private key
         // Note: This calls into the Rust FFI which needs the wake private key directly,
-        // not the device key state. For now, use the legacy ECIES path if the server
-        // hasn't migrated to HPKE yet. When the server sends HPKE envelopes, this
-        // will use the HPKE open path.
+        // not the device key state.
         let plaintextHex = try mobileHpkeOpen(
             envelope: envelope,
             expectedLabel: CryptoLabels.LABEL_PUSH_WAKE,

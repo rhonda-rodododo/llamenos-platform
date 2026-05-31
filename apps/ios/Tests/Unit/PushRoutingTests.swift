@@ -12,7 +12,7 @@ import UserNotifications
 //   LinphoneService.handleVoipPush(callId:hubId:) so the call→hub mapping is
 //   available when onCallStateChanged fires.
 //
-// The payloadDecryptorForTesting hook on AppDelegate bypasses real ECIES crypto,
+// The payloadDecryptorForTesting hook on AppDelegate bypasses real HPKE crypto,
 // allowing pure logic tests without a wake keypair.
 
 final class PushRoutingTests: XCTestCase {
