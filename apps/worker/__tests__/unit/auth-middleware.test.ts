@@ -254,6 +254,27 @@ describe('auth middleware', () => {
     })
   })
 
+  it('sets X-New-Session-Token header when session was rotated', async () => {
+    const user = makeUser()
+    const newToken = 'rotated-session-token-hex' // gitleaks:allow
+    mockAuthenticateRequest.mockResolvedValue({ pubkey: user.pubkey, user, newSessionToken: newToken })
+    const { app } = createApp()
+
+    const res = await req(app, '/test')
+    expect(res.status).toBe(200)
+    expect(res.headers.get('X-New-Session-Token')).toBe(newToken)
+  })
+
+  it('does not set X-New-Session-Token header when session was not rotated', async () => {
+    const user = makeUser()
+    mockAuthenticateRequest.mockResolvedValue({ pubkey: user.pubkey, user })
+    const { app } = createApp()
+
+    const res = await req(app, '/test')
+    expect(res.status).toBe(200)
+    expect(res.headers.get('X-New-Session-Token')).toBeNull()
+  })
+
   it('increments auth error counter on failure', async () => {
     mockAuthenticateRequest.mockResolvedValue(null)
     const { app } = createApp()

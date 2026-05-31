@@ -614,14 +614,15 @@ describe('IdentityService — Sessions', () => {
       expect(deleteFn).toHaveBeenCalled()
     })
 
-    it('renews session when remaining time < 1 hour', async () => {
+    it('renews session when remaining time < 1 hour, rotating the token', async () => {
       const nearExpiry = makeSessionRow({
         expiresAt: new Date(Date.now() + 30 * 60 * 1000), // 30 min from now
       })
+      const rotatedRow = { ...nearExpiry, token: 'rotated-token-hex' }
       // RACE-06: update().set().where().returning() chain
       const updateSet = vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([nearExpiry]),
+          returning: vi.fn().mockResolvedValue([rotatedRow]),
         }),
       })
 
@@ -641,9 +642,15 @@ describe('IdentityService — Sessions', () => {
 
       // Session should be renewed with a new expiry
       expect(updateSet).toHaveBeenCalled()
-      const newExpiry = new Date(result.expiresAt)
+      const updateArgs = updateSet.mock.calls[0][0]
+      // The update must include both a new token and a new expiresAt
+      expect(updateArgs).toHaveProperty('token')
+      expect(updateArgs).toHaveProperty('expiresAt')
       // New expiry should be ~8 hours from now (not 30 min)
+      const newExpiry = new Date(result.expiresAt)
       expect(newExpiry.getTime()).toBeGreaterThan(Date.now() + 7 * 60 * 60 * 1000)
+      // newToken should be propagated for client rotation
+      expect(result.newToken).toBeTruthy()
     })
   })
 })
@@ -918,9 +925,9 @@ describe('IdentityService — Reset', () => {
     await svc.reset(false, 'development')
 
     expect(txFn).toHaveBeenCalled()
-    // 7 tables must be cleared: devices, webauthnCredentials, webauthnChallenges,
-    // sessions, provisionRooms, inviteCodes, users
-    expect(txDelete!).toHaveBeenCalledTimes(7)
+    // 8 tables must be cleared: devices, webauthnCredentials, webauthnChallenges,
+    // sessions, authNonces, provisionRooms, inviteCodes, users
+    expect(txDelete!).toHaveBeenCalledTimes(8)
   })
 
   it('allows reset in demo mode with DEMO_MODE_CONFIRM=DESTROY_ALL_DATA', async () => {
@@ -936,6 +943,6 @@ describe('IdentityService — Reset', () => {
     await svc.reset(true, 'staging', 'DESTROY_ALL_DATA')
 
     expect(txFn).toHaveBeenCalled()
-    expect(txDelete!).toHaveBeenCalledTimes(7)
+    expect(txDelete!).toHaveBeenCalledTimes(8)
   })
 })

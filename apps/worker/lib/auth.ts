@@ -1,9 +1,9 @@
+import { createHash } from 'crypto'
 import type { AuthPayload, User } from '../types'
 import { ed25519Verify } from '@llamenos/crypto/ffi'
 import { hexToBytes, utf8ToBytes } from '@shared/encoding'
 import { LABEL_DEVICE_AUTH } from '@shared/crypto-labels'
 import type { IdentityService } from '../services/identity'
-import { ServiceError } from '../services/settings'
 import { createLogger } from './logger'
 
 const logger = createLogger('auth')
@@ -59,11 +59,14 @@ export function verifyAuthToken(auth: AuthPayload, method?: string, path?: strin
 
 /**
  * Authenticate a request using session token or Ed25519 signature.
+ *
+ * Returns `newSessionToken` when the session was rotated during renewal —
+ * the caller should forward this to the client via `X-New-Session-Token` header.
  */
 export async function authenticateRequest(
   request: Request,
   identityService: IdentityService,
-): Promise<{ pubkey: string; user: User } | null> {
+): Promise<{ pubkey: string; user: User; newSessionToken?: string } | null> {
   const authHeader = request.headers.get('Authorization')
 
   // Try session token auth first (WebAuthn-based sessions)
@@ -74,7 +77,12 @@ export async function authenticateRequest(
       const user = await identityService.getUserInternal(session.pubkey)
       if (!user) return null
       if (user.active === false) return null
-      return { pubkey: session.pubkey, user }
+      return {
+        pubkey: session.pubkey,
+        user,
+        // Propagate rotated token so middleware can set X-New-Session-Token header
+        newSessionToken: session.newToken,
+      }
     } catch (e) {
       logger.warn('Session token validation failed', { error: e })
       return null
@@ -86,6 +94,23 @@ export async function authenticateRequest(
   if (!auth) return null
   const url = new URL(request.url)
   if (!verifyAuthToken(auth, request.method, url.pathname)) return null
+
+  // Replay protection: mark the signature nonce as used.
+  // The Ed25519 signature is deterministic (RFC 8032), so the same
+  // pubkey+timestamp+method+path always produces the same signature bytes.
+  // Storing a hash of the signature prevents replay within the 5-minute window.
+  const nonceHash = createHash('sha256').update(auth.token).digest('hex')
+  const nonceExpiresAt = new Date(auth.timestamp + TOKEN_MAX_AGE_MS)
+  try {
+    const isFirst = await identityService.checkAndMarkAuthNonce(nonceHash, auth.pubkey, nonceExpiresAt)
+    if (!isFirst) {
+      logger.warn('Bearer token replay detected', { pubkeyPrefix: auth.pubkey.slice(0, 8) })
+      return null
+    }
+  } catch (e) {
+    logger.warn('Auth nonce check failed', { error: e })
+    return null
+  }
 
   // Look up user via identity service
   try {

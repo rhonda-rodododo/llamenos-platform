@@ -6,11 +6,11 @@
  * using real keys from @noble/curves.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { schnorr } from '@noble/curves/secp256k1.js'
 import { ed25519 } from '@noble/curves/ed25519.js'
 import { sha256 } from '@noble/hashes/sha2.js'
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
+import { bytesToHex } from '@noble/hashes/utils.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
 import { LABEL_DEVICE_AUTH } from '@shared/crypto-labels'
 
@@ -280,11 +280,14 @@ describe('authenticateRequest', () => {
     new Request('http://localhost/api/me', { headers })
 
   const makeIdentityService = (overrides?: {
-    validateSession?: (token: string) => Promise<{ pubkey: string }>
+    validateSession?: (token: string) => Promise<{ pubkey: string; newToken?: string }>
     getUserInternal?: (pubkey: string) => Promise<{ pubkey: string; active: boolean } | null>
+    checkAndMarkAuthNonce?: (hash: string, pubkey: string, expiresAt: Date) => Promise<boolean>
   }) => ({
     validateSession: overrides?.validateSession ?? vi.fn(),
     getUserInternal: overrides?.getUserInternal ?? vi.fn(),
+    // Default: nonce is fresh (first use). Tests for replay override this.
+    checkAndMarkAuthNonce: overrides?.checkAndMarkAuthNonce ?? vi.fn().mockResolvedValue(true),
   })
 
   it('returns null when no Authorization header', async () => {
@@ -366,5 +369,65 @@ describe('authenticateRequest', () => {
     const svc = makeIdentityService()
     const req = makeRequest({ Authorization: 'Bearer not-json' })
     expect(await authenticateRequest(req, svc as never)).toBeNull()
+  })
+
+  it('returns null when Ed25519 token is replayed (nonce already used)', async () => {
+    const { privKey, pubkeyHex } = makeEd25519Keys()
+    const ts = Date.now()
+    const token = await makeEd25519Token(privKey, pubkeyHex, ts, 'GET', '/api/me')
+    const payload: AuthPayload = { pubkey: pubkeyHex, timestamp: ts, token }
+    const svc = makeIdentityService({
+      // Simulate: nonce already in DB (replay)
+      checkAndMarkAuthNonce: vi.fn().mockResolvedValue(false),
+      getUserInternal: vi.fn().mockResolvedValue({ pubkey: pubkeyHex, active: true }),
+    })
+    const req = new Request('http://localhost/api/me', {
+      headers: { Authorization: `Bearer ${JSON.stringify(payload)}` },
+    })
+    expect(await authenticateRequest(req, svc as never)).toBeNull()
+  })
+
+  it('calls checkAndMarkAuthNonce with SHA-256 hash of the token signature', async () => {
+    const { privKey, pubkeyHex } = makeEd25519Keys()
+    const ts = Date.now()
+    const token = await makeEd25519Token(privKey, pubkeyHex, ts, 'GET', '/api/me')
+    const payload: AuthPayload = { pubkey: pubkeyHex, timestamp: ts, token }
+    const checkNonce = vi.fn().mockResolvedValue(true)
+    const svc = makeIdentityService({
+      checkAndMarkAuthNonce: checkNonce,
+      getUserInternal: vi.fn().mockResolvedValue({ pubkey: pubkeyHex, active: true }),
+    })
+    const req = new Request('http://localhost/api/me', {
+      headers: { Authorization: `Bearer ${JSON.stringify(payload)}` },
+    })
+    await authenticateRequest(req, svc as never)
+    expect(checkNonce).toHaveBeenCalledOnce()
+    const [nonceHash, calledPubkey] = checkNonce.mock.calls[0]
+    expect(calledPubkey).toBe(pubkeyHex)
+    // nonceHash is SHA-256 of the signature hex — just verify it's a 64-char hex string
+    expect(nonceHash).toMatch(/^[0-9a-f]{64}$/)
+  })
+
+  it('propagates newSessionToken when session token is rotated', async () => {
+    const pubkey = 'a'.repeat(64)
+    const newToken = 'b'.repeat(64) // gitleaks:allow
+    const svc = makeIdentityService({
+      validateSession: vi.fn().mockResolvedValue({ pubkey, newToken }),
+      getUserInternal: vi.fn().mockResolvedValue({ pubkey, active: true }),
+    })
+    const req = makeRequest({ Authorization: 'Session validtoken' })
+    const result = await authenticateRequest(req, svc as never)
+    expect(result?.newSessionToken).toBe(newToken)
+  })
+
+  it('does not set newSessionToken when session is valid without rotation', async () => {
+    const pubkey = 'a'.repeat(64)
+    const svc = makeIdentityService({
+      validateSession: vi.fn().mockResolvedValue({ pubkey }),
+      getUserInternal: vi.fn().mockResolvedValue({ pubkey, active: true }),
+    })
+    const req = makeRequest({ Authorization: 'Session validtoken' })
+    const result = await authenticateRequest(req, svc as never)
+    expect(result?.newSessionToken).toBeUndefined()
   })
 })
