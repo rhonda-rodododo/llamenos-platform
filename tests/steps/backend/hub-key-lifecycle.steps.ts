@@ -19,7 +19,7 @@ import { LABEL_HUB_KEY_WRAP } from '@shared/crypto-labels'
 
 interface HubMember {
   name: string
-  nsec: string
+  seedHex: string
   pubkey: string
 }
 
@@ -99,7 +99,7 @@ Given(
       await apiPost(request, `/hubs/${hubId}/members`, { pubkey: vol.pubkey, roleIds: ['role-volunteer'] })
       getHubKeyState(world).members.set(name, {
         name,
-        nsec: vol.nsec,
+        seedHex: vol.seedHex,
         pubkey: vol.pubkey,
       })
     }
@@ -161,7 +161,7 @@ Then(
     const res = await apiGet<{ envelope: { pubkey: string; ct: string; enc: string } }>(
       request,
       `/hubs/${getHubKeyState(world).hubId}/key`,
-      member!.nsec,
+      member!.seedHex,
     )
     expect(res.status).toBe(200)
     expect(res.data.envelope).toBeTruthy()
@@ -228,7 +228,7 @@ Then(
     const res = await apiGet(
       request,
       `/hubs/${getHubKeyState(world).hubId}/key`,
-      member!.nsec,
+      member!.seedHex,
     )
     expect(res.status).toBe(expectedStatus)
     getHubKeyState(world).fetchResults.set(name, { status: res.status })
@@ -286,9 +286,9 @@ const AUTH_GUARD_KEY = 'hub_key_auth_guard'
 
 interface AuthGuardState {
   hubId?: string
-  memberNsec?: string
-  nonMemberNsec?: string
-  noEnvelopeMemberNsec?: string
+  memberSeedHex?: string
+  nonMemberSeedHex?: string
+  noEnvelopeMemberSeedHex?: string
   lastStatus?: number
 }
 
@@ -313,11 +313,11 @@ Given('a hub exists with a member {string}', async ({ request, world }, name: st
 
   const vol = await createVolunteerViaApi(request, { name: `${name} ${Date.now()}` })
   getAuthGuardState(world).hubId = hubId
-  getAuthGuardState(world).memberNsec = vol.nsec
+  getAuthGuardState(world).memberSeedHex = vol.seedHex
 
   // Store member pubkey for hub membership purposes — hub membership is implied by envelope presence
   getHubKeyState(world).hubId = hubId
-  getHubKeyState(world).members.set(name, { name, nsec: vol.nsec, pubkey: vol.pubkey })
+  getHubKeyState(world).members.set(name, { name, seedHex: vol.seedHex, pubkey: vol.pubkey })
 })
 
 Given('hub key envelopes are set for {string}', async ({ request, world }, name: string) => {
@@ -335,7 +335,7 @@ Given('hub key envelopes are set for {string}', async ({ request, world }, name:
 
 Given('a volunteer {string} who is not a hub member', async ({ request, world }, name: string) => {
   const vol = await createVolunteerViaApi(request, { name: `${name} ${Date.now()}` })
-  getAuthGuardState(world).nonMemberNsec = vol.nsec
+  getAuthGuardState(world).nonMemberSeedHex = vol.seedHex
 })
 
 Given(
@@ -344,10 +344,10 @@ Given(
     // Create a volunteer but do NOT set their envelope — they're "in the hub" via hub roles
     // but the key server has no wrapped key for them
     const vol = await createVolunteerViaApi(request, { name: `${name} ${Date.now()}` })
-    getHubKeyState(world).members.set(name, { name, nsec: vol.nsec, pubkey: vol.pubkey })
+    getHubKeyState(world).members.set(name, { name, seedHex: vol.seedHex, pubkey: vol.pubkey })
     // Add them to the hub via hub membership (PUT envelopes with existing members only)
     // They won't have an envelope entry, so GET /hubs/:id/key will return 404 for them
-    getAuthGuardState(world).noEnvelopeMemberNsec = vol.nsec
+    getAuthGuardState(world).noEnvelopeMemberSeedHex = vol.seedHex
 
     // Add them as a hub member via hub membership API (hub membership = having a hub role)
     // But do NOT add their key envelope — so GET /hubs/:id/key returns 404 for them
@@ -370,17 +370,17 @@ When('{string} requests the hub key envelope', async ({ request, world }, name: 
   const hubId = getAuthGuardState(world).hubId
   expect(hubId).toBeTruthy()
 
-  // Determine which nsec to use based on the name
-  let nsec: string | undefined
+  // Determine which seed to use based on the name
+  let seedHex: string | undefined
   if (getHubKeyState(world).members.has(name)) {
     // Could be the no-envelope member
-    nsec = getAuthGuardState(world).noEnvelopeMemberNsec
-      ?? getHubKeyState(world).members.get(name)!.nsec
+    seedHex = getAuthGuardState(world).noEnvelopeMemberSeedHex
+      ?? getHubKeyState(world).members.get(name)!.seedHex
   } else {
-    nsec = getAuthGuardState(world).nonMemberNsec
+    seedHex = getAuthGuardState(world).nonMemberSeedHex
   }
 
-  const res = await apiGet(request, `/hubs/${hubId}/key`, nsec)
+  const res = await apiGet(request, `/hubs/${hubId}/key`, seedHex)
   getAuthGuardState(world).lastStatus = res.status
 })
 
