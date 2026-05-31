@@ -4,8 +4,8 @@
  * Covers: withRetry, isRetryableError, assertOkOrRetryable, RetryableError.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { withRetry, isRetryableError, assertOkOrRetryable, RetryableError } from './retry'
+import { describe, it, expect, vi } from 'vitest'
+import { withRetry, isRetryableError, isRetryableDbError, assertOkOrRetryable, RetryableError } from './retry'
 
 // ---------------------------------------------------------------------------
 // RetryableError
@@ -96,6 +96,45 @@ describe('isRetryableError', () => {
     expect(isRetryableError(new Error('some unknown error'))).toBe(true)
     expect(isRetryableError('string error')).toBe(true)
     expect(isRetryableError(null)).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// isRetryableDbError
+// ---------------------------------------------------------------------------
+
+describe('isRetryableDbError', () => {
+  it('returns true for deadlock detected', () => {
+    expect(isRetryableDbError(new Error('deadlock detected'))).toBe(true)
+  })
+
+  it('returns true for too many connections', () => {
+    expect(isRetryableDbError(new Error('too many connections'))).toBe(true)
+  })
+
+  it('returns true for remaining connection slots', () => {
+    expect(isRetryableDbError(new Error('remaining connection slots are reserved'))).toBe(true)
+  })
+
+  it('returns true for connection terminated unexpectedly', () => {
+    expect(isRetryableDbError(new Error('connection terminated unexpectedly'))).toBe(true)
+  })
+
+  it('returns true for statement timeout / canceling statement', () => {
+    expect(isRetryableDbError(new Error('canceling statement due to statement timeout'))).toBe(true)
+    expect(isRetryableDbError(new Error('statement timeout exceeded'))).toBe(true)
+  })
+
+  it('delegates to isRetryableError for ECONNRESET', () => {
+    expect(isRetryableDbError(new Error('ECONNRESET'))).toBe(true)
+  })
+
+  it('delegates to isRetryableError for network timeout', () => {
+    expect(isRetryableDbError(new Error('connection timeout'))).toBe(true)
+  })
+
+  it('returns true for unknown errors (safe default)', () => {
+    expect(isRetryableDbError(new Error('something completely unknown'))).toBe(true)
   })
 })
 
