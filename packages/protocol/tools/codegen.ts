@@ -744,6 +744,12 @@ function stripSwiftConvenienceExtensions(lines: string[]): string {
   // `ContactTimelineResponse` conflicts with local Contact.swift — different shape.
   output = output.replace(/\bContactTimelineResponse\b(?!Contact)/g, 'ProtocolContactTimelineResponse')
 
+  // `ActiveCallsResponse` conflicts with local Call.swift — different shape (uses CallRecordDTO).
+  output = output.replace(/\bActiveCallsResponse\b/g, 'ProtocolActiveCallsResponse')
+
+  // `CallHistoryResponse` conflicts with local Call.swift — different shape (uses CallRecordDTO, Int fields).
+  output = output.replace(/\bCallHistoryResponse\b/g, 'ProtocolCallHistoryResponse')
+
   // Note: CaseInteraction and EvidenceListResponse are NOT renamed — the iOS app
   // uses the generated types directly (custom duplicates removed from CaseRecord.swift).
 
