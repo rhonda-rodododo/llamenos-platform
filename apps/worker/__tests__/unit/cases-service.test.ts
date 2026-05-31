@@ -1,6 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
 import { CasesService } from '../../services/cases'
-import { ServiceError } from '../../services/settings'
 
 // ---------------------------------------------------------------------------
 // DB Mock Helpers
@@ -201,7 +200,7 @@ describe('CasesService — CRUD', () => {
       }
 
       const svc = new CasesService(db as never)
-      const result = await svc.update('case-1', {
+      await svc.update('case-1', {
         statusHash: 'hash-closed',
         authorPubkey: 'pk-admin',
       })
@@ -548,18 +547,32 @@ describe('CasesService — Reset safety', () => {
     ).rejects.toThrow('Reset not allowed')
   })
 
-  it('allows reset in demo mode and deletes all case tables', async () => {
+  it('throws 403 when DEMO_MODE=true but DEMO_MODE_CONFIRM is missing', async () => {
+    const svc = new CasesService({} as never)
+    await expect(
+      svc.reset({ DEMO_MODE: 'true', ENVIRONMENT: 'staging' }),
+    ).rejects.toThrow('DEMO_MODE reset requires DEMO_MODE_CONFIRM=DESTROY_ALL_DATA')
+  })
+
+  it('throws 403 when DEMO_MODE=true but DEMO_MODE_CONFIRM has wrong value', async () => {
+    const svc = new CasesService({} as never)
+    await expect(
+      svc.reset({ DEMO_MODE: 'true', DEMO_MODE_CONFIRM: 'yes', ENVIRONMENT: 'staging' }),
+    ).rejects.toThrow('DEMO_MODE reset requires DEMO_MODE_CONFIRM=DESTROY_ALL_DATA')
+  })
+
+  it('allows reset in demo mode with confirmation and deletes all case tables', async () => {
     const db = { delete: vi.fn().mockResolvedValue(undefined) }
     const svc = new CasesService(db as never)
 
-    await svc.reset({ DEMO_MODE: 'true', ENVIRONMENT: 'production' })
+    await svc.reset({ DEMO_MODE: 'true', DEMO_MODE_CONFIRM: 'DESTROY_ALL_DATA', ENVIRONMENT: 'staging' })
 
     // 9 tables must be cleared: custodyEntries, evidence, caseInteractions,
     // reportCases, reportEvents, caseEvents, caseContacts, events, caseRecords
     expect(db.delete).toHaveBeenCalledTimes(9)
   })
 
-  it('allows reset in development environment and deletes all case tables', async () => {
+  it('allows reset in development environment without DEMO_MODE_CONFIRM', async () => {
     const db = { delete: vi.fn().mockResolvedValue(undefined) }
     const svc = new CasesService(db as never)
 

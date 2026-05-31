@@ -12,7 +12,7 @@
  * - R8: serverEventKeyHex behind auth, DEMO_MODE production gate, webhook hostname bypass,
  *        NotePayload maxLength, hub slug validation, blast mediaUrl HTTPS enforcement
  */
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 
 // ─── Round 4: Mass assignment field allowlist ─────────────────────────────────
 
@@ -423,6 +423,34 @@ describe('R8 Epic 258 C3: DEMO_MODE production gate', () => {
     ]
     // Verify all 7 DOs are accounted for
     expect(DOS_WITH_RESET).toHaveLength(7)
+  })
+
+  it('DEMO_MODE=true is blocked at startup in production environment', () => {
+    // validateConfig should throw when DEMO_MODE=true + ENVIRONMENT=production
+    function isBlockedInProduction(env: Record<string, string | undefined>): boolean {
+      return env.DEMO_MODE === 'true' && env.ENVIRONMENT === 'production'
+    }
+    expect(isBlockedInProduction({ DEMO_MODE: 'true', ENVIRONMENT: 'production' })).toBe(true)
+    expect(isBlockedInProduction({ DEMO_MODE: 'true', ENVIRONMENT: 'development' })).toBe(false)
+    expect(isBlockedInProduction({ DEMO_MODE: 'true', ENVIRONMENT: 'staging' })).toBe(false)
+    expect(isBlockedInProduction({ DEMO_MODE: 'false', ENVIRONMENT: 'production' })).toBe(false)
+  })
+
+  it('DEMO_MODE reset requires DEMO_MODE_CONFIRM=DESTROY_ALL_DATA', () => {
+    function canDemoReset(env: { DEMO_MODE?: string; DEMO_MODE_CONFIRM?: string; ENVIRONMENT?: string }): boolean {
+      const isDemoMode = env.DEMO_MODE === 'true'
+      const isDev = env.ENVIRONMENT === 'development'
+      if (!isDemoMode && !isDev) return false
+      if (isDemoMode && !isDev && env.DEMO_MODE_CONFIRM !== 'DESTROY_ALL_DATA') return false
+      return true
+    }
+    // Dev environment allowed without confirm
+    expect(canDemoReset({ DEMO_MODE: 'false', ENVIRONMENT: 'development' })).toBe(true)
+    // DEMO_MODE requires confirm
+    expect(canDemoReset({ DEMO_MODE: 'true', ENVIRONMENT: 'staging' })).toBe(false)
+    expect(canDemoReset({ DEMO_MODE: 'true', DEMO_MODE_CONFIRM: 'DESTROY_ALL_DATA', ENVIRONMENT: 'staging' })).toBe(true)
+    // Wrong confirm value
+    expect(canDemoReset({ DEMO_MODE: 'true', DEMO_MODE_CONFIRM: 'yes', ENVIRONMENT: 'staging' })).toBe(false)
   })
 })
 

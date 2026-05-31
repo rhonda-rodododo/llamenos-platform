@@ -41,11 +41,11 @@ dev.post('/test-reset', async (c) => {
     return c.json({ error: 'Not Found' }, 404)
   }
   const services = c.get('services')
-  const env = { DEMO_MODE: c.env.DEMO_MODE, ENVIRONMENT: c.env.ENVIRONMENT }
+  const env = { DEMO_MODE: c.env.DEMO_MODE, DEMO_MODE_CONFIRM: c.env.DEMO_MODE_CONFIRM, ENVIRONMENT: c.env.ENVIRONMENT }
   const adminPubkey = c.env.ADMIN_PUBKEY
   const demoMode = c.env.DEMO_MODE === 'true'
   await services.audit.reset()
-  await services.identity.reset(true, c.env.ENVIRONMENT)
+  await services.identity.reset(true, c.env.ENVIRONMENT, c.env.DEMO_MODE_CONFIRM)
   // Re-seed admin immediately — minimizes the window where hasAdmin()=false
   // (concurrent browser requests between reset() and the later ensureInit() would
   // see needsBootstrap=true, causing flaky AdminBootstrap to appear in E2E tests)
@@ -76,10 +76,10 @@ dev.post('/test-reset-no-admin', async (c) => {
     return c.json({ error: 'Not Found' }, 404)
   }
   const services = c.get('services')
-  const env = { DEMO_MODE: c.env.DEMO_MODE, ENVIRONMENT: c.env.ENVIRONMENT }
+  const env = { DEMO_MODE: c.env.DEMO_MODE, DEMO_MODE_CONFIRM: c.env.DEMO_MODE_CONFIRM, ENVIRONMENT: c.env.ENVIRONMENT }
   // Reset all services
   await services.audit.reset()
-  await services.identity.reset(true, c.env.ENVIRONMENT)
+  await services.identity.reset(true, c.env.ENVIRONMENT, c.env.DEMO_MODE_CONFIRM)
   await services.settings.reset(env)
   await services.records.reset()
   await services.shifts.reset('')
@@ -112,7 +112,7 @@ dev.post('/test-reset-records', async (c) => {
     return c.json({ error: 'Forbidden' }, 403)
   }
   const services = c.get('services')
-  const env = { DEMO_MODE: c.env.DEMO_MODE, ENVIRONMENT: c.env.ENVIRONMENT }
+  const env = { DEMO_MODE: c.env.DEMO_MODE, DEMO_MODE_CONFIRM: c.env.DEMO_MODE_CONFIRM, ENVIRONMENT: c.env.ENVIRONMENT }
   await services.records.reset()
   await services.shifts.reset('')
   await services.calls.reset('')

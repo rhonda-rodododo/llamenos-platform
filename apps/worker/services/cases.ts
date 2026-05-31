@@ -1763,9 +1763,14 @@ export class CasesService {
   // Reset (demo/development only)
   // =========================================================================
 
-  async reset(env: { DEMO_MODE?: string; ENVIRONMENT?: string }): Promise<void> {
-    if (env.DEMO_MODE !== 'true' && env.ENVIRONMENT !== 'development') {
+  async reset(env: { DEMO_MODE?: string; DEMO_MODE_CONFIRM?: string; ENVIRONMENT?: string }): Promise<void> {
+    const isDemoMode = env.DEMO_MODE === 'true'
+    const isDev = env.ENVIRONMENT === 'development'
+    if (!isDemoMode && !isDev) {
       throw new ServiceError(403, 'Reset not allowed outside demo/development mode')
+    }
+    if (isDemoMode && !isDev && env.DEMO_MODE_CONFIRM !== 'DESTROY_ALL_DATA') {
+      throw new ServiceError(403, 'DEMO_MODE reset requires DEMO_MODE_CONFIRM=DESTROY_ALL_DATA')
     }
 
     await this.db.delete(custodyEntries)

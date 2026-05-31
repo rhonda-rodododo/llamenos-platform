@@ -891,7 +891,21 @@ describe('IdentityService — Reset', () => {
     ).rejects.toThrow('Reset not allowed')
   })
 
-  it('allows reset in development mode and deletes all identity tables', async () => {
+  it('throws 403 when DEMO_MODE=true but DEMO_MODE_CONFIRM is missing', async () => {
+    const svc = new IdentityService({} as never)
+    await expect(
+      svc.reset(true, 'staging'),
+    ).rejects.toThrow('DEMO_MODE reset requires DEMO_MODE_CONFIRM=DESTROY_ALL_DATA')
+  })
+
+  it('throws 403 when DEMO_MODE=true but DEMO_MODE_CONFIRM has wrong value', async () => {
+    const svc = new IdentityService({} as never)
+    await expect(
+      svc.reset(true, 'staging', 'wrong'),
+    ).rejects.toThrow('DEMO_MODE reset requires DEMO_MODE_CONFIRM=DESTROY_ALL_DATA')
+  })
+
+  it('allows reset in development mode without DEMO_MODE_CONFIRM', async () => {
     let txDelete: ReturnType<typeof vi.fn>
     const txFn = vi.fn().mockImplementation(async (fn: (tx: unknown) => unknown) => {
       txDelete = vi.fn().mockResolvedValue(undefined)
@@ -909,7 +923,7 @@ describe('IdentityService — Reset', () => {
     expect(txDelete!).toHaveBeenCalledTimes(7)
   })
 
-  it('allows reset in demo mode and deletes all identity tables', async () => {
+  it('allows reset in demo mode with DEMO_MODE_CONFIRM=DESTROY_ALL_DATA', async () => {
     let txDelete: ReturnType<typeof vi.fn>
     const txFn = vi.fn().mockImplementation(async (fn: (tx: unknown) => unknown) => {
       txDelete = vi.fn().mockResolvedValue(undefined)
@@ -919,7 +933,7 @@ describe('IdentityService — Reset', () => {
     const db = { transaction: txFn }
     const svc = new IdentityService(db as never)
 
-    await svc.reset(true, 'production')
+    await svc.reset(true, 'staging', 'DESTROY_ALL_DATA')
 
     expect(txFn).toHaveBeenCalled()
     expect(txDelete!).toHaveBeenCalledTimes(7)
