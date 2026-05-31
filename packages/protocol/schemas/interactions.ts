@@ -47,7 +47,7 @@ export type CaseInteraction = z.infer<typeof caseInteractionSchema>
 export const createInteractionBodySchema = z.object({
   interactionType: interactionTypeSchema,
   sourceId: z.string().optional(),
-  encryptedContent: z.string().optional(),
+  encryptedContent: z.string().max(65536).optional(),
   contentEnvelopes: z.array(recipientEnvelopeSchema).optional(),
   interactionTypeHash: z.string(),
   previousStatusHash: z.string().optional(),

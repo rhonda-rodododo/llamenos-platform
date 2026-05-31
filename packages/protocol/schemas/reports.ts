@@ -77,12 +77,12 @@ export const createReportBodySchema = z.looseObject({
   title: z.string().min(1).max(500),
   category: z.string().optional(),
   reportTypeId: z.string().optional(),
-  encryptedContent: z.string().min(1, 'Report content is required'),
+  encryptedContent: z.string().min(1, 'Report content is required').max(131072),
   readerEnvelopes: z.array(recipientEnvelopeSchema).min(1, 'At least one reader envelope required'),
 })
 
 export const reportMessageBodySchema = z.looseObject({
-  encryptedContent: z.string().min(1, 'encryptedContent is required'),
+  encryptedContent: z.string().min(1, 'encryptedContent is required').max(65536),
   readerEnvelopes: z.array(recipientEnvelopeSchema).min(1, 'At least one reader envelope required'),
   attachmentIds: z.array(z.string()).optional(),
 })

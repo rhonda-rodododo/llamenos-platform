@@ -42,7 +42,7 @@ export const createNoteBodySchema = z.looseObject({
   callId: z.string().optional(),
   conversationId: z.string().optional(),
   contactHash: z.string().optional(),
-  encryptedContent: z.string().min(1, 'encryptedContent is required'),
+  encryptedContent: z.string().min(1, 'encryptedContent is required').max(65536),
   authorEnvelope: keyEnvelopeSchema.optional(),
   adminEnvelopes: z.array(recipientEnvelopeSchema).optional(),
 }).refine(
@@ -51,12 +51,12 @@ export const createNoteBodySchema = z.looseObject({
 )
 
 export const updateNoteBodySchema = z.looseObject({
-  encryptedContent: z.string().min(1).optional(),
+  encryptedContent: z.string().min(1).max(65536).optional(),
   authorEnvelope: keyEnvelopeSchema.optional(),
   adminEnvelopes: z.array(recipientEnvelopeSchema).optional(),
 })
 
 export const createReplyBodySchema = z.looseObject({
-  encryptedContent: z.string().min(1, 'encryptedContent is required'),
+  encryptedContent: z.string().min(1, 'encryptedContent is required').max(65536),
   readerEnvelopes: z.array(recipientEnvelopeSchema).min(1, 'At least one reader envelope required'),
 })
