@@ -46,8 +46,11 @@ struct DeviceRegistrationRequest: Encodable, Sendable {
 /// without requiring PIN unlock — critical for lock-screen call notifications.
 ///
 /// V3: Uses HPKE (X25519) for push payload encryption instead of legacy ECIES.
-/// The private key is stored in the Keychain with `kSecAttrAccessibleAfterFirstUnlock`
-/// so it remains accessible even when the device is locked (needed for push decryption).
+/// The private key is stored in the Keychain with `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`
+/// and `kSecAttrSynchronizable: false` — it never leaves this device via iCloud Keychain.
+///
+/// Note: The Secure Enclave (kSecAttrTokenIDSecureEnclave) only supports P-256/P-384 keys.
+/// X25519 wake keys cannot be stored in the Secure Enclave; device-only Keychain is used instead.
 ///
 /// Flow:
 /// 1. On first launch: `ensureKeypairExists()` generates and stores the wake key
@@ -108,6 +111,9 @@ final class WakeKeyService: @unchecked Sendable {
     /// Uses random 32 bytes as an X25519 private key for HPKE decryption.
     /// This must be called early in the app lifecycle, before push token registration.
     func ensureKeypairExists() throws {
+        // Migrate any legacy key stored with iCloud-syncable or wrong accessibility attributes.
+        try migrateWakeKeyIfNeeded()
+
         if publicKeyHex != nil { return }
 
         // Generate 32 random bytes for the wake private key (X25519)
@@ -122,7 +128,7 @@ final class WakeKeyService: @unchecked Sendable {
         // Derive X25519 public key from private key
         let publicKey = try deriveX25519PublicKey(from: privateKeyHex)
 
-        // Store private key with kSecAttrAccessibleAfterFirstUnlock
+        // Store private key with device-only, non-syncable attributes
         try storeWakePrivateKey(privateKeyHex)
 
         // Store public key normally
@@ -133,7 +139,14 @@ final class WakeKeyService: @unchecked Sendable {
         publicKeyHex = publicKey
     }
 
-    /// Store the wake private key with afterFirstUnlockThisDeviceOnly accessibility (H8).
+    /// Store the wake private key with device-only, non-syncable Keychain attributes (H8).
+    ///
+    /// Uses `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` — the key is never synced to iCloud
+    /// Keychain and never migrates to a new device. `kSecAttrSynchronizable: false` is set
+    /// explicitly as a defense-in-depth measure.
+    ///
+    /// Note: `kSecAttrTokenIDSecureEnclave` is intentionally omitted — the Secure Enclave only
+    /// supports P-256/P-384 keys. X25519 wake keys must use the software Keychain.
     private func storeWakePrivateKey(_ privateKeyHex: String) throws {
         guard let data = privateKeyHex.data(using: .utf8) else {
             throw WakeKeyError.keyStorageFailed(errSecParam)
@@ -144,17 +157,18 @@ final class WakeKeyService: @unchecked Sendable {
             kSecAttrService as String: "org.llamenos.hotline.wake",
             kSecAttrAccount as String: Self.wakePrivateKeyAccount,
             kSecValueData as String: data,
-            // H8: Use ThisDeviceOnly to prevent iCloud sync
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
-            // H8: Explicitly disable iCloud Keychain synchronization
+            // H8: WhenUnlockedThisDeviceOnly — never syncs to iCloud, never migrates to new device
+            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+            // H8: Defense-in-depth — explicitly disable iCloud Keychain synchronization
             kSecAttrSynchronizable as String: kCFBooleanFalse!,
         ]
 
-        // Delete any existing key first
+        // Delete any existing key first (including synced variants via kSecAttrSynchronizableAny)
         let deleteQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: "org.llamenos.hotline.wake",
             kSecAttrAccount as String: Self.wakePrivateKeyAccount,
+            kSecAttrSynchronizable as String: kSecAttrSynchronizableAny,
         ]
         SecItemDelete(deleteQuery as CFDictionary)
 
@@ -162,6 +176,38 @@ final class WakeKeyService: @unchecked Sendable {
         guard addStatus == errSecSuccess else {
             throw WakeKeyError.keyStorageFailed(addStatus)
         }
+    }
+
+    /// Migrate wake key from iCloud-syncable or wrong-accessibility storage to device-only.
+    ///
+    /// Older app versions stored the wake private key without explicit `kSecAttrSynchronizable`
+    /// or with `kSecAttrAccessibleAfterFirstUnlock` (without `ThisDeviceOnly`), allowing iCloud
+    /// Keychain to sync the key to other devices. This method detects such keys and re-stores
+    /// them with the correct device-only attributes.
+    private func migrateWakeKeyIfNeeded() throws {
+        // Query for the key matching any sync state to detect legacy syncable items.
+        let migrateQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "org.llamenos.hotline.wake",
+            kSecAttrAccount as String: Self.wakePrivateKeyAccount,
+            kSecAttrSynchronizable as String: kSecAttrSynchronizableAny,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+
+        var result: AnyObject?
+        let status = SecItemCopyMatching(migrateQuery as CFDictionary, &result)
+
+        // Nothing to migrate if not found
+        guard status == errSecSuccess,
+              let data = result as? Data,
+              let privateKeyHex = String(data: data, encoding: .utf8) else {
+            return
+        }
+
+        // Re-store with correct device-only, non-syncable attributes.
+        // storeWakePrivateKey already deletes via kSecAttrSynchronizableAny before adding.
+        try storeWakePrivateKey(privateKeyHex)
     }
 
     /// Retrieve the wake private key from Keychain.
@@ -267,9 +313,11 @@ final class WakeKeyService: @unchecked Sendable {
 
     /// Remove wake keys and registration state. Called on logout.
     func cleanup() {
+        // Use kSecAttrSynchronizableAny to delete both current and any legacy synced items.
         let deleteQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: "org.llamenos.hotline.wake",
+            kSecAttrSynchronizable as String: kSecAttrSynchronizableAny,
         ]
         SecItemDelete(deleteQuery as CFDictionary)
         keychainService.delete(key: Self.wakePublicKeyAccount)

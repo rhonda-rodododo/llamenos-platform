@@ -68,6 +68,9 @@ final class KeychainService: @unchecked Sendable {
             kSecValueData as String: data,
         ]
 
+        // Explicitly disable iCloud Keychain sync — all items are device-only.
+        query[kSecAttrSynchronizable as String] = kCFBooleanFalse!
+
         if biometric {
             var error: Unmanaged<CFError>?
             guard let access = SecAccessControlCreateWithFlags(
@@ -91,10 +94,13 @@ final class KeychainService: @unchecked Sendable {
                 kSecClass as String: kSecClassGenericPassword,
                 kSecAttrService as String: service,
                 kSecAttrAccount as String: key,
+                kSecAttrSynchronizable as String: kSecAttrSynchronizableAny,
             ]
 
             var updateAttributes: [String: Any] = [
                 kSecValueData as String: data,
+                // Ensure synchronizable remains false on updates too.
+                kSecAttrSynchronizable as String: kCFBooleanFalse!,
             ]
 
             // Re-apply access control on update if biometric is requested.
