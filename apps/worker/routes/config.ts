@@ -8,6 +8,8 @@ import { configResponseSchema, configVerifyResponseSchema, configPinsResponseSch
 import { publicErrors } from '../openapi/helpers'
 import { ed25519Sign } from '@llamenos/crypto/ffi'
 import { bytesToHex } from '@shared/encoding'
+import { DEMO_ACCOUNTS } from '@shared/demo-accounts'
+import { DEMO_SEEDS } from '../lib/demo-seeds'
 
 const config = new Hono<AppEnv>()
 
@@ -210,5 +212,30 @@ config.get('/pins',
 
     return c.json({ ...payload, signature })
   })
+
+// MARK: - Demo Credentials (demo mode only)
+
+/**
+ * GET /api/config/demo/credentials
+ *
+ * Returns demo account seed material so the login page can authenticate as a
+ * demo account without any prior session. Only available when DEMO_MODE=true.
+ *
+ * Private key seeds are stored server-side (this file) and MUST NOT appear in
+ * client bundles. This endpoint is the single fetch point.
+ */
+config.get('/demo/credentials', (c) => {
+  const demoMode = c.env.DEMO_MODE === 'true'
+  if (!demoMode) {
+    return c.json({ error: 'Not Found' }, 404)
+  }
+
+  const credentials = DEMO_ACCOUNTS.map(account => ({
+    pubkey: account.pubkey,
+    seedHex: DEMO_SEEDS[account.pubkey] ?? null,
+  })).filter(a => a.seedHex !== null)
+
+  return c.json({ credentials })
+})
 
 export default config

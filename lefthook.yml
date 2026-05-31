@@ -72,6 +72,19 @@ pre-commit:
           echo "Staged: $added"
           exit 1
         fi
+    block-private-keys:
+      run: |
+        # Block committing private key literals (nsec1 bech32 or raw 64-char hex seeds)
+        # into client-side source files. Private keys must never appear in browser bundles.
+        STAGED_CLIENT=$(git diff --cached --diff-filter=d --name-only | grep -E '^src/client/' || true)
+        if [ -z "$STAGED_CLIENT" ]; then
+          exit 0
+        fi
+        if git diff --cached --diff-filter=d -- $STAGED_CLIENT | grep -E '\+.*nsec1[a-z0-9]{58,}' > /dev/null 2>&1; then
+          echo "ERROR: nsec1 private key literal detected in staged client code."
+          echo "Private keys must never be bundled in the browser. Move them to the server."
+          exit 1
+        fi
     block-env-files:
       run: |
         # Block actual .env files (which may contain secrets) but allow .env.example (template)

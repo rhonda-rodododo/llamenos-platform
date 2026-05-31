@@ -1,11 +1,11 @@
 /**
- * Demo account Ed25519 seeds — loaded dynamically to avoid bundling in production.
+ * Demo account Ed25519 seed material — server-side only.
  *
- * This file is imported lazily by demo-accounts.ts only when demo mode is active.
- * Tree-shaking cannot remove top-level data, so isolating seeds here ensures
- * they are only fetched when explicitly needed.
+ * These seeds correspond to the demo accounts in packages/shared/demo-accounts.ts.
+ * They MUST NOT be shipped to the browser. The /api/config/demo/credentials endpoint
+ * returns these only when DEMO_MODE=true.
  *
- * Keys: Ed25519 signing pubkey hex → Ed25519 signing seed hex (64 chars each).
+ * Map: Ed25519 signing pubkey hex → Ed25519 signing seed hex (64 chars each).
  */
 export const DEMO_SEEDS: Record<string, string> = {
   '9bfc4116dc9d579cc0f88d58af7bef098f8bc31a16e053deb1de4525b79fe9da':

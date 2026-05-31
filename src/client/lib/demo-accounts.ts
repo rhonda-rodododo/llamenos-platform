@@ -1,16 +1,18 @@
 import { DEMO_ACCOUNTS } from '@shared/demo-accounts'
 
 /**
- * Demo account seed values — loaded dynamically to keep secrets out of
- * the main bundle. The seed data is in a separate chunk that is only
- * fetched when demo mode is active.
+ * Demo account seed values — fetched from the server at login time.
+ * Seeds are NOT bundled in the client. The server returns them only when
+ * DEMO_MODE=true via GET /api/config/demo/credentials.
  */
 let demoSeeds: Record<string, string> | null = null
 
 async function loadSeeds(): Promise<Record<string, string>> {
   if (!demoSeeds) {
-    const mod = await import('./demo-seed-data')
-    demoSeeds = mod.DEMO_SEEDS
+    const res = await fetch('/api/config/demo/credentials')
+    if (!res.ok) return {}
+    const data = await res.json() as { credentials: Array<{ pubkey: string; seedHex: string }> }
+    demoSeeds = Object.fromEntries(data.credentials.map(c => [c.pubkey, c.seedHex]))
   }
   return demoSeeds
 }
@@ -22,7 +24,7 @@ export async function getDemoSeed(pubkey: string): Promise<string | undefined> {
 
 export async function getDemoAccountsWithSeed() {
   const seeds = await loadSeeds()
-  return DEMO_ACCOUNTS.filter(a => !a.roleIds.includes('role-volunteer') || a.name !== 'Fatima Al-Rashid').map(a => ({
+  return DEMO_ACCOUNTS.filter(a => seeds[a.pubkey]).map(a => ({
     ...a,
     seedHex: seeds[a.pubkey]!,
     deviceKey: seeds[a.pubkey]!,
