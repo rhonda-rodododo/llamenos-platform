@@ -29,7 +29,7 @@ services:
       - "5432:5432"
     environment:
       POSTGRES_USER: llamenos
-      POSTGRES_PASSWORD: dev
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-dev}
       POSTGRES_DB: llamenos
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -44,8 +44,8 @@ services:
     ports:
       - "9000:9000"
     environment:
-      RUSTFS_ACCESS_KEY: rustfsadmin
-      RUSTFS_SECRET_KEY: rustfsadmin
+      RUSTFS_ACCESS_KEY: ${STORAGE_ACCESS_KEY:-rustfsadmin}
+      RUSTFS_SECRET_KEY: ${STORAGE_SECRET_KEY:-rustfsadmin}
     command: server /data
     volumes:
       - rustfsdata:/data
