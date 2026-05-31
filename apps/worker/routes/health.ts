@@ -69,16 +69,35 @@ async function checkSipBridge(env: Record<string, unknown>): Promise<CheckResult
   }
 }
 
+async function checkSignalNotifier(env: Record<string, unknown>): Promise<CheckResult | null> {
+  const notifierUrl = (env.SIGNAL_NOTIFIER_URL ?? env.NOTIFIER_URL) as string | undefined
+  if (!notifierUrl) return null  // Not configured — skip
+  const t0 = Date.now()
+  try {
+    const res = await safeFetch(`${notifierUrl.replace(/\/$/, '')}/health`, { timeoutMs: 5_000 })
+    if (!res.ok) return { status: 'failing', latencyMs: Date.now() - t0, detail: `HTTP ${res.status}` }
+    const body = await res.json() as { ok?: boolean; error?: string }
+    if (!body.ok) {
+      return { status: 'failing', latencyMs: Date.now() - t0, detail: body.error ?? 'Signal notifier reported unhealthy' }
+    }
+    return { status: 'ok', latencyMs: Date.now() - t0 }
+  } catch (err) {
+    return { status: 'failing', latencyMs: Date.now() - t0, detail: err instanceof Error ? err.message : 'Unreachable' }
+  }
+}
+
 async function runChecks(env: Record<string, unknown>): Promise<HealthResult> {
-  const [postgres, storage, relay, sipBridge] = await Promise.all([
+  const [postgres, storage, relay, sipBridge, signalNotifier] = await Promise.all([
     checkPostgres(),
     checkStorage(env),
     checkRelay(env),
     checkSipBridge(env),
+    checkSignalNotifier(env),
   ])
 
   const checks: Record<string, CheckResult> = { postgres, storage, relay }
   if (sipBridge !== null) checks.sipBridge = sipBridge
+  if (signalNotifier !== null) checks.signalNotifier = signalNotifier
 
   const status = Object.values(checks).every(v => v.status === 'ok') ? 'ok' : 'degraded'
   return { status, checks }
