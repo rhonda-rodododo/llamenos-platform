@@ -282,7 +282,7 @@ When('an unauthenticated client initiates recovery for a nonexistent user in the
 When('an authenticated user contributes a share to session {string}', async ({ request, world }, sessionId: string) => {
   const s = getS(world)
   const { status, data } = await apiPost(request, `/recovery-group/session/${sessionId}/contribute`, {
-    encryptedShare: toBase64('fake-share'),
+    encryptedShare: encryptContent('fake-share', generateContentKey(), 'llamenos:recovery'),
     contributorSignature: 'a'.repeat(128),
   }, s.adminSeed)
   s.lastStatus = status
@@ -298,7 +298,7 @@ When('an authenticated user stores a recovery envelope for the hub', async ({ re
 
   const { status, data } = await apiPost(request, '/recovery-group/user-envelope', {
     hubId: s.hubId!,
-    envelope: toBase64(`puk-seed-envelope-${Date.now()}`),
+    envelope: encryptContent(`puk-seed-envelope-${Date.now()}`, generateContentKey(), 'llamenos:recovery'),
   }, s.adminSeed)
   s.lastStatus = status
   s.lastBody = data as Record<string, unknown>
@@ -311,7 +311,7 @@ When('the user stores a different envelope for the same hub', async ({ request, 
 
   const { status, data } = await apiPost(request, '/recovery-group/user-envelope', {
     hubId: s.hubId!,
-    envelope: toBase64(`puk-seed-envelope-v2-${Date.now()}`),
+    envelope: encryptContent(`puk-seed-envelope-v2-${Date.now()}`, generateContentKey(), 'llamenos:recovery'),
   }, s.adminSeed)
   s.lastStatus = status
   s.lastBody = data as Record<string, unknown>
