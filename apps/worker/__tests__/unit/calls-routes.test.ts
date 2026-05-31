@@ -651,7 +651,7 @@ describe('Calls Routes', () => {
 
       const services = makeServices({ calls: callsSvc })
       const { app } = createTestApp({
-        permissions: ['calls:read-recording'],
+        permissions: ['calls:read-active', 'calls:read-recording'],
         pubkey: 'a'.repeat(64),
         services,
       })
@@ -673,7 +673,7 @@ describe('Calls Routes', () => {
 
       const services = makeServices({ calls: callsSvc })
       const { app } = createTestApp({
-        permissions: [],
+        permissions: ['calls:read-active'],
         pubkey: 'a'.repeat(64),
         services,
       })
@@ -696,7 +696,7 @@ describe('Calls Routes', () => {
 
       const services = makeServices({ calls: callsSvc })
       const { app } = createTestApp({
-        permissions: [],
+        permissions: ['calls:read-active'],
         pubkey,
         services,
       })

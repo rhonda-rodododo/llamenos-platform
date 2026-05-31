@@ -266,7 +266,7 @@ metrics.get('/prometheus',
       const pubkey = c.get('pubkey')
       if (!pubkey) return c.json({ error: 'Authentication failed' }, 401)
       const permissions = c.get('permissions')
-      if (!permissions?.includes('audit:read') && !permissions?.includes('*')) {
+      if (!permissions?.includes('metrics:read') && !permissions?.includes('*')) {
         return c.json({ error: 'Forbidden' }, 403)
       }
     }

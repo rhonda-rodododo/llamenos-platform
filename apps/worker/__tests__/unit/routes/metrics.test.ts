@@ -6,7 +6,7 @@
  * - GET /prometheus — auth via scrape token or admin permission
  * - GET / — JSON summary, requires metrics:read
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { Hono } from 'hono'
 import type { AppEnv } from '@worker/types'
 
@@ -162,7 +162,6 @@ describe('GET /prometheus', () => {
   })
 
   it('returns 401 when no scrape token configured and no pubkey', async () => {
-    const { app } = makeApp({ env: {}, pubkey: '' })
     // Override to simulate missing auth context
     const app2 = new Hono<AppEnv>()
     app2.use('*', async (c, next) => {
@@ -178,15 +177,15 @@ describe('GET /prometheus', () => {
     expect(res.status).toBe(401)
   })
 
-  it('returns 403 when authenticated but missing audit:read permission', async () => {
+  it('returns 403 when authenticated but missing metrics:read permission', async () => {
     const { app } = makeApp({ env: {}, permissions: ['notes:read-own'] })
 
     const res = await app.request('/prometheus')
     expect(res.status).toBe(403)
   })
 
-  it('returns Prometheus text when authenticated with audit:read permission', async () => {
-    const { app } = makeApp({ env: {}, permissions: ['audit:read'] })
+  it('returns Prometheus text when authenticated with metrics:read permission', async () => {
+    const { app } = makeApp({ env: {}, permissions: ['metrics:read'] })
 
     const res = await app.request('/prometheus')
     expect(res.status).toBe(200)

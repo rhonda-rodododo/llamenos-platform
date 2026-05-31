@@ -442,6 +442,7 @@ calls.get('/:callId/recording',
       ...notFoundError,
     },
   }),
+  requirePermission('calls:read-active'),
   async (c) => {
     const callId = c.req.param('callId')
     const services = c.get('services')
