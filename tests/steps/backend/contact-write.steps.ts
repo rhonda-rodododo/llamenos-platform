@@ -12,6 +12,8 @@ import {
   updateContactViaApi,
   uploadEntityFileViaApi,
 } from '../../api-helpers'
+import { generateContentKey, encryptContent } from '../../crypto-helpers'
+import { LABEL_NOTE_KEY } from '@shared/crypto-labels'
 
 // ── Local State ────────────────────────────────────────────────────
 
@@ -40,7 +42,11 @@ When('the admin updates the contact\'s encrypted profile', async ({ request, wor
   if (!contactId) throw new Error('No contact in cms state to update')
   const hubId = getScenarioState(world).hubId
   const updated = await updateContactViaApi(request, contactId, {
-    encryptedSummary: btoa(JSON.stringify({ displayName: 'Updated Profile', contactType: 'individual', tags: [] })),
+    encryptedSummary: encryptContent(
+      JSON.stringify({ displayName: 'Updated Profile', contactType: 'individual', tags: [] }),
+      generateContentKey(),
+      LABEL_NOTE_KEY,
+    ),
     identifierHashes: [`updated_${Date.now()}`],
   }, hubId)
   const cwState = getCwState(world)

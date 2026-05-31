@@ -7,6 +7,7 @@
 import { expect } from '@playwright/test'
 import { Given, When, Then, Before, getState, setState } from './fixtures'
 import { setLastResponse } from './shared-state'
+import { encryptContent, generateContentKey } from '../../crypto-helpers'
 import {
   apiGet,
   apiPost,
@@ -53,14 +54,10 @@ Before({ tags: '@backend' }, async ({ world }) => {
 
 // ── Helpers ────────────────────────────────────────────────────────
 
-function toBase64(str: string): string {
-  return btoa(str)
-}
-
 function makeShareEnvelopes(count: number, pubkeys: string[] = []): Array<{ holderPubkey: string; shareEnvelope: string }> {
   return Array.from({ length: count }, (_, i) => ({
     holderPubkey: pubkeys[i] ?? `deadbeef${String(i).padStart(56, '0')}`,
-    shareEnvelope: toBase64(`hpke-share-envelope-${i}`),
+    shareEnvelope: encryptContent(`hpke-share-envelope-${i}`, generateContentKey(), 'llamenos:recovery'),
   }))
 }
 

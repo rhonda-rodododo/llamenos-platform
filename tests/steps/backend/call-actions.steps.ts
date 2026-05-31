@@ -11,7 +11,7 @@ import { expect } from '@playwright/test'
 import { Given, When, Then, getState, setState } from './fixtures'
 import { getScenarioState } from './common.steps'
 import { getSharedState, setLastResponse } from './shared-state'
-import { apiPost, apiGet, listBansViaApi, listNotesViaApi } from '../../api-helpers'
+import { apiPost, apiGet, listBansViaApi, listNotesViaApi, encryptForTest } from '../../api-helpers'
 import {
   simulateIncomingCall,
   simulateAnswerCall,
@@ -114,7 +114,7 @@ When(
       '/notes',
       {
         callId: state.callId,
-        encryptedContent: 'YmRkIHRlc3Qgbm90ZSBmb3IgYWN0aXZlIGNhbGw=', // base64 mock ciphertext
+        encryptedContent: (await encryptForTest('bdd test note for active call', [state.volunteers[volIndex].nsec])).encryptedContent,
       },
       state.volunteers[volIndex].nsec,
     )

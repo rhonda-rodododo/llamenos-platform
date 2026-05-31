@@ -12,6 +12,8 @@ import {
   apiPost,
   createVolunteerViaApi,
 } from '../../api-helpers'
+import { generateContentKey, wrapKeyForRecipient, x25519PubkeyFromSeed } from '../../crypto-helpers'
+import { LABEL_HUB_KEY_WRAP } from '@shared/crypto-labels'
 
 // ── Local State ────────────────────────────────────────────────────
 
@@ -59,11 +61,12 @@ Before({ tags: '@crypto' }, async ({ world }) => {
 
 // ── Helpers ────────────────────────────────────────────────────────
 
-function generateMockEnvelopeEntry(pubkey: string, seed: string): EnvelopeEntry {
-  // ct encodes pubkey+seed so each member gets a DISTINCT value
-  const ct = Buffer.from(`wrapped:${pubkey}:${seed}`).toString('base64')
-  // enc must match pubkeySchema: ^[0-9a-f]{64}$ — real pubkeys satisfy this
-  return { pubkey, ct, enc: pubkey }
+async function generateRealEnvelopeEntry(pubkey: string, memberSeedHex: string): Promise<EnvelopeEntry> {
+  // Use real HPKE to wrap a random hub key for this member
+  const hubKey = generateContentKey()
+  const x25519Pub = x25519PubkeyFromSeed(memberSeedHex)
+  const envelope = await wrapKeyForRecipient(hubKey, x25519Pub, memberSeedHex, LABEL_HUB_KEY_WRAP)
+  return { pubkey, ct: envelope.ct, enc: envelope.enc }
 }
 
 async function createHub(request: import('@playwright/test').APIRequestContext): Promise<string> {
@@ -112,7 +115,7 @@ When(
 
     const envelopes: EnvelopeEntry[] = []
     for (const [name, member] of getHubKeyState(world).members) {
-      const entry = generateMockEnvelopeEntry(member.pubkey, 'initial')
+      const entry = await generateRealEnvelopeEntry(member.pubkey, member.nsec)
       envelopes.push(entry)
       getHubKeyState(world).originalEnvelopes.set(name, entry.ct)
       getHubKeyState(world).currentEnvelopes.set(name, entry.ct)
@@ -132,7 +135,7 @@ Given('hub key envelopes are set for all {int} members', async ({ request, world
 
   const envelopes: EnvelopeEntry[] = []
   for (const [name, member] of getHubKeyState(world).members) {
-    const entry = generateMockEnvelopeEntry(member.pubkey, 'initial')
+    const entry = await generateRealEnvelopeEntry(member.pubkey, member.nsec)
     envelopes.push(entry)
     getHubKeyState(world).originalEnvelopes.set(name, entry.ct)
     getHubKeyState(world).currentEnvelopes.set(name, entry.ct)
@@ -198,7 +201,7 @@ When(
     for (const name of [name1, name2]) {
       const member = getHubKeyState(world).members.get(name)
       expect(member).toBeTruthy()
-      const entry = generateMockEnvelopeEntry(member!.pubkey, 'rotated')
+      const entry = await generateRealEnvelopeEntry(member!.pubkey, member!.nsec)
       envelopes.push(entry)
       getHubKeyState(world).currentEnvelopes.set(name, entry.ct)
     }
@@ -243,7 +246,7 @@ When(
     for (const [name, member] of getHubKeyState(world).members) {
       // Only wrap for members still tracked in currentEnvelopes (non-removed)
       if (getHubKeyState(world).currentEnvelopes.has(name)) {
-        const entry = generateMockEnvelopeEntry(member.pubkey, 'new-key')
+        const entry = await generateRealEnvelopeEntry(member.pubkey, member.nsec)
         envelopes.push(entry)
         getHubKeyState(world).currentEnvelopes.set(name, entry.ct)
       }
@@ -323,7 +326,7 @@ Given('hub key envelopes are set for {string}', async ({ request, world }, name:
   const member = getHubKeyState(world).members.get(name)
   expect(member).toBeTruthy()
 
-  const entry = generateMockEnvelopeEntry(member!.pubkey, 'initial')
+  const entry = await generateRealEnvelopeEntry(member!.pubkey, member!.nsec)
   const res = await apiPut(request, `/hubs/${hubId}/key`, { envelopes: [entry] })
   expect(res.status).toBe(200)
   getHubKeyState(world).originalEnvelopes.set(name, entry.ct)
