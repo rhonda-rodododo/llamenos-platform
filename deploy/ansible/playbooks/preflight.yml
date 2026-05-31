@@ -76,6 +76,35 @@
         msg: "Docker status: {{ docker_version.stdout if docker_version is succeeded else 'NOT INSTALLED (will be installed during hardening)' }}"
       tags: always
 
+    - name: Assert minimum free disk space (10 GiB on root volume)
+      ansible.builtin.assert:
+        that:
+          - (ansible_facts.mounts | selectattr('mount', 'equalto', '/') | list | first).size_available >= 10737418240
+        fail_msg: |
+          INSUFFICIENT DISK SPACE: The root filesystem has less than 10 GiB free.
+
+          Available: {{ ((ansible_facts.mounts | selectattr('mount', 'equalto', '/') | list | first).size_available / 1073741824) | round(1) }} GiB
+          Required:  10 GiB minimum
+
+          Free up space or provision a larger volume before deploying.
+        success_msg: >-
+          Disk space OK: {{ ((ansible_facts.mounts | selectattr('mount', 'equalto', '/') | list | first).size_available / 1073741824) | round(1) }} GiB free on /
+      tags: always
+
+    - name: Assert minimum available RAM (512 MiB)
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.memfree_mb >= 512
+        fail_msg: |
+          INSUFFICIENT MEMORY: The target host has less than 512 MiB of free RAM.
+
+          Free RAM: {{ ansible_facts.memfree_mb }} MiB
+          Required: 512 MiB minimum
+
+          Llamenos requires at least 1 GiB RAM total; 512 MiB must be free at deploy time.
+        success_msg: "RAM OK: {{ ansible_facts.memfree_mb }} MiB free"
+      tags: always
+
 - name: Preflight variable validation
   hosts: all
   gather_facts: false
@@ -263,20 +292,20 @@
             openssl rand -base64 24
         success_msg: "storage_secret_key: [set, {{ storage_secret_key | length }} chars]"
 
-    - name: Assert bridge_secret is set when Asterisk is enabled
+    - name: Assert bridge_secret is set when SIP bridge or Asterisk is enabled
       ansible.builtin.assert:
         that:
           - bridge_secret is defined
           - bridge_secret | length > 0
         fail_msg: |
-          REQUIRED: 'bridge_secret' must be set when Asterisk PBX is enabled.
-          
+          REQUIRED: 'bridge_secret' must be set when SIP bridge or Asterisk PBX is enabled.
+
           Current value: {{ bridge_secret | default('NOT SET') }}
-          
+
           To generate:
             openssl rand -hex 32
         success_msg: "bridge_secret: [set, {{ bridge_secret | length }} chars]"
-      when: llamenos_asterisk_enabled | default(false) | bool
+      when: (llamenos_asterisk_enabled | default(false) | bool) or (llamenos_sip_bridge_enabled | default(false) | bool)
 
     - name: Assert ntfy_auth_token is set when ntfy is enabled
       ansible.builtin.assert:
@@ -293,15 +322,33 @@
         success_msg: "ntfy_auth_token: [set, {{ ntfy_auth_token | length }} chars]"
       when: llamenos_ntfy_enabled | default(false) | bool
 
+    - name: Assert signal_notifier_bearer_token is set when Signal is enabled
+      ansible.builtin.assert:
+        that:
+          - signal_notifier_bearer_token is defined
+          - signal_notifier_bearer_token | length >= 32
+        fail_msg: |
+          REQUIRED: 'signal_notifier_bearer_token' must be at least 32 characters when the Signal messaging sidecar is enabled.
+          This token must match the value configured in the signal-notifier sidecar.
+
+          Current value: {{ signal_notifier_bearer_token | default('NOT SET') }}
+          Length: {{ signal_notifier_bearer_token | default('') | length }} chars (expected: >= 32)
+
+          To generate:
+            openssl rand -hex 32
+        success_msg: "signal_notifier_bearer_token: [set, {{ signal_notifier_bearer_token | length }} chars]"
+      when: llamenos_signal_enabled | default(false) | bool
+
     - name: Warn if ntfy is not enabled
       ansible.builtin.debug:
         msg: "Note: ntfy push relay not enabled (Android push notifications via UnifiedPush disabled)"
       when: not (llamenos_ntfy_enabled | default(false) | bool)
 
-    - name: Warn if bridge_secret is not set but Asterisk is disabled
+    - name: Warn if bridge_secret is not set but SIP bridge/Asterisk is disabled
       ansible.builtin.debug:
-        msg: "Note: bridge_secret not set (Asterisk is disabled, so this is OK)"
+        msg: "Note: bridge_secret not set (SIP bridge and Asterisk are disabled, so this is OK)"
       when: not (llamenos_asterisk_enabled | default(false) | bool) and
+            not (llamenos_sip_bridge_enabled | default(false) | bool) and
             (bridge_secret is not defined or bridge_secret | length == 0)
 
     - name: Warn if SSH is open to the world
@@ -378,12 +425,14 @@
           ALL PREFLIGHT CHECKS PASSED
           ===========================================
           Domain: {{ domain }}
-          Admin Pubkey: {{ admin_pubkey[:16] }}...
+          Admin Pubkey: {{ (admin_pubkey[:16] + '...') if (admin_pubkey | default('') | length > 0) else 'NOT SET (bootstrap via Tauri app)' }}
           Server Secret: {{ server_secret[:8] }}...
           PostgreSQL Password: [set, {{ pg_password | length }} chars]
-           Storage Access Key: [set]
-           Storage Secret Key: [set, {{ storage_secret_key | length }} chars]
+          Storage Access Key: [set]
+          Storage Secret Key: [set, {{ storage_secret_key | length }} chars]
           HMAC Secret: [set, {{ hmac_secret | length }} chars]
+          Signal Messaging: {{ 'ENABLED' if llamenos_signal_enabled | default(false) | bool else 'DISABLED' }}
+          SIP Bridge: {{ 'ENABLED' if llamenos_sip_bridge_enabled | default(false) | bool else 'DISABLED' }}
           Backup Encryption: {{ 'ENABLED' if backup_age_public_key | default('') | length > 0 else 'DISABLED (set backup_age_public_key to enable)' }}
           ===========================================
           Proceeding with deployment...
