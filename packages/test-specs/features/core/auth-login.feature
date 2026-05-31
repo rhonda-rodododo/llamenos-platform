@@ -444,9 +444,7 @@ Feature: Authentication & Login
 
   # ── Desktop/Mobile: Panic Wipe ────────────────────────────────────
 
-  # FIXME: flaky in CI — panic wipe triggers multiple navigations and
-  # page.evaluate() hits "execution context destroyed" before storage checks.
-  @desktop @ios @android @smoke @fixme
+  @desktop @ios @android @smoke
   Scenario: Triple-Escape triggers panic wipe
     Given I am logged in as an admin
     And I am on the dashboard

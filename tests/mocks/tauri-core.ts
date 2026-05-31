@@ -1028,8 +1028,14 @@ const commands: Record<string, CommandHandler> = {
     mockRecoveryGroupKey = null
     mockProvisioningEphemeral = null
     schnorrSecretBytes = null
-    // In test mode, also clear lockout state
-    resetPinLockout()
+    // Reset lockout state in memory without calling saveLockoutState().
+    // localStorage.clear() has already run before wipe_keys is called (panic wipe
+    // clears storage first, then calls wipeVaultFile which invokes this command).
+    // Calling saveLockoutState() would write __test_pin_lockout_state back into
+    // the cleared storage, causing the "all local storage should be cleared" check
+    // to see localStorage.length === 1 instead of 0.
+    pinLockoutState = { failedAttempts: 0, lockoutUntil: 0 }
+    localStorage.removeItem(LOCKOUT_STORAGE_KEY)
   },
 
   // --- SAS emoji verification ---

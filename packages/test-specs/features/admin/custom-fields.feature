@@ -30,9 +30,6 @@ Feature: Custom Fields Administration
     Then I should see a success message
     And "Category" should appear in the field list
 
-  # FIXME: flaky in CI — custom-field-row detaches from DOM between visibility
-  # check and scrollIntoViewIfNeeded (component re-renders during delete flow).
-  @fixme
   Scenario: Admin can delete a custom field
     Given a custom field "ToDelete" exists
     When I click the delete button on "ToDelete"

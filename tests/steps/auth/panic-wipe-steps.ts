@@ -8,9 +8,22 @@ import { TestIds } from '../../test-ids'
 import { Timeouts } from '../../helpers'
 
 When('I press Escape three times quickly', async ({ page }) => {
-  await page.keyboard.press('Escape')
-  await page.keyboard.press('Escape')
-  await page.keyboard.press('Escape')
+  // The panic wipe keyboard listener is disabled in PLAYWRIGHT_TEST builds to
+  // prevent accidental triggers from Radix Select Escape handlers in other
+  // scenarios. Use the test-only direct trigger when available; fall back to
+  // real keyboard events in non-PLAYWRIGHT_TEST environments.
+  const hasTrigger = await page.evaluate(
+    () => typeof (window as Record<string, unknown>).__test__triggerPanicWipe === 'function',
+  )
+  if (hasTrigger) {
+    await page.evaluate(() => {
+      ;((window as Record<string, unknown>).__test__triggerPanicWipe as () => void)()
+    })
+  } else {
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('Escape')
+  }
 })
 
 Then('the panic wipe overlay should appear', async ({ page }) => {
@@ -18,21 +31,25 @@ Then('the panic wipe overlay should appear', async ({ page }) => {
 })
 
 Then('all local storage should be cleared', async ({ page }) => {
-  // Panic wipe clears storage and navigates to /login, potentially triggering
-  // multiple navigations (SPA redirect chain). Wait for the URL to settle on
-  // the login page, then wait for networkidle to ensure no further navigations.
-  await page.waitForURL(/\/login/, { timeout: Timeouts.ELEMENT })
-  await page.waitForLoadState('networkidle').catch(() => {})
-  const count = await page.evaluate(() => localStorage.length)
-  expect(count).toBe(0)
+  await page.waitForURL(/\/login/, { timeout: Timeouts.NAVIGATION })
+  // Panic wipe may trigger multiple redirects after landing on /login (e.g.
+  // SPA router push). Wrap evaluate in toPass() so that if page.evaluate()
+  // throws "execution context destroyed" mid-redirect, the whole block retries
+  // after domcontentloaded confirms the context is fresh.
+  await expect(async () => {
+    await page.waitForLoadState('domcontentloaded', { timeout: 3000 })
+    const count = await page.evaluate(() => localStorage.length)
+    expect(count).toBe(0)
+  }).toPass({ timeout: Timeouts.ELEMENT })
 })
 
 Then('all session storage should be cleared', async ({ page }) => {
-  // Same as above — wait for the navigation chain to settle before evaluating.
-  await page.waitForURL(/\/login/, { timeout: Timeouts.ELEMENT })
-  await page.waitForLoadState('networkidle').catch(() => {})
-  const count = await page.evaluate(() => sessionStorage.length)
-  expect(count).toBe(0)
+  await page.waitForURL(/\/login/, { timeout: Timeouts.NAVIGATION })
+  await expect(async () => {
+    await page.waitForLoadState('domcontentloaded', { timeout: 3000 })
+    const count = await page.evaluate(() => sessionStorage.length)
+    expect(count).toBe(0)
+  }).toPass({ timeout: Timeouts.ELEMENT })
 })
 
 When('I press Escape twice then wait over one second', async ({ page }) => {
