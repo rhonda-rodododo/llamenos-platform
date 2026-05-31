@@ -192,6 +192,8 @@ pub fn run() {
             crypto::legacy_import_nsec,
             crypto::generate_ephemeral_ed25519,
             crypto::generate_backup_from_state,
+            // Epic 355: Device provisioning (nsec encrypted in Rust, never enters webview)
+            crypto::encrypt_nsec_for_provisioning,
             // H17: Stronghold vault file wipe
             crypto::wipe_keys,
             // Device provisioning (nsec NEVER enters the webview)
