@@ -39,12 +39,6 @@ pub enum CryptoError {
     #[error("Signature verification failed")]
     SignatureVerificationFailed,
 
-    #[error("Invalid nsec bech32 encoding")]
-    InvalidNsec,
-
-    #[error("Invalid npub bech32 encoding")]
-    InvalidNpub,
-
     #[error("JSON serialization error: {0}")]
     JsonError(#[from] serde_json::Error),
 

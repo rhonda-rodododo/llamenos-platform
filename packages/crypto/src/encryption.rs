@@ -586,35 +586,35 @@ mod tests {
 
     #[test]
     fn roundtrip_pin_encryption() {
-        let nsec = "nsec1test1234567890abcdef";
+        let seed_hex = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4";
         let pin = "12345678";
         let pubkey = "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
 
-        let encrypted = encrypt_with_pin(nsec, pin, pubkey).unwrap();
+        let encrypted = encrypt_with_pin(seed_hex, pin, pubkey).unwrap();
         // New encryptions use 12-byte nonce (24 hex chars)
         assert_eq!(encrypted.nonce.len(), 24);
         let decrypted = decrypt_with_pin(&encrypted, pin).unwrap();
-        assert_eq!(decrypted, nsec);
+        assert_eq!(decrypted, seed_hex);
     }
 
     #[test]
     fn roundtrip_passphrase_encryption() {
-        let nsec = "nsec1testpassphrase";
+        let seed_hex = "deadbeef0123456789abcdef01234567";
         let passphrase = "MyStr0ngPass!";
         let pubkey = "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
 
-        let encrypted = encrypt_with_pin(nsec, passphrase, pubkey).unwrap();
+        let encrypted = encrypt_with_pin(seed_hex, passphrase, pubkey).unwrap();
         let decrypted = decrypt_with_pin(&encrypted, passphrase).unwrap();
-        assert_eq!(decrypted, nsec);
+        assert_eq!(decrypted, seed_hex);
     }
 
     #[test]
     fn wrong_credential_fails() {
-        let nsec = "nsec1test1234567890abcdef";
+        let seed_hex = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4";
         let pin = "12345678";
         let pubkey = "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
 
-        let encrypted = encrypt_with_pin(nsec, pin, pubkey).unwrap();
+        let encrypted = encrypt_with_pin(seed_hex, pin, pubkey).unwrap();
         let result = decrypt_with_pin(&encrypted, "99999999");
         assert!(result.is_err());
     }
@@ -805,7 +805,7 @@ mod tests {
 
     #[test]
     fn encrypt_with_pin_invalid_pin_rejected() {
-        let result = encrypt_with_pin("nsec1test", "123", "a".repeat(64).as_str());
+        let result = encrypt_with_pin("test_seed_data", "123", "a".repeat(64).as_str());
         assert!(matches!(result, Err(CryptoError::InvalidPin)));
     }
 

@@ -1082,21 +1082,21 @@ pub fn generate_backup_from_state(
 
 /// Encrypt the primary device's nsec for a new device's provisioning room.
 ///
-/// The nsec NEVER leaves Rust. Performs:
+/// The signing seed NEVER leaves Rust. Performs:
 ///   1. X25519(primarySK, ephemeralPK) → shared_secret
 ///   2. HKDF-SHA256(shared_secret, salt=LABEL_PROVISIONING_SALT, info=LABEL_DEVICE_PROVISION) → key
-///   3. AES-256-GCM encrypt(nsec_bech32, key, aad=LABEL_DEVICE_PROVISION) → ciphertext
+///   3. AES-256-GCM encrypt(seed_bytes, key, aad=LABEL_DEVICE_PROVISION) → ciphertext
 ///   4. SAS = HKDF(shared_secret, SAS_SALT, SAS_INFO) → 6-digit code
 ///
 /// Returns { encryptedHex, sasCode } or an error string.
 #[tauri::command]
-pub fn encrypt_nsec_for_provisioning(
+pub fn encrypt_seed_for_provisioning(
     state: tauri::State<'_, CryptoState>,
     ephemeral_pubkey_hex: String,
 ) -> Result<serde_json::Value, String> {
     state.with_secrets(|secrets| {
         let result =
-            provisioning::encrypt_nsec_for_provisioning(&secrets.signing_seed, &ephemeral_pubkey_hex)
+            provisioning::encrypt_seed_for_provisioning(&secrets.signing_seed, &ephemeral_pubkey_hex)
                 .map_err(err_str)?;
         Ok(serde_json::json!({
             "encryptedHex": result.encrypted_hex,
@@ -1143,7 +1143,7 @@ pub fn provision_encrypt_for_device(
     ephemeral_pubkey_hex: String,
 ) -> Result<serde_json::Value, String> {
     state.with_secrets(|secrets| {
-        let result = llamenos_core::provisioning::encrypt_nsec_for_provisioning(
+        let result = llamenos_core::provisioning::encrypt_seed_for_provisioning(
             &secrets.encryption_seed,
             &ephemeral_pubkey_hex,
         )
@@ -1239,28 +1239,16 @@ pub fn provision_decrypt_and_import(
         .take()
         .ok_or_else(|| "No provisioning session. Call provision_create_session first.".to_string())?;
 
-    // Decrypt the provisioned payload
-    let decrypted = llamenos_core::provisioning::decrypt_provisioned_nsec(
+    // Decrypt the provisioned payload — returns raw seed bytes directly
+    let decrypted = llamenos_core::provisioning::decrypt_provisioned_seed(
         &encrypted_hex,
         &primary_enc_pubkey_hex,
         &ephemeral_secret,
     )
     .map_err(err_str)?;
 
-    // The decrypted nsec is a bech32-encoded signing seed — decode it
-    let (hrp, signing_seed_bytes) =
-        bech32::decode(&decrypted.nsec).map_err(|e| format!("Invalid nsec bech32: {e}"))?;
-    if hrp.as_str() != "nsec" {
-        return Err(format!("Expected nsec HRP, got {}", hrp));
-    }
-    if signing_seed_bytes.len() != 32 {
-        return Err(format!(
-            "Signing seed must be 32 bytes, got {}",
-            signing_seed_bytes.len()
-        ));
-    }
     let mut signing_seed = [0u8; 32];
-    signing_seed.copy_from_slice(&signing_seed_bytes);
+    signing_seed.copy_from_slice(&decrypted.seed);
 
     // Derive encryption seed from signing seed (same as device_import_and_load)
     let encryption_seed = derive_encryption_seed_from_signing(&signing_seed);
