@@ -90,8 +90,8 @@ describe('ConnectionManager.evictMember', () => {
 
     expect(conn.hubs.has('hub-1')).toBe(false)
     expect((conn.ws.send as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(0)
-    const lastCall = (conn.ws.send as ReturnType<typeof vi.fn>).mock.calls.at(-1)
-    const lastMsg = JSON.parse(lastCall![0])
+    const lastCall = (conn.ws.send as ReturnType<typeof vi.fn>).mock.calls.at(-1) ?? []
+    const lastMsg = JSON.parse(lastCall[0] as string)
     expect(lastMsg.type).toBe('unsubscribed')
     expect(lastMsg.reason).toBe('membership_revoked')
   })
