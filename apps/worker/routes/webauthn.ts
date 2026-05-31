@@ -107,7 +107,6 @@ webauthn.post('/login/verify',
 
 // --- Authenticated routes ---
 webauthn.use('/register/*', authMiddleware)
-webauthn.use('/credentials', authMiddleware)
 webauthn.use('/credentials/*', authMiddleware)
 
 webauthn.post('/register/options',
