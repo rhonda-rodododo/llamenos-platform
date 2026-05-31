@@ -908,8 +908,8 @@ fn hub_key_multi_recipient_wrap() {
     let admin_unwrapped =
         hpke_unwrap_key(&admin_env, TEST_ADMIN_SECRET_KEY, LABEL_HUB_KEY_WRAP).unwrap();
 
-    assert_eq!(vol_unwrapped, hub_key);
-    assert_eq!(admin_unwrapped, hub_key);
+    assert_eq!(*vol_unwrapped, hub_key);
+    assert_eq!(*admin_unwrapped, hub_key);
 
     // Wrong label fails
     assert!(hpke_unwrap_key(&vol_env, TEST_SECRET_KEY, LABEL_NOTE_KEY).is_err());
@@ -981,7 +981,7 @@ fn domain_separation_all_labels() {
             let result = hpke_unwrap_key(env, TEST_ADMIN_SECRET_KEY, label);
             if i == j {
                 assert!(result.is_ok(), "Same label must succeed: {label}");
-                assert_eq!(result.unwrap(), key);
+                assert_eq!(*result.unwrap(), key);
             } else {
                 assert!(
                     result.is_err(),
