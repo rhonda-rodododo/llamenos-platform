@@ -17,19 +17,19 @@ import {
 } from '../../simulation-helpers'
 import { ed25519 } from '@noble/curves/ed25519.js'
 import { hexToBytes, utf8ToBytes } from '@shared/encoding'
-import { deriveServerEventKey, decryptHubEvent } from '../../helpers/relay-crypto'
-import { ADMIN_SEED } from '../../api-helpers'
+import { decryptHubEvent } from '../../helpers/relay-crypto'
+import { ADMIN_SEED, apiGet } from '../../api-helpers'
 
 const RELAY_URL = process.env.TEST_RELAY_URL || 'ws://localhost:3000/ws'
 const BASE_URL = process.env.TEST_HUB_URL || 'http://localhost:3000'
-// Default dev secret from scripts/dev-bun.sh — used for event decryption in tests
-const DEV_SERVER_SECRET = '0000000000000000000000000000000000000000000000000000000000000001'
 
 const RELAY_KEY = 'relay'
 
 interface RelayStepState {
   lastCapturedEvent?: CapturedEvent
   serverPubkey?: string
+  /** Server event key (hex) fetched from GET /api/auth/me */
+  serverEventKeyHex?: string
 }
 
 function getRelayState(world: Record<string, unknown>): RelayStepState {
@@ -43,8 +43,9 @@ function getRelayState(world: Record<string, unknown>): RelayStepState {
 
 // --- Relay Setup ---
 
-Given('the test relay is connected and capturing events', async ({ world }) => {
+Given('the test relay is connected and capturing events', async ({ request, world }) => {
   const state = getScenarioState(world)
+  const rs = getRelayState(world)
   if (state.relayCapture) {
     state.relayCapture.close()
   }
@@ -52,6 +53,15 @@ Given('the test relay is connected and capturing events', async ({ world }) => {
     seedHex: ADMIN_SEED,
     hubId: state.hubId ?? undefined,
   })
+
+  // Fetch the server event key from /api/auth/me so we can decrypt relay events.
+  // This makes tests work regardless of what SERVER_SECRET the server uses.
+  if (!rs.serverEventKeyHex) {
+    const { status, data } = await apiGet<{ serverEventKeyHex?: string }>(request, '/auth/me', ADMIN_SEED)
+    if (status === 200 && data?.serverEventKeyHex) {
+      rs.serverEventKeyHex = data.serverEventKeyHex
+    }
+  }
 })
 
 After(async ({ world }) => {
@@ -138,7 +148,7 @@ Then(
 Then('the decrypted event content type should be {string}', async ({ world }, expectedType: string) => {
   const rs = getRelayState(world)
   expect(rs.lastCapturedEvent).toBeTruthy()
-  const content = decryptEventPayload(rs.lastCapturedEvent!)
+  const content = decryptEventPayload(rs.lastCapturedEvent!, rs.serverEventKeyHex)
   expect(content).toBeTruthy()
   expect(content!.type).toBe(expectedType)
 })
@@ -146,7 +156,7 @@ Then('the decrypted event content type should be {string}', async ({ world }, ex
 Then('the event should contain a {string} field', async ({ world }, fieldName: string) => {
   const rs = getRelayState(world)
   expect(rs.lastCapturedEvent).toBeTruthy()
-  const content = decryptEventPayload(rs.lastCapturedEvent!)
+  const content = decryptEventPayload(rs.lastCapturedEvent!, rs.serverEventKeyHex)
   expect(content).toBeTruthy()
   expect(content![fieldName]).toBeDefined()
 })
@@ -156,7 +166,7 @@ Then(
   async ({ world }, fieldName: string, expectedValue: string) => {
     const rs = getRelayState(world)
     expect(rs.lastCapturedEvent).toBeTruthy()
-    const content = decryptEventPayload(rs.lastCapturedEvent!)
+    const content = decryptEventPayload(rs.lastCapturedEvent!, rs.serverEventKeyHex)
     expect(content).toBeTruthy()
     expect(content![fieldName]).toBe(expectedValue)
   },
@@ -178,7 +188,7 @@ Then('the raw event payload should NOT be valid JSON', async ({ world }) => {
 Then('the decrypted event content should be valid JSON', async ({ world }) => {
   const rs = getRelayState(world)
   expect(rs.lastCapturedEvent).toBeTruthy()
-  const content = decryptEventPayload(rs.lastCapturedEvent!)
+  const content = decryptEventPayload(rs.lastCapturedEvent!, rs.serverEventKeyHex)
   expect(content).toBeTruthy()
 })
 
@@ -236,15 +246,15 @@ Then("the event pubkey should match the server's configured pubkey", async ({ re
 // --- Helpers ---
 
 /**
- * Decrypt event payload using the server event key derived from SERVER_SECRET.
+ * Decrypt event payload using the server event key fetched from GET /api/auth/me.
  *
- * The new WsEventMessage uses `payload` (encrypted hex string) and `epoch`.
- * Decryption uses HKDF(SHA-256, secret, salt=LABEL_SERVER_EVENT_ENCRYPTION_KEY,
- * info=LABEL_HUB_EVENT_EPOCH:epoch, 32) + AES-256-GCM with padded plaintext.
+ * The server provides `serverEventKeyHex` (epoch-scoped AES-256-GCM key) to
+ * authenticated clients. Using this key directly avoids any dependency on knowing
+ * the server's SERVER_SECRET — the test works with any server configuration.
  *
  * Falls back to direct JSON parse for unencrypted content (shouldn't happen in prod).
  */
-function decryptEventPayload(event: CapturedEvent): Record<string, unknown> | null {
+function decryptEventPayload(event: CapturedEvent, serverEventKeyHex?: string): Record<string, unknown> | null {
   // Try direct JSON parse first (unencrypted fallback)
   try {
     return JSON.parse(event.payload) as Record<string, unknown>
@@ -252,14 +262,13 @@ function decryptEventPayload(event: CapturedEvent): Record<string, unknown> | nu
     // Payload is encrypted — decrypt with server event key
   }
 
-  const secret = process.env.SERVER_SECRET || process.env.DEV_SERVER_SECRET || DEV_SERVER_SECRET
-  if (!secret) {
-    console.warn('[relay.steps] No SERVER_SECRET — cannot decrypt event payload')
+  if (!serverEventKeyHex) {
+    console.warn('[relay.steps] No serverEventKeyHex from /api/auth/me — cannot decrypt event payload')
     return null
   }
 
   try {
-    const eventKey = deriveServerEventKey(secret, undefined, event.epoch)
+    const eventKey = hexToBytes(serverEventKeyHex)
     return decryptHubEvent(event.payload, eventKey, event.epoch)
   } catch (err) {
     console.warn('[relay.steps] Failed to decrypt event payload:', err)

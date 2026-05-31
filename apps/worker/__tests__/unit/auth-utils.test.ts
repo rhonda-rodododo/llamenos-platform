@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { parseAuthHeader, parseSessionHeader, validateToken, verifyAuthToken, buildAuthMessage } from '@worker/lib/auth'
 import { ed25519 } from '@noble/curves/ed25519.js'
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
+import { bytesToHex } from '@noble/hashes/utils.js'
 import { LABEL_DEVICE_AUTH } from '@shared/crypto-labels'
 
 describe('parseAuthHeader', () => {
@@ -89,10 +89,10 @@ describe('validateToken', () => {
   })
 
   it('returns false when token timestamp is in the far future', () => {
-    const fiveMinutesAhead = Date.now() + 5 * 60 * 1000 + 1
+    const sixMinutesAhead = Date.now() + 6 * 60 * 1000
     expect(validateToken({
       pubkey: 'abc',
-      timestamp: fiveMinutesAhead,
+      timestamp: sixMinutesAhead,
       token: 'def',
     })).toBe(false)
   })

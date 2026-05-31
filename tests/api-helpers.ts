@@ -15,7 +15,13 @@
 import { type APIRequestContext } from '@playwright/test'
 import { ed25519 } from '@noble/curves/ed25519.js'
 import { hexToBytes, bytesToHex, utf8ToBytes } from '@shared/encoding'
-import { LABEL_DEVICE_AUTH } from '@shared/crypto-labels'
+import { LABEL_DEVICE_AUTH, LABEL_NOTE_KEY } from '@shared/crypto-labels'
+import {
+  generateContentKey,
+  encryptContent,
+  wrapKeyForRecipient,
+  x25519PubkeyFromSeed,
+} from './crypto-helpers'
 
 // Admin Ed25519 seed (32 bytes hex) — deterministic test credential.
 // The corresponding pubkey is derived at runtime via ed25519PubkeyFromSeed.
@@ -685,21 +691,18 @@ export async function createReportViaApi(
   options?: { title?: string; category?: string; status?: string; reportTypeId?: string; seedHex?: string; hubId?: string },
 ): Promise<ReportRecord> {
   const seedHex = options?.seedHex ?? ADMIN_SEED
-  const pubkey = seedHexToPubkey(seedHex)
-
-  // Dummy ECIES envelope — server stores but doesn't validate crypto
-  const envelope = {
-    pubkey,
-    ct: 'a'.repeat(64),
-    enc: pubkey,
-  }
 
   const title = options?.title ?? `Test Report ${Date.now()}`
+  const { encryptedContent, envelopes } = await encryptForTest(
+    `report content: ${title}`,
+    [seedHex],
+  )
+
   const body: Record<string, unknown> = {
     title,
     category: options?.category ?? 'test',
-    encryptedContent: 'dGVzdCByZXBvcnQgY29udGVudA==', // base64 "test report content"
-    readerEnvelopes: [envelope],
+    encryptedContent,
+    readerEnvelopes: envelopes,
   }
   if (options?.reportTypeId) body.reportTypeId = options.reportTypeId
 
@@ -1177,10 +1180,18 @@ export async function createContactByNameViaApi(
   for (let i = 0; i <= normalized.length - 3; i++) {
     trigrams.push(normalized.slice(i, i + 3))
   }
-  const nameHash = Buffer.from(normalized).toString('base64').slice(0, 32)
+  const nameHash = bytesToHex(utf8ToBytes(normalized)).slice(0, 32)
+
+  // Encrypt the summary with real AES-256-GCM
+  const contentKey = generateContentKey()
+  const encryptedSummary = encryptContent(
+    JSON.stringify({ displayName, contactType, tags: [] }),
+    contentKey,
+    LABEL_NOTE_KEY,
+  )
 
   return createContactViaApi(request, {
-    encryptedSummary: btoa(JSON.stringify({ displayName, contactType, tags: [] })),
+    encryptedSummary,
     identifierHashes: [`name_${Date.now()}_${Math.random().toString(36).slice(2)}`],
     contactTypeHash: contactType,
     nameHash,
@@ -1189,9 +1200,36 @@ export async function createContactByNameViaApi(
   }, seedHex)
 }
 
-function dummyEnvelope(seedHex = ADMIN_SEED): { pubkey: string; ct: string; enc: string } {
-  const pubkey = seedHexToPubkey(seedHex)
-  return { pubkey, ct: 'a'.repeat(64), enc: pubkey }
+/**
+ * Create a real HPKE envelope wrapping a content key for a recipient.
+ * Uses the same DHKEM(X25519, HKDF-SHA256) + AES-256-GCM as production code.
+ */
+async function realEnvelope(
+  contentKey: Uint8Array,
+  seedHex = ADMIN_SEED,
+  label = LABEL_NOTE_KEY,
+): Promise<{ pubkey: string; ct: string; enc: string }> {
+  const x25519Pubkey = x25519PubkeyFromSeed(seedHex)
+  const envelope = await wrapKeyForRecipient(contentKey, x25519Pubkey, seedHex, label)
+  return { pubkey: x25519Pubkey, ...envelope }
+}
+
+/**
+ * Encrypt content with real AES-256-GCM and produce HPKE envelopes for recipients.
+ * Returns the hex ciphertext and an array of recipient envelopes.
+ * This replaces all fake base64 "encryption" in test helpers.
+ */
+export async function encryptForTest(
+  plaintext: string,
+  recipientSeedHexes: string[] = [ADMIN_SEED],
+  label = LABEL_NOTE_KEY,
+): Promise<{ encryptedContent: string; envelopes: Array<{ pubkey: string; ct: string; enc: string }> }> {
+  const contentKey = generateContentKey()
+  const encryptedContent = encryptContent(plaintext, contentKey, label)
+  const envelopes = await Promise.all(
+    recipientSeedHexes.map(seed => realEnvelope(contentKey, seed, label)),
+  )
+  return { encryptedContent, envelopes }
 }
 
 export async function createContactViaApi(
@@ -1206,7 +1244,10 @@ export async function createContactViaApi(
   },
   seedHex = ADMIN_SEED,
 ): Promise<Record<string, unknown>> {
-  const envelope = dummyEnvelope(seedHex)
+  const contentKey = generateContentKey()
+  const summaryText = options?.encryptedSummary ?? 'test contact summary'
+  const encryptedSummary = encryptContent(summaryText, contentKey, LABEL_NOTE_KEY)
+  const envelope = await realEnvelope(contentKey, seedHex)
   const { status, data } = await apiPost<Record<string, unknown>>(
     request,
     hubPath('/directory', options?.hubId),
@@ -1215,7 +1256,7 @@ export async function createContactViaApi(
       identifierHashes: options?.identifierHashes ?? [`idhash_${Date.now()}_${Math.random().toString(36).slice(2)}`],
       nameHash: options?.nameHash,
       trigramTokens: options?.trigramTokens,
-      encryptedSummary: options?.encryptedSummary ?? 'dGVzdCBjb250YWN0',
+      encryptedSummary: options?.encryptedSummary ?? encryptedSummary,
       summaryEnvelopes: [envelope],
       contactTypeHash: options?.contactTypeHash,
       tagHashes: [],
@@ -1290,7 +1331,9 @@ export async function createRecordViaApi(
   },
   seedHex = ADMIN_SEED,
 ): Promise<Record<string, unknown>> {
-  const envelope = dummyEnvelope(seedHex)
+  const contentKey = generateContentKey()
+  const encryptedSummary = encryptContent('test record', contentKey, LABEL_NOTE_KEY)
+  const envelope = await realEnvelope(contentKey, seedHex)
   const { status, data } = await apiPost<Record<string, unknown>>(
     request,
     hubPath('/records', options?.hubId),
@@ -1299,7 +1342,7 @@ export async function createRecordViaApi(
       statusHash: options?.statusHash ?? 'status_open_hash',
       assignedTo: options?.assignedTo ?? [],
       blindIndexes: options?.blindIndexes ?? {},
-      encryptedSummary: 'dGVzdCByZWNvcmQ=',
+      encryptedSummary,
       summaryEnvelopes: [envelope],
       parentRecordId: options?.parentRecordId,
     },
@@ -1405,7 +1448,9 @@ export async function createEventViaApi(
   },
   seedHex = ADMIN_SEED,
 ): Promise<Record<string, unknown>> {
-  const envelope = dummyEnvelope(seedHex)
+  const contentKey = generateContentKey()
+  const encryptedDetails = encryptContent('test event', contentKey, LABEL_NOTE_KEY)
+  const envelope = await realEnvelope(contentKey, seedHex)
   const { status, data } = await apiPost<Record<string, unknown>>(
     request,
     hubPath('/events', options?.hubId),
@@ -1417,7 +1462,7 @@ export async function createEventViaApi(
       eventTypeHash: options?.eventTypeHash ?? 'event_type_hash',
       statusHash: options?.statusHash ?? 'event_status_hash',
       blindIndexes: {},
-      encryptedDetails: 'dGVzdCBldmVudA==',
+      encryptedDetails,
       detailEnvelopes: [envelope],
       locationPrecision: 'neighborhood',
     },
@@ -1487,15 +1532,15 @@ export async function createInteractionViaApi(
   },
   seedHex = ADMIN_SEED,
 ): Promise<Record<string, unknown>> {
-  const envelope = dummyEnvelope(seedHex)
+  const contentKey = generateContentKey()
   const body: Record<string, unknown> = {
     interactionType: options.interactionType,
     interactionTypeHash: options.interactionTypeHash ?? `${options.interactionType}_hash`,
   }
   // Schema requires sourceId for note/call/message; encryptedContent for comment
   if (options.interactionType === 'comment' && !options.encryptedContent) {
-    body.encryptedContent = 'dGVzdCBjb21tZW50' // base64 "test comment"
-    body.contentEnvelopes = [envelope]
+    body.encryptedContent = encryptContent('test comment', contentKey, LABEL_NOTE_KEY)
+    body.contentEnvelopes = [await realEnvelope(contentKey, seedHex)]
   }
   if (['note', 'call', 'message'].includes(options.interactionType) && !options.sourceId) {
     body.sourceId = crypto.randomUUID()
@@ -1503,7 +1548,7 @@ export async function createInteractionViaApi(
   if (options.sourceId) body.sourceId = options.sourceId
   if (options.encryptedContent) {
     body.encryptedContent = options.encryptedContent
-    body.contentEnvelopes = [envelope]
+    body.contentEnvelopes = [await realEnvelope(contentKey, seedHex)]
   }
   if (options.previousStatusHash) body.previousStatusHash = options.previousStatusHash
   if (options.newStatusHash) body.newStatusHash = options.newStatusHash
@@ -1823,10 +1868,11 @@ export async function createAffinityGroupViaApi(
   seedHex = ADMIN_SEED,
   hubId?: string,
 ): Promise<GroupResult> {
-  const envelope = dummyEnvelope(seedHex)
+  const contentKey = generateContentKey()
+  const encryptedDetails = encryptContent(JSON.stringify({ name }), contentKey, LABEL_NOTE_KEY)
+  const envelope = await realEnvelope(contentKey, seedHex)
   // The group body requires at least one member. If none provided, the caller
-  // must supply initialMembers. The encryptedDetails is a base64 blob that
-  // the client would normally encrypt; for tests we embed the plaintext name.
+  // must supply initialMembers. The encryptedDetails is encrypted with real AES-256-GCM.
   const members = initialMembers.map(m => ({
     contactId: m.contactId,
     role: m.role,
@@ -1836,7 +1882,7 @@ export async function createAffinityGroupViaApi(
     request,
     hubPath('/directory/groups', hubId),
     {
-      encryptedDetails: btoa(JSON.stringify({ name })),
+      encryptedDetails,
       detailEnvelopes: [envelope],
       members,
     },
@@ -1948,7 +1994,6 @@ export async function createCaseFromReportViaApi(
   seedHex = ADMIN_SEED,
   hubId?: string,
 ): Promise<{ recordId: string; linkId: string }> {
-  const envelope = dummyEnvelope(seedHex)
   // Create the record first
   const record = await createRecordViaApi(request, entityTypeId, {
     statusHash: 'status_open_hash',
@@ -1956,20 +2001,25 @@ export async function createCaseFromReportViaApi(
   }, seedHex)
   const recordId = (record as { id: string }).id
 
-  // Link it to the report
+  // Link it to the report with real encryption
+  const contentKey = generateContentKey()
+  const encryptedNotes = encryptContent('test link', contentKey, LABEL_NOTE_KEY)
+  const envelope = await realEnvelope(contentKey, seedHex)
   const { status, data } = await apiPost<{ id?: string; reportId?: string; caseId?: string }>(
     request,
     hubPath(`/reports/${reportId}/records`, hubId),
     {
       caseId: recordId,
-      encryptedNotes: 'dGVzdCBsaW5r',
+      encryptedNotes,
       notesEnvelopes: [envelope],
     },
     seedHex,
   )
   if (status !== 201 && status !== 200) throw new Error(`Failed to link case to report: ${status}`)
-  const linkData = data as Record<string, unknown>
-  return { recordId, linkId: (linkData.id ?? linkData.caseId ?? recordId) as string }
+  // Response is ReportCaseRow with composite PK (reportId + caseId) — no separate id field.
+  // linkId is the caseId from the row, which equals recordId.
+  const linkData = data as { caseId?: string; reportId?: string }
+  return { recordId, linkId: linkData.caseId ?? recordId }
 }
 
 /**

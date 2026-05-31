@@ -79,6 +79,11 @@ final class AppState {
     /// Whether to show the soft-update banner (dismissible).
     var showUpdateBanner: Bool = false
 
+    /// Pending hub invite token from a `llamenos://hub-invite?token=` deep link.
+    /// Set before the user is authenticated so the login / registration flow can
+    /// use it when creating or linking an account to a hub.
+    var pendingHubInviteToken: String?
+
     // MARK: - WebSocket Event Listener
 
     /// Background task that listens for WebSocket events.

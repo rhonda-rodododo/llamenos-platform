@@ -11,7 +11,7 @@ import { Hono } from 'hono'
 import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { authErrors } from '../openapi/helpers'
-import { registerDeviceBodySchema, voipTokenBodySchema, deviceDetailListResponseSchema, renameDeviceBodySchema, revokeDeviceBodySchema, verifyDeviceBodySchema } from '@protocol/schemas/devices'
+import { registerDeviceBodySchema, voipTokenBodySchema, deviceDetailListResponseSchema, renameDeviceBodySchema, revokeDeviceBodySchema, verifyDeviceBodySchema, clearPushTokenBodySchema } from '@protocol/schemas/devices'
 import { requirePermission } from '../middleware/permission-guard'
 import { rateLimit } from '../middleware/rate-limit'
 
@@ -140,6 +140,32 @@ devicesRoutes.post('/voip-token',
       voipToken: body.voipToken,
     })
 
+    return c.body(null, 204)
+  })
+
+/**
+ * DELETE /api/devices/push-token
+ * Deregister a specific push endpoint by token value.
+ * Called when a UnifiedPush distributor (e.g. ntfy) unregisters the device.
+ *
+ * NOTE: This literal route MUST be registered BEFORE /:id to prevent
+ * the parameterized route from intercepting /push-token requests.
+ */
+devicesRoutes.delete('/push-token',
+  describeRoute({
+    tags: ['Devices'],
+    summary: 'Deregister a push endpoint by token value',
+    responses: {
+      204: { description: 'Push endpoint removed (or was not registered)' },
+      ...authErrors,
+    },
+  }),
+  validator('json', clearPushTokenBodySchema),
+  async (c) => {
+    const pubkey = c.get('pubkey')
+    const { pushToken } = c.req.valid('json')
+    const services = c.get('services')
+    await services.identity.cleanupDevices(pubkey, [pushToken])
     return c.body(null, 204)
   })
 

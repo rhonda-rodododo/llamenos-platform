@@ -11,10 +11,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import org.llamenos.hotline.R
+import org.llamenos.hotline.api.ApiService
 import org.llamenos.hotline.crypto.CryptoService
 import org.llamenos.hotline.crypto.KeystoreService
 import org.llamenos.hotline.crypto.WakeKeyService
 import org.llamenos.hotline.hub.ActiveHubState
+import org.llamenos.hotline.model.RegisterDeviceRequest
 import org.llamenos.hotline.telephony.LinphoneService
 import org.unifiedpush.android.connector.FailedReason
 import org.unifiedpush.android.connector.MessagingReceiver
@@ -64,6 +66,9 @@ class PushService : MessagingReceiver() {
     @Inject
     lateinit var linphoneService: LinphoneService
 
+    @Inject
+    lateinit var apiService: ApiService
+
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /**
@@ -79,12 +84,25 @@ class PushService : MessagingReceiver() {
     override fun onNewEndpoint(context: Context, endpoint: PushEndpoint, instance: String) {
         keystoreService.store(KEY_PUSH_ENDPOINT, endpoint.url)
 
-        // Ensure a wake key exists for push encryption
-        wakeKeyService.getOrCreateWakePublicKey()
-
-        // TODO: Send endpoint to backend via API call
-        // The endpoint URL is the full ntfy topic URL that the backend
-        // will POST encrypted payloads to.
+        serviceScope.launch {
+            try {
+                val wakePublicKey = wakeKeyService.getOrCreateWakePublicKey()
+                apiService.registerPushEndpoint(
+                    RegisterDeviceRequest(
+                        pushToken = endpoint.url,
+                        wakeKeyPublic = wakePublicKey,
+                        ed25519Pubkey = cryptoService.signingPubkeyHex,
+                        x25519Pubkey = cryptoService.encryptionPubkeyHex,
+                        deviceModel = Build.MODEL,
+                        osVersion = Build.VERSION.RELEASE,
+                    ),
+                )
+            } catch (_: Exception) {
+                // Registration will be retried on next endpoint assignment.
+                // The backend will also re-request registration via WebSocket
+                // challenge if no device record is found.
+            }
+        }
     }
 
     /**
@@ -92,9 +110,19 @@ class PushService : MessagingReceiver() {
      * Clean up the stored endpoint and notify the backend.
      */
     override fun onUnregistered(context: Context, instance: String) {
+        val storedEndpoint = keystoreService.retrieve(KEY_PUSH_ENDPOINT)
         keystoreService.delete(KEY_PUSH_ENDPOINT)
 
-        // TODO: Notify backend to remove this device's push endpoint
+        if (storedEndpoint != null) {
+            serviceScope.launch {
+                try {
+                    apiService.clearPushEndpoint(storedEndpoint)
+                } catch (_: Exception) {
+                    // Best-effort: the backend will eventually detect stale endpoints
+                    // when push delivery fails to the old ntfy topic URL.
+                }
+            }
+        }
     }
 
     /**

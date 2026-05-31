@@ -46,7 +46,7 @@ import { getMessagingAdapterFromService } from '../lib/service-factories'
 
 const settings = new Hono<AppEnv>()
 
-// --- Transcription settings: readable by all authenticated, writable by settings:manage ---
+// --- Transcription settings: readable + writable by settings:manage-transcription ---
 settings.get('/transcription',
   describeRoute({
     tags: ['Settings'],
@@ -63,6 +63,7 @@ settings.get('/transcription',
       ...authErrors,
     },
   }),
+  requirePermission('settings:manage-transcription'),
   async (c) => {
     const services = c.get('services')
     const result = await services.settings.getTranscriptionSettings()
@@ -98,7 +99,7 @@ settings.patch('/transcription',
   },
 )
 
-// --- Custom fields: readable by all authenticated (filtered by permissions), writable by admin ---
+// --- Custom fields: readable by settings:read (filtered by manage-fields), writable by admin ---
 settings.get('/custom-fields',
   describeRoute({
     tags: ['Settings'],
@@ -115,6 +116,7 @@ settings.get('/custom-fields',
       ...authErrors,
     },
   }),
+  requirePermission('settings:read'),
   async (c) => {
     const permissions = c.get('permissions')
     const canManageFields = checkPermission(permissions, 'settings:manage-fields')
@@ -450,7 +452,7 @@ settings.post('/telephony-provider/test',
           break
         case 'signalwire': {
           if (!body.signalwireSpace || !/^[a-zA-Z0-9_-]+$/.test(body.signalwireSpace)) {
-            return Response.json({ ok: false, error: 'Invalid SignalWire space name' }, { status: 400 })
+            return c.json({ error: 'Invalid SignalWire space name' }, 400)
           }
           testUrl = `https://${body.signalwireSpace}.signalwire.com/api/relay/rest/phone_numbers`
           testHeaders['Authorization'] = 'Basic ' + btoa(`${body.accountSid}:${body.authToken}`)
@@ -465,28 +467,28 @@ settings.post('/telephony-provider/test',
           break
         case 'asterisk': {
           if (!body.ariUrl) {
-            return Response.json({ ok: false, error: 'ARI URL is required' }, { status: 400 })
+            return c.json({ error: 'ARI URL is required' }, 400)
           }
           const ariError = validateExternalUrl(body.ariUrl, 'ARI URL')
           if (ariError) {
-            return Response.json({ ok: false, error: ariError }, { status: 400 })
+            return c.json({ error: ariError }, 400)
           }
           testUrl = `${body.ariUrl}/api/asterisk/info`
           testHeaders['Authorization'] = 'Basic ' + btoa(`${body.ariUsername}:${body.ariPassword}`)
           break
         }
         default:
-          return Response.json({ ok: false, error: 'Unknown provider type' }, { status: 400 })
+          return c.json({ error: 'Unknown provider type' }, 400)
       }
 
       const testRes = await safeFetch(testUrl, { headers: testHeaders })
       if (testRes.ok) {
-        return Response.json({ ok: true })
+        return c.json({ ok: true })
       }
-      return Response.json({ ok: false, error: `Provider returned ${testRes.status}` }, { status: 400 })
+      return c.json({ error: `Provider returned ${testRes.status}` }, 400)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Connection failed'
-      return Response.json({ ok: false, error: message }, { status: 400 })
+      return c.json({ error: message }, 400)
     }
   },
 )
@@ -1124,7 +1126,7 @@ settings.get('/cleanup-metrics',
   },
 )
 
-// --- Geocoding config: readable by authenticated users, writable by settings:manage ---
+// --- Geocoding config: readable by settings:read (API key omitted), writable by settings:manage ---
 settings.get('/geocoding',
   describeRoute({
     tags: ['Settings'],
@@ -1134,6 +1136,7 @@ settings.get('/geocoding',
       ...authErrors,
     },
   }),
+  requirePermission('settings:read'),
   async (c) => {
     const config = await c.get('services').settings.getGeocodingConfig()
     return c.json(config)
