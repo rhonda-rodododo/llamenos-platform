@@ -221,7 +221,7 @@ final class KeychainService: @unchecked Sendable {
     /// Returns nil if no biometric PIN is stored or the context is invalid.
     /// Throws on unexpected Keychain errors.
     func retrievePINWithBiometric(context: LAContext) throws -> String? {
-        var query: [String: Any] = [
+        let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: KeychainKey.biometricPIN,
