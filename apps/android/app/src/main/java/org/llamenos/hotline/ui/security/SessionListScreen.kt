@@ -32,7 +32,7 @@ fun SessionListScreen(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        items(sessions, key = { it.token }) { session ->
+        items(sessions, key = { it.id }) { session ->
             Card(modifier = Modifier.fillMaxWidth()) {
                 Row(
                     modifier = Modifier.padding(16.dp),
