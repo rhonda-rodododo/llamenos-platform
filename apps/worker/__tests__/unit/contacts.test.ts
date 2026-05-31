@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { ContactsService } from '@worker/services/contacts'
 import { createMockDb } from './mock-db'
 
@@ -17,17 +17,20 @@ describe('ContactsService', () => {
       nameHash: 'name-hash',
       trigramTokens: ['tok1'],
       encryptedSummary: 'enc-summary',
-      summaryEnvelopes: [],
+      summaryEnvelopes: [{ v: 1, enc: 'abc', ct: 'def' }],
       encryptedPii: null,
       piiEnvelopes: null,
       contactTypeHash: null,
       tagHashes: [],
       statusHash: null,
       blindIndexes: {},
+      needsReencryption: false,
       caseCount: 0,
       noteCount: 0,
       interactionCount: 0,
       lastInteractionAt: new Date(),
+      mergedIntoId: null,
+      deletedAt: null,
       createdAt: new Date(),
       updatedAt: new Date(),
       ...overrides,
@@ -66,6 +69,19 @@ describe('ContactsService', () => {
       db.$setSelectResult([])
 
       await expect(service.get('contact-1')).rejects.toThrow('Contact not found')
+    })
+
+    it('logs a warning when accessing a plaintext (needs_reencryption) contact', async () => {
+      const { db, service } = setup()
+      db.$setSelectResult([makeContact({ needsReencryption: true, summaryEnvelopes: [] })])
+
+      // Logger writes JSON to process.stdout — spy there
+      const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+      const result = await service.get('contact-1')
+      expect(result.needsReencryption).toBe(true)
+      const output = stdoutSpy.mock.calls.map((c) => String(c[0])).join('')
+      expect(output).toContain('SECURITY')
+      stdoutSpy.mockRestore()
     })
   })
 

@@ -18,6 +18,9 @@ import {
   affinityGroups,
   groupMembers,
 } from '../db/schema'
+import { createLogger } from '../lib/logger'
+
+const logger = createLogger('contacts-service')
 import type { MergeContactsBody } from '@protocol/schemas/contact-merge'
 import type { BulkContactAction, BulkCreateContactBody } from '@protocol/schemas/contact-bulk'
 import { ServiceError } from './settings'
@@ -98,7 +101,14 @@ export class ContactsService {
     if (rows.length === 0) {
       throw new ServiceError(404, 'Contact not found')
     }
-    return rows[0]
+    const contact = rows[0]
+    if (contact.needsReencryption) {
+      logger.warn('SECURITY: Plaintext contact accessed — re-encryption required', {
+        contactId: contact.id,
+        hubId: contact.hubId,
+      })
+    }
+    return contact
   }
 
   async update(id: string, input: UpdateContactBody): Promise<ContactRow> {
@@ -210,6 +220,15 @@ export class ContactsService {
       .orderBy(desc(contacts.lastInteractionAt))
       .limit(limit)
       .offset(offset)
+
+    const plaintextCount = rows.filter((r) => r.needsReencryption).length
+    if (plaintextCount > 0) {
+      logger.warn('SECURITY: Plaintext contacts returned in list — re-encryption required', {
+        hubId: input.hubId,
+        plaintextCount,
+        page,
+      })
+    }
 
     return {
       contacts: rows,
