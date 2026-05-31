@@ -146,6 +146,10 @@ final class AppState {
 
         // Determine initial auth state
         resolveAuthStatus()
+
+        // Load cached admin decryption pubkey so it's available immediately after unlock
+        // (before the async fetchUserRole() completes)
+        adminDecryptionPubkey = try? keychain.retrieveString(key: KeychainKey.adminDecryptionPubkey)
     }
 
     // MARK: - Launch Arguments (Test Support)
@@ -335,6 +339,26 @@ final class AppState {
         Task { await offlineQueue.replay() }
     }
 
+    /// Fetch admin decryption pubkey from the API if not already cached.
+    /// Call this before any encryption operation to guarantee the pubkey is available.
+    func ensureAdminPubkeyLoaded() async {
+        if adminDecryptionPubkey != nil { return }
+        do {
+            let response: AuthMeResponse = try await apiService.request(
+                method: "GET",
+                path: "/api/auth/me"
+            )
+            await MainActor.run {
+                self.adminDecryptionPubkey = response.adminDecryptionPubkey
+                if let pubkey = response.adminDecryptionPubkey {
+                    try? self.keychainService.storeString(pubkey, key: KeychainKey.adminDecryptionPubkey)
+                }
+            }
+        } catch {
+            // Non-fatal — the cached value (if any) will be used
+        }
+    }
+
     /// Called after successful onboarding (new identity or import + PIN set).
     func didCompleteOnboarding() {
         isLocked = false
@@ -366,6 +390,8 @@ final class AppState {
         isLocked = false
         authStatus = .unauthenticated
         userRole = .volunteer
+        adminDecryptionPubkey = nil
+        keychainService.delete(key: KeychainKey.adminDecryptionPubkey)
         permissionService.clear()
         unreadConversationCount = 0
     }
@@ -428,6 +454,10 @@ final class AppState {
 
                     // Store admin decryption pubkey for E2EE envelope encryption
                     self.adminDecryptionPubkey = response.adminDecryptionPubkey
+                    // Persist to keychain so it's available immediately on next unlock
+                    if let pubkey = response.adminDecryptionPubkey {
+                        try? self.keychainService.storeString(pubkey, key: KeychainKey.adminDecryptionPubkey)
+                    }
 
                     // Store the server event key in CryptoService keyed by the active hub ID
                     // so multi-hub key-trial attribution can identify this hub's events.

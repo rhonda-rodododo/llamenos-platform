@@ -445,6 +445,7 @@ class CaseManagementViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isAddingComment = true, actionError = null) }
             try {
+                sessionState.ensureAdminPubkeyLoaded(apiService)
                 val encrypted = cryptoService.encryptNote(comment, sessionState.adminPubkeys)
                 val envelopes = encrypted.envelopes.map { env ->
                     CreateInteractionBodyContentEnvelope(

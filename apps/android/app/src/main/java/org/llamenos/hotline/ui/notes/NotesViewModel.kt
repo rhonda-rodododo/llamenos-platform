@@ -122,6 +122,9 @@ class NotesViewModel @Inject constructor(
             .launchIn(viewModelScope)
     }
 
+    private suspend fun ensureAdminPubkeyLoaded() =
+        sessionState.ensureAdminPubkeyLoaded(apiService)
+
     /**
      * Load notes from the API and decrypt them locally.
      */
@@ -280,6 +283,7 @@ class NotesViewModel @Inject constructor(
                 val payload = NotePayload(text = noteText, fields = fields)
                 val payloadJson = json.encodeToString(NotePayload.serializer(), payload)
 
+                ensureAdminPubkeyLoaded()
                 val encrypted = cryptoService.encryptNote(payloadJson, sessionState.adminPubkeys)
 
                 // Map HPKE envelopes to wire format.
@@ -406,6 +410,7 @@ class NotesViewModel @Inject constructor(
                 val payload = NotePayload(text = text, fields = fields)
                 val payloadJson = json.encodeToString(NotePayload.serializer(), payload)
 
+                ensureAdminPubkeyLoaded()
                 val encrypted = cryptoService.encryptNote(payloadJson, sessionState.adminPubkeys)
 
                 val authorEnv = encrypted.envelopes.first()
@@ -484,6 +489,7 @@ class NotesViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isSendingReply = true) }
             try {
+                ensureAdminPubkeyLoaded()
                 val encrypted = cryptoService.encryptNote(text, sessionState.adminPubkeys)
 
                 val readerEnvelopes = encrypted.envelopes.map { env ->

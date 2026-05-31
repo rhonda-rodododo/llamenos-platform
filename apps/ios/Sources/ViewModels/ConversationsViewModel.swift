@@ -11,7 +11,7 @@ final class ConversationsViewModel {
     private let cryptoService: CryptoService
     private let webSocketService: WebSocketService
     private let hubContext: HubContext
-    private let adminPubkeys: [String]
+    var adminPubkeys: [String]
 
     // MARK: - Public State
 

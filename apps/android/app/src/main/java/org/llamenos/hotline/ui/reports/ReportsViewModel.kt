@@ -256,6 +256,7 @@ class ReportsViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isCreating = true, actionError = null, createSuccess = false) }
             try {
+                sessionState.ensureAdminPubkeyLoaded(apiService)
                 val encrypted = cryptoService.encryptNote(body, sessionState.adminPubkeys)
                 val envelopes = encrypted.envelopes.map { env ->
                     ReportEnvelope(
@@ -308,6 +309,7 @@ class ReportsViewModel @Inject constructor(
                     fieldValues,
                 )
 
+                sessionState.ensureAdminPubkeyLoaded(apiService)
                 val encrypted = cryptoService.encryptNote(fieldsJson, sessionState.adminPubkeys)
                 val envelopes = encrypted.envelopes.map { env ->
                     ReportEnvelope(

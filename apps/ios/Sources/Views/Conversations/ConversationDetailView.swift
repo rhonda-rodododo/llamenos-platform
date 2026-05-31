@@ -230,7 +230,9 @@ struct ConversationDetailView: View {
     // MARK: - ViewModel Resolution
 
     private var resolvedViewModel: ConversationsViewModel {
+        let currentAdminPubkeys = [appState.adminDecryptionPubkey].compactMap { $0 }
         if let vm = viewModel {
+            vm.adminPubkeys = currentAdminPubkeys
             return vm
         }
         let vm = ConversationsViewModel(
@@ -238,7 +240,7 @@ struct ConversationDetailView: View {
             cryptoService: appState.cryptoService,
             webSocketService: appState.webSocketService,
             hubContext: hubContext,
-            adminPubkeys: [appState.adminDecryptionPubkey].compactMap { $0 }
+            adminPubkeys: currentAdminPubkeys
         )
         DispatchQueue.main.async {
             self.viewModel = vm

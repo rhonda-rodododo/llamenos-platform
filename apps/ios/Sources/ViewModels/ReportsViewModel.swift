@@ -10,7 +10,7 @@ import UIKit
 final class ReportsViewModel {
     private let apiService: APIService
     private let cryptoService: CryptoService
-    private let adminPubkeys: [String]
+    var adminPubkeys: [String]
 
     // MARK: - Public State
 

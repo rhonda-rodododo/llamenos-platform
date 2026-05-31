@@ -296,10 +296,12 @@ struct ReportsView: View {
     // MARK: - ViewModel Resolution
 
     private var resolvedViewModel: ReportsViewModel {
+        let currentAdminPubkeys = [appState.adminDecryptionPubkey].compactMap { $0 }
         if let vm = viewModel {
+            vm.adminPubkeys = currentAdminPubkeys
             return vm
         }
-        let vm = ReportsViewModel(apiService: appState.apiService, cryptoService: appState.cryptoService, adminPubkeys: [appState.adminDecryptionPubkey].compactMap { $0 })
+        let vm = ReportsViewModel(apiService: appState.apiService, cryptoService: appState.cryptoService, adminPubkeys: currentAdminPubkeys)
         DispatchQueue.main.async {
             self.viewModel = vm
         }
