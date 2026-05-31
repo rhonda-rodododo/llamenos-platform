@@ -278,7 +278,14 @@ function deduplicateAnonymousSchemas(
       }
       if (!valid) continue
       const lastKey = ref.path[ref.path.length - 1]
-      parent[lastKey] = { '$ref': defName }
+      // Preserve "default" value from the original inline schema so that
+      // post-processors (Kotlin/Swift default injection) can still read it.
+      const original = parent[lastKey] as Record<string, unknown> | undefined
+      const replacement: Record<string, unknown> = { '$ref': defName }
+      if (original && typeof original === 'object' && 'default' in original) {
+        replacement['default'] = original['default']
+      }
+      parent[lastKey] = replacement
     }
   }
 
@@ -901,6 +908,104 @@ function postProcessKotlin(
     }
 
     result.push(line)
+  }
+
+  // Reorder data class constructor params: fields without defaults before fields with defaults.
+  // Kotlin requires non-default params to precede default params in constructors.
+  return reorderKotlinConstructorParams(result.join('\n'))
+}
+
+/**
+ * Reorder Kotlin data class constructor parameters so that fields without
+ * default values come before fields with default values.
+ *
+ * Handles @SerialName annotations that precede field declarations by
+ * treating annotation+field as a single logical unit.
+ */
+function reorderKotlinConstructorParams(output: string): string {
+  const lines = output.split('\n')
+  const result: string[] = []
+  let i = 0
+
+  while (i < lines.length) {
+    const classMatch = lines[i].match(/^data class \w+\s*\(/)
+    if (!classMatch) {
+      result.push(lines[i])
+      i++
+      continue
+    }
+
+    // Found a data class — collect all constructor param lines
+    result.push(lines[i]) // push the "data class Foo (" line
+    i++
+
+    // Collect field entries (each entry may be annotation + field line)
+    type FieldEntry = { lines: string[]; hasDefault: boolean }
+    const fields: FieldEntry[] = []
+    let pendingAnnotation: string | null = null
+
+    while (i < lines.length) {
+      const line = lines[i]
+      const trimmed = line.trim()
+
+      // End of constructor
+      if (trimmed === ')' || trimmed === ') {') {
+        // Reorder: non-default fields first, then default fields (stable within each group)
+        const noDefault = fields.filter(f => !f.hasDefault)
+        const withDefault = fields.filter(f => f.hasDefault)
+        const reordered = [...noDefault, ...withDefault]
+
+        // Output reordered fields, fixing trailing commas
+        for (let j = 0; j < reordered.length; j++) {
+          const entry = reordered[j]
+          for (let k = 0; k < entry.lines.length; k++) {
+            let fieldLine = entry.lines[k]
+            // Fix trailing comma on the last field's last line
+            if (j === reordered.length - 1 && k === entry.lines.length - 1) {
+              fieldLine = fieldLine.replace(/,(\s*)$/, '$1')
+            }
+            // Ensure non-last fields have trailing comma
+            if (j < reordered.length - 1 && k === entry.lines.length - 1) {
+              if (!fieldLine.trimEnd().endsWith(',')) {
+                fieldLine = fieldLine.replace(/(\s*)$/, ',$1')
+              }
+            }
+            result.push(fieldLine)
+          }
+        }
+        result.push(line) // push the closing ")" or ") {"
+        i++
+        break
+      }
+
+      // @SerialName annotation line (precedes a val declaration)
+      if (trimmed.startsWith('@SerialName(')) {
+        pendingAnnotation = line
+        i++
+        continue
+      }
+
+      // Field declaration line
+      const fieldMatch = trimmed.match(/^val \w+:/)
+      if (fieldMatch) {
+        const hasDefault = /=\s*.+/.test(trimmed.replace(/,\s*$/, ''))
+        const entryLines = pendingAnnotation ? [pendingAnnotation, line] : [line]
+        fields.push({ lines: entryLines, hasDefault })
+        pendingAnnotation = null
+        i++
+        continue
+      }
+
+      // Blank line inside constructor — skip (reordering normalizes spacing)
+      if (trimmed === '') {
+        i++
+        continue
+      }
+
+      // Other content inside constructor — preserve as-is
+      result.push(line)
+      i++
+    }
   }
 
   return result.join('\n')
