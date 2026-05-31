@@ -69,10 +69,9 @@ export interface PukState {
   dhPubkeyHex: string    // X25519 (64 hex chars)
 }
 
-/** PUK creation result. */
+/** PUK creation result. Seed stays in Rust CryptoState — never exposed to JS. */
 export interface PukCreateResult {
   pukState: PukState
-  seedHex: string
   envelope: HpkeEnvelope
 }
 
@@ -334,15 +333,16 @@ export async function pukCreateFromState(): Promise<PukCreateResult> {
   throw new Error('WASM puk create not yet implemented')
 }
 
-/** Rotate the PUK to a new generation. */
-export async function pukRotate(
-  oldSeedHex: string,
+/**
+ * Rotate the PUK to a new generation using the seed stored in CryptoState.
+ * The PUK seed NEVER enters JavaScript — it stays in Rust throughout the rotation.
+ */
+export async function pukRotateFromState(
   oldGen: number,
   remainingDevices: Array<[string, string]>,
 ): Promise<PukRotateResult> {
   if (useTauri) {
-    return tauriInvoke<PukRotateResult>('puk_rotate', {
-      oldSeedHex,
+    return tauriInvoke<PukRotateResult>('puk_rotate_from_state', {
       oldGen,
       remainingDevicesJson: JSON.stringify(remainingDevices),
     })
@@ -350,18 +350,22 @@ export async function pukRotate(
   throw new Error('WASM puk rotate not yet implemented')
 }
 
-/** Unwrap a PUK seed from an HPKE envelope using CryptoState. */
+/**
+ * Unwrap a PUK seed from an HPKE envelope and store it in CryptoState.
+ * The PUK seed NEVER enters JavaScript — it goes from HPKE decryption straight to state.
+ */
 export async function pukUnwrapSeedFromState(
   envelope: HpkeEnvelope,
   expectedLabel: string,
   aadHex: string,
-): Promise<string> {
+): Promise<void> {
   if (useTauri) {
-    return tauriInvoke<string>('puk_unwrap_seed_from_state', {
+    await tauriInvoke<void>('puk_unwrap_seed_from_state', {
       envelope,
       expectedLabel,
       aadHex,
     })
+    return
   }
   throw new Error('WASM puk unwrap seed not yet implemented')
 }
@@ -417,15 +421,46 @@ export async function sigchainVerifyLink(
 // ── Hub event decryption (H2 hardening) ────────────────────────────
 
 /**
- * Store a hub symmetric key in Rust CryptoState.
- * After this call, the key is held ONLY in Rust memory — JS cannot access it.
+ * Unwrap an HPKE envelope containing a hub key and store it in Rust CryptoState.
+ * The hub key NEVER enters JavaScript — it goes from HPKE decryption straight to state.
  */
-export async function setHubKey(hubKeyHex: string): Promise<void> {
+export async function hpkeUnwrapAndSetHubKey(
+  envelope: HpkeEnvelope,
+  expectedLabel: string,
+  aadHex: string,
+): Promise<void> {
   if (useTauri) {
-    await tauriInvoke<void>('set_hub_key', { hubKeyHex })
+    await tauriInvoke<void>('hpke_unwrap_and_set_hub_key', { envelope, expectedLabel, aadHex })
     return
   }
-  throw new Error('WASM set_hub_key not yet implemented')
+  throw new Error('WASM hpke_unwrap_and_set_hub_key not yet implemented')
+}
+
+/**
+ * Generate a random 32-byte hub key and store it in Rust CryptoState.
+ * The key NEVER enters JavaScript — only wrapped envelopes leave Rust.
+ */
+export async function generateHubKeyInState(): Promise<void> {
+  if (useTauri) {
+    await tauriInvoke<void>('generate_hub_key_in_state')
+    return
+  }
+  throw new Error('WASM generate_hub_key_in_state not yet implemented')
+}
+
+/**
+ * HPKE-seal the hub key stored in CryptoState for a recipient.
+ * The hub key NEVER enters JavaScript — it goes from state directly to HPKE encryption.
+ */
+export async function wrapHubKeyForMember(
+  recipientPubkeyHex: string,
+  label: string,
+  aadHex: string,
+): Promise<HpkeEnvelope> {
+  if (useTauri) {
+    return tauriInvoke<HpkeEnvelope>('wrap_hub_key_for_member', { recipientPubkeyHex, label, aadHex })
+  }
+  throw new Error('WASM wrap_hub_key_for_member not yet implemented')
 }
 
 /**
@@ -1032,12 +1067,12 @@ export async function unwrapFileKey(
   throw new Error('unwrapFileKey removed in v3 — use hpkeOpenKeyFromState with LABEL_FILE_KEY')
 }
 
-/** @deprecated Use hpkeOpenKeyFromState with LABEL_HUB_KEY_WRAP. */
+/** @deprecated Use hpkeUnwrapAndSetHubKey — hub key stays in Rust CryptoState. */
 export async function unwrapHubKey(
   envelope: KeyEnvelope,
 ): Promise<string> {
   void envelope
-  throw new Error('unwrapHubKey removed in v3 — use hpkeOpenKeyFromState with LABEL_HUB_KEY_WRAP')
+  throw new Error('unwrapHubKey removed — use hpkeUnwrapAndSetHubKey (hub key stays in Rust)')
 }
 
 /** @deprecated Use hpkeOpenKeyFromState + hpkeSealKey composition. */
@@ -1165,25 +1200,9 @@ export interface ShamirSplitResult {
   commitments: string[] // SHA-256 hex commitments
 }
 
-/** Split a secret (hex) into N shares with threshold K using Shamir SSS. */
-export async function shamirSplit(
-  secretHex: string,
-  total: number,
-  threshold: number,
-): Promise<ShamirSplitResult> {
-  if (useTauri) {
-    return tauriInvoke<ShamirSplitResult>('shamir_split', { secretHex, total, threshold })
-  }
-  throw new Error('WASM shamir split not yet implemented')
-}
-
-/** Combine >= threshold Shamir shares to reconstruct the secret. */
-export async function shamirCombine(shares: ShamirShare[]): Promise<string> {
-  if (useTauri) {
-    return tauriInvoke<string>('shamir_combine', { sharesJson: JSON.stringify(shares) })
-  }
-  throw new Error('WASM shamir combine not yet implemented')
-}
+// shamirSplit and shamirCombine removed — secret material must not pass through the JS bridge.
+// Use recoveryGroupCreate (split) and recoveryGroupReconstructFromShares (combine) instead,
+// which keep all secret material in Rust CryptoState.
 
 /** Compute SHA-256 commitment for a Shamir share. */
 export async function shamirCommit(x: number, yHex: string): Promise<string> {

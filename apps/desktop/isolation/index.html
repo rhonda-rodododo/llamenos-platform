@@ -37,22 +37,23 @@ window.__TAURI_ISOLATION_HOOK__ = (payload) => {
     'ed25519_verify',
     // PUK (Per-User Key)
     'puk_create_from_state',
-    'puk_rotate',
+    'puk_rotate_from_state',
     'puk_unwrap_seed_from_state',
     // Sigchain
     'sigchain_create_link_from_state',
     'sigchain_verify',
     'sigchain_verify_link',
-    // Hub + server event decryption
-    'set_hub_key',
+    // Hub key management (stateful — key never enters JS)
+    'hpke_unwrap_and_set_hub_key',
+    'generate_hub_key_in_state',
+    'wrap_hub_key_for_member',
+    // Server event decryption
     'set_server_event_keys',
     'decrypt_hub_event',
     'decrypt_server_event',
     // SFrame voice E2EE
     'sframe_derive_key',
-    // Shamir secret sharing (social recovery)
-    'shamir_split',
-    'shamir_combine',
+    // Shamir verification (split/combine are internal-only — secrets never enter JS)
     'shamir_commit',
     'shamir_verify',
     // H16: Recovery group key isolation — private key never enters JS

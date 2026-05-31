@@ -92,6 +92,9 @@ let mockProvisioningEphemeral: Uint8Array | null = null
 // ── Hub key mock state ───────────────────────────────────────────────
 let mockHubKey: Uint8Array | null = null
 
+// ── PUK seed mock state ─────────────────────────────────────────────
+let mockPukSeed: Uint8Array | null = null
+
 // ── Recovery group key mock state ───────────────────────────────────
 let mockRecoveryGroupKey: Uint8Array | null = null
 
@@ -328,6 +331,8 @@ function hpkeOpenMock(
 }
 
 // ── GF(2^8) helpers for Shamir SSS mock ──────────────────────────────
+// shamir_split and shamir_combine are internal — NOT exposed as IPC commands
+// to prevent secrets from passing through the JS bridge.
 
 function gf256Mul(a: number, b: number): number {
   let result = 0
@@ -353,6 +358,73 @@ function gf256Inv(a: number): number {
   }
   result = gf256Mul(result, result)
   return result
+}
+
+// ── Internal Shamir SSS functions (NOT exposed as IPC commands) ──────
+
+function shamirSplitInternal(secretHex: string, total: number, threshold: number): {
+  shares: Array<{ x: number; y: string }>
+  commitments: string[]
+} {
+  if (threshold < 2 || threshold > 5) throw new Error('Threshold must be 2-5')
+  if (total < 3 || total > 5) throw new Error('Total must be 3-5')
+  if (threshold > total) throw new Error('Threshold cannot exceed total')
+
+  const secret = hexToBytes(secretHex)
+
+  const coefficients: Uint8Array[] = []
+  for (let c = 0; c < threshold - 1; c++) {
+    coefficients.push(randomBytes(secret.length))
+  }
+
+  const shares: Array<{ x: number; y: string }> = []
+  for (let i = 1; i <= total; i++) {
+    const y = new Uint8Array(secret.length)
+    for (let byteIdx = 0; byteIdx < secret.length; byteIdx++) {
+      let val = secret[byteIdx]
+      let xPow = i
+      for (const coeff of coefficients) {
+        val ^= gf256Mul(coeff[byteIdx], xPow)
+        xPow = gf256Mul(xPow, i)
+      }
+      y[byteIdx] = val
+    }
+    shares.push({ x: i, y: bytesToHex(y) })
+  }
+
+  const commitments = shares.map(s => {
+    const data = new Uint8Array([s.x, ...hexToBytes(s.y)])
+    return bytesToHex(sha256(data))
+  })
+
+  return { shares, commitments }
+}
+
+function shamirCombineInternal(shareObjs: Array<{ x: number; y: string }>): string {
+  if (shareObjs.length < 2) throw new Error('Need at least 2 shares')
+
+  const shares = shareObjs.map(s => ({ x: s.x, y: hexToBytes(s.y) }))
+  const secretLen = shares[0].y.length
+  const result = new Uint8Array(secretLen)
+
+  for (let byteIdx = 0; byteIdx < secretLen; byteIdx++) {
+    let val = 0
+    for (let i = 0; i < shares.length; i++) {
+      let lagrange = 1
+      for (let j = 0; j < shares.length; j++) {
+        if (i === j) continue
+        const xi = shares[i].x
+        const xj = shares[j].x
+        const den = xi ^ xj
+        if (den === 0) throw new Error('Duplicate share x values')
+        lagrange = gf256Mul(lagrange, gf256Mul(xj, gf256Inv(den)))
+      }
+      val ^= gf256Mul(shares[i].y[byteIdx], lagrange)
+    }
+    result[byteIdx] = val
+  }
+
+  return bytesToHex(result)
 }
 
 // ── Types ─────────────────────────────────────────────────────────────
@@ -522,6 +594,9 @@ const commands: Record<string, CommandHandler> = {
     // Generate random seed
     const seed = randomBytes(32)
 
+    // Store PUK seed in mock state — never return to JS
+    mockPukSeed = seed
+
     // Derive PUK subkeys (labels match crypto-labels.json)
     const signSubkey = hmac(sha256, seed, utf8ToBytes('llamenos:puk:sign:v1\x00\x00\x00\x01'))
     const dhSubkey = hmac(sha256, seed, utf8ToBytes('llamenos:puk:dh:v1\x00\x00\x00\x01'))
@@ -542,13 +617,13 @@ const commands: Record<string, CommandHandler> = {
 
     return {
       pukState,
-      seedHex: bytesToHex(seed),
       envelope,
     }
   },
 
-  puk_rotate: (a) => {
-    const oldSeedBytes = hexToBytes(a.oldSeedHex as string)
+  puk_rotate_from_state: (a) => {
+    if (!mockPukSeed) throw new Error('No PUK seed loaded. Unwrap or create PUK first.')
+    const oldSeedBytes = mockPukSeed
     const oldGen = a.oldGen as number
     const remainingDevices = JSON.parse(a.remainingDevicesJson as string) as Array<[string, string]>
     const newGen = oldGen + 1
@@ -592,6 +667,9 @@ const commands: Record<string, CommandHandler> = {
 
     const clkrChainLinkHex = bytesToHex(new Uint8Array([...clkrNonce, ...clkrCt]))
 
+    // Clear old PUK seed — caller must unwrap new seed from their envelope
+    mockPukSeed = null
+
     return { state, deviceEnvelopes, clkrChainLinkHex }
   },
 
@@ -603,7 +681,8 @@ const commands: Record<string, CommandHandler> = {
     const secretHex = bytesToHex(secrets.encryptionSeed)
     const seed = hpkeOpenMock(envelope, secretHex, expectedLabel, aad)
     if (seed.length !== 32) throw new Error('PUK seed must be 32 bytes')
-    return bytesToHex(seed)
+    // Store PUK seed in mock state — never return to JS
+    mockPukSeed = seed
   },
 
   // --- Sigchain ---
@@ -789,75 +868,9 @@ const commands: Record<string, CommandHandler> = {
     })
   },
 
-  // --- Shamir secret sharing (GF(2^8)) ---
-
-  shamir_split: (a) => {
-    const secretHex = a.secretHex as string
-    const total = a.total as number
-    const threshold = a.threshold as number
-
-    if (threshold < 2 || threshold > 5) throw new Error('Threshold must be 2-5')
-    if (total < 3 || total > 5) throw new Error('Total must be 3-5')
-    if (threshold > total) throw new Error('Threshold cannot exceed total')
-
-    const secret = hexToBytes(secretHex)
-
-    // Random polynomial coefficients (degree threshold-1, constant = secret)
-    const coefficients: Uint8Array[] = []
-    for (let c = 0; c < threshold - 1; c++) {
-      coefficients.push(randomBytes(secret.length))
-    }
-
-    const shares: Array<{ x: number; y: string }> = []
-    for (let i = 1; i <= total; i++) {
-      const y = new Uint8Array(secret.length)
-      for (let byteIdx = 0; byteIdx < secret.length; byteIdx++) {
-        let val = secret[byteIdx]
-        let xPow = i
-        for (const coeff of coefficients) {
-          val ^= gf256Mul(coeff[byteIdx], xPow)
-          xPow = gf256Mul(xPow, i)
-        }
-        y[byteIdx] = val
-      }
-      shares.push({ x: i, y: bytesToHex(y) })
-    }
-
-    const commitments = shares.map(s => {
-      const data = new Uint8Array([s.x, ...hexToBytes(s.y)])
-      return bytesToHex(sha256(data))
-    })
-
-    return { shares, commitments }
-  },
-
-  shamir_combine: (a) => {
-    const shareObjs = JSON.parse(a.sharesJson as string) as Array<{ x: number; y: string }>
-    if (shareObjs.length < 2) throw new Error('Need at least 2 shares')
-
-    const shares = shareObjs.map(s => ({ x: s.x, y: hexToBytes(s.y) }))
-    const secretLen = shares[0].y.length
-    const result = new Uint8Array(secretLen)
-
-    for (let byteIdx = 0; byteIdx < secretLen; byteIdx++) {
-      let val = 0
-      for (let i = 0; i < shares.length; i++) {
-        let lagrange = 1
-        for (let j = 0; j < shares.length; j++) {
-          if (i === j) continue
-          const xi = shares[i].x
-          const xj = shares[j].x
-          const den = xi ^ xj
-          if (den === 0) throw new Error('Duplicate share x values')
-          lagrange = gf256Mul(lagrange, gf256Mul(xj, gf256Inv(den)))
-        }
-        val ^= gf256Mul(shares[i].y[byteIdx], lagrange)
-      }
-      result[byteIdx] = val
-    }
-
-    return bytesToHex(result)
-  },
+  // --- Shamir secret sharing (only stateless verification exposed as IPC) ---
+  // shamir_split and shamir_combine are internal — NOT exposed to prevent
+  // secrets from passing through the JS bridge.
 
   shamir_commit: (a) => {
     const x = a.x as number
@@ -888,10 +901,7 @@ const commands: Record<string, CommandHandler> = {
     const secretHex = bytesToHex(privateKey)
 
     // Split immediately — private key never returned to JS
-    const splitResult = commands.shamir_split({ secretHex, total, threshold }) as {
-      shares: Array<{ x: number; y: string }>
-      commitments: string[]
-    }
+    const splitResult = shamirSplitInternal(secretHex, total, threshold)
 
     return {
       publicKeyHex: bytesToHex(publicKey),
@@ -921,10 +931,8 @@ const commands: Record<string, CommandHandler> = {
       shareObjs.push({ x, y: yHex })
     }
 
-    // Combine via Shamir
-    const recoveredHex = commands.shamir_combine({
-      sharesJson: JSON.stringify(shareObjs),
-    }) as string
+    // Combine via Shamir (internal — never exposed as IPC)
+    const recoveredHex = shamirCombineInternal(shareObjs)
 
     // Store in mock state (key never enters JS in real Tauri)
     mockRecoveryGroupKey = hexToBytes(recoveredHex)
@@ -957,6 +965,7 @@ const commands: Record<string, CommandHandler> = {
     mockDeviceState = null
     mockEncryptedKeys = null
     mockHubKey = null
+    mockPukSeed = null
     mockRecoveryGroupKey = null
     mockProvisioningEphemeral = null
     // Reset lockout state in memory without calling saveLockoutState().
@@ -1182,11 +1191,29 @@ const commands: Record<string, CommandHandler> = {
     return result
   },
 
-  // --- Hub key management ---
+  // --- Hub key management (key stays in mock state, never enters JS) ---
 
-  set_hub_key: (a) => {
-    const hubKeyHex = a.hubKeyHex as string
-    mockHubKey = hexToBytes(hubKeyHex)
+  hpke_unwrap_and_set_hub_key: (a) => {
+    const secrets = requireSecrets()
+    const envelope = a.envelope as { v: number; labelId: number; enc: string; ct: string }
+    const expectedLabel = a.expectedLabel as string
+    const aad = hexToBytes(a.aadHex as string)
+    const secretHex = bytesToHex(secrets.encryptionSeed)
+    const key = hpkeOpenMock(envelope, secretHex, expectedLabel, aad)
+    if (key.length !== 32) throw new Error('Hub key must be 32 bytes')
+    mockHubKey = key
+  },
+
+  generate_hub_key_in_state: () => {
+    mockHubKey = randomBytes(32)
+  },
+
+  wrap_hub_key_for_member: (a) => {
+    if (!mockHubKey) throw new Error('Hub key not loaded')
+    const recipientPubkeyHex = a.recipientPubkeyHex as string
+    const label = a.label as string
+    const aad = hexToBytes(a.aadHex as string)
+    return hpkeSealMock(mockHubKey, recipientPubkeyHex, label, aad)
   },
 
   encrypt_hub_field: (a) => {

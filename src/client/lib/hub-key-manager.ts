@@ -16,124 +16,97 @@
  *   6. On rotation, admin generates new key + re-wraps for all members
  */
 
-import { gcm } from '@noble/ciphers/aes.js'
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
-import { utf8ToBytes } from '@noble/ciphers/utils.js'
 import {
-  unwrapHubKey as platformUnwrapHubKey,
-  hpkeWrapKey,
+  hpkeUnwrapAndSetHubKey,
+  generateHubKeyInState,
+  wrapHubKeyForMember as platformWrapHubKeyForMember,
+  encryptHubField,
+  decryptHubField,
 } from './platform'
-import type { KeyEnvelope, RecipientEnvelope } from './platform'
-import { LABEL_HUB_KEY_WRAP, LABEL_HUB_EVENT } from '@shared/crypto-labels'
-
-function randomBytes(n: number): Uint8Array {
-  const buf = new Uint8Array(n)
-  crypto.getRandomValues(buf)
-  return buf
-}
+import type { HpkeEnvelope, RecipientEnvelope } from './platform'
+import { LABEL_HUB_KEY_WRAP } from '@shared/crypto-labels'
 
 /**
- * Generate a random 32-byte hub key.
- * This is NOT derived from any user key — it's pure random.
+ * Generate a random 32-byte hub key and store it in Rust CryptoState.
+ * The key NEVER enters JavaScript.
  */
-export function generateHubKey(): Uint8Array {
-  return randomBytes(32)
+export async function generateHubKey(): Promise<void> {
+  await generateHubKeyInState()
 }
 
 /**
- * Wrap a hub key for a specific member using HPKE via Rust.
+ * Wrap the hub key (stored in CryptoState) for a specific member using HPKE via Rust.
  * Uses LABEL_HUB_KEY_WRAP domain separation to prevent cross-context attacks.
+ * The hub key NEVER enters JavaScript — Rust wraps it directly.
  */
 export async function wrapHubKeyForMember(
-  hubKey: Uint8Array,
   memberPubkeyHex: string,
 ): Promise<RecipientEnvelope> {
-  const hubKeyHex = bytesToHex(hubKey)
-  const envelope = await hpkeWrapKey(hubKeyHex, memberPubkeyHex, LABEL_HUB_KEY_WRAP)
+  const envelope = await platformWrapHubKeyForMember(memberPubkeyHex, LABEL_HUB_KEY_WRAP, '')
   return {
     pubkey: memberPubkeyHex,
-    ...envelope,
+    enc: envelope.enc,
+    ct: envelope.ct,
   }
 }
 
 /**
- * Wrap a hub key for multiple members at once.
+ * Wrap the hub key for multiple members at once.
  * Returns an array of RecipientEnvelopes.
  */
 export async function wrapHubKeyForMembers(
-  hubKey: Uint8Array,
   memberPubkeys: string[],
 ): Promise<RecipientEnvelope[]> {
-  return Promise.all(memberPubkeys.map(pk => wrapHubKeyForMember(hubKey, pk)))
+  return Promise.all(memberPubkeys.map(pk => wrapHubKeyForMember(pk)))
 }
 
 /**
- * Unwrap a hub key from an HPKE envelope using CryptoState (device key stays in Rust).
- * Returns the hub key as bytes.
+ * Unwrap a hub key from an HPKE envelope and store it in Rust CryptoState.
+ * The hub key NEVER enters JavaScript — it goes from HPKE decryption straight to state.
  */
 export async function unwrapHubKey(
-  envelope: KeyEnvelope,
-): Promise<Uint8Array> {
-  const hex = await platformUnwrapHubKey(envelope)
-  return hexToBytes(hex)
+  envelope: HpkeEnvelope,
+): Promise<void> {
+  await hpkeUnwrapAndSetHubKey(envelope, LABEL_HUB_KEY_WRAP, '')
 }
 
 /**
- * Encrypt arbitrary data with the hub key using AES-256-GCM.
+ * Encrypt arbitrary data with the hub key stored in Rust CryptoState.
  * Returns hex: nonce(12) + ciphertext + tag(16).
- * AAD = LABEL_HUB_EVENT bytes for domain separation.
- * Hub key is shared symmetric — stays in JS.
+ * The hub key NEVER enters JavaScript — encryption happens entirely in Rust.
  */
-export function encryptForHub(
+export async function encryptForHub(
   plaintext: string,
-  hubKey: Uint8Array,
-): string {
-  const nonce = randomBytes(12)
-  const aad = utf8ToBytes(LABEL_HUB_EVENT)
-  const cipher = gcm(hubKey, nonce, aad)
-  const ciphertext = cipher.encrypt(utf8ToBytes(plaintext))
-
-  const packed = new Uint8Array(nonce.length + ciphertext.length)
-  packed.set(nonce)
-  packed.set(ciphertext, nonce.length)
-  return bytesToHex(packed)
+  label: string,
+): Promise<string> {
+  return encryptHubField(plaintext, label)
 }
 
 /**
- * Decrypt hub-encrypted data using the hub key.
+ * Decrypt hub-encrypted data using the hub key stored in Rust CryptoState.
  * Returns null on decryption failure (wrong key, corrupted data, etc.).
- * Hub key is shared symmetric — stays in JS.
+ * The hub key NEVER enters JavaScript — decryption happens entirely in Rust.
  */
-export function decryptFromHub(
+export async function decryptFromHub(
   packed: string,
-  hubKey: Uint8Array,
-): string | null {
-  try {
-    const data = hexToBytes(packed)
-    const nonce = data.slice(0, 12)
-    const ciphertext = data.slice(12)
-    const aad = utf8ToBytes(LABEL_HUB_EVENT)
-    const cipher = gcm(hubKey, nonce, aad)
-    const plaintext = cipher.decrypt(ciphertext)
-    return new TextDecoder().decode(plaintext)
-  } catch {
-    return null
-  }
+  label: string,
+): Promise<string | null> {
+  return decryptHubField(packed, label)
 }
 
 /**
- * Rotate the hub key: generate a new key and wrap it for all current members.
- * Returns the new key and all member envelopes.
+ * Rotate the hub key: generate a new key in Rust CryptoState and wrap for all members.
+ * Returns the member envelopes. The key itself NEVER enters JavaScript.
  *
  * The caller is responsible for:
- * 1. Re-encrypting any hub-scoped data with the new key
+ * 1. Re-encrypting any hub-scoped data with the new key (via encryptForHub)
  * 2. Storing the new envelopes server-side
  * 3. Distributing via GET /api/hub/key
  */
 export async function rotateHubKey(
   memberPubkeys: string[],
-): Promise<{ hubKey: Uint8Array; envelopes: RecipientEnvelope[] }> {
-  const hubKey = generateHubKey()
-  const envelopes = await wrapHubKeyForMembers(hubKey, memberPubkeys)
-  return { hubKey, envelopes }
+): Promise<{ envelopes: RecipientEnvelope[] }> {
+  await generateHubKey()
+  const envelopes = await wrapHubKeyForMembers(memberPubkeys)
+  return { envelopes }
 }
