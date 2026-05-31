@@ -160,7 +160,7 @@ jobs:
 
       - name: Setup Ruby
         if: env.HAS_PLAY_SERVICE_ACCOUNT == 'true'
-        uses: ruby/setup-ruby@13e7a03dc3ac6c3798f4570bfead2aed4d96abfb
+        uses: ruby/setup-ruby@afeafc3d1ab54a631816aba4c914a0081c12ff2f
         with:
           ruby-version: '3.3'
           bundler-cache: true
