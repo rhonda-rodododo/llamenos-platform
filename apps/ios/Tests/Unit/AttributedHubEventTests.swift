@@ -4,29 +4,14 @@ import Testing
 
 // MARK: - AttributedHubEvent Unit Tests
 
-/// Tests for `AttributedHubEvent` struct construction and `WebSocketService` hub-tagging behavior.
+/// Tests for `AttributedHubEvent` struct construction and `WebSocketService` attributed-event
+/// stream delivery.
 ///
-/// Strategy: `WebSocketService.emitEvent(_:)` is `internal`, so `@testable import` lets us
-/// inject synthetic `NostrEvent` values directly and observe the typed-event stream without
-/// requiring a real WebSocket connection.
+/// Strategy: `WebSocketService.emitAttributedEvent(hubId:eventType:)` is `internal`, so
+/// `@testable import` lets us inject synthetic typed events directly and observe the
+/// attributed-event stream without requiring a real WebSocket connection.
 @MainActor
 struct AttributedHubEventTests {
-
-    // MARK: - Helpers
-
-    /// Build a minimal `NostrEvent` with empty content (no decryption key set, so typed
-    /// emission is skipped) for testing raw stream delivery.
-    private func makeRawEvent(id: String = UUID().uuidString) -> NostrEvent {
-        NostrEvent(
-            id: id,
-            pubkey: "deadbeef",
-            createdAt: 1_700_000_000,
-            kind: 20001,
-            tags: [["t", "llamenos:event"]],
-            content: "opaque-ciphertext",
-            sig: "cafebabe"
-        )
-    }
 
     // MARK: - Struct tests
 
@@ -43,15 +28,15 @@ struct AttributedHubEventTests {
         #expect(a.event == b.event)
     }
 
-    // MARK: - Raw event stream delivery
+    // MARK: - Attributed event stream delivery
 
-    @Test func rawEventsStreamDeliversEmittedEvents() async {
+    @Test func attributedEventsStreamDeliversEmittedEvents() async {
         let ws = WebSocketService(cryptoService: CryptoService())
 
-        let collected: NostrEvent? = await withCheckedContinuation { continuation in
+        let collected: AttributedHubEvent? = await withCheckedContinuation { continuation in
             var resumed = false
             Task {
-                for await event in ws.events {
+                for await event in ws.attributedEvents {
                     if !resumed {
                         resumed = true
                         continuation.resume(returning: event)
@@ -60,21 +45,21 @@ struct AttributedHubEventTests {
                 }
             }
             Task {
-                // Small yield to let the subscriber register before emitting.
                 await Task.yield()
-                ws.emitEvent(self.makeRawEvent(id: "evt-hub-1"))
+                ws.emitAttributedEvent(hubId: "hub-1", eventType: .callRing)
             }
         }
-        #expect(collected?.id == "evt-hub-1")
+        #expect(collected?.hubId == "hub-1")
+        #expect(collected?.event == .callRing)
     }
 
-    @Test func rawEventsStreamDeliversMultipleSequentialEvents() async {
+    @Test func attributedEventsStreamDeliversMultipleSequentialEvents() async {
         let ws = WebSocketService(cryptoService: CryptoService())
 
-        let first: NostrEvent? = await withCheckedContinuation { continuation in
+        let first: AttributedHubEvent? = await withCheckedContinuation { continuation in
             var resumed = false
             Task {
-                for await event in ws.events {
+                for await event in ws.attributedEvents {
                     if !resumed {
                         resumed = true
                         continuation.resume(returning: event)
@@ -84,15 +69,16 @@ struct AttributedHubEventTests {
             }
             Task {
                 await Task.yield()
-                ws.emitEvent(self.makeRawEvent(id: "evt-first"))
+                ws.emitAttributedEvent(hubId: "hub-first", eventType: .presenceSummary)
             }
         }
-        #expect(first?.id == "evt-first")
+        #expect(first?.hubId == "hub-first")
+        #expect(first?.event == .presenceSummary)
 
-        let second: NostrEvent? = await withCheckedContinuation { continuation in
+        let second: AttributedHubEvent? = await withCheckedContinuation { continuation in
             var resumed = false
             Task {
-                for await event in ws.events {
+                for await event in ws.attributedEvents {
                     if !resumed {
                         resumed = true
                         continuation.resume(returning: event)
@@ -102,17 +88,91 @@ struct AttributedHubEventTests {
             }
             Task {
                 await Task.yield()
-                ws.emitEvent(self.makeRawEvent(id: "evt-second"))
+                ws.emitAttributedEvent(hubId: "hub-second", eventType: .messageNew)
             }
         }
-        #expect(second?.id == "evt-second")
+        #expect(second?.hubId == "hub-second")
+        #expect(second?.event == .messageNew)
     }
 
     @Test func attributedEventsStreamHasCorrectElementType() {
         let ws = WebSocketService(cryptoService: CryptoService())
         // Type-level assertion: if this compiles, the stream element type is correct.
-        // Actual emission requires decryption; that's covered in WebSocketServiceAttributionTests.
         let stream: AsyncStream<AttributedHubEvent> = ws.attributedEvents
         _ = stream
+    }
+
+    // MARK: - All 4 previously-missing event types
+
+    @Test func attributedEventsStreamDeliversCallAnswered() async {
+        let ws = WebSocketService(cryptoService: CryptoService())
+        let result: AttributedHubEvent? = await withCheckedContinuation { continuation in
+            var resumed = false
+            Task {
+                for await event in ws.attributedEvents {
+                    if !resumed { resumed = true; continuation.resume(returning: event) }
+                    return
+                }
+            }
+            Task {
+                await Task.yield()
+                ws.emitAttributedEvent(hubId: "h", eventType: .callAnswered)
+            }
+        }
+        #expect(result?.event == .callAnswered)
+    }
+
+    @Test func attributedEventsStreamDeliversPresenceDetail() async {
+        let ws = WebSocketService(cryptoService: CryptoService())
+        let result: AttributedHubEvent? = await withCheckedContinuation { continuation in
+            var resumed = false
+            Task {
+                for await event in ws.attributedEvents {
+                    if !resumed { resumed = true; continuation.resume(returning: event) }
+                    return
+                }
+            }
+            Task {
+                await Task.yield()
+                ws.emitAttributedEvent(hubId: "h", eventType: .presenceDetail)
+            }
+        }
+        #expect(result?.event == .presenceDetail)
+    }
+
+    @Test func attributedEventsStreamDeliversConversationNew() async {
+        let ws = WebSocketService(cryptoService: CryptoService())
+        let result: AttributedHubEvent? = await withCheckedContinuation { continuation in
+            var resumed = false
+            Task {
+                for await event in ws.attributedEvents {
+                    if !resumed { resumed = true; continuation.resume(returning: event) }
+                    return
+                }
+            }
+            Task {
+                await Task.yield()
+                ws.emitAttributedEvent(hubId: "h", eventType: .conversationNew)
+            }
+        }
+        #expect(result?.event == .conversationNew)
+    }
+
+    @Test func attributedEventsStreamDeliversMessageStatus() async {
+        let ws = WebSocketService(cryptoService: CryptoService())
+        let result: AttributedHubEvent? = await withCheckedContinuation { continuation in
+            var resumed = false
+            Task {
+                for await event in ws.attributedEvents {
+                    if !resumed { resumed = true; continuation.resume(returning: event) }
+                    return
+                }
+            }
+            Task {
+                await Task.yield()
+                ws.emitAttributedEvent(hubId: "h", eventType: .messageStatus)
+            }
+        }
+        #expect(result?.event == .messageStatus)
     }
 }

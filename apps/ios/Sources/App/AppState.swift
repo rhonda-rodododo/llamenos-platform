@@ -459,11 +459,13 @@ final class AppState {
                         try? self.keychainService.storeString(pubkey, key: KeychainKey.adminDecryptionPubkey)
                     }
 
-                    // Store the server event key in CryptoService keyed by the active hub ID
-                    // so multi-hub key-trial attribution can identify this hub's events.
-                    if let hubId = self.hubContext.activeHubId,
-                       let keyHex = response.serverEventKeyHex {
-                        self.cryptoService.storeServerEventKey(hubId: hubId, keyHex: keyHex)
+                    // Store server event keys in Rust CryptoState for epoch-aware decryption.
+                    // current key is required; previous key is optional (used during epoch rotation).
+                    if let keyHex = response.serverEventKeyHex {
+                        try? self.cryptoService.setServerEventKeys(
+                            currentHex: keyHex,
+                            previousHex: response.serverEventKeyPrevHex
+                        )
                     }
                 }
             } catch {
@@ -499,6 +501,13 @@ final class AppState {
             await webSocketService.connect(to: relayURL)
         }
 
+        // Subscribe to the active hub (and any additional hubs from hubContext).
+        // Subscriptions are buffered in WebSocketService until the auth handshake completes.
+        let allHubKinds = [1000, 1001, 1002, 1010, 1011, 20000]
+        if let activeHubId = hubContext.activeHubId {
+            webSocketService.subscribe(hubId: activeHubId, kinds: allHubKinds)
+        }
+
         // Start (or restart) the attributed-event consumer that drives per-hub activity state.
         eventListenerTask?.cancel()
         eventListenerTask = Task { [weak self] in
@@ -522,4 +531,5 @@ struct AuthMeResponse: Decodable {
     let onBreak: Bool?
     let adminDecryptionPubkey: String?
     let serverEventKeyHex: String?
+    let serverEventKeyPrevHex: String?
 }
