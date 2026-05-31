@@ -142,6 +142,25 @@ export class RetryableError extends Error {
   }
 }
 
+/**
+ * Predicate: is this a retryable database error?
+ * Extends isRetryableError with PostgreSQL-specific transient failure patterns.
+ */
+export function isRetryableDbError(error: unknown): boolean {
+  if (error instanceof Error) {
+    const msg = error.message.toLowerCase()
+    // PostgreSQL deadlock — transient, safe to retry
+    if (msg.includes('deadlock detected')) return true
+    // Connection pool exhaustion
+    if (msg.includes('too many connections') || msg.includes('remaining connection slots')) return true
+    // Connection lost mid-query
+    if (msg.includes('connection terminated unexpectedly') || msg.includes('connection reset')) return true
+    // Query cancelled due to statement timeout
+    if (msg.includes('canceling statement') || msg.includes('statement timeout')) return true
+  }
+  return isRetryableError(error)
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
 }

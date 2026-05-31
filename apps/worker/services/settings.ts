@@ -102,6 +102,8 @@ import {
   resolveTTL,
 } from '../lib/ttl'
 import { createLogger } from '../lib/logger'
+import { withRetry, isRetryableDbError } from '../lib/retry'
+import { getCircuitBreaker } from '../lib/circuit-breaker'
 
 const log = createLogger('services.settings')
 
@@ -3080,54 +3082,89 @@ export class SettingsService {
    */
   async runCleanup(): Promise<CleanupMetrics> {
     log.info('Starting periodic cleanup')
-    try {
-      const row = await getSettings(this.db)
-      const overrides = (row.ttlOverrides as TTLOverrides) ?? {}
-      const metrics =
-        (row.cleanupMetrics as CleanupMetrics) ?? emptyCleanupMetrics()
-      const now = Date.now()
 
-      // Clean up expired rate limit entries
-      const rateLimitTTL = resolveTTL('rateLimit', overrides)
-      const allRateLimits = await this.db.select().from(rateLimits)
-      for (const rl of allRateLimits) {
-        const timestamps = rl.timestamps as number[]
-        const recent = timestamps.filter((t) => now - t < rateLimitTTL)
-        if (recent.length === 0) {
-          await this.db
-            .delete(rateLimits)
-            .where(eq(rateLimits.key, rl.key))
-          metrics.rateLimitEntriesDeleted++
-        } else {
-          await this.db
-            .update(rateLimits)
-            .set({ timestamps: recent })
-            .where(eq(rateLimits.key, rl.key))
+    const cb = getCircuitBreaker({
+      name: 'settings-cleanup',
+      failureThreshold: 5,
+      resetTimeoutMs: 5 * 60 * 1000, // 5 minutes
+      onStateChange: (_name, _from, to) => {
+        if (to === 'open') {
+          log.error(
+            'CRITICAL: Settings cleanup circuit opened — persistent cleanup failures detected',
+            new Error('Circuit opened: settings-cleanup'),
+          )
+        } else if (to === 'closed') {
+          log.info('Settings cleanup circuit recovered')
         }
-      }
+      },
+    })
 
-      // Clean up expired CAPTCHA challenges
-      const captchaTTL = resolveTTL('captchaChallenge', overrides)
-      const cutoff = new Date(now - captchaTTL)
-      const deleted = await this.db
-        .delete(captchas)
-        .where(lt(captchas.createdAt, cutoff))
-        .returning()
-      metrics.captchaChallengesDeleted += deleted.length
+    try {
+      return await cb.execute(() =>
+        withRetry(
+          async () => {
+            const row = await getSettings(this.db)
+            const overrides = (row.ttlOverrides as TTLOverrides) ?? {}
+            const metrics =
+              (row.cleanupMetrics as CleanupMetrics) ?? emptyCleanupMetrics()
+            const now = Date.now()
 
-      metrics.lastCleanupAt = new Date().toISOString()
-      await this.db
-        .update(systemSettings)
-        .set({ cleanupMetrics: metrics })
-        .where(eq(systemSettings.id, SINGLETON_ID))
+            // Clean up expired rate limit entries
+            const rateLimitTTL = resolveTTL('rateLimit', overrides)
+            const allRateLimits = await this.db.select().from(rateLimits)
+            for (const rl of allRateLimits) {
+              const timestamps = rl.timestamps as number[]
+              const recent = timestamps.filter((t) => now - t < rateLimitTTL)
+              if (recent.length === 0) {
+                await this.db
+                  .delete(rateLimits)
+                  .where(eq(rateLimits.key, rl.key))
+                metrics.rateLimitEntriesDeleted++
+              } else {
+                await this.db
+                  .update(rateLimits)
+                  .set({ timestamps: recent })
+                  .where(eq(rateLimits.key, rl.key))
+              }
+            }
 
-      log.info('Periodic cleanup complete', {
-        rateLimitEntriesDeleted: metrics.rateLimitEntriesDeleted,
-        captchaChallengesDeleted: metrics.captchaChallengesDeleted,
-      })
-      return metrics
+            // Clean up expired CAPTCHA challenges
+            const captchaTTL = resolveTTL('captchaChallenge', overrides)
+            const cutoff = new Date(now - captchaTTL)
+            const deleted = await this.db
+              .delete(captchas)
+              .where(lt(captchas.createdAt, cutoff))
+              .returning()
+            metrics.captchaChallengesDeleted += deleted.length
+
+            metrics.lastCleanupAt = new Date().toISOString()
+            await this.db
+              .update(systemSettings)
+              .set({ cleanupMetrics: metrics })
+              .where(eq(systemSettings.id, SINGLETON_ID))
+
+            log.info('Periodic cleanup complete', {
+              rateLimitEntriesDeleted: metrics.rateLimitEntriesDeleted,
+              captchaChallengesDeleted: metrics.captchaChallengesDeleted,
+            })
+            return metrics
+          },
+          {
+            maxAttempts: 3,
+            baseDelayMs: 1_000,
+            maxDelayMs: 10_000,
+            isRetryable: isRetryableDbError,
+            onRetry: (attempt, error) => {
+              log.warn('Settings cleanup attempt failed, retrying', {
+                attempt,
+                error: error instanceof Error ? error.message : String(error),
+              })
+            },
+          },
+        ),
+      )
     } catch (err) {
-      log.error('Periodic cleanup failed', err instanceof Error ? err : new Error(String(err)))
+      log.error('Settings cleanup failed', err instanceof Error ? err : new Error(String(err)))
       throw err
     }
   }

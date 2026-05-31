@@ -32,6 +32,8 @@ import type {
 import { ServiceError } from './settings'
 import { DEMO_ACCOUNTS } from '@shared/demo-accounts'
 import { createLogger } from '../lib/logger'
+import { withRetry, isRetryableDbError } from '../lib/retry'
+import { getCircuitBreaker } from '../lib/circuit-breaker'
 
 const log = createLogger('services.identity')
 
@@ -1577,68 +1579,103 @@ export class IdentityService {
     expiredAuthNonces: number
   }> {
     log.info('Starting identity cleanup')
+
+    const cb = getCircuitBreaker({
+      name: 'identity-cleanup',
+      failureThreshold: 5,
+      resetTimeoutMs: 5 * 60 * 1000, // 5 minutes
+      onStateChange: (_name, _from, to) => {
+        if (to === 'open') {
+          log.error(
+            'CRITICAL: Identity cleanup circuit opened — persistent cleanup failures detected',
+            new Error('Circuit opened: identity-cleanup'),
+          )
+        } else if (to === 'closed') {
+          log.info('Identity cleanup circuit recovered')
+        }
+      },
+    })
+
     try {
-      const now = new Date()
+      return await cb.execute(() =>
+        withRetry(
+          async () => {
+            const now = new Date()
 
-      // Expired sessions
-      const deletedSessions = await this.db
-        .delete(sessions)
-        .where(lt(sessions.expiresAt, now))
-        .returning({ token: sessions.token })
+            // Expired sessions
+            const deletedSessions = await this.db
+              .delete(sessions)
+              .where(lt(sessions.expiresAt, now))
+              .returning({ token: sessions.token })
 
-      // Expired challenges (5 min TTL)
-      const challengeCutoff = new Date(now.getTime() - CHALLENGE_TTL_MS)
-      const deletedChallenges = await this.db
-        .delete(webauthnChallenges)
-        .where(lt(webauthnChallenges.createdAt, challengeCutoff))
-        .returning({ challengeId: webauthnChallenges.challengeId })
+            // Expired challenges (5 min TTL)
+            const challengeCutoff = new Date(now.getTime() - CHALLENGE_TTL_MS)
+            const deletedChallenges = await this.db
+              .delete(webauthnChallenges)
+              .where(lt(webauthnChallenges.createdAt, challengeCutoff))
+              .returning({ challengeId: webauthnChallenges.challengeId })
 
-      // Expired provisioning rooms
-      const deletedRooms = await this.db
-        .delete(provisionRooms)
-        .where(lt(provisionRooms.expiresAt, now))
-        .returning({ roomId: provisionRooms.roomId })
+            // Expired provisioning rooms
+            const deletedRooms = await this.db
+              .delete(provisionRooms)
+              .where(lt(provisionRooms.expiresAt, now))
+              .returning({ roomId: provisionRooms.roomId })
 
-      // Redeemed invites (clean up after 24h) and expired-unredeemed invites (clean up after 7 days)
-      const redeemedCutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000)
-      const expiredCutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+            // Redeemed invites (clean up after 24h) and expired-unredeemed invites (clean up after 7 days)
+            const redeemedCutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+            const expiredCutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
 
-      const deletedRedeemedInvites = await this.db
-        .delete(inviteCodes)
-        .where(
-          and(
-            sql`${inviteCodes.usedAt} IS NOT NULL`,
-            lt(inviteCodes.usedAt, redeemedCutoff),
-          ),
-        )
-        .returning({ code: inviteCodes.code })
+            const deletedRedeemedInvites = await this.db
+              .delete(inviteCodes)
+              .where(
+                and(
+                  sql`${inviteCodes.usedAt} IS NOT NULL`,
+                  lt(inviteCodes.usedAt, redeemedCutoff),
+                ),
+              )
+              .returning({ code: inviteCodes.code })
 
-      const deletedExpiredInvites = await this.db
-        .delete(inviteCodes)
-        .where(
-          and(
-            sql`${inviteCodes.usedAt} IS NULL`,
-            lt(inviteCodes.expiresAt, expiredCutoff),
-          ),
-        )
-        .returning({ code: inviteCodes.code })
+            const deletedExpiredInvites = await this.db
+              .delete(inviteCodes)
+              .where(
+                and(
+                  sql`${inviteCodes.usedAt} IS NULL`,
+                  lt(inviteCodes.expiresAt, expiredCutoff),
+                ),
+              )
+              .returning({ code: inviteCodes.code })
 
-      // Expired auth nonces (Bearer token replay prevention records)
-      const deletedAuthNonces = await this.db
-        .delete(authNonces)
-        .where(lt(authNonces.expiresAt, now))
-        .returning({ nonceHash: authNonces.nonceHash })
+            // Expired auth nonces (Bearer token replay prevention records)
+            const deletedAuthNonces = await this.db
+              .delete(authNonces)
+              .where(lt(authNonces.expiresAt, now))
+              .returning({ nonceHash: authNonces.nonceHash })
 
-      const result = {
-        expiredSessions: deletedSessions.length,
-        expiredChallenges: deletedChallenges.length,
-        expiredProvisionRooms: deletedRooms.length,
-        expiredInvites: deletedRedeemedInvites.length + deletedExpiredInvites.length,
-        expiredAuthNonces: deletedAuthNonces.length,
-      }
+            const result = {
+              expiredSessions: deletedSessions.length,
+              expiredChallenges: deletedChallenges.length,
+              expiredProvisionRooms: deletedRooms.length,
+              expiredInvites: deletedRedeemedInvites.length + deletedExpiredInvites.length,
+              expiredAuthNonces: deletedAuthNonces.length,
+            }
 
-      log.info('Identity cleanup complete', result)
-      return result
+            log.info('Identity cleanup complete', result)
+            return result
+          },
+          {
+            maxAttempts: 3,
+            baseDelayMs: 1_000,
+            maxDelayMs: 10_000,
+            isRetryable: isRetryableDbError,
+            onRetry: (attempt, error) => {
+              log.warn('Identity cleanup attempt failed, retrying', {
+                attempt,
+                error: error instanceof Error ? error.message : String(error),
+              })
+            },
+          },
+        ),
+      )
     } catch (err) {
       log.error('Identity cleanup failed', err instanceof Error ? err : new Error(String(err)))
       throw err
