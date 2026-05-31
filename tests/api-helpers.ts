@@ -1989,8 +1989,10 @@ export async function createCaseFromReportViaApi(
     seedHex,
   )
   if (status !== 201 && status !== 200) throw new Error(`Failed to link case to report: ${status}`)
-  const linkData = data as Record<string, unknown>
-  return { recordId, linkId: (linkData.id ?? linkData.caseId ?? recordId) as string }
+  // Response is ReportCaseRow with composite PK (reportId + caseId) — no separate id field.
+  // linkId is the caseId from the row, which equals recordId.
+  const linkData = data as { caseId?: string; reportId?: string }
+  return { recordId, linkId: linkData.caseId ?? recordId }
 }
 
 /**
