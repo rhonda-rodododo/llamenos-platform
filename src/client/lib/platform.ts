@@ -1115,38 +1115,78 @@ export async function generateEphemeralKeypair(): Promise<EphemeralKeyPair> {
   throw new Error('WASM ephemeral keypair not yet implemented')
 }
 
-/** @deprecated Device provisioning needs v3 migration. */
+// ── Device provisioning (nsec NEVER enters the webview) ────────────
+
+/** Result of primary device encrypting its signing seed for a new device. */
 export interface ProvisioningEncryptResult {
   encryptedHex: string
   sasCode: string
+  primaryEncPubkeyHex: string
 }
 
-/** @deprecated Device provisioning needs v3 migration. */
-export interface ProvisioningDecryptResult {
-  nsec: string
-  sasCode: string
-}
-
-/** @deprecated Device provisioning needs v3 migration. */
-export async function encryptNsecForProvisioning(
+/**
+ * Primary device: encrypt signing seed for a new device's ephemeral pubkey.
+ * Uses CryptoState's X25519 encryption seed for ECDH — nsec NEVER enters JS.
+ */
+export async function provisionEncryptForDevice(
   ephemeralPubkeyHex: string,
 ): Promise<ProvisioningEncryptResult> {
-  void ephemeralPubkeyHex
-  throw new Error('encryptNsecForProvisioning removed in v3')
+  if (useTauri) {
+    return tauriInvoke<ProvisioningEncryptResult>('provision_encrypt_for_device', {
+      ephemeralPubkeyHex,
+    })
+  }
+  throw new Error('WASM provision_encrypt_for_device not yet implemented')
 }
 
-/** @deprecated Device provisioning needs v3 migration. */
-export async function generateProvisioningEphemeral(): Promise<string> {
-  throw new Error('generateProvisioningEphemeral removed in v3')
+/**
+ * New device: generate an ephemeral X25519 keypair for provisioning.
+ * The secret is stored in Rust CryptoState — only the pubkey is returned.
+ */
+export async function provisionCreateSession(): Promise<string> {
+  if (useTauri) {
+    return tauriInvoke<string>('provision_create_session')
+  }
+  throw new Error('WASM provision_create_session not yet implemented')
 }
 
-/** @deprecated Device provisioning needs v3 migration. */
-export async function decryptProvisionedNsec(
+/**
+ * New device: compute the provisioning SAS code.
+ * Uses the ephemeral secret stored in CryptoState + the primary's encryption pubkey.
+ */
+export async function provisionComputeSas(
+  primaryEncPubkeyHex: string,
+): Promise<string> {
+  if (useTauri) {
+    return tauriInvoke<string>('provision_compute_sas', { primaryEncPubkeyHex })
+  }
+  throw new Error('WASM provision_compute_sas not yet implemented')
+}
+
+/** Result of provisioning decrypt+import — the encrypted device keys for storage. */
+export type ProvisioningImportResult = EncryptedDeviceKeys
+
+/**
+ * New device: decrypt the provisioned signing seed and import as device keys.
+ * The decrypted signing seed NEVER enters JavaScript — it goes directly from
+ * decryption into CryptoState, encrypted with the user's PIN.
+ * Returns the encrypted device key blob for Stronghold persistence.
+ */
+export async function provisionDecryptAndImport(
   encryptedHex: string,
-  primaryPubkeyHex: string,
-): Promise<ProvisioningDecryptResult> {
-  void [encryptedHex, primaryPubkeyHex]
-  throw new Error('decryptProvisionedNsec removed in v3')
+  primaryEncPubkeyHex: string,
+  pin: string,
+  deviceId: string,
+): Promise<ProvisioningImportResult> {
+  if (useTauri) {
+    return tauriInvoke<ProvisioningImportResult>('provision_decrypt_and_import', {
+      encryptedHex,
+      primaryEncPubkeyHex,
+      pin,
+      deviceId,
+    })
+  }
+  throw new Error('WASM provision_decrypt_and_import not yet implemented')
 }
 
 // ── Recovery group crypto ─────────────────────────────────────────────

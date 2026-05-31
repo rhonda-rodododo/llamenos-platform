@@ -3164,10 +3164,11 @@ dependencies = [
 
 [[package]]
 name = "llamenos-desktop"
-version = "0.18.0"
+version = "0.19.10"
 dependencies = [
  "aes-gcm",
  "argon2",
+ "bech32",
  "ed25519-dalek",
  "hex",
  "hkdf",
