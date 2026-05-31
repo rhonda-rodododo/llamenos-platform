@@ -1,4 +1,5 @@
 import { safeFetch } from '../lib/safe-fetch'
+import { buildWebhookUrl } from '../lib/webhook-url'
 import type {
   TelephonyAdapter,
   IncomingCallParams,
@@ -79,11 +80,13 @@ export class TwilioAdapter implements TelephonyAdapter {
   protected accountSid: string
   protected authToken: string
   protected phoneNumber: string
+  protected webhookBaseUrl: string
 
-  constructor(accountSid: string, authToken: string, phoneNumber: string) {
+  constructor(accountSid: string, authToken: string, phoneNumber: string, webhookBaseUrl = '') {
     this.accountSid = accountSid
     this.authToken = authToken
     this.phoneNumber = phoneNumber
+    this.webhookBaseUrl = webhookBaseUrl
   }
 
   async handleLanguageMenu(params: LanguageMenuParams): Promise<TelephonyResponse> {
@@ -321,7 +324,7 @@ export class TwilioAdapter implements TelephonyAdapter {
     const signature = request.headers.get('X-Twilio-Signature')
     if (!signature) return false
 
-    const url = new URL(request.url)
+    const url = buildWebhookUrl(request, this.webhookBaseUrl)
     const body = await request.clone().text()
     const params = new URLSearchParams(body)
 

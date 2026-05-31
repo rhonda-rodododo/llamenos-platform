@@ -1,4 +1,5 @@
 import { TwilioAdapter } from './twilio'
+import { buildWebhookUrl } from '../lib/webhook-url'
 
 /**
  * SignalWire adapter — extends TwilioAdapter since SignalWire is API-compatible.
@@ -8,8 +9,8 @@ import { TwilioAdapter } from './twilio'
 export class SignalWireAdapter extends TwilioAdapter {
   private space: string
 
-  constructor(projectId: string, apiToken: string, phoneNumber: string, space: string) {
-    super(projectId, apiToken, phoneNumber)
+  constructor(projectId: string, apiToken: string, phoneNumber: string, space: string, webhookBaseUrl = '') {
+    super(projectId, apiToken, phoneNumber, webhookBaseUrl)
     this.space = space
   }
 
@@ -27,7 +28,7 @@ export class SignalWireAdapter extends TwilioAdapter {
     const signature = request.headers.get('X-SignalWire-Signature') || request.headers.get('X-Twilio-Signature')
     if (!signature) return false
 
-    const url = new URL(request.url)
+    const url = buildWebhookUrl(request, this.webhookBaseUrl)
     const body = await request.clone().text()
     const params = new URLSearchParams(body)
 

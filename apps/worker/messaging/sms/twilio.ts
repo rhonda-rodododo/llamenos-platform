@@ -1,4 +1,5 @@
 import { safeFetch } from '../../lib/safe-fetch'
+import { buildWebhookUrl } from '../../lib/webhook-url'
 import type {
   MessagingAdapter,
   IncomingMessage,
@@ -25,11 +26,14 @@ export class TwilioSMSAdapter implements MessagingAdapter {
   protected phoneNumber: string
   protected hmacSecret: string
 
-  constructor(accountSid: string, authToken: string, phoneNumber: string, hmacSecret: string) {
+  protected webhookBaseUrl: string
+
+  constructor(accountSid: string, authToken: string, phoneNumber: string, hmacSecret: string, webhookBaseUrl = '') {
     this.accountSid = accountSid
     this.authToken = authToken
     this.phoneNumber = phoneNumber
     this.hmacSecret = hmacSecret
+    this.webhookBaseUrl = webhookBaseUrl
   }
 
   async parseIncomingMessage(request: Request): Promise<IncomingMessage> {
@@ -68,7 +72,7 @@ export class TwilioSMSAdapter implements MessagingAdapter {
     const signature = request.headers.get('X-Twilio-Signature')
     if (!signature) return false
 
-    const url = new URL(request.url)
+    const url = buildWebhookUrl(request, this.webhookBaseUrl)
     const body = await request.clone().text()
     const params = new URLSearchParams(body)
 

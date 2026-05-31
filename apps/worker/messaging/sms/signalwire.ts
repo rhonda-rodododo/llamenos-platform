@@ -1,6 +1,7 @@
 import { safeFetch } from '../../lib/safe-fetch'
 import type { ChannelStatus } from '../adapter'
 import { TwilioSMSAdapter } from './twilio'
+import { buildWebhookUrl } from '../../lib/webhook-url'
 
 /**
  * SignalWireSMSAdapter -- extends TwilioSMSAdapter since SignalWire is API-compatible.
@@ -10,8 +11,8 @@ import { TwilioSMSAdapter } from './twilio'
 export class SignalWireSMSAdapter extends TwilioSMSAdapter {
   private space: string
 
-  constructor(accountSid: string, authToken: string, phoneNumber: string, space: string, hmacSecret: string) {
-    super(accountSid, authToken, phoneNumber, hmacSecret)
+  constructor(accountSid: string, authToken: string, phoneNumber: string, space: string, hmacSecret: string, webhookBaseUrl = '') {
+    super(accountSid, authToken, phoneNumber, hmacSecret, webhookBaseUrl)
     this.space = space
   }
 
@@ -25,7 +26,7 @@ export class SignalWireSMSAdapter extends TwilioSMSAdapter {
       || request.headers.get('X-Twilio-Signature')
     if (!signature) return false
 
-    const url = new URL(request.url)
+    const url = buildWebhookUrl(request, this.webhookBaseUrl)
     const body = await request.clone().text()
     const params = new URLSearchParams(body)
 

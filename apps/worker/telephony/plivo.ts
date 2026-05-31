@@ -1,4 +1,5 @@
 import { safeFetch } from '../lib/safe-fetch'
+import { buildWebhookUrl } from '../lib/webhook-url'
 import type {
   TelephonyAdapter,
   IncomingCallParams,
@@ -97,11 +98,13 @@ export class PlivoAdapter implements TelephonyAdapter {
   private authId: string
   private authToken: string
   private phoneNumber: string
+  private webhookBaseUrl: string
 
-  constructor(authId: string, authToken: string, phoneNumber: string) {
+  constructor(authId: string, authToken: string, phoneNumber: string, webhookBaseUrl = '') {
     this.authId = authId
     this.authToken = authToken
     this.phoneNumber = phoneNumber
+    this.webhookBaseUrl = webhookBaseUrl
   }
 
   private plivoXml(xml: string): TelephonyResponse {
@@ -317,7 +320,7 @@ export class PlivoAdapter implements TelephonyAdapter {
     const nonce = request.headers.get('X-Plivo-Signature-V3-Nonce')
     if (!signature || !nonce) return false
 
-    const url = new URL(request.url)
+    const url = buildWebhookUrl(request, this.webhookBaseUrl)
     const body = await request.clone().text()
     const params = new URLSearchParams(body)
 

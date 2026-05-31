@@ -53,6 +53,7 @@ export interface Env {
   ADMIN_DECRYPTION_PUBKEY?: string // Separate pubkey for note/hub key encryption (falls back to ADMIN_PUBKEY)
   HOTLINE_NAME: string
   ENVIRONMENT: string
+  WEBHOOK_BASE_URL?: string        // Public base URL used for webhook signature verification (prevents Host header spoofing)
   CORS_ALLOWED_ORIGINS?: string   // Comma-separated allowed origins (overrides hardcoded defaults)
   HMAC_SECRET: string
   METRICS_SCRAPE_TOKEN?: string
