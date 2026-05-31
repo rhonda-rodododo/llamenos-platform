@@ -94,7 +94,9 @@ final class BiometricPrompt {
 // MARK: - BiometricButton
 
 /// A button that shows the appropriate biometric icon (Face ID / Touch ID) and
-/// triggers authentication when tapped.
+/// triggers the biometric unlock flow when tapped. The caller is responsible for
+/// performing the actual LAContext evaluation and Keychain access — this button
+/// only provides the UI affordance and triggers the flow.
 struct BiometricButton: View {
     let onAuthenticated: () -> Void
 
@@ -103,12 +105,7 @@ struct BiometricButton: View {
     var body: some View {
         if biometricType != .none {
             Button {
-                Task {
-                    let success = await BiometricPrompt.authenticate()
-                    if success {
-                        onAuthenticated()
-                    }
-                }
+                onAuthenticated()
             } label: {
                 Label {
                     Text(String(

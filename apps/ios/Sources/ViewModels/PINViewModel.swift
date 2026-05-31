@@ -1,4 +1,5 @@
 import Foundation
+import LocalAuthentication
 
 // MARK: - PINMode
 
@@ -300,15 +301,34 @@ final class PINViewModel {
 
     // MARK: - Biometric Unlock (C5)
 
-    /// Attempt biometric unlock. Retrieves the PIN from biometric-protected Keychain
-    /// and uses it to decrypt device keys — no manual PIN entry needed.
+    /// Attempt biometric unlock. Evaluates biometrics via LAContext, then retrieves
+    /// the PIN from the biometric-protected Keychain item using the authenticated
+    /// context (kSecUseAuthenticationContext) — one biometric prompt, no double challenge.
     func attemptBiometricUnlock() {
         guard isBiometricAvailable else { return }
 
         Task { @MainActor in
+            let context = LAContext()
+            var canEvalError: NSError?
+            guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &canEvalError) else {
+                return
+            }
+
+            let reason = NSLocalizedString(
+                "biometric_unlock_reason",
+                comment: "Authenticate to unlock Llamenos"
+            )
+
             do {
-                if let pin = try keychainService.retrievePINWithBiometric() {
-                    // Use the biometric-retrieved PIN to unlock
+                let success = try await context.evaluatePolicy(
+                    .deviceOwnerAuthenticationWithBiometrics,
+                    localizedReason: reason
+                )
+                guard success else { return }
+
+                // Biometric succeeded — retrieve PIN using the authenticated context
+                // so the Keychain does not prompt for biometrics a second time.
+                if let pin = try keychainService.retrievePINWithBiometric(context: context) {
                     isLoading = true
                     do {
                         try authService.unlockWithPIN(pin)
@@ -318,17 +338,39 @@ final class PINViewModel {
                     } catch {
                         isLoading = false
                         // Biometric succeeded but PIN failed (key may have been re-encrypted
-                        // with a different PIN). Fall back to manual PIN entry.
+                        // with a different PIN after biometrics changed). Fall back to manual PIN.
                         errorMessage = NSLocalizedString(
                             "error_biometric_pin_mismatch",
                             comment: "Biometric unlock failed. Please enter your PIN."
                         )
                     }
                 }
-                // nil = user cancelled biometric prompt or no stored PIN — fall back to PIN pad
+                // nil = no stored PIN (biometric not set up) — fall back to PIN pad
+            } catch let laError as LAError {
+                switch laError.code {
+                case .userCancel, .userFallback, .systemCancel, .appCancel, .notInteractive:
+                    // User cancelled or chose PIN — fall back to PIN pad silently
+                    break
+                case .biometryLockout:
+                    errorMessage = NSLocalizedString(
+                        "error_biometric_lockout",
+                        comment: "Biometric authentication is locked out. Please enter your PIN."
+                    )
+                case .biometryNotEnrolled:
+                    // Biometrics removed/changed since setup — invalidate stored PIN so
+                    // the next enrollment doesn't silently reuse the old stored PIN.
+                    keychainService.deleteBiometricPIN()
+                    try? authService.setBiometricEnabled(false)
+                    errorMessage = NSLocalizedString(
+                        "error_biometric_not_enrolled",
+                        comment: "Biometric enrollment changed. Please enter your PIN."
+                    )
+                default:
+                    // Other LAError — fall back to PIN pad silently
+                    break
+                }
             } catch {
-                // Keychain error — fall back to PIN pad silently
-                errorMessage = nil
+                // Non-LAError (e.g. Keychain error) — fall back to PIN pad silently
             }
         }
     }
