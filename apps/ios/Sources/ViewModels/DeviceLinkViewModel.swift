@@ -146,16 +146,38 @@ final class DeviceLinkViewModel {
         let relayPart = String(fullPath[fullPath.startIndex..<lastSlash])
         let roomId = String(fullPath[fullPath.index(after: lastSlash)...])
 
-        // H5: Validate the relay host to prevent SSRF to internal networks
-        // Extract the host portion (strip port if present)
-        let hostPart = relayPart.split(separator: "/").first.map(String.init) ?? relayPart
-        let hostOnly = hostPart.split(separator: ":").first.map(String.init) ?? hostPart
-        guard Self.isValidRelayHost(hostOnly) else {
+        // H5: Validate the relay host to prevent SSRF to internal networks.
+        // Use URL parsing for reliable host extraction — manual splitting on ":" fails
+        // for IPv6 addresses like [::1], which would be truncated to "[" and bypass
+        // all private-range checks.
+        guard let parsedRelayURL = URL(string: "wss://\(relayPart)"),
+              let extractedHost = parsedRelayURL.host, !extractedHost.isEmpty else {
+            currentStep = .error(NSLocalizedString(
+                "device_link_invalid_relay",
+                comment: "Invalid relay URL."
+            ))
+            return
+        }
+        guard Self.isValidRelayHost(extractedHost) else {
             currentStep = .error(NSLocalizedString(
                 "device_link_private_relay",
                 comment: "The relay URL points to a private or local network address. This is not allowed for security reasons."
             ))
             return
+        }
+
+        // H5b: If a hub URL is already configured, the relay must originate from
+        // the same host — prevents redirecting device linking to an attacker's server.
+        if let hubURLString = authService.hubURL,
+           let hubURL = URL(string: hubURLString),
+           let hubHost = hubURL.host, !hubHost.isEmpty {
+            guard extractedHost.lowercased() == hubHost.lowercased() else {
+                currentStep = .error(NSLocalizedString(
+                    "device_link_relay_domain_mismatch",
+                    comment: "The relay URL does not match your configured server. Scan the QR code shown on your own server's desktop app."
+                ))
+                return
+            }
         }
 
         relayURL = "wss://\(relayPart)"
@@ -448,34 +470,45 @@ final class DeviceLinkViewModel {
     /// Validate that a relay host is not a private/internal IP address or localhost.
     /// Prevents SSRF attacks via malicious QR codes pointing to internal networks.
     ///
-    /// Rejects: localhost, 127.x, ::1, 10.x, 172.16-31.x, 192.168.x, 169.254.x,
-    /// fe80: (link-local), [::1], and numeric-only hosts with private ranges.
+    /// Rejects: localhost, 127.x, ::1, [::1], 10.x, 172.16–31.x, 192.168.x,
+    /// 169.254.x, fe80: (link-local), ::ffff: (IPv4-mapped private addresses),
+    /// 0.0.0.0, :: (unspecified), and empty hosts.
+    ///
+    /// Note: `processQRCode` uses `URL.host` to extract the host, which strips
+    /// brackets from IPv6 literals — `[::1]` → `::1`. The bracketed form is also
+    /// rejected here to guard callers who pass the host directly.
     static func isValidRelayHost(_ host: String) -> Bool {
         let lowered = host.lowercased()
 
-        // Reject localhost and loopback
+        // Reject empty host
+        if lowered.isEmpty { return false }
+
+        // Reject localhost and loopback variants (including bracketed IPv6)
         if lowered == "localhost" || lowered == "127.0.0.1" || lowered == "::1" || lowered == "[::1]" {
             return false
         }
 
         // Reject loopback range 127.x.x.x
-        if lowered.hasPrefix("127.") {
-            return false
-        }
+        if lowered.hasPrefix("127.") { return false }
 
-        // Reject private IP ranges
-        let blockedPrefixes = ["10.", "192.168.", "169.254.", "fe80:"]
+        // Reject unspecified / all-interfaces addresses
+        if lowered == "0.0.0.0" || lowered == "::" { return false }
+
+        // Reject private IPv4 ranges
+        let blockedIPv4Prefixes = ["10.", "192.168.", "169.254."]
             + (16...31).map { "172.\($0)." }
-
-        for prefix in blockedPrefixes {
-            if lowered.hasPrefix(prefix) {
-                return false
-            }
+        for prefix in blockedIPv4Prefixes where lowered.hasPrefix(prefix) {
+            return false
         }
 
-        // Reject empty host
-        if lowered.isEmpty {
-            return false
+        // Reject IPv6 link-local (fe80::/10)
+        if lowered.hasPrefix("fe80") { return false }
+
+        // Reject IPv4-mapped IPv6 private addresses (::ffff:A.B.C.D).
+        // Apply the IPv4 private-range rules to the embedded IPv4 address.
+        if lowered.hasPrefix("::ffff:") {
+            let ipv4Part = String(lowered.dropFirst("::ffff:".count))
+            return isValidRelayHost(ipv4Part)
         }
 
         return true

@@ -82,6 +82,136 @@ final class SecurityHardeningTests: XCTestCase {
         XCTAssertTrue(DeviceLinkViewModel.isValidRelayHost("relay.example.com"))
     }
 
+    // MARK: - H5 (additional): IPv4-mapped IPv6 and unspecified addresses
+
+    func testRejectsIPv4MappedIPv6Loopback() {
+        // ::ffff:127.0.0.1 is IPv4-mapped loopback — must be rejected
+        XCTAssertFalse(DeviceLinkViewModel.isValidRelayHost("::ffff:127.0.0.1"))
+    }
+
+    func testRejectsIPv4MappedIPv6PrivateRanges() {
+        XCTAssertFalse(DeviceLinkViewModel.isValidRelayHost("::ffff:10.0.0.1"))
+        XCTAssertFalse(DeviceLinkViewModel.isValidRelayHost("::ffff:192.168.1.1"))
+        XCTAssertFalse(DeviceLinkViewModel.isValidRelayHost("::ffff:172.16.0.1"))
+        XCTAssertFalse(DeviceLinkViewModel.isValidRelayHost("::ffff:169.254.0.1"))
+    }
+
+    func testRejectsUnspecifiedAddresses() {
+        XCTAssertFalse(DeviceLinkViewModel.isValidRelayHost("0.0.0.0"))
+        XCTAssertFalse(DeviceLinkViewModel.isValidRelayHost("::"))
+    }
+
+    // MARK: - H5 (additional): processQRCode IPv6 bracket bypass
+
+    func testProcessQRCodeRejectsBracketedIPv6Loopback() {
+        // Regression: manual ":" splitting extracted "[" from "[::1]", bypassing checks.
+        // URL.host correctly returns "::1", which isValidRelayHost rejects.
+        let viewModel = makeDeviceLinkViewModel()
+        viewModel.processQRCode("llamenos-link://[::1]/abc123")
+        if case .error = viewModel.currentStep {
+            // Expected — private relay rejected
+        } else {
+            XCTFail("processQRCode must reject bracketed IPv6 loopback, got \(viewModel.currentStep)")
+        }
+    }
+
+    func testProcessQRCodeRejectsBracketedIPv6Private() {
+        let viewModel = makeDeviceLinkViewModel()
+        viewModel.processQRCode("llamenos-link://[::ffff:192.168.1.1]/abc123")
+        if case .error = viewModel.currentStep {
+            // Expected
+        } else {
+            XCTFail("processQRCode must reject IPv4-mapped IPv6 private address, got \(viewModel.currentStep)")
+        }
+    }
+
+    func testProcessQRCodeRejectsIPv6LoopbackWithPort() {
+        let viewModel = makeDeviceLinkViewModel()
+        viewModel.processQRCode("llamenos-link://[::1]:8080/abc123")
+        if case .error = viewModel.currentStep {
+            // Expected
+        } else {
+            XCTFail("processQRCode must reject IPv6 loopback with port, got \(viewModel.currentStep)")
+        }
+    }
+
+    func testProcessQRCodeRejectsPrivate10RangeDirectly() {
+        let viewModel = makeDeviceLinkViewModel()
+        viewModel.processQRCode("llamenos-link://10.0.0.1/abc123")
+        if case .error = viewModel.currentStep {
+            // Expected
+        } else {
+            XCTFail("processQRCode must reject 10.x address, got \(viewModel.currentStep)")
+        }
+    }
+
+    // MARK: - H5 (additional): hub domain enforcement
+
+    func testProcessQRCodeRejectsRelayMismatchingConfiguredHub() {
+        let crypto = CryptoService()
+        let keychain = KeychainService()
+        let auth = AuthService(cryptoService: crypto, keychainService: keychain)
+        // Configure hub URL so domain enforcement kicks in
+        try? auth.setHubURL("https://myserver.llamenos.org")
+        let viewModel = DeviceLinkViewModel(
+            cryptoService: crypto,
+            authService: auth,
+            keychainService: keychain
+        )
+
+        // Relay from a different domain than the configured hub
+        viewModel.processQRCode("llamenos-link://evil.example.com/abc123")
+        if case .error = viewModel.currentStep {
+            // Expected — relay domain doesn't match hub domain
+        } else {
+            XCTFail("processQRCode must reject relay not matching configured hub, got \(viewModel.currentStep)")
+        }
+    }
+
+    func testProcessQRCodeAcceptsRelayMatchingConfiguredHub() {
+        let crypto = CryptoService()
+        let keychain = KeychainService()
+        let auth = AuthService(cryptoService: crypto, keychainService: keychain)
+        try? auth.setHubURL("https://myserver.llamenos.org")
+        let viewModel = DeviceLinkViewModel(
+            cryptoService: crypto,
+            authService: auth,
+            keychainService: keychain
+        )
+
+        // Relay from the same host as the configured hub — should pass validation
+        // (it will proceed to connect, so step transitions away from .scanning)
+        viewModel.processQRCode("llamenos-link://myserver.llamenos.org/relay/abc123")
+        // Not in .error and not in .scanning means validation passed and connect started
+        if case .error = viewModel.currentStep {
+            XCTFail("processQRCode should accept relay matching configured hub domain, got \(viewModel.currentStep)")
+        }
+        XCTAssertNotEqual(viewModel.currentStep, .scanning,
+            "Step should have advanced past scanning when relay matches configured hub")
+    }
+
+    func testProcessQRCodeAllowsAnyPublicRelayWhenNoHubConfigured() {
+        // When no hub URL is configured (first setup), any public non-private relay is allowed.
+        let viewModel = makeDeviceLinkViewModel() // no hub URL set
+        viewModel.processQRCode("llamenos-link://relay.example.com/abc123")
+        if case .error = viewModel.currentStep {
+            XCTFail("processQRCode should allow public relay when no hub is configured, got \(viewModel.currentStep)")
+        }
+    }
+
+    // MARK: - Helpers
+
+    private func makeDeviceLinkViewModel() -> DeviceLinkViewModel {
+        let crypto = CryptoService()
+        let keychain = KeychainService()
+        let auth = AuthService(cryptoService: crypto, keychainService: keychain)
+        return DeviceLinkViewModel(
+            cryptoService: crypto,
+            authService: auth,
+            keychainService: keychain
+        )
+    }
+
     // MARK: - H7: PIN Lockout Timing
 
     func testNoLockoutForFirstFourAttempts() {
