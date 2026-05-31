@@ -1,6 +1,8 @@
 /**
  * Backend note encryption step definitions.
  * Verifies note envelope structure, per-note forward secrecy, and E2EE via API.
+ *
+ * Uses REAL AES-256-GCM + HPKE encryption — no mock base64.
  */
 import { expect } from '@playwright/test'
 import {Given, When, Then, getState, setState, Before} from './fixtures'
@@ -10,7 +12,16 @@ import {
   apiPost,
   generateTestKeypair,
   listNotesViaApi,
+  encryptForTest,
+  ADMIN_SEED,
 } from '../../api-helpers'
+import {
+  x25519PubkeyFromSeed,
+  wrapKeyForRecipient,
+  generateContentKey,
+  encryptContent,
+} from '../../crypto-helpers'
+import { LABEL_NOTE_KEY } from '@shared/crypto-labels'
 
 // ── Local state for note-specific scenarios ──────────────────────
 
@@ -18,7 +29,7 @@ interface NoteTestState {
   envelope?: Record<string, unknown>
   envelopes: Array<Record<string, unknown>>
   symmetricKey?: string
-  adminKeypairs: Array<{ nsec: string; pubkey: string; skHex: string }>
+  adminKeypairs: Array<{ seedHex: string; pubkey: string }>
   volunteerKeypair?: { nsec: string; pubkey: string; skHex: string }
 }
 
@@ -37,14 +48,16 @@ Before({ tags: '@backend' }, async ({ world }) => {
 // ── Note Creation ────────────────────────────────────────────────
 
 Given('a new note is created', async ({request, world}) => {
-  // Create a note via the API — must send encryptedContent (notes are always encrypted)
+  // Create a note via the API with real AES-256-GCM encryption
   const callId = `test-call-${Date.now()}`
+  const { encryptedContent, envelopes } = await encryptForTest('test note encrypted', [ADMIN_SEED])
   const { status, data } = await apiPost<{ note?: Record<string, unknown> }>(
     request,
     '/notes',
     {
-      encryptedContent: 'dGVzdCBub3RlIGVuY3J5cHRlZA==', // base64 mock ciphertext
+      encryptedContent,
       callId,
+      adminEnvelopes: envelopes,
     },
   )
   expect([200, 201]).toContain(status)
@@ -52,13 +65,15 @@ Given('a new note is created', async ({request, world}) => {
 })
 
 Given('a note created by a volunteer', async ({request, world}) => {
-  // Notes must be created by a registered volunteer
+  // Notes must be created by a registered volunteer — real crypto
+  const { encryptedContent, envelopes } = await encryptForTest('volunteer note', [ADMIN_SEED])
   const { status, data } = await apiPost<{ note?: Record<string, unknown> }>(
     request,
     '/notes',
     {
-      encryptedContent: 'dm9sdW50ZWVyIG5vdGU=', // base64 mock ciphertext
+      encryptedContent,
       callId: `test-call-${Date.now()}`,
+      adminEnvelopes: envelopes,
     },
   )
   if (status === 200 || status === 201) {
@@ -69,17 +84,20 @@ Given('a note created by a volunteer', async ({request, world}) => {
 Given('a hub with {int} admins', async ({request, world}, count: number) => {
   getNoteTestState(world).adminKeypairs = []
   for (let i = 0; i < count; i++) {
-    getNoteTestState(world).adminKeypairs.push(generateTestKeypair())
+    const kp = generateTestKeypair()
+    getNoteTestState(world).adminKeypairs.push(kp)
   }
 })
 
 Given('an encrypted note envelope', async ({request, world}) => {
+  const { encryptedContent, envelopes } = await encryptForTest('envelope test note', [ADMIN_SEED])
   const { status, data } = await apiPost<{ note?: Record<string, unknown> }>(
     request,
     '/notes',
     {
-      encryptedContent: 'ZW52ZWxvcGUgdGVzdCBub3Rl', // base64 mock ciphertext
+      encryptedContent,
       callId: `test-call-${Date.now()}`,
+      adminEnvelopes: envelopes,
     },
   )
   if (status === 200 || status === 201) {
@@ -90,12 +108,18 @@ Given('an encrypted note envelope', async ({request, world}) => {
 Given('two notes created by the same volunteer', async ({request, world}) => {
   getNoteTestState(world).envelopes = []
   for (let i = 0; i < 2; i++) {
+    // Each note gets a unique content key (forward secrecy)
+    const { encryptedContent, envelopes } = await encryptForTest(
+      `forward secrecy test note ${i}`,
+      [ADMIN_SEED],
+    )
     const { status, data } = await apiPost<{ note?: Record<string, unknown> }>(
       request,
       '/notes',
       {
-        encryptedContent: `Zm9yd2FyZCBzZWNyZWN5IHRlc3Qgbm90ZQ==${i}`, // unique per note
+        encryptedContent,
         callId: `test-call-${Date.now()}-${i}`,
+        adminEnvelopes: envelopes,
       },
     )
     if (status === 200 || status === 201) {
@@ -105,18 +129,23 @@ Given('two notes created by the same volunteer', async ({request, world}) => {
 })
 
 When('a note is created', async ({request, world}) => {
-  // Build admin envelopes from the keypairs created in the "hub with N admins" step
-  const adminEnvelopes = getNoteTestState(world).adminKeypairs.map(kp => ({
-    pubkey: kp.pubkey,
-    ct: 'a'.repeat(64),
-    enc: kp.pubkey,
-  }))
+  // Build real HPKE admin envelopes from the keypairs created in the "hub with N admins" step
+  const contentKey = generateContentKey()
+  const encryptedContent = encryptContent('multi admin note', contentKey, LABEL_NOTE_KEY)
+
+  const adminEnvelopes = await Promise.all(
+    getNoteTestState(world).adminKeypairs.map(async kp => {
+      const x25519Pub = x25519PubkeyFromSeed(kp.seedHex)
+      const env = await wrapKeyForRecipient(contentKey, x25519Pub, kp.seedHex, LABEL_NOTE_KEY)
+      return { pubkey: x25519Pub, ...env }
+    }),
+  )
 
   const { status, data } = await apiPost<{ note?: Record<string, unknown> }>(
     request,
     '/notes',
     {
-      encryptedContent: 'bXVsdGkgYWRtaW4gbm90ZQ==', // base64 mock
+      encryptedContent,
       callId: `test-call-${Date.now()}`,
       adminEnvelopes,
     },

@@ -987,7 +987,7 @@ export async function updateTelephonyProvider(config: TelephonyProviderConfig) {
 }
 
 export async function testTelephonyProvider(config: Partial<TelephonyProviderConfig> & { type: string }) {
-  return request<{ ok: boolean; error?: string }>(hp('/settings/telephony-provider/test'), {
+  return request<{ ok: true }>(hp('/settings/telephony-provider/test'), {
     method: 'POST',
     body: JSON.stringify(config),
   })

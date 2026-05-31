@@ -128,65 +128,84 @@ struct LlamenosApp: App {
     /// Handle `llamenos://` deep link URLs and navigate to the appropriate screen.
     private func handleDeepLink(_ url: URL) {
         guard url.scheme == "llamenos" else { return }
-        guard appState.authStatus == .unlocked else { return }
 
         let host = url.host ?? ""
         let pathComponents = url.pathComponents.filter { $0 != "/" }
+        let queryItems = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems
 
         switch host {
-        case "cases":
-            if let caseId = pathComponents.first {
-                router.navigate(to: .caseDetail(id: caseId))
-            } else {
-                router.navigate(to: .cases)
+        case "device-link":
+            // Device linking works at any auth state:
+            // - Unauthenticated: user is setting up a new device by linking from an existing device
+            // - Unlocked: user is adding an additional device to their account from Settings
+            router.navigate(to: .deviceLink)
+
+        case "hub-invite":
+            // Store the invite token so the login / registration flow can pick it up.
+            // Does not require authentication — a new volunteer may tap this link before
+            // creating their account.
+            if let token = queryItems?.first(where: { $0.name == "token" })?.value {
+                appState.pendingHubInviteToken = token
             }
-        case "notes":
-            if let noteId = pathComponents.first {
-                router.navigate(to: .noteDetail(id: noteId))
-            } else {
-                router.navigate(to: .notes)
-            }
-        case "calls":
-            if let callId = pathComponents.first {
-                router.navigate(to: .callDetail(id: callId))
-            } else {
-                router.navigate(to: .callHistory)
-            }
-        case "conversations":
-            if let conversationId = pathComponents.first {
-                router.navigate(to: .conversationDetail(id: conversationId))
-            } else {
-                router.navigate(to: .conversations)
-            }
-        case "reports":
-            if let reportId = pathComponents.first {
-                router.navigate(to: .reportDetail(id: reportId))
-            } else {
-                router.navigate(to: .reports)
-            }
-        case "settings":
-            router.navigate(to: .settings)
-        case "admin":
-            if appState.isAdmin {
-                router.navigate(to: .admin)
-            }
-        case "oauth":
-            // llamenos://oauth/callback?status=success|error&error=<message>&csrf_state=<state>
-            let queryItems = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems
-            let status = queryItems?.first(where: { $0.name == "status" })?.value
-            let errorMsg = queryItems?.first(where: { $0.name == "error" })?.value
-            let csrfState = queryItems?.first(where: { $0.name == "csrf_state" })?.value
-            NotificationCenter.default.post(
-                name: .llamenos_oauthCallback,
-                object: nil,
-                userInfo: [
-                    "status": status ?? "error",
-                    "error": errorMsg as Any,
-                    "csrf_state": csrfState as Any
-                ]
-            )
+
         default:
-            break
+            // All remaining destinations require a fully authenticated and unlocked session.
+            guard appState.authStatus == .unlocked else { return }
+
+            switch host {
+            case "cases":
+                if let caseId = pathComponents.first {
+                    router.navigate(to: .caseDetail(id: caseId))
+                } else {
+                    router.navigate(to: .cases)
+                }
+            case "notes":
+                if let noteId = pathComponents.first {
+                    router.navigate(to: .noteDetail(id: noteId))
+                } else {
+                    router.navigate(to: .notes)
+                }
+            case "calls":
+                if let callId = pathComponents.first {
+                    router.navigate(to: .callDetail(id: callId))
+                } else {
+                    router.navigate(to: .callHistory)
+                }
+            case "conversations":
+                if let conversationId = pathComponents.first {
+                    router.navigate(to: .conversationDetail(id: conversationId))
+                } else {
+                    router.navigate(to: .conversations)
+                }
+            case "reports":
+                if let reportId = pathComponents.first {
+                    router.navigate(to: .reportDetail(id: reportId))
+                } else {
+                    router.navigate(to: .reports)
+                }
+            case "settings":
+                router.navigate(to: .settings)
+            case "admin":
+                if appState.isAdmin {
+                    router.navigate(to: .admin)
+                }
+            case "oauth":
+                // llamenos://oauth/callback?status=success|error&error=<message>&csrf_state=<state>
+                let status = queryItems?.first(where: { $0.name == "status" })?.value
+                let errorMsg = queryItems?.first(where: { $0.name == "error" })?.value
+                let csrfState = queryItems?.first(where: { $0.name == "csrf_state" })?.value
+                NotificationCenter.default.post(
+                    name: .llamenos_oauthCallback,
+                    object: nil,
+                    userInfo: [
+                        "status": status ?? "error",
+                        "error": errorMsg as Any,
+                        "csrf_state": csrfState as Any
+                    ]
+                )
+            default:
+                break
+            }
         }
     }
 

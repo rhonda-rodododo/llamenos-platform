@@ -292,7 +292,7 @@ dev.post('/test-create-shift', async (c) => {
     return c.json({ ok: true })
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Failed to create shift'
-    return c.json({ ok: false, error: msg })
+    return c.json({ error: msg }, 400)
   }
 })
 
