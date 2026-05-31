@@ -62,6 +62,34 @@ const VOLUNTEER_SAFE_FIELDS = new Set([
 // Helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Detect PostgreSQL unique-constraint / duplicate-key violations across driver layers.
+ *
+ * Bun's native SQL driver wraps PG errors with `code: 'ERR_POSTGRES_SERVER_ERROR'`
+ * instead of the raw `'23505'`. Drizzle then wraps that in a `DrizzleQueryError`.
+ * This helper checks both the error message and the `.cause` chain.
+ */
+function isDuplicateKeyError(e: unknown): boolean {
+  if (!(e instanceof Error)) return false
+  const msg = e.message.toLowerCase()
+  if (msg.includes('duplicate key') || msg.includes('unique constraint') || msg.includes('23505')) {
+    return true
+  }
+  // Check .cause (Drizzle wraps the native driver error)
+  const cause = (e as { cause?: unknown }).cause
+  if (cause instanceof Error) {
+    const causeMsg = cause.message.toLowerCase()
+    if (causeMsg.includes('duplicate key') || causeMsg.includes('unique constraint') || causeMsg.includes('23505')) {
+      return true
+    }
+    // Some drivers expose .code on cause
+    if ((cause as { code?: string }).code === '23505') return true
+  }
+  // Direct .code check (node-postgres style)
+  if ((e as { code?: string }).code === '23505') return true
+  return false
+}
+
 /** Generate a cryptographically random hex token of `bytes` length */
 function randomHexToken(bytes: number): string {
   const buf = new Uint8Array(bytes)
@@ -1557,8 +1585,11 @@ export class IdentityService {
       await this.db.insert(authNonces).values({ nonceHash, pubkey, expiresAt })
       return true
     } catch (e: unknown) {
-      // Unique primary key violation = replay detected
-      if ((e as { code?: string }).code === '23505') return false
+      // Unique primary key violation = replay detected.
+      // Check both the outer error and the cause — Bun's native SQL driver wraps
+      // PG errors with code 'ERR_POSTGRES_SERVER_ERROR' instead of the raw '23505',
+      // while Drizzle wraps the whole thing in DrizzleQueryError.
+      if (isDuplicateKeyError(e)) return false
       throw e
     }
   }

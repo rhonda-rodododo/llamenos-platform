@@ -114,7 +114,6 @@ auth.post('/bootstrap',
 )
 
 // --- Authenticated routes ---
-auth.use('/me', authMiddleware)
 auth.use('/me/*', authMiddleware)
 
 auth.get('/me',
