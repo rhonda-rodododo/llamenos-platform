@@ -32,7 +32,7 @@ that operating systems will block.
 The Tauri updater uses Ed25519 signatures to verify that downloaded updates are
 authentic. Every release artifact (`.app.tar.gz`, `.nsis.zip`, `.AppImage`) gets
 a `.sig` sidecar file. The desktop app checks signatures against the public key
-embedded in `src-tauri/tauri.conf.json` before applying updates.
+embedded in `apps/desktop/tauri.conf.json` before applying updates.
 
 **This is the single most critical secret.** If the private key is compromised,
 an attacker can push malicious updates to every installed desktop client.
@@ -58,7 +58,7 @@ dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQ4...
 
 ### Store the public key in the app
 
-Edit `src-tauri/tauri.conf.json` and set the `plugins.updater.pubkey` field:
+Edit `apps/desktop/tauri.conf.json` and set the `plugins.updater.pubkey` field:
 
 ```jsonc
 {
@@ -264,7 +264,7 @@ which makes it ideal for GitHub Actions CI. Cost is approximately $10/month.
 
 #### 3A.3 Configure Tauri for Azure Trusted Signing
 
-Add to `src-tauri/tauri.conf.json` under `bundle`:
+Add to `apps/desktop/tauri.conf.json` under `bundle`:
 
 ```jsonc
 {
@@ -667,27 +667,24 @@ identifiers, and configuration values are consistent across the project.
 
 ### Pre-first-release checklist
 
-- [ ] **Tauri updater public key** is set in `src-tauri/tauri.conf.json`
-      (`plugins.updater.pubkey` is currently an empty string)
-- [ ] **Tauri updater endpoint** URL in `src-tauri/tauri.conf.json` points to
-      the correct GitHub repository
-      (currently: `https://github.com/rhonda-rodododo/llamenos/releases/latest/download/latest.json`)
-- [ ] **App identifier** is finalized in `src-tauri/tauri.conf.json`
+- [x] **Tauri updater public key** is set in `apps/desktop/tauri.conf.json`
+      (`plugins.updater.pubkey` contains the real minisign Ed25519 public key; key ID E1F35E58BD83142F)
+- [x] **Tauri updater endpoint** URL in `apps/desktop/tauri.conf.json` points to
+      the RustFS update server (primary: `https://updates.llamenos.org/desktop/latest.json`,
+      fallback: `https://releases.llamenos.org/desktop/latest.json`)
+- [ ] **App identifier** is finalized in `apps/desktop/tauri.conf.json`
       (currently: `org.llamenos.hotline`)
 - [ ] **Version numbers are in sync** across all files:
-  - `package.json` `version` field (currently: `0.18.0`)
-  - `src-tauri/Cargo.toml` `version` field (currently: `0.1.0`)
-  - `src-tauri/tauri.conf.json` `version` field (currently: `0.1.0`)
-  - `deploy/helm/llamenos/Chart.yaml` `appVersion` field (currently: `"0.18.0"`)
-- [ ] **Tauri and Cargo versions match**: `src-tauri/tauri.conf.json` `version`
-      must equal `src-tauri/Cargo.toml` `version`. Both must match `package.json`
-      at release time. Currently they are out of sync (`0.1.0` vs `0.18.0`).
-      The CI `version` job updates `package.json` and `Chart.yaml` automatically
-      but does NOT update `tauri.conf.json` or `Cargo.toml` -- add these to the
-      version bump script or CI workflow before the first desktop release.
-- [ ] **Bundle targets** in `src-tauri/tauri.conf.json` are set to `"all"` for
+  - `package.json` `version` field (currently: `0.19.10`)
+  - `apps/desktop/Cargo.toml` `version` field
+  - `apps/desktop/tauri.conf.json` `version` field
+  - `deploy/helm/llamenos/Chart.yaml` `appVersion` field
+- [ ] **Tauri and Cargo versions match**: `apps/desktop/tauri.conf.json` `version`
+      must equal `apps/desktop/Cargo.toml` `version`. Both must match `package.json`
+      at release time. knope manages version bumps across all files automatically.
+- [ ] **Bundle targets** in `apps/desktop/tauri.conf.json` are set to `"all"` for
       release (currently correct)
-- [ ] **`createUpdaterArtifacts`** is `true` in `src-tauri/tauri.conf.json`
+- [ ] **`createUpdaterArtifacts`** is `true` in `apps/desktop/tauri.conf.json`
       (currently correct -- ensures `.sig` files are generated)
 - [ ] **GitHub Actions workflows are enabled** on the repository (check
       Settings > Actions > General)
@@ -695,7 +692,7 @@ identifiers, and configuration values are consistent across the project.
       `packages/crypto/` in this monorepo. No external `llamenos-core` checkout
       is needed. `tauri-release.yml` builds from the monorepo directly.
 - [ ] **All GitHub Secrets from Section 7** are set and populated
-- [ ] **CSP `connect-src`** in `src-tauri/tauri.conf.json` includes the
+- [ ] **CSP `connect-src`** in `apps/desktop/tauri.conf.json` includes the
       production API domain (currently: `https://app.llamenos.org`)
 - [ ] **Update manifest script** (`scripts/generate-update-manifest.sh`) uses
       the correct repository name in `REPO` variable (currently:
@@ -715,8 +712,8 @@ The CI version job (`ci.yml` `version` step) currently bumps:
 - `deploy/helm/llamenos/Chart.yaml` `appVersion` (yes)
 
 It does NOT bump:
-- `src-tauri/tauri.conf.json` `version` (needs adding)
-- `src-tauri/Cargo.toml` `version` (needs adding)
+- `apps/desktop/tauri.conf.json` `version` (needs adding)
+- `apps/desktop/Cargo.toml` `version` (managed by knope)
 
 Similarly, the manual `scripts/bump-version.ts` only updates `package.json`.
 Before the first desktop release, update both the CI workflow and the manual

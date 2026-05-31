@@ -22,6 +22,8 @@ import {
   createEntityTypeViaApi,
   testEndpointAccess,
   generateTestKeypair,
+  encryptForTest,
+  ADMIN_SEED,
   ADMIN_NSEC,
   type CreateVolunteerResult,
 } from '../../api-helpers'
@@ -95,9 +97,9 @@ Given(
       name: `${name} ${Date.now()}`,
     })
 
-    // Assign the right role
+    // Assign the right role — use role IDs (not slugs)
     if (role === 'reporter') {
-      await apiPatch(request, `/users/${vol.pubkey}`, { roles: ['reporter'] })
+      await apiPatch(request, `/users/${vol.pubkey}`, { roles: ['role-reporter'] })
     } else if (role === 'volunteer') {
       // Default role is volunteer — no change needed
     }
@@ -113,13 +115,18 @@ Given(
 
     // Create resources as this user
     if (role === 'volunteer') {
-      // Create a note
+      // Create a note with real AES-256-GCM encryption
+      const { encryptedContent: noteContent, envelopes: noteEnvelopes } = await encryptForTest(
+        `${name}'s note`,
+        [vol.seedHex, ADMIN_SEED],
+      )
       const noteRes = await apiPost<{ note?: { id?: string }; id?: string }>(
         request,
         '/notes',
         {
-          encryptedContent: Buffer.from(`${name}'s note`).toString('base64'),
+          encryptedContent: noteContent,
           callId: `iso-${Date.now()}-${name}`,
+          adminEnvelopes: noteEnvelopes,
         },
         vol.nsec,
       )
@@ -141,9 +148,11 @@ Given(
     }
 
     if (role === 'reporter') {
-      // Create a report as this reporter
+      // Create a report authenticated as this reporter so the server records their
+      // pubkey as the author — required for reporter-isolation filter in GET /reports
       const report = await createReportViaApi(request, {
         title: `${name}'s report ${Date.now()}`,
+        seedHex: vol.nsec,
       })
       user.reportIds.push(report.id)
     }
@@ -262,12 +271,17 @@ When(
   async ({ request, world }, volName: string, _hubName: string) => {
     const user = getIsolationState(world).users.get(volName)
     expect(user).toBeTruthy()
+    const { encryptedContent: hubNoteContent, envelopes: hubNoteEnvelopes } = await encryptForTest(
+      `${volName}'s hub note`,
+      [user!.nsec, ADMIN_SEED],
+    )
     const res = await apiPost<{ note?: { id?: string }; id?: string }>(
       request,
       '/notes',
       {
-        encryptedContent: Buffer.from(`${volName}'s hub note`).toString('base64'),
+        encryptedContent: hubNoteContent,
         callId: `hub-iso-${Date.now()}-${volName}`,
+        adminEnvelopes: hubNoteEnvelopes,
       },
       user!.nsec,
     )
@@ -368,13 +382,18 @@ Given('an active volunteer with notes and shift access', async ({ request, world
   const vol = await createVolunteerViaApi(request, {
     name: `Deactivation Vol ${Date.now()}`,
   })
-  // Create a note as the volunteer
+  // Create a note as the volunteer with real encryption
+  const { encryptedContent: deactContent, envelopes: deactEnvelopes } = await encryptForTest(
+    'deactivation test note',
+    [vol.seedHex, ADMIN_SEED],
+  )
   await apiPost(
     request,
     '/notes',
     {
-      encryptedContent: Buffer.from('deactivation test note').toString('base64'),
+      encryptedContent: deactContent,
       callId: `deact-${Date.now()}`,
+      adminEnvelopes: deactEnvelopes,
     },
     vol.nsec,
   )

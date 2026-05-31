@@ -53,7 +53,7 @@ telephony.use('*', async (c, next) => {
   const isValid = await adapter.validateWebhook(c.req.raw)
   if (!isValid) {
     logger.error(`Webhook signature FAILED for ${url.pathname}`)
-    return c.text('Forbidden', 403)
+    return c.json({ error: 'Forbidden' }, 403)
   }
   await next()
 })
@@ -236,7 +236,7 @@ telephony.post('/user-answer',
   const tokenData = callToken ? await services.calls.resolveCallToken(callToken) : null
   if (!tokenData) {
     logger.warn('user-answer: invalid or expired call token', { callToken: callToken.slice(0, 8) })
-    return new Response('Forbidden', { status: 403 })
+    return c.json({ error: 'Forbidden' }, 403)
   }
   const { callSid: parentCallSid, volunteerPubkey: pubkey, hubId } = tokenData
   const adapter = (await getHubAdapter(c.env, services, hubId || undefined))!
