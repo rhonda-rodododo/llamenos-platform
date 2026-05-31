@@ -221,7 +221,7 @@ describe('settings route', () => {
     })
 
     it('PATCH /ivr-languages updates with permission', async () => {
-      const updateSpy = vi.fn().mockResolvedValue({ languages: ['en', 'es'] })
+      const updateSpy = vi.fn().mockResolvedValue({ enabledLanguages: ['en', 'es'] })
       const app = createTestApp({
         permissions: ['settings:manage-ivr'],
         services: { settings: { updateIvrLanguages: updateSpy } },
@@ -229,7 +229,7 @@ describe('settings route', () => {
       const res = await app.request('/ivr-languages', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ languages: ['en', 'es'] }),
+        body: JSON.stringify({ enabledLanguages: ['en', 'es'] }),
       })
       expect(res.status).toBe(200)
     })
