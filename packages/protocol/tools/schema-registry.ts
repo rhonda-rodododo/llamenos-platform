@@ -73,7 +73,7 @@ const EXCLUDED_SCHEMAS = new Set([
   // Signal notification — bare sub-schemas inlined at call sites
   'signalTrustLevelSchema',
   'signalRegistrationMethodSchema',
-  'signalRegistrationStatusSchema',
+  // signalRegistrationStatusSchema kept in codegen: Android imports SignalRegistrationStatus by name
 
   // Entity template sub-schemas (inlined in parent response)
   'entityTemplateCategorySchema',
