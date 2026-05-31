@@ -47,7 +47,9 @@ final class DeviceLinkViewModel {
     var hasCameraPermission: Bool = false
 
     /// Whether the user confirmed the SAS code match.
-    var sasConfirmed: Bool = false
+    /// `private(set)` — external code may read this but must never set it directly.
+    /// SAS confirmation is only valid from the `.verifying` step via `confirmSASCode()`.
+    private(set) var sasConfirmed: Bool = false
 
     /// Error message for the current step.
     var errorMessage: String?
@@ -319,21 +321,23 @@ final class DeviceLinkViewModel {
             }
 
             if sasConfirmed {
-                // SAS already confirmed — import immediately
+                // SAS already confirmed — import immediately.
+                // sasConfirmed can only be true if confirmSASCode() was called while
+                // in .verifying state (enforced by the guard in confirmSASCode()).
                 Task {
                     await importEncryptedProvisionData(encryptedData, sharedSecret: shared)
                 }
-            } else {
-                // Hold the encrypted data until SAS is confirmed
+            } else if case .verifying = currentStep {
+                // SAS not yet confirmed, but we're showing it — hold data for when user confirms.
                 pendingEncryptedData = encryptedData
-                if case .verifying = currentStep {
-                    // Already showing SAS — user just needs to confirm
-                } else {
-                    currentStep = .error(NSLocalizedString(
-                        "device_link_sas_required",
-                        comment: "Key received but SAS verification is required first."
-                    ))
-                }
+            } else {
+                // H4: Encrypted data arrived before the SAS screen was shown.
+                // Do NOT store pendingEncryptedData — require a clean retry so the
+                // user cannot inadvertently confirm SAS for data they never saw arrive.
+                currentStep = .error(NSLocalizedString(
+                    "device_link_sas_required",
+                    comment: "Key received but SAS verification is required first."
+                ))
             }
 
         default:
@@ -345,7 +349,17 @@ final class DeviceLinkViewModel {
 
     /// Confirm the SAS code matches the desktop display.
     /// If an encrypted nsec was received before confirmation, imports it now (H4).
+    ///
+    /// SECURITY: This function is a no-op (and aborts the flow) if called outside
+    /// the `.verifying` step. This prevents SAS bypass via state manipulation.
     func confirmSASCode() {
+        // H4: Enforce state machine — SAS confirmation is only valid from verifying step.
+        // Calling this from any other step (e.g., connecting, error) is an indication
+        // of a bug or an attempt to bypass the check. Treat it as a rejection.
+        guard case .verifying = currentStep else {
+            rejectSASCode()
+            return
+        }
         sasConfirmed = true
 
         // Send confirmation to the other device
