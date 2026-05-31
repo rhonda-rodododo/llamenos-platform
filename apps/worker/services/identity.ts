@@ -1557,8 +1557,14 @@ export class IdentityService {
       await this.db.insert(authNonces).values({ nonceHash, pubkey, expiresAt })
       return true
     } catch (e: unknown) {
-      // Unique primary key violation = replay detected
-      if ((e as { code?: string }).code === '23505') return false
+      // Unique primary key violation = replay detected.
+      // Bun SQL wraps postgres errors in DrizzleQueryError; the postgres error code
+      // is in e.cause.errno (not e.code). Check both for driver compatibility.
+      const cause = (e as { cause?: { errno?: string } }).cause
+      const isUniqueViolation =
+        (e as { code?: string }).code === '23505' ||
+        cause?.errno === '23505'
+      if (isUniqueViolation) return false
       throw e
     }
   }

@@ -114,7 +114,8 @@ auth.post('/bootstrap',
 )
 
 // --- Authenticated routes ---
-auth.use('/me', authMiddleware)
+// Hono's use('/me') is a prefix match — covers /me and all sub-paths (/me/logout, etc.)
+// Registering both '/me' and '/me/*' causes double-invocation on /me (replay false-positive)
 auth.use('/me/*', authMiddleware)
 
 auth.get('/me',
