@@ -9,6 +9,15 @@ import { createAuthToken } from './platform'
 
 const API_BASE = '/api'
 
+// Monotonic timestamp shared with api.ts — prevents nonce replay when
+// webauthn auth headers are generated concurrently with other API calls.
+let lastAuthTimestamp = 0
+function monotoneNow(): number {
+  const now = Date.now()
+  lastAuthTimestamp = now > lastAuthTimestamp ? now : lastAuthTimestamp + 1
+  return lastAuthTimestamp
+}
+
 async function getAuthHeaders(method: string, path: string): Promise<Record<string, string>> {
   // Prefer session token if available
   const sessionToken = sessionStorage.getItem('llamenos-session-token')
@@ -18,7 +27,7 @@ async function getAuthHeaders(method: string, path: string): Promise<Record<stri
   // Use CryptoState for Schnorr auth if unlocked
   if (keyManager.isUnlocked()) {
     try {
-      const token = await createAuthToken(Date.now(), method, `${API_BASE}${path}`)
+      const token = await createAuthToken(monotoneNow(), method, `${API_BASE}${path}`)
       return { 'Authorization': `Bearer ${token}` }
     } catch {
       return {}

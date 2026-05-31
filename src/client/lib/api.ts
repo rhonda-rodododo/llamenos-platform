@@ -81,6 +81,18 @@ const API_BASE = '/api'
 let onAuthExpired: (() => void) | null = null
 export function setOnAuthExpired(cb: (() => void) | null) { onAuthExpired = cb }
 
+// Monotonic timestamp: ensures each auth token gets a unique timestamp even when
+// multiple requests fire within the same millisecond. The server's nonce replay
+// protection rejects duplicate Ed25519 signatures (which are deterministic), so
+// two requests with identical timestamp+method+path would produce the same sig
+// and the second would be rejected as a replay.
+let lastAuthTimestamp = 0
+function monotoneNow(): number {
+  const now = Date.now()
+  lastAuthTimestamp = now > lastAuthTimestamp ? now : lastAuthTimestamp + 1
+  return lastAuthTimestamp
+}
+
 async function getAuthHeaders(method: string, apiPath: string): Promise<Record<string, string>> {
   // Prefer session token if available (WebAuthn-based sessions)
   const sessionToken = sessionStorage.getItem('llamenos-session-token')
@@ -90,7 +102,7 @@ async function getAuthHeaders(method: string, apiPath: string): Promise<Record<s
   // Use CryptoState for Schnorr auth if unlocked
   if (keyManager.isUnlocked()) {
     try {
-      const token = await createAuthToken(Date.now(), method, `${API_BASE}${apiPath}`)
+      const token = await createAuthToken(monotoneNow(), method, `${API_BASE}${apiPath}`)
       return { 'Authorization': `Bearer ${token}` }
     } catch {
       return {}
