@@ -15,6 +15,8 @@ import {
   createShiftViaApi,
   createBanViaApi,
   listAuditLogViaApi,
+  verifyAuditChainViaApi,
+  type ChainVerificationResult,
 } from '../../api-helpers'
 import { computeAuditEntryHash } from '../../integrity-helpers'
 import { TestDB } from '../../db-helpers'
@@ -37,6 +39,7 @@ interface AuditTestState {
   latestEntry?: AuditEntry
   recomputedHash?: string
   tamperHash?: string
+  chainVerification?: ChainVerificationResult
 }
 
 const AUDIT_INTEGRITY_KEY = 'audit_integrity'
@@ -257,3 +260,56 @@ Then('modifying the actor pubkey should produce a different hash', async ({ worl
   })
   expect(tamperedHash).not.toBe(entry.entryHash)
 })
+
+// ── API-Level Chain Verification ──────────────────────────────────
+
+When('the audit chain is verified via the API endpoint', async ({ request, world }) => {
+  const hubId = getScenarioState(world).hubId
+  const result = await verifyAuditChainViaApi(request, { hubId })
+  getAuditTestState(world).chainVerification = result
+})
+
+Then('the verification result should be valid', async ({ world }) => {
+  const result = getAuditTestState(world).chainVerification
+  expect(result).toBeTruthy()
+  expect(result!.valid).toBe(true)
+})
+
+Then('the verification result should be invalid', async ({ world }) => {
+  const result = getAuditTestState(world).chainVerification
+  expect(result).toBeTruthy()
+  expect(result!.valid).toBe(false)
+})
+
+Then(
+  'the verification result should report at least {int} checked entries',
+  async ({ world }, minEntries: number) => {
+    const result = getAuditTestState(world).chainVerification
+    expect(result).toBeTruthy()
+    expect(result!.checkedEntries).toBeGreaterThanOrEqual(minEntries)
+  },
+)
+
+Then('the verification result should identify the broken entry', async ({ world }) => {
+  const result = getAuditTestState(world).chainVerification
+  expect(result).toBeTruthy()
+  expect(result!.firstBrokenEntry).toBeDefined()
+  expect(result!.firstBrokenEntry?.id).toBeTruthy()
+  expect(result!.firstBrokenEntry?.reason).toBeTruthy()
+})
+
+When(
+  'the action field of the latest audit entry is tampered in the database',
+  async ({ request, world }) => {
+    const hubId = getScenarioState(world).hubId
+    // Fetch the latest entry via API to get its id
+    const result = await listAuditLogViaApi(request, { limit: 1, hubId })
+    expect(result.entries.length).toBeGreaterThan(0)
+    const latestEntry = result.entries[0] as unknown as AuditEntry
+    getAuditTestState(world).latestEntry = latestEntry
+
+    // Directly update the action field in the database to simulate tampering.
+    // The stored entryHash won't match after this change, breaking the chain.
+    await TestDB.updateColumn('audit_log', latestEntry.id, 'action', 'TAMPERED_ACTION')
+  },
+)
