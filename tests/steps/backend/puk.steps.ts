@@ -8,14 +8,13 @@ import { setLastResponse, getSharedState } from './shared-state'
 import {
   apiGet,
   apiPost,
-  createUserViaApi,
 } from '../../api-helpers'
 import { bytesToHex } from '@shared/encoding'
 
 // ── State ──────────────��────────────────────────────────────────────
 
 interface PukTestState {
-  user?: { nsec: string; pubkey: string }
+  user?: { deviceKey: string; pubkey: string }
   deviceIds: string[]
 }
 
@@ -43,7 +42,7 @@ function fakeEnvelope(): string {
 
 async function registerDevice(
   request: import('@playwright/test').APIRequestContext,
-  nsec: string,
+  _deviceKey: string,
 ) {
   const wakeKey = bytesToHex(crypto.getRandomValues(new Uint8Array(32)))
   const pushToken = bytesToHex(crypto.getRandomValues(new Uint8Array(16)))
@@ -55,9 +54,9 @@ async function registerDevice(
 Given('the user has a registered device {string}', async ({ request, world }, _label: string) => {
   const s = getS(world)
   expect(s.user).toBeDefined()
-  const regRes = await registerDevice(request, s.user!.nsec)
+  const regRes = await registerDevice(request, s.user!.deviceKey)
   expect(regRes.status).toBe(204)
-  const listRes = await apiGet<{ devices: Array<{ id: string }> }>(request, '/devices', s.user!.nsec)
+  const listRes = await apiGet<{ devices: Array<{ id: string }> }>(request, '/devices', s.user!.deviceKey)
   expect(listRes.status).toBe(200)
   const latestDevice = listRes.data.devices[listRes.data.devices.length - 1]
   expect(latestDevice).toBeDefined()
@@ -71,7 +70,7 @@ Given('PUK envelopes are distributed for generation {int}', async ({ request, wo
   expect(s.user).toBeDefined()
   expect(s.deviceIds.length).toBeGreaterThan(0)
   const envelopes = s.deviceIds.map(deviceId => ({ deviceId, generation, envelope: fakeEnvelope() }))
-  const res = await apiPost(request, '/puk/envelopes', { envelopes }, s.user!.nsec)
+  const res = await apiPost(request, '/puk/envelopes', { envelopes }, s.user!.deviceKey)
   expect(res.status).toBe(201)
 })
 
@@ -82,7 +81,7 @@ When('the user distributes PUK envelopes for generation {int}', async ({ request
   expect(s.user).toBeDefined()
   expect(s.deviceIds.length).toBeGreaterThan(0)
   const envelopes = s.deviceIds.map(deviceId => ({ deviceId, generation, envelope: fakeEnvelope() }))
-  setLastResponse(world, await apiPost(request, '/puk/envelopes', { envelopes }, s.user!.nsec))
+  setLastResponse(world, await apiPost(request, '/puk/envelopes', { envelopes }, s.user!.deviceKey))
 })
 
 When('the user distributes PUK envelopes for generation {int} to all devices', async ({ request, world }, generation: number) => {
@@ -90,7 +89,7 @@ When('the user distributes PUK envelopes for generation {int} to all devices', a
   expect(s.user).toBeDefined()
   expect(s.deviceIds.length).toBeGreaterThan(0)
   const envelopes = s.deviceIds.map(deviceId => ({ deviceId, generation, envelope: fakeEnvelope() }))
-  setLastResponse(world, await apiPost(request, '/puk/envelopes', { envelopes }, s.user!.nsec))
+  setLastResponse(world, await apiPost(request, '/puk/envelopes', { envelopes }, s.user!.deviceKey))
 })
 
 When('the user fetches the PUK envelope for {string}', async ({ request, world }, deviceLabel: string) => {
@@ -99,7 +98,7 @@ When('the user fetches the PUK envelope for {string}', async ({ request, world }
   const labels = ['device-alpha', 'device-beta']
   const idx = labels.indexOf(deviceLabel)
   const deviceId = idx >= 0 && idx < s.deviceIds.length ? s.deviceIds[idx] : deviceLabel
-  setLastResponse(world, await apiGet(request, `/puk/envelopes/${deviceId}`, s.user!.nsec))
+  setLastResponse(world, await apiGet(request, `/puk/envelopes/${deviceId}`, s.user!.deviceKey))
 })
 
 // ── Then ────────────────────────────────────────────────────────────

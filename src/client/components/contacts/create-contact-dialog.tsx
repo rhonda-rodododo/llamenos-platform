@@ -53,7 +53,7 @@ const IDENTIFIER_TYPES: Array<{ value: IdentifierType; label: string }> = [
 
 export function CreateContactDialog({ open, onOpenChange, onCreated }: CreateContactDialogProps) {
   const { t } = useTranslation()
-  const { hasNsec, publicKey, adminDecryptionPubkey } = useAuth()
+  const { hasDeviceKey, publicKey, adminDecryptionPubkey } = useAuth()
   const { toast } = useToast()
   const [saving, setSaving] = useState(false)
 
@@ -105,7 +105,7 @@ export function CreateContactDialog({ open, onOpenChange, onCreated }: CreateCon
 
   const handleSubmit = useCallback(async () => {
     if (!displayName.trim()) return
-    if (!hasNsec || !publicKey) {
+    if (!hasDeviceKey || !publicKey) {
       toast(t('contactDirectory.noKeyPair', { defaultValue: 'Encryption key not available' }), 'error')
       return
     }
@@ -182,7 +182,7 @@ export function CreateContactDialog({ open, onOpenChange, onCreated }: CreateCon
     } finally {
       setSaving(false)
     }
-  }, [displayName, contactType, identifiers, hasNsec, publicKey, adminDecryptionPubkey, toast, t, onCreated, handleClose])
+  }, [displayName, contactType, identifiers, hasDeviceKey, publicKey, adminDecryptionPubkey, toast, t, onCreated, handleClose])
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>

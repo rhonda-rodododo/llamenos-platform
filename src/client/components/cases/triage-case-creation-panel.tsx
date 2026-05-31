@@ -28,7 +28,7 @@ interface TriageCaseCreationPanelProps {
  */
 export function TriageCaseCreationPanel({ reportId, onCaseCreated }: TriageCaseCreationPanelProps) {
   const { t } = useTranslation()
-  const { hasNsec, publicKey, adminDecryptionPubkey } = useAuth()
+  const { hasDeviceKey, publicKey, adminDecryptionPubkey } = useAuth()
   const { toast } = useToast()
 
   const [entityTypes, setEntityTypes] = useState<EntityTypeDefinition[]>([])
@@ -62,7 +62,7 @@ export function TriageCaseCreationPanel({ reportId, onCaseCreated }: TriageCaseC
   }, [selectedTypeId])
 
   const handleSubmit = useCallback(async () => {
-    if (!selectedType || !title.trim() || !hasNsec || !publicKey) return
+    if (!selectedType || !title.trim() || !hasDeviceKey || !publicKey) return
 
     setSubmitting(true)
     try {
@@ -110,7 +110,7 @@ export function TriageCaseCreationPanel({ reportId, onCaseCreated }: TriageCaseC
     } finally {
       setSubmitting(false)
     }
-  }, [selectedType, title, fieldValues, hasNsec, publicKey, adminDecryptionPubkey, reportId, toast, t, onCaseCreated])
+  }, [selectedType, title, fieldValues, hasDeviceKey, publicKey, adminDecryptionPubkey, reportId, toast, t, onCaseCreated])
 
   const handleAtomicConvert = useCallback(async () => {
     if (!selectedTypeId) return

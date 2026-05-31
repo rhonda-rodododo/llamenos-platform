@@ -29,7 +29,7 @@ export const Route = createFileRoute('/conversations')({
 
 function ConversationsPage() {
   const { t } = useTranslation()
-  const { isAdmin, hasNsec, publicKey, adminDecryptionPubkey } = useAuth()
+  const { isAdmin, hasDeviceKey, publicKey, adminDecryptionPubkey } = useAuth()
   const { channels } = useConfig()
   const { toast } = useToast()
   const { conversations, waitingConversations } = useConversations()
@@ -99,7 +99,7 @@ function ConversationsPage() {
 
   // Encrypt and send a message using envelope pattern
   const handleComposerSend = useCallback(async (plaintext: string) => {
-    if (!selectedId || !hasNsec || !publicKey) return
+    if (!selectedId || !hasDeviceKey || !publicKey) return
 
     // Build reader list: current user + admin decryption pubkey
     const readerPubkeys = [publicKey]
@@ -119,7 +119,7 @@ function ConversationsPage() {
     } catch {
       toast(t('conversations.sendError', { defaultValue: 'Failed to send message' }), 'error')
     }
-  }, [selectedId, hasNsec, publicKey, adminDecryptionPubkey, t, toast])
+  }, [selectedId, hasDeviceKey, publicKey, adminDecryptionPubkey, t, toast])
 
   const hasAnyMessaging = channels.sms || channels.whatsapp || channels.signal || channels.reports
 

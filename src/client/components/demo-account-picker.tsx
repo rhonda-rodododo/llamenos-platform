@@ -26,7 +26,7 @@ interface DemoAccount {
   name: string
   description: string
   roleIds: string[]
-  nsec: string
+  deviceKey: string
 }
 
 export function DemoAccountPicker() {
@@ -36,21 +36,21 @@ export function DemoAccountPicker() {
   const [loadingPubkey, setLoadingPubkey] = useState<string | null>(null)
   const [accounts, setAccounts] = useState<DemoAccount[]>([])
 
-  // Dynamic import: nsec values are only fetched when this component mounts (demo mode active)
+  // Dynamic import: seed values are only fetched when this component mounts (demo mode active)
   useEffect(() => {
-    import('@/lib/demo-accounts').then(({ getDemoAccountsWithNsec }) =>
-      getDemoAccountsWithNsec()
+    import('@/lib/demo-accounts').then(({ getDemoAccountsWithSeed }) =>
+      getDemoAccountsWithSeed()
     ).then(setAccounts)
   }, [])
 
-  async function handleDemoLogin(nsec: string, pubkey: string) {
+  async function handleDemoLogin(deviceKey: string, pubkey: string) {
     setLoadingPubkey(pubkey)
     try {
       // Import key with demo PIN so it persists in local storage
-      await keyManager.importKey(nsec, DEMO_PIN)
+      await keyManager.importKey(deviceKey, DEMO_PIN)
       // Disable auto-lock in demo mode — frequent tab switches shouldn't force re-login
       keyManager.disableAutoLock()
-      await signIn(nsec, DEMO_PIN)
+      await signIn(deviceKey, DEMO_PIN)
       navigate({ to: '/' })
     } catch {
       setLoadingPubkey(null)
@@ -87,7 +87,7 @@ export function DemoAccountPicker() {
             return (
               <button
                 key={account.pubkey}
-                onClick={() => handleDemoLogin(account.nsec, account.pubkey)}
+                onClick={() => handleDemoLogin(account.deviceKey, account.pubkey)}
                 disabled={loadingPubkey !== null}
                 className="flex w-full items-center gap-3 rounded-md border bg-card p-2.5 text-left transition-colors hover:bg-accent disabled:opacity-50"
               >

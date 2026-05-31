@@ -291,7 +291,7 @@ final class SecurityUITests: BaseUITest {
         // 1. The device link button exists and is accessible in Settings
         // 2. The SAS-gated elements are NOT accessible from the main view
         //    (they only appear inside the sheet, after QR scan + key exchange)
-        // The actual gating logic (pendingEncryptedNsec held until sasConfirmed)
+        // The actual gating logic (pendingEncryptedData held until sasConfirmed)
         // is exhaustively tested in DeviceLinkViewModel unit tests.
 
         given("I am authenticated") {
@@ -337,7 +337,7 @@ final class SecurityUITests: BaseUITest {
         //
         // Since we cannot drive a real WebSocket handshake in XCUITest,
         // we verify the UI elements are defined with correct accessibility IDs.
-        // The actual gating logic (pendingEncryptedNsec held until sasConfirmed)
+        // The actual gating logic (pendingEncryptedData held until sasConfirmed)
         // is covered by unit tests in DeviceLinkViewModel.
         given("I am authenticated") {
             launchAuthenticated()
@@ -554,9 +554,9 @@ final class SecurityUITests: BaseUITest {
         }
     }
 
-    // MARK: - Epic 260: nsec Input Cleared After Import (M27)
+    // MARK: - Epic 260: Device Key Input Cleared After Import (M27)
 
-    func testNsecInputClearedAfterSuccessfulImport() {
+    func testDeviceKeyInputClearedAfterSuccessfulImport() {
         given("the app is on the login screen") {
             app.launchArguments.append("--test-skip-hub-validation")
             launchClean()
@@ -581,11 +581,11 @@ final class SecurityUITests: BaseUITest {
             }
             importButton.tap()
         }
-        then("the nsec input field should be present and empty") {
-            let nsecInput = find("nsec-input")
+        then("the device key input field should be present and empty") {
+            let deviceKeyInput = find("device-key-input")
             XCTAssertTrue(
-                nsecInput.waitForExistence(timeout: 5),
-                "Nsec input field should appear on import screen"
+                deviceKeyInput.waitForExistence(timeout: 5),
+                "Device key input field should appear on import screen"
             )
             // The SecureField renders dots for entered text, but an empty field
             // has no value/placeholder text. We verify the field exists and is
@@ -598,8 +598,8 @@ final class SecurityUITests: BaseUITest {
                 "Submit import button should exist"
             )
         }
-        and("the cancel button should clear the nsec input") {
-            // Navigate back via cancel — AuthViewModel.cancelImport() clears nsecInput
+        and("the cancel button should clear the device key input") {
+            // Navigate back via cancel — AuthViewModel.cancelImport() clears deviceKeyInput
             let cancelButton = find("cancel-import")
             if cancelButton.waitForExistence(timeout: 3) {
                 cancelButton.tap()
@@ -611,21 +611,21 @@ final class SecurityUITests: BaseUITest {
                     "Should return to login screen after cancel"
                 )
 
-                // Re-enter import screen — nsecInput should be empty (cleared by cancelImport)
+                // Re-enter import screen — deviceKeyInput should be empty (cleared by cancelImport)
                 let importButton = find("import-key")
                 if importButton.waitForExistence(timeout: 3) {
                     importButton.tap()
-                    let nsecInput = find("nsec-input")
-                    if nsecInput.waitForExistence(timeout: 3) {
+                    let deviceKeyInput = find("device-key-input")
+                    if deviceKeyInput.waitForExistence(timeout: 3) {
                         // The field should be empty — SecureField with empty string
                         // shows the placeholder text. We verify the field has no
                         // typed content by checking its value property.
-                        let fieldValue = nsecInput.value as? String ?? ""
+                        let fieldValue = deviceKeyInput.value as? String ?? ""
                         // An empty SecureField's value is "" or the placeholder text.
-                        // It should NOT contain any nsec key data.
-                        XCTAssertFalse(
-                            fieldValue.hasPrefix("nsec1"),
-                            "Nsec input should not retain key data after cancel"
+                        // It should NOT contain any device key data.
+                        XCTAssertTrue(
+                            fieldValue.isEmpty || fieldValue == deviceKeyInput.placeholderValue,
+                            "Device key input should not retain key data after cancel"
                         )
                     }
                 }

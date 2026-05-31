@@ -14,11 +14,11 @@ Feature: Sidebar Navigation
 
   Scenario: Login page renders with sign-in form
     When I visit the login page
-    Then I should see the nsec input
+    Then I should see the device key input
 
-  Scenario: Login rejects invalid nsec
+  Scenario: Login rejects invalid device key
     When I visit the login page
-    And I enter "invalid-key" in the nsec input
+    And I enter "invalid-key" in the device key input
     And I click "Log In"
     Then I should see a validation error
 

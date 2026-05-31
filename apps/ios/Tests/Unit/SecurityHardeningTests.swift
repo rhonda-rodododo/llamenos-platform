@@ -502,8 +502,8 @@ final class SecurityHardeningTests: XCTestCase {
         XCTAssertFalse(viewModel.sasConfirmed, "sasConfirmed must not be settable except via verifying-step confirmation")
     }
 
-    // The pre-V3 nsec import flow (and the AuthViewModel.nsecInput / .importingKey state
-    // that mediated it) was removed when device keys replaced single-nsec identity.
+    // The pre-V3 signing-seed import flow (and the AuthViewModel.signingKeyInput / .importingKey state
+    // that mediated it) was removed when device keys replaced single-key identity.
     // The equivalent V3 flow is sigchain-authorized device linking, which has its own
     // tests in DeviceLinkViewModel coverage.
 

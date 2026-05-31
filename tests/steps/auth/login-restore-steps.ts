@@ -1,7 +1,7 @@
 /**
  * Login restore step definitions.
  * Matches steps from: packages/test-specs/features/desktop/auth/login-restore.feature
- * Covers fresh install view (nsec input, backup upload, errors),
+ * Covers fresh install view (device key input, backup upload, errors),
  * stored key view (PIN input, recovery options),
  * and common login elements (language selector, theme toggles, security note).
  */

@@ -22,7 +22,7 @@ import { LABEL_DEVICE_AUTH } from '@shared/crypto-labels'
 interface InviteTestState {
   inviteCode?: string
   rateLimitResponses: number[]
-  volunteerNsec?: string
+  volunteerDeviceKey?: string
   /** Unique per-scenario fake IP so validation calls don't share the 'unknown' rate limit bucket. */
   scenarioIp: string
 }
@@ -78,7 +78,7 @@ Given('the invite has been redeemed by a user', async ({ request, world }) => {
 
 Given('a registered volunteer user', async ({ request, world }) => {
   const vol = await createUserViaApi(request, { name: `Invite Vol ${Date.now()}` })
-  getS(world).volunteerNsec = vol.nsec
+  getS(world).volunteerDeviceKey = vol.deviceKey
 })
 
 // ── When ────────────────────────────────────────────────────────────
@@ -157,10 +157,10 @@ When('a client floods invite validation {int} times', async ({ request, world },
 
 When('the volunteer tries to create an invite', async ({ request, world }) => {
   const s = getS(world)
-  expect(s.volunteerNsec).toBeDefined()
+  expect(s.volunteerDeviceKey).toBeDefined()
   setLastResponse(world, await apiPost(request, '/invites', {
     name: 'Unauthorized Invite', phone: '+15559999999', roleIds: ['role-volunteer'],
-  }, s.volunteerNsec!))
+  }, s.volunteerDeviceKey!))
 })
 
 // ── Then ─────────────────��──────────────────────────────────────────

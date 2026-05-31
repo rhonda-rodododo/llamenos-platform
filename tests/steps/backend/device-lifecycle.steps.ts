@@ -4,20 +4,19 @@
  */
 import { expect } from '@playwright/test'
 import { Given, When, Then, Before, getState, setState } from './fixtures'
-import { setLastResponse, getSharedState } from './shared-state'
+import { setLastResponse } from './shared-state'
 import {
   apiGet,
   apiPost,
   apiPatch,
   apiDelete,
-  createUserViaApi,
 } from '../../api-helpers'
 import { bytesToHex } from '@shared/encoding'
 
 // ── State ───��────────────────────────────��──────────────────────────
 
 interface DeviceTestState {
-  user?: { nsec: string; pubkey: string }
+  user?: { deviceKey: string; pubkey: string }
   devices: Array<{ id: string; platform: string }>
   ed25519Pubkey?: string
 }
@@ -55,14 +54,14 @@ Given('the user registers a device with platform {string}', async ({ request, wo
   expect(s.user).toBeDefined()
   const res = await apiPost(request, '/devices/register', {
     platform, pushToken: randomPushToken(), wakeKeyPublic: randomWakeKey(),
-  }, s.user!.nsec)
+  }, s.user!.deviceKey)
   setLastResponse(world, res)
 })
 
 When('the user lists their devices', async ({ request, world }) => {
   const s = getS(world)
   expect(s.user).toBeDefined()
-  const res = await apiGet<{ devices: Array<{ id: string; platform: string }> }>(request, '/devices', s.user!.nsec)
+  const res = await apiGet<{ devices: Array<{ id: string; platform: string }> }>(request, '/devices', s.user!.deviceKey)
   setLastResponse(world, res)
   if (res.status === 200) { s.devices = res.data.devices }
 })
@@ -71,19 +70,19 @@ When('the user deregisters the first device', async ({ request, world }) => {
   const s = getS(world)
   expect(s.user).toBeDefined()
   expect(s.devices.length).toBeGreaterThan(0)
-  setLastResponse(world, await apiDelete(request, `/devices/${s.devices[0].id}`, s.user!.nsec))
+  setLastResponse(world, await apiDelete(request, `/devices/${s.devices[0].id}`, s.user!.deviceKey))
 })
 
 When('the user deregisters device {string}', async ({ request, world }, deviceId: string) => {
   const s = getS(world)
   expect(s.user).toBeDefined()
-  setLastResponse(world, await apiDelete(request, `/devices/${deviceId}`, s.user!.nsec))
+  setLastResponse(world, await apiDelete(request, `/devices/${deviceId}`, s.user!.deviceKey))
 })
 
 When('the user deletes all their devices', async ({ request, world }) => {
   const s = getS(world)
   expect(s.user).toBeDefined()
-  setLastResponse(world, await apiDelete(request, '/devices', s.user!.nsec))
+  setLastResponse(world, await apiDelete(request, '/devices', s.user!.deviceKey))
 })
 
 When('the user registers a device with Ed25519 and X25519 keys', async ({ request, world }) => {
@@ -94,7 +93,7 @@ When('the user registers a device with Ed25519 and X25519 keys', async ({ reques
   s.ed25519Pubkey = ed25519Pubkey
   setLastResponse(world, await apiPost(request, '/devices/register', {
     platform: 'ios', pushToken: randomPushToken(), wakeKeyPublic: randomWakeKey(), ed25519Pubkey, x25519Pubkey,
-  }, s.user!.nsec))
+  }, s.user!.deviceKey))
 })
 
 When('the user registers a VoIP token', async ({ request, world }) => {
@@ -102,7 +101,7 @@ When('the user registers a VoIP token', async ({ request, world }) => {
   expect(s.user).toBeDefined()
   setLastResponse(world, await apiPost(request, '/devices/voip-token', {
     platform: 'ios', voipToken: randomPushToken(),
-  }, s.user!.nsec))
+  }, s.user!.deviceKey))
 })
 
 When('the user renames the first device to {string}', async ({ request, world }, newName: string) => {
@@ -111,7 +110,7 @@ When('the user renames the first device to {string}', async ({ request, world },
   expect(s.devices.length).toBeGreaterThan(0)
   setLastResponse(world, await apiPatch(request, `/devices/${s.devices[0].id}`, {
     deviceName: newName,
-  }, s.user!.nsec))
+  }, s.user!.deviceKey))
 })
 
 When('the user renames device {string} to {string}', async ({ request, world }, deviceId: string, newName: string) => {
@@ -119,7 +118,7 @@ When('the user renames device {string} to {string}', async ({ request, world }, 
   expect(s.user).toBeDefined()
   setLastResponse(world, await apiPatch(request, `/devices/${deviceId}`, {
     deviceName: newName,
-  }, s.user!.nsec))
+  }, s.user!.deviceKey))
 })
 
 When('the user revokes the first device', async ({ request, world }) => {
@@ -128,7 +127,7 @@ When('the user revokes the first device', async ({ request, world }) => {
   expect(s.devices.length).toBeGreaterThan(0)
   setLastResponse(world, await apiPost(request, `/devices/${s.devices[0].id}/revoke`, {
     confirm: true,
-  }, s.user!.nsec))
+  }, s.user!.deviceKey))
 })
 
 When('the user revokes the first device without confirmation', async ({ request, world }) => {
@@ -137,7 +136,7 @@ When('the user revokes the first device without confirmation', async ({ request,
   expect(s.devices.length).toBeGreaterThan(0)
   setLastResponse(world, await apiPost(request, `/devices/${s.devices[0].id}/revoke`, {
     confirm: false,
-  }, s.user!.nsec))
+  }, s.user!.deviceKey))
 })
 
 // ── Then ────────────────────────────────────────────────────────────
@@ -159,7 +158,7 @@ Then('one device has platform {string}', async ({ world }, platform: string) => 
 Then('the user has {int} devices', async ({ request, world }, count: number) => {
   const s = getS(world)
   expect(s.user).toBeDefined()
-  const res = await apiGet<{ devices: unknown[] }>(request, '/devices', s.user!.nsec)
+  const res = await apiGet<{ devices: unknown[] }>(request, '/devices', s.user!.deviceKey)
   expect(res.status).toBe(200)
   expect(res.data.devices).toHaveLength(count)
 })
@@ -175,7 +174,7 @@ Then('the device lists show the Ed25519 public key', async ({ request, world }) 
   const s = getS(world)
   expect(s.user).toBeDefined()
   expect(s.ed25519Pubkey).toBeDefined()
-  const res = await apiGet<{ devices: Array<{ ed25519Pubkey: string | null }> }>(request, '/devices', s.user!.nsec)
+  const res = await apiGet<{ devices: Array<{ ed25519Pubkey: string | null }> }>(request, '/devices', s.user!.deviceKey)
   expect(res.status).toBe(200)
   expect(res.data.devices.some(d => d.ed25519Pubkey === s.ed25519Pubkey)).toBe(true)
 })

@@ -40,7 +40,7 @@ export const Route = createFileRoute('/')({
 
 function DashboardPage() {
   const { t } = useTranslation()
-  const { isAuthenticated, isAdmin, hasNsec, publicKey, onBreak, toggleBreak } = useAuth()
+  const { isAuthenticated, isAdmin, hasDeviceKey, publicKey, onBreak, toggleBreak } = useAuth()
   const { toast } = useToast()
   const navigate = useNavigate()
   const { calls, currentCall, answerCall, hangupCall, reportSpam, ringingCalls, activeCalls } = useCalls()
@@ -197,7 +197,7 @@ function DashboardPage() {
       )}
 
       {/* Current active call */}
-      {currentCall && hasNsec && publicKey && (
+      {currentCall && hasDeviceKey && publicKey && (
         <ActiveCallPanel
           call={currentCall}
           onHangup={() => hangupCall(currentCall.id)}

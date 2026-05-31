@@ -17,7 +17,7 @@ import {
 // ── Local geocoding test state ─────────────────────────────────────
 
 interface GeocodingState {
-  volunteerNsec?: string
+  volunteerDeviceKey?: string
   lastStatus: number
   lastData: unknown
 }
@@ -34,7 +34,7 @@ function getGeocodingState(world: Record<string, unknown>): GeocodingState {
 Given('I am logged in as an admin', async ({ world }) => {
   // ADMIN_NSEC is pre-registered in global setup — use directly
   const state = getGeocodingState(world)
-  state.volunteerNsec = undefined  // undefined means use admin (ADMIN_NSEC)
+  state.volunteerDeviceKey = undefined  // undefined means use admin (ADMIN_NSEC)
   setState(world, GEOCODING_KEY, state)
 })
 
@@ -43,7 +43,7 @@ Given('I am logged in as a volunteer', async ({ request, world }) => {
     name: uniqueName('geo-vol'),
   })
   const state = getGeocodingState(world)
-  state.volunteerNsec = vol.nsec
+  state.volunteerDeviceKey = vol.deviceKey
   setState(world, GEOCODING_KEY, state)
 })
 
@@ -68,7 +68,7 @@ Given('geocoding is not configured', async ({ request }) => {
 // ── When steps ─────────────────────────────────────────────────────
 
 When('I configure the geocoding provider to {string}', async ({ request, world }, provider: string) => {
-  const nsec = getGeocodingState(world).volunteerNsec ?? ADMIN_NSEC
+  const nsec = getGeocodingState(world).volunteerDeviceKey ?? ADMIN_NSEC
   const { status, data } = await apiPut(request, '/settings/geocoding', {
     provider,
     apiKey: 'test-api-key-123',
@@ -82,7 +82,7 @@ When('I configure the geocoding provider to {string}', async ({ request, world }
 })
 
 When('I GET the geocoding settings', async ({ request, world }) => {
-  const nsec = getGeocodingState(world).volunteerNsec ?? ADMIN_NSEC
+  const nsec = getGeocodingState(world).volunteerDeviceKey ?? ADMIN_NSEC
   const { status, data } = await apiGet(request, '/settings/geocoding', nsec)
   const state = getGeocodingState(world)
   state.lastStatus = status
@@ -91,7 +91,7 @@ When('I GET the geocoding settings', async ({ request, world }) => {
 })
 
 When('I POST geocoding autocomplete with query {string}', async ({ request, world }, query: string) => {
-  const nsec = getGeocodingState(world).volunteerNsec ?? ADMIN_NSEC
+  const nsec = getGeocodingState(world).volunteerDeviceKey ?? ADMIN_NSEC
   const { status, data } = await apiPost(request, '/geocoding/autocomplete', { query, limit: 5 }, nsec)
   const state = getGeocodingState(world)
   state.lastStatus = status

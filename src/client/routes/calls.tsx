@@ -33,7 +33,7 @@ export const Route = createFileRoute('/calls')({
 
 function CallHistoryPage() {
   const { t } = useTranslation()
-  const { isAdmin, hasNsec, publicKey } = useAuth()
+  const { isAdmin, hasDeviceKey, publicKey } = useAuth()
   const { toast } = useToast()
   const navigate = useNavigate({ from: '/calls' })
   const { page, q, dateFrom, dateTo } = Route.useSearch()
@@ -68,7 +68,7 @@ function CallHistoryPage() {
   // Decrypt encrypted call records client-side (Epic 77)
   // Uses functional state update to avoid stale closure over calls
   useEffect(() => {
-    if (!hasNsec || !publicKey || calls.length === 0) return
+    if (!hasDeviceKey || !publicKey || calls.length === 0) return
     if (!keyManager.isUnlocked()) return
     // Only run if there are undecrypted records
     const hasUndecrypted = calls.some(c => c.answeredBy === undefined && c.encryptedContent && c.adminEnvelopes?.length)
@@ -86,7 +86,7 @@ function CallHistoryPage() {
       if (!cancelled) setCalls(decrypted)
     })()
     return () => { cancelled = true }
-  }, [calls, hasNsec, publicKey])
+  }, [calls, hasDeviceKey, publicKey])
 
   useEffect(() => {
     listUsers().then(r => setUsers(r.users)).catch(() => toast(t('common.error'), 'error'))

@@ -181,7 +181,7 @@ class DeviceLinkViewModel @Inject constructor(
             try {
                 // In production, we would:
                 // 1. Send SAS confirmation to the provisioning room
-                // 2. Wait for the encrypted nsec from the desktop
+                // 2. Wait for the encrypted device key from the desktop
                 // 3. Decrypt with shared secret
                 // 4. Import into CryptoService
 

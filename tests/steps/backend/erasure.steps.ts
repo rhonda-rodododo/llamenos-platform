@@ -15,9 +15,9 @@ import {
 // ── State ──────────────────────────────────────────────────────────
 
 interface ErasureTestState {
-  volunteer?: { seedHex: string; pubkey: string; nsec: string }
-  admin?: { seedHex: string; pubkey: string; nsec: string }
-  targetUser?: { seedHex: string; pubkey: string; nsec: string }
+  volunteer?: { seedHex: string; pubkey: string; deviceKey: string }
+  admin?: { seedHex: string; pubkey: string; deviceKey: string }
+  targetUser?: { seedHex: string; pubkey: string; deviceKey: string }
 }
 
 const STATE_KEY = 'erasure_test'
@@ -40,7 +40,7 @@ Given('a volunteer user', async ({ request, world }) => {
 Given('a registered volunteer user with a pending erasure request', async ({ request, world }) => {
   const s = getS(world)
   s.volunteer = await createUserViaApi(request)
-  const res = await apiPost(request, '/erasure/me', { justification: 'test' }, s.volunteer.nsec)
+  const res = await apiPost(request, '/erasure/me', { justification: 'test' }, s.volunteer.deviceKey)
   expect(res.status).toBe(200)
 })
 
@@ -57,7 +57,7 @@ Given('an admin user', async ({ request, world }) => {
 Given('{int} pending erasure requests exist', async ({ request }, count: number) => {
   for (let i = 0; i < count; i++) {
     const user = await createUserViaApi(request)
-    await apiPost(request, '/erasure/me', { justification: `test-${i}` }, user.nsec)
+    await apiPost(request, '/erasure/me', { justification: `test-${i}` }, user.deviceKey)
   }
 })
 
@@ -76,35 +76,35 @@ Given('a target volunteer user with a known device pubkey', async ({ request, wo
 When('the volunteer POSTs to {string} with a justification', async ({ request, world }, path: string) => {
   const s = getS(world)
   expect(s.volunteer).toBeDefined()
-  const res = await apiPost(request, path, { justification: 'I want my data removed' }, s.volunteer!.nsec)
+  const res = await apiPost(request, path, { justification: 'I want my data removed' }, s.volunteer!.deviceKey)
   setLastResponse(world, res)
 })
 
 When('the volunteer POSTs to {string} again', async ({ request, world }, path: string) => {
   const s = getS(world)
   expect(s.volunteer).toBeDefined()
-  const res = await apiPost(request, path, { justification: 'duplicate' }, s.volunteer!.nsec)
+  const res = await apiPost(request, path, { justification: 'duplicate' }, s.volunteer!.deviceKey)
   setLastResponse(world, res)
 })
 
 When('the volunteer DELETEs {string}', async ({ request, world }, path: string) => {
   const s = getS(world)
   expect(s.volunteer).toBeDefined()
-  const res = await apiDelete(request, path, s.volunteer!.nsec)
+  const res = await apiDelete(request, path, s.volunteer!.deviceKey)
   setLastResponse(world, res)
 })
 
 When('the volunteer GETs {string}', async ({ request, world }, path: string) => {
   const s = getS(world)
   expect(s.volunteer).toBeDefined()
-  const res = await apiGet(request, path, s.volunteer!.nsec)
+  const res = await apiGet(request, path, s.volunteer!.deviceKey)
   setLastResponse(world, res)
 })
 
 When('the admin GETs {string}', async ({ request, world }, path: string) => {
   const s = getS(world)
   expect(s.admin).toBeDefined()
-  const res = await apiGet(request, path, s.admin!.nsec)
+  const res = await apiGet(request, path, s.admin!.deviceKey)
   setLastResponse(world, res)
 })
 
@@ -113,7 +113,7 @@ When('the admin POSTs to {string} with a justification', async ({ request, world
   expect(s.admin).toBeDefined()
   expect(s.targetUser).toBeDefined()
   const path = pathTemplate.replace(':userId', s.targetUser!.pubkey)
-  const res = await apiPost(request, path, { justification: 'Admin-ordered erasure' }, s.admin!.nsec)
+  const res = await apiPost(request, path, { justification: 'Admin-ordered erasure' }, s.admin!.deviceKey)
   setLastResponse(world, res)
 })
 
@@ -124,7 +124,7 @@ When('the admin POSTs to {string}', async ({ request, world }, pathTemplate: str
   const path = pathTemplate
     .replace(':userId', s.targetUser!.pubkey)
     .replace(':devicePubkey', 'a'.repeat(64))
-  const res = await apiPost(request, path, {}, s.admin!.nsec)
+  const res = await apiPost(request, path, {}, s.admin!.deviceKey)
   setLastResponse(world, res)
 })
 

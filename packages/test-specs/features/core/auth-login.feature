@@ -87,48 +87,48 @@ Feature: Authentication & Login
     Given the app is freshly installed
     And no identity exists on the device
     When the app launches
-    Then I should see the nsec import input field
+    Then I should see the device key import input field
     And I should see a "Log in" button
 
   @desktop @ios @android @smoke
-  Scenario: Nsec input is password-masked
+  Scenario: Device key input is password-masked
     Given the app is freshly installed
     And no identity exists on the device
-    When I enter "nsec1test" in the nsec field
-    Then the nsec field should be a password field
+    When I enter "test-key-input" in the device key field
+    Then the device key field should be a password field
 
   @desktop @ios @android @regression
-  Scenario: Login with empty nsec shows error
+  Scenario: Login with empty device key shows error
     Given the app is freshly installed
     And no identity exists on the device
-    When I tap "Log in" without entering an nsec
+    When I tap "Log in" without entering a device key
     Then I should see an error message
     And I should remain on the login screen
 
   @desktop @ios @android @regression
-  Scenario: Login with invalid nsec shows error
+  Scenario: Login with invalid device key shows error
     Given the app is freshly installed
     And no identity exists on the device
-    When I enter "not-a-valid-nsec" in the nsec field
+    When I enter "not-a-valid-key" in the device key field
     And I tap "Log in"
     Then I should see an error message
     And I should remain on the login screen
 
   @desktop @ios @android @regression
-  Scenario: Login with valid nsec navigates away from login
+  Scenario: Login with valid device key navigates away from login
     Given the app is freshly installed
     And no identity exists on the device
-    When I enter a valid 63-character nsec
+    When I enter a valid 63-character device key
     And I tap "Log in"
     Then I should be redirected away from login
 
   # ── Desktop/Mobile: Onboarding ────────────────────────────────────
 
   @desktop @ios @android @smoke
-  Scenario: Valid nsec login navigates to dashboard
+  Scenario: Valid device key login navigates to dashboard
     Given the app is freshly installed
     And I am on the login screen
-    When I enter a valid 63-character nsec
+    When I enter a valid 63-character device key
     And I tap "Log in"
     Then I should be redirected away from login
 
@@ -136,8 +136,8 @@ Feature: Authentication & Login
   Scenario: Nsec field shows password type
     Given the app is freshly installed
     And I am on the login screen
-    When I enter "nsec1test" in the nsec field
-    Then the nsec field should be a password field
+    When I enter "nsec1test" in the device key field
+    Then the device key field should be a password field
 
   @desktop @ios @android @smoke
   Scenario: Link device button is visible
@@ -233,7 +233,7 @@ Feature: Authentication & Login
     Given I have a stored identity with PIN "12345678"
     And the app is restarted
     When I tap "Recovery options"
-    Then I should see the nsec import input field
+    Then I should see the device key import input field
 
   # ── Desktop/Mobile: PIN Lockout ───────────────────────────────────
 
@@ -323,20 +323,20 @@ Feature: Authentication & Login
   # ── Desktop/Mobile: Key Import ────────────────────────────────────
 
   @desktop @ios @android @regression
-  Scenario: Import valid nsec logs in successfully
+  Scenario: Import valid device key logs in successfully
     Given the app is freshly installed
     And I am on the login screen
-    When I enter a valid 63-character nsec
+    When I enter a valid 63-character device key
     And I tap "Log in"
     Then I should be redirected away from login
 
   @desktop @ios @android @regression
-  Scenario: Error clears when typing in nsec field
+  Scenario: Error clears when typing in device key field
     Given the app is freshly installed
     And I am on the login screen
     When I tap "Log in"
     And I should see an error message
-    And I start typing in the nsec field
+    And I start typing in the device key field
     Then the error should disappear
 
   # ── Desktop/Mobile: Invite Onboarding ─────────────────────────────
@@ -402,7 +402,7 @@ Feature: Authentication & Login
     And I fill in name with "Valid Phone Test"
     And I fill in a valid phone number
     And I click "Save"
-    Then I should see the volunteer nsec
+    Then I should see the volunteer device key
 
   @desktop @ios @android
   Scenario: Ban form rejects invalid phone
@@ -415,20 +415,20 @@ Feature: Authentication & Login
     Then I should see "invalid phone"
 
   @desktop @ios @android
-  Scenario: Login rejects nsec without nsec prefix
+  Scenario: Login rejects key without valid prefix
     Given I am logged in as an admin
     When I log out
     And I click "Recovery Options"
-    And I enter "npub1abc123" in the nsec field
+    And I enter "npub1abc123" in the device key field
     And I click "Log In"
     Then I should see "invalid"
 
   @desktop @ios @android
-  Scenario: Login rejects very short nsec
+  Scenario: Login rejects very short device key
     Given I am logged in as an admin
     When I log out
     And I click "Recovery Options"
-    And I enter "nsec1short" in the nsec field
+    And I enter "nsec1short" in the device key field
     And I click "Log In"
     Then I should see "invalid"
 

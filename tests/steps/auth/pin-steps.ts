@@ -19,7 +19,7 @@ Given('I have created a new identity', async ({ page }) => {
   await page.waitForURL(/\/login/, { timeout: Timeouts.ELEMENT })
 })
 
-Given('I have confirmed my nsec backup', async ({ page }) => {
+Given('I have confirmed my key backup', async ({ page }) => {
   // Click the backup confirmation button
   const backupBtn = page.getByRole('button', { name: /backed up|confirm|continue/i })
   const backupVisible = await backupBtn.isVisible({ timeout: 5000 }).catch(() => false)

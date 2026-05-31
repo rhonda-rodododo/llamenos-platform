@@ -20,8 +20,8 @@ Feature: Admin Flow
   Scenario: Volunteer CRUD — add and delete volunteer
     When I navigate to the "Volunteers" page
     And I add a new volunteer with a unique name and phone
-    Then I should see the generated nsec
-    When I close the nsec card
+    Then I should see the generated device key
+    When I close the device key card
     Then the volunteer should appear in the list
     When I delete the volunteer
     Then the volunteer should be removed from the list

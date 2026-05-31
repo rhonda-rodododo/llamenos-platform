@@ -50,7 +50,7 @@ export const Route = createFileRoute('/cases')({
 
 function CasesPage() {
   const { t } = useTranslation()
-  const { hasNsec, publicKey, isAdmin, hasPermission, adminDecryptionPubkey } = useAuth()
+  const { hasDeviceKey, publicKey, isAdmin, hasPermission, adminDecryptionPubkey } = useAuth()
   const { toast } = useToast()
 
   // --- Data state ---
@@ -475,7 +475,7 @@ function CasesPage() {
                       entityType={entityTypeMap.get(record.entityTypeId)}
                       isSelected={selectedId === record.id}
                       onSelect={setSelectedId}
-                      hasNsec={hasNsec}
+                      hasDeviceKey={hasDeviceKey}
                     />
                   ))}
                 </div>
@@ -524,7 +524,7 @@ function CasesPage() {
                 entityType={selectedEntityType}
                 hasPermission={hasPermission}
                 publicKey={publicKey}
-                hasNsec={hasNsec}
+                hasDeviceKey={hasDeviceKey}
                 adminDecryptionPubkey={adminDecryptionPubkey}
                 onStatusChange={handleStatusChange}
                 onAssignToMe={handleAssignToMe}
@@ -586,13 +586,13 @@ function RecordCard({
   entityType,
   isSelected,
   onSelect,
-  hasNsec,
+  hasDeviceKey,
 }: {
   record: CaseRecord
   entityType: EntityTypeDefinition | undefined
   isSelected: boolean
   onSelect: (id: string) => void
-  hasNsec: boolean
+  hasDeviceKey: boolean
 }) {
   const { t } = useTranslation()
   const [title, setTitle] = useState<string | null>(null)
@@ -600,7 +600,7 @@ function RecordCard({
   // Decrypt summary to extract title
   useEffect(() => {
     let cancelled = false
-    const canDecrypt = hasNsec && keyManager.isUnlocked()
+    const canDecrypt = hasDeviceKey && keyManager.isUnlocked()
     if (!canDecrypt || !record.encryptedSummary || !record.summaryEnvelopes?.length) return
     decryptMessage(record.encryptedSummary, record.summaryEnvelopes).then(plaintext => {
       if (cancelled || !plaintext) return
@@ -610,7 +610,7 @@ function RecordCard({
       } catch { /* ignore parse errors */ }
     })
     return () => { cancelled = true }
-  }, [record.id, record.encryptedSummary, hasNsec])
+  }, [record.id, record.encryptedSummary, hasDeviceKey])
 
   const statusDef = entityType?.statuses.find(s => s.value === record.statusHash)
   const statusColor = statusDef?.color ?? '#6b7280'
@@ -709,7 +709,7 @@ function RecordDetail({
   entityType,
   hasPermission,
   publicKey,
-  hasNsec,
+  hasDeviceKey,
   adminDecryptionPubkey,
   onStatusChange,
   onAssignToMe,
@@ -722,7 +722,7 @@ function RecordDetail({
   entityType: EntityTypeDefinition
   hasPermission: (p: string) => boolean
   publicKey: string | null
-  hasNsec: boolean
+  hasDeviceKey: boolean
   adminDecryptionPubkey: string
   onStatusChange: (id: string, newStatus: string) => void
   onAssignToMe: (id: string) => void
@@ -741,7 +741,7 @@ function RecordDetail({
 
   useEffect(() => {
     let cancelled = false
-    const canDecrypt = hasNsec && keyManager.isUnlocked()
+    const canDecrypt = hasDeviceKey && keyManager.isUnlocked()
     if (!canDecrypt || !record.encryptedSummary || !record.summaryEnvelopes?.length) {
       setDecryptedSummary(null)
       return
@@ -755,7 +755,7 @@ function RecordDetail({
       }
     })
     return () => { cancelled = true }
-  }, [record.id, record.encryptedSummary, hasNsec])
+  }, [record.id, record.encryptedSummary, hasDeviceKey])
 
   // Derive severity info
   const severityDef = record.severityHash
@@ -941,7 +941,7 @@ function RecordDetail({
             entityType={entityType}
             hasPermission={hasPermission}
             isAssigned={isAssigned}
-            hasNsec={hasNsec}
+            hasDeviceKey={hasDeviceKey}
             publicKey={publicKey}
             adminDecryptionPubkey={adminDecryptionPubkey}
           />
@@ -983,7 +983,7 @@ function DetailsTab({
   entityType,
   hasPermission,
   isAssigned,
-  hasNsec,
+  hasDeviceKey,
   publicKey,
   adminDecryptionPubkey,
 }: {
@@ -991,7 +991,7 @@ function DetailsTab({
   entityType: EntityTypeDefinition
   hasPermission: (p: string) => boolean
   isAssigned: boolean
-  hasNsec: boolean
+  hasDeviceKey: boolean
   publicKey: string | null
   adminDecryptionPubkey: string
 }) {
@@ -1005,7 +1005,7 @@ function DetailsTab({
   // Decrypt encrypted fields on load
   useEffect(() => {
     let cancelled = false
-    const canDecrypt = hasNsec && keyManager.isUnlocked()
+    const canDecrypt = hasDeviceKey && keyManager.isUnlocked()
     if (!canDecrypt || !record.encryptedFields || !record.fieldEnvelopes?.length) {
       setFieldValues({})
       return
@@ -1024,7 +1024,7 @@ function DetailsTab({
       if (!cancelled) setDecrypting(false)
     })
     return () => { cancelled = true }
-  }, [record.id, record.encryptedFields, hasNsec])
+  }, [record.id, record.encryptedFields, hasDeviceKey])
 
   // Cleanup save timeout on unmount
   useEffect(() => {
@@ -1040,7 +1040,7 @@ function DetailsTab({
     setFieldValues(newValues)
     setSaveStatus('idle')
 
-    if (!canEdit || !publicKey || !hasNsec) return
+    if (!canEdit || !publicKey || !hasDeviceKey) return
 
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
     saveTimeoutRef.current = setTimeout(async () => {
@@ -1063,7 +1063,7 @@ function DetailsTab({
         toast(t('cases.saveError', { defaultValue: 'Failed to save field changes' }), 'error')
       }
     }, 800)
-  }, [publicKey, hasNsec, adminDecryptionPubkey, canEdit, record.id, toast, t])
+  }, [publicKey, hasDeviceKey, adminDecryptionPubkey, canEdit, record.id, toast, t])
 
   if (entityType.fields.length === 0) {
     return (

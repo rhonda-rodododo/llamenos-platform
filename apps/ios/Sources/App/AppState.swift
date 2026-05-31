@@ -8,7 +8,7 @@ enum AuthStatus: Equatable {
     case unauthenticated
     /// Identity exists but is locked — show PIN unlock.
     case locked
-    /// Identity is loaded and nsec is in memory — show dashboard.
+    /// Identity is loaded and device key is in memory — show dashboard.
     case unlocked
 }
 
@@ -321,7 +321,7 @@ final class AppState {
 
     // MARK: - Lock / Unlock
 
-    /// Lock the app: clear nsec from memory, set locked state.
+    /// Lock the app: clear device key from memory, set locked state.
     func lockApp() {
         authService.lock()
         isLocked = true

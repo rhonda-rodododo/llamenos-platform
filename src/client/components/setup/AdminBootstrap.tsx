@@ -45,7 +45,7 @@ export function AdminBootstrap({ onComplete }: AdminBootstrapProps) {
   const [pinStep, setPinStep] = useState<'create' | 'confirm'>('create')
   const [pinError, setPinError] = useState('')
 
-  // Keypair result (no nsec in JS state — lives in Rust/WASM CryptoState)
+  // Keypair result (no device key in JS state — lives in Rust/WASM CryptoState)
   const [genResult, setGenResult] = useState<GenerateAndLoadResult | null>(null)
   const [confirmedPin, setConfirmedPin] = useState('')
 
@@ -127,12 +127,12 @@ export function AdminBootstrap({ onComplete }: AdminBootstrapProps) {
     setStep('generating')
     setError('')
     try {
-      // Generate keypair atomically — nsec goes directly into Rust/WASM CryptoState, never into JS
+      // Generate keypair atomically — device key goes directly into Rust/WASM CryptoState, never into JS
       const result = await generateKeypairAndLoad(pin)
       setGenResult(result)
       setConfirmedPin(pin)
 
-      // Sign bootstrap request using CryptoState (nsec stays in Rust/WASM)
+      // Sign bootstrap request using CryptoState (device key stays in Rust/WASM)
       const tokenJson = await createAuthToken(Date.now(), 'POST', '/api/auth/bootstrap')
       const parsed = JSON.parse(tokenJson) as { timestamp: number; token: string }
 
@@ -155,7 +155,7 @@ export function AdminBootstrap({ onComplete }: AdminBootstrapProps) {
 
   async function downloadBackup() {
     if (!genResult) return
-    // Backup created entirely in Rust — nsec never enters JS
+    // Backup created entirely in Rust — device key never enters JS
     const backupJson = await generateBackupFromState(genResult.publicKey, confirmedPin, recoveryKeyStr)
     const backup = JSON.parse(backupJson) as Parameters<typeof downloadBackupFile>[0]
     downloadBackupFile(backup)

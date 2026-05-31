@@ -360,7 +360,7 @@ export async function createUserViaApi(
     throw new Error(`Failed to create user: ${status}`)
   }
 
-  return { pubkey, seedHex, nsec: seedHex, name, phone }
+  return { pubkey, seedHex, deviceKey: seedHex, name, phone }
 }
 
 /** @deprecated Use createUserViaApi instead */

@@ -4,22 +4,22 @@ Feature: Login Page Restore
   I want the login page to handle both fresh installs and returning users
   So that I can access the app whether I'm new or returning
 
-  Scenario: Fresh install shows nsec input and Log in button
+  Scenario: Fresh install shows device key input and Log in button
     Given I am on the login screen
-    Then I should see the nsec input
+    Then I should see the device key input
     And I should see the "Log in" button
 
   Scenario: Fresh install shows backup file upload area
     Given I am on the login screen
     Then I should see the backup file upload area
 
-  Scenario: Invalid nsec shows error
+  Scenario: Invalid device key shows error
     Given I am on the login screen
-    When I enter "not-a-valid-nsec" in the nsec field
+    When I enter "not-a-valid-key" in the device key field
     And I click "Log in"
     Then I should see "invalid"
 
-  Scenario: Empty nsec shows error
+  Scenario: Empty device key shows error
     Given I am on the login screen
     When I click "Log in"
     Then I should see "invalid"
@@ -39,7 +39,7 @@ Feature: Login Page Restore
     When I visit the login page
     Then I should see the PIN digit inputs
     When I click "Recovery Options"
-    Then I should see the nsec input
+    Then I should see the device key input
     And I should see the "Log in" button
 
   Scenario: Language selector available on login

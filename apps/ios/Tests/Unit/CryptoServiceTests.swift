@@ -3,7 +3,7 @@ import XCTest
 
 /// Tests for `CryptoService` against the V3 device-key crypto API
 /// (Ed25519 signing + X25519 encryption, HPKE envelope encryption,
-/// PIN-encrypted on-device storage). The pre-V3 nsec/Schnorr surface
+/// PIN-encrypted on-device storage). The pre-V3 signing-seed/Schnorr surface
 /// no longer exists.
 final class CryptoServiceTests: XCTestCase {
 

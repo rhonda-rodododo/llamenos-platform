@@ -101,7 +101,7 @@ struct HelpView: View {
             )
             guideItem(
                 title: NSLocalizedString("help_vol_encryption_title", comment: "Encryption basics"),
-                detail: NSLocalizedString("help_vol_encryption_detail", comment: "Your secret key (nsec) never leaves your device. Notes and messages are encrypted locally before being sent to the server. Even if the server is compromised, your data remains private.")
+                detail: NSLocalizedString("help_vol_encryption_detail", comment: "Your device signing key never leaves your device. Notes and messages are encrypted locally before being sent to the server. Even if the server is compromised, your data remains private.")
             )
             guideItem(
                 title: NSLocalizedString("help_vol_safety_title", comment: "Staying safe"),
@@ -164,8 +164,8 @@ struct HelpView: View {
                 answer: NSLocalizedString("help_faq_gs_a1", comment: "Ask your admin for an invite code. Enter the hub URL, create or import your identity, and set a PIN. You'll be ready to receive calls once you clock in for your shift.")
             )
             faqItem(
-                question: NSLocalizedString("help_faq_gs_q2", comment: "What is an nsec?"),
-                answer: NSLocalizedString("help_faq_gs_a2", comment: "Your nsec is your secret key — like a password that proves your identity. It's generated on your device and never sent to the server. Back it up securely; if you lose it, you'll need a new identity.")
+                question: NSLocalizedString("help_faq_gs_q2", comment: "What is a device key?"),
+                answer: NSLocalizedString("help_faq_gs_a2", comment: "Your device key is your signing key — like a password that proves your identity. It's generated on your device and never sent to the server. Use Device Link to securely authorize additional devices.")
             )
             faqItem(
                 question: NSLocalizedString("help_faq_gs_q3", comment: "Can I use multiple devices?"),

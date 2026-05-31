@@ -46,7 +46,7 @@ final class AuthFlowUITests: XCTestCase {
         let createButton = find("create-identity")
         XCTAssertTrue(createButton.waitForExistence(timeout: 3), "Create Identity button should exist")
 
-        // Link Device button (v3: device linking via QR/ECDH replaces nsec import)
+        // Link Device button (v3: device linking via QR/ECDH replaces device key import)
         let linkButton = find("link-device")
         XCTAssertTrue(linkButton.waitForExistence(timeout: 3), "Link Device button should exist")
     }
@@ -55,7 +55,7 @@ final class AuthFlowUITests: XCTestCase {
 
     func testOnboardingFlowCreateIdentity() {
         // V3 device key model: tapping "Create New Identity" validates the hub URL
-        // and navigates directly to the PIN set screen — no nsec display or backup step.
+        // and navigates directly to the PIN set screen — no device key display or backup step.
         let hubURLInput = find("hub-url-input")
         XCTAssertTrue(hubURLInput.waitForExistence(timeout: 5))
         hubURLInput.tap()
@@ -70,7 +70,7 @@ final class AuthFlowUITests: XCTestCase {
         }
         createButton.tap()
 
-        // PIN pad should appear directly (v3 flow: no onboarding/nsec step)
+        // PIN pad should appear directly (v3 flow: no onboarding/device key step)
         let pinPad = find("pin-pad")
         XCTAssertTrue(
             pinPad.waitForExistence(timeout: 10),
@@ -126,7 +126,7 @@ final class AuthFlowUITests: XCTestCase {
     // MARK: - Import Flow
 
     func testDeviceLinkFlow() {
-        // V3: nsec import replaced by device linking (QR + ephemeral ECDH).
+        // V3: device key import replaced by device linking (QR + ephemeral ECDH).
         // Tap "Link from Another Device" and verify the device link screen appears.
         let hubInput = find("hub-url-input")
         XCTAssertTrue(hubInput.waitForExistence(timeout: 20), "Hub URL input should exist")

@@ -18,8 +18,8 @@ import { ed25519 } from '@noble/curves/ed25519.js'
 // ── State ──────────────────────��────────────────────────────────────
 
 interface SigchainTestState {
-  user?: { nsec: string; pubkey: string }
-  secondUser?: { nsec: string; pubkey: string }
+  user?: { deviceKey: string; pubkey: string }
+  secondUser?: { deviceKey: string; pubkey: string }
   genesisHash?: string
   lastHash?: string
   lastSeqNo?: number
@@ -44,7 +44,7 @@ function computeLinkHash(prevHash: string, linkType: string, seqNo: number, payl
 
 async function appendLink(
   request: import('@playwright/test').APIRequestContext,
-  nsec: string,
+  deviceKey: string,
   targetPubkey: string,
   opts: { seqNo: number; linkType: string; prevHash: string; payload?: Record<string, unknown>; signature?: string; hash?: string },
 ) {
@@ -61,7 +61,7 @@ async function appendLink(
 
 Given('a registered user with a known keypair', async ({ request, world }) => {
   const user = await createUserViaApi(request, { name: `Sigchain User ${Date.now()}` })
-  const userData = { nsec: user.nsec, pubkey: user.pubkey }
+  const userData = { deviceKey: user.deviceKey, pubkey: user.pubkey }
   getS(world).user = userData
   // Also write to shared state so PUK/WebAuthn step namespaces can access it
   getSharedState(world).sharedUser = userData
@@ -72,7 +72,7 @@ Given('the user has a genesis sigchain link', async ({ request, world }) => {
   expect(s.user).toBeDefined()
   const payload = { devicePubkey: bytesToHex(crypto.getRandomValues(new Uint8Array(32))) }
   const hash = computeLinkHash('', 'genesis', 0, payload)
-  const res = await appendLink(request, s.user!.nsec, s.user!.pubkey, { seqNo: 0, linkType: 'genesis', prevHash: '', payload, hash })
+  const res = await appendLink(request, s.user!.deviceKey, s.user!.pubkey, { seqNo: 0, linkType: 'genesis', prevHash: '', payload, hash })
   expect(res.status).toBe(201)
   s.genesisHash = hash
   s.lastHash = hash
@@ -81,7 +81,7 @@ Given('the user has a genesis sigchain link', async ({ request, world }) => {
 
 Given('a second registered user', async ({ request, world }) => {
   const user = await createUserViaApi(request, { name: `Second User ${Date.now()}` })
-  getS(world).secondUser = { nsec: user.nsec, pubkey: user.pubkey }
+  getS(world).secondUser = { deviceKey: user.deviceKey, pubkey: user.pubkey }
 })
 
 // ── When ──────────────��───────────────────────────────────���─────────
@@ -91,7 +91,7 @@ When('the user appends a genesis sigchain link', async ({ request, world }) => {
   expect(s.user).toBeDefined()
   const payload = { devicePubkey: bytesToHex(crypto.getRandomValues(new Uint8Array(32))) }
   const hash = computeLinkHash('', 'genesis', 0, payload)
-  const res = await appendLink(request, s.user!.nsec, s.user!.pubkey, { seqNo: 0, linkType: 'genesis', prevHash: '', payload, hash })
+  const res = await appendLink(request, s.user!.deviceKey, s.user!.pubkey, { seqNo: 0, linkType: 'genesis', prevHash: '', payload, hash })
   setLastResponse(world, res)
   if (res.status === 201) { s.genesisHash = hash; s.lastHash = hash; s.lastSeqNo = 0 }
 })
@@ -103,7 +103,7 @@ When('the user appends a {string} link with valid prevHash', async ({ request, w
   const newSeqNo = (s.lastSeqNo ?? 0) + 1
   const payload = { devicePubkey: bytesToHex(crypto.getRandomValues(new Uint8Array(32))) }
   const hash = computeLinkHash(s.lastHash!, linkType, newSeqNo, payload)
-  const res = await appendLink(request, s.user!.nsec, s.user!.pubkey, { seqNo: newSeqNo, linkType, prevHash: s.lastHash!, payload, hash })
+  const res = await appendLink(request, s.user!.deviceKey, s.user!.pubkey, { seqNo: newSeqNo, linkType, prevHash: s.lastHash!, payload, hash })
   setLastResponse(world, res)
   if (res.status === 201) { s.lastHash = hash; s.lastSeqNo = newSeqNo }
 })
@@ -119,7 +119,7 @@ When('the user appends a link with an invalid Ed25519 signature', async ({ reque
     seqNo: newSeqNo, linkType: 'device_add', payload,
     signature: 'badbad', // doesn't match 128-char hex regex
     prevHash: s.lastHash!, hash,
-  }, s.user!.nsec)
+  }, s.user!.deviceKey)
   setLastResponse(world, res)
 })
 
@@ -130,7 +130,7 @@ When('the user appends a link with wrong prevHash', async ({ request, world }) =
   const wrongPrevHash = bytesToHex(crypto.getRandomValues(new Uint8Array(32)))
   const payload = { devicePubkey: bytesToHex(crypto.getRandomValues(new Uint8Array(32))) }
   const hash = computeLinkHash(wrongPrevHash, 'device_add', newSeqNo, payload)
-  const res = await appendLink(request, s.user!.nsec, s.user!.pubkey, { seqNo: newSeqNo, linkType: 'device_add', prevHash: wrongPrevHash, payload, hash })
+  const res = await appendLink(request, s.user!.deviceKey, s.user!.pubkey, { seqNo: newSeqNo, linkType: 'device_add', prevHash: wrongPrevHash, payload, hash })
   setLastResponse(world, res)
 })
 
@@ -139,7 +139,7 @@ When('the user appends a link with duplicate seqNo {int}', async ({ request, wor
   expect(s.user).toBeDefined()
   const payload = { devicePubkey: bytesToHex(crypto.getRandomValues(new Uint8Array(32))) }
   const hash = computeLinkHash('', 'genesis', seqNo, payload)
-  const res = await appendLink(request, s.user!.nsec, s.user!.pubkey, { seqNo, linkType: 'genesis', prevHash: '', payload, hash })
+  const res = await appendLink(request, s.user!.deviceKey, s.user!.pubkey, { seqNo, linkType: 'genesis', prevHash: '', payload, hash })
   setLastResponse(world, res)
 })
 
@@ -149,7 +149,7 @@ When('the second user tries to append to the first user\'s sigchain', async ({ r
   expect(s.secondUser).toBeDefined()
   const payload = { devicePubkey: bytesToHex(crypto.getRandomValues(new Uint8Array(32))) }
   const hash = computeLinkHash('', 'genesis', 0, payload)
-  const res = await appendLink(request, s.secondUser!.nsec, s.user!.pubkey, { seqNo: 0, linkType: 'genesis', prevHash: '', payload, hash })
+  const res = await appendLink(request, s.secondUser!.deviceKey, s.user!.pubkey, { seqNo: 0, linkType: 'genesis', prevHash: '', payload, hash })
   setLastResponse(world, res)
 })
 
@@ -163,7 +163,7 @@ When('the second user tries to read the first user\'s sigchain', async ({ reques
   const s = getS(world)
   expect(s.user).toBeDefined()
   expect(s.secondUser).toBeDefined()
-  setLastResponse(world, await apiGet(request, `/users/${s.user!.pubkey}/sigchain`, s.secondUser!.nsec))
+  setLastResponse(world, await apiGet(request, `/users/${s.user!.pubkey}/sigchain`, s.secondUser!.deviceKey))
 })
 
 // ── Then ─────────────��───────────────────────���──────────────────────
@@ -171,7 +171,7 @@ When('the second user tries to read the first user\'s sigchain', async ({ reques
 Then('the sigchain has {int} link(s)', async ({ request, world }, count: number) => {
   const s = getS(world)
   expect(s.user).toBeDefined()
-  const res = await apiGet<{ links: unknown[] }>(request, `/users/${s.user!.pubkey}/sigchain`, s.user!.nsec)
+  const res = await apiGet<{ links: unknown[] }>(request, `/users/${s.user!.pubkey}/sigchain`, s.user!.deviceKey)
   expect(res.status).toBe(200)
   expect(res.data.links).toHaveLength(count)
 })
@@ -179,6 +179,6 @@ Then('the sigchain has {int} link(s)', async ({ request, world }, count: number)
 Then('the first link has linkType {string}', async ({ request, world }, linkType: string) => {
   const s = getS(world)
   expect(s.user).toBeDefined()
-  const res = await apiGet<{ links: Array<{ linkType: string }> }>(request, `/users/${s.user!.pubkey}/sigchain`, s.user!.nsec)
+  const res = await apiGet<{ links: Array<{ linkType: string }> }>(request, `/users/${s.user!.pubkey}/sigchain`, s.user!.deviceKey)
   expect(res.data.links[0].linkType).toBe(linkType)
 })

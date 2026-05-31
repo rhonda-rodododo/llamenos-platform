@@ -90,6 +90,7 @@ data class AdminUiState(
     val volunteersError: String? = null,
     val volunteerSearchQuery: String = "",
     val showAddVolunteerDialog: Boolean = false,
+    val createdVolunteerDeviceKey: String? = null,
     val showDeleteVolunteerDialog: String? = null, // user ID to delete
 
     // Ban list
@@ -488,11 +489,15 @@ class AdminViewModel @Inject constructor(
     // ---- User CRUD ----
 
     fun showAddVolunteerDialog() {
-        _uiState.update { it.copy(showAddVolunteerDialog = true) }
+        _uiState.update { it.copy(showAddVolunteerDialog = true, createdVolunteerDeviceKey = null) }
     }
 
     fun dismissAddVolunteerDialog() {
         _uiState.update { it.copy(showAddVolunteerDialog = false) }
+    }
+
+    fun clearCreatedVolunteerDeviceKey() {
+        _uiState.update { it.copy(createdVolunteerDeviceKey = null) }
     }
 
     fun createVolunteer(name: String, phone: String, role: String = "role-volunteer") {
@@ -503,8 +508,7 @@ class AdminViewModel @Inject constructor(
                 val response = apiService.request<CreateUserResponse>(
                     "POST", "/api/users", request,
                 )
-                // Emit nsec as a one-shot event — never stored in persistent ViewModel state.
-                _nsecEvent.trySend(response.nsec)
+                _uiState.update { it.copy(createdVolunteerDeviceKey = response.deviceKey) }
                 loadVolunteers()
             } catch (e: Exception) {
                 _uiState.update {

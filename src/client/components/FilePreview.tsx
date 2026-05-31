@@ -20,7 +20,7 @@ function formatFileSize(bytes: number): string {
 
 export function FilePreview({ fileId }: FilePreviewProps) {
   const { t } = useTranslation()
-  const { hasNsec, publicKey } = useAuth()
+  const { hasDeviceKey, publicKey } = useAuth()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [blobUrl, setBlobUrl] = useState<string | null>(null)
@@ -31,7 +31,7 @@ export function FilePreview({ fileId }: FilePreviewProps) {
     let objectUrl: string | null = null
 
     async function loadAndDecrypt() {
-      if (!hasNsec || !keyManager.isUnlocked()) {
+      if (!hasDeviceKey || !keyManager.isUnlocked()) {
         if (mounted) setError(t('reports.noKeyAvailable', { defaultValue: 'Encryption key not available' }))
         if (mounted) setLoading(false)
         return
@@ -92,7 +92,7 @@ export function FilePreview({ fileId }: FilePreviewProps) {
       mounted = false
       if (objectUrl) URL.revokeObjectURL(objectUrl)
     }
-  }, [fileId, hasNsec, publicKey, t])
+  }, [fileId, hasDeviceKey, publicKey, t])
 
   if (loading) {
     return (

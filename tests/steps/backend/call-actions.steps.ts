@@ -10,7 +10,7 @@
 import { expect } from '@playwright/test'
 import { Given, When, Then, getState, setState } from './fixtures'
 import { getScenarioState } from './common.steps'
-import { getSharedState, setLastResponse } from './shared-state'
+import { setLastResponse } from './shared-state'
 import { apiPost, apiGet, listBansViaApi, listNotesViaApi, encryptForTest } from '../../api-helpers'
 import {
   simulateIncomingCall,
@@ -63,7 +63,7 @@ When(
       request,
       `/calls/${state.callId}/ban`,
       {},
-      state.volunteers[volIndex].nsec,
+      state.volunteers[volIndex].deviceKey,
     )
     state.lastApiResponse = res
     setLastResponse(world, res)
@@ -79,7 +79,7 @@ When(
       request,
       `/calls/${state.callId}/ban`,
       { reason },
-      state.volunteers[volIndex].nsec,
+      state.volunteers[volIndex].deviceKey,
     )
     state.lastApiResponse = res
     setLastResponse(world, res)
@@ -95,7 +95,7 @@ When(
       request,
       `/calls/${state.callId}/ban`,
       {},
-      state.volunteers[volIndex].nsec,
+      state.volunteers[volIndex].deviceKey,
     )
     state.lastApiResponse = res
     setLastResponse(world, res)
@@ -114,9 +114,9 @@ When(
       '/notes',
       {
         callId: state.callId,
-        encryptedContent: (await encryptForTest('bdd test note for active call', [state.volunteers[volIndex].nsec])).encryptedContent,
+        encryptedContent: (await encryptForTest('bdd test note for active call', [state.volunteers[volIndex].deviceKey])).encryptedContent,
       },
-      state.volunteers[volIndex].nsec,
+      state.volunteers[volIndex].deviceKey,
     )
     state.lastApiResponse = res
     setLastResponse(world, res)

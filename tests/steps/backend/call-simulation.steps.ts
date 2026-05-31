@@ -11,21 +11,17 @@ import { expect } from '@playwright/test'
 import { Given, When, Then, Before, getState, setState } from './fixtures'
 import { getScenarioState } from './common.steps'
 import {
-  apiGet,
   apiPatch,
   apiPut,
   createVolunteerViaApi,
   createShiftViaApi,
   listShiftsViaApi,
   deleteShiftViaApi,
-  uniquePhone,
   uniqueName,
 } from '../../api-helpers'
 import {
   simulateIncomingCall,
   simulateAnswerCall,
-  simulateEndCall,
-  simulateVoicemail,
   simulateIncomingMessage,
   uniqueCallerNumber,
 } from '../../simulation-helpers'
@@ -40,7 +36,7 @@ interface CallSimState {
   providerConfig?: Record<string, unknown>
   validationResult?: { valid: boolean; error?: string }
   adapterInstance?: string
-  shiftVolunteers: Array<{ pubkey: string; nsec: string; busy?: boolean }>
+  shiftVolunteers: Array<{ pubkey: string; deviceKey: string; busy?: boolean }>
   ringGroup: string[]
   fallbackConfigured: boolean
 }
@@ -144,7 +140,7 @@ Then('it should return a Twilio adapter instance', async ({ world }) => {
 })
 
 When('the factory is asked for an unknown provider', async ({ request, world }) => {
-  const res = await apiPatch(request, '/settings/telephony-provider', {
+  const _res = await apiPatch(request, '/settings/telephony-provider', {
     type: 'nonexistent-provider',
   })
   getCallSimState(world).validationResult = { valid: false, error: 'unknown provider' }
@@ -155,7 +151,7 @@ Then('it should return a configuration error', async ({ world }) => {
   expect(getCallSimState(world).validationResult!.valid).toBe(false)
 })
 
-Then('each provider should have a display label and icon identifier', async ({ world }) => {
+Then('each provider should have a display label and icon identifier', async ({ world: _world }) => {
   // Provider metadata is baked into the adapter implementations
   // This is a design constraint verified by code review
   expect(true).toBeTruthy()
@@ -170,7 +166,7 @@ Given('a shift is currently active with {int} volunteers', async ({ request, wor
   getCallSimState(world).shiftVolunteers = []
   for (let i = 0; i < count; i++) {
     const vol = await createVolunteerViaApi(request, { name: uniqueName(`Shift Vol ${i}`) })
-    getCallSimState(world).shiftVolunteers.push({ pubkey: vol.pubkey, nsec: vol.nsec })
+    getCallSimState(world).shiftVolunteers.push({ pubkey: vol.pubkey, deviceKey: vol.deviceKey })
     getScenarioState(world).volunteers.push({ ...vol, onShift: true })
   }
   const shift = await createShiftViaApi(request, {
@@ -189,7 +185,7 @@ Given('a shift with {int} volunteers and {int} is on a call', async ({ request, 
   getCallSimState(world).shiftVolunteers = []
   for (let i = 0; i < total; i++) {
     const vol = await createVolunteerViaApi(request, { name: uniqueName(`Busy Shift Vol ${i}`) })
-    getCallSimState(world).shiftVolunteers.push({ pubkey: vol.pubkey, nsec: vol.nsec, busy: i < busyCount })
+    getCallSimState(world).shiftVolunteers.push({ pubkey: vol.pubkey, deviceKey: vol.deviceKey, busy: i < busyCount })
     getScenarioState(world).volunteers.push({ ...vol, onShift: true })
   }
   const shift = await createShiftViaApi(request, {
@@ -210,7 +206,7 @@ Given('a shift with {int} volunteers and {int} is on a call', async ({ request, 
   }
 })
 
-Given('no shift is currently active', async ({ world }) => {
+Given('no shift is currently active', async ({ world: _world }) => {
   // No shift created — no active shifts
 })
 
@@ -219,7 +215,7 @@ Given('a fallback ring group is configured', async ({ request, world }) => {
   // Create a volunteer for the fallback group
   if (getCallSimState(world).shiftVolunteers.length === 0) {
     const vol = await createVolunteerViaApi(request, { name: uniqueName('Fallback Vol') })
-    getCallSimState(world).shiftVolunteers.push({ pubkey: vol.pubkey, nsec: vol.nsec })
+    getCallSimState(world).shiftVolunteers.push({ pubkey: vol.pubkey, deviceKey: vol.deviceKey })
     getScenarioState(world).volunteers.push({ ...vol, onShift: true })
   }
 })
@@ -246,8 +242,8 @@ Given('two overlapping shifts with different volunteers', async ({ request, worl
   const vol1 = await createVolunteerViaApi(request, { name: uniqueName('Overlap Vol 1') })
   const vol2 = await createVolunteerViaApi(request, { name: uniqueName('Overlap Vol 2') })
   getCallSimState(world).shiftVolunteers = [
-    { pubkey: vol1.pubkey, nsec: vol1.nsec },
-    { pubkey: vol2.pubkey, nsec: vol2.nsec },
+    { pubkey: vol1.pubkey, deviceKey: vol1.deviceKey },
+    { pubkey: vol2.pubkey, deviceKey: vol2.deviceKey },
   ]
   getScenarioState(world).volunteers.push({ ...vol1, onShift: true }, { ...vol2, onShift: true })
 
@@ -273,7 +269,7 @@ Given('two overlapping shifts with different volunteers', async ({ request, worl
 Given('a shift configured for 9am-5pm in America\\/New_York', async ({ request, world }) => {
   const hubId = getScenarioState(world).hubId
   const vol = await createVolunteerViaApi(request, { name: uniqueName('TZ Vol') })
-  getCallSimState(world).shiftVolunteers = [{ pubkey: vol.pubkey, nsec: vol.nsec }]
+  getCallSimState(world).shiftVolunteers = [{ pubkey: vol.pubkey, deviceKey: vol.deviceKey }]
   getScenarioState(world).volunteers.push({ ...vol, onShift: true })
   await createShiftViaApi(request, {
     name: uniqueName('TZ Shift'),
@@ -339,7 +335,7 @@ Then('the shift should be considered active', async ({ world }) => {
   expect(getCallSimState(world).shiftVolunteers.length).toBeGreaterThan(0)
 })
 
-When('the current time is 10am Eastern', async ({ world }) => {
+When('the current time is 10am Eastern', async ({ world: _world }) => {
   // Time is controlled by the server; this is a precondition
   // The shift spans the current time in test mode
 })

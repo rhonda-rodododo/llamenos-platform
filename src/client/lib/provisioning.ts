@@ -2,7 +2,7 @@
  * Device provisioning protocol — Signal-style QR device linking.
  *
  * ALL cryptographic operations happen in Rust via IPC. The webview NEVER sees
- * private key material (ephemeral secrets, signing seeds, nsec).
+ * private key material (ephemeral secrets, signing seeds, device keys).
  *
  * New Device:
  *   1. provision_create_session → ephemeral X25519 pubkey (secret stays in Rust)

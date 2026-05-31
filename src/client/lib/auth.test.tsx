@@ -174,7 +174,7 @@ describe('useAuth lockKey', () => {
     })
 
     expect(result.current.isKeyUnlocked).toBe(false)
-    expect(result.current.hasNsec).toBe(false)
+    expect(result.current.hasDeviceKey).toBe(false)
   })
 })
 

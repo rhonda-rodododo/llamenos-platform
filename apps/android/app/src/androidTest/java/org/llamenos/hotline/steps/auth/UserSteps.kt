@@ -24,11 +24,11 @@ class UserSteps : BaseSteps() {
         // Precondition — admin has previously created a volunteer account
     }
 
-    @When("the volunteer logs in with their nsec")
+    @When("the volunteer logs in with their device key")
     fun theVolunteerLogsInWithTheirNsec() {
-        // Navigate to login and enter nsec — nsec would come from admin creation
+        // Navigate to login and enter device key — device key would come from admin creation
         try {
-            onNodeWithTag("nsec-input").performTextInput("nsec1testvolunteer${System.currentTimeMillis()}")
+            onNodeWithTag("device-key-input").performTextInput("nsec1testvolunteer${System.currentTimeMillis()}")
             onNodeWithTag("import-key").performClick()
             composeRule.waitForIdle()
         } catch (_: Throwable) {
@@ -84,14 +84,14 @@ class UserSteps : BaseSteps() {
 
     // ---- Form validation results ----
 
-    @Then("I should see the volunteer nsec")
+    @Then("I should see the volunteer device key")
     fun iShouldSeeTheVolunteerNsec() {
-        // After successful volunteer creation, the nsec display dialog should appear
+        // After successful volunteer creation, the device key display dialog should appear
         try {
-            onNodeWithTag("nsec-display-dialog").assertIsDisplayed()
-            onNodeWithTag("created-volunteer-nsec").assertIsDisplayed()
+            onNodeWithTag("device-key-display-dialog").assertIsDisplayed()
+            onNodeWithTag("created-volunteer-device-key").assertIsDisplayed()
         } catch (_: Throwable) {
-            // nsec dialog may have been dismissed already
+            // Device key dialog may have been dismissed already
         }
     }
 }

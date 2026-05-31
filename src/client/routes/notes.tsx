@@ -40,7 +40,7 @@ interface DecryptedNote extends EncryptedNote {
 
 function NotesPage() {
   const { t } = useTranslation()
-  const { hasNsec, publicKey, isAdmin, adminDecryptionPubkey } = useAuth()
+  const { hasDeviceKey, publicKey, isAdmin, adminDecryptionPubkey } = useAuth()
   const { toast } = useToast()
   const navigate = useNavigate({ from: '/notes' })
   const { page, callId, search } = Route.useSearch()
@@ -72,7 +72,7 @@ function NotesPage() {
   // Decrypt encrypted call records client-side (Epic 77)
   // Uses cancelled flag to avoid updating state after unmount or re-render
   useEffect(() => {
-    if (!hasNsec || !publicKey || recentCalls.length === 0) return
+    if (!hasDeviceKey || !publicKey || recentCalls.length === 0) return
     if (!keyManager.isUnlocked()) return
     const hasUndecrypted = recentCalls.some(c => c.answeredBy === undefined && c.encryptedContent && c.adminEnvelopes?.length)
     if (!hasUndecrypted) return
@@ -89,7 +89,7 @@ function NotesPage() {
       if (!cancelled) setRecentCalls(decrypted)
     })()
     return () => { cancelled = true }
-  }, [recentCalls, hasNsec, publicKey])
+  }, [recentCalls, hasDeviceKey, publicKey])
 
   const nameMap = useMemo(() => {
     const map = new Map<string, string>()
@@ -112,7 +112,7 @@ function NotesPage() {
         if (note.authorPubkey === 'system:transcription') return !isAdmin
         return true
       })
-      const canDecrypt = hasNsec && keyManager.isUnlocked()
+      const canDecrypt = hasDeviceKey && keyManager.isUnlocked()
       const decryptedNotes: DecryptedNote[] = await Promise.all(
         filtered.map(async note => {
           const isTranscription = note.authorPubkey.startsWith('system:transcription')
@@ -150,12 +150,12 @@ function NotesPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, callId, hasNsec, isAdmin])
+  }, [page, callId, hasDeviceKey, isAdmin])
 
   useEffect(() => { loadNotes() }, [loadNotes])
 
   async function handleSaveEdit(noteId: string, text: string, fields: Record<string, string | number | boolean>) {
-    if (!hasNsec || !publicKey || !text.trim()) return
+    if (!hasDeviceKey || !publicKey || !text.trim()) return
     setSaving(true)
     try {
       const payload: NotePayload = { text }
@@ -176,7 +176,7 @@ function NotesPage() {
   }
 
   async function handleCreateNote(callId: string, text: string, fields: Record<string, string | number | boolean>) {
-    if (!hasNsec || !publicKey || !text.trim() || !callId.trim()) return
+    if (!hasDeviceKey || !publicKey || !text.trim() || !callId.trim()) return
     setSaving(true)
     try {
       const payload: NotePayload = { text }
@@ -240,7 +240,7 @@ function NotesPage() {
   }
 
   async function handleSendReply(noteId: string) {
-    if (!replyText.trim() || !hasNsec || !publicKey) return
+    if (!replyText.trim() || !hasDeviceKey || !publicKey) return
     setSendingReply(true)
     try {
       const readerPubkeys = [publicKey]
@@ -266,7 +266,7 @@ function NotesPage() {
   }
 
   async function handleExport() {
-    if (!hasNsec || !keyManager.isUnlocked()) return
+    if (!hasDeviceKey || !keyManager.isUnlocked()) return
     const rows = filteredNotes.map(n => ({
       id: n.id, callId: n.callId, content: n.decrypted, fields: n.payload.fields,
       isTranscription: n.isTranscription, createdAt: n.createdAt, updatedAt: n.updatedAt,

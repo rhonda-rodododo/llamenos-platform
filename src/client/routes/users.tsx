@@ -47,7 +47,7 @@ function UsersPage() {
   const [roles, setRoles] = useState<RoleDefinition[]>([])
   const [showAddForm, setShowAddForm] = useState(false)
   const [showInviteForm, setShowInviteForm] = useState(false)
-  const [generatedNsec, setGeneratedNsec] = useState<string | null>(null)
+  const [generatedDeviceKey, setGeneratedDeviceKey] = useState<string | null>(null)
   const [inviteLink, setInviteLink] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -84,7 +84,7 @@ function UsersPage() {
             <Mail className="h-4 w-4" />
             {t('users.inviteVolunteer')}
           </Button>
-          <Button data-testid="volunteer-add-btn" onClick={() => { setShowAddForm(true); setGeneratedNsec(null) }}>
+          <Button data-testid="volunteer-add-btn" onClick={() => { setShowAddForm(true); setGeneratedDeviceKey(null) }}>
             <UserPlus className="h-4 w-4" />
             {t('users.addVolunteer')}
           </Button>
@@ -92,7 +92,7 @@ function UsersPage() {
       </div>
 
       {/* Generated key warning */}
-      {generatedNsec && (
+      {generatedDeviceKey && (
         <Card className="border-yellow-400/50 bg-yellow-50 dark:border-yellow-600/50 dark:bg-yellow-950/10">
           <CardContent className="space-y-3">
             <div className="flex items-start gap-2">
@@ -103,17 +103,17 @@ function UsersPage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <code data-testid="volunteer-nsec-code" className="flex-1 break-all rounded-md bg-background px-3 py-2 text-xs">{generatedNsec}</code>
+              <code data-testid="volunteer-device-key-code" className="flex-1 break-all rounded-md bg-background px-3 py-2 text-xs">{generatedDeviceKey}</code>
               <Button
                 variant="outline"
                 size="icon"
-                onClick={() => { navigator.clipboard.writeText(generatedNsec); toast(t('common.success'), 'success'); setTimeout(() => navigator.clipboard.writeText('').catch(() => {}), 30000) }}
+                onClick={() => { navigator.clipboard.writeText(generatedDeviceKey); toast(t('common.success'), 'success'); setTimeout(() => navigator.clipboard.writeText('').catch(() => {}), 30000) }}
                 aria-label={t('a11y.copyToClipboard')}
               >
                 <Copy className="h-3.5 w-3.5" />
               </Button>
             </div>
-            <Button variant="ghost" size="sm" data-testid="dismiss-nsec" onClick={() => setGeneratedNsec(null)}>
+            <Button variant="ghost" size="sm" data-testid="dismiss-device-key" onClick={() => setGeneratedDeviceKey(null)}>
               {t('common.close')}
             </Button>
           </CardContent>
@@ -166,9 +166,9 @@ function UsersPage() {
       {showAddForm && (
         <AddUserForm
           roles={roles}
-          onCreated={(user, nsec) => {
+          onCreated={(user, deviceKey) => {
             setUsers(prev => [...prev, user])
-            setGeneratedNsec(nsec)
+            setGeneratedDeviceKey(deviceKey)
             setShowAddForm(false)
           }}
           onCancel={() => setShowAddForm(false)}
@@ -350,7 +350,7 @@ function InviteForm({ roles, onCreated, onCancel }: {
 
 function AddUserForm({ roles, onCreated, onCancel }: {
   roles: RoleDefinition[]
-  onCreated: (user: User, nsec: string) => void
+  onCreated: (user: User, deviceKey: string) => void
   onCancel: () => void
 }) {
   const { t } = useTranslation()
@@ -375,7 +375,7 @@ function AddUserForm({ roles, onCreated, onCancel }: {
       if (typeof window !== 'undefined' && win.__TEST_PLATFORM) {
         win.__last_vol_seed_hex = keyPair.seedHex
       }
-      onCreated(user, keyPair.nsec)
+      onCreated(user, keyPair.deviceKey)
       toast(t('users.userAdded'), 'success')
     } catch {
       toast(t('common.error'), 'error')

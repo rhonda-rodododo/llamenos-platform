@@ -35,8 +35,8 @@ function LinkDevicePage() {
   const [session, setSession] = useState<ProvisioningSession | null>(null)
   const [error, setError] = useState('')
   const [sasCode, setSasCode] = useState('')
-  // Store only encrypted data and the primary's pubkey — the nsec NEVER enters JS
-  const [encryptedNsecData, setEncryptedNsecData] = useState<{ encryptedNsec: string; primaryPubkey: string } | null>(null)
+  // Store only encrypted data and the primary's pubkey — the device key NEVER enters JS
+  const [encryptedKeyData, setEncryptedNsecData] = useState<{ encryptedNsec: string; primaryPubkey: string } | null>(null)
   const [pin1, setPin1] = useState('')
   const [pin2, setPin2] = useState('')
   const [pinError, setPinError] = useState('')
@@ -122,9 +122,9 @@ function LinkDevicePage() {
   }, [])
 
   function handleSASConfirm() {
-    if (!encryptedNsecData) return
+    if (!encryptedKeyData) return
     // SAS verified — proceed to PIN creation.
-    // The nsec is NOT decrypted here. Decryption + import happens in handlePinConfirm,
+    // The device key is NOT decrypted here. Decryption + import happens in handlePinConfirm,
     // entirely within Rust CryptoState.
     setStep('pin-create')
   }
@@ -147,17 +147,17 @@ function LinkDevicePage() {
       setPin2('')
       return
     }
-    if (!encryptedNsecData) {
+    if (!encryptedKeyData) {
       setPinError(t('common.error'))
       return
     }
     try {
-      // Decrypt + import happens entirely in Rust — nsec NEVER enters JavaScript.
+      // Decrypt + import happens entirely in Rust — device key NEVER enters JavaScript.
       // Rust decrypts the provisioned payload, derives device keys, encrypts with PIN,
       // and loads into CryptoState in one atomic operation.
       const encrypted = await decryptAndImportProvisionedKey(
-        encryptedNsecData.encryptedNsec,
-        encryptedNsecData.primaryPubkey,
+        encryptedKeyData.encryptedNsec,
+        encryptedKeyData.primaryPubkey,
         pin,
       )
       // Mark key manager as unlocked with the public key

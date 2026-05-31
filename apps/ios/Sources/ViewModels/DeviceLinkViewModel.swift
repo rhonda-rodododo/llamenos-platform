@@ -11,7 +11,7 @@ enum DeviceLinkStep: Equatable {
     case connecting
     /// Verifying identity via SAS code.
     case verifying(sasCode: String)
-    /// Importing the decrypted nsec.
+    /// Importing the decrypted device key.
     case importing
     /// Successfully linked.
     case completed
@@ -348,7 +348,7 @@ final class DeviceLinkViewModel {
     // MARK: - SAS Confirmation
 
     /// Confirm the SAS code matches the desktop display.
-    /// If an encrypted nsec was received before confirmation, imports it now (H4).
+    /// If an encrypted device key was received before confirmation, imports it now (H4).
     ///
     /// SECURITY: This function is a no-op (and aborts the flow) if called outside
     /// the `.verifying` step. This prevents SAS bypass via state manipulation.

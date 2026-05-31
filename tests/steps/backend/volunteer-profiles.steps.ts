@@ -25,7 +25,7 @@ import {
 // ── Local State ────────────────────────────────────────────────────
 
 interface ProfileState {
-  volunteers: Map<string, { pubkey: string; nsec: string; name: string }>
+  volunteers: Map<string, { pubkey: string; deviceKey: string; name: string }>
   entityTypeIds: Map<string, string>
   lastVolunteerPubkey?: string
   lastVolunteerNsec?: string
@@ -88,8 +88,8 @@ Given('a volunteer exists with self-update permissions', async ({ request, world
     name: `vol-self-${Date.now()}`,
   })
   getProfileState(world).lastVolunteerPubkey = vol.pubkey
-  getProfileState(world).lastVolunteerNsec = vol.nsec
-  getProfileState(world).volunteers.set('self', { pubkey: vol.pubkey, nsec: vol.nsec, name: vol.name })
+  getProfileState(world).lastVolunteerNsec = vol.deviceKey
+  getProfileState(world).volunteers.set('self', { pubkey: vol.pubkey, deviceKey: vol.deviceKey, name: vol.name })
 })
 
 Given('a volunteer exists for profile update', async ({ request, world }) => {
@@ -97,15 +97,15 @@ Given('a volunteer exists for profile update', async ({ request, world }) => {
     name: `vol-profile-${Date.now()}`,
   })
   getProfileState(world).lastVolunteerPubkey = vol.pubkey
-  getProfileState(world).lastVolunteerNsec = vol.nsec
-  getProfileState(world).volunteers.set('profile', { pubkey: vol.pubkey, nsec: vol.nsec, name: vol.name })
+  getProfileState(world).lastVolunteerNsec = vol.deviceKey
+  getProfileState(world).volunteers.set('profile', { pubkey: vol.pubkey, deviceKey: vol.deviceKey, name: vol.name })
 })
 
 Given('a volunteer {string} exists for case assignment', async ({ request, world }, alias: string) => {
   const vol = await createVolunteerViaApi(request, {
     name: `vol-${alias}-${Date.now()}`,
   })
-  getProfileState(world).volunteers.set(alias, { pubkey: vol.pubkey, nsec: vol.nsec, name: vol.name })
+  getProfileState(world).volunteers.set(alias, { pubkey: vol.pubkey, deviceKey: vol.deviceKey, name: vol.name })
 })
 
 Given('{int} records of type {string} are assigned to volunteer {string}', async ({ request, world }, count: number, typeName: string, alias: string) => {
@@ -133,7 +133,7 @@ When('the admin creates a volunteer with specializations {string}', async ({ req
   // Set specializations via admin update (create doesn't go through admin PATCH)
   await updateVolunteerViaApi(request, vol.pubkey, { specializations } as Record<string, unknown>)
   getProfileState(world).lastVolunteerPubkey = vol.pubkey
-  getProfileState(world).lastVolunteerNsec = vol.nsec
+  getProfileState(world).lastVolunteerNsec = vol.deviceKey
 })
 
 When('the volunteer updates their specializations to {string}', async ({ request, world }, specsCsv: string) => {
@@ -149,7 +149,7 @@ When('the volunteer updates their specializations to {string}', async ({ request
     request,
     '/auth/me/profile',
     { specializations },
-    vol!.nsec,
+    vol!.deviceKey,
   )
   expect(status).toBe(200)
 })

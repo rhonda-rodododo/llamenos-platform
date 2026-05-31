@@ -7,12 +7,13 @@ import { Then } from '../fixtures'
 import { TestIds, Timeouts } from '../../helpers'
 
 Then('I should see the onboarding screen', async ({ page }) => {
-  // Onboarding shows the generated keypair — nsec content is a valid content assertion
-  await expect(page.locator('text=/nsec1|backup|key/i').first()).toBeVisible({ timeout: Timeouts.AUTH })
+  // Onboarding shows the generated keypair — recovery key content is a valid content assertion
+  await expect(page.locator('text=/backup|key|recovery/i').first()).toBeVisible({ timeout: Timeouts.AUTH })
 })
 
-Then('I should see my generated nsec', async ({ page }) => {
-  await expect(page.locator('text=/nsec1/')).toBeVisible({ timeout: Timeouts.ELEMENT })
+Then('I should see my generated signing key', async ({ page }) => {
+  // V3: signing key is hex, not bech32 nsec1
+  await expect(page.locator('text=/[0-9a-f]{16}/').first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('I should see my generated npub', async ({ page }) => {
@@ -30,11 +31,11 @@ Then('the hub URL should be persisted', async ({ page }) => {
   expect(hubUrl).toBeTruthy()
 })
 
-Then('the displayed nsec should start with {string}', async ({ page }, prefix: string) => {
-  // nsec display is a content assertion — text matcher is appropriate here
-  const nsecText = page.locator('text=/nsec1/')
-  await expect(nsecText).toBeVisible({ timeout: Timeouts.ELEMENT })
-  const text = await nsecText.textContent()
+Then('the displayed signing key should start with {string}', async ({ page }, prefix: string) => {
+  // V3: signing key is hex, not bech32
+  const keyText = page.locator('text=/[0-9a-f]{16}/').first()
+  await expect(keyText).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const text = await keyText.textContent()
   expect(text).toContain(prefix)
 })
 

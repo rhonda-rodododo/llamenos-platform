@@ -40,7 +40,7 @@ export function CreateRecordDialog({
   defaultEntityTypeId,
 }: CreateRecordDialogProps) {
   const { t } = useTranslation()
-  const { hasNsec, publicKey, adminDecryptionPubkey } = useAuth()
+  const { hasDeviceKey, publicKey, adminDecryptionPubkey } = useAuth()
   const { toast } = useToast()
 
   const [entityTypes, setEntityTypes] = useState<EntityTypeDefinition[]>([])
@@ -99,7 +99,7 @@ export function CreateRecordDialog({
     // during editing, not during initial creation. The create dialog requires
     // only a title to allow fast case creation in urgent situations.
 
-    if (!hasNsec || !publicKey) {
+    if (!hasDeviceKey || !publicKey) {
       toast(t('cases.noKeyPair', { defaultValue: 'Encryption key not available' }), 'error')
       return
     }
@@ -166,7 +166,7 @@ export function CreateRecordDialog({
     }
   }, [
     selectedType, title, description, fieldValues,
-    hasNsec, publicKey, adminDecryptionPubkey,
+    hasDeviceKey, publicKey, adminDecryptionPubkey,
     toast, t, resetForm, onOpenChange, onCreated,
   ])
 

@@ -12,7 +12,7 @@
  */
 import { expect } from '@playwright/test'
 import { Given, When, Then, Before, getState, setState } from './fixtures'
-import { getSharedState, setLastResponse } from './shared-state'
+import { setLastResponse } from './shared-state'
 import { getScenarioState } from './common.steps'
 import {
   createContactViaApi,
@@ -33,7 +33,7 @@ interface NotificationState {
   contacts: Array<{ contactId: string; role: string; phone: string }>
   notifyResult?: NotifyContactsResult | null
   notifyStatus?: number
-  volunteerNsec?: string
+  volunteerDeviceKey?: string
 }
 
 const NOTIFICATIONS_KEY = 'notifications'
@@ -101,7 +101,7 @@ Given('a volunteer exists without cases:update permission', async ({ request, wo
     name: `vol-readonly-${Date.now()}`,
     roleIds: [role.id],
   })
-  getNotificationState(world).volunteerNsec = vol.nsec
+  getNotificationState(world).volunteerDeviceKey = vol.deviceKey
 })
 
 // ── When ──────────────────────────────────────────────────────────
@@ -163,7 +163,7 @@ When('the admin triggers notifications with no recipients', async ({ request, wo
 
 When('the volunteer tries to send notifications for the record', async ({ request, world }) => {
   const recordId = await getLatestRecordId(request, getScenarioState(world).hubId)
-  expect(getNotificationState(world).volunteerNsec).toBeTruthy()
+  expect(getNotificationState(world).volunteerDeviceKey).toBeTruthy()
 
   const { status, data } = await notifyContactsRawViaApi(
     request,
@@ -176,7 +176,7 @@ When('the volunteer tries to send notifications for the record', async ({ reques
         message: 'Test notification',
       }],
     },
-    getNotificationState(world).volunteerNsec!,
+    getNotificationState(world).volunteerDeviceKey!,
   )
   getNotificationState(world).notifyStatus = status
   setLastResponse(world, { status, data })

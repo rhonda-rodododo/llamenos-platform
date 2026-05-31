@@ -82,13 +82,13 @@ data class CreateUserRequest(
 
 /**
  * Response from creating a user. Contains the user data
- * and a one-time nsec that must be given to the user.
+ * and a one-time device key that must be given to the user.
  * Client-only type — no generated equivalent.
  */
 @Serializable
 data class CreateUserResponse(
     val user: org.llamenos.protocol.UserListResponseUser,
-    val nsec: String,
+    val deviceKey: String,
 )
 
 // ---- Shift Admin ----
