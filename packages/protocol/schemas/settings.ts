@@ -156,7 +156,7 @@ export const callSettingsSchema = z.object({
 
 export type CallSettings = z.infer<typeof callSettingsSchema>
 
-export const messagingConfigSchema = z.object({
+export const messagingConfigSchema = z.looseObject({
   enabledChannels: z.array(messagingChannelTypeSchema).optional(),
   autoAssignEnabled: z.boolean().optional(),
   maxConcurrentPerUser: z.number().int().min(1).max(20).optional(),
@@ -233,7 +233,7 @@ export const transcriptionSettingsSchema = z.object({
 })
 
 export const ivrLanguagesSchema = z.object({
-  languages: z.array(z.string()).optional(),
+  enabledLanguages: z.array(z.string()),
 })
 
 /** Hub-scoped IVR language configuration (ordered list) */
