@@ -68,10 +68,6 @@ openmls_basic_credential = "0.5"
 
 # BIP-340 Schnorr / secp256k1 (for sign_prehash / verify_prehash)
 k256 = { version = "0.13", features = ["schnorr"] }
-
-# bech32 encoding (used by provisioning.rs for nsec transport)
-bech32 = "0.11"
-
 [features]
 default = []
 server = []

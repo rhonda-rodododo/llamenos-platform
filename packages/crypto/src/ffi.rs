@@ -407,7 +407,7 @@ mod tests {
 
         let symmetric_key = crate::provisioning::derive_provisioning_key(&shared_x);
 
-        let plaintext = "this is the nsec to transfer";
+        let plaintext = "this is the seed to transfer";
         let mut nonce_bytes = [0u8; 12];
         getrandom::getrandom(&mut nonce_bytes).unwrap();
         let nonce = Nonce::from_slice(&nonce_bytes);
