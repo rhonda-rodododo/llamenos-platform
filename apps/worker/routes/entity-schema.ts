@@ -313,12 +313,10 @@ entitySchema.post('/case-number',
   async (c) => {
     const body = c.req.valid('json')
     const services = c.get('services')
-    // hubId is passed in body (looseObject allows extra fields) or falls back to middleware context
-    const bodyRecord = body as Record<string, unknown>
     const result = await services.settings.generateCaseNumber({
       prefix: body.prefix,
       year: body.year,
-      hubId: (bodyRecord.hubId as string) || c.get('hubId') || '',
+      hubId: body.hubId || c.get('hubId') || '',
     })
     return c.json(result)
   },

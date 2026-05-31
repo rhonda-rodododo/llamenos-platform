@@ -8,7 +8,7 @@ const x25519PubkeySchema = z.string().regex(/^[0-9a-f]{64}$/i, 'Must be 32-byte 
 
 // --- Input schemas ---
 
-export const registerDeviceBodySchema = z.looseObject({
+export const registerDeviceBodySchema = z.object({
   platform: z.enum(['ios', 'android']),
   pushToken: z.string().min(1, 'pushToken is required'),
   wakeKeyPublic: z.string().regex(/^[0-9a-f]{64}$/i, 'Must be 32-byte X25519 public key in hex'),
@@ -20,7 +20,7 @@ export const registerDeviceBodySchema = z.looseObject({
   appVersion: z.string().max(50).optional(),
 })
 
-export const voipTokenBodySchema = z.looseObject({
+export const voipTokenBodySchema = z.object({
   platform: z.enum(['ios', 'android']),
   voipToken: z.string().min(1, 'voipToken is required'),
 })

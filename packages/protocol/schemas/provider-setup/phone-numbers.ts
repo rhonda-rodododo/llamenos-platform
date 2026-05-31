@@ -27,7 +27,7 @@ export const availableNumberSchema = z.object({
 })
 export type AvailableNumber = z.infer<typeof availableNumberSchema>
 
-export const numberSearchQuerySchema = z.looseObject({
+export const numberSearchQuerySchema = z.object({
   providerType: telephonyProviderTypeSchema,
   countryCode: z.string().optional().default('US'),
   areaCode: z.string().optional(),
@@ -37,7 +37,7 @@ export const numberSearchQuerySchema = z.looseObject({
 })
 export type NumberSearchQuery = z.infer<typeof numberSearchQuerySchema>
 
-export const numberProvisionRequestSchema = z.looseObject({
+export const numberProvisionRequestSchema = z.object({
   phoneNumber: z.string(),
   providerType: telephonyProviderTypeSchema,
   friendlyName: z.string().optional(),

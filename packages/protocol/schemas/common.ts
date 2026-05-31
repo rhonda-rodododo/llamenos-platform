@@ -56,7 +56,7 @@ export const paginatedMeta = {
 export const okResponseSchema = z.object({ ok: z.boolean() })
 
 /** HPKE recipient envelope — used across notes, messages, files */
-export const recipientEnvelopeSchema = z.looseObject({
+export const recipientEnvelopeSchema = z.object({
   pubkey: pubkeySchema,
   enc: hpkeEncSchema,
   // HPKE-wrapped 32-byte symmetric key: 48 bytes ciphertext + base64 overhead ≤ 512 chars
@@ -64,20 +64,20 @@ export const recipientEnvelopeSchema = z.looseObject({
 })
 
 /** Key envelope — used for note author copies (no pubkey) */
-export const keyEnvelopeSchema = z.looseObject({
+export const keyEnvelopeSchema = z.object({
   enc: hpkeEncSchema,
   ct: z.string().min(1).max(512),
 })
 
 /** File key envelope — used for file uploads */
-export const fileKeyEnvelopeSchema = z.looseObject({
+export const fileKeyEnvelopeSchema = z.object({
   pubkey: pubkeySchema,
   enc: hpkeEncSchema,
   ct: z.string().min(1).max(512),
 })
 
 /** Encrypted metadata entry — used for file uploads */
-export const encryptedMetadataEntrySchema = z.looseObject({
+export const encryptedMetadataEntrySchema = z.object({
   pubkey: z.string().min(1),
   encryptedContent: z.string().min(1).max(4096),
   enc: hpkeEncSchema,

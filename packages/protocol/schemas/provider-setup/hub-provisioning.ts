@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { telephonyProviderTypeSchema } from '@protocol/schemas/settings'
 import { messagingProviderTypeSchema } from './provider-types'
 
-export const hubProvisioningConfigSchema = z.looseObject({
+export const hubProvisioningConfigSchema = z.object({
   hubId: z.string(),
   telephonyProvider: telephonyProviderTypeSchema.optional(),
   messagingProviders: z.array(messagingProviderTypeSchema).optional(),

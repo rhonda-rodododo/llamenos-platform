@@ -16,6 +16,7 @@ import { authErrors } from '../openapi/helpers'
 import {
   signalContactRegistrationSchema,
   securityPrefsPatchSchema,
+  digestRunBodySchema,
 } from '@protocol/schemas/signal-notification'
 const signalNotificationRoutes = new Hono<AppEnv>()
 
@@ -249,6 +250,7 @@ signalNotificationRoutes.post('/digest/run',
       ...authErrors,
     },
   }),
+  validator('json', digestRunBodySchema),
   async (c) => {
     const permissions = c.get('permissions')
     if (!permissions.includes('system:admin')) {
@@ -256,12 +258,7 @@ signalNotificationRoutes.post('/digest/run',
     }
 
     const services = c.get('services')
-    let body: { cadence?: string }
-    try {
-      body = await c.req.json()
-    } catch {
-      body = {}
-    }
+    const body = c.req.valid('json')
 
     const cadence = body.cadence === 'daily' ? 'daily' : 'weekly'
     const result = await services.digestCron.runDigests(cadence)

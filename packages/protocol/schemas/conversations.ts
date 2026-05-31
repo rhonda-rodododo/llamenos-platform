@@ -70,7 +70,7 @@ export const listConversationsQuerySchema = paginationSchema.extend({
   contactHash: z.string().optional(),
 })
 
-export const sendMessageBodySchema = z.looseObject({
+export const sendMessageBodySchema = z.object({
   /** E2EE encrypted content — required for web channel, optional for external channels with plaintextForSending */
   encryptedContent: z.string().max(65536).optional(),
   /** HPKE-wrapped keys for each reader — required for web channel, optional for external channels */
@@ -79,19 +79,21 @@ export const sendMessageBodySchema = z.looseObject({
   plaintextForSending: z.string().max(65536).optional(),
   /** Alias for plaintextForSending — convenience for API consumers */
   body: z.string().max(65536).optional(),
+  /** Provider-assigned external message ID (used by simulation/test flows) */
+  externalId: z.string().optional(),
 })
 
-export const updateConversationBodySchema = z.looseObject({
+export const updateConversationBodySchema = z.object({
   status: z.enum(['waiting', 'active', 'closed']).optional(),
   assignedTo: pubkeySchema.optional().nullable(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 })
 
-export const claimConversationBodySchema = z.looseObject({
+export const claimConversationBodySchema = z.object({
   pubkey: pubkeySchema,
 })
 
-export const createConversationBodySchema = z.looseObject({
+export const createConversationBodySchema = z.object({
   channelType: z.enum(['sms', 'whatsapp', 'signal', 'rcs', 'web']).optional().default('web'),
   contactIdentifierHash: z.string().optional().default(''),
   contactLast4: z.string().max(4).optional(),

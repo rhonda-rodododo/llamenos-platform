@@ -67,7 +67,7 @@ export const cmsReportTypeListResponseSchema = z.object({
 
 // --- Input schemas for CRUD ---
 
-export const createCmsReportTypeBodySchema = z.looseObject({
+export const createCmsReportTypeBodySchema = z.object({
   name: z.string().regex(/^[a-zA-Z0-9_]+$/).max(100),
   label: z.string().min(1).max(200),
   labelPlural: z.string().min(1).max(200),
@@ -94,7 +94,7 @@ export const createCmsReportTypeBodySchema = z.looseObject({
   templateVersion: z.string().optional(),
 })
 
-export const updateCmsReportTypeBodySchema = z.looseObject({
+export const updateCmsReportTypeBodySchema = z.object({
   label: z.string().min(1).max(200).optional(),
   labelPlural: z.string().min(1).max(200).optional(),
   description: z.string().max(1000).optional(),

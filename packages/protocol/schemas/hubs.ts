@@ -40,14 +40,14 @@ export const hubKeyEnvelopeResponseSchema = z.object({
 
 // --- Input schemas ---
 
-export const createHubBodySchema = z.looseObject({
+export const createHubBodySchema = z.object({
   name: z.string().min(1).max(200),
   slug: z.string().regex(/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/).optional(),
   description: z.string().max(500).optional(),
   phoneNumber: z.string().max(20).optional(),
 })
 
-export const updateHubBodySchema = z.looseObject({
+export const updateHubBodySchema = z.object({
   name: z.string().min(1).max(200).optional(),
   slug: z.string().regex(/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/).optional(),
   description: z.string().max(500).optional(),
@@ -55,12 +55,12 @@ export const updateHubBodySchema = z.looseObject({
   status: z.enum(['active', 'archived']).optional(),
 })
 
-export const addHubMemberBodySchema = z.looseObject({
+export const addHubMemberBodySchema = z.object({
   pubkey: pubkeySchema,
   roleIds: z.array(z.string()).min(1, 'At least one role required'),
 })
 
-export const hubKeyEnvelopesBodySchema = z.looseObject({
+export const hubKeyEnvelopesBodySchema = z.object({
   envelopes: z.array(z.object({
     pubkey: pubkeySchema,
     enc: z.string().min(1),

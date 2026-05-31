@@ -4,7 +4,7 @@
  * Tests: contact registration/retrieval/deletion, HMAC key endpoint,
  * security preferences, digest run (admin-only).
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { Hono } from 'hono'
 import type { AppEnv } from '@worker/types'
 import signalNotificationRoutes from '@worker/routes/signal-notification'
@@ -322,20 +322,24 @@ describe('POST /digest/run', () => {
   it('defaults cadence to weekly when not specified', async () => {
     const { app, mockDigestCron } = makeApp({ permissions: ['system:admin'] })
 
-    await app.request('/digest/run', { method: 'POST' })
+    await app.request('/digest/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    })
     expect(mockDigestCron.runDigests).toHaveBeenCalledWith('weekly')
   })
 
-  it('defaults cadence to weekly when invalid value provided', async () => {
-    const { app, mockDigestCron } = makeApp({ permissions: ['system:admin'] })
+  it('returns 400 when invalid cadence value provided', async () => {
+    const { app } = makeApp({ permissions: ['system:admin'] })
 
-    await app.request('/digest/run', {
+    const res = await app.request('/digest/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cadence: 'monthly' }),
     })
 
-    expect(mockDigestCron.runDigests).toHaveBeenCalledWith('weekly')
+    expect(res.status).toBe(400)
   })
 
   it('returns 403 without system:admin permission', async () => {
@@ -348,7 +352,7 @@ describe('POST /digest/run', () => {
   it('returns 403 with only wildcard user when system:admin missing', async () => {
     // Wildcard '*' doesn't include 'system:admin' in this route's check
     // (it checks permissions.includes('system:admin') specifically)
-    const { app, mockDigestCron } = makeApp({ permissions: ['*'] })
+    const { app } = makeApp({ permissions: ['*'] })
     // '*' is NOT in the includes check — this route checks for exact 'system:admin'
     // But wait — let's check the actual route logic. It checks:
     //   if (!permissions.includes('system:admin')) return 403

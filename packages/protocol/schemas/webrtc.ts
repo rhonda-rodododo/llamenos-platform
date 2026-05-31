@@ -14,7 +14,7 @@ export const sipTokenResponseSchema = z.object({
   transport: z.string(),
   username: z.string(),
   password: z.string(),
-  iceServers: z.array(z.looseObject({ urls: z.array(z.string()) })).optional(),
+  iceServers: z.array(z.object({ urls: z.array(z.string()) })).optional(),
   encryption: z.string().optional(),
 })
 

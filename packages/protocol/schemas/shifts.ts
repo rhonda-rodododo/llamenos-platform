@@ -40,7 +40,7 @@ export const shiftListResponseSchema = z.object({
 
 // --- Input schemas ---
 
-export const createShiftBodySchema = z.looseObject({
+export const createShiftBodySchema = z.object({
   id: z.string().uuid(),
   encryptedName: z.string().min(1).max(200),
   startTime: z.string(),
@@ -52,7 +52,7 @@ export const createShiftBodySchema = z.looseObject({
 
 export type CreateShiftBody = z.infer<typeof createShiftBodySchema>
 
-export const updateShiftBodySchema = z.looseObject({
+export const updateShiftBodySchema = z.object({
   encryptedName: z.string().min(1).max(200).optional(),
   startTime: z.string().optional(),
   endTime: z.string().optional(),
@@ -61,6 +61,6 @@ export const updateShiftBodySchema = z.looseObject({
   userPubkeys: z.array(pubkeySchema).optional(),
 })
 
-export const fallbackGroupSchema = z.looseObject({
+export const fallbackGroupSchema = z.object({
   userPubkeys: z.array(pubkeySchema),
 })

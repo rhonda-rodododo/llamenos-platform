@@ -101,10 +101,7 @@ notes.post('/',
     await audit(services.audit, 'noteCreated', pubkey, { callId: body.callId, conversationId: body.conversationId })
 
     // Auto-create interaction linking note to case (Epic 323)
-    // createNoteBodySchema uses z.looseObject, so extra fields pass through
-    const looseBody = body as Record<string, unknown>
-    const caseId = looseBody.caseId as string | undefined
-    const interactionTypeHash = looseBody.interactionTypeHash as string | undefined
+    const { caseId, interactionTypeHash } = body
     if (caseId && interactionTypeHash) {
       services.cases.createInteraction(caseId, pubkey, {
         interactionType: 'note',

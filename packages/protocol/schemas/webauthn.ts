@@ -2,16 +2,16 @@ import { z } from 'zod'
 
 // --- Input schemas ---
 
-export const authenticateBodySchema = z.looseObject({
+export const authenticateBodySchema = z.object({
   assertion: z.record(z.string(), z.unknown()),
   challengeId: z.string().min(1),
 })
 
-export const addCredentialBodySchema = z.looseObject({
+export const addCredentialBodySchema = z.object({
   label: z.string().min(1).max(100).optional(),
 })
 
-export const registerCredentialBodySchema = z.looseObject({
+export const registerCredentialBodySchema = z.object({
   attestation: z.record(z.string(), z.unknown()),
   label: z.string().min(1).max(100),
   challengeId: z.string().min(1),
@@ -32,7 +32,7 @@ export const webauthnChallengeResponseSchema = z.object({
   challenge: z.string(),
 })
 
-export const webauthnOptionsResponseSchema = z.looseObject({
+export const webauthnOptionsResponseSchema = z.object({
   challengeId: z.string(),
   challenge: z.string(),
 })

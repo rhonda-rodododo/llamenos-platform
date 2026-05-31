@@ -413,8 +413,8 @@ conversations.post('/:id/messages',
 
     // Fall back to client-provided externalId (used by simulation/test flows
     // when the messaging adapter is not configured)
-    if (!externalId && (body as Record<string, unknown>).externalId) {
-      externalId = String((body as Record<string, unknown>).externalId)
+    if (!externalId && body.externalId) {
+      externalId = body.externalId
     }
 
     // Store the message via service

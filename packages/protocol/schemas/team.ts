@@ -50,7 +50,7 @@ export const contactTeamAssignmentListResponseSchema = z.object({
 
 // --- Input schemas ---
 
-export const createTeamBodySchema = z.looseObject({
+export const createTeamBodySchema = z.object({
   id: z.string().uuid(),
   encryptedName: z.string().min(1),
   encryptedDescription: z.string().optional(),
@@ -58,17 +58,17 @@ export const createTeamBodySchema = z.looseObject({
 
 export type CreateTeamBody = z.infer<typeof createTeamBodySchema>
 
-export const updateTeamBodySchema = z.looseObject({
+export const updateTeamBodySchema = z.object({
   encryptedName: z.string().min(1).optional(),
   encryptedDescription: z.string().nullable().optional(),
 })
 
 export type UpdateTeamBody = z.infer<typeof updateTeamBodySchema>
 
-export const addTeamMembersBodySchema = z.looseObject({
+export const addTeamMembersBodySchema = z.object({
   pubkeys: z.array(z.string()).min(1),
 })
 
-export const assignTeamContactsBodySchema = z.looseObject({
+export const assignTeamContactsBodySchema = z.object({
   contactIds: z.array(z.string()).min(1),
 })

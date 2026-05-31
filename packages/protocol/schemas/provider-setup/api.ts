@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { telephonyProviderTypeSchema } from '@protocol/schemas/settings'
 import { providerStatusSchema } from './provider-types'
 
-export const startOAuthRequestSchema = z.looseObject({
+export const startOAuthRequestSchema = z.object({
   provider: telephonyProviderTypeSchema,
   redirectUrl: z.string(),
   hubId: z.string().optional(),
@@ -16,7 +16,7 @@ export const startOAuthResponseSchema = z.object({
 })
 export type StartOAuthResponse = z.infer<typeof startOAuthResponseSchema>
 
-export const configureProviderRequestSchema = z.looseObject({
+export const configureProviderRequestSchema = z.object({
   provider: telephonyProviderTypeSchema,
   credentials: z.record(z.string(), z.string()).optional(),
   hubId: z.string().optional(),
@@ -24,7 +24,7 @@ export const configureProviderRequestSchema = z.looseObject({
 })
 export type ConfigureProviderRequest = z.infer<typeof configureProviderRequestSchema>
 
-export const listNumbersRequestSchema = z.looseObject({
+export const listNumbersRequestSchema = z.object({
   provider: telephonyProviderTypeSchema,
   hubId: z.string().optional(),
 })
