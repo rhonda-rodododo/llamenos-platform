@@ -212,12 +212,17 @@ final class SecurityHardeningTests: XCTestCase {
 
     // MARK: - H8: Wake Key Keychain Accessibility
 
-    func testWakeKeyUsesAfterFirstUnlockThisDeviceOnly() {
+    func testWakeKeyUsesWhenUnlockedThisDeviceOnly() {
         // The WakeKeyService.storeWakePrivateKey() method stores the wake private
-        // key with kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly. This is critical
-        // because the notification service extension needs to access the wake key
-        // even when the device is locked (to decrypt push payloads), but the key
-        // must NOT sync to iCloud Keychain (ThisDeviceOnly).
+        // key with kSecAttrAccessibleWhenUnlockedThisDeviceOnly and
+        // kSecAttrSynchronizable: false. This ensures the key:
+        //   1. Never syncs to iCloud Keychain (ThisDeviceOnly + explicit false sync)
+        //   2. Never migrates to a new device on restore
+        //   3. Is only readable when the device is unlocked
+        //
+        // Note: kSecAttrTokenIDSecureEnclave is intentionally NOT used — the Secure
+        // Enclave only supports P-256/P-384 keys. X25519 wake keys use the software
+        // Keychain with device-only, non-syncable attributes.
         //
         // Since the actual Keychain write uses hardcoded constants, we verify the
         // contract by checking the WakeKeyService source constants. The test
