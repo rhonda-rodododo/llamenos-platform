@@ -115,7 +115,7 @@ When(
 
     const envelopes: EnvelopeEntry[] = []
     for (const [name, member] of getHubKeyState(world).members) {
-      const entry = await generateRealEnvelopeEntry(member.pubkey, member.nsec)
+      const entry = await generateRealEnvelopeEntry(member.pubkey, member.seedHex)
       envelopes.push(entry)
       getHubKeyState(world).originalEnvelopes.set(name, entry.ct)
       getHubKeyState(world).currentEnvelopes.set(name, entry.ct)
@@ -135,7 +135,7 @@ Given('hub key envelopes are set for all {int} members', async ({ request, world
 
   const envelopes: EnvelopeEntry[] = []
   for (const [name, member] of getHubKeyState(world).members) {
-    const entry = await generateRealEnvelopeEntry(member.pubkey, member.nsec)
+    const entry = await generateRealEnvelopeEntry(member.pubkey, member.seedHex)
     envelopes.push(entry)
     getHubKeyState(world).originalEnvelopes.set(name, entry.ct)
     getHubKeyState(world).currentEnvelopes.set(name, entry.ct)
@@ -201,7 +201,7 @@ When(
     for (const name of [name1, name2]) {
       const member = getHubKeyState(world).members.get(name)
       expect(member).toBeTruthy()
-      const entry = await generateRealEnvelopeEntry(member!.pubkey, member!.nsec)
+      const entry = await generateRealEnvelopeEntry(member!.pubkey, member!.seedHex)
       envelopes.push(entry)
       getHubKeyState(world).currentEnvelopes.set(name, entry.ct)
     }
@@ -246,7 +246,7 @@ When(
     for (const [name, member] of getHubKeyState(world).members) {
       // Only wrap for members still tracked in currentEnvelopes (non-removed)
       if (getHubKeyState(world).currentEnvelopes.has(name)) {
-        const entry = await generateRealEnvelopeEntry(member.pubkey, member.nsec)
+        const entry = await generateRealEnvelopeEntry(member.pubkey, member.seedHex)
         envelopes.push(entry)
         getHubKeyState(world).currentEnvelopes.set(name, entry.ct)
       }
@@ -326,7 +326,7 @@ Given('hub key envelopes are set for {string}', async ({ request, world }, name:
   const member = getHubKeyState(world).members.get(name)
   expect(member).toBeTruthy()
 
-  const entry = await generateRealEnvelopeEntry(member!.pubkey, member!.nsec)
+  const entry = await generateRealEnvelopeEntry(member!.pubkey, member!.seedHex)
   const res = await apiPut(request, `/hubs/${hubId}/key`, { envelopes: [entry] })
   expect(res.status).toBe(200)
   getHubKeyState(world).originalEnvelopes.set(name, entry.ct)
