@@ -206,4 +206,82 @@ describe('notifier routes (PostgreSQL)', () => {
     const r2 = await app.fetch(makeReq())
     expect(r2.status).toBe(429)
   })
+
+  test('rate limiting on /check/:hash', async () => {
+    const limiter = { check: new RateLimiter(2, 60_000) }
+    const app = createApp(undefined, limiter as any)
+    const makeReq = () => new Request('http://localhost/check/any-hash', {
+      headers: { authorization: `Bearer ${API_KEY}` },
+    })
+
+    expect((await app.fetch(makeReq())).status).toBe(200)
+    expect((await app.fetch(makeReq())).status).toBe(200)
+    expect((await app.fetch(makeReq())).status).toBe(429)
+  })
+
+  test('rate limiting on /unregister/:hash', async () => {
+    const limiter = { unregister: new RateLimiter(1, 60_000) }
+    const app = createApp(undefined, limiter as any)
+    const makeReq = () => new Request('http://localhost/unregister/any-hash', {
+      method: 'DELETE',
+      headers: { authorization: `Bearer ${API_KEY}` },
+    })
+
+    expect((await app.fetch(makeReq())).status).toBe(200)
+    expect((await app.fetch(makeReq())).status).toBe(429)
+  })
+
+  test('POST /register-client 400 does not include Zod details', async () => {
+    const app = createApp()
+    const res = await app.fetch(new Request('http://localhost/register-client', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ token: '', plaintextIdentifier: '+15551234567', identifierType: 'phone' }),
+    }))
+    expect(res.status).toBe(400)
+    const data = await res.json()
+    expect(data.error).toBe('Invalid request body')
+    expect(data.details).toBeUndefined()
+  })
+
+  test('POST /notify 502 does not expose bridge error text', async () => {
+    await store.register('hash-bridge-err', '+15551234567', 'phone')
+    const app = createApp()
+    const res = await app.fetch(new Request('http://localhost/notify', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${API_KEY}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ identifierHash: 'hash-bridge-err', message: 'hello' }),
+    }))
+    expect(res.status).toBe(502)
+    const data = await res.json()
+    // Generic message only — must not contain phone numbers or raw bridge text
+    expect(data.error).toBe('Notification delivery failed')
+    expect(data.error).not.toMatch(/\+1/)
+    expect(data.error).not.toMatch(/Bridge/)
+  })
+
+  test('bearer auth: wrong key is rejected with generic 401', async () => {
+    const app = createApp()
+    const res = await app.fetch(new Request('http://localhost/check/hash123', {
+      headers: { authorization: 'Bearer totally-wrong-key' },
+    }))
+    expect(res.status).toBe(401)
+    const data = await res.json()
+    // Must not leak whether key format vs value is wrong
+    expect(data.error).toBe('Unauthorized')
+    expect(Object.keys(data)).toEqual(['error'])
+  })
+
+  test('POST /notify 400 does not include Zod details', async () => {
+    const app = createApp()
+    const res = await app.fetch(new Request('http://localhost/notify', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${API_KEY}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ identifierHash: '', message: 'hello' }),
+    }))
+    expect(res.status).toBe(400)
+    const data = await res.json()
+    expect(data.error).toBe('Invalid request body')
+    expect(data.details).toBeUndefined()
+  })
 })
