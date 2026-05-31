@@ -3135,12 +3135,19 @@ export class SettingsService {
 
   async reset(env: {
     DEMO_MODE?: string
+    DEMO_MODE_CONFIRM?: string
     ENVIRONMENT?: string
   }): Promise<{ ok: true }> {
-    if (env.DEMO_MODE !== 'true' && env.ENVIRONMENT !== 'development') {
+    const isDemoMode = env.DEMO_MODE === 'true'
+    const isDev = env.ENVIRONMENT === 'development'
+    if (!isDemoMode && !isDev) {
+      throw new ServiceError(403, 'Reset not allowed outside demo/development mode')
+    }
+    // When resetting via DEMO_MODE (not a development env), require explicit two-factor confirmation.
+    if (isDemoMode && !isDev && env.DEMO_MODE_CONFIRM !== 'DESTROY_ALL_DATA') {
       throw new ServiceError(
         403,
-        'Reset not allowed outside demo/development mode',
+        'DEMO_MODE reset requires DEMO_MODE_CONFIRM=DESTROY_ALL_DATA',
       )
     }
 

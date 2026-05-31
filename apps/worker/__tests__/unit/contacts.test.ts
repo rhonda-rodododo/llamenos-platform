@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest'
 import { ContactsService } from '@worker/services/contacts'
-import { ServiceError } from '@worker/services/settings'
 import { createMockDb } from './mock-db'
 
 describe('ContactsService', () => {
@@ -385,12 +384,18 @@ describe('ContactsService', () => {
   })
 
   describe('reset', () => {
-    it('allows reset in demo mode', async () => {
+    it('allows reset in demo mode with DEMO_MODE_CONFIRM', async () => {
       const { service } = setup()
-      await expect(service.reset({ DEMO_MODE: 'true' })).resolves.toBeUndefined()
+      await expect(service.reset({ DEMO_MODE: 'true', DEMO_MODE_CONFIRM: 'DESTROY_ALL_DATA', ENVIRONMENT: 'staging' })).resolves.toBeUndefined()
     })
 
-    it('allows reset in development', async () => {
+    it('rejects reset in demo mode without DEMO_MODE_CONFIRM', async () => {
+      const { service } = setup()
+      await expect(service.reset({ DEMO_MODE: 'true', ENVIRONMENT: 'staging' }))
+        .rejects.toThrow('DEMO_MODE reset requires DEMO_MODE_CONFIRM=DESTROY_ALL_DATA')
+    })
+
+    it('allows reset in development without DEMO_MODE_CONFIRM', async () => {
       const { service } = setup()
       await expect(service.reset({ ENVIRONMENT: 'development' })).resolves.toBeUndefined()
     })

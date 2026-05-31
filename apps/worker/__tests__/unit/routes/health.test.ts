@@ -64,6 +64,14 @@ describe('health route', () => {
       expect(body.checks.sipBridge.status).toBe('ok')
       expect(body.version).toBeDefined()
       expect(body.uptime).toBeDefined()
+      expect(body.demoMode).toBe(false)
+    })
+
+    it('reports demoMode=true when DEMO_MODE env is set', async () => {
+      const app = createTestApp({ env: { DEMO_MODE: 'true' } })
+      const res = await app.request('/')
+      const body = await res.json()
+      expect(body.demoMode).toBe(true)
     })
 
     it('returns 503 when postgres fails', async () => {
@@ -195,6 +203,14 @@ describe('health route', () => {
       expect(body.status).toBe('ok')
       expect(body.checks).toBeDefined()
       expect(body.version).toBeDefined()
+      expect(body.demoMode).toBe(false)
+    })
+
+    it('reports demoMode=true in readiness response when DEMO_MODE is set', async () => {
+      const app = createTestApp({ env: { DEMO_MODE: 'true' } })
+      const res = await app.request('/ready')
+      const body = await res.json()
+      expect(body.demoMode).toBe(true)
     })
 
     it('returns 503 when dependencies are degraded', async () => {

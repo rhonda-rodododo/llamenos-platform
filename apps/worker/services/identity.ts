@@ -1594,9 +1594,13 @@ export class IdentityService {
   /**
    * Truncate all identity-related tables. Only allowed in demo/development mode.
    */
-  async reset(demoMode: boolean, environment: string): Promise<void> {
-    if (!demoMode && environment !== 'development') {
+  async reset(demoMode: boolean, environment: string, demoModeConfirm?: string): Promise<void> {
+    const isDev = environment === 'development'
+    if (!demoMode && !isDev) {
       throw new ServiceError(403, 'Reset not allowed outside demo/development mode')
+    }
+    if (demoMode && !isDev && demoModeConfirm !== 'DESTROY_ALL_DATA') {
+      throw new ServiceError(403, 'DEMO_MODE reset requires DEMO_MODE_CONFIRM=DESTROY_ALL_DATA')
     }
 
     await this.db.transaction(async (tx) => {
