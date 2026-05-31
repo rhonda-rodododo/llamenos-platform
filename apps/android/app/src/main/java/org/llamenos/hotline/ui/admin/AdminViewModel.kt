@@ -3,9 +3,11 @@ package org.llamenos.hotline.ui.admin
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.llamenos.hotline.api.ApiService
@@ -88,7 +90,6 @@ data class AdminUiState(
     val volunteersError: String? = null,
     val volunteerSearchQuery: String = "",
     val showAddVolunteerDialog: Boolean = false,
-    val createdVolunteerNsec: String? = null,
     val showDeleteVolunteerDialog: String? = null, // user ID to delete
 
     // Ban list
@@ -206,6 +207,14 @@ class AdminViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(AdminUiState())
     val uiState: StateFlow<AdminUiState> = _uiState.asStateFlow()
+
+    /**
+     * One-shot event carrying the one-time volunteer nsec returned by the server.
+     * Use a Channel (not StateFlow) so the sensitive value is never retained in persistent
+     * ViewModel state — it fires once, is consumed by the UI, and is gone.
+     */
+    private val _nsecEvent = Channel<String>(Channel.CONFLATED)
+    val nsecEvent = _nsecEvent.receiveAsFlow()
 
     init {
         loadVolunteers()
@@ -479,15 +488,11 @@ class AdminViewModel @Inject constructor(
     // ---- User CRUD ----
 
     fun showAddVolunteerDialog() {
-        _uiState.update { it.copy(showAddVolunteerDialog = true, createdVolunteerNsec = null) }
+        _uiState.update { it.copy(showAddVolunteerDialog = true) }
     }
 
     fun dismissAddVolunteerDialog() {
         _uiState.update { it.copy(showAddVolunteerDialog = false) }
-    }
-
-    fun clearCreatedVolunteerNsec() {
-        _uiState.update { it.copy(createdVolunteerNsec = null) }
     }
 
     fun createVolunteer(name: String, phone: String, role: String = "role-volunteer") {
@@ -498,7 +503,8 @@ class AdminViewModel @Inject constructor(
                 val response = apiService.request<CreateUserResponse>(
                     "POST", "/api/users", request,
                 )
-                _uiState.update { it.copy(createdVolunteerNsec = response.nsec) }
+                // Emit nsec as a one-shot event — never stored in persistent ViewModel state.
+                _nsecEvent.trySend(response.nsec)
                 loadVolunteers()
             } catch (e: Exception) {
                 _uiState.update {

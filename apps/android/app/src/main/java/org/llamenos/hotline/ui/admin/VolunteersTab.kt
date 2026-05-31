@@ -35,6 +35,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -55,6 +56,7 @@ import org.llamenos.hotline.model.displayName
 import org.llamenos.hotline.model.id
 import org.llamenos.hotline.model.role
 import org.llamenos.hotline.model.status
+import org.llamenos.hotline.ui.components.SecureWindowEffect
 
 /**
  * Volunteers management tab in the admin panel.
@@ -71,6 +73,13 @@ fun VolunteersTab(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val filteredVolunteers = viewModel.filteredVolunteers()
+
+    // One-time nsec display: consumed from Channel, held only in local ephemeral state.
+    // Never stored in ViewModel state — the Channel fires once and the value is gone.
+    var pendingNsec by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(viewModel) {
+        viewModel.nsecEvent.collect { nsec -> pendingNsec = nsec }
+    }
 
     // Add volunteer dialog
     if (uiState.showAddVolunteerDialog) {
@@ -113,11 +122,13 @@ fun VolunteersTab(
         )
     }
 
-    // Created volunteer nsec card
-    if (uiState.createdVolunteerNsec != null) {
+    // Created volunteer nsec display — shown once when server returns a new volunteer's key.
+    // Protected with FLAG_SECURE to prevent screen capture/screenshots.
+    if (pendingNsec != null) {
+        SecureWindowEffect()
         NsecDisplayDialog(
-            nsec = uiState.createdVolunteerNsec!!,
-            onDismiss = { viewModel.clearCreatedVolunteerNsec() },
+            nsec = pendingNsec!!,
+            onDismiss = { pendingNsec = null },
         )
     }
 
