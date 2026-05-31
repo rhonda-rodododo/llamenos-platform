@@ -290,8 +290,8 @@ final class WebSocketService: @unchecked Sendable {
         guard let pubkey = cryptoService.signingPubkeyHex else { return }
 
         let ts = Int(Date().timeIntervalSince1970 * 1000)
-        // Signed message format: "llamenos:ws-auth:v1:{pubkey}:{nonce}:{ts}"
-        let signedMessage = "llamenos:ws-auth:v1:\(pubkey):\(nonce):\(ts)"
+        // Signed message format: LABEL_WS_CHALLENGE:{pubkey}:{nonce}:{ts}
+        let signedMessage = "\(CryptoLabels.LABEL_WS_CHALLENGE):\(pubkey):\(nonce):\(ts)"
         guard
             let msgData = signedMessage.data(using: .utf8),
             let sig = try? cryptoService.ed25519Sign(
