@@ -163,8 +163,11 @@ final class WebSocketService: @unchecked Sendable {
     // MARK: - Connect
 
     /// Connect to the relay at the given URL.
+    /// Only `wss://` and `https://` schemes are accepted; all others are rejected
+    /// to prevent cleartext relay connections that would expose auth tokens.
     func connect(to urlString: String) async {
         guard let url = URL(string: urlString) else { return }
+        guard url.scheme == "wss" || url.scheme == "https" else { return }
         relayURL = url
         isIntentionalDisconnect = false
         reconnectAttempt = 0

@@ -169,6 +169,49 @@ final class SecurityHardeningTests: XCTestCase {
         try api.configure(hubURLString: "app.llamenos.org")
     }
 
+    // MARK: - H5b: WebSocket Relay URL Scheme Validation
+
+    func testWebSocketServiceRejectsHTTPScheme() async {
+        let ws = WebSocketService(cryptoService: CryptoService())
+        await ws.connect(to: "http://evil.example.com/relay")
+        XCTAssertEqual(
+            ws.connectionState, .disconnected,
+            "WebSocketService must reject http:// URLs — state must stay disconnected"
+        )
+    }
+
+    func testWebSocketServiceRejectsWSScheme() async {
+        let ws = WebSocketService(cryptoService: CryptoService())
+        await ws.connect(to: "ws://evil.example.com/relay")
+        XCTAssertEqual(
+            ws.connectionState, .disconnected,
+            "WebSocketService must reject ws:// URLs — state must stay disconnected"
+        )
+    }
+
+    func testWebSocketServiceAcceptsWSSScheme() async {
+        let ws = WebSocketService(cryptoService: CryptoService())
+        await ws.connect(to: "wss://app.llamenos.org/relay")
+        // State transitions to .connecting (or later) once the URL passes validation
+        XCTAssertNotEqual(
+            ws.connectionState, .disconnected,
+            "WebSocketService must accept wss:// URLs and attempt connection"
+        )
+        ws.disconnect()
+    }
+
+    func testWebSocketServiceAcceptsHTTPSScheme() async {
+        // https:// is a valid scheme — used when the hub URL is https:// and the caller
+        // passes it directly to WebSocketService (URLSession upgrades the WS handshake).
+        let ws = WebSocketService(cryptoService: CryptoService())
+        await ws.connect(to: "https://app.llamenos.org/relay")
+        XCTAssertNotEqual(
+            ws.connectionState, .disconnected,
+            "WebSocketService must accept https:// URLs"
+        )
+        ws.disconnect()
+    }
+
     // MARK: - Certificate Pinning Constants (H14)
 
     func testCertificatePinsNonEmpty() {

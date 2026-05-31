@@ -482,16 +482,19 @@ final class AppState {
     private func connectWebSocketIfConfigured() {
         guard let hubURL = authService.hubURL else { return }
 
-        // Derive relay URL from hub URL
+        // Derive relay URL from hub URL. Only wss:// and https:// (converted to wss://)
+        // are allowed — http:// and ws:// are rejected to prevent MITM attacks.
         var relayURL = hubURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !relayURL.hasPrefix("wss://") && !relayURL.hasPrefix("ws://") {
-            if relayURL.hasPrefix("https://") {
-                relayURL = relayURL.replacingOccurrences(of: "https://", with: "wss://")
-            } else if relayURL.hasPrefix("http://") {
-                relayURL = relayURL.replacingOccurrences(of: "http://", with: "ws://")
-            } else {
-                relayURL = "wss://\(relayURL)"
-            }
+        if relayURL.hasPrefix("https://") {
+            relayURL = relayURL.replacingOccurrences(of: "https://", with: "wss://")
+        } else if relayURL.hasPrefix("wss://") {
+            // Already the correct secure scheme — no transformation needed
+        } else if !relayURL.contains("://") {
+            // No scheme — assume secure relay
+            relayURL = "wss://\(relayURL)"
+        } else {
+            // http://, ws://, or any other non-HTTPS/WSS scheme — reject
+            return
         }
         if !relayURL.hasSuffix("/relay") {
             relayURL += "/relay"
