@@ -232,10 +232,11 @@ final class OfflineQueue: @unchecked Sendable {
     static func classifyOperation(path: String, method: String) -> QueuedOperationType {
         if path.contains("/notes") && method.uppercased() == "POST" { return .noteCreate }
         if path.contains("/notes/") && method.uppercased() == "PATCH" { return .noteUpdate }
+        // Check report-messages before generic messages (more specific pattern first)
+        if path.contains("/reports/") && path.contains("/messages") && method.uppercased() == "POST" { return .reportMessage }
         if path.contains("/messages") && method.uppercased() == "POST" { return .messageSend }
         if path.contains("/shifts/my-status") || path.contains("/shifts/clock") { return .shiftToggle }
-        if path.contains("/reports") && method.uppercased() == "POST" && !path.contains("/messages") { return .reportCreate }
-        if path.contains("/reports/") && path.contains("/messages") && method.uppercased() == "POST" { return .reportMessage }
+        if path.contains("/reports") && method.uppercased() == "POST" { return .reportCreate }
         if path.contains("/bans") && method.uppercased() == "POST" { return .banAdd }
         if path.contains("/bans/") && method.uppercased() == "DELETE" { return .banRemove }
         return .genericWrite
