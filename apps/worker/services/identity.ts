@@ -19,6 +19,7 @@ import {
   securityEvents,
   deviceVerifications,
   sigchainLinks,
+  authNonces,
 } from '../db/schema'
 import type {
   User,
@@ -620,14 +621,15 @@ export class IdentityService {
       throw new ServiceError(401, 'Session expired')
     }
 
-    // RACE-06: Sliding expiry — atomic conditional update ensures we only
-    // renew a still-alive session. If the session was concurrently revoked
-    // (deleted) between the SELECT and this UPDATE, the WHERE clause
-    // `expiresAt > NOW()` prevents silent renewal of a ghost session.
+    // RACE-06 + replay fix: Atomic renewal with token rotation.
+    // Generating a new token value on each renewal limits the replay window:
+    // a captured token is only valid until the next renewal event (~7h after
+    // last renewal). The token field acts as a one-time-use credential per window.
     if (decision.action === 'renew') {
+      const newToken = randomHexToken(32)
       const [updated] = await this.db
         .update(sessions)
-        .set({ expiresAt: decision.newExpiresAt })
+        .set({ token: newToken, expiresAt: decision.newExpiresAt })
         .where(
           and(
             eq(sessions.token, token),
@@ -637,7 +639,11 @@ export class IdentityService {
         .returning()
 
       if (!updated) throw new ServiceError(401, 'Session expired or revoked')
-      return { ...rowToSession(row), expiresAt: decision.newExpiresAt.toISOString() }
+      return {
+        ...rowToSession({ ...row, token: newToken }),
+        expiresAt: decision.newExpiresAt.toISOString(),
+        newToken,
+      }
     }
 
     return rowToSession(row)
@@ -1524,6 +1530,38 @@ export class IdentityService {
   }
 
   // =========================================================================
+  // Auth Token Nonce Tracking (replay prevention)
+  // =========================================================================
+
+  /**
+   * Check whether a Bearer auth token nonce has been used, and mark it used if not.
+   *
+   * The nonce is the SHA-256 hash of the Ed25519 signature bytes (the `token`
+   * field in `AuthPayload`). Because Ed25519 is deterministic, two requests
+   * with identical pubkey+timestamp+method+path produce the same signature —
+   * storing used signatures prevents replay within the TOKEN_MAX_AGE_MS window.
+   *
+   * @param nonceHash  SHA-256 of the token signature hex string
+   * @param pubkey     Pubkey that issued the token (for audit)
+   * @param expiresAt  When to expire the nonce record (= token issue time + max age)
+   * @returns `true` if the nonce is fresh (first use), `false` if it is a replay
+   */
+  async checkAndMarkAuthNonce(
+    nonceHash: string,
+    pubkey: string,
+    expiresAt: Date,
+  ): Promise<boolean> {
+    try {
+      await this.db.insert(authNonces).values({ nonceHash, pubkey, expiresAt })
+      return true
+    } catch (e: unknown) {
+      // Unique primary key violation = replay detected
+      if ((e as { code?: string }).code === '23505') return false
+      throw e
+    }
+  }
+
+  // =========================================================================
   // Cleanup (replaces DO alarm)
   // =========================================================================
 
@@ -1536,6 +1574,7 @@ export class IdentityService {
     expiredChallenges: number
     expiredProvisionRooms: number
     expiredInvites: number
+    expiredAuthNonces: number
   }> {
     log.info('Starting identity cleanup')
     try {
@@ -1584,11 +1623,18 @@ export class IdentityService {
         )
         .returning({ code: inviteCodes.code })
 
+      // Expired auth nonces (Bearer token replay prevention records)
+      const deletedAuthNonces = await this.db
+        .delete(authNonces)
+        .where(lt(authNonces.expiresAt, now))
+        .returning({ nonceHash: authNonces.nonceHash })
+
       const result = {
         expiredSessions: deletedSessions.length,
         expiredChallenges: deletedChallenges.length,
         expiredProvisionRooms: deletedRooms.length,
         expiredInvites: deletedRedeemedInvites.length + deletedExpiredInvites.length,
+        expiredAuthNonces: deletedAuthNonces.length,
       }
 
       log.info('Identity cleanup complete', result)
@@ -1621,6 +1667,7 @@ export class IdentityService {
       await tx.delete(webauthnCredentials)
       await tx.delete(webauthnChallenges)
       await tx.delete(sessions)
+      await tx.delete(authNonces)
       await tx.delete(provisionRooms)
       await tx.delete(inviteCodes)
       await tx.delete(users)

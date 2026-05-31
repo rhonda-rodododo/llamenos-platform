@@ -21,6 +21,12 @@ export const auth = createMiddleware<AppEnv>(async (c, next) => {
     c.set('sessionToken', sessionToken)
   }
 
+  // If the session token was rotated during renewal, tell the client the new token
+  // so they can update their stored credential and avoid a forced re-authentication.
+  if (authResult?.newSessionToken) {
+    c.header('X-New-Session-Token', authResult.newSessionToken)
+  }
+
   // Dev-mode signature bypass: explicit opt-in via DEV_AUTH_BYPASS=true env var.
   // Only active when ENVIRONMENT=development AND DEV_AUTH_BYPASS=true.
   // Handles mobile E2E tests where cross-architecture crypto may fail verification.

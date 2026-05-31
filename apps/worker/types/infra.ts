@@ -234,6 +234,8 @@ export interface ServerSession {
   pubkey: string          // Which user
   createdAt: string
   expiresAt: string       // 8-hour expiry
+  /** Set when the session token was rotated during renewal. Client should store this as the new token. */
+  newToken?: string
 }
 
 export interface AuthPayload {

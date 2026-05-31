@@ -337,6 +337,13 @@
       "when": 1780189077868,
       "tag": "0047_event-outbox",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1780205964196,
+      "tag": "0048_auth_nonces",
+      "breakpoints": true
     }
   ]
 }
