@@ -3,6 +3,11 @@
  *
  * Encrypts content via Rust FFI (AES-256-GCM with epoch key),
  * then publishes through the ConnectionManager for fan-out.
+ *
+ * Durable events (kind < 20000) are also persisted to a PostgreSQL
+ * outbox table so they survive process restarts. A periodic drain
+ * loop re-publishes any events that were persisted but not yet
+ * delivered (e.g. from a previous process life).
  */
 import { hkdfSha256, symmetricEncrypt, randomBytes } from '@llamenos/crypto/ffi'
 import { bytesToHex, utf8ToBytes, hexToBytes } from '@shared/encoding'
@@ -12,6 +17,7 @@ import {
   LABEL_HUB_EVENT,
 } from '@shared/crypto-labels'
 import { getConnectionManager } from './ws-manager'
+import type { EventOutbox } from './event-outbox'
 import type { Env } from '../types/infra'
 import { createLogger } from './logger'
 
@@ -23,6 +29,21 @@ const EPOCH_DURATION_SEC = 86400
 /** Get the current epoch (UTC day number) */
 export function currentEpoch(): number {
   return Math.floor(Date.now() / 1000 / EPOCH_DURATION_SEC)
+}
+
+// ---------------------------------------------------------------------------
+// Outbox singleton — set once at startup, used by publishEvent
+// ---------------------------------------------------------------------------
+let outbox: EventOutbox | null = null
+
+/** Attach a persistent outbox. Call once at server startup. */
+export function setEventOutbox(o: EventOutbox): void {
+  outbox = o
+}
+
+/** Get the active outbox (for drain/cleanup from the poller). */
+export function getEventOutbox(): EventOutbox | null {
+  return outbox
 }
 
 /** Minimum padded bucket size */
@@ -97,12 +118,20 @@ function encryptEventContent(
   return bytesToHex(ciphertext)
 }
 
+/** Durable events only — ephemeral events (kind >= 20000) skip the outbox */
+function isDurable(kind: number): boolean {
+  return kind < 20000
+}
+
 /**
  * Publish an event to all WebSocket subscribers of a hub.
  *
  * This is the drop-in replacement for publishNostrEvent.
  * Encrypts content with an epoch-scoped key, then publishes
  * through the ConnectionManager for signing and fan-out.
+ *
+ * Durable events are also persisted to the PostgreSQL outbox
+ * so they survive process restarts.
  */
 export function publishEvent(
   env: Env,
@@ -110,14 +139,8 @@ export function publishEvent(
   content: Record<string, unknown>,
   hubId?: string,
 ): void {
-  const manager = getConnectionManager()
-  if (!manager) {
-    log.debug('No connection manager — event dropped', { kind })
-    return
-  }
-
   const epoch = currentEpoch()
-  const serverSecret = env.SERVER_SECRET
+  const serverSecret = env?.SERVER_SECRET
   let payload: string
 
   if (serverSecret) {
@@ -127,5 +150,81 @@ export function publishEvent(
   }
 
   const targetHub = hubId ?? 'global'
+
+  // Persist durable events to the outbox before fan-out.
+  // Fire-and-forget: the in-memory fan-out is the fast path;
+  // the outbox is the durable safety net for restarts.
+  if (outbox && isDurable(kind)) {
+    const outboxRef = outbox
+    outboxRef
+      .enqueue({ hubId: targetHub, kind, epoch, payload })
+      .then((id) => {
+        // Fan out, then mark delivered
+        const manager = getConnectionManager()
+        if (manager) {
+          manager.publishToHub(targetHub, kind, payload, epoch)
+        }
+        return outboxRef.markDelivered(id)
+      })
+      .catch((err) => {
+        log.error('Outbox enqueue failed — falling back to in-memory fan-out', { kind, err })
+        // Still attempt in-memory delivery even if outbox write failed
+        const manager = getConnectionManager()
+        if (manager) {
+          manager.publishToHub(targetHub, kind, payload, epoch)
+        }
+      })
+    return
+  }
+
+  // Non-durable events or no outbox: direct in-memory fan-out only
+  const manager = getConnectionManager()
+  if (!manager) {
+    log.debug('No connection manager — event dropped', { kind })
+    return
+  }
   manager.publishToHub(targetHub, kind, payload, epoch)
+}
+
+/**
+ * Drain pending outbox events (from previous process life or failed deliveries).
+ * Called by the startup drain and periodic sweep.
+ */
+export async function drainOutbox(): Promise<number> {
+  if (!outbox) return 0
+
+  const manager = getConnectionManager()
+  if (!manager) return 0
+
+  const batch = await outbox.drainBatch()
+  let delivered = 0
+
+  for (const { id, event } of batch) {
+    try {
+      manager.publishToHub(
+        event.hubId ?? 'global',
+        event.kind,
+        event.payload,
+        event.epoch,
+      )
+      await outbox.markDelivered(id)
+      delivered++
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      await outbox.markFailed(id, message)
+    }
+  }
+
+  if (delivered > 0) {
+    log.info('Outbox drain delivered events', { delivered, total: batch.length })
+  }
+  return delivered
+}
+
+/**
+ * Clean up expired outbox events (delivered + failed past TTL).
+ */
+export async function cleanupOutbox(): Promise<number> {
+  if (!outbox) return 0
+  return outbox.cleanup()
 }

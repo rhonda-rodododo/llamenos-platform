@@ -14,8 +14,9 @@ import { createBlobStorage } from '../../apps/worker/lib/blob-storage'
 import { createTranscriptionService } from '../../apps/worker/lib/transcription-client'
 import { validateConfig } from '../../apps/worker/lib/config'
 import { getMessagingAdapterFromService } from '../../apps/worker/lib/service-factories'
-import { publishEvent } from '../../apps/worker/lib/ws-events'
+import { publishEvent, setEventOutbox, drainOutbox, cleanupOutbox } from '../../apps/worker/lib/ws-events'
 import { initConnectionManager } from '../../apps/worker/lib/ws-manager'
+import { EventOutbox } from '../../apps/worker/lib/event-outbox'
 import { deriveServerKeypair } from '../../apps/worker/lib/server-identity'
 import { createWsHandler, createConnectionData } from '../../apps/worker/routes/ws'
 import type { WsConnectionData } from '../../apps/worker/routes/ws'
@@ -98,6 +99,32 @@ if (serverSecret) {
   initConnectionManager(keypair.secretKey)
   console.log('[llamenos] WebSocket relay initialized (server pubkey:', keypair.pubkeyHex.slice(0, 8) + '...)')
 }
+
+// --- Initialize event outbox (persistent delivery queue) ---
+const eventOutbox = new EventOutbox(db)
+setEventOutbox(eventOutbox)
+
+// Initial drain after 3s — pick up events from previous process life
+setTimeout(() => {
+  drainOutbox().catch((err) => {
+    console.error('[llamenos] Initial outbox drain failed:', err)
+  })
+}, 3000)
+
+// Periodic drain every 30s and cleanup every 5 min
+const outboxDrainTimer = setInterval(() => {
+  drainOutbox().catch((err) => {
+    console.error('[llamenos] Outbox drain failed:', err)
+  })
+}, 30_000)
+
+const outboxCleanupTimer = setInterval(() => {
+  cleanupOutbox().catch((err) => {
+    console.error('[llamenos] Outbox cleanup failed:', err)
+  })
+}, 300_000)
+
+console.log('[llamenos] Event outbox initialized (drain: 30s, cleanup: 5m)')
 
 // --- Start scheduled task poller with blast delivery worker ---
 services.scheduler.start({
@@ -224,6 +251,8 @@ if (process.env.ENVIRONMENT === 'development') {
 // --- Graceful shutdown ---
 const shutdown = async () => {
   console.log('[llamenos] Shutting down...')
+  clearInterval(outboxDrainTimer)
+  clearInterval(outboxCleanupTimer)
   services.firehoseAgent?.shutdown()
   services.scheduler.stop()
   await closeDb()
