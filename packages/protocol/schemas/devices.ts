@@ -11,7 +11,7 @@ const x25519PubkeySchema = z.string().regex(/^[0-9a-f]{64}$/i, 'Must be 32-byte 
 export const registerDeviceBodySchema = z.looseObject({
   platform: z.enum(['ios', 'android']),
   pushToken: z.string().min(1, 'pushToken is required'),
-  wakeKeyPublic: z.string().regex(/^0[23][0-9a-f]{64}$/i, 'Must be 33-byte compressed secp256k1 pubkey in hex'),
+  wakeKeyPublic: z.string().regex(/^[0-9a-f]{64}$/i, 'Must be 32-byte X25519 public key in hex'),
   ed25519Pubkey: ed25519PubkeySchema.optional(),
   x25519Pubkey: x25519PubkeySchema.optional(),
   deviceName: z.string().max(100).optional(),

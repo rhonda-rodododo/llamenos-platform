@@ -9,7 +9,6 @@ import devicesRoutes from '../../routes/devices'
 import {
   createTestApp,
   sendJSON,
-  VALID_COMPRESSED_PUBKEY,
   VALID_PUBKEY,
 } from '../helpers/openapi-validation'
 
@@ -29,7 +28,7 @@ describe('devices route validation', () => {
     const VALID_REGISTER = {
       platform: 'ios',
       pushToken: 'device-push-token-abc123',
-      wakeKeyPublic: VALID_COMPRESSED_PUBKEY,
+      wakeKeyPublic: VALID_PUBKEY, // 32-byte X25519 public key in hex
     }
 
     it('rejects empty body', async () => {
@@ -70,20 +69,20 @@ describe('devices route validation', () => {
       expect(res.status).toBe(400)
     })
 
-    it('rejects wakeKeyPublic that is not compressed format', async () => {
+    it('rejects wakeKeyPublic that is not 64 hex chars', async () => {
       const app = createApp()
       const res = await sendJSON(app, '/devices/register', {
         ...VALID_REGISTER,
-        wakeKeyPublic: VALID_PUBKEY, // 64-char hex, missing 02/03 prefix
+        wakeKeyPublic: 'short',
       })
       expect(res.status).toBe(400)
     })
 
-    it('rejects wakeKeyPublic with wrong prefix', async () => {
+    it('rejects wakeKeyPublic with wrong length', async () => {
       const app = createApp()
       const res = await sendJSON(app, '/devices/register', {
         ...VALID_REGISTER,
-        wakeKeyPublic: '04' + 'a'.repeat(64), // uncompressed prefix
+        wakeKeyPublic: '04' + 'a'.repeat(64), // 66 chars, not 64
       })
       expect(res.status).toBe(400)
     })

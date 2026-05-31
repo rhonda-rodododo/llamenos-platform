@@ -34,7 +34,7 @@ enum WakeKeyError: LocalizedError {
 /// Request body for `POST /api/devices/register`.
 struct DeviceRegistrationRequest: Encodable, Sendable {
     let pushToken: String
-    let wakePublicKey: String
+    let wakeKeyPublic: String
     let platform: String
     let deviceId: String
 }
@@ -202,7 +202,7 @@ final class WakeKeyService: @unchecked Sendable {
 
         let request = DeviceRegistrationRequest(
             pushToken: pushToken,
-            wakePublicKey: wakePublicKey,
+            wakeKeyPublic: wakePublicKey,
             platform: "ios",
             deviceId: deviceId
         )
