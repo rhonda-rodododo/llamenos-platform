@@ -101,6 +101,9 @@ import {
   emptyCleanupMetrics,
   resolveTTL,
 } from '../lib/ttl'
+import { createLogger } from '../lib/logger'
+
+const log = createLogger('services.settings')
 
 // ---------------------------------------------------------------------------
 // Result types — services return typed data, not Response objects
@@ -3076,47 +3079,57 @@ export class SettingsService {
    * Called by the task scheduler instead of DO alarms.
    */
   async runCleanup(): Promise<CleanupMetrics> {
-    const row = await getSettings(this.db)
-    const overrides = (row.ttlOverrides as TTLOverrides) ?? {}
-    const metrics =
-      (row.cleanupMetrics as CleanupMetrics) ?? emptyCleanupMetrics()
-    const now = Date.now()
+    log.info('Starting periodic cleanup')
+    try {
+      const row = await getSettings(this.db)
+      const overrides = (row.ttlOverrides as TTLOverrides) ?? {}
+      const metrics =
+        (row.cleanupMetrics as CleanupMetrics) ?? emptyCleanupMetrics()
+      const now = Date.now()
 
-    // Clean up expired rate limit entries
-    const rateLimitTTL = resolveTTL('rateLimit', overrides)
-    const allRateLimits = await this.db.select().from(rateLimits)
-    for (const rl of allRateLimits) {
-      const timestamps = rl.timestamps as number[]
-      const recent = timestamps.filter((t) => now - t < rateLimitTTL)
-      if (recent.length === 0) {
-        await this.db
-          .delete(rateLimits)
-          .where(eq(rateLimits.key, rl.key))
-        metrics.rateLimitEntriesDeleted++
-      } else {
-        await this.db
-          .update(rateLimits)
-          .set({ timestamps: recent })
-          .where(eq(rateLimits.key, rl.key))
+      // Clean up expired rate limit entries
+      const rateLimitTTL = resolveTTL('rateLimit', overrides)
+      const allRateLimits = await this.db.select().from(rateLimits)
+      for (const rl of allRateLimits) {
+        const timestamps = rl.timestamps as number[]
+        const recent = timestamps.filter((t) => now - t < rateLimitTTL)
+        if (recent.length === 0) {
+          await this.db
+            .delete(rateLimits)
+            .where(eq(rateLimits.key, rl.key))
+          metrics.rateLimitEntriesDeleted++
+        } else {
+          await this.db
+            .update(rateLimits)
+            .set({ timestamps: recent })
+            .where(eq(rateLimits.key, rl.key))
+        }
       }
+
+      // Clean up expired CAPTCHA challenges
+      const captchaTTL = resolveTTL('captchaChallenge', overrides)
+      const cutoff = new Date(now - captchaTTL)
+      const deleted = await this.db
+        .delete(captchas)
+        .where(lt(captchas.createdAt, cutoff))
+        .returning()
+      metrics.captchaChallengesDeleted += deleted.length
+
+      metrics.lastCleanupAt = new Date().toISOString()
+      await this.db
+        .update(systemSettings)
+        .set({ cleanupMetrics: metrics })
+        .where(eq(systemSettings.id, SINGLETON_ID))
+
+      log.info('Periodic cleanup complete', {
+        rateLimitEntriesDeleted: metrics.rateLimitEntriesDeleted,
+        captchaChallengesDeleted: metrics.captchaChallengesDeleted,
+      })
+      return metrics
+    } catch (err) {
+      log.error('Periodic cleanup failed', err instanceof Error ? err : new Error(String(err)))
+      throw err
     }
-
-    // Clean up expired CAPTCHA challenges
-    const captchaTTL = resolveTTL('captchaChallenge', overrides)
-    const cutoff = new Date(now - captchaTTL)
-    const deleted = await this.db
-      .delete(captchas)
-      .where(lt(captchas.createdAt, cutoff))
-      .returning()
-    metrics.captchaChallengesDeleted += deleted.length
-
-    metrics.lastCleanupAt = new Date().toISOString()
-    await this.db
-      .update(systemSettings)
-      .set({ cleanupMetrics: metrics })
-      .where(eq(systemSettings.id, SINGLETON_ID))
-
-    return metrics
   }
 
   // =========================================================================
