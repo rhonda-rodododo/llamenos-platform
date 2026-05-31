@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { initPanicWipe } from '@/lib/panic-wipe'
+import { initPanicWipe, performPanicWipe } from '@/lib/panic-wipe'
 
 /**
  * Full-screen red flash overlay shown during panic wipe.
@@ -11,6 +11,18 @@ export function PanicWipeIndicator() {
 
   useEffect(() => {
     const cleanup = initPanicWipe(() => setWiping(true))
+
+    // In PLAYWRIGHT_TEST builds, the keyboard listener is disabled to prevent
+    // accidental triggers from Radix Select Escape handlers in other scenarios.
+    // Expose a direct trigger so the panic-wipe scenario can still exercise the
+    // full wipe flow (overlay + storage clear + redirect) without keyboard events.
+    if (import.meta.env.PLAYWRIGHT_TEST) {
+      ;(window as unknown as Record<string, unknown>).__test__triggerPanicWipe = () => {
+        setWiping(true) // show overlay immediately (panicWipeCallback is null in test builds)
+        performPanicWipe() // clear storage and schedule redirect
+      }
+    }
+
     return cleanup
   }, [])
 

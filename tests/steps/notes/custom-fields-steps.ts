@@ -319,14 +319,18 @@ Given('a custom field {string} exists', async ({ page, request }, fieldLabel: st
 })
 
 When('I click the delete button on {string}', async ({ page }, fieldLabel: string) => {
-  // Re-locate the row fresh each time to avoid stale DOM references from re-renders.
-  const rowLocator = page.getByTestId(TestIds.CUSTOM_FIELD_ROW).filter({ hasText: fieldLabel }).first()
-  await expect(rowLocator).toBeVisible({ timeout: Timeouts.ELEMENT })
-  // Register dialog handler before clicking. The handler must call accept()
-  // synchronously (no await) to prevent the confirm() dialog from blocking
-  // the click action and causing a timeout.
+  // Register dialog handler before the retry loop — page.once keeps it alive
+  // until the click actually triggers the browser confirm() dialog.
   page.once('dialog', dialog => dialog.accept())
-  // Click the delete button directly — Playwright auto-scrolls into view on click()
-  const deleteBtn = rowLocator.getByTestId(TestIds.CUSTOM_FIELD_DELETE_BTN)
-  await deleteBtn.click()
+  // Wrap in toPass() to retry when the row detaches between Playwright's
+  // internal visibility check and scrollIntoViewIfNeeded (component re-renders
+  // during the delete flow in CI under load).
+  await expect(async () => {
+    await page
+      .getByTestId(TestIds.CUSTOM_FIELD_ROW)
+      .filter({ hasText: fieldLabel })
+      .getByTestId(TestIds.CUSTOM_FIELD_DELETE_BTN)
+      .first()
+      .click({ timeout: 3000 })
+  }).toPass({ timeout: Timeouts.ELEMENT })
 })
