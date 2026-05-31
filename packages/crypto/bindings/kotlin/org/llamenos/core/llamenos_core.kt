@@ -703,6 +703,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Short
     external fun uniffi_llamenos_core_checksum_func_mobile_decrypt_server_event(
     ): Short
+    external fun uniffi_llamenos_core_checksum_func_mobile_decrypt_server_event_with_epoch(
+    ): Short
     external fun uniffi_llamenos_core_checksum_func_mobile_ed25519_verify(
     ): Short
     external fun uniffi_llamenos_core_checksum_func_mobile_encrypt_draft(
@@ -835,6 +837,8 @@ external fun uniffi_llamenos_core_fn_func_mobile_decrypt_hub_event(`ciphertextHe
 external fun uniffi_llamenos_core_fn_func_mobile_decrypt_hub_event_trial(`encryptedHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
 external fun uniffi_llamenos_core_fn_func_mobile_decrypt_server_event(`encryptedHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+): RustBuffer.ByValue
+external fun uniffi_llamenos_core_fn_func_mobile_decrypt_server_event_with_epoch(`encryptedHex`: RustBuffer.ByValue,`epoch`: Long,uniffi_out_err: UniffiRustCallStatus, 
 ): RustBuffer.ByValue
 external fun uniffi_llamenos_core_fn_func_mobile_ed25519_verify(`messageHex`: RustBuffer.ByValue,`signatureHex`: RustBuffer.ByValue,`pubkeyHex`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
 ): Byte
@@ -1107,6 +1111,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_llamenos_core_checksum_func_mobile_decrypt_server_event() != 16015.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_llamenos_core_checksum_func_mobile_decrypt_server_event_with_epoch() != 46532.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_llamenos_core_checksum_func_mobile_ed25519_verify() != 35261.toShort()) {
@@ -3408,6 +3415,27 @@ public object FfiConverterSequenceTypeShamirShare: FfiConverterRustBuffer<List<S
     UniffiLib.uniffi_llamenos_core_fn_func_mobile_decrypt_server_event(
     
         FfiConverterString.lower(`encryptedHex`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Decrypt a server-published event using the epoch-aware AAD and padding format.
+         *
+         * The server pads plaintext to a power-of-2 bucket (min 512B) before encrypting:
+         * `[4-byte LE actual-length][plaintext JSON bytes][random padding]`
+         * AAD = `"llamenos:hub-event:{epoch}"` (includes epoch for domain separation).
+         *
+         * Tries the stored current key first, then the previous key for epoch rotation.
+         * Returns the decrypted JSON string with padding stripped.
+         */
+    @Throws(CryptoException::class) fun `mobileDecryptServerEventWithEpoch`(`encryptedHex`: kotlin.String, `epoch`: kotlin.ULong): kotlin.String {
+            return FfiConverterString.lift(
+    uniffiRustCallWithError(CryptoException) { _status ->
+    UniffiLib.uniffi_llamenos_core_fn_func_mobile_decrypt_server_event_with_epoch(
+    
+        FfiConverterString.lower(`encryptedHex`),FfiConverterULong.lower(`epoch`),_status)
 }
     )
     }

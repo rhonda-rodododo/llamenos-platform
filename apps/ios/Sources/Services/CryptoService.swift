@@ -360,7 +360,7 @@ final class CryptoService: @unchecked Sendable {
         return try ffiMobileSigchainCreateLink(id: id, seq: seq, prevHash: prevHash, timestamp: timestamp, payloadJson: payloadJson)
     }
 
-    // MARK: - Device Linking ECDH (legacy secp256k1)
+    // MARK: - Device Linking ECDH (X25519)
 
     func generateEphemeralKeypair() -> (secretHex: String, publicHex: String) {
         let kp = ffiGenerateEphemeralKeypair()

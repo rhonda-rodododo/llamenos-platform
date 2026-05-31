@@ -50,9 +50,9 @@ typedef void (*UniffiRustFutureContinuationCallback)(uint64_t, int8_t
     );
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_FREE
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_FREE
-typedef void (*UniffiForeignFutureFree)(uint64_t
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_DROPPED_CALLBACK
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_DROPPED_CALLBACK
+typedef void (*UniffiForeignFutureDroppedCallback)(uint64_t
     );
 
 #endif
@@ -62,213 +62,190 @@ typedef void (*UniffiCallbackInterfaceFree)(uint64_t
     );
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE
-typedef struct UniffiForeignFuture {
-    uint64_t handle;
-    UniffiForeignFutureFree _Nonnull free;
-} UniffiForeignFuture;
+#ifndef UNIFFI_FFIDEF_CALLBACK_INTERFACE_CLONE
+#define UNIFFI_FFIDEF_CALLBACK_INTERFACE_CLONE
+typedef uint64_t (*UniffiCallbackInterfaceClone)(uint64_t
+    );
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_U8
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_U8
-typedef struct UniffiForeignFutureStructU8 {
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_DROPPED_CALLBACK_STRUCT
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_DROPPED_CALLBACK_STRUCT
+typedef struct UniffiForeignFutureDroppedCallbackStruct {
+    uint64_t handle;
+    UniffiForeignFutureDroppedCallback _Nonnull free;
+} UniffiForeignFutureDroppedCallbackStruct;
+
+#endif
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_U8
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_U8
+typedef struct UniffiForeignFutureResultU8 {
     uint8_t returnValue;
     RustCallStatus callStatus;
-} UniffiForeignFutureStructU8;
+} UniffiForeignFutureResultU8;
 
 #endif
 #ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_U8
 #define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_U8
-typedef void (*UniffiForeignFutureCompleteU8)(uint64_t, UniffiForeignFutureStructU8
+typedef void (*UniffiForeignFutureCompleteU8)(uint64_t, UniffiForeignFutureResultU8
     );
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_I8
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_I8
-typedef struct UniffiForeignFutureStructI8 {
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_I8
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_I8
+typedef struct UniffiForeignFutureResultI8 {
     int8_t returnValue;
     RustCallStatus callStatus;
-} UniffiForeignFutureStructI8;
+} UniffiForeignFutureResultI8;
 
 #endif
 #ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_I8
 #define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_I8
-typedef void (*UniffiForeignFutureCompleteI8)(uint64_t, UniffiForeignFutureStructI8
+typedef void (*UniffiForeignFutureCompleteI8)(uint64_t, UniffiForeignFutureResultI8
     );
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_U16
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_U16
-typedef struct UniffiForeignFutureStructU16 {
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_U16
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_U16
+typedef struct UniffiForeignFutureResultU16 {
     uint16_t returnValue;
     RustCallStatus callStatus;
-} UniffiForeignFutureStructU16;
+} UniffiForeignFutureResultU16;
 
 #endif
 #ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_U16
 #define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_U16
-typedef void (*UniffiForeignFutureCompleteU16)(uint64_t, UniffiForeignFutureStructU16
+typedef void (*UniffiForeignFutureCompleteU16)(uint64_t, UniffiForeignFutureResultU16
     );
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_I16
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_I16
-typedef struct UniffiForeignFutureStructI16 {
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_I16
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_I16
+typedef struct UniffiForeignFutureResultI16 {
     int16_t returnValue;
     RustCallStatus callStatus;
-} UniffiForeignFutureStructI16;
+} UniffiForeignFutureResultI16;
 
 #endif
 #ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_I16
 #define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_I16
-typedef void (*UniffiForeignFutureCompleteI16)(uint64_t, UniffiForeignFutureStructI16
+typedef void (*UniffiForeignFutureCompleteI16)(uint64_t, UniffiForeignFutureResultI16
     );
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_U32
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_U32
-typedef struct UniffiForeignFutureStructU32 {
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_U32
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_U32
+typedef struct UniffiForeignFutureResultU32 {
     uint32_t returnValue;
     RustCallStatus callStatus;
-} UniffiForeignFutureStructU32;
+} UniffiForeignFutureResultU32;
 
 #endif
 #ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_U32
 #define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_U32
-typedef void (*UniffiForeignFutureCompleteU32)(uint64_t, UniffiForeignFutureStructU32
+typedef void (*UniffiForeignFutureCompleteU32)(uint64_t, UniffiForeignFutureResultU32
     );
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_I32
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_I32
-typedef struct UniffiForeignFutureStructI32 {
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_I32
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_I32
+typedef struct UniffiForeignFutureResultI32 {
     int32_t returnValue;
     RustCallStatus callStatus;
-} UniffiForeignFutureStructI32;
+} UniffiForeignFutureResultI32;
 
 #endif
 #ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_I32
 #define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_I32
-typedef void (*UniffiForeignFutureCompleteI32)(uint64_t, UniffiForeignFutureStructI32
+typedef void (*UniffiForeignFutureCompleteI32)(uint64_t, UniffiForeignFutureResultI32
     );
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_U64
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_U64
-typedef struct UniffiForeignFutureStructU64 {
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_U64
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_U64
+typedef struct UniffiForeignFutureResultU64 {
     uint64_t returnValue;
     RustCallStatus callStatus;
-} UniffiForeignFutureStructU64;
+} UniffiForeignFutureResultU64;
 
 #endif
 #ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_U64
 #define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_U64
-typedef void (*UniffiForeignFutureCompleteU64)(uint64_t, UniffiForeignFutureStructU64
+typedef void (*UniffiForeignFutureCompleteU64)(uint64_t, UniffiForeignFutureResultU64
     );
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_I64
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_I64
-typedef struct UniffiForeignFutureStructI64 {
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_I64
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_I64
+typedef struct UniffiForeignFutureResultI64 {
     int64_t returnValue;
     RustCallStatus callStatus;
-} UniffiForeignFutureStructI64;
+} UniffiForeignFutureResultI64;
 
 #endif
 #ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_I64
 #define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_I64
-typedef void (*UniffiForeignFutureCompleteI64)(uint64_t, UniffiForeignFutureStructI64
+typedef void (*UniffiForeignFutureCompleteI64)(uint64_t, UniffiForeignFutureResultI64
     );
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_F32
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_F32
-typedef struct UniffiForeignFutureStructF32 {
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_F32
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_F32
+typedef struct UniffiForeignFutureResultF32 {
     float returnValue;
     RustCallStatus callStatus;
-} UniffiForeignFutureStructF32;
+} UniffiForeignFutureResultF32;
 
 #endif
 #ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_F32
 #define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_F32
-typedef void (*UniffiForeignFutureCompleteF32)(uint64_t, UniffiForeignFutureStructF32
+typedef void (*UniffiForeignFutureCompleteF32)(uint64_t, UniffiForeignFutureResultF32
     );
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_F64
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_F64
-typedef struct UniffiForeignFutureStructF64 {
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_F64
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_F64
+typedef struct UniffiForeignFutureResultF64 {
     double returnValue;
     RustCallStatus callStatus;
-} UniffiForeignFutureStructF64;
+} UniffiForeignFutureResultF64;
 
 #endif
 #ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_F64
 #define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_F64
-typedef void (*UniffiForeignFutureCompleteF64)(uint64_t, UniffiForeignFutureStructF64
+typedef void (*UniffiForeignFutureCompleteF64)(uint64_t, UniffiForeignFutureResultF64
     );
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_POINTER
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_POINTER
-typedef struct UniffiForeignFutureStructPointer {
-    void*_Nonnull returnValue;
-    RustCallStatus callStatus;
-} UniffiForeignFutureStructPointer;
-
-#endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_POINTER
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_POINTER
-typedef void (*UniffiForeignFutureCompletePointer)(uint64_t, UniffiForeignFutureStructPointer
-    );
-
-#endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_RUST_BUFFER
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_RUST_BUFFER
-typedef struct UniffiForeignFutureStructRustBuffer {
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_RUST_BUFFER
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_RUST_BUFFER
+typedef struct UniffiForeignFutureResultRustBuffer {
     RustBuffer returnValue;
     RustCallStatus callStatus;
-} UniffiForeignFutureStructRustBuffer;
+} UniffiForeignFutureResultRustBuffer;
 
 #endif
 #ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_RUST_BUFFER
 #define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_RUST_BUFFER
-typedef void (*UniffiForeignFutureCompleteRustBuffer)(uint64_t, UniffiForeignFutureStructRustBuffer
+typedef void (*UniffiForeignFutureCompleteRustBuffer)(uint64_t, UniffiForeignFutureResultRustBuffer
     );
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_VOID
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_VOID
-typedef struct UniffiForeignFutureStructVoid {
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_VOID
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_VOID
+typedef struct UniffiForeignFutureResultVoid {
     RustCallStatus callStatus;
-} UniffiForeignFutureStructVoid;
+} UniffiForeignFutureResultVoid;
 
 #endif
 #ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_VOID
 #define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_VOID
-typedef void (*UniffiForeignFutureCompleteVoid)(uint64_t, UniffiForeignFutureStructVoid
+typedef void (*UniffiForeignFutureCompleteVoid)(uint64_t, UniffiForeignFutureResultVoid
     );
 
-#endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_CREATE_AUTH_TOKEN
-#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_CREATE_AUTH_TOKEN
-RustBuffer uniffi_llamenos_core_fn_func_create_auth_token(RustBuffer secret_key_hex, uint64_t timestamp, RustBuffer method, RustBuffer path, RustCallStatus *_Nonnull out_status
-);
-#endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_DECRYPT_CALL_RECORD_FOR_READER
-#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_DECRYPT_CALL_RECORD_FOR_READER
-RustBuffer uniffi_llamenos_core_fn_func_decrypt_call_record_for_reader(RustBuffer encrypted_content, RustBuffer admin_envelopes, RustBuffer secret_key_hex, RustBuffer reader_pubkey, RustCallStatus *_Nonnull out_status
-);
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_DECRYPT_DRAFT
 #define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_DECRYPT_DRAFT
 RustBuffer uniffi_llamenos_core_fn_func_decrypt_draft(RustBuffer packed_hex, RustBuffer secret_key_hex, RustCallStatus *_Nonnull out_status
-);
-#endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_DECRYPT_MESSAGE_FOR_READER
-#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_DECRYPT_MESSAGE_FOR_READER
-RustBuffer uniffi_llamenos_core_fn_func_decrypt_message_for_reader(RustBuffer encrypted_content, RustBuffer reader_envelopes, RustBuffer secret_key_hex, RustBuffer reader_pubkey, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_DECRYPT_NOTE
@@ -281,24 +258,49 @@ RustBuffer uniffi_llamenos_core_fn_func_decrypt_note(RustBuffer encrypted_conten
 RustBuffer uniffi_llamenos_core_fn_func_decrypt_with_pin(RustBuffer data, RustBuffer pin, RustCallStatus *_Nonnull out_status
 );
 #endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_DERIVE_KEK_HEX
-#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_DERIVE_KEK_HEX
-RustBuffer uniffi_llamenos_core_fn_func_derive_kek_hex(RustBuffer pin, RustBuffer salt_hex, RustCallStatus *_Nonnull out_status
-);
-#endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_ECIES_UNWRAP_KEY_HEX
-#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_ECIES_UNWRAP_KEY_HEX
-RustBuffer uniffi_llamenos_core_fn_func_ecies_unwrap_key_hex(RustBuffer envelope, RustBuffer secret_key_hex, RustBuffer label, RustCallStatus *_Nonnull out_status
-);
-#endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_ECIES_WRAP_KEY_HEX
-#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_ECIES_WRAP_KEY_HEX
-RustBuffer uniffi_llamenos_core_fn_func_ecies_wrap_key_hex(RustBuffer key_hex, RustBuffer recipient_pubkey_hex, RustBuffer label, RustCallStatus *_Nonnull out_status
-);
-#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_ENCRYPT_DRAFT
 #define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_ENCRYPT_DRAFT
 RustBuffer uniffi_llamenos_core_fn_func_encrypt_draft(RustBuffer plaintext, RustBuffer secret_key_hex, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_ENCRYPT_WITH_PIN
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_ENCRYPT_WITH_PIN
+RustBuffer uniffi_llamenos_core_fn_func_encrypt_with_pin(RustBuffer key_material, RustBuffer pin, RustBuffer pubkey_hex, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_IS_VALID_PIN
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_IS_VALID_PIN
+int8_t uniffi_llamenos_core_fn_func_is_valid_pin(RustBuffer pin, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_COMPUTE_SAS_CODE
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_COMPUTE_SAS_CODE
+RustBuffer uniffi_llamenos_core_fn_func_compute_sas_code(RustBuffer shared_x_hex, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_COMPUTE_SHARED_X_HEX
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_COMPUTE_SHARED_X_HEX
+RustBuffer uniffi_llamenos_core_fn_func_compute_shared_x_hex(RustBuffer our_secret_hex, RustBuffer their_pubkey_hex, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_DECRYPT_CALL_RECORD_FOR_READER
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_DECRYPT_CALL_RECORD_FOR_READER
+RustBuffer uniffi_llamenos_core_fn_func_decrypt_call_record_for_reader(RustBuffer encrypted_content, RustBuffer admin_envelopes, RustBuffer secret_key_hex, RustBuffer reader_pubkey, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_DECRYPT_MESSAGE_FOR_READER
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_DECRYPT_MESSAGE_FOR_READER
+RustBuffer uniffi_llamenos_core_fn_func_decrypt_message_for_reader(RustBuffer encrypted_content, RustBuffer reader_envelopes, RustBuffer secret_key_hex, RustBuffer reader_pubkey, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_DECRYPT_SERVER_EVENT_HEX
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_DECRYPT_SERVER_EVENT_HEX
+RustBuffer uniffi_llamenos_core_fn_func_decrypt_server_event_hex(RustBuffer encrypted_hex, RustBuffer key_hex, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_DECRYPT_WITH_SHARED_KEY_HEX
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_DECRYPT_WITH_SHARED_KEY_HEX
+RustBuffer uniffi_llamenos_core_fn_func_decrypt_with_shared_key_hex(RustBuffer ciphertext_hex, RustBuffer shared_x_hex, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_ENCRYPT_MESSAGE_FOR_READERS
@@ -311,35 +313,45 @@ RustBuffer uniffi_llamenos_core_fn_func_encrypt_message_for_readers(RustBuffer p
 RustBuffer uniffi_llamenos_core_fn_func_encrypt_note_for_recipients(RustBuffer payload_json, RustBuffer author_pubkey, RustBuffer admin_pubkeys, RustCallStatus *_Nonnull out_status
 );
 #endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_ENCRYPT_WITH_PIN
-#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_ENCRYPT_WITH_PIN
-RustBuffer uniffi_llamenos_core_fn_func_encrypt_with_pin(RustBuffer nsec, RustBuffer pin, RustBuffer pubkey_hex, RustCallStatus *_Nonnull out_status
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_HPKE_UNWRAP_KEY_HEX
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_HPKE_UNWRAP_KEY_HEX
+RustBuffer uniffi_llamenos_core_fn_func_hpke_unwrap_key_hex(RustBuffer envelope, RustBuffer secret_key_hex, RustBuffer label, RustCallStatus *_Nonnull out_status
 );
 #endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_GENERATE_KEYPAIR
-#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_GENERATE_KEYPAIR
-RustBuffer uniffi_llamenos_core_fn_func_generate_keypair(RustCallStatus *_Nonnull out_status
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_HPKE_WRAP_KEY_HEX
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_HPKE_WRAP_KEY_HEX
+RustBuffer uniffi_llamenos_core_fn_func_hpke_wrap_key_hex(RustBuffer key_hex, RustBuffer recipient_pubkey_hex, RustBuffer label, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_RECOVERY_GROUP_GENERATE_KEYPAIR
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_RECOVERY_GROUP_GENERATE_KEYPAIR
+RustBuffer uniffi_llamenos_core_fn_func_mobile_recovery_group_generate_keypair(RustCallStatus *_Nonnull out_status
     
 );
 #endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_GET_PUBLIC_KEY
-#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_GET_PUBLIC_KEY
-RustBuffer uniffi_llamenos_core_fn_func_get_public_key(RustBuffer secret_key_hex, RustCallStatus *_Nonnull out_status
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_RECOVERY_GROUP_SPLIT_PRIVATE_KEY
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_RECOVERY_GROUP_SPLIT_PRIVATE_KEY
+RustBuffer uniffi_llamenos_core_fn_func_mobile_recovery_group_split_private_key(uint64_t handle, uint8_t total, uint8_t threshold, RustCallStatus *_Nonnull out_status
 );
 #endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_IS_VALID_NSEC
-#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_IS_VALID_NSEC
-int8_t uniffi_llamenos_core_fn_func_is_valid_nsec(RustBuffer nsec, RustCallStatus *_Nonnull out_status
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_SHAMIR_COMBINE
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_SHAMIR_COMBINE
+RustBuffer uniffi_llamenos_core_fn_func_mobile_shamir_combine(RustBuffer shares, uint8_t threshold, RustCallStatus *_Nonnull out_status
 );
 #endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_IS_VALID_PIN
-#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_IS_VALID_PIN
-int8_t uniffi_llamenos_core_fn_func_is_valid_pin(RustBuffer pin, RustCallStatus *_Nonnull out_status
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_SHAMIR_COMMIT
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_SHAMIR_COMMIT
+RustBuffer uniffi_llamenos_core_fn_func_mobile_shamir_commit(RustBuffer share, RustCallStatus *_Nonnull out_status
 );
 #endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_KEYPAIR_FROM_NSEC
-#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_KEYPAIR_FROM_NSEC
-RustBuffer uniffi_llamenos_core_fn_func_keypair_from_nsec(RustBuffer nsec, RustCallStatus *_Nonnull out_status
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_SHAMIR_SPLIT
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_SHAMIR_SPLIT
+RustBuffer uniffi_llamenos_core_fn_func_mobile_shamir_split(RustBuffer secret_hex, uint8_t total, uint8_t threshold, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_SHAMIR_VERIFY
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_SHAMIR_VERIFY
+int8_t uniffi_llamenos_core_fn_func_mobile_shamir_verify(RustBuffer share, RustBuffer commitment_hex, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_RANDOM_BYTES_HEX
@@ -348,14 +360,202 @@ RustBuffer uniffi_llamenos_core_fn_func_random_bytes_hex(RustCallStatus *_Nonnul
     
 );
 #endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_VERIFY_AUTH_TOKEN
-#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_VERIFY_AUTH_TOKEN
-int8_t uniffi_llamenos_core_fn_func_verify_auth_token(RustBuffer token, RustBuffer method, RustBuffer path, RustCallStatus *_Nonnull out_status
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_GENERATE_EPHEMERAL_KEYPAIR_MOBILE
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_GENERATE_EPHEMERAL_KEYPAIR_MOBILE
+RustBuffer uniffi_llamenos_core_fn_func_generate_ephemeral_keypair_mobile(RustCallStatus *_Nonnull out_status
+    
 );
 #endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_VERIFY_SCHNORR
-#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_VERIFY_SCHNORR
-int8_t uniffi_llamenos_core_fn_func_verify_schnorr(RustBuffer message_hex, RustBuffer signature_hex, RustBuffer pubkey_hex, RustCallStatus *_Nonnull out_status
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_GET_PUBLIC_KEY
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_GET_PUBLIC_KEY
+RustBuffer uniffi_llamenos_core_fn_func_get_public_key(RustBuffer secret_key_hex, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_CLEAR_HUB_KEYS
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_CLEAR_HUB_KEYS
+void uniffi_llamenos_core_fn_func_mobile_clear_hub_keys(RustCallStatus *_Nonnull out_status
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_CLEAR_SERVER_EVENT_KEYS
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_CLEAR_SERVER_EVENT_KEYS
+void uniffi_llamenos_core_fn_func_mobile_clear_server_event_keys(RustCallStatus *_Nonnull out_status
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_CREATE_AUTH_TOKEN
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_CREATE_AUTH_TOKEN
+RustBuffer uniffi_llamenos_core_fn_func_mobile_create_auth_token(uint64_t timestamp, RustBuffer method, RustBuffer path, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_CREATE_AUTH_TOKEN_FROM_SIGNING_KEY
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_CREATE_AUTH_TOKEN_FROM_SIGNING_KEY
+RustBuffer uniffi_llamenos_core_fn_func_mobile_create_auth_token_from_signing_key(RustBuffer signing_key_hex, uint64_t timestamp, RustBuffer method, RustBuffer path, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_DECRYPT_DRAFT
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_DECRYPT_DRAFT
+RustBuffer uniffi_llamenos_core_fn_func_mobile_decrypt_draft(RustBuffer packed_hex, RustBuffer hub_id, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_DECRYPT_EVENT_WITH_ATTRIBUTION
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_DECRYPT_EVENT_WITH_ATTRIBUTION
+RustBuffer uniffi_llamenos_core_fn_func_mobile_decrypt_event_with_attribution(RustBuffer ciphertext_hex, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_DECRYPT_HUB_EVENT
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_DECRYPT_HUB_EVENT
+RustBuffer uniffi_llamenos_core_fn_func_mobile_decrypt_hub_event(RustBuffer ciphertext_hex, RustBuffer hub_id, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_DECRYPT_HUB_EVENT_TRIAL
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_DECRYPT_HUB_EVENT_TRIAL
+RustBuffer uniffi_llamenos_core_fn_func_mobile_decrypt_hub_event_trial(RustBuffer encrypted_hex, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_DECRYPT_SERVER_EVENT
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_DECRYPT_SERVER_EVENT
+RustBuffer uniffi_llamenos_core_fn_func_mobile_decrypt_server_event(RustBuffer encrypted_hex, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_DECRYPT_SERVER_EVENT_WITH_EPOCH
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_DECRYPT_SERVER_EVENT_WITH_EPOCH
+RustBuffer uniffi_llamenos_core_fn_func_mobile_decrypt_server_event_with_epoch(RustBuffer encrypted_hex, uint64_t epoch, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_ED25519_VERIFY
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_ED25519_VERIFY
+int8_t uniffi_llamenos_core_fn_func_mobile_ed25519_verify(RustBuffer message_hex, RustBuffer signature_hex, RustBuffer pubkey_hex, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_ENCRYPT_DRAFT
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_ENCRYPT_DRAFT
+RustBuffer uniffi_llamenos_core_fn_func_mobile_encrypt_draft(RustBuffer plaintext, RustBuffer hub_id, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_GENERATE_AND_LOAD
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_GENERATE_AND_LOAD
+RustBuffer uniffi_llamenos_core_fn_func_mobile_generate_and_load(RustBuffer device_id, RustBuffer pin, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_GET_DEVICE_STATE
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_GET_DEVICE_STATE
+RustBuffer uniffi_llamenos_core_fn_func_mobile_get_device_state(RustCallStatus *_Nonnull out_status
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_HAS_HUB_KEY
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_HAS_HUB_KEY
+int8_t uniffi_llamenos_core_fn_func_mobile_has_hub_key(RustBuffer hub_id, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_HPKE_OPEN
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_HPKE_OPEN
+RustBuffer uniffi_llamenos_core_fn_func_mobile_hpke_open(RustBuffer envelope, RustBuffer expected_label, RustBuffer aad_hex, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_HPKE_OPEN_KEY
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_HPKE_OPEN_KEY
+RustBuffer uniffi_llamenos_core_fn_func_mobile_hpke_open_key(RustBuffer envelope, RustBuffer expected_label, RustBuffer aad_hex, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_HPKE_SEAL
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_HPKE_SEAL
+RustBuffer uniffi_llamenos_core_fn_func_mobile_hpke_seal(RustBuffer plaintext_hex, RustBuffer recipient_pubkey_hex, RustBuffer label, RustBuffer aad_hex, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_HPKE_SEAL_KEY
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_HPKE_SEAL_KEY
+RustBuffer uniffi_llamenos_core_fn_func_mobile_hpke_seal_key(RustBuffer key_hex, RustBuffer recipient_pubkey_hex, RustBuffer label, RustBuffer aad_hex, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_IS_UNLOCKED
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_IS_UNLOCKED
+int8_t uniffi_llamenos_core_fn_func_mobile_is_unlocked(RustCallStatus *_Nonnull out_status
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_IS_VALID_PIN
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_IS_VALID_PIN
+int8_t uniffi_llamenos_core_fn_func_mobile_is_valid_pin(RustBuffer pin, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_LOCK
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_LOCK
+void uniffi_llamenos_core_fn_func_mobile_lock(RustCallStatus *_Nonnull out_status
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_PUK_CREATE
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_PUK_CREATE
+RustBuffer uniffi_llamenos_core_fn_func_mobile_puk_create(RustCallStatus *_Nonnull out_status
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_PUK_DERIVE_STATE
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_PUK_DERIVE_STATE
+RustBuffer uniffi_llamenos_core_fn_func_mobile_puk_derive_state(RustBuffer seed_hex, uint32_t generation, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_PUK_ROTATE
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_PUK_ROTATE
+RustBuffer uniffi_llamenos_core_fn_func_mobile_puk_rotate(RustBuffer old_seed_hex, uint32_t old_gen, RustBuffer remaining_devices_json, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_PUK_UNWRAP_SEED
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_PUK_UNWRAP_SEED
+RustBuffer uniffi_llamenos_core_fn_func_mobile_puk_unwrap_seed(RustBuffer envelope, RustBuffer expected_label, RustBuffer aad_hex, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_RANDOM_BYTES_HEX
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_RANDOM_BYTES_HEX
+RustBuffer uniffi_llamenos_core_fn_func_mobile_random_bytes_hex(RustCallStatus *_Nonnull out_status
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_SET_HUB_KEY
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_SET_HUB_KEY
+void uniffi_llamenos_core_fn_func_mobile_set_hub_key(RustBuffer hub_id, RustBuffer key_hex, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_SET_SERVER_EVENT_KEYS
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_SET_SERVER_EVENT_KEYS
+void uniffi_llamenos_core_fn_func_mobile_set_server_event_keys(RustBuffer current_hex, RustBuffer previous_hex, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_SIGCHAIN_CREATE_LINK
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_SIGCHAIN_CREATE_LINK
+RustBuffer uniffi_llamenos_core_fn_func_mobile_sigchain_create_link(RustBuffer id, uint64_t seq, RustBuffer prev_hash, RustBuffer timestamp, RustBuffer payload_json, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_SIGCHAIN_VERIFY
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_SIGCHAIN_VERIFY
+RustBuffer uniffi_llamenos_core_fn_func_mobile_sigchain_verify(RustBuffer links_json, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_SIGCHAIN_VERIFY_LINK
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_SIGCHAIN_VERIFY_LINK
+int8_t uniffi_llamenos_core_fn_func_mobile_sigchain_verify_link(RustBuffer link_json, RustBuffer expected_signer_pubkey, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_SIGN
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_SIGN
+RustBuffer uniffi_llamenos_core_fn_func_mobile_sign(RustBuffer message_hex, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_SYMMETRIC_DECRYPT
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_SYMMETRIC_DECRYPT
+RustBuffer uniffi_llamenos_core_fn_func_mobile_symmetric_decrypt(RustBuffer ciphertext_hex, RustBuffer key_hex, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_SYMMETRIC_ENCRYPT
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_SYMMETRIC_ENCRYPT
+RustBuffer uniffi_llamenos_core_fn_func_mobile_symmetric_encrypt(RustBuffer plaintext_hex, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_UNLOCK
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_FN_FUNC_MOBILE_UNLOCK
+RustBuffer uniffi_llamenos_core_fn_func_mobile_unlock(RustBuffer data, RustBuffer pin, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_FFI_LLAMENOS_CORE_RUSTBUFFER_ALLOC
@@ -578,26 +778,6 @@ void ffi_llamenos_core_rust_future_free_f64(uint64_t handle
 double ffi_llamenos_core_rust_future_complete_f64(uint64_t handle, RustCallStatus *_Nonnull out_status
 );
 #endif
-#ifndef UNIFFI_FFIDEF_FFI_LLAMENOS_CORE_RUST_FUTURE_POLL_POINTER
-#define UNIFFI_FFIDEF_FFI_LLAMENOS_CORE_RUST_FUTURE_POLL_POINTER
-void ffi_llamenos_core_rust_future_poll_pointer(uint64_t handle, UniffiRustFutureContinuationCallback _Nonnull callback, uint64_t callback_data
-);
-#endif
-#ifndef UNIFFI_FFIDEF_FFI_LLAMENOS_CORE_RUST_FUTURE_CANCEL_POINTER
-#define UNIFFI_FFIDEF_FFI_LLAMENOS_CORE_RUST_FUTURE_CANCEL_POINTER
-void ffi_llamenos_core_rust_future_cancel_pointer(uint64_t handle
-);
-#endif
-#ifndef UNIFFI_FFIDEF_FFI_LLAMENOS_CORE_RUST_FUTURE_FREE_POINTER
-#define UNIFFI_FFIDEF_FFI_LLAMENOS_CORE_RUST_FUTURE_FREE_POINTER
-void ffi_llamenos_core_rust_future_free_pointer(uint64_t handle
-);
-#endif
-#ifndef UNIFFI_FFIDEF_FFI_LLAMENOS_CORE_RUST_FUTURE_COMPLETE_POINTER
-#define UNIFFI_FFIDEF_FFI_LLAMENOS_CORE_RUST_FUTURE_COMPLETE_POINTER
-void*_Nonnull ffi_llamenos_core_rust_future_complete_pointer(uint64_t handle, RustCallStatus *_Nonnull out_status
-);
-#endif
 #ifndef UNIFFI_FFIDEF_FFI_LLAMENOS_CORE_RUST_FUTURE_POLL_RUST_BUFFER
 #define UNIFFI_FFIDEF_FFI_LLAMENOS_CORE_RUST_FUTURE_POLL_RUST_BUFFER
 void ffi_llamenos_core_rust_future_poll_rust_buffer(uint64_t handle, UniffiRustFutureContinuationCallback _Nonnull callback, uint64_t callback_data
@@ -638,27 +818,9 @@ void ffi_llamenos_core_rust_future_free_void(uint64_t handle
 void ffi_llamenos_core_rust_future_complete_void(uint64_t handle, RustCallStatus *_Nonnull out_status
 );
 #endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_CREATE_AUTH_TOKEN
-#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_CREATE_AUTH_TOKEN
-uint16_t uniffi_llamenos_core_checksum_func_create_auth_token(void
-    
-);
-#endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_DECRYPT_CALL_RECORD_FOR_READER
-#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_DECRYPT_CALL_RECORD_FOR_READER
-uint16_t uniffi_llamenos_core_checksum_func_decrypt_call_record_for_reader(void
-    
-);
-#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_DECRYPT_DRAFT
 #define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_DECRYPT_DRAFT
 uint16_t uniffi_llamenos_core_checksum_func_decrypt_draft(void
-    
-);
-#endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_DECRYPT_MESSAGE_FOR_READER
-#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_DECRYPT_MESSAGE_FOR_READER
-uint16_t uniffi_llamenos_core_checksum_func_decrypt_message_for_reader(void
     
 );
 #endif
@@ -674,27 +836,57 @@ uint16_t uniffi_llamenos_core_checksum_func_decrypt_with_pin(void
     
 );
 #endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_DERIVE_KEK_HEX
-#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_DERIVE_KEK_HEX
-uint16_t uniffi_llamenos_core_checksum_func_derive_kek_hex(void
-    
-);
-#endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_ECIES_UNWRAP_KEY_HEX
-#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_ECIES_UNWRAP_KEY_HEX
-uint16_t uniffi_llamenos_core_checksum_func_ecies_unwrap_key_hex(void
-    
-);
-#endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_ECIES_WRAP_KEY_HEX
-#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_ECIES_WRAP_KEY_HEX
-uint16_t uniffi_llamenos_core_checksum_func_ecies_wrap_key_hex(void
-    
-);
-#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_ENCRYPT_DRAFT
 #define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_ENCRYPT_DRAFT
 uint16_t uniffi_llamenos_core_checksum_func_encrypt_draft(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_ENCRYPT_WITH_PIN
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_ENCRYPT_WITH_PIN
+uint16_t uniffi_llamenos_core_checksum_func_encrypt_with_pin(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_IS_VALID_PIN
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_IS_VALID_PIN
+uint16_t uniffi_llamenos_core_checksum_func_is_valid_pin(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_COMPUTE_SAS_CODE
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_COMPUTE_SAS_CODE
+uint16_t uniffi_llamenos_core_checksum_func_compute_sas_code(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_COMPUTE_SHARED_X_HEX
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_COMPUTE_SHARED_X_HEX
+uint16_t uniffi_llamenos_core_checksum_func_compute_shared_x_hex(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_DECRYPT_CALL_RECORD_FOR_READER
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_DECRYPT_CALL_RECORD_FOR_READER
+uint16_t uniffi_llamenos_core_checksum_func_decrypt_call_record_for_reader(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_DECRYPT_MESSAGE_FOR_READER
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_DECRYPT_MESSAGE_FOR_READER
+uint16_t uniffi_llamenos_core_checksum_func_decrypt_message_for_reader(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_DECRYPT_SERVER_EVENT_HEX
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_DECRYPT_SERVER_EVENT_HEX
+uint16_t uniffi_llamenos_core_checksum_func_decrypt_server_event_hex(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_DECRYPT_WITH_SHARED_KEY_HEX
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_DECRYPT_WITH_SHARED_KEY_HEX
+uint16_t uniffi_llamenos_core_checksum_func_decrypt_with_shared_key_hex(void
     
 );
 #endif
@@ -710,39 +902,51 @@ uint16_t uniffi_llamenos_core_checksum_func_encrypt_note_for_recipients(void
     
 );
 #endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_ENCRYPT_WITH_PIN
-#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_ENCRYPT_WITH_PIN
-uint16_t uniffi_llamenos_core_checksum_func_encrypt_with_pin(void
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_HPKE_UNWRAP_KEY_HEX
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_HPKE_UNWRAP_KEY_HEX
+uint16_t uniffi_llamenos_core_checksum_func_hpke_unwrap_key_hex(void
     
 );
 #endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_GENERATE_KEYPAIR
-#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_GENERATE_KEYPAIR
-uint16_t uniffi_llamenos_core_checksum_func_generate_keypair(void
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_HPKE_WRAP_KEY_HEX
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_HPKE_WRAP_KEY_HEX
+uint16_t uniffi_llamenos_core_checksum_func_hpke_wrap_key_hex(void
     
 );
 #endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_GET_PUBLIC_KEY
-#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_GET_PUBLIC_KEY
-uint16_t uniffi_llamenos_core_checksum_func_get_public_key(void
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_RECOVERY_GROUP_GENERATE_KEYPAIR
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_RECOVERY_GROUP_GENERATE_KEYPAIR
+uint16_t uniffi_llamenos_core_checksum_func_mobile_recovery_group_generate_keypair(void
     
 );
 #endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_IS_VALID_NSEC
-#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_IS_VALID_NSEC
-uint16_t uniffi_llamenos_core_checksum_func_is_valid_nsec(void
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_RECOVERY_GROUP_SPLIT_PRIVATE_KEY
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_RECOVERY_GROUP_SPLIT_PRIVATE_KEY
+uint16_t uniffi_llamenos_core_checksum_func_mobile_recovery_group_split_private_key(void
     
 );
 #endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_IS_VALID_PIN
-#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_IS_VALID_PIN
-uint16_t uniffi_llamenos_core_checksum_func_is_valid_pin(void
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_SHAMIR_COMBINE
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_SHAMIR_COMBINE
+uint16_t uniffi_llamenos_core_checksum_func_mobile_shamir_combine(void
     
 );
 #endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_KEYPAIR_FROM_NSEC
-#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_KEYPAIR_FROM_NSEC
-uint16_t uniffi_llamenos_core_checksum_func_keypair_from_nsec(void
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_SHAMIR_COMMIT
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_SHAMIR_COMMIT
+uint16_t uniffi_llamenos_core_checksum_func_mobile_shamir_commit(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_SHAMIR_SPLIT
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_SHAMIR_SPLIT
+uint16_t uniffi_llamenos_core_checksum_func_mobile_shamir_split(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_SHAMIR_VERIFY
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_SHAMIR_VERIFY
+uint16_t uniffi_llamenos_core_checksum_func_mobile_shamir_verify(void
     
 );
 #endif
@@ -752,15 +956,231 @@ uint16_t uniffi_llamenos_core_checksum_func_random_bytes_hex(void
     
 );
 #endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_VERIFY_AUTH_TOKEN
-#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_VERIFY_AUTH_TOKEN
-uint16_t uniffi_llamenos_core_checksum_func_verify_auth_token(void
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_GENERATE_EPHEMERAL_KEYPAIR_MOBILE
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_GENERATE_EPHEMERAL_KEYPAIR_MOBILE
+uint16_t uniffi_llamenos_core_checksum_func_generate_ephemeral_keypair_mobile(void
     
 );
 #endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_VERIFY_SCHNORR
-#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_VERIFY_SCHNORR
-uint16_t uniffi_llamenos_core_checksum_func_verify_schnorr(void
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_GET_PUBLIC_KEY
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_GET_PUBLIC_KEY
+uint16_t uniffi_llamenos_core_checksum_func_get_public_key(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_CLEAR_HUB_KEYS
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_CLEAR_HUB_KEYS
+uint16_t uniffi_llamenos_core_checksum_func_mobile_clear_hub_keys(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_CLEAR_SERVER_EVENT_KEYS
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_CLEAR_SERVER_EVENT_KEYS
+uint16_t uniffi_llamenos_core_checksum_func_mobile_clear_server_event_keys(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_CREATE_AUTH_TOKEN
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_CREATE_AUTH_TOKEN
+uint16_t uniffi_llamenos_core_checksum_func_mobile_create_auth_token(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_CREATE_AUTH_TOKEN_FROM_SIGNING_KEY
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_CREATE_AUTH_TOKEN_FROM_SIGNING_KEY
+uint16_t uniffi_llamenos_core_checksum_func_mobile_create_auth_token_from_signing_key(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_DECRYPT_DRAFT
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_DECRYPT_DRAFT
+uint16_t uniffi_llamenos_core_checksum_func_mobile_decrypt_draft(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_DECRYPT_EVENT_WITH_ATTRIBUTION
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_DECRYPT_EVENT_WITH_ATTRIBUTION
+uint16_t uniffi_llamenos_core_checksum_func_mobile_decrypt_event_with_attribution(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_DECRYPT_HUB_EVENT
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_DECRYPT_HUB_EVENT
+uint16_t uniffi_llamenos_core_checksum_func_mobile_decrypt_hub_event(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_DECRYPT_HUB_EVENT_TRIAL
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_DECRYPT_HUB_EVENT_TRIAL
+uint16_t uniffi_llamenos_core_checksum_func_mobile_decrypt_hub_event_trial(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_DECRYPT_SERVER_EVENT
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_DECRYPT_SERVER_EVENT
+uint16_t uniffi_llamenos_core_checksum_func_mobile_decrypt_server_event(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_DECRYPT_SERVER_EVENT_WITH_EPOCH
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_DECRYPT_SERVER_EVENT_WITH_EPOCH
+uint16_t uniffi_llamenos_core_checksum_func_mobile_decrypt_server_event_with_epoch(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_ED25519_VERIFY
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_ED25519_VERIFY
+uint16_t uniffi_llamenos_core_checksum_func_mobile_ed25519_verify(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_ENCRYPT_DRAFT
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_ENCRYPT_DRAFT
+uint16_t uniffi_llamenos_core_checksum_func_mobile_encrypt_draft(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_GENERATE_AND_LOAD
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_GENERATE_AND_LOAD
+uint16_t uniffi_llamenos_core_checksum_func_mobile_generate_and_load(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_GET_DEVICE_STATE
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_GET_DEVICE_STATE
+uint16_t uniffi_llamenos_core_checksum_func_mobile_get_device_state(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_HAS_HUB_KEY
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_HAS_HUB_KEY
+uint16_t uniffi_llamenos_core_checksum_func_mobile_has_hub_key(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_HPKE_OPEN
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_HPKE_OPEN
+uint16_t uniffi_llamenos_core_checksum_func_mobile_hpke_open(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_HPKE_OPEN_KEY
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_HPKE_OPEN_KEY
+uint16_t uniffi_llamenos_core_checksum_func_mobile_hpke_open_key(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_HPKE_SEAL
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_HPKE_SEAL
+uint16_t uniffi_llamenos_core_checksum_func_mobile_hpke_seal(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_HPKE_SEAL_KEY
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_HPKE_SEAL_KEY
+uint16_t uniffi_llamenos_core_checksum_func_mobile_hpke_seal_key(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_IS_UNLOCKED
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_IS_UNLOCKED
+uint16_t uniffi_llamenos_core_checksum_func_mobile_is_unlocked(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_IS_VALID_PIN
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_IS_VALID_PIN
+uint16_t uniffi_llamenos_core_checksum_func_mobile_is_valid_pin(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_LOCK
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_LOCK
+uint16_t uniffi_llamenos_core_checksum_func_mobile_lock(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_PUK_CREATE
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_PUK_CREATE
+uint16_t uniffi_llamenos_core_checksum_func_mobile_puk_create(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_PUK_DERIVE_STATE
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_PUK_DERIVE_STATE
+uint16_t uniffi_llamenos_core_checksum_func_mobile_puk_derive_state(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_PUK_ROTATE
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_PUK_ROTATE
+uint16_t uniffi_llamenos_core_checksum_func_mobile_puk_rotate(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_PUK_UNWRAP_SEED
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_PUK_UNWRAP_SEED
+uint16_t uniffi_llamenos_core_checksum_func_mobile_puk_unwrap_seed(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_RANDOM_BYTES_HEX
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_RANDOM_BYTES_HEX
+uint16_t uniffi_llamenos_core_checksum_func_mobile_random_bytes_hex(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_SET_HUB_KEY
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_SET_HUB_KEY
+uint16_t uniffi_llamenos_core_checksum_func_mobile_set_hub_key(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_SET_SERVER_EVENT_KEYS
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_SET_SERVER_EVENT_KEYS
+uint16_t uniffi_llamenos_core_checksum_func_mobile_set_server_event_keys(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_SIGCHAIN_CREATE_LINK
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_SIGCHAIN_CREATE_LINK
+uint16_t uniffi_llamenos_core_checksum_func_mobile_sigchain_create_link(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_SIGCHAIN_VERIFY
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_SIGCHAIN_VERIFY
+uint16_t uniffi_llamenos_core_checksum_func_mobile_sigchain_verify(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_SIGCHAIN_VERIFY_LINK
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_SIGCHAIN_VERIFY_LINK
+uint16_t uniffi_llamenos_core_checksum_func_mobile_sigchain_verify_link(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_SIGN
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_SIGN
+uint16_t uniffi_llamenos_core_checksum_func_mobile_sign(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_SYMMETRIC_DECRYPT
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_SYMMETRIC_DECRYPT
+uint16_t uniffi_llamenos_core_checksum_func_mobile_symmetric_decrypt(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_SYMMETRIC_ENCRYPT
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_SYMMETRIC_ENCRYPT
+uint16_t uniffi_llamenos_core_checksum_func_mobile_symmetric_encrypt(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_UNLOCK
+#define UNIFFI_FFIDEF_UNIFFI_LLAMENOS_CORE_CHECKSUM_FUNC_MOBILE_UNLOCK
+uint16_t uniffi_llamenos_core_checksum_func_mobile_unlock(void
     
 );
 #endif

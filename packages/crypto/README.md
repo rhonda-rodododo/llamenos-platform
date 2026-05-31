@@ -20,7 +20,6 @@ Shared Rust cryptographic core for Llamenos. All cryptographic operations are im
 - **MLS** (RFC 9420, OpenMLS 0.8) — group key management for hub state
 - **SFrame** — voice E2EE key derivation
 - **Payload padding** — power-of-2 bucketing for traffic analysis resistance
-- **Legacy ECIES/Schnorr/nsec** — retained for decrypting existing data; being phased out
 
 ## Building
 
@@ -39,7 +38,7 @@ bun run crypto:fmt            # format check
 ## Key rules
 
 - **Never use raw string literals for crypto contexts** — always use constants generated from `../protocol/crypto-labels.json`
-- **HPKE only for new code** — the legacy ECIES modules (`ecies.rs`) are read-only; no new callers
+- **HPKE for all key wrapping** — Ed25519/X25519 + HPKE (RFC 9180) is the only crypto path
 - **`mobile` feature is required** for iOS/Android library builds — without it, the static archive has zero UniFFI symbols
 - Private key material uses `zeroize::Zeroizing<>` throughout; secrets are cleared on lock/drop
 

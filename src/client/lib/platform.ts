@@ -750,36 +750,11 @@ export async function decryptWithPin(pin: string): Promise<string | null> {
   return state?.signingPubkeyHex ?? null
 }
 
-/** @deprecated No more nsec-based key import in v3. */
-export async function encryptWithPin(
-  nsec: string,
-  pin: string,
-  pubkeyHex: string,
-): Promise<void> {
-  void [nsec, pin, pubkeyHex]
-  throw new Error('encryptWithPin removed in v3 — use deviceGenerateAndLoad instead')
-}
-
-/** @deprecated Use getDevicePubkeys instead. */
-export async function getPublicKeyFromState(): Promise<string | null> {
-  const state = await getDevicePubkeys()
-  return state?.signingPubkeyHex ?? null
-}
-
 /**
  * Validate a hex-encoded Ed25519 seed (64 hex chars = 32 bytes).
  */
 export function isValidSeedHex(seedHex: string): boolean {
   return /^[0-9a-f]{64}$/i.test(seedHex)
-}
-
-/** @deprecated Use ed25519Verify instead. */
-export async function verifySchnorr(
-  message: string,
-  signature: string,
-  pubkey: string,
-): Promise<boolean> {
-  return ed25519Verify(message, signature, pubkey)
 }
 
 // ── Helpers: base64url ↔ hex conversion for HPKE enc field ──────────

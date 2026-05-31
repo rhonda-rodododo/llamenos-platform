@@ -42,13 +42,10 @@ data class WakePayload(
  * when [PushService] receives a message while the device is locked.
  *
  * Flow:
- * 1. On first use, [getOrCreateWakePublicKey] generates a secp256k1 keypair and stores it
+ * 1. On first use, [getOrCreateWakePublicKey] generates an X25519 keypair and stores it
  * 2. The wake public key is registered with the server (POST /api/devices/register)
- * 3. Server encrypts push payloads with the device's wake public key via HPKE (or legacy ECIES)
+ * 3. Server encrypts push payloads with the device's wake public key via HPKE
  * 4. [PushService] calls [decryptWakePayload] to decrypt
- *
- * V3 migration: The server will migrate from ECIES to HPKE for push envelopes.
- * Both decryption paths are supported during the transition.
  */
 @Singleton
 class WakeKeyService @Inject constructor(
@@ -256,7 +253,6 @@ class WakeKeyService @Inject constructor(
      * Decrypt a wake-tier push notification payload.
      *
      * Accepts an HPKE envelope JSON string. Delegates to [decryptWakePayloadHpke].
-     * Legacy ECIES path removed — all push envelopes use HPKE.
      */
     suspend fun decryptWakePayload(envelopeJson: String): WakePayload? =
         decryptWakePayloadHpke(envelopeJson)

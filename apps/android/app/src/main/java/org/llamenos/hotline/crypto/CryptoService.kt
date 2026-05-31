@@ -727,10 +727,10 @@ class CryptoService @Inject constructor() {
         }
     }
 
-    // ---- Device Linking (legacy ECDH provisioning) ----
+    // ---- Device Linking (ECDH provisioning) ----
 
     /**
-     * Generate an ephemeral secp256k1 keypair for device linking ECDH.
+     * Generate an ephemeral X25519 keypair for device linking ECDH.
      *
      * Returns an [EphemeralKeypair] that holds the secret as a [ByteArray].
      * Always use within a `.use { }` block to ensure the secret is zeroized after use.
