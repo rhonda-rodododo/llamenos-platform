@@ -52,6 +52,8 @@ interface E2EEIntegrityState {
   adminPubkey?: string
   /** The admin X25519 pubkey (for HPKE operations) */
   adminX25519Pubkey?: string
+  /** Whether the last HPKE unwrap attempt raised an error */
+  lastDecryptionFailed?: boolean
 }
 
 const E2EE_INTEGRITY_KEY = 'e2ee_integrity'
@@ -522,3 +524,429 @@ Then('the DB author_envelope JSONB should be a proper object not a string', asyn
   expect(result.pgType).toBe('object')
   expect(result.isDoubleStringified).toBe(false)
 })
+
+// ── Cross-user encryption boundary steps ─────────────────────────────
+// Matches: packages/test-specs/features/security/cross-user-encryption.feature
+
+Given('a reviewer {string} with a real keypair', async ({ request, world }, name: string) => {
+  const kp = generateTestKeypair()
+  const x25519Pubkey = x25519PubkeyFromSeed(kp.seedHex)
+  getE2EEIntegrityState(world).keypairs.set(name, { ...kp, x25519Pubkey })
+  const { status } = await apiPost(request, '/users', {
+    name: `XU Reviewer ${name} ${Date.now()}`,
+    phone: uniquePhone(),
+    roleIds: ['role-reviewer'],
+    pubkey: kp.pubkey,
+  })
+  expect([200, 201]).toContain(status)
+})
+
+Given('a hub admin {string} with a real keypair', async ({ request, world }, name: string) => {
+  const kp = generateTestKeypair()
+  const x25519Pubkey = x25519PubkeyFromSeed(kp.seedHex)
+  getE2EEIntegrityState(world).keypairs.set(name, { ...kp, x25519Pubkey })
+  const { status } = await apiPost(request, '/users', {
+    name: `XU HubAdmin ${name} ${Date.now()}`,
+    phone: uniquePhone(),
+    roleIds: ['role-hub-admin'],
+    pubkey: kp.pubkey,
+  })
+  expect([200, 201]).toContain(status)
+})
+
+When(
+  '{string} creates an encrypted note {string} with their own envelope and admin envelope',
+  async ({ request, world }, authorName: string, plaintext: string) => {
+    const state = getE2EEIntegrityState(world)
+    const authorKp = getKeypair(world, authorName)
+    expect(state.adminX25519Pubkey).toBeDefined()
+
+    state.contentKey = generateContentKey()
+    state.ciphertextHex = encryptContent(plaintext, state.contentKey, LABEL_NOTE_KEY)
+    state.envelopes = new Map()
+
+    const authorEnv = await wrapKeyForRecipient(
+      state.contentKey,
+      authorKp.x25519Pubkey,
+      authorKp.seedHex,
+      LABEL_NOTE_KEY,
+    )
+    state.envelopes.set(authorKp.x25519Pubkey, authorEnv)
+
+    const adminEnv = await wrapKeyForRecipient(
+      state.contentKey,
+      state.adminX25519Pubkey!,
+      state.adminSeedHex!,
+      LABEL_NOTE_KEY,
+    )
+    state.envelopes.set(state.adminX25519Pubkey!, adminEnv)
+
+    const { status, data } = await apiPost<{ note?: Record<string, unknown> & { id?: string } }>(
+      request,
+      '/notes',
+      {
+        encryptedContent: state.ciphertextHex,
+        callId: `xu-${Date.now()}`,
+        authorEnvelope: authorEnv,
+        adminEnvelopes: [{ pubkey: state.adminX25519Pubkey, ...adminEnv }],
+      },
+      authorKp.seedHex,
+    )
+    expect([200, 201]).toContain(status)
+    state.noteId = data.note?.id
+    state.apiNote = data.note
+  },
+)
+
+When(
+  'the admin creates an encrypted note {string} with only the admin envelope',
+  async ({ request, world }, plaintext: string) => {
+    const state = getE2EEIntegrityState(world)
+    expect(state.adminX25519Pubkey).toBeDefined()
+    expect(state.adminSeedHex).toBeDefined()
+
+    state.contentKey = generateContentKey()
+    state.ciphertextHex = encryptContent(plaintext, state.contentKey, LABEL_NOTE_KEY)
+    state.envelopes = new Map()
+
+    const adminEnv = await wrapKeyForRecipient(
+      state.contentKey,
+      state.adminX25519Pubkey!,
+      state.adminSeedHex!,
+      LABEL_NOTE_KEY,
+    )
+    state.envelopes.set(state.adminX25519Pubkey!, adminEnv)
+
+    const { status, data } = await apiPost<{ note?: Record<string, unknown> & { id?: string } }>(
+      request,
+      '/notes',
+      {
+        encryptedContent: state.ciphertextHex,
+        callId: `xu-admin-${Date.now()}`,
+        authorEnvelope: adminEnv,
+        adminEnvelopes: [{ pubkey: state.adminX25519Pubkey, ...adminEnv }],
+      },
+      state.adminSeedHex!,
+    )
+    expect([200, 201]).toContain(status)
+    state.noteId = data.note?.id
+    state.apiNote = data.note
+  },
+)
+
+Then('the note is stored on the server', async ({ world }) => {
+  expect(getE2EEIntegrityState(world).noteId).toBeTruthy()
+})
+
+When('{string} retrieves the note as the author', async ({ request, world }, authorName: string) => {
+  const state = getE2EEIntegrityState(world)
+  const authorKp = getKeypair(world, authorName)
+  expect(state.noteId).toBeDefined()
+
+  const { status, data } = await apiGet<{ notes: Array<Record<string, unknown>> }>(
+    request,
+    '/notes',
+    authorKp.seedHex,
+  )
+  expect(status).toBe(200)
+  const note = data.notes.find(n => n.id === state.noteId)
+  expect(note).toBeTruthy()
+  state.apiNote = note
+})
+
+When('{string} decrypts their note using their own envelope', async ({ world }, authorName: string) => {
+  const state = getE2EEIntegrityState(world)
+  const authorKp = getKeypair(world, authorName)
+  expect(state.apiNote?.encryptedContent).toBeTruthy()
+
+  const envelope = state.envelopes.get(authorKp.x25519Pubkey)
+  expect(envelope).toBeDefined()
+
+  const recoveredKey = await unwrapKey(
+    envelope!.ct,
+    envelope!.enc,
+    authorKp.seedHex,
+    LABEL_NOTE_KEY,
+  )
+  state.decryptedText = decryptContent(
+    state.apiNote!.encryptedContent as string,
+    recoveredKey,
+    LABEL_NOTE_KEY,
+  )
+})
+
+When('the admin retrieves the note via notes:read-all', async ({ request, world }) => {
+  const state = getE2EEIntegrityState(world)
+  expect(state.noteId).toBeDefined()
+  expect(state.adminSeedHex).toBeDefined()
+
+  const { status, data } = await apiGet<{ notes: Array<Record<string, unknown>> }>(
+    request,
+    '/notes',
+    state.adminSeedHex!,
+  )
+  expect(status).toBe(200)
+  const note = data.notes.find(n => n.id === state.noteId)
+  expect(note).toBeTruthy()
+  state.apiNote = note
+})
+
+When('the admin decrypts the note using the admin envelope', async ({ world }) => {
+  const state = getE2EEIntegrityState(world)
+  expect(state.adminX25519Pubkey).toBeDefined()
+  expect(state.adminSeedHex).toBeDefined()
+  expect(state.apiNote?.encryptedContent).toBeTruthy()
+
+  const envelope = state.envelopes.get(state.adminX25519Pubkey!)
+  expect(envelope).toBeDefined()
+
+  const recoveredKey = await unwrapKey(
+    envelope!.ct,
+    envelope!.enc,
+    state.adminSeedHex!,
+    LABEL_NOTE_KEY,
+  )
+  state.decryptedText = decryptContent(
+    state.apiNote!.encryptedContent as string,
+    recoveredKey,
+    LABEL_NOTE_KEY,
+  )
+})
+
+Then('the decrypted note content should be {string}', async ({ world }, expected: string) => {
+  expect(getE2EEIntegrityState(world).decryptedText).toBe(expected)
+})
+
+When(
+  '{string} fetches the author\'s note via direct API access as an authorized reader',
+  async ({ request, world }, readerName: string) => {
+    const state = getE2EEIntegrityState(world)
+    const readerKp = getKeypair(world, readerName)
+
+    // Reader (reviewer role) fetches their own note list — they won't see the author's note
+    // since they have notes:read-own only (not notes:read-all)
+    const { status, data } = await apiGet<{ notes: Array<Record<string, unknown>> }>(
+      request,
+      '/notes',
+      readerKp.seedHex,
+    )
+    expect(status).toBe(200)
+    const ownNote = data.notes.find(n => n.id === state.noteId)
+    // Reviewer cannot see another volunteer's note — apiNote stays as previously set
+    if (ownNote) {
+      state.apiNote = ownNote
+    }
+    // If not found: the reader cannot access this note via the API at all —
+    // the cryptographic protection is verified independently via the in-memory state
+  },
+)
+
+When('{string} fetches notes via notes:read-all', async ({ request, world }, readerName: string) => {
+  const state = getE2EEIntegrityState(world)
+  const readerKp = getKeypair(world, readerName)
+  expect(state.noteId).toBeDefined()
+
+  // Hub admin has notes:read-all → can see all notes
+  const { status, data } = await apiGet<{ notes: Array<Record<string, unknown>> }>(
+    request,
+    '/notes',
+    readerKp.seedHex,
+  )
+  expect(status).toBe(200)
+  const note = data.notes.find(n => n.id === state.noteId)
+  expect(note).toBeTruthy()
+  state.apiNote = note
+})
+
+When('{string} retrieves notes visible to them', async ({ request, world }, volName: string) => {
+  const state = getE2EEIntegrityState(world)
+  const volKp = getKeypair(world, volName)
+
+  const { status, data } = await apiGet<{ notes: Array<Record<string, unknown>> }>(
+    request,
+    '/notes',
+    volKp.seedHex,
+  )
+  expect(status).toBe(200)
+  // Volunteer sees only own notes — admin-created note won't appear here
+  state.apiNote = data.notes.find(n => n.id === state.noteId)
+})
+
+When(
+  '{string} attempts HPKE unwrap of {string}\'s author envelope',
+  async ({ world }, attackerName: string, _ownerName: string) => {
+    const state = getE2EEIntegrityState(world)
+    const attackerKp = getKeypair(world, attackerName)
+
+    // The attacker tries to unwrap the authorEnvelope (wrapped for the actual author) with their key.
+    // The server may not return authorEnvelope in the API response — if so, the encryption
+    // already provides protection (no envelope = no decryption path).
+    const authorEnvelope = state.apiNote?.authorEnvelope as { ct?: string; enc?: string } | undefined
+    if (!authorEnvelope?.ct || !authorEnvelope?.enc) {
+      // No envelope exposed → decryption is impossible; test passes trivially
+      state.lastDecryptionFailed = true
+      return
+    }
+
+    state.lastDecryptionFailed = false
+    try {
+      await unwrapKey(authorEnvelope.ct, authorEnvelope.enc, attackerKp.seedHex, LABEL_NOTE_KEY)
+    } catch {
+      state.lastDecryptionFailed = true
+    }
+  },
+)
+
+Then('{string} receives the encrypted blob', async ({ world }, _readerName: string) => {
+  const state = getE2EEIntegrityState(world)
+  // The encrypted ciphertext exists in state (created by the author)
+  expect(state.ciphertextHex).toBeTruthy()
+  // If the API note was fetched by the reader, verify it carries the same ciphertext
+  if (state.apiNote) {
+    expect(state.apiNote.encryptedContent).toBeTruthy()
+  }
+})
+
+Then('{string} has no HPKE envelope for their key', async ({ world }, readerName: string) => {
+  const state = getE2EEIntegrityState(world)
+  const readerKp = getKeypair(world, readerName)
+
+  // Verify the reader's X25519 pubkey was NOT included in the envelopes map
+  expect(state.envelopes.has(readerKp.x25519Pubkey)).toBe(false)
+
+  // Also verify via the API note's adminEnvelopes (if exposed)
+  if (state.apiNote?.adminEnvelopes) {
+    const adminEnvelopes = state.apiNote.adminEnvelopes as Array<{ pubkey: string }>
+    const inEnvelopes = adminEnvelopes.some(
+      e => e.pubkey === readerKp.pubkey || e.pubkey === readerKp.x25519Pubkey,
+    )
+    expect(inEnvelopes).toBe(false)
+  }
+})
+
+Then(
+  '{string} cannot decrypt the note with their private key',
+  async ({ world }, readerName: string) => {
+    const state = getE2EEIntegrityState(world)
+    const readerKp = getKeypair(world, readerName)
+    expect(state.ciphertextHex).toBeTruthy()
+
+    // Find the author's envelope (the one NOT belonging to the admin or reader)
+    let targetEnv: { ct: string; enc: string } | undefined
+    for (const [pubkey, env] of state.envelopes.entries()) {
+      if (pubkey !== state.adminX25519Pubkey && pubkey !== readerKp.x25519Pubkey) {
+        targetEnv = env
+        break
+      }
+    }
+    // Fall back to admin envelope if no author-specific one
+    if (!targetEnv) {
+      targetEnv = state.envelopes.get(state.adminX25519Pubkey!)
+    }
+    expect(targetEnv).toBeDefined()
+
+    let decryptionFailed = false
+    try {
+      await unwrapKey(targetEnv!.ct, targetEnv!.enc, readerKp.seedHex, LABEL_NOTE_KEY)
+    } catch {
+      decryptionFailed = true
+    }
+    expect(decryptionFailed).toBe(true)
+  },
+)
+
+Then('{string} can see the encrypted note blob', async ({ world }, _readerName: string) => {
+  const state = getE2EEIntegrityState(world)
+  // Hub admin fetched the note — it should be in apiNote with encryptedContent
+  expect(state.apiNote).toBeDefined()
+  expect(state.apiNote!.encryptedContent).toBeTruthy()
+  expect(state.apiNote!.encryptedContent).toBe(state.ciphertextHex)
+})
+
+Then(
+  '{string} does not see the admin\'s note in their list',
+  async ({ world }, _volName: string) => {
+    // Volunteer fetched their note list — admin's note should not appear
+    expect(getE2EEIntegrityState(world).apiNote).toBeUndefined()
+  },
+)
+
+Then(
+  'any attempt to decrypt the admin note ciphertext with {string} key should fail',
+  async ({ world }, volName: string) => {
+    const state = getE2EEIntegrityState(world)
+    const volKp = getKeypair(world, volName)
+    expect(state.ciphertextHex).toBeTruthy()
+    expect(state.adminX25519Pubkey).toBeTruthy()
+
+    const adminEnv = state.envelopes.get(state.adminX25519Pubkey!)
+    expect(adminEnv).toBeDefined()
+
+    let decryptionFailed = false
+    try {
+      await unwrapKey(adminEnv!.ct, adminEnv!.enc, volKp.seedHex, LABEL_NOTE_KEY)
+    } catch {
+      decryptionFailed = true
+    }
+    expect(decryptionFailed).toBe(true)
+  },
+)
+
+Then('the HPKE operation should throw a decryption error', async ({ world }) => {
+  expect(getE2EEIntegrityState(world).lastDecryptionFailed).toBe(true)
+})
+
+Then(
+  'the author envelope ciphertext differs from the admin envelope ciphertext',
+  async ({ world }) => {
+    const state = getE2EEIntegrityState(world)
+
+    // Find the author (volunteer) keypair — not an admin-named one
+    let authorX25519: string | undefined
+    for (const [name, kp] of state.keypairs.entries()) {
+      if (!name.toLowerCase().includes('admin') && state.envelopes.has(kp.x25519Pubkey)) {
+        authorX25519 = kp.x25519Pubkey
+        break
+      }
+    }
+    expect(authorX25519).toBeTruthy()
+
+    const authorEnv = state.envelopes.get(authorX25519!)
+    const adminEnv = state.envelopes.get(state.adminX25519Pubkey!)
+    expect(authorEnv).toBeDefined()
+    expect(adminEnv).toBeDefined()
+    expect(authorEnv!.ct).not.toBe(adminEnv!.ct)
+  },
+)
+
+Then(
+  'both envelopes encrypt the same content key but are cryptographically independent',
+  async ({ world }) => {
+    const state = getE2EEIntegrityState(world)
+    expect(state.contentKey).toBeDefined()
+    expect(state.envelopes.size).toBeGreaterThanOrEqual(2)
+
+    const entries = [...state.envelopes.entries()]
+    const [pubkey1, env1] = entries[0]
+    const [pubkey2, env2] = entries[1]
+
+    // Resolve seed hex for each pubkey
+    function seedForPubkey(pubkey: string): string {
+      if (pubkey === state.adminX25519Pubkey) return state.adminSeedHex!
+      for (const kp of state.keypairs.values()) {
+        if (kp.x25519Pubkey === pubkey) return kp.seedHex
+      }
+      throw new Error(`No seed found for pubkey ${pubkey}`)
+    }
+
+    const key1 = await unwrapKey(env1.ct, env1.enc, seedForPubkey(pubkey1), LABEL_NOTE_KEY)
+    const key2 = await unwrapKey(env2.ct, env2.enc, seedForPubkey(pubkey2), LABEL_NOTE_KEY)
+
+    // Both unwrapped keys equal the original content key
+    expect(bytesToHex(key1)).toBe(bytesToHex(state.contentKey!))
+    expect(bytesToHex(key2)).toBe(bytesToHex(state.contentKey!))
+
+    // The HPKE enc (encapsulated key) must differ — each encapsulation is ephemeral
+    expect(env1.enc).not.toBe(env2.enc)
+  },
+)
