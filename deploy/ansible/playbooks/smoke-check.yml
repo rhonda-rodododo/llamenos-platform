@@ -15,12 +15,18 @@
   become: true
   vars_files:
     - ../vars.yml
+  vars:
+    # Derive the API base URL from deployment config (matches Caddyfile logic)
+    _api_host: "{{ api_subdomain + '.' + domain if (api_subdomain | default('') | length > 0) else domain }}"
+    _api_base_url: "https://{{ _api_host }}"
 
   tasks:
     - name: Initialize smoke-check results
       ansible.builtin.set_fact:
         smoke_results: []
       tags: always
+
+    # ─── System hardening ────────────────────────────────────────────────────
 
     - name: Assert ufw is active with deny-incoming default
       ansible.builtin.shell: |
@@ -109,7 +115,65 @@
         smoke_results: "{{ smoke_results + [{'check': 'TCP syncookies enabled', 'status': 'PASS' if syncookies is succeeded else 'FAIL'}] }}"
       tags: always
 
-    - name: Check app health endpoint responds 200
+    # ─── Container health ────────────────────────────────────────────────────
+
+    - name: Check for unhealthy Docker containers
+      ansible.builtin.shell: |
+        set -euo pipefail
+        unhealthy=$(docker ps --filter health=unhealthy --format '{{ "{{" }}.Names{{ "}}" }}' | tr '\n' ' ')
+        if [ -n "$unhealthy" ]; then
+          echo "UNHEALTHY: $unhealthy"
+          exit 1
+        fi
+      args:
+        executable: /bin/bash
+      changed_when: false
+      register: container_health_check
+      ignore_errors: true
+      tags: always
+
+    - name: Record container health result
+      ansible.builtin.set_fact:
+        smoke_results: "{{ smoke_results + [{'check': 'No unhealthy Docker containers', 'status': 'PASS' if container_health_check is succeeded else 'FAIL: ' + container_health_check.stdout | default('')}] }}"
+      tags: always
+
+    # ─── Application health endpoints ────────────────────────────────────────
+
+    - name: Check app liveness probe (process alive)
+      ansible.builtin.uri:
+        url: "http://localhost:3000/api/health/live"
+        method: GET
+        status_code: 200
+        return_content: true
+      register: app_live
+      retries: 3
+      delay: 5
+      ignore_errors: true
+      tags: always
+
+    - name: Record app liveness result
+      ansible.builtin.set_fact:
+        smoke_results: "{{ smoke_results + [{'check': 'App liveness probe /api/health/live (200)', 'status': 'PASS' if app_live is succeeded else 'FAIL'}] }}"
+      tags: always
+
+    - name: Check app readiness probe (all dependencies reachable)
+      ansible.builtin.uri:
+        url: "http://localhost:3000/api/health/ready"
+        method: GET
+        status_code: 200
+        return_content: true
+      register: app_ready
+      retries: 5
+      delay: 5
+      ignore_errors: true
+      tags: always
+
+    - name: Record app readiness result
+      ansible.builtin.set_fact:
+        smoke_results: "{{ smoke_results + [{'check': 'App readiness probe /api/health/ready (200)', 'status': 'PASS' if app_ready is succeeded else 'FAIL (postgres/storage/relay dependency check failed)'}] }}"
+      tags: always
+
+    - name: Check app full health endpoint
       ansible.builtin.uri:
         url: "http://localhost:3000/api/health"
         method: GET
@@ -123,8 +187,10 @@
 
     - name: Record app health result
       ansible.builtin.set_fact:
-        smoke_results: "{{ smoke_results + [{'check': 'App health endpoint (200)', 'status': 'PASS' if app_health is succeeded else 'FAIL'}] }}"
+        smoke_results: "{{ smoke_results + [{'check': 'App health endpoint /api/health (200)', 'status': 'PASS' if app_health is succeeded else 'FAIL'}] }}"
       tags: always
+
+    # ─── Database ────────────────────────────────────────────────────────────
 
     - name: Check PostgreSQL is accepting connections
       ansible.builtin.shell: |
@@ -145,7 +211,29 @@
       when: llamenos_postgres_enabled | default(true) | bool
       tags: always
 
+    # ─── Object storage ──────────────────────────────────────────────────────
 
+    - name: Check RustFS is reachable (S3-compatible object storage)
+      ansible.builtin.uri:
+        url: "http://localhost:9000/"
+        method: GET
+        # RustFS returns 403 on unauthenticated root — still proves reachability
+        status_code: [200, 403]
+        return_content: false
+      register: rustfs_check
+      retries: 3
+      delay: 5
+      ignore_errors: true
+      when: llamenos_rustfs_enabled | default(true) | bool
+      tags: always
+
+    - name: Record RustFS result
+      ansible.builtin.set_fact:
+        smoke_results: "{{ smoke_results + [{'check': 'RustFS object storage reachable (port 9000)', 'status': 'PASS' if rustfs_check is succeeded else 'FAIL' if rustfs_check is failed else 'SKIP'}] }}"
+      when: llamenos_rustfs_enabled | default(true) | bool
+      tags: always
+
+    # ─── Optional sidecars ───────────────────────────────────────────────────
 
     - name: Check ntfy health endpoint (if push profile enabled)
       ansible.builtin.uri:
@@ -166,13 +254,34 @@
       when: llamenos_ntfy_enabled | default(false) | bool
       tags: always
 
+    - name: Check Signal Notifier sidecar health
+      ansible.builtin.uri:
+        url: "http://localhost:3100/health"
+        method: GET
+        status_code: 200
+        return_content: true
+      register: signal_notifier_check
+      retries: 2
+      delay: 3
+      ignore_errors: true
+      when: llamenos_signal_enabled | default(false) | bool
+      tags: always
+
+    - name: Record Signal Notifier result
+      ansible.builtin.set_fact:
+        smoke_results: "{{ smoke_results + [{'check': 'Signal Notifier sidecar health (port 3100)', 'status': 'PASS' if signal_notifier_check is succeeded else 'FAIL' if signal_notifier_check is failed else 'SKIP'}] }}"
+      when: llamenos_signal_enabled | default(false) | bool
+      tags: always
+
     - name: Check update server health (official only)
       ansible.builtin.uri:
         url: "http://localhost:3080/health"
         return_content: true
       register: update_health
       failed_when: update_health.content != "ok"
+      ignore_errors: true
       when: llamenos_update_server_enabled | default(false) | bool
+      tags: always
 
     - name: Record update server result
       ansible.builtin.set_fact:
@@ -180,9 +289,11 @@
       when: llamenos_update_server_enabled | default(false) | bool
       tags: always
 
-    - name: Check Caddy is serving HTTPS
+    # ─── TLS / Caddy ─────────────────────────────────────────────────────────
+
+    - name: Check Caddy is serving HTTPS on the configured API domain
       ansible.builtin.uri:
-        url: "https://shared.{{ domain }}/api/health"
+        url: "{{ _api_base_url }}/api/health/live"
         method: GET
         status_code: 200
         validate_certs: true
@@ -193,11 +304,95 @@
       when: llamenos_caddy_enabled | default(true) | bool
       tags: always
 
-    - name: Record Caddy result
+    - name: Record Caddy HTTPS result
       ansible.builtin.set_fact:
-        smoke_results: "{{ smoke_results + [{'check': 'Caddy HTTPS serving', 'status': 'PASS' if caddy_check is succeeded else 'FAIL' if caddy_check is failed else 'SKIP'}] }}"
+        smoke_results: "{{ smoke_results + [{'check': 'Caddy HTTPS serving ' + _api_base_url, 'status': 'PASS' if caddy_check is succeeded else 'FAIL' if caddy_check is failed else 'SKIP'}] }}"
       when: llamenos_caddy_enabled | default(true) | bool
       tags: always
+
+    - name: Check HSTS and security headers are present in Caddy response
+      ansible.builtin.uri:
+        url: "{{ _api_base_url }}/api/health/live"
+        method: GET
+        status_code: 200
+        return_content: false
+      register: caddy_headers
+      ignore_errors: true
+      when: llamenos_caddy_enabled | default(true) | bool
+      tags: always
+
+    - name: Assert HSTS header is present
+      ansible.builtin.assert:
+        that:
+          - caddy_headers.strict_transport_security is defined
+          - "'max-age=' in caddy_headers.strict_transport_security"
+        fail_msg: |
+          MISSING SECURITY HEADER: Strict-Transport-Security (HSTS) not found in Caddy response.
+
+          This header is required to prevent downgrade attacks.
+          Check the Caddyfile security_headers snippet is applied to the API site block.
+        success_msg: "HSTS header present: {{ caddy_headers.strict_transport_security | default('') }}"
+      ignore_errors: true
+      register: hsts_check
+      when: llamenos_caddy_enabled | default(true) | bool and caddy_headers is succeeded
+      tags: always
+
+    - name: Record HSTS header result
+      ansible.builtin.set_fact:
+        smoke_results: "{{ smoke_results + [{'check': 'HSTS header present (Caddy security_headers)', 'status': 'PASS' if hsts_check is succeeded else 'FAIL' if hsts_check is defined and hsts_check is failed else 'SKIP'}] }}"
+      when: llamenos_caddy_enabled | default(true) | bool
+      tags: always
+
+    - name: Assert X-Frame-Options header is present
+      ansible.builtin.assert:
+        that:
+          - caddy_headers.x_frame_options is defined
+          - caddy_headers.x_frame_options == 'DENY'
+        fail_msg: |
+          MISSING SECURITY HEADER: X-Frame-Options: DENY not found in Caddy response.
+
+          This header is required to prevent clickjacking attacks.
+        success_msg: "X-Frame-Options: {{ caddy_headers.x_frame_options | default('') }}"
+      ignore_errors: true
+      register: xframe_check
+      when: llamenos_caddy_enabled | default(true) | bool and caddy_headers is succeeded
+      tags: always
+
+    - name: Record X-Frame-Options result
+      ansible.builtin.set_fact:
+        smoke_results: "{{ smoke_results + [{'check': 'X-Frame-Options: DENY header present', 'status': 'PASS' if xframe_check is succeeded else 'FAIL' if xframe_check is defined and xframe_check is failed else 'SKIP'}] }}"
+      when: llamenos_caddy_enabled | default(true) | bool
+      tags: always
+
+    # ─── Disk space ──────────────────────────────────────────────────────────
+
+    - name: Check available disk space on root volume
+      ansible.builtin.shell: |
+        df -BG / | awk 'NR==2 {gsub("G","",$4); print $4}'
+      args:
+        executable: /bin/bash
+      register: disk_free_gb
+      changed_when: false
+      tags: always
+
+    - name: Assert at least 2 GiB free disk space post-deploy
+      ansible.builtin.assert:
+        that:
+          - disk_free_gb.stdout | int >= 2
+        fail_msg: |
+          LOW DISK SPACE: Only {{ disk_free_gb.stdout }} GiB free on /.
+          At least 2 GiB is required for log rotation, Docker image pulls, and backups.
+        success_msg: "Disk space OK: {{ disk_free_gb.stdout }} GiB free on /"
+      ignore_errors: true
+      register: disk_check
+      tags: always
+
+    - name: Record disk space result
+      ansible.builtin.set_fact:
+        smoke_results: "{{ smoke_results + [{'check': 'Disk space >= 2 GiB free post-deploy', 'status': 'PASS' if disk_check is succeeded else 'FAIL: only ' + disk_free_gb.stdout + ' GiB free'}] }}"
+      tags: always
+
+    # ─── Summary ─────────────────────────────────────────────────────────────
 
     - name: Print pass/fail summary
       ansible.builtin.debug:
@@ -207,21 +402,22 @@
           ===========================================
           Host: {{ inventory_hostname }}
           Distribution: {{ ansible_facts.distribution }} {{ ansible_facts.distribution_version }}
+          API URL: {{ _api_base_url }}
           {% for result in smoke_results %}
           [{{ result.status }}] {{ result.check }}
           {% endfor %}
           ===========================================
           Total: {{ smoke_results | length }} checks
           Passed: {{ smoke_results | selectattr('status', 'equalto', 'PASS') | list | length }}
-          Failed: {{ smoke_results | selectattr('status', 'equalto', 'FAIL') | list | length }}
+          Failed: {{ smoke_results | selectattr('status', 'startswith', 'FAIL') | list | length }}
           Skipped: {{ smoke_results | selectattr('status', 'equalto', 'SKIP') | list | length }}
           ===========================================
-          Result: {{ 'PASSED' if (smoke_results | selectattr('status', 'equalto', 'FAIL') | list | length) == 0 else 'FAILED' }}
+          Result: {{ 'PASSED' if (smoke_results | selectattr('status', 'startswith', 'FAIL') | list | length) == 0 else 'FAILED' }}
           ===========================================
       tags: always
 
     - name: Fail if any smoke check failed
       ansible.builtin.fail:
-        msg: "Smoke check FAILED: {{ smoke_results | selectattr('status', 'equalto', 'FAIL') | list | length }} check(s) failed."
-      when: (smoke_results | selectattr('status', 'equalto', 'FAIL') | list | length) > 0
+        msg: "Smoke check FAILED: {{ smoke_results | selectattr('status', 'startswith', 'FAIL') | list | length }} check(s) failed."
+      when: (smoke_results | selectattr('status', 'startswith', 'FAIL') | list | length) > 0
       tags: always
