@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { TwilioAdapter } from '../../telephony/twilio'
 import { SignalWireAdapter } from '../../telephony/signalwire'
-import { DEFAULT_LANGUAGE } from '@shared/languages'
 
 describe('TwilioAdapter', () => {
   let adapter: TwilioAdapter
@@ -313,11 +312,6 @@ describe('TwilioAdapter', () => {
     it('accepts valid Twilio signature', async () => {
       // Build a request with known parameters
       const body = new URLSearchParams({ CallSid: 'CA123', From: '+15551234567' })
-      const request = new Request('https://example.com/webhook', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: body.toString(),
-      })
 
       // Compute expected signature manually
       const encoder = new TextEncoder()
@@ -384,12 +378,6 @@ describe('TwilioAdapter', () => {
       params.append('StatusCallbackEvent', 'answered')
       params.append('StatusCallbackEvent', 'completed')
 
-      const request = new Request('https://example.com/webhook', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: params.toString(),
-      })
-
       // Compute expected signature using Twilio's algorithm:
       // URL + sorted(key + value) for ALL values
       const encoder = new TextEncoder()
@@ -419,6 +407,86 @@ describe('TwilioAdapter', () => {
       })
 
       const result = await adapter.validateWebhook(signedRequest)
+      expect(result).toBe(true)
+    })
+  })
+
+  // --- Host header spoofing protection tests ---
+
+  describe('Host header spoofing protection', () => {
+    it('rejects signature when Host header is spoofed and webhookBaseUrl is configured', async () => {
+      // Attacker sends a request with a spoofed Host header pointing to their domain.
+      // They compute a valid HMAC over 'https://attacker.com/webhook' + params.
+      // The adapter is configured with webhookBaseUrl='https://example.com' so it
+      // uses that as the origin instead — the attacker's HMAC will not match.
+      const adapterWithBase = new TwilioAdapter('AC1234567890', 'auth-token-123', '+15551234567', 'https://example.com')
+
+      const body = new URLSearchParams({ CallSid: 'CA123', From: '+15551234567' })
+      const encoder = new TextEncoder()
+
+      // Attacker computes HMAC over their spoofed URL
+      let attackerDataString = 'https://attacker.com/webhook'
+      const sortedKeys = Array.from(body.keys()).sort()
+      for (const key of sortedKeys) {
+        attackerDataString += key + body.get(key)
+      }
+      const key = await crypto.subtle.importKey(
+        'raw',
+        encoder.encode('auth-token-123'),
+        { name: 'HMAC', hash: 'SHA-1' },
+        false,
+        ['sign']
+      )
+      const sig = await crypto.subtle.sign('HMAC', key, encoder.encode(attackerDataString))
+      const attackerSig = btoa(String.fromCharCode(...new Uint8Array(sig)))
+
+      // Attacker sends request claiming to be from example.com but signed for attacker.com
+      const spoofedRequest = new Request('https://attacker.com/webhook', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-Twilio-Signature': attackerSig,
+        },
+        body: body.toString(),
+      })
+
+      // Must reject — adapter uses configured 'https://example.com', not 'https://attacker.com'
+      const result = await adapterWithBase.validateWebhook(spoofedRequest)
+      expect(result).toBe(false)
+    })
+
+    it('accepts valid signature when request URL matches webhookBaseUrl origin', async () => {
+      const adapterWithBase = new TwilioAdapter('AC1234567890', 'auth-token-123', '+15551234567', 'https://example.com')
+
+      const body = new URLSearchParams({ CallSid: 'CA123', From: '+15551234567' })
+      const encoder = new TextEncoder()
+
+      // Legitimate provider signs over the correct canonical URL
+      let dataString = 'https://example.com/webhook'
+      const sortedKeys = Array.from(body.keys()).sort()
+      for (const key of sortedKeys) {
+        dataString += key + body.get(key)
+      }
+      const key = await crypto.subtle.importKey(
+        'raw',
+        encoder.encode('auth-token-123'),
+        { name: 'HMAC', hash: 'SHA-1' },
+        false,
+        ['sign']
+      )
+      const sig = await crypto.subtle.sign('HMAC', key, encoder.encode(dataString))
+      const validSig = btoa(String.fromCharCode(...new Uint8Array(sig)))
+
+      const request = new Request('https://example.com/webhook', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-Twilio-Signature': validSig,
+        },
+        body: body.toString(),
+      })
+
+      const result = await adapterWithBase.validateWebhook(request)
       expect(result).toBe(true)
     })
   })

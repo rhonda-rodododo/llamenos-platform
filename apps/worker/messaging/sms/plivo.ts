@@ -1,4 +1,5 @@
 import { safeFetch } from '../../lib/safe-fetch'
+import { buildWebhookUrl } from '../../lib/webhook-url'
 import type {
   MessagingAdapter,
   IncomingMessage,
@@ -22,12 +23,14 @@ export class PlivoSMSAdapter implements MessagingAdapter {
   private authToken: string
   private phoneNumber: string
   private hmacSecret: string
+  private webhookBaseUrl: string
 
-  constructor(authId: string, authToken: string, phoneNumber: string, hmacSecret: string) {
+  constructor(authId: string, authToken: string, phoneNumber: string, hmacSecret: string, webhookBaseUrl = '') {
     this.authId = authId
     this.authToken = authToken
     this.phoneNumber = phoneNumber
     this.hmacSecret = hmacSecret
+    this.webhookBaseUrl = webhookBaseUrl
   }
 
   async parseIncomingMessage(request: Request): Promise<IncomingMessage> {
@@ -70,7 +73,7 @@ export class PlivoSMSAdapter implements MessagingAdapter {
     const nonce = request.headers.get('X-Plivo-Signature-V3-Nonce')
     if (!signature || !nonce) return false
 
-    const url = new URL(request.url)
+    const url = buildWebhookUrl(request, this.webhookBaseUrl)
     const body = await request.clone().text()
     const params = new URLSearchParams(body)
 

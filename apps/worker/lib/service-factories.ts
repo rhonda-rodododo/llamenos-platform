@@ -28,15 +28,16 @@ export async function getTelephonyFromService(
   env: Env,
   settingsService: { getTelephonyProvider(): Promise<TelephonyProviderConfig | null> },
 ): Promise<TelephonyAdapter | null> {
+  const webhookBaseUrl = env.WEBHOOK_BASE_URL ?? ''
   try {
     const config = await settingsService.getTelephonyProvider()
-    if (config) return createAdapterFromConfig(config)
+    if (config) return createAdapterFromConfig(config, webhookBaseUrl)
   } catch (e) {
     logger.warn('getTelephonyProvider failed, falling back to env vars', { error: e })
   }
 
   if (env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_PHONE_NUMBER) {
-    return new TwilioAdapter(env.TWILIO_ACCOUNT_SID, env.TWILIO_AUTH_TOKEN, env.TWILIO_PHONE_NUMBER)
+    return new TwilioAdapter(env.TWILIO_ACCOUNT_SID, env.TWILIO_AUTH_TOKEN, env.TWILIO_PHONE_NUMBER, webhookBaseUrl)
   }
 
   return null
@@ -54,9 +55,10 @@ export async function getHubTelephonyFromService(
   },
   hubId: string,
 ): Promise<TelephonyAdapter | null> {
+  const webhookBaseUrl = env.WEBHOOK_BASE_URL ?? ''
   try {
     const config = await settingsService.getHubTelephonyProvider(hubId)
-    if (config) return createAdapterFromConfig(config)
+    if (config) return createAdapterFromConfig(config, webhookBaseUrl)
   } catch (e) {
     logger.warn('getHubTelephonyProvider failed for hub, falling back to global', { error: e })
   }
@@ -74,6 +76,7 @@ export async function getMessagingAdapterFromService(
     getTelephonyProvider(): Promise<TelephonyProviderConfig | null>
   },
   hmacSecret: string,
+  webhookBaseUrl = '',
 ): Promise<MessagingAdapter> {
   const config = await settingsService.getMessagingConfig()
   if (!config || !config.enabledChannels.includes(channel)) {
@@ -85,11 +88,11 @@ export async function getMessagingAdapterFromService(
       if (!config.sms?.enabled) throw new Error('SMS is not enabled')
       const telConfig = await settingsService.getTelephonyProvider()
       if (!telConfig) throw new Error('SMS requires a configured telephony provider')
-      return createSMSAdapter(telConfig, config.sms, hmacSecret)
+      return createSMSAdapter(telConfig, config.sms, hmacSecret, webhookBaseUrl)
     }
     case 'whatsapp': {
       if (!config.whatsapp) throw new Error('WhatsApp is not configured')
-      return createWhatsAppAdapter(config.whatsapp, hmacSecret)
+      return createWhatsAppAdapter(config.whatsapp, hmacSecret, undefined, webhookBaseUrl)
     }
     case 'signal': {
       if (!config.signal) throw new Error('Signal is not configured')
@@ -112,16 +115,16 @@ export async function getMessagingAdapterFromService(
  * Create adapter from saved config.
  * Supports Twilio, SignalWire, Vonage, Plivo, Asterisk, Telnyx, Bandwidth, and FreeSWITCH.
  */
-function createAdapterFromConfig(config: TelephonyProviderConfig): TelephonyAdapter {
+function createAdapterFromConfig(config: TelephonyProviderConfig, webhookBaseUrl = ''): TelephonyAdapter {
   switch (config.type) {
     case 'twilio':
-      return new TwilioAdapter(config.accountSid!, config.authToken!, config.phoneNumber)
+      return new TwilioAdapter(config.accountSid!, config.authToken!, config.phoneNumber, webhookBaseUrl)
     case 'signalwire':
-      return new SignalWireAdapter(config.accountSid!, config.authToken!, config.phoneNumber, config.signalwireSpace!)
+      return new SignalWireAdapter(config.accountSid!, config.authToken!, config.phoneNumber, config.signalwireSpace!, webhookBaseUrl)
     case 'vonage':
       return new VonageAdapter(config.apiKey!, config.apiSecret!, config.applicationId!, config.phoneNumber, config.privateKey)
     case 'plivo':
-      return new PlivoAdapter(config.authId!, config.authToken!, config.phoneNumber)
+      return new PlivoAdapter(config.authId!, config.authToken!, config.phoneNumber, webhookBaseUrl)
     case 'asterisk':
       return new AsteriskAdapter(
         config.ariUrl!,

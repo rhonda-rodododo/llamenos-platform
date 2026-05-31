@@ -1,4 +1,5 @@
 import { safeFetch } from '../../lib/safe-fetch'
+import { buildWebhookUrl } from '../../lib/webhook-url'
 import type { TwilioSendMessageResponse } from './types'
 
 const TWILIO_API_BASE = 'https://api.twilio.com/2010-04-01/Accounts'
@@ -13,11 +14,13 @@ export class TwilioWhatsAppClient {
   private readonly accountSid: string
   private readonly authToken: string
   private readonly whatsappNumber: string
+  private readonly webhookBaseUrl: string
 
-  constructor(accountSid: string, authToken: string, whatsappNumber: string) {
+  constructor(accountSid: string, authToken: string, whatsappNumber: string, webhookBaseUrl = '') {
     this.accountSid = accountSid
     this.authToken = authToken
     this.whatsappNumber = whatsappNumber
+    this.webhookBaseUrl = webhookBaseUrl
   }
 
   /**
@@ -67,7 +70,7 @@ export class TwilioWhatsAppClient {
     const signature = request.headers.get('X-Twilio-Signature')
     if (!signature) return false
 
-    const url = new URL(request.url)
+    const url = buildWebhookUrl(request, this.webhookBaseUrl)
     const body = await request.clone().text()
     const params = new URLSearchParams(body)
 
