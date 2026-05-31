@@ -277,6 +277,7 @@ class KeystoreService @Inject constructor(
         val keyGen = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
         val spec = try {
             // Request StrongBox hardware security module backing where available.
+            // setIsStrongBoxBacked requires API 28 — gate with version check so lint is satisfied.
             KeyGenParameterSpec.Builder(
                 BIOMETRIC_KEY_ALIAS,
                 KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
@@ -286,7 +287,11 @@ class KeystoreService @Inject constructor(
                 .setKeySize(BIOMETRIC_KEY_SIZE)
                 .setUserAuthenticationRequired(true)
                 .setInvalidatedByBiometricEnrollment(true)
-                .setIsStrongBoxBacked(true)
+                .apply {
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                        setIsStrongBoxBacked(true)
+                    }
+                }
                 .build()
         } catch (_: Exception) {
             // StrongBox not available on this device — fall back to TEE-backed key.
