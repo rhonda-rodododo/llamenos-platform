@@ -13,6 +13,8 @@ import {
   apiPost,
   apiPatch,
   createVolunteerViaApi,
+  createUserViaApi,
+  listNotesViaApi,
   createReportViaApi,
   listRecordsViaApi,
   createRecordViaApi,
@@ -20,6 +22,9 @@ import {
   createEntityTypeViaApi,
   testEndpointAccess,
   encryptForTest,
+  createHubViaApi,
+  deleteHubViaApi,
+  addHubMemberViaApi,
   ADMIN_SEED,
   type CreateVolunteerResult,
 } from '../../api-helpers'
@@ -35,6 +40,11 @@ interface UserWithResources {
   recordIds: string[]
 }
 
+interface DedicatedHubInfo {
+  hubId: string
+  memberName: string
+}
+
 interface IsolationState {
   users: Map<string, UserWithResources>
   entityTypeId?: string
@@ -46,6 +56,14 @@ interface IsolationState {
   /** For deactivation scenarios */
   deactivatedVol?: CreateVolunteerResult
   deactivationResponses: Map<string, number>
+  /** For direct-patch isolation scenario */
+  lastUpdateStatus?: number
+  /** For admin-sees-all-notes scenario */
+  adminListResult?: string[]
+  /** For cross-hub isolation scenarios */
+  dedicatedHubs: Map<string, DedicatedHubInfo>
+  lastHubAccessStatus?: number
+  dedicatedHubListResult?: string[]
 }
 
 const DATA_ISOLATION_KEY = 'data_isolation'
@@ -56,10 +74,11 @@ function getIsolationState(world: Record<string, unknown>): IsolationState {
 
 
 Before({ tags: '@security or @permissions' }, async ({ world }) => {
-  const iso = {
+  const iso: IsolationState = {
     users: new Map(),
     listResults: new Map(),
     deactivationResponses: new Map(),
+    dedicatedHubs: new Map(),
   }
   setState(world, DATA_ISOLATION_KEY, iso)
 })
@@ -441,5 +460,174 @@ Then(
       getIsolationState(world).deactivatedVol!.deviceKey,
     )
     expect(status).toBe(expectedStatus)
+  },
+)
+
+// ── Direct Note Mutation by Non-Author ────────────────────────────
+
+When(
+  '{string} tries to update {string}\'s note',
+  async ({ request, world }, actorName: string, targetName: string) => {
+    const actor = getIsolationState(world).users.get(actorName)
+    const target = getIsolationState(world).users.get(targetName)
+    expect(actor, `actor "${actorName}" not found`).toBeTruthy()
+    expect(target, `target "${targetName}" not found`).toBeTruthy()
+    expect(target!.noteIds.length, `"${targetName}" has no notes to target`).toBeGreaterThan(0)
+
+    const noteId = target!.noteIds[0]
+    const { encryptedContent } = await encryptForTest('tampered content by non-author', [actor!.nsec])
+    const status = await testEndpointAccess(
+      request,
+      'PATCH',
+      `/notes/${noteId}`,
+      actor!.nsec,
+      { encryptedContent },
+    )
+    getIsolationState(world).lastUpdateStatus = status
+  },
+)
+
+Then('the note update should be rejected with {int}', async ({ world }, expectedStatus: number) => {
+  expect(getIsolationState(world).lastUpdateStatus).toBe(expectedStatus)
+})
+
+// ── Admin Reads All Notes; Volunteers Read Only Their Own ─────────
+
+When('the admin lists all notes', async ({ request, world }) => {
+  const { status, data } = await apiGet<{ notes: Array<{ id: string }> }>(
+    request,
+    '/notes',
+    ADMIN_SEED,
+  )
+  expect(status).toBe(200)
+  getIsolationState(world).adminListResult = data.notes.map(n => n.id)
+})
+
+Then('the admin should see notes from {string}', async ({ world }, name: string) => {
+  const user = getIsolationState(world).users.get(name)
+  expect(user, `user "${name}" not found`).toBeTruthy()
+  const adminNotes = getIsolationState(world).adminListResult
+  expect(adminNotes, 'admin note list not populated').toBeTruthy()
+
+  for (const noteId of user!.noteIds) {
+    expect(adminNotes, `admin list missing note ${noteId} from "${name}"`).toContain(noteId)
+  }
+})
+
+// ── Cross-Hub Data Isolation ──────────────────────────────────────
+
+Given(
+  'volunteer {string} is a member of dedicated hub {string}',
+  async ({ request, world }, volName: string, hubLabel: string) => {
+    const hubId = await createHubViaApi(request, `bdd-iso-${hubLabel}-${Date.now()}`)
+
+    // Create the volunteer with NO global roles so they only have hub-specific access.
+    // This ensures they get 403 when accessing a hub they are not a member of.
+    const vol = await createUserViaApi(request, {
+      name: `${volName} ${Date.now()}`,
+      roleIds: [],
+    })
+    await addHubMemberViaApi(request, hubId, vol.pubkey, ['role-volunteer'])
+
+    const isoState = getIsolationState(world)
+    isoState.users.set(volName, {
+      name: volName,
+      nsec: vol.seedHex,
+      pubkey: vol.pubkey,
+      noteIds: [],
+      reportIds: [],
+      recordIds: [],
+    })
+    isoState.dedicatedHubs.set(hubLabel, { hubId, memberName: volName })
+  },
+)
+
+When(
+  '{string} creates a note in dedicated hub {string}',
+  async ({ request, world }, volName: string, hubLabel: string) => {
+    const user = getIsolationState(world).users.get(volName)
+    const hubEntry = getIsolationState(world).dedicatedHubs.get(hubLabel)
+    expect(user, `user "${volName}" not found`).toBeTruthy()
+    expect(hubEntry, `dedicated hub "${hubLabel}" not found`).toBeTruthy()
+
+    const { encryptedContent, envelopes } = await encryptForTest(
+      `${volName}'s dedicated hub note`,
+      [user!.nsec, ADMIN_SEED],
+    )
+    const res = await apiPost<{ note?: { id?: string }; id?: string }>(
+      request,
+      `/hubs/${hubEntry!.hubId}/notes`,
+      {
+        encryptedContent,
+        callId: `hub-iso-${Date.now()}-${volName}`,
+        adminEnvelopes: envelopes,
+      },
+      user!.nsec,
+    )
+    if (res.status === 200 || res.status === 201) {
+      const noteId = res.data.note?.id ?? res.data.id
+      if (noteId) user!.noteIds.push(noteId)
+    }
+  },
+)
+
+Then(
+  '{string} cannot see {string} notes when listing dedicated hub {string} notes',
+  async ({ request, world }, viewerName: string, otherHubLabel: string, ownHubLabel: string) => {
+    const viewer = getIsolationState(world).users.get(viewerName)
+    const ownHubEntry = getIsolationState(world).dedicatedHubs.get(ownHubLabel)
+    const otherHubEntry = getIsolationState(world).dedicatedHubs.get(otherHubLabel)
+    expect(viewer, `viewer "${viewerName}" not found`).toBeTruthy()
+    expect(ownHubEntry, `own hub "${ownHubLabel}" not found`).toBeTruthy()
+    expect(otherHubEntry, `other hub "${otherHubLabel}" not found`).toBeTruthy()
+
+    const { status, data } = await apiGet<{ notes: Array<{ id: string }> }>(
+      request,
+      `/hubs/${ownHubEntry!.hubId}/notes`,
+      viewer!.nsec,
+    )
+    expect(status, `expected 200 listing own hub "${ownHubLabel}"`).toBe(200)
+
+    // Get the note IDs belonging to the other hub's member
+    const otherMemberName = otherHubEntry!.memberName
+    const otherUser = getIsolationState(world).users.get(otherMemberName)
+    const ownHubNoteIds = data.notes.map(n => n.id)
+
+    for (const otherNoteId of otherUser?.noteIds ?? []) {
+      expect(
+        ownHubNoteIds,
+        `hub "${ownHubLabel}" notes should not contain note ${otherNoteId} from hub "${otherHubLabel}"`,
+      ).not.toContain(otherNoteId)
+    }
+  },
+)
+
+Then(
+  '{string} cannot see {string}\'s notes when accessing dedicated hub {string} directly',
+  async ({ request, world }, viewerName: string, authorName: string, hubLabel: string) => {
+    const viewer = getIsolationState(world).users.get(viewerName)
+    const author = getIsolationState(world).users.get(authorName)
+    const hubEntry = getIsolationState(world).dedicatedHubs.get(hubLabel)
+    expect(viewer, `viewer "${viewerName}" not found`).toBeTruthy()
+    expect(author, `author "${authorName}" not found`).toBeTruthy()
+    expect(hubEntry, `hub "${hubLabel}" not found`).toBeTruthy()
+
+    // The viewer accesses the hub directly — the response may be 200 (global
+    // volunteer role grants hub entry) but the note list must be filtered to
+    // their own authorPubkey, so the author's notes are never visible.
+    const { status, data } = await apiGet<{ notes: Array<{ id: string }> }>(
+      request,
+      `/hubs/${hubEntry!.hubId}/notes`,
+      viewer!.nsec,
+    )
+    expect(status, `expected 200 for ${viewerName} accessing hub ${hubLabel}`).toBe(200)
+
+    const visibleNoteIds = data.notes.map(n => n.id)
+    for (const authorNoteId of author!.noteIds) {
+      expect(
+        visibleNoteIds,
+        `${viewerName} must not see ${authorName}'s note ${authorNoteId} in hub "${hubLabel}"`,
+      ).not.toContain(authorNoteId)
+    }
   },
 )
