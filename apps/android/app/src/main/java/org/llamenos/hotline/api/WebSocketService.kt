@@ -118,9 +118,14 @@ class WebSocketService @Inject constructor(
         }
 
         val hubUrl = keystoreService.retrieve(KeystoreService.KEY_HUB_URL) ?: return
+        // Only HTTPS hub URLs are permitted — HTTP would produce an unencrypted ws:// relay
+        // connection that exposes all communications in transit (H33).
+        if (!hubUrl.startsWith("https://")) {
+            android.util.Log.e("WebSocketService", "Refusing relay connection: hub URL is not HTTPS")
+            return
+        }
         val relayUrl = hubUrl
             .replace("https://", "wss://")
-            .replace("http://", "ws://")
             .trimEnd('/') + "/relay"
 
         _connectionState.value = ConnectionState.CONNECTING

@@ -8,6 +8,8 @@ import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import org.llamenos.hotline.api.ProviderSetupRepository
+import org.llamenos.hotline.crypto.KeyValueStore
+import org.llamenos.hotline.crypto.KeystoreService
 import org.llamenos.hotline.hub.HubRepository
 import org.llamenos.hotline.ui.DeepLinkDestination
 import java.security.SecureRandom
@@ -32,6 +34,9 @@ class DeepLinkActivity : ComponentActivity() {
 
     @Inject
     lateinit var hubRepository: HubRepository
+
+    @Inject
+    lateinit var keystoreService: KeyValueStore
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -86,6 +91,20 @@ class DeepLinkActivity : ComponentActivity() {
     }
 
     private fun handleHubDeepLink(uri: android.net.Uri) {
+        // Reject any injected relayUrl parameter — if present it must use wss:// and
+        // match the configured hub domain to prevent MITM via relay URL injection (H33).
+        val injectedRelayUrl = uri.getQueryParameter("relayUrl")
+        if (injectedRelayUrl != null) {
+            val configuredHubUrl = keystoreService.retrieve(KeystoreService.KEY_HUB_URL)
+            if (configuredHubUrl == null ||
+                !DeepLinkValidator.isValidRelayParam(injectedRelayUrl, configuredHubUrl)
+            ) {
+                Log.w(TAG, "Hub deep link rejected: invalid or mismatched relayUrl parameter")
+                finish()
+                return
+            }
+        }
+
         val hubId = uri.getQueryParameter("hubId")
         if (hubId != null) {
             Log.d(TAG, "Hub deep link: hubId=$hubId")
