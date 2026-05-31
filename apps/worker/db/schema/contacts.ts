@@ -51,6 +51,7 @@ export const contacts = pgTable(
     lastInteractionAt: timestamp('last_interaction_at', {
       withTimezone: true,
     }),
+    needsReencryption: boolean('needs_reencryption').notNull().default(false),
     mergedIntoId: text('merged_into_id'),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true })

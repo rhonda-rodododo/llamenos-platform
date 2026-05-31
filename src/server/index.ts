@@ -7,7 +7,8 @@
  */
 import 'reflect-metadata' // Required by @peculiar/x509 → tsyringe (transitive dep of @simplewebauthn/server)
 import { Hono } from 'hono'
-import { createDatabase, closeDb, getDb } from '../../apps/worker/db'
+import { createDatabase, closeDb, getDb, schema } from '../../apps/worker/db'
+import { eq, count } from 'drizzle-orm'
 import { cleanupExpiredNonces } from '../../apps/worker/services/webhook-replay'
 import { createServices, type Services } from '../../apps/worker/services'
 import { createBlobStorage } from '../../apps/worker/lib/blob-storage'
@@ -72,6 +73,24 @@ const services: Services = createServices(db, {
   },
 })
 console.log('[llamenos] Services initialized')
+
+// --- Startup: warn if any plaintext (un-encrypted) contacts exist ---
+try {
+  const [result] = await db
+    .select({ count: count() })
+    .from(schema.contacts)
+    .where(eq(schema.contacts.needsReencryption, true))
+  const plaintextCount = result?.count ?? 0
+  if (plaintextCount > 0) {
+    console.warn(
+      `[llamenos] SECURITY WARNING: ${plaintextCount} contact(s) flagged as plaintext ` +
+        '(needs_reencryption=true). These contacts were stored before E2EE was implemented ' +
+        'and must be re-encrypted. Clients will be prompted to re-encrypt on next access.',
+    )
+  }
+} catch (err) {
+  console.warn('[llamenos] Could not check for plaintext contacts:', err)
+}
 
 const env: Record<string, unknown> = {
   ADMIN_PUBKEY: readSecret('admin-pubkey', 'ADMIN_PUBKEY'),
