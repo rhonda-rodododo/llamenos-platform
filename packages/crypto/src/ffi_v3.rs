@@ -263,7 +263,7 @@ pub fn mobile_hpke_open_key(
     let aad = hex::decode(&aad_hex).map_err(CryptoError::HexError)?;
     let secret_hex = encryption_secret_hex()?;
     let key = hpke_envelope::hpke_open_key(&envelope, &secret_hex, &expected_label, &aad)?;
-    let hex_out = hex::encode(&*key);
+    let hex_out = hex::encode(key.as_ref());
     Ok(hex_out)
 }
 
@@ -389,7 +389,7 @@ pub fn mobile_puk_unwrap_seed(
     let aad = hex::decode(&aad_hex).map_err(CryptoError::HexError)?;
     let secret_hex = encryption_secret_hex()?;
     let seed = hpke_envelope::hpke_open_key(&envelope, &secret_hex, &expected_label, &aad)?;
-    let hex_out = hex::encode(&*seed);
+    let hex_out = hex::encode(seed.as_ref());
     Ok(hex_out)
 }
 
