@@ -879,8 +879,8 @@ describe('IdentityService.cleanup', () => {
 
     await service.cleanup()
 
-    // delete should be called 5 times: sessions, challenges, rooms, redeemed invites, expired invites
-    expect(db.delete).toHaveBeenCalledTimes(5)
+    // delete should be called 6 times: sessions, challenges, rooms, redeemed invites, expired invites, auth nonces
+    expect(db.delete).toHaveBeenCalledTimes(6)
   })
 
   it('rethrows database errors', async () => {

@@ -15,11 +15,11 @@ function createTestApp(opts: {
   const app = new Hono<AppEnv>()
 
   app.use('*', async (c, next) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(c as any).env = {
       STORAGE_ENDPOINT: 'http://storage:9000',
       SERVER_SECRET: 'a'.repeat(64),
       SIP_BRIDGE_URL: 'http://sip-bridge:3000',
+      SIGNAL_NOTIFIER_URL: 'http://signal-notifier:3100',
       ...opts.env,
     }
     await next()
@@ -42,6 +42,9 @@ describe('health route', () => {
       if (urlStr.includes('sip-bridge')) {
         return new Response('ok', { status: 200 })
       }
+      if (urlStr.includes('signal-notifier')) {
+        return new Response(JSON.stringify({ ok: true, registeredCount: 5 }), { status: 200 })
+      }
       return new Response(null, { status: 500 })
     })
   })
@@ -62,6 +65,7 @@ describe('health route', () => {
       expect(body.checks.storage.status).toBe('ok')
       expect(body.checks.relay.status).toBe('ok')
       expect(body.checks.sipBridge.status).toBe('ok')
+      expect(body.checks.signalNotifier.status).toBe('ok')
       expect(body.version).toBeDefined()
       expect(body.uptime).toBeDefined()
       expect(body.demoMode).toBe(false)
@@ -124,6 +128,69 @@ describe('health route', () => {
       expect(body.checks.sipBridge).toBeUndefined()
     })
 
+    it('returns 503 when signal notifier fails', async () => {
+      fetchSpy.mockImplementation(async (url: unknown) => {
+        const urlStr = String(url)
+        if (urlStr.includes('signal-notifier')) {
+          return new Response(JSON.stringify({ ok: false, error: 'DB connection failed' }), { status: 503 })
+        }
+        if (urlStr.includes('storage:9000')) return new Response(null, { status: 403 })
+        if (urlStr.includes('sip-bridge')) return new Response('ok', { status: 200 })
+        return new Response(null, { status: 500 })
+      })
+
+      const app = createTestApp()
+      const res = await app.request('/')
+      expect(res.status).toBe(503)
+      const body = await res.json()
+      expect(body.checks.signalNotifier.status).toBe('failing')
+    })
+
+    it('marks signal notifier failing when it returns ok:false body', async () => {
+      fetchSpy.mockImplementation(async (url: unknown) => {
+        const urlStr = String(url)
+        if (urlStr.includes('signal-notifier')) {
+          return new Response(JSON.stringify({ ok: false, error: 'migration pending' }), { status: 200 })
+        }
+        if (urlStr.includes('storage:9000')) return new Response(null, { status: 403 })
+        if (urlStr.includes('sip-bridge')) return new Response('ok', { status: 200 })
+        return new Response(null, { status: 500 })
+      })
+
+      const app = createTestApp()
+      const res = await app.request('/')
+      expect(res.status).toBe(503)
+      const body = await res.json()
+      expect(body.checks.signalNotifier.status).toBe('failing')
+      expect(body.checks.signalNotifier.detail).toContain('migration pending')
+    })
+
+    it('skips signalNotifier check when SIGNAL_NOTIFIER_URL not configured', async () => {
+      const app = createTestApp({ env: { SIGNAL_NOTIFIER_URL: undefined } })
+      const res = await app.request('/')
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(body.checks.signalNotifier).toBeUndefined()
+    })
+
+    it('falls back to NOTIFIER_URL when SIGNAL_NOTIFIER_URL not set', async () => {
+      fetchSpy.mockImplementation(async (url: unknown) => {
+        const urlStr = String(url)
+        if (urlStr.includes('legacy-notifier')) {
+          return new Response(JSON.stringify({ ok: true, registeredCount: 0 }), { status: 200 })
+        }
+        if (urlStr.includes('storage:9000')) return new Response(null, { status: 403 })
+        if (urlStr.includes('sip-bridge')) return new Response('ok', { status: 200 })
+        return new Response(null, { status: 500 })
+      })
+
+      const app = createTestApp({ env: { SIGNAL_NOTIFIER_URL: undefined, NOTIFIER_URL: 'http://legacy-notifier:3100' } })
+      const res = await app.request('/')
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(body.checks.signalNotifier.status).toBe('ok')
+    })
+
     it('treats storage 403 as ok (RustFS unauthenticated path behavior)', async () => {
       fetchSpy.mockImplementation(async (url: unknown) => {
         const urlStr = String(url)
@@ -132,6 +199,9 @@ describe('health route', () => {
         }
         if (urlStr.includes('sip-bridge')) {
           return new Response('ok', { status: 200 })
+        }
+        if (urlStr.includes('signal-notifier')) {
+          return new Response(JSON.stringify({ ok: true, registeredCount: 0 }), { status: 200 })
         }
         return new Response(null, { status: 500 })
       })
@@ -167,8 +237,9 @@ describe('health route', () => {
       const body = await res.json()
       expect(body.checks.postgres.latencyMs).toBeGreaterThanOrEqual(0)
       expect(body.checks.storage.latencyMs).toBeGreaterThanOrEqual(0)
-      // relay check is in-process (no latency), sipBridge is external
+      // relay check is in-process (no latency), sipBridge and signalNotifier are external
       expect(body.checks.sipBridge.latencyMs).toBeGreaterThanOrEqual(0)
+      expect(body.checks.signalNotifier.latencyMs).toBeGreaterThanOrEqual(0)
     })
 
     it('includes memory usage when process.memoryUsage is available', async () => {
