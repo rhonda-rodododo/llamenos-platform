@@ -84,11 +84,14 @@
 		# `default-src 'none'; script-src 'none'` CSP on every response.
 		# Caddy-level headers here are belt-and-suspenders for routes
 		# that bypass middleware (e.g. health probes served by Caddy).
+		Content-Security-Policy "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
 		Cross-Origin-Opener-Policy "same-origin"
 		Cross-Origin-Resource-Policy "cross-origin"
 		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
 		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
 		Referrer-Policy "no-referrer"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()"
 		-Server
 	}
 }
@@ -126,10 +129,13 @@
 		Cross-Origin-Resource-Policy "cross-origin"
 		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
 		X-Content-Type-Options "nosniff"
-		# frame-ancestors (above) replaces X-Frame-Options — we MUST allow
-		# app.* to iframe this origin, so X-Frame-Options:DENY would be wrong.
+		# X-Frame-Options intentionally omitted — the crypto sandbox MUST be
+		# embeddable by app.* as an iframe. The CSP frame-ancestors directive
+		# above is the correct mechanism for restricting embedders in modern
+		# browsers. X-Frame-Options:DENY would break the Tier 4 split-origin.
 		Referrer-Policy "no-referrer"
 		X-Permitted-Cross-Domain-Policies "none"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()"
 		-Server
 	}
 }
@@ -161,7 +167,9 @@
 		Cross-Origin-Resource-Policy "cross-origin"
 		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
 		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
 		Referrer-Policy "no-referrer"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()"
 		-Server
 	}
 }
@@ -201,11 +209,16 @@
 		Access-Control-Allow-Methods "GET, HEAD"
 		Vary "Origin"
 
+		# Updater metadata CSP — static JSON/sig files only, no scripts or frames
+		Content-Security-Policy "default-src 'none'; connect-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+
 		Cross-Origin-Opener-Policy "same-origin"
 		Cross-Origin-Resource-Policy "cross-origin"
 		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
 		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
 		Referrer-Policy "no-referrer"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()"
 		-Server
 	}
 }
