@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/auth'
 import { useConfig } from '@/lib/config'
 import { useTheme } from '@/lib/theme'
 import { isValidSeedHex, hasStoredKey } from '@/lib/platform'
+import { isSafeRelativePath } from '@/lib/redirect-guard'
 import { readBackupFile, restoreFromBackupWithPin, restoreFromBackupWithRecoveryKey } from '@/lib/backup'
 import * as keyManager from '@/lib/key-manager'
 import { isWebAuthnAvailable } from '@/lib/webauthn'
@@ -23,6 +24,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 export const Route = createFileRoute('/login')({
   component: LoginPage,
 })
+
 
 function LoginPage() {
   const { t } = useTranslation()
@@ -68,8 +70,9 @@ function LoginPage() {
         // Return to the page the user was on before the lock, or default to dashboard
         const returnTo = sessionStorage.getItem('returnTo')
         sessionStorage.removeItem('returnTo')
-        // Validate returnTo to prevent open redirects — must be a relative path
-        const safePath = returnTo && /^\/[^/:]/.test(returnTo) ? returnTo : '/'
+        // Validate returnTo to prevent open redirects — must be a same-origin relative path.
+        // Use URL parsing with a dummy base: if the resolved origin differs, it's external.
+        const safePath = returnTo && isSafeRelativePath(returnTo) ? returnTo : '/'
         navigate({ to: safePath })
         return true
       }

@@ -1,4 +1,5 @@
 import { safeFetch } from '../lib/safe-fetch'
+import { isAllowedOAuthRedirectUrl } from '../lib/redirect-guard'
 import { Hono, type Context } from 'hono'
 import { describeRoute, resolver, validator } from 'hono-openapi'
 import { z } from 'zod'
@@ -151,6 +152,10 @@ providerSetup.post('/oauth/start',
     const body = c.req.valid('json')
     const services = c.get('services')
 
+    if (!isAllowedOAuthRedirectUrl(body.redirectUrl, c.env)) {
+      return c.json({ error: 'Invalid redirect URL: must be the app deep link or a configured origin' }, 400)
+    }
+
     const oauthConfig = PROVIDER_OAUTH_CONFIG[body.provider]
     if (!oauthConfig) {
       return c.json({ error: `Provider ${body.provider} does not support OAuth` }, 400)
@@ -216,6 +221,14 @@ providerSetup.post('/oauth/callback',
     if (new Date() > stateRow.expiresAt) {
       await services.providerSetup.failOAuthState(state)
       return c.json({ error: 'State token expired' }, 400)
+    }
+
+    // Defense-in-depth: re-validate the stored redirectUrl before using it.
+    // The /oauth/start handler validates on write, but an older state row may
+    // predate that check. Reject any URL that doesn't match the allowlist.
+    if (!isAllowedOAuthRedirectUrl(stateRow.redirectUrl, c.env)) {
+      await services.providerSetup.failOAuthState(state)
+      return c.json({ error: 'Stored redirect URL is not allowed' }, 400)
     }
 
     // For non-HTTP redirect URLs (e.g. app:// deep links), return JSON instead of HTTP redirect.
@@ -313,6 +326,12 @@ providerSetup.get('/oauth/callback',
     if (new Date() > stateRow.expiresAt) {
       await services.providerSetup.failOAuthState(state)
       return c.json({ error: 'State token expired' }, 400)
+    }
+
+    // Defense-in-depth: re-validate the stored redirectUrl before using it.
+    if (!isAllowedOAuthRedirectUrl(stateRow.redirectUrl, c.env)) {
+      await services.providerSetup.failOAuthState(state)
+      return c.json({ error: 'Stored redirect URL is not allowed' }, 400)
     }
 
     const isHttpRedirect = stateRow.redirectUrl.startsWith('http://') || stateRow.redirectUrl.startsWith('https://')
