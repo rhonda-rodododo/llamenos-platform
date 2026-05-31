@@ -939,7 +939,7 @@
     "description": "Chikaa PIN miíún ña kuaꞌan noꞌó ji chiꞌña yóꞌo.",
     "maxAttempts": "Ni̱ ndíꞌi ndiꞌi intento. Ni̱ xíta llave.",
     "title": "Verificar Identidad Miíún",
-    "wrongPin": "PIN ña va̱ꞌa. {{remaining}} intento koo."
+    "wrongPin": "Incorrect PIN."
   },
   "preferences": {
     "invalidToken": "Enlace de preferencia ña va̱ꞌa xi ni̱ ndíꞌi",

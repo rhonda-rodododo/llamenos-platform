@@ -179,6 +179,7 @@ export const TestIds = {
   EMERGENCY_WIPE_BTN: 'emergency-wipe-btn',
   PIN_CHALLENGE_DIALOG: 'pin-challenge-dialog',
   PIN_CHALLENGE_ERROR: 'pin-challenge-error',
+  PIN_CHALLENGE_LOCKOUT: 'pin-challenge-lockout',
   PIN_INPUT: 'pin-input',
 
   // ============ Audit ============

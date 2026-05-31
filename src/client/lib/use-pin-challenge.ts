@@ -5,17 +5,19 @@
  *   const { requirePin, PinChallengeDialog } = usePinChallenge()
  *   const ok = await requirePin()
  *   if (!ok) return // user cancelled or max attempts exceeded
+ *
+ * Attempt counting and lockout enforcement are handled entirely in Rust CryptoState
+ * (unlock_with_pin IPC command). The Rust counter persists across page refreshes
+ * because the Tauri process remains alive. The React state only tracks UI display state.
  */
 
 import { useState, useCallback, useRef } from 'react'
 import * as keyManager from './key-manager'
 
-const MAX_ATTEMPTS = 3
-
 interface PinChallengeState {
   isOpen: boolean
-  attempts: number
   error: boolean
+  lockoutMessage: string | null
 }
 
 interface PinChallengeReturn {
@@ -23,10 +25,10 @@ interface PinChallengeReturn {
   requirePin: () => Promise<boolean>
   /** Whether the dialog is currently open */
   isOpen: boolean
-  /** Current PIN attempt count */
-  attempts: number
   /** Whether the last attempt was wrong */
   error: boolean
+  /** Lockout message from Rust (e.g. "Locked out. Try again in 30 seconds") */
+  lockoutMessage: string | null
   /** Handle PIN completion (called by dialog component) */
   handleComplete: (pin: string) => Promise<void>
   /** Handle dialog cancel */
@@ -36,49 +38,53 @@ interface PinChallengeReturn {
 export function usePinChallenge(): PinChallengeReturn {
   const [state, setState] = useState<PinChallengeState>({
     isOpen: false,
-    attempts: 0,
     error: false,
+    lockoutMessage: null,
   })
 
   const resolveRef = useRef<((value: boolean) => void) | null>(null)
 
   const requirePin = useCallback((): Promise<boolean> => {
-    // If key manager is already unlocked, verify via unlock (re-enter PIN)
-    // The key needs to be re-verified even if unlocked
     return new Promise<boolean>((resolve) => {
       resolveRef.current = resolve
-      setState({ isOpen: true, attempts: 0, error: false })
+      setState({ isOpen: true, error: false, lockoutMessage: null })
     })
   }, [])
 
   const handleComplete = useCallback(async (pin: string) => {
-    // Try to verify the PIN by attempting unlock
-    // If already unlocked, we need to verify against stored key
-    const result = await keyManager.unlock(pin)
+    try {
+      const result = await keyManager.unlock(pin)
 
-    if (result) {
-      // PIN correct
-      setState({ isOpen: false, attempts: 0, error: false })
-      resolveRef.current?.(true)
-      resolveRef.current = null
-    } else {
-      // Wrong PIN
-      setState(prev => {
-        const newAttempts = prev.attempts + 1
-        if (newAttempts >= MAX_ATTEMPTS) {
-          // Max attempts exceeded — close dialog, wipe key
-          keyManager.wipeKey()
-          resolveRef.current?.(false)
-          resolveRef.current = null
-          return { isOpen: false, attempts: 0, error: false }
-        }
-        return { ...prev, attempts: newAttempts, error: true }
-      })
+      if (result) {
+        // PIN correct — Rust counter reset
+        setState({ isOpen: false, error: false, lockoutMessage: null })
+        resolveRef.current?.(true)
+        resolveRef.current = null
+      } else {
+        // Wrong PIN — Rust incremented its counter
+        setState(prev => ({ ...prev, error: true, lockoutMessage: null }))
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+
+      if (msg.includes('wiped') || msg.includes('Wiped')) {
+        // Rust wiped keys after too many failures — lock JS state and close dialog
+        keyManager.lock()
+        setState({ isOpen: false, error: false, lockoutMessage: null })
+        resolveRef.current?.(false)
+        resolveRef.current = null
+      } else if (msg.includes('Locked out') || msg.includes('locked')) {
+        // Rust-enforced time-based lockout — display message, keep dialog open
+        setState(prev => ({ ...prev, error: false, lockoutMessage: msg }))
+      } else {
+        // Unexpected error — treat as wrong PIN
+        setState(prev => ({ ...prev, error: true, lockoutMessage: null }))
+      }
     }
   }, [])
 
   const handleCancel = useCallback(() => {
-    setState({ isOpen: false, attempts: 0, error: false })
+    setState({ isOpen: false, error: false, lockoutMessage: null })
     resolveRef.current?.(false)
     resolveRef.current = null
   }, [])
@@ -86,8 +92,8 @@ export function usePinChallenge(): PinChallengeReturn {
   return {
     requirePin,
     isOpen: state.isOpen,
-    attempts: state.attempts,
     error: state.error,
+    lockoutMessage: state.lockoutMessage,
     handleComplete,
     handleCancel,
   }

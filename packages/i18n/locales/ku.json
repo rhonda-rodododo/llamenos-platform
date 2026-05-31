@@ -939,7 +939,7 @@
     "description": "Ji bo berdewamkirina vê çalakiyê PIN a xwe binivîse.",
     "maxAttempts": "Herî zêde hewldan derbaskirî. Kilîd hat paqijkirin.",
     "title": "Nasnameya Xwe Piştrast Bike",
-    "wrongPin": "PIN şaş e. {{remaining}} hewldan mane."
+    "wrongPin": "Incorrect PIN."
   },
   "preferences": {
     "invalidToken": "Girêdana bijarteyan ne derbasdar e an qediyaye",

@@ -1,7 +1,7 @@
 /**
  * PIN challenge step definitions.
- * Matches steps from: packages/test-specs/features/desktop/auth/pin-challenge.feature
- * Covers phone unmask PIN re-verification, wrong PIN wipe, and cancel dialog.
+ * Matches steps from: packages/test-specs/features/platform/desktop/auth/pin-challenge.feature
+ * Covers phone unmask PIN re-verification, wrong PIN error display, and cancel dialog.
  */
 import { expect } from '@playwright/test'
 import { When, Then } from '../fixtures'
@@ -28,6 +28,11 @@ Then('the PIN challenge dialog should close', async ({ page }) => {
   await expect(pinDialog).not.toBeVisible({ timeout: 5000 })
 })
 
+Then('the PIN challenge dialog should remain open', async ({ page }) => {
+  const pinDialog = page.getByTestId(TestIds.PIN_CHALLENGE_DIALOG)
+  await expect(pinDialog).toBeVisible({ timeout: Timeouts.ELEMENT })
+})
+
 Then('I should see the unmasked phone number', async ({ page }) => {
   // Scope phone number lookup within the PIN challenge context / volunteer row
   const pinDialog = page.getByTestId(TestIds.PIN_CHALLENGE_DIALOG)
@@ -46,6 +51,12 @@ When('I enter a wrong PIN three times', async ({ page }) => {
   await expect(errorMsg).toBeVisible({ timeout: 5000 })
 
   await enterPin(page, '77777777')
+  await expect(errorMsg).toBeVisible({ timeout: 5000 })
+})
+
+Then('I should see a wrong PIN error message', async ({ page }) => {
+  const errorMsg = page.getByTestId(TestIds.PIN_CHALLENGE_ERROR)
+  await expect(errorMsg).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('I should still be on the volunteers page', async ({ page }) => {

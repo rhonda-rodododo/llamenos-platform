@@ -939,7 +939,7 @@
     "description": "Tatz'ib'aj ri PIN awech rech kasamajix re b'anoj re'.",
     "maxAttempts": "Xek'is ri taq rayik. Ri etal xyujux.",
     "title": "Tijikib'ax Ri Awetal",
-    "wrongPin": "Man ütz ta ri PIN. {{remaining}} rayik k'a k'o."
+    "wrongPin": "Incorrect PIN."
   },
   "preferences": {
     "invalidToken": "Man okel ta o xk'is ri ramaj rech ri okem rech taq chojmixik",

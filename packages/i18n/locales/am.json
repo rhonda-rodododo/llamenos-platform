@@ -939,7 +939,7 @@
     "description": "ይህን ድርጊት ለመቀጠል PIN ዎን ያስገቡ።",
     "maxAttempts": "ከፍተኛ ሙከራዎች ተሟልተዋል። ቁልፍ ተጠፍቷል።",
     "title": "ማንነትዎን ያረጋግጡ",
-    "wrongPin": "ልክ ያልሆነ PIN። {{remaining}} ሙከራ(ዎች) ቀርተዋል።"
+    "wrongPin": "Incorrect PIN."
   },
   "preferences": {
     "invalidToken": "ልክ ያልሆነ ወይም ጊዜው ያለፈ የምርጫ ማገናኛ",

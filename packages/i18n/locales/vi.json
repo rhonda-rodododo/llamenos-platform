@@ -2853,7 +2853,7 @@
     "description": "Enter your PIN to continue with this action.",
     "maxAttempts": "Maximum attempts exceeded. Key has been wiped.",
     "title": "Verify Your Identity",
-    "wrongPin": "Wrong PIN. {{remaining}} attempt(s) remaining."
+    "wrongPin": "Incorrect PIN."
   },
   "platformBans": {
     "bulkDialogTitle": "Bulk Import Bans",
