@@ -119,14 +119,6 @@ async function resolveEntityTypeId(
   }
 
   const created = await createEntityTypeViaApi(request, { name, category: 'case', hubId })
-  // 409 race: another parallel scenario created it first — re-fetch
-  if (!created) {
-    const retryTypes = await listEntityTypesViaApi(request, hubId)
-    const found = retryTypes.find(t => t.name === name)
-    if (!found) throw new Error(`Entity type '${name}' not found after 409`)
-    getCmsState(world).entityTypeIds.set(name, found.id as string)
-    return found.id as string
-  }
   const id = created.id as string
   getCmsState(world).entityTypeIds.set(name, id)
   return id
@@ -150,14 +142,6 @@ async function resolveEventEntityTypeId(
   }
 
   const created = await createEntityTypeViaApi(request, { name, category: 'event', hubId })
-  // 409 race: another parallel scenario created it first — re-fetch
-  if (!created) {
-    const retryTypes = await listEntityTypesViaApi(request, hubId)
-    const found = retryTypes.find(t => t.name === name)
-    if (!found) throw new Error(`Event entity type '${name}' not found after 409`)
-    getCmsState(world).eventEntityTypeIds.set(name, found.id as string)
-    return found.id as string
-  }
   const id = created.id as string
   getCmsState(world).eventEntityTypeIds.set(name, id)
   return id

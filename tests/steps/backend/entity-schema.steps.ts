@@ -58,14 +58,6 @@ Given('an entity type {string} exists', async ({ request, world }, name: string)
     return
   }
   const created = await createEntityTypeViaApi(request, { name, category: 'case', hubId })
-  // 409 race: another parallel scenario created it first — re-fetch
-  if (!created) {
-    const retryTypes = await listEntityTypesViaApi(request, hubId)
-    const found = retryTypes.find(t => t.name === name)
-    if (!found) throw new Error(`Entity type '${name}' not found after 409`)
-    getEntitySchemaState(world).lastEntityType = found
-    return
-  }
   getEntitySchemaState(world).lastEntityType = created
 })
 
