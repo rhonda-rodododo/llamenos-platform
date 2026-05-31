@@ -2,8 +2,7 @@ import { Hono } from 'hono'
 import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { auth } from '../middleware/auth'
-import { checkRateLimit } from '../lib/helpers'
-import { hashIP } from '../lib/crypto'
+import { rateLimit } from '../middleware/rate-limit'
 import { publicErrors, authErrors } from '../openapi/helpers'
 import { okResponseSchema } from '@protocol/schemas/common'
 import { createRoomBodySchema, roomPayloadBodySchema, provisionRoomResponseSchema, provisionRoomStatusResponseSchema } from '@protocol/schemas/provisioning'
@@ -20,6 +19,10 @@ const provisioning = new Hono<AppEnv>()
  * 4. New device: GET /rooms/:id → polls for encrypted payload
  */
 
+// Per-room brute-force protection: max 3 token presentations per room per 10-minute window.
+const PROVISION_ROOM_MAX_GUESSES = 3
+const PROVISION_ROOM_WINDOW_MS = 10 * 60 * 1000
+
 // Create provisioning room (public — new device has no auth yet)
 provisioning.post('/rooms',
   describeRoute({
@@ -34,9 +37,11 @@ provisioning.post('/rooms',
           },
         },
       },
+      429: { description: 'Rate limit exceeded' },
       ...publicErrors,
     },
   }),
+  rateLimit('strict'),
   validator('json', createRoomBodySchema),
   async (c) => {
     const services = c.get('services')
@@ -64,20 +69,31 @@ provisioning.get('/rooms/:id',
       429: { description: 'Rate limited' },
     },
   }),
+  rateLimit('strict'),
   async (c) => {
     const services = c.get('services')
-    const clientIp = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || 'unknown'
-    const limited = await checkRateLimit(services.settings, `provision:${hashIP(clientIp, c.env.HMAC_SECRET)}`, 30)
-    if (limited) return c.json({ error: 'Rate limited' }, 429)
     const id = c.req.param('id')
     const token = c.req.query('token')
     if (!token) return c.json({ error: 'Missing token' }, 400)
+
+    // Per-room brute-force protection: cap token presentations per room to prevent
+    // enumeration attacks even from different IPs.
+    const roomLimit = await services.settings.checkApiRateLimit(
+      `provision:room:${id}`,
+      PROVISION_ROOM_MAX_GUESSES,
+      PROVISION_ROOM_WINDOW_MS,
+    )
+    if (roomLimit.limited) {
+      c.header('Retry-After', String(roomLimit.retryAfterSeconds))
+      return c.json({ error: 'Rate limited' }, 429)
+    }
+
     const result = await services.identity.getProvisionRoom(id, token)
     return c.json(result)
   })
 
 // Send encrypted payload (authenticated — primary device)
-provisioning.post('/rooms/:id/payload', auth,
+provisioning.post('/rooms/:id/payload', auth, rateLimit('write'),
   describeRoute({
     tags: ['Provisioning'],
     summary: 'Send encrypted provisioning payload to room',
@@ -90,6 +106,7 @@ provisioning.post('/rooms/:id/payload', auth,
           },
         },
       },
+      429: { description: 'Rate limit exceeded' },
       ...authErrors,
     },
   }),
