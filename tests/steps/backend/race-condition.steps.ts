@@ -283,8 +283,7 @@ Given('a user has {int} registered devices', async ({ request, world }, count: n
   // Register devices up to count
   for (let i = 0; i < count; i++) {
     const kp = generateTestKeypair()
-    // Generate a valid-format compressed secp256k1 pubkey for wakeKeyPublic
-    const wakeKeyPublic = '02' + kp.pubkey
+    const wakeKeyPublic = kp.pubkey
     const res = await apiPost(request, '/devices/register', {
       platform: 'ios',
       pushToken: `push-token-race-${i}-${Date.now()}`,
@@ -303,7 +302,7 @@ When('two new devices register simultaneously for the user', async ({ request, w
 
   const registerDevice = (idx: number) => {
     const kp = generateTestKeypair()
-    const wakeKeyPublic = '02' + kp.pubkey
+    const wakeKeyPublic = kp.pubkey
     return apiPost(request, '/devices/register', {
       platform: 'ios',
       pushToken: `push-token-race-new-${idx}-${Date.now()}`,

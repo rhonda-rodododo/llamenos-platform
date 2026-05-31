@@ -943,12 +943,15 @@ export async function createEntityTypeViaApi(
     seedHex,
   )
   // 409 = entity type already exists (TOCTOU race in parallel test workers).
-  // Re-fetch using the same hub-scoped path and return the existing entity.
+  // The concurrent create may still be mid-commit; retry the list with backoff.
   if (status === 409) {
-    const types = await listEntityTypesViaApi(request, options?.hubId, seedHex)
-    const existing = types.find(t => t.name === name)
-    if (existing) return existing
-    throw new Error(`Entity type '${name}' returned 409 but not found in list (hubId=${options?.hubId})`)
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) await new Promise(r => setTimeout(r, 200 * attempt))
+      const types = await listEntityTypesViaApi(request, options?.hubId, seedHex)
+      const existing = types.find(t => t.name === name)
+      if (existing) return existing
+    }
+    throw new Error(`Entity type '${name}' returned 409 but not found after retries (hubId=${options?.hubId})`)
   }
   if (status !== 201 && status !== 200) throw new Error(`Failed to create entity type: ${status}`)
   return data
@@ -959,7 +962,7 @@ export async function listEntityTypesViaApi(
   hubId?: string,
   seedHex = ADMIN_SEED,
 ): Promise<Record<string, unknown>[]> {
-  const path = hubPath('/settings/cms/entity-types', hubId)
+  const path = hubId ? `/settings/cms/entity-types?hubId=${hubId}` : '/settings/cms/entity-types'
   const { data } = await apiGet<{ entityTypes: Record<string, unknown>[] }>(request, path, seedHex)
   return data?.entityTypes ?? []
 }

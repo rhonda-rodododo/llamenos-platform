@@ -45,7 +45,7 @@ async function registerDevice(
   request: import('@playwright/test').APIRequestContext,
   nsec: string,
 ) {
-  const wakeKey = '02' + bytesToHex(crypto.getRandomValues(new Uint8Array(32)))
+  const wakeKey = bytesToHex(crypto.getRandomValues(new Uint8Array(32)))
   const pushToken = bytesToHex(crypto.getRandomValues(new Uint8Array(16)))
   return apiPost(request, '/devices/register', { platform: 'ios', pushToken, wakeKeyPublic: wakeKey }, nsec)
 }
