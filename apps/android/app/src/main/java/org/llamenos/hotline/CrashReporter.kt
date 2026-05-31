@@ -47,9 +47,18 @@ class CrashReporter @Inject constructor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val prefs: SharedPreferences? by lazy {
         try {
-            val masterKey = androidx.security.crypto.MasterKey.Builder(context)
-                .setKeyScheme(androidx.security.crypto.MasterKey.KeyScheme.AES256_GCM)
-                .build()
+            val masterKey = try {
+                // Request StrongBox hardware security module backing where available.
+                androidx.security.crypto.MasterKey.Builder(context)
+                    .setKeyScheme(androidx.security.crypto.MasterKey.KeyScheme.AES256_GCM)
+                    .setRequestStrongBoxBacked(true)
+                    .build()
+            } catch (_: Exception) {
+                // StrongBox not available on this device — fall back to TEE-backed key.
+                androidx.security.crypto.MasterKey.Builder(context)
+                    .setKeyScheme(androidx.security.crypto.MasterKey.KeyScheme.AES256_GCM)
+                    .build()
+            }
             androidx.security.crypto.EncryptedSharedPreferences.create(
                 context,
                 PREFS_NAME,
