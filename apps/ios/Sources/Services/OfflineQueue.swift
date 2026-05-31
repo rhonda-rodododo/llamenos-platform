@@ -92,18 +92,11 @@ final class OfflineQueue: @unchecked Sendable {
 
         connectivityTask?.cancel()
         connectivityTask = Task { [weak self] in
-            // Wait briefly for initial state
-            try? await Task.sleep(for: .seconds(1))
-            // Poll the monitor for connectivity changes
-            var wasConnected = monitor.isConnected
-            while !Task.isCancelled {
-                let connected = monitor.isConnected
-                if connected && !wasConnected {
-                    // Just came online — replay
+            for await isConnected in monitor.changes {
+                guard !Task.isCancelled else { break }
+                if isConnected {
                     await self?.replay()
                 }
-                wasConnected = connected
-                try? await Task.sleep(for: .seconds(2))
             }
         }
     }
@@ -225,29 +218,12 @@ final class OfflineQueue: @unchecked Sendable {
     // MARK: - Request Execution
 
     /// Execute a queued operation against the API. Returns (statusCode, responseBody).
+    ///
+    /// Delegates to `APIService.rawRequest` so the replayed request carries the same
+    /// Ed25519 auth token and cert-pinning URLSession as a live request. Using
+    /// `URLSession.shared` here would bypass both, causing 401s on every replay.
     private func executeRequest(_ op: QueuedOperation) async throws -> (Int, String) {
-        guard let baseURL = apiService.baseURL else {
-            throw APIError.noBaseURL
-        }
-
-        let fullURL = baseURL.appendingPathComponent(op.path)
-        var request = URLRequest(url: fullURL)
-        request.httpMethod = op.method.uppercased()
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-
-        if let body = op.body {
-            request.httpBody = body.data(using: .utf8)
-        }
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw APIError.requestFailed(statusCode: 0, body: "Non-HTTP response")
-        }
-
-        let bodyString = String(data: data, encoding: .utf8) ?? ""
-        return (httpResponse.statusCode, bodyString)
+        return try await apiService.rawRequest(method: op.method, path: op.path, body: op.body)
     }
 
     // MARK: - Classification
@@ -309,16 +285,31 @@ private final class NetworkMonitorService: @unchecked Sendable {
     private let monitor = NWPathMonitor()
     private let monitorQueue = DispatchQueue(label: "org.llamenos.network-monitor")
 
+    /// Current connectivity state (true = reachable).
     private(set) var isConnected: Bool = true
+
+    /// AsyncStream that yields `true` when the path becomes reachable and
+    /// `false` when it becomes unreachable. Consumers drive replay on reconnect
+    /// without any polling.
+    private let _continuation: AsyncStream<Bool>.Continuation
+    let changes: AsyncStream<Bool>
+
+    init() {
+        (changes, _continuation) = AsyncStream<Bool>.makeStream()
+    }
 
     func start() {
         monitor.pathUpdateHandler = { [weak self] path in
-            self?.isConnected = path.status == .satisfied
+            guard let self else { return }
+            let connected = path.status == .satisfied
+            self.isConnected = connected
+            self._continuation.yield(connected)
         }
         monitor.start(queue: monitorQueue)
     }
 
     func stop() {
+        _continuation.finish()
         monitor.cancel()
     }
 }
