@@ -822,3 +822,75 @@ describe('IdentityService.validateSession - sliding expiry', () => {
     await expect(service.validateSession('tok-abc123')).rejects.toMatchObject({ status: 401 })
   })
 })
+
+// ---------------------------------------------------------------------------
+// IdentityService.cleanup
+// ---------------------------------------------------------------------------
+
+describe('IdentityService.cleanup', () => {
+  it('returns zero counts when nothing is expired', async () => {
+    const { db, service } = setup()
+    db.$setDeleteResult([])
+
+    const result = await service.cleanup()
+
+    expect(result.expiredSessions).toBe(0)
+    expect(result.expiredChallenges).toBe(0)
+    expect(result.expiredProvisionRooms).toBe(0)
+    expect(result.expiredInvites).toBe(0)
+  })
+
+  it('counts deleted sessions', async () => {
+    const { db, service } = setup()
+    // delete is called 4 times (sessions, challenges, rooms, redeemed invites, expired invites)
+    // mock-db uses a single _deleteResult for all calls
+    db.$setDeleteResult([{ token: 'tok-1' }, { token: 'tok-2' }])
+
+    const result = await service.cleanup()
+
+    expect(result.expiredSessions).toBe(2)
+  })
+
+  it('counts deleted challenges', async () => {
+    const { db, service } = setup()
+    db.$setDeleteResult([{ challengeId: 'ch-1' }])
+
+    const result = await service.cleanup()
+
+    // expiredChallenges uses the same delete mock result as all deletes
+    expect(result.expiredChallenges).toBe(1)
+  })
+
+  it('returns all four cleanup counts', async () => {
+    const { db, service } = setup()
+    db.$setDeleteResult([{ id: 'row-1' }])
+
+    const result = await service.cleanup()
+
+    expect(typeof result.expiredSessions).toBe('number')
+    expect(typeof result.expiredChallenges).toBe('number')
+    expect(typeof result.expiredProvisionRooms).toBe('number')
+    expect(typeof result.expiredInvites).toBe('number')
+  })
+
+  it('calls delete for sessions, challenges, provision rooms, and invites', async () => {
+    const { db, service } = setup()
+    db.$setDeleteResult([])
+
+    await service.cleanup()
+
+    // delete should be called 5 times: sessions, challenges, rooms, redeemed invites, expired invites
+    expect(db.delete).toHaveBeenCalledTimes(5)
+  })
+
+  it('rethrows database errors', async () => {
+    const { db, service } = setup()
+    db.delete = vi.fn().mockReturnValue({
+      where: vi.fn().mockReturnValue({
+        returning: vi.fn().mockRejectedValue(new Error('DB gone')),
+      }),
+    })
+
+    await expect(service.cleanup()).rejects.toThrow('DB gone')
+  })
+})

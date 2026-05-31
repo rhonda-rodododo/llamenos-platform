@@ -1268,3 +1268,104 @@ describe('SettingsService.deleteHub', () => {
     expect((db as any).transaction).toHaveBeenCalled()
   })
 })
+
+// ---------------------------------------------------------------------------
+// runCleanup
+// ---------------------------------------------------------------------------
+
+describe('SettingsService.runCleanup', () => {
+  it('deletes expired rate limit entries and returns metrics', async () => {
+    const { db, service } = setup()
+    const now = Date.now()
+    const oldTs = now - 999_999_999 // far in the past — well beyond any TTL
+    const recentTs = now - 1000 // 1 second ago — within TTL
+
+    // Select sequence: getSettings → select rateLimits
+    db.$setSelectResults([
+      [makeSettingsRow({ ttlOverrides: null, cleanupMetrics: null })],
+      [
+        { key: 'stale-key', timestamps: [oldTs] },
+        { key: 'active-key', timestamps: [recentTs] },
+      ],
+    ])
+    db.$setDeleteResult([{ key: 'stale-key' }])
+
+    const metrics = await service.runCleanup()
+
+    expect(metrics.rateLimitEntriesDeleted).toBe(1)
+    expect(db.delete).toHaveBeenCalled()
+  })
+
+  it('deletes expired CAPTCHA challenges', async () => {
+    const { db, service } = setup()
+    // Select: getSettings + empty rateLimits
+    db.$setSelectResults([
+      [makeSettingsRow({ ttlOverrides: null, cleanupMetrics: null })],
+      [],
+    ])
+    db.$setDeleteResult([{ id: 'cap-1' }, { id: 'cap-2' }])
+
+    const metrics = await service.runCleanup()
+
+    expect(metrics.captchaChallengesDeleted).toBe(2)
+  })
+
+  it('preserves existing accumulated metrics from DB', async () => {
+    const { db, service } = setup()
+    const existing = {
+      rateLimitEntriesDeleted: 10,
+      captchaChallengesDeleted: 5,
+      lastCleanupAt: '2024-01-01T00:00:00.000Z',
+    }
+    db.$setSelectResults([
+      [makeSettingsRow({ cleanupMetrics: existing })],
+      [],
+    ])
+    db.$setDeleteResult([{ id: 'cap-1' }])
+
+    const metrics = await service.runCleanup()
+
+    // Accumulated from existing + new
+    expect(metrics.captchaChallengesDeleted).toBe(6)
+    expect(metrics.rateLimitEntriesDeleted).toBe(10)
+  })
+
+  it('sets lastCleanupAt to a current ISO timestamp', async () => {
+    const { db, service } = setup()
+    const before = new Date().toISOString()
+    db.$setSelectResults([
+      [makeSettingsRow({ ttlOverrides: null, cleanupMetrics: null })],
+      [],
+    ])
+    db.$setDeleteResult([])
+
+    const metrics = await service.runCleanup()
+
+    expect(metrics.lastCleanupAt).toBeDefined()
+    expect(metrics.lastCleanupAt! >= before).toBe(true)
+  })
+
+  it('updates systemSettings with new metrics', async () => {
+    const { db, service } = setup()
+    db.$setSelectResults([
+      [makeSettingsRow({ ttlOverrides: null, cleanupMetrics: null })],
+      [],
+    ])
+    db.$setDeleteResult([])
+
+    await service.runCleanup()
+
+    expect(db.update).toHaveBeenCalled()
+  })
+
+  it('rethrows database errors', async () => {
+    const { db, service } = setup()
+    db.select = vi.fn().mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockRejectedValue(new Error('DB connection failed')),
+      }),
+    })
+
+    await expect(service.runCleanup()).rejects.toThrow('DB connection failed')
+  })
+})

@@ -30,6 +30,9 @@ import type {
 } from '../types'
 import { ServiceError } from './settings'
 import { DEMO_ACCOUNTS } from '@shared/demo-accounts'
+import { createLogger } from '../lib/logger'
+
+const log = createLogger('services.identity')
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -1534,56 +1537,65 @@ export class IdentityService {
     expiredProvisionRooms: number
     expiredInvites: number
   }> {
-    const now = new Date()
+    log.info('Starting identity cleanup')
+    try {
+      const now = new Date()
 
-    // Expired sessions
-    const deletedSessions = await this.db
-      .delete(sessions)
-      .where(lt(sessions.expiresAt, now))
-      .returning({ token: sessions.token })
+      // Expired sessions
+      const deletedSessions = await this.db
+        .delete(sessions)
+        .where(lt(sessions.expiresAt, now))
+        .returning({ token: sessions.token })
 
-    // Expired challenges (5 min TTL)
-    const challengeCutoff = new Date(now.getTime() - CHALLENGE_TTL_MS)
-    const deletedChallenges = await this.db
-      .delete(webauthnChallenges)
-      .where(lt(webauthnChallenges.createdAt, challengeCutoff))
-      .returning({ challengeId: webauthnChallenges.challengeId })
+      // Expired challenges (5 min TTL)
+      const challengeCutoff = new Date(now.getTime() - CHALLENGE_TTL_MS)
+      const deletedChallenges = await this.db
+        .delete(webauthnChallenges)
+        .where(lt(webauthnChallenges.createdAt, challengeCutoff))
+        .returning({ challengeId: webauthnChallenges.challengeId })
 
-    // Expired provisioning rooms
-    const deletedRooms = await this.db
-      .delete(provisionRooms)
-      .where(lt(provisionRooms.expiresAt, now))
-      .returning({ roomId: provisionRooms.roomId })
+      // Expired provisioning rooms
+      const deletedRooms = await this.db
+        .delete(provisionRooms)
+        .where(lt(provisionRooms.expiresAt, now))
+        .returning({ roomId: provisionRooms.roomId })
 
-    // Redeemed invites (clean up after 24h) and expired-unredeemed invites (clean up after 7 days)
-    const redeemedCutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000)
-    const expiredCutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+      // Redeemed invites (clean up after 24h) and expired-unredeemed invites (clean up after 7 days)
+      const redeemedCutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+      const expiredCutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
 
-    const deletedRedeemedInvites = await this.db
-      .delete(inviteCodes)
-      .where(
-        and(
-          sql`${inviteCodes.usedAt} IS NOT NULL`,
-          lt(inviteCodes.usedAt, redeemedCutoff),
-        ),
-      )
-      .returning({ code: inviteCodes.code })
+      const deletedRedeemedInvites = await this.db
+        .delete(inviteCodes)
+        .where(
+          and(
+            sql`${inviteCodes.usedAt} IS NOT NULL`,
+            lt(inviteCodes.usedAt, redeemedCutoff),
+          ),
+        )
+        .returning({ code: inviteCodes.code })
 
-    const deletedExpiredInvites = await this.db
-      .delete(inviteCodes)
-      .where(
-        and(
-          sql`${inviteCodes.usedAt} IS NULL`,
-          lt(inviteCodes.expiresAt, expiredCutoff),
-        ),
-      )
-      .returning({ code: inviteCodes.code })
+      const deletedExpiredInvites = await this.db
+        .delete(inviteCodes)
+        .where(
+          and(
+            sql`${inviteCodes.usedAt} IS NULL`,
+            lt(inviteCodes.expiresAt, expiredCutoff),
+          ),
+        )
+        .returning({ code: inviteCodes.code })
 
-    return {
-      expiredSessions: deletedSessions.length,
-      expiredChallenges: deletedChallenges.length,
-      expiredProvisionRooms: deletedRooms.length,
-      expiredInvites: deletedRedeemedInvites.length + deletedExpiredInvites.length,
+      const result = {
+        expiredSessions: deletedSessions.length,
+        expiredChallenges: deletedChallenges.length,
+        expiredProvisionRooms: deletedRooms.length,
+        expiredInvites: deletedRedeemedInvites.length + deletedExpiredInvites.length,
+      }
+
+      log.info('Identity cleanup complete', result)
+      return result
+    } catch (err) {
+      log.error('Identity cleanup failed', err instanceof Error ? err : new Error(String(err)))
+      throw err
     }
   }
 
