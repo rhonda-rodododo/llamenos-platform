@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.llamenos.hotline.RelayUrlValidator
 import org.llamenos.hotline.api.WebSocketService
 import org.llamenos.hotline.crypto.CryptoService
 import javax.inject.Inject
@@ -69,8 +70,9 @@ class DeviceLinkViewModel @Inject constructor(
      *
      * Expected format: "llamenos:provision:<roomId>:<relayUrl>"
      *
-     * Validates the relay URL host to reject private/internal network addresses
-     * that could be used for SSRF or relay URL injection attacks.
+     * Validates the relay URL using [RelayUrlValidator]:
+     * - Must use `wss://` or `https://` scheme (rejects plaintext `ws://`)
+     * - Host must not be loopback, RFC 1918 private, or link-local (SSRF prevention)
      */
     fun onQRCodeScanned(rawValue: String) {
         val parts = rawValue.split(":")
@@ -87,18 +89,11 @@ class DeviceLinkViewModel @Inject constructor(
         val roomId = parts[2]
         val relayUrl = parts.drop(3).joinToString(":")
 
-        // Extract host from relay URL and validate
-        val host = try {
-            java.net.URI(relayUrl).host ?: ""
-        } catch (_: Exception) {
-            ""
-        }
-
-        if (host.isEmpty() || !isValidRelayHost(host)) {
+        if (!RelayUrlValidator.isValidRelayUrl(relayUrl)) {
             _uiState.update {
                 it.copy(
                     step = DeviceLinkStep.ERROR,
-                    error = "Invalid relay URL: private or reserved network address",
+                    error = "Invalid relay URL: must use wss:// and not be a private or reserved address",
                 )
             }
             return
@@ -114,29 +109,6 @@ class DeviceLinkViewModel @Inject constructor(
         }
 
         connectToProvisioningRoom(roomId, relayUrl)
-    }
-
-    /**
-     * Validate that a relay host is not a private/internal network address.
-     *
-     * Rejects:
-     * - localhost, 127.0.0.1, ::1 (loopback)
-     * - 10.x.x.x (RFC 1918 Class A)
-     * - 172.16-31.x.x (RFC 1918 Class B)
-     * - 192.168.x.x (RFC 1918 Class C)
-     * - 169.254.x.x (link-local)
-     * - fe80: (IPv6 link-local)
-     *
-     * @return true if the host is a valid public relay address
-     */
-    internal fun isValidRelayHost(host: String): Boolean {
-        val lower = host.lowercase()
-        if (lower == "localhost" || lower == "127.0.0.1" || lower == "::1") return false
-        if (lower == "[::1]") return false
-
-        val blockedPrefixes = listOf("10.", "192.168.", "169.254.", "fe80:") +
-            (16..31).map { "172.$it." }
-        return blockedPrefixes.none { lower.startsWith(it) }
     }
 
     /**

@@ -63,4 +63,53 @@ class DeepLinkValidatorTest {
     fun `call does not require confirmation`() {
         assertFalse(DeepLinkValidator.requiresConfirmation(Uri.parse("llamenos://call/answer")))
     }
+
+    // ── Relay URL parameter validation (H33) ─────────────────────────────────
+
+    @Test
+    fun `valid wss relay param with matching hub url is accepted`() {
+        assertTrue(
+            DeepLinkValidator.isValidRelayParam(
+                "wss://relay.llamenos.org/relay",
+                "https://relay.llamenos.org",
+            )
+        )
+    }
+
+    @Test
+    fun `malicious ws relay param is rejected`() {
+        assertFalse(
+            DeepLinkValidator.isValidRelayParam(
+                "ws://evil.com/relay",
+                "https://relay.llamenos.org",
+            )
+        )
+    }
+
+    @Test
+    fun `foreign domain relay param is rejected even with valid scheme`() {
+        assertFalse(
+            DeepLinkValidator.isValidRelayParam(
+                "wss://evil.com/relay",
+                "https://relay.llamenos.org",
+            )
+        )
+    }
+
+    @Test
+    fun `private ip relay param is rejected`() {
+        assertFalse(
+            DeepLinkValidator.isValidRelayParam(
+                "wss://192.168.1.1/relay",
+                "https://relay.llamenos.org",
+            )
+        )
+    }
+
+    @Test
+    fun `relay param without hub url uses basic validation`() {
+        // No hub URL configured — still requires wss:// and non-private host
+        assertTrue(DeepLinkValidator.isValidRelayParam("wss://relay.llamenos.org/relay"))
+        assertFalse(DeepLinkValidator.isValidRelayParam("ws://relay.llamenos.org/relay"))
+    }
 }
