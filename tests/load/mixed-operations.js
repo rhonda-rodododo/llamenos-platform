@@ -32,13 +32,17 @@ export const options = {
     { duration: '1m', target: 0 },
   ],
   thresholds: {
-    health_check_latency: ['p(95)<500'],
-    notes_list_latency: ['p(95)<1500'],
-    volunteers_list_latency: ['p(95)<1500'],
-    audit_log_latency: ['p(95)<2000'],
-    shifts_list_latency: ['p(95)<1500'],
-    settings_read_latency: ['p(95)<1000'],
-    errors: ['rate<0.05'],
+    // Baseline: p95 < 500ms, p99 < 2s for all API calls
+    health_check_latency: ['p(95)<500', 'p(99)<2000'],
+    notes_list_latency: ['p(95)<500', 'p(99)<2000'],
+    volunteers_list_latency: ['p(95)<500', 'p(99)<2000'],
+    audit_log_latency: ['p(95)<500', 'p(99)<2000'],
+    shifts_list_latency: ['p(95)<500', 'p(99)<2000'],
+    settings_read_latency: ['p(95)<500', 'p(99)<2000'],
+    // Baseline: error rate < 1%
+    errors: ['rate<0.01'],
+    // Overall HTTP request duration baseline
+    http_req_duration: ['p(95)<500', 'p(99)<2000'],
   },
 };
 
@@ -121,4 +125,42 @@ export default function () {
   const operation = pickOperation();
   operation();
   sleep(randomBetween(1, 3));
+}
+
+export function handleSummary(data) {
+  const thresholds = data.metrics;
+  const passed = [];
+  const failed = [];
+
+  for (const [name, metric] of Object.entries(thresholds)) {
+    if (!metric.thresholds) continue;
+    for (const t of metric.thresholds) {
+      if (t.ok) {
+        passed.push(`  PASS  ${name}: ${t.threshold}`);
+      } else {
+        failed.push(`  FAIL  ${name}: ${t.threshold}`);
+      }
+    }
+  }
+
+  const status = failed.length === 0 ? 'PASSED' : 'FAILED';
+  const lines = [
+    '',
+    '══════════════════════════════════════════════════',
+    `  Load Test: Mixed Operations — ${status}`,
+    '══════════════════════════════════════════════════',
+    '',
+    '  Baseline Thresholds (p95<500ms, p99<2s, errors<1%):',
+    '',
+    ...passed,
+    ...failed,
+    '',
+    `  ${passed.length} passed / ${failed.length} failed`,
+    '══════════════════════════════════════════════════',
+    '',
+  ];
+
+  return {
+    stdout: lines.join('\n'),
+  };
 }

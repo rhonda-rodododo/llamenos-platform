@@ -1,6 +1,7 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { Rate, Trend } from 'k6/metrics';
+import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.2/index.js';
 
 // Custom metrics
 const callSetupLatency = new Trend('call_setup_latency', true);
@@ -36,9 +37,13 @@ export const options = {
     { duration: '1m', target: 0 },
   ],
   thresholds: {
-    call_setup_latency: ['p(95)<2000'],
-    call_answer_latency: ['p(95)<1000'],
-    errors: ['rate<0.05'],
+    // Baseline: p95 < 500ms, p99 < 2s for API calls
+    call_setup_latency: ['p(95)<500', 'p(99)<2000'],
+    call_answer_latency: ['p(95)<500', 'p(99)<2000'],
+    // Baseline: error rate < 1%
+    errors: ['rate<0.01'],
+    // Overall HTTP request duration baseline
+    http_req_duration: ['p(95)<500', 'p(99)<2000'],
   },
 };
 
@@ -101,4 +106,42 @@ export default function () {
   });
 
   sleep(1);
+}
+
+export function handleSummary(data) {
+  const thresholds = data.metrics;
+  const passed = [];
+  const failed = [];
+
+  for (const [name, metric] of Object.entries(thresholds)) {
+    if (!metric.thresholds) continue;
+    for (const t of metric.thresholds) {
+      if (t.ok) {
+        passed.push(`  PASS  ${name}: ${t.threshold}`);
+      } else {
+        failed.push(`  FAIL  ${name}: ${t.threshold}`);
+      }
+    }
+  }
+
+  const status = failed.length === 0 ? 'PASSED' : 'FAILED';
+  const lines = [
+    '',
+    '══════════════════════════════════════════════════',
+    `  Load Test: Concurrent Calls — ${status}`,
+    '══════════════════════════════════════════════════',
+    '',
+    '  Baseline Thresholds (p95<500ms, p99<2s, errors<1%):',
+    '',
+    ...passed,
+    ...failed,
+    '',
+    `  ${passed.length} passed / ${failed.length} failed`,
+    '══════════════════════════════════════════════════',
+    '',
+  ];
+
+  return {
+    stdout: lines.join('\n'),
+  };
 }

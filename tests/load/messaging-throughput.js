@@ -39,8 +39,12 @@ export const options = {
     },
   },
   thresholds: {
-    message_send_latency: ['p(95)<500'],
-    errors: ['rate<0.02'],
+    // Baseline: p95 < 500ms, p99 < 2s for API calls
+    message_send_latency: ['p(95)<500', 'p(99)<2000'],
+    // Baseline: error rate < 1%
+    errors: ['rate<0.01'],
+    // Overall HTTP request duration baseline
+    http_req_duration: ['p(95)<500', 'p(99)<2000'],
   },
 };
 
@@ -76,4 +80,42 @@ export default function () {
   });
   errorRate.add(!ok);
   messageSendLatency.add(res.timings.duration);
+}
+
+export function handleSummary(data) {
+  const thresholds = data.metrics;
+  const passed = [];
+  const failed = [];
+
+  for (const [name, metric] of Object.entries(thresholds)) {
+    if (!metric.thresholds) continue;
+    for (const t of metric.thresholds) {
+      if (t.ok) {
+        passed.push(`  PASS  ${name}: ${t.threshold}`);
+      } else {
+        failed.push(`  FAIL  ${name}: ${t.threshold}`);
+      }
+    }
+  }
+
+  const status = failed.length === 0 ? 'PASSED' : 'FAILED';
+  const lines = [
+    '',
+    '══════════════════════════════════════════════════',
+    `  Load Test: Messaging Throughput — ${status}`,
+    '══════════════════════════════════════════════════',
+    '',
+    '  Baseline Thresholds (p95<500ms, p99<2s, errors<1%):',
+    '',
+    ...passed,
+    ...failed,
+    '',
+    `  ${passed.length} passed / ${failed.length} failed`,
+    '══════════════════════════════════════════════════',
+    '',
+  ];
+
+  return {
+    stdout: lines.join('\n'),
+  };
 }

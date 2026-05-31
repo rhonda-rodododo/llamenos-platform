@@ -45,12 +45,13 @@ export const options = {
     },
   },
   thresholds: {
-    // Allow higher error rate during burst
-    errors: ['rate<0.10'],
-    // Normal phase should be fast
-    call_setup_latency: ['p(95)<1000'],
-    // Recovery should stabilize within 2s
-    call_answer_latency: ['p(95)<2000'],
+    // Baseline: p95 < 500ms, p99 < 2s for API calls
+    call_setup_latency: ['p(95)<500', 'p(99)<2000'],
+    call_answer_latency: ['p(95)<500', 'p(99)<2000'],
+    // Burst test allows higher error rate (5%) — 10x spike will cause transient failures
+    errors: ['rate<0.05'],
+    // Overall HTTP request duration baseline
+    http_req_duration: ['p(95)<500', 'p(99)<2000'],
   },
 };
 
@@ -115,4 +116,43 @@ export default function () {
   });
 
   sleep(1);
+}
+
+export function handleSummary(data) {
+  const thresholds = data.metrics;
+  const passed = [];
+  const failed = [];
+
+  for (const [name, metric] of Object.entries(thresholds)) {
+    if (!metric.thresholds) continue;
+    for (const t of metric.thresholds) {
+      if (t.ok) {
+        passed.push(`  PASS  ${name}: ${t.threshold}`);
+      } else {
+        failed.push(`  FAIL  ${name}: ${t.threshold}`);
+      }
+    }
+  }
+
+  const status = failed.length === 0 ? 'PASSED' : 'FAILED';
+  const lines = [
+    '',
+    '══════════════════════════════════════════════════',
+    `  Load Test: Burst Traffic — ${status}`,
+    '══════════════════════════════════════════════════',
+    '  Note: error rate threshold is 5% (10x spike test)',
+    '',
+    '  Baseline Thresholds (p95<500ms, p99<2s):',
+    '',
+    ...passed,
+    ...failed,
+    '',
+    `  ${passed.length} passed / ${failed.length} failed`,
+    '══════════════════════════════════════════════════',
+    '',
+  ];
+
+  return {
+    stdout: lines.join('\n'),
+  };
 }
