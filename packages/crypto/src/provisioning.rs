@@ -378,7 +378,10 @@ mod tests {
         // yields the all-zeros shared secret, enabling a trivial oracle attack.
         let zeros = "00".repeat(32);
         assert!(
-            matches!(parse_x25519_pubkey(&zeros), Err(crate::errors::CryptoError::InvalidPublicKey)),
+            matches!(
+                parse_x25519_pubkey(&zeros),
+                Err(crate::errors::CryptoError::InvalidPublicKey)
+            ),
             "All-zeros pubkey must be rejected as InvalidPublicKey"
         );
     }
