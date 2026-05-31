@@ -13,7 +13,9 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.llamenos.hotline.crypto.KeyValueStore
 import org.llamenos.hotline.crypto.KeystoreService
 import org.llamenos.hotline.hub.ActiveHubState
+import org.llamenos.hotline.model.ClearPushTokenRequest
 import org.llamenos.hotline.model.OkResponse
+import org.llamenos.hotline.model.RegisterDeviceRequest
 import org.llamenos.hotline.model.RecoveryContributeRequest
 import org.llamenos.hotline.model.RecoveryContributeResponse
 import org.llamenos.hotline.model.RecoveryEnrollRequest
@@ -321,6 +323,24 @@ class ApiService @Inject constructor(
             "/hubs/$hubId$path"
         }
     }
+
+    // ---- Device registration API ----
+
+    /**
+     * Register or update this device's UnifiedPush endpoint on the backend.
+     * The [RegisterDeviceRequest.pushToken] is the full ntfy endpoint URL.
+     * Idempotent — safe to call on every new endpoint assignment.
+     */
+    suspend fun registerPushEndpoint(body: RegisterDeviceRequest): Unit =
+        requestNoContent("POST", "/api/devices/register", body)
+
+    /**
+     * Remove this device's push endpoint from the backend.
+     * Called when the UnifiedPush distributor unregisters this device,
+     * so the backend stops attempting delivery to the stale endpoint.
+     */
+    suspend fun clearPushEndpoint(pushToken: String): Unit =
+        requestNoContent("DELETE", "/api/devices/push-token", ClearPushTokenRequest(pushToken))
 
     /**
      * Fetch the E2EE key envelope for a specific hub.
