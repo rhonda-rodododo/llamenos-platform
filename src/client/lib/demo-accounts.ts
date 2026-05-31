@@ -24,9 +24,9 @@ export async function getDemoSeed(pubkey: string): Promise<string | undefined> {
 
 export async function getDemoAccountsWithSeed() {
   const seeds = await loadSeeds()
-  return DEMO_ACCOUNTS.filter(a => seeds[a.pubkey]).map(a => ({
+  return DEMO_ACCOUNTS.filter(a => a.pubkey in seeds).map(a => ({
     ...a,
-    seedHex: seeds[a.pubkey]!,
-    deviceKey: seeds[a.pubkey]!,
+    seedHex: seeds[a.pubkey] as string,
+    deviceKey: seeds[a.pubkey] as string,
   }))
 }
