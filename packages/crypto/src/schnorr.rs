@@ -122,7 +122,7 @@ mod tests {
     // signing with a specific aux_rand, and signature verification.
 
     struct SignVector {
-        secret_key: &'static str,
+        sk_hex: &'static str,
         public_key: &'static str,
         aux_rand: &'static str,
         msg: &'static str,
@@ -132,7 +132,7 @@ mod tests {
     const SIGN_VECTORS: &[SignVector] = &[
         // index 0 — all-zero message, all-zero aux_rand
         SignVector {
-            secret_key: "0000000000000000000000000000000000000000000000000000000000000003",
+            sk_hex: "0000000000000000000000000000000000000000000000000000000000000003",
             public_key: "F9308A019258C31049344F85F89D5229B531C845836F99B08601F113BCE036F9",
             aux_rand:   "0000000000000000000000000000000000000000000000000000000000000000",
             msg:        "0000000000000000000000000000000000000000000000000000000000000000",
@@ -140,7 +140,7 @@ mod tests {
         },
         // index 1 — non-trivial key and message
         SignVector {
-            secret_key: "B7E151628AED2A6ABF7158809CF4F3C762E7160F38B4DA56A784D9045190CFEF",
+            sk_hex: "B7E151628AED2A6ABF7158809CF4F3C762E7160F38B4DA56A784D9045190CFEF",
             public_key: "DFF1D77F2A671C5F36183726DB2341BE58FEAE1DA2DECED843240F7B502BA659",
             aux_rand:   "0000000000000000000000000000000000000000000000000000000000000001",
             msg:        "243F6A8885A308D313198A2E03707344A4093822299F31D0082EFA98EC4E6C89",
@@ -148,7 +148,7 @@ mod tests {
         },
         // index 2 — Pi/e-digit derived constants; confirms aux_rand mixing is correct
         SignVector {
-            secret_key: "C90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B14E5C9",
+            sk_hex: "C90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B14E5C9",
             public_key: "DD308AFEC5777E13121FA72B9CC1B7CC0139715309B086C960E18FD969774EB8",
             aux_rand:   "C87AA53824B4D7AE2EB035A2B5BBBCCC080E76CDC6D1692C4B0B62D798E6D906",
             msg:        "7E2D58D8B3BCDF1ABADEC7829054F90DDA9805AAB56C77333024B9D0A508B75C",
@@ -156,7 +156,7 @@ mod tests {
         },
         // index 3 — all-0xff message, all-0xff aux_rand (max-value scalars, boundary case)
         SignVector {
-            secret_key: "0B432B2677937381AEF05BB02A66ECD012773062CF3FA2549E44F58ED2401710",
+            sk_hex: "0B432B2677937381AEF05BB02A66ECD012773062CF3FA2549E44F58ED2401710",
             public_key: "25D1DFF95105F5253C4022F628A996AD3A0D95FBF21D468A1B33F8C160D8F517",
             aux_rand:   "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
             msg:        "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
@@ -167,7 +167,7 @@ mod tests {
     #[test]
     fn bip340_pubkey_derivation() {
         for (i, v) in SIGN_VECTORS.iter().enumerate() {
-            let sk = from_hex32(v.secret_key);
+            let sk = from_hex32(v.sk_hex);
             let expected_pk = from_hex32(v.public_key);
             let got_pk = bip340_pubkey_from_secret(&sk)
                 .unwrap_or_else(|e| panic!("vector {i}: pubkey derivation failed: {e}"));
@@ -178,7 +178,7 @@ mod tests {
     #[test]
     fn bip340_sign_official_vectors() {
         for (i, v) in SIGN_VECTORS.iter().enumerate() {
-            let sk = from_hex32(v.secret_key);
+            let sk = from_hex32(v.sk_hex);
             let msg = from_hex32(v.msg);
             let aux = from_hex32(v.aux_rand);
             let expected_sig = from_hex64(v.signature);
