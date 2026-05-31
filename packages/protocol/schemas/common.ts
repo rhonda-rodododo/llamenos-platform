@@ -59,28 +59,29 @@ export const okResponseSchema = z.object({ ok: z.boolean() })
 export const recipientEnvelopeSchema = z.looseObject({
   pubkey: pubkeySchema,
   enc: hpkeEncSchema,
-  ct: z.string().min(1),
+  // HPKE-wrapped 32-byte symmetric key: 48 bytes ciphertext + base64 overhead ≤ 512 chars
+  ct: z.string().min(1).max(512),
 })
 
 /** Key envelope — used for note author copies (no pubkey) */
 export const keyEnvelopeSchema = z.looseObject({
   enc: hpkeEncSchema,
-  ct: z.string().min(1),
+  ct: z.string().min(1).max(512),
 })
 
 /** File key envelope — used for file uploads */
 export const fileKeyEnvelopeSchema = z.looseObject({
   pubkey: pubkeySchema,
   enc: hpkeEncSchema,
-  ct: z.string().min(1),
+  ct: z.string().min(1).max(512),
 })
 
 /** Encrypted metadata entry — used for file uploads */
 export const encryptedMetadataEntrySchema = z.looseObject({
   pubkey: z.string().min(1),
-  encryptedContent: z.string().min(1),
+  encryptedContent: z.string().min(1).max(4096),
   enc: hpkeEncSchema,
-  ct: z.string().min(1),
+  ct: z.string().min(1).max(512),
 })
 
 // --- Inferred types (canonical source of truth for envelope types) ---

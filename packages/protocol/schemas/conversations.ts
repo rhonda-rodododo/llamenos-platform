@@ -72,13 +72,13 @@ export const listConversationsQuerySchema = paginationSchema.extend({
 
 export const sendMessageBodySchema = z.looseObject({
   /** E2EE encrypted content — required for web channel, optional for external channels with plaintextForSending */
-  encryptedContent: z.string().optional(),
+  encryptedContent: z.string().max(65536).optional(),
   /** HPKE-wrapped keys for each reader — required for web channel, optional for external channels */
   readerEnvelopes: z.array(recipientEnvelopeSchema).optional(),
   /** Plaintext body for external channel dispatch (SMS/WhatsApp/Signal/RCS) — discarded after send */
-  plaintextForSending: z.string().optional(),
+  plaintextForSending: z.string().max(65536).optional(),
   /** Alias for plaintextForSending — convenience for API consumers */
-  body: z.string().optional(),
+  body: z.string().max(65536).optional(),
 })
 
 export const updateConversationBodySchema = z.looseObject({
