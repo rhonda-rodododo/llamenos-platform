@@ -942,6 +942,13 @@ export async function createEntityTypeViaApi(
     },
     seedHex,
   )
+  // 409 = entity type already exists (TOCTOU race in parallel test workers).
+  // Fetch and return the existing one instead of failing.
+  if (status === 409) {
+    const types = await listEntityTypesViaApi(request, options?.hubId, seedHex)
+    const existing = types.find(t => t.name === name)
+    if (existing) return existing
+  }
   if (status !== 201 && status !== 200) throw new Error(`Failed to create entity type: ${status}`)
   return data
 }
