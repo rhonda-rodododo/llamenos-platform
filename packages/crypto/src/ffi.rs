@@ -97,9 +97,8 @@ pub fn hpke_unwrap_key_hex(
         enc: URL_SAFE_NO_PAD.encode(&enc_bytes),
         ct: URL_SAFE_NO_PAD.encode(&ct_bytes),
     };
-    let mut key = hpke_envelope::hpke_open_key(&hpke_env, secret_key_hex, label, aad.as_bytes())?;
-    let hex_out = hex::encode(key);
-    key.zeroize();
+    let key = hpke_envelope::hpke_open_key(&hpke_env, secret_key_hex, label, aad.as_bytes())?;
+    let hex_out = hex::encode(&*key);
     Ok(hex_out)
 }
 
