@@ -8,11 +8,25 @@ vi.mock('@worker/middleware/auth', () => ({
   auth: vi.fn(async (_c: unknown, next: () => Promise<void>) => next()),
 }))
 
+// Mock rateLimit middleware — returns a passthrough by default; individual tests
+// that want to exercise rate-limiting override checkApiRateLimit on the services mock.
+vi.mock('@worker/middleware/rate-limit', () => ({
+  rateLimit: vi.fn(() => async (_c: unknown, next: () => Promise<void>) => next()),
+}))
+
 import provisioningRoutes from '@worker/routes/provisioning'
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+function makeSettingsMock(overrides: Record<string, unknown> = {}) {
+  return {
+    checkRateLimit: vi.fn().mockResolvedValue({ limited: false }),
+    checkApiRateLimit: vi.fn().mockResolvedValue({ limited: false, retryAfterSeconds: 0 }),
+    ...overrides,
+  }
+}
 
 function createTestApp(opts: {
   pubkey?: string
@@ -33,7 +47,7 @@ function createTestApp(opts: {
     c.set('permissions', ['*'])
     c.set('services', {
       identity: serviceMock.identity || {},
-      settings: serviceMock.settings || { checkRateLimit: vi.fn().mockResolvedValue({ limited: false }) },
+      settings: serviceMock.settings || makeSettingsMock(),
       audit: { log: vi.fn().mockResolvedValue(undefined) },
     } as unknown as AppEnv['Variables']['services'])
     c.set('allRoles', [])
@@ -72,7 +86,7 @@ describe('provisioning routes', () => {
   })
 
   // -------------------------------------------------------------------------
-  // POST /provision/rooms — Create provisioning room (public)
+  // POST /provision/rooms — Create provisioning room (public, rate limited)
   // -------------------------------------------------------------------------
 
   describe('POST /provision/rooms', () => {
@@ -139,7 +153,7 @@ describe('provisioning routes', () => {
       const { app } = createTestApp({
         serviceMock: {
           identity: { getProvisionRoom: getProvisionRoomSpy },
-          settings: { checkRateLimit: vi.fn().mockResolvedValue({ limited: false }) },
+          settings: makeSettingsMock(),
         },
       })
 
@@ -154,22 +168,23 @@ describe('provisioning routes', () => {
       const { app } = createTestApp({
         serviceMock: {
           identity: { getProvisionRoom: vi.fn() },
-          settings: { checkRateLimit: vi.fn().mockResolvedValue({ limited: false }) },
+          settings: makeSettingsMock(),
         },
       })
 
-      // No rate limit hit needed for missing token — check happens before rate limit
       const res = await app.request('/provision/rooms/room-1')
       expect(res.status).toBe(400)
       const json = await res.json()
       expect(json.error).toMatch(/missing token/i)
     })
 
-    it('returns 429 when rate limited', async () => {
+    it('returns 429 when per-room attempt limit is exceeded', async () => {
       const { app } = createTestApp({
         serviceMock: {
           identity: { getProvisionRoom: vi.fn() },
-          settings: { checkRateLimit: vi.fn().mockResolvedValue({ limited: true }) },
+          settings: makeSettingsMock({
+            checkApiRateLimit: vi.fn().mockResolvedValue({ limited: true, retryAfterSeconds: 600 }),
+          }),
         },
       })
 
@@ -177,6 +192,26 @@ describe('provisioning routes', () => {
       expect(res.status).toBe(429)
       const json = await res.json()
       expect(json.error).toMatch(/rate limited/i)
+      expect(res.headers.get('Retry-After')).toBe('600')
+    })
+
+    it('keys per-room limit by room id', async () => {
+      const checkApiRateLimit = vi.fn().mockResolvedValue({ limited: false, retryAfterSeconds: 0 })
+      const getProvisionRoomSpy = vi.fn().mockResolvedValue({ status: 'waiting' })
+      const { app } = createTestApp({
+        serviceMock: {
+          identity: { getProvisionRoom: getProvisionRoomSpy },
+          settings: makeSettingsMock({ checkApiRateLimit }),
+        },
+      })
+
+      await app.request('/provision/rooms/room-xyz?token=tok-abc')
+
+      expect(checkApiRateLimit).toHaveBeenCalledWith(
+        'provision:room:room-xyz',
+        3,
+        10 * 60 * 1000,
+      )
     })
 
     it('returns ready status with encrypted nsec when payload is delivered', async () => {
@@ -188,7 +223,7 @@ describe('provisioning routes', () => {
       const { app } = createTestApp({
         serviceMock: {
           identity: { getProvisionRoom: getProvisionRoomSpy },
-          settings: { checkRateLimit: vi.fn().mockResolvedValue({ limited: false }) },
+          settings: makeSettingsMock(),
         },
       })
 
@@ -212,7 +247,7 @@ describe('provisioning routes', () => {
         pubkey: 'a'.repeat(64),
         serviceMock: {
           identity: { setProvisionPayload: setProvisionPayloadSpy },
-          settings: { checkRateLimit: vi.fn().mockResolvedValue({ limited: false }) },
+          settings: makeSettingsMock(),
         },
       })
 
@@ -241,7 +276,7 @@ describe('provisioning routes', () => {
       const { app } = createTestApp({
         serviceMock: {
           identity: { setProvisionPayload: vi.fn() },
-          settings: { checkRateLimit: vi.fn().mockResolvedValue({ limited: false }) },
+          settings: makeSettingsMock(),
         },
       })
 
