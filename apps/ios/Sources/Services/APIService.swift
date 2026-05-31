@@ -468,6 +468,55 @@ final class APIService: @unchecked Sendable {
         }
     }
 
+    // MARK: - Raw Authenticated Request (for OfflineQueue replay)
+
+    /// Execute an authenticated request without decoding the response body.
+    ///
+    /// Used by `OfflineQueue` to replay queued write operations. Applies the same
+    /// Ed25519 auth token, cert-pinning URLSession, and Content-Type headers as the
+    /// generic `request<T>` overloads, but returns the raw HTTP status code and body
+    /// string instead of a decoded value.
+    ///
+    /// - Parameters:
+    ///   - method: HTTP method (POST, PUT, PATCH, DELETE).
+    ///   - path: API path relative to the base URL.
+    ///   - body: Pre-serialized JSON body string, or nil.
+    /// - Returns: `(statusCode, responseBody)` tuple.
+    func rawRequest(method: String, path: String, body: String?) async throws -> (Int, String) {
+        guard let baseURL else { throw APIError.noBaseURL }
+
+        let fullURL = baseURL.appendingPathComponent(path)
+        var urlRequest = URLRequest(url: fullURL)
+        urlRequest.httpMethod = method.uppercased()
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        if cryptoService.isUnlocked {
+            do {
+                let token = try cryptoService.createAuthToken(method: method.uppercased(), path: path)
+                let authJSON = """
+                {"pubkey":"\(token.pubkey)","timestamp":\(token.timestamp),"token":"\(token.token)"}
+                """
+                urlRequest.setValue("Bearer \(authJSON)", forHTTPHeaderField: "Authorization")
+            } catch {
+                throw APIError.authTokenCreationFailed(error)
+            }
+        }
+
+        if let body {
+            urlRequest.httpBody = body.data(using: .utf8)
+        }
+
+        let (data, response) = try await session.data(for: urlRequest)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.requestFailed(statusCode: 0, body: "Non-HTTP response")
+        }
+
+        let bodyString = String(data: data, encoding: .utf8) ?? ""
+        return (httpResponse.statusCode, bodyString)
+    }
+
     // MARK: - Recovery Group API
 
     func enrollRecoveryGroup(_ body: [String: Any]) async throws -> OkResponse {
