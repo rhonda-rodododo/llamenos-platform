@@ -1,5 +1,6 @@
 package org.llamenos.hotline.crypto
 
+import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
@@ -113,23 +114,31 @@ class WakeKeyService @Inject constructor(
 
             // Generate (or reuse) the hardware-backed AES key
             if (!keyStore.containsAlias(KeystoreService.WAKE_KEY_ALIAS)) {
-                val builder = KeyGenParameterSpec.Builder(
-                    KeystoreService.WAKE_KEY_ALIAS,
-                    KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
-                )
-                    .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-                    .setKeySize(256)
-                // Request StrongBox hardware security module backing where available (API 28+).
-                val spec = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-                    try {
-                        builder.setIsStrongBoxBacked(true).build()
-                    } catch (_: Exception) {
-                        // StrongBox not available on this device — fall back to TEE-backed key.
-                        builder.setIsStrongBoxBacked(false).build()
+                val spec = try {
+                    // Request StrongBox hardware security module backing where available (API 28+).
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                        KeyGenParameterSpec.Builder(
+                            KeystoreService.WAKE_KEY_ALIAS,
+                            KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
+                        )
+                            .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                            .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                            .setKeySize(256)
+                            .setIsStrongBoxBacked(true)
+                            .build()
+                    } else {
+                        throw UnsupportedOperationException("StrongBox requires API 28+")
                     }
-                } else {
-                    builder.build()
+                } catch (_: Exception) {
+                    // StrongBox not available on this device — fall back to TEE-backed key.
+                    KeyGenParameterSpec.Builder(
+                        KeystoreService.WAKE_KEY_ALIAS,
+                        KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
+                    )
+                        .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                        .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                        .setKeySize(256)
+                        .build()
                 }
                 val keyGen = KeyGenerator.getInstance(
                     KeyProperties.KEY_ALGORITHM_AES,
