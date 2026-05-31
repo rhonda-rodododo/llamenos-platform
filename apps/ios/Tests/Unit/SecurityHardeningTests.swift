@@ -355,6 +355,110 @@ final class SecurityHardeningTests: XCTestCase {
         )
     }
 
+    func testConfirmSASCodeIsNoOpWhenNotVerifying() {
+        // SECURITY: confirmSASCode() must not set sasConfirmed when called from
+        // any step other than .verifying. If it did, an attacker or UI bug could
+        // bypass the SAS check and allow import without user verification.
+        let cryptoService = CryptoService()
+        let keychainService = KeychainService()
+        let authService = AuthService(
+            cryptoService: cryptoService,
+            keychainService: keychainService
+        )
+
+        let viewModel = DeviceLinkViewModel(
+            cryptoService: cryptoService,
+            authService: authService,
+            keychainService: keychainService
+        )
+
+        // Initial state: scanning — calling confirmSASCode must NOT set sasConfirmed.
+        XCTAssertEqual(viewModel.currentStep, .scanning)
+        viewModel.confirmSASCode()
+        XCTAssertFalse(
+            viewModel.sasConfirmed,
+            "confirmSASCode() called from .scanning must not set sasConfirmed — SAS bypass prevented"
+        )
+        // The step should transition to error (treating the out-of-state call as a rejection).
+        if case .error = viewModel.currentStep {
+            // Expected
+        } else {
+            XCTFail("Expected error step after out-of-state confirmSASCode() call, got \(viewModel.currentStep)")
+        }
+    }
+
+    func testConfirmSASCodeIsNoOpFromConnectingStep() {
+        // Calling confirmSASCode() from .connecting must also fail — only .verifying is valid.
+        let cryptoService = CryptoService()
+        let keychainService = KeychainService()
+        let authService = AuthService(
+            cryptoService: cryptoService,
+            keychainService: keychainService
+        )
+
+        let viewModel = DeviceLinkViewModel(
+            cryptoService: cryptoService,
+            authService: authService,
+            keychainService: keychainService
+        )
+
+        // Force to connecting step (simulates mid-flow state)
+        viewModel.currentStep = .connecting
+        viewModel.confirmSASCode()
+        XCTAssertFalse(
+            viewModel.sasConfirmed,
+            "confirmSASCode() from .connecting must not set sasConfirmed"
+        )
+    }
+
+    func testConfirmSASCodeSetsConfirmedOnlyFromVerifyingStep() {
+        // When the step IS .verifying, confirmSASCode() should set sasConfirmed = true.
+        let cryptoService = CryptoService()
+        let keychainService = KeychainService()
+        let authService = AuthService(
+            cryptoService: cryptoService,
+            keychainService: keychainService
+        )
+
+        let viewModel = DeviceLinkViewModel(
+            cryptoService: cryptoService,
+            authService: authService,
+            keychainService: keychainService
+        )
+
+        // Force to verifying step with a SAS code
+        viewModel.currentStep = .verifying(sasCode: "123456")
+        viewModel.confirmSASCode()
+        XCTAssertTrue(
+            viewModel.sasConfirmed,
+            "confirmSASCode() from .verifying must set sasConfirmed = true"
+        )
+    }
+
+    func testSASConfirmedIsNotPubliclyWritable() {
+        // sasConfirmed is declared private(set) — this test verifies via API that
+        // the only way to confirm SAS is through confirmSASCode() from the verifying step.
+        // (The compiler enforces private(set); this test acts as documentation.)
+        let cryptoService = CryptoService()
+        let keychainService = KeychainService()
+        let authService = AuthService(
+            cryptoService: cryptoService,
+            keychainService: keychainService
+        )
+
+        let viewModel = DeviceLinkViewModel(
+            cryptoService: cryptoService,
+            authService: authService,
+            keychainService: keychainService
+        )
+
+        // The only path to sasConfirmed == true is confirmSASCode() in .verifying.
+        // In any other starting state it stays false.
+        XCTAssertFalse(viewModel.sasConfirmed)
+        viewModel.confirmSASCode() // called from .scanning → no-op
+        XCTAssertFalse(viewModel.sasConfirmed, "sasConfirmed must not be settable except via verifying-step confirmation")
+    }
+
     // The pre-V3 nsec import flow (and the AuthViewModel.nsecInput / .importingKey state
     // that mediated it) was removed when device keys replaced single-nsec identity.
     // The equivalent V3 flow is sigchain-authorized device linking, which has its own
