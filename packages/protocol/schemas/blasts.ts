@@ -171,7 +171,7 @@ export const listDeliveriesQuerySchema = paginationSchema.extend({
   status: z.enum(['pending', 'sent', 'delivered', 'failed', 'opted_out', 'skipped']).optional(),
 })
 
-export const createBlastBodySchema = z.looseObject({
+export const createBlastBodySchema = z.object({
   name: z.string().min(1).max(200),
   content: blastContentSchema,
   defaultLanguage: z.string().max(10).optional().default('en'),
@@ -179,7 +179,7 @@ export const createBlastBodySchema = z.looseObject({
   scheduledAt: z.iso.datetime().optional(),
 })
 
-export const updateBlastBodySchema = z.looseObject({
+export const updateBlastBodySchema = z.object({
   name: z.string().min(1).max(200).optional(),
   content: blastContentSchema.optional(),
   defaultLanguage: z.string().max(10).optional(),
@@ -187,12 +187,12 @@ export const updateBlastBodySchema = z.looseObject({
   scheduledAt: z.iso.datetime().optional().nullable(),
 })
 
-export const scheduleBlastBodySchema = z.looseObject({
+export const scheduleBlastBodySchema = z.object({
   scheduledAt: z.iso.datetime(),
 })
 
-export const importSubscribersBodySchema = z.looseObject({
-  subscribers: z.array(z.looseObject({
+export const importSubscribersBodySchema = z.object({
+  subscribers: z.array(z.object({
     identifier: z.string().min(1).max(200),
     channel: z.enum(['sms', 'whatsapp', 'signal']),
     tags: z.array(z.string().max(100)).optional(),
@@ -200,7 +200,7 @@ export const importSubscribersBodySchema = z.looseObject({
   })).min(1).max(10000),
 })
 
-export const updateBlastSettingsBodySchema = z.looseObject({
+export const updateBlastSettingsBodySchema = z.object({
   subscribeKeyword: z.string().max(50).optional(),
   unsubscribeKeyword: z.string().max(50).optional(),
   confirmationMessage: z.string().max(500).optional(),
@@ -209,7 +209,7 @@ export const updateBlastSettingsBodySchema = z.looseObject({
   maxBlastsPerDay: z.number().int().min(1).max(100).optional(),
 })
 
-export const messagingPreferencesBodySchema = z.looseObject({
+export const messagingPreferencesBodySchema = z.object({
   optedOut: z.boolean().optional(),
   channels: z.array(z.enum(['sms', 'whatsapp', 'signal'])).optional(),
   language: z.string().max(10).optional(),

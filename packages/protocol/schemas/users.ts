@@ -46,7 +46,7 @@ export const userMetricsResponseSchema = z.object({
 
 // --- Input schemas ---
 
-export const createUserBodySchema = z.looseObject({
+export const createUserBodySchema = z.object({
   pubkey: pubkeySchema,
   name: z.string().min(1).max(200),
   phone: z.string().max(20),
@@ -60,7 +60,7 @@ export const createUserBodySchema = z.looseObject({
   supervisorPubkey: pubkeySchema.optional(),
 })
 
-export const updateUserBodySchema = z.looseObject({
+export const updateUserBodySchema = z.object({
   name: z.string().min(1).max(200).optional(),
   phone: z.string().max(20).optional(),
   spokenLanguages: z.array(z.string().max(5)).optional(),

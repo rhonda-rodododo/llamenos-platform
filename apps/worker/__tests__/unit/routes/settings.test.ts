@@ -119,7 +119,7 @@ describe('settings route', () => {
     })
 
     it('PATCH /transcription updates settings with permission', async () => {
-      const updateSpy = vi.fn().mockResolvedValue({ enabled: false })
+      const updateSpy = vi.fn().mockResolvedValue({ globalEnabled: false, allowUserOptOut: true })
       const app = createTestApp({
         permissions: ['settings:manage-transcription'],
         services: { settings: { updateTranscriptionSettings: updateSpy } },
@@ -127,10 +127,10 @@ describe('settings route', () => {
       const res = await app.request('/transcription', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: false }),
+        body: JSON.stringify({ globalEnabled: false }),
       })
       expect(res.status).toBe(200)
-      expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({ enabled: false }))
+      expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({ globalEnabled: false }))
     })
   })
 
@@ -221,7 +221,7 @@ describe('settings route', () => {
     })
 
     it('PATCH /ivr-languages updates with permission', async () => {
-      const updateSpy = vi.fn().mockResolvedValue({ languages: ['en', 'es'] })
+      const updateSpy = vi.fn().mockResolvedValue({ enabledLanguages: ['en', 'es'] })
       const app = createTestApp({
         permissions: ['settings:manage-ivr'],
         services: { settings: { updateIvrLanguages: updateSpy } },
@@ -229,7 +229,7 @@ describe('settings route', () => {
       const res = await app.request('/ivr-languages', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ languages: ['en', 'es'] }),
+        body: JSON.stringify({ enabledLanguages: ['en', 'es'] }),
       })
       expect(res.status).toBe(200)
     })
@@ -243,7 +243,7 @@ describe('settings route', () => {
     })
 
     it('PATCH /webauthn updates with permission', async () => {
-      const updateSpy = vi.fn().mockResolvedValue({ enabled: false })
+      const updateSpy = vi.fn().mockResolvedValue({ requireForAdmins: false, requireForUsers: false })
       const app = createTestApp({
         permissions: ['settings:manage-webauthn'],
         services: { identity: { updateWebAuthnSettings: updateSpy } },
@@ -251,10 +251,10 @@ describe('settings route', () => {
       const res = await app.request('/webauthn', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: false }),
+        body: JSON.stringify({ requireForAdmins: false }),
       })
       expect(res.status).toBe(200)
-      expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({ enabled: false }))
+      expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({ requireForAdmins: false }))
     })
   })
 
@@ -298,7 +298,7 @@ describe('settings route', () => {
     })
 
     it('PATCH /messaging updates with permission', async () => {
-      const updateSpy = vi.fn().mockResolvedValue({ channels: ['sms', 'whatsapp'] })
+      const updateSpy = vi.fn().mockResolvedValue({ enabledChannels: ['sms', 'whatsapp'] })
       const app = createTestApp({
         permissions: ['settings:manage-messaging'],
         services: { settings: { updateMessagingConfig: updateSpy } },
@@ -306,10 +306,10 @@ describe('settings route', () => {
       const res = await app.request('/messaging', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ channels: ['sms', 'whatsapp'] }),
+        body: JSON.stringify({ enabledChannels: ['sms', 'whatsapp'] }),
       })
       expect(res.status).toBe(200)
-      expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({ channels: ['sms', 'whatsapp'] }))
+      expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({ enabledChannels: ['sms', 'whatsapp'] }))
     })
   })
 

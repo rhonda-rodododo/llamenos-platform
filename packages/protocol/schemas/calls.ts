@@ -83,7 +83,7 @@ export const callHistoryResponseSchema = z.object({
 
 // --- Input schemas ---
 
-export const banCallerBodySchema = z.looseObject({
+export const banCallerBodySchema = z.object({
   reason: z.string().max(500).optional(),
 })
 

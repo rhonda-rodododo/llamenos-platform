@@ -24,12 +24,12 @@ export const bulkBanResponseSchema = z.object({
 
 // --- Input schemas ---
 
-export const createBanBodySchema = z.looseObject({
+export const createBanBodySchema = z.object({
   phone: e164PhoneSchema,
   reason: z.string().max(500).optional(),
 })
 
-export const bulkBanBodySchema = z.looseObject({
+export const bulkBanBodySchema = z.object({
   phones: z.array(e164PhoneSchema).min(1).max(500),
   reason: z.string().max(500).optional(),
 })
@@ -49,17 +49,17 @@ export const platformBanListResponseSchema = z.object({
   total: z.number(),
 })
 
-export const createPlatformBanBodySchema = z.looseObject({
+export const createPlatformBanBodySchema = z.object({
   phone: e164PhoneSchema,
   reason: z.string().max(500).optional(),
 })
 
-export const bulkPlatformBanBodySchema = z.looseObject({
+export const bulkPlatformBanBodySchema = z.object({
   phones: z.array(e164PhoneSchema).min(1).max(500),
   reason: z.string().max(500).optional(),
 })
 
-export const promoteBanBodySchema = z.looseObject({
+export const promoteBanBodySchema = z.object({
   banId: z.string().min(1),
 })
 

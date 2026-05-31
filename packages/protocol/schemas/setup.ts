@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 // --- Response schemas ---
 
-export const setupStateResponseSchema = z.looseObject({
+export const setupStateResponseSchema = z.object({
   setupCompleted: z.boolean(),
   demoMode: z.boolean().optional(),
 })

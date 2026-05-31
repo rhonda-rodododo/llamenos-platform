@@ -42,11 +42,11 @@ export const shareFileBodySchema = z.object({
 // --- Response schemas ---
 
 export const fileEnvelopesResponseSchema = z.object({
-  envelopes: z.array(z.looseObject({ pubkey: z.string() })),
+  envelopes: z.array(z.object({ pubkey: z.string() })),
 })
 
 export const fileMetadataResponseSchema = z.object({
-  metadata: z.array(z.looseObject({ pubkey: z.string() })),
+  metadata: z.array(z.object({ pubkey: z.string() })),
 })
 
 export const fileResponseSchema = z.object({

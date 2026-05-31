@@ -32,14 +32,14 @@ export const inviteListResponseSchema = z.object({
 
 // --- Input schemas ---
 
-export const redeemInviteBodySchema = z.looseObject({
+export const redeemInviteBodySchema = z.object({
   code: z.uuid(),
   pubkey: pubkeySchema,
   timestamp: z.number(),
   token: z.string().min(1),
 })
 
-export const createInviteBodySchema = z.looseObject({
+export const createInviteBodySchema = z.object({
   name: z.string().min(1).max(200),
   phone: z.string().max(20),
   roleIds: z.array(z.string()).min(1),

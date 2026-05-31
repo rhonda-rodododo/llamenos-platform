@@ -28,19 +28,19 @@ export const meResponseSchema = z.object({
 
 // --- Input schemas ---
 
-export const loginBodySchema = z.looseObject({
+export const loginBodySchema = z.object({
   pubkey: pubkeySchema,
   timestamp: z.number(),
   token: z.string().min(1),
 })
 
-export const bootstrapBodySchema = z.looseObject({
+export const bootstrapBodySchema = z.object({
   pubkey: pubkeySchema,
   timestamp: z.number(),
   token: z.string().min(1),
 })
 
-export const profileUpdateBodySchema = z.looseObject({
+export const profileUpdateBodySchema = z.object({
   name: z.string().min(1).max(200).optional(),
   phone: z.string().max(20).optional(),
   spokenLanguages: z.array(z.string().max(5)).optional(),
@@ -50,10 +50,10 @@ export const profileUpdateBodySchema = z.looseObject({
   specializations: z.array(z.string().max(100)).optional(), // Epic 340
 })
 
-export const availabilityBodySchema = z.looseObject({
+export const availabilityBodySchema = z.object({
   onBreak: z.boolean(),
 })
 
-export const transcriptionToggleBodySchema = z.looseObject({
+export const transcriptionToggleBodySchema = z.object({
   enabled: z.boolean(),
 })

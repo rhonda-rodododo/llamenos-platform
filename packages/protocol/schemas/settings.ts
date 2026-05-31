@@ -106,8 +106,8 @@ export const reportTypeResponseSchema = z.object({
 
 // --- Input schemas ---
 
-export const customFieldsBodySchema = z.looseObject({
-  fields: z.array(z.looseObject({
+export const customFieldsBodySchema = z.object({
+  fields: z.array(z.object({
     name: z.string().min(1).max(200),
     label: z.string().min(1).max(200),
     type: z.enum(['text', 'number', 'select', 'checkbox', 'textarea', 'file', 'location']),
@@ -119,14 +119,14 @@ export const customFieldsBodySchema = z.looseObject({
   })),
 })
 
-export const createReportTypeBodySchema = z.looseObject({
+export const createReportTypeBodySchema = z.object({
   name: z.string().min(1).max(200),
   description: z.string().max(500).optional(),
   icon: z.string().max(50).optional(),
   fields: z.array(z.string()).optional(),
 })
 
-export const updateReportTypeBodySchema = z.looseObject({
+export const updateReportTypeBodySchema = z.object({
   name: z.string().min(1).max(200).optional(),
   description: z.string().max(500).optional(),
   icon: z.string().max(50).optional(),
@@ -136,11 +136,11 @@ export const updateReportTypeBodySchema = z.looseObject({
 
 export const ttlOverridesBodySchema = z.record(z.string(), z.number().int().min(0))
 
-export const setupCompleteBodySchema = z.looseObject({
+export const setupCompleteBodySchema = z.object({
   demoMode: z.boolean().optional(),
 })
 
-export const spamSettingsSchema = z.looseObject({
+export const spamSettingsSchema = z.object({
   voiceCaptchaEnabled: z.boolean().optional(),
   rateLimitEnabled: z.boolean().optional(),
   maxCallsPerMinute: z.number().int().min(1).max(100).optional(),
@@ -149,7 +149,7 @@ export const spamSettingsSchema = z.looseObject({
 
 export type SpamSettings = z.infer<typeof spamSettingsSchema>
 
-export const callSettingsSchema = z.looseObject({
+export const callSettingsSchema = z.object({
   queueTimeoutSeconds: z.number().int().min(30).max(300).optional(),
   voicemailMaxSeconds: z.number().int().min(30).max(300).optional(),
 })
@@ -167,7 +167,7 @@ export const messagingConfigSchema = z.looseObject({
   smsContentMode: z.enum(['full', 'notification-only']).optional().default('notification-only'),
 })
 
-export const telephonyProviderSchema = z.looseObject({
+export const telephonyProviderSchema = z.object({
   type: telephonyProviderTypeSchema,
   // HIGH-W5: Validate Account SID / Project ID format to prevent SSRF via crafted values.
   // Twilio uses AC + 32 hex chars; SignalWire uses UUID project IDs.
@@ -193,7 +193,7 @@ export const telephonyProviderSchema = z.looseObject({
   authId: z.string().optional(),
 })
 
-export const createRoleSchema = z.looseObject({
+export const createRoleSchema = z.object({
   id: z.string().optional(),
   name: z.string().min(1).max(100),
   slug: z.string().regex(/^[a-z0-9-]+$/, 'Slug must be lowercase alphanumeric with hyphens'),
@@ -204,17 +204,17 @@ export const createRoleSchema = z.looseObject({
   envelopes: z.array(roleEnvelopeSchema).optional(),
 })
 
-export const updateRoleSchema = z.looseObject({
+export const updateRoleSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   description: z.string().max(500).optional(),
   permissions: z.array(z.string()).optional(),
 })
 
-export const addRoleEnvelopesSchema = z.looseObject({
+export const addRoleEnvelopesSchema = z.object({
   envelopes: z.array(roleEnvelopeSchema).min(1),
 })
 
-export const webauthnSettingsSchema = z.looseObject({
+export const webauthnSettingsSchema = z.object({
   requireForAdmins: z.boolean().optional(),
   requireForUsers: z.boolean().optional(),
 })
@@ -227,13 +227,13 @@ export const webauthnSettingsResponseSchema = z.object({
 
 export type WebAuthnSettings = z.infer<typeof webauthnSettingsResponseSchema>
 
-export const transcriptionSettingsSchema = z.looseObject({
+export const transcriptionSettingsSchema = z.object({
   globalEnabled: z.boolean().optional(),
   allowUserOptOut: z.boolean().optional(),
 })
 
-export const ivrLanguagesSchema = z.looseObject({
-  languages: z.array(z.string()).optional(),
+export const ivrLanguagesSchema = z.object({
+  enabledLanguages: z.array(z.string()),
 })
 
 /** Hub-scoped IVR language configuration (ordered list) */
@@ -241,7 +241,7 @@ export const hubIvrLanguagesSchema = z.object({
   ivrLanguages: z.array(z.string()),
 })
 
-export const setupStateSchema = z.looseObject({
+export const setupStateSchema = z.object({
   completed: z.boolean().optional(),
   step: z.string().optional(),
 })

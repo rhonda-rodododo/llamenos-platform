@@ -73,7 +73,7 @@ export const listReportsQuerySchema = paginationSchema.extend({
   conversionStatus: conversionStatusEnum.optional(),
 })
 
-export const createReportBodySchema = z.looseObject({
+export const createReportBodySchema = z.object({
   title: z.string().min(1).max(500),
   category: z.string().optional(),
   reportTypeId: z.string().optional(),
@@ -81,17 +81,17 @@ export const createReportBodySchema = z.looseObject({
   readerEnvelopes: z.array(recipientEnvelopeSchema).min(1, 'At least one reader envelope required'),
 })
 
-export const reportMessageBodySchema = z.looseObject({
+export const reportMessageBodySchema = z.object({
   encryptedContent: z.string().min(1, 'encryptedContent is required').max(65536),
   readerEnvelopes: z.array(recipientEnvelopeSchema).min(1, 'At least one reader envelope required'),
   attachmentIds: z.array(z.string()).optional(),
 })
 
-export const assignReportBodySchema = z.looseObject({
+export const assignReportBodySchema = z.object({
   assignedTo: pubkeySchema,
 })
 
-export const updateReportBodySchema = z.looseObject({
+export const updateReportBodySchema = z.object({
   status: z.enum(['waiting', 'active', 'closed']).optional(),
   conversionStatus: conversionStatusEnum.optional(),
 })

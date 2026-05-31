@@ -280,7 +280,7 @@ describe('entity-schema routes', () => {
 
   describe('PATCH /cms/entity-types/:id', () => {
     it('updates an entity type and returns 200', async () => {
-      const updateEntityTypeSpy = vi.fn().mockResolvedValue({ id: 'et-1', name: 'Updated' })
+      const updateEntityTypeSpy = vi.fn().mockResolvedValue({ id: 'et-1', label: 'Updated' })
       const { app, auditLogSpy } = createTestApp({
         permissions: ['cases:manage-types'],
         serviceMock: {
@@ -291,11 +291,11 @@ describe('entity-schema routes', () => {
       const res = await app.request('/cms/entity-types/et-1', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'Updated' }),
+        body: JSON.stringify({ label: 'Updated' }),
       })
 
       expect(res.status).toBe(200)
-      expect(updateEntityTypeSpy).toHaveBeenCalledWith('et-1', { name: 'Updated' }, expect.objectContaining({ callerPubkey: expect.any(String), permissions: expect.any(Array) }))
+      expect(updateEntityTypeSpy).toHaveBeenCalledWith('et-1', { label: 'Updated' }, expect.objectContaining({ callerPubkey: expect.any(String), permissions: expect.any(Array) }))
       expect(auditLogSpy).toHaveBeenCalledOnce()
     })
 

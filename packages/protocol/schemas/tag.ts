@@ -25,7 +25,7 @@ export const tagDeleteResponseSchema = z.object({
 
 // --- Input schemas ---
 
-export const createTagBodySchema = z.looseObject({
+export const createTagBodySchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1).max(100).regex(/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/),
   encryptedLabel: z.string().min(1),
@@ -35,7 +35,7 @@ export const createTagBodySchema = z.looseObject({
 
 export type CreateTagBody = z.infer<typeof createTagBodySchema>
 
-export const updateTagBodySchema = z.looseObject({
+export const updateTagBodySchema = z.object({
   encryptedLabel: z.string().min(1).optional(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   encryptedCategory: z.string().nullable().optional(),

@@ -190,7 +190,7 @@ export type RelationshipTypeDefinition = z.infer<typeof relationshipTypeDefiniti
 
 // --- Input schemas for CRUD ---
 
-export const createEntityTypeBodySchema = z.looseObject({
+export const createEntityTypeBodySchema = z.object({
   name: z.string().regex(/^[a-zA-Z0-9_]+$/).max(100),
   label: z.string().min(1).max(200),
   labelPlural: z.string().min(1).max(200),
@@ -240,7 +240,7 @@ export const createEntityTypeBodySchema = z.looseObject({
 
 export type CreateEntityTypeBody = z.input<typeof createEntityTypeBodySchema>
 
-export const updateEntityTypeBodySchema = z.looseObject({
+export const updateEntityTypeBodySchema = z.object({
   label: z.string().min(1).max(200).optional(),
   labelPlural: z.string().min(1).max(200).optional(),
   description: z.string().max(1000).optional(),
@@ -284,7 +284,7 @@ export const updateEntityTypeBodySchema = z.looseObject({
   notifyContactsOnStatusChange: z.boolean().optional(),
 })
 
-export const createRelationshipTypeBodySchema = z.looseObject({
+export const createRelationshipTypeBodySchema = z.object({
   sourceEntityTypeId: z.string(),
   targetEntityTypeId: z.string(),
   cardinality: z.enum(['1:1', '1:N', 'M:N']),
@@ -302,7 +302,7 @@ export const createRelationshipTypeBodySchema = z.looseObject({
   templateId: z.string().optional(),
 })
 
-export const updateRelationshipTypeBodySchema = z.looseObject({
+export const updateRelationshipTypeBodySchema = z.object({
   label: z.string().min(1).max(200).optional(),
   reverseLabel: z.string().min(1).max(200).optional(),
   sourceLabel: z.string().min(1).max(200).optional(),
@@ -313,9 +313,10 @@ export const updateRelationshipTypeBodySchema = z.looseObject({
   required: z.boolean().optional(),
 })
 
-export const caseNumberBodySchema = z.looseObject({
+export const caseNumberBodySchema = z.object({
   prefix: z.string().regex(/^[A-Z]{1,5}$/),
   year: z.number().int().min(2020).max(2099).optional(),
+  hubId: z.string().optional(),
 })
 
 // --- Create roles from template suggestions (Epic 321) ---
@@ -418,7 +419,7 @@ export type EntityFileUploadResponse = z.infer<typeof entityFileUploadResponseSc
 
 // --- Template customization (EP06-A2) ---
 
-export const entityTemplateCustomizeBodySchema = z.looseObject({
+export const entityTemplateCustomizeBodySchema = z.object({
   label: z.string().min(1).max(200).optional(),
   labelPlural: z.string().min(1).max(200).optional(),
   icon: z.string().max(50).optional(),

@@ -146,3 +146,11 @@ export const signalContactRecordSchema = z.object({
 })
 
 export type SignalContactRecord = z.infer<typeof signalContactRecordSchema>
+
+// ---------------------------------------------------------------------------
+// Digest run request body — POST /signal-notification/digest/run (admin)
+// ---------------------------------------------------------------------------
+
+export const digestRunBodySchema = z.object({
+  cadence: z.enum(['daily', 'weekly']).optional(),
+})
