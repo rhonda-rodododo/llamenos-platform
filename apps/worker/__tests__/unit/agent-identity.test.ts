@@ -6,7 +6,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { generateAgentKeypair, unsealAgentNsec } from '@worker/lib/agent-identity'
-import { schnorr } from '@noble/curves/secp256k1.js'
+import { ed25519 } from '@noble/curves/ed25519.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 
 // A valid 32-byte hex seal key
@@ -15,10 +15,10 @@ const SEAL_LABEL = 'llamenos:agent-seal'
 
 describe('agent-identity', () => {
   describe('generateAgentKeypair', () => {
-    it('generates a valid secp256k1 keypair', () => {
+    it('generates a valid Ed25519 keypair', () => {
       const { pubkey, encryptedNsec } = generateAgentKeypair('agent-1', SEAL_KEY, SEAL_LABEL)
 
-      // Pubkey should be 64 hex chars (32 bytes x-only)
+      // Pubkey should be 64 hex chars (32 bytes)
       expect(pubkey).toMatch(/^[0-9a-f]{64}$/)
       // Encrypted nsec should be non-empty hex
       expect(encryptedNsec).toMatch(/^[0-9a-f]+$/)
@@ -39,28 +39,32 @@ describe('agent-identity', () => {
       const kp1 = generateAgentKeypair('agent-1', SEAL_KEY, SEAL_LABEL)
       const kp2 = generateAgentKeypair('agent-1', SEAL_KEY, SEAL_LABEL)
 
-      // Random nsec means different pubkeys each time
+      // Random private key means different pubkeys each time
       expect(kp1.pubkey).not.toBe(kp2.pubkey)
     })
 
-    it('pubkey is valid for Schnorr verification', () => {
-      const { pubkey } = generateAgentKeypair('agent-test', SEAL_KEY, SEAL_LABEL)
-      // Should not throw when used as a public key
-      const point = schnorr.utils.lift_x(BigInt('0x' + pubkey))
-      expect(point).toBeDefined()
+    it('pubkey is a valid Ed25519 public key', () => {
+      const { pubkey, encryptedNsec } = generateAgentKeypair('agent-test', SEAL_KEY, SEAL_LABEL)
+      const pubkeyBytes = hexToBytes(pubkey)
+      expect(pubkeyBytes.length).toBe(32)
+
+      // Unseal the private key and verify it derives the same pubkey
+      const nsecHex = unsealAgentNsec('agent-test', encryptedNsec, SEAL_KEY, SEAL_LABEL)
+      const derivedPubkey = bytesToHex(ed25519.getPublicKey(hexToBytes(nsecHex)))
+      expect(derivedPubkey).toBe(pubkey)
     })
   })
 
   describe('unsealAgentNsec', () => {
-    it('round-trips: seal then unseal recovers nsec that matches pubkey', () => {
+    it('round-trips: seal then unseal recovers private key that matches pubkey', () => {
       const { pubkey, encryptedNsec } = generateAgentKeypair('agent-rt', SEAL_KEY, SEAL_LABEL)
       const nsecHex = unsealAgentNsec('agent-rt', encryptedNsec, SEAL_KEY, SEAL_LABEL)
 
-      // nsec should be 64 hex chars (32 bytes)
+      // Private key should be 64 hex chars (32 bytes)
       expect(nsecHex).toMatch(/^[0-9a-f]{64}$/)
 
-      // Derive pubkey from recovered nsec to verify it matches
-      const recoveredPubkey = bytesToHex(schnorr.getPublicKey(hexToBytes(nsecHex)))
+      // Derive pubkey from recovered private key to verify it matches
+      const recoveredPubkey = bytesToHex(ed25519.getPublicKey(hexToBytes(nsecHex)))
       expect(recoveredPubkey).toBe(pubkey)
     })
 
