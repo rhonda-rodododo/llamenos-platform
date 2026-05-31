@@ -40,9 +40,8 @@ export type CasesWorld = {
 }
 
 export type SasWorld = {
-  ephemeralSecret?: Uint8Array
-  ephemeralPubkey?: string
-  primarySecret?: Uint8Array
+  ephemeralPubkey?: string    // X25519 pubkey hex (secret stays in Rust/mock state)
+  primarySecret?: Uint8Array  // test-only: simulates the primary device's key
   primaryPubkey?: string
   sasCode?: string
   encryptedNsec?: string

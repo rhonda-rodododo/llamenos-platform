@@ -194,6 +194,11 @@ pub fn run() {
             crypto::generate_backup_from_state,
             // H17: Stronghold vault file wipe
             crypto::wipe_keys,
+            // Device provisioning (nsec NEVER enters the webview)
+            crypto::provision_encrypt_for_device,
+            crypto::provision_create_session,
+            crypto::provision_compute_sas,
+            crypto::provision_decrypt_and_import,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

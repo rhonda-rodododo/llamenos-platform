@@ -92,6 +92,9 @@ type KeyType = 'ed25519' | 'secp256k1'
 let currentKeyType: KeyType = 'ed25519'
 let schnorrSecretBytes: Uint8Array | null = null // secp256k1 secret for Schnorr auth
 
+// ── Provisioning ephemeral key mock state ────────────────────────────
+let mockProvisioningEphemeral: Uint8Array | null = null
+
 // ── Hub key mock state ───────────────────────────────────────────────
 let mockHubKey: Uint8Array | null = null
 
@@ -1023,6 +1026,7 @@ const commands: Record<string, CommandHandler> = {
     mockEncryptedKeys = null
     mockHubKey = null
     mockRecoveryGroupKey = null
+    mockProvisioningEphemeral = null
     schnorrSecretBytes = null
     // In test mode, also clear lockout state
     resetPinLockout()
@@ -1121,6 +1125,126 @@ const commands: Record<string, CommandHandler> = {
   expire_pin_lockout: () => {
     pinLockoutState.lockoutUntil = 0
     saveLockoutState()
+  },
+
+  // --- Device provisioning (nsec NEVER enters JS) ---
+
+  provision_encrypt_for_device: (a) => {
+    const secrets = requireSecrets()
+    const ephemeralPubkeyHex = a.ephemeralPubkeyHex as string
+
+    // ECDH: X25519(encryptionSeed, ephemeralPK)
+    const sharedSecret = x25519.getSharedSecret(secrets.encryptionSeed, hexToBytes(ephemeralPubkeyHex))
+
+    // Derive symmetric key (matches Rust provisioning::derive_provisioning_key)
+    const symmetricKey = hkdf(sha256, sharedSecret,
+      utf8ToBytes('llamenos:provisioning:v1'),
+      utf8ToBytes('llamenos:device-provision'), 32)
+
+    // Compute SAS (matches Rust provisioning::compute_sas)
+    const sasBytes = hkdf(sha256, sharedSecret,
+      utf8ToBytes('llamenos:sas'),
+      utf8ToBytes('llamenos:provisioning-sas'), 4)
+    const sasNum = ((sasBytes[0] << 24) | (sasBytes[1] << 16) | (sasBytes[2] << 8) | sasBytes[3]) >>> 0
+    const sasCode6 = (sasNum % 1_000_000).toString().padStart(6, '0')
+    const sasCode = `${sasCode6.slice(0, 3)} ${sasCode6.slice(3)}`
+
+    // Encrypt signing seed as bech32 nsec (matches Rust provisioning.rs)
+    // For the mock, we encode the signing seed hex as plaintext (simplified bech32 mock)
+    const nsecPayload = utf8ToBytes(`nsec1${bytesToHex(secrets.signingSeed)}`)
+
+    const nonce = randomBytes(12)
+    const aad = utf8ToBytes('llamenos:device-provision')
+    const cipher = gcm(symmetricKey, nonce, aad)
+    const ciphertext = cipher.encrypt(nsecPayload)
+
+    const packed = new Uint8Array(12 + ciphertext.length)
+    packed.set(nonce)
+    packed.set(ciphertext, 12)
+
+    const encPubkey = bytesToHex(deriveX25519Pubkey(secrets.encryptionSeed))
+
+    return {
+      encryptedHex: bytesToHex(packed),
+      sasCode,
+      primaryEncPubkeyHex: encPubkey,
+    }
+  },
+
+  provision_create_session: () => {
+    const ephemeralSecret = randomBytes(32)
+    mockProvisioningEphemeral = ephemeralSecret
+    const ephemeralPubkey = x25519.getPublicKey(ephemeralSecret)
+    return bytesToHex(ephemeralPubkey)
+  },
+
+  provision_compute_sas: (a) => {
+    if (!mockProvisioningEphemeral) throw new Error('No provisioning session')
+    const primaryEncPubkeyHex = a.primaryEncPubkeyHex as string
+
+    const sharedSecret = x25519.getSharedSecret(mockProvisioningEphemeral, hexToBytes(primaryEncPubkeyHex))
+
+    const sasBytes = hkdf(sha256, sharedSecret,
+      utf8ToBytes('llamenos:sas'),
+      utf8ToBytes('llamenos:provisioning-sas'), 4)
+    const sasNum = ((sasBytes[0] << 24) | (sasBytes[1] << 16) | (sasBytes[2] << 8) | sasBytes[3]) >>> 0
+    const sasCode6 = (sasNum % 1_000_000).toString().padStart(6, '0')
+    return `${sasCode6.slice(0, 3)} ${sasCode6.slice(3)}`
+  },
+
+  provision_decrypt_and_import: async (a) => {
+    if (!mockProvisioningEphemeral) throw new Error('No provisioning session')
+    const encryptedHex = a.encryptedHex as string
+    const primaryEncPubkeyHex = a.primaryEncPubkeyHex as string
+    const pin = a.pin as string
+    const deviceId = a.deviceId as string
+
+    // ECDH
+    const sharedSecret = x25519.getSharedSecret(mockProvisioningEphemeral, hexToBytes(primaryEncPubkeyHex))
+
+    // Derive symmetric key
+    const symmetricKey = hkdf(sha256, sharedSecret,
+      utf8ToBytes('llamenos:provisioning:v1'),
+      utf8ToBytes('llamenos:device-provision'), 32)
+
+    // Decrypt
+    const data = hexToBytes(encryptedHex)
+    const nonce = data.slice(0, 12)
+    const ciphertext = data.slice(12)
+    const aad = utf8ToBytes('llamenos:device-provision')
+    const cipher = gcm(symmetricKey, nonce, aad)
+    const plaintext = cipher.decrypt(ciphertext)
+
+    // Parse the nsec payload — extract signing seed
+    const nsecStr = new TextDecoder().decode(plaintext)
+    // Mock format: "nsec1" + hex signing seed
+    const signingSeedHex = nsecStr.slice(5) // Remove "nsec1" prefix
+    const signingSeed = hexToBytes(signingSeedHex)
+
+    // Derive encryption seed from signing seed (matches Rust)
+    const encryptionSeed = hkdf(sha256, signingSeed, new Uint8Array(0),
+      utf8ToBytes('llamenos:device-encryption-seed:v1'), 32)
+
+    const signingPubkey = deriveEd25519Pubkey(signingSeed)
+    const encryptionPubkey = deriveX25519Pubkey(encryptionSeed)
+
+    const state: MockDeviceKeyState = {
+      deviceId,
+      signingPubkeyHex: bytesToHex(signingPubkey),
+      encryptionPubkeyHex: bytesToHex(encryptionPubkey),
+    }
+
+    const encrypted = await encryptWithPin(signingSeed, encryptionSeed, pin)
+    const result = { ...encrypted, state, _keyType: 'ed25519' as string }
+
+    mockSecrets = { signingSeed, encryptionSeed }
+    mockDeviceState = state
+    mockEncryptedKeys = result
+    currentKeyType = 'ed25519'
+    schnorrSecretBytes = null
+    mockProvisioningEphemeral = null // Consumed
+
+    return result
   },
 
   // --- Hub key management ---

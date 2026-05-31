@@ -6,8 +6,8 @@ import { useTheme } from '@/lib/theme'
 import {
   createProvisioningRoom,
   pollProvisioningRoom,
-  decryptProvisionedNsec,
   computeSASForNewDevice,
+  decryptAndImportProvisionedKey,
   type ProvisioningSession,
 } from '@/lib/provisioning'
 import * as keyManager from '@/lib/key-manager'
@@ -35,8 +35,8 @@ function LinkDevicePage() {
   const [session, setSession] = useState<ProvisioningSession | null>(null)
   const [error, setError] = useState('')
   const [sasCode, setSasCode] = useState('')
+  // Store only encrypted data and the primary's pubkey — the nsec NEVER enters JS
   const [encryptedNsecData, setEncryptedNsecData] = useState<{ encryptedNsec: string; primaryPubkey: string } | null>(null)
-  const [nsec, setNsec] = useState('')
   const [pin1, setPin1] = useState('')
   const [pin2, setPin2] = useState('')
   const [pinError, setPinError] = useState('')
@@ -62,17 +62,13 @@ function LinkDevicePage() {
       sasCode: string
       encryptedNsec: string
       primaryPubkey: string
-      ephemeralSecretHex: string
     }
     const handler = (e: Event) => {
-      const { sasCode: code, encryptedNsec, primaryPubkey, ephemeralSecretHex } =
+      const { sasCode: code, encryptedNsec, primaryPubkey } =
         (e as CustomEvent<TestProvisionEvent>).detail
-      const ephemeralSecret = Uint8Array.from(
-        ephemeralSecretHex.match(/../g)!.map(h => parseInt(h, 16)),
-      )
       setSasCode(code)
       setEncryptedNsecData({ encryptedNsec, primaryPubkey })
-      setSession({ roomId: 'test-room', token: 'test-token', ephemeralSecret, ephemeralPubkey: primaryPubkey })
+      setSession({ roomId: 'test-room', token: 'test-token', ephemeralPubkeyHex: primaryPubkey })
       setStep('verify-sas')
     }
     window.addEventListener('test:provisioning-complete', handler)
@@ -97,8 +93,8 @@ function LinkDevicePage() {
           if (status.status === 'ready' && status.encryptedNsec && status.primaryPubkey) {
             clearInterval(pollRef.current!)
             pollRef.current = null
-            // Compute SAS for verification before decrypting
-            const sas = computeSASForNewDevice(s.ephemeralSecret, status.primaryPubkey)
+            // Compute SAS in Rust — ephemeral secret stays in CryptoState
+            const sas = await computeSASForNewDevice(status.primaryPubkey)
             setSasCode(sas)
             setEncryptedNsecData({ encryptedNsec: status.encryptedNsec, primaryPubkey: status.primaryPubkey })
             setStep('verify-sas')
@@ -126,20 +122,11 @@ function LinkDevicePage() {
   }, [])
 
   function handleSASConfirm() {
-    if (!session || !encryptedNsecData) return
-    try {
-      const decryptedNsec = decryptProvisionedNsec(
-        encryptedNsecData.encryptedNsec,
-        encryptedNsecData.primaryPubkey,
-        session.ephemeralSecret,
-      )
-      setNsec(decryptedNsec)
-      setEncryptedNsecData(null)
-      setStep('pin-create')
-    } catch {
-      setError(t('deviceLink.decryptFailed'))
-      setStep('error')
-    }
+    if (!encryptedNsecData) return
+    // SAS verified — proceed to PIN creation.
+    // The nsec is NOT decrypted here. Decryption + import happens in handlePinConfirm,
+    // entirely within Rust CryptoState.
+    setStep('pin-create')
   }
 
   function handleSASMismatch() {
@@ -160,10 +147,22 @@ function LinkDevicePage() {
       setPin2('')
       return
     }
+    if (!encryptedNsecData) {
+      setPinError(t('common.error'))
+      return
+    }
     try {
-      await keyManager.importKey(nsec, pin)
-      // Zero out nsec from memory
-      setNsec('')
+      // Decrypt + import happens entirely in Rust — nsec NEVER enters JavaScript.
+      // Rust decrypts the provisioned payload, derives device keys, encrypts with PIN,
+      // and loads into CryptoState in one atomic operation.
+      const encrypted = await decryptAndImportProvisionedKey(
+        encryptedNsecData.encryptedNsec,
+        encryptedNsecData.primaryPubkey,
+        pin,
+      )
+      // Mark key manager as unlocked with the public key
+      keyManager.markUnlocked(encrypted.state.signingPubkeyHex)
+      setEncryptedNsecData(null)
       setStep('done')
     } catch {
       setPinError(t('common.error'))

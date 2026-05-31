@@ -20,6 +20,7 @@ import type { WebAuthnCredentialInfo } from '@protocol/schemas/webauthn'
 import { PhoneInput } from '@/components/phone-input'
 import {
   getProvisioningRoom,
+  encryptForDevice,
   sendProvisionedKey,
 } from '@/lib/provisioning'
 import { getNotificationPrefs, setNotificationPrefs } from '@/lib/notifications'
@@ -737,18 +738,17 @@ function LinkDeviceSection() {
         return
       }
 
-      // Encrypt nsec entirely in Rust/WASM — the nsec NEVER enters JavaScript.
+      // Encrypt signing seed entirely in Rust — the nsec NEVER enters JavaScript.
       // ECDH, HKDF key derivation, encryption, and SAS all happen in native code.
-      const { encryptNsecForProvisioning, createAuthToken } = await import('@/lib/platform')
-      const { encryptedHex: encrypted, sasCode: sas } = await encryptNsecForProvisioning(room.ephemeralPubkey)
+      const { createAuthToken } = await import('@/lib/platform')
+      const { encryptedHex: encrypted, sasCode: sas, primaryEncPubkeyHex } =
+        await encryptForDevice(room.ephemeralPubkey)
       setSasCode(sas)
-
-      const publicKey = keyManager.getPublicKeyHex()!
 
       // Send encrypted payload (authenticated via CryptoState)
       const provisionPath = `/api/provision/rooms/${roomId}/payload`
       const authTokenJson = await createAuthToken(Date.now(), 'POST', provisionPath)
-      await sendProvisionedKey(roomId, token, encrypted, publicKey, {
+      await sendProvisionedKey(roomId, token, encrypted, primaryEncPubkeyHex, {
         'Authorization': `Bearer ${authTokenJson}`,
       })
 

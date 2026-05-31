@@ -8,9 +8,9 @@
  * drives the link-device component to the verify-sas step without needing a
  * live backend provisioning room.
  *
- * Crypto setup mirrors the real provisioning.ts protocol:
- *   new-device ephemeral secret ↔ primary device public key → X25519 shared secret
- *   → HKDF → AES-256-GCM encrypt a mock nsec string.
+ * The test calls provision_create_session via the IPC mock to set up the
+ * ephemeral key in Rust/mock state. The ephemeral secret NEVER enters the
+ * webview JavaScript — matching the production security invariant.
  */
 import { expect } from '@playwright/test'
 import { Given, When, Then, type SasWorld } from '../fixtures'
@@ -27,10 +27,6 @@ import {
   SAS_INFO,
 } from '@shared/crypto-labels'
 
-function deriveProvisioningKey(sharedSecret: Uint8Array): Uint8Array {
-  return hkdf(sha256, sharedSecret, utf8ToBytes(LABEL_PROVISIONING_SALT), utf8ToBytes(LABEL_DEVICE_PROVISION), 32)
-}
-
 function computeSAS(sharedSecret: Uint8Array): string {
   const sasBytes = hkdf(sha256, sharedSecret, utf8ToBytes(SAS_SALT), utf8ToBytes(SAS_INFO), 4)
   const num = ((sasBytes[0] << 24) | (sasBytes[1] << 16) | (sasBytes[2] << 8) | sasBytes[3]) >>> 0
@@ -40,7 +36,7 @@ function computeSAS(sharedSecret: Uint8Array): string {
 
 function encryptNsecForTest(nsec: string, ephemeralPubkeyHex: string, primarySecret: Uint8Array): string {
   const shared = x25519.getSharedSecret(primarySecret, hexToBytes(ephemeralPubkeyHex))
-  const key = deriveProvisioningKey(shared)
+  const key = hkdf(sha256, shared, utf8ToBytes(LABEL_PROVISIONING_SALT), utf8ToBytes(LABEL_DEVICE_PROVISION), 32)
   const nonce = new Uint8Array(12) // deterministic zero nonce — test only
   const aad = utf8ToBytes(LABEL_DEVICE_PROVISION)
   const cipher = gcm(key, nonce, aad)
@@ -53,18 +49,27 @@ function encryptNsecForTest(nsec: string, ephemeralPubkeyHex: string, primarySec
 
 // ── Steps ─────────────────────────────────────────────────────────
 
-Given('a valid provisioning room is established', ({ sasWorld }) => {
+Given('a valid provisioning room is established', async ({ page, sasWorld }) => {
   const state: SasWorld = sasWorld
-  // Generate real X25519 keypairs so the SAS + crypto ops all match
-  state.ephemeralSecret = crypto.getRandomValues(new Uint8Array(32))
-  state.ephemeralPubkey = bytesToHex(x25519.getPublicKey(state.ephemeralSecret))
+
+  // Call provision_create_session via the IPC mock to generate the ephemeral keypair.
+  // The ephemeral secret is stored in the mock's state — it NEVER enters JavaScript.
+  // We only get back the pubkey hex.
+  const ephemeralPubkeyHex = await page.evaluate(async () => {
+    const { invoke } = await import('@tauri-apps/api/core')
+    return invoke<string>('provision_create_session')
+  })
+  state.ephemeralPubkey = ephemeralPubkeyHex
+
+  // Generate a primary keypair (test-side only — simulates the primary device)
   state.primarySecret = crypto.getRandomValues(new Uint8Array(32))
   state.primaryPubkey = bytesToHex(x25519.getPublicKey(state.primarySecret))
   state.mockNsec = 'nsec1testmocksecretforplaywrighttest00000000000000000000000000000001'
 
-  // Pre-compute values used when the "key exchange" event fires
-  const shared = x25519.getSharedSecret(state.ephemeralSecret, hexToBytes(state.primaryPubkey))
+  // Compute SAS from the primary's perspective (primary_secret × ephemeral_pubkey)
+  const shared = x25519.getSharedSecret(state.primarySecret, hexToBytes(state.ephemeralPubkey))
   state.sasCode = computeSAS(shared)
+
   // Encrypt the mock nsec as if the primary device sent it
   state.encryptedNsec = encryptNsecForTest(state.mockNsec, state.ephemeralPubkey, state.primarySecret)
 })
@@ -79,18 +84,18 @@ Given('the ephemeral key exchange completes', async ({ page, sasWorld }) => {
   // Wait for the React useEffect to register the test:provisioning-complete listener
   await page.locator('body[data-test-provisioning-ready="true"]').waitFor({ state: 'attached', timeout: 5000 })
 
-  // Dispatch the test event that drives link-device.tsx to the verify-sas step
+  // Dispatch the test event that drives link-device.tsx to the verify-sas step.
+  // Note: NO ephemeral secret is sent — it stays in Rust/mock state.
   await page.evaluate(
-    ({ sasCode, encryptedNsec, primaryPubkey, ephemeralSecretHex }) => {
+    ({ sasCode, encryptedNsec, primaryPubkey }) => {
       window.dispatchEvent(new CustomEvent('test:provisioning-complete', {
-        detail: { sasCode, encryptedNsec, primaryPubkey, ephemeralSecretHex },
+        detail: { sasCode, encryptedNsec, primaryPubkey },
       }))
     },
     {
       sasCode: state.sasCode!,
       encryptedNsec: state.encryptedNsec!,
       primaryPubkey: state.primaryPubkey!,
-      ephemeralSecretHex: bytesToHex(state.ephemeralSecret!),
     },
   )
 
@@ -147,8 +152,9 @@ When('I confirm the SAS code matches', async ({ page }) => {
 })
 
 Then('the nsec should be imported', async ({ page }) => {
-  // After SAS confirmation, decryptProvisionedNsec runs and (if successful)
-  // advances to pin-create. Both pin-create and done states indicate successful receipt.
+  // After SAS confirmation, the component advances to pin-create (nsec is NOT
+  // decrypted here — it happens when the user enters a PIN in handlePinConfirm).
+  // Both pin-create and done states indicate successful SAS verification.
   const pinCreate = page.locator('[data-testid="pin-input"]')
   const doneState = page.getByText(/success|linked|complete/i)
   const advancedStep = await pinCreate.first().isVisible({ timeout: 5000 }).catch(() => false)
