@@ -1,4 +1,5 @@
 import Foundation
+import LocalAuthentication
 import Security
 
 // MARK: - KeychainError
@@ -211,20 +212,22 @@ final class KeychainService: @unchecked Sendable {
         try store(key: KeychainKey.biometricPIN, data: data, biometric: true)
     }
 
-    /// Retrieve the PIN using biometric authentication. The system will automatically
-    /// prompt for Face ID / Touch ID. Returns nil if no biometric PIN is stored.
-    /// Throws on Keychain errors (not on user cancellation — that returns nil).
-    func retrievePINWithBiometric() throws -> String? {
-        let query: [String: Any] = [
+    /// Retrieve the PIN using a pre-authenticated LAContext (from biometric evaluation).
+    ///
+    /// Pass the `LAContext` returned after a successful `evaluatePolicy` call.
+    /// Using `kSecUseAuthenticationContext` prevents the Keychain from triggering a
+    /// second biometric challenge — the caller already authenticated.
+    ///
+    /// Returns nil if no biometric PIN is stored or the context is invalid.
+    /// Throws on unexpected Keychain errors.
+    func retrievePINWithBiometric(context: LAContext) throws -> String? {
+        var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: KeychainKey.biometricPIN,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
-            kSecUseOperationPrompt as String: NSLocalizedString(
-                "biometric_unlock_reason",
-                comment: "Authenticate to unlock Llamenos"
-            ),
+            kSecUseAuthenticationContext as String: context,
         ]
 
         var result: AnyObject?
