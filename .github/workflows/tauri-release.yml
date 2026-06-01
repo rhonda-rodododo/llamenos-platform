@@ -88,6 +88,28 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # Guard: updater pubkey and endpoints must be configured before release builds.
+      # An empty pubkey would ship an app that accepts any unsigned update — a critical
+      # supply-chain vulnerability. Hard-fail here so no artifact is ever produced.
+      - name: Verify updater pubkey and endpoints are configured
+        shell: bash
+        run: |
+          PUBKEY=$(jq -r '.plugins.updater.pubkey // ""' apps/desktop/tauri.conf.json)
+          if [ -z "$PUBKEY" ]; then
+            echo "::error::tauri.conf.json plugins.updater.pubkey is empty — refusing to build release. Set the pubkey before cutting a release."
+            exit 1
+          fi
+
+          ENDPOINT_COUNT=$(jq '.plugins.updater.endpoints | length' apps/desktop/tauri.conf.json)
+          if [ "$ENDPOINT_COUNT" -eq 0 ]; then
+            echo "::error::tauri.conf.json plugins.updater.endpoints is empty — no update server configured."
+            exit 1
+          fi
+
+          echo "Updater pubkey: present ($(echo -n "$PUBKEY" | wc -c) chars)"
+          echo "Updater endpoints: $ENDPOINT_COUNT configured"
+          jq -r '.plugins.updater.endpoints[]' apps/desktop/tauri.conf.json | sed 's/^/  - /'
+
       - name: Run codegen
         run: bun run codegen
 
