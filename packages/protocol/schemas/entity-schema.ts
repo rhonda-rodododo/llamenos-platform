@@ -191,6 +191,7 @@ export type RelationshipTypeDefinition = z.infer<typeof relationshipTypeDefiniti
 // --- Input schemas for CRUD ---
 
 export const createEntityTypeBodySchema = z.object({
+  hubId: z.string().optional().default(''),
   name: z.string().regex(/^[a-zA-Z0-9_]+$/).max(100),
   label: z.string().min(1).max(200),
   labelPlural: z.string().min(1).max(200),
@@ -285,6 +286,7 @@ export const updateEntityTypeBodySchema = z.object({
 })
 
 export const createRelationshipTypeBodySchema = z.object({
+  hubId: z.string().optional().default(''),
   sourceEntityTypeId: z.string(),
   targetEntityTypeId: z.string(),
   cardinality: z.enum(['1:1', '1:N', 'M:N']),

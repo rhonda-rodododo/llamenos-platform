@@ -68,6 +68,7 @@ export const cmsReportTypeListResponseSchema = z.object({
 // --- Input schemas for CRUD ---
 
 export const createCmsReportTypeBodySchema = z.object({
+  hubId: z.string().optional().default(''),
   name: z.string().regex(/^[a-zA-Z0-9_]+$/).max(100),
   label: z.string().min(1).max(200),
   labelPlural: z.string().min(1).max(200),

@@ -63,4 +63,4 @@ CREATE INDEX "erasure_requests_status_idx" ON "erasure_requests" USING btree ("s
 CREATE INDEX "erasure_requests_execute_at_idx" ON "erasure_requests" USING btree ("execute_at");--> statement-breakpoint
 CREATE INDEX "re_encryption_jobs_user_id_idx" ON "re_encryption_jobs" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "re_encryption_jobs_status_idx" ON "re_encryption_jobs" USING btree ("status");--> statement-breakpoint
-ALTER TABLE "bans" DROP COLUMN "phone_plain";
+ALTER TABLE "bans" DROP COLUMN IF EXISTS "phone_plain";

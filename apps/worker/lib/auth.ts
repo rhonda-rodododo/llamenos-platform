@@ -34,19 +34,21 @@ export function validateToken(auth: AuthPayload): boolean {
 
 /**
  * Build the canonical auth message bytes.
- * Format: `{LABEL_DEVICE_AUTH}:{pubkey_hex}:{timestamp_ms}:{METHOD}:{path}`
+ * Format: `{LABEL_DEVICE_AUTH}:{pubkey_hex}:{timestamp_ms}:{METHOD}:{path}` (legacy)
+ * or:     `{LABEL_DEVICE_AUTH}:{pubkey_hex}:{timestamp_ms}:{METHOD}:{path}:{nonce}` (with nonce)
  *
  * MUST match exactly: packages/crypto/src/auth.rs::build_auth_message()
  */
-export function buildAuthMessage(pubkey: string, timestamp: number, method: string, path: string): Uint8Array {
-  return utf8ToBytes(`${LABEL_DEVICE_AUTH}:${pubkey}:${timestamp}:${method}:${path}`)
+export function buildAuthMessage(pubkey: string, timestamp: number, method: string, path: string, nonce?: string): Uint8Array {
+  const base = `${LABEL_DEVICE_AUTH}:${pubkey}:${timestamp}:${method}:${path}`
+  return utf8ToBytes(nonce ? `${base}:${nonce}` : base)
 }
 
 export function verifyAuthToken(auth: AuthPayload, method?: string, path?: string): boolean {
   if (!validateToken(auth)) return false
   if (!method || !path) return false
   try {
-    const message = buildAuthMessage(auth.pubkey, auth.timestamp, method, path)
+    const message = buildAuthMessage(auth.pubkey, auth.timestamp, method, path, auth.nonce)
     return ed25519Verify(
       hexToBytes(auth.pubkey),
       message,

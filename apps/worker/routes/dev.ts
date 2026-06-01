@@ -62,6 +62,17 @@ dev.post('/test-reset', async (c) => {
   await services.cases.reset(env)
   await services.providerSetup.reset()
   await services.settings.ensureInit()
+  // Final safety net: verify the admin user has role-super-admin after all
+  // resets complete. A race condition between reset() and ensureInit() or
+  // concurrent requests during the reset window can leave the admin with
+  // role-volunteer. This explicit check-and-fix runs last, after all other
+  // services are fully reset and re-initialized.
+  if (adminPubkey) {
+    const adminUser = await services.identity.getUserInternal(adminPubkey)
+    if (adminUser && !adminUser.roles.includes('role-super-admin')) {
+      await services.identity.updateUser(adminPubkey, { roles: ['role-super-admin'] }, true)
+    }
+  }
   return c.json({ ok: true })
 })
 
@@ -239,16 +250,21 @@ dev.post('/test-add-hub-member', async (c) => {
   }
   const services = c.get('services')
   const roleIds = body.roleIds ?? ['role-admin']
+  // Determine the correct global roles for user creation.
+  // If the pubkey matches ADMIN_PUBKEY, the user MUST get role-super-admin
+  // to avoid silently downgrading the admin to role-volunteer.
+  const isAdminPubkey = pubkey === c.env.ADMIN_PUBKEY
+  const globalRoleIds = isAdminPubkey ? ['role-super-admin'] : roleIds
   try {
     await services.identity.setHubRole({ pubkey, hubId: body.hubId, roleIds })
   } catch {
-    // User may not exist yet — create with the hub role
+    // User may not exist yet — create with the correct global role
     try {
       await services.identity.createUser({
         pubkey,
-        name: 'BDD Test User',
-        phone: '+15550000002',
-        roleIds: ['role-volunteer'],
+        name: isAdminPubkey ? 'Admin' : 'BDD Test User',
+        phone: isAdminPubkey ? '' : '+15550000002',
+        roleIds: globalRoleIds,
         encryptedSecretKey: '',
       })
       await services.identity.setHubRole({ pubkey, hubId: body.hubId, roleIds })
@@ -1067,17 +1083,33 @@ dev.post('/test-create-hub', async (c) => {
     return c.json({ error: message }, 500)
   }
 
-  // Add admin as a member of the new hub so WS relay subscribe works in tests
+  // Add admin as a member of the new hub so WS relay subscribe works in tests.
+  // This is CRITICAL for E2E — without hub membership, all hub-scoped API calls
+  // return 403 and the frontend fails to render hub pages.
   const adminPubkey = c.env?.ADMIN_PUBKEY as string | undefined
   if (adminPubkey) {
-    try {
-      await services.identity.setHubRole({
-        pubkey: adminPubkey,
-        hubId: hub.id,
-        roleIds: ['role-super-admin'],
-      })
-    } catch {
-      // Admin user may not exist yet — non-fatal for hub creation
+    // Retry up to 3 times — the admin user may be mid-creation from a concurrent
+    // bootstrap/ensureInit call that hasn't committed yet.
+    let hubRoleSet = false
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        await services.identity.setHubRole({
+          pubkey: adminPubkey,
+          hubId: hub.id,
+          roleIds: ['role-super-admin'],
+        })
+        hubRoleSet = true
+        break
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        console.warn(`[test-create-hub] setHubRole attempt ${attempt + 1}/3 failed: ${msg}`)
+        if (attempt < 2) {
+          await new Promise(r => setTimeout(r, 500))
+        }
+      }
+    }
+    if (!hubRoleSet) {
+      console.error(`[test-create-hub] FAILED to set admin hub role for hub ${hub.id} — hub-scoped tests will 403`)
     }
   }
 

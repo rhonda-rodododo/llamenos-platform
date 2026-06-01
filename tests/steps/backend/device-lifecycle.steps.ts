@@ -41,7 +41,7 @@ Before(async ({ world }) => {
 // ── Helpers ─────────────────────────────────────────────────────────
 
 function randomWakeKey(): string {
-  return '02' + bytesToHex(crypto.getRandomValues(new Uint8Array(32)))
+  return bytesToHex(crypto.getRandomValues(new Uint8Array(32)))
 }
 
 function randomPushToken(): string {

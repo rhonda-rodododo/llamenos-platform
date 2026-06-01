@@ -32,12 +32,14 @@ export const loginBodySchema = z.object({
   pubkey: pubkeySchema,
   timestamp: z.number(),
   token: z.string().min(1),
+  nonce: z.string().optional(),
 })
 
 export const bootstrapBodySchema = z.object({
   pubkey: pubkeySchema,
   timestamp: z.number(),
   token: z.string().min(1),
+  nonce: z.string().optional(),
 })
 
 export const profileUpdateBodySchema = z.object({

@@ -324,12 +324,13 @@ When('I attempt to decrypt with PIN {string}', async ({ page }, pin: string) => 
 
 Then('the pubkey should match the original', async ({ page }) => {
   // After successful unlock, the WASM state has the key.
-  // getPublicKeyFromState() returns the pubkey in state.
+  // getDevicePubkeys() returns { signingPubkeyHex, ... } from CryptoState.
   const pubkey = await page.evaluate(async () => {
     const p = (window as Record<string, unknown>).__TEST_PLATFORM as {
-      getPublicKeyFromState(): Promise<string | null>
+      getDevicePubkeys(): Promise<{ signingPubkeyHex: string } | null>
     }
-    return p.getPublicKeyFromState()
+    const keys = await p.getDevicePubkeys()
+    return keys?.signingPubkeyHex ?? null
   })
   const kp = await page.evaluate(
     () => (window as Record<string, unknown>).__test_keypair,

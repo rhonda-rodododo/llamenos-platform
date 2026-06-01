@@ -33,6 +33,16 @@ android {
 
         testInstrumentationRunner = "org.llamenos.hotline.CucumberHiltRunner"
 
+        // AGP 9.x no longer auto-forwards -Pandroid.testInstrumentationRunnerArguments.*
+        // properties to the instrumentation runner. Explicitly forward them here so that
+        // CI shard filtering (cucumberFeatures), backend URL (testHubUrl), and reset
+        // secret (testSecret) reach CucumberHiltRunner.onCreate().
+        val prefix = "android.testInstrumentationRunnerArguments."
+        project.properties.forEach { (key, value) ->
+            if (key.startsWith(prefix) && value is String) {
+                testInstrumentationRunnerArguments[key.removePrefix(prefix)] = value
+            }
+        }
     }
 
     // Signing credentials resolution order:

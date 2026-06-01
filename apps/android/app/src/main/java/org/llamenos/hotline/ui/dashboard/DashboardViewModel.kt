@@ -200,7 +200,7 @@ class DashboardViewModel @Inject constructor(
      */
     private suspend fun loadShiftStatus(): Boolean {
         return try {
-            val status = apiService.request<ShiftStatusResponse>("GET", "/api/shifts/status")
+            val status = apiService.request<ShiftStatusResponse>("GET", apiService.hp("/api/shifts/my-status"))
             _uiState.update {
                 it.copy(
                     isOnShift = status.isOnShift,
@@ -212,7 +212,8 @@ class DashboardViewModel @Inject constructor(
                 )
             }
             true
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            android.util.Log.w("DashboardViewModel", "loadShiftStatus failed: ${e.message}")
             false
         }
     }
@@ -338,9 +339,15 @@ class DashboardViewModel @Inject constructor(
             val path = apiService.hp("/api/calls/active")
             val response = apiService.request<ActiveCallsResponse>("GET", path)
             val call = response.calls.firstOrNull()
+            if (call != null) {
+                android.util.Log.d("DashboardViewModel", "fetchActiveCall: found call id=${call.id} status=${call.status}")
+            }
             _uiState.update { it.copy(currentCall = call) }
-        } catch (_: Exception) {
-            // Non-fatal — active call will be updated on next event
+        } catch (e: Exception) {
+            // Non-fatal — active call will be updated on next event.
+            // Log for CI diagnostics — silent 401s from replay detection or
+            // missing user registration are invisible without this.
+            android.util.Log.w("DashboardViewModel", "fetchActiveCall failed: ${e.message}")
         }
     }
 
@@ -369,6 +376,7 @@ class DashboardViewModel @Inject constructor(
      */
     fun refresh() {
         viewModelScope.launch {
+            android.util.Log.d("DashboardViewModel", "refresh() started, hubId=${activeHubState.activeHubId.value}")
             _uiState.update { it.copy(isRefreshing = true, errorRes = null) }
             val success = loadShiftStatus()
             if (!success) {

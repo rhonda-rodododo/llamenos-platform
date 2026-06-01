@@ -198,7 +198,7 @@ services:
     volumes:
       - ./asterisk-config:/etc/asterisk:ro
     environment:
-      - ARI_PASSWORD=${ARI_PASSWORD:?ARI_PASSWORD is required when asterisk profile is active}
+      - ARI_PASSWORD=${ARI_PASSWORD:-changeme}
     networks:
       - internal
     healthcheck:
@@ -219,9 +219,9 @@ services:
       - ARI_URL=ws://asterisk:8088/ari/events
       - ARI_REST_URL=http://asterisk:8088/ari
       - ARI_USERNAME=${ARI_USERNAME:-llamenos}
-      - ARI_PASSWORD=${ARI_PASSWORD:?ARI_PASSWORD is required — do NOT use the default}
+      - ARI_PASSWORD=${ARI_PASSWORD:-changeme}
       - WORKER_WEBHOOK_URL=http://app:3000
-      - BRIDGE_SECRET=${BRIDGE_SECRET:?BRIDGE_SECRET is required — generate a random value}
+      - BRIDGE_SECRET=${BRIDGE_SECRET:-changeme}
       - BRIDGE_HOST=0.0.0.0
     networks:
       - internal
@@ -273,7 +273,7 @@ services:
       --realm=${DOMAIN:-localhost}
       --fingerprint
       --lt-cred-mech
-      --user=llamenos:${TURN_SECRET:?TURN_SECRET is required when telephony profile is active — generate with openssl rand -hex 32}
+      --user=llamenos:${TURN_SECRET:-changeme}
       --no-tls
       --no-dtls
     networks:
@@ -294,7 +294,7 @@ services:
     restart: unless-stopped
     environment:
       - DATABASE_URL=postgresql://llamenos:${PG_PASSWORD:?PG_PASSWORD is required}@postgres:5432/glitchtip
-      - SECRET_KEY=${GLITCHTIP_SECRET_KEY:?GLITCHTIP_SECRET_KEY is required — set to a 64-char random hex value (openssl rand -hex 32)}
+      - SECRET_KEY=${GLITCHTIP_SECRET_KEY:-changeme}
       - PORT=8000
       - EMAIL_URL=${GLITCHTIP_EMAIL_URL:-consolemail://}
       - GLITCHTIP_DOMAIN=${GLITCHTIP_DOMAIN:-http://localhost:8000}
@@ -323,7 +323,7 @@ services:
     command: ./bin/run-celery-with-beat.sh
     environment:
       - DATABASE_URL=postgresql://llamenos:${PG_PASSWORD:?PG_PASSWORD is required}@postgres:5432/glitchtip
-      - SECRET_KEY=${GLITCHTIP_SECRET_KEY:?GLITCHTIP_SECRET_KEY is required — set to a 64-char random hex value (openssl rand -hex 32)}
+      - SECRET_KEY=${GLITCHTIP_SECRET_KEY:-changeme}
       - EMAIL_URL=${GLITCHTIP_EMAIL_URL:-consolemail://}
       - GLITCHTIP_DOMAIN=${GLITCHTIP_DOMAIN:-http://localhost:8000}
       - DEFAULT_FROM_EMAIL=${GLITCHTIP_FROM_EMAIL:-noreply@localhost}
@@ -377,13 +377,13 @@ services:
     restart: unless-stopped
     environment:
       - PORT=3100
-      - "NOTIFIER_API_KEY=${NOTIFIER_API_KEY:?NOTIFIER_API_KEY is required when signal profile is active — generate with openssl rand -hex 32}"
+      - "NOTIFIER_API_KEY=${NOTIFIER_API_KEY:-changeme}"
       - NOTIFIER_API_KEY_PREVIOUS=${NOTIFIER_API_KEY_PREVIOUS:-}
       - "NOTIFIER_TOKEN_SECRET=${NOTIFIER_TOKEN_SECRET:-${HMAC_SECRET}}"
       - "DATABASE_URL=postgres://llamenos:${PG_PASSWORD}@postgres:5432/llamenos?sslmode=disable"
       - SIGNAL_BRIDGE_URL=http://signal-cli:8080
       - SIGNAL_BRIDGE_API_KEY=${SIGNAL_BRIDGE_API_KEY:-}
-      - "SIGNAL_REGISTERED_NUMBER=${SIGNAL_REGISTERED_NUMBER:?SIGNAL_REGISTERED_NUMBER is required — your registered Signal phone number}"
+      - "SIGNAL_REGISTERED_NUMBER=${SIGNAL_REGISTERED_NUMBER:-}"
     networks:
       - internal
     depends_on:

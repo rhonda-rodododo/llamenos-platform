@@ -198,7 +198,18 @@ final class WebSocketService: @unchecked Sendable {
             ? .reconnecting(attempt: reconnectAttempt)
             : .connecting
 
-        let task = session.webSocketTask(with: url)
+        // URLSessionWebSocketTask requires ws:// or wss:// schemes. Convert https:// → wss://.
+        let wsURL: URL
+        if url.scheme == "https", var components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+            components.scheme = "wss"
+            wsURL = components.url ?? url
+        } else if url.scheme == "http", var components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+            components.scheme = "ws"
+            wsURL = components.url ?? url
+        } else {
+            wsURL = url
+        }
+        let task = session.webSocketTask(with: wsURL)
         webSocketTask = task
         task.resume()
 

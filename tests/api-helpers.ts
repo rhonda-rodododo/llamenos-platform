@@ -41,24 +41,34 @@ export function seedHexToPubkey(seedHex: string): string {
  * Format: `{LABEL_DEVICE_AUTH}:{pubkey_hex}:{timestamp_ms}:{METHOD}:{path}`
  * MUST match apps/worker/lib/auth.ts::buildAuthMessage()
  */
-function buildAuthMessage(pubkey: string, timestamp: number, method: string, path: string): Uint8Array {
-  return utf8ToBytes(`${LABEL_DEVICE_AUTH}:${pubkey}:${timestamp}:${method}:${path}`)
+function buildAuthMessage(pubkey: string, timestamp: number, method: string, path: string, nonce?: string): Uint8Array {
+  const base = `${LABEL_DEVICE_AUTH}:${pubkey}:${timestamp}:${method}:${path}`
+  return utf8ToBytes(nonce ? `${base}:${nonce}` : base)
+}
+
+/** Generate a random 16-byte hex nonce for auth replay prevention */
+function randomNonce(): string {
+  const bytes = new Uint8Array(16)
+  crypto.getRandomValues(bytes)
+  return bytesToHex(bytes)
 }
 
 /**
  * Create an Ed25519 auth token for API calls.
  * Matches the format expected by apps/worker/lib/auth.ts.
+ * Includes a random nonce to prevent replay collisions in parallel test workers.
  */
 function createEd25519AuthToken(
   seedHex: string,
   method: string,
   path: string,
-): { pubkey: string; timestamp: number; token: string } {
+): { pubkey: string; timestamp: number; token: string; nonce: string } {
   const pubkey = seedHexToPubkey(seedHex)
   const timestamp = Date.now()
-  const message = buildAuthMessage(pubkey, timestamp, method, path)
+  const nonce = randomNonce()
+  const message = buildAuthMessage(pubkey, timestamp, method, path, nonce)
   const sig = ed25519.sign(message, hexToBytes(seedHex))
-  return { pubkey, timestamp, token: bytesToHex(sig) }
+  return { pubkey, timestamp, token: bytesToHex(sig), nonce }
 }
 
 function authHeaders(seedHex: string, method: string, path: string): Record<string, string> {
@@ -244,6 +254,55 @@ export async function deleteHubViaApi(
     // Non-fatal: log but don't throw — teardown should not fail tests
     console.warn(`Failed to delete hub ${hubId}: ${status}`)
   }
+}
+
+/**
+ * Verify that the admin user has membership in the given hub.
+ * Makes an authenticated API call to a hub-scoped endpoint and checks
+ * the response is not 403 (Access denied). If membership is missing,
+ * retries by re-adding the admin via the test-create-hub membership path.
+ *
+ * This catches the silent failure case where test-create-hub's setHubRole
+ * failed (e.g., admin user not yet committed to DB during concurrent bootstrap).
+ */
+export async function verifyHubMembership(
+  request: APIRequestContext,
+  hubId: string,
+): Promise<void> {
+  // Try a hub-scoped endpoint that requires any permission
+  const { status } = await apiGet<unknown>(request, `/hubs/${hubId}/notes?limit=1`)
+  if (status === 200) return // Admin has access
+
+  if (status === 403) {
+    console.warn(`[verifyHubMembership] Admin lacks membership in hub ${hubId} — re-adding via API`)
+    // Re-add admin as hub member via the hub members endpoint
+    const { status: addStatus } = await apiPost(request, `/hubs/${hubId}/members`, {
+      pubkey: seedHexToPubkey(ADMIN_SEED),
+      roleIds: ['role-super-admin'],
+    })
+    if (addStatus !== 200 && addStatus !== 201 && addStatus !== 204 && addStatus !== 409) {
+      // Try the dev endpoint as fallback
+      const { status: devStatus } = await devPost(request, '/test-add-hub-member', {
+        hubId,
+        pubkey: seedHexToPubkey(ADMIN_SEED),
+        roleIds: ['role-super-admin'],
+      })
+      if (devStatus !== 200) {
+        throw new Error(
+          `Failed to ensure admin hub membership for hub ${hubId}: ` +
+          `notes returned ${status}, add-member returned ${addStatus}, dev-add returned ${devStatus}`
+        )
+      }
+    }
+    // Verify again
+    const { status: retryStatus } = await apiGet<unknown>(request, `/hubs/${hubId}/notes?limit=1`)
+    if (retryStatus === 403) {
+      throw new Error(
+        `Admin still lacks hub membership after re-add for hub ${hubId} (status: ${retryStatus})`
+      )
+    }
+  }
+  // 401 or other errors during verification are non-fatal — the test itself will catch them
 }
 
 // ── Unique Test Data Generators ───────────────────────────────────
@@ -714,10 +773,11 @@ export async function createReportViaApi(
   const report = data as ReportRecord
   // If caller wants a specific status, update it
   if (options?.status && options.status !== 'waiting') {
+    const assigneePubkey = seedHexToPubkey(seedHex)
     if (options.status === 'active') {
-      await assignReportViaApi(request, report.id, pubkey, options?.hubId)
+      await assignReportViaApi(request, report.id, assigneePubkey, options?.hubId)
     } else if (options.status === 'closed') {
-      await assignReportViaApi(request, report.id, pubkey, options?.hubId)
+      await assignReportViaApi(request, report.id, assigneePubkey, options?.hubId)
       await updateReportStatusViaApi(request, report.id, 'closed', options?.hubId)
     }
   }
@@ -932,6 +992,17 @@ export async function createEntityTypeViaApi(
     },
     seedHex,
   )
+  // 409 = entity type already exists (TOCTOU race in parallel test workers).
+  // The concurrent create may still be mid-commit; retry the list with backoff.
+  if (status === 409) {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) await new Promise(r => setTimeout(r, 200 * attempt))
+      const types = await listEntityTypesViaApi(request, options?.hubId, seedHex)
+      const existing = types.find(t => t.name === name)
+      if (existing) return existing
+    }
+    throw new Error(`Entity type '${name}' returned 409 but not found after retries (hubId=${options?.hubId})`)
+  }
   if (status !== 201 && status !== 200) throw new Error(`Failed to create entity type: ${status}`)
   return data
 }

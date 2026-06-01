@@ -3,8 +3,11 @@ import { z } from 'zod'
 /** Hex-encoded 32-byte Nostr public key (x-only, 64 hex chars) */
 export const pubkeySchema = z.string().regex(/^[0-9a-f]{64}$/, 'Must be a 64-character hex string')
 
-/** Hex-encoded X25519 ephemeral public key (32 bytes, 64 hex) */
-export const hpkeEncSchema = z.string().regex(/^[0-9a-f]{64}$/, 'Must be a 64-character hex string (32-byte X25519 enc)')
+/** Base64url-encoded X25519 ephemeral public key (32 bytes → 43 base64url chars) or hex (64 chars) */
+export const hpkeEncSchema = z.string().regex(
+  /^(?:[A-Za-z0-9_-]{43}|[0-9a-f]{64})$/,
+  'Must be a base64url-encoded 32-byte key (43 chars) or 64-character hex string',
+)
 
 /** @deprecated Use hpkeEncSchema — kept only for schema migration references */
 export const eciesPubkeySchema = hpkeEncSchema

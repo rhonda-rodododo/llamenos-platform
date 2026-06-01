@@ -32,9 +32,9 @@ async function checkPostgres(): Promise<CheckResult> {
   }
 }
 
-async function checkStorage(env: Record<string, unknown>): Promise<CheckResult> {
+async function checkStorage(env: Record<string, unknown>): Promise<CheckResult | null> {
   const endpoint = env.STORAGE_ENDPOINT as string | undefined
-  if (!endpoint) return { status: 'failing', detail: 'STORAGE_ENDPOINT not configured' }
+  if (!endpoint) return null  // Not configured — skip (optional in CI/test environments)
   const t0 = Date.now()
   try {
     // RustFS returns 403 on unauthenticated paths — this still proves reachability.
@@ -48,11 +48,11 @@ async function checkStorage(env: Record<string, unknown>): Promise<CheckResult> 
   }
 }
 
-async function checkRelay(env: Record<string, unknown>): Promise<CheckResult> {
+async function checkRelay(env: Record<string, unknown>): Promise<CheckResult | null> {
   // Native WebSocket relay is in-process — if the server is running, the relay is running.
   // Only requires SERVER_SECRET to be set (used for relay auth key derivation).
   const serverSecret = env.SERVER_SECRET
-  if (!serverSecret) return { status: 'failing', detail: 'SERVER_SECRET not configured (relay disabled)' }
+  if (!serverSecret) return null  // Not configured — skip (relay disabled)
   return { status: 'ok' }
 }
 
@@ -95,7 +95,9 @@ async function runChecks(env: Record<string, unknown>): Promise<HealthResult> {
     checkSignalNotifier(env),
   ])
 
-  const checks: Record<string, CheckResult> = { postgres, storage, relay }
+  const checks: Record<string, CheckResult> = { postgres }
+  if (storage !== null) checks.storage = storage
+  if (relay !== null) checks.relay = relay
   if (sipBridge !== null) checks.sipBridge = sipBridge
   if (signalNotifier !== null) checks.signalNotifier = signalNotifier
 

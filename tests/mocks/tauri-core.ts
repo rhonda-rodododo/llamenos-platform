@@ -440,15 +440,18 @@ const commands: Record<string, CommandHandler> = {
     const timestamp = a.timestamp as number
     const method = a.method as string
     const path = a.path as string
+    const nonce = (a.nonce as string | undefined) || undefined
 
     // Ed25519 auth (v3 device keys) — must match Rust build_auth_message() exactly:
-    // Format: "llamenos:device-auth:v1:{pubkey}:{timestamp}:{method}:{path}"
+    // Format: "llamenos:device-auth:v1:{pubkey}:{timestamp}:{method}:{path}" (legacy)
+    // or:     "llamenos:device-auth:v1:{pubkey}:{timestamp}:{method}:{path}:{nonce}" (with nonce)
     // Sign raw UTF-8 bytes (no SHA-256 pre-hash — Ed25519 internally uses SHA-512)
     const secrets = requireSecrets()
     const pubkey = bytesToHex(deriveEd25519Pubkey(secrets.signingSeed))
-    const msgStr = `llamenos:device-auth:v1:${pubkey}:${timestamp}:${method}:${path}`
+    const base = `llamenos:device-auth:v1:${pubkey}:${timestamp}:${method}:${path}`
+    const msgStr = nonce ? `${base}:${nonce}` : base
     const sig = ed25519.sign(utf8ToBytes(msgStr), secrets.signingSeed)
-    return JSON.stringify({ pubkey, timestamp, token: bytesToHex(sig) })
+    return JSON.stringify({ pubkey, timestamp, token: bytesToHex(sig), ...(nonce ? { nonce } : {}) })
   },
 
   // --- Ed25519 signing/verification ---

@@ -132,9 +132,11 @@ test.describe('Cross-platform crypto interop', () => {
   test('JS can verify auth token produced by Rust', () => {
     const { token, method, path } = vectors.auth
 
-    // Reconstruct the Ed25519 auth message: LABEL_DEVICE_AUTH:pubkey:timestamp:method:path
-    // Signed as raw UTF-8 bytes (no SHA-256 pre-hash) — matches Rust build_auth_message()
-    const message = `${labels.LABEL_DEVICE_AUTH}:${token.pubkey}:${token.timestamp}:${method}:${path}`
+    // Reconstruct the Ed25519 auth message — must match Rust build_auth_message_with_nonce():
+    // Format: LABEL_DEVICE_AUTH:pubkey:timestamp:method:path[:nonce]
+    // Signed as raw UTF-8 bytes (no SHA-256 pre-hash)
+    const base = `${labels.LABEL_DEVICE_AUTH}:${token.pubkey}:${token.timestamp}:${method}:${path}`
+    const message = token.nonce ? `${base}:${token.nonce}` : base
 
     // Verify Ed25519 signature (signs raw message bytes, no SHA-256 pre-hash)
     const valid = ed25519.verify(hexToBytes(token.token), utf8ToBytes(message), hexToBytes(token.pubkey))

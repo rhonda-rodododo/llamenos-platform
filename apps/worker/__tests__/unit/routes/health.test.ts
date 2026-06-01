@@ -213,22 +213,20 @@ describe('health route', () => {
       expect(body.checks.storage.status).toBe('ok')
     })
 
-    it('marks storage failing when STORAGE_ENDPOINT not configured', async () => {
+    it('skips storage check when STORAGE_ENDPOINT not configured', async () => {
       const app = createTestApp({ env: { STORAGE_ENDPOINT: undefined } })
       const res = await app.request('/')
-      expect(res.status).toBe(503)
+      expect(res.status).toBe(200)
       const body = await res.json()
-      expect(body.checks.storage.status).toBe('failing')
-      expect(body.checks.storage.detail).toContain('STORAGE_ENDPOINT not configured')
+      expect(body.checks.storage).toBeUndefined()
     })
 
-    it('marks relay failing when SERVER_SECRET not configured', async () => {
+    it('skips relay check when SERVER_SECRET not configured', async () => {
       const app = createTestApp({ env: { SERVER_SECRET: undefined } })
       const res = await app.request('/')
-      expect(res.status).toBe(503)
+      expect(res.status).toBe(200)
       const body = await res.json()
-      expect(body.checks.relay.status).toBe('failing')
-      expect(body.checks.relay.detail).toContain('SERVER_SECRET not configured')
+      expect(body.checks.relay).toBeUndefined()
     })
 
     it('includes latency measurements for external checks', async () => {

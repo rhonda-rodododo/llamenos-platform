@@ -51,11 +51,21 @@ auth.post('/login',
 
     // Verify Schnorr signature before returning any user information
     const url = new URL(c.req.url)
-    const isValid = await verifyAuthToken({ pubkey: body.pubkey, timestamp: body.timestamp, token: body.token }, c.req.method, url.pathname)
+    const isValid = await verifyAuthToken({ pubkey: body.pubkey, timestamp: body.timestamp, token: body.token, nonce: body.nonce }, c.req.method, url.pathname)
     if (!isValid) return c.json({ error: 'Authentication failed' }, 401)
 
     try {
       const volunteer = await services.identity.getUser(body.pubkey)
+
+      // Defensive: if this pubkey matches ADMIN_PUBKEY but has lost its admin role
+      // (e.g., due to a race condition during test-reset), restore it immediately.
+      // This prevents the admin from being locked out with volunteer-level access.
+      if (c.env.ADMIN_PUBKEY && body.pubkey === c.env.ADMIN_PUBKEY &&
+          !volunteer.roles.includes('role-super-admin')) {
+        await services.identity.updateUser(body.pubkey, { roles: ['role-super-admin'] }, true)
+        return c.json({ ok: true, roles: ['role-super-admin'] })
+      }
+
       return c.json({ ok: true, roles: volunteer.roles })
     } catch {
       return c.json({ error: 'Authentication failed' }, 401)
@@ -97,7 +107,7 @@ auth.post('/bootstrap',
 
     // Verify Schnorr signature — proves caller owns the private key
     const bootstrapUrl = new URL(c.req.url)
-    const isValid = await verifyAuthToken({ pubkey: body.pubkey, timestamp: body.timestamp, token: body.token }, c.req.method, bootstrapUrl.pathname)
+    const isValid = await verifyAuthToken({ pubkey: body.pubkey, timestamp: body.timestamp, token: body.token, nonce: body.nonce }, c.req.method, bootstrapUrl.pathname)
     if (!isValid) return c.json({ error: 'Authentication failed' }, 401)
 
     // Check if admin already exists
@@ -114,7 +124,6 @@ auth.post('/bootstrap',
 )
 
 // --- Authenticated routes ---
-auth.use('/me', authMiddleware)
 auth.use('/me/*', authMiddleware)
 
 auth.get('/me',

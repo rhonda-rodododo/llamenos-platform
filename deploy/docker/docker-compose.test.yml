@@ -40,6 +40,17 @@ services:
         condition: service_healthy
       rustfs:
         condition: service_healthy
+    # Override production healthcheck: in CI, sidecars start AFTER the app
+    # (bootstrap-backend runs `--wait app` first, then starts sidecar profiles).
+    # The production healthcheck uses /api/health/ready which requires signal-notifier,
+    # causing a chicken-and-egg deadlock. Use /api/health/live (process check only) here
+    # and let the bootstrap-backend action verify full readiness separately.
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://localhost:3000/api/health/live').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
   # ── Signal sidecar: test mode ──────────────────────────────────────
   # signal-cli runs in json-rpc mode; AUTO_RECEIVE_SCHEDULE disabled in CI

@@ -1,1 +1,1 @@
-ALTER TABLE "bans" DROP COLUMN "phone_plain";
+ALTER TABLE "bans" DROP COLUMN IF EXISTS "phone_plain";

@@ -82,13 +82,22 @@ export const test = base.extend<
     const state = { responses: [] as Array<{ url: string; status: number }>, pageErrors: [] as Error[] }
 
     // Monitor all API responses for server errors and auth failures
-    page.on('response', (response) => {
+    page.on('response', async (response) => {
       const url = response.url()
       const status = response.status()
       // Only track /api/ calls, skip static assets and test-reset
       if (!url.includes('/api/') || url.includes('/api/test-reset')) return
       if (status >= 400) {
         state.responses.push({ url: url.replace(/^https?:\/\/[^/]+/, ''), status })
+        // Log response body for 403s to help diagnose permission issues
+        if (status === 403) {
+          try {
+            const body = await response.text()
+            if (body.includes('debug')) {
+              console.warn(`[test-monitor] 403 body: ${body.substring(0, 300)}`)
+            }
+          } catch { /* response may already be consumed */ }
+        }
       }
     })
 
@@ -152,6 +161,10 @@ export const test = base.extend<
     const ctx = await playwright.request.newContext({ baseURL: backendUrl, timeout: 60_000 })
     const name = `test-hub-${workerInfo.workerIndex}-${Date.now()}`
     const hubId = await createHubViaApi(ctx, name)
+    // Verify admin has hub membership — without this, all hub-scoped API calls
+    // return 403 and the frontend fails to render hub pages (shard 1 CI failures).
+    const { verifyHubMembership } = await import('../api-helpers')
+    await verifyHubMembership(ctx, hubId)
     await ctx.dispose()
     await use(hubId)
   }, { scope: 'worker', timeout: 60_000 }],

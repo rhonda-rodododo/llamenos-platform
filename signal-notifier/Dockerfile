@@ -1,5 +1,5 @@
-# oven/bun:1-slim digest pinned 2026-05-18 — update via scripts/update-image-digests.sh
-FROM oven/bun:1-slim@sha256:d56a2534ffd262e92c12fd3249d3924d296d97086da773f821d7d0477435ea04
+# oven/bun:1.3.5-slim digest pinned to match .mise.toml — update via scripts/update-image-digests.sh
+FROM oven/bun:1.3.5-slim@sha256:6111acec4c5a703f2069d6e681967c047920ff2883e7e5a5e64f4ac95ddeb27f
 WORKDIR /app
 COPY package.json bun.lock* ./
 RUN bun install --frozen-lockfile --production --ignore-scripts

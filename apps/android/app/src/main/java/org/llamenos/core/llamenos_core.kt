@@ -1436,11 +1436,13 @@ public object FfiConverterString: FfiConverter<String, RustBuffer.ByValue> {
  */
 data class AuthToken (
     val `pubkey`: kotlin.String
-    , 
+    ,
     val `timestamp`: kotlin.ULong
-    , 
+    ,
     val `token`: kotlin.String
-    
+    ,
+    val `nonce`: kotlin.String?
+
 ){
     
 
@@ -1459,19 +1461,22 @@ public object FfiConverterTypeAuthToken: FfiConverterRustBuffer<AuthToken> {
             FfiConverterString.read(buf),
             FfiConverterULong.read(buf),
             FfiConverterString.read(buf),
+            FfiConverterOptionalString.read(buf),
         )
     }
 
     override fun allocationSize(value: AuthToken) = (
             FfiConverterString.allocationSize(value.`pubkey`) +
             FfiConverterULong.allocationSize(value.`timestamp`) +
-            FfiConverterString.allocationSize(value.`token`)
+            FfiConverterString.allocationSize(value.`token`) +
+            FfiConverterOptionalString.allocationSize(value.`nonce`)
     )
 
     override fun write(value: AuthToken, buf: ByteBuffer) {
             FfiConverterString.write(value.`pubkey`, buf)
             FfiConverterULong.write(value.`timestamp`, buf)
             FfiConverterString.write(value.`token`, buf)
+            FfiConverterOptionalString.write(value.`nonce`, buf)
     }
 }
 

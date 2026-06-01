@@ -18,9 +18,8 @@ export async function hubContext(c: Context<AppEnv>, next: Next): Promise<Respon
   const services = c.get('services')
 
   // Verify hub exists — distinguish "not found" from database errors
-  let hub: Awaited<ReturnType<typeof services.settings.getHub>>
   try {
-    hub = await services.settings.getHub(hubId)
+    await services.settings.getHub(hubId)
   } catch (err) {
     if (err instanceof ServiceError && err.status === 404) {
       return c.json({ error: 'Hub not found' }, 404)
@@ -38,8 +37,16 @@ export async function hubContext(c: Context<AppEnv>, next: Next): Promise<Respon
 
   // Must have at least one permission in this hub (or be super admin)
   if (hubPermissions.length === 0) {
+    const diag = {
+      pubkey: user.pubkey?.slice(0, 16),
+      roles: user.roles,
+      hubId,
+      allRolesCount: allRoles?.length ?? 0,
+      hubRoles: user.hubRoles,
+    }
     if (c.env?.ENVIRONMENT === 'development') {
-      console.warn(`[hub] Access denied: pubkey=${user.pubkey?.slice(0, 16)}... roles=${JSON.stringify(user.roles)} hubId=${hubId} allRolesCount=${allRoles?.length ?? 0} hubRoles=${JSON.stringify(user.hubRoles)}`)
+      console.warn(`[hub] Access denied: ${JSON.stringify(diag)}`)
+      return c.json({ error: 'Access denied', debug: diag }, 403)
     }
     return c.json({ error: 'Access denied' }, 403)
   }

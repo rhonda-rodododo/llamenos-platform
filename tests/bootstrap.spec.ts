@@ -71,6 +71,7 @@ async function unlockAndNavigateToDashboard(page: import('@playwright/test').Pag
 
   // Ensure sidebar is visible (confirms full auth)
   await page.getByTestId(TestIds.NAV_SIDEBAR).waitFor({ state: 'visible', timeout: Timeouts.AUTH })
+
 }
 
 /**

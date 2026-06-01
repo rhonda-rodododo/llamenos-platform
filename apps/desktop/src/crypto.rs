@@ -219,7 +219,10 @@ pub fn create_auth_token_from_state(
     timestamp: u64,
     method: String,
     path: String,
+    #[allow(unused)] nonce: Option<String>,
 ) -> Result<String, String> {
+    // The nonce parameter is accepted for API compatibility with the JS caller
+    // but Rust generates its own cryptographic nonce internally via getrandom.
     state.with_secrets(|secrets| {
         let token = auth::create_auth_token(secrets, timestamp, &method, &path).map_err(err_str)?;
         serde_json::to_string(&token).map_err(err_str)

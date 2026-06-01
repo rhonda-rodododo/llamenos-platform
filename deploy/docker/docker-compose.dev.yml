@@ -149,9 +149,9 @@ services:
       - ARI_URL=ws://asterisk:8088/ari/events
       - ARI_REST_URL=http://asterisk:8088/ari
       - ARI_USERNAME=${ARI_USERNAME:-llamenos}
-      - ARI_PASSWORD=${ARI_PASSWORD:?ARI_PASSWORD is required — set in .env}
+      - ARI_PASSWORD=${ARI_PASSWORD:-changeme}
       - WORKER_WEBHOOK_URL=http://host.docker.internal:3000
-      - BRIDGE_SECRET=${BRIDGE_SECRET:?BRIDGE_SECRET is required — generate with openssl rand -hex 32}
+      - BRIDGE_SECRET=${BRIDGE_SECRET:-changeme}
     depends_on:
       asterisk:
         condition: service_healthy

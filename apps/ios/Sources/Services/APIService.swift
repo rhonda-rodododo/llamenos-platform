@@ -253,8 +253,9 @@ final class APIService: @unchecked Sendable {
         if cryptoService.isUnlocked {
             do {
                 let token = try cryptoService.createAuthToken(method: method.uppercased(), path: path)
+                let nonceField = token.nonce.map { ",\"nonce\":\"\($0)\"" } ?? ""
                 let authJSON = """
-                {"pubkey":"\(token.pubkey)","timestamp":\(token.timestamp),"token":"\(token.token)"}
+                {"pubkey":"\(token.pubkey)","timestamp":\(token.timestamp),"token":"\(token.token)"\(nonceField)}
                 """
                 urlRequest.setValue("Bearer \(authJSON)", forHTTPHeaderField: "Authorization")
             } catch {
@@ -337,8 +338,9 @@ final class APIService: @unchecked Sendable {
         if cryptoService.isUnlocked {
             do {
                 let token = try cryptoService.createAuthToken(method: method.uppercased(), path: path)
+                let nonceField = token.nonce.map { ",\"nonce\":\"\($0)\"" } ?? ""
                 let authJSON = """
-                {"pubkey":"\(token.pubkey)","timestamp":\(token.timestamp),"token":"\(token.token)"}
+                {"pubkey":"\(token.pubkey)","timestamp":\(token.timestamp),"token":"\(token.token)"\(nonceField)}
                 """
                 urlRequest.setValue("Bearer \(authJSON)", forHTTPHeaderField: "Authorization")
             } catch {
@@ -494,8 +496,9 @@ final class APIService: @unchecked Sendable {
         if cryptoService.isUnlocked {
             do {
                 let token = try cryptoService.createAuthToken(method: method.uppercased(), path: path)
+                let nonceField = token.nonce.map { ",\"nonce\":\"\($0)\"" } ?? ""
                 let authJSON = """
-                {"pubkey":"\(token.pubkey)","timestamp":\(token.timestamp),"token":"\(token.token)"}
+                {"pubkey":"\(token.pubkey)","timestamp":\(token.timestamp),"token":"\(token.token)"\(nonceField)}
                 """
                 urlRequest.setValue("Bearer \(authJSON)", forHTTPHeaderField: "Authorization")
             } catch {

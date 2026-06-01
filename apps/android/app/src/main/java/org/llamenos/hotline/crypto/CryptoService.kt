@@ -8,6 +8,7 @@ import org.llamenos.hotline.model.NotePayload
 import org.llamenos.protocol.CryptoLabels
 import org.llamenos.protocol.HubKeyEnvelopeResponse
 import org.llamenos.protocol.RecipientEnvelope
+import java.security.SecureRandom
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -39,6 +40,7 @@ data class AuthToken(
     val pubkey: String,
     val timestamp: Long,
     val token: String,
+    val nonce: String? = null,
 )
 
 data class HpkeEnvelope(
@@ -359,10 +361,14 @@ class CryptoService @Inject constructor() {
                 method = method,
                 path = path,
             )
+            // Use the nonce from the FFI token — the Rust layer generates a random
+            // nonce and includes it in the signed message. Using a different nonce
+            // here would cause signature verification to fail on the backend.
             AuthToken(
                 pubkey = ffiToken.pubkey,
                 timestamp = ffiToken.timestamp.toLong(),
                 token = ffiToken.token,
+                nonce = ffiToken.nonce,
             )
         } catch (e: org.llamenos.core.CryptoException) {
             throw CryptoException("Auth token creation failed: ${e.message}", e)
@@ -1169,6 +1175,12 @@ class CryptoService @Inject constructor() {
         }
 
     // ---- Hex Utility ----
+
+    private fun randomNonce(): String {
+        val bytes = ByteArray(16)
+        SecureRandom().nextBytes(bytes)
+        return bytes.joinToString("") { "%02x".format(it) }
+    }
 
     private fun hexToBytes(hex: String): ByteArray {
         require(hex.length % 2 == 0) { "Hex string has odd length" }

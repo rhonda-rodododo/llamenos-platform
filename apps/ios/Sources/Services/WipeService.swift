@@ -50,8 +50,16 @@ final class WipeService {
         // 5. Crash logs — delete all crash report files
         crashReportingService.clearCrashLogs()
 
-        // 6. URL cache — remove all cached HTTP responses
-        URLCache.shared.removeAllCachedResponses()
+        // 6. URL cache — replace with a fresh empty cache.
+        // removeAllCachedResponses() is asynchronous under the hood and may not
+        // clear the in-memory cache immediately, causing race conditions in tests.
+        // Replacing the singleton guarantees instant, deterministic clearing.
+        let old = URLCache.shared
+        URLCache.shared = URLCache(
+            memoryCapacity: old.memoryCapacity,
+            diskCapacity: old.diskCapacity,
+            diskPath: nil
+        )
 
         // 7. HTTP cookies — remove all cookies
         if let cookies = HTTPCookieStorage.shared.cookies {

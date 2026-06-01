@@ -52,7 +52,13 @@ class AuthInterceptor @Inject constructor(
                     append(token.timestamp)
                     append(""","token":"""")
                     append(token.token)
-                    append(""""}""")
+                    append('"')
+                    if (token.nonce != null) {
+                        append(""","nonce":"""")
+                        append(token.nonce)
+                        append('"')
+                    }
+                    append('}')
                 }
 
                 originalRequest.newBuilder()

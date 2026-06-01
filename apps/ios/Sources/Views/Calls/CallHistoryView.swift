@@ -77,7 +77,7 @@ final class CallHistoryViewModel {
         errorMessage = nil
 
         do {
-            let response: CallHistoryResponse = try await apiService.request(
+            let response: ProtocolCallHistoryResponse = try await apiService.request(
                 method: "GET",
                 path: apiService.hp("/api/calls/history?limit=50")
             )

@@ -137,14 +137,25 @@ When('the admin deletes entity type {string}', async ({request, world}, name: st
 
 When('the admin tries to create an entity type named {string}', async ({request, world}, name: string) => {
   const hubId = getScenarioState(world).hubId
-  try {
-    await createEntityTypeViaApi(request, { name, category: 'case', hubId })
-    setLastResponse(world, { status: 201, data: null })
-  } catch (e: unknown) {
-    const msg = (e as Error).message
-    const match = msg.match(/(\d{3})/)
-    setLastResponse(world, { status: match ? parseInt(match[1]) : 500, data: null })
-  }
+  const defaultStatuses = [
+    { value: 'open', label: 'Open', order: 0 },
+    { value: 'closed', label: 'Closed', order: 1, isClosed: true },
+  ]
+  // Use raw apiPost (not createEntityTypeViaApi) to capture the actual HTTP status,
+  // since createEntityTypeViaApi swallows 409 for idempotent setup helpers.
+  const path = hubId ? `/hubs/${hubId}/settings/cms/entity-types` : '/settings/cms/entity-types'
+  const res = await apiPost(request, path, {
+    name,
+    label: name.replace(/_/g, ' '),
+    labelPlural: `${name.replace(/_/g, ' ')}s`,
+    description: `Test entity type ${name}`,
+    category: 'case',
+    hubId: hubId ?? '',
+    statuses: defaultStatuses,
+    defaultStatus: 'open',
+    closedStatuses: ['closed'],
+  })
+  setLastResponse(world, res)
 })
 
 When('the admin creates a relationship type from {string} to {string} with cardinality {string}', async ({ request, world }, source: string, target: string, cardinality: string) => {
