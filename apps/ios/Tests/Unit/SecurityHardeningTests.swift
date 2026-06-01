@@ -5,6 +5,15 @@ import XCTest
 /// Tests relay URL validation (H5), PIN lockout timing (H7), and API URL validation (H6).
 final class SecurityHardeningTests: XCTestCase {
 
+    override func tearDown() {
+        super.tearDown()
+        // Clean up any hub URL written to the real Keychain during tests
+        // to prevent cross-test contamination (e.g. a stored hub URL leaking
+        // into a test that expects no hub to be configured).
+        let keychain = KeychainService()
+        keychain.delete(key: KeychainKey.hubURL)
+    }
+
     // MARK: - H5: Relay URL Validation (isValidRelayHost)
 
     func testRejectsLocalhost() {
