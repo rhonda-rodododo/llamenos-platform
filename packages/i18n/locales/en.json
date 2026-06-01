@@ -1987,7 +1987,7 @@
     "hubUrlInsecure": "Hub URL must use HTTPS for a secure connection",
     "hubUrlRequired": "Hub URL is required",
     "identityExists": "An identity already exists",
-    "invalidDeviceKey": "The provided device key is invalid",
+    "invalidKey": "The provided device key is invalid",
     "invalidPin": "PIN must be 6-8 digits",
     "noHubUrl": "No hub URL configured",
     "noKeyLoaded": "No cryptographic key is loaded",
