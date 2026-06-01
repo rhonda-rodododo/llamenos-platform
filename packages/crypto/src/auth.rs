@@ -87,8 +87,7 @@ pub fn create_auth_token(
     let pubkey_hex = hex::encode(signing_key.verifying_key().to_bytes());
 
     let nonce = generate_nonce();
-    let message =
-        build_auth_message_with_nonce(&pubkey_hex, timestamp, method, path, Some(&nonce));
+    let message = build_auth_message_with_nonce(&pubkey_hex, timestamp, method, path, Some(&nonce));
     let signature = signing_key.sign(&message);
     let token_hex = hex::encode(signature.to_bytes());
 
@@ -123,8 +122,7 @@ pub fn create_auth_token_from_signing_key(
     let pubkey_hex = hex::encode(signing_key.verifying_key().to_bytes());
 
     let nonce = generate_nonce();
-    let message =
-        build_auth_message_with_nonce(&pubkey_hex, timestamp, method, path, Some(&nonce));
+    let message = build_auth_message_with_nonce(&pubkey_hex, timestamp, method, path, Some(&nonce));
     let signature = signing_key.sign(&message);
     let token_hex = hex::encode(signature.to_bytes());
 
