@@ -492,21 +492,21 @@ async function sendRequest(
   request: import('@playwright/test').APIRequestContext,
   method: string,
   path: string,
-  _deviceKey: string,
+  deviceKey: string,
 ): Promise<{ status: number; data: unknown }> {
   // Strip /api prefix if present — api helpers add it
   const apiPath = path.startsWith('/api') ? path.slice(4) : path
   switch (method) {
     case 'GET':
-      return apiGet(request, apiPath, nsec)
+      return apiGet(request, apiPath, deviceKey)
     case 'POST':
-      return apiPost(request, apiPath, {}, nsec)
+      return apiPost(request, apiPath, {}, deviceKey)
     case 'PATCH':
-      return apiPatch(request, apiPath, {}, nsec)
+      return apiPatch(request, apiPath, {}, deviceKey)
     case 'PUT':
-      return apiPut(request, apiPath, {}, nsec)
+      return apiPut(request, apiPath, {}, deviceKey)
     case 'DELETE':
-      return apiDelete(request, apiPath, nsec)
+      return apiDelete(request, apiPath, deviceKey)
     default:
       throw new Error(`Unknown method: ${method}`)
   }

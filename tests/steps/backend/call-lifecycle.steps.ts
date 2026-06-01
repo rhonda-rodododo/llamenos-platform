@@ -14,7 +14,7 @@ import {
   apiPost,
   apiGet,
   generateTestKeypair,
-  ADMIN_NSEC,
+  ADMIN_SEED,
 } from '../../api-helpers'
 import {
   simulateIncomingCall,
@@ -88,13 +88,13 @@ When('the answering volunteer creates a note for the call', async ({ request, wo
 async function listNotesAs(
   request: import('@playwright/test').APIRequestContext,
   callId: string | undefined,
-  _deviceKey: string,
+  deviceKey: string,
 ): Promise<{ notes: Array<Record<string, unknown>>; total: number }> {
   const qs = callId ? `?callId=${callId}` : ''
   const { status, data } = await apiGet<{ notes: Array<Record<string, unknown>>; total: number }>(
     request,
     `/notes${qs}`,
-    nsec,
+    deviceKey,
   )
   if (status !== 200) return { notes: [], total: 0 }
   return data
@@ -110,7 +110,7 @@ Then('the answering volunteer can see the note', async ({ request, world }) => {
 })
 
 Then('the admin can see the note', async ({ request, world }) => {
-  const { notes } = await listNotesAs(request, getScenarioState(world).callId, ADMIN_NSEC)
+  const { notes } = await listNotesAs(request, getScenarioState(world).callId, ADMIN_SEED)
   expect(notes.length).toBeGreaterThan(0)
 })
 
