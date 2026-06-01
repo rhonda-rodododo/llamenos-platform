@@ -11,7 +11,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import org.llamenos.hotline.R
 import org.llamenos.protocol.DeviceDetailListResponse
 import org.llamenos.hotline.model.DeviceDetailListResponseDevice
 
@@ -54,7 +56,7 @@ fun DeviceListScreen(
                             if (device.isCurrent) {
                                 AssistChip(
                                     onClick = {},
-                                    label = { Text("Current", style = MaterialTheme.typography.labelSmall) },
+                                    label = { Text(stringResource(R.string.security_devices_current), style = MaterialTheme.typography.labelSmall) },
                                 )
                             }
                         }

@@ -15,7 +15,13 @@
     "switchToLanguage": "Zu {{language}} wechseln",
     "themeDark": "Dunkles Theme",
     "themeLight": "Helles Theme",
-    "themeSystem": "System-Theme"
+    "themeSystem": "System-Theme",
+    "back": "Back",
+    "createCase": "Create case",
+    "currentStatus": "Current status",
+    "customDateRange": "Custom date range",
+    "session": "Session",
+    "sessionIcon": "Session key"
   },
   "accountNameLabel": "Account Name",
   "accountSidLabel": "Account SID",
@@ -267,7 +273,8 @@
       "agentStopped": "Stopped",
       "systemPromptSuffix": "System Prompt Suffix",
       "interval": "Interval (sec)",
-      "status": "Status"
+      "status": "Status",
+      "purgeError": "Failed to purge"
     },
     "geocoding": {
       "title": "Geocoding",
@@ -346,7 +353,8 @@
       "tags": "Tags",
       "teams": "Teams",
       "transcription": "Transcription",
-      "voicePrompts": "Voice Prompts"
+      "voicePrompts": "Voice Prompts",
+      "recoveryRequests": "Recovery Requests"
     },
     "openMenu": "Open menu",
     "scopes": {
@@ -678,7 +686,13 @@
     "deliveryStatusOptedout": "Abgemeldet",
     "deliveryStatusSkipped": "Übersprungen",
     "wsConnected": "Live-Updates aktiv",
-    "wsDisconnected": "Live-Updates pausiert"
+    "wsDisconnected": "Live-Updates pausiert",
+    "languages": "Languages",
+    "addLanguage": "Add language",
+    "removeLanguage": "Remove language",
+    "default": "default",
+    "defaultLanguage": "Default Language",
+    "defaultLanguageHint": "Subscribers whose language is not included will receive this version"
   },
   "bridgeUrlLabel": "Bridge URL",
   "call": {
@@ -2066,7 +2080,8 @@
     "title": "Error",
     "wakeDecryptFailed": "Wake decrypt failed: %@",
     "wakeKeyGeneration": "Failed to generate wake key",
-    "wakeRegisterFailed": "Device registration failed: %@"
+    "wakeRegisterFailed": "Device registration failed: %@",
+    "hubUrlInsecure": "Hub URL must use HTTPS for a secure connection"
   },
   "eventType": {
     "call": "Anruf",
@@ -2487,7 +2502,14 @@
   "ivr": {
     "selfAnnouncement": "Für Deutsch, drücken Sie [N].",
     "moreLanguages": "For more languages, press [N].",
-    "goBack": "To go back, press 0."
+    "goBack": "To go back, press 0.",
+    "title": "IVR Language Menu",
+    "description": "Configure which languages callers can select from via keypad.",
+    "enabledLanguages": "Enabled languages (ordered)",
+    "subMenu": "sub-menu",
+    "subMenuNote": "Languages after position 8 are in a sub-menu (caller presses 9 for more).",
+    "availableLanguages": "Available languages",
+    "atLeastOne": "At least one language must be enabled."
   },
   "ivrAudio": {
     "delete": "Löschen",
@@ -3865,7 +3887,9 @@
     "whatsappProvider": "WhatsApp Integration",
     "whatsappTwilio": "Via Twilio",
     "whatsappTwilioNote": "WhatsApp messages will be handled through your existing Twilio telephony provider. No additional configuration needed.",
-    "whatsappVerifyToken": "Verify Token"
+    "whatsappVerifyToken": "Verify Token",
+    "hubUrlLabel": "Hub URL",
+    "hubUrlPlaceholder": "https://hub.example.org"
   },
   "shifts": {
     "active": {
@@ -4606,5 +4630,12 @@
     "unavailableMessage": "Es tut uns leid, im Moment ist niemand erreichbar. Bitte versuchen Sie es später erneut. Auf Wiederhören.",
     "voicemailPrompt": "Im Moment ist niemand verfügbar, um Ihren Anruf entgegenzunehmen. Bitte hinterlassen Sie eine Nachricht nach dem Signalton.",
     "voicemailThanks": "Vielen Dank für Ihre Nachricht. Auf Wiederhören."
-  }
+  },
+  "biometricUnlockTitle": "Unlock Llamenos",
+  "biometricUnlockSubtitle": "Use your fingerprint or face to unlock",
+  "usePinInstead": "Use PIN",
+  "deepLinkConfirmTitle": "Open link?",
+  "deepLinkConfirmMessage": "Llamenos wants to perform a %s action.",
+  "deepLinkConfirmProceed": "Proceed",
+  "deepLinkConfirmCancel": "Cancel"
 }

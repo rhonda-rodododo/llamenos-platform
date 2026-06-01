@@ -276,7 +276,7 @@ struct SettingsView: View {
             // EP02: Security sub-pages
             NavigationLink(value: "security-devices") {
                 Label {
-                    Text("Devices")
+                    Text(NSLocalizedString("security_tabs_devices", comment: "Devices"))
                         .foregroundStyle(.primary)
                 } icon: {
                     Image(systemName: "iphone")
@@ -287,7 +287,7 @@ struct SettingsView: View {
 
             NavigationLink(value: "security-sessions") {
                 Label {
-                    Text("Sessions")
+                    Text(NSLocalizedString("security_tabs_sessions", comment: "Sessions"))
                         .foregroundStyle(.primary)
                 } icon: {
                     Image(systemName: "key.fill")
@@ -298,7 +298,7 @@ struct SettingsView: View {
 
             NavigationLink(value: "security-history") {
                 Label {
-                    Text("Security History")
+                    Text(NSLocalizedString("security_history_title", comment: "Security History"))
                         .foregroundStyle(.primary)
                 } icon: {
                     Image(systemName: "clock.fill")

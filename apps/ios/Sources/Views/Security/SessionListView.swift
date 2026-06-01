@@ -42,7 +42,7 @@ struct SessionRow: View {
                     Text(session.platform ?? "Unknown")
                         .font(.body)
                     if session.isCurrent {
-                        Text("Current")
+                        Text(NSLocalizedString("security_sessions_current", comment: "Current session"))
                             .font(.caption2)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)

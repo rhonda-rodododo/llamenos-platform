@@ -43,7 +43,7 @@ struct DeviceRow: View {
                     Text(device.deviceName ?? device.platform)
                         .font(.body)
                     if device.isCurrent {
-                        Text("Current")
+                        Text(NSLocalizedString("security_devices_current", comment: "This device"))
                             .font(.caption2)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
