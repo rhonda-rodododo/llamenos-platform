@@ -784,6 +784,9 @@ jobs:
         uses: ./.github/actions/bootstrap-backend
         with:
           admin_pubkey: ${{ env.TEST_ADMIN_PUBKEY }}
+          with_sidecars: 'true'
+          wait_for_signal: 'true'
+          wait_for_sip_bridge: 'true'
 
       - name: Cache AVD snapshot
         id: avd-cache
@@ -846,22 +849,20 @@ jobs:
           # Forward host port 3000 into emulator so localhost:3000 works inside the app
           adb reverse tcp:3000 tcp:3000
 
-          # Verify backend is reachable from host before running tests
-          # Retry health check -- backend may return 503 briefly during startup
-          for i in $(seq 1 30); do
-            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/api/health/ready 2>/dev/null || echo "000")
+          # Quick sanity check that backend is reachable after adb reverse setup.
+          # Full health was already verified by bootstrap-backend action.
+          # Use /api/health/live (process-level) not /api/health/ready (includes sidecars)
+          # to avoid false failures when sidecars are still converging.
+          for i in $(seq 1 15); do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/api/health/live 2>/dev/null || echo "000")
             if [ "$HTTP_CODE" = "200" ]; then
-              echo "Backend is ready"
+              echo "Backend is reachable"
               break
-            elif [ "$HTTP_CODE" = "503" ]; then
-              echo "Backend starting (503), attempt $i/30..."
-              sleep 2
-            else
-              echo "Backend not reachable (HTTP $HTTP_CODE), attempt $i/30..."
-              sleep 2
             fi
-            if [ "$i" = "30" ]; then
-              echo "::error::Backend not reachable after 60s (last HTTP $HTTP_CODE)"
+            echo "Backend not reachable (HTTP $HTTP_CODE), attempt $i/15..."
+            sleep 2
+            if [ "$i" = "15" ]; then
+              echo "::error::Backend not reachable after 30s (last HTTP $HTTP_CODE)"
               exit 1
             fi
           done
@@ -896,10 +897,27 @@ jobs:
           emulator-boot-timeout: 600
           script: /tmp/run-android-e2e.sh "${{ steps.shard-features.outputs.features }}"
 
+      - name: Smoke check sidecar health endpoints
+        if: always()
+        run: |
+          curl -sf http://localhost:3000/api/health/ready || echo "::warning::app health check failed"
+          curl -sf http://localhost:3100/health || echo "::warning::signal-notifier health check failed"
+          curl -sf http://localhost:3001/health || echo "::warning::sip-bridge health check failed"
+
+      - name: Dump app container logs on failure
+        if: failure()
+        run: |
+          echo "=== App container logs (last 100 lines) ==="
+          docker compose --env-file .env \
+            -f deploy/docker/docker-compose.yml \
+            -f deploy/docker/docker-compose.test.yml \
+            logs app --tail=100 2>&1 || true
+
       - name: Tear down Docker Compose
         if: always()
         run: |
           docker compose --env-file .env \
+            --profile signal --profile asterisk \
             -f deploy/docker/docker-compose.yml \
             -f deploy/docker/docker-compose.test.yml \
             down -v || true
