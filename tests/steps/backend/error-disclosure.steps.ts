@@ -116,7 +116,8 @@ Given('the request body is {string}', async ({ world }, body: string) => {
 When('the command is sent to the SIP bridge', async ({ request, world }) => {
   const state = getEDState(world)
   // Verify JSON parse safety on the worker's telephony webhook (same pattern as bridge).
-  const res = await request.post(`${BASE_URL}/api/telephony/webhook`, {
+  // Uses /api/telephony/incoming — webhook validation is per-route, not wildcard.
+  const res = await request.post(`${BASE_URL}/api/telephony/incoming`, {
     headers: { 'Content-Type': 'application/json' },
     data: state.sipBridgeBody ?? 'not json',
   })
@@ -129,7 +130,8 @@ When('the command is sent to the SIP bridge', async ({ request, world }) => {
 
 When('the ring command is sent to the SIP bridge', async ({ request, world }) => {
   const state = getEDState(world)
-  const res = await request.post(`${BASE_URL}/api/telephony/webhook`, {
+  // Uses /api/telephony/call-status — another real webhook endpoint for the ring test.
+  const res = await request.post(`${BASE_URL}/api/telephony/call-status`, {
     headers: { 'Content-Type': 'application/json' },
     data: state.sipBridgeBody ?? 'not json',
   })

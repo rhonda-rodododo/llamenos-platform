@@ -191,7 +191,7 @@ Feature: API Contract Validation
 
   Scenario: Create ban accepts valid E164 phone
     When an admin sends "POST" to "/api/bans" with body:
-      | phone  | +15559876543 |
+      | phone  | +15550003333 |
       | reason | valid test   |
     Then the response status should not be 400
 
@@ -214,10 +214,10 @@ Feature: API Contract Validation
   Scenario: Ban audit log does not expose raw phone number
     Given I am authenticated as admin
     When an admin sends "POST" to "/api/bans" with body:
-      | phone  | +15551234567   |
+      | phone  | +15550001111   |
       | reason | audit log test |
     Then the response status should be 200
-    And the audit log entry for "numberBanned" should not contain the raw phone "+15551234567"
+    And the audit log entry for "numberBanned" should not contain the raw phone "+15550001111"
 
   # ─── Dev Endpoint Disclosure ────────────────────────────────────
 
@@ -243,6 +243,6 @@ Feature: API Contract Validation
   Scenario: Admin with bans:create can directly ban a phone number
     Given I am authenticated as admin
     When an admin sends "POST" to "/api/bans" with body:
-      | phone  | +15559876543 |
+      | phone  | +15550002222 |
       | reason | admin ban    |
     Then the response status should be 200
