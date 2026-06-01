@@ -257,7 +257,7 @@ jobs:
 
       # ─── Docker (not pre-installed on macOS runners) ───────────
       - name: Setup Docker
-        uses: docker/setup-docker-action@e43656e248c0bd0647d3f5c195d116aacf6fcaf4 # v4
+        uses: docker/setup-docker-action@0234bb73ccb40f0c430b795634f9247e2b5c2d23 # v5.2.0
 
       # ─── Start Backend Services ────────────────────────────────
       - name: Bootstrap backend
