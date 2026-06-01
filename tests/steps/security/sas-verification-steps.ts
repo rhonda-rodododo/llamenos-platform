@@ -52,12 +52,14 @@ function encryptNsecForTest(nsec: string, ephemeralPubkeyHex: string, primarySec
 Given('a valid provisioning room is established', async ({ page, sasWorld }) => {
   const state: SasWorld = sasWorld
 
-  // Call provision_create_session via the IPC mock to generate the ephemeral keypair.
-  // The ephemeral secret is stored in the mock's state — it NEVER enters JavaScript.
-  // We only get back the pubkey hex.
+  // Call provision_create_session via the platform abstraction to generate the
+  // ephemeral keypair. The ephemeral secret is stored in Rust/mock CryptoState —
+  // it NEVER enters JavaScript. We only get back the pubkey hex.
   const ephemeralPubkeyHex = await page.evaluate(async () => {
-    const { invoke } = await import('@tauri-apps/api/core')
-    return invoke<string>('provision_create_session')
+    const platform = (window as Record<string, unknown>).__TEST_PLATFORM as {
+      provisionCreateSession(): Promise<string>
+    }
+    return platform.provisionCreateSession()
   })
   state.ephemeralPubkey = ephemeralPubkeyHex
 

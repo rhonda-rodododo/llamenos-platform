@@ -102,15 +102,21 @@ async function getAuthHeaders(method: string, apiPath: string): Promise<Record<s
   // Use CryptoState for Schnorr auth if unlocked
   if (keyManager.isUnlocked()) {
     try {
-      const token = await createAuthToken(monotoneNow(), method, `${API_BASE}${apiPath}`)
+      const nonce = randomNonce()
+      const token = await createAuthToken(monotoneNow(), method, `${API_BASE}${apiPath}`, nonce)
       return { 'Authorization': `Bearer ${token}` }
-    } catch (err) {
-      console.error(`[auth-debug] createAuthToken failed for ${method} ${apiPath}:`, err)
+    } catch {
       return {}
     }
   }
-  console.warn(`[auth-debug] key not unlocked for ${method} ${apiPath}`)
   return {}
+}
+
+/** Generate a random hex nonce for replay protection. */
+function randomNonce(): string {
+  const bytes = new Uint8Array(16)
+  crypto.getRandomValues(bytes)
+  return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('')
 }
 
 /**
@@ -206,10 +212,19 @@ export async function request<T>(path: string, options: RequestInit & { retries?
           const body = await res.text()
           throw new ApiError(res.status, body)
         }
-        if (res.status === 401 && !path.startsWith('/auth/') && keyManager.isUnlocked()) {
+        const body = await res.text()
+        // Only trigger session expiry when the request actually carried credentials
+        // AND the server has rejected us on the FINAL attempt. Nonce replay (deterministic
+        // Ed25519 sigs hitting the server's replay window) can cause transient 401s that
+        // succeed on retry with a fresh timestamp, so we always retry once before declaring
+        // the session expired.
+        if (res.status === 401 && !path.startsWith('/auth/') && 'Authorization' in headers) {
+          if (attempt < Math.max(maxRetries, 1)) {
+            lastError = new ApiError(res.status, body)
+            continue
+          }
           onAuthExpired?.()
         }
-        const body = await res.text()
         const err = new ApiError(res.status, body)
         if (isRetryable(res.status) && attempt < maxRetries) {
           lastError = err
@@ -727,7 +742,10 @@ export async function getCallRecording(callId: string): Promise<ArrayBuffer> {
       const headers = await getAuthHeaders('GET', pathOnly)
       const res = await fetch(`${API_BASE}${hp(`/calls/${callId}/recording`)}`, { headers, signal: controller.signal })
       if (!res.ok) {
-        if (res.status === 401) onAuthExpired?.()
+        if (res.status === 401 && 'Authorization' in headers) {
+          if (attempt < MAX_RETRIES) continue
+          onAuthExpired?.()
+        }
         const err = new ApiError(res.status, await res.text())
         if (isRetryable(res.status) && attempt < MAX_RETRIES) continue
         throw err
@@ -922,17 +940,18 @@ export async function uploadIvrAudio(promptType: string, language: string, audio
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 30_000)
   try {
+    const headers = {
+      ...await getAuthHeaders('PUT', `/settings/ivr-audio/${promptType}/${language}`),
+      'Content-Type': audioBlob.type || 'audio/webm',
+    }
     const res = await fetch(`${API_BASE}/settings/ivr-audio/${promptType}/${language}`, {
       method: 'PUT',
-      headers: {
-        ...await getAuthHeaders('PUT', `/settings/ivr-audio/${promptType}/${language}`),
-        'Content-Type': audioBlob.type || 'audio/webm',
-      },
+      headers,
       body: audioBlob,
       signal: controller.signal,
     })
     if (!res.ok) {
-      if (res.status === 401) onAuthExpired?.()
+      if (res.status === 401 && 'Authorization' in headers) onAuthExpired?.()
       throw new ApiError(res.status, await res.text())
     }
     onApiActivity?.()
@@ -1491,7 +1510,10 @@ export async function uploadChunk(uploadId: string, chunkIndex: number, data: Ar
         signal: controller.signal,
       })
       if (!res.ok) {
-        if (res.status === 401) onAuthExpired?.()
+        if (res.status === 401 && 'Authorization' in headers) {
+          if (attempt < maxRetries) { lastError = new ApiError(res.status, await res.text()); continue }
+          onAuthExpired?.()
+        }
         const err = new ApiError(res.status, await res.text())
         if (isRetryable(res.status) && attempt < maxRetries) { lastError = err; continue }
         throw err
@@ -1526,10 +1548,13 @@ export async function downloadFile(fileId: string): Promise<ArrayBuffer> {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 30_000)
     try {
-      const headers = await getAuthHeaders('GET', `/files/${fileId}/content`)
+      const headers: Record<string, string> = await getAuthHeaders('GET', `/files/${fileId}/content`)
       const res = await fetch(`${API_BASE}/files/${fileId}/content`, { headers, signal: controller.signal })
       if (!res.ok) {
-        if (res.status === 401) onAuthExpired?.()
+        if (res.status === 401 && 'Authorization' in headers) {
+          if (attempt < MAX_RETRIES) continue
+          onAuthExpired?.()
+        }
         const err = new ApiError(res.status, await res.text())
         if (isRetryable(res.status) && attempt < MAX_RETRIES) continue
         throw err

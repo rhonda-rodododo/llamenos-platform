@@ -190,9 +190,9 @@ describe('Telephony routes', () => {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: 'CallSid=CA123',
       })
-      expect(res.status).toBe(404)
+      expect(res.status).toBe(403)
       const body = await res.json()
-      expect(body.error).toContain('Telephony is not configured')
+      expect(body.error).toBe('Forbidden')
     })
   })
 

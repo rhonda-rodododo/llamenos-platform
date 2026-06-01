@@ -203,12 +203,14 @@ export async function createAuthToken(
   timestamp: number,
   method: string,
   path: string,
+  nonce?: string,
 ): Promise<string> {
   if (useTauri) {
     return tauriInvoke<string>('create_auth_token_from_state', {
       timestamp,
       method,
       path,
+      nonce,
     })
   }
   throw new Error('WASM auth token not yet implemented')

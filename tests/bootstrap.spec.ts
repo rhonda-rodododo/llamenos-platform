@@ -39,18 +39,6 @@ async function unlockAndNavigateToDashboard(page: import('@playwright/test').Pag
     }
   })
 
-  // Debug: log all 401 responses and console warnings
-  page.on('response', (res) => {
-    if (res.status() === 401) {
-      console.log(`[DEBUG-401] ${res.request().method()} ${res.url()} → 401`)
-    }
-  })
-  page.on('console', (msg) => {
-    if (msg.text().includes('auth-debug')) {
-      console.log(`[BROWSER] ${msg.text()}`)
-    }
-  })
-
   await page.goto('/', { waitUntil: 'domcontentloaded' })
 
   const pinInput = page.getByTestId(TestIds.PIN_INPUT).locator('input')
@@ -83,6 +71,7 @@ async function unlockAndNavigateToDashboard(page: import('@playwright/test').Pag
 
   // Ensure sidebar is visible (confirms full auth)
   await page.getByTestId(TestIds.NAV_SIDEBAR).waitFor({ state: 'visible', timeout: Timeouts.AUTH })
+
 }
 
 /**

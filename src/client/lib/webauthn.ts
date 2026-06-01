@@ -27,7 +27,8 @@ async function getAuthHeaders(method: string, path: string): Promise<Record<stri
   // Use CryptoState for Schnorr auth if unlocked
   if (keyManager.isUnlocked()) {
     try {
-      const token = await createAuthToken(monotoneNow(), method, `${API_BASE}${path}`)
+      const nonce = Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('')
+      const token = await createAuthToken(monotoneNow(), method, `${API_BASE}${path}`, nonce)
       return { 'Authorization': `Bearer ${token}` }
     } catch {
       return {}

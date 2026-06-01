@@ -42,11 +42,10 @@ telephony.use('*', async (c, next) => {
   const hubId = url.searchParams.get('hub') || undefined
   const adapter = await getHubAdapter(env, services, hubId)
 
-  // If no telephony provider is configured, return a helpful error
+  // If no telephony provider is configured, reject with 403 — same as
+  // signature validation failure. Never reveal whether telephony is set up.
   if (!adapter) {
-    return c.json({
-      error: 'Telephony is not configured. Set up a voice provider in Admin Settings or the Setup Wizard.',
-    }, 404)
+    return c.json({ error: 'Forbidden' }, 403)
   }
 
   // H05: Always validate webhook signatures — no localhost bypass

@@ -724,10 +724,11 @@ export async function createReportViaApi(
   const report = data as ReportRecord
   // If caller wants a specific status, update it
   if (options?.status && options.status !== 'waiting') {
+    const assigneePubkey = seedHexToPubkey(seedHex)
     if (options.status === 'active') {
-      await assignReportViaApi(request, report.id, pubkey, options?.hubId)
+      await assignReportViaApi(request, report.id, assigneePubkey, options?.hubId)
     } else if (options.status === 'closed') {
-      await assignReportViaApi(request, report.id, pubkey, options?.hubId)
+      await assignReportViaApi(request, report.id, assigneePubkey, options?.hubId)
       await updateReportStatusViaApi(request, report.id, 'closed', options?.hubId)
     }
   }
