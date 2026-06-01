@@ -1513,6 +1513,12 @@ export class SettingsService {
       .set(updates)
       .where(eq(rolesTable.id, id))
 
+    // Invalidate the roles cache so subsequent requests pick up the updated
+    // permissions immediately. Without this, the 30-second cache TTL causes
+    // stale permissions in E2E tests where test-seed updates the volunteer
+    // role then the app immediately queries a newly-permitted endpoint.
+    invalidateRolesCache()
+
     const [updated] = await this.db
       .select()
       .from(rolesTable)

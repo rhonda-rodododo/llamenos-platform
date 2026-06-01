@@ -104,22 +104,29 @@ class EventsViewModel @Inject constructor(
     }
 
     /**
-     * Check if CMS is enabled for this hub.
+     * Check if CMS is enabled for this hub (launches in viewModelScope).
      */
     private fun checkCmsEnabled() {
         viewModelScope.launch {
-            try {
-                @kotlinx.serialization.Serializable
-                data class CmsStatusResponse(val enabled: Boolean)
+            checkCmsEnabledSync()
+        }
+    }
 
-                val response = apiService.request<CmsStatusResponse>(
-                    "GET",
-                    apiService.hp("/api/settings/cms/case-management"),
-                )
-                _uiState.update { it.copy(cmsEnabled = response.enabled) }
-            } catch (_: Exception) {
-                _uiState.update { it.copy(cmsEnabled = false) }
-            }
+    /**
+     * Suspending version of CMS check — called from [refresh] for sequential execution.
+     */
+    private suspend fun checkCmsEnabledSync() {
+        try {
+            @kotlinx.serialization.Serializable
+            data class CmsStatusResponse(val enabled: Boolean)
+
+            val response = apiService.request<CmsStatusResponse>(
+                "GET",
+                apiService.hp("/api/settings/cms/case-management"),
+            )
+            _uiState.update { it.copy(cmsEnabled = response.enabled) }
+        } catch (_: Exception) {
+            _uiState.update { it.copy(cmsEnabled = false) }
         }
     }
 
@@ -129,24 +136,31 @@ class EventsViewModel @Inject constructor(
      */
     fun loadEntityTypes() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoadingEntityTypes = true) }
-            try {
-                val response = apiService.request<EntityTypesResponse>(
-                    "GET",
-                    apiService.hp("/api/settings/cms/entity-types"),
+            loadEntityTypesSync()
+        }
+    }
+
+    /**
+     * Suspending version of entity type loading — called from [refresh] for sequential execution.
+     */
+    private suspend fun loadEntityTypesSync() {
+        _uiState.update { it.copy(isLoadingEntityTypes = true) }
+        try {
+            val response = apiService.request<EntityTypesResponse>(
+                "GET",
+                apiService.hp("/api/settings/cms/entity-types"),
+            )
+            _uiState.update {
+                it.copy(
+                    entityTypes = response.entityTypes,
+                    isLoadingEntityTypes = false,
                 )
-                _uiState.update {
-                    it.copy(
-                        entityTypes = response.entityTypes,
-                        isLoadingEntityTypes = false,
-                    )
-                }
-                // Now load events for the first event entity type
-                loadEvents()
-            } catch (_: Exception) {
-                _uiState.update { it.copy(isLoadingEntityTypes = false) }
-                // Entity types unavailable — likely CMS not configured
             }
+            // Now load events for the first event entity type
+            loadEvents()
+        } catch (_: Exception) {
+            _uiState.update { it.copy(isLoadingEntityTypes = false) }
+            // Entity types unavailable — likely CMS not configured
         }
     }
 
@@ -304,8 +318,14 @@ class EventsViewModel @Inject constructor(
     }
 
     fun refresh() {
-        checkCmsEnabled()
-        loadEntityTypes()
+        viewModelScope.launch {
+            // Sequential: check CMS first, then load entity types.
+            // Running these concurrently caused a race where checkCmsEnabled()
+            // could set cmsEnabled=false (on transient error) before loadEntityTypes()
+            // finished, permanently hiding the events UI for that ViewModel lifecycle.
+            checkCmsEnabledSync()
+            loadEntityTypesSync()
+        }
     }
 
     fun dismissError() {

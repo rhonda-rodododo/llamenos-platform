@@ -355,18 +355,20 @@ class CryptoService @Inject constructor() {
         if (!isUnlocked) throw CryptoException("No key loaded")
 
         val timestamp = System.currentTimeMillis()
-        val nonce = randomNonce()
         return try {
             val ffiToken = org.llamenos.core.mobileCreateAuthToken(
                 timestamp = timestamp.toULong(),
                 method = method,
                 path = path,
             )
+            // Use the nonce from the FFI token — the Rust layer generates a random
+            // nonce and includes it in the signed message. Using a different nonce
+            // here would cause signature verification to fail on the backend.
             AuthToken(
                 pubkey = ffiToken.pubkey,
                 timestamp = ffiToken.timestamp.toLong(),
                 token = ffiToken.token,
-                nonce = nonce,
+                nonce = ffiToken.nonce,
             )
         } catch (e: org.llamenos.core.CryptoException) {
             throw CryptoException("Auth token creation failed: ${e.message}", e)
