@@ -25,12 +25,17 @@ const AUTH_TIMEOUT_MS = 10_000
 /** Timestamp freshness window for auth (10 seconds) */
 const AUTH_TIMESTAMP_WINDOW_MS = 10_000
 
+/** Interval at which authenticated connections re-validate user status and hub memberships */
+export const MEMBERSHIP_REVALIDATION_INTERVAL_MS = 5 * 60 * 1000 // 5 minutes
+
 export interface WsConnectionData {
   nonce: string
   nonceCreatedAt: number
   authenticated: boolean
   connState: ConnectionState | null
   authTimeout: ReturnType<typeof setTimeout> | null
+  /** Periodic interval that re-validates the user's account status and hub memberships */
+  validationInterval: ReturnType<typeof setInterval> | null
   lookupUser: (pubkey: string) => Promise<{ hubs: string[] } | null>
 }
 
@@ -48,6 +53,7 @@ export function createConnectionData(
     authenticated: false,
     connState: null,
     authTimeout: null,
+    validationInterval: null,
     lookupUser,
   }
 }
@@ -160,6 +166,10 @@ export function createWsHandler() {
       if (data.authTimeout) {
         clearTimeout(data.authTimeout)
       }
+      if (data.validationInterval) {
+        clearInterval(data.validationInterval)
+        data.validationInterval = null
+      }
       if (data.connState) {
         const manager = getConnectionManager()
         if (manager) {
@@ -235,4 +245,54 @@ async function handleAuth(
 
   ws.sendText(JSON.stringify({ type: 'authenticated', hubs: user.hubs }))
   log.debug('Client authenticated', { pubkey: msg.pubkey, hubs: user.hubs.length })
+
+  // Periodically re-validate the user's account status and hub memberships.
+  // If the account is deactivated or hubs change, terminate or update accordingly.
+  data.validationInterval = setInterval(() => {
+    revalidateMembership(ws, data).catch((err) => {
+      log.error('Membership revalidation error', { error: err instanceof Error ? err.message : String(err) })
+    })
+  }, MEMBERSHIP_REVALIDATION_INTERVAL_MS)
+}
+
+/**
+ * Re-validate an authenticated connection's user status and hub memberships.
+ * Terminates the connection if the user is no longer active.
+ * Evicts subscriptions for hubs the user has been removed from.
+ */
+async function revalidateMembership(
+  ws: import('bun').ServerWebSocket<WsConnectionData>,
+  data: WsConnectionData,
+): Promise<void> {
+  if (!data.authenticated || !data.connState) return
+
+  const pubkey = data.connState.pubkey
+  const updated = await data.lookupUser(pubkey)
+
+  if (!updated) {
+    // User account deactivated or deleted — terminate connection
+    log.debug('Membership revalidation: user no longer active, closing', { pubkey })
+    ws.close(4001, 'Account deactivated')
+    return
+  }
+
+  const manager = getConnectionManager()
+  const newHubs = new Set(updated.hubs)
+  const currentHubs = data.connState.hubs
+
+  // Evict subscriptions for hubs the user has been removed from
+  for (const hubId of currentHubs) {
+    if (!newHubs.has(hubId)) {
+      log.debug('Membership revalidation: evicting hub', { pubkey, hubId })
+      if (manager) {
+        manager.evictMember(pubkey, hubId)
+      }
+      currentHubs.delete(hubId)
+    }
+  }
+
+  // Add any newly-joined hubs
+  for (const hubId of newHubs) {
+    currentHubs.add(hubId)
+  }
 }
