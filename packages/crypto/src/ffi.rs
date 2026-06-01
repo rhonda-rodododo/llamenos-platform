@@ -172,7 +172,7 @@ pub fn compute_shared_x_hex(
     our_secret_hex: &str,
     their_pubkey_hex: &str,
 ) -> Result<String, CryptoError> {
-    use x25519_dalek::{PublicKey as X25519PublicKey, StaticSecret as X25519StaticSecret};
+    use x25519_dalek::StaticSecret as X25519StaticSecret;
 
     let sk_bytes = hex::decode(our_secret_hex).map_err(CryptoError::HexError)?;
     if sk_bytes.len() != 32 {
