@@ -1404,7 +1404,10 @@ export class SettingsService {
       createdAt: r.createdAt.toISOString(),
       updatedAt: r.updatedAt.toISOString(),
     }))
-    _rolesCache = { roles: rolesList, expiresAt: now + ROLES_CACHE_TTL_MS }
+    // Don't cache empty results — they indicate a race with reset/ensureInit
+    if (rolesList.length > 0) {
+      _rolesCache = { roles: rolesList, expiresAt: now + ROLES_CACHE_TTL_MS }
+    }
     return { roles: rolesList }
   }
 
@@ -3218,8 +3221,17 @@ export class SettingsService {
       await tx.delete(systemSettings)
     })
 
+    // Invalidate roles cache so concurrent requests don't see stale empty roles
+    // between the delete above and the ensureInit re-seed below.
+    invalidateRolesCache()
+
     this.initialized = false
     await this.ensureInit(env)
+
+    // Invalidate again after re-seeding: a concurrent request may have cached
+    // the empty roles table between the delete and ensureInit.
+    invalidateRolesCache()
+
     return { ok: true }
   }
 

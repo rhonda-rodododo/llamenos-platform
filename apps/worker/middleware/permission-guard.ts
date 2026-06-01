@@ -25,6 +25,10 @@ export function requirePermission(...required: string[]) {
     for (const perm of required) {
       if (!permissionGranted(permissions, perm) &&
           !(hubPermissions && permissionGranted(hubPermissions, perm))) {
+        const user = c.get('user')
+        if (c.env?.ENVIRONMENT === 'development') {
+          return c.json({ error: 'Forbidden', required: perm, debug: { roles: user?.roles, permCount: permissions?.length, hubPermCount: hubPermissions?.length } }, 403)
+        }
         return c.json({ error: 'Forbidden', required: perm }, 403)
       }
     }

@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { Hono, type Context, type Next } from 'hono'
 import { describeRoute } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { getTelephonyFromService, getHubTelephonyFromService } from '../lib/service-factories'
@@ -30,8 +30,12 @@ async function getHubAdapter(env: Env, services: Services, hubId: string | undef
   return getTelephonyFromService(env, services.settings)
 }
 
-// Validate telephony webhook signature on all routes
-telephony.use('*', async (c, next) => {
+/**
+ * Webhook validation middleware — applied per-route to actual webhook endpoints.
+ * NOT a wildcard `use('*')` because authenticated webrtcRoutes are mounted at the
+ * same `/telephony` prefix and must not be intercepted by webhook signature checks.
+ */
+async function validateWebhook(c: Context<AppEnv>, next: Next) {
   const url = new URL(c.req.url)
   logger.debug('Webhook received', { method: c.req.method, path: url.pathname, search: url.search })
   const env = c.env
@@ -55,10 +59,11 @@ telephony.use('*', async (c, next) => {
     return c.json({ error: 'Forbidden' }, 403)
   }
   await next()
-})
+}
 
 // --- Step 1: Incoming call -> hub lookup -> ban check -> language menu ---
 telephony.post('/incoming',
+  validateWebhook,
   describeRoute({
     tags: ['Telephony Webhooks'],
     summary: 'Incoming call — provider webhook (step 1)',
@@ -108,6 +113,7 @@ telephony.post('/incoming',
 
 // --- Step 2: Language selected -> spam check -> greeting + hold/captcha ---
 telephony.post('/language-selected',
+  validateWebhook,
   describeRoute({
     tags: ['Telephony Webhooks'],
     summary: 'Language digit collected — provider webhook (step 2)',
@@ -183,6 +189,7 @@ telephony.post('/language-selected',
 
 // --- Step 3: CAPTCHA response ---
 telephony.post('/captcha',
+  validateWebhook,
   describeRoute({
     tags: ['Telephony Webhooks'],
     summary: 'CAPTCHA digit response — provider webhook (step 3)',
@@ -216,6 +223,7 @@ telephony.post('/captcha',
 
 // --- Step 4: User answered -> bridge via queue ---
 telephony.post('/user-answer',
+  validateWebhook,
   describeRoute({
     tags: ['Telephony Webhooks'],
     summary: 'Volunteer answered — provider webhook (step 4)',
@@ -270,6 +278,7 @@ telephony.post('/user-answer',
 
 // --- Step 5: Call status callback ---
 telephony.post('/call-status',
+  validateWebhook,
   describeRoute({
     tags: ['Telephony Webhooks'],
     summary: 'Call status callback — provider webhook (step 5)',
@@ -330,7 +339,7 @@ telephony.post('/call-status',
 })
 
 // --- Step 6: Wait music for queued callers ---
-telephony.all('/wait-music', async (c) => {
+telephony.all('/wait-music', validateWebhook, async (c) => {
   const url = new URL(c.req.url)
   const hubId = url.searchParams.get('hub') || undefined
   const services = c.get('services')
@@ -346,7 +355,7 @@ telephony.all('/wait-music', async (c) => {
 })
 
 // --- Step 7: Queue exit -> voicemail if no one answered ---
-telephony.post('/queue-exit', async (c) => {
+telephony.post('/queue-exit', validateWebhook, async (c) => {
   const url = new URL(c.req.url)
   const hubId = url.searchParams.get('hub') || undefined
   const services = c.get('services')
@@ -381,7 +390,7 @@ telephony.post('/queue-exit', async (c) => {
 })
 
 // --- Step 8: Voicemail recording complete ---
-telephony.post('/voicemail-complete', async (c) => {
+telephony.post('/voicemail-complete', validateWebhook, async (c) => {
   const url = new URL(c.req.url)
   const hubId = url.searchParams.get('hub') || undefined
   const services = c.get('services')
@@ -391,7 +400,7 @@ telephony.post('/voicemail-complete', async (c) => {
 })
 
 // --- Step 9: Call recording status callback (bridged call recording) ---
-telephony.post('/call-recording', async (c) => {
+telephony.post('/call-recording', validateWebhook, async (c) => {
   const url = new URL(c.req.url)
   const services = c.get('services')
 
@@ -434,7 +443,7 @@ telephony.post('/call-recording', async (c) => {
 })
 
 // --- Step 10: Voicemail recording status callback ---
-telephony.post('/voicemail-recording', async (c) => {
+telephony.post('/voicemail-recording', validateWebhook, async (c) => {
   const url = new URL(c.req.url)
   const hubId = url.searchParams.get('hub') || undefined
   const services = c.get('services')

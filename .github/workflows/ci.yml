@@ -426,6 +426,15 @@ jobs:
             " || true
           fi
 
+      - name: Dump app container logs on failure
+        if: failure()
+        run: |
+          echo "=== App container access/permission logs ==="
+          docker compose --env-file .env \
+            -f deploy/docker/docker-compose.yml \
+            -f deploy/docker/docker-compose.test.yml \
+            logs app --tail=500 2>&1 | grep -iE 'hub.*Access|Forbidden|Auth failed|WEBAUTHN|permission|403' | tail -100 || true
+
       - name: Tear down Docker Compose
         if: always()
         run: |

@@ -82,13 +82,22 @@ export const test = base.extend<
     const state = { responses: [] as Array<{ url: string; status: number }>, pageErrors: [] as Error[] }
 
     // Monitor all API responses for server errors and auth failures
-    page.on('response', (response) => {
+    page.on('response', async (response) => {
       const url = response.url()
       const status = response.status()
       // Only track /api/ calls, skip static assets and test-reset
       if (!url.includes('/api/') || url.includes('/api/test-reset')) return
       if (status >= 400) {
         state.responses.push({ url: url.replace(/^https?:\/\/[^/]+/, ''), status })
+        // Log response body for 403s to help diagnose permission issues
+        if (status === 403) {
+          try {
+            const body = await response.text()
+            if (body.includes('debug')) {
+              console.warn(`[test-monitor] 403 body: ${body.substring(0, 300)}`)
+            }
+          } catch { /* response may already be consumed */ }
+        }
       }
     })
 
