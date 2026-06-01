@@ -158,9 +158,9 @@ pub fn run() {
             crypto::hpke_open_from_state,
             crypto::hpke_seal_key,
             crypto::hpke_open_key_from_state,
-            // PUK (Per-User Key)
+            // PUK (Per-User Key — seed stays in Rust CryptoState)
             crypto::puk_create_from_state,
-            crypto::puk_rotate,
+            crypto::puk_rotate_from_state,
             crypto::puk_unwrap_seed_from_state,
             // Sigchain
             crypto::sigchain_create_link_from_state,
@@ -168,8 +168,10 @@ pub fn run() {
             crypto::sigchain_verify_link,
             // SFrame key derivation
             crypto::sframe_derive_key,
-            // Hub event decryption (H2 — symmetric key stays in Rust)
-            crypto::set_hub_key,
+            // Hub key management (key stays in Rust CryptoState)
+            crypto::hpke_unwrap_and_set_hub_key,
+            crypto::generate_hub_key_in_state,
+            crypto::wrap_hub_key_for_member,
             crypto::set_server_event_keys,
             crypto::decrypt_hub_event,
             crypto::decrypt_server_event,
@@ -177,9 +179,7 @@ pub fn run() {
             crypto::decrypt_hub_field,
             // SAS emoji verification
             crypto::derive_sas,
-            // Shamir secret sharing (recovery group)
-            crypto::shamir_split,
-            crypto::shamir_combine,
+            // Shamir secret sharing (only stateless verification — split/combine are internal)
             crypto::shamir_commit,
             crypto::shamir_verify,
             // H16: Recovery group key isolation (combine+decrypt in Rust only)

@@ -165,47 +165,41 @@ test.describe('Recovery Group - IPC Mock Verification', () => {
     )
   }
 
-  test('shamir split and combine round-trips correctly', async ({ page }) => {
+  test('recovery_group_create produces valid shares with verifiable commitments', async ({ page }) => {
     await waitForInvoke(page)
 
     const result = await page.evaluate(async () => {
       const invoke = (window as any)[Symbol.for('llamenos_test_invoke')] as
         (cmd: string, args?: Record<string, unknown>) => Promise<unknown>
 
-      const secretHex =
-        'deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
-
-      const splitResult = (await invoke('shamir_split', {
-        secretHex,
+      // Use recovery_group_create instead of standalone shamir_split
+      // (shamir_split/shamir_combine are no longer exposed as IPC — secrets must not pass through JS)
+      const group = (await invoke('recovery_group_create', {
         total: 3,
         threshold: 2,
-      })) as { shares: Array<{ x: number; y: string }>; commitments: string[] }
-
-      const recovered = (await invoke('shamir_combine', {
-        sharesJson: JSON.stringify(splitResult.shares.slice(0, 2)),
-      })) as string
+      })) as { publicKeyHex: string; shares: Array<{ x: number; y: string }>; commitments: string[] }
 
       const commitment0 = (await invoke('shamir_commit', {
-        x: splitResult.shares[0].x,
-        yHex: splitResult.shares[0].y,
+        x: group.shares[0].x,
+        yHex: group.shares[0].y,
       })) as string
 
       const verified = (await invoke('shamir_verify', {
-        x: splitResult.shares[0].x,
-        yHex: splitResult.shares[0].y,
+        x: group.shares[0].x,
+        yHex: group.shares[0].y,
         commitmentHex: commitment0,
       })) as boolean
 
       return {
-        secretMatches: recovered === secretHex,
-        commitmentMatches: commitment0 === splitResult.commitments[0],
+        hasPublicKey: group.publicKeyHex.length === 64,
+        commitmentMatches: commitment0 === group.commitments[0],
         commitmentVerified: verified,
-        shareCount: splitResult.shares.length,
-        commitmentCount: splitResult.commitments.length,
+        shareCount: group.shares.length,
+        commitmentCount: group.commitments.length,
       }
     })
 
-    expect(result.secretMatches).toBe(true)
+    expect(result.hasPublicKey).toBe(true)
     expect(result.commitmentMatches).toBe(true)
     expect(result.commitmentVerified).toBe(true)
     expect(result.shareCount).toBe(3)
@@ -246,16 +240,16 @@ test.describe('Recovery Group - IPC Mock Verification', () => {
       const invoke = (window as any)[Symbol.for('llamenos_test_invoke')] as
         (cmd: string, args?: Record<string, unknown>) => Promise<unknown>
 
-      const splitResult = (await invoke('shamir_split', {
-        secretHex: 'aabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaabbccdd',
+      // Use recovery_group_create to get shares (shamir_split no longer exposed as IPC)
+      const group = (await invoke('recovery_group_create', {
         total: 3,
         threshold: 2,
-      })) as { shares: Array<{ x: number; y: string }>; commitments: string[] }
+      })) as { publicKeyHex: string; shares: Array<{ x: number; y: string }>; commitments: string[] }
 
       const badCommitment = '0'.repeat(64)
       const rejected = (await invoke('shamir_verify', {
-        x: splitResult.shares[0].x,
-        yHex: splitResult.shares[0].y,
+        x: group.shares[0].x,
+        yHex: group.shares[0].y,
         commitmentHex: badCommitment,
       })) as boolean
 
