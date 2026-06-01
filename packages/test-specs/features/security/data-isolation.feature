@@ -51,3 +51,35 @@ Feature: Data Isolation
     Then the volunteer should receive 401 when listing notes
     And the volunteer should receive 401 when listing shifts
     And the volunteer should receive 401 when accessing their profile
+
+  # ── Direct Note Mutation by Non-Author ───────────────────────────
+
+  Scenario: Volunteer cannot update another volunteer's note via direct API call
+    Given a "volunteer" user "PatchAlice" with resources
+    And a "volunteer" user "PatchBob" with resources
+    When "PatchBob" tries to update "PatchAlice"'s note
+    Then the note update should be rejected with 403
+
+  # ── Admin Reads All Notes; Volunteers Read Only Their Own ─────────
+
+  Scenario: Admin sees all volunteers' notes but each volunteer only sees their own
+    Given a "volunteer" user "NoteVis_Alice" with resources
+    And a "volunteer" user "NoteVis_Bob" with resources
+    When the admin lists all notes
+    Then the admin should see notes from "NoteVis_Alice"
+    And the admin should see notes from "NoteVis_Bob"
+    When "NoteVis_Alice" lists their note
+    Then "NoteVis_Alice" should only see resources they created
+    And "NoteVis_Bob"'s note should not be visible to "NoteVis_Alice"
+
+  # ── Cross-Hub Data Isolation ──────────────────────────────────────
+  # Notes are tagged with the hub in which they were created.  Even when a
+  # volunteer has global access, the hub-scoped listing endpoint only returns
+  # notes created within that hub, so hub A data never leaks into hub B.
+
+  Scenario: Hub-scoped notes do not bleed across hub boundaries
+    Given volunteer "HubAlice" is a member of dedicated hub "hub-alpha"
+    And volunteer "HubBob" is a member of dedicated hub "hub-beta"
+    When "HubAlice" creates a note in dedicated hub "hub-alpha"
+    Then "HubBob" cannot see "hub-alpha" notes when listing dedicated hub "hub-beta" notes
+    And "HubBob" cannot see "HubAlice"'s notes when accessing dedicated hub "hub-alpha" directly
