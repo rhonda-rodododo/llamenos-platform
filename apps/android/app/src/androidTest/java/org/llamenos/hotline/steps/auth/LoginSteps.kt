@@ -28,9 +28,9 @@ class LoginSteps : BaseSteps() {
         val found = assertAnyTagDisplayed("hub-url-input", "app-title", "create-identity", "dashboard-title")
     }
 
-    @Then("I should see the nsec import input field")
+    @Then("I should see the device key import input field")
     fun iShouldSeeTheNsecImportInputField() {
-        val found = assertAnyTagDisplayed("nsec-input", "app-title", "create-identity", "dashboard-title")
+        val found = assertAnyTagDisplayed("device-key-input", "app-title", "create-identity", "dashboard-title")
     }
 
     @Then("I should see the {string} button")
@@ -70,22 +70,22 @@ class LoginSteps : BaseSteps() {
         val found = assertAnyTagDisplayed("hub-url-input", "app-title", "dashboard-title")
     }
 
-    @When("I enter {string} in the nsec field")
+    @When("I enter {string} in the device key field")
     fun iEnterInTheNsecField(value: String) {
         try {
-            onNodeWithTag("nsec-input").performTextInput(value)
+            onNodeWithTag("device-key-input").performTextInput(value)
             composeRule.waitForIdle()
         } catch (_: Throwable) {
-            // nsec input not available
+            // device key input not available
         }
     }
 
-    @Then("the nsec field should be a password field")
+    @Then("the device key field should be a password field")
     fun theNsecFieldShouldBeAPasswordField() {
-        val found = assertAnyTagDisplayed("nsec-input", "app-title", "dashboard-title")
+        val found = assertAnyTagDisplayed("device-key-input", "app-title", "dashboard-title")
     }
 
-    @When("I tap {string} without entering an nsec")
+    @When("I tap {string} without entering a device key")
     fun iTapWithoutEnteringAnNsec(buttonText: String) {
         try {
             onNodeWithTag("import-key").performClick()
@@ -170,14 +170,14 @@ class LoginSteps : BaseSteps() {
         }
     }
 
-    @When("I enter a valid 63-character nsec")
+    @When("I enter a valid 63-character signing key")
     fun iEnterAValid63CharacterNsec() {
         try {
-            onNodeWithTag("nsec-input")
+            onNodeWithTag("device-key-input")
                 .performTextInput("nsec1vl029mgpspedva04g90vltkh6fvh240zqtv9k0t9af8935ke9laqsnlfe5e")
             composeRule.waitForIdle()
         } catch (_: Throwable) {
-            // nsec input not available
+            // device key input not available
         }
     }
 }

@@ -738,7 +738,7 @@ function LinkDeviceSection() {
         return
       }
 
-      // Encrypt signing seed entirely in Rust — the nsec NEVER enters JavaScript.
+      // Encrypt signing seed entirely in Rust — the device key NEVER enters JavaScript.
       // ECDH, HKDF key derivation, encryption, and SAS all happen in native code.
       const { createAuthToken } = await import('@/lib/platform')
       const { encryptedHex: encrypted, sasCode: sas, primaryEncPubkeyHex } =

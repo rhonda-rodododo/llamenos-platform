@@ -5,7 +5,7 @@
  * The desktop login page has three states:
  * 1. PIN unlock (when stored key exists)
  * 2. Bootstrap redirect (when no admin exists)
- * 3. Recovery / first-time login (nsec entry, backup restore, device linking)
+ * 3. Recovery / first-time login (device key entry, backup restore, device linking)
  *
  * There is NO "Create New Identity" button, no "Import Key" button, no #hub-url field,
  * and no data-testid="page-title" on the login page.
@@ -17,38 +17,38 @@ import { expect } from '@playwright/test'
 import { When, Then } from '../fixtures'
 import { TestIds, Timeouts } from '../../helpers'
 
-Then('I should see the nsec import input field', async ({ page }) => {
-  await expect(page.getByTestId(TestIds.NSEC_INPUT)).toBeVisible({ timeout: Timeouts.ELEMENT })
+Then('I should see the device key import input field', async ({ page }) => {
+  await expect(page.getByTestId(TestIds.DEVICE_KEY_INPUT)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
-When('I enter {string} in the nsec field', async ({ page }, nsec: string) => {
-  await page.getByTestId(TestIds.NSEC_INPUT).fill(nsec)
+When('I enter {string} in the device key field', async ({ page }, value: string) => {
+  await page.getByTestId(TestIds.DEVICE_KEY_INPUT).fill(value)
 })
 
-When('I enter {string} in the nsec input', async ({ page }, nsec: string) => {
-  await page.getByTestId(TestIds.NSEC_INPUT).fill(nsec)
+When('I enter {string} in the device key input', async ({ page }, value: string) => {
+  await page.getByTestId(TestIds.DEVICE_KEY_INPUT).fill(value)
 })
 
-Then('the nsec field should be a password field', async ({ page }) => {
-  const nsecInput = page.getByTestId(TestIds.NSEC_INPUT)
-  await expect(nsecInput).toHaveAttribute('type', 'password')
+Then('the device key field should be a password field', async ({ page }) => {
+  const keyInput = page.getByTestId(TestIds.DEVICE_KEY_INPUT)
+  await expect(keyInput).toHaveAttribute('type', 'password')
 })
 
-When('I enter a valid 63-character nsec', async ({ page }) => {
+When('I enter a valid 63-character device key', async ({ page }) => {
   // The login page validates via isValidSeedHex() which expects a 64-char hex string
-  // (raw Ed25519 seed), not a bech32 nsec. Use the admin seed so the backend
+  // (raw Ed25519 seed). Use the admin seed so the backend
   // recognizes the derived pubkey and getMe() succeeds after signIn().
   const { ADMIN_SEED } = await import('../../helpers')
-  await page.getByTestId(TestIds.NSEC_INPUT).fill(ADMIN_SEED)
-  // The login form requires a PIN alongside the nsec — fill the PIN field if present
-  const pinField = page.locator('#nsec-pin')
+  await page.getByTestId(TestIds.DEVICE_KEY_INPUT).fill(ADMIN_SEED)
+  // The login form requires a PIN alongside the device key — fill the PIN field if present
+  const pinField = page.locator('#device-key-pin')
   const pinVisible = await pinField.isVisible({ timeout: 1000 }).catch(() => false)
   if (pinVisible) {
     await pinField.fill('12345678')
   }
 })
 
-// 'I start typing in the nsec field' is defined in key-import-steps.ts (shared)
+// 'I start typing in the device key field' is defined in key-import-steps.ts (shared)
 // 'the error should disappear' is defined in key-import-steps.ts (shared)
 
 When('I see the error {string}', async ({ page }, _text: string) => {
@@ -63,4 +63,4 @@ Then('I should see the PIN setup screen', async ({ page }) => {
   await expect(pinInput).toBeVisible({ timeout: Timeouts.AUTH })
 })
 
-// 'I tap {string} without entering an nsec' is defined in interaction-steps.ts (shared)
+// 'I tap {string} without entering a device key' is defined in interaction-steps.ts (shared)

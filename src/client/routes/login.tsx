@@ -47,13 +47,13 @@ function LoginPage() {
   }, [])
 
   // Recovery state
-  const [recoveryMode] = useState<'none' | 'nsec' | 'backup'>('none')
-  const [nsec, setNsec] = useState('')
+  const [recoveryMode] = useState<'none' | 'key' | 'backup'>('none')
+  const [seedHex, setSeedHex] = useState('')
   const [backupFile, setBackupFile] = useState<import('@/lib/backup').BackupFile | null>(null)
   const [recoveryPin, setRecoveryPin] = useState('')
   const [recoveryKey, setRecoveryKey] = useState('')
   const [recoveryStep, setRecoveryStep] = useState<'upload' | 'decrypt' | 'newpin'>('upload')
-  const [recoveredNsec, setRecoveredNsec] = useState('')
+  const [recoveredSeedHex, setRecoveredSeedHex] = useState('')
   const [newPin1, setNewPin1] = useState('')
   const [newPin2, setNewPin2] = useState('')
   const [newPinStep, setNewPinStep] = useState<'create' | 'confirm'>('create')
@@ -95,11 +95,11 @@ function LoginPage() {
     setShowRecovery(true)
   }
 
-  // --- Direct nsec login (recovery) ---
-  async function handleNsecSubmit(e: React.FormEvent) {
+  // --- Direct device key login (recovery) ---
+  async function handleKeySubmit(e: React.FormEvent) {
     e.preventDefault()
     setValidationError('')
-    if (!nsec.trim() || !isValidSeedHex(nsec.trim())) {
+    if (!seedHex.trim() || !isValidSeedHex(seedHex.trim())) {
       setValidationError(t('auth.invalidKey'))
       return
     }
@@ -107,7 +107,7 @@ function LoginPage() {
       setValidationError(t('pin.tooShort', { defaultValue: 'PIN or passphrase must be 8+ characters' }))
       return
     }
-    await signIn(nsec.trim(), recoveryPin)
+    await signIn(seedHex.trim(), recoveryPin)
     navigate({ to: '/' })
   }
 
@@ -155,23 +155,23 @@ function LoginPage() {
     if (!backupFile) return
     setValidationError('')
 
-    let nsecResult: string | null = null
+    let seedResult: string | null = null
 
     // Try recovery key first if provided
     if (recoveryKey.trim()) {
-      nsecResult = await restoreFromBackupWithRecoveryKey(backupFile, recoveryKey.trim())
+      seedResult = await restoreFromBackupWithRecoveryKey(backupFile, recoveryKey.trim())
     }
     // Try PIN if recovery key didn't work
-    if (!nsecResult && recoveryPin.trim()) {
-      nsecResult = await restoreFromBackupWithPin(backupFile, recoveryPin.trim())
+    if (!seedResult && recoveryPin.trim()) {
+      seedResult = await restoreFromBackupWithPin(backupFile, recoveryPin.trim())
     }
 
-    if (!nsecResult) {
+    if (!seedResult) {
       setValidationError(t('auth.decryptFailed', { defaultValue: 'Failed to decrypt backup. Check your PIN or recovery key.' }))
       return
     }
 
-    setRecoveredNsec(nsecResult)
+    setRecoveredSeedHex(seedResult)
     setRecoveryStep('newpin')
   }
 
@@ -193,7 +193,7 @@ function LoginPage() {
       }
       // Import the recovered key with the new PIN
       try {
-        const pubkeyHex = await keyManager.importKey(recoveredNsec, pin)
+        const pubkeyHex = await keyManager.importKey(recoveredSeedHex, pin)
         // Key is now in CryptoState — use loginAfterKeyLoaded (not signIn, which would re-import)
         await loginAfterKeyLoaded(pubkeyHex)
         navigate({ to: '/' })
@@ -395,7 +395,7 @@ function LoginPage() {
           )}
 
           {/* Backup file restore */}
-          {recoveryMode !== 'nsec' && (
+          {recoveryMode !== 'key' && (
             <div className="space-y-3">
               {recoveryStep === 'upload' && (
                 <div className="space-y-2">
@@ -483,7 +483,7 @@ function LoginPage() {
             </div>
           )}
 
-          {/* Direct nsec entry (advanced recovery) */}
+          {/* Direct device key entry (advanced recovery) */}
           {recoveryMode !== 'backup' && recoveryStep === 'upload' && (
             <>
               <div className="relative">
@@ -495,26 +495,26 @@ function LoginPage() {
                 </div>
               </div>
 
-              <form onSubmit={handleNsecSubmit} className="space-y-3">
+              <form onSubmit={handleKeySubmit} className="space-y-3">
                 <div className="space-y-2">
-                  <Label htmlFor="nsec">
+                  <Label htmlFor="device-key">
                     <KeyRound className="h-3.5 w-3.5 text-muted-foreground" />
                     {t('auth.secretKey')}
                   </Label>
                   <Input
-                    id="nsec"
-                    data-testid="nsec-input"
+                    id="device-key"
+                    data-testid="device-key-input"
                     type="password"
-                    value={nsec}
-                    onChange={(e) => setNsec(e.target.value)}
+                    value={seedHex}
+                    onChange={(e) => setSeedHex(e.target.value)}
                     placeholder={t('auth.secretKeyPlaceholder')}
                     autoComplete="off"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="nsec-pin">{t('pin.createPin', { defaultValue: 'Create PIN or passphrase (8+ characters)' })}</Label>
+                  <Label htmlFor="device-key-pin">{t('pin.createPin', { defaultValue: 'Create PIN or passphrase (8+ characters)' })}</Label>
                   <Input
-                    id="nsec-pin"
+                    id="device-key-pin"
                     type="password"
                     value={recoveryPin}
                     onChange={(e) => setRecoveryPin(e.target.value)}

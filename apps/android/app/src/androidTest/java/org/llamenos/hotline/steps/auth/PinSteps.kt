@@ -63,7 +63,7 @@ class PinSteps : BaseSteps() {
         }
     }
 
-    @Given("I have confirmed my nsec backup")
+    @Given("I have confirmed my device key backup")
     fun iHaveConfirmedMyNsecBackup() {
         // v3 device key model: no Onboarding/confirm-backup screen.
         // Login navigates directly to PINSet. This step is a no-op.

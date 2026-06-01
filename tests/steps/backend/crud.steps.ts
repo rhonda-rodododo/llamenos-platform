@@ -44,7 +44,7 @@ import {
 
 interface CrudState {
   volunteerPubkey?: string
-  volunteerNsec?: string
+  volunteerDeviceKey?: string
   volunteerName?: string
   shiftId?: string
   shiftName?: string
@@ -59,7 +59,7 @@ interface CrudState {
   roleId?: string
   roleName?: string
   reportId?: string
-  reporterNsec?: string
+  reporterDeviceKey?: string
   reviewerPubkey?: string
   fallbackVolunteers: string[]
 }
@@ -85,7 +85,7 @@ Before({ tags: '@backend' }, async ({ world }) => {
 When('an admin creates a volunteer named {string}', async ({ request, world }, name: string) => {
   const vol = await createVolunteerViaApi(request, { name })
   getCrudState(world).volunteerPubkey = vol.pubkey
-  getCrudState(world).volunteerNsec = vol.nsec
+  getCrudState(world).volunteerDeviceKey = vol.deviceKey
   getCrudState(world).volunteerName = name
 })
 
@@ -116,7 +116,7 @@ When('an admin creates a volunteer with role {string}', async ({ request, world 
     roleIds: [roleId],
   })
   getCrudState(world).volunteerPubkey = vol.pubkey
-  getCrudState(world).volunteerNsec = vol.nsec
+  getCrudState(world).volunteerDeviceKey = vol.deviceKey
 })
 
 Then('the volunteer\'s role list should include {string}', async ({ request, world }, roleId: string) => {
@@ -459,7 +459,7 @@ Given('a reporter user exists', async ({ request, world }) => {
     name: uniqueName('CRUD Reporter'),
     roleIds: ['role-reporter'],
   })
-  getCrudState(world).reporterNsec = vol.nsec
+  getCrudState(world).reporterDeviceKey = vol.deviceKey
   // Also create a reviewer for assignment
   const reviewer = await createVolunteerViaApi(request, {
     name: uniqueName('CRUD Reviewer'),
@@ -479,7 +479,7 @@ When('the reporter creates a report titled {string}', async ({ request, world },
       encryptedContent: 'crud-report-content',
       readerEnvelopes: [{ pubkey: kp.pubkey, ct: 'key', enc: kp.pubkey }],
     },
-    getCrudState(world).reporterNsec!,
+    getCrudState(world).reporterDeviceKey!,
   )
   expect(status).toBeLessThan(300)
   getCrudState(world).reportId = (data as Record<string, unknown>)?.id as string

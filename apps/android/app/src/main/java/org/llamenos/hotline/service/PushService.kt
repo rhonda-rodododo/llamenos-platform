@@ -44,7 +44,7 @@ import javax.inject.Inject
  *    is stored in Android Keystore without user authentication requirement.
  *
  * 2. **Full tier** (via [CryptoService]): Requires the app to be unlocked.
- *    Shows detailed caller context when the volunteer's nsec is available.
+ *    Shows detailed caller context when the volunteer's device key is available.
  *
  * ntfy/UnifiedPush never see the notification content in plaintext.
  */

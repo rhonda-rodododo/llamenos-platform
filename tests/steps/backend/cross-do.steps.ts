@@ -6,7 +6,6 @@
  */
 import { expect } from '@playwright/test'
 import { Given, When, Then, Before, getState, setState } from './fixtures'
-import { getSharedState, setLastResponse } from './shared-state'
 import { getScenarioState } from './common.steps'
 import {
   apiGet,
@@ -15,13 +14,11 @@ import {
   createVolunteerViaApi,
   createShiftViaApi,
   createBanViaApi,
-  removeBanViaApi,
   listAuditLogViaApi,
   listNotesViaApi,
   generateTestKeypair,
   uniquePhone,
   uniqueName,
-  ADMIN_NSEC,
 } from '../../api-helpers'
 import {
   simulateIncomingCall,
@@ -36,9 +33,9 @@ import {
 
 interface CrossDoState {
   volunteerPubkey?: string
-  volunteerNsec?: string
+  volunteerDeviceKey?: string
   newVolunteerPubkey?: string
-  newVolunteerNsec?: string
+  newVolunteerDeviceKey?: string
   shiftId?: string
   callId?: string
   callStatus?: string
@@ -47,7 +44,7 @@ interface CrossDoState {
   conversationIds: string[]
   inviteCode?: string
   reportId?: string
-  reporterNsec?: string
+  reporterDeviceKey?: string
   reviewerPubkey?: string
 }
 
@@ -68,7 +65,7 @@ Before({ tags: '@backend' }, async ({ world }) => {
 When('an admin creates a volunteer', async ({ request, world }) => {
   const vol = await createVolunteerViaApi(request, { name: uniqueName('XDO Vol') })
   getCrossDoState(world).volunteerPubkey = vol.pubkey
-  getCrossDoState(world).volunteerNsec = vol.nsec
+  getCrossDoState(world).volunteerDeviceKey = vol.deviceKey
 })
 
 When('the admin creates a shift including the volunteer', async ({ request, world }) => {
@@ -113,7 +110,7 @@ When('the volunteer writes a note for the call', async ({ request, world }) => {
       callId: getCrossDoState(world).callId,
       readerEnvelopes: [],
     },
-    getCrossDoState(world).volunteerNsec!,
+    getCrossDoState(world).volunteerDeviceKey!,
   )
   if (status < 300) {
     getCrossDoState(world).noteId = (data as Record<string, unknown>)?.id as string
@@ -134,12 +131,12 @@ Then('the call history should show a completed call', async ({ request, world })
   expect(call!.status).toBe('completed')
 })
 
-Then('the notes list should contain the volunteer\'s note', async ({request, world}) => {
+Then('the notes list should contain the volunteer\'s note', async ({request, world: _world}) => {
   const { notes } = await listNotesViaApi(request)
   expect(notes.length).toBeGreaterThan(0)
 })
 
-Then('the audit log should have entries for each step', async ({request, world}) => {
+Then('the audit log should have entries for each step', async ({request, world: _world}) => {
   // 'userAdded' and 'noteCreated' are logged without hub scope (global events).
   // Query without hubId to find them; hub-scoped entries (shifts, bans) will also appear.
   const { entries } = await listAuditLogViaApi(request)
@@ -216,7 +213,7 @@ Then('a conversation should have been created', async ({ world }) => {
 When('the volunteer claims the conversation', async ({ request, world }) => {
   const volPubkey = getScenarioState(world).volunteers[0]?.pubkey ?? getCrossDoState(world).volunteerPubkey
   if (volPubkey && getCrossDoState(world).conversationId) {
-    const volNsec = getScenarioState(world).volunteers[0]?.nsec ?? getCrossDoState(world).volunteerNsec
+    const volDeviceKey = getScenarioState(world).volunteers[0]?.deviceKey ?? getCrossDoState(world).volunteerDeviceKey
     // Conversation claim requires hub context — use hub-scoped path
     const hubId = getScenarioState(world).hubId
     const claimPath = hubId
@@ -224,7 +221,7 @@ When('the volunteer claims the conversation', async ({ request, world }) => {
       : `/conversations/${getCrossDoState(world).conversationId}/claim`
     await apiPost(request, claimPath, {
       pubkey: volPubkey,
-    }, volNsec!)
+    }, volDeviceKey!)
   }
 })
 
@@ -246,7 +243,7 @@ When('the admin closes the conversation', async ({ request, world }) => {
   }
 })
 
-When('another SMS arrives from {string} with body {string}', async ({request, world}, phone: string, body: string) => {
+When('another SMS arrives from {string} with body {string}', async ({request, world: _world}, phone: string, body: string) => {
   await simulateIncomingMessage(request, {
     senderNumber: phone,
     body,
@@ -287,7 +284,7 @@ When('the invite is redeemed by a new user', async ({ request, world }) => {
     roleIds: ['role-volunteer'],
   })
   getCrossDoState(world).newVolunteerPubkey = vol.pubkey
-  getCrossDoState(world).newVolunteerNsec = vol.nsec
+  getCrossDoState(world).newVolunteerDeviceKey = vol.deviceKey
 })
 
 When('the admin creates a shift with the new volunteer', async ({ request, world }) => {
@@ -336,7 +333,7 @@ Given('a reporter and reviewer exist', async ({ request, world }) => {
     name: uniqueName('XDO Reporter'),
     roleIds: ['role-reporter'],
   })
-  getCrossDoState(world).reporterNsec = reporter.nsec
+  getCrossDoState(world).reporterDeviceKey = reporter.deviceKey
 
   const reviewer = await createVolunteerViaApi(request, {
     name: uniqueName('XDO Reviewer'),
@@ -347,7 +344,7 @@ Given('a reporter and reviewer exist', async ({ request, world }) => {
 
 When('the reporter creates a report', async ({ request, world }) => {
   const kp = generateTestKeypair()
-  const { data, status } = await apiPost<{ id?: string; conversation?: { id: string } }>(
+  const { data, status: _status } = await apiPost<{ id?: string; conversation?: { id: string } }>(
     request,
     '/reports',
     {
@@ -356,7 +353,7 @@ When('the reporter creates a report', async ({ request, world }) => {
       encryptedContent: 'xdo-report-content',
       readerEnvelopes: [{ pubkey: kp.pubkey, ct: 'key', enc: kp.pubkey }],
     },
-    getCrossDoState(world).reporterNsec!,
+    getCrossDoState(world).reporterDeviceKey!,
   )
   getCrossDoState(world).reportId = (data as Record<string, unknown>)?.id as string
     ?? ((data as Record<string, unknown>)?.conversation as Record<string, unknown>)?.id as string
@@ -380,7 +377,7 @@ Then('the report should show the reviewer as assignee', async ({ request, world 
   }
 })
 
-Then('the audit log should contain report assignment entries', async ({request, world}) => {
+Then('the audit log should contain report assignment entries', async ({request, world: _world}) => {
   // Report-related audit entries are logged without hub scope — query globally
   const { entries } = await listAuditLogViaApi(request)
   // Look for report-related audit entries
@@ -430,8 +427,8 @@ Then('only the second volunteer should be rung', async ({ world }) => {
 // ─── Conversation Notes ─────────────────────────────────────────────
 
 When('the volunteer writes a note for the conversation', async ({ request, world }) => {
-  const volNsec = getScenarioState(world).volunteers[0]?.nsec ?? getCrossDoState(world).volunteerNsec
-  if (volNsec && getCrossDoState(world).conversationId) {
+  const volDeviceKey = getScenarioState(world).volunteers[0]?.deviceKey ?? getCrossDoState(world).volunteerDeviceKey
+  if (volDeviceKey && getCrossDoState(world).conversationId) {
     const { data, status } = await apiPost<{ id?: string; note?: { id: string } }>(
       request,
       '/notes',
@@ -440,7 +437,7 @@ When('the volunteer writes a note for the conversation', async ({ request, world
         conversationId: getCrossDoState(world).conversationId,
         readerEnvelopes: [],
       },
-      volNsec,
+      volDeviceKey,
     )
     if (status < 300) {
       getCrossDoState(world).noteId = (data as Record<string, unknown>)?.id as string

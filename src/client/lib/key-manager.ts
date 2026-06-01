@@ -94,11 +94,11 @@ if (typeof document !== 'undefined') {
 // --- Public API ---
 
 /**
- * Unlock the key store by decrypting the nsec with the user's PIN.
+ * Unlock the key store by decrypting the device key with the user's PIN.
  * Returns the hex pubkey on success, null on wrong PIN.
  * Throws on lockout or key wipe (errors propagate from Rust-side tracking).
  *
- * The nsec is loaded into Rust CryptoState and NEVER enters the webview.
+ * The device key is loaded into Rust CryptoState and NEVER enters the webview.
  */
 export async function unlock(pin: string): Promise<string | null> {
   // decryptWithPin throws on lockout/wipe — let it propagate
@@ -113,7 +113,7 @@ export async function unlock(pin: string): Promise<string | null> {
 }
 
 /**
- * Lock the key manager — zeros nsec in Rust CryptoState.
+ * Lock the key manager — zeros device key in Rust CryptoState.
  */
 export function lock() {
   unlocked = false

@@ -3,19 +3,18 @@
  * Tests registration options, login challenge generation, and rate limiting.
  */
 import { expect } from '@playwright/test'
-import { Given, When, Then, Before, getState, setState } from './fixtures'
+import { When, Then, Before, getState, setState } from './fixtures'
 import { setLastResponse, getSharedState } from './shared-state'
 import {
   apiGet,
   apiPost,
-  createUserViaApi,
 } from '../../api-helpers'
 import { bytesToHex } from '@shared/encoding'
 
 // ── State ────────────────────���──────────────────────────────────────
 
 interface WebAuthnTestState {
-  user?: { nsec: string; pubkey: string }
+  user?: { deviceKey: string; pubkey: string }
   challengeId?: string
   rateLimitResponses: number[]
 }
@@ -43,13 +42,13 @@ const BASE_URL = process.env.TEST_HUB_URL || 'http://localhost:3000'
 When('the user requests WebAuthn registration options', async ({ request, world }) => {
   const s = getS(world)
   expect(s.user).toBeDefined()
-  setLastResponse(world, await apiPost(request, '/webauthn/register/options', {}, s.user!.nsec))
+  setLastResponse(world, await apiPost(request, '/webauthn/register/options', {}, s.user!.deviceKey))
 })
 
 When('the user lists their WebAuthn credentials', async ({ request, world }) => {
   const s = getS(world)
   expect(s.user).toBeDefined()
-  setLastResponse(world, await apiGet(request, '/webauthn/credentials', s.user!.nsec))
+  setLastResponse(world, await apiGet(request, '/webauthn/credentials', s.user!.deviceKey))
 })
 
 When('a client requests WebAuthn login options', async ({ request, world }) => {

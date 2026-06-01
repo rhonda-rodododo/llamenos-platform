@@ -48,7 +48,7 @@ export function isWebAuthnAvailable(): boolean {
 
 /**
  * Register a new WebAuthn credential (passkey).
- * Requires existing auth (nsec or session token).
+ * Requires existing auth (device key or session token).
  */
 export async function registerCredential(label: string): Promise<void> {
   // 1. Get registration options from server

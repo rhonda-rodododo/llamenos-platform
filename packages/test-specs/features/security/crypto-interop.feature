@@ -9,16 +9,16 @@ Feature: Crypto Interop
   @smoke
   Scenario: Generated keypair has valid format
     When I generate a new keypair
-    Then the nsec should start with "nsec1"
+    Then the signing key should be valid hex
     And the npub should start with "npub1"
-    And the nsec should be 63 characters long
+    And the signing key should be 64 characters long
     And the npub should be 63 characters long
 
   @smoke
   Scenario: Generated keypair is unique each time
     When I generate keypair A
     And I generate keypair B
-    Then keypair A's nsec should differ from keypair B's nsec
+    Then keypair A's signing key should differ from keypair B's signing key
     And keypair A's npub should differ from keypair B's npub
 
   Scenario: Public key is 64 hex characters
@@ -27,8 +27,8 @@ Feature: Crypto Interop
     And the public key should only contain hex characters [0-9a-f]
 
   Scenario: Keypair import roundtrip
-    When I generate a keypair and get the nsec
-    And I import that nsec into a fresh CryptoService
+    When I generate a keypair and get the signing key
+    And I import that signing key into a fresh CryptoService
     Then the imported pubkey should match the original pubkey
     And the imported npub should match the original npub
 
@@ -66,7 +66,7 @@ Feature: Crypto Interop
   @smoke
   Scenario: PIN encryption matches format constraints
     Given the test-vectors.json fixture is loaded
-    And the test PIN and nsec from vectors
+    And the test PIN and signing key from vectors
     When I encrypt with the test PIN
     Then the salt length should be 32 hex characters
     And the nonce length should be 48 hex characters

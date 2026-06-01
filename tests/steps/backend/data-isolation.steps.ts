@@ -13,27 +13,22 @@ import {
   apiPost,
   apiPatch,
   createVolunteerViaApi,
-  listNotesViaApi,
   createReportViaApi,
-  listReportsViaApi,
   listRecordsViaApi,
   createRecordViaApi,
   enableCaseManagementViaApi,
   createEntityTypeViaApi,
   testEndpointAccess,
-  generateTestKeypair,
   encryptForTest,
   ADMIN_SEED,
-  ADMIN_NSEC,
   type CreateVolunteerResult,
 } from '../../api-helpers'
-import { TestDB } from '../../db-helpers'
 
 // ── Local State ────────────────────────────────────────────────────
 
 interface UserWithResources {
   name: string
-  nsec: string
+  deviceKey: string
   pubkey: string
   noteIds: string[]
   reportIds: string[]
@@ -106,7 +101,7 @@ Given(
 
     const user: UserWithResources = {
       name,
-      nsec: vol.nsec,
+      deviceKey: vol.deviceKey,
       pubkey: vol.pubkey,
       noteIds: [],
       reportIds: [],
@@ -128,7 +123,7 @@ Given(
           callId: `iso-${Date.now()}-${name}`,
           adminEnvelopes: noteEnvelopes,
         },
-        vol.nsec,
+        vol.deviceKey,
       )
       if (noteRes.status === 200 || noteRes.status === 201) {
         const noteId = noteRes.data.note?.id ?? noteRes.data.id
@@ -138,7 +133,7 @@ Given(
       // Create a record (if CMS enabled)
       try {
         const etId = await ensureEntityType(request, world)
-        const rec = await createRecordViaApi(request, etId, {}, vol.nsec)
+        const rec = await createRecordViaApi(request, etId, {}, vol.deviceKey)
         if ((rec as { id?: string }).id) {
           user.recordIds.push((rec as { id: string }).id)
         }
@@ -152,7 +147,7 @@ Given(
       // pubkey as the author — required for reporter-isolation filter in GET /reports
       const report = await createReportViaApi(request, {
         title: `${name}'s report ${Date.now()}`,
-        seedHex: vol.nsec,
+        seedHex: vol.deviceKey,
       })
       user.reportIds.push(report.id)
     }
@@ -171,7 +166,7 @@ When('{string} lists their {word}', async ({ request, world }, name: string, res
     const { status, data } = await apiGet<{ notes: Array<{ id: string }> }>(
       request,
       '/notes',
-      user!.nsec,
+      user!.deviceKey,
     )
     results.notes = status === 200 ? data.notes.map(n => n.id) : []
   }
@@ -180,14 +175,14 @@ When('{string} lists their {word}', async ({ request, world }, name: string, res
     const { status, data } = await apiGet<{ conversations: Array<{ id: string }> }>(
       request,
       '/reports',
-      user!.nsec,
+      user!.deviceKey,
     )
     results.reports = status === 200 ? data.conversations.map(r => r.id) : []
   }
 
   if (resource === 'record' || resource === 'records') {
     try {
-      const data = await listRecordsViaApi(request, {}, user!.nsec)
+      const data = await listRecordsViaApi(request, {}, user!.deviceKey)
       results.records = data.records.map(r => (r as { id: string }).id)
     } catch {
       results.records = []
@@ -257,7 +252,7 @@ Given(
     })
     getIsolationState(world).users.set(volName, {
       name: volName,
-      nsec: vol.nsec,
+      deviceKey: vol.deviceKey,
       pubkey: vol.pubkey,
       noteIds: [],
       reportIds: [],
@@ -273,7 +268,7 @@ When(
     expect(user).toBeTruthy()
     const { encryptedContent: hubNoteContent, envelopes: hubNoteEnvelopes } = await encryptForTest(
       `${volName}'s hub note`,
-      [user!.nsec, ADMIN_SEED],
+      [user!.deviceKey, ADMIN_SEED],
     )
     const res = await apiPost<{ note?: { id?: string }; id?: string }>(
       request,
@@ -283,7 +278,7 @@ When(
         callId: `hub-iso-${Date.now()}-${volName}`,
         adminEnvelopes: hubNoteEnvelopes,
       },
-      user!.nsec,
+      user!.deviceKey,
     )
     if (res.status === 200 || res.status === 201) {
       const noteId = res.data.note?.id ?? res.data.id
@@ -301,7 +296,7 @@ Then(
     const { status, data } = await apiGet<{ notes: Array<{ id: string }> }>(
       request,
       '/notes',
-      viewer!.nsec,
+      viewer!.deviceKey,
     )
     expect(status).toBe(200)
 
@@ -358,7 +353,7 @@ When(
       request,
       'GET',
       endpoint,
-      getIsolationState(world).volunteer!.nsec,
+      getIsolationState(world).volunteer!.deviceKey,
     )
   },
 )
@@ -395,7 +390,7 @@ Given('an active volunteer with notes and shift access', async ({ request, world
       callId: `deact-${Date.now()}`,
       adminEnvelopes: deactEnvelopes,
     },
-    vol.nsec,
+    vol.deviceKey,
   )
   getIsolationState(world).deactivatedVol = vol
 })
@@ -415,7 +410,7 @@ Then(
       request,
       'GET',
       '/notes',
-      getIsolationState(world).deactivatedVol!.nsec,
+      getIsolationState(world).deactivatedVol!.deviceKey,
     )
     expect(status).toBe(expectedStatus)
   },
@@ -429,7 +424,7 @@ Then(
       request,
       'GET',
       '/shifts',
-      getIsolationState(world).deactivatedVol!.nsec,
+      getIsolationState(world).deactivatedVol!.deviceKey,
     )
     expect(status).toBe(expectedStatus)
   },
@@ -443,7 +438,7 @@ Then(
       request,
       'GET',
       '/auth/me',
-      getIsolationState(world).deactivatedVol!.nsec,
+      getIsolationState(world).deactivatedVol!.deviceKey,
     )
     expect(status).toBe(expectedStatus)
   },

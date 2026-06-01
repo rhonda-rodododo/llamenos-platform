@@ -6,8 +6,7 @@ import * as keyManager from '@/lib/key-manager'
 import type { ConversationMessage } from '@/lib/api'
 import { formatTimestamp } from '@/lib/format'
 import { FilePreview } from '@/components/FilePreview'
-import { Lock, ArrowDown, ArrowUp, Loader2, Check, CheckCheck, Clock, AlertCircle } from 'lucide-react'
-import type { MessageDeliveryStatus } from '@/lib/api'
+import { Lock, ArrowDown, Loader2, Check, CheckCheck, Clock, AlertCircle } from 'lucide-react'
 
 interface ConversationThreadProps {
   conversationId: string
@@ -17,9 +16,9 @@ interface ConversationThreadProps {
   compact?: boolean
 }
 
-export function ConversationThread({ conversationId, messages, isLoading, compact }: ConversationThreadProps) {
+export function ConversationThread({ conversationId: _conversationId, messages, isLoading, compact }: ConversationThreadProps) {
   const { t } = useTranslation()
-  const { hasNsec, publicKey } = useAuth()
+  const { hasDeviceKey, publicKey } = useAuth()
   const [decryptedContent, setDecryptedContent] = useState<Map<string, string>>(new Map())
   const scrollRef = useRef<HTMLDivElement>(null)
   const [showScrollDown, setShowScrollDown] = useState(false)
@@ -27,7 +26,7 @@ export function ConversationThread({ conversationId, messages, isLoading, compac
   // Decrypt messages when they change
   useEffect(() => {
     if (messages.length === 0 || !publicKey) return
-    if (!hasNsec || !keyManager.isUnlocked()) return
+    if (!hasDeviceKey || !keyManager.isUnlocked()) return
 
     ;(async () => {
       const newDecrypted = new Map<string, string>()
@@ -44,7 +43,7 @@ export function ConversationThread({ conversationId, messages, isLoading, compac
       }
       setDecryptedContent(newDecrypted)
     })()
-  }, [messages, hasNsec, publicKey])
+  }, [messages, hasDeviceKey, publicKey])
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {

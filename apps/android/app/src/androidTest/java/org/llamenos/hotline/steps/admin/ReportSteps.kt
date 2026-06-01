@@ -87,7 +87,7 @@ class ReportSteps : BaseSteps() {
 
     @When("the reporter logs in")
     fun theReporterLogsIn() {
-        // Reporter uses standard login flow with their nsec
+        // Reporter uses standard login flow with their device key
         navigateToMainScreen()
     }
 

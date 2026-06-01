@@ -904,7 +904,7 @@ export async function redeemInvite(
   timestamp: number,
   token: string,
 ) {
-  // Auth fields are pre-computed by the caller via createAuthToken (stateful — nsec stays in Rust)
+  // Auth fields are pre-computed by the caller via createAuthToken (stateful — device key stays in Rust)
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
   try {

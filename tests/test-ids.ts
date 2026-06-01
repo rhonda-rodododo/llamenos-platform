@@ -43,11 +43,11 @@ export const TestIds = {
   VOLUNTEER_ADD_BTN: 'volunteer-add-btn',
   VOLUNTEER_DELETE_BTN: 'volunteer-delete-btn',
   VOLUNTEER_EDIT_BTN: 'volunteer-edit-btn',
-  VOLUNTEER_NSEC_CARD: 'volunteer-nsec-card',
-  VOLUNTEER_NSEC_CODE: 'volunteer-nsec-code',
+  VOLUNTEER_DEVICE_KEY_CARD: 'volunteer-device-key-card',
+  VOLUNTEER_DEVICE_KEY_CODE: 'volunteer-device-key-code',
   VOLUNTEER_INVITE_CARD: 'volunteer-invite-card',
   VOLUNTEER_INVITE_LINK: 'volunteer-invite-link',
-  DISMISS_NSEC: 'dismiss-nsec',
+  DISMISS_DEVICE_KEY: 'dismiss-device-key',
   DISMISS_INVITE: 'dismiss-invite',
   TOGGLE_PHONE_VISIBILITY: 'toggle-phone-visibility',
   INVITE_BTN: 'invite-btn',
@@ -168,7 +168,7 @@ export const TestIds = {
   CONTINUE_TO_LOGIN: 'continue-to-login',
 
   // ============ Auth / Login ============
-  NSEC_INPUT: 'nsec-input',
+  DEVICE_KEY_INPUT: 'device-key-input',
   LOGIN_SUBMIT_BTN: 'login-submit-btn',
   GO_TO_SETUP_BTN: 'go-to-setup-btn',
   LOCK_BTN: 'lock-btn',

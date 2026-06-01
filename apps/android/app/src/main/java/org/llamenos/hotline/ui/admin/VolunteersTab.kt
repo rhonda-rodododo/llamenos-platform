@@ -122,13 +122,11 @@ fun VolunteersTab(
         )
     }
 
-    // Created volunteer nsec display — shown once when server returns a new volunteer's key.
-    // Protected with FLAG_SECURE to prevent screen capture/screenshots.
-    if (pendingNsec != null) {
-        SecureWindowEffect()
-        NsecDisplayDialog(
-            nsec = pendingNsec!!,
-            onDismiss = { pendingNsec = null },
+    // Created volunteer device key card
+    if (uiState.createdVolunteerDeviceKey != null) {
+        DeviceKeyDisplayDialog(
+            deviceKey = uiState.createdVolunteerDeviceKey!!,
+            onDismiss = { viewModel.clearCreatedVolunteerDeviceKey() },
         )
     }
 
@@ -412,11 +410,11 @@ private fun AddVolunteerDialog(
 }
 
 /**
- * Dialog displaying the one-time nsec for a newly created volunteer.
+ * Dialog displaying the one-time device key for a newly created volunteer.
  */
 @Composable
-private fun NsecDisplayDialog(
-    nsec: String,
+private fun DeviceKeyDisplayDialog(
+    deviceKey: String,
     onDismiss: () -> Unit,
 ) {
     val clipboardManager: ClipboardManager = LocalClipboardManager.current
@@ -427,7 +425,7 @@ private fun NsecDisplayDialog(
         text = {
             Column {
                 Text(
-                    text = "Share this private key with the volunteer. It will only be shown once.",
+                    text = "Share this device key with the volunteer. It will only be shown once.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Spacer(Modifier.height(12.dp))
@@ -443,15 +441,15 @@ private fun NsecDisplayDialog(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            text = nsec.take(12) + "..." + nsec.takeLast(8),
+                            text = deviceKey.take(12) + "..." + deviceKey.takeLast(8),
                             style = MaterialTheme.typography.bodySmall,
                             modifier = Modifier
                                 .weight(1f)
-                                .testTag("created-volunteer-nsec"),
+                                .testTag("created-volunteer-device-key"),
                         )
                         IconButton(
-                            onClick = { clipboardManager.setText(AnnotatedString(nsec)) },
-                            modifier = Modifier.testTag("copy-nsec-button"),
+                            onClick = { clipboardManager.setText(AnnotatedString(deviceKey)) },
+                            modifier = Modifier.testTag("copy-device-key-button"),
                         ) {
                             Icon(Icons.Filled.ContentCopy, contentDescription = stringResource(R.string.action_copy))
                         }
@@ -462,11 +460,11 @@ private fun NsecDisplayDialog(
         confirmButton = {
             TextButton(
                 onClick = onDismiss,
-                modifier = Modifier.testTag("dismiss-nsec-dialog"),
+                modifier = Modifier.testTag("dismiss-device-key-dialog"),
             ) {
                 Text("Done")
             }
         },
-        modifier = Modifier.testTag("nsec-display-dialog"),
+        modifier = Modifier.testTag("device-key-display-dialog"),
     )
 }

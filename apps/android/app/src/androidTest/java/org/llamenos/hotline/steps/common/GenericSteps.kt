@@ -126,7 +126,7 @@ class GenericSteps : BaseSteps() {
     fun iShouldSee(text: String) {
         // Some validation messages don't appear on Android (buttons are disabled instead)
         val androidNoTextValidation = setOf(
-            "invalid phone", "invalid invite", "invalid nsec", "invalid",
+            "invalid phone", "invalid invite", "invalid device key", "invalid",
             "no invite code", "access denied",
         )
         if (androidNoTextValidation.any { text.lowercase().contains(it) }) {
@@ -479,14 +479,14 @@ class GenericSteps : BaseSteps() {
         )
     }
 
-    @When("I enter {string} in the nsec input")
+    @When("I enter {string} in the device key input")
     fun iEnterInTheNsecInput(value: String) {
         try {
-            onNodeWithTag("nsec-input").performTextClearance()
-            onNodeWithTag("nsec-input").performTextInput(value)
+            onNodeWithTag("device-key-input").performTextClearance()
+            onNodeWithTag("device-key-input").performTextInput(value)
             composeRule.waitForIdle()
         } catch (_: Throwable) {
-            // nsec input not available — may not be on key import screen
+            // device key input not available — may not be on key import screen
         }
     }
 
@@ -529,9 +529,9 @@ class GenericSteps : BaseSteps() {
             onNodeWithTag("volunteer-phone-input").performTextInput(uniquePhone)
             onNodeWithTag("confirm-add-volunteer").performClick()
             composeRule.waitForIdle()
-            // Dismiss the nsec display dialog if it appears
+            // Dismiss the device key display dialog if it appears
             try {
-                onNodeWithTag("dismiss-nsec-dialog").performClick()
+                onNodeWithTag("dismiss-device-key-dialog").performClick()
                 composeRule.waitForIdle()
             } catch (_: Throwable) {
                 // Dialog may not appear

@@ -10,7 +10,7 @@ Feature: Volunteer Lifecycle
   Scenario: Volunteer can login after admin creates account
     Given I am logged in as an admin
     And an admin has created a volunteer
-    When the volunteer logs in with their nsec
+    When the volunteer logs in with their device key
     Then they should see the dashboard or profile setup
 
   @desktop @ios @android

@@ -39,7 +39,7 @@ interface AuthState {
 }
 
 interface AuthContextValue extends AuthState {
-  signIn: (nsec: string, pin: string) => Promise<void>
+  signIn: (seedHex: string, pin: string) => Promise<void>
   loginAfterKeyLoaded: (pubkeyHex: string) => Promise<void>
   signInWithPasskey: () => Promise<void>
   signOut: () => void
@@ -51,7 +51,7 @@ interface AuthContextValue extends AuthState {
   hasPermission: (permission: string) => boolean
   isAdmin: boolean
   isAuthenticated: boolean
-  hasNsec: boolean
+  hasDeviceKey: boolean
   adminPubkey: string
   adminDecryptionPubkey: string
   webauthnEnrollmentRequired: boolean
@@ -247,7 +247,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await persistAndUnlockDeviceKeys(encrypted, pin)
       const pubkeyHex = encrypted.state.signingPubkeyHex
       keyManager.markUnlocked(pubkeyHex)
-      // Create auth token using CryptoState (nsec never leaves Rust)
+      // Create auth token using CryptoState (device key never leaves Rust)
       const tokenJson = await createAuthToken(Date.now(), 'POST', '/api/auth/login')
       const parsed = JSON.parse(tokenJson)
       await login(pubkeyHex, parsed.timestamp, parsed.token)
@@ -384,12 +384,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState(s => ({ ...s, isLoading: true, error: null }))
     try {
       const { token, pubkey } = await webauthnLogin()
-      // Store session token (not nsec — user doesn't have it)
+      // Store session token (not device key — user doesn't have it)
       sessionStorage.setItem('llamenos-session-token', token)
       const me = await getMe()
       lastApiActivity.current = Date.now()
       setState({
-        isKeyUnlocked: false, // No nsec available — crypto locked
+        isKeyUnlocked: false, // No device key available — crypto locked
         publicKey: pubkey,
         roles: me.roles || [],
         permissions: me.permissions || [],
@@ -553,7 +553,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     hasPermission: (permission: string) => permissionGranted(state.permissions, permission),
     isAdmin: permissionGranted(state.permissions, 'settings:manage'),
     isAuthenticated: (state.isKeyUnlocked || hasSessionToken) && state.roles.length > 0,
-    hasNsec: state.isKeyUnlocked,
+    hasDeviceKey: state.isKeyUnlocked,
     webauthnEnrollmentRequired: state.webauthnRequired && !state.webauthnRegistered,
   }
 

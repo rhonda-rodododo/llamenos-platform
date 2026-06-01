@@ -10,7 +10,7 @@ import { getState, setState } from './fixtures'
 export interface SharedResponseState {
   lastResponse?: { status: number; data: unknown }
   /** User created by "a registered user with a known keypair" — shared across step namespaces. */
-  sharedUser?: { nsec: string; pubkey: string }
+  sharedUser?: { deviceKey: string; pubkey: string }
   /** Device IDs registered via "the user has a registered device" — shared across step namespaces. */
   sharedDeviceIds: string[]
   /** Collected response statuses from flood/rate-limit tests (invite, webauthn). */

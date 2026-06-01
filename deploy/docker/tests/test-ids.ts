@@ -4,7 +4,7 @@
 export const TestIds = {
   // Volunteers
   VOLUNTEER_ADD_BTN: 'volunteer-add-btn',
-  VOLUNTEER_NSEC_CODE: 'volunteer-nsec-code',
+  VOLUNTEER_DEVICE_KEY_CODE: 'volunteer-device-key-code',
   VOLUNTEER_LIST: 'volunteer-list',
   VOLUNTEER_DELETE_BTN: 'volunteer-delete-btn',
 

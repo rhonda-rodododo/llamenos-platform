@@ -8,7 +8,7 @@
  * - Custom field context filtering (call-notes, conversation-notes, reports)
  */
 import { test, expect, type Page } from '@playwright/test'
-import { loginAsAdmin, loginAsVolunteer, createUserAndGetNsec, dismissNsecCard, navigateAfterLogin, TestIds, Navigation, uniquePhone, Timeouts } from './helpers'
+import { loginAsAdmin, loginAsVolunteer, createUserAndGetDeviceKey, dismissDeviceKeyCard, navigateAfterLogin, TestIds, Navigation, uniquePhone, Timeouts } from './helpers'
 
 /**
  * Fill the call-id field in the new note form.
@@ -168,8 +168,8 @@ test.describe('Records Architecture', () => {
 
   test('volunteer cannot see contacts nav link', async ({ page }) => {
     // Create a volunteer first
-    volunteerNsec = await createUserAndGetNsec(page, `Vol-${Date.now()}`, uniquePhone())
-    await dismissNsecCard(page)
+    volunteerNsec = await createUserAndGetDeviceKey(page, `Vol-${Date.now()}`, uniquePhone())
+    await dismissDeviceKeyCard(page)
 
     // Login as volunteer
     await loginAsVolunteer(page, volunteerNsec)

@@ -8,7 +8,6 @@ import { setLastResponse, getSharedState } from './shared-state'
 import {
   apiGet,
   apiPost,
-  createUserViaApi,
   createHubViaApi,
 } from '../../api-helpers'
 import { bytesToHex } from '@shared/encoding'
@@ -16,7 +15,7 @@ import { bytesToHex } from '@shared/encoding'
 // ─��� State ────────────────────────────────��──────────────────────────
 
 interface MlsTestState {
-  user?: { nsec: string; pubkey: string }
+  user?: { deviceKey: string; pubkey: string }
   hubId?: string
   deviceIds: string[]
   pendingMessageCount?: number
@@ -53,7 +52,7 @@ function randomWakeKey(): string {
   return bytesToHex(crypto.getRandomValues(new Uint8Array(32)))
 }
 
-function randomPushToken(): string {
+function _randomPushToken(): string {
   return bytesToHex(crypto.getRandomValues(new Uint8Array(16)))
 }
 
@@ -72,7 +71,7 @@ When('the user uploads {int} key packages for {string}', async ({ request, world
   const deviceId = s.deviceIds[s.deviceIds.length - 1]
   expect(deviceId).toBeDefined()
   const keyPackages = Array.from({ length: count }, () => fakePayload())
-  setLastResponse(world, await apiPost(request, `/hubs/${s.hubId}/mls/key-packages?deviceId=${deviceId}`, { keyPackages }, s.user!.nsec))
+  setLastResponse(world, await apiPost(request, `/hubs/${s.hubId}/mls/key-packages?deviceId=${deviceId}`, { keyPackages }, s.user!.deviceKey))
 })
 
 When('the user sends an MLS commit to device {string}', async ({ request, world }, targetDeviceId: string) => {
@@ -81,7 +80,7 @@ When('the user sends an MLS commit to device {string}', async ({ request, world 
   expect(s.hubId).toBeDefined()
   setLastResponse(world, await apiPost(request, `/hubs/${s.hubId}/mls/commit`, {
     recipientDeviceIds: [targetDeviceId], payload: fakePayload(),
-  }, s.user!.nsec))
+  }, s.user!.deviceKey))
 })
 
 When('the user sends an MLS welcome to device {string}', async ({ request, world }, targetDeviceId: string) => {
@@ -90,7 +89,7 @@ When('the user sends an MLS welcome to device {string}', async ({ request, world
   expect(s.hubId).toBeDefined()
   setLastResponse(world, await apiPost(request, `/hubs/${s.hubId}/mls/welcome`, {
     recipientDeviceId: targetDeviceId, payload: fakePayload(),
-  }, s.user!.nsec))
+  }, s.user!.deviceKey))
 })
 
 Given('an MLS commit was sent to {string}', async ({ request, world }, deviceId: string) => {
@@ -99,7 +98,7 @@ Given('an MLS commit was sent to {string}', async ({ request, world }, deviceId:
   expect(s.hubId).toBeDefined()
   const res = await apiPost(request, `/hubs/${s.hubId}/mls/commit`, {
     recipientDeviceIds: [deviceId], payload: fakePayload(),
-  }, s.user!.nsec)
+  }, s.user!.deviceKey)
   expect(res.status).toBe(204)
 })
 
@@ -107,7 +106,7 @@ When('the user fetches MLS messages for {string}', async ({ request, world }, de
   const s = getS(world)
   expect(s.user).toBeDefined()
   expect(s.hubId).toBeDefined()
-  const res = await apiGet(request, `/hubs/${s.hubId}/mls/messages?deviceId=${deviceId}`, s.user!.nsec)
+  const res = await apiGet(request, `/hubs/${s.hubId}/mls/messages?deviceId=${deviceId}`, s.user!.deviceKey)
   setLastResponse(world, res)
   if (res.status === 200) {
     s.pendingMessageCount = (res.data as { messages: unknown[] }).messages.length
@@ -118,7 +117,7 @@ When('the user fetches MLS messages for {string} again', async ({ request, world
   const s = getS(world)
   expect(s.user).toBeDefined()
   expect(s.hubId).toBeDefined()
-  const res = await apiGet(request, `/hubs/${s.hubId}/mls/messages?deviceId=${deviceId}`, s.user!.nsec)
+  const res = await apiGet(request, `/hubs/${s.hubId}/mls/messages?deviceId=${deviceId}`, s.user!.deviceKey)
   setLastResponse(world, res)
   if (res.status === 200) {
     s.pendingMessageCount = (res.data as { messages: unknown[] }).messages.length
@@ -129,7 +128,7 @@ When('the user fetches MLS messages without a deviceId', async ({ request, world
   const s = getS(world)
   expect(s.user).toBeDefined()
   expect(s.hubId).toBeDefined()
-  setLastResponse(world, await apiGet(request, `/hubs/${s.hubId}/mls/messages`, s.user!.nsec))
+  setLastResponse(world, await apiGet(request, `/hubs/${s.hubId}/mls/messages`, s.user!.deviceKey))
 })
 
 // ── Then ─────────────────────���──────────────────────────────────────

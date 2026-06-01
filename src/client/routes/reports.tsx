@@ -34,7 +34,7 @@ export const Route = createFileRoute('/reports')({
 
 function ReportsPage() {
   const { t } = useTranslation()
-  const { hasNsec, publicKey, isAdmin, hasPermission, adminDecryptionPubkey } = useAuth()
+  const { hasDeviceKey, publicKey, isAdmin, hasPermission, adminDecryptionPubkey } = useAuth()
   const { toast } = useToast()
 
   const [reports, setReports] = useState<Report[]>([])
@@ -133,7 +133,7 @@ function ReportsPage() {
   }, [selectedId, toast, t])
 
   const handleSendReply = useCallback(async () => {
-    if (!selectedId || !replyText.trim() || !hasNsec || !publicKey) return
+    if (!selectedId || !replyText.trim() || !hasDeviceKey || !publicKey) return
     setSending(true)
     try {
       // Build reader list: current user + admin decryption pubkey
@@ -155,10 +155,10 @@ function ReportsPage() {
     } finally {
       setSending(false)
     }
-  }, [selectedId, replyText, hasNsec, publicKey, adminDecryptionPubkey, toast, t])
+  }, [selectedId, replyText, hasDeviceKey, publicKey, adminDecryptionPubkey, toast, t])
 
   const handleFileUploadComplete = useCallback(async (fileIds: string[]) => {
-    if (!selectedId || !hasNsec || !publicKey) return
+    if (!selectedId || !hasDeviceKey || !publicKey) return
     try {
       // Build reader list: current user + admin decryption pubkey
       const readerPubkeys = [publicKey]
@@ -179,7 +179,7 @@ function ReportsPage() {
     } catch {
       toast(t('reports.sendError', { defaultValue: 'Failed to send message' }), 'error')
     }
-  }, [selectedId, hasNsec, publicKey, adminDecryptionPubkey, toast, t])
+  }, [selectedId, hasDeviceKey, publicKey, adminDecryptionPubkey, toast, t])
 
   const handleReportCreated = useCallback((reportId: string) => {
     // Refresh reports list and select the new one.
@@ -390,7 +390,7 @@ function ReportDetail({ report, messages, messagesLoading, replyText, onReplyCha
   onFileUploadComplete: (fileIds: string[]) => void
 }) {
   const { t } = useTranslation()
-  const { hasNsec, publicKey } = useAuth()
+  const { hasDeviceKey, publicKey } = useAuth()
 
   const isReporter = hasPermission('reports:create') && !hasPermission('calls:answer')
   const canReply = report.status === 'active' || isReporter
@@ -441,7 +441,7 @@ function ReportDetail({ report, messages, messagesLoading, replyText, onReplyCha
       />
 
       {/* File upload area */}
-      {showFileUpload && hasNsec && publicKey && (
+      {showFileUpload && hasDeviceKey && publicKey && (
         <div className="border-t border-border px-4 py-3">
           <FileUpload
             conversationId={report.id}

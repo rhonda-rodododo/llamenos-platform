@@ -3,7 +3,7 @@ import Foundation
 // MARK: - AuthStep
 
 /// Steps in the login/onboarding flow.
-/// V3 device key model: no nsec to show. Create identity → set PIN → done.
+/// V3 device key model: no device key to show. Create identity → set PIN → done.
 enum AuthStep: Equatable {
     /// Initial login screen.
     case login
@@ -18,9 +18,9 @@ enum AuthStep: Equatable {
 /// View model for the login and onboarding flow. Manages the state machine for
 /// identity creation and hub URL configuration. PIN handling is delegated to PINViewModel.
 ///
-/// V3: No more nsec display or import. Device keys are generated atomically with
+/// V3: No more device key display or import. Device keys are generated atomically with
 /// PIN encryption. Multi-device support uses device linking (QR + ECDH) instead of
-/// nsec backup/import.
+/// device key backup/import.
 @Observable
 final class AuthViewModel {
     private let authService: AuthService
@@ -48,7 +48,7 @@ final class AuthViewModel {
 
     /// Validate hub URL and proceed to PIN set.
     /// In the v3 model, device key generation happens atomically with PIN encryption
-    /// inside PINViewModel — no nsec display step.
+    /// inside PINViewModel — no device key display step.
     func createNewIdentity() async {
         errorMessage = nil
         guard await validateAndStoreHubURL() else { return }

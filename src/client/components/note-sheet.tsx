@@ -28,7 +28,7 @@ import { CustomFieldInputs, validateCustomFields } from '@/components/notes/cust
 
 export function NoteSheet() {
   const { t } = useTranslation()
-  const { hasNsec, publicKey, isAdmin, adminDecryptionPubkey } = useAuth()
+  const { hasDeviceKey, publicKey, isAdmin, adminDecryptionPubkey } = useAuth()
   const { isOpen, mode, editNoteId, initialCallId, initialConversationId, initialText, initialFields, close, onSaved } = useNoteSheet()
   const { toast } = useToast()
   const [saving, setSaving] = useState(false)
@@ -69,7 +69,7 @@ export function NoteSheet() {
   }, [isAdmin, isOpen, isConversationNote])
 
   async function handleSave() {
-    if (!hasNsec || !publicKey || !draft.text.trim()) return
+    if (!hasDeviceKey || !publicKey || !draft.text.trim()) return
     // For new notes: require either callId or conversationId
     if (mode === 'new' && !isConversationNote && !draft.callId.trim()) return
 

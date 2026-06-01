@@ -28,7 +28,7 @@ import java.util.UUID
  * auth-tokens.feature, and crypto-interop.feature.
  *
  * V3 device key model: generates Ed25519 + X25519 device keys via
- * [CryptoService.generateDeviceKeys]. No more nsec/npub — device keys
+ * [CryptoService.generateDeviceKeys]. No more legacy Nostr terminology — device keys
  * are identified by signing pubkey (hex) and encryption pubkey (hex).
  */
 class CryptoSteps : BaseSteps() {
@@ -71,9 +71,9 @@ class CryptoSteps : BaseSteps() {
         generatedPubkey = cryptoService.pubkey
     }
 
-    @Then("the nsec should start with {string}")
+    @Then("the signing key should start with {string}")
     fun theNsecShouldStartWith(prefix: String) {
-        // V3: nsec no longer exists. Verify signing pubkey is valid hex instead.
+        // V3: device key model. Verify signing pubkey is valid hex instead.
         assertNotNull("Signing pubkey should exist", generatedSigningPubkey)
         assertTrue("Signing pubkey should be hex", generatedSigningPubkey!!.matches(Regex("^[0-9a-f]+$")))
     }
@@ -89,7 +89,7 @@ class CryptoSteps : BaseSteps() {
         }
     }
 
-    @Then("the nsec should be {int} characters long")
+    @Then("the signing key should be {int} characters long")
     fun theNsecShouldBeCharactersLong(length: Int) {
         // V3: signing pubkey is 64 hex chars (32 bytes Ed25519)
         assertEquals("Signing pubkey length", 64, generatedSigningPubkey!!.length)
@@ -117,9 +117,9 @@ class CryptoSteps : BaseSteps() {
         keypairBEncryptionPubkey = keys.state.encryptionPubkeyHex
     }
 
-    @Then("keypair A's nsec should differ from keypair B's nsec")
+    @Then("keypair A's device key should differ from keypair B's device key")
     fun keypairANsecShouldDifferFromKeypairBNsec() {
-        // V3: compare signing pubkeys instead of nsecs
+        // V3: compare signing pubkeys instead of legacy key formats
         assertNotEquals("Signing pubkeys should be unique", keypairASigningPubkey, keypairBSigningPubkey)
     }
 
@@ -148,18 +148,18 @@ class CryptoSteps : BaseSteps() {
         )
     }
 
-    @When("I generate a keypair and get the nsec")
+    @When("I generate a keypair and get the device key")
     fun iGenerateAKeypairAndGetTheNsec() {
-        // V3: generate device keys; store signing pubkey where nsec was used
+        // V3: generate device keys; store signing pubkey
         val keys = generateDeviceKeysForTest()
         generatedSigningPubkey = keys.state.signingPubkeyHex
         originalPubkey = cryptoService.pubkey
         generatedEncryptionPubkey = keys.state.encryptionPubkeyHex
     }
 
-    @When("I import that nsec into a fresh CryptoService")
+    @When("I import that device key into a fresh CryptoService")
     fun iImportThatNsecIntoAFreshCryptoService() {
-        // V3: no nsec import. Verify device keys can be unlocked on a fresh service.
+        // V3: no legacy key import. Verify device keys can be unlocked on a fresh service.
         val importService = CryptoService()
         // Re-generate keys to verify key generation works on a fresh instance
         val keys = generateDeviceKeysForTest(importService)
@@ -408,7 +408,7 @@ class CryptoSteps : BaseSteps() {
 
     @Given("the test secret key from vectors")
     fun theTestSecretKeyFromVectors() {
-        // V3: no nsec import. Generate device keys and set test state from vectors.
+        // V3: Generate device keys and set test state from vectors.
         generateDeviceKeysForTest()
     }
 
@@ -421,7 +421,7 @@ class CryptoSteps : BaseSteps() {
     fun itShouldMatchTheExpectedPublicKeyInVectors() {
         try {
             // V3: verify the service has a valid pubkey (can't match vectors since
-            // device keys are random — vector matching only works with nsec import)
+            // device keys are random — vector matching only works with deterministic key import)
             assertNotNull("Pubkey should exist", cryptoService.pubkey)
             assertTrue("Pubkey should be hex", cryptoService.pubkey!!.matches(Regex("^[0-9a-f]+$")))
         } catch (_: Throwable) {
@@ -535,7 +535,7 @@ class CryptoSteps : BaseSteps() {
         // Verified structurally — no matching envelope for wrong key
     }
 
-    @Given("the test PIN and nsec from vectors")
+    @Given("the test PIN and device key from vectors")
     fun theTestPinAndNsecFromVectors() {
         encryptedKeyData = generateDeviceKeysForTest()
     }

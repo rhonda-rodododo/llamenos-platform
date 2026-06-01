@@ -7,7 +7,7 @@
  */
 import { expect } from '@playwright/test'
 import { Given, When, Then, Before, getState, setState } from './fixtures'
-import { getSharedState, setLastResponse } from './shared-state'
+import { setLastResponse } from './shared-state'
 import {
   apiGet,
   apiPost,
@@ -16,12 +16,10 @@ import {
   generateTestKeypair,
   uniquePhone,
   uniqueName,
-  ADMIN_NSEC,
   getMeViaApi,
 } from '../../api-helpers'
 import {
   simulateIncomingMessage,
-  uniqueCallerNumber,
 } from '../../simulation-helpers'
 import { ed25519 } from '@noble/curves/ed25519.js'
 import { hexToBytes, bytesToHex, utf8ToBytes } from '@shared/encoding'
@@ -29,7 +27,7 @@ import { LABEL_DEVICE_AUTH } from '@shared/crypto-labels'
 import * as crypto from 'crypto'
 
 const BASE_URL = process.env.TEST_HUB_URL || 'http://localhost:3000'
-const TEST_SECRET = process.env.DEV_RESET_SECRET || 'test-reset-secret'
+const _TEST_SECRET = process.env.DEV_RESET_SECRET || 'test-reset-secret'
 const AUTH_PREFIX = LABEL_DEVICE_AUTH
 
 // ── Local security audit state ──────────────────────────────────
@@ -37,7 +35,7 @@ const AUTH_PREFIX = LABEL_DEVICE_AUTH
 interface NetworkSecState {
   webhookRequest?: Record<string, unknown>
   webhookResult?: { status: number; data: unknown }
-  volunteerNsec?: string
+  volunteerDeviceKey?: string
   volunteerPubkey?: string
   patchResult?: { status: number; data: unknown }
   apiResponse?: { status: number; headers: Record<string, string>; data: unknown }
@@ -115,9 +113,9 @@ Then('the request should be rejected as replay', async ({ world }) => {
 
 // ── Role Escalation Steps ────────────────────────────────────────
 
-Given('a volunteer PATCH request with {string} set to admin', async ({ request, world }, field: string) => {
+Given('a volunteer PATCH request with {string} set to admin', async ({ request, world }, _field: string) => {
   const vol = await createVolunteerViaApi(request, { name: uniqueName('RoleEsc Vol') })
-  getNetworkSecState(world).volunteerNsec = vol.nsec
+  getNetworkSecState(world).volunteerDeviceKey = vol.deviceKey
   getNetworkSecState(world).volunteerPubkey = vol.pubkey
 })
 
@@ -127,7 +125,7 @@ When('the update is processed', async ({ request, world }) => {
     request,
     `/users/${getNetworkSecState(world).volunteerPubkey}`,
     { roles: ['role-super-admin'] },
-    getNetworkSecState(world).volunteerNsec!,
+    getNetworkSecState(world).volunteerDeviceKey!,
   )
   getNetworkSecState(world).patchResult = res
 })
@@ -191,18 +189,18 @@ Then('the server should reject the request', async ({ world }) => {
 
 // ── CAPTCHA Steps ────────────────────────────────────────────────
 
-Given('a CAPTCHA challenge is generated', async ({ world }) => {
+Given('a CAPTCHA challenge is generated', async ({ world: _world }) => {
   // CAPTCHA is generated server-side during call routing
   // The digits are stored server-side only
 })
 
-Then('the expected digits should not appear in any URL or response body', async ({ world }) => {
+Then('the expected digits should not appear in any URL or response body', async ({ world: _world }) => {
   // CAPTCHA digits are never exposed — this is a design constraint
   // Verified by the architecture: digits stored in DO state only
   expect(true).toBeTruthy()
 })
 
-Then('the digits should be stored server-side only', async ({ world }) => {
+Then('the digits should be stored server-side only', async ({ world: _world }) => {
   // CAPTCHA digits are stored in CallRouterDO state, never sent to clients
   expect(true).toBeTruthy()
 })
@@ -228,7 +226,7 @@ When('someone tries to redeem it without a Schnorr signature', async ({ request,
   getNetworkSecState(world).webhookResult = { status: res.status(), data: null }
 })
 
-Then('the redemption should fail with {int}', async ({ world }, expectedStatus: number) => {
+Then('the redemption should fail with {int}', async ({ world }, _expectedStatus: number) => {
   expect(getNetworkSecState(world).webhookResult).toBeDefined()
   // Should fail with 400 or 401
   expect(getNetworkSecState(world).webhookResult!.status).toBeGreaterThanOrEqual(400)
@@ -238,20 +236,20 @@ Then('the redemption should fail with {int}', async ({ world }, expectedStatus: 
 
 Given('volunteer A uploads a file chunk', async ({ request, world }) => {
   const volA = await createVolunteerViaApi(request, { name: uniqueName('Upload A') })
-  getNetworkSecState(world).volANsec = volA.nsec
+  getNetworkSecState(world).volANsec = volA.deviceKey
   // Simulate a file upload start
   const { data } = await apiPost<{ uploadId?: string }>(
     request,
     '/uploads/start',
     { filename: 'test.txt', contentType: 'text/plain', totalSize: 1024 },
-    volA.nsec,
+    volA.deviceKey,
   )
   getNetworkSecState(world).uploadChunkIdA = (data as Record<string, unknown>)?.uploadId as string ?? 'test-upload-id'
 })
 
 When("volunteer B tries to access volunteer A's upload status", async ({ request, world }) => {
   const volB = await createVolunteerViaApi(request, { name: uniqueName('Upload B') })
-  getNetworkSecState(world).volBNsec = volB.nsec
+  getNetworkSecState(world).volBNsec = volB.deviceKey
   // Try to access volA's upload from volB's session
   const res = await apiGet(
     request,
@@ -261,7 +259,7 @@ When("volunteer B tries to access volunteer A's upload status", async ({ request
   getNetworkSecState(world).webhookResult = { status: res.status, data: null }
 })
 
-Then('the request should be rejected with {int}', async ({ world }, expectedStatus: number) => {
+Then('the request should be rejected with {int}', async ({ world }, _expectedStatus: number) => {
   expect(getNetworkSecState(world).webhookResult).toBeDefined()
   expect(getNetworkSecState(world).webhookResult!.status).toBeGreaterThanOrEqual(400)
 })
@@ -273,7 +271,7 @@ Given('a user with reporter role', async ({ request, world }) => {
     name: uniqueName('Reporter Sec'),
     roleIds: ['role-reporter'],
   })
-  getNetworkSecState(world).volunteerNsec = vol.nsec
+  getNetworkSecState(world).volunteerDeviceKey = vol.deviceKey
   getNetworkSecState(world).volunteerPubkey = vol.pubkey
 })
 
@@ -285,7 +283,7 @@ When('they attempt to create a call note', async ({ request, world }) => {
       encryptedContent: 'reporter-note-attempt',
       callId: `test-call-${Date.now()}`,
     },
-    getNetworkSecState(world).volunteerNsec!,
+    getNetworkSecState(world).volunteerDeviceKey!,
   )
   setLastResponse(world, res)
   getNetworkSecState(world).webhookResult = res
@@ -293,7 +291,7 @@ When('they attempt to create a call note', async ({ request, world }) => {
 
 // ── Dev Reset Steps ─────────────────────────────────────────────
 
-Given('the DEV_RESET_SECRET environment variable is set', async ({ world }) => {
+Given('the DEV_RESET_SECRET environment variable is set', async ({ world: _world }) => {
   // The test environment has DEV_RESET_SECRET configured
   // This is a precondition that's always true in test mode
 })
@@ -383,11 +381,11 @@ Then('the response should not contain serverEventKeyHex', async ({ world }) => {
 
 Given('an authenticated user', async ({ request, world }) => {
   const vol = await createVolunteerViaApi(request, { name: uniqueName('Auth User') })
-  getNetworkSecState(world).volunteerNsec = vol.nsec
+  getNetworkSecState(world).volunteerDeviceKey = vol.deviceKey
 })
 
 When('they query \\/api\\/auth\\/me', async ({ request, world }) => {
-  const result = await getMeViaApi(request, getNetworkSecState(world).volunteerNsec!)
+  const result = await getMeViaApi(request, getNetworkSecState(world).volunteerDeviceKey!)
   getNetworkSecState(world).meData = result.data as Record<string, unknown>
   getNetworkSecState(world).webhookResult = { status: result.status, data: result.data }
 })
@@ -406,7 +404,7 @@ Given('a volunteer-permissioned user', async ({ request, world }) => {
     name: uniqueName('Priv Esc Vol'),
     roleIds: ['role-volunteer'],
   })
-  getNetworkSecState(world).volunteerNsec = vol.nsec
+  getNetworkSecState(world).volunteerDeviceKey = vol.deviceKey
 })
 
 When('they try to create an invite with admin role', async ({ request, world }) => {
@@ -418,7 +416,7 @@ When('they try to create an invite with admin role', async ({ request, world }) 
       phone: uniquePhone(),
       roleIds: ['role-super-admin'],
     },
-    getNetworkSecState(world).volunteerNsec!,
+    getNetworkSecState(world).volunteerDeviceKey!,
   )
   getNetworkSecState(world).webhookResult = res
   setLastResponse(world, res)
@@ -431,17 +429,17 @@ Then('the server should reject with {int} citing missing permissions', async ({ 
 
 // ── Nostr Relay Events Steps ─────────────────────────────────────
 
-Given('a hub with SERVER_SECRET configured', async ({ world }) => {
+Given('a hub with SERVER_SECRET configured', async ({ world: _world }) => {
   // The test server has SERVER_SECRET configured
   // This is a precondition verified by the server starting
 })
 
-When('the server publishes a WebSocket event', async ({ world }) => {
+When('the server publishes a WebSocket event', async ({ world: _world }) => {
   // WebSocket events are published internally by the server
   // This step verifies the architecture ensures encryption
 })
 
-Then('the event content should be encrypted with the derived event key', async ({ world }) => {
+Then('the event content should be encrypted with the derived event key', async ({ world: _world }) => {
   // The server uses HKDF-derived event key for WebSocket event encryption
   // This is an architectural constraint verified by code review
   expect(true).toBeTruthy()
@@ -489,7 +487,7 @@ When('the conversation is stored', async ({ world }) => {
   expect(getNetworkSecState(world).conversationId).toBeDefined()
 })
 
-Then('the stored phone value should start with {string}', async ({ world }, prefix: string) => {
+Then('the stored phone value should start with {string}', async ({ world }, _prefix: string) => {
   // The phone is encrypted at rest by ConversationDO
   // We can't directly verify the stored value via API (it's decrypted on read)
   // This is an architectural constraint verified by the DO implementation
@@ -498,17 +496,17 @@ Then('the stored phone value should start with {string}', async ({ world }, pref
 
 // ── BlastDO HMAC Steps ──────────────────────────────────────────
 
-Given('HMAC_SECRET is set to a unique value', async ({ world }) => {
+Given('HMAC_SECRET is set to a unique value', async ({ world: _world }) => {
   // The test environment has HMAC_SECRET configured
   // This is a precondition
 })
 
-When('a subscriber phone is hashed for the blast list', async ({ world }) => {
+When('a subscriber phone is hashed for the blast list', async ({ world: _world }) => {
   // BlastDO hashes subscriber phones using HMAC_SECRET
   // This is an internal implementation detail
 })
 
-Then('the hash should depend on HMAC_SECRET, not a public constant', async ({ world }) => {
+Then('the hash should depend on HMAC_SECRET, not a public constant', async ({ world: _world }) => {
   // Verified by the HMAC approach — different secrets produce different hashes
   // Same as the phone hashing test above
   expect(true).toBeTruthy()
@@ -516,7 +514,7 @@ Then('the hash should depend on HMAC_SECRET, not a public constant', async ({ wo
 
 // ── DEMO_MODE Steps ─────────────────────────────────────────────
 
-Given('DEMO_MODE is set to {string}', async ({ world }, value: string) => {
+Given('DEMO_MODE is set to {string}', async ({ world: _world }, _value: string) => {
   // DEMO_MODE is an environment variable
   // In test mode, DEMO_MODE is typically not set or set to a dev value
 })
@@ -587,7 +585,7 @@ When('uploading a file of {int}MB', async ({ request, world }, sizeMB: number) =
   }
 })
 
-Then('the server should reject with {int} Payload Too Large', async ({ world }, expectedStatus: number) => {
+Then('the server should reject with {int} Payload Too Large', async ({ world }, _expectedStatus: number) => {
   expect(getNetworkSecState(world).webhookResult).toBeDefined()
   expect(getNetworkSecState(world).webhookResult!.status).toBeGreaterThanOrEqual(400)
 })

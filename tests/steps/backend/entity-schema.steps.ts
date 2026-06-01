@@ -6,7 +6,7 @@
  */
 import { expect } from '@playwright/test'
 import { Given, When, Then, Before, getState, setState } from './fixtures'
-import { getSharedState, setLastResponse } from './shared-state'
+import { setLastResponse } from './shared-state'
 import { getScenarioState } from './common.steps'
 import {
   enableCaseManagementViaApi,
@@ -19,8 +19,6 @@ import {
   generateCaseNumberViaApi,
   createVolunteerViaApi,
   listRolesViaApi,
-  apiPost,
-  ADMIN_NSEC,
 } from '../../api-helpers'
 
 // ── State ───────────────────────────────────────────────────────────
@@ -45,7 +43,7 @@ Before({ tags: '@cases or @contacts or @events or @evidence or @templates or @re
 
 // ── Given ───────────────────────────────────────────────────────────
 
-Given('case management is enabled', async ({request, world}) => {
+Given('case management is enabled', async ({request, world: _world}) => {
   await enableCaseManagementViaApi(request, true)
 })
 
@@ -63,7 +61,7 @@ Given('an entity type {string} exists', async ({ request, world }, name: string)
 
 // ── When ────────────────────────────────────────────────────────────
 
-When('the admin enables case management', async ({request, world}) => {
+When('the admin enables case management', async ({request, world: _world}) => {
   await enableCaseManagementViaApi(request, true)
 })
 
@@ -178,7 +176,7 @@ When('the admin creates a relationship type from {string} to {string} with cardi
 When('a volunteer tries to create an entity type', async ({request, world}) => {
   const vol = await createVolunteerViaApi(request, { name: `vol-schema-${Date.now()}` })
   try {
-    await createEntityTypeViaApi(request, { name: `forbidden_${Date.now()}` }, vol.nsec)
+    await createEntityTypeViaApi(request, { name: `forbidden_${Date.now()}` }, vol.deviceKey)
     setLastResponse(world, { status: 201, data: null })
   } catch (e: unknown) {
     const msg = (e as Error).message
@@ -205,7 +203,7 @@ When('the admin lists all roles', async () => {
 
 // ── Then ────────────────────────────────────────────────────────────
 
-Then('case management should be enabled', async ({request, world}) => {
+Then('case management should be enabled', async ({request, world: _world}) => {
   const result = await getCaseManagementEnabledViaApi(request)
   expect(result.enabled).toBe(true)
 })

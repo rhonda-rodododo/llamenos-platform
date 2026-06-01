@@ -10,7 +10,7 @@ import org.llamenos.hotline.steps.BaseSteps
  * Step definitions for key-import.feature scenarios.
  *
  * Feature: Key Import
- * Tests importing an existing nsec and completing PIN setup.
+ * Tests importing an existing device key and completing PIN setup.
  */
 class KeyImportSteps : BaseSteps() {
 
@@ -21,16 +21,16 @@ class KeyImportSteps : BaseSteps() {
 
     @When("I see the error {string}")
     fun iSeeTheError(errorMessage: String) {
-        assertAnyTagDisplayed("nsec-error", "login-error", "create-identity")
+        assertAnyTagDisplayed("device-key-error", "login-error", "create-identity")
     }
 
-    @When("I start typing in the nsec field")
+    @When("I start typing in the device key field")
     fun iStartTypingInTheNsecField() {
         try {
-            onNodeWithTag("nsec-input").performTextInput("n")
+            onNodeWithTag("device-key-input").performTextInput("n")
             composeRule.waitForIdle()
         } catch (_: Throwable) {
-            // nsec input not available
+            // device key input not available
         }
     }
 
@@ -38,7 +38,7 @@ class KeyImportSteps : BaseSteps() {
     fun theErrorShouldDisappear() {
         composeRule.waitForIdle()
         try {
-            onNodeWithTag("nsec-error").assertDoesNotExist()
+            onNodeWithTag("device-key-error").assertDoesNotExist()
         } catch (_: Throwable) {
             // Error state unclear
         }

@@ -2,13 +2,13 @@ import SwiftUI
 
 // MARK: - SecureTextField
 
-/// A non-copyable text display for sensitive data like nsec keys. Disables all
-/// text interaction (copy, paste, select, drag) so the nsec cannot be accidentally
+/// A non-copyable text display for sensitive data like device signing keys. Disables all
+/// text interaction (copy, paste, select, drag) so the signing key cannot be accidentally
 /// or maliciously extracted via the clipboard.
 ///
 /// The text is displayed in a monospaced font with word wrapping. The field is
 /// read-only and non-interactive — it exists purely for visual display of the
-/// nsec during onboarding backup confirmation.
+/// signing key during onboarding backup confirmation.
 struct SecureTextField: View {
     let text: String
     let label: String
@@ -29,11 +29,11 @@ struct SecureTextField: View {
             }
 
             SecureTextContent(text: text)
-                .accessibilityIdentifier("nsec-display")
-                .accessibilityLabel(NSLocalizedString("nsec_display_label", comment: "Your secret key"))
+                .accessibilityIdentifier("device-key-display")
+                .accessibilityLabel(NSLocalizedString("device_key_display_label", comment: "Your signing key"))
                 // Deliberately vague accessibility value to prevent screen reader from
-                // reading the full nsec aloud in a shared space.
-                .accessibilityValue(NSLocalizedString("nsec_display_value", comment: "Secret key is displayed. Keep this private."))
+                // reading the full signing key aloud in a shared space.
+                .accessibilityValue(NSLocalizedString("device_key_display_value", comment: "Signing key is displayed. Keep this private."))
         }
     }
 }
@@ -72,8 +72,8 @@ private struct SecureTextContent: View {
 #if DEBUG
 #Preview("SecureTextField") {
     SecureTextField(
-        "nsec1qqqsyqcyq5rqwzqfhg9scnmcesgvse3s43jy5wdxkfhmyzxhldqqu69m0z",
-        label: NSLocalizedString("onboarding_nsec_label", comment: "Your Secret Key")
+        "ed25519_seed:0000000000000000000000000000000000000000000000000000000000000001",
+        label: NSLocalizedString("onboarding_device_key_label", comment: "Your Signing Key")
     )
     .padding()
 }

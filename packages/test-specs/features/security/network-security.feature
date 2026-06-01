@@ -84,25 +84,25 @@ Feature: Network Security
     And I should see "Confirm" and "Reject" buttons
 
   @desktop
-  Scenario: SAS confirmation required before nsec import
+  Scenario: SAS confirmation required before device key import
     Given I am authenticated
     And I navigate to the device link screen from settings
     And a valid provisioning room is established
     And the ephemeral key exchange completes
-    And an encrypted nsec is received from the other device
+    And an encrypted device key is received from the other device
     When I have not yet confirmed the SAS code
-    Then the nsec should not be imported
+    Then the device key should not be imported
     And the crypto service should not have a new key
 
   @desktop
-  Scenario: SAS confirmation allows nsec import
+  Scenario: SAS confirmation allows device key import
     Given I am authenticated
     And I navigate to the device link screen from settings
     And a valid provisioning room is established
     And the ephemeral key exchange completes
-    And an encrypted nsec is received from the other device
+    And an encrypted device key is received from the other device
     When I confirm the SAS code matches
-    Then the nsec should be imported
+    Then the device key should be imported
     And I should see the import success state
 
   @desktop
@@ -114,7 +114,7 @@ Feature: Network Security
     When I reject the SAS code
     Then the provisioning room should be closed
     And I should see a "Linking cancelled" message
-    And the nsec should not be imported
+    And the device key should not be imported
 
   # ── Backend: Security Audit Coverage ──────────────────────────────
 

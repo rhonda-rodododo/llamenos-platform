@@ -28,7 +28,7 @@ const BASE_URL = process.env.TEST_HUB_URL || 'http://localhost:3000'
 // ── Role-keyed user state ───────────────────────────────────────────
 
 interface RoleUser {
-  nsec: string
+  deviceKey: string
   pubkey: string
   name: string
 }
@@ -79,7 +79,7 @@ Given('test users exist for all default roles', async ({ request, world }) => {
       name: `PM ${role} ${Date.now()}`,
       roleIds: [roleIdFromName(role)],
     })
-    getPermMatrixState(world).roleUsers[role] = { nsec: vol.nsec, pubkey: vol.pubkey, name: vol.name }
+    getPermMatrixState(world).roleUsers[role] = { deviceKey: vol.deviceKey, pubkey: vol.pubkey, name: vol.name }
   }
 })
 
@@ -155,7 +155,7 @@ When('the {string} user sends {string} to {string}', async ({ request, world }, 
   const user = getPermMatrixState(world).roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
-  getSharedState(world).lastResponse = await sendRequest(request, method, path, user.nsec)
+  getSharedState(world).lastResponse = await sendRequest(request, method, path, user.deviceKey)
 })
 
 When('the {string} user sends {string} to {string} with valid volunteer body', async ({ request, world }, role: string, _method: string, _path: string) => {
@@ -168,7 +168,7 @@ When('the {string} user sends {string} to {string} with valid volunteer body', a
     name: uniqueName('PM Vol'),
     phone: uniquePhone(),
     roleIds: ['role-volunteer'],
-  }, user.nsec)
+  }, user.deviceKey)
 })
 
 When('the {string} user sends {string} to the test volunteer endpoint with update body', async ({ request, world }, role: string, _method: string) => {
@@ -177,14 +177,14 @@ When('the {string} user sends {string} to the test volunteer endpoint with updat
 
   getSharedState(world).lastResponse = await apiPatch(request, `/users/${getPermMatrixState(world).testVolunteerPubkey}`, {
     name: uniqueName('PM Updated'),
-  }, user.nsec)
+  }, user.deviceKey)
 })
 
 When('the {string} user sends {string} to the deletable volunteer endpoint', async ({ request, world }, role: string, _method: string) => {
   const user = getPermMatrixState(world).roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
-  getSharedState(world).lastResponse = await apiDelete(request, `/users/${getPermMatrixState(world).deletableVolunteerPubkey}`, user.nsec)
+  getSharedState(world).lastResponse = await apiDelete(request, `/users/${getPermMatrixState(world).deletableVolunteerPubkey}`, user.deviceKey)
 })
 
 When('the {string} user sends {string} to {string} with valid shift body', async ({ request, world }, role: string, _method: string, _path: string) => {
@@ -199,7 +199,7 @@ When('the {string} user sends {string} to {string} with valid shift body', async
     endTime: '17:00',
     days: [1, 2, 3, 4, 5],
     userPubkeys: [],
-  }, user.nsec)
+  }, user.deviceKey)
 })
 
 When('the {string} user sends {string} to the test shift endpoint with shift update body', async ({ request, world }, role: string, _method: string) => {
@@ -209,7 +209,7 @@ When('the {string} user sends {string} to the test shift endpoint with shift upd
   const hubId = getScenarioState(world).hubId
   getSharedState(world).lastResponse = await apiPatch(request, `/hubs/${hubId}/shifts/${getPermMatrixState(world).testShiftId}`, {
     encryptedName: uniqueName('PM Shift Updated'),
-  }, user.nsec)
+  }, user.deviceKey)
 })
 
 When('the {string} user sends {string} to the deletable shift endpoint', async ({ request, world }, role: string, _method: string) => {
@@ -217,7 +217,7 @@ When('the {string} user sends {string} to the deletable shift endpoint', async (
   if (!user) throw new Error(`No test user for role "${role}"`)
 
   const hubId = getScenarioState(world).hubId
-  getSharedState(world).lastResponse = await apiDelete(request, `/hubs/${hubId}/shifts/${getPermMatrixState(world).deletableShiftId}`, user.nsec)
+  getSharedState(world).lastResponse = await apiDelete(request, `/hubs/${hubId}/shifts/${getPermMatrixState(world).deletableShiftId}`, user.deviceKey)
 })
 
 When('the {string} user sends {string} to {string} with fallback body', async ({ request, world }, role: string, _method: string, _path: string) => {
@@ -226,7 +226,7 @@ When('the {string} user sends {string} to {string} with fallback body', async ({
 
   getSharedState(world).lastResponse = await apiPut(request, '/shifts/fallback', {
     userPubkeys: [],
-  }, user.nsec)
+  }, user.deviceKey)
 })
 
 When('the {string} user sends {string} to {string} with valid ban body', async ({ request, world }, role: string, _method: string, _path: string) => {
@@ -236,7 +236,7 @@ When('the {string} user sends {string} to {string} with valid ban body', async (
   getSharedState(world).lastResponse = await apiPost(request, '/bans', {
     phone: uniquePhone(),
     reason: 'PM test ban',
-  }, user.nsec)
+  }, user.deviceKey)
 })
 
 When('the {string} user sends {string} to {string} with valid bulk ban body', async ({ request, world }, role: string, _method: string, _path: string) => {
@@ -246,7 +246,7 @@ When('the {string} user sends {string} to {string} with valid bulk ban body', as
   getSharedState(world).lastResponse = await apiPost(request, '/bans/bulk', {
     phones: [uniquePhone()],
     reason: 'PM bulk test',
-  }, user.nsec)
+  }, user.deviceKey)
 })
 
 When('the {string} user sends {string} to the test ban endpoint', async ({ request, world }, role: string, _method: string) => {
@@ -256,7 +256,7 @@ When('the {string} user sends {string} to the test ban endpoint', async ({ reque
   getSharedState(world).lastResponse = await apiDelete(
     request,
     `/bans/${encodeURIComponent(getPermMatrixState(world).testBanPhone!)}`,
-    user.nsec,
+    user.deviceKey,
   )
 })
 
@@ -271,7 +271,7 @@ When('the {string} user sends {string} to {string} with valid note body', async 
       ct: 'test-key',
       enc: user.pubkey,
     },
-  }, user.nsec)
+  }, user.deviceKey)
 })
 
 When('the {string} user sends {string} to the test note reply endpoint with reply body', async ({ request, world }, role: string, _method: string) => {
@@ -285,7 +285,7 @@ When('the {string} user sends {string} to the test note reply endpoint with repl
       ct: 'test-key',
       enc: user.pubkey,
     }],
-  }, user.nsec)
+  }, user.deviceKey)
 })
 
 When('the {string} user sends {string} to {string} with valid invite body', async ({ request, world }, role: string, _method: string, _path: string) => {
@@ -296,14 +296,14 @@ When('the {string} user sends {string} to {string} with valid invite body', asyn
     name: uniqueName('PM Invite'),
     phone: uniquePhone(),
     roleIds: ['role-volunteer'],
-  }, user.nsec)
+  }, user.deviceKey)
 })
 
 When('the {string} user sends {string} to the test invite endpoint', async ({ request, world }, role: string, _method: string) => {
   const user = getPermMatrixState(world).roleUsers[role]
   if (!user) throw new Error(`No test user for role "${role}"`)
 
-  getSharedState(world).lastResponse = await apiDelete(request, `/invites/${getPermMatrixState(world).testInviteCode}`, user.nsec)
+  getSharedState(world).lastResponse = await apiDelete(request, `/invites/${getPermMatrixState(world).testInviteCode}`, user.deviceKey)
 })
 
 When('the {string} user sends {string} to {string} with spam settings body', async ({ request, world }, role: string, _method: string, _path: string) => {
@@ -312,7 +312,7 @@ When('the {string} user sends {string} to {string} with spam settings body', asy
 
   getSharedState(world).lastResponse = await apiPatch(request, '/settings/spam', {
     voiceCaptchaEnabled: false,
-  }, user.nsec)
+  }, user.deviceKey)
 })
 
 When('the {string} user sends {string} to {string} with telephony body', async ({ request, world }, role: string, _method: string, _path: string) => {
@@ -324,7 +324,7 @@ When('the {string} user sends {string} to {string} with telephony body', async (
     accountSid: 'AC' + '0'.repeat(32), // HIGH-W5: AC + 32 hex chars (obviously fake test value)
     authToken: 'test_token',
     phoneNumber: '+15551234567',
-  }, user.nsec)
+  }, user.deviceKey)
 })
 
 When('the {string} user sends {string} to {string} with messaging body', async ({ request, world }, role: string, _method: string, _path: string) => {
@@ -333,7 +333,7 @@ When('the {string} user sends {string} to {string} with messaging body', async (
 
   getSharedState(world).lastResponse = await apiPatch(request, '/settings/messaging', {
     smsEnabled: false,
-  }, user.nsec)
+  }, user.deviceKey)
 })
 
 When('the {string} user sends {string} to {string} with IVR body', async ({ request, world }, role: string, _method: string, _path: string) => {
@@ -342,7 +342,7 @@ When('the {string} user sends {string} to {string} with IVR body', async ({ requ
 
   getSharedState(world).lastResponse = await apiPatch(request, '/settings/ivr-languages', {
     enabledLanguages: ['en'],
-  }, user.nsec)
+  }, user.deviceKey)
 })
 
 When('the {string} user sends {string} to {string} with transcription body', async ({ request, world }, role: string, _method: string, _path: string) => {
@@ -351,7 +351,7 @@ When('the {string} user sends {string} to {string} with transcription body', asy
 
   getSharedState(world).lastResponse = await apiPatch(request, '/settings/transcription', {
     globalEnabled: false,
-  }, user.nsec)
+  }, user.deviceKey)
 })
 
 When('the {string} user sends {string} to {string} with custom fields body', async ({ request, world }, role: string, _method: string, _path: string) => {
@@ -360,7 +360,7 @@ When('the {string} user sends {string} to {string} with custom fields body', asy
 
   getSharedState(world).lastResponse = await apiPut(request, '/settings/custom-fields', {
     fields: [],
-  }, user.nsec)
+  }, user.deviceKey)
 })
 
 When('the {string} user sends {string} to {string} with call settings body', async ({ request, world }, role: string, _method: string, _path: string) => {
@@ -369,7 +369,7 @@ When('the {string} user sends {string} to {string} with call settings body', asy
 
   getSharedState(world).lastResponse = await apiPatch(request, '/settings/call', {
     queueTimeoutSeconds: 120,
-  }, user.nsec)
+  }, user.deviceKey)
 })
 
 When('the {string} user sends {string} to {string} with webauthn body', async ({ request, world }, role: string, _method: string, _path: string) => {
@@ -378,7 +378,7 @@ When('the {string} user sends {string} to {string} with webauthn body', async ({
 
   getSharedState(world).lastResponse = await apiPatch(request, '/settings/webauthn', {
     requireForAdmins: false,
-  }, user.nsec)
+  }, user.deviceKey)
 })
 
 When('the {string} user sends {string} to {string} with TTL body', async ({ request, world }, role: string, _method: string, _path: string) => {
@@ -387,7 +387,7 @@ When('the {string} user sends {string} to {string} with TTL body', async ({ requ
 
   getSharedState(world).lastResponse = await apiPatch(request, '/settings/ttl', {
     captchaChallenge: 600000,
-  }, user.nsec)
+  }, user.deviceKey)
 })
 
 When('the {string} user sends {string} to {string} with report type body', async ({ request, world }, role: string, _method: string, _path: string) => {
@@ -396,7 +396,7 @@ When('the {string} user sends {string} to {string} with report type body', async
 
   getSharedState(world).lastResponse = await apiPost(request, '/settings/report-types', {
     name: uniqueName('PM ReportType'),
-  }, user.nsec)
+  }, user.deviceKey)
 })
 
 When('the {string} user sends {string} to {string} with valid role body', async ({ request, world }, role: string, _method: string, _path: string) => {
@@ -408,7 +408,7 @@ When('the {string} user sends {string} to {string} with valid role body', async 
     slug: `pm-role-${Date.now()}`,
     permissions: ['notes:read-own'],
     description: 'PM test role',
-  }, user.nsec)
+  }, user.deviceKey)
 })
 
 When('the {string} user sends {string} to {string} with share body', async ({ request, world }, role: string, _method: string, _path: string) => {
@@ -419,7 +419,7 @@ When('the {string} user sends {string} to {string} with share body', async ({ re
   getSharedState(world).lastResponse = await apiPost(request, '/files/test-file-id/share', {
     envelope: { pubkey: user.pubkey, encryptedFileKey: 'test', enc: user.pubkey },
     encryptedMetadata: { pubkey: user.pubkey, encryptedContent: 'test', enc: user.pubkey },
-  }, user.nsec)
+  }, user.deviceKey)
 })
 
 When('the {string} user sends {string} to {string} with valid hub body', async ({ request, world }, role: string, _method: string, _path: string) => {
@@ -429,7 +429,7 @@ When('the {string} user sends {string} to {string} with valid hub body', async (
   getSharedState(world).lastResponse = await apiPost(request, '/hubs', {
     name: uniqueName('PM Hub'),
     description: 'PM test hub',
-  }, user.nsec)
+  }, user.deviceKey)
 })
 
 When('the {string} user sends {string} to {string} with valid report body', async ({ request, world }, role: string, _method: string, _path: string) => {
@@ -445,7 +445,7 @@ When('the {string} user sends {string} to {string} with valid report body', asyn
       ct: 'test-key',
       enc: user.pubkey,
     }],
-  }, user.nsec)
+  }, user.deviceKey)
 })
 
 // ── Unauthenticated request step ────────────────────────────────────
@@ -492,7 +492,7 @@ async function sendRequest(
   request: import('@playwright/test').APIRequestContext,
   method: string,
   path: string,
-  nsec: string,
+  _deviceKey: string,
 ): Promise<{ status: number; data: unknown }> {
   // Strip /api prefix if present — api helpers add it
   const apiPath = path.startsWith('/api') ? path.slice(4) : path

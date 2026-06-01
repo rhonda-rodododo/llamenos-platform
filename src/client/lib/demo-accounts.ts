@@ -9,7 +9,7 @@ let demoSeeds: Record<string, string> | null = null
 
 async function loadSeeds(): Promise<Record<string, string>> {
   if (!demoSeeds) {
-    const mod = await import('./demo-nsec-data')
+    const mod = await import('./demo-seed-data')
     demoSeeds = mod.DEMO_SEEDS
   }
   return demoSeeds
@@ -20,17 +20,11 @@ export async function getDemoSeed(pubkey: string): Promise<string | undefined> {
   return seeds[pubkey]
 }
 
-/** @deprecated Use getDemoSeed instead. */
-export const getDemoNsec = getDemoSeed
-
 export async function getDemoAccountsWithSeed() {
   const seeds = await loadSeeds()
   return DEMO_ACCOUNTS.filter(a => !a.roleIds.includes('role-volunteer') || a.name !== 'Fatima Al-Rashid').map(a => ({
     ...a,
     seedHex: seeds[a.pubkey]!,
-    nsec: seeds[a.pubkey]!, // backward compat
+    deviceKey: seeds[a.pubkey]!,
   }))
 }
-
-/** @deprecated Use getDemoAccountsWithSeed instead. */
-export const getDemoAccountsWithNsec = getDemoAccountsWithSeed

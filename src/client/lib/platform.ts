@@ -696,11 +696,12 @@ export interface GenerateAndLoadResult extends PublicKeyPair {
   encryptedKeyData: EncryptedKeyData
 }
 
-/** @deprecated Removed in v3 — no more Nostr nsec/npub. */
+/** @deprecated Removed in v3 — no more Nostr npub. */
 export interface EphemeralKeyPair {
   publicKey: string
   npub: string
-  nsec: string
+  /** Raw 32-byte Ed25519 seed as hex (64 chars). Use this for deviceImportAndLoad. */
+  deviceKey: string
   /** Raw 32-byte Ed25519 seed as hex (64 chars). Use this for deviceImportAndLoad. */
   seedHex: string
 }
@@ -1071,12 +1072,12 @@ export async function generateBackupFromState(
 export async function generateEphemeralKeypair(): Promise<EphemeralKeyPair> {
   if (useTauri) {
     const result = await tauriInvoke<{ signingPubkeyHex: string; seedHex: string }>('generate_ephemeral_ed25519')
-    return { publicKey: result.signingPubkeyHex, npub: '', nsec: result.seedHex, seedHex: result.seedHex }
+    return { publicKey: result.signingPubkeyHex, npub: '', deviceKey: result.seedHex, seedHex: result.seedHex }
   }
   throw new Error('WASM ephemeral keypair not yet implemented')
 }
 
-// ── Device provisioning (nsec NEVER enters the webview) ────────────
+// ── Device provisioning (device key NEVER enters the webview) ────────────
 
 /** Result of primary device encrypting its signing seed for a new device. */
 export interface ProvisioningEncryptResult {
@@ -1087,7 +1088,7 @@ export interface ProvisioningEncryptResult {
 
 /**
  * Primary device: encrypt signing seed for a new device's ephemeral pubkey.
- * Uses CryptoState's X25519 encryption seed for ECDH — nsec NEVER enters JS.
+ * Uses CryptoState's X25519 encryption seed for ECDH — device key NEVER enters JS.
  */
 export async function provisionEncryptForDevice(
   ephemeralPubkeyHex: string,

@@ -8,7 +8,7 @@
  */
 import { expect } from '@playwright/test'
 import { Given, When, Then, Before, getState, setState } from './fixtures'
-import { getSharedState, setLastResponse } from './shared-state'
+import { setLastResponse } from './shared-state'
 import { getScenarioState } from './common.steps'
 import {
   createEntityTypeViaApi,
@@ -77,7 +77,7 @@ interface CmsState {
   // Report
   lastReportId?: string
   // Volunteer for permission tests
-  volunteerNsec?: string
+  volunteerDeviceKey?: string
   volunteerPubkey?: string
 }
 
@@ -209,7 +209,7 @@ Then('entity types from the template should exist', async ({request, world}) => 
   expect(types.length).toBeGreaterThan(0)
 })
 
-Then('relationship types from the template should exist', async ({request, world}) => {
+Then('relationship types from the template should exist', async ({request, world: _world}) => {
   const { data } = await apiGet<{ relationshipTypes: unknown[] }>(request, '/settings/cms/relationship-types')
   expect(data.relationshipTypes.length).toBeGreaterThan(0)
 })
@@ -227,7 +227,7 @@ Then('entity types from both templates should exist', async ({request, world}) =
 When('a volunteer tries to apply template {string}', async ({request, world}, templateId: string) => {
   const hubId = getScenarioState(world).hubId
   const vol = await createVolunteerViaApi(request, { name: `vol-tmpl-${Date.now()}` })
-  const result = await applyTemplateViaApi(request, templateId, vol.nsec, hubId)
+  const result = await applyTemplateViaApi(request, templateId, vol.deviceKey, hubId)
   setLastResponse(world, { status: result.status, data: result.data })
 })
 
@@ -329,13 +329,13 @@ Given('a volunteer exists with only contacts:view permission', async ({ request,
     name: `vol-viewer-${Date.now()}`,
     roleIds: [role.id],
   })
-  getCmsState(world).volunteerNsec = vol.nsec
+  getCmsState(world).volunteerDeviceKey = vol.deviceKey
   getCmsState(world).volunteerPubkey = vol.pubkey
 })
 
 When('the volunteer lists contacts', async ({ request, world }) => {
   try {
-    getCmsState(world).contactListResult = await listContactsViaApi(request, {}, getCmsState(world).volunteerNsec!)
+    getCmsState(world).contactListResult = await listContactsViaApi(request, {}, getCmsState(world).volunteerDeviceKey!)
   } catch {
     // If it fails with an error, capture the status
     setLastResponse(world, { status: 403, data: null })
@@ -348,7 +348,7 @@ Then('the contact list request should succeed', async ({ world }) => {
 
 When('the volunteer tries to create a contact', async ({ request, world }) => {
   try {
-    await createContactViaApi(request, {}, getCmsState(world).volunteerNsec!)
+    await createContactViaApi(request, {}, getCmsState(world).volunteerDeviceKey!)
     setLastResponse(world, { status: 201, data: null })
   } catch (e: unknown) {
     const msg = (e as Error).message
@@ -435,7 +435,7 @@ Then('the linked contact should have role {string}', async ({ request, world }, 
 
 Given('a volunteer exists for assignment', async ({ request, world }) => {
   const vol = await createVolunteerViaApi(request, { name: `vol-assign-${Date.now()}` })
-  getCmsState(world).volunteerNsec = vol.nsec
+  getCmsState(world).volunteerDeviceKey = vol.deviceKey
   getCmsState(world).volunteerPubkey = vol.pubkey
 })
 
@@ -509,13 +509,13 @@ Given('a volunteer exists with cases:read-own and cases:create permissions', asy
     name: `vol-scoped-${Date.now()}`,
     roleIds: [role.id],
   })
-  getCmsState(world).volunteerNsec = vol.nsec
+  getCmsState(world).volunteerDeviceKey = vol.deviceKey
   getCmsState(world).volunteerPubkey = vol.pubkey
 })
 
 When('the volunteer lists records', async ({ request, world }) => {
   const hubId = getScenarioState(world).hubId
-  getCmsState(world).recordListResult = await listRecordsViaApi(request, { hubId }, getCmsState(world).volunteerNsec!)
+  getCmsState(world).recordListResult = await listRecordsViaApi(request, { hubId }, getCmsState(world).volunteerDeviceKey!)
 })
 
 Then('the volunteer should see {int} records', async ({ world }, count: number) => {

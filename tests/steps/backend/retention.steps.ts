@@ -14,9 +14,9 @@ import {
 // ── State ──────────────────────────────────────────────────────────
 
 interface RetentionTestState {
-  hubAdmin?: { seedHex: string; pubkey: string; nsec: string }
-  superAdmin?: { seedHex: string; pubkey: string; nsec: string }
-  volunteer?: { seedHex: string; pubkey: string; nsec: string }
+  hubAdmin?: { seedHex: string; pubkey: string; deviceKey: string }
+  superAdmin?: { seedHex: string; pubkey: string; deviceKey: string }
+  volunteer?: { seedHex: string; pubkey: string; deviceKey: string }
   hubId?: string
 }
 
@@ -53,7 +53,7 @@ Given('a platform floor of {int} days for call_records', async ({ request, world
   expect(s.superAdmin).toBeDefined()
   const res = await apiPatch(request, '/retention/platform-floors', {
     floors: [{ category: 'call_records', minRetentionDays: days }],
-  }, s.superAdmin!.nsec)
+  }, s.superAdmin!.deviceKey)
   expect(res.status).toBe(200)
 })
 
@@ -64,7 +64,7 @@ When('the retention admin GETs {string}', async ({ request, world }, path: strin
   const user = s.superAdmin ?? s.hubAdmin
   expect(user).toBeDefined()
   const resolvedPath = s.hubId ? path.replace('test-hub', s.hubId) : path
-  const res = await apiGet(request, resolvedPath, user!.nsec)
+  const res = await apiGet(request, resolvedPath, user!.deviceKey)
   setLastResponse(world, res)
 })
 
@@ -75,7 +75,7 @@ When('the admin PATCHes {string} with call_records {int} days', async ({ request
   const resolvedPath = s.hubId ? path.replace('test-hub', s.hubId) : path
   const res = await apiPatch(request, resolvedPath, {
     settings: [{ category: 'call_records', retentionDays: days }],
-  }, user!.nsec)
+  }, user!.deviceKey)
   setLastResponse(world, res)
 })
 
@@ -89,7 +89,7 @@ When('the admin PATCHes {string} with notes {int} days and messages {int} days',
       { category: 'notes', retentionDays: noteDays },
       { category: 'messages', retentionDays: msgDays },
     ],
-  }, user!.nsec)
+  }, user!.deviceKey)
   setLastResponse(world, res)
 })
 
@@ -100,7 +100,7 @@ When('the admin PATCHes {string} with category {string}', async ({ request, worl
   const resolvedPath = s.hubId ? path.replace('test-hub', s.hubId) : path
   const res = await apiPatch(request, resolvedPath, {
     settings: [{ category, retentionDays: 365 }],
-  }, user!.nsec)
+  }, user!.deviceKey)
   setLastResponse(world, res)
 })
 
@@ -109,14 +109,14 @@ When('the admin PATCHes {string} with audit_log minimum {int} days', async ({ re
   expect(s.superAdmin).toBeDefined()
   const res = await apiPatch(request, path, {
     floors: [{ category: 'audit_log', minRetentionDays: days }],
-  }, s.superAdmin!.nsec)
+  }, s.superAdmin!.deviceKey)
   setLastResponse(world, res)
 })
 
 When('the non-admin GETs {string}', async ({ request, world }, path: string) => {
   const s = getS(world)
   expect(s.volunteer).toBeDefined()
-  const res = await apiGet(request, path, s.volunteer!.nsec)
+  const res = await apiGet(request, path, s.volunteer!.deviceKey)
   setLastResponse(world, res)
 })
 

@@ -393,14 +393,14 @@ export async function logout(page: Page) {
 /**
  * Create a volunteer via UI and return the raw Ed25519 seed hex for login.
  *
- * The displayed seed is only for user display. Internally,
+ * The displayed device key is only for user display. Internally,
  * the volunteer was created with an Ed25519 keypair. We return the raw seedHex
  * so that `loginAsVolunteer` uses `deviceImportAndLoad`.
  *
  * The seedHex is stored in `window.__last_vol_seed_hex` by users.tsx after
  * calling generateEphemeralKeypair().
  */
-export async function createUserAndGetNsec(page: Page, name: string, phone: string): Promise<string> {
+export async function createUserAndGetDeviceKey(page: Page, name: string, phone: string): Promise<string> {
   await page.getByTestId(TestIds.NAV_VOLUNTEERS).click()
   await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible()
 
@@ -410,12 +410,12 @@ export async function createUserAndGetNsec(page: Page, name: string, phone: stri
   await page.getByLabel('Phone Number').blur()
   await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
 
-  const nsecCode = page.getByTestId(TestIds.VOLUNTEER_NSEC_CODE)
-  await expect(nsecCode).toBeVisible({ timeout: Timeouts.API })
+  const keyCode = page.getByTestId(TestIds.VOLUNTEER_DEVICE_KEY_CODE)
+  await expect(keyCode).toBeVisible({ timeout: Timeouts.API })
 
   // Try to get the raw Ed25519 seedHex from window state (set by users.tsx).
   // If available, return it so loginAsVolunteer uses deviceImportAndLoad (Ed25519).
-  // If not available (e.g., pre-test reload), fall back to bech32 nsec from DOM.
+  // If not available (e.g., pre-test reload), fall back to displayed key from DOM.
   const seedHex = await page.evaluate(
     () => (window as Record<string, unknown>).__last_vol_seed_hex as string | undefined,
   )
@@ -423,15 +423,15 @@ export async function createUserAndGetNsec(page: Page, name: string, phone: stri
     return seedHex
   }
 
-  const nsec = await nsecCode.textContent()
-  if (!nsec) throw new Error('Failed to get nsec')
-  return nsec
+  const key = await keyCode.textContent()
+  if (!key) throw new Error('Failed to get device key')
+  return key
 }
 
-/** Dismiss the nsec card shown after volunteer creation. */
-export async function dismissNsecCard(page: Page): Promise<void> {
-  await page.getByTestId('dismiss-nsec').click()
-  await expect(page.getByTestId('dismiss-nsec')).not.toBeVisible()
+/** Dismiss the device key card shown after volunteer creation. */
+export async function dismissDeviceKeyCard(page: Page): Promise<void> {
+  await page.getByTestId('dismiss-device-key').click()
+  await expect(page.getByTestId('dismiss-device-key')).not.toBeVisible()
 }
 
 export async function completeProfileSetup(page: Page) {

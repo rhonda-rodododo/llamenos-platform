@@ -44,7 +44,7 @@ function OnboardingPage() {
   const [pinStep, setPinStep] = useState<'create' | 'confirm'>('create')
   const [pinError, setPinError] = useState('')
 
-  // Keypair result (no nsec in JS state — it lives in Rust/WASM CryptoState)
+  // Keypair result (no device key in JS state — it lives in Rust/WASM CryptoState)
   const [genResult, setGenResult] = useState<GenerateAndLoadResult | null>(null)
 
   // Recovery key & backup
@@ -130,17 +130,17 @@ function OnboardingPage() {
   async function generateKeypairAndRedeem(pin: string) {
     setStep('keypair')
     try {
-      // Generate keypair atomically — nsec goes directly into Rust/WASM CryptoState, never into JS
+      // Generate keypair atomically — device key goes directly into Rust/WASM CryptoState, never into JS
       const result = await generateKeypairAndLoad(pin)
       setGenResult(result)
       setConfirmedPin(pin)
 
-      // Prove key ownership: sign redeem request using CryptoState (nsec stays in Rust/WASM)
+      // Prove key ownership: sign redeem request using CryptoState (device key stays in Rust/WASM)
       const tokenJson = await createAuthToken(Date.now(), 'POST', '/api/invites/redeem')
       const parsed = JSON.parse(tokenJson) as { timestamp: number; token: string }
       await redeemInvite(inviteCode, result.publicKey, parsed.timestamp, parsed.token)
 
-      // Generate recovery key (shown to user instead of nsec)
+      // Generate recovery key (shown to user instead of device key)
       const rk = generateRecoveryKey()
       setRecoveryKeyStr(rk)
 
@@ -153,7 +153,7 @@ function OnboardingPage() {
 
   async function downloadBackup() {
     if (!genResult) return
-    // Backup created entirely in Rust — nsec never enters JS
+    // Backup created entirely in Rust — device key never enters JS
     const backupJson = await generateBackupFromState(genResult.publicKey, confirmedPin, recoveryKeyStr)
     const backup = JSON.parse(backupJson) as Parameters<typeof downloadBackupFile>[0]
     downloadBackupFile(backup)
@@ -325,7 +325,7 @@ function OnboardingPage() {
               <CardDescription>{t('onboarding.backupDescription')}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Show recovery key (NOT nsec) */}
+              {/* Show recovery key */}
               <div className="space-y-2">
                 <p className="text-sm font-medium">{t('onboarding.recoveryKey')}</p>
                 <div className="flex items-center gap-2">

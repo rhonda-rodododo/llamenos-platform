@@ -10,8 +10,8 @@ import { Given, When, Then } from '../fixtures'
 import { TestIds } from '../../test-ids'
 import {
   Timeouts,
-  createUserAndGetNsec,
-  dismissNsecCard,
+  createUserAndGetDeviceKey,
+  dismissDeviceKeyCard,
   loginAsVolunteer,
   loginAsAdmin,
   navigateAfterLogin,
@@ -25,25 +25,25 @@ Given('an admin has created a volunteer', async ({ page }) => {
   await Navigation.goToVolunteers(page)
   const name = `TestVol ${Date.now()}`
   const phone = `+1212${Date.now().toString().slice(-7)}`
-  const nsec = await createUserAndGetNsec(page, name, phone)
+  const deviceKey = await createUserAndGetDeviceKey(page, name, phone)
   await page.evaluate((n) => {
     (window as Record<string, unknown>).__test_vol_nsec = n
-  }, nsec)
-  await dismissNsecCard(page)
+  }, deviceKey)
+  await dismissDeviceKeyCard(page)
 })
 
-When('the volunteer logs in with their nsec', async ({ page }) => {
-  const nsec = (await page.evaluate(() => (window as Record<string, unknown>).__test_vol_nsec)) as string
-  await loginAsVolunteer(page, nsec)
+When('the volunteer logs in with their device key', async ({ page }) => {
+  const deviceKey = (await page.evaluate(() => (window as Record<string, unknown>).__test_vol_nsec)) as string
+  await loginAsVolunteer(page, deviceKey)
 })
 
 Given('a volunteer has logged in', async ({ page }) => {
   await Navigation.goToVolunteers(page)
   const name = `TestVol ${Date.now()}`
   const phone = `+1212${Date.now().toString().slice(-7)}`
-  const nsec = await createUserAndGetNsec(page, name, phone)
-  await dismissNsecCard(page)
-  await loginAsVolunteer(page, nsec)
+  const deviceKey = await createUserAndGetDeviceKey(page, name, phone)
+  await dismissDeviceKeyCard(page)
+  await loginAsVolunteer(page, deviceKey)
 })
 
 When('they complete the profile setup', async ({ page }) => {
@@ -55,9 +55,9 @@ Given('a volunteer is logged in and on the dashboard', async ({ page }) => {
   await Navigation.goToVolunteers(page)
   const name = `TestVol ${Date.now()}`
   const phone = `+1212${Date.now().toString().slice(-7)}`
-  const nsec = await createUserAndGetNsec(page, name, phone)
-  await dismissNsecCard(page)
-  await loginAsVolunteer(page, nsec)
+  const deviceKey = await createUserAndGetDeviceKey(page, name, phone)
+  await dismissDeviceKeyCard(page)
+  await loginAsVolunteer(page, deviceKey)
 })
 
 Given('a volunteer is logged in', async ({ page }) => {
@@ -65,20 +65,20 @@ Given('a volunteer is logged in', async ({ page }) => {
   await Navigation.goToVolunteers(page)
   const name = `TestVol ${Date.now()}`
   const phone = `+1212${Date.now().toString().slice(-7)}`
-  const nsec = await createUserAndGetNsec(page, name, phone)
-  await dismissNsecCard(page)
-  await loginAsVolunteer(page, nsec)
+  const deviceKey = await createUserAndGetDeviceKey(page, name, phone)
+  await dismissDeviceKeyCard(page)
+  await loginAsVolunteer(page, deviceKey)
 })
 
 Given('a volunteer exists', async ({ page }) => {
   await Navigation.goToVolunteers(page)
   const name = `TestVol ${Date.now()}`
   const phone = `+1212${Date.now().toString().slice(-7)}`
-  const nsec = await createUserAndGetNsec(page, name, phone)
+  const deviceKey = await createUserAndGetDeviceKey(page, name, phone)
   await page.evaluate((n) => {
     (window as Record<string, unknown>).__test_vol_nsec = n
-  }, nsec)
-  await dismissNsecCard(page)
+  }, deviceKey)
+  await dismissDeviceKeyCard(page)
 })
 
 When('they tap the break button', async ({ page }) => {
@@ -91,7 +91,7 @@ When('I create an invite for a new volunteer', async ({ page }) => {
   // Wait for the Volunteers page to fully load before trying to click buttons
   await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {})
 
-  // Click the "Invite Volunteer" button (not "Add Volunteer" which generates nsec directly)
+  // Click the "Invite Volunteer" button (not "Add Volunteer" which generates device key directly)
   const inviteBtn = page.getByTestId(TestIds.INVITE_BTN)
   await expect(inviteBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
   await inviteBtn.click()
@@ -119,18 +119,18 @@ When('I create an invite for a new volunteer', async ({ page }) => {
 
 Then('an invite link should be generated', async ({ page }) => {
   // After creating an invite, the invite link card appears (testid="invite-link-code").
-  // The nsec card/code appears after direct volunteer creation (not invite flow).
+  // The device key card/code appears after direct volunteer creation (not invite flow).
   const inviteLinkCode = page.getByTestId('invite-link-code')
   const isInviteLink = await inviteLinkCode.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
   if (isInviteLink) return
   const inviteCard = page.getByTestId(TestIds.VOLUNTEER_INVITE_CARD)
   const isInvite = await inviteCard.isVisible({ timeout: 2000 }).catch(() => false)
   if (isInvite) return
-  const nsecCard = page.getByTestId(TestIds.VOLUNTEER_NSEC_CARD)
-  const isNsecCard = await nsecCard.isVisible({ timeout: 2000 }).catch(() => false)
-  if (isNsecCard) return
-  // At minimum, the nsec code must be visible
-  await expect(page.getByTestId(TestIds.VOLUNTEER_NSEC_CODE)).toBeVisible({ timeout: 3000 })
+  const keyCard = page.getByTestId(TestIds.VOLUNTEER_DEVICE_KEY_CARD)
+  const isKeyCard = await keyCard.isVisible({ timeout: 2000 }).catch(() => false)
+  if (isKeyCard) return
+  // At minimum, the device key code must be visible
+  await expect(page.getByTestId(TestIds.VOLUNTEER_DEVICE_KEY_CODE)).toBeVisible({ timeout: 3000 })
 })
 
 When('the volunteer opens the invite link', async ({ page }) => {
@@ -194,8 +194,8 @@ Then('the volunteer name should no longer appear in the list', async ({ page }) 
 
 // --- Form validation ---
 
-Then('I should see the volunteer nsec', async ({ page }) => {
-  await expect(page.getByTestId(TestIds.VOLUNTEER_NSEC_CODE)).toBeVisible({ timeout: Timeouts.API })
+Then('I should see the volunteer device key', async ({ page }) => {
+  await expect(page.getByTestId(TestIds.VOLUNTEER_DEVICE_KEY_CODE)).toBeVisible({ timeout: Timeouts.API })
 })
 
 When('I paste invalid phone numbers in the textarea', async ({ page }) => {
@@ -236,16 +236,16 @@ Given('I have created a volunteer', async ({ page }) => {
   await Navigation.goToVolunteers(page)
   const name = `AuditVol ${Date.now()}`
   const phone = `+1212${Date.now().toString().slice(-7)}`
-  await createUserAndGetNsec(page, name, phone)
-  await dismissNsecCard(page)
+  await createUserAndGetDeviceKey(page, name, phone)
+  await dismissDeviceKeyCard(page)
 })
 
 Given('I have created and then deleted a volunteer', async ({ page }) => {
   await Navigation.goToVolunteers(page)
   const name = `DeleteVol ${Date.now()}`
   const phone = `+1212${Date.now().toString().slice(-7)}`
-  await createUserAndGetNsec(page, name, phone)
-  await dismissNsecCard(page)
+  await createUserAndGetDeviceKey(page, name, phone)
+  await dismissDeviceKeyCard(page)
   // Delete the volunteer
   const row = page.getByTestId(TestIds.VOLUNTEER_ROW).filter({ hasText: name })
   await row.getByTestId(TestIds.VOLUNTEER_DELETE_BTN).click()
@@ -254,8 +254,8 @@ Given('I have created and then deleted a volunteer', async ({ page }) => {
 })
 
 When('the volunteer logs in and navigates to {string}', async ({ page }, path: string) => {
-  const nsec = (await page.evaluate(() => (window as Record<string, unknown>).__test_vol_nsec)) as string
-  await loginAsVolunteer(page, nsec)
+  const deviceKey = (await page.evaluate(() => (window as Record<string, unknown>).__test_vol_nsec)) as string
+  await loginAsVolunteer(page, deviceKey)
   // This step is only used in access-denied scenarios — the volunteer is navigating
   // somewhere they shouldn't be able to reach. Passing true asserts "Access Denied"
   // is shown rather than accepting either outcome.
@@ -271,20 +271,20 @@ Given('a reporter has been invited and onboarded', async ({ page, backendRequest
   await Navigation.goToVolunteers(page)
   const name = `Reporter ${Date.now()}`
   const phone = `+1212${Date.now().toString().slice(-7)}`
-  const nsec = await createUserAndGetNsec(page, name, phone)
+  const deviceKey = await createUserAndGetDeviceKey(page, name, phone)
   await page.evaluate((n) => {
     (window as Record<string, unknown>).__test_reporter_nsec = n
-  }, nsec)
-  await dismissNsecCard(page)
+  }, deviceKey)
+  await dismissDeviceKeyCard(page)
   // Assign role-reporter so the user has reports:create permission
-  const pubkey = seedHexToPubkey(nsec)
+  const pubkey = seedHexToPubkey(deviceKey)
   await updateUserViaApi(backendRequest, pubkey, { roles: ['role-reporter'] })
 })
 
 Given('a reporter is logged in', async ({ page, backendRequest }) => {
-  // Check if a reporter nsec was set by a previous step (e.g., "a reporter has been invited and onboarded")
-  let nsec = (await page.evaluate(() => (window as Record<string, unknown>).__test_reporter_nsec)) as string | undefined
-  if (!nsec) {
+  // Check if a reporter key was set by a previous step (e.g., "a reporter has been invited and onboarded")
+  let key = (await page.evaluate(() => (window as Record<string, unknown>).__test_reporter_nsec)) as string | undefined
+  if (!key) {
     // No reporter exists yet — create one via the admin flow
     // Ensure we're logged in as admin first
     const sidebar = page.getByTestId(TestIds.NAV_SIDEBAR)
@@ -295,30 +295,30 @@ Given('a reporter is logged in', async ({ page, backendRequest }) => {
     await Navigation.goToVolunteers(page)
     const name = `Reporter ${Date.now()}`
     const phone = `+1212${Date.now().toString().slice(-7)}`
-    nsec = await createUserAndGetNsec(page, name, phone)
-    await dismissNsecCard(page)
+    key = await createUserAndGetDeviceKey(page, name, phone)
+    await dismissDeviceKeyCard(page)
     // Assign role-reporter so the user has reports:create permission
-    const pubkey = seedHexToPubkey(nsec)
+    const pubkey = seedHexToPubkey(key)
     await updateUserViaApi(backendRequest, pubkey, { roles: ['role-reporter'] })
   }
-  await loginAsVolunteer(page, nsec)
+  await loginAsVolunteer(page, key)
 })
 
 When('the reporter logs in', async ({ page, backendRequest }) => {
-  let nsec = (await page.evaluate(() => (window as Record<string, unknown>).__test_reporter_nsec)) as string | undefined
-  if (!nsec) {
+  let key = (await page.evaluate(() => (window as Record<string, unknown>).__test_reporter_nsec)) as string | undefined
+  if (!key) {
     // Reporter wasn't set up yet — create one (loginAsAdmin first to access volunteers)
     await loginAsAdmin(page)
     await Navigation.goToVolunteers(page)
     const name = `Reporter ${Date.now()}`
     const phone = `+1212${Date.now().toString().slice(-7)}`
-    nsec = await createUserAndGetNsec(page, name, phone)
-    await dismissNsecCard(page)
+    key = await createUserAndGetDeviceKey(page, name, phone)
+    await dismissDeviceKeyCard(page)
     // Assign role-reporter so the user has reports:create permission
-    const pubkey = seedHexToPubkey(nsec)
+    const pubkey = seedHexToPubkey(key)
     await updateUserViaApi(backendRequest, pubkey, { roles: ['role-reporter'] })
   }
-  await loginAsVolunteer(page, nsec)
+  await loginAsVolunteer(page, key)
 })
 
 When('they create a new report', async ({ page }) => {

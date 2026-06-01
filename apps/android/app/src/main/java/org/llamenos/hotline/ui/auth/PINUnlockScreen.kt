@@ -52,7 +52,7 @@ import kotlin.math.max
 /**
  * PIN unlock screen for returning users with stored keys.
  *
- * Accepts the user's PIN and attempts to decrypt the stored nsec.
+ * Accepts the user's PIN and attempts to decrypt the stored device key.
  * Shows biometric option if configured.
  * Shows error on incorrect PIN and clears the entry.
  */

@@ -29,7 +29,7 @@ When('I add a new volunteer with a unique name and phone', async ({ page, adminW
 })
 
 Then('I should see the generated nsec', async ({ page }) => {
-  const nsecCode = page.getByTestId(TestIds.VOLUNTEER_NSEC_CODE)
+  const nsecCode = page.getByTestId(TestIds.VOLUNTEER_DEVICE_KEY_CODE)
   await expect(nsecCode).toBeVisible({ timeout: 15000 })
   // Verify the key looks valid: either bech32 nsec1 or hex seed (v3 API)
   const nsecText = await nsecCode.textContent()
@@ -40,8 +40,8 @@ Then('I should see the generated nsec', async ({ page }) => {
 })
 
 When('I close the nsec card', async ({ page }) => {
-  await page.getByTestId(TestIds.DISMISS_NSEC).click()
-  await expect(page.getByTestId(TestIds.DISMISS_NSEC)).not.toBeVisible({ timeout: 5000 })
+  await page.getByTestId(TestIds.DISMISS_DEVICE_KEY).click()
+  await expect(page.getByTestId(TestIds.DISMISS_DEVICE_KEY)).not.toBeVisible({ timeout: 5000 })
 })
 
 Then('the volunteer should appear in the list', async ({ page, backendRequest, workerHub, adminWorld }) => {

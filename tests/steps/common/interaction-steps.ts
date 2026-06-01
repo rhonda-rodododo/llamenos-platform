@@ -155,7 +155,7 @@ When('I tap {string}', async ({ page }, text: string) => {
   await clickByTextOrTestId(page, text)
 })
 
-When('I tap {string} without entering an nsec', async ({ page }, buttonText: string) => {
+When('I tap {string} without entering a device key', async ({ page }, buttonText: string) => {
   await page.getByRole('button', { name: buttonText }).click()
 })
 

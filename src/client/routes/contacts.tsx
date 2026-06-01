@@ -25,7 +25,7 @@ export const Route = createFileRoute('/contacts')({
 function ContactsPage() {
   const { t } = useTranslation()
   const navigate = useNavigate({ from: '/contacts' })
-  const { hasNsec, publicKey, isAdmin } = useAuth()
+  const { hasDeviceKey, publicKey, isAdmin } = useAuth()
   const { toast } = useToast()
   const { page } = Route.useSearch()
   const [contacts, setContacts] = useState<ContactSummary[]>([])
@@ -60,7 +60,7 @@ function ContactsPage() {
       setTimeline({ notes: res.notes, conversations: res.conversations })
 
       // Decrypt notes
-      if (hasNsec && keyManager.isUnlocked() && publicKey) {
+      if (hasDeviceKey && keyManager.isUnlocked() && publicKey) {
         const newDecrypted = new Map<string, string>()
         for (const note of res.notes) {
           const envelope = isAdmin

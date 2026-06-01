@@ -5,14 +5,14 @@ import UIKit
 // MARK: - DeviceLinkView
 
 /// Device linking flow that uses QR code scanning and ephemeral ECDH to
-/// securely transfer an nsec from the desktop app to this device.
+/// securely transfer a device key from the desktop app to this device.
 ///
 /// Steps:
 /// 1. Camera QR scanner captures the provisioning room URL
 /// 2. Connects to the relay and exchanges ephemeral public keys
 /// 3. Both devices derive and display a 6-digit SAS verification code
 /// 4. User confirms codes match (prevents MITM)
-/// 5. Desktop sends encrypted nsec, mobile decrypts and imports
+/// 5. Desktop sends encrypted device key, mobile decrypts and imports
 struct DeviceLinkView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss

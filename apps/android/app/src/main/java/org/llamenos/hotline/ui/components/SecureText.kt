@@ -18,7 +18,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
 /**
- * SecureText displays sensitive text (like nsec) in a non-copyable manner.
+ * SecureText displays sensitive text (like a device key) in a non-copyable manner.
  *
  * Security measures:
  * - Uses FLAG_SECURE to prevent screenshots while this composable is displayed
@@ -26,8 +26,8 @@ import androidx.compose.ui.unit.dp
  * - No long-press copy action (standard Text composable, not SelectionContainer)
  * - Clears clipboard if it contains the displayed text on dispose
  *
- * The nsec is only shown during onboarding for the user to write down.
- * After confirming backup, the nsec is never displayed again.
+ * The device key is only shown during onboarding for the user to write down.
+ * After confirming backup, the device key is never displayed again.
  */
 @Composable
 fun SecureText(

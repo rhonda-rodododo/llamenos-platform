@@ -95,12 +95,12 @@ import androidx.compose.ui.unit.dp
 sealed interface LlamenosRoute {
     val route: String
 
-    /** Hub URL input, nsec import, or new identity creation. */
+    /** Hub URL input, device key import, or new identity creation. */
     data object Login : LlamenosRoute {
         override val route = "login"
     }
 
-    /** Display generated nsec for user to back up. */
+    /** Display generated device key for user to back up. */
     data object Onboarding : LlamenosRoute {
         override val route = "onboarding"
     }
@@ -492,7 +492,7 @@ fun LlamenosNavigation(
                 viewModel = authViewModel,
                 onNavigateToPinSet = {
                     navController.navigate(LlamenosRoute.PINSet.route) {
-                        // Clear onboarding from back stack -- nsec should not be re-shown
+                        // Clear onboarding from back stack -- device key should not be re-shown
                         popUpTo(LlamenosRoute.Onboarding.route) { inclusive = true }
                     }
                 },

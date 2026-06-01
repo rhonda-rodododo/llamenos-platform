@@ -17,9 +17,6 @@ import {
   TestIds,
   Timeouts,
   navigateAfterLogin,
-  createUserAndGetNsec,
-  dismissNsecCard,
-  uniquePhone,
 } from './helpers'
 import { Navigation } from './pages/index'
 import {
@@ -30,7 +27,7 @@ import {
   simulateIncomingMessage,
   uniqueCallerNumber,
 } from './simulation-helpers'
-import { createUserViaApi, createShiftViaApi } from './api-helpers'
+import { createUserViaApi } from './api-helpers'
 
 test.describe('Call Simulation', () => {
   test.beforeEach(async ({ page }) => {

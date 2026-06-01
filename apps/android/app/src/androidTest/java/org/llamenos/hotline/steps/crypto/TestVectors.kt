@@ -1,5 +1,6 @@
 package org.llamenos.hotline.steps.crypto
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -32,7 +33,7 @@ data class TestVectorsJson(
 data class KeyVectors(
     val secretKeyHex: String,
     val publicKeyHex: String,
-    val nsec: String,
+    @SerialName("nsec") val signingKeyBech32: String,
     val npub: String,
     val adminSecretKeyHex: String,
     val adminPublicKeyHex: String,
@@ -43,7 +44,7 @@ data class KeyVectors(
 @Serializable
 data class PinEncryptionVectors(
     val pin: String,
-    val nsec: String,
+    @SerialName("nsec") val signingKeyBech32: String,
     val pubkeyHex: String,
     val encrypted: PinEncryptedData,
     val decryptable: Boolean,

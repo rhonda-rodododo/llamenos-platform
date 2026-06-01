@@ -24,7 +24,7 @@ import {
 
 interface TransitionState {
   reportId?: string
-  reporterNsec?: string
+  reporterDeviceKey?: string
   caseRecordId?: string
   entityTypeId?: string
   convertCount: number
@@ -49,13 +49,13 @@ Given('a reporter exists for conversion testing', async ({ request, world }) => 
     name: uniqueName('Conversion Reporter'),
     roleIds: ['role-reporter'],
   })
-  getTransitionState(world).reporterNsec = reporter.nsec
+  getTransitionState(world).reporterDeviceKey = reporter.deviceKey
 })
 
 // ── Report creation for conversion ──────────────────────────────
 
 When('the reporter submits a report for conversion', async ({ request, world }) => {
-  expect(getTransitionState(world).reporterNsec).toBeDefined()
+  expect(getTransitionState(world).reporterDeviceKey).toBeDefined()
   const kp = generateTestKeypair()
   const { data, status } = await apiPost<{ id?: string; conversation?: { id: string } }>(
     request,
@@ -66,7 +66,7 @@ When('the reporter submits a report for conversion', async ({ request, world }) 
       encryptedContent: 'conversion-report-content',
       readerEnvelopes: [{ pubkey: kp.pubkey, ct: 'key', enc: kp.pubkey }],
     },
-    getTransitionState(world).reporterNsec!,
+    getTransitionState(world).reporterDeviceKey!,
   )
   expect(status).toBeLessThan(300)
   getTransitionState(world).reportId = (data as Record<string, unknown>)?.id as string

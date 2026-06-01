@@ -63,7 +63,7 @@ export function CaseTimeline({
   computeTypeHash,
 }: CaseTimelineProps) {
   const { t } = useTranslation()
-  const { hasNsec, publicKey, adminDecryptionPubkey } = useAuth()
+  const { hasDeviceKey, publicKey, adminDecryptionPubkey } = useAuth()
   const { toast } = useToast()
 
   // --- State ---
@@ -105,7 +105,7 @@ export function CaseTimeline({
   // --- Decrypt interaction content ---
   useEffect(() => {
     if (interactions.length === 0 || !publicKey) return
-    if (!hasNsec || !keyManager.isUnlocked()) return
+    if (!hasDeviceKey || !keyManager.isUnlocked()) return
 
     ;(async () => {
       const newMap = new Map<string, string>()
@@ -122,7 +122,7 @@ export function CaseTimeline({
       }
       setDecryptedMap(newMap)
     })()
-  }, [interactions, hasNsec, publicKey])
+  }, [interactions, hasDeviceKey, publicKey])
 
   // --- Filter and sort ---
   const filteredInteractions = interactions.filter(i => {
@@ -137,7 +137,7 @@ export function CaseTimeline({
 
   // --- Post comment ---
   const handlePostComment = useCallback(async () => {
-    if (!commentText.trim() || !hasNsec || !publicKey) return
+    if (!commentText.trim() || !hasDeviceKey || !publicKey) return
     setSending(true)
     try {
       const readers = [...readerPubkeys]
@@ -171,7 +171,7 @@ export function CaseTimeline({
     } finally {
       setSending(false)
     }
-  }, [commentText, hasNsec, publicKey, adminDecryptionPubkey, readerPubkeys, recordId, computeTypeHash, t, toast])
+  }, [commentText, hasDeviceKey, publicKey, adminDecryptionPubkey, readerPubkeys, recordId, computeTypeHash, t, toast])
 
   // --- Render ---
 
@@ -250,7 +250,7 @@ export function CaseTimeline({
       </div>
 
       {/* Inline comment composer */}
-      {hasNsec && (
+      {hasDeviceKey && (
         <div data-testid="timeline-comment-composer" className="border-t border-border px-4 py-3">
           <div className="flex items-end gap-2">
             <Textarea

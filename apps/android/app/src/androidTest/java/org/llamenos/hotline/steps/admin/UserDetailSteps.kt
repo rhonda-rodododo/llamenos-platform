@@ -31,8 +31,8 @@ class UserDetailSteps : BaseSteps() {
                 onNodeWithTag("volunteer-phone-input").performTextInput(uniquePhone)
                 onNodeWithTag("confirm-add-volunteer").performClick()
                 composeRule.waitForIdle()
-                // Dismiss nsec dialog if it appears
-                try { onNodeWithTag("dismiss-nsec-dialog").performClick(); composeRule.waitForIdle() } catch (_: Throwable) {}
+                // Dismiss device key dialog if it appears
+                try { onNodeWithTag("dismiss-device-key-dialog").performClick(); composeRule.waitForIdle() } catch (_: Throwable) {}
             } catch (_: Throwable) {
                 // Creation failed — volunteer detail tests will use defensive assertions
                 return

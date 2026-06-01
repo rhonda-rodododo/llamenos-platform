@@ -75,7 +75,7 @@ When('the answering volunteer creates a note for the call', async ({ request, wo
         { pubkey: vol.pubkey, ct: 'key-vol', enc: kp.pubkey },
       ],
     },
-    vol.nsec,
+    vol.deviceKey,
   )
   expect(status).toBeLessThan(300)
   getLifecycleState(world).noteId = (data as Record<string, unknown>)?.id as string
@@ -88,7 +88,7 @@ When('the answering volunteer creates a note for the call', async ({ request, wo
 async function listNotesAs(
   request: import('@playwright/test').APIRequestContext,
   callId: string | undefined,
-  nsec: string,
+  _deviceKey: string,
 ): Promise<{ notes: Array<Record<string, unknown>>; total: number }> {
   const qs = callId ? `?callId=${callId}` : ''
   const { status, data } = await apiGet<{ notes: Array<Record<string, unknown>>; total: number }>(
@@ -105,7 +105,7 @@ Then('the answering volunteer can see the note', async ({ request, world }) => {
   const vol = getScenarioState(world).volunteers[volIndex]
   expect(vol).toBeDefined()
 
-  const { notes } = await listNotesAs(request, getScenarioState(world).callId, vol.nsec)
+  const { notes } = await listNotesAs(request, getScenarioState(world).callId, vol.deviceKey)
   expect(notes.length).toBeGreaterThan(0)
 })
 
@@ -126,6 +126,6 @@ Then('the other volunteer cannot see the note', async ({ request, world }) => {
   // Notes are E2EE — only the author + admins can decrypt.
   // The API may return the note metadata but content is unreadable.
   // This assertion documents the expected access boundary.
-  const { notes } = await listNotesAs(request, getScenarioState(world).callId, otherVol.nsec)
+  const { notes } = await listNotesAs(request, getScenarioState(world).callId, otherVol.deviceKey)
   expect(notes).toBeDefined()
 })

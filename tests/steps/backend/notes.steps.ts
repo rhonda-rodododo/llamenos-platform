@@ -6,12 +6,9 @@
  */
 import { expect } from '@playwright/test'
 import {Given, When, Then, getState, setState, Before} from './fixtures'
-import { getScenarioState } from './common.steps'
 import {
-  apiGet,
   apiPost,
   generateTestKeypair,
-  listNotesViaApi,
   encryptForTest,
   ADMIN_SEED,
 } from '../../api-helpers'
@@ -30,7 +27,7 @@ interface NoteTestState {
   envelopes: Array<Record<string, unknown>>
   symmetricKey?: string
   adminKeypairs: Array<{ seedHex: string; pubkey: string }>
-  volunteerKeypair?: { nsec: string; pubkey: string; skHex: string }
+  volunteerKeypair?: { deviceKey: string; pubkey: string; skHex: string }
 }
 
 const NOTE_TEST_KEY = 'note_test'
@@ -81,7 +78,7 @@ Given('a note created by a volunteer', async ({request, world}) => {
   }
 })
 
-Given('a hub with {int} admins', async ({request, world}, count: number) => {
+Given('a hub with {int} admins', async ({request: _request, world}, count: number) => {
   getNoteTestState(world).adminKeypairs = []
   for (let i = 0; i < count; i++) {
     const kp = generateTestKeypair()

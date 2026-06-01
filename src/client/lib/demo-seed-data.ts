@@ -19,6 +19,3 @@ export const DEMO_SEEDS: Record<string, string> = {
   '8bd8335c35a2966fd58ee7a7a7508a8b5c4844b0103c946ddfe1cd4381259e06':
     '671e497a6e2f9fd45b60d1d0e268acb7ad57e6d96d9207403ce13da4967ac01e',
 }
-
-/** @deprecated Use DEMO_SEEDS instead. */
-export const DEMO_NSECS = DEMO_SEEDS

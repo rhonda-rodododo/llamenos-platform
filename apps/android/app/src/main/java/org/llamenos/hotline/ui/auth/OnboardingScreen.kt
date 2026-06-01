@@ -42,7 +42,7 @@ import org.llamenos.hotline.R
 /**
  * Onboarding screen for v3 device key model.
  *
- * In v3, there is no nsec to display. Device keys are generated atomically
+ * In v3, there is no legacy key format to display. Device keys are generated atomically
  * with PIN encryption. This screen shows a welcome message and proceeds
  * to PIN setup. Multi-device support is via device linking (QR scan).
  */

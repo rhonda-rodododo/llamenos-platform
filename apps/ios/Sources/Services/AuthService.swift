@@ -99,7 +99,7 @@ final class AuthService {
 
     /// Generate new device keys and persist them, protected by the user's PIN.
     /// In the v3 model, key generation and PIN encryption happen atomically —
-    /// there is no separate "show nsec" step. Device keys are non-exportable;
+    /// there is no separate "show device key" step. Device keys are non-exportable;
     /// multi-device support uses device linking via sigchain + PUK.
     ///
     /// Returns the DeviceKeyState (public keys) for display/registration.

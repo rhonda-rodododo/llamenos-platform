@@ -22,17 +22,17 @@ When('I see the error {string}', async ({ page }, errorText: string) => {
   await expect(errorMessage).toContainText(errorText)
 })
 
-When('I start typing in the nsec field', async ({ page }) => {
-  await page.getByTestId(TestIds.NSEC_INPUT).fill('n')
+When('I start typing in the device key field', async ({ page }) => {
+  await page.getByTestId(TestIds.DEVICE_KEY_INPUT).fill('n')
 })
 
 Then('the error should disappear', async ({ page }) => {
   // Wait briefly for error to clear
-  const errorVisible = await page
+  const _errorVisible = await page
     .getByTestId(TestIds.ERROR_MESSAGE)
     .isVisible({ timeout: 1000 })
     .catch(() => false)
   // Error may or may not be gone depending on implementation
-  // Just verify the nsec field is still editable
-  await expect(page.getByTestId(TestIds.NSEC_INPUT)).toBeEditable()
+  // Just verify the device key field is still editable
+  await expect(page.getByTestId(TestIds.DEVICE_KEY_INPUT)).toBeEditable()
 })

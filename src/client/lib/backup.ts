@@ -34,8 +34,8 @@ export interface BackupFile {
   v: 1
   id: string         // truncated SHA-256(pubkey), first 6 hex chars
   t: number          // unix timestamp (seconds), rounded to nearest hour
-  d: EncryptedBlock  // PIN-encrypted nsec
-  r?: EncryptedBlock // recovery-key-encrypted nsec
+  d: EncryptedBlock  // PIN-encrypted device key
+  r?: EncryptedBlock // recovery-key-encrypted device key
 }
 
 /**
@@ -153,7 +153,7 @@ function roundToHour(date: Date): number {
  * Create an encrypted backup file.
  */
 export async function createBackup(
-  nsec: string,
+  seedHex: string,
   pin: string,
   pubkey: string,
   recoveryKey: string,
@@ -161,12 +161,12 @@ export async function createBackup(
   const salt = new Uint8Array(16)
   crypto.getRandomValues(salt)
   const kek = await deriveFromPin(pin, salt)
-  const { nonce, ciphertext } = encrypt(nsec, kek)
+  const { nonce, ciphertext } = encrypt(seedHex, kek)
 
   const rSalt = new Uint8Array(16)
   crypto.getRandomValues(rSalt)
   const rKek = await deriveFromRecoveryKey(recoveryKey, rSalt)
-  const { nonce: rNonce, ciphertext: rCt } = encrypt(nsec, rKek)
+  const { nonce: rNonce, ciphertext: rCt } = encrypt(seedHex, rKek)
 
   return {
     v: 1,
@@ -188,7 +188,7 @@ export async function createBackup(
 }
 
 /**
- * Restore nsec from a backup file using PIN.
+ * Restore device key from a backup file using PIN.
  */
 export async function restoreFromBackupWithPin(backup: BackupFile, pin: string): Promise<string | null> {
   const salt = hexToBytes(backup.d.s)
@@ -197,7 +197,7 @@ export async function restoreFromBackupWithPin(backup: BackupFile, pin: string):
 }
 
 /**
- * Restore nsec from a backup file using recovery key.
+ * Restore device key from a backup file using recovery key.
  */
 export async function restoreFromBackupWithRecoveryKey(backup: BackupFile, recoveryKey: string): Promise<string | null> {
   if (!backup.r) return null
