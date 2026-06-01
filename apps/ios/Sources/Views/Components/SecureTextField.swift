@@ -72,7 +72,7 @@ private struct SecureTextContent: View {
 #if DEBUG
 #Preview("SecureTextField") {
     SecureTextField(
-        "ed25519_seed:0000000000000000000000000000000000000000000000000000000000000001",
+        "ed25519_seed:0000000000000000000000000000000000000000000000000000000000000001", // gitleaks:allow
         label: NSLocalizedString("onboarding_device_key_label", comment: "Your Signing Key")
     )
     .padding()
