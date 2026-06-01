@@ -213,6 +213,11 @@ export class IdentityService {
     const { hasAdmin } = await this.hasAdmin()
     if (hasAdmin) throw new ServiceError(403, 'Admin already exists')
 
+    // Use onConflictDoUpdate instead of onConflictDoNothing:
+    // If the user row already exists with role-volunteer (e.g. race between
+    // test-reset and concurrent requests), onConflictDoNothing silently skips
+    // the insert, leaving the user with the wrong role. onConflictDoUpdate
+    // guarantees the admin always ends up with role-super-admin.
     await this.db.insert(users).values({
       pubkey,
       displayName: 'Admin',
@@ -226,7 +231,13 @@ export class IdentityService {
       profileCompleted: false,
       onBreak: false,
       callPreference: 'phone',
-    }).onConflictDoNothing()
+    }).onConflictDoUpdate({
+      target: users.pubkey,
+      set: {
+        roles: ['role-super-admin'],
+        active: true,
+      },
+    })
   }
 
   /**

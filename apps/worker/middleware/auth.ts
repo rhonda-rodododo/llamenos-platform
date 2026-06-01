@@ -70,7 +70,7 @@ export const auth = createMiddleware<AppEnv>(async (c, next) => {
   // Defensive: if this is the ADMIN_PUBKEY user but their roles have been
   // downgraded (e.g., race in test-add-hub-member recreated them as volunteer),
   // restore role-super-admin before resolving permissions.
-  const adminPubkey = c.env?.ADMIN_PUBKEY
+  const adminPubkey = c.env?.ADMIN_PUBKEY as string | undefined
   if (adminPubkey && authResult.pubkey === adminPubkey &&
       !authResult.user.roles.includes('role-super-admin')) {
     reqLog.warn('Admin user missing role-super-admin — restoring', {

@@ -62,6 +62,17 @@ dev.post('/test-reset', async (c) => {
   await services.cases.reset(env)
   await services.providerSetup.reset()
   await services.settings.ensureInit()
+  // Final safety net: verify the admin user has role-super-admin after all
+  // resets complete. A race condition between reset() and ensureInit() or
+  // concurrent requests during the reset window can leave the admin with
+  // role-volunteer. This explicit check-and-fix runs last, after all other
+  // services are fully reset and re-initialized.
+  if (adminPubkey) {
+    const adminUser = await services.identity.getUserInternal(adminPubkey)
+    if (adminUser && !adminUser.roles.includes('role-super-admin')) {
+      await services.identity.updateUser(adminPubkey, { roles: ['role-super-admin'] }, true)
+    }
+  }
   return c.json({ ok: true })
 })
 

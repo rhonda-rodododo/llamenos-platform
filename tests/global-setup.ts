@@ -67,6 +67,32 @@ async function verifyAdminAccess(baseUrl: string): Promise<void> {
     const text = await res.text()
     throw new Error(`Admin verification failed: ${res.status} ${text}`)
   }
+  // Verify the admin actually has role-super-admin. If not, force-promote
+  // via the test-promote-admin endpoint. This catches cases where the
+  // admin user was created with role-volunteer due to race conditions
+  // during test-reset, and the auth middleware's defensive fix didn't
+  // fire (e.g. ADMIN_PUBKEY mismatch in env).
+  const me = await res.json() as { roles?: string[] }
+  if (me.roles && !me.roles.includes('role-super-admin')) {
+    console.warn(`[global-setup] Admin has wrong roles: ${JSON.stringify(me.roles)} — promoting via test-promote-admin`)
+    const secret = loadDevVarsSecret()
+    if (secret) {
+      const seedBytes = hexToBytes(ADMIN_SEED)
+      const pubkey = bytesToHex(ed25519.getPublicKey(seedBytes))
+      const promoteRes = await fetch(`${baseUrl}/api/test-promote-admin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Test-Secret': secret },
+        body: JSON.stringify({ pubkey }),
+      })
+      if (!promoteRes.ok) {
+        const text = await promoteRes.text()
+        throw new Error(`Admin role promotion failed: ${promoteRes.status} ${text}`)
+      }
+      console.log('[global-setup] Admin promoted to role-super-admin successfully')
+    } else {
+      throw new Error('Admin has wrong roles and no DEV_RESET_SECRET available to promote')
+    }
+  }
 }
 
 async function ensureDefaultHub(baseUrl: string): Promise<void> {

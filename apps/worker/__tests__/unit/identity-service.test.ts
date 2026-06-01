@@ -135,7 +135,7 @@ describe('IdentityService — Admin Bootstrap', () => {
   describe('bootstrapAdmin', () => {
     it('creates admin when none exists', async () => {
       const insertValues = vi.fn().mockReturnValue({
-        onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+        onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
       })
 
       const db = {
