@@ -77,17 +77,26 @@ function verifyBearer(authHeader: string | undefined, auth: AuthConfig): boolean
  * - Bearer token routes: app-server-only (notify, unregister, check)
  * - Token-based route: client-direct registration (/register-client)
  */
+export interface RateLimiters {
+  register: RateLimiter
+  notify: RateLimiter
+  check: RateLimiter
+  unregister: RateLimiter
+}
+
 export function buildRoutes(
   auth: AuthConfig,
   tokenSecret: string,
   store: IdentifierStore,
   bridgeCfg: BridgeConfig,
   audit: AuditLogger,
-  rateLimiter?: { register: RateLimiter; notify: RateLimiter }
+  rateLimiter?: Partial<RateLimiters>
 ): Hono {
   const app = new Hono()
   const registerLimiter = rateLimiter?.register ?? new RateLimiter(10, 60_000)
   const notifyLimiter = rateLimiter?.notify ?? new RateLimiter(30, 60_000)
+  const checkLimiter = rateLimiter?.check ?? new RateLimiter(100, 60_000)
+  const unregisterLimiter = rateLimiter?.unregister ?? new RateLimiter(30, 60_000)
 
   app.post('/register-client', async (c) => {
     const clientIp = c.req.header('x-forwarded-for') ?? c.req.header('x-real-ip') ?? 'unknown'
@@ -99,7 +108,8 @@ export function buildRoutes(
 
     const parseResult = RegisterClientSchema.safeParse(await c.req.json().catch(() => null))
     if (!parseResult.success) {
-      return c.json({ error: 'Invalid request body', details: parseResult.error.issues }, 400)
+      // Do not return Zod issue details — they reveal schema structure to unauthenticated callers
+      return c.json({ error: 'Invalid request body' }, 400)
     }
 
     const { token, plaintextIdentifier, identifierType } = parseResult.data
@@ -123,12 +133,26 @@ export function buildRoutes(
   })
 
   app.get('/check/:hash', async (c) => {
+    const clientIp = c.req.header('x-forwarded-for') ?? c.req.header('x-real-ip') ?? 'unknown'
+
+    if (!checkLimiter.check(clientIp)) {
+      await audit.log({ action: 'rate_limited', success: false, metadata: `check:${clientIp}` })
+      return c.json({ error: 'Rate limit exceeded' }, 429)
+    }
+
     const hash = c.req.param('hash')
     const registered = await store.isRegistered(hash)
     return c.json({ registered })
   })
 
   app.delete('/unregister/:hash', async (c) => {
+    const clientIp = c.req.header('x-forwarded-for') ?? c.req.header('x-real-ip') ?? 'unknown'
+
+    if (!unregisterLimiter.check(clientIp)) {
+      await audit.log({ action: 'rate_limited', success: false, metadata: `unregister:${clientIp}` })
+      return c.json({ error: 'Rate limit exceeded' }, 429)
+    }
+
     const hash = c.req.param('hash')
     await store.remove(hash)
     await audit.log({ action: 'unregister', identifierHash: hash, success: true })
@@ -145,7 +169,7 @@ export function buildRoutes(
 
     const parseResult = NotifySchema.safeParse(await c.req.json().catch(() => null))
     if (!parseResult.success) {
-      return c.json({ error: 'Invalid request body', details: parseResult.error.issues }, 400)
+      return c.json({ error: 'Invalid request body' }, 400)
     }
 
     const { identifierHash, message, disappearingTimerSeconds } = parseResult.data
@@ -163,8 +187,10 @@ export function buildRoutes(
       disappearingTimerSeconds ?? null
     )
     if (!result.ok) {
+      // Log the full bridge error internally but do not return it to callers —
+      // bridge error text may contain the recipient phone number.
       await audit.log({ action: 'notify_failed', identifierHash, success: false, errorMessage: result.error })
-      return c.json({ error: result.error }, 502)
+      return c.json({ error: 'Notification delivery failed' }, 502)
     }
 
     await audit.log({ action: 'notify', identifierHash, success: true })

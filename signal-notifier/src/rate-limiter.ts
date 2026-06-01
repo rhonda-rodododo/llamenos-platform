@@ -14,27 +14,38 @@ export class RateLimiter {
 
   /**
    * Returns true if the request is allowed, false if rate-limited.
+   *
+   * Keys whose entire window has expired are evicted from the map to prevent
+   * unbounded memory growth when many unique IPs are seen (e.g. IPv6 churn).
    */
   check(key: string): boolean {
     const now = Date.now()
     const cutoff = now - this.windowMs
 
-    let timestamps = this.windows.get(key)
-    if (!timestamps) {
-      timestamps = []
-      this.windows.set(key, timestamps)
+    const existing = this.windows.get(key) ?? []
+
+    // Trim expired entries
+    let start = 0
+    while (start < existing.length && existing[start] < cutoff) {
+      start++
+    }
+    const active = start === 0 ? existing : existing.slice(start)
+
+    // Persist trimmed state to map (evict if empty, update if trimmed).
+    // This reclaims memory from expired entries even on denial, and prevents
+    // unbounded map growth under many unique IPs (e.g. IPv6 churn).
+    if (active.length === 0) {
+      this.windows.delete(key)
+    } else if (start > 0) {
+      this.windows.set(key, active)
     }
 
-    // Remove expired entries
-    while (timestamps.length > 0 && timestamps[0] < cutoff) {
-      timestamps.shift()
-    }
-
-    if (timestamps.length >= this.maxRequests) {
+    if (active.length >= this.maxRequests) {
       return false
     }
 
-    timestamps.push(now)
+    active.push(now)
+    this.windows.set(key, active)
     return true
   }
 

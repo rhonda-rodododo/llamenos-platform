@@ -71,12 +71,11 @@ const bridgeCfg: BridgeConfig = { bridgeUrl, bridgeApiKey, registeredNumber }
 
 const app = new Hono()
 
-// Health check — verifies PostgreSQL connectivity
+// Health check — verifies PostgreSQL connectivity; does not expose operational metrics
 app.get('/health', async (c) => {
   try {
-    const result = await db.select({ n: sql<number>`1` }).from(signalIdentifiers).limit(0)
-    const count = await store.count()
-    return c.json({ ok: true, registeredCount: count })
+    await db.select({ n: sql<number>`1` }).from(signalIdentifiers).limit(0)
+    return c.json({ ok: true })
   } catch (err) {
     return c.json(
       { ok: false, error: err instanceof Error ? err.message : 'database connection failed' },

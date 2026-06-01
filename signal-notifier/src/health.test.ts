@@ -22,14 +22,14 @@ describe('health endpoint', () => {
     await ctx.cleanup()
   })
 
-  test('returns ok:true when PG is healthy', async () => {
+  test('returns ok:true when PG is healthy (no operational metrics exposed)', async () => {
     await store.register('h1', '+15551234567', 'phone')
 
     const app = new Hono()
     app.get('/health', async (c) => {
       try {
-        const count = await store.count()
-        return c.json({ ok: true, registeredCount: count })
+        await store.count()
+        return c.json({ ok: true })
       } catch (err) {
         return c.json({ ok: false, error: err instanceof Error ? err.message : 'db error' }, 503)
       }
@@ -39,7 +39,8 @@ describe('health endpoint', () => {
     expect(res.status).toBe(200)
     const data = await res.json()
     expect(data.ok).toBe(true)
-    expect(data.registeredCount).toBe(1)
+    // registeredCount must not be exposed — it leaks operational metadata
+    expect(data.registeredCount).toBeUndefined()
   })
 
   test('returns 503 when PG is down', async () => {
@@ -53,8 +54,8 @@ describe('health endpoint', () => {
     const app = new Hono()
     app.get('/health', async (c) => {
       try {
-        const count = await badStore.count()
-        return c.json({ ok: true, registeredCount: count })
+        await badStore.count()
+        return c.json({ ok: true })
       } catch (err) {
         return c.json({ ok: false, error: err instanceof Error ? err.message : 'db error' }, 503)
       }
