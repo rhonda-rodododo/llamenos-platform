@@ -8,8 +8,8 @@
 # Bun runs TypeScript natively — no esbuild transpilation step needed.
 
 # Stage 1: Install runtime deps
-FROM oven/bun:1@sha256:e10577f0db68676a7024391c6e5cb4b879ebd17188ab750cf10024a6d700e5c4 AS deps
-# oven/bun:1 pinned 2026-05-20 — update via Dependabot or on new minor release
+FROM oven/bun:1.3.5@sha256:e90cdbaf9ccdb3d4bd693aa335c3310a6004286a880f62f79b18f9b1312a8ec3 AS deps
+# oven/bun:1.3.5 pinned to match .mise.toml — update via Dependabot or on new minor release
 WORKDIR /app
 COPY package.json bun.lockb ./
 # Copy workspace package.json stubs so bun can resolve the workspace graph from the
@@ -35,8 +35,8 @@ RUN cargo build --release --manifest-path packages/crypto/Cargo.toml --features 
     && cp packages/crypto/target/release/libllamenos_core.so packages/crypto/dist/server/
 
 # Stage 3: Production
-FROM oven/bun:1-slim@sha256:d56a2534ffd262e92c12fd3249d3924d296d97086da773f821d7d0477435ea04
-# oven/bun:1-slim pinned 2026-05-20 — update via Dependabot
+FROM oven/bun:1.3.5-slim@sha256:6111acec4c5a703f2069d6e681967c047920ff2883e7e5a5e64f4ac95ddeb27f
+# oven/bun:1.3.5-slim pinned to match .mise.toml — update via Dependabot
 
 # Create non-root user
 RUN groupadd -r llamenos && useradd -r -g llamenos -d /app -s /sbin/nologin llamenos

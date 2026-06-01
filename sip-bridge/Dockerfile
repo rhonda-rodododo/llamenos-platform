@@ -1,4 +1,4 @@
-FROM oven/bun:1@sha256:856da45d07aeb62eb38ea3e7f9e1794c0143a4ff63efb00e6c4491b627e2a521 AS base
+FROM oven/bun:1.3.5@sha256:e90cdbaf9ccdb3d4bd693aa335c3310a6004286a880f62f79b18f9b1312a8ec3 AS base
 WORKDIR /app
 
 # Install dependencies
@@ -16,7 +16,7 @@ RUN bunx tsc --noEmit --project tsconfig.build.json
 RUN bun build src/index.ts --outdir dist --target bun
 
 # Production stage
-FROM oven/bun:1@sha256:856da45d07aeb62eb38ea3e7f9e1794c0143a4ff63efb00e6c4491b627e2a521
+FROM oven/bun:1.3.5@sha256:e90cdbaf9ccdb3d4bd693aa335c3310a6004286a880f62f79b18f9b1312a8ec3
 WORKDIR /app
 
 # Install espeak-ng for local TTS support (used when TTS_ENGINE=espeak)

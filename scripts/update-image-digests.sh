@@ -31,7 +31,7 @@ images=(
   "ollama/ollama:latest"
   "containrrr/watchtower:1.7.1"
   "tecnativa/docker-socket-proxy:latest"
-  "oven/bun:1-slim"
+  "oven/bun:1.3.5-slim"
   "node:26-slim"
 )
 
