@@ -25,11 +25,18 @@ class CucumberHiltRunner : CucumberAndroidJUnitRunner() {
 
     override fun onCreate(arguments: android.os.Bundle) {
         // Override compile-time @CucumberOptions features with runtime instrumentation arg.
-        // CI sharding passes cucumber.features="features/path/a.feature,features/path/b.feature"
-        // via -Pandroid.testInstrumentationRunnerArguments.cucumber.features=...
-        // Without this override, @CucumberOptions(features=["features"]) takes precedence
-        // and all shards run all tests.
-        val shardFeatures = arguments.getString("cucumber.features")
+        //
+        // Two paths set the shard feature list:
+        // 1. CI (Gradle -P): uses "cucumberFeatures" (no dot) because Gradle's
+        //    -Pandroid.testInstrumentationRunnerArguments.cucumber.features silently
+        //    drops the value — dots in the key get misinterpreted as nested property access.
+        // 2. Local (am instrument -e): uses "cucumber.features" directly — dots are
+        //    fine in bundle keys set via `am instrument`.
+        //
+        // We check both keys and write to "cucumber.features" which is what
+        // cucumber-android's CucumberAndroidJUnitRunner reads from the bundle.
+        val shardFeatures = arguments.getString("cucumberFeatures")
+            ?: arguments.getString("cucumber.features")
         if (!shardFeatures.isNullOrBlank()) {
             arguments.putString("cucumber.features", shardFeatures)
         }
