@@ -239,16 +239,21 @@ dev.post('/test-add-hub-member', async (c) => {
   }
   const services = c.get('services')
   const roleIds = body.roleIds ?? ['role-admin']
+  // Determine the correct global roles for user creation.
+  // If the pubkey matches ADMIN_PUBKEY, the user MUST get role-super-admin
+  // to avoid silently downgrading the admin to role-volunteer.
+  const isAdminPubkey = pubkey === c.env.ADMIN_PUBKEY
+  const globalRoleIds = isAdminPubkey ? ['role-super-admin'] : roleIds
   try {
     await services.identity.setHubRole({ pubkey, hubId: body.hubId, roleIds })
   } catch {
-    // User may not exist yet — create with the hub role
+    // User may not exist yet — create with the correct global role
     try {
       await services.identity.createUser({
         pubkey,
-        name: 'BDD Test User',
-        phone: '+15550000002',
-        roleIds: ['role-volunteer'],
+        name: isAdminPubkey ? 'Admin' : 'BDD Test User',
+        phone: isAdminPubkey ? '' : '+15550000002',
+        roleIds: globalRoleIds,
         encryptedSecretKey: '',
       })
       await services.identity.setHubRole({ pubkey, hubId: body.hubId, roleIds })

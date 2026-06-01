@@ -67,6 +67,24 @@ export const auth = createMiddleware<AppEnv>(async (c, next) => {
     return c.json({ error: 'Authentication failed' }, 401)
   }
 
+  // Defensive: if this is the ADMIN_PUBKEY user but their roles have been
+  // downgraded (e.g., race in test-add-hub-member recreated them as volunteer),
+  // restore role-super-admin before resolving permissions.
+  const adminPubkey = c.env?.ADMIN_PUBKEY
+  if (adminPubkey && authResult.pubkey === adminPubkey &&
+      !authResult.user.roles.includes('role-super-admin')) {
+    reqLog.warn('Admin user missing role-super-admin — restoring', {
+      pubkeyPrefix: authResult.pubkey.slice(0, 8),
+      currentRoles: authResult.user.roles,
+    })
+    try {
+      await services.identity.updateUser(authResult.pubkey, { roles: ['role-super-admin'] }, true)
+      authResult.user.roles = ['role-super-admin']
+    } catch (e) {
+      reqLog.error('Failed to restore admin role', { error: e })
+    }
+  }
+
   // Load all roles from SettingsService
   const { roles: allRoles } = await services.settings.getRoles()
 

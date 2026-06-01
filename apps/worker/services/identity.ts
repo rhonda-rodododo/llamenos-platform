@@ -235,6 +235,10 @@ export class IdentityService {
    */
   async ensureInit(adminPubkey?: string, demoMode = false): Promise<void> {
     if (adminPubkey) {
+      // Use onConflictDoUpdate to ensure admin always has role-super-admin.
+      // A race condition in test-add-hub-member can create the admin user
+      // with role-volunteer; this corrects that on the next ensureInit call
+      // (e.g., during test-reset or server startup).
       await this.db.insert(users).values({
         pubkey: adminPubkey,
         displayName: 'Admin',
@@ -248,7 +252,13 @@ export class IdentityService {
         profileCompleted: true,
         onBreak: false,
         callPreference: 'phone',
-      }).onConflictDoNothing()
+      }).onConflictDoUpdate({
+        target: users.pubkey,
+        set: {
+          roles: ['role-super-admin'],
+          active: true,
+        },
+      })
     }
 
     if (demoMode) {
