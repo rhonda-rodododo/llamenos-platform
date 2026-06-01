@@ -112,12 +112,30 @@ runs:
       run: |
         echo "Waiting for backend to be ready..."
         for i in $(seq 1 60); do
-          if curl -sf http://localhost:3000/api/health/ready; then
-            echo "Backend is ready"
+          # Accept both 200 (fully healthy) and 503 (degraded — sidecars not ready yet)
+          # as long as postgres is reachable. The global-setup also does its own health check.
+          HTTP_CODE=$(curl -s -o /tmp/health.json -w "%{http_code}" http://localhost:3000/api/health/ready 2>/dev/null || echo "000")
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "Backend is fully ready"
             break
+          elif [ "$HTTP_CODE" = "503" ]; then
+            # Check if postgres is ok — that's sufficient for E2E tests
+            PG_STATUS=$(cat /tmp/health.json 2>/dev/null | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('checks',{}).get('postgres',{}).get('status','unknown'))" 2>/dev/null || echo "unknown")
+            if [ "$PG_STATUS" = "ok" ]; then
+              echo "Backend degraded but postgres is ok — proceeding (sidecars may still be starting)"
+              break
+            fi
+            if [ $((i % 10)) -eq 9 ]; then
+              echo "Backend degraded, postgres=$PG_STATUS, retrying... ($i/60)"
+            fi
+          else
+            if [ $((i % 10)) -eq 9 ]; then
+              echo "Backend returned HTTP $HTTP_CODE, retrying... ($i/60)"
+            fi
           fi
           if [ "$i" -eq 60 ]; then
             echo "::error::Backend did not become healthy after 120s"
+            cat /tmp/health.json 2>/dev/null || true
             docker compose --env-file .env \
               -f deploy/docker/docker-compose.yml \
               -f deploy/docker/docker-compose.test.yml \

@@ -1067,17 +1067,33 @@ dev.post('/test-create-hub', async (c) => {
     return c.json({ error: message }, 500)
   }
 
-  // Add admin as a member of the new hub so WS relay subscribe works in tests
+  // Add admin as a member of the new hub so WS relay subscribe works in tests.
+  // This is CRITICAL for E2E — without hub membership, all hub-scoped API calls
+  // return 403 and the frontend fails to render hub pages.
   const adminPubkey = c.env?.ADMIN_PUBKEY as string | undefined
   if (adminPubkey) {
-    try {
-      await services.identity.setHubRole({
-        pubkey: adminPubkey,
-        hubId: hub.id,
-        roleIds: ['role-super-admin'],
-      })
-    } catch {
-      // Admin user may not exist yet — non-fatal for hub creation
+    // Retry up to 3 times — the admin user may be mid-creation from a concurrent
+    // bootstrap/ensureInit call that hasn't committed yet.
+    let hubRoleSet = false
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        await services.identity.setHubRole({
+          pubkey: adminPubkey,
+          hubId: hub.id,
+          roleIds: ['role-super-admin'],
+        })
+        hubRoleSet = true
+        break
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        console.warn(`[test-create-hub] setHubRole attempt ${attempt + 1}/3 failed: ${msg}`)
+        if (attempt < 2) {
+          await new Promise(r => setTimeout(r, 500))
+        }
+      }
+    }
+    if (!hubRoleSet) {
+      console.error(`[test-create-hub] FAILED to set admin hub role for hub ${hub.id} — hub-scoped tests will 403`)
     }
   }
 

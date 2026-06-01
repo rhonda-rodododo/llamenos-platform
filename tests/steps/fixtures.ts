@@ -161,6 +161,10 @@ export const test = base.extend<
     const ctx = await playwright.request.newContext({ baseURL: backendUrl, timeout: 60_000 })
     const name = `test-hub-${workerInfo.workerIndex}-${Date.now()}`
     const hubId = await createHubViaApi(ctx, name)
+    // Verify admin has hub membership — without this, all hub-scoped API calls
+    // return 403 and the frontend fails to render hub pages (shard 1 CI failures).
+    const { verifyHubMembership } = await import('../api-helpers')
+    await verifyHubMembership(ctx, hubId)
     await ctx.dispose()
     await use(hubId)
   }, { scope: 'worker', timeout: 60_000 }],

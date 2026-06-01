@@ -256,6 +256,55 @@ export async function deleteHubViaApi(
   }
 }
 
+/**
+ * Verify that the admin user has membership in the given hub.
+ * Makes an authenticated API call to a hub-scoped endpoint and checks
+ * the response is not 403 (Access denied). If membership is missing,
+ * retries by re-adding the admin via the test-create-hub membership path.
+ *
+ * This catches the silent failure case where test-create-hub's setHubRole
+ * failed (e.g., admin user not yet committed to DB during concurrent bootstrap).
+ */
+export async function verifyHubMembership(
+  request: APIRequestContext,
+  hubId: string,
+): Promise<void> {
+  // Try a hub-scoped endpoint that requires any permission
+  const { status } = await apiGet<unknown>(request, `/hubs/${hubId}/notes?limit=1`)
+  if (status === 200) return // Admin has access
+
+  if (status === 403) {
+    console.warn(`[verifyHubMembership] Admin lacks membership in hub ${hubId} — re-adding via API`)
+    // Re-add admin as hub member via the hub members endpoint
+    const { status: addStatus } = await apiPost(request, `/hubs/${hubId}/members`, {
+      pubkey: seedHexToPubkey(ADMIN_SEED),
+      roleIds: ['role-super-admin'],
+    })
+    if (addStatus !== 200 && addStatus !== 201 && addStatus !== 204 && addStatus !== 409) {
+      // Try the dev endpoint as fallback
+      const { status: devStatus } = await devPost(request, '/test-add-hub-member', {
+        hubId,
+        pubkey: seedHexToPubkey(ADMIN_SEED),
+        roleIds: ['role-super-admin'],
+      })
+      if (devStatus !== 200) {
+        throw new Error(
+          `Failed to ensure admin hub membership for hub ${hubId}: ` +
+          `notes returned ${status}, add-member returned ${addStatus}, dev-add returned ${devStatus}`
+        )
+      }
+    }
+    // Verify again
+    const { status: retryStatus } = await apiGet<unknown>(request, `/hubs/${hubId}/notes?limit=1`)
+    if (retryStatus === 403) {
+      throw new Error(
+        `Admin still lacks hub membership after re-add for hub ${hubId} (status: ${retryStatus})`
+      )
+    }
+  }
+  // 401 or other errors during verification are non-fatal — the test itself will catch them
+}
+
 // ── Unique Test Data Generators ───────────────────────────────────
 
 // Incrementing counter ensures uniqueness within a single worker process,

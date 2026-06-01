@@ -11,13 +11,21 @@ function loadDevVarsSecret(): string | undefined {
 // Admin Ed25519 seed — must match tests/api-helpers.ts ADMIN_SEED
 const ADMIN_SEED = 'f54a5851e9372b87810a8e60cdd2e7cfd80b6e31c7af18188f7db106ceda8be7'
 
+function randomNonce(): string {
+  const bytes = new Uint8Array(16)
+  crypto.getRandomValues(bytes)
+  return bytesToHex(bytes)
+}
+
 function makeBootstrapToken(seedHex: string, method: string, path: string) {
   const seedBytes = hexToBytes(seedHex)
   const pubkey = bytesToHex(ed25519.getPublicKey(seedBytes))
   const timestamp = Date.now()
-  const message = utf8ToBytes(`${LABEL_DEVICE_AUTH}:${pubkey}:${timestamp}:${method}:${path}`)
+  const nonce = randomNonce()
+  // Include nonce to prevent replay detection rejections in parallel test workers
+  const message = utf8ToBytes(`${LABEL_DEVICE_AUTH}:${pubkey}:${timestamp}:${method}:${path}:${nonce}`)
   const sig = ed25519.sign(message, seedBytes)
-  return { pubkey, timestamp, token: bytesToHex(sig) }
+  return { pubkey, timestamp, token: bytesToHex(sig), nonce }
 }
 
 async function resetTestState(baseUrl: string): Promise<void> {
@@ -82,21 +90,50 @@ async function ensureDefaultHub(baseUrl: string): Promise<void> {
 }
 
 export default async function globalSetup(_config: FullConfig): Promise<void> {
-  const maxAttempts = process.env.CI ? 30 : 10
+  const maxAttempts = process.env.CI ? 40 : 10
   const retryDelayMs = process.env.CI ? 3000 : 2000
 
+  // Phase 1: Wait for the backend to be reachable and healthy.
+  // Use /api/health/ready to ensure Postgres + all core deps are up,
+  // but tolerate degraded status (sidecars may not be ready yet).
+  let backendReady = false
   for (let i = 0; i < maxAttempts; i++) {
     try {
-      const res = await fetch(`${BACKEND_URL}/api/config`)
-      if (res.ok) {
-        await resetTestState(BACKEND_URL)
-        await bootstrapAdmin(BACKEND_URL)
-        await verifyAdminAccess(BACKEND_URL)
-        await ensureDefaultHub(BACKEND_URL)
-        return
+      // First check basic reachability with /api/config
+      const configRes = await fetch(`${BACKEND_URL}/api/config`)
+      if (!configRes.ok) {
+        if (i % 5 === 4) {
+          console.log(`[global-setup] /api/config returned ${configRes.status}, retrying... (${i + 1}/${maxAttempts})`)
+        }
+        await new Promise(r => setTimeout(r, retryDelayMs))
+        continue
       }
-      if (i % 5 === 4) {
-        console.log(`[global-setup] Backend returned ${res.status}, retrying... (${i + 1}/${maxAttempts})`)
+
+      // Then verify health — accept both 200 (ok) and 503 (degraded, sidecars not ready)
+      // as long as core dependencies (postgres) are reachable.
+      const healthRes = await fetch(`${BACKEND_URL}/api/health/ready`)
+      if (healthRes.ok) {
+        backendReady = true
+        break
+      }
+      // Parse health response to check if postgres is ok (core dep)
+      try {
+        const health = await healthRes.json() as { status: string; checks: Record<string, { status: string }> }
+        const pgOk = health.checks?.postgres?.status === 'ok'
+        if (pgOk) {
+          // Postgres is up — backend can serve requests even if sidecars are degraded
+          console.log(`[global-setup] Backend degraded but postgres is ok — proceeding (status: ${health.status})`)
+          backendReady = true
+          break
+        }
+        if (i % 5 === 4) {
+          console.log(`[global-setup] Health check: postgres=${health.checks?.postgres?.status ?? 'unknown'}, retrying... (${i + 1}/${maxAttempts})`)
+        }
+      } catch {
+        // Can't parse health response — fall through to retry
+        if (i % 5 === 4) {
+          console.log(`[global-setup] Health check returned ${healthRes.status}, retrying... (${i + 1}/${maxAttempts})`)
+        }
       }
     } catch (err) {
       if (i % 5 === 4) {
@@ -106,7 +143,18 @@ export default async function globalSetup(_config: FullConfig): Promise<void> {
     }
     await new Promise(r => setTimeout(r, retryDelayMs))
   }
-  throw new Error(
-    `Backend not ready after ${maxAttempts} attempts (${(maxAttempts * retryDelayMs) / 1000}s). Is the server running at ${BACKEND_URL}?`
-  )
+
+  if (!backendReady) {
+    throw new Error(
+      `Backend not ready after ${maxAttempts} attempts (${(maxAttempts * retryDelayMs) / 1000}s). Is the server running at ${BACKEND_URL}?`
+    )
+  }
+
+  // Phase 2: Initialize test state
+  console.log('[global-setup] Backend ready — initializing test state')
+  await resetTestState(BACKEND_URL)
+  await bootstrapAdmin(BACKEND_URL)
+  await verifyAdminAccess(BACKEND_URL)
+  await ensureDefaultHub(BACKEND_URL)
+  console.log('[global-setup] Test state initialized successfully')
 }

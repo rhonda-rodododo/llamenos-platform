@@ -429,11 +429,17 @@ jobs:
       - name: Dump app container logs on failure
         if: failure()
         run: |
-          echo "=== App container access/permission logs ==="
+          echo "=== App container health + hub membership logs ==="
           docker compose --env-file .env \
             -f deploy/docker/docker-compose.yml \
             -f deploy/docker/docker-compose.test.yml \
-            logs app --tail=500 2>&1 | grep -iE 'hub.*Access|Forbidden|Auth failed|WEBAUTHN|permission|403' | tail -100 || true
+            logs app --tail=300 2>&1 | grep -iE 'hub.*Access|Forbidden|Auth failed|permission|403|401|test-create-hub|setHubRole|FAILED|ERROR|migrate' | tail -100 || true
+          echo ""
+          echo "=== Full app container logs (last 100 lines) ==="
+          docker compose --env-file .env \
+            -f deploy/docker/docker-compose.yml \
+            -f deploy/docker/docker-compose.test.yml \
+            logs app --tail=100 2>&1 || true
 
       - name: Tear down Docker Compose
         if: always()
