@@ -43,10 +43,31 @@ pub struct DecryptionResult {
     pub sas_code: String,
 }
 
-/// Parse an X25519 public key from hex (32 bytes / 64 hex chars).
-fn parse_x25519_pubkey(pubkey_hex: &str) -> Result<X25519PublicKey, CryptoError> {
+/// Parse an X25519 public key from a hex-encoded byte string.
+///
+/// X25519 public keys are always 32 bytes (the Montgomery-form u-coordinate, x-only).
+/// There is no compressed/uncompressed distinction — 32 bytes is the sole canonical format.
+///
+/// Accepts:
+///   - 64 hex chars → 32 bytes (canonical x-only format)
+///
+/// Rejects:
+///   - Any other length (including 33-byte secp256k1-style or 65-byte uncompressed keys
+///     which would indicate the wrong algorithm)
+///   - The all-zeros identity point (would produce a trivial shared secret)
+pub fn parse_x25519_pubkey(pubkey_hex: &str) -> Result<X25519PublicKey, CryptoError> {
     let bytes = hex::decode(pubkey_hex).map_err(CryptoError::HexError)?;
     if bytes.len() != 32 {
+        // Common wrong formats and what they indicate:
+        //   33 bytes → secp256k1 compressed (wrong algorithm)
+        //   65 bytes → secp256k1 uncompressed (wrong algorithm)
+        //   64 bytes (raw) → Ed25519 pubkey accidentally used (wrong key type, same length as decoded)
+        // X25519 has exactly one encoding: 32-byte Montgomery u-coordinate.
+        return Err(CryptoError::InvalidPublicKey);
+    }
+    // Reject the all-zeros identity point — DH against it always yields zero,
+    // which is a low-order point that would produce a predictable shared secret.
+    if bytes.iter().all(|&b| b == 0) {
         return Err(CryptoError::InvalidPublicKey);
     }
     let mut arr = [0u8; 32];
@@ -55,9 +76,21 @@ fn parse_x25519_pubkey(pubkey_hex: &str) -> Result<X25519PublicKey, CryptoError>
 }
 
 /// Compute X25519 shared secret between our secret key and their public key.
-fn compute_shared_secret(sk: &X25519StaticSecret, their_pk: &X25519PublicKey) -> [u8; 32] {
+///
+/// Returns `Err(EcdhFailed)` if the result is the all-zeros point, which indicates a
+/// low-order public key (small subgroup attack). Legitimate X25519 DH never yields zero.
+fn compute_shared_secret(
+    sk: &X25519StaticSecret,
+    their_pk: &X25519PublicKey,
+) -> Result<[u8; 32], CryptoError> {
     let shared = sk.diffie_hellman(their_pk);
-    *shared.as_bytes()
+    let bytes = *shared.as_bytes();
+    if bytes == [0u8; 32] {
+        // All-zero shared secret indicates a low-order or small-subgroup point.
+        // Reject to prevent key derivation from a predictable, attacker-controlled value.
+        return Err(CryptoError::EcdhFailed);
+    }
+    Ok(bytes)
 }
 
 /// Derive the symmetric key for provisioning using HKDF-SHA256.
@@ -111,7 +144,7 @@ pub fn encrypt_seed_for_provisioning(
     let ephemeral_pk = parse_x25519_pubkey(ephemeral_pubkey_hex)?;
 
     // X25519 shared secret
-    let mut shared = compute_shared_secret(&secret, &ephemeral_pk);
+    let mut shared = compute_shared_secret(&secret, &ephemeral_pk)?;
 
     // Derive symmetric key using HKDF
     let mut symmetric_key = derive_provisioning_key(&shared);
@@ -175,7 +208,7 @@ pub fn decrypt_provisioned_seed(
     let primary_pk = parse_x25519_pubkey(primary_pubkey_hex)?;
 
     // X25519 shared secret
-    let mut shared = compute_shared_secret(&ephemeral_secret, &primary_pk);
+    let mut shared = compute_shared_secret(&ephemeral_secret, &primary_pk)?;
 
     // Derive symmetric key using HKDF
     let mut symmetric_key = derive_provisioning_key(&shared);
@@ -317,5 +350,67 @@ mod tests {
         assert_eq!(r1.sas_code, r2.sas_code);
         // But encrypted payloads differ (different random nonces)
         assert_ne!(r1.encrypted_hex, r2.encrypted_hex);
+    }
+
+    // ── Format detection tests ──────────────────────────────────────────────
+
+    #[test]
+    fn pubkey_wrong_length_rejected() {
+        // 33 bytes (secp256k1 compressed format — wrong algorithm)
+        let too_long = "00".repeat(33);
+        assert!(parse_x25519_pubkey(&too_long).is_err());
+
+        // 65 bytes (secp256k1 uncompressed — wrong algorithm)
+        let uncompressed = "04".to_string() + &"00".repeat(64);
+        assert!(parse_x25519_pubkey(&uncompressed).is_err());
+
+        // 31 bytes — too short
+        let too_short = "00".repeat(31);
+        assert!(parse_x25519_pubkey(&too_short).is_err());
+
+        // Empty
+        assert!(parse_x25519_pubkey("").is_err());
+    }
+
+    #[test]
+    fn pubkey_all_zeros_rejected() {
+        // The all-zeros identity point must be rejected — DH against it always
+        // yields the all-zeros shared secret, enabling a trivial oracle attack.
+        let zeros = "00".repeat(32);
+        assert!(
+            matches!(
+                parse_x25519_pubkey(&zeros),
+                Err(crate::errors::CryptoError::InvalidPublicKey)
+            ),
+            "All-zeros pubkey must be rejected as InvalidPublicKey"
+        );
+    }
+
+    #[test]
+    fn compute_shared_secret_rejects_low_order_point() {
+        // A low-order point produces all-zeros output from X25519 DH.
+        // Construct the all-zeros "public key" directly to simulate this.
+        // x25519-dalek allows constructing this, so we test our wrapper rejects it.
+        let (sk_hex, _pk_hex) = generate_x25519_keypair();
+        let sk_bytes = hex::decode(&sk_hex).unwrap();
+        let sk_arr: [u8; 32] = sk_bytes.try_into().unwrap();
+        let secret = X25519StaticSecret::from(sk_arr);
+
+        // The canonical low-order point in X25519 is [0; 32].
+        let low_order_pk = X25519PublicKey::from([0u8; 32]);
+        assert!(
+            matches!(
+                compute_shared_secret(&secret, &low_order_pk),
+                Err(crate::errors::CryptoError::EcdhFailed)
+            ),
+            "Low-order point DH must be rejected as EcdhFailed"
+        );
+    }
+
+    #[test]
+    fn valid_pubkey_accepted() {
+        let (_sk, pk_hex) = generate_x25519_keypair();
+        // A freshly generated key must pass validation
+        assert!(parse_x25519_pubkey(&pk_hex).is_ok());
     }
 }

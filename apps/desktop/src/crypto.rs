@@ -1225,18 +1225,17 @@ pub fn provision_compute_sas(
         .as_ref()
         .ok_or_else(|| "No provisioning session. Call provision_create_session first.".to_string())?;
 
-    // Compute shared secret and derive SAS (same as Rust provisioning module)
+    // Compute shared secret and derive SAS (same as Rust provisioning module).
+    // parse_x25519_pubkey validates: 32-byte x-only format, rejects all-zeros identity point.
     let eph_sk = x25519_dalek::StaticSecret::from(*ephemeral_secret);
-    let primary_pk_bytes = hex::decode(&primary_enc_pubkey_hex).map_err(err_str)?;
-    if primary_pk_bytes.len() != 32 {
-        return Err("Primary pubkey must be 32 bytes".into());
-    }
-    let mut pk_arr = [0u8; 32];
-    pk_arr.copy_from_slice(&primary_pk_bytes);
-    let primary_pk = x25519_dalek::PublicKey::from(pk_arr);
+    let primary_pk = llamenos_core::provisioning::parse_x25519_pubkey(&primary_enc_pubkey_hex)
+        .map_err(err_str)?;
 
     let shared = eph_sk.diffie_hellman(&primary_pk);
     let shared_bytes = shared.as_bytes();
+    if *shared_bytes == [0u8; 32] {
+        return Err("ECDH shared secret is all-zeros (low-order point)".into());
+    }
 
     // SAS derivation: HKDF(ikm=shared, salt=SAS_SALT, info=SAS_INFO, len=4)
     let hk = hkdf::Hkdf::<sha2::Sha256>::new(
