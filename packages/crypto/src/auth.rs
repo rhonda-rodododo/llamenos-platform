@@ -63,6 +63,16 @@ pub fn build_auth_message_with_nonce(
     }
 }
 
+/// Generate a random 16-byte hex nonce for replay prevention.
+///
+/// Each auth token gets a unique nonce so that even requests with identical
+/// (timestamp, method, path) produce distinct signatures.
+fn generate_nonce() -> String {
+    let mut bytes = [0u8; 16];
+    getrandom::getrandom(&mut bytes).expect("getrandom failed");
+    hex::encode(bytes)
+}
+
 /// Create an Ed25519 auth token using device secrets.
 ///
 /// The message is bound to the specific key, method, and path to prevent
@@ -76,7 +86,9 @@ pub fn create_auth_token(
     let signing_key = secrets.signing_key();
     let pubkey_hex = hex::encode(signing_key.verifying_key().to_bytes());
 
-    let message = build_auth_message(&pubkey_hex, timestamp, method, path);
+    let nonce = generate_nonce();
+    let message =
+        build_auth_message_with_nonce(&pubkey_hex, timestamp, method, path, Some(&nonce));
     let signature = signing_key.sign(&message);
     let token_hex = hex::encode(signature.to_bytes());
 
@@ -84,7 +96,7 @@ pub fn create_auth_token(
         pubkey: pubkey_hex,
         timestamp,
         token: token_hex,
-        nonce: None,
+        nonce: Some(nonce),
     })
 }
 
@@ -110,7 +122,9 @@ pub fn create_auth_token_from_signing_key(
     let signing_key = ed25519_dalek::SigningKey::from_bytes(&sk_arr);
     let pubkey_hex = hex::encode(signing_key.verifying_key().to_bytes());
 
-    let message = build_auth_message(&pubkey_hex, timestamp, method, path);
+    let nonce = generate_nonce();
+    let message =
+        build_auth_message_with_nonce(&pubkey_hex, timestamp, method, path, Some(&nonce));
     let signature = signing_key.sign(&message);
     let token_hex = hex::encode(signature.to_bytes());
 
@@ -118,7 +132,7 @@ pub fn create_auth_token_from_signing_key(
         pubkey: pubkey_hex,
         timestamp,
         token: token_hex,
-        nonce: None,
+        nonce: Some(nonce),
     })
 }
 

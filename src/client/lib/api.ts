@@ -104,10 +104,12 @@ async function getAuthHeaders(method: string, apiPath: string): Promise<Record<s
     try {
       const token = await createAuthToken(monotoneNow(), method, `${API_BASE}${apiPath}`)
       return { 'Authorization': `Bearer ${token}` }
-    } catch {
+    } catch (err) {
+      console.error(`[auth-debug] createAuthToken failed for ${method} ${apiPath}:`, err)
       return {}
     }
   }
+  console.warn(`[auth-debug] key not unlocked for ${method} ${apiPath}`)
   return {}
 }
 

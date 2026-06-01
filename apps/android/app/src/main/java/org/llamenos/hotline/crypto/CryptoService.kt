@@ -39,6 +39,7 @@ data class AuthToken(
     val pubkey: String,
     val timestamp: Long,
     val token: String,
+    val nonce: String? = null,
 )
 
 data class HpkeEnvelope(
@@ -363,6 +364,7 @@ class CryptoService @Inject constructor() {
                 pubkey = ffiToken.pubkey,
                 timestamp = ffiToken.timestamp.toLong(),
                 token = ffiToken.token,
+                nonce = ffiToken.nonce,
             )
         } catch (e: org.llamenos.core.CryptoException) {
             throw CryptoException("Auth token creation failed: ${e.message}", e)
