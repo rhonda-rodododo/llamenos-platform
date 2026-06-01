@@ -51,7 +51,7 @@ auth.post('/login',
 
     // Verify Schnorr signature before returning any user information
     const url = new URL(c.req.url)
-    const isValid = await verifyAuthToken({ pubkey: body.pubkey, timestamp: body.timestamp, token: body.token }, c.req.method, url.pathname)
+    const isValid = await verifyAuthToken({ pubkey: body.pubkey, timestamp: body.timestamp, token: body.token, nonce: body.nonce }, c.req.method, url.pathname)
     if (!isValid) return c.json({ error: 'Authentication failed' }, 401)
 
     try {
@@ -97,7 +97,7 @@ auth.post('/bootstrap',
 
     // Verify Schnorr signature — proves caller owns the private key
     const bootstrapUrl = new URL(c.req.url)
-    const isValid = await verifyAuthToken({ pubkey: body.pubkey, timestamp: body.timestamp, token: body.token }, c.req.method, bootstrapUrl.pathname)
+    const isValid = await verifyAuthToken({ pubkey: body.pubkey, timestamp: body.timestamp, token: body.token, nonce: body.nonce }, c.req.method, bootstrapUrl.pathname)
     if (!isValid) return c.json({ error: 'Authentication failed' }, 401)
 
     // Check if admin already exists
