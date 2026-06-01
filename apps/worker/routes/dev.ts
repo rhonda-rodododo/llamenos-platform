@@ -46,13 +46,20 @@ dev.post('/test-reset', async (c) => {
   const demoMode = c.env.DEMO_MODE === 'true'
   await services.audit.reset()
   await services.identity.reset(true, c.env.ENVIRONMENT, c.env.DEMO_MODE_CONFIRM)
+  // Reset settings (including roles table and hubs) BEFORE re-seeding admin.
+  // The old order was: identity.reset → identity.ensureInit → settings.reset.
+  // That created a window where the admin existed but the roles table was empty,
+  // causing resolvePermissions('role-super-admin', []) → [] → 403 on hub routes.
+  // By resetting settings first, the roles table is re-seeded before the admin
+  // user is created and before concurrent requests can authenticate.
+  await services.settings.reset(env)
+  await services.settings.ensureInit()
   // Re-seed admin immediately — minimizes the window where hasAdmin()=false
   // (concurrent browser requests between reset() and the later ensureInit() would
   // see needsBootstrap=true, causing flaky AdminBootstrap to appear in E2E tests)
   if (adminPubkey) {
     await services.identity.ensureInit(adminPubkey, demoMode)
   }
-  await services.settings.reset(env)
   await services.records.reset()
   await services.shifts.reset('')
   await services.calls.reset('')
@@ -61,7 +68,6 @@ dev.post('/test-reset', async (c) => {
   await services.contacts.reset(env)
   await services.cases.reset(env)
   await services.providerSetup.reset()
-  await services.settings.ensureInit()
   // Final safety net: verify the admin user has role-super-admin after all
   // resets complete. A race condition between reset() and ensureInit() or
   // concurrent requests during the reset window can leave the admin with
@@ -1088,8 +1094,14 @@ dev.post('/test-create-hub', async (c) => {
   // return 403 and the frontend fails to render hub pages.
   const adminPubkey = c.env?.ADMIN_PUBKEY as string | undefined
   if (adminPubkey) {
-    // Retry up to 3 times — the admin user may be mid-creation from a concurrent
-    // bootstrap/ensureInit call that hasn't committed yet.
+    // Ensure the admin user exists before attempting setHubRole. During parallel
+    // test startup, test-create-hub can race with test-reset/ensureInit — the
+    // admin row may not exist yet. ensureInit uses onConflictDoUpdate so it's
+    // safe to call concurrently (idempotent, always sets role-super-admin).
+    await services.identity.ensureInit(adminPubkey, false)
+
+    // Retry up to 3 times — even after ensureInit, a concurrent reset could
+    // briefly delete the user row between our ensureInit and setHubRole.
     let hubRoleSet = false
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
@@ -1105,6 +1117,8 @@ dev.post('/test-create-hub', async (c) => {
         console.warn(`[test-create-hub] setHubRole attempt ${attempt + 1}/3 failed: ${msg}`)
         if (attempt < 2) {
           await new Promise(r => setTimeout(r, 500))
+          // Re-ensure admin exists before retrying
+          await services.identity.ensureInit(adminPubkey, false).catch(() => {})
         }
       }
     }

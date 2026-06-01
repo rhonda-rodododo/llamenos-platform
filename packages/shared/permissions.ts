@@ -388,11 +388,17 @@ export function permissionGranted(grantedPermissions: string[], required: string
 /**
  * Resolve effective permissions from multiple role IDs.
  * Returns the union of all permissions from all roles.
+ *
+ * Falls back to DEFAULT_ROLES for system role IDs not found in the provided
+ * role definitions. This prevents a window during settings.reset() where the
+ * roles table is empty — without this fallback, even role-super-admin resolves
+ * to zero permissions, causing 403 on every hub-scoped request.
  */
 export function resolvePermissions(roleIds: string[], roles: Role[]): string[] {
   const perms = new Set<string>()
   for (const roleId of roleIds) {
     const role = roles.find(r => r.id === roleId)
+      ?? DEFAULT_ROLES.find(r => r.id === roleId)
     if (role) {
       for (const p of role.permissions) perms.add(p)
     }
