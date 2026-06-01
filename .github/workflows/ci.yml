@@ -852,7 +852,24 @@ jobs:
             # Forward host port 3000 into emulator so localhost:3000 works inside the app
             adb reverse tcp:3000 tcp:3000
             # Verify backend is reachable from host before running tests
-            curl -sf http://localhost:3000/api/health/ready || { echo "::error::Backend not reachable"; exit 1; }
+            # Retry health check — backend may return 503 briefly during startup
+            for i in $(seq 1 30); do
+              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/api/health/ready 2>/dev/null || echo "000")
+              if [ "$HTTP_CODE" = "200" ]; then
+                echo "Backend is ready"
+                break
+              elif [ "$HTTP_CODE" = "503" ]; then
+                echo "Backend starting (503), attempt $i/30..."
+                sleep 2
+              else
+                echo "Backend not reachable (HTTP $HTTP_CODE), attempt $i/30..."
+                sleep 2
+              fi
+              if [ "$i" = "30" ]; then
+                echo "::error::Backend not reachable after 60s (last HTTP $HTTP_CODE)"
+                exit 1
+              fi
+            done
             # Capture logcat in background DURING tests — the emulator dies when this
             # script block ends, so post-script adb logcat -d always gets an empty file.
             adb logcat -v time > /tmp/logcat.txt 2>/dev/null &
