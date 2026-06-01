@@ -201,7 +201,7 @@ describe('request retry logic', () => {
 
   it('calls onAuthExpired on 401 when unlocked', async () => {
     const fetchMock = vi.mocked(globalThis.fetch)
-    fetchMock.mockResolvedValue(new Response('Unauthorized', { status: 401 }))
+    fetchMock.mockImplementation(async () => new Response('Unauthorized', { status: 401 }))
 
     keyManager.markUnlocked('test-pubkey')
     const cb = vi.fn()
@@ -213,7 +213,7 @@ describe('request retry logic', () => {
 
   it('does not call onAuthExpired on 401 for auth paths', async () => {
     const fetchMock = vi.mocked(globalThis.fetch)
-    fetchMock.mockResolvedValue(new Response('Unauthorized', { status: 401 }))
+    fetchMock.mockImplementation(async () => new Response('Unauthorized', { status: 401 }))
 
     keyManager.markUnlocked('test-pubkey')
     const cb = vi.fn()

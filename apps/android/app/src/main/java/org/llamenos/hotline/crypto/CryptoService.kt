@@ -8,6 +8,7 @@ import org.llamenos.hotline.model.NotePayload
 import org.llamenos.protocol.CryptoLabels
 import org.llamenos.protocol.HubKeyEnvelopeResponse
 import org.llamenos.protocol.RecipientEnvelope
+import java.security.SecureRandom
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -354,6 +355,7 @@ class CryptoService @Inject constructor() {
         if (!isUnlocked) throw CryptoException("No key loaded")
 
         val timestamp = System.currentTimeMillis()
+        val nonce = randomNonce()
         return try {
             val ffiToken = org.llamenos.core.mobileCreateAuthToken(
                 timestamp = timestamp.toULong(),
@@ -364,7 +366,7 @@ class CryptoService @Inject constructor() {
                 pubkey = ffiToken.pubkey,
                 timestamp = ffiToken.timestamp.toLong(),
                 token = ffiToken.token,
-                nonce = ffiToken.nonce,
+                nonce = nonce,
             )
         } catch (e: org.llamenos.core.CryptoException) {
             throw CryptoException("Auth token creation failed: ${e.message}", e)
@@ -1171,6 +1173,12 @@ class CryptoService @Inject constructor() {
         }
 
     // ---- Hex Utility ----
+
+    private fun randomNonce(): String {
+        val bytes = ByteArray(16)
+        SecureRandom().nextBytes(bytes)
+        return bytes.joinToString("") { "%02x".format(it) }
+    }
 
     private fun hexToBytes(hex: String): ByteArray {
         require(hex.length % 2 == 0) { "Hex string has odd length" }
