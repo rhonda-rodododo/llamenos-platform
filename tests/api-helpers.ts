@@ -335,6 +335,8 @@ export interface CreateUserResult {
   seedHex: string
   /** @deprecated Use seedHex */
   nsec: string
+  /** @deprecated Use seedHex */
+  deviceKey: string
   name: string
   phone: string
 }
@@ -360,7 +362,7 @@ export async function createUserViaApi(
     throw new Error(`Failed to create user: ${status}`)
   }
 
-  return { pubkey, seedHex, deviceKey: seedHex, name, phone }
+  return { pubkey, seedHex, nsec: seedHex, deviceKey: seedHex, name, phone }
 }
 
 /** @deprecated Use createUserViaApi instead */
