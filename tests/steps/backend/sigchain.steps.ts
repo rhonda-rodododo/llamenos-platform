@@ -51,10 +51,10 @@ async function appendLink(
   const payload = opts.payload ?? { devicePubkey: bytesToHex(crypto.getRandomValues(new Uint8Array(32))) }
   const hash = opts.hash ?? computeLinkHash(opts.prevHash, opts.linkType, opts.seqNo, payload)
   // Generate a real Ed25519 signature over the link hash — server verifies this
-  const signature = opts.signature ?? bytesToHex(ed25519.sign(hexToBytes(hash), hexToBytes(nsec)))
+  const signature = opts.signature ?? bytesToHex(ed25519.sign(hexToBytes(hash), hexToBytes(deviceKey)))
   return apiPost(request, `/users/${targetPubkey}/sigchain`, {
     seqNo: opts.seqNo, linkType: opts.linkType, payload, signature, prevHash: opts.prevHash, hash,
-  }, nsec)
+  }, deviceKey)
 }
 
 // ── Given ────────────────────���──────────────────────────────────────

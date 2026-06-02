@@ -42,11 +42,11 @@ function fakeEnvelope(): string {
 
 async function registerDevice(
   request: import('@playwright/test').APIRequestContext,
-  _deviceKey: string,
+  deviceKey: string,
 ) {
   const wakeKey = bytesToHex(crypto.getRandomValues(new Uint8Array(32)))
   const pushToken = bytesToHex(crypto.getRandomValues(new Uint8Array(16)))
-  return apiPost(request, '/devices/register', { platform: 'ios', pushToken, wakeKeyPublic: wakeKey }, nsec)
+  return apiPost(request, '/devices/register', { platform: 'ios', pushToken, wakeKeyPublic: wakeKey }, deviceKey)
 }
 
 // ── Given ───────────────────────────────────────────────────────────

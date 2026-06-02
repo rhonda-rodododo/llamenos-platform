@@ -183,6 +183,9 @@ final class DeviceLinkViewModel {
         relayURL = "wss://\(relayPart)"
         provisioningRoomId = roomId
 
+        // Transition to connecting state before launching the async connection
+        currentStep = .connecting
+
         // Start the connection
         Task {
             await connectToProvisioningRoom()
