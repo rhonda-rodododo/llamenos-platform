@@ -475,12 +475,12 @@ When(
     expect(target!.noteIds.length, `"${targetName}" has no notes to target`).toBeGreaterThan(0)
 
     const noteId = target!.noteIds[0]
-    const { encryptedContent } = await encryptForTest('tampered content by non-author', [actor!.nsec])
+    const { encryptedContent } = await encryptForTest('tampered content by non-author', [actor!.deviceKey])
     const status = await testEndpointAccess(
       request,
       'PATCH',
       `/notes/${noteId}`,
-      actor!.nsec,
+      actor!.deviceKey,
       { encryptedContent },
     )
     getIsolationState(world).lastUpdateStatus = status
@@ -552,7 +552,7 @@ When(
 
     const { encryptedContent, envelopes } = await encryptForTest(
       `${volName}'s dedicated hub note`,
-      [user!.nsec, ADMIN_SEED],
+      [user!.deviceKey, ADMIN_SEED],
     )
     const res = await apiPost<{ note?: { id?: string }; id?: string }>(
       request,
@@ -562,7 +562,7 @@ When(
         callId: `hub-iso-${Date.now()}-${volName}`,
         adminEnvelopes: envelopes,
       },
-      user!.nsec,
+      user!.deviceKey,
     )
     if (res.status === 200 || res.status === 201) {
       const noteId = res.data.note?.id ?? res.data.id
@@ -584,7 +584,7 @@ Then(
     const { status, data } = await apiGet<{ notes: Array<{ id: string }> }>(
       request,
       `/hubs/${ownHubEntry!.hubId}/notes`,
-      viewer!.nsec,
+      viewer!.deviceKey,
     )
     expect(status, `expected 200 listing own hub "${ownHubLabel}"`).toBe(200)
 
@@ -618,7 +618,7 @@ Then(
     const { status, data } = await apiGet<{ notes: Array<{ id: string }> }>(
       request,
       `/hubs/${hubEntry!.hubId}/notes`,
-      viewer!.nsec,
+      viewer!.deviceKey,
     )
     expect(status, `expected 200 for ${viewerName} accessing hub ${hubLabel}`).toBe(200)
 
