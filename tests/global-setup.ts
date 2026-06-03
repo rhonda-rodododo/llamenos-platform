@@ -176,11 +176,32 @@ export default async function globalSetup(_config: FullConfig): Promise<void> {
     )
   }
 
-  // Phase 2: Initialize test state
+  // Phase 2: Initialize test state (public schema — used by bootstrap project)
   console.log('[global-setup] Backend ready — initializing test state')
   await resetTestState(BACKEND_URL)
   await bootstrapAdmin(BACKEND_URL)
   await verifyAdminAccess(BACKEND_URL)
   await ensureDefaultHub(BACKEND_URL)
   console.log('[global-setup] Test state initialized successfully')
+
+  // Phase 3: Create per-worker PostgreSQL schemas for parallel test isolation.
+  // Each Playwright worker gets its own schema so concurrent tests don't
+  // share database state. Workers send X-Test-Worker-Index header to route
+  // requests to worker-specific services backed by isolated schemas.
+  const workerCount = parseInt(process.env.TEST_WORKER_COUNT || '0', 10)
+  if (workerCount > 0) {
+    console.log(`[global-setup] Creating ${workerCount} per-worker PostgreSQL schemas...`)
+    const { createWorkerSchemas, initWorkerSchema } = await import('./worker-db-setup')
+    await createWorkerSchemas(workerCount)
+
+    // Initialize each schema with default data (roles, settings, admin)
+    const testSecret = loadDevVarsSecret() || 'test-reset-secret'
+    const seedBytes = hexToBytes(ADMIN_SEED)
+    const adminPubkey = bytesToHex(ed25519.getPublicKey(seedBytes))
+
+    for (let i = 0; i < workerCount; i++) {
+      await initWorkerSchema(i, BACKEND_URL, testSecret, adminPubkey)
+    }
+    console.log(`[global-setup] Per-worker schemas initialized`)
+  }
 }

@@ -50,6 +50,25 @@ export function getDb(): Database {
 }
 
 /**
+ * Create an isolated Drizzle database instance (non-singleton).
+ * Used for per-worker test isolation — each worker gets its own connection pool
+ * with a search_path pointing to a worker-specific PostgreSQL schema.
+ */
+export function createIsolatedDatabase(databaseUrl: string, poolSize = 3): Database {
+  const idleTimeoutRaw = process.env.PG_IDLE_TIMEOUT
+  const idleTimeout = idleTimeoutRaw !== undefined ? parseInt(idleTimeoutRaw, 10) : 0
+
+  const client = new SQL({
+    url: databaseUrl,
+    max: poolSize,
+    idleTimeout,
+    connectionTimeout: 30,
+  })
+
+  return drizzle({ client, schema })
+}
+
+/**
  * Close the database connection.
  */
 export async function closeDb(): Promise<void> {
@@ -60,6 +79,14 @@ export async function closeDb(): Promise<void> {
     db = null
     logger.info('Connection closed')
   }
+}
+
+/**
+ * Close an isolated database instance returned by createIsolatedDatabase().
+ */
+export async function closeIsolatedDb(isolatedDb: Database): Promise<void> {
+  const bunDb = isolatedDb as BunSQLDatabase<typeof schema> & { $client: SQL }
+  await bunDb.$client.close()
 }
 
 // Re-export schema for convenience

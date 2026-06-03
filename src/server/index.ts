@@ -7,7 +7,8 @@
  */
 import 'reflect-metadata' // Required by @peculiar/x509 → tsyringe (transitive dep of @simplewebauthn/server)
 import { Hono } from 'hono'
-import { createDatabase, closeDb, getDb, schema } from '../../apps/worker/db'
+import { createDatabase, createIsolatedDatabase, closeDb, closeIsolatedDb, getDb, schema } from '../../apps/worker/db'
+import type { Database } from '../../apps/worker/db'
 import { eq, count } from 'drizzle-orm'
 import { cleanupExpiredNonces } from '../../apps/worker/services/webhook-replay'
 import { createServices, type Services } from '../../apps/worker/services'
@@ -73,6 +74,42 @@ const services: Services = createServices(db, {
   },
 })
 console.log('[llamenos] Services initialized')
+
+// --- Per-worker test isolation (ENVIRONMENT=development only) ---
+// When TEST_WORKER_COUNT is set, create isolated service instances for each
+// Playwright worker. Each gets its own PostgreSQL schema via search_path,
+// preventing parallel test workers from interfering with each other's data.
+const testWorkerCount = parseInt(process.env.TEST_WORKER_COUNT || '0', 10)
+const workerServices = new Map<string, Services>()
+const workerDbs: Database[] = []
+
+if (testWorkerCount > 0 && (process.env.ENVIRONMENT === 'development' || process.env.ENVIRONMENT === 'test')) {
+  const serviceOpts = {
+    hmacSecret,
+    firehoseSealKey,
+    notifierUrl,
+    notifierApiKey,
+    notifierTokenSecret,
+    env: {
+      ADMIN_PUBKEY: readSecret('admin-pubkey', 'ADMIN_PUBKEY'),
+      ADMIN_DECRYPTION_PUBKEY: process.env.ADMIN_DECRYPTION_PUBKEY || undefined,
+      SERVER_SECRET: serverSecret || undefined,
+      ENVIRONMENT: process.env.ENVIRONMENT || undefined,
+      DOMAIN: process.env.DOMAIN || undefined,
+    },
+  }
+
+  for (let i = 0; i < testWorkerCount; i++) {
+    const schemaName = `test_worker_${i}`
+    // PostgreSQL search_path via connection options — each worker pool uses its own schema
+    const sep = databaseUrl.includes('?') ? '&' : '?'
+    const workerUrl = `${databaseUrl}${sep}options=-csearch_path%3D${schemaName}%2Cpublic`
+    const wdb = createIsolatedDatabase(workerUrl, 3)
+    workerDbs.push(wdb)
+    workerServices.set(String(i), createServices(wdb, serviceOpts))
+  }
+  console.log(`[llamenos] Created ${testWorkerCount} per-worker isolated service instances`)
+}
 
 // --- Startup: warn if any plaintext (un-encrypted) contacts exist ---
 try {
@@ -210,13 +247,21 @@ const { default: workerApp } = await import('../../apps/worker/app')
 
 const app = new Hono<AppEnv>()
 
-// Inject env bindings and services into every request
+// Inject env bindings and services into every request.
+// When X-Test-Worker-Index header is present and per-worker isolation is enabled,
+// route to the worker-specific services (isolated PostgreSQL schema).
 /* eslint-disable @typescript-eslint/no-explicit-any -- Hono context type bridging across module boundaries */
 app.use('*', async (c, next) => {
   // Dev server bootstrap: env is built from process.env, not from Hono bindings
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ;(c as unknown as { env: Record<string, unknown> }).env = env
-  c.set('services', services)
+
+  const workerIndex = c.req.header('X-Test-Worker-Index')
+  if (workerIndex && workerServices.has(workerIndex)) {
+    c.set('services', workerServices.get(workerIndex)!)
+  } else {
+    c.set('services', services)
+  }
   await next()
 })
 /* eslint-enable @typescript-eslint/no-explicit-any */
@@ -288,6 +333,10 @@ const shutdown = async () => {
   clearInterval(outboxCleanupTimer)
   services.firehoseAgent?.shutdown()
   services.scheduler.stop()
+  // Close per-worker isolated databases
+  for (const wdb of workerDbs) {
+    await closeIsolatedDb(wdb).catch(() => {})
+  }
   await closeDb()
   console.log('[llamenos] Server stopped')
   process.exit(0)
