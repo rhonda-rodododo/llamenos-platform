@@ -213,19 +213,10 @@ dev.post('/test-promote-admin', async (c) => {
     return c.json({ error: `Invalid pubkey: ${e instanceof Error ? e.message : String(e)}` }, 400)
   }
   const services = c.get('services')
-  // Try to update existing volunteer to super-admin role.
-  try {
-    await services.identity.updateUser(pubkey, { roles: ['role-super-admin'] }, true)
-  } catch {
-    // Volunteer may not exist yet — create with admin role
-    await services.identity.createUser({
-      pubkey,
-      name: 'BDD Test Admin',
-      phone: '+15550000001',
-      roleIds: ['role-super-admin'],
-      encryptedSecretKey: '',
-    })
-  }
+  // Use ensureInit which does INSERT ... ON CONFLICT DO UPDATE SET roles = ['role-super-admin'].
+  // This is atomic and race-safe — unlike the old updateUser/createUser pattern which could
+  // fail if the user was created by a concurrent request between the two calls.
+  await services.identity.ensureInit(pubkey, false)
   return c.json({ ok: true, pubkey })
 })
 
