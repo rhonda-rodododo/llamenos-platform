@@ -532,7 +532,7 @@ Given(
     const isoState = getIsolationState(world)
     isoState.users.set(volName, {
       name: volName,
-      nsec: vol.seedHex,
+      deviceKey: vol.seedHex,
       pubkey: vol.pubkey,
       noteIds: [],
       reportIds: [],
