@@ -213,19 +213,10 @@ dev.post('/test-promote-admin', async (c) => {
     return c.json({ error: `Invalid pubkey: ${e instanceof Error ? e.message : String(e)}` }, 400)
   }
   const services = c.get('services')
-  // Try to update existing volunteer to super-admin role.
-  try {
-    await services.identity.updateUser(pubkey, { roles: ['role-super-admin'] }, true)
-  } catch {
-    // Volunteer may not exist yet — create with admin role
-    await services.identity.createUser({
-      pubkey,
-      name: 'BDD Test Admin',
-      phone: '+15550000001',
-      roleIds: ['role-super-admin'],
-      encryptedSecretKey: '',
-    })
-  }
+  // Use ensureInit which does INSERT ... ON CONFLICT DO UPDATE SET roles = ['role-super-admin'].
+  // This is atomic and race-safe — unlike the old updateUser/createUser pattern which could
+  // fail if the user was created by a concurrent request between the two calls.
+  await services.identity.ensureInit(pubkey, false)
   return c.json({ ok: true, pubkey })
 })
 
@@ -1092,7 +1083,11 @@ dev.post('/test-create-hub', async (c) => {
   // Add admin as a member of the new hub so WS relay subscribe works in tests.
   // This is CRITICAL for E2E — without hub membership, all hub-scoped API calls
   // return 403 and the frontend fails to render hub pages.
-  const adminPubkey = c.env?.ADMIN_PUBKEY as string | undefined
+  // Accept adminPubkey from request body as fallback — local dev may not have
+  // ADMIN_PUBKEY set in env, but the test helper knows the admin pubkey.
+  const bodyAdminPubkey = typeof rawBody === 'object' && rawBody !== null && 'adminPubkey' in rawBody && typeof rawBody.adminPubkey === 'string'
+    ? rawBody.adminPubkey : undefined
+  const adminPubkey = (c.env?.ADMIN_PUBKEY as string | undefined) || bodyAdminPubkey
   if (adminPubkey) {
     // Ensure the admin user exists before attempting setHubRole. During parallel
     // test startup, test-create-hub can race with test-reset/ensureInit — the

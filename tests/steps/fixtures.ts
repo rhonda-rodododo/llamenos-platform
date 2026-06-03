@@ -1,6 +1,6 @@
 import { type APIRequestContext } from '@playwright/test'
 import { test as base, createBdd } from 'playwright-bdd'
-import { createHubViaApi } from '../api-helpers'
+import { createHubViaApi, ensureAdminRole } from '../api-helpers'
 
 // ── Scenario-scoped World types ──────────────────────────────────────
 // Each scenario gets a fresh instance via fixture. Step definitions read/write
@@ -159,6 +159,10 @@ export const test = base.extend<
   workerHub: [async ({ playwright }, use, workerInfo) => {
     const backendUrl = process.env.TEST_HUB_URL || 'http://localhost:3000'
     const ctx = await playwright.request.newContext({ baseURL: backendUrl, timeout: 60_000 })
+    // Ensure admin has role-super-admin before creating hub — parallel workers
+    // can race with test-reset, leaving the admin with role-volunteer which
+    // causes cascading 403 failures on all hub-scoped and permission-guarded routes.
+    await ensureAdminRole(ctx)
     const name = `test-hub-${workerInfo.workerIndex}-${Date.now()}`
     const hubId = await createHubViaApi(ctx, name)
     // Verify admin has hub membership — without this, all hub-scoped API calls

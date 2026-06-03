@@ -221,7 +221,12 @@ export async function createHubViaApi(
   // Use the test-create-hub endpoint (dev.ts) which bypasses permission checks
   // and only requires the X-Test-Secret header. The authenticated /api/hubs POST
   // requires system:manage-hubs which the bootstrap admin may not have.
-  const { status, data } = await devPost<{ id: string }>(request, '/test-create-hub', { name })
+  // Pass adminPubkey so the endpoint can add the admin as a hub member even when
+  // ADMIN_PUBKEY env var is not set (local dev without .env).
+  const { status, data } = await devPost<{ id: string }>(request, '/test-create-hub', {
+    name,
+    adminPubkey: seedHexToPubkey(ADMIN_SEED),
+  })
   if (status !== 200) {
     throw new Error(`Failed to create hub: ${status}`)
   }
@@ -257,49 +262,78 @@ export async function deleteHubViaApi(
 }
 
 /**
+ * Ensure the admin user has the correct global role (role-super-admin).
+ * Uses the dev endpoint which bypasses auth and directly sets the role.
+ * This prevents cascading 403 failures when the admin's role gets
+ * downgraded to role-volunteer during parallel test-reset races.
+ */
+export async function ensureAdminRole(
+  request: APIRequestContext,
+): Promise<void> {
+  const { status } = await devPost(request, '/test-promote-admin', {
+    pubkey: seedHexToPubkey(ADMIN_SEED),
+  })
+  if (status !== 200) {
+    console.warn(`[ensureAdminRole] test-promote-admin returned ${status}`)
+  }
+}
+
+/**
  * Verify that the admin user has membership in the given hub.
  * Makes an authenticated API call to a hub-scoped endpoint and checks
  * the response is not 403 (Access denied). If membership is missing,
  * retries by re-adding the admin via the test-create-hub membership path.
  *
- * This catches the silent failure case where test-create-hub's setHubRole
- * failed (e.g., admin user not yet committed to DB during concurrent bootstrap).
+ * Also ensures the admin has the correct global role (role-super-admin)
+ * before checking hub access — a downgraded global role causes 403s on
+ * permission-guarded routes even when hub membership is correct.
  */
 export async function verifyHubMembership(
   request: APIRequestContext,
   hubId: string,
 ): Promise<void> {
+  // First ensure admin has role-super-admin globally — without this,
+  // even correct hub membership won't grant admin-level permissions.
+  await ensureAdminRole(request)
+
   // Try a hub-scoped endpoint that requires any permission
   const { status } = await apiGet<unknown>(request, `/hubs/${hubId}/notes?limit=1`)
   if (status === 200) return // Admin has access
 
   if (status === 403) {
     console.warn(`[verifyHubMembership] Admin lacks membership in hub ${hubId} — re-adding via API`)
-    // Re-add admin as hub member via the hub members endpoint
-    const { status: addStatus } = await apiPost(request, `/hubs/${hubId}/members`, {
+    // Re-add admin as hub member via the dev endpoint (bypasses auth)
+    const { status: devStatus } = await devPost(request, '/test-add-hub-member', {
+      hubId,
       pubkey: seedHexToPubkey(ADMIN_SEED),
       roleIds: ['role-super-admin'],
     })
-    if (addStatus !== 200 && addStatus !== 201 && addStatus !== 204 && addStatus !== 409) {
-      // Try the dev endpoint as fallback
-      const { status: devStatus } = await devPost(request, '/test-add-hub-member', {
-        hubId,
+    if (devStatus !== 200) {
+      // Fallback: try the authenticated endpoint
+      const { status: addStatus } = await apiPost(request, `/hubs/${hubId}/members`, {
         pubkey: seedHexToPubkey(ADMIN_SEED),
         roleIds: ['role-super-admin'],
       })
-      if (devStatus !== 200) {
+      if (addStatus !== 200 && addStatus !== 201 && addStatus !== 204 && addStatus !== 409) {
         throw new Error(
           `Failed to ensure admin hub membership for hub ${hubId}: ` +
-          `notes returned ${status}, add-member returned ${addStatus}, dev-add returned ${devStatus}`
+          `notes returned ${status}, dev-add returned ${devStatus}, add-member returned ${addStatus}`
         )
       }
     }
-    // Verify again
+    // Brief delay for DB commit propagation, then verify
+    await new Promise(r => setTimeout(r, 100))
     const { status: retryStatus } = await apiGet<unknown>(request, `/hubs/${hubId}/notes?limit=1`)
     if (retryStatus === 403) {
-      throw new Error(
-        `Admin still lacks hub membership after re-add for hub ${hubId} (status: ${retryStatus})`
-      )
+      // One more attempt: re-ensure admin role and retry
+      await ensureAdminRole(request)
+      await new Promise(r => setTimeout(r, 200))
+      const { status: finalStatus } = await apiGet<unknown>(request, `/hubs/${hubId}/notes?limit=1`)
+      if (finalStatus === 403) {
+        throw new Error(
+          `Admin still lacks hub membership after re-add for hub ${hubId} (status: ${finalStatus})`
+        )
+      }
     }
   }
   // 401 or other errors during verification are non-fatal — the test itself will catch them
