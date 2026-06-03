@@ -221,7 +221,12 @@ export async function createHubViaApi(
   // Use the test-create-hub endpoint (dev.ts) which bypasses permission checks
   // and only requires the X-Test-Secret header. The authenticated /api/hubs POST
   // requires system:manage-hubs which the bootstrap admin may not have.
-  const { status, data } = await devPost<{ id: string }>(request, '/test-create-hub', { name })
+  // Pass adminPubkey so the endpoint can add the admin as a hub member even when
+  // ADMIN_PUBKEY env var is not set (local dev without .env).
+  const { status, data } = await devPost<{ id: string }>(request, '/test-create-hub', {
+    name,
+    adminPubkey: seedHexToPubkey(ADMIN_SEED),
+  })
   if (status !== 200) {
     throw new Error(`Failed to create hub: ${status}`)
   }

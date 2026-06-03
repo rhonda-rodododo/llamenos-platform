@@ -1083,7 +1083,11 @@ dev.post('/test-create-hub', async (c) => {
   // Add admin as a member of the new hub so WS relay subscribe works in tests.
   // This is CRITICAL for E2E — without hub membership, all hub-scoped API calls
   // return 403 and the frontend fails to render hub pages.
-  const adminPubkey = c.env?.ADMIN_PUBKEY as string | undefined
+  // Accept adminPubkey from request body as fallback — local dev may not have
+  // ADMIN_PUBKEY set in env, but the test helper knows the admin pubkey.
+  const bodyAdminPubkey = typeof rawBody === 'object' && rawBody !== null && 'adminPubkey' in rawBody && typeof rawBody.adminPubkey === 'string'
+    ? rawBody.adminPubkey : undefined
+  const adminPubkey = (c.env?.ADMIN_PUBKEY as string | undefined) || bodyAdminPubkey
   if (adminPubkey) {
     // Ensure the admin user exists before attempting setHubRole. During parallel
     // test startup, test-create-hub can race with test-reset/ensureInit — the
