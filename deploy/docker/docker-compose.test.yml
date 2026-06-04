@@ -32,9 +32,6 @@ services:
       - DEV_ROUTES_ENABLED=true
       - DEV_RESET_SECRET=${DEV_RESET_SECRET:-test-reset-secret}
       - TOKEN_MAX_AGE_MS=${TOKEN_MAX_AGE_MS:-3600000}
-      # Per-worker DB isolation: backend creates isolated PostgreSQL schemas
-      # when this is set, routing requests via X-Test-Worker-Index header.
-      - TEST_WORKER_COUNT=${TEST_WORKER_COUNT:-4}
       # Wire up sidecar services so integration tests can reach them
       - NOTIFIER_URL=http://signal-notifier:3100
       - NOTIFIER_API_KEY=${NOTIFIER_API_KEY:-ci-test-notifier-key}

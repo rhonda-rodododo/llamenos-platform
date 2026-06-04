@@ -402,7 +402,6 @@ jobs:
           DEV_RESET_SECRET: test-reset-secret
           E2E_TEST_SECRET: test-reset-secret
           DATABASE_URL: postgresql://llamenos:ci-test-password@localhost:5432/llamenos
-          TEST_WORKER_COUNT: "4"
 
       - name: Stop Vite preview server
         if: always()
@@ -528,7 +527,6 @@ jobs:
           SERVER_SECRET: "0000000000000000000000000000000000000000000000000000000000000001"
           # sip-bridge exposed on host port 3001 via docker-compose.test.yml
           SIP_BRIDGE_URL: http://localhost:3001
-          TEST_WORKER_COUNT: "4"
 
       - name: Tear down Docker Compose
         if: always()

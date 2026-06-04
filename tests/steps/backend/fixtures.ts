@@ -13,10 +13,6 @@ import { createHubViaApi, deleteHubViaApi } from '../../api-helpers'
  *
  * `workerHub` is a test-scoped hub ID — each scenario gets its own isolated
  * hub so tests never see state created by other scenarios.
- *
- * When TEST_WORKER_COUNT is set, the `request` context includes an
- * X-Test-Worker-Index header to route API calls to the worker's isolated
- * PostgreSQL schema.
  */
 export const test = base.extend<
   { world: Record<string, unknown>; workerHub: string }

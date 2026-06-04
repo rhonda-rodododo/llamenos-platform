@@ -72,15 +72,9 @@ export const test = base.extend<
 >({
   // Backend API request context — targets the backend server directly (not the Vite preview).
   // Used by CMS step definitions that need to call API helpers for Given-step data setup.
-  // Includes X-Test-Worker-Index header when worker isolation is enabled so the backend
-  // routes requests to the correct per-worker PostgreSQL schema.
-  backendRequest: async ({ playwright }, use, workerInfo) => {
+  backendRequest: async ({ playwright }, use) => {
     const backendUrl = process.env.TEST_HUB_URL || 'http://localhost:3000'
-    const extraHeaders: Record<string, string> = {}
-    if (process.env.TEST_WORKER_COUNT) {
-      extraHeaders['X-Test-Worker-Index'] = String(workerInfo.workerIndex)
-    }
-    const ctx = await playwright.request.newContext({ baseURL: backendUrl, extraHTTPHeaders: extraHeaders })
+    const ctx = await playwright.request.newContext({ baseURL: backendUrl })
     await use(ctx)
     await ctx.dispose()
   },
@@ -162,15 +156,9 @@ export const test = base.extend<
   // Worker-scoped hub: created once per Playwright worker process.
   // Each worker gets its own isolated hub so parallel tests don't share state.
   // Hub is NOT deleted after tests — stale hubs accumulate and are purged separately.
-  // When TEST_WORKER_COUNT is set, includes X-Test-Worker-Index header to route
-  // API calls to the worker's isolated PostgreSQL schema.
   workerHub: [async ({ playwright }, use, workerInfo) => {
     const backendUrl = process.env.TEST_HUB_URL || 'http://localhost:3000'
-    const extraHeaders: Record<string, string> = {}
-    if (process.env.TEST_WORKER_COUNT) {
-      extraHeaders['X-Test-Worker-Index'] = String(workerInfo.workerIndex)
-    }
-    const ctx = await playwright.request.newContext({ baseURL: backendUrl, timeout: 60_000, extraHTTPHeaders: extraHeaders })
+    const ctx = await playwright.request.newContext({ baseURL: backendUrl, timeout: 60_000 })
     // Ensure admin has role-super-admin before creating hub — parallel workers
     // can race with test-reset, leaving the admin with role-volunteer which
     // causes cascading 403 failures on all hub-scoped and permission-guarded routes.

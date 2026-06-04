@@ -27,7 +27,6 @@ export default defineConfig({
     : [["list"]],
   timeout: process.env.CI ? 60_000 : 30_000,
   globalSetup: './tests/global-setup.ts',
-  globalTeardown: './tests/global-teardown.ts',
   expect: {
     timeout: process.env.CI ? 15_000 : 10_000,
   },
