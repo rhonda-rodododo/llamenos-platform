@@ -224,8 +224,15 @@ config.get('/pins',
  * Private key seeds are stored server-side (this file) and MUST NOT appear in
  * client bundles. This endpoint is the single fetch point.
  */
-config.get('/demo/credentials', (c) => {
-  const demoMode = c.env.DEMO_MODE === 'true'
+config.get('/demo/credentials', async (c) => {
+  const services = c.get('services')
+  let demoMode = c.env.DEMO_MODE === 'true'
+  if (!demoMode) {
+    try {
+      const setupState = await services.settings.getSetupState()
+      demoMode = (setupState as SetupState & { demoMode?: boolean }).demoMode ?? false
+    } catch { /* default to false */ }
+  }
   if (!demoMode) {
     return c.json({ error: 'Not Found' }, 404)
   }
