@@ -22,7 +22,7 @@ import { enterPin, Timeouts } from '../../helpers'
  */
 async function testInvoke(page: import('@playwright/test').Page, cmd: string, args?: Record<string, unknown>) {
   // Ensure __TEST_PLATFORM is available and trigger tauri-core lazy load
-  await page.waitForFunction(() => !!(window as Record<string, unknown>).__TEST_PLATFORM, { timeout: 10000 })
+  await page.waitForFunction(() => !!(window as Record<string, unknown>).__TEST_PLATFORM, { timeout: Timeouts.AUTH })
 
   // Trigger tauri-core chunk load by calling a platform function
   await page.evaluate(async () => {
@@ -59,7 +59,7 @@ Then('I should not see a lockout timer', async ({ page }) => {
 Given('I have {int} failed PIN attempts', async ({ page }, count: number) => {
   // Seed the mock with N failed attempts.
   // Wait for __TEST_PLATFORM which is set in the same module that registers the test invoke symbol.
-  await page.waitForFunction(() => !!(window as Record<string, unknown>).__TEST_PLATFORM, { timeout: 10000 })
+  await page.waitForFunction(() => !!(window as Record<string, unknown>).__TEST_PLATFORM, { timeout: Timeouts.AUTH })
   await seedFailedAttempts(page, count)
 })
 
@@ -145,7 +145,7 @@ Then('I should not be able to enter a PIN until lockout expires', async ({ page 
 
 Given('the lockout has expired', async ({ page }) => {
   // Wait for test platform to be ready
-  await page.waitForFunction(() => !!(window as Record<string, unknown>).__TEST_PLATFORM, { timeout: 10000 })
+  await page.waitForFunction(() => !!(window as Record<string, unknown>).__TEST_PLATFORM, { timeout: Timeouts.AUTH })
   // Clear the lockout timer (simulates timer expiry) — keeps attempt count unchanged
   await testInvoke(page, 'expire_pin_lockout')
 })

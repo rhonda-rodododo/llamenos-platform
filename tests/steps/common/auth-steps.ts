@@ -53,7 +53,7 @@ Given('an identity exists with PIN {string}', async ({ page }, pin: string) => {
   await page.waitForLoadState('domcontentloaded')
 
   // Wait for __TEST_PLATFORM to be loaded (set asynchronously in main.tsx)
-  await page.waitForFunction(() => !!(window as Record<string, unknown>).__TEST_PLATFORM, { timeout: 10000 })
+  await page.waitForFunction(() => !!(window as Record<string, unknown>).__TEST_PLATFORM, { timeout: Timeouts.AUTH })
 
   // Import key via test platform shim: persists encrypted keys then locks — leaving the
   // app in the "locked, PIN required" state that these scenarios test.
@@ -117,7 +117,7 @@ Given('I have a stored identity with PIN {string}', async ({ page }, pin: string
   await page.waitForLoadState('domcontentloaded')
 
   // Wait for __TEST_PLATFORM to be loaded (set asynchronously in main.tsx)
-  await page.waitForFunction(() => !!(window as Record<string, unknown>).__TEST_PLATFORM, { timeout: 10000 })
+  await page.waitForFunction(() => !!(window as Record<string, unknown>).__TEST_PLATFORM, { timeout: Timeouts.AUTH })
 
   await page.evaluate(async ({ secretHex, pin }) => {
     const platform = (window as Record<string, unknown>).__TEST_PLATFORM as {

@@ -290,7 +290,7 @@ export async function loginAsAdmin(page: Page) {
     await page.reload()
     await page.waitForLoadState('domcontentloaded')
 
-    await page.waitForFunction(() => !!(window as any).__TEST_PLATFORM, { timeout: 10000 })
+    await page.waitForFunction(() => !!(window as any).__TEST_PLATFORM, { timeout: Timeouts.AUTH })
 
     const secretHex = ADMIN_SEED
     await page.evaluate(async ({ secretHex, pin }) => {
@@ -348,7 +348,7 @@ export async function loginAsVolunteer(page: Page, seedHex: string) {
   await page.waitForLoadState('domcontentloaded')
 
   // Wait for __TEST_PLATFORM to be loaded
-  await page.waitForFunction(() => !!(window as any).__TEST_PLATFORM, { timeout: 10000 })
+  await page.waitForFunction(() => !!(window as any).__TEST_PLATFORM, { timeout: Timeouts.AUTH })
 
   // Import Ed25519 seed
   await page.evaluate(async ({ secretHex, pin }) => {
