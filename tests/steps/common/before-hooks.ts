@@ -1,8 +1,6 @@
-import { test, Before } from '../fixtures'
+import { Before } from '../fixtures'
 
-Before(async ({ page, workerHub }) => {
-  const { workerIndex } = test.info()
-
+Before(async ({ page, workerHub }, { workerIndex }) => {
   // Use addInitScript so the hub ID persists across page navigations.
   // The ConfigProvider in config.tsx checks window.__TEST_WORKER_HUB and uses it
   // instead of the server's default hub, ensuring all API calls are hub-scoped
