@@ -389,7 +389,7 @@ jobs:
           done
 
       - name: Run E2E tests
-        run: bunx playwright test --project=bootstrap --project=bdd --shard=${{ matrix.shard }}/2
+        run: bunx playwright test --project=bootstrap --project=bdd --shard=${{ matrix.shard }}/2 --workers=1
         env:
           CI: "true"
           PLAYWRIGHT_BASE_URL: "http://localhost:8788"
