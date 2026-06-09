@@ -9,12 +9,13 @@
 
 ## Executive Summary
 
-The Llamenos protocol implementation is **substantially compliant** across all four platforms. The shared Rust crypto crate (`packages/crypto`) serves as a single auditable implementation for all cryptographic operations, and all platforms correctly route crypto through this crate (desktop via native Rust, iOS via UniFFI XCFramework, Android via JNI). No raw string literals for crypto labels were found in any platform — all use generated or imported constants.
+The Llamenos protocol implementation is **substantially compliant** across all four platforms. The shared Rust crypto crate (`packages/crypto`) serves as a single auditable implementation for all cryptographic operations, and all platforms correctly route crypto through this crate (desktop via native Rust, iOS via UniFFI XCFramework, Android via JNI).
 
 **Critical findings:**
 1. **TypeScript crypto-labels drift** — `packages/shared/crypto-labels.ts` exports only 47 of 91 labels defined in the source of truth (`crypto-labels.json`). The Rust crate has all 91. The backend and desktop TypeScript code currently only uses labels present in the TS module, but any new feature using the 44 missing labels would need to add them manually, risking raw string usage.
 2. **3 TypeScript-only labels** — `LABEL_FIREHOSE_AGENT_SEAL`, `LABEL_FIREHOSE_BUFFER_ENCRYPT`, `LABEL_FIREHOSE_REPORT_WRAP` exist in `packages/shared/crypto-labels.ts` but NOT in `crypto-labels.json` or the Rust crate. These firehose labels are used in production backend code.
-3. **Mobile platforms are partially implemented** — iOS and Android have complete crypto service layers via UniFFI/JNI but rely on mock/placeholder implementations until native crypto libs are linked in CI.
+3. **Desktop frontend raw string literals** — 11 raw crypto label strings found in `src/client/` (platform.ts, recovery components, platform roles). These bypass the `@shared/crypto-labels` module and violate the Albrecht defense principle (all label strings should be imported from a single source of truth).
+4. **Mobile platforms are partially implemented** — iOS and Android have complete crypto service layers via UniFFI/JNI but rely on mock/placeholder implementations until native crypto libs are linked in CI.
 
 ---
 
@@ -143,15 +144,29 @@ These are used by backend firehose code but were never added to `crypto-labels.j
 
 ### 2.3 Raw String Literal Violations (Albrecht Defense)
 
-**No violations found.** All platforms import crypto label constants from their respective sources:
+**11 violations found in desktop frontend.** iOS, Android, and backend correctly import from their respective label sources. The desktop TypeScript frontend has raw crypto label strings that bypass `@shared/crypto-labels`:
 
-| Platform | Import Source | Mechanism |
-|----------|-------------|-----------|
-| Desktop (Rust) | `packages/crypto/src/labels.rs` | Native Rust `const` |
-| Desktop (TS frontend) | `@shared/crypto-labels` | TypeScript `import` |
-| iOS | `CryptoLabels` (codegen) | Swift `enum` from codegen |
-| Android | `org.llamenos.protocol.CryptoLabels` (codegen) | Kotlin `object` from codegen |
-| Backend | `@shared/crypto-labels` | TypeScript `import` |
+| Platform | Import Source | Mechanism | Status |
+|----------|-------------|-----------|--------|
+| Desktop (Rust) | `packages/crypto/src/labels.rs` | Native Rust `const` | ✅ Clean |
+| Desktop (TS frontend) | `@shared/crypto-labels` | TypeScript `import` | ⚠️ 11 raw strings |
+| iOS | `CryptoLabels` (codegen) | Swift `enum` from codegen | ✅ Clean |
+| Android | `org.llamenos.protocol.CryptoLabels` (codegen) | Kotlin `object` from codegen | ✅ Clean |
+| Backend | `@shared/crypto-labels` | TypeScript `import` | ✅ Clean |
+
+**Desktop raw string violations:**
+
+| File | Line(s) | Raw String | Should Use |
+|------|---------|------------|------------|
+| `src/client/lib/platform.ts` | 883, 893, 920 | `'llamenos:note-key'` | `LABEL_NOTE_KEY` |
+| `src/client/lib/platform.ts` | 951, 986 | `'llamenos:message'` | `LABEL_MESSAGE` |
+| `src/client/lib/platform.ts` | 1016 | `'llamenos:call-meta'` | `LABEL_CALL_META` |
+| `src/client/components/admin-sections/platform-roles-section.tsx` | 23–24 | `'llamenos:platform-role-name-encrypt:v1'`, `'llamenos:platform-role-desc-encrypt:v1'` | Missing from `crypto-labels.ts` (present in JSON) |
+| `src/client/components/account-recovery-flow.tsx` | 111 | `'llamenos:recovery-group:share-contribute:v1'` | Missing from `crypto-labels.ts` (present in JSON) |
+| `src/client/components/admin-settings/recovery-group-section.tsx` | 117 | `'llamenos:recovery-group:share-wrap:v1'` | Missing from `crypto-labels.ts` (present in JSON) |
+| `src/client/components/admin-settings/recovery-requests-section.tsx` | 109, 129 | `'llamenos:recovery-group:share-wrap:v1'`, `'llamenos:recovery-group:share-contribute:v1'` | Missing from `crypto-labels.ts` (present in JSON) |
+
+**Root cause:** 6 of these 11 violations use labels that exist in `crypto-labels.json` but are among the 44 labels missing from `crypto-labels.ts` (Finding C-1). Developers resorted to raw strings because the constants weren't available to import. The remaining 5 in `platform.ts` use labels that ARE exported from `crypto-labels.ts` — these are straightforward import omissions.
 
 Only occurrences of `"llamenos:"` in iOS/Android code are deep link URL schemes (`llamenos://`), not crypto labels.
 
@@ -416,6 +431,7 @@ Desktop fully implements hub key management via `src/client/lib/hub-key-manager.
 | C-1 | `packages/shared/crypto-labels.ts` missing 44 labels from JSON source of truth | Medium — new features may use raw strings if TS labels aren't added first | Auto-generate `crypto-labels.ts` from `crypto-labels.json` (same as Swift/Kotlin codegen), or add CI guard |
 | C-2 | 3 firehose labels in TS not in JSON | Low — inconsistency between source of truth and runtime | Add `LABEL_FIREHOSE_*` to `crypto-labels.json` |
 | C-3 | Android `LABEL_ID_*` constants hand-maintained | Medium — labelId mismatch would cause decryption failures | Auto-generate from LABEL_REGISTRY or add cross-platform label ID test |
+| C-4 | 11 raw crypto label strings in desktop frontend (`platform.ts`, recovery components, platform roles) | Medium — bypasses Albrecht defense; typo or drift would silently break decryption | Replace with imports from `@shared/crypto-labels` (5 cases); add missing labels to `crypto-labels.ts` first (6 cases, blocked by C-1) |
 
 ### Important (Protocol Compliance)
 
