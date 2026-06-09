@@ -11,7 +11,6 @@ import { hexToBytes, bytesToHex, utf8ToBytes } from '@shared/encoding'
 import { LABEL_DEVICE_AUTH } from '@shared/crypto-labels'
 
 const BASE_URL = process.env.TEST_HUB_URL || 'http://localhost:3000'
-const DEV_TEST_SECRET = process.env.DEV_RESET_SECRET || process.env.E2E_TEST_SECRET || 'test-reset-secret'
 
 // ── State ───────────────────────────────────────────────────────────
 
@@ -59,11 +58,10 @@ function buildBootstrapBody(pubkey: string, seedHex: string): Record<string, unk
 
 // ── Given ───────────────────────────────────────────────────────────
 
-Given('rate limit counters are cleared', async ({ request }) => {
-  // Use dev route to clear rate limit state for a clean test
-  await request.delete(`${BASE_URL}/api/test-rate-limits`, {
-    headers: { 'X-Test-Secret': DEV_TEST_SECRET, 'Content-Type': 'application/json' },
-  })
+Given('rate limit counters are cleared', async () => {
+  // No-op: each scenario uses unique random IPs/pubkeys via randomFakeIp(),
+  // so rate limit buckets are naturally isolated between scenarios.
+  // Global clearing is avoided to prevent race conditions in parallel test workers.
 })
 
 // ── When: Login ─────────────────────────────────────────────────────
