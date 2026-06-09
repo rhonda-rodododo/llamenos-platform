@@ -39,6 +39,9 @@ pub mod sigchain;
 pub mod mls;
 pub mod sframe;
 
+// === KDF parameters (shared across device_keys + encryption) ===
+pub mod kdf_params;
+
 // === Stable modules (curve-independent) ===
 pub mod blind_index;
 pub mod errors;

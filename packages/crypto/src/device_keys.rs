@@ -20,26 +20,7 @@ use zeroize::{Zeroize, Zeroizing};
 
 use crate::ct_hex_eq;
 use crate::errors::CryptoError;
-
-/// KDF version byte stored in encrypted key material for future-proofing.
-/// v2 = Argon2id (64MB, 3 iterations, 4 parallelism).
-const KDF_VERSION: u8 = 2;
-
-/// Argon2id parameters — tuned for GPU/ASIC resistance.
-/// The `test-kdf` feature uses minimal params so emulator tests finish in seconds.
-#[cfg(not(feature = "test-kdf"))]
-const ARGON2_M_COST_KIB: u32 = 65_536; // 64 MB
-#[cfg(not(feature = "test-kdf"))]
-const ARGON2_T_COST: u32 = 3; // 3 iterations
-#[cfg(not(feature = "test-kdf"))]
-const ARGON2_P_COST: u32 = 4; // 4 lanes
-
-#[cfg(feature = "test-kdf")]
-const ARGON2_M_COST_KIB: u32 = 1_024; // 1 MB
-#[cfg(feature = "test-kdf")]
-const ARGON2_T_COST: u32 = 1;
-#[cfg(feature = "test-kdf")]
-const ARGON2_P_COST: u32 = 1;
+use crate::kdf_params::{ARGON2_M_COST_KIB, ARGON2_P_COST, ARGON2_T_COST, KDF_VERSION};
 
 /// Device key state exposed to callers (no secret material).
 #[derive(Debug, Clone, Serialize, Deserialize)]
