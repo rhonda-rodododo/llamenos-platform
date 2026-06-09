@@ -727,11 +727,7 @@ mod tests {
         };
         assert_eq!(hash1, expected_hash1);
         // Pin the expected hash so other platforms can hardcode it
-        assert_eq!(
-            hash1,
-            expected_hash1,
-            "vector 1: genesis entry hash"
-        );
+        assert_eq!(hash1, expected_hash1, "vector 1: genesis entry hash");
 
         // Vector 2: Chained entry (prevHash = some hex string)
         //
