@@ -62,9 +62,11 @@ export function ed25519PubkeyFromSeed(seed: Uint8Array): Uint8Array {
 
 /**
  * HPKE Seal: encrypt plaintext for recipientPk.
+ * The `label` parameter must be a registered domain separation label
+ * (enforced in the real FFI; mock accepts any bytes for test flexibility).
  * Returns: enc(32 bytes) || ciphertext+tag
  */
-export function hpkeSeal(recipientPk: Uint8Array, plaintext: Uint8Array, info: Uint8Array, aad: Uint8Array): Uint8Array {
+export function hpkeSeal(recipientPk: Uint8Array, plaintext: Uint8Array, label: Uint8Array, aad: Uint8Array): Uint8Array {
   // 1. Generate ephemeral X25519 keypair
   const ephSecretKey = randomBytes(32)
   const enc = x25519.getPublicKey(ephSecretKey) // 32 bytes
@@ -75,7 +77,7 @@ export function hpkeSeal(recipientPk: Uint8Array, plaintext: Uint8Array, info: U
   // 3. KDF: derive symmetric key via HKDF
   const kem_context = concatBytes(enc, recipientPk)
   const prk = hkdf(sha256Noble, sharedSecret, new Uint8Array(0), kem_context, 32)
-  const symmetricKey = hkdf(sha256Noble, prk, new Uint8Array(0), info, 32)
+  const symmetricKey = hkdf(sha256Noble, prk, new Uint8Array(0), label, 32)
 
   // 4. AEAD: AES-256-GCM encrypt
   const nonce = randomBytes(12)
@@ -88,9 +90,10 @@ export function hpkeSeal(recipientPk: Uint8Array, plaintext: Uint8Array, info: U
 
 /**
  * HPKE Open: decrypt ciphertext using secretKey.
+ * The `label` parameter must match the label used during seal.
  * envelope = enc(32) || nonce(12) || ciphertext+tag
  */
-export function hpkeOpen(secretKey: Uint8Array, envelope: Uint8Array, info: Uint8Array, aad: Uint8Array): Uint8Array {
+export function hpkeOpen(secretKey: Uint8Array, envelope: Uint8Array, label: Uint8Array, aad: Uint8Array): Uint8Array {
   const enc = envelope.subarray(0, 32)
   const nonce = envelope.subarray(32, 44)
   const ciphertext = envelope.subarray(44)
@@ -104,7 +107,7 @@ export function hpkeOpen(secretKey: Uint8Array, envelope: Uint8Array, info: Uint
   // KDF
   const kem_context = concatBytes(enc, recipientPk)
   const prk = hkdf(sha256Noble, sharedSecret, new Uint8Array(0), kem_context, 32)
-  const symmetricKey = hkdf(sha256Noble, prk, new Uint8Array(0), info, 32)
+  const symmetricKey = hkdf(sha256Noble, prk, new Uint8Array(0), label, 32)
 
   // AEAD decrypt
   const cipher = gcm(symmetricKey, nonce, aad)

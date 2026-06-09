@@ -376,15 +376,17 @@ pub extern "C" fn ffi_aes256gcm_decrypt(
 /// HPKE seal (encrypt for a recipient). Output = enc(32) || ciphertext || tag(16).
 /// Output buffer must be at least 32 + pt_len + 16 bytes.
 ///
-/// Uses the internal hpke_envelope module with raw bytes (no JSON envelope).
+/// The `label` parameter must be a valid UTF-8 domain separation label registered
+/// in the label registry (Albrecht defense). Raw info bytes are NOT accepted —
+/// all HPKE operations must use a registered label for domain separation.
 #[no_mangle]
 pub extern "C" fn ffi_hpke_seal(
     recipient_pk: *const u8,
     pk_len: usize,
     plaintext: *const u8,
     pt_len: usize,
-    info: *const u8,
-    info_len: usize,
+    label: *const u8,
+    label_len: usize,
     aad: *const u8,
     aad_len: usize,
     out: *mut u8,
@@ -392,10 +394,31 @@ pub extern "C" fn ffi_hpke_seal(
 ) -> i32 {
     clear_error();
     check_null!(recipient_pk, out);
-    check_input_size!(pt_len, info_len, aad_len);
+    check_input_size!(pt_len, label_len, aad_len);
 
     if pk_len != 32 {
         set_error("HPKE recipient public key must be 32 bytes");
+        return -5;
+    }
+
+    // Label is required — reject null/empty
+    if label.is_null() || label_len == 0 {
+        set_error("HPKE label is required (domain separation)");
+        return -5;
+    }
+
+    let label_slice = unsafe { std::slice::from_raw_parts(label, label_len) };
+    let label_str = match std::str::from_utf8(label_slice) {
+        Ok(s) => s,
+        Err(_) => {
+            set_error("HPKE label must be valid UTF-8");
+            return -5;
+        }
+    };
+
+    // Albrecht defense: validate label against the registry
+    if crate::labels::label_to_id(label_str).is_none() {
+        set_error(&format!("unknown crypto label: {label_str}"));
         return -5;
     }
 
@@ -404,60 +427,56 @@ pub extern "C" fn ffi_hpke_seal(
 
     let pk_slice = unsafe { std::slice::from_raw_parts(recipient_pk, 32) };
     let pt_slice = nullable_slice!(plaintext, pt_len);
-    let info_slice = nullable_slice!(info, info_len);
     let aad_slice = nullable_slice!(aad, aad_len);
 
-    // Use the hpke crate directly for raw seal
-    use hpke::aead::AesGcm256;
-    use hpke::kdf::HkdfSha256;
-    use hpke::kem::X25519HkdfSha256;
-    use hpke::{Deserializable, Kem as KemTrait, OpModeS, Serializable};
-
-    type Aead = AesGcm256;
-    type Kdf = HkdfSha256;
-    type Kem = X25519HkdfSha256;
-
-    let recipient_pk = match <Kem as KemTrait>::PublicKey::from_bytes(pk_slice) {
-        Ok(pk) => pk,
-        Err(_) => {
-            set_error("invalid X25519 public key");
-            return -5;
-        }
-    };
-
-    let mut rng = hpke_envelope::OsRng09;
-    let (enc, ciphertext) = match hpke::single_shot_seal::<Aead, Kdf, Kem, _>(
-        &OpModeS::Base,
-        &recipient_pk,
-        info_slice,
-        pt_slice,
-        aad_slice,
-        &mut rng,
-    ) {
-        Ok(result) => result,
+    // Route through hpke_envelope which enforces label as HPKE info
+    let pk_hex = hex::encode(pk_slice);
+    let envelope = match hpke_envelope::hpke_seal(pt_slice, &pk_hex, label_str, aad_slice) {
+        Ok(env) => env,
         Err(e) => {
-            set_error(&format!("HPKE seal failed: {e:?}"));
+            set_error(&format!("HPKE seal failed: {e}"));
             return -1;
         }
     };
 
-    let enc_bytes = enc.to_bytes();
+    // Convert HpkeEnvelope (base64url) back to binary: enc(32) || ct
+    use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+    use base64::Engine;
+    let enc_bytes = match URL_SAFE_NO_PAD.decode(&envelope.enc) {
+        Ok(b) => b,
+        Err(e) => {
+            set_error(&format!("internal error decoding enc: {e}"));
+            return -1;
+        }
+    };
+    let ct_bytes = match URL_SAFE_NO_PAD.decode(&envelope.ct) {
+        Ok(b) => b,
+        Err(e) => {
+            set_error(&format!("internal error decoding ct: {e}"));
+            return -1;
+        }
+    };
+
     let out_slice = unsafe { std::slice::from_raw_parts_mut(out, required_out) };
     out_slice[..32].copy_from_slice(&enc_bytes);
-    out_slice[32..].copy_from_slice(&ciphertext);
+    out_slice[32..].copy_from_slice(&ct_bytes);
     0
 }
 
 /// HPKE open (decrypt). Input = enc(32) || ciphertext || tag(16).
 /// Output buffer must be at least env_len - 48 bytes.
+///
+/// The `label` parameter must be a valid UTF-8 domain separation label registered
+/// in the label registry (Albrecht defense). The label is verified against the
+/// envelope's embedded label_id before decryption proceeds.
 #[no_mangle]
 pub extern "C" fn ffi_hpke_open(
     secret_key: *const u8,
     sk_len: usize,
     envelope: *const u8,
     env_len: usize,
-    info: *const u8,
-    info_len: usize,
+    label: *const u8,
+    label_len: usize,
     aad: *const u8,
     aad_len: usize,
     out: *mut u8,
@@ -465,12 +484,36 @@ pub extern "C" fn ffi_hpke_open(
 ) -> i32 {
     clear_error();
     check_null!(secret_key, envelope, out);
-    check_input_size!(env_len, info_len, aad_len);
+    check_input_size!(env_len, label_len, aad_len);
 
     if sk_len != 32 {
         set_error("HPKE secret key must be 32 bytes");
         return -5;
     }
+
+    // Label is required — reject null/empty
+    if label.is_null() || label_len == 0 {
+        set_error("HPKE label is required (domain separation)");
+        return -5;
+    }
+
+    let label_slice = unsafe { std::slice::from_raw_parts(label, label_len) };
+    let label_str = match std::str::from_utf8(label_slice) {
+        Ok(s) => s,
+        Err(_) => {
+            set_error("HPKE label must be valid UTF-8");
+            return -5;
+        }
+    };
+
+    // Albrecht defense: validate label against the registry
+    let label_id = match crate::labels::label_to_id(label_str) {
+        Some(id) => id,
+        None => {
+            set_error(&format!("unknown crypto label: {label_str}"));
+            return -5;
+        }
+    };
 
     // enc(32) + tag(16) = 48 bytes minimum
     if env_len < 48 {
@@ -483,42 +526,21 @@ pub extern "C" fn ffi_hpke_open(
 
     let sk_slice = unsafe { std::slice::from_raw_parts(secret_key, 32) };
     let env_slice = unsafe { std::slice::from_raw_parts(envelope, env_len) };
-    let info_slice = nullable_slice!(info, info_len);
     let aad_slice = nullable_slice!(aad, aad_len);
 
-    use hpke::aead::AesGcm256;
-    use hpke::kdf::HkdfSha256;
-    use hpke::kem::X25519HkdfSha256;
-    use hpke::{Deserializable, Kem as KemTrait, OpModeR};
+    // Reconstruct HpkeEnvelope for the envelope layer to validate
+    use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+    use base64::Engine;
 
-    type Aead = AesGcm256;
-    type Kdf = HkdfSha256;
-    type Kem = X25519HkdfSha256;
-
-    let sk = match <Kem as KemTrait>::PrivateKey::from_bytes(sk_slice) {
-        Ok(sk) => sk,
-        Err(_) => {
-            set_error("invalid X25519 secret key");
-            return -5;
-        }
+    let hpke_env = hpke_envelope::HpkeEnvelope {
+        v: 3,
+        label_id,
+        enc: URL_SAFE_NO_PAD.encode(&env_slice[..32]),
+        ct: URL_SAFE_NO_PAD.encode(&env_slice[32..]),
     };
 
-    let encapped_key = match <Kem as KemTrait>::EncappedKey::from_bytes(&env_slice[..32]) {
-        Ok(ek) => ek,
-        Err(_) => {
-            set_error("invalid HPKE encapsulated key");
-            return -5;
-        }
-    };
-
-    let plaintext = match hpke::single_shot_open::<Aead, Kdf, Kem>(
-        &OpModeR::Base,
-        &sk,
-        &encapped_key,
-        info_slice,
-        &env_slice[32..],
-        aad_slice,
-    ) {
+    let sk_hex = hex::encode(sk_slice);
+    let plaintext = match hpke_envelope::hpke_open(&hpke_env, &sk_hex, label_str, aad_slice) {
         Ok(pt) => pt,
         Err(_) => {
             set_error("HPKE open failed: decryption error");
@@ -895,7 +917,7 @@ mod tests {
         let pk_slice: &[u8] = pk_bytes.as_ref();
 
         let plaintext = b"secret for HPKE";
-        let info = b"test-info";
+        let label = crate::labels::LABEL_NOTE_KEY.as_bytes();
         let aad = b"test-aad";
 
         let env_len = 32 + plaintext.len() + 16;
@@ -906,8 +928,8 @@ mod tests {
             32,
             plaintext.as_ptr(),
             plaintext.len(),
-            info.as_ptr(),
-            info.len(),
+            label.as_ptr(),
+            label.len(),
             aad.as_ptr(),
             aad.len(),
             envelope.as_mut_ptr(),
@@ -921,8 +943,8 @@ mod tests {
             32,
             envelope.as_ptr(),
             env_len,
-            info.as_ptr(),
-            info.len(),
+            label.as_ptr(),
+            label.len(),
             aad.as_ptr(),
             aad.len(),
             decrypted.as_mut_ptr(),
@@ -946,7 +968,7 @@ mod tests {
         let wrong_sk_slice: &[u8] = wrong_sk_bytes.as_ref();
 
         let plaintext = b"test";
-        let info = b"info";
+        let label = crate::labels::LABEL_NOTE_KEY.as_bytes();
         let aad = b"aad";
         let env_len = 32 + plaintext.len() + 16;
         let mut envelope = vec![0u8; env_len];
@@ -956,8 +978,8 @@ mod tests {
             32,
             plaintext.as_ptr(),
             plaintext.len(),
-            info.as_ptr(),
-            info.len(),
+            label.as_ptr(),
+            label.len(),
             aad.as_ptr(),
             aad.len(),
             envelope.as_mut_ptr(),
@@ -970,14 +992,125 @@ mod tests {
             32,
             envelope.as_ptr(),
             env_len,
-            info.as_ptr(),
-            info.len(),
+            label.as_ptr(),
+            label.len(),
             aad.as_ptr(),
             aad.len(),
             decrypted.as_mut_ptr(),
             plaintext.len(),
         );
         assert_eq!(ret, -1);
+    }
+
+    #[test]
+    fn test_hpke_rejects_unknown_label() {
+        use hpke::kem::X25519HkdfSha256;
+        use hpke::{Kem as KemTrait, Serializable};
+
+        let mut rng = hpke_envelope::OsRng09;
+        let (_, pk) = X25519HkdfSha256::gen_keypair(&mut rng);
+        let pk_bytes = pk.to_bytes();
+        let pk_slice: &[u8] = pk_bytes.as_ref();
+
+        let plaintext = b"test";
+        let bad_label = b"not-a-registered-label";
+        let aad = b"aad";
+        let env_len = 32 + plaintext.len() + 16;
+        let mut envelope = vec![0u8; env_len];
+
+        let ret = ffi_hpke_seal(
+            pk_slice.as_ptr(),
+            32,
+            plaintext.as_ptr(),
+            plaintext.len(),
+            bad_label.as_ptr(),
+            bad_label.len(),
+            aad.as_ptr(),
+            aad.len(),
+            envelope.as_mut_ptr(),
+            env_len,
+        );
+        assert_eq!(ret, -5, "ffi_hpke_seal must reject unknown labels");
+    }
+
+    #[test]
+    fn test_hpke_rejects_null_label() {
+        use hpke::kem::X25519HkdfSha256;
+        use hpke::{Kem as KemTrait, Serializable};
+
+        let mut rng = hpke_envelope::OsRng09;
+        let (_, pk) = X25519HkdfSha256::gen_keypair(&mut rng);
+        let pk_bytes = pk.to_bytes();
+        let pk_slice: &[u8] = pk_bytes.as_ref();
+
+        let plaintext = b"test";
+        let aad = b"aad";
+        let env_len = 32 + plaintext.len() + 16;
+        let mut envelope = vec![0u8; env_len];
+
+        let ret = ffi_hpke_seal(
+            pk_slice.as_ptr(),
+            32,
+            plaintext.as_ptr(),
+            plaintext.len(),
+            std::ptr::null(),
+            0,
+            aad.as_ptr(),
+            aad.len(),
+            envelope.as_mut_ptr(),
+            env_len,
+        );
+        assert_eq!(ret, -5, "ffi_hpke_seal must reject null label");
+    }
+
+    #[test]
+    fn test_hpke_label_mismatch_rejected() {
+        use hpke::kem::X25519HkdfSha256;
+        use hpke::{Kem as KemTrait, Serializable};
+
+        let mut rng = hpke_envelope::OsRng09;
+        let (sk, pk) = X25519HkdfSha256::gen_keypair(&mut rng);
+        let sk_bytes = sk.to_bytes();
+        let pk_bytes = pk.to_bytes();
+        let sk_slice: &[u8] = sk_bytes.as_ref();
+        let pk_slice: &[u8] = pk_bytes.as_ref();
+
+        let plaintext = b"test";
+        let seal_label = crate::labels::LABEL_NOTE_KEY.as_bytes();
+        let open_label = crate::labels::LABEL_FILE_KEY.as_bytes();
+        let aad = b"aad";
+        let env_len = 32 + plaintext.len() + 16;
+        let mut envelope = vec![0u8; env_len];
+
+        let ret = ffi_hpke_seal(
+            pk_slice.as_ptr(),
+            32,
+            plaintext.as_ptr(),
+            plaintext.len(),
+            seal_label.as_ptr(),
+            seal_label.len(),
+            aad.as_ptr(),
+            aad.len(),
+            envelope.as_mut_ptr(),
+            env_len,
+        );
+        assert_eq!(ret, 0);
+
+        // Try to open with a different label — must fail
+        let mut decrypted = vec![0u8; plaintext.len()];
+        let ret = ffi_hpke_open(
+            sk_slice.as_ptr(),
+            32,
+            envelope.as_ptr(),
+            env_len,
+            open_label.as_ptr(),
+            open_label.len(),
+            aad.as_ptr(),
+            aad.len(),
+            decrypted.as_mut_ptr(),
+            plaintext.len(),
+        );
+        assert_eq!(ret, -1, "ffi_hpke_open must reject label mismatch");
     }
 
     #[test]
