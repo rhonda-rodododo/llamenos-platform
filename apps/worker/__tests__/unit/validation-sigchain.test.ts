@@ -39,6 +39,9 @@ describe('sigchain route validation', () => {
       signature: VALID_SIGNATURE,
       prevHash: '',
       hash: VALID_HASH,
+      signerDeviceId: 'dev-1',
+      signerPubkey: VALID_PUBKEY,
+      timestamp: '2026-01-01T00:00:00Z',
     }
 
     it('rejects empty body', async () => {
@@ -160,6 +163,36 @@ describe('sigchain route validation', () => {
         signature: 'A'.repeat(128),
       })
       expect(res.status).not.toBe(400)
+    })
+
+    it('rejects missing signerDeviceId', async () => {
+      const app = createApp()
+      const { signerDeviceId: _, ...body } = VALID_LINK
+      const res = await sendJSON(app, SIGCHAIN_PATH, body)
+      expect(res.status).toBe(400)
+    })
+
+    it('rejects missing signerPubkey', async () => {
+      const app = createApp()
+      const { signerPubkey: _, ...body } = VALID_LINK
+      const res = await sendJSON(app, SIGCHAIN_PATH, body)
+      expect(res.status).toBe(400)
+    })
+
+    it('rejects signerPubkey that is not 64 hex chars', async () => {
+      const app = createApp()
+      const res = await sendJSON(app, SIGCHAIN_PATH, {
+        ...VALID_LINK,
+        signerPubkey: 'tooshort',
+      })
+      expect(res.status).toBe(400)
+    })
+
+    it('rejects missing timestamp', async () => {
+      const app = createApp()
+      const { timestamp: _, ...body } = VALID_LINK
+      const res = await sendJSON(app, SIGCHAIN_PATH, body)
+      expect(res.status).toBe(400)
     })
   })
 })

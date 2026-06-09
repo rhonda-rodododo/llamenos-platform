@@ -57,3 +57,21 @@ Feature: Sigchain Integrity
     Given a second registered user
     When the second user tries to read the first user's sigchain
     Then the response status is 403
+
+  @backend
+  Scenario: Accept link with valid recomputed hash
+    When the user appends a genesis sigchain link with correctly computed hash
+    Then the response status is 201
+    And the sigchain has 1 link
+
+  @backend
+  Scenario: Reject link with tampered payload (hash mismatch)
+    When the user appends a sigchain link whose payload was modified after hashing
+    Then the response status is 400
+    And the error message contains "hash mismatch"
+
+  @backend
+  Scenario: Reject link with forged hash that does not bind to content
+    When the user appends a sigchain link with a hash that does not match the canonical content
+    Then the response status is 400
+    And the error message contains "hash mismatch"

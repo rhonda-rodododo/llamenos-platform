@@ -10,7 +10,8 @@ import { and, asc, desc, eq, sql } from 'drizzle-orm'
 import type { Database } from '../db'
 import { sigchainLinks, pukEnvelopes, mlsPendingMessages } from '../db/schema'
 import { ed25519Verify } from '@llamenos/crypto/ffi'
-import { hexToBytes } from '@shared/encoding'
+import { hexToBytes, bytesToHex } from '@shared/encoding'
+import { sha256 } from '@noble/hashes/sha2.js'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -44,6 +45,66 @@ export interface MlsMessageRecord {
   messageType: string
   payload: unknown
   createdAt: string
+}
+
+// ---------------------------------------------------------------------------
+// Canonical JSON — matches packages/crypto/src/sigchain.rs compute_entry_hash
+// ---------------------------------------------------------------------------
+
+/**
+ * Recursively sort all object keys alphabetically. This matches
+ * serde_json's default BTreeMap-backed serialization used by the Rust
+ * sigchain crate. Arrays preserve element order; only object keys are
+ * sorted.
+ *
+ * Algorithm: RFC 8785 (JCS) key-sort subset — lexicographic key ordering
+ * with standard JSON.stringify() serialization (no whitespace).
+ */
+function canonicalizeJson(value: unknown): unknown {
+  if (value === null || value === undefined) return value
+  if (Array.isArray(value)) return value.map(canonicalizeJson)
+  if (typeof value === 'object') {
+    const sorted: Record<string, unknown> = {}
+    for (const key of Object.keys(value as Record<string, unknown>).sort()) {
+      sorted[key] = canonicalizeJson((value as Record<string, unknown>)[key])
+    }
+    return sorted
+  }
+  return value
+}
+
+/**
+ * Recompute the canonical SHA-256 entry hash for a sigchain link.
+ *
+ * Canonical form matches packages/crypto/src/sigchain.rs:compute_entry_hash:
+ * ```
+ * SHA-256(JSON.stringify({
+ *   payload, prevHash, seq, signerDeviceId, signerPubkey, timestamp
+ * }, keys sorted lexicographically, no whitespace))
+ * ```
+ *
+ * - `payload` is recursively key-sorted (matches serde_json BTreeMap).
+ * - `prevHash` is `null` (not `""`) for genesis links (matches Rust Option<String>).
+ * - `seq` is a number (matches Rust u64).
+ */
+function computeEntryHash(
+  seq: number,
+  prevHash: string | null,
+  timestamp: string,
+  signerDeviceId: string,
+  signerPubkey: string,
+  payload: unknown,
+): string {
+  const canonical = canonicalizeJson({
+    payload,
+    prevHash,
+    seq,
+    signerDeviceId,
+    signerPubkey,
+    timestamp,
+  })
+  const canonicalStr = JSON.stringify(canonical)
+  return bytesToHex(sha256(new TextEncoder().encode(canonicalStr)))
 }
 
 // ---------------------------------------------------------------------------
@@ -97,6 +158,9 @@ export class CryptoKeysService {
     signature: string
     prevHash: string
     hash: string
+    signerDeviceId: string
+    signerPubkey: string
+    timestamp: string
   }): Promise<SigchainLinkRecord> {
     // Fetch the chain tail (highest seqNo) in one query
     const [currentHead] = await this.db
@@ -121,6 +185,28 @@ export class CryptoKeysService {
       throw new CryptoKeyError(
         'sigchain prevHash mismatch: does not match current chain head',
         409,
+      )
+    }
+
+    // Recompute entry hash from canonical form and verify it matches the
+    // claimed hash BEFORE checking the signature. This prevents a malicious
+    // client from submitting an arbitrary payload with a correctly-signed
+    // hash that doesn't actually bind to the payload content.
+    //
+    // Canonical form matches packages/crypto/src/sigchain.rs:compute_entry_hash.
+    // prevHash: empty string → null (Rust Option<String> serialization).
+    const recomputedHash = computeEntryHash(
+      link.seqNo,
+      link.prevHash === '' ? null : link.prevHash,
+      link.timestamp,
+      link.signerDeviceId,
+      link.signerPubkey,
+      link.payload,
+    )
+    if (recomputedHash !== link.hash.toLowerCase()) {
+      throw new CryptoKeyError(
+        'sigchain hash mismatch: recomputed hash does not match claimed hash — payload may have been tampered',
+        400,
       )
     }
 
@@ -154,6 +240,9 @@ export class CryptoKeysService {
         signature: link.signature,
         prevHash: link.prevHash,
         hash: link.hash,
+        signerDeviceId: link.signerDeviceId,
+        signerPubkey: link.signerPubkey,
+        linkTimestamp: link.timestamp,
       })
       .returning()
 
