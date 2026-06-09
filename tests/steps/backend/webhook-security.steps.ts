@@ -83,9 +83,12 @@ When('the webhook is delivered', async ({ request, world }) => {
 
   const headers: Record<string, string> = {}
 
-  // Set Content-Type (wrong one for the mismatch test)
+  // Set Content-Type — wrong one for the mismatch test, correct one otherwise
+  // so requests reach the IP/replay checks without being rejected by content-type enforcement.
   if (state.contentType) {
     headers['Content-Type'] = state.contentType
+  } else {
+    headers['Content-Type'] = 'application/x-www-form-urlencoded'
   }
 
   // Simulate source IP via CF-Connecting-IP (the header the server trusts)
@@ -93,14 +96,14 @@ When('the webhook is delivered', async ({ request, world }) => {
     headers['CF-Connecting-IP'] = state.sourceIp
   }
 
-  // Send a minimal POST body — the webhook will fail validation regardless
-  // since we have no valid provider signature, but we check the specific
-  // rejection reason (Content-Type vs IP vs signature).
+  // Send a minimal POST body with a unique nonce to avoid replay-detection
+  // collisions between parallel test scenarios sharing the same nonce table.
+  const nonce = crypto.randomUUID()
   const res = await request.post(webhookPath, {
     headers,
     data: state.contentType === 'application/json'
-      ? JSON.stringify({ CallSid: 'test', From: '+15551234567', To: '+15559876543' })
-      : 'CallSid=test&From=%2B15551234567&To=%2B15559876543',
+      ? JSON.stringify({ CallSid: `test-${nonce}`, From: '+15551234567', To: '+15559876543' })
+      : `CallSid=test-${nonce}&From=%2B15551234567&To=%2B15559876543`,
   })
 
   const contentTypeHeader = res.headers()['content-type'] ?? ''
