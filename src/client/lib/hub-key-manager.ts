@@ -4,15 +4,15 @@
  * Hub-wide symmetric encryption key management. Each hub has a random 32-byte
  * key that is HPKE-wrapped individually for each member who needs it.
  *
- * HPKE wrap/unwrap operations delegate to Rust via platform.ts.
- * Symmetric hub encrypt/decrypt stays in JS (hub key is shared symmetric, not identity-secret).
+ * ALL hub key operations delegate to Rust via platform.ts IPC commands.
+ * The hub key NEVER enters JavaScript — it stays in Rust CryptoState.
  *
  * Key lifecycle:
- *   1. Admin generates hub key via generateHubKey()
+ *   1. Admin generates hub key via generateHubKey() → Rust CryptoState
  *   2. Key is wrapped for each member via wrapHubKeyForMember() (Rust HPKE)
  *   3. Members fetch their wrapped key from GET /api/hub/key
- *   4. Members unwrap with CryptoState via unwrapHubKey() (Rust HPKE)
- *   5. Hub key encrypts/decrypts hub-scoped data via encryptForHub()/decryptFromHub() (JS)
+ *   4. Members unwrap with CryptoState via unwrapHubKey() (Rust HPKE → CryptoState)
+ *   5. Hub key encrypts/decrypts hub-scoped data via encryptForHub()/decryptFromHub() (Rust IPC)
  *   6. On rotation, admin generates new key + re-wraps for all members
  */
 
