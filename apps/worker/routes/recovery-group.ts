@@ -244,11 +244,17 @@ authenticatedRoutes.post('/session/:id/emergency',
     const sessionId = c.req.param('id')
     const body = c.req.valid('json')
     const services = c.get('services')
+    const callerPubkey = c.get('pubkey')
+
+    // HIGH-W6: Enforce approverPubkey matches the authenticated caller — prevent impersonation
+    if (body.approverPubkey !== callerPubkey) {
+      return c.json({ error: 'approverPubkey must match authenticated user' }, 403)
+    }
 
     try {
       await services.recoveryGroup.applyEmergencyOverride({
         sessionId,
-        approverPubkey: body.approverPubkey,
+        approverPubkey: callerPubkey,
         justification: body.justification,
         signature: body.signature,
       })

@@ -246,6 +246,7 @@ records.get('/by-contact/:contactId',
   }),
   async (c) => {
     const contactId = c.req.param('contactId')
+    const pubkey = c.get('pubkey')
     const permissions = c.get('permissions')
     const hubId = c.get('hubId') ?? ''
 
@@ -255,8 +256,16 @@ records.get('/by-contact/:contactId',
     }
 
     const services = c.get('services')
-    // IDOR fix: pass hubId so results are scoped to the caller's hub
     const result = await services.cases.listByContact(contactId, hubId)
+
+    // HIGH-W4: Non-admin users can only see records they created or are assigned to
+    if (accessLevel !== 'all') {
+      result.records = result.records.filter(
+        r => r.createdBy === pubkey || r.assignedTo.includes(pubkey),
+      )
+      result.total = result.records.length
+    }
+
     return c.json(result)
   },
 )

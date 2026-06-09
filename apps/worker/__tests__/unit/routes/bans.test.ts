@@ -115,7 +115,7 @@ describe('bans routes', () => {
     it('bans a valid phone number', async () => {
       const addBanSpy = vi.fn().mockResolvedValue({
         phone: hashPhone('+12125551234', TEST_HMAC_SECRET),
-        phoneDisplay: '+12125551234',
+        phoneDisplay: '***1234',
         reason: 'Spam',
         bannedBy: 'a'.repeat(64),
         bannedAt: new Date().toISOString(),
@@ -134,11 +134,11 @@ describe('bans routes', () => {
 
       expect(res.status).toBe(200)
       const json = await res.json()
-      expect(json.ban.phone).toBe('+12125551234')
+      expect(json.ban.phone).toBe('***1234')
       expect(addBanSpy).toHaveBeenCalledWith({
         hubId: 'hub-1',
         phone: hashPhone('+12125551234', TEST_HMAC_SECRET),
-        phoneDisplay: '+12125551234',
+        phoneDisplay: '***1234',
         reason: 'Spam',
         bannedBy: 'a'.repeat(64),
       })
@@ -195,8 +195,8 @@ describe('bans routes', () => {
       expect(json.count).toBe(2)
       expect(bulkAddBansSpy).toHaveBeenCalledWith(
         [
-          { phoneHash: hashPhone('+12125551234', TEST_HMAC_SECRET), phoneDisplay: '+12125551234' },
-          { phoneHash: hashPhone('+12125555678', TEST_HMAC_SECRET), phoneDisplay: '+12125555678' },
+          { phoneHash: hashPhone('+12125551234', TEST_HMAC_SECRET), phoneDisplay: '***1234' },
+          { phoneHash: hashPhone('+12125555678', TEST_HMAC_SECRET), phoneDisplay: '***5678' },
         ],
         'Spam', 'a'.repeat(64), 'hub-1',
       )
