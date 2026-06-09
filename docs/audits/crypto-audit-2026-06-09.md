@@ -369,7 +369,7 @@ While auth tokens have cross-language test vectors, the HPKE envelope and higher
 
 ### 11.1 Label Registry — PASS
 
-92 domain separation constants with:
+Domain separation constants (see packages/protocol/crypto-labels.json) with:
 - Unique `u8` IDs for wire format efficiency
 - Human-readable string labels for HPKE info parameter
 - Bidirectional lookup (ID→label and label→ID) via `LABEL_REGISTRY` array and `LazyLock<HashMap>`
