@@ -46,3 +46,48 @@ Feature: MLS Group Messaging
   Scenario: Missing deviceId query parameter returns 400
     When the user fetches MLS messages without a deviceId
     Then the response status is 400
+
+  # -------------------------------------------------------------------------
+  # Device ownership verification (P1 security fix)
+  # -------------------------------------------------------------------------
+
+  @backend @security
+  Scenario: Fetching MLS messages for own device succeeds
+    Given the user has a registered device "mls-own-device"
+    And an MLS commit was sent to "mls-own-device"
+    When the user fetches MLS messages for "mls-own-device"
+    Then the response status is 200
+
+  @backend @security
+  Scenario: Fetching MLS messages for another user's device returns 403
+    Given the user has a registered device "mls-own-device"
+    And another user has a registered device "mls-other-device"
+    When the user fetches MLS messages for "mls-other-device"
+    Then the response status is 403
+
+  @backend @security
+  Scenario: Uploading key packages for own device succeeds
+    Given the user has a registered device "mls-own-device"
+    When the user uploads 2 key packages for "mls-own-device"
+    Then the response status is 204
+
+  @backend @security
+  Scenario: Uploading key packages for another user's device returns 403
+    Given the user has a registered device "mls-own-device"
+    And another user has a registered device "mls-other-device"
+    When the user uploads 2 key packages for "mls-other-device"
+    Then the response status is 403
+
+  @backend @security
+  Scenario: MLS commit to non-hub-member device returns 403
+    Given the user has a registered device "mls-own-device"
+    And "non-member-device" is not a device of any hub member
+    When the user sends an MLS commit to device "non-member-device"
+    Then the response status is 403
+
+  @backend @security
+  Scenario: MLS welcome to non-hub-member device returns 403
+    Given the user has a registered device "mls-own-device"
+    And "non-member-device" is not a device of any hub member
+    When the user sends an MLS welcome to device "non-member-device"
+    Then the response status is 403
