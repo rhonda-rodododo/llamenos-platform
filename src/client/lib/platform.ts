@@ -1021,31 +1021,38 @@ export async function decryptCallRecord(
   }
 }
 
-/** @deprecated Use hpkeOpenFromState instead. */
+/**
+ * Decrypt a transcription note — these are encrypted as messages (LABEL_MESSAGE)
+ * with reader envelopes in adminEnvelopes. Find our envelope and decrypt.
+ */
 export async function decryptTranscription(
-  packed: string,
-  ephemeralPubkeyHex: string,
+  encryptedContent: string,
+  adminEnvelopes: RecipientEnvelope[],
 ): Promise<string | null> {
-  void [packed, ephemeralPubkeyHex]
-  throw new Error('decryptTranscription removed in v3 — use hpkeOpenFromState')
+  return decryptMessage(encryptedContent, adminEnvelopes)
 }
 
-/** @deprecated Drafts need v3 migration. */
+/**
+ * Encrypt draft data using the hub key with HKDF_CONTEXT_DRAFTS domain separation.
+ * Drafts are local-only (localStorage), encrypted with the hub key held in Rust CryptoState.
+ */
 export async function encryptDraft(plaintext: string): Promise<string> {
-  void plaintext
-  throw new Error('encryptDraft removed in v3 — needs migration to HPKE')
+  return encryptHubField(plaintext, 'llamenos:drafts')
 }
 
-/** @deprecated Drafts need v3 migration. */
-export async function decryptDraft(packed: string): Promise<string | null> {
-  void packed
-  return null
+/**
+ * Decrypt draft data encrypted with encryptDraft.
+ */
+export async function decryptDraft(ciphertextHex: string): Promise<string | null> {
+  return decryptHubField(ciphertextHex, 'llamenos:drafts')
 }
 
-/** @deprecated Export encryption needs v3 migration. */
+/**
+ * Encrypt an export payload using the hub key with HKDF_CONTEXT_EXPORT domain separation.
+ * Returns hex-encoded ciphertext suitable for binary download.
+ */
 export async function encryptExport(jsonString: string): Promise<string> {
-  void jsonString
-  throw new Error('encryptExport removed in v3 — needs migration to HPKE')
+  return encryptHubField(jsonString, 'llamenos:export')
 }
 
 

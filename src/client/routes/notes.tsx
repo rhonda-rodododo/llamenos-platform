@@ -118,9 +118,9 @@ function NotesPage() {
           const isTranscription = note.authorPubkey.startsWith('system:transcription')
           let payload: NotePayload
           if (isTranscription && canDecrypt) {
-            // Transcription decryption via HPKE — use author envelope if present
-            const text = note.authorEnvelope
-              ? await decryptTranscription(note.encryptedContent, note.authorEnvelope.enc) || '[Decryption failed]'
+            // Transcriptions are encrypted as messages with reader envelopes in adminEnvelopes
+            const text = note.adminEnvelopes?.length
+              ? await decryptTranscription(note.encryptedContent, note.adminEnvelopes) || '[Decryption failed]'
               : note.encryptedContent
             payload = { text }
           } else if (isTranscription) {
@@ -272,8 +272,8 @@ function NotesPage() {
       isTranscription: n.isTranscription, createdAt: n.createdAt, updatedAt: n.updatedAt,
     }))
     const jsonString = JSON.stringify(rows, null, 2)
-    const base64 = await encryptExport(jsonString)
-    const binary = Uint8Array.from(atob(base64), c => c.charCodeAt(0))
+    const ciphertextHex = await encryptExport(jsonString)
+    const binary = new Uint8Array(ciphertextHex.match(/.{2}/g)!.map(b => parseInt(b, 16)))
     const blob = new Blob([binary.buffer as ArrayBuffer], { type: 'application/octet-stream' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
