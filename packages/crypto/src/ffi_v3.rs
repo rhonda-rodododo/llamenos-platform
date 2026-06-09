@@ -36,6 +36,11 @@ struct MobileState {
     /// Server event keys: (current, previous). Previous used during epoch rotation.
     server_event_current_key: Option<[u8; 32]>,
     server_event_previous_key: Option<[u8; 32]>,
+    /// Ephemeral X25519 secret for device-linking ECDH. Zeroized after use.
+    ephemeral_secret: Option<Zeroizing<[u8; 32]>>,
+    /// Wake key X25519 secret for push notification decryption.
+    /// Persists across lock/unlock — wake key must be available without PIN.
+    wake_key_secret: Option<Zeroizing<[u8; 32]>>,
 }
 
 impl MobileState {
@@ -46,6 +51,8 @@ impl MobileState {
             hub_keys: HashMap::new(),
             server_event_current_key: None,
             server_event_previous_key: None,
+            ephemeral_secret: None,
+            wake_key_secret: None,
         }
     }
 }
@@ -130,6 +137,10 @@ pub fn mobile_lock() {
         k.zeroize();
     }
     guard.server_event_previous_key = None;
+    // Zeroize ephemeral key (Zeroizing<[u8; 32]> handles drop)
+    guard.ephemeral_secret = None;
+    // NOTE: wake_key_secret intentionally NOT cleared on lock —
+    // it must remain available for push notification decryption without PIN.
 }
 
 /// Check if the mobile crypto state is unlocked.
@@ -840,6 +851,206 @@ pub fn mobile_clear_server_event_keys() {
         k.zeroize();
     }
     guard.server_event_previous_key = None;
+}
+
+// ── A3: Ephemeral ECDH held entirely in Rust ─────────────────────────
+
+/// Generate an ephemeral X25519 keypair for device-linking ECDH.
+/// The secret key is stored in Rust state and NEVER returned to the caller.
+/// Returns only the public key hex.
+#[uniffi::export]
+pub fn mobile_generate_ephemeral_key() -> Result<String, CryptoError> {
+    use x25519_dalek::{PublicKey as X25519PublicKey, StaticSecret as X25519StaticSecret};
+
+    let mut rng_bytes = [0u8; 32];
+    getrandom::getrandom(&mut rng_bytes).map_err(|_| {
+        CryptoError::InvalidInput("getrandom failed".into())
+    })?;
+    let secret = X25519StaticSecret::from(rng_bytes);
+    let public_key = X25519PublicKey::from(&secret);
+    let pubkey_hex = hex::encode(public_key.as_bytes());
+
+    // Store the secret in Rust state
+    let mut guard = state().lock().unwrap();
+    guard.ephemeral_secret = Some(Zeroizing::new(rng_bytes));
+
+    Ok(pubkey_hex)
+}
+
+/// Perform ECDH using the stored ephemeral secret and the peer's public key.
+/// Returns the shared secret hex. The ephemeral secret is zeroized and removed
+/// from state after this call — it cannot be used again.
+#[uniffi::export]
+pub fn mobile_ecdh_complete(their_pubkey_hex: String) -> Result<String, CryptoError> {
+    use x25519_dalek::StaticSecret as X25519StaticSecret;
+
+    let mut guard = state().lock().unwrap();
+    let ephemeral_bytes = guard
+        .ephemeral_secret
+        .take() // Remove from state (Zeroizing will clear on drop)
+        .ok_or_else(|| {
+            CryptoError::InvalidInput("No ephemeral key in state. Call mobile_generate_ephemeral_key first.".into())
+        })?;
+
+    let secret = X25519StaticSecret::from(*ephemeral_bytes.as_ref());
+    drop(guard); // Release lock before ECDH computation
+
+    let public_key = crate::provisioning::parse_x25519_pubkey(&their_pubkey_hex)?;
+    let shared = secret.diffie_hellman(&public_key);
+    let mut shared_bytes = *shared.as_bytes();
+
+    if shared_bytes == [0u8; 32] {
+        shared_bytes.zeroize();
+        return Err(CryptoError::EcdhFailed);
+    }
+
+    let hex_out = hex::encode(shared_bytes);
+    shared_bytes.zeroize();
+    Ok(hex_out)
+}
+
+/// Clear the ephemeral key from state without performing ECDH.
+/// Called when the device linking flow is cancelled.
+#[uniffi::export]
+pub fn mobile_clear_ephemeral_key() {
+    let mut guard = state().lock().unwrap();
+    // Zeroizing<[u8; 32]> handles zeroization on drop
+    guard.ephemeral_secret = None;
+}
+
+// ── A4: Hub key loading with Rust-side envelope construction ─────────
+
+/// Unwrap a hub key from server-provided HPKE envelope fields and store in state.
+///
+/// The caller provides only `enc` and `ct` from the server response. The envelope
+/// version and label ID are constructed by Rust from the label registry — clients
+/// never need to hardcode protocol constants.
+#[uniffi::export]
+pub fn mobile_load_hub_key(
+    hub_id: String,
+    enc: String,
+    ct: String,
+) -> Result<(), CryptoError> {
+    let label_id = crate::labels::label_to_id(crate::labels::LABEL_HUB_KEY_WRAP)
+        .ok_or_else(|| CryptoError::InvalidInput("LABEL_HUB_KEY_WRAP not in registry".into()))?;
+
+    let envelope = HpkeEnvelope {
+        v: hpke_envelope::ENVELOPE_VERSION,
+        label_id,
+        enc,
+        ct,
+    };
+
+    let secret_hex = encryption_secret_hex()?;
+    let key = hpke_envelope::hpke_open_key(&envelope, &secret_hex, crate::labels::LABEL_HUB_KEY_WRAP, &[])?;
+
+    let mut guard = state().lock().unwrap();
+    guard.hub_keys.insert(hub_id, *key.as_ref());
+
+    Ok(())
+}
+
+// ── A5: Wake key held in Rust state ──────────────────────────────────
+
+/// Generate a wake key X25519 keypair entirely in Rust.
+/// The secret is stored in Rust state; only the public key hex is returned.
+#[uniffi::export]
+pub fn mobile_generate_wake_key() -> Result<String, CryptoError> {
+    use x25519_dalek::{PublicKey as X25519PublicKey, StaticSecret as X25519StaticSecret};
+
+    let mut rng_bytes = [0u8; 32];
+    getrandom::getrandom(&mut rng_bytes).map_err(|_| {
+        CryptoError::InvalidInput("getrandom failed".into())
+    })?;
+    let secret = X25519StaticSecret::from(rng_bytes);
+    let public_key = X25519PublicKey::from(&secret);
+    let pubkey_hex = hex::encode(public_key.as_bytes());
+
+    let mut guard = state().lock().unwrap();
+    guard.wake_key_secret = Some(Zeroizing::new(rng_bytes));
+
+    Ok(pubkey_hex)
+}
+
+/// Load a wake key secret into Rust state from encrypted storage.
+/// Called at app startup after decrypting the wake secret from AndroidKeyStore.
+/// The secret bytes are consumed and the input is zeroized by the caller.
+#[uniffi::export]
+pub fn mobile_load_wake_key(secret_hex: String) -> Result<(), CryptoError> {
+    let mut sk_bytes = hex::decode(&secret_hex).map_err(CryptoError::HexError)?;
+    if sk_bytes.len() != 32 {
+        sk_bytes.zeroize();
+        return Err(CryptoError::InvalidSecretKey);
+    }
+    let mut arr = [0u8; 32];
+    arr.copy_from_slice(&sk_bytes);
+    sk_bytes.zeroize();
+
+    let mut guard = state().lock().unwrap();
+    guard.wake_key_secret = Some(Zeroizing::new(arr));
+    Ok(())
+}
+
+/// Export the wake key secret as hex for encrypted persistence.
+/// The caller MUST immediately encrypt this and zeroize the hex string.
+#[uniffi::export]
+pub fn mobile_export_wake_key_hex() -> Result<String, CryptoError> {
+    let guard = state().lock().unwrap();
+    let secret = guard
+        .wake_key_secret
+        .as_ref()
+        .ok_or_else(|| CryptoError::InvalidInput("No wake key in state".into()))?;
+    Ok(hex::encode(secret.as_ref()))
+}
+
+/// Derive the public key from the stored wake key secret.
+#[uniffi::export]
+pub fn mobile_wake_key_pubkey() -> Result<String, CryptoError> {
+    use x25519_dalek::{PublicKey as X25519PublicKey, StaticSecret as X25519StaticSecret};
+
+    let guard = state().lock().unwrap();
+    let secret_bytes = guard
+        .wake_key_secret
+        .as_ref()
+        .ok_or_else(|| CryptoError::InvalidInput("No wake key in state".into()))?;
+    let secret = X25519StaticSecret::from(*secret_bytes.as_ref());
+    let public_key = X25519PublicKey::from(&secret);
+    Ok(hex::encode(public_key.as_bytes()))
+}
+
+/// Check whether a wake key is loaded in Rust state.
+#[uniffi::export]
+pub fn mobile_has_wake_key() -> bool {
+    state().lock().unwrap().wake_key_secret.is_some()
+}
+
+/// HPKE open using the stored wake key (not the device key).
+/// Used for decrypting push notification payloads when the device is locked.
+#[uniffi::export]
+pub fn mobile_hpke_open_with_wake_key(
+    envelope: HpkeEnvelope,
+    expected_label: String,
+    aad_hex: String,
+) -> Result<String, CryptoError> {
+    let guard = state().lock().unwrap();
+    let secret_bytes = guard
+        .wake_key_secret
+        .as_ref()
+        .ok_or_else(|| CryptoError::InvalidInput("No wake key in state".into()))?;
+    let secret_hex = hex::encode(secret_bytes.as_ref());
+    drop(guard);
+
+    let aad = hex::decode(&aad_hex).map_err(CryptoError::HexError)?;
+    let plaintext = hpke_envelope::hpke_open(&envelope, &secret_hex, &expected_label, &aad)?;
+    Ok(hex::encode(plaintext))
+}
+
+/// Clear the wake key from Rust state. Called on logout/wipe.
+#[uniffi::export]
+pub fn mobile_clear_wake_key() {
+    let mut guard = state().lock().unwrap();
+    // Zeroizing<[u8; 32]> handles zeroization on drop
+    guard.wake_key_secret = None;
 }
 
 #[cfg(test)]
