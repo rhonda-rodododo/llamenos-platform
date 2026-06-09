@@ -66,9 +66,17 @@ private func ffiMobilePukCreate() throws -> String {
     try mobilePukCreate()
 }
 
-// V3 Sigchain (stateful)
+// V3 Sigchain (stateful + stateless verification)
 private func ffiMobileSigchainCreateLink(id: String, seq: UInt64, prevHash: String?, timestamp: String, payloadJson: String) throws -> SigchainLink {
     try mobileSigchainCreateLink(id: id, seq: seq, prevHash: prevHash, timestamp: timestamp, payloadJson: payloadJson)
+}
+
+private func ffiMobileSigchainVerifyLink(linkJson: String, expectedSignerPubkey: String) throws -> Bool {
+    try mobileSigchainVerifyLink(linkJson: linkJson, expectedSignerPubkey: expectedSignerPubkey)
+}
+
+private func ffiMobileEd25519Verify(messageHex: String, signatureHex: String, pubkeyHex: String) throws -> Bool {
+    try mobileEd25519Verify(messageHex: messageHex, signatureHex: signatureHex, pubkeyHex: pubkeyHex)
 }
 
 // Legacy functions still needed for device linking and server events
@@ -358,6 +366,18 @@ final class CryptoService: @unchecked Sendable {
     func createSigchainLink(id: String, seq: UInt64, prevHash: String?, timestamp: String, payloadJson: String) throws -> SigchainLink {
         guard isUnlocked else { throw CryptoServiceError.noKeyLoaded }
         return try ffiMobileSigchainCreateLink(id: id, seq: seq, prevHash: prevHash, timestamp: timestamp, payloadJson: payloadJson)
+    }
+
+    /// Verify a single sigchain link's Ed25519 signature against an expected signer pubkey.
+    /// Stateless — no device key needed.
+    func verifySigchainLink(linkJson: String, expectedSignerPubkey: String) throws -> Bool {
+        try ffiMobileSigchainVerifyLink(linkJson: linkJson, expectedSignerPubkey: expectedSignerPubkey)
+    }
+
+    /// Verify an Ed25519 signature (stateless — no device key needed).
+    /// All inputs are hex-encoded.
+    func ed25519Verify(messageHex: String, signatureHex: String, pubkeyHex: String) throws -> Bool {
+        try ffiMobileEd25519Verify(messageHex: messageHex, signatureHex: signatureHex, pubkeyHex: pubkeyHex)
     }
 
     // MARK: - Device Linking ECDH (X25519)

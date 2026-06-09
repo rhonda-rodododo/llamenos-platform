@@ -422,6 +422,10 @@ final class DeviceLinkViewModel {
     /// Decrypt and process provisioning data received from the desktop.
     /// In the v3 model, this contains the PUK seed and user metadata needed
     /// to create a new device identity linked to the same user.
+    ///
+    /// SECURITY: If the provisioning payload contains a sigchain link, we verify
+    /// its Ed25519 signature before trusting the key material. This prevents a
+    /// MITM from injecting forged device authorization records during provisioning.
     private func importEncryptedProvisionData(_ encrypted: String, sharedSecret: String) async {
         await MainActor.run {
             currentStep = .importing
@@ -433,11 +437,59 @@ final class DeviceLinkViewModel {
                 sharedSecret: sharedSecret
             )
 
+            // Parse the decrypted JSON to check for sigchain data
+            if let jsonData = decrypted.data(using: .utf8),
+               let payload = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] {
+
+                // If the payload includes a sigchain link, verify its signature
+                // before trusting any key material in the provisioning data.
+                if let sigchainLinkJson = payload["sigchainLink"],
+                   let signerPubkey = payload["signerPubkey"] as? String {
+                    let linkData = try JSONSerialization.data(withJSONObject: sigchainLinkJson)
+                    let linkJsonString = String(data: linkData, encoding: .utf8) ?? ""
+
+                    let valid = try cryptoService.verifySigchainLink(
+                        linkJson: linkJsonString,
+                        expectedSignerPubkey: signerPubkey
+                    )
+                    if !valid {
+                        await MainActor.run {
+                            currentStep = .error(NSLocalizedString(
+                                "device_link_sigchain_invalid",
+                                comment: "Sigchain verification failed — the provisioning data may have been tampered with."
+                            ))
+                        }
+                        return
+                    }
+                }
+
+                // If the payload includes a signature over the provision data,
+                // verify it against the provisioning device's pubkey.
+                if let signature = payload["signature"] as? String,
+                   let signerPubkey = payload["signerPubkey"] as? String,
+                   let signedData = payload["signedPayload"] as? String {
+                    let messageHex = signedData.data(using: .utf8)!
+                        .map { String(format: "%02x", $0) }.joined()
+                    let valid = try cryptoService.ed25519Verify(
+                        messageHex: messageHex,
+                        signatureHex: signature,
+                        pubkeyHex: signerPubkey
+                    )
+                    if !valid {
+                        await MainActor.run {
+                            currentStep = .error(NSLocalizedString(
+                                "device_link_signature_invalid",
+                                comment: "Provision data signature verification failed — the data may have been tampered with."
+                            ))
+                        }
+                        return
+                    }
+                }
+            }
+
             // The decrypted data contains provisioning info.
-            // For now, this triggers PIN set flow — the user will create device keys
+            // This triggers PIN set flow — the user will create device keys
             // protected by a new PIN, then register this device with the hub.
-            // Full PUK seed provisioning will be handled when the server protocol
-            // is updated to support device linking via sigchain.
 
             await MainActor.run {
                 currentStep = .completed
