@@ -41,7 +41,7 @@ import { okResponseSchema } from '@protocol/schemas/common'
 import { authErrors } from '../openapi/helpers'
 import { audit } from '../services/audit'
 import { invalidateRolesCache } from '../services/settings'
-import { validateExternalUrl } from '../lib/ssrf-guard'
+import { validateExternalUrlWithDns } from '../lib/ssrf-guard'
 import { getMessagingAdapterFromService } from '../lib/service-factories'
 
 const settings = new Hono<AppEnv>()
@@ -469,7 +469,7 @@ settings.post('/telephony-provider/test',
           if (!body.ariUrl) {
             return c.json({ error: 'ARI URL is required' }, 400)
           }
-          const ariError = validateExternalUrl(body.ariUrl, 'ARI URL')
+          const ariError = await validateExternalUrlWithDns(body.ariUrl, 'ARI URL')
           if (ariError) {
             return c.json({ error: ariError }, 400)
           }
@@ -481,7 +481,7 @@ settings.post('/telephony-provider/test',
           return c.json({ error: 'Unknown provider type' }, 400)
       }
 
-      const testRes = await safeFetch(testUrl, { headers: testHeaders })
+      const testRes = await safeFetch(testUrl, { headers: testHeaders, ssrfGuard: true })
       if (testRes.ok) {
         return c.json({ ok: true })
       }

@@ -255,6 +255,14 @@ describe('GET /firehose/:id', () => {
     expect(res.status).toBe(404)
   })
 
+  it('returns 404 for connection in different hub (M6 hub-scoping)', async () => {
+    const { app, mockFirehose } = makeApp({ permissions: ['firehose:read'], hubId: 'hub-2' })
+    mockFirehose.getConnection.mockResolvedValue(baseConn) // baseConn.hubId = 'hub-1'
+
+    const res = await app.request('/conn-1')
+    expect(res.status).toBe(404)
+  })
+
   it('returns 403 without firehose:read', async () => {
     const { app } = makeApp({ permissions: [] })
     const res = await app.request('/conn-1')
