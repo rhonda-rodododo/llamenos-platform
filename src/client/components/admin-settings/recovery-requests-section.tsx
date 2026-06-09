@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '@/lib/toast'
+import { LABEL_RECOVERY_GROUP_SHARE_WRAP, LABEL_RECOVERY_SHARE_CONTRIBUTE } from '@shared/crypto-labels'
 import {
   contributeShare,
   cancelRecoverySession,
@@ -106,7 +107,7 @@ export function RecoveryRequestsSection({
       const envelope = JSON.parse(myShareEnvelope) as HpkeEnvelope
       const shareHex = await hpkeOpenFromState(
         envelope,
-        'llamenos:recovery-group:share-wrap:v1',
+        LABEL_RECOVERY_GROUP_SHARE_WRAP,
         '',
       )
 
@@ -126,7 +127,7 @@ export function RecoveryRequestsSection({
       const contribution = await hpkeSeal(
         shareHex,
         session.newDevicePubkey,
-        'llamenos:recovery-group:share-contribute:v1',
+        LABEL_RECOVERY_SHARE_CONTRIBUTE,
         aad,
       )
 

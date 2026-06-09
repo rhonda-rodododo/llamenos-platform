@@ -95,6 +95,9 @@
     "LABEL_SHAMIR_COMMIT": "llamenos:shamir-commit:v1",
     "LABEL_BACKUP_HKDF_INFO": "llamenos:backup:v1",
     "LABEL_DEVICE_ENCRYPTION_SEED": "llamenos:device-encryption-seed:v1",
-    "LABEL_LOCKDOWN_INTENT": "llamenos:lockdown-intent:v1"
+    "LABEL_LOCKDOWN_INTENT": "llamenos:lockdown-intent:v1",
+    "LABEL_FIREHOSE_AGENT_SEAL": "llamenos:firehose:agent-seal",
+    "LABEL_FIREHOSE_BUFFER_ENCRYPT": "llamenos:firehose:buffer-encrypt",
+    "LABEL_FIREHOSE_REPORT_WRAP": "llamenos:firehose:report-wrap"
   }
 }

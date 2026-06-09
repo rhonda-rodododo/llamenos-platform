@@ -11,6 +11,8 @@
  * Import from here instead of directly from @tauri-apps/*.
  */
 
+import { LABEL_NOTE_KEY, LABEL_MESSAGE, LABEL_CALL_META } from '@shared/crypto-labels'
+
 // ── Backend detection ────────────────────────────────────────────────
 
 const useTauri = typeof window !== 'undefined' &&
@@ -880,7 +882,7 @@ export async function encryptNote(
 
   // HPKE-wrap key for author
   const authorEncPub = await resolveEncryptionPubkey(authorPubkey)
-  const authorHpke = await hpkeSealKey(keyHex, authorEncPub, 'llamenos:note-key', '')
+  const authorHpke = await hpkeSealKey(keyHex, authorEncPub, LABEL_NOTE_KEY, '')
   const authorEnvelope: KeyEnvelope = {
     enc: base64urlToHex(authorHpke.enc),
     ct: authorHpke.ct,
@@ -890,7 +892,7 @@ export async function encryptNote(
   const adminEnvelopes: RecipientEnvelope[] = await Promise.all(
     adminPubkeys.map(async (pubkey) => {
       const encPub = await resolveEncryptionPubkey(pubkey)
-      const hpke = await hpkeSealKey(keyHex, encPub, 'llamenos:note-key', '')
+      const hpke = await hpkeSealKey(keyHex, encPub, LABEL_NOTE_KEY, '')
       return {
         pubkey,
         enc: base64urlToHex(hpke.enc),
@@ -917,7 +919,7 @@ export async function decryptNote(
       enc: hexToBase64url(envelope.enc),
       ct: envelope.ct,
     }
-    const keyHex = await hpkeOpenKeyFromState(hpkeEnvelope, 'llamenos:note-key', '')
+    const keyHex = await hpkeOpenKeyFromState(hpkeEnvelope, LABEL_NOTE_KEY, '')
     return await aesGcmDecrypt(encryptedContent, keyHex)
   } catch {
     return null
@@ -948,7 +950,7 @@ export async function encryptMessage(
   const readerEnvelopes: RecipientEnvelope[] = await Promise.all(
     readerPubkeys.map(async (pubkey) => {
       const encPub = await resolveEncryptionPubkey(pubkey)
-      const hpke = await hpkeSealKey(keyHex, encPub, 'llamenos:message', '')
+      const hpke = await hpkeSealKey(keyHex, encPub, LABEL_MESSAGE, '')
       return {
         pubkey,
         enc: base64urlToHex(hpke.enc),
@@ -983,7 +985,7 @@ export async function decryptMessage(
       enc: hexToBase64url(myEnvelope.enc),
       ct: myEnvelope.ct,
     }
-    const keyHex = await hpkeOpenKeyFromState(hpkeEnvelope, 'llamenos:message', '')
+    const keyHex = await hpkeOpenKeyFromState(hpkeEnvelope, LABEL_MESSAGE, '')
     return await aesGcmDecrypt(encryptedContent, keyHex)
   } catch {
     return null
@@ -1013,7 +1015,7 @@ export async function decryptCallRecord(
       enc: hexToBase64url(myEnvelope.enc),
       ct: myEnvelope.ct,
     }
-    const keyHex = await hpkeOpenKeyFromState(hpkeEnvelope, 'llamenos:call-meta', '')
+    const keyHex = await hpkeOpenKeyFromState(hpkeEnvelope, LABEL_CALL_META, '')
     const plaintext = await aesGcmDecrypt(encryptedContent, keyHex)
     return JSON.parse(plaintext)
   } catch {

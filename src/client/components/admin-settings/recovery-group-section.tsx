@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '@/lib/toast'
+import { LABEL_RECOVERY_GROUP_SHARE_WRAP } from '@shared/crypto-labels'
 import {
   enrollRecoveryGroup,
   type RecoveryGroupEnrollBody,
@@ -114,7 +115,7 @@ export function RecoveryGroupSettingsSection({
           const envelope = await hpkeSeal(
             shareHex,
             candidate.encryptionPubkey,
-            'llamenos:recovery-group:share-wrap:v1',
+            LABEL_RECOVERY_GROUP_SHARE_WRAP,
             '',
           )
           return { holderPubkey, envelope: JSON.stringify(envelope) }
