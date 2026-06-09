@@ -399,15 +399,31 @@ final class AppState {
     // MARK: - Hub Key Management
 
     /// Load hub keys for all hubs in parallel. Called after login.
-    /// Full implementation added in Task 13 (requires APIService.getHubKey from Task 4
-    /// and CryptoService.loadHubKey from Task 7).
+    /// Fetches each hub's HPKE-wrapped key envelope from the API and unwraps it
+    /// into Rust CryptoState. Failures on individual hubs are logged and skipped —
+    /// partial key loading is better than blocking the entire login flow.
     func loadAllHubKeys(hubs: [SharedHub]) async {
-        // Implemented in Task 13
+        await withTaskGroup(of: Void.self) { group in
+            for hub in hubs {
+                guard !cryptoService.hasHubKey(hubId: hub.id) else { continue }
+                group.addTask { [apiService, cryptoService] in
+                    do {
+                        let envelope = try await apiService.getHubKey(hub.id)
+                        try cryptoService.loadHubKey(hubId: hub.id, envelope: envelope)
+                    } catch {
+                        #if DEBUG
+                        print("[HubKeys] Failed to load key for hub \(hub.id): \(error.localizedDescription)")
+                        #endif
+                    }
+                }
+            }
+        }
     }
 
     /// Clear hub key cache on lock / logout.
-    /// Full implementation added in Task 13 (requires CryptoService.clearHubKeys from Task 7).
+    /// Evicts all hub symmetric keys from Rust memory and resets the active hub.
     func clearHubKeys() {
+        cryptoService.clearHubKeys()
         hubContext.clearActiveHub()
     }
 

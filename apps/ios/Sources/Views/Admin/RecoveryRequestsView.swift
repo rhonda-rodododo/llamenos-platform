@@ -115,7 +115,9 @@ struct RecoveryRequestsView: View {
             sessions = fetched
         } catch {
             // Non-fatal: show empty state rather than blocking the UI
+            #if DEBUG
             print("[Recovery] Failed to load sessions: \(error.localizedDescription)")
+            #endif
         }
         isLoading = false
     }
