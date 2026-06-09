@@ -344,6 +344,17 @@ pub const LABEL_DEVICE_ENCRYPTION_SEED: &str = "llamenos:device-encryption-seed:
 /// Account lockdown intent binding (prevents replay of lockdown commands)
 pub const LABEL_LOCKDOWN_INTENT: &str = "llamenos:lockdown-intent:v1";
 
+// --- Firehose Agent (EP-Firehose) ---
+
+/// Firehose agent payload seal (HPKE envelope)
+pub const LABEL_FIREHOSE_AGENT_SEAL: &str = "llamenos:firehose:agent-seal";
+
+/// Firehose buffer content encryption
+pub const LABEL_FIREHOSE_BUFFER_ENCRYPT: &str = "llamenos:firehose:buffer-encrypt";
+
+/// Firehose report wrapping (admin HPKE envelope)
+pub const LABEL_FIREHOSE_REPORT_WRAP: &str = "llamenos:firehose:report-wrap";
+
 // --- SAS Derivation (EP02) ---
 
 /// Domain separation for SAS emoji derivation (device verification ceremony)
@@ -363,6 +374,7 @@ pub const LABEL_SAS_DERIVE: &str = "llamenos:sas-derive:v1";
 // Indices 73-76: Recovery Group (EP09-P1)
 // Indices 77-79: Role Encryption (EP01)
 // Index 80: EP02 Device Identity
+// Indices 92-94: Firehose Agent (EP-Firehose)
 // =============================================================================
 
 pub const LABEL_REGISTRY: &[&str] = &[
@@ -489,6 +501,10 @@ pub const LABEL_REGISTRY: &[&str] = &[
     LABEL_DEVICE_ENCRYPTION_SEED, // 91
     // 92: Account Lockdown
     LABEL_LOCKDOWN_INTENT, // 92
+    // 93-95: Firehose Agent (EP-Firehose)
+    LABEL_FIREHOSE_AGENT_SEAL,     // 93
+    LABEL_FIREHOSE_BUFFER_ENCRYPT, // 94
+    LABEL_FIREHOSE_REPORT_WRAP,    // 95
 ];
 
 /// Look up a label string by its numeric ID.
@@ -655,6 +671,12 @@ mod tests {
             "llamenos:device-encryption-seed:v1"
         );
         assert_eq!(LABEL_LOCKDOWN_INTENT, "llamenos:lockdown-intent:v1");
+        assert_eq!(LABEL_FIREHOSE_AGENT_SEAL, "llamenos:firehose:agent-seal");
+        assert_eq!(
+            LABEL_FIREHOSE_BUFFER_ENCRYPT,
+            "llamenos:firehose:buffer-encrypt"
+        );
+        assert_eq!(LABEL_FIREHOSE_REPORT_WRAP, "llamenos:firehose:report-wrap");
     }
 
     /// Verify registry index stability.
@@ -710,6 +732,9 @@ mod tests {
         assert_eq!(id_to_label(90), Some(LABEL_BACKUP_HKDF_INFO));
         assert_eq!(id_to_label(91), Some(LABEL_DEVICE_ENCRYPTION_SEED));
         assert_eq!(id_to_label(92), Some(LABEL_LOCKDOWN_INTENT));
+        assert_eq!(id_to_label(93), Some(LABEL_FIREHOSE_AGENT_SEAL));
+        assert_eq!(id_to_label(94), Some(LABEL_FIREHOSE_BUFFER_ENCRYPT));
+        assert_eq!(id_to_label(95), Some(LABEL_FIREHOSE_REPORT_WRAP));
     }
 
     /// Verify bidirectional lookup (skipping tombstoned indices).
