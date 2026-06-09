@@ -79,10 +79,15 @@ final class WipeService {
             clearDirectory(appSupport)
         }
 
-        // 11. WebSocket — disconnect from relay
+        // 11. Documents directory — exhaustive wipe covers any future file attachments or exports
+        if let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+            clearDirectory(documents)
+        }
+
+        // 12. WebSocket — disconnect from relay
         webSocketService.disconnect()
 
-        // 12. UserDefaults — remove all app preferences
+        // 13. UserDefaults — remove all app preferences
         if let bundleId = Bundle.main.bundleIdentifier {
             UserDefaults.standard.removePersistentDomain(forName: bundleId)
         }
