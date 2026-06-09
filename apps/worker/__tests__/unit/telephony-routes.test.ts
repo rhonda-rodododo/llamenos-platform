@@ -18,6 +18,14 @@ vi.mock('@worker/db', () => ({
 }))
 import { getTelephonyFromService, getHubTelephonyFromService } from '@worker/lib/service-factories'
 
+// Mock webhook replay protection — unit tests have no database
+vi.mock('@worker/services/webhook-replay', () => ({
+  checkWebhookReplay: vi.fn().mockResolvedValue(true),
+}))
+vi.mock('@worker/db', () => ({
+  getDb: vi.fn().mockReturnValue({}),
+}))
+
 function makeMockAdapter(overrides?: Partial<TelephonyAdapter>): TelephonyAdapter {
   return {
     handleLanguageMenu: vi.fn().mockResolvedValue({ contentType: 'text/xml', body: '<Response><Gather/></Response>' }),

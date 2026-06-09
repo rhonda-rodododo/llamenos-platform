@@ -16,6 +16,7 @@ import { observeFirehoseMessage } from './firehose-observer'
 import { checkWebhookReplay } from '../services/webhook-replay'
 import { getDb } from '../db'
 import { isIpInCidrs } from '../middleware/webhook-ip-allowlist'
+import { webhookAuth } from '../middleware/webhook-auth'
 
 const logger = createLogger('messaging')
 
@@ -64,9 +65,15 @@ messaging.get('/rcs/webhook', async (c) => {
  *   /api/messaging/whatsapp/webhook?hub={hubId}
  *   /api/messaging/signal/webhook?hub={hubId}
  *
- * No auth middleware — each adapter validates its own webhook signature.
+ * webhookAuth provides content-type enforcement, IP allowlisting, and replay protection.
+ * Each adapter additionally validates its own provider-specific webhook signature.
  */
-messaging.post('/:channel/webhook', async (c) => {
+messaging.post('/:channel/webhook',
+  webhookAuth({
+    provider: 'messaging',
+    allowedContentTypes: ['application/json'],
+  }),
+  async (c) => {
   const channel = c.req.param('channel') as MessagingChannelType
   const validChannels: MessagingChannelType[] = ['sms', 'whatsapp', 'signal', 'rcs', 'telegram']
   if (!validChannels.includes(channel)) {

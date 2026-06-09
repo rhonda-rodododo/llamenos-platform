@@ -22,6 +22,10 @@ interface WebhookSecurityState {
   provider?: string
   /** Whether the provider expects form-encoded content */
   expectsFormEncoded?: boolean
+  /** Payload body for replay tests */
+  replayPayload?: string
+  /** Response from the second (replayed) delivery */
+  secondResponse?: { status: number; data: unknown }
 }
 
 const STATE_KEY = 'webhook_security'
@@ -52,6 +56,10 @@ Given('IP allowlisting is enabled for provider {string}', async ({ world }, prov
 
 Given('the request comes from IP {string}', async ({ world }, ip: string) => {
   getWebhookState(world).sourceIp = ip
+})
+
+Given('a webhook payload {string}', async ({ world }, payload: string) => {
+  getWebhookState(world).replayPayload = payload
 })
 
 // ── When steps ──────────────────────────────────────────────────
@@ -104,4 +112,32 @@ When('the webhook is delivered', async ({ request, world }) => {
   }
 
   setLastResponse(world, { status: res.status(), data })
+})
+
+When('the webhook is delivered twice with the same payload', async ({ request, world }) => {
+  const state = getWebhookState(world)
+  const webhookPath = `${BASE_URL}/api/telephony/incoming`
+  const body = state.replayPayload ?? 'CallSid=replay&From=%2B15551234567'
+
+  // First delivery — nonce is recorded; will likely fail signature validation (403)
+  const res1 = await request.post(webhookPath, {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    data: body,
+  })
+  const data1 = await res1.text()
+  setLastResponse(world, { status: res1.status(), data: data1 })
+
+  // Second delivery — same payload, replay protection returns idempotent 200
+  const res2 = await request.post(webhookPath, {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    data: body,
+  })
+  const data2 = await res2.text()
+  state.secondResponse = { status: res2.status(), data: data2 }
+})
+
+Then('the second response status should be {int}', async ({ world }, expectedStatus: number) => {
+  const state = getWebhookState(world)
+  expect(state.secondResponse).toBeDefined()
+  expect(state.secondResponse!.status).toBe(expectedStatus)
 })
