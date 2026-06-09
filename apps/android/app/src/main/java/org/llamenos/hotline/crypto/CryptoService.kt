@@ -163,22 +163,12 @@ data class RecoveryGroupKeypair(
 )
 
 /**
- * Ephemeral keypair for device linking ECDH.
- * Secret key material is held as a [ByteArray] and zeroized on [close].
- * Always use within a `.use { }` block to ensure cleanup.
+ * Result of generating an ephemeral key for device linking.
+ * The secret is held exclusively in Rust state — only the public key is available here.
  */
-class EphemeralKeypair(
+data class EphemeralKeyResult(
     val publicKeyHex: String,
-    private val secretBytes: ByteArray,
-) : AutoCloseable {
-    /** Return the secret key as a hex string. */
-    fun secretHex(): String = secretBytes.joinToString("") { "%02x".format(it) }
-
-    /** Zeroize the secret key material. */
-    override fun close() {
-        secretBytes.fill(0)
-    }
-}
+)
 
 class CryptoException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
@@ -738,39 +728,41 @@ class CryptoService @Inject constructor() {
     /**
      * Generate an ephemeral X25519 keypair for device linking ECDH.
      *
-     * Returns an [EphemeralKeypair] that holds the secret as a [ByteArray].
-     * Always use within a `.use { }` block to ensure the secret is zeroized after use.
-     *
-     * SECURITY NOTE (M02): UniFFI returns hex-encoded strings which are immutable
-     * JVM objects and cannot be explicitly zeroized. The secretKeyHex String will
-     * linger on the JVM heap until garbage collected. We convert to ByteArray
-     * immediately and the EphemeralKeypair.close() zeroizes that. The residual
-     * String is method-scoped and eligible for GC promptly. Changing the FFI
-     * to return ByteArray would require modifying the Rust UniFFI bindings.
+     * The secret key is held exclusively in Rust state — it NEVER crosses JNI.
+     * Returns only the public key. Use [ecdhComplete] to derive the shared secret.
      */
-    fun generateEphemeralKeypair(): EphemeralKeypair {
+    fun generateEphemeralKey(): EphemeralKeyResult {
         check(nativeLibLoaded) { "Native crypto library not loaded." }
         return try {
-            val secretKeyHex = org.llamenos.core.mobileRandomBytesHex()
-            val publicKeyHex = org.llamenos.core.getPublicKey(secretKeyHex)
-            val secretBytes = ByteArray(secretKeyHex.length / 2) { i ->
-                secretKeyHex.substring(i * 2, i * 2 + 2).toInt(16).toByte()
-            }
-            EphemeralKeypair(publicKeyHex, secretBytes)
+            val publicKeyHex = org.llamenos.core.mobileGenerateEphemeralKey()
+            EphemeralKeyResult(publicKeyHex)
         } catch (e: org.llamenos.core.CryptoException) {
-            throw CryptoException("Ephemeral keypair generation failed: ${e.message}", e)
+            throw CryptoException("Ephemeral key generation failed: ${e.message}", e)
         }
     }
 
     /**
-     * Derive ECDH shared secret from our ephemeral secret and their ephemeral public key.
+     * Perform ECDH using the stored ephemeral secret and the peer's public key.
+     *
+     * The ephemeral secret is zeroized and removed from Rust state after this call.
+     * Returns the shared secret hex for SAS derivation and provisioning decryption.
      */
-    fun deriveSharedSecret(ourSecret: String, theirPublic: String): String {
+    fun ecdhComplete(theirPublicKeyHex: String): String {
         check(nativeLibLoaded) { "Native crypto library not loaded." }
         return try {
-            org.llamenos.core.computeSharedXHex(ourSecret, theirPublic)
+            org.llamenos.core.mobileEcdhComplete(theirPublicKeyHex)
         } catch (e: org.llamenos.core.CryptoException) {
             throw CryptoException("ECDH derivation failed: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Clear the ephemeral key from Rust state without performing ECDH.
+     * Called when the device linking flow is cancelled.
+     */
+    fun clearEphemeralKey() {
+        if (nativeLibLoaded) {
+            org.llamenos.core.mobileClearEphemeralKey()
         }
     }
 
@@ -823,35 +815,24 @@ class CryptoService @Inject constructor() {
 
     /**
      * Unwrap and cache the hub key using HPKE from a server-provided envelope.
+     *
      * The unwrapped key is stored in Rust memory — it never enters JVM memory.
+     * Envelope version and label ID are constructed by Rust from the label registry,
+     * so Kotlin never hardcodes protocol constants.
      */
     suspend fun loadHubKey(hubId: String, envelope: HubKeyEnvelopeResponse): Unit =
         withContext(computeDispatcher) {
             check(nativeLibLoaded) { "Native crypto library not loaded." }
             if (!isUnlocked) throw CryptoException("No key loaded")
 
-            val ffiEnvelope = org.llamenos.core.HpkeEnvelope(
-                v = HpkeEnvelope.CURRENT_VERSION.toUByte(),
-                labelId = HpkeEnvelope.LABEL_ID_HUB_KEY_WRAP.toUByte(),
-                enc = envelope.envelope.enc,
-                ct = envelope.envelope.ct,
-            )
-
-            val keyHex = try {
-                org.llamenos.core.mobileHpkeOpenKey(
-                    envelope = ffiEnvelope,
-                    expectedLabel = CryptoLabels.LABEL_HUB_KEY_WRAP,
-                    aadHex = "",
+            try {
+                org.llamenos.core.mobileLoadHubKey(
+                    hubId = hubId,
+                    enc = envelope.envelope.enc,
+                    ct = envelope.envelope.ct,
                 )
             } catch (e: org.llamenos.core.CryptoException) {
                 throw CryptoException("Hub key decryption failed for hub $hubId: ${e.message}", e)
-            }
-
-            // Store the unwrapped key in Rust state, then zeroize the local reference
-            try {
-                org.llamenos.core.mobileSetHubKey(hubId, keyHex)
-            } catch (e: org.llamenos.core.CryptoException) {
-                throw CryptoException("Failed to store hub key for $hubId: ${e.message}", e)
             }
         }
 

@@ -24,7 +24,7 @@ use crate::errors::CryptoError;
 use crate::hpke_envelope::{self, HpkeEnvelope};
 use crate::puk::{self, PukState, RotatePukResult};
 use crate::sigchain::{self, SigchainLink, SigchainVerifiedState};
-use zeroize::Zeroize;
+use zeroize::{Zeroize, Zeroizing};
 
 // ── Static mobile state ────────────────────────────────────────────
 
@@ -892,8 +892,9 @@ pub fn mobile_ecdh_complete(their_pubkey_hex: String) -> Result<String, CryptoEr
             CryptoError::InvalidInput("No ephemeral key in state. Call mobile_generate_ephemeral_key first.".into())
         })?;
 
-    let secret = X25519StaticSecret::from(*ephemeral_bytes.as_ref());
+    let arr: [u8; 32] = *ephemeral_bytes;
     drop(guard); // Release lock before ECDH computation
+    let secret = X25519StaticSecret::from(arr);
 
     let public_key = crate::provisioning::parse_x25519_pubkey(&their_pubkey_hex)?;
     let shared = secret.diffie_hellman(&public_key);
@@ -945,7 +946,7 @@ pub fn mobile_load_hub_key(
     let key = hpke_envelope::hpke_open_key(&envelope, &secret_hex, crate::labels::LABEL_HUB_KEY_WRAP, &[])?;
 
     let mut guard = state().lock().unwrap();
-    guard.hub_keys.insert(hub_id, *key.as_ref());
+    guard.hub_keys.insert(hub_id, *key);
 
     Ok(())
 }
@@ -1013,7 +1014,8 @@ pub fn mobile_wake_key_pubkey() -> Result<String, CryptoError> {
         .wake_key_secret
         .as_ref()
         .ok_or_else(|| CryptoError::InvalidInput("No wake key in state".into()))?;
-    let secret = X25519StaticSecret::from(*secret_bytes.as_ref());
+    let arr: [u8; 32] = **secret_bytes;
+    let secret = X25519StaticSecret::from(arr);
     let public_key = X25519PublicKey::from(&secret);
     Ok(hex::encode(public_key.as_bytes()))
 }

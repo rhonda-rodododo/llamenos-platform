@@ -117,40 +117,41 @@ class DeviceLinkViewModel @Inject constructor(
     private fun connectToProvisioningRoom(roomId: String, relayUrl: String) {
         viewModelScope.launch {
             try {
-                // Generate our ephemeral keypair — secret is zeroized after use
-                cryptoService.generateEphemeralKeypair().use { keypair ->
-                    // In production, we would:
-                    // 1. Connect to the relay at relayUrl
-                    // 2. Subscribe to events in the provisioning room
-                    // 3. Send our ephemeral public key (keypair.publicKeyHex)
-                    // 4. Wait for the desktop's ephemeral public key
-                    // 5. Derive shared secret via ECDH
+                // Generate our ephemeral key — secret is held in Rust, never in JVM
+                val ephemeral = cryptoService.generateEphemeralKey()
 
-                    // Simulate connection delay
-                    delay(1500)
+                // In production, we would:
+                // 1. Connect to the relay at relayUrl
+                // 2. Subscribe to events in the provisioning room
+                // 3. Send our ephemeral public key (ephemeral.publicKeyHex)
+                // 4. Wait for the desktop's ephemeral public key
+                // 5. Derive shared secret via ECDH (Rust holds the secret)
 
-                    // Mock: derive shared secret with a placeholder "desktop" key
-                    val mockDesktopPublic = ByteArray(32).apply {
-                        java.security.SecureRandom().nextBytes(this)
-                    }.joinToString("") { "%02x".format(it) }
+                // Simulate connection delay
+                delay(1500)
 
-                    val derivedSecret = cryptoService.deriveSharedSecret(
-                        keypair.secretHex(),
-                        mockDesktopPublic,
+                // Mock: derive shared secret with a placeholder "desktop" key
+                val mockDesktopPublic = ByteArray(32).apply {
+                    java.security.SecureRandom().nextBytes(this)
+                }.joinToString("") { "%02x".format(it) }
+
+                // ECDH is performed entirely in Rust — ephemeral secret
+                // is zeroized in Rust after this call
+                val derivedSecret = cryptoService.ecdhComplete(mockDesktopPublic)
+                sharedSecret = derivedSecret
+
+                // Derive SAS code
+                val sasCode = cryptoService.deriveSASCode(derivedSecret)
+
+                _uiState.update {
+                    it.copy(
+                        step = DeviceLinkStep.VERIFYING,
+                        sasCode = sasCode,
                     )
-                    sharedSecret = derivedSecret
-
-                    // Derive SAS code
-                    val sasCode = cryptoService.deriveSASCode(derivedSecret)
-
-                    _uiState.update {
-                        it.copy(
-                            step = DeviceLinkStep.VERIFYING,
-                            sasCode = sasCode,
-                        )
-                    }
                 }
             } catch (e: Exception) {
+                // Clean up ephemeral key on error
+                cryptoService.clearEphemeralKey()
                 _uiState.update {
                     it.copy(
                         step = DeviceLinkStep.ERROR,
@@ -211,6 +212,7 @@ class DeviceLinkViewModel @Inject constructor(
      */
     fun cancel() {
         sharedSecret = null
+        cryptoService.clearEphemeralKey()
         _uiState.update { DeviceLinkUiState() }
     }
 
@@ -219,6 +221,7 @@ class DeviceLinkViewModel @Inject constructor(
      */
     fun retry() {
         sharedSecret = null
+        cryptoService.clearEphemeralKey()
         _uiState.update { DeviceLinkUiState() }
     }
 }

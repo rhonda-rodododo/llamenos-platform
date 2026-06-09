@@ -103,13 +103,13 @@ class CryptoServiceTest {
     }
 
     @Test(expected = IllegalStateException::class)
-    fun `generateEphemeralKeypair throws without native lib`() {
-        cryptoService.generateEphemeralKeypair()
+    fun `generateEphemeralKey throws without native lib`() {
+        cryptoService.generateEphemeralKey()
     }
 
     @Test(expected = IllegalStateException::class)
-    fun `deriveSharedSecret throws without native lib`() {
-        cryptoService.deriveSharedSecret("a".repeat(64), "b".repeat(64))
+    fun `ecdhComplete throws without native lib`() {
+        cryptoService.ecdhComplete("b".repeat(64))
     }
 
     @Test(expected = IllegalStateException::class)

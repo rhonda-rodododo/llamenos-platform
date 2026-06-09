@@ -45,7 +45,7 @@ type Kdf = HkdfSha256;
 type Kem = X25519HkdfSha256;
 
 /// HPKE envelope version for v3 (Ed25519/X25519 + HPKE)
-const ENVELOPE_VERSION: u8 = 3;
+pub(crate) const ENVELOPE_VERSION: u8 = 3;
 
 /// Bridge getrandom 0.2 to hpke's rand_core 0.9 interface.
 /// The hpke crate v0.13 uses rand_core 0.9, while the rest of this crate

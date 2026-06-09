@@ -613,19 +613,20 @@ class CryptoSteps : BaseSteps() {
     @When("I generate an ephemeral keypair")
     fun iGenerateAnEphemeralKeypair() {
         try {
-            cryptoService.generateEphemeralKeypair().use { keypair ->
-                keypairASigningPubkey = keypair.secretHex()
-                keypairAEncryptionPubkey = keypair.publicKeyHex
-            }
+            val result = cryptoService.generateEphemeralKey()
+            // Secret is held in Rust — we only have the public key
+            keypairAEncryptionPubkey = result.publicKeyHex
+            // Store pubkey in signing field too for the length assertion
+            keypairASigningPubkey = result.publicKeyHex
         } catch (_: Throwable) {
-            // Ephemeral keypair generation may fail without native crypto
+            // Ephemeral key generation may fail without native crypto
         }
     }
 
     @Then("both the secret and public key should be {int} hex characters")
     fun bothTheSecretAndPublicKeyShouldBeHexCharacters(length: Int) {
         try {
-            assertEquals("Secret key should be $length hex chars", length, keypairASigningPubkey!!.length)
+            // Secret is no longer exposed to Kotlin — only verify public key length
             assertEquals("Public key should be $length hex chars", length, keypairAEncryptionPubkey!!.length)
         } catch (_: Throwable) {
             // Keypair may not be available
@@ -635,12 +636,10 @@ class CryptoSteps : BaseSteps() {
     @Then("generating another keypair should produce different keys")
     fun generatingAnotherKeypairShouldProduceDifferentKeys() {
         try {
-            cryptoService.generateEphemeralKeypair().use { keypair2 ->
-                assertNotEquals("Ephemeral keys should be unique", keypairASigningPubkey, keypair2.secretHex())
-                assertNotEquals("Ephemeral pubkeys should be unique", keypairAEncryptionPubkey, keypair2.publicKeyHex)
-            }
+            val result2 = cryptoService.generateEphemeralKey()
+            assertNotEquals("Ephemeral pubkeys should be unique", keypairAEncryptionPubkey, result2.publicKeyHex)
         } catch (_: Throwable) {
-            // Keypair generation may fail without native crypto
+            // Key generation may fail without native crypto
         }
     }
 
