@@ -863,9 +863,8 @@ pub fn mobile_generate_ephemeral_key() -> Result<String, CryptoError> {
     use x25519_dalek::{PublicKey as X25519PublicKey, StaticSecret as X25519StaticSecret};
 
     let mut rng_bytes = [0u8; 32];
-    getrandom::getrandom(&mut rng_bytes).map_err(|_| {
-        CryptoError::InvalidInput("getrandom failed".into())
-    })?;
+    getrandom::getrandom(&mut rng_bytes)
+        .map_err(|_| CryptoError::InvalidInput("getrandom failed".into()))?;
     let secret = X25519StaticSecret::from(rng_bytes);
     let public_key = X25519PublicKey::from(&secret);
     let pubkey_hex = hex::encode(public_key.as_bytes());
@@ -889,7 +888,9 @@ pub fn mobile_ecdh_complete(their_pubkey_hex: String) -> Result<String, CryptoEr
         .ephemeral_secret
         .take() // Remove from state (Zeroizing will clear on drop)
         .ok_or_else(|| {
-            CryptoError::InvalidInput("No ephemeral key in state. Call mobile_generate_ephemeral_key first.".into())
+            CryptoError::InvalidInput(
+                "No ephemeral key in state. Call mobile_generate_ephemeral_key first.".into(),
+            )
         })?;
 
     let arr: [u8; 32] = *ephemeral_bytes;
@@ -927,11 +928,7 @@ pub fn mobile_clear_ephemeral_key() {
 /// version and label ID are constructed by Rust from the label registry — clients
 /// never need to hardcode protocol constants.
 #[uniffi::export]
-pub fn mobile_load_hub_key(
-    hub_id: String,
-    enc: String,
-    ct: String,
-) -> Result<(), CryptoError> {
+pub fn mobile_load_hub_key(hub_id: String, enc: String, ct: String) -> Result<(), CryptoError> {
     let label_id = crate::labels::label_to_id(crate::labels::LABEL_HUB_KEY_WRAP)
         .ok_or_else(|| CryptoError::InvalidInput("LABEL_HUB_KEY_WRAP not in registry".into()))?;
 
@@ -943,7 +940,12 @@ pub fn mobile_load_hub_key(
     };
 
     let secret_hex = encryption_secret_hex()?;
-    let key = hpke_envelope::hpke_open_key(&envelope, &secret_hex, crate::labels::LABEL_HUB_KEY_WRAP, &[])?;
+    let key = hpke_envelope::hpke_open_key(
+        &envelope,
+        &secret_hex,
+        crate::labels::LABEL_HUB_KEY_WRAP,
+        &[],
+    )?;
 
     let mut guard = state().lock().unwrap();
     guard.hub_keys.insert(hub_id, *key);
@@ -960,9 +962,8 @@ pub fn mobile_generate_wake_key() -> Result<String, CryptoError> {
     use x25519_dalek::{PublicKey as X25519PublicKey, StaticSecret as X25519StaticSecret};
 
     let mut rng_bytes = [0u8; 32];
-    getrandom::getrandom(&mut rng_bytes).map_err(|_| {
-        CryptoError::InvalidInput("getrandom failed".into())
-    })?;
+    getrandom::getrandom(&mut rng_bytes)
+        .map_err(|_| CryptoError::InvalidInput("getrandom failed".into()))?;
     let secret = X25519StaticSecret::from(rng_bytes);
     let public_key = X25519PublicKey::from(&secret);
     let pubkey_hex = hex::encode(public_key.as_bytes());
