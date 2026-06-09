@@ -258,3 +258,13 @@ Feature: Messaging Flow
     And conversations exist across SMS and WhatsApp
     When I filter by SMS channel
     Then I should only see SMS conversations
+
+  # ── Backend: Outbound Message Encryption ─────────────────────────
+
+  @backend @security
+  Scenario: Outbound message stores encrypted content, not plaintext
+    Given a conversation exists for an SMS contact
+    When a volunteer sends an outbound message with plaintext "Help is on the way"
+    Then the stored message encryptedContent should not contain "Help is on the way"
+    And the stored message should have reader envelopes with HPKE fields
+    And the stored message should have an envelope for the admin decryption pubkey

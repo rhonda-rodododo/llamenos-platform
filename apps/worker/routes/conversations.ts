@@ -18,6 +18,7 @@ import { getCircuitBreaker, CircuitOpenError } from '../lib/circuit-breaker'
 import { incCounter } from './metrics'
 import type { Services } from '../services'
 import { createLogger } from '../lib/logger'
+import { encryptMessageForStorage } from '../lib/crypto'
 
 const logger = createLogger('routes.conversations')
 
@@ -313,8 +314,25 @@ conversations.post('/:id/messages',
 
     // Normalize: `body` field is an alias for `plaintextForSending`
     const plaintextForSending = body.plaintextForSending ?? body.body
-    const encryptedContent = body.encryptedContent ?? plaintextForSending ?? ''
-    const readerEnvelopes = body.readerEnvelopes ?? []
+
+    // Determine encrypted content + envelopes for storage.
+    // If the client provided pre-encrypted content (web channel E2EE), use it directly.
+    // Otherwise, encrypt server-side before storing — plaintext must NEVER be stored.
+    let encryptedContent: string
+    let readerEnvelopes = body.readerEnvelopes ?? []
+    if (body.encryptedContent) {
+      encryptedContent = body.encryptedContent
+    } else if (plaintextForSending) {
+      const adminDecryptionPubkey = c.env.ADMIN_DECRYPTION_PUBKEY || c.env.ADMIN_PUBKEY
+      const readerPubkeys: string[] = []
+      if (adminDecryptionPubkey) readerPubkeys.push(adminDecryptionPubkey)
+      if (pubkey !== adminDecryptionPubkey) readerPubkeys.push(pubkey)
+      const encrypted = encryptMessageForStorage(plaintextForSending, readerPubkeys)
+      encryptedContent = encrypted.encryptedContent
+      readerEnvelopes = encrypted.readerEnvelopes
+    } else {
+      encryptedContent = ''
+    }
 
     // Web channel requires real E2EE envelope
     if (conv.channelType === 'web' && (!body.encryptedContent || !body.readerEnvelopes?.length)) {
