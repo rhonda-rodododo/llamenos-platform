@@ -37,7 +37,7 @@ webauthn.post('/login/options',
     const services = c.get('services')
     // Rate limit WebAuthn login attempts to prevent challenge flooding
     const clientIp = c.req.header('CF-Connecting-IP') || 'unknown'
-    const limited = await checkRateLimit(services.settings, `webauthn:${hashIP(clientIp, c.env.HMAC_SECRET)}`, 10)
+    const limited = await checkRateLimit(services.settings, `webauthn:${hashIP(clientIp, c.env.HMAC_SECRET)}`, 5)
     if (limited) return c.json({ error: 'Too many requests. Try again later.' }, 429)
     const rpID = new URL(c.req.url).hostname
     const { credentials } = await services.identity.getAllWebAuthnCredentials()
@@ -71,7 +71,7 @@ webauthn.post('/login/verify',
     const services = c.get('services')
     // Rate limit verification attempts
     const clientIp = c.req.header('CF-Connecting-IP') || 'unknown'
-    const verifyLimited = await checkRateLimit(services.settings, `webauthn-verify:${hashIP(clientIp, c.env.HMAC_SECRET)}`, 10)
+    const verifyLimited = await checkRateLimit(services.settings, `webauthn-verify:${hashIP(clientIp, c.env.HMAC_SECRET)}`, 5)
     if (verifyLimited) return c.json({ error: 'Too many requests. Try again later.' }, 429)
     const body = c.req.valid('json')
     const assertion = body.assertion as unknown as AuthenticationResponseJSON
