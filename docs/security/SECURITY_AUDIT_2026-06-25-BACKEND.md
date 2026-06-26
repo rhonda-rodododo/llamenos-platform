@@ -19,9 +19,9 @@ The backend has strong fundamentals: Zod validation on nearly all production rou
 |----------|-------|--------|
 | CRITICAL | 1 | Persists from wave 2 |
 | HIGH | 10 | 5 persist from wave 2, 5 new |
-| MEDIUM | 24 | 8 persist from wave 2, 16 new |
+| MEDIUM | 25 | 8 persist from wave 2, 17 new |
 | LOW | 15 | 6 persist from wave 2, 9 new |
-| **Total** | **50** | |
+| **Total** | **51** | |
 
 ### Top Priority Actions
 
@@ -291,35 +291,44 @@ The Signal adapter communicates with the signal-cli bridge at `config.bridgeUrl`
 
 **Fix:** Gate behind auth or restrict to development mode in production deployments.
 
-### M20: Contacts-v2 group operations not hub-scoped by resource (NEW)
+### M20: SSRF via unvalidated ntfy pushToken URL (NEW)
+**Files:** `packages/protocol/schemas/devices.ts:13`, `apps/worker/lib/ntfy-client.ts:60`, `apps/worker/lib/push-dispatch.ts:263`
+
+Android UnifiedPush tokens are endpoint URLs (e.g., `https://ntfy.example.com/up-topic-xxx`) stored via `registerDeviceBodySchema` with only `z.string().min(1)` validation — no URL format or SSRF checks. When the server sends push notifications, `NtfyClient.send()` calls `fetch(options.endpoint, ...)` with no SSRF guard. Any authenticated user can register a `pushToken` pointing to `http://169.254.169.254/latest/meta-data/` or other internal services, and the server will fetch it on every push notification.
+
+**Impact:** Internal infrastructure probing, cloud metadata access. Unlike the settings SSRF (admin-only), this is exploitable by any authenticated user with device registration access.
+
+**Fix:** Validate `pushToken` as a well-formed HTTPS URL via `z.string().url()`. Apply `validateExternalUrlWithDns()` before storing. Enable `ssrfGuard: true` in `NtfyClient.send()`.
+
+### M21: Contacts-v2 group operations not hub-scoped by resource (NEW)
 **File:** `apps/worker/routes/contacts-v2.ts:216-376`
 
 Group CRUD operations (`GET/PATCH/DELETE /groups/:groupId`, member management) check `contacts:manage-groups` permission but do not verify the group belongs to the caller's hub. A user with this permission in Hub A could modify or delete groups in Hub B by providing Hub B's group ID. The `listGroups` correctly passes `hubId`, but individual operations use only the groupId.
 
 **Fix:** After fetching the group by ID, verify `group.hubId` matches the caller's hub context.
 
-### M21: Erasure admin operations not scoped to admin's hub (NEW)
+### M22: Erasure admin operations not scoped to admin's hub (NEW)
 **File:** `apps/worker/routes/erasure.ts:268-360`
 
 `POST /:userId` (execute erasure) and `POST /:userId/wipe-device/:devicePubkey` take `userId` from URL params but only check `erasure:admin` permission. No verification that the target user belongs to a hub the admin manages. An admin of Hub A could erase users or remote-wipe devices in Hub B.
 
 **Fix:** Verify target user is a member of a hub the caller administers before executing erasure.
 
-### M22: Recovery group info endpoint allows cross-hub access (NEW)
+### M23: Recovery group info endpoint allows cross-hub access (NEW)
 **File:** `apps/worker/routes/recovery-group.ts:99-131`
 
 `GET /:hubId` takes hubId from the URL parameter with only `recovery:view` permission check. Unlike the session status endpoint (which checks hub membership via `user.hubRoles`), the group info endpoint does not verify the caller is a member of the requested hub.
 
 **Fix:** Verify caller is a member of the requested hub before returning recovery group configuration.
 
-### M23: Entity-schema and contacts-v2 accept hubId from request body (NEW)
+### M24: Entity-schema and contacts-v2 accept hubId from request body (NEW)
 **Files:** `apps/worker/routes/entity-schema.ts:319`, `apps/worker/routes/contacts-v2.ts:151`
 
 Case number generation prefers `body.hubId` over `c.get('hubId')`. Contact creation uses `c.get('hubId') ?? body.hubId`. When accessed via the non-hub-scoped `authenticated` router, the client can specify any hubId, creating resources in arbitrary hubs.
 
 **Fix:** Never accept `hubId` from request body. Always use `c.get('hubId')` from hub context middleware.
 
-### M24: Entity-schema cross-hub sharing toggle uses hub-level permission for platform operation (NEW)
+### M25: Entity-schema cross-hub sharing toggle uses hub-level permission for platform operation (NEW)
 **File:** `apps/worker/routes/entity-schema.ts:137-178`
 
 `GET /cross-hub` and `PUT /cross-hub` toggle cross-hub sharing for the entire platform but only require `settings:manage-cms` (a hub-scoped permission). A hub admin could toggle platform-wide sharing.
@@ -515,7 +524,8 @@ This audit was conducted by:
 | P1 | Hub-scope evidence routes | H9 |
 | P1 | Fix admin device hubId from query param | H10 |
 | P1 | Encrypt/remove ban list `phone_display` | H5 |
-| P1 | **Systemic: audit ALL routes for hub-scoping gaps** | H7,H9,H10,M20-M24 |
+| P1 | **Systemic: audit ALL routes for hub-scoping gaps** | H7,H9,H10,M21-M25 |
+| P1 | SSRF guard on ntfy pushToken URLs | M20 |
 | P1 | Fix login rate limit key for non-CF deployments | M7 |
 | P2 | Rate limit WebSocket upgrade path | M6 |
 | P2 | Rate limit public endpoints | M4 |
@@ -530,9 +540,9 @@ This audit was conducted by:
 | P2 | Add ADMIN_PUBKEY kill switch | M13 |
 | P3 | Gate OpenAPI docs behind auth | M19 |
 | P3 | Enforce events sunset date | L2 |
-| P2 | Hub-scope contacts-v2 group operations | M20 |
-| P2 | Hub-scope erasure admin operations | M21 |
-| P2 | Hub-scope recovery group info | M22 |
-| P2 | Never accept hubId from request body | M23 |
-| P2 | Require platform permission for cross-hub toggle | M24 |
+| P2 | Hub-scope contacts-v2 group operations | M21 |
+| P2 | Hub-scope erasure admin operations | M22 |
+| P2 | Hub-scope recovery group info | M23 |
+| P2 | Never accept hubId from request body | M24 |
+| P2 | Require platform permission for cross-hub toggle | M25 |
 | P3 | Address remaining LOW findings | L1, L3-L15 |
