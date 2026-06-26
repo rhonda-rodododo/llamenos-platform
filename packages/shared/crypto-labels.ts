@@ -187,3 +187,8 @@ export const LABEL_TEAM_ENCRYPT = 'llamenos:team-field:v1'
 
 /** Hub-scoped AES-256-GCM encryption for tag label and category fields */
 export const LABEL_TAG_ENCRYPT = 'llamenos:tag-field:v1'
+
+// --- Security: Account lockdown ---
+
+/** Lockdown intent signature — Ed25519 sig over lockdown request proving device key possession */
+export const LABEL_LOCKDOWN_INTENT = 'llamenos:lockdown-intent:v1'

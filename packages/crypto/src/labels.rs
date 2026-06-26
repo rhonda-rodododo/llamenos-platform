@@ -341,6 +341,9 @@ pub const LABEL_BACKUP_HKDF_INFO: &str = "llamenos:backup:v1";
 /// HKDF info for deriving X25519 encryption seed from Ed25519 signing seed
 pub const LABEL_DEVICE_ENCRYPTION_SEED: &str = "llamenos:device-encryption-seed:v1";
 
+/// Account lockdown intent binding (prevents replay of lockdown commands)
+pub const LABEL_LOCKDOWN_INTENT: &str = "llamenos:lockdown-intent:v1";
+
 // --- SAS Derivation (EP02) ---
 
 /// Domain separation for SAS emoji derivation (device verification ceremony)
@@ -484,6 +487,8 @@ pub const LABEL_REGISTRY: &[&str] = &[
     // 90-91: Desktop Key Management (Security Audit)
     LABEL_BACKUP_HKDF_INFO,       // 90
     LABEL_DEVICE_ENCRYPTION_SEED, // 91
+    // 92: Account Lockdown
+    LABEL_LOCKDOWN_INTENT, // 92
 ];
 
 /// Look up a label string by its numeric ID.
@@ -649,6 +654,7 @@ mod tests {
             LABEL_DEVICE_ENCRYPTION_SEED,
             "llamenos:device-encryption-seed:v1"
         );
+        assert_eq!(LABEL_LOCKDOWN_INTENT, "llamenos:lockdown-intent:v1");
     }
 
     /// Verify registry index stability.
@@ -703,6 +709,7 @@ mod tests {
         assert_eq!(id_to_label(89), Some(LABEL_SHAMIR_COMMIT));
         assert_eq!(id_to_label(90), Some(LABEL_BACKUP_HKDF_INFO));
         assert_eq!(id_to_label(91), Some(LABEL_DEVICE_ENCRYPTION_SEED));
+        assert_eq!(id_to_label(92), Some(LABEL_LOCKDOWN_INTENT));
     }
 
     /// Verify bidirectional lookup (skipping tombstoned indices).

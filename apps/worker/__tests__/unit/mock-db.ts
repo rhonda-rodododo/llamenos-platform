@@ -133,7 +133,11 @@ export function createMockDb(tables: string[] = []) {
             returning: returningFn,
           })
         )
-        const onConflictDoNothingFn = vi.fn(() => Promise.resolve())
+        const onConflictDoNothingFn = vi.fn(() =>
+          makeChainable(_insertResult, {
+            returning: returningFn,
+          })
+        )
 
         return makeChainable(_insertResult, {
           returning: returningFn,

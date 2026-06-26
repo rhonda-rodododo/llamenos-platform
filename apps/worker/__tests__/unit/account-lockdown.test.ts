@@ -63,7 +63,7 @@ describe('POST /account/lockdown — elevated auth', () => {
     expect(services.identity.terminateOtherSessions).toHaveBeenCalledWith('test-pubkey', '')
   })
 
-  it('lockdown/complete does not require elevated auth', async () => {
+  it('lockdown/complete rejects session-token auth (requires elevated auth)', async () => {
     const { app } = makeApp({ sessionToken: 'some-session' })
 
     const res = await app.request('/account/lockdown/complete', {
@@ -71,7 +71,20 @@ describe('POST /account/lockdown — elevated auth', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pukRotated: true, hubKeysRotated: ['hub-1'], hubKeysFailed: [] }),
     })
-    // Should not be blocked by elevated auth
+    // E/LOCKDOWN: lockdown/complete now requires elevated auth (fresh device key signature)
+    expect(res.status).toBe(401)
+    const body = await res.json() as { error: string; code: string }
+    expect(body.code).toBe('ELEVATED_AUTH_REQUIRED')
+  })
+
+  it('lockdown/complete allows Schnorr-authenticated requests', async () => {
+    const { app } = makeApp({ sessionToken: undefined })
+
+    const res = await app.request('/account/lockdown/complete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pukRotated: true, hubKeysRotated: ['hub-1'], hubKeysFailed: [] }),
+    })
     expect(res.status).toBe(200)
   })
 })

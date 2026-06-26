@@ -127,9 +127,9 @@ export abstract class SipBridgeAdapter implements TelephonyAdapter {
     const timestamp = request.headers.get('X-Bridge-Timestamp') || ''
     const url = request.url
 
-    // Reject webhooks with timestamps older than 5 minutes (replay protection)
+    // W05-M08: Reject webhooks with timestamps older than 60 seconds (tightened from 300s)
     const tsMs = parseInt(timestamp, 10)
-    if (isNaN(tsMs) || Math.abs(Date.now() - tsMs) > 300_000) {
+    if (isNaN(tsMs) || Math.abs(Date.now() - tsMs) > 60_000) {
       return false
     }
 
