@@ -19,9 +19,9 @@ The backend has strong fundamentals: Zod validation on nearly all production rou
 |----------|-------|--------|
 | CRITICAL | 1 | Persists from wave 2 |
 | HIGH | 6 | 5 persist from wave 2, 1 new |
-| MEDIUM | 12 | 8 persist from wave 2, 4 new |
-| LOW | 10 | 6 persist from wave 2, 4 new |
-| **Total** | **29** | |
+| MEDIUM | 14 | 8 persist from wave 2, 6 new |
+| LOW | 11 | 6 persist from wave 2, 5 new |
+| **Total** | **32** | |
 
 ### Top Priority Actions
 
@@ -203,7 +203,21 @@ The ADMIN_PUBKEY user's `role-super-admin` is automatically restored on every au
 
 **Fix:** Add kill switch env var (`ADMIN_PUBKEY_AUTO_RESTORE=false`) for incident containment.
 
-### M12: OpenAPI spec and Scalar docs publicly accessible (PERSISTS from wave 2)
+### M12: WebAuthn registration challenge not bound to authenticated user during verification (NEW)
+**Files:** `apps/worker/routes/webauthn.ts:141,173`, `apps/worker/services/identity.ts:828`
+
+The `storeWebAuthnChallenge` correctly accepts a `pubkey` parameter and stores it with the challenge. However, `getWebAuthnChallenge()` only checks `challengeId` — it never validates that the consuming user matches the `pubkey` stored with the challenge. An attacker who intercepts a challenge ID could register their own authenticator under a victim's account if they can satisfy the origin/rpID checks.
+
+**Fix:** Add a `pubkey` parameter to `getWebAuthnChallenge()` and include `eq(webauthnChallenges.pubkey, pubkey)` in the WHERE clause for registration flows.
+
+### M13: Session token compared with `===` instead of constant-time comparison (NEW)
+**File:** `apps/worker/routes/sessions.ts:49`
+
+`isCurrent: s.token === currentToken` uses JavaScript string equality, which is susceptible to timing side-channels. The codebase already uses `timingSafeEqual` for webhook secrets (Telegram, Signal) but not here.
+
+**Fix:** Use `crypto.timingSafeEqual` for the `isCurrent` comparison, or compare by session `id` instead of the secret token value.
+
+### M14: OpenAPI spec and Scalar docs publicly accessible (PERSISTS from wave 2)
 **File:** `apps/worker/app.ts:299-300`
 
 `/api/openapi.json` and `/api/docs` are unauthenticated, revealing every endpoint, schema, and parameter definition to potential attackers.
@@ -288,7 +302,14 @@ The raw `result.error` from messaging adapters (which may contain provider API d
 
 **Fix:** Use a dedicated `firehose:optout` permission or `firehose:manage` for write operations.
 
-### L10: Bridge-unavailable messages silently marked as `sent` (NEW)
+### L10: Missing `X-Frame-Options`, `Strict-Transport-Security`, and `Cache-Control` headers (NEW)
+**File:** `apps/worker/app.ts:113-118`
+
+Security headers include `X-Content-Type-Options` and `Referrer-Policy` but omit `X-Frame-Options: DENY`, `Strict-Transport-Security`, and `Cache-Control: no-store`. While this is an API (not serving HTML), defense-in-depth best practice is to include these. Missing `Cache-Control` could allow sensitive API responses to be cached by intermediaries.
+
+**Fix:** Add `X-Frame-Options: DENY`, `Strict-Transport-Security: max-age=31536000; includeSubDomains`, and `Cache-Control: no-store`.
+
+### L11: Bridge-unavailable messages silently marked as `sent` (NEW)
 **File:** `apps/worker/routes/conversations.ts:388-397`
 
 When the messaging bridge is unreachable (ECONNREFUSED, ETIMEDOUT, etc.), the message is stored with `status: 'sent'` rather than a retry or failure state. The user sees a successful send, but the message was never delivered.
@@ -363,8 +384,10 @@ This audit was conducted by:
 | P2 | Rate limit public endpoints | M4 |
 | P2 | Add WebSocket per-connection rate limit | M5 |
 | P2 | Add WebSocket per-user connection cap | M9 |
-| P2 | Zod validate preferences endpoint | M6 (new) |
+| P2 | Zod validate preferences endpoint | M6 |
+| P2 | Bind WebAuthn challenge to user | M12 |
+| P2 | Constant-time session token comparison | M13 |
 | P2 | Add ADMIN_PUBKEY kill switch | M11 |
 | P3 | Gate OpenAPI docs behind auth | M12 |
 | P3 | Enforce events sunset date | L2 |
-| P3 | Address remaining LOW findings | L1, L3-L10 |
+| P3 | Address remaining LOW findings | L1, L3-L11 |
