@@ -51,9 +51,16 @@ mkdir -p "$CACHE_DIR" "$OUT_DIR" "$WORK_DIR"
 cd "$WORK_DIR"
 
 ISO_NAME="debian-${DEBIAN_VERSION}-amd64-netinst.iso"
-ISO_URL="https://cdimage.debian.org/debian-cd/${DEBIAN_VERSION}/amd64/iso-cd/${ISO_NAME}"
-SUMS_URL="https://cdimage.debian.org/debian-cd/${DEBIAN_VERSION}/amd64/iso-cd/SHA512SUMS"
-SIGN_URL="https://cdimage.debian.org/debian-cd/${DEBIAN_VERSION}/amd64/iso-cd/SHA512SUMS.sign"
+# Current releases: cdimage.debian.org/debian-cd/<version>/
+# Point releases superseded by a newer version are moved to the archive CDN.
+_CDN_BASE="https://cdimage.debian.org/debian-cd/${DEBIAN_VERSION}/amd64/iso-cd"
+_ARCHIVE_BASE="https://cdimage.debian.org/cdimage/archive/${DEBIAN_VERSION}/amd64/iso-cd"
+ISO_URL="${_CDN_BASE}/${ISO_NAME}"
+SUMS_URL="${_CDN_BASE}/SHA512SUMS"
+SIGN_URL="${_CDN_BASE}/SHA512SUMS.sign"
+ISO_URL_ARCHIVE="${_ARCHIVE_BASE}/${ISO_NAME}"
+SUMS_URL_ARCHIVE="${_ARCHIVE_BASE}/SHA512SUMS"
+SIGN_URL_ARCHIVE="${_ARCHIVE_BASE}/SHA512SUMS.sign"
 
 CACHED_ISO="${CACHE_DIR}/${ISO_NAME}"
 # SHA512SUMS and .sign are cached alongside the ISO so offline builds work.
@@ -65,7 +72,8 @@ CACHED_SIGN="${CACHE_DIR}/SHA512SUMS-${DEBIAN_VERSION}.sign"
 # --- 1. Fetch upstream ISO + verify ---
 fetch_with_offline_check() {
   local url="$1"
-  local dest="$2"
+  local archive_url="$2"
+  local dest="$3"
   if [ "$OFFLINE" = "1" ]; then
     if [ ! -f "$dest" ]; then
       echo "build-inside.sh: --offline set but $dest is missing" >&2
@@ -73,17 +81,22 @@ fetch_with_offline_check() {
     fi
     return 0
   fi
-  wget -nv -O "$dest" "$url"
+  # Try main CDN first; fall back to archive CDN if the point release was superseded.
+  if ! wget -nv -O "$dest" "$url"; then
+    rm -f "$dest"
+    echo "==> Main CDN returned error, trying archive CDN..."
+    wget -nv -O "$dest" "$archive_url"
+  fi
 }
 
 if [ "$NO_CACHE" = "1" ] || [ ! -f "$CACHED_ISO" ]; then
   echo "==> Downloading upstream ISO"
-  fetch_with_offline_check "$ISO_URL" "$CACHED_ISO"
+  fetch_with_offline_check "$ISO_URL" "$ISO_URL_ARCHIVE" "$CACHED_ISO"
 fi
 
 echo "==> Downloading SHA512SUMS + signature"
-fetch_with_offline_check "$SUMS_URL" "$CACHED_SUMS"
-fetch_with_offline_check "$SIGN_URL" "$CACHED_SIGN"
+fetch_with_offline_check "$SUMS_URL" "$SUMS_URL_ARCHIVE" "$CACHED_SUMS"
+fetch_with_offline_check "$SIGN_URL" "$SIGN_URL_ARCHIVE" "$CACHED_SIGN"
 
 echo "==> Verifying GPG signature against debian-keyring"
 gpg --no-default-keyring \
