@@ -17,12 +17,14 @@ Feature: MLS Group Messaging
   @backend
   Scenario: Fan-out a Commit to group members
     Given the user has a registered device "mls-device-1"
+    And the user has a registered device "mls-device-2"
     When the user sends an MLS commit to device "mls-device-2"
     Then the response status is 204
 
   @backend
   Scenario: Deliver a Welcome to a new member
     Given the user has a registered device "mls-device-1"
+    And the user has a registered device "mls-device-new"
     When the user sends an MLS welcome to device "mls-device-new"
     Then the response status is 204
 

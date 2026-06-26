@@ -115,7 +115,19 @@ Then('one redemption returns an error', async ({ world }) => {
 Given('MLS messages are queued for a test device', async ({ request, world, workerHub }) => {
   const s = getS(world)
   s.mlsHubId = workerHub
-  s.mlsDeviceId = `test-device-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+
+  // Register a real device for the admin user so it passes getHubMemberDeviceIds() validation
+  const wakeKey = bytesToHex(crypto.getRandomValues(new Uint8Array(32)))
+  const pushToken = bytesToHex(crypto.getRandomValues(new Uint8Array(16)))
+  const regRes = await apiPost(request, '/devices/register', {
+    platform: 'ios', pushToken, wakeKeyPublic: wakeKey,
+  }, ADMIN_SEED)
+  expect(regRes.status).toBe(204)
+  const listRes = await apiGet<{ devices: Array<{ id: string }> }>(request, '/devices', ADMIN_SEED)
+  expect(listRes.status).toBe(200)
+  const latestDevice = listRes.data.devices[listRes.data.devices.length - 1]
+  expect(latestDevice).toBeDefined()
+  s.mlsDeviceId = latestDevice.id
 
   // Enqueue several MLS messages for this device via the commit endpoint
   const messageCount = 5

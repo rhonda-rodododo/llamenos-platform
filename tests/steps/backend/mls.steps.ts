@@ -4,11 +4,13 @@
  */
 import { expect } from '@playwright/test'
 import { Given, When, Then, Before, getState, setState } from './fixtures'
-import { setLastResponse, getSharedState } from './shared-state'
+import { setLastResponse, getSharedState, resolveDeviceLabel } from './shared-state'
 import {
   apiGet,
   apiPost,
   createHubViaApi,
+  addHubMemberViaApi,
+  createUserViaApi,
 } from '../../api-helpers'
 import { bytesToHex } from '@shared/encoding'
 
@@ -59,53 +61,83 @@ function _randomPushToken(): string {
 // ── Given ───────────────────────────────────────────────────────────
 
 Given('a test hub exists', async ({ request, world }) => {
-  getS(world).hubId = await createHubViaApi(request, `mls-hub-${Date.now()}`)
+  const s = getS(world)
+  s.hubId = await createHubViaApi(request, `mls-hub-${Date.now()}`)
+  // Add the test user as a hub member so their devices pass getHubMemberDeviceIds() checks
+  if (s.user) {
+    await addHubMemberViaApi(request, s.hubId, s.user.pubkey)
+  }
+})
+
+Given('another user has a registered device {string}', async ({ request, world }, label: string) => {
+  const s = getS(world)
+  expect(s.hubId).toBeDefined()
+  // Create a separate user, add them to the hub, register a device, and store the label
+  const otherUser = await createUserViaApi(request, { name: `OtherUser-${Date.now()}` })
+  await addHubMemberViaApi(request, s.hubId!, otherUser.pubkey)
+  const wakeKey = bytesToHex(crypto.getRandomValues(new Uint8Array(32)))
+  const pushToken = bytesToHex(crypto.getRandomValues(new Uint8Array(16)))
+  const regRes = await apiPost(request, '/devices/register', { platform: 'ios', pushToken, wakeKeyPublic: wakeKey }, otherUser.deviceKey)
+  expect(regRes.status).toBe(204)
+  const listRes = await apiGet<{ devices: Array<{ id: string }> }>(request, '/devices', otherUser.deviceKey)
+  expect(listRes.status).toBe(200)
+  const latestDevice = listRes.data.devices[listRes.data.devices.length - 1]
+  expect(latestDevice).toBeDefined()
+  getSharedState(world).sharedDeviceLabels[label] = latestDevice.id
+})
+
+Given('{string} is not a device of any hub member', async ({ world }, label: string) => {
+  // Store a fake device ID that will never match any registered device
+  getSharedState(world).sharedDeviceLabels[label] = `non-member-fake-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 })
 
 // ── When ────────────────────────────────────────────────────────────
 
-When('the user uploads {int} key packages for {string}', async ({ request, world }, count: number, _label: string) => {
+When('the user uploads {int} key packages for {string}', async ({ request, world }, count: number, label: string) => {
   const s = getS(world)
   expect(s.user).toBeDefined()
   expect(s.hubId).toBeDefined()
-  const deviceId = s.deviceIds[s.deviceIds.length - 1]
-  expect(deviceId).toBeDefined()
+  const deviceId = resolveDeviceLabel(world, label)
   const keyPackages = Array.from({ length: count }, () => fakePayload())
   setLastResponse(world, await apiPost(request, `/hubs/${s.hubId}/mls/key-packages?deviceId=${deviceId}`, { keyPackages }, s.user!.deviceKey))
 })
 
-When('the user sends an MLS commit to device {string}', async ({ request, world }, targetDeviceId: string) => {
+When('the user sends an MLS commit to device {string}', async ({ request, world }, targetLabel: string) => {
   const s = getS(world)
   expect(s.user).toBeDefined()
   expect(s.hubId).toBeDefined()
+  const targetDeviceId = resolveDeviceLabel(world, targetLabel)
   setLastResponse(world, await apiPost(request, `/hubs/${s.hubId}/mls/commit`, {
     recipientDeviceIds: [targetDeviceId], payload: fakePayload(),
   }, s.user!.deviceKey))
 })
 
-When('the user sends an MLS welcome to device {string}', async ({ request, world }, targetDeviceId: string) => {
+When('the user sends an MLS welcome to device {string}', async ({ request, world }, targetLabel: string) => {
   const s = getS(world)
   expect(s.user).toBeDefined()
   expect(s.hubId).toBeDefined()
+  const targetDeviceId = resolveDeviceLabel(world, targetLabel)
   setLastResponse(world, await apiPost(request, `/hubs/${s.hubId}/mls/welcome`, {
     recipientDeviceId: targetDeviceId, payload: fakePayload(),
   }, s.user!.deviceKey))
 })
 
-Given('an MLS commit was sent to {string}', async ({ request, world }, deviceId: string) => {
+Given('an MLS commit was sent to {string}', async ({ request, world }, label: string) => {
   const s = getS(world)
   expect(s.user).toBeDefined()
   expect(s.hubId).toBeDefined()
+  const deviceId = resolveDeviceLabel(world, label)
   const res = await apiPost(request, `/hubs/${s.hubId}/mls/commit`, {
     recipientDeviceIds: [deviceId], payload: fakePayload(),
   }, s.user!.deviceKey)
   expect(res.status).toBe(204)
 })
 
-When('the user fetches MLS messages for {string}', async ({ request, world }, deviceId: string) => {
+When('the user fetches MLS messages for {string}', async ({ request, world }, label: string) => {
   const s = getS(world)
   expect(s.user).toBeDefined()
   expect(s.hubId).toBeDefined()
+  const deviceId = resolveDeviceLabel(world, label)
   const res = await apiGet(request, `/hubs/${s.hubId}/mls/messages?deviceId=${deviceId}`, s.user!.deviceKey)
   setLastResponse(world, res)
   if (res.status === 200) {
@@ -113,10 +145,11 @@ When('the user fetches MLS messages for {string}', async ({ request, world }, de
   }
 })
 
-When('the user fetches MLS messages for {string} again', async ({ request, world }, deviceId: string) => {
+When('the user fetches MLS messages for {string} again', async ({ request, world }, label: string) => {
   const s = getS(world)
   expect(s.user).toBeDefined()
   expect(s.hubId).toBeDefined()
+  const deviceId = resolveDeviceLabel(world, label)
   const res = await apiGet(request, `/hubs/${s.hubId}/mls/messages?deviceId=${deviceId}`, s.user!.deviceKey)
   setLastResponse(world, res)
   if (res.status === 200) {
