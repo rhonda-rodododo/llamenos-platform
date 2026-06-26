@@ -407,8 +407,7 @@ mod tests {
         let sig = sign_device_wipe(&server_secrets, &target, 1000, reason);
 
         // Signed with timestamp 1000, but verify claims timestamp 2000 — signature mismatch
-        let result =
-            verify_device_wipe(&sig, &server_pubkey, &target, 2000, reason, 2000, MAX_AGE);
+        let result = verify_device_wipe(&sig, &server_pubkey, &target, 2000, reason, 2000, MAX_AGE);
         assert!(matches!(result, Err(CryptoError::InvalidSignature)));
     }
 
@@ -421,8 +420,15 @@ mod tests {
 
         let sig = sign_device_wipe(&server_secrets, &target, FRESH_TS, reason);
 
-        let result =
-            verify_device_wipe(&sig, &other_pubkey, &target, FRESH_TS, reason, FRESH_TS, MAX_AGE);
+        let result = verify_device_wipe(
+            &sig,
+            &other_pubkey,
+            &target,
+            FRESH_TS,
+            reason,
+            FRESH_TS,
+            MAX_AGE,
+        );
         assert!(
             matches!(result, Err(CryptoError::InvalidSignature)),
             "wrong server key must fail — prevents forged wipe attacks"
@@ -468,8 +474,15 @@ mod tests {
         let mut sig = sign_device_wipe(&server_secrets, &target, FRESH_TS, reason);
         sig[31] ^= 0xFF;
 
-        let result =
-            verify_device_wipe(&sig, &server_pubkey, &target, FRESH_TS, reason, FRESH_TS, MAX_AGE);
+        let result = verify_device_wipe(
+            &sig,
+            &server_pubkey,
+            &target,
+            FRESH_TS,
+            reason,
+            FRESH_TS,
+            MAX_AGE,
+        );
         assert!(matches!(result, Err(CryptoError::InvalidSignature)));
     }
 
@@ -515,8 +528,15 @@ mod tests {
 
         let sig = sign_device_wipe(&server_secrets, &target, future_ts, reason);
 
-        let result =
-            verify_device_wipe(&sig, &server_pubkey, &target, future_ts, reason, now, MAX_AGE);
+        let result = verify_device_wipe(
+            &sig,
+            &server_pubkey,
+            &target,
+            future_ts,
+            reason,
+            now,
+            MAX_AGE,
+        );
         assert!(
             matches!(result, Err(CryptoError::FutureTimestamp)),
             "wipe command with future timestamp must be rejected"
