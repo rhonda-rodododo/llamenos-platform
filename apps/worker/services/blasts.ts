@@ -394,17 +394,21 @@ export class BlastsService {
     if (normalizedKeyword === settings.subscribeKeyword.toUpperCase()) {
       const existing = await this.getSubscriberByIdentifierHash(data.identifierHash, hubId)
       if (existing) {
-        // Re-subscribe
-        const channels = (existing.channels ?? []) as SubscriberChannel[]
-        const hasChannel = channels.some((ch: SubscriberChannel) => ch.type === data.channel)
-        if (!hasChannel) {
-          channels.push({ type: data.channel, verified: true })
-        }
+        // RACE-13: Atomic channel merge at the SQL level to avoid read-modify-write race.
+        // Uses jsonb_agg(DISTINCT elem) to merge existing channels with the new one.
+        const newChannel = JSON.stringify({ type: data.channel, verified: true })
         await this.db
           .update(subscribers)
           .set({
             status: 'active',
-            channels: channels,
+            channels: sql`(
+              SELECT jsonb_agg(DISTINCT elem)
+              FROM (
+                SELECT elem FROM jsonb_array_elements(${subscribers.channels}) elem
+                UNION ALL
+                SELECT ${newChannel}::jsonb
+              ) combined
+            )`,
           })
           .where(eq(subscribers.id, existing.id))
         return { action: 'resubscribed', message: settings.confirmationMessage }

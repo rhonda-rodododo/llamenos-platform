@@ -240,9 +240,10 @@ describe('RecordsService', () => {
   })
 
   describe('bulkAddBans', () => {
-    it('adds multiple bans and skips duplicates', async () => {
+    it('adds multiple bans and skips in-batch duplicates', async () => {
       const { db, service } = setup()
-      db.$setSelectResult([])
+      // RACE-13: onConflictDoNothing().returning() returns the successfully inserted rows
+      db.$setInsertResult([{ id: 'ban-1' }, { id: 'ban-2' }])
 
       const count = await service.bulkAddBans(
         [
@@ -255,12 +256,14 @@ describe('RecordsService', () => {
         'hub-1'
       )
 
+      // 3 entries → 2 unique (in-batch dedup) → insert with ON CONFLICT DO NOTHING
       expect(count).toBe(2)
     })
 
-    it('skips already-banned phones', async () => {
+    it('returns count of actually inserted rows (DB-level dedup)', async () => {
       const { db, service } = setup()
-      db.$setSelectResult([{ phone: '+1111' }])
+      // DB returns only the rows that were actually inserted (not conflicts)
+      db.$setInsertResult([{ id: 'ban-1' }])
 
       const count = await service.bulkAddBans(
         [
@@ -270,6 +273,7 @@ describe('RecordsService', () => {
         'spam',
         'pk1',
       )
+      // ON CONFLICT DO NOTHING skipped one; only 1 actually inserted
       expect(count).toBe(1)
     })
   })

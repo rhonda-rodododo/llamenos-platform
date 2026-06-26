@@ -13,6 +13,9 @@ import type { Services } from '../services'
 import { SignalAdapter } from './signal/adapter'
 import type { SignalWebhookPayload } from './signal/types'
 import { observeFirehoseMessage } from './firehose-observer'
+import { checkWebhookReplay } from '../services/webhook-replay'
+import { getDb } from '../db'
+import { isIpInCidrs } from '../middleware/webhook-ip-allowlist'
 
 const logger = createLogger('messaging')
 
@@ -82,11 +85,31 @@ messaging.post('/:channel/webhook', async (c) => {
     return c.json({ error: `${channel} channel is not configured` }, 404)
   }
 
+  // W05-H03: IP allowlist (opt-in via <CHANNEL>_WEBHOOK_IPS env var)
+  const cidrKey = `${channel.toUpperCase()}_WEBHOOK_IPS`
+  const cidrs = (c.env as unknown as Record<string, string | undefined>)[cidrKey]
+  if (cidrs) {
+    const cidrList = cidrs.split(',').map(s => s.trim()).filter(Boolean)
+    const clientIp = c.req.header('CF-Connecting-IP') ?? c.req.header('X-Forwarded-For')?.split(',')[0]?.trim()
+    if (!clientIp || !isIpInCidrs(clientIp, cidrList)) {
+      logger.warn(`Messaging webhook IP not in allowlist for ${channel}`, { clientIp })
+      return new Response('Forbidden', { status: 403 })
+    }
+  }
+
   // Validate webhook signature
   const isValid = await adapter.validateWebhook(c.req.raw)
   if (!isValid) {
     logger.error(`Webhook signature FAILED for ${channel}`)
     return new Response('Forbidden', { status: 403 })
+  }
+
+  // W05-H02: Replay protection — return idempotent 200 for duplicate deliveries
+  const bodyText = await c.req.raw.clone().text()
+  const isFirst = await checkWebhookReplay(getDb(), channel, bodyText, 300)
+  if (!isFirst) {
+    logger.info(`Messaging webhook replay detected for ${channel}, returning idempotent 200`)
+    return new Response('OK', { status: 200 })
   }
 
   // Try to parse as status update first (if adapter supports it)

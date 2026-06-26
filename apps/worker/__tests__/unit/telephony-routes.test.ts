@@ -10,6 +10,12 @@ import '@worker/__tests__/mocks/llamenos-crypto-ffi'
 // Top-level mock ensures the telephony route always gets the mocked service-factories,
 // regardless of module cache state from parallel test files.
 vi.mock('@worker/lib/service-factories')
+vi.mock('@worker/services/webhook-replay', () => ({
+  checkWebhookReplay: vi.fn().mockResolvedValue(true),
+}))
+vi.mock('@worker/db', () => ({
+  getDb: vi.fn().mockReturnValue({}),
+}))
 import { getTelephonyFromService, getHubTelephonyFromService } from '@worker/lib/service-factories'
 
 function makeMockAdapter(overrides?: Partial<TelephonyAdapter>): TelephonyAdapter {

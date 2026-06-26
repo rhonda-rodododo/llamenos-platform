@@ -43,6 +43,7 @@ accountRoutes.post('/lockdown', requireFreshAuth, async (c) => {
  * Client reports completion of PUK rotation and hub key rotations.
  */
 accountRoutes.post('/lockdown/complete',
+  requireFreshAuth,
   validator('json', lockdownCompleteBodySchema),
   async (c) => {
     const pubkey = c.get('pubkey')

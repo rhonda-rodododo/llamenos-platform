@@ -15,6 +15,9 @@ import { publishEvent } from '../lib/ws-events'
 import { KIND_CALL_UPDATE, KIND_CALL_VOICEMAIL, KIND_PRESENCE_UPDATE } from '@shared/event-kinds'
 import { createLogger } from '../lib/logger'
 import { backgroundTask } from '../lib/hono-compat'
+import { checkWebhookReplay } from '../services/webhook-replay'
+import { getDb } from '../db'
+import { isIpInCidrs } from '../middleware/webhook-ip-allowlist'
 
 const logger = createLogger('telephony')
 
@@ -34,6 +37,8 @@ async function getHubAdapter(env: Env, services: Services, hubId: string | undef
  * Webhook validation middleware — applied per-route to actual webhook endpoints.
  * NOT a wildcard `use('*')` because authenticated webrtcRoutes are mounted at the
  * same `/telephony` prefix and must not be intercepted by webhook signature checks.
+ *
+ * W05: Enforces signature validation, IP allowlist (opt-in), and replay protection.
  */
 async function validateWebhook(c: Context<AppEnv>, next: Next) {
   const url = new URL(c.req.url)
@@ -52,12 +57,33 @@ async function validateWebhook(c: Context<AppEnv>, next: Next) {
     return c.json({ error: 'Forbidden' }, 403)
   }
 
+  // W05-H03: IP allowlist (opt-in via TELEPHONY_WEBHOOK_IPS env var)
+  const cidrs = (env as unknown as Record<string, string | undefined>).TELEPHONY_WEBHOOK_IPS
+  if (cidrs) {
+    const cidrList = cidrs.split(',').map(s => s.trim()).filter(Boolean)
+    const clientIp = c.req.header('CF-Connecting-IP') ?? c.req.header('X-Forwarded-For')?.split(',')[0]?.trim()
+    if (!clientIp || !isIpInCidrs(clientIp, cidrList)) {
+      logger.warn('Telephony webhook IP not in allowlist', { clientIp })
+      return c.json({ error: 'Forbidden' }, 403)
+    }
+  }
+
   // H05: Always validate webhook signatures — no localhost bypass
   const isValid = await adapter.validateWebhook(c.req.raw)
   if (!isValid) {
     logger.error(`Webhook signature FAILED for ${url.pathname}`)
     return c.json({ error: 'Forbidden' }, 403)
   }
+
+  // W05-H02: Replay protection — hash body to detect duplicate deliveries.
+  // Returns idempotent 200 for replays (provider retries stop on 2xx).
+  const bodyText = await c.req.raw.clone().text()
+  const isFirst = await checkWebhookReplay(getDb(), 'telephony', bodyText, 300)
+  if (!isFirst) {
+    logger.info('Telephony webhook replay detected, returning idempotent 200')
+    return c.text('OK', 200)
+  }
+
   await next()
 }
 

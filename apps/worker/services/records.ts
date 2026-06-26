@@ -295,31 +295,21 @@ export class RecordsService {
     bannedBy: string,
     hubId?: string,
   ): Promise<number> {
-    // Get existing phones to avoid duplicates
-    const existingRows = await this.db
-      .select({ phone: bans.phone })
-      .from(bans)
-      .where(
-        hubId
-          ? eq(bans.hubId, hubId)
-          : sql`${bans.hubId} IS NULL`,
-      )
-
-    const existingPhones = new Set(existingRows.map((r) => r.phone))
-    // Deduplicate within the input array AND exclude already-banned phones
+    // RACE-13: Deduplicate within input, then INSERT...ON CONFLICT DO NOTHING
+    // to handle concurrent imports atomically at the database level.
     const seen = new Set<string>()
-    const newEntries = entries.filter((e) => {
-      if (existingPhones.has(e.phoneHash) || seen.has(e.phoneHash)) return false
+    const uniqueEntries = entries.filter((e) => {
+      if (seen.has(e.phoneHash)) return false
       seen.add(e.phoneHash)
       return true
     })
 
-    if (newEntries.length === 0) return 0
+    if (uniqueEntries.length === 0) return 0
 
-    await this.db
+    const inserted = await this.db
       .insert(bans)
       .values(
-        newEntries.map((entry) => ({
+        uniqueEntries.map((entry) => ({
           hubId: hubId || null,  // normalize empty string to null
           phone: entry.phoneHash,
           phoneDisplay: entry.phoneDisplay,
@@ -327,8 +317,10 @@ export class RecordsService {
           bannedBy,
         })),
       )
+      .onConflictDoNothing()
+      .returning({ id: bans.id })
 
-    return newEntries.length
+    return inserted.length
   }
 
   async removeBan(phone: string, hubId?: string): Promise<void> {
