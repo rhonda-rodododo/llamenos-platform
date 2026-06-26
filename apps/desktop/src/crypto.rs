@@ -464,9 +464,10 @@ pub fn sframe_derive_key(
 
 // ── SAS emoji verification ─────────────────────────────────────────
 
-/// Derive 7 SAS emoji indices from two Ed25519 public keys and a random nonce.
+/// Derive 10 SAS emoji indices from two Ed25519 public keys and a random nonce.
 /// Both parties compute the same result regardless of argument order.
-/// Returns an array of 7 indices (0-63) and the corresponding emoji strings.
+/// Returns an array of 10 indices (0-255) and the corresponding emoji strings.
+/// Entropy: 80 bits (10 symbols from 256-entry table).
 #[tauri::command]
 pub fn derive_sas(
     pubkey_a_hex: String,
