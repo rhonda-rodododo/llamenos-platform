@@ -25,73 +25,73 @@ pub const SAS_EMOJI_COUNT: usize = 10;
 /// user confusion during the verification ceremony.
 pub const SAS_EMOJI_TABLE: [&str; 256] = [
     // 0-15: Animals (domestic)
-    "\u{1F436}",         // 0: dog
-    "\u{1F431}",         // 1: cat
-    "\u{1F434}",         // 2: horse
-    "\u{1F437}",         // 3: pig
-    "\u{1F430}",         // 4: rabbit
-    "\u{1F43B}",         // 5: bear
-    "\u{1F42F}",         // 6: tiger
-    "\u{1F428}",         // 7: koala
-    "\u{1F43C}",         // 8: panda
-    "\u{1F981}",         // 9: lion
-    "\u{1F984}",         // 10: unicorn
-    "\u{1F422}",         // 11: turtle
-    "\u{1F420}",         // 12: tropical fish
-    "\u{1F419}",         // 13: octopus
-    "\u{1F98B}",         // 14: butterfly
-    "\u{1F40C}",         // 15: snail
+    "\u{1F436}", // 0: dog
+    "\u{1F431}", // 1: cat
+    "\u{1F434}", // 2: horse
+    "\u{1F437}", // 3: pig
+    "\u{1F430}", // 4: rabbit
+    "\u{1F43B}", // 5: bear
+    "\u{1F42F}", // 6: tiger
+    "\u{1F428}", // 7: koala
+    "\u{1F43C}", // 8: panda
+    "\u{1F981}", // 9: lion
+    "\u{1F984}", // 10: unicorn
+    "\u{1F422}", // 11: turtle
+    "\u{1F420}", // 12: tropical fish
+    "\u{1F419}", // 13: octopus
+    "\u{1F98B}", // 14: butterfly
+    "\u{1F40C}", // 15: snail
     // 16-31: Animals (wild)
-    "\u{1F98A}",         // 16: fox
-    "\u{1F427}",         // 17: penguin
-    "\u{1F989}",         // 18: owl
-    "\u{1F99C}",         // 19: parrot
-    "\u{1F982}",         // 20: scorpion
-    "\u{1F980}",         // 21: crab
-    "\u{1F41D}",         // 22: honeybee
-    "\u{1F433}",         // 23: whale
-    "\u{1F40A}",         // 24: crocodile
-    "\u{1F418}",         // 25: elephant
-    "\u{1F992}",         // 26: giraffe
-    "\u{1F98D}",         // 27: gorilla
-    "\u{1F43A}",         // 28: wolf
-    "\u{1F985}",         // 29: eagle
-    "\u{1F987}",         // 30: bat
-    "\u{1F41A}",         // 31: shell
+    "\u{1F98A}", // 16: fox
+    "\u{1F427}", // 17: penguin
+    "\u{1F989}", // 18: owl
+    "\u{1F99C}", // 19: parrot
+    "\u{1F982}", // 20: scorpion
+    "\u{1F980}", // 21: crab
+    "\u{1F41D}", // 22: honeybee
+    "\u{1F433}", // 23: whale
+    "\u{1F40A}", // 24: crocodile
+    "\u{1F418}", // 25: elephant
+    "\u{1F992}", // 26: giraffe
+    "\u{1F98D}", // 27: gorilla
+    "\u{1F43A}", // 28: wolf
+    "\u{1F985}", // 29: eagle
+    "\u{1F987}", // 30: bat
+    "\u{1F41A}", // 31: shell
     // 32-47: Nature
-    "\u{1F33B}",         // 32: sunflower
-    "\u{1F332}",         // 33: evergreen tree
-    "\u{1F335}",         // 34: cactus
-    "\u{1F344}",         // 35: mushroom
-    "\u{1F33F}",         // 36: herb
-    "\u{1F34E}",         // 37: apple
-    "\u{1F352}",         // 38: cherries
-    "\u{1F349}",         // 39: watermelon
-    "\u{1F33A}",         // 40: hibiscus
-    "\u{1F337}",         // 41: tulip
-    "\u{1F339}",         // 42: rose
-    "\u{1F334}",         // 43: palm tree
-    "\u{1F343}",         // 44: leaf fluttering
-    "\u{1F341}",         // 45: maple leaf
-    "\u{1F340}",         // 46: four-leaf clover
-    "\u{1F338}",         // 47: cherry blossom
+    "\u{1F33B}", // 32: sunflower
+    "\u{1F332}", // 33: evergreen tree
+    "\u{1F335}", // 34: cactus
+    "\u{1F344}", // 35: mushroom
+    "\u{1F33F}", // 36: herb
+    "\u{1F34E}", // 37: apple
+    "\u{1F352}", // 38: cherries
+    "\u{1F349}", // 39: watermelon
+    "\u{1F33A}", // 40: hibiscus
+    "\u{1F337}", // 41: tulip
+    "\u{1F339}", // 42: rose
+    "\u{1F334}", // 43: palm tree
+    "\u{1F343}", // 44: leaf fluttering
+    "\u{1F341}", // 45: maple leaf
+    "\u{1F340}", // 46: four-leaf clover
+    "\u{1F338}", // 47: cherry blossom
     // 48-63: Celestial / Weather
-    "\u{1F30D}",         // 48: globe (Europe-Africa)
-    "\u{1F319}",         // 49: crescent moon
-    "\u{2B50}",          // 50: star
-    "\u{26A1}",          // 51: lightning
-    "\u{1F525}",         // 52: fire
-    "\u{1F4A7}",         // 53: droplet
-    "\u{2744}\u{FE0F}",  // 54: snowflake
-    "\u{1F308}",         // 55: rainbow
-    "\u{2600}\u{FE0F}",  // 56: sun
-    "\u{2601}\u{FE0F}",  // 57: cloud
-    "\u{1F30A}",         // 58: wave
-    "\u{1F31F}",         // 59: glowing star
-    "\u{1F30E}",         // 60: globe (Americas)
-    "\u{1F30F}",         // 61: globe (Asia-Australia)
-    "\u{1F311}",         // 62: new moon
-    "\u{1F315}",         // 63: full moon
+    "\u{1F30D}",        // 48: globe (Europe-Africa)
+    "\u{1F319}",        // 49: crescent moon
+    "\u{2B50}",         // 50: star
+    "\u{26A1}",         // 51: lightning
+    "\u{1F525}",        // 52: fire
+    "\u{1F4A7}",        // 53: droplet
+    "\u{2744}\u{FE0F}", // 54: snowflake
+    "\u{1F308}",        // 55: rainbow
+    "\u{2600}\u{FE0F}", // 56: sun
+    "\u{2601}\u{FE0F}", // 57: cloud
+    "\u{1F30A}",        // 58: wave
+    "\u{1F31F}",        // 59: glowing star
+    "\u{1F30E}",        // 60: globe (Americas)
+    "\u{1F30F}",        // 61: globe (Asia-Australia)
+    "\u{1F311}",        // 62: new moon
+    "\u{1F315}",        // 63: full moon
     // 64-79: Food
     "\u{1F34A}",         // 64: tangerine
     "\u{1F34B}",         // 65: lemon
@@ -161,22 +161,22 @@ pub const SAS_EMOJI_TABLE: [&str; 256] = [
     "\u{1F5FC}",         // 126: Tokyo tower
     "\u{1F5FD}",         // 127: Statue of Liberty
     // 128-143: Activities / Sports
-    "\u{1F3C6}",         // 128: trophy
-    "\u{1F3AF}",         // 129: bullseye
-    "\u{1F3C0}",         // 130: basketball
-    "\u{26BD}",          // 131: soccer ball
-    "\u{1F3B3}",         // 132: bowling
-    "\u{1F3B8}",         // 133: guitar
-    "\u{1F3B9}",         // 134: musical keyboard
-    "\u{1F3BA}",         // 135: trumpet
-    "\u{1F941}",         // 136: drum
-    "\u{1F3A8}",         // 137: palette
-    "\u{1F3B5}",         // 138: music note
-    "\u{1F3B2}",         // 139: dice
-    "\u{1F3AD}",         // 140: performing arts
-    "\u{1F3AE}",         // 141: video game
-    "\u{1F9E9}",         // 142: puzzle piece
-    "\u{265F}\u{FE0F}",  // 143: chess pawn
+    "\u{1F3C6}",        // 128: trophy
+    "\u{1F3AF}",        // 129: bullseye
+    "\u{1F3C0}",        // 130: basketball
+    "\u{26BD}",         // 131: soccer ball
+    "\u{1F3B3}",        // 132: bowling
+    "\u{1F3B8}",        // 133: guitar
+    "\u{1F3B9}",        // 134: musical keyboard
+    "\u{1F3BA}",        // 135: trumpet
+    "\u{1F941}",        // 136: drum
+    "\u{1F3A8}",        // 137: palette
+    "\u{1F3B5}",        // 138: music note
+    "\u{1F3B2}",        // 139: dice
+    "\u{1F3AD}",        // 140: performing arts
+    "\u{1F3AE}",        // 141: video game
+    "\u{1F9E9}",        // 142: puzzle piece
+    "\u{265F}\u{FE0F}", // 143: chess pawn
     // 144-159: Symbols / Geometric
     "\u{2764}\u{FE0F}",  // 144: heart
     "\u{1F48E}",         // 145: gem
@@ -246,39 +246,39 @@ pub const SAS_EMOJI_TABLE: [&str; 256] = [
     "\u{1F48D}",         // 206: ring
     "\u{1F484}",         // 207: lipstick
     // 208-223: Emotions / Faces
-    "\u{1F600}",         // 208: grinning face
-    "\u{1F602}",         // 209: face with tears of joy
-    "\u{1F60D}",         // 210: heart eyes
-    "\u{1F60E}",         // 211: sunglasses face
-    "\u{1F914}",         // 212: thinking face
-    "\u{1F92F}",         // 213: exploding head
-    "\u{1F921}",         // 214: clown
-    "\u{1F47B}",         // 215: ghost
-    "\u{1F47D}",         // 216: alien
-    "\u{1F916}",         // 217: robot
-    "\u{1F4A9}",         // 218: poo
-    "\u{1F383}",         // 219: jack-o-lantern
-    "\u{1F47E}",         // 220: alien monster
-    "\u{1F480}",         // 221: skull
-    "\u{1F608}",         // 222: smiling devil
-    "\u{1F4AB}",         // 223: dizzy
+    "\u{1F600}", // 208: grinning face
+    "\u{1F602}", // 209: face with tears of joy
+    "\u{1F60D}", // 210: heart eyes
+    "\u{1F60E}", // 211: sunglasses face
+    "\u{1F914}", // 212: thinking face
+    "\u{1F92F}", // 213: exploding head
+    "\u{1F921}", // 214: clown
+    "\u{1F47B}", // 215: ghost
+    "\u{1F47D}", // 216: alien
+    "\u{1F916}", // 217: robot
+    "\u{1F4A9}", // 218: poo
+    "\u{1F383}", // 219: jack-o-lantern
+    "\u{1F47E}", // 220: alien monster
+    "\u{1F480}", // 221: skull
+    "\u{1F608}", // 222: smiling devil
+    "\u{1F4AB}", // 223: dizzy
     // 224-239: Flags / Markers
-    "\u{1F3C1}",         // 224: chequered flag
-    "\u{1F6A9}",         // 225: triangular flag
-    "\u{2705}",          // 226: check mark (green)
-    "\u{274C}",          // 227: cross mark
-    "\u{26D4}",          // 228: no entry
-    "\u{2757}",          // 229: exclamation mark
-    "\u{2753}",          // 230: question mark
-    "\u{1F198}",         // 231: SOS
-    "\u{1F4A2}",         // 232: anger symbol
-    "\u{1F4AC}",         // 233: speech bubble
-    "\u{1F4AD}",         // 234: thought bubble
-    "\u{1F4A4}",         // 235: zzz
-    "\u{1F4A5}",         // 236: collision
-    "\u{1F4A8}",         // 237: dash (running away)
-    "\u{1F4AF}",         // 238: hundred points
-    "\u{1F3C5}",         // 239: sports medal
+    "\u{1F3C1}", // 224: chequered flag
+    "\u{1F6A9}", // 225: triangular flag
+    "\u{2705}",  // 226: check mark (green)
+    "\u{274C}",  // 227: cross mark
+    "\u{26D4}",  // 228: no entry
+    "\u{2757}",  // 229: exclamation mark
+    "\u{2753}",  // 230: question mark
+    "\u{1F198}", // 231: SOS
+    "\u{1F4A2}", // 232: anger symbol
+    "\u{1F4AC}", // 233: speech bubble
+    "\u{1F4AD}", // 234: thought bubble
+    "\u{1F4A4}", // 235: zzz
+    "\u{1F4A5}", // 236: collision
+    "\u{1F4A8}", // 237: dash (running away)
+    "\u{1F4AF}", // 238: hundred points
+    "\u{1F3C5}", // 239: sports medal
     // 240-255: Time / Clocks / Events
     "\u{1F550}",         // 240: one o'clock
     "\u{1F553}",         // 241: four o'clock
@@ -392,7 +392,10 @@ mod tests {
     fn test_sas_emoji_valid_all_indices() {
         // With a 256-entry table and u8 indices, every possible index is valid.
         for i in 0..=255u8 {
-            assert!(!sas_emoji(i).is_empty(), "index {i} should map to a non-empty emoji");
+            assert!(
+                !sas_emoji(i).is_empty(),
+                "index {i} should map to a non-empty emoji"
+            );
         }
     }
 
