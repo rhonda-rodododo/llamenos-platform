@@ -19,9 +19,9 @@ The backend has strong fundamentals: Zod validation on nearly all production rou
 |----------|-------|--------|
 | CRITICAL | 1 | Persists from wave 2 |
 | HIGH | 10 | 5 persist from wave 2, 5 new |
-| MEDIUM | 25 | 8 persist from wave 2, 17 new |
-| LOW | 15 | 6 persist from wave 2, 9 new |
-| **Total** | **51** | |
+| MEDIUM | 30 | 8 persist from wave 2, 22 new |
+| LOW | 17 | 6 persist from wave 2, 11 new |
+| **Total** | **58** | |
 
 ### Top Priority Actions
 
@@ -335,6 +335,43 @@ Case number generation prefers `body.hubId` over `c.get('hubId')`. Contact creat
 
 **Fix:** Require `system:manage-instance` (platform-level permission) instead.
 
+### M26: Conversations accessible cross-hub when status is 'waiting' (NEW)
+**File:** `apps/worker/routes/conversations.ts:224,263`
+
+The access check is `if (!canReadAll && conv.assignedTo !== pubkey && conv.status !== 'waiting')`. Any authenticated user — including those in other hubs — can read conversation details and messages for any conversation with `status === 'waiting'`. In a multi-hub deployment, this leaks waiting conversation data across hubs.
+
+**Impact:** Cross-hub information disclosure of unassigned conversations, potentially containing sensitive message content.
+
+**Fix:** Add hub membership check before the status-based access bypass.
+
+### M27: Records contacts endpoint does not verify assignment for 'assigned' access level (NEW)
+**File:** `apps/worker/routes/records.ts:747+`
+
+`GET /:id/contacts` checks access level but for users with `cases:read-assigned`, does not verify the user is actually assigned to or created the case. A user with `cases:read-assigned` could view contacts for any case in their hub.
+
+**Fix:** When access level is 'assigned', verify `record.assignedTo.includes(pubkey)` before returning contacts.
+
+### M28: Shifts availability delete has no ownership check (NEW)
+**File:** `apps/worker/routes/shifts.ts:317`
+
+`DELETE /availability/:id` requires `shifts:set-availability` but does not verify the caller owns the availability block. Any user with `shifts:set-availability` can delete any other user's availability block by ID.
+
+**Fix:** After fetching the availability record, verify it belongs to the authenticated user.
+
+### M29: Users cases endpoint takes hubId from query parameter (NEW)
+**File:** `apps/worker/routes/users.ts:180`
+
+`GET /:targetPubkey/cases` uses `c.req.query('hubId') ?? c.get('hubId') ?? ''` — a user with `users:read-cases` in Hub A could pass `hubId=<hub-B-id>` to view case assignments in Hub B. Another instance of the systemic hub-scoping pattern.
+
+**Fix:** Use `c.get('hubId')` only, never accept from query parameter.
+
+### M30: Evidence upload does not verify caller's access to parent case (NEW)
+**File:** `apps/worker/routes/evidence.ts:29-46`
+
+`POST /records/:id/evidence` requires `evidence:upload` permission but does not check the caller's assignment to or access level for the parent case record. A user with `evidence:upload` could attach evidence to any case in the system by guessing the case ID.
+
+**Fix:** Verify caller has access to the parent case record before accepting evidence upload.
+
 ---
 
 ## LOW
@@ -455,6 +492,20 @@ The `POST /entity-file` endpoint validates file size but has no MIME type valida
 
 **Fix:** Add MIME type allowlist validation (e.g., images, PDFs, documents).
 
+### L16: Debug info leak in development mode 403 responses (NEW)
+**Files:** `apps/worker/middleware/permission-guard.ts:29`, `apps/worker/middleware/hub.ts:41-49`
+
+Development-mode 403 responses include user roles, permission counts, pubkey prefix, and hubId. If `ENVIRONMENT=development` is set on a non-local deployment, these responses leak internal authorization state.
+
+**Fix:** Remove detailed debug info from 403 responses, or restrict to localhost.
+
+### L17: Bandwidth webhook uses Basic Auth without HMAC body integrity (NEW)
+**File:** `apps/worker/telephony/bandwidth.ts:356-388`
+
+Bandwidth webhook validation uses HTTP Basic Auth (username/password) but does not verify request body integrity via HMAC. A network-level attacker who intercepts the Basic Auth credentials could forge webhook payloads. This is a provider limitation (Bandwidth doesn't offer HMAC signing), but worth documenting.
+
+**Fix:** Document the limitation. Consider IP allowlisting as a compensating control.
+
 ---
 
 ## Positive Security Patterns
@@ -524,7 +575,7 @@ This audit was conducted by:
 | P1 | Hub-scope evidence routes | H9 |
 | P1 | Fix admin device hubId from query param | H10 |
 | P1 | Encrypt/remove ban list `phone_display` | H5 |
-| P1 | **Systemic: audit ALL routes for hub-scoping gaps** | H7,H9,H10,M21-M25 |
+| P1 | **Systemic: audit ALL routes for hub-scoping gaps** | H7,H9,H10,M21-M26,M29 |
 | P1 | SSRF guard on ntfy pushToken URLs | M20 |
 | P1 | Fix login rate limit key for non-CF deployments | M7 |
 | P2 | Rate limit WebSocket upgrade path | M6 |
@@ -545,4 +596,7 @@ This audit was conducted by:
 | P2 | Hub-scope recovery group info | M23 |
 | P2 | Never accept hubId from request body | M24 |
 | P2 | Require platform permission for cross-hub toggle | M25 |
-| P3 | Address remaining LOW findings | L1, L3-L15 |
+| P2 | Verify assignment on records contacts access | M27 |
+| P2 | Add ownership check to shifts availability delete | M28 |
+| P2 | Verify parent case access on evidence upload | M30 |
+| P3 | Address remaining LOW findings | L1, L3-L17 |
