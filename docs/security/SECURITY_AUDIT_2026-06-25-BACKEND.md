@@ -18,10 +18,10 @@ The backend has strong fundamentals: Zod validation on nearly all production rou
 | Severity | Count | Status |
 |----------|-------|--------|
 | CRITICAL | 1 | Persists from wave 2 |
-| HIGH | 6 | 5 persist from wave 2, 1 new |
-| MEDIUM | 14 | 8 persist from wave 2, 6 new |
+| HIGH | 7 | 5 persist from wave 2, 2 new |
+| MEDIUM | 17 | 8 persist from wave 2, 9 new |
 | LOW | 11 | 6 persist from wave 2, 5 new |
-| **Total** | **32** | |
+| **Total** | **36** | |
 
 ### Top Priority Actions
 
@@ -101,7 +101,16 @@ The `bans` table has a `phone` column (hash) and a `phone_display` column (plain
 
 **Fix:** Encrypt `phone_display` with the hub key, or remove it and derive display from the hash lookup at query time.
 
-### H6: Firehose connection read lacks hub-scoping — cross-hub data access (NEW)
+### H6: SSRF via telephony recording URL fetches (NEW)
+**Files:** `apps/worker/telephony/vonage.ts:405,415`, `apps/worker/telephony/plivo.ts:366,378`
+
+`getRecordingAudio()` in both Vonage and Plivo adapters accepts a parameter that is a full URL (from webhook payload `recording_url` / `RecordUrl` fields) and passes it to `safeFetch()` without `ssrfGuard: true`. A compromised or spoofed webhook could supply an internal URL (e.g., `http://169.254.169.254/latest/meta-data/`) and the server would fetch it with provider authentication headers attached.
+
+**Impact:** Server-side request forgery — an attacker could probe internal infrastructure, access cloud metadata endpoints, or reach internal services.
+
+**Fix:** Enable `ssrfGuard: true` on all recording URL fetches. Alternatively, validate recording URLs against provider-specific hostname allowlists (e.g., `*.api.vonage.com`, `*.plivo.com`).
+
+### H7: Firehose connection read lacks hub-scoping — cross-hub data access (NEW)
 **File:** `apps/worker/routes/firehose.ts:169-179`
 
 `GET /:id` with `firehose:read` permission retrieves any firehose connection by UUID without verifying it belongs to the caller's hub. The same issue affects `GET /:id/buffer` (line 360-371), `POST /:id/optout` (line 408-418), and `DELETE /:id/optout` (line 434-442).
@@ -217,7 +226,28 @@ The `storeWebAuthnChallenge` correctly accepts a `pubkey` parameter and stores i
 
 **Fix:** Use `crypto.timingSafeEqual` for the `isCurrent` comparison, or compare by session `id` instead of the secret token value.
 
-### M14: OpenAPI spec and Scalar docs publicly accessible (PERSISTS from wave 2)
+### M14: `safeFetch` SSRF guard defaults to disabled (NEW)
+**File:** `apps/worker/lib/safe-fetch.ts:17`
+
+The `safeFetch` wrapper defaults `ssrfGuard` to `false`. Only 1 call site out of dozens enables it (Signal adapter). For a security-critical application, the default should be inverted: SSRF guard on by default, with explicit `ssrfGuard: false` for trusted provider API calls.
+
+**Fix:** Invert the default to `ssrfGuard: true`. Add `ssrfGuard: false` to trusted API calls (Twilio, Vonage base API URLs, etc.).
+
+### M15: SIP credentials returned as long-lived plaintext passwords (NEW)
+**File:** `apps/worker/telephony/sip-tokens.ts:48-66`
+
+`generateSipParams()` returns SIP passwords as plaintext strings for mobile Linphone SDK configuration. These are long-lived static passwords, unlike WebRTC tokens (`webrtc-tokens.ts`) which use 1-hour JWT expiry. A compromised device retains valid SIP credentials until manually rotated.
+
+**Fix:** Generate time-limited SIP credentials (like the WebRTC JWT approach), or implement credential rotation on session renewal.
+
+### M16: Signal/SIP bridge communication may use plaintext HTTP (NEW)
+**Files:** `apps/worker/messaging/signal/adapter.ts:139,199,234`, SIP bridge adapter
+
+The Signal adapter communicates with the signal-cli bridge at `config.bridgeUrl`. If the URL uses `http://` (common in Docker sidecar deployments), the bridge API key is transmitted in cleartext. For a zero-knowledge architecture where the bridge handles plaintext Signal identifiers, this undermines the security model.
+
+**Fix:** Validate that `bridgeUrl` uses HTTPS, or enforce TLS at the code level. Allow HTTP only when explicitly opted into for localhost development.
+
+### M17: OpenAPI spec and Scalar docs publicly accessible (PERSISTS from wave 2)
 **File:** `apps/worker/app.ts:299-300`
 
 `/api/openapi.json` and `/api/docs` are unauthenticated, revealing every endpoint, schema, and parameter definition to potential attackers.
@@ -379,7 +409,8 @@ This audit was conducted by:
 | Priority | Action | Findings Addressed |
 |----------|--------|--------------------|
 | P0 | Merge existing wave 2 fix PRs | C1, H1-H4, and 10+ MEDIUM/LOW |
-| P1 | Hub-scope firehose individual reads | H6 |
+| P1 | SSRF guard on recording URL fetches | H6 |
+| P1 | Hub-scope firehose individual reads | H7 |
 | P1 | Encrypt/remove ban list `phone_display` | H5 |
 | P2 | Rate limit public endpoints | M4 |
 | P2 | Add WebSocket per-connection rate limit | M5 |
@@ -387,6 +418,9 @@ This audit was conducted by:
 | P2 | Zod validate preferences endpoint | M6 |
 | P2 | Bind WebAuthn challenge to user | M12 |
 | P2 | Constant-time session token comparison | M13 |
+| P2 | Invert safeFetch SSRF guard default | M14 |
+| P2 | Time-limit SIP credentials | M15 |
+| P2 | Enforce TLS on bridge communication | M16 |
 | P2 | Add ADMIN_PUBKEY kill switch | M11 |
 | P3 | Gate OpenAPI docs behind auth | M12 |
 | P3 | Enforce events sunset date | L2 |
