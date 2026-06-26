@@ -115,15 +115,32 @@ pub fn sign_device_wipe(
 /// - `target_device_pubkey`: the target device's pubkey (hex)
 /// - `timestamp_ms`: timestamp from the wipe command
 /// - `reason`: reason from the wipe command
+/// - `current_timestamp_ms`: current time for freshness check
+/// - `max_age_ms`: maximum allowed age of the wipe command in milliseconds
 ///
-/// Returns `Ok(())` if valid, `Err(CryptoError::InvalidSignature)` if invalid.
+/// Returns `Ok(())` if valid, `Err(CryptoError::InvalidSignature)` if invalid,
+/// `Err(CryptoError::StaleTimestamp)` if the command is too old,
+/// `Err(CryptoError::FutureTimestamp)` if the command timestamp is in the future.
 pub fn verify_device_wipe(
     signature_bytes: &[u8],
     server_pubkey_hex: &str,
     target_device_pubkey: &str,
     timestamp_ms: u64,
     reason: &str,
+    current_timestamp_ms: u64,
+    max_age_ms: u64,
 ) -> Result<(), CryptoError> {
+    // Reject future timestamps (with small clock-skew tolerance of 30 seconds)
+    const CLOCK_SKEW_TOLERANCE_MS: u64 = 30_000;
+    if timestamp_ms > current_timestamp_ms.saturating_add(CLOCK_SKEW_TOLERANCE_MS) {
+        return Err(CryptoError::FutureTimestamp);
+    }
+
+    // Reject stale timestamps
+    if current_timestamp_ms.saturating_sub(timestamp_ms) > max_age_ms {
+        return Err(CryptoError::StaleTimestamp);
+    }
+
     let message = build_device_wipe_message(target_device_pubkey, timestamp_ms, reason);
     let valid = verify_signature(&message, signature_bytes, server_pubkey_hex)?;
     if !valid {
@@ -331,7 +348,16 @@ mod tests {
         let sig = sign_device_wipe(&server_secrets, &target_device, FRESH_TS, reason);
         assert_eq!(sig.len(), 64);
 
-        verify_device_wipe(&sig, &server_pubkey, &target_device, FRESH_TS, reason).unwrap();
+        verify_device_wipe(
+            &sig,
+            &server_pubkey,
+            &target_device,
+            FRESH_TS,
+            reason,
+            FRESH_TS,
+            MAX_AGE,
+        )
+        .unwrap();
     }
 
     #[test]
@@ -341,7 +367,15 @@ mod tests {
 
         let sig = sign_device_wipe(&server_secrets, &"aa".repeat(32), FRESH_TS, reason);
 
-        let result = verify_device_wipe(&sig, &server_pubkey, &"bb".repeat(32), FRESH_TS, reason);
+        let result = verify_device_wipe(
+            &sig,
+            &server_pubkey,
+            &"bb".repeat(32),
+            FRESH_TS,
+            reason,
+            FRESH_TS,
+            MAX_AGE,
+        );
         assert!(matches!(result, Err(CryptoError::InvalidSignature)));
     }
 
@@ -352,8 +386,15 @@ mod tests {
 
         let sig = sign_device_wipe(&server_secrets, &target, FRESH_TS, "user-erasure");
 
-        let result =
-            verify_device_wipe(&sig, &server_pubkey, &target, FRESH_TS, "device-revocation");
+        let result = verify_device_wipe(
+            &sig,
+            &server_pubkey,
+            &target,
+            FRESH_TS,
+            "device-revocation",
+            FRESH_TS,
+            MAX_AGE,
+        );
         assert!(matches!(result, Err(CryptoError::InvalidSignature)));
     }
 
@@ -365,7 +406,9 @@ mod tests {
 
         let sig = sign_device_wipe(&server_secrets, &target, 1000, reason);
 
-        let result = verify_device_wipe(&sig, &server_pubkey, &target, 2000, reason);
+        // Signed with timestamp 1000, but verify claims timestamp 2000 — signature mismatch
+        let result =
+            verify_device_wipe(&sig, &server_pubkey, &target, 2000, reason, 2000, MAX_AGE);
         assert!(matches!(result, Err(CryptoError::InvalidSignature)));
     }
 
@@ -378,7 +421,8 @@ mod tests {
 
         let sig = sign_device_wipe(&server_secrets, &target, FRESH_TS, reason);
 
-        let result = verify_device_wipe(&sig, &other_pubkey, &target, FRESH_TS, reason);
+        let result =
+            verify_device_wipe(&sig, &other_pubkey, &target, FRESH_TS, reason, FRESH_TS, MAX_AGE);
         assert!(
             matches!(result, Err(CryptoError::InvalidSignature)),
             "wrong server key must fail — prevents forged wipe attacks"
@@ -402,8 +446,16 @@ mod tests {
 
         for reason in &["user-erasure", "device-revocation", "admin-erasure"] {
             let sig = sign_device_wipe(&server_secrets, &target, FRESH_TS, reason);
-            verify_device_wipe(&sig, &server_pubkey, &target, FRESH_TS, reason)
-                .unwrap_or_else(|_| panic!("reason '{reason}' should verify"));
+            verify_device_wipe(
+                &sig,
+                &server_pubkey,
+                &target,
+                FRESH_TS,
+                reason,
+                FRESH_TS,
+                MAX_AGE,
+            )
+            .unwrap_or_else(|_| panic!("reason '{reason}' should verify"));
         }
     }
 
@@ -416,7 +468,81 @@ mod tests {
         let mut sig = sign_device_wipe(&server_secrets, &target, FRESH_TS, reason);
         sig[31] ^= 0xFF;
 
-        let result = verify_device_wipe(&sig, &server_pubkey, &target, FRESH_TS, reason);
+        let result =
+            verify_device_wipe(&sig, &server_pubkey, &target, FRESH_TS, reason, FRESH_TS, MAX_AGE);
         assert!(matches!(result, Err(CryptoError::InvalidSignature)));
+    }
+
+    #[test]
+    fn device_wipe_stale_timestamp_rejected() {
+        let (server_secrets, server_pubkey) = test_secrets("server-key-stale");
+        let target = "ab".repeat(32);
+        let reason = "user-erasure";
+        let old_ts = 1000;
+        let now = old_ts + MAX_AGE + 1; // just past max age
+
+        let sig = sign_device_wipe(&server_secrets, &target, old_ts, reason);
+
+        let result =
+            verify_device_wipe(&sig, &server_pubkey, &target, old_ts, reason, now, MAX_AGE);
+        assert!(
+            matches!(result, Err(CryptoError::StaleTimestamp)),
+            "stale wipe command must be rejected to prevent replay attacks"
+        );
+    }
+
+    #[test]
+    fn device_wipe_at_max_age_boundary_accepted() {
+        let (server_secrets, server_pubkey) = test_secrets("server-key-boundary");
+        let target = "ab".repeat(32);
+        let reason = "user-erasure";
+        let old_ts = 1000;
+        let now = old_ts + MAX_AGE; // exactly at max age
+
+        let sig = sign_device_wipe(&server_secrets, &target, old_ts, reason);
+
+        verify_device_wipe(&sig, &server_pubkey, &target, old_ts, reason, now, MAX_AGE).unwrap();
+    }
+
+    #[test]
+    fn device_wipe_future_timestamp_rejected() {
+        let (server_secrets, server_pubkey) = test_secrets("server-key-future");
+        let target = "ab".repeat(32);
+        let reason = "device-revocation";
+        let now = 1_708_900_000_000;
+        // 60 seconds in the future — well beyond 30s clock-skew tolerance
+        let future_ts = now + 60_000;
+
+        let sig = sign_device_wipe(&server_secrets, &target, future_ts, reason);
+
+        let result =
+            verify_device_wipe(&sig, &server_pubkey, &target, future_ts, reason, now, MAX_AGE);
+        assert!(
+            matches!(result, Err(CryptoError::FutureTimestamp)),
+            "wipe command with future timestamp must be rejected"
+        );
+    }
+
+    #[test]
+    fn device_wipe_within_clock_skew_tolerance_accepted() {
+        let (server_secrets, server_pubkey) = test_secrets("server-key-skew");
+        let target = "ab".repeat(32);
+        let reason = "admin-erasure";
+        let now = 1_708_900_000_000;
+        // 20 seconds in the future — within 30s clock-skew tolerance
+        let slightly_future_ts = now + 20_000;
+
+        let sig = sign_device_wipe(&server_secrets, &target, slightly_future_ts, reason);
+
+        verify_device_wipe(
+            &sig,
+            &server_pubkey,
+            &target,
+            slightly_future_ts,
+            reason,
+            now,
+            MAX_AGE,
+        )
+        .unwrap();
     }
 }
