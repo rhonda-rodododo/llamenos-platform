@@ -18,10 +18,10 @@ The backend has strong fundamentals: Zod validation on nearly all production rou
 | Severity | Count | Status |
 |----------|-------|--------|
 | CRITICAL | 1 | Persists from wave 2 |
-| HIGH | 7 | 5 persist from wave 2, 2 new |
-| MEDIUM | 19 | 8 persist from wave 2, 11 new |
-| LOW | 13 | 6 persist from wave 2, 7 new |
-| **Total** | **40** | |
+| HIGH | 10 | 5 persist from wave 2, 5 new |
+| MEDIUM | 24 | 8 persist from wave 2, 16 new |
+| LOW | 15 | 6 persist from wave 2, 9 new |
+| **Total** | **50** | |
 
 ### Top Priority Actions
 
@@ -120,6 +120,27 @@ While the list endpoints (lines 60, 91) correctly scope by `hubId`, individual r
 **Impact:** A user with `firehose:read` in hub A can read firehose connection details and buffer contents from hub B.
 
 **Fix:** After fetching the connection, verify `row.hubId` matches the caller's hub context.
+
+### H8: WebRTC/SIP token routes lack any permission guard (NEW)
+**File:** `apps/worker/routes/webrtc.ts:19,72,126,154`
+
+All four WebRTC/SIP endpoints (token generation, SIP credential generation, status checks) rely solely on authentication but have zero `requirePermission()` calls. Any authenticated user — regardless of role — can generate WebRTC tokens and SIP credentials. A user with zero permissions (e.g., deactivated but still holding a valid session) could generate telephony credentials.
+
+**Fix:** Add `requirePermission('calls:answer')` or a dedicated `telephony:use-webrtc` permission to all four endpoints.
+
+### H9: Evidence routes missing hub-scoping — cross-hub IDOR (NEW)
+**Files:** `apps/worker/routes/evidence.ts:126-259`
+
+Evidence-by-ID routes (`GET /evidence/:evidenceId`, `GET /evidence/:evidenceId/custody`, `POST /evidence/:evidenceId/access`, `POST /evidence/:evidenceId/verify`) accept an arbitrary `evidenceId` with no check that the evidence belongs to the caller's hub. A user with `evidence:download` in Hub A could access evidence metadata, custody chains, and trigger access logs for evidence in Hub B by guessing evidence IDs.
+
+**Fix:** After fetching evidence by ID, verify it belongs to the caller's hub context.
+
+### H10: Admin device overview accepts arbitrary hubId query parameter — cross-hub enumeration (NEW)
+**File:** `apps/worker/routes/admin/devices.ts:25`
+
+The `hubId` comes from `c.req.valid('query')` (user-provided), not from hub context middleware. An admin of Hub A with `users:manage-devices` could pass `hubId=<hub-B-id>` and view device overviews for users in Hub B.
+
+**Fix:** Use `c.get('hubId')` from hub context middleware instead of accepting it as a query parameter.
 
 ---
 
@@ -270,6 +291,41 @@ The Signal adapter communicates with the signal-cli bridge at `config.bridgeUrl`
 
 **Fix:** Gate behind auth or restrict to development mode in production deployments.
 
+### M20: Contacts-v2 group operations not hub-scoped by resource (NEW)
+**File:** `apps/worker/routes/contacts-v2.ts:216-376`
+
+Group CRUD operations (`GET/PATCH/DELETE /groups/:groupId`, member management) check `contacts:manage-groups` permission but do not verify the group belongs to the caller's hub. A user with this permission in Hub A could modify or delete groups in Hub B by providing Hub B's group ID. The `listGroups` correctly passes `hubId`, but individual operations use only the groupId.
+
+**Fix:** After fetching the group by ID, verify `group.hubId` matches the caller's hub context.
+
+### M21: Erasure admin operations not scoped to admin's hub (NEW)
+**File:** `apps/worker/routes/erasure.ts:268-360`
+
+`POST /:userId` (execute erasure) and `POST /:userId/wipe-device/:devicePubkey` take `userId` from URL params but only check `erasure:admin` permission. No verification that the target user belongs to a hub the admin manages. An admin of Hub A could erase users or remote-wipe devices in Hub B.
+
+**Fix:** Verify target user is a member of a hub the caller administers before executing erasure.
+
+### M22: Recovery group info endpoint allows cross-hub access (NEW)
+**File:** `apps/worker/routes/recovery-group.ts:99-131`
+
+`GET /:hubId` takes hubId from the URL parameter with only `recovery:view` permission check. Unlike the session status endpoint (which checks hub membership via `user.hubRoles`), the group info endpoint does not verify the caller is a member of the requested hub.
+
+**Fix:** Verify caller is a member of the requested hub before returning recovery group configuration.
+
+### M23: Entity-schema and contacts-v2 accept hubId from request body (NEW)
+**Files:** `apps/worker/routes/entity-schema.ts:319`, `apps/worker/routes/contacts-v2.ts:151`
+
+Case number generation prefers `body.hubId` over `c.get('hubId')`. Contact creation uses `c.get('hubId') ?? body.hubId`. When accessed via the non-hub-scoped `authenticated` router, the client can specify any hubId, creating resources in arbitrary hubs.
+
+**Fix:** Never accept `hubId` from request body. Always use `c.get('hubId')` from hub context middleware.
+
+### M24: Entity-schema cross-hub sharing toggle uses hub-level permission for platform operation (NEW)
+**File:** `apps/worker/routes/entity-schema.ts:137-178`
+
+`GET /cross-hub` and `PUT /cross-hub` toggle cross-hub sharing for the entire platform but only require `settings:manage-cms` (a hub-scoped permission). A hub admin could toggle platform-wide sharing.
+
+**Fix:** Require `system:manage-instance` (platform-level permission) instead.
+
 ---
 
 ## LOW
@@ -376,6 +432,20 @@ Several `console.error` calls in the event outbox drain bypass the structured lo
 
 **Fix:** Replace `console.error` with `createLogger('outbox')` for consistent redaction.
 
+### L14: Config endpoint exposes hub structure and bootstrap state to unauthenticated callers (NEW)
+**File:** `apps/worker/routes/config.ts:96-112`
+
+The public `/api/config` endpoint returns `serverPubkey`, `wsRelayUrl`, `hubs` (all active hubs with metadata), `needsBootstrap`, `setupCompleted`, and optionally `sentryDsn`. An attacker could learn hub count, names, and whether the instance is freshly deployed. The `sentryDsn` could be used to pollute crash reporting.
+
+**Fix:** Minimize public config response. Move hub listing behind auth. Never expose `sentryDsn` publicly.
+
+### L15: Entity file upload lacks MIME type validation (NEW)
+**File:** `apps/worker/routes/uploads.ts:23-53`
+
+The `POST /entity-file` endpoint validates file size but has no MIME type validation — any file type can be uploaded. While files are stored with server-generated UUID keys (preventing path traversal), unrestricted upload types could be used to store malicious content.
+
+**Fix:** Add MIME type allowlist validation (e.g., images, PDFs, documents).
+
 ---
 
 ## Positive Security Patterns
@@ -441,7 +511,11 @@ This audit was conducted by:
 | P0 | Merge existing wave 2 fix PRs | C1, H1-H4, and 10+ MEDIUM/LOW |
 | P1 | SSRF guard on recording URL fetches | H6 |
 | P1 | Hub-scope firehose individual reads | H7 |
+| P1 | Add permission guards to WebRTC/SIP routes | H8 |
+| P1 | Hub-scope evidence routes | H9 |
+| P1 | Fix admin device hubId from query param | H10 |
 | P1 | Encrypt/remove ban list `phone_display` | H5 |
+| P1 | **Systemic: audit ALL routes for hub-scoping gaps** | H7,H9,H10,M20-M24 |
 | P1 | Fix login rate limit key for non-CF deployments | M7 |
 | P2 | Rate limit WebSocket upgrade path | M6 |
 | P2 | Rate limit public endpoints | M4 |
@@ -456,4 +530,9 @@ This audit was conducted by:
 | P2 | Add ADMIN_PUBKEY kill switch | M13 |
 | P3 | Gate OpenAPI docs behind auth | M19 |
 | P3 | Enforce events sunset date | L2 |
-| P3 | Address remaining LOW findings | L1, L3-L13 |
+| P2 | Hub-scope contacts-v2 group operations | M20 |
+| P2 | Hub-scope erasure admin operations | M21 |
+| P2 | Hub-scope recovery group info | M22 |
+| P2 | Never accept hubId from request body | M23 |
+| P2 | Require platform permission for cross-hub toggle | M24 |
+| P3 | Address remaining LOW findings | L1, L3-L15 |
