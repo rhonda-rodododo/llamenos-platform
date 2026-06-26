@@ -19,9 +19,9 @@ The backend has strong fundamentals: Zod validation on nearly all production rou
 |----------|-------|--------|
 | CRITICAL | 1 | Persists from wave 2 |
 | HIGH | 7 | 5 persist from wave 2, 2 new |
-| MEDIUM | 17 | 8 persist from wave 2, 9 new |
-| LOW | 11 | 6 persist from wave 2, 5 new |
-| **Total** | **36** | |
+| MEDIUM | 19 | 8 persist from wave 2, 11 new |
+| LOW | 13 | 6 persist from wave 2, 7 new |
+| **Total** | **40** | |
 
 ### Top Priority Actions
 
@@ -162,7 +162,23 @@ Replay has a per-hub rate limit, but incoming client messages (subscribe/unsubsc
 
 **Fix:** Add per-connection message rate limit (e.g., 60 msg/min).
 
-### M6: `PATCH /messaging/preferences` accepts unvalidated JSON body (NEW)
+### M6: WebSocket upgrade path bypasses all Hono rate limiting (NEW)
+**File:** `src/server/index.ts:254-264`
+
+WebSocket upgrades are handled in the raw `Bun.serve()` `fetch()` handler, before requests reach the Hono app and its `rateLimit()` middleware. An attacker can flood the server with upgrade requests — each allocating a 32-byte nonce and a timer — without any IP-based throttling, even for unauthenticated attempts.
+
+**Fix:** Add an IP-based rate limit check before `server.upgrade()`, or move WebSocket handling into the Hono middleware chain.
+
+### M7: Login rate limit key is `'unknown'` for all non-Cloudflare deployments (NEW)
+**File:** `apps/worker/routes/auth.ts:43`
+
+`const clientIp = c.req.header('CF-Connecting-IP') || 'unknown'` — since the production deployment is a self-hosted Bun server behind Caddy (not Cloudflare), `CF-Connecting-IP` is never set. ALL login attempts share the rate limit key `auth:hash('unknown')`. This means the 10 attempts/minute limit is shared across all attackers AND all legitimate users. The same issue exists in `/bootstrap` (line 99) and `/webauthn/login/options`.
+
+**Impact:** The auth rate limit is effectively a single global bucket — one attacker can lock out all users, and distributed attackers bypass per-IP limits entirely.
+
+**Fix:** Use Caddy's `X-Real-IP` header or Bun's connection remote address. Ensure the `extractIp` helper is used consistently.
+
+### M8: `PATCH /messaging/preferences` accepts unvalidated JSON body (NEW)
 **File:** `apps/worker/app.ts:171-183`
 
 ```typescript
@@ -175,35 +191,35 @@ Uses raw `c.req.json()` with an `as` cast instead of Zod validation. Any JSON sh
 
 **Fix:** Add a Zod schema for the preferences update body with explicit field validation.
 
-### M7: Signal notification digest inline permission check — wildcard bypass (PERSISTS from wave 2)
+### M9: Signal notification digest inline permission check — wildcard bypass (PERSISTS from wave 2)
 **File:** `apps/worker/routes/signal-notification.ts:281-293`
 
 `POST /digest/run` checks `permissions.includes('system:admin')` directly instead of `requirePermission()`. A super-admin with wildcard `*` permission (but not the literal string `system:admin`) would be denied.
 
 **Fix:** Replace with `requirePermission('system:admin')` middleware.
 
-### M8: Health check leaks error messages to unauthenticated callers (PERSISTS from wave 2)
+### M10: Health check leaks error messages to unauthenticated callers (PERSISTS from wave 2)
 **File:** `apps/worker/routes/health.ts`
 
 `err.message` returned in `detail` field for failing health checks. Could leak internal hostnames, connection strings, database errors.
 
 **Fix:** Return generic `'Connection check failed'`. Log actual error server-side only.
 
-### M9: No WebSocket connection limit per user (NEW)
+### M11: No WebSocket connection limit per user (NEW)
 **File:** `apps/worker/routes/ws.ts`, `apps/worker/lib/ws-manager.ts`
 
 No cap on simultaneous WebSocket connections per pubkey. An attacker with valid credentials can open thousands of connections, causing memory exhaustion on the server.
 
 **Fix:** Cap at ~10 connections per pubkey in the connection manager.
 
-### M10: Webhook URL falls back to request URL without `WEBHOOK_BASE_URL` (PERSISTS from wave 2)
+### M12: Webhook URL falls back to request URL without `WEBHOOK_BASE_URL` (PERSISTS from wave 2)
 **File:** `apps/worker/lib/webhook-url.ts:18-21`
 
 If `WEBHOOK_BASE_URL` is unconfigured in production, webhook signature validation may use the spoofable `Host` header.
 
 **Fix:** Fail-hard at startup if `WEBHOOK_BASE_URL` is empty in non-development environments.
 
-### M11: ADMIN_PUBKEY auto-restoration cannot be disabled during incidents (NEW)
+### M13: ADMIN_PUBKEY auto-restoration cannot be disabled during incidents (NEW)
 **File:** `apps/worker/middleware/auth.ts:72-86`
 
 The ADMIN_PUBKEY user's `role-super-admin` is automatically restored on every authenticated request. During an incident where the admin account is compromised, there is no way to revoke admin access — the middleware will re-grant it immediately.
@@ -212,42 +228,42 @@ The ADMIN_PUBKEY user's `role-super-admin` is automatically restored on every au
 
 **Fix:** Add kill switch env var (`ADMIN_PUBKEY_AUTO_RESTORE=false`) for incident containment.
 
-### M12: WebAuthn registration challenge not bound to authenticated user during verification (NEW)
+### M14: WebAuthn registration challenge not bound to authenticated user during verification (NEW)
 **Files:** `apps/worker/routes/webauthn.ts:141,173`, `apps/worker/services/identity.ts:828`
 
 The `storeWebAuthnChallenge` correctly accepts a `pubkey` parameter and stores it with the challenge. However, `getWebAuthnChallenge()` only checks `challengeId` — it never validates that the consuming user matches the `pubkey` stored with the challenge. An attacker who intercepts a challenge ID could register their own authenticator under a victim's account if they can satisfy the origin/rpID checks.
 
 **Fix:** Add a `pubkey` parameter to `getWebAuthnChallenge()` and include `eq(webauthnChallenges.pubkey, pubkey)` in the WHERE clause for registration flows.
 
-### M13: Session token compared with `===` instead of constant-time comparison (NEW)
+### M15: Session token compared with `===` instead of constant-time comparison (NEW)
 **File:** `apps/worker/routes/sessions.ts:49`
 
 `isCurrent: s.token === currentToken` uses JavaScript string equality, which is susceptible to timing side-channels. The codebase already uses `timingSafeEqual` for webhook secrets (Telegram, Signal) but not here.
 
 **Fix:** Use `crypto.timingSafeEqual` for the `isCurrent` comparison, or compare by session `id` instead of the secret token value.
 
-### M14: `safeFetch` SSRF guard defaults to disabled (NEW)
+### M16: `safeFetch` SSRF guard defaults to disabled (NEW)
 **File:** `apps/worker/lib/safe-fetch.ts:17`
 
 The `safeFetch` wrapper defaults `ssrfGuard` to `false`. Only 1 call site out of dozens enables it (Signal adapter). For a security-critical application, the default should be inverted: SSRF guard on by default, with explicit `ssrfGuard: false` for trusted provider API calls.
 
 **Fix:** Invert the default to `ssrfGuard: true`. Add `ssrfGuard: false` to trusted API calls (Twilio, Vonage base API URLs, etc.).
 
-### M15: SIP credentials returned as long-lived plaintext passwords (NEW)
+### M17: SIP credentials returned as long-lived plaintext passwords (NEW)
 **File:** `apps/worker/telephony/sip-tokens.ts:48-66`
 
 `generateSipParams()` returns SIP passwords as plaintext strings for mobile Linphone SDK configuration. These are long-lived static passwords, unlike WebRTC tokens (`webrtc-tokens.ts`) which use 1-hour JWT expiry. A compromised device retains valid SIP credentials until manually rotated.
 
 **Fix:** Generate time-limited SIP credentials (like the WebRTC JWT approach), or implement credential rotation on session renewal.
 
-### M16: Signal/SIP bridge communication may use plaintext HTTP (NEW)
+### M18: Signal/SIP bridge communication may use plaintext HTTP (NEW)
 **Files:** `apps/worker/messaging/signal/adapter.ts:139,199,234`, SIP bridge adapter
 
 The Signal adapter communicates with the signal-cli bridge at `config.bridgeUrl`. If the URL uses `http://` (common in Docker sidecar deployments), the bridge API key is transmitted in cleartext. For a zero-knowledge architecture where the bridge handles plaintext Signal identifiers, this undermines the security model.
 
 **Fix:** Validate that `bridgeUrl` uses HTTPS, or enforce TLS at the code level. Allow HTTP only when explicitly opted into for localhost development.
 
-### M17: OpenAPI spec and Scalar docs publicly accessible (PERSISTS from wave 2)
+### M19: OpenAPI spec and Scalar docs publicly accessible (PERSISTS from wave 2)
 **File:** `apps/worker/app.ts:299-300`
 
 `/api/openapi.json` and `/api/docs` are unauthenticated, revealing every endpoint, schema, and parameter definition to potential attackers.
@@ -346,6 +362,20 @@ When the messaging bridge is unreachable (ECONNREFUSED, ETIMEDOUT, etc.), the me
 
 **Fix:** Use a `'queued'` or `'pending_retry'` status for bridge-unavailable scenarios. Implement a background retry queue.
 
+### L12: Health endpoint exposes memory usage and uptime without authentication (NEW)
+**File:** `apps/worker/routes/health.ts:137-151`
+
+`GET /api/health/` returns heap memory usage, RSS, and uptime to unauthenticated callers. These details help attackers fingerprint the server, estimate traffic levels, and time attacks.
+
+**Fix:** Restrict the full health endpoint to internal network only. The `/live` and `/ready` probes are sufficient for k8s.
+
+### L13: Event outbox uses `console.error` bypassing PII redaction pipeline (NEW)
+**File:** `src/server/index.ts:142-158`
+
+Several `console.error` calls in the event outbox drain bypass the structured logger's PII redaction patterns. Database error messages containing query data could be logged without redaction.
+
+**Fix:** Replace `console.error` with `createLogger('outbox')` for consistent redaction.
+
 ---
 
 ## Positive Security Patterns
@@ -412,16 +442,18 @@ This audit was conducted by:
 | P1 | SSRF guard on recording URL fetches | H6 |
 | P1 | Hub-scope firehose individual reads | H7 |
 | P1 | Encrypt/remove ban list `phone_display` | H5 |
+| P1 | Fix login rate limit key for non-CF deployments | M7 |
+| P2 | Rate limit WebSocket upgrade path | M6 |
 | P2 | Rate limit public endpoints | M4 |
 | P2 | Add WebSocket per-connection rate limit | M5 |
-| P2 | Add WebSocket per-user connection cap | M9 |
-| P2 | Zod validate preferences endpoint | M6 |
-| P2 | Bind WebAuthn challenge to user | M12 |
-| P2 | Constant-time session token comparison | M13 |
-| P2 | Invert safeFetch SSRF guard default | M14 |
-| P2 | Time-limit SIP credentials | M15 |
-| P2 | Enforce TLS on bridge communication | M16 |
-| P2 | Add ADMIN_PUBKEY kill switch | M11 |
-| P3 | Gate OpenAPI docs behind auth | M12 |
+| P2 | Add WebSocket per-user connection cap | M11 |
+| P2 | Zod validate preferences endpoint | M8 |
+| P2 | Bind WebAuthn challenge to user | M14 |
+| P2 | Constant-time session token comparison | M15 |
+| P2 | Invert safeFetch SSRF guard default | M16 |
+| P2 | Time-limit SIP credentials | M17 |
+| P2 | Enforce TLS on bridge communication | M18 |
+| P2 | Add ADMIN_PUBKEY kill switch | M13 |
+| P3 | Gate OpenAPI docs behind auth | M19 |
 | P3 | Enforce events sunset date | L2 |
-| P3 | Address remaining LOW findings | L1, L3-L11 |
+| P3 | Address remaining LOW findings | L1, L3-L13 |
