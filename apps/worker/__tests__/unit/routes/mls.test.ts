@@ -7,6 +7,8 @@ import mlsRoutes from '@worker/routes/mls'
 // Helpers
 // ---------------------------------------------------------------------------
 
+const DEFAULT_PUBKEY = 'a'.repeat(64)
+
 function createTestApp(opts: {
   hubId?: string
   pubkey?: string
@@ -14,7 +16,7 @@ function createTestApp(opts: {
 } = {}) {
   const {
     hubId = 'hub-1',
-    pubkey = 'a'.repeat(64),
+    pubkey = DEFAULT_PUBKEY,
     serviceMock = {},
   } = opts
 
@@ -25,6 +27,7 @@ function createTestApp(opts: {
     c.set('permissions', ['*'])
     c.set('services', {
       cryptoKeys: serviceMock.cryptoKeys || {},
+      identity: serviceMock.identity || {},
     } as unknown as AppEnv['Variables']['services'])
     c.set('allRoles', [])
     c.set('requestId', 'test-req-1')
@@ -55,6 +58,17 @@ function createTestApp(opts: {
   return { app }
 }
 
+/** Identity mock that approves all device ownership and hub membership checks. */
+function defaultIdentityMock(overrides: Record<string, unknown> = {}) {
+  return {
+    verifyDeviceOwnership: vi.fn().mockResolvedValue(true),
+    getHubMemberDeviceIds: vi.fn().mockResolvedValue(
+      new Set(['device-1', 'device-2', 'device-3', 'dev-1', 'dev-2', 'd1', 'd2', 'new-device-1']),
+    ),
+    ...overrides,
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -73,7 +87,10 @@ describe('mls routes', () => {
       const enqueueSpy = vi.fn().mockResolvedValue(undefined)
       const { app } = createTestApp({
         hubId: 'hub-1',
-        serviceMock: { cryptoKeys: { enqueueMlsMessages: enqueueSpy } },
+        serviceMock: {
+          cryptoKeys: { enqueueMlsMessages: enqueueSpy },
+          identity: defaultIdentityMock(),
+        },
       })
 
       const res = await app.request('/mls/commit', {
@@ -98,7 +115,10 @@ describe('mls routes', () => {
 
     it('returns 400 when recipientDeviceIds is empty', async () => {
       const { app } = createTestApp({
-        serviceMock: { cryptoKeys: { enqueueMlsMessages: vi.fn() } },
+        serviceMock: {
+          cryptoKeys: { enqueueMlsMessages: vi.fn() },
+          identity: defaultIdentityMock(),
+        },
       })
 
       const res = await app.request('/mls/commit', {
@@ -115,7 +135,10 @@ describe('mls routes', () => {
 
     it('returns 400 when payload is empty string', async () => {
       const { app } = createTestApp({
-        serviceMock: { cryptoKeys: { enqueueMlsMessages: vi.fn() } },
+        serviceMock: {
+          cryptoKeys: { enqueueMlsMessages: vi.fn() },
+          identity: defaultIdentityMock(),
+        },
       })
 
       const res = await app.request('/mls/commit', {
@@ -134,7 +157,10 @@ describe('mls routes', () => {
       const enqueueSpy = vi.fn().mockResolvedValue(undefined)
       const { app } = createTestApp({
         hubId: 'hub-2',
-        serviceMock: { cryptoKeys: { enqueueMlsMessages: enqueueSpy } },
+        serviceMock: {
+          cryptoKeys: { enqueueMlsMessages: enqueueSpy },
+          identity: defaultIdentityMock(),
+        },
       })
 
       await app.request('/mls/commit', {
@@ -151,6 +177,33 @@ describe('mls routes', () => {
       expect(hubId).toBe('hub-2')
       expect(messages.map(m => m.recipientDeviceId)).toEqual(['d1', 'd2'])
     })
+
+    it('returns 403 when recipient device is not a hub member', async () => {
+      const enqueueSpy = vi.fn().mockResolvedValue(undefined)
+      const { app } = createTestApp({
+        hubId: 'hub-1',
+        serviceMock: {
+          cryptoKeys: { enqueueMlsMessages: enqueueSpy },
+          identity: defaultIdentityMock({
+            getHubMemberDeviceIds: vi.fn().mockResolvedValue(new Set(['device-1'])),
+          }),
+        },
+      })
+
+      const res = await app.request('/mls/commit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipientDeviceIds: ['device-1', 'attacker-device'],
+          payload: 'base64urlencodedcommit',
+        }),
+      })
+
+      expect(res.status).toBe(403)
+      const json = await res.json()
+      expect(json.error).toMatch(/not active hub members/i)
+      expect(enqueueSpy).not.toHaveBeenCalled()
+    })
   })
 
   // -------------------------------------------------------------------------
@@ -162,7 +215,10 @@ describe('mls routes', () => {
       const enqueueSpy = vi.fn().mockResolvedValue(undefined)
       const { app } = createTestApp({
         hubId: 'hub-1',
-        serviceMock: { cryptoKeys: { enqueueMlsMessages: enqueueSpy } },
+        serviceMock: {
+          cryptoKeys: { enqueueMlsMessages: enqueueSpy },
+          identity: defaultIdentityMock(),
+        },
       })
 
       const res = await app.request('/mls/welcome', {
@@ -183,7 +239,10 @@ describe('mls routes', () => {
 
     it('returns 400 when recipientDeviceId is empty', async () => {
       const { app } = createTestApp({
-        serviceMock: { cryptoKeys: { enqueueMlsMessages: vi.fn() } },
+        serviceMock: {
+          cryptoKeys: { enqueueMlsMessages: vi.fn() },
+          identity: defaultIdentityMock(),
+        },
       })
 
       const res = await app.request('/mls/welcome', {
@@ -200,7 +259,10 @@ describe('mls routes', () => {
 
     it('returns 400 when payload is missing', async () => {
       const { app } = createTestApp({
-        serviceMock: { cryptoKeys: { enqueueMlsMessages: vi.fn() } },
+        serviceMock: {
+          cryptoKeys: { enqueueMlsMessages: vi.fn() },
+          identity: defaultIdentityMock(),
+        },
       })
 
       const res = await app.request('/mls/welcome', {
@@ -210,6 +272,33 @@ describe('mls routes', () => {
       })
 
       expect(res.status).toBe(400)
+    })
+
+    it('returns 403 when recipient device is not a hub member', async () => {
+      const enqueueSpy = vi.fn().mockResolvedValue(undefined)
+      const { app } = createTestApp({
+        hubId: 'hub-1',
+        serviceMock: {
+          cryptoKeys: { enqueueMlsMessages: enqueueSpy },
+          identity: defaultIdentityMock({
+            getHubMemberDeviceIds: vi.fn().mockResolvedValue(new Set(['other-device'])),
+          }),
+        },
+      })
+
+      const res = await app.request('/mls/welcome', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipientDeviceId: 'attacker-device',
+          payload: 'base64urlencodedwelcome',
+        }),
+      })
+
+      expect(res.status).toBe(403)
+      const json = await res.json()
+      expect(json.error).toMatch(/not an active hub member/i)
+      expect(enqueueSpy).not.toHaveBeenCalled()
     })
   })
 
@@ -225,7 +314,10 @@ describe('mls routes', () => {
       ])
       const { app } = createTestApp({
         hubId: 'hub-1',
-        serviceMock: { cryptoKeys: { fetchAndClearMlsMessages: fetchAndClearSpy } },
+        serviceMock: {
+          cryptoKeys: { fetchAndClearMlsMessages: fetchAndClearSpy },
+          identity: defaultIdentityMock(),
+        },
       })
 
       const res = await app.request('/mls/messages?deviceId=dev-1')
@@ -238,7 +330,10 @@ describe('mls routes', () => {
 
     it('returns 400 when deviceId query param is missing', async () => {
       const { app } = createTestApp({
-        serviceMock: { cryptoKeys: { fetchAndClearMlsMessages: vi.fn() } },
+        serviceMock: {
+          cryptoKeys: { fetchAndClearMlsMessages: vi.fn() },
+          identity: defaultIdentityMock(),
+        },
       })
 
       const res = await app.request('/mls/messages')
@@ -250,13 +345,35 @@ describe('mls routes', () => {
     it('returns empty messages array when no pending messages', async () => {
       const fetchAndClearSpy = vi.fn().mockResolvedValue([])
       const { app } = createTestApp({
-        serviceMock: { cryptoKeys: { fetchAndClearMlsMessages: fetchAndClearSpy } },
+        serviceMock: {
+          cryptoKeys: { fetchAndClearMlsMessages: fetchAndClearSpy },
+          identity: defaultIdentityMock(),
+        },
       })
 
       const res = await app.request('/mls/messages?deviceId=dev-1')
       expect(res.status).toBe(200)
       const json = await res.json()
       expect(json.messages).toHaveLength(0)
+    })
+
+    it('returns 403 when deviceId does not belong to authenticated user', async () => {
+      const fetchAndClearSpy = vi.fn().mockResolvedValue([])
+      const { app } = createTestApp({
+        hubId: 'hub-1',
+        serviceMock: {
+          cryptoKeys: { fetchAndClearMlsMessages: fetchAndClearSpy },
+          identity: defaultIdentityMock({
+            verifyDeviceOwnership: vi.fn().mockResolvedValue(false),
+          }),
+        },
+      })
+
+      const res = await app.request('/mls/messages?deviceId=other-users-device')
+      expect(res.status).toBe(403)
+      const json = await res.json()
+      expect(json.error).toMatch(/does not belong to the authenticated user/i)
+      expect(fetchAndClearSpy).not.toHaveBeenCalled()
     })
   })
 
@@ -269,7 +386,10 @@ describe('mls routes', () => {
       const uploadSpy = vi.fn().mockResolvedValue(undefined)
       const { app } = createTestApp({
         hubId: 'hub-1',
-        serviceMock: { cryptoKeys: { uploadKeyPackage: uploadSpy } },
+        serviceMock: {
+          cryptoKeys: { uploadKeyPackage: uploadSpy },
+          identity: defaultIdentityMock(),
+        },
       })
 
       const res = await app.request('/mls/key-packages?deviceId=dev-1', {
@@ -290,7 +410,10 @@ describe('mls routes', () => {
 
     it('returns 400 when deviceId query param is missing', async () => {
       const { app } = createTestApp({
-        serviceMock: { cryptoKeys: { uploadKeyPackage: vi.fn() } },
+        serviceMock: {
+          cryptoKeys: { uploadKeyPackage: vi.fn() },
+          identity: defaultIdentityMock(),
+        },
       })
 
       const res = await app.request('/mls/key-packages', {
@@ -306,7 +429,10 @@ describe('mls routes', () => {
 
     it('returns 400 when keyPackages array is empty', async () => {
       const { app } = createTestApp({
-        serviceMock: { cryptoKeys: { uploadKeyPackage: vi.fn() } },
+        serviceMock: {
+          cryptoKeys: { uploadKeyPackage: vi.fn() },
+          identity: defaultIdentityMock(),
+        },
       })
 
       const res = await app.request('/mls/key-packages?deviceId=dev-1', {
@@ -320,7 +446,10 @@ describe('mls routes', () => {
 
     it('returns 400 when a key package is an empty string', async () => {
       const { app } = createTestApp({
-        serviceMock: { cryptoKeys: { uploadKeyPackage: vi.fn() } },
+        serviceMock: {
+          cryptoKeys: { uploadKeyPackage: vi.fn() },
+          identity: defaultIdentityMock(),
+        },
       })
 
       const res = await app.request('/mls/key-packages?deviceId=dev-1', {
@@ -330,6 +459,30 @@ describe('mls routes', () => {
       })
 
       expect(res.status).toBe(400)
+    })
+
+    it('returns 403 when deviceId does not belong to authenticated user', async () => {
+      const uploadSpy = vi.fn().mockResolvedValue(undefined)
+      const { app } = createTestApp({
+        hubId: 'hub-1',
+        serviceMock: {
+          cryptoKeys: { uploadKeyPackage: uploadSpy },
+          identity: defaultIdentityMock({
+            verifyDeviceOwnership: vi.fn().mockResolvedValue(false),
+          }),
+        },
+      })
+
+      const res = await app.request('/mls/key-packages?deviceId=other-users-device', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keyPackages: ['pkg-1'] }),
+      })
+
+      expect(res.status).toBe(403)
+      const json = await res.json()
+      expect(json.error).toMatch(/does not belong to the authenticated user/i)
+      expect(uploadSpy).not.toHaveBeenCalled()
     })
   })
 })

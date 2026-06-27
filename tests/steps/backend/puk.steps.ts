@@ -51,7 +51,7 @@ async function registerDevice(
 
 // ── Given ───────────────────────────────────────────────────────────
 
-Given('the user has a registered device {string}', async ({ request, world }, _label: string) => {
+Given('the user has a registered device {string}', async ({ request, world }, label: string) => {
   const s = getS(world)
   expect(s.user).toBeDefined()
   const regRes = await registerDevice(request, s.user!.deviceKey)
@@ -62,7 +62,9 @@ Given('the user has a registered device {string}', async ({ request, world }, _l
   expect(latestDevice).toBeDefined()
   s.deviceIds.push(latestDevice.id)
   // Also write to shared state so MLS step namespace can access device IDs
-  getSharedState(world).sharedDeviceIds.push(latestDevice.id)
+  const shared = getSharedState(world)
+  shared.sharedDeviceIds.push(latestDevice.id)
+  shared.sharedDeviceLabels[label] = latestDevice.id
 })
 
 Given('PUK envelopes are distributed for generation {int}', async ({ request, world }, generation: number) => {

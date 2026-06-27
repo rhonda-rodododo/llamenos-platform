@@ -83,6 +83,13 @@ mlsRoutes.post('/commit',
     const body = c.req.valid('json')
     const services = c.get('services')
 
+    // Validate all recipient device IDs belong to active hub members
+    const hubDeviceIds = await services.identity.getHubMemberDeviceIds(hubId)
+    const invalidIds = body.recipientDeviceIds.filter(id => !hubDeviceIds.has(id))
+    if (invalidIds.length > 0) {
+      return c.json({ error: 'One or more recipient devices are not active hub members' }, 403)
+    }
+
     await services.cryptoKeys.enqueueMlsMessages(
       hubId,
       body.recipientDeviceIds.map(deviceId => ({
@@ -118,6 +125,12 @@ mlsRoutes.post('/welcome',
     const hubId = c.req.param('hubId') ?? c.get('hubId') ?? ''
     const body = c.req.valid('json')
     const services = c.get('services')
+
+    // Validate recipient device belongs to an active hub member
+    const hubDeviceIds = await services.identity.getHubMemberDeviceIds(hubId)
+    if (!hubDeviceIds.has(body.recipientDeviceId)) {
+      return c.json({ error: 'Recipient device is not an active hub member' }, 403)
+    }
 
     await services.cryptoKeys.enqueueMlsMessages(hubId, [
       {
@@ -165,7 +178,15 @@ mlsRoutes.get('/messages',
       return c.json({ error: 'deviceId query parameter is required' }, 400)
     }
 
+    const callerPubkey = c.get('pubkey')
     const services = c.get('services')
+
+    // Verify the requested device belongs to the authenticated user
+    const isOwner = await services.identity.verifyDeviceOwnership(callerPubkey, deviceId)
+    if (!isOwner) {
+      return c.json({ error: 'Device does not belong to the authenticated user' }, 403)
+    }
+
     const messages = await services.cryptoKeys.fetchAndClearMlsMessages(hubId, deviceId)
     return c.json({ messages })
   },
@@ -195,10 +216,15 @@ mlsRoutes.post('/key-packages',
     const body = c.req.valid('json')
     const services = c.get('services')
 
-    // Resolve caller's device: use deviceId from query, or look up devices
     const deviceIdParam = c.req.query('deviceId')
     if (!deviceIdParam) {
       return c.json({ error: 'deviceId query parameter is required' }, 400)
+    }
+
+    // Verify the device belongs to the authenticated user
+    const isOwner = await services.identity.verifyDeviceOwnership(callerPubkey, deviceIdParam)
+    if (!isOwner) {
+      return c.json({ error: 'Device does not belong to the authenticated user' }, 403)
     }
 
     for (const pkg of body.keyPackages) {

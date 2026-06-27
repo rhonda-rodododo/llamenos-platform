@@ -1478,6 +1478,47 @@ export class IdentityService {
     return (user.hubRoles as Array<{ hubId: string }>).map(hr => hr.hubId)
   }
 
+  /**
+   * Verify that a device ID belongs to the specified user.
+   * Returns true if the device exists and is owned by the given pubkey.
+   */
+  async verifyDeviceOwnership(pubkey: string, deviceId: string): Promise<boolean> {
+    const [device] = await this.db
+      .select({ id: devices.id })
+      .from(devices)
+      .where(and(eq(devices.id, deviceId), eq(devices.pubkey, pubkey)))
+      .limit(1)
+    return !!device
+  }
+
+  /**
+   * Get all device IDs belonging to active members of a specific hub.
+   * Used to validate that MLS recipient device IDs are legitimate hub members.
+   */
+  async getHubMemberDeviceIds(hubId: string): Promise<Set<string>> {
+    // Get all active users who are members of this hub
+    const allUsers = await this.db
+      .select({ pubkey: users.pubkey, hubRoles: users.hubRoles })
+      .from(users)
+      .where(eq(users.active, true))
+
+    const memberPubkeys = allUsers
+      .filter(u => {
+        const roles = u.hubRoles as Array<{ hubId: string }> | null
+        return roles?.some(hr => hr.hubId === hubId)
+      })
+      .map(u => u.pubkey)
+
+    if (memberPubkeys.length === 0) return new Set()
+
+    const memberDevices = await this.db
+      .select({ id: devices.id })
+      .from(devices)
+      .where(inArray(devices.pubkey, memberPubkeys))
+
+    return new Set(memberDevices.map(d => d.id))
+  }
+
   // =========================================================================
   // Admin Device Overview (EP02)
   // =========================================================================

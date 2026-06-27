@@ -13,6 +13,8 @@ export interface SharedResponseState {
   sharedUser?: { deviceKey: string; pubkey: string }
   /** Device IDs registered via "the user has a registered device" — shared across step namespaces. */
   sharedDeviceIds: string[]
+  /** Map from feature-file device labels (e.g. "mls-device-2") to real registered device IDs. */
+  sharedDeviceLabels: Record<string, string>
   /** Collected response statuses from flood/rate-limit tests (invite, webauthn). */
   floodResponses: number[]
 }
@@ -22,14 +24,24 @@ const KEY = 'shared'
 export function getSharedState(world: Record<string, unknown>): SharedResponseState {
   let s = getState<SharedResponseState | undefined>(world, KEY)
   if (!s) {
-    s = { sharedDeviceIds: [], floodResponses: [] }
+    s = { sharedDeviceIds: [], sharedDeviceLabels: {}, floodResponses: [] }
     setState(world, KEY, s)
   }
   if (!s.sharedDeviceIds) s.sharedDeviceIds = []
+  if (!s.sharedDeviceLabels) s.sharedDeviceLabels = {}
   if (!s.floodResponses) s.floodResponses = []
   return s
 }
 
 export function setLastResponse(world: Record<string, unknown>, res: { status: number; data: unknown }): void {
   getSharedState(world).lastResponse = res
+}
+
+/**
+ * Resolve a feature-file device label (e.g. "mls-device-2") to its real registered device ID.
+ * Falls back to the raw label if no mapping exists (for backwards compatibility with
+ * steps that don't register devices, like the "non-member-device" negative test).
+ */
+export function resolveDeviceLabel(world: Record<string, unknown>, label: string): string {
+  return getSharedState(world).sharedDeviceLabels[label] ?? label
 }
