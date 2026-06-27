@@ -153,11 +153,14 @@ final class WebSocketService: @unchecked Sendable {
 
     // MARK: - Initialization
 
+    /// Certificate pinning delegate retained by the WebSocket URLSession (NS-2).
+    private let pinningDelegate = CertificatePinningDelegate()
+
     init(cryptoService: CryptoService) {
         self.cryptoService = cryptoService
         let config = URLSessionConfiguration.default
         config.waitsForConnectivity = true
-        self.session = URLSession(configuration: config)
+        self.session = URLSession(configuration: config, delegate: pinningDelegate, delegateQueue: nil)
     }
 
     // MARK: - Connect
@@ -199,12 +202,10 @@ final class WebSocketService: @unchecked Sendable {
             : .connecting
 
         // URLSessionWebSocketTask requires ws:// or wss:// schemes. Convert https:// → wss://.
+        // connect(to:) already guards against http://, so the http→ws path is unreachable and omitted.
         let wsURL: URL
         if url.scheme == "https", var components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
             components.scheme = "wss"
-            wsURL = components.url ?? url
-        } else if url.scheme == "http", var components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
-            components.scheme = "ws"
             wsURL = components.url ?? url
         } else {
             wsURL = url
