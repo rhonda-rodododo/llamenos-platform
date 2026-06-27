@@ -22,6 +22,10 @@ interface WebhookSecurityState {
   provider?: string
   /** Whether the provider expects form-encoded content */
   expectsFormEncoded?: boolean
+  /** Payload body for replay tests */
+  replayPayload?: string
+  /** Response from the second (replayed) delivery */
+  secondResponse?: { status: number; data: unknown }
 }
 
 const STATE_KEY = 'webhook_security'
@@ -54,6 +58,10 @@ Given('the request comes from IP {string}', async ({ world }, ip: string) => {
   getWebhookState(world).sourceIp = ip
 })
 
+Given('a webhook payload {string}', async ({ world }, payload: string) => {
+  getWebhookState(world).replayPayload = payload
+})
+
 // ── When steps ──────────────────────────────────────────────────
 
 When('the webhook is delivered', async ({ request, world }) => {
@@ -75,9 +83,12 @@ When('the webhook is delivered', async ({ request, world }) => {
 
   const headers: Record<string, string> = {}
 
-  // Set Content-Type (wrong one for the mismatch test)
+  // Set Content-Type — wrong one for the mismatch test, correct one otherwise
+  // so requests reach the IP/replay checks without being rejected by content-type enforcement.
   if (state.contentType) {
     headers['Content-Type'] = state.contentType
+  } else {
+    headers['Content-Type'] = 'application/x-www-form-urlencoded'
   }
 
   // Simulate source IP via CF-Connecting-IP (the header the server trusts)
@@ -85,14 +96,14 @@ When('the webhook is delivered', async ({ request, world }) => {
     headers['CF-Connecting-IP'] = state.sourceIp
   }
 
-  // Send a minimal POST body — the webhook will fail validation regardless
-  // since we have no valid provider signature, but we check the specific
-  // rejection reason (Content-Type vs IP vs signature).
+  // Send a minimal POST body with a unique nonce to avoid replay-detection
+  // collisions between parallel test scenarios sharing the same nonce table.
+  const nonce = crypto.randomUUID()
   const res = await request.post(webhookPath, {
     headers,
     data: state.contentType === 'application/json'
-      ? JSON.stringify({ CallSid: 'test', From: '+15551234567', To: '+15559876543' })
-      : 'CallSid=test&From=%2B15551234567&To=%2B15559876543',
+      ? JSON.stringify({ CallSid: `test-${nonce}`, From: '+15551234567', To: '+15559876543' })
+      : `CallSid=test-${nonce}&From=%2B15551234567&To=%2B15559876543`,
   })
 
   const contentTypeHeader = res.headers()['content-type'] ?? ''
@@ -104,4 +115,32 @@ When('the webhook is delivered', async ({ request, world }) => {
   }
 
   setLastResponse(world, { status: res.status(), data })
+})
+
+When('the webhook is delivered twice with the same payload', async ({ request, world }) => {
+  const state = getWebhookState(world)
+  const webhookPath = `${BASE_URL}/api/telephony/incoming`
+  const body = state.replayPayload ?? 'CallSid=replay&From=%2B15551234567'
+
+  // First delivery — nonce is recorded; will likely fail signature validation (403)
+  const res1 = await request.post(webhookPath, {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    data: body,
+  })
+  const data1 = await res1.text()
+  setLastResponse(world, { status: res1.status(), data: data1 })
+
+  // Second delivery — same payload, replay protection returns idempotent 200
+  const res2 = await request.post(webhookPath, {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    data: body,
+  })
+  const data2 = await res2.text()
+  state.secondResponse = { status: res2.status(), data: data2 }
+})
+
+Then('the second response status should be {int}', async ({ world }, expectedStatus: number) => {
+  const state = getWebhookState(world)
+  expect(state.secondResponse).toBeDefined()
+  expect(state.secondResponse!.status).toBe(expectedStatus)
 })

@@ -18,10 +18,20 @@ import { backgroundTask } from '../lib/hono-compat'
 import { checkWebhookReplay } from '../services/webhook-replay'
 import { getDb } from '../db'
 import { isIpInCidrs } from '../middleware/webhook-ip-allowlist'
+import { webhookAuth } from '../middleware/webhook-auth'
 
 const logger = createLogger('telephony')
 
 const telephony = new Hono<AppEnv>()
+
+// Apply webhook auth middleware to all telephony webhook routes:
+// - Content-Type enforcement (form-encoded or JSON depending on provider)
+// - IP allowlisting (via TELEPHONY_WEBHOOK_IPS env var)
+// - Replay protection (PostgreSQL nonce tracking)
+telephony.use('*', webhookAuth({
+  provider: 'telephony',
+  allowedContentTypes: ['application/x-www-form-urlencoded', 'application/json'],
+}))
 
 /**
  * Resolve hub-scoped services and telephony adapter from a hub query param.

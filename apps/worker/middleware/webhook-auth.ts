@@ -40,7 +40,8 @@ export function webhookAuth(options: WebhookAuthOptions) {
 
     // 3. Replay protection
     if (!skipReplay) {
-      const bodyText = await c.req.text()
+      // Clone the raw request before reading so downstream handlers can still consume c.req.raw
+      const bodyText = await c.req.raw.clone().text()
       const isFirst = await checkWebhookReplay(getDb(), provider, bodyText, replayWindowSeconds)
       if (!isFirst) {
         return c.text('OK', 200)

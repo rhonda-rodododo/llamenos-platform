@@ -2,6 +2,7 @@ import { createHash } from 'crypto'
 import { webhookNonces } from '../db/schema/webhook-nonces'
 import { lt } from 'drizzle-orm'
 import { createLogger } from '../lib/logger'
+import { isDuplicateKeyError } from '../lib/db-errors'
 import type { Database } from '../db'
 
 const logger = createLogger('webhook-replay')
@@ -32,7 +33,7 @@ export async function checkWebhookReplay(
     })
     return true
   } catch (e: unknown) {
-    if ((e as { code?: string }).code === '23505') {
+    if (isDuplicateKeyError(e)) {
       logger.info('Webhook replay detected', { provider })
       return false
     }

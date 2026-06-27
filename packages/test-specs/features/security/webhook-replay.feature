@@ -14,3 +14,8 @@ Feature: Webhook replay protection
     And the request comes from IP "1.2.3.4"
     When the webhook is delivered
     Then the response status should be 403
+
+  Scenario: Replayed webhook payload returns idempotent 200
+    Given a webhook payload "CallSid=replay-test-123&From=%2B15551234567"
+    When the webhook is delivered twice with the same payload
+    Then the second response status should be 200
