@@ -210,9 +210,8 @@ describe('auth routes', () => {
       expect(res.status).toBe(429)
     })
 
-    it('skips rate limiting in development', async () => {
-      mockCheckRateLimit.mockResolvedValue(true) // would be limited
-      mockVerifyAuthToken.mockResolvedValue(true)
+    it('enforces rate limiting in development mode (security audit Epic A)', async () => {
+      mockCheckRateLimit.mockResolvedValue(true) // rate limited
       const { app } = createApp()
 
       const res = await app.request('/auth/login', {
@@ -221,7 +220,26 @@ describe('auth routes', () => {
         body: JSON.stringify({ pubkey: 'aabb1122eeff3344', timestamp: Date.now(), token: 'valid' }),
       }, { ...defaultEnv as Record<string, string>, ENVIRONMENT: 'development' } as never)
 
-      expect(res.status).toBe(200)
+      expect(res.status).toBe(429)
+    })
+
+    it('checks both IP and pubkey rate limits', async () => {
+      let callCount = 0
+      mockCheckRateLimit.mockImplementation(async () => {
+        callCount++
+        return false // not limited
+      })
+      mockVerifyAuthToken.mockResolvedValue(true)
+      const { app } = createApp()
+
+      await app.request('/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pubkey: 'aabb1122eeff3344', timestamp: Date.now(), token: 'valid' }),
+      }, defaultEnv)
+
+      // Should call checkRateLimit twice: once for IP, once for pubkey
+      expect(callCount).toBe(2)
     })
   })
 

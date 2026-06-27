@@ -38,16 +38,22 @@ auth.post('/login',
   async (c) => {
     const services = c.get('services')
 
-    // Rate limit login attempts by IP (skip in development for testing)
-    if (c.env.ENVIRONMENT !== 'development') {
-      const clientIp = c.req.header('CF-Connecting-IP') || 'unknown'
-      const limited = await checkRateLimit(services.settings, `auth:${hashIP(clientIp, c.env.HMAC_SECRET)}`, 10)
-      if (limited) {
-        return c.json({ error: 'Too many login attempts. Try again later.' }, 429)
-      }
+    // Rate limit login attempts by IP — always enforced (security audit Epic A)
+    const clientIp = c.req.header('CF-Connecting-IP') || 'unknown'
+    const ipKey = `auth-login:${hashIP(clientIp, c.env.HMAC_SECRET)}`
+    const limited = await checkRateLimit(services.settings, ipKey, 5)
+    if (limited) {
+      return c.json({ error: 'Too many login attempts. Try again later.' }, 429)
     }
 
     const body = c.req.valid('json')
+
+    // Per-pubkey failed attempt tracking — prevents targeted brute force
+    const pubkeyKey = `auth-login-pk:${body.pubkey.slice(0, 16)}`
+    const pubkeyLimited = await checkRateLimit(services.settings, pubkeyKey, 5)
+    if (pubkeyLimited) {
+      return c.json({ error: 'Too many login attempts. Try again later.' }, 429)
+    }
 
     // Verify Schnorr signature before returning any user information
     const url = new URL(c.req.url)
@@ -94,13 +100,11 @@ auth.post('/bootstrap',
   async (c) => {
     const services = c.get('services')
 
-    // Rate limit by IP
-    if (c.env.ENVIRONMENT !== 'development') {
-      const clientIp = c.req.header('CF-Connecting-IP') || 'unknown'
-      const limited = await checkRateLimit(services.settings, `bootstrap:${hashIP(clientIp, c.env.HMAC_SECRET)}`, 5)
-      if (limited) {
-        return c.json({ error: 'Too many attempts. Try again later.' }, 429)
-      }
+    // Rate limit bootstrap by IP — always enforced (security audit Epic A)
+    const clientIp = c.req.header('CF-Connecting-IP') || 'unknown'
+    const limited = await checkRateLimit(services.settings, `auth-bootstrap:${hashIP(clientIp, c.env.HMAC_SECRET)}`, 3)
+    if (limited) {
+      return c.json({ error: 'Too many attempts. Try again later.' }, 429)
     }
 
     const body = c.req.valid('json')
