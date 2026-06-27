@@ -2,7 +2,7 @@
 name = "llamenos-desktop"
 version = "0.19.10"
 edition = "2024"
-rust-version = "1.85.0"
+rust-version = "1.88.0"
 
 [lib]
 name = "llamenos_desktop_lib"
@@ -41,3 +41,13 @@ subtle = "2"
 default = ["custom-protocol", "updater"]
 custom-protocol = ["tauri/custom-protocol"]
 updater = ["dep:tauri-plugin-updater"]
+
+# Security: RUSTSEC-2026-0124 — hpke-rs-libcrux 0.6.1 on crates.io pins libcrux-aead
+# to ^0.0.7, pulling libcrux-chacha20poly1305 0.0.7 (DoS vulnerability) into the
+# Cargo.lock even though the libcrux backend is never compiled (openmls_rust_crypto
+# uses hpke-rs-rust-crypto, not hpke-rs-libcrux). The celabshq/hpke-rs main branch
+# already bumps libcrux-aead to 0.0.8 but hasn't been released to crates.io yet.
+# This patch replaces the published 0.6.1 with the git head at the same version so
+# the lock file resolves libcrux-chacha20poly1305 to >=0.0.8.
+[patch.crates-io]
+hpke-rs-libcrux = { git = "https://github.com/celabshq/hpke-rs", package = "hpke-rs-libcrux" }
