@@ -19,12 +19,8 @@ use zeroize::{Zeroize, Zeroizing};
 use crate::ct_hex_eq;
 use crate::errors::CryptoError;
 use crate::hpke_envelope::{self, HpkeEnvelope};
+use crate::kdf_params::{ARGON2_M_COST_KIB, ARGON2_P_COST, ARGON2_T_COST};
 use crate::labels::*;
-
-/// Argon2id parameters (matching device_keys.rs).
-const ARGON2_M_COST_KIB: u32 = 65_536;
-const ARGON2_T_COST: u32 = 3;
-const ARGON2_P_COST: u32 = 4;
 
 // ── Envelope types (hex-encoded wire format) ─────────────────────────
 
