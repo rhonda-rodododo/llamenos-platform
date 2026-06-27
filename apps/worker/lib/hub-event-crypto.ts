@@ -16,7 +16,7 @@
  *
  * AAD (domain separation):
  *   hub events:    LABEL_HUB_EVENT bytes
- *   server events: "${LABEL_HUB_EVENT}:${epoch}" bytes
+ *   server events: "${LABEL_HUB_EVENT_EPOCH}:${epoch}" bytes
  *
  * Padding format: [4-byte LE actual-length][plaintext][random padding bytes]
  * Buckets: 512, 1024, 2048, 4096, 8192, ... (powers of 2, minimum 512B)
@@ -115,11 +115,15 @@ export function getCurrentEpoch(timestampSec?: number): number {
 /**
  * Build the AAD bytes for hub/server event encryption.
  * Hub events (no epoch): LABEL_HUB_EVENT bytes.
- * Server events (with epoch): "${LABEL_HUB_EVENT}:{epoch}" bytes.
+ * Server events (with epoch): "${LABEL_HUB_EVENT_EPOCH}:{epoch}" bytes.
+ *
+ * Epoch-keyed events use LABEL_HUB_EVENT_EPOCH (not LABEL_HUB_EVENT) for domain
+ * separation — this must match the AAD used in ws-events.ts, desktop crypto.rs,
+ * and mobile ffi_v3.rs.
  */
 function buildEventAad(epoch?: number): Uint8Array {
   if (epoch !== undefined) {
-    return utf8ToBytes(`${LABEL_HUB_EVENT}:${epoch}`)
+    return utf8ToBytes(`${LABEL_HUB_EVENT_EPOCH}:${epoch}`)
   }
   return utf8ToBytes(LABEL_HUB_EVENT)
 }

@@ -663,7 +663,7 @@ pub fn mobile_decrypt_server_event_with_epoch(
     }
     let nonce = Nonce::from_slice(&data[..12]);
     let ciphertext = &data[12..];
-    let aad = format!("{}:{}", crate::labels::LABEL_HUB_EVENT, epoch);
+    let aad = format!("{}:{}", crate::labels::LABEL_HUB_EVENT_EPOCH, epoch);
     let aad_bytes = aad.as_bytes();
 
     let try_decrypt = |key: &[u8]| -> Option<Vec<u8>> {

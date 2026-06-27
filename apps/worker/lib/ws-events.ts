@@ -14,7 +14,6 @@ import { bytesToHex, utf8ToBytes, hexToBytes } from '@shared/encoding'
 import {
   LABEL_SERVER_EVENT_ENCRYPTION_KEY,
   LABEL_HUB_EVENT_EPOCH,
-  LABEL_HUB_EVENT,
 } from '@shared/crypto-labels'
 import { getConnectionManager } from './ws-manager'
 import type { EventOutbox } from './event-outbox'
@@ -113,7 +112,7 @@ function encryptEventContent(
   const key = getOrDeriveEpochKey(serverSecret, epoch)
   const plaintext = utf8ToBytes(JSON.stringify(content))
   const padded = padToBucket(plaintext)
-  const aad = utf8ToBytes(`${LABEL_HUB_EVENT}:${epoch}`)
+  const aad = utf8ToBytes(`${LABEL_HUB_EVENT_EPOCH}:${epoch}`)
   const ciphertext = symmetricEncrypt(key, padded, aad)
   return bytesToHex(ciphertext)
 }

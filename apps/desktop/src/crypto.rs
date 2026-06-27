@@ -15,7 +15,7 @@ use std::sync::Mutex;
 
 use llamenos_core::{
     auth, device_keys, hpke_envelope,
-    labels::{LABEL_BACKUP_HKDF_INFO, LABEL_DEVICE_ENCRYPTION_SEED},
+    labels::{LABEL_BACKUP_HKDF_INFO, LABEL_DEVICE_ENCRYPTION_SEED, LABEL_HUB_EVENT_EPOCH},
     provisioning, puk, sas, sigchain,
 };
 use tauri::Manager;
@@ -1371,7 +1371,8 @@ fn encrypt_secrets_with_pin(
 
 /// Decrypt a server-published relay event using the epoch-keyed server event key.
 /// Input: hex-encoded nonce(12) + ciphertext + epoch number.
-/// AAD: "{LABEL_HUB_EVENT_EPOCH}:{epoch}" for domain separation.
+/// AAD: `"{LABEL_HUB_EVENT_EPOCH}:{epoch}"` for domain separation (epoch-keyed events
+/// use LABEL_HUB_EVENT_EPOCH, not LABEL_HUB_EVENT which is for hub-key-encrypted events).
 /// Returns the decrypted plaintext string.
 #[tauri::command]
 pub fn decrypt_server_event(
@@ -1391,7 +1392,7 @@ pub fn decrypt_server_event(
         return Err("Ciphertext too short (need at least 12-byte nonce + 16-byte tag)".into());
     }
 
-    let aad = format!("{}:{}", llamenos_core::LABEL_HUB_EVENT, epoch);
+    let aad = format!("{}:{}", LABEL_HUB_EVENT_EPOCH, epoch);
     let nonce = Nonce::from_slice(&data[..12]);
     let cipher =
         Aes256Gcm::new_from_slice(key).map_err(|e| format!("Invalid server event key: {e}"))?;
