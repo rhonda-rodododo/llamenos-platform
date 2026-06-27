@@ -26,6 +26,7 @@ export async function checkBridgeHealth(config: SignalConfig): Promise<BridgeHea
         'Authorization': `Bearer ${config.bridgeApiKey}`,
       },
       timeoutMs: 10_000,
+      ssrfGuard: false,
     })
 
     if (!response.ok) {
@@ -74,6 +75,7 @@ export async function checkRegistrationStatus(config: SignalConfig): Promise<{
           'Authorization': `Bearer ${config.bridgeApiKey}`,
         },
         timeoutMs: 10_000,
+        ssrfGuard: false,
       },
     )
 

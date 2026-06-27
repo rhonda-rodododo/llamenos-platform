@@ -82,6 +82,8 @@ function makeChallengeRow(overrides: Record<string, unknown> = {}) {
   return {
     challengeId: 'challenge-1',
     challenge: 'random-challenge-bytes',
+    pubkey: null,
+    allowedCredIds: null,
     createdAt: new Date(),
     ...overrides,
   }

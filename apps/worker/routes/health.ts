@@ -40,7 +40,7 @@ async function checkStorage(env: Record<string, unknown>): Promise<CheckResult |
     // RustFS returns 403 on unauthenticated paths — this still proves reachability.
     // A 403 still proves the server is running and reachable.
     const url = `${endpoint.replace(/\/$/, '')}/`
-    const res = await safeFetch(url, { timeoutMs: 5_000 })
+    const res = await safeFetch(url, { timeoutMs: 5_000, ssrfGuard: false })
     if (res.ok || res.status === 403) return { status: 'ok', latencyMs: Date.now() - t0 }
     return { status: 'failing', latencyMs: Date.now() - t0, detail: `HTTP ${res.status}` }
   } catch (err) {
@@ -61,7 +61,7 @@ async function checkSipBridge(env: Record<string, unknown>): Promise<CheckResult
   if (!bridgeUrl) return null  // Not configured — skip
   const t0 = Date.now()
   try {
-    const res = await safeFetch(`${bridgeUrl.replace(/\/$/, '')}/health`, { timeoutMs: 5_000 })
+    const res = await safeFetch(`${bridgeUrl.replace(/\/$/, '')}/health`, { timeoutMs: 5_000, ssrfGuard: false })
     if (!res.ok) return { status: 'failing', latencyMs: Date.now() - t0, detail: `HTTP ${res.status}` }
     return { status: 'ok', latencyMs: Date.now() - t0 }
   } catch (err) {
@@ -74,7 +74,7 @@ async function checkSignalNotifier(env: Record<string, unknown>): Promise<CheckR
   if (!notifierUrl) return null  // Not configured — skip
   const t0 = Date.now()
   try {
-    const res = await safeFetch(`${notifierUrl.replace(/\/$/, '')}/health`, { timeoutMs: 5_000 })
+    const res = await safeFetch(`${notifierUrl.replace(/\/$/, '')}/health`, { timeoutMs: 5_000, ssrfGuard: false })
     if (!res.ok) return { status: 'failing', latencyMs: Date.now() - t0, detail: `HTTP ${res.status}` }
     const body = await res.json() as { ok?: boolean; error?: string }
     if (!body.ok) {

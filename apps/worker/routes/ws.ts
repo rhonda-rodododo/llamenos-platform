@@ -240,7 +240,12 @@ async function handleAuth(
 
   const manager = getConnectionManager()
   if (manager) {
-    manager.register(connState)
+    const accepted = manager.register(connState)
+    if (!accepted) {
+      ws.sendText(JSON.stringify({ type: 'error', code: 'connection_limit', message: 'Too many concurrent connections' }))
+      ws.close(4008, 'Connection limit exceeded')
+      return
+    }
   }
 
   ws.sendText(JSON.stringify({ type: 'authenticated', hubs: user.hubs }))

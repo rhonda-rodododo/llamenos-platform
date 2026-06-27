@@ -27,6 +27,7 @@ vi.mock('@worker/lib/helpers', () => ({
 
 vi.mock('@worker/lib/crypto', () => ({
   hashIP: (...args: unknown[]) => mockHashIP(...args),
+  getClientIp: () => '127.0.0.1',
 }))
 
 vi.mock('@worker/services/audit', () => ({

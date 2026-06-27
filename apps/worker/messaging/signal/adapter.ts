@@ -144,6 +144,7 @@ export class SignalAdapter implements MessagingAdapter {
         },
         body: JSON.stringify(sendRequest),
         timeoutMs: 10_000,
+        ssrfGuard: false,
       })
 
       if (!response.ok) {
@@ -204,6 +205,7 @@ export class SignalAdapter implements MessagingAdapter {
         },
         body: JSON.stringify(sendRequest),
         timeoutMs: 10_000,
+        ssrfGuard: false,
       })
 
       if (!response.ok) {
@@ -238,6 +240,7 @@ export class SignalAdapter implements MessagingAdapter {
           'Authorization': `Bearer ${this.bridgeApiKey}`,
         },
         timeoutMs: 10_000,
+        ssrfGuard: false,
       })
 
       if (!response.ok) {
@@ -366,6 +369,7 @@ export class SignalAdapter implements MessagingAdapter {
           remove: params.remove ?? false,
         }),
         timeoutMs: 10_000,
+        ssrfGuard: false,
       })
 
       if (!response.ok) {
@@ -406,6 +410,7 @@ export class SignalAdapter implements MessagingAdapter {
           receipt_type: params.type ?? 'read',
         }),
         timeoutMs: 10_000,
+        ssrfGuard: false,
       })
 
       if (!response.ok) {

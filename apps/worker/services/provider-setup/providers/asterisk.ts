@@ -25,6 +25,7 @@ export const asteriskProvider: ProviderCapabilityImpl = {
         headers: {
           Authorization: `Basic ${btoa(`${ariUsername}:${ariPassword}`)}`,
         },
+        ssrfGuard: false,
       })
       if (!res.ok) {
         await res.text()
@@ -94,6 +95,7 @@ export const asteriskProvider: ProviderCapabilityImpl = {
           { attribute: 'password', value: sipPassword },
         ],
       }),
+      ssrfGuard: false,
     })
     if (!res.ok) {
       const text = await res.text()

@@ -87,6 +87,7 @@ async function sendToNotifier(
       },
       body: JSON.stringify({ identifierHash, message, disappearingTimerSeconds }),
       timeoutMs: 10_000,
+      ssrfGuard: false,
     })
     if (!res.ok) {
       return { ok: false, error: `Notifier ${res.status}` }
@@ -204,6 +205,7 @@ export class UserNotificationsService {
           method: 'DELETE',
           headers: { authorization: `Bearer ${this.config.notifierApiKey}` },
           timeoutMs: 10_000,
+          ssrfGuard: false,
         }
       )
     } catch (err) {

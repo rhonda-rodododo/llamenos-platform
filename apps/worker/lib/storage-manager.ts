@@ -396,7 +396,7 @@ export function createStorageManager(opts?: StorageManagerOptions): StorageManag
       async healthy(): Promise<boolean> {
         try {
           const healthUrl = `${endpoint}/health`
-          const response = await safeFetch(healthUrl, { timeoutMs: 10_000 })
+          const response = await safeFetch(healthUrl, { timeoutMs: 10_000, ssrfGuard: false })
           return response.ok
         } catch {
           return false

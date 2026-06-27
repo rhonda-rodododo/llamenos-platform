@@ -1,0 +1,1 @@
+ALTER TABLE "webauthn_challenges" ADD COLUMN "allowed_cred_ids" text;

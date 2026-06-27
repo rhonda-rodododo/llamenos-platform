@@ -1,7 +1,7 @@
 /**
  * Shared utilities for provider setup service.
  */
-import { safeFetch } from '../../lib/safe-fetch'
+import { safeFetch, type SafeFetchOptions } from '../../lib/safe-fetch'
 
 /** Encode username:password as a Basic auth header value. */
 export function basicAuth(username: string, password: string): string {
@@ -20,12 +20,12 @@ export function nowISO(): string {
  */
 export async function fetchWithRetry(
   url: string,
-  opts?: RequestInit,
+  opts?: SafeFetchOptions,
   maxRetries = 1,
 ): Promise<Response> {
   let lastResponse: Response | undefined
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    const res = await safeFetch(url, opts)
+    const res = await safeFetch(url, { ssrfGuard: false, ...opts })
 
     if (res.status === 429 && attempt < maxRetries) {
       const retryAfter = res.headers.get('Retry-After')

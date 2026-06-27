@@ -277,6 +277,7 @@ export abstract class SipBridgeAdapter implements TelephonyAdapter {
       },
       body: bodyStr || undefined,
       timeoutMs: 10_000,
+      ssrfGuard: false,
     })
 
     if (!response.ok) {

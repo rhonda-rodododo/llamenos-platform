@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
 import { checkRateLimit } from '../lib/helpers'
-import { hashIP } from '../lib/crypto'
+import { hashIP, getClientIp } from '../lib/crypto'
 import { verifyAuthToken } from '../lib/auth'
 import { auth as authMiddleware } from '../middleware/auth'
 import { requirePermission } from '../middleware/permission-guard'
@@ -38,7 +38,7 @@ invites.get('/validate/:code',
     const services = c.get('services')
     const code = c.req.param('code')
     // Rate limit invite validation to prevent enumeration
-    const clientIp = c.req.header('CF-Connecting-IP') || 'unknown'
+    const clientIp = getClientIp(c.req.raw)
     const limited = await checkRateLimit(services.settings, `invite-validate:${hashIP(clientIp, c.env.HMAC_SECRET)}`, 5)
     if (limited) return c.json({ error: 'Too many requests' }, 429)
     const result = await services.identity.validateInvite(code)
@@ -75,7 +75,7 @@ invites.post('/redeem',
     }
 
     // Rate limit redemption attempts
-    const clientIp = c.req.header('CF-Connecting-IP') || 'unknown'
+    const clientIp = getClientIp(c.req.raw)
     const limited = await checkRateLimit(services.settings, `invite-redeem:${hashIP(clientIp, c.env.HMAC_SECRET)}`, 5)
     if (limited) return c.json({ error: 'Too many requests' }, 429)
 

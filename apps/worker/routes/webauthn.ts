@@ -3,7 +3,7 @@ import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AuthenticationResponseJSON, RegistrationResponseJSON } from '@simplewebauthn/server'
 import type { AppEnv, WebAuthnCredential } from '../types'
 import { uint8ArrayToBase64URL, checkRateLimit } from '../lib/helpers'
-import { hashIP } from '../lib/crypto'
+import { hashIP, getClientIp } from '../lib/crypto'
 import { generateRegOptions, verifyRegResponse, generateAuthOptions, verifyAuthResponse } from '../lib/webauthn'
 import { auth as authMiddleware } from '../middleware/auth'
 import { rateLimit } from '../middleware/rate-limit'
@@ -36,14 +36,16 @@ webauthn.post('/login/options',
   async (c) => {
     const services = c.get('services')
     // Rate limit WebAuthn login attempts to prevent challenge flooding
-    const clientIp = c.req.header('CF-Connecting-IP') || 'unknown'
+    const clientIp = getClientIp(c.req.raw)
     const limited = await checkRateLimit(services.settings, `webauthn:${hashIP(clientIp, c.env.HMAC_SECRET)}`, 5)
     if (limited) return c.json({ error: 'Too many requests. Try again later.' }, 429)
     const rpID = new URL(c.req.url).hostname
     const { credentials } = await services.identity.getAllWebAuthnCredentials()
     const options = await generateAuthOptions(credentials, rpID)
     const challengeId = crypto.randomUUID()
-    await services.identity.storeWebAuthnChallenge(challengeId, options.challenge)
+    // B-M14: Bind challenge to the credential IDs that were offered, preventing relay attacks
+    const allowedCredIds = credentials.map(cr => cr.id)
+    await services.identity.storeWebAuthnChallenge(challengeId, options.challenge, undefined, allowedCredIds)
     return c.json({ ...options, challengeId })
   })
 
@@ -70,7 +72,7 @@ webauthn.post('/login/verify',
   async (c) => {
     const services = c.get('services')
     // Rate limit verification attempts
-    const clientIp = c.req.header('CF-Connecting-IP') || 'unknown'
+    const clientIp = getClientIp(c.req.raw)
     const verifyLimited = await checkRateLimit(services.settings, `webauthn-verify:${hashIP(clientIp, c.env.HMAC_SECRET)}`, 5)
     if (verifyLimited) return c.json({ error: 'Too many requests. Try again later.' }, 429)
     const body = c.req.valid('json')
@@ -78,7 +80,7 @@ webauthn.post('/login/verify',
     const origin = new URL(c.req.url).origin
     const rpID = new URL(c.req.url).hostname
 
-    let challengeData: { challenge: string }
+    let challengeData: { challenge: string; allowedCredIds: string[] | null }
     try {
       challengeData = await services.identity.getWebAuthnChallenge(body.challengeId)
     } catch {
@@ -88,6 +90,12 @@ webauthn.post('/login/verify',
     const { credentials } = await services.identity.getAllWebAuthnCredentials()
     const matched = credentials.find(cr => cr.id === assertion.id)
     if (!matched) return c.json({ error: 'Authentication failed' }, 401)
+
+    // B-M14: Verify the matched credential was in the allowed set from challenge generation
+    if (challengeData.allowedCredIds && !challengeData.allowedCredIds.includes(matched.id)) {
+      return c.json({ error: 'Authentication failed' }, 401)
+    }
+
     try {
       const verification = await verifyAuthResponse(assertion, matched, challengeData.challenge, origin, rpID)
       if (!verification.verified) return c.json({ error: 'Authentication failed' }, 401)
@@ -169,11 +177,16 @@ webauthn.post('/register/verify',
     const origin = new URL(c.req.url).origin
     const rpID = new URL(c.req.url).hostname
 
-    let challengeData: { challenge: string }
+    let challengeData: { challenge: string; pubkey: string | null }
     try {
       challengeData = await services.identity.getWebAuthnChallenge(body.challengeId)
     } catch {
       return c.json({ error: 'Invalid or expired challenge' }, 400)
+    }
+
+    // B-M14: Verify challenge was bound to this user (registration challenges store pubkey)
+    if (challengeData.pubkey && challengeData.pubkey !== pubkey) {
+      return c.json({ error: 'Challenge not bound to this user' }, 400)
     }
 
     try {

@@ -80,6 +80,7 @@ export function createStorageAdmin(opts: {
       headers: authHeaders(),
       body,
       timeoutMs: 10_000,
+      ssrfGuard: false,
     })
     return res
   }

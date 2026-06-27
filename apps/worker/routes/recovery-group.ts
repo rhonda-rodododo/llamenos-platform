@@ -21,7 +21,7 @@ import type { AppEnv } from '../types'
 import { requirePermission } from '../middleware/permission-guard'
 import { checkPermission } from '../middleware/permission-guard'
 import { authErrors, publicErrors, notFoundError } from '../openapi/helpers'
-import { hashIP } from '../lib/crypto'
+import { hashIP, getClientIp } from '../lib/crypto'
 import { checkRateLimit } from '../lib/helpers'
 import { RecoveryGroupError } from '../services/recovery-group'
 import {
@@ -421,9 +421,7 @@ publicRoutes.post('/initiate',
   validator('json', recoveryInitiateSchema),
   async (c) => {
     // Rate limit: 10 req / 5 min per IP
-    const clientIp = c.req.header('CF-Connecting-IP') ||
-      c.req.header('X-Forwarded-For')?.split(',')[0]?.trim() ||
-      'unknown'
+    const clientIp = getClientIp(c.req.raw)
     const services = c.get('services')
 
     const limited = await checkRateLimit(
@@ -454,6 +452,7 @@ publicRoutes.post('/initiate',
             message: `Your Llamenos recovery verification code is: ${code}\n\nIf you did not request account recovery, please contact your administrator immediately.`,
           }),
           timeoutMs: 10_000,
+          ssrfGuard: false,
         })
         return res.ok
       } catch {

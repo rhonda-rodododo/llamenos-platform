@@ -61,6 +61,7 @@ export async function startRegistration(params: StartRegistrationParams): Promis
         captcha: params.captcha,
       }),
       timeoutMs: 10_000,
+      ssrfGuard: false,
     })
 
     if (!response.ok) {
@@ -120,6 +121,7 @@ export async function verifyRegistration(params: VerifyRegistrationParams): Prom
           'Authorization': `Bearer ${params.bridgeApiKey}`,
         },
         timeoutMs: 10_000,
+        ssrfGuard: false,
       },
     )
 
@@ -166,6 +168,7 @@ export async function unregisterNumber(config: SignalConfig): Promise<{ success:
           'Authorization': `Bearer ${config.bridgeApiKey}`,
         },
         timeoutMs: 10_000,
+        ssrfGuard: false,
       },
     )
 
@@ -205,6 +208,7 @@ export async function getAccountInfo(config: SignalConfig): Promise<{
     const aboutResponse = await safeFetch(`${bridgeUrl}/v1/about`, {
       headers: { 'Authorization': `Bearer ${config.bridgeApiKey}` },
       timeoutMs: 10_000,
+      ssrfGuard: false,
     })
 
     if (!aboutResponse.ok) {
@@ -223,6 +227,7 @@ export async function getAccountInfo(config: SignalConfig): Promise<{
       {
         headers: { 'Authorization': `Bearer ${config.bridgeApiKey}` },
         timeoutMs: 10_000,
+        ssrfGuard: false,
       },
     )
 
@@ -246,6 +251,7 @@ export async function getAccountInfo(config: SignalConfig): Promise<{
         {
           headers: { 'Authorization': `Bearer ${config.bridgeApiKey}` },
           timeoutMs: 10_000,
+          ssrfGuard: false,
         },
       )
       if (devicesResponse.ok) {

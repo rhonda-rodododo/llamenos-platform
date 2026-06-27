@@ -10,6 +10,7 @@
  */
 
 import { createLogger } from './logger'
+import { validateExternalUrl } from './ssrf-guard'
 
 const logger = createLogger('ntfy')
 
@@ -41,6 +42,20 @@ export class NtfyClient {
    * Returns true on success, false if the endpoint is invalid/expired (410/404).
    */
   async send(options: NtfySendOptions): Promise<boolean> {
+    // B-M20: Validate the endpoint URL against SSRF before making the request.
+    // pushToken URLs come from client device registration and could be attacker-controlled.
+    // Allow our own baseUrl (trusted ntfy instance) but block internal/private addresses otherwise.
+    const isOwnInstance = options.endpoint.startsWith(this.baseUrl)
+    if (!isOwnInstance) {
+      const ssrfError = validateExternalUrl(options.endpoint, 'Push endpoint')
+      if (ssrfError) {
+        logger.warn(`Blocked SSRF attempt via pushToken: ${ssrfError}`, {
+          endpoint: options.endpoint.slice(0, 60),
+        })
+        return false
+      }
+    }
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/octet-stream',
     }
@@ -52,7 +67,7 @@ export class NtfyClient {
     }
 
     // If the endpoint is on our own ntfy instance, add auth
-    if (this.authToken && options.endpoint.startsWith(this.baseUrl)) {
+    if (this.authToken && isOwnInstance) {
       headers['Authorization'] = `Bearer ${this.authToken}`
     }
 

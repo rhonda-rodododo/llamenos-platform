@@ -40,6 +40,44 @@ export function hashIP(ip: string, secret: string): string {
   return bytesToHex(hmacSha256(key, input)).slice(0, 24)
 }
 
+/**
+ * Extract the client IP from request headers with multi-source fallback.
+ *
+ * B-M7: Never returns a constant like 'unknown' — self-hosted instances
+ * without CF-Connecting-IP still get per-client rate limit buckets via
+ * X-Forwarded-For, X-Real-IP, or the Bun socket address.
+ */
+export function getClientIp(req: Request): string {
+  // Cloudflare — most reliable when behind CF
+  const cfIp = req.headers.get('CF-Connecting-IP')
+  if (cfIp) return cfIp
+
+  // Reverse proxy (nginx, Caddy, etc.)
+  const xff = req.headers.get('X-Forwarded-For')
+  if (xff) {
+    const first = xff.split(',')[0]?.trim()
+    if (first) return first
+  }
+
+  const realIp = req.headers.get('X-Real-IP')
+  if (realIp) return realIp
+
+  // Bun exposes the socket address on the request (non-standard)
+  const bunAddr = (req as unknown as Record<string, unknown>).requestIP
+  if (typeof bunAddr === 'function') {
+    const addr = bunAddr()
+    if (addr && typeof addr === 'object' && 'address' in addr) {
+      return String((addr as { address: string }).address)
+    }
+  }
+
+  // Last resort: use a hash of invariant request characteristics so each
+  // unique client at least gets its own bucket (TLS fingerprint, UA, etc.)
+  const ua = req.headers.get('User-Agent') || ''
+  const accept = req.headers.get('Accept-Language') || ''
+  return `fingerprint:${ua}:${accept}`
+}
+
 // --- Server-Side Symmetric Encryption (Tier 1) ---
 
 /**
