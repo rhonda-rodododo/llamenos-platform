@@ -62,4 +62,7 @@ pub enum CryptoError {
 
     #[error("Stale timestamp: message is older than allowed max age")]
     StaleTimestamp,
+
+    #[error("Future timestamp: message timestamp is ahead of current time")]
+    FutureTimestamp,
 }
