@@ -8,6 +8,16 @@ options:
   generateEmptyDirectories: false
   groupSortPosition: bottom
 
+# UITesting inherits from Debug but adds the UI_TESTING compilation condition.
+# This ensures test-automation hooks (mock identity injection, keychain reset)
+# are stripped from all builds except those explicitly using this configuration.
+# Regular Debug builds do NOT define UI_TESTING, preventing accidental inclusion
+# in TestFlight or Ad Hoc builds that use a Debug configuration.
+configs:
+  Debug: debug
+  Release: release
+  UITesting: debug
+
 settings:
   base:
     SWIFT_VERSION: "5.9"
@@ -71,6 +81,9 @@ targets:
         Release:
           CODE_SIGN_ENTITLEMENTS: Sources/App/Llamenos.Release.entitlements
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: RELEASE_HARDENED
+        UITesting:
+          CODE_SIGN_ENTITLEMENTS: Sources/App/Llamenos.Debug.entitlements
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) UI_TESTING
     scheme:
       testTargets:
         - LlamenosTests

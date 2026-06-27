@@ -130,7 +130,7 @@ final class AppState {
         // Wire offline queue into API service for automatic enqueue on network errors
         api.offlineQueue = offline
 
-        #if DEBUG
+        #if UI_TESTING
         // Handle launch arguments BEFORE reading persisted state
         // so --reset-keychain clears everything before we configure services
         handleLaunchArguments()
@@ -154,7 +154,7 @@ final class AppState {
 
     // MARK: - Launch Arguments (Test Support)
 
-    #if DEBUG
+    #if UI_TESTING
     /// Handle launch arguments for XCUITest automation.
     /// These flags let UI tests set up specific states without going through full flows.
     private func handleLaunchArguments() {
@@ -304,7 +304,7 @@ final class AppState {
         URLSession.shared.dataTask(with: request) { _, _, _ in sem.signal() }.resume()
         _ = sem.wait(timeout: .now() + 5)
     }
-    #endif
+    #endif // UI_TESTING
 
     // MARK: - Auth Status Resolution
 

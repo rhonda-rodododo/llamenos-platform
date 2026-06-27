@@ -243,10 +243,14 @@ cmd_uitest() {
 
   cd "$IOS_DIR"
   set +e
+  # Use UITesting configuration so the app is compiled with UI_TESTING=1, which
+  # enables the test-automation hooks in AppState (mock identity injection,
+  # keychain reset, etc.). These hooks are stripped from Debug and Release builds.
   TEST_HUB_URL="${TEST_HUB_URL:-http://localhost:3000}" \
   xcodebuild test \
     -project Llamenos.xcodeproj \
     -scheme "$XCODE_SCHEME" \
+    -configuration UITesting \
     -only-testing:LlamenosUITests \
     -destination "platform=iOS Simulator,name=$sim_device" \
     -parallel-testing-enabled YES \

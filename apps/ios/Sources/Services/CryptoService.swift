@@ -410,10 +410,16 @@ final class CryptoService: @unchecked Sendable {
 
     // MARK: - Stateless Auth Token (test bootstrap)
 
+    // Gate behind #if DEBUG so this method is excluded from Release and any build
+    // that does not explicitly use a Debug-derived configuration. The callers in
+    // AppState are already behind #if UI_TESTING, but gating the method itself
+    // prevents it from being reachable from any other code path in release builds.
+    #if DEBUG
     static func createAuthTokenStatic(secretHex: String, method: String, path: String) throws -> AuthToken {
         let timestamp = UInt64(Date().timeIntervalSince1970 * 1000)
         return try mobileCreateAuthTokenFromSigningKey(signingKeyHex: secretHex, timestamp: timestamp, method: method, path: path)
     }
+    #endif
 
     // MARK: - Hub Key Management (keys stored in Rust, never in Swift)
 

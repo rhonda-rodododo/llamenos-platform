@@ -168,6 +168,7 @@ jobs:
           xcodebuild build-for-testing \
             -project Llamenos.xcodeproj \
             -scheme Llamenos \
+            -configuration UITesting \
             -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }}" \
             -derivedDataPath /tmp/llamenos-build \
             -parallelizeTargets \
