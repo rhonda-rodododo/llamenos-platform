@@ -11,7 +11,7 @@
 //! with PBKDF2 key derivation) via the frontend — see `platform.ts`. This module
 //! does not access storage directly; it only manages in-memory crypto state.
 
-use std::sync::Mutex;
+use std::sync::{Mutex, MutexGuard};
 
 use llamenos_core::{
     auth, device_keys, hpke_envelope,
@@ -27,6 +27,16 @@ use aes_gcm::{
 
 fn err_str(e: impl std::fmt::Display) -> String {
     e.to_string()
+}
+
+/// Acquire a mutex lock, converting a poisoned-mutex error to a descriptive String.
+/// Mutex poisoning can only occur if another thread panicked while holding the lock.
+/// Returning an error here allows Tauri commands to surface the failure to the caller
+/// instead of crashing the process via panic.
+fn lock_mutex<T>(mutex: &Mutex<T>) -> Result<MutexGuard<'_, T>, String> {
+    mutex
+        .lock()
+        .map_err(|_| "Internal error: state lock poisoned".to_string())
 }
 
 // ── CryptoState — device key secrets live ONLY here, never in the webview ──
@@ -74,22 +84,27 @@ impl CryptoState {
     }
 
     /// Zeroize secrets and lock.
+    /// Uses `unwrap_or_else(|e| e.into_inner())` to recover from poisoned mutexes so that
+    /// zeroization succeeds even if another thread panicked while holding a lock.
     pub fn lock(&self) {
         // DeviceSecrets implements Zeroize on drop
-        *self.secrets.lock().unwrap() = None;
-        *self.device_state.lock().unwrap() = None;
-        *self.hub_key.lock().unwrap() = None;
-        self.server_event_keys.lock().unwrap().clear();
-        *self.recovery_group_key.lock().unwrap() = None;
-        *self.provisioning_ephemeral.lock().unwrap() = None;
-        *self.puk_seed.lock().unwrap() = None;
+        *self.secrets.lock().unwrap_or_else(|e| e.into_inner()) = None;
+        *self.device_state.lock().unwrap_or_else(|e| e.into_inner()) = None;
+        *self.hub_key.lock().unwrap_or_else(|e| e.into_inner()) = None;
+        self.server_event_keys
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clear();
+        *self.recovery_group_key.lock().unwrap_or_else(|e| e.into_inner()) = None;
+        *self.provisioning_ephemeral.lock().unwrap_or_else(|e| e.into_inner()) = None;
+        *self.puk_seed.lock().unwrap_or_else(|e| e.into_inner()) = None;
     }
 
     fn with_secrets<T>(
         &self,
         f: impl FnOnce(&device_keys::DeviceSecrets) -> Result<T, String>,
     ) -> Result<T, String> {
-        let guard = self.secrets.lock().unwrap();
+        let guard = lock_mutex(&self.secrets)?;
         let secrets = guard
             .as_ref()
             .ok_or_else(|| "Device key is locked. Enter PIN to unlock.".to_string())?;
@@ -97,9 +112,7 @@ impl CryptoState {
     }
 
     fn get_device_state(&self) -> Result<device_keys::DeviceKeyState, String> {
-        self.device_state
-            .lock()
-            .unwrap()
+        lock_mutex(&self.device_state)?
             .clone()
             .ok_or_else(|| "Device key is locked. Enter PIN to unlock.".into())
     }
@@ -123,8 +136,8 @@ pub fn device_generate_and_load(
     let secrets = device_keys::unlock_device_keys(&encrypted, &pin).map_err(err_str)?;
 
     let device_state = encrypted.state.clone();
-    *state.secrets.lock().unwrap() = Some(secrets);
-    *state.device_state.lock().unwrap() = Some(device_state.clone());
+    *lock_mutex(&state.secrets)? = Some(secrets);
+    *lock_mutex(&state.device_state)? = Some(device_state.clone());
 
     let result = serde_json::to_value(&encrypted).map_err(err_str)?;
     Ok(result)
@@ -145,8 +158,8 @@ pub fn unlock_with_pin(
     data: device_keys::EncryptedDeviceKeys,
     pin: String,
 ) -> Result<serde_json::Value, String> {
-    let attempts: u32 = *state.pin_failed_attempts.lock().unwrap();
-    let lockout_until: u64 = *state.pin_lockout_until.lock().unwrap();
+    let attempts: u32 = *lock_mutex(&state.pin_failed_attempts)?;
+    let lockout_until: u64 = *lock_mutex(&state.pin_lockout_until)?;
 
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -160,18 +173,18 @@ pub fn unlock_with_pin(
 
     match device_keys::unlock_device_keys(&data, &pin) {
         Ok(secrets) => {
-            *state.pin_failed_attempts.lock().unwrap() = 0;
-            *state.pin_lockout_until.lock().unwrap() = 0;
+            *lock_mutex(&state.pin_failed_attempts)? = 0;
+            *lock_mutex(&state.pin_lockout_until)? = 0;
 
             let device_state = data.state.clone();
-            *state.secrets.lock().unwrap() = Some(secrets);
-            *state.device_state.lock().unwrap() = Some(device_state.clone());
+            *lock_mutex(&state.secrets)? = Some(secrets);
+            *lock_mutex(&state.device_state)? = Some(device_state.clone());
 
             serde_json::to_value(&device_state).map_err(err_str)
         }
         Err(_) => {
             let new_attempts = attempts + 1;
-            *state.pin_failed_attempts.lock().unwrap() = new_attempts;
+            *lock_mutex(&state.pin_failed_attempts)? = new_attempts;
 
             let lockout_ms: u64 = match new_attempts {
                 1..=4 => 0,
@@ -181,13 +194,13 @@ pub fn unlock_with_pin(
                 _ => {
                     // Signal the frontend to wipe the encrypted keys from Stronghold.
                     // The frontend handles storage — Rust only manages in-memory state.
-                    *state.pin_failed_attempts.lock().unwrap() = 0;
-                    *state.pin_lockout_until.lock().unwrap() = 0;
+                    *lock_mutex(&state.pin_failed_attempts)? = 0;
+                    *lock_mutex(&state.pin_lockout_until)? = 0;
                     return Err("Too many failed attempts. Keys wiped.".to_string());
                 }
             };
             if lockout_ms > 0 {
-                *state.pin_lockout_until.lock().unwrap() = now + lockout_ms;
+                *lock_mutex(&state.pin_lockout_until)? = now + lockout_ms;
             }
             Err("Wrong PIN".to_string())
         }
@@ -203,7 +216,7 @@ pub fn lock_crypto(state: tauri::State<'_, CryptoState>) {
 /// Check if the crypto state is unlocked.
 #[tauri::command]
 pub fn is_crypto_unlocked(state: tauri::State<'_, CryptoState>) -> bool {
-    state.secrets.lock().unwrap().is_some()
+    state.secrets.lock().map(|g| g.is_some()).unwrap_or(false)
 }
 
 /// Get the device public keys from CryptoState (no secret key exposure).
@@ -341,7 +354,7 @@ pub fn puk_create_from_state(
         puk::create_initial_puk(&ds.encryption_pubkey_hex, &ds.device_id).map_err(err_str)?;
 
     // Store PUK seed in CryptoState — never return it to JS
-    *state.puk_seed.lock().unwrap() = Some(seed);
+    *lock_mutex(&state.puk_seed)? = Some(seed);
 
     Ok(serde_json::json!({
         "pukState": serde_json::to_value(&puk_state).map_err(err_str)?,
@@ -358,10 +371,7 @@ pub fn puk_rotate_from_state(
     old_gen: u32,
     remaining_devices_json: String,
 ) -> Result<serde_json::Value, String> {
-    let old_seed = state
-        .puk_seed
-        .lock()
-        .unwrap()
+    let old_seed = lock_mutex(&state.puk_seed)?
         .ok_or_else(|| "No PUK seed loaded. Unwrap or create PUK first.".to_string())?;
 
     let remaining_devices: Vec<(String, String)> =
@@ -376,7 +386,7 @@ pub fn puk_rotate_from_state(
     // Since the Rust puk module returns the new seed in the rotation result,
     // we'll store it. For now, clear the old seed — caller must unwrap the new
     // PUK envelope to load the new seed.
-    *state.puk_seed.lock().unwrap() = None;
+    *lock_mutex(&state.puk_seed)? = None;
 
     serde_json::to_value(&result).map_err(err_str)
 }
@@ -395,8 +405,9 @@ pub fn puk_unwrap_seed_from_state(
     let seed = hpke_envelope::hpke_open_key(&envelope, &secret_hex, &expected_label, &aad)
         .map_err(err_str)?;
 
-    // Store PUK seed in CryptoState — never return it to JS
-    *state.puk_seed.lock().unwrap() = Some(seed);
+    // Store PUK seed in CryptoState — never return it to JS.
+    // hpke_open_key returns Zeroizing<[u8; 32]>; dereference to copy the inner array.
+    *lock_mutex(&state.puk_seed)? = Some(*seed);
     Ok(())
 }
 
@@ -525,7 +536,7 @@ pub fn hpke_unwrap_and_set_hub_key(
     let secret_hex = state.encryption_secret_hex()?;
     let key =
         hpke_envelope::hpke_open_key(&envelope, &secret_hex, &expected_label, &aad).map_err(err_str)?;
-    *state.hub_key.lock().unwrap() = Some(key.to_vec());
+    *lock_mutex(&state.hub_key)? = Some(key.to_vec());
     Ok(())
 }
 
@@ -535,7 +546,7 @@ pub fn hpke_unwrap_and_set_hub_key(
 pub fn generate_hub_key_in_state(state: tauri::State<'_, CryptoState>) -> Result<(), String> {
     let mut key = [0u8; 32];
     rand::RngCore::fill_bytes(&mut rand::rngs::OsRng, &mut key);
-    *state.hub_key.lock().unwrap() = Some(key.to_vec());
+    *lock_mutex(&state.hub_key)? = Some(key.to_vec());
     Ok(())
 }
 
@@ -548,7 +559,7 @@ pub fn wrap_hub_key_for_member(
     label: String,
     aad_hex: String,
 ) -> Result<serde_json::Value, String> {
-    let hub_key = state.hub_key.lock().unwrap();
+    let hub_key = lock_mutex(&state.hub_key)?;
     let key = hub_key.as_ref().ok_or("Hub key not loaded")?;
     if key.len() != 32 {
         return Err("Hub key must be 32 bytes".into());
@@ -580,7 +591,7 @@ pub fn set_server_event_keys(
         }
         decoded.push((epoch, key_bytes));
     }
-    *state.server_event_keys.lock().unwrap() = decoded;
+    *lock_mutex(&state.server_event_keys)? = decoded;
     Ok(())
 }
 
@@ -593,7 +604,7 @@ pub fn decrypt_hub_event(
     state: tauri::State<'_, CryptoState>,
     ciphertext_hex: String,
 ) -> Result<String, String> {
-    let hub_key = state.hub_key.lock().unwrap();
+    let hub_key = lock_mutex(&state.hub_key)?;
     let key = hub_key.as_ref().ok_or("Hub key not loaded")?;
 
     let data = hex::decode(&ciphertext_hex).map_err(err_str)?;
@@ -631,7 +642,7 @@ pub fn encrypt_hub_field(
         return Err("Unknown crypto label: not in LABEL_REGISTRY".into());
     }
 
-    let hub_key = state.hub_key.lock().unwrap();
+    let hub_key = lock_mutex(&state.hub_key)?;
     let key = hub_key.as_ref().ok_or("Hub key not loaded")?;
 
     let mut nonce_bytes = [0u8; 12];
@@ -669,7 +680,7 @@ pub fn decrypt_hub_field(
         return Err("Unknown crypto label: not in LABEL_REGISTRY".into());
     }
 
-    let hub_key = state.hub_key.lock().unwrap();
+    let hub_key = lock_mutex(&state.hub_key)?;
     let key = hub_key.as_ref().ok_or("Hub key not loaded")?;
 
     let data = hex::decode(&ciphertext_hex).map_err(err_str)?;
@@ -955,7 +966,7 @@ pub fn recovery_group_reconstruct_from_shares(
     let recovered_bytes = hex::decode(&recovered_hex).map_err(err_str)?;
 
     // Store in CryptoState — key NEVER enters JavaScript
-    *state.recovery_group_key.lock().unwrap() = Some(recovered_bytes);
+    *lock_mutex(&state.recovery_group_key)? = Some(recovered_bytes);
 
     Ok(serde_json::json!({ "success": true }))
 }
@@ -970,10 +981,7 @@ pub fn recovery_group_decrypt(
     label: String,
 ) -> Result<String, String> {
     // Take the key out of state (zeroizes the stored copy)
-    let key_bytes = state
-        .recovery_group_key
-        .lock()
-        .unwrap()
+    let key_bytes = lock_mutex(&state.recovery_group_key)?
         .take()
         .ok_or_else(|| {
             "No recovery group key loaded. Reconstruct from shares first.".to_string()
@@ -1033,8 +1041,8 @@ pub fn device_import_and_load(
     // Encrypt the imported seeds with PIN (Argon2id + AES-256-GCM)
     let encrypted_imported = encrypt_secrets_with_pin(&secrets, &pin, &device_state)?;
 
-    *state.secrets.lock().unwrap() = Some(secrets);
-    *state.device_state.lock().unwrap() = Some(device_state);
+    *lock_mutex(&state.secrets)? = Some(secrets);
+    *lock_mutex(&state.device_state)? = Some(device_state);
 
     let result = serde_json::to_value(&encrypted_imported).map_err(err_str)?;
     Ok(result)
@@ -1066,7 +1074,7 @@ pub fn generate_backup_from_state(
     recovery_key: String,
 ) -> Result<String, String> {
     let ds = state.get_device_state()?;
-    let secrets_guard = state.secrets.lock().unwrap();
+    let secrets_guard = lock_mutex(&state.secrets)?;
     let secrets = secrets_guard
         .as_ref()
         .ok_or_else(|| "Device key is locked. Enter PIN to unlock.".to_string())?;
@@ -1209,7 +1217,7 @@ pub fn provision_create_session(
         x25519_dalek::PublicKey::from(&x25519_dalek::StaticSecret::from(ephemeral_secret));
     let pubkey_hex = hex::encode(ephemeral_public.as_bytes());
 
-    *state.provisioning_ephemeral.lock().unwrap() = Some(ephemeral_secret);
+    *lock_mutex(&state.provisioning_ephemeral)? = Some(ephemeral_secret);
 
     Ok(pubkey_hex)
 }
@@ -1221,7 +1229,7 @@ pub fn provision_compute_sas(
     state: tauri::State<'_, CryptoState>,
     primary_enc_pubkey_hex: String,
 ) -> Result<String, String> {
-    let guard = state.provisioning_ephemeral.lock().unwrap();
+    let guard = lock_mutex(&state.provisioning_ephemeral)?;
     let ephemeral_secret = guard
         .as_ref()
         .ok_or_else(|| "No provisioning session. Call provision_create_session first.".to_string())?;
@@ -1268,10 +1276,7 @@ pub fn provision_decrypt_and_import(
     device_id: String,
 ) -> Result<serde_json::Value, String> {
     // Take the ephemeral secret out (consumed — one-shot)
-    let ephemeral_secret = state
-        .provisioning_ephemeral
-        .lock()
-        .unwrap()
+    let ephemeral_secret = lock_mutex(&state.provisioning_ephemeral)?
         .take()
         .ok_or_else(|| "No provisioning session. Call provision_create_session first.".to_string())?;
 
@@ -1304,8 +1309,8 @@ pub fn provision_decrypt_and_import(
     let encrypted_keys = encrypt_secrets_with_pin(&secrets, &pin, &device_state)?;
 
     // Load into CryptoState
-    *state.secrets.lock().unwrap() = Some(secrets);
-    *state.device_state.lock().unwrap() = Some(device_state);
+    *lock_mutex(&state.secrets)? = Some(secrets);
+    *lock_mutex(&state.device_state)? = Some(device_state);
 
     serde_json::to_value(&encrypted_keys).map_err(err_str)
 }
@@ -1381,7 +1386,7 @@ pub fn decrypt_server_event(
     ciphertext_hex: String,
     epoch: u64,
 ) -> Result<String, String> {
-    let keys = state.server_event_keys.lock().unwrap();
+    let keys = lock_mutex(&state.server_event_keys)?;
     let key = keys
         .iter()
         .find(|(e, _)| *e == epoch)
