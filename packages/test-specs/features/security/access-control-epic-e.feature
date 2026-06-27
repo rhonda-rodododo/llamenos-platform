@@ -53,6 +53,29 @@ Feature: Backend access control and input validation (Epic E)
     Then the response status is 200
     And the returned records list is empty
 
+  # ── HIGH-W4: Non-admin volunteer only sees own records via /by-contact ────
+
+  @backend
+  Scenario: Non-admin volunteer only sees their own records via by-contact (HIGH-W4)
+    Given hub "hub-alpha" has two case records for contact "C-003"
+    And record "R-001" is created by volunteer "vol-pk-1"
+    And record "R-002" is created by volunteer "vol-pk-2"
+    And I am authenticated as volunteer "vol-pk-1" in "hub-alpha" with "cases:read-own"
+    When I call GET /api/records/by-contact/C-003
+    Then the response status is 200
+    And the returned records contain only "R-001"
+    And record "R-002" is not visible
+
+  @backend
+  Scenario: Admin sees all records via by-contact regardless of ownership
+    Given hub "hub-alpha" has two case records for contact "C-003"
+    And record "R-001" is created by volunteer "vol-pk-1"
+    And record "R-002" is created by volunteer "vol-pk-2"
+    And I am authenticated as admin in "hub-alpha" with "cases:read-all"
+    When I call GET /api/records/by-contact/C-003
+    Then the response status is 200
+    And the returned records contain both "R-001" and "R-002"
+
   # ── Lockdown: Account lockdown requires Schnorr re-auth ───────────────────
 
   @backend
@@ -69,8 +92,15 @@ Feature: Backend access control and input validation (Epic E)
     Then the response status is 200
 
   @backend
-  Scenario: Account lockdown/complete does not require Schnorr re-auth
-    Given I am authenticated with a session token
+  Scenario: Account lockdown/complete via session token is rejected (HIGH-W5)
+    Given I am authenticated with a session token (not a Schnorr-signed request)
+    When I call POST /api/account/lockdown/complete with valid completion payload
+    Then the response status is 401
+    And the error code is "ELEVATED_AUTH_REQUIRED"
+
+  @backend
+  Scenario: Account lockdown/complete via Schnorr-signed request is accepted
+    Given I am authenticated with a fresh Schnorr-signed Ed25519 request
     When I call POST /api/account/lockdown/complete with valid completion payload
     Then the response status is 200
 
@@ -156,3 +186,63 @@ Feature: Backend access control and input validation (Epic E)
     When I call GET /api/puk/envelopes/dev-1
     Then the response status is 200
     And the returned generation is 2
+
+  # ── HIGH-W2: Dev endpoint checkResetSecret only accepts X-Test-Secret ────
+
+  @backend
+  Scenario: Dev test-reset rejects requests without X-Test-Secret header
+    Given the server is running in development mode with DEV_RESET_SECRET set
+    When I call POST /api/dev/test-reset without X-Test-Secret header
+    Then the response status is 404
+
+  @backend
+  Scenario: Dev test-reset rejects requests with wrong X-Test-Secret
+    Given the server is running in development mode with DEV_RESET_SECRET set
+    When I call POST /api/dev/test-reset with X-Test-Secret "wrong-secret"
+    Then the response status is 404
+
+  @backend
+  Scenario: Dev test-reset accepts requests with correct X-Test-Secret
+    Given the server is running in development mode with DEV_RESET_SECRET set
+    When I call POST /api/dev/test-reset with correct X-Test-Secret
+    Then the response status is 200
+
+  @backend
+  Scenario: Dev test-reset returns 404 in production environment
+    Given the server is running in production mode
+    When I call POST /api/dev/test-reset with any credentials
+    Then the response status is 404
+
+  # ── HIGH-W3: Ban list does not store plaintext phone numbers ─────────────
+
+  @backend
+  Scenario: Banning a phone stores only a masked display value (HIGH-W3)
+    Given I am authenticated as an admin with "bans:create" permission
+    When I ban the phone number "+12125551234" with reason "Spam"
+    Then the ban response contains phone "***1234"
+    And the stored phoneDisplay field does not contain the full phone number
+
+  @backend
+  Scenario: Bulk ban stores only masked display values (HIGH-W3)
+    Given I am authenticated as an admin with "bans:bulk-create" permission
+    When I bulk ban phones ["+12125551234", "+12125555678"]
+    Then the stored phoneDisplay values are "***1234" and "***5678"
+
+  # ── HIGH-W6: Recovery group emergency override requires matching pubkey ──
+
+  @backend
+  Scenario: Emergency override rejects mismatched approverPubkey (HIGH-W6)
+    Given I am authenticated as an admin with "recovery:approve" permission
+    And my pubkey is "admin-pk-1"
+    And a recovery session exists and is awaiting contributions
+    When I call POST /api/recovery-group/session/{id}/emergency with approverPubkey "other-pk-2"
+    Then the response status is 403
+    And the error mentions approverPubkey must match
+
+  @backend
+  Scenario: Emergency override accepts matching approverPubkey (HIGH-W6)
+    Given I am authenticated as an admin with "recovery:approve" permission
+    And my pubkey is "admin-pk-1"
+    And a recovery session exists and is awaiting contributions
+    When I call POST /api/recovery-group/session/{id}/emergency with approverPubkey "admin-pk-1"
+    Then the response is not 403

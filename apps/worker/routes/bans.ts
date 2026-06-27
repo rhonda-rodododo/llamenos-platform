@@ -56,10 +56,12 @@ bans.post('/',
       return c.json({ error: 'Invalid phone number. Use E.164 format (e.g. +12125551234)' }, 400)
     }
     const phoneHash = hashPhone(body.phone, c.env.HMAC_SECRET)
+    // HIGH-W3: Never store plaintext phone — only masked last-4 for admin display
+    const phoneMasked = body.phone.length >= 4 ? `***${body.phone.slice(-4)}` : '***'
     const ban = await services.records.addBan({
       hubId,
       phone: phoneHash,
-      phoneDisplay: body.phone,
+      phoneDisplay: phoneMasked,
       reason: body.reason ?? '',
       bannedBy: pubkey,
     })
@@ -95,7 +97,11 @@ bans.post('/bulk',
     if (invalidPhones.length > 0) {
       return c.json({ error: `Invalid phone number(s): ${invalidPhones[0]}. Use E.164 format (e.g. +12125551234)` }, 400)
     }
-    const entries = body.phones.map(p => ({ phoneHash: hashPhone(p, c.env.HMAC_SECRET), phoneDisplay: p }))
+    // HIGH-W3: Never store plaintext phone — only masked last-4 for admin display
+    const entries = body.phones.map(p => ({
+      phoneHash: hashPhone(p, c.env.HMAC_SECRET),
+      phoneDisplay: p.length >= 4 ? `***${p.slice(-4)}` : '***',
+    }))
     const added = await services.records.bulkAddBans(entries, body.reason ?? '', pubkey, hubId)
     await audit(services.audit, 'numberBanned', pubkey, { count: body.phones.length, bulk: true }, undefined, hubId ?? undefined)
     return c.json({ count: added })

@@ -85,9 +85,11 @@ platformBans.post(
       )
     }
     const phoneHash = hashPhone(body.phone, c.env.HMAC_SECRET)
+    // HIGH-W3: Never store plaintext phone — only masked last-4 for admin display
+    const phoneMasked = body.phone.length >= 4 ? `***${body.phone.slice(-4)}` : '***'
     await services.records.addBan({
       phone: phoneHash,
-      phoneDisplay: body.phone,
+      phoneDisplay: phoneMasked,
       reason: body.reason ?? '',
       bannedBy: pubkey,
     })
@@ -133,9 +135,10 @@ platformBans.post(
         400,
       )
     }
+    // HIGH-W3: Never store plaintext phone — only masked last-4 for admin display
     const entries = body.phones.map((p: string) => ({
       phoneHash: hashPhone(p, c.env.HMAC_SECRET),
-      phoneDisplay: p,
+      phoneDisplay: p.length >= 4 ? `***${p.slice(-4)}` : '***',
     }))
     const added = await services.records.bulkAddBans(
       entries,
