@@ -119,7 +119,10 @@ impl MlsManager {
             member_count: group.members().count() as u32,
         };
 
-        self.groups.lock().unwrap_or_else(|e| e.into_inner()).push(group);
+        self.groups
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .push(group);
         Ok(state)
     }
 
@@ -236,7 +239,10 @@ impl MlsManager {
             member_count: group.members().count() as u32,
         };
 
-        self.groups.lock().unwrap_or_else(|e| e.into_inner()).push(group);
+        self.groups
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .push(group);
         Ok(state)
     }
 
