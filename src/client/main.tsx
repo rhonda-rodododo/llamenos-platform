@@ -33,7 +33,7 @@ declare global {
     __TEST_GET_ACTIVE_HUB: () => string | null
   }
 }
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && (import.meta.env.DEV || import.meta.env.PLAYWRIGHT_TEST)) {
   window.__TEST_ROUTER = router
   import('./lib/key-manager').then(km => {
     window.__TEST_KEY_MANAGER = km
