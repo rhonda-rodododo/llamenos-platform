@@ -24,7 +24,7 @@ class EphemeralKeypairTest {
         // EphemeralKeyResult is a data class; its constructor fields define its shape.
         // Java reflection on declared fields confirms only publicKeyHex exists.
         val fields = EphemeralKeyResult::class.java.declaredFields
-            .filter { !it.isSynthetic }
+            .filter { !it.isSynthetic && !it.name.startsWith("$") }
             .map { it.name }
         assertEquals(listOf("publicKeyHex"), fields)
         // Ensure no field name suggests secret material leaked to JVM

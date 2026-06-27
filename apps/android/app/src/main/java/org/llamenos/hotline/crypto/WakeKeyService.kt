@@ -78,7 +78,7 @@ class WakeKeyService @Inject constructor(
         val existing = keystoreService.retrieve(KEY_WAKE_PUBKEY)
         if (existing != null) {
             // Ensure the wake key is loaded into Rust state (may have been cleared)
-            if (!org.llamenos.core.mobileHasWakeKey()) {
+            if (nativeLibLoaded && !org.llamenos.core.mobileHasWakeKey()) {
                 loadWakeKeyIntoRust()
             }
             return existing
