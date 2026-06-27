@@ -206,7 +206,7 @@ Then('the ban list should contain {string}', async ({request, world}, phone: str
   const bans = await listBansViaApi(request, hubId)
   const phoneHash = getScenarioState(world).phoneHashMap[phone]
   expect(phoneHash).toBeDefined()
-  expect(bans.some(b => b.phone === phoneHash)).toBeTruthy()
+  expect(bans.some(b => b.phoneHash === phoneHash)).toBeTruthy()
 })
 
 Then('the ban list should not contain {string}', async ({request, world}, phone: string) => {
@@ -214,7 +214,7 @@ Then('the ban list should not contain {string}', async ({request, world}, phone:
   const bans = await listBansViaApi(request, hubId)
   const phoneHash = getScenarioState(world).phoneHashMap[phone]
   expect(phoneHash).toBeDefined()
-  expect(bans.some(b => b.phone === phoneHash)).toBeFalsy()
+  expect(bans.some(b => b.phoneHash === phoneHash)).toBeFalsy()
 })
 
 When('the admin removes the ban for {string}', async ({request, world}, phone: string) => {

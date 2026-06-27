@@ -605,8 +605,8 @@ export async function banAndHangup(callId: string, reason?: string) {
   )
 }
 
-export async function removeBan(phone: string) {
-  return request<{ ok: true }>(hp(`/bans/${encodeURIComponent(phone)}`), { method: 'DELETE' })
+export async function removeBan(phoneHash: string) {
+  return request<{ ok: true }>(hp(`/bans/${encodeURIComponent(phoneHash)}`), { method: 'DELETE' })
 }
 
 export async function bulkAddBans(data: { phones: string[]; reason: string }) {

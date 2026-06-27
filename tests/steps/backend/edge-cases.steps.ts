@@ -164,7 +164,7 @@ Then('the ban list should contain exactly {int} entry for {string}', async ({req
   const bans = await listBansViaApi(request, hubId)
   const phoneHash = getScenarioState(world).phoneHashMap[phone]
   expect(phoneHash).toBeDefined()
-  const matches = bans.filter(b => b.phone === phoneHash)
+  const matches = bans.filter(b => b.phoneHash === phoneHash)
   expect(matches.length).toBe(count)
 })
 

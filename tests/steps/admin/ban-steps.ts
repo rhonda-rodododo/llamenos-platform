@@ -3,12 +3,21 @@
  * Matches steps from: packages/test-specs/features/bans/ban-management.feature
  *
  * Behavioral depth: All CRUD operations verify state via API, not just UI presence.
+ *
+ * Note: Phone numbers are masked server-side (HIGH-W3 security fix). The API
+ * stores only `***XXXX` (last 4 digits) for admin display. UI and API
+ * assertions use the masked format.
  */
 import { expect } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
 import { TestIds } from '../../test-ids'
 import { Timeouts } from '../../helpers'
 import { listBansViaApi } from '../../api-helpers'
+
+/** Convert a full E.164 phone to the server's masked format: `***` + last 4 digits */
+function maskPhone(phone: string): string {
+  return phone.length >= 4 ? `***${phone.slice(-4)}` : '***'
+}
 
 Then('I should see bans or the {string} message', async ({ page }, _emptyMsg: string) => {
   // Wait for loading to complete — the ban list shows a skeleton while fetching
@@ -43,15 +52,16 @@ When('I fill in the phone number with {string}', async ({ page }, phone: string)
 Then('the phone number should appear in the ban list', async ({ page, backendRequest: request, workerHub }) => {
   const phone = (await page.evaluate(() => (window as Record<string, unknown>).__test_ban_phone)) as string
   expect(phone).toBeTruthy()
+  const masked = maskPhone(phone)
 
-  // UI verification
+  // UI verification — phone is displayed in masked format (HIGH-W3)
   await expect(
-    page.getByTestId(TestIds.BAN_LIST).getByText(phone),
+    page.getByTestId(TestIds.BAN_LIST).getByText(masked),
   ).toBeVisible({ timeout: Timeouts.ELEMENT })
 
-  // API verification: ban exists in backend
+  // API verification: ban exists in backend (phone field is masked)
   const bans = await listBansViaApi(request, workerHub)
-  const found = bans.find(b => b.phone === phone)
+  const found = bans.find(b => b.phone === masked)
   expect(found).toBeTruthy()
 })
 
@@ -80,15 +90,16 @@ Given('a ban exists', async ({ page, backendRequest: request, workerHub }) => {
   await page.getByLabel(/phone/i).blur()
   await page.getByLabel(/reason/i).fill('Test ban')
   await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
+  const masked = maskPhone(phone)
 
-  // Wait for UI to show the ban
+  // Wait for UI to show the ban (masked format)
   await expect(
-    page.getByTestId(TestIds.BAN_ROW).filter({ hasText: phone }).first(),
+    page.getByTestId(TestIds.BAN_ROW).filter({ hasText: masked }).first(),
   ).toBeVisible({ timeout: Timeouts.ELEMENT })
 
   // Verify it was persisted to backend
   const bans = await listBansViaApi(request, workerHub)
-  const found = bans.find(b => b.phone === phone)
+  const found = bans.find(b => b.phone === masked)
   expect(found).toBeTruthy()
 
   // Store the phone for later steps — retry if context was destroyed
@@ -106,7 +117,8 @@ Given('a ban exists', async ({ page, backendRequest: request, workerHub }) => {
 When('I click {string} on the ban', async ({ page }, buttonText: string) => {
   const phone = (await page.evaluate(() => (window as Record<string, unknown>).__test_ban_phone)) as string
   expect(phone).toBeTruthy()
-  const row = page.getByTestId(TestIds.BAN_ROW).filter({ hasText: phone })
+  const masked = maskPhone(phone)
+  const row = page.getByTestId(TestIds.BAN_ROW).filter({ hasText: masked })
   if (buttonText.toLowerCase() === 'remove' || buttonText.toLowerCase() === 'delete') {
     await row.getByTestId(TestIds.BAN_REMOVE_BTN).click()
   } else {
@@ -132,30 +144,32 @@ Then('the dialog should close', async ({ page }) => {
 Then('the ban should no longer appear in the list', async ({ page, backendRequest: request, workerHub }) => {
   const phone = (await page.evaluate(() => (window as Record<string, unknown>).__test_ban_phone)) as string
   expect(phone).toBeTruthy()
+  const masked = maskPhone(phone)
 
   // UI verification
   await expect(
-    page.getByTestId(TestIds.BAN_ROW).filter({ hasText: phone }),
+    page.getByTestId(TestIds.BAN_ROW).filter({ hasText: masked }),
   ).not.toBeVisible({ timeout: Timeouts.ELEMENT })
 
   // API verification: ban is gone from backend
   const bans = await listBansViaApi(request, workerHub)
-  const found = bans.find(b => b.phone === phone)
+  const found = bans.find(b => b.phone === masked)
   expect(found).toBeUndefined()
 })
 
 Then('the ban should still appear in the list', async ({ page, backendRequest: request, workerHub }) => {
   const phone = (await page.evaluate(() => (window as Record<string, unknown>).__test_ban_phone)) as string
   expect(phone).toBeTruthy()
+  const masked = maskPhone(phone)
 
   // UI verification
   await expect(
-    page.getByTestId(TestIds.BAN_ROW).filter({ hasText: phone }),
+    page.getByTestId(TestIds.BAN_ROW).filter({ hasText: masked }),
   ).toBeVisible({ timeout: Timeouts.ELEMENT })
 
   // API verification: ban still exists
   const bans = await listBansViaApi(request, workerHub)
-  const found = bans.find(b => b.phone === phone)
+  const found = bans.find(b => b.phone === masked)
   expect(found).toBeTruthy()
 })
 
@@ -171,6 +185,8 @@ When('I add two bans with different phone numbers', async ({ page }) => {
   const phone1 = `+1212${Date.now().toString().slice(-7)}`
   // Small delay to ensure unique timestamp
   const phone2 = `+1212${(Date.now() + 1).toString().slice(-7)}`
+  const masked1 = maskPhone(phone1)
+  const masked2 = maskPhone(phone2)
 
   await page.getByTestId(TestIds.BAN_ADD_BTN).click()
   await page.getByLabel(/phone/i).fill(phone1)
@@ -178,7 +194,7 @@ When('I add two bans with different phone numbers', async ({ page }) => {
   await page.getByLabel(/reason/i).fill('Reason 1')
   await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
   await expect(
-    page.getByTestId(TestIds.BAN_ROW).filter({ hasText: phone1 }),
+    page.getByTestId(TestIds.BAN_ROW).filter({ hasText: masked1 }),
   ).toBeVisible({ timeout: Timeouts.ELEMENT })
 
   await page.getByTestId(TestIds.BAN_ADD_BTN).click()
@@ -187,7 +203,7 @@ When('I add two bans with different phone numbers', async ({ page }) => {
   await page.getByLabel(/reason/i).fill('Reason 2')
   await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
   await expect(
-    page.getByTestId(TestIds.BAN_ROW).filter({ hasText: phone2 }),
+    page.getByTestId(TestIds.BAN_ROW).filter({ hasText: masked2 }),
   ).toBeVisible({ timeout: Timeouts.ELEMENT })
 
   await page.evaluate(
@@ -207,17 +223,19 @@ Then('both phone numbers should appear in the ban list', async ({ page, backendR
   }
   expect(phones.length).toBe(2)
 
-  // UI verification
+  // UI verification (masked format)
   for (const phone of phones) {
+    const masked = maskPhone(phone)
     await expect(
-      page.getByTestId(TestIds.BAN_ROW).filter({ hasText: phone }),
+      page.getByTestId(TestIds.BAN_ROW).filter({ hasText: masked }),
     ).toBeVisible({ timeout: Timeouts.ELEMENT })
   }
 
-  // API verification
+  // API verification (phone field is masked)
   const bans = await listBansViaApi(request, workerHub)
   for (const phone of phones) {
-    const found = bans.find(b => b.phone === phone)
+    const masked = maskPhone(phone)
+    const found = bans.find(b => b.phone === masked)
     expect(found).toBeTruthy()
   }
 })

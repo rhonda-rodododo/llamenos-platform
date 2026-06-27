@@ -5,6 +5,7 @@ import { e164PhoneSchema } from './common'
 
 export const banResponseSchema = z.object({
   phone: z.string(),
+  phoneHash: z.string(),
   reason: z.string(),
   bannedBy: z.string(),
   bannedAt: z.string(),

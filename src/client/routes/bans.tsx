@@ -97,9 +97,9 @@ export function BansPage() {
             <div data-testid="ban-list" className="divide-y divide-border">
               {bans.map(ban => (
                 <BanRow
-                  key={ban.phone}
+                  key={ban.phoneHash}
                   ban={ban}
-                  onRemoved={() => setBans(prev => prev.filter(b => b.phone !== ban.phone))}
+                  onRemoved={() => setBans(prev => prev.filter(b => b.phoneHash !== ban.phoneHash))}
                 />
               ))}
             </div>
@@ -216,7 +216,7 @@ function BanRow({ ban, onRemoved }: {
         confirmLabel={t('banList.removeNumber')}
         onConfirm={async () => {
           try {
-            await removeBan(ban.phone)
+            await removeBan(ban.phoneHash)
             onRemoved()
           } catch {
             toast(t('common.error'), 'error')

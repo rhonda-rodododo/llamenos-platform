@@ -466,11 +466,11 @@ export async function createBanViaApi(
   const phone = options?.phone ?? uniquePhone()
   const reason = options?.reason ?? 'E2E test ban'
 
-  const { status, data } = await apiPost<{ ban: { phone: string; reason: string } }>(request, hubPath('/bans', options?.hubId), { phone, reason })
+  const { status, data } = await apiPost<{ ban: { phone: string; phoneHash: string; reason: string } }>(request, hubPath('/bans', options?.hubId), { phone, reason })
   if (status !== 200 && status !== 201) {
     throw new Error(`Failed to create ban: ${status}`)
   }
-  return { phone, phoneHash: data.ban.phone, reason }
+  return { phone, phoneHash: data.ban.phoneHash, reason }
 }
 
 export async function removeBanViaApi(
@@ -485,8 +485,8 @@ export async function removeBanViaApi(
 export async function listBansViaApi(
   request: APIRequestContext,
   hubId?: string,
-): Promise<Array<{ phone: string; reason: string; bannedBy: string; bannedAt: string }>> {
-  const { status, data } = await apiGet<{ bans: Array<{ phone: string; reason: string; bannedBy: string; bannedAt: string }> }>(request, hubPath('/bans', hubId))
+): Promise<Array<{ phone: string; phoneHash: string; reason: string; bannedBy: string; bannedAt: string }>> {
+  const { status, data } = await apiGet<{ bans: Array<{ phone: string; phoneHash: string; reason: string; bannedBy: string; bannedAt: string }> }>(request, hubPath('/bans', hubId))
   if (status !== 200) throw new Error(`Failed to list bans: ${status}`)
   return data.bans
 }

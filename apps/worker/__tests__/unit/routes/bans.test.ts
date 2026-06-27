@@ -230,11 +230,11 @@ describe('bans routes', () => {
   })
 
   // -------------------------------------------------------------------------
-  // DELETE /bans/:phone — Unban
+  // DELETE /bans/:phoneHash — Unban
   // -------------------------------------------------------------------------
 
-  describe('DELETE /bans/:phone', () => {
-    it('unbans a phone number', async () => {
+  describe('DELETE /bans/:phoneHash', () => {
+    it('unbans via raw E.164 phone (hashes it server-side)', async () => {
       const removeBanSpy = vi.fn().mockResolvedValue(undefined)
       const { app, auditLogSpy } = createTestApp({
         permissions: ['bans:delete'],
@@ -248,20 +248,19 @@ describe('bans routes', () => {
       expect(auditLogSpy).toHaveBeenCalledOnce()
     })
 
-    it('unbans a phone number with percent-encoded characters correctly', async () => {
+    it('unbans via pre-computed phoneHash (passes through without re-hashing)', async () => {
       const removeBanSpy = vi.fn().mockResolvedValue(undefined)
+      const preComputedHash = hashPhone('+12125551234', TEST_HMAC_SECRET)
       const { app } = createTestApp({
         permissions: ['bans:delete'],
         hubId: 'hub-1',
         serviceMock: { records: { removeBan: removeBanSpy } },
       })
 
-      // %25 is the percent-encoded % — Hono decodes to %, should NOT double-decode
-      const res = await app.request('/bans/%252B12125551234', { method: 'DELETE' })
+      const res = await app.request(`/bans/${preComputedHash}`, { method: 'DELETE' })
       expect(res.status).toBe(200)
-      // The phone passed to removeBan should be "%2B12125551234" (single decoded),
-      // NOT "+12125551234" (double decoded)
-      expect(removeBanSpy).toHaveBeenCalledWith(hashPhone('%2B12125551234', TEST_HMAC_SECRET), 'hub-1')
+      // Hash is already 64-char hex, should be passed through directly
+      expect(removeBanSpy).toHaveBeenCalledWith(preComputedHash, 'hub-1')
     })
 
     it('returns 403 without bans:delete permission', async () => {
