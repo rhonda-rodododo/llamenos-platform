@@ -19,9 +19,10 @@ import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import { bytesToHex } from '@noble/hashes/utils.js'
+import { LABEL_PLATFORM_ROLE_NAME_ENCRYPT, LABEL_PLATFORM_ROLE_DESC_ENCRYPT } from '@shared/crypto-labels'
 
-const LABEL_NAME = 'llamenos:platform-role-name-encrypt:v1'
-const LABEL_DESC = 'llamenos:platform-role-desc-encrypt:v1'
+const LABEL_NAME = LABEL_PLATFORM_ROLE_NAME_ENCRYPT
+const LABEL_DESC = LABEL_PLATFORM_ROLE_DESC_ENCRYPT
 
 function textToHex(text: string): string {
   return bytesToHex(new TextEncoder().encode(text))

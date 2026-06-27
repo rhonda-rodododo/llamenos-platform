@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from '@tanstack/react-router'
+import { LABEL_RECOVERY_SHARE_CONTRIBUTE } from '@shared/crypto-labels'
 import {
   initiateRecovery,
   verifyRecoveryCode,
@@ -108,7 +109,7 @@ export function AccountRecoveryFlow({ onBack }: Props) {
 
         await recoveryGroupReconstructFromShares(
           envelopes,
-          'llamenos:recovery-group:share-contribute:v1',
+          LABEL_RECOVERY_SHARE_CONTRIBUTE,
         )
 
         setStep('set-pin')
