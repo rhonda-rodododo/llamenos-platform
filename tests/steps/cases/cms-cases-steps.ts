@@ -52,6 +52,11 @@ Given('the {string} template has been applied', async ({ backendRequest: request
   if (entityTypes.length < 2) {
     // Create entity types to satisfy the test — template may not be registered.
     // Names must match /^[a-zA-Z0-9_]+$/ (no spaces); labels carry the display name.
+    const defaultFields = [
+      { name: 'description', label: 'Description', type: 'text', order: 0 },
+      { name: 'location', label: 'Location', type: 'text', order: 1 },
+      { name: 'priority', label: 'Priority', type: 'select', order: 2 },
+    ]
     const slugToTypes: Record<string, Array<{ name: string; label: string; category: string }>> = {
       'jail-support': [
         { name: 'arrest_case', label: 'Arrest Case', category: 'case' },
@@ -65,7 +70,10 @@ Given('the {string} template has been applied', async ({ backendRequest: request
     for (const t of types) {
       const exists = entityTypes.find(e => (e as Record<string, unknown>).name === t.name)
       if (!exists) {
-        await createEntityTypeViaApi(request, { name: t.name, label: t.label, category: t.category, hubId: workerHub }).catch((e) => {
+        await createEntityTypeViaApi(request, {
+          name: t.name, label: t.label, category: t.category, hubId: workerHub,
+          fields: defaultFields,
+        }).catch((e) => {
           console.warn(`[cms] Failed to create entity type "${t.name}":`, e)
         })
       }

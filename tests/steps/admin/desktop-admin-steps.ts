@@ -570,8 +570,16 @@ Given('demo mode has been enabled', async ({ page }) => {
   const completeBtn = page.getByTestId('setup-complete-btn')
   await expect(completeBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
   await completeBtn.click()
-  // Wait for redirect to dashboard (wizard completion)
+  // Wait for redirect to dashboard (wizard completion includes async demo seeding)
   await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.AUTH })
+  // Verify demo mode was persisted by checking the API — the config endpoint
+  // must return demoMode: true before we proceed, otherwise the login page
+  // won't render the demo account picker.
+  await page.waitForFunction(async () => {
+    const res = await fetch('/api/config', { headers: { 'Cache-Control': 'no-cache' } })
+    const data = await res.json()
+    return data.demoMode === true
+  }, { timeout: Timeouts.ELEMENT })
 })
 
 // 'I visit the login page' -> defined in common/navigation-steps.ts

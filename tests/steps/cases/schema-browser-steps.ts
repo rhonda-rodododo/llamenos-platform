@@ -19,14 +19,13 @@ Then('I should see a list of entity types from the template', async ({ page }) =
   // Entity type rows should be visible after template is applied.
   // The entity-types section may need to be expanded first.
   const section = page.getByTestId('entity-types')
-  const hasSect = await section.isVisible({ timeout: 5000 }).catch(() => false)
+  const hasSect = await section.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
   if (hasSect) {
-    // Check if section is collapsed — expand it
-    const isOpen = await section.locator('[data-slot="collapsible-content"][data-state="open"]').count() > 0
-    if (!isOpen) {
-      const trigger = page.getByTestId('entity-types-trigger')
-      const hasTrigger = await trigger.isVisible({ timeout: 2000 }).catch(() => false)
-      if (hasTrigger) await trigger.click()
+    // Check if section is collapsed — expand it by clicking the title text
+    const hasRow = await page.getByTestId('entity-type-row').first().isVisible({ timeout: 500 }).catch(() => false)
+    if (!hasRow) {
+      const titleText = section.locator('h3').first()
+      await titleText.click()
     }
   }
   const entityTypeRow = page.getByTestId('entity-type-row').first()
@@ -47,27 +46,29 @@ Then('I should see the {string} entity type', async ({ page }, typeName: string)
 
 When('I select the {string} entity type', async ({ page }, typeName: string) => {
   // The entity-types section is only rendered when CMS is enabled on the page.
-  // Wait for the trigger with a generous timeout — the page fetches cmsEnabled on mount.
-  const trigger = page.getByTestId('entity-types-trigger')
-  const hasTrigger = await trigger.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (hasTrigger) {
-    // Check if it's collapsed (no entity-type-row visible yet)
-    const hasRow = await page.getByTestId('entity-type-row').first().isVisible({ timeout: 500 }).catch(() => false)
-    if (!hasRow) {
-      await trigger.click()
-      // Wait for the accordion to finish opening and data to load
-      await expect(page.getByTestId('entity-type-row').first()).toBeVisible({ timeout: Timeouts.ELEMENT })
-    }
-  } else {
+  // Wait for the section container — it renders even when collapsed.
+  const section = page.getByTestId('entity-types')
+  const hasSection = await section.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+  if (!hasSection) {
     // CMS section not rendered — page may not have CMS enabled. Fall through gracefully.
     await expect(page.getByTestId('page-title')).toBeVisible({ timeout: Timeouts.ELEMENT })
     return
   }
+
+  // Expand the section if collapsed — click the title text to avoid hitting the copy-link button
+  const hasRow = await page.getByTestId('entity-type-row').first().isVisible({ timeout: 500 }).catch(() => false)
+  if (!hasRow) {
+    // Click the section title text (inside the trigger) to expand
+    const titleText = section.locator('h3').first()
+    await titleText.click()
+    // Wait for accordion to open and entity types to load from API
+    await expect(page.getByTestId('entity-type-row').first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  }
+
   // Wait for the entity type row to become visible (accordion may be animating open)
   const typeRow = page.getByTestId('entity-type-row').filter({ hasText: typeName }).first()
   await expect(typeRow).toBeVisible({ timeout: Timeouts.ELEMENT })
   // Click the Edit button on the matching row to open the entity type editor.
-  // Use ELEMENT timeout — 2s was too short in CI.
   const editBtn = typeRow.getByTestId('entity-type-edit-btn')
   const hasEditBtn = await editBtn.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
   if (hasEditBtn) {
