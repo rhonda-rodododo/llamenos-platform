@@ -351,6 +351,13 @@
       "when": 1780205843382,
       "tag": "0049_flag_plaintext_contacts",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1781016793188,
+      "tag": "0050_sigchain_signer_fields",
+      "breakpoints": true
     }
   ]
 }

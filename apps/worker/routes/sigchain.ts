@@ -9,7 +9,7 @@ import { describeRoute, resolver, validator } from 'hono-openapi'
 import { z } from 'zod'
 import type { AppEnv } from '../types'
 import { checkPermission } from '../middleware/permission-guard'
-import { authErrors, notFoundError } from '../openapi/helpers'
+import { authErrors } from '../openapi/helpers'
 import { CryptoKeyError } from '../services/crypto-keys'
 
 const sigchainRoutes = new Hono<AppEnv>()
@@ -38,12 +38,18 @@ const appendLinkBodySchema = z.object({
   seqNo: z.number().int().nonnegative(),
   linkType: z.enum(['genesis', 'device_add', 'device_remove', 'key_rotate', 'puk_epoch']),
   payload: z.record(z.string(), z.unknown()),
-  /** Ed25519 signature over canonical(prevHash || linkType || seqNo || payload), hex. */
+  /** Ed25519 signature over entry hash, hex. */
   signature: z.string().regex(/^[0-9a-f]{128}$/i, 'Must be 64-byte Ed25519 signature in hex'),
   /** SHA-256 hash of the previous link (hex). Empty string for genesis. */
   prevHash: z.string().regex(/^([0-9a-f]{64}|)$/i, 'Must be SHA-256 hex or empty string'),
-  /** SHA-256 hash of this link (hex). */
+  /** SHA-256 hash of this link's canonical form (hex). Server recomputes and verifies. */
   hash: z.string().regex(/^[0-9a-f]{64}$/i, 'Must be SHA-256 hex'),
+  /** Device ID of the signing device. */
+  signerDeviceId: z.string().min(1),
+  /** Ed25519 pubkey of the signing device (hex). */
+  signerPubkey: z.string().regex(/^[0-9a-f]{64}$/i, 'Must be 32-byte Ed25519 pubkey in hex'),
+  /** ISO-8601 timestamp of link creation. */
+  timestamp: z.string().min(1),
 })
 
 // ---------------------------------------------------------------------------

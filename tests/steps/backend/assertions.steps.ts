@@ -28,3 +28,10 @@ Then('the response should indicate the role is protected', async ({ world }) => 
   // System roles return 400 or 403 when deletion is attempted
   expect([400, 403]).toContain(getSharedState(world).lastResponse!.status)
 })
+
+Then('the error message contains {string}', async ({ world }, substring: string) => {
+  expect(getSharedState(world).lastResponse).toBeDefined()
+  const data = getSharedState(world).lastResponse!.data as { error?: string }
+  expect(data.error).toBeDefined()
+  expect(data.error!.toLowerCase()).toContain(substring.toLowerCase())
+})

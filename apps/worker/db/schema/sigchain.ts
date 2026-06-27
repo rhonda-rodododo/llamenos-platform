@@ -48,6 +48,12 @@ export const sigchainLinks = pgTable(
     prevHash: text('prev_hash').notNull().default(''),
     /** SHA-256 hash of this link's canonical representation (hex). */
     hash: text('hash').notNull(),
+    /** Device ID of the signing device. */
+    signerDeviceId: text('signer_device_id').notNull().default(''),
+    /** Ed25519 pubkey of the signing device, hex-encoded. */
+    signerPubkey: text('signer_pubkey').notNull().default(''),
+    /** ISO-8601 timestamp of link creation (client-provided). */
+    linkTimestamp: text('timestamp').notNull().default(''),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

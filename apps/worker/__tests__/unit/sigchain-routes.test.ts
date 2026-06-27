@@ -106,6 +106,9 @@ describe('sigchain routes', () => {
       signature: 'a'.repeat(128),
       prevHash: '',
       hash: 'b'.repeat(64),
+      signerDeviceId: 'dev-1',
+      signerPubkey: 'cc'.repeat(32),
+      timestamp: '2026-01-01T00:00:00Z',
     }
 
     it('appends to own sigchain', async () => {
