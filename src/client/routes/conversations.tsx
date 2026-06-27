@@ -30,7 +30,7 @@ export const Route = createFileRoute('/conversations')({
 function ConversationsPage() {
   const { t } = useTranslation()
   const { isAdmin, hasDeviceKey, publicKey, adminDecryptionPubkey } = useAuth()
-  const { channels } = useConfig()
+  const { channels, isLoading: configLoading } = useConfig()
   const { toast } = useToast()
   const { conversations, waitingConversations } = useConversations()
 
@@ -122,6 +122,20 @@ function ConversationsPage() {
   }, [selectedId, hasDeviceKey, publicKey, adminDecryptionPubkey, t, toast])
 
   const hasAnyMessaging = channels.sms || channels.whatsapp || channels.signal || channels.reports
+
+  if (configLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-3">
+          <MessageSquare className="h-6 w-6 text-primary" />
+          <h1 data-testid="page-title" className="text-xl font-bold sm:text-2xl">{t('conversations.title', { defaultValue: 'Conversations' })}</h1>
+        </div>
+        <div data-testid="loading-skeleton" className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
+          {t('common.loading')}
+        </div>
+      </div>
+    )
+  }
 
   if (!hasAnyMessaging) {
     return (

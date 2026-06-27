@@ -57,8 +57,6 @@ export function DemoAccountPicker() {
     }
   }
 
-  if (accounts.length === 0) return null
-
   return (
     <div className="space-y-3">
       <div className="relative">
@@ -71,6 +69,12 @@ export function DemoAccountPicker() {
           </span>
         </div>
       </div>
+
+      {accounts.length === 0 ? (
+        <div data-testid="demo-loading" className="flex justify-center py-4">
+          <span className="text-xs text-muted-foreground">{t('common.loading')}</span>
+        </div>
+      ) : (
 
       <div className="rounded-lg border border-dashed border-primary/30 bg-primary/5 p-3 space-y-2">
         <p className="text-sm font-medium text-center">
@@ -115,6 +119,7 @@ export function DemoAccountPicker() {
           {t('demo.resetNotice', { defaultValue: 'Demo data resets daily' })}
         </p>
       </div>
+      )}
     </div>
   )
 }

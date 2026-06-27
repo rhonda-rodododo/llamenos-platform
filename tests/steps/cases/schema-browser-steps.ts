@@ -108,9 +108,10 @@ Then('each field should show its type and label', async ({ page }) => {
 })
 
 Then('I should see the statuses defined for {string}', async ({ page }, _typeName: string) => {
-  // Click the "Statuses" tab in the entity editor
+  // Click the "Statuses" tab in the entity editor — use ELEMENT timeout since
+  // the editor may still be rendering after the previous step opened it.
   const statusTab = page.getByTestId('entity-tab-statuses')
-  const hasTab = await statusTab.isVisible({ timeout: 3000 }).catch(() => false)
+  const hasTab = await statusTab.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
   if (hasTab) await statusTab.click()
   // Status rows should appear. Avoid .or() combinator — it causes strict mode violations
   // when multiple elements match (e.g., badge text "2 statuses" also matches /statuses/i).
