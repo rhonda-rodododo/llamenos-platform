@@ -1,6 +1,5 @@
 package org.llamenos.hotline.crypto
 
-import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
@@ -70,40 +69,53 @@ class WakeKeyService @Inject constructor(
      * Get the wake public key, generating a new keypair if none exists.
      * This key is registered with the server for push notification encryption.
      *
-     * The wake secret is encrypted under a dedicated AndroidKeyStore AES-256-GCM key
-     * (alias [KeystoreService.WAKE_KEY_ALIAS]) before being stored. This provides
-     * hardware-backed protection even though the key is accessible without PIN/biometric.
+     * The wake secret is generated and held in Rust state — it NEVER enters JVM memory
+     * as raw bytes. For persistence, the secret is exported from Rust, encrypted under
+     * a dedicated AndroidKeyStore AES-256-GCM key, and stored as Base64 ciphertext.
+     * On subsequent app launches, the encrypted secret is loaded and sent back to Rust.
      */
     fun getOrCreateWakePublicKey(): String {
         val existing = keystoreService.retrieve(KEY_WAKE_PUBKEY)
-        if (existing != null) return existing
-
-        if (nativeLibLoaded) {
-            // SECURITY NOTE (M01): UniFFI returns hex-encoded strings which are immutable
-            // JVM objects and cannot be explicitly zeroized. The secretKeyHex String will
-            // linger on the JVM heap until garbage collected. We convert to ByteArray
-            // immediately and zeroize that in storeWakeSecret(). The residual String is
-            // short-lived (method-scoped) and eligible for GC promptly. Changing the FFI
-            // to return ByteArray would require modifying the Rust UniFFI bindings.
-            val secretKeyHex = org.llamenos.core.mobileRandomBytesHex()
-            val publicKeyHex = org.llamenos.core.getPublicKey(secretKeyHex)
-            val secretBytes = hexToBytes(secretKeyHex)
-            storeWakeSecret(secretBytes)
-            keystoreService.store(KEY_WAKE_PUBKEY, publicKeyHex)
-            return publicKeyHex
+        if (existing != null) {
+            // Ensure the wake key is loaded into Rust state (may have been cleared)
+            if (nativeLibLoaded && !org.llamenos.core.mobileHasWakeKey()) {
+                loadWakeKeyIntoRust()
+            }
+            return existing
         }
 
-        // Native FFI unavailable — cannot generate a valid X25519 keypair.
-        // Do not fall back to random bytes: the public key must be derived
-        // from the private key for HPKE decryption to work. A random public key
-        // will silently produce a keypair the server cannot encrypt to.
-        // This should only occur on emulators/test environments without native libs.
-        // In production, native libs are always linked (see build-mobile.sh).
-        throw IllegalStateException(
+        check(nativeLibLoaded) {
             "WakeKeyService: native crypto library not loaded. " +
             "Cannot derive X25519 wake keypair without native FFI. " +
             "Ensure jniLibs are present for this ABI."
-        )
+        }
+
+        // Generate keypair entirely in Rust — secret never enters JVM
+        val publicKeyHex = org.llamenos.core.mobileGenerateWakeKey()
+
+        // Export secret from Rust for encrypted persistence only
+        val secretHex = org.llamenos.core.mobileExportWakeKeyHex()
+        val secretBytes = hexToBytes(secretHex)
+        storeWakeSecret(secretBytes)
+        // secretBytes zeroized inside storeWakeSecret
+
+        keystoreService.store(KEY_WAKE_PUBKEY, publicKeyHex)
+        return publicKeyHex
+    }
+
+    /**
+     * Load the wake key secret from encrypted storage into Rust state.
+     * Called on app startup when a wake key already exists in persistence.
+     */
+    internal fun loadWakeKeyIntoRust() {
+        if (!nativeLibLoaded) return
+        val secretBytes = loadWakeSecret() ?: return
+        try {
+            val secretHex = secretBytes.joinToString("") { "%02x".format(it) }
+            org.llamenos.core.mobileLoadWakeKey(secretHex)
+        } finally {
+            secretBytes.fill(0)
+        }
     }
 
     /** Exposed for testing only. */
@@ -204,9 +216,13 @@ class WakeKeyService @Inject constructor(
     }
 
     /**
-     * Clean up the wake key from both EncryptedSharedPreferences and AndroidKeyStore.
+     * Clean up the wake key from Rust state, EncryptedSharedPreferences, and AndroidKeyStore.
      */
     fun cleanup() {
+        // Clear from Rust state first
+        if (nativeLibLoaded) {
+            try { org.llamenos.core.mobileClearWakeKey() } catch (_: Exception) {}
+        }
         keystoreService.delete(KEY_WAKE_SECRET)
         keystoreService.delete(KEY_WAKE_PUBKEY)
         try {
@@ -228,15 +244,21 @@ class WakeKeyService @Inject constructor(
     /**
      * Decrypt a wake-tier push notification payload using HPKE.
      * This is the v3 path — the server sends an HPKE envelope JSON.
+     *
+     * Decryption uses the wake key stored in Rust state. The secret never
+     * enters JVM memory during the decryption path.
      */
     suspend fun decryptWakePayloadHpke(envelopeJson: String): WakePayload? =
         withContext(Dispatchers.Default) {
             if (!nativeLibLoaded) return@withContext null
 
-            val secretBytes = loadWakeSecret() ?: return@withContext null
+            // Ensure wake key is loaded into Rust state
+            if (!org.llamenos.core.mobileHasWakeKey()) {
+                loadWakeKeyIntoRust()
+                if (!org.llamenos.core.mobileHasWakeKey()) return@withContext null
+            }
+
             try {
-                // Secret bytes are loaded to verify availability and for potential
-                // future direct use. The FFI call uses internally loaded state.
                 val envelope = json.decodeFromString<HpkeEnvelopeJson>(envelopeJson)
                 val ffiEnvelope = org.llamenos.core.HpkeEnvelope(
                     v = envelope.v.toUByte(),
@@ -244,7 +266,7 @@ class WakeKeyService @Inject constructor(
                     enc = envelope.enc,
                     ct = envelope.ct,
                 )
-                val plaintextHex = org.llamenos.core.mobileHpkeOpen(
+                val plaintextHex = org.llamenos.core.mobileHpkeOpenWithWakeKey(
                     envelope = ffiEnvelope,
                     expectedLabel = LABEL_PUSH_WAKE,
                     aadHex = "",
@@ -254,9 +276,6 @@ class WakeKeyService @Inject constructor(
                 json.decodeFromString<WakePayload>(plaintext)
             } catch (_: Exception) {
                 null
-            } finally {
-                // Zeroize the decrypted secret
-                secretBytes.fill(0)
             }
         }
 

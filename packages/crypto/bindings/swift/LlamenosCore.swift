@@ -537,13 +537,21 @@ public struct AuthToken: Equatable, Hashable {
     public let pubkey: String
     public let timestamp: UInt64
     public let token: String
+    /**
+     * Optional random nonce to prevent replay collisions in parallel requests.
+     */
+    public let nonce: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(pubkey: String, timestamp: UInt64, token: String) {
+    public init(pubkey: String, timestamp: UInt64, token: String, 
+        /**
+         * Optional random nonce to prevent replay collisions in parallel requests.
+         */nonce: String?) {
         self.pubkey = pubkey
         self.timestamp = timestamp
         self.token = token
+        self.nonce = nonce
     }
 
     
@@ -564,7 +572,8 @@ public struct FfiConverterTypeAuthToken: FfiConverterRustBuffer {
             try AuthToken(
                 pubkey: FfiConverterString.read(from: &buf), 
                 timestamp: FfiConverterUInt64.read(from: &buf), 
-                token: FfiConverterString.read(from: &buf)
+                token: FfiConverterString.read(from: &buf), 
+                nonce: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -572,6 +581,7 @@ public struct FfiConverterTypeAuthToken: FfiConverterRustBuffer {
         FfiConverterString.write(value.pubkey, into: &buf)
         FfiConverterUInt64.write(value.timestamp, into: &buf)
         FfiConverterString.write(value.token, into: &buf)
+        FfiConverterOptionString.write(value.nonce, into: &buf)
     }
 }
 
@@ -2178,10 +2188,6 @@ public enum CryptoError: Swift.Error, Equatable, Hashable, Foundation.LocalizedE
     
     case SignatureVerificationFailed(message: String)
     
-    case InvalidNsec(message: String)
-    
-    case InvalidNpub(message: String)
-    
     case JsonError(message: String)
     
     case WrongPin(message: String)
@@ -2271,43 +2277,35 @@ public struct FfiConverterTypeCryptoError: FfiConverterRustBuffer {
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 12: return .InvalidNsec(
+        case 12: return .JsonError(
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 13: return .InvalidNpub(
+        case 13: return .WrongPin(
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 14: return .JsonError(
+        case 14: return .InvalidPin(
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 15: return .WrongPin(
+        case 15: return .InvalidInput(
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 16: return .InvalidPin(
+        case 16: return .InvalidFormat(
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 17: return .InvalidInput(
+        case 17: return .HkdfExpandError(
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 18: return .InvalidFormat(
+        case 18: return .InvalidSignature(
             message: try FfiConverterString.read(from: &buf)
         )
         
-        case 19: return .HkdfExpandError(
-            message: try FfiConverterString.read(from: &buf)
-        )
-        
-        case 20: return .InvalidSignature(
-            message: try FfiConverterString.read(from: &buf)
-        )
-        
-        case 21: return .StaleTimestamp(
+        case 19: return .StaleTimestamp(
             message: try FfiConverterString.read(from: &buf)
         )
         
@@ -2344,26 +2342,22 @@ public struct FfiConverterTypeCryptoError: FfiConverterRustBuffer {
             writeInt(&buf, Int32(10))
         case .SignatureVerificationFailed(_ /* message is ignored*/):
             writeInt(&buf, Int32(11))
-        case .InvalidNsec(_ /* message is ignored*/):
-            writeInt(&buf, Int32(12))
-        case .InvalidNpub(_ /* message is ignored*/):
-            writeInt(&buf, Int32(13))
         case .JsonError(_ /* message is ignored*/):
-            writeInt(&buf, Int32(14))
+            writeInt(&buf, Int32(12))
         case .WrongPin(_ /* message is ignored*/):
-            writeInt(&buf, Int32(15))
+            writeInt(&buf, Int32(13))
         case .InvalidPin(_ /* message is ignored*/):
-            writeInt(&buf, Int32(16))
+            writeInt(&buf, Int32(14))
         case .InvalidInput(_ /* message is ignored*/):
-            writeInt(&buf, Int32(17))
+            writeInt(&buf, Int32(15))
         case .InvalidFormat(_ /* message is ignored*/):
-            writeInt(&buf, Int32(18))
+            writeInt(&buf, Int32(16))
         case .HkdfExpandError(_ /* message is ignored*/):
-            writeInt(&buf, Int32(19))
+            writeInt(&buf, Int32(17))
         case .InvalidSignature(_ /* message is ignored*/):
-            writeInt(&buf, Int32(20))
+            writeInt(&buf, Int32(18))
         case .StaleTimestamp(_ /* message is ignored*/):
-            writeInt(&buf, Int32(21))
+            writeInt(&buf, Int32(19))
 
         
         }
@@ -2588,7 +2582,8 @@ public func computeSasCode(sharedXHex: String)throws  -> String  {
 /**
  * Compute the X25519 shared secret for device provisioning.
  *
- * Uses X25519 ECDH for the provisioning protocol.
+ * X25519 public keys are always 32 bytes (x-only Montgomery-form u-coordinate).
+ * Rejects low-order points (all-zeros pubkey or all-zeros ECDH result).
  */
 public func computeSharedXHex(ourSecretHex: String, theirPubkeyHex: String)throws  -> String  {
     return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCryptoError_lift) {
@@ -2815,6 +2810,15 @@ public func getPublicKey(secretKeyHex: String)throws  -> String  {
 })
 }
 /**
+ * Clear the ephemeral key from state without performing ECDH.
+ * Called when the device linking flow is cancelled.
+ */
+public func mobileClearEphemeralKey()  {try! rustCall() {
+    uniffi_llamenos_core_fn_func_mobile_clear_ephemeral_key($0
+    )
+}
+}
+/**
  * Clear all hub keys from Rust memory.
  */
 public func mobileClearHubKeys()  {try! rustCall() {
@@ -2827,6 +2831,14 @@ public func mobileClearHubKeys()  {try! rustCall() {
  */
 public func mobileClearServerEventKeys()  {try! rustCall() {
     uniffi_llamenos_core_fn_func_mobile_clear_server_event_keys($0
+    )
+}
+}
+/**
+ * Clear the wake key from Rust state. Called on logout/wipe.
+ */
+public func mobileClearWakeKey()  {try! rustCall() {
+    uniffi_llamenos_core_fn_func_mobile_clear_wake_key($0
     )
 }
 }
@@ -2936,6 +2948,18 @@ public func mobileDecryptServerEventWithEpoch(encryptedHex: String, epoch: UInt6
 })
 }
 /**
+ * Perform ECDH using the stored ephemeral secret and the peer's public key.
+ * Returns the shared secret hex. The ephemeral secret is zeroized and removed
+ * from state after this call — it cannot be used again.
+ */
+public func mobileEcdhComplete(theirPubkeyHex: String)throws  -> String  {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCryptoError_lift) {
+    uniffi_llamenos_core_fn_func_mobile_ecdh_complete(
+        FfiConverterString.lower(theirPubkeyHex),$0
+    )
+})
+}
+/**
  * Verify an Ed25519 signature (stateless — no secrets needed).
  */
 public func mobileEd25519Verify(messageHex: String, signatureHex: String, pubkeyHex: String)throws  -> Bool  {
@@ -2960,6 +2984,16 @@ public func mobileEncryptDraft(plaintext: String, hubId: String)throws  -> Strin
 })
 }
 /**
+ * Export the wake key secret as hex for encrypted persistence.
+ * The caller MUST immediately encrypt this and zeroize the hex string.
+ */
+public func mobileExportWakeKeyHex()throws  -> String  {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCryptoError_lift) {
+    uniffi_llamenos_core_fn_func_mobile_export_wake_key_hex($0
+    )
+})
+}
+/**
  * Generate a new device keypair, encrypt with PIN, load into mobile state.
  * Returns the EncryptedDeviceKeys blob for persistent storage.
  */
@@ -2968,6 +3002,27 @@ public func mobileGenerateAndLoad(deviceId: String, pin: String)throws  -> Encry
     uniffi_llamenos_core_fn_func_mobile_generate_and_load(
         FfiConverterString.lower(deviceId),
         FfiConverterString.lower(pin),$0
+    )
+})
+}
+/**
+ * Generate an ephemeral X25519 keypair for device-linking ECDH.
+ * The secret key is stored in Rust state and NEVER returned to the caller.
+ * Returns only the public key hex.
+ */
+public func mobileGenerateEphemeralKey()throws  -> String  {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCryptoError_lift) {
+    uniffi_llamenos_core_fn_func_mobile_generate_ephemeral_key($0
+    )
+})
+}
+/**
+ * Generate a wake key X25519 keypair entirely in Rust.
+ * The secret is stored in Rust state; only the public key hex is returned.
+ */
+public func mobileGenerateWakeKey()throws  -> String  {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCryptoError_lift) {
+    uniffi_llamenos_core_fn_func_mobile_generate_wake_key($0
     )
 })
 }
@@ -2991,6 +3046,15 @@ public func mobileHasHubKey(hubId: String) -> Bool  {
 })
 }
 /**
+ * Check whether a wake key is loaded in Rust state.
+ */
+public func mobileHasWakeKey() -> Bool  {
+    return try!  FfiConverterBool.lift(try! rustCall() {
+    uniffi_llamenos_core_fn_func_mobile_has_wake_key($0
+    )
+})
+}
+/**
  * HPKE open: decrypt an envelope using the device's X25519 key from mobile state.
  */
 public func mobileHpkeOpen(envelope: HpkeEnvelope, expectedLabel: String, aadHex: String)throws  -> String  {
@@ -3008,6 +3072,19 @@ public func mobileHpkeOpen(envelope: HpkeEnvelope, expectedLabel: String, aadHex
 public func mobileHpkeOpenKey(envelope: HpkeEnvelope, expectedLabel: String, aadHex: String)throws  -> String  {
     return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCryptoError_lift) {
     uniffi_llamenos_core_fn_func_mobile_hpke_open_key(
+        FfiConverterTypeHpkeEnvelope_lower(envelope),
+        FfiConverterString.lower(expectedLabel),
+        FfiConverterString.lower(aadHex),$0
+    )
+})
+}
+/**
+ * HPKE open using the stored wake key (not the device key).
+ * Used for decrypting push notification payloads when the device is locked.
+ */
+public func mobileHpkeOpenWithWakeKey(envelope: HpkeEnvelope, expectedLabel: String, aadHex: String)throws  -> String  {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCryptoError_lift) {
+    uniffi_llamenos_core_fn_func_mobile_hpke_open_with_wake_key(
         FfiConverterTypeHpkeEnvelope_lower(envelope),
         FfiConverterString.lower(expectedLabel),
         FfiConverterString.lower(aadHex),$0
@@ -3058,6 +3135,32 @@ public func mobileIsValidPin(pin: String) -> Bool  {
         FfiConverterString.lower(pin),$0
     )
 })
+}
+/**
+ * Unwrap a hub key from server-provided HPKE envelope fields and store in state.
+ *
+ * The caller provides only `enc` and `ct` from the server response. The envelope
+ * version and label ID are constructed by Rust from the label registry — clients
+ * never need to hardcode protocol constants.
+ */
+public func mobileLoadHubKey(hubId: String, enc: String, ct: String)throws   {try rustCallWithError(FfiConverterTypeCryptoError_lift) {
+    uniffi_llamenos_core_fn_func_mobile_load_hub_key(
+        FfiConverterString.lower(hubId),
+        FfiConverterString.lower(enc),
+        FfiConverterString.lower(ct),$0
+    )
+}
+}
+/**
+ * Load a wake key secret into Rust state from encrypted storage.
+ * Called at app startup after decrypting the wake secret from AndroidKeyStore.
+ * The secret bytes are consumed and the input is zeroized by the caller.
+ */
+public func mobileLoadWakeKey(secretHex: String)throws   {try rustCallWithError(FfiConverterTypeCryptoError_lift) {
+    uniffi_llamenos_core_fn_func_mobile_load_wake_key(
+        FfiConverterString.lower(secretHex),$0
+    )
+}
 }
 /**
  * Lock the mobile crypto state — zeroize device secrets, hub keys, and server event keys.
@@ -3220,6 +3323,15 @@ public func mobileUnlock(data: EncryptedDeviceKeys, pin: String)throws  -> Devic
     )
 })
 }
+/**
+ * Derive the public key from the stored wake key secret.
+ */
+public func mobileWakeKeyPubkey()throws  -> String  {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCryptoError_lift) {
+    uniffi_llamenos_core_fn_func_mobile_wake_key_pubkey($0
+    )
+})
+}
 
 private enum InitializationResult {
     case ok
@@ -3257,7 +3369,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_llamenos_core_checksum_func_compute_sas_code() != 62033) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_llamenos_core_checksum_func_compute_shared_x_hex() != 20076) {
+    if (uniffi_llamenos_core_checksum_func_compute_shared_x_hex() != 4280) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_llamenos_core_checksum_func_decrypt_call_record_for_reader() != 29910) {
@@ -3311,10 +3423,16 @@ private let initializationResult: InitializationResult = {
     if (uniffi_llamenos_core_checksum_func_get_public_key() != 4118) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_llamenos_core_checksum_func_mobile_clear_ephemeral_key() != 9718) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_llamenos_core_checksum_func_mobile_clear_hub_keys() != 49932) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_llamenos_core_checksum_func_mobile_clear_server_event_keys() != 57036) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_llamenos_core_checksum_func_mobile_clear_wake_key() != 9240) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_llamenos_core_checksum_func_mobile_create_auth_token() != 23090) {
@@ -3341,13 +3459,25 @@ private let initializationResult: InitializationResult = {
     if (uniffi_llamenos_core_checksum_func_mobile_decrypt_server_event_with_epoch() != 46532) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_llamenos_core_checksum_func_mobile_ecdh_complete() != 49203) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_llamenos_core_checksum_func_mobile_ed25519_verify() != 35261) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_llamenos_core_checksum_func_mobile_encrypt_draft() != 30232) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_llamenos_core_checksum_func_mobile_export_wake_key_hex() != 57742) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_llamenos_core_checksum_func_mobile_generate_and_load() != 51176) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_llamenos_core_checksum_func_mobile_generate_ephemeral_key() != 28329) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_llamenos_core_checksum_func_mobile_generate_wake_key() != 33299) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_llamenos_core_checksum_func_mobile_get_device_state() != 13863) {
@@ -3356,10 +3486,16 @@ private let initializationResult: InitializationResult = {
     if (uniffi_llamenos_core_checksum_func_mobile_has_hub_key() != 39831) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_llamenos_core_checksum_func_mobile_has_wake_key() != 11945) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_llamenos_core_checksum_func_mobile_hpke_open() != 47930) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_llamenos_core_checksum_func_mobile_hpke_open_key() != 8328) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_llamenos_core_checksum_func_mobile_hpke_open_with_wake_key() != 53247) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_llamenos_core_checksum_func_mobile_hpke_seal() != 41122) {
@@ -3372,6 +3508,12 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_llamenos_core_checksum_func_mobile_is_valid_pin() != 59853) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_llamenos_core_checksum_func_mobile_load_hub_key() != 11270) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_llamenos_core_checksum_func_mobile_load_wake_key() != 41647) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_llamenos_core_checksum_func_mobile_lock() != 62527) {
@@ -3417,6 +3559,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_llamenos_core_checksum_func_mobile_unlock() != 24233) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_llamenos_core_checksum_func_mobile_wake_key_pubkey() != 39092) {
         return InitializationResult.apiChecksumMismatch
     }
 

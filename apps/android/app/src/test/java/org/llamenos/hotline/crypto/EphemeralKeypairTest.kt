@@ -1,69 +1,57 @@
 package org.llamenos.hotline.crypto
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertFalse
 import org.junit.Test
 
 /**
- * Unit tests for [EphemeralKeypair] zeroization behavior.
+ * Unit tests for [EphemeralKeyResult] — the HIGH-A3 refactored ephemeral key type.
  *
- * Verifies that secret key material is properly zeroized when [close] is called,
- * preventing key material from lingering in JVM memory after use.
+ * After the HIGH-A3 security fix, ephemeral secret key material never crosses JNI.
+ * [EphemeralKeyResult] only exposes the public key hex. These tests verify that
+ * contract holds at the type level.
  */
 class EphemeralKeypairTest {
 
     @Test
-    fun `secretHex returns correct hex encoding`() {
-        val bytes = byteArrayOf(0x0a, 0x1b, 0x2c, 0xff.toByte())
-        val keypair = EphemeralKeypair("pubkey", bytes)
-        assertEquals("0a1b2cff", keypair.secretHex())
-        keypair.close()
+    fun `EphemeralKeyResult exposes only publicKeyHex`() {
+        val result = EphemeralKeyResult("ab01cd02")
+        assertEquals("ab01cd02", result.publicKeyHex)
     }
 
     @Test
-    fun `close zeroizes secret bytes`() {
-        val keypair = EphemeralKeypair("pubkey", byteArrayOf(1, 2, 3, 4))
-        // Before close, secretHex should have non-zero content
-        assertNotEquals("00000000", keypair.secretHex())
-        keypair.close()
-        // After close, all bytes should be zero
-        assertEquals("00000000", keypair.secretHex())
-    }
-
-    @Test
-    fun `close is idempotent`() {
-        val keypair = EphemeralKeypair("pubkey", byteArrayOf(0x41, 0x42))
-        keypair.close()
-        keypair.close()
-        assertEquals("0000", keypair.secretHex())
-    }
-
-    @Test
-    fun `publicKeyHex is preserved after close`() {
-        val keypair = EphemeralKeypair("mypubkey", byteArrayOf(1, 2))
-        keypair.close()
-        assertEquals("mypubkey", keypair.publicKeyHex)
-    }
-
-    @Test
-    fun `use block zeroizes automatically`() {
-        var secretAfterUse: String? = null
-        val keypair = EphemeralKeypair("pub", byteArrayOf(0xde.toByte(), 0xad.toByte()))
-        keypair.use {
-            assertNotEquals("0000", it.secretHex())
+    fun `EphemeralKeyResult has no secret or private key fields`() {
+        // EphemeralKeyResult is a data class; its constructor fields define its shape.
+        // Java reflection on declared fields confirms only publicKeyHex exists.
+        val fields = EphemeralKeyResult::class.java.declaredFields
+            .filter { !it.isSynthetic && !it.name.startsWith("$") }
+            .map { it.name }
+        assertEquals(listOf("publicKeyHex"), fields)
+        // Ensure no field name suggests secret material leaked to JVM
+        fields.forEach { name ->
+            assertFalse(
+                "Field '$name' suggests secret key material leaked to JVM",
+                name.contains("secret", ignoreCase = true) ||
+                    name.contains("private", ignoreCase = true),
+            )
         }
-        secretAfterUse = keypair.secretHex()
-        assertEquals("0000", secretAfterUse)
     }
 
     @Test
-    fun `32-byte key round-trips correctly before close`() {
-        val bytes = ByteArray(32) { (it + 1).toByte() }
-        val keypair = EphemeralKeypair("pub", bytes)
-        val hex = keypair.secretHex()
-        assertEquals(64, hex.length) // 32 bytes = 64 hex chars
-        keypair.close()
-        // After close, should be all zeros
-        assertEquals("0".repeat(64), keypair.secretHex())
+    fun `EphemeralKeyResult is a data class with correct copy semantics`() {
+        val original = EphemeralKeyResult("aabbccdd")
+        val copy = original.copy(publicKeyHex = "11223344")
+        assertEquals("aabbccdd", original.publicKeyHex)
+        assertEquals("11223344", copy.publicKeyHex)
+    }
+
+    @Test
+    fun `EphemeralKeyResult equality is based on publicKeyHex`() {
+        val a = EphemeralKeyResult("deadbeef")
+        val b = EphemeralKeyResult("deadbeef")
+        val c = EphemeralKeyResult("cafebabe")
+        assertEquals(a, b)
+        assertEquals(a.hashCode(), b.hashCode())
+        assertFalse(a == c)
     }
 }
