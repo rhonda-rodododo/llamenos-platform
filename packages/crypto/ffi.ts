@@ -141,27 +141,36 @@ export function symmetricDecrypt(key: Uint8Array, ciphertext: Uint8Array, aad: U
   return out
 }
 
-export function hpkeSeal(recipientPk: Uint8Array, plaintext: Uint8Array, info: Uint8Array, aad: Uint8Array): Uint8Array {
+/**
+ * HPKE seal (encrypt for a recipient). The `label` parameter must be a registered
+ * domain separation label (e.g., utf8ToBytes("llamenos:note-key")). Raw info bytes
+ * are rejected — Albrecht defense enforced at the FFI boundary.
+ */
+export function hpkeSeal(recipientPk: Uint8Array, plaintext: Uint8Array, label: Uint8Array, aad: Uint8Array): Uint8Array {
   const outLen = 32 + plaintext.length + 16
   const out = new Uint8Array(outLen)
   checkResult(lib.symbols.ffi_hpke_seal(
     ptr(recipientPk), recipientPk.length,
     plaintext.length > 0 ? ptr(plaintext) : null, plaintext.length,
-    info.length > 0 ? ptr(info) : null, info.length,
+    ptr(label), label.length,
     aad.length > 0 ? ptr(aad) : null, aad.length,
     ptr(out), outLen,
   ))
   return out
 }
 
-export function hpkeOpen(secretKey: Uint8Array, envelope: Uint8Array, info: Uint8Array, aad: Uint8Array): Uint8Array {
+/**
+ * HPKE open (decrypt). The `label` parameter must be a registered domain separation
+ * label matching the one used during seal. Albrecht defense enforced at the FFI boundary.
+ */
+export function hpkeOpen(secretKey: Uint8Array, envelope: Uint8Array, label: Uint8Array, aad: Uint8Array): Uint8Array {
   const ptLen = envelope.length - 48
   if (ptLen < 0) throw new CryptoError(-5, 'envelope too short')
   const out = new Uint8Array(ptLen)
   checkResult(lib.symbols.ffi_hpke_open(
     ptr(secretKey), secretKey.length,
     ptr(envelope), envelope.length,
-    info.length > 0 ? ptr(info) : null, info.length,
+    ptr(label), label.length,
     aad.length > 0 ? ptr(aad) : null, aad.length,
     ptr(out), ptLen,
   ))
