@@ -66,7 +66,7 @@ bans.post('/',
       bannedBy: pubkey,
     })
     await audit(services.audit, 'numberBanned', pubkey, { phoneHash }, undefined, hubId ?? undefined)
-    return c.json({ ban: { phone: ban.phoneDisplay ?? ban.phone, reason: ban.reason, bannedBy: ban.bannedBy, bannedAt: ban.bannedAt } })
+    return c.json({ ban: { phone: ban.phoneDisplay ?? ban.phone, phoneHash: ban.phone, reason: ban.reason, bannedBy: ban.bannedBy, bannedAt: ban.bannedAt } })
   },
 )
 
@@ -108,10 +108,10 @@ bans.post('/bulk',
   },
 )
 
-bans.delete('/:phone',
+bans.delete('/:phoneHash',
   describeRoute({
     tags: ['Bans'],
-    summary: 'Unban a phone number',
+    summary: 'Unban a phone number by its hash',
     responses: {
       200: {
         description: 'Number unbanned',
@@ -129,8 +129,11 @@ bans.delete('/:phone',
     const services = c.get('services')
     const pubkey = c.get('pubkey')
     const hubId = c.get('hubId')
-    const phone = c.req.param('phone')
-    await services.records.removeBan(hashPhone(phone, c.env.HMAC_SECRET), hubId)
+    const phoneHash = c.req.param('phoneHash')
+    // Accept either a pre-computed HMAC hash (from the ban list response) or a raw E.164 phone
+    const isHash = /^[0-9a-f]{64}$/i.test(phoneHash)
+    const hash = isHash ? phoneHash : hashPhone(phoneHash, c.env.HMAC_SECRET)
+    await services.records.removeBan(hash, hubId)
     await audit(services.audit, 'numberUnbanned', pubkey, {}, undefined, hubId ?? undefined)
     return c.json({ ok: true })
   },
