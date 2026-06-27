@@ -79,6 +79,12 @@ class WakeKeyService @Inject constructor(
         if (existing != null) return existing
 
         if (nativeLibLoaded) {
+            // SECURITY NOTE (M01): UniFFI returns hex-encoded strings which are immutable
+            // JVM objects and cannot be explicitly zeroized. The secretKeyHex String will
+            // linger on the JVM heap until garbage collected. We convert to ByteArray
+            // immediately and zeroize that in storeWakeSecret(). The residual String is
+            // short-lived (method-scoped) and eligible for GC promptly. Changing the FFI
+            // to return ByteArray would require modifying the Rust UniFFI bindings.
             val secretKeyHex = org.llamenos.core.mobileRandomBytesHex()
             val publicKeyHex = org.llamenos.core.getPublicKey(secretKeyHex)
             val secretBytes = hexToBytes(secretKeyHex)

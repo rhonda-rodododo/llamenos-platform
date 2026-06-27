@@ -3,6 +3,7 @@ package org.llamenos.hotline
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
+import org.llamenos.hotline.BuildConfig
 import androidx.activity.ComponentActivity
 import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
@@ -80,7 +81,7 @@ class DeepLinkActivity : ComponentActivity() {
     private fun handleCallDeepLink(uri: android.net.Uri) {
         val callId = uri.getQueryParameter("callId")
         if (callId != null) {
-            Log.d(TAG, "Call deep link: callId=$callId")
+            if (BuildConfig.DEBUG) Log.d(TAG, "Call deep link received")
             val intent = Intent(this, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
                 data = android.net.Uri.parse("llamenos://calls/$callId")
@@ -107,7 +108,7 @@ class DeepLinkActivity : ComponentActivity() {
 
         val hubId = uri.getQueryParameter("hubId")
         if (hubId != null) {
-            Log.d(TAG, "Hub deep link: hubId=$hubId")
+            if (BuildConfig.DEBUG) Log.d(TAG, "Hub deep link received")
             // Hub switch was already confirmed via showConfirmationDialog() before reaching here.
             // This is an explicit user action (tap → confirmation dialog → proceed), not background processing.
             lifecycleScope.launch {

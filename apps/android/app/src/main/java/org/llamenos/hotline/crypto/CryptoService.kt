@@ -740,6 +740,13 @@ class CryptoService @Inject constructor() {
      *
      * Returns an [EphemeralKeypair] that holds the secret as a [ByteArray].
      * Always use within a `.use { }` block to ensure the secret is zeroized after use.
+     *
+     * SECURITY NOTE (M02): UniFFI returns hex-encoded strings which are immutable
+     * JVM objects and cannot be explicitly zeroized. The secretKeyHex String will
+     * linger on the JVM heap until garbage collected. We convert to ByteArray
+     * immediately and the EphemeralKeypair.close() zeroizes that. The residual
+     * String is method-scoped and eligible for GC promptly. Changing the FFI
+     * to return ByteArray would require modifying the Rust UniFFI bindings.
      */
     fun generateEphemeralKeypair(): EphemeralKeypair {
         check(nativeLibLoaded) { "Native crypto library not loaded." }

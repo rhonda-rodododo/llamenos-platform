@@ -340,7 +340,7 @@ class DashboardViewModel @Inject constructor(
             val response = apiService.request<ActiveCallsResponse>("GET", path)
             val call = response.calls.firstOrNull()
             if (call != null) {
-                android.util.Log.d("DashboardViewModel", "fetchActiveCall: found call id=${call.id} status=${call.status}")
+                if (org.llamenos.hotline.BuildConfig.DEBUG) android.util.Log.d("DashboardViewModel", "fetchActiveCall: found call id=${call.id} status=${call.status}")
             }
             _uiState.update { it.copy(currentCall = call) }
         } catch (e: Exception) {
@@ -376,7 +376,7 @@ class DashboardViewModel @Inject constructor(
      */
     fun refresh() {
         viewModelScope.launch {
-            android.util.Log.d("DashboardViewModel", "refresh() started, hubId=${activeHubState.activeHubId.value}")
+            if (org.llamenos.hotline.BuildConfig.DEBUG) android.util.Log.d("DashboardViewModel", "refresh() started")
             _uiState.update { it.copy(isRefreshing = true, errorRes = null) }
             val success = loadShiftStatus()
             if (!success) {

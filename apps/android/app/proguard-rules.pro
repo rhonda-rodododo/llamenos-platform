@@ -99,3 +99,10 @@
     volatile <fields>;
 }
 -dontwarn kotlinx.coroutines.**
+
+# Strip debug and verbose log calls from release builds (L05/L06).
+# R8 treats these as side-effect-free and removes them entirely.
+-assumenosideeffects class android.util.Log {
+    public static int d(...);
+    public static int v(...);
+}
