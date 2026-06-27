@@ -3,6 +3,15 @@
 //! Centralized to ensure device_keys and encryption modules use identical
 //! parameters. The `test-kdf` feature gates fast parameters for test/debug builds.
 
+// C-M3: Prevent test-kdf from being compiled into release builds.
+// debug_assertions is disabled in --release; this fires before any other code compiles.
+#[cfg(all(feature = "test-kdf", not(debug_assertions)))]
+compile_error!(
+    "The `test-kdf` feature MUST NOT be enabled in release builds. \
+     It reduces Argon2id KDF resistance from ~seconds to ~microseconds per guess, \
+     making brute-force of device PIN encryption trivially fast."
+);
+
 /// KDF version byte stored in encrypted key material for future-proofing.
 /// v2 = Argon2id (64MB, 3 iterations, 4 parallelism).
 pub const KDF_VERSION: u8 = 2;

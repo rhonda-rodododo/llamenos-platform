@@ -119,7 +119,7 @@ impl MlsManager {
             member_count: group.members().count() as u32,
         };
 
-        self.groups.lock().unwrap().push(group);
+        self.groups.lock().unwrap_or_else(|e| e.into_inner()).push(group);
         Ok(state)
     }
 
@@ -169,7 +169,7 @@ impl MlsManager {
             .validate(self.provider.crypto(), ProtocolVersion::Mls10)
             .map_err(|e| CryptoError::InvalidFormat(format!("MLS KP validate: {e:?}")))?;
 
-        let mut groups = self.groups.lock().unwrap();
+        let mut groups = self.groups.lock().unwrap_or_else(|e| e.into_inner());
         let group = groups
             .iter_mut()
             .find(|g| g.group_id().as_slice() == group_id)
@@ -236,7 +236,7 @@ impl MlsManager {
             member_count: group.members().count() as u32,
         };
 
-        self.groups.lock().unwrap().push(group);
+        self.groups.lock().unwrap_or_else(|e| e.into_inner()).push(group);
         Ok(state)
     }
 
@@ -252,7 +252,7 @@ impl MlsManager {
         context: &[u8],
         length: usize,
     ) -> Result<Vec<u8>, CryptoError> {
-        let groups = self.groups.lock().unwrap();
+        let groups = self.groups.lock().unwrap_or_else(|e| e.into_inner());
         let group = groups
             .iter()
             .find(|g| g.group_id().as_slice() == group_id)
@@ -267,7 +267,7 @@ impl MlsManager {
 
     /// Perform a self-update for post-compromise security.
     pub fn self_update(&self, group_id: &[u8]) -> Result<MlsCommitResult, CryptoError> {
-        let mut groups = self.groups.lock().unwrap();
+        let mut groups = self.groups.lock().unwrap_or_else(|e| e.into_inner());
         let group = groups
             .iter_mut()
             .find(|g| g.group_id().as_slice() == group_id)
@@ -299,7 +299,7 @@ impl MlsManager {
 
     /// Get the current state of a group.
     pub fn group_state(&self, group_id: &[u8]) -> Result<MlsGroupState, CryptoError> {
-        let groups = self.groups.lock().unwrap();
+        let groups = self.groups.lock().unwrap_or_else(|e| e.into_inner());
         let group = groups
             .iter()
             .find(|g| g.group_id().as_slice() == group_id)

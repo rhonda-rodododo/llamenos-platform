@@ -11,10 +11,10 @@ crate-type = ["lib", "cdylib", "staticlib"]
 
 [dependencies]
 # Ed25519 signing
-ed25519-dalek = { version = "2", features = ["rand_core"] }
+ed25519-dalek = { version = "2", features = ["rand_core", "zeroize"] }
 
 # X25519 key agreement
-x25519-dalek = { version = "2", features = ["static_secrets"] }
+x25519-dalek = { version = "2", features = ["static_secrets", "zeroize"] }
 
 # HPKE: DHKEM(X25519, HKDF-SHA256) + HKDF-SHA256 + AES-256-GCM
 hpke = { version = "0.13", default-features = false, features = ["x25519", "alloc"] }
