@@ -171,9 +171,10 @@ firehose.get('/:id',
   async (c) => {
     const services = c.get('services')
     const id = c.req.param('id')
+    const hubId = c.get('hubId') ?? 'global'
 
     const row = await services.firehose.getConnection(id)
-    if (!row) {
+    if (!row || row.hubId !== hubId) {
       return c.json({ error: 'Firehose connection not found' }, 404)
     }
     return c.json({ connection: mapConnection(row) })

@@ -121,6 +121,15 @@ export function validateConfig(env: ConfigInput = process.env): void {
     )
   }
 
+  // --- Production-required vars ---
+  if (environment === 'production' && !env['WEBHOOK_BASE_URL']?.trim()) {
+    throw new Error(
+      '[llamenos] WEBHOOK_BASE_URL is required in production. ' +
+      'Without it, webhook signature validation falls back to the spoofable Host header. ' +
+      'Set WEBHOOK_BASE_URL to your public base URL (e.g. https://api.llamenos.org).'
+    )
+  }
+
   // --- Optional vars (warn when absent, do not fail) ---
   warnIfAbsent(env, 'WEBHOOK_BASE_URL', 'webhook signature validation uses request Host header (vulnerable to Host header spoofing — set WEBHOOK_BASE_URL in production)')
   // WebSocket relay is in-process — no external relay URL needed

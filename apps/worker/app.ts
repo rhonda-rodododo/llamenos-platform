@@ -295,9 +295,15 @@ hubScoped.route('/tags', tagsRoutes)
 
 authenticated.route('/hubs/:hubId', hubScoped)
 
-// OpenAPI spec + Scalar interactive docs (public, before auth)
-api.get('/openapi.json', openAPIRouteHandler(api, openAPIConfig))
-api.get('/docs', Scalar({ url: '/api/openapi.json' }))
+// OpenAPI spec + Scalar interactive docs — restricted to non-production (L3)
+const openAPIGuard = createMiddleware<AppEnv>(async (c, next) => {
+  if (c.env.ENVIRONMENT === 'production') {
+    return c.json({ error: 'Not Found' }, 404)
+  }
+  return next()
+})
+api.get('/openapi.json', openAPIGuard, openAPIRouteHandler(api, openAPIConfig))
+api.get('/docs', openAPIGuard, Scalar({ url: '/api/openapi.json' }))
 
 api.route('/', authenticated)
 
