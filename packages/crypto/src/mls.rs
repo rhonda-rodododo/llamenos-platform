@@ -2,7 +2,7 @@
 //!
 //! Each hub is an MLS group. Each device is a leaf in the ratchet tree.
 //!
-//! Ciphersuite: MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519
+//! Ciphersuite: MLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519
 //!
 //! This module provides:
 //! - Group creation and management
@@ -24,7 +24,7 @@ use crate::errors::CryptoError;
 use crate::labels::LABEL_HUB_PTK;
 
 /// The ciphersuite used for all MLS groups.
-const CIPHERSUITE: Ciphersuite = Ciphersuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519;
+const CIPHERSUITE: Ciphersuite = Ciphersuite::MLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519;
 
 /// MLS group state (public info).
 #[derive(Debug, Clone, Serialize, Deserialize)]
