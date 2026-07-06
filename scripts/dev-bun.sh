@@ -13,6 +13,15 @@ set -euo pipefail
 COMPOSE_FILE="deploy/docker/docker-compose.dev.yml"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$PROJECT_DIR"
+
+# Source root .env for PG_PASSWORD, ADMIN_PUBKEY, and other config (skip comments and blanks)
+if [ -f "$PROJECT_DIR/.env" ]; then
+  set -a
+  # shellcheck disable=SC1091
+  source <(grep -v '^\s*#' "$PROJECT_DIR/.env" | grep -v '^\s*$')
+  set +a
+fi
+
 COMPOSE="docker compose --project-directory $PROJECT_DIR -f $COMPOSE_FILE"
 
 GREEN='\033[0;32m'
@@ -45,11 +54,19 @@ cmd_start() {
   # Set environment variables for local development
   export PLATFORM=bun
   export PORT=3000
-  export DATABASE_URL="postgresql://llamenos:dev@localhost:5432/llamenos"
+  export DATABASE_URL="${DATABASE_URL:-postgresql://llamenos:${PG_PASSWORD:-dev}@localhost:5432/llamenos}"
   export PG_POOL_SIZE=5
-  export ADMIN_PUBKEY="${ADMIN_PUBKEY:-79215a4c04f08fcd817c6f820c87169beb8cddf96dfa590a1315556b78af9183}"
+  # ADMIN_PUBKEY: use .env value if set (skips setup wizard); otherwise leave unset
+  # so the admin bootstrap / setup wizard is exercisable in dev.
+  [ -n "${ADMIN_PUBKEY:-}" ] && export ADMIN_PUBKEY
   export HOTLINE_NAME="${HOTLINE_NAME:-Llámenos (Dev)}"
-  export ENVIRONMENT=development
+  # Only default ENVIRONMENT to 'development' when ADMIN_PUBKEY is set (wizard skipped).
+  # Without ADMIN_PUBKEY, leave it unset so the setup wizard is shown.
+  if [ -n "${ENVIRONMENT:-}" ]; then
+    export ENVIRONMENT
+  elif [ -n "${ADMIN_PUBKEY:-}" ]; then
+    export ENVIRONMENT=development
+  fi
   export DEV_RESET_SECRET="${DEV_RESET_SECRET:-test-reset-secret}"
   if [ -z "${HMAC_SECRET:-}" ]; then
     warn "HMAC_SECRET not set. Generating random value for this session."

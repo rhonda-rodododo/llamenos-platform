@@ -349,14 +349,14 @@ export async function login(pubkey: string, timestamp: number, token: string) {
   })
 }
 
-export async function bootstrapAdmin(pubkey: string, timestamp: number, token: string) {
+export async function bootstrapAdmin(pubkey: string, timestamp: number, token: string, nonce?: string) {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
   try {
     const res = await fetch(`${API_BASE}/auth/bootstrap`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pubkey, timestamp, token }),
+      body: JSON.stringify({ pubkey, timestamp, token, ...(nonce ? { nonce } : {}) }),
       signal: controller.signal,
     })
     if (!res.ok) {

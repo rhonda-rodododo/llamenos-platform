@@ -72,7 +72,12 @@ window.__TAURI_ISOLATION_HOOK__ = (payload) => {
     'plugin:window|set_title',
     // Stronghold plugin commands
     'plugin:stronghold|initialize',
+    'plugin:stronghold|create_client',
+    'plugin:stronghold|load_client',
     'plugin:stronghold|save',
+    'plugin:stronghold|save_store_record',
+    'plugin:stronghold|get_store_record',
+    'plugin:stronghold|remove_store_record',
     'plugin:stronghold|destroy',
     // Store plugin commands (encrypted key persistence)
     'plugin:store|get',
@@ -92,6 +97,10 @@ window.__TAURI_ISOLATION_HOOK__ = (payload) => {
     'plugin:window-state|save_window_state',
     // Log plugin commands
     'plugin:log|log',
+    // Backup generation (device-state export during admin bootstrap)
+    'generate_backup_from_state',
+    // Path plugin commands (store/stronghold resolve the app data directory)
+    'plugin:path|resolve_directory',
     // Process plugin commands (for quit only)
     'plugin:process|exit',
   ]);
