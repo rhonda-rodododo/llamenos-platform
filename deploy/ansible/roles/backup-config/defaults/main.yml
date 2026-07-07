@@ -12,9 +12,8 @@ backup_config_paths:
 
 # Optional extra paths (TLS certs, ansible inventory, etc.)
 backup_config_extra_paths: []
-
 # Ansible inventory/vars on the control node (backed up locally, not on remote)
-backup_config_ansible_dir: ""           # e.g., "/path/to/deploy/ansible"
+backup_config_ansible_dir: "" # e.g., "/path/to/deploy/ansible"
 
 # Retention policy
 backup_config_retain_daily: 14

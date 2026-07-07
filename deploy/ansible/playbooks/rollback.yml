@@ -143,7 +143,7 @@
         version_result: success
 
     - name: Clean up old images
-      ansible.builtin.shell: docker image prune -f
+      ansible.builtin.command: docker image prune -f
       changed_when: true
 
     - name: Display rollback summary

@@ -99,7 +99,8 @@
 
     - name: Record SSH hardening result
       ansible.builtin.set_fact:
-        smoke_results: "{{ smoke_results + [{'check': 'SSH password auth disabled + root login disabled', 'status': 'PASS' if ssh_check is succeeded else 'FAIL'}] }}"
+        smoke_results: "{{ smoke_results + [{'check': 'SSH password auth disabled + root login disabled', 'status': 'PASS' if ssh_check is succeeded else 'FAIL'}]
+          }}"
       tags: always
 
     - name: Assert tcp_syncookies is enabled
@@ -134,7 +135,8 @@
 
     - name: Record container health result
       ansible.builtin.set_fact:
-        smoke_results: "{{ smoke_results + [{'check': 'No unhealthy Docker containers', 'status': 'PASS' if container_health_check is succeeded else 'FAIL: ' + container_health_check.stdout | default('')}] }}"
+        smoke_results: "{{ smoke_results + [{'check': 'No unhealthy Docker containers', 'status': 'PASS' if container_health_check is succeeded else 'FAIL: ' + container_health_check.stdout
+          | default('')}] }}"
       tags: always
 
     # ─── Application health endpoints ────────────────────────────────────────
@@ -170,7 +172,8 @@
 
     - name: Record app readiness result
       ansible.builtin.set_fact:
-        smoke_results: "{{ smoke_results + [{'check': 'App readiness probe /api/health/ready (200)', 'status': 'PASS' if app_ready is succeeded else 'FAIL (postgres/storage/relay dependency check failed)'}] }}"
+        smoke_results: "{{ smoke_results + [{'check': 'App readiness probe /api/health/ready (200)', 'status': 'PASS' if app_ready is succeeded else 'FAIL (postgres/storage/relay
+          dependency check failed)'}] }}"
       tags: always
 
     - name: Check app full health endpoint
@@ -207,7 +210,8 @@
 
     - name: Record PostgreSQL result
       ansible.builtin.set_fact:
-        smoke_results: "{{ smoke_results + [{'check': 'PostgreSQL accepting connections', 'status': 'PASS' if postgres_check is succeeded else 'FAIL' if postgres_check is failed else 'SKIP'}] }}"
+        smoke_results: "{{ smoke_results + [{'check': 'PostgreSQL accepting connections', 'status': 'PASS' if postgres_check is succeeded else 'FAIL' if postgres_check
+          is failed else 'SKIP'}] }}"
       when: llamenos_postgres_enabled | default(true) | bool
       tags: always
 
@@ -229,7 +233,8 @@
 
     - name: Record RustFS result
       ansible.builtin.set_fact:
-        smoke_results: "{{ smoke_results + [{'check': 'RustFS object storage reachable (port 9000)', 'status': 'PASS' if rustfs_check is succeeded else 'FAIL' if rustfs_check is failed else 'SKIP'}] }}"
+        smoke_results: "{{ smoke_results + [{'check': 'RustFS object storage reachable (port 9000)', 'status': 'PASS' if rustfs_check is succeeded else 'FAIL' if
+          rustfs_check is failed else 'SKIP'}] }}"
       when: llamenos_rustfs_enabled | default(true) | bool
       tags: always
 
@@ -250,7 +255,8 @@
 
     - name: Record ntfy result
       ansible.builtin.set_fact:
-        smoke_results: "{{ smoke_results + [{'check': 'ntfy health endpoint (200)', 'status': 'PASS' if ntfy_check is succeeded else 'FAIL' if ntfy_check is failed else 'SKIP'}] }}"
+        smoke_results: "{{ smoke_results + [{'check': 'ntfy health endpoint (200)', 'status': 'PASS' if ntfy_check is succeeded else 'FAIL' if ntfy_check is failed
+          else 'SKIP'}] }}"
       when: llamenos_ntfy_enabled | default(false) | bool
       tags: always
 
@@ -269,7 +275,8 @@
 
     - name: Record Signal Notifier result
       ansible.builtin.set_fact:
-        smoke_results: "{{ smoke_results + [{'check': 'Signal Notifier sidecar health (port 3100)', 'status': 'PASS' if signal_notifier_check is succeeded else 'FAIL' if signal_notifier_check is failed else 'SKIP'}] }}"
+        smoke_results: "{{ smoke_results + [{'check': 'Signal Notifier sidecar health (port 3100)', 'status': 'PASS' if signal_notifier_check is succeeded else 'FAIL'
+          if signal_notifier_check is failed else 'SKIP'}] }}"
       when: llamenos_signal_enabled | default(false) | bool
       tags: always
 
@@ -285,7 +292,8 @@
 
     - name: Record update server result
       ansible.builtin.set_fact:
-        smoke_results: "{{ smoke_results + [{'check': 'Update server health', 'status': 'PASS' if update_health is succeeded else 'FAIL' if update_health is failed else 'SKIP'}] }}"
+        smoke_results: "{{ smoke_results + [{'check': 'Update server health', 'status': 'PASS' if update_health is succeeded else 'FAIL' if update_health is failed
+          else 'SKIP'}] }}"
       when: llamenos_update_server_enabled | default(false) | bool
       tags: always
 
@@ -306,7 +314,8 @@
 
     - name: Record Caddy HTTPS result
       ansible.builtin.set_fact:
-        smoke_results: "{{ smoke_results + [{'check': 'Caddy HTTPS serving ' + _api_base_url, 'status': 'PASS' if caddy_check is succeeded else 'FAIL' if caddy_check is failed else 'SKIP'}] }}"
+        smoke_results: "{{ smoke_results + [{'check': 'Caddy HTTPS serving ' + _api_base_url, 'status': 'PASS' if caddy_check is succeeded else 'FAIL' if caddy_check
+          is failed else 'SKIP'}] }}"
       when: llamenos_caddy_enabled | default(true) | bool
       tags: always
 
@@ -339,7 +348,8 @@
 
     - name: Record HSTS header result
       ansible.builtin.set_fact:
-        smoke_results: "{{ smoke_results + [{'check': 'HSTS header present (Caddy security_headers)', 'status': 'PASS' if hsts_check is succeeded else 'FAIL' if hsts_check is defined and hsts_check is failed else 'SKIP'}] }}"
+        smoke_results: "{{ smoke_results + [{'check': 'HSTS header present (Caddy security_headers)', 'status': 'PASS' if hsts_check is succeeded else 'FAIL' if hsts_check
+          is defined and hsts_check is failed else 'SKIP'}] }}"
       when: llamenos_caddy_enabled | default(true) | bool
       tags: always
 
@@ -360,7 +370,8 @@
 
     - name: Record X-Frame-Options result
       ansible.builtin.set_fact:
-        smoke_results: "{{ smoke_results + [{'check': 'X-Frame-Options: DENY header present', 'status': 'PASS' if xframe_check is succeeded else 'FAIL' if xframe_check is defined and xframe_check is failed else 'SKIP'}] }}"
+        smoke_results: "{{ smoke_results + [{'check': 'X-Frame-Options: DENY header present', 'status': 'PASS' if xframe_check is succeeded else 'FAIL' if xframe_check
+          is defined and xframe_check is failed else 'SKIP'}] }}"
       when: llamenos_caddy_enabled | default(true) | bool
       tags: always
 
@@ -389,7 +400,8 @@
 
     - name: Record disk space result
       ansible.builtin.set_fact:
-        smoke_results: "{{ smoke_results + [{'check': 'Disk space >= 2 GiB free post-deploy', 'status': 'PASS' if disk_check is succeeded else 'FAIL: only ' + disk_free_gb.stdout + ' GiB free'}] }}"
+        smoke_results: "{{ smoke_results + [{'check': 'Disk space >= 2 GiB free post-deploy', 'status': 'PASS' if disk_check is succeeded else 'FAIL: only ' + disk_free_gb.stdout
+          + ' GiB free'}] }}"
       tags: always
 
     # ─── Summary ─────────────────────────────────────────────────────────────
