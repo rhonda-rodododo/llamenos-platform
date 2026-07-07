@@ -23,7 +23,7 @@
     mode: "0750"
 
 - name: Capture current running image versions
-  ansible.builtin.shell: bash "{{ version_tracker_dir }}/capture-versions.sh"
+  ansible.builtin.command: bash "{{ version_tracker_dir }}/capture-versions.sh"
   register: _captured_versions_raw
   changed_when: false
   failed_when: false

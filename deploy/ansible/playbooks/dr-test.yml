@@ -18,13 +18,13 @@
   gather_facts: true
 
   vars:
-    dr_mode: full  # full | restore | validate
+    dr_mode: full # full | restore | validate
     dr_start_time: "{{ ansible_date_time.epoch }}"
     dr_compose_dir: "{{ ansible_env.HOME }}/.llamenos-dr-test"
     dr_results_file: "{{ app_dir | default('/opt/llamenos') }}/dr-results/dr-{{ ansible_date_time.iso8601_basic_short }}.json"
     dr_project_name: llamenos-dr-test
     dr_port: 3333
-    dr_rto_target: 14400  # 4 hours in seconds
+    dr_rto_target: 14400 # 4 hours in seconds
     backup_dir: "{{ app_dir | default('/opt/llamenos') }}/backups"
     age_identity: "{{ age_identity_file | default('/root/backup-key.txt') }}"
 

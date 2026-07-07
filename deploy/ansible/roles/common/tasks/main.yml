@@ -31,7 +31,7 @@
     name: "{{ timezone }}"
 
 - name: Set locale to {{ locale }}
-  ansible.builtin.locale_gen:
+  community.general.locale_gen:
     name: "{{ locale }}"
     state: present
 

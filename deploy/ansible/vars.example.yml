@@ -34,7 +34,7 @@ ssh_port: 2222
 # CIDR ranges allowed to connect via SSH
 # Restrict to your admin IP addresses for maximum security
 ssh_allowed_cidrs:
-  - "REPLACE_WITH_YOUR_IP/32"  # REQUIRED — restrict to your admin IP(s)
+  - "REPLACE_WITH_YOUR_IP/32" # REQUIRED — restrict to your admin IP(s)
 
 # ─── Deploy User ─────────────────────────────────────────────────
 # The non-root user that runs the application
@@ -57,12 +57,12 @@ llamenos_signal_enabled: false
 # Pin all images to specific versions + digests for reproducible deployments.
 # Image digests must be re-verified when updating tags.
 # Use: docker inspect --format='{{index .RepoDigests 0}}' <image>:<tag>
-llamenos_app_image: docker.io/llamenos/llamenos:latest  # Update on each release
+llamenos_app_image: docker.io/llamenos/llamenos:latest # Update on each release
 llamenos_postgres_image: postgres:17-alpine@sha256:3430fe182f5065a6ea505c3d432d2c7fff18fbab954df8f277c1dbf4c70124af
 llamenos_caddy_image: caddy:2.9-alpine@sha256:b4e3952384eb9524a887633ce65c752dd7c71314d2c2acf98cd5c715aaa534f0
 llamenos_rustfs_image: rustfs/rustfs:latest
-llamenos_whisper_image: fedirz/faster-whisper-server:0.4.1  # digest pin pending: tag not yet on Docker Hub
-llamenos_asterisk_image: andrius/asterisk@sha256:e30df5ec1b512827bf3cffc49b8000b07376a05c950736d028348eba80035015  # 20.x
+llamenos_whisper_image: fedirz/faster-whisper-server:0.4.1 # digest pin pending: tag not yet on Docker Hub
+llamenos_asterisk_image: andrius/asterisk@sha256:e30df5ec1b512827bf3cffc49b8000b07376a05c950736d028348eba80035015 # 20.x
 llamenos_signal_image: bbernhard/signal-cli-rest-api:0.92@sha256:702db336aa1a87611595e66755c9ccf65b24c25589857301eabef1d46056b3c5
 
 # ─── Application ─────────────────────────────────────────────────
@@ -120,7 +120,6 @@ server_secret: ""
 # These are kept for backward compatibility with the monolithic compose template.
 # For new deployments, use llamenos_*_enabled toggles above instead.
 compose_profiles: []
-
 # Whisper transcription settings (only used if transcription is enabled)
 whisper_model: Systran/faster-whisper-base
 whisper_device: cpu
@@ -179,7 +178,6 @@ backup_config_retain_weekly: 8
 backup_config_retain_monthly: 6
 # Additional paths to back up (e.g., TLS certs, custom scripts)
 backup_config_extra_paths: []
-
 # ─── Backup Monitoring ────────────────────────────────────────
 # Maximum hours before a backup is considered stale
 backup_monitor_max_age_hours: 26
@@ -196,7 +194,6 @@ docker_userns_remap: true
 # Additional ports to open beyond SSH, HTTP, and HTTPS
 # Example: [{ port: 5060, proto: "udp", comment: "SIP" }]
 firewall_extra_ports: []
-
 # ─── NTP ─────────────────────────────────────────────────────────
 # NTP servers (accurate time is critical for Schnorr token validation)
 ntp_servers:
@@ -229,13 +226,13 @@ prometheus_scrape_interval: 15s
 
 # Grafana settings
 grafana_image: grafana/grafana-oss:11.5.2
-grafana_admin_password: ""  # Generate with: openssl rand -base64 24
-grafana_domain: ""          # Leave empty to use {{ domain }} with /grafana path
+grafana_admin_password: "" # Generate with: openssl rand -base64 24
+grafana_domain: "" # Leave empty to use {{ domain }} with /grafana path
 grafana_allow_signup: false
 
 # Loki settings
 loki_image: grafana/loki:3.4.2
-loki_retention_period: 168h  # 7 days
+loki_retention_period: 168h # 7 days
 
 # Promtail settings
 promtail_image: grafana/promtail:3.4.2
@@ -260,7 +257,7 @@ alert_smtp_to: "oncall@yourdomain.org"
 # ntfy settings (for alert_notification_method: ntfy)
 alert_ntfy_url: "https://ntfy.sh"
 alert_ntfy_topic: "llamenos-alerts"
-alert_ntfy_token: ""  # Optional auth token
+alert_ntfy_token: "" # Optional auth token
 
 # Webhook settings (for alert_notification_method: webhook)
 alert_webhook_url: ""
@@ -270,7 +267,7 @@ node_exporter_image: prom/node-exporter:v1.9.0
 
 # Healthcheck-only mode settings (used when healthcheck_only: true)
 healthcheck_image: curlimages/curl:8.12.1
-healthcheck_interval: 30     # seconds between checks
+healthcheck_interval: 30 # seconds between checks
 healthcheck_endpoints:
   - name: app
     url: "http://app:3000/api/health"
@@ -296,11 +293,8 @@ llamenos_alert_cert_expiry_days: 7
 # Disk space: warning threshold percentage
 llamenos_alert_disk_percent: 85
 
-# Enable/disable PostgreSQL maintenance (vacuum, cleanup)
-llamenos_postgres_enabled: true
-
-# Enable/disable Caddy certificate monitoring
-llamenos_caddy_enabled: true
+# PostgreSQL vacuum/cleanup and Caddy certificate monitoring cron jobs
+# are gated on llamenos_postgres_enabled / llamenos_caddy_enabled above.
 
 # ─── Alerting ─────────────────────────────────────────────────────────
 # Opt-in operator alerting: cron-based health checks every 5 minutes.

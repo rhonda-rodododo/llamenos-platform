@@ -5,7 +5,7 @@
 # Required facts (set by main.yml): current_versions, version_history
 
 - name: Capture post-update versions
-  ansible.builtin.shell: bash "{{ version_tracker_dir }}/capture-versions.sh"
+  ansible.builtin.command: bash "{{ version_tracker_dir }}/capture-versions.sh"
   register: _post_update_versions_raw
   changed_when: false
 

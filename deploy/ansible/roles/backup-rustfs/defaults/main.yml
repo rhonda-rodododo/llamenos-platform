@@ -7,11 +7,11 @@ backup_rustfs_dir: "{{ backup_base_dir }}/rustfs"
 # RustFS connection (S3-compatible bucket)
 backup_rustfs_container: llamenos-rustfs-1
 backup_rustfs_bucket: llamenos-files
-backup_rustfs_alias: local               # s3 alias name
+backup_rustfs_alias: local # s3 alias name
 
 # S3 mirror options
-backup_rustfs_remove_deleted: false       # mirror --remove (sync deletes)
-backup_rustfs_overwrite: false            # mirror --overwrite (re-copy changed)
+backup_rustfs_remove_deleted: false # mirror --remove (sync deletes)
+backup_rustfs_overwrite: false # mirror --overwrite (re-copy changed)
 
 # Retention policy
 backup_rustfs_retain_daily: 7
