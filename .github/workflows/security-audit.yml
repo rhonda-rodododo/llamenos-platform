@@ -145,21 +145,23 @@ jobs:
 
       - name: Upload Dockerfile.build scan results
         uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v3
-        if: always()
+        # upload-sarif requires GitHub Advanced Security (public repos or GHAS license).
+        # Skip on private repos to avoid action_required failures.
+        if: always() && github.repository_visibility == 'public'
         with:
           sarif_file: 'dockerfile-build-results.sarif'
           category: 'dockerfile-build'
 
       - name: Upload deploy Dockerfile scan results
         uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v3
-        if: always()
+        if: always() && github.repository_visibility == 'public'
         with:
           sarif_file: 'dockerfile-deploy-results.sarif'
           category: 'dockerfile-deploy'
 
       - name: Upload Docker Compose scan results
         uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v3
-        if: always()
+        if: always() && github.repository_visibility == 'public'
         with:
           sarif_file: 'docker-compose-results.sarif'
           category: 'docker-compose'
@@ -213,7 +215,7 @@ jobs:
 
       - name: Upload image scan results
         uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v3
-        if: always()
+        if: always() && github.repository_visibility == 'public'
         with:
           sarif_file: 'image-results.sarif'
           category: 'image-scan-${{ matrix.image.name }}'
@@ -293,3 +295,33 @@ jobs:
           else
             echo "No hardcoded keys found in production crypto code."
           fi
+
+  # ─── Rust Dependency Policy (cargo deny) ───────────────────
+  cargo-deny:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 15
+    # Warn-only initially — change continue-on-error to false once the initial
+    # deny.toml triage is complete and all findings are addressed.
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # stable
+        with:
+          toolchain: stable
+
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --locked
+
+      - name: Check packages/crypto (licenses, advisories, bans, sources)
+        run: cargo deny --manifest-path packages/crypto/Cargo.toml check
+        continue-on-error: true
+
+      - name: Check apps/desktop (licenses, advisories, bans, sources)
+        run: cargo deny --manifest-path apps/desktop/Cargo.toml check
+        continue-on-error: true
