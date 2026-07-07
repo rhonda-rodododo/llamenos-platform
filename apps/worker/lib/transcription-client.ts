@@ -53,6 +53,7 @@ export function createTranscriptionService(opts?: {
       const response = await safeFetch(whisperUrl, {
         method: 'POST',
         body: formData,
+        ssrfGuard: false,
       })
 
       if (!response.ok) {

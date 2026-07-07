@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest'
-import { hashPhone, hashIP, hashAuditEntry, stableJsonStringify, encryptMessageForStorage, encryptCallRecordForStorage } from '@worker/lib/crypto'
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { hashPhone, hashIP, hashAuditEntry, stableJsonStringify, encryptMessageForStorage, encryptCallRecordForStorage, getClientIp } from '@worker/lib/crypto'
+import { bytesToHex } from '@noble/hashes/utils.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { utf8ToBytes } from '@noble/ciphers/utils.js'
 
@@ -71,6 +71,64 @@ describe('hashIP', () => {
     const hash = hashIP('2001:db8::1', TEST_SECRET)
     expect(hash).toMatch(/^[0-9a-f]+$/)
     expect(hash.length).toBe(24)
+  })
+})
+
+describe('getClientIp', () => {
+  const originalTrustProxyHeaders = process.env.TRUST_PROXY_HEADERS
+
+  beforeEach(() => {
+    delete process.env.TRUST_PROXY_HEADERS
+  })
+
+  afterEach(() => {
+    if (originalTrustProxyHeaders === undefined) {
+      delete process.env.TRUST_PROXY_HEADERS
+    } else {
+      process.env.TRUST_PROXY_HEADERS = originalTrustProxyHeaders
+    }
+  })
+
+  it('ignores spoofable forwarding headers by default (no trusted proxy configured)', () => {
+    const req = new Request('http://localhost/', {
+      headers: {
+        'CF-Connecting-IP': '1.2.3.4',
+        'X-Forwarded-For': '9.9.9.9',
+        'X-Real-IP': '8.8.8.8',
+        'User-Agent': 'test-agent',
+      },
+    })
+    const ip = getClientIp(req)
+    expect(ip).not.toBe('1.2.3.4')
+    expect(ip).not.toBe('9.9.9.9')
+    expect(ip).not.toBe('8.8.8.8')
+    expect(ip).toMatch(/^fingerprint:/)
+  })
+
+  it('trusts CF-Connecting-IP only when TRUST_PROXY_HEADERS=true', () => {
+    process.env.TRUST_PROXY_HEADERS = 'true'
+    const req = new Request('http://localhost/', {
+      headers: { 'CF-Connecting-IP': '1.2.3.4' },
+    })
+    expect(getClientIp(req)).toBe('1.2.3.4')
+  })
+
+  it('takes the right-most X-Forwarded-For entry when trusted (nearest hop, not client-controlled left-most)', () => {
+    process.env.TRUST_PROXY_HEADERS = 'true'
+    const req = new Request('http://localhost/', {
+      headers: { 'X-Forwarded-For': '9.9.9.9, 10.0.0.5' },
+    })
+    expect(getClientIp(req)).toBe('10.0.0.5')
+  })
+
+  it('falls back to a per-client fingerprint when no headers or socket address are available', () => {
+    const req = new Request('http://localhost/', {
+      headers: { 'User-Agent': 'agent-a', 'Accept-Language': 'en-US' },
+    })
+    const req2 = new Request('http://localhost/', {
+      headers: { 'User-Agent': 'agent-b', 'Accept-Language': 'en-US' },
+    })
+    expect(getClientIp(req)).not.toBe(getClientIp(req2))
   })
 })
 

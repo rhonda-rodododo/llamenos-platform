@@ -6,6 +6,7 @@
  * All state is stored in PostgreSQL via Drizzle ORM.
  */
 import { eq, and, lt, sql, inArray } from 'drizzle-orm'
+import { timingSafeCompare } from '../lib/timing-safe'
 import type { Database } from '../db'
 import {
   users,
@@ -629,6 +630,12 @@ export class IdentityService {
     if (rows.length === 0) throw new ServiceError(401, 'Invalid session')
     const row = rows[0]
 
+    // B-M15: Constant-time verification of the token after DB retrieval
+    // prevents timing oracle attacks even if SQL comparison leaks timing
+    if (!timingSafeCompare(row.token, token)) {
+      throw new ServiceError(401, 'Invalid session')
+    }
+
     const decision = decideSessionRenewal(
       row.expiresAt,
       new Date(),
@@ -789,18 +796,20 @@ export class IdentityService {
   /**
    * Store a WebAuthn challenge (5-minute TTL, consumed on read).
    */
-  async storeWebAuthnChallenge(id: string, challenge: string, pubkey?: string): Promise<void> {
+  async storeWebAuthnChallenge(id: string, challenge: string, pubkey?: string, allowedCredIds?: string[]): Promise<void> {
     await this.db.insert(webauthnChallenges).values({
       challengeId: id,
       challenge,
       pubkey: pubkey ?? null,
+      allowedCredIds: allowedCredIds ? allowedCredIds.join(',') : null,
     })
   }
 
   /**
    * Retrieve and consume a WebAuthn challenge. Throws if not found or expired.
+   * Returns the stored pubkey binding (if any) for caller-side verification (B-M14).
    */
-  async getWebAuthnChallenge(id: string): Promise<{ challenge: string }> {
+  async getWebAuthnChallenge(id: string): Promise<{ challenge: string; pubkey: string | null; allowedCredIds: string[] | null }> {
     // RACE-08: Atomic consume — DELETE...RETURNING with TTL in WHERE clause.
     // Fixes two issues: (1) concurrent consume race, (2) delete-before-validate
     // bug where expired challenges were deleted then errored, wasting the entry.
@@ -815,7 +824,11 @@ export class IdentityService {
       )
       .returning()
 
-    if (row) return { challenge: row.challenge }
+    if (row) return {
+      challenge: row.challenge,
+      pubkey: row.pubkey ?? null,
+      allowedCredIds: row.allowedCredIds ? row.allowedCredIds.split(',') : null,
+    }
 
     // No row deleted — either doesn't exist or expired. Check which case
     // to return the appropriate error code (H08 error differentiation).

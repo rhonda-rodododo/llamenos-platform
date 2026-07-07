@@ -163,6 +163,7 @@ setup.post('/test/signal', requirePermission('settings:manage-messaging'),
       const res = await safeFetch(`${body.bridgeUrl}/v1/about`, {
         headers,
         timeoutMs: 10_000,
+        ssrfGuard: false,
       })
 
       if (res.ok) {

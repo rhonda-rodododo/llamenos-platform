@@ -27,6 +27,7 @@ async function checkSignalAvailability(
       {
         headers: { authorization: `Bearer ${notifierApiKey}` },
         timeoutMs: 10_000,
+        ssrfGuard: false,
       }
     )
     if (!res.ok) return false

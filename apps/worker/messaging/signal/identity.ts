@@ -216,6 +216,7 @@ export class SignalIdentityService {
           },
           body: JSON.stringify(body),
           timeoutMs: 10_000,
+          ssrfGuard: false,
         },
       )
 

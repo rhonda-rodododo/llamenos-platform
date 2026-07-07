@@ -24,6 +24,9 @@ services:
       # Tier 4 PR-A: API enforces cross-site CORS/cookies scoped to the SPA origin.
       - APP_ORIGIN=https://${APP_DOMAIN:?APP_DOMAIN is required}
       - API_COOKIE_DOMAIN=${API_DOMAIN:?API_DOMAIN is required}
+      # Caddy is the only path into `app` in this topology and sets/overwrites
+      # X-Forwarded-For itself, so forwarded headers are safe to trust here.
+      - TRUST_PROXY_HEADERS=true
     security_opt:
       - no-new-privileges:true
     deploy:

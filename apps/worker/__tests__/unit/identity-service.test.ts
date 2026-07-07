@@ -610,7 +610,8 @@ describe('IdentityService — Sessions', () => {
       }
 
       const svc = new IdentityService(db as never)
-      await expect(svc.validateSession('expired-token')).rejects.toThrow('Session expired')
+      // B-M15: token must match the mock row's token for constant-time comparison to pass
+      await expect(svc.validateSession('session-token-abc')).rejects.toThrow('Session expired')
       expect(deleteFn).toHaveBeenCalled()
     })
 
@@ -638,7 +639,8 @@ describe('IdentityService — Sessions', () => {
       }
 
       const svc = new IdentityService(db as never)
-      const result = await svc.validateSession('near-expiry-token')
+      // B-M15: token must match the mock row's token for constant-time comparison
+      const result = await svc.validateSession('session-token-abc')
 
       // Session should be renewed with a new expiry
       expect(updateSet).toHaveBeenCalled()

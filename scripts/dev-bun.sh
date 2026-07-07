@@ -67,13 +67,20 @@ cmd_start() {
   # so this does not affect whether the setup wizard is shown.
   export ENVIRONMENT="${ENVIRONMENT:-development}"
   export DEV_RESET_SECRET="${DEV_RESET_SECRET:-test-reset-secret}"
+  # No real reverse proxy in front of local dev, but the backend BDD suite
+  # simulates one (CF-Connecting-IP) to test per-client rate-limit buckets —
+  # same trust posture as docker-compose.production.yml.
+  export TRUST_PROXY_HEADERS="${TRUST_PROXY_HEADERS:-true}"
   if [ -z "${HMAC_SECRET:-}" ]; then
     warn "HMAC_SECRET not set. Generating random value for this session."
     export HMAC_SECRET=$(openssl rand -hex 32)
   fi
   export STORAGE_ENDPOINT=http://localhost:9000
-  export STORAGE_ACCESS_KEY=rustfsadmin
-  export STORAGE_SECRET_KEY=rustfsadmin
+  # Must match the RustFS container's actual credentials — docker-compose.dev.yml
+  # takes these from the same root .env (RUSTFS_ACCESS_KEY: ${STORAGE_ACCESS_KEY:-rustfsadmin}),
+  # so a hardcoded value here silently drifts from the container once .env sets one.
+  export STORAGE_ACCESS_KEY="${STORAGE_ACCESS_KEY:-rustfsadmin}"
+  export STORAGE_SECRET_KEY="${STORAGE_SECRET_KEY:-rustfsadmin}"
   export STORAGE_BUCKET=llamenos-files
   export SERVER_SECRET="${SERVER_SECRET:-0000000000000000000000000000000000000000000000000000000000000001}"
 

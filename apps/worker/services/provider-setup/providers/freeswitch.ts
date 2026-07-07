@@ -45,6 +45,7 @@ export const freeswitchProvider: ProviderCapabilityImpl = {
         headers: {
           Authorization: `Basic ${btoa(`:${eslPassword}`)}`,
         },
+        ssrfGuard: false,
       })
       if (!res.ok) {
         await res.text()
@@ -102,6 +103,7 @@ export const freeswitchProvider: ProviderCapabilityImpl = {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: `command=sofia profile external gwadd ${sipUsername} ${domain} ${sipUsername} ${sipPassword}`,
+      ssrfGuard: false,
     })
     if (!res.ok) {
       const text = await res.text()

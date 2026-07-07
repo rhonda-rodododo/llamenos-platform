@@ -33,6 +33,7 @@ vi.mock('@worker/lib/helpers', () => ({
 
 vi.mock('@worker/lib/crypto', () => ({
   hashIP: (...args: unknown[]) => mockHashIP(...args),
+  getClientIp: () => '127.0.0.1',
 }))
 
 vi.mock('@worker/services/audit', () => ({
@@ -67,7 +68,7 @@ function createApp(pubkey = 'user-pk-1') {
       getAllWebAuthnCredentials: vi.fn().mockResolvedValue({ credentials: [] }),
       getWebAuthnCredentials: vi.fn().mockResolvedValue({ credentials: [] }),
       storeWebAuthnChallenge: vi.fn().mockResolvedValue(undefined),
-      getWebAuthnChallenge: vi.fn().mockResolvedValue({ challenge: 'test-challenge' }),
+      getWebAuthnChallenge: vi.fn().mockResolvedValue({ challenge: 'test-challenge', pubkey: null, allowedCredIds: null }),
       updateWebAuthnCounter: vi.fn().mockResolvedValue(undefined),
       createSession: vi.fn().mockResolvedValue({ token: 'session-token', pubkey }),
       addWebAuthnCredential: vi.fn().mockResolvedValue(undefined),

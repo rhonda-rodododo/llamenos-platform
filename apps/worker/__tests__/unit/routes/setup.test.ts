@@ -23,6 +23,8 @@ vi.mock('@worker/messaging/signal/registration', () => ({
 // Mock SSRF guard
 vi.mock('@worker/lib/ssrf-guard', () => ({
   validateExternalUrl: vi.fn().mockReturnValue(null), // null = valid URL
+  isInternalAddress: vi.fn().mockReturnValue(false), // B-M16: safeFetch now uses this by default
+  validateExternalUrlWithDns: vi.fn().mockResolvedValue(null),
 }))
 
 // ---------------------------------------------------------------------------

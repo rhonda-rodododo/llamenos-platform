@@ -12,6 +12,7 @@ import type { AppEnv } from '../types'
 import { sessionListResponseSchema, terminateSessionsResponseSchema } from '@protocol/schemas/devices'
 import { authErrors } from '../openapi/helpers'
 import { rateLimit } from '../middleware/rate-limit'
+import { timingSafeCompare } from '../lib/timing-safe'
 
 const sessionRoutes = new Hono<AppEnv>()
 
@@ -46,7 +47,7 @@ sessionRoutes.get('/',
         ipHash: (s.deviceInfo as Record<string, unknown>)?.ipHash ?? null,
         createdAt: s.createdAt.toISOString(),
         expiresAt: s.expiresAt.toISOString(),
-        isCurrent: s.token === currentToken,
+        isCurrent: currentToken ? timingSafeCompare(s.token, currentToken) : false,
       })),
     })
   })

@@ -339,7 +339,7 @@ export class SignalRegistrationService {
     if (ssrfError) {
       throw new SignalRegistrationError(ssrfError, 400)
     }
-    return safeFetch(url, { ...opts, timeoutMs: 10_000 })
+    return safeFetch(url, { ...opts, timeoutMs: 10_000, ssrfGuard: false })
   }
 
   private async loadRow(id: string) {
@@ -430,7 +430,7 @@ export class SignalRegistrationService {
     try {
       const res = await safeFetch(
         `${bridgeUrl}/v1/register/${encodeURIComponent(phone)}/verify/${encodeURIComponent(params.code)}`,
-        { method: 'POST', headers: { 'Content-Type': 'application/json' }, timeoutMs: 10_000 },
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, timeoutMs: 10_000, ssrfGuard: false },
       )
       return res.ok
     } catch (err) {

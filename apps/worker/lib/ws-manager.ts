@@ -17,6 +17,9 @@ import { createLogger } from './logger'
 
 const log = createLogger('ws-manager')
 
+/** Maximum concurrent WebSocket connections per user (B-M11) */
+const MAX_CONNECTIONS_PER_USER = 5
+
 /** Maximum events in a hub's ring buffer */
 const BUFFER_CAPACITY = 1000
 
@@ -89,14 +92,21 @@ export class ConnectionManager {
     this.serverKey = serverKey
   }
 
-  /** Register a new authenticated connection. */
-  register(state: ConnectionState): void {
+  /**
+   * Register a new authenticated connection.
+   * Returns false if the per-user connection limit is exceeded (B-M11).
+   */
+  register(state: ConnectionState): boolean {
     let conns = this.connections.get(state.pubkey)
     if (!conns) {
       conns = new Set()
       this.connections.set(state.pubkey, conns)
     }
+    if (conns.size >= MAX_CONNECTIONS_PER_USER) {
+      return false
+    }
     conns.add(state)
+    return true
   }
 
   /** Unregister a connection on close. Cleans up empty maps. */

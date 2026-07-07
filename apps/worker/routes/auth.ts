@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { describeRoute, resolver, validator } from 'hono-openapi'
 import type { AppEnv } from '../types'
-import { hashIP } from '../lib/crypto'
+import { hashIP, getClientIp } from '../lib/crypto'
 import { isValidE164, checkRateLimit } from '../lib/helpers'
 import { verifyAuthToken } from '../lib/auth'
 import { auth as authMiddleware } from '../middleware/auth'
@@ -39,7 +39,7 @@ auth.post('/login',
     const services = c.get('services')
 
     // Rate limit login attempts by IP — always enforced (security audit Epic A)
-    const clientIp = c.req.header('CF-Connecting-IP') || 'unknown'
+    const clientIp = getClientIp(c.req.raw)
     const ipKey = `auth-login:${hashIP(clientIp, c.env.HMAC_SECRET)}`
     const limited = await checkRateLimit(services.settings, ipKey, 5)
     if (limited) {
@@ -101,7 +101,7 @@ auth.post('/bootstrap',
     const services = c.get('services')
 
     // Rate limit bootstrap by IP — always enforced (security audit Epic A)
-    const clientIp = c.req.header('CF-Connecting-IP') || 'unknown'
+    const clientIp = getClientIp(c.req.raw)
     const limited = await checkRateLimit(services.settings, `auth-bootstrap:${hashIP(clientIp, c.env.HMAC_SECRET)}`, 3)
     if (limited) {
       return c.json({ error: 'Too many attempts. Try again later.' }, 429)

@@ -146,6 +146,8 @@ export const webauthnChallenges = pgTable(
     challenge: text('challenge').notNull(),
     // RACE-08 Phase 2: Bind challenges to users to prevent cross-user consumption
     pubkey: text('pubkey'),
+    // B-M14: Comma-separated credential IDs allowed for this challenge (relay prevention)
+    allowedCredIds: text('allowed_cred_ids'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

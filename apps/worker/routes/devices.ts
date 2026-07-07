@@ -14,6 +14,7 @@ import { authErrors } from '../openapi/helpers'
 import { registerDeviceBodySchema, voipTokenBodySchema, deviceDetailListResponseSchema, renameDeviceBodySchema, revokeDeviceBodySchema, verifyDeviceBodySchema, clearPushTokenBodySchema, renameDeviceResponseSchema, revokeDeviceResponseSchema, verifyDeviceResponseSchema } from '@protocol/schemas/devices'
 import { requirePermission } from '../middleware/permission-guard'
 import { rateLimit } from '../middleware/rate-limit'
+import { validateExternalUrl } from '../lib/ssrf-guard'
 
 const devicesRoutes = new Hono<AppEnv>()
 
@@ -90,6 +91,16 @@ devicesRoutes.post('/register',
     const pubkey = c.get('pubkey')
     const body = c.req.valid('json')
     const services = c.get('services')
+
+    // B-M20: Validate pushToken URL at registration time to prevent SSRF via ntfy.
+    // Only URL-format tokens (UnifiedPush/ntfy) need SSRF validation —
+    // opaque tokens (APNs, FCM) are not URLs and are never fetched by the server.
+    if (body.pushToken && body.pushToken.includes('://')) {
+      const ssrfError = validateExternalUrl(body.pushToken, 'Push token URL')
+      if (ssrfError) {
+        return c.json({ error: ssrfError }, 400)
+      }
+    }
 
     await services.identity.registerDevice(pubkey, {
       platform: body.platform,
