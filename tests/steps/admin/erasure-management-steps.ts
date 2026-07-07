@@ -8,12 +8,15 @@ import { Timeouts } from '../../helpers'
 
 Then('I should see the erasure queue or empty state', async ({ page }) => {
   await page.waitForLoadState('domcontentloaded')
+  // Wait for loading state to disappear first — the API call may take longer in CI
+  const loadingEl = page.getByTestId('erasure-loading')
+  await loadingEl.waitFor({ state: 'hidden', timeout: Timeouts.API }).catch(() => {})
   const requestList = page.getByTestId('erasure-request-list')
   const empty = page.getByTestId('erasure-empty')
   const section = page.locator('[data-testid^="erasure-"]').first()
-  const hasList = await requestList.isVisible({ timeout: Timeouts.API }).catch(() => false)
-  const hasEmpty = await empty.isVisible({ timeout: 2000 }).catch(() => false)
-  const hasSection = await section.isVisible({ timeout: 2000 }).catch(() => false)
+  const hasList = await requestList.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+  const hasEmpty = await empty.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+  const hasSection = await section.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
   expect(hasList || hasEmpty || hasSection).toBe(true)
 })
 

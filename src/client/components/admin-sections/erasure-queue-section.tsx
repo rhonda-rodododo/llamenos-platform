@@ -28,7 +28,7 @@ export function ErasureQueueSection() {
 
   useEffect(() => { loadRequests() }, [])
 
-  if (loading) return <div className="text-muted-foreground">{t('common.loading')}</div>
+  if (loading) return <div data-testid="erasure-loading" className="text-muted-foreground">{t('common.loading')}</div>
 
   const pendingCount = requests.filter(r => r.status === 'pending').length
   const statusSummary = pendingCount > 0
