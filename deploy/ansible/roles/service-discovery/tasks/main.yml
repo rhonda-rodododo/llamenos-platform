@@ -35,8 +35,6 @@
         http://rustfs:9000
       {%- endif -%}
 
-      {%- endif -%}
-
 - name: Determine Whisper transcription URL
   ansible.builtin.set_fact:
     llamenos_whisper_url: >-

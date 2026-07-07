@@ -595,7 +595,15 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Install Ansible and ansible-lint
-        run: pip install ansible ansible-lint
+        # Pinned for reproducible CI: unpinned ansible-lint pulls whatever the
+        # latest release is, and its default rule set / tree-discovery behaviour
+        # drifts between versions (26.x lints the whole roles/ tree; older
+        # releases effectively linted a single file). The enforced rule set is
+        # declared in deploy/ansible/.ansible-lint (profile: min).
+        # ansible==14.1.0 pins ansible-core 2.21.1 and ships the community
+        # collections (community.docker/crypto/general, ansible.posix) the
+        # playbooks require for the syntax-check step below.
+        run: pip install 'ansible==14.1.0' 'ansible-lint==26.6.0'
 
       - name: Run ansible-lint
         run: cd deploy/ansible && ansible-lint .

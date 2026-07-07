@@ -23,8 +23,6 @@
   ansible.builtin.include_role:
     name: backup-postgres
 
-  ansible.builtin.include_role:
-
 - name: Include RustFS backup role
   ansible.builtin.include_role:
     name: backup-rustfs

@@ -1,0 +1,32 @@
+# ansible-lint configuration for deploy/ansible
+#
+# Why this file exists
+# --------------------
+# CI installs ansible-lint unpinned (see .github/workflows/ci.yml → ansible-validate).
+# ansible-lint 26.x recursively discovers the entire roles/ + playbooks/ tree
+# (older releases effectively linted a single file, which is why past `main` runs
+# were trivially green). The version is now pinned in CI for reproducibility, and
+# this file makes the enforced rule set explicit rather than "whatever the latest
+# release defaults to".
+#
+# Profile
+# -------
+# We enforce the `min` profile: the floor of correctness/safety rules that must
+# always hold (syntax-check, no-log-password, internal-error, etc.). All genuine
+# defects surfaced by ansible-lint 26.6.0 lived in this tier and have been fixed
+# (invalid play-level `always:` in restore.yml / test-restore.yml, an orphaned
+# `include_role` in roles/backup, and a stray `{% endif %}` in service-discovery).
+#
+# The stricter `basic`-tier findings that remain are style/convention preferences
+# (role-name underscores vs hyphens across 28 roles, yaml formatting, command-vs-shell
+# idiom, register-var prefixes, no-changed-when on read-only commands). Converging on
+# those — especially renaming every role, which ripples through every playbook
+# reference — is a deliberate cleanup epic, not a CI-unblock, and is intentionally
+# out of scope here. Raise the profile to `basic`/`production` when that work lands.
+#
+# Known remaining (non-blocking) items to fold into that cleanup epic:
+#   - vars.example.yml defines llamenos_postgres_enabled / llamenos_caddy_enabled
+#     twice (lines ~49/50 vs ~300/303). The second pair was meant to be distinct
+#     maintenance/monitoring toggles; dedup requires renaming the keys AND wiring
+#     the new names into the consuming roles, so it is left for that epic.
+profile: min

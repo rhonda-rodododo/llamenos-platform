@@ -23,179 +23,181 @@
     test_service: all   # all, postgres, config
 
   tasks:
-    # ── PostgreSQL restore test ────────────────────────────────────
+    - name: Backup restoration test (cleanup guaranteed on exit)
+      block:
+        # ── PostgreSQL restore test ────────────────────────────────────
 
-    - name: Find latest PostgreSQL backup
-      ansible.builtin.find:
-        paths:
-          - "{{ app_dir }}/backups/postgres/daily"
-          # Fallback to legacy location
-          - "{{ app_dir }}/backups/daily"
-        patterns:
-          - "llamenos-postgres-*.dump*"
-          - "llamenos-*.sql.gz.age"
-          - "llamenos-*.sql.gz"
-        file_type: file
-      register: pg_backup_files
-      when: test_service in ['all', 'postgres']
+        - name: Find latest PostgreSQL backup
+          ansible.builtin.find:
+            paths:
+              - "{{ app_dir }}/backups/postgres/daily"
+              # Fallback to legacy location
+              - "{{ app_dir }}/backups/daily"
+            patterns:
+              - "llamenos-postgres-*.dump*"
+              - "llamenos-*.sql.gz.age"
+              - "llamenos-*.sql.gz"
+            file_type: file
+          register: pg_backup_files
+          when: test_service in ['all', 'postgres']
 
-    - name: Check PostgreSQL backup exists
-      ansible.builtin.assert:
-        that: pg_backup_files.matched > 0
-        fail_msg: "No PostgreSQL backups found"
-        success_msg: "Found {{ pg_backup_files.matched }} PostgreSQL backup(s)"
-      when: test_service in ['all', 'postgres']
+        - name: Check PostgreSQL backup exists
+          ansible.builtin.assert:
+            that: pg_backup_files.matched > 0
+            fail_msg: "No PostgreSQL backups found"
+            success_msg: "Found {{ pg_backup_files.matched }} PostgreSQL backup(s)"
+          when: test_service in ['all', 'postgres']
 
-    - name: Select most recent PostgreSQL backup
-      ansible.builtin.set_fact:
-        latest_pg_backup: "{{ (pg_backup_files.files | sort(attribute='mtime') | last).path }}"
-      when: test_service in ['all', 'postgres'] and pg_backup_files.matched > 0
+        - name: Select most recent PostgreSQL backup
+          ansible.builtin.set_fact:
+            latest_pg_backup: "{{ (pg_backup_files.files | sort(attribute='mtime') | last).path }}"
+          when: test_service in ['all', 'postgres'] and pg_backup_files.matched > 0
 
-    - name: Display backup being tested
-      ansible.builtin.debug:
-        msg: "Testing PostgreSQL restore of: {{ latest_pg_backup }}"
-      when: latest_pg_backup is defined
+        - name: Display backup being tested
+          ansible.builtin.debug:
+            msg: "Testing PostgreSQL restore of: {{ latest_pg_backup }}"
+          when: latest_pg_backup is defined
 
-    - name: Create temp directory for restore test
-      ansible.builtin.tempfile:
-        state: directory
-        prefix: llamenos-restore-test-
-      register: restore_tmpdir
+        - name: Create temp directory for restore test
+          ansible.builtin.tempfile:
+            state: directory
+            prefix: llamenos-restore-test-
+          register: restore_tmpdir
 
-    - name: Decrypt PostgreSQL backup (age-encrypted .dump)
-      ansible.builtin.command:
-        cmd: "age -d -i {{ backup_age_private_key_path }} -o {{ restore_tmpdir.path }}/dump.sql {{ latest_pg_backup }}"
-      when:
-        - latest_pg_backup is defined
-        - latest_pg_backup is search('.age$')
-        - backup_age_public_key | default('') | length > 0
+        - name: Decrypt PostgreSQL backup (age-encrypted .dump)
+          ansible.builtin.command:
+            cmd: "age -d -i {{ backup_age_private_key_path }} -o {{ restore_tmpdir.path }}/dump.sql {{ latest_pg_backup }}"
+          when:
+            - latest_pg_backup is defined
+            - latest_pg_backup is search('.age$')
+            - backup_age_public_key | default('') | length > 0
 
-    - name: Decrypt PostgreSQL backup (age-encrypted .sql.gz legacy)
-      ansible.builtin.shell: |
-        age -d -i {{ backup_age_private_key_path }} {{ latest_pg_backup }} | gunzip > {{ restore_tmpdir.path }}/dump.sql
-      when:
-        - latest_pg_backup is defined
-        - latest_pg_backup is search('.sql.gz.age$')
-        - backup_age_public_key | default('') | length > 0
+        - name: Decrypt PostgreSQL backup (age-encrypted .sql.gz legacy)
+          ansible.builtin.shell: |
+            age -d -i {{ backup_age_private_key_path }} {{ latest_pg_backup }} | gunzip > {{ restore_tmpdir.path }}/dump.sql
+          when:
+            - latest_pg_backup is defined
+            - latest_pg_backup is search('.sql.gz.age$')
+            - backup_age_public_key | default('') | length > 0
 
-    - name: Copy unencrypted PostgreSQL backup
-      ansible.builtin.copy:
-        src: "{{ latest_pg_backup }}"
-        dest: "{{ restore_tmpdir.path }}/dump.sql"
-        remote_src: true
-      when:
-        - latest_pg_backup is defined
-        - latest_pg_backup is not search('.age$')
+        - name: Copy unencrypted PostgreSQL backup
+          ansible.builtin.copy:
+            src: "{{ latest_pg_backup }}"
+            dest: "{{ restore_tmpdir.path }}/dump.sql"
+            remote_src: true
+          when:
+            - latest_pg_backup is defined
+            - latest_pg_backup is not search('.age$')
 
-    - name: Start temporary PostgreSQL container
-      ansible.builtin.command:
-        cmd: >
-          docker run -d --name llamenos-restore-test
-          -e POSTGRES_DB=llamenos
-          -e POSTGRES_USER=llamenos
-          -e POSTGRES_PASSWORD=restore-test-password
-          -v {{ restore_tmpdir.path }}:/restore:ro
-          postgres:17-alpine
-      register: restore_container
-      when: latest_pg_backup is defined
+        - name: Start temporary PostgreSQL container
+          ansible.builtin.command:
+            cmd: >
+              docker run -d --name llamenos-restore-test
+              -e POSTGRES_DB=llamenos
+              -e POSTGRES_USER=llamenos
+              -e POSTGRES_PASSWORD=restore-test-password
+              -v {{ restore_tmpdir.path }}:/restore:ro
+              postgres:17-alpine
+          register: restore_container
+          when: latest_pg_backup is defined
 
-    - name: Wait for PostgreSQL to be ready
-      ansible.builtin.command:
-        cmd: docker exec llamenos-restore-test pg_isready -U llamenos -d llamenos
-      register: pg_ready
-      retries: 10
-      delay: 2
-      until: pg_ready.rc == 0
-      when: latest_pg_backup is defined
+        - name: Wait for PostgreSQL to be ready
+          ansible.builtin.command:
+            cmd: docker exec llamenos-restore-test pg_isready -U llamenos -d llamenos
+          register: pg_ready
+          retries: 10
+          delay: 2
+          until: pg_ready.rc == 0
+          when: latest_pg_backup is defined
 
-    - name: Restore PostgreSQL backup (custom format)
-      ansible.builtin.command:
-        cmd: >
-          docker exec llamenos-restore-test
-          pg_restore -U llamenos -d llamenos --no-owner --no-privileges /restore/dump.sql
-      register: pg_restore_result
-      when:
-        - latest_pg_backup is defined
-        - latest_pg_backup is search('.dump')
-      ignore_errors: true
+        - name: Restore PostgreSQL backup (custom format)
+          ansible.builtin.command:
+            cmd: >
+              docker exec llamenos-restore-test
+              pg_restore -U llamenos -d llamenos --no-owner --no-privileges /restore/dump.sql
+          register: pg_restore_result
+          when:
+            - latest_pg_backup is defined
+            - latest_pg_backup is search('.dump')
+          ignore_errors: true
 
-    - name: Restore PostgreSQL backup (plain SQL format)
-      ansible.builtin.shell: |
-        cat {{ restore_tmpdir.path }}/dump.sql | \
-          docker exec -i llamenos-restore-test psql -U llamenos -d llamenos
-      register: pg_restore_plain
-      when:
-        - latest_pg_backup is defined
-        - latest_pg_backup is not search('.dump')
+        - name: Restore PostgreSQL backup (plain SQL format)
+          ansible.builtin.shell: |
+            cat {{ restore_tmpdir.path }}/dump.sql | \
+              docker exec -i llamenos-restore-test psql -U llamenos -d llamenos
+          register: pg_restore_plain
+          when:
+            - latest_pg_backup is defined
+            - latest_pg_backup is not search('.dump')
 
-    - name: Validate kv_store table exists
-      ansible.builtin.command:
-        cmd: >
-          docker exec llamenos-restore-test
-          psql -U llamenos -d llamenos -t -c "SELECT COUNT(*) FROM kv_store"
-      register: kv_count
-      failed_when: kv_count.rc != 0
-      when: latest_pg_backup is defined
+        - name: Validate kv_store table exists
+          ansible.builtin.command:
+            cmd: >
+              docker exec llamenos-restore-test
+              psql -U llamenos -d llamenos -t -c "SELECT COUNT(*) FROM kv_store"
+          register: kv_count
+          failed_when: kv_count.rc != 0
+          when: latest_pg_backup is defined
 
-    - name: Validate alarms table exists
-      ansible.builtin.command:
-        cmd: >
-          docker exec llamenos-restore-test
-          psql -U llamenos -d llamenos -t -c "SELECT COUNT(*) FROM alarms"
-      register: alarms_count
-      failed_when: alarms_count.rc != 0
-      when: latest_pg_backup is defined
+        - name: Validate alarms table exists
+          ansible.builtin.command:
+            cmd: >
+              docker exec llamenos-restore-test
+              psql -U llamenos -d llamenos -t -c "SELECT COUNT(*) FROM alarms"
+          register: alarms_count
+          failed_when: alarms_count.rc != 0
+          when: latest_pg_backup is defined
 
-    - name: Display PostgreSQL restore results
-      ansible.builtin.debug:
-        msg: |
-          PostgreSQL Restore Test PASSED
-          - kv_store rows: {{ kv_count.stdout | trim }}
-          - alarms rows: {{ alarms_count.stdout | trim }}
-          - Backup file: {{ latest_pg_backup }}
-      when: latest_pg_backup is defined
+        - name: Display PostgreSQL restore results
+          ansible.builtin.debug:
+            msg: |
+              PostgreSQL Restore Test PASSED
+              - kv_store rows: {{ kv_count.stdout | trim }}
+              - alarms rows: {{ alarms_count.stdout | trim }}
+              - Backup file: {{ latest_pg_backup }}
+          when: latest_pg_backup is defined
 
 
-    - name: Validate strfry backup exists and is non-empty
-      ansible.builtin.debug:
-        msg: |
-          strfry Backup Test: {{ 'PASSED' if strfry_backup_files.matched > 0 else 'NO BACKUPS FOUND' }}
-          - Found {{ strfry_backup_files.matched }} backup(s)
-          {% if strfry_backup_files.matched > 0 %}
-          - Latest: {{ (strfry_backup_files.files | sort(attribute='mtime') | last).path }}
-          - Size: {{ (strfry_backup_files.files | sort(attribute='mtime') | last).size }} bytes
-          {% endif %}
-      when: test_service in ['all', 'strfry']
+        - name: Validate strfry backup exists and is non-empty
+          ansible.builtin.debug:
+            msg: |
+              strfry Backup Test: {{ 'PASSED' if strfry_backup_files.matched > 0 else 'NO BACKUPS FOUND' }}
+              - Found {{ strfry_backup_files.matched }} backup(s)
+              {% if strfry_backup_files.matched > 0 %}
+              - Latest: {{ (strfry_backup_files.files | sort(attribute='mtime') | last).path }}
+              - Size: {{ (strfry_backup_files.files | sort(attribute='mtime') | last).size }} bytes
+              {% endif %}
+          when: test_service in ['all', 'strfry']
 
-    # ── Config restore test ────────────────────────────────────────
+        # ── Config restore test ────────────────────────────────────────
 
-    - name: Find latest config backup
-      ansible.builtin.find:
-        paths: "{{ app_dir }}/backups/config/daily"
-        patterns: "llamenos-config-*.tar*"
-        file_type: file
-      register: config_backup_files
-      when: test_service in ['all', 'config']
+        - name: Find latest config backup
+          ansible.builtin.find:
+            paths: "{{ app_dir }}/backups/config/daily"
+            patterns: "llamenos-config-*.tar*"
+            file_type: file
+          register: config_backup_files
+          when: test_service in ['all', 'config']
 
-    - name: Validate config backup exists and is non-empty
-      ansible.builtin.debug:
-        msg: |
-          Config Backup Test: {{ 'PASSED' if config_backup_files.matched > 0 else 'NO BACKUPS FOUND' }}
-          - Found {{ config_backup_files.matched }} backup(s)
-          {% if config_backup_files.matched > 0 %}
-          - Latest: {{ (config_backup_files.files | sort(attribute='mtime') | last).path }}
-          - Size: {{ (config_backup_files.files | sort(attribute='mtime') | last).size }} bytes
-          {% endif %}
-      when: test_service in ['all', 'config']
+        - name: Validate config backup exists and is non-empty
+          ansible.builtin.debug:
+            msg: |
+              Config Backup Test: {{ 'PASSED' if config_backup_files.matched > 0 else 'NO BACKUPS FOUND' }}
+              - Found {{ config_backup_files.matched }} backup(s)
+              {% if config_backup_files.matched > 0 %}
+              - Latest: {{ (config_backup_files.files | sort(attribute='mtime') | last).path }}
+              - Size: {{ (config_backup_files.files | sort(attribute='mtime') | last).size }} bytes
+              {% endif %}
+          when: test_service in ['all', 'config']
 
-  always:
-    - name: Remove test container
-      ansible.builtin.command:
-        cmd: docker rm -f llamenos-restore-test
-      ignore_errors: true
+      always:
+        - name: Remove test container
+          ansible.builtin.command:
+            cmd: docker rm -f llamenos-restore-test
+          ignore_errors: true
 
-    - name: Clean up temp directory
-      ansible.builtin.file:
-        path: "{{ restore_tmpdir.path }}"
-        state: absent
-      when: restore_tmpdir is defined
+        - name: Clean up temp directory
+          ansible.builtin.file:
+            path: "{{ restore_tmpdir.path }}"
+            state: absent
+          when: restore_tmpdir is defined
