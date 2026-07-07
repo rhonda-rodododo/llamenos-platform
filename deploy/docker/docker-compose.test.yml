@@ -32,6 +32,10 @@ services:
       - DEV_ROUTES_ENABLED=true
       - DEV_RESET_SECRET=${DEV_RESET_SECRET:-test-reset-secret}
       - TOKEN_MAX_AGE_MS=${TOKEN_MAX_AGE_MS:-3600000}
+      # CI has no real reverse proxy in front of the app, but the BDD suite
+      # simulates one (CF-Connecting-IP) to test per-client rate-limit
+      # buckets — same trust posture as docker-compose.production.yml.
+      - TRUST_PROXY_HEADERS=true
       # Wire up sidecar services so integration tests can reach them
       - NOTIFIER_URL=http://signal-notifier:3100
       - NOTIFIER_API_KEY=${NOTIFIER_API_KEY:-ci-test-notifier-key}
