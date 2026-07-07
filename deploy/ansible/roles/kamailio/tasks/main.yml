@@ -23,7 +23,7 @@
       - kamailio_dispatcher_targets | length > 0
     fail_msg: |
       REQUIRED: kamailio_dispatcher_targets must contain at least one PBX backend.
-      
+
       Example:
         kamailio_dispatcher_targets:
           - sip:asterisk1.internal:5060

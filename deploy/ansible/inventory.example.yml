@@ -1,3 +1,4 @@
+---
 # Llamenos Multi-Host Ansible Inventory
 #
 # Copy this file to inventory.yml and fill in your server details.
@@ -66,7 +67,6 @@ all:
     llamenos_relay:
       hosts:
         hub1: {}
-
     # Optional service groups — only deployed if the service is enabled
     # in vars.yml (llamenos_*_enabled: true)
     llamenos_transcription:

@@ -134,9 +134,9 @@
           - domain != "hotline.yourdomain.org"
         fail_msg: |
           REQUIRED: 'domain' must be set to your actual domain name.
-          
+
           Current value: {{ domain | default('NOT SET') }}
-          
+
           To fix:
             1. Edit vars.yml
             2. Set domain: your-actual-domain.org
@@ -150,9 +150,9 @@
           - acme_email != "admin@yourdomain.org"
         fail_msg: |
           REQUIRED: 'acme_email' must be set to your actual email address for Let's Encrypt.
-          
+
           Current value: {{ acme_email | default('NOT SET') }}
-          
+
           To fix:
             1. Edit vars.yml
             2. Set acme_email: your-email@example.org
@@ -165,9 +165,9 @@
           - deploy_user | length > 0
         fail_msg: |
           REQUIRED: 'deploy_user' must be set to the non-root user that runs the application.
-          
+
           Current value: {{ deploy_user | default('NOT SET') }}
-          
+
           To fix:
             1. Edit vars.yml
             2. Set deploy_user: deploy
@@ -180,11 +180,11 @@
           - llamenos_app_image | length > 0
         fail_msg: |
           REQUIRED: 'llamenos_app_image' must be set to the Docker image for the Llamenos app.
-          
+
           Current value: {{ llamenos_app_image | default('NOT SET') }}
-          
+
           Example: llamenos_app_image: docker.io/llamenos/llamenos:latest
-          
+
           To fix:
             1. Edit vars.yml
             2. Set llamenos_app_image to a valid image reference
@@ -194,7 +194,7 @@
       ansible.builtin.debug:
         msg: |
           WARNING: 'admin_pubkey' is not set. The first admin will need to be bootstrapped via the Tauri desktop app.
-          
+
           To pre-configure an admin:
             1. Generate a keypair: bun run bootstrap-admin
             2. Copy the hex public key to admin_pubkey in vars.yml
@@ -207,10 +207,10 @@
           - admin_pubkey | regex_search('^[0-9a-f]{64}$') is truthy
         fail_msg: |
           INVALID: 'admin_pubkey' must be a 64-character lowercase hex string (Nostr public key).
-          
+
           Current value: {{ admin_pubkey }}
           Length: {{ admin_pubkey | length }} chars (expected: 64)
-          
+
           To fix:
             1. Generate a keypair: bun run bootstrap-admin
             2. Copy the hex public key to admin_pubkey in vars.yml
@@ -224,10 +224,10 @@
           - hmac_secret | length >= 32
         fail_msg: |
           REQUIRED: 'hmac_secret' must be at least 32 characters long.
-          
+
           Current value: {{ hmac_secret | default('NOT SET') }}
           Length: {{ hmac_secret | default('') | length }} chars (expected: >= 32)
-          
+
           To generate:
             openssl rand -hex 32
         success_msg: "hmac_secret: [set, {{ hmac_secret | length }} chars]"
@@ -240,10 +240,10 @@
           - server_secret | regex_search('^[0-9a-f]{64}$') is truthy
         fail_msg: |
           REQUIRED: 'server_secret' must be exactly 64 lowercase hex characters.
-          
+
           Current value: {{ server_secret | default('NOT SET') }}
           Length: {{ server_secret | default('') | length }} chars (expected: 64)
-          
+
           To generate:
             openssl rand -hex 32
         success_msg: "server_secret: [set, 64 chars]"
@@ -255,10 +255,10 @@
           - pg_password | length >= 16
         fail_msg: |
           REQUIRED: 'pg_password' must be at least 16 characters long.
-          
+
           Current value: {{ pg_password | default('NOT SET') }}
           Length: {{ pg_password | default('') | length }} chars (expected: >= 16)
-          
+
           To generate:
             openssl rand -base64 24
         success_msg: "pg_password: [set, {{ pg_password | length }} chars]"
@@ -270,9 +270,9 @@
           - storage_access_key | length > 0
         fail_msg: |
           REQUIRED: 'storage_access_key' must be set.
-          
+
           Current value: {{ storage_access_key | default('NOT SET') }}
-          
+
           To generate:
             openssl rand -base64 24
         success_msg: "storage_access_key: [set]"
@@ -284,10 +284,10 @@
           - storage_secret_key | length >= 16
         fail_msg: |
           REQUIRED: 'storage_secret_key' must be at least 16 characters long.
-          
+
           Current value: {{ storage_secret_key | default('NOT SET') }}
           Length: {{ storage_secret_key | default('') | length }} chars (expected: >= 16)
-          
+
           To generate:
             openssl rand -base64 24
         success_msg: "storage_secret_key: [set, {{ storage_secret_key | length }} chars]"
@@ -347,15 +347,14 @@
     - name: Warn if bridge_secret is not set but SIP bridge/Asterisk is disabled
       ansible.builtin.debug:
         msg: "Note: bridge_secret not set (SIP bridge and Asterisk are disabled, so this is OK)"
-      when: not (llamenos_asterisk_enabled | default(false) | bool) and
-            not (llamenos_sip_bridge_enabled | default(false) | bool) and
-            (bridge_secret is not defined or bridge_secret | length == 0)
+      when: not (llamenos_asterisk_enabled | default(false) | bool) and not (llamenos_sip_bridge_enabled | default(false) | bool) and (bridge_secret is not
+        defined or bridge_secret | length == 0)
 
     - name: Warn if SSH is open to the world
       ansible.builtin.debug:
         msg: |
           WARNING: ssh_allowed_cidrs includes '0.0.0.0/0' — SSH is open to the entire internet.
-          
+
           This is a security risk. Restrict to your admin IP addresses:
             ssh_allowed_cidrs:
               - "203.0.113.1/32"
@@ -368,13 +367,13 @@
           - backup_age_public_key | regex_search('^age1[0-9a-z]{58}$') is truthy
         fail_msg: |
           INVALID: 'backup_age_public_key' does not appear to be a valid age public key.
-          
+
           Expected format: age1... (59 characters starting with 'age1')
           Current value: {{ backup_age_public_key[:20] | default('NOT SET') }}...
-          
+
           To generate a keypair:
             age-keygen -o backup-key.txt
-          
+
           Then copy the public key (starts with 'age1') to backup_age_public_key in vars.yml.
           Store the private key somewhere safe (NOT on the server).
         success_msg: "backup_age_public_key: [valid age key]"
