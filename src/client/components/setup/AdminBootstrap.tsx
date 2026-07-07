@@ -134,10 +134,12 @@ export function AdminBootstrap({ onComplete }: AdminBootstrapProps) {
 
       // Sign bootstrap request using CryptoState (device key stays in Rust/WASM)
       const tokenJson = await createAuthToken(Date.now(), 'POST', '/api/auth/bootstrap')
-      const parsed = JSON.parse(tokenJson) as { timestamp: number; token: string }
+      const parsed = JSON.parse(tokenJson) as { timestamp: number; token: string; nonce?: string }
 
-      // Call bootstrap endpoint
-      await bootstrapAdmin(result.publicKey, parsed.timestamp, parsed.token)
+      // Call bootstrap endpoint. The nonce is generated inside Rust's createAuthToken
+      // and signed into the token; it MUST be forwarded so the server can rebuild and
+      // verify the same auth message (buildAuthMessage includes the nonce).
+      await bootstrapAdmin(result.publicKey, parsed.timestamp, parsed.token, parsed.nonce)
 
       // Generate recovery key
       const rk = generateRecoveryKey()

@@ -76,8 +76,11 @@ export default defineConfig({
   server: {
     host: process.env.TAURI_DEV_HOST || '0.0.0.0',
     strictPort: true,
-    // Proxy API/WS to Docker Compose backend for test and standalone dev builds
-    ...(isTestBuild || !process.env.TAURI_ENV_PLATFORM ? {
+    // Proxy API/WS to the backend. Needed for test builds (no Tauri at all),
+    // standalone dev, and Tauri dev mode — in `tauri:dev` the webview loads from
+    // the Vite dev server (devUrl), so it's a browser and must proxy /api and /ws.
+    // Only skip in Tauri production builds (frontendDist bundled, no dev server).
+    ...(isTestBuild || !process.env.TAURI_ENV_PLATFORM || process.env.TAURI_ENV_DEBUG ? {
       proxy: {
         '/api': {
           target: process.env.API_URL || 'http://localhost:3000',

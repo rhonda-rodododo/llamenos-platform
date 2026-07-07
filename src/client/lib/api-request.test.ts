@@ -9,6 +9,7 @@ import {
   setOnAuthExpired,
   setOnApiActivity,
   setActiveHub,
+  bootstrapAdmin,
 } from './api'
 import * as keyManager from './key-manager'
 import { offlineQueue } from './offline-queue'
@@ -72,6 +73,39 @@ describe('OfflineQueuedError', () => {
     expect(err.path).toBe('/notes')
     expect(err.method).toBe('POST')
     expect(err.name).toBe('OfflineQueuedError')
+  })
+})
+
+describe('bootstrapAdmin', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn())
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  // Regression: Rust's createAuthToken generates a nonce internally and signs it
+  // into the token; the server rebuilds the auth message with body.nonce. If the
+  // client drops the nonce, verifyAuthToken can't reconstruct the signed message
+  // and bootstrap auth fails. bootstrapAdmin MUST forward the nonce.
+  it('forwards the nonce in the request body when provided', async () => {
+    const fetchMock = vi.mocked(globalThis.fetch)
+    fetchMock.mockResolvedValue(new Response('{"ok":true,"roles":["admin"]}', { status: 200 }))
+
+    await bootstrapAdmin('pubkey-hex', 1234, 'token-sig', 'nonce-abc')
+
+    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)
+    expect(body).toMatchObject({ pubkey: 'pubkey-hex', timestamp: 1234, token: 'token-sig', nonce: 'nonce-abc' })
+  })
+
+  it('omits the nonce key when not provided', async () => {
+    const fetchMock = vi.mocked(globalThis.fetch)
+    fetchMock.mockResolvedValue(new Response('{"ok":true,"roles":["admin"]}', { status: 200 }))
+
+    await bootstrapAdmin('pubkey-hex', 1234, 'token-sig')
+
+    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)
+    expect(body).not.toHaveProperty('nonce')
   })
 })
 
