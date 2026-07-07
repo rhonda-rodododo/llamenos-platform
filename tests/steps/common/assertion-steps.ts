@@ -56,7 +56,7 @@ Then('I should see an error message', async ({ page }) => {
   const isTitle = await pageTitle.isVisible({ timeout: 3000 }).catch(() => false)
   if (isTitle) return
   // May be on login page (which has no page-title) — that's acceptable for cascading failures
-  const loginForm = page.getByTestId(TestIds.NSEC_INPUT)
+  const loginForm = page.getByTestId(TestIds.DEVICE_KEY_INPUT)
     .or(page.getByTestId(TestIds.LOGIN_SUBMIT_BTN))
     .or(page.getByTestId(TestIds.PIN_INPUT))
   await expect(loginForm.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
@@ -146,7 +146,7 @@ Then('I should see {string} and {string} buttons', async ({ page }, btn1: string
       const byRole = page.getByRole('button', { name: btnText })
       if (await byRole.isVisible({ timeout: 2000 }).catch(() => false)) continue
       // May be on login page (cascading failure)
-      const loginIndicator = page.getByTestId(TestIds.NSEC_INPUT).or(page.getByTestId(TestIds.LOGIN_SUBMIT_BTN))
+      const loginIndicator = page.getByTestId(TestIds.DEVICE_KEY_INPUT).or(page.getByTestId(TestIds.LOGIN_SUBMIT_BTN))
       await expect(loginIndicator.first()).toBeVisible({ timeout: 2000 })
     } else {
       await expect(page.getByRole('button', { name: btnText })).toBeVisible({ timeout: Timeouts.ELEMENT })

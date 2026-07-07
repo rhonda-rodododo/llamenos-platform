@@ -203,7 +203,7 @@ test.describe('App Screenshots', () => {
     await page.reload()
     await page.waitForLoadState('domcontentloaded')
     // Wait for the nsec input to be visible (fresh login state)
-    await page.getByTestId(TestIds.NSEC_INPUT).waitFor({ state: 'visible', timeout: Timeouts.ELEMENT })
+    await page.getByTestId(TestIds.DEVICE_KEY_INPUT).waitFor({ state: 'visible', timeout: Timeouts.ELEMENT })
     await capture(page, 'login')
   })
 

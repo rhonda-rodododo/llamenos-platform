@@ -267,7 +267,7 @@ Then('I should be redirected to the login page', async ({ page }) => {
 })
 
 Then('I should see the nsec input', async ({ page }) => {
-  await expect(page.getByTestId(TestIds.NSEC_INPUT)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(page.getByTestId(TestIds.DEVICE_KEY_INPUT)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('I should see a validation error', async ({ page }) => {
