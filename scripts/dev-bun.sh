@@ -60,13 +60,12 @@ cmd_start() {
   # so the admin bootstrap / setup wizard is exercisable in dev.
   [ -n "${ADMIN_PUBKEY:-}" ] && export ADMIN_PUBKEY
   export HOTLINE_NAME="${HOTLINE_NAME:-Llámenos (Dev)}"
-  # Only default ENVIRONMENT to 'development' when ADMIN_PUBKEY is set (wizard skipped).
-  # Without ADMIN_PUBKEY, leave it unset so the setup wizard is shown.
-  if [ -n "${ENVIRONMENT:-}" ]; then
-    export ENVIRONMENT
-  elif [ -n "${ADMIN_PUBKEY:-}" ]; then
-    export ENVIRONMENT=development
-  fi
+  # ENVIRONMENT is required unconditionally by apps/worker/lib/config.ts and gates the
+  # dev-only test-reset/test-promote-admin routes the admin bootstrap flow relies on —
+  # it must always be set for local dev, regardless of whether ADMIN_PUBKEY is set.
+  # needsBootstrap depends only on whether an admin exists in the DB, not on ENVIRONMENT,
+  # so this does not affect whether the setup wizard is shown.
+  export ENVIRONMENT="${ENVIRONMENT:-development}"
   export DEV_RESET_SECRET="${DEV_RESET_SECRET:-test-reset-secret}"
   if [ -z "${HMAC_SECRET:-}" ]; then
     warn "HMAC_SECRET not set. Generating random value for this session."
