@@ -389,7 +389,7 @@ function LoginPage() {
           </div>
 
           {(validationError || error) && (
-            <p role="alert" className="flex items-center gap-1.5 text-sm text-destructive">
+            <p role="alert" data-testid="login-error" className="flex items-center gap-1.5 text-sm text-destructive">
               {validationError || error}
             </p>
           )}

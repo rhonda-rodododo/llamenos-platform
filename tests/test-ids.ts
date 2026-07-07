@@ -170,6 +170,7 @@ export const TestIds = {
   // ============ Auth / Login ============
   DEVICE_KEY_INPUT: 'device-key-input',
   LOGIN_SUBMIT_BTN: 'login-submit-btn',
+  LOGIN_ERROR: 'login-error',
   GO_TO_SETUP_BTN: 'go-to-setup-btn',
   LOCK_BTN: 'lock-btn',
   RECOVERY_OPTIONS_BTN: 'recovery-options-btn',
