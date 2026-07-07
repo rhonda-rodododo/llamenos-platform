@@ -3,22 +3,17 @@
 //! Centralized to ensure device_keys and encryption modules use identical
 //! parameters. The `test-kdf` feature gates fast parameters for test/debug builds.
 
-// C-M3: Prevent test-kdf from being compiled into binaries that ship to real
-// devices. The Android build (see scripts/build-mobile.sh) always builds its
-// x86_64-only, test-kdf, emulator-debug variant with the `--release` Cargo
-// profile for speed — so `debug_assertions` cannot distinguish it from a real
-// release build. Production binaries only ever target aarch64/arm (Android
-// arm64-v8a/armeabi-v7a, iOS aarch64-apple-ios) or wasm32 (browser); test-kdf
-// must never reach those targets.
-#[cfg(all(
-    feature = "test-kdf",
-    any(target_arch = "aarch64", target_arch = "arm", target_arch = "wasm32")
-))]
+// C-M3: Prevent test-kdf from being compiled into release builds.
+// debug_assertions is disabled in --release; this fires before any other code compiles.
+// The Android emulator build (scripts/build-mobile.sh, CI android-e2e job) uses the
+// `emulator` Cargo profile instead of `--release` for exactly this reason — it inherits
+// release's optimizations but keeps debug_assertions on, so it passes this guard while
+// a real `--release` build (shipped to production devices/browsers) still fails.
+#[cfg(all(feature = "test-kdf", not(debug_assertions)))]
 compile_error!(
-    "The `test-kdf` feature MUST NOT be enabled for aarch64/arm/wasm32 targets. \
+    "The `test-kdf` feature MUST NOT be enabled in release builds. \
      It reduces Argon2id KDF resistance from ~seconds to ~microseconds per guess, \
-     making brute-force of device PIN encryption trivially fast. test-kdf is only \
-     for the x86_64 Android emulator build."
+     making brute-force of device PIN encryption trivially fast."
 );
 
 /// KDF version byte stored in encrypted key material for future-proofing.

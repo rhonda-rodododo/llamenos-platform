@@ -95,13 +95,16 @@ build_android() {
 
   # Debug variant: test-kdf params (1MB/1iter/1lane) for emulator testing.
   # x86_64 only — emulators run on x86_64; no need for ARM in debug.
+  # Uses the `emulator` Cargo profile (release optimizations, debug_assertions
+  # kept on) rather than `--release` — the C-M3 guard in kdf_params.rs rejects
+  # test-kdf whenever debug_assertions is off, to keep it out of real release builds.
   echo ""
   echo "Building debug variant (test-kdf, x86_64 emulator only)..."
   cargo ndk \
     -t x86_64 \
     --platform 24 \
     -o "$android_debug_dist" \
-    build --release --features mobile,test-kdf
+    build --profile emulator --features mobile,test-kdf
 
   echo ""
   echo "Debug .so files:"

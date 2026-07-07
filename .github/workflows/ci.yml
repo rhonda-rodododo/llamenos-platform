@@ -777,7 +777,7 @@ jobs:
           mkdir -p ../../apps/android/app/src/debug/jniLibs
           cargo ndk -t x86_64 --platform 24 \
             -o ../../apps/android/app/src/debug/jniLibs \
-            build --release --features mobile,test-kdf
+            build --profile emulator --features mobile,test-kdf
 
       - name: Verify crypto .so exists
         run: |
