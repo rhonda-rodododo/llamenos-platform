@@ -315,7 +315,7 @@ jobs:
   e2e:
     needs: [changes, build]
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest  # playwright --with-deps needs root; GH-hosted has browsers
     permissions:
       contents: read
     timeout-minutes: 30
@@ -464,7 +464,7 @@ jobs:
   backend-bdd:
     needs: [changes]
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest  # playwright --with-deps needs root; GH-hosted has browsers
     permissions:
       contents: read
     timeout-minutes: 30
@@ -703,7 +703,7 @@ jobs:
   android-e2e:
     needs: [changes]
     if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.android == 'true'
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest  # android emulator needs KVM (no nested-virt on Hetzner cloud)
     permissions:
       contents: read
     timeout-minutes: 45
