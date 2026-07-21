@@ -49,7 +49,7 @@ env:
 jobs:
   # ─── JavaScript/TypeScript Dependency Audit ─────────────────
   dependency-audit:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     permissions:
       contents: read
     timeout-minutes: 10
@@ -75,7 +75,7 @@ jobs:
 
   # ─── Rust Dependency Audit ─────────────────────────────────
   rust-audit:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     permissions:
       contents: read
     timeout-minutes: 15
@@ -103,7 +103,7 @@ jobs:
 
   # ─── Dockerfile Security Scanning ──────────────────────────
   dockerfile-scan:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     timeout-minutes: 10
 
     permissions:
@@ -168,7 +168,7 @@ jobs:
 
   # ─── Container Image Vulnerability Scan ────────────────────
   image-scan:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     timeout-minutes: 20
 
     permissions:
@@ -230,7 +230,7 @@ jobs:
 
   # ─── Crypto Guardrails (informational) ─────────────────────
   crypto-guardrails:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     if: >-
       github.event_name == 'schedule' ||
       github.event_name == 'workflow_dispatch'
@@ -298,7 +298,7 @@ jobs:
 
   # ─── Rust Dependency Policy (cargo deny) ───────────────────
   cargo-deny:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     permissions:
       contents: read
     timeout-minutes: 15

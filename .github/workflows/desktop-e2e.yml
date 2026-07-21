@@ -34,7 +34,7 @@ jobs:
   # ─── Build (codegen + typecheck + vite build) ─────────────────
   # Separated from test so the 45-min test timeout is not eaten by build steps.
   build:
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, linux, x64]
     timeout-minutes: 15
 
     steps:

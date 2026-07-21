@@ -23,7 +23,7 @@ permissions:
 jobs:
   bats:
     name: Bats tests (arg parsing + template rendering)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
       - name: Install bats and gettext
@@ -40,7 +40,7 @@ jobs:
 
   build:
     name: Full ISO build + reproducibility
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     needs: bats
     concurrency:
       group: iso-build-${{ github.ref }}
