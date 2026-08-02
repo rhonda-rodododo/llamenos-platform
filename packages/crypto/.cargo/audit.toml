@@ -1,21 +1,64 @@
 [advisories]
-# RUSTSEC-2026-0124: Potential Panic on Overlong Ciphertext Buffer in
-# libcrux-chacha20poly1305 0.0.7
+# ── libcrux advisories reachable only via openmls → hpke-rs ────────────────
 #
-# Dependency chain: openmls -> openmls_rust_crypto -> hpke-rs -> hpke-rs-libcrux
-#   -> libcrux-aead -> libcrux-chacha20poly1305
+# Dependency chain for every ignore below:
+#   llamenos-core -> openmls / openmls_rust_crypto 0.5.1 -> hpke-rs 0.6.1
+#     -> hpke-rs-libcrux 0.6.1 -> libcrux-aead 0.0.7 -> libcrux-* 0.0.x
 #
-# This is an indirect transitive dependency used in the MLS code path (behind the
-# `mls` feature flag). The vulnerability requires an adversarially crafted
-# overlong ciphertext buffer. In our HPKE-over-MLS usage, ciphertext buffers are
-# produced by the library itself (RFC 9180 outputs), not from untrusted external
-# input directly to this layer.
+# NO UPGRADE PATH EXISTS. openmls_rust_crypto 0.5.1 (latest on crates.io)
+# requires hpke-rs ^0.6.0, and hpke-rs 0.6.1 requires libcrux-sha3 "^0.0.8" /
+# libcrux-aead "=0.0.7". Under Cargo semver, 0.0.x releases are mutually
+# incompatible, so `cargo update --precise 0.0.10` is rejected outright:
 #
-# No fix is available upstream: hpke-rs-libcrux 0.6.1 is the latest release and
-# hard-pins libcrux-aead = "=0.0.7" which in turn hard-pins
-# libcrux-chacha20poly1305 = "=0.0.7". We cannot force a patch without a new
-# upstream release.
+#   error: failed to select a version for the requirement `libcrux-sha3 = "^0.0.8"`
+#   candidate versions found which didn't match: 0.0.10
 #
-# We will remove this ignore when hpke-rs-libcrux releases a version that depends
-# on libcrux-chacha20poly1305 >= 0.0.8.
-ignore = ["RUSTSEC-2026-0124"]
+# Patching hpke-rs / hpke-rs-libcrux to the celabshq git fork was evaluated and
+# rejected: it advances libcrux-sha3 0.0.8 -> 0.0.9 (still below the fixed
+# 0.0.10) and pulls in libcrux-aesgcm 0.0.8, leaving the same number of unfixed
+# advisories while adding an unpinned git source to the supply chain.
+#
+# REACHABILITY: our MLS ciphersuite is fixed at
+#   MLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519
+# (see `CIPHERSUITE` in src/mls.rs). That is X25519 + ChaCha20-Poly1305 +
+# SHA-256 + Ed25519 — it invokes neither SHA-3/SHAKE, nor AES-GCM, nor ML-KEM.
+# All advisories below are confined to code paths this crate never executes.
+# Our own AES-GCM operations (PIN storage, items_key, content encryption) use
+# the RustCrypto `aes-gcm` crate, not libcrux.
+#
+# REVISIT: remove each ignore as soon as openmls_rust_crypto ships a release
+# depending on hpke-rs >=0.7, which pulls the fixed libcrux crates.
+
+ignore = [
+  # Potential Panic on Overlong Ciphertext Buffer in libcrux-chacha20poly1305
+  # 0.0.7. hpke-rs-libcrux 0.6.1 hard-pins libcrux-aead "=0.0.7", which pins
+  # libcrux-chacha20poly1305 "=0.0.7". Ciphertext buffers on this path are
+  # produced by the library itself (RFC 9180 outputs) rather than taken as
+  # untrusted lengths at this layer.
+  "RUSTSEC-2026-0124",
+
+  # Incorrect Output of Incremental Portable SHAKE API on Multiple Squeeze
+  # Calls (libcrux-sha3 0.0.8; fixed in 0.0.10, unreachable — see above).
+  # Not reachable: our ciphersuite hashes with SHA-256, never SHA-3/SHAKE.
+  "RUSTSEC-2026-0207",
+
+  # Potential Panic in AVX2 SHAKE-256 (libcrux-sha3 0.0.8; fixed in 0.0.10,
+  # unreachable — see above). Not reachable: no SHAKE usage.
+  "RUSTSEC-2026-0208",
+
+  # AES-GCM did not enforce limits on AAD length (libcrux-aesgcm 0.0.7).
+  # No fixed release exists upstream. Not reachable: our MLS ciphersuite is
+  # ChaCha20-Poly1305, and our own AES-GCM uses the RustCrypto `aes-gcm` crate.
+  "RUSTSEC-2026-0209",
+
+  # Non-constant time Authentication Tag Check in AES-GCM Decryption
+  # (libcrux-aesgcm 0.0.7). No fixed release exists upstream. Not reachable
+  # for the same reason as RUSTSEC-2026-0209.
+  "RUSTSEC-2026-0211",
+
+  # Potentially Incorrect Output of Constant-Time Swap/Select on Aarch64
+  # (libcrux-secrets 0.0.5; fixed in 0.0.6, unreachable — see above).
+  # Pulled in via libcrux-traits -> libcrux-sha3. The affected constant-time
+  # primitives back ML-KEM and SHA-3, neither of which our ciphersuite uses.
+  "RUSTSEC-2026-0212",
+]
