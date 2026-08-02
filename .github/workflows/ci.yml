@@ -595,7 +595,11 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Install Ansible and ansible-lint
-        run: pip install ansible==14.1.0 ansible-lint==26.6.0
+        run: |
+          pip install --user ansible==14.1.0 ansible-lint==26.6.0
+          # pip installs console scripts into ~/.local/bin, which is not on
+          # PATH for the self-hosted runner user.
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       # `min` is the profile ansible-lint itself defines as "prevents fatal
       # errors" (syntax/parser/load failures) — the appropriate bar for this
