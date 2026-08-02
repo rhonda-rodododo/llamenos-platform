@@ -297,11 +297,17 @@ export async function verifyHubMembership(
   await ensureAdminRole(request)
 
   // Try a hub-scoped endpoint that requires any permission
-  const { status } = await apiGet<unknown>(request, `/hubs/${hubId}/notes?limit=1`)
+  const { status, data } = await apiGet<unknown>(request, `/hubs/${hubId}/notes?limit=1`)
   if (status === 200) return // Admin has access
 
   if (status === 403) {
-    console.warn(`[verifyHubMembership] Admin lacks membership in hub ${hubId} — re-adding via API`)
+    // The dev backend embeds `debug: { roles, permCount, hubPermCount }` in 403
+    // bodies, and hubContext denials say "Access denied". Surfacing the body is
+    // the only way to tell a hub-membership denial apart from a permission or
+    // WebAuthn-enforcement denial when this only reproduces in CI.
+    console.warn(
+      `[verifyHubMembership] Admin denied on hub ${hubId} — body: ${JSON.stringify(data)}`,
+    )
     // Re-add admin as hub member via the dev endpoint (bypasses auth)
     const { status: devStatus } = await devPost(request, '/test-add-hub-member', {
       hubId,
@@ -328,10 +334,23 @@ export async function verifyHubMembership(
       // One more attempt: re-ensure admin role and retry
       await ensureAdminRole(request)
       await new Promise(r => setTimeout(r, 200))
-      const { status: finalStatus } = await apiGet<unknown>(request, `/hubs/${hubId}/notes?limit=1`)
+      const { status: finalStatus, data: finalData } = await apiGet<unknown>(request, `/hubs/${hubId}/notes?limit=1`)
       if (finalStatus === 403) {
+        // A 403 that survives both a hub-role re-add and a global-role re-promote
+        // points at the role definitions themselves rather than at membership.
+        // Dump what the server currently thinks role-super-admin can do.
+        const { status: rolesStatus, data: rolesData } = await apiGet<{
+          roles?: { id: string; permissions: string[] }[]
+        }>(request, '/settings/roles')
+        const superAdmin = rolesData?.roles?.find(r => r.id === 'role-super-admin')
+        console.warn(
+          `[verifyHubMembership] roles snapshot (status ${rolesStatus}): ` +
+          `roleCount=${rolesData?.roles?.length}, ` +
+          `role-super-admin permissions=${JSON.stringify(superAdmin?.permissions)}`,
+        )
         throw new Error(
-          `Admin still lacks hub membership after re-add for hub ${hubId} (status: ${finalStatus})`
+          `Admin still lacks hub membership after re-add for hub ${hubId} ` +
+          `(status: ${finalStatus}, dev-add: ${devStatus}, body: ${JSON.stringify(finalData)})`
         )
       }
     }
