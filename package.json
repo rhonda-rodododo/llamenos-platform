@@ -182,6 +182,7 @@
   },
   "overrides": {
     "seroval": ">=1.6.0",
+    "seroval-plugins": ">=1.5.3",
     "protobufjs": ">=8.4.0",
     "ws": ">=8.21.0",
     "axios": ">=1.16.1",
