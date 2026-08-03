@@ -159,7 +159,34 @@ function rowToDevice(row: typeof devices.$inferSelect): DeviceRecord {
 // ---------------------------------------------------------------------------
 
 export class IdentityService {
-  constructor(protected db: Database) {}
+  /**
+   * @param adminPubkey The platform admin configured via ADMIN_PUBKEY. This user
+   *   is the root of trust for the deployment and must always hold
+   *   role-super-admin — see `enforceAdminRoles`.
+   */
+  constructor(protected db: Database, protected adminPubkey?: string) {}
+
+  /**
+   * Enforce the platform-admin invariant: the user identified by ADMIN_PUBKEY
+   * always holds role-super-admin.
+   *
+   * Any write path that can assign roles (createUser, updateUser, invite
+   * redemption) must funnel role arrays through this. Without it, a user row
+   * for the configured admin can be (re-)created with the default
+   * `role-volunteer` — for example when a request races a database reset that
+   * has momentarily deleted the row — and the deployment is left with no admin.
+   * The scattered per-route "restore the admin" patches only papered over
+   * individual paths; this closes the class at the data layer.
+   */
+  protected enforceAdminRoles(pubkey: string, roles: string[]): string[] {
+    if (!this.adminPubkey || pubkey !== this.adminPubkey) return roles
+    if (roles.includes('role-super-admin')) return roles
+    log.warn('Refusing to demote the configured platform admin', {
+      pubkeyPrefix: pubkey.slice(0, 8),
+      attemptedRoles: roles,
+    })
+    return ['role-super-admin']
+  }
 
   // =========================================================================
   // Admin Bootstrap & Init
@@ -321,7 +348,7 @@ export class IdentityService {
     maxCaseAssignments?: number
     supervisorPubkey?: string
   }): Promise<{ volunteer: ReturnType<typeof sanitizeUser> }> {
-    const roles = data.roleIds ?? data.roles ?? ['role-volunteer']
+    const roles = this.enforceAdminRoles(data.pubkey, data.roleIds ?? data.roles ?? ['role-volunteer'])
     const [row] = await this.db.insert(users).values({
       pubkey: data.pubkey,
       displayName: data.name,
@@ -362,7 +389,7 @@ export class IdentityService {
       switch (key) {
         case 'name': updates.displayName = value as string; break
         case 'phone': updates.phone = value as string; break
-        case 'roles': updates.roles = value as string[]; break
+        case 'roles': updates.roles = this.enforceAdminRoles(pubkey, value as string[]); break
         case 'active': updates.active = value as boolean; break
         case 'encryptedSecretKey': updates.encryptedSecretKey = value as string; break
         case 'transcriptionEnabled': updates.transcriptionEnabled = value as boolean; break
@@ -563,7 +590,10 @@ export class IdentityService {
         pubkey: data.pubkey,
         displayName: invite.name,
         phone: invite.phone,
-        roles: invite.roleIds.length > 0 ? invite.roleIds : ['role-volunteer'],
+        roles: this.enforceAdminRoles(
+          data.pubkey,
+          invite.roleIds.length > 0 ? invite.roleIds : ['role-volunteer'],
+        ),
         active: true,
         encryptedSecretKey: '',
         transcriptionEnabled: true,

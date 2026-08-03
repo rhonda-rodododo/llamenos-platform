@@ -41,6 +41,7 @@ runs:
         printf '%s\n' \
           "ADMIN_PUBKEY=${{ inputs.admin_pubkey }}" \
           "DOMAIN=localhost" \
+          "PG_POOL_SIZE=40" \
           "PG_PASSWORD=ci-test-password" \
           "HMAC_SECRET=$(openssl rand -hex 32)" \
           "STORAGE_ACCESS_KEY=testaccess" \

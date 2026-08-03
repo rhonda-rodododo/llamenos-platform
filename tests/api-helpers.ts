@@ -262,20 +262,46 @@ export async function deleteHubViaApi(
 }
 
 /**
- * Ensure the admin user has the correct global role (role-super-admin).
- * Uses the dev endpoint which bypasses auth and directly sets the role.
- * This prevents cascading 403 failures when the admin's role gets
- * downgraded to role-volunteer during parallel test-reset races.
+ * Read the admin's current global roles via the authenticated /auth/me route.
+ * Returns null when the call does not succeed (e.g. the user row is momentarily
+ * absent during a database reset), which callers treat as "not yet admin".
+ */
+async function readAdminRoles(request: APIRequestContext): Promise<string[] | null> {
+  const { status, data } = await apiGet<{ roles?: string[] }>(request, '/auth/me')
+  if (status !== 200) return null
+  return data?.roles ?? null
+}
+
+/**
+ * Ensure the admin user has the correct global role (role-super-admin), and
+ * verify it actually took effect.
+ *
+ * A test-reset deletes every user row; a request that lands inside that window
+ * can recreate the admin with the default role-volunteer. Promotion alone is
+ * not enough — it can itself race a concurrent reset — so this polls /auth/me
+ * until the role is really in place. Failing loudly here beats letting a whole
+ * shard fail later with unrelated-looking 403s.
  */
 export async function ensureAdminRole(
   request: APIRequestContext,
 ): Promise<void> {
-  const { status } = await devPost(request, '/test-promote-admin', {
-    pubkey: seedHexToPubkey(ADMIN_SEED),
-  })
-  if (status !== 200) {
-    console.warn(`[ensureAdminRole] test-promote-admin returned ${status}`)
+  const pubkey = seedHexToPubkey(ADMIN_SEED)
+  let lastRoles: string[] | null = null
+  let lastStatus = 0
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const { status } = await devPost(request, '/test-promote-admin', { pubkey })
+    lastStatus = status
+    if (status === 200) {
+      lastRoles = await readAdminRoles(request)
+      if (lastRoles?.includes('role-super-admin')) return
+    }
+    // Back off — a concurrent reset takes a moment to finish re-seeding.
+    await new Promise(r => setTimeout(r, 200 * (attempt + 1)))
   }
+  throw new Error(
+    `[ensureAdminRole] admin ${pubkey.slice(0, 8)} never reached role-super-admin ` +
+    `(test-promote-admin returned ${lastStatus}, /auth/me roles: ${JSON.stringify(lastRoles)})`,
+  )
 }
 
 /**
@@ -297,11 +323,17 @@ export async function verifyHubMembership(
   await ensureAdminRole(request)
 
   // Try a hub-scoped endpoint that requires any permission
-  const { status } = await apiGet<unknown>(request, `/hubs/${hubId}/notes?limit=1`)
+  const { status, data } = await apiGet<unknown>(request, `/hubs/${hubId}/notes?limit=1`)
   if (status === 200) return // Admin has access
 
   if (status === 403) {
-    console.warn(`[verifyHubMembership] Admin lacks membership in hub ${hubId} — re-adding via API`)
+    // The dev backend embeds `debug: { roles, permCount, hubPermCount }` in 403
+    // bodies, and hubContext denials say "Access denied". Surfacing the body is
+    // the only way to tell a hub-membership denial apart from a permission or
+    // WebAuthn-enforcement denial when this only reproduces in CI.
+    console.warn(
+      `[verifyHubMembership] Admin denied on hub ${hubId} — body: ${JSON.stringify(data)}`,
+    )
     // Re-add admin as hub member via the dev endpoint (bypasses auth)
     const { status: devStatus } = await devPost(request, '/test-add-hub-member', {
       hubId,
@@ -328,10 +360,23 @@ export async function verifyHubMembership(
       // One more attempt: re-ensure admin role and retry
       await ensureAdminRole(request)
       await new Promise(r => setTimeout(r, 200))
-      const { status: finalStatus } = await apiGet<unknown>(request, `/hubs/${hubId}/notes?limit=1`)
+      const { status: finalStatus, data: finalData } = await apiGet<unknown>(request, `/hubs/${hubId}/notes?limit=1`)
       if (finalStatus === 403) {
+        // A 403 that survives both a hub-role re-add and a global-role re-promote
+        // points at the role definitions themselves rather than at membership.
+        // Dump what the server currently thinks role-super-admin can do.
+        const { status: rolesStatus, data: rolesData } = await apiGet<{
+          roles?: { id: string; permissions: string[] }[]
+        }>(request, '/settings/roles')
+        const superAdmin = rolesData?.roles?.find(r => r.id === 'role-super-admin')
+        console.warn(
+          `[verifyHubMembership] roles snapshot (status ${rolesStatus}): ` +
+          `roleCount=${rolesData?.roles?.length}, ` +
+          `role-super-admin permissions=${JSON.stringify(superAdmin?.permissions)}`,
+        )
         throw new Error(
-          `Admin still lacks hub membership after re-add for hub ${hubId} (status: ${finalStatus})`
+          `Admin still lacks hub membership after re-add for hub ${hubId} ` +
+          `(status: ${finalStatus}, dev-add: ${devStatus}, body: ${JSON.stringify(finalData)})`
         )
       }
     }
