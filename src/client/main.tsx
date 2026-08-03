@@ -8,6 +8,9 @@ import { ThemeProvider } from '@/lib/theme'
 import { ToastProvider } from '@/lib/toast'
 import { NoteSheetProvider } from '@/lib/note-sheet-context'
 import { installGlobalErrorHandlers, uploadPendingReports, isCrashReportingEnabled } from '@/lib/crash-reporting'
+import * as testPlatform from '@/lib/platform'
+import * as testKeyManager from '@/lib/key-manager'
+import * as testApi from '@/lib/api'
 import '@/lib/i18n'
 import '@/app.css'
 
@@ -34,17 +37,15 @@ declare global {
   }
 }
 if (typeof window !== 'undefined' && (import.meta.env.DEV || import.meta.env.PLAYWRIGHT_TEST)) {
+  // Assigned synchronously from static imports (not dynamic import()) so tests
+  // waiting on window.__TEST_PLATFORM never race a chunk-load — see e2e shard 1
+  // flake where `waitForFunction(() => !!window.__TEST_PLATFORM)` timed out
+  // under CI load because the dynamic import resolved too slowly.
   window.__TEST_ROUTER = router
-  import('./lib/key-manager').then(km => {
-    window.__TEST_KEY_MANAGER = km
-  })
-  import('./lib/platform').then(p => {
-    window.__TEST_PLATFORM = p
-  })
-  import('./lib/api').then(api => {
-    window.__TEST_SET_ACTIVE_HUB = api.setActiveHub
-    window.__TEST_GET_ACTIVE_HUB = api.getActiveHub
-  })
+  window.__TEST_KEY_MANAGER = testKeyManager
+  window.__TEST_PLATFORM = testPlatform
+  window.__TEST_SET_ACTIVE_HUB = testApi.setActiveHub
+  window.__TEST_GET_ACTIVE_HUB = testApi.getActiveHub
 }
 
 declare module '@tanstack/react-router' {
