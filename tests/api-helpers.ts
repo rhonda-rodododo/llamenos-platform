@@ -262,20 +262,46 @@ export async function deleteHubViaApi(
 }
 
 /**
- * Ensure the admin user has the correct global role (role-super-admin).
- * Uses the dev endpoint which bypasses auth and directly sets the role.
- * This prevents cascading 403 failures when the admin's role gets
- * downgraded to role-volunteer during parallel test-reset races.
+ * Read the admin's current global roles via the authenticated /auth/me route.
+ * Returns null when the call does not succeed (e.g. the user row is momentarily
+ * absent during a database reset), which callers treat as "not yet admin".
+ */
+async function readAdminRoles(request: APIRequestContext): Promise<string[] | null> {
+  const { status, data } = await apiGet<{ roles?: string[] }>(request, '/auth/me')
+  if (status !== 200) return null
+  return data?.roles ?? null
+}
+
+/**
+ * Ensure the admin user has the correct global role (role-super-admin), and
+ * verify it actually took effect.
+ *
+ * A test-reset deletes every user row; a request that lands inside that window
+ * can recreate the admin with the default role-volunteer. Promotion alone is
+ * not enough — it can itself race a concurrent reset — so this polls /auth/me
+ * until the role is really in place. Failing loudly here beats letting a whole
+ * shard fail later with unrelated-looking 403s.
  */
 export async function ensureAdminRole(
   request: APIRequestContext,
 ): Promise<void> {
-  const { status } = await devPost(request, '/test-promote-admin', {
-    pubkey: seedHexToPubkey(ADMIN_SEED),
-  })
-  if (status !== 200) {
-    console.warn(`[ensureAdminRole] test-promote-admin returned ${status}`)
+  const pubkey = seedHexToPubkey(ADMIN_SEED)
+  let lastRoles: string[] | null = null
+  let lastStatus = 0
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const { status } = await devPost(request, '/test-promote-admin', { pubkey })
+    lastStatus = status
+    if (status === 200) {
+      lastRoles = await readAdminRoles(request)
+      if (lastRoles?.includes('role-super-admin')) return
+    }
+    // Back off — a concurrent reset takes a moment to finish re-seeding.
+    await new Promise(r => setTimeout(r, 200 * (attempt + 1)))
   }
+  throw new Error(
+    `[ensureAdminRole] admin ${pubkey.slice(0, 8)} never reached role-super-admin ` +
+    `(test-promote-admin returned ${lastStatus}, /auth/me roles: ${JSON.stringify(lastRoles)})`,
+  )
 }
 
 /**

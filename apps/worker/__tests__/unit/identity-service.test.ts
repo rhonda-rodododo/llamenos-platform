@@ -365,6 +365,44 @@ describe('IdentityService — User CRUD', () => {
       expect(setVals.roles).toBeUndefined()
     })
 
+    it('never demotes the configured platform admin', async () => {
+      const existingRow = makeUserRow({ pubkey: 'admin-pk' })
+      const updatedRow = makeUserRow({ pubkey: 'admin-pk', roles: ['role-super-admin'] })
+
+      const updateSet = vi.fn()
+      const db = {
+        update: vi.fn().mockReturnValue({
+          set: updateSet.mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              returning: vi.fn().mockResolvedValue([updatedRow]),
+            }),
+          }),
+        }),
+      }
+      void existingRow
+
+      const svc = new IdentityService(db as never, 'admin-pk')
+      await svc.updateUser('admin-pk', { roles: ['role-volunteer'] } as never, true)
+
+      expect(updateSet.mock.calls[0][0].roles).toEqual(['role-super-admin'])
+    })
+
+    it('creates the configured platform admin as super-admin even without explicit roles', async () => {
+      const insertValues = vi.fn()
+      const db = {
+        insert: vi.fn().mockReturnValue({
+          values: insertValues.mockReturnValue({
+            returning: vi.fn().mockResolvedValue([makeUserRow({ pubkey: 'admin-pk', roles: ['role-super-admin'] })]),
+          }),
+        }),
+      }
+
+      const svc = new IdentityService(db as never, 'admin-pk')
+      await svc.createUser({ pubkey: 'admin-pk', name: 'Admin', phone: '', encryptedSecretKey: '' })
+
+      expect(insertValues.mock.calls[0][0].roles).toEqual(['role-super-admin'])
+    })
+
     it('admin can update restricted fields like roles', async () => {
       const existingRow = makeUserRow({ pubkey: 'pk-1' })
       const updatedRow = makeUserRow({ pubkey: 'pk-1', roles: ['role-admin'] })

@@ -105,7 +105,7 @@ export function createServices(db: Database, opts?: ServicesOpts): Services {
   const digestCron = new DigestCronService(db, userNotifications, securityPrefs)
   const providerSetup = new ProviderSetup(db, opts?.hmacSecret ?? '', opts?.env?.DOMAIN ?? 'localhost')
 
-  const identity = new IdentityService(db)
+  const identity = new IdentityService(db, opts?.env?.ADMIN_PUBKEY)
 
   const services: Services = {
     identity,
