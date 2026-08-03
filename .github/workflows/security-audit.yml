@@ -103,7 +103,12 @@ jobs:
 
   # ─── Dockerfile Security Scanning ──────────────────────────
   dockerfile-scan:
-    runs-on: [self-hosted, linux, x64]
+    # aquasecurity/trivy-action restores/installs the trivy binary under
+    # $HOME/.local/bin and adds it to $GITHUB_PATH, but on the self-hosted
+    # runner that PATH update doesn't take effect for the next step ("trivy:
+    # command not found", exit 127) — same class of $HOME/PATH mismatch as
+    # the gitleaks and ansible-lint self-hosted issues. Keep hosted.
+    runs-on: ubuntu-latest
     timeout-minutes: 10
 
     permissions:
@@ -168,7 +173,8 @@ jobs:
 
   # ─── Container Image Vulnerability Scan ────────────────────
   image-scan:
-    runs-on: [self-hosted, linux, x64]
+    # Same trivy-action PATH/$HOME mismatch as dockerfile-scan — keep hosted.
+    runs-on: ubuntu-latest
     timeout-minutes: 20
 
     permissions:
