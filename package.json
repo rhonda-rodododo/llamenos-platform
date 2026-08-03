@@ -181,6 +181,8 @@
     "wrangler": "^4.85.0"
   },
   "overrides": {
+    "seroval": ">=1.5.3",
+    "seroval-plugins": ">=1.5.3",
     "protobufjs": ">=8.4.0",
     "ws": ">=8.20.1",
     "axios": ">=1.16.1",
