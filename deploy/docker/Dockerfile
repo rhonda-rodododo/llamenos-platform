@@ -26,7 +26,7 @@ COPY site/package.json site/package.json
 RUN bun install --frozen-lockfile --production --ignore-scripts
 
 # Stage 2: Build Rust crypto FFI (.so)
-FROM rust:1-slim@sha256:14c4fe50ea427dc42381a1a09a9a839c1d2346a2e508cd491bf02c659dbc0ed7 AS rust-builder
+FROM rust:1-slim@sha256:3b2879047d42784ca9403ad20c51ed3df361a50f1df96f5777d39b4e33aa65cd AS rust-builder
 RUN apt-get update && apt-get install -y --no-install-recommends pkg-config && rm -rf /var/lib/apt/lists/*
 WORKDIR /build
 COPY packages/crypto/ packages/crypto/
