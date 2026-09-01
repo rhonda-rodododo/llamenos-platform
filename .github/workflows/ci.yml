@@ -31,7 +31,7 @@ env:
 jobs:
   # ─── Detect Changed Files ─────────────────────────────────────
   changes:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     permissions:
       contents: read
     if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
@@ -84,7 +84,7 @@ jobs:
   # ─── Guard: No Generated Files In Git ────────────────────
   no-generated-files-in-git:
     name: No generated files in git
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     permissions:
       contents: read
     timeout-minutes: 2
@@ -140,7 +140,7 @@ jobs:
   # ─── Guard: Updater Pubkey Must Be Set ───────────────────
   verify-updater-config:
     name: Updater pubkey is set
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     permissions:
       contents: read
     timeout-minutes: 2
@@ -194,7 +194,7 @@ jobs:
   # ─── Build & Validate ──────────────────────────────────────
   build:
     needs: changes
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     permissions:
       contents: read
     timeout-minutes: 15
@@ -246,7 +246,7 @@ jobs:
   crypto-tests:
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     permissions:
       contents: read
     timeout-minutes: 15
@@ -277,7 +277,7 @@ jobs:
   # ─── Dependency Vulnerability Scan ───────────────────────────
   audit:
     needs: changes
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     permissions:
       contents: read
 
@@ -315,7 +315,7 @@ jobs:
   e2e:
     needs: [changes, build]
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest  # playwright --with-deps needs root; GH-hosted has browsers
     permissions:
       contents: read
     timeout-minutes: 30
@@ -464,7 +464,7 @@ jobs:
   backend-bdd:
     needs: [changes]
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest  # playwright --with-deps needs root; GH-hosted has browsers
     permissions:
       contents: read
     timeout-minutes: 30
@@ -551,7 +551,7 @@ jobs:
   backend-unit:
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     permissions:
       contents: read
     timeout-minutes: 10
@@ -585,7 +585,7 @@ jobs:
   ansible-validate:
     needs: changes
     if: needs.changes.outputs.ansible == 'true' || needs.changes.outputs.app == 'true'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     permissions:
       contents: read
     timeout-minutes: 10
@@ -595,7 +595,11 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Install Ansible and ansible-lint
-        run: pip install ansible==14.1.0 ansible-lint==26.6.0
+        run: |
+          pip install --user ansible==14.1.0 ansible-lint==26.6.0
+          # pip installs console scripts into ~/.local/bin, which is not on
+          # PATH for the self-hosted runner user.
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       # `min` is the profile ansible-lint itself defines as "prevents fatal
       # errors" (syntax/parser/load failures) — the appropriate bar for this
@@ -619,7 +623,7 @@ jobs:
   desktop-unit:
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     permissions:
       contents: read
     timeout-minutes: 10
@@ -653,7 +657,7 @@ jobs:
   android-build-test:
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     permissions:
       contents: read
     timeout-minutes: 25
@@ -703,7 +707,7 @@ jobs:
   android-e2e:
     needs: [changes]
     if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.android == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest  # android emulator needs KVM (no nested-virt on Hetzner cloud)
     permissions:
       contents: read
     timeout-minutes: 45
@@ -1076,7 +1080,7 @@ jobs:
   crypto-guardrails:
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     permissions:
       contents: read
     timeout-minutes: 5
@@ -1169,7 +1173,7 @@ jobs:
   migration-drift:
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     permissions:
       contents: read
     timeout-minutes: 5
@@ -1190,7 +1194,7 @@ jobs:
         run: bun run migration:check --ci
 
   docs-guard:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     timeout-minutes: 3
 
     steps:
@@ -1206,7 +1210,7 @@ jobs:
   docker-canary:
     needs: ci-status
     if: github.ref == 'refs/heads/main' && needs.ci-status.result == 'success'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     permissions:
       contents: read
       packages: write
@@ -1273,7 +1277,7 @@ jobs:
   ci-status:
     needs: [no-generated-files-in-git, verify-updater-config, build, audit, crypto-tests, backend-bdd, backend-unit, desktop-unit, android-build-test, android-e2e, e2e, ios-build-test, crypto-guardrails, migration-drift, ansible-validate, docs-guard]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     permissions:
       contents: read
     timeout-minutes: 2
