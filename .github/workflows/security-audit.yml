@@ -79,15 +79,16 @@ jobs:
     permissions:
       contents: read
     timeout-minutes: 15
-    # Runners share one $HOME across concurrent jobs; give each job its own
-    # rustup/cargo homes so parallel installs don't race on the same toolchain dir.
-    env:
-      RUSTUP_HOME: ${{ runner.temp }}/rustup
-      CARGO_HOME: ${{ runner.temp }}/cargo
 
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Isolate rustup/cargo home (self-hosted runners share $HOME)
+        run: |
+          echo "RUSTUP_HOME=$RUNNER_TEMP/rustup" >> "$GITHUB_ENV"
+          echo "CARGO_HOME=$RUNNER_TEMP/cargo" >> "$GITHUB_ENV"
+          echo "$RUNNER_TEMP/cargo/bin" >> "$GITHUB_PATH"
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@67ef31d5b988238dd797d409d6f9574278e20537 # stable
@@ -316,15 +317,16 @@ jobs:
     # Warn-only initially — change continue-on-error to false once the initial
     # deny.toml triage is complete and all findings are addressed.
     continue-on-error: true
-    # Runners share one $HOME across concurrent jobs; give each job its own
-    # rustup/cargo homes so parallel installs don't race on the same toolchain dir.
-    env:
-      RUSTUP_HOME: ${{ runner.temp }}/rustup
-      CARGO_HOME: ${{ runner.temp }}/cargo
 
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Isolate rustup/cargo home (self-hosted runners share $HOME)
+        run: |
+          echo "RUSTUP_HOME=$RUNNER_TEMP/rustup" >> "$GITHUB_ENV"
+          echo "CARGO_HOME=$RUNNER_TEMP/cargo" >> "$GITHUB_ENV"
+          echo "$RUNNER_TEMP/cargo/bin" >> "$GITHUB_PATH"
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # stable

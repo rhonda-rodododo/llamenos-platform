@@ -250,15 +250,16 @@ jobs:
     permissions:
       contents: read
     timeout-minutes: 15
-    # Runners share one $HOME across concurrent jobs; give each job its own
-    # rustup/cargo homes so parallel installs don't race on the same toolchain dir.
-    env:
-      RUSTUP_HOME: ${{ runner.temp }}/rustup
-      CARGO_HOME: ${{ runner.temp }}/cargo
 
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Isolate rustup/cargo home (self-hosted runners share $HOME)
+        run: |
+          echo "RUSTUP_HOME=$RUNNER_TEMP/rustup" >> "$GITHUB_ENV"
+          echo "CARGO_HOME=$RUNNER_TEMP/cargo" >> "$GITHUB_ENV"
+          echo "$RUNNER_TEMP/cargo/bin" >> "$GITHUB_PATH"
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@67ef31d5b988238dd797d409d6f9574278e20537 # stable
@@ -666,15 +667,16 @@ jobs:
     permissions:
       contents: read
     timeout-minutes: 25
-    # Runners share one $HOME across concurrent jobs; give each job its own
-    # rustup/cargo homes so parallel installs don't race on the same toolchain dir.
-    env:
-      RUSTUP_HOME: ${{ runner.temp }}/rustup
-      CARGO_HOME: ${{ runner.temp }}/cargo
 
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Isolate rustup/cargo home (self-hosted runners share $HOME)
+        run: |
+          echo "RUSTUP_HOME=$RUNNER_TEMP/rustup" >> "$GITHUB_ENV"
+          echo "CARGO_HOME=$RUNNER_TEMP/cargo" >> "$GITHUB_ENV"
+          echo "$RUNNER_TEMP/cargo/bin" >> "$GITHUB_PATH"
 
       - name: Setup Bun (for codegen)
         uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2.0.2
