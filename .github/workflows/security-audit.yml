@@ -49,7 +49,7 @@ env:
 jobs:
   # ─── JavaScript/TypeScript Dependency Audit ─────────────────
   dependency-audit:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     permissions:
       contents: read
     timeout-minutes: 10
@@ -75,7 +75,7 @@ jobs:
 
   # ─── Rust Dependency Audit ─────────────────────────────────
   rust-audit:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     permissions:
       contents: read
     timeout-minutes: 15
@@ -83,6 +83,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Isolate rustup/cargo home (self-hosted runners share $HOME)
+        run: |
+          echo "RUSTUP_HOME=$RUNNER_TEMP/rustup" >> "$GITHUB_ENV"
+          echo "CARGO_HOME=$RUNNER_TEMP/cargo" >> "$GITHUB_ENV"
+          echo "$RUNNER_TEMP/cargo/bin" >> "$GITHUB_PATH"
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@67ef31d5b988238dd797d409d6f9574278e20537 # stable
@@ -103,6 +109,11 @@ jobs:
 
   # ─── Dockerfile Security Scanning ──────────────────────────
   dockerfile-scan:
+    # aquasecurity/trivy-action restores/installs the trivy binary under
+    # $HOME/.local/bin and adds it to $GITHUB_PATH, but on the self-hosted
+    # runner that PATH update doesn't take effect for the next step ("trivy:
+    # command not found", exit 127) — same class of $HOME/PATH mismatch as
+    # the gitleaks and ansible-lint self-hosted issues. Keep hosted.
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -168,6 +179,7 @@ jobs:
 
   # ─── Container Image Vulnerability Scan ────────────────────
   image-scan:
+    # Same trivy-action PATH/$HOME mismatch as dockerfile-scan — keep hosted.
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -230,7 +242,7 @@ jobs:
 
   # ─── Crypto Guardrails (informational) ─────────────────────
   crypto-guardrails:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     if: >-
       github.event_name == 'schedule' ||
       github.event_name == 'workflow_dispatch'
@@ -298,7 +310,7 @@ jobs:
 
   # ─── Rust Dependency Policy (cargo deny) ───────────────────
   cargo-deny:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     permissions:
       contents: read
     timeout-minutes: 15
@@ -309,6 +321,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Isolate rustup/cargo home (self-hosted runners share $HOME)
+        run: |
+          echo "RUSTUP_HOME=$RUNNER_TEMP/rustup" >> "$GITHUB_ENV"
+          echo "CARGO_HOME=$RUNNER_TEMP/cargo" >> "$GITHUB_ENV"
+          echo "$RUNNER_TEMP/cargo/bin" >> "$GITHUB_PATH"
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # stable
