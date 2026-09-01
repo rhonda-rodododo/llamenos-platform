@@ -56,7 +56,7 @@ Given('a valid provisioning room is established', async ({ page, sasWorld }) => 
   // ephemeral keypair. The ephemeral secret is stored in Rust/mock CryptoState —
   // it NEVER enters JavaScript. We only get back the pubkey hex.
   const ephemeralPubkeyHex = await page.evaluate(async () => {
-    const platform = (window as Record<string, unknown>).__TEST_PLATFORM as {
+    const platform = (window as unknown as Record<string, unknown>).__TEST_PLATFORM as {
       provisionCreateSession(): Promise<string>
     }
     return platform.provisionCreateSession()

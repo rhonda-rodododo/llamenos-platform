@@ -417,7 +417,7 @@ export async function createUserAndGetDeviceKey(page: Page, name: string, phone:
   // If available, return it so loginAsVolunteer uses deviceImportAndLoad (Ed25519).
   // If not available (e.g., pre-test reload), fall back to displayed key from DOM.
   const seedHex = await page.evaluate(
-    () => (window as Record<string, unknown>).__last_vol_seed_hex as string | undefined,
+    () => (window as unknown as Record<string, unknown>).__last_vol_seed_hex as string | undefined,
   )
   if (seedHex && /^[0-9a-f]{64}$/.test(seedHex)) {
     return seedHex

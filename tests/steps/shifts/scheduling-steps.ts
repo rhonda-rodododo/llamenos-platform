@@ -29,7 +29,7 @@ When('I fill in the shift name with a unique name', async ({ page }) => {
   const name = `TestShift ${Date.now()}`
   await page.getByTestId(TestIds.SHIFT_NAME_INPUT).fill(name)
   await page.evaluate((n) => {
-    (window as Record<string, unknown>).__test_shift_name = n
+    (window as unknown as Record<string, unknown>).__test_shift_name = n
   }, name)
 })
 
@@ -42,7 +42,7 @@ When('I set the end time to {string}', async ({ page }, time: string) => {
 })
 
 Then('the shift should appear in the schedule', async ({ page }) => {
-  const name = (await page.evaluate(() => (window as Record<string, unknown>).__test_shift_name)) as string
+  const name = (await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_shift_name)) as string
   expect(name).toBeTruthy()
 
   // UI verification: shift card with name visible
@@ -51,7 +51,7 @@ Then('the shift should appear in the schedule', async ({ page }) => {
 })
 
 Then('the shift should show {string}', async ({ page }, text: string) => {
-  const name = (await page.evaluate(() => (window as Record<string, unknown>).__test_shift_name)) as string
+  const name = (await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_shift_name)) as string
   if (name) {
     // Scoped assertion: verify the text within the specific shift card
     const card = page.getByTestId(TestIds.SHIFT_CARD).filter({ hasText: name })
@@ -69,7 +69,7 @@ Given('a shift exists', async ({ page }) => {
   const name = `EditShift ${Date.now()}`
   await ShiftPage.createShift(page, name)
   await page.evaluate((n) => {
-    (window as Record<string, unknown>).__test_shift_name = n
+    (window as unknown as Record<string, unknown>).__test_shift_name = n
   }, name)
 
   // Verify the card appears (UI confirmation is sufficient for a Given step)
@@ -78,7 +78,7 @@ Given('a shift exists', async ({ page }) => {
 })
 
 When('I click {string} on the shift', async ({ page }, buttonText: string) => {
-  const name = (await page.evaluate(() => (window as Record<string, unknown>).__test_shift_name)) as string
+  const name = (await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_shift_name)) as string
   expect(name).toBeTruthy()
 
   const card = ShiftPage.getCard(page, name)
@@ -97,12 +97,12 @@ When('I change the shift name', async ({ page }) => {
   await page.getByTestId(TestIds.SHIFT_NAME_INPUT).clear()
   await page.getByTestId(TestIds.SHIFT_NAME_INPUT).fill(newName)
   await page.evaluate((n) => {
-    (window as Record<string, unknown>).__test_shift_name = n
+    (window as unknown as Record<string, unknown>).__test_shift_name = n
   }, newName)
 })
 
 Then('the updated shift name should be visible', async ({ page }) => {
-  const name = (await page.evaluate(() => (window as Record<string, unknown>).__test_shift_name)) as string
+  const name = (await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_shift_name)) as string
   expect(name).toBeTruthy()
 
   // UI verification
@@ -111,7 +111,7 @@ Then('the updated shift name should be visible', async ({ page }) => {
 })
 
 Then('the shift should no longer be visible', async ({ page }) => {
-  const name = (await page.evaluate(() => (window as Record<string, unknown>).__test_shift_name)) as string
+  const name = (await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_shift_name)) as string
   expect(name).toBeTruthy()
 
   // UI verification
@@ -132,7 +132,7 @@ Then('the edit form should be visible', async ({ page }) => {
 })
 
 Then('the original shift name should still be visible', async ({ page }) => {
-  const name = (await page.evaluate(() => (window as Record<string, unknown>).__test_shift_name)) as string
+  const name = (await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_shift_name)) as string
   expect(name).toBeTruthy()
   const card = page.getByTestId(TestIds.SHIFT_CARD).filter({ hasText: name })
   await expect(card.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
@@ -145,7 +145,7 @@ When('I create a shift and assign the volunteer', async ({ page }) => {
   const name = `AssignShift ${Date.now()}`
   await page.getByTestId(TestIds.SHIFT_NAME_INPUT).fill(name)
   await page.evaluate((n) => {
-    (window as Record<string, unknown>).__test_shift_name = n
+    (window as unknown as Record<string, unknown>).__test_shift_name = n
   }, name)
   // Assign volunteer via UserMultiSelect combobox
   const form = page.getByTestId(TestIds.SHIFT_FORM)
@@ -187,18 +187,18 @@ When('I create a shift without assigning volunteers', async ({ page }) => {
   const name = `EmptyShift ${Date.now()}`
   await ShiftPage.createShift(page, name)
   await page.evaluate((n) => {
-    (window as Record<string, unknown>).__test_shift_name = n
+    (window as unknown as Record<string, unknown>).__test_shift_name = n
   }, name)
 })
 
 // --- Persistence scenarios ---
 
-Given('I create a shift with name {string}', async ({ page }) => {
+Given('I create a shift with name {string}', async ({ page }, baseName: string) => {
   await ShiftPage.openCreateForm(page)
-  const name = `${arguments[1]} ${Date.now()}`
+  const name = `${baseName} ${Date.now()}`
   await ShiftPage.createShift(page, name)
   await page.evaluate((n) => {
-    (window as Record<string, unknown>).__test_shift_name = n
+    (window as unknown as Record<string, unknown>).__test_shift_name = n
   }, name)
 })
 
@@ -208,26 +208,26 @@ Given('a shift exists with time {string}', async ({ page }, timeRange: string) =
   await ShiftPage.openCreateForm(page)
   await ShiftPage.createShift(page, name, { startTime: start, endTime: end })
   await page.evaluate((n) => {
-    (window as Record<string, unknown>).__test_shift_name = n
+    (window as unknown as Record<string, unknown>).__test_shift_name = n
   }, name)
 
   const card = page.getByTestId(TestIds.SHIFT_CARD).filter({ hasText: name })
   await expect(card.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
-When('I edit the shift time to {string}', async ({ page }) => {
-  const name = (await page.evaluate(() => (window as Record<string, unknown>).__test_shift_name)) as string
+When('I edit the shift time to {string}', async ({ page }, timeRange: string) => {
+  const name = (await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_shift_name)) as string
   expect(name).toBeTruthy()
   const card = ShiftPage.getCard(page, name)
   await card.getByTestId(TestIds.SHIFT_EDIT_BTN).click()
-  const [start, end] = (arguments[1] as string).split(' - ')
+  const [start, end] = timeRange.split(' - ')
   await page.getByTestId(TestIds.SHIFT_START_TIME).fill(start)
   await page.getByTestId(TestIds.SHIFT_END_TIME).fill(end)
   await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
 })
 
 Then('the shift should not show {string}', async ({ page }, text: string) => {
-  const name = (await page.evaluate(() => (window as Record<string, unknown>).__test_shift_name)) as string
+  const name = (await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_shift_name)) as string
   if (name) {
     const card = page.getByTestId(TestIds.SHIFT_CARD).filter({ hasText: name })
     await expect(card.first()).not.toContainText(text, { timeout: 3000 })

@@ -1,11 +1,8 @@
 import Twilio from 'twilio'
 import { expect, type Page, type APIRequestContext } from '@playwright/test'
-import { gcm } from '@noble/ciphers/aes.js'
-import { utf8ToBytes } from '@noble/ciphers/utils.js'
-import { bytesToHex } from '@noble/hashes/utils.js'
-import { getPublicKey, nip19 } from '@llamenos/crypto/ffi'
+import { TestIds } from '../test-ids'
 
-// Re-export helpers that don't depend on ADMIN_NSEC
+// Re-export helpers that don't depend on ADMIN_SEED
 export { enterPin } from '../helpers'
 
 const STAGING_PIN = '12345678'
@@ -24,7 +21,7 @@ export function getLiveConfig() {
     hotlineNumber: requireEnv('TWILIO_PHONE_NUMBER'),
     testCallerNumber: requireEnv('TWILIO_TEST_CALLER'),
     testSecret: requireEnv('E2E_TEST_SECRET'),
-    adminNsec: requireEnv('STAGING_ADMIN_NSEC'),
+    adminSeed: requireEnv('STAGING_ADMIN_SEED'),
     baseURL: process.env.LIVE_BASE_URL || 'https://demo-next.llamenos-platform.com',
   }
 }
@@ -35,56 +32,35 @@ export function createTwilioClient() {
 }
 
 /**
- * Pre-compute an encrypted key blob and inject it into localStorage.
- * Same PBKDF2 + AES-256-GCM format as key-store.ts.
- */
-async function preloadEncryptedKey(page: Page, nsec: string, pin: string): Promise<void> {
-  const encoder = new TextEncoder()
-  const pinBytes = encoder.encode(pin)
-  const salt = crypto.getRandomValues(new Uint8Array(16))
-
-  const keyMaterial = await crypto.subtle.importKey('raw', pinBytes, 'PBKDF2', false, ['deriveBits'])
-  const derivedBits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', hash: 'SHA-256', salt, iterations: 600_000 },
-    keyMaterial,
-    256,
-  )
-  const kek = new Uint8Array(derivedBits)
-
-  const nonce = crypto.getRandomValues(new Uint8Array(12))
-  const cipher = gcm(kek, nonce)
-  const ciphertext = cipher.encrypt(utf8ToBytes(nsec))
-
-  const decoded = nip19.decode(nsec)
-  if (decoded.type !== 'nsec') throw new Error('Invalid nsec')
-  const pubkey = getPublicKey(decoded.data)
-  const hashInput = encoder.encode(`llamenos:keyid:${pubkey}`)
-  const pubkeyHashBuf = await crypto.subtle.digest('SHA-256', hashInput)
-  const pubkeyHash = bytesToHex(new Uint8Array(pubkeyHashBuf)).slice(0, 16)
-
-  const data = {
-    salt: bytesToHex(salt),
-    iterations: 600_000,
-    nonce: bytesToHex(nonce),
-    ciphertext: bytesToHex(ciphertext),
-    pubkey: pubkeyHash,
-  }
-
-  await page.evaluate(
-    ({ key, value }) => localStorage.setItem(key, value),
-    { key: 'llamenos-encrypted-key', value: JSON.stringify(data) },
-  )
-}
-
-/**
- * Login as the staging admin using the nsec from STAGING_ADMIN_NSEC env var.
+ * Login as the staging admin using the raw Ed25519 signing seed hex from
+ * STAGING_ADMIN_SEED (the same "admin logs in with the IDENTITY seed hex"
+ * material `scripts/bootstrap-admin.ts` prints). Device keys live behind
+ * Tauri Stronghold (see src/client/lib/platform.ts getSecureStore()), so
+ * there is no localStorage blob to hand-roll — import through the same
+ * window.__TEST_PLATFORM bridge the desktop E2E suite uses in
+ * tests/helpers.ts loginAsAdmin's key-import path.
  */
 export async function loginAsAdmin(page: Page) {
-  const { adminNsec } = getLiveConfig()
+  const { adminSeed } = getLiveConfig()
   await page.goto('/login')
-  await page.evaluate(() => sessionStorage.clear())
-  await preloadEncryptedKey(page, adminNsec, STAGING_PIN)
+  await page.evaluate(() => {
+    sessionStorage.clear()
+    localStorage.clear()
+  })
   await page.reload()
+  await page.waitForLoadState('domcontentloaded')
+
+  await page.waitForFunction(() => !!(window as any).__TEST_PLATFORM, { timeout: 15000 })
+
+  await page.evaluate(async ({ adminSeed, pin }) => {
+    const platform = (window as any).__TEST_PLATFORM
+    const encrypted = await platform.deviceImportAndLoad(adminSeed, pin, crypto.randomUUID())
+    await platform.persistAndUnlockDeviceKeys(encrypted, pin)
+    await platform.lockCrypto()
+  }, { adminSeed, pin: STAGING_PIN })
+
+  await page.reload()
+  await page.waitForLoadState('domcontentloaded')
 
   // Enter PIN
   const pinInput = page.getByTestId('pin-input').locator('input')
@@ -92,7 +68,7 @@ export async function loginAsAdmin(page: Page) {
   await pinInput.fill(STAGING_PIN)
   await pinInput.press('Enter')
 
-  await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible({ timeout: 15000 })
+  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: 15000 })
 }
 
 interface CallHotlineOptions {

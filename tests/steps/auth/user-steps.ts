@@ -27,13 +27,13 @@ Given('an admin has created a volunteer', async ({ page }) => {
   const phone = `+1212${Date.now().toString().slice(-7)}`
   const deviceKey = await createUserAndGetDeviceKey(page, name, phone)
   await page.evaluate((n) => {
-    (window as Record<string, unknown>).__test_vol_nsec = n
+    (window as unknown as Record<string, unknown>).__test_vol_nsec = n
   }, deviceKey)
   await dismissDeviceKeyCard(page)
 })
 
 When('the volunteer logs in with their device key', async ({ page }) => {
-  const deviceKey = (await page.evaluate(() => (window as Record<string, unknown>).__test_vol_nsec)) as string
+  const deviceKey = (await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_vol_nsec)) as string
   await loginAsVolunteer(page, deviceKey)
 })
 
@@ -76,7 +76,7 @@ Given('a volunteer exists', async ({ page }) => {
   const phone = `+1212${Date.now().toString().slice(-7)}`
   const deviceKey = await createUserAndGetDeviceKey(page, name, phone)
   await page.evaluate((n) => {
-    (window as Record<string, unknown>).__test_vol_nsec = n
+    (window as unknown as Record<string, unknown>).__test_vol_nsec = n
   }, deviceKey)
   await dismissDeviceKeyCard(page)
 })
@@ -112,7 +112,7 @@ When('I create an invite for a new volunteer', async ({ page }) => {
   await page.getByTestId('dismiss-invite').waitFor({ state: 'visible', timeout: Timeouts.API })
   // Persist the vol name in localStorage so it survives page.reload()
   await page.evaluate((n) => {
-    (window as Record<string, unknown>).__test_invite_vol_name = n
+    (window as unknown as Record<string, unknown>).__test_invite_vol_name = n
     localStorage.setItem('__test_invite_vol_name', n)
   }, name)
 })
@@ -144,7 +144,7 @@ When('the volunteer opens the invite link', async ({ page }) => {
 })
 
 Then('they should see a welcome screen with their name', async ({ page }) => {
-  const volName = (await page.evaluate(() => (window as Record<string, unknown>).__test_invite_vol_name || localStorage.getItem('__test_invite_vol_name'))) as string
+  const volName = (await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_invite_vol_name || localStorage.getItem('__test_invite_vol_name'))) as string
   expect(volName).toBeTruthy()
   // Content assertion — verifying displayed volunteer name
   await expect(page.getByText(new RegExp(volName, 'i')).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
@@ -161,7 +161,7 @@ When('the volunteer completes the onboarding flow', async ({ page }) => {
 })
 
 Then('the volunteer name should appear in the pending invites list', async ({ page }) => {
-  const volName = (await page.evaluate(() => (window as Record<string, unknown>).__test_invite_vol_name || localStorage.getItem('__test_invite_vol_name'))) as string
+  const volName = (await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_invite_vol_name || localStorage.getItem('__test_invite_vol_name'))) as string
   expect(volName).toBeTruthy()
   // Content assertion — verifying volunteer name is displayed
   await expect(page.getByText(volName, { exact: true }).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
@@ -174,7 +174,7 @@ When('I revoke the invite', async ({ page, request }) => {
   // directly to ensure the invite is actually deleted.
   const { apiGet, apiDelete } = await import('../../api-helpers')
   const volName = (await page.evaluate(() =>
-    (window as Record<string, unknown>).__test_invite_vol_name || localStorage.getItem('__test_invite_vol_name'),
+    (window as unknown as Record<string, unknown>).__test_invite_vol_name || localStorage.getItem('__test_invite_vol_name'),
   )) as string
   const { data: inviteList } = await apiGet<{ invites: Array<{ code: string; name: string }> }>(request, '/invites')
   const invite = inviteList.invites.find((i: { name: string }) => i.name === volName)
@@ -184,7 +184,7 @@ When('I revoke the invite', async ({ page, request }) => {
 })
 
 Then('the volunteer name should no longer appear in the list', async ({ page }) => {
-  const volName = (await page.evaluate(() => (window as Record<string, unknown>).__test_invite_vol_name || localStorage.getItem('__test_invite_vol_name'))) as string
+  const volName = (await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_invite_vol_name || localStorage.getItem('__test_invite_vol_name'))) as string
   expect(volName).toBeTruthy()
   // Reload the page to pick up the server-side deletion, then verify the name is gone.
   await page.reload()
@@ -224,7 +224,7 @@ When('I paste two phone numbers in the textarea', async ({ page }) => {
   }
   await page.evaluate(
     ({ p1, p2 }) => {
-      (window as Record<string, unknown>).__test_bulk_phones = [p1, p2]
+      (window as unknown as Record<string, unknown>).__test_bulk_phones = [p1, p2]
     },
     { p1: phone1, p2: phone2 },
   )
@@ -254,7 +254,7 @@ Given('I have created and then deleted a volunteer', async ({ page }) => {
 })
 
 When('the volunteer logs in and navigates to {string}', async ({ page }, path: string) => {
-  const deviceKey = (await page.evaluate(() => (window as Record<string, unknown>).__test_vol_nsec)) as string
+  const deviceKey = (await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_vol_nsec)) as string
   await loginAsVolunteer(page, deviceKey)
   // This step is only used in access-denied scenarios — the volunteer is navigating
   // somewhere they shouldn't be able to reach. Passing true asserts "Access Denied"
@@ -273,7 +273,7 @@ Given('a reporter has been invited and onboarded', async ({ page, backendRequest
   const phone = `+1212${Date.now().toString().slice(-7)}`
   const deviceKey = await createUserAndGetDeviceKey(page, name, phone)
   await page.evaluate((n) => {
-    (window as Record<string, unknown>).__test_reporter_nsec = n
+    (window as unknown as Record<string, unknown>).__test_reporter_nsec = n
   }, deviceKey)
   await dismissDeviceKeyCard(page)
   // Assign role-reporter so the user has reports:create permission
@@ -283,7 +283,7 @@ Given('a reporter has been invited and onboarded', async ({ page, backendRequest
 
 Given('a reporter is logged in', async ({ page, backendRequest }) => {
   // Check if a reporter key was set by a previous step (e.g., "a reporter has been invited and onboarded")
-  let key = (await page.evaluate(() => (window as Record<string, unknown>).__test_reporter_nsec)) as string | undefined
+  let key = (await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_reporter_nsec)) as string | undefined
   if (!key) {
     // No reporter exists yet — create one via the admin flow
     // Ensure we're logged in as admin first
@@ -305,7 +305,7 @@ Given('a reporter is logged in', async ({ page, backendRequest }) => {
 })
 
 When('the reporter logs in', async ({ page, backendRequest }) => {
-  let key = (await page.evaluate(() => (window as Record<string, unknown>).__test_reporter_nsec)) as string | undefined
+  let key = (await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_reporter_nsec)) as string | undefined
   if (!key) {
     // Reporter wasn't set up yet — create one (loginAsAdmin first to access volunteers)
     await loginAsAdmin(page)
