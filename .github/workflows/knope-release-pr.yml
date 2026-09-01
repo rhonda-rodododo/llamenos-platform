@@ -36,7 +36,7 @@ jobs:
     # The head_commit.message is consumed only by the Actions expression
     # engine, never by a shell, so this is safe from injection.
     if: "!contains(github.event.head_commit.message, 'chore: prepare release')"
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
