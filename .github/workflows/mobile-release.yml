@@ -37,6 +37,10 @@ jobs:
     env:
       HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
       HAS_PLAY_SERVICE_ACCOUNT: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON != '' }}
+      # Runners share one $HOME across concurrent jobs; give each job its own
+      # rustup/cargo homes so parallel installs don't race on the same toolchain dir.
+      RUSTUP_HOME: ${{ runner.temp }}/rustup
+      CARGO_HOME: ${{ runner.temp }}/cargo
 
     steps:
       - name: Checkout

@@ -250,6 +250,11 @@ jobs:
     permissions:
       contents: read
     timeout-minutes: 15
+    # Runners share one $HOME across concurrent jobs; give each job its own
+    # rustup/cargo homes so parallel installs don't race on the same toolchain dir.
+    env:
+      RUSTUP_HOME: ${{ runner.temp }}/rustup
+      CARGO_HOME: ${{ runner.temp }}/cargo
 
     steps:
       - name: Checkout
@@ -661,6 +666,11 @@ jobs:
     permissions:
       contents: read
     timeout-minutes: 25
+    # Runners share one $HOME across concurrent jobs; give each job its own
+    # rustup/cargo homes so parallel installs don't race on the same toolchain dir.
+    env:
+      RUSTUP_HOME: ${{ runner.temp }}/rustup
+      CARGO_HOME: ${{ runner.temp }}/cargo
 
     steps:
       - name: Checkout

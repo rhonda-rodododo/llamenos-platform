@@ -79,6 +79,11 @@ jobs:
     permissions:
       contents: read
     timeout-minutes: 15
+    # Runners share one $HOME across concurrent jobs; give each job its own
+    # rustup/cargo homes so parallel installs don't race on the same toolchain dir.
+    env:
+      RUSTUP_HOME: ${{ runner.temp }}/rustup
+      CARGO_HOME: ${{ runner.temp }}/cargo
 
     steps:
       - name: Checkout
@@ -311,6 +316,11 @@ jobs:
     # Warn-only initially — change continue-on-error to false once the initial
     # deny.toml triage is complete and all findings are addressed.
     continue-on-error: true
+    # Runners share one $HOME across concurrent jobs; give each job its own
+    # rustup/cargo homes so parallel installs don't race on the same toolchain dir.
+    env:
+      RUSTUP_HOME: ${{ runner.temp }}/rustup
+      CARGO_HOME: ${{ runner.temp }}/cargo
 
     steps:
       - name: Checkout
