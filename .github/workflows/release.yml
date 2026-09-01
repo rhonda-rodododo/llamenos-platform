@@ -41,7 +41,7 @@ jobs:
     if: >-
       github.event.pull_request.merged == true &&
       github.head_ref == 'release'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     permissions:
       contents: read
     outputs:
@@ -63,7 +63,7 @@ jobs:
   # --- Build (needed for CHECKSUMS and attestation) ---
   build:
     needs: check
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     permissions:
       contents: read
 
@@ -115,7 +115,7 @@ jobs:
   # --- Tag + GitHub Release, then attach signed artifacts ---
   release:
     needs: [check, build]
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
 
     permissions:
       contents: write
@@ -326,7 +326,7 @@ jobs:
 
   docker-stable:
     needs: [check, release]
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     permissions:
       contents: read
       packages: write
@@ -412,7 +412,7 @@ jobs:
   # --- Dispatch downstream release workflows ---
   dispatch:
     needs: [check, release, docker-stable]
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     permissions:
       contents: read
     steps:
