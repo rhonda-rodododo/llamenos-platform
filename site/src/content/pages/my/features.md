@@ -268,7 +268,7 @@ Llámenos သည် တစ်ခုခု သတ်မှတ်ထားသေ�
 
 ### Docker Compose (တစ်ခုတည်း ဆာဗာ)
 
-- အပြည့်အစုံ stack: Bun HTTP server၊ PostgreSQL၊ RustFS (object storage)、WebSocket relay (WebSocket relay)
+- အပြည့်အစုံ stack: Bun HTTP server၊ PostgreSQL၊ RustFS (object storage)、WebSocket relay
 - ရွေးချယ်နိုင်သော profiles: `--profile signal` (signal-cli sidecar)、`--profile telephony` (Kamailio + CoTURN)、`--profile inference` (LLM firehose agent)、`--profile monitoring` (Prometheus + Grafana)
 - `docker-compose.dev.yml` သည် file watching ဖြင့် ဒေသန္တရ ဖွံ့ဖြိုးမှု အတွက်
 - `docker-compose.production.yml` overlay သည် ထုတ်လုပ်မှု ခိုင်မာစေရန်

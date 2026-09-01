@@ -166,7 +166,7 @@ Client A (volunteer action)
     | Encrypt event content with hub key
     | Sign as WebSocket event (Schnorr)
     v
-WebSocket relay (WebSocket relay / Nosflare)
+WebSocket relay
     |
     | Broadcast to subscribers
     v

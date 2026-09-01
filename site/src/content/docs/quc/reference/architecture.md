@@ -153,7 +153,7 @@ Per-note key (random 32 bytes)
 
 Real-time updates (new calls, messages, shift changes, presence) yek'am chupam jun WebSocket relay:
 
-- **Self-hosted**: WebSocket relay relay running alongside ri app pa Docker/Kubernetes
+- **Self-hosted**: WebSocket relay running alongside ri app pa Docker/Kubernetes
 - **Cloudflare**: Nosflare (Cloudflare Workers-based relay)
 
 Ronojel events yek'owis (kind 20001) chuqa' ewan ruma ri hub key. Events okisax generic tags (`["t", "llamenos:event"]`) richin ri relay majun tikirel nik'ut achike samaj ri'. Ri content field nuya' XChaCha20-Poly1305 ciphertext.
@@ -166,7 +166,7 @@ Client A (volunteer action)
     | Encrypt event content with hub key
     | Sign as WebSocket event (Schnorr)
     v
-WebSocket relay (WebSocket relay / Nosflare)
+WebSocket relay
     |
     | Broadcast to subscribers
     v

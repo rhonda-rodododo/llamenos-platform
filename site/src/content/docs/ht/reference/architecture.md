@@ -166,7 +166,7 @@ Kliyan A (aksyon vòlontè)
     | Chifre kontni evènman ak kle hub
     | Siyen kòm evènman WebSocket (Schnorr)
     v
-Relè WebSocket (WebSocket relay / Nosflare)
+Relè WebSocket
     |
     | Difize bay abòne yo
     v

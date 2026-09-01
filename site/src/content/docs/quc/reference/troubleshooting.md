@@ -53,7 +53,7 @@ We ri app majun tikirel nok pa PostgreSQL:
 
 ### Strfry relay majun nok
 
-Ri WebSocket relay (WebSocket relay) jun core service, majun optional. We ri relay majun running:
+Ri WebSocket relay jun core service, majun optional. We ri relay majun running:
 
 ```bash
 # Check relay status

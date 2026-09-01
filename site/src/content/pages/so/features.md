@@ -268,7 +268,7 @@ Llámenos kuma xidhna mid kasta oo isticmaal oo gaar ah. Wax walba waa qaab-dhal
 
 ### Docker Compose (Hal Server)
 
-- Qaybta buuxda: Bun HTTP server, PostgreSQL, RustFS (kaydinta shayga), WebSocket relay (WebSocket relay)
+- Qaybta buuxda: Bun HTTP server, PostgreSQL, RustFS (kaydinta shayga), WebSocket relay
 - Profiles-ka ikhtiyaariga ah: `--profile signal` (signal-cli sidecar), `--profile telephony` (Kamailio + CoTURN), `--profile inference` (LLM firehose agent), `--profile monitoring` (Prometheus + Grafana)
 - `docker-compose.dev.yml` horumarinta maxalliga ah oo leh daawashada faylka
 - `docker-compose.production.yml` daboolka adaynta wax-soo-saarka

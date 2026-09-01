@@ -64,7 +64,7 @@ For Cloudflare Workers deployments, Nosflare runs as a Durable Object with a ser
 
 ### Docker Compose
 
-The WebSocket relay (WebSocket relay) is a core service that starts automatically with `docker compose up -d`. The `SERVER_SECRET` env var is required in `.env` (see [Quickstart](QUICKSTART.md)).
+The WebSocket relay is a core service that starts automatically with `docker compose up -d`. The `SERVER_SECRET` env var is required in `.env` (see [Quickstart](QUICKSTART.md)).
 
 The relay runs on port 7777 internally. Caddy proxies `/WebSocket` to the relay via WebSocket.
 
@@ -100,7 +100,7 @@ The StatefulSet uses a PersistentVolumeClaim for the LMDB data directory.
 
 ### Cloudflare (Service Binding)
 
-> **Note**: The Llamenos backend (`apps/worker/`) is a Bun HTTP server on a self-hosted VPS — it is **not** a Cloudflare Worker. The only Cloudflare deployment is the marketing site (`site/`). Nosflare is an alternative relay option for organizations that want to run *only* the relay on Cloudflare's edge network (e.g., as a relay-only Cloudflare Worker separate from the main backend). The self-hosted WebSocket relay relay (Docker Compose) is the default and recommended approach.
+> **Note**: The Llamenos backend (`apps/worker/`) is a Bun HTTP server on a self-hosted VPS — it is **not** a Cloudflare Worker. The only Cloudflare deployment is the marketing site (`site/`). Nosflare is an alternative relay option for organizations that want to run *only* the relay on Cloudflare's edge network (e.g., as a relay-only Cloudflare Worker separate from the main backend). The self-hosted WebSocket relay (Docker Compose) is the default and recommended approach.
 
 If deploying Nosflare as a standalone Cloudflare Worker, configure a separate `wrangler.jsonc` for the Nosflare Worker (not `site/wrangler.jsonc`, which is for the marketing site):
 

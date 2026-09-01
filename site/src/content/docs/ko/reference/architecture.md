@@ -153,7 +153,7 @@ Worker API  -->  ConversationDO  -->  메시징 제공업체 (답장 전송)
 
 실시간 업데이트 (새 통화, 메시지, 근무 변경, 접속 상태)는 WebSocket relay를 통해 흐릅니다:
 
-- **자체 호스팅**: Docker/Kubernetes에서 앱과 함께 실행되는 WebSocket relay relay
+- **자체 호스팅**: Docker/Kubernetes에서 앱과 함께 실행되는 WebSocket relay
 - **Cloudflare**: Nosflare (Cloudflare Workers 기반 relay)
 
 모든 이벤트는 임시(kind 20001)이며 허브 키로 암호화됩니다. 이벤트는 일반 태그(`["t", "llamenos:event"]`)를 사용하므로 relay는 이벤트 유형을 구분할 수 없습니다. content 필드에는 XChaCha20-Poly1305 암호문이 포함됩니다.
@@ -166,7 +166,7 @@ Worker API  -->  ConversationDO  -->  메시징 제공업체 (답장 전송)
     | 허브 키로 이벤트 내용 암호화
     | WebSocket 이벤트로 서명 (Schnorr)
     v
-WebSocket relay (WebSocket relay / Nosflare)
+WebSocket relay
     |
     | 구독자에게 브로드캐스트
     v

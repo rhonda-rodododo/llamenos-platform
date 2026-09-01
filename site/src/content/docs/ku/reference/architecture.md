@@ -153,7 +153,7 @@ Kilîta nîşokê ya taybetî (32 byteyên rasthatî)
 
 Nûvekirinên dem-rast (bangên nû, peyam, guherînên şevê, berdestî) bi navgîniya WebSocket relay diherikin:
 
-- **Xweser**: WebSocket relay relay li gel sepanê di Docker/Kubernetes de dixebite
+- **Xweser**: WebSocket relay li gel sepanê di Docker/Kubernetes de dixebite
 - **Cloudflare**: Nosflare (relay-a li ser bingeha Cloudflare Workers)
 
 Hemû bûyer demkî ne (cureyê 20001) û bi kilîta hub têne şîfre kirin. Bûyer tag-ên giştî (`["t", "llamenos:event"]`) bikar tînin da ku relay nikare cureyên bûyerê ji hev cuda bike. Zeviya naverokê ciphertext-a XChaCha20-Poly1305 dihewîne.
@@ -166,7 +166,7 @@ Xerîdar A (kiryara xwebexş)
     | Naveroka bûyerê bi kilîta hub şîfre dike
     | Wekî bûyera WebSocket îmze dike (Schnorr)
     v
-WebSocket relay (WebSocket relay / Nosflare)
+WebSocket relay
     |
     | Belavok ji bo aboneyan
     v

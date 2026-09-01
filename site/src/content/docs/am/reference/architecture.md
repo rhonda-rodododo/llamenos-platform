@@ -153,7 +153,7 @@ Per-note key (random 32 bytes)
 
 በጊዜ-እውነታ ዝማኔዎች (አዲስ ጥሪዎች፣ መልእክቶች፣ shift ለውጦች፣ presence) WebSocket relay በኩል ይፈሳሉ፦
 
-- **ራስ-አስተናጋጅ**: WebSocket relay relay ከapp ጋር በDocker/Kubernetes ውስጥ
+- **ራስ-አስተናጋጅ**: WebSocket relay ከapp ጋር በDocker/Kubernetes ውስጥ
 - **Cloudflare**: Nosflare (Cloudflare Workers-based relay)
 
 ሁሉም ክስተቶች ephemeral (kind 20001) ናቸው እና ከhub key ጋር የተመሰጠሩ ናቸው። ክስተቶች generic tags (`["t", "llamenos:event"]`) ይጠቀማሉ — relay ክስተት አይነቶችን መለየት አይችልም። Content field XChaCha20-Poly1305 ciphertext ይዟል።
@@ -166,7 +166,7 @@ Client A (volunteer action)
     | Encrypt event content with hub key
     | Sign as WebSocket event (Schnorr)
     v
-WebSocket relay (WebSocket relay / Nosflare)
+WebSocket relay
     |
     | Broadcast to subscribers
     v

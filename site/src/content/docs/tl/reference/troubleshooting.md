@@ -48,7 +48,7 @@ Kung hindi makakonekta ang app sa PostgreSQL:
 
 ### Hindi kumokonekta ang Strfry relay
 
-Ang WebSocket relay (WebSocket relay) ay isang core service, hindi opsyonal. Kung hindi tumatakbo ang relay:
+Ang WebSocket relay ay isang core service, hindi opsyonal. Kung hindi tumatakbo ang relay:
 
 ```bash
 docker compose logs WebSocket relay

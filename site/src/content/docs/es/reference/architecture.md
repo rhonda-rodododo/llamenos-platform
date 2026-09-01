@@ -166,7 +166,7 @@ Cliente A (accion del voluntario)
     | Cifra contenido del evento con clave del hub
     | Firma como evento WebSocket (Schnorr)
     v
-WebSocket relay (WebSocket relay / Nosflare)
+WebSocket relay
     |
     | Transmite a suscriptores
     v

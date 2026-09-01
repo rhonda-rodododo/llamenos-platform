@@ -153,7 +153,7 @@ Per-note key (random 32 bytes)
 
 实时更新（新来电、消息、排班变更、在线状态）通过 WebSocket relay 传输：
 
-- **自托管**：与应用程序一起在 Docker/Kubernetes 中运行的 WebSocket relay relay
+- **自托管**：与应用程序一起在 Docker/Kubernetes 中运行的 WebSocket relay
 - **Cloudflare**：Nosflare（基于 Cloudflare Workers 的 relay）
 
 所有事件都是临时的（kind 20001）并使用 hub key 加密。事件使用通用标签（`["t", "llamenos:event"]`），因此 relay 无法区分事件类型。内容字段包含 XChaCha20-Poly1305 密文。
@@ -166,7 +166,7 @@ Client A (volunteer action)
     | Encrypt event content with hub key
     | Sign as WebSocket event (Schnorr)
     v
-WebSocket relay (WebSocket relay / Nosflare)
+WebSocket relay
     |
     | Broadcast to subscribers
     v

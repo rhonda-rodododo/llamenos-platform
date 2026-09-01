@@ -349,7 +349,7 @@ kubectl logs -l app.kubernetes.io/instance=llamenos -c app -f
 | `RustFS.credentials.secretKey` | RustFS root password (required) | `""` |
 | `RustFS.resources` | CPU/memory requests and limits | `{}` |
 
-### WebSocket relay (WebSocket relay)
+### WebSocket relay
 
 | Parameter | Sharaxaad | Default |
 |-----------|-------------|---------|
