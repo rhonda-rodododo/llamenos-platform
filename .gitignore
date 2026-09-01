@@ -38,6 +38,8 @@ apps/android/build/
 apps/android/local.properties
 apps/android/app/src/debug/jniLibs/
 apps/android/app/src/release/jniLibs/
+# Locally-built native crypto libs land here too; not just debug/release
+apps/android/app/src/main/jniLibs/
 apps/android/app/src/androidTest/assets/features/
 
 # Android signing — keystore credentials (never commit real passwords)

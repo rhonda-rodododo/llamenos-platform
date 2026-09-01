@@ -1,19 +1,32 @@
 # CODEOWNERS
 # Each line is a file pattern followed by one or more owners.
-
-*                                   @rhonda-rodododo
-
-apps/desktop/                       @rhonda-rodododo
-apps/worker/                        @rhonda-rodododo
-apps/ios/                           @rhonda-rodododo
-apps/android/                       @rhonda-rodododo
-apps/sip-bridge/                    @rhonda-rodododo
-apps/signal-notifier/               @rhonda-rodododo
+#
+# Policy: the fleet publisher merges routine PRs (dependency bumps, i18n,
+# docs, app-code features) unattended once required status checks are
+# green. Only paths listed below require human code-owner review before
+# merge — everything else is intentionally left uncovered so it keeps
+# auto-merging. This file is scoped to genuinely sensitive surfaces:
+# crypto, wire format, CI/supply-chain, release manifests, deployment
+# config, the guard config that constrains agents, and the security-
+# relevant test suites. There is no catch-all `*` rule — do not add one
+# without re-evaluating this policy, since it would gate every PR again.
+#
+# Consequence worth calling out: GitHub Actions dependency bumps (e.g.
+# Dependabot PRs touching .github/workflows/) now require review, because
+# a compromised or malicious action is a supply-chain vector.
 
 packages/crypto/                    @rhonda-rodododo
-packages/protocol/                  @rhonda-rodododo
-packages/shared/                    @rhonda-rodododo
-packages/i18n/                      @rhonda-rodododo
+packages/protocol/schemas/          @rhonda-rodododo
 
-.github/                            @rhonda-rodododo
+.github/workflows/                  @rhonda-rodododo
+
+knope.toml                          @rhonda-rodododo
+
+CODEOWNERS                          @rhonda-rodododo
+.claude/settings.json               @rhonda-rodododo
+
 deploy/                             @rhonda-rodododo
+
+tests/                              @rhonda-rodododo
+packages/test-specs/                @rhonda-rodododo
+apps/worker/__tests__/              @rhonda-rodododo
