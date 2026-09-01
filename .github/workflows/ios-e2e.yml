@@ -40,7 +40,7 @@ env:
 jobs:
   # ─── Detect Changed Files ─────────────────────────────────────
   changes:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     permissions:
       contents: read
     if: "!startsWith(github.event.head_commit.message, 'chore(release):')"

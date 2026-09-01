@@ -25,7 +25,7 @@ permissions:
 jobs:
   deploy-demo:
     name: Deploy to Demo VPS
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     environment: demo
     timeout-minutes: 30
 
