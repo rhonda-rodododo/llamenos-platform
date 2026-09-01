@@ -268,7 +268,7 @@ Llámenos, herhangi bir spesifik kullanım durumuna sabit kodlanmış değildir.
 
 ### Docker Compose (Tek Sunucu)
 
-- Tam yığın: Bun HTTP sunucusu, PostgreSQL, RustFS (nesne depolama), WebSocket aktarımı (WebSocket aktarımı)
+- Tam yığın: Bun HTTP sunucusu, PostgreSQL, RustFS (nesne depolama), WebSocket aktarımı
 - İsteğe bağlı profiller: `--profile signal` (signal-cli yan hizmeti), `--profile telephony` (Kamailio + CoTURN), `--profile inference` (LLM firehose agent), `--profile monitoring` (Prometheus + Grafana)
 - Dosya izleme ile yerel geliştirme için `docker-compose.dev.yml`
 - Üretim sertleştirme için `docker-compose.production.yml` katmanı

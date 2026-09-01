@@ -53,7 +53,7 @@ Wenn die App keine Verbindung zu PostgreSQL herstellen kann:
 
 ### Strfry-Relay verbindet sich nicht
 
-Das WebSocket-Relay (WebSocket relay) ist ein Kerndienst, nicht optional. Wenn das Relay nicht laeuft:
+Das WebSocket-Relay ist ein Kerndienst, nicht optional. Wenn das Relay nicht laeuft:
 
 ```bash
 # Relay-Status pruefen

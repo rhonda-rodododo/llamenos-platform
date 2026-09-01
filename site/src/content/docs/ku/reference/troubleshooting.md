@@ -53,7 +53,7 @@ Heke sepan nikare bi PostgreSQL re girêbide:
 
 ### Strfry relay nagire
 
-WebSocket relay (WebSocket relay) karûbarek bingehîn e, ne bijarte. Heke relay naxebite:
+WebSocket relay karûbarek bingehîn e, ne bijarte. Heke relay naxebite:
 
 ```bash
 # Statûya relay kontrol bikin

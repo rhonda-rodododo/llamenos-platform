@@ -53,7 +53,7 @@ Si la aplicacion no puede conectarse a PostgreSQL:
 
 ### El relay WebSocket relay no conecta
 
-El relay WebSocket (WebSocket relay) es un servicio esencial, no opcional. Si el relay no esta ejecutandose:
+El relay WebSocket es un servicio esencial, no opcional. Si el relay no esta ejecutandose:
 
 ```bash
 # Verificar estado del relay

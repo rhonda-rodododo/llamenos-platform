@@ -222,7 +222,7 @@ Llámenos man hardcoded ta pa jun specific use case. Konojel template-driven.
 
 ## K'ak'a' Samajib'äl Infrastructure
 
-**WebSocket relay** — Self-hosted WebSocket relay relay (o Nosflare pa Cloudflare) richin k'ak'a' event distribution. Konojel event content encrypted rik'in ri hub key. Generic tags (`["t", "llamenos:event"]`) prevent relay-level metadata inference about event types.
+**WebSocket relay** — Self-hosted WebSocket relay (o Nosflare pa Cloudflare) richin k'ak'a' event distribution. Konojel event content encrypted rik'in ri hub key. Generic tags (`["t", "llamenos:event"]`) prevent relay-level metadata inference about event types.
 
 **Hub key** — Random 32 bytes (`crypto.getRandomValues`), HPKE-wrapped individually per hub member via `LABEL_HUB_KEY_WRAP`. Rotated pa member departure — departed members man yetikïr ta nitz'akaj future events.
 
@@ -268,7 +268,7 @@ Llámenos man hardcoded ta pa jun specific use case. Konojel template-driven.
 
 ### Docker Compose (Ruk'u'x Samaj)
 
-- Full stack: Bun HTTP server, PostgreSQL, RustFS (ruk'u'x k'ayib'äl), WebSocket relay (WebSocket relay)
+- Full stack: Bun HTTP server, PostgreSQL, RustFS (ruk'u'x k'ayib'äl), WebSocket relay
 - Optional profiles: `--profile signal` (signal-cli sidecar), `--profile telephony` (Kamailio + CoTURN), `--profile inference` (LLM firehose agent), `--profile monitoring` (Prometheus + Grafana)
 - `docker-compose.dev.yml` richin local development rik'in file watching
 - `docker-compose.production.yml` overlay richin production hardening

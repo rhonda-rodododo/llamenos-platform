@@ -53,7 +53,7 @@ App ከPostgreSQL ጋር ካልተገናኘ፦
 
 ### Strfry relay not connecting
 
-WebSocket relay (WebSocket relay) ማዕከላዊ አገልግሎት ነው፣ አማራጭ አይደለም። Relay ካልሰራ፦
+WebSocket relay ማዕከላዊ አገልግሎት ነው፣ አማራጭ አይደለም። Relay ካልሰራ፦
 
 ```bash
 # Check relay status

@@ -53,7 +53,7 @@ Haddii app-ka aan ku xiri karin PostgreSQL:
 
 ### Strfry relay not connecting
 
-WebSocket relay (WebSocket relay) waa adeeg aasaasi ah, ma aha ikhtiyaar. Haddii relay aan shaqeyn:
+WebSocket relay waa adeeg aasaasi ah, ma aha ikhtiyaar. Haddii relay aan shaqeyn:
 
 ```bash
 # Check relay status

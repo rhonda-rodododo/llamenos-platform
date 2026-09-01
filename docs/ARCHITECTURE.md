@@ -32,7 +32,7 @@ Bun HTTP Server (Hono) ──► PostgreSQL
   ├─ REST responses ◄─────────┤
   │                           │
   ▼                           ▼
-WebSocket Relay (WebSocket relay)     RustFS (encrypted file storage)
+WebSocket Relay (own Hono server)     RustFS (encrypted file storage)
   │
   ├──► Desktop App (Tauri v2 + webview)
   │      └── Rust CryptoState (device keys never enter webview)
@@ -72,7 +72,7 @@ WebSocket Relay (WebSocket relay)     RustFS (encrypted file storage)
 - **Legacy envelope**: secp256k1 ECIES (ECDH + XChaCha20-Poly1305) — for existing data
 - **Symmetric**: XChaCha20-Poly1305 (24-byte nonce, 16-byte tag) for hub events
 - **KDF**: HKDF-SHA-256, PBKDF2-SHA-256 600K iterations (PINs)
-- **Signing**: Ed25519 (device auth, sigchain) + BIP-340 Schnorr (WebSocket identity)
+- **Signing**: Ed25519 (device auth, sigchain) + BIP-340 Schnorr (legacy Nostr identity)
 - **Domain separation**: All labeled contexts defined in `packages/protocol/crypto-labels.json` (source of truth; see file for current count)
 
 All crypto is implemented once in Rust (`packages/crypto/`), compiled to:
@@ -96,7 +96,7 @@ The backend runs as a Bun HTTP server with Hono routing and PostgreSQL for persi
 
 ## Real-Time Sync
 
-WebSocket relay (WebSocket relay) with encrypted ephemeral events:
+WebSocket relay (own Hono server) with encrypted ephemeral events:
 - All event content encrypted with hub key
 - Generic tags (`["t", "llamenos:event"]`) — relay can't distinguish types
 - Hub key rotated on member departure (excludes departed member)

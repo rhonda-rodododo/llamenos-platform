@@ -349,7 +349,7 @@ kubectl logs -l app.kubernetes.io/instance=llamenos -c app -f
 | `RustFS.credentials.secretKey` | Pêborîna rootê RustFS (pêwîst) | `""` |
 | `RustFS.resources` | Daxwaz û sînorkirinên CPU/bîr | `{}` |
 
-### WebSocket relay (WebSocket relay)
+### WebSocket relay
 
 | Parametre | Sermawecî | Default |
 |-----------|-----------|---------|
