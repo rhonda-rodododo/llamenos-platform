@@ -50,10 +50,14 @@ export async function loginAsAdmin(page: Page) {
   await page.reload()
   await page.waitForLoadState('domcontentloaded')
 
-  await page.waitForFunction(() => !!(window as any).__TEST_PLATFORM, { timeout: 15000 })
+  await page.waitForFunction(() => !!(window as unknown as Record<string, unknown>).__TEST_PLATFORM, { timeout: 15000 })
 
   await page.evaluate(async ({ adminSeed, pin }) => {
-    const platform = (window as any).__TEST_PLATFORM
+    const platform = (window as unknown as Record<string, unknown>).__TEST_PLATFORM as {
+      deviceImportAndLoad: (secretHex: string, pin: string, deviceId: string) => Promise<unknown>
+      persistAndUnlockDeviceKeys: (encrypted: unknown, pin: string) => Promise<unknown>
+      lockCrypto: () => Promise<void>
+    }
     const encrypted = await platform.deviceImportAndLoad(adminSeed, pin, crypto.randomUUID())
     await platform.persistAndUnlockDeviceKeys(encrypted, pin)
     await platform.lockCrypto()
