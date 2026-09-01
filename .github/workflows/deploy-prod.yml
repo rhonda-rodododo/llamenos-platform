@@ -22,7 +22,7 @@ permissions:
 jobs:
   deploy-prod:
     name: Deploy to Production VPS
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     environment: production
     timeout-minutes: 30
 
