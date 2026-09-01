@@ -48,6 +48,9 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      - name: Isolate Gradle home (self-hosted runners share $HOME)
+        run: echo "GRADLE_USER_HOME=$RUNNER_TEMP/gradle" >> "$GITHUB_ENV"
+
       - name: Setup Gradle cache
         uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
 
