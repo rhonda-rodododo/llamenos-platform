@@ -48,6 +48,11 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      - name: Isolate Gradle + Android build dirs (self-hosted runners share $HOME and /tmp)
+        run: |
+          echo "GRADLE_USER_HOME=$RUNNER_TEMP/gradle" >> "$GITHUB_ENV"
+          echo "ANDROID_BUILD_DIR=$RUNNER_TEMP/android-build/app" >> "$GITHUB_ENV"
+
       - name: Setup Gradle cache
         uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
 
@@ -139,7 +144,7 @@ jobs:
 
       - name: Generate APK checksum
         run: |
-          APK=$(find apps/android/app/build/outputs/apk/release -name "*.apk" | head -1)
+          APK=$(find "$ANDROID_BUILD_DIR/outputs/apk/release" -name "*.apk" | head -1)
           if [ -n "$APK" ]; then
             sha256sum "$APK" > "${APK}.sha256"
             echo "APK checksum:"
@@ -150,18 +155,18 @@ jobs:
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v2.1.0
         with:
           subject-path: |
-            apps/android/app/build/outputs/bundle/release/*.aab
-            apps/android/app/build/outputs/apk/release/*.apk
+            ${{ env.ANDROID_BUILD_DIR }}/outputs/bundle/release/*.aab
+            ${{ env.ANDROID_BUILD_DIR }}/outputs/apk/release/*.apk
 
       - name: Upload AAB artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: android-release
           path: |
-            apps/android/app/build/outputs/bundle/release/*.aab
-            apps/android/app/build/outputs/apk/release/*.apk
-            apps/android/app/build/outputs/apk/release/*.sha256
-            apps/android/app/build/outputs/mapping/release/mapping.txt
+            ${{ env.ANDROID_BUILD_DIR }}/outputs/bundle/release/*.aab
+            ${{ env.ANDROID_BUILD_DIR }}/outputs/apk/release/*.apk
+            ${{ env.ANDROID_BUILD_DIR }}/outputs/apk/release/*.sha256
+            ${{ env.ANDROID_BUILD_DIR }}/outputs/mapping/release/mapping.txt
           retention-days: 30
 
       - name: Setup Ruby
@@ -178,9 +183,10 @@ jobs:
         env:
           GOOGLE_PLAY_JSON_KEY: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
         run: |
-          echo "$GOOGLE_PLAY_JSON_KEY" > /tmp/play-key.json
-          SUPPLY_JSON_KEY=/tmp/play-key.json bundle exec fastlane android internal
-          rm -f /tmp/play-key.json
+          PLAY_KEY_PATH="$RUNNER_TEMP/play-key.json"
+          echo "$GOOGLE_PLAY_JSON_KEY" > "$PLAY_KEY_PATH"
+          SUPPLY_JSON_KEY="$PLAY_KEY_PATH" bundle exec fastlane android internal
+          rm -f "$PLAY_KEY_PATH"
 
       - name: Upload Android artifacts to GitHub Release
         env:
@@ -189,8 +195,8 @@ jobs:
           TAG="v${VERSION}"
 
           # Find the APK and checksum
-          APK=$(find apps/android/app/build/outputs/apk/release -name "*.apk" | head -1)
-          CHECKSUM=$(find apps/android/app/build/outputs/apk/release -name "*.sha256" | head -1)
+          APK=$(find "$ANDROID_BUILD_DIR/outputs/apk/release" -name "*.apk" | head -1)
+          CHECKSUM=$(find "$ANDROID_BUILD_DIR/outputs/apk/release" -name "*.sha256" | head -1)
           if [ -n "$APK" ]; then
             # Create release if it doesn't exist
             if ! gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" &>/dev/null; then
