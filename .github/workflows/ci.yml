@@ -220,6 +220,9 @@ jobs:
       - name: Verify codegen output is up to date
         run: bun run codegen:check
 
+      - name: Verify supervisor agent definitions are up to date
+        run: bun run agents:check
+
       - name: Validate i18n strings
         run: bun run i18n:validate:all
 

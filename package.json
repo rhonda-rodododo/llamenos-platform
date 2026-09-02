@@ -57,6 +57,8 @@
     "i18n:validate:all": "bun run packages/i18n/tools/validate-strings.ts all",
     "codegen": "bun run packages/protocol/tools/codegen.ts",
     "codegen:check": "bun run packages/protocol/tools/codegen.ts --check",
+    "agents:build": "bash .claude/agents/build-agents.sh",
+    "agents:check": "bash .claude/agents/build-agents.sh --check",
     "migration:check": "bun scripts/check-migration-drift.ts",
     "test-specs:validate": "bun packages/test-specs/tools/validate-coverage.ts",
     "mac:run": "bash scripts/mac-run.sh",

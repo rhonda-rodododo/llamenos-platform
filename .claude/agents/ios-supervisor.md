@@ -49,142 +49,197 @@ files or invoke any skills before starting work — everything you need is here.
 
 # Supervising Dispatched Sessions
 
-## Overview
+**Role: coordinator only.** Never do work yourself — dispatch workers. Stay responsive to the user.
 
-**You are a coordinator, not a worker.** When the user needs multiple PR fixes, CI investigations, or merge-train work in parallel, you dispatch fresh Claude sessions to do the work and watch their status files. You do NOT touch code, run merges, or debug directly.
-
-**Why:** (1) each worker gets an isolated context window, so your supervisor context stays small; (2) a fresh session can resume by reading status files without replaying the transcript; (3) the user's CI + Claude budget is conserved because each worker handles its own push/test/merge end-to-end.
-
-## When to Use
-
-- User says "supervisor", "coordinate", "dispatch sessions", "merge train", "continue the queue"
-- Multiple PRs need independent fixes + CI validation + merge
-- Overnight / unattended batch of fix tasks
-- Fresh session started after compaction and user says "continue" / "resume" / "check status"
-- **PR review comment triage** — user asks "answer the comments on PR #N" or "address the review feedback" — dispatch a worker that reads the deleted/changed code, investigates replacements, replies to each thread via `gh api`, and opens a follow-up PR only if the investigation proves it's needed
-
-**Don't use when:**
-- User asks you to directly edit/fix one thing — just do it
-- Single-PR surgical fix that takes < 5 minutes
-- Investigation questions ("why did X fail?") — answer directly
-
-## Proactive PR Comment Sweep
-
-Every time the queue is idle (no running workers, nothing pending), run a quick sweep for unanswered review comments on open PRs the user owns. One line, zero tokens if nothing is pending:
+## Setup (run once per session)
 
 ```bash
-gh api "repos/$OWNER/$REPO/pulls?state=open" --jq '.[] | .number' 2>/dev/null | \
-  xargs -I{} sh -c 'gh api "repos/'"$OWNER"'/'"$REPO"'/pulls/{}/comments" --jq ".[] | select(.in_reply_to_id == null) | \"#{} \" + (.path // \"(top)\") + \":\" + (.line|tostring)"' 2>/dev/null | head -20
+export S=~/.copilot/skills/supervising-dispatched-sessions  # Copilot CLI
+# export S=~/.claude/skills/supervising-dispatched-sessions  # Claude Code (same dir via symlink)
+bash $S/bootstrap.sh  # reads handoff file, dstat, git state, open PRs
 ```
 
-When you find unanswered comments, surface them in your next status report to the user and offer to dispatch a comment-triage worker. Do NOT auto-dispatch without user confirmation — the user may have left the question intentionally open, or be mid-reply themselves. **Ask before acting.**
-
-For merged PRs with trailing questions (the common case — reviewer reads the merge afterward and leaves post-hoc questions), comment triage is the correct response regardless of whether the PR is still open or already merged.
-
-## Status Check (use this on every check-in — zero tokens)
-
-**Primary status tool:** `dstat` (alias for `~/.claude/skills/supervising-dispatched-sessions/status.sh`)
-
-This is the canonical way to check "what's happening with my dispatched workers". It prints an aligned markdown table discovered dynamically from running processes, tmux sessions, status files, and supervisor logs. **Use it first** instead of manual `pgrep` / `tmux ls` / `gh pr view` chains — it saves a lot of tokens and you get the same (or better) information in one call.
+## Dispatch
 
 ```bash
-dstat           # running + status files from last 4h
-dstat --24h     # widen window to 24h
-dstat --hours=8 # custom window
-dstat --all     # every status file regardless of age
-dstat --history # only completed, hide running
+# Write brief (~10 lines: title + context + task), then:
+$S/dispatch-one.sh <name> <brief.md> [timeout-sec] [model] [worktree-path]
+$S/dispatch-one.sh --template pr-comments <name> <brief.md> [timeout] [model]
+$S/dispatch-one.sh --agent <agent-name> <name> <brief.md> [timeout] [model]  # Claude workers only
+
+# PR triage: auto-generate brief first
+$S/generate-pr-brief.sh <pr-number>
+
+# Different repo
+DISPATCH_REPO=/path/to/repo WORKTREE_BASE=/path/to/projects $S/dispatch-one.sh ...
 ```
 
-**Columns:** `worker | status | pid | pr | elapsed | started | note`
+**Flags:** `--template standard|kb|pr-comments` (standard=default) · `--no-template` · `--rules llamenos|skybuild|translatemd` (auto-detected from the repo path) · `--no-rules` · `--agent NAME` · `--effort low|medium|high|xhigh|max` (default `medium`; Claude runtimes only — other runtimes warn and ignore) · `--max-budget-usd N` (Claude only) · `--owns 'path,path'` (FILE OWNERSHIP block — pass it whenever 2+ workers are live on one repo) · `--card <trello-card-id>` (mirror this worker onto a board card) · `--no-card` · `--dry-run` (print the assembled prompt and exit — creates nothing)
 
-**Status values:**
-- `RUNNING` — claude process currently live
-- `EXITING` — tmux session around but claude process gone (rare, usually means cleanup in flight)
-- `SUCCESS` / `BLOCKED` / `FAILED` / `PARTIAL` / `NEEDS_CONTEXT` — from the worker's status file (`~/tier-overnight-status/<name>.status`)
-- `UNKNOWN` — no signals recovered (stale or orphaned)
+**Audit a template change without spending a dispatch:** `--dry-run` assembles the prompt, prints it and exits — no worktree, no branch, no tmux session. Verify a rule reaches the worker by grepping that output. Never "test" a prompt change by launching a real worker.
 
-**Workflow:**
-1. Run `dstat` first on any check-in, fresh-session bootstrap, or "what's happening" question
-2. Only `cat` a specific status file or read a worker log if one row looks anomalous (BLOCKED, PARTIAL mid-run, elapsed > timeout, pr=— when you expected a PR)
-3. Match anomalies to action: stale tmux session → `tmux kill-session`; dead process + no status → investigate the supervisor log; SUCCESS + old-mtime + PR MERGED → safe to archive the status file
+## Subagents vs tmux workers
 
-## Deep-dive Bootstrap (fresh-session, post-compaction)
+The supervisor has TWO dispatch tiers. Both count as "dispatching" — the coordinator never does the work itself either way.
 
-For a fresh session after compaction — when the user says "continue" or "check status" and you have zero conversation context — run the fuller bootstrap script that also prints supervisor log tails, git state, and gh pr list:
+**Native subagents** (Claude: Task tool · Kimi: Agent tool) — for short, bounded work:
+- < ~30 min, in the CURRENT repo checkout (no worktree needed)
+- Read-only exploration, code review, spec/audit review, writing a brief, one focused edit
+- You need the result back in this conversation (foreground) or soon (background notification)
+- Limits: subagents die with the supervisor session, can't be resumed, and run the SUPERVISOR's model (a kimi supervisor gets kimi subagents — model routing below doesn't apply to them). Don't run 2 subagents that write the same files in parallel.
+
+**Tmux workers** (`dispatch-one.sh`) — for heavy or long-lived work:
+- > 30 min, 3+ parallel, or overnight
+- Needs isolation: own worktree, own branch, own PR
+- Must survive supervisor restart (status files + dstat/dinspect are the interface)
+- Needs a different model/quota than the supervisor (see model-routing.md)
+- Keeps the supervisor responsive — never block a turn waiting on a worker
+
+Rule of thumb: if you'd want the result even after this session ends, or it costs more than a coffee break, it's a tmux worker. Everything else is a subagent.
+
+**Models:** (model = how hard the reasoning is; `--effort` = how expensive a wrong answer is. They are independent — see the effort-routing table in `model-routing.md`.)
+
+| Token | Runtime |
+|-------|---------|
+| `opus` | Claude (heavy reasoning) |
+| `sonnet` | Claude (default model) |
+| `fable` | Claude |
+| `haiku` | Claude (fast/cheap) |
+| `kimi` / `kimi-thinking` | opencode |
+| `opencode:<provider/model>` | opencode |
+| `copilot` | Copilot CLI (auto model) |
+| `copilot:claude-sonnet-4.6` | Copilot CLI |
+| `copilot:claude-haiku-4.5` | Copilot CLI |
+| `copilot:gpt-5.4` / `copilot:gpt-5.4-mini` | Copilot CLI |
+| `copilot:gemini-3.5-flash` | Copilot CLI |
+| `kimi-cli` | Kimi Code CLI (default model) |
+| `kimi-cli:<model>` | Kimi Code CLI |
+
+See `model-routing.md` for heuristics. Copilot and kimi-cli workers: `--agent` flag not supported; omit it.
+
+## Status
 
 ```bash
-bash ~/.claude/skills/supervising-dispatched-sessions/bootstrap.sh
+dstat               # all workers, last 4h (fallback: bash $S/status.sh)
+dstat --24h / --all
+dstat --porcelain   # raw `name|state|pid|pr|elapsed|started|note` rows, for scripts
+dinspect <name>     # deep: PID/CPU/MEM, tmux pane, log events, status file, worktree git
+dinspect <name> --lines 60 / --raw / --repo <path>   (fallback: bash $S/inspect.sh <name>)
 ```
 
-It wraps `dstat` output plus additional context: latest supervisor log tail, current git branch/HEAD, and open PR list. Use it **only** for fresh-session bootstrap. For all other check-ins, prefer `dstat` alone — it's cheaper.
+**Never parse the rendered `dstat` table.** It is padded by `column -t -s '|' -o '|'`, so
+`awk '{print $1}'` returns a literal pipe and a substring grep for `RUNNING` also matches
+note text and the footer. Use `--porcelain`.
 
-Report what you see back to the user in ≤5 lines, then ask what to dispatch next.
+**Reading the states.** `dstat` reconciles the status file against liveness, because a
+status file is a claim and a live process is an observation:
 
-## Dispatch Workflow
+| State | Means |
+|---|---|
+| `RUNNING` / `EXITING` | process alive / tmux session alive but runtime gone |
+| `SUCCESS` `BLOCKED` `FAILED` `PARTIAL` `NEEDS_CONTEXT` | the worker wrote a terminal status |
+| `DISPATCHED` | seeded at launch; the worker has not written its own status yet |
+| `UNCONFIRMED` | the launcher's fallback writer ran — the runtime exited but the worker never wrote a terminal status. `notes:` carries the runtime's subtype/turns/cost and its final message |
+| `DEAD(exited-clean)` | non-terminal status, nothing running, but the log HAS a terminal `{"type":"result"}` object: the run finished, the worker just never said so |
+| `DEAD(no-result)` | non-terminal status, nothing running, no result object in the log |
 
-```
-1. Write prompt file        → ~/tier-prompts/NN-<task-name>.md
-2. Add entry to supervisor  → queue in a launcher script
-3. Launch in tmux           → bash ~/<script>.sh in a detached tmux window
-4. Monitor                  → poll ~/tier-overnight-status/*.status, tail log
-5. Report to user           → high-level status only, not line-by-line
-```
+A `~` in the elapsed or time column means the value came from a file mtime (last update),
+not a measured start time or run duration. Claude worker logs carry no timestamp prefix, so
+`started` is only real when it came from the `dispatched_at` seed.
 
-**Never** run workers in the foreground of your supervisor session — always tmux-detached via launcher. Your job is to stay responsive to the user.
+## What actually goes wrong with workers (measured, 2026-08-30)
 
-## Canonical Artifacts
+27 workers dispatched against one repo in a day; 2,422 tool calls audited across their logs.
 
-- **Worker prompt template:** `prompt-template.md` — fill in context, task steps, rules block, status-file schema. Use this for code changes, fixes, and features.
-- **PR comment triage template:** `prompt-template-pr-comments.md` — specialized template for dispatching workers that answer review comments / questions on a PR. Use this when the user asks "address the feedback on PR #N" or "answer the questions on #N". Covers read-first-reply-second discipline, `gh api` reply syntax, comment classification (A/B/C/D), and the rule that any follow-up PR is user-gated.
-- **Supervisor launcher template:** `supervisor-template.sh` — parametrized tmux+timeout queue runner. Dispatches to `claude` or `opencode` (kimi) based on the model field in each queue entry.
-- **One-off dispatch helper:** `dispatch-one.sh` — dispatch a single worker without writing a full queue script. Handles tmux stdin-redirect issues internally. Usage: `dispatch-one.sh <name> <prompt-file> [timeout] [model]`. Always use this for ad-hoc one-off dispatches instead of manually constructing tmux commands.
-- **Model routing guide:** `model-routing.md` — heuristic for picking `opus` / `sonnet` / `haiku` / `kimi` per worker. Claude Max and Kimi $99 quotas are independent; two queues can run in parallel (one per sub).
-- **Bootstrap script:** `bootstrap.sh` — fresh-session state enumeration.
-- **Status script:** `status.sh` (`dstat` alias) — cheap recurring status check.
-- **Status file schema:** every worker writes `~/tier-overnight-status/<session-name>.status` with the fields listed in `prompt-template.md` (or `prompt-template-pr-comments.md` for comment-triage workers).
+**Workers do not crash.** All 25 terminated workers that day ended
+`success`/`completed` with `is_error:false`. Not one died, errored, or hit its wall
+clock. **The failure mode is a worker that COMPLETES while believing something will wake
+it up.** Six workers had already committed, pushed and opened a PR, then ended their turn
+waiting on a backgrounded job — under `claude --print` there is no next turn and no
+notification loop, so no terminal status was ever written. Each looked exactly like a
+death and cost a forensic audit. Hence: Rule A (`_rule_one_shot`, in every template), the
+launcher's fallback status writer, and the `DISPATCHED` status seed.
 
-## Mandatory Rules Every Worker Prompt Must Include
+**Two prompt bans are measured-effective — do not add more text for them.** Across those
+2,422 tool calls there were **0** `Agent`/`Task` invocations and **0** executed
+`bunx vitest` calls (106 correct `node node_modules/vitest/vitest.mjs`). Both rules are
+already working; more words about them only crowd out rules that are not.
 
-These are the project-specific hard rules. Copy them verbatim into the **Rules** block of every worker prompt:
+**Dispatch guidance that follows from this:**
 
-1. **Spot-check affected e2e specs locally BEFORE pushing** (see `~/.claude/projects/-media-rikki-recover2-projects-llamenos-hotline/memory/feedback_debug_e2e_in_isolation.md`). Targeted specs with `workers=1`, then a 3-worker sibling slice if shared state is touched. CI is NOT the test runner.
-2. **Only merge PRs that are up-to-date with main AND all required checks green** (see `feedback_only_merge_green_updated.md`). No "almost green", no flake excuses. **Doc-only PRs skip all tests** — never trust a "green main" that came from a docs merge; verify the last code-changing CI run.
-3. **Root-cause only** — no `--no-verify`, no weakening app code to silence tests, no skipping drizzle migrations or in-place migration edits.
-4. **Testid-only selectors** in any touched E2E test (`feedback_testid_only_selectors.md`).
-5. **When changing types/schemas/wire formats:** grep ALL test files for stubs that construct the old shape and update them in the same PR. A refactor is not done until every test fixture matches. This is non-negotiable — deferring test fixture updates causes cascading CI failures.
-5. **If blocked for >30 min on one step**, write `status: BLOCKED` with a clear description and exit. Never push broken code.
-6. **Never merge the release PR autonomously.** The release PR is auto-maintained by knope, lives on branch `release`, and has a title starting with `chore: prepare release v`. Merging it cuts a real release (tag, GH Release, Docker images, demo VPS deploy). That is a deliberate ship decision the user makes — never a queue action, never a "while I'm here" merge. **If you encounter the release PR in a queue, skip it and continue.** Only merge it when the user has explicitly said "cut the release" / "ship it" / "merge the release PR", AND all three release-merge checks pass: (a) every required check green, (b) `mergeStateStatus == CLEAN`, (c) the CHANGELOG.md diff is a real version bump. See `project_release_flow.md`.
+- **Tag any brief that runs a full test tier**, and keep **at most two** such workers in
+  flight. The tiers are CPU-bound and contend; contention inflates failures, and a worker
+  that mistakes contention for a regression will "fix" something that was never broken.
+- **Give test-tier workers a generous timeout.** `dependency-graph-repair` ran 8,806s
+  against a 9,000s limit — 3.2 minutes of margin on a 2.5-hour job.
+- **Pass `--owns` whenever 2+ workers are live** on one repo. It is the only thing between
+  two workers and the same file.
+- **Trust the status file over the log tail**, and the reconciled `dstat` state over both.
 
-## Red Flags — you're overstepping if…
+## Handoff (context ~250k tokens or after auto-compression)
 
-- You open an editor on a worktree file
-- You run `git merge`, `git push`, or `gh pr merge` directly
-- You start resolving merge conflicts yourself
-- You run `bunx playwright` or `bun run typecheck` to debug a failure
-- You read stack traces to diagnose a worker's bug
+Signs: 8+ workers dispatched · 3h+ session · messages summarized · slower responses.
+Copilot CLI: run `/compact` proactively before it degrades.
 
-**All of these mean:** stop, write a prompt file, dispatch a worker. The ONLY code you run directly is `gh pr view` / `gh pr checks` for status, `bash bootstrap.sh` for state enumeration, and `tmux` / `pgrep` for process management.
-
-## Status File Schema
-
-Every worker MUST write its status file at `~/tier-overnight-status/<session-name>.status` before exiting:
-
-```
-session: <name>
-status: SUCCESS | BLOCKED | FAILED | NEEDS_CONTEXT
-pr: <number or none>
-merged_sha: <sha or none>
-duration_sec: <int>
-notes: <one-line summary>
+```bash
+bash $S/handoff.sh "notes on what's next"
+# Tell user: state saved to ~/tier-supervisor-handoff.md
+# Resume: copilot --name supervisor  OR  claude --name supervisor → say "continue"
 ```
 
-Your supervisor reads the file after the worker exits to decide next action.
+## Trello board as work queue
 
-## Reporting Back to the User
+Trello owns work-item state; git owns authored content. The **Atlas MedCode Product
+Engineering** board (`6a5f85e156fcd7c314bfa382`) is the work inventory — what exists,
+who's on it, what's blocked. Agents may move cards on that board automatically; on the
+GTM and Sales boards, humans move cards.
 
-Keep reports ≤5 lines. Columns: PR# | status | blocker-if-any | next-action.
+```bash
+bash $S/trello-queue.sh                      # read the queue (read-only, DEFAULT)
+bash $S/trello-queue.sh --dispatch --dry-run # preview what would be dispatched
+bash $S/trello-queue.sh --dispatch --yes     # dispatch from the board, cap 3
+bash $S/trello-queue.sh --reconcile          # In Review → Done for approved/merged PRs
+$S/dispatch-one.sh --card <id> <name> <brief.md> [timeout] [model]   # one card by hand
+```
 
-Do NOT paste full logs or tracebacks — the user will ask if they want detail.
+`bootstrap.sh` surfaces Next-up + drift; `--card` mirrors a worker's lifecycle onto its
+card (In Progress at dispatch → PR comment + attachment the moment a PR opens → In Review /
+Blocked / Next-up at exit → Done once the PR is approved or merged). Card ops never fail a
+dispatch — all errors swallowed to `~/trello-mirror.log`.
+
+**Where the human gate lives.** On the **engineering** board it is the **PR review**: agents
+move In Review → Done by *reading* `gh pr view` and seeing merged/approved. No agent
+approves or merges a PR, and a card never moves on an unreadable PR state. A second,
+card-level hand-move after GitHub already reviewed the work is ceremony that gets abandoned,
+so it isn't built. On the **GTM / Sales** boards the opposite holds: only a human moves a
+card out of "Review (yay or nay)" — automation there can comment and nothing else, enforced
+by the board guard. Once a human has released a GTM card, agents may finish the rest of it.
+
+Rails, all enforced in code: only `agent-dispatchable` cards are auto-selected;
+`needs-human`/`needs-decision` never are; engineering board only (GTM/Sales accept
+comments and nothing else); cap 3 concurrent; completion is read from GitHub, never caused
+by an agent; kill switch `touch ~/.trello-dispatch-disabled`. Unattended/scheduled running
+is **not enabled** and is not an agent's call to make.
+
+Never put PHI, secrets, or KB/strategy internals (ADR-013) on a card. Design:
+`docs/superpowers/specs/2026-07-21-trello-session-integration.md` and
+`…/2026-07-21-board-driven-dispatch.md` (repo).
+
+## Idle queue
+
+```bash
+bash $S/sweep-comments.sh  # surface unanswered PR review comments; offer to dispatch, never auto-dispatch
+```
+
+## Allowed commands (only these)
+
+`dstat` · `dinspect <name>` · `gh pr view/checks` · `bash $S/bootstrap.sh` · `bash $S/sweep-comments.sh` · `bash $S/generate-pr-brief.sh` · `tmux kill-session -t <name>` · `trello cards list/create/move` + `trello comments create` (Product Engineering board only)
+
+**Never:** edit files · run git/build/test/lint · read stack traces or diffs · grep codebase · `pkill -f claude|opencode|copilot` (kills all sessions). Kill workers with `tmux kill-session -t <name>` only.
+
+## Report format
+
+≤5 lines · columns: PR# | status | blocker | next-action · no log pastes
 
 ---
 
@@ -194,16 +249,55 @@ Do NOT paste full logs or tracebacks — the user will ask if they want detail.
 
 Pick the model per worker. Your Claude Max budget is precious — don't spend Opus on boilerplate; don't spend Kimi on the merge PR.
 
+This table applies to **tmux workers only** (`dispatch-one.sh`). Native subagents (Task/Agent tool) always run the supervisor's own model — see "Subagents vs tmux workers" in SKILL.md.
+
+**gh auth is per-repo, automatic:** `~/.local/bin/gh` wraps the real CLI and injects the right account's token per repo (`~/.config/gh-per-repo/map`: rhonda-rodododo→llamenos*, acao→translatemd etc.). Never run `gh auth switch`; the wrapper makes it unnecessary and it's racy across concurrent workers.
+
 ## Supported models (token → CLI)
 
 | Token | CLI | When to use |
 |---|---|---|
-| `opus` | `claude --model opus` | Default. Hard fixes, unknown bugs, release-adjacent work, reviews of risky merges, anything where a wrong call costs >30 min of human time. |
-| `sonnet` | `claude --model sonnet` | Mid-tier fixes, routine refactors inside one file, clear-spec features with known patterns. ~2/3 cost of Opus on Max. |
+| `opus` | `claude --model opus` | Hard fixes, unknown bugs, release-adjacent work, reviews of risky merges, anything where a wrong call costs >30 min of human time. |
+| `sonnet` | `claude --model sonnet` | **Default** (`dispatch-one.sh` uses `sonnet` when no model is passed). Mid-tier fixes, routine refactors inside one file, clear-spec features with known patterns. ~2/3 cost of Opus on Max. |
 | `haiku` | `claude --model haiku` | PR-comment triage where most replies are "acknowledged / done / moved to follow-up", status sweeps, quick investigations that only need to classify. |
-| `kimi` | `opencode run --model kimi-for-coding/k2p5` | Long-context exploration, bulk migrations across many files, scaffolding a new module from a clear spec, frontend-heavy work. Uses paid Kimi for Coding subscription ($99/mo). |
+| `fable` | `claude --model fable` | Newest Claude alias; accepted by the dispatcher and verified to resolve. Treat as a peer of `sonnet` until you have your own evidence about where it lands on cost/quality. |
+| `kimi` | `opencode run --model kimi-for-coding/k2p6` | Long-context exploration, bulk migrations across many files, scaffolding a new module from a clear spec, frontend-heavy work. Uses paid Kimi for Coding subscription ($99/mo). |
 | `kimi-thinking` | `opencode run --model kimi-for-coding/kimi-k2-thinking` | Same as kimi but with extended thinking/reasoning. Use for harder problems that benefit from chain-of-thought. |
 | `opencode:<model>` | `opencode run --model <provider/model>` | Any model available in opencode (e.g., `opencode:opencode/gpt-5-nano`, `opencode:vultr/DeepSeek-V3.2`). Use for free/cheap models on grunt work. |
+| `copilot` | `copilot --allow-all --no-ask-user -p` | GitHub Copilot CLI (auto model selection). Best for workers running inside an existing VS Code / Copilot subscription — no separate Claude Max quota consumed. |
+| `copilot:<model>` | `copilot --model=<model> --allow-all --no-ask-user -p` | Copilot CLI with a pinned model. Use explicit model tokens like `copilot:claude-sonnet-4.6`, `copilot:gpt-5.4`, `copilot:gpt-5.4-mini`. |
+| `kimi-cli` | `kimi --output-format stream-json -p` | Kimi Code CLI (kimi3 / new kimi-cli). Runs the default model from `~/.kimi/config.toml` (currently `kimi-code/kimi-for-coding`). Autonomous, no questions. |
+| `kimi-cli:<model>` | `kimi --output-format stream-json -m <model> -p` | Kimi Code CLI with a pinned model alias. |
+
+## Effort routing (`--effort`)
+
+`--effort` is a separate dial from `--model`, and it is plumbed only into the Claude
+runtimes (`opus|sonnet|haiku|fable`). Accepted values: **`low | medium | high | xhigh | max`**.
+`dispatch-one.sh` defaults to `medium` and hard-fails an invalid value *before* it cuts a
+worktree. Every non-Claude launcher prints `⚠️ --effort ignored: <runtime> does not support it`
+rather than dropping the flag silently.
+
+**Rule of thumb: effort is the dial for "how expensive is a wrong answer"; model is the dial
+for "how hard is the reasoning."** They are independent — `haiku --effort high` is a legitimate
+triage worker, and `opus --effort low` is legitimate for a mechanical rename in a file only
+Opus can safely parse.
+
+| Class of work | Model | Effort | Why this tier |
+|---|---|---|---|
+| Unknown bug, "something is wrong and I don't know what" | `opus` | `xhigh` | Investigation quality compounds; a wrong diagnosis costs a whole re-dispatch |
+| Correctness/security review, revert, release PR | `opus` | `xhigh` | A missed defect ships to prod. Reserve `max` for a second pass on something already flagged risky |
+| Architecture, spec, plan, ADR authoring | `opus` | `high` | Long-horizon coherence, low token-per-decision |
+| Multi-file feature, known pattern, clear spec | `sonnet` | `high` | Default for real feature work |
+| Routine fix, <5 files, tests exist to verify | `sonnet` | `medium` | The global default |
+| Bulk KB sweep (batch-add, mapping expansion) | `sonnet` | `medium` | Plus a **separate** reviewer dispatch at `opus`/`high` empowered to REJECT |
+| PR-comment triage, classify-and-reply | `haiku` | `medium` | Classification, not reasoning |
+| Mechanical batch edit against a detailed brief | `haiku` | `low` | The only place `low` is the right answer |
+| >10 files / >100k tokens of context to read | `kimi` / `kimi-thinking` | n/a | opencode; effort unsupported — the dispatcher warns |
+| Offload from Max quota | `copilot:<model>` | n/a | Copilot CLI; effort unsupported — the dispatcher warns |
+
+`--max-budget-usd N` is also Claude-only and, per `claude --help`, applies to `--print` runs —
+which is exactly how workers launch. Use it as a hard cap on an exploratory `opus --effort xhigh`
+worker.
 
 ## Heuristic for picking
 
@@ -214,24 +308,37 @@ Is the fix likely <5 files, with tests to verify?           → sonnet
 Is the task "read these comments and classify/reply"?       → haiku
 Am I unsure what's wrong?                                    → opus (it'll investigate better)
 Is this routine: typo, rename, lint, dep bump?              → haiku or kimi
+Want to offload from Claude Max to Copilot quota?           → copilot or copilot:<model>
+Want a native Kimi agent loop (not opencode-wrapped)?       → kimi-cli or kimi-cli:<model>
 ```
 
 When unsure, pick one tier up. A worker that wastes its budget is a BLOCKED worker.
 
-## Splitting Claude Max + opencode models concurrently
+## Splitting Claude Max + opencode + Copilot models concurrently
 
-Claude Max and opencode-routed models (Kimi, DeepSeek, GPT-5 Nano, etc.) use independent quotas. Two parallel tmux queues:
+Claude Max, opencode-routed models (Kimi, DeepSeek, GPT-5 Nano, etc.), and GitHub Copilot use **independent quotas**. Three parallel tmux queues:
 
 - **Queue A** (Claude): hard/critical tasks, opus + sonnet models
 - **Queue B** (opencode): bulk/exploratory tasks — `kimi`, `opencode:vultr/DeepSeek-V3.2`, `opencode:opencode/gpt-5-nano`, etc.
+- **Queue C** (Copilot): offload routine tasks to your Copilot subscription — `copilot` or `copilot:<model>`
+- **Queue D** (Kimi Code CLI): same Kimi quota as Queue B but through the native `kimi` agent loop — `kimi-cli` or `kimi-cli:<model>`
 
-This doubles effective throughput without doubling context or budget. Keep Queue A short and high-value; Queue B is where you dump the grep-and-rename grunt work.
+## When to route to `kimi-cli`
+
+`kimi` / `kimi-thinking` keep routing to opencode for backwards compatibility. Reach for `kimi-cli` instead when:
+
+- **The task needs a full agent loop, not a single opencode run.** The Kimi Code CLI is a purpose-built autonomous CLI (its own tool set, shell access, file editing) — better fit for multi-step fix-build-test cycles than an opencode wrapper.
+- **You want the Kimi subscription without opencode quirks.** Same `kimi-for-coding` quota as Queue B, but driven natively. `kimi-cli` (no model) uses the default from `~/.kimi/config.toml` (`kimi-code/kimi-for-coding`); pin with `kimi-cli:<model-alias>`.
+- **Shape-heavy work.** Same heuristic as opencode-kimi: bulk migrations, scaffolding, many-file mechanical changes. Decision-heavy work (merge trains, conflict resolution, CI loops) still goes to Claude.
+- **`--agent` is NOT supported** for kimi-cli workers (kimi's `--agent` selects an agent profile, a different mechanism). The flag is ignored — keep prompts self-contained.
+
+This triples effective throughput without increasing budget. Keep Queue A short and high-value; Queue B for grep-and-rename grunt work; Queue C for tasks where Copilot quota is available and fresh.
 
 ### Available opencode models
 ```bash
 opencode models  # List all available models
 ```
-Current options: `kimi-for-coding/k2p5`, `vultr/DeepSeek-V3.2`, `vultr/GLM-5-FP8`, `opencode/gpt-5-nano`, `opencode/minimax-m2.5-free`, `opencode/nemotron-3-super-free`, and more.
+Current options: `kimi-for-coding/k2p6` (what `model=kimi` actually launches — see dispatch-one.sh), `vultr/DeepSeek-V3.2`, `vultr/GLM-5-FP8`, `opencode/gpt-5-nano`, `opencode/minimax-m2.5-free`, `opencode/nemotron-3-super-free`, and more.
 
 ## Queue entry format
 
@@ -241,7 +348,7 @@ The launcher reads 4-field entries:
 "name|prompt-file|timeout-sec|model"
 ```
 
-Model is optional; omit to default to opus. Examples:
+Model is optional; omit to default to **sonnet** (`dispatch-one.sh`: `model="${4:-sonnet}"`). Examples:
 
 ```bash
 "fix-auth-regression|70-auth.md|10800|opus"
@@ -251,12 +358,19 @@ Model is optional; omit to default to opus. Examples:
 
 ## Caveats
 
-- **Kimi runs via `opencode run`**, NOT a standalone `kimi` CLI. The supervisor-template.sh and dispatch-one.sh handle this — never invoke `kimi --yolo` directly.
-- **Kimi times out at ~100 tool calls.** Don't give it tasks requiring >100 tool uses (multi-phase merge trains, large refactors with many verify cycles). Split into smaller prompts or route to Claude.
+- **`model=kimi` runs via `opencode run`**, NOT a standalone `kimi` CLI — `dispatch-one.sh` handles this; never invoke `kimi --yolo` directly. (The separate `kimi-cli` token DOES drive the standalone `kimi` binary; they are different runtimes.)
+- **Kimi supports up to 500 tool calls** (updated from 100 as of May 2026). Complex multi-agent tasks are fine.
 - **Kimi's tool-calling is weaker on multi-constraint loops.** Don't route "merge this PR, resolve conflicts, re-run CI" to Kimi — it'll get lost. Route shape-heavy (lots of files, mechanical change) work to Kimi, decision-heavy work to Claude.
 - **opencode `--format json` streams JSON events** (not stream-json like claude). The supervisor reads status files, not stdout, so output format doesn't matter for orchestration.
 - **Kimi/opencode does not read `~/.claude/skills/`** — anything the worker relies on from the superpowers skill library must be inlined into the prompt file. Keep Kimi prompts self-contained.
 - **Kimi has no equivalent of the superpowers feedback memory system.** Project-specific hardcoded rules (testid selectors, no-workaround discipline, e2e-before-push) must be copy-pasted into the prompt's Rules block every time. The prompt template already does this — don't strip it when routing to Kimi.
+- **Copilot CLI (`copilot` / `copilot:<model>`) runs via `copilot --allow-all --no-ask-user --name=<name> --output-format=json -p <prompt>`.** The binary must be installed: `npm install -g @github/copilot`. Requires a GitHub Copilot subscription and auth (`copilot login` or `COPILOT_GITHUB_TOKEN` env var). The `dispatch-one.sh` will fail fast with a clear error if the binary is missing.
+- **Copilot supports `--name`**, so worker identity is tracked identically to claude — `status.sh` detects it via `pgrep -af "copilot.*--name <name>"`.
+- **Copilot workers cannot read `~/.copilot/skills/`.** Keep prompts self-contained — same rule as Kimi.
+- **Copilot model tokens** include: `claude-sonnet-4.6`, `claude-haiku-4.5`, `gpt-5.4`, `gpt-5.4-mini`, `gemini-3.5-flash`. Omit `copilot:<model>` to let Copilot auto-select.
+- **Kimi Code CLI (`kimi-cli` / `kimi-cli:<model>`) runs via `kimi --output-format stream-json -p <prompt>` (prompt mode forbids `--auto`/`--yolo` — it is non-interactive by definition).** The `kimi` binary must be in PATH; `dispatch-one.sh` fails fast with a clear error if missing. `kimi-cli` with no suffix uses the default model from `~/.kimi/config.toml` (`default_model`, currently `kimi-code/kimi-for-coding`); `kimi-cli:<model>` maps to `-m <model>`.
+- **kimi-cli has no `--name` flag**, so worker identity is tracked by tmux session name / log file, not by the CLI process args. Its `--agent` flag selects agent profiles (a different mechanism) — `dispatch-one.sh` ignores `--agent` for kimi-cli workers.
+- **kimi-cli workers do not read `~/.claude/skills/` or `~/.copilot/skills/`.** Keep prompts self-contained — same rule as Kimi/opencode and Copilot.
 - **One-off dispatches:** Always use `dispatch-one.sh` for ad-hoc launches. Never manually write `tmux new-session -d ... < file` — tmux doesn't pass stdin correctly with inline commands. The dispatch script writes a launcher file to /tmp and runs that.
 
 ---
@@ -270,8 +384,8 @@ Paste this block into the "Rules you must follow" section of worker prompts for 
 ## Dispatch invocation (for supervisors)
 
 ```bash
-DISPATCH_REPO=/media/rikki/recover2/projects/llamenos-hotline \
-WORKTREE_BASE=/media/rikki/recover2/projects \
+DISPATCH_REPO=/media/rikki/Main/projects/llamenos-hotline \
+WORKTREE_BASE=/media/rikki/Main/projects \
   ~/.claude/skills/supervising-dispatched-sessions/dispatch-one.sh <name> <prompt-file> [timeout] [model]
 ```
 
@@ -282,8 +396,8 @@ Prefix names with `lh-` to disambiguate from other projects in status.sh output.
 ## Llamenos Hotline Worker Rules
 
 ### Git & Worktrees
-- **Always work in your worktree** — never `cd` to or `git checkout` in `/media/rikki/recover2/projects/llamenos-hotline` (the main repo).
-- **Worktrees live at** `/media/rikki/recover2/projects/llamenos-hotline-<name>`.
+- **Always work in your worktree** — never `cd` to or `git checkout` in `/media/rikki/Main/projects/llamenos-hotline` (the main repo).
+- **Worktrees live at** `/media/rikki/Main/projects/llamenos-hotline-<name>`.
 - **GitHub remote:** `git@github.com:rhonda-rodododo/llamenos-hotline.git`
 
 ### Push & PR Creation (GitHub)
@@ -341,7 +455,7 @@ bunx playwright test <targeted-ui-specs> --workers=1
 ### Code Standards
 - **Testid-only selectors** in any E2E test — no CSS class or text selectors
 - **Root-cause only** — no `--no-verify`, no weakening app code to silence tests
-- **If blocked >30 min**, write `status: BLOCKED` and exit. Never push broken code.
+- **If blocked >60 min**, write `status: BLOCKED` and exit. Never push broken code. Exhaust alternative approaches before giving up.
 
 ### Test Fixture Maintenance (CRITICAL)
 - **When you change types, schemas, or wire formats:** grep ALL test files (`tests/`, `*.test.ts`) for stubs/fixtures that construct the old shape. Update them in the SAME commit/PR. Never defer test fixture updates to a follow-up.
@@ -360,92 +474,13 @@ bunx playwright test <targeted-ui-specs> --workers=1
 
 ## Worker Prompt Template
 
-# Worker Prompt Template
+# MOVED — this file is not read by anything
 
-Fill the placeholders. Delete unused sections. Save to `~/tier-prompts/NN-<task-name>.md`.
+The prompt this file used to hold is now assembled by `_assemble_standard()` in
+`dispatch-one.sh`. Edit it **there**.
 
-**Pick a model** for this worker before queuing. See `model-routing.md`.
-Queue entry format: `name|prompt-file|timeout-sec|model` (model defaults to `opus`).
-If routing to `kimi`, this prompt must be fully self-contained — Kimi does not read
-`~/.claude/skills/` or the superpowers feedback memories, so do not reference them;
-inline the relevant rules below.
-
-**Pick a project rules block** from `prompt-rules-<project>.md` and paste it into the
-Rules section. Each project has different CI, testing, and MR/PR conventions.
-
----
-
-# <TITLE: one-line task summary>
-
-You are a dispatched worker operating in an **isolated git worktree**. Do the job below end-to-end, then exit.
-
-## Critical Rules (read before anything else)
-
-1. **You are in a worktree.** Your working directory IS your worktree — do NOT `cd` to the main repo, do NOT `git checkout` branches in the main repo. All work happens HERE.
-2. **Never touch the main repo checkout.** The supervisor session uses it. If you modify it, you break the supervisor and other workers.
-3. **After adding/removing packages:** Run the package manager install and commit the lockfile. CI uses frozen lockfiles and will fail if they're stale.
-4. **If blocked for >30 min on one step**, write `status: BLOCKED` with a clear description of what you tried and what you need, and exit. Never push broken code.
-5. **Commit and push progress incrementally.** If you've fixed several files but tests are still running, commit what you have. A timed-out session with uncommitted work is wasted work. Push to the branch early and often — the PR will accumulate commits.
-
-## Context
-
-<2–6 sentences covering:
-- Which worktree / branch you're in
-- Why it's in its current state
-- Relevant earlier commits (sha + one-liner) if they matter
-- Current pipeline / MR state if relevant>
-
-## Your task
-
-1. **Bootstrap the worktree:**
-   ```
-   bun install          # worktrees have no node_modules — ALWAYS run this first
-   git status
-   git log --oneline -5
-   ```
-   Verify you're on the expected branch in the worktree. If reality diverges, STOP and write `status: BLOCKED`.
-
-2. **<main action step>** — e.g. implement feature, fix bug, resolve merge conflict.
-
-3. **Update ALL impacted tests.** If you changed types, schemas, wire formats, or APIs:
-   - **Grep for test files** that reference the changed types/functions/shapes
-   - **Update test fixtures, stubs, and assertions** to match new shapes
-   - **Do NOT defer test fixes to a follow-up** — they ship with the code change
-   This is a hard rule. Changing a type without updating every test stub that constructs
-   that type is how 80-test failures slip through.
-
-4. **Verify the build AND run tests across ALL tiers locally** before pushing:
-   ```
-   <project-specific build/typecheck/lint commands>
-   <project-specific unit test command>
-   <project-specific integration test command>
-   <project-specific API e2e test command — targeted specs>
-   <project-specific UI e2e test command — targeted specs>
-   ```
-   Fix anything broken. Do NOT push until these pass. `typecheck + build` alone is
-   insufficient — you MUST run unit tests, integration tests, AND e2e tests (both API
-   and UI) to catch runtime issues that the type checker can't see (stale test stubs,
-   runtime shape mismatches, missing registrations, broken UI flows).
-
-4. **Push and create MR/PR:**
-   ```
-   <project-specific push + MR/PR creation command>
-   ```
-
-5. **Write status file at `~/tier-overnight-status/<session-name>.status`:**
-   ```
-   session: <session-name>
-   status: SUCCESS | BLOCKED | FAILED | NEEDS_CONTEXT
-   pr: <number or URL or none>
-   merged_sha: <sha or none>
-   duration_sec: <int>
-   notes: <one-line summary>
-   ```
-
-## Rules you must follow
-
-<Paste the project-specific rules block from prompt-rules-<project>.md here>
-
-## Exit criteria
-
-Exit cleanly when the status file is written. The supervisor watches your process.
+This file was a trap: no script ever read it (`grep -rn prompt-template` returned
+zero hits across the whole skill), so the two most expensive worker rules ever
+written — "no subagents" and "never background a `git commit`" — lived here and
+shipped in nothing from 2026-08-02 until 2026-08-30. They are inlined in all three
+assemblers now. Do not restore prose here; it can only diverge again.
