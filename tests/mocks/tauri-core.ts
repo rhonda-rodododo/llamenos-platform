@@ -1257,7 +1257,7 @@ export async function invoke<T>(cmd: string, args?: Record<string, unknown>): Pr
 export const __TEST_INVOKE_SYMBOL = Symbol.for('llamenos_test_invoke')
 
 if (typeof window !== 'undefined' && import.meta.env.PLAYWRIGHT_TEST) {
-  (window as Record<symbol, unknown>)[__TEST_INVOKE_SYMBOL] = invoke
+  (window as unknown as Record<symbol, unknown>)[__TEST_INVOKE_SYMBOL] = invoke
 }
 
 export function convertFileSrc(path: string): string { return path }

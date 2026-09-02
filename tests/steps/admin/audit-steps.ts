@@ -24,7 +24,7 @@ Then('audit entries should be visible with date information', async ({ page, bac
   expect(result.entries.length).toBeGreaterThan(0)
   // Verify API entries have timestamps
   const firstEntry = result.entries[0]
-  expect(firstEntry.timestamp || firstEntry.created_at || firstEntry.createdAt).toBeTruthy()
+  expect(firstEntry.createdAt).toBeTruthy()
 })
 
 Then('audit entries should show actor links pointing to volunteer profiles', async ({ page }) => {
@@ -67,8 +67,7 @@ Then('only {string} events should be visible', async ({ page, backendRequest: re
   expect(result.entries.length).toBeGreaterThan(0)
   // All returned entries should match the filter
   for (const entry of result.entries) {
-    const entryType = entry.event_type || entry.eventType || entry.type
-    expect(String(entryType).toLowerCase()).toContain(eventType.toLowerCase())
+    expect(entry.action.toLowerCase()).toContain(eventType.toLowerCase())
   }
 })
 

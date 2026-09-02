@@ -53,12 +53,12 @@ Given('an identity exists with PIN {string}', async ({ page }, pin: string) => {
   await page.waitForLoadState('domcontentloaded')
 
   // Wait for __TEST_PLATFORM to be loaded (set asynchronously in main.tsx)
-  await page.waitForFunction(() => !!(window as Record<string, unknown>).__TEST_PLATFORM, { timeout: Timeouts.AUTH })
+  await page.waitForFunction(() => !!(window as unknown as Record<string, unknown>).__TEST_PLATFORM, { timeout: Timeouts.AUTH })
 
   // Import key via test platform shim: persists encrypted keys then locks — leaving the
   // app in the "locked, PIN required" state that these scenarios test.
   await page.evaluate(async ({ secretHex, pin }) => {
-    const platform = (window as Record<string, unknown>).__TEST_PLATFORM as {
+    const platform = (window as unknown as Record<string, unknown>).__TEST_PLATFORM as {
       deviceImportAndLoad: (secretHex: string, pin: string, deviceId: string) => Promise<unknown>
       persistAndUnlockDeviceKeys: (encrypted: unknown, pin: string) => Promise<unknown>
       lockCrypto: () => Promise<void>
@@ -117,10 +117,10 @@ Given('I have a stored identity with PIN {string}', async ({ page }, pin: string
   await page.waitForLoadState('domcontentloaded')
 
   // Wait for __TEST_PLATFORM to be loaded (set asynchronously in main.tsx)
-  await page.waitForFunction(() => !!(window as Record<string, unknown>).__TEST_PLATFORM, { timeout: Timeouts.AUTH })
+  await page.waitForFunction(() => !!(window as unknown as Record<string, unknown>).__TEST_PLATFORM, { timeout: Timeouts.AUTH })
 
   await page.evaluate(async ({ secretHex, pin }) => {
-    const platform = (window as Record<string, unknown>).__TEST_PLATFORM as {
+    const platform = (window as unknown as Record<string, unknown>).__TEST_PLATFORM as {
       deviceImportAndLoad: (secretHex: string, pin: string, deviceId: string) => Promise<unknown>
       persistAndUnlockDeviceKeys: (encrypted: unknown, pin: string) => Promise<unknown>
       lockCrypto: () => Promise<void>

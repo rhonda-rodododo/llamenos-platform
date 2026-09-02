@@ -236,7 +236,7 @@ When('I visit the login page', async ({ page }) => {
 When('I check the API health endpoint', async ({ page }) => {
   const response = await page.request.get('/api/health')
   await page.evaluate((status) => {
-    (window as Record<string, unknown>).__test_api_status = status
+    (window as unknown as Record<string, unknown>).__test_api_status = status
   }, response.status())
 })
 
@@ -244,7 +244,7 @@ When('I check the API config endpoint', async ({ page }) => {
   const response = await page.request.get('/api/config')
   const body = await response.text()
   await page.evaluate((b) => {
-    (window as Record<string, unknown>).__test_api_config = b
+    (window as unknown as Record<string, unknown>).__test_api_config = b
   }, body)
 })
 
@@ -277,12 +277,12 @@ Then('I should see a validation error', async ({ page }) => {
 })
 
 Then('the response should be successful', async ({ page }) => {
-  const status = await page.evaluate(() => (window as Record<string, unknown>).__test_api_status)
+  const status = await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_api_status)
   expect(status).toBe(200)
 })
 
 Then('the response should contain {string}', async ({ page }, text: string) => {
-  const body = await page.evaluate(() => (window as Record<string, unknown>).__test_api_config) as string
+  const body = await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_api_config) as string
   expect(body).toContain(text)
 })
 

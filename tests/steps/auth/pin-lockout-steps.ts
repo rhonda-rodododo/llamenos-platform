@@ -22,11 +22,11 @@ import { enterPin, Timeouts } from '../../helpers'
  */
 async function testInvoke(page: import('@playwright/test').Page, cmd: string, args?: Record<string, unknown>) {
   // Ensure __TEST_PLATFORM is available and trigger tauri-core lazy load
-  await page.waitForFunction(() => !!(window as Record<string, unknown>).__TEST_PLATFORM, { timeout: Timeouts.AUTH })
+  await page.waitForFunction(() => !!(window as unknown as Record<string, unknown>).__TEST_PLATFORM, { timeout: Timeouts.AUTH })
 
   // Trigger tauri-core chunk load by calling a platform function
   await page.evaluate(async () => {
-    const platform = (window as Record<string, unknown>).__TEST_PLATFORM as {
+    const platform = (window as unknown as Record<string, unknown>).__TEST_PLATFORM as {
       isCryptoUnlocked: () => Promise<boolean>
     }
     await platform.isCryptoUnlocked()
@@ -35,7 +35,7 @@ async function testInvoke(page: import('@playwright/test').Page, cmd: string, ar
   // Now the symbol is guaranteed to be on window
   return page.evaluate(async ({ cmd, args }) => {
     const sym = Symbol.for('llamenos_test_invoke')
-    const invoke = (window as Record<symbol, unknown>)[sym] as
+    const invoke = (window as unknown as Record<symbol, unknown>)[sym] as
       ((cmd: string, args?: Record<string, unknown>) => Promise<unknown>) | undefined
     if (!invoke) throw new Error('llamenos_test_invoke not available — is the Tauri mock loaded?')
     return invoke(cmd, args)
@@ -59,7 +59,7 @@ Then('I should not see a lockout timer', async ({ page }) => {
 Given('I have {int} failed PIN attempts', async ({ page }, count: number) => {
   // Seed the mock with N failed attempts.
   // Wait for __TEST_PLATFORM which is set in the same module that registers the test invoke symbol.
-  await page.waitForFunction(() => !!(window as Record<string, unknown>).__TEST_PLATFORM, { timeout: Timeouts.AUTH })
+  await page.waitForFunction(() => !!(window as unknown as Record<string, unknown>).__TEST_PLATFORM, { timeout: Timeouts.AUTH })
   await seedFailedAttempts(page, count)
 })
 
@@ -145,7 +145,7 @@ Then('I should not be able to enter a PIN until lockout expires', async ({ page 
 
 Given('the lockout has expired', async ({ page }) => {
   // Wait for test platform to be ready
-  await page.waitForFunction(() => !!(window as Record<string, unknown>).__TEST_PLATFORM, { timeout: Timeouts.AUTH })
+  await page.waitForFunction(() => !!(window as unknown as Record<string, unknown>).__TEST_PLATFORM, { timeout: Timeouts.AUTH })
   // Clear the lockout timer (simulates timer expiry) — keeps attempt count unchanged
   await testInvoke(page, 'expire_pin_lockout')
 })

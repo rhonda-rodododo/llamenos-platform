@@ -89,8 +89,9 @@ Given(
         await createBanViaApi(request, { phone: detail, reason: 'audit test', hubId })
       } else if (operation === 'update volunteer') {
         // Remove from hub to generate a hub-scoped userRemoved audit entry
-        if (getAuditTestState(world).latestEntry?.id && hubId) {
-          await apiDelete(request, `/hubs/${hubId}/members/${getAuditTestState(world).latestEntry.id}`)
+        const latestId = getAuditTestState(world).latestEntry?.id
+        if (latestId && hubId) {
+          await apiDelete(request, `/hubs/${hubId}/members/${latestId}`)
         }
       }
     }
@@ -160,7 +161,7 @@ When(
 
 Then('each entry should have an {string} field', async ({ world }, fieldName: string) => {
   for (const entry of getAuditTestState(world).entries) {
-    const value = (entry as Record<string, unknown>)[fieldName]
+    const value = (entry as unknown as Record<string, unknown>)[fieldName]
     // entryHash should always be truthy; previousEntryHash can be null for first entry
     if (fieldName === 'entryHash') {
       expect(value).toBeTruthy()
@@ -172,7 +173,7 @@ Then(
   'entry {int} should have a null {string}',
   async ({ world }, index: number, fieldName: string) => {
     expect(getAuditTestState(world).entries.length).toBeGreaterThan(index)
-    const value = (getAuditTestState(world).entries[index] as Record<string, unknown>)[fieldName]
+    const value = (getAuditTestState(world).entries[index] as unknown as Record<string, unknown>)[fieldName]
     expect(value).toBeNull()
   },
 )

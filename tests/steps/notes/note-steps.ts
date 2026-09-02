@@ -286,7 +286,7 @@ Then('I should see the full notes list', async ({ page }) => {
 When('I fill in the call ID with {string}', async ({ page }, callId: string) => {
   await page.getByTestId(TestIds.NOTE_CALL_ID).fill(callId)
   await page.evaluate((id) => {
-    (window as Record<string, unknown>).__test_note_call_id = id
+    (window as unknown as Record<string, unknown>).__test_note_call_id = id
   }, callId)
 })
 

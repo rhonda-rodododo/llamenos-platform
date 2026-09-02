@@ -20,7 +20,7 @@ Given('I have an active call', async ({ page, backendRequest }) => {
     if (callResult?.callId) {
       // Get the current user's pubkey to answer the call
       const pubkey = await page.evaluate(() => {
-        const p = (window as Record<string, unknown>).__TEST_PLATFORM as { getDevicePubkeys?(): Promise<{ signingPubkeyHex: string }> } | undefined
+        const p = (window as unknown as Record<string, unknown>).__TEST_PLATFORM as { getDevicePubkeys?(): Promise<{ signingPubkeyHex: string }> } | undefined
         return p?.getDevicePubkeys?.().then(k => k.signingPubkeyHex).catch(() => 'a'.repeat(64)) ?? 'a'.repeat(64)
       })
       await simulateAnswerCall(backendRequest, callResult.callId, pubkey)
@@ -30,7 +30,7 @@ Given('I have an active call', async ({ page, backendRequest }) => {
   } catch {
     // Backend not available — store flag so downstream assertions skip gracefully
     await page.evaluate(() => {
-      (window as Record<string, unknown>).__test_no_active_call = true
+      (window as unknown as Record<string, unknown>).__test_no_active_call = true
     })
   }
 })
@@ -46,7 +46,7 @@ When('I view the dashboard', async ({ page }) => {
 })
 
 When('I click the ban button on the active call panel', async ({ page }) => {
-  const noCall = await page.evaluate(() => (window as Record<string, unknown>).__test_no_active_call)
+  const noCall = await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_no_active_call)
   if (noCall) return
   const panel = page.getByTestId(TestIds.ACTIVE_CALL_PANEL)
   await expect(panel).toBeVisible({ timeout: Timeouts.ELEMENT })
@@ -55,7 +55,7 @@ When('I click the ban button on the active call panel', async ({ page }) => {
 })
 
 When('I enter ban reason {string}', async ({ page }, reason: string) => {
-  const noCall = await page.evaluate(() => (window as Record<string, unknown>).__test_no_active_call)
+  const noCall = await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_no_active_call)
   if (noCall) return
   const input = page.getByTestId(TestIds.BAN_REASON_INPUT)
   await expect(input).toBeVisible({ timeout: Timeouts.ELEMENT })
@@ -63,7 +63,7 @@ When('I enter ban reason {string}', async ({ page }, reason: string) => {
 })
 
 When('I confirm the ban', async ({ page }) => {
-  const noCall = await page.evaluate(() => (window as Record<string, unknown>).__test_no_active_call)
+  const noCall = await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_no_active_call)
   if (noCall) return
   const confirmBtn = page.getByTestId(TestIds.BAN_CONFIRM_BTN)
   await expect(confirmBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
@@ -78,7 +78,7 @@ When('the call ends', async ({ page }) => {
 // ── Then ───────────────────────────────────────────────────────────
 
 Then('the active call panel should be visible', async ({ page }) => {
-  const noCall = await page.evaluate(() => (window as Record<string, unknown>).__test_no_active_call)
+  const noCall = await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_no_active_call)
   if (noCall) {
     // Backend not available — verify dashboard loaded instead
     await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
@@ -88,7 +88,7 @@ Then('the active call panel should be visible', async ({ page }) => {
 })
 
 Then('the call timer should be visible', async ({ page }) => {
-  const noCall = await page.evaluate(() => (window as Record<string, unknown>).__test_no_active_call)
+  const noCall = await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_no_active_call)
   if (noCall) {
     await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
     return
@@ -100,7 +100,7 @@ Then('the call timer should be visible', async ({ page }) => {
 })
 
 Then('the ban reason input should be visible', async ({ page }) => {
-  const noCall = await page.evaluate(() => (window as Record<string, unknown>).__test_no_active_call)
+  const noCall = await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_no_active_call)
   if (noCall) {
     await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
     return
@@ -109,7 +109,7 @@ Then('the ban reason input should be visible', async ({ page }) => {
 })
 
 Then('the active call panel should not be visible', async ({ page }) => {
-  const noCall = await page.evaluate(() => (window as Record<string, unknown>).__test_no_active_call)
+  const noCall = await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_no_active_call)
   if (noCall) {
     // No call was ever created — panel was never visible. Pass.
     return
