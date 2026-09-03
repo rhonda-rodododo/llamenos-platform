@@ -112,6 +112,9 @@ class CaseDetailSteps : BaseSteps() {
 
     @Then("I should see the status pill")
     fun iShouldSeeTheStatusPill() {
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithTag("case-status-pill").fetchSemanticsNodes().isNotEmpty()
+        }
         onNodeWithTag("case-status-pill").assertIsDisplayed()
     }
 
@@ -246,12 +249,23 @@ class CaseDetailSteps : BaseSteps() {
 
     /**
      * Wait for the case detail to finish loading.
+     *
+     * NOTE: "case-detail-header" is NOT a valid loaded-signal — it's the
+     * TopAppBar title, which is rendered unconditionally in CaseDetailScreen's
+     * Scaffold (outside the isLoadingDetail/detailError/record `when` branch),
+     * so it's present from the very first frame, even while the body is still
+     * showing the loading spinner. Waiting on it (or on "case-detail-loading",
+     * which is the spinner itself) let this helper return before the record
+     * actually finished loading, so downstream steps like "I tap the status
+     * pill" raced the body content and flaked with "case-status-pill is not
+     * displayed". Wait for an actual terminal state of the body instead: the
+     * loaded content (signaled by "case-status-pill", which only renders once
+     * `record != null || isNewCase`) or the error state.
      */
     private fun waitForDetailLoaded() {
         composeRule.waitUntil(10_000) {
-            composeRule.onAllNodesWithTag("case-detail-header").fetchSemanticsNodes().isNotEmpty() ||
-                composeRule.onAllNodesWithTag("case-detail-error").fetchSemanticsNodes().isNotEmpty() ||
-                composeRule.onAllNodesWithTag("case-detail-loading").fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodesWithTag("case-status-pill").fetchSemanticsNodes().isNotEmpty() ||
+                composeRule.onAllNodesWithTag("case-detail-error").fetchSemanticsNodes().isNotEmpty()
         }
     }
 }
