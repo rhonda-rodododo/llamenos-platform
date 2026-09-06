@@ -8,7 +8,7 @@
 # Bun runs TypeScript natively — no esbuild transpilation step needed.
 
 # Stage 1: Install runtime deps
-FROM oven/bun:1.4.0@sha256:5ff609364c049b54eb0ff560ec96319729a972078ef2c755d758f0c6ef89c2d6 AS deps
+FROM oven/bun:1.4.2@sha256:9114c058aeae42162ee16dd5084b95fe9473970bb6bcb5b232ab1630f0546895 AS deps
 # oven/bun:1.3.5 pinned to match .mise.toml — update via Dependabot or on new minor release
 WORKDIR /app
 COPY package.json bun.lockb ./
@@ -26,7 +26,7 @@ COPY site/package.json site/package.json
 RUN bun install --frozen-lockfile --production --ignore-scripts
 
 # Stage 2: Build Rust crypto FFI (.so)
-FROM rust:1-slim@sha256:cc0448b41c3b7b7fea44f5dc50eacba729a56db365b65b7bd5e8a82d5b3db078 AS rust-builder
+FROM rust:1-slim@sha256:17d1ba895198f9934c6314ec5346a0d5115372f3243390c3d731e242f35c2f27 AS rust-builder
 RUN apt-get update && apt-get install -y --no-install-recommends pkg-config && rm -rf /var/lib/apt/lists/*
 WORKDIR /build
 COPY packages/crypto/ packages/crypto/
@@ -35,7 +35,7 @@ RUN cargo build --release --manifest-path packages/crypto/Cargo.toml --features 
     && cp packages/crypto/target/release/libllamenos_core.so packages/crypto/dist/server/
 
 # Stage 3: Production
-FROM oven/bun:1.4.0-slim@sha256:e0ee68d16ccb9927bf02aa7dd8fd4bf3369ee6d46da04faa72b05ce8bfd135f6
+FROM oven/bun:1.4.2-slim@sha256:cb3bbbb08e13a4a2ff400f24c7a2a1d5efa83f6ef8544d52d95a519631e2fc61
 # oven/bun:1.3.5-slim pinned to match .mise.toml — update via Dependabot
 
 # Create non-root user
