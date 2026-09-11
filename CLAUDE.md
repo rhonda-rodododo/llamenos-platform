@@ -80,8 +80,6 @@ apps/
     messaging/        # MessagingAdapter interface + SMS, WhatsApp, Signal, Telegram, RCS adapters
     lib/              # Auth, crypto, webauthn utilities
     # (no wrangler.jsonc — see site/wrangler.jsonc for marketing site)
-  sip-bridge/         # Protocol-agnostic SIP bridge (replaces asterisk-bridge/); PBX_TYPE selects ARI/ESL/Kamailio
-  signal-notifier/    # Zero-knowledge Signal notification sidecar (port 3100; HMAC-hashed contact resolution)
   ios/                # Native SwiftUI iOS client
     Sources/          # Swift source (App/, Services/, Views/, ViewModels/)
     Tests/            # XCTest + XCUITest
@@ -89,6 +87,8 @@ apps/
   android/            # Native Kotlin/Compose Android client
     app/src/main/     # Kotlin source (crypto/, api/, ui/, di/, service/)
     gradle/           # Version catalog (libs.versions.toml)
+sip-bridge/           # Protocol-agnostic SIP bridge (replaces asterisk-bridge/); PBX_TYPE selects ARI/ESL/Kamailio
+signal-notifier/      # Zero-knowledge Signal notification sidecar (port 3100; HMAC-hashed contact resolution)
 packages/
   crypto/             # Shared Rust crypto crate (native + WASM + UniFFI)
     src/              # Rust source (HPKE/X25519-HKDF-SHA256-AES256-GCM, Ed25519/Schnorr, PBKDF2, HKDF, XChaCha20-Poly1305, SFrame, MLS)
@@ -105,7 +105,7 @@ packages/
     generated/        # Auto-generated types — GITIGNORED (typescript/, swift/, kotlin/)
     crypto-labels.json # Domain separation constants (source of truth; see file for current count)
   i18n/               # Localization package
-    locales/          # 13 locale JSON files (en, es, zh, tl, vi, ar, fr, ht, ko, ru, hi, pt, de)
+    locales/          # 22 locale JSON files (en, es, zh, tl, vi, ar, fr, ht, ko, ru, hi, pt, de, am, fa, ku, mix, my, quc, so, tr, uk)
     languages.ts      # Language config (codes, labels, Twilio voice IDs)
     tools/            # i18n-codegen.ts → iOS .strings + Android strings.xml + Kotlin I18n.kt
                       # validate-strings.ts → cross-platform string ref validator
