@@ -115,4 +115,38 @@ describe('checkScope', () => {
     const scope: LaneScope = { owned: ['apps/ios/'], notOwned: ['apps/ios/' /* same length as owned */] }
     expect(checkScope(['apps/ios/x.swift'], scope, []).strayed).toEqual(['apps/ios/x.swift'])
   })
+
+  // --- G1 regression: bare-filename neverWrite patterns must catch nested secrets ---
+
+  it('marks a nested .env file as forbidden — the case matchesPath used to miss via startsWith', () => {
+    const r = checkScope(['apps/worker/config/.env'], { owned: ['apps/worker/'], notOwned: [] }, ['.env'])
+    expect(r.forbidden).toEqual(['apps/worker/config/.env'])
+    expect(r.strayed).toEqual([])
+  })
+
+  // --- G1 specificity check: does a short basename pattern ever outrank a
+  // long owned directory pattern in a way that blocks legitimate work? ---
+  //
+  // neverWrite is checked first and unconditionally (see checkScope's doc
+  // comment), so it is immune to this question by construction — it never
+  // competes with owned/notOwned length at all. The question only applies to
+  // owned-vs-notOwned overlap. Against the real fragments, every directory
+  // pattern is at least 5 characters (`site/`) and no lane's `notOwned` list
+  // currently contains a bare-filename pattern at all — so the risky
+  // configuration (a `notOwned` basename pattern shorter than a competing
+  // `owned` directory pattern for the same file) does not occur in the
+  // current data. This test demonstrates the safe case holds when a bare
+  // basename pattern IS mixed into `notOwned`.
+  it('a long owned directory pattern beats a short notOwned basename pattern for the same file', () => {
+    const scope: LaneScope = { owned: ['apps/worker/'], notOwned: ['config.ts'] }
+    const r = checkScope(['apps/worker/config.ts'], scope, [])
+    expect(r.strayed).toEqual([])
+  })
+
+  it('flags every already-passing scope case above still holds after the matchesPath fix', () => {
+    expect(checkScope(['.github/workflows/ios-e2e.yml'], IOS, []).strayed).toEqual([])
+    expect(checkScope(['.github/workflows/android.yml'], IOS, []).strayed).toEqual([
+      '.github/workflows/android.yml',
+    ])
+  })
 })

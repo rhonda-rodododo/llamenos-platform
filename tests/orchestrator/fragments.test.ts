@@ -125,6 +125,33 @@ describe('matchesPath', () => {
   it('rejects a file that does not share the pattern prefix at all', () => {
     expect(matchesPath('xknope.toml', 'knope.toml')).toBe(false)
   })
+
+  // G1 fix: a slash-free pattern is a basename pattern — it matches at any
+  // depth, not just at the repo root. This is the never-write hole: a plain
+  // `startsWith` on the whole path let a worker write `.env` anywhere except
+  // the root.
+  it('matches a bare-filename pattern at any depth, not just the repo root', () => {
+    expect(matchesPath('.env', '.env')).toBe(true)
+    expect(matchesPath('apps/worker/config/.env', '.env')).toBe(true)
+    expect(matchesPath('deploy/docker/.env', '.env')).toBe(true)
+  })
+
+  it('does not let a bare-filename pattern match an unrelated file that merely contains it', () => {
+    expect(matchesPath('apps/worker/env.ts', '.env')).toBe(false)
+    expect(matchesPath('src/dotenv/index.ts', '.env')).toBe(false)
+  })
+
+  it('still over-blocks a basename that starts with the pattern — deliberate, deny-side, and safe', () => {
+    // `.environment` is not `.env`, but a deny list erring toward blocking
+    // too much rather than too little is the safe failure mode here, so this
+    // is asserted as intended behavior, not tolerated as a quirk.
+    expect(matchesPath('.environment', '.env')).toBe(true)
+  })
+
+  it('matches a bare glob pattern against the basename at any depth', () => {
+    expect(matchesPath('Dockerfile.build', 'Dockerfile*')).toBe(true)
+    expect(matchesPath('deploy/docker/Dockerfile', 'Dockerfile*')).toBe(true)
+  })
 })
 
 describe('loadLaneScopes against the real fragments', () => {

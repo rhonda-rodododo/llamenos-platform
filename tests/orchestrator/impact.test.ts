@@ -38,4 +38,18 @@ describe('classifyImpact', () => {
   it('gives a reason for every high-impact verdict', () => {
     expect(classifyImpact(['packages/crypto/src/lib.rs'], 5).reasons.length).toBeGreaterThan(0)
   })
+
+  // G2: boundary-exact tests, so a `>` -> `>=` refactor cannot pass silently.
+  it('stays low at exactly the file-count threshold, and escalates one file past it', () => {
+    const atThreshold = Array.from({ length: 40 }, (_, i) => `src/client/x${i}.ts`)
+    expect(classifyImpact(atThreshold, 100).impact).toBe('low')
+
+    const overThreshold = Array.from({ length: 41 }, (_, i) => `src/client/x${i}.ts`)
+    expect(classifyImpact(overThreshold, 100).impact).toBe('high')
+  })
+
+  it('stays low at exactly the line-count threshold, and escalates one line past it', () => {
+    expect(classifyImpact(['src/client/a.ts'], 1500).impact).toBe('low')
+    expect(classifyImpact(['src/client/a.ts'], 1501).impact).toBe('high')
+  })
 })

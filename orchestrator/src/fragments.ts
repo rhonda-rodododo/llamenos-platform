@@ -98,28 +98,53 @@ export function parseOwnedPaths(markdown: string): LaneScope {
   return { owned, notOwned }
 }
 
+/** Turns a `*`-glob into an anchored RegExp where `*` matches within one path
+ *  segment only, never across `/` — a glob owned-path like `ios*.yml` must
+ *  not accidentally swallow a `/`. */
+function globToRegExp(pattern: string): RegExp {
+  const escaped = pattern
+    .split('*')
+    .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
+    .join('[^/]*')
+  return new RegExp(`^${escaped}$`)
+}
+
 /**
- * Owned-path patterns come straight from fragment prose and take three
+ * Owned-path patterns come straight from fragment prose and take four
  * shapes: a directory (`apps/ios/`, trailing slash — matches everything
  * beneath it), a glob (`Dockerfile*`, `.github/workflows/ios*.yml` — `*`
- * matches within one path segment, never across `/`), or a literal/prefix
- * path with no wildcard at all. The scope breaker (Task 8's `checkScope`)
- * used a bare `startsWith`, which judges `.github/workflows/ios-e2e.yml`
- * out-of-lane for the ios lane that owns `.github/workflows/ios*.yml` —
- * `*` was never translated into anything a prefix check understands.
+ * matches within one path segment, never across `/`), a bare filename with
+ * no `/` at all (`.env`, `knope.toml` — matches that name at ANY depth, not
+ * just at the repo root), or a literal/prefix path containing a `/` with no
+ * wildcard. The scope breaker (Task 8's `checkScope`) used a bare
+ * `startsWith`, which judges `.github/workflows/ios-e2e.yml` out-of-lane for
+ * the ios lane that owns `.github/workflows/ios*.yml` — `*` was never
+ * translated into anything a prefix check understands.
+ *
+ * The bare-filename case matters most for the never-write list: `.env` with
+ * a plain `startsWith(file, '.env')` only ever caught a `.env` sitting at
+ * the repo root, so a worker was free to write `apps/worker/config/.env` or
+ * `deploy/docker/.env` — exactly the secrets file the list exists to block,
+ * just one directory down. A pattern with no `/` is therefore compared
+ * against the file's last path segment (its basename) instead of the whole
+ * path: glob-matched if it contains `*`, otherwise `startsWith` on the
+ * basename — which deliberately still over-blocks lookalikes like
+ * `.environment` (a `.env`-prefixed basename). That over-block is the safe
+ * direction for a deny list and is left as-is; it only ever makes the never-
+ * write list MORE conservative, never less.
  */
 export function matchesPath(file: string, pattern: string): boolean {
+  if (!pattern.includes('/')) {
+    const basename = file.slice(file.lastIndexOf('/') + 1)
+    return pattern.includes('*') ? globToRegExp(pattern).test(basename) : basename.startsWith(pattern)
+  }
   if (pattern.endsWith('/')) {
     return file.startsWith(pattern)
   }
   if (!pattern.includes('*')) {
     return file.startsWith(pattern)
   }
-  const escaped = pattern
-    .split('*')
-    .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
-    .join('[^/]*')
-  return new RegExp(`^${escaped}$`).test(file)
+  return globToRegExp(pattern).test(file)
 }
 
 export async function loadLaneScopes(repoRoot: string): Promise<Record<string, LaneScope>> {
