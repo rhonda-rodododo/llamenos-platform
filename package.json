@@ -96,7 +96,7 @@
     "setup": "bash scripts/setup.sh",
     "cert-pins:extract": "bash scripts/extract-cert-pins.sh",
     "cert-pins:inject": "bun scripts/inject-cert-pins.ts",
-    "lint": "eslint src/ apps/worker/",
+    "lint": "eslint src/ apps/worker/ orchestrator/ tests/orchestrator/",
     "supervisors": "scripts/supervisors.sh",
     "supervisors:kill": "scripts/supervisors.sh --kill"
   },
