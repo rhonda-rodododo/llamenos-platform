@@ -48,7 +48,7 @@ export function checkBreakers(rows: RunRecord[], limits: Limits, now: number, re
 
 /** Lane-level backoff instead of a global halt: one provider's quota should not
  *  stop five other lanes that use a different one. */
-export function inQuotaCooldown(rows: RunRecord[], lane: string, now: number, cooldownMs = HOUR): boolean {
+export function inQuotaCooldown(rows: RunRecord[], lane: string, now: number, limits: Limits): boolean {
   const last = rows.filter((x) => x.lane === lane && x.outcome === 'QUOTA').sort((a, b) => b.ts - a.ts)[0]
-  return last !== undefined && now - last.ts < cooldownMs
+  return last !== undefined && now - last.ts < limits.quotaCooldownMs
 }

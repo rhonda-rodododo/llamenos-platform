@@ -1,7 +1,5 @@
 import { describe, it, expect } from 'vitest'
 import { haltedOnGitHubFrom } from '../../orchestrator/src/killswitch.js'
-import { execSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
 
 describe('haltedOnGitHubFrom', () => {
   it('halts when an open issue carries the halt label', () => {

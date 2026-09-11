@@ -42,12 +42,19 @@ describe('failureBreaker', () => {
 
 describe('inQuotaCooldown', () => {
   it('sits the lane out after a quota outcome', () => {
-    expect(inQuotaCooldown([r('QUOTA', 1000, 'ios')], 'ios', 1000 + 60_000)).toBe(true)
+    expect(inQuotaCooldown([r('QUOTA', 1000, 'ios')], 'ios', 1000 + 60_000, LIMITS)).toBe(true)
   })
   it('releases the lane after the cooldown', () => {
-    expect(inQuotaCooldown([r('QUOTA', 1000, 'ios')], 'ios', 1000 + 3_700_000)).toBe(false)
+    expect(inQuotaCooldown([r('QUOTA', 1000, 'ios')], 'ios', 1000 + 3_700_000, LIMITS)).toBe(false)
   })
   it('is per-lane, not global', () => {
-    expect(inQuotaCooldown([r('QUOTA', 1000, 'ios')], 'backend', 1000 + 60_000)).toBe(false)
+    expect(inQuotaCooldown([r('QUOTA', 1000, 'ios')], 'backend', 1000 + 60_000, LIMITS)).toBe(false)
+  })
+  it('honours a non-default cooldown value from limits', () => {
+    const shortCooldown = { ...LIMITS, quotaCooldownMs: 30_000 }
+    // 60s after the QUOTA outcome: still inside the default 1h cooldown, but
+    // past this limits object's 30s cooldown — proves the value actually read
+    // is limits.quotaCooldownMs, not a hardcoded default.
+    expect(inQuotaCooldown([r('QUOTA', 1000, 'ios')], 'ios', 1000 + 60_000, shortCooldown)).toBe(false)
   })
 })
