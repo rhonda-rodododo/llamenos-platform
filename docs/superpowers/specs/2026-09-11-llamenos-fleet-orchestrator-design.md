@@ -258,71 +258,93 @@ Eight, each a file, each asserted by a test rather than promised by a comment.
    before briefing it** and abort if the answer is wrong. A flag that is
    accepted and ignored is indistinguishable from one that works, unless you
    ask. Work is salvaged to a pushed branch before teardown on every outcome.
-7. **Lane modes** (`config.ts`). `off | shadow | live`, a hand edit, one lane at
-   a time. `shadow` reads and reports and dispatches nothing. **Every lane
-   starts `off`.** The dry period is not a formality; it is how we find out what
-   the fleet would have done before it does it.
+7. **Lane modes** (`config.ts`). `off | shadow | live`. `shadow` reads and
+   reports and dispatches nothing. **Lane mode and merge gate are separate
+   dials**: a `live` lane *dispatches*; it does not thereby *merge*. A live lane
+   doing crypto work still stops at human review (§5.8).
+
+   Ramp: **one shadow pass** (~30 minutes), then all six lanes go `live`
+   together at cap 1. The shadow pass answers exactly one question — *did the
+   generated scope paths come out right?* — which is cheap to ask and expensive
+   to skip, because six lanes with wrong scopes is precisely the overwriting
+   failure the design exists to prevent. It is not a trust-building exercise;
+   the reference system's scars are already encoded as rails.
 8. **A live lane must have a write scope.** A lane with empty `scopePaths` gives
    the scope breaker nothing to compare against. Asserted in a test that refuses
    to let such a lane be `live`.
 
 ### 5.6 Agent-to-agent messaging
 
-Two tiers, one protocol.
+Two tiers: **GitHub at rest, orchestrator relay at runtime.**
 
-**At rest — a durable mailbox in git.** `.claude/coordination/` is promoted from
-prose convention to a real protocol:
+**At rest — GitHub.** Messages between agents are issue comments. An issue is a
+thread; a cross-domain conversation is an issue carrying both lane labels.
+
+An earlier draft of this spec put the durable mailbox in git, under
+`.claude/coordination/inbox/`. That was wrong, and the reason is worth recording
+so it is not re-proposed: **every worker runs in its own worktree.** A message
+committed in worktree A is invisible in worktree B until it is pushed and
+pulled, so a git mailbox silently assumes a shared filesystem that does not
+exist. Making it work would require constant push/pull against a coordination
+branch, and the specified append-at-top format for `blockers.md` would put a
+three-way merge on the hot path of every message with six concurrent lanes.
+
+GitHub is better on every axis that matters here: writes are append-only
+server-side and therefore conflict-free; every worker can read it regardless of
+worktree; it adds no network dependency the fleet does not already have, since
+it needs `gh` for PRs; it is searchable; and — the property no git-based
+design can offer — **a human can read and answer in the same channel from a
+phone.**
+
+Message convention, as a comment body prefix so threads stay machine-parseable:
 
 ```
-.claude/coordination/
-  STATUS.md                      per-domain current state (exists, unused)
-  blockers.md                    escalation log (exists, unused)
-  contracts/                     inter-domain interface contracts (empty)
-  inbox/<role>/<ts>-<from>.md    NEW — durable messages
+<!-- fleet: from=<role>/<lane> to=<role>/<lane> needs=reply|ack|none ref=<sha|pr> -->
 ```
-
-Each message carries front-matter: `from`, `to`, `subject`, `ref` (issue/PR/sha),
-`needs: reply | ack | none`, `thread`. Messages are **committed**, which buys
-three properties nothing else does: they survive every process death, they are
-reviewable in a PR like any other change, and an agent joining a conversation
-late gets the entire history rather than a summary of it.
-
-`blockers.md` becomes machine-read. An unresolved blocker older than **12 hours** (one digest cycle)
-is what populates the digest's "waiting on a human" section — a section the
-reference system renders but always passes an empty array, i.e. dead code in the
-one place a human most needs to look.
 
 **At runtime — the orchestrator as relay** (`relay.ts`). Workers are named,
 long-lived sessions and the orchestrator already holds a send channel to each.
 A worker addresses a peer by role; the orchestrator delivers into that peer's
-next turn, with the mailbox as write-behind so a message to a worker that has
-already exited still lands and is picked up by its successor.
+next turn, with a GitHub comment as write-behind so a message to a worker that
+has already exited still lands and is picked up by its successor.
 
-The concrete thing this buys is the **review loop**. Today a rejected run is
-discarded entirely and a human must rescue it. Here the reviewer's verdict
-returns to the author, who fixes and resubmits — bounded at **two rounds**,
-after which the item goes to a human. A bounded loop is the difference between
-iteration and a spiral.
+The concrete thing the relay buys is the **review loop**. In the reference
+system a rejected run is discarded entirely and a human must rescue it. Here the
+reviewer's verdict returns to the author, who fixes and resubmits — bounded at
+**two rounds**, after which the item goes to a human. A bounded loop is the
+difference between iteration and a spiral.
 
 ### 5.7 Shared memory
 
-Three layers, each with exactly one writer:
+Split by what the data *is*, not by convenience. The test is whether a reader
+needs the value **as of now** or **as of a commit**.
 
-| Layer | Writer | Readers | Contains |
+| Layer | Where | Writer | Why there |
 |---|---|---|---|
-| Ledger (`runs.jsonl`) | orchestrator | digest, breakers, briefs | outcome history per item |
-| `coordination/STATUS.md` | each supervisor, own section | all | current state per domain |
-| `coordination/contracts/` | the domain that owns the interface | consumers | cross-domain interface contracts |
+| Messages, blockers | GitHub issues/comments | any role | Realtime, conflict-free, human-participable |
+| Per-domain status | **Derived** from the Projects board + ledger | nobody | A file six agents rewrite to restate what the board already knows is a conflict generator with no readers |
+| Interface contracts | `.claude/coordination/contracts/` **in git** | the domain owning the interface | Must be true *at a commit* |
+| Run ledger | `~/.llamenos-fleet/runs.jsonl` | orchestrator | High write rate, machine-only |
 
-`memory.ts` augments every brief with what is already known about that item:
-prior attempts and why they failed, the reviewer's last verdict, any contract
-that governs the files it is about to touch. This closes the reference system's
-sharpest gap — there, the ledger is written by the orchestrator and read by
-nothing that briefs a worker, so every run starts from zero.
+**Contracts stay in git, and this is the one exception worth defending.** A
+contract says "the backend's API shape is X, so iOS and Android must match". It
+must be true at a given commit, and it must change *in the PR that changes the
+interface*, reviewed alongside it. A contract living in a GitHub comment is read
+by a worker checked out at an older commit as a description of code that worker
+does not have. Everything else in this table benefits from being live; this one
+benefits from being pinned. `contracts/` is currently an empty `.gitkeep` and is
+the obvious home for the cross-platform coupling this monorepo generates
+constantly.
 
-`contracts/` is currently an empty `.gitkeep` and is the obvious home for the
-cross-platform coupling this monorepo generates constantly: the backend changes
-an API shape, and iOS, Android and desktop must follow.
+Consequently `.claude/coordination/STATUS.md` and `blockers.md` are **deleted**
+— they are conventions that were never used, and both are better served by the
+board and by labelled issues.
+
+`memory.ts` augments every brief with what is already known about the item:
+prior attempts and why they failed, the reviewer's last verdict, and any
+contract governing the files it is about to touch. This closes the reference
+system's sharpest gap — there, the ledger is written by the orchestrator and
+read by nothing that briefs a worker, so every run starts from zero.
 
 ### 5.8 Merge policy
 
@@ -473,3 +495,6 @@ a one-line ask. That ask is what the blocked ping carries.
 | iOS pipeline | Wire CI properly (Environments + Apple secrets + real match repo) |
 | First backend | Staging instance with a mandatory warning banner; FDE production deferred to Wave 4 |
 | Telephony | Simulated for IA; real PSTN later |
+| Agent messaging at rest | GitHub issue comments, not a git mailbox — workers do not share a filesystem |
+| Shared memory | Contracts in git (true *at a commit*); everything else on GitHub or derived |
+| Ramp | One shadow pass, then all six lanes live at cap 1 |
