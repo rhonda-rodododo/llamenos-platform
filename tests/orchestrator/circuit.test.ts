@@ -38,6 +38,20 @@ describe('failureBreaker', () => {
     const rows = [r('FAILED', 1), r('FAILED', 2), r('FAILED', 3)]
     expect(failureBreaker(rows, LIMITS, 100)).toBeUndefined()
   })
+  it('trips on three consecutive REJECTED outcomes', () => {
+    // REJECTED means a worker's output failed verification — that is exactly
+    // the fleet misbehaving, so it must be able to trip the breaker.
+    const rows = [r('REJECTED', 1), r('REJECTED', 2), r('REJECTED', 3)]
+    expect(failureBreaker(rows, LIMITS, 0)).toMatch(/consecutive/i)
+  })
+  it('does not trip on three consecutive BLOCKED outcomes', () => {
+    // BLOCKED means a worker correctly reported it cannot proceed (e.g. a
+    // scope conflict) — that is the system working as designed, and the
+    // per-item attempt limit already bounds it, so it must not also feed a
+    // fleet-wide halt the way REJECTED does.
+    const rows = [r('BLOCKED', 1), r('BLOCKED', 2), r('BLOCKED', 3)]
+    expect(failureBreaker(rows, LIMITS, 0)).toBeUndefined()
+  })
 })
 
 describe('inQuotaCooldown', () => {

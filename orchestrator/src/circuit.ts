@@ -10,8 +10,18 @@ export interface Limits {
 
 const HOUR = 3_600_000
 
-/** QUOTA is excluded: a provider rate limit is not the fleet misbehaving. */
-const STREAK_FAILURES: ReadonlySet<Outcome> = new Set<Outcome>(['FAILED', 'TIMEOUT'])
+/**
+ * QUOTA is excluded: a provider rate limit is not the fleet misbehaving.
+ *
+ * REJECTED counts toward the streak; BLOCKED deliberately does not. REJECTED
+ * means a worker's output failed verification — three of those in a row is
+ * exactly the fleet misbehaving, which is what this breaker exists to catch.
+ * BLOCKED means a worker correctly reported it cannot proceed (e.g. a scope
+ * conflict) — that is the system working as designed, and the per-item
+ * attempt limit (see ledger.ts's failedAttemptsFor) already bounds it, so it
+ * must not also feed a fleet-wide halt.
+ */
+const STREAK_FAILURES: ReadonlySet<Outcome> = new Set<Outcome>(['FAILED', 'TIMEOUT', 'REJECTED'])
 const STREAK_RESETS: ReadonlySet<Outcome> = new Set<Outcome>(['SUCCESS', 'SHADOW'])
 
 export function rateBreaker(rows: RunRecord[], limits: Limits, now: number): string | undefined {
