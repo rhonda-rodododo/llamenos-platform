@@ -53,8 +53,9 @@ Two further facts shape the design:
    wrong.
 2. Distinct roles with real division of labour, not one implementer plus a
    critic.
-3. Agent-to-agent messaging that works both **at runtime** (a live peer) and
-   **at rest** (a peer that does not exist yet, or is already gone).
+3. Agent-to-agent messaging carried entirely on GitHub — issue comments for
+   work items, PR reviews for diffs — so that agents and humans share one
+   channel and no second system needs keeping in sync.
 4. Shared memory that survives process death, is reviewable, and actually feeds
    back into what the next agent is told.
 5. A burn-down that ends with a non-technical volunteer using the app.
@@ -134,9 +135,8 @@ the reference system's proven decomposition:
 | `src/killswitch.ts` | File switch and phone-reachable issue switch |
 | `src/lock.ts` | One scheduler, pidfile with liveness probe |
 | `src/ledger.ts` | Append-only JSONL run records |
-| `src/mailbox.ts` | **New** — durable agent-to-agent messages |
-| `src/relay.ts` | **New** — runtime message delivery between live sessions |
-| `src/memory.ts` | **New** — shared memory read/write, brief augmentation |
+| `src/memory.ts` | **New** — brief augmentation from ledger, contracts and prior reviews |
+| `src/review.ts` | **New** — emit and read back PR reviews; the bounded review loop |
 | `src/digest.ts` | Rendering |
 | `src/notify.ts` | Delivery |
 | `systemd/` | tick timer, digest timer, engine-server unit |
@@ -275,44 +275,56 @@ Eight, each a file, each asserted by a test rather than promised by a comment.
 
 ### 5.6 Agent-to-agent messaging
 
-Two tiers: **GitHub at rest, orchestrator relay at runtime.**
+**GitHub is the channel. There is no separate message bus.**
 
-**At rest — GitHub.** Messages between agents are issue comments. An issue is a
-thread; a cross-domain conversation is an issue carrying both lane labels.
+Three surfaces, each matched to what the message is *about*, so a message always
+lands anchored to the artifact it concerns:
 
-An earlier draft of this spec put the durable mailbox in git, under
-`.claude/coordination/inbox/`. That was wrong, and the reason is worth recording
-so it is not re-proposed: **every worker runs in its own worktree.** A message
-committed in worktree A is invisible in worktree B until it is pushed and
-pulled, so a git mailbox silently assumes a shared filesystem that does not
-exist. Making it work would require constant push/pull against a coordination
-branch, and the specified append-at-top format for `blockers.md` would put a
-three-way merge on the hot path of every message with six concurrent lanes.
+| Message is about | Surface | Why |
+|---|---|---|
+| A work item — planner→implementer, cross-domain ask, "I need X before I can do Y" | **Issue comments** on that item | The item is the thread |
+| A diff — the review loop | **PR reviews**, with inline comments | Anchored to the lines in question, carries `APPROVE` / `REQUEST_CHANGES` as machine-readable state, and threads resolve |
+| Fleet-wide state — halt, breaker trip | **The pinned control issue** | One place, phone-readable |
 
-GitHub is better on every axis that matters here: writes are append-only
-server-side and therefore conflict-free; every worker can read it regardless of
-worktree; it adds no network dependency the fleet does not already have, since
-it needs `gh` for PRs; it is searchable; and — the property no git-based
-design can offer — **a human can read and answer in the same channel from a
-phone.**
+**The review loop is a real PR review, not a synthesised message.** The reviewer
+role emits `gh pr review --request-changes` or `--approve` with inline comments
+on specific lines; the author reads them back via the reviews API and revises.
+Bounded at **two rounds**, then a human.
 
-Message convention, as a comment body prefix so threads stay machine-parseable:
+This is materially better than the custom channel two drafts of this spec
+proposed, for a reason that generalises: the reviewer's output is now *the same
+artifact a human reviewer would produce*. You can open the PR, read the
+machine's review inline next to the code, and reply in the same thread — and
+your reply is in the channel the author already reads. No bridging, no
+translation, no second system that has to be kept in sync with the one
+everybody actually looks at.
+
+**Two designs are deliberately cut here**, and the reasoning is recorded so they
+are not re-proposed:
+
+- *A git-based mailbox under `.claude/coordination/inbox/`.* Every worker runs
+  in its own worktree, so a committed message is invisible to peers until pushed
+  and pulled. It silently assumed a shared filesystem that does not exist, and
+  the append-at-top `blockers.md` format would have put a three-way merge on the
+  hot path of every message with six concurrent lanes.
+- *A runtime relay (`relay.ts`) delivering messages between live sessions.* On
+  inspection it buys nothing. A worker is inside one long turn — up to 60
+  minutes — and cannot act on a message until that turn ends, so sub-second
+  delivery has no consumer. Between turns, polling GitHub is equivalent. The
+  only genuine need is the orchestrator telling a worker something, and that is
+  the send channel it already has. `relay.ts` and `mailbox.ts` are dropped from
+  the file map; where the orchestrator needs to wake a worker, it sends on the
+  existing channel and points at the GitHub thread.
+
+That leaves the messaging layer as a thin convention over `gh` rather than a
+subsystem — which is the correct size for it.
+
+Comment bodies carry a machine-parseable prefix so threads can be read back
+without prose parsing:
 
 ```
 <!-- fleet: from=<role>/<lane> to=<role>/<lane> needs=reply|ack|none ref=<sha|pr> -->
 ```
-
-**At runtime — the orchestrator as relay** (`relay.ts`). Workers are named,
-long-lived sessions and the orchestrator already holds a send channel to each.
-A worker addresses a peer by role; the orchestrator delivers into that peer's
-next turn, with a GitHub comment as write-behind so a message to a worker that
-has already exited still lands and is picked up by its successor.
-
-The concrete thing the relay buys is the **review loop**. In the reference
-system a rejected run is discarded entirely and a human must rescue it. Here the
-reviewer's verdict returns to the author, who fixes and resubmits — bounded at
-**two rounds**, after which the item goes to a human. A bounded loop is the
-difference between iteration and a spiral.
 
 ### 5.7 Shared memory
 
@@ -322,6 +334,7 @@ needs the value **as of now** or **as of a commit**.
 | Layer | Where | Writer | Why there |
 |---|---|---|---|
 | Messages, blockers | GitHub issues/comments | any role | Realtime, conflict-free, human-participable |
+| Review feedback | GitHub PR reviews (inline) | reviewer role | Anchored to the diff; identical to what a human reviewer produces |
 | Per-domain status | **Derived** from the Projects board + ledger | nobody | A file six agents rewrite to restate what the board already knows is a conflict generator with no readers |
 | Interface contracts | `.claude/coordination/contracts/` **in git** | the domain owning the interface | Must be true *at a commit* |
 | Run ledger | `~/.llamenos-fleet/runs.jsonl` | orchestrator | High write rate, machine-only |
@@ -495,6 +508,6 @@ a one-line ask. That ask is what the blocked ping carries.
 | iOS pipeline | Wire CI properly (Environments + Apple secrets + real match repo) |
 | First backend | Staging instance with a mandatory warning banner; FDE production deferred to Wave 4 |
 | Telephony | Simulated for IA; real PSTN later |
-| Agent messaging at rest | GitHub issue comments, not a git mailbox — workers do not share a filesystem |
+| Agent messaging | GitHub only: issue comments for items, PR reviews for diffs. No custom bus — a git mailbox assumed a shared filesystem, and a runtime relay had no consumer |
 | Shared memory | Contracts in git (true *at a commit*); everything else on GitHub or derived |
 | Ramp | One shadow pass, then all six lanes live at cap 1 |
