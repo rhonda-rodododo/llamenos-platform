@@ -24,7 +24,12 @@
 - **No `any`.** CLAUDE.md forbids it. Use `unknown` plus narrowing at boundaries.
 - **A source read that fails returns `undefined`, never `[]`.** An empty backlog and an unreadable backlog must be distinguishable at every layer. A pass that cannot read its source aborts.
 - **All fleet state lives under `~/.llamenos-fleet/`.** Never write state into the repo except worktrees at `.fleet-worktrees/` (gitignored).
-- **Every lane's initial mode is `off`.** Modes change by hand edit only.
+- **Every lane's initial mode is `off`.** Modes live in runtime state at
+  `~/.llamenos-fleet/lanes.json`, never in `config.ts` — `orchestrator/` is
+  human-gated, and a dial that needs a reviewed PR to turn is not a dial.
+  An absent or unparseable file means every lane is off.
+- **Rail 8 is enforced, not just tested.** `loadLanes()` throws if any
+  non-`off` lane has an empty `owned` list.
 - **`orchestrator/` and `tests/orchestrator/` are high-impact**; the fleet may never merge changes to them. Encode this in `impact.ts` from the first version.
 - **Workers never receive store, signing, deploy, or telephony credentials.**
 - Tests live in `tests/orchestrator/` and run via `bun run test:fleet`.
@@ -627,6 +632,7 @@ git commit -m "feat(fleet): single-scheduler pidfile lock with liveness probe"
 import { describe, it, expect } from 'vitest'
 import { haltedOnGitHubFrom } from '../../orchestrator/src/killswitch.js'
 import { execSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 
 describe('haltedOnGitHubFrom', () => {
   it('halts when an open issue carries the halt label', () => {
@@ -1127,7 +1133,37 @@ git commit -m "feat(fleet): lane scope and never-write enforcement over diffs"
 ```ts
 // tests/orchestrator/config.test.ts
 import { describe, it, expect } from 'vitest'
-import { LANES, LIMITS, NEVER_WRITE_PATHS, MAX_ATTEMPTS_PER_ITEM } from '../../orchestrator/src/config.js'
+import { LANES, LIMITS, NEVER_WRITE_PATHS, MAX_ATTEMPTS_PER_ITEM, assertLiveLanesHaveScope } from '../../orchestrator/src/config.js'
+import type { Lane } from '../../orchestrator/src/config.js'
+
+describe('assertLiveLanesHaveScope', () => {
+  const lane = (mode: Lane['mode'], owned: string[]): Lane => ({
+    id: 'ios', mode, cap: 1, engine: 'claude',
+    requireLabel: 'agent-dispatchable', vetoLabels: [],
+    scope: { owned, notOwned: [] },
+  })
+
+  it('throws when a live lane has no owned paths', () => {
+    expect(() => assertLiveLanesHaveScope([lane('live', [])])).toThrow(/no owned paths|write scope/i)
+  })
+
+  it('throws when a shadow lane has no owned paths', () => {
+    expect(() => assertLiveLanesHaveScope([lane('shadow', [])])).toThrow()
+  })
+
+  it('permits an off lane with no owned paths', () => {
+    expect(() => assertLiveLanesHaveScope([lane('off', [])])).not.toThrow()
+  })
+
+  it('permits a live lane with owned paths', () => {
+    expect(() => assertLiveLanesHaveScope([lane('live', ['apps/ios/'])])).not.toThrow()
+  })
+
+  it('names the offending lane and its fragment in the error', () => {
+    expect(() => assertLiveLanesHaveScope([lane('live', [])]))
+      .toThrow(/ios-supervisor\.md/)
+  })
+})
 
 describe('config', () => {
   it('defines exactly the six domain lanes', () => {
@@ -1135,7 +1171,7 @@ describe('config', () => {
       .toEqual(['android', 'backend', 'desktop', 'infra', 'ios', 'shared'])
   })
 
-  it('starts every lane off', () => {
+  it('defaults every lane to off', () => {
     expect(LANES.every((l) => l.mode === 'off')).toBe(true)
   })
 
@@ -1176,7 +1212,10 @@ Expected: FAIL — module not found.
 
 ```ts
 // orchestrator/src/config.ts
+import { existsSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { loadLaneScopes, type LaneScope } from './fragments.js'
+import { FLEET_DIR } from './paths.js'
 import type { Limits } from './circuit.js'
 
 export type LaneMode = 'off' | 'shadow' | 'live'
@@ -1203,7 +1242,7 @@ export const LANE_IDS = ['backend', 'shared', 'desktop', 'ios', 'android', 'infr
  */
 export const LANES: Lane[] = LANE_IDS.map((id) => ({
   id,
-  mode: 'off',                       // every lane starts off; mode is a hand edit
+  mode: 'off',                       // DEFAULT only — real mode comes from readLaneModes()
   cap: 1,
   engine: 'claude',
   requireLabel: 'agent-dispatchable',
@@ -1211,9 +1250,60 @@ export const LANES: Lane[] = LANE_IDS.map((id) => ({
   scope: { owned: [], notOwned: [] },
 }))
 
+export const LANE_MODES_FILE = join(FLEET_DIR, 'lanes.json')
+
+/**
+ * Modes live in runtime state, NOT in this source file. Two reasons: a dial
+ * meant to be turned must not sit behind the merge gate (orchestrator/ is
+ * high-impact, so editing it would require a human-gated PR to change a lane
+ * from off to shadow), and a mode baked into source makes the "every lane
+ * starts off" test false the moment anyone turns one on.
+ *
+ * Unknown lane ids and unreadable files both yield the default: off.
+ */
+export function readLaneModes(): Record<string, LaneMode> {
+  if (!existsSync(LANE_MODES_FILE)) return {}
+  try {
+    const raw: unknown = JSON.parse(readFileSync(LANE_MODES_FILE, 'utf8'))
+    if (typeof raw !== 'object' || raw === null) return {}
+    const out: Record<string, LaneMode> = {}
+    for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+      if (v === 'off' || v === 'shadow' || v === 'live') out[k] = v
+    }
+    return out
+  } catch {
+    return {}
+  }
+}
+
+/**
+ * Rail 8, ENFORCED rather than merely tested. A live lane with an empty owned
+ * list gives the scope breaker nothing to compare a diff against — it is not a
+ * lane with wide permissions, it is a lane with no permission check at all.
+ * Throwing at load is the safe direction: a startup failure beats a silent
+ * unscoped dispatch.
+ */
+export function assertLiveLanesHaveScope(lanes: Lane[]): void {
+  for (const l of lanes) {
+    if (l.mode !== 'off' && l.scope.owned.length === 0) {
+      throw new Error(
+        `lane "${l.id}" is ${l.mode} but parsed no owned paths from ` +
+        `.claude/agents/fragments/${l.id}-supervisor.md — refusing to run without a write scope`,
+      )
+    }
+  }
+}
+
 export async function loadLanes(repoRoot: string): Promise<Lane[]> {
   const scopes = await loadLaneScopes(repoRoot)
-  return LANES.map((l) => ({ ...l, scope: scopes[l.id] ?? { owned: [], notOwned: [] } }))
+  const modes = readLaneModes()
+  const lanes = LANES.map((l) => ({
+    ...l,
+    mode: modes[l.id] ?? l.mode,
+    scope: scopes[l.id] ?? { owned: [], notOwned: [] },
+  }))
+  assertLiveLanesHaveScope(lanes)
+  return lanes
 }
 
 /** Binds every lane, including one with an empty owned list. */
@@ -1896,20 +1986,23 @@ read this one file and see every safety property in one place.
 ```ts
 // tests/orchestrator/guards.test.ts
 import { describe, it, expect } from 'vitest'
-import { LANES, NEVER_WRITE_PATHS, loadLanes } from '../../orchestrator/src/config.js'
+import { LANES, NEVER_WRITE_PATHS, loadLanes, assertLiveLanesHaveScope } from '../../orchestrator/src/config.js'
 import { classifyImpact, HIGH_IMPACT_PATHS } from '../../orchestrator/src/impact.js'
 import { checkScope } from '../../orchestrator/src/scope.js'
 import { haltedOnGitHubFrom } from '../../orchestrator/src/killswitch.js'
 import { execSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 
 describe('rail: a live lane must have a write scope', () => {
-  it('refuses to let a live lane carry an empty owned list', async () => {
-    const lanes = await loadLanes(process.cwd())
-    for (const l of lanes) {
-      if (l.mode === 'live') {
-        expect(l.scope.owned.length, `lane ${l.id} is live with no scope`).toBeGreaterThan(0)
-      }
-    }
+  // Asserted against a synthetic lane, not the live config: every configured
+  // lane defaults to `off`, so looping over them would execute no assertion at
+  // all — a test that passes by never running its check.
+  it('throws rather than running a live lane with an empty scope', () => {
+    expect(() => assertLiveLanesHaveScope([{
+      id: 'ios', mode: 'live', cap: 1, engine: 'claude',
+      requireLabel: 'agent-dispatchable', vetoLabels: [],
+      scope: { owned: [], notOwned: [] },
+    }])).toThrow()
   })
 
   it('parses a non-empty scope for every configured lane', async () => {
@@ -1970,6 +2063,15 @@ describe('rail: every lane starts off', () => {
     expect(LANES.filter((l) => l.mode !== 'off')).toHaveLength(0)
   })
 })
+
+describe('rail: lane modes are runtime state, not source', () => {
+  it('does not require editing orchestrator source to turn a dial', () => {
+    // orchestrator/ is high-impact and human-gated. If mode lived in
+    // config.ts, changing a lane from off to shadow would need a reviewed PR.
+    const src = readFileSync('orchestrator/src/config.ts', 'utf8')
+    expect(src).toContain('LANE_MODES_FILE')
+  })
+})
 ```
 
 - [ ] **Step 2: Run the guards**
@@ -2007,7 +2109,7 @@ import { acquire } from './lock.js'
 import { checkHalt, halt, resume, haltedLocally } from './killswitch.js'
 import { readAll, append, since } from './ledger.js'
 import { readResumedAt } from './circuit.js'
-import { loadLanes, LIMITS } from './config.js'
+import { loadLanes, LIMITS, LANE_MODES_FILE } from './config.js'
 import { GitHubSource } from './source.js'
 import { tick, type TickDeps } from './tick.js'
 import { FLEET_DIR, LOG_FILE, HALT_REASON_FILE } from './paths.js'
@@ -2058,6 +2160,7 @@ async function doctor(): Promise<number> {
   }
   const modes = lanes.map((l) => `${l.id}=${l.mode}`).join(' ')
   process.stdout.write(`\nlanes: ${modes}\n`)
+  process.stdout.write(`lane modes file: ${LANE_MODES_FILE}${existsSync(LANE_MODES_FILE) ? '' : ' (absent — all lanes off)'}\n`)
   return bad === 0 ? 0 : 1
 }
 
@@ -2212,14 +2315,24 @@ WantedBy=timers.target
 
 - [ ] **Step 2: Put one lane into shadow and run a pass by hand**
 
-Edit `orchestrator/src/config.ts` and set the `backend` lane's `mode` to `'shadow'`.
+Modes are runtime state, not source — never edit `config.ts` to turn a dial:
+
+```bash
+mkdir -p ~/.llamenos-fleet
+echo '{"backend":"shadow"}' > ~/.llamenos-fleet/lanes.json
+```
 
 Run: `llamenos-fleet tick`
 Expected: a JSON line reporting `ran: true`, `dispatched: 0`, and either `shadowed: N` or a rejection histogram. **`dispatched` must be 0.**
 
 - [ ] **Step 3: Put all six lanes into shadow and run again**
 
-Set every lane's `mode` to `'shadow'`. Run `llamenos-fleet tick` and read the log at `~/.llamenos-fleet/fleet.log`.
+```bash
+echo '{"backend":"shadow","shared":"shadow","desktop":"shadow","ios":"shadow","android":"shadow","infra":"shadow"}' \
+  > ~/.llamenos-fleet/lanes.json
+```
+
+Run `llamenos-fleet tick` and read the log at `~/.llamenos-fleet/fleet.log`.
 
 Confirm, and record the answers in the commit message:
 1. Every lane reports scope paths matching its fragment's "Owned paths".
@@ -2245,7 +2358,7 @@ Expected: a real NEXT time, **never `infinity`** or an empty column.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add orchestrator/systemd orchestrator/README.md orchestrator/src/config.ts
+git add orchestrator/systemd orchestrator/README.md
 git commit -m "feat(fleet): systemd timer and first shadow pass"
 ```
 
