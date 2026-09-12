@@ -431,28 +431,31 @@ published rates are $1.40/$4.40 per 1M in/out for `glm-5.3` and $0.075/$0.25 for
 
 ## Llamenos Worker Rules (paste into every worker prompt)
 
-# Project Rules: Llamenos Hotline
+# Project Rules: Llámenos Platform
 
-Paste this block into the "Rules you must follow" section of worker prompts for Llamenos Hotline.
+Paste this block into the "Rules you must follow" section of worker prompts for the Llámenos
+platform monorepo (`llamenos-platform` on GitHub; local directory name `llamenos`). This is
+the current multi-platform monorepo — it is a different repo from the retired `llamenos-hotline`
+v1 project; do not mix their paths, remotes, or scripts.
 
 ## Dispatch invocation (for supervisors)
 
 ```bash
-DISPATCH_REPO=/media/rikki/Main/projects/llamenos-hotline \
+DISPATCH_REPO=/media/rikki/Main/projects/llamenos \
 WORKTREE_BASE=/media/rikki/Main/projects \
   ~/.claude/skills/supervising-dispatched-sessions/dispatch-one.sh <name> <prompt-file> [timeout] [model]
 ```
 
-Prefix names with `lh-` to disambiguate from other projects in status.sh output.
+Prefix names with `ll-` to disambiguate from other projects in status.sh output.
 
 ---
 
-## Llamenos Hotline Worker Rules
+## Llámenos Platform Worker Rules
 
 ### Git & Worktrees
-- **Always work in your worktree** — never `cd` to or `git checkout` in `/media/rikki/Main/projects/llamenos-hotline` (the main repo).
-- **Worktrees live at** `/media/rikki/Main/projects/llamenos-hotline-<name>`.
-- **GitHub remote:** `git@github.com:rhonda-rodododo/llamenos-hotline.git`
+- **Always work in your worktree** — never `cd` to or `git checkout` in `/media/rikki/Main/projects/llamenos` (the main repo).
+- **Worktrees live at** `/media/rikki/Main/projects/llamenos-<name>`.
+- **GitHub remote:** `git@github.com:rhonda-rodododo/llamenos-platform.git`
 
 ### Push & PR Creation (GitHub)
 ```bash
@@ -470,7 +473,7 @@ Use `gh` CLI for PR operations. Poll `gh pr view <n> --json statusCheckRollup` f
 
 ### Build + Test Verification (ALL tiers, MANDATORY before pushing)
 
-Run **all four test tiers**, not just typecheck+build. CI is not the test runner.
+Run **all applicable test tiers**, not just typecheck+build. CI is not the test runner.
 
 ```bash
 # 1. Build verification
@@ -479,25 +482,26 @@ bun run lint
 bun run build
 
 # 2. Unit tests (fast, no services needed)
-bun run test:unit
+bun run test:worker:unit
 
-# 3. Integration tests (need postgres — start with bun run dev:docker)
-bun run dev:docker   # if not already up
-bunx playwright test tests/api/ --grep "integration" --workers=1
+# 3. Integration tests (need PostgreSQL — start backing services first per CLAUDE.md)
+docker compose -f deploy/docker/docker-compose.dev.yml up -d   # PostgreSQL, RustFS
+bun run test:worker:integration
 
-# 4. API E2E tests (need running server)
+# 4. Backend BDD (against a real running server + real authenticated API — see CLAUDE.md)
 bun run dev:server &  # if not already up
-bunx playwright test tests/api/ --workers=1
+bun run test:backend:bdd
 
-# 5. UI E2E tests (need running server + browser)
-bunx playwright test <targeted-ui-specs> --workers=1
+# 5. Targeted desktop E2E (Playwright) — target specs that touch your changes
+PLAYWRIGHT_TEST=true bunx playwright test <targeted-spec-path> --workers=1
 ```
 
-- **Start dev services first:** `bun run dev:docker`, then `bun run dev:server`. Confirm `curl -sf http://localhost:3000/api/health` → 200.
-- **Target specs that touch your changes** — don't run the full suite unless you changed shared infrastructure.
-- If shared state was touched (routes, fixtures, portals, IDB, crypto worker, types/schemas), run a **broader slice with 3 workers**:
+- **Start dev services first:** `docker compose -f deploy/docker/docker-compose.dev.yml up -d`, then `bun run dev:server`. Confirm `curl -sf http://localhost:3000/api/health/ready` → 200.
+  (`bun run test:docker:up` / `test:docker:down` builds and runs the app inside Docker against the CI compose overlay — use that instead when you need to validate the containerized build itself, not for routine local iteration.)
+- **NEVER use `deploy/docker/docker-compose.yml` alone for local dev/testing** — it bundles the app into an image that won't reflect code changes until rebuilt. Use `docker-compose.dev.yml` (backing services) + `bun run dev:server` (app with file watching).
+- **Don't run the full suite unless you changed shared infrastructure.** If shared state was touched (routes, schemas, crypto, protocol types), run a broader slice:
   ```bash
-  PLAYWRIGHT_WORKERS=3 bunx playwright test tests/api/ tests/ui/ --reporter=list
+  PLAYWRIGHT_TEST=true bunx playwright test --workers=3 --reporter=list
   ```
 - If anything fails, diagnose root cause. No blind patches.
 
@@ -512,12 +516,12 @@ bunx playwright test <targeted-ui-specs> --workers=1
 - **If blocked >60 min**, write `status: BLOCKED` and exit. Never push broken code. Exhaust alternative approaches before giving up.
 
 ### Test Fixture Maintenance (CRITICAL)
-- **When you change types, schemas, or wire formats:** grep ALL test files (`tests/`, `*.test.ts`) for stubs/fixtures that construct the old shape. Update them in the SAME commit/PR. Never defer test fixture updates to a follow-up.
-- **Refactors that touch shared types are not done until every test stub matches.** A PR that changes `RecipientEnvelope` from `{wrappedKey, ephemeralPubkey}` to `{v, labelId, enc, ct}` MUST also update every test that creates a `RecipientEnvelope` stub.
-- **Run e2e tests locally, not just typecheck+build.** Type-checking cannot catch stale runtime test data — only running the tests reveals shape mismatches at the zod validation boundary.
+- **When you change types, schemas, or wire formats:** grep ALL test files (`tests/`, `apps/worker/__tests__/`) for stubs/fixtures that construct the old shape. Update them in the SAME commit/PR. Never defer test fixture updates to a follow-up.
+- **Refactors that touch shared types are not done until every test stub matches.** A PR that changes an envelope shape MUST also update every test that constructs that envelope.
+- **Run tests locally, not just typecheck+build.** Type-checking cannot catch stale runtime test data — only running the tests reveals shape mismatches at the zod validation boundary.
 
 ### CI False-Positive Awareness
-- **Doc-only PRs skip all test jobs** (unit, integration, API, E2E). A "green main" after merging a docs PR is meaningless for test health.
+- **Doc-only PRs skip all test jobs** (unit, integration, BDD, E2E). A "green main" after merging a docs PR is meaningless for test health.
 - **Before merging a code PR or release PR**, verify that the last *code-changing* CI run on main was green — not just the latest commit's CI status. Check `gh run list --branch main` and find the most recent run that actually ran tests (not all SKIPPED).
 - **After merging a major refactor**, always trigger or wait for a full CI run on a code-changing commit before merging the next PR.
 

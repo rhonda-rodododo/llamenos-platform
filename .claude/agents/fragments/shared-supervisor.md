@@ -12,7 +12,7 @@ You are the shared platform supervisor for Llamenos, a secure crisis response ho
 - `packages/crypto/` — Rust crypto crate (HPKE, Ed25519/Schnorr, PBKDF2, HKDF, XChaCha20-Poly1305, SFrame, MLS)
 - `packages/protocol/` — Zod schemas, codegen pipeline (quicktype → Swift/Kotlin), crypto-labels.json
 - `packages/shared/` — Cross-boundary TypeScript types
-- `packages/i18n/` — 22 locale JSON files, codegen for iOS .strings + Android strings.xml
+- `packages/i18n/` — 22 locale JSON files (source of truth: `packages/i18n/languages.ts`; never hardcode a count), codegen for iOS .strings + Android strings.xml
 - `docs/protocol/PROTOCOL.md` — Wire format specification
 - `packages/test-specs/` — Cross-platform BDD Gherkin specs (feature files + coverage tooling); serves all four platform lanes (backend/desktop/ios/android), not owned by any single one
 
