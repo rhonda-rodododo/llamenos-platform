@@ -54,8 +54,27 @@ describe('classifyImpact', () => {
     ['apps/worker/services/crypto-keys.ts'],
     // Shared crypto labels.
     ['packages/shared/crypto-labels.ts'],
+    // Key-boundary wrapper paths (restored 2026-09-12 — see impact.ts's
+    // CORRECTED comment): not the crypto crate itself, but the surfaces that
+    // keep a device private key from leaking — the webview IPC boundary, the
+    // Tauri permission grants, and the iOS/Android Keychain/Keystore
+    // wrappers. A quiet mistake in any of these is an identity disclosure,
+    // which is the high-impact criterion — unrelated to deployment risk, so
+    // "no production users yet" never relaxes it.
+    ['src/client/lib/platform.ts'],
+    ['apps/desktop/src/crypto.rs'],
+    ['apps/desktop/capabilities/default.json'],
+    ['apps/ios/Sources/Services/CryptoService.swift'],
+    ['apps/android/app/src/main/java/org/llamenos/hotline/crypto/CryptoService.kt'],
   ])('treats %s as high impact', (f) => {
     expect(classifyImpact([f], 5).impact).toBe('high')
+  })
+
+  // Boundary-exact: ONLY `apps/desktop/src/crypto.rs` is restored above, not
+  // the whole `apps/desktop/src/` directory — an ordinary desktop source file
+  // stays low impact.
+  it('does not escalate an ordinary desktop source file that is not the crypto IPC wrapper', () => {
+    expect(classifyImpact(['apps/desktop/src/main.rs'], 5).impact).toBe('low')
   })
 
   // NARROWED 2026-09-12 (impact.ts's dated comment): no production users
@@ -74,13 +93,6 @@ describe('classifyImpact', () => {
     ['apps/android/fastlane/Fastfile'],
     ['apps/desktop/tauri.conf.json'],
     ['packages/protocol/tools/codegen.ts'],
-    // Desktop IPC / capabilities and mobile crypto-service WRAPPER paths —
-    // the crypto crate itself (packages/crypto/) stays high-impact above.
-    ['src/client/lib/platform.ts'],
-    ['apps/desktop/src/main.rs'],
-    ['apps/desktop/capabilities/default.json'],
-    ['apps/ios/Sources/Services/CryptoService.swift'],
-    ['apps/android/app/src/main/java/org/llamenos/hotline/crypto/CryptoService.kt'],
     ['scripts/inject-cert-pins.ts'],
     ['scripts/extract-cert-pins.sh'],
     ['scripts/verify-build.sh'],

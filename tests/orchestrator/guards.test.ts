@@ -49,6 +49,12 @@ describe('rail: crypto and protocol always reach a human', () => {
     'packages/protocol/schemas/note.ts',
     'packages/protocol/crypto-labels.json',
     'apps/worker/lib/auth.ts',
+    // The key-boundary wrapper: not the crypto crate itself, but the single
+    // abstraction (per CLAUDE.md) keeping a device private key out of the
+    // webview. A quiet mistake here is an identity disclosure exactly like a
+    // mistake in packages/crypto/ itself — see impact.ts's CORRECTED comment
+    // for why this was briefly (and wrongly) narrowed out, then restored.
+    'src/client/lib/platform.ts',
   ])('%s is high impact', (f) => {
     expect(classifyImpact([f], 1).impact).toBe('high')
   })

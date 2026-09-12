@@ -43,19 +43,6 @@ export const CRYPTO_SECURITY_REVIEWER_AGENT = 'crypto-security-reviewer'
  * covered here too, so the two lists cannot drift apart the way two
  * independently-maintained lists inevitably do.
  */
-// NOTE (2026-09-12): `impact.ts`'s HIGH_IMPACT_PATHS was narrowed on this date
-// to remove the desktop IPC / capabilities and mobile crypto-service WRAPPER
-// paths (`src/client/lib/platform.ts`, the iOS/Android CryptoService files) —
-// see impact.ts's own dated comment for why. Because this array derives
-// `CRYPTO_REVIEW_PATHS` from HIGH_IMPACT_PATHS, the `platform.ts` and
-// `CryptoService` keywords below no longer match anything: a diff touching
-// only those wrapper files no longer gets the mandatory crypto-security-
-// reviewer, even though `platform.ts` is exactly the boundary that keeps a
-// device private key out of the webview. That is a real, intentional-per-
-// policy narrowing, not an oversight — flagged here so it is not mistaken for
-// one, and so re-adding those paths to HIGH_IMPACT_PATHS (recommended once
-// production users exist) automatically restores this review too. The
-// keywords are left in place rather than deleted for exactly that reason.
 const CRYPTO_PATH_KEYWORDS: readonly string[] = [
   'crypto', 'auth', 'session', 'webauthn', 'sigchain',
   'server-identity', 'agent-identity', 'timing-safe', 'blind-index',
