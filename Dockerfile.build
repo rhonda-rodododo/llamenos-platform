@@ -10,10 +10,15 @@
 #   docker cp extract:/build/dist ./dist
 #   docker rm extract
 #
+# The image is an artifact carrier, not a runnable environment: the final
+# stage holds /build/dist and nothing else. To get an interactive shell in
+# the build environment itself, build the builder stage explicitly:
+#   docker build -f Dockerfile.build --target builder -t llamenos-buildenv .
+#
 # CI sets SOURCE_DATE_EPOCH from git commit time for deterministic timestamps.
 # Local builds default to epoch 0 (1970-01-01) for full reproducibility.
 
-FROM oven/bun:1.3.5@sha256:e90cdbaf9ccdb3d4bd693aa335c3310a6004286a880f62f79b18f9b1312a8ec3
+FROM oven/bun:1.3.5@sha256:e90cdbaf9ccdb3d4bd693aa335c3310a6004286a880f62f79b18f9b1312a8ec3 AS builder
 
 # Consistent locale (prevents locale-dependent output differences)
 ENV LANG=C.UTF-8
@@ -61,13 +66,28 @@ RUN bun run build
 # Build server for reproducibility (Bun build with bytecode)
 RUN bun build src/server/index.ts --target=bun --outdir=dist/server --sourcemap
 
-# Drop to non-root after all build steps run — keeps the Trivy config scan
-# happy (final image user != root) without invalidating the Docker layer
-# cache for bun install / vite build / server build on every unrelated change.
-# No chown needed: this image is only ever `docker cp`'d from (see header),
-# never run as a process, so ownership of the (root-owned) build output
-# doesn't matter — and a recursive chown here would force overlayfs to
-# copy up the entire node_modules tree, which is slower than the build itself.
-USER bun
+# ─────────────────────────────────────────────────────────────────────────
+# Artifact carrier — this is what `docker build -f Dockerfile.build` yields.
+#
+# No process is ever run in this image: every consumer (the header above,
+# scripts/verify-build.sh) does `docker create` + `docker cp .../build/dist`.
+# Shipping the builder as the final image dragged its whole toolchain into
+# the published/scanned artifact — the Debian base packages plus bun's global
+# install cache at /build/.bun/install/cache, which vendors Go-built binaries
+# (esbuild) carrying Go stdlib CVEs we cannot patch. None of that is part of
+# the build output, so none of it belongs in the image.
+#
+# Keeping the builder stage byte-identical preserves reproducibility: the
+# same pinned Bun 1.3.5 image produces dist/, we just stop publishing the
+# scaffolding around it.
+FROM scratch
+
+# Non-root by UID — scratch has no /etc/passwd to name a user against.
+USER 65532:65532
+
+COPY --from=builder /build/dist /build/dist
+
+# `docker create` refuses an image with no command. Nothing executes it.
+CMD ["/build/dist"]
 
 # Output: /build/dist/client/ and /build/dist/server/

@@ -239,7 +239,12 @@ jobs:
           push: false
           load: true
           tags: llamenos-scan:latest
-          cache-from: type=gha
+          # cache-to was missing, so cache-from never had anything to read and
+          # every run rebuilt from scratch — that is what pushed the
+          # Dockerfile.build leg past its timeout. Scope per matrix entry so
+          # the two images don't overwrite each other's cache.
+          cache-from: type=gha,scope=image-scan-${{ matrix.image.name }}
+          cache-to: type=gha,mode=max,scope=image-scan-${{ matrix.image.name }}
 
       - name: Scan image with Trivy
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
@@ -256,8 +261,16 @@ jobs:
       # entirely with --ignore-unfixed. Failing on all CRITICAL/HIGH today
       # would redden CI (52 fixable HIGH findings — see the tracking issue
       # filed alongside this PR for the full list), so this hard-fails only
-      # on FIXABLE CRITICAL vulnerabilities — currently zero — and leaves
-      # HIGH as report-only via the SARIF upload and table step below.
+      # on FIXABLE CRITICAL vulnerabilities and leaves HIGH as report-only
+      # via the SARIF upload and table step below.
+      #
+      # 2026-09-12: that measurement only covered the `app` image. The `build`
+      # image tripped this gate with 5 fixable CRITICALs — an openssl CVE from
+      # the Debian base and Go stdlib CVEs in the esbuild binaries sitting in
+      # bun's install cache. All five were build-toolchain artefacts that
+      # Dockerfile.build shipped by accident; it is now multi-stage and the
+      # final image carries only /build/dist, so the gate is genuinely clean
+      # rather than suppressed.
       - name: Fail on fixable CRITICAL vulnerabilities
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
