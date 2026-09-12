@@ -38,6 +38,18 @@ describe('tick', () => {
     expect(d.dispatch).not.toHaveBeenCalled()
   })
 
+  it('never rejects when acquireLock() throws (unwritable $HOME, full disk, read-only remount)', async () => {
+    const d = deps({
+      acquireLock: () => {
+        throw new Error('cannot acquire lock at /home/x/.llamenos-fleet/lock: EACCES')
+      },
+    })
+    const r = await tick(d)
+    expect(r.aborted).toBe('error')
+    expect(r.errorMessage).toContain('EACCES')
+    expect(d.dispatch).not.toHaveBeenCalled()
+  })
+
   it('does nothing when halted', async () => {
     const d = deps({ checkHalt: async () => ({ halted: true, reason: 'testing' }) })
     const r = await tick(d)

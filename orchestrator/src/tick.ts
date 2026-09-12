@@ -76,13 +76,15 @@ export function claimAcrossLanes(lanes: Lane[], itemsByLane: Map<string, WorkIte
  * `readLabels`, or a `readLedger`/`now` that throws synchronously.
  */
 export async function tick(deps: TickDeps): Promise<TickResult> {
-  const lock = deps.acquireLock()
-  if (!lock.held) {
-    deps.log(`another scheduler holds the lock (pid ${lock.heldByPid})`)
-    return empty()
-  }
+  let lock: ReturnType<TickDeps['acquireLock']> | undefined
 
   try {
+    lock = deps.acquireLock()
+    if (!lock.held) {
+      deps.log(`another scheduler holds the lock (pid ${lock.heldByPid})`)
+      return empty()
+    }
+
     const halt = await deps.checkHalt()
     if (halt.halted) {
       deps.log(`halted: ${halt.reason ?? 'unknown'}`)
@@ -174,6 +176,9 @@ export async function tick(deps: TickDeps): Promise<TickResult> {
     deps.log(`tick failed: ${msg}`)
     return empty({ ran: true, aborted: 'error', errorMessage: msg })
   } finally {
-    if (lock.held) lock.release()
+    // `acquireLock()` itself may have thrown before `lock` was assigned (e.g.
+    // an unwritable $HOME, a full disk, a read-only remount surfacing as a
+    // non-EEXIST errno) — guard against releasing a lock we never held.
+    if (lock?.held) lock.release()
   }
 }

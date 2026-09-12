@@ -197,4 +197,8 @@ async function main(): Promise<void> {
   }
 }
 
-void main()
+void main().catch((e: unknown) => {
+  const msg = e instanceof Error ? e.message : String(e)
+  process.stderr.write(`FATAL: unhandled error in fleet CLI: ${msg}\n`)
+  process.exit(1)
+})
