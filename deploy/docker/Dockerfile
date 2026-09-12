@@ -3,7 +3,9 @@
 # Builds:
 #   Stage 1: Install JS dependencies
 #   Stage 2: Build Rust crypto library (.so) for bun:ffi
-#   Stage 3: Production image (API-only — desktop clients connect to this)
+#   Stage 3 (`app`): Production image (API-only — desktop clients connect to this)
+#   Stage 4-6 (`static`): Caddy image for docker-compose.production.yml's
+#     `caddy` service (built SPA + custom rate-limiting Caddy binary)
 #
 # Bun runs TypeScript natively — no esbuild transpilation step needed.
 
@@ -35,7 +37,7 @@ RUN cargo build --release --manifest-path packages/crypto/Cargo.toml --features 
     && cp packages/crypto/target/release/libllamenos_core.so packages/crypto/dist/server/
 
 # Stage 3: Production
-FROM oven/bun:1.4.0-slim@sha256:e0ee68d16ccb9927bf02aa7dd8fd4bf3369ee6d46da04faa72b05ce8bfd135f6
+FROM oven/bun:1.4.0-slim@sha256:e0ee68d16ccb9927bf02aa7dd8fd4bf3369ee6d46da04faa72b05ce8bfd135f6 AS app
 # oven/bun:1.3.5-slim pinned to match .mise.toml — update via Dependabot
 
 # Create non-root user
@@ -85,3 +87,62 @@ HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=5 \
 
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD []
+
+# ─────────────────────────────────────────────────────────────────────────
+# Stages below build the `static` target consumed by
+# docker-compose.production.yml's `caddy` service (Tier 4 split-origin
+# Caddy: see deploy/docker/Caddyfile.production).
+
+# Stage 4: Install full JS deps (incl. devDependencies) for the SPA build.
+# Separate from the `deps` stage above, which installs --production only.
+FROM oven/bun:1.4.0@sha256:5ff609364c049b54eb0ff560ec96319729a972078ef2c755d758f0c6ef89c2d6 AS frontend-deps
+WORKDIR /app
+COPY package.json bun.lockb ./
+COPY packages/crypto/package.json packages/crypto/package.json
+COPY packages/i18n/package.json packages/i18n/package.json
+COPY packages/protocol/package.json packages/protocol/package.json
+COPY packages/test-specs/package.json packages/test-specs/package.json
+COPY apps/worker/package.json apps/worker/package.json
+COPY site/package.json site/package.json
+RUN bun install --frozen-lockfile --ignore-scripts
+
+# Stage 5: Build the SPA (Vite) served at /srv/app by the `static` image.
+# The client imports Zod schemas straight from packages/protocol/schemas
+# (via the @protocol alias) — no protocol codegen step is required for
+# this build, unlike the native (iOS/Android) clients.
+FROM frontend-deps AS frontend-builder
+COPY index.html vite.config.ts tsconfig.json ./
+COPY public/ public/
+COPY src/client/ src/client/
+COPY packages/shared/ packages/shared/
+COPY packages/i18n/ packages/i18n/
+COPY packages/protocol/ packages/protocol/
+ARG BUILD_VERSION=dev
+ARG BUILD_COMMIT=local
+ARG BUILD_TIME=
+ENV GITHUB_SHA=${BUILD_COMMIT}
+RUN bun run build
+
+# Stage 6: Custom Caddy binary with the caddy-ratelimit plugin.
+# Caddyfile.production's `rate_limit` directive (auth/register throttling —
+# see CLAUDE.md's "Call spam mitigation" / network-level rate limiting
+# requirement) is NOT part of stock Caddy; it ships only via this plugin,
+# built with xcaddy. Without this stage Caddy refuses to start with
+# "unrecognized directive: rate_limit".
+FROM caddy:2.9-builder-alpine@sha256:0d51ab53402e144be9cab449f5adfec681b87d481dcd175230813427d5e00f00 AS caddy-builder
+RUN xcaddy build --with github.com/mholt/caddy-ratelimit
+
+# Stage 7 (`static`): Caddy image serving the built SPA. Matches the
+# `caddy:2.9-alpine` base pinned in docker-compose.yml, with the custom
+# rate-limiting binary swapped in and the SPA baked into /srv/app.
+FROM caddy:2.9-alpine@sha256:b4e3952384eb9524a887633ce65c752dd7c71314d2c2acf98cd5c715aaa534f0 AS static
+COPY --from=caddy-builder /usr/bin/caddy /usr/bin/caddy
+COPY --from=frontend-builder /app/dist/client /srv/app
+# NOTE: /srv/crypto (the Tier-4 sandboxed-crypto-iframe origin referenced by
+# Caddyfile.production's {$CRYPTO_DOMAIN} block) is intentionally left
+# empty. The crypto-sandbox/ app that's supposed to be baked in here was
+# developed on an unmerged branch (commit a294b15a5, "tier 4 PR-B") and
+# never landed on main — there is no source in this tree to build. Do not
+# fabricate placeholder content: crypto.$CRYPTO_DOMAIN will 404 until that
+# app is merged. See the PR that added this comment for full context.
+RUN mkdir -p /srv/crypto
