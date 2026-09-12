@@ -1371,6 +1371,106 @@ jobs:
             "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${DIGEST}"
           echo "Signed: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${DIGEST}"
 
+
+  # ─── Fleet gates: the ONLY place the fleet's verdicts become enforceable ──
+  #
+  # These two jobs compute the fleet's gates on GitHub's runners, on the PR's
+  # exact head SHA, and post them as commit statuses the repo ruleset
+  # requires. Nothing about them runs on the operator's laptop, and they fail
+  # closed: a job that does not run leaves its required status missing.
+  #
+  # Required checks apply to EVERY pull request, so a non-fleet branch gets a
+  # trivially-passing status that says so in its description — the CLI does
+  # that, not an `if:` on the job (a skipped job's check reports as skipped,
+  # which GitHub treats as satisfying a required check: fail-open).
+  #
+  # Deliberately NOT in `ci-status`'s needs list: that is the repo's own CI
+  # verdict, these are the fleet's, so a reader can tell which one refused.
+  fleet-verify:
+    name: fleet/verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      statuses: write
+    timeout-minutes: 20
+
+    steps:
+      # The PR HEAD commit, not the default merge ref: the status must land on
+      # the commit the ruleset checks, and `verifyMechanical` records what it
+      # examined as `sha=`. Checking the head out makes those the same commit.
+      - name: Checkout the PR head itself
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Fetch origin/main for the diff range
+        run: git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2.0.2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Verify and post fleet/verify
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FLEET_CI_BRANCH: ${{ github.head_ref || github.ref_name }}
+          FLEET_CI_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          FLEET_CI_PR: ${{ github.event.pull_request.number }}
+        run: bun orchestrator/src/cli.ts verify-ci
+
+  fleet-review:
+    name: fleet/review
+    runs-on: ubuntu-latest
+    permissions:
+      # contents: read only — the non-author reviewer runs in this job, and
+      # a token that cannot write to the repo is the containment that
+      # matters. It reads a `.git`-less `git archive` export (review.ts), so
+      # there is nothing to commit into or push from in place either.
+      contents: read
+      statuses: write
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout the PR head itself
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Fetch origin/main for the diff range
+        run: git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2.0.2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      # Only the non-author engine is installed, and only for a fleet branch.
+      # The fleet's workers are `claude`, so the reviewer is `opencode` — a
+      # model reviewing its own output shares its own blind spots, which is
+      # the entire reason this check exists.
+      - name: Install the non-author review engine
+        if: startsWith(github.head_ref, 'fleet/')
+        run: |
+          curl -fsSL https://opencode.ai/install | bash
+          echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
+
+      - name: Review and post fleet/review
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Absent is an ERROR status and a failed job, never a skip and never
+          # a pass — a review that could not run is not a review that passed.
+          FLEET_REVIEW_API_KEY: ${{ secrets.FLEET_REVIEW_API_KEY }}
+          FLEET_CI_BRANCH: ${{ github.head_ref || github.ref_name }}
+          FLEET_CI_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          FLEET_CI_PR: ${{ github.event.pull_request.number }}
+        run: bun orchestrator/src/cli.ts review-ci
+
   ci-status:
     needs: [no-generated-files-in-git, verify-updater-config, build, audit, lint, crypto-tests, backend-bdd, backend-unit, desktop-unit, android-build-test, android-e2e, e2e, ios-build-test, crypto-guardrails, migration-drift, ansible-validate, docs-guard]
     if: always()

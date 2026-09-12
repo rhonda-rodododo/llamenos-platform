@@ -71,13 +71,12 @@ export function isCryptoDiff(changedFiles: string[]): boolean {
  * agent, as an ADDITIONAL mandatory reviewer, never a substitute for the
  * non-author opinion.
  *
- * Its verdict is advisory to a human and is never wired into
- * `mayAutoMerge` as a merge permission (see the comment there) — crypto
- * paths are already `impact: 'high'` via `classifyImpact`, so they never
- * auto-merge regardless of what any reviewer, human or automated, says
- * about them. The point of requesting it is that the human who ultimately
- * approves the merge starts from a security review instead of from
- * scratch.
+ * Its verdict is advisory to a human and is never a merge permission: every
+ * crypto path is owned in `CODEOWNERS`, so GitHub's own "require review from
+ * Code Owners" rule holds the PR until a human approves it, regardless of
+ * what any reviewer says about it. The point of requesting it is that the
+ * human who ultimately approves starts from a security review instead of
+ * from scratch.
  */
 export function requiredAdditionalReviewers(changedFiles: string[]): readonly string[] {
   return isCryptoDiff(changedFiles) ? [CRYPTO_SECURITY_REVIEWER_AGENT] : []
@@ -231,13 +230,13 @@ function buildReviewPrompt(pr: string, diff: string, report: VerifyReport): stri
  *      that never touches this worktree at all.
  *
  * The defense that actually holds against a verifier with real push access
- * is downstream of this file, in merge.ts: `mayAutoMerge` refuses unless
- * the PR's head commit still matches `report.verifiedCommit` — the exact
- * commit `verifyMechanical` examined — and `mergePr` enforces the same
- * check server-side via `--match-head-commit`. A verifier that pushes a
- * modified branch, by whatever path, invalidates its own approval rather
- * than getting it merged: the merge gate does not trust "what the branch
- * looks like now," only "does it still match what was verified."
+ * is no longer in this repo's code at all — it is GitHub's. Every fleet gate
+ * is a commit status attached to ONE head SHA (ci.ts), and the repo ruleset
+ * requires them; a push to the branch moves the head, and the new one
+ * carries no green `fleet/verify` or `fleet/review` of its own, so
+ * auto-merge simply does not fire. A verifier that pushes a modified branch,
+ * by whatever path, invalidates its own approval rather than getting it
+ * merged — and no process in this repo has to notice for that to hold.
  */
 async function gitState(worktree: string): Promise<{ head: string; status: string }> {
   const { stdout: head } = await execFileAsync('git', ['-C', worktree, 'rev-parse', 'HEAD'])
@@ -319,7 +318,7 @@ async function exportReviewSnapshot(worktree: string, headSha: string): Promise<
  * `GH_TOKEN`/`SSH_AUTH_SOCK` are set. Excluding `GH_TOKEN`, `GITHUB_TOKEN`,
  * `SSH_AUTH_SOCK`, and `GIT_ASKPASS` removes the CONVENIENT path and costs
  * nothing — worth doing regardless — but it is not the defense this fleet
- * relies on. That defense is the commit-pinning in merge.ts (see the
+ * relies on. That defense is GitHub's per-SHA required statuses (see the
  * comment above `gitState`).
  */
 const VERIFIER_ENV_ALLOWLIST: readonly string[] = [
@@ -334,6 +333,14 @@ function verifierEnv(): NodeJS.ProcessEnv {
     const value = process.env[key]
     if (value !== undefined) env[key] = value
   }
+  // The `fleet/review` CI job exports the repo secret under its own name
+  // (`FLEET_REVIEW_API_KEY`, see ci.ts); opencode's zai/GLM provider reads
+  // `ZHIPU_API_KEY`. Mapped here, in one place, so the workflow names the
+  // SECRET and nothing outside this file has to know the provider's variable
+  // name. An explicitly-set `ZHIPU_API_KEY` always wins — this only fills a
+  // gap, it never overrides an operator's own configuration.
+  const ciKey = process.env['FLEET_REVIEW_API_KEY']
+  if (ciKey !== undefined && env['ZHIPU_API_KEY'] === undefined) env['ZHIPU_API_KEY'] = ciKey
   return env
 }
 
@@ -436,8 +443,8 @@ export async function secondOpinion(input: SecondOpinionInput): Promise<SecondOp
     })
 
     // Detective layer (see the honest accounting in the comment above
-    // `gitState`): with the merge-time commit pin (W1, merge.ts) as the
-    // actual defense, this check is no longer what PREVENTS a tampering
+    // `gitState`): with GitHub's per-SHA required statuses as the actual
+    // defense, this check is no longer what PREVENTS a tampering
     // verifier from getting its changes merged — it is what TELLS US one
     // tried, rather than silently discarding the evidence. That distinction
     // matters: a verifier that modified the author's own worktree mid-review
@@ -475,18 +482,22 @@ export async function secondOpinion(input: SecondOpinionInput): Promise<SecondOp
 }
 
 /**
- * Posts the verdict to the PR with `gh pr review`, so it is the same
- * artifact a human reviewer produces and a human can reply in the same
- * thread — not a side-channel log only the orchestrator can see.
+ * Posts the loop's verdict to the PR as a plain COMMENT, never as a GitHub
+ * REVIEW of any kind.
  *
- * UNREADABLE gets `--request-changes`, the same as FAIL: an unreachable or
- * incoherent reviewer is not a pass, and the PR must carry that verdict as a
- * blocking review, not as silence that could be mistaken for "nobody
- * objected."
+ * It used to approve or request changes, back when this verdict fed the
+ * orchestrator's own merge decision. It no longer does: `fleet/review`
+ * (ci.ts), computed on GitHub's runner against the exact head SHA, is the
+ * verdict of record, and this loop's only remaining job is revising the work
+ * before the PR is final. An approving review from the fleet would now be a
+ * review GitHub COUNTS — today harmlessly (`required_approving_review_count`
+ * is 0), but it is one ruleset edit away from being an approval the fleet
+ * grants itself. A comment records the same text in the same thread and can
+ * never be that. The flags are deliberately not written anywhere under
+ * `orchestrator/` — see the rail in tests/orchestrator/guards.test.ts.
  */
 export async function postReview(pr: string, verdict: 'PASS' | 'FAIL' | 'UNREADABLE', body: string): Promise<void> {
-  const flag = verdict === 'PASS' ? '--approve' : '--request-changes'
-  await gh(['pr', 'review', pr, flag, '--body', body])
+  await gh(['pr', 'comment', pr, '--body', `Non-author review (advisory, pre-PR loop) — ${verdict}\n\n${body}`])
 }
 
 /**
@@ -497,8 +508,8 @@ export async function postReview(pr: string, verdict: 'PASS' | 'FAIL' | 'UNREADA
  * reviewer found a problem", not "there was no reviewer". Root-caused live
  * against issue #660/PR #662: this box has no opencode/`ZHIPU_API_KEY`
  * configured, so `invokeVerifierEngine` could not even start the non-author
- * engine — the fail-safe worked (UNREADABLE correctly blocks auto-merge via
- * `mayAutoMerge`), but nothing told the human reviewing the PR that they were
+ * engine — the fail-safe worked (UNREADABLE is posted as `fleet/review` =
+ * `error`, which GitHub will not merge on), but nothing told the human reviewing the PR that they were
  * the ONLY review it had gotten. This is that explicit comment, posted in
  * ADDITION to the review above, in plain language a human skimming the PR
  * will actually notice.

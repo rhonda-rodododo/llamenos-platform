@@ -8,7 +8,21 @@ import type { Lane } from './config.js'
 
 const execFileAsync = promisify(execFile)
 
-export interface VerifyInput { worktree: string; branch: string; lane: Lane }
+export interface VerifyInput {
+  worktree: string
+  /** The right-hand side of the diff range (`origin/main...<branch>`). CI
+   *  checks the PR's head SHA out detached, so it passes `HEAD`. */
+  branch: string
+  lane: Lane
+  /**
+   * Scope and impact only — used by the `fleet/review` CI job, where
+   * `fleet/verify` is the job that runs the diff-targeted tests and running
+   * them a second time buys no extra signal. A report produced this way has
+   * `testsRun: []` and `testsPassed: undefined`, so it can never be mistaken
+   * for one whose tests passed: `buildGateTrace` renders it `tests=none`.
+   */
+  skipTests?: boolean
+}
 
 export interface VerifyReport {
   passed: boolean
@@ -20,16 +34,13 @@ export interface VerifyReport {
   testsRun?: string[]
   testsPassed?: boolean
   /**
-   * Fix-round finding (W1): the exact commit `verifyMechanical` actually
-   * examined (`git rev-parse HEAD` in the worktree, captured once, up
-   * front). This is a RECORD, not something to be re-derived later — the
-   * whole point is that `mayAutoMerge` compares this against the PR's head
-   * at merge time and refuses if they differ, rather than a fresh
-   * observation at merge time silently re-legitimizing a branch that moved
-   * (whether from an ordinary push race or a verifier that pushed its own
-   * changes). `undefined` only when `verifyMechanical` could not identify a
-   * commit at all (`git rev-parse` itself failed) — which already implies
-   * `passed: false`.
+   * The exact commit this report examined (`git rev-parse HEAD` in the
+   * worktree, captured once, up front). It no longer has to be compared
+   * against anything at merge time: a commit status is attached to ONE SHA,
+   * so GitHub itself refuses to merge a head that does not carry its own
+   * green `fleet/verify`. It survives as the `sha=` field of the gate trace,
+   * which `llamenos-fleet status <issue>` reads back. `undefined` only when
+   * `git rev-parse` itself failed — which already implies `passed: false`.
    */
   verifiedCommit?: string
 }
@@ -222,9 +233,11 @@ function parseFailingCount(output: string): number | undefined {
  * 1. Scope — any forbidden or strayed file is an immediate fail, naming the
  *    offenders. `checkScope` and `classifyImpact` have had no runtime caller
  *    until this function; this is what wires them in.
- * 2. Impact — recorded on the report, never itself a fail. A high-impact
- *    diff still needs to pass scope and tests; it is the merge gate
- *    (merge.ts), not this one, that refuses to auto-merge it.
+ * 2. Impact — recorded on the report, never itself a fail, and no longer a
+ *    gate anywhere: a diff touching a sensitive path is held by GitHub's own
+ *    "require review from Code Owners" rule against `CODEOWNERS`, not by
+ *    this process. `classifyImpact` survives to DESCRIBE a diff (the trace,
+ *    the digest, the reviewer's turn budget), never to decide about it.
  * 3. Diff-targeted tests only, run by argv via `execFile` — never a shell,
  *    never the whole suite (slow, produces failures unrelated to the diff,
  *    and CI already shards it).
@@ -236,10 +249,8 @@ export async function verifyMechanical(input: VerifyInput): Promise<VerifyReport
   const { worktree, branch, lane } = input
   const range = `origin/main...${branch}`
 
-  // Captured FIRST and once, before anything else runs: this is the commit
-  // every check below actually examines, and it is what `mayAutoMerge` will
-  // later compare against the PR's head at merge time (W1) — a record of
-  // what was verified, not a value re-derived after the fact.
+  // Captured FIRST and once, before anything else runs: the commit every
+  // check below actually examines, recorded rather than re-derived later.
   const headShaRaw = await runGit(worktree, ['rev-parse', 'HEAD'])
   if (headShaRaw === undefined) {
     return {
@@ -288,7 +299,7 @@ export async function verifyMechanical(input: VerifyInput): Promise<VerifyReport
     return { passed: false, reasons, changedFiles, addedLines, impact, impactReasons, verifiedCommit }
   }
 
-  const routes = routesFor(changedFiles)
+  const routes = input.skipTests === true ? [] : routesFor(changedFiles)
   const testsRun = routes.map((r) => r.target)
   let testsPassed: boolean | undefined
 

@@ -13,7 +13,10 @@ import { loadContracts, contractsFor, buildMemoryContext, augmentBrief } from '.
 import { dispatch as dispatchWorker, type EffortLevel } from './engines.js'
 import { verifyMechanical } from './verify.js'
 import { secondOpinion, postReview } from './review.js'
-import { ciStatusFor, mergePr } from './merge.js'
+import {
+  runVerifyCi, runReviewCi, postCommitStatus, ciContextFromEnv, ciDiff,
+  REVIEW_KEY_ENV, type CiContext,
+} from './ci.js'
 import {
   settle as settleWorktree,
   destroyWorktree,
@@ -255,11 +258,6 @@ async function prDiff(pr: string): Promise<string> {
   return gh(['pr', 'diff', pr])
 }
 
-async function prHeadSha(pr: string): Promise<string | undefined> {
-  const view = await ghJson<{ headRefOid: string }>(['pr', 'view', pr, '--json', 'headRefOid'])
-  return view?.headRefOid
-}
-
 async function commentOnIssue(itemId: string, body: string): Promise<void> {
   await gh(['issue', 'comment', itemId, '--body', body])
 }
@@ -294,6 +292,21 @@ async function commentOnPr(pr: string, body: string): Promise<void> {
   await gh(['pr', 'comment', pr, '--body', body])
 }
 
+/**
+ * The fleet's ONE and ONLY merge call — and it merges nothing itself. It
+ * asks GitHub to merge the PR later, on GitHub's own terms: when every
+ * required status check (`ci-status`, `fleet/verify`, `fleet/review`, …) is
+ * green on the PR's current head SHA, and any code-owner approval the
+ * `CODEOWNERS` rule demands has been given. A push to the branch invalidates
+ * the per-SHA statuses, so the verified-commit pin the orchestrator used to
+ * enforce itself is now a property of the platform. No bypass flag is passed
+ * here, and none may ever be added: see the rail asserted in
+ * tests/orchestrator/guards.test.ts.
+ */
+async function enableAutoMerge(pr: string): Promise<void> {
+  await gh(['pr', 'merge', pr, '--auto', '--squash'])
+}
+
 async function runTick(): Promise<number> {
   const lanes = await loadLanes(REPO_ROOT)
 
@@ -314,9 +327,7 @@ async function runTick(): Promise<number> {
     commentOnPr,
     reviseWithWorker,
     haltFleet: halt,
-    ciStatusFor,
-    prHeadSha,
-    mergePr,
+    enableAutoMerge,
     commentOnIssue,
     settle: settleItem,
     record: append,
@@ -860,6 +871,32 @@ async function runIntegrate(): Promise<number> {
   return runIntegrateWith(defaultIntegrateDeps())
 }
 
+// ---------------------------------------------------------------------------
+// verify-ci / review-ci — the two gates, computed on GitHub's own runners
+// ---------------------------------------------------------------------------
+
+/**
+ * Both CI entry points take their subject from the environment rather than
+ * argv: the workflow already has `github.head_ref` and
+ * `github.event.pull_request.head.sha` as expressions, and passing them as
+ * named variables is harder to get silently wrong than positional arguments.
+ * A missing one is exit 2 with no status posted — an entry point that does
+ * not know which commit it is judging must refuse, not guess (and the
+ * missing required status then blocks the PR, which is the right direction).
+ */
+async function runCiGate(run: (ctx: CiContext) => Promise<number>): Promise<number> {
+  const ctx = ciContextFromEnv(process.env, REPO_ROOT)
+  if (ctx === undefined) {
+    process.stderr.write('FLEET_CI_BRANCH and FLEET_CI_SHA must both be set — refusing to post a status\n')
+    return 2
+  }
+  return run(ctx)
+}
+
+/** Plain stdout, not the fleet log: a CI runner has no fleet state directory
+ *  worth writing to, and the job log IS the durable record there. */
+const ciLog = (msg: string): void => { process.stdout.write(`${msg}\n`) }
+
 type CommandHandler = (rest: string[]) => Promise<number> | number
 
 /**
@@ -890,6 +927,23 @@ const HANDLERS: Record<string, CommandHandler> = {
     return revert(runId, defaultRevertDeps())
   },
   digest: (rest) => runDigest(rest[0]),
+  'verify-ci': () => runCiGate((ctx) => runVerifyCi({
+    ctx,
+    lanes: () => loadLanes(REPO_ROOT),
+    verify: verifyMechanical,
+    postStatus: (context, state, description) => postCommitStatus(ctx.sha, context, state, description),
+    log: ciLog,
+  })),
+  'review-ci': () => runCiGate((ctx) => runReviewCi({
+    ctx,
+    apiKey: process.env[REVIEW_KEY_ENV],
+    lanes: () => loadLanes(REPO_ROOT),
+    verify: verifyMechanical,
+    prDiff: () => ciDiff(ctx.worktree),
+    secondOpinion,
+    postStatus: (context, state, description) => postCommitStatus(ctx.sha, context, state, description),
+    log: ciLog,
+  })),
   plan: () => runPlan(),
   integrate: () => runIntegrate(),
 }

@@ -12,8 +12,12 @@ const execFileAsync = promisify(execFile)
  */
 export const REPO = 'rhonda-rodododo/llamenos-platform'
 
+/** `gh api` carries the repo inside its path and rejects `-R` outright
+ *  ("unknown shorthand flag"), so it is exempt from the pin rather than
+ *  broken by it — callers build `repos/${REPO}/...` themselves. */
 export function ghArgs(args: string[]): string[] {
-  return args.includes('-R') || args.includes('--repo') ? args : [...args, '-R', REPO]
+  if (args[0] === 'api' || args.includes('-R') || args.includes('--repo')) return args
+  return [...args, '-R', REPO]
 }
 
 /** Runs gh by argv — never through a shell. Returns stdout. Throws on non-zero exit. */

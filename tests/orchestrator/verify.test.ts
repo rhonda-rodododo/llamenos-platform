@@ -1,8 +1,8 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { execFileSync, execSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import {
   changedFilesFrom, addedLinesFrom, testTargetsFor, isSafeTestPath, resolvesWithinRoot, verifyMechanical,
 } from '../../orchestrator/src/verify.js'
@@ -142,22 +142,30 @@ describe('verifyMechanical', () => {
     }
   })
 
-  function makeRepoWithDivergedMain(): { dir: string; headSha: string; originMainSha: string } {
+  function makeRepoWithDivergedMain(file = 'notes.md'): { dir: string; headSha: string; originMainSha: string } {
     const dir = mkdtempSync(join(tmpdir(), 'llamenos-fleet-verify-test-'))
     createdRepos.push(dir)
-    execSync('git init -q', { cwd: dir })
+    // `-b main` explicitly: without it the default branch name comes from the
+    // AMBIENT ~/.gitconfig (`init.defaultBranch`), so on a machine without
+    // that setting the repo is on `master`, the `origin/main...main` range
+    // below never resolves, and `verifyMechanical` bails out at the diff —
+    // returning a report that happens to satisfy a `passed === false`
+    // assertion for entirely the wrong reason. Pinned so this fixture means
+    // the same thing on every machine.
+    execSync('git init -q -b main', { cwd: dir })
     execSync('git config user.email test@example.com', { cwd: dir })
     execSync('git config user.name "Test"', { cwd: dir })
-    writeFileSync(join(dir, 'notes.md'), 'first\n')
-    execSync('git add notes.md', { cwd: dir })
+    mkdirSync(dirname(join(dir, file)), { recursive: true })
+    writeFileSync(join(dir, file), 'first\n')
+    execFileSync('git', ['add', file], { cwd: dir })
     execSync('git commit -q -m initial', { cwd: dir })
     const originMainSha = execSync('git rev-parse HEAD', { cwd: dir }).toString().trim()
     // A local ref standing in for a fetched `origin/main`, without needing
     // an actual remote — verifyMechanical only reads it as a ref.
     execFileSync('git', ['update-ref', 'refs/remotes/origin/main', originMainSha], { cwd: dir })
 
-    writeFileSync(join(dir, 'notes.md'), 'first\nsecond\n')
-    execSync('git add notes.md', { cwd: dir })
+    writeFileSync(join(dir, file), 'first\nsecond\n')
+    execFileSync('git', ['add', file], { cwd: dir })
     execSync('git commit -q -m "add a note"', { cwd: dir })
     const headSha = execSync('git rev-parse HEAD', { cwd: dir }).toString().trim()
 
@@ -191,5 +199,30 @@ describe('verifyMechanical', () => {
       expect(report.passed).toBe(false)
       expect(report.verifiedCommit).toBe(headSha)
     })()
+  })
+
+  // `skipTests` exists for the `fleet/review` CI job, where `fleet/verify` is
+  // the job that runs the suites. The property that has to hold is that a
+  // skipped run is INDISTINGUISHABLE FROM "nothing ran" and can never be
+  // mistaken for "the tests passed": `testsRun` empty, `testsPassed`
+  // undefined, and no test runner spawned at all. Exercised on a diff that
+  // WOULD route to a suite (`orchestrator/`), since a diff that routes
+  // nowhere would pass this vacuously either way.
+  it('skipTests runs no suite and records none, on a diff that would otherwise route to one', async () => {
+    const { dir } = makeRepoWithDivergedMain('orchestrator/src/thing.ts')
+    const lane: Lane = { ...testLane, scope: { owned: ['orchestrator/'], notOwned: [] } }
+
+    const skipped = await verifyMechanical({ worktree: dir, branch: 'main', lane, skipTests: true })
+    // The diff really was computed — otherwise an empty testsRun would mean
+    // "verifyMechanical bailed out early", not "skipTests worked".
+    expect(skipped.changedFiles).toEqual(['orchestrator/src/thing.ts'])
+    expect(skipped.reasons).toEqual([])
+    expect(skipped.testsRun).toEqual([])
+    expect(skipped.testsPassed).toBeUndefined()
+    expect(skipped.passed).toBe(true)
+
+    // The route this diff maps to is real — so the empty testsRun above is
+    // `skipTests` doing its job, not the diff mapping to nothing.
+    expect(testTargetsFor(['orchestrator/src/thing.ts'])).toEqual(['orchestrator'])
   })
 })

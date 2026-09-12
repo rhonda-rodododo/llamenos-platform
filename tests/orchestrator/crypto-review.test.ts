@@ -1,10 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import {
-  isCryptoDiff, requiredAdditionalReviewers, CRYPTO_SECURITY_REVIEWER_AGENT,
+  isCryptoDiff, requiredAdditionalReviewers, CRYPTO_SECURITY_REVIEWER_AGENT, CRYPTO_REVIEW_PATHS,
 } from '../../orchestrator/src/review.js'
-import { mayAutoMerge } from '../../orchestrator/src/merge.js'
+import { codeownersPatterns } from './codeowners.js'
 import { classifyImpact } from '../../orchestrator/src/impact.js'
-import type { VerifyReport } from '../../orchestrator/src/verify.js'
 
 describe('isCryptoDiff / requiredAdditionalReviewers', () => {
   it('requests the crypto reviewer for a diff touching packages/crypto/', () => {
@@ -37,32 +36,21 @@ describe('isCryptoDiff / requiredAdditionalReviewers', () => {
   })
 })
 
-describe('mayAutoMerge refuses crypto diffs regardless of reviewer approval', () => {
-  const cryptoReport = (): VerifyReport => {
-    const changedFiles = ['packages/crypto/src/hpke_envelope.rs']
-    const { impact, reasons } = classifyImpact(changedFiles, 20)
-    return {
-      passed: true, reasons: [], changedFiles, addedLines: 20,
-      impact, impactReasons: reasons, testsPassed: true, verifiedCommit: 'deadbeef',
+describe('crypto diffs always reach a human — now via CODEOWNERS, not a merge function', () => {
+  it('still classifies a packages/crypto/ diff as high impact', () => {
+    expect(classifyImpact(['packages/crypto/src/hpke_envelope.rs'], 20).impact).toBe('high')
+  })
+
+  // The rail that used to live in `mayAutoMerge` — "an approving reviewer can
+  // never be smuggled in as merge permission for a crypto diff" — is now
+  // structural rather than conditional: there is no merge function left to
+  // pass a verdict to, and GitHub holds the PR because the path is owned in
+  // CODEOWNERS. Asserted on the real file so a crypto path silently losing
+  // its owner fails here.
+  it('owns every crypto review path in CODEOWNERS, so no verdict of any kind can merge one', () => {
+    const owned = codeownersPatterns()
+    for (const p of CRYPTO_REVIEW_PATHS) {
+      expect(owned.some((o) => p.startsWith(o) || o.startsWith(p)), `${p} has no CODEOWNERS owner`).toBe(true)
     }
-  }
-
-  it('classifies a packages/crypto/ diff as high impact', () => {
-    expect(cryptoReport().impact).toBe('high')
-  })
-
-  it('refuses to auto-merge a crypto diff even with CI green and the non-author review PASS', () => {
-    const result = mayAutoMerge(cryptoReport(), true, 'PASS', 'deadbeef')
-    expect(result.merge).toBe(false)
-  })
-
-  it('refuses to auto-merge a crypto diff even if a crypto-reviewer approval were folded into the ' +
-    'same PASS verdict — mayAutoMerge has no separate crypto-verdict parameter to smuggle an ' +
-    'approval through', () => {
-    // Simulates "the crypto reviewer approved" the only way it could ever reach this function:
-    // as part of an approving reviewVerdict. Impact alone must still block it.
-    const result = mayAutoMerge(cryptoReport(), true, 'PASS', 'deadbeef')
-    expect(result.merge).toBe(false)
-    expect(result.reason).toMatch(/high-impact/i)
   })
 })

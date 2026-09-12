@@ -1,7 +1,6 @@
 import { checkBreakers, inQuotaCooldown } from './circuit.js'
 import { LIMITS, MAX_ATTEMPTS_PER_ITEM, type Lane } from './config.js'
 import { failedAttemptsIn, type Outcome, type RunRecord } from './ledger.js'
-import { mayAutoMerge } from './merge.js'
 import { runReviewLoop, type SecondOpinionInput, type SecondOpinionResult } from './review.js'
 import { judge, selectForLane, type Rejection } from './select.js'
 import type { WorkItem } from './source.js'
@@ -43,19 +42,18 @@ export interface SettleInput {
    * — added when the fleet is leaving an open PR for a human to look at
    * rather than something it will retry itself, so `judge()`'s existing veto
    * (`select.ts`, `needs-human` is already in every lane's `vetoLabels`)
-   * keeps the item from being re-claimed on the next pass. This is narrower
-   * than "any non-merge outcome": an ordinary mechanical or review REJECTED
-   * is still retried up to `MAX_ATTEMPTS_PER_ITEM` (the worker may simply fix
-   * it on the next attempt), so this is `true` only for the two cases where
-   * retrying would be pointless or actively wrong —
-   *   1. BLOCKED: mechanical verification and non-author review both
-   *      PASSED, and `mayAutoMerge` still refused (high impact, CI red, or
-   *      the branch moved) — a human gate, not a rejection of the work.
-   *   2. A worker-reported SUCCESS that could not be run through the
-   *      pipeline at all (missing branch/worktree) — see the `else` branch
-   *      in `runLiveDispatch` below. This is the exact shape of issue
-   *      #660/PR #662: a claimed success with an open, UNVERIFIED PR is far
-   *      more dangerous left agent-dispatchable than a routine rejection is.
+   * keeps the item from being re-claimed on the next pass. An ordinary
+   * mechanical or review REJECTED is still retried up to
+   * `MAX_ATTEMPTS_PER_ITEM` (the worker may simply fix it next attempt), so
+   * exactly one case sets this now: a worker-reported SUCCESS that could not
+   * be run through the pipeline at all (missing branch/worktree) — see the
+   * `else` branch in `runLiveDispatch`. That is the shape of issue #660/PR
+   * #662: a claimed success with an open, UNVERIFIED PR is far more
+   * dangerous left agent-dispatchable than a routine rejection is.
+   *
+   * A PR that is verified, reviewed, and simply waiting — on a required
+   * check, or on a code owner's approval — is NOT flagged here: it is
+   * waiting on GitHub, which needs no label from this process to hold it.
    */
   needsHuman: boolean
 }
@@ -96,12 +94,16 @@ export interface TickDeps {
    *  non-author verification rail itself, never for an ordinary
    *  FAIL/UNREADABLE review verdict. */
   haltFleet(reason: string): void
-  ciStatusFor(pr: string): Promise<boolean | undefined>
-  /** The PR's CURRENT head commit, read immediately before the merge decision
-   *  — never the commit `verifyMechanical` examined, which is a separate,
-   *  frozen record on `VerifyReport.verifiedCommit`. */
-  prHeadSha(pr: string): Promise<string | undefined>
-  mergePr(pr: string, expectedHeadSha: string): Promise<void>
+  /**
+   * Arms GitHub's own auto-merge on the PR the worker opened, as soon as
+   * there is a PR to arm. This is the ONLY `gh pr merge` the fleet runs, and
+   * it decides nothing: GitHub merges if and only if every required status
+   * check is green ON THAT EXACT HEAD SHA and any required code-owner
+   * approval exists. Arming it early rather than after verification is
+   * deliberate — a fleet that crashes mid-pass then leaves behind a PR that
+   * is still fully gated, instead of one that quietly never merges.
+   */
+  enableAutoMerge(pr: string): Promise<void>
   commentOnIssue(itemId: string, body: string): Promise<void>
   /** G3: posts the "non-author review was unavailable" comment on the PR
    *  itself (not the issue) when the review loop ends UNREADABLE — see
@@ -179,13 +181,12 @@ type BaseRecord = Pick<RunRecord, 'ts' | 'runId' | 'lane' | 'itemId' | 'itemName
  *    requested for a diff that failed mechanically — a second opinion may
  *    only downgrade a pass, never rescue a failure.
  * 4. `secondOpinion(...)`, posted as a PR review, only reached once
- *    mechanical verification has passed.
- * 5. `mayAutoMerge(...)`, called unconditionally once a review verdict
- *    exists (PASS, FAIL, or UNREADABLE) so it remains the single place that
- *    decision is made — `tick` never second-guesses it by branching around
- *    it. A refusal reads as BLOCKED when the review itself passed (a human
- *    gate — CI, high impact, a branch that moved), or REJECTED when the
- *    review did not.
+ *    mechanical verification has passed. This loop's job is to REVISE the
+ *    work before the PR is final; it decides nothing about merging.
+ * 5. No merge decision at all. `enableAutoMerge` was armed back at step 2,
+ *    and the gates that hold the PR are commit statuses posted by CI
+ *    (`fleet/verify`, `fleet/review` — see ci.ts) plus GitHub's own
+ *    code-owner rule, all enforced by the repo ruleset on the head SHA.
  * 6. Exactly one terminal ledger row, whatever the outcome.
  * 7. `settle()` — unconditionally, even when something above threw.
  */
@@ -209,6 +210,19 @@ async function runLiveDispatch(
     worktree = result.worktree
     branch = result.branch
     pr = result.pr
+
+    if (pr !== undefined) {
+      // Best-effort by design, and it fails CLOSED: if arming auto-merge
+      // fails, nothing merges — the PR just sits open with its statuses on
+      // it. Failing the whole item over it would throw away good work for a
+      // transient `gh` error, so it is logged and the pass continues.
+      try {
+        await deps.enableAutoMerge(pr)
+        deps.log(`auto-merge: armed on pr ${pr} — GitHub merges it when its required statuses are green`)
+      } catch (e) {
+        deps.log(`auto-merge: could not arm on pr ${pr}: ${errorMessage(e)} — it will not merge unattended`)
+      }
+    }
 
     if (result.outcome === 'SUCCESS' && branch !== undefined && pr !== undefined && worktree !== undefined) {
       // The bounded mechanical-verify -> second-opinion -> (on FAIL) revise
@@ -235,8 +249,8 @@ async function runLiveDispatch(
       // G2: one log line for the verify stage, ALWAYS — whether or not it
       // passed — so an operator reading fleet.log can tell "verify ran and
       // refused" from "verify never ran" without cross-referencing the
-      // ledger. The review and merge lines below only appear when their
-      // stage was actually reached, which is itself the signal: a run that
+      // ledger. The review line below only appears when that stage was
+      // actually reached, which is itself the signal: a run that
       // stops at mechanical verification has a verify line and nothing
       // after it.
       deps.log(`verify: item ${item.id} pr ${pr} ${buildGateTrace({ report: verifyReport })}`)
@@ -266,26 +280,16 @@ async function runLiveDispatch(
             })}`),
           }
         } else {
-          const [ciGreen, headSha] = await Promise.all([deps.ciStatusFor(pr), deps.prHeadSha(pr)])
-          const decision = mayAutoMerge(verifyReport, ciGreen === true, loop.finalVerdict, headSha ?? '')
-          const trace = buildGateTrace({
-            report: verifyReport, reviewVerdict: loop.finalVerdict, reviewText: loop.lastVerdictText, decision,
-          })
-          deps.log(`merge: item ${item.id} pr ${pr} decision=${decision.merge} reason=${decision.reason}`)
-
-          if (decision.merge) {
-            await deps.mergePr(pr, verifyReport.verifiedCommit ?? '')
-            final = { ...base, outcome: 'SUCCESS', branch, pr, note: truncateNote(trace) }
-          } else {
-            await deps.commentOnIssue(item.id, `Auto-merge withheld: ${decision.reason}`)
-            // A review that PASSED but was still refused a merge is a human
-            // gate (CI red, high impact, a branch that moved) — BLOCKED, not
-            // a rejection of the work, and not something a retry can fix on
-            // its own. G1: this is one of the two cases `needs-human` gets
-            // attached (see SettleInput's own comment) so the item is not
-            // silently re-dispatched while it sits open for a person.
-            final = { ...base, outcome: 'BLOCKED', branch, pr, note: truncateNote(trace) }
-            needsHuman = true
+          // SUCCESS means the fleet finished ITS part — verified, reviewed,
+          // auto-merge armed — never a claim that the PR merged. Whether it
+          // did is a fact about GitHub, derived live by `llamenos-fleet
+          // status <issue>` and by the digest's own "waiting" section; see
+          // ledger.ts's module comment on why nothing here caches it.
+          final = {
+            ...base, outcome: 'SUCCESS', branch, pr,
+            note: truncateNote(buildGateTrace({
+              report: verifyReport, reviewVerdict: loop.finalVerdict, reviewText: loop.lastVerdictText,
+            })),
           }
         }
       }
@@ -302,8 +306,8 @@ async function runLiveDispatch(
       // anything, or one dispatched with an unresolvable worktree, can still
       // land here with a claimed SUCCESS this fleet cannot verify.
       //
-      // The ENTIRE pipeline — scope, diff-targeted tests, non-author review,
-      // the verified-SHA merge pin — is skipped for exactly that reason, so
+      // The ENTIRE pipeline — scope, diff-targeted tests, non-author review
+      // — is skipped for exactly that reason, so
       // this is recorded as-is (never silently upgraded to a real SUCCESS)
       // with an explicit trace showing every stage as not-run, `needs-human`
       // attached so it is never re-claimed, and — if a PR exists — a comment
@@ -311,7 +315,7 @@ async function runLiveDispatch(
       deps.log(
         `verify: item ${item.id} pr ${pr ?? '(none)'} SKIPPED — dispatch result missing ` +
         `${branch === undefined ? 'branch ' : ''}${worktree === undefined ? 'worktree ' : ''}` +
-        `— the mechanical verify -> review -> merge pipeline never ran for this claimed SUCCESS`,
+        `— the mechanical verify -> review pipeline never ran for this claimed SUCCESS`,
       )
       const trace = buildGateTrace({})
       if (pr !== undefined) {

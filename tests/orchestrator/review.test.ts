@@ -299,30 +299,18 @@ describe('secondOpinion', () => {
 })
 
 describe('postReview', () => {
-  it('approves on PASS', async () => {
+  // The verdict of record is `fleet/review`, a commit status posted by CI.
+  // This one is advisory, so it must never be a GitHub REVIEW: an --approve
+  // from the fleet is a review GitHub counts, and is one ruleset edit away
+  // from being an approval the fleet grants itself.
+  it.each(['PASS', 'FAIL', 'UNREADABLE'] as const)('posts %s as a comment, never a review', async (verdict) => {
     mockExecFileResolves('')
-    await postReviewViaFreshImport('PASS')
-    const args = mockExecFile.mock.calls[0]?.[1] as string[]
-    expect(args).toContain('--approve')
-    expect(args).not.toContain('--request-changes')
-  })
-
-  it('requests changes on FAIL', async () => {
-    mockExecFileResolves('')
-    await postReviewViaFreshImport('FAIL')
-    const args = mockExecFile.mock.calls[0]?.[1] as string[]
-    expect(args).toContain('--request-changes')
-  })
-
-  it('requests changes on UNREADABLE — an unreachable reviewer is not a pass', async () => {
-    mockExecFileResolves('')
-    await postReviewViaFreshImport('UNREADABLE')
-    const args = mockExecFile.mock.calls[0]?.[1] as string[]
-    expect(args).toContain('--request-changes')
-  })
-
-  async function postReviewViaFreshImport(verdict: 'PASS' | 'FAIL' | 'UNREADABLE'): Promise<void> {
     const { postReview } = await import('../../orchestrator/src/review.js')
     await postReview('123', verdict, 'body text')
-  }
+    const args = mockExecFile.mock.calls[0]?.[1] as string[]
+    expect(args.slice(0, 3)).toEqual(['pr', 'comment', '123'])
+    expect(args).not.toContain('--approve')
+    expect(args).not.toContain('--request-changes')
+    expect(args.join(' ')).toContain(verdict)
+  })
 })

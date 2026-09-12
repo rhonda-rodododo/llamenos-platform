@@ -40,9 +40,7 @@ function baseDeps(over: Partial<TickDeps> = {}): TickDeps {
     postReview: vi.fn(async () => {}),
     reviseWithWorker: vi.fn(async () => {}),
     haltFleet: vi.fn(),
-    ciStatusFor: vi.fn(async () => true),
-    prHeadSha: vi.fn(async () => 'c0ffee'),
-    mergePr: vi.fn(async () => {}),
+    enableAutoMerge: vi.fn(async () => {}),
     commentOnIssue: vi.fn(async () => {}),
     commentOnPr: vi.fn(async () => {}),
     settle: vi.fn(async () => {}),
@@ -53,16 +51,42 @@ function baseDeps(over: Partial<TickDeps> = {}): TickDeps {
 }
 
 describe('tick: live dispatch pipeline (task 7)', () => {
-  it('a live lane dispatches, verifies, gets a second opinion, and merges on a clean pass', async () => {
+  it('a live lane dispatches, arms GitHub auto-merge, verifies, and gets a second opinion', async () => {
     const d = baseDeps()
     const r = await tick(d)
     expect(d.dispatch).toHaveBeenCalledTimes(1)
+    expect(d.enableAutoMerge).toHaveBeenCalledWith('42')
     expect(d.verifyMechanical).toHaveBeenCalledWith({ worktree: '/wt/ios-1', branch: 'fleet/ios/1', lane: lane() })
     expect(d.secondOpinion).toHaveBeenCalledTimes(1)
     expect(d.postReview).toHaveBeenCalledWith('42', 'PASS', expect.any(String))
-    expect(d.mergePr).toHaveBeenCalledWith('42', 'c0ffee')
     expect(d.record).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'SUCCESS', pr: '42', branch: 'fleet/ios/1' }))
     expect(r.attempted).toBe(1)
+  })
+
+  // The fleet arms auto-merge and then has no further say: GitHub merges the
+  // PR when its required statuses are green on that head SHA, and refuses
+  // otherwise. Arming it BEFORE verification is deliberate — a fleet that
+  // crashes mid-pass still leaves a fully-gated PR behind.
+  it('arms auto-merge before the verify/review pipeline runs, not after it', async () => {
+    const order: string[] = []
+    const d = baseDeps({
+      enableAutoMerge: vi.fn(async () => { order.push('auto-merge') }),
+      verifyMechanical: vi.fn(async () => { order.push('verify'); return passingVerify }),
+    })
+    await tick(d)
+    expect(order).toEqual(['auto-merge', 'verify'])
+  })
+
+  it('a failure to arm auto-merge is logged and does not fail the item — nothing merges, which is the safe direction', async () => {
+    const lines: string[] = []
+    const d = baseDeps({
+      enableAutoMerge: vi.fn(async () => { throw new Error('gh: auto-merge is not enabled for this repository') }),
+      log: (msg: string) => { lines.push(msg) },
+    })
+    const r = await tick(d)
+    expect(r.failed).toBe(0)
+    expect(d.record).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'SUCCESS' }))
+    expect(lines.some((l) => l.includes('could not arm'))).toBe(true)
   })
 
   it('writes a DISPATCHED row BEFORE the worker runs — this is what the rate breaker counts (#638)', async () => {
@@ -106,7 +130,7 @@ describe('tick: live dispatch pipeline (task 7)', () => {
     const d = baseDeps({ record, dispatch })
     await tick(d)
     expect(recorded.some((r) => r.outcome === 'QUOTA')).toBe(true)
-    // verify/review/merge must never have been reached for a QUOTA outcome
+    // verify/review must never have been reached for a QUOTA outcome
     expect(d.verifyMechanical).not.toHaveBeenCalled()
     expect(failureBreaker(recorded, LIMITS, 0)).toBeUndefined()
   })
@@ -165,48 +189,15 @@ describe('tick: live dispatch pipeline (task 7)', () => {
     expect(recorded.some((row) => row.outcome === 'SUCCESS')).toBe(true)
   })
 
-  it('a review verdict that is not PASS is REJECTED and never merged', async () => {
+  it('a review verdict that is not PASS is REJECTED', async () => {
     const d = baseDeps({ secondOpinion: vi.fn(async () => ({ verdict: 'FAIL' as const, text: 'VERDICT: FAIL — nope' })) })
     await tick(d)
-    expect(d.mergePr).not.toHaveBeenCalled()
     expect(d.record).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'REJECTED' }))
-  })
-
-  it('a passing review that mayAutoMerge still refuses (e.g. CI red) is BLOCKED for a human, not REJECTED', async () => {
-    const d = baseDeps({ ciStatusFor: vi.fn(async () => false) })
-    await tick(d)
-    expect(d.mergePr).not.toHaveBeenCalled()
-    expect(d.record).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'BLOCKED' }))
-    expect(d.commentOnIssue).toHaveBeenCalled()
-  })
-
-  it('refuses to merge when the PR head moved since verification, even with everything else green', async () => {
-    const d = baseDeps({ prHeadSha: vi.fn(async () => 'a-different-commit') })
-    await tick(d)
-    expect(d.mergePr).not.toHaveBeenCalled()
-    expect(d.record).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'BLOCKED' }))
   })
 })
 
 describe('tick: G1 needs-human handoff and G2 gate-trace observability', () => {
-  it('BLOCKED (mayAutoMerge refused after a passing review) is handed to a human via settle', async () => {
-    const d = baseDeps({ ciStatusFor: vi.fn(async () => false) })
-    await tick(d)
-    expect(d.settle).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'BLOCKED', needsHuman: true }))
-  })
-
-  // G2's own required test: a run that stops at the merge gate must carry
-  // the merge reason in the terminal ledger row's note.
-  it('the terminal row for a run that stops at the merge gate contains the merge reason', async () => {
-    const d = baseDeps({ ciStatusFor: vi.fn(async () => false) })
-    await tick(d)
-    expect(d.record).toHaveBeenCalledWith(expect.objectContaining({
-      outcome: 'BLOCKED',
-      note: expect.stringContaining('CI is not green'),
-    }))
-  })
-
-  it('a real auto-merge (SUCCESS) does NOT get needs-human — nothing is left for a human', async () => {
+  it('a verified, reviewed, auto-merge-armed SUCCESS does NOT get needs-human — GitHub holds it, not a label', async () => {
     const d = baseDeps()
     await tick(d)
     expect(d.settle).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'SUCCESS', needsHuman: false }))
@@ -225,31 +216,29 @@ describe('tick: G1 needs-human handoff and G2 gate-trace observability', () => {
     expect(d.settle).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'REJECTED', needsHuman: false }))
   })
 
-  it('logs one line per gate stage reached: verify, review, and merge', async () => {
+  it('logs one line per gate stage reached: verify and review', async () => {
     const lines: string[] = []
     const d = baseDeps({ log: (msg: string) => { lines.push(msg) } })
     await tick(d)
     expect(lines.some((l) => l.startsWith('verify:'))).toBe(true)
     expect(lines.some((l) => l.startsWith('review:'))).toBe(true)
-    expect(lines.some((l) => l.startsWith('merge:'))).toBe(true)
   })
 
-  it('a mechanical failure logs a verify line but no review or merge line — the operator can tell the gate never reached review', async () => {
+  it('a mechanical failure logs a verify line but no review line — the operator can tell the gate never reached review', async () => {
     const lines: string[] = []
     const failing: VerifyReport = { ...passingVerify, passed: false, reasons: ['touched never-write paths: .env'] }
     const d = baseDeps({ verifyMechanical: vi.fn(async () => failing), log: (msg: string) => { lines.push(msg) } })
     await tick(d)
     expect(lines.some((l) => l.startsWith('verify:'))).toBe(true)
     expect(lines.some((l) => l.startsWith('review:'))).toBe(false)
-    expect(lines.some((l) => l.startsWith('merge:'))).toBe(false)
   })
 
-  it('the terminal note is a compact gate trace carrying scope, impact, tests, review, merge and sha', async () => {
+  it('the terminal note is a compact gate trace carrying scope, impact, tests, review and sha', async () => {
     const d = baseDeps()
     await tick(d)
     expect(d.record).toHaveBeenCalledWith(expect.objectContaining({
       outcome: 'SUCCESS',
-      note: expect.stringMatching(/scope=\S+ impact=\S+ tests=\S+ review=PASS merge=yes\(.*\) sha=c0ffee/),
+      note: expect.stringMatching(/scope=\S+ impact=\S+ tests=\S+ review=PASS sha=c0ffee/),
     }))
   })
 
@@ -267,7 +256,6 @@ describe('tick: G1 needs-human handoff and G2 gate-trace observability', () => {
 
       expect(d.verifyMechanical).not.toHaveBeenCalled()
       expect(d.secondOpinion).not.toHaveBeenCalled()
-      expect(d.mergePr).not.toHaveBeenCalled()
       expect(d.commentOnPr).toHaveBeenCalledWith('662', expect.stringContaining('NO automated verification'))
       expect(d.settle).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'SUCCESS', needsHuman: true }))
       expect(d.record).toHaveBeenCalledWith(expect.objectContaining({

@@ -1,9 +1,10 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { LANES, NEVER_WRITE_PATHS, loadLanes, readLaneModes, assertLiveLanesHaveScope } from '../../orchestrator/src/config.js'
-import { classifyImpact } from '../../orchestrator/src/impact.js'
+import { classifyImpact, HIGH_IMPACT_PATHS } from '../../orchestrator/src/impact.js'
 import { checkScope } from '../../orchestrator/src/scope.js'
 import { haltedOnGitHubFrom } from '../../orchestrator/src/killswitch.js'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { codeownersPatterns } from './codeowners.js'
+import { mkdtempSync, rmSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -41,6 +42,79 @@ describe('rail: the fleet cannot merge its own changes', () => {
   it('classifies its own tests as high impact', () => {
     expect(classifyImpact(['tests/orchestrator/guards.test.ts'], 1).impact).toBe('high')
   })
+
+  // `classifyImpact` only DESCRIBES a diff now — it gated nothing that
+  // anything outside this process ever saw. The gate is GitHub's own
+  // "require review from Code Owners" rule over CODEOWNERS, so the property
+  // that actually has to hold is that every high-impact path is owned there.
+  // Asserted against the real file, not a fixture: a fixture would keep
+  // passing while the shipped CODEOWNERS lost an entry.
+  it('owns every HIGH_IMPACT_PATH in CODEOWNERS — that file, not impact.ts, is the gate', () => {
+    const owned = codeownersPatterns()
+    for (const p of HIGH_IMPACT_PATHS) {
+      expect(owned.some((o) => p.startsWith(o) || o.startsWith(p)), `${p} has no CODEOWNERS owner`).toBe(true)
+    }
+  })
+
+  it('has no catch-all `*` rule — one would gate every PR and stop the fleet merging anything', () => {
+    expect(codeownersPatterns()).not.toContain('*')
+  })
+})
+
+/**
+ * A grep, deliberately, and the ONE place in this suite where that is the
+ * right instrument: it guards the ABSENCE of a capability that has been
+ * deleted. There is no `mayAutoMerge` and no `mergePr` left to call, so
+ * there is no behaviour to assert — the only thing that can regress is
+ * someone writing the argv again. The pattern is unambiguous: `gh pr merge`
+ * is the only command that merges a pull request, and the fleet's single
+ * legitimate use of it is arming GitHub's own auto-merge. Anything else —
+ * a bare merge, an admin override, a head-commit pin — is this process
+ * deciding something that is GitHub's to decide.
+ *
+ * The user's standing rule, stated per-command: no command may bypass PR
+ * checks unless they say so explicitly, for that command.
+ */
+describe('rail: nothing in orchestrator/ can merge a PR or bypass its checks', () => {
+  function orchestratorSources(): { file: string; text: string }[] {
+    const out: { file: string; text: string }[] = []
+    const walk = (dir: string): void => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, e.name)
+        if (e.isDirectory()) walk(full)
+        else if (e.name.endsWith('.ts')) out.push({ file: full, text: readFileSync(full, 'utf8') })
+      }
+    }
+    walk(join(process.cwd(), 'orchestrator', 'src'))
+    return out
+  }
+
+  it('finds orchestrator sources to scan at all — the grep must not pass vacuously', () => {
+    expect(orchestratorSources().length).toBeGreaterThan(10)
+  })
+
+  it('invokes `gh pr merge` only to arm --auto', () => {
+    // Matches the argv form every gh call in this repo uses: `['pr', 'merge', ...]`.
+    const PR_MERGE = /\[\s*'pr'\s*,\s*'merge'[^\]]*\]/g
+    let seen = 0
+    for (const { file, text } of orchestratorSources()) {
+      for (const call of text.match(PR_MERGE) ?? []) {
+        seen++
+        expect(call, `${file}: gh pr merge without --auto`).toContain("'--auto'")
+      }
+    }
+    // Exactly one: the auto-merge enablement in cli.ts. A second would mean
+    // some other path learned to merge.
+    expect(seen).toBe(1)
+  })
+
+  it('passes no merge-bypass flag anywhere', () => {
+    for (const { file, text } of orchestratorSources()) {
+      for (const flag of ['--admin', '--match-head-commit', '--bypass', '--approve']) {
+        expect(text, `${file} passes ${flag}`).not.toContain(flag)
+      }
+    }
+  })
 })
 
 describe('rail: crypto and protocol always reach a human', () => {
@@ -75,12 +149,13 @@ describe('rail: never-write binds even an unrestricted lane', () => {
       .toEqual(['apps/android/keystore.properties'])
   })
 
-  // NARROWED 2026-09-12 (impact.ts's dated comment): with no production
-  // users yet, CI and deploy are writable AND low-impact — the deterministic
-  // gates (scope, diff-targeted tests, non-author review, verified-SHA pin)
-  // are the decision, not a human. Must flip back to high-impact once the
-  // first internal testers are onboarded.
-  it('leaves CI and deploy writable and low-impact — the deterministic gates decide, not a human', () => {
+  // CI and deploy stay WRITABLE (a lane owning them can fix its own CI) and
+  // stay low-impact in `classifyImpact`, which now only describes a diff.
+  // They are nevertheless owned in CODEOWNERS — #615's supply-chain policy,
+  // which this change adopts — so GitHub holds such a PR for its owner even
+  // though impact.ts calls it low. That divergence is deliberate: CODEOWNERS
+  // is the gate, impact.ts is the description.
+  it('leaves CI and deploy writable, and low-impact in the descriptive classifier', () => {
     expect(checkScope(['.github/workflows/ci.yml'], { owned: [], notOwned: [] }, [...NEVER_WRITE_PATHS]).forbidden)
       .toEqual([])
     expect(classifyImpact(['.github/workflows/ci.yml'], 1).impact).toBe('low')

@@ -1,19 +1,106 @@
 # CODEOWNERS
 # Each line is a file pattern followed by one or more owners.
+#
+# Policy (from PR #615, which this file is based on and supersedes): routine
+# PRs — dependency bumps, i18n, docs, app-code features — merge unattended
+# once required status checks are green. Only the paths listed below require
+# human code-owner review before merge; everything else is intentionally left
+# uncovered so it keeps auto-merging. There is deliberately NO catch-all `*`
+# rule: adding one would gate every PR again and defeat the fleet entirely.
+#
+# This file is now LOAD-BEARING, not advisory. It is the whole of the fleet's
+# "this needs a human" gate. The orchestrator used to make that call itself
+# (`classifyImpact` + `mayAutoMerge`), on the operator's laptop, before the PR
+# existed — so GitHub never knew, and anyone could merge past it. Every path
+# in `HIGH_IMPACT_PATHS` (orchestrator/src/impact.ts) is therefore owned here,
+# and tests/orchestrator/guards.test.ts fails if one of them ever stops being
+# covered. Requires the ruleset's `required_code_owner_review` to be on; until
+# that is enabled these lines request review but do not block.
+#
+# Consequence worth calling out, inherited from #615: GitHub Actions
+# dependency bumps (Dependabot PRs touching .github/workflows/) require
+# review, because a compromised or malicious action is a supply-chain vector.
 
-*                                   @rhonda-rodododo
+# ─── Crypto, protocol, and the key boundaries around them ──────────────
+packages/crypto/                    @rhonda-rodododo
+packages/protocol/schemas/          @rhonda-rodododo
+packages/protocol/crypto-labels.json @rhonda-rodododo
+packages/shared/crypto-labels.ts    @rhonda-rodododo
 
-apps/desktop/                       @rhonda-rodododo
-apps/worker/                        @rhonda-rodododo
-apps/ios/                           @rhonda-rodododo
-apps/android/                       @rhonda-rodododo
+# Not the crypto crate itself, but the surfaces that keep (or could leak) a
+# device private key: the webview IPC boundary, the Tauri permission grants,
+# and the iOS/Android Keychain/Keystore wrappers.
+src/client/lib/platform.ts          @rhonda-rodododo
+apps/desktop/src/crypto.rs          @rhonda-rodododo
+apps/desktop/capabilities/          @rhonda-rodododo
+apps/ios/Sources/Services/CryptoService.swift @rhonda-rodododo
+apps/android/app/src/main/java/org/llamenos/hotline/crypto/ @rhonda-rodododo
+apps/android/keystore               @rhonda-rodododo
+
+# ─── Auth, sessions, sigchain: state a revert does not restore ─────────
+apps/worker/middleware/             @rhonda-rodododo
+apps/worker/lib/auth                @rhonda-rodododo
+apps/worker/lib/webauthn            @rhonda-rodododo
+apps/worker/lib/session             @rhonda-rodododo
+apps/worker/lib/crypto              @rhonda-rodododo
+apps/worker/lib/hub-event-crypto    @rhonda-rodododo
+apps/worker/lib/push-encryption     @rhonda-rodododo
+apps/worker/lib/server-identity     @rhonda-rodododo
+apps/worker/lib/agent-identity      @rhonda-rodododo
+apps/worker/lib/timing-safe         @rhonda-rodododo
+apps/worker/lib/blind-index-query   @rhonda-rodododo
+apps/worker/routes/auth             @rhonda-rodododo
+apps/worker/routes/sessions         @rhonda-rodododo
+apps/worker/routes/webauthn         @rhonda-rodododo
+apps/worker/routes/sigchain         @rhonda-rodododo
+apps/worker/db/schema/sigchain      @rhonda-rodododo
+apps/worker/services/crypto-keys    @rhonda-rodododo
+
+# ─── Deanonymization surfaces ──────────────────────────────────────────
+# sip-bridge/ routes PSTN calls and handles caller phone numbers;
+# signal-notifier/ does HMAC-hashed contact resolution. Both are top-level,
+# NOT under apps/ despite what older docs say.
 sip-bridge/                         @rhonda-rodododo
 signal-notifier/                    @rhonda-rodododo
 
-packages/crypto/                    @rhonda-rodododo
-packages/protocol/                  @rhonda-rodododo
-packages/shared/                    @rhonda-rodododo
-packages/i18n/                      @rhonda-rodododo
+# ─── The fleet's own trust base ────────────────────────────────────────
+# A worker that edits the orchestrator, the fragment defining its own lane's
+# write scope, or the hook enforcing the write-deny rules can widen its own
+# authority. These must never be self-approvable.
+orchestrator/                       @rhonda-rodododo
+.claude/agents/fragments/           @rhonda-rodododo
+.claude/settings.json               @rhonda-rodododo
+CODEOWNERS                          @rhonda-rodododo
 
-.github/                            @rhonda-rodododo
+# ─── Supply chain, release, deployment ─────────────────────────────────
+.github/workflows/                  @rhonda-rodododo
+knope.toml                          @rhonda-rodododo
 deploy/                             @rhonda-rodododo
+
+# ─── Security-relevant test suites ─────────────────────────────────────
+# Weakening a test is the shortest route to disabling the check that would
+# have caught the change. `tests/` covers tests/orchestrator/ too.
+tests/                              @rhonda-rodododo
+packages/test-specs/                @rhonda-rodododo
+apps/worker/__tests__/              @rhonda-rodododo
+
+# ─── Key material, wherever it appears ─────────────────────────────────
+# Mirrors SECRET_PATH_PATTERNS (orchestrator/src/config.ts). checkScope
+# already refuses to WRITE these; this is the second half, so a secret that
+# reaches a diff by a route the write gate did not cover still stops here.
+**/.env                             @rhonda-rodododo
+**/.dev.vars                        @rhonda-rodododo
+**/.npmrc                           @rhonda-rodododo
+**/.pgpass                          @rhonda-rodododo
+**/authorized_keys                  @rhonda-rodododo
+**/id_rsa                           @rhonda-rodododo
+**/id_ed25519                       @rhonda-rodododo
+**/keystore.properties              @rhonda-rodododo
+**/*.pem                            @rhonda-rodododo
+**/*.jks                            @rhonda-rodododo
+**/*.keystore                       @rhonda-rodododo
+**/*.p8                             @rhonda-rodododo
+**/*.p12                            @rhonda-rodododo
+**/*.pfx                            @rhonda-rodododo
+**/*.key                            @rhonda-rodododo
+**/*.mobileprovision                @rhonda-rodododo
