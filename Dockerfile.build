@@ -30,8 +30,6 @@ ENV SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}
 ENV GITHUB_SHA=${GITHUB_SHA}
 
 WORKDIR /build
-RUN chown -R bun:bun /build
-USER bun
 
 # Install dependencies first (layer caching)
 # Copy workspace package.json files so bun can resolve the lockfile.
@@ -62,5 +60,14 @@ RUN bun run build
 
 # Build server for reproducibility (Bun build with bytecode)
 RUN bun build src/server/index.ts --target=bun --outdir=dist/server --sourcemap
+
+# Drop to non-root after all build steps run — keeps the Trivy config scan
+# happy (final image user != root) without invalidating the Docker layer
+# cache for bun install / vite build / server build on every unrelated change.
+# No chown needed: this image is only ever `docker cp`'d from (see header),
+# never run as a process, so ownership of the (root-owned) build output
+# doesn't matter — and a recursive chown here would force overlayfs to
+# copy up the entire node_modules tree, which is slower than the build itself.
+USER bun
 
 # Output: /build/dist/client/ and /build/dist/server/
