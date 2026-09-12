@@ -140,6 +140,42 @@ describe('secondOpinion', () => {
     expect(binary).toBe('opencode') // author was claude, so the verifier must be opencode
   })
 
+  /**
+   * Pins the exact opencode argv, because both of its previous values were
+   * wrong in ways nothing here could see: `--format text` is not one of
+   * opencode's accepted choices (`default` | `json`), so `opencode run`
+   * printed its help and exited 0 without contacting a model at all; and the
+   * model id `kimi-for-coding/k2p6` does not exist in opencode's registry, so
+   * the provider answered `Unexpected server error`. Either one on its own
+   * meant `fleet/review` could never return a verdict — every call came back
+   * UNREADABLE, which blocks correctly but reads exactly like "the engine was
+   * unreachable", so nobody looked. Both were confirmed by running the real
+   * binary (1.18.30) each way. The CI job's smoke step is the end-to-end
+   * guard; this is the one that fails before a push.
+   */
+  it('invokes opencode with a model and format the binary actually accepts', async () => {
+    mockExecFileResolves('VERDICT: PASS')
+    const { secondOpinion } = await import('../../orchestrator/src/review.js')
+    const worktree = makeAuthorWorktree()
+    await secondOpinion({
+      authorEngine: 'claude', pr: '1', worktree, diff: 'diff',
+      report: {
+        passed: true, reasons: [], changedFiles: ['apps/worker/x.ts'], addedLines: 1,
+        impact: 'low' as const, impactReasons: [],
+      },
+    })
+    const args = mockExecFile.mock.calls[0]?.[1] as string[]
+    const format = args[args.indexOf('--format') + 1]
+    const model = args[args.indexOf('--model') + 1]
+    expect(args[0]).toBe('run')
+    expect(['default', 'json']).toContain(format)
+    expect(model).toMatch(/^kimi-for-coding\//)
+    expect(model).not.toBe('kimi-for-coding/k2p6') // removed from the registry
+    // No external plugins: the reviewer's behaviour must not depend on
+    // whatever happens to be configured on the machine running it.
+    expect(args).toContain('--pure')
+  })
+
   it('treats an unreachable reviewer as UNREADABLE, not a pass', async () => {
     mockExecFileRejects(new Error('spawn ENOENT'))
     const { secondOpinion } = await import('../../orchestrator/src/review.js')

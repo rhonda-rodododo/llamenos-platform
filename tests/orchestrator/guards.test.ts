@@ -3,7 +3,7 @@ import { LANES, NEVER_WRITE_PATHS, loadLanes, readLaneModes, assertLiveLanesHave
 import { classifyImpact, HIGH_IMPACT_PATHS } from '../../orchestrator/src/impact.js'
 import { checkScope } from '../../orchestrator/src/scope.js'
 import { haltedOnGitHubFrom } from '../../orchestrator/src/killswitch.js'
-import { codeownersPatterns } from './codeowners.js'
+import { codeownersMatcher, codeownersPatterns, trackedFiles, trackedFilesUnder } from './codeowners.js'
 import { mkdtempSync, rmSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -46,14 +46,34 @@ describe('rail: the fleet cannot merge its own changes', () => {
   // `classifyImpact` only DESCRIBES a diff now — it gated nothing that
   // anything outside this process ever saw. The gate is GitHub's own
   // "require review from Code Owners" rule over CODEOWNERS, so the property
-  // that actually has to hold is that every high-impact path is owned there.
-  // Asserted against the real file, not a fixture: a fixture would keep
-  // passing while the shipped CODEOWNERS lost an entry.
-  it('owns every HIGH_IMPACT_PATH in CODEOWNERS — that file, not impact.ts, is the gate', () => {
-    const owned = codeownersPatterns()
+  // that has to hold is about REAL FILES, not about two lists of strings
+  // agreeing with each other.
+  //
+  // The previous version of this test compared patterns with `startsWith`,
+  // and passed on a CODEOWNERS in which sixteen of the auth/session/identity
+  // rules matched nothing whatsoever: CODEOWNERS is gitignore syntax, where
+  // `apps/worker/lib/auth` means a file NAMED `auth`, not `auth.ts`. The
+  // string check could not see that, because a string check can only tell you
+  // two lists agree — never that either one means anything. These two assert
+  // against `git ls-files` with the same matcher GitHub uses.
+  it('every HIGH_IMPACT_PATH matches at least one tracked file — a gate over nothing is not a gate', () => {
+    const files = trackedFiles()
     for (const p of HIGH_IMPACT_PATHS) {
-      expect(owned.some((o) => p.startsWith(o) || o.startsWith(p)), `${p} has no CODEOWNERS owner`).toBe(true)
+      expect(trackedFilesUnder(p, files).length, `HIGH_IMPACT_PATHS entry "${p}" matches no tracked file`)
+        .toBeGreaterThan(0)
     }
+  })
+
+  it('CODEOWNERS owns every tracked file under every HIGH_IMPACT_PATH, by gitignore semantics', () => {
+    const files = trackedFiles()
+    const owner = codeownersMatcher()
+    const unowned: string[] = []
+    for (const p of HIGH_IMPACT_PATHS) {
+      for (const f of trackedFilesUnder(p, files)) {
+        if (!owner.owns(f)) unowned.push(`${f} (under ${p})`)
+      }
+    }
+    expect(unowned, `high-impact files with no CODEOWNERS owner:\n${unowned.join('\n')}`).toEqual([])
   })
 
   it('has no catch-all `*` rule — one would gate every PR and stop the fleet merging anything', () => {

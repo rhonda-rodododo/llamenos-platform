@@ -22,6 +22,7 @@ import {
   destroyWorktree,
   findWorktreeForBranch,
   deleteLocalBranch,
+  type SettleTarget,
 } from './worktree.js'
 import { GitHubSource, toWorkItem, type RawIssue } from './source.js'
 import { tick, type TickDeps, type TickResult, type SettleInput, type DispatchOutcome } from './tick.js'
@@ -262,11 +263,33 @@ async function commentOnIssue(itemId: string, body: string): Promise<void> {
   await gh(['issue', 'comment', itemId, '--body', body])
 }
 
+/**
+ * `needsHuman` is FORWARDED, not dropped — and this mapping is a separate,
+ * exported, pure function precisely because it was being dropped here, in a
+ * hand-written object literal, where nothing could see it. `settle`'s one
+ * remaining label write (the `needs-human` label, worktree.ts) could
+ * therefore never fire in production: tick.ts sets it for a claimed SUCCESS
+ * the fleet could not verify at all (issue #660's shape), and that label is
+ * what stops `judge()` re-dispatching the item on the next pass. Without it
+ * the fleet re-claims an unverifiable item every tick, forever.
+ *
+ * A literal that silently omits one field is invisible to TypeScript when
+ * every field it does set is optional on the target. The unit test on this
+ * function is what makes the omission visible.
+ */
+export function settleTargetFor(input: SettleInput): SettleTarget {
+  return {
+    name: nameFor(input.lane, input.item),
+    itemId: input.item.id,
+    outcome: input.outcome,
+    worktree: input.worktree,
+    branch: input.branch,
+    needsHuman: input.needsHuman,
+  }
+}
+
 async function settleItem(input: SettleInput): Promise<void> {
-  await settleWorktree(
-    { name: nameFor(input.lane, input.item), itemId: input.item.id, outcome: input.outcome, worktree: input.worktree, branch: input.branch },
-    log,
-  )
+  await settleWorktree(settleTargetFor(input), log)
 }
 
 /**

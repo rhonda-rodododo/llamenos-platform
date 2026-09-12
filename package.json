@@ -169,6 +169,7 @@
     "drizzle-kit": "^0.31.10",
     "eslint": "^10.2.1",
     "happy-dom": "^20.9.0",
+    "ignore": "^7.0.9",
     "playwright-bdd": "^8.5.0",
     "postgres": "^3.4.9",
     "quicktype-core": "^23.2.6",

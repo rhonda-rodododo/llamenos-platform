@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, type Mock } from 'vitest'
 import {
   runVerifyCi, runReviewCi, laneIdFromBranch, verdictSummary, ciContextFromEnv,
-  NOT_A_FLEET_PR, REVIEW_KEY_ENV, type CiContext, type VerifyCiDeps, type ReviewCiDeps,
+  REVIEW_KEY_ENV, UNSCOPED_LANE, type CiContext, type VerifyCiDeps, type ReviewCiDeps,
 } from '../../orchestrator/src/ci.js'
 import type { Lane } from '../../orchestrator/src/config.js'
 import type { VerifyInput, VerifyReport } from '../../orchestrator/src/verify.js'
@@ -60,13 +60,27 @@ describe('fleet/verify in CI', () => {
     ...over,
   })
 
-  // Required checks apply to EVERY PR, so a human's branch has to satisfy
-  // them trivially or the repo deadlocks — and the summary has to say that is
-  // what happened, not imply a gate ran.
-  it('passes trivially on a non-fleet branch, and never runs verification', async () => {
+  // No opt-out: a human's branch is verified too. It has no lane, so there
+  // is no owned-path scope to hold it to — but never-write still binds it,
+  // which is exactly what an empty `owned` list means to `checkScope` (the
+  // "never-write binds even an unrestricted lane" rail in guards.test.ts
+  // proves that half; this proves CI actually hands it that lane).
+  it('still verifies a non-fleet branch, against a lane with no owned scope', async () => {
     const d = deps({ ctx: ctx({ branch: 'feat/human-work' }) })
-    expect(await runVerifyCi(d)).toEqual({ ok: true, summary: NOT_A_FLEET_PR })
-    expect(d.verify).not.toHaveBeenCalled()
+    expect((await runVerifyCi(d)).ok).toBe(true)
+    const input = (d.verify as Mock).mock.calls[0]?.[0] as VerifyInput | undefined
+    expect(input?.lane).toBe(UNSCOPED_LANE)
+    expect(input?.lane.scope.owned).toEqual([])
+  })
+
+  it('fails a non-fleet branch whose diff failed the never-write check', async () => {
+    const failed: VerifyReport = {
+      ...passing, passed: false, reasons: ['touched never-write paths: deploy/secrets/prod.pem'],
+    }
+    const d = deps({ ctx: ctx({ branch: 'feat/human-work' }), verify: vi.fn(async () => failed) })
+    const v = await runVerifyCi(d)
+    expect(v.ok).toBe(false)
+    expect(v.summary).toContain('touched never-write paths')
   })
 
   it('passes with the gate trace as its summary when verification passes', async () => {
@@ -102,11 +116,14 @@ describe('fleet/verify in CI', () => {
     expect((await runVerifyCi(deps({ verify: vi.fn(async () => failed) }))).ok).toBe(false)
   })
 
+  // A branch that PARSES as a fleet branch but names no real lane is a
+  // misconfiguration and must fail — never be quietly downgraded to the
+  // unscoped check a human branch gets.
   it('fails for a fleet branch naming a lane that does not exist', async () => {
     const d = deps({ ctx: ctx({ branch: 'fleet/nosuchlane/1' }) })
     const v = await runVerifyCi(d)
     expect(v.ok).toBe(false)
-    expect(v.summary).toContain('unknown lane "nosuchlane"')
+    expect(v.summary).toContain('unknown lane')
     expect(d.verify).not.toHaveBeenCalled()
   })
 })
@@ -122,10 +139,13 @@ describe('fleet/review in CI', () => {
     ...over,
   })
 
-  it('passes trivially on a non-fleet branch without needing a key', async () => {
-    const d = deps({ ctx: ctx({ branch: 'main' }), apiKey: undefined })
-    expect(await runReviewCi(d)).toEqual({ ok: true, summary: NOT_A_FLEET_PR })
-    expect(d.secondOpinion).not.toHaveBeenCalled()
+  // Every PR gets the non-author review, fleet or not: the user's policy is
+  // green CI plus a non-author review for all work, and author login could
+  // not discriminate anyway — the fleet pushes with the operator's account.
+  it('reviews a non-fleet branch too, with the non-author engine', async () => {
+    const d = deps({ ctx: ctx({ branch: 'feat/human-work' }) })
+    expect((await runReviewCi(d)).ok).toBe(true)
+    expect(d.secondOpinion).toHaveBeenCalledWith(expect.objectContaining({ authorEngine: 'claude' }))
   })
 
   // A missing secret must FAIL, never skip and never pass: a review that

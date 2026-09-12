@@ -37,8 +37,13 @@ describe('classifyImpact', () => {
     // scope, and the settings file enforcing the write-deny hook.
     ['.claude/agents/fragments/backend.md'],
     ['.claude/settings.json'],
-    // sigchain schema/routes — state a revert does not restore.
-    ['apps/worker/db/schema/sigchain/devices.ts'],
+    // sigchain schema/routes — state a revert does not restore. The real
+    // tracked file: this used to read `.../sigchain/devices.ts`, a path that
+    // has never existed, and it passed anyway because HIGH_IMPACT_PATHS
+    // carried the bare prefix `apps/worker/db/schema/sigchain` that
+    // `startsWith` matched. Both are the exact file now, and guards.test.ts
+    // fails if it ever stops existing without both lists being updated.
+    ['apps/worker/db/schema/sigchain.ts'],
     // Middleware and the auth/crypto route and lib surface.
     ['apps/worker/middleware/rate-limit.ts'],
     ['apps/worker/routes/auth.ts'],

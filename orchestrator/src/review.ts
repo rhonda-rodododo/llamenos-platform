@@ -161,17 +161,25 @@ export function parseVerdict(output: string): 'PASS' | 'FAIL' | 'UNREADABLE' {
   return captured.toUpperCase() as 'PASS' | 'FAIL'
 }
 
-/** Which binary and model each engine resolves to for a one-shot, read-only
- *  review invocation — independent of `dispatch-one.sh`'s own model aliasing
- *  (engines.ts's `dispatch()` is for a long-running worker session with a
- *  worktree, a tmux session, and a status file; a reviewer is none of those,
- *  it is a single read and a single verdict). `kimi-for-coding/k2p6` is the
- *  concrete opencode model id, not the `kimi` alias dispatch-one.sh accepts,
- *  since that alias resolution happens inside a script this function does
- *  not go through. */
+/**
+ * Which binary and model each engine resolves to for a one-shot, read-only
+ * review invocation — independent of `dispatch-one.sh`'s own model aliasing
+ * (engines.ts's `dispatch()` is for a long-running worker session with a
+ * worktree, a tmux session, and a status file; a reviewer is none of those,
+ * it is a single read and a single verdict).
+ *
+ * The opencode model was `kimi-for-coding/k2p6`, which does not exist in
+ * opencode's model registry — asked for it directly and the provider returns
+ * `Unexpected server error`. That, plus the invalid `--format text` below,
+ * meant the non-author review had never once returned a verdict: every call
+ * failed and was recorded UNREADABLE, which correctly blocked but looked
+ * exactly like "the engine was unreachable". `kimi-for-coding/k3-256k` is a
+ * real id in the registry (`opencode models`), and its 256k context is the
+ * reason to prefer it over `k3` for a whole-diff review.
+ */
 const VERIFIER_ENGINE: Record<EngineId, { binary: string; model: string }> = {
   claude: { binary: 'claude', model: 'sonnet' },
-  opencode: { binary: 'opencode', model: 'kimi-for-coding/k2p6' },
+  opencode: { binary: 'opencode', model: 'kimi-for-coding/k3-256k' },
 }
 
 /**
@@ -360,9 +368,15 @@ async function invokeVerifierEngine(input: {
   timeoutMs: number
 }): Promise<{ reached: boolean; output: string }> {
   const cfg = VERIFIER_ENGINE[input.engine]
+  // `--format text` was not a valid choice (opencode accepts only `default`
+  // or `json`); passing it made `opencode run` print its help and exit
+  // without ever contacting a model. `--pure` skips external plugins, so the
+  // reviewer's behaviour does not depend on whatever plugins happen to be
+  // configured on the machine it runs on. The prompt goes on stdin — verified
+  // against opencode 1.18.30, which accepts it there as well as positionally.
   const args = input.engine === 'claude'
     ? ['--print', '--permission-mode', 'plan', '--model', cfg.model, '--max-turns', String(input.maxTurns)]
-    : ['run', '--model', cfg.model, '--format', 'text', '--dir', input.cwd]
+    : ['run', '--pure', '--model', cfg.model, '--format', 'default', '--dir', input.cwd]
 
   try {
     // execFile (unlike execFileSync) has no `input` option — the prompt must

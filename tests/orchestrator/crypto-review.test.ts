@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   isCryptoDiff, requiredAdditionalReviewers, CRYPTO_SECURITY_REVIEWER_AGENT, CRYPTO_REVIEW_PATHS,
 } from '../../orchestrator/src/review.js'
-import { codeownersPatterns } from './codeowners.js'
+import { codeownersMatcher, trackedFiles, trackedFilesUnder } from './codeowners.js'
 import { classifyImpact } from '../../orchestrator/src/impact.js'
 
 describe('isCryptoDiff / requiredAdditionalReviewers', () => {
@@ -18,8 +18,11 @@ describe('isCryptoDiff / requiredAdditionalReviewers', () => {
     expect(isCryptoDiff(['packages/protocol/crypto-labels.json'])).toBe(true)
   })
   it('requests the crypto reviewer for a diff touching auth/session/sigchain code', () => {
-    expect(isCryptoDiff(['apps/worker/lib/auth/tokens.ts'])).toBe(true)
-    expect(isCryptoDiff(['apps/worker/lib/session/store.ts'])).toBe(true)
+    // Real tracked files, not invented ones: `apps/worker/lib/auth/tokens.ts`
+    // and `apps/worker/lib/session/store.ts` — which this test used to assert
+    // on — do not exist in this repo and never have.
+    expect(isCryptoDiff(['apps/worker/lib/auth.ts'])).toBe(true)
+    expect(isCryptoDiff(['apps/worker/lib/session-renewal.ts'])).toBe(true)
     expect(isCryptoDiff(['apps/worker/routes/sigchain.ts'])).toBe(true)
   })
   it('does not request the crypto reviewer for an unrelated diff', () => {
@@ -47,10 +50,13 @@ describe('crypto diffs always reach a human — now via CODEOWNERS, not a merge 
   // pass a verdict to, and GitHub holds the PR because the path is owned in
   // CODEOWNERS. Asserted on the real file so a crypto path silently losing
   // its owner fails here.
-  it('owns every crypto review path in CODEOWNERS, so no verdict of any kind can merge one', () => {
-    const owned = codeownersPatterns()
+  it('owns every tracked crypto-review file in CODEOWNERS, so no verdict of any kind can merge one', () => {
+    const files = trackedFiles()
+    const owner = codeownersMatcher()
     for (const p of CRYPTO_REVIEW_PATHS) {
-      expect(owned.some((o) => p.startsWith(o) || o.startsWith(p)), `${p} has no CODEOWNERS owner`).toBe(true)
+      const under = trackedFilesUnder(p, files)
+      expect(under.length, `CRYPTO_REVIEW_PATHS entry "${p}" matches no tracked file`).toBeGreaterThan(0)
+      for (const f of under) expect(owner.owns(f), `${f} has no CODEOWNERS owner`).toBe(true)
     }
   })
 })

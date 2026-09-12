@@ -6,13 +6,13 @@ import {
   runPlanWith, type PlanDeps,
   runIntegrateWith, type IntegrateDeps, type DirtyFleetPr,
   resolveDispatchResult, statusForItemWith, type StatusItemDeps,
-  resolveAwaitingHumanWith,
+  resolveAwaitingHumanWith, settleTargetFor,
 } from '../../orchestrator/src/cli.js'
 import { renderDigest, computeBanner } from '../../orchestrator/src/digest.js'
 import { buildIssueCreateArgs, NEEDS_HUMAN_LABEL, type ProposedIssue } from '../../orchestrator/src/roles/planner.js'
 import type { RunRecord } from '../../orchestrator/src/ledger.js'
 import type { WorkItem } from '../../orchestrator/src/source.js'
-import type { TickResult } from '../../orchestrator/src/tick.js'
+import type { SettleInput, TickResult } from '../../orchestrator/src/tick.js'
 import type { DependencyReport } from '../../orchestrator/src/dependency.js'
 import type { PrFacts } from '../../orchestrator/src/status.js'
 
@@ -486,5 +486,37 @@ describe('resolveAwaitingHumanWith (digest live derivation)', () => {
     const readPr = async (): Promise<PrFacts | undefined> => undefined
     const out = await resolveAwaitingHumanWith([candidate('1', '1')], readPr)
     expect(out).toHaveLength(0)
+  })
+})
+
+describe('settleTargetFor', () => {
+  const input = (needsHuman: boolean): SettleInput => ({
+    item: { id: '7', title: 't', body: 'b', url: 'u', labels: [] },
+    lane: {
+      id: 'ios', mode: 'live', cap: 1, engine: 'claude',
+      requireLabel: 'agent-dispatchable', vetoLabels: [], scope: { owned: ['apps/ios/'], notOwned: [] },
+    },
+    outcome: 'SUCCESS',
+    worktree: '/wt/ios-7',
+    branch: 'fleet/ios/7',
+    pr: '99',
+    needsHuman,
+  })
+
+  // The regression this exists for: needsHuman was silently omitted from the
+  // object literal handed to settle(), so the `needs-human` label — the only
+  // thing stopping the fleet re-dispatching a claimed SUCCESS it could not
+  // verify (issue #660's shape) — could never be applied in production.
+  // TypeScript could not see it: every field it does set is optional on
+  // SettleTarget, so an omission type-checks.
+  it.each([true, false])('carries needsHuman=%s through to settle()', (needsHuman) => {
+    expect(settleTargetFor(input(needsHuman)).needsHuman).toBe(needsHuman)
+  })
+
+  it('carries the worktree, branch, outcome and item id settle() needs to clean up', () => {
+    expect(settleTargetFor(input(true))).toEqual({
+      name: 'fleet-ios-7', itemId: '7', outcome: 'SUCCESS',
+      worktree: '/wt/ios-7', branch: 'fleet/ios/7', needsHuman: true,
+    })
   })
 })

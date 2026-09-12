@@ -31,49 +31,61 @@ export const LARGE_DIFF_LINES = 1500
  * check in `classifyImpact`.
  */
 export const HIGH_IMPACT_PATHS: readonly string[] = [
+  // Every entry below is a REAL tracked path — a directory prefix ending in
+  // `/`, or an exact file. That is not cosmetic: these same strings are the
+  // `CODEOWNERS` lines, and CODEOWNERS is gitignore syntax, where a bare
+  // `apps/worker/lib/auth` matches a file NAMED `auth` and therefore matches
+  // nothing at all in this repo. An entry here that matches no tracked file
+  // is a gate that silently protects nothing, so `guards.test.ts` asserts
+  // both directions against `git ls-files`: every path here matches at least
+  // one real file, and every real file under it is owned in CODEOWNERS.
   'packages/crypto/',
   'packages/protocol/schemas/',
   'packages/protocol/crypto-labels.json',
-  'apps/worker/lib/auth',
-  'apps/worker/lib/webauthn',
-  'apps/worker/lib/session',
-  'apps/android/keystore',
+  'packages/shared/crypto-labels.ts',
   'orchestrator/',
   'tests/orchestrator/',
 
-  // Key-boundary wrapper paths — restored 2026-09-12 (see the CORRECTED
-  // comment above). Not the crypto crate itself, but the surfaces that keep
-  // (or could leak) a device private key: the webview IPC boundary, the
-  // Tauri permission grants, and the iOS/Android Keychain/Keystore wrappers.
+  // Key-boundary surfaces. Not the crypto crate itself, but the places that
+  // keep (or could leak) a device private key: the webview IPC boundary, the
+  // Tauri permission grants, the iOS/Android Keychain/Keystore wrappers, and
+  // the Tauri IPC mock, which mirrors the Rust CryptoState.
   'src/client/lib/platform.ts',
   'apps/desktop/src/crypto.rs',
   'apps/desktop/capabilities/',
   'apps/ios/Sources/Services/CryptoService.swift',
   'apps/android/app/src/main/java/org/llamenos/hotline/crypto/',
+  'tests/mocks/',
 
-  // These two are the other half of the orchestrator's own trust base: it
-  // already treats its own source as high-impact, but a worker that edits the
-  // fragment defining its own lane's write scope — or the settings file
-  // enforcing the PreToolUse write-deny hook — can widen its own authority
-  // without ever touching `orchestrator/`.
-  '.claude/agents/fragments/',
+  // The fleet's own trust base: a worker that edits the orchestrator, the
+  // agent definitions bounding its own behaviour, or the write-deny hook can
+  // widen its own authority.
+  '.claude/agents/',
   '.claude/settings.json',
 
+  // Auth, sessions, sigchain, identity: state a revert does not restore.
+  // `.test.ts` siblings are listed explicitly — weakening the test is the
+  // shortest route to disabling the check it guards.
   'apps/worker/middleware/',
-  'apps/worker/routes/auth',
-  'apps/worker/routes/sessions',
-  'apps/worker/routes/webauthn',
-  'apps/worker/routes/sigchain',
-  'apps/worker/db/schema/sigchain',
-  'apps/worker/lib/crypto',
-  'apps/worker/lib/hub-event-crypto',
-  'apps/worker/lib/push-encryption',
-  'apps/worker/lib/server-identity',
-  'apps/worker/lib/agent-identity',
-  'apps/worker/lib/timing-safe',
-  'apps/worker/lib/blind-index-query',
-  'apps/worker/services/crypto-keys',
-  'packages/shared/crypto-labels.ts',
+  'apps/worker/lib/auth.ts',
+  'apps/worker/lib/auth.test.ts',
+  'apps/worker/lib/webauthn.ts',
+  'apps/worker/lib/session-renewal.ts',
+  'apps/worker/lib/crypto.ts',
+  'apps/worker/lib/crypto.test.ts',
+  'apps/worker/lib/hub-event-crypto.ts',
+  'apps/worker/lib/push-encryption.ts',
+  'apps/worker/lib/server-identity.ts',
+  'apps/worker/lib/agent-identity.ts',
+  'apps/worker/lib/timing-safe.ts',
+  'apps/worker/lib/blind-index-query.ts',
+  'apps/worker/lib/blind-index-query.test.ts',
+  'apps/worker/routes/auth.ts',
+  'apps/worker/routes/sessions.ts',
+  'apps/worker/routes/webauthn.ts',
+  'apps/worker/routes/sigchain.ts',
+  'apps/worker/db/schema/sigchain.ts',
+  'apps/worker/services/crypto-keys.ts',
 ]
 
 export function classifyImpact(
