@@ -22,7 +22,14 @@ const HOUR = 3_600_000
  * must not also feed a fleet-wide halt.
  */
 const STREAK_FAILURES: ReadonlySet<Outcome> = new Set<Outcome>(['FAILED', 'TIMEOUT', 'REJECTED'])
-const STREAK_RESETS: ReadonlySet<Outcome> = new Set<Outcome>(['SUCCESS', 'SHADOW'])
+// SHADOW is excluded from both sets, like QUOTA — a shadow lane writes a
+// SHADOW row on every pass it runs, so in the mixed ramp the spec prescribes
+// (some lanes live, some shadow), the newest row would always be a SHADOW
+// row. Treating it as a reset would mean the newest row resets the streak on
+// every single pass, so the consecutive-failure breaker could never trip for
+// a live lane running alongside a shadow one. It must be ignored entirely so
+// the streak is computed only from the outcomes that actually bear on it.
+const STREAK_RESETS: ReadonlySet<Outcome> = new Set<Outcome>(['SUCCESS'])
 
 export function rateBreaker(rows: RunRecord[], limits: Limits, now: number): string | undefined {
   const n = rows.filter((x) => x.outcome === 'DISPATCHED' && now - x.ts <= HOUR).length

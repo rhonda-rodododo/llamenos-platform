@@ -44,6 +44,16 @@ describe('failureBreaker', () => {
     const rows = [r('REJECTED', 1), r('REJECTED', 2), r('REJECTED', 3)]
     expect(failureBreaker(rows, LIMITS, 0)).toMatch(/consecutive/i)
   })
+  it('trips on three FAILED rows interleaved with SHADOW rows', () => {
+    // F4: a shadow lane writes a SHADOW row every pass it runs, so in the
+    // mixed ramp (some lanes live, some shadow) the newest row is very often
+    // a SHADOW row. If SHADOW reset the streak, the newest SHADOW row would
+    // reset it on every single pass and the breaker could never trip for a
+    // live lane running alongside a shadow one. SHADOW must be ignored
+    // entirely, like QUOTA, not treated as a reset.
+    const rows = [r('FAILED', 1), r('SHADOW', 2), r('FAILED', 3), r('SHADOW', 4), r('FAILED', 5)]
+    expect(failureBreaker(rows, LIMITS, 0)).toMatch(/consecutive/i)
+  })
   it('does not trip on three consecutive BLOCKED outcomes', () => {
     // BLOCKED means a worker correctly reported it cannot proceed (e.g. a
     // scope conflict) — that is the system working as designed, and the
