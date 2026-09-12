@@ -1,5 +1,19 @@
 import { describe, it, expect } from 'vitest'
 import { classifyImpact } from '../../orchestrator/src/impact.js'
+import { NEVER_WRITE_PATHS, SECRET_PATH_PATTERNS } from '../../orchestrator/src/config.js'
+
+/**
+ * Builds a realistic changed-file path for a `matchesPath`/glob pattern so
+ * pattern-driven tests below don't need a hand-maintained example per entry
+ * — a future addition to SECRET_PATH_PATTERNS is covered automatically.
+ * `*` becomes a plausible filename fragment; a bare basename pattern (no
+ * `/`) is nested a couple of directories deep to also exercise the
+ * basename-matches-at-any-depth behavior `matchesPath` implements.
+ */
+function realisticPathFor(pattern: string): string {
+  const filename = pattern.includes('*') ? pattern.replace('*', 'example-secret') : pattern
+  return pattern.includes('/') ? filename : `some/nested/dir/${filename}`
+}
 
 describe('classifyImpact', () => {
   it('treats ordinary code as low impact', () => {
@@ -92,5 +106,49 @@ describe('classifyImpact', () => {
   it('stays low at exactly the line-count threshold, and escalates one line past it', () => {
     expect(classifyImpact(['src/client/a.ts'], 1500).impact).toBe('low')
     expect(classifyImpact(['src/client/a.ts'], 1501).impact).toBe('high')
+  })
+})
+
+describe('classifyImpact — secrets always classify high', () => {
+  // Every pattern in SECRET_PATH_PATTERNS (config.ts) must classify as high
+  // impact, iterated from the real constant so a future addition is covered
+  // without a new test.
+  it.each(SECRET_PATH_PATTERNS)('treats a file matching secret pattern %s as high impact', (pattern) => {
+    const file = realisticPathFor(pattern)
+    const result = classifyImpact([file], 5)
+    expect(result.impact).toBe('high')
+    expect(result.reasons.join(' ')).toMatch(new RegExp(`matches secret pattern`))
+  })
+
+  // Guard against the two gates drifting apart again: everything checkScope
+  // refuses to write (NEVER_WRITE_PATHS) must also be high-impact here.
+  // Iterates the real, currently-configured constants — not a hardcoded
+  // copy — so it fails the moment someone adds a never-write pattern without
+  // making classifyImpact aware of it.
+  it.each(NEVER_WRITE_PATHS)('never-write pattern %s is also high-impact (gates must not drift)', (pattern) => {
+    const file = realisticPathFor(pattern)
+    expect(classifyImpact([file], 5).impact).toBe('high')
+  })
+
+  // The twelve-path probe from the security review: every one is a
+  // never-write secret, but before this fix, most classified low because
+  // HIGH_IMPACT_PATHS only caught them incidentally via an unrelated
+  // directory prefix (apps/ios/fastlane/, deploy/, or the android keystore
+  // dir) rather than because they are secrets.
+  it.each([
+    'apps/android/app/release.jks',
+    'apps/android/upload.keystore',
+    'apps/ios/fastlane/AuthKey_ABC123.p8',
+    'apps/ios/certs/dist.p12',
+    'certs/server.pem',
+    'deploy/secrets/tls.key',
+    '.env',
+    'apps/worker/config/.env',
+    'apps/android/keystore.properties',
+    'id_ed25519',
+    '.npmrc',
+    'authorized_keys',
+  ])('probe path %s classifies high', (file) => {
+    expect(classifyImpact([file], 5).impact).toBe('high')
   })
 })

@@ -132,8 +132,17 @@ export async function loadLanes(repoRoot: string, modesFile: string = LANE_MODES
  * `.npmrc`/`.pgpass`/`authorized_keys` cover registry auth tokens, Postgres
  * credentials, and SSH access — none of which are recoverable secrets a
  * revert can undo once exfiltrated.
+ *
+ * SINGLE SOURCE OF TRUTH for two independent gates: `NEVER_WRITE_PATHS`
+ * below (checked by `checkScope` at write/diff time) and `classifyImpact`
+ * in `impact.ts` (checked at merge time). A secret pattern that is
+ * never-write but not also high-impact is a gap the moment a secret reaches
+ * a diff by any route the write gate did not cover — a rename, a symlink, a
+ * path the write gate missed — because the merge gate would then wave it
+ * through unreviewed. Add new secret patterns here ONLY; both gates pick
+ * them up automatically.
  */
-export const NEVER_WRITE_PATHS: readonly string[] = [
+export const SECRET_PATH_PATTERNS: readonly string[] = [
   '.env',
   '.dev.vars',
   'keystore.properties',
@@ -151,6 +160,8 @@ export const NEVER_WRITE_PATHS: readonly string[] = [
   '.pgpass',
   'authorized_keys',
 ]
+
+export const NEVER_WRITE_PATHS: readonly string[] = SECRET_PATH_PATTERNS
 
 export const MAX_ATTEMPTS_PER_ITEM = 3
 
