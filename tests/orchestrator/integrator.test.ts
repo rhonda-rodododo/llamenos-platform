@@ -73,7 +73,14 @@ interface Fixture { bareOrigin: string; worktree: string; branch: string }
  *  commit ahead of `main`. */
 function makeFixture(branch = 'fleet/backend/1'): Fixture {
   const bareOrigin = tmp('llamenos-fleet-int-origin-')
-  git(bareOrigin, 'init -q --bare')
+  // Pin the bare repo's default branch explicitly: `git init --bare` fixes
+  // HEAD at init time from init.defaultBranch, which is unset (and falls
+  // back to git's legacy "master") on a runner with no global gitconfig.
+  // Without -b main here, HEAD points at a ref that's never created (the
+  // "main" branch only exists after the seed repo below pushes it), so a
+  // later `git clone` of this origin checks out nothing and every fixture
+  // built on top loses its local "main" branch to push against.
+  git(bareOrigin, 'init -q --bare -b main')
 
   const seed = tmp('llamenos-fleet-int-seed-')
   git(seed, 'init -q -b main')
