@@ -1,9 +1,10 @@
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, afterEach, vi } from 'vitest'
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { checkHalt, halt, haltedLocally, haltedOnGitHubFrom, resume } from '../../orchestrator/src/killswitch.js'
 import { FLEET_DIR, HALT_FILE, HALT_REASON_FILE, RESUMED_AT_FILE } from '../../orchestrator/src/paths.js'
-import { failureBreaker, readResumedAt, type Limits } from '../../orchestrator/src/circuit.js'
-import type { RunRecord } from '../../orchestrator/src/ledger.js'
+import { failureBreaker, readResumedAt, checkBreakers, type Limits } from '../../orchestrator/src/circuit.js'
+import { doctor } from '../../orchestrator/src/cli.js'
+import type { RunRecord, Outcome } from '../../orchestrator/src/ledger.js'
 
 const LIMITS: Limits = { maxDispatchesPerHour: 6, consecutiveFailuresToHalt: 3, quotaCooldownMs: 3_600_000 }
 const failedAt = (ts: number): RunRecord =>
@@ -71,6 +72,67 @@ describe('halt / resume', () => {
     const result = await checkHalt()
     expect(result.halted).toBe(true)
     expect(result.reason).toBe('local halt reason')
+  })
+})
+
+describe('checkBreakers halting the fleet (issue #638)', () => {
+  const r = (outcome: Outcome, ts: number, lane = 'backend'): RunRecord =>
+    ({ ts, runId: 'x', lane, itemId: '1', itemName: 'n', engine: 'claude', outcome })
+  const LIMITS: Limits = { maxDispatchesPerHour: 6, consecutiveFailuresToHalt: 3, quotaCooldownMs: 3_600_000 }
+
+  it('a tripped rate breaker actually halts the fleet, naming itself in the reason', () => {
+    expect(haltedLocally()).toBe(false)
+    const rows = Array.from({ length: 7 }, (_, i) => r('DISPATCHED', 1000 + i))
+    const reason = checkBreakers(rows, LIMITS, 2000, 0)
+    expect(reason).toMatch(/dispatch rate/i)
+    expect(haltedLocally()).toBe(true)
+    expect(readFileSync(HALT_REASON_FILE, 'utf8')).toMatch(/rate breaker/i)
+  })
+
+  it('a tripped failure breaker actually halts the fleet, naming itself in the reason', () => {
+    expect(haltedLocally()).toBe(false)
+    const rows = [r('FAILED', 1), r('TIMEOUT', 2), r('FAILED', 3)]
+    const reason = checkBreakers(rows, LIMITS, 100, 0)
+    expect(reason).toMatch(/consecutive/i)
+    expect(haltedLocally()).toBe(true)
+    expect(readFileSync(HALT_REASON_FILE, 'utf8')).toMatch(/failure breaker/i)
+  })
+
+  it('does not halt when neither breaker trips', () => {
+    checkBreakers([r('SUCCESS', 1)], LIMITS, 100, 0)
+    expect(haltedLocally()).toBe(false)
+  })
+
+  // MUTATION GUARD: a version of checkBreakers that only returned the string
+  // without calling halt() would still pass every rateBreaker/failureBreaker
+  // unit test elsewhere (they call those pure functions directly, never
+  // checkBreakers, and never inspect the halt file) — this is the only place
+  // that regression would be caught.
+  it('halting is a hard side effect of the trip itself, not merely incidental to logging', () => {
+    const rows = Array.from({ length: 7 }, (_, i) => r('DISPATCHED', 1000 + i))
+    checkBreakers(rows, LIMITS, 2000, 0)
+    expect(haltedLocally()).toBe(true) // read from the filesystem, not from checkBreakers' return value
+  })
+
+  // Operator-facing half: doctor is the command a human actually runs to ask
+  // "is this thing OK", and before this fix it unconditionally reported
+  // "not halted" because nothing ever called halt() from a breaker trip.
+  it('doctor reports the halt and the literal resume command once a breaker has tripped', async () => {
+    checkBreakers(Array.from({ length: 7 }, (_, i) => r('DISPATCHED', 1000 + i)), LIMITS, 2000, 0)
+    const lines: string[] = []
+    const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
+      lines.push(String(chunk))
+      return true
+    })
+    try {
+      await doctor()
+    } finally {
+      spy.mockRestore()
+    }
+    const output = lines.join('')
+    expect(output).toMatch(/FAIL\s+not halted/)
+    expect(output).toContain('rate breaker tripped')
+    expect(output).toContain('llamenos-fleet resume')
   })
 })
 

@@ -1,0 +1,86 @@
+import type { Lane } from './config.js'
+import type { WorkItem } from './source.js'
+
+export interface BriefSection {
+  heading: string
+  body: string
+}
+
+/**
+ * Composable, not one opaque string. A later augmentation step adds context
+ * a fresh dispatch does not have — the last reviewer verdict, a governing
+ * interface contract from a sibling lane's in-flight work — and needs to
+ * ADD a section, not string-splice into the middle of one. If buildBrief
+ * returned a single string here, that augmentation would end up doing
+ * fragile text surgery on prose it does not own.
+ */
+export interface Brief {
+  sections: BriefSection[]
+}
+
+export function renderBrief(brief: Brief): string {
+  return brief.sections.map((s) => `## ${s.heading}\n\n${s.body}`).join('\n\n')
+}
+
+/**
+ * Assembles a worker's entire task specification. Every section here exists
+ * because of a specific failure mode in the reference system (Atlas): a
+ * worker that merged its own PR, one that "helpfully" ran the full suite and
+ * burned its whole budget on unrelated flakes, one that silently widened its
+ * scope instead of saying so, and one that wrote a status file with no
+ * parseable terminal outcome so the orchestrator had to guess.
+ *
+ * Fix round 2, M2: this used to also take `priorAttempts` and append its own
+ * "Previous attempts" section — duplicating `memory.ts`'s `augmentBrief`,
+ * which does the identical filter-by-item / sort / cap-at-three / render
+ * under a different heading ("Prior attempts on this item"). A caller that
+ * used both (as `cli.ts` did, and as `tick.ts` was always going to) would
+ * render the same failure history twice under two headings — precisely the
+ * "wastes the worker's context for no information" failure this brief
+ * exists to avoid, reached by a path no test caught. `memory.ts` is now the
+ * SOLE owner of prior-attempt history: this function no longer takes or
+ * renders it at all, which makes double-rendering structurally impossible
+ * rather than a wiring convention someone has to remember. Any caller that
+ * wants prior-attempt context must go through `augmentBrief`.
+ */
+export function buildBrief(item: WorkItem, lane: Lane, branch: string): Brief {
+  const sections: BriefSection[] = [
+    {
+      heading: `Issue #${item.id}: ${item.title}`,
+      body: `${item.url}\n\n${item.body}`,
+    },
+    {
+      heading: 'Branch',
+      body: `Work on branch \`${branch}\`. Do not create or push to any other branch.`,
+    },
+    {
+      heading: 'Scope',
+      body:
+        `You own these paths and ONLY these paths:\n\n` +
+        lane.scope.owned.map((p) => `- \`${p}\``).join('\n') +
+        `\n\nIf the fix genuinely requires touching something outside your scope, ` +
+        `do NOT touch it — reduce the fix to what fits inside your scope, note in your ` +
+        `final status exactly what you had to leave out and why, and let a human decide ` +
+        `whether the scope itself needs to change. Never silently widen your scope.`,
+    },
+    {
+      heading: 'What you must NOT do',
+      body:
+        `- Never merge your own pull request. Open exactly one PR and stop.\n` +
+        `- Never deploy anything, to any environment.\n` +
+        `- Never send anything (no notifications, no messages, no emails) as a side effect of this work.\n` +
+        `- Do not run the full test suite. Run only the tests your diff actually touches — ` +
+        `a full run on an unattended worker burns budget on failures that have nothing to do with your change.`,
+    },
+    {
+      heading: 'Output contract',
+      body:
+        `When you are finished, write your status file's final line as exactly one of:\n\n` +
+        `- \`DONE <pr-url>\` — you opened exactly one PR and it is ready for review.\n` +
+        `- \`BLOCKED <reason>\` — you could not finish; say specifically why, so the next ` +
+        `attempt (or a human) knows what to try differently.`,
+    },
+  ]
+
+  return { sections }
+}

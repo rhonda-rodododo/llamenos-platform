@@ -50,6 +50,8 @@ export const HIGH_IMPACT_PATHS: readonly string[] = [
   'apps/worker/routes/auth',
   'apps/worker/routes/sessions',
   'apps/worker/routes/webauthn',
+  'apps/worker/routes/sigchain',
+  'apps/worker/db/schema/sigchain',
   'apps/worker/lib/crypto',
   'apps/worker/lib/hub-event-crypto',
   'apps/worker/lib/push-encryption',

@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs'
+import { halt } from './killswitch.js'
 import { RESUMED_AT_FILE } from './paths.js'
 import type { Outcome, RunRecord } from './ledger.js'
 
@@ -59,8 +60,29 @@ export function readResumedAt(): number {
   return Number.isFinite(n) ? n : 0
 }
 
+/**
+ * Issue #638: the spec promises "a tripped breaker writes the same halt file
+ * a human would — one halted state, one recovery path", and killswitch.ts's
+ * own comment on `halt()` says breakers call it. Until now, nothing did — a
+ * tripped breaker aborted the one pass and logged a line, but `doctor` kept
+ * reporting `not halted` and an operator had no reason to run `resume`. The
+ * breaker name is folded into the reason passed to `halt()` (not into the
+ * string returned here, which callers already prefix with their own
+ * "breaker tripped:" wording) so the halt reason file — read by both `doctor`
+ * and `status` — names which breaker fired, not just that something did.
+ */
 export function checkBreakers(rows: RunRecord[], limits: Limits, now: number, resumedAt: number): string | undefined {
-  return rateBreaker(rows, limits, now) ?? failureBreaker(rows, limits, resumedAt)
+  const rate = rateBreaker(rows, limits, now)
+  if (rate !== undefined) {
+    halt(`rate breaker tripped: ${rate}`)
+    return rate
+  }
+  const failure = failureBreaker(rows, limits, resumedAt)
+  if (failure !== undefined) {
+    halt(`failure breaker tripped: ${failure}`)
+    return failure
+  }
+  return undefined
 }
 
 /** Lane-level backoff instead of a global halt: one provider's quota should not
