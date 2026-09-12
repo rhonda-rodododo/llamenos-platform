@@ -186,12 +186,21 @@ jobs:
       fail-fast: false
       matrix:
         image:
+          # `deploy/docker/Dockerfile` is multi-stage; Docker defaults to its
+          # LAST stage (`static`), so each entry names its stage explicitly.
+          # `target: ''` means "single-stage Dockerfile, no stage to select".
           - name: app
             dockerfile: deploy/docker/Dockerfile
             context: .
+            target: app
+          - name: static
+            dockerfile: deploy/docker/Dockerfile
+            context: .
+            target: static
           - name: build
             dockerfile: Dockerfile.build
             context: .
+            target: ''
 
     steps:
       - name: Checkout
@@ -205,6 +214,7 @@ jobs:
         with:
           context: .
           file: ${{ matrix.image.dockerfile }}
+          target: ${{ matrix.image.target }}
           push: false
           load: true
           tags: llamenos-scan:latest

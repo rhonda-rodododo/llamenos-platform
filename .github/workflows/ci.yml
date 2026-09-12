@@ -1268,6 +1268,12 @@ jobs:
         with:
           context: .
           file: deploy/docker/Dockerfile
+          # `deploy/docker/Dockerfile` is multi-stage and its LAST stage is
+          # `static` (the Caddy image that serves the SPA, consumed by
+          # docker-compose.production.yml's `caddy` service). Docker defaults
+          # to the last stage, so without an explicit target this would
+          # publish the Caddy static-file server under the app image tags.
+          target: app
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha

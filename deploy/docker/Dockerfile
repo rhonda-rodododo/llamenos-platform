@@ -7,6 +7,12 @@
 #   Stage 4-6 (`static`): Caddy image for docker-compose.production.yml's
 #     `caddy` service (built SPA + custom rate-limiting Caddy binary)
 #
+# EVERY consumer of this file MUST pass an explicit stage (`--target` /
+# compose `build.target` / build-push-action `target:`). Docker builds the
+# LAST stage when none is given, and that is `static` (Caddy) — not `app`.
+# Call sites: deploy/docker/docker-compose.yml (app), docker-compose.production.yml
+# (caddy), .github/workflows/{docker,release,ci,security-audit}.yml.
+#
 # Bun runs TypeScript natively — no esbuild transpilation step needed.
 
 # Stage 1: Install runtime deps
