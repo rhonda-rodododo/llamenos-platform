@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { tick, claimAcrossLanes, type TickDeps } from '../../orchestrator/src/tick.js'
 import type { Lane } from '../../orchestrator/src/config.js'
 import type { WorkItem } from '../../orchestrator/src/source.js'
+import type { RunRecord } from '../../orchestrator/src/ledger.js'
 
 const lane = (id: string, mode: Lane['mode'] = 'shadow'): Lane => ({
   id, mode, cap: 1, engine: 'claude',
@@ -95,6 +96,109 @@ describe('tick', () => {
     const d = deps({ readLabels: async () => ['lane:ios'] })
     const r = await tick(d)
     expect(r.rejections).toEqual([{ id: '1', reason: 'missing-require-label' }])
+  })
+
+  // E1: a rejecting dispatch() must not crash the process or abort the pass —
+  // it is recorded FAILED (note truncated to ~300 chars) and the loop moves on
+  // to the next item, so the consecutive-failure breaker (not an uncaught
+  // rejection) is what eventually stops a run of these. This also proves E5's
+  // first half: the lock is still released.
+  it('records a FAILED row (truncated) and continues past a rejecting dispatch, without losing the lock', async () => {
+    const release = vi.fn()
+    const longMessage = 'x'.repeat(400)
+    const dispatch = vi
+      .fn()
+      .mockRejectedValueOnce(new Error(longMessage))
+      .mockResolvedValueOnce({ outcome: 'SUCCESS' as const })
+    const d = deps({
+      lanes: [{ ...lane('ios', 'live'), cap: 2 }],
+      listItems: async () => [item('1'), item('2')],
+      acquireLock: () => ({ held: true, release }),
+      dispatch,
+    })
+    const r = await tick(d)
+    expect(dispatch).toHaveBeenCalledTimes(2)
+    expect(d.record).toHaveBeenCalledWith(
+      expect.objectContaining({ itemId: '1', outcome: 'FAILED', note: 'x'.repeat(300) }),
+    )
+    expect(d.record).toHaveBeenCalledWith(expect.objectContaining({ itemId: '2', outcome: 'SUCCESS' }))
+    expect(r.dispatched).toBe(2)
+    expect(r.aborted).toBeUndefined()
+    expect(release).toHaveBeenCalledTimes(1)
+  })
+
+  // E1 (layer 2) + E5 (second half): a rejection from anywhere else in the
+  // pass — here, listItems() itself throwing instead of resolving to
+  // `undefined` — must not escape tick() uncaught either. It comes back as
+  // `aborted: 'error'`, and the lock is still released.
+  it('returns aborted: "error" and releases the lock, rather than throwing, when listItems rejects unexpectedly', async () => {
+    const release = vi.fn()
+    const d = deps({
+      acquireLock: () => ({ held: true, release }),
+      listItems: async () => { throw new Error('network down') },
+    })
+    const r = await tick(d)
+    expect(r.aborted).toBe('error')
+    expect(r.errorMessage).toContain('network down')
+    expect(release).toHaveBeenCalledTimes(1)
+    expect(d.dispatch).not.toHaveBeenCalled()
+  })
+
+  // E2: `judge()` legitimately lets one item pass for two lanes at once (it is
+  // labelled for both). Ownership must still be exclusive at dispatch time —
+  // the first lane in claim-priority order gets it, the second must not also
+  // dispatch it.
+  it('claims a dual-labelled item to only the first lane in claim-priority order', async () => {
+    const dispatch = vi.fn(async (_item: WorkItem, _lane: Lane) => ({ outcome: 'SUCCESS' as const }))
+    const d = deps({
+      lanes: [lane('backend', 'live'), lane('ios', 'live')],
+      readLabels: async () => ['agent-dispatchable', 'lane:backend', 'lane:ios'],
+      dispatch,
+    })
+    const r = await tick(d)
+    expect(dispatch).toHaveBeenCalledTimes(1)
+    expect(dispatch.mock.calls[0][1].id).toBe('backend')
+    expect(r.dispatched).toBe(1)
+  })
+
+  // E3: MAX_ATTEMPTS_PER_ITEM is enforced by failedAttemptsIn() at dispatch
+  // time, not merely defined as a constant. resumedAt is set past all three
+  // failure rows on purpose — the consecutive-failure breaker only counts rows
+  // after resumedAt, so without this the breaker would trip first (aborted:
+  // 'breaker') and mask whether the per-item skip itself works.
+  it('skips an item that has exhausted MAX_ATTEMPTS_PER_ITEM prior failures', async () => {
+    const rows: RunRecord[] = [
+      { ts: 1, runId: 'a', lane: 'ios', itemId: '1', itemName: 't1', engine: 'claude', outcome: 'FAILED' },
+      { ts: 2, runId: 'b', lane: 'ios', itemId: '1', itemName: 't1', engine: 'claude', outcome: 'FAILED' },
+      { ts: 3, runId: 'c', lane: 'ios', itemId: '1', itemName: 't1', engine: 'claude', outcome: 'FAILED' },
+    ]
+    const d = deps({
+      lanes: [lane('ios', 'live')],
+      readLedger: () => rows,
+      resumedAt: () => 10, // past all three failure rows — see comment above
+    })
+    const r = await tick(d)
+    expect(d.dispatch).not.toHaveBeenCalled()
+    expect(r.dispatched).toBe(0)
+  })
+
+  // E4: cap must be tracked per lane. The mutation this guards against is
+  // hoisting `let taken = 0` out of the per-lane loop so it accumulates across
+  // lanes — that would starve every lane after the first.
+  it('applies the per-lane cap independently, so a second lane is not starved by the first', async () => {
+    const dispatch = vi.fn(async () => ({ outcome: 'SUCCESS' as const }))
+    const backendItems = [item('b1'), item('b2')]
+    const iosItems = [item('i1'), item('i2')]
+    const d = deps({
+      lanes: [{ ...lane('backend', 'live'), cap: 1 }, { ...lane('ios', 'live'), cap: 1 }],
+      listItems: async (l: Lane) => (l.id === 'backend' ? backendItems : iosItems),
+      readLabels: async (id: string) =>
+        id.startsWith('b') ? ['agent-dispatchable', 'lane:backend'] : ['agent-dispatchable', 'lane:ios'],
+      dispatch,
+    })
+    const r = await tick(d)
+    expect(dispatch).toHaveBeenCalledTimes(2)
+    expect(r.dispatched).toBe(2)
   })
 })
 

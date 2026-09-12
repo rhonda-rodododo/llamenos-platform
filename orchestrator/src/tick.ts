@@ -22,8 +22,9 @@ export interface TickResult {
   ran: boolean
   halted?: boolean
   haltReason?: string
-  aborted?: 'source-unreadable' | 'breaker'
+  aborted?: 'source-unreadable' | 'breaker' | 'error'
   breakerReason?: string
+  errorMessage?: string
   dispatched: number
   shadowed: number
   rejections: { id: string; reason: Rejection }[]
@@ -36,6 +37,13 @@ let counter = 0
 function runId(now: number): string {
   counter = (counter + 1) % 0xffff
   return `${now.toString(36)}${counter.toString(36).padStart(3, '0')}`
+}
+
+const NOTE_MAX_CHARS = 300
+
+function errorMessage(e: unknown): string {
+  const msg = e instanceof Error ? e.message : String(e)
+  return msg.length > NOTE_MAX_CHARS ? msg.slice(0, NOTE_MAX_CHARS) : msg
 }
 
 /**
@@ -53,6 +61,16 @@ export function claimAcrossLanes(lanes: Lane[], itemsByLane: Map<string, WorkIte
   return owned
 }
 
+/**
+ * `tick()` always returns; it never throws. Every abnormal exit — a halted
+ * fleet, a tripped breaker, an unreadable source, or an unexpected rejection
+ * anywhere in this pass — comes back as a `TickResult` a human can read, not
+ * an uncaught rejection that crashes the scheduler process and leaves no
+ * ledger row explaining why. A single failed `dispatch()` is handled closer
+ * to its source (recorded FAILED, loop continues); this catch is the backstop
+ * for everything else that can reject: `checkHalt`, `listItems`,
+ * `readLabels`, or a `readLedger`/`now` that throws synchronously.
+ */
 export async function tick(deps: TickDeps): Promise<TickResult> {
   const lock = deps.acquireLock()
   if (!lock.held) {
@@ -128,14 +146,27 @@ export async function tick(deps: TickDeps): Promise<TickResult> {
           continue
         }
 
-        const result = await deps.dispatch(item, lane)
-        deps.record({ ...base, ...result })
+        // A rejecting dispatch (network failure against GitHub or the engine,
+        // routine for either) must not abort the pass or escape uncaught: it
+        // is recorded FAILED like any other bad outcome, so the consecutive-
+        // failure breaker — not an uncaught rejection — is what stops a run
+        // of these, and a human reading the ledger the next morning sees why.
+        try {
+          const result = await deps.dispatch(item, lane)
+          deps.record({ ...base, ...result })
+        } catch (e) {
+          deps.record({ ...base, outcome: 'FAILED', note: errorMessage(e) })
+        }
         dispatched++
         taken++
       }
     }
 
     return { ran: true, dispatched, shadowed, rejections: allRejections }
+  } catch (e) {
+    const msg = errorMessage(e)
+    deps.log(`tick failed: ${msg}`)
+    return empty({ ran: true, aborted: 'error', errorMessage: msg })
   } finally {
     if (lock.held) lock.release()
   }
