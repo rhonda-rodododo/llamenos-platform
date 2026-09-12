@@ -3,6 +3,28 @@ import { dirname } from 'node:path'
 import { LEDGER_FILE } from './paths.js'
 
 /**
+ * G1 (2026-09-12): this ledger records ONLY the fleet's own actions and
+ * observations, AT THE TIME they happened — never a durable claim about
+ * external state that can drift out from under it. The concrete incident
+ * this guards against: issue #660's terminal row recorded `SUCCESS` with a
+ * PR link, and `worktree.ts` used to map that straight to a `fleet:merged`
+ * label — but the PR was never merged, and nothing here ever re-checked. The
+ * label was a CACHE of "what we believed happened", and it went stale the
+ * instant it was written.
+ *
+ * The fix is not a better mapping — any label the fleet writes to describe
+ * an outcome can drift the same way. Whether a PR is open, merged, or closed
+ * is a fact about GitHub, and is DERIVED ON READ from `gh` (state, mergedAt,
+ * headRefOid, reviews) plus this ledger's own rows plus `git` (does the
+ * branch/worktree still exist) — see `llamenos-fleet status <issue>` and
+ * `digest.ts`'s "waiting on a human" section, neither of which reads a
+ * label. Do not add a field here (or a label in worktree.ts) that caches
+ * "merged", "reviewed", or any other fact this ledger cannot itself
+ * guarantee stays true after the row is written — if it's derivable from a
+ * live query, derive it, every time, rather than remembering it once.
+ */
+
+/**
  * QUOTA is deliberately not a flavour of FAILED. A provider rate limit is not
  * the fleet misbehaving, and letting it feed the consecutive-failure breaker
  * turns a billing event into a global halt.

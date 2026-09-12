@@ -43,6 +43,19 @@ export const CRYPTO_SECURITY_REVIEWER_AGENT = 'crypto-security-reviewer'
  * covered here too, so the two lists cannot drift apart the way two
  * independently-maintained lists inevitably do.
  */
+// NOTE (2026-09-12): `impact.ts`'s HIGH_IMPACT_PATHS was narrowed on this date
+// to remove the desktop IPC / capabilities and mobile crypto-service WRAPPER
+// paths (`src/client/lib/platform.ts`, the iOS/Android CryptoService files) —
+// see impact.ts's own dated comment for why. Because this array derives
+// `CRYPTO_REVIEW_PATHS` from HIGH_IMPACT_PATHS, the `platform.ts` and
+// `CryptoService` keywords below no longer match anything: a diff touching
+// only those wrapper files no longer gets the mandatory crypto-security-
+// reviewer, even though `platform.ts` is exactly the boundary that keeps a
+// device private key out of the webview. That is a real, intentional-per-
+// policy narrowing, not an oversight — flagged here so it is not mistaken for
+// one, and so re-adding those paths to HIGH_IMPACT_PATHS (recommended once
+// production users exist) automatically restores this review too. The
+// keywords are left in place rather than deleted for exactly that reason.
 const CRYPTO_PATH_KEYWORDS: readonly string[] = [
   'crypto', 'auth', 'session', 'webauthn', 'sigchain',
   'server-identity', 'agent-identity', 'timing-safe', 'blind-index',
@@ -489,6 +502,36 @@ export async function postReview(pr: string, verdict: 'PASS' | 'FAIL' | 'UNREADA
   await gh(['pr', 'review', pr, flag, '--body', body])
 }
 
+/**
+ * G3: an UNREADABLE verdict already gets a `--request-changes` review (same
+ * as FAIL, above) — but that review's body is either the reviewer's own raw,
+ * incoherent output or the terse `(reviewer engine was unreachable)`
+ * placeholder, and its "Changes requested" framing reads to a human as "the
+ * reviewer found a problem", not "there was no reviewer". Root-caused live
+ * against issue #660/PR #662: this box has no opencode/`ZHIPU_API_KEY`
+ * configured, so `invokeVerifierEngine` could not even start the non-author
+ * engine — the fail-safe worked (UNREADABLE correctly blocks auto-merge via
+ * `mayAutoMerge`), but nothing told the human reviewing the PR that they were
+ * the ONLY review it had gotten. This is that explicit comment, posted in
+ * ADDITION to the review above, in plain language a human skimming the PR
+ * will actually notice.
+ */
+export function buildReviewUnavailableComment(reasonText: string): string {
+  const reason = reasonText.trim().length > 0 ? reasonText.trim() : 'no reason was recorded'
+  return [
+    '**Non-author review was unavailable for this PR.**',
+    '',
+    'Every PR the fleet opens is meant to get an independent review from a DIFFERENT engine ' +
+      'than the one that wrote the diff, before it can auto-merge. That review could not be ' +
+      'completed here:',
+    '',
+    `> ${reason}`,
+    '',
+    'This PR has NOT received that second opinion. If you are reviewing it, you are currently ' +
+      'the only review it has had — please treat it accordingly.',
+  ].join('\n')
+}
+
 // ---------------------------------------------------------------------------
 // The bounded review loop (task 13, spec §5.6)
 // ---------------------------------------------------------------------------
@@ -523,6 +566,18 @@ export interface ReviewLoopDeps {
   secondOpinion(input: SecondOpinionInput): Promise<SecondOpinionResult>
   postReview(pr: string, verdict: SecondOpinionResult['verdict'], body: string): Promise<void>
   /**
+   * G3: posts `buildReviewUnavailableComment`'s explicit "you are the only
+   * review this PR has had" comment. Called whenever the loop ends with
+   * UNREADABLE — both when `secondOpinion` itself returned it (a review WAS
+   * posted via `postReview`, just an unhelpful one) and when a tamper
+   * detection ends the loop before `postReview` is ever reached (zero
+   * reviews posted at all). Best-effort from the caller's point of view: a
+   * failure here must never be allowed to overwrite an already-decided
+   * verdict or trip the kill switch a second time, so `runReviewLoop` itself
+   * catches and logs rather than propagates a failure of this call.
+   */
+  commentOnPr(pr: string, body: string): Promise<void>
+  /**
    * Sends the reviewer's verdict text back to the SAME worker session, its
    * worktree left intact (see engines.ts's `dispatch` — it deliberately
    * never tears the session or worktree down on return, exactly so this
@@ -554,6 +609,13 @@ export interface ReviewLoopResult {
    *  came from — `undefined` only if verifyMechanical itself never got a
    *  chance to run, which does not currently happen in this loop. */
   lastReport?: VerifyReport
+  /** The last reviewer output — `secondOpinion`'s own `text`, or a fixed
+   *  description of the tamper detection when that is what ended the loop.
+   *  `undefined` only when no review was ever attempted (a mechanical
+   *  failure on round one). Carried out to the caller (tick.ts) so G2's gate
+   *  trace can show WHY an UNREADABLE verdict was unreadable, not just that
+   *  it was. */
+  lastVerdictText?: string
 }
 
 /**
@@ -578,7 +640,21 @@ export interface ReviewLoopResult {
 export async function runReviewLoop(input: ReviewLoopInput, deps: ReviewLoopDeps): Promise<ReviewLoopResult> {
   let lastReport: VerifyReport | undefined
   let lastVerdict: SecondOpinionResult['verdict'] | undefined
+  let lastVerdictText: string | undefined
   let rounds = 0
+
+  // G3: best-effort — a comment failing here must never overwrite a verdict
+  // already decided above it, nor look like the tamper/kill-switch path
+  // itself failed. Logged and swallowed, same reasoning as every other
+  // best-effort post in this fleet (see settle()'s own per-step try/catch).
+  const safeCommentOnPr = async (reasonText: string): Promise<void> => {
+    try {
+      await deps.commentOnPr(input.pr, buildReviewUnavailableComment(reasonText))
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      deps.log(`review loop: failed to post the "review unavailable" comment on PR ${input.pr}: ${msg}`)
+    }
+  }
 
   for (let round = 1; round <= MAX_REVIEW_ROUNDS; round++) {
     rounds = round
@@ -598,16 +674,26 @@ export async function runReviewLoop(input: ReviewLoopInput, deps: ReviewLoopDeps
       if (e instanceof VerifierTamperedWorktreeError) {
         deps.haltFleet(`non-author verifier tampered with the author's own worktree during review of PR ${input.pr}: ${e.message}`)
         deps.log(`review loop: verifier tamper detected on PR ${input.pr} on round ${round} — kill switch tripped, NOT retrying`)
-        return { finalVerdict: 'UNREADABLE', rounds, needsHuman: true, lastReport }
+        // No `postReview` was ever reached on this round — the PR has ZERO
+        // reviews at this point, not even an UNREADABLE one, so the "you are
+        // the only review" comment matters more here than anywhere else.
+        const tamperText = `the non-author verifier appears to have tampered with the worktree during review (${e.message}) — the fleet has halted, and this verdict cannot be trusted`
+        await safeCommentOnPr(tamperText)
+        return { finalVerdict: 'UNREADABLE', rounds, needsHuman: true, lastReport, lastVerdictText: tamperText }
       }
       throw e
     }
 
     await deps.postReview(input.pr, secondOp.verdict, secondOp.text)
     lastVerdict = secondOp.verdict
+    lastVerdictText = secondOp.text
+
+    if (secondOp.verdict === 'UNREADABLE') {
+      await safeCommentOnPr(secondOp.text)
+    }
 
     if (secondOp.verdict === 'PASS') {
-      return { finalVerdict: 'PASS', rounds, needsHuman: false, lastReport }
+      return { finalVerdict: 'PASS', rounds, needsHuman: false, lastReport, lastVerdictText }
     }
 
     if (round < MAX_REVIEW_ROUNDS) {
@@ -617,5 +703,5 @@ export async function runReviewLoop(input: ReviewLoopInput, deps: ReviewLoopDeps
   }
 
   deps.log(`review loop: exhausted ${MAX_REVIEW_ROUNDS} round(s) for PR ${input.pr} without a PASS — a human is needed`)
-  return { finalVerdict: lastVerdict ?? 'FAIL', rounds, needsHuman: true, lastReport }
+  return { finalVerdict: lastVerdict ?? 'FAIL', rounds, needsHuman: true, lastReport, lastVerdictText }
 }

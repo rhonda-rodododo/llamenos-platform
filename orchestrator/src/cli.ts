@@ -23,7 +23,8 @@ import {
 import { GitHubSource, toWorkItem, type RawIssue } from './source.js'
 import { tick, type TickDeps, type TickResult, type SettleInput, type DispatchOutcome } from './tick.js'
 import type { WorkItem } from './source.js'
-import { renderDigest, resumeCommand, type DigestInput, type LaneStatus } from './digest.js'
+import { renderDigest, resumeCommand, waitingOnHuman, type DigestInput, type LaneStatus } from './digest.js'
+import { deriveItemStatus, renderItemStatus, type PrFacts, type PrState } from './status.js'
 import { notify } from './notify.js'
 import { FLEET_DIR, LOG_FILE, HALT_REASON_FILE, DISPATCH_SCRIPT } from './paths.js'
 import { REPO, gh, ghJson } from './gh.js'
@@ -184,6 +185,46 @@ function nameFor(lane: Lane, item: WorkItem): string {
   return `fleet-${lane.id}-${item.id}`
 }
 
+/**
+ * G3's root-caused fix for issue #660/PR #662: audited directly against
+ * `dispatch-one.sh` (`~/.claude/skills/supervising-dispatched-sessions/`),
+ * the WORKER's own terminal status write (as opposed to the throwaway
+ * DISPATCHED seed file the launcher writes before the worker starts) only
+ * ever carries `session`, `status`, `pr`, `merged_sha`, `duration_sec`, and
+ * `notes` — NEVER `branch` or `worktree`, even though the seed file has
+ * both. `engines.ts`'s `dispatch()` reads the WORKER's file, so
+ * `DispatchResult.branch`/`.worktree` are `undefined` for every real
+ * terminal status a worker writes itself — which is exactly what silently
+ * skipped the mechanical verify -> review -> merge pipeline for #660: the
+ * `result.outcome === 'SUCCESS' && branch !== undefined && pr !== undefined
+ * && worktree !== undefined` guard in `tick.ts`'s `runLiveDispatch` was
+ * never satisfied, so the item fell straight to the pass-through branch with
+ * zero scope check, zero tests, and zero non-author review.
+ *
+ * This does not change `engines.ts` or ask it to guess at a contract it does
+ * not own (`dispatch-one.sh` is a separate, unvendored dependency — see
+ * paths.ts's `DISPATCH_SCRIPT` comment). It repairs both fields at the one
+ * place that already has a correct answer independent of the worker's own
+ * report:
+ *   - `branch` is deterministic and known BEFORE dispatch even starts (built
+ *     right below) — the worker's report is never trusted for it.
+ *   - `worktree` is asked of git directly via `findWorktreeForBranch`
+ *     (worktree.ts), exactly the reasoning that function's own doc comment
+ *     already gives for `revert`/`integrate`.
+ *
+ * Exported and pure-ish (the git lookup is injected) so this exact repair is
+ * unit-tested without a real dispatch-one.sh in sight.
+ */
+export async function resolveDispatchResult(
+  result: DispatchOutcome,
+  branch: string,
+  repoRoot: string,
+  findWorktree: (repoRoot: string, branch: string) => Promise<string | undefined>,
+): Promise<DispatchOutcome> {
+  const worktree = result.worktree ?? await findWorktree(repoRoot, branch)
+  return { ...result, branch: result.branch ?? branch, worktree }
+}
+
 async function realDispatch(item: WorkItem, lane: Lane): Promise<DispatchOutcome> {
   const branch = `fleet/${lane.id}/${item.id}`
   const baseBrief = buildBrief(item, lane, branch)
@@ -198,7 +239,7 @@ async function realDispatch(item: WorkItem, lane: Lane): Promise<DispatchOutcome
   mkdirSync(BRIEFS_DIR, { recursive: true })
   const briefPath = join(BRIEFS_DIR, `${nameFor(lane, item)}.md`)
   writeFileSync(briefPath, renderBrief(brief))
-  return dispatchWorker({
+  const result = await dispatchWorker({
     name: nameFor(lane, item),
     item,
     lane,
@@ -207,6 +248,7 @@ async function realDispatch(item: WorkItem, lane: Lane): Promise<DispatchOutcome
     model: lane.model ?? DEFAULT_MODEL,
     effort: DEFAULT_EFFORT,
   })
+  return resolveDispatchResult(result, branch, REPO_ROOT, findWorktreeForBranch)
 }
 
 async function prDiff(pr: string): Promise<string> {
@@ -248,6 +290,10 @@ async function reviseWithWorker(item: WorkItem, lane: Lane, verdictText: string)
   await execFileAsync('tmux', ['send-keys', '-t', name, message, 'Enter'], { timeout: 10_000 })
 }
 
+async function commentOnPr(pr: string, body: string): Promise<void> {
+  await gh(['pr', 'comment', pr, '--body', body])
+}
+
 async function runTick(): Promise<number> {
   const lanes = await loadLanes(REPO_ROOT)
 
@@ -265,6 +311,7 @@ async function runTick(): Promise<number> {
     prDiff,
     secondOpinion,
     postReview,
+    commentOnPr,
     reviseWithWorker,
     haltFleet: halt,
     ciStatusFor,
@@ -324,6 +371,99 @@ function status(): number {
 
 function errMsg(e: unknown): string {
   return e instanceof Error ? e.message : String(e)
+}
+
+// ---------------------------------------------------------------------------
+// status <issue> — G1: everything derived on read, nothing from a label.
+// ---------------------------------------------------------------------------
+
+export interface StatusItemDeps {
+  /** Every ledger row for this item, any order. */
+  readRows(itemId: string): RunRecord[]
+  /** `undefined` on any read failure, matching `ghJson`'s own contract. */
+  readPr(pr: string): Promise<PrFacts | undefined>
+  /** `undefined` when the check itself could not be answered (network/auth) —
+   *  distinct from a confirmed `false` ("definitely gone"). */
+  branchExistsOnOrigin(branch: string): Promise<boolean | undefined>
+  findWorktreeForBranch(branch: string): Promise<string | undefined>
+}
+
+/**
+ * DI-shaped exactly like `revert`/`runIntegrateWith` above, so `gh` and `git`
+ * are mocked at this boundary in tests rather than by mocking `child_process`
+ * globally. Pulls the most recent PR/branch this item's ledger rows recorded
+ * (an item can accumulate several attempts; only the latest PR/branch is
+ * still meaningful) and hands everything to `deriveItemStatus` (status.ts),
+ * which is pure and reads no label.
+ */
+export async function statusForItemWith(itemId: string, deps: StatusItemDeps): Promise<string> {
+  const rows = deps.readRows(itemId)
+  const byRecency = [...rows].sort((a, b) => b.ts - a.ts)
+  const latestPr = byRecency.find((r) => r.pr !== undefined)?.pr
+  const latestBranch = byRecency.find((r) => r.branch !== undefined)?.branch
+
+  const [pr, branchExists, worktree] = await Promise.all([
+    latestPr !== undefined ? deps.readPr(latestPr) : Promise.resolve(undefined),
+    latestBranch !== undefined ? deps.branchExistsOnOrigin(latestBranch) : Promise.resolve(undefined),
+    latestBranch !== undefined ? deps.findWorktreeForBranch(latestBranch) : Promise.resolve(undefined),
+  ])
+
+  return renderItemStatus(deriveItemStatus({
+    itemId, rows, pr, branchExists, worktreeExists: latestBranch !== undefined ? worktree !== undefined : undefined,
+  }))
+}
+
+interface GhPrView {
+  state: string
+  headRefOid: string
+  reviews: { state: string; author: { login: string } }[]
+}
+
+function normalizePrState(state: string): PrState {
+  if (state === 'MERGED') return 'MERGED'
+  if (state === 'CLOSED') return 'CLOSED'
+  return 'OPEN'
+}
+
+async function readPr(pr: string): Promise<PrFacts | undefined> {
+  const view = await ghJson<GhPrView>(['pr', 'view', pr, '--json', 'state,headRefOid,reviews'])
+  if (view === undefined) return undefined
+  return {
+    number: pr,
+    state: normalizePrState(view.state),
+    headRefOid: view.headRefOid,
+    reviews: view.reviews.map((r) => ({ state: r.state, author: r.author.login })),
+  }
+}
+
+/**
+ * `git ls-remote --exit-code` exits 2 specifically for "no matching refs" —
+ * a confirmed, definite "the branch is gone" — and non-zero for any other
+ * reason (network, auth) means the check itself failed, which must read as
+ * `undefined` ("unknown"), never be conflated with a confirmed `false`.
+ */
+async function branchExistsOnOrigin(branch: string): Promise<boolean | undefined> {
+  try {
+    await execFileAsync('git', ['ls-remote', '--exit-code', '--heads', 'origin', branch], { cwd: REPO_ROOT, timeout: 15_000 })
+    return true
+  } catch (e) {
+    const err = e as { code?: number }
+    return err.code === 2 ? false : undefined
+  }
+}
+
+function defaultStatusItemDeps(): StatusItemDeps {
+  return {
+    readRows: (itemId) => readAll().filter((r) => r.itemId === itemId),
+    readPr,
+    branchExistsOnOrigin,
+    findWorktreeForBranch: (branch) => findWorktreeForBranch(REPO_ROOT, branch),
+  }
+}
+
+async function runStatusForItem(itemId: string): Promise<number> {
+  process.stdout.write(await statusForItemWith(itemId, defaultStatusItemDeps()) + '\n')
+  return 0
 }
 
 /**
@@ -435,6 +575,12 @@ export function digestInputFrom(
   recentRuns: RunRecord[],
   dependency: DependencyReport,
   repoRoot: string,
+  // G1: already LIVE-filtered by the caller (runDigest) — see
+  // digest.ts's `DigestInput.awaitingHuman` and `waitingOnHuman`'s own
+  // comment. Defaults to `[]` so every existing call site (and every test
+  // that predates G1) keeps compiling and rendering an empty section rather
+  // than being forced to thread a live `gh` result through.
+  awaitingHuman: RunRecord[] = [],
 ): DigestInput {
   return {
     halted,
@@ -442,6 +588,7 @@ export function digestInputFrom(
     resumeCommand: resumeCommand(repoRoot),
     lanes,
     recentRuns,
+    awaitingHuman,
     rejections: lastTick?.rejections ?? [],
     dependency,
     // R3/digest hardening: tick() reports `aborted: 'source-unreadable'`
@@ -453,6 +600,30 @@ export function digestInputFrom(
     // to a healthy, quiet one.
     sourceUnreadable: lastTick?.aborted === 'source-unreadable',
   }
+}
+
+/**
+ * G1: turns `waitingOnHuman`'s ledger-only candidates into the actual answer
+ * by asking `gh` — live, every call — whether each candidate's PR is still
+ * open and unmerged. A candidate with no `pr` at all (dispatch never got
+ * that far) or whose live `gh` read fails is dropped rather than assumed:
+ * this section exists so an operator can trust it, and "we couldn't check"
+ * must never render identically to "yes, waiting."
+ */
+export async function resolveAwaitingHumanWith(
+  candidates: RunRecord[],
+  readPrFn: (pr: string) => Promise<PrFacts | undefined>,
+): Promise<RunRecord[]> {
+  const resolved = await Promise.all(candidates.map(async (r): Promise<RunRecord | undefined> => {
+    if (r.pr === undefined) return undefined
+    const pr = await readPrFn(r.pr)
+    return pr !== undefined && pr.state === 'OPEN' ? r : undefined
+  }))
+  return resolved.filter((r): r is RunRecord => r !== undefined)
+}
+
+async function resolveAwaitingHuman(candidates: RunRecord[]): Promise<RunRecord[]> {
+  return resolveAwaitingHumanWith(candidates, readPr)
 }
 
 async function runDigest(hoursArg?: string): Promise<number> {
@@ -472,15 +643,18 @@ async function runDigest(hoursArg?: string): Promise<number> {
     ? readFileSync(HALT_REASON_FILE, 'utf8').trim()
     : undefined
   const dependency = checkDispatchDependency()
+  const recentRuns = since(hours * 3_600_000)
+  const awaitingHuman = await resolveAwaitingHuman(waitingOnHuman(recentRuns))
 
   const input = digestInputFrom(
     lastTickResult(),
     haltedNow,
     haltReason,
     lanes.map((l) => ({ id: l.id, mode: l.mode })),
-    since(hours * 3_600_000),
+    recentRuns,
     dependency,
     REPO_ROOT,
+    awaitingHuman,
   )
   const body = renderDigest(input)
   process.stdout.write(body + '\n')
@@ -701,7 +875,10 @@ type CommandHandler = (rest: string[]) => Promise<number> | number
 const HANDLERS: Record<string, CommandHandler> = {
   doctor: () => doctor(),
   tick: () => runTick(),
-  status: () => status(),
+  // With an issue id: derive-and-print that item's status (G1) — everything
+  // computed live from the ledger, `gh`, and `git`, nothing from a label.
+  // With no argument: the existing fleet-wide overview, unchanged.
+  status: (rest) => (rest[0] !== undefined ? runStatusForItem(rest[0]) : status()),
   halt: (rest) => { halt(rest.join(' ') || 'halted by hand'); log('HALTED'); return 0 },
   resume: () => { resume(); log('RESUMED'); return 0 },
   revert: (rest) => {

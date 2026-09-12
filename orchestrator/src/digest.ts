@@ -87,14 +87,30 @@ export function outcomeHistogram(runs: RunRecord[]): HistogramEntry<Outcome>[] {
     .sort((a, b) => b.count - a.count || a.reason.localeCompare(b.reason))
 }
 
-/** BLOCKED means a worker correctly reported it cannot proceed without a
- *  human decision — see circuit.ts's comment on why BLOCKED does not feed the
- *  failure breaker. Deduped to the most recent BLOCKED row per item: an item
- *  blocked three times in a row is one thing waiting on a human, not three. */
+const OUTCOMES_MEANING_A_PR_WAS_LEFT_FOR_A_HUMAN: ReadonlySet<Outcome> = new Set<Outcome>(['SUCCESS', 'BLOCKED'])
+
+/**
+ * G1: this is a CANDIDATE list from the ledger alone, not the final answer —
+ * see status.ts's own module comment on why nothing in this fleet caches
+ * "the PR is still open". BLOCKED means a worker correctly reported it
+ * cannot proceed without a human decision (circuit.ts explains why BLOCKED
+ * does not feed the failure breaker); SUCCESS is a candidate too, because
+ * after this fleet's redesign SUCCESS no longer implies "merged" — see
+ * ledger.ts's module comment — it can mean a clean auto-merge OR a claimed
+ * success this fleet could not verify and left for a human (tick.ts's
+ * `needsHuman` handoff). Distinguishing those two requires a LIVE `gh` query
+ * per candidate (is the PR still open and unmerged?), which this pure,
+ * I/O-free function cannot do — `runDigest` (cli.ts) does that query and
+ * passes the FILTERED result to `renderDigest` as `DigestInput.awaitingHuman`
+ * (see digestInputFrom); `renderDigest` itself never calls this function.
+ *
+ * Deduped to the most recent qualifying row per item: an item blocked three
+ * times in a row is one thing waiting on a human, not three.
+ */
 export function waitingOnHuman(runs: RunRecord[]): RunRecord[] {
   const latestByItem = new Map<string, RunRecord>()
   for (const r of runs) {
-    if (r.outcome !== 'BLOCKED') continue
+    if (!OUTCOMES_MEANING_A_PR_WAS_LEFT_FOR_A_HUMAN.has(r.outcome)) continue
     const prev = latestByItem.get(r.itemId)
     if (prev === undefined || r.ts > prev.ts) latestByItem.set(r.itemId, r)
   }
@@ -139,6 +155,14 @@ export interface DigestInput {
   resumeCommand: string
   lanes: LaneStatus[]
   recentRuns: RunRecord[]
+  /**
+   * G1: the LIVE-derived subset of `waitingOnHuman(recentRuns)`'s candidates
+   * that `gh` still confirms are open and unmerged, gathered by `runDigest`
+   * (cli.ts) — never computed inside this module, which does no I/O. See
+   * `waitingOnHuman`'s own comment for why a ledger-only candidate is not
+   * enough on its own since this fleet's G1 redesign.
+   */
+  awaitingHuman: RunRecord[]
   rejections: RejectionInput[]
   dependency: DependencyReport
   /**
@@ -248,7 +272,7 @@ export function renderDigest(input: DigestInput): string {
   parts.push(
     section(
       'Waiting on a human',
-      waitingOnHuman(input.recentRuns).map((r) => `- ${r.lane}/${r.itemId} (${r.itemName})${r.note ? `: ${r.note}` : ''}`),
+      input.awaitingHuman.map((r) => `- ${r.lane}/${r.itemId} (${r.itemName})${r.note ? `: ${r.note}` : ''}`),
     ),
   )
 

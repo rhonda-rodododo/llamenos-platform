@@ -44,6 +44,7 @@ function baseDeps(over: Partial<TickDeps> = {}): TickDeps {
     prHeadSha: vi.fn(async () => 'c0ffee'),
     mergePr: vi.fn(async () => {}),
     commentOnIssue: vi.fn(async () => {}),
+    commentOnPr: vi.fn(async () => {}),
     settle: vi.fn(async () => {}),
     record: vi.fn(),
     log: () => {},
@@ -184,6 +185,114 @@ describe('tick: live dispatch pipeline (task 7)', () => {
     await tick(d)
     expect(d.mergePr).not.toHaveBeenCalled()
     expect(d.record).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'BLOCKED' }))
+  })
+})
+
+describe('tick: G1 needs-human handoff and G2 gate-trace observability', () => {
+  it('BLOCKED (mayAutoMerge refused after a passing review) is handed to a human via settle', async () => {
+    const d = baseDeps({ ciStatusFor: vi.fn(async () => false) })
+    await tick(d)
+    expect(d.settle).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'BLOCKED', needsHuman: true }))
+  })
+
+  // G2's own required test: a run that stops at the merge gate must carry
+  // the merge reason in the terminal ledger row's note.
+  it('the terminal row for a run that stops at the merge gate contains the merge reason', async () => {
+    const d = baseDeps({ ciStatusFor: vi.fn(async () => false) })
+    await tick(d)
+    expect(d.record).toHaveBeenCalledWith(expect.objectContaining({
+      outcome: 'BLOCKED',
+      note: expect.stringContaining('CI is not green'),
+    }))
+  })
+
+  it('a real auto-merge (SUCCESS) does NOT get needs-human — nothing is left for a human', async () => {
+    const d = baseDeps()
+    await tick(d)
+    expect(d.settle).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'SUCCESS', needsHuman: false }))
+  })
+
+  it('an ordinary mechanical REJECTED does NOT get needs-human — it is still retryable', async () => {
+    const failing: VerifyReport = { ...passingVerify, passed: false, reasons: ['touched never-write paths: .env'] }
+    const d = baseDeps({ verifyMechanical: vi.fn(async () => failing) })
+    await tick(d)
+    expect(d.settle).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'REJECTED', needsHuman: false }))
+  })
+
+  it('a review-exhausted REJECTED does NOT get needs-human — it is still retryable', async () => {
+    const d = baseDeps({ secondOpinion: vi.fn(async () => ({ verdict: 'FAIL' as const, text: 'VERDICT: FAIL — nope' })) })
+    await tick(d)
+    expect(d.settle).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'REJECTED', needsHuman: false }))
+  })
+
+  it('logs one line per gate stage reached: verify, review, and merge', async () => {
+    const lines: string[] = []
+    const d = baseDeps({ log: (msg: string) => { lines.push(msg) } })
+    await tick(d)
+    expect(lines.some((l) => l.startsWith('verify:'))).toBe(true)
+    expect(lines.some((l) => l.startsWith('review:'))).toBe(true)
+    expect(lines.some((l) => l.startsWith('merge:'))).toBe(true)
+  })
+
+  it('a mechanical failure logs a verify line but no review or merge line — the operator can tell the gate never reached review', async () => {
+    const lines: string[] = []
+    const failing: VerifyReport = { ...passingVerify, passed: false, reasons: ['touched never-write paths: .env'] }
+    const d = baseDeps({ verifyMechanical: vi.fn(async () => failing), log: (msg: string) => { lines.push(msg) } })
+    await tick(d)
+    expect(lines.some((l) => l.startsWith('verify:'))).toBe(true)
+    expect(lines.some((l) => l.startsWith('review:'))).toBe(false)
+    expect(lines.some((l) => l.startsWith('merge:'))).toBe(false)
+  })
+
+  it('the terminal note is a compact gate trace carrying scope, impact, tests, review, merge and sha', async () => {
+    const d = baseDeps()
+    await tick(d)
+    expect(d.record).toHaveBeenCalledWith(expect.objectContaining({
+      outcome: 'SUCCESS',
+      note: expect.stringMatching(/scope=\S+ impact=\S+ tests=\S+ review=PASS merge=yes\(.*\) sha=c0ffee/),
+    }))
+  })
+
+  // G3: the root-caused fix for issue #660/PR #662 — a worker-reported
+  // SUCCESS whose dispatch result is missing branch/worktree must NEVER be
+  // silently treated as a real, verified merge. The whole pipeline is
+  // skipped, so it must be flagged for a human and the PR told it received
+  // no automated verification.
+  describe('G3: a claimed SUCCESS the fleet cannot verify (issue #660/PR #662)', () => {
+    it('is recorded as-is, flagged needs-human, and comments on the PR that no verification ran', async () => {
+      const dispatch = vi.fn(async (): Promise<DispatchOutcome> =>
+        ({ outcome: 'SUCCESS', pr: '662', note: 'dep:abc123 worker summary here' })) // no branch, no worktree
+      const d = baseDeps({ dispatch })
+      await tick(d)
+
+      expect(d.verifyMechanical).not.toHaveBeenCalled()
+      expect(d.secondOpinion).not.toHaveBeenCalled()
+      expect(d.mergePr).not.toHaveBeenCalled()
+      expect(d.commentOnPr).toHaveBeenCalledWith('662', expect.stringContaining('NO automated verification'))
+      expect(d.settle).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'SUCCESS', needsHuman: true }))
+      expect(d.record).toHaveBeenCalledWith(expect.objectContaining({
+        outcome: 'SUCCESS',
+        note: expect.stringContaining('scope=not-run'),
+      }))
+    })
+
+    it('still carries the worker\'s own note alongside the not-run trace', async () => {
+      const dispatch = vi.fn(async (): Promise<DispatchOutcome> =>
+        ({ outcome: 'SUCCESS', pr: '662', note: 'dep:abc123 worker summary here' }))
+      const d = baseDeps({ dispatch })
+      await tick(d)
+      expect(d.record).toHaveBeenCalledWith(expect.objectContaining({
+        note: expect.stringContaining('dep:abc123 worker summary here'),
+      }))
+    })
+
+    it('does not comment on a PR that does not exist (no pr field at all)', async () => {
+      const dispatch = vi.fn(async (): Promise<DispatchOutcome> => ({ outcome: 'SUCCESS', note: 'no pr yet' }))
+      const d = baseDeps({ dispatch })
+      await tick(d)
+      expect(d.commentOnPr).not.toHaveBeenCalled()
+      expect(d.settle).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'SUCCESS', needsHuman: true }))
+    })
   })
 })
 

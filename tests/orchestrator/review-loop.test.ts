@@ -32,6 +32,7 @@ function deps(over: Partial<ReviewLoopDeps> = {}): ReviewLoopDeps {
     prDiff: vi.fn(async () => 'diff'),
     secondOpinion: vi.fn(async (): Promise<SecondOpinionResult> => ({ verdict: 'PASS', text: 'VERDICT: PASS' })),
     postReview: vi.fn(async () => {}),
+    commentOnPr: vi.fn(async () => {}),
     reviseWithWorker: vi.fn(async () => {}),
     haltFleet: vi.fn(),
     log: () => {},
@@ -44,12 +45,16 @@ describe('runReviewLoop', () => {
     const d = deps()
     const result = await runReviewLoop(input, d)
 
-    expect(result).toEqual({ finalVerdict: 'PASS', rounds: 1, needsHuman: false, lastReport: passingReport() })
+    expect(result).toEqual({
+      finalVerdict: 'PASS', rounds: 1, needsHuman: false, lastReport: passingReport(), lastVerdictText: 'VERDICT: PASS',
+    })
     expect(d.verifyMechanical).toHaveBeenCalledTimes(1)
     expect(d.secondOpinion).toHaveBeenCalledTimes(1)
     expect(d.postReview).toHaveBeenCalledTimes(1)
     expect(d.postReview).toHaveBeenCalledWith('42', 'PASS', expect.any(String))
     expect(d.reviseWithWorker).not.toHaveBeenCalled()
+    // A PASS is a real review — no "review unavailable" comment is needed.
+    expect(d.commentOnPr).not.toHaveBeenCalled()
   })
 
   it('a FAIL then a PASS reports two rounds', async () => {
@@ -149,5 +154,59 @@ describe('runReviewLoop', () => {
 
     await expect(runReviewLoop(input, d)).rejects.toThrow('network down')
     expect(d.haltFleet).not.toHaveBeenCalled()
+  })
+
+  // G3: the fix for issue #660/PR #662's silent gap — a human reading an
+  // UNREADABLE-reviewed PR must be told explicitly that they are the only
+  // review it has had, not left to infer it from a terse review body.
+  describe('G3: "review unavailable" comment', () => {
+    it('posts an explicit comment on an UNREADABLE verdict from secondOpinion, in addition to the review', async () => {
+      const secondOpinion = vi.fn<ReviewLoopDeps['secondOpinion']>()
+        .mockResolvedValue({ verdict: 'UNREADABLE', text: '(reviewer engine was unreachable)' })
+      const d = deps({ secondOpinion })
+
+      const result = await runReviewLoop(input, d)
+
+      expect(result.finalVerdict).toBe('UNREADABLE')
+      expect(result.lastVerdictText).toBe('(reviewer engine was unreachable)')
+      expect(d.postReview).toHaveBeenCalledWith('42', 'UNREADABLE', expect.any(String))
+      expect(d.commentOnPr).toHaveBeenCalledWith('42', expect.stringContaining('(reviewer engine was unreachable)'))
+      expect(d.commentOnPr).toHaveBeenCalledWith('42', expect.stringContaining('only review'))
+    })
+
+    it('posts the comment on a tamper-halted loop even though postReview was never reached', async () => {
+      const secondOpinion = vi.fn(async () => { throw new VerifierTamperedWorktreeError('HEAD moved during review') })
+      const d = deps({ secondOpinion })
+
+      const result = await runReviewLoop(input, d)
+
+      expect(result.finalVerdict).toBe('UNREADABLE')
+      expect(d.postReview).not.toHaveBeenCalled()
+      expect(d.commentOnPr).toHaveBeenCalledTimes(1)
+      expect(d.commentOnPr).toHaveBeenCalledWith('42', expect.stringContaining('tampered'))
+    })
+
+    it('does NOT post the comment for an ordinary FAIL — a real review already happened', async () => {
+      const secondOpinion = vi.fn<ReviewLoopDeps['secondOpinion']>()
+        .mockResolvedValue({ verdict: 'FAIL', text: 'VERDICT: FAIL — nope' })
+      const d = deps({ secondOpinion })
+
+      await runReviewLoop(input, d)
+
+      expect(d.commentOnPr).not.toHaveBeenCalled()
+    })
+
+    it('a comment failure is logged and swallowed — it must not overwrite the already-decided verdict', async () => {
+      const secondOpinion = vi.fn<ReviewLoopDeps['secondOpinion']>()
+        .mockResolvedValue({ verdict: 'UNREADABLE', text: 'garbled output' })
+      const commentOnPr = vi.fn(async () => { throw new Error('gh: rate limited') })
+      const log = vi.fn()
+      const d = deps({ secondOpinion, commentOnPr, log })
+
+      const result = await runReviewLoop(input, d)
+
+      expect(result.finalVerdict).toBe('UNREADABLE')
+      expect(log).toHaveBeenCalledWith(expect.stringContaining('failed to post the "review unavailable" comment'))
+    })
   })
 })

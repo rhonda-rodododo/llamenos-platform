@@ -40,6 +40,7 @@ function deps(over: Partial<TickDeps> = {}): TickDeps {
     prHeadSha: vi.fn(async () => 'deadbeef'),
     mergePr: vi.fn(async () => {}),
     commentOnIssue: vi.fn(async () => {}),
+    commentOnPr: vi.fn(async () => {}),
     settle: vi.fn(async () => {}),
     record: vi.fn(),
     log: () => {},
