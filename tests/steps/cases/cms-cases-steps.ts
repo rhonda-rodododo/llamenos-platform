@@ -39,7 +39,7 @@ Given('case management is disabled', async ({ backendRequest: request, casesWorl
   await enableCaseManagementViaApi(request, false, ADMIN_NSEC, workerHub)
 })
 
-Given('the {string} template has been applied', async ({ backendRequest: request, casesWorld, workerHub }, templateSlug: string) => {
+Given('the {string} template has been applied', async ({ backendRequest: request, workerHub }, templateSlug: string) => {
   const templates = await listTemplatesViaApi(request, ADMIN_NSEC, workerHub)
   const match = templates.find(t => t.id === templateSlug || t.name.toLowerCase().includes(templateSlug.replace('-', ' ')))
   if (match) {
