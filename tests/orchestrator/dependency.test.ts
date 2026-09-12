@@ -1,41 +1,27 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { execFileSync } from 'node:child_process'
-import { existsSync, readFileSync, statSync, mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { DISPATCH_SCRIPT, DISPATCH_SKILL_DIR } from '../../orchestrator/src/paths.js'
 import { problemsWith, rulesReferenceDeadCommands, gitFactsFor } from '../../orchestrator/src/dependency.js'
 
+// The three checks that used to live here — the script exists and is
+// executable, its rules avoid dead commands, and its directory is a real
+// git repo — all read `DISPATCH_SCRIPT`/`DISPATCH_SKILL_DIR`, which resolve
+// under the real `homedir()` (see paths.ts) and point at
+// `~/.claude/skills/supervising-dispatched-sessions`, a path that exists
+// only on an operator's machine, not in this repo or on a CI runner. They
+// asserted the state of the developer's machine, not the state of the code,
+// so they could only ever fail on a runner that has never seen that
+// directory. `doctor` (orchestrator/src/cli.ts) already reports this
+// dependency's path, HEAD commit and any problems at runtime, which is the
+// only place the answer is meaningful. What remains below is the part with
+// durable value: `problemsWith` and `gitFactsFor` are pure functions over
+// data, and `rulesReferenceDeadCommands` is a pure function over text —
+// none of them touch the filesystem outside of temp dirs they create and
+// clean up themselves.
+
 describe('dispatch dependency', () => {
-  it('the script exists and is executable', () => {
-    expect(existsSync(DISPATCH_SCRIPT)).toBe(true)
-    expect(statSync(DISPATCH_SCRIPT).mode & 0o111).toBeGreaterThan(0)
-  })
-
-  /**
-   * The naive form of this check — `grep -rn 'llamenos-hotline' <file>` — is a
-   * false positive on this exact file: `prompt-rules-llamenos.md`'s own intro
-   * paragraph names the retired repo ONLY to warn workers not to mix it up
-   * ("it is a different repo from the retired `llamenos-hotline` v1 project;
-   * do not mix their paths, remotes, or scripts"). That sentence is the fix,
-   * not the bug. The actual risk this test guards is a worker being handed a
-   * runnable command that targets a repo or script that does not exist here,
-   * so it inspects fenced code blocks only — the same scope
-   * `rulesReferenceDeadCommands` (dependency.ts) checks at runtime — and
-   * ignores prose. Kept as a real filesystem read (not a fixture) because the
-   * fact under test is the live state of a repo outside this one; a fixture
-   * would only ever prove the parser works, not that the dependency is clean.
-   */
-  it('its rules do not name commands this repo does not have', () => {
-    const text = readFileSync(`${DISPATCH_SKILL_DIR}/prompt-rules-llamenos.md`, 'utf8')
-    expect(rulesReferenceDeadCommands(text), 'worker rules reference a command or repo that does not exist here').toBe(false)
-  })
-
-  it('the dependency directory is a real git repository', () => {
-    expect(() => execFileSync('git', ['-C', DISPATCH_SKILL_DIR, 'rev-parse', '--is-inside-work-tree'], { stdio: 'pipe' }))
-      .not.toThrow()
-  })
-
   it('reports a dirty dependency repo as a problem', () => {
     expect(problemsWith({ exists: true, executable: true, isGitRepo: true, dirty: true, rulesClean: true }))
       .toContainEqual(expect.stringMatching(/uncommitted/i))
