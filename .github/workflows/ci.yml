@@ -31,7 +31,7 @@ env:
 jobs:
   # ─── Detect Changed Files ─────────────────────────────────────
   changes:
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
@@ -84,7 +84,7 @@ jobs:
   # ─── Guard: No Generated Files In Git ────────────────────
   no-generated-files-in-git:
     name: No generated files in git
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     timeout-minutes: 2
@@ -140,7 +140,7 @@ jobs:
   # ─── Guard: Updater Pubkey Must Be Set ───────────────────
   verify-updater-config:
     name: Updater pubkey is set
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     timeout-minutes: 2
@@ -194,7 +194,7 @@ jobs:
   # ─── Build & Validate ──────────────────────────────────────
   build:
     needs: changes
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     timeout-minutes: 15
@@ -246,7 +246,7 @@ jobs:
   crypto-tests:
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     timeout-minutes: 15
@@ -254,12 +254,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-
-      - name: Isolate rustup/cargo home (self-hosted runners share $HOME)
-        run: |
-          echo "RUSTUP_HOME=$RUNNER_TEMP/rustup" >> "$GITHUB_ENV"
-          echo "CARGO_HOME=$RUNNER_TEMP/cargo" >> "$GITHUB_ENV"
-          echo "$RUNNER_TEMP/cargo/bin" >> "$GITHUB_PATH"
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@67ef31d5b988238dd797d409d6f9574278e20537 # stable
@@ -284,7 +278,7 @@ jobs:
   # ─── Dependency Vulnerability Scan ───────────────────────────
   audit:
     needs: changes
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
 
@@ -322,7 +316,7 @@ jobs:
   e2e:
     needs: [changes, build]
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: ubuntu-latest  # playwright --with-deps needs root; GH-hosted has browsers
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     timeout-minutes: 30
@@ -471,7 +465,7 @@ jobs:
   backend-bdd:
     needs: [changes]
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: ubuntu-latest  # playwright --with-deps needs root; GH-hosted has browsers
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     timeout-minutes: 30
@@ -558,7 +552,7 @@ jobs:
   backend-unit:
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     timeout-minutes: 10
@@ -592,7 +586,7 @@ jobs:
   ansible-validate:
     needs: changes
     if: needs.changes.outputs.ansible == 'true' || needs.changes.outputs.app == 'true'
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     timeout-minutes: 10
@@ -601,11 +595,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
+      # The ubuntu-24.04 hosted image ships a PEP 668 "externally managed"
+      # system Python, which rejects `pip install --user`. setup-python
+      # provides a standalone interpreter where pip installs normally.
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
       - name: Install Ansible and ansible-lint
         run: |
           pip install --user ansible==14.1.0 ansible-lint==26.6.0
-          # pip installs console scripts into ~/.local/bin, which is not on
-          # PATH for the self-hosted runner user.
+          # pip installs console scripts into ~/.local/bin, which is not on PATH.
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       # `min` is the profile ansible-lint itself defines as "prevents fatal
@@ -630,7 +631,7 @@ jobs:
   desktop-unit:
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     timeout-minutes: 10
@@ -664,7 +665,7 @@ jobs:
   android-build-test:
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     timeout-minutes: 25
@@ -672,12 +673,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-
-      - name: Isolate rustup/cargo home (self-hosted runners share $HOME)
-        run: |
-          echo "RUSTUP_HOME=$RUNNER_TEMP/rustup" >> "$GITHUB_ENV"
-          echo "CARGO_HOME=$RUNNER_TEMP/cargo" >> "$GITHUB_ENV"
-          echo "$RUNNER_TEMP/cargo/bin" >> "$GITHUB_PATH"
 
       - name: Setup Bun (for codegen)
         uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2.0.2
@@ -720,7 +715,7 @@ jobs:
   android-e2e:
     needs: [changes]
     if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.android == 'true'
-    runs-on: ubuntu-latest  # android emulator needs KVM (no nested-virt on Hetzner cloud)
+    runs-on: ubuntu-latest  # android emulator needs KVM (hosted x86_64 images provide it)
     permissions:
       contents: read
     timeout-minutes: 45
@@ -1093,7 +1088,7 @@ jobs:
   crypto-guardrails:
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     timeout-minutes: 5
@@ -1186,7 +1181,7 @@ jobs:
   migration-drift:
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     timeout-minutes: 5
@@ -1207,7 +1202,7 @@ jobs:
         run: bun run migration:check --ci
 
   docs-guard:
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     timeout-minutes: 3
 
     steps:
@@ -1223,7 +1218,7 @@ jobs:
   docker-canary:
     needs: ci-status
     if: github.ref == 'refs/heads/main' && needs.ci-status.result == 'success'
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
@@ -1290,7 +1285,7 @@ jobs:
   ci-status:
     needs: [no-generated-files-in-git, verify-updater-config, build, audit, crypto-tests, backend-bdd, backend-unit, desktop-unit, android-build-test, android-e2e, e2e, ios-build-test, crypto-guardrails, migration-drift, ansible-validate, docs-guard]
     if: always()
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     timeout-minutes: 2
