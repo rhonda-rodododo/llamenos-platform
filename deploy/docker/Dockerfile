@@ -135,13 +135,13 @@ RUN bun run build
 # requirement) is NOT part of stock Caddy; it ships only via this plugin,
 # built with xcaddy. Without this stage Caddy refuses to start with
 # "unrecognized directive: rate_limit".
-FROM caddy:2.9-builder-alpine@sha256:0d51ab53402e144be9cab449f5adfec681b87d481dcd175230813427d5e00f00 AS caddy-builder
+FROM caddy:2.11.4-builder-alpine@sha256:1a1689db91cfb390b2d856a1b3774e796852822cd723fa54c475b272f82bb4b7 AS caddy-builder
 RUN xcaddy build --with github.com/mholt/caddy-ratelimit
 
 # Stage 7 (`static`): Caddy image serving the built SPA. Matches the
-# `caddy:2.9-alpine` base pinned in docker-compose.yml, with the custom
+# `caddy:2.11.4-alpine` base pinned in docker-compose.yml, with the custom
 # rate-limiting binary swapped in and the SPA baked into /srv/app.
-FROM caddy:2.9-alpine@sha256:b4e3952384eb9524a887633ce65c752dd7c71314d2c2acf98cd5c715aaa534f0 AS static
+FROM caddy:2.11.4-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648 AS static
 COPY --from=caddy-builder /usr/bin/caddy /usr/bin/caddy
 COPY --from=frontend-builder /app/dist/client /srv/app
 # NOTE: /srv/crypto (the Tier-4 sandboxed-crypto-iframe origin referenced by

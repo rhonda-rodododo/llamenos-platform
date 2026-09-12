@@ -116,7 +116,7 @@ services:
       start_period: 10s
 
   caddy:
-    image: caddy:2.9-alpine@sha256:b4e3952384eb9524a887633ce65c752dd7c71314d2c2acf98cd5c715aaa534f0
+    image: caddy:2.11.4-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
     restart: unless-stopped
     ports:
       - "${HTTP_PORT:-80}:80"
