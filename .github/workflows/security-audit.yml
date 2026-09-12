@@ -155,7 +155,7 @@ jobs:
           exit-code: '0'
 
       - name: Upload Dockerfile.build scan results
-        uses: github/codeql-action/upload-sarif@5595ccaf912efad79be6eef63a5619ff05969be3 # v3
+        uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v3
         # upload-sarif requires GitHub Advanced Security (public repos or GHAS license).
         # Skip on private repos to avoid action_required failures.
         if: always() && github.repository_visibility == 'public'
@@ -164,14 +164,14 @@ jobs:
           category: 'dockerfile-build'
 
       - name: Upload deploy Dockerfile scan results
-        uses: github/codeql-action/upload-sarif@5595ccaf912efad79be6eef63a5619ff05969be3 # v3
+        uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v3
         if: always() && github.repository_visibility == 'public'
         with:
           sarif_file: 'dockerfile-deploy-results.sarif'
           category: 'dockerfile-deploy'
 
       - name: Upload Docker Compose scan results
-        uses: github/codeql-action/upload-sarif@5595ccaf912efad79be6eef63a5619ff05969be3 # v3
+        uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v3
         if: always() && github.repository_visibility == 'public'
         with:
           sarif_file: 'docker-compose-results.sarif'
@@ -226,7 +226,7 @@ jobs:
           exit-code: '0'
 
       - name: Upload image scan results
-        uses: github/codeql-action/upload-sarif@5595ccaf912efad79be6eef63a5619ff05969be3 # v3
+        uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v3
         if: always() && github.repository_visibility == 'public'
         with:
           sarif_file: 'image-results.sarif'
