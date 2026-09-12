@@ -30,27 +30,43 @@ real (`live`).
   the fleet was designed so it can never merge its own changes (see rail 2
   below).
 
-## The eight rails
+## Safety properties asserted in this branch
 
-Each of these is asserted in `tests/orchestrator/guards.test.ts` — a
-reviewer can read that one file to see every safety property in one place.
+**This is not the spec's "eight rails."** The design spec
+(`docs/superpowers/specs/`) defines eight rails: (1) non-author verification,
+(2) one scheduler, (3) a phone-reachable stop, (4) circuit breakers, (5) a
+rehearsed revert, (6) the worker runs in its own worktree, (7) lane modes,
+(8) live-lane write scope. **This branch does not implement spec rails 1
+(non-author verification), 5 (rehearsed revert), or 6 (worker-in-its-own-
+worktree)** — there is no live dispatch yet, so there is no worker output to
+verify, no worktree to isolate, and nothing to revert. Those three ship in
+the follow-on live-dispatch plan.
 
-| # | Rail | Owning file |
+What follows is the list of safety properties this branch *does* assert and
+unit-test today, in `tests/orchestrator/guards.test.ts` — a reviewer can read
+that one file to see every one of them in one place. Rows 1, 7, and 8 below
+are spec rails 8 and 7; row 5 is the GitHub-fails-open half of spec rail 3
+(phone-reachable stop). Rows 2, 3, 4, and 6 are properties specific to this
+branch's shadow-pass scaffolding, not one of the spec's numbered eight.
+
+| # | Property | Owning file |
 |---|------|-------------|
-| 1 | A `live` lane must have a non-empty write scope, enforced at load time (not merely tested) — a live lane with an empty `owned` list gives the scope breaker nothing to compare a diff against. | `orchestrator/src/config.ts` (`assertLiveLanesHaveScope`), scope parsed by `orchestrator/src/fragments.ts` |
-| 2 | The fleet cannot merge its own changes — `orchestrator/` and `tests/orchestrator/` are always high-impact, so a change there can never auto-merge and always reaches a human. | `orchestrator/src/impact.ts` (`HIGH_IMPACT_PATHS`, `classifyImpact`) |
-| 3 | Crypto, protocol schemas, crypto labels, and DB migrations always reach a human, regardless of which lane touched them. | `orchestrator/src/impact.ts` |
-| 4 | The never-write list binds even a lane with no declared scope at all — secrets, keystores, and PEM/SSH key files are unwritable by any lane, unconditionally. | `orchestrator/src/config.ts` (`NEVER_WRITE_PATHS`), enforced by `orchestrator/src/scope.ts` (`checkScope`) |
+| 1 | A `live` lane must have a non-empty write scope, enforced at load time (not merely tested) — a live lane with an empty `owned` list gives the scope breaker nothing to compare a diff against. (Spec rail 8, live-lane write scope.) | `orchestrator/src/config.ts` (`assertLiveLanesHaveScope`), scope parsed by `orchestrator/src/fragments.ts` |
+| 2 | The fleet cannot merge its own changes — `orchestrator/` and `tests/orchestrator/` are always high-impact, so a change there can never auto-merge and always reaches a human. **Implemented and unit-tested; wired into the merge/verify path in the follow-on plan** — `classifyImpact` has no runtime caller on this branch today, only test callers. | `orchestrator/src/impact.ts` (`HIGH_IMPACT_PATHS`, `classifyImpact`) |
+| 3 | Crypto, protocol schemas, crypto labels, and DB migrations always reach a human, regardless of which lane touched them. Same caveat as above: asserted by `classifyImpact`, which is not yet called anywhere at runtime. | `orchestrator/src/impact.ts` |
+| 4 | The never-write list classifies secrets, keystores, and PEM/SSH key files as forbidden for even a lane with no declared scope at all. **Implemented and unit-tested; wired into the merge/verify path in the follow-on plan.** `NEVER_WRITE_PATHS` and `checkScope` are a post-hoc diff classifier, not a write barrier, and have no runtime caller on this branch — so the previous claim that these paths are "unwritable by any lane, unconditionally" was wrong; nothing on this branch stops a write to them from happening in the first place. | `orchestrator/src/config.ts` (`NEVER_WRITE_PATHS`), `orchestrator/src/scope.ts` (`checkScope`) |
 | 5 | The GitHub kill switch fails **open**: if the halt-label issue list cannot be read, that is treated as "not halted," not as a halt — an API outage must never look like a silent full stop. | `orchestrator/src/killswitch.ts` (`haltedOnGitHubFrom`) |
 | 6 | Exactly one git remote (`origin` → `llamenos-platform`) — a second remote makes it possible to dispatch work at the wrong repository. | `orchestrator/src/gh.ts` (pinned `REPO`), asserted by `llamenos-fleet doctor` and by `tests/orchestrator/guards.test.ts` |
-| 7 | Every lane ships `off` by default — no lane is live or shadow out of the box. | `orchestrator/src/config.ts` (`LANES`) |
-| 8 | Lane modes are runtime state, never source: turning a dial does not require a human-gated PR to `orchestrator/`, and "every lane starts off" cannot go stale because a mode got hardcoded. | `orchestrator/src/config.ts` (`LANE_MODES_FILE`, `readLaneModes`) — see "Changing a lane's mode" below |
+| 7 | Every lane ships `off` by default — no lane is live or shadow out of the box. (Spec rail 7, lane modes.) | `orchestrator/src/config.ts` (`LANES`) |
+| 8 | Lane modes are runtime state, never source: turning a dial does not require a human-gated PR to `orchestrator/`, and "every lane starts off" cannot go stale because a mode got hardcoded. (Spec rail 7, lane modes.) | `orchestrator/src/config.ts` (`LANE_MODES_FILE`, `readLaneModes`) — see "Changing a lane's mode" below |
 
-Two more mechanisms sit underneath these eight and are exercised throughout
-`tests/orchestrator/`, but are not separately listed as one of the eight:
-the single-scheduler pidfile lock (`orchestrator/src/lock.ts`) and the
-circuit breakers for dispatch rate and consecutive failures
-(`orchestrator/src/circuit.ts`).
+Two more mechanisms sit underneath the list above and are exercised
+throughout `tests/orchestrator/`: the single-scheduler pidfile lock
+(`orchestrator/src/lock.ts` — spec rail 2, "one scheduler") and the circuit
+breakers for dispatch rate and consecutive failures
+(`orchestrator/src/circuit.ts` — spec rail 4, "circuit breakers"). Unlike
+rails 2 and 4 in the table above, these two run for real on every `tick()`
+call today — they are not deferred to the follow-on plan.
 
 ## The two kill switches — opposite failure modes, on purpose
 
@@ -190,22 +206,33 @@ are `tick()` working as designed, not a fault for systemd to back off on.
 Run by hand on 2026-09-12, all six lanes in `shadow` mode
 (`~/.llamenos-fleet/lanes.json`: every lane `"shadow"`).
 
-**Result: `attempted: 0`, `failed: 0`, `shadowed: 0` for every lane, on every
-run.** Nothing was dispatched. Full detail (candidate counts and rejection
+**`attempted: 0` on every run, for every lane, throughout.** No lane was in
+`live` mode, so no real `dispatch()` call was ever going to happen — that
+part was true from the start and stays true.
+
+The label taxonomy (`agent-dispatchable`, `lane:<id>`, `needs-human`, etc.)
+was created, and three smoke issues were then filed against real GitHub to
+actually exercise `selectForLane`'s selection and rejection paths, not just
+assert them against synthetic fixtures:
+
+- **#634** — a normal, correctly-labelled candidate. Produced a `SHADOW` row
+  on the `infra` lane (`shadowed: 1`) — the first real evidence that a real
+  GitHub issue flows all the way through selection, claim, and the shadow
+  record path.
+- **#635** — a candidate with a too-short body. Rejected `body-too-short`.
+- **#636** — a candidate carrying a veto label. Rejected `vetoed`, in every
+  lane it was visible to.
+
+All three issues are now closed. Full detail (candidate counts and rejection
 histograms per lane) is in
 `.superpowers/sdd/2026-09-11-fleet-core/task-14-15-report.md`.
 
-**Why `shadowed` is also 0, not just `attempted`:** there is currently no
-open issue in `llamenos-platform` carrying the `agent-dispatchable` label —
-`gh issue list --label agent-dispatchable --state open` returns `[]`. This
-was confirmed to be a genuine empty backlog, not a broken read: `GitHubSource
-.list()` returns `[]` (not `undefined`) for that query, and `tick()`
-distinguishes the two explicitly (`aborted: 'source-unreadable'` only fires
-on `undefined`; an empty pass with no `aborted` field at all means the read
-succeeded and simply found nothing). Every lane's own `listItems()` call
-independently confirmed the same `[]`. Because there was nothing to select
-from, `selectForLane`'s rejection paths were **not exercised** by this pass —
-that is an unverified code path, not a verified "everything's fine."
+**What remains unexercised:** multi-item claim contention (two lanes both
+able to claim the same issue — `claimAcrossLanes`'s priority-order behavior
+is unit-tested but has not been observed against real concurrent GitHub
+data) and cap enforcement against real data (no smoke issue count has yet
+exceeded a lane's `cap`). Both are exercised only by synthetic tests today,
+not by this pass.
 
 **Scope check (rail 1) per lane**, compared against
 `.claude/agents/fragments/<lane>-supervisor.md`:
