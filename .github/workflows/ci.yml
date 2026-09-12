@@ -1374,15 +1374,22 @@ jobs:
 
   # ─── Fleet gates: the ONLY place the fleet's verdicts become enforceable ──
   #
-  # These two jobs compute the fleet's gates on GitHub's runners, on the PR's
-  # exact head SHA, and post them as commit statuses the repo ruleset
-  # requires. Nothing about them runs on the operator's laptop, and they fail
-  # closed: a job that does not run leaves its required status missing.
+  # These two jobs compute the fleet's gates on GitHub's runners against the
+  # PR's exact head commit. Nothing about them runs on the operator's laptop,
+  # and they fail closed: a job that does not run leaves its required check
+  # missing, and the merge is blocked.
   #
-  # Required checks apply to EVERY pull request, so a non-fleet branch gets a
-  # trivially-passing status that says so in its description — the CLI does
-  # that, not an `if:` on the job (a skipped job's check reports as skipped,
-  # which GitHub treats as satisfying a required check: fail-open).
+  # The job NAME is the required check — `fleet/verify` / `fleet/review` in
+  # the ruleset refer to these two `name:` values, so do not rename them. The
+  # jobs post no commit status of their own: a job result already IS a check
+  # run under that name, so a same-named status would be a second copy of the
+  # same verdict, and the `statuses: write` it needed is what makes fork PRs
+  # (whose GITHUB_TOKEN is read-only) permanently unmergeable.
+  #
+  # Required checks apply to EVERY pull request, so a non-fleet branch passes
+  # trivially — the CLI decides that, not an `if:` on the job (a skipped job's
+  # check reports as skipped, which GitHub treats as satisfying a required
+  # check: fail-open, the one direction this must never be).
   #
   # Deliberately NOT in `ci-status`'s needs list: that is the repo's own CI
   # verdict, these are the fleet's, so a reader can tell which one refused.
@@ -1391,7 +1398,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      statuses: write
     timeout-minutes: 20
 
     steps:
@@ -1415,11 +1421,9 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Verify and post fleet/verify
+      - name: Verify
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           FLEET_CI_BRANCH: ${{ github.head_ref || github.ref_name }}
-          FLEET_CI_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           FLEET_CI_PR: ${{ github.event.pull_request.number }}
         run: bun orchestrator/src/cli.ts verify-ci
 
@@ -1427,12 +1431,11 @@ jobs:
     name: fleet/review
     runs-on: ubuntu-latest
     permissions:
-      # contents: read only — the non-author reviewer runs in this job, and
-      # a token that cannot write to the repo is the containment that
-      # matters. It reads a `.git`-less `git archive` export (review.ts), so
-      # there is nothing to commit into or push from in place either.
+      # contents: read and nothing else — the non-author reviewer runs inside
+      # this job, and a token that cannot write to the repo is the
+      # containment that matters. It reads a `.git`-less `git archive` export
+      # (review.ts), so there is nothing to commit into or push from either.
       contents: read
-      statuses: write
     timeout-minutes: 30
 
     steps:
@@ -1450,24 +1453,68 @@ jobs:
         with:
           bun-version: ${{ env.BUN_VERSION }}
 
-      # Only the non-author engine is installed, and only for a fleet branch.
-      # The fleet's workers are `claude`, so the reviewer is `opencode` — a
+      # `orchestrator/` imports `yaml` (fragments.ts), so the CLI needs the
+      # workspace's dependencies to start at all.
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # Only for a fleet branch, and from a pinned release asset whose sha256
+      # is recorded here — never a `curl | bash` installer, in a repo that
+      # pins every action by SHA. (The npm package `opencode-ai@1.18.30` was
+      # tried first, per the preferred option, and rejected: it ships a
+      # postinstall that fetches the real binary, which newer npm blocks by
+      # default and which would leave a broken `opencode` on PATH. A hash a
+      # reader can re-check beats a trust-on-first-use script.)
+      #
+      # The fleet's workers are `claude`, so the reviewer is `opencode`: a
       # model reviewing its own output shares its own blind spots, which is
       # the entire reason this check exists.
       - name: Install the non-author review engine
         if: startsWith(github.head_ref, 'fleet/')
-        run: |
-          curl -fsSL https://opencode.ai/install | bash
-          echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
-
-      - name: Review and post fleet/review
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Absent is an ERROR status and a failed job, never a skip and never
-          # a pass — a review that could not run is not a review that passed.
+          OPENCODE_VERSION: "1.18.30"
+          OPENCODE_SHA256: "55007246858165496ff85ba1c2b648f7421e8e2013bf4189a680c9ff8e699d17"
+        run: |
+          set -euo pipefail
+          url="https://github.com/anomalyco/opencode/releases/download/v${OPENCODE_VERSION}/opencode-linux-x64.tar.gz"
+          curl -fsSL -o /tmp/opencode.tar.gz "$url"
+          echo "${OPENCODE_SHA256}  /tmp/opencode.tar.gz" | sha256sum -c -
+          mkdir -p "$HOME/.local/bin"
+          tar -xzf /tmp/opencode.tar.gz -C "$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/opencode" --version
+
+      # opencode authenticates from `auth.json`, not an env var (there is no
+      # OPENCODE_API_KEY — see review.ts's VERIFIER_ENV_ALLOWLIST comment).
+      # The shape here is the one confirmed on the operator's own machine:
+      # the provider id `kimi-for-coding` keyed to a Moonshot Kimi API key,
+      # which is the model VERIFIER_ENGINE selects (`kimi-for-coding/k2p6`).
+      # Written to a file rather than passed through the environment so the
+      # key is never in the verifier subprocess's env at all.
+      - name: Authenticate the review engine
+        if: startsWith(github.head_ref, 'fleet/')
+        env:
+          FLEET_REVIEW_API_KEY: ${{ secrets.FLEET_REVIEW_API_KEY }}
+        run: |
+          # Guarded in shell, not in `if:` — the `secrets` context is not
+          # available in a step condition. A missing key is NOT an error here;
+          # the Review step below is the one place that decides, and it fails.
+          if [ -z "$FLEET_REVIEW_API_KEY" ]; then
+            echo "FLEET_REVIEW_API_KEY is not configured; the review step will fail, deliberately"
+            exit 0
+          fi
+          mkdir -p "$HOME/.local/share/opencode"
+          jq -n --arg k "$FLEET_REVIEW_API_KEY" \
+            '{"kimi-for-coding":{"type":"api","key":$k}}' \
+            > "$HOME/.local/share/opencode/auth.json"
+          chmod 600 "$HOME/.local/share/opencode/auth.json"
+
+      - name: Review
+        env:
+          # Absent fails the job — never a skip and never a pass. A review
+          # that could not run is not a review that passed.
           FLEET_REVIEW_API_KEY: ${{ secrets.FLEET_REVIEW_API_KEY }}
           FLEET_CI_BRANCH: ${{ github.head_ref || github.ref_name }}
-          FLEET_CI_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           FLEET_CI_PR: ${{ github.event.pull_request.number }}
         run: bun orchestrator/src/cli.ts review-ci
 

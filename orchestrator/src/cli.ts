@@ -14,8 +14,8 @@ import { dispatch as dispatchWorker, type EffortLevel } from './engines.js'
 import { verifyMechanical } from './verify.js'
 import { secondOpinion, postReview } from './review.js'
 import {
-  runVerifyCi, runReviewCi, postCommitStatus, ciContextFromEnv, ciDiff,
-  REVIEW_KEY_ENV, type CiContext,
+  runVerifyCi, runReviewCi, ciContextFromEnv, ciDiff,
+  REVIEW_JOB, REVIEW_KEY_ENV, VERIFY_JOB, type CiContext, type CiVerdict,
 } from './ci.js'
 import {
   settle as settleWorktree,
@@ -877,25 +877,26 @@ async function runIntegrate(): Promise<number> {
 
 /**
  * Both CI entry points take their subject from the environment rather than
- * argv: the workflow already has `github.head_ref` and
- * `github.event.pull_request.head.sha` as expressions, and passing them as
- * named variables is harder to get silently wrong than positional arguments.
- * A missing one is exit 2 with no status posted — an entry point that does
- * not know which commit it is judging must refuse, not guess (and the
- * missing required status then blocks the PR, which is the right direction).
+ * argv: the workflow already has `github.head_ref` as an expression, and a
+ * named variable is harder to get silently wrong than a positional argument.
+ * A missing one is a non-zero exit — an entry point that does not know what
+ * it is judging must refuse, not guess, and a red job is the right direction.
+ *
+ * The verdict becomes the EXIT CODE and nothing else. The job's own result is
+ * already a check run named `fleet/verify` / `fleet/review`, which is what
+ * the ruleset requires; the summary goes to the job log, where a reader
+ * follows the red check anyway.
  */
-async function runCiGate(run: (ctx: CiContext) => Promise<number>): Promise<number> {
+async function runCiGate(job: string, run: (ctx: CiContext) => Promise<CiVerdict>): Promise<number> {
   const ctx = ciContextFromEnv(process.env, REPO_ROOT)
   if (ctx === undefined) {
-    process.stderr.write('FLEET_CI_BRANCH and FLEET_CI_SHA must both be set — refusing to post a status\n')
+    process.stderr.write(`${job}: FLEET_CI_BRANCH is not set — refusing to judge an unknown branch\n`)
     return 2
   }
-  return run(ctx)
+  const verdict = await run(ctx)
+  process.stdout.write(`${job}: ${verdict.ok ? 'PASS' : 'FAIL'} — ${verdict.summary}\n`)
+  return verdict.ok ? 0 : 1
 }
-
-/** Plain stdout, not the fleet log: a CI runner has no fleet state directory
- *  worth writing to, and the job log IS the durable record there. */
-const ciLog = (msg: string): void => { process.stdout.write(`${msg}\n`) }
 
 type CommandHandler = (rest: string[]) => Promise<number> | number
 
@@ -927,22 +928,18 @@ const HANDLERS: Record<string, CommandHandler> = {
     return revert(runId, defaultRevertDeps())
   },
   digest: (rest) => runDigest(rest[0]),
-  'verify-ci': () => runCiGate((ctx) => runVerifyCi({
+  'verify-ci': () => runCiGate(VERIFY_JOB, (ctx) => runVerifyCi({
     ctx,
     lanes: () => loadLanes(REPO_ROOT),
     verify: verifyMechanical,
-    postStatus: (context, state, description) => postCommitStatus(ctx.sha, context, state, description),
-    log: ciLog,
   })),
-  'review-ci': () => runCiGate((ctx) => runReviewCi({
+  'review-ci': () => runCiGate(REVIEW_JOB, (ctx) => runReviewCi({
     ctx,
     apiKey: process.env[REVIEW_KEY_ENV],
     lanes: () => loadLanes(REPO_ROOT),
     verify: verifyMechanical,
     prDiff: () => ciDiff(ctx.worktree),
     secondOpinion,
-    postStatus: (context, state, description) => postCommitStatus(ctx.sha, context, state, description),
-    log: ciLog,
   })),
   plan: () => runPlan(),
   integrate: () => runIntegrate(),

@@ -333,14 +333,6 @@ function verifierEnv(): NodeJS.ProcessEnv {
     const value = process.env[key]
     if (value !== undefined) env[key] = value
   }
-  // The `fleet/review` CI job exports the repo secret under its own name
-  // (`FLEET_REVIEW_API_KEY`, see ci.ts); opencode's zai/GLM provider reads
-  // `ZHIPU_API_KEY`. Mapped here, in one place, so the workflow names the
-  // SECRET and nothing outside this file has to know the provider's variable
-  // name. An explicitly-set `ZHIPU_API_KEY` always wins — this only fills a
-  // gap, it never overrides an operator's own configuration.
-  const ciKey = process.env['FLEET_REVIEW_API_KEY']
-  if (ciKey !== undefined && env['ZHIPU_API_KEY'] === undefined) env['ZHIPU_API_KEY'] = ciKey
   return env
 }
 

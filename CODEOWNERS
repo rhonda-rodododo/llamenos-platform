@@ -77,12 +77,17 @@ CODEOWNERS                          @rhonda-rodododo
 knope.toml                          @rhonda-rodododo
 deploy/                             @rhonda-rodododo
 
-# ─── Security-relevant test suites ─────────────────────────────────────
-# Weakening a test is the shortest route to disabling the check that would
-# have caught the change. `tests/` covers tests/orchestrator/ too.
-tests/                              @rhonda-rodododo
-packages/test-specs/                @rhonda-rodododo
-apps/worker/__tests__/              @rhonda-rodododo
+# ─── Security-relevant test suites, and ONLY those ─────────────────────
+# Narrower than #615's blanket `tests/`: weakening a test is the shortest
+# route to disabling the check that would have caught the change, but that
+# only matters for the two directories where the test IS the guard.
+# tests/orchestrator/ is the fleet judging itself; tests/mocks/ is the Tauri
+# IPC mock, which mirrors the Rust CryptoState and is therefore a key-boundary
+# file. Every other test directory is ordinary lane work and merges on green —
+# a blanket `tests/` would have held every BDD feature PR the backend and
+# desktop lanes write.
+tests/orchestrator/                 @rhonda-rodododo
+tests/mocks/                        @rhonda-rodododo
 
 # ─── Key material, wherever it appears ─────────────────────────────────
 # Mirrors SECRET_PATH_PATTERNS (orchestrator/src/config.ts). checkScope
