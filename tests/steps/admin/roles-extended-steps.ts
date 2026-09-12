@@ -9,7 +9,7 @@
  */
 import { expect } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
-import { TestIds, navTestIdMap, Timeouts, loginAsAdmin, loginAsVolunteer } from '../../helpers'
+import { TestIds, navTestIdMap, Timeouts, loginAsVolunteer } from '../../helpers'
 import { Navigation } from '../../pages/index'
 import {
   createVolunteerViaApi,
@@ -73,7 +73,7 @@ Then('I should have access to all API endpoints', async ({ request }) => {
 
 // --- Multi-role steps ---
 
-Given('a volunteer has both {string} and {string} roles', async ({ page, request, rolesWorld }, role1: string, role2: string) => {
+Given('a volunteer has both {string} and {string} roles', async ({ request, rolesWorld }, role1: string, role2: string) => {
   const roles = await listRolesViaApi(request)
   const roleId1 = roles.find(r => r.name === role1)?.id
   const roleId2 = roles.find(r => r.name === role2)?.id
@@ -120,7 +120,7 @@ Given('a volunteer has only a custom {string} role', async ({ request, rolesWorl
 
 Then('they should only see endpoints allowed by that role', async ({ request, rolesWorld }) => {
   // Verify the volunteer can access calls but not admin endpoints
-  const callsStatus = await testEndpointAccess(request, 'GET', '/calls/history', rolesWorld.volunteerNsec)
+  const _callsStatus = await testEndpointAccess(request, 'GET', '/calls/history', rolesWorld.volunteerNsec)
   // Calls read should work (200 or similar)
   // Admin endpoints should be denied
   const volunteersStatus = await testEndpointAccess(request, 'GET', '/users', rolesWorld.volunteerNsec)
@@ -216,14 +216,14 @@ Given('a volunteer with {string} role', async ({ page, request, rolesWorld }, ro
   })
   rolesWorld.volunteerNsec = vol.nsec
   await page.evaluate((name) => {
-    (window as Record<string, unknown>).__test_vol_name = name
+    (window as unknown as Record<string, unknown>).__test_vol_name = name
   }, vol.name)
 })
 
 When('I change their role to {string} via the dropdown', async ({ page }, roleName: string) => {
   // Navigate to volunteers page first
   await Navigation.goToVolunteers(page)
-  const volName = (await page.evaluate(() => (window as Record<string, unknown>).__test_vol_name)) as string
+  const volName = (await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_vol_name)) as string
   if (volName) {
     const row = page.getByTestId(TestIds.VOLUNTEER_ROW).filter({ hasText: volName })
     const dropdown = row.locator('select, [role="combobox"]').first()
@@ -241,7 +241,7 @@ When('I change their role to {string} via the dropdown', async ({ page }, roleNa
 })
 
 Then('the volunteer should display the {string} badge', async ({ page }, roleName: string) => {
-  const volName = (await page.evaluate(() => (window as Record<string, unknown>).__test_vol_name)) as string
+  const volName = (await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_vol_name)) as string
   if (volName) {
     const row = page.getByTestId(TestIds.VOLUNTEER_ROW).filter({ hasText: volName })
     const hasRow = await row.first().isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
@@ -266,12 +266,12 @@ Given('I changed a volunteer\'s role to {string}', async ({ page, request }, rol
     roleIds: [role!.id],
   })
   await page.evaluate((name) => {
-    (window as Record<string, unknown>).__test_vol_name = name
+    (window as unknown as Record<string, unknown>).__test_vol_name = name
   }, vol.name)
 })
 
 Then('I should see the {string} badge on their card', async ({ page }, roleName: string) => {
-  const volName = (await page.evaluate(() => (window as Record<string, unknown>).__test_vol_name)) as string
+  const volName = (await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_vol_name)) as string
   if (volName) {
     await Navigation.goToVolunteers(page)
     const row = page.getByTestId(TestIds.VOLUNTEER_ROW).filter({ hasText: volName })

@@ -167,8 +167,6 @@ When('I am on a note detail view', async ({ page }) => {
 })
 
 Then('a copy button should be visible in the top bar', async ({ page }) => {
-  // Look for a copy action button in the note detail view
-  const copyBtn = page.locator('button[aria-label="Copy"], button:has-text("Copy"), [data-testid="copy-btn"]')
   // Verify the detail view is showing — note sheet or note card must be visible
   const noteSheet = page.getByTestId(TestIds.NOTE_SHEET)
   const noteCard = page.getByTestId(TestIds.NOTE_CARD).first()
@@ -286,7 +284,7 @@ Then('I should see the full notes list', async ({ page }) => {
 When('I fill in the call ID with {string}', async ({ page }, callId: string) => {
   await page.getByTestId(TestIds.NOTE_CALL_ID).fill(callId)
   await page.evaluate((id) => {
-    (window as Record<string, unknown>).__test_note_call_id = id
+    (window as unknown as Record<string, unknown>).__test_note_call_id = id
   }, callId)
 })
 

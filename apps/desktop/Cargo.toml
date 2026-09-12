@@ -3,6 +3,7 @@ name = "llamenos-desktop"
 version = "0.19.11"
 edition = "2024"
 rust-version = "1.88.0"
+license = "AGPL-3.0-or-later"
 
 [lib]
 name = "llamenos_desktop_lib"

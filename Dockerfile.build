@@ -30,6 +30,8 @@ ENV SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}
 ENV GITHUB_SHA=${GITHUB_SHA}
 
 WORKDIR /build
+RUN chown -R bun:bun /build
+USER bun
 
 # Install dependencies first (layer caching)
 # Copy workspace package.json files so bun can resolve the lockfile.
