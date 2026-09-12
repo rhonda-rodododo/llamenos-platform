@@ -47,36 +47,38 @@ Given('the {string} template has been applied', async ({ backendRequest: request
       console.warn('[cms] Template apply failed (may already be applied):', e)
     })
   }
-  // Ensure entity types exist regardless of template availability
+  // Ensure the entity types the scenarios rely on exist, regardless of template
+  // availability. Names must match /^[a-zA-Z0-9_]+$/ (no spaces); labels carry the display name.
+  const defaultFields = [
+    { name: 'description', label: 'Description', type: 'text', order: 0 },
+    { name: 'location', label: 'Location', type: 'text', order: 1 },
+    { name: 'priority', label: 'Priority', type: 'select', order: 2 },
+  ]
+  const slugToTypes: Record<string, Array<{ name: string; label: string; category: string }>> = {
+    'jail-support': [
+      { name: 'arrest_case', label: 'Arrest Case', category: 'case' },
+      { name: 'legal_observer_report', label: 'Legal Observer Report', category: 'report' },
+    ],
+  }
   const entityTypes = await listEntityTypesViaApi(request, workerHub)
-  if (entityTypes.length < 2) {
-    // Create entity types to satisfy the test — template may not be registered.
-    // Names must match /^[a-zA-Z0-9_]+$/ (no spaces); labels carry the display name.
-    const defaultFields = [
-      { name: 'description', label: 'Description', type: 'text', order: 0 },
-      { name: 'location', label: 'Location', type: 'text', order: 1 },
-      { name: 'priority', label: 'Priority', type: 'select', order: 2 },
-    ]
-    const slugToTypes: Record<string, Array<{ name: string; label: string; category: string }>> = {
-      'jail-support': [
-        { name: 'arrest_case', label: 'Arrest Case', category: 'case' },
-        { name: 'legal_observer_report', label: 'Legal Observer Report', category: 'report' },
-      ],
-    }
-    const types = slugToTypes[templateSlug] ?? [
-      { name: 'case', label: 'Case', category: 'case' },
-      { name: 'incident', label: 'Incident', category: 'case' },
-    ]
-    for (const t of types) {
-      const exists = entityTypes.find(e => (e as Record<string, unknown>).name === t.name)
-      if (!exists) {
-        await createEntityTypeViaApi(request, {
-          name: t.name, label: t.label, category: t.category, hubId: workerHub,
-          fields: defaultFields,
-        }).catch((e) => {
-          console.warn(`[cms] Failed to create entity type "${t.name}":`, e)
-        })
-      }
+  const knownTypes = slugToTypes[templateSlug]
+  // For a template whose types scenarios reference by name, check each name: the
+  // worker hub may already hold unrelated entity types from earlier scenarios, and a
+  // count check would let those mask a missing "Arrest Case" (#669).
+  // For other templates only a generic pair is needed when nothing was applied.
+  const required = knownTypes ?? (entityTypes.length < 2
+    ? [
+        { name: 'case', label: 'Case', category: 'case' },
+        { name: 'incident', label: 'Incident', category: 'case' },
+      ]
+    : [])
+  for (const t of required) {
+    const exists = entityTypes.some(e => (e as Record<string, unknown>).name === t.name)
+    if (!exists) {
+      await createEntityTypeViaApi(request, {
+        name: t.name, label: t.label, category: t.category, hubId: workerHub,
+        fields: defaultFields,
+      })
     }
   }
 })
