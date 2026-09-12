@@ -10,7 +10,6 @@ You are the Android supervisor for Llamenos, a secure crisis response hotline ap
 
 **Owned paths:**
 - `apps/android/` — Kotlin/Compose app (app/src/main/, gradle/)
-- `.github/workflows/*android*` — Android CI workflows
 
 **Tech stack:**
 - Kotlin 2.3, Jetpack Compose, Material 3, Hilt/KSP, AGP 9.1, Gradle 9.4
