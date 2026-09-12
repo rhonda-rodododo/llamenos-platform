@@ -21,6 +21,21 @@ function getFirehoseState(world: Record<string, unknown>): FirehoseState {
   return world.firehose as FirehoseState
 }
 
+/** Shape of the various /firehose response bodies read back out of lastApiResponse.data (stored as unknown). */
+interface FirehoseResponseData {
+  connection?: { id: string; status: string; agentPubkey?: string; displayName?: string }
+  connections?: Array<{ id: string; displayName: string }>
+  statuses?: Array<{ id: string; bufferSize: number }>
+  bufferSize?: number
+  agentRunning?: boolean
+  connectionId?: string
+  error?: string
+}
+
+function getFirehoseData(world: Record<string, unknown>): FirehoseResponseData | undefined {
+  return getScenarioState(world).lastApiResponse?.data as FirehoseResponseData | undefined
+}
+
 // --- Create ---
 
 When(
@@ -48,14 +63,14 @@ Then('the connection should be created with status {string}', async ({ world }) 
   const state = getScenarioState(world)
   if (state.lastApiResponse?.status === 503) return // Seal key not configured
   expect(state.lastApiResponse?.status).toBe(201)
-  const conn = state.lastApiResponse?.data?.connection
+  const conn = getFirehoseData(world)?.connection
   expect(conn?.status).toBe('pending')
 })
 
 Then('the connection should have an agent pubkey', async ({ world }) => {
   const state = getScenarioState(world)
   if (state.lastApiResponse?.status === 503) return
-  const conn = state.lastApiResponse?.data?.connection
+  const conn = getFirehoseData(world)?.connection
   expect(conn?.agentPubkey).toBeDefined()
   expect(conn?.agentPubkey).toMatch(/^[0-9a-f]{64}$/)
 })
@@ -92,7 +107,7 @@ When('I list firehose connections', async ({ request, world, workerHub }) => {
 Then('I should see the connection {string} in the list', async ({ world }) => {
   const state = getScenarioState(world)
   if (!getFirehoseState(world).connectionId) return // Seal key not configured
-  expect(state.lastApiResponse?.data?.connections?.length).toBeGreaterThan(0)
+  expect(getFirehoseData(world)?.connections?.length).toBeGreaterThan(0)
 })
 
 // --- Update ---
@@ -126,7 +141,7 @@ When('I update the connection display name to {string}', async ({ request, world
 Then('the connection display name should be {string}', async ({ world }) => {
   const state = getScenarioState(world)
   if (!getFirehoseState(world).connectionId) return
-  expect(state.lastApiResponse?.data?.connection?.displayName).toBe('Updated Name')
+  expect(getFirehoseData(world)?.connection?.displayName).toBe('Updated Name')
 })
 
 // --- Activate ---
@@ -162,7 +177,7 @@ When('I activate the connection', async ({ request, world, workerHub }) => {
 Then('the connection status should be {string}', async ({ world }) => {
   const state = getScenarioState(world)
   if (!getFirehoseState(world).connectionId) return
-  const expected = state.lastApiResponse?.data?.connection?.status
+  const expected = getFirehoseData(world)?.connection?.status
   // If seal key isn't configured, agent start may fail but status still updates
   expect(expected).toBeDefined()
 })
@@ -216,8 +231,8 @@ When('I request firehose health status', async ({ request, world, workerHub }) =
 
 Then('I should receive health data with buffer size', async ({ world }) => {
   const state = getScenarioState(world)
-  expect(state.lastApiResponse?.data?.statuses).toBeDefined()
-  expect(Array.isArray(state.lastApiResponse?.data?.statuses)).toBe(true)
+  expect(getFirehoseData(world)?.statuses).toBeDefined()
+  expect(Array.isArray(getFirehoseData(world)?.statuses)).toBe(true)
 })
 
 // --- Buffer ---
@@ -236,8 +251,8 @@ When('I request buffer info for the connection', async ({ request, world, worker
 Then('I should see the buffer size and agent running status', async ({ world }) => {
   const state = getScenarioState(world)
   if (!getFirehoseState(world).connectionId) return
-  expect(state.lastApiResponse?.data?.bufferSize).toBeDefined()
-  expect(typeof state.lastApiResponse?.data?.agentRunning).toBe('boolean')
+  expect(getFirehoseData(world)?.bufferSize).toBeDefined()
+  expect(typeof getFirehoseData(world)?.agentRunning).toBe('boolean')
 })
 
 // --- Notification Opt-out ---
@@ -257,7 +272,7 @@ When('I opt out of notifications for the connection', async ({ request, world, w
 Then('my notification opt-out should be recorded', async ({ world }) => {
   const state = getScenarioState(world)
   if (!getFirehoseState(world).connectionId) return
-  expect(state.lastApiResponse?.data?.connectionId).toBe(getFirehoseState(world).connectionId)
+  expect(getFirehoseData(world)?.connectionId).toBe(getFirehoseState(world).connectionId)
 })
 
 Given('I have opted out of notifications for the connection', async ({ request, world, workerHub }) => {
@@ -305,6 +320,6 @@ Then('I should receive a 503 error about missing seal key', async ({ world }) =>
   // This scenario is informational — it documents the expected behavior when
   // the seal key is missing, but doesn't fail if the key happens to be present.
   if (state.lastApiResponse?.status === 503) {
-    expect(state.lastApiResponse?.data?.error).toContain('seal key')
+    expect(getFirehoseData(world)?.error).toContain('seal key')
   }
 })

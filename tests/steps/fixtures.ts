@@ -1,6 +1,6 @@
 import { type APIRequestContext } from '@playwright/test'
 import { test as base, createBdd } from 'playwright-bdd'
-import { createHubViaApi, ensureAdminRole } from '../api-helpers'
+import { createHubViaApi, ensureAdminRole, type RoleDefinition } from '../api-helpers'
 
 // ── Scenario-scoped World types ──────────────────────────────────────
 // Each scenario gets a fresh instance via fixture. Step definitions read/write
@@ -14,7 +14,7 @@ export type AdminWorld = {
 }
 
 export type RolesWorld = {
-  cachedRoles: Array<Record<string, unknown>>
+  cachedRoles: RoleDefinition[]
   lastCreatedRoleId: string
   volunteerNsec: string
   reporterNsec: string

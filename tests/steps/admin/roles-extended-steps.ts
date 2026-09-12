@@ -216,14 +216,14 @@ Given('a volunteer with {string} role', async ({ page, request, rolesWorld }, ro
   })
   rolesWorld.volunteerNsec = vol.nsec
   await page.evaluate((name) => {
-    (window as Record<string, unknown>).__test_vol_name = name
+    (window as unknown as Record<string, unknown>).__test_vol_name = name
   }, vol.name)
 })
 
 When('I change their role to {string} via the dropdown', async ({ page }, roleName: string) => {
   // Navigate to volunteers page first
   await Navigation.goToVolunteers(page)
-  const volName = (await page.evaluate(() => (window as Record<string, unknown>).__test_vol_name)) as string
+  const volName = (await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_vol_name)) as string
   if (volName) {
     const row = page.getByTestId(TestIds.VOLUNTEER_ROW).filter({ hasText: volName })
     const dropdown = row.locator('select, [role="combobox"]').first()
@@ -241,7 +241,7 @@ When('I change their role to {string} via the dropdown', async ({ page }, roleNa
 })
 
 Then('the volunteer should display the {string} badge', async ({ page }, roleName: string) => {
-  const volName = (await page.evaluate(() => (window as Record<string, unknown>).__test_vol_name)) as string
+  const volName = (await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_vol_name)) as string
   if (volName) {
     const row = page.getByTestId(TestIds.VOLUNTEER_ROW).filter({ hasText: volName })
     const hasRow = await row.first().isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
@@ -266,12 +266,12 @@ Given('I changed a volunteer\'s role to {string}', async ({ page, request }, rol
     roleIds: [role!.id],
   })
   await page.evaluate((name) => {
-    (window as Record<string, unknown>).__test_vol_name = name
+    (window as unknown as Record<string, unknown>).__test_vol_name = name
   }, vol.name)
 })
 
 Then('I should see the {string} badge on their card', async ({ page }, roleName: string) => {
-  const volName = (await page.evaluate(() => (window as Record<string, unknown>).__test_vol_name)) as string
+  const volName = (await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_vol_name)) as string
   if (volName) {
     await Navigation.goToVolunteers(page)
     const row = page.getByTestId(TestIds.VOLUNTEER_ROW).filter({ hasText: volName })

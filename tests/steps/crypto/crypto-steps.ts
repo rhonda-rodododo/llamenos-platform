@@ -30,7 +30,7 @@ async function ensureAppLoaded(page: import('@playwright/test').Page) {
   // Check if the platform is already loaded (set by main.tsx after platform.ts loads).
   // If it's already there, we're already logged in and WASM is initialized.
   const alreadyLoaded = await page.evaluate(
-    () => !!(window as Record<string, unknown>).__TEST_PLATFORM,
+    () => !!(window as unknown as Record<string, unknown>).__TEST_PLATFORM,
   ).catch(() => false)
   if (alreadyLoaded) return
   const { loginAsAdmin } = await import('../../helpers')
@@ -42,7 +42,7 @@ async function ensureAppLoaded(page: import('@playwright/test').Page) {
 When('I generate a new keypair', async ({ page }) => {
   await ensureAppLoaded(page)
   const kp = await page.evaluate(async () => {
-    const p = (window as Record<string, unknown>).__TEST_PLATFORM as {
+    const p = (window as unknown as Record<string, unknown>).__TEST_PLATFORM as {
       generateEphemeralKeypair(): Promise<KP>
     }
     const raw = await p.generateEphemeralKeypair()
@@ -57,13 +57,13 @@ When('I generate a new keypair', async ({ page }) => {
     }
   })
   await page.evaluate((k) => {
-    (window as Record<string, unknown>).__test_keypair = k
+    (window as unknown as Record<string, unknown>).__test_keypair = k
   }, kp)
 })
 
 Then('the nsec should start with {string}', async ({ page }, prefix: string) => {
   const kp = await page.evaluate(
-    () => (window as Record<string, unknown>).__test_keypair,
+    () => (window as unknown as Record<string, unknown>).__test_keypair,
   ) as KP
   // v3 API returns hex seedHex, not bech32 nsec. Accept either format.
   if (kp.nsec && kp.nsec.startsWith(prefix)) {
@@ -78,7 +78,7 @@ Then('the nsec should start with {string}', async ({ page }, prefix: string) => 
 
 Then('the nsec should be 63 characters long', async ({ page }) => {
   const kp = await page.evaluate(
-    () => (window as Record<string, unknown>).__test_keypair,
+    () => (window as unknown as Record<string, unknown>).__test_keypair,
   ) as KP
   // v3 API: hex seed is 64 chars. Accept either bech32 (63) or hex (64).
   const bech32Match = kp.nsec.match(/nsec1[a-z0-9]+/)
@@ -93,7 +93,7 @@ Then('the nsec should be 63 characters long', async ({ page }) => {
 
 Then('the npub should be 63 characters long', async ({ page }) => {
   const kp = await page.evaluate(
-    () => (window as Record<string, unknown>).__test_keypair,
+    () => (window as unknown as Record<string, unknown>).__test_keypair,
   ) as KP
   // v3 API: publicKey is 64 hex chars. Accept either bech32 npub (63) or hex pubkey (64).
   const bech32Match = kp.npub?.match(/npub1[a-z0-9]+/)
@@ -108,32 +108,32 @@ Then('the npub should be 63 characters long', async ({ page }) => {
 When('I generate keypair A', async ({ page }) => {
   await ensureAppLoaded(page)
   const kp = await page.evaluate(async () => {
-    const p = (window as Record<string, unknown>).__TEST_PLATFORM as {
+    const p = (window as unknown as Record<string, unknown>).__TEST_PLATFORM as {
       generateEphemeralKeypair(): Promise<KP>
     }
     return p.generateEphemeralKeypair()
   })
   await page.evaluate((k) => {
-    (window as Record<string, unknown>).__test_keypairA = k
+    (window as unknown as Record<string, unknown>).__test_keypairA = k
   }, kp)
 })
 
 When('I generate keypair B', async ({ page }) => {
   await ensureAppLoaded(page)
   const kp = await page.evaluate(async () => {
-    const p = (window as Record<string, unknown>).__TEST_PLATFORM as {
+    const p = (window as unknown as Record<string, unknown>).__TEST_PLATFORM as {
       generateEphemeralKeypair(): Promise<KP>
     }
     return p.generateEphemeralKeypair()
   })
   await page.evaluate((k) => {
-    (window as Record<string, unknown>).__test_keypairB = k
+    (window as unknown as Record<string, unknown>).__test_keypairB = k
   }, kp)
 })
 
 Then('keypair A\'s nsec should differ from keypair B\'s nsec', async ({ page }) => {
-  const a = await page.evaluate(() => (window as Record<string, unknown>).__test_keypairA) as KP
-  const b = await page.evaluate(() => (window as Record<string, unknown>).__test_keypairB) as KP
+  const a = await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_keypairA) as KP
+  const b = await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_keypairB) as KP
   // v3 API: compare seedHex (hex seeds) instead of bech32 nsec
   const aSeed = a.seedHex || a.nsec
   const bSeed = b.seedHex || b.nsec
@@ -141,8 +141,8 @@ Then('keypair A\'s nsec should differ from keypair B\'s nsec', async ({ page }) 
 })
 
 Then('keypair A\'s npub should differ from keypair B\'s npub', async ({ page }) => {
-  const a = await page.evaluate(() => (window as Record<string, unknown>).__test_keypairA) as KP
-  const b = await page.evaluate(() => (window as Record<string, unknown>).__test_keypairB) as KP
+  const a = await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_keypairA) as KP
+  const b = await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_keypairB) as KP
   // v3 API: compare publicKey (hex) instead of bech32 npub
   const aPub = a.publicKey || a.npub
   const bPub = b.publicKey || b.npub
@@ -152,26 +152,26 @@ Then('keypair A\'s npub should differ from keypair B\'s npub', async ({ page }) 
 When('I generate a keypair', async ({ page }) => {
   await ensureAppLoaded(page)
   const kp = await page.evaluate(async () => {
-    const p = (window as Record<string, unknown>).__TEST_PLATFORM as {
+    const p = (window as unknown as Record<string, unknown>).__TEST_PLATFORM as {
       generateEphemeralKeypair(): Promise<KP>
     }
     return p.generateEphemeralKeypair()
   })
   await page.evaluate((k) => {
-    (window as Record<string, unknown>).__test_keypair = k
+    (window as unknown as Record<string, unknown>).__test_keypair = k
   }, kp)
 })
 
 Then('the public key hex should be 64 characters', async ({ page }) => {
   const kp = await page.evaluate(
-    () => (window as Record<string, unknown>).__test_keypair,
+    () => (window as unknown as Record<string, unknown>).__test_keypair,
   ) as KP
   expect(kp.publicKey.length).toBe(64)
 })
 
 Then('the public key should only contain hex characters [0-9a-f]', async ({ page }) => {
   const kp = await page.evaluate(
-    () => (window as Record<string, unknown>).__test_keypair,
+    () => (window as unknown as Record<string, unknown>).__test_keypair,
   ) as KP
   expect(kp.publicKey).toMatch(/^[0-9a-f]+$/)
 })
@@ -179,47 +179,47 @@ Then('the public key should only contain hex characters [0-9a-f]', async ({ page
 When('I generate a keypair and get the nsec', async ({ page }) => {
   await ensureAppLoaded(page)
   const kp = await page.evaluate(async () => {
-    const p = (window as Record<string, unknown>).__TEST_PLATFORM as {
+    const p = (window as unknown as Record<string, unknown>).__TEST_PLATFORM as {
       generateEphemeralKeypair(): Promise<KP>
     }
     return p.generateEphemeralKeypair()
   })
   await page.evaluate((k) => {
-    (window as Record<string, unknown>).__test_keypair = k
+    (window as unknown as Record<string, unknown>).__test_keypair = k
   }, kp)
 })
 
 When('I import that nsec into a fresh CryptoService', async ({ page }) => {
   const kp = await page.evaluate(
-    () => (window as Record<string, unknown>).__test_keypair,
+    () => (window as unknown as Record<string, unknown>).__test_keypair,
   ) as KP
   // Use seedHex (v3 hex seed) for import. deviceImportAndLoad expects a hex signing secret.
   const seedHex = kp.seedHex || kp.nsec
   const derivedPubkey = await page.evaluate(async (hex) => {
-    const p = (window as Record<string, unknown>).__TEST_PLATFORM as {
+    const p = (window as unknown as Record<string, unknown>).__TEST_PLATFORM as {
       deviceImportAndLoad(signingSecretHex: string, pin: string, deviceId: string): Promise<{ state: { signingPubkeyHex: string } }>
     }
     const result = await p.deviceImportAndLoad(hex, '12345678', crypto.randomUUID())
     return result.state.signingPubkeyHex
   }, seedHex)
   await page.evaluate((pubkey) => {
-    (window as Record<string, unknown>).__test_derived_pubkey = pubkey
+    (window as unknown as Record<string, unknown>).__test_derived_pubkey = pubkey
   }, derivedPubkey)
 })
 
 Then('the imported pubkey should match the original pubkey', async ({ page }) => {
   const kp = await page.evaluate(
-    () => (window as Record<string, unknown>).__test_keypair,
+    () => (window as unknown as Record<string, unknown>).__test_keypair,
   ) as KP
   const derived = await page.evaluate(
-    () => (window as Record<string, unknown>).__test_derived_pubkey,
+    () => (window as unknown as Record<string, unknown>).__test_derived_pubkey,
   ) as string
   expect(derived).toBe(kp.publicKey)
 })
 
 Then('the imported npub should match the original npub', async ({ page }) => {
   const kp = await page.evaluate(
-    () => (window as Record<string, unknown>).__test_keypair,
+    () => (window as unknown as Record<string, unknown>).__test_keypair,
   ) as KP
   // v3 API: npub may be empty; verify publicKey is valid hex instead
   if (kp.npub && kp.npub.startsWith('npub1')) {
@@ -235,26 +235,26 @@ Given('I have a loaded keypair', async ({ page }) => {
   await ensureAppLoaded(page)
   // Generate a fresh ephemeral keypair for PIN tests
   const kp = await page.evaluate(async () => {
-    const p = (window as Record<string, unknown>).__TEST_PLATFORM as {
+    const p = (window as unknown as Record<string, unknown>).__TEST_PLATFORM as {
       generateEphemeralKeypair(): Promise<KP>
     }
     return p.generateEphemeralKeypair()
   })
   await page.evaluate((k) => {
-    (window as Record<string, unknown>).__test_keypair = k
+    (window as unknown as Record<string, unknown>).__test_keypair = k
   }, kp)
 })
 
 Given('I have a loaded keypair with known pubkey', async ({ page }) => {
   await ensureAppLoaded(page)
   const kp = await page.evaluate(async () => {
-    const p = (window as Record<string, unknown>).__TEST_PLATFORM as {
+    const p = (window as unknown as Record<string, unknown>).__TEST_PLATFORM as {
       generateEphemeralKeypair(): Promise<KP>
     }
     return p.generateEphemeralKeypair()
   })
   await page.evaluate((k) => {
-    (window as Record<string, unknown>).__test_keypair = k
+    (window as unknown as Record<string, unknown>).__test_keypair = k
   }, kp)
 })
 
@@ -262,7 +262,7 @@ When('I encrypt the key with PIN {string}', async ({ page }, pin: string) => {
   // Generate a new device keypair, encrypt with PIN, and persist to store.
   // Uses deviceGenerateAndLoad + persistAndUnlockDeviceKeys (the v3 API).
   const result = await page.evaluate(async (p) => {
-    const platform = (window as Record<string, unknown>).__TEST_PLATFORM as {
+    const platform = (window as unknown as Record<string, unknown>).__TEST_PLATFORM as {
       deviceGenerateAndLoad(pin: string, deviceId: string): Promise<{
         salt: string; nonce: string; ciphertext: string; iterations: number;
         state: { deviceId: string; signingPubkeyHex: string; encryptionPubkeyHex: string }
@@ -275,13 +275,13 @@ When('I encrypt the key with PIN {string}', async ({ page }, pin: string) => {
     return { publicKey: encrypted.state.signingPubkeyHex }
   }, pin)
   await page.evaluate((pubkey) => {
-    ;(window as Record<string, unknown>).__test_keypair = { nsec: '', npub: '', publicKey: pubkey }
+    ;(window as unknown as Record<string, unknown>).__test_keypair = { nsec: '', npub: '', publicKey: pubkey }
   }, result.publicKey)
 })
 
 When('I lock the crypto service', async ({ page }) => {
   await page.evaluate(async () => {
-    const p = (window as Record<string, unknown>).__TEST_PLATFORM as {
+    const p = (window as unknown as Record<string, unknown>).__TEST_PLATFORM as {
       lockCrypto(): Promise<void>
     }
     await p.lockCrypto()
@@ -291,16 +291,16 @@ When('I lock the crypto service', async ({ page }) => {
 When('I decrypt with PIN {string}', async ({ page }, pin: string) => {
   // decryptWithPin reads from the Tauri store, decrypts, and returns pubkey or null.
   await page.evaluate(async (p) => {
-    const platform = (window as Record<string, unknown>).__TEST_PLATFORM as {
+    const platform = (window as unknown as Record<string, unknown>).__TEST_PLATFORM as {
       decryptWithPin(pin: string): Promise<string | null>
     }
     try {
       const result = await platform.decryptWithPin(p)
-      ;(window as Record<string, unknown>).__test_unlock_result = result
-      ;(window as Record<string, unknown>).__test_unlock_error = null
+      ;(window as unknown as Record<string, unknown>).__test_unlock_result = result
+      ;(window as unknown as Record<string, unknown>).__test_unlock_error = null
     } catch (err: unknown) {
-      ;(window as Record<string, unknown>).__test_unlock_result = null
-      ;(window as Record<string, unknown>).__test_unlock_error = err instanceof Error ? err.message : String(err)
+      ;(window as unknown as Record<string, unknown>).__test_unlock_result = null
+      ;(window as unknown as Record<string, unknown>).__test_unlock_error = err instanceof Error ? err.message : String(err)
     }
   }, pin)
 })
@@ -308,16 +308,16 @@ When('I decrypt with PIN {string}', async ({ page }, pin: string) => {
 When('I attempt to decrypt with PIN {string}', async ({ page }, pin: string) => {
   // Same as I decrypt with PIN — used for failure scenarios
   await page.evaluate(async (p) => {
-    const platform = (window as Record<string, unknown>).__TEST_PLATFORM as {
+    const platform = (window as unknown as Record<string, unknown>).__TEST_PLATFORM as {
       decryptWithPin(pin: string): Promise<string | null>
     }
     try {
       const result = await platform.decryptWithPin(p)
-      ;(window as Record<string, unknown>).__test_unlock_result = result
-      ;(window as Record<string, unknown>).__test_unlock_error = null
+      ;(window as unknown as Record<string, unknown>).__test_unlock_result = result
+      ;(window as unknown as Record<string, unknown>).__test_unlock_error = null
     } catch (err: unknown) {
-      ;(window as Record<string, unknown>).__test_unlock_result = null
-      ;(window as Record<string, unknown>).__test_unlock_error = err instanceof Error ? err.message : String(err)
+      ;(window as unknown as Record<string, unknown>).__test_unlock_result = null
+      ;(window as unknown as Record<string, unknown>).__test_unlock_error = err instanceof Error ? err.message : String(err)
     }
   }, pin)
 })
@@ -326,24 +326,24 @@ Then('the pubkey should match the original', async ({ page }) => {
   // After successful unlock, the WASM state has the key.
   // getDevicePubkeys() returns { signingPubkeyHex, ... } from CryptoState.
   const pubkey = await page.evaluate(async () => {
-    const p = (window as Record<string, unknown>).__TEST_PLATFORM as {
+    const p = (window as unknown as Record<string, unknown>).__TEST_PLATFORM as {
       getDevicePubkeys(): Promise<{ signingPubkeyHex: string } | null>
     }
     const keys = await p.getDevicePubkeys()
     return keys?.signingPubkeyHex ?? null
   })
   const kp = await page.evaluate(
-    () => (window as Record<string, unknown>).__test_keypair,
+    () => (window as unknown as Record<string, unknown>).__test_keypair,
   ) as KP
   expect(pubkey).toBe(kp.publicKey)
 })
 
 Then('decryption should fail with {string}', async ({ page }, errorText: string) => {
   const unlockResult = await page.evaluate(
-    () => (window as Record<string, unknown>).__test_unlock_result,
+    () => (window as unknown as Record<string, unknown>).__test_unlock_result,
   )
   const unlockError = await page.evaluate(
-    () => (window as Record<string, unknown>).__test_unlock_error,
+    () => (window as unknown as Record<string, unknown>).__test_unlock_error,
   ) as string | null
   // Failure: null result (wrong PIN) or error message containing text
   if (unlockError) {
@@ -355,7 +355,7 @@ Then('decryption should fail with {string}', async ({ page }, errorText: string)
 
 Then('the crypto service should be unlocked', async ({ page }) => {
   const unlocked = await page.evaluate(async () => {
-    const p = (window as Record<string, unknown>).__TEST_PLATFORM as {
+    const p = (window as unknown as Record<string, unknown>).__TEST_PLATFORM as {
       isCryptoUnlocked(): Promise<boolean>
     }
     return p.isCryptoUnlocked()
@@ -365,7 +365,7 @@ Then('the crypto service should be unlocked', async ({ page }) => {
 
 Then('the crypto service should be locked', async ({ page }) => {
   const unlocked = await page.evaluate(async () => {
-    const p = (window as Record<string, unknown>).__TEST_PLATFORM as {
+    const p = (window as unknown as Record<string, unknown>).__TEST_PLATFORM as {
       isCryptoUnlocked(): Promise<boolean>
     }
     return p.isCryptoUnlocked()
@@ -375,7 +375,7 @@ Then('the crypto service should be locked', async ({ page }) => {
 
 Then('the crypto service should remain locked', async ({ page }) => {
   const unlocked = await page.evaluate(async () => {
-    const p = (window as Record<string, unknown>).__TEST_PLATFORM as {
+    const p = (window as unknown as Record<string, unknown>).__TEST_PLATFORM as {
       isCryptoUnlocked(): Promise<boolean>
     }
     return p.isCryptoUnlocked()
@@ -454,8 +454,8 @@ Then('encryption should {string}', async () => {
 When('I create an auth token for {string} {string}', async ({ page }, method: string, path: string) => {
   await page.evaluate(
     ({ m, p }) => {
-      (window as Record<string, unknown>).__test_auth_method = m
-      ;(window as Record<string, unknown>).__test_auth_path = p
+      (window as unknown as Record<string, unknown>).__test_auth_method = m
+      ;(window as unknown as Record<string, unknown>).__test_auth_path = p
     },
     { m: method, p: path },
   )
@@ -625,12 +625,12 @@ When('I generate a wake key', async ({ page }) => {
   // Wake key generation is a mobile-only feature (UniFFI/JNI)
   // On desktop, this is a no-op — scenarios tagged @android @ios only
   await page.evaluate(() => {
-    (window as Record<string, unknown>).__test_wake_pubkey = 'a'.repeat(64)
+    (window as unknown as Record<string, unknown>).__test_wake_pubkey = 'a'.repeat(64)
   })
 })
 
 Then('the wake public key should be {int} hex characters', async ({ page }, count: number) => {
-  const pubkey = await page.evaluate(() => (window as Record<string, unknown>).__test_wake_pubkey) as string
+  const pubkey = await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_wake_pubkey) as string
   expect(pubkey.length).toBe(count)
 })
 
@@ -644,7 +644,7 @@ Then('generating the wake key again should return the same key', async () => {
 
 Given('a wake key has been generated', async ({ page }) => {
   await page.evaluate(() => {
-    (window as Record<string, unknown>).__test_wake_pubkey = 'b'.repeat(64)
+    (window as unknown as Record<string, unknown>).__test_wake_pubkey = 'b'.repeat(64)
   })
 })
 
