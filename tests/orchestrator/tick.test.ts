@@ -122,7 +122,8 @@ describe('tick', () => {
       expect.objectContaining({ itemId: '1', outcome: 'FAILED', note: 'x'.repeat(300) }),
     )
     expect(d.record).toHaveBeenCalledWith(expect.objectContaining({ itemId: '2', outcome: 'SUCCESS' }))
-    expect(r.dispatched).toBe(2)
+    expect(r.attempted).toBe(2)
+    expect(r.failed).toBe(1)
     expect(r.aborted).toBeUndefined()
     expect(release).toHaveBeenCalledTimes(1)
   })
@@ -158,7 +159,7 @@ describe('tick', () => {
     const r = await tick(d)
     expect(dispatch).toHaveBeenCalledTimes(1)
     expect(dispatch.mock.calls[0][1].id).toBe('backend')
-    expect(r.dispatched).toBe(1)
+    expect(r.attempted).toBe(1)
   })
 
   // E3: MAX_ATTEMPTS_PER_ITEM is enforced by failedAttemptsIn() at dispatch
@@ -179,7 +180,7 @@ describe('tick', () => {
     })
     const r = await tick(d)
     expect(d.dispatch).not.toHaveBeenCalled()
-    expect(r.dispatched).toBe(0)
+    expect(r.attempted).toBe(0)
   })
 
   // E4: cap must be tracked per lane. The mutation this guards against is
@@ -198,7 +199,7 @@ describe('tick', () => {
     })
     const r = await tick(d)
     expect(dispatch).toHaveBeenCalledTimes(2)
-    expect(r.dispatched).toBe(2)
+    expect(r.attempted).toBe(2)
   })
 })
 

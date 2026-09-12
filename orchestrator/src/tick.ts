@@ -25,13 +25,17 @@ export interface TickResult {
   aborted?: 'source-unreadable' | 'breaker' | 'error'
   breakerReason?: string
   errorMessage?: string
-  dispatched: number
+  /** Every dispatch() call made, whether it succeeded or threw. Not a count
+   *  of successes — see `failed` for the subset that threw. */
+  attempted: number
+  /** Of `attempted`, the count that threw and were recorded FAILED. */
+  failed: number
   shadowed: number
   rejections: { id: string; reason: Rejection }[]
 }
 
 const empty = (over: Partial<TickResult> = {}): TickResult =>
-  ({ ran: false, dispatched: 0, shadowed: 0, rejections: [], ...over })
+  ({ ran: false, attempted: 0, failed: 0, shadowed: 0, rejections: [], ...over })
 
 let counter = 0
 function runId(now: number): string {
@@ -115,7 +119,8 @@ export async function tick(deps: TickDeps): Promise<TickResult> {
     }
 
     const owned = claimAcrossLanes(active, itemsByLane)
-    let dispatched = 0
+    let attempted = 0
+    let failed = 0
     let shadowed = 0
 
     for (const lane of active) {
@@ -134,7 +139,7 @@ export async function tick(deps: TickDeps): Promise<TickResult> {
         const mid = await deps.checkHalt()
         if (mid.halted) {
           deps.log(`halted mid-pass: ${mid.reason ?? 'unknown'}`)
-          return { ran: true, halted: true, haltReason: mid.reason, dispatched, shadowed, rejections: allRejections }
+          return { ran: true, halted: true, haltReason: mid.reason, attempted, failed, shadowed, rejections: allRejections }
         }
 
         const base = { ts: deps.now(), runId: runId(deps.now()), lane: lane.id, itemId: item.id, itemName: item.title, engine: lane.engine }
@@ -156,13 +161,14 @@ export async function tick(deps: TickDeps): Promise<TickResult> {
           deps.record({ ...base, ...result })
         } catch (e) {
           deps.record({ ...base, outcome: 'FAILED', note: errorMessage(e) })
+          failed++
         }
-        dispatched++
+        attempted++
         taken++
       }
     }
 
-    return { ran: true, dispatched, shadowed, rejections: allRejections }
+    return { ran: true, attempted, failed, shadowed, rejections: allRejections }
   } catch (e) {
     const msg = errorMessage(e)
     deps.log(`tick failed: ${msg}`)
