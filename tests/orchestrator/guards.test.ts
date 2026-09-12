@@ -3,6 +3,7 @@ import { LANES, NEVER_WRITE_PATHS, loadLanes, assertLiveLanesHaveScope } from '.
 import { classifyImpact } from '../../orchestrator/src/impact.js'
 import { checkScope } from '../../orchestrator/src/scope.js'
 import { haltedOnGitHubFrom } from '../../orchestrator/src/killswitch.js'
+import { loadLaneScopes } from '../../orchestrator/src/fragments.js'
 import { execSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 
@@ -29,6 +30,28 @@ describe('rail: a live lane must have a write scope', () => {
     const lanes = await loadLanes(process.cwd(), '/nonexistent/fixture-lanes.json')
     for (const l of lanes) {
       expect(l.scope.owned.length, `lane ${l.id} parsed no owned paths from its fragment`).toBeGreaterThan(0)
+    }
+  })
+})
+
+describe('rail: notOwned entries must be directory-shaped, not bare filenames', () => {
+  // The scope specificity rule (scope.ts) ranks owned vs. notOwned by
+  // matched-pattern STRING LENGTH — sound for today's fragments, but not in
+  // general: a bare-filename notOwned entry (e.g. `README.md`, length 10)
+  // sitting under a long owned directory prefix (e.g. `apps/backend/`,
+  // length 13) would lose the length comparison and be silently ignored —
+  // the file would be treated as owned even though the fragment says it is
+  // explicitly excluded. A directory-shaped entry does not have this trap
+  // because matchesPath's trailing-`/` and prefix rules make it dominate any
+  // owned prefix it is nested under. This guard converts that invisible trap
+  // into a failing test the moment any fragment adds a bare-filename
+  // notOwned entry, rather than letting it silently mis-rank in production.
+  it('every parsed notOwned entry across all six fragments contains a "/"', async () => {
+    const scopes = await loadLaneScopes(process.cwd())
+    for (const [lane, scope] of Object.entries(scopes)) {
+      for (const p of scope.notOwned) {
+        expect(p, `lane ${lane}'s notOwned entry "${p}" is a bare filename — see comment above`).toContain('/')
+      }
     }
   })
 })
