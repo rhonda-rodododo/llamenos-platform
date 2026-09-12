@@ -116,9 +116,9 @@ Then('I should see the statuses defined for {string}', async ({ page, backendReq
 
 Then('the initial status should be marked', async ({ page }) => {
   // Exactly one status row carries the default badge, and it is the entity type's defaultStatus.
-  const defaultBadges = editor(page).getByTestId('status-default-badge')
-  await expect(defaultBadges).toHaveCount(1, { timeout: Timeouts.ELEMENT })
-  const defaultRow = editor(page).getByTestId('status-row').filter({ has: defaultBadges })
+  await expect(editor(page).getByTestId('status-default-badge')).toHaveCount(1, { timeout: Timeouts.ELEMENT })
+  // `has` is resolved relative to each row, so the inner locator must not be editor-rooted.
+  const defaultRow = editor(page).getByTestId('status-row').filter({ has: page.getByTestId('status-default-badge') })
   await expect(defaultRow).toHaveCount(1)
   await expect(defaultRow.getByTestId('status-set-default-btn')).toHaveCount(0)
   const defaultStatus = expectedDefaultStatus.get(page)

@@ -54,10 +54,11 @@ Given('the {string} template has been applied', async ({ backendRequest: request
     { name: 'location', label: 'Location', type: 'text', order: 1 },
     { name: 'priority', label: 'Priority', type: 'select', order: 2 },
   ]
+  // Mirrors packages/protocol/templates/<slug>.json entity type names and categories.
   const slugToTypes: Record<string, Array<{ name: string; label: string; category: string }>> = {
     'jail-support': [
       { name: 'arrest_case', label: 'Arrest Case', category: 'case' },
-      { name: 'legal_observer_report', label: 'Legal Observer Report', category: 'report' },
+      { name: 'mass_arrest_event', label: 'Mass Arrest Event', category: 'event' },
     ],
   }
   const entityTypes = await listEntityTypesViaApi(request, workerHub)
