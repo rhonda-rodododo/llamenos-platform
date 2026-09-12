@@ -111,6 +111,22 @@ export async function loadLanes(repoRoot: string): Promise<Lane[]> {
  * matches `apps/worker/config/.env` at any depth, `keystore.properties`
  * matches `apps/android/keystore.properties`, and `*.pem`/`id_rsa`/
  * `id_ed25519` catch key material wherever a worker might create it.
+ *
+ * This list is NOT a mirror of `.claude/settings.json`'s PreToolUse hook —
+ * that regex (`\.env$|\.dev\.vars|\.pem$|id_rsa$|id_ed25519$`) is a fast,
+ * best-effort bail-out for interactive editing and has already drifted from
+ * this one (it does not know about `keystore.properties` or any of the
+ * signing-key extensions below). This list is the authoritative, exhaustive
+ * one the scope checker enforces; the two are independent defenses and must
+ * each be kept correct on their own, not assumed to track each other.
+ *
+ * `keystore.properties` holds the Android signing key's *password*, not the
+ * key itself — `*.jks`/`*.keystore` are the actual Android keystore files.
+ * `*.p8`/`*.p12`/`*.pfx`/`*.mobileprovision` cover iOS/macOS signing
+ * (App Store Connect API keys, PKCS#12 export, provisioning profiles).
+ * `.npmrc`/`.pgpass`/`authorized_keys` cover registry auth tokens, Postgres
+ * credentials, and SSH access — none of which are recoverable secrets a
+ * revert can undo once exfiltrated.
  */
 export const NEVER_WRITE_PATHS: readonly string[] = [
   '.env',
@@ -119,6 +135,16 @@ export const NEVER_WRITE_PATHS: readonly string[] = [
   '*.pem',
   'id_rsa',
   'id_ed25519',
+  '*.jks',
+  '*.keystore',
+  '*.p8',
+  '*.p12',
+  '*.pfx',
+  '*.key',
+  '*.mobileprovision',
+  '.npmrc',
+  '.pgpass',
+  'authorized_keys',
 ]
 
 export const MAX_ATTEMPTS_PER_ITEM = 3

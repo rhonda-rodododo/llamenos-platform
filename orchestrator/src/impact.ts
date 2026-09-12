@@ -25,6 +25,42 @@ export const HIGH_IMPACT_PATHS: readonly string[] = [
   'apps/desktop/tauri.conf.json',
   'orchestrator/',
   'tests/orchestrator/',
+
+  // These two are the other half of the orchestrator's own trust base: it
+  // already treats its own source as high-impact, but a worker that edits the
+  // fragment defining its own lane's write scope — or the settings file
+  // enforcing the PreToolUse write-deny hook — can widen its own authority
+  // without ever touching `orchestrator/`.
+  '.claude/agents/fragments/',
+  '.claude/settings.json',
+
+  'drizzle/migrations/',
+  'packages/shared/migrations/',
+  'apps/worker/db/schema/',
+  'apps/worker/middleware/',
+  'apps/worker/routes/auth',
+  'apps/worker/routes/sessions',
+  'apps/worker/routes/webauthn',
+  'apps/worker/lib/crypto',
+  'apps/worker/lib/hub-event-crypto',
+  'apps/worker/lib/push-encryption',
+  'apps/worker/lib/server-identity',
+  'apps/worker/lib/agent-identity',
+  'apps/worker/lib/timing-safe',
+  'apps/worker/lib/blind-index-query',
+  'apps/worker/services/crypto-keys',
+  'packages/protocol/tools/',
+  'packages/shared/crypto-labels.ts',
+  'src/client/lib/platform.ts',
+  'apps/desktop/src/',
+  'apps/desktop/capabilities/',
+  'apps/ios/Sources/Services/CryptoService.swift',
+  'apps/android/app/src/main/java/org/llamenos/hotline/crypto/',
+  'scripts/inject-cert-pins.ts',
+  'scripts/extract-cert-pins.sh',
+  'scripts/verify-build.sh',
+  'Dockerfile.build',
+  'knope.toml',
 ]
 
 export function classifyImpact(

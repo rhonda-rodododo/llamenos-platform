@@ -79,6 +79,27 @@ describe('config', () => {
     expect(r.forbidden).toEqual(['apps/android/keystore.properties'])
   })
 
+  // F3: keystore.properties only holds the signing key's password — the key
+  // itself (a .jks/.keystore file, or an iOS App Store Connect API key) was
+  // previously writable by any lane.
+  it('never permits writes to the actual signing keys, not just their passwords', () => {
+    for (const p of [
+      '*.jks', '*.keystore', '*.p8', '*.p12', '*.pfx', '*.key',
+      '*.mobileprovision', '.npmrc', '.pgpass', 'authorized_keys',
+    ]) {
+      expect(NEVER_WRITE_PATHS).toContain(p)
+    }
+  })
+
+  it('marks a release Android keystore and an iOS App Store Connect API key as forbidden', () => {
+    const r = checkScope(
+      ['apps/android/app/release.jks', 'apps/ios/fastlane/AuthKey_ABC123.p8'],
+      { owned: [], notOwned: [] },
+      [...NEVER_WRITE_PATHS],
+    )
+    expect(r.forbidden).toEqual(['apps/android/app/release.jks', 'apps/ios/fastlane/AuthKey_ABC123.p8'])
+  })
+
   it('gives up on an item after three failed attempts', () => {
     expect(MAX_ATTEMPTS_PER_ITEM).toBe(3)
   })
