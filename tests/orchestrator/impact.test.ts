@@ -11,7 +11,7 @@ import { NEVER_WRITE_PATHS, SECRET_PATH_PATTERNS } from '../../orchestrator/src/
  * basename-matches-at-any-depth behavior `matchesPath` implements.
  */
 function realisticPathFor(pattern: string): string {
-  const filename = pattern.includes('*') ? pattern.replace('*', 'example-secret') : pattern
+  const filename = pattern.includes('*') ? pattern.replaceAll('*', 'example-secret') : pattern
   return pattern.includes('/') ? filename : `some/nested/dir/${filename}`
 }
 
