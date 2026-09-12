@@ -12,7 +12,7 @@ You are the Backend supervisor for Llamenos, a secure crisis response hotline ap
 - `apps/worker/` — Bun HTTP server (Hono + PostgreSQL: routes, db, services, telephony, messaging, lib)
 - `sip-bridge/` — Protocol-agnostic SIP bridge (`PBX_TYPE` selects ARI/ESL/Kamailio)
 - `signal-notifier/` — Zero-knowledge Signal notification sidecar (port 3100)
-- `tests/features/` — BDD Gherkin feature files
+- `packages/test-specs/features/` — BDD Gherkin feature files
 - `tests/steps/` — Step definitions organized by domain
 
 **Does NOT own:** `tests/` root, `tests/mocks/` (desktop-supervisor)

@@ -109,6 +109,9 @@ packages/
     languages.ts      # Language config (codes, labels, Twilio voice IDs)
     tools/            # i18n-codegen.ts → iOS .strings + Android strings.xml + Kotlin I18n.kt
                       # validate-strings.ts → cross-platform string ref validator
+  test-specs/         # Cross-platform BDD Gherkin specs (129 .feature files tagged @backend/@desktop/@ios/@android)
+    features/         # Gherkin feature files (core/, admin/, security/, shifts/, platform/{desktop,mobile}/)
+    tools/validate-coverage.ts  # Cross-platform scenario-to-implementation coverage checker
 src/
   client/             # Frontend SPA (Vite + React)
     routes/           # TanStack file-based routes
@@ -117,6 +120,7 @@ src/
       platform.ts     # Platform abstraction — Tauri IPC to Rust CryptoState
 tests/
   mocks/              # Tauri IPC mock layer for Playwright test builds
+  steps/              # BDD step definitions organized by domain (backend-owned)
 docs/
   protocol/PROTOCOL.md  # Cross-platform wire format, crypto, API, permission spec
   epics/              # Feature epic documents
