@@ -1387,16 +1387,27 @@ jobs:
   # (whose GITHUB_TOKEN is read-only) permanently unmergeable.
   #
   # Both jobs run their FULL logic on every pull request — no branch-name
-  # opt-out. A human PR has no lane, so it gets no owned-path scope check, but
-  # never-write still binds it and the non-author review still runs. Nothing
-  # here uses an `if:` to skip a job either: a skipped job's check reports as
-  # skipped, which GitHub treats as satisfying a required check — fail-open,
-  # the one direction this must never be.
+  # opt-out and no path filter. A human PR has no lane, so it gets no
+  # owned-path scope check, but never-write still binds it and the non-author
+  # review still runs.
+  #
+  # The ONE `if:` here is an EVENT filter, and the distinction matters: a
+  # skipped job's check reports as *skipped*, which GitHub treats as
+  # satisfying a required check, so any condition that can skip on a PULL
+  # REQUEST would be fail-open. `github.event_name == 'pull_request'` cannot:
+  # on a push to main/desktop there is no PR to gate, `origin/main...HEAD` is
+  # empty, and the review job would otherwise go red on every merge. On a
+  # pull request — the only event the ruleset acts on — both jobs always run
+  # and always report.
+  #
+  # Neither is in `ci-status`'s `needs` list, so skipping them on push does
+  # not affect it at all.
   #
   # Deliberately NOT in `ci-status`'s needs list: that is the repo's own CI
   # verdict, these are the fleet's, so a reader can tell which one refused.
   fleet-verify:
     name: fleet/verify
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -1431,6 +1442,7 @@ jobs:
 
   fleet-review:
     name: fleet/review
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       # contents: read and nothing else — the non-author reviewer runs inside
@@ -1494,13 +1506,8 @@ jobs:
 
       # opencode authenticates from `auth.json`, not an env var (there is no
       # OPENCODE_API_KEY — see review.ts's VERIFIER_ENV_ALLOWLIST comment).
-      # The shape here is the one confirmed on the operator's own machine:
-      # the provider id `kimi-for-coding` keyed to a Moonshot Kimi API key,
-      # which is the model VERIFIER_ENGINE selects (`kimi-for-coding/k2p6`).
-      # Written to a file rather than passed through the environment so the
+      # Written to a file rather than passed through the environment, so the
       # key is never in the verifier subprocess's env at all.
-      # opencode authenticates from `auth.json`, not an env var (there is no
-      # OPENCODE_API_KEY — see review.ts's VERIFIER_ENV_ALLOWLIST comment).
       # This is the shape confirmed on the operator's own machine. No
       # `opencode.json` is written: `kimi-for-coding` is a provider in
       # opencode's built-in models.dev registry, verified by resolving
