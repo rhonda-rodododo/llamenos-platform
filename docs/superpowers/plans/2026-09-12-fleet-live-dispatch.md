@@ -6,6 +6,8 @@
 
 **Architecture:** The engine adapter wraps the repo's existing, proven `dispatch-one.sh` rather than standing up a second runtime. Verification is mechanical-first: scope and tests block; a second-engine opinion may only downgrade a pass, never rescue a mechanical failure. Everything already built in Plan 1 (`select`, `scope`, `impact`, `circuit`, `killswitch`, `lock`, `ledger`, `tick`) is wired, not rewritten.
 
+**Scope: the whole design, not a minimum.** This plan implements §5 of the spec in full — five distinct roles including a Planner that generates work, the bounded review loop, shared memory feeding every brief, and contracts in git. A fleet that only dispatches implementers is the reference system with extra steps; the roles and the memory are the point.
+
 **Tech Stack:** TypeScript (strict, no `any`), Bun, vitest 4, `gh` CLI, `dispatch-one.sh` + tmux.
 
 **Spec:** `docs/superpowers/specs/2026-09-11-llamenos-fleet-orchestrator-design.md`
@@ -24,93 +26,82 @@
 
 ---
 
-### Task 1: Vendor the dispatch machinery into the repo
+### Task 1: Pin and verify the dispatch dependency
 
-The fleet must not depend on an untracked script that can change under it without a commit. This is the failure PR #623's own README describes — machine-local sources drifting for months unnoticed.
+`dispatch-one.sh` lives at `~/.claude/skills/supervising-dispatched-sessions/`, which is a symlink into `/media/rikki/Main/projects/claude-skills` — **a real git repository, and the script is tracked there.** It is not untracked, as an earlier draft of this plan wrongly claimed.
+
+The actual risk is narrower: llamenos cannot *pin a version* of it. A change committed to `claude-skills` takes effect on the next dispatch with no llamenos commit, and the fleet cannot run on a machine where that repo is absent. Vendoring a duplicate of a tracked file is the wrong fix — it creates two sources of truth for one script. Pin and verify instead.
 
 **Files:**
-- Create: `orchestrator/vendor/dispatch/` (copied from `~/.claude/skills/supervising-dispatched-sessions/`)
-- Create: `orchestrator/vendor/README.md`
-- Create: `scripts/check-vendor-drift.sh`
-- Modify: `package.json` (add `fleet:vendor:check`)
-- Test: `tests/orchestrator/vendor.test.ts`
+- Modify: `orchestrator/src/paths.ts` (add `DISPATCH_SKILL_DIR`, `DISPATCH_SCRIPT`)
+- Create: `orchestrator/src/dependency.ts`
+- Modify: `orchestrator/src/cli.ts` (doctor checks)
+- Test: `tests/orchestrator/dependency.test.ts`
 
 **Interfaces:**
-- Produces: `DISPATCH_SCRIPT` path constant exported from `orchestrator/src/paths.ts`.
+- Produces: `DISPATCH_SCRIPT`, `checkDispatchDependency(): { ok: boolean; problems: string[]; commit?: string }`, `MIN_DISPATCH_COMMIT`.
 
-- [ ] **Step 1: Identify exactly what must be vendored**
-
-Run `bash ~/.claude/skills/supervising-dispatched-sessions/dispatch-one.sh --help` and read the script's head. Copy `dispatch-one.sh` and every file it sources or references at runtime — at minimum the `prompt-template*.md` and `prompt-rules-llamenos.md` it assembles from. Do **not** vendor `trello-*.sh` (this fleet reads GitHub) or other projects' rules files (`prompt-rules-skybuild.md`, `prompt-rules-translatemd.md`).
-
-**Take the version that includes PR #643's fixes** — the pre-#643 rules instruct workers to run `bun run dev:docker` and `bun run test:unit`, neither of which exists, and point `DISPATCH_REPO` at the retired sibling repo `llamenos-hotline`. Verify before copying: grep the copied rules for `dev:docker`, `test:unit`, and `llamenos-hotline`. If any are present, you have the wrong version — stop and report.
-
-- [ ] **Step 2: Write the drift guard**
-
-```bash
-# scripts/check-vendor-drift.sh
-#!/usr/bin/env bash
-# The fleet dispatches through orchestrator/vendor/dispatch/. That copy is the
-# one that ships and the one CI runs. The $HOME skill directory is a developer
-# convenience that is NOT version-controlled and may differ.
-#
-# This guard does not force them equal — that would make every local experiment
-# a CI failure. It asserts the vendored copy is present, executable, and carries
-# no reference to a command or repo that does not exist, which is exactly how
-# the pre-#643 rules shipped broken for months.
-set -euo pipefail
-V="orchestrator/vendor/dispatch"
-fail=0
-[[ -x "$V/dispatch-one.sh" ]] || { echo "FAIL: $V/dispatch-one.sh missing or not executable"; fail=1; }
-for bad in "dev:docker" "run test:unit" "llamenos-hotline"; do
-  if grep -rn -- "$bad" "$V" >/dev/null 2>&1; then
-    echo "FAIL: vendored dispatch references '$bad', which does not exist in this repo:"
-    grep -rn -- "$bad" "$V" | head -5
-    fail=1
-  fi
-done
-exit $fail
-```
-
-- [ ] **Step 3: Write the test**
+- [ ] **Step 1: Write the failing test**
 
 ```ts
-// tests/orchestrator/vendor.test.ts
+// tests/orchestrator/dependency.test.ts
 import { describe, it, expect } from 'vitest'
-import { existsSync, readFileSync, statSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
-import { DISPATCH_SCRIPT } from '../../orchestrator/src/paths.js'
+import { existsSync, statSync } from 'node:fs'
+import { DISPATCH_SCRIPT, DISPATCH_SKILL_DIR } from '../../orchestrator/src/paths.js'
+import { problemsWith } from '../../orchestrator/src/dependency.js'
 
-describe('vendored dispatch machinery', () => {
-  it('exists and is executable', () => {
+describe('dispatch dependency', () => {
+  it('the script exists and is executable', () => {
     expect(existsSync(DISPATCH_SCRIPT)).toBe(true)
     expect(statSync(DISPATCH_SCRIPT).mode & 0o111).toBeGreaterThan(0)
   })
 
-  it.each(['dev:docker', 'run test:unit', 'llamenos-hotline'])(
-    'does not instruct workers to use %s, which does not exist here',
-    (bad) => {
-      const out = execFileSync('bash', ['-c',
-        `grep -rn -- '${bad}' orchestrator/vendor/dispatch || true`], { encoding: 'utf8' })
-      expect(out.trim()).toBe('')
-    })
+  it('its rules do not name commands this repo does not have', () => {
+    const out = execFileSync('bash', ['-c',
+      `grep -rn -- 'dev:docker\\|run test:unit\\|llamenos-hotline' "${DISPATCH_SKILL_DIR}"/prompt-rules-llamenos.md || true`],
+      { encoding: 'utf8' })
+    expect(out.trim(), 'worker rules reference a command or repo that does not exist here').toBe('')
+  })
 
-  it('accepts the flags the engine adapter depends on', () => {
-    const src = readFileSync(DISPATCH_SCRIPT, 'utf8')
-    for (const flag of ['--agent', '--owns', '--effort', '--rules', '--max-budget-usd', '--dry-run']) {
-      expect(src, `dispatch-one.sh must accept ${flag}`).toContain(flag)
-    }
+  it('reports a dirty dependency repo as a problem', () => {
+    expect(problemsWith({ exists: true, executable: true, isGitRepo: true, dirty: true, rulesClean: true }))
+      .toContainEqual(expect.stringMatching(/uncommitted/i))
+  })
+
+  it('reports a missing script as a problem', () => {
+    expect(problemsWith({ exists: false, executable: false, isGitRepo: true, dirty: false, rulesClean: true }).length)
+      .toBeGreaterThan(0)
+  })
+
+  it('reports no problems when everything is in order', () => {
+    expect(problemsWith({ exists: true, executable: true, isGitRepo: true, dirty: false, rulesClean: true }))
+      .toEqual([])
   })
 })
 ```
 
-- [ ] **Step 4: Run, wire, commit**
+- [ ] **Step 2: Run to verify failure**
 
-Run: `bun run test:fleet -- tests/orchestrator/vendor.test.ts` → PASS.
-Add `"fleet:vendor:check": "bash scripts/check-vendor-drift.sh"` to `package.json` and a step to CI's `backend-unit` job beside the fleet suite.
+Run: `bun run test:fleet -- tests/orchestrator/dependency.test.ts` → FAIL, module not found.
+
+- [ ] **Step 3: Implement**
+
+`dependency.ts` exports a pure `problemsWith(facts)` and an impure `checkDispatchDependency()` that gathers the facts. It must detect:
+- the script missing or not executable
+- the skill directory not being inside a git repository
+- **uncommitted changes in that repository** — a dispatch whose behaviour comes from an uncommitted edit is not reproducible, and this is exactly how a fix to the worker rules sat in a working tree with the llamenos PR carrying only its generated output
+- the Llamenos rules naming `dev:docker`, `test:unit`, or `llamenos-hotline`
+
+Record the dependency's HEAD commit in every `RunRecord`'s note at dispatch, so a run's behaviour can be traced to a specific version of the script that produced it. That is the version-pin llamenos cannot otherwise express.
+
+- [ ] **Step 4: Wire into doctor and commit**
+
+`doctor` reports the dependency's path, its HEAD commit, and every problem. A dirty dependency repo is a **warning**, not a hard failure — it is normal while iterating — but it must be visible, and the digest must carry it too.
 
 ```bash
-git add orchestrator/vendor scripts/check-vendor-drift.sh tests/orchestrator/vendor.test.ts package.json .github/workflows/ci.yml orchestrator/src/paths.ts
-git commit -m "feat(fleet): vendor the dispatch machinery with a drift guard"
+git add orchestrator/src/dependency.ts orchestrator/src/paths.ts orchestrator/src/cli.ts tests/orchestrator/dependency.test.ts
+git commit -m "feat(fleet): pin and verify the dispatch dependency"
 ```
 
 ---
@@ -641,7 +632,148 @@ git commit -m "feat(fleet): rehearsed revert"
 
 ---
 
-### Task 12: The ramp
+### Task 12: Shared memory — contracts and brief augmentation
+
+Spec §5.7. The reference system's sharpest gap: its ledger is written by the orchestrator and read by nothing that briefs a worker, so every run starts from zero.
+
+**Files:**
+- Create: `orchestrator/src/memory.ts`
+- Create: `.claude/coordination/contracts/README.md`
+- Delete: `.claude/coordination/STATUS.md`, `.claude/coordination/blockers.md`
+- Test: `tests/orchestrator/memory.test.ts`
+
+**Interfaces:**
+- Produces: `loadContracts(repoRoot): Promise<Contract[]>`, `contractsFor(changed: string[], contracts): Contract[]`, `augmentBrief(base: string, ctx: MemoryContext): string`.
+
+```ts
+export interface Contract { path: string; title: string; owner: string; governs: string[]; body: string }
+export interface MemoryContext {
+  priorAttempts: RunRecord[]
+  lastReviewVerdict?: { verdict: string; text: string }
+  contracts: Contract[]
+}
+```
+
+- [ ] **Step 1: Write the failing tests**
+
+Cover: a contract whose `governs` globs match a changed file is selected and one that does not is omitted (reuse `matchesPath`); `augmentBrief` includes prior failure notes, the last reviewer verdict, and any governing contract; and it adds nothing when there is no history — a brief padded with empty sections wastes the worker's context.
+
+- [ ] **Step 2–4: Fail, implement, pass**
+
+**Contracts stay in git and this is deliberate.** A contract says "the backend's API shape is X, so iOS and Android must match." It must be true *at a commit* and must change in the PR that changes the interface. A contract in a GitHub comment is read by a worker checked out at an older commit as a description of code that worker does not have.
+
+`STATUS.md` and `blockers.md` are deleted, not migrated: six agents rewriting a file to restate what the Projects board already knows is a conflict generator with no readers. Per-domain status is *derived*; blockers are labelled issues.
+
+```bash
+git commit -m "feat(fleet): shared memory — contracts in git, briefs carrying history"
+```
+
+---
+
+### Task 13: The bounded review loop
+
+Spec §5.6. In the reference system a rejected run is discarded entirely and a human must rescue it. Here the reviewer's verdict returns to the author.
+
+**Files:** Modify `orchestrator/src/tick.ts`, `orchestrator/src/review.ts`; test `tests/orchestrator/review-loop.test.ts`.
+
+**Interfaces:** `runReviewLoop(input): Promise<{ finalVerdict, rounds: number }>`.
+
+- [ ] **Steps**
+
+The loop: mechanical verify → second opinion → if FAIL, send the verdict back to the *same worker session* with its worktree intact → it revises → re-verify. **Bounded at two rounds**, then the item goes to a human with the review history on the PR.
+
+Required tests: a pass on round one runs no second round; a fail then a pass reports two rounds; two fails stop and label the issue for a human; the round counter cannot exceed two **even if the reviewer keeps failing** — assert with a reviewer stubbed to always FAIL, because an unbounded loop here burns a worker's budget and the fleet's rate limit simultaneously.
+
+A bounded loop is the difference between iteration and a spiral.
+
+```bash
+git commit -m "feat(fleet): bounded two-round review loop"
+```
+
+---
+
+### Task 14: Mandatory crypto review
+
+**Files:** Modify `orchestrator/src/review.ts`, `orchestrator/src/merge.ts`; test `tests/orchestrator/crypto-review.test.ts`.
+
+- [ ] **Steps**
+
+Any diff touching `packages/crypto/`, `packages/protocol/schemas/`, `crypto-labels.json`, or auth/session/sigchain code gets the `crypto-security-reviewer` agent as an **additional, mandatory** reviewer — on top of the non-author second opinion, not instead of it.
+
+Its verdict is advisory to a human, never a merge permission: those paths are high-impact, so they never auto-merge regardless. The point is that the human starts from a security review rather than from scratch.
+
+Tests: a crypto diff requests the crypto reviewer; a non-crypto diff does not; and `mayAutoMerge` still refuses a crypto diff **even when the crypto reviewer approves** — that last one is the guard against a future change quietly promoting an advisory verdict into a merge permission.
+
+Note: `.claude/agents/crypto-security-reviewer.md` is only fit for this purpose once PR #643 lands — before that it reviews against the retired ECIES/secp256k1/nsec architecture. Assert in a test that it does not mention `secp256k1` or `nsec`.
+
+```bash
+git commit -m "feat(fleet): mandatory crypto-security review on sensitive diffs"
+```
+
+---
+
+### Task 15: The Planner role
+
+Spec §5.4. The capability the reference system lacks entirely — there, every task must be hand-written by a human and an oversized one simply fails three times and is set aside.
+
+**Files:** Create `orchestrator/src/roles/planner.ts`; modify `cli.ts` (add `plan`); test `tests/orchestrator/planner.test.ts`.
+
+**Interfaces:** `proposeIssues(input): Promise<ProposedIssue[]>`, `ProposedIssue { title, body, lane, effort, dependsOn?: string[] }`.
+
+- [ ] **Steps**
+
+The Planner reads the GA/IA gate document, the open backlog, and recent run outcomes, and proposes issues with a lane label, an effort label, and dependency edges. It runs on the most capable model at high effort.
+
+**It may write issues and nothing else.** Assert this: the Planner's role definition grants no write scope, and a test confirms `proposeIssues` returns data rather than performing any mutation — the caller creates the issues, so the model never holds the pen.
+
+**Every proposed issue is created with `needs-human` attached**, so a human removes that label to admit it to the backlog. A fleet that both invents and executes its own work with no human in the loop is a different risk category from one that executes a human-approved backlog, and this plan does not cross that line. Test that the label is always present.
+
+Also required: the Planner must not propose an item that duplicates an open issue. Test with an existing backlog containing a near-duplicate.
+
+```bash
+git commit -m "feat(fleet): planner role proposing human-gated work"
+```
+
+---
+
+### Task 16: The Integrator role
+
+**Files:** Create `orchestrator/src/roles/integrator.ts`; modify `cli.ts` (add `integrate`); test `tests/orchestrator/integrator.test.ts`.
+
+- [ ] **Steps**
+
+Owns everything after a PR exists: rebasing a PR that went `DIRTY`, watching CI, and **post-merge revert-on-red** — the reference system is blind after `mergePr` succeeds and has no way to notice that the merge broke `main`.
+
+Required behaviour and tests:
+- A `DIRTY` PR is rebased and re-pushed; a rebase that would drop a commit aborts instead.
+- After a merge, watch `main`'s CI. If it goes red **and the merge is the most recent commit**, open a revert PR and halt the fleet. Test both the red-and-latest case and the red-but-something-else-landed-after case, where reverting blindly would be wrong.
+- Never force-push a branch it did not create.
+
+```bash
+git commit -m "feat(fleet): integrator role with post-merge revert-on-red"
+```
+
+---
+
+### Task 17: The Release engineer role
+
+**Files:** Create `orchestrator/src/roles/release.ts`; test `tests/orchestrator/release.test.ts`.
+
+- [ ] **Steps**
+
+Runs the store and deploy pipelines, verifies artifacts, and reports. Constrained hard:
+- **Never merges its own work.** Test it.
+- **Never holds store, signing, deploy, or telephony credentials** — those live in CI and on the operator's machines. Test that its dispatch carries no secret-bearing environment.
+- **Never merges the knope release PR.** Test it.
+- Its deliverable is a report plus a one-line ask when a human-only action is the critical path — Apple Developer administration, Play Console submission, signing-key custody, VPS provisioning, DNS cutover.
+
+```bash
+git commit -m "feat(fleet): release engineer role, credential-free by construction"
+```
+
+---
+
+### Task 18: The ramp
 
 **Files:** `orchestrator/README.md`, `~/.llamenos-fleet/lanes.json` (not in git).
 
@@ -667,3 +799,8 @@ git commit -m "feat(fleet): rehearsed revert"
 - The digest's rejection histogram reports one entry per item.
 - `halt` stops a pass with a worker in flight; `resume` does not immediately re-trip.
 - Every lane is returned to `off`.
+- A reviewer's FAIL returns to the author and a second attempt is made, bounded at two rounds.
+- A crypto diff pulls in the crypto reviewer and still refuses to auto-merge.
+- The Planner proposes an issue and it arrives carrying `needs-human`.
+- The Integrator rebases a DIRTY PR and, on a red `main`, opens a revert and halts.
+- Every brief carries prior-attempt context and any governing contract.
