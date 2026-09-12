@@ -1,5 +1,6 @@
-import { existsSync, mkdirSync, appendFileSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, appendFileSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 import { execFile, execFileSync } from 'node:child_process'
 import { promisify } from 'node:util'
 import { acquire } from './lock.js'
@@ -15,7 +16,7 @@ import { verifyMechanical } from './verify.js'
 import { secondOpinion, postReview } from './review.js'
 import {
   runVerifyCi, runReviewCi, ciContextFromEnv, ciDiff,
-  REVIEW_JOB, REVIEW_KEY_ENV, VERIFY_JOB, type CiContext, type CiVerdict,
+  REVIEW_JOB, REVIEW_KEY_ENV, VERIFY_JOB, itemIdFromBranch, type CiContext, type CiVerdict,
 } from './ci.js'
 import {
   settle as settleWorktree,
@@ -316,17 +317,107 @@ async function commentOnPr(pr: string, body: string): Promise<void> {
 }
 
 /**
+ * GitHub closes an issue when a MERGED pull request's body contains
+ * `Closes #<n>`. The fleet's workers are told to write that line themselves
+ * (brief.ts), but a brief is an instruction, not a guarantee — and a PR that
+ * merges without it leaves its issue open forever, with the work already on
+ * `main`. This is the belt to that braces.
+ *
+ * Returns the body to write, or `null` when the line is already present —
+ * so the caller can tell "nothing to do" from "write this", and a second
+ * tick over the same PR cannot append the line twice.
+ *
+ * The match is word-bounded on purpose: `Closes #123` must NOT satisfy item
+ * `12`. Without `\b` it would, and the fleet would skip linking issue 12
+ * because a DIFFERENT issue happened to be referenced — the issue would stay
+ * open and nothing would say why. It is case-insensitive because GitHub's
+ * own matching is, and a worker writing `closes #12` has satisfied the
+ * requirement.
+ */
+export function ensureClosesLine(body: string, item: string): string | null {
+  const escaped = item.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  if (new RegExp(String.raw`\bcloses\s+#${escaped}\b`, 'i').test(body)) return null
+  return `${body.trimEnd()}\n\nCloses #${item}`
+}
+
+export interface IssueLinkDeps {
+  /** `undefined` on any read failure, matching `ghJson`'s own contract. */
+  readPr(pr: string): Promise<{ body: string; headRefName: string } | undefined>
+  editBody(pr: string, body: string): Promise<void>
+  log(msg: string): void
+}
+
+/**
+ * The item number comes from the PR's OWN head branch as GitHub reports it
+ * (`fleet/<lane>/<item>`), never from the worker's status file — the same
+ * reasoning as `resolveDispatchResult` above: the worker's report is the one
+ * source that has already been observed to omit fields it promised.
+ *
+ * A PR on a non-fleet branch has no issue to link and is left alone.
+ */
+export async function ensureIssueLinkWith(pr: string, deps: IssueLinkDeps): Promise<void> {
+  const view = await deps.readPr(pr)
+  if (view === undefined) {
+    deps.log(`issue link: could not read PR ${pr} — leaving its body alone`)
+    return
+  }
+  const item = itemIdFromBranch(view.headRefName)
+  if (item === undefined) {
+    deps.log(`issue link: PR ${pr} is on "${view.headRefName}", not a fleet branch — nothing to link`)
+    return
+  }
+  const updated = ensureClosesLine(view.body, item)
+  if (updated === null) return
+  await deps.editBody(pr, updated)
+  deps.log(`issue link: added "Closes #${item}" to PR ${pr}`)
+}
+
+/**
+ * `--body-file` from a temp file rather than `--body` with the text as an
+ * argv element: a PR body is arbitrary worker-authored prose of unbounded
+ * length, and passing it as an argument is how you meet the OS argv limit on
+ * exactly the PR whose description was most worth reading.
+ */
+async function editPrBody(pr: string, body: string): Promise<void> {
+  const dir = mkdtempSync(join(tmpdir(), 'llamenos-fleet-prbody-'))
+  try {
+    const file = join(dir, 'body.md')
+    writeFileSync(file, body)
+    await gh(['pr', 'edit', pr, '--body-file', file])
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+}
+
+function defaultIssueLinkDeps(): IssueLinkDeps {
+  return {
+    readPr: (pr) => ghJson<{ body: string; headRefName: string }>(['pr', 'view', pr, '--json', 'body,headRefName']),
+    editBody: editPrBody,
+    log,
+  }
+}
+
+/**
  * The fleet's ONE and ONLY merge call — and it merges nothing itself. It
  * asks GitHub to merge the PR later, on GitHub's own terms: when every
- * required status check (`ci-status`, `fleet/verify`, `fleet/review`, …) is
- * green on the PR's current head SHA, and any code-owner approval the
- * `CODEOWNERS` rule demands has been given. A push to the branch invalidates
- * the per-SHA statuses, so the verified-commit pin the orchestrator used to
- * enforce itself is now a property of the platform. No bypass flag is passed
- * here, and none may ever be added: see the rail asserted in
- * tests/orchestrator/guards.test.ts.
+ * required check (`ci-status`, `fleet/verify`, `fleet/review`, …) is green on
+ * the PR's current head SHA, and any code-owner approval the `CODEOWNERS`
+ * rule demands has been given. A push to the branch invalidates the per-SHA
+ * checks, so the verified-commit pin the orchestrator used to enforce itself
+ * is now a property of the platform. No bypass flag is passed here, and none
+ * may ever be added: see the rail asserted in tests/orchestrator/guards.test.ts.
+ *
+ * The issue link is ensured FIRST, and its failure is swallowed: the worst
+ * case is an issue that stays open after its PR merges, which the digest
+ * already surfaces. Letting it throw would leave auto-merge unarmed, turning
+ * a cosmetic miss into a PR that never lands at all.
  */
 async function enableAutoMerge(pr: string): Promise<void> {
+  try {
+    await ensureIssueLinkWith(pr, defaultIssueLinkDeps())
+  } catch (e) {
+    log(`issue link: failed for PR ${pr}: ${errMsg(e)} — arming auto-merge anyway`)
+  }
   await gh(['pr', 'merge', pr, '--auto', '--squash'])
 }
 

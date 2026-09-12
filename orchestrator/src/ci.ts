@@ -68,11 +68,22 @@ export const REVIEW_KEY_ENV = 'FLEET_REVIEW_API_KEY'
  *  reason a reader needs for why the job is the colour it is. */
 export interface CiVerdict { ok: boolean; summary: string }
 
-/** `realDispatch` (cli.ts) builds every fleet branch as `fleet/<lane>/<item>`.
- *  Deriving the lane from the branch — not from a label or a ledger row —
- *  is what lets CI load the lane's real scope with no state of its own. */
+/**
+ * `realDispatch` (cli.ts) builds every fleet branch as `fleet/<lane>/<item>`.
+ * ONE regex for that grammar, used by everything that reads a fleet branch —
+ * deriving the lane (CI, to load its real scope) and the item (cli.ts, to
+ * link the PR to its issue) from the branch NAME rather than from a label, a
+ * ledger row, or a worker's own status report, which is the only source that
+ * is both authoritative and available with no state of its own.
+ */
+const FLEET_BRANCH_RE = /^fleet\/([^/]+)\/([^/]+)$/
+
 export function laneIdFromBranch(branch: string): string | undefined {
-  return /^fleet\/([^/]+)\/[^/]+$/.exec(branch)?.[1]
+  return FLEET_BRANCH_RE.exec(branch)?.[1]
+}
+
+export function itemIdFromBranch(branch: string): string | undefined {
+  return FLEET_BRANCH_RE.exec(branch)?.[2]
 }
 
 /** The reviewer's own `VERDICT: PASS|FAIL` line if it wrote one, else its
