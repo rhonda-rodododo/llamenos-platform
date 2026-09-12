@@ -94,13 +94,12 @@ data class SupportedLanguage(
  * All supported languages matching packages/i18n/languages.ts.
  *
  * NOTE: This list previously only had 12 of the 22 locales that actually
- * ship complete translations (packages/i18n/locales/*.json) — including
+ * ship complete translations under packages/i18n/locales/ — including
  * missing 'de', which was also missing from languages.ts itself. That meant
  * the Android app's language picker silently made 10 fully-translated
  * locales unreachable in the UI: de, am, fa, ku, mix, my, quc, so, tr, uk.
- * Ideally this list is generated from packages/i18n/languages.ts rather than
- * hand-maintained; tracked as a follow-up (see fix(i18n): derive locale
- * lists dynamically PR).
+ * Keep this list in sync with packages/i18n/languages.ts; bun run
+ * i18n:validate fails if the two drift apart.
  */
 val SUPPORTED_LANGUAGES = listOf(
     SupportedLanguage("en", "English", "EN"),
