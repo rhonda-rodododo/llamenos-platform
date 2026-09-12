@@ -10,7 +10,6 @@
  */
 import { expect } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
-import { TestIds } from '../../test-ids'
 import { Timeouts, navigateAfterLogin } from '../../helpers'
 import {
   ADMIN_NSEC,
@@ -31,11 +30,11 @@ import {
 
 // --- Background: CMS setup ---
 
-Given('case management is enabled', async ({ backendRequest: request, casesWorld, workerHub }) => {
+Given('case management is enabled', async ({ backendRequest: request, workerHub }) => {
   await enableCaseManagementViaApi(request, true, ADMIN_NSEC, workerHub)
 })
 
-Given('case management is disabled', async ({ backendRequest: request, casesWorld, workerHub }) => {
+Given('case management is disabled', async ({ backendRequest: request, workerHub }) => {
   await enableCaseManagementViaApi(request, false, ADMIN_NSEC, workerHub)
 })
 
@@ -255,7 +254,7 @@ Then('the entity type selector should show {string}', async ({ page }, expected:
 
 // --- Case list preconditions ---
 
-Given('no cases have been created', async ({ backendRequest: request, casesWorld, workerHub }) => {
+Given('no cases have been created', async ({ backendRequest: request, workerHub }) => {
   // Delete ALL existing records (paginate through all pages)
   const { apiDelete } = await import('../../api-helpers')
   let page = 1
@@ -271,7 +270,7 @@ Given('no cases have been created', async ({ backendRequest: request, casesWorld
   }
 })
 
-Given('arrest cases exist', async ({ backendRequest: request, casesWorld, workerHub }) => {
+Given('arrest cases exist', async ({ backendRequest: request, workerHub }) => {
   const entityTypes = await listEntityTypesViaApi(request, workerHub)
   const arrestType = entityTypes.find(et => (et as { name?: string }).name === 'arrest_case')
   if (!arrestType) return
@@ -282,7 +281,7 @@ Given('arrest cases exist', async ({ backendRequest: request, casesWorld, worker
   }
 })
 
-Given('arrest cases with multiple statuses exist', async ({ backendRequest: request, casesWorld, workerHub }) => {
+Given('arrest cases with multiple statuses exist', async ({ backendRequest: request, workerHub }) => {
   const entityTypes = await listEntityTypesViaApi(request, workerHub)
   const arrestType = entityTypes.find(et => (et as { name?: string }).name === 'arrest_case')
   if (!arrestType) return
@@ -610,7 +609,7 @@ Given('an arrest case with comment and status_change interactions exists', async
   await createInteractionViaApi(request, recordId, { interactionType: 'status_change', hubId: workerHub })
 })
 
-Given('an arrest case is selected with the Timeline tab active', async ({ page, backendRequest: request, casesWorld, workerHub }) => {
+Given('an arrest case is selected with the Timeline tab active', async ({ page, backendRequest: request, workerHub }) => {
   const entityTypes = await listEntityTypesViaApi(request, workerHub)
   const arrestType = entityTypes.find(et => (et as { name?: string }).name === 'arrest_case')
   if (!arrestType) return
@@ -856,14 +855,14 @@ Given('an arrest case exists that is not assigned to me', async ({ backendReques
 // "I click the {string} button" and "the {string} button should be visible"
 // are handled by common/interaction-steps.ts
 
-Then('the {string} button should no longer be visible', async ({ page }, text: string) => {
+Then('the {string} button should no longer be visible', async ({ page }) => {
   const btn = page.getByTestId('case-assign-btn')
   await expect(btn).not.toBeVisible({ timeout: 5000 })
 })
 
 // --- Pagination ---
 
-Given('more than 50 cases exist', async ({ backendRequest: request, casesWorld, workerHub }) => {
+Given('more than 50 cases exist', async ({ backendRequest: request, workerHub }) => {
   const entityTypes = await listEntityTypesViaApi(request, workerHub)
   const arrestType = entityTypes.find(et => (et as { name?: string }).name === 'arrest_case')
   if (!arrestType) return
