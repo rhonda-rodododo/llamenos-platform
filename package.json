@@ -37,6 +37,8 @@
     "test:worker:unit": "bunx vitest run --config vitest.unit.config.ts",
     "test:worker:integration": "bunx vitest run --config vitest.integration.config.ts",
     "test:worker:watch": "bunx vitest --config vitest.unit.config.ts",
+    "test:fleet": "bunx vitest run --config vitest.orchestrator.config.ts",
+    "fleet": "bun orchestrator/src/cli.ts",
     "site:dev": "cd site && bun run dev",
     "site:build": "cd site && bun run build",
     "changelog": "git-cliff --output CHANGELOG.md",
@@ -95,7 +97,7 @@
     "setup": "bash scripts/setup.sh",
     "cert-pins:extract": "bash scripts/extract-cert-pins.sh",
     "cert-pins:inject": "bun scripts/inject-cert-pins.ts",
-    "lint": "eslint src/ apps/worker/",
+    "lint": "eslint src/ apps/worker/ orchestrator/ tests/orchestrator/",
     "supervisors": "scripts/supervisors.sh",
     "supervisors:kill": "scripts/supervisors.sh --kill"
   },
