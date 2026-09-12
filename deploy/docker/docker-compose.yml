@@ -36,6 +36,14 @@ services:
     build:
       context: ../..
       dockerfile: deploy/docker/Dockerfile
+      # Dockerfile's later stages (frontend-deps/frontend-builder/caddy-builder/
+      # static) build the Caddy static-file image consumed by
+      # docker-compose.production.yml's `caddy` service. Without an explicit
+      # target here, `docker build`/`docker compose build` default to the
+      # LAST stage in the file — which is `static`, not `app` — so the `app`
+      # service would silently build and run the Caddy static server instead
+      # of the Bun backend.
+      target: app
     restart: unless-stopped
     read_only: true
     tmpfs:
