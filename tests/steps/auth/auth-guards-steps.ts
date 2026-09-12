@@ -30,13 +30,13 @@ When('I make an unauthenticated API request to {string}', async ({ page }, endpo
   // Intentionally NO auth headers — verifying the server rejects unauthenticated requests
   const response = await page.request.get(endpoint)
   await page.evaluate((status) => {
-    ;(window as Record<string, unknown>).__test_api_response_status = status
+    ;(window as unknown as Record<string, unknown>).__test_api_response_status = status
   }, response.status())
 })
 
 Then('the response status should be {int}', async ({ page }, expectedStatus: number) => {
   const status = await page.evaluate(
-    () => (window as Record<string, unknown>).__test_api_response_status,
+    () => (window as unknown as Record<string, unknown>).__test_api_response_status,
   )
   expect(status).toBe(expectedStatus)
 })

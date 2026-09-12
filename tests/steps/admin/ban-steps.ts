@@ -40,7 +40,7 @@ When('I fill in the phone number', async ({ page }) => {
   await page.getByLabel(/phone/i).fill(phone)
   await page.getByLabel(/phone/i).blur()
   await page.evaluate((p) => {
-    (window as Record<string, unknown>).__test_ban_phone = p
+    (window as unknown as Record<string, unknown>).__test_ban_phone = p
   }, phone)
 })
 
@@ -50,7 +50,7 @@ When('I fill in the phone number with {string}', async ({ page }, phone: string)
 })
 
 Then('the phone number should appear in the ban list', async ({ page, backendRequest: request, workerHub }) => {
-  const phone = (await page.evaluate(() => (window as Record<string, unknown>).__test_ban_phone)) as string
+  const phone = (await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_ban_phone)) as string
   expect(phone).toBeTruthy()
   const masked = maskPhone(phone)
 
@@ -73,7 +73,7 @@ When('I add a ban with reason {string}', async ({ page }, reason: string) => {
   await page.getByLabel(/reason/i).fill(reason)
   await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
   await page.evaluate((p) => {
-    (window as Record<string, unknown>).__test_ban_phone = p
+    (window as unknown as Record<string, unknown>).__test_ban_phone = p
   }, phone)
 })
 
@@ -104,18 +104,18 @@ Given('a ban exists', async ({ page, backendRequest: request, workerHub }) => {
 
   // Store the phone for later steps — retry if context was destroyed
   await page.evaluate((p) => {
-    (window as Record<string, unknown>).__test_ban_phone = p
+    (window as unknown as Record<string, unknown>).__test_ban_phone = p
   }, phone).catch(async () => {
     // Context destroyed due to navigation — wait for page to settle and retry
     await page.waitForLoadState('domcontentloaded')
     await page.evaluate((p) => {
-      (window as Record<string, unknown>).__test_ban_phone = p
+      (window as unknown as Record<string, unknown>).__test_ban_phone = p
     }, phone)
   })
 })
 
 When('I click {string} on the ban', async ({ page }, buttonText: string) => {
-  const phone = (await page.evaluate(() => (window as Record<string, unknown>).__test_ban_phone)) as string
+  const phone = (await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_ban_phone)) as string
   expect(phone).toBeTruthy()
   const masked = maskPhone(phone)
   const row = page.getByTestId(TestIds.BAN_ROW).filter({ hasText: masked })
@@ -142,7 +142,7 @@ Then('the dialog should close', async ({ page }) => {
 })
 
 Then('the ban should no longer appear in the list', async ({ page, backendRequest: request, workerHub }) => {
-  const phone = (await page.evaluate(() => (window as Record<string, unknown>).__test_ban_phone)) as string
+  const phone = (await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_ban_phone)) as string
   expect(phone).toBeTruthy()
   const masked = maskPhone(phone)
 
@@ -158,7 +158,7 @@ Then('the ban should no longer appear in the list', async ({ page, backendReques
 })
 
 Then('the ban should still appear in the list', async ({ page, backendRequest: request, workerHub }) => {
-  const phone = (await page.evaluate(() => (window as Record<string, unknown>).__test_ban_phone)) as string
+  const phone = (await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_ban_phone)) as string
   expect(phone).toBeTruthy()
   const masked = maskPhone(phone)
 
@@ -208,14 +208,14 @@ When('I add two bans with different phone numbers', async ({ page }) => {
 
   await page.evaluate(
     ({ p1, p2 }) => {
-      (window as Record<string, unknown>).__test_ban_phones = [p1, p2]
+      (window as unknown as Record<string, unknown>).__test_ban_phones = [p1, p2]
     },
     { p1: phone1, p2: phone2 },
   )
 })
 
 Then('both phone numbers should appear in the ban list', async ({ page, backendRequest: request, workerHub }) => {
-  const phones = (await page.evaluate(() => (window as Record<string, unknown>).__test_ban_phones)) as string[] | undefined
+  const phones = (await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_ban_phones)) as string[] | undefined
   if (!phones || phones.length === 0) {
     // Prior step didn't create bans — just verify ban page is loaded
     await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })

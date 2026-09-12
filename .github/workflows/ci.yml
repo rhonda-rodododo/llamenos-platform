@@ -229,6 +229,15 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
 
+      - name: Typecheck tests/ (baseline-gated — see scripts/typecheck-tests-gate.ts)
+        run: bun run scripts/typecheck-tests-gate.ts
+
+      - name: Typecheck signal-notifier/
+        run: cd signal-notifier && bunx tsc --noEmit
+
+      - name: Typecheck sip-bridge/
+        run: cd sip-bridge && bun run typecheck
+
       - name: Build frontend (with Tauri IPC mocks for test builds)
         run: PLAYWRIGHT_TEST=true bun run build
 
@@ -296,21 +305,23 @@ jobs:
 
       - name: Audit dependencies
         run: |
-          # GHSA-rmmr-r34h-pfm5 flags @tanstack/history >=0 but the malicious versions
-          # were 1.161.9+ published 2026-05-11. Our pinned 1.161.6 is safe.
-          # Filter out this overbroad advisory until GitHub narrows the affected range.
-          bun audit --audit-level=high || {
-            echo "::warning::High-severity vulns found — checking for critical"
-            CRITICAL_OUTPUT=$(bun audit --audit-level=critical 2>&1) || {
-              if echo "$CRITICAL_OUTPUT" | grep -q "GHSA-rmmr-r34h-pfm5" && \
-                 ! echo "$CRITICAL_OUTPUT" | grep -v "GHSA-rmmr-r34h-pfm5" | grep -q "critical:"; then
-                echo "::warning::Only critical finding is GHSA-rmmr-r34h-pfm5 (@tanstack/history >=0 overbroad range) — our 1.161.6 is safe, skipping"
-              else
-                echo "$CRITICAL_OUTPUT"
-                exit 1
-              fi
-            }
-          }
+          # Fails on any HIGH or CRITICAL advisory that is not in the
+          # explicit, dated, individually-justified allowlist at
+          # .github/ci/audit-allowlist.txt. Any *new* high/critical finding
+          # fails CI immediately — nothing here is a blanket suppression.
+          #
+          # To update: re-run this command locally, diff the findings
+          # against the allowlist, and add a justified entry (or fix the
+          # dependency) for anything new. Do not widen --audit-level.
+          ALLOWLIST=.github/ci/audit-allowlist.txt
+          IGNORE_ARGS=()
+          while IFS= read -r id; do
+            [[ -z "$id" ]] && continue
+            IGNORE_ARGS+=("--ignore=$id")
+          done < <(grep -oE '^GHSA-[a-z0-9-]+' "$ALLOWLIST")
+
+          echo "Ignoring ${#IGNORE_ARGS[@]} allowlisted advisories from $ALLOWLIST"
+          bun audit --audit-level=high "${IGNORE_ARGS[@]}"
 
   # ─── E2E + Backend BDD Tests (Docker Compose) ──────────────
   e2e:
@@ -1186,6 +1197,75 @@ jobs:
           fi
           echo "as-any check complete."
 
+  # ─── Lint (changed files only) ────────────────────────────────
+  # ESLint previously ran ONLY as a lefthook pre-commit hook globbed to
+  # {src,apps/worker}/**/*.{ts,tsx} — never in CI, so packages/, apps/desktop/,
+  # tests/, scripts/, site/, sip-bridge/, signal-notifier/ were never linted,
+  # and the covered paths were skipped entirely by anyone bypassing hooks.
+  #
+  # Repo-wide there is substantial pre-existing lint debt (over a thousand
+  # problems across all trees combined — see
+  # https://github.com/rhonda-rodododo/llamenos-platform/issues/647 for the
+  # full per-tree breakdown), so this job intentionally lints only the
+  # files changed in this PR/push rather than the whole repo. That means it
+  # cannot regress further and does not require a repo-wide cleanup before
+  # going live — but any *new* lint error introduced in a touched file fails
+  # the build immediately.
+  lint:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2.0.2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Determine changed files
+        id: changed
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+            HEAD="${{ github.event.after }}"
+          fi
+
+          # Fall back to a single-commit diff if before/base is unavailable
+          # (e.g. force-push, or first commit on a branch).
+          if [[ -z "$BASE" ]] || ! git cat-file -e "$BASE" 2>/dev/null; then
+            BASE="HEAD^"
+          fi
+
+          FILES=$(git diff --name-only --diff-filter=d "$BASE" "$HEAD" -- '*.ts' '*.tsx' \
+            | grep -vE '^(dist/|\.features-gen|\.features-gen-backend|packages/protocol/generated/|packages/i18n/generated/)' \
+            || true)
+
+          echo "Changed lintable files:"
+          echo "$FILES"
+
+          {
+            echo "files<<EOF"
+            echo "$FILES"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Run ESLint on changed files
+        if: steps.changed.outputs.files != ''
+        run: |
+          echo "${{ steps.changed.outputs.files }}" | xargs -r bunx eslint
+
   # ─── Migration Drift Check ────────────────────────────────────
   migration-drift:
     needs: changes
@@ -1292,7 +1372,7 @@ jobs:
           echo "Signed: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${DIGEST}"
 
   ci-status:
-    needs: [no-generated-files-in-git, verify-updater-config, build, audit, crypto-tests, backend-bdd, backend-unit, desktop-unit, android-build-test, android-e2e, e2e, ios-build-test, crypto-guardrails, migration-drift, ansible-validate, docs-guard]
+    needs: [no-generated-files-in-git, verify-updater-config, build, audit, lint, crypto-tests, backend-bdd, backend-unit, desktop-unit, android-build-test, android-e2e, e2e, ios-build-test, crypto-guardrails, migration-drift, ansible-validate, docs-guard]
     if: always()
     runs-on: ubuntu-latest
     permissions:
@@ -1312,6 +1392,7 @@ jobs:
           check_job "verify-updater-config" "${{ needs.verify-updater-config.result }}"
           check_job "build" "${{ needs.build.result }}"
           check_job "audit" "${{ needs.audit.result }}"
+          check_job "lint" "${{ needs.lint.result }}"
           check_job "crypto-tests" "${{ needs.crypto-tests.result }}"
           check_job "e2e" "${{ needs.e2e.result }}"
           check_job "backend-bdd" "${{ needs.backend-bdd.result }}"
@@ -1323,6 +1404,7 @@ jobs:
           check_job "crypto-guardrails" "${{ needs.crypto-guardrails.result }}"
           check_job "migration-drift" "${{ needs.migration-drift.result }}"
           check_job "ansible-validate" "${{ needs.ansible-validate.result }}"
+          check_job "docs-guard" "${{ needs.docs-guard.result }}"
 
           if [[ -n "$FAILED" ]]; then
             echo "Failed jobs:$FAILED"

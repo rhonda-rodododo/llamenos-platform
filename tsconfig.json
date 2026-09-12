@@ -24,6 +24,6 @@
     },
     "types": ["@types/bun"]
   },
-  "include": ["src/**/*", "apps/**/*", "packages/**/*", "orchestrator/**/*", "tests/orchestrator/**/*", "vite.config.ts"],
+  "include": ["src/**/*", "apps/**/*", "packages/**/*", "orchestrator/**/*", "tests/orchestrator/**/*", "vite.config.ts", "scripts/**/*"],
   "exclude": ["node_modules", "dist", "packages/i18n/tools/add-cms-translations.ts", "sip-bridge"]
 }

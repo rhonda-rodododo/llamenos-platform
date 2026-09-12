@@ -1,0 +1,110 @@
+# bun audit high-severity allowlist
+#
+# `.github/workflows/ci.yml`'s `audit` job runs:
+#   bun audit --audit-level=high $(this file, one --ignore=<GHSA-id> per line)
+# Any HIGH or CRITICAL advisory NOT listed below fails CI immediately.
+#
+# Every line here is a temporary, individually-justified exception for a
+# finding that existed on the date it was added — not a blanket suppression.
+# Do NOT add an entry without a justification, and do NOT bump the date on
+# review without re-verifying the reasoning still holds.
+#
+# Review cadence: re-audit and prune stale entries whenever a listed
+# package is intentionally upgraded, and at least quarterly otherwise.
+# Follow-up tracking issue: https://github.com/rhonda-rodododo/llamenos-platform/issues/649
+#
+# Format: GHSA-id  # added YYYY-MM-DD by <who> — package — reachability — reasoning
+
+# --- h3 / smol-toml / js-yaml / svgo: astro (marketing site build, site/) ---
+# All four are pulled in transitively by Astro, used only to build the static
+# marketing site (`site/`) deployed to Cloudflare Pages. None of these code
+# paths (Astro dev server, SSE, TOML config parsing, SVG optimization) ship
+# in the final static HTML/CSS/JS output or run against untrusted input at
+# request time in the deployed site.
+GHSA-22cc-p3c6-wpvm  # added 2026-09-11 by rhonda-rodododo — h3 (astro, site/ build tool) — build-time only, not present in static output
+GHSA-7w5x-hrqm-74c2  # added 2026-09-11 by rhonda-rodododo — smol-toml (astro, site/ build tool) — parses only repo-controlled TOML at build time
+GHSA-52cp-r559-cp3m  # added 2026-09-11 by rhonda-rodododo — js-yaml (astro, site/ build tool) — parses only repo-controlled YAML at build time
+GHSA-5p4m-2wfm-xmqj  # added 2026-09-11 by rhonda-rodododo — js-yaml (astro, site/ build tool) — same as above
+GHSA-2883-xcg3-v3hh  # added 2026-09-11 by rhonda-rodododo — js-yaml (astro, site/ build tool) — same as above
+GHSA-2p49-hgcm-8545  # added 2026-09-11 by rhonda-rodododo — svgo (astro, site/ build tool) — optimizes repo-controlled SVG assets at build time only
+GHSA-w27v-7q3p-w38r  # added 2026-09-11 by rhonda-rodododo — svgo (astro, site/ build tool) — same as above
+
+# --- vite: direct devDependency, dev server only ---
+# All four advisories are exploitable only against a running `vite dev`
+# server (fs.deny bypass, dev-server websocket arbitrary file read). CI and
+# production never run the Vite dev server — CI builds via `vite build` and
+# serves the static output with `vite preview`; production serves the
+# prebuilt bundle from the Tauri shell / static hosting. Still tracked for
+# upgrade since local `bun run dev` does run the dev server.
+GHSA-v2wj-q39q-566r  # added 2026-09-11 by rhonda-rodododo — vite (direct dep) — dev-server-only bypass, not exercised by build/preview
+GHSA-p9ff-h696-f583  # added 2026-09-11 by rhonda-rodododo — vite (direct dep) — dev-server-only websocket file read
+GHSA-fx2h-pf6j-xcff  # added 2026-09-11 by rhonda-rodododo — vite (direct dep) — dev-server-only, Windows-path specific (Linux/macOS dev + CI unaffected)
+
+# --- hono: direct production dependency (backend framework) ---
+# This is the one entry in this list that IS in the production request path
+# (apps/worker's Hono app). The advisory is in Hono's CORS middleware
+# reflecting Origin with credentials when `origin` defaults to the
+# wildcard. Audited apps/worker/app.ts: our CORS middleware always passes an
+# explicit allow-list `origin` function (never the wildcard default), so the
+# vulnerable default is not in use — but this is a config-dependent
+# mitigation, not a code fix, so it stays allowlisted only until upgraded to
+# a patched Hono release rather than being treated as permanently safe.
+GHSA-88fw-hqm2-52qc  # added 2026-09-11 by rhonda-rodododo — hono (direct prod dep) — CORS wildcard default not used; explicit allow-list configured in apps/worker/app.ts; upgrade tracked
+
+# --- form-data: openai (prod dep) / twilio (devDep, unused SDK path) ---
+GHSA-hmw2-7cc7-3qxx  # added 2026-09-11 by rhonda-rodododo — form-data (via openai, prod dep; also via twilio devDep) — field/filenames we send to the OpenAI SDK are server-generated, not attacker-controlled; twilio path is devDependency-only and its SDK is not imported anywhere in apps/worker (adapters use raw fetch, see apps/worker/telephony/twilio.ts)
+
+# --- axios: twilio (devDependency, SDK not imported at runtime) ---
+GHSA-gcfj-64vw-6mp9  # added 2026-09-11 by rhonda-rodododo — axios (via twilio, devDependency) — twilio npm SDK is not imported by apps/worker (adapter uses safeFetch directly); no production reachability
+
+# --- protobufjs: onnxruntime-web, used by client-side Whisper transcription ---
+GHSA-wcpc-wj8m-hjx6  # added 2026-09-11 by rhonda-rodododo — protobufjs (via @huggingface/transformers > onnxruntime-web, prod dep) — parses only the bundled, repo-controlled ONNX model files shipped with the app, never user-supplied protobuf input
+
+# --- sharp: astro (site build) / huggingface transformers (optional native binding, unused) ---
+GHSA-f88m-g3jw-g9cj  # added 2026-09-11 by rhonda-rodododo — sharp (astro site/ build tool; optional native binding under @huggingface/transformers, not used — project uses onnxruntime-web/WASM per docs) — build-time image processing on repo-controlled assets only
+GHSA-rgj7-g3m4-5g8c  # added 2026-09-11 by rhonda-rodododo — sharp — same as above
+
+# --- nanoid: vite/shadcn build tooling + @scalar/hono-api-reference (prod dep, docs UI) ---
+# @scalar/hono-api-reference mounts the OpenAPI reference UI in apps/worker;
+# nanoid there generates internal, non-security-sensitive IDs for the docs
+# UI (never called with attacker-controlled/negative/zero size arguments).
+GHSA-28wg-ghj8-5hjv  # added 2026-09-11 by rhonda-rodododo — nanoid (vite/shadcn build tooling; also @scalar/hono-api-reference prod dep, non-security-sensitive UI ids) — no attacker-controlled size argument
+GHSA-2v37-7h3g-55p8  # added 2026-09-11 by rhonda-rodododo — nanoid — same as above
+GHSA-xwg4-73v4-xw9w  # added 2026-09-11 by rhonda-rodododo — nanoid — same as above
+
+# --- postcss: vite/shadcn build tooling ---
+GHSA-r28c-9q8g-f849  # added 2026-09-11 by rhonda-rodododo — postcss (via vite/shadcn build tooling) — source-map path traversal only affects local build-time source map loading of repo-controlled CSS
+
+# --- fast-uri: eslint/shadcn (dev tooling, ajv JSON-schema validation for lint/CLI configs) ---
+GHSA-5jgf-p345-68v8  # added 2026-09-11 by rhonda-rodododo — fast-uri (via eslint/shadcn devDependencies, ajv) — dev-tooling only, not in request path
+GHSA-f65p-4m7j-42xc  # added 2026-09-11 by rhonda-rodododo — fast-uri — same as above
+GHSA-fph4-wmhf-6fwf  # added 2026-09-11 by rhonda-rodododo — fast-uri — same as above
+GHSA-jqff-g426-hqxp  # added 2026-09-11 by rhonda-rodododo — fast-uri — same as above
+
+# --- browserslist: shadcn CLI / @tanstack/router-plugin (babel build-time transform) ---
+GHSA-c83g-rgw3-j3cx  # added 2026-09-11 by rhonda-rodododo — browserslist (shadcn devDependency CLI; @tanstack/router-plugin babel build-time transform) — build-time only, no untrusted input
+GHSA-73wf-gq98-2v4g  # added 2026-09-11 by rhonda-rodododo — browserslist — same as above
+
+# --- ip-address: shadcn MCP SDK / webdriverio proxy tooling (dev tooling) ---
+GHSA-mwp4-54f8-5fhr  # added 2026-09-11 by rhonda-rodododo — ip-address (shadcn CLI's bundled MCP SDK; webdriverio proxy-agent chain) — dev/test tooling only, not in request path
+
+# --- undici: wrangler/webdriverio/vitest/astro dev+test tooling ---
+GHSA-4cwx-7wf7-3272  # added 2026-09-11 by rhonda-rodododo — undici (wrangler, webdriverio, vitest jsdom, astro — all dev/test/build tooling) — no production runtime chain (worker uses Bun's built-in fetch, not undici, directly)
+GHSA-vmh5-mc38-953g  # added 2026-09-11 by rhonda-rodododo — undici — same as above
+GHSA-vxpw-j846-p89q  # added 2026-09-11 by rhonda-rodododo — undici — same as above
+GHSA-hm92-r4w5-c3mj  # added 2026-09-11 by rhonda-rodododo — undici — same as above
+
+# --- brace-expansion: eslint/typescript-eslint/webdriverio/shadcn (dev tooling glob matching) ---
+GHSA-mh99-v99m-4gvg  # added 2026-09-11 by rhonda-rodododo — brace-expansion (eslint, typescript-eslint, webdriverio, shadcn devDependencies) — dev/test tooling only
+GHSA-rgw5-rvv9-x895  # added 2026-09-11 by rhonda-rodododo — brace-expansion — same as above
+GHSA-3jxr-9vmj-r5cp  # added 2026-09-11 by rhonda-rodododo — brace-expansion — same as above
+
+# --- basic-ftp / extract-zip / adm-zip / deepmerge-ts: webdriverio (Android E2E tooling, dev-only) ---
+GHSA-rpmf-866q-6p89  # added 2026-09-11 by rhonda-rodododo — basic-ftp (webdriverio devDependency, browser-download FTP path) — dev/test tooling only, not in request path
+GHSA-6v7q-wjvx-w8wg  # added 2026-09-11 by rhonda-rodododo — basic-ftp — same as above
+GHSA-chqc-8p9q-pq6q  # added 2026-09-11 by rhonda-rodododo — basic-ftp — same as above
+GHSA-rp42-5vxx-qpwr  # added 2026-09-11 by rhonda-rodododo — basic-ftp — same as above
+GHSA-jmr9-qjv8-65gv  # added 2026-09-11 by rhonda-rodododo — extract-zip (webdriverio devDependency, browser-download unzip path) — dev/test tooling only
+GHSA-7pqw-9j4j-h8q3  # added 2026-09-11 by rhonda-rodododo — extract-zip — same as above
+GHSA-xcpc-8h2w-3j85  # added 2026-09-11 by rhonda-rodododo — adm-zip (via @huggingface/transformers > onnxruntime-node, optional native binding not used — project uses onnxruntime-web/WASM) — not reachable at runtime
+GHSA-ggr8-5vv4-36mx  # added 2026-09-11 by rhonda-rodododo — deepmerge-ts (webdriverio devDependency config merging) — dev/test tooling only

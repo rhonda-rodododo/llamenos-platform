@@ -118,7 +118,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - name: Scan Dockerfile.build with Trivy
+      - name: Scan Dockerfile.build with Trivy (SARIF, informational)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: 'config'
@@ -128,7 +128,20 @@ jobs:
           severity: 'CRITICAL,HIGH,MEDIUM'
           exit-code: '0'
 
-      - name: Scan deploy/docker/Dockerfile with Trivy
+      # G6 (CI gate audit, 2026-09-11): config scans are clean as of this PR
+      # (fixed DS-0002 — Dockerfile.build ran as root, no USER directive).
+      # Fail the build on CRITICAL/HIGH misconfigurations going forward;
+      # MEDIUM stays report-only via the SARIF upload above.
+      - name: Scan Dockerfile.build with Trivy (fail on CRITICAL/HIGH)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: 'config'
+          scan-ref: 'Dockerfile.build'
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'
+
+      - name: Scan deploy/docker/Dockerfile with Trivy (SARIF, informational)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: 'config'
@@ -138,7 +151,16 @@ jobs:
           severity: 'CRITICAL,HIGH,MEDIUM'
           exit-code: '0'
 
-      - name: Scan Docker Compose files with Trivy
+      - name: Scan deploy/docker/Dockerfile with Trivy (fail on CRITICAL/HIGH)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: 'config'
+          scan-ref: 'deploy/docker/Dockerfile'
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'
+
+      - name: Scan Docker Compose files with Trivy (SARIF, informational)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: 'config'
@@ -147,6 +169,15 @@ jobs:
           output: 'docker-compose-results.sarif'
           severity: 'CRITICAL,HIGH,MEDIUM'
           exit-code: '0'
+
+      - name: Scan Docker Compose files with Trivy (fail on CRITICAL/HIGH)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: 'config'
+          scan-ref: 'deploy/docker'
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'
 
       - name: Upload Dockerfile.build scan results
         uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v3
@@ -208,7 +239,12 @@ jobs:
           push: false
           load: true
           tags: llamenos-scan:latest
-          cache-from: type=gha
+          # cache-to was missing, so cache-from never had anything to read and
+          # every run rebuilt from scratch — that is what pushed the
+          # Dockerfile.build leg past its timeout. Scope per matrix entry so
+          # the two images don't overwrite each other's cache.
+          cache-from: type=gha,scope=image-scan-${{ matrix.image.name }}
+          cache-to: type=gha,mode=max,scope=image-scan-${{ matrix.image.name }}
 
       - name: Scan image with Trivy
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
@@ -218,6 +254,31 @@ jobs:
           output: 'image-results.sarif'
           severity: 'CRITICAL,HIGH'
           exit-code: '0'
+
+      # G6 (CI gate audit, 2026-09-11): measured findings on 2026-09-11 —
+      # 83 debian OS + 22 node-pkg HIGH/CRITICAL total, but only 3 CRITICAL
+      # (perl-base, no fix available upstream yet) and those disappear
+      # entirely with --ignore-unfixed. Failing on all CRITICAL/HIGH today
+      # would redden CI (52 fixable HIGH findings — see the tracking issue
+      # filed alongside this PR for the full list), so this hard-fails only
+      # on FIXABLE CRITICAL vulnerabilities and leaves HIGH as report-only
+      # via the SARIF upload and table step below.
+      #
+      # 2026-09-12: that measurement only covered the `app` image. The `build`
+      # image tripped this gate with 5 fixable CRITICALs — an openssl CVE from
+      # the Debian base and Go stdlib CVEs in the esbuild binaries sitting in
+      # bun's install cache. All five were build-toolchain artefacts that
+      # Dockerfile.build shipped by accident; it is now multi-stage and the
+      # final image carries only /build/dist, so the gate is genuinely clean
+      # rather than suppressed.
+      - name: Fail on fixable CRITICAL vulnerabilities
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: 'llamenos-scan:latest'
+          format: 'table'
+          severity: 'CRITICAL'
+          ignore-unfixed: true
+          exit-code: '1'
 
       - name: Upload image scan results
         uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v3
@@ -303,14 +364,23 @@ jobs:
           fi
 
   # ─── Rust Dependency Policy (cargo deny) ───────────────────
+  # G5 (CI gate audit, 2026-09-11): this job was continue-on-error at both
+  # job AND step level, and cargo install cargo-deny --locked (unpinned)
+  # had drifted onto cargo-deny 0.20, whose config schema silently broke
+  # deny.toml's `unmaintained = "warn"` field — the tool was failing to even
+  # parse its config and producing zero results, invisibly, before this fix.
+  #
+  # deny.toml has been fixed for the 0.20 schema and the version is now
+  # pinned. `licenses`, `bans`, and `sources` are clean for both manifests
+  # and are now hard-fail. `advisories` has real, un-triaged findings
+  # (RUSTSEC vulnerabilities + unmaintained crates in the openmls/libcrux
+  # dependency chain — see the tracking issue filed alongside this PR) and
+  # stays warn-only until that triage is complete.
   cargo-deny:
     runs-on: ubuntu-latest
     permissions:
       contents: read
     timeout-minutes: 15
-    # Warn-only initially — change continue-on-error to false once the initial
-    # deny.toml triage is complete and all findings are addressed.
-    continue-on-error: true
 
     steps:
       - name: Checkout
@@ -321,13 +391,19 @@ jobs:
         with:
           toolchain: stable
 
-      - name: Install cargo-deny
-        run: cargo install cargo-deny --locked
+      - name: Install cargo-deny (pinned — avoid silent config-schema drift)
+        run: cargo install cargo-deny --version 0.20.2 --locked
 
-      - name: Check packages/crypto (licenses, advisories, bans, sources)
-        run: cargo deny --manifest-path packages/crypto/Cargo.toml check
+      - name: Check packages/crypto (licenses, bans, sources)
+        run: cargo deny --manifest-path packages/crypto/Cargo.toml check licenses bans sources
+
+      - name: Check apps/desktop (licenses, bans, sources)
+        run: cargo deny --manifest-path apps/desktop/Cargo.toml check licenses bans sources
+
+      - name: Check packages/crypto advisories (warn-only — see tracking issue)
+        run: cargo deny --manifest-path packages/crypto/Cargo.toml check advisories
         continue-on-error: true
 
-      - name: Check apps/desktop (licenses, advisories, bans, sources)
-        run: cargo deny --manifest-path apps/desktop/Cargo.toml check
+      - name: Check apps/desktop advisories (warn-only — see tracking issue)
+        run: cargo deny --manifest-path apps/desktop/Cargo.toml check advisories
         continue-on-error: true
