@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, appendFileSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { acquire } from './lock.js'
 import { checkHalt, halt, resume, haltedLocally } from './killswitch.js'
@@ -91,9 +92,32 @@ async function doctor(): Promise<number> {
     process.stdout.write(`${ok ? '  ok  ' : ' FAIL '} ${name}${ok || !fix ? '' : `\n        ${fix}`}\n`)
     if (!ok) bad++
   }
+
+  // F7: a lane's owned list being non-empty (checked above) says nothing
+  // about whether the paths in it actually exist. A fragment can drift from
+  // the real tree (e.g. declaring `apps/sip-bridge/` when the directory is
+  // actually `sip-bridge/` at the repo root) and the scope checker will
+  // silently never match anything under it — the lane is not scoped down,
+  // it is scoped to nothing. This is a WARNING, not a hard failure: it is
+  // expected to fire for real drift already present on this branch (see
+  // backend's fragment), and doctor must stay usable while that is fixed
+  // separately rather than refusing to run at all.
+  let warnings = 0
+  for (const l of lanes) {
+    const missing = l.scope.owned.filter((p) => !p.includes('*') && !existsSync(join(REPO_ROOT, p)))
+    if (missing.length > 0) {
+      warnings++
+      process.stdout.write(` WARN  lane ${l.id} owns path(s) that do not exist on disk: ${missing.join(', ')}\n`)
+      process.stdout.write(`        check .claude/agents/fragments/${l.id}-supervisor.md "**Owned paths:**" section\n`)
+    }
+  }
+
   const modes = lanes.map((l) => `${l.id}=${l.mode}`).join(' ')
   process.stdout.write(`\nlanes: ${modes}\n`)
   process.stdout.write(`lane modes file: ${LANE_MODES_FILE}${existsSync(LANE_MODES_FILE) ? '' : ' (absent — all lanes off)'}\n`)
+  if (warnings > 0) {
+    process.stdout.write(`\n${warnings} lane(s) with owned paths that do not exist on disk (warning only — see above)\n`)
+  }
   return bad === 0 ? 0 : 1
 }
 
