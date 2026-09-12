@@ -183,27 +183,6 @@ When('I expand the WebRTC section', async ({ page }) => {
   await trigger.first().click()
 })
 
-Then('I should see the WebRTC configuration options', async ({ page }) => {
-  // Content assertion — verifying WebRTC text is displayed
-  await expect(page.getByText(/webrtc/i).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
-})
-
-When('I navigate to the WebRTC settings', async ({ page }) => {
-  await page.getByTestId(navTestIdMap['Hub Settings']).click()
-})
-
-When('I toggle the WebRTC calling switch', async ({ page }) => {
-  const toggle = page.locator('[role="switch"]').first()
-  await toggle.click()
-})
-
-Then('the setting should be saved', async ({ page }) => {
-  // Settings auto-save — look for a success toast or the absence of unsaved-changes indicator
-  const toast = page.locator('[role="status"]').first()
-  const saved = toast.or(page.getByText(/saved|updated|success/i).first())
-  await expect(saved).toBeVisible({ timeout: Timeouts.ELEMENT })
-})
-
 Then('I should see fields for STUN and TURN server configuration', async ({ page }) => {
   // Content assertion — verifying STUN/TURN text is displayed
   await expect(page.getByText(/stun|turn/i).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
