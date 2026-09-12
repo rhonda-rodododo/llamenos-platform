@@ -46,11 +46,16 @@ export const LANE_MODES_FILE = join(FLEET_DIR, 'lanes.json')
  * starts off" test false the moment anyone turns one on.
  *
  * Unknown lane ids and unreadable files both yield the default: off.
+ *
+ * `file` defaults to the real operator state (`LANE_MODES_FILE`, under
+ * `~/.llamenos-fleet/`) but is injectable so callers — tests in particular —
+ * can point it at a fixture instead of depending on whatever the machine
+ * running the test happens to have turned on.
  */
-export function readLaneModes(): Record<string, LaneMode> {
-  if (!existsSync(LANE_MODES_FILE)) return {}
+export function readLaneModes(file: string = LANE_MODES_FILE): Record<string, LaneMode> {
+  if (!existsSync(file)) return {}
   try {
-    const raw: unknown = JSON.parse(readFileSync(LANE_MODES_FILE, 'utf8'))
+    const raw: unknown = JSON.parse(readFileSync(file, 'utf8'))
     if (typeof raw !== 'object' || raw === null) return {}
     const out: Record<string, LaneMode> = {}
     for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
@@ -80,9 +85,9 @@ export function assertLiveLanesHaveScope(lanes: Lane[]): void {
   }
 }
 
-export async function loadLanes(repoRoot: string): Promise<Lane[]> {
+export async function loadLanes(repoRoot: string, modesFile: string = LANE_MODES_FILE): Promise<Lane[]> {
   const scopes = await loadLaneScopes(repoRoot)
-  const modes = readLaneModes()
+  const modes = readLaneModes(modesFile)
   const lanes = LANES.map((l) => ({
     ...l,
     mode: modes[l.id] ?? l.mode,
