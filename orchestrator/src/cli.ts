@@ -172,7 +172,7 @@ const BRIEFS_DIR = join(FLEET_DIR, 'briefs')
 // enough for a real implementer pass, short enough that a wedged worker does
 // not sit a lane's cap out for the rest of a shift.
 const DEFAULT_TIMEOUT_SEC = 90 * 60
-const DEFAULT_EFFORT: EffortLevel = 'medium'
+const DEFAULT_EFFORT: EffortLevel = 'high'
 const DEFAULT_MODEL = 'sonnet'
 
 /** One name identifies a dispatched item everywhere: the tmux session
