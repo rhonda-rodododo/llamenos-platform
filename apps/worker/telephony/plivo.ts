@@ -17,34 +17,29 @@ import type {
   WebhookQueueWait,
   WebhookRecordingStatus,
 } from './adapter'
-import {
-  DEFAULT_LANGUAGE,
-  ivrIndexToDigit,
-} from '@shared/languages'
-import { IVR_PROMPTS, IVR_MORE_PROMPTS, getPrompt, getVoicemailThanks, resolveIvrPrompt } from '@shared/voice-prompts'
+import { getPrompt, getVoicemailThanks } from '@shared/voice-prompts'
+import { IvrVoiceCatalog, buildIvrLanguageMenu } from './ivr-menu'
 
 /**
- * Plivo voice language codes, keyed by ISO 639-1.
- * Plivo uses Polly voices by default.
+ * Plivo `<Speak language>` codes (Polly voices) — the explicit, ordered list of
+ * locales Plivo has a voice for. Absent locales are never offered in the IVR menu.
  */
-const PLIVO_VOICE_CODES: Record<string, string> = {
-  en: 'en-US',
-  es: 'es-MX',
-  zh: 'cmn-CN',
-  tl: 'en-US', // Plivo doesn't support Filipino, fallback to English
-  vi: 'vi-VN',
-  ar: 'ar-XA',
-  fr: 'fr-FR',
-  ht: 'fr-FR', // No Haitian Creole, use French
-  ko: 'ko-KR',
-  ru: 'ru-RU',
-  hi: 'hi-IN',
-  pt: 'pt-BR',
-  de: 'de-DE',
-}
+export const PLIVO_VOICES = new IvrVoiceCatalog<string>('plivo', [
+  ['en', 'en-US'],
+  ['es', 'es-MX'],
+  ['zh', 'cmn-CN'],
+  ['vi', 'vi-VN'],
+  ['ar', 'ar-XA'],
+  ['fr', 'fr-FR'],
+  ['ko', 'ko-KR'],
+  ['ru', 'ru-RU'],
+  ['hi', 'hi-IN'],
+  ['pt', 'pt-BR'],
+  ['de', 'de-DE'],
+])
 
 function getPlivoVoice(lang: string): string {
-  return PLIVO_VOICE_CODES[lang] ?? PLIVO_VOICE_CODES[DEFAULT_LANGUAGE]
+  return PLIVO_VOICES.voiceForPrompt(lang)
 }
 
 /** Build a <Speak> element */
@@ -126,35 +121,19 @@ export class PlivoAdapter implements TelephonyAdapter {
   }
 
   async handleLanguageMenu(params: LanguageMenuParams): Promise<TelephonyResponse> {
-    const languages = params.enabledLanguages
+    const menu = buildIvrLanguageMenu(params.enabledLanguages, PLIVO_VOICES)
     const hp = hubXmlParam(params.hubId)
 
-    if (languages.length <= 1) {
-      const lang = languages[0] || DEFAULT_LANGUAGE
+    if (menu.kind === 'single') {
       return this.plivoXml(`
-        <Redirect method="POST">/api/telephony/language-selected?auto=1&amp;forceLang=${lang}${hp}</Redirect>
+        <Redirect method="POST">/api/telephony/language-selected?auto=1&amp;forceLang=${menu.language}${hp}</Redirect>
       `)
     }
 
     const hubParam = params.hubId ? `?hub=${escapeXml(encodeURIComponent(params.hubId))}` : ''
-    let speakElements: string
-
-    if (languages.length > 9) {
-      const mainMenu = languages.slice(0, 8)
-      speakElements = mainMenu.map((langCode, i) => {
-        const prompt = IVR_PROMPTS[langCode]
-        if (!prompt) return ''
-        return speak(resolveIvrPrompt(prompt, String(i + 1)), langCode)
-      }).filter(Boolean).join('\n      ')
-      const morePrompt = IVR_MORE_PROMPTS[languages[0]] || IVR_MORE_PROMPTS['en']
-      speakElements += '\n      ' + speak(resolveIvrPrompt(morePrompt, '9'), 'en')
-    } else {
-      speakElements = languages.map((langCode, i) => {
-        const prompt = IVR_PROMPTS[langCode]
-        if (!prompt) return ''
-        return speak(resolveIvrPrompt(prompt, ivrIndexToDigit(i)), langCode)
-      }).filter(Boolean).join('\n      ')
-    }
+    const speakElements = menu.options
+      .map(o => `<Speak language="${o.voice}">${escapeXml(o.prompt)}</Speak>`)
+      .join('\n        ')
 
     return this.plivoXml(`
       <GetDigits numDigits="1" action="/api/telephony/language-selected${hubParam}" method="POST" timeout="8" redirect="true">
