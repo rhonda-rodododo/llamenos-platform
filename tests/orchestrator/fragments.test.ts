@@ -164,24 +164,18 @@ describe('loadLaneScopes against the real fragments', () => {
     })
 
     expect(scopes.android).toEqual({
-      owned: ['apps/android/', '.github/workflows/*android*'],
+      owned: ['apps/android/'],
       notOwned: [],
     })
 
     expect(scopes.desktop).toEqual({
       owned: ['apps/desktop/', 'src/client/', 'tests/', 'tests/mocks/', 'playwright.config.ts'],
-      notOwned: ['tests/features/', 'tests/steps/'],
+      notOwned: ['tests/steps/', 'packages/test-specs/'],
     })
 
     expect(scopes.backend).toEqual({
-      owned: [
-        'apps/worker/',
-        'apps/sip-bridge/',
-        'apps/signal-notifier/',
-        'tests/features/',
-        'tests/steps/',
-      ],
-      notOwned: ['tests/', 'tests/mocks/'],
+      owned: ['apps/worker/', 'sip-bridge/', 'signal-notifier/', 'tests/steps/'],
+      notOwned: ['tests/', 'tests/mocks/', 'packages/test-specs/'],
     })
 
     expect(scopes.shared).toEqual({
@@ -191,6 +185,7 @@ describe('loadLaneScopes against the real fragments', () => {
         'packages/shared/',
         'packages/i18n/',
         'docs/protocol/PROTOCOL.md',
+        'packages/test-specs/',
       ],
       notOwned: [],
     })

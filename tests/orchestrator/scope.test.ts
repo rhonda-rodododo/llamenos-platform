@@ -68,29 +68,23 @@ describe('checkScope', () => {
     })
 
     it('parses the real fragments into the expected owned/notOwned lists', () => {
-      expect(backend.owned).toEqual([
-        'apps/worker/',
-        'apps/sip-bridge/',
-        'apps/signal-notifier/',
-        'tests/features/',
-        'tests/steps/',
-      ])
-      expect(backend.notOwned).toEqual(['tests/', 'tests/mocks/'])
+      expect(backend.owned).toEqual(['apps/worker/', 'sip-bridge/', 'signal-notifier/', 'tests/steps/'])
+      expect(backend.notOwned).toEqual(['tests/', 'tests/mocks/', 'packages/test-specs/'])
       expect(desktop.owned).toEqual(['apps/desktop/', 'src/client/', 'tests/', 'tests/mocks/', 'playwright.config.ts'])
-      expect(desktop.notOwned).toEqual(['tests/features/', 'tests/steps/'])
+      expect(desktop.notOwned).toEqual(['tests/steps/', 'packages/test-specs/'])
     })
 
-    it('backend may write tests/features/*.feature — owned tests/features/ (15 chars) beats notOwned tests/ (6 chars)', () => {
-      expect(checkScope(['tests/features/auth.feature'], backend, []).strayed).toEqual([])
+    it('backend may write tests/steps/scope.step.ts — owned tests/steps/ (12 chars) beats notOwned tests/ (6 chars)', () => {
+      expect(checkScope(['tests/steps/scope.step.ts'], backend, []).strayed).toEqual([])
     })
 
     it('backend may not write tests/mocks/* — no owned match at all', () => {
       expect(checkScope(['tests/mocks/tauri.ts'], backend, []).strayed).toEqual(['tests/mocks/tauri.ts'])
     })
 
-    it('desktop may not write tests/features/*.feature — notOwned tests/features/ (15) beats owned tests/ (6)', () => {
-      expect(checkScope(['tests/features/auth.feature'], desktop, []).strayed).toEqual([
-        'tests/features/auth.feature',
+    it('desktop may not write tests/steps/scope.step.ts — notOwned tests/steps/ (12) beats owned tests/ (6)', () => {
+      expect(checkScope(['tests/steps/scope.step.ts'], desktop, []).strayed).toEqual([
+        'tests/steps/scope.step.ts',
       ])
     })
 
