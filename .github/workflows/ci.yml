@@ -580,6 +580,15 @@ jobs:
           mkdir -p test-results
           bunx vitest run --config vitest.unit.config.ts --reporter=default --reporter=junit --outputFile=test-results/backend-unit.xml
 
+      # The fleet orchestrator (orchestrator/) has no backend/DB dependency —
+      # same profile as the backend unit suite above — so its safety-rail
+      # tests (guards.test.ts asserts every documented safety property) run
+      # here rather than only when a human types `bun run test:fleet`.
+      - name: Run fleet orchestrator tests
+        run: |
+          mkdir -p test-results
+          bunx vitest run --config vitest.orchestrator.config.ts --reporter=default --reporter=junit --outputFile=test-results/fleet.xml
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
