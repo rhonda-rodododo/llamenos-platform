@@ -45,8 +45,7 @@ When('that admin enables the passkey requirement for admins', async ({ request, 
 
 Then('the response error code is {string}', async ({ world }, code: string) => {
   const resp = getSharedState(world).lastResponse
-  expect(resp).toBeDefined()
-  expect((resp!.data as { code?: string } | null)?.code).toBe(code)
+  expect((resp?.data as { code?: string } | null | undefined)?.code).toBe(code)
 })
 
 Then('the passkey requirement for admins is still disabled', async ({ request, world }) => {
