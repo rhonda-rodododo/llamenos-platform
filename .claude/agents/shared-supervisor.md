@@ -82,7 +82,7 @@ $S/generate-pr-brief.sh <pr-number>
 DISPATCH_REPO=/path/to/repo WORKTREE_BASE=/path/to/projects $S/dispatch-one.sh ...
 ```
 
-**Flags:** `--template standard|kb|pr-comments` (standard=default) · `--no-template` · `--rules llamenos|skybuild|translatemd` (auto-detected from the repo path) · `--no-rules` · `--agent NAME` · `--effort low|medium|high|xhigh|max` (default `medium`; Claude runtimes only — other runtimes warn and ignore) · `--max-budget-usd N` (Claude only) · `--owns 'path,path'` (FILE OWNERSHIP block — pass it whenever 2+ workers are live on one repo) · `--card <trello-card-id>` (mirror this worker onto a board card) · `--no-card` · `--dry-run` (print the assembled prompt and exit — creates nothing)
+**Flags:** `--template standard|kb|pr-comments` (standard=default) · `--no-template` · `--rules llamenos|skybuild|translatemd` (auto-detected from the repo path) · `--no-rules` · `--agent NAME` · `--effort low|medium|high|xhigh|max` (default `high`; Claude runtimes only — other runtimes warn and ignore) · `--max-budget-usd N` (Claude only) · `--owns 'path,path'` (FILE OWNERSHIP block — pass it whenever 2+ workers are live on one repo) · `--card <trello-card-id>` (mirror this worker onto a board card) · `--no-card` · `--dry-run` (print the assembled prompt and exit — creates nothing)
 
 **Audit a template change without spending a dispatch:** `--dry-run` assembles the prompt, prints it and exits — no worktree, no branch, no tmux session. Verify a rule reaches the worker by grepping that output. Never "test" a prompt change by launching a real worker.
 
@@ -292,7 +292,7 @@ off at all. The dispatcher maps `low`→`low`, `medium|high`→`high`, `xhigh|ma
 prints what it did. It clamps rather than forwarding, because z.ai rejects an unknown
 effort with a 401/400 that reads like a bad key — a failure you would spend an hour
 attributing to the wrong thing.
-`dispatch-one.sh` defaults to `medium` and hard-fails an invalid value *before* it cuts a
+`dispatch-one.sh` defaults to `high` and hard-fails an invalid value *before* it cuts a
 worktree. Every non-Claude launcher prints `⚠️ --effort ignored: <runtime> does not support it`
 rather than dropping the flag silently.
 
@@ -306,8 +306,8 @@ Opus can safely parse.
 | Unknown bug, "something is wrong and I don't know what" | `opus` | `xhigh` | Investigation quality compounds; a wrong diagnosis costs a whole re-dispatch |
 | Correctness/security review, revert, release PR | `opus` | `xhigh` | A missed defect ships to prod. Reserve `max` for a second pass on something already flagged risky |
 | Architecture, spec, plan, ADR authoring | `opus` | `high` | Long-horizon coherence, low token-per-decision |
-| Multi-file feature, known pattern, clear spec | `sonnet` | `high` | Default for real feature work |
-| Routine fix, <5 files, tests exist to verify | `sonnet` | `medium` | The global default |
+| Multi-file feature, known pattern, clear spec | `sonnet` | `high` | The global default — matches Claude's own default effort |
+| Routine fix, <5 files, tests exist to verify | `sonnet` | `medium` | Cheaper than the default; fine when tests will catch a miss |
 | Bulk KB sweep (batch-add, mapping expansion) | `sonnet` | `medium` | Plus a **separate** reviewer dispatch at `opus`/`high` empowered to REJECT |
 | PR-comment triage, classify-and-reply | `haiku` | `medium` | Classification, not reasoning |
 | Mechanical batch edit against a detailed brief | `haiku` | `low` | The only place `low` is the right answer |
