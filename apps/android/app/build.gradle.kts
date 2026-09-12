@@ -1,3 +1,4 @@
+import java.security.MessageDigest
 import java.util.Properties
 
 plugins {
@@ -11,12 +12,32 @@ plugins {
 
 // ecryptfs (encrypted home dirs) has a 143-byte filename limit. D8 global synthetics
 // for Compose lambdas generate filenames up to ~150 chars, causing build failures.
-// Redirect build output to /tmp on Linux to avoid this. Set ANDROID_BUILD_DIR to override.
-val buildDir = System.getenv("ANDROID_BUILD_DIR")
-if (buildDir != null) {
-    layout.buildDirectory = file(buildDir)
+// So on Linux the build output must live outside the (possibly ecryptfs) checkout.
+//
+// It must NOT live in one fixed shared directory, though: three self-hosted CI runners
+// share a single box, and this repo is routinely built from several git worktrees at
+// once. Concurrent builds then delete each other's intermediates mid-run — see the
+// `mergeDebugResources` / `kspDebugKotlin` "No such file or directory" failures on
+// PRs #645 and #651. Scope the directory per checkout, and per CI job where possible.
+//
+// Resolution order:
+//   1. ANDROID_BUILD_DIR — explicit override (CI pins this per job).
+//   2. $RUNNER_TEMP      — GitHub Actions gives each concurrent job its own. On this
+//                          fleet it resolves to /opt/runner-llamenos-N/_work/_temp,
+//                          i.e. not under an encrypted home, so the limit above is moot.
+//   3. /tmp              — the known-good non-ecryptfs location the original fix used.
+// In cases 2 and 3 a short digest of this checkout's absolute path keeps worktrees and
+// runners apart. The digest is stable per checkout, so incremental builds still hit.
+val explicitBuildDir = System.getenv("ANDROID_BUILD_DIR")
+if (explicitBuildDir != null) {
+    layout.buildDirectory = file(explicitBuildDir)
 } else if (System.getProperty("os.name")?.lowercase()?.contains("linux") == true) {
-    layout.buildDirectory = file("/tmp/llamenos-android-build/app")
+    val base = System.getenv("RUNNER_TEMP")?.takeIf { it.isNotEmpty() } ?: "/tmp"
+    val checkoutId = MessageDigest.getInstance("SHA-256")
+        .digest(rootProject.projectDir.absolutePath.toByteArray())
+        .take(4)
+        .joinToString("") { "%02x".format(it) }
+    layout.buildDirectory = file("$base/llamenos-android-build-$checkoutId/app")
 }
 
 android {
