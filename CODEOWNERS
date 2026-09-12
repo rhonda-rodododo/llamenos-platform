@@ -6,10 +6,12 @@
 # green. Only paths listed below require human code-owner review before
 # merge — everything else is intentionally left uncovered so it keeps
 # auto-merging. This file is scoped to genuinely sensitive surfaces:
-# crypto, wire format, CI/supply-chain, release manifests, deployment
-# config, the guard config that constrains agents, and the security-
-# relevant test suites. There is no catch-all `*` rule — do not add one
-# without re-evaluating this policy, since it would gate every PR again.
+# crypto, wire format, the PSTN/notification sidecars that handle caller
+# and volunteer identifiers, CI/supply-chain, release manifests,
+# deployment config, the guard config that constrains agents, and the
+# security-relevant test suites. There is no catch-all `*` rule — do not
+# add one without re-evaluating this policy, since it would gate every
+# PR again.
 #
 # Consequence worth calling out: GitHub Actions dependency bumps (e.g.
 # Dependabot PRs touching .github/workflows/) now require review, because
@@ -17,6 +19,13 @@
 
 packages/crypto/                    @rhonda-rodododo
 packages/protocol/schemas/          @rhonda-rodododo
+
+# Deanonymization surfaces: sip-bridge/ routes PSTN calls and handles
+# caller phone numbers; signal-notifier/ does HMAC-hashed contact
+# resolution. Both are top-level, NOT under apps/ despite what older
+# docs say.
+sip-bridge/                         @rhonda-rodododo
+signal-notifier/                    @rhonda-rodododo
 
 .github/workflows/                  @rhonda-rodododo
 
