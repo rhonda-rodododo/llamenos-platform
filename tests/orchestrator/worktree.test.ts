@@ -162,12 +162,15 @@ describe('labelIssue', () => {
 })
 
 describe('settle', () => {
-  it('stops the session, salvages, destroys the worktree, and labels the issue, in that order, on success', async () => {
+  it('stops the session, salvages, destroys the worktree, and labels needs-human, in that order, when the caller says so', async () => {
     const f = makeFixture()
     writeFileSync(join(f.worktree, 'uncommitted.txt'), 'salvage me\n')
     const log = vi.fn()
 
-    await settle({ name: 'fleet-ios-1', itemId: '1', outcome: 'SUCCESS', worktree: f.worktree, branch: f.branch }, log)
+    await settle(
+      { name: 'fleet-ios-1', itemId: '1', outcome: 'BLOCKED', worktree: f.worktree, branch: f.branch, needsHuman: true },
+      log,
+    )
 
     // Ordering: tmux kill-session must be the FIRST mocked call, and the
     // gh label call must be the LAST — with the real git salvage/destroy
@@ -179,6 +182,7 @@ describe('settle', () => {
     expect(mockExecFile.mock.calls[0]?.[0]).toBe('tmux')
     const ghCallIndex = mockExecFile.mock.calls.findIndex((c) => c[0] === 'gh')
     expect(ghCallIndex).toBe(mockExecFile.mock.calls.length - 1)
+    expect(mockExecFile.mock.calls[ghCallIndex]?.[1]).toEqual(expect.arrayContaining(['needs-human']))
     expect(existsSync(f.worktree)).toBe(false)
     expect(log).toHaveBeenCalledWith(expect.stringContaining('salvaged uncommitted work'))
   })
@@ -186,7 +190,7 @@ describe('settle', () => {
   it('destroys the worktree on a FAILED outcome too', async () => {
     const f = makeFixture()
     const log = vi.fn()
-    await settle({ name: 'fleet-ios-1', itemId: '1', outcome: 'FAILED', worktree: f.worktree, branch: f.branch }, log)
+    await settle({ name: 'fleet-ios-1', itemId: '1', outcome: 'FAILED', worktree: f.worktree, branch: f.branch, needsHuman: false }, log)
     expect(existsSync(f.worktree)).toBe(false)
   })
 
@@ -202,22 +206,39 @@ describe('settle', () => {
     // worktree, fails.
     execSync(`git remote set-url origin ${join(tmpdir(), 'llamenos-fleet-nonexistent-origin')}`, { cwd: f.worktree })
     const log = vi.fn()
-    await settle({ name: 'fleet-ios-1', itemId: '1', outcome: 'BLOCKED', worktree: f.worktree, branch: f.branch }, log)
+    await settle({ name: 'fleet-ios-1', itemId: '1', outcome: 'BLOCKED', worktree: f.worktree, branch: f.branch, needsHuman: true }, log)
     expect(existsSync(f.worktree)).toBe(true)
     expect(log).toHaveBeenCalledWith(expect.stringContaining('refusing to destroy the worktree'))
   })
 
-  it('skips worktree steps entirely when no worktree is known, but still labels the issue', async () => {
+  it('skips worktree steps entirely when no worktree is known, but still applies needs-human when asked', async () => {
     const log = vi.fn()
-    await settle({ name: 'fleet-ios-1', itemId: '1', outcome: 'REJECTED' }, log)
+    await settle({ name: 'fleet-ios-1', itemId: '1', outcome: 'BLOCKED', needsHuman: true }, log)
     const ghCall = mockExecFile.mock.calls.find((c) => c[0] === 'gh')
-    expect(ghCall?.[1]).toEqual(expect.arrayContaining(['fleet:rejected']))
+    expect(ghCall?.[1]).toEqual(expect.arrayContaining(['needs-human']))
   })
 
-  it('applies no label for an outcome with none mapped (e.g. SHADOW, DISPATCHED)', async () => {
+  // G1: this is the property the whole redesign exists for. settle() must
+  // NEVER write an outcome-shaped label (`fleet:merged`, `fleet:rejected`,
+  // ...) for ANY outcome — that is exactly the cached claim that drifted
+  // from reality on issue #660 (`fleet:merged` on a PR that was never
+  // merged). A label is only ever `needs-human`, and only when the caller
+  // explicitly says so.
+  it('applies NO label at all for any outcome when needsHuman is not set — outcome labels no longer exist', () => {
+    return Promise.all(
+      (['SUCCESS', 'REJECTED', 'BLOCKED', 'FAILED', 'TIMEOUT', 'QUOTA', 'SHADOW', 'DISPATCHED'] as const).map(async (outcome) => {
+        mockExecFile.mockClear()
+        await settle({ name: 'fleet-ios-1', itemId: '1', outcome }, () => {})
+        const ghCall = mockExecFile.mock.calls.find((c) => c[0] === 'gh')
+        expect(ghCall, `outcome ${outcome} must not label the issue`).toBeUndefined()
+      }),
+    )
+  })
+
+  it('applies needs-human even for a claimed SUCCESS the fleet could not verify', async () => {
     const log = vi.fn()
-    await settle({ name: 'fleet-ios-1', itemId: '1', outcome: 'SHADOW' }, log)
+    await settle({ name: 'fleet-ios-1', itemId: '1', outcome: 'SUCCESS', needsHuman: true }, log)
     const ghCall = mockExecFile.mock.calls.find((c) => c[0] === 'gh')
-    expect(ghCall).toBeUndefined()
+    expect(ghCall?.[1]).toEqual(expect.arrayContaining(['needs-human']))
   })
 })

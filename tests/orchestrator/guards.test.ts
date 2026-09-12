@@ -48,7 +48,13 @@ describe('rail: crypto and protocol always reach a human', () => {
     'packages/crypto/src/hpke.rs',
     'packages/protocol/schemas/note.ts',
     'packages/protocol/crypto-labels.json',
-    'apps/worker/db/migrations/0001_init.sql',
+    'apps/worker/lib/auth.ts',
+    // The key-boundary wrapper: not the crypto crate itself, but the single
+    // abstraction (per CLAUDE.md) keeping a device private key out of the
+    // webview. A quiet mistake here is an identity disclosure exactly like a
+    // mistake in packages/crypto/ itself — see impact.ts's CORRECTED comment
+    // for why this was briefly (and wrongly) narrowed out, then restored.
+    'src/client/lib/platform.ts',
   ])('%s is high impact', (f) => {
     expect(classifyImpact([f], 1).impact).toBe('high')
   })
@@ -69,11 +75,16 @@ describe('rail: never-write binds even an unrestricted lane', () => {
       .toEqual(['apps/android/keystore.properties'])
   })
 
-  it('leaves CI and deploy writable but high-impact, so the merge gate holds them', () => {
+  // NARROWED 2026-09-12 (impact.ts's dated comment): with no production
+  // users yet, CI and deploy are writable AND low-impact — the deterministic
+  // gates (scope, diff-targeted tests, non-author review, verified-SHA pin)
+  // are the decision, not a human. Must flip back to high-impact once the
+  // first internal testers are onboarded.
+  it('leaves CI and deploy writable and low-impact — the deterministic gates decide, not a human', () => {
     expect(checkScope(['.github/workflows/ci.yml'], { owned: [], notOwned: [] }, [...NEVER_WRITE_PATHS]).forbidden)
       .toEqual([])
-    expect(classifyImpact(['.github/workflows/ci.yml'], 1).impact).toBe('high')
-    expect(classifyImpact(['deploy/helm/values.yaml'], 1).impact).toBe('high')
+    expect(classifyImpact(['.github/workflows/ci.yml'], 1).impact).toBe('low')
+    expect(classifyImpact(['deploy/helm/values.yaml'], 1).impact).toBe('low')
   })
 })
 

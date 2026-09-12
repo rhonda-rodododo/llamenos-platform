@@ -73,14 +73,25 @@ describe('outcomeHistogram', () => {
 
 describe('waitingOnHuman', () => {
   it('lists BLOCKED items, deduped to their most recent row', () => {
-    const rows = [r('BLOCKED', 1, 'a'), r('BLOCKED', 5, 'a'), r('SUCCESS', 2, 'b'), r('BLOCKED', 3, 'c')]
+    const rows = [r('BLOCKED', 1, 'a'), r('BLOCKED', 5, 'a'), r('FAILED', 2, 'b'), r('BLOCKED', 3, 'c')]
     const waiting = waitingOnHuman(rows)
     expect(waiting.map((x) => x.itemId).sort()).toEqual(['a', 'c'])
     expect(waiting.find((x) => x.itemId === 'a')?.ts).toBe(5)
   })
 
-  it('is empty when nothing is blocked', () => {
-    expect(waitingOnHuman([r('SUCCESS', 1)])).toEqual([])
+  // G1: SUCCESS is a CANDIDATE too — since the redesign, a SUCCESS row no
+  // longer implies "merged" (ledger.ts's module comment), so it can be
+  // either a clean auto-merge or a claimed success the fleet could not
+  // verify and left for a human. `waitingOnHuman` alone cannot tell those
+  // apart (it does no I/O) — `runDigest` (cli.ts) resolves the difference
+  // with a live `gh` query before this candidate list becomes the digest's
+  // actual "Waiting on a human" section.
+  it('lists SUCCESS as a candidate too, since SUCCESS no longer implies merged', () => {
+    expect(waitingOnHuman([r('SUCCESS', 1, 'a')]).map((x) => x.itemId)).toEqual(['a'])
+  })
+
+  it('is empty when nothing is blocked or a claimed success', () => {
+    expect(waitingOnHuman([r('FAILED', 1), r('REJECTED', 2), r('TIMEOUT', 3)])).toEqual([])
   })
 })
 
@@ -108,6 +119,7 @@ describe('resume command', () => {
       resumeCommand: cmd,
       lanes: [{ id: 'backend', mode: 'live' }],
       recentRuns: [],
+      awaitingHuman: [],
       rejections: [],
       dependency: DEP_OK,
     }
@@ -124,6 +136,9 @@ describe('renderDigest', () => {
     resumeCommand: resumeCommand(REPO_ROOT),
     lanes: [{ id: 'backend', mode: 'live' }, { id: 'ios', mode: 'off' }],
     recentRuns: [r('SUCCESS', 1000, 'a'), r('BLOCKED', 2000, 'b')],
+    // G1: renderDigest renders whatever the caller already resolved live —
+    // it does not derive this from recentRuns itself. See runDigest (cli.ts).
+    awaitingHuman: [r('BLOCKED', 2000, 'b')],
     rejections: [{ id: 'c', reason: 'other-lane' }, { id: 'd', reason: 'vetoed' }],
     dependency: DEP_OK,
   }
@@ -169,6 +184,7 @@ describe('renderDigest', () => {
       resumeCommand: resumeCommand(REPO_ROOT),
       lanes: [{ id: 'backend', mode: 'live' }],
       recentRuns: [],
+      awaitingHuman: [],
       rejections: [],
       dependency: broken,
     }
@@ -228,6 +244,7 @@ describe('renderDigest', () => {
       resumeCommand: resumeCommand(REPO_ROOT),
       lanes: [{ id: 'backend', mode: 'live' }],
       recentRuns: [],
+      awaitingHuman: [],
       rejections: [],
       dependency: DEP_OK,
     })

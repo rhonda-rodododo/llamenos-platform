@@ -25,10 +25,6 @@ describe('classifyImpact', () => {
     ['packages/protocol/schemas/note.ts'],
     ['packages/protocol/crypto-labels.json'],
     ['apps/worker/lib/auth.ts'],
-    ['apps/worker/db/migrations/0042_x.sql'],
-    ['.github/workflows/ci.yml'],
-    ['deploy/helm/llamenos/values.yaml'],
-    ['apps/ios/fastlane/Fastfile'],
     ['apps/android/keystore.properties'],
     ['orchestrator/src/tick.ts'],
     ['tests/orchestrator/impact.test.ts'],
@@ -41,11 +37,9 @@ describe('classifyImpact', () => {
     // scope, and the settings file enforcing the write-deny hook.
     ['.claude/agents/fragments/backend.md'],
     ['.claude/settings.json'],
-    // Migrations and schema — state a revert does not restore.
-    ['drizzle/migrations/0001_init.sql'],
-    ['packages/shared/migrations/0002_x.sql'],
-    ['apps/worker/db/schema/users.ts'],
-    // Middleware and the newly-covered auth/crypto route and lib surface.
+    // sigchain schema/routes — state a revert does not restore.
+    ['apps/worker/db/schema/sigchain/devices.ts'],
+    // Middleware and the auth/crypto route and lib surface.
     ['apps/worker/middleware/rate-limit.ts'],
     ['apps/worker/routes/auth.ts'],
     ['apps/worker/routes/sessions.ts'],
@@ -58,23 +52,54 @@ describe('classifyImpact', () => {
     ['apps/worker/lib/timing-safe.ts'],
     ['apps/worker/lib/blind-index-query.ts'],
     ['apps/worker/services/crypto-keys.ts'],
-    // Protocol codegen and shared crypto labels.
-    ['packages/protocol/tools/codegen.ts'],
+    // Shared crypto labels.
     ['packages/shared/crypto-labels.ts'],
-    // Client/platform crypto boundary across desktop, iOS, Android.
+    // Key-boundary wrapper paths (restored 2026-09-12 — see impact.ts's
+    // CORRECTED comment): not the crypto crate itself, but the surfaces that
+    // keep a device private key from leaking — the webview IPC boundary, the
+    // Tauri permission grants, and the iOS/Android Keychain/Keystore
+    // wrappers. A quiet mistake in any of these is an identity disclosure,
+    // which is the high-impact criterion — unrelated to deployment risk, so
+    // "no production users yet" never relaxes it.
     ['src/client/lib/platform.ts'],
-    ['apps/desktop/src/main.rs'],
+    ['apps/desktop/src/crypto.rs'],
     ['apps/desktop/capabilities/default.json'],
     ['apps/ios/Sources/Services/CryptoService.swift'],
     ['apps/android/app/src/main/java/org/llamenos/hotline/crypto/CryptoService.kt'],
-    // Build/release integrity: cert pinning, reproducible builds, versioning.
+  ])('treats %s as high impact', (f) => {
+    expect(classifyImpact([f], 5).impact).toBe('high')
+  })
+
+  // Boundary-exact: ONLY `apps/desktop/src/crypto.rs` is restored above, not
+  // the whole `apps/desktop/src/` directory — an ordinary desktop source file
+  // stays low impact.
+  it('does not escalate an ordinary desktop source file that is not the crypto IPC wrapper', () => {
+    expect(classifyImpact(['apps/desktop/src/main.rs'], 5).impact).toBe('low')
+  })
+
+  // NARROWED 2026-09-12 (impact.ts's dated comment): no production users
+  // exist yet, so these no longer always-human-gate — the deterministic
+  // gates (scope, diff-targeted tests, non-author review, verified-SHA pin)
+  // are the decision. Must move back to "high impact" above once the first
+  // internal testers are onboarded.
+  it.each([
+    ['apps/worker/db/migrations/0042_x.sql'],
+    ['drizzle/migrations/0001_init.sql'],
+    ['packages/shared/migrations/0002_x.sql'],
+    ['apps/worker/db/schema/users.ts'],
+    ['.github/workflows/ci.yml'],
+    ['deploy/helm/llamenos/values.yaml'],
+    ['apps/ios/fastlane/Fastfile'],
+    ['apps/android/fastlane/Fastfile'],
+    ['apps/desktop/tauri.conf.json'],
+    ['packages/protocol/tools/codegen.ts'],
     ['scripts/inject-cert-pins.ts'],
     ['scripts/extract-cert-pins.sh'],
     ['scripts/verify-build.sh'],
     ['Dockerfile.build'],
     ['knope.toml'],
-  ])('treats %s as high impact', (f) => {
-    expect(classifyImpact([f], 5).impact).toBe('high')
+  ])('treats %s as low impact (narrowed 2026-09-12 — no production users yet)', (f) => {
+    expect(classifyImpact([f], 5).impact).toBe('low')
   })
 
   it('escalates on a large file count regardless of content', () => {

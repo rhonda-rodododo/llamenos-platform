@@ -3,6 +3,7 @@ import { isAbsolute, resolve as resolvePath } from 'node:path'
 import { promisify } from 'node:util'
 import { gh } from './gh.js'
 import type { Outcome } from './ledger.js'
+import { NEEDS_HUMAN_LABEL } from './roles/planner.js'
 
 const execFileAsync = promisify(execFile)
 
@@ -140,21 +141,23 @@ export async function deleteLocalBranch(repoRoot: string, branch: string): Promi
   }
 }
 
-const OUTCOME_LABEL: Partial<Record<Outcome, string>> = {
-  SUCCESS: 'fleet:merged',
-  REJECTED: 'fleet:rejected',
-  BLOCKED: 'fleet:blocked',
-  FAILED: 'fleet:failed',
-  TIMEOUT: 'fleet:failed',
-  QUOTA: 'fleet:quota',
-}
-
 export interface SettleTarget {
   name: string
   itemId: string
   outcome: Outcome
   worktree?: string
   branch?: string
+  /**
+   * The one control-label write settle() still performs: adds `needs-human`
+   * when the fleet is leaving an open PR for a person rather than something
+   * it will retry itself — see `SettleInput`'s own doc comment in tick.ts for
+   * exactly which two cases set this. `judge()` (select.ts) already vetoes
+   * any item carrying `needs-human`, so this is what keeps a handed-off item
+   * from being re-claimed on the next pass — not a record of what happened
+   * (that is derived on read; see ledger.ts's module comment), but an
+   * instruction to the fleet's own future self.
+   */
+  needsHuman?: boolean
 }
 
 /**
@@ -168,7 +171,13 @@ export interface SettleTarget {
  *    a failed salvage also cancels the teardown, not just runs before it and
  *    gets ignored.
  * 3. Destroy — reached only when salvage succeeded or had nothing to do.
- * 4. Label the issue with the outcome.
+ * 4. Add `needs-human`, if the caller says this outcome is one (see
+ *    `SettleTarget.needsHuman`'s own comment). This is the ONLY label
+ *    `settle()` writes — see ledger.ts's module comment on why an outcome
+ *    label (`fleet:merged`, `fleet:rejected`, ...) is never written here at
+ *    all: whether a PR merged is a fact about GitHub's state, derived on
+ *    read (`llamenos-fleet status <issue>`), never cached as a label that
+ *    can drift from what actually happened to the PR.
  *
  * Each step's own failure is logged and does not stop the ones after it
  * (except salvage -> destroy, per above): a labelling failure must not skip
@@ -199,12 +208,11 @@ export async function settle(target: SettleTarget, log: (msg: string) => void): 
     }
   }
 
-  const label = OUTCOME_LABEL[target.outcome]
-  if (label !== undefined) {
+  if (target.needsHuman === true) {
     try {
-      await labelIssue(target.itemId, label)
+      await labelIssue(target.itemId, NEEDS_HUMAN_LABEL)
     } catch (e) {
-      log(`labelling issue ${target.itemId} failed: ${errMsg(e)}`)
+      log(`labelling issue ${target.itemId} with ${NEEDS_HUMAN_LABEL} failed: ${errMsg(e)}`)
     }
   }
 }

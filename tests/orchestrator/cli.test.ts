@@ -1,10 +1,12 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   revert, digestInputFrom, COMMANDS, type RevertDeps,
   runPlanWith, type PlanDeps,
   runIntegrateWith, type IntegrateDeps, type DirtyFleetPr,
+  resolveDispatchResult, statusForItemWith, type StatusItemDeps,
+  resolveAwaitingHumanWith,
 } from '../../orchestrator/src/cli.js'
 import { renderDigest, computeBanner } from '../../orchestrator/src/digest.js'
 import { buildIssueCreateArgs, NEEDS_HUMAN_LABEL, type ProposedIssue } from '../../orchestrator/src/roles/planner.js'
@@ -12,6 +14,7 @@ import type { RunRecord } from '../../orchestrator/src/ledger.js'
 import type { WorkItem } from '../../orchestrator/src/source.js'
 import type { TickResult } from '../../orchestrator/src/tick.js'
 import type { DependencyReport } from '../../orchestrator/src/dependency.js'
+import type { PrFacts } from '../../orchestrator/src/status.js'
 
 const REPO_ROOT = join(import.meta.dirname, '..', '..')
 const DEP_OK: DependencyReport = { ok: true, problems: [], commit: 'abc123' }
@@ -328,5 +331,160 @@ describe('runIntegrateWith', () => {
       commentOnPr,
     }))
     expect(commentOnPr).toHaveBeenCalledWith('1', expect.stringContaining('conflicts'))
+  })
+})
+
+// G3's root-caused fix for issue #660/PR #662: `dispatch-one.sh`'s WORKER-
+// written terminal status never carries `branch`/`worktree` (only the
+// throwaway pre-worker seed file does) — see `resolveDispatchResult`'s own
+// doc comment in cli.ts. These tests pin the repair directly, independent of
+// the rest of the dispatch/tick machinery.
+describe('resolveDispatchResult', () => {
+  const findWorktree = vi.fn(async (_repoRoot: string, _branch: string): Promise<string | undefined> => '/wt/found')
+  beforeEach(() => { findWorktree.mockClear() })
+
+  it('fills in the deterministic branch when the dispatch result is missing it', async () => {
+    const result = await resolveDispatchResult(
+      { outcome: 'SUCCESS', pr: '662' }, 'fleet/infra/660', REPO_ROOT, findWorktree,
+    )
+    expect(result.branch).toBe('fleet/infra/660')
+  })
+
+  it('resolves the worktree via git (findWorktreeForBranch) when the dispatch result is missing it', async () => {
+    const result = await resolveDispatchResult(
+      { outcome: 'SUCCESS', pr: '662' }, 'fleet/infra/660', REPO_ROOT, findWorktree,
+    )
+    expect(result.worktree).toBe('/wt/found')
+    expect(findWorktree).toHaveBeenCalledWith(REPO_ROOT, 'fleet/infra/660')
+  })
+
+  it('never overrides a branch or worktree the dispatch result already reported', async () => {
+    const result = await resolveDispatchResult(
+      { outcome: 'SUCCESS', pr: '662', branch: 'worker-reported-branch', worktree: '/wt/worker-reported' },
+      'fleet/infra/660', REPO_ROOT, findWorktree,
+    )
+    expect(result.branch).toBe('worker-reported-branch')
+    expect(result.worktree).toBe('/wt/worker-reported')
+    expect(findWorktree).not.toHaveBeenCalled()
+  })
+
+  it('leaves worktree undefined when git cannot find one either — never fabricates a path', async () => {
+    const result = await resolveDispatchResult(
+      { outcome: 'SUCCESS', pr: '662' }, 'fleet/infra/660', REPO_ROOT, async () => undefined,
+    )
+    expect(result.worktree).toBeUndefined()
+  })
+
+  it('preserves every other field on the result unchanged', async () => {
+    const result = await resolveDispatchResult(
+      { outcome: 'BLOCKED', pr: '662', note: 'worker note' }, 'fleet/infra/660', REPO_ROOT, findWorktree,
+    )
+    expect(result.outcome).toBe('BLOCKED')
+    expect(result.note).toBe('worker note')
+    expect(result.pr).toBe('662')
+  })
+})
+
+describe('statusForItemWith (G1: derive-on-read, never a label)', () => {
+  const row = (overrides: Partial<RunRecord> = {}): RunRecord => ({
+    ts: 1000, runId: 'run-1', lane: 'infra', itemId: '660', itemName: 'fix inventory path',
+    engine: 'claude', outcome: 'SUCCESS', pr: '662', branch: 'fleet/infra/660',
+    note: 'scope=pass impact=low tests=orchestrator:pass review=PASS merge=yes(all green) sha=c0ffee',
+    ...overrides,
+  })
+
+  function deps(overrides: Partial<StatusItemDeps> = {}): StatusItemDeps {
+    return {
+      readRows: () => [row()],
+      readPr: async () => ({ number: '662', state: 'OPEN', headRefOid: 'c0ffee', reviews: [] }),
+      branchExistsOnOrigin: async () => true,
+      findWorktreeForBranch: async () => '/wt/fleet-infra-660',
+      ...overrides,
+    }
+  }
+
+  it('derives MERGED state for a merged PR', async () => {
+    const out = await statusForItemWith('660', deps({
+      readPr: async () => ({ number: '662', state: 'MERGED', headRefOid: 'c0ffee', reviews: [] }),
+    }))
+    expect(out).toContain('state: MERGED')
+    expect(out).toContain('MERGED')
+  })
+
+  it('derives OPEN state for an open, unmerged PR and reports the head matches the verified SHA', async () => {
+    const out = await statusForItemWith('660', deps())
+    expect(out).toContain('state: OPEN')
+    expect(out).toContain('head matches the last verified SHA')
+    expect(out).toContain('Awaiting a human: YES')
+  })
+
+  it('derives CLOSED (not merged) state for a closed-unmerged PR', async () => {
+    const out = await statusForItemWith('660', deps({
+      readPr: async () => ({ number: '662', state: 'CLOSED', headRefOid: 'c0ffee', reviews: [] }),
+    }))
+    expect(out).toContain('state: CLOSED')
+    expect(out).not.toContain('MERGED')
+    // Closed (not merged, not open) is never "awaiting a human" — there is
+    // nothing left to wait on.
+    expect(out).toContain('Awaiting a human: no')
+  })
+
+  it('flags a branch that moved since verification', async () => {
+    const out = await statusForItemWith('660', deps({
+      readPr: async () => ({ number: '662', state: 'OPEN', headRefOid: 'a-different-commit', reviews: [] }),
+    }))
+    expect(out).toContain('DOES NOT MATCH')
+  })
+
+  // MUTATION GUARD, and the literal test the brief asks for: none of the
+  // three derivations above ever reads a label. `StatusItemDeps` has no
+  // label-reading capability in its type at all, so a derivation that tried
+  // to read one would fail to compile — but assert behaviourally too, since
+  // `deriveItemStatus` is pure and takes no label input whatsoever.
+  it('never reads or reports a label — PrFacts has no label field at all', async () => {
+    const facts: PrFacts = { number: '662', state: 'MERGED', headRefOid: 'c0ffee', reviews: [] }
+    expect(Object.keys(facts)).not.toContain('labels')
+    expect(Object.keys(facts)).not.toContain('label')
+    const out = await statusForItemWith('660', deps({ readPr: async () => facts }))
+    expect(out.toLowerCase()).not.toContain('fleet:merged')
+  })
+
+  it('reports "no PR found" when the item has no recorded PR at all', async () => {
+    const out = await statusForItemWith('660', deps({
+      readRows: () => [row({ pr: undefined })],
+      readPr: async () => { throw new Error('must not be called with no pr') },
+    }))
+    expect(out).toContain('no PR found')
+  })
+})
+
+describe('resolveAwaitingHumanWith (digest live derivation)', () => {
+  const candidate = (itemId: string, pr: string): RunRecord =>
+    ({ ts: 1000, runId: `run-${itemId}`, lane: 'infra', itemId, itemName: `item ${itemId}`, engine: 'claude', outcome: 'SUCCESS', pr })
+
+  it('keeps a candidate whose PR is still open', async () => {
+    const readPr = async (): Promise<PrFacts> => ({ number: '1', state: 'OPEN', headRefOid: 'x', reviews: [] })
+    const out = await resolveAwaitingHumanWith([candidate('1', '1')], readPr)
+    expect(out).toHaveLength(1)
+  })
+
+  it('drops a candidate whose PR already merged', async () => {
+    const readPr = async (): Promise<PrFacts> => ({ number: '1', state: 'MERGED', headRefOid: 'x', reviews: [] })
+    const out = await resolveAwaitingHumanWith([candidate('1', '1')], readPr)
+    expect(out).toHaveLength(0)
+  })
+
+  it('drops a candidate with no PR recorded at all, without calling gh', async () => {
+    const readPr = vi.fn(async (): Promise<PrFacts | undefined> => undefined)
+    const noPr: RunRecord = { ts: 1000, runId: 'run-x', lane: 'infra', itemId: 'x', itemName: 'x', engine: 'claude', outcome: 'SUCCESS' }
+    const out = await resolveAwaitingHumanWith([noPr], readPr)
+    expect(out).toHaveLength(0)
+    expect(readPr).not.toHaveBeenCalled()
+  })
+
+  it('drops a candidate whose live gh read fails — "could not check" is never "yes, waiting"', async () => {
+    const readPr = async (): Promise<PrFacts | undefined> => undefined
+    const out = await resolveAwaitingHumanWith([candidate('1', '1')], readPr)
+    expect(out).toHaveLength(0)
   })
 })
