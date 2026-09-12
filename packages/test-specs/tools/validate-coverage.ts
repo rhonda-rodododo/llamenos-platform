@@ -7,9 +7,73 @@
  * a corresponding implementation on the target platform(s).
  *
  * Platforms:
- *   android — Kotlin @Test methods OR Cucumber step defs
- *   desktop — playwright-bdd step definitions (planned)
- *   ios     — Swift func test*() methods (planned)
+ *   android — Cucumber step defs (Kotlin @Given/@When/@Then), real phrase matching
+ *   desktop — playwright-bdd step definitions, real Cucumber-expression matching
+ *   backend — playwright-bdd step definitions, real Cucumber-expression matching
+ *   ios     — Swift func test*() method-name matching (approximate; see checkIosCoverage)
+ *
+ * Desktop/backend matching semantics
+ * -----------------------------------
+ * playwright-bdd (see node_modules/playwright-bdd/dist/steps/stepDefinition.js
+ * and dist/steps/finder.js) binds each Gherkin step to a step definition by
+ * compiling the definition's string pattern into a `CucumberExpression`
+ * (from `@cucumber/cucumber-expressions`, playwright-bdd's own matching
+ * engine) and testing it against the step text.
+ *
+ * playwright-bdd *can* additionally filter candidates by keyword type
+ * (Given↔Context, When↔Action, Then↔Outcome, with And/But inheriting the
+ * previous step's type) — but only when the project config sets
+ * `matchKeywords: true`. This repo's `playwright.config.ts` does not set
+ * it (verified: no `matchKeywords` reference anywhere in the repo), so the
+ * real runner matches purely by pattern text, Given/When/Then/And/But all
+ * interchangeable against the same step-definition pool. That's also
+ * documented in-repo: see the comment in
+ * `tests/steps/security/sas-verification-steps.ts` ("Used as both Given
+ * and When — playwright-bdd matches Given/When/Then interchangeably").
+ * We replicate that: keyword is ignored entirely and every step is matched
+ * against every parsed step definition regardless of keyword.
+ *
+ * We import the real `@cucumber/cucumber-expressions` package (a transitive
+ * dependency of playwright-bdd, already in node_modules) and construct a
+ * `CucumberExpression` per parsed step definition, so `{int}`, `{string}`,
+ * `{word}`, `{float}`, escaped literals (`\(`, `\)`, `\/`), and anchoring
+ * are handled with the exact same engine the test runner uses — not a
+ * hand-rolled regex approximation.
+ *
+ * What this DOES catch:
+ *   - A scenario whose step text has no matching registered step definition
+ *     text/keyword-type on the target platform (the same condition that
+ *     causes playwright-bdd's `missingSteps: "skip-scenario"` to silently
+ *     skip the scenario at runtime).
+ *   - Deleting/renaming step definition files (proven via the delete
+ *     experiment in the PR description).
+ *   - Scenario Outline steps, via first-row Examples substitution (see
+ *     "What this DOES NOT catch" below for the exact limitation).
+ *
+ * What this DOES NOT catch:
+ *   - Whether the *body* of a matched step definition is correct/complete
+ *     (e.g. a step registered with the right phrase but an empty or wrong
+ *     implementation still counts as "covered" — this tool measures
+ *     phrase-level binding, not assertion quality).
+ *   - Scenario Outline rows beyond the first Examples row — only the first
+ *     row's values are substituted for `<placeholder>` tokens before
+ *     matching, so a step whose match validity depends on a later row's
+ *     value (e.g. a numeric parameter type that only fails to parse for a
+ *     non-numeric example in row 3) will not be flagged.
+ *   - Step definitions registered with a `RegExp` literal (`Given(/.../, ...)`)
+ *     instead of a string Cucumber Expression — none currently exist in
+ *     `tests/steps/`, but if one is added, this parser will not detect it
+ *     as a step definition (its `Given(`/`When(`/`Then(` regex only
+ *     extracts quoted string literals).
+ *   - Custom Cucumber parameter types defined via `defineParameterType()` —
+ *     none currently exist in the repo (verified), so the default
+ *     `ParameterTypeRegistry` (built-in `{int}`, `{float}`, `{string}`,
+ *     `{word}`) is sufficient. If a custom parameter type is added later
+ *     without updating this tool, expressions using it will fail to match
+ *     here even though the real runner would resolve them correctly.
+ *   - Runtime-only failures: a step that matches syntactically but throws,
+ *     times out, or asserts incorrectly at test execution time is outside
+ *     this tool's scope entirely — it verifies binding, not pass/fail.
  *
  * Usage:
  *   bun run test-specs:validate                  # All platforms with implementations
@@ -19,13 +83,14 @@
  *   bun run test-specs:validate --platform all
  *
  * Exit codes:
- *   0 — all scenarios have matching tests
- *   1 — missing test implementations found
+ *   0 — all scenarios have matching tests (or coverage is at/above threshold)
+ *   1 — coverage is below the required threshold for a validated platform
  */
 
 import { readFileSync, readdirSync, statSync, existsSync } from "fs";
 import { join, relative, basename, dirname } from "path";
 import { fileURLToPath } from "url";
+import { CucumberExpression, ParameterTypeRegistry } from "@cucumber/cucumber-expressions";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, "../../..");
@@ -36,10 +101,11 @@ const ANDROID_TEST_DIR = join(
 );
 const IOS_TEST_DIR = join(ROOT, "apps/ios/Tests");
 const DESKTOP_STEPS_DIR = join(ROOT, "tests/steps");
+const BACKEND_STEPS_DIR = join(ROOT, "tests/steps/backend");
 
-type Platform = "android" | "desktop" | "ios" | "backend";
+export type Platform = "android" | "desktop" | "ios" | "backend";
 
-interface Scenario {
+export interface Scenario {
   title: string;
   featureFile: string;
   featureName: string;
@@ -87,7 +153,7 @@ function parsePlatformArg(): Platform[] {
 
 // ---- Feature file parsing ----
 
-function findFiles(dir: string, ext: string): string[] {
+export function findFiles(dir: string, ext: string): string[] {
   const files: string[] = [];
   try {
     for (const entry of readdirSync(dir)) {
@@ -111,7 +177,7 @@ function parseTags(line: string): string[] {
     .map((t) => t.slice(1));
 }
 
-function parseFeatureFile(path: string): Scenario[] {
+export function parseFeatureFile(path: string, featuresDir = FEATURES_DIR): Scenario[] {
   const content = readFileSync(path, "utf-8");
   const lines = content.split("\n");
   const scenarios: Scenario[] = [];
@@ -150,7 +216,7 @@ function parseFeatureFile(path: string): Scenario[] {
       const allTags = [...new Set([...featureTags, ...pendingTags])];
       scenarios.push({
         title: scenarioMatch[1].trim(),
-        featureFile: relative(FEATURES_DIR, path),
+        featureFile: relative(featuresDir, path),
         featureName,
         featureTags,
         scenarioTags: [...pendingTags],
@@ -170,8 +236,25 @@ function parseFeatureFile(path: string): Scenario[] {
   return scenarios;
 }
 
-function scenariosForPlatform(scenarios: Scenario[], platform: Platform): Scenario[] {
-  return scenarios.filter((s) => s.allTags.includes(platform));
+/**
+ * Platform tag filters, replicating the scenario selection that actually
+ * runs in `playwright.config.ts` (`defineBddProject({ tags: ... })`).
+ * A scenario tagged e.g. `@desktop @wip` never runs on desktop in CI, so
+ * counting it in the desktop denominator would understate real coverage.
+ *
+ * NOTE: these must be kept in sync with playwright.config.ts by hand — there
+ * is no shared source of truth between the two today.
+ */
+const PLATFORM_EXCLUDE_TAGS: Partial<Record<Platform, string[]>> = {
+  desktop: ["backend", "wip", "fixme", "requires-camera", "requires-live-calls", "requires-demo"],
+  backend: ["wip", "fixme"],
+};
+
+export function scenariosForPlatform(scenarios: Scenario[], platform: Platform): Scenario[] {
+  const excludeTags = PLATFORM_EXCLUDE_TAGS[platform] ?? [];
+  return scenarios.filter(
+    (s) => s.allTags.includes(platform) && !excludeTags.some((t) => s.allTags.includes(t))
+  );
 }
 
 // ---- Scenario title to method name conversion ----
@@ -234,26 +317,6 @@ function parseCucumberStepPhrases(path: string): string[] {
 }
 
 /**
- * Extract all Gherkin step phrases from a feature file's scenarios.
- * Returns unique Given/When/Then/And/But phrases used in the feature.
- */
-function extractGherkinSteps(featurePath: string): string[] {
-  const content = readFileSync(featurePath, "utf-8");
-  const lines = content.split("\n");
-  const steps: string[] = [];
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    const stepMatch = trimmed.match(/^(?:Given|When|Then|And|But)\s+(.+)$/);
-    if (stepMatch) {
-      steps.push(stepMatch[1]);
-    }
-  }
-
-  return steps;
-}
-
-/**
  * Check if a Gherkin step text matches a Cucumber step phrase pattern.
  * Handles Cucumber expression parameters like {string}, {int}, {word},
  * escaped characters like \\(, and DataTable steps (ending with :).
@@ -312,6 +375,199 @@ function parseSwiftTestFile(path: string): TestMethod[] {
   return methods;
 }
 
+// ---- Gherkin step extraction (shared by android fuzzy-phrase + desktop/backend expression matching) ----
+
+interface RawStepLine {
+  keyword: "Given" | "When" | "Then" | "And" | "But";
+  text: string;
+}
+
+/**
+ * Extract the raw Given/When/Then/And/But step lines for one scenario,
+ * including any Background steps (which apply to every scenario in the
+ * file), and substitute the first Examples row's values into
+ * `<placeholder>` tokens for Scenario Outlines.
+ *
+ * LIMITATION: only the first Examples row is used for substitution — see
+ * the "What this DOES NOT catch" note at the top of this file.
+ */
+function extractRawScenarioSteps(featurePath: string, scenarioTitle: string): RawStepLine[] {
+  const content = readFileSync(featurePath, "utf-8");
+  const lines = content.split("\n");
+
+  const backgroundSteps: RawStepLine[] = [];
+  const scenarioSteps: RawStepLine[] = [];
+  const exampleTableRows: string[][] = [];
+
+  let inBackground = false;
+  let inTargetScenario = false;
+  let inExamplesTable = false;
+  let sawTargetScenario = false;
+
+  const stepLineRe = /^(Given|When|Then|And|But)\s+(.+)$/;
+
+  for (const rawLine of lines) {
+    const trimmed = rawLine.trim();
+
+    if (trimmed.startsWith("Background:")) {
+      inBackground = true;
+      inTargetScenario = false;
+      inExamplesTable = false;
+      continue;
+    }
+
+    const scenarioMatch = trimmed.match(/^Scenario(?:\s+Outline)?:\s*(.+)$/);
+    if (scenarioMatch) {
+      inBackground = false;
+      inExamplesTable = false;
+      inTargetScenario = scenarioMatch[1].trim() === scenarioTitle;
+      if (inTargetScenario) sawTargetScenario = true;
+      else if (sawTargetScenario) break; // moved past our scenario into the next one
+      continue;
+    }
+
+    if (trimmed.startsWith("Examples:")) {
+      inExamplesTable = inTargetScenario;
+      continue;
+    }
+
+    if (trimmed.startsWith("|")) {
+      if (inExamplesTable) {
+        const cells = trimmed
+          .split("|")
+          .slice(1, -1)
+          .map((c) => c.trim());
+        exampleTableRows.push(cells);
+      }
+      continue;
+    }
+
+    if (trimmed === "" || trimmed.startsWith("#") || trimmed.startsWith("@") || trimmed.startsWith("Feature:")) {
+      continue;
+    }
+
+    const stepMatch = trimmed.match(stepLineRe);
+    if (stepMatch) {
+      const step: RawStepLine = { keyword: stepMatch[1] as RawStepLine["keyword"], text: stepMatch[2] };
+      if (inBackground) backgroundSteps.push(step);
+      else if (inTargetScenario) scenarioSteps.push(step);
+    }
+  }
+
+  // Scenario Outline: substitute first Examples data row into <placeholder> tokens.
+  let resolvedScenarioSteps = scenarioSteps;
+  if (exampleTableRows.length >= 2) {
+    const [header, firstRow] = exampleTableRows;
+    resolvedScenarioSteps = scenarioSteps.map((step) => {
+      let text = step.text;
+      header.forEach((placeholderName, idx) => {
+        text = text.split(`<${placeholderName}>`).join(firstRow[idx] ?? "");
+      });
+      return { ...step, text };
+    });
+  }
+
+  return [...backgroundSteps, ...resolvedScenarioSteps];
+}
+
+/** Legacy string-only accessor, kept for the Android Cucumber matcher which does plain text matching. */
+function extractScenarioSteps(featurePath: string, scenarioTitle: string): string[] {
+  return extractRawScenarioSteps(featurePath, scenarioTitle).map((s) => s.text);
+}
+
+// ---- Real playwright-bdd step definition parsing + matching ----
+
+interface PlaywrightBddStepDef {
+  keyword: "Given" | "When" | "Then";
+  pattern: string;
+  file: string;
+  expression: CucumberExpression | null;
+  parseError?: string;
+}
+
+/**
+ * playwright-bdd's default `ParameterTypeRegistry` contains only Cucumber's
+ * built-in parameter types ({int}, {float}, {string}, {word}, {}, etc).
+ * `tests/steps/**` defines no custom parameter types via
+ * `defineParameterType()` (verified with `grep -rn defineParameterType
+ * tests/`), so a fresh registry has identical semantics to the one the
+ * real test run uses.
+ */
+function newParameterTypeRegistry(): ParameterTypeRegistry {
+  return new ParameterTypeRegistry();
+}
+
+/**
+ * Parse `Given(...)`, `When(...)`, `Then(...)` calls with a quoted string
+ * pattern (Cucumber Expression) out of a step definition file. Multi-line
+ * calls are supported (the pattern is often on its own line). Step
+ * definitions registered with a RegExp literal instead of a string are not
+ * detected — see the "What this DOES NOT catch" note at the top of the
+ * file.
+ */
+function parsePlaywrightBddStepDefs(path: string, registry: ParameterTypeRegistry): PlaywrightBddStepDef[] {
+  const content = readFileSync(path, "utf-8");
+  const defs: PlaywrightBddStepDef[] = [];
+
+  // Matches Given(/When(/Then( followed by a single- or double-quoted string,
+  // honoring backslash-escaped characters within the string (so `\(` and
+  // `\'`/`\"` don't terminate the match early).
+  const callRe = /\b(Given|When|Then)\s*\(\s*(['"])((?:\\.|(?!\2)[\s\S])*)\2/g;
+  let match: RegExpExecArray | null;
+  while ((match = callRe.exec(content)) !== null) {
+    const keyword = match[1] as PlaywrightBddStepDef["keyword"];
+    const pattern = unescapeJsStringLiteral(match[3], match[2]);
+    let expression: CucumberExpression | null = null;
+    let parseError: string | undefined;
+    try {
+      expression = new CucumberExpression(pattern, registry);
+    } catch (err) {
+      parseError = err instanceof Error ? err.message : String(err);
+    }
+    defs.push({ keyword, pattern, file: relative(ROOT, path), expression, parseError });
+  }
+
+  return defs;
+}
+
+/** Undo JS string-literal escaping (\\ -> \, \' -> ', \" -> ") to get the runtime string value. */
+function unescapeJsStringLiteral(raw: string, quote: string): string {
+  let out = "";
+  for (let i = 0; i < raw.length; i++) {
+    const c = raw[i];
+    if (c === "\\" && i + 1 < raw.length) {
+      const next = raw[i + 1];
+      if (next === "\\" || next === quote || next === "'" || next === '"') {
+        out += next;
+      } else if (next === "n") {
+        out += "\n";
+      } else if (next === "t") {
+        out += "\t";
+      } else {
+        out += next;
+      }
+      i++;
+    } else {
+      out += c;
+    }
+  }
+  return out;
+}
+
+/**
+ * Match a Gherkin step's text against a registered step definition's
+ * Cucumber Expression. Keyword (Given/When/Then/And/But) is intentionally
+ * NOT used as a filter — see the "Desktop/backend matching semantics" note
+ * at the top of this file for why that mirrors this repo's actual
+ * playwright-bdd configuration (`matchKeywords` is not enabled).
+ */
+function findMatchingStepDef(
+  stepText: string,
+  defs: PlaywrightBddStepDef[]
+): PlaywrightBddStepDef | undefined {
+  return defs.find((def) => def.expression !== null && def.expression.match(stepText) !== null);
+}
+
 // ---- Coverage checking per platform ----
 
 function checkAndroidCoverage(scenarios: Scenario[]): { covered: number; missing: number } {
@@ -355,7 +611,7 @@ function checkAndroidCoverage(scenarios: Scenario[]): { covered: number; missing
     if (found) {
       const method = allMethods.find((m) => m.name === expectedMethod)!;
       console.log(
-        `    \u2713 ${scenario.title}\n      ${method.className}.${method.name}`
+        `    ✓ ${scenario.title}\n      ${method.className}.${method.name}`
       );
       covered++;
     } else {
@@ -370,7 +626,7 @@ function checkAndroidCoverage(scenarios: Scenario[]): { covered: number; missing
         covered++;
       } else {
         console.log(
-          `    \u2717 ${scenario.title}\n      MISSING (expected: ${expectedMethod})`
+          `    ✗ ${scenario.title}\n      MISSING (expected: ${expectedMethod})`
         );
         missing++;
       }
@@ -387,6 +643,14 @@ function checkAndroidCoverage(scenarios: Scenario[]): { covered: number; missing
  * phrase in @android-tagged feature files has a matching step definition
  * in the steps/ directory. Scenarios are covered when all their steps
  * have matching definitions.
+ *
+ * NOTE: this uses a hand-rolled regex approximation of Cucumber Expression
+ * matching (`stepMatchesCucumberPhrase`), not the real `@cucumber/
+ * cucumber-expressions` engine used for desktop/backend below — Android's
+ * Cucumber runtime is JVM-based (io.cucumber:cucumber-java), not
+ * playwright-bdd, so the JS library's exact behavior doesn't apply here.
+ * It supports {string}/{int}/{word} and \(-style escapes, which covers
+ * every parameter type actually used in `apps/android/.../steps/*.kt`.
  */
 function checkAndroidCucumberCoverage(scenarios: Scenario[]): { covered: number; missing: number } {
   const stepsDir = join(ANDROID_TEST_DIR, "steps");
@@ -418,7 +682,7 @@ function checkAndroidCucumberCoverage(scenarios: Scenario[]): { covered: number;
 
     if (gherkinSteps.length === 0) {
       // No steps extracted — could be an outline with examples or empty scenario
-      console.log(`    \u2713 ${scenario.title} (no steps to validate)`);
+      console.log(`    ✓ ${scenario.title} (no steps to validate)`);
       covered++;
       continue;
     }
@@ -436,12 +700,12 @@ function checkAndroidCucumberCoverage(scenarios: Scenario[]): { covered: number;
 
     if (unmatchedSteps.length === 0) {
       console.log(
-        `    \u2713 ${scenario.title} (${gherkinSteps.length} steps matched)`
+        `    ✓ ${scenario.title} (${gherkinSteps.length} steps matched)`
       );
       covered++;
     } else {
       console.log(
-        `    \u2717 ${scenario.title}\n      Missing step defs for:`
+        `    ✗ ${scenario.title}\n      Missing step defs for:`
       );
       for (const step of unmatchedSteps) {
         console.log(`        - ${step}`);
@@ -454,90 +718,94 @@ function checkAndroidCucumberCoverage(scenarios: Scenario[]): { covered: number;
 }
 
 /**
- * Extract the Gherkin step lines belonging to a specific scenario within a feature file.
+ * Real coverage check for playwright-bdd platforms (desktop, backend).
+ *
+ * For each scenario: extract its resolved Gherkin steps (background +
+ * scenario, outline placeholders substituted from the first Examples row),
+ * and check that some registered step definition's `CucumberExpression`
+ * matches the step text — keyword-agnostic, exactly as playwright-bdd
+ * binds steps in this repo's configuration (see file header).
+ *
+ * A scenario is "covered" only if every one of its steps matches. This
+ * mirrors the real runtime: `missingSteps: "skip-scenario"` skips the
+ * *entire* scenario if even one step has no binding.
  */
-function extractScenarioSteps(featurePath: string, scenarioTitle: string): string[] {
-  const content = readFileSync(featurePath, "utf-8");
-  const lines = content.split("\n");
-  const steps: string[] = [];
-  let inTargetScenario = false;
-  let inBackground = false;
-  const backgroundSteps: string[] = [];
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-
-    // Track Background section
-    if (trimmed.startsWith("Background:")) {
-      inBackground = true;
-      inTargetScenario = false;
-      continue;
-    }
-
-    // Track target scenario
-    const scenarioMatch = trimmed.match(/^Scenario(?:\s+Outline)?:\s*(.+)$/);
-    if (scenarioMatch) {
-      inBackground = false;
-      inTargetScenario = scenarioMatch[1].trim() === scenarioTitle;
-      continue;
-    }
-
-    // Skip tags, empty lines, comments, examples, tables
-    if (
-      trimmed.startsWith("@") ||
-      trimmed.startsWith("#") ||
-      trimmed.startsWith("|") ||
-      trimmed.startsWith("Examples:") ||
-      trimmed.startsWith("Feature:") ||
-      trimmed === ""
-    ) {
-      if (trimmed.startsWith("@") || trimmed.startsWith("Examples:") || trimmed.startsWith("Feature:")) {
-        if (inTargetScenario && !trimmed.startsWith("|")) {
-          // End of scenario
-          break;
-        }
-      }
-      continue;
-    }
-
-    // Collect step lines
-    const stepMatch = trimmed.match(/^(?:Given|When|Then|And|But)\s+(.+)$/);
-    if (stepMatch) {
-      if (inBackground) {
-        backgroundSteps.push(stepMatch[1]);
-      } else if (inTargetScenario) {
-        steps.push(stepMatch[1]);
-      }
-    }
-  }
-
-  // Background steps apply to all scenarios
-  return [...backgroundSteps, ...steps];
-}
-
-function checkDesktopCoverage(scenarios: Scenario[]): { covered: number; missing: number } {
-  if (!existsSync(DESKTOP_STEPS_DIR)) {
-    console.log("  Desktop step definitions not yet created (tests/steps/)");
-    console.log(`  ${scenarios.length} scenarios tagged @desktop pending implementation\n`);
+function checkPlaywrightBddCoverage(
+  scenarios: Scenario[],
+  stepsDir: string,
+  label: string,
+  featuresDir: string = FEATURES_DIR
+): { covered: number; missing: number } {
+  if (!existsSync(stepsDir)) {
+    console.log(`  ${label} step definitions not yet created (${relative(ROOT, stepsDir)}/)`);
+    console.log(`  ${scenarios.length} scenarios pending implementation\n`);
     return { covered: 0, missing: scenarios.length };
   }
 
-  // For playwright-bdd, check that step definition files exist in tests/steps/
-  const stepFiles = findFiles(DESKTOP_STEPS_DIR, ".ts");
-  console.log(`  Found ${stepFiles.length} step definition files in tests/steps/\n`);
-
-  // Basic check: step files exist. Full step-phrase matching is complex and
-  // deferred to playwright-bdd's own validation (bddgen will fail on missing steps)
-  if (stepFiles.length > 0) {
-    // Report all scenarios as covered if step files exist
-    // (playwright-bdd validates at build time)
-    for (const scenario of scenarios) {
-      console.log(`    \u2713 ${scenario.title} (validated by playwright-bdd)`);
-    }
-    return { covered: scenarios.length, missing: 0 };
+  const stepFiles = findFiles(stepsDir, ".ts");
+  const registry = newParameterTypeRegistry();
+  const allDefs: PlaywrightBddStepDef[] = [];
+  for (const file of stepFiles) {
+    allDefs.push(...parsePlaywrightBddStepDefs(file, registry));
   }
 
-  return { covered: 0, missing: scenarios.length };
+  const parseErrors = allDefs.filter((d) => d.parseError);
+  console.log(
+    `  Found ${allDefs.length} ${label} step definitions across ${stepFiles.length} step files` +
+      (parseErrors.length ? ` (${parseErrors.length} failed to parse as Cucumber Expressions)` : "") +
+      "\n"
+  );
+  for (const d of parseErrors) {
+    console.log(`    WARNING: could not parse pattern in ${d.file}: "${d.pattern}" — ${d.parseError}`);
+  }
+
+  let covered = 0;
+  let missing = 0;
+  let currentFeature = "";
+
+  for (const scenario of scenarios) {
+    if (scenario.featureFile !== currentFeature) {
+      currentFeature = scenario.featureFile;
+      console.log(`  Feature: ${scenario.featureName} (${scenario.featureFile})`);
+    }
+
+    const featurePath = join(featuresDir, scenario.featureFile);
+    const steps = extractRawScenarioSteps(featurePath, scenario.title).map((s) => s.text);
+
+    if (steps.length === 0) {
+      console.log(`    ✓ ${scenario.title} (no steps to validate)`);
+      covered++;
+      continue;
+    }
+
+    const unmatchedSteps: string[] = [];
+    for (const stepText of steps) {
+      if (!findMatchingStepDef(stepText, allDefs)) {
+        unmatchedSteps.push(stepText);
+      }
+    }
+
+    if (unmatchedSteps.length === 0) {
+      console.log(`    ✓ ${scenario.title} (${steps.length} steps matched)`);
+      covered++;
+    } else {
+      console.log(`    ✗ ${scenario.title}\n      Missing step defs for:`);
+      for (const step of unmatchedSteps) {
+        console.log(`        - ${step}`);
+      }
+      missing++;
+    }
+  }
+
+  return { covered, missing };
+}
+
+function checkDesktopCoverage(scenarios: Scenario[]): { covered: number; missing: number } {
+  return checkPlaywrightBddCoverage(scenarios, DESKTOP_STEPS_DIR, "desktop");
+}
+
+function checkBackendCoverage(scenarios: Scenario[]): { covered: number; missing: number } {
+  return checkPlaywrightBddCoverage(scenarios, BACKEND_STEPS_DIR, "backend");
 }
 
 function checkIosCoverage(scenarios: Scenario[]): { covered: number; missing: number } {
@@ -574,7 +842,7 @@ function checkIosCoverage(scenarios: Scenario[]): { covered: number; missing: nu
     if (found) {
       const method = allMethods.find((m) => m.name === expectedMethod)!;
       console.log(
-        `    \u2713 ${scenario.title}\n      ${method.className}.${method.name}`
+        `    ✓ ${scenario.title}\n      ${method.className}.${method.name}`
       );
       covered++;
     } else {
@@ -589,7 +857,7 @@ function checkIosCoverage(scenarios: Scenario[]): { covered: number; missing: nu
         covered++;
       } else {
         console.log(
-          `    \u2717 ${scenario.title}\n      MISSING (expected: ${expectedMethod})`
+          `    ✗ ${scenario.title}\n      MISSING (expected: ${expectedMethod})`
         );
         missing++;
       }
@@ -597,29 +865,6 @@ function checkIosCoverage(scenarios: Scenario[]): { covered: number; missing: nu
   }
 
   return { covered, missing };
-}
-
-const BACKEND_STEPS_DIR = join(ROOT, "tests/steps/backend");
-
-function checkBackendCoverage(scenarios: Scenario[]): { covered: number; missing: number } {
-  if (!existsSync(BACKEND_STEPS_DIR)) {
-    console.log("  Backend step definitions not yet created (tests/steps/backend/)");
-    console.log(`  ${scenarios.length} scenarios tagged @backend pending implementation\n`);
-    return { covered: 0, missing: scenarios.length };
-  }
-
-  const stepFiles = findFiles(BACKEND_STEPS_DIR, ".ts");
-  console.log(`  Found ${stepFiles.length} backend step definition files in tests/steps/backend/\n`);
-
-  if (stepFiles.length > 0) {
-    // Backend steps validated by playwright-bdd at build time
-    for (const scenario of scenarios) {
-      console.log(`    \u2713 ${scenario.title} (validated by playwright-bdd)`);
-    }
-    return { covered: scenarios.length, missing: 0 };
-  }
-
-  return { covered: 0, missing: scenarios.length };
 }
 
 // ---- Tag & duplicate validation ----
@@ -702,22 +947,26 @@ function checkDuplicateFeatureNames(featureFiles: string[]) {
 
 /**
  * Minimum required coverage percentages per platform.
- * Platforms not listed here default to 100%.
  *
- * These thresholds are intentionally below 100% for mobile platforms
- * while test infrastructure is being built out. Raise them as coverage
- * improves.
+ * These are RATCHETS, not aspirations: each value is the real measured
+ * coverage on 2026-09-11 (see PR fix(test-specs): measure BDD coverage
+ * instead of asserting it), rounded down to the nearest integer. They
+ * exist so a regression in step-definition coverage fails CI instead of
+ * silently passing. This threshold must only ever move UP as real
+ * coverage improves — never down, and never back to a value chosen to
+ * make a red run go green.
  *
- * - desktop: 100% — full playwright-bdd coverage required
- * - backend: 100% — full step coverage required
- * - android: 75%  — many new-feature steps not yet ported to mobile
- * - ios:     0%   — iOS test infra is early-stage; tracked but not gated
+ * Desktop/backend are now measured by real Cucumber-expression matching
+ * (see checkPlaywrightBddCoverage); previously this file only checked
+ * that `tests/steps/` was non-empty and reported every scenario as
+ * covered regardless of content, which is why desktop/backend were
+ * fabricated at 100% before this fix.
  */
 const COVERAGE_THRESHOLDS: Record<Platform, number> = {
-  desktop: 100,
-  backend: 100,
-  android: 75,
-  ios: 0,
+  desktop: 95,
+  backend: 77,
+  android: 76,
+  ios: 2,
 };
 
 // ---- Main ----
@@ -799,7 +1048,7 @@ function main() {
     const pctStr = r.total > 0 ? pct.toFixed(1) : "N/A";
     const threshold = COVERAGE_THRESHOLDS[r.platform as Platform] ?? 100;
     const belowThreshold = r.total > 0 && pct < threshold;
-    const status = belowThreshold ? "\u2717" : "\u2713";
+    const status = belowThreshold ? "✗" : "✓";
     const thresholdNote = threshold < 100 ? ` (threshold: ${threshold}%)` : "";
     console.log(`  ${status} ${r.platform}: ${r.covered}/${r.total} (${pctStr}%)${thresholdNote}`);
     if (belowThreshold) {
@@ -817,4 +1066,17 @@ function main() {
   }
 }
 
-main();
+// ---- Test-only exports (used by validate-coverage.test.ts) ----
+
+export const __testing = {
+  extractRawScenarioSteps,
+  parsePlaywrightBddStepDefs,
+  findMatchingStepDef,
+  checkPlaywrightBddCoverage,
+  newParameterTypeRegistry,
+  COVERAGE_THRESHOLDS,
+};
+
+if (import.meta.main) {
+  main();
+}
