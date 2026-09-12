@@ -155,18 +155,16 @@ describe('matchesPath', () => {
 })
 
 describe('loadLaneScopes against the real fragments', () => {
-  it('parses all six lanes to exactly the paths documented in the source files', async () => {
+  // backend and desktop keep their exact-content pin: they're the one pair
+  // whose owned/notOwned lists actually overlap (each excludes a path the
+  // other owns — see scope.ts's doc comment on Ruling 2), which is the shape
+  // that needs the specificity/tie-break logic scope.test.ts's
+  // "overlap resolution against real backend/desktop fragments" block
+  // exercises in depth. Pinning their real parsed content here is what lets
+  // those tests build on real data instead of a synthetic fixture that could
+  // drift from what the fragments actually say.
+  it('parses backend and desktop to exactly the overlapping paths their scope-overlap tests rely on', async () => {
     const scopes = await loadLaneScopes(process.cwd())
-
-    expect(scopes.ios).toEqual({
-      owned: ['apps/ios/', '.github/workflows/ios*.yml'],
-      notOwned: [],
-    })
-
-    expect(scopes.android).toEqual({
-      owned: ['apps/android/'],
-      notOwned: [],
-    })
 
     expect(scopes.desktop).toEqual({
       owned: ['apps/desktop/', 'src/client/', 'tests/', 'tests/mocks/', 'playwright.config.ts'],
@@ -177,22 +175,25 @@ describe('loadLaneScopes against the real fragments', () => {
       owned: ['apps/worker/', 'sip-bridge/', 'signal-notifier/', 'tests/steps/'],
       notOwned: ['tests/', 'tests/mocks/', 'packages/test-specs/'],
     })
-
-    expect(scopes.shared).toEqual({
-      owned: [
-        'packages/crypto/',
-        'packages/protocol/',
-        'packages/shared/',
-        'packages/i18n/',
-        'docs/protocol/PROTOCOL.md',
-        'packages/test-specs/',
-      ],
-      notOwned: [],
-    })
-
-    expect(scopes.infra).toEqual({
-      owned: ['deploy/', '.github/workflows/', 'site/', 'Dockerfile*', 'knope.toml', 'Caddyfile*'],
-      notOwned: [],
-    })
   })
+
+  // ios, android, shared, and infra don't have that overlap shape, so what
+  // matters for them is the parser's general contract — every owned/notOwned
+  // entry is a non-empty string, and every lane that declares owned paths at
+  // all gets at least one — not their exact current path list, which will
+  // keep changing as those lanes' fragments grow and would otherwise turn
+  // this into a snapshot every legitimate scope edit has to hand-update.
+  it.each(['ios', 'android', 'shared', 'infra'] as const)(
+    '%s parses to well-formed, non-empty owned paths',
+    async (lane) => {
+      const scopes = await loadLaneScopes(process.cwd())
+      const scope = scopes[lane]
+      if (scope === undefined) throw new Error(`expected a scope for lane ${lane}`)
+      expect(scope.owned.length, `lane ${lane} parsed no owned paths`).toBeGreaterThan(0)
+      for (const p of [...scope.owned, ...scope.notOwned]) {
+        expect(typeof p).toBe('string')
+        expect(p.length).toBeGreaterThan(0)
+      }
+    },
+  )
 })

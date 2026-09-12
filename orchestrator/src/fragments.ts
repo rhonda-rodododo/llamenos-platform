@@ -75,9 +75,9 @@ function collectSection(lines: string[], startIdx: number): string[] {
 /**
  * The scope breaker compares a worker's diff against these paths. They come
  * from the same fragment that briefs the worker, so a lane cannot be told it
- * owns something the breaker will then reject — the drift the reference system
- * could not prevent, because there scope lived in config and ownership lived in
- * prompt text.
+ * owns something the breaker will then reject — the drift the reference
+ * system (atlas-orchestrator, in the `translatemd` repo) could not prevent,
+ * because there scope lived in config and ownership lived in prompt text.
  */
 export function parseOwnedPaths(markdown: string): LaneScope {
   const lines = markdown.split('\n')

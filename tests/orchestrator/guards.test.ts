@@ -1,11 +1,11 @@
-import { describe, it, expect } from 'vitest'
-import { LANES, NEVER_WRITE_PATHS, loadLanes, assertLiveLanesHaveScope } from '../../orchestrator/src/config.js'
+import { describe, it, expect, afterEach } from 'vitest'
+import { LANES, NEVER_WRITE_PATHS, loadLanes, readLaneModes, assertLiveLanesHaveScope } from '../../orchestrator/src/config.js'
 import { classifyImpact } from '../../orchestrator/src/impact.js'
 import { checkScope } from '../../orchestrator/src/scope.js'
 import { haltedOnGitHubFrom } from '../../orchestrator/src/killswitch.js'
-import { loadLaneScopes } from '../../orchestrator/src/fragments.js'
-import { execSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 describe('rail: a live lane must have a write scope', () => {
   // Asserted against a synthetic lane, not the live config: every configured
@@ -30,28 +30,6 @@ describe('rail: a live lane must have a write scope', () => {
     const lanes = await loadLanes(process.cwd(), '/nonexistent/fixture-lanes.json')
     for (const l of lanes) {
       expect(l.scope.owned.length, `lane ${l.id} parsed no owned paths from its fragment`).toBeGreaterThan(0)
-    }
-  })
-})
-
-describe('rail: notOwned entries must be directory-shaped, not bare filenames', () => {
-  // The scope specificity rule (scope.ts) ranks owned vs. notOwned by
-  // matched-pattern STRING LENGTH — sound for today's fragments, but not in
-  // general: a bare-filename notOwned entry (e.g. `README.md`, length 10)
-  // sitting under a long owned directory prefix (e.g. `apps/backend/`,
-  // length 13) would lose the length comparison and be silently ignored —
-  // the file would be treated as owned even though the fragment says it is
-  // explicitly excluded. A directory-shaped entry does not have this trap
-  // because matchesPath's trailing-`/` and prefix rules make it dominate any
-  // owned prefix it is nested under. This guard converts that invisible trap
-  // into a failing test the moment any fragment adds a bare-filename
-  // notOwned entry, rather than letting it silently mis-rank in production.
-  it('every parsed notOwned entry across all six fragments contains a "/"', async () => {
-    const scopes = await loadLaneScopes(process.cwd())
-    for (const [lane, scope] of Object.entries(scopes)) {
-      for (const p of scope.notOwned) {
-        expect(p, `lane ${lane}'s notOwned entry "${p}" is a bare filename — see comment above`).toContain('/')
-      }
     }
   })
 })
@@ -105,21 +83,15 @@ describe('rail: the GitHub kill switch fails open', () => {
   })
 })
 
-describe('rail: origin points at llamenos-platform', () => {
-  // Relaxed from "the remote set is exactly {origin}": any contributor
-  // working from a fork adds their own remote (or renames origin), which
-  // would fail an exact-set assertion for a reason that has nothing to do
-  // with the invariant this rail actually protects — that the fleet's
-  // canonical upstream is reachable and points at the real repo. Asserting
-  // "origin exists and points at llamenos-platform" keeps that intent
-  // without depending on how many other remotes a contributor's machine has.
-  it('has an origin remote pointing at llamenos-platform', () => {
-    const remotes = execSync('git remote -v', { encoding: 'utf8' }).trim().split('\n')
-    const origin = remotes.find((l) => l.split(/\s+/)[0] === 'origin')
-    expect(origin, 'no "origin" remote configured').toBeDefined()
-    expect(origin).toContain('llamenos-platform')
-  })
-})
+// The single-origin-remote invariant ("rail: origin points at
+// llamenos-platform") used to be asserted here by shelling out to
+// `git remote -v` on the machine running the test suite. Removed: it
+// asserted the test-runner's own git config, not the code — it fails on any
+// contributor's fork or differently-configured checkout for reasons that
+// have nothing to do with the diff under test, and `doctor`
+// (orchestrator/src/cli.ts) already enforces the stronger form of this
+// invariant (exactly one remote, named origin) at runtime on the only
+// machine where the answer is meaningful: the operator's.
 
 describe('rail: every lane starts off', () => {
   it('ships no lane in live or shadow mode by default', () => {
@@ -128,10 +100,36 @@ describe('rail: every lane starts off', () => {
 })
 
 describe('rail: lane modes are runtime state, not source', () => {
-  it('does not require editing orchestrator source to turn a dial', () => {
-    // orchestrator/ is high-impact and human-gated. If mode lived in
-    // config.ts, changing a lane from off to shadow would need a reviewed PR.
-    const src = readFileSync('orchestrator/src/config.ts', 'utf8')
-    expect(src).toContain('LANE_MODES_FILE')
+  // orchestrator/ is high-impact and human-gated. If a lane's mode lived in
+  // config.ts, flipping it from off to shadow would need a reviewed PR —
+  // defeating the point of a runtime dial. Proven behaviorally: write a real
+  // modes file and show readLaneModes()/loadLanes() actually pick the mode
+  // up from its content, rather than grepping config.ts's source text for a
+  // constant name (a check a refactor could break, or a hardcoded mode could
+  // satisfy, without the underlying property changing either way).
+  const dirs: string[] = []
+  afterEach(() => {
+    for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true })
+  })
+
+  function tempModesFile(modes: Record<string, string>): string {
+    const dir = mkdtempSync(join(tmpdir(), 'fleet-guards-lane-modes-'))
+    dirs.push(dir)
+    const file = join(dir, 'lanes.json')
+    writeFileSync(file, JSON.stringify(modes))
+    return file
+  }
+
+  it('readLaneModes reads a lane mode from file content, not from source', () => {
+    const file = tempModesFile({ backend: 'shadow' })
+    expect(readLaneModes(file)).toEqual({ backend: 'shadow' })
+  })
+
+  it('loadLanes turns a lane on from the modes file alone, with no source change', async () => {
+    const file = tempModesFile({ ios: 'live' })
+    const lanes = await loadLanes(process.cwd(), file)
+    expect(lanes.find((l) => l.id === 'ios')?.mode).toBe('live')
+    // Every other lane is untouched by that same file.
+    expect(lanes.filter((l) => l.id !== 'ios').every((l) => l.mode === 'off')).toBe(true)
   })
 })

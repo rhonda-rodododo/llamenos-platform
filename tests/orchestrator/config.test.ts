@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { LANES, LIMITS, NEVER_WRITE_PATHS, MAX_ATTEMPTS_PER_ITEM, assertLiveLanesHaveScope } from '../../orchestrator/src/config.js'
+import {
+  LANES, LIMITS, NEVER_WRITE_PATHS, MAX_ATTEMPTS_PER_ITEM,
+  assertLiveLanesHaveScope,
+} from '../../orchestrator/src/config.js'
 import type { Lane } from '../../orchestrator/src/config.js'
 import { checkScope } from '../../orchestrator/src/scope.js'
 

@@ -23,7 +23,24 @@ function deps(over: Partial<TickDeps> = {}): TickDeps {
     resumedAt: () => 0,
     listItems: async () => [item('1')],
     readLabels: async () => ['agent-dispatchable', 'lane:ios'],
+    // Default dispatch resolves SUCCESS but WITHOUT pr/branch/worktree, so it
+    // never falls into the verify/review/merge pipeline unless a test opts
+    // in explicitly by overriding dispatch (or the pipeline deps below).
     dispatch: vi.fn(async () => ({ outcome: 'SUCCESS' as const })),
+    verifyMechanical: vi.fn(async () => ({
+      passed: true, reasons: [], changedFiles: [], addedLines: 0,
+      impact: 'low' as const, impactReasons: [], testsPassed: true, verifiedCommit: 'deadbeef',
+    })),
+    prDiff: vi.fn(async () => ''),
+    secondOpinion: vi.fn(async () => ({ verdict: 'PASS' as const, text: 'VERDICT: PASS' })),
+    postReview: vi.fn(async () => {}),
+    reviseWithWorker: vi.fn(async () => {}),
+    haltFleet: vi.fn(),
+    ciStatusFor: vi.fn(async () => true),
+    prHeadSha: vi.fn(async () => 'deadbeef'),
+    mergePr: vi.fn(async () => {}),
+    commentOnIssue: vi.fn(async () => {}),
+    settle: vi.fn(async () => {}),
     record: vi.fn(),
     log: () => {},
     ...over,

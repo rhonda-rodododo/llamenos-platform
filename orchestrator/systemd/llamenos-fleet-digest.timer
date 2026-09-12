@@ -1,0 +1,22 @@
+# orchestrator/systemd/llamenos-fleet-digest.timer
+[Unit]
+Description=Llámenos fleet digest, twice daily (07:00 and 18:00)
+
+[Timer]
+# ABSOLUTE wall-clock, deliberately — NOT OnBootSec + OnUnitActiveSec, for the
+# same reason llamenos-fleet-tick.timer avoids it. OnUnitActiveSec anchors off
+# the last time the service was active, and OnBootSec fires only in the first
+# minutes after a boot; on a machine that has been up for days with no recent
+# activation there is nothing left to anchor to, so systemd schedules NOTHING
+# for either — while `systemctl is-enabled` still reports enabled and
+# `is-active` still reports active. That failure mode has been observed twice
+# in the reference system this project is not repeating a third time. An
+# OnCalendar expression has no "last activation" to anchor to: every
+# expression has its next occurrence computed from the clock alone, so it
+# cannot silently go quiet the way OnBootSec/OnUnitActiveSec can.
+OnCalendar=*-*-* 07,18:00:00
+Persistent=true
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target
