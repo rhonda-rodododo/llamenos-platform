@@ -27,7 +27,10 @@ i18n
     },
   })
 
-const RTL_LANGUAGES = ['ar']
+// fa (Persian) is written in Perso-Arabic script, same as ar — both are RTL.
+// ku (Kurdish) is Kurmanji/Latin script in this app's locale (label 'Kurdî'),
+// so it stays LTR.
+const RTL_LANGUAGES = ['ar', 'fa']
 
 function syncDocumentLang(lang: string) {
   document.documentElement.lang = lang

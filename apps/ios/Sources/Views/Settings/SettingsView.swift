@@ -23,7 +23,16 @@ enum AutoLockTimeout: Int, CaseIterable, Identifiable {
 
 // MARK: - SupportedLanguage
 
-/// Supported languages for the app, matching the 13 locales in the project.
+/// Supported languages for the app.
+///
+/// NOTE: This list must be kept in sync with the full locale set in
+/// packages/i18n/languages.ts (the source of truth) — it previously only
+/// listed 13 of the 22 locales that actually ship complete translations
+/// (packages/i18n/locales/*.json), which meant the app's language picker
+/// silently made 9 fully-translated locales unreachable in the UI:
+/// am, fa, ku, mix, my, quc, so, tr, uk. Ideally this array is generated
+/// from packages/i18n/languages.ts rather than hand-maintained; tracked as
+/// a follow-up (see fix(i18n): derive locale lists dynamically PR).
 struct SupportedLanguage: Identifiable, Hashable {
     let id: String  // locale code
     let name: String
@@ -42,6 +51,15 @@ struct SupportedLanguage: Identifiable, Hashable {
         SupportedLanguage(id: "hi", name: "\u{0939}\u{093F}\u{0928}\u{094D}\u{0926}\u{0940}"),
         SupportedLanguage(id: "pt", name: "Portugu\u{00EA}s"),
         SupportedLanguage(id: "de", name: "Deutsch"),
+        SupportedLanguage(id: "uk", name: "\u{0423}\u{043A}\u{0440}\u{0430}\u{0457}\u{043D}\u{0441}\u{044C}\u{043A}\u{0430}"),
+        SupportedLanguage(id: "fa", name: "\u{0641}\u{0627}\u{0631}\u{0633}\u{06CC}"),
+        SupportedLanguage(id: "tr", name: "T\u{00FC}rk\u{00E7}e"),
+        SupportedLanguage(id: "ku", name: "Kurd\u{00EE}"),
+        SupportedLanguage(id: "so", name: "Soomaali"),
+        SupportedLanguage(id: "am", name: "\u{12A0}\u{121B}\u{122D}\u{129B}"),
+        SupportedLanguage(id: "my", name: "\u{1019}\u{103C}\u{1014}\u{103A}\u{1019}\u{102C}"),
+        SupportedLanguage(id: "quc", name: "K'iche'"),
+        SupportedLanguage(id: "mix", name: "Tu'un savi"),
     ]
 }
 

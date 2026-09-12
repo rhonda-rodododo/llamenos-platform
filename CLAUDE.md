@@ -38,7 +38,7 @@ All platforms implement the same protocol: `docs/protocol/PROTOCOL.md`
 - **Protocol**: `packages/protocol/` JSON Schema → codegen (TypeScript, Swift, Kotlin via quicktype-core)
 - **Telephony**: 8 providers via `TelephonyAdapter` interface (Twilio, SignalWire, Vonage, Plivo, Telnyx, Bandwidth, Asterisk, FreeSWITCH). `SipBridgeAdapter` base class for ARI/ESL/Kamailio backends. `PBX_TYPE` env var selects backend for `sip-bridge/`.
 - **Auth**: Ed25519/X25519 per-device keys for E2EE + WebAuthn session tokens for multi-device support
-- **i18n**: `packages/i18n/` — 13 locales + codegen for iOS `.strings` and Android `strings.xml`
+- **i18n**: `packages/i18n/` — 22 locales (source of truth: `packages/i18n/languages.ts`; never hardcode a count/list elsewhere — `bun run i18n:validate` fails loudly if one drifts from `packages/i18n/locales/`) + codegen for iOS `.strings` and Android `strings.xml`
 - **Deployment**: Docker Compose / Helm (VPS self-hosted), Cloudflare Tunnels for ingress. EU/GDPR-compatible.
 - **Testing**: E2E via Playwright (desktop), XCUITest (iOS), Compose UI tests (Android), Cucumber BDD (Android E2E), backend BDD; Rust tests via `cargo test`
 - **Desktop Security**: Tauri Stronghold (encrypted vault), isolation pattern, CSP, single-instance
@@ -105,7 +105,7 @@ packages/
     generated/        # Auto-generated types — GITIGNORED (typescript/, swift/, kotlin/)
     crypto-labels.json # Domain separation constants (source of truth; see file for current count)
   i18n/               # Localization package
-    locales/          # 22 locale JSON files (en, es, zh, tl, vi, ar, fr, ht, ko, ru, hi, pt, de, am, fa, ku, mix, my, quc, so, tr, uk)
+    locales/          # 22 locale JSON files — see packages/i18n/languages.ts for the current list
     languages.ts      # Language config (codes, labels, Twilio voice IDs)
     tools/            # i18n-codegen.ts → iOS .strings + Android strings.xml + Kotlin I18n.kt
                       # validate-strings.ts → cross-platform string ref validator

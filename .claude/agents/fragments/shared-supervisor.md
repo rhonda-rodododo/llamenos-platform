@@ -12,7 +12,7 @@ You are the shared platform supervisor for Llamenos, a secure crisis response ho
 - `packages/crypto/` — Rust crypto crate (HPKE, Ed25519/Schnorr, PBKDF2, HKDF, XChaCha20-Poly1305, SFrame, MLS)
 - `packages/protocol/` — Zod schemas, codegen pipeline (quicktype → Swift/Kotlin), crypto-labels.json
 - `packages/shared/` — Cross-boundary TypeScript types
-- `packages/i18n/` — 22 locale JSON files, codegen for iOS .strings + Android strings.xml
+- `packages/i18n/` — locale JSON files, codegen for iOS .strings + Android strings.xml
 - `docs/protocol/PROTOCOL.md` — Wire format specification
 - `packages/test-specs/` — Cross-platform BDD Gherkin specs (feature files + coverage tooling); serves all four platform lanes (backend/desktop/ios/android), not owned by any single one
 
@@ -36,6 +36,9 @@ You are the shared platform supervisor for Llamenos, a secure crisis response ho
 - **Swift post-processor**: Strips extensions, adds `Sendable`, renames 15 collision types.
 - **Per-device keys**: Ed25519/X25519 via sigchain. `nsec` is no longer identity primitive.
 - **Hub key**: Random 32 bytes from `crypto.getRandomValues`, NEVER derived.
+- **Locale list is derived, never hardcoded**: languages.ts under packages/i18n is the single
+  source of truth for supported locales. Never hardcode a locale count or an enumerated locale
+  list anywhere — derive it. Run `bun run i18n:validate:all` after any locale change.
 
 ## Quality Gates (workers must run before pushing)
 

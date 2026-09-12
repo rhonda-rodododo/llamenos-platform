@@ -95,24 +95,18 @@ jobs:
 
       - name: Check for tracked generated files
         run: |
-          # These paths must NEVER be tracked in git — they are generated on-the-fly
+          # These paths must NEVER be tracked in git — they are generated on-the-fly.
+          # Android/iOS locale patterns are globs so they cover EVERY locale under
+          # packages/i18n/locales/ without hardcoding a per-locale list (a hardcoded
+          # list here previously only covered 13 of 22 locales and silently let the
+          # other 9 slip through this guard — see packages/i18n/languages.ts for the
+          # authoritative locale list).
           GENERATED_PATTERNS=(
             "packages/protocol/generated/"
             "packages/i18n/generated/"
             "apps/ios/Resources/Localizable/"
             "apps/android/app/src/main/res/values/strings.xml"
-            "apps/android/app/src/main/res/values-ar/strings.xml"
-            "apps/android/app/src/main/res/values-de/strings.xml"
-            "apps/android/app/src/main/res/values-es/strings.xml"
-            "apps/android/app/src/main/res/values-fr/strings.xml"
-            "apps/android/app/src/main/res/values-hi/strings.xml"
-            "apps/android/app/src/main/res/values-ht/strings.xml"
-            "apps/android/app/src/main/res/values-ko/strings.xml"
-            "apps/android/app/src/main/res/values-pt/strings.xml"
-            "apps/android/app/src/main/res/values-ru/strings.xml"
-            "apps/android/app/src/main/res/values-tl/strings.xml"
-            "apps/android/app/src/main/res/values-vi/strings.xml"
-            "apps/android/app/src/main/res/values-zh/strings.xml"
+            "apps/android/app/src/main/res/values-*/strings.xml"
             "apps/android/app/src/main/java/org/llamenos/i18n/I18n.kt"
             "apps/ios/Sources/Generated/LlamenosCore.swift"
             "apps/ios/LlamenosCoreFFI.xcframework/"
