@@ -7,8 +7,8 @@ apps/desktop/                       @rhonda-rodododo
 apps/worker/                        @rhonda-rodododo
 apps/ios/                           @rhonda-rodododo
 apps/android/                       @rhonda-rodododo
-apps/sip-bridge/                    @rhonda-rodododo
-apps/signal-notifier/               @rhonda-rodododo
+sip-bridge/                         @rhonda-rodododo
+signal-notifier/                    @rhonda-rodododo
 
 packages/crypto/                    @rhonda-rodododo
 packages/protocol/                  @rhonda-rodododo
