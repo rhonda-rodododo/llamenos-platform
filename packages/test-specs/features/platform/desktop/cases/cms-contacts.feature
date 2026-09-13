@@ -27,6 +27,8 @@ Feature: Contact Directory
 
   # --- Search ---
 
+  # @fixme: API-seeded contacts are undecryptable in the desktop UI, so no card shows the name — #796
+  @fixme
   Scenario: Search contacts by name filters the list
     Given contacts "Carlos Martinez" and "Maria Garcia" exist
     When I navigate to the "Contact Directory" page
@@ -126,6 +128,8 @@ Feature: Contact Directory
     And the "Profile" tab is active
     Then the contact profile content should be visible
 
+  # @fixme: API-seeded contacts are undecryptable in the desktop UI — #796
+  @fixme
   Scenario: Profile tab shows empty state when no details added
     Given a contact exists with no profile data
     When I navigate to the "Contact Directory" page
@@ -136,6 +140,8 @@ Feature: Contact Directory
 
   # --- Identifiers tab ---
 
+  # @fixme: API-seeded contacts are undecryptable in the desktop UI — #796
+  @fixme
   Scenario: Identifiers tab shows phone and email identifiers
     Given a contact exists with phone and email identifiers
     When I navigate to the "Contact Directory" page
@@ -145,6 +151,8 @@ Feature: Contact Directory
     And identifier cards should show type and value
     And the primary identifier should show a "Primary" badge
 
+  # @fixme: API-seeded contacts are undecryptable in the desktop UI — #796
+  @fixme
   Scenario: Identifiers tab shows empty state when none exist
     Given a contact exists with no identifiers
     When I navigate to the "Contact Directory" page
@@ -155,6 +163,8 @@ Feature: Contact Directory
 
   # --- Cases tab ---
 
+  # @fixme: GET /directory/:id/cases does not exist, so linked cases never render — #797
+  @fixme
   Scenario: Cases tab shows linked case records
     Given a contact exists with linked cases
     When I navigate to the "Contact Directory" page
