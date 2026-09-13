@@ -65,13 +65,24 @@ export const HIGH_IMPACT_PATHS: readonly string[] = [
 
   // The build's own trust base, and the reason this list gained entries in
   // the round that fixed the gate. The gate jobs install from the lockfile
-  // and run from the workflow definition; a PR editing any of these is a PR
-  // editing the machinery that judges it. `ci.yml` most of all — it is where
-  // "check out the base, not the head" is written down.
+  // and run from workflow definitions; a PR editing any of these is a PR
+  // editing the machinery that judges it or the supply chain around a
+  // release. Widened from the single `ci.yml` entry to the whole
+  // `.github/workflows/` directory (PR #794) to match what CODEOWNERS
+  // actually enforces — the impact classifier disagreeing with CODEOWNERS
+  // about which workflow files are high-impact is worse than a broad match.
   'package.json',
   'bun.lockb',
   'lefthook.yml',
-  '.github/workflows/ci.yml',
+  '.github/workflows/',
+  'knope.toml',
+
+  // Deanonymization surfaces (PR #794, matching CODEOWNERS): sip-bridge/
+  // routes PSTN calls and handles caller phone numbers; signal-notifier/
+  // does HMAC-hashed contact resolution. Both are top-level, NOT under
+  // apps/ despite what older docs say.
+  'sip-bridge/',
+  'signal-notifier/',
 
   // Auth, sessions, sigchain, identity: state a revert does not restore.
   // `.test.ts` siblings are listed explicitly — weakening the test is the
