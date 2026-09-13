@@ -7,27 +7,17 @@ import { When, Then } from '../fixtures'
 import { Timeouts } from '../../helpers'
 
 Then('I should see the erasure queue or empty state', async ({ page }) => {
-  await page.waitForLoadState('domcontentloaded')
-  // Wait for loading state to disappear first — the API call may take longer in CI
-  const loadingEl = page.getByTestId('erasure-loading')
-  await loadingEl.waitFor({ state: 'hidden', timeout: Timeouts.API }).catch(() => {})
-  const requestList = page.getByTestId('erasure-request-list')
-  const empty = page.getByTestId('erasure-empty')
-  const section = page.locator('[data-testid^="erasure-"]').first()
-  const hasList = await requestList.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  const hasEmpty = await empty.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  const hasSection = await section.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  expect(hasList || hasEmpty || hasSection).toBe(true)
+  // The section only mounts once its request list has loaded (erasure-loading renders
+  // until then), so either the list or the empty state proves the queue rendered.
+  const queue = page.getByTestId('erasure-queue')
+  await expect(
+    queue.getByTestId('erasure-request-list').or(queue.getByTestId('erasure-empty')),
+  ).toBeVisible({ timeout: Timeouts.API })
 })
 
 Then('I should see the erasure config form', async ({ page }) => {
-  await page.waitForLoadState('domcontentloaded')
-  // Erasure config section shows delay hours input
-  const form = page.locator('input[type="number"]').first()
-  const section = page.getByTestId('admin-section')
-  const hasForm = await form.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  const hasSection = await section.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  expect(hasForm || hasSection).toBe(true)
+  const config = page.getByTestId('erasure-config')
+  await expect(config.getByTestId('erasure-delay-input')).toBeVisible({ timeout: Timeouts.API })
 })
 
 Then('I should see the admin erase button', async ({ page }) => {

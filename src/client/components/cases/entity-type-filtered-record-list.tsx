@@ -46,18 +46,21 @@ export function EntityTypeFilteredRecordList({
   const [records, setRecords] = useState<CaseRecord[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [entityTypes, setEntityTypes] = useState<EntityTypeDefinition[]>([])
+  // null until listEntityTypes() settles — distinguishes "not loaded yet" from
+  // "hub has no entity types of this category", so the empty state never renders
+  // before the real record list has been fetched.
+  const [entityTypes, setEntityTypes] = useState<EntityTypeDefinition[] | null>(null)
   const [cmsEnabled, setCmsEnabled] = useState<boolean | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
 
   const filteredEntityTypes = useMemo(
-    () => entityTypes.filter(et => et.category === entityCategory && !et.isArchived),
+    () => (entityTypes ?? []).filter(et => et.category === entityCategory && !et.isArchived),
     [entityTypes, entityCategory],
   )
 
   const entityTypeMap = useMemo(
-    () => new Map(entityTypes.map(et => [et.id, et])),
+    () => new Map((entityTypes ?? []).map(et => [et.id, et])),
     [entityTypes],
   )
 
@@ -73,10 +76,11 @@ export function EntityTypeFilteredRecordList({
 
     listEntityTypes()
       .then(({ entityTypes: types }) => setEntityTypes(types.filter(et => !et.isArchived)))
-      .catch(() => {})
+      .catch(() => setEntityTypes([]))
   }, [])
 
   const fetchRecords = useCallback(() => {
+    if (entityTypes === null) return
     if (filteredEntityTypes.length === 0) {
       setLoading(false)
       return
@@ -92,7 +96,7 @@ export function EntityTypeFilteredRecordList({
         toast(t(`${i18nPrefix}.loadError`, { defaultValue: 'Failed to load records' }), 'error'),
       )
       .finally(() => setLoading(false))
-  }, [filteredEntityTypes, toast, t, i18nPrefix])
+  }, [entityTypes, filteredEntityTypes, toast, t, i18nPrefix])
 
   useEffect(() => { fetchRecords() }, [fetchRecords])
 

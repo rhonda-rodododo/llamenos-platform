@@ -32,20 +32,25 @@ export function AssignmentDialog({
 }: AssignmentDialogProps) {
   const { t } = useTranslation()
   const { toast } = useToast()
-  const [suggestions, setSuggestions] = useState<AssignmentSuggestion[]>([])
-  const [loading, setLoading] = useState(false)
+  // null = not loaded for the current open. Starting (and resetting on close) at null
+  // means the dialog never renders the "no suggestions" state, or a previous record's
+  // suggestions, before this record's fetch has settled.
+  const [suggestions, setSuggestions] = useState<AssignmentSuggestion[] | null>(null)
   const [assigning, setAssigning] = useState<string | null>(null)
 
   // Fetch suggestions when dialog opens
   useEffect(() => {
+    setSuggestions(null)
     if (!open || !recordId) return
-    setLoading(true)
+    let cancelled = false
     getAssignmentSuggestions(recordId)
-      .then(({ suggestions: s }) => setSuggestions(s))
+      .then(({ suggestions: s }) => { if (!cancelled) setSuggestions(s) })
       .catch(() => {
+        if (cancelled) return
+        setSuggestions([])
         toast(t('cases.suggestError', { defaultValue: 'Failed to load suggestions' }), 'error')
       })
-      .finally(() => setLoading(false))
+    return () => { cancelled = true }
   }, [open, recordId, t, toast])
 
   const handleAssign = useCallback(async (pubkey: string) => {
@@ -75,7 +80,7 @@ export function AssignmentDialog({
         </DialogHeader>
 
         <div className="space-y-2 max-h-80 overflow-y-auto">
-          {loading ? (
+          {suggestions === null ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>

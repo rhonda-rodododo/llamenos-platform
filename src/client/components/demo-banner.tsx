@@ -25,7 +25,7 @@ export function DemoBanner() {
     : t('demo.bannerText', { defaultValue: "You're exploring the Ll\u00e1menos demo. Data resets daily." })
 
   return (
-    <div className="flex items-center justify-between gap-2 border-b border-primary/20 bg-primary/5 px-4 py-2 text-sm">
+    <div data-testid="demo-banner" className="flex items-center justify-between gap-2 border-b border-primary/20 bg-primary/5 px-4 py-2 text-sm">
       <p className="flex items-center gap-2 text-muted-foreground">
         <span className="shrink-0 text-base">&#10024;</span>
         <span>
@@ -43,6 +43,7 @@ export function DemoBanner() {
         </span>
       </p>
       <button
+        data-testid="dismiss-demo-banner"
         onClick={handleDismiss}
         className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
         aria-label={t('common.dismiss', { defaultValue: 'Dismiss' })}

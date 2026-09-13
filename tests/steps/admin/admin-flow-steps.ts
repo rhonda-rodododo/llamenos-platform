@@ -14,6 +14,7 @@ import {
   listShiftsViaApi,
   listBansViaApi,
 } from '../../api-helpers'
+import { expandSettingsSection } from '../common/ui-helpers'
 
 // --- Volunteer CRUD ---
 
@@ -221,29 +222,15 @@ Then('the clear filters button should not be visible', async ({ page }) => {
 // --- Settings toggles ---
 
 Then('I should see at least one toggle switch', async ({ page }) => {
-  // Hub settings sections are collapsible — expand any collapsed sections to reveal switches.
-  // Use count() (DOM presence) rather than isVisible() to determine expansion state:
-  // Radix collapsible animates from height:0, so the [data-state="open"] element exists in
-  // the DOM immediately but has zero dimensions during animation — isVisible() would falsely
-  // return false and trigger a collapse of an already-expanded section.
-  const sections = page.locator('[data-testid][data-settings-section]')
-  const sectionCount = await sections.count()
-  for (let i = 0; i < sectionCount; i++) {
-    const section = sections.nth(i)
-    const openCount = await section.locator('[data-state="open"]').count()
-    const isExpanded = openCount > 0
-    if (!isExpanded) {
-      // Click the trigger element using data-testid pattern "{id}-trigger"
-      const sectionTestId = await section.getAttribute('data-testid')
-      if (sectionTestId) {
-        await section.getByTestId(`${sectionTestId}-trigger`).click().catch(() => {})
-      }
-    }
+  // Hub settings sections are collapsible; expand every section so their switches render.
+  const sections = page.locator('[data-settings-section]')
+  await expect(sections.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const sectionIds = await sections.evaluateAll(els => els.map(el => el.getAttribute('data-testid')))
+  for (const id of sectionIds) {
+    expect(id, 'every SettingsSection carries its id as data-testid').toBeTruthy()
+    await expandSettingsSection(page, id!)
   }
-  const switches = page.getByRole('switch')
-  await expect(switches.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
-  const count = await switches.count()
-  expect(count).toBeGreaterThan(0)
+  await expect(page.getByRole('switch').first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 // --- Language switching ---
@@ -269,10 +256,8 @@ Then('the transcription card should be visible', async ({ page }) => {
 })
 
 Then('at least one status summary should be visible', async ({ page }) => {
-  const statusCount = await page
-    .getByText(
-      /(Enabled|Disabled|Not configured|Not required|languages|fields|None|CAPTCHA|Default|Customized)/i,
-    )
-    .count()
-  expect(statusCount).toBeGreaterThan(0)
+  const summary = page.getByText(
+    /(Enabled|Disabled|Not configured|Not required|languages|fields|None|CAPTCHA|Default|Customized)/i,
+  )
+  await expect(summary.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })

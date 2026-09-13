@@ -7,35 +7,22 @@ import { Then } from '../fixtures'
 import { Timeouts } from '../../helpers'
 
 Then('I should see the erasure request button or pending state', async ({ page }) => {
-  const available = page.getByTestId('erasure-available')
-  const pending = page.getByTestId('erasure-pending')
-  const completed = page.getByTestId('erasure-completed')
-  // One of these states should be visible after loading
-  await Promise.race([
-    available.waitFor({ state: 'visible', timeout: Timeouts.API }),
-    pending.waitFor({ state: 'visible', timeout: Timeouts.API }),
-    completed.waitFor({ state: 'visible', timeout: Timeouts.API }),
-  ]).catch(() => {
-    // If none visible, still loading or API unavailable — check page loaded
-  })
-  const anyVisible =
-    (await available.isVisible().catch(() => false)) ||
-    (await pending.isVisible().catch(() => false)) ||
-    (await completed.isVisible().catch(() => false)) ||
-    (await page.getByTestId('account-erasure').isVisible().catch(() => false))
-  expect(anyVisible).toBe(true)
+  // Waits for the section to leave its loading state and render one of its three
+  // terminal states. `.or()` keeps this a single retrying assertion — no snapshot probes.
+  const section = page.getByTestId('account-erasure')
+  const settled = section.getByTestId('erasure-available')
+    .or(section.getByTestId('erasure-pending'))
+    .or(section.getByTestId('erasure-completed'))
+  await expect(settled).toBeVisible({ timeout: Timeouts.API })
 })
 
 Then('I should see the erasure available state or pending state', async ({ page }) => {
-  // Allow time for the API call to complete
-  await page.waitForLoadState('domcontentloaded')
-  const available = page.getByTestId('erasure-available')
-  const pending = page.getByTestId('erasure-pending')
+  // Background logs in a freshly created volunteer, who cannot have an erasure request
+  // yet, so the only correct terminal state is "available" with the request button.
   const section = page.getByTestId('account-erasure')
-  const isAvailable = await available.isVisible({ timeout: Timeouts.API }).catch(() => false)
-  const isPending = await pending.isVisible({ timeout: 2000 }).catch(() => false)
-  const isSectionVisible = await section.isVisible({ timeout: 2000 }).catch(() => false)
-  expect(isAvailable || isPending || isSectionVisible).toBe(true)
+  await expect(section.getByTestId('erasure-available')).toBeVisible({ timeout: Timeouts.API })
+  await expect(section.getByTestId('erasure-request-btn')).toBeVisible()
+  await expect(section.getByTestId('erasure-pending')).toHaveCount(0)
 })
 
 Then('the account erasure section should be visible', async ({ page }) => {
