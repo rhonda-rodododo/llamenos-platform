@@ -185,10 +185,12 @@ Then('a contact card for {string} should not be visible', async ({ page }, name:
   await expect(card).toHaveCount(0, { timeout: Timeouts.ELEMENT })
 })
 
-Then('both {string} and {string} should be visible', async ({ page }, _name1: string, _name2: string) => {
-  // Accept if at least some contacts are visible
-  const anyCard = page.getByTestId('directory-contact-card').first()
-  await expect(anyCard).toBeVisible({ timeout: Timeouts.ELEMENT })
+Then('both {string} and {string} should be visible', async ({ page }, name1: string, name2: string) => {
+  // Both named contacts must be visible, not just any card in the list.
+  const card1 = page.getByTestId('directory-contact-card').filter({ hasText: name1 })
+  const card2 = page.getByTestId('directory-contact-card').filter({ hasText: name2 })
+  await expect(card1.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(card2.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('the contact list should show {string}', async ({ page }, message: string) => {

@@ -250,8 +250,10 @@ Then('default statuses {string} and {string} should be pre-populated', async ({ 
   const rows = page.getByTestId('status-row')
   const count = await rows.count()
   expect(count).toBeGreaterThanOrEqual(2)
-  // Use exact match to avoid matching the value badge (lowercase) in addition to the label
-  await expect(rows.first().getByText(s1, { exact: true })).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // Use exact match to avoid matching the value badge (lowercase) in addition to the label.
+  // Both defaults must be pre-populated, not just whichever sorts first.
+  await expect(rows.filter({ hasText: s1 }).first().getByText(s1, { exact: true })).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(rows.filter({ hasText: s2 }).first().getByText(s2, { exact: true })).toBeVisible({ timeout: Timeouts.ELEMENT })
   // Go back to general tab
   await page.getByTestId('entity-tab-general').click()
 })
@@ -319,10 +321,13 @@ When('I fill in the field label {string}', async ({ page }, label: string) => {
   await page.getByTestId('entity-field-label-input').fill(label)
 })
 
-Then('the field name should auto-populate with {string}', async ({ page }, _expected: string) => {
-  // The field name auto-populates from the label — check the DOM for the name value
-  // The auto-generated name is stored in the editingField state, not in a visible input by default
-  // Accept as passing if the label input has the expected value
+Then('the field name should auto-populate with {string}', async ({ page }) => {
+  // The auto-generated field name lives in `editingField.name` in
+  // src/client/components/admin-settings/case-management-section.tsx (outside this
+  // worker's owned paths — src/client/components/cases/ only) and is never rendered
+  // to the DOM under any testid, before or after save, so the captured value can't
+  // be asserted from here without an app change there. Left as a follow-up; assert
+  // what is observable instead: the label the auto-population is driven by.
   const labelInput = page.getByTestId('entity-field-label-input')
   const value = await labelInput.inputValue()
   expect(value.length).toBeGreaterThan(0)
