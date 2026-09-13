@@ -42,9 +42,18 @@ Then('I should see the {string} call filter chip', async ({ page }, filterName: 
 })
 
 When('I tap the {string} call filter chip', async ({ page }, filterName: string) => {
-  const filterChip = page.getByText(new RegExp(filterName, 'i'))
-  const isVisible = await filterChip.first().isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (isVisible) {
+  // Desktop call history has no per-status chips (search + date filters only — see the
+  // sibling Then step above); this step is shared with iOS/Android, where the chip is
+  // real. Was: `isVisible({ timeout })` — ignored on Playwright's `isVisible()`, so this
+  // returned immediately rather than waiting, racing the page load on platforms that DO
+  // have the chip — and matched on an unanchored substring, so filterName "All" matched
+  // the sidebar's "Call Notes" nav link. Word-boundary the match, then wait for a settled
+  // state (the chip, or confirmation the page itself has loaded) instead of guessing, and
+  // click only if the chip actually exists.
+  const filterChip = page.getByText(new RegExp(`\\b${filterName}\\b`, 'i')).filter({ visible: true })
+  const pageTitle = page.getByTestId(TestIds.PAGE_TITLE)
+  await expect(filterChip.first().or(pageTitle)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  if (await filterChip.count() > 0) {
     await filterChip.first().click()
   }
 })
@@ -133,8 +142,10 @@ Then('I should see the date to filter', async ({ page }) => {
 })
 
 Given('a date range is selected', async ({ page }) => {
-  // Fill in date range
+  // Fill in date range. Was: filled `.first()`/`.nth(1)` with no assertion that exactly
+  // the expected from/to pair had rendered — a scoped wait replaces the blind assumption.
   const dateInputs = page.locator('input[type="date"]')
+  await expect(dateInputs).toHaveCount(2, { timeout: Timeouts.ELEMENT })
   await dateInputs.first().fill('2024-01-01')
   await dateInputs.nth(1).fill('2024-12-31')
 })

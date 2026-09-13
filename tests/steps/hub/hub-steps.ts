@@ -70,13 +70,14 @@ When('I submit the create hub form', async ({ page }) => {
   const submitBtn = page.getByTestId('create-hub-submit')
     .or(page.getByTestId(TestIds.FORM_SUBMIT_BTN))
     .or(page.getByTestId(TestIds.FORM_SAVE_BTN))
-  const isBtnVisible = await submitBtn.first().isVisible({ timeout: 3000 }).catch(() => false)
-  if (isBtnVisible) {
-    await submitBtn.first().click()
-    return
-  }
-  // Fallback: submit/save/create button
-  await page.getByRole('button', { name: /create|save|submit/i }).first().click()
+    .or(page.getByRole('button', { name: /create|save|submit/i }))
+  const visible = submitBtn.filter({ visible: true })
+  // Wait for exactly one visible candidate across all tiers instead of probing the
+  // testid tier with a short timeout and silently falling back to an unscoped role
+  // query on failure — that fallback could match an unrelated "Save"/"Create" button
+  // elsewhere on the page and submit the wrong write.
+  await expect(visible).toHaveCount(1, { timeout: Timeouts.ELEMENT })
+  await visible.click()
 })
 
 Then('each hub card should display a member count', async ({ page }) => {

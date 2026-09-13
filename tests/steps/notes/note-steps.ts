@@ -211,7 +211,9 @@ Then('I should see the note edit button', async ({ page }) => {
 })
 
 When('I tap the note edit button', async ({ page }) => {
-  await page.getByTestId(TestIds.NOTE_EDIT_BTN).first().click()
+  const editBtn = page.getByTestId(TestIds.NOTE_EDIT_BTN).first()
+  await expect(editBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await editBtn.click()
 })
 
 Then('I should see the note edit input', async ({ page }) => {

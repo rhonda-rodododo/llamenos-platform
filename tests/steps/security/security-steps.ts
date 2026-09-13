@@ -6,6 +6,7 @@
  */
 import { expect } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
+import { Timeouts } from '../../helpers'
 
 // ── HTTPS Enforcement ──────────────────────────────────────────────
 
@@ -36,9 +37,15 @@ When('I enter hub URL {string}', async ({ page }, url: string) => {
 When('I submit the form', async ({ page }) => {
   const submitBtn = page.getByTestId('setup-next-btn')
     .or(page.getByRole('button', { name: /next|submit|continue|save/i }))
+  const visible = submitBtn.filter({ visible: true })
+  // Wait for exactly one visible candidate instead of blindly taking `.first()` —
+  // `force: true` below skips Playwright's own actionability wait (needed to click a
+  // disabled button), so without this assertion a hidden or ambiguous match could be
+  // force-clicked, silently no-op'ing the submit.
+  await expect(visible).toHaveCount(1, { timeout: Timeouts.ELEMENT })
   // If button is disabled (validation prevents submit), attempt click anyway —
   // Playwright clicks disabled buttons without error, but no navigation occurs.
-  await submitBtn.first().click({ force: true })
+  await visible.click({ force: true })
 })
 
 Then('I should see an error about insecure connection', async ({ page }) => {
