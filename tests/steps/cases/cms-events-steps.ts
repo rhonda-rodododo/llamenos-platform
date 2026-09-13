@@ -182,9 +182,16 @@ Given('an event {string} exists', async ({ backendRequest: request, casesWorld, 
   casesWorld.lastEventName = eventName
 })
 
-When('I click on the {string} event card', async ({ page }, eventName: string) => {
-  // Event cards are rendered as case cards — find by text content
-  const card = page.getByTestId('case-card').first()
+When('I click on the {string} event card', async ({ page, backendRequest: request, casesWorld, workerHub }, eventName: string) => {
+  // Records don't render the free-text event name from the Given — they show an
+  // auto-generated case number (same as "I view the event detail" below). Verify
+  // the Gherkin text names this scenario's event, then open the card by identifier
+  // rather than "first card", which is unreliable once the worker hub accumulates
+  // events across scenarios.
+  expect(eventName).toBe(casesWorld.lastEventName)
+  const event = await getRecordViaApi(request, casesWorld.lastEventId, workerHub)
+  const label = (event as { caseNumber?: string | null }).caseNumber || casesWorld.lastEventId.slice(0, 8)
+  const card = page.getByTestId('case-list').getByTestId('case-card').filter({ hasText: label })
   await expect(card).toBeVisible({ timeout: Timeouts.ELEMENT })
   await card.click()
 })
@@ -359,8 +366,17 @@ When('I change the event status to {string}', async ({ page }, newStatus: string
   await option.click()
 })
 
-Then('the event status should reflect {string}', async ({ page }, status: string) => {
+Then('the event status should reflect {string}', async ({ page, backendRequest: request, casesWorld, workerHub }, status: string) => {
   // The pill re-renders with the new label only after the status write succeeds.
   const pill = page.getByTestId('case-detail-header').getByTestId('case-status-pill')
   await expect(pill).toHaveText(new RegExp(status, 'i'), { timeout: Timeouts.ELEMENT })
+
+  // The pill alone only proves local React state changed — the earlier bug here
+  // (onStatusChange called fetchRecords() instead of updateRecord, so the change
+  // was silently dropped) rendered the same pill text without ever writing the
+  // status. Re-read the record through the real API to prove it persisted server-side.
+  // Gherkin uses the status value for the write ("completed") and its display
+  // label for the pill assertion above ("Completed") — compare case-insensitively.
+  const record = await getRecordViaApi(request, casesWorld.lastEventId, workerHub)
+  expect((record as { statusHash?: string }).statusHash?.toLowerCase()).toBe(status.toLowerCase())
 })
