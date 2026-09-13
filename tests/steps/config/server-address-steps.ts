@@ -70,7 +70,9 @@ Given('the desktop app is now simulating a packaged build connected to its own o
     (window as unknown as Record<string, unknown>).__TEST_SIMULATE_PACKAGED_TAURI__ = true
   })
   await page.evaluate(async (appOrigin) => {
-    await window.__TEST_API_CONFIG.setApiBase(appOrigin)
+    const apiConfig = (window as unknown as Record<string, unknown>).__TEST_API_CONFIG as
+      { setApiBase: (url: string) => Promise<void> }
+    await apiConfig.setApiBase(appOrigin)
     ;(window as unknown as Record<string, unknown>).__TEST_SIMULATE_PACKAGED_TAURI__ = true
   }, origin)
 })
@@ -224,7 +226,9 @@ When('I open the settings server address section', async ({ page }) => {
   // In-app navigation, not page.goto: a full reload would lock the device key
   // and bounce to the unlock screen before Settings is reachable.
   await page.evaluate(() => {
-    void window.__TEST_ROUTER.navigate({ to: '/settings', search: { section: 'server-connection' } })
+    const router = (window as unknown as Record<string, unknown>).__TEST_ROUTER as
+      { navigate: (opts: { to: string; search: Record<string, string> }) => Promise<void> }
+    void router.navigate({ to: '/settings', search: { section: 'server-connection' } })
   })
   await expect(page.getByTestId(TestIds.SETTINGS_SERVER_ADDRESS_INPUT)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })

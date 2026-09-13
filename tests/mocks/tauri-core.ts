@@ -554,7 +554,7 @@ function netBytesToBase64(bytes: Uint8Array): string {
   return btoa(binary)
 }
 
-function netBase64ToBytes(b64: string): Uint8Array {
+function netBase64ToBytes(b64: string): Uint8Array<ArrayBuffer> {
   const binary = atob(b64)
   const bytes = new Uint8Array(binary.length)
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
@@ -1136,14 +1136,13 @@ const commands: Record<string, CommandHandler> = {
     if (nonceBuf.length !== 32) throw new Error(`nonce must be 32 bytes, got ${nonceBuf.length}`)
 
     // Canonical ordering: min first (matches Rust)
-    let first: Uint8Array, second: Uint8Array
     let aFirst = true
     for (let i = 0; i < 32; i++) {
       if (pkA[i] < pkB[i]) { aFirst = true; break }
       if (pkA[i] > pkB[i]) { aFirst = false; break }
     }
-    first = aFirst ? pkA : pkB
-    second = aFirst ? pkB : pkA
+    const first = aFirst ? pkA : pkB
+    const second = aFirst ? pkB : pkA
 
     // Input key material: min_pubkey || max_pubkey || nonce
     const ikm = new Uint8Array(96)
