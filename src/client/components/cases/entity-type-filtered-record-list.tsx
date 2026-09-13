@@ -4,6 +4,7 @@ import { useToast } from '@/lib/toast'
 import {
   listRecords,
   listEntityTypes,
+  updateRecord,
   getCaseManagementEnabled,
   type CaseRecord,
   type EntityTypeDefinition,
@@ -101,6 +102,18 @@ export function EntityTypeFilteredRecordList({
     setSelectedId(recordId)
   }, [fetchRecords])
 
+  const handleStatusChange = useCallback(async (recordId: string, newStatusValue: string) => {
+    try {
+      await updateRecord(recordId, { statusHash: newStatusValue })
+      setRecords(prev =>
+        prev.map(r => r.id === recordId ? { ...r, statusHash: newStatusValue, updatedAt: new Date().toISOString() } : r),
+      )
+      toast(t('cases.statusUpdated', { defaultValue: 'Status updated' }))
+    } catch {
+      toast(t('cases.statusUpdateError', { defaultValue: 'Failed to update status' }), 'error')
+    }
+  }, [toast, t])
+
   if (cmsEnabled === false) {
     return (
       <div className="space-y-4">
@@ -185,7 +198,7 @@ export function EntityTypeFilteredRecordList({
               <CaseDetail
                 record={selectedRecord}
                 entityType={selectedEntityType}
-                onStatusChange={() => fetchRecords()}
+                onStatusChange={handleStatusChange}
                 onBack={() => setSelectedId(null)}
               />
             ) : (
