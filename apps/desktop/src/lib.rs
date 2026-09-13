@@ -1,8 +1,10 @@
 mod crypto;
+mod net;
 
 use tauri::{Emitter, Manager};
 
 use crate::crypto::CryptoState;
+use crate::net::WsRegistry;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -45,6 +47,8 @@ pub fn run() {
     builder
         // Register CryptoState as managed state (v3: Ed25519 + X25519 device keys)
         .manage(CryptoState::new())
+        // Registry of live Rust-proxied WebSocket connections (#739)
+        .manage(WsRegistry::default())
         .setup(|app| {
             // System tray setup
             use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
@@ -199,6 +203,14 @@ pub fn run() {
             crypto::provision_create_session,
             crypto::provision_compute_sas,
             crypto::provision_decrypt_and_import,
+            // Runtime-enforced network egress (#739) — the webview's CSP connect-src
+            // allows only `ipc:`; all HTTP/WS traffic to the configured backend goes
+            // through these commands instead of a browser fetch/WebSocket.
+            net::net_fetch,
+            net::net_probe_health,
+            net::net_ws_connect,
+            net::net_ws_send,
+            net::net_ws_close,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

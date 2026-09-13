@@ -12,6 +12,7 @@ if (!import.meta.env.PLAYWRIGHT_TEST) {
   throw new Error('FATAL: Tauri IPC mock loaded outside test environment.')
 }
 
+import { Store } from './tauri-store'
 import { ed25519 } from '@noble/curves/ed25519.js'
 import { x25519 } from '@noble/curves/ed25519.js'
 import { hkdf } from '@noble/hashes/hkdf.js'
@@ -428,6 +429,96 @@ function shamirCombineInternal(shareObjs: Array<{ x: number; y: string }>): stri
 }
 
 // ── Types ─────────────────────────────────────────────────────────────
+
+// ── Runtime-enforced network egress mock (#739) ─────────────────────
+//
+// Mirrors apps/desktop/src/net.rs: reads the SAME persisted store
+// (llamenos-api-config.json / apiBaseUrl) and enforces the SAME allowlist
+// logic, but performs the request with a real browser `fetch`/`WebSocket`
+// instead of Rust's reqwest/tokio-tungstenite. This lets Playwright tests
+// exercise the full chain (UI → api-config → net.ts → IPC → real network
+// request) end-to-end against a real, separately-bound test server — see
+// tests/steps/config/.
+//
+// NOTE: unlike the real Rust path (a native HTTP/WS client with no CORS
+// concept), this mock's `fetch`/`WebSocket` calls run in a real browser and
+// ARE subject to CORS/browser security. A test server used to prove
+// cross-origin delivery must send `Access-Control-Allow-Origin` — that is a
+// test-harness requirement only, not something the production backend needs.
+
+const CONFIG_STORE_NAME = 'llamenos-api-config.json'
+const CONFIG_KEY = 'apiBaseUrl'
+
+async function mockConfiguredOrigin(): Promise<URL> {
+  const store = await Store.load(CONFIG_STORE_NAME)
+  const raw = await store.get<string>(CONFIG_KEY)
+  if (!raw) throw new Error('no backend server configured')
+  return new URL(raw)
+}
+
+function defaultPortFor(protocol: string): string {
+  return protocol === 'https:' || protocol === 'wss:' ? '443' : '80'
+}
+
+function parentDomain(host: string): string | null {
+  const labels = host.split('.')
+  if (labels.length < 2) return null
+  return labels.slice(-2).join('.').toLowerCase()
+}
+
+function sameOrSiblingHost(configuredHost: string, candidateHost: string): boolean {
+  if (configuredHost.toLowerCase() === candidateHost.toLowerCase()) return true
+  const a = parentDomain(configuredHost)
+  const b = parentDomain(candidateHost)
+  return !!a && !!b && a === b
+}
+
+async function mockCheckHttpAllowed(target: URL): Promise<void> {
+  const configured = await mockConfiguredOrigin()
+  const sameScheme = target.protocol === configured.protocol
+  const sameHost = target.hostname.toLowerCase() === configured.hostname.toLowerCase()
+  const samePort = (target.port || defaultPortFor(target.protocol)) === (configured.port || defaultPortFor(configured.protocol))
+  if (!(sameScheme && sameHost && samePort)) {
+    throw new Error(`blocked: ${target.origin} is not the configured backend (${configured.origin})`)
+  }
+}
+
+async function mockCheckWsAllowed(target: URL): Promise<void> {
+  const configured = await mockConfiguredOrigin()
+  const expectedProtocol = configured.protocol === 'https:' ? 'wss:' : 'ws:'
+  if (target.protocol !== expectedProtocol) {
+    throw new Error(`blocked: expected ${expectedProtocol}// for the configured backend, got ${target.protocol}//`)
+  }
+  if (!sameOrSiblingHost(configured.hostname, target.hostname)) {
+    throw new Error(`blocked: ${target.hostname} is not the configured backend or a sibling host of it`)
+  }
+}
+
+function netBytesToBase64(bytes: Uint8Array): string {
+  let binary = ''
+  const chunkSize = 0x8000
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize))
+  }
+  return btoa(binary)
+}
+
+function netBase64ToBytes(b64: string): Uint8Array {
+  const binary = atob(b64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  return bytes
+}
+
+/** Emits a `net-ws:<id>` payload to listeners registered via net.ts's `listenNetWs` (PLAYWRIGHT_TEST branch). */
+function emitNetWsEvent(id: string, payload: unknown): void {
+  const win = window as unknown as Record<string, unknown>
+  const map = (win.__NET_WS_LISTENERS__ ?? {}) as Record<string, Array<(p: unknown) => void>>
+  const channel = `net-ws:${id}`
+  for (const handler of map[channel] ?? []) handler(payload)
+}
+
+const mockWsConnections = new Map<string, WebSocket>()
 
 type Args = Record<string, unknown>
 type CommandHandler = (a: Args) => unknown | Promise<unknown>
@@ -1242,6 +1333,77 @@ const commands: Record<string, CommandHandler> = {
     const cipher = gcm(mockHubKey, nonce, aad)
     const plaintext = cipher.decrypt(ciphertext)
     return new TextDecoder().decode(plaintext)
+  },
+
+  // --- Runtime-enforced network egress (#739) — mirrors apps/desktop/src/net.rs ---
+
+  net_fetch: async (a) => {
+    const method = a.method as string
+    const url = a.url as string
+    const headers = (a.headers ?? {}) as Record<string, string>
+    const bodyBase64 = a.bodyBase64 as string | null | undefined
+
+    const target = new URL(url)
+    await mockCheckHttpAllowed(target)
+
+    const init: RequestInit = { method, headers }
+    if (bodyBase64) init.body = netBase64ToBytes(bodyBase64)
+
+    const res = await fetch(url, init)
+    const outHeaders: Record<string, string> = {}
+    res.headers.forEach((value, key) => { outHeaders[key] = value })
+    const bytes = new Uint8Array(await res.arrayBuffer())
+    return { status: res.status, headers: outHeaders, bodyBase64: netBytesToBase64(bytes) }
+  },
+
+  net_probe_health: async (a) => {
+    const url = a.url as string
+    const target = new URL(url)
+    if (target.protocol !== 'http:' && target.protocol !== 'https:') {
+      throw new Error('only http/https addresses are supported')
+    }
+    target.pathname = '/api/health'
+    target.search = ''
+
+    const res = await fetch(target.toString())
+    const bytes = new Uint8Array(await res.arrayBuffer())
+    return { status: res.status, headers: {}, bodyBase64: netBytesToBase64(bytes) }
+  },
+
+  net_ws_connect: async (a) => {
+    const id = a.id as string
+    const url = a.url as string
+    const target = new URL(url)
+    await mockCheckWsAllowed(target)
+
+    const ws = new WebSocket(url)
+    mockWsConnections.set(id, ws)
+    ws.addEventListener('open', () => emitNetWsEvent(id, { type: 'open' }))
+    ws.addEventListener('message', (e) => {
+      emitNetWsEvent(id, { type: 'message', data: typeof e.data === 'string' ? e.data : '' })
+    })
+    ws.addEventListener('close', (e) => {
+      emitNetWsEvent(id, { type: 'close', code: e.code, reason: e.reason })
+      mockWsConnections.delete(id)
+    })
+    ws.addEventListener('error', () => emitNetWsEvent(id, { type: 'error', message: 'websocket error' }))
+  },
+
+  net_ws_send: async (a) => {
+    const id = a.id as string
+    const data = a.data as string
+    const ws = mockWsConnections.get(id)
+    if (!ws) throw new Error('no such WebSocket connection')
+    ws.send(data)
+  },
+
+  net_ws_close: async (a) => {
+    const id = a.id as string
+    const ws = mockWsConnections.get(id)
+    if (ws) {
+      ws.close()
+      mockWsConnections.delete(id)
+    }
   },
 }
 

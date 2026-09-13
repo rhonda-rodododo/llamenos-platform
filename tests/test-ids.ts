@@ -302,6 +302,15 @@ export const TestIds = {
   SUCCESS_TOAST: 'success-toast',
   IMPORT_CSV: 'import-csv',
   BACK_BTN: 'back-btn',
+
+  // ============ Server Address (#738/#739) ============
+  SERVER_ADDRESS_TITLE: 'server-address-title',
+  SERVER_ADDRESS_INPUT: 'server-address-input',
+  SERVER_ADDRESS_SUBMIT: 'server-address-submit',
+  SERVER_ADDRESS_ERROR: 'server-address-error',
+  SETTINGS_SERVER_ADDRESS_INPUT: 'settings-server-address-input',
+  SETTINGS_SERVER_ADDRESS_SUBMIT: 'settings-server-address-submit',
+  SETTINGS_SERVER_ADDRESS_ERROR: 'settings-server-address-error',
 } as const
 
 export type TestId = (typeof TestIds)[keyof typeof TestIds]
