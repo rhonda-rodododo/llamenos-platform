@@ -54,7 +54,7 @@ sealed class PinLockoutState {
 @Singleton
 class KeystoreService @Inject constructor(
     @ApplicationContext private val context: Context,
-) : KeyValueStore {
+) : KeyValueStore, BiometricKeyStore {
 
     private val masterKey: MasterKey by lazy {
         try {
@@ -242,7 +242,7 @@ class KeystoreService @Inject constructor(
      *
      * Call this during biometric enrollment (when the user first enables biometric unlock).
      */
-    fun storePINForBiometric(cipher: Cipher, pin: String) {
+    override fun storePINForBiometric(cipher: Cipher, pin: String) {
         val encrypted = cipher.doFinal(pin.toByteArray(Charsets.UTF_8))
         val iv = cipher.iv
         prefs.edit()
@@ -255,7 +255,7 @@ class KeystoreService @Inject constructor(
      * Decrypt the stored PIN using the [Cipher] from a successful [BiometricPrompt] auth
      * (in decryption mode). Returns null if no biometric PIN has been stored.
      */
-    fun decryptPINWithBiometric(cipher: Cipher): String? {
+    override fun decryptPINWithBiometric(cipher: Cipher): String? {
         val encryptedB64 = prefs.getString(KEY_BIOMETRIC_ENCRYPTED_PIN, null) ?: return null
         val encrypted = android.util.Base64.decode(encryptedB64, android.util.Base64.NO_WRAP)
         return String(cipher.doFinal(encrypted), Charsets.UTF_8)
@@ -264,7 +264,7 @@ class KeystoreService @Inject constructor(
     /**
      * Whether a biometric-protected PIN is stored.
      */
-    fun hasBiometricPIN(): Boolean = prefs.contains(KEY_BIOMETRIC_ENCRYPTED_PIN)
+    override fun hasBiometricPIN(): Boolean = prefs.contains(KEY_BIOMETRIC_ENCRYPTED_PIN)
 
     /**
      * Create (or get existing) the AndroidKeystore AES-256-GCM key for biometric PIN encryption.
@@ -313,23 +313,70 @@ class KeystoreService @Inject constructor(
     /**
      * Get a [Cipher] initialized for encryption with the biometric key.
      * Pass this Cipher as the [BiometricPrompt.CryptoObject] for biometric enrollment.
+     *
+     * If a key from a prior enrollment was invalidated by a biometric change
+     * (new fingerprint/face enrolled, or all biometrics removed), it is wiped
+     * and a fresh key is minted — a new enrollment should never be blocked by
+     * stale material left over from an old one.
      */
-    fun getBiometricEncryptCipher(): Cipher {
-        val key = getOrCreateBiometricKey()
-        return Cipher.getInstance(BIOMETRIC_TRANSFORMATION).also { it.init(Cipher.ENCRYPT_MODE, key) }
+    override fun getBiometricEncryptCipher(): Cipher {
+        return try {
+            initEncryptCipher(getOrCreateBiometricKey())
+        } catch (_: android.security.keystore.KeyPermanentlyInvalidatedException) {
+            clearBiometricKeyMaterial()
+            initEncryptCipher(getOrCreateBiometricKey())
+        }
     }
+
+    private fun initEncryptCipher(key: SecretKey): Cipher =
+        Cipher.getInstance(BIOMETRIC_TRANSFORMATION).also { it.init(Cipher.ENCRYPT_MODE, key) }
 
     /**
      * Get a [Cipher] initialized for decryption using the stored IV.
      * Pass this Cipher as the [BiometricPrompt.CryptoObject] for biometric unlock.
      * Returns null if no biometric PIN IV is stored.
+     *
+     * @throws BiometricKeyInvalidatedException if a PIN is enrolled but the
+     *   AndroidKeystore key was invalidated by a biometric change since it
+     *   was created (`setInvalidatedByBiometricEnrollment(true)`). The stale
+     *   enrollment is wiped before this throws, so the caller can fall back
+     *   to PIN entry immediately.
      */
-    fun getBiometricDecryptCipher(): Cipher? {
+    override fun getBiometricDecryptCipher(): Cipher? {
         val ivB64 = prefs.getString(KEY_BIOMETRIC_PIN_IV, null) ?: return null
         val iv = android.util.Base64.decode(ivB64, android.util.Base64.NO_WRAP)
         val key = getOrCreateBiometricKey()
-        return Cipher.getInstance(BIOMETRIC_TRANSFORMATION).also {
-            it.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(BIOMETRIC_GCM_TAG_LENGTH, iv))
+        return try {
+            Cipher.getInstance(BIOMETRIC_TRANSFORMATION).also {
+                it.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(BIOMETRIC_GCM_TAG_LENGTH, iv))
+            }
+        } catch (e: android.security.keystore.KeyPermanentlyInvalidatedException) {
+            removeBiometricPIN()
+            throw BiometricKeyInvalidatedException(e)
+        }
+    }
+
+    /**
+     * Wipe all biometric-enrolled PIN material: the encrypted PIN blob, its
+     * IV, and the AndroidKeystore key itself. Used for explicit
+     * un-enrollment from Settings and for cleanup after a detected key
+     * invalidation. Never touches the PIN-encrypted device keys — PIN
+     * unlock is completely unaffected.
+     */
+    override fun removeBiometricPIN() {
+        prefs.edit()
+            .remove(KEY_BIOMETRIC_ENCRYPTED_PIN)
+            .remove(KEY_BIOMETRIC_PIN_IV)
+            .apply()
+        clearBiometricKeyMaterial()
+    }
+
+    private fun clearBiometricKeyMaterial() {
+        try {
+            val keyStore = KeyStore.getInstance("AndroidKeyStore").also { it.load(null) }
+            keyStore.deleteEntry(BIOMETRIC_KEY_ALIAS)
+        } catch (_: Exception) {
+            // KeyStore may not be available on all devices/test environments.
         }
     }
 
