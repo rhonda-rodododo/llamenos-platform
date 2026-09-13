@@ -515,7 +515,7 @@ function UserRow({ user, roles, onUpdate, onDelete }: {
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
-        <Badge variant={isAdminRole ? 'default' : 'secondary'}>
+        <Badge data-testid="volunteer-row-role-badge" variant={isAdminRole ? 'default' : 'secondary'}>
           {isAdminRole && <ShieldCheck className="h-3 w-3" />}
           {primaryRole?.name || primaryRoleId}
           {user.roles.length > 1 && (
@@ -539,13 +539,13 @@ function UserRow({ user, roles, onUpdate, onDelete }: {
         )}
         <div className="flex items-center gap-1">
           <Select value={primaryRoleId} onValueChange={changeRole}>
-            <SelectTrigger className="h-7 w-auto gap-1 border-none bg-transparent px-2 text-xs shadow-none" aria-label={t('users.changeRole')}>
+            <SelectTrigger data-testid="volunteer-row-role-select" className="h-7 w-auto gap-1 border-none bg-transparent px-2 text-xs shadow-none" aria-label={t('users.changeRole')}>
               <Shield className="h-3 w-3" />
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               {roles.map(role => (
-                <SelectItem key={role.id} value={role.id}>{role.name}</SelectItem>
+                <SelectItem key={role.id} value={role.id} data-testid="volunteer-row-role-option" data-role-id={role.id}>{role.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
