@@ -5,93 +5,99 @@ export const LARGE_DIFF_FILES = 40
 export const LARGE_DIFF_LINES = 1500
 
 /**
- * Each entry is here because a mistake behind it is expensive in a way CI does
- * not catch. Crypto and protocol: a quiet error becomes an identity disclosure,
- * which is the whole threat model. Auth and sigchain: state a revert does not
- * restore. orchestrator/ and its tests: a defect there disables the checks that
- * would have caught it, and weakening its tests is the same hazard by a
- * shorter route.
+ * The paths where a quiet mistake is expensive in a way CI does not catch.
+ * Crypto and protocol: a quiet error becomes an identity disclosure, which
+ * is the whole threat model. Auth and sigchain: state a revert does not
+ * restore. `orchestrator/` and its tests: a defect there disables the checks
+ * that would have caught it.
+ *
+ * This list is currently enforced TWICE, and deliberately so while the gate
+ * moves from userland to the platform. `classifyImpact` marks a diff high and
+ * `mayAutoMerge` (merge.ts) refuses it — enforcement nothing outside this
+ * process can see, and therefore nothing outside this process is bound by.
+ * Every path below is now ALSO owned in `CODEOWNERS`, where GitHub's own
+ * "require review from Code Owners" rule binds anyone, whoever or whatever
+ * opened the PR. `tests/orchestrator/guards.test.ts` asserts that coverage
+ * against the real tree, so a path added here without a matching `CODEOWNERS`
+ * line fails the suite.
+ *
+ * The in-process half goes away with `mayAutoMerge` once the CI gates are
+ * required (PR C of that sequence). What remains here afterwards is
+ * DESCRIPTION, not decision: the gate trace, the digest, the reviewer's turn
+ * and timeout budget (review.ts), and the subset `CRYPTO_REVIEW_PATHS`
+ * derives for the crypto-security-reviewer.
  *
  * NOT the full secrets list: every path `checkScope` refuses to write
  * (`SECRET_PATH_PATTERNS` in config.ts, the never-write source of truth) is
- * also classified high-impact below via `matchesPath`, so this array need not
- * duplicate secret filename patterns — see the `secretHit` check in
- * `classifyImpact`.
- *
- * NARROWED 2026-09-12: this list used to also always-human-gate `deploy/`,
- * `.github/workflows/`, migrations, fastlane, `Dockerfile.build`, `knope.toml`,
- * and the cert-pin/verify-build scripts. That policy was set assuming
- * production users; there are none yet, so a bad deploy config or a broken CI
- * workflow hurts nobody, and gating it behind a human was pure latency with no
- * offsetting safety benefit. The fleet's first live PR (#662, a two-line
- * OpenTofu fix) stopped at the merge gate for exactly this reason. With no
- * users, the deterministic gates — scope, diff-targeted tests, a
- * different-engine non-author review, and the verified-SHA pin in merge.ts —
- * ARE the decision for those paths now; they merge on green without a human.
- * `deploy/`, `.github/workflows/`, and the migration paths below MUST return
- * to this list before the first internal testers are onboarded — a bad
- * migration or deploy config stops being harmless the moment real data or
- * real callers exist.
- *
- * CORRECTED 2026-09-12 (same day): the first pass of the narrowing above also
- * removed the desktop IPC / capabilities and mobile crypto-service *wrapper*
- * paths (`src/client/lib/platform.ts`, `apps/desktop/src/crypto.rs`,
- * `apps/desktop/capabilities/`, the iOS/Android `CryptoService` files),
- * reasoning that they weren't `packages/crypto/` itself. That was wrong: a
- * quiet mistake in any of them is an identity disclosure — `platform.ts` is,
- * per CLAUDE.md, the SINGLE abstraction keeping a device private key out of
- * the webview; `crypto.rs`/`capabilities/` are the IPC surface and Tauri
- * permission grants that could expose it; the iOS/Android files are the
- * Keychain/Keystore boundary. That is the high-impact criterion (a quiet
- * error becomes an identity disclosure), and it has nothing to do with
- * deployment risk — "no users yet" does not relax it. They are restored
- * below and must never be narrowed on the same "no users" reasoning that
- * applies to `deploy/` and CI.
+ * also classified high-impact below via `matchesPath` — see the `secretHit`
+ * check in `classifyImpact`.
  */
 export const HIGH_IMPACT_PATHS: readonly string[] = [
+  // Every entry below is a REAL tracked path — a directory prefix ending in
+  // `/`, or an exact file. That is not cosmetic: these same strings are the
+  // `CODEOWNERS` lines, and CODEOWNERS is gitignore syntax, where a bare
+  // `apps/worker/lib/auth` matches a file NAMED `auth` and therefore matches
+  // nothing at all in this repo. An entry here that matches no tracked file
+  // is a gate that silently protects nothing, so `guards.test.ts` asserts
+  // both directions against `git ls-files`: every path here matches at least
+  // one real file, and every real file under it is owned in CODEOWNERS.
   'packages/crypto/',
   'packages/protocol/schemas/',
   'packages/protocol/crypto-labels.json',
-  'apps/worker/lib/auth',
-  'apps/worker/lib/webauthn',
-  'apps/worker/lib/session',
-  'apps/android/keystore',
+  'packages/shared/crypto-labels.ts',
   'orchestrator/',
   'tests/orchestrator/',
 
-  // Key-boundary wrapper paths — restored 2026-09-12 (see the CORRECTED
-  // comment above). Not the crypto crate itself, but the surfaces that keep
-  // (or could leak) a device private key: the webview IPC boundary, the
-  // Tauri permission grants, and the iOS/Android Keychain/Keystore wrappers.
+  // Key-boundary surfaces. Not the crypto crate itself, but the places that
+  // keep (or could leak) a device private key: the webview IPC boundary, the
+  // Tauri permission grants, the iOS/Android Keychain/Keystore wrappers, and
+  // the Tauri IPC mock, which mirrors the Rust CryptoState.
   'src/client/lib/platform.ts',
   'apps/desktop/src/crypto.rs',
   'apps/desktop/capabilities/',
   'apps/ios/Sources/Services/CryptoService.swift',
   'apps/android/app/src/main/java/org/llamenos/hotline/crypto/',
+  'tests/mocks/',
 
-  // These two are the other half of the orchestrator's own trust base: it
-  // already treats its own source as high-impact, but a worker that edits the
-  // fragment defining its own lane's write scope — or the settings file
-  // enforcing the PreToolUse write-deny hook — can widen its own authority
-  // without ever touching `orchestrator/`.
-  '.claude/agents/fragments/',
+  // The fleet's own trust base: a worker that edits the orchestrator, the
+  // agent definitions bounding its own behaviour, or the write-deny hook can
+  // widen its own authority.
+  '.claude/agents/',
   '.claude/settings.json',
 
+  // The build's own trust base, and the reason this list gained entries in
+  // the round that fixed the gate. The gate jobs install from the lockfile
+  // and run from the workflow definition; a PR editing any of these is a PR
+  // editing the machinery that judges it. `ci.yml` most of all — it is where
+  // "check out the base, not the head" is written down.
+  'package.json',
+  'bun.lockb',
+  'lefthook.yml',
+  '.github/workflows/ci.yml',
+
+  // Auth, sessions, sigchain, identity: state a revert does not restore.
+  // `.test.ts` siblings are listed explicitly — weakening the test is the
+  // shortest route to disabling the check it guards.
   'apps/worker/middleware/',
-  'apps/worker/routes/auth',
-  'apps/worker/routes/sessions',
-  'apps/worker/routes/webauthn',
-  'apps/worker/routes/sigchain',
-  'apps/worker/db/schema/sigchain',
-  'apps/worker/lib/crypto',
-  'apps/worker/lib/hub-event-crypto',
-  'apps/worker/lib/push-encryption',
-  'apps/worker/lib/server-identity',
-  'apps/worker/lib/agent-identity',
-  'apps/worker/lib/timing-safe',
-  'apps/worker/lib/blind-index-query',
-  'apps/worker/services/crypto-keys',
-  'packages/shared/crypto-labels.ts',
+  'apps/worker/lib/auth.ts',
+  'apps/worker/lib/auth.test.ts',
+  'apps/worker/lib/webauthn.ts',
+  'apps/worker/lib/session-renewal.ts',
+  'apps/worker/lib/crypto.ts',
+  'apps/worker/lib/crypto.test.ts',
+  'apps/worker/lib/hub-event-crypto.ts',
+  'apps/worker/lib/push-encryption.ts',
+  'apps/worker/lib/server-identity.ts',
+  'apps/worker/lib/agent-identity.ts',
+  'apps/worker/lib/timing-safe.ts',
+  'apps/worker/lib/blind-index-query.ts',
+  'apps/worker/lib/blind-index-query.test.ts',
+  'apps/worker/routes/auth.ts',
+  'apps/worker/routes/sessions.ts',
+  'apps/worker/routes/webauthn.ts',
+  'apps/worker/routes/sigchain.ts',
+  'apps/worker/db/schema/sigchain.ts',
+  'apps/worker/services/crypto-keys.ts',
 ]
 
 export function classifyImpact(

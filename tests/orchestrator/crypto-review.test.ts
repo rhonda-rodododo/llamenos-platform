@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import {
-  isCryptoDiff, requiredAdditionalReviewers, CRYPTO_SECURITY_REVIEWER_AGENT,
+  isCryptoDiff, requiredAdditionalReviewers, CRYPTO_SECURITY_REVIEWER_AGENT, CRYPTO_REVIEW_PATHS,
 } from '../../orchestrator/src/review.js'
 import { mayAutoMerge } from '../../orchestrator/src/merge.js'
 import { classifyImpact } from '../../orchestrator/src/impact.js'
+import { codeownersMatcher, trackedFiles, trackedFilesUnder } from './codeowners.js'
 import type { VerifyReport } from '../../orchestrator/src/verify.js'
 
 describe('isCryptoDiff / requiredAdditionalReviewers', () => {
@@ -19,8 +20,11 @@ describe('isCryptoDiff / requiredAdditionalReviewers', () => {
     expect(isCryptoDiff(['packages/protocol/crypto-labels.json'])).toBe(true)
   })
   it('requests the crypto reviewer for a diff touching auth/session/sigchain code', () => {
-    expect(isCryptoDiff(['apps/worker/lib/auth/tokens.ts'])).toBe(true)
-    expect(isCryptoDiff(['apps/worker/lib/session/store.ts'])).toBe(true)
+    // Real tracked files, not invented ones: `apps/worker/lib/auth/tokens.ts`
+    // and `apps/worker/lib/session/store.ts` — which this test used to assert
+    // on — do not exist in this repo and never have.
+    expect(isCryptoDiff(['apps/worker/lib/auth.ts'])).toBe(true)
+    expect(isCryptoDiff(['apps/worker/lib/session-renewal.ts'])).toBe(true)
     expect(isCryptoDiff(['apps/worker/routes/sigchain.ts'])).toBe(true)
   })
   it('does not request the crypto reviewer for an unrelated diff', () => {
@@ -64,5 +68,20 @@ describe('mayAutoMerge refuses crypto diffs regardless of reviewer approval', ()
     const result = mayAutoMerge(cryptoReport(), true, 'PASS', 'deadbeef')
     expect(result.merge).toBe(false)
     expect(result.reason).toMatch(/high-impact/i)
+  })
+})
+
+// `mayAutoMerge` stops a crypto diff today. CODEOWNERS is what will still
+// stop it once that function is deleted (PR C), so both are asserted here —
+// against the real tree, with the same gitignore semantics GitHub applies.
+describe('crypto paths are owned in CODEOWNERS, not only gated in code', () => {
+  it('owns every tracked crypto-review file', () => {
+    const files = trackedFiles()
+    const owner = codeownersMatcher()
+    for (const p of CRYPTO_REVIEW_PATHS) {
+      const under = trackedFilesUnder(p, files)
+      expect(under.length, `CRYPTO_REVIEW_PATHS entry "${p}" matches no tracked file`).toBeGreaterThan(0)
+      for (const f of under) expect(owner.owns(f), `${f} has no CODEOWNERS owner`).toBe(true)
+    }
   })
 })

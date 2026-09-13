@@ -8,7 +8,40 @@ import type { Lane } from './config.js'
 
 const execFileAsync = promisify(execFile)
 
-export interface VerifyInput { worktree: string; branch: string; lane: Lane }
+export interface VerifyInput {
+  /**
+   * Where git runs. This must be a TRUSTED checkout: in CI it is the PR's
+   * BASE commit, never the head. Everything this function decides — the
+   * changed-file list, and therefore scope, never-write and impact — is
+   * computed by git here, from repository history, with no code from the
+   * commit under judgement executing anywhere.
+   */
+  worktree: string
+  /** The right-hand side of the diff range. In CI this is the PR's head SHA,
+   *  fetched into the base checkout as an object — not checked out. */
+  branch: string
+  /** The left-hand side of the diff range. Defaults to `origin/main`; CI
+   *  passes the PR's base SHA so the range is exactly the PR's own change. */
+  base?: string
+  lane: Lane
+  /**
+   * Scope and impact only — used by the `fleet/review` CI job, where
+   * `fleet/verify` is the job that runs the diff-targeted tests and running
+   * them a second time buys no extra signal. A report produced this way has
+   * `testsRun: []` and `testsPassed: undefined`, so it can never be mistaken
+   * for one whose tests passed: `buildGateTrace` renders it `tests=none`.
+   */
+  skipTests?: boolean
+  /**
+   * Where the diff-targeted tests run, and the ONLY place code from the
+   * commit under judgement is ever executed. Defaults to `worktree` (the
+   * fleet's own worker on the operator's box, where the two are the same
+   * tree). CI passes a `git archive` export of the head instead, so the
+   * tests run against the PR's files while every DECISION above was already
+   * made from the base checkout.
+   */
+  testDir?: string
+}
 
 export interface VerifyReport {
   passed: boolean
@@ -20,16 +53,13 @@ export interface VerifyReport {
   testsRun?: string[]
   testsPassed?: boolean
   /**
-   * Fix-round finding (W1): the exact commit `verifyMechanical` actually
-   * examined (`git rev-parse HEAD` in the worktree, captured once, up
-   * front). This is a RECORD, not something to be re-derived later — the
-   * whole point is that `mayAutoMerge` compares this against the PR's head
-   * at merge time and refuses if they differ, rather than a fresh
-   * observation at merge time silently re-legitimizing a branch that moved
-   * (whether from an ordinary push race or a verifier that pushed its own
-   * changes). `undefined` only when `verifyMechanical` could not identify a
-   * commit at all (`git rev-parse` itself failed) — which already implies
-   * `passed: false`.
+   * The exact commit this report examined: the resolved right-hand side of
+   * the diff range, captured once, up front. It no longer has to be compared
+   * against anything at merge time: a commit status is attached to ONE SHA,
+   * so GitHub itself refuses to merge a head that does not carry its own
+   * green `fleet/verify`. It survives as the `sha=` field of the gate trace,
+   * which `llamenos-fleet status <issue>` reads back. `undefined` only when
+   * `git rev-parse` itself failed — which already implies `passed: false`.
    */
   verifiedCommit?: string
 }
@@ -222,9 +252,14 @@ function parseFailingCount(output: string): number | undefined {
  * 1. Scope — any forbidden or strayed file is an immediate fail, naming the
  *    offenders. `checkScope` and `classifyImpact` have had no runtime caller
  *    until this function; this is what wires them in.
- * 2. Impact — recorded on the report, never itself a fail. A high-impact
- *    diff still needs to pass scope and tests; it is the merge gate
- *    (merge.ts), not this one, that refuses to auto-merge it.
+ * 2. Impact — recorded on the report, never itself a fail HERE. It is still
+ *    a gate one layer up: `mayAutoMerge` (merge.ts) refuses a high-impact
+ *    diff outright. Every high-impact path is now ALSO owned in `CODEOWNERS`,
+ *    so GitHub's own "require review from Code Owners" rule binds anyone,
+ *    not just this process; when the CI gates are required and merge.ts is
+ *    deleted, that becomes the only enforcement and `classifyImpact` is left
+ *    describing a diff (the trace, the digest, the reviewer's turn budget)
+ *    rather than deciding about it.
  * 3. Diff-targeted tests only, run by argv via `execFile` — never a shell,
  *    never the whole suite (slow, produces failures unrelated to the diff,
  *    and CI already shards it).
@@ -234,13 +269,18 @@ function parseFailingCount(output: string): number | undefined {
  */
 export async function verifyMechanical(input: VerifyInput): Promise<VerifyReport> {
   const { worktree, branch, lane } = input
-  const range = `origin/main...${branch}`
+  const range = `${input.base ?? 'origin/main'}...${branch}`
+  const testRoot = input.testDir ?? worktree
 
-  // Captured FIRST and once, before anything else runs: this is the commit
-  // every check below actually examines, and it is what `mayAutoMerge` will
-  // later compare against the PR's head at merge time (W1) — a record of
-  // what was verified, not a value re-derived after the fact.
-  const headShaRaw = await runGit(worktree, ['rev-parse', 'HEAD'])
+  // Captured FIRST and once: the commit under judgement — the RIGHT-HAND
+  // side of the range, resolved, not the worktree's own HEAD. Those are the
+  // same thing on the operator's box, where the worktree is checked out on
+  // the branch being verified. They are NOT the same in CI, where git runs
+  // in the trusted BASE checkout and the commit being judged is only an
+  // object in it: `rev-parse HEAD` there names the base, so the trace would
+  // have identified the wrong commit entirely — and `status.ts` reads this
+  // field back as "the commit this report examined".
+  const headShaRaw = await runGit(worktree, ['rev-parse', branch])
   if (headShaRaw === undefined) {
     return {
       passed: false,
@@ -288,7 +328,7 @@ export async function verifyMechanical(input: VerifyInput): Promise<VerifyReport
     return { passed: false, reasons, changedFiles, addedLines, impact, impactReasons, verifiedCommit }
   }
 
-  const routes = routesFor(changedFiles)
+  const routes = input.skipTests === true ? [] : routesFor(changedFiles)
   const testsRun = routes.map((r) => r.target)
   let testsPassed: boolean | undefined
 
@@ -296,7 +336,7 @@ export async function verifyMechanical(input: VerifyInput): Promise<VerifyReport
     let sawParsedFailure = false
     let sawUnparsedNonZero = false
     for (const route of routes) {
-      const result = await runVitestTarget(worktree, route)
+      const result = await runVitestTarget(testRoot, route)
       const failingCount = parseFailingCount(result.output)
       if (failingCount !== undefined && failingCount > 0) {
         sawParsedFailure = true

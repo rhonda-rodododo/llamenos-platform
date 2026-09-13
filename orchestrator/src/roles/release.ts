@@ -6,8 +6,8 @@
  * the comments say so plainly rather than leaving that capability implied.
  *
  * This role NEVER merges a pull request. There is no function anywhere in
- * this module that calls `gh pr merge`, or imports `mergePr` from
- * `../merge.js`. Merging `main` is the Integrator's job (integrator.ts);
+ * this module that calls `gh pr merge`. Merging `main` is GitHub's job now
+ * (auto-merge, gated by the repo ruleset);
  * merging the knope release PR is a human's, always. `releaseEngineerMayMerge`
  * below exists only so that boundary has something concrete to test: it is
  * a function that can NEVER return `merge: true`, for any input — not a

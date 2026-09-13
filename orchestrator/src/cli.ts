@@ -1,5 +1,6 @@
-import { existsSync, mkdirSync, appendFileSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, appendFileSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 import { execFile, execFileSync } from 'node:child_process'
 import { promisify } from 'node:util'
 import { acquire } from './lock.js'
@@ -15,10 +16,15 @@ import { verifyMechanical } from './verify.js'
 import { secondOpinion, postReview } from './review.js'
 import { ciStatusFor, mergePr } from './merge.js'
 import {
+  runVerifyCi, runReviewCi, ciContextFromEnv, ciDiff,
+  REVIEW_JOB, REVIEW_KEY_ENV, VERIFY_JOB, itemIdFromBranch, type CiContext, type CiVerdict,
+} from './ci.js'
+import {
   settle as settleWorktree,
   destroyWorktree,
   findWorktreeForBranch,
   deleteLocalBranch,
+  type SettleTarget,
 } from './worktree.js'
 import { GitHubSource, toWorkItem, type RawIssue } from './source.js'
 import { tick, type TickDeps, type TickResult, type SettleInput, type DispatchOutcome } from './tick.js'
@@ -85,8 +91,16 @@ export async function doctor(): Promise<number> {
   // Exactly one remote is an invariant, not a preference: a second remote
   // breaks bare `gh` and makes it possible to push fleet work to the wrong
   // repository. Asserted here so drift surfaces as a failed check.
-  const remotes = execFileSync('git', ['remote'], { cwd: REPO_ROOT, encoding: 'utf8' })
-    .split('\n').map((r) => r.trim()).filter(Boolean)
+  // Wrapped: `doctor` is a health check, and a health check that THROWS
+  // instead of reporting a failed check is useless in exactly the situation
+  // it exists for. This throws wherever REPO_ROOT is not a git repository —
+  // including a `git archive` export, which is how the fleet's own tests now
+  // run under `fleet/verify`.
+  let remotes: string[] = []
+  try {
+    remotes = execFileSync('git', ['remote'], { cwd: REPO_ROOT, encoding: 'utf8' })
+      .split('\n').map((r) => r.trim()).filter(Boolean)
+  } catch { /* not a git repo, or git unavailable — reported as a failed check below */ }
   checks.push([`exactly one git remote (found: ${remotes.join(', ') || 'none'})`,
     remotes.length === 1 && remotes[0] === 'origin',
     'git remote remove <name> — this repo must only ever have origin -> llamenos-platform'])
@@ -248,7 +262,19 @@ async function realDispatch(item: WorkItem, lane: Lane): Promise<DispatchOutcome
     model: lane.model ?? DEFAULT_MODEL,
     effort: DEFAULT_EFFORT,
   })
-  return resolveDispatchResult(result, branch, REPO_ROOT, findWorktreeForBranch)
+  const resolved = await resolveDispatchResult(result, branch, REPO_ROOT, findWorktreeForBranch)
+
+  // At PR open, which is the earliest moment the PR exists. Best-effort: the
+  // worst case is an issue that stays open after its PR merges, which the
+  // digest already surfaces, and it must never cost the dispatch itself.
+  if (resolved.pr !== undefined) {
+    try {
+      await ensureIssueLinkWith(resolved.pr, defaultIssueLinkDeps())
+    } catch (e) {
+      log(`issue link: failed for PR ${resolved.pr}: ${errMsg(e)}`)
+    }
+  }
+  return resolved
 }
 
 async function prDiff(pr: string): Promise<string> {
@@ -264,11 +290,33 @@ async function commentOnIssue(itemId: string, body: string): Promise<void> {
   await gh(['issue', 'comment', itemId, '--body', body])
 }
 
+/**
+ * `needsHuman` is FORWARDED, not dropped — and this mapping is a separate,
+ * exported, pure function precisely because it was being dropped here, in a
+ * hand-written object literal, where nothing could see it. `settle`'s one
+ * remaining label write (the `needs-human` label, worktree.ts) could
+ * therefore never fire in production: tick.ts sets it for a claimed SUCCESS
+ * the fleet could not verify at all (issue #660's shape), and that label is
+ * what stops `judge()` re-dispatching the item on the next pass. Without it
+ * the fleet re-claims an unverifiable item every tick, forever.
+ *
+ * A literal that silently omits one field is invisible to TypeScript when
+ * every field it does set is optional on the target. The unit test on this
+ * function is what makes the omission visible.
+ */
+export function settleTargetFor(input: SettleInput): SettleTarget {
+  return {
+    name: nameFor(input.lane, input.item),
+    itemId: input.item.id,
+    outcome: input.outcome,
+    worktree: input.worktree,
+    branch: input.branch,
+    needsHuman: input.needsHuman,
+  }
+}
+
 async function settleItem(input: SettleInput): Promise<void> {
-  await settleWorktree(
-    { name: nameFor(input.lane, input.item), itemId: input.item.id, outcome: input.outcome, worktree: input.worktree, branch: input.branch },
-    log,
-  )
+  await settleWorktree(settleTargetFor(input), log)
 }
 
 /**
@@ -292,6 +340,87 @@ async function reviseWithWorker(item: WorkItem, lane: Lane, verdictText: string)
 
 async function commentOnPr(pr: string, body: string): Promise<void> {
   await gh(['pr', 'comment', pr, '--body', body])
+}
+
+/**
+ * GitHub closes an issue when a MERGED pull request's body contains
+ * `Closes #<n>`. The fleet's workers are told to write that line themselves
+ * (brief.ts), but a brief is an instruction, not a guarantee — and a PR that
+ * merges without it leaves its issue open forever, with the work already on
+ * `main`. This is the belt to that braces.
+ *
+ * Returns the body to write, or `null` when the line is already present —
+ * so the caller can tell "nothing to do" from "write this", and a second
+ * tick over the same PR cannot append the line twice.
+ *
+ * The match is word-bounded on purpose: `Closes #123` must NOT satisfy item
+ * `12`. Without `\b` it would, and the fleet would skip linking issue 12
+ * because a DIFFERENT issue happened to be referenced — the issue would stay
+ * open and nothing would say why. It is case-insensitive because GitHub's
+ * own matching is, and a worker writing `closes #12` has satisfied the
+ * requirement.
+ */
+export function ensureClosesLine(body: string, item: string): string | null {
+  const escaped = item.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  if (new RegExp(String.raw`\bcloses\s+#${escaped}\b`, 'i').test(body)) return null
+  return `${body.trimEnd()}\n\nCloses #${item}`
+}
+
+export interface IssueLinkDeps {
+  /** `undefined` on any read failure, matching `ghJson`'s own contract. */
+  readPr(pr: string): Promise<{ body: string; headRefName: string } | undefined>
+  editBody(pr: string, body: string): Promise<void>
+  log(msg: string): void
+}
+
+/**
+ * The item number comes from the PR's OWN head branch as GitHub reports it
+ * (`fleet/<lane>/<item>`), never from the worker's status file — the same
+ * reasoning as `resolveDispatchResult` above: the worker's report is the one
+ * source that has already been observed to omit fields it promised.
+ *
+ * A PR on a non-fleet branch has no issue to link and is left alone.
+ */
+export async function ensureIssueLinkWith(pr: string, deps: IssueLinkDeps): Promise<void> {
+  const view = await deps.readPr(pr)
+  if (view === undefined) {
+    deps.log(`issue link: could not read PR ${pr} — leaving its body alone`)
+    return
+  }
+  const item = itemIdFromBranch(view.headRefName)
+  if (item === undefined) {
+    deps.log(`issue link: PR ${pr} is on "${view.headRefName}", not a fleet branch — nothing to link`)
+    return
+  }
+  const updated = ensureClosesLine(view.body, item)
+  if (updated === null) return
+  await deps.editBody(pr, updated)
+  deps.log(`issue link: added "Closes #${item}" to PR ${pr}`)
+}
+
+/**
+ * `--body-file` from a temp file rather than `--body` with the text as an
+ * argv element: a PR body is arbitrary worker-authored prose of unbounded
+ * length, and passing it as an argument is how you meet the OS argv limit on
+ * exactly the PR whose description was most worth reading.
+ */
+async function editPrBody(pr: string, body: string): Promise<void> {
+  const dir = mkdtempSync(join(tmpdir(), 'llamenos-fleet-prbody-'))
+  try {
+    const file = join(dir, 'body.md')
+    writeFileSync(file, body)
+    await gh(['pr', 'edit', pr, '--body-file', file])
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+}
+
+function defaultIssueLinkDeps(): IssueLinkDeps {
+  return {
+    readPr: (pr) => ghJson<{ body: string; headRefName: string }>(['pr', 'view', pr, '--json', 'body,headRefName']),
+    editBody: editPrBody,
+    log,
+  }
 }
 
 async function runTick(): Promise<number> {
@@ -860,6 +989,40 @@ async function runIntegrate(): Promise<number> {
   return runIntegrateWith(defaultIntegrateDeps())
 }
 
+// ---------------------------------------------------------------------------
+// verify-ci / review-ci — the two gates, computed on GitHub's own runners
+// ---------------------------------------------------------------------------
+
+/**
+ * Both CI entry points take their subject from the environment rather than
+ * argv: the workflow already has `github.head_ref` as an expression, and a
+ * named variable is harder to get silently wrong than a positional argument.
+ * A missing one is a non-zero exit — an entry point that does not know what
+ * it is judging must refuse, not guess, and a red job is the right direction.
+ *
+ * The verdict becomes the EXIT CODE and nothing else. The job's own result is
+ * already a check run named `fleet/verify` / `fleet/review`, which is what
+ * the ruleset requires; the summary goes to the job log, where a reader
+ * follows the red check anyway.
+ */
+/** Plain stdout, not the fleet log: a CI runner has no fleet state directory
+ *  worth writing to, and the job log IS the durable record there. */
+const ciLog = (msg: string): void => { process.stdout.write(`${msg}\n`) }
+
+async function runCiGate(job: string, run: (ctx: CiContext) => Promise<CiVerdict>): Promise<number> {
+  const ctx = ciContextFromEnv(process.env, REPO_ROOT)
+  if (ctx === undefined) {
+    process.stderr.write(
+      `${job}: FLEET_CI_BRANCH, FLEET_CI_HEAD_DIR, FLEET_CI_HEAD_SHA and FLEET_CI_BASE_SHA ` +
+      'must all be set — refusing to judge an unknown tree\n',
+    )
+    return 2
+  }
+  const verdict = await run(ctx)
+  process.stdout.write(`${job}: ${verdict.ok ? 'PASS' : 'FAIL'} — ${verdict.summary}\n`)
+  return verdict.ok ? 0 : 1
+}
+
 type CommandHandler = (rest: string[]) => Promise<number> | number
 
 /**
@@ -890,6 +1053,23 @@ const HANDLERS: Record<string, CommandHandler> = {
     return revert(runId, defaultRevertDeps())
   },
   digest: (rest) => runDigest(rest[0]),
+  'verify-ci': () => runCiGate(VERIFY_JOB, (ctx) => runVerifyCi({
+    ctx,
+    lanes: () => loadLanes(REPO_ROOT),
+    verify: verifyMechanical,
+    pathExists: existsSync,
+    log: ciLog,
+  })),
+  'review-ci': () => runCiGate(REVIEW_JOB, (ctx) => runReviewCi({
+    ctx,
+    apiKey: process.env[REVIEW_KEY_ENV],
+    lanes: () => loadLanes(REPO_ROOT),
+    verify: verifyMechanical,
+    pathExists: existsSync,
+    log: ciLog,
+    prDiff: () => ciDiff(ctx),
+    secondOpinion,
+  })),
   plan: () => runPlan(),
   integrate: () => runIntegrate(),
 }
