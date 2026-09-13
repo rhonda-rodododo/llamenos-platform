@@ -127,35 +127,26 @@ Then('the create case sheet should be visible', async ({ page }) => {
 })
 
 When('I select entity type {string} in the create dialog', async ({ page }, typeName: string) => {
-  // Wait for entity types to finish loading — the dialog fetches them async on open.
-  // Either the select dropdown renders (multiple types) or a single-type badge renders.
-  const typeSelect = page.getByTestId('case-type-select')
-  const singleTypeBadge = page.locator('[role="dialog"] .font-medium').filter({ hasText: typeName })
-  const loader = page.locator('[role="dialog"]').getByText(/loading/i)
+  // The dialog fetches entity types on open, then renders exactly one of two mutually
+  // exclusive controls: a type select (several types) or a single-type badge (one type,
+  // auto-selected). Wait for whichever renders; after that the branch is settled.
+  const dialog = page.getByRole('dialog')
+  const typeSelect = dialog.getByTestId('case-type-select')
+  const singleType = dialog.getByTestId('case-type-single')
+  await expect(typeSelect.or(singleType)).toBeVisible({ timeout: Timeouts.ELEMENT })
 
-  // Wait for loader to disappear first
-  await loader.waitFor({ state: 'hidden', timeout: Timeouts.ELEMENT }).catch(() => {})
-
-  const isSelect = await typeSelect.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (isSelect) {
+  if (await typeSelect.count() > 0) {
     await typeSelect.click()
-    const option = page.getByRole('option', { name: new RegExp(typeName, 'i') })
+    // Option test ids use the entity type name: label lowercased, spaces as underscores.
+    const option = page.getByTestId(`case-type-option-${typeName.toLowerCase().replace(/\s+/g, '_')}`)
     await expect(option).toBeVisible({ timeout: Timeouts.ELEMENT })
     await option.click()
+    await expect(typeSelect).toContainText(typeName, { timeout: Timeouts.ELEMENT })
   } else {
-    // Single entity type was auto-selected — verify by looking for the type label badge
-    const isSingle = await singleTypeBadge.isVisible({ timeout: 3000 }).catch(() => false)
-    if (!isSingle) {
-      // Entity types may have failed to load — try waiting more for the select
-      const retrySelect = await typeSelect.isVisible({ timeout: 5000 }).catch(() => false)
-      if (retrySelect) {
-        await typeSelect.click()
-        const option = page.getByRole('option', { name: new RegExp(typeName, 'i') })
-        await expect(option).toBeVisible({ timeout: Timeouts.ELEMENT })
-        await option.click()
-      }
-    }
+    await expect(singleType).toContainText(typeName)
   }
+  // The title input renders only once a type is selected.
+  await expect(dialog.getByTestId('case-title-input')).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 When('I fill in the case title with a unique name', async ({ page, casesWorld }) => {
@@ -166,10 +157,10 @@ When('I fill in the case title with a unique name', async ({ page, casesWorld })
 })
 
 When('I fill in the case description', async ({ page }) => {
-  const descInput = page.getByTestId('case-description-input')
-  if (await descInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await descInput.fill('Test case description for BDD testing')
-  }
+  // The description renders together with the title once a type is selected.
+  const descInput = page.getByRole('dialog').getByTestId('case-description-input')
+  await expect(descInput).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await descInput.fill('Test case description for BDD testing')
 })
 
 When('I click the create case submit button', async ({ page }) => {
@@ -177,29 +168,13 @@ When('I click the create case submit button', async ({ page }) => {
 })
 
 Then('a toast {string} should appear', async ({ page }, toastText: string) => {
-  // Custom ToastProvider renders with role="status" (success/info) or role="alert" (error).
-  // Toasts auto-dismiss after 4s, so we need to catch them quickly.
-  const successToast = page.locator('[role="status"], [role="alert"]').filter({ hasText: new RegExp(toastText, 'i') })
-  const anyToast = page.locator('[role="status"], [role="alert"]')
-  const textMatch = page.getByText(new RegExp(toastText, 'i'))
-
-  // Try matching toast first
-  const successVisible = await successToast.first().isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (successVisible) return
-
-  // Fallback: any toast is visible (may be an error toast if operation failed)
-  const anyVisible = await anyToast.first().isVisible({ timeout: 3000 }).catch(() => false)
-  if (anyVisible) return
-
-  // Fallback: text visible anywhere on page
-  const textVisible = await textMatch.first().isVisible({ timeout: 3000 }).catch(() => false)
-  if (textVisible) return
-
-  // Final: accept that the list/page updated (operation may have succeeded but toast dismissed)
-  const caseList = page.getByTestId('case-list')
-  const contactList = page.getByTestId('contact-list')
-  const combined = caseList.or(contactList).or(successToast.first()).or(textMatch.first())
-  await expect(combined.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // ToastProvider renders toast-success / toast-info / toast-error. Only a non-error
+  // toast carrying the expected message counts — an error toast, a different toast,
+  // or the page merely still rendering is a failure. Toasts live ~4s; the waiting
+  // assertion polls from the moment the triggering action completed.
+  const toast = page.getByTestId('toast-success').or(page.getByTestId('toast-info'))
+    .filter({ hasText: new RegExp(toastText, 'i') })
+  await expect(toast).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('the new case should appear in the case list', async ({ page }) => {
@@ -210,30 +185,16 @@ Then('the new case should appear in the case list', async ({ page }) => {
 })
 
 Then('the new case should be auto-selected in the detail panel', async ({ page }) => {
-  // Wait for Sheet close animation before checking detail panel
-  const sheetOverlay = page.locator('[data-slot="sheet-overlay"]')
-  const overlayGone = await sheetOverlay.waitFor({ state: 'hidden', timeout: 5000 }).then(() => true).catch(() => false)
-  if (!overlayGone) {
-    await page.keyboard.press('Escape')
-  }
-
-  const detailHeader = page.getByTestId('case-detail-header')
-  const detailVisible = await detailHeader.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (!detailVisible) {
-    // Fallback: click first case card to select it
-    const card = page.getByTestId('case-card').first()
-    if (await card.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await card.click()
-      await expect(detailHeader).toBeVisible({ timeout: Timeouts.ELEMENT })
-    }
-  }
+  // A successful create closes the sheet and selects the new record (handleRecordCreated).
+  await expect(page.getByRole('dialog')).toBeHidden({ timeout: Timeouts.ELEMENT })
+  await expect(page.getByTestId('case-detail-header')).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 When('I leave the case title empty', async ({ page }) => {
-  const titleInput = page.getByTestId('case-title-input')
-  if (await titleInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await titleInput.clear()
-  }
+  const titleInput = page.getByRole('dialog').getByTestId('case-title-input')
+  await expect(titleInput).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await titleInput.clear()
+  await expect(titleInput).toHaveValue('')
 })
 
 Then('the create case submit button should be disabled', async ({ page }) => {
@@ -252,10 +213,9 @@ When('I click the {string} entity type tab', async ({ page }, tabName: string) =
 })
 
 Then('the entity type selector should show {string}', async ({ page }, expected: string) => {
-  const typeSelect = page.getByTestId('case-type-select')
-  if (await typeSelect.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await expect(typeSelect).toContainText(new RegExp(expected, 'i'))
-  }
+  // The filtered tab passes defaultEntityTypeId; the select shows the pre-selected type.
+  const typeSelect = page.getByRole('dialog').getByTestId('case-type-select')
+  await expect(typeSelect).toContainText(new RegExp(expected, 'i'), { timeout: Timeouts.ELEMENT })
 })
 
 // --- Case list preconditions ---
