@@ -7,9 +7,12 @@
  * which satisfies `isTauriRuntime()` but not `isPackagedTauri()`, so the
  * first-run server-address gate never appears for them. These steps opt a
  * scenario INTO packaged-app behavior via `window.__TEST_SIMULATE_PACKAGED_TAURI__`,
- * set through `page.addInitScript` (persists across reloads) or a live
- * `page.evaluate` (does not survive a reload — used deliberately in the
- * "change from settings" scenario, see the step below for why).
+ * set through `page.addInitScript` so it survives the reloads a server change
+ * performs, like a real packaged app would.
+ *
+ * The IPC mock (tests/mocks/tauri-core.ts) mirrors apps/desktop/src/api_config.rs
+ * and net.rs — exact-origin allowlist, first-run-only health probe — so these
+ * scenarios assert the same policy the Rust unit tests pin down.
  */
 import { expect } from '@playwright/test'
 import { Given, When, Then, After } from '../fixtures'
@@ -36,9 +39,13 @@ function lastServer(page: object): TestBackendServer {
   return server
 }
 
+// A server the app must NOT be able to reach (see the health-probe scenario).
+const secondServerByPage = new WeakMap<object, TestBackendServer>()
+
 After(async ({ page }) => {
   const list = serversByPage.get(page)
   list?.forEach(s => s.close())
+  secondServerByPage.get(page)?.close()
 })
 
 // --- Simulating a packaged desktop build ---
@@ -52,18 +59,20 @@ Given('the desktop app is simulating a packaged build with no server configured'
   })
 })
 
-Given('the desktop app is now simulating a packaged build', async ({ page }) => {
-  // Deliberately NOT addInitScript: this fires AFTER an admin has already
-  // logged in against the default (relative /api) backend. We want the
-  // Settings "Server address" section to become visible for THIS page state
-  // only — the later window.location.reload() in this scenario is expected
-  // to drop the simulation (a real reload of a real packaged app doesn't stop
-  // being packaged, but re-arming that for every reload isn't needed to prove
-  // the behavior this scenario cares about: saving a new address actually
-  // redirects traffic there and clears the old session).
-  await page.evaluate(() => {
+Given('the desktop app is now simulating a packaged build connected to its own origin', async ({ page }) => {
+  // The admin logged in against the relative /api default. A packaged app always
+  // has an absolute backend configured, so configure this app's own origin (the
+  // preview server proxies /api to the real backend) — traffic now flows through
+  // the mocked Rust proxy exactly as in a packaged build — and only then flip the
+  // packaged-build switch, for this page and for every reload that follows.
+  const origin = new URL(page.url()).origin
+  await page.addInitScript(() => {
     (window as unknown as Record<string, unknown>).__TEST_SIMULATE_PACKAGED_TAURI__ = true
   })
+  await page.evaluate(async (appOrigin) => {
+    await window.__TEST_API_CONFIG.setApiBase(appOrigin)
+    ;(window as unknown as Record<string, unknown>).__TEST_SIMULATE_PACKAGED_TAURI__ = true
+  }, origin)
 })
 
 // --- Test backend server lifecycle ---
@@ -71,6 +80,17 @@ Given('the desktop app is now simulating a packaged build', async ({ page }) => 
 Given('a real test backend server is running', async ({ page }) => {
   trackServer(page, await startTestBackendServer())
 })
+
+Given('a second test backend server is running', async ({ page }) => {
+  // Kept out of `serversByPage` so `lastServer` still means the configured one.
+  secondServerByPage.set(page, await startTestBackendServer())
+})
+
+function secondServer(page: object): TestBackendServer {
+  const server = secondServerByPage.get(page)
+  if (!server) throw new Error('No second test backend server has been started for this scenario')
+  return server
+}
 
 // --- Navigation ---
 
@@ -100,6 +120,13 @@ Then('I should see the server address input', async ({ page }) => {
 
 Then('I should see a server address error', async ({ page }) => {
   await expect(page.getByTestId(TestIds.SERVER_ADDRESS_ERROR)).toBeVisible({ timeout: Timeouts.API })
+})
+
+Then('the server address error says https is required', async ({ page }) => {
+  // The refusal comes from local validation (normalizeServerInput), before any
+  // probe: an unreachable-host error here would mean the insecure address was
+  // contacted.
+  await expect(page.getByTestId(TestIds.SERVER_ADDRESS_ERROR)).toContainText('https://', { timeout: Timeouts.API })
 })
 
 When('I enter {string} as the server address and submit', async ({ page }, address: string) => {
@@ -164,29 +191,48 @@ Then('the request is blocked by the runtime allowlist', async ({ page }) => {
   expect(result?.message).toMatch(/blocked/i)
 })
 
+const probeResultByPage = new WeakMap<object, BlockResult>()
+
+When('the app attempts a health probe of the second server', async ({ page }) => {
+  const url = secondServer(page).origin
+  const result = await page.evaluate(async (target) => {
+    const invoke = (window as unknown as Record<symbol, unknown>)[Symbol.for('llamenos_test_invoke')] as
+      (cmd: string, args?: Record<string, unknown>) => Promise<unknown>
+    try {
+      await invoke('net_probe_health', { url: target })
+      return { blocked: false }
+    } catch (err) {
+      return { blocked: true, message: err instanceof Error ? err.message : String(err) }
+    }
+  }, url)
+  probeResultByPage.set(page, result)
+})
+
+Then('the probe is refused because a server is already configured', async ({ page }) => {
+  const result = probeResultByPage.get(page)
+  expect(result?.blocked).toBe(true)
+  expect(result?.message).toMatch(/already configured/i)
+})
+
+Then('the second test backend server should have received no requests', async ({ page }) => {
+  expect(secondServer(page).requests).toEqual([])
+})
+
 // --- Changing the address later from Settings ---
 
 When('I open the settings server address section', async ({ page }) => {
-  await page.goto('/settings?section=server-connection')
+  // In-app navigation, not page.goto: a full reload would lock the device key
+  // and bounce to the unlock screen before Settings is reachable.
+  await page.evaluate(() => {
+    void window.__TEST_ROUTER.navigate({ to: '/settings', search: { section: 'server-connection' } })
+  })
+  await expect(page.getByTestId(TestIds.SETTINGS_SERVER_ADDRESS_INPUT)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 When('I enter the test backend server\'s address and save', async ({ page }) => {
   const server = lastServer(page)
   await page.getByTestId(TestIds.SETTINGS_SERVER_ADDRESS_INPUT).fill(server.origin)
   await page.getByTestId(TestIds.SETTINGS_SERVER_ADDRESS_SUBMIT).click()
-})
-
-Then('the app reloads and requests land on the test backend server', async ({ page }) => {
-  const server = lastServer(page)
-  // The settings save handler calls window.location.reload(). Poll directly
-  // rather than waiting on a load-state event first — waiting on
-  // 'domcontentloaded' here can race the reload and resolve against the
-  // page's PRE-reload state; polling the server's request log is immune to
-  // that race and succeeds as soon as the reloaded app's ConfigProvider fires.
-  await expect.poll(
-    () => server.requests.some(r => r.path === '/api/config'),
-    { timeout: Timeouts.API },
-  ).toBe(true)
 })
 
 Then('my session is cleared', async ({ page }) => {
