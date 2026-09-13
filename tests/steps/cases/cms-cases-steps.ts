@@ -855,9 +855,16 @@ Given('an arrest case exists that is not assigned to me', async ({ backendReques
 // "I click the {string} button" and "the {string} button should be visible"
 // are handled by common/interaction-steps.ts
 
-Then('the {string} button should no longer be visible', async ({ page }) => {
-  const btn = page.getByTestId('case-assign-btn')
-  await expect(btn).not.toBeVisible({ timeout: 5000 })
+Then('the {string} button should no longer be visible', async ({ page }, text: string) => {
+  // Feature-file button text doesn't always match the accessible name — map known
+  // mismatches to their data-testid, same pattern as buttonTextToTestIdMap in
+  // common/interaction-steps.ts.
+  const testIdMap: Record<string, string> = {
+    'Assign to me': 'case-assign-btn',
+  }
+  const testId = testIdMap[text]
+  const btn = testId ? page.getByTestId(testId) : page.getByRole('button', { name: text }).first()
+  await expect(btn).toBeHidden({ timeout: Timeouts.ELEMENT })
 })
 
 // --- Pagination ---
