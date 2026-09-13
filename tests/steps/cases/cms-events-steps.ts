@@ -24,6 +24,9 @@ import {
   listRecordsViaApi,
   linkReportToEventViaApi,
   createReportViaApi,
+  listEventRecordsViaApi,
+  listEventReportsViaApi,
+  getRecordViaApi,
 } from '../../api-helpers'
 
 // State is now in casesWorld fixture (casesWorld.eventEntityTypeId, casesWorld.lastEventId, casesWorld.lastEventName)
@@ -78,6 +81,14 @@ async function ensureEventEntityType(
 
   casesWorld.eventEntityTypeId = eventType.id
   return eventType.id
+}
+
+/** The jail-support template's arrest case type — the Background applies the template, so it must exist. */
+async function arrestCaseTypeId(request: APIRequestContext, workerHub?: string): Promise<string> {
+  const entityTypes = await listEntityTypesViaApi(request, workerHub)
+  const arrestType = entityTypes.find(et => (et as { name?: string }).name === 'arrest_case')
+  expect(arrestType, 'jail-support template should define the arrest_case entity type').toBeDefined()
+  return (arrestType as { id: string }).id
 }
 
 // --- Background: event entity type exists ---
@@ -144,29 +155,11 @@ When('I click the new event button', async ({ page }) => {
 
 When('I fill in the event name with a unique name', async ({ page, casesWorld }) => {
   casesWorld.lastEventName = `Test Event ${Date.now()}`
-  const dialog = page.getByRole('dialog')
-  const titleInput = page.getByTestId('case-title-input')
-  const typeSelect = page.getByTestId('case-type-select')
-
-  // The dialog fetches entity types asynchronously on open. Wait for the loader to
-  // clear; afterwards the DOM is settled in exactly one of two states — a type
-  // select (multiple entity types) or the title input (single type auto-selected).
-  await expect(dialog.getByText(/loading/i)).toBeHidden({ timeout: Timeouts.ELEMENT })
-  await expect(typeSelect.or(titleInput)).toBeVisible({ timeout: Timeouts.ELEMENT })
-
-  if (await typeSelect.count() > 0) {
-    await typeSelect.click()
-    // Prefer an event-category type; otherwise take the first available type.
-    const options = page.getByRole('option')
-    await expect(options.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
-    const eventOption = page.getByRole('option', { name: /event|protest/i })
-    if (await eventOption.count() > 0) {
-      await eventOption.first().click()
-    } else {
-      await options.first().click()
-    }
-  }
-
+  // The Events page opens the create dialog with its event entity type pre-selected
+  // (defaultEntityTypeId), and the title input only renders once entity types have
+  // loaded AND a type is selected. It is therefore the single settled wait target —
+  // the type select may also be visible (several entity types) but needs no change.
+  const titleInput = page.getByRole('dialog').getByTestId('case-title-input')
   await expect(titleInput).toBeVisible({ timeout: Timeouts.ELEMENT })
   await titleInput.fill(casesWorld.lastEventName)
 })
@@ -268,14 +261,18 @@ Given('an event with linked reports exists', async ({ backendRequest: request, c
   await linkReportToEventViaApi(request, casesWorld.lastEventId!, (report as { id: string }).id, ADMIN_NSEC, workerHub)
 })
 
-When('I view the event detail', async ({ page }) => {
+When('I view the event detail', async ({ page, backendRequest: request, casesWorld, workerHub }) => {
+  // Records sort by updatedAt, and the worker hub accumulates events across scenarios,
+  // so "the first card" is not necessarily this scenario's event. Open the card that
+  // shows this event's identifier (case number, or the id prefix when unnumbered).
+  const event = await getRecordViaApi(request, casesWorld.lastEventId, workerHub)
+  const label = (event as { caseNumber?: string | null }).caseNumber || casesWorld.lastEventId.slice(0, 8)
   await navigateAfterLogin(page, '/events')
-  // Click first case card (event) to open detail
-  const card = page.getByTestId('case-card').first()
+  const card = page.getByTestId('case-list').getByTestId('case-card').filter({ hasText: label })
   await expect(card).toBeVisible({ timeout: Timeouts.ELEMENT })
   await card.click()
-  // Wait for detail panel to render before subsequent tab interactions
-  await expect(page.getByTestId('case-detail-header')).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // Wait for this event's detail panel to render before subsequent tab interactions
+  await expect(page.getByTestId('case-detail-header')).toContainText(label, { timeout: Timeouts.ELEMENT })
 })
 
 Then('linked case records should be visible', async ({ page }) => {
@@ -292,35 +289,34 @@ Then('each case link should show a case number', async ({ page }) => {
 })
 
 Then('the linked cases count should show {int}', async ({ page }, count: number) => {
-  // The linked count is the number of case cards on the detail "Cases" tab
-  const casesTab = page.getByTestId('case-tab-cases')
-  await expect(casesTab).toBeVisible({ timeout: Timeouts.ELEMENT })
-  await casesTab.click()
-  const list = page.getByTestId('event-linked-cases-list')
-  await expect(list).toBeVisible({ timeout: Timeouts.ELEMENT })
-  await expect(list.getByTestId('event-linked-case-card')).toHaveCount(count, { timeout: Timeouts.ELEMENT })
+  // The linked count is the number of entries in the event's Cases tab.
+  const tab = page.getByTestId('case-tab-cases')
+  await expect(tab).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await tab.click()
+  await expect(page.getByTestId('event-linked-case-card')).toHaveCount(count, { timeout: Timeouts.ELEMENT })
 })
 
-Then('the linked cases count should increase by {int}', async ({ page }, _increment: number) => {
-  // Accept that linking was successful if the detail is still visible
-  await expect(page.getByTestId('case-detail-header')).toBeVisible({ timeout: Timeouts.ELEMENT })
+Then('the linked cases count should increase by {int}', async ({ page, backendRequest: request, casesWorld, workerHub }, increment: number) => {
+  // 'an event exists' creates a fresh event, so the baseline is zero links.
+  await expect(page.getByTestId('event-linked-case-card')).toHaveCount(increment, { timeout: Timeouts.ELEMENT })
+  const { links } = await listEventRecordsViaApi(request, casesWorld.lastEventId, ADMIN_NSEC, workerHub)
+  expect(links).toHaveLength(increment)
 })
 
 Then('linked reports should be visible', async ({ page }) => {
-  await expect(page.getByTestId('case-detail-header')).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // The previous step opened the event's Reports tab (case-tab-reports).
+  const items = page.getByTestId('event-linked-reports-list').getByTestId('event-linked-report-item')
+  await expect(items.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 // --- Link cases to events ---
 
 Given('an event exists', async ({ backendRequest: request, casesWorld, workerHub }) => {
+  // Always a fresh event: linking scenarios assert link counts, so reusing an event
+  // that earlier scenarios in this worker hub already linked would make them order-dependent.
   const entityTypeId = await ensureEventEntityType(request, casesWorld, workerHub)
-  const records = await listRecordsViaApi(request, { entityTypeId, hubId: workerHub })
-  if (records.records.length === 0) {
-    const event = await createRecordViaApi(request, entityTypeId, { statusHash: 'active', hubId: workerHub })
-    casesWorld.lastEventId = (event as { id: string }).id
-  } else {
-    casesWorld.lastEventId = (records.records[0] as { id: string }).id
-  }
+  const event = await createRecordViaApi(request, entityTypeId, { statusHash: 'active', hubId: workerHub })
+  casesWorld.lastEventId = (event as { id: string }).id
 })
 
 // 'a report exists' is handled by admin/desktop-admin-steps.ts
@@ -328,32 +324,44 @@ Given('an event exists', async ({ backendRequest: request, casesWorld, workerHub
 // "I click the {string} button" is handled by common/interaction-steps.ts
 
 When('I search for a case by number', async ({ page }) => {
-  // Search input inside the link-case dialog
-  const searchInput = page.getByRole('dialog').getByTestId('event-link-case-search')
+  // Search input inside the link-case dialog. Wait for at least one result so the
+  // next step's click has something settled to act on instead of racing the search.
+  const dialog = page.getByRole('dialog')
+  const searchInput = dialog.getByTestId('event-link-case-search')
   await expect(searchInput).toBeVisible({ timeout: Timeouts.ELEMENT })
   await searchInput.fill('case')
+  await expect(dialog.getByTestId('event-link-case-result').first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 When('I select the case from the search results', async ({ page }) => {
-  // Close the link dialog (the linking is done via API in the Given steps)
-  await page.keyboard.press('Escape')
-  const overlay = page.locator('[data-slot="dialog-overlay"]')
-  await overlay.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
+  // Selecting a result performs the link write; the dialog closes only on success.
+  const dialog = page.getByRole('dialog')
+  const result = dialog.getByTestId('event-link-case-result').first()
+  await expect(result).toBeEnabled({ timeout: Timeouts.ELEMENT })
+  await result.click()
+  await expect(dialog).toBeHidden({ timeout: Timeouts.ELEMENT })
 })
 
 Then('the case should appear in the event\'s linked cases', async ({ page }) => {
-  await expect(page.getByTestId('case-detail-header')).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const items = page.getByTestId('event-linked-cases-list').getByTestId('event-linked-case-card')
+  await expect(items.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 When('I select the report', async ({ page }) => {
-  // Close the link dialog (the linking is done via API in the Given steps)
-  await page.keyboard.press('Escape')
-  const overlay = page.locator('[data-slot="dialog-overlay"]')
-  await overlay.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
+  // Selecting a result performs the link write; the dialog closes only on success.
+  const dialog = page.getByRole('dialog')
+  const result = dialog.getByTestId('event-link-report-result').first()
+  await expect(result).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(result).toBeEnabled()
+  await result.click()
+  await expect(dialog).toBeHidden({ timeout: Timeouts.ELEMENT })
 })
 
-Then('the report should appear in the event\'s linked reports', async ({ page }) => {
-  await expect(page.getByTestId('case-detail-header')).toBeVisible({ timeout: Timeouts.ELEMENT })
+Then('the report should appear in the event\'s linked reports', async ({ page, backendRequest: request, casesWorld, workerHub }) => {
+  const items = page.getByTestId('event-linked-reports-list').getByTestId('event-linked-report-item')
+  await expect(items).toHaveCount(1, { timeout: Timeouts.ELEMENT })
+  const { links } = await listEventReportsViaApi(request, casesWorld.lastEventId, ADMIN_NSEC, workerHub)
+  expect(links).toHaveLength(1)
 })
 
 // --- Event status ---
@@ -370,14 +378,15 @@ When('I change the event status to {string}', async ({ page }, newStatus: string
   await expect(pill).toBeVisible({ timeout: Timeouts.ELEMENT })
   await pill.click()
 
-  const option = page.getByTestId('case-status-dropdown')
-    .getByRole('option', { name: new RegExp(newStatus, 'i') })
+  // The Gherkin status is the status value; options are keyed by value
+  // (data-testid={`case-status-option-${status.value}`} in status-pill.tsx).
+  const option = page.getByTestId('case-status-dropdown').getByTestId(`case-status-option-${newStatus}`)
   await expect(option).toBeVisible({ timeout: Timeouts.ELEMENT })
   await option.click()
 })
 
 Then('the event status should reflect {string}', async ({ page }, status: string) => {
-  // Waits for the status PATCH + re-render to update the pill label
+  // The pill re-renders with the new label only after the status write succeeds.
   const pill = page.getByTestId('case-detail-header').getByTestId('case-status-pill')
-  await expect(pill).toContainText(new RegExp(status, 'i'), { timeout: Timeouts.ELEMENT })
+  await expect(pill).toHaveText(new RegExp(status, 'i'), { timeout: Timeouts.ELEMENT })
 })
