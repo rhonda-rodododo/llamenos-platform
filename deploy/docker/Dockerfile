@@ -46,6 +46,16 @@ RUN cargo build --release --manifest-path packages/crypto/Cargo.toml --features 
 FROM oven/bun:1.4.0-slim@sha256:e0ee68d16ccb9927bf02aa7dd8fd4bf3369ee6d46da04faa72b05ce8bfd135f6 AS app
 # oven/bun:1.3.5-slim pinned to match .mise.toml — update via Dependabot
 
+# Apply outstanding Debian security updates on top of the pinned base.
+# The base digest above is the newest published for the `1.4.0-slim` tag, so a
+# digest bump cannot pick these up: when Debian publishes a security update the
+# upstream image lags it, and security-audit.yml's image-scan gate (fail on
+# FIXABLE CRITICAL) goes red on a base the tag can't move off. Upgrading here
+# rebases onto the current debian-security archive (this landed for perl-base
+# 5.40.1-6 → 5.40.1-6+deb13u1: CVE-2026-13221, CVE-2026-42496, CVE-2026-8376).
+# No new packages are installed — upgrade only, then the apt lists are dropped.
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+
 # Create non-root user
 RUN groupadd -r llamenos && useradd -r -g llamenos -d /app -s /sbin/nologin llamenos
 
