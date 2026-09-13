@@ -752,8 +752,17 @@ export class SettingsService {
             : 'all',
     }))
 
-    // Replace all custom fields in a transaction
+    // Replace all custom fields in a transaction, serialized across writers.
+    // DELETE-all + INSERT under READ COMMITTED is not safe on its own: a
+    // concurrent writer's DELETE blocks on our row locks, then skips the rows
+    // we deleted and cannot see the rows we inserted, so both inserts survive
+    // and the table ends up holding the union of both lists (duplicate names)
+    // (#686). The transaction-scoped advisory lock makes each replacement see
+    // the previous one's committed state: last writer wins, never a union.
     await this.db.transaction(async (tx) => {
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtext('custom_field_definitions:replace'))`,
+      )
       await tx.delete(customFieldDefinitions)
       for (const [i, f] of normalized.entries()) {
         await tx.insert(customFieldDefinitions).values({
