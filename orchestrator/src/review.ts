@@ -376,7 +376,12 @@ async function invokeVerifierEngine(input: {
   // against opencode 1.18.30, which accepts it there as well as positionally.
   const args = input.engine === 'claude'
     ? ['--print', '--permission-mode', 'plan', '--model', cfg.model, '--max-turns', String(input.maxTurns)]
-    : ['run', '--pure', '--model', cfg.model, '--format', 'default', '--dir', input.cwd]
+    // `--agent plan` is the enforcement that the reviewer is a READER. Verified
+    // against opencode 1.18.30: told directly to overwrite a file, the plan
+    // agent produces a plan and the file is untouched. The default `build`
+    // agent allows bash and edit, which on a CI runner means a
+    // prompt-injected reviewer could act on the machine judging the diff.
+    : ['run', '--pure', '--agent', 'plan', '--model', cfg.model, '--format', 'default', '--dir', input.cwd]
 
   try {
     // execFile (unlike execFileSync) has no `input` option — the prompt must

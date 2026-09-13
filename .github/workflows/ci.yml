@@ -1499,11 +1499,11 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
-      # contents: read and nothing else. The reviewer runs inside this job
-      # with the review key on disk, so the containment that matters is that
-      # NOTHING from the commit under judgement ever executes here: it is a
-      # `git archive` export the model reads, never a checkout, never
-      # installed, never on a module path.
+      # contents: read and NOTHING else. This job holds the review key and
+      # runs a model over the judged commit's diff, so it must never hold a
+      # token that can act on the PR. Recording the verdict as an approval
+      # happens in `fleet-approve.yml`, which runs from base-branch YAML on a
+      # `workflow_run` event — see that file for why this separation exists.
       contents: read
     # HIGH_IMPACT_TIMEOUT_MS alone is 25 minutes (review.ts); checkout, deps,
     # the engine download and the smoke call have to fit around it.
@@ -1565,10 +1565,14 @@ jobs:
           url="https://github.com/anomalyco/opencode/releases/download/v${OPENCODE_VERSION}/opencode-linux-x64.tar.gz"
           curl -fsSL -o /tmp/opencode.tar.gz "$url"
           echo "${OPENCODE_SHA256}  /tmp/opencode.tar.gz" | sha256sum -c -
-          mkdir -p "$HOME/.local/bin"
-          tar -xzf /tmp/opencode.tar.gz -C "$HOME/.local/bin"
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-          "$HOME/.local/bin/opencode" --version
+          # A dedicated directory, APPENDED to PATH, never `$HOME/.local/bin`
+          # prepended: a reviewer that got a write primitive should not be able
+          # to shadow `gh`, `git` or anything else a later step invokes by
+          # dropping a file into a directory that wins the PATH search.
+          mkdir -p "$RUNNER_TEMP/opencode-bin"
+          tar -xzf /tmp/opencode.tar.gz -C "$RUNNER_TEMP/opencode-bin"
+          echo "$RUNNER_TEMP/opencode-bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/opencode-bin/opencode" --version
 
       # opencode authenticates from `auth.json`, not an env var (there is no
       # OPENCODE_API_KEY — see review.ts's VERIFIER_ENV_ALLOWLIST comment).
@@ -1636,7 +1640,31 @@ jobs:
               ;;
           esac
 
+      # Written here, from BASE-branch YAML, so the commit under judgement
+      # cannot influence what its own reviewer is allowed to do. `--agent plan`
+      # (review.ts) is the enforcement; this denies the write primitives a
+      # second time, at the layer below it. Verified against opencode 1.18.30:
+      # under `--agent plan` a direct instruction to overwrite a file produces
+      # a plan and leaves the file untouched.
+      - name: Constrain the reviewer to read-only
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.config/opencode"
+          cat > "$HOME/.config/opencode/opencode.json" <<'JSON'
+          {
+            "$schema": "https://opencode.ai/config.json",
+            "permission": [
+              { "permission": "bash", "action": "deny", "pattern": "*" },
+              { "permission": "edit", "action": "deny", "pattern": "*" },
+              { "permission": "write", "action": "deny", "pattern": "*" },
+              { "permission": "patch", "action": "deny", "pattern": "*" },
+              { "permission": "webfetch", "action": "deny", "pattern": "*" }
+            ]
+          }
+          JSON
+
       - name: Review
+        id: review
         env:
           # Absent fails the job — never a skip and never a pass. A review
           # that could not run is not a review that passed.
