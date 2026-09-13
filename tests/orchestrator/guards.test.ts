@@ -95,9 +95,12 @@ describe('rail: the fleet cannot merge its own changes', () => {
  *     non-author verdict as a COMMENT; an approving review is one ruleset
  *     edit away from being an approval the fleet grants itself.
  *
- * `--match-head-commit` is deliberately NOT forbidden: it is a pin, the
- * opposite of a bypass, and `mergePr` passing it is exactly what stops a
- * branch that moved after verification from being merged.
+ * `--match-head-commit` is not mentioned here at all any more: `mergePr` and
+ * its pin are gone, because the fleet no longer merges anything. What
+ * replaced the pin is a property of the platform — a check run attaches to
+ * ONE commit, so a push moves the head and the new head carries no green
+ * `fleet/verify` or `fleet/review` of its own. See the merge-call block
+ * below for what does remain.
  */
 describe('rail: the fleet never bypasses a PR\'s checks, and never reviews', () => {
   function orchestratorSources(): { file: string; text: string }[] {
@@ -145,6 +148,39 @@ describe('rail: the fleet never bypasses a PR\'s checks, and never reviews', () 
     }
   })
 
+  /**
+   * The fleet must never ask "who am I?" and compare that to a PR's author.
+   *
+   * This is not hypothetical tidiness — it encodes a decision already taken
+   * twice. A proposal to "verify unless the author is the human owner" was
+   * rejected because the fleet pushed with the operator's own account, so
+   * author login could not discriminate anything. Now the opposite holds:
+   * the fleet authors as a dedicated machine user and the sole code owner
+   * approves, because GitHub forbids self-approval. Either way, an identity
+   * check here would be wrong — and in the second arrangement it would
+   * silently do the wrong thing rather than fail.
+   *
+   * Authors ARE read (`PrFacts.reviews`), but only to render; nothing
+   * compares them. These are the calls that would introduce a self-identity
+   * to compare against.
+   */
+  it('never resolves its own GitHub identity', () => {
+    for (const { file, text } of orchestratorSources()) {
+      // Argv-aware rather than literal-string: `'api', 'user'` with the exact
+      // spacing was trivially evaded by `gh(['api','/user'])`. Any `user`
+      // path segment inside a gh call is the thing to catch, however spaced
+      // or quoted.
+      for (const call of ghCalls(text)) {
+        for (const seg of ["'user'", '"user"', "'/user'", '"/user"']) {
+          expect(call, `${file}: gh call resolves the authenticated user (${seg})`).not.toContain(seg)
+        }
+      }
+      // GraphQL's `viewer` has no other meaning in this codebase, so the bare
+      // word is forbidden outright — no construction evades it.
+      expect(text, `${file} uses the GraphQL viewer (self) field`).not.toMatch(/\bviewer\b/)
+    }
+  })
+
   it('finds gh calls to scan — the grep must not pass vacuously', () => {
     const total = orchestratorSources().reduce((n, { text }) => n + ghCalls(text).length, 0)
     expect(total).toBeGreaterThan(5)
@@ -162,20 +198,34 @@ describe('rail: the fleet never bypasses a PR\'s checks, and never reviews', () 
     }
   })
 
-  // Every merge this fleet performs is pinned to the commit that was
-  // verified. A `gh pr merge` without the pin would merge whatever the branch
-  // happens to point at now, which is the race `mayAutoMerge`'s own
-  // verified-commit comparison exists to close.
-  it('pins every `gh pr merge` to the verified commit', () => {
+  /**
+   * `mergePr` and its `--match-head-commit` pin are gone: the fleet no longer
+   * merges anything. What replaced the pin is a property of the platform —
+   * a check run is attached to ONE commit, so a push moves the head and the
+   * new head carries no green `fleet/verify` or `fleet/review` of its own,
+   * and auto-merge does not fire.
+   *
+   * Exactly two `gh pr merge` calls remain and they are a pair: one ARMS
+   * GitHub's auto-merge, reached only after mechanical verification and the
+   * non-author review have both passed; one can only UN-arm, for a PR an
+   * earlier attempt armed before this one rejected it. Anything that is
+   * neither — a bare merge, or a third call — would be this process deciding
+   * something that is GitHub's to decide.
+   */
+  it('invokes `gh pr merge` only to arm or to un-arm auto-merge, never to merge', () => {
     const PR_MERGE = /\[\s*'pr'\s*,\s*'merge'[^\]]*\]/g
-    let seen = 0
+    const calls: string[] = []
     for (const { file, text } of orchestratorSources()) {
       for (const call of text.match(PR_MERGE) ?? []) {
-        seen++
-        expect(call, `${file}: gh pr merge without --match-head-commit`).toContain("'--match-head-commit'")
+        calls.push(call)
+        const arms = call.includes("'--auto'")
+        const disarms = call.includes("'--disable-auto'")
+        expect(arms !== disarms, `${file}: gh pr merge that neither arms nor disarms: ${call}`).toBe(true)
       }
     }
-    expect(seen).toBe(1)
+    expect(calls.filter((c) => c.includes("'--auto'"))).toHaveLength(1)
+    expect(calls.filter((c) => c.includes("'--disable-auto'"))).toHaveLength(1)
+    expect(calls).toHaveLength(2)
   })
 })
 

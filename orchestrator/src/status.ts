@@ -61,7 +61,7 @@ export interface ItemStatusView {
   worktreeExists?: boolean
 }
 
-/** `verify=`/`review=`/`merge=` etc. all use `=`, so anchoring on `sha=`
+/** `scope=`/`impact=`/`tests=`/`review=` all use `=`, so anchoring on `sha=`
  *  specifically (rather than splitting the whole note on spaces) is safe
  *  even though the reason text after other fields can itself contain `=`
  *  or spaces — `sha` is always the LAST field `buildGateTrace` emits and its

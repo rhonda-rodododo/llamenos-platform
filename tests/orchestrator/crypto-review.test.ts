@@ -2,10 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   isCryptoDiff, requiredAdditionalReviewers, CRYPTO_SECURITY_REVIEWER_AGENT, CRYPTO_REVIEW_PATHS,
 } from '../../orchestrator/src/review.js'
-import { mayAutoMerge } from '../../orchestrator/src/merge.js'
-import { classifyImpact } from '../../orchestrator/src/impact.js'
 import { codeownersMatcher, trackedFiles, trackedFilesUnder } from './codeowners.js'
-import type { VerifyReport } from '../../orchestrator/src/verify.js'
 
 describe('isCryptoDiff / requiredAdditionalReviewers', () => {
   it('requests the crypto reviewer for a diff touching packages/crypto/', () => {
@@ -41,39 +38,10 @@ describe('isCryptoDiff / requiredAdditionalReviewers', () => {
   })
 })
 
-describe('mayAutoMerge refuses crypto diffs regardless of reviewer approval', () => {
-  const cryptoReport = (): VerifyReport => {
-    const changedFiles = ['packages/crypto/src/hpke_envelope.rs']
-    const { impact, reasons } = classifyImpact(changedFiles, 20)
-    return {
-      passed: true, reasons: [], changedFiles, addedLines: 20,
-      impact, impactReasons: reasons, testsPassed: true, verifiedCommit: 'deadbeef',
-    }
-  }
-
-  it('classifies a packages/crypto/ diff as high impact', () => {
-    expect(cryptoReport().impact).toBe('high')
-  })
-
-  it('refuses to auto-merge a crypto diff even with CI green and the non-author review PASS', () => {
-    const result = mayAutoMerge(cryptoReport(), true, 'PASS', 'deadbeef')
-    expect(result.merge).toBe(false)
-  })
-
-  it('refuses to auto-merge a crypto diff even if a crypto-reviewer approval were folded into the ' +
-    'same PASS verdict — mayAutoMerge has no separate crypto-verdict parameter to smuggle an ' +
-    'approval through', () => {
-    // Simulates "the crypto reviewer approved" the only way it could ever reach this function:
-    // as part of an approving reviewVerdict. Impact alone must still block it.
-    const result = mayAutoMerge(cryptoReport(), true, 'PASS', 'deadbeef')
-    expect(result.merge).toBe(false)
-    expect(result.reason).toMatch(/high-impact/i)
-  })
-})
-
-// `mayAutoMerge` stops a crypto diff today. CODEOWNERS is what will still
-// stop it once that function is deleted (PR C), so both are asserted here —
-// against the real tree, with the same gitignore semantics GitHub applies.
+// `mayAutoMerge` is gone. CODEOWNERS is now the only thing that stops a
+// crypto diff merging without a human, so this is no longer a belt-and-braces
+// assertion — it is THE assertion, against the real tree, with the same
+// gitignore semantics GitHub applies.
 describe('crypto paths are owned in CODEOWNERS, not only gated in code', () => {
   it('owns every tracked crypto-review file', () => {
     const files = trackedFiles()

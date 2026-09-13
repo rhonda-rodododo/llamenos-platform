@@ -112,7 +112,7 @@ describe('fleet/verify in CI', () => {
   it('passes with the gate trace as its summary when verification passes', async () => {
     expect(await runVerifyCi(deps())).toEqual({
       ok: true,
-      summary: 'scope=pass impact=low tests=orchestrator:pass review=not-run merge=not-run sha=c0ffee',
+      summary: 'scope=pass impact=low tests=orchestrator:pass review=not-run sha=c0ffee',
     })
   })
 
