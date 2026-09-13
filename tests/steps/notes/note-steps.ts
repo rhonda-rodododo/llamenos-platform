@@ -255,13 +255,9 @@ When('I type in the notes search input', async ({ page }) => {
 })
 
 Then('the notes list should update', async ({ page }) => {
-  // Verify the list has responded to the search — wait for network to settle
-  await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {})
-  // The note list or empty state should be visible after search
-  const anyContent = page.locator(
-    `[data-testid="${TestIds.NOTE_LIST}"], [data-testid="${TestIds.NOTE_CARD}"], [data-testid="${TestIds.EMPTY_STATE}"]`,
-  )
-  await expect(anyContent.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // After a search the page settles on either the (filtered) list or the empty state.
+  const settled = page.getByTestId(TestIds.NOTE_LIST).or(page.getByTestId(TestIds.EMPTY_STATE))
+  await expect(settled).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 When('I clear the notes search', async ({ page }) => {
@@ -271,12 +267,11 @@ When('I clear the notes search', async ({ page }) => {
 })
 
 Then('I should see the full notes list', async ({ page }) => {
-  // After clearing search, the note list or empty state should be visible
-  const noteList = page.getByTestId(TestIds.NOTE_LIST)
-  const emptyState = page.getByTestId(TestIds.EMPTY_STATE)
-  const isList = await noteList.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (isList) return
-  await expect(emptyState).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // After clearing search the unfiltered list renders — or the empty state when the hub
+  // has no notes. One retrying assertion over both, instead of probing the list first.
+  await expect(page.getByTestId(TestIds.NOTE_SEARCH)).toHaveValue('')
+  const settled = page.getByTestId(TestIds.NOTE_LIST).or(page.getByTestId(TestIds.EMPTY_STATE))
+  await expect(settled).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 // --- Save and verify note creation via API ---

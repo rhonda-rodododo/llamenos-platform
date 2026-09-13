@@ -193,11 +193,8 @@ When('I reload and re-authenticate', async ({ page }) => {
 })
 
 When('I log out', async ({ page }) => {
+  // The sidebar logout signs out immediately (only the settings-page button confirms).
   await page.getByTestId(TestIds.LOGOUT_BTN).click()
-  // Logout always asks for confirmation.
-  const dialog = page.getByTestId(TestIds.CONFIRM_DIALOG)
-  await expect(dialog).toBeVisible({ timeout: Timeouts.ELEMENT })
-  await dialog.getByTestId(TestIds.CONFIRM_DIALOG_OK).click()
   await page.waitForURL(/\/login/, { timeout: Timeouts.ELEMENT })
 })
 
