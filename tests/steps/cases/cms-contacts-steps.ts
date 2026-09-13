@@ -43,50 +43,37 @@ When('I navigate to the {string} admin page', async ({ page }, pageName: string)
  * Contacts created via API may not appear in the directory listing due to
  * blind index / encryption constraints in the test mock environment.
  * This helper creates a contact through the UI as a fallback.
+ *
+ * Every branch is decided only after a waiting assertion on a settled directory
+ * state (cards, the "no match" notice, or the empty state) — never on a
+ * non-waiting isVisible() probe. A failed UI creation fails the step loudly
+ * instead of being force-dismissed with Escape.
  */
 async function ensureContactVisibleInDirectory(
   page: import('@playwright/test').Page,
   name?: string,
 ): Promise<void> {
-  const card = page.getByTestId('directory-contact-card').first()
-  const isVisible = await card.isVisible({ timeout: 5000 }).catch(() => false)
-  if (isVisible) return
+  const card = page.getByTestId('directory-contact-card')
+  const noResults = page.getByTestId('contact-list').getByText(/no contacts match/i)
+  const emptyState = page.getByTestId('empty-state')
+  await expect(card.first().or(noResults).or(emptyState)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  if (await card.count() > 0) return
 
-  const newBtn = page.getByTestId('new-contact-btn')
-  const emptyBtn = page.getByTestId('empty-state-create-btn')
-  const createBtn = newBtn.or(emptyBtn)
-  if (await createBtn.first().isVisible({ timeout: 3000 }).catch(() => false)) {
-    await createBtn.first().click()
-    const contactName = name ?? `Test Contact ${Date.now()}`
-    await page.getByTestId('contact-name-input').fill(contactName)
-    await page.getByTestId('create-contact-submit').click()
+  // Directory is genuinely empty — create a contact through the UI. The header
+  // button always renders; the empty state has its own create button.
+  const createBtn = page.getByTestId('new-contact-btn').or(page.getByTestId('empty-state-create-btn'))
+  await expect(createBtn.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await createBtn.first().click()
 
-    // Wait for dialog to close
-    const dialog = page.getByTestId('create-contact-dialog')
-    await dialog.waitFor({ state: 'hidden', timeout: Timeouts.ELEMENT }).catch(() => {})
+  const dialog = page.getByTestId('create-contact-dialog')
+  await expect(dialog).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await page.getByTestId('contact-name-input').fill(name ?? `Test Contact ${Date.now()}`)
+  await page.getByTestId('create-contact-submit').click()
 
-    // If dialog is still open (e.g. submission pending), force-close with Escape
-    const stillOpen = await dialog.isVisible({ timeout: 1000 }).catch(() => false)
-    if (stillOpen) {
-      await page.keyboard.press('Escape')
-      await dialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
-    }
-
-    // Check if card appeared after creation
-    const appeared = await card.isVisible({ timeout: 5000 }).catch(() => false)
-    if (!appeared) {
-      // Contact may have been created but directory needs a reload to show it
-      await navigateAfterLogin(page, '/contacts-directory')
-    }
-  }
-
-  // Ensure any residual create-contact-dialog is dismissed before returning,
-  // so subsequent card clicks are not blocked by the dialog overlay.
-  const residualDialog = page.getByTestId('create-contact-dialog')
-  if (await residualDialog.isVisible({ timeout: 500 }).catch(() => false)) {
-    await page.keyboard.press('Escape')
-    await residualDialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
-  }
+  // On success the parent prepends the contact, selects it, and closes the dialog
+  // (handleContactCreated). Both are required outcomes — assert them.
+  await expect(dialog).toBeHidden({ timeout: Timeouts.ELEMENT })
+  await expect(card.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 }
 
 // --- Contact directory page elements ---
@@ -96,22 +83,25 @@ Then('the new contact button should be visible', async ({ page }) => {
 })
 
 Then('the contact search input should be visible', async ({ page }) => {
-  // Search input is inside contact-list which only renders when contacts exist.
-  // If empty state is showing, create a contact to make the list appear.
-  const contactList = page.getByTestId('contact-list')
-  if (!await contactList.isVisible({ timeout: 5000 }).catch(() => false)) {
+  // The search input is inside the contact-list pane, which only renders when the
+  // directory is non-empty. Seed a contact through the UI if it is empty.
+  await expect(
+    page.getByTestId('contact-list').or(page.getByTestId('empty-state')),
+  ).toBeVisible({ timeout: Timeouts.ELEMENT })
+  if (await page.getByTestId('contact-search-input').count() === 0) {
     await ensureContactVisibleInDirectory(page)
   }
-  const searchInput = page.getByTestId('contact-search-input')
-  const emptyState = page.getByTestId('empty-state')
-  const combined = searchInput.or(emptyState)
-  await expect(combined.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(page.getByTestId('contact-search-input')).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('the contact type filter should be visible', async ({ page }) => {
-  // Type filter is inside contact-list which only renders when contacts exist.
-  const contactList = page.getByTestId('contact-list')
-  if (!await contactList.isVisible({ timeout: 3000 }).catch(() => false)) return
+  // Same render condition as the search input — never return early on a probe.
+  await expect(
+    page.getByTestId('contact-list').or(page.getByTestId('empty-state')),
+  ).toBeVisible({ timeout: Timeouts.ELEMENT })
+  if (await page.getByTestId('contact-type-filter').count() === 0) {
+    await ensureContactVisibleInDirectory(page)
+  }
   await expect(page.getByTestId('contact-type-filter')).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
@@ -218,18 +208,21 @@ Then('the contact list should show {string}', async ({ page }, message: string) 
 // --- Type filter ---
 
 When('I select {string} from the contact type filter', async ({ page }, filterLabel: string) => {
-  const filter = page.getByTestId('contact-type-filter')
-  if (!await filter.isVisible({ timeout: 5000 }).catch(() => false)) {
+  // The type filter renders inside the contact-list pane, which only exists when
+  // the directory is non-empty — seed a contact through the UI if it is empty.
+  await expect(
+    page.getByTestId('contact-list').or(page.getByTestId('empty-state')),
+  ).toBeVisible({ timeout: Timeouts.ELEMENT })
+  if (await page.getByTestId('contact-type-filter').count() === 0) {
     await ensureContactVisibleInDirectory(page)
   }
-  if (!await filter.isVisible({ timeout: 3000 }).catch(() => false)) return
+  const filter = page.getByTestId('contact-type-filter')
+  await expect(filter).toBeVisible({ timeout: Timeouts.ELEMENT })
   await filter.click()
-  const option = page.locator('[role="option"]').filter({ hasText: new RegExp(filterLabel, 'i') })
-  if (await option.first().isVisible({ timeout: 3000 }).catch(() => false)) {
-    await option.first().click()
-  } else {
-    await page.keyboard.press('Escape')
-  }
+  // The option must exist — pressing Escape instead would silently skip the write.
+  const option = page.getByRole('option', { name: new RegExp(filterLabel, 'i') })
+  await expect(option.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await option.first().click()
 })
 
 Then('only individual contacts should appear in the list', async ({ page }) => {
@@ -464,43 +457,35 @@ Given('no contacts have been created', async ({ backendRequest: request, casesWo
 })
 
 When('I click on the {string} contact card', async ({ page }, name: string) => {
-  // Contacts created via API may not appear in the directory listing (blind index issue).
-  const card = page.getByTestId('directory-contact-card').filter({ hasText: name })
-  const isNameVisible = await card.first().isVisible({ timeout: 5000 }).catch(() => false)
-  if (isNameVisible) {
-    await card.first().click()
-  } else {
+  const namedCard = page.getByTestId('directory-contact-card').filter({ hasText: name })
+  // Wait for the directory to settle before deciding whether the contact is listed.
+  await expect(
+    namedCard.first()
+      .or(page.getByTestId('directory-contact-card').first())
+      .or(page.getByTestId('empty-state')),
+  ).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // API-created contacts may not list in the test mock env (blind index
+  // constraints) — create one through the UI, which shows immediately by name.
+  if (await namedCard.count() === 0) {
     await ensureContactVisibleInDirectory(page, name)
-    // Dismiss any open dialog before clicking (ensureContactVisibleInDirectory may have left one open)
-    const openDialog = page.getByTestId('create-contact-dialog')
-    if (await openDialog.isVisible({ timeout: 500 }).catch(() => false)) {
-      await page.keyboard.press('Escape')
-      await openDialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
-    }
-    const anyCard = page.getByTestId('directory-contact-card').first()
-    if (await anyCard.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await anyCard.click()
-    }
   }
+  await expect(namedCard.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await namedCard.first().click()
 })
 
 When('I click on the contact card', async ({ page }) => {
-  // If no contacts appear, create one through the UI first.
-  const card = page.getByTestId('directory-contact-card').first()
-  let isVisible = await card.isVisible({ timeout: 8000 }).catch(() => false)
-  if (!isVisible) {
+  const card = page.getByTestId('directory-contact-card')
+  // Wait for the directory to settle, seeding a contact through the UI if empty.
+  await expect(
+    card.first()
+      .or(page.getByTestId('contact-list').getByText(/no contacts match/i))
+      .or(page.getByTestId('empty-state')),
+  ).toBeVisible({ timeout: Timeouts.ELEMENT })
+  if (await card.count() === 0) {
     await ensureContactVisibleInDirectory(page)
-    // Dismiss any open dialog before clicking the card
-    const openDialog = page.getByTestId('create-contact-dialog')
-    if (await openDialog.isVisible({ timeout: 500 }).catch(() => false)) {
-      await page.keyboard.press('Escape')
-      await openDialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
-    }
-    isVisible = await card.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
   }
-  if (isVisible) {
-    await card.click()
-  }
+  await expect(card.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await card.first().click()
 })
 
 Then('the contact profile header should be visible', async ({ page }) => {
@@ -667,40 +652,25 @@ Given('I am logged in as a volunteer without PII access', async ({ page, backend
 })
 
 When('I click on the restricted contact card', async ({ page }) => {
-  // After re-login as volunteer, contacts should be visible but undecryptable (showing "Restricted").
-  // If no contacts are visible, create one via UI so we have something to click.
-  const card = page.getByTestId('directory-contact-card').first()
-  let cardVisible = await card.isVisible({ timeout: 8000 }).catch(() => false)
-
-  if (!cardVisible) {
-    // No contacts visible — try creating one via the UI
+  // After re-login as a volunteer without PII access, undecryptable contacts list
+  // as "Restricted". Wait for the directory to settle, seeding one through the UI
+  // if it is empty.
+  const card = page.getByTestId('directory-contact-card')
+  await expect(
+    card.first()
+      .or(page.getByTestId('contact-list').getByText(/no contacts match/i))
+      .or(page.getByTestId('empty-state')),
+  ).toBeVisible({ timeout: Timeouts.ELEMENT })
+  if (await card.count() === 0) {
     await ensureContactVisibleInDirectory(page)
-    cardVisible = await card.isVisible({ timeout: 5000 }).catch(() => false)
   }
-
-  if (!cardVisible) {
-    // Still not visible — navigate again in case the page needs a refresh
-    const { navigateAfterLogin } = await import('../../helpers')
-    await navigateAfterLogin(page, '/contacts-directory')
-    cardVisible = await card.isVisible({ timeout: 8000 }).catch(() => false)
-  }
-
-  // Close any open dialog that may be blocking clicks (e.g. create-contact-dialog
-  // left open after ensureContactVisibleInDirectory ran its UI creation fallback)
-  const openDialog = page.getByTestId('create-contact-dialog')
-  if (await openDialog.isVisible({ timeout: 1000 }).catch(() => false)) {
-    await page.keyboard.press('Escape')
-    await openDialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
-  }
-
-  if (cardVisible) {
-    // Prefer a card showing "Restricted" text
-    const restricted = page.getByTestId('directory-contact-card').filter({ hasText: /restricted/i })
-    if (await restricted.first().isVisible({ timeout: 3000 }).catch(() => false)) {
-      await restricted.first().click()
-    } else {
-      await card.click()
-    }
+  // Prefer a card showing "Restricted" text; fall back to the first card.
+  const restricted = card.filter({ hasText: /restricted/i })
+  await expect(card.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  if (await restricted.count() > 0) {
+    await restricted.first().click()
+  } else {
+    await card.first().click()
   }
 })
 

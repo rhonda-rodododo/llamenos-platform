@@ -241,8 +241,14 @@ Then('the create case submit button should be disabled', async ({ page }) => {
 })
 
 When('I click the {string} entity type tab', async ({ page }, tabName: string) => {
-  const tab = page.locator('[data-testid^="case-tab-"]').filter({ hasText: tabName })
-  await tab.first().click()
+  // Tab test ids are deterministic — case-tab-all, or case-tab-<entity type name>
+  // with the label lowercased and spaces as underscores (routes/cases.tsx).
+  const testId = tabName === 'All'
+    ? 'case-tab-all'
+    : `case-tab-${tabName.toLowerCase().replace(/\s+/g, '_')}`
+  const tab = page.getByTestId(testId)
+  await expect(tab).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await tab.click()
 })
 
 Then('the entity type selector should show {string}', async ({ page }, expected: string) => {
@@ -459,37 +465,22 @@ Then('I should see the {string} tab', async ({ page }, tabName: string) => {
 
 Then('the {string} tab is active', async ({ page }, tabName: string) => {
   const tabKey = tabName.toLowerCase()
+  // Case detail tabs render case-tab-<key> (bg-card when active), contact profile
+  // tabs render contact-tab-<key> (border-primary when active). This is an
+  // assertion step — never click here to force the state.
   const tab = page.getByTestId(`case-tab-${tabKey}`).or(page.getByTestId(`contact-tab-${tabKey}`))
-  await expect(tab.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
-  // Tab is active when it has the bg-card class for case tabs or border-primary for contact tabs
-  const classList = await tab.first().getAttribute('class') ?? ''
-  if (!classList.includes('bg-card') && !classList.includes('border-primary')) {
-    await tab.first().click()
-  }
+  await expect(tab).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(tab).toHaveClass(/bg-card|border-primary/, { timeout: Timeouts.ELEMENT })
 })
 
 When('I click the {string} tab', async ({ page }, tabName: string) => {
   const tabKey = tabName.toLowerCase()
-
-  // Wait for case detail panel to be loaded before clicking tabs
-  // This prevents race conditions where the tab button isn't rendered yet
-  const detailHeader = page.getByTestId('case-detail-header')
-  const contactHeader = page.getByTestId('contact-profile-header')
-  await detailHeader.or(contactHeader).first().waitFor({ state: 'visible', timeout: Timeouts.ELEMENT }).catch(() => {})
-
-  // Try case detail tab first, then contact profile tab
-  const caseTab = page.getByTestId(`case-tab-${tabKey}`)
-  if (await caseTab.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await caseTab.click()
-  } else {
-    const contactTab = page.getByTestId(`contact-tab-${tabKey}`)
-    if (await contactTab.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await contactTab.click()
-    } else {
-      // Fallback to text-based tab click
-      await page.getByRole('button', { name: new RegExp(tabName, 'i') }).first().click()
-    }
-  }
+  // Exactly one detail panel is open at a time: case detail (case-tab-<key>) or
+  // contact profile (contact-tab-<key>). The tab itself is the wait target — no
+  // separate header probe needed.
+  const tab = page.getByTestId(`case-tab-${tabKey}`).or(page.getByTestId(`contact-tab-${tabKey}`))
+  await expect(tab).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await tab.click()
 })
 
 // --- Details tab ---
@@ -541,12 +532,11 @@ Then('the status dropdown should list available statuses', async ({ page }) => {
 
 When('I select a different status from the dropdown', async ({ page }) => {
   const dropdown = page.getByTestId('case-status-dropdown')
-  // Click the first non-selected option
+  // Click the first non-selected option. If there is none the step must fail —
+  // silently leaving the status unchanged would make later assertions vacuous.
   const options = dropdown.locator('[role="option"][aria-selected="false"]')
-  const count = await options.count()
-  if (count > 0) {
-    await options.first().click()
-  }
+  await expect(options.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await options.first().click()
 })
 
 Then('the status pill should reflect the new status', async ({ page }) => {
