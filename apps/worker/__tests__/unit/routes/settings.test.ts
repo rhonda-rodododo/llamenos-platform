@@ -256,6 +256,61 @@ describe('settings route', () => {
       expect(res.status).toBe(200)
       expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({ requireForAdmins: false }))
     })
+
+    // #672: enabling requireForAdmins without a credential locks the caller out
+    it('PATCH /webauthn rejects requireForAdmins=true when the caller has no passkey', async () => {
+      const updateSpy = vi.fn()
+      const credsSpy = vi.fn().mockResolvedValue({ credentials: [] })
+      const pubkey = 'a'.repeat(64)
+      const app = createTestApp({
+        pubkey,
+        permissions: ['settings:manage-webauthn'],
+        services: { identity: { updateWebAuthnSettings: updateSpy, getWebAuthnCredentials: credsSpy } },
+      })
+      const res = await app.request('/webauthn', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requireForAdmins: true }),
+      })
+      expect(res.status).toBe(409)
+      expect(await res.json()).toMatchObject({ code: 'WEBAUTHN_CREDENTIAL_REQUIRED' })
+      expect(credsSpy).toHaveBeenCalledWith(pubkey)
+      expect(updateSpy).not.toHaveBeenCalled()
+    })
+
+    it('PATCH /webauthn persists requireForAdmins=true when the caller has a passkey', async () => {
+      const persisted = { requireForAdmins: true, requireForUsers: false }
+      const updateSpy = vi.fn().mockResolvedValue(persisted)
+      const credsSpy = vi.fn().mockResolvedValue({ credentials: [{ id: 'cred-1' }] })
+      const app = createTestApp({
+        permissions: ['settings:manage-webauthn'],
+        services: { identity: { updateWebAuthnSettings: updateSpy, getWebAuthnCredentials: credsSpy } },
+      })
+      const res = await app.request('/webauthn', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requireForAdmins: true }),
+      })
+      expect(res.status).toBe(200)
+      expect(await res.json()).toEqual(persisted)
+      expect(updateSpy).toHaveBeenCalledWith({ requireForAdmins: true })
+    })
+
+    it('PATCH /webauthn does not require a passkey to change only requireForUsers', async () => {
+      const updateSpy = vi.fn().mockResolvedValue({ requireForAdmins: false, requireForUsers: true })
+      const credsSpy = vi.fn().mockResolvedValue({ credentials: [] })
+      const app = createTestApp({
+        permissions: ['settings:manage-webauthn'],
+        services: { identity: { updateWebAuthnSettings: updateSpy, getWebAuthnCredentials: credsSpy } },
+      })
+      const res = await app.request('/webauthn', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requireForUsers: true }),
+      })
+      expect(res.status).toBe(200)
+      expect(credsSpy).not.toHaveBeenCalled()
+    })
   })
 
   describe('telephony-provider', () => {
