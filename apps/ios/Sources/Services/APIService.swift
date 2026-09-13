@@ -771,11 +771,13 @@ final class CertificatePinningDelegate: NSObject, URLSessionDelegate {
 
         let activePins = CertificatePins.active.hashes
         var pinMatched = false
+        var observedHashes: [String] = []
         for certificate in certificateChain {
             if let publicKey = SecCertificateCopyKey(certificate) {
                 var error: Unmanaged<CFError>?
                 if let publicKeyData = SecKeyCopyExternalRepresentation(publicKey, &error) as Data? {
                     let hash = sha256Base64(publicKeyData)
+                    observedHashes.append(hash)
                     if activePins.contains(hash) {
                         pinMatched = true
                         break
@@ -788,7 +790,12 @@ final class CertificatePinningDelegate: NSObject, URLSessionDelegate {
             completionHandler(.useCredential, URLCredential(trust: serverTrust))
         } else {
             // Hard fail: pin mismatch — report security event and refuse connection.
-            SecurityEventReporter.reportPinMismatch(host: host)
+            #if DEBUG
+            print("[CertPinning] HARD FAIL: Pin mismatch for host: \(host). Connection refused.")
+            #endif
+            SecurityEventService.shared.report(
+                .certPinMismatch(activePins: activePins, observedPins: observedHashes)
+            )
             completionHandler(.cancelAuthenticationChallenge, nil)
         }
     }
@@ -801,31 +808,6 @@ final class CertificatePinningDelegate: NSObject, URLSessionDelegate {
         }
         return Data(hash).base64EncodedString()
     }
-}
-
-// MARK: - Security Event Reporting
-
-/// Centralized security event reporter for certificate pinning failures.
-/// Reports are queued and sent to the server's `/api/security-events` endpoint
-/// when the user is authenticated. In debug builds, also prints to console.
-enum SecurityEventReporter {
-    static func reportPinMismatch(host: String) {
-        #if DEBUG
-        print("[CertPinning] HARD FAIL: Pin mismatch for host: \(host). Connection refused.")
-        #endif
-
-        // Post notification so any listening component (e.g. AppState) can forward
-        // to the server security-events API when authenticated.
-        NotificationCenter.default.post(
-            name: .certPinMismatch,
-            object: nil,
-            userInfo: ["host": host, "timestamp": ISO8601DateFormatter().string(from: Date())]
-        )
-    }
-}
-
-extension Notification.Name {
-    static let certPinMismatch = Notification.Name("org.llamenos.certPinMismatch")
 }
 
 // MARK: - Dynamic Pin Update

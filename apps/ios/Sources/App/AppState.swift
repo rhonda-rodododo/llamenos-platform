@@ -139,7 +139,13 @@ final class AppState {
         // Configure API base URL if stored
         if let hubURL = auth.hubURL {
             try? api.configure(hubURLString: hubURL)
+            SecurityEventService.shared.configure(baseURL: api.baseURL)
         }
+
+        // Start retrying queued security events (e.g. cert pin mismatches from a
+        // previous session) as soon as the network is available. Independent of
+        // auth state — a pin failure can happen before login.
+        SecurityEventService.shared.startMonitoring()
 
         // Generate wake keypair on first launch (non-blocking)
         try? wake.ensureKeypairExists()
@@ -337,6 +343,9 @@ final class AppState {
         offlineQueue.startMonitoring()
         // Replay any queued operations now that we're authenticated
         Task { await offlineQueue.replay() }
+        // Retry any queued security events (e.g. a cert pin mismatch seen while
+        // locked or logged out) now that we're back online and unlocked.
+        Task { await SecurityEventService.shared.flush() }
     }
 
     /// Fetch admin decryption pubkey from the API if not already cached.
@@ -367,11 +376,13 @@ final class AppState {
         // Configure API with the stored hub URL
         if let hubURL = authService.hubURL {
             try? apiService.configure(hubURLString: hubURL)
+            SecurityEventService.shared.configure(baseURL: apiService.baseURL)
         }
 
         connectWebSocketIfConfigured()
         fetchUserRole()
         offlineQueue.startMonitoring()
+        Task { await SecurityEventService.shared.flush() }
     }
 
     /// Handle a device wipe command from the server.
