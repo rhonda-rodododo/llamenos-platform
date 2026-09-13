@@ -1,0 +1,98 @@
+# Records the `fleet/review` verdict as a GitHub review.
+#
+# WHY THIS IS A SEPARATE WORKFLOW, and not a step in CI:
+#
+# On `pull_request`, GitHub runs the PR's OWN workflow files. An approve step
+# living in `ci.yml` is therefore PR-controlled: any same-repo PR could add a
+# job with `pull-requests: write` and approve itself with no review at all.
+# That is not hypothetical — the first version of this change did exactly
+# that to its own pull request (#813, review 5190958692).
+#
+# `workflow_run` is the fix: it always runs the workflow file from the BASE
+# branch, never the PR's copy, and its token is independent of the triggering
+# run. So the commit under judgement cannot alter the thing that approves it,
+# cannot grant itself the write scope, and cannot reach the token — the
+# reviewer's own runner never holds one.
+#
+# The verdict is not re-derived here. It is read back as the `fleet/review`
+# check-run conclusion for the exact head SHA, which is the same fact the
+# ruleset requires.
+name: fleet-approve
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  record-verdict:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Record the fleet/review verdict as a review
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          R: ${{ github.repository }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+
+          # `/usr/bin/gh` by absolute path: this step holds the only write
+          # token in the whole design, and must not be reachable by anything
+          # a PATH entry could shadow.
+          GH=/usr/bin/gh
+
+          prs=$("$GH" api "repos/${R}/commits/${SHA}/pulls" \
+            --jq '.[] | select(.state == "open") | "\(.number) \(.user.login) \(.user.type)"')
+          if [ -z "$prs" ]; then
+            echo "no open PR for ${SHA} — nothing to record"
+            exit 0
+          fi
+
+          # The check-run conclusion for THIS SHA is the verdict. Read back
+          # rather than inferred from the workflow_run's overall result, which
+          # aggregates every job in CI and would approve on a green build with
+          # a red review.
+          verdict=$("$GH" api "repos/${R}/commits/${SHA}/check-runs" \
+            --jq '[.check_runs[] | select(.name == "fleet/review")] | first | .conclusion // "missing"')
+          echo "fleet/review on ${SHA}: ${verdict}"
+
+          echo "$prs" | while read -r pr author type; do
+            # knope's release PRs are opened by github-actions[bot] with
+            # GITHUB_TOKEN, and GitHub answers 422 "Can not approve your own
+            # pull request" — which under `set -e` would turn a PASS into a
+            # red required check. Skipped, never failed.
+            if [ "$author" = "github-actions[bot]" ] || [ "$type" = "Bot" ]; then
+              echo "PR #${pr} is authored by a bot (${author}) — skipping, GitHub forbids self-approval"
+              continue
+            fi
+
+            if [ "$verdict" = "success" ]; then
+              # `commit_id` pins the approval to the commit that was actually
+              # reviewed. Without it the approval lands on whatever the head is
+              # when this request arrives, which after a push in the gap is a
+              # commit nobody reviewed.
+              "$GH" api -X POST "repos/${R}/pulls/${pr}/reviews" \
+                -f event=APPROVE \
+                -f commit_id="${SHA}" \
+                -f body="fleet/review: PASS on ${SHA} (non-author model review, base-ref executed)"
+              echo "approved PR #${pr} at ${SHA}"
+            else
+              # Any non-success verdict, including a missing check: clear any
+              # approval this bot left on an earlier head. The failing required
+              # check blocks the merge on its own — this stops the PR also
+              # DISPLAYING an endorsement that is no longer true.
+              ids=$("$GH" api "repos/${R}/pulls/${pr}/reviews" --paginate \
+                --jq '.[] | select(.user.login == "github-actions[bot]" and .state == "APPROVED") | .id')
+              for id in $ids; do
+                "$GH" api -X PUT "repos/${R}/pulls/${pr}/reviews/${id}/dismissals" \
+                  -f message="fleet/review is ${verdict} on ${SHA}" \
+                  -f event=DISMISS
+                echo "dismissed stale approval ${id} on PR #${pr}"
+              done
+            fi
+          done

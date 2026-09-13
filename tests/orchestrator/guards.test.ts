@@ -7,6 +7,7 @@ import { codeownersMatcher, codeownersPatterns, trackedFiles, trackedFilesUnder 
 import { mkdtempSync, rmSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { parse as parseYaml } from 'yaml'
 
 describe('rail: a live lane must have a write scope', () => {
   // Asserted against a synthetic lane, not the live config: every configured
@@ -329,5 +330,149 @@ describe('rail: lane modes are runtime state, not source', () => {
     expect(lanes.find((l) => l.id === 'ios')?.mode).toBe('live')
     // Every other lane is untouched by that same file.
     expect(lanes.filter((l) => l.id !== 'ios').every((l) => l.mode === 'off')).toBe(true)
+  })
+})
+
+/**
+ * The gate's own workflow shape, asserted against the real YAML — the only
+ * place these properties are visible, because none of them is reachable from
+ * a unit test.
+ *
+ * The load-bearing one: on `pull_request`, GitHub runs the PR's OWN workflow
+ * files. Anything in `ci.yml` that can act on a pull request is therefore
+ * PR-controlled — an approve step there approves whatever the PR says it
+ * should, which is how the first version of this change approved its own pull
+ * request. So `ci.yml` must hold NO write scope over pull requests at all,
+ * and the approval lives in `fleet-approve.yml`, which `workflow_run` always
+ * runs from the base branch.
+ */
+describe('rail: the gate workflow grants only what it must', () => {
+  interface Step { name?: string; id?: string; if?: string; run?: string; 'continue-on-error'?: boolean }
+  interface Job { permissions?: Record<string, string>; steps?: Step[] }
+  interface Workflow { on?: unknown; permissions?: Record<string, string>; jobs: Record<string, Job> }
+
+  const workflow = (file: string): Workflow =>
+    parseYaml(readFileSync(join(process.cwd(), '.github', 'workflows', file), 'utf8')) as Workflow
+  const ci = (): Workflow => workflow('ci.yml')
+  const approve = (): Workflow => workflow('fleet-approve.yml')
+  const runsOf = (j?: Job): string[] => (j?.steps ?? []).map((st) => st.run ?? '')
+
+  it('finds both gate jobs and the approval workflow — nothing below may pass vacuously', () => {
+    expect(Object.keys(ci().jobs)).toEqual(expect.arrayContaining(['fleet-verify', 'fleet-review']))
+    expect(Object.keys(approve().jobs).length).toBeGreaterThan(0)
+  })
+
+  // toEqual, not key-by-key: `statuses`, `actions`, `checks` or `id-token`
+  // write would all slip past a check that only looks at two keys.
+  it('both gate jobs hold read-only permissions, exactly', () => {
+    expect(ci().jobs['fleet-verify']?.permissions).toEqual({ contents: 'read' })
+    expect(ci().jobs['fleet-review']?.permissions).toEqual({ contents: 'read' })
+  })
+
+  // Not just the two gate jobs: ANY job in ci.yml gaining pull-request write
+  // reopens the hole, since ci.yml runs from the PR.
+  it('no job in ci.yml can write pull requests, and none reviews one', () => {
+    // Scoped to `pull-requests`: `docker-canary` legitimately holds
+    // packages/id-token/attestations write for image publishing and
+    // attestation, and a rail that fires on those gets trained away rather
+    // than fixed. It is pull-request write specifically that reopens the hole.
+    for (const [name, job] of Object.entries(ci().jobs)) {
+      expect(job.permissions?.['pull-requests'], `job ${name} can write pull requests`).not.toBe('write')
+      for (const run of runsOf(job)) {
+        expect(run, `job ${name} acts on reviews`)
+          .not.toMatch(/--approve|--request-changes|event=(APPROVE|REQUEST_CHANGES)|\/reviews/)
+      }
+    }
+  })
+
+  // `continue-on-error` or a missing id would let a FAILED verdict read as a
+  // success downstream. The verdict IS the step's outcome.
+  it('the review step is identified and cannot swallow its own failure', () => {
+    // `cli.ts review-ci`, not bare `review-ci`: the bootstrap guard step
+    // mentions the command name too and comes first.
+    const step = (ci().jobs['fleet-review']?.steps ?? []).find((st) => (st.run ?? '').includes('cli.ts review-ci'))
+    expect(step, 'no review-ci step found').toBeDefined()
+    expect(step?.id).toBe('review')
+    expect(step?.['continue-on-error']).toBeUndefined()
+  })
+
+  it('the reviewer is constrained to read-only and installed off the shared PATH', () => {
+    const runs = runsOf(ci().jobs['fleet-review']).join('\n')
+    expect(runs).toContain('"action": "deny"')
+    // What matters is what goes ON the PATH, not whether the old path is
+    // mentioned — it is, in the comment explaining why it is not used.
+    expect(runs).toMatch(/echo "\$RUNNER_TEMP\/opencode-bin" >> "\$GITHUB_PATH"/)
+    expect(runs).not.toMatch(/echo "\$HOME\/\.local\/bin" >> "\$GITHUB_PATH"/)
+  })
+})
+
+/**
+ * `fleet-approve.yml` holds the only pull-request write token in the design.
+ * `workflow_run` is what makes that safe — it always runs the BASE branch's
+ * copy of this file, so the commit under judgement cannot edit the thing that
+ * approves it, grant itself the scope, or reach the token.
+ */
+describe('rail: the approval workflow runs from base and pins what it approves', () => {
+  interface Step { run?: string; env?: Record<string, string> }
+  interface Job { steps?: Step[] }
+  interface Workflow { on?: Record<string, { workflows?: string[]; types?: string[] }>; permissions?: Record<string, string>; jobs: Record<string, Job> }
+  const wf = (): Workflow =>
+    parseYaml(readFileSync(join(process.cwd(), '.github', 'workflows', 'fleet-approve.yml'), 'utf8')) as Workflow
+  const allRuns = (): string => Object.values(wf().jobs).flatMap((j) => (j.steps ?? []).map((s) => s.run ?? '')).join('\n')
+
+  // `on: pull_request` here would run the PR's own copy and reinstate the
+  // exact hole this file exists to close.
+  it('triggers only on workflow_run completing, never on pull_request', () => {
+    const on = wf().on ?? {}
+    expect(Object.keys(on)).toEqual(['workflow_run'])
+    expect(on['workflow_run']?.workflows).toEqual(['CI'])
+    expect(on['workflow_run']?.types).toEqual(['completed'])
+  })
+
+  it('holds pull-request write and nothing else', () => {
+    expect(wf().permissions).toEqual({ contents: 'read', 'pull-requests': 'write' })
+  })
+
+  // The verdict is the check-run conclusion for the exact SHA, not the
+  // workflow_run's own result, which aggregates every job in CI and would
+  // approve a green build carrying a red review.
+  it('reads the fleet/review check conclusion for the head SHA', () => {
+    const runs = allRuns()
+    expect(runs).toMatch(/check-runs/)
+    expect(runs).toContain('fleet/review')
+    // The SHA reaches the script through `env:`, which is the injection-safe
+    // form — so it is asserted there, not in the run body.
+    const envs = Object.values(wf().jobs)
+      .flatMap((j) => (j.steps ?? []).map((st) => JSON.stringify(st.env ?? {})))
+      .join('\n')
+    expect(envs).toContain('workflow_run.head_sha')
+  })
+
+  // Without commit_id the approval lands on whatever the head is when the
+  // request arrives — after a push in the gap, a commit nobody reviewed.
+  it('pins the approval to the reviewed commit', () => {
+    expect(allRuns()).toMatch(/-f commit_id="\$\{SHA\}"/)
+  })
+
+  it('approves only on success', () => {
+    expect(allRuns()).toMatch(/if \[ "\$verdict" = "success" \]/)
+  })
+
+  // knope's release PRs are bot-authored and GitHub answers 422 on
+  // self-approval; under `set -e` that would turn a PASS into a red check.
+  it('skips bot-authored pull requests rather than failing on them', () => {
+    const runs = allRuns()
+    expect(runs).toContain('github-actions[bot]')
+    expect(runs).toMatch(/continue/)
+  })
+
+  it('dismisses via the dismissals endpoint, not by talking about it', () => {
+    const runs = allRuns()
+    expect(runs).toMatch(/api -X PUT "repos\/\$\{R\}\/pulls\/\$\{pr\}\/reviews\/\$\{id\}\/dismissals"/)
+    expect(runs).toContain('-f event=DISMISS')
+  })
+
+  it('uses gh by absolute path — the only write token must not be shadowable', () => {
+    expect(allRuns()).toContain('GH=/usr/bin/gh')
   })
 })
