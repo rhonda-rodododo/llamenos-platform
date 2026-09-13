@@ -319,24 +319,23 @@ Then('I should see the report type tabs', async ({ page }) => {
 
 Then('the report type tabs should include template-defined types', async ({ page }) => {
   const filterArea = page.getByTestId('report-filter-area')
+  // The filter area only renders once at least one report exists. Whether that's
+  // already true depends on scenario order, so this is a genuine (not probed) branch:
+  // seed one through the real report-creation form when it's missing.
   const filterVisible = await filterArea.isVisible({ timeout: 5000 }).catch(() => false)
   if (!filterVisible) {
     const newBtn = page.getByTestId(TestIds.REPORT_NEW_BTN)
-    if (await newBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await newBtn.click()
-      const titleInput = page.getByTestId(TestIds.REPORT_TITLE_INPUT)
-      if (await titleInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await titleInput.fill(`Seed Report ${Date.now()}`)
-      }
-      const bodyInput = page.getByTestId(TestIds.REPORT_BODY_INPUT)
-      if (await bodyInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await bodyInput.fill('Seed report for type filter test')
-      }
-      const submitBtn = page.getByTestId(TestIds.REPORT_SUBMIT_BTN)
-      if (await submitBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await submitBtn.click()
-      }
-    }
+    await expect(newBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
+    await newBtn.click()
+    const titleInput = page.getByTestId(TestIds.REPORT_TITLE_INPUT)
+    await expect(titleInput).toBeVisible({ timeout: Timeouts.ELEMENT })
+    await titleInput.fill(`Seed Report ${Date.now()}`)
+    const bodyInput = page.getByTestId(TestIds.REPORT_BODY_INPUT)
+    await expect(bodyInput).toBeVisible({ timeout: Timeouts.ELEMENT })
+    await bodyInput.fill('Seed report for type filter test')
+    const submitBtn = page.getByTestId(TestIds.REPORT_SUBMIT_BTN)
+    await expect(submitBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
+    await submitBtn.click()
     await expect(filterArea).toBeVisible({ timeout: Timeouts.ELEMENT })
   }
 })
@@ -383,14 +382,14 @@ Then('the report form should show dynamic schema fields', async ({ page }) => {
 })
 
 When('I fill in the required report fields', async ({ page }) => {
+  // Title and body are base fields present on every report form regardless of
+  // template — only the schema-driven fields below are template-conditional.
   const titleInput = page.getByTestId(TestIds.REPORT_TITLE_INPUT)
-  if (await titleInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await titleInput.fill(`Template Report ${Date.now()}`)
-  }
+  await expect(titleInput).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await titleInput.fill(`Template Report ${Date.now()}`)
   const bodyInput = page.getByTestId(TestIds.REPORT_BODY_INPUT)
-  if (await bodyInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await bodyInput.fill('Template-driven report test body content')
-  }
+  await expect(bodyInput).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await bodyInput.fill('Template-driven report test body content')
   const schemaInputs = page.getByTestId('report-schema-form').locator('input[required], textarea[required]')
   const count = await schemaInputs.count().catch(() => 0)
   for (let i = 0; i < count; i++) {

@@ -284,11 +284,10 @@ When('I reload and re-authenticate', async ({ page }) => {
 
 When('I log out', async ({ page }) => {
   await page.getByTestId(TestIds.LOGOUT_BTN).click()
-  // Logout now shows a confirmation dialog — confirm it
+  // Logout always shows a confirmation dialog — confirm it
   const confirmBtn = page.getByTestId(TestIds.CONFIRM_DIALOG_OK)
-  if (await confirmBtn.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
-    await confirmBtn.click()
-  }
+  await expect(confirmBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await confirmBtn.click()
   await page.waitForURL(/\/login/, { timeout: Timeouts.ELEMENT })
 })
 

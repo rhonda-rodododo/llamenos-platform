@@ -132,17 +132,14 @@ Given('the volunteer is on the cases page', async ({ page }) => {
 })
 
 When('the volunteer switches to a different hub', async ({ page }) => {
+  // Precondition ("a volunteer assigned to multiple hubs") guarantees at least
+  // two hubs exist, so the selector and a second option are both required.
   const hubSelector = page.getByTestId('hub-selector')
-  const isVisible = await hubSelector.isVisible({ timeout: 3000 }).catch(() => false)
-  if (isVisible) {
-    await hubSelector.click()
-    // Select the second option
-    const options = page.getByRole('option')
-    const count = await options.count()
-    if (count > 1) {
-      await options.nth(1).click()
-    }
-  }
+  await expect(hubSelector).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await hubSelector.click()
+  const options = page.getByRole('option')
+  await expect(options.nth(1)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await options.nth(1).click()
 })
 
 Then('the cases page should reload', async ({ page }) => {
