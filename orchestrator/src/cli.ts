@@ -14,7 +14,6 @@ import { loadContracts, contractsFor, buildMemoryContext, augmentBrief } from '.
 import { dispatch as dispatchWorker, type EffortLevel } from './engines.js'
 import { verifyMechanical } from './verify.js'
 import { secondOpinion, postReview } from './review.js'
-import { ciStatusFor, mergePr } from './merge.js'
 import {
   runVerifyCi, runReviewCi, ciContextFromEnv, ciDiff,
   REVIEW_JOB, REVIEW_KEY_ENV, VERIFY_JOB, itemIdFromBranch, type CiContext, type CiVerdict,
@@ -281,11 +280,6 @@ async function prDiff(pr: string): Promise<string> {
   return gh(['pr', 'diff', pr])
 }
 
-async function prHeadSha(pr: string): Promise<string | undefined> {
-  const view = await ghJson<{ headRefOid: string }>(['pr', 'view', pr, '--json', 'headRefOid'])
-  return view?.headRefOid
-}
-
 async function commentOnIssue(itemId: string, body: string): Promise<void> {
   await gh(['issue', 'comment', itemId, '--body', body])
 }
@@ -340,6 +334,30 @@ async function reviseWithWorker(item: WorkItem, lane: Lane, verdictText: string)
 
 async function commentOnPr(pr: string, body: string): Promise<void> {
   await gh(['pr', 'comment', pr, '--body', body])
+}
+
+/**
+ * The fleet's ONE arming call, and it merges nothing itself: it asks GitHub
+ * to merge later, on GitHub's terms — every required check green on that
+ * exact head SHA (`ci-status`, `fleet/verify`, `fleet/review`) plus any
+ * code-owner approval `CODEOWNERS` demands. A push to the branch invalidates
+ * the per-SHA checks, so the verified-commit pin `mergePr` used to enforce
+ * with `--match-head-commit` is now a property of the platform rather than a
+ * flag this process remembers to pass.
+ *
+ * Reached only after mechanical verification AND the non-author review have
+ * both passed — see tick.ts. No bypass flag is passed here and none may ever
+ * be added: see the rail in tests/orchestrator/guards.test.ts.
+ */
+async function enableAutoMerge(pr: string): Promise<void> {
+  await gh(['pr', 'merge', pr, '--auto', '--squash', '--delete-branch'])
+}
+
+/** Clears an auto-merge armed by an EARLIER attempt on the same PR before
+ *  this one was rejected. The only other `gh pr merge` in the fleet, and it
+ *  can only ever UN-arm. */
+async function disableAutoMerge(pr: string): Promise<void> {
+  await gh(['pr', 'merge', pr, '--disable-auto'])
 }
 
 /**
@@ -443,9 +461,8 @@ async function runTick(): Promise<number> {
     commentOnPr,
     reviseWithWorker,
     haltFleet: halt,
-    ciStatusFor,
-    prHeadSha,
-    mergePr,
+    enableAutoMerge,
+    disableAutoMerge,
     commentOnIssue,
     settle: settleItem,
     record: append,
