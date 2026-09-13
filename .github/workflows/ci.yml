@@ -1524,6 +1524,17 @@ jobs:
       # `git archive | tar`. No `.git`, no checkout, nothing on a module path,
       # nothing executed. verify-ci/review-ci refuse outright if a `.git` ever
       # appears in there — see headDirRefusal in ci.ts.
+      #
+      # Agent instructions and configuration are then stripped, with every
+      # symlink: `opencode.json(c)` declares MCP servers that get spawned,
+      # `.opencode/` holds tool and plugin modules that get imported and run,
+      # `AGENTS.md`/`CONTEXT.md`/`CLAUDE.md` are prompt text an engine obeys,
+      # `.claude/` and `.agents/` carry hooks and skills. A PR controls all of
+      # them, and the reviewer runs next to the review key. A symlink would
+      # turn the reviewer's read access to this tree into read access to
+      # `~/.local/share/opencode/auth.json`. review.ts strips the same set
+      # again (REVIEWER_CONTROL_NAMES) from base code, because this workflow
+      # file is the PR's own copy on a pull_request run.
       - name: Export the PR head as data
         env:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
@@ -1533,6 +1544,15 @@ jobs:
           mkdir -p "$RUNNER_TEMP/head"
           git archive "$HEAD_SHA" | tar -x -C "$RUNNER_TEMP/head"
           test ! -e "$RUNNER_TEMP/head/.git"
+          control=( \( -iname opencode.json -o -iname opencode.jsonc -o -iname .opencode
+            -o -iname AGENTS.md -o -iname CONTEXT.md -o -iname .agents
+            -o -iname CLAUDE.md -o -iname .claude -o -type l \) )
+          find "$RUNNER_TEMP/head" -mindepth 1 "${control[@]}" -prune -print -exec rm -rf {} +
+          left="$(find "$RUNNER_TEMP/head" -mindepth 1 "${control[@]}" -print -quit)"
+          if [ -n "$left" ]; then
+            echo "::error::agent configuration survived the strip: $left"
+            exit 1
+          fi
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2.0.2
@@ -1597,19 +1617,53 @@ jobs:
             > "$HOME/.local/share/opencode/auth.json"
           chmod 600 "$HOME/.local/share/opencode/auth.json"
 
-      # Proves the engine, the key, the provider and the model id all work
-      # BEFORE the real review runs — so "the reviewer is misconfigured" can
-      # never again be indistinguishable from "the reviewer read the diff and
-      # could not produce a verdict". Exactly the failure this round fixed:
-      # the model id did not exist and `--format text` was not a valid choice,
-      # so every review had silently been UNREADABLE.
+      # Proves the engine, the key, the provider, the model id AND the
+      # reviewer's permission config all work BEFORE the real review runs — so
+      # "the reviewer is misconfigured" can never again be indistinguishable
+      # from "the reviewer read the diff and could not produce a verdict". An
+      # earlier round's model id did not exist and `--format text` was not a
+      # valid choice, so every review had silently been UNREADABLE; an
+      # array-shaped `permission` does the same thing (1.18.30 rejects it and
+      # exits 1).
+      #
+      # Invoked the way review.ts's invokeVerifierEngine invokes it: from an
+      # EMPTY project root, never from an export (a PR's `.opencode/` and
+      # `opencode.json` execute when the PR is the project root); settings
+      # only from a fresh OPENCODE_CONFIG_DIR holding the object-form deny-all
+      # permission; `--format json`; and the verdict taken from the final
+      # non-empty line of assistant text parts only, exactly as parseVerdict
+      # reads it. `opencode debug config` makes the binary itself validate the
+      # config shape — it exits non-zero on a shape it rejects. (review.ts
+      # additionally grants read access to the export under
+      # `external_directory`; there is no export here to grant.)
       - name: Smoke-test the review engine
         run: |
           set -euo pipefail
-          out=$(printf 'Reply with exactly: VERDICT: PASS\n' \
-            | opencode run --pure --model kimi-for-coding/k3-256k --format default --dir "$RUNNER_TEMP")
-          echo "$out"
-          echo "$out" | grep -q 'VERDICT: PASS'
+          root="$(mktemp -d)"
+          cfg="$(mktemp -d)"
+          jq -n '{
+            "$schema": "https://opencode.ai/config.json",
+            "permission": {
+              "bash": "deny", "edit": "deny", "webfetch": "deny", "websearch": "deny",
+              "external_directory": { "*": "deny" }
+            }
+          }' > "$cfg/opencode.json"
+          cd "$root"
+          export OPENCODE_CONFIG_DIR="$cfg" OPENCODE_DISABLE_PROJECT_CONFIG=1
+          opencode debug config --pure > "$RUNNER_TEMP/opencode-config.json"
+          jq -e '.permission | .bash == "deny" and .edit == "deny" and .webfetch == "deny" and .websearch == "deny"' \
+            "$RUNNER_TEMP/opencode-config.json"
+          out="$(printf 'Reply with exactly: VERDICT: PASS\n' \
+            | opencode run --pure --model kimi-for-coding/k3-256k --format json --dir "$root")"
+          text="$(printf '%s\n' "$out" \
+            | jq -Rr 'fromjson? | select(.type == "text" and .part.type == "text" and ((.part.synthetic // false) | not)) | .part.text')"
+          echo "$text"
+          last="$(printf '%s\n' "$text" | sed -e 's/[[:space:]]*$//' | awk 'NF { last = $0 } END { print last }')"
+          if [ "$last" != "VERDICT: PASS" ]; then
+            echo "::error::the review engine did not return an exact 'VERDICT: PASS' as its final assistant line"
+            printf '%s\n' "$out" | tail -n 20
+            exit 1
+          fi
 
 
       # Bootstrap guard. The gate runs from the BASE checkout by design, so

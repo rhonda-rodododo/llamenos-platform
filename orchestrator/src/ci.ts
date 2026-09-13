@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import type { Lane } from './config.js'
 import type { VerifyInput, VerifyReport } from './verify.js'
+import { finalLine } from './review.js'
 import type { SecondOpinionInput, SecondOpinionResult } from './review.js'
 import { join } from 'node:path'
 import { buildGateTrace } from './trace.js'
@@ -106,11 +107,12 @@ export function itemIdFromBranch(branch: string): string | undefined {
   return FLEET_BRANCH_RE.exec(branch)?.[2]
 }
 
-/** The reviewer's own `VERDICT: PASS|FAIL` line if it wrote one, else its
- *  first non-empty line — never an invented summary. */
+/** The reviewer's final non-empty line — the same line `parseVerdict` judges,
+ *  selected by the same function, so the printed summary can never name a
+ *  different line from the one that decided the job. Never an invented
+ *  summary. */
 export function verdictSummary(text: string): string {
-  const lines = text.split('\n').map((l) => l.trim()).filter((l) => l.length > 0)
-  return lines.find((l) => /verdict:/i.test(l)) ?? lines[0] ?? '(no reviewer output)'
+  return finalLine(text) ?? '(no reviewer output)'
 }
 
 export interface CiContext {
