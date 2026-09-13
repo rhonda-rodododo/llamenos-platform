@@ -3,7 +3,7 @@ import { LIMITS, MAX_ATTEMPTS_PER_ITEM, type Lane } from './config.js'
 import { failedAttemptsIn, type Outcome, type RunRecord } from './ledger.js'
 import { runReviewLoop, type SecondOpinionInput, type SecondOpinionResult } from './review.js'
 import { judge, selectForLane, type Rejection } from './select.js'
-import type { WorkItem } from './source.js'
+import type { ListResult, WorkItem } from './source.js'
 import { buildGateTrace } from './trace.js'
 import type { VerifyInput, VerifyReport } from './verify.js'
 
@@ -65,7 +65,7 @@ export interface TickDeps {
   checkHalt(): Promise<{ halted: boolean; reason?: string }>
   readLedger(): RunRecord[]
   resumedAt(): number
-  listItems(lane: Lane): Promise<WorkItem[] | undefined>
+  listItems(lane: Lane): Promise<ListResult>
   readLabels(id: string): Promise<string[] | undefined>
   dispatch(item: WorkItem, lane: Lane): Promise<DispatchOutcome>
   /** Mechanical gates: scope, never-write, diff-targeted tests. Injected so
@@ -456,13 +456,17 @@ export async function tick(deps: TickDeps): Promise<TickResult> {
     const labelCache = new Map<string, string[] | undefined>()
 
     for (const lane of active) {
-      const items = await deps.listItems(lane)
+      const read = await deps.listItems(lane)
       // An unreadable source is NOT an empty one. Aborting the whole pass is
-      // the only way a credential failure cannot masquerade as a quiet night.
-      if (items === undefined) {
-        deps.log(`source unreadable for lane ${lane.id} — aborting pass`)
+      // the only way a credential failure cannot masquerade as a quiet night —
+      // and the REASON travels with it, because a fail-closed abort that
+      // destroys its own cause cannot be told apart from a rate limit, a
+      // network blip or a real outage by whoever reads this line next.
+      if (!read.ok) {
+        deps.log(`source unreadable for lane ${lane.id} — aborting pass: ${read.detail}`)
         return empty({ ran: true, aborted: 'source-unreadable' })
       }
+      const items = read.items
       for (const item of items) {
         if (!labelCache.has(item.id)) labelCache.set(item.id, await deps.readLabels(item.id))
       }
