@@ -126,13 +126,13 @@ describe('fleet/verify in CI', () => {
 
   it('prints the result-file evidence behind a passing test verdict', async () => {
     const evidenced: VerifyReport = {
-      ...passing, testResults: ['orchestrator: result file read — 0 failed test(s), 0 failed suite(s) of 12 test(s)'],
+      ...passing, testResults: ['orchestrator: result file read — 0 failed test(s), 0 failed suite(s), 12 passed, 0 skipped/todo, of 12 test(s)'],
     }
     const v = await runVerifyCi(deps({ verify: vi.fn(async () => evidenced) }))
     expect(v.ok).toBe(true)
     expect(v.summary).toBe([
       'scope=pass impact=low tests=orchestrator:pass review=not-run sha=c0ffee',
-      '- orchestrator: result file read — 0 failed test(s), 0 failed suite(s) of 12 test(s)',
+      '- orchestrator: result file read — 0 failed test(s), 0 failed suite(s), 12 passed, 0 skipped/todo, of 12 test(s)',
     ].join('\n'))
   })
 

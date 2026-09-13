@@ -1448,12 +1448,26 @@ jobs:
       - name: Install dependencies (base lockfile, no install scripts)
         run: bun install --frozen-lockfile --ignore-scripts
 
-      # The head export has no node_modules of its own. The base install is
-      # linked in so the phase-2 tests resolve their RUNNER from the trusted
-      # tree — a PR cannot swap vitest out from under its own verification,
-      # only supply the test files it is entitled to supply.
+      # The head export must have no node_modules of its own. `git archive`
+      # exports whatever is committed, and a plain `ln -s` onto an existing
+      # directory does not fail — it nests the link INSIDE it, leaving the
+      # PR's own `node_modules/.bin/vitest` in place. So a committed
+      # `node_modules` (directory, file or symlink) is refused before anything
+      # is linked, and `ln -T` refuses to nest regardless.
+      #
+      # This is one of three locks on the same door: verify.ts also runs the
+      # runner by absolute path from $GITHUB_WORKSPACE (never `bunx` from the
+      # export), and refuses an export whose node_modules is not, by realpath,
+      # this trusted install. The PR supplies test files and nothing else.
       - name: Make base dependencies available to the head export
-        run: ln -s "$GITHUB_WORKSPACE/node_modules" "$RUNNER_TEMP/head/node_modules"
+        run: |
+          set -euo pipefail
+          head_modules="$RUNNER_TEMP/head/node_modules"
+          if [ -e "$head_modules" ] || [ -L "$head_modules" ]; then
+            echo "::error::the commit under judgement contains node_modules — refusing to judge it with a runner it could supply"
+            exit 1
+          fi
+          ln -s -T "$GITHUB_WORKSPACE/node_modules" "$head_modules"
 
       # Two phases inside one command: scope/never-write/impact first, from
       # the base checkout with nothing of the PR's executing; then the PR's
@@ -1603,13 +1617,23 @@ jobs:
       # could not produce a verdict". Exactly the failure this round fixed:
       # the model id did not exist and `--format text` was not a valid choice,
       # so every review had silently been UNREADABLE.
+      #
+      # Judged by the review's OWN parser (`parseVerdict`, from this trusted
+      # base checkout), never a looser substring match: an engine whose output
+      # grows colour codes or a trailing line must fail HERE, not pass the
+      # smoke step and then make every real review UNREADABLE.
       - name: Smoke-test the review engine
         run: |
           set -euo pipefail
           out=$(printf 'Reply with exactly: VERDICT: PASS\n' \
             | opencode run --pure --model kimi-for-coding/k3-256k --format default --dir "$RUNNER_TEMP")
           echo "$out"
-          echo "$out" | grep -q 'VERDICT: PASS'
+          printf '%s' "$out" | bun -e '
+            import { parseVerdict } from "./orchestrator/src/review.ts"
+            const verdict = parseVerdict(await Bun.stdin.text())
+            console.log("smoke verdict (parseVerdict): " + verdict)
+            process.exit(verdict === "PASS" ? 0 : 1)
+          '
 
 
       # Bootstrap guard. The gate runs from the BASE checkout by design, so

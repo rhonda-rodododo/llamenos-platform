@@ -55,9 +55,30 @@ describe('parseVerdict', () => {
   it('is UNREADABLE when a well-formed VERDICT: PASS is followed by more prose', () => {
     expect(parseVerdict('VERDICT: PASS\nActually, one more thing I noticed.')).toBe('UNREADABLE')
   })
+  // Accepted risk, stated so the next edit to VERDICT_LINE_RE sees it: last
+  // line wins in the PERMISSIVE direction too. The brief demands exactly one
+  // verdict line at the end; a reviewer talked out of an earlier FAIL (or
+  // prompt-injected into a final PASS) ends on PASS, and the parser cannot
+  // tell those apart — that is an LLM-layer problem, not a parsing one.
+  it('takes a final PASS over an earlier FAIL: the last line wins in both directions', () => {
+    expect(parseVerdict('VERDICT: FAIL — leaks key\nOn reflection the key is a test fixture.\nVERDICT: PASS')).toBe('PASS')
+  })
   it('tolerates trailing newlines and trailing whitespace after a valid final line', () => {
     expect(parseVerdict('ok\nVERDICT: PASS   \n\n  \n')).toBe('PASS')
     expect(parseVerdict('ok\r\nVERDICT: FAIL — nope\t\r\n')).toBe('FAIL')
+  })
+  // FAIL matches on `\b`, which a stray `\r` would not break; PASS is anchored
+  // with `$`, which it would. So CRLF has to be pinned on PASS specifically.
+  it('reads a CRLF-terminated PASS: the `$` anchor must not see the carriage return', () => {
+    expect(parseVerdict('ok\r\nVERDICT: PASS\r\n')).toBe('PASS')
+  })
+  // Fail closed on terminal colour codes — and the CI smoke step now judges
+  // the engine's output with this same function, so an engine that starts
+  // emitting them fails the smoke step instead of passing it.
+  it('is UNREADABLE when the verdict line carries ANSI escape codes', () => {
+    expect(parseVerdict('\x1b[32mVERDICT: PASS\x1b[0m')).toBe('UNREADABLE')
+    expect(parseVerdict('VERDICT: PASS\x1b[0m')).toBe('UNREADABLE')
+    expect(parseVerdict('VERDICT: PASS\n\x1b[0m')).toBe('UNREADABLE')
   })
   it('is case-sensitive: a lowercase verdict line is UNREADABLE', () => {
     expect(parseVerdict('verdict: pass')).toBe('UNREADABLE')
