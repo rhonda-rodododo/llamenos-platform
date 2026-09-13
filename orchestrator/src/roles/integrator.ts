@@ -9,9 +9,8 @@ const execFileAsync = promisify(execFile)
  * Owns everything after a PR exists: bringing a PR GitHub reports as
  * `DIRTY` back up to date with `main`, and watching `main` after a merge
  * for the case the reference system (atlas-orchestrator, in the
- * `translatemd` repo) cannot see at all — its `mergePr` equivalent returns
- * and nothing ever checks whether the merge it just made broke the branch
- * it landed on.
+ * `translatemd` repo) cannot see at all — it merges and nothing ever checks
+ * whether the merge it just made broke the branch it landed on.
  */
 
 async function run(cmd: string, args: string[], opts: { cwd?: string } = {}): Promise<string> {
@@ -77,8 +76,8 @@ export interface UpdateBranchResult {
  * human's unpushed local commits if it is ever pointed at the wrong branch.
  * That trade bought a tidier intermediate history in exchange for keeping a
  * genuinely dangerous capability in the fleet's hands. It wasn't worth it:
- * this repo's merge queue ruleset locks the merge method to squash, and
- * `mergePr` (merge.ts) already passes `--squash` — the messy merge commit a
+ * this repo's ruleset locks the merge method to squash, and the fleet's
+ * auto-merge enablement passes `--squash` too — the messy merge commit a
  * plain `git merge` produces here is discarded the moment the PR actually
  * lands on `main`, so a rebase's "cleaner history" was never going to reach
  * `main` anyway. A merge achieves the exact same practical outcome (the PR

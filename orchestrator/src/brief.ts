@@ -67,6 +67,9 @@ export function buildBrief(item: WorkItem, lane: Lane, branch: string): Brief {
       heading: 'What you must NOT do',
       body:
         `- Never merge your own pull request. Open exactly one PR and stop.\n` +
+        `- Your PR description MUST contain the line \`Closes #${item.id}\` on its own line. ` +
+        `That is what closes issue #${item.id} when the PR merges; without it the issue stays ` +
+        `open after the work has landed.\n` +
         `- Never deploy anything, to any environment.\n` +
         `- Never send anything (no notifications, no messages, no emails) as a side effect of this work.\n` +
         `- Do not run the full test suite. Run only the tests your diff actually touches — ` +

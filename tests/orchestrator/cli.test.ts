@@ -6,13 +6,14 @@ import {
   runPlanWith, type PlanDeps,
   runIntegrateWith, type IntegrateDeps, type DirtyFleetPr,
   resolveDispatchResult, statusForItemWith, type StatusItemDeps,
-  resolveAwaitingHumanWith,
+  resolveAwaitingHumanWith, settleTargetFor,
+  ensureClosesLine, ensureIssueLinkWith, type IssueLinkDeps,
 } from '../../orchestrator/src/cli.js'
 import { renderDigest, computeBanner } from '../../orchestrator/src/digest.js'
 import { buildIssueCreateArgs, NEEDS_HUMAN_LABEL, type ProposedIssue } from '../../orchestrator/src/roles/planner.js'
 import type { RunRecord } from '../../orchestrator/src/ledger.js'
 import type { WorkItem } from '../../orchestrator/src/source.js'
-import type { TickResult } from '../../orchestrator/src/tick.js'
+import type { SettleInput, TickResult } from '../../orchestrator/src/tick.js'
 import type { DependencyReport } from '../../orchestrator/src/dependency.js'
 import type { PrFacts } from '../../orchestrator/src/status.js'
 
@@ -486,5 +487,107 @@ describe('resolveAwaitingHumanWith (digest live derivation)', () => {
     const readPr = async (): Promise<PrFacts | undefined> => undefined
     const out = await resolveAwaitingHumanWith([candidate('1', '1')], readPr)
     expect(out).toHaveLength(0)
+  })
+})
+
+describe('settleTargetFor', () => {
+  const input = (needsHuman: boolean): SettleInput => ({
+    item: { id: '7', title: 't', body: 'b', url: 'u', labels: [] },
+    lane: {
+      id: 'ios', mode: 'live', cap: 1, engine: 'claude',
+      requireLabel: 'agent-dispatchable', vetoLabels: [], scope: { owned: ['apps/ios/'], notOwned: [] },
+    },
+    outcome: 'SUCCESS',
+    worktree: '/wt/ios-7',
+    branch: 'fleet/ios/7',
+    pr: '99',
+    needsHuman,
+  })
+
+  // The regression this exists for: needsHuman was silently omitted from the
+  // object literal handed to settle(), so the `needs-human` label — the only
+  // thing stopping the fleet re-dispatching a claimed SUCCESS it could not
+  // verify (issue #660's shape) — could never be applied in production.
+  // TypeScript could not see it: every field it does set is optional on
+  // SettleTarget, so an omission type-checks.
+  it.each([true, false])('carries needsHuman=%s through to settle()', (needsHuman) => {
+    expect(settleTargetFor(input(needsHuman)).needsHuman).toBe(needsHuman)
+  })
+
+  it('carries the worktree, branch, outcome and item id settle() needs to clean up', () => {
+    expect(settleTargetFor(input(true))).toEqual({
+      name: 'fleet-ios-7', itemId: '7', outcome: 'SUCCESS',
+      worktree: '/wt/ios-7', branch: 'fleet/ios/7', needsHuman: true,
+    })
+  })
+})
+
+describe('ensureClosesLine', () => {
+  // GitHub closes the linked issue only when a MERGED PR body carries this
+  // line, so a missing one means the work lands on main and the issue stays
+  // open with nothing saying why.
+  it('appends the line when it is absent', () => {
+    expect(ensureClosesLine('Fixes the thing.', '12')).toBe('Fixes the thing.\n\nCloses #12')
+  })
+
+  it('returns null when it is already there — a second tick must not append twice', () => {
+    expect(ensureClosesLine('Fixes the thing.\n\nCloses #12', '12')).toBeNull()
+  })
+
+  it('returns null for a lowercase `closes #12` — GitHub matches case-insensitively too', () => {
+    expect(ensureClosesLine('done\n\ncloses #12', '12')).toBeNull()
+  })
+
+  // THE load-bearing case. Without the trailing \b, `#123` satisfies item 12,
+  // so the fleet would skip linking issue 12 because a DIFFERENT issue
+  // happened to be mentioned — and issue 12 would silently stay open.
+  it('does not accept `Closes #123` as closing item 12', () => {
+    expect(ensureClosesLine('see also Closes #123', '12')).toBe('see also Closes #123\n\nCloses #12')
+  })
+
+  it('does not accept a longer word ending in closes, e.g. "encloses #12"', () => {
+    expect(ensureClosesLine('encloses #12', '12')).toBe('encloses #12\n\nCloses #12')
+  })
+
+  it('is idempotent: applying it to its own output changes nothing', () => {
+    const once = ensureClosesLine('body', '12')
+    expect(once).not.toBeNull()
+    expect(ensureClosesLine(once ?? '', '12')).toBeNull()
+  })
+})
+
+describe('ensureIssueLinkWith', () => {
+  function deps(over: Partial<IssueLinkDeps> = {}): IssueLinkDeps {
+    return {
+      readPr: vi.fn(async () => ({ body: 'some work', headRefName: 'fleet/ios/12' })),
+      editBody: vi.fn(async () => {}),
+      log: () => {},
+      ...over,
+    }
+  }
+
+  it('edits the PR body when the line is missing, with the item taken from the branch', async () => {
+    const d = deps()
+    await ensureIssueLinkWith('42', d)
+    expect(d.editBody).toHaveBeenCalledWith('42', 'some work\n\nCloses #12')
+  })
+
+  it('does NOT edit when the line is already present', async () => {
+    const d = deps({ readPr: vi.fn(async () => ({ body: 'work\n\nCloses #12', headRefName: 'fleet/ios/12' })) })
+    await ensureIssueLinkWith('42', d)
+    expect(d.editBody).not.toHaveBeenCalled()
+  })
+
+  it('does not touch a PR on a non-fleet branch — there is no issue to link', async () => {
+    const d = deps({ readPr: vi.fn(async () => ({ body: 'work', headRefName: 'feat/human-work' })) })
+    await ensureIssueLinkWith('42', d)
+    expect(d.editBody).not.toHaveBeenCalled()
+  })
+
+  // An unreadable PR must never be rewritten from a guess.
+  it('does not edit when the PR could not be read', async () => {
+    const d = deps({ readPr: vi.fn(async () => undefined) })
+    await ensureIssueLinkWith('42', d)
+    expect(d.editBody).not.toHaveBeenCalled()
   })
 })

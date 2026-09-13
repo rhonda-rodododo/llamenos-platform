@@ -71,13 +71,12 @@ export function isCryptoDiff(changedFiles: string[]): boolean {
  * agent, as an ADDITIONAL mandatory reviewer, never a substitute for the
  * non-author opinion.
  *
- * Its verdict is advisory to a human and is never wired into
- * `mayAutoMerge` as a merge permission (see the comment there) — crypto
- * paths are already `impact: 'high'` via `classifyImpact`, so they never
- * auto-merge regardless of what any reviewer, human or automated, says
- * about them. The point of requesting it is that the human who ultimately
- * approves the merge starts from a security review instead of from
- * scratch.
+ * Its verdict is advisory to a human and is never a merge permission: every
+ * crypto path is owned in `CODEOWNERS`, so GitHub's own "require review from
+ * Code Owners" rule holds the PR until a human approves it, regardless of
+ * what any reviewer says about it. The point of requesting it is that the
+ * human who ultimately approves starts from a security review instead of
+ * from scratch.
  */
 export function requiredAdditionalReviewers(changedFiles: string[]): readonly string[] {
   return isCryptoDiff(changedFiles) ? [CRYPTO_SECURITY_REVIEWER_AGENT] : []
@@ -162,17 +161,25 @@ export function parseVerdict(output: string): 'PASS' | 'FAIL' | 'UNREADABLE' {
   return captured.toUpperCase() as 'PASS' | 'FAIL'
 }
 
-/** Which binary and model each engine resolves to for a one-shot, read-only
- *  review invocation — independent of `dispatch-one.sh`'s own model aliasing
- *  (engines.ts's `dispatch()` is for a long-running worker session with a
- *  worktree, a tmux session, and a status file; a reviewer is none of those,
- *  it is a single read and a single verdict). `kimi-for-coding/k2p6` is the
- *  concrete opencode model id, not the `kimi` alias dispatch-one.sh accepts,
- *  since that alias resolution happens inside a script this function does
- *  not go through. */
+/**
+ * Which binary and model each engine resolves to for a one-shot, read-only
+ * review invocation — independent of `dispatch-one.sh`'s own model aliasing
+ * (engines.ts's `dispatch()` is for a long-running worker session with a
+ * worktree, a tmux session, and a status file; a reviewer is none of those,
+ * it is a single read and a single verdict).
+ *
+ * The opencode model was `kimi-for-coding/k2p6`, which does not exist in
+ * opencode's model registry — asked for it directly and the provider returns
+ * `Unexpected server error`. That, plus the invalid `--format text` below,
+ * meant the non-author review had never once returned a verdict: every call
+ * failed and was recorded UNREADABLE, which correctly blocked but looked
+ * exactly like "the engine was unreachable". `kimi-for-coding/k3-256k` is a
+ * real id in the registry (`opencode models`), and its 256k context is the
+ * reason to prefer it over `k3` for a whole-diff review.
+ */
 const VERIFIER_ENGINE: Record<EngineId, { binary: string; model: string }> = {
   claude: { binary: 'claude', model: 'sonnet' },
-  opencode: { binary: 'opencode', model: 'kimi-for-coding/k2p6' },
+  opencode: { binary: 'opencode', model: 'kimi-for-coding/k3-256k' },
 }
 
 /**
@@ -231,13 +238,13 @@ function buildReviewPrompt(pr: string, diff: string, report: VerifyReport): stri
  *      that never touches this worktree at all.
  *
  * The defense that actually holds against a verifier with real push access
- * is downstream of this file, in merge.ts: `mayAutoMerge` refuses unless
- * the PR's head commit still matches `report.verifiedCommit` — the exact
- * commit `verifyMechanical` examined — and `mergePr` enforces the same
- * check server-side via `--match-head-commit`. A verifier that pushes a
- * modified branch, by whatever path, invalidates its own approval rather
- * than getting it merged: the merge gate does not trust "what the branch
- * looks like now," only "does it still match what was verified."
+ * is no longer in this repo's code at all — it is GitHub's. Every fleet gate
+ * is a commit status attached to ONE head SHA (ci.ts), and the repo ruleset
+ * requires them; a push to the branch moves the head, and the new one
+ * carries no green `fleet/verify` or `fleet/review` of its own, so
+ * auto-merge simply does not fire. A verifier that pushes a modified branch,
+ * by whatever path, invalidates its own approval rather than getting it
+ * merged — and no process in this repo has to notice for that to hold.
  */
 async function gitState(worktree: string): Promise<{ head: string; status: string }> {
   const { stdout: head } = await execFileAsync('git', ['-C', worktree, 'rev-parse', 'HEAD'])
@@ -319,7 +326,7 @@ async function exportReviewSnapshot(worktree: string, headSha: string): Promise<
  * `GH_TOKEN`/`SSH_AUTH_SOCK` are set. Excluding `GH_TOKEN`, `GITHUB_TOKEN`,
  * `SSH_AUTH_SOCK`, and `GIT_ASKPASS` removes the CONVENIENT path and costs
  * nothing — worth doing regardless — but it is not the defense this fleet
- * relies on. That defense is the commit-pinning in merge.ts (see the
+ * relies on. That defense is GitHub's per-SHA required statuses (see the
  * comment above `gitState`).
  */
 const VERIFIER_ENV_ALLOWLIST: readonly string[] = [
@@ -361,9 +368,15 @@ async function invokeVerifierEngine(input: {
   timeoutMs: number
 }): Promise<{ reached: boolean; output: string }> {
   const cfg = VERIFIER_ENGINE[input.engine]
+  // `--format text` was not a valid choice (opencode accepts only `default`
+  // or `json`); passing it made `opencode run` print its help and exit
+  // without ever contacting a model. `--pure` skips external plugins, so the
+  // reviewer's behaviour does not depend on whatever plugins happen to be
+  // configured on the machine it runs on. The prompt goes on stdin — verified
+  // against opencode 1.18.30, which accepts it there as well as positionally.
   const args = input.engine === 'claude'
     ? ['--print', '--permission-mode', 'plan', '--model', cfg.model, '--max-turns', String(input.maxTurns)]
-    : ['run', '--model', cfg.model, '--format', 'text', '--dir', input.cwd]
+    : ['run', '--pure', '--model', cfg.model, '--format', 'default', '--dir', input.cwd]
 
   try {
     // execFile (unlike execFileSync) has no `input` option — the prompt must
@@ -392,7 +405,23 @@ async function invokeVerifierEngine(input: {
 export interface SecondOpinionInput {
   authorEngine: EngineId
   pr: string
-  worktree: string
+  /**
+   * The AUTHOR'S OWN worktree — the operator-box path only. Present when the
+   * fleet reviews its worker's tree in place: a snapshot is exported from it
+   * and it is checked before and after for tampering. Mutually exclusive
+   * with `snapshotDir`.
+   */
+  worktree?: string
+  /**
+   * A `git archive` export that ALREADY exists — the CI path. When given,
+   * this function runs no git command at all and exports nothing: the tree
+   * under judgement was extracted as data before this process started, and
+   * there is no worktree to tamper with because none was ever created.
+   *
+   * This is what keeps the review job free of any execution of the code it
+   * is judging, which is the whole reason the job may hold the review key.
+   */
+  snapshotDir?: string
   diff: string
   report: VerifyReport
 }
@@ -420,24 +449,41 @@ export async function secondOpinion(input: SecondOpinionInput): Promise<SecondOp
     )
   }
 
+  if ((input.worktree === undefined) === (input.snapshotDir === undefined)) {
+    throw new Error(
+      'secondOpinion needs exactly one of `worktree` (export a snapshot from the author\'s tree ' +
+      'and watch it for tampering) or `snapshotDir` (an export that already exists) — ' +
+      'never both, and never neither',
+    )
+  }
+
   const engine = verifierFor(input.authorEngine)
   const highImpact = input.report.impact === 'high'
   const prompt = buildReviewPrompt(input.pr, input.diff, input.report)
+  const turns = { maxTurns: highImpact ? HIGH_IMPACT_MAX_TURNS : DEFAULT_MAX_TURNS,
+    timeoutMs: highImpact ? HIGH_IMPACT_TIMEOUT_MS : DEFAULT_TIMEOUT_MS }
 
-  const before = await gitState(input.worktree)
-  const snapshot = await exportReviewSnapshot(input.worktree, before.head)
+  // CI path: the export is already on disk, made by `git archive` before this
+  // process began. No git runs, nothing is created, and there is no author
+  // worktree for a verifier to modify — so the tamper detection below has
+  // nothing to detect and is correctly absent rather than vacuously "passing".
+  if (input.snapshotDir !== undefined) {
+    const result = await invokeVerifierEngine({ engine, cwd: input.snapshotDir, prompt, ...turns })
+    if (!result.reached) {
+      return { verdict: 'UNREADABLE', text: result.output.length > 0 ? result.output : '(reviewer engine was unreachable)' }
+    }
+    return { verdict: parseVerdict(result.output), text: result.output }
+  }
+
+  const worktree = input.worktree as string
+  const before = await gitState(worktree)
+  const snapshot = await exportReviewSnapshot(worktree, before.head)
   try {
-    const result = await invokeVerifierEngine({
-      engine,
-      cwd: snapshot.dir,
-      prompt,
-      maxTurns: highImpact ? HIGH_IMPACT_MAX_TURNS : DEFAULT_MAX_TURNS,
-      timeoutMs: highImpact ? HIGH_IMPACT_TIMEOUT_MS : DEFAULT_TIMEOUT_MS,
-    })
+    const result = await invokeVerifierEngine({ engine, cwd: snapshot.dir, prompt, ...turns })
 
     // Detective layer (see the honest accounting in the comment above
-    // `gitState`): with the merge-time commit pin (W1, merge.ts) as the
-    // actual defense, this check is no longer what PREVENTS a tampering
+    // `gitState`): with GitHub's per-SHA required statuses as the actual
+    // defense, this check is no longer what PREVENTS a tampering
     // verifier from getting its changes merged — it is what TELLS US one
     // tried, rather than silently discarding the evidence. That distinction
     // matters: a verifier that modified the author's own worktree mid-review
@@ -452,11 +498,11 @@ export async function secondOpinion(input: SecondOpinionInput): Promise<SecondOp
     // record this one run as failed — left to that caller because tripping
     // the kill switch here would reach outside this file's own concern and
     // into `tick`'s orchestration of every lane, not just this review.
-    const after = await gitState(input.worktree)
+    const after = await gitState(worktree)
     if (after.head !== before.head || after.status !== before.status) {
       throw new VerifierTamperedWorktreeError(
         `the non-author verifier appears to have modified the AUTHOR'S OWN worktree at ` +
-        `${input.worktree} during review (HEAD ${before.head} -> ${after.head}${
+        `${worktree} during review (HEAD ${before.head} -> ${after.head}${
           after.status !== before.status ? ', working-tree status also changed' : ''
         }) — refusing to trust this verdict. This is a fleet-level trust failure in the ` +
         'non-author verification rail itself, not a flake in this one review; the caller ' +
@@ -475,30 +521,34 @@ export async function secondOpinion(input: SecondOpinionInput): Promise<SecondOp
 }
 
 /**
- * Posts the verdict to the PR with `gh pr review`, so it is the same
- * artifact a human reviewer produces and a human can reply in the same
- * thread — not a side-channel log only the orchestrator can see.
+ * Posts the loop's verdict to the PR as a plain COMMENT, never as a GitHub
+ * REVIEW of any kind.
  *
- * UNREADABLE gets `--request-changes`, the same as FAIL: an unreachable or
- * incoherent reviewer is not a pass, and the PR must carry that verdict as a
- * blocking review, not as silence that could be mistaken for "nobody
- * objected."
+ * It used to approve or request changes, back when this verdict fed the
+ * orchestrator's own merge decision. It no longer does: `fleet/review`
+ * (ci.ts), computed on GitHub's runner against the exact head SHA, is the
+ * verdict of record, and this loop's only remaining job is revising the work
+ * before the PR is final. An approving review from the fleet would now be a
+ * review GitHub COUNTS — today harmlessly (`required_approving_review_count`
+ * is 0), but it is one ruleset edit away from being an approval the fleet
+ * grants itself. A comment records the same text in the same thread and can
+ * never be that. The flags are deliberately not written anywhere under
+ * `orchestrator/` — see the rail in tests/orchestrator/guards.test.ts.
  */
 export async function postReview(pr: string, verdict: 'PASS' | 'FAIL' | 'UNREADABLE', body: string): Promise<void> {
-  const flag = verdict === 'PASS' ? '--approve' : '--request-changes'
-  await gh(['pr', 'review', pr, flag, '--body', body])
+  await gh(['pr', 'comment', pr, '--body', `Non-author review (advisory, pre-PR loop) — ${verdict}\n\n${body}`])
 }
 
 /**
- * G3: an UNREADABLE verdict already gets a `--request-changes` review (same
- * as FAIL, above) — but that review's body is either the reviewer's own raw,
+ * G3: an UNREADABLE verdict is already recorded on the PR (same as FAIL,
+ * above) — but that comment's body is either the reviewer's own raw,
  * incoherent output or the terse `(reviewer engine was unreachable)`
- * placeholder, and its "Changes requested" framing reads to a human as "the
- * reviewer found a problem", not "there was no reviewer". Root-caused live
+ * placeholder, which reads to a human as "the reviewer found a problem",
+ * not "there was no reviewer". Root-caused live
  * against issue #660/PR #662: this box has no opencode/`ZHIPU_API_KEY`
  * configured, so `invokeVerifierEngine` could not even start the non-author
- * engine — the fail-safe worked (UNREADABLE correctly blocks auto-merge via
- * `mayAutoMerge`), but nothing told the human reviewing the PR that they were
+ * engine — the fail-safe worked (UNREADABLE is posted as `fleet/review` =
+ * `error`, which GitHub will not merge on), but nothing told the human reviewing the PR that they were
  * the ONLY review it had gotten. This is that explicit comment, posted in
  * ADDITION to the review above, in plain language a human skimming the PR
  * will actually notice.
