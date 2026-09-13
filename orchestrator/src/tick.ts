@@ -195,8 +195,9 @@ type BaseRecord = Pick<RunRecord, 'ts' | 'runId' | 'lane' | 'itemId' | 'itemName
  * 4. `secondOpinion(...)`, posted as a PR review, only reached once
  *    mechanical verification has passed. This loop's job is to REVISE the
  *    work before the PR is final; it decides nothing about merging.
- * 5. No merge decision at all. `enableAutoMerge` was armed back at step 2,
- *    and the gates that hold the PR are commit statuses posted by CI
+ * 5. No merge decision at all. Auto-merge is ARMED HERE, and only here —
+ *    after step 3 and step 4 have both passed, never at PR open. Whatever
+ *    holds the PR after that is GitHub's: the required checks
  *    (`fleet/verify`, `fleet/review` — see ci.ts) plus GitHub's own
  *    code-owner rule, all enforced by the repo ruleset on the head SHA.
  * 6. Exactly one terminal ledger row, whatever the outcome.
@@ -216,6 +217,15 @@ async function runLiveDispatch(
   let final: RunRecord
   let needsHuman = false
   let threw = false
+  /**
+   * Set ONLY at the single arm site below. The disarm is keyed on this, not
+   * on the outcome, because the two are not equivalent: the unverifiable
+   * claimed-SUCCESS branch also records `SUCCESS` while arming nothing, so an
+   * outcome-keyed disarm skipped it — and an arming left by an EARLIER
+   * attempt on the same PR survived into a pass that never verified anything.
+   * Every terminal path that did not itself arm must disarm.
+   */
+  let armed = false
 
   try {
     const result = await deps.dispatch(item, lane)
@@ -283,11 +293,21 @@ async function runLiveDispatch(
           // passed AND the non-author review passed. Best-effort and
           // fail-closed — if arming fails nothing merges, which is the safe
           // direction, so it is logged rather than failing the item.
+          let armFailure: string | undefined
           try {
             await deps.enableAutoMerge(pr)
+            armed = true
             deps.log(`auto-merge: armed on pr ${pr} — GitHub merges it when its required checks are green`)
           } catch (e) {
-            deps.log(`auto-merge: could not arm on pr ${pr}: ${errorMessage(e)} — it will not merge unattended`)
+            // Fail-closed: nothing merges, which is the safe direction. But
+            // the work is verified, reviewed and correct, and nobody asked
+            // GitHub to merge it — so without this the PR sits open forever
+            // with a log line as its only explanation. `needs-human` puts it
+            // in the digest's "waiting on a human" section, and the reason
+            // goes in the ledger note that section renders.
+            armFailure = errorMessage(e)
+            needsHuman = true
+            deps.log(`auto-merge: could not arm on pr ${pr}: ${armFailure} — it will not merge unattended`)
           }
 
           // SUCCESS means the fleet finished ITS part — verified, reviewed,
@@ -295,11 +315,15 @@ async function runLiveDispatch(
           // did is a fact about GitHub, derived live by `llamenos-fleet
           // status <issue>` and by the digest's own "waiting" section; see
           // ledger.ts's module comment on why nothing here caches it.
+          // The arm failure PREFIXES the trace rather than following it:
+          // `sha=` must stay the last field, because `status.ts`'s
+          // `extractVerifiedSha` and its own comment both depend on that.
+          const trace = buildGateTrace({
+            report: verifyReport, reviewVerdict: loop.finalVerdict, reviewText: loop.lastVerdictText,
+          })
           final = {
             ...base, outcome: 'SUCCESS', branch, pr,
-            note: truncateNote(buildGateTrace({
-              report: verifyReport, reviewVerdict: loop.finalVerdict, reviewText: loop.lastVerdictText,
-            })),
+            note: truncateNote(armFailure === undefined ? trace : `arm=failed(${armFailure}) ${trace}`),
           }
         }
       }
@@ -361,12 +385,14 @@ async function runLiveDispatch(
     final = { ...base, outcome: 'FAILED', note: errorMessage(e), branch, pr }
   }
 
-  // Any terminal outcome other than a verified-and-reviewed SUCCESS must
-  // leave NOTHING armed. An earlier attempt on this same PR may have armed
-  // auto-merge before being rejected on a later round; without this, a PR
-  // whose own reviewer returned VERDICT: FAIL would still merge the moment
-  // ordinary CI went green.
-  if (pr !== undefined && final.outcome !== 'SUCCESS') {
+  // Every path that did not ITSELF arm must disarm. Keyed on `armed` rather
+  // than on the outcome: an earlier attempt on this same PR may have armed
+  // auto-merge before a later round rejected the work, and the claimed-
+  // SUCCESS branch that could not be verified at all records `SUCCESS`
+  // without arming anything. Outcome-keyed, both of those left the earlier
+  // arming in place — and a PR whose own reviewer returned VERDICT: FAIL
+  // would merge the moment ordinary CI went green.
+  if (pr !== undefined && !armed) {
     try {
       await deps.disableAutoMerge(pr)
     } catch (e) {

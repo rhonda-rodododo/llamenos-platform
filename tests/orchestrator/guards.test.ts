@@ -95,9 +95,12 @@ describe('rail: the fleet cannot merge its own changes', () => {
  *     non-author verdict as a COMMENT; an approving review is one ruleset
  *     edit away from being an approval the fleet grants itself.
  *
- * `--match-head-commit` is deliberately NOT forbidden: it is a pin, the
- * opposite of a bypass, and `mergePr` passing it is exactly what stops a
- * branch that moved after verification from being merged.
+ * `--match-head-commit` is not mentioned here at all any more: `mergePr` and
+ * its pin are gone, because the fleet no longer merges anything. What
+ * replaced the pin is a property of the platform — a check run attaches to
+ * ONE commit, so a push moves the head and the new head carries no green
+ * `fleet/verify` or `fleet/review` of its own. See the merge-call block
+ * below for what does remain.
  */
 describe('rail: the fleet never bypasses a PR\'s checks, and never reviews', () => {
   function orchestratorSources(): { file: string; text: string }[] {
@@ -163,9 +166,18 @@ describe('rail: the fleet never bypasses a PR\'s checks, and never reviews', () 
    */
   it('never resolves its own GitHub identity', () => {
     for (const { file, text } of orchestratorSources()) {
-      for (const probe of ["'api', 'user'", '"api", "user"', 'viewer {', 'viewer{']) {
-        expect(text, `${file} resolves the authenticated user (${probe})`).not.toContain(probe)
+      // Argv-aware rather than literal-string: `'api', 'user'` with the exact
+      // spacing was trivially evaded by `gh(['api','/user'])`. Any `user`
+      // path segment inside a gh call is the thing to catch, however spaced
+      // or quoted.
+      for (const call of ghCalls(text)) {
+        for (const seg of ["'user'", '"user"', "'/user'", '"/user"']) {
+          expect(call, `${file}: gh call resolves the authenticated user (${seg})`).not.toContain(seg)
+        }
       }
+      // GraphQL's `viewer` has no other meaning in this codebase, so the bare
+      // word is forbidden outright — no construction evades it.
+      expect(text, `${file} uses the GraphQL viewer (self) field`).not.toMatch(/\bviewer\b/)
     }
   })
 

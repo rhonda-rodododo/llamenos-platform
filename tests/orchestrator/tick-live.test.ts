@@ -92,6 +92,65 @@ describe('tick: live dispatch pipeline (task 7)', () => {
     expect(d.disableAutoMerge).toHaveBeenCalledWith('42')
   })
 
+  /**
+   * The gap a human review found: the disarm was keyed on the OUTCOME, and
+   * the claimed-SUCCESS branch — a worker that reported success but whose
+   * dispatch the fleet could not verify at all (no branch, no worktree) —
+   * also records `SUCCESS`. So it armed nothing and disarmed nothing, and an
+   * arming left by an EARLIER attempt on the same PR survived into a pass
+   * that verified nothing. Keyed on "did THIS pass arm it", both cases
+   * disarm.
+   */
+  it('disarms on a claimed SUCCESS the fleet could not verify — it armed nothing itself', async () => {
+    const dispatch = vi.fn(async (): Promise<DispatchOutcome> =>
+      ({ outcome: 'SUCCESS', pr: '42', note: 'worker said done' })) // no branch, no worktree
+    const d = baseDeps({ dispatch })
+    await tick(d)
+    expect(d.verifyMechanical).not.toHaveBeenCalled()
+    expect(d.enableAutoMerge).not.toHaveBeenCalled()
+    expect(d.disableAutoMerge).toHaveBeenCalledWith('42')
+  })
+
+  // If arming THREW, this pass did not arm it either — so it must still
+  // disarm, or a failed arm would leave an earlier attempt's arming standing.
+  it('disarms when its own arming attempt failed', async () => {
+    const d = baseDeps({
+      enableAutoMerge: vi.fn(async () => { throw new Error('gh: auto-merge unavailable') }),
+    })
+    await tick(d)
+    expect(d.disableAutoMerge).toHaveBeenCalledWith('42')
+  })
+
+  /**
+   * The liveness gap the non-author reviewer named: a PR that passed both
+   * gates but whose arming failed is fail-CLOSED (nothing merges) yet
+   * invisible — correct work sitting open forever with a log line as its only
+   * explanation. It has to reach a human, and the reason has to travel with
+   * it, which means the ledger note the digest's "waiting on a human" section
+   * actually renders.
+   */
+  it('hands a failed arming to a human, with the reason in the note', async () => {
+    const recorded: RunRecord[] = []
+    const d = baseDeps({
+      enableAutoMerge: vi.fn(async () => { throw new Error('gh: auto-merge is not enabled') }),
+      record: vi.fn((r: RunRecord) => recorded.push(r)),
+    })
+    await tick(d)
+
+    expect(d.settle).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'SUCCESS', needsHuman: true }))
+    const terminal = recorded.find((r) => r.outcome === 'SUCCESS')
+    expect(terminal?.note).toContain('arm=failed(gh: auto-merge is not enabled)')
+    // `sha=` must remain the LAST field — status.ts's extractVerifiedSha and
+    // its own comment both depend on it, so the reason prefixes the trace.
+    expect(terminal?.note).toMatch(/sha=\S+$/)
+  })
+
+  it('leaves a successfully armed PR alone — no human needed', async () => {
+    const d = baseDeps()
+    await tick(d)
+    expect(d.settle).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'SUCCESS', needsHuman: false }))
+  })
+
   it('does not disarm on the success path — that would undo what it just armed', async () => {
     const d = baseDeps()
     await tick(d)
