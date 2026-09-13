@@ -131,7 +131,7 @@ describe('fleet/verify in CI', () => {
     const v = await runVerifyCi(deps({ verify: vi.fn(async () => evidenced) }))
     expect(v.ok).toBe(true)
     expect(v.summary).toBe([
-      'scope=pass impact=low tests=orchestrator:pass review=not-run merge=not-run sha=c0ffee',
+      'scope=pass impact=low tests=orchestrator:pass review=not-run sha=c0ffee',
       '- orchestrator: result file read — 0 failed test(s), 0 failed suite(s) of 12 test(s)',
     ].join('\n'))
   })
