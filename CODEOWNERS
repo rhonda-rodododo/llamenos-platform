@@ -84,6 +84,21 @@ orchestrator/                       @rhonda-rodododo
 .claude/settings.json               @rhonda-rodododo
 CODEOWNERS                          @rhonda-rodododo
 
+# ─── The build's own trust base ────────────────────────────────────────
+# The gate jobs install from this lockfile and run from this workflow, so a
+# PR touching any of these is a PR editing the machinery that judges it. That
+# is not theoretical: the first version of these gates checked out the PR
+# head and ran `bun install` from it, so an install script added here would
+# have forged both verdicts and could have read the review key. Dependency
+# bumps now need an owner's approval — dependabot PRs are few, and this is
+# the file that makes "the judge runs only trusted code" true.
+# `bunfig.toml` does not exist yet; it is owned pre-emptively because it
+# configures the same install.
+package.json                        @rhonda-rodododo
+bun.lockb                           @rhonda-rodododo
+bunfig.toml                         @rhonda-rodododo
+lefthook.yml                        @rhonda-rodododo
+
 # ─── Supply chain, release, deployment ─────────────────────────────────
 .github/workflows/                  @rhonda-rodododo
 knope.toml                          @rhonda-rodododo

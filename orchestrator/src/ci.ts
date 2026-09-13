@@ -3,6 +3,7 @@ import { promisify } from 'node:util'
 import type { Lane } from './config.js'
 import type { VerifyInput, VerifyReport } from './verify.js'
 import type { SecondOpinionInput, SecondOpinionResult } from './review.js'
+import { join } from 'node:path'
 import { buildGateTrace } from './trace.js'
 
 const execFileAsync = promisify(execFile)
@@ -16,6 +17,21 @@ const execFileAsync = promisify(execFile)
  * "may this merge?" in-process and then ran the merge itself; GitHub knew
  * nothing about it, so anyone could merge a fleet PR on the repo's own CI
  * alone, which is what happened to the fleet's first live PR (#662).
+ *
+ * THE INVARIANT, and the reason this round exists: **the gate never executes
+ * code from the commit it judges — it reads it.** The jobs check out the
+ * PR's BASE commit, install from the BASE lockfile with `--ignore-scripts`,
+ * and run this orchestrator from that trusted tree. The head commit is
+ * fetched as an object and extracted with `git archive | tar` into a
+ * directory with no `.git` — files, never a checkout, never a module path.
+ *
+ * The first version of this design checked out the head and ran
+ * `bun install` plus the CLI from it. A PR editing `package.json` (an
+ * install script) or `bun.lockb` (a postinstall) therefore got arbitrary
+ * execution inside both gate jobs BEFORE any verdict was computed — enough
+ * to force exit 0 on both and to read the review key out of the runner's
+ * HOME. Neither file was code-owned, so no human would have seen it. The
+ * judge was running the defendant's code; `fleet/review` itself caught it.
  *
  * Nothing here posts a commit status. An Actions job already IS a check run
  * named after the job, and that name is what the ruleset requires — posting a
@@ -94,34 +110,43 @@ export function verdictSummary(text: string): string {
 }
 
 export interface CiContext {
-  /** The PR's HEAD branch name — `github.head_ref` on a pull_request event.
-   *  Used only to derive the lane; the diff is always taken against `HEAD`,
-   *  since CI checks the head commit out detached. */
+  /** The PR's HEAD branch name — `github.head_ref`. Used only to derive the
+   *  lane; it is a NAME, never something that gets checked out. */
   branch: string
-  worktree: string
+  /** The BASE checkout: trusted git history, trusted orchestrator code,
+   *  trusted `node_modules`. Every decision is computed from here. */
+  repoDir: string
+  /** `git archive <headSha> | tar -x` of the commit under judgement — its
+   *  files, with no `.git` and nothing executed. */
+  headDir: string
+  /** LHS of the diff range: the commit the PR is based on. */
+  baseSha: string
+  /** RHS of the diff range: the commit under judgement, fetched into the
+   *  base checkout as an object. */
+  headSha: string
   /** For the reviewer's prompt only. */
   pr: string
 }
 
-export interface VerifyCiDeps {
+export interface CiDeps {
   ctx: CiContext
   lanes(): Promise<Lane[]>
   verify(input: VerifyInput): Promise<VerifyReport>
+  /** Injected so the export-not-a-checkout invariant below is testable
+   *  without a filesystem. */
+  pathExists(p: string): boolean
+  /** The job log — the durable record of what the gate saw. */
+  log(msg: string): void
 }
 
-export interface ReviewCiDeps {
-  ctx: CiContext
+export type VerifyCiDeps = CiDeps
+
+export interface ReviewCiDeps extends CiDeps {
   /** `undefined`/empty when the repo secret is not configured. */
   apiKey: string | undefined
-  lanes(): Promise<Lane[]>
-  verify(input: VerifyInput): Promise<VerifyReport>
   prDiff(): Promise<string>
   secondOpinion(input: SecondOpinionInput): Promise<SecondOpinionResult>
 }
-
-/** CI checks the head commit out detached, so the branch NAME is not a local
- *  ref — `HEAD` is, and it is the commit the check run attaches to. */
-const CI_DIFF_REF = 'HEAD'
 
 /**
  * `undefined` ONLY when the branch parses as a fleet branch but names a lane
@@ -130,22 +155,63 @@ const CI_DIFF_REF = 'HEAD'
  * branch at all resolves to `UNSCOPED_LANE` and is verified like anything
  * else.
  */
-async function resolveLane(deps: VerifyCiDeps | ReviewCiDeps): Promise<Lane | undefined> {
+async function resolveLane(deps: CiDeps): Promise<Lane | undefined> {
   const laneId = laneIdFromBranch(deps.ctx.branch)
   if (laneId === undefined) return UNSCOPED_LANE
   return (await deps.lanes()).find((l) => l.id === laneId)
 }
 
+/**
+ * Asserted, never assumed. A `.git` inside the head directory means someone
+ * changed the workflow to CHECK OUT the commit under judgement instead of
+ * exporting it — restoring exactly the hole this design closed, silently and
+ * with both jobs still green. Refusing here makes that edit fail loudly on
+ * its own PR.
+ */
+function headDirRefusal(deps: CiDeps): CiVerdict | undefined {
+  if (!deps.pathExists(join(deps.ctx.headDir, '.git'))) return undefined
+  return {
+    ok: false,
+    summary: `refusing to judge: ${deps.ctx.headDir} contains a .git — the commit under ` +
+      'judgement must be exported as data (git archive), never checked out',
+  }
+}
+
+/** The diff range, taken entirely inside the trusted base checkout. */
+function rangeFor(ctx: CiContext): Pick<VerifyInput, 'worktree' | 'base' | 'branch'> {
+  return { worktree: ctx.repoDir, base: ctx.baseSha, branch: ctx.headSha }
+}
+
 /** `fleet/verify` — scope, impact, and diff-targeted tests against
  *  `origin/main...HEAD`. */
 export async function runVerifyCi(deps: VerifyCiDeps): Promise<CiVerdict> {
+  const refusal = headDirRefusal(deps)
+  if (refusal !== undefined) return refusal
+
   const lane = await resolveLane(deps)
   if (lane === undefined) return { ok: false, summary: `unknown lane in branch ${deps.ctx.branch}` }
 
-  const report = await deps.verify({ worktree: deps.ctx.worktree, branch: CI_DIFF_REF, lane })
+  // PHASE 1 — trusted only. git runs in the base checkout; scope, never-write
+  // and impact are pure functions over the file list it returns. No code from
+  // the commit under judgement has executed, or can, at this point.
+  const gate = await deps.verify({ ...rangeFor(deps.ctx), lane, skipTests: true })
+  deps.log(`gate (no code from the commit under judgement executed): ${buildGateTrace({ report: gate })}`)
+  if (!gate.passed) {
+    return {
+      ok: false,
+      summary: [buildGateTrace({ report: gate }), ...gate.reasons.map((r) => `- ${r}`)].join('\n'),
+    }
+  }
+
+  // PHASE 2 — the ONLY place the judged commit's code runs, and running it is
+  // unavoidable: these are its own tests. It happens AFTER the verdict above
+  // was computed and printed, in a separate process, against the export — so
+  // it can only AND into the result, never revise it. This job holds no
+  // secrets for that code to reach.
+  const withTests = await deps.verify({ ...rangeFor(deps.ctx), lane, testDir: deps.ctx.headDir })
   return {
-    ok: report.passed,
-    summary: [buildGateTrace({ report }), ...report.reasons.map((r) => `- ${r}`)].join('\n'),
+    ok: withTests.passed,
+    summary: [buildGateTrace({ report: withTests }), ...withTests.reasons.map((r) => `- ${r}`)].join('\n'),
   }
 }
 
@@ -162,13 +228,16 @@ export async function runVerifyCi(deps: VerifyCiDeps): Promise<CiVerdict> {
  * diff that failed scope gets no review at all.
  */
 export async function runReviewCi(deps: ReviewCiDeps): Promise<CiVerdict> {
+  const refusal = headDirRefusal(deps)
+  if (refusal !== undefined) return refusal
+
   if (deps.apiKey === undefined || deps.apiKey.length === 0) {
     return { ok: false, summary: `review unavailable: ${REVIEW_KEY_ENV} is not configured on this repository` }
   }
   const lane = await resolveLane(deps)
   if (lane === undefined) return { ok: false, summary: `unknown lane in branch ${deps.ctx.branch}` }
 
-  const report = await deps.verify({ worktree: deps.ctx.worktree, branch: CI_DIFF_REF, lane, skipTests: true })
+  const report = await deps.verify({ ...rangeFor(deps.ctx), lane, skipTests: true })
   if (!report.passed) {
     return {
       ok: false,
@@ -179,8 +248,11 @@ export async function runReviewCi(deps: ReviewCiDeps): Promise<CiVerdict> {
   let result: SecondOpinionResult
   try {
     const diff = await deps.prDiff()
+    // `snapshotDir`, never `worktree`: the export already exists, so this
+    // job runs no git and creates nothing. Zero execution of the judged
+    // commit's code anywhere in this job — which is what lets it hold the key.
     result = await deps.secondOpinion({
-      authorEngine: lane.engine, pr: deps.ctx.pr, worktree: deps.ctx.worktree, diff, report,
+      authorEngine: lane.engine, pr: deps.ctx.pr, snapshotDir: deps.ctx.headDir, diff, report,
     })
   } catch (e) {
     return { ok: false, summary: `review unavailable: ${e instanceof Error ? e.message : String(e)}` }
@@ -197,14 +269,20 @@ export async function runReviewCi(deps: ReviewCiDeps): Promise<CiVerdict> {
 
 /** `undefined` when the workflow did not supply a branch — a CI entry point
  *  with no idea what it is judging must refuse, not guess. */
-export function ciContextFromEnv(env: NodeJS.ProcessEnv, worktree: string): CiContext | undefined {
+export function ciContextFromEnv(env: NodeJS.ProcessEnv, repoDir: string): CiContext | undefined {
   const branch = env['FLEET_CI_BRANCH'] ?? ''
-  if (branch.length === 0) return undefined
-  return { branch, worktree, pr: env['FLEET_CI_PR'] ?? '(unknown)' }
+  const headDir = env['FLEET_CI_HEAD_DIR'] ?? ''
+  const headSha = env['FLEET_CI_HEAD_SHA'] ?? ''
+  const baseSha = env['FLEET_CI_BASE_SHA'] ?? ''
+  if (branch.length === 0 || headDir.length === 0 || headSha.length === 0 || baseSha.length === 0) return undefined
+  return { branch, repoDir, headDir, headSha, baseSha, pr: env['FLEET_CI_PR'] ?? '(unknown)' }
 }
 
-export async function ciDiff(worktree: string): Promise<string> {
-  const { stdout } = await execFileAsync('git', ['-C', worktree, 'diff', `origin/main...${CI_DIFF_REF}`],
-    { maxBuffer: 32 * 1024 * 1024 })
+/** Read inside the trusted base checkout, over the fetched head object. */
+export async function ciDiff(ctx: CiContext): Promise<string> {
+  const { stdout } = await execFileAsync(
+    'git', ['-C', ctx.repoDir, 'diff', `${ctx.baseSha}...${ctx.headSha}`],
+    { maxBuffer: 32 * 1024 * 1024 },
+  )
   return stdout
 }

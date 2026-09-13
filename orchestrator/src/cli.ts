@@ -90,8 +90,16 @@ export async function doctor(): Promise<number> {
   // Exactly one remote is an invariant, not a preference: a second remote
   // breaks bare `gh` and makes it possible to push fleet work to the wrong
   // repository. Asserted here so drift surfaces as a failed check.
-  const remotes = execFileSync('git', ['remote'], { cwd: REPO_ROOT, encoding: 'utf8' })
-    .split('\n').map((r) => r.trim()).filter(Boolean)
+  // Wrapped: `doctor` is a health check, and a health check that THROWS
+  // instead of reporting a failed check is useless in exactly the situation
+  // it exists for. This throws wherever REPO_ROOT is not a git repository —
+  // including a `git archive` export, which is how the fleet's own tests now
+  // run under `fleet/verify`.
+  let remotes: string[] = []
+  try {
+    remotes = execFileSync('git', ['remote'], { cwd: REPO_ROOT, encoding: 'utf8' })
+      .split('\n').map((r) => r.trim()).filter(Boolean)
+  } catch { /* not a git repo, or git unavailable — reported as a failed check below */ }
   checks.push([`exactly one git remote (found: ${remotes.join(', ') || 'none'})`,
     remotes.length === 1 && remotes[0] === 'origin',
     'git remote remove <name> — this repo must only ever have origin -> llamenos-platform'])
@@ -418,7 +426,7 @@ async function enableAutoMerge(pr: string): Promise<void> {
   } catch (e) {
     log(`issue link: failed for PR ${pr}: ${errMsg(e)} — arming auto-merge anyway`)
   }
-  await gh(['pr', 'merge', pr, '--auto', '--squash'])
+  await gh(['pr', 'merge', pr, '--auto', '--squash', '--delete-branch'])
 }
 
 async function runTick(): Promise<number> {
@@ -1001,10 +1009,17 @@ async function runIntegrate(): Promise<number> {
  * the ruleset requires; the summary goes to the job log, where a reader
  * follows the red check anyway.
  */
+/** Plain stdout, not the fleet log: a CI runner has no fleet state directory
+ *  worth writing to, and the job log IS the durable record there. */
+const ciLog = (msg: string): void => { process.stdout.write(`${msg}\n`) }
+
 async function runCiGate(job: string, run: (ctx: CiContext) => Promise<CiVerdict>): Promise<number> {
   const ctx = ciContextFromEnv(process.env, REPO_ROOT)
   if (ctx === undefined) {
-    process.stderr.write(`${job}: FLEET_CI_BRANCH is not set — refusing to judge an unknown branch\n`)
+    process.stderr.write(
+      `${job}: FLEET_CI_BRANCH, FLEET_CI_HEAD_DIR, FLEET_CI_HEAD_SHA and FLEET_CI_BASE_SHA ` +
+      'must all be set — refusing to judge an unknown tree\n',
+    )
     return 2
   }
   const verdict = await run(ctx)
@@ -1046,13 +1061,17 @@ const HANDLERS: Record<string, CommandHandler> = {
     ctx,
     lanes: () => loadLanes(REPO_ROOT),
     verify: verifyMechanical,
+    pathExists: existsSync,
+    log: ciLog,
   })),
   'review-ci': () => runCiGate(REVIEW_JOB, (ctx) => runReviewCi({
     ctx,
     apiKey: process.env[REVIEW_KEY_ENV],
     lanes: () => loadLanes(REPO_ROOT),
     verify: verifyMechanical,
-    prDiff: () => ciDiff(ctx.worktree),
+    pathExists: existsSync,
+    log: ciLog,
+    prDiff: () => ciDiff(ctx),
     secondOpinion,
   })),
   plan: () => runPlan(),

@@ -1414,30 +1414,85 @@ jobs:
     timeout-minutes: 20
 
     steps:
-      # The PR HEAD commit, not the default merge ref: the status must land on
-      # the commit the ruleset checks, and `verifyMechanical` records what it
-      # examined as `sha=`. Checking the head out makes those the same commit.
-      - name: Checkout the PR head itself
+      # The BASE commit, not the head. Everything the gate decides is computed
+      # from this tree: its git history, its orchestrator code, its lockfile,
+      # its node_modules. The commit under judgement never becomes code here.
+      - name: Checkout the PR BASE (trusted)
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.event.pull_request.base.sha }}
           fetch-depth: 0
+          persist-credentials: false
 
-      - name: Fetch origin/main for the diff range
-        run: git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+      # The head arrives as DATA: fetched as an object, extracted with
+      # `git archive | tar`. No `.git`, no checkout, nothing on a module path,
+      # nothing executed. verify-ci/review-ci refuse outright if a `.git` ever
+      # appears in there — see headDirRefusal in ci.ts.
+      - name: Export the PR head as data
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "$HEAD_SHA"
+          mkdir -p "$RUNNER_TEMP/head"
+          git archive "$HEAD_SHA" | tar -x -C "$RUNNER_TEMP/head"
+          test ! -e "$RUNNER_TEMP/head/.git"
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2.0.2
         with:
           bun-version: ${{ env.BUN_VERSION }}
 
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
+      # From the BASE lockfile, and `--ignore-scripts` on top: a postinstall is
+      # the shortest path from "PR edits a dependency" to "PR runs code inside
+      # its own judge".
+      - name: Install dependencies (base lockfile, no install scripts)
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      # The head export has no node_modules of its own. The base install is
+      # linked in so the phase-2 tests resolve their RUNNER from the trusted
+      # tree — a PR cannot swap vitest out from under its own verification,
+      # only supply the test files it is entitled to supply.
+      - name: Make base dependencies available to the head export
+        run: ln -s "$GITHUB_WORKSPACE/node_modules" "$RUNNER_TEMP/head/node_modules"
+
+      # Two phases inside one command: scope/never-write/impact first, from
+      # the base checkout with nothing of the PR's executing; then the PR's
+      # own diff-targeted tests against the export, whose result can only AND
+      # into the verdict already computed and printed. This job holds no
+      # secrets, which is what makes running those tests acceptable at all.
+
+      # Bootstrap guard. The gate runs from the BASE checkout by design, so
+      # the FIRST pull request that introduces the gate cannot be judged by
+      # it: the base predates it. This says so, instead of surfacing as an
+      # unrelated "usage: llamenos-fleet <...>" and exit 2.
+      #
+      # It fails CLOSED, deliberately. After the gate has merged once, a base
+      # without it means someone removed it from `main` — and that must stop
+      # every PR until a human looks, never silently wave them through.
+      - name: Check the base provides the gate
+        run: |
+          set -eu
+          usage="$(bun orchestrator/src/cli.ts 2>&1 || true)"
+          case "$usage" in
+            *verify-ci*) ;;
+            *)
+              echo "::error::the base commit has no 'verify-ci' command, so it cannot judge this PR"
+              echo "The gate deliberately runs from the BASE, never from the commit it judges."
+              echo "The PR that INTRODUCES the gate therefore cannot pass it. Merge that one PR"
+              echo "with these checks not yet required by the ruleset; every later PR is judged"
+              echo "by the now-trusted, merged gate."
+              exit 1
+              ;;
+          esac
 
       - name: Verify
         env:
-          FLEET_CI_BRANCH: ${{ github.head_ref || github.ref_name }}
+          FLEET_CI_BRANCH: ${{ github.head_ref }}
           FLEET_CI_PR: ${{ github.event.pull_request.number }}
+          FLEET_CI_HEAD_DIR: ${{ runner.temp }}/head
+          FLEET_CI_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          FLEET_CI_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: bun orchestrator/src/cli.ts verify-ci
 
   fleet-review:
@@ -1445,39 +1500,51 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
-      # contents: read and nothing else — the non-author reviewer runs inside
-      # this job, and a token that cannot write to the repo is the
-      # containment that matters. It reads a `.git`-less `git archive` export
-      # (review.ts), so there is nothing to commit into or push from either.
+      # contents: read and nothing else. The reviewer runs inside this job
+      # with the review key on disk, so the containment that matters is that
+      # NOTHING from the commit under judgement ever executes here: it is a
+      # `git archive` export the model reads, never a checkout, never
+      # installed, never on a module path.
       contents: read
     # HIGH_IMPACT_TIMEOUT_MS alone is 25 minutes (review.ts); checkout, deps,
     # the engine download and the smoke call have to fit around it.
     timeout-minutes: 40
 
     steps:
-      - name: Checkout the PR head itself
+      # The BASE commit, not the head. Everything the gate decides is computed
+      # from this tree: its git history, its orchestrator code, its lockfile,
+      # its node_modules. The commit under judgement never becomes code here.
+      - name: Checkout the PR BASE (trusted)
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.event.pull_request.base.sha }}
           fetch-depth: 0
-          # The model runs in this job with HOME set (it needs HOME to read
-          # its own auth), so it can read any file under it — including
-          # `.git/config`. Leaving the checkout token there would hand the
-          # reviewer a push credential for the branch it is judging.
           persist-credentials: false
 
-      - name: Fetch origin/main for the diff range
-        run: git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+      # The head arrives as DATA: fetched as an object, extracted with
+      # `git archive | tar`. No `.git`, no checkout, nothing on a module path,
+      # nothing executed. verify-ci/review-ci refuse outright if a `.git` ever
+      # appears in there — see headDirRefusal in ci.ts.
+      - name: Export the PR head as data
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "$HEAD_SHA"
+          mkdir -p "$RUNNER_TEMP/head"
+          git archive "$HEAD_SHA" | tar -x -C "$RUNNER_TEMP/head"
+          test ! -e "$RUNNER_TEMP/head/.git"
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2.0.2
         with:
           bun-version: ${{ env.BUN_VERSION }}
 
-      # `orchestrator/` imports `yaml` (fragments.ts), so the CLI needs the
-      # workspace's dependencies to start at all.
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
+      # From the BASE lockfile, and `--ignore-scripts` on top: a postinstall is
+      # the shortest path from "PR edits a dependency" to "PR runs code inside
+      # its own judge".
+      - name: Install dependencies (base lockfile, no install scripts)
+        run: bun install --frozen-lockfile --ignore-scripts
 
       # From a pinned release asset whose sha256 is recorded here — never a
       # `curl | bash` installer, in a repo that pins every action by SHA. (The
@@ -1545,13 +1612,41 @@ jobs:
           echo "$out"
           echo "$out" | grep -q 'VERDICT: PASS'
 
+
+      # Bootstrap guard. The gate runs from the BASE checkout by design, so
+      # the FIRST pull request that introduces the gate cannot be judged by
+      # it: the base predates it. This says so, instead of surfacing as an
+      # unrelated "usage: llamenos-fleet <...>" and exit 2.
+      #
+      # It fails CLOSED, deliberately. After the gate has merged once, a base
+      # without it means someone removed it from `main` — and that must stop
+      # every PR until a human looks, never silently wave them through.
+      - name: Check the base provides the gate
+        run: |
+          set -eu
+          usage="$(bun orchestrator/src/cli.ts 2>&1 || true)"
+          case "$usage" in
+            *review-ci*) ;;
+            *)
+              echo "::error::the base commit has no 'review-ci' command, so it cannot judge this PR"
+              echo "The gate deliberately runs from the BASE, never from the commit it judges."
+              echo "The PR that INTRODUCES the gate therefore cannot pass it. Merge that one PR"
+              echo "with these checks not yet required by the ruleset; every later PR is judged"
+              echo "by the now-trusted, merged gate."
+              exit 1
+              ;;
+          esac
+
       - name: Review
         env:
           # Absent fails the job — never a skip and never a pass. A review
           # that could not run is not a review that passed.
           FLEET_REVIEW_API_KEY: ${{ secrets.FLEET_REVIEW_API_KEY }}
-          FLEET_CI_BRANCH: ${{ github.head_ref || github.ref_name }}
+          FLEET_CI_BRANCH: ${{ github.head_ref }}
           FLEET_CI_PR: ${{ github.event.pull_request.number }}
+          FLEET_CI_HEAD_DIR: ${{ runner.temp }}/head
+          FLEET_CI_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          FLEET_CI_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: bun orchestrator/src/cli.ts review-ci
 
   ci-status:

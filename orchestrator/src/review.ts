@@ -405,7 +405,23 @@ async function invokeVerifierEngine(input: {
 export interface SecondOpinionInput {
   authorEngine: EngineId
   pr: string
-  worktree: string
+  /**
+   * The AUTHOR'S OWN worktree — the operator-box path only. Present when the
+   * fleet reviews its worker's tree in place: a snapshot is exported from it
+   * and it is checked before and after for tampering. Mutually exclusive
+   * with `snapshotDir`.
+   */
+  worktree?: string
+  /**
+   * A `git archive` export that ALREADY exists — the CI path. When given,
+   * this function runs no git command at all and exports nothing: the tree
+   * under judgement was extracted as data before this process started, and
+   * there is no worktree to tamper with because none was ever created.
+   *
+   * This is what keeps the review job free of any execution of the code it
+   * is judging, which is the whole reason the job may hold the review key.
+   */
+  snapshotDir?: string
   diff: string
   report: VerifyReport
 }
@@ -433,20 +449,37 @@ export async function secondOpinion(input: SecondOpinionInput): Promise<SecondOp
     )
   }
 
+  if ((input.worktree === undefined) === (input.snapshotDir === undefined)) {
+    throw new Error(
+      'secondOpinion needs exactly one of `worktree` (export a snapshot from the author\'s tree ' +
+      'and watch it for tampering) or `snapshotDir` (an export that already exists) — ' +
+      'never both, and never neither',
+    )
+  }
+
   const engine = verifierFor(input.authorEngine)
   const highImpact = input.report.impact === 'high'
   const prompt = buildReviewPrompt(input.pr, input.diff, input.report)
+  const turns = { maxTurns: highImpact ? HIGH_IMPACT_MAX_TURNS : DEFAULT_MAX_TURNS,
+    timeoutMs: highImpact ? HIGH_IMPACT_TIMEOUT_MS : DEFAULT_TIMEOUT_MS }
 
-  const before = await gitState(input.worktree)
-  const snapshot = await exportReviewSnapshot(input.worktree, before.head)
+  // CI path: the export is already on disk, made by `git archive` before this
+  // process began. No git runs, nothing is created, and there is no author
+  // worktree for a verifier to modify — so the tamper detection below has
+  // nothing to detect and is correctly absent rather than vacuously "passing".
+  if (input.snapshotDir !== undefined) {
+    const result = await invokeVerifierEngine({ engine, cwd: input.snapshotDir, prompt, ...turns })
+    if (!result.reached) {
+      return { verdict: 'UNREADABLE', text: result.output.length > 0 ? result.output : '(reviewer engine was unreachable)' }
+    }
+    return { verdict: parseVerdict(result.output), text: result.output }
+  }
+
+  const worktree = input.worktree as string
+  const before = await gitState(worktree)
+  const snapshot = await exportReviewSnapshot(worktree, before.head)
   try {
-    const result = await invokeVerifierEngine({
-      engine,
-      cwd: snapshot.dir,
-      prompt,
-      maxTurns: highImpact ? HIGH_IMPACT_MAX_TURNS : DEFAULT_MAX_TURNS,
-      timeoutMs: highImpact ? HIGH_IMPACT_TIMEOUT_MS : DEFAULT_TIMEOUT_MS,
-    })
+    const result = await invokeVerifierEngine({ engine, cwd: snapshot.dir, prompt, ...turns })
 
     // Detective layer (see the honest accounting in the comment above
     // `gitState`): with GitHub's per-SHA required statuses as the actual
@@ -465,11 +498,11 @@ export async function secondOpinion(input: SecondOpinionInput): Promise<SecondOp
     // record this one run as failed — left to that caller because tripping
     // the kill switch here would reach outside this file's own concern and
     // into `tick`'s orchestration of every lane, not just this review.
-    const after = await gitState(input.worktree)
+    const after = await gitState(worktree)
     if (after.head !== before.head || after.status !== before.status) {
       throw new VerifierTamperedWorktreeError(
         `the non-author verifier appears to have modified the AUTHOR'S OWN worktree at ` +
-        `${input.worktree} during review (HEAD ${before.head} -> ${after.head}${
+        `${worktree} during review (HEAD ${before.head} -> ${after.head}${
           after.status !== before.status ? ', working-tree status also changed' : ''
         }) — refusing to trust this verdict. This is a fleet-level trust failure in the ` +
         'non-author verification rail itself, not a flake in this one review; the caller ' +

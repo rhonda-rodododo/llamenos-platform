@@ -208,6 +208,24 @@ describe('verifyMechanical', () => {
   // undefined, and no test runner spawned at all. Exercised on a diff that
   // WOULD route to a suite (`orchestrator/`), since a diff that routes
   // nowhere would pass this vacuously either way.
+  // The CI shape: git runs in a TRUSTED checkout that is parked on the base,
+  // and the commit under judgement is only an object in it. `verifiedCommit`
+  // must name the commit judged, not the tree git happened to be sitting on —
+  // it is what `status.ts` reads back, and what the gate trace prints as
+  // `sha=`. Recording the worktree's own HEAD here named the base instead.
+  it('records the commit under judgement, not the worktree HEAD, when they differ', async () => {
+    const { dir, headSha, originMainSha } = makeRepoWithDivergedMain()
+    execFileSync('git', ['checkout', '-q', '--detach', originMainSha], { cwd: dir })
+
+    const report = await verifyMechanical({
+      worktree: dir, base: originMainSha, branch: headSha, lane: testLane, skipTests: true,
+    })
+
+    expect(execSync('git rev-parse HEAD', { cwd: dir }).toString().trim()).toBe(originMainSha)
+    expect(report.verifiedCommit).toBe(headSha)
+    expect(report.changedFiles).toEqual(['notes.md'])
+  })
+
   it('skipTests runs no suite and records none, on a diff that would otherwise route to one', async () => {
     const { dir } = makeRepoWithDivergedMain('orchestrator/src/thing.ts')
     const lane: Lane = { ...testLane, scope: { owned: ['orchestrator/'], notOwned: [] } }

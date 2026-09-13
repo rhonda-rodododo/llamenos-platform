@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import ignore from 'ignore'
 
@@ -31,11 +31,53 @@ export function codeownersPatterns(repoRoot: string = process.cwd()): string[] {
     .filter((p) => p.length > 0)
 }
 
-/** Every file git actually tracks. The tree is the source of truth for
- *  "does this pattern protect anything" — a list of strings cannot answer it. */
+/**
+ * Every file the repository actually contains at this commit. The tree is the
+ * source of truth for "does this pattern protect anything" — a list of
+ * strings cannot answer it.
+ *
+ * Two environments, one answer. On a checkout, `git ls-files` is exact. Under
+ * `fleet/verify` the suite runs inside a `git archive` EXPORT of the commit
+ * under judgement — deliberately no `.git`, so no git command can run there —
+ * and a walk of that directory is if anything MORE exact, because an archive
+ * contains precisely the tracked files at that commit and nothing else. The
+ * only thing to exclude is `node_modules`, which the workflow symlinks in
+ * from the trusted base install and which git never tracked.
+ *
+ * The result is asserted non-trivial before it is returned: a walk that
+ * silently found nothing would turn every coverage assertion below into a
+ * vacuous pass, which is the precise failure mode these tests exist to
+ * prevent.
+ */
 export function trackedFiles(repoRoot: string = process.cwd()): string[] {
-  return execFileSync('git', ['ls-files'], { cwd: repoRoot, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
-    .split('\n').map((l) => l.trim()).filter((l) => l.length > 0)
+  let files: string[]
+  try {
+    files = execFileSync('git', ['ls-files'], { cwd: repoRoot, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+      .split('\n').map((l) => l.trim()).filter((l) => l.length > 0)
+  } catch {
+    files = walk(repoRoot, '')
+  }
+  if (files.length < 100 || !files.includes('CODEOWNERS')) {
+    throw new Error(
+      `trackedFiles(${repoRoot}) found ${files.length} file(s) and ` +
+      `${files.includes('CODEOWNERS') ? 'did' : 'did NOT'} see CODEOWNERS — refusing to let ` +
+      'every coverage assertion pass vacuously over an empty or wrong tree',
+    )
+  }
+  return files
+}
+
+const WALK_SKIP = new Set(['node_modules', '.git'])
+
+function walk(root: string, rel: string): string[] {
+  const out: string[] = []
+  for (const e of readdirSync(join(root, rel), { withFileTypes: true })) {
+    if (WALK_SKIP.has(e.name)) continue
+    const child = rel.length === 0 ? e.name : `${rel}/${e.name}`
+    if (e.isDirectory()) out.push(...walk(root, child))
+    else if (e.isFile()) out.push(child)
+  }
+  return out
 }
 
 export interface CodeownersMatcher {

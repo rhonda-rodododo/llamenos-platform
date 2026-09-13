@@ -169,16 +169,16 @@ describe('rail: never-write binds even an unrestricted lane', () => {
       .toEqual(['apps/android/keystore.properties'])
   })
 
-  // CI and deploy stay WRITABLE (a lane owning them can fix its own CI) and
-  // stay low-impact in `classifyImpact`, which now only describes a diff.
-  // They are nevertheless owned in CODEOWNERS — #615's supply-chain policy,
-  // which this change adopts — so GitHub holds such a PR for its owner even
-  // though impact.ts calls it low. That divergence is deliberate: CODEOWNERS
-  // is the gate, impact.ts is the description.
-  it('leaves CI and deploy writable, and low-impact in the descriptive classifier', () => {
+  // CI and deploy stay WRITABLE — a lane owning them can still fix its own
+  // CI, and never-write is about secrets, not about review. `deploy/` stays
+  // low-impact (owned in CODEOWNERS via #615's policy, but not part of the
+  // gate's own trust base). `ci.yml` is now HIGH impact, because it is where
+  // "check out the base, not the head" is written down: a PR editing the
+  // gate's own definition is editing the machinery that judges it.
+  it('leaves CI and deploy writable, and treats the gate definition itself as high impact', () => {
     expect(checkScope(['.github/workflows/ci.yml'], { owned: [], notOwned: [] }, [...NEVER_WRITE_PATHS]).forbidden)
       .toEqual([])
-    expect(classifyImpact(['.github/workflows/ci.yml'], 1).impact).toBe('low')
+    expect(classifyImpact(['.github/workflows/ci.yml'], 1).impact).toBe('high')
     expect(classifyImpact(['deploy/helm/values.yaml'], 1).impact).toBe('low')
   })
 })

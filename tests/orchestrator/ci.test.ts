@@ -12,8 +12,13 @@ const lane = (): Lane => ({
   scope: { owned: ['apps/ios/'], notOwned: [] },
 })
 
-const ctx = (over: Partial<CiContext> = {}): CiContext =>
-  ({ branch: 'fleet/ios/123', worktree: '/wt', pr: '42', ...over })
+const ctx = (over: Partial<CiContext> = {}): CiContext => ({
+  branch: 'fleet/ios/123', repoDir: '/base', headDir: '/tmp/head',
+  baseSha: 'base111', headSha: 'head222', pr: '42', ...over,
+})
+
+/** The head export has no `.git` — that is the invariant under test. */
+const noGitInHead = (p: string): boolean => p !== '/tmp/head/.git'
 
 const passing: VerifyReport = {
   passed: true, reasons: [], changedFiles: ['apps/ios/a.swift'], addedLines: 3,
@@ -45,10 +50,29 @@ describe('ciContextFromEnv', () => {
     expect(ciContextFromEnv({}, '/wt')).toBeUndefined()
     expect(ciContextFromEnv({ FLEET_CI_BRANCH: '' }, '/wt')).toBeUndefined()
   })
-  it('builds one from the branch alone, defaulting the PR label', () => {
-    expect(ciContextFromEnv({ FLEET_CI_BRANCH: 'fleet/ios/1', FLEET_CI_PR: '9' }, '/wt'))
-      .toEqual({ branch: 'fleet/ios/1', worktree: '/wt', pr: '9' })
-    expect(ciContextFromEnv({ FLEET_CI_BRANCH: 'fleet/ios/1' }, '/wt')?.pr).toBe('(unknown)')
+  // A gate that does not know which trees it is comparing must refuse, not
+  // fall back to a default — a default here would mean judging the wrong
+  // commit and reporting green.
+  it.each(['FLEET_CI_HEAD_DIR', 'FLEET_CI_HEAD_SHA', 'FLEET_CI_BASE_SHA'])(
+    'refuses when %s is missing', (missing) => {
+      const env: NodeJS.ProcessEnv = {
+        FLEET_CI_BRANCH: 'fleet/ios/1', FLEET_CI_HEAD_DIR: '/tmp/head',
+        FLEET_CI_HEAD_SHA: 'h', FLEET_CI_BASE_SHA: 'b',
+      }
+      delete env[missing]
+      expect(ciContextFromEnv(env, '/base')).toBeUndefined()
+    })
+
+  it('builds one from the full set, defaulting only the PR label', () => {
+    const env = {
+      FLEET_CI_BRANCH: 'fleet/ios/1', FLEET_CI_HEAD_DIR: '/tmp/head',
+      FLEET_CI_HEAD_SHA: 'h', FLEET_CI_BASE_SHA: 'b', FLEET_CI_PR: '9',
+    }
+    expect(ciContextFromEnv(env, '/base')).toEqual({
+      branch: 'fleet/ios/1', repoDir: '/base', headDir: '/tmp/head',
+      headSha: 'h', baseSha: 'b', pr: '9',
+    })
+    expect(ciContextFromEnv({ ...env, FLEET_CI_PR: undefined }, '/base')?.pr).toBe('(unknown)')
   })
 })
 
@@ -57,6 +81,8 @@ describe('fleet/verify in CI', () => {
     ctx: ctx(),
     lanes: async () => [lane()],
     verify: vi.fn(async () => passing),
+    pathExists: noGitInHead,
+    log: () => {},
     ...over,
   })
 
@@ -93,9 +119,11 @@ describe('fleet/verify in CI', () => {
   it('runs the diff-targeted tests — it must never quietly skip them', async () => {
     const d = deps()
     await runVerifyCi(d)
-    const input = (d.verify as Mock).mock.calls[0]?.[0] as VerifyInput | undefined
-    expect(input?.skipTests).not.toBe(true)
-    expect(input?.lane.id).toBe('ios')
+    // Phase 2 (call 1) is the one that runs tests; phase 1 must not.
+    const calls = (d.verify as Mock).mock.calls.map((c) => c[0] as VerifyInput)
+    expect(calls[0]?.skipTests).toBe(true)
+    expect(calls[1]?.skipTests).not.toBe(true)
+    expect(calls[1]?.lane.id).toBe('ios')
   })
 
   it('fails when scope fails, naming the offending path', async () => {
@@ -134,6 +162,8 @@ describe('fleet/review in CI', () => {
     apiKey: 'a-key',
     lanes: async () => [lane()],
     verify: vi.fn(async () => passing),
+    pathExists: noGitInHead,
+    log: () => {},
     prDiff: vi.fn(async () => 'diff --git a/x b/x'),
     secondOpinion: vi.fn(async () => ({ verdict: 'PASS' as const, text: 'looks fine\nVERDICT: PASS' })),
     ...over,
@@ -213,10 +243,88 @@ describe('fleet/review in CI', () => {
     expect(((d.verify as Mock).mock.calls[0]?.[0] as VerifyInput | undefined)?.skipTests).toBe(true)
   })
 
+  // The judge must never execute the judged commit's code. `snapshotDir` is
+  // an export that already exists; `worktree` would mean exporting from — and
+  // running git against — a PR-controlled tree inside the job that holds the
+  // review key.
+  it('hands the reviewer the export, never a worktree', async () => {
+    const d = deps()
+    await runReviewCi(d)
+    expect(d.secondOpinion).toHaveBeenCalledWith(expect.objectContaining({ snapshotDir: '/tmp/head' }))
+    expect((d.secondOpinion as Mock).mock.calls[0]?.[0]).not.toHaveProperty('worktree')
+  })
+
   it('asks the non-author engine, derived from the lane that wrote the diff', async () => {
     const d = deps()
     await runReviewCi(d)
     expect(d.secondOpinion).toHaveBeenCalledWith(
-      expect.objectContaining({ authorEngine: 'claude', pr: '42', worktree: '/wt' }))
+      expect.objectContaining({ authorEngine: 'claude', pr: '42', snapshotDir: '/tmp/head' }))
+  })
+})
+
+// The load-bearing invariant of the round that fixed the gate: a `.git` in
+// the head directory means the workflow CHECKED OUT the commit under
+// judgement instead of exporting it — which is how the judge came to be
+// running the defendant's code in the first place. Both gates must refuse,
+// loudly, rather than proceed on a tree they could also be executing from.
+describe('the commit under judgement is data, never a checkout', () => {
+  const hasGitInHead = (): boolean => true
+
+  it('verify-ci refuses when the head dir contains a .git', async () => {
+    const verify = vi.fn(async () => passing)
+    const v = await runVerifyCi({
+      ctx: ctx(), lanes: async () => [lane()], verify, pathExists: hasGitInHead, log: () => {},
+    })
+    expect(v.ok).toBe(false)
+    expect(v.summary).toContain('must be exported as data')
+    expect(verify).not.toHaveBeenCalled()
+  })
+
+  it('review-ci refuses when the head dir contains a .git, before touching the key', async () => {
+    const secondOpinion = vi.fn(async () => ({ verdict: 'PASS' as const, text: 'VERDICT: PASS' }))
+    const v = await runReviewCi({
+      ctx: ctx(), apiKey: 'a-key', lanes: async () => [lane()], verify: vi.fn(async () => passing),
+      pathExists: hasGitInHead, log: () => {},
+      prDiff: vi.fn(async () => ''), secondOpinion,
+    })
+    expect(v.ok).toBe(false)
+    expect(v.summary).toContain('must be exported as data')
+    expect(secondOpinion).not.toHaveBeenCalled()
+  })
+
+  // Every decision is computed in the BASE checkout over the fetched head
+  // object. If the adapter ever pointed git at the head dir (or at cwd), the
+  // PR would be describing its own diff.
+  it('computes the diff inside the base checkout, over base...head', async () => {
+    const verify = vi.fn(async () => passing)
+    await runVerifyCi({
+      ctx: ctx(), lanes: async () => [lane()], verify, pathExists: noGitInHead, log: () => {},
+    })
+    const first = (verify as Mock).mock.calls[0]?.[0] as VerifyInput
+    expect(first.worktree).toBe('/base')
+    expect(first.base).toBe('base111')
+    expect(first.branch).toBe('head222')
+  })
+
+  it('runs the diff-targeted tests in the head export, not in the base checkout', async () => {
+    const verify = vi.fn(async () => passing)
+    await runVerifyCi({
+      ctx: ctx(), lanes: async () => [lane()], verify, pathExists: noGitInHead, log: () => {},
+    })
+    const second = (verify as Mock).mock.calls[1]?.[0] as VerifyInput
+    expect(second.testDir).toBe('/tmp/head')
+    expect(second.worktree).toBe('/base')
+  })
+
+  // Phase 2 exists only to AND in. A scope failure must stop before any of
+  // the judged commit's code runs at all.
+  it('never reaches the test phase when scope already failed', async () => {
+    const failed: VerifyReport = { ...passing, passed: false, reasons: ['touched never-write paths: .env'] }
+    const verify = vi.fn(async () => failed)
+    const v = await runVerifyCi({
+      ctx: ctx(), lanes: async () => [lane()], verify, pathExists: noGitInHead, log: () => {},
+    })
+    expect(v.ok).toBe(false)
+    expect(verify).toHaveBeenCalledTimes(1)
   })
 })

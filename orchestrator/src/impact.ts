@@ -63,6 +63,16 @@ export const HIGH_IMPACT_PATHS: readonly string[] = [
   '.claude/agents/',
   '.claude/settings.json',
 
+  // The build's own trust base, and the reason this list gained entries in
+  // the round that fixed the gate. The gate jobs install from the lockfile
+  // and run from the workflow definition; a PR editing any of these is a PR
+  // editing the machinery that judges it. `ci.yml` most of all — it is where
+  // "check out the base, not the head" is written down.
+  'package.json',
+  'bun.lockb',
+  'lefthook.yml',
+  '.github/workflows/ci.yml',
+
   // Auth, sessions, sigchain, identity: state a revert does not restore.
   // `.test.ts` siblings are listed explicitly — weakening the test is the
   // shortest route to disabling the check it guards.

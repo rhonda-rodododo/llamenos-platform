@@ -92,7 +92,11 @@ describe('classifyImpact', () => {
     ['drizzle/migrations/0001_init.sql'],
     ['packages/shared/migrations/0002_x.sql'],
     ['apps/worker/db/schema/users.ts'],
-    ['.github/workflows/ci.yml'],
+    // `.github/workflows/ci.yml` used to be in this list. It is HIGH impact
+    // now, and not because of deployment risk: it is where the gate's own
+    // rule — check out the base, never the head — is written down, so a PR
+    // editing it is editing the machinery that judges it. Asserted in
+    // guards.test.ts instead.
     ['deploy/helm/llamenos/values.yaml'],
     ['apps/ios/fastlane/Fastfile'],
     ['apps/android/fastlane/Fastfile'],

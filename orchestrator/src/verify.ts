@@ -9,10 +9,20 @@ import type { Lane } from './config.js'
 const execFileAsync = promisify(execFile)
 
 export interface VerifyInput {
+  /**
+   * Where git runs. This must be a TRUSTED checkout: in CI it is the PR's
+   * BASE commit, never the head. Everything this function decides — the
+   * changed-file list, and therefore scope, never-write and impact — is
+   * computed by git here, from repository history, with no code from the
+   * commit under judgement executing anywhere.
+   */
   worktree: string
-  /** The right-hand side of the diff range (`origin/main...<branch>`). CI
-   *  checks the PR's head SHA out detached, so it passes `HEAD`. */
+  /** The right-hand side of the diff range. In CI this is the PR's head SHA,
+   *  fetched into the base checkout as an object — not checked out. */
   branch: string
+  /** The left-hand side of the diff range. Defaults to `origin/main`; CI
+   *  passes the PR's base SHA so the range is exactly the PR's own change. */
+  base?: string
   lane: Lane
   /**
    * Scope and impact only — used by the `fleet/review` CI job, where
@@ -22,6 +32,15 @@ export interface VerifyInput {
    * for one whose tests passed: `buildGateTrace` renders it `tests=none`.
    */
   skipTests?: boolean
+  /**
+   * Where the diff-targeted tests run, and the ONLY place code from the
+   * commit under judgement is ever executed. Defaults to `worktree` (the
+   * fleet's own worker on the operator's box, where the two are the same
+   * tree). CI passes a `git archive` export of the head instead, so the
+   * tests run against the PR's files while every DECISION above was already
+   * made from the base checkout.
+   */
+  testDir?: string
 }
 
 export interface VerifyReport {
@@ -34,8 +53,8 @@ export interface VerifyReport {
   testsRun?: string[]
   testsPassed?: boolean
   /**
-   * The exact commit this report examined (`git rev-parse HEAD` in the
-   * worktree, captured once, up front). It no longer has to be compared
+   * The exact commit this report examined: the resolved right-hand side of
+   * the diff range, captured once, up front. It no longer has to be compared
    * against anything at merge time: a commit status is attached to ONE SHA,
    * so GitHub itself refuses to merge a head that does not carry its own
    * green `fleet/verify`. It survives as the `sha=` field of the gate trace,
@@ -247,11 +266,18 @@ function parseFailingCount(output: string): number | undefined {
  */
 export async function verifyMechanical(input: VerifyInput): Promise<VerifyReport> {
   const { worktree, branch, lane } = input
-  const range = `origin/main...${branch}`
+  const range = `${input.base ?? 'origin/main'}...${branch}`
+  const testRoot = input.testDir ?? worktree
 
-  // Captured FIRST and once, before anything else runs: the commit every
-  // check below actually examines, recorded rather than re-derived later.
-  const headShaRaw = await runGit(worktree, ['rev-parse', 'HEAD'])
+  // Captured FIRST and once: the commit under judgement — the RIGHT-HAND
+  // side of the range, resolved, not the worktree's own HEAD. Those are the
+  // same thing on the operator's box, where the worktree is checked out on
+  // the branch being verified. They are NOT the same in CI, where git runs
+  // in the trusted BASE checkout and the commit being judged is only an
+  // object in it: `rev-parse HEAD` there names the base, so the trace would
+  // have identified the wrong commit entirely — and `status.ts` reads this
+  // field back as "the commit this report examined".
+  const headShaRaw = await runGit(worktree, ['rev-parse', branch])
   if (headShaRaw === undefined) {
     return {
       passed: false,
@@ -307,7 +333,7 @@ export async function verifyMechanical(input: VerifyInput): Promise<VerifyReport
     let sawParsedFailure = false
     let sawUnparsedNonZero = false
     for (const route of routes) {
-      const result = await runVitestTarget(worktree, route)
+      const result = await runVitestTarget(testRoot, route)
       const failingCount = parseFailingCount(result.output)
       if (failingCount !== undefined && failingCount > 0) {
         sawParsedFailure = true
