@@ -45,6 +45,8 @@ export const TestIds = {
   VOLUNTEER_ROW_ROLE_SELECT: 'volunteer-row-role-select',
   VOLUNTEER_ROW_ROLE_OPTION: 'volunteer-row-role-option',
   VOLUNTEER_ROW_ROLE_BADGE: 'volunteer-row-role-badge',
+  USER_FORM_ROLE_SELECT: 'user-form-role-select',
+  USER_FORM_ROLE_OPTION: 'user-form-role-option',
   VOLUNTEER_EDIT_BTN: 'volunteer-edit-btn',
   VOLUNTEER_DEVICE_KEY_CARD: 'volunteer-device-key-card',
   VOLUNTEER_DEVICE_KEY_CODE: 'volunteer-device-key-code',

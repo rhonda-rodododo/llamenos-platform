@@ -324,12 +324,12 @@ function InviteForm({ roles, onCreated, onCancel }: {
           <div className="space-y-2">
             <Label htmlFor="invite-role">{t('users.role')}</Label>
             <Select value={roleId} onValueChange={setRoleId}>
-              <SelectTrigger id="invite-role">
+              <SelectTrigger id="invite-role" data-testid="user-form-role-select">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {roles.map(role => (
-                  <SelectItem key={role.id} value={role.id}>{role.name}</SelectItem>
+                  <SelectItem key={role.id} value={role.id} data-testid="user-form-role-option" data-role-id={role.id}>{role.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -417,12 +417,12 @@ function AddUserForm({ roles, onCreated, onCancel }: {
           <div className="space-y-2">
             <Label htmlFor="vol-role">{t('users.role')}</Label>
             <Select value={roleId} onValueChange={setRoleId}>
-              <SelectTrigger id="vol-role">
+              <SelectTrigger id="vol-role" data-testid="user-form-role-select">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {roles.map(role => (
-                  <SelectItem key={role.id} value={role.id}>{role.name}</SelectItem>
+                  <SelectItem key={role.id} value={role.id} data-testid="user-form-role-option" data-role-id={role.id}>{role.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
