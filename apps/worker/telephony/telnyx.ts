@@ -16,36 +16,31 @@ import type {
   WebhookQueueWait,
   WebhookRecordingStatus,
 } from './adapter'
-import {
-  DEFAULT_LANGUAGE,
-  ivrIndexToDigit,
-} from '@shared/languages'
-import { IVR_PROMPTS, IVR_MORE_PROMPTS, getPrompt, resolveIvrPrompt } from '@shared/voice-prompts'
+import { DEFAULT_LANGUAGE } from '@shared/languages'
+import { getPrompt } from '@shared/voice-prompts'
+import { IvrVoiceCatalog, buildIvrLanguageMenu } from './ivr-menu'
 
 const TELNYX_API_BASE = 'https://api.telnyx.com/v2'
 
 /**
- * Telnyx TTS voice names mapped by ISO 639-1 language code.
- * Uses AWS Polly Neural voices via Telnyx's TTS engine.
+ * Telnyx TTS voices (AWS Polly via Telnyx) — the explicit, ordered list of
+ * locales Telnyx has a voice for. Absent locales are never offered in the IVR menu.
  */
-const TELNYX_VOICES: Record<string, { voice: string; language: string }> = {
-  en: { voice: 'AWS.Polly.Joanna-Neural', language: 'en-US' },
-  es: { voice: 'AWS.Polly.Lupe-Neural', language: 'es-US' },
-  zh: { voice: 'AWS.Polly.Zhiyu-Neural', language: 'cmn-CN' },
-  tl: { voice: 'AWS.Polly.Joanna-Neural', language: 'en-US' },
-  vi: { voice: 'AWS.Polly.Joanna-Neural', language: 'en-US' },
-  ar: { voice: 'AWS.Polly.Zeina', language: 'arb' },
-  fr: { voice: 'AWS.Polly.Lea-Neural', language: 'fr-FR' },
-  ht: { voice: 'AWS.Polly.Lea-Neural', language: 'fr-FR' },
-  ko: { voice: 'AWS.Polly.Seoyeon-Neural', language: 'ko-KR' },
-  ru: { voice: 'AWS.Polly.Tatyana', language: 'ru-RU' },
-  hi: { voice: 'AWS.Polly.Kajal-Neural', language: 'hi-IN' },
-  pt: { voice: 'AWS.Polly.Camila-Neural', language: 'pt-BR' },
-  de: { voice: 'AWS.Polly.Vicki-Neural', language: 'de-DE' },
-}
+export const TELNYX_VOICES = new IvrVoiceCatalog<{ voice: string; language: string }>('telnyx', [
+  ['en', { voice: 'AWS.Polly.Joanna-Neural', language: 'en-US' }],
+  ['es', { voice: 'AWS.Polly.Lupe-Neural', language: 'es-US' }],
+  ['zh', { voice: 'AWS.Polly.Zhiyu-Neural', language: 'cmn-CN' }],
+  ['ar', { voice: 'AWS.Polly.Zeina', language: 'arb' }],
+  ['fr', { voice: 'AWS.Polly.Lea-Neural', language: 'fr-FR' }],
+  ['ko', { voice: 'AWS.Polly.Seoyeon-Neural', language: 'ko-KR' }],
+  ['ru', { voice: 'AWS.Polly.Tatyana', language: 'ru-RU' }],
+  ['hi', { voice: 'AWS.Polly.Kajal-Neural', language: 'hi-IN' }],
+  ['pt', { voice: 'AWS.Polly.Camila-Neural', language: 'pt-BR' }],
+  ['de', { voice: 'AWS.Polly.Vicki-Neural', language: 'de-DE' }],
+])
 
 function getTelnyxVoice(lang: string): { voice: string; language: string } {
-  return TELNYX_VOICES[lang] ?? TELNYX_VOICES[DEFAULT_LANGUAGE]
+  return TELNYX_VOICES.voiceForPrompt(lang)
 }
 
 function encodeClientState(state: Record<string, unknown>): string {
@@ -225,7 +220,7 @@ export class TelnyxAdapter implements TelephonyAdapter {
   // --- IVR Methods ---
 
   async handleLanguageMenu(params: LanguageMenuParams): Promise<TelephonyResponse> {
-    const languages = params.enabledLanguages
+    const menu = buildIvrLanguageMenu(params.enabledLanguages, TELNYX_VOICES)
 
     const clientState = encodeClientState({
       hubId: params.hubId,
@@ -236,8 +231,8 @@ export class TelnyxAdapter implements TelephonyAdapter {
 
     await this.client.command(params.callSid, 'answer', { client_state: clientState })
 
-    if (languages.length <= 1) {
-      const lang = languages[0] || DEFAULT_LANGUAGE
+    if (menu.kind === 'single') {
+      const lang = menu.language
       const skipState = encodeClientState({
         hubId: params.hubId,
         lang,
@@ -253,23 +248,7 @@ export class TelnyxAdapter implements TelephonyAdapter {
       return this.emptyResponse()
     }
 
-    const promptParts: string[] = []
-    if (languages.length > 9) {
-      const mainMenu = languages.slice(0, 8)
-      for (let i = 0; i < mainMenu.length; i++) {
-        const prompt = IVR_PROMPTS[mainMenu[i]]
-        if (prompt) promptParts.push(resolveIvrPrompt(prompt, String(i + 1)))
-      }
-      const morePrompt = IVR_MORE_PROMPTS[languages[0]] || IVR_MORE_PROMPTS['en']
-      promptParts.push(resolveIvrPrompt(morePrompt, '9'))
-    } else {
-      for (let i = 0; i < languages.length; i++) {
-        const prompt = IVR_PROMPTS[languages[i]]
-        if (prompt) promptParts.push(resolveIvrPrompt(prompt, ivrIndexToDigit(i)))
-      }
-    }
-
-    const menuText = promptParts.join(' ')
+    const menuText = menu.options.map(o => o.prompt).join(' ')
     const { voice, language } = getTelnyxVoice(DEFAULT_LANGUAGE)
 
     await this.client.command(params.callSid, 'gather_using_speak', {
