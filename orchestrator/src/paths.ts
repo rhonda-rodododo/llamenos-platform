@@ -33,18 +33,22 @@ export const HALT_FILE = join(fleetHome(), '.llamenos-fleet-disabled')
 
 /**
  * Carries `GH_TOKEN` for the machine-user GitHub identity the fleet is meant
- * to dispatch and push under (#773) — kept OUTSIDE `FLEET_DIR`, same
- * reasoning as `HALT_FILE`: it is a human-managed secret, not generated fleet
- * state, and the two systemd units (`llamenos-fleet-tick.service`,
- * `llamenos-fleet-digest.service`) source it via `EnvironmentFile=-%h/
- * .llamenos-fleet/env` (leading `-` = missing file is not fatal) while
- * `orchestrator/bin/llamenos-fleet` sources it the same way for hand-run
- * commands and dispatched workers. Until that file exists the fleet runs as
- * whatever account the ambient `gh`/git credentials belong to — see
- * `fleet-env.ts`'s `checkFleetEnvFile`, which `doctor` surfaces as a WARNING
- * (not a failure) for exactly that reason.
+ * to dispatch and push under (#773). Deliberately derived from `FLEET_DIR`
+ * (not `fleetHome()` directly) — the two systemd units
+ * (`llamenos-fleet-tick.service`, `llamenos-fleet-digest.service`) and
+ * `orchestrator/bin/llamenos-fleet` all hardcode `~/.llamenos-fleet/env`
+ * (leading `-` on `EnvironmentFile=-%h/.llamenos-fleet/env` = missing file is
+ * not fatal), so this constant MUST resolve to the same path or the
+ * credential-permission guard in `checkFleetEnvFile` silently checks a file
+ * nothing else reads or writes. `FLEET_DIR` already carries the
+ * `.llamenos-fleet` segment — reusing it here, instead of re-deriving
+ * `fleetHome() + '.llamenos-fleet'` a second time, is what keeps this one
+ * source of truth. Until the file exists the fleet runs as whatever account
+ * the ambient `gh`/git credentials belong to — see `fleet-env.ts`'s
+ * `checkFleetEnvFile`, which `doctor` surfaces as a WARNING (not a failure)
+ * for exactly that reason.
  */
-export const FLEET_ENV_FILE = join(fleetHome(), 'env')
+export const FLEET_ENV_FILE = join(FLEET_DIR, 'env')
 
 /**
  * `dispatch-one.sh` is NOT vendored into this repo. It lives at

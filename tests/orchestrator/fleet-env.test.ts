@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
-import { mkdtempSync, rmSync, writeFileSync, chmodSync, readFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync, chmodSync, readFileSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 
 /**
  * `checkFleetEnvFile` reads `FLEET_ENV_FILE`, which (see paths.ts) resolves
@@ -54,6 +54,7 @@ describe('checkFleetEnvFile — the three states doctor surfaces', () => {
   it('present with the wrong mode (0644) — reports "fail" even though GH_TOKEN is defined', async () => {
     freshTempHome()
     const { paths, fleetEnv } = await freshModules()
+    mkdirSync(dirname(paths.FLEET_ENV_FILE), { recursive: true })
     writeFileSync(paths.FLEET_ENV_FILE, 'GH_TOKEN=ghp_test_token\n')
     chmodSync(paths.FLEET_ENV_FILE, 0o644)
     const result = fleetEnv.checkFleetEnvFile()
@@ -64,6 +65,7 @@ describe('checkFleetEnvFile — the three states doctor surfaces', () => {
   it('present, mode 0600, GH_TOKEN defined — reports "ok"', async () => {
     freshTempHome()
     const { paths, fleetEnv } = await freshModules()
+    mkdirSync(dirname(paths.FLEET_ENV_FILE), { recursive: true })
     writeFileSync(paths.FLEET_ENV_FILE, 'GH_TOKEN=ghp_test_token\n')
     chmodSync(paths.FLEET_ENV_FILE, 0o600)
     const result = fleetEnv.checkFleetEnvFile()
@@ -78,11 +80,34 @@ describe('checkFleetEnvFile — the three states doctor surfaces', () => {
   it('present, mode 0600, but GH_TOKEN missing — still reports "fail"', async () => {
     freshTempHome()
     const { paths, fleetEnv } = await freshModules()
+    mkdirSync(dirname(paths.FLEET_ENV_FILE), { recursive: true })
     writeFileSync(paths.FLEET_ENV_FILE, 'SOME_OTHER_VAR=1\n')
     chmodSync(paths.FLEET_ENV_FILE, 0o600)
     const result = fleetEnv.checkFleetEnvFile()
     expect(result.state).toBe('fail')
     expect(result.message).toMatch(/GH_TOKEN/)
+  })
+
+  // Non-self-referential: writes to a path built independently of
+  // `paths.FLEET_ENV_FILE` — literally `join(FLEET_HOME, '.llamenos-fleet',
+  // 'env')`, the same path the wrapper and systemd units hardcode via
+  // `$HOME`/`%h` — rather than asking `paths.FLEET_ENV_FILE` where to write
+  // and then asking it again whether the file is there. A regression back to
+  // `FLEET_ENV_FILE = join(fleetHome(), 'env')` would write/stat a
+  // DIFFERENT file (`<tempHome>/env`) than the one this test creates
+  // (`<tempHome>/.llamenos-fleet/env`), so `checkFleetEnvFile` would report
+  // 'absent' here even though a validly-configured file exists on disk —
+  // that mismatch is exactly the bug this PR fixes.
+  it('doctor finds a real GH_TOKEN file at the independently-computed .llamenos-fleet/env path', async () => {
+    const dir = freshTempHome()
+    const { fleetEnv } = await freshModules()
+    const independentPath = join(dir, '.llamenos-fleet', 'env')
+    mkdirSync(join(dir, '.llamenos-fleet'), { recursive: true })
+    writeFileSync(independentPath, 'GH_TOKEN=ghp_test_token\n')
+    chmodSync(independentPath, 0o600)
+    const result = fleetEnv.checkFleetEnvFile()
+    expect(result.state).toBe('ok')
+    expect(result.message).toBe(independentPath)
   })
 })
 
