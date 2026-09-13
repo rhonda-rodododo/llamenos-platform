@@ -8,7 +8,7 @@ import { expect } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
 import { TestIds } from '../../test-ids'
 import { Timeouts, loginAsVolunteer, navigateAfterLogin } from '../../helpers'
-import { createUserViaApi, createHubViaApi, createShiftViaApi } from '../../api-helpers'
+import { createUserViaApi, createHubViaApi } from '../../api-helpers'
 
 // ── Hub Management UI Steps ───────────────────────────────────────
 
