@@ -1,8 +1,11 @@
+mod api_config;
 mod crypto;
+mod net;
 
 use tauri::{Emitter, Manager};
 
 use crate::crypto::CryptoState;
+use crate::net::{ProbeLimiter, WsRegistry};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -45,6 +48,10 @@ pub fn run() {
     builder
         // Register CryptoState as managed state (v3: Ed25519 + X25519 device keys)
         .manage(CryptoState::new())
+        // Registry of live Rust-proxied WebSocket connections (#739)
+        .manage(WsRegistry::default())
+        // One-per-second budget for first-run health probes (#739)
+        .manage(ProbeLimiter::default())
         .setup(|app| {
             // System tray setup
             use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
@@ -190,8 +197,6 @@ pub fn run() {
             crypto::device_import_and_load,
             crypto::generate_ephemeral_ed25519,
             crypto::generate_backup_from_state,
-            // Epic 355: Device provisioning (seed encrypted in Rust, never enters webview)
-            crypto::encrypt_seed_for_provisioning,
             // H17: Stronghold vault file wipe
             crypto::wipe_keys,
             // Device provisioning (seed NEVER enters the webview)
@@ -199,6 +204,19 @@ pub fn run() {
             crypto::provision_create_session,
             crypto::provision_compute_sas,
             crypto::provision_decrypt_and_import,
+            // Configured backend address (#738) — persisted and validated in Rust;
+            // the webview holds no store-plugin permission for it.
+            api_config::api_config_get,
+            api_config::api_config_set,
+            api_config::api_config_clear,
+            // Runtime-enforced network egress (#739) — the webview's CSP connect-src
+            // allows only `ipc:`; all HTTP/WS traffic to the configured backend goes
+            // through these commands instead of a browser fetch/WebSocket.
+            net::net_fetch,
+            net::net_probe_health,
+            net::net_ws_connect,
+            net::net_ws_send,
+            net::net_ws_close,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

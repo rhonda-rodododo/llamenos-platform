@@ -67,6 +67,49 @@ Feature: Account Erasure
     When the volunteer GETs "/erasure/requests"
     Then the response status should be 403
 
+  # ── Backend: Hub erasure config ─────────────────────────────────────
+
+  @backend
+  Scenario: Admin reads default erasure config for a hub
+    Given an admin user
+    When the admin GETs "/hubs/test-hub/erasure/config"
+    Then the response status should be 200
+    And the response should contain an erasure config for the hub with delayHours 72 and emergency override "enabled"
+    And the erasure config should not have been saved yet
+
+  @backend
+  Scenario: Admin updates erasure config for a hub
+    Given an admin user
+    When the admin PATCHes "/hubs/test-hub/erasure/config" with delayHours 96 and emergency override "disabled"
+    Then the response status should be 200
+    And the response should contain an erasure config for the hub with delayHours 96 and emergency override "disabled"
+    When the admin GETs "/hubs/test-hub/erasure/config"
+    Then the response status should be 200
+    And the response should contain an erasure config for the hub with delayHours 96 and emergency override "disabled"
+    And the erasure config should record the admin as the last updater
+
+  @backend
+  Scenario: Saved hub erasure delay governs new self-erasure requests
+    Given an admin user
+    And a volunteer user
+    When the admin PATCHes "/hubs/test-hub/erasure/config" with delayHours 120
+    Then the response status should be 200
+    When the volunteer POSTs to "/hubs/test-hub/erasure/me" with a justification
+    Then the response status should be 200
+    And the executeAt should be approximately 120 hours in the future
+
+  @backend
+  Scenario: Erasure config rejects a delay below the allowed minimum
+    Given an admin user
+    When the admin PATCHes "/hubs/test-hub/erasure/config" with delayHours 12
+    Then the response status should be 400
+
+  @backend
+  Scenario: Non-admin cannot read hub erasure config
+    Given a volunteer user
+    When the volunteer GETs "/hubs/test-hub/erasure/config"
+    Then the response status should be 403
+
   # ── Backend: Device wipe ────────────────────────────────────────────
 
   @backend

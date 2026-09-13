@@ -102,7 +102,6 @@ lefthook.yml                        @rhonda-rodododo
 # ─── Supply chain, release, deployment ─────────────────────────────────
 .github/workflows/                  @rhonda-rodododo
 knope.toml                          @rhonda-rodododo
-deploy/                             @rhonda-rodododo
 
 # ─── The fleet judging itself ──────────────────────────────────────────
 # Narrower than #615's blanket `tests/`, deliberately: every other test

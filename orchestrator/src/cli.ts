@@ -9,12 +9,12 @@ import { readAll, append, since, type RunRecord } from './ledger.js'
 import { readResumedAt } from './circuit.js'
 import { loadLanes, LIMITS, LANE_MODES_FILE, type Lane } from './config.js'
 import { checkDispatchDependency, type DependencyReport } from './dependency.js'
+import { checkFleetEnvFile } from './fleet-env.js'
 import { buildBrief, renderBrief } from './brief.js'
 import { loadContracts, contractsFor, buildMemoryContext, augmentBrief } from './memory.js'
 import { dispatch as dispatchWorker, type EffortLevel } from './engines.js'
 import { verifyMechanical } from './verify.js'
 import { secondOpinion, postReview } from './review.js'
-import { ciStatusFor, mergePr } from './merge.js'
 import {
   runVerifyCi, runReviewCi, ciContextFromEnv, ciDiff,
   REVIEW_JOB, REVIEW_KEY_ENV, VERIFY_JOB, itemIdFromBranch, type CiContext, type CiVerdict,
@@ -32,7 +32,7 @@ import type { WorkItem } from './source.js'
 import { renderDigest, resumeCommand, waitingOnHuman, type DigestInput, type LaneStatus } from './digest.js'
 import { deriveItemStatus, renderItemStatus, type PrFacts, type PrState } from './status.js'
 import { notify } from './notify.js'
-import { FLEET_DIR, LOG_FILE, HALT_REASON_FILE, DISPATCH_SCRIPT } from './paths.js'
+import { FLEET_DIR, LOG_FILE, HALT_REASON_FILE, DISPATCH_SCRIPT, FLEET_ENV_FILE } from './paths.js'
 import { REPO, gh, ghJson } from './gh.js'
 import { proposeIssues, buildIssueCreateArgs, type ProposedIssue } from './roles/planner.js'
 import { updateBranchFromMain, type UpdateBranchInput, type UpdateBranchResult } from './roles/integrator.js'
@@ -74,6 +74,10 @@ function lastTickResult(): TickResult | undefined {
 
 export async function doctor(): Promise<number> {
   const checks: [string, boolean, string][] = []
+  // Declared here (not beside the lane-scope loop below, where it used to
+  // live) so the fleet-env WARN case below and the lane-owned-path WARN case
+  // further down share one counter and one summary line.
+  let warnings = 0
   let ghOk = false
   try { execFileSync('gh', ['auth', 'status'], { stdio: 'pipe' }); ghOk = true } catch { /* not authed */ }
   checks.push(['gh authenticated', ghOk, 'run: gh auth login'])
@@ -136,10 +140,27 @@ export async function doctor(): Promise<number> {
   checks.push([`dispatch dependency ok (${DISPATCH_SCRIPT})`, depHardProblems.length === 0,
     depHardProblems.join('; ')])
 
+  // #773: the fleet's GitHub identity. `absent` is the expected state until
+  // the bot account's token is placed here, so it is a WARNING, printed
+  // alongside the lane-scope warnings below — never a hard FAIL, and never
+  // something this loop or `bad` below sees. `fail`/`ok` DO go through the
+  // normal checks list: once the file exists, wrong permissions or a missing
+  // GH_TOKEN are real misconfiguration, not a transitional state.
+  const envFile = checkFleetEnvFile()
+  if (envFile.state === 'absent') {
+    warnings++
+  } else {
+    checks.push([`fleet env file (${FLEET_ENV_FILE})`, envFile.state === 'ok', envFile.message])
+  }
+
   let bad = 0
   for (const [name, ok, fix] of checks) {
     process.stdout.write(`${ok ? '  ok  ' : ' FAIL '} ${name}${ok || !fix ? '' : `\n        ${fix}`}\n`)
     if (!ok) bad++
+  }
+
+  if (envFile.state === 'absent') {
+    process.stdout.write(` WARN  ${envFile.message}\n`)
   }
 
   // F7: a lane's owned list being non-empty (checked above) says nothing
@@ -151,7 +172,6 @@ export async function doctor(): Promise<number> {
   // expected to fire for real drift already present on this branch (see
   // backend's fragment), and doctor must stay usable while that is fixed
   // separately rather than refusing to run at all.
-  let warnings = 0
   for (const l of lanes) {
     const missing = l.scope.owned.filter((p) => !p.includes('*') && !existsSync(join(REPO_ROOT, p)))
     if (missing.length > 0) {
@@ -165,7 +185,7 @@ export async function doctor(): Promise<number> {
   process.stdout.write(`\nlanes: ${modes}\n`)
   process.stdout.write(`lane modes file: ${LANE_MODES_FILE}${existsSync(LANE_MODES_FILE) ? '' : ' (absent — all lanes off)'}\n`)
   if (warnings > 0) {
-    process.stdout.write(`\n${warnings} lane(s) with owned paths that do not exist on disk (warning only — see above)\n`)
+    process.stdout.write(`\n${warnings} warning(s) above — non-fatal, see WARN lines\n`)
   }
 
   process.stdout.write(`\ndispatch dependency: ${DISPATCH_SCRIPT}\n`)
@@ -176,6 +196,18 @@ export async function doctor(): Promise<number> {
       process.stdout.write(`${isWarning ? ' WARN ' : ' FAIL '} dispatch dependency: ${p}\n`)
     }
   }
+
+  // Informational only. #773's bot account isn't live yet, so today this is
+  // normally the operator's own login — that's expected, not a problem, and
+  // this print is not wired into any check, `bad`, or `warnings` above. It
+  // exists purely so a human reading doctor output can see which identity a
+  // dispatch would actually push/comment/merge as, without turning "which
+  // login is this" into a pass/fail decision doctor makes on anyone's behalf.
+  let ghLogin = '(unknown — gh api user failed)'
+  try {
+    ghLogin = execFileSync('gh', ['api', 'user', '--jq', '.login'], { stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8' }).trim()
+  } catch { /* informational only — the "gh authenticated" check above already reports auth failures */ }
+  process.stdout.write(`\ngh token resolves to GitHub login: ${ghLogin}\n`)
 
   return bad === 0 ? 0 : 1
 }
@@ -281,11 +313,6 @@ async function prDiff(pr: string): Promise<string> {
   return gh(['pr', 'diff', pr])
 }
 
-async function prHeadSha(pr: string): Promise<string | undefined> {
-  const view = await ghJson<{ headRefOid: string }>(['pr', 'view', pr, '--json', 'headRefOid'])
-  return view?.headRefOid
-}
-
 async function commentOnIssue(itemId: string, body: string): Promise<void> {
   await gh(['issue', 'comment', itemId, '--body', body])
 }
@@ -340,6 +367,30 @@ async function reviseWithWorker(item: WorkItem, lane: Lane, verdictText: string)
 
 async function commentOnPr(pr: string, body: string): Promise<void> {
   await gh(['pr', 'comment', pr, '--body', body])
+}
+
+/**
+ * The fleet's ONE arming call, and it merges nothing itself: it asks GitHub
+ * to merge later, on GitHub's terms — every required check green on that
+ * exact head SHA (`ci-status`, `fleet/verify`, `fleet/review`) plus any
+ * code-owner approval `CODEOWNERS` demands. A push to the branch invalidates
+ * the per-SHA checks, so the verified-commit pin `mergePr` used to enforce
+ * with `--match-head-commit` is now a property of the platform rather than a
+ * flag this process remembers to pass.
+ *
+ * Reached only after mechanical verification AND the non-author review have
+ * both passed — see tick.ts. No bypass flag is passed here and none may ever
+ * be added: see the rail in tests/orchestrator/guards.test.ts.
+ */
+async function enableAutoMerge(pr: string): Promise<void> {
+  await gh(['pr', 'merge', pr, '--auto', '--squash', '--delete-branch'])
+}
+
+/** Clears an auto-merge armed by an EARLIER attempt on the same PR before
+ *  this one was rejected. The only other `gh pr merge` in the fleet, and it
+ *  can only ever UN-arm. */
+async function disableAutoMerge(pr: string): Promise<void> {
+  await gh(['pr', 'merge', pr, '--disable-auto'])
 }
 
 /**
@@ -443,9 +494,8 @@ async function runTick(): Promise<number> {
     commentOnPr,
     reviseWithWorker,
     haltFleet: halt,
-    ciStatusFor,
-    prHeadSha,
-    mergePr,
+    enableAutoMerge,
+    disableAutoMerge,
     commentOnIssue,
     settle: settleItem,
     record: append,

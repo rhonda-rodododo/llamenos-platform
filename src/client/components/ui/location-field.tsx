@@ -3,6 +3,8 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { MapPin, ExternalLink } from 'lucide-react'
 import type { LocationResult } from '@protocol/schemas/geocoding'
+import { getApiUrl } from '@/lib/api-config'
+import { netFetch } from '@/lib/net'
 
 type LocationPrecision = 'none' | 'city' | 'neighborhood' | 'block' | 'exact'
 
@@ -70,7 +72,7 @@ export function LocationField({
     if (q.length < 3) { setSuggestions([]); return }
     setLoading(true)
     try {
-      const res = await fetch('/api/geocoding/autocomplete', {
+      const res = await netFetch(getApiUrl('/geocoding/autocomplete'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: q, limit: 5 }),

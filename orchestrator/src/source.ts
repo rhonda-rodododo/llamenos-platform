@@ -17,9 +17,18 @@ export interface RawIssue {
   labels: { name: string }[]
 }
 
+/**
+ * "Nothing there" and "could not look" are different facts, and this type
+ * makes them impossible to confuse — or to drop. `undefined` carried the
+ * distinction but not the REASON, so an abort could say only that the source
+ * was unreadable, never why. `detail` is that why, in one line.
+ */
+export type ListResult =
+  | { ok: true; items: WorkItem[] }
+  | { ok: false; detail: string }
+
 export interface WorkSource {
-  /** `undefined` means the read FAILED. `[]` means the backlog is empty. */
-  list(): Promise<WorkItem[] | undefined>
+  list(): Promise<ListResult>
   /** Labels read fresh at dispatch time, never from a cached list. */
   labels(id: string): Promise<string[] | undefined>
 }
@@ -43,13 +52,23 @@ const FIELDS = 'number,title,body,url,state,labels'
 export class GitHubSource implements WorkSource {
   constructor(private readonly requireLabel: string) {}
 
-  async list(): Promise<WorkItem[] | undefined> {
-    return itemsFrom(
-      await ghJson<RawIssue[]>([
+  async list(): Promise<ListResult> {
+    let failure: string | undefined
+    const raw = await ghJson<RawIssue[]>(
+      [
         'issue', 'list', '--state', 'open', '--label', this.requireLabel,
         '--limit', '200', '--json', FIELDS,
-      ]),
+      ],
+      undefined,
+      (detail) => { failure = detail },
     )
+    if (raw === undefined) {
+      // `ghJson` only returns undefined after a failure, so `failure` is set —
+      // the fallback names the one case that would otherwise print "undefined"
+      // and send the next reader down the same blind alley this exists to end.
+      return { ok: false, detail: failure ?? 'gh returned no JSON and reported no error' }
+    }
+    return { ok: true, items: raw.map(toWorkItem) }
   }
 
   /**

@@ -31,6 +31,10 @@ import { LABEL_ERASURE_OVERRIDE_SIG } from '@shared/crypto-labels'
 // Emergency override minimum floor — hard-coded, not configurable
 const EMERGENCY_MIN_HOURS = 4
 
+// Per-hub erasure config defaults, applied until an admin saves a config row
+export const DEFAULT_ERASURE_DELAY_HOURS = 72
+export const DEFAULT_EMERGENCY_OVERRIDE_ENABLED = true
+
 const ADMIN_ROLES = ['role-super-admin', 'role-admin', 'role-hub-admin'] as const
 
 export class ErasureService {
@@ -56,6 +60,27 @@ export class ErasureService {
       .where(eq(erasureConfig.hubId, hubId))
       .limit(1)
     return row ?? null
+  }
+
+  /**
+   * The config that is actually in force for a hub: the saved row, or the
+   * defaults when no admin has saved one yet (updatedAt/updatedBy null).
+   */
+  async getEffectiveConfig(hubId: string): Promise<{
+    hubId: string
+    delayHours: number
+    emergencyOverrideEnabled: boolean
+    updatedAt: Date | null
+    updatedBy: string | null
+  }> {
+    const row = await this.getConfig(hubId)
+    return row ?? {
+      hubId,
+      delayHours: DEFAULT_ERASURE_DELAY_HOURS,
+      emergencyOverrideEnabled: DEFAULT_EMERGENCY_OVERRIDE_ENABLED,
+      updatedAt: null,
+      updatedBy: null,
+    }
   }
 
   async upsertConfig(
@@ -94,8 +119,8 @@ export class ErasureService {
     } else {
       await this.db.insert(erasureConfig).values({
         hubId,
-        delayHours: updates.delayHours ?? 72,
-        emergencyOverrideEnabled: updates.emergencyOverrideEnabled ?? true,
+        delayHours: updates.delayHours ?? DEFAULT_ERASURE_DELAY_HOURS,
+        emergencyOverrideEnabled: updates.emergencyOverrideEnabled ?? DEFAULT_EMERGENCY_OVERRIDE_ENABLED,
         updatedAt: new Date(),
         updatedBy,
       })
@@ -138,7 +163,7 @@ export class ErasureService {
 
     // Get hub config for delay
     const config = await this.getConfig(hubId)
-    const delayHours = config?.delayHours ?? 72
+    const delayHours = config?.delayHours ?? DEFAULT_ERASURE_DELAY_HOURS
 
     let effectiveDelayHours = delayHours
     let isEmergency = false
