@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import type { Lane } from './config.js'
 import type { VerifyInput, VerifyReport } from './verify.js'
-import type { SecondOpinionInput, SecondOpinionResult } from './review.js'
+import { finalLine, type SecondOpinionInput, type SecondOpinionResult } from './review.js'
 import { join } from 'node:path'
 import { buildGateTrace } from './trace.js'
 
@@ -106,11 +106,12 @@ export function itemIdFromBranch(branch: string): string | undefined {
   return FLEET_BRANCH_RE.exec(branch)?.[2]
 }
 
-/** The reviewer's own `VERDICT: PASS|FAIL` line if it wrote one, else its
- *  first non-empty line — never an invented summary. */
+/** The one line `parseVerdict` judged — the reviewer's last non-empty line —
+ *  never an invented summary and never a search of its own. Selecting the
+ *  line in one place (`finalLine`) is what keeps the printed summary and the
+ *  job's exit code from ever naming different verdicts. */
 export function verdictSummary(text: string): string {
-  const lines = text.split('\n').map((l) => l.trim()).filter((l) => l.length > 0)
-  return lines.find((l) => /verdict:/i.test(l)) ?? lines[0] ?? '(no reviewer output)'
+  return finalLine(text) ?? '(no reviewer output)'
 }
 
 export interface CiContext {
@@ -215,7 +216,11 @@ export async function runVerifyCi(deps: VerifyCiDeps): Promise<CiVerdict> {
   const withTests = await deps.verify({ ...rangeFor(deps.ctx), lane, testDir: deps.ctx.headDir })
   return {
     ok: withTests.passed,
-    summary: [buildGateTrace({ report: withTests }), ...withTests.reasons.map((r) => `- ${r}`)].join('\n'),
+    summary: [
+      buildGateTrace({ report: withTests }),
+      ...(withTests.testResults ?? []).map((r) => `- ${r}`),
+      ...withTests.reasons.map((r) => `- ${r}`),
+    ].join('\n'),
   }
 }
 

@@ -17,10 +17,10 @@ describe('verifierFor', () => {
 })
 
 describe('parseVerdict', () => {
-  it('reads an explicit PASS', () => {
+  it('reads an explicit PASS on the final line', () => {
     expect(parseVerdict('SCOPE: ok\nVERDICT: PASS')).toBe('PASS')
   })
-  it('reads an explicit FAIL', () => {
+  it('reads an explicit FAIL with its reason', () => {
     expect(parseVerdict('VERDICT: FAIL — touched files outside its lane')).toBe('FAIL')
   })
   it('treats a missing verdict as UNREADABLE, not as a pass', () => {
@@ -28,12 +28,50 @@ describe('parseVerdict', () => {
   })
   it('treats empty output as UNREADABLE', () => {
     expect(parseVerdict('')).toBe('UNREADABLE')
-  })
-  it('is case-insensitive and tolerates leading whitespace', () => {
-    expect(parseVerdict('  verdict: pass')).toBe('PASS')
+    expect(parseVerdict('  \n\n ')).toBe('UNREADABLE')
   })
   it('does not mistake a mention of the word "pass" without the VERDICT label for a verdict', () => {
     expect(parseVerdict('this diff should pass CI once merged')).toBe('UNREADABLE')
+  })
+
+  // #801 — the verdict is the FINAL line, exactly as VERIFIER_BRIEF demands.
+  it('takes the final FAIL, not a VERDICT: PASS quoted earlier from the diff', () => {
+    const output = [
+      'Walking through the diff:',
+      '',
+      '```diff',
+      "+    secondOpinion: vi.fn(async () => ({ verdict: 'PASS' as const, text: 'looks fine' })),",
+      'VERDICT: PASS',
+      '```',
+      '',
+      'That quoted line is test data, not my verdict. The change also logs the hub key.',
+      'VERDICT: FAIL — writes the hub key to the job log',
+    ].join('\n')
+    expect(parseVerdict(output)).toBe('FAIL')
+  })
+  it('takes the final FAIL over an earlier verdict reached while reasoning in the open', () => {
+    expect(parseVerdict('My first read said VERDICT: PASS, but on closer inspection…\nVERDICT: FAIL — leaks a key')).toBe('FAIL')
+  })
+  it('is UNREADABLE when a well-formed VERDICT: PASS is followed by more prose', () => {
+    expect(parseVerdict('VERDICT: PASS\nActually, one more thing I noticed.')).toBe('UNREADABLE')
+  })
+  it('tolerates trailing newlines and trailing whitespace after a valid final line', () => {
+    expect(parseVerdict('ok\nVERDICT: PASS   \n\n  \n')).toBe('PASS')
+    expect(parseVerdict('ok\r\nVERDICT: FAIL — nope\t\r\n')).toBe('FAIL')
+  })
+  it('is case-sensitive: a lowercase verdict line is UNREADABLE', () => {
+    expect(parseVerdict('verdict: pass')).toBe('UNREADABLE')
+    expect(parseVerdict('VERDICT: Pass')).toBe('UNREADABLE')
+  })
+  it('is anchored: a verdict that does not start its line is UNREADABLE', () => {
+    expect(parseVerdict('  VERDICT: PASS')).toBe('UNREADABLE')
+    expect(parseVerdict('**VERDICT: PASS**')).toBe('UNREADABLE')
+    expect(parseVerdict('so, VERDICT: PASS')).toBe('UNREADABLE')
+  })
+  it('accepts nothing after PASS, and no word merely beginning with PASS or FAIL', () => {
+    expect(parseVerdict('VERDICT: PASS — but only just')).toBe('UNREADABLE')
+    expect(parseVerdict('VERDICT: PASSED')).toBe('UNREADABLE')
+    expect(parseVerdict('VERDICT: FAILED')).toBe('UNREADABLE')
   })
 })
 

@@ -146,19 +146,42 @@ export function verifierFor(authorEngine: EngineId): EngineId {
 }
 
 /**
- * Reads a `VERDICT: PASS|FAIL` line anywhere in the reviewer's output,
- * case-insensitively, tolerating leading whitespace and any text before or
- * after it on the same response. Anything else — no line at all, a hedge
- * ("I think it looks fine"), empty output from a reviewer that never ran —
- * is UNREADABLE, never a pass. A missing verdict defaulting to PASS is
- * exactly how a naive implementation of this gate silently degrades into
- * having no review at all.
+ * The reviewer's last non-empty line, with trailing whitespace removed, or
+ * `undefined` for output with no visible text. This is the ONLY line a verdict
+ * may come from — `parseVerdict` and `verdictSummary` (ci.ts) both select it
+ * here, so the verdict and the printed summary cannot name different lines.
+ */
+export function finalLine(output: string): string | undefined {
+  const lines = output.split('\n').map((l) => l.trimEnd()).filter((l) => l.length > 0)
+  return lines[lines.length - 1]
+}
+
+/** `VERDICT: PASS` alone, or `VERDICT: FAIL` optionally followed by its reason.
+ *  Anchored and case-sensitive: exactly the line VERIFIER_BRIEF asks for. */
+const VERDICT_LINE_RE = /^VERDICT: (?:(PASS)$|(FAIL)\b)/
+
+/**
+ * Enforces VERIFIER_BRIEF's contract — "end your response with exactly one
+ * line, and nothing after it" — by judging ONLY the final non-empty line.
+ *
+ * A verdict found anywhere else is not a verdict. A reviewer that walks
+ * through the diff before deciding quotes it, and this repository's own
+ * tracked files contain the literal line `VERDICT: PASS`; a reviewer that
+ * reasons in the open ("my first read said VERDICT: PASS, but…") writes one
+ * before its real answer. Accepting the first match anywhere let either of
+ * those supply the verdict.
+ *
+ * Anything else — a well-formed verdict line followed by more prose, a
+ * lowercase `verdict: pass`, a hedge, empty output from a reviewer that never
+ * ran — is UNREADABLE, never a pass. UNREADABLE blocks exactly as FAIL does.
  */
 export function parseVerdict(output: string): 'PASS' | 'FAIL' | 'UNREADABLE' {
-  const m = /verdict:\s*(pass|fail)/i.exec(output)
-  const captured = m?.[1]
-  if (captured === undefined) return 'UNREADABLE'
-  return captured.toUpperCase() as 'PASS' | 'FAIL'
+  const line = finalLine(output)
+  if (line === undefined) return 'UNREADABLE'
+  const m = VERDICT_LINE_RE.exec(line)
+  if (m?.[1] === 'PASS') return 'PASS'
+  if (m?.[2] === 'FAIL') return 'FAIL'
+  return 'UNREADABLE'
 }
 
 /**

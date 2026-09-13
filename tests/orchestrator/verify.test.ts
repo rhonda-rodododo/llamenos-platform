@@ -1,8 +1,8 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { execFileSync, execSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, readFileSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { delimiter, dirname, join } from 'node:path'
 import {
   changedFilesFrom, addedLinesFrom, testTargetsFor, isSafeTestPath, resolvesWithinRoot, verifyMechanical,
 } from '../../orchestrator/src/verify.js'
@@ -242,5 +242,161 @@ describe('verifyMechanical', () => {
     // The route this diff maps to is real — so the empty testsRun above is
     // `skipTests` doing its job, not the diff mapping to nothing.
     expect(testTargetsFor(['orchestrator/src/thing.ts'])).toEqual(['orchestrator'])
+  })
+})
+
+// --- #811: the test verdict fails CLOSED. `verifyMechanical` resolves `bunx`
+// through PATH, so each case puts a stand-in `bunx` first on PATH that
+// behaves like one specific broken (or healthy) runner. Driving the real
+// function end to end — real git repo, real child process, real exit code —
+// means these cases exercise the same code path CI does, and they run
+// unchanged against the previous text-scraping implementation (where the
+// crash cases went green).
+
+describe('verifyMechanical test verdict (#811)', () => {
+  const cleanup: string[] = []
+  const originalPath = process.env['PATH']
+
+  afterEach(() => {
+    process.env['PATH'] = originalPath
+    while (cleanup.length > 0) {
+      const dir = cleanup.pop()
+      if (dir) rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  /** A repo whose diff touches `orchestrator/`, so it routes to one suite. */
+  function orchestratorDiffRepo(): string {
+    const dir = mkdtempSync(join(tmpdir(), 'llamenos-fleet-verify-811-'))
+    cleanup.push(dir)
+    const git = (...args: string[]): void => { execFileSync('git', args, { cwd: dir }) }
+    git('init', '-q', '-b', 'main')
+    git('config', 'user.email', 'test@example.com')
+    git('config', 'user.name', 'Test')
+    mkdirSync(join(dir, 'orchestrator/src'), { recursive: true })
+    writeFileSync(join(dir, 'orchestrator/src/thing.ts'), 'export const a = 1\n')
+    git('add', '.')
+    git('commit', '-q', '-m', 'initial')
+    git('update-ref', 'refs/remotes/origin/main', 'HEAD')
+    writeFileSync(join(dir, 'orchestrator/src/thing.ts'), 'export const a = 2\n')
+    git('commit', '-q', '-am', 'change')
+    return dir
+  }
+
+  /** Installs a fake `bunx` whose body runs with `$OUT` set to the value of
+   *  any `--outputFile=` argument it was given (empty if none). */
+  function fakeRunner(body: string): void {
+    const bin = mkdtempSync(join(tmpdir(), 'llamenos-fleet-fake-bunx-'))
+    cleanup.push(bin)
+    const script = [
+      '#!/bin/sh',
+      'OUT=""',
+      'for a in "$@"; do case "$a" in --outputFile=*) OUT="${a#--outputFile=}" ;; esac; done',
+      body,
+    ].join('\n')
+    writeFileSync(join(bin, 'bunx'), `${script}\n`)
+    chmodSync(join(bin, 'bunx'), 0o755)
+    process.env['PATH'] = `${bin}${delimiter}${originalPath ?? ''}`
+  }
+
+  const lane: Lane = {
+    id: 'test', mode: 'live', cap: 1, engine: 'claude',
+    requireLabel: 'agent-dispatchable', vetoLabels: [],
+    scope: { owned: ['orchestrator/'], notOwned: [] },
+  }
+
+  const vitestJson = (over: Record<string, unknown> = {}): string => JSON.stringify({
+    numTotalTestSuites: 3, numPassedTestSuites: 3, numFailedTestSuites: 0, numPendingTestSuites: 0,
+    numTotalTests: 12, numPassedTests: 12, numFailedTests: 0, numPendingTests: 0, numTodoTests: 0,
+    startTime: 0, success: true, testResults: [], ...over,
+  })
+
+  const verify = async (): Promise<Awaited<ReturnType<typeof verifyMechanical>>> =>
+    verifyMechanical({ worktree: orchestratorDiffRepo(), branch: 'main', lane })
+
+  it('FAILS when the runner is OOM-killed (exit 137) and writes no output at all', async () => {
+    fakeRunner('exit 137')
+    const report = await verify()
+    expect(report.testsRun).toEqual(['orchestrator'])
+    expect(report.testsPassed).toBe(false)
+    expect(report.passed).toBe(false)
+    expect(report.reasons.join('\n')).toMatch(/runner-exit.*exited 137.*no result file/)
+  })
+
+  it('FAILS when the runner writes malformed JSON and exits 0', async () => {
+    fakeRunner('printf \'{"numFailedTests": 0, "trunc\' > "$OUT"; exit 0')
+    const report = await verify()
+    expect(report.testsPassed).toBe(false)
+    expect(report.passed).toBe(false)
+    expect(report.reasons.join('\n')).toMatch(/unparseable result/)
+  })
+
+  it('FAILS when the result reports one failed test, naming the count', async () => {
+    fakeRunner(`printf '%s' '${vitestJson({ numFailedTests: 1, numPassedTests: 11, numFailedTestSuites: 1, success: false })}' > "$OUT"; exit 1`)
+    const report = await verify()
+    expect(report.testsPassed).toBe(false)
+    expect(report.passed).toBe(false)
+    expect(report.reasons.join('\n')).toMatch(/tests failed — 1 failed test\(s\), 1 failed suite\(s\) of 12/)
+  })
+
+  it('FAILS when the runner exits 0 but never writes the result file', async () => {
+    fakeRunner('echo "all good, trust me"; exit 0')
+    const report = await verify()
+    expect(report.passed).toBe(false)
+    expect(report.reasons.join('\n')).toMatch(/missing result.*exited 0.*all good, trust me/)
+  })
+
+  it('names the three could-not-tell cases distinguishably', async () => {
+    const reasonFor = async (body: string): Promise<string> => {
+      fakeRunner(body)
+      return (await verify()).reasons.join('\n')
+    }
+    const crashed = await reasonFor('exit 137')
+    const garbage = await reasonFor('echo nope > "$OUT"; exit 0')
+    const nothing = await reasonFor('exit 0')
+    expect(crashed).toMatch(/runner-exit/)
+    expect(garbage).toMatch(/unparseable result/)
+    expect(nothing).toMatch(/missing result/)
+    expect(new Set([crashed, garbage, nothing]).size).toBe(3)
+  })
+
+  it('FAILS a result reporting zero tests — a run that proves nothing is not a pass', async () => {
+    fakeRunner(`printf '%s' '${vitestJson({ numTotalTests: 0, numPassedTests: 0, numTotalTestSuites: 0, numPassedTestSuites: 0 })}' > "$OUT"; exit 0`)
+    const report = await verify()
+    expect(report.passed).toBe(false)
+    expect(report.reasons.join('\n')).toMatch(/no tests ran/)
+  })
+
+  it('FAILS a green-looking result from a runner that still exited non-zero', async () => {
+    fakeRunner(`printf '%s' '${vitestJson()}' > "$OUT"; echo "Unhandled error" >&2; exit 1`)
+    const report = await verify()
+    expect(report.passed).toBe(false)
+    expect(report.reasons.join('\n')).toMatch(/runner-exit.*exited 1/)
+  })
+
+  it('FAILS a result document missing the fields the verdict depends on', async () => {
+    fakeRunner('printf \'{"success": true}\' > "$OUT"; exit 0')
+    const report = await verify()
+    expect(report.passed).toBe(false)
+    expect(report.reasons.join('\n')).toMatch(/unparseable result/)
+  })
+
+  it('passes only on a read, all-green result, and records it as evidence', async () => {
+    fakeRunner(`printf '%s' '${vitestJson()}' > "$OUT"; exit 0`)
+    const report = await verify()
+    expect(report.reasons).toEqual([])
+    expect(report.testsPassed).toBe(true)
+    expect(report.passed).toBe(true)
+    expect(report.testResults).toEqual(['orchestrator: result file read — 0 failed test(s), 0 failed suite(s) of 12 test(s)'])
+  })
+
+  it('asks vitest for its JSON reporter written to a file', async () => {
+    const dir = orchestratorDiffRepo()
+    const argvLog = join(dir, 'argv.log')
+    fakeRunner(`printf '%s\\n' "$@" > '${argvLog}'; exit 137`)
+    await verifyMechanical({ worktree: dir, branch: 'main', lane })
+    const argv = readFileSync(argvLog, 'utf8').split('\n')
+    expect(argv).toContain('--reporter=json')
+    expect(argv.some((a) => /^--outputFile=.+\.json$/.test(a))).toBe(true)
   })
 })

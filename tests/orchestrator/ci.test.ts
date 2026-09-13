@@ -34,11 +34,19 @@ describe('laneIdFromBranch', () => {
 })
 
 describe('verdictSummary', () => {
-  it('prefers the reviewer\'s own VERDICT line', () => {
-    expect(verdictSummary('some preamble\nVERDICT: FAIL — scope creep\ntrailing')).toBe('VERDICT: FAIL — scope creep')
+  it('is the reviewer\'s final VERDICT line', () => {
+    expect(verdictSummary('some preamble\nVERDICT: FAIL — scope creep\n\n')).toBe('VERDICT: FAIL — scope creep')
   })
-  it('falls back to the first non-empty line when there is no verdict line', () => {
-    expect(verdictSummary('\n\nengine exploded\nmore')).toBe('engine exploded')
+  // #801: summary and verdict select the SAME line. A verdict line that is
+  // not last makes parseVerdict UNREADABLE, so the summary must not print it
+  // as though it were the verdict.
+  it('is the final non-empty line even when an earlier line looks like a verdict', () => {
+    const text = 'quoted from the diff:\nVERDICT: PASS\nVERDICT: FAIL — leaks a key'
+    expect(verdictSummary(text)).toBe('VERDICT: FAIL — leaks a key')
+    expect(verdictSummary('VERDICT: PASS\ntrailing prose')).toBe('trailing prose')
+  })
+  it('falls back to the final non-empty line when there is no verdict line', () => {
+    expect(verdictSummary('\n\nengine exploded\nmore\n')).toBe('more')
   })
   it('never invents a summary for empty output', () => {
     expect(verdictSummary('   \n ')).toBe('(no reviewer output)')
@@ -114,6 +122,18 @@ describe('fleet/verify in CI', () => {
       ok: true,
       summary: 'scope=pass impact=low tests=orchestrator:pass review=not-run sha=c0ffee',
     })
+  })
+
+  it('prints the result-file evidence behind a passing test verdict', async () => {
+    const evidenced: VerifyReport = {
+      ...passing, testResults: ['orchestrator: result file read — 0 failed test(s), 0 failed suite(s) of 12 test(s)'],
+    }
+    const v = await runVerifyCi(deps({ verify: vi.fn(async () => evidenced) }))
+    expect(v.ok).toBe(true)
+    expect(v.summary).toBe([
+      'scope=pass impact=low tests=orchestrator:pass review=not-run merge=not-run sha=c0ffee',
+      '- orchestrator: result file read — 0 failed test(s), 0 failed suite(s) of 12 test(s)',
+    ].join('\n'))
   })
 
   it('runs the diff-targeted tests — it must never quietly skip them', async () => {
