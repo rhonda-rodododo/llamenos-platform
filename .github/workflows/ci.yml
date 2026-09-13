@@ -642,6 +642,14 @@ jobs:
             -i inventory.example.yml \
             --extra-vars "@vars.example.yml"
 
+      # Parses the required-env-var list straight out of
+      # apps/worker/lib/config.ts and asserts every Ansible template that
+      # renders the worker's .env carries all of them — the two role
+      # templates drifting out of sync (or a future third copy rotting
+      # unnoticed) is exactly the bug class issue #798 fixed.
+      - name: Check required env vars across templates
+        run: python3 deploy/ansible/scripts/check-required-env.py
+
   desktop-unit:
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
