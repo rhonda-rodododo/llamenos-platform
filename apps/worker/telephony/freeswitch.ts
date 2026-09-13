@@ -8,8 +8,8 @@ import type {
   AudioUrlMap,
 } from './adapter'
 import { SipBridgeAdapter } from './sip-bridge-adapter'
-import { DEFAULT_LANGUAGE, ivrIndexToDigit } from '@shared/languages'
-import { IVR_PROMPTS, IVR_MORE_PROMPTS, getPrompt, resolveIvrPrompt } from '@shared/voice-prompts'
+import { getPrompt } from '@shared/voice-prompts'
+import { IvrVoiceCatalog, buildIvrLanguageMenu } from './ivr-menu'
 
 /**
  * FreeSwitchAdapter — generates mod_httapi XML responses for FreeSWITCH.
@@ -88,10 +88,11 @@ export class FreeSwitchAdapter extends SipBridgeAdapter {
   // --- IVR / Call flow ---
 
   async handleLanguageMenu(params: LanguageMenuParams): Promise<TelephonyResponse> {
-    const { enabledLanguages: languages, hubId } = params
+    const { hubId } = params
+    const menu = buildIvrLanguageMenu(params.enabledLanguages, FREESWITCH_VOICES)
 
-    if (languages.length <= 1) {
-      const lang = languages[0] || DEFAULT_LANGUAGE
+    if (menu.kind === 'single') {
+      const lang = menu.language
       const setVars = [
         `\n    <execute application="set" data="caller_lang=${escapeXml(lang)}"/>`,
         `\n    <execute application="set" data="call_phase=language_selected"/>`,
@@ -106,23 +107,7 @@ export class FreeSwitchAdapter extends SipBridgeAdapter {
       )
     }
 
-    let promptXml = ''
-    if (languages.length > 9) {
-      const mainMenu = languages.slice(0, 8)
-      for (let i = 0; i < mainMenu.length; i++) {
-        const prompt = IVR_PROMPTS[mainMenu[i]]
-        if (!prompt) continue
-        promptXml += this.fsSpeak(resolveIvrPrompt(prompt, String(i + 1)), mainMenu[i])
-      }
-      const morePrompt = IVR_MORE_PROMPTS[languages[0]] || IVR_MORE_PROMPTS['en']
-      promptXml += this.fsSpeak(resolveIvrPrompt(morePrompt, '9'), 'en')
-    } else {
-      for (let i = 0; i < languages.length; i++) {
-        const prompt = IVR_PROMPTS[languages[i]]
-        if (!prompt) continue
-        promptXml += this.fsSpeak(resolveIvrPrompt(prompt, ivrIndexToDigit(i)), languages[i])
-      }
-    }
+    const promptXml = menu.options.map(o => this.fsSpeak(o.prompt, o.language)).join('')
 
     const callbackUrl = this.buildCallbackUrl('/api/telephony/language-selected', hubId)
     const bindXml = `\n    <bind strip="#">~\\d ${escapeXml(callbackUrl)}</bind>`
@@ -239,8 +224,17 @@ export class FreeSwitchAdapter extends SipBridgeAdapter {
 
 // --- Helpers ---
 
-function getFliteVoice(_lang: string): string {
-  return 'slt'
+/**
+ * FreeSWITCH TTS voices (mod_flite) — the explicit, ordered list of locales
+ * FreeSWITCH can speak. Flite ships English voices only, so FreeSWITCH offers
+ * no multi-language IVR menu until a multilingual TTS engine is configured.
+ */
+export const FREESWITCH_VOICES = new IvrVoiceCatalog<string>('freeswitch', [
+  ['en', 'slt'],
+])
+
+function getFliteVoice(lang: string): string {
+  return FREESWITCH_VOICES.voiceForPrompt(lang)
 }
 
 function escapeXml(text: string): string {

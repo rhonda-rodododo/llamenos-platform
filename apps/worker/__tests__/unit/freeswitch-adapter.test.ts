@@ -44,7 +44,7 @@ describe('FreeSwitchAdapter', () => {
       expect(response.body).toContain('xml/freeswitch-httapi')
     })
 
-    it('auto-selects language when only one enabled', async () => {
+    it('never offers Spanish, which the English-only Flite TTS cannot speak (#657)', async () => {
       const response = await adapter.handleLanguageMenu({
         enabledLanguages: ['es'],
         callSid: 'call-1',
@@ -52,19 +52,22 @@ describe('FreeSwitchAdapter', () => {
         hotlineName: 'Test Hotline',
       })
 
-      expect(response.body).toContain('caller_lang=es')
+      expect(response.body).toContain('caller_lang=en')
+      expect(response.body).not.toContain('caller_lang=es')
     })
 
-    it('generates gather for multiple languages', async () => {
+    it('skips the menu for multiple hub languages when only English is speakable (#657)', async () => {
       const response = await adapter.handleLanguageMenu({
-        enabledLanguages: ['en', 'es', 'zh'],
+        enabledLanguages: ['es', 'en', 'zh'],
         callSid: 'call-1',
         callerNumber: '+15551234567',
         hotlineName: 'Test Hotline',
       })
 
-      // Should contain speak elements for language prompts
-      expect(response.body).toContain('speak')
+      expect(response.body).not.toContain('<speak')
+      expect(response.body).not.toContain('<bind')
+      expect(response.body).toContain('caller_lang=en')
+      expect(response.body).toContain('call_phase=language_selected')
     })
   })
 
