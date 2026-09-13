@@ -73,7 +73,8 @@ pub fn validate_backend_origin(raw: &str, allow_loopback_http: bool) -> Result<S
     Ok(url.origin().ascii_serialization())
 }
 
-fn read_raw(app: &AppHandle) -> Result<Option<String>, String> {
+/// The raw stored address, valid or not — `None` only on first run.
+pub fn stored_address(app: &AppHandle) -> Result<Option<String>, String> {
     let store = app
         .store(CONFIG_STORE)
         .map_err(|e| format!("could not open config store: {e}"))?;
@@ -88,7 +89,7 @@ fn read_raw(app: &AppHandle) -> Result<Option<String>, String> {
 /// build, read by a release build) is an error — callers enforcing the
 /// allowlist fail closed on it.
 pub fn configured_origin(app: &AppHandle) -> Result<Option<Url>, String> {
-    match read_raw(app)? {
+    match stored_address(app)? {
         None => Ok(None),
         Some(raw) => {
             let origin = validate_backend_origin(&raw, ALLOW_LOOPBACK_HTTP)
@@ -128,15 +129,25 @@ pub fn api_config_get(app: AppHandle) -> Result<Option<String>, String> {
     }
 }
 
+/// First-run gate shared by `api_config_set` and `net_probe_health`: both are
+/// permitted only while NO address is stored. An invalid stored value counts as
+/// configured (fail closed); `api_config_get` clears such a value at boot.
+pub fn require_unconfigured(stored: Option<&str>) -> Result<(), String> {
+    match stored {
+        None => Ok(()),
+        Some(_) => {
+            Err("refused: a backend server is already configured — clear it first".to_string())
+        }
+    }
+}
+
 /// Persists the backend address. Only permitted while none is configured —
 /// changing servers means `api_config_clear` first (which the frontend pairs
 /// with ending the session), so an address can never be swapped underneath a
 /// live session.
 #[tauri::command]
 pub fn api_config_set(app: AppHandle, url: String) -> Result<String, String> {
-    if read_raw(&app)?.is_some() {
-        return Err("refused: a backend server is already configured — clear it first".to_string());
-    }
+    require_unconfigured(stored_address(&app)?.as_deref())?;
     let origin = validate_backend_origin(&url, ALLOW_LOOPBACK_HTTP)?;
     let store = app
         .store(CONFIG_STORE)
@@ -157,6 +168,15 @@ pub fn api_config_clear(app: AppHandle) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn first_run_gate_refuses_once_any_address_is_stored() {
+        assert!(require_unconfigured(None).is_ok());
+        for stored in ["https://app.example.org", "http://10.0.0.5", "not a url"] {
+            let err = require_unconfigured(Some(stored)).unwrap_err();
+            assert!(err.contains("already configured"), "{err}");
+        }
+    }
 
     #[test]
     fn https_origins_are_accepted_and_canonicalised() {

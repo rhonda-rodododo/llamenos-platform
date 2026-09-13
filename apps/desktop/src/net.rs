@@ -263,9 +263,7 @@ pub async fn net_probe_health(
     limiter: State<'_, ProbeLimiter>,
     url: String,
 ) -> Result<bool, String> {
-    if api_config::configured_origin(&app)?.is_some() {
-        return Err("refused: a backend server is already configured".to_string());
-    }
+    api_config::require_unconfigured(api_config::stored_address(&app)?.as_deref())?;
     let target = probe_target(&url, api_config::ALLOW_LOOPBACK_HTTP)?;
     if !limiter.try_acquire(Instant::now()) {
         return Err("rate limited: wait a moment before checking again".to_string());
