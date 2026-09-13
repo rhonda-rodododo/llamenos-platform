@@ -54,12 +54,16 @@ async function ensureContactVisibleInDirectory(
   name?: string,
 ): Promise<void> {
   const card = page.getByTestId('directory-contact-card')
+  // When a specific name is requested, the presence of SOME other card (e.g. left
+  // over from an earlier scenario in the same hub) must not short-circuit creation —
+  // only a card matching that name satisfies the caller.
+  const target = name ? card.filter({ hasText: name }) : card
   const noResults = page.getByTestId('contact-list').getByText(/no contacts match/i)
   const emptyState = page.getByTestId('empty-state')
   await expect(card.first().or(noResults).or(emptyState)).toBeVisible({ timeout: Timeouts.ELEMENT })
-  if (await card.count() > 0) return
+  if (await target.count() > 0) return
 
-  // Directory is genuinely empty — create a contact through the UI. The header
+  // The target contact doesn't exist yet — create it through the UI. The header
   // button always renders; the empty state has its own create button.
   const createBtn = page.getByTestId('new-contact-btn').or(page.getByTestId('empty-state-create-btn'))
   await expect(createBtn.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
@@ -73,7 +77,7 @@ async function ensureContactVisibleInDirectory(
   // On success the parent prepends the contact, selects it, and closes the dialog
   // (handleContactCreated). Both are required outcomes — assert them.
   await expect(dialog).toBeHidden({ timeout: Timeouts.ELEMENT })
-  await expect(card.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(target.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 }
 
 // --- Contact directory page elements ---
@@ -459,9 +463,13 @@ Given('no contacts have been created', async ({ backendRequest: request, casesWo
 When('I click on the {string} contact card', async ({ page }, name: string) => {
   const namedCard = page.getByTestId('directory-contact-card').filter({ hasText: name })
   // Wait for the directory to settle before deciding whether the contact is listed.
+  // namedCard is a subset of the unfiltered card locator, so waiting on the
+  // unfiltered card's first element (or the empty state) is sufficient — adding
+  // namedCard.first() here as a separate OR branch is redundant and, once other
+  // non-matching cards exist, resolves to two distinct elements (strict-mode
+  // violation) instead of one settled state.
   await expect(
-    namedCard.first()
-      .or(page.getByTestId('directory-contact-card').first())
+    page.getByTestId('directory-contact-card').first()
       .or(page.getByTestId('empty-state')),
   ).toBeVisible({ timeout: Timeouts.ELEMENT })
   // API-created contacts may not list in the test mock env (blind index
