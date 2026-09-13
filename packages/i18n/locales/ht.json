@@ -1457,7 +1457,9 @@
     "rateLimitTitle": "Chanje Limitasyon Frekans",
     "transcriptionDisable": "Dezaktive transkripsyon apèl? Volontè yo pa p gen apèl yo transkri otomatikman ankò.",
     "transcriptionEnable": "Aktive transkripsyon apèl pou tout volontè? Sa a itilize IA pou transkri apèl an tan reyèl.",
-    "transcriptionTitle": "Chanje Paramèt Transkripsyon"
+    "transcriptionTitle": "Chanje Paramèt Transkripsyon",
+    "biometricDisable": "Turn off biometric unlock? You'll still be able to unlock with your PIN.",
+    "biometricDisableTitle": "Turn Off Biometric Unlock"
   },
   "connectWithOauth": "Connect with OAuth",
   "connectionFailed": "Connection failed",
@@ -3734,7 +3736,11 @@
     "transcriptionSettings": "Transkripsyon",
     "version": "Version",
     "voicemail": "Voicemail",
-    "webrtcNotConfigured": "Apèl nan navigatè pa disponib. Admin ou bezwen aktive WebRTC nan paramèt founisè telefoni a."
+    "webrtcNotConfigured": "Apèl nan navigatè pa disponib. Admin ou bezwen aktive WebRTC nan paramèt founisè telefoni a.",
+    "biometricDesc": "Unlock with your fingerprint or face instead of typing your PIN. Your PIN still works and is never disabled.",
+    "biometricEnrolled": "Biometric unlock is on for this device.",
+    "biometricInvalidated": "Your device's biometrics changed, so biometric unlock was turned off. Re-enable it below, or continue using your PIN.",
+    "biometricPinPrompt": "Enter your PIN to enable biometric unlock"
   },
   "serverAddress": {
     "checking": "Checking...",
