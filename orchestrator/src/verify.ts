@@ -252,11 +252,14 @@ function parseFailingCount(output: string): number | undefined {
  * 1. Scope — any forbidden or strayed file is an immediate fail, naming the
  *    offenders. `checkScope` and `classifyImpact` have had no runtime caller
  *    until this function; this is what wires them in.
- * 2. Impact — recorded on the report, never itself a fail, and no longer a
- *    gate anywhere: a diff touching a sensitive path is held by GitHub's own
- *    "require review from Code Owners" rule against `CODEOWNERS`, not by
- *    this process. `classifyImpact` survives to DESCRIBE a diff (the trace,
- *    the digest, the reviewer's turn budget), never to decide about it.
+ * 2. Impact — recorded on the report, never itself a fail HERE. It is still
+ *    a gate one layer up: `mayAutoMerge` (merge.ts) refuses a high-impact
+ *    diff outright. Every high-impact path is now ALSO owned in `CODEOWNERS`,
+ *    so GitHub's own "require review from Code Owners" rule binds anyone,
+ *    not just this process; when the CI gates are required and merge.ts is
+ *    deleted, that becomes the only enforcement and `classifyImpact` is left
+ *    describing a diff (the trace, the digest, the reviewer's turn budget)
+ *    rather than deciding about it.
  * 3. Diff-targeted tests only, run by argv via `execFile` — never a shell,
  *    never the whole suite (slow, produces failures unrelated to the diff,
  *    and CI already shards it).

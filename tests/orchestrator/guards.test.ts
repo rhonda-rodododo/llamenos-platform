@@ -117,33 +117,47 @@ describe('rail: the fleet never bypasses a PR\'s checks, and never reviews', () 
     expect(orchestratorSources().length).toBeGreaterThan(10)
   })
 
-  // Scoped to `gh(...)` argv, not to the file text: `git worktree remove
-  // --force` is a legitimate, unrelated use of the same word, and a rail that
-  // fires on it would be trained away rather than fixed.
   const GH_CALL = /gh\(\s*\[[^\]]*\]/g
   const ghCalls = (text: string): string[] => text.match(GH_CALL) ?? []
+
+  /**
+   * Whole-file, NOT scoped to a `gh([...])` literal. A scan that only reads
+   * literal argv arrays is evaded by hoisting one:
+   *
+   *     const args = ['pr', 'merge', pr, '--admin']
+   *     await gh(args)
+   *
+   * None of these strings has any legitimate reason to appear anywhere under
+   * `orchestrator/src` — not in argv, not in a variable, not in prose — so
+   * the file text is the right granularity and there is no false positive to
+   * trade away for it. `--approve`/`--request-changes` are here for the same
+   * reason: the fleet records the non-author verdict as a COMMENT, and an
+   * approving review is one ruleset edit from being an approval it grants
+   * itself.
+   */
+  const FORBIDDEN_ANYWHERE = ['--admin', '--bypass', '--approve', '--request-changes']
+
+  it('contains no bypass or review flag anywhere, however the argv is built', () => {
+    for (const { file, text } of orchestratorSources()) {
+      for (const flag of FORBIDDEN_ANYWHERE) {
+        expect(text, `${file} contains ${flag}`).not.toContain(flag)
+      }
+    }
+  })
 
   it('finds gh calls to scan — the grep must not pass vacuously', () => {
     const total = orchestratorSources().reduce((n, { text }) => n + ghCalls(text).length, 0)
     expect(total).toBeGreaterThan(5)
   })
 
-  it('passes no check-bypass flag to gh', () => {
+  // `--force` is the one that CANNOT be whole-file: `git worktree remove
+  // --force` is a legitimate, unrelated use, and a rail that fires on correct
+  // code gets trained away rather than fixed. Scoped to gh argv, where it
+  // would mean force-pushing or forcing a merge.
+  it('passes no --force to gh', () => {
     for (const { file, text } of orchestratorSources()) {
       for (const call of ghCalls(text)) {
-        for (const flag of ['--admin', '--bypass', '--force']) {
-          expect(call, `${file}: gh call passes ${flag}`).not.toContain(flag)
-        }
-      }
-    }
-  })
-
-  it('posts no GitHub review — the non-author verdict is a comment', () => {
-    for (const { file, text } of orchestratorSources()) {
-      for (const call of ghCalls(text)) {
-        for (const flag of ['--approve', '--request-changes']) {
-          expect(call, `${file}: gh call passes ${flag}`).not.toContain(flag)
-        }
+        expect(call, `${file}: gh call passes --force`).not.toContain('--force')
       }
     }
   })
