@@ -292,6 +292,12 @@
             openssl rand -base64 24
         success_msg: "storage_secret_key: [set, {{ storage_secret_key | length }} chars]"
 
+    # Demo/dev-only settings (demo_mode, dev_routes_enabled, dev_reset_secret) must
+    # never reach a production instance. See issue #716.
+    - name: Include shared demo/dev-mode production safety guard
+      ansible.builtin.include_tasks: tasks/guard-demo-mode.yml
+      tags: always
+
     - name: Assert bridge_secret is set when SIP bridge or Asterisk is enabled
       ansible.builtin.assert:
         that:
@@ -433,6 +439,11 @@
           Signal Messaging: {{ 'ENABLED' if llamenos_signal_enabled | default(false) | bool else 'DISABLED' }}
           SIP Bridge: {{ 'ENABLED' if llamenos_sip_bridge_enabled | default(false) | bool else 'DISABLED' }}
           Backup Encryption: {{ 'ENABLED' if backup_age_public_key | default('') | length > 0 else 'DISABLED (set backup_age_public_key to enable)' }}
+          iOS Push (APNs): {{ 'ENABLED' if (apns_key_p8 | default('') | length > 0 and apns_key_id | default('') | length > 0 and apns_team_id | default('') | length > 0) else 'DISABLED' }}
+          Android Push (ntfy): {{ 'ENABLED' if llamenos_ntfy_enabled | default(false) | bool else 'DISABLED' }}
+          Crash Reporting (GlitchTip): {{ 'ENABLED' if glitchtip_dsn | default('') | length > 0 else 'DISABLED' }}
+          Demo Mode: {{ 'ENABLED' if demo_mode | default(false) | bool else 'DISABLED' }} (app_environment={{ app_environment | default('production') }})
+          Dev Routes: {{ 'ENABLED' if dev_routes_enabled | default(false) | bool else 'DISABLED' }}
           ===========================================
           Proceeding with deployment...
           ===========================================

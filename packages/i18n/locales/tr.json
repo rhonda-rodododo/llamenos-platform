@@ -3081,9 +3081,8 @@
     "volunteer": "Gönüllü",
     "dismiss": "Kapat",
     "banner": "Demo Mode",
-    "bannerText": "You're exploring the Llamenos demo. Data resets daily.",
-    "bannerTextSchedule": "You're exploring the Llamenos demo. Data resets on schedule.",
-    "getStarted": "Deploy your own",
+    "bannerText": "Test ortamı — gerçek arayan bilgilerini girmeyin. Buradaki veriler gizli değildir ve herhangi bir zamanda silinebilir.",
+    "bannerTextSchedule": "Test ortamı — gerçek arayan bilgilerini girmeyin. Veriler {{schedule}} sıfırlanır ve gizli değildir.",
     "pickAccount": "Pick a demo account to explore",
     "resetNotice": "Demo data resets daily",
     "tryDemo": "Try the demo"

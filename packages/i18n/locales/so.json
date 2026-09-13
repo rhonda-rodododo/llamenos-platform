@@ -4359,9 +4359,8 @@
     "dismiss": "Iska dhaaf",
     "volunteer": "Mutadawwic",
     "banner": "Demo Mode",
-    "bannerText": "You're exploring the Llamenos demo. Data resets daily.",
-    "bannerTextSchedule": "You're exploring the Llamenos demo. Data resets on schedule.",
-    "getStarted": "Deploy your own",
+    "bannerText": "Deegaan tijaabo ah — ha gelin macluumaad dhab ah oo ku saabsan wicitaanka. Xogta halkan ma aha mid qarsoodi ah waana la tirtiri karaa waqti kasta.",
+    "bannerTextSchedule": "Deegaan tijaabo ah — ha gelin macluumaad dhab ah oo ku saabsan wicitaanka. Xogta waxaa dib loo dejiyaa {{schedule}}, mana aha mid qarsoodi ah.",
     "pickAccount": "Pick a demo account to explore",
     "resetNotice": "Demo data resets daily",
     "tryDemo": "Try the demo"

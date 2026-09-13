@@ -2849,9 +2849,8 @@
     "admin": "Адміністрування",
     "dismiss": "Закрити",
     "banner": "Demo Mode",
-    "bannerText": "You're exploring the Llamenos demo. Data resets daily.",
-    "bannerTextSchedule": "You're exploring the Llamenos demo. Data resets on schedule.",
-    "getStarted": "Deploy your own",
+    "bannerText": "Тестове середовище — не вводьте реальні дані абонентів. Дані тут не є конфіденційними і можуть бути видалені в будь-який момент.",
+    "bannerTextSchedule": "Тестове середовище — не вводьте реальні дані абонентів. Дані скидаються {{schedule}} і не є конфіденційними.",
     "pickAccount": "Pick a demo account to explore",
     "resetNotice": "Demo data resets daily",
     "tryDemo": "Try the demo"

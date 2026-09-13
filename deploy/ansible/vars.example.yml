@@ -129,8 +129,48 @@ ari_username: llamenos
 ari_password: ""
 bridge_secret: ""
 
-# Signal bridge settings (only used if signal is enabled)
-# No additional config needed beyond enabling
+# Signal bridge settings (only used if signal is enabled).
+# Must match the token configured in the signal-notifier sidecar.
+# Generate with: openssl rand -hex 32
+signal_notifier_bearer_token: ""
+
+# ─── Push Notifications (Epic 86) ────────────────────────────────
+# APNs (iOS push). Get these from the Apple Developer Portal → Keys.
+# Leave all three empty to disable — iOS push is skipped gracefully.
+apns_key_p8: "" # PEM-formatted auth key contents
+apns_key_id: ""
+apns_team_id: ""
+
+# ntfy/UnifiedPush (Android push). Requires a self-hosted ntfy instance
+# reachable from the app container (standing that service up is #717 —
+# not yet automated by this playbook). Leave llamenos_ntfy_enabled: false
+# until that instance exists.
+llamenos_ntfy_enabled: false
+ntfy_url: "http://ntfy:80" # Compose service name:port, not a public URL
+ntfy_auth_token: "" # Optional bearer token for the ntfy instance
+
+# ─── Crash Reporting (Epic 293) ──────────────────────────────────
+# GlitchTip/Sentry-compatible DSN for client-side crash reporting.
+# Leave empty to disable — crash reporting is skipped gracefully.
+glitchtip_dsn: ""
+
+# ─── Demo / Staging Mode ──────────────────────────────────────────
+# See docs/deploy/staging.md. NEVER set demo_mode: true when
+# app_environment is "production" — both the app and an Ansible preflight
+# assert (playbooks/tasks/guard-demo-mode.yml) refuse to proceed if you do.
+# When demo_mode is true, demo_mode_confirm MUST be exactly the literal
+# string "DESTROY_ALL_DATA" — this two-factor confirmation is required by
+# apps/worker/lib/config.ts before it will run scheduled data resets.
+demo_mode: false
+demo_mode_confirm: ""
+
+# ─── Developer/Test Routes ────────────────────────────────────────
+# NEVER set dev_routes_enabled: true or a non-empty dev_reset_secret when
+# app_environment is "production" — same guard as demo_mode applies.
+# Currently only takes effect when app_environment is "development"
+# (widening that to staging/demo instances is tracked separately — #723).
+dev_routes_enabled: false
+dev_reset_secret: ""
 
 # ─── Cross-Host Networking ──────────────────────────────────────
 # Enable TLS between services on different hosts (recommended for multi-host)

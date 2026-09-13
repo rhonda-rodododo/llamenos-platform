@@ -4197,9 +4197,8 @@
     "admin": "B'anel",
     "volunteer": "Aj Samajel",
     "banner": "Demo Mode",
-    "bannerText": "You're exploring the Llamenos demo. Data resets daily.",
-    "bannerTextSchedule": "You're exploring the Llamenos demo. Data resets on schedule.",
-    "getStarted": "Deploy your own",
+    "bannerText": "Kꞌutbꞌal etaꞌmanik — makokisaj qas etaꞌmabꞌal rech ri sikꞌinel. Ri etaꞌmabꞌal waral man ewal taj xuqujeꞌ kkunataj kesax pa jubꞌiqꞌ qꞌij.",
+    "bannerTextSchedule": "Kꞌutbꞌal etaꞌmanik — makokisaj qas etaꞌmabꞌal rech ri sikꞌinel. Ri etaꞌmabꞌal {{schedule}} ktzalij chi na jun mul, man ewal taj.",
     "pickAccount": "Pick a demo account to explore",
     "resetNotice": "Demo data resets daily",
     "tryDemo": "Try the demo"
