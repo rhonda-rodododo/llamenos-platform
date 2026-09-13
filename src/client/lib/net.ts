@@ -5,11 +5,9 @@
  * (see apps/desktop/tauri.conf.json) — the webview cannot open a raw `fetch` or
  * `WebSocket` to any remote host, full stop. All HTTP and WebSocket traffic to the
  * configured backend is instead proxied through Tauri commands implemented in
- * `apps/desktop/src/net.rs` (`net_fetch`, `net_probe_health`, `net_ws_connect`,
- * `net_ws_send`, `net_ws_close`), which re-check the target origin against the SAME
- * persisted `apiBaseUrl` that `api-config.ts` reads/writes (via the Tauri Store),
- * so "which hosts can this app reach" is a runtime decision driven by user config —
- * not a build-time CSP allowlist. See #739 for the security rationale.
+ * `apps/desktop/src/net.rs` and reached via `platform.ts`. Rust checks every target
+ * against the exact origin persisted by `api_config.rs` (scheme + host + port; no
+ * sibling hosts), never follows redirects, and strips hop-by-hop/Host headers.
  *
  * In dev (`bun run tauri:dev`) and outside a real backend configuration (relative
  * `/api` default), this module falls straight through to the browser's native
@@ -18,19 +16,24 @@
  *
  * Playwright tests exercise the SAME code path as production: `tests/mocks/tauri-core.ts`
  * implements `net_fetch`/`net_probe_health`/`net_ws_*` by performing a real fetch/WebSocket
- * from the mock (mirroring the Rust allowlist check in JS), so a configured non-default
+ * from the mock (mirroring the Rust allowlist rules in JS), so a configured non-default
  * origin is genuinely reached end-to-end in tests, not just asserted against a string.
  */
 
 import { getApiBase, isAbsoluteUrl, isTauriRuntime } from './api-config'
+import {
+  ipcErrorMessage,
+  listenNetWs,
+  netFetchViaRust,
+  netProbeHealth,
+  netWsClose,
+  netWsConnect,
+  netWsSend,
+  type NetResponse,
+} from './platform'
 
 function shouldRouteThroughRust(): boolean {
   return isTauriRuntime() && isAbsoluteUrl(getApiBase())
-}
-
-async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-  const { invoke: tauriInvoke } = await import('@tauri-apps/api/core')
-  return tauriInvoke<T>(cmd, args)
 }
 
 // ── base64 <-> bytes helpers (no Node Buffer in the webview) ───────────
@@ -62,12 +65,6 @@ async function bodyToBase64(body: BodyInit | null | undefined): Promise<string |
     return bytesToBase64(new Uint8Array(await body.arrayBuffer()))
   }
   throw new Error('netFetch: unsupported request body type')
-}
-
-interface NetResponse {
-  status: number
-  headers: Record<string, string>
-  bodyBase64: string
 }
 
 /** Minimal `Response`-compatible wrapper around a Rust-proxied HTTP result. */
@@ -106,6 +103,9 @@ class ProxiedResponse {
  * whenever a real backend address is configured under Tauri; otherwise behaves
  * exactly like the browser's native `fetch` (dev/test relative `/api`, or
  * outside Tauri entirely).
+ *
+ * A refused or failed proxied request rejects with a `TypeError`, as `fetch`
+ * does, so existing network-error handling (api.ts retry/offline queue) applies.
  */
 export async function netFetch(input: string, init: RequestInit = {}): Promise<Response> {
   if (!shouldRouteThroughRust()) {
@@ -118,11 +118,13 @@ export async function netFetch(input: string, init: RequestInit = {}): Promise<R
   }
   const bodyBase64 = await bodyToBase64(init.body as BodyInit | null | undefined)
 
-  const invocation = invoke<NetResponse>('net_fetch', {
+  const invocation = netFetchViaRust({
     method: (init.method || 'GET').toUpperCase(),
     url: input,
     headers,
     bodyBase64: bodyBase64 ?? null,
+  }).catch((err: unknown) => {
+    throw new TypeError(ipcErrorMessage(err))
   })
 
   // Respect the caller's AbortSignal (callers like api.ts's request() rely on
@@ -145,20 +147,15 @@ export async function netFetch(input: string, init: RequestInit = {}): Promise<R
 }
 
 /**
- * Test a CANDIDATE server address before it is confirmed/persisted — used by the
- * first-run and settings "Server address" screens. Always requests a fixed
- * `/api/health` path with no credentials and no caller-supplied headers, so
- * probing an unconfigured/untrusted host can never leak anything sensitive —
- * see `net_probe_health` in apps/desktop/src/net.rs, which intentionally skips
- * the backend allowlist check for exactly this reason (there is nothing
- * confirmed yet to check against).
+ * Test a CANDIDATE server address during first-run configuration. Under Tauri
+ * this is `net_probe_health`, which only answers whether `/api/health` returned
+ * 2xx, refuses once a server is configured, and is rate-limited — so there is
+ * no status or body to report, only reachable/unreachable or the refusal reason.
  */
 export async function probeServerHealth(baseUrl: string): Promise<{ ok: boolean; error?: string }> {
   try {
     if (isTauriRuntime() && isAbsoluteUrl(baseUrl)) {
-      const result = await invoke<NetResponse>('net_probe_health', { url: baseUrl })
-      if (result.status >= 200 && result.status < 300) return { ok: true }
-      return { ok: false, error: `server responded with status ${result.status}` }
+      return { ok: await netProbeHealth(baseUrl) }
     }
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 8_000)
@@ -170,37 +167,11 @@ export async function probeServerHealth(baseUrl: string): Promise<{ ok: boolean;
       clearTimeout(timeout)
     }
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : 'unreachable' }
+    return { ok: false, error: ipcErrorMessage(err) }
   }
 }
 
 // ── WebSocket shim (Rust-proxied) ───────────────────────────────────────
-
-type NetWsPayload =
-  | { type: 'open' }
-  | { type: 'message'; data: string }
-  | { type: 'close'; code: number; reason: string }
-  | { type: 'error'; message: string }
-
-/**
- * Registers a handler for Rust-emitted `net-ws:<id>` events. Mirrors
- * `platformListen` in `platform.ts`: Playwright test builds use an in-page
- * listener registry (populated directly by the mock's `net_ws_connect`/`send`
- * handlers in tests/mocks/tauri-core.ts) instead of the real Tauri event API.
- */
-async function listenNetWs(id: string, handler: (payload: NetWsPayload) => void): Promise<() => void> {
-  const channel = `net-ws:${id}`
-  if (import.meta.env.PLAYWRIGHT_TEST) {
-    const win = window as unknown as Record<string, unknown>
-    if (!win.__NET_WS_LISTENERS__) win.__NET_WS_LISTENERS__ = {}
-    const map = win.__NET_WS_LISTENERS__ as Record<string, Array<(p: NetWsPayload) => void>>
-    ;(map[channel] ??= []).push(handler)
-    return () => { map[channel] = (map[channel] ?? []).filter(h => h !== handler) }
-  }
-  const { listen } = await import('@tauri-apps/api/event')
-  const unlisten = await listen<NetWsPayload>(channel, (event) => handler(event.payload))
-  return unlisten
-}
 
 /**
  * Minimal `WebSocket`-compatible shim backed by the Rust WS proxy. Implements
@@ -240,10 +211,12 @@ class TauriRelaySocket {
           this.emit('error', { message: payload.message })
         }
       })
-      await invoke('net_ws_connect', { id: this.id, url })
+      await netWsConnect(this.id, url)
     } catch (err) {
+      const message = ipcErrorMessage(err)
+      console.error('[net] relay WebSocket refused or failed to connect:', message)
       this.readyState = TauriRelaySocket.CLOSED
-      this.emit('error', { message: err instanceof Error ? err.message : String(err) })
+      this.emit('error', { message })
       this.emit('close', { code: 1006, reason: 'connect failed' })
     }
   }
@@ -264,12 +237,12 @@ class TauriRelaySocket {
   }
 
   send(data: string): void {
-    invoke('net_ws_send', { id: this.id, data }).catch(() => { /* connection likely closed */ })
+    netWsSend(this.id, data).catch(() => { /* connection likely closed */ })
   }
 
   close(): void {
     this.readyState = TauriRelaySocket.CLOSING
-    invoke('net_ws_close', { id: this.id }).catch(() => { /* already closed */ })
+    netWsClose(this.id).catch(() => { /* already closed */ })
     this.unlisten?.()
   }
 }

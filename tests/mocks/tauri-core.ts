@@ -430,67 +430,118 @@ function shamirCombineInternal(shareObjs: Array<{ x: number; y: string }>): stri
 
 // ── Types ─────────────────────────────────────────────────────────────
 
-// ── Runtime-enforced network egress mock (#739) ─────────────────────
+// ── Backend address + runtime-enforced network egress mock (#738, #739) ──
 //
-// Mirrors apps/desktop/src/net.rs: reads the SAME persisted store
-// (llamenos-api-config.json / apiBaseUrl) and enforces the SAME allowlist
-// logic, but performs the request with a real browser `fetch`/`WebSocket`
-// instead of Rust's reqwest/tokio-tungstenite. This lets Playwright tests
-// exercise the full chain (UI → api-config → net.ts → IPC → real network
-// request) end-to-end against a real, separately-bound test server — see
+// Mirrors apps/desktop/src/api_config.rs and apps/desktop/src/net.rs: the same
+// persisted value (llamenos-api-config.json / apiBaseUrl, here in the mock
+// store), the same validation, the same exact-origin allowlist, the same header
+// denylist and first-run-only, rate-limited health probe — but the request is a
+// real browser `fetch`/`WebSocket` instead of reqwest/tokio-tungstenite. That
+// lets Playwright exercise the full chain (UI → api-config → net.ts → IPC → real
+// network request) against a real, separately-bound test server — see
 // tests/steps/config/.
 //
-// NOTE: unlike the real Rust path (a native HTTP/WS client with no CORS
-// concept), this mock's `fetch`/`WebSocket` calls run in a real browser and
-// ARE subject to CORS/browser security. A test server used to prove
-// cross-origin delivery must send `Access-Control-Allow-Origin` — that is a
-// test-harness requirement only, not something the production backend needs.
+// A Playwright build is a dev-equivalent build, so loopback `http://` is allowed
+// here exactly as Rust allows it under `cfg!(debug_assertions)`.
+//
+// Browser limits the mock cannot erase: `fetch` here IS subject to CORS (a test
+// server proving cross-origin delivery must send `Access-Control-Allow-Origin`
+// — a harness requirement only; Rust has no CORS concept), and a manual-redirect
+// fetch surfaces as an opaque status-0 response where Rust returns the real 3xx.
+// Either way, nothing is followed.
 
 const CONFIG_STORE_NAME = 'llamenos-api-config.json'
 const CONFIG_KEY = 'apiBaseUrl'
+const MOCK_ALLOW_LOOPBACK_HTTP = true
+const PROBE_MIN_INTERVAL_MS = 1000
+let lastProbeAt: number | null = null
 
-async function mockConfiguredOrigin(): Promise<URL> {
+const FORBIDDEN_REQUEST_HEADERS = new Set([
+  'host', 'content-length', 'transfer-encoding', 'connection', 'keep-alive',
+  'proxy-connection', 'proxy-authenticate', 'proxy-authorization', 'te', 'trailer', 'upgrade',
+])
+
+function isLoopbackHostname(hostname: string): boolean {
+  const h = hostname.toLowerCase()
+  return h === 'localhost' || h === '127.0.0.1' || h === '[::1]'
+}
+
+/** api_config.rs `check_backend_url`. */
+function mockCheckBackendUrl(url: URL): void {
+  if (!url.hostname) throw new Error('backend address has no host')
+  if (url.protocol === 'http:') {
+    if (!(MOCK_ALLOW_LOOPBACK_HTTP && isLoopbackHostname(url.hostname))) {
+      throw new Error('backend address must use https://')
+    }
+  } else if (url.protocol !== 'https:') {
+    throw new Error(`unsupported scheme ${url.protocol}// — backend address must use https://`)
+  }
+  if (url.username || url.password) throw new Error('backend address must not contain credentials')
+}
+
+/** api_config.rs `validate_backend_origin`. */
+function mockValidateBackendOrigin(raw: string): string {
+  let url: URL
+  try {
+    url = new URL(raw.trim())
+  } catch {
+    throw new Error('invalid backend address')
+  }
+  mockCheckBackendUrl(url)
+  if (!(url.pathname === '' || url.pathname === '/') || url.search || url.hash) {
+    throw new Error('backend address must be an origin only (no path, query or fragment)')
+  }
+  return url.origin
+}
+
+async function mockReadConfiguredRaw(): Promise<string | null> {
   const store = await Store.load(CONFIG_STORE_NAME)
-  const raw = await store.get<string>(CONFIG_KEY)
-  if (!raw) throw new Error('no backend server configured')
-  return new URL(raw)
+  return (await store.get<string>(CONFIG_KEY)) || null
+}
+
+/** api_config.rs `configured_origin` — fails closed on an invalid stored value. */
+async function mockConfiguredOrigin(): Promise<URL | null> {
+  const raw = await mockReadConfiguredRaw()
+  if (!raw) return null
+  try {
+    return new URL(mockValidateBackendOrigin(raw))
+  } catch (err) {
+    throw new Error(`configured backend address is invalid: ${err instanceof Error ? err.message : String(err)}`)
+  }
+}
+
+async function mockAllowedOrigin(): Promise<URL> {
+  const configured = await mockConfiguredOrigin()
+  if (!configured) throw new Error('no backend server configured')
+  return configured
 }
 
 function defaultPortFor(protocol: string): string {
   return protocol === 'https:' || protocol === 'wss:' ? '443' : '80'
 }
 
-function parentDomain(host: string): string | null {
-  const labels = host.split('.')
-  if (labels.length < 2) return null
-  return labels.slice(-2).join('.').toLowerCase()
+function sameHostAndPort(configured: URL, target: URL): boolean {
+  return configured.hostname.toLowerCase() === target.hostname.toLowerCase() &&
+    (configured.port || defaultPortFor(configured.protocol)) === (target.port || defaultPortFor(target.protocol))
 }
 
-function sameOrSiblingHost(configuredHost: string, candidateHost: string): boolean {
-  if (configuredHost.toLowerCase() === candidateHost.toLowerCase()) return true
-  const a = parentDomain(configuredHost)
-  const b = parentDomain(candidateHost)
-  return !!a && !!b && a === b
-}
-
-async function mockCheckHttpAllowed(target: URL): Promise<void> {
-  const configured = await mockConfiguredOrigin()
-  const sameScheme = target.protocol === configured.protocol
-  const sameHost = target.hostname.toLowerCase() === configured.hostname.toLowerCase()
-  const samePort = (target.port || defaultPortFor(target.protocol)) === (configured.port || defaultPortFor(configured.protocol))
-  if (!(sameScheme && sameHost && samePort)) {
+/** net.rs `check_http_target`: exact scheme + host + port. */
+function mockCheckHttpTarget(configured: URL, target: URL): void {
+  if (target.username || target.password) throw new Error('blocked: request URL must not contain credentials')
+  if (!(target.protocol === configured.protocol && sameHostAndPort(configured, target))) {
     throw new Error(`blocked: ${target.origin} is not the configured backend (${configured.origin})`)
   }
 }
 
-async function mockCheckWsAllowed(target: URL): Promise<void> {
-  const configured = await mockConfiguredOrigin()
+/** net.rs `check_ws_target`: exact host + port, scheme mapped to ws/wss. */
+function mockCheckWsTarget(configured: URL, target: URL): void {
   const expectedProtocol = configured.protocol === 'https:' ? 'wss:' : 'ws:'
   if (target.protocol !== expectedProtocol) {
     throw new Error(`blocked: expected ${expectedProtocol}// for the configured backend, got ${target.protocol}//`)
   }
-  if (!sameOrSiblingHost(configured.hostname, target.hostname)) {
-    throw new Error(`blocked: ${target.hostname} is not the configured backend or a sibling host of it`)
+  if (target.username || target.password) throw new Error('blocked: WebSocket URL must not contain credentials')
+  if (!sameHostAndPort(configured, target)) {
+    throw new Error(`blocked: ${target.host} is not the configured backend (${configured.origin})`)
   }
 }
 
@@ -510,7 +561,7 @@ function netBase64ToBytes(b64: string): Uint8Array {
   return bytes
 }
 
-/** Emits a `net-ws:<id>` payload to listeners registered via net.ts's `listenNetWs` (PLAYWRIGHT_TEST branch). */
+/** Emits a `net-ws:<id>` payload to listeners registered via platform.ts's `listenNetWs` (PLAYWRIGHT_TEST branch). */
 function emitNetWsEvent(id: string, payload: unknown): void {
   const win = window as unknown as Record<string, unknown>
   const map = (win.__NET_WS_LISTENERS__ ?? {}) as Record<string, Array<(p: unknown) => void>>
@@ -1335,6 +1386,36 @@ const commands: Record<string, CommandHandler> = {
     return new TextDecoder().decode(plaintext)
   },
 
+  // --- Backend address (#738) — mirrors apps/desktop/src/api_config.rs ---
+
+  api_config_get: async () => {
+    try {
+      const configured = await mockConfiguredOrigin()
+      return configured ? configured.origin : null
+    } catch {
+      const store = await Store.load(CONFIG_STORE_NAME)
+      await store.delete(CONFIG_KEY)
+      return null
+    }
+  },
+
+  api_config_set: async (a) => {
+    if (await mockReadConfiguredRaw()) {
+      throw new Error('refused: a backend server is already configured — clear it first')
+    }
+    const origin = mockValidateBackendOrigin(a.url as string)
+    const store = await Store.load(CONFIG_STORE_NAME)
+    await store.set(CONFIG_KEY, origin)
+    await store.save()
+    return origin
+  },
+
+  api_config_clear: async () => {
+    const store = await Store.load(CONFIG_STORE_NAME)
+    await store.delete(CONFIG_KEY)
+    await store.save()
+  },
+
   // --- Runtime-enforced network egress (#739) — mirrors apps/desktop/src/net.rs ---
 
   net_fetch: async (a) => {
@@ -1343,13 +1424,18 @@ const commands: Record<string, CommandHandler> = {
     const headers = (a.headers ?? {}) as Record<string, string>
     const bodyBase64 = a.bodyBase64 as string | null | undefined
 
+    const configured = await mockAllowedOrigin()
     const target = new URL(url)
-    await mockCheckHttpAllowed(target)
+    mockCheckHttpTarget(configured, target)
 
-    const init: RequestInit = { method, headers }
+    const forwarded: Record<string, string> = {}
+    for (const [k, v] of Object.entries(headers)) {
+      if (!FORBIDDEN_REQUEST_HEADERS.has(k.trim().toLowerCase())) forwarded[k] = v
+    }
+    const init: RequestInit = { method, headers: forwarded, redirect: 'manual' }
     if (bodyBase64) init.body = netBase64ToBytes(bodyBase64)
 
-    const res = await fetch(url, init)
+    const res = await fetch(target.toString(), init)
     const outHeaders: Record<string, string> = {}
     res.headers.forEach((value, key) => { outHeaders[key] = value })
     const bytes = new Uint8Array(await res.arrayBuffer())
@@ -1357,26 +1443,39 @@ const commands: Record<string, CommandHandler> = {
   },
 
   net_probe_health: async (a) => {
-    const url = a.url as string
-    const target = new URL(url)
-    if (target.protocol !== 'http:' && target.protocol !== 'https:') {
-      throw new Error('only http/https addresses are supported')
+    if (await mockConfiguredOrigin()) {
+      throw new Error('refused: a backend server is already configured')
     }
-    target.pathname = '/api/health'
-    target.search = ''
+    let candidate: URL
+    try {
+      candidate = new URL((a.url as string).trim())
+    } catch {
+      throw new Error('invalid URL')
+    }
+    mockCheckBackendUrl(candidate)
+    const target = new URL(`${candidate.origin}/api/health`)
 
-    const res = await fetch(target.toString())
-    const bytes = new Uint8Array(await res.arrayBuffer())
-    return { status: res.status, headers: {}, bodyBase64: netBytesToBase64(bytes) }
+    const now = Date.now()
+    if (lastProbeAt !== null && now - lastProbeAt < PROBE_MIN_INTERVAL_MS) {
+      throw new Error('rate limited: wait a moment before checking again')
+    }
+    lastProbeAt = now
+
+    try {
+      const res = await fetch(target.toString(), { redirect: 'manual', signal: AbortSignal.timeout(8_000) })
+      return res.status >= 200 && res.status < 300
+    } catch {
+      return false
+    }
   },
 
   net_ws_connect: async (a) => {
     const id = a.id as string
     const url = a.url as string
     const target = new URL(url)
-    await mockCheckWsAllowed(target)
+    mockCheckWsTarget(await mockAllowedOrigin(), target)
 
-    const ws = new WebSocket(url)
+    const ws = new WebSocket(target.toString())
     mockWsConnections.set(id, ws)
     ws.addEventListener('open', () => emitNetWsEvent(id, { type: 'open' }))
     ws.addEventListener('message', (e) => {

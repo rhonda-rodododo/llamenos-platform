@@ -1,56 +1,87 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Server, Loader2 } from 'lucide-react'
-import { normalizeServerInput, setApiBase } from '@/lib/api-config'
+import { normalizeServerInput, ServerAddressError } from '@/lib/api-config'
 import { probeServerHealth } from '@/lib/net'
 
 interface ServerAddressFormProps {
-  /** Currently-configured address (settings screen) — empty for first run. */
+  /** Pre-filled address (current server in Settings, or a staged change on first run). */
   initialValue?: string
-  /** Called with the normalized, confirmed-reachable address after it is persisted. */
-  onSaved: (base: string) => void
+  /**
+   * Probe `<origin>/api/health` before confirming. Only possible on first run:
+   * the Rust probe refuses once a server is configured, so Settings stages the
+   * change and lets the first-run screen verify it.
+   */
+  verify: boolean
+  /** Submit the value in `initialValue` once on mount (a staged server change). */
+  autoSubmit?: boolean
+  /** Called with the validated canonical origin (after a successful probe when `verify`). */
+  onConfirm: (origin: string) => Promise<void>
   submitLabel: string
   /** Prefix for `data-testid` attributes so first-run and settings usages don't collide. */
   testIdPrefix: string
 }
 
 /**
- * Shared "type a server address, we probe it, we save it" form — used by both
- * the first-run gate (`ServerAddressScreen`) and the Settings "Server address"
- * section. Mirrors the iOS client's `APIService.configure(baseURL:)` flow:
- * infer the scheme, probe `/api/health`, and surface a clear error on an
- * unreachable or non-Llámenos host (see `net.ts#probeServerHealth`).
+ * Shared "type a server address" form — used by the first-run gate
+ * (`ServerAddressScreen`) and the Settings "Server connection" section.
+ * Validates the address locally first (https-only; see `normalizeServerInput`),
+ * so a refused address never triggers a probe, a session change or a reload.
  */
-export function ServerAddressForm({ initialValue = '', onSaved, submitLabel, testIdPrefix }: ServerAddressFormProps) {
+export function ServerAddressForm({
+  initialValue = '',
+  verify,
+  autoSubmit = false,
+  onConfirm,
+  submitLabel,
+  testIdPrefix,
+}: ServerAddressFormProps) {
   const { t } = useTranslation()
   const [value, setValue] = useState(initialValue)
   const [checking, setChecking] = useState(false)
   const [error, setError] = useState('')
+  const autoSubmitted = useRef(false)
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    const trimmed = value.trim()
+  async function submit(raw: string) {
+    const trimmed = raw.trim()
     if (!trimmed || checking) return
 
     setChecking(true)
     setError('')
     try {
-      const normalized = normalizeServerInput(trimmed)
-      const result = await probeServerHealth(normalized)
-      if (!result.ok) {
-        setError(result.error ? t('serverAddress.errorWithDetail', { detail: result.error }) : t('serverAddress.unreachable'))
-        return
+      const origin = normalizeServerInput(trimmed)
+      if (verify) {
+        const result = await probeServerHealth(origin)
+        if (!result.ok) {
+          setError(result.error ? t('serverAddress.errorWithDetail', { detail: result.error }) : t('serverAddress.unreachable'))
+          return
+        }
       }
-      await setApiBase(normalized)
-      onSaved(normalized)
-    } catch {
-      setError(t('serverAddress.unreachable'))
+      await onConfirm(origin)
+    } catch (err) {
+      setError(err instanceof ServerAddressError
+        ? t('serverAddress.errorWithDetail', { detail: err.message })
+        : t('serverAddress.unreachable'))
     } finally {
       setChecking(false)
     }
+  }
+
+  useEffect(() => {
+    // Ref guard: StrictMode re-runs mount effects, and a second probe inside the
+    // Rust rate-limit window would be refused.
+    if (!autoSubmit || autoSubmitted.current || !initialValue) return
+    autoSubmitted.current = true
+    void submit(initialValue)
+    // Mount-only by design: a staged address is submitted once, not on every change.
+  }, [])
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    void submit(value)
   }
 
   return (

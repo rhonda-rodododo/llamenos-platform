@@ -19,11 +19,11 @@ import '@/app.css'
 // Install global error handlers for crash reporting (respects consent)
 installGlobalErrorHandlers()
 
-// Upload any pending crash reports from previous sessions
+// Upload any pending crash reports from previous sessions. Failures keep the
+// reports pending; where uploads are unavailable (desktop app) the reason is
+// logged by uploadPendingReports itself.
 if (isCrashReportingEnabled()) {
-  uploadPendingReports().catch(() => {
-    // Silently fail — will retry on next page load
-  })
+  uploadPendingReports().catch(() => {})
 }
 
 const router = createRouter({ routeTree })

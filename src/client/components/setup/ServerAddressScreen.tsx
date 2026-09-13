@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { LogoMark } from '@/components/logo-mark'
+import { clearPendingServerAddress, peekPendingServerAddress, setApiBase } from '@/lib/api-config'
 import { ServerAddressForm } from './ServerAddressForm'
 
 /**
@@ -8,9 +10,21 @@ import { ServerAddressForm } from './ServerAddressForm'
  * can safely render until the user tells us which server to talk to.
  * Rendered from `RootLayout` (`src/client/routes/__root.tsx`) in place of the
  * entire route tree whenever `needsServerAddress()` is true.
+ *
+ * This is the only place a server address is verified and persisted: the Rust
+ * health probe is refused once a server is configured. Changing servers from
+ * Settings stages the new address and returns here, where it is pre-filled and
+ * checked automatically.
  */
 export function ServerAddressScreen({ onConfigured }: { onConfigured: (base: string) => void }) {
   const { t } = useTranslation()
+  // Read once, then consumed: a staged change gets one automatic attempt, and
+  // on failure it stays in the input for the user to correct rather than
+  // re-submitting on every reload.
+  const [staged] = useState(() => peekPendingServerAddress())
+  useEffect(() => {
+    if (staged) clearPendingServerAddress()
+  }, [staged])
 
   return (
     <div className="relative flex min-h-screen items-center justify-center bg-background p-4 overflow-hidden">
@@ -30,7 +44,13 @@ export function ServerAddressScreen({ onConfigured }: { onConfigured: (base: str
         <ServerAddressForm
           testIdPrefix="server-address"
           submitLabel={t('serverAddress.connect')}
-          onSaved={onConfigured}
+          initialValue={staged ?? ''}
+          autoSubmit={!!staged}
+          verify
+          onConfirm={async (origin) => {
+            await setApiBase(origin)
+            onConfigured(origin)
+          }}
         />
       </div>
     </div>
