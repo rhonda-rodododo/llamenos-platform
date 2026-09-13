@@ -190,6 +190,31 @@
             2. Set llamenos_app_image to a valid image reference
         success_msg: "llamenos_app_image: {{ llamenos_app_image }}"
 
+    # apps/worker/lib/config.ts hard-fails at startup if ENVIRONMENT=production
+    # and WEBHOOK_BASE_URL is unset (webhook signature validation would
+    # otherwise fall back to the spoofable Host header). Fail here, before
+    # anything is rendered to disk, rather than after the container is
+    # already running and refusing to serve traffic. See #716/#771 review
+    # round 2 — this is the same class of bug as the missing DATABASE_URL
+    # that PR fixed, caught by the same completeness check
+    # (deploy/ansible/scripts/check-required-env.py).
+    - name: Assert webhook_base_url is set when app_environment is production
+      ansible.builtin.assert:
+        that:
+          - webhook_base_url is defined
+          - webhook_base_url | length > 0
+        fail_msg: |
+          REQUIRED: 'webhook_base_url' must be set to your public base URL
+          (e.g. https://api.yourdomain.org) when app_environment is 'production'.
+
+          Current value: {{ webhook_base_url | default('NOT SET') }}
+
+          To fix:
+            1. Edit vars.yml
+            2. Set webhook_base_url: https://your-public-domain.org
+        success_msg: "webhook_base_url: {{ webhook_base_url }}"
+      when: (app_environment | default('production')) == 'production'
+
     - name: Warn if admin_pubkey is not set (Tauri desktop app bootstrap allowed)
       ansible.builtin.debug:
         msg: |
@@ -444,6 +469,7 @@
           Crash Reporting (GlitchTip): {{ 'ENABLED' if glitchtip_dsn | default('') | length > 0 else 'DISABLED' }}
           Demo Mode: {{ 'ENABLED' if demo_mode | default(false) | bool else 'DISABLED' }} (app_environment={{ app_environment | default('production') }})
           Dev Routes: {{ 'ENABLED' if dev_routes_enabled | default(false) | bool else 'DISABLED' }}
+          Webhook Base URL: {{ webhook_base_url if (webhook_base_url | default('') | length > 0) else 'NOT SET' }}
           ===========================================
           Proceeding with deployment...
           ===========================================

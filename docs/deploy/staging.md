@@ -88,9 +88,15 @@ should pick one of the two knowingly rather than discover the 404 later.
   values including `app_environment: demo` and `demo_mode: true` (today's
   content is unknown to this change — this PR does not have access to the
   live secrets and cannot confirm what the current demo host runs).
-- Triggering the `Deploy Demo` workflow and capturing the live
-  `curl -i https://<host>/health/ready`, `/health/live`, and `/api/config`
-  evidence issue #718 asks for.
+- Triggering the `Deploy Demo` workflow and capturing the live health/config
+  evidence issue #718 asks for (routes are mounted under `/api` —
+  `apps/worker/app.ts` does `app.route('/api', api)` and
+  `api.route('/health', healthRoutes)` — there is no bare `/health/*`):
+  ```bash
+  curl -i https://<host>/api/health/ready
+  curl -i https://<host>/api/health/live
+  curl -i https://<host>/api/config
+  ```
 - Confirming issue #655 (production image cannot run migrations or serve
   HTTP) does not affect whatever image the demo host currently runs — this
   PR does not change the Docker image and cannot verify that independently.

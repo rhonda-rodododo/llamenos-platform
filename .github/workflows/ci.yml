@@ -642,6 +642,28 @@ jobs:
             -i inventory.example.yml \
             --extra-vars "@vars.example.yml"
 
+      # Syntax-check above never executes a `template` task, so it cannot
+      # catch a .env template silently missing a var apps/worker/lib/config.ts
+      # requires at startup -- exactly how roles/llamenos/templates/env.j2
+      # shipped without DATABASE_URL (#716/#771). This renders both the
+      # monolithic role's template and the per-service app role's template
+      # for real, with app_environment=production (the strictest case, since
+      # WEBHOOK_BASE_URL is only required there) and asserts every var
+      # config.ts requires is present in BOTH renders. See
+      # deploy/ansible/scripts/check-required-env.py for how the required
+      # list is derived (parsed from config.ts, not hand-maintained here).
+      - name: Verify both .env templates render every var config.ts requires
+        run: |
+          cd deploy/ansible
+          ansible-playbook playbooks/check-env-templates.yml \
+            -e @vars.example.yml \
+            -e app_environment=production \
+            -e webhook_base_url=https://example.org
+          ansible-playbook playbooks/check-env-templates.yml \
+            -e @vars.example.yml \
+            -e @scripts/full-scenario.extra-vars.json
+          python3 scripts/check-required-env.py
+
   desktop-unit:
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
