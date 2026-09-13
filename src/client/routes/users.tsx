@@ -492,7 +492,7 @@ function UserRow({ user, roles, onUpdate, onDelete }: {
           {user.name.charAt(0).toUpperCase()}
         </Link>
         <div className="min-w-0 flex-1">
-          <Link to="/users/$pubkey" params={{ pubkey: user.pubkey }} className="text-sm font-medium hover:underline">{user.name} <span className="font-mono text-xs text-muted-foreground">({user.pubkey.slice(0, 8)})</span></Link>
+          <Link to="/users/$pubkey" params={{ pubkey: user.pubkey }} data-testid="volunteer-row-name-link" className="text-sm font-medium hover:underline">{user.name} <span className="font-mono text-xs text-muted-foreground">({user.pubkey.slice(0, 8)})</span></Link>
           {user.phone && (
             <p className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
               {showPhone ? user.phone : maskedPhone(user.phone)}
