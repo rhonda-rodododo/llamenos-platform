@@ -243,7 +243,10 @@ final class SecurityEventService: @unchecked Sendable {
     /// next attempt. Returns the number of events successfully uploaded.
     @discardableResult
     func flush() async -> Int {
-        guard let baseURL else { return 0 }
+        queueLock.lock()
+        let currentBaseURL = baseURL
+        queueLock.unlock()
+        guard let baseURL = currentBaseURL else { return 0 }
 
         queueLock.lock()
         let alreadyUploading = isUploading
