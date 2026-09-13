@@ -348,10 +348,13 @@ Then('the report type selector should be visible', async ({ page }) => {
 })
 
 Then('the report type selector should list template-defined types', async ({ page }) => {
+  // `report-type-picker` never exists in the app (ReportForm only renders
+  // `report-type-select`) — the `.or()` was a dead fallback that made `.first()` look
+  // like it was resolving ambiguity when it was really just masking that. A single
+  // scoped locator makes the click deterministic without needing `.first()` at all.
   const selector = page.getByTestId('report-type-select')
-    .or(page.getByTestId('report-type-picker'))
-  await expect(selector.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
-  await selector.first().click()
+  await expect(selector).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await selector.click()
   const options = page.locator('[role="option"]')
   const count = await options.count()
   expect(count).toBeGreaterThanOrEqual(1)
@@ -359,24 +362,17 @@ Then('the report type selector should list template-defined types', async ({ pag
 })
 
 When('I select the first template report type', async ({ page }) => {
+  // Was: probe the dropdown with a 3s timeout, fall back to a `report-type-option`
+  // testid that does not exist anywhere in the app (dead code — always a silent no-op),
+  // and even on the happy path select `options.nth(1)` — the SECOND type — whenever more
+  // than one was available, contradicting the step's own name. Fixed: always open the
+  // one real selector and click the first option.
   const selector = page.getByTestId('report-type-select')
-  if (await selector.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await selector.click()
-    const options = page.locator('[role="option"]')
-    const count = await options.count()
-    if (count > 1) {
-      await options.nth(1).click()
-    } else if (count === 1) {
-      await options.first().click()
-    } else {
-      await page.keyboard.press('Escape')
-    }
-  } else {
-    const option = page.getByTestId('report-type-option').first()
-    if (await option.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await option.click()
-    }
-  }
+  await expect(selector).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await selector.click()
+  const firstOption = page.locator('[role="option"]').first()
+  await expect(firstOption).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await firstOption.click()
 })
 
 Then('the report form should show dynamic schema fields', async ({ page }) => {

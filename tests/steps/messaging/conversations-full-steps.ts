@@ -53,7 +53,9 @@ Given('a conversation exists', async ({ page, backendRequest }) => {
 Given('I have an open conversation', async ({ page, backendRequest }) => {
   const hasConvo = await ensureConversationExists(page, backendRequest)
   if (hasConvo) {
-    await page.getByTestId(TestIds.CONVERSATION_ITEM).first().click()
+    const item = page.getByTestId(TestIds.CONVERSATION_ITEM).first()
+    await expect(item).toBeVisible({ timeout: Timeouts.ELEMENT })
+    await item.click()
     // Claim the conversation so it becomes "active" and the composer is visible
     const claimBtn = page.getByTestId(TestIds.CONV_ASSIGN_BTN)
     const hasClaim = await claimBtn.isVisible({ timeout: 3000 }).catch(() => false)
@@ -106,7 +108,9 @@ Given('conversations from different channels exist', async ({ page, backendReque
 Given('an open conversation exists', async ({ page, backendRequest }) => {
   const hasConvo = await ensureConversationExists(page, backendRequest)
   if (hasConvo) {
-    await page.getByTestId(TestIds.CONVERSATION_ITEM).first().click()
+    const item = page.getByTestId(TestIds.CONVERSATION_ITEM).first()
+    await expect(item).toBeVisible({ timeout: Timeouts.ELEMENT })
+    await item.click()
   }
 })
 
@@ -114,7 +118,9 @@ Given('a closed conversation exists', async ({ page, backendRequest }) => {
   // Create a conversation first, then we'd need to close it — for now seed one
   const hasConvo = await ensureConversationExists(page, backendRequest)
   if (hasConvo) {
-    await page.getByTestId(TestIds.CONVERSATION_ITEM).first().click()
+    const item = page.getByTestId(TestIds.CONVERSATION_ITEM).first()
+    await expect(item).toBeVisible({ timeout: Timeouts.ELEMENT })
+    await item.click()
   }
 })
 
