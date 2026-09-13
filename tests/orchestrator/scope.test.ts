@@ -70,7 +70,14 @@ describe('checkScope', () => {
     it('parses the real fragments into the expected owned/notOwned lists', () => {
       expect(backend.owned).toEqual(['apps/worker/', 'sip-bridge/', 'signal-notifier/', 'tests/steps/'])
       expect(backend.notOwned).toEqual(['tests/', 'tests/mocks/', 'packages/test-specs/'])
-      expect(desktop.owned).toEqual(['apps/desktop/', 'src/client/', 'tests/', 'tests/mocks/', 'playwright.config.ts'])
+      expect(desktop.owned).toEqual([
+        'apps/desktop/',
+        'src/client/',
+        'tests/',
+        'tests/mocks/',
+        'playwright.config.ts',
+        '.github/ci/*-baseline.json',
+      ])
       expect(desktop.notOwned).toEqual(['tests/steps/', 'packages/test-specs/'])
     })
 
