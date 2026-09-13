@@ -5,129 +5,123 @@
  *
  * The schema browser lets users view entity type schemas defined by
  * the applied CMS template — entity types, fields, and statuses.
+ *
+ * Every step asserts with a waiting `expect`. The Background guarantees CMS is
+ * enabled and the template's entity types exist in the worker hub, so there is
+ * nothing to "fall through" to: a missing section, row or editor is a failure.
+ * (`locator.isVisible()` ignores its `timeout` and returns immediately — probing
+ * with it while the page was still loading made these steps silently skip the
+ * editor, which is what #669 was.)
  */
-import { expect } from '@playwright/test'
+import { expect, type Page } from '@playwright/test'
 import { When, Then } from '../fixtures'
 import { Timeouts, navigateAfterLogin } from '../../helpers'
+import { listEntityTypesViaApi } from '../../api-helpers'
+
+interface ApiEnumOption { value: string; label: string }
+interface ApiEntityType {
+  name: string
+  label: string
+  fields: Array<{ label: string; type: string }>
+  statuses: ApiEnumOption[]
+  defaultStatus: string
+  isArchived?: boolean
+}
+
+function entityTypeRow(page: Page, typeName: string) {
+  return page.getByTestId('entity-type-row').filter({
+    has: page.getByTestId('entity-type-label').getByText(typeName, { exact: true }),
+  })
+}
+
+/** Default status of the entity type whose statuses the scenario last opened. */
+const expectedDefaultStatus = new WeakMap<Page, string>()
+
+function editor(page: Page) {
+  return page.getByTestId('entity-type-editor')
+}
 
 When('I open the schema browser', async ({ page }) => {
-  // Schema browser is at /admin/case-management or accessible from CMS settings
-  await navigateAfterLogin(page, '/admin/case-management')
+  // Deep-link to the entity types section so it is deterministically expanded
+  // (expansion state otherwise depends on sessionStorage from earlier navigation).
+  await navigateAfterLogin(page, '/admin/case-management?section=entity-types')
+  await expect(page.getByTestId('entity-types')).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
-Then('I should see a list of entity types from the template', async ({ page }) => {
-  // Entity type rows should be visible after template is applied.
-  // The entity-types section may need to be expanded first.
-  const section = page.getByTestId('entity-types')
-  const hasSect = await section.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (hasSect) {
-    // Check if section is collapsed — expand it by clicking the title text
-    const hasRow = await page.getByTestId('entity-type-row').first().isVisible({ timeout: 500 }).catch(() => false)
-    if (!hasRow) {
-      const titleText = section.locator('h3').first()
-      await titleText.click()
-    }
-  }
-  const entityTypeRow = page.getByTestId('entity-type-row').first()
-    .or(page.locator('[data-testid^="entity-type-"]').first())
-  const hasRow = await entityTypeRow.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (hasRow) return
-  // Entity types may not have been created (template apply failed in CI) — verify page loaded
-  await expect(page.getByTestId('page-title')).toBeVisible({ timeout: Timeouts.ELEMENT })
+Then('I should see a list of entity types from the template', async ({ page, backendRequest, workerHub }) => {
+  const types = (await listEntityTypesViaApi(backendRequest, workerHub)) as unknown as ApiEntityType[]
+  const activeLabels = types.filter(t => !t.isArchived).map(t => t.label)
+  expect(activeLabels.length).toBeGreaterThan(0)
+  await expect(page.getByTestId('entity-type-label')).toHaveText(activeLabels, {
+    useInnerText: true,
+    timeout: Timeouts.ELEMENT,
+  })
 })
 
 Then('I should see the {string} entity type', async ({ page }, typeName: string) => {
-  const typeEl = page.getByText(typeName, { exact: false }).first()
-  const isVisible = await typeEl.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (isVisible) return
-  // Entity type may not exist (template apply failed in CI) — verify page loaded
-  await expect(page.getByTestId('page-title')).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(entityTypeRow(page, typeName)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 When('I select the {string} entity type', async ({ page }, typeName: string) => {
-  // The entity-types section is only rendered when CMS is enabled on the page.
-  // Wait for the section container — it renders even when collapsed.
-  const section = page.getByTestId('entity-types')
-  const hasSection = await section.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (!hasSection) {
-    // CMS section not rendered — page may not have CMS enabled. Fall through gracefully.
-    await expect(page.getByTestId('page-title')).toBeVisible({ timeout: Timeouts.ELEMENT })
-    return
-  }
-
-  // Expand the section if collapsed — click the title text to avoid hitting the copy-link button
-  const hasRow = await page.getByTestId('entity-type-row').first().isVisible({ timeout: 500 }).catch(() => false)
-  if (!hasRow) {
-    // Click the section title text (inside the trigger) to expand
-    const titleText = section.locator('h3').first()
-    await titleText.click()
-    // Wait for accordion to open and entity types to load from API
-    await expect(page.getByTestId('entity-type-row').first()).toBeVisible({ timeout: Timeouts.ELEMENT })
-  }
-
-  // Wait for the entity type row to become visible (accordion may be animating open)
-  const typeRow = page.getByTestId('entity-type-row').filter({ hasText: typeName }).first()
-  await expect(typeRow).toBeVisible({ timeout: Timeouts.ELEMENT })
-  // Click the Edit button on the matching row to open the entity type editor.
-  const editBtn = typeRow.getByTestId('entity-type-edit-btn')
-  const hasEditBtn = await editBtn.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (hasEditBtn) {
-    await editBtn.click()
-  } else {
-    // Fallback: click the row itself
-    await typeRow.click()
-  }
-  // Wait for the editor tabs to render before proceeding — the editor
-  // is rendered conditionally and may take a frame to appear.
-  await expect(page.getByTestId('entity-tab-general')).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const row = entityTypeRow(page, typeName)
+  await expect(row).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await row.getByTestId('entity-type-edit-btn').click()
+  await expect(editor(page)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
-Then('I should see the fields defined for {string}', async ({ page }, _typeName: string) => {
-  // If the entity type editor is not open (e.g. entity types don't exist in this environment),
-  // fall through gracefully — the previous step already verified the page loaded.
-  const editor = page.getByTestId('entity-type-editor')
-  const editorOpen = await editor.isVisible({ timeout: 2000 }).catch(() => false)
-  if (!editorOpen) {
-    await expect(page.getByTestId('page-title')).toBeVisible({ timeout: Timeouts.ELEMENT })
-    return
-  }
-  // Editor is open — click the Fields tab and verify the tab is accessible.
-  const fieldsTab = page.getByTestId('entity-tab-fields')
-  await expect(fieldsTab).toBeVisible({ timeout: Timeouts.ELEMENT })
-  await fieldsTab.click()
-  // Look for entity-field-row. Avoid .or() combinator — it causes strict mode violations
-  // when multiple elements match (e.g., "28 fields" badge text also matches /fields/i).
-  const fieldRow = page.getByTestId('entity-field-row').first()
-  await fieldRow.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
+async function getEntityTypeByLabel(
+  request: Parameters<typeof listEntityTypesViaApi>[0],
+  hubId: string,
+  typeName: string,
+): Promise<ApiEntityType> {
+  const types = (await listEntityTypesViaApi(request, hubId)) as unknown as ApiEntityType[]
+  const match = types.find(t => t.label === typeName)
+  if (!match) throw new Error(`Entity type "${typeName}" not found in hub ${hubId}`)
+  return match
+}
+
+Then('I should see the fields defined for {string}', async ({ page, backendRequest, workerHub }, typeName: string) => {
+  const entityType = await getEntityTypeByLabel(backendRequest, workerHub, typeName)
+  expect(entityType.fields.length).toBeGreaterThan(0)
+
+  await editor(page).getByTestId('entity-tab-fields').click()
+  await expect(editor(page).getByTestId('entity-field-label')).toHaveText(
+    entityType.fields.map(f => f.label),
+    { timeout: Timeouts.ELEMENT },
+  )
 })
 
 Then('each field should show its type and label', async ({ page }) => {
-  // At least one field row should be visible with type and label information
-  const fieldRow = page.getByTestId('entity-field-row').first()
-    .or(page.locator('[data-testid^="entity-field-"]').first())
-  await expect(fieldRow).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const rows = editor(page).getByTestId('entity-field-row')
+  await expect(rows.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const count = await rows.count()
+  for (let i = 0; i < count; i++) {
+    const row = rows.nth(i)
+    await expect(row.getByTestId('entity-field-label')).toHaveText(/\S/)
+    await expect(row.getByTestId('entity-field-type')).toHaveText(/\S/)
+  }
 })
 
-Then('I should see the statuses defined for {string}', async ({ page }, _typeName: string) => {
-  // Click the "Statuses" tab in the entity editor — use ELEMENT timeout since
-  // the editor may still be rendering after the previous step opened it.
-  const statusTab = page.getByTestId('entity-tab-statuses')
-  const hasTab = await statusTab.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (hasTab) await statusTab.click()
-  // Status rows should appear. Avoid .or() combinator — it causes strict mode violations
-  // when multiple elements match (e.g., badge text "2 statuses" also matches /statuses/i).
-  const statusRow = page.getByTestId('status-row').first()
-  const hasRow = await statusRow.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (hasRow) return
-  // Fallback: the statuses tab itself confirms the statuses section is accessible
-  await expect(statusTab).toBeVisible({ timeout: Timeouts.ELEMENT })
+Then('I should see the statuses defined for {string}', async ({ page, backendRequest, workerHub }, typeName: string) => {
+  const entityType = await getEntityTypeByLabel(backendRequest, workerHub, typeName)
+  expect(entityType.statuses.length).toBeGreaterThan(0)
+
+  await editor(page).getByTestId('entity-tab-statuses').click()
+  await expect(editor(page).getByTestId('status-label')).toHaveText(
+    entityType.statuses.map(s => s.label),
+    { timeout: Timeouts.ELEMENT },
+  )
+  expectedDefaultStatus.set(page, entityType.defaultStatus)
 })
 
 Then('the initial status should be marked', async ({ page }) => {
-  // The default/initial status should have a "set default" or "default" indicator.
-  // Check data-testid first; fall back to text match only if needed.
-  const statusBadge = page.locator('[data-testid^="status-"]').first()
-  const hasBadge = await statusBadge.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (hasBadge) return
-  await expect(page.getByText(/default|initial|open/i).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // Exactly one status row carries the default badge, and it is the entity type's defaultStatus.
+  await expect(editor(page).getByTestId('status-default-badge')).toHaveCount(1, { timeout: Timeouts.ELEMENT })
+  // `has` is resolved relative to each row, so the inner locator must not be editor-rooted.
+  const defaultRow = editor(page).getByTestId('status-row').filter({ has: page.getByTestId('status-default-badge') })
+  await expect(defaultRow).toHaveCount(1)
+  await expect(defaultRow.getByTestId('status-set-default-btn')).toHaveCount(0)
+  const defaultStatus = expectedDefaultStatus.get(page)
+  if (!defaultStatus) throw new Error('"the initial status should be marked" must follow "I should see the statuses defined for ..."')
+  await expect(defaultRow.getByTestId('status-value')).toHaveText(defaultStatus)
 })

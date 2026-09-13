@@ -10,7 +10,6 @@
  */
 import { expect } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
-import { TestIds } from '../../test-ids'
 import { Timeouts, navigateAfterLogin } from '../../helpers'
 import {
   ADMIN_NSEC,
@@ -31,15 +30,15 @@ import {
 
 // --- Background: CMS setup ---
 
-Given('case management is enabled', async ({ backendRequest: request, casesWorld, workerHub }) => {
+Given('case management is enabled', async ({ backendRequest: request, workerHub }) => {
   await enableCaseManagementViaApi(request, true, ADMIN_NSEC, workerHub)
 })
 
-Given('case management is disabled', async ({ backendRequest: request, casesWorld, workerHub }) => {
+Given('case management is disabled', async ({ backendRequest: request, workerHub }) => {
   await enableCaseManagementViaApi(request, false, ADMIN_NSEC, workerHub)
 })
 
-Given('the {string} template has been applied', async ({ backendRequest: request, casesWorld, workerHub }, templateSlug: string) => {
+Given('the {string} template has been applied', async ({ backendRequest: request, workerHub }, templateSlug: string) => {
   const templates = await listTemplatesViaApi(request, ADMIN_NSEC, workerHub)
   const match = templates.find(t => t.id === templateSlug || t.name.toLowerCase().includes(templateSlug.replace('-', ' ')))
   if (match) {
@@ -47,36 +46,39 @@ Given('the {string} template has been applied', async ({ backendRequest: request
       console.warn('[cms] Template apply failed (may already be applied):', e)
     })
   }
-  // Ensure entity types exist regardless of template availability
+  // Ensure the entity types the scenarios rely on exist, regardless of template
+  // availability. Names must match /^[a-zA-Z0-9_]+$/ (no spaces); labels carry the display name.
+  const defaultFields = [
+    { name: 'description', label: 'Description', type: 'text', order: 0 },
+    { name: 'location', label: 'Location', type: 'text', order: 1 },
+    { name: 'priority', label: 'Priority', type: 'select', order: 2 },
+  ]
+  // Mirrors packages/protocol/templates/<slug>.json entity type names and categories.
+  const slugToTypes: Record<string, Array<{ name: string; label: string; category: string }>> = {
+    'jail-support': [
+      { name: 'arrest_case', label: 'Arrest Case', category: 'case' },
+      { name: 'mass_arrest_event', label: 'Mass Arrest Event', category: 'event' },
+    ],
+  }
   const entityTypes = await listEntityTypesViaApi(request, workerHub)
-  if (entityTypes.length < 2) {
-    // Create entity types to satisfy the test — template may not be registered.
-    // Names must match /^[a-zA-Z0-9_]+$/ (no spaces); labels carry the display name.
-    const defaultFields = [
-      { name: 'description', label: 'Description', type: 'text', order: 0 },
-      { name: 'location', label: 'Location', type: 'text', order: 1 },
-      { name: 'priority', label: 'Priority', type: 'select', order: 2 },
-    ]
-    const slugToTypes: Record<string, Array<{ name: string; label: string; category: string }>> = {
-      'jail-support': [
-        { name: 'arrest_case', label: 'Arrest Case', category: 'case' },
-        { name: 'legal_observer_report', label: 'Legal Observer Report', category: 'report' },
-      ],
-    }
-    const types = slugToTypes[templateSlug] ?? [
-      { name: 'case', label: 'Case', category: 'case' },
-      { name: 'incident', label: 'Incident', category: 'case' },
-    ]
-    for (const t of types) {
-      const exists = entityTypes.find(e => (e as Record<string, unknown>).name === t.name)
-      if (!exists) {
-        await createEntityTypeViaApi(request, {
-          name: t.name, label: t.label, category: t.category, hubId: workerHub,
-          fields: defaultFields,
-        }).catch((e) => {
-          console.warn(`[cms] Failed to create entity type "${t.name}":`, e)
-        })
-      }
+  const knownTypes = slugToTypes[templateSlug]
+  // For a template whose types scenarios reference by name, check each name: the
+  // worker hub may already hold unrelated entity types from earlier scenarios, and a
+  // count check would let those mask a missing "Arrest Case" (#669).
+  // For other templates only a generic pair is needed when nothing was applied.
+  const required = knownTypes ?? (entityTypes.length < 2
+    ? [
+        { name: 'case', label: 'Case', category: 'case' },
+        { name: 'incident', label: 'Incident', category: 'case' },
+      ]
+    : [])
+  for (const t of required) {
+    const exists = entityTypes.some(e => (e as Record<string, unknown>).name === t.name)
+    if (!exists) {
+      await createEntityTypeViaApi(request, {
+        name: t.name, label: t.label, category: t.category, hubId: workerHub,
+        fields: defaultFields,
+      })
     }
   }
 })
@@ -252,7 +254,7 @@ Then('the entity type selector should show {string}', async ({ page }, expected:
 
 // --- Case list preconditions ---
 
-Given('no cases have been created', async ({ backendRequest: request, casesWorld, workerHub }) => {
+Given('no cases have been created', async ({ backendRequest: request, workerHub }) => {
   // Delete ALL existing records (paginate through all pages)
   const { apiDelete } = await import('../../api-helpers')
   let page = 1
@@ -268,7 +270,7 @@ Given('no cases have been created', async ({ backendRequest: request, casesWorld
   }
 })
 
-Given('arrest cases exist', async ({ backendRequest: request, casesWorld, workerHub }) => {
+Given('arrest cases exist', async ({ backendRequest: request, workerHub }) => {
   const entityTypes = await listEntityTypesViaApi(request, workerHub)
   const arrestType = entityTypes.find(et => (et as { name?: string }).name === 'arrest_case')
   if (!arrestType) return
@@ -279,7 +281,7 @@ Given('arrest cases exist', async ({ backendRequest: request, casesWorld, worker
   }
 })
 
-Given('arrest cases with multiple statuses exist', async ({ backendRequest: request, casesWorld, workerHub }) => {
+Given('arrest cases with multiple statuses exist', async ({ backendRequest: request, workerHub }) => {
   const entityTypes = await listEntityTypesViaApi(request, workerHub)
   const arrestType = entityTypes.find(et => (et as { name?: string }).name === 'arrest_case')
   if (!arrestType) return
@@ -607,7 +609,7 @@ Given('an arrest case with comment and status_change interactions exists', async
   await createInteractionViaApi(request, recordId, { interactionType: 'status_change', hubId: workerHub })
 })
 
-Given('an arrest case is selected with the Timeline tab active', async ({ page, backendRequest: request, casesWorld, workerHub }) => {
+Given('an arrest case is selected with the Timeline tab active', async ({ page, backendRequest: request, workerHub }) => {
   const entityTypes = await listEntityTypesViaApi(request, workerHub)
   const arrestType = entityTypes.find(et => (et as { name?: string }).name === 'arrest_case')
   if (!arrestType) return
@@ -854,13 +856,20 @@ Given('an arrest case exists that is not assigned to me', async ({ backendReques
 // are handled by common/interaction-steps.ts
 
 Then('the {string} button should no longer be visible', async ({ page }, text: string) => {
-  const btn = page.getByTestId('case-assign-btn')
-  await expect(btn).not.toBeVisible({ timeout: 5000 })
+  // Feature-file button text doesn't always match the accessible name — map known
+  // mismatches to their data-testid, same pattern as buttonTextToTestIdMap in
+  // common/interaction-steps.ts.
+  const testIdMap: Record<string, string> = {
+    'Assign to me': 'case-assign-btn',
+  }
+  const testId = testIdMap[text]
+  const btn = testId ? page.getByTestId(testId) : page.getByRole('button', { name: text }).first()
+  await expect(btn).toBeHidden({ timeout: Timeouts.ELEMENT })
 })
 
 // --- Pagination ---
 
-Given('more than 50 cases exist', async ({ backendRequest: request, casesWorld, workerHub }) => {
+Given('more than 50 cases exist', async ({ backendRequest: request, workerHub }) => {
   const entityTypes = await listEntityTypesViaApi(request, workerHub)
   const arrestType = entityTypes.find(et => (et as { name?: string }).name === 'arrest_case')
   if (!arrestType) return
