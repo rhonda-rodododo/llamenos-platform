@@ -540,11 +540,11 @@ export async function postReview(pr: string, verdict: 'PASS' | 'FAIL' | 'UNREADA
 }
 
 /**
- * G3: an UNREADABLE verdict already gets a `--request-changes` review (same
- * as FAIL, above) — but that review's body is either the reviewer's own raw,
+ * G3: an UNREADABLE verdict is already recorded on the PR (same as FAIL,
+ * above) — but that comment's body is either the reviewer's own raw,
  * incoherent output or the terse `(reviewer engine was unreachable)`
- * placeholder, and its "Changes requested" framing reads to a human as "the
- * reviewer found a problem", not "there was no reviewer". Root-caused live
+ * placeholder, which reads to a human as "the reviewer found a problem",
+ * not "there was no reviewer". Root-caused live
  * against issue #660/PR #662: this box has no opencode/`ZHIPU_API_KEY`
  * configured, so `invokeVerifierEngine` could not even start the non-author
  * engine — the fail-safe worked (UNREADABLE is posted as `fleet/review` =

@@ -83,19 +83,23 @@ describe('rail: the fleet cannot merge its own changes', () => {
 
 /**
  * A grep, deliberately, and the ONE place in this suite where that is the
- * right instrument: it guards the ABSENCE of a capability that has been
- * deleted. There is no `mayAutoMerge` and no `mergePr` left to call, so
- * there is no behaviour to assert — the only thing that can regress is
- * someone writing the argv again. The pattern is unambiguous: `gh pr merge`
- * is the only command that merges a pull request, and the fleet's single
- * legitimate use of it is arming GitHub's own auto-merge. Anything else —
- * a bare merge, an admin override, a head-commit pin — is this process
- * deciding something that is GitHub's to decide.
+ * right instrument: it guards a property of the ARGV, of which there is no
+ * behaviour to assert beyond "nobody wrote the flag".
  *
- * The user's standing rule, stated per-command: no command may bypass PR
- * checks unless they say so explicitly, for that command.
+ * Two invariants, both true of this repo today:
+ *   - the fleet never bypasses a PR's checks. No `--admin`, no `--force`, no
+ *     `--bypass`, anywhere under `orchestrator/`. The operator's standing
+ *     rule is per-command: nothing bypasses checks unless they say so, for
+ *     that command.
+ *   - the fleet never posts a GitHub REVIEW. `postReview` records the
+ *     non-author verdict as a COMMENT; an approving review is one ruleset
+ *     edit away from being an approval the fleet grants itself.
+ *
+ * `--match-head-commit` is deliberately NOT forbidden: it is a pin, the
+ * opposite of a bypass, and `mergePr` passing it is exactly what stops a
+ * branch that moved after verification from being merged.
  */
-describe('rail: nothing in orchestrator/ can merge a PR or bypass its checks', () => {
+describe('rail: the fleet never bypasses a PR\'s checks, and never reviews', () => {
   function orchestratorSources(): { file: string; text: string }[] {
     const out: { file: string; text: string }[] = []
     const walk = (dir: string): void => {
@@ -113,32 +117,51 @@ describe('rail: nothing in orchestrator/ can merge a PR or bypass its checks', (
     expect(orchestratorSources().length).toBeGreaterThan(10)
   })
 
-  it('invokes `gh pr merge` only to arm or to un-arm auto-merge, never to merge', () => {
-    // Matches the argv form every gh call in this repo uses: `['pr', 'merge', ...]`.
-    const PR_MERGE = /\[\s*'pr'\s*,\s*'merge'[^\]]*\]/g
-    const calls: string[] = []
-    for (const { file, text } of orchestratorSources()) {
-      for (const call of text.match(PR_MERGE) ?? []) {
-        calls.push(call)
-        const arms = call.includes("'--auto'")
-        const disarms = call.includes("'--disable-auto'")
-        expect(arms !== disarms, `${file}: gh pr merge that neither arms nor disarms: ${call}`).toBe(true)
-      }
-    }
-    // Exactly two, and they are the pair: one arms GitHub's auto-merge after
-    // both gates passed, one clears it for a PR the fleet rejected. A third
-    // would mean some other path learned to merge.
-    expect(calls.filter((c) => c.includes("'--auto'"))).toHaveLength(1)
-    expect(calls.filter((c) => c.includes("'--disable-auto'"))).toHaveLength(1)
-    expect(calls).toHaveLength(2)
+  // Scoped to `gh(...)` argv, not to the file text: `git worktree remove
+  // --force` is a legitimate, unrelated use of the same word, and a rail that
+  // fires on it would be trained away rather than fixed.
+  const GH_CALL = /gh\(\s*\[[^\]]*\]/g
+  const ghCalls = (text: string): string[] => text.match(GH_CALL) ?? []
+
+  it('finds gh calls to scan — the grep must not pass vacuously', () => {
+    const total = orchestratorSources().reduce((n, { text }) => n + ghCalls(text).length, 0)
+    expect(total).toBeGreaterThan(5)
   })
 
-  it('passes no merge-bypass flag anywhere', () => {
+  it('passes no check-bypass flag to gh', () => {
     for (const { file, text } of orchestratorSources()) {
-      for (const flag of ['--admin', '--match-head-commit', '--bypass', '--approve']) {
-        expect(text, `${file} passes ${flag}`).not.toContain(flag)
+      for (const call of ghCalls(text)) {
+        for (const flag of ['--admin', '--bypass', '--force']) {
+          expect(call, `${file}: gh call passes ${flag}`).not.toContain(flag)
+        }
       }
     }
+  })
+
+  it('posts no GitHub review — the non-author verdict is a comment', () => {
+    for (const { file, text } of orchestratorSources()) {
+      for (const call of ghCalls(text)) {
+        for (const flag of ['--approve', '--request-changes']) {
+          expect(call, `${file}: gh call passes ${flag}`).not.toContain(flag)
+        }
+      }
+    }
+  })
+
+  // Every merge this fleet performs is pinned to the commit that was
+  // verified. A `gh pr merge` without the pin would merge whatever the branch
+  // happens to point at now, which is the race `mayAutoMerge`'s own
+  // verified-commit comparison exists to close.
+  it('pins every `gh pr merge` to the verified commit', () => {
+    const PR_MERGE = /\[\s*'pr'\s*,\s*'merge'[^\]]*\]/g
+    let seen = 0
+    for (const { file, text } of orchestratorSources()) {
+      for (const call of text.match(PR_MERGE) ?? []) {
+        seen++
+        expect(call, `${file}: gh pr merge without --match-head-commit`).toContain("'--match-head-commit'")
+      }
+    }
+    expect(seen).toBe(1)
   })
 })
 

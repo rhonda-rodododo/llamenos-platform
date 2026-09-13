@@ -9,12 +9,27 @@ const passingReport = (): VerifyReport => ({
 
 describe('buildGateTrace', () => {
   it('reports every stage as not-run when nothing ran at all', () => {
-    expect(buildGateTrace({})).toBe('scope=not-run impact=not-run tests=not-run review=not-run sha=none')
+    expect(buildGateTrace({})).toBe('scope=not-run impact=not-run tests=not-run review=not-run merge=not-run sha=none')
   })
 
   it('reports a fully-passing run', () => {
-    const trace = buildGateTrace({ report: passingReport(), reviewVerdict: 'PASS' })
-    expect(trace).toBe('scope=pass impact=low tests=orchestrator:pass review=PASS sha=c0ffee')
+    const trace = buildGateTrace({
+      report: passingReport(),
+      reviewVerdict: 'PASS',
+      decision: { merge: true, reason: 'all gates green' },
+    })
+    expect(trace).toBe('scope=pass impact=low tests=orchestrator:pass review=PASS merge=yes(all gates green) sha=c0ffee')
+  })
+
+  // The load-bearing case for G2's own test requirement: a run that stops at
+  // the merge gate must carry the merge reason in the trace.
+  it('carries the merge refusal reason when the merge gate stops it', () => {
+    const trace = buildGateTrace({
+      report: passingReport(),
+      reviewVerdict: 'PASS',
+      decision: { merge: false, reason: 'high-impact diff requires human review: touches deploy/' },
+    })
+    expect(trace).toContain('merge=no(high-impact diff requires human review: touches deploy/)')
   })
 
   it('reports scope failure distinctly from a test failure', () => {
@@ -58,26 +73,21 @@ describe('buildGateTrace', () => {
     expect(trace).toContain('review=UNREADABLE((reviewer engine was unreachable))')
   })
 
-  it('reports review as not-run when mechanical verification never passed', () => {
+  it('reports review and merge as not-run when mechanical verification never passed', () => {
     const failing: VerifyReport = { ...passingReport(), passed: false, reasons: ['touched never-write paths: .env'] }
-    expect(buildGateTrace({ report: failing })).toContain('review=not-run')
-  })
-
-  // The trace is the ONLY record of what the fleet itself checked, and it
-  // deliberately no longer carries a merge verdict: whether a PR merged is a
-  // fact about GitHub, derived live, never cached here.
-  it('carries no merge field at all — merging is not this process\'s decision to record', () => {
-    expect(buildGateTrace({ report: passingReport(), reviewVerdict: 'PASS' })).not.toContain('merge=')
+    const trace = buildGateTrace({ report: failing })
+    expect(trace).toContain('review=not-run')
+    expect(trace).toContain('merge=not-run')
   })
 
   // MUTATION GUARD: every value is an explicit string, never absent — a
   // regression that dropped a key silently (e.g. `undefined` interpolated
   // into the template, or a key omitted for the not-run case) is caught by
-  // asserting every one of the five keys is always present.
-  it('always emits all five keys, whatever the input', () => {
+  // asserting every one of the six keys is always present.
+  it('always emits all six keys, whatever the input', () => {
     for (const input of [{}, { report: passingReport() }, { reviewVerdict: 'FAIL' as const }]) {
       const trace = buildGateTrace(input)
-      for (const key of ['scope=', 'impact=', 'tests=', 'review=', 'sha=']) {
+      for (const key of ['scope=', 'impact=', 'tests=', 'review=', 'merge=', 'sha=']) {
         expect(trace).toContain(key)
       }
     }

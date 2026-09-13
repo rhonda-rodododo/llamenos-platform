@@ -14,6 +14,7 @@ import { loadContracts, contractsFor, buildMemoryContext, augmentBrief } from '.
 import { dispatch as dispatchWorker, type EffortLevel } from './engines.js'
 import { verifyMechanical } from './verify.js'
 import { secondOpinion, postReview } from './review.js'
+import { ciStatusFor, mergePr } from './merge.js'
 import {
   runVerifyCi, runReviewCi, ciContextFromEnv, ciDiff,
   REVIEW_JOB, REVIEW_KEY_ENV, VERIFY_JOB, itemIdFromBranch, type CiContext, type CiVerdict,
@@ -261,11 +262,28 @@ async function realDispatch(item: WorkItem, lane: Lane): Promise<DispatchOutcome
     model: lane.model ?? DEFAULT_MODEL,
     effort: DEFAULT_EFFORT,
   })
-  return resolveDispatchResult(result, branch, REPO_ROOT, findWorktreeForBranch)
+  const resolved = await resolveDispatchResult(result, branch, REPO_ROOT, findWorktreeForBranch)
+
+  // At PR open, which is the earliest moment the PR exists. Best-effort: the
+  // worst case is an issue that stays open after its PR merges, which the
+  // digest already surfaces, and it must never cost the dispatch itself.
+  if (resolved.pr !== undefined) {
+    try {
+      await ensureIssueLinkWith(resolved.pr, defaultIssueLinkDeps())
+    } catch (e) {
+      log(`issue link: failed for PR ${resolved.pr}: ${errMsg(e)}`)
+    }
+  }
+  return resolved
 }
 
 async function prDiff(pr: string): Promise<string> {
   return gh(['pr', 'diff', pr])
+}
+
+async function prHeadSha(pr: string): Promise<string | undefined> {
+  const view = await ghJson<{ headRefOid: string }>(['pr', 'view', pr, '--json', 'headRefOid'])
+  return view?.headRefOid
 }
 
 async function commentOnIssue(itemId: string, body: string): Promise<void> {
@@ -405,36 +423,6 @@ function defaultIssueLinkDeps(): IssueLinkDeps {
   }
 }
 
-/**
- * The fleet's ONE and ONLY merge call — and it merges nothing itself. It
- * asks GitHub to merge the PR later, on GitHub's own terms: when every
- * required check (`ci-status`, `fleet/verify`, `fleet/review`, …) is green on
- * the PR's current head SHA, and any code-owner approval the `CODEOWNERS`
- * rule demands has been given. A push to the branch invalidates the per-SHA
- * checks, so the verified-commit pin the orchestrator used to enforce itself
- * is now a property of the platform. No bypass flag is passed here, and none
- * may ever be added: see the rail asserted in tests/orchestrator/guards.test.ts.
- *
- * The issue link is ensured FIRST, and its failure is swallowed: the worst
- * case is an issue that stays open after its PR merges, which the digest
- * already surfaces. Letting it throw would leave auto-merge unarmed, turning
- * a cosmetic miss into a PR that never lands at all.
- */
-async function enableAutoMerge(pr: string): Promise<void> {
-  try {
-    await ensureIssueLinkWith(pr, defaultIssueLinkDeps())
-  } catch (e) {
-    log(`issue link: failed for PR ${pr}: ${errMsg(e)} — arming auto-merge anyway`)
-  }
-  await gh(['pr', 'merge', pr, '--auto', '--squash', '--delete-branch'])
-}
-
-/** Clears an auto-merge armed by an earlier attempt on the same PR. The only
- *  other `gh pr merge` in the fleet, and it can only ever UN-arm. */
-async function disableAutoMerge(pr: string): Promise<void> {
-  await gh(['pr', 'merge', pr, '--disable-auto'])
-}
-
 async function runTick(): Promise<number> {
   const lanes = await loadLanes(REPO_ROOT)
 
@@ -455,8 +443,9 @@ async function runTick(): Promise<number> {
     commentOnPr,
     reviseWithWorker,
     haltFleet: halt,
-    enableAutoMerge,
-    disableAutoMerge,
+    ciStatusFor,
+    prHeadSha,
+    mergePr,
     commentOnIssue,
     settle: settleItem,
     record: append,

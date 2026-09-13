@@ -11,19 +11,21 @@ export const LARGE_DIFF_LINES = 1500
  * restore. `orchestrator/` and its tests: a defect there disables the checks
  * that would have caught it.
  *
- * THIS LIST NO LONGER GATES ANYTHING. It used to be half of a userland merge
- * gate — `classifyImpact` marked a diff high, and the orchestrator's own
- * merge function refused it. Nothing outside this process knew, so nothing
- * outside this process was bound by it. Enforcement is now GitHub's "require
- * review from Code Owners" rule over `CODEOWNERS`, where every path below is
- * owned: a PR touching one cannot merge until the owner approves, whoever or
- * whatever opened it. `tests/orchestrator/guards.test.ts` asserts that
- * coverage directly, so a path added here without a matching `CODEOWNERS`
+ * This list is currently enforced TWICE, and deliberately so while the gate
+ * moves from userland to the platform. `classifyImpact` marks a diff high and
+ * `mayAutoMerge` (merge.ts) refuses it — enforcement nothing outside this
+ * process can see, and therefore nothing outside this process is bound by.
+ * Every path below is now ALSO owned in `CODEOWNERS`, where GitHub's own
+ * "require review from Code Owners" rule binds anyone, whoever or whatever
+ * opened the PR. `tests/orchestrator/guards.test.ts` asserts that coverage
+ * against the real tree, so a path added here without a matching `CODEOWNERS`
  * line fails the suite.
  *
- * What survives here is DESCRIPTION, not decision: the gate trace, the
- * digest, the reviewer's turn and timeout budget (review.ts), and the subset
- * `CRYPTO_REVIEW_PATHS` derives for the crypto-security-reviewer.
+ * The in-process half goes away with `mayAutoMerge` once the CI gates are
+ * required (PR C of that sequence). What remains here afterwards is
+ * DESCRIPTION, not decision: the gate trace, the digest, the reviewer's turn
+ * and timeout budget (review.ts), and the subset `CRYPTO_REVIEW_PATHS`
+ * derives for the crypto-security-reviewer.
  *
  * NOT the full secrets list: every path `checkScope` refuses to write
  * (`SECRET_PATH_PATTERNS` in config.ts, the never-write source of truth) is
