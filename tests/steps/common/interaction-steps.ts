@@ -11,6 +11,7 @@ import { expect } from '@playwright/test'
 import { When, Then } from '../fixtures'
 import { TestIds, navTestIdMap, sectionTestIdMap } from '../../test-ids'
 import { Timeouts, navigateViaSpa } from '../../helpers'
+import { clickResolvedControl, expandSettingsSection } from './ui-helpers'
 
 /**
  * Map from feature-file button text to data-testid values.
@@ -56,96 +57,38 @@ const buttonTextToTestIdMap: Record<string, string> = {
 }
 
 /**
- * Try to click an element by testid map, nav test ID, role-based lookup, then text.
- * Uses buttonTextToTestIdMap first for feature-file text that doesn't match
- * the actual button accessible name.
+ * Click a control named by Gherkin text. Special cases route to the one control that
+ * text can mean on the current page; everything else goes through clickResolvedControl,
+ * which waits for a candidate and refuses to guess between ambiguous matches.
  */
 async function clickByTextOrTestId(page: import('@playwright/test').Page, text: string): Promise<void> {
-  // Guard: if "Send" is clicked but __test_no_conversation is set (messaging backend
-  // unavailable), skip gracefully instead of timing out on the send button.
   if (text === 'Send') {
-    const noConvo = await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_no_conversation).catch(() => false)
+    // conversations-full-steps sets this flag when its Given could not create a
+    // conversation (messaging backend unavailable). It is set synchronously by a prior
+    // step, so reading it is deterministic.
+    const noConvo = await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_no_conversation)
     if (noConvo) return
-    // Check conversation send button first
-    const sendBtn = page.getByTestId('conv-send-btn')
-    const hasSend = await sendBtn.isVisible({ timeout: 3000 }).catch(() => false)
-    if (hasSend) {
-      await expect(sendBtn).toBeEnabled({ timeout: Timeouts.ELEMENT })
-      await sendBtn.click()
-      return
-    }
-    // Fallback: blast send button (draft blast detail panel)
-    const blastSendBtn = page.getByTestId('blast-send-btn')
-    const hasBlastSend = await blastSendBtn.isVisible({ timeout: 3000 }).catch(() => false)
-    if (hasBlastSend) {
-      await blastSendBtn.click()
-    }
+    // Conversation composer or draft-blast detail panel — never both on one page.
+    const send = page.getByTestId('conv-send-btn').or(page.getByTestId('blast-send-btn'))
+    await expect(send).toBeVisible({ timeout: Timeouts.ELEMENT })
+    await expect(send).toBeEnabled({ timeout: Timeouts.ELEMENT })
+    await send.click()
     return
   }
-  // 0a. "Log Out" on settings page → use settings-specific button (shows confirmation dialog)
-  //     The logout button is at the bottom of the settings page and may be below the fold,
-  //     so check DOM attachment (not viewport visibility) then scroll into view before clicking.
+  // "Log Out" on the settings page is the settings button (opens a confirmation dialog).
+  // It sits at the bottom of the page, so scroll it into view first.
   if (text === 'Log Out' && page.url().includes('/settings')) {
     const settingsLogout = page.getByTestId(TestIds.SETTINGS_LOGOUT_BTN)
-    const attached = await settingsLogout.waitFor({ state: 'attached', timeout: Timeouts.ELEMENT }).then(() => true).catch(() => false)
-    if (attached) {
-      await settingsLogout.scrollIntoViewIfNeeded()
-      await settingsLogout.click()
-      return
-    }
-  }
-  // 0b. If a confirm dialog is open, "Cancel"/"Confirm" target the dialog buttons
-  if (text === 'Cancel' || text === 'Confirm') {
-    const dialog = page.getByTestId(TestIds.CONFIRM_DIALOG)
-    const dialogOpen = await dialog.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-    if (dialogOpen) {
-      const testId = text === 'Cancel' ? TestIds.CONFIRM_DIALOG_CANCEL : TestIds.CONFIRM_DIALOG_OK
-      const btn = page.getByTestId(testId)
-      await expect(btn).toBeVisible({ timeout: Timeouts.ELEMENT })
-      await btn.click()
-      return
-    }
-  }
-  // 0. Check button-text-to-testid map — resolves Gherkin text → data-testid
-  const buttonTestId = buttonTextToTestIdMap[text]
-  if (buttonTestId) {
-    const el = page.getByTestId(buttonTestId)
-    // Use ELEMENT timeout for testid lookup — gives enough time for
-    // buttons to render after navigation before falling through
-    if (await el.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
-      await expect(el).toBeEnabled({ timeout: Timeouts.ELEMENT })
-      await el.click()
-      return
-    }
-  }
-  // 1. Check nav test ID map — deterministic, wait longer
-  const navTestId = navTestIdMap[text]
-  if (navTestId) {
-    const el = page.getByTestId(navTestId)
-    if (await el.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
-      await el.click()
-      return
-    }
-  }
-  // 2. Fallback: button role, link role, tab role, then text
-  const button = page.getByRole('button', { name: text }).first()
-  if (await button.isVisible({ timeout: 2000 }).catch(() => false)) {
-    // Wait for the button to be enabled before clicking
-    await expect(button).toBeEnabled({ timeout: Timeouts.ELEMENT })
-    await button.click()
+    await settingsLogout.scrollIntoViewIfNeeded({ timeout: Timeouts.ELEMENT })
+    await settingsLogout.click()
     return
   }
-  const link = page.getByRole('link', { name: text }).first()
-  if (await link.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await link.click()
-    return
-  }
-  const tab = page.getByRole('tab', { name: text }).first()
-  if (await tab.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await tab.click()
-    return
-  }
-  await page.getByText(text, { exact: true }).first().click()
+  const testIds: string[] = []
+  if (text === 'Cancel') testIds.push(TestIds.CONFIRM_DIALOG_CANCEL)
+  if (text === 'Confirm') testIds.push(TestIds.CONFIRM_DIALOG_OK)
+  if (buttonTextToTestIdMap[text]) testIds.push(buttonTextToTestIdMap[text])
+  if (navTestIdMap[text]) testIds.push(navTestIdMap[text])
+  await clickResolvedControl(page, text, [...new Set(testIds)])
 }
 
 // --- Click/Tap patterns ---
@@ -163,17 +106,9 @@ When('I click {string}', async ({ page }, text: string) => {
 })
 
 When('I click the {string} button', async ({ page }, text: string) => {
-  // Check button-text-to-testid map first to avoid strict mode violations
-  // when multiple buttons share the same accessible name (e.g., "Assign").
+  // The testid map disambiguates buttons that share an accessible name (e.g. "Assign").
   const testId = buttonTextToTestIdMap[text]
-  if (testId) {
-    const el = page.getByTestId(testId)
-    if (await el.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
-      await el.click()
-      return
-    }
-  }
-  await page.getByRole('button', { name: text }).first().click()
+  await clickResolvedControl(page, text, testId ? [testId] : [])
 })
 
 When('I click the {string} link', async ({ page }, name: string) => {
@@ -242,32 +177,7 @@ When('I fill in the reason with {string}', async ({ page }, reason: string) => {
 When('I expand the {string} section', async ({ page }, sectionName: string) => {
   const testId = sectionTestIdMap[sectionName]
   if (!testId) throw new Error(`Unknown section: "${sectionName}". Add it to sectionTestIdMap in test-ids.ts`)
-  const section = page.getByTestId(testId)
-  const el = section.first()
-  await el.scrollIntoViewIfNeeded()
-  // Use count() (DOM presence) not isVisible() — Radix animates from height:0 so the element
-  // exists in DOM immediately with data-state="open" but has zero dimensions during animation.
-  // Target CollapsibleContent specifically via data-slot to avoid strict mode violations:
-  // both CollapsibleTrigger and CollapsibleContent carry data-state, so [data-state="open"]
-  // resolves to 2 elements when open, failing Playwright strict mode.
-  const contentSelector = '[data-slot="collapsible-content"][data-state="open"]'
-  const openCount = await el.locator(contentSelector).count()
-  const isExpanded = openCount > 0
-  if (!isExpanded) {
-    // Click the trigger element (CardHeader with data-testid="{id}-trigger")
-    const trigger = page.getByTestId(`${testId}-trigger`)
-    if (await trigger.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await trigger.click()
-    } else {
-      // Fallback: click the first heading/title within the section
-      await el.locator('h3, [class*="CardTitle"]').first().click()
-    }
-    // Wait for CollapsibleContent to appear in DOM with data-state="open".
-    // Without this wait, the next step may run before React processes the state update,
-    // see the section as still-closed (count=0), and click the trigger again — collapsing it.
-    await el.locator(contentSelector).waitFor({ state: 'attached', timeout: Timeouts.ELEMENT })
-  }
-  await expect(page.getByTestId(testId)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expandSettingsSection(page, testId)
 })
 
 // --- Reload and auth ---
@@ -284,11 +194,10 @@ When('I reload and re-authenticate', async ({ page }) => {
 
 When('I log out', async ({ page }) => {
   await page.getByTestId(TestIds.LOGOUT_BTN).click()
-  // Logout now shows a confirmation dialog — confirm it
-  const confirmBtn = page.getByTestId(TestIds.CONFIRM_DIALOG_OK)
-  if (await confirmBtn.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
-    await confirmBtn.click()
-  }
+  // Logout always asks for confirmation.
+  const dialog = page.getByTestId(TestIds.CONFIRM_DIALOG)
+  await expect(dialog).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await dialog.getByTestId(TestIds.CONFIRM_DIALOG_OK).click()
   await page.waitForURL(/\/login/, { timeout: Timeouts.ELEMENT })
 })
 
@@ -327,42 +236,18 @@ Then('the {string} button should not be visible', async ({ page }, name: string)
   if (testId) {
     await expect(page.getByTestId(testId)).not.toBeVisible({ timeout: 3000 })
   } else {
-    await expect(page.getByRole('button', { name }).first()).not.toBeVisible({ timeout: 3000 })
+    await expect(page.getByRole('button', { name }).filter({ visible: true })).toHaveCount(0, { timeout: 3000 })
   }
 })
 
 // --- Text visibility patterns ---
 
 Then('I should see {string}', async ({ page }, text: string) => {
-  // First try exact match
-  const exactEl = page.getByText(text, { exact: true }).first()
-  const exactVisible = await exactEl.isVisible({ timeout: 2000 }).catch(() => false)
-  if (exactVisible) return
-
-  // Fallback: case-insensitive substring match (handles validation messages like
-  // "invalid phone" matching "Invalid phone number. Use E.164 format...")
-  const regexEl = page.getByText(new RegExp(text, 'i')).first()
-  const regexVisible = await regexEl.isVisible({ timeout: 2000 }).catch(() => false)
-  if (regexVisible) return
-
-  // Also check toasts (validation errors shown via toast in some forms)
-  // Sonner toasts render with [data-sonner-toast]; also check role=status/alert
-  // Use longer timeout — toasts may take a moment to appear after form submission
-  const toastEl = page.locator('[data-sonner-toast], [data-testid="toast-message"], [role="status"], [role="alert"], .toast-message')
-    .filter({ hasText: new RegExp(text, 'i') }).first()
-  const toastVisible = await toastEl.isVisible({ timeout: 5000 }).catch(() => false)
-  if (toastVisible) return
-
-  // Check for text in any error element (inline validation)
-  const errorEl = page.locator('[data-testid="error-message"], [role="alert"]')
-    .filter({ hasText: new RegExp(text, 'i') }).first()
-  const errorVisible = await errorEl.isVisible({ timeout: 2000 }).catch(() => false)
-  if (errorVisible) return
-
-  // Final assertion — will fail with a clear error
-  await expect(
-    page.getByText(new RegExp(text, 'i')).first()
-  ).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // Case-insensitive substring over rendered text — covers exact labels, inline
+  // validation messages ("invalid phone" in "Invalid phone number. Use E.164…") and
+  // toasts, all of which render their message as text. One retrying assertion.
+  const escaped = text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  await expect(page.getByText(new RegExp(escaped, 'i')).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('I should see the {string} heading', async ({ page }, heading: string) => {
@@ -388,23 +273,23 @@ Then('I should not see {string}', async ({ page }, text: string) => {
   // multiple notes. Scope the assertion to the first note card (the one just edited) so
   // unrelated notes don't cause false failures.
   if (page.url().includes('/notes')) {
+    // Wait for the list to render before asserting absence — asserting "not visible"
+    // against a still-loading page passes vacuously.
     const firstNoteCard = page.getByTestId(TestIds.NOTE_CARD).first()
-    const cardExists = await firstNoteCard.isVisible({ timeout: 2000 }).catch(() => false)
-    if (cardExists) {
-      await expect(firstNoteCard.getByText(text, { exact: true }).first()).not.toBeVisible({ timeout: Timeouts.ELEMENT })
-      return
-    }
+    await expect(firstNoteCard).toBeVisible({ timeout: Timeouts.ELEMENT })
+    await expect(firstNoteCard.getByText(text, { exact: true })).toHaveCount(0, { timeout: Timeouts.ELEMENT })
+    return
   }
   // Wait longer for save operations to complete and re-render (e.g. custom field updates)
-  await expect(page.getByText(text, { exact: true }).first()).not.toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(page.getByText(text, { exact: true }).filter({ visible: true })).toHaveCount(0, { timeout: Timeouts.ELEMENT })
 })
 
 Then('{string} should no longer be visible', async ({ page }, text: string) => {
-  await expect(page.getByText(text, { exact: true }).first()).not.toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(page.getByText(text, { exact: true }).filter({ visible: true })).toHaveCount(0, { timeout: Timeouts.ELEMENT })
 })
 
 Then('{string} should not be visible', async ({ page }, text: string) => {
-  await expect(page.getByText(text, { exact: true }).first()).not.toBeVisible({ timeout: 3000 })
+  await expect(page.getByText(text, { exact: true }).filter({ visible: true })).toHaveCount(0, { timeout: 3000 })
 })
 
 Then('I should see a success message', async ({ page }) => {
@@ -478,12 +363,9 @@ Then('they should see a phone input', async ({ page }) => {
 Then('they should see their public key', async ({ page }) => {
   // Public key is displayed as hex in the settings/profile code block
   // Look for the public key hex string or npub format
-  const hexKey = page.locator('code').filter({ hasText: /[0-9a-f]{32,}/i }).first()
-  const isHex = await hexKey.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (isHex) return
-  // Fallback: npub format
-  const npub = page.getByText(/npub1/).first()
-  await expect(npub).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const key = page.locator('code').filter({ hasText: /[0-9a-f]{32,}/i })
+    .or(page.getByText(/npub1/))
+  await expect(key.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('they should not see a {string} link', async ({ page }, text: string) => {
@@ -496,7 +378,7 @@ Then('they should not see a {string} link', async ({ page }, text: string) => {
 })
 
 Then('they should not see {string}', async ({ page }, text: string) => {
-  await expect(page.getByText(text, { exact: true }).first()).not.toBeVisible({ timeout: 3000 })
+  await expect(page.getByText(text, { exact: true }).filter({ visible: true })).toHaveCount(0, { timeout: 3000 })
 })
 
 Then('they should see {string} in the navigation', async ({ page }, text: string) => {
@@ -522,32 +404,17 @@ Then('they should not see {string} in the navigation', async ({ page }, text: st
 // --- "they" pronoun interaction variants ---
 
 When('they navigate to the {string} page', async ({ page }, pageName: string) => {
-  const testId = navTestIdMap[pageName]
-  if (testId) {
-    const navLink = page.getByTestId(testId)
-    const isVisible = await navLink.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-    if (isVisible) {
-      await navLink.click()
-    } else {
-      // Nav link may not be visible (e.g. volunteer without channel access) — navigate directly
-      const pathMap: Record<string, string> = {
-        'Dashboard': '/', 'Settings': '/settings', 'Reports': '/reports',
-        'Volunteers': '/users', 'Shifts': '/shifts', 'Ban List': '/bans',
-        'Audit Log': '/audit', 'Hub Settings': '/admin',
-        'Notes': '/notes', 'Conversations': '/conversations', 'Blasts': '/blasts',
-      }
-      const path = pathMap[pageName]
-      if (path) {
-        await page.evaluate((p) => {
-          const router = (window as unknown as Record<string, unknown>).__TEST_ROUTER as { navigate: (opts: { to: string }) => void } | undefined
-          if (router) router.navigate({ to: p })
-        }, path)
-        await page.waitForLoadState('domcontentloaded')
-      }
-    }
-  } else {
-    await page.getByTestId(TestIds.NAV_SIDEBAR).getByText(pageName, { exact: true }).click()
+  // Route by path rather than probing whether the nav link happens to be rendered yet:
+  // a role may legitimately lack the nav entry, and permissions load asynchronously.
+  const pathMap: Record<string, string> = {
+    'Dashboard': '/', 'Settings': '/settings', 'Reports': '/reports',
+    'Volunteers': '/users', 'Shifts': '/shifts', 'Ban List': '/bans',
+    'Audit Log': '/audit', 'Hub Settings': '/admin',
+    'Notes': '/notes', 'Conversations': '/conversations', 'Blasts': '/blasts',
   }
+  const path = pathMap[pageName]
+  if (!path) throw new Error(`Unknown page "${pageName}" — add it to the pathMap in interaction-steps.ts`)
+  await navigateViaSpa(page, path)
 })
 
 When('they navigate to {string} via SPA', async ({ page }, path: string) => {
@@ -583,11 +450,10 @@ Then('they should arrive at the profile setup or dashboard', async ({ page }) =>
 // --- Dismiss patterns ---
 
 When('I dismiss the demo banner', async ({ page }) => {
-  const dismissBtn = page.getByTestId('dismiss-demo-banner')
-    .or(page.locator('button[aria-label="Dismiss"]'))
-  if (await dismissBtn.first().isVisible({ timeout: 2000 }).catch(() => false)) {
-    await dismissBtn.first().click()
-  }
+  const banner = page.getByTestId('demo-banner')
+  await expect(banner).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await banner.getByTestId('dismiss-demo-banner').click()
+  await expect(banner).toBeHidden({ timeout: Timeouts.ELEMENT })
 })
 
 When('I dismiss the invite link card', async ({ page }) => {

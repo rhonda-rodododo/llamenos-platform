@@ -38,6 +38,7 @@ export function TranscriptionSection({ globalEnabled, allowOptOut, onOptOutChang
           <p className="text-xs text-muted-foreground">{t('transcription.enabledGlobal')}</p>
         </div>
         <Switch
+          data-testid="transcription-enabled-switch"
           checked={globalEnabled}
           onCheckedChange={(checked) => onConfirmToggle('transcription', checked)}
         />
@@ -48,6 +49,7 @@ export function TranscriptionSection({ globalEnabled, allowOptOut, onOptOutChang
           <p className="text-xs text-muted-foreground">{t('transcription.allowOptOutDescription')}</p>
         </div>
         <Switch
+          data-testid="transcription-optout-switch"
           checked={allowOptOut}
           onCheckedChange={async (checked) => {
             try {

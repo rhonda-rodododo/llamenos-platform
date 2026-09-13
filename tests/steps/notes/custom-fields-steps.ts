@@ -13,6 +13,7 @@ import { TestIds } from '../../test-ids'
 import { Timeouts, fillCallId } from '../../helpers'
 import { Navigation } from '../../pages/index'
 import { getCustomFieldsViaApi, updateCustomFieldsViaApi, listNotesViaApi } from '../../api-helpers'
+import { expandSettingsSection } from '../common/ui-helpers'
 
 // --- Custom fields in note form ---
 
@@ -87,18 +88,18 @@ Given('a note exists with text {string} and {string} set to {string}', async ({ 
 })
 
 When('I click edit on the note', async ({ page }) => {
-  // Ensure we're on the notes page
-  const noteCard = page.getByTestId(TestIds.NOTE_CARD).first()
-  const isVisible = await noteCard.isVisible({ timeout: 2000 }).catch(() => false)
-  if (!isVisible) {
+  // Decide by URL (settled once navigation completes), not by whether a card has rendered yet.
+  if (!new URL(page.url()).pathname.startsWith('/notes')) {
     await Navigation.goToNotes(page)
   }
+  const noteCard = page.getByTestId(TestIds.NOTE_CARD).first()
   await expect(noteCard).toBeVisible({ timeout: Timeouts.ELEMENT })
   // The edit button is within the note card — hover to reveal it (may be hidden by default)
   await noteCard.hover()
-  const editBtn = page.getByTestId(TestIds.NOTE_EDIT_BTN).first()
+  const editBtn = noteCard.getByTestId(TestIds.NOTE_EDIT_BTN)
   await expect(editBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
   await editBtn.click()
+  await expect(noteCard.getByTestId(TestIds.NOTE_EDIT_INPUT)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('the {string} input should have value {string}', async ({ page }, fieldLabel: string, value: string) => {
@@ -112,31 +113,12 @@ When('I change {string} to {string}', async ({ page }, fieldLabel: string, newVa
 })
 
 When('I change the note text to {string}', async ({ page }, newText: string) => {
-  // The inline edit form uses note-edit-input (NoteEditForm textarea)
-  const editInput = page.getByTestId(TestIds.NOTE_EDIT_INPUT)
-  const isEditInput = await editInput.isVisible({ timeout: 3000 }).catch(() => false)
-  if (isEditInput) {
-    await editInput.click({ clickCount: 3 })
-    await editInput.fill(newText)
-    return
-  }
-  const noteContent = page.getByTestId(TestIds.NOTE_CONTENT)
-  // The edit form may use a sheet or inline edit — wait for the element to be visible
-  const isVisible = await noteContent.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (isVisible) {
-    // Use triple-click + type to replace content instead of clear() which can timeout
-    // on some textarea implementations
-    await noteContent.click({ clickCount: 3 })
-    await noteContent.fill(newText)
-  } else {
-    // Try the sheet note text field (used by note sheet edit mode)
-    const sheetText = page.getByTestId(TestIds.SHEET_NOTE_TEXT)
-    const isSheetVisible = await sheetText.isVisible({ timeout: 3000 }).catch(() => false)
-    if (isSheetVisible) {
-      await sheetText.click({ clickCount: 3 })
-      await sheetText.fill(newText)
-    }
-  }
+  // Inline edit on the notes page (NoteEditForm) or the note sheet in edit mode — the
+  // two are never open at once, so the combined locator resolves to exactly one.
+  const editor = page.getByTestId(TestIds.NOTE_EDIT_INPUT).or(page.getByTestId(TestIds.SHEET_NOTE_TEXT))
+  await expect(editor).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await editor.fill(newText)
+  await expect(editor).toHaveValue(newText)
 })
 
 Then('I should not see the original text', async ({ page }) => {
@@ -201,14 +183,8 @@ Then('both notes should appear under a single call header', async ({ page }) => 
 })
 
 Given('a note exists', async ({ page, backendRequest: request, workerHub }) => {
-  // Verify via API first
-  let noteCount = 0
-  try {
-    const { notes } = await listNotesViaApi(request, { hubId: workerHub })
-    noteCount = notes.length
-  } catch {
-    // API may not be available
-  }
+  const { notes } = await listNotesViaApi(request, { hubId: workerHub })
+  const noteCount = notes.length
 
   // Always navigate to notes page so subsequent steps find note cards
   await Navigation.goToNotes(page)
@@ -293,29 +269,12 @@ Given('a custom field {string} exists', async ({ page, request }, fieldLabel: st
   // race conditions where the field list hasn't loaded yet.
   await page.getByTestId(TestIds.NAV_DASHBOARD).click()
   await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.NAVIGATION })
-  const settingsResponsePromise = page.waitForResponse(
-    resp => resp.url().includes('/api/settings') && resp.request().method() === 'GET',
-    { timeout: Timeouts.API },
-  ).catch(() => null)
   await page.getByTestId(TestIds.NAV_ADMIN_SETTINGS).click()
-  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.NAVIGATION })
-  await settingsResponsePromise
-  // Ensure the custom fields section is expanded
-  const section = page.getByTestId(TestIds.SETTINGS_CUSTOM_FIELDS)
-  await expect(section).toBeVisible({ timeout: Timeouts.ELEMENT })
-  await section.scrollIntoViewIfNeeded()
-  // Use count() instead of isVisible() — Radix Collapsible sets data-state="open" immediately
-  // but element has height:0 during animation, causing isVisible() to return false and
-  // re-click the trigger, collapsing an already-expanding section.
-  const contentSelector = '[data-slot="collapsible-content"][data-state="open"]'
-  const isOpen = await section.locator(contentSelector).count() > 0
-  if (!isOpen) {
-    const trigger = page.getByTestId(`${TestIds.SETTINGS_CUSTOM_FIELDS}-trigger`)
-    await trigger.click()
-  }
-  // Wait for the field row to be visible
-  const fieldRow = page.getByTestId(TestIds.CUSTOM_FIELD_ROW).filter({ hasText: fieldLabel })
-  await expect(fieldRow.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // Hub settings render their sections only after every settings request (including
+  // custom fields) has settled, so a visible section already holds fresh data.
+  const section = await expandSettingsSection(page, TestIds.SETTINGS_CUSTOM_FIELDS)
+  const fieldRow = section.getByTestId(TestIds.CUSTOM_FIELD_ROW).filter({ hasText: fieldLabel })
+  await expect(fieldRow).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 When('I click the delete button on {string}', async ({ page }, fieldLabel: string) => {

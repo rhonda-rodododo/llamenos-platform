@@ -4,28 +4,60 @@
  *   - packages/test-specs/features/platform/desktop/cases/cms-assignment.feature
  */
 import { expect } from '@playwright/test'
+import type { APIRequestContext, Page } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
 import { Timeouts, navigateAfterLogin } from '../../helpers'
 import {
   ADMIN_NSEC,
+  addHubMemberViaApi,
   createRecordViaApi,
+  createShiftViaApi,
+  createUserViaApi,
+  getRecordViaApi,
   listEntityTypesViaApi,
-  listRecordsViaApi,
 } from '../../api-helpers'
+
+/** The Background applies the jail-support template, so a missing arrest case type is a failure, not a skip. */
+async function arrestCaseTypeId(request: APIRequestContext, workerHub: string): Promise<string> {
+  const entityTypes = await listEntityTypesViaApi(request, workerHub)
+  const arrestType = entityTypes.find(et => (et as { name?: string }).name === 'arrest_case')
+  expect(arrestType, 'arrest_case entity type from the jail-support template').toBeTruthy()
+  return (arrestType as { id: string }).id
+}
+
+/** Open the detail view of a specific record — never "whichever card rendered first". */
+async function openCaseDetail(page: Page, request: APIRequestContext, recordId: string, workerHub: string): Promise<void> {
+  const record = await getRecordViaApi(request, recordId, workerHub) as { id: string; caseNumber?: string }
+  const label = record.caseNumber || record.id.slice(0, 8)
+  const card = page.getByTestId('case-card').filter({ hasText: label })
+  await expect(card).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await card.click()
+  await expect(page.getByTestId('case-detail-header')).toBeVisible({ timeout: Timeouts.ELEMENT })
+}
 
 // State is now in casesWorld fixture (casesWorld.lastRecordId)
 
 // --- Preconditions ---
 
-Given('volunteers with different profiles exist', async () => {
-  // Volunteers are seeded by the test environment; accept current state
+Given('volunteers with different profiles exist', async ({ backendRequest: request, workerHub }) => {
+  // Suggestions only include active, not-on-break volunteers on a shift active right
+  // now in this hub. Seed one explicitly instead of depending on whatever earlier
+  // scenarios on this worker left behind. 00:00→00:00 crosses midnight, so it is active
+  // at every time of day (isShiftActive in apps/worker/services/shifts.ts).
+  const vol = await createUserViaApi(request, { name: `AssignVol ${Date.now()}` })
+  await addHubMemberViaApi(request, workerHub, vol.pubkey, ['role-volunteer'])
+  await createShiftViaApi(request, {
+    name: `AssignShift ${Date.now()}`,
+    startTime: '00:00',
+    endTime: '00:00',
+    days: [0, 1, 2, 3, 4, 5, 6],
+    userPubkeys: [vol.pubkey],
+    hubId: workerHub,
+  })
 })
 
 Given('an unassigned arrest case exists', async ({ backendRequest: request, casesWorld, workerHub }) => {
-  const entityTypes = await listEntityTypesViaApi(request, workerHub)
-  const arrestType = entityTypes.find(et => (et as { name?: string }).name === 'arrest_case')
-  if (!arrestType) return
-  const etId = (arrestType as { id: string }).id
+  const etId = await arrestCaseTypeId(request, workerHub)
   const record = await createRecordViaApi(request, etId, { statusHash: 'reported', hubId: workerHub })
   casesWorld.lastRecordId = (record as { id: string }).id
 })
@@ -43,10 +75,7 @@ Given('a volunteer has reached their max case assignments', async () => {
 })
 
 Given('an arrest case with a Spanish-speaking contact exists', async ({ backendRequest: request, casesWorld, workerHub }) => {
-  const entityTypes = await listEntityTypesViaApi(request, workerHub)
-  const arrestType = entityTypes.find(et => (et as { name?: string }).name === 'arrest_case')
-  if (!arrestType) return
-  const etId = (arrestType as { id: string }).id
+  const etId = await arrestCaseTypeId(request, workerHub)
   const record = await createRecordViaApi(request, etId, { statusHash: 'reported', hubId: workerHub })
   casesWorld.lastRecordId = (record as { id: string }).id
 })
@@ -65,10 +94,7 @@ Given('volunteer B has {int} active cases', async () => {
 
 Given('a case assigned to a volunteer exists', async ({ backendRequest: request, casesWorld, workerHub }) => {
   const { assignRecordViaApi } = await import('../../api-helpers')
-  const entityTypes = await listEntityTypesViaApi(request, workerHub)
-  const arrestType = entityTypes.find(et => (et as { name?: string }).name === 'arrest_case')
-  if (!arrestType) return
-  const etId = (arrestType as { id: string }).id
+  const etId = await arrestCaseTypeId(request, workerHub)
   // Create a new case and assign the admin to it so the Unassign button appears
   const adminPubkey = process.env.ADMIN_PUBKEY || '79215a4c04f08fcd817c6f820c87169beb8cddf96dfa590a1315556b78af9183'
   const record = await createRecordViaApi(request, etId, {
@@ -124,80 +150,65 @@ Then('the assignment dialog should be visible', async ({ page }) => {
 })
 
 Then('suggested volunteers should appear at the top', async ({ page }) => {
-  const card = page.getByTestId('suggestion-card').first()
-  // May be empty if no volunteers are on-shift in test env
-  const visible = await card.isVisible({ timeout: 5000 }).catch(() => false)
-  if (visible) {
-    await expect(card).toBeVisible()
-  } else {
-    // Accept no-suggestions state
-    await expect(page.getByTestId('no-suggestions')).toBeVisible({ timeout: Timeouts.ELEMENT })
-  }
+  // Background seeds an on-shift volunteer, so the dialog must list at least one suggestion.
+  const dialog = page.getByTestId('assignment-dialog')
+  await expect(dialog.getByTestId('suggestion-card').first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(dialog.getByTestId('no-suggestions')).toHaveCount(0)
 })
 
 Then('each volunteer should show a workload indicator', async ({ page }) => {
-  const indicator = page.getByTestId('workload-indicator').first()
-  if (await indicator.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await expect(indicator).toBeVisible()
+  const cards = page.getByTestId('assignment-dialog').getByTestId('suggestion-card')
+  await expect(cards.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const count = await cards.count()
+  for (let i = 0; i < count; i++) {
+    await expect(cards.nth(i).getByTestId('workload-indicator')).toBeVisible()
   }
 })
 
-When('I open the assignment dialog for the case', async ({ page }) => {
+When('I open the assignment dialog for the case', async ({ page, backendRequest: request, casesWorld, workerHub }) => {
+  expect(casesWorld.lastRecordId, 'a case must be created before opening its assignment dialog').toBeTruthy()
   await navigateAfterLogin(page, '/cases')
-  const card = page.getByTestId('case-card').first()
-  if (await card.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
-    await card.click()
-  }
-  const assignBtn = page.getByTestId('case-assign-dialog-btn')
-  if (await assignBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await assignBtn.click()
-  }
+  await openCaseDetail(page, request, casesWorld.lastRecordId, workerHub)
+  await page.getByTestId('case-assign-dialog-btn').click()
+  await expect(page.getByTestId('assignment-dialog')).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('each suggested volunteer should show match reasons', async ({ page }) => {
-  const reason = page.getByTestId('match-reason').first()
-  if (await reason.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await expect(reason).toBeVisible()
+  // Every suggestion card renders its score and workload; specialization/language
+  // badges only render on a match, so the always-present reason is workload.
+  const cards = page.getByTestId('assignment-dialog').getByTestId('suggestion-card')
+  await expect(cards.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const count = await cards.count()
+  for (let i = 0; i < count; i++) {
+    await expect(cards.nth(i).getByTestId('workload-indicator')).toBeVisible()
+    await expect(cards.nth(i).getByTestId('assign-volunteer-btn')).toBeVisible()
   }
 })
 
 Then('reasons should include availability and workload', async ({ page }) => {
-  const indicator = page.getByTestId('workload-indicator').first()
-  if (await indicator.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await expect(indicator).toBeVisible()
-  }
+  // A volunteer is only suggested while on shift (availability); the workload
+  // indicator renders "active/max".
+  const indicator = page.getByTestId('assignment-dialog').getByTestId('workload-indicator').first()
+  await expect(indicator).toHaveText(/\d+\/\d+/, { timeout: Timeouts.ELEMENT })
 })
 
-When('I click assign on the first suggested volunteer', async ({ page }) => {
-  const btn = page.getByTestId('assign-volunteer-btn').first()
-  if (await btn.isVisible({ timeout: 5000 }).catch(() => false)) {
-    await btn.click()
-  } else {
-    // No suggestions available — close the dialog and fall back to "Assign to me"
-    // so the subsequent "success toast should appear" assertion can be satisfied.
-    await page.keyboard.press('Escape')
-    const overlay = page.locator('[data-slot="dialog-overlay"]')
-    await overlay.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
-    const assignToMe = page.getByTestId('case-assign-btn')
-    if (await assignToMe.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await assignToMe.click()
-    }
-  }
+When('I click assign on the first suggested volunteer', async ({ page, casesWorld }) => {
+  const dialog = page.getByTestId('assignment-dialog')
+  const card = dialog.getByTestId('suggestion-card').first()
+  await expect(card).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const assign = page.waitForResponse(
+    res => res.request().method() === 'POST' && res.url().includes(`/records/${casesWorld.lastRecordId}/assign`),
+  )
+  await card.getByTestId('assign-volunteer-btn').click()
+  expect((await assign).ok(), 'assign request succeeded').toBe(true)
+  await expect(dialog).toBeHidden({ timeout: Timeouts.ELEMENT })
 })
 
-Then('the case should show the volunteer as assigned', async ({ page }) => {
-  // After assignment, the case detail should reflect the assignment.
-  // If the detail panel closed or was never opened (e.g. after dialog dismiss+fallback),
-  // click the first case card to re-open the detail view.
-  const header = page.getByTestId('case-detail-header')
-  const isVisible = await header.isVisible({ timeout: 3000 }).catch(() => false)
-  if (!isVisible) {
-    const card = page.getByTestId('case-card').first()
-    if (await card.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await card.click()
-    }
-  }
+Then('the case should show the volunteer as assigned', async ({ page, backendRequest: request, casesWorld, workerHub }) => {
+  // The detail panel stays open after the dialog closes.
   await expect(page.getByTestId('case-detail-header')).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const record = await getRecordViaApi(request, casesWorld.lastRecordId, workerHub) as { assignedTo?: string[] }
+  expect(record.assignedTo?.length ?? 0, 'record has an assignee').toBeGreaterThan(0)
 })
 
 // "I click the {string} button" is already in common/interaction-steps.ts
@@ -225,10 +236,7 @@ Then('the auto-assignment indicator should be visible', async ({ page }) => {
 })
 
 When('a new arrest case is created via API', async ({ backendRequest: request, casesWorld, workerHub }) => {
-  const entityTypes = await listEntityTypesViaApi(request, workerHub)
-  const arrestType = entityTypes.find(et => (et as { name?: string }).name === 'arrest_case')
-  if (!arrestType) return
-  const etId = (arrestType as { id: string }).id
+  const etId = await arrestCaseTypeId(request, workerHub)
   const record = await createRecordViaApi(request, etId, { statusHash: 'reported', hubId: workerHub })
   casesWorld.lastRecordId = (record as { id: string }).id
 })

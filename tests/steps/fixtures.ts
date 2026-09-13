@@ -18,6 +18,8 @@ export type RolesWorld = {
   lastCreatedRoleId: string
   volunteerNsec: string
   reporterNsec: string
+  /** HTTP status of the last endpoint-access probe made by a When step */
+  lastEndpointStatus: number | null
 }
 
 export type CasesWorld = {
@@ -139,7 +141,7 @@ export const test = base.extend<
     await use({ lastUserName: '', lastUserPubkey: '', lastShiftName: '', lastPhone: '' })
   },
   rolesWorld: async ({}, use) => {
-    await use({ cachedRoles: [], lastCreatedRoleId: '', volunteerNsec: '', reporterNsec: '' })
+    await use({ cachedRoles: [], lastCreatedRoleId: '', volunteerNsec: '', reporterNsec: '', lastEndpointStatus: null })
   },
   casesWorld: async ({}, use) => {
     await use({
