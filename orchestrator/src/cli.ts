@@ -429,6 +429,12 @@ async function enableAutoMerge(pr: string): Promise<void> {
   await gh(['pr', 'merge', pr, '--auto', '--squash', '--delete-branch'])
 }
 
+/** Clears an auto-merge armed by an earlier attempt on the same PR. The only
+ *  other `gh pr merge` in the fleet, and it can only ever UN-arm. */
+async function disableAutoMerge(pr: string): Promise<void> {
+  await gh(['pr', 'merge', pr, '--disable-auto'])
+}
+
 async function runTick(): Promise<number> {
   const lanes = await loadLanes(REPO_ROOT)
 
@@ -450,6 +456,7 @@ async function runTick(): Promise<number> {
     reviseWithWorker,
     haltFleet: halt,
     enableAutoMerge,
+    disableAutoMerge,
     commentOnIssue,
     settle: settleItem,
     record: append,

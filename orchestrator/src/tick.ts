@@ -95,15 +95,27 @@ export interface TickDeps {
    *  FAIL/UNREADABLE review verdict. */
   haltFleet(reason: string): void
   /**
-   * Arms GitHub's own auto-merge on the PR the worker opened, as soon as
-   * there is a PR to arm. This is the ONLY `gh pr merge` the fleet runs, and
-   * it decides nothing: GitHub merges if and only if every required status
-   * check is green ON THAT EXACT HEAD SHA and any required code-owner
-   * approval exists. Arming it early rather than after verification is
-   * deliberate — a fleet that crashes mid-pass then leaves behind a PR that
-   * is still fully gated, instead of one that quietly never merges.
+   * Arms GitHub's own auto-merge — ONLY after this fleet's own mechanical
+   * verification and non-author review have both passed. GitHub then merges
+   * if and only if every required check is green on that exact head SHA and
+   * any required code-owner approval exists.
+   *
+   * This used to be armed immediately at PR open, "so a fleet that crashes
+   * mid-pass still leaves a fully-gated PR". That reasoning silently assumed
+   * the repo ruleset already required `fleet/verify` and `fleet/review` — and
+   * until it does, an armed PR merges on ordinary CI alone. Worse, nothing
+   * disarmed it: an item the fleet REJECTED, whose own reviewer returned
+   * VERDICT: FAIL, kept its armed auto-merge and would land the moment CI
+   * went green. Arming only on the success path removes the window rather
+   * than trying to police it.
    */
   enableAutoMerge(pr: string): Promise<void>
+  /**
+   * Belt to that braces: clears any auto-merge left armed by an EARLIER
+   * attempt on the same PR before this one was rejected. Best-effort — a
+   * failure here is logged, never fatal.
+   */
+  disableAutoMerge(pr: string): Promise<void>
   commentOnIssue(itemId: string, body: string): Promise<void>
   /** G3: posts the "non-author review was unavailable" comment on the PR
    *  itself (not the issue) when the review loop ends UNREADABLE — see
@@ -211,19 +223,6 @@ async function runLiveDispatch(
     branch = result.branch
     pr = result.pr
 
-    if (pr !== undefined) {
-      // Best-effort by design, and it fails CLOSED: if arming auto-merge
-      // fails, nothing merges — the PR just sits open with its statuses on
-      // it. Failing the whole item over it would throw away good work for a
-      // transient `gh` error, so it is logged and the pass continues.
-      try {
-        await deps.enableAutoMerge(pr)
-        deps.log(`auto-merge: armed on pr ${pr} — GitHub merges it when its required statuses are green`)
-      } catch (e) {
-        deps.log(`auto-merge: could not arm on pr ${pr}: ${errorMessage(e)} — it will not merge unattended`)
-      }
-    }
-
     if (result.outcome === 'SUCCESS' && branch !== undefined && pr !== undefined && worktree !== undefined) {
       // The bounded mechanical-verify -> second-opinion -> (on FAIL) revise
       // -> re-verify loop (task 13, review.ts). Mechanical failure is
@@ -280,6 +279,17 @@ async function runLiveDispatch(
             })}`),
           }
         } else {
+          // The ONLY place auto-merge is armed: mechanical verification
+          // passed AND the non-author review passed. Best-effort and
+          // fail-closed — if arming fails nothing merges, which is the safe
+          // direction, so it is logged rather than failing the item.
+          try {
+            await deps.enableAutoMerge(pr)
+            deps.log(`auto-merge: armed on pr ${pr} — GitHub merges it when its required checks are green`)
+          } catch (e) {
+            deps.log(`auto-merge: could not arm on pr ${pr}: ${errorMessage(e)} — it will not merge unattended`)
+          }
+
           // SUCCESS means the fleet finished ITS part — verified, reviewed,
           // auto-merge armed — never a claim that the PR merged. Whether it
           // did is a fact about GitHub, derived live by `llamenos-fleet
@@ -349,6 +359,19 @@ async function runLiveDispatch(
   } catch (e) {
     threw = true
     final = { ...base, outcome: 'FAILED', note: errorMessage(e), branch, pr }
+  }
+
+  // Any terminal outcome other than a verified-and-reviewed SUCCESS must
+  // leave NOTHING armed. An earlier attempt on this same PR may have armed
+  // auto-merge before being rejected on a later round; without this, a PR
+  // whose own reviewer returned VERDICT: FAIL would still merge the moment
+  // ordinary CI went green.
+  if (pr !== undefined && final.outcome !== 'SUCCESS') {
+    try {
+      await deps.disableAutoMerge(pr)
+    } catch (e) {
+      deps.log(`auto-merge: could not disarm pr ${pr}: ${errorMessage(e)}`)
+    }
   }
 
   deps.record(final)

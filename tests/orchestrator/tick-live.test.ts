@@ -41,6 +41,7 @@ function baseDeps(over: Partial<TickDeps> = {}): TickDeps {
     reviseWithWorker: vi.fn(async () => {}),
     haltFleet: vi.fn(),
     enableAutoMerge: vi.fn(async () => {}),
+    disableAutoMerge: vi.fn(async () => {}),
     commentOnIssue: vi.fn(async () => {}),
     commentOnPr: vi.fn(async () => {}),
     settle: vi.fn(async () => {}),
@@ -63,18 +64,39 @@ describe('tick: live dispatch pipeline (task 7)', () => {
     expect(r.attempted).toBe(1)
   })
 
-  // The fleet arms auto-merge and then has no further say: GitHub merges the
-  // PR when its required statuses are green on that head SHA, and refuses
-  // otherwise. Arming it BEFORE verification is deliberate — a fleet that
-  // crashes mid-pass still leaves a fully-gated PR behind.
-  it('arms auto-merge before the verify/review pipeline runs, not after it', async () => {
+  // THE ordering property, and the one the non-author reviewer caught this
+  // PR getting backwards. Arming at PR-open left a window in which a PR the
+  // fleet went on to REJECT — its own reviewer returning VERDICT: FAIL —
+  // stayed armed and would merge the moment ordinary CI went green. Nothing
+  // disarmed it. Auto-merge is now armed only after BOTH gates passed.
+  it('arms auto-merge only after verify and review have passed, never before', async () => {
     const order: string[] = []
     const d = baseDeps({
       enableAutoMerge: vi.fn(async () => { order.push('auto-merge') }),
       verifyMechanical: vi.fn(async () => { order.push('verify'); return passingVerify }),
+      secondOpinion: vi.fn(async () => { order.push('review'); return { verdict: 'PASS' as const, text: 'VERDICT: PASS' } }),
     })
     await tick(d)
-    expect(order).toEqual(['auto-merge', 'verify'])
+    expect(order).toEqual(['verify', 'review', 'auto-merge'])
+  })
+
+  it.each([
+    ['a mechanical failure', { verifyMechanical: () => ({ ...passingVerify, passed: false, reasons: ['nope'] }) }],
+    ['a failing review', { secondOpinion: () => ({ verdict: 'FAIL' as const, text: 'VERDICT: FAIL' }) }],
+  ])('never arms auto-merge after %s, and disarms anything an earlier attempt armed', async (_label, over) => {
+    const d = baseDeps(Object.fromEntries(
+      Object.entries(over).map(([k, fn]) => [k, vi.fn(async () => (fn as () => unknown)())]),
+    ) as Partial<TickDeps>)
+    await tick(d)
+    expect(d.enableAutoMerge).not.toHaveBeenCalled()
+    expect(d.disableAutoMerge).toHaveBeenCalledWith('42')
+  })
+
+  it('does not disarm on the success path — that would undo what it just armed', async () => {
+    const d = baseDeps()
+    await tick(d)
+    expect(d.enableAutoMerge).toHaveBeenCalledWith('42')
+    expect(d.disableAutoMerge).not.toHaveBeenCalled()
   })
 
   it('a failure to arm auto-merge is logged and does not fail the item — nothing merges, which is the safe direction', async () => {

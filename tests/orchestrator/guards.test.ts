@@ -113,19 +113,24 @@ describe('rail: nothing in orchestrator/ can merge a PR or bypass its checks', (
     expect(orchestratorSources().length).toBeGreaterThan(10)
   })
 
-  it('invokes `gh pr merge` only to arm --auto', () => {
+  it('invokes `gh pr merge` only to arm or to un-arm auto-merge, never to merge', () => {
     // Matches the argv form every gh call in this repo uses: `['pr', 'merge', ...]`.
     const PR_MERGE = /\[\s*'pr'\s*,\s*'merge'[^\]]*\]/g
-    let seen = 0
+    const calls: string[] = []
     for (const { file, text } of orchestratorSources()) {
       for (const call of text.match(PR_MERGE) ?? []) {
-        seen++
-        expect(call, `${file}: gh pr merge without --auto`).toContain("'--auto'")
+        calls.push(call)
+        const arms = call.includes("'--auto'")
+        const disarms = call.includes("'--disable-auto'")
+        expect(arms !== disarms, `${file}: gh pr merge that neither arms nor disarms: ${call}`).toBe(true)
       }
     }
-    // Exactly one: the auto-merge enablement in cli.ts. A second would mean
-    // some other path learned to merge.
-    expect(seen).toBe(1)
+    // Exactly two, and they are the pair: one arms GitHub's auto-merge after
+    // both gates passed, one clears it for a PR the fleet rejected. A third
+    // would mean some other path learned to merge.
+    expect(calls.filter((c) => c.includes("'--auto'"))).toHaveLength(1)
+    expect(calls.filter((c) => c.includes("'--disable-auto'"))).toHaveLength(1)
+    expect(calls).toHaveLength(2)
   })
 
   it('passes no merge-bypass flag anywhere', () => {

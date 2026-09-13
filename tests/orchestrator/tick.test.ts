@@ -37,6 +37,7 @@ function deps(over: Partial<TickDeps> = {}): TickDeps {
     reviseWithWorker: vi.fn(async () => {}),
     haltFleet: vi.fn(),
     enableAutoMerge: vi.fn(async () => {}),
+    disableAutoMerge: vi.fn(async () => {}),
     commentOnIssue: vi.fn(async () => {}),
     commentOnPr: vi.fn(async () => {}),
     settle: vi.fn(async () => {}),
