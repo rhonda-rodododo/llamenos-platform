@@ -20,7 +20,6 @@ import {
   listEntityTypesViaApi,
   createRelationshipViaApi,
   createAffinityGroupViaApi,
-  addGroupMemberViaApi,
 } from '../../api-helpers'
 
 // State is now in casesWorld fixture (casesWorld.contactCarlosId, casesWorld.contactMariaId, casesWorld.contactWithDataId)
@@ -139,14 +138,14 @@ Given('contacts {string} and {string} exist', async ({ backendRequest: request, 
   }
 })
 
-Given('contacts exist', async ({ backendRequest: request, casesWorld, workerHub }) => {
+Given('contacts exist', async ({ backendRequest: request, workerHub }) => {
   const existing = await listContactsViaApi(request, { hubId: workerHub })
   if (existing.contacts.length === 0) {
     await createContactByNameViaApi(request, `Seed Contact ${Date.now()}`, { hubId: workerHub })
   }
 })
 
-Given('contacts of type {string} and {string} exist', async ({ backendRequest: request, casesWorld, workerHub }, type1: string, type2: string) => {
+Given('contacts of type {string} and {string} exist', async ({ backendRequest: request, workerHub }, type1: string, type2: string) => {
   const hash1 = type1.toLowerCase().replace(/\s+/g, '_')
   const hash2 = type2.toLowerCase().replace(/\s+/g, '_')
   await createContactByNameViaApi(request, `${type1} Contact ${Date.now()}`, { contactTypeHash: hash1, hubId: workerHub })
@@ -203,7 +202,7 @@ Then('a contact card for {string} should not be visible', async ({ page }, name:
   void await card.isVisible({ timeout: 3000 }).catch(() => false)
 })
 
-Then('both {string} and {string} should be visible', async ({ page }, name1: string, name2: string) => {
+Then('both {string} and {string} should be visible', async ({ page }, _name1: string, _name2: string) => {
   // Accept if at least some contacts are visible
   const anyCard = page.getByTestId('directory-contact-card').first()
   await expect(anyCard).toBeVisible({ timeout: Timeouts.ELEMENT })
@@ -448,7 +447,7 @@ Given('a contact exists not in any groups', async ({ backendRequest: request, ca
   casesWorld.contactWithDataId = (created as { id: string }).id
 })
 
-Given('no contacts have been created', async ({ backendRequest: request, casesWorld, workerHub }) => {
+Given('no contacts have been created', async ({ backendRequest: request, workerHub }) => {
   // Delete all existing contacts so we get a clean empty state.
   const { deleteContactViaApi } = await import('../../api-helpers')
   const existing = await listContactsViaApi(request, { limit: 100, hubId: workerHub }).catch(() => ({ contacts: [], total: 0, hasMore: false }))
@@ -644,7 +643,7 @@ Given('a contact with PII data exists', async ({ backendRequest: request, casesW
   casesWorld.contactWithDataId = (contact as { id: string }).id
 })
 
-Given('I am logged in as a volunteer without PII access', async ({ page, backendRequest: request, casesWorld }) => {
+Given('I am logged in as a volunteer without PII access', async ({ page, backendRequest: request }) => {
   // Create a volunteer with default role-volunteer (no contacts:view-pii permission)
   // but with contacts:view so they can access the contact directory
   const { createRoleViaApi, createVolunteerViaApi } = await import('../../api-helpers')

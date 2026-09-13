@@ -7,7 +7,7 @@
  */
 import { expect } from '@playwright/test'
 import { Given, When, Then, Before, getState, setState } from './fixtures'
-import { getSharedState, setLastResponse } from './shared-state'
+import { setLastResponse } from './shared-state'
 
 const BASE_URL = process.env.TEST_HUB_URL || 'http://localhost:3000'
 

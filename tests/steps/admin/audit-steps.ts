@@ -6,7 +6,7 @@
  * Filtering verified via API cross-check. No empty assertion bodies.
  */
 import { expect } from '@playwright/test'
-import { Given, When, Then } from '../fixtures'
+import { When, Then } from '../fixtures'
 import { TestIds } from '../../test-ids'
 import { Timeouts } from '../../helpers'
 import { listAuditLogViaApi } from '../../api-helpers'

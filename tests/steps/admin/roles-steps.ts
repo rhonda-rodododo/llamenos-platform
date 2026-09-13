@@ -14,8 +14,6 @@ import {
   createRoleViaApi,
   deleteRoleViaApi,
   getPermissionsCatalogViaApi,
-  createVolunteerViaApi,
-  updateVolunteerViaApi,
 } from '../../api-helpers'
 
 When('I request the roles list', async ({ page, request, rolesWorld }) => {
