@@ -25,6 +25,7 @@ import {
   createReportViaApi,
   listEventRecordsViaApi,
   listEventReportsViaApi,
+  apiDelete,
 } from '../../api-helpers'
 
 // State is now in casesWorld fixture (casesWorld.eventEntityTypeId, casesWorld.lastEventId, casesWorld.lastEventName)
@@ -85,9 +86,23 @@ Then('the new event button should be visible', async ({ page }) => {
 
 Given('no events have been created', async ({ backendRequest: request, casesWorld, workerHub }) => {
   await ensureEventEntityType(request, casesWorld, workerHub)
-  const records = await listRecordsViaApi(request, { entityTypeId: casesWorld.eventEntityTypeId!, hubId: workerHub })
-  // Accept current state — we just need the empty state to be possible
-  void records
+  // The hub is worker-scoped, so events created by earlier scenarios on this worker
+  // are still present. The Events page lists every event-category entity type, so
+  // clear records of all of them — otherwise the empty state can never render.
+  const types = await listEntityTypesViaApi(request, workerHub)
+  const eventTypeIds = types
+    .filter(et => (et as { category?: string }).category === 'event')
+    .map(et => (et as { id: string }).id)
+  for (const entityTypeId of eventTypeIds) {
+    const { records } = await listRecordsViaApi(request, { entityTypeId, hubId: workerHub, limit: 100 })
+    for (const record of records) {
+      const id = (record as { id: string }).id
+      const { status } = await apiDelete(request, `/hubs/${workerHub}/records/${id}`)
+      expect(status, `delete event record ${id}`).toBe(200)
+    }
+    const after = await listRecordsViaApi(request, { entityTypeId, hubId: workerHub })
+    expect(after.total, `event records left for entity type ${entityTypeId}`).toBe(0)
+  }
 })
 
 Given('events exist', async ({ backendRequest: request, casesWorld, workerHub }) => {
