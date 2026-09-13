@@ -461,11 +461,7 @@ gh pr create --title "<type>(<scope>): <description>" --body "## Summary\n<bulle
 Use `gh` CLI for PR operations. Poll `gh pr view <n> --json statusCheckRollup` for CI status.
 
 ### Merging (GitHub)
-- **Only merge when** `mergeStateStatus=CLEAN` AND every required check is green
-- ```bash
-  gh pr merge <n> --squash --delete-branch
-  ```
-- No flake excuses, no "almost green"
+- **Never merge.** Open exactly one PR with `Closes #<issue>` in the body and stop; the fleet enables auto-merge and GitHub merges when every required check passes. Never pass --admin, --force, --approve, or --no-verify to anything.
 
 ### Build + Test Verification (ALL tiers, MANDATORY before pushing)
 

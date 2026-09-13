@@ -95,6 +95,19 @@ for name in "${SUPERVISORS[@]}"; do
 
   } > "$output"
 
+  # Post-generation override: the "Merging (GitHub)" section pasted in from
+  # the shared prompt-rules-llamenos.md (outside this repo, in the sibling
+  # claude-skills project — see .claude/agents/fragments/README merge-policy
+  # note) still tells workers to run `gh pr merge` directly. That is stale
+  # advice: #665 removed orchestrator-side merge logic and made GitHub the
+  # only gate (required checks + `gh pr merge --auto`, enabled once at PR
+  # open by the fleet, not by the worker). No dispatched worker may merge,
+  # approve, or force/bypass anything. Until the upstream skill file is fixed
+  # (out of scope here — it lives in a different repo shared by other
+  # projects), enforce the corrected instruction here so every generated
+  # agent definition in THIS repo is safe regardless of upstream drift.
+  perl -0777 -pi -e 's/### Merging \(GitHub\)\n(?:-.*\n|  .*\n|```.*\n)*\n/### Merging (GitHub)\n- **Never merge.** Open exactly one PR with `Closes #<issue>` in the body and stop; the fleet enables auto-merge and GitHub merges when every required check passes. Never pass --admin, --force, --approve, or --no-verify to anything.\n\n/' "$output"
+
   built=$((built + 1))
   echo "BUILT: $output"
 done
