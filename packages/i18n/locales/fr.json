@@ -1457,7 +1457,9 @@
     "rateLimitTitle": "Modifier la limitation de fréquence",
     "transcriptionDisable": "Désactiver la transcription des appels ? Les appels des bénévoles ne seront plus transcrits automatiquement.",
     "transcriptionEnable": "Activer la transcription des appels pour tous les bénévoles ? Cela utilise l'IA pour transcrire les appels en temps réel.",
-    "transcriptionTitle": "Modifier le paramètre de transcription"
+    "transcriptionTitle": "Modifier le paramètre de transcription",
+    "biometricDisable": "Désactiver le déverrouillage biométrique ? Vous pourrez toujours déverrouiller avec votre code PIN.",
+    "biometricDisableTitle": "Désactiver le Déverrouillage Biométrique"
   },
   "connectWithOauth": "Connect with OAuth",
   "connectionFailed": "Connection failed",
@@ -3734,7 +3736,11 @@
     "transcriptionSettings": "Transcription",
     "version": "Version",
     "voicemail": "Voicemail",
-    "webrtcNotConfigured": "Les appels via le navigateur ne sont pas disponibles. Votre administrateur doit activer WebRTC dans les paramètres du fournisseur de téléphonie."
+    "webrtcNotConfigured": "Les appels via le navigateur ne sont pas disponibles. Votre administrateur doit activer WebRTC dans les paramètres du fournisseur de téléphonie.",
+    "biometricDesc": "Déverrouillez avec votre empreinte digitale ou votre visage au lieu de saisir votre code PIN. Votre code PIN fonctionne toujours et n'est jamais désactivé.",
+    "biometricEnrolled": "Le déverrouillage biométrique est activé sur cet appareil.",
+    "biometricInvalidated": "La biométrie de votre appareil a changé, le déverrouillage biométrique a donc été désactivé. Réactivez-le ci-dessous ou continuez avec votre code PIN.",
+    "biometricPinPrompt": "Entrez votre code PIN pour activer le déverrouillage biométrique"
   },
   "serverAddress": {
     "checking": "Checking...",
