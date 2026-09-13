@@ -11,6 +11,7 @@
 import { expect } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
 import { Timeouts } from '../../helpers'
+import { collapseSettingsSection, expandSettingsSection } from '../common/ui-helpers'
 import {
   ADMIN_NSEC,
   listEntityTypesViaApi,
@@ -28,22 +29,7 @@ Then('the CMS toggle section should be visible', async ({ page }) => {
 })
 
 When('I expand the CMS toggle section', async ({ page }) => {
-  const section = page.getByTestId('cms-toggle')
-  await expect(section).toBeVisible({ timeout: Timeouts.ELEMENT })
-  await section.scrollIntoViewIfNeeded()
-  // Check if already expanded — the switch is inside CollapsibleContent
-  const toggle = page.getByTestId('cms-enable-toggle')
-  const isExpanded = await toggle.isVisible({ timeout: 2000 }).catch(() => false)
-  if (!isExpanded) {
-    // Click the CollapsibleTrigger (CardHeader)
-    const header = section.locator('[data-slot="card-header"]')
-    if (await header.count() > 0) {
-      await header.click()
-    } else {
-      // Fallback: click the section's first header/title element
-      await section.locator('h3, [class*="CardTitle"]').first().click()
-    }
-  }
+  await expandSettingsSection(page, 'cms-toggle')
 })
 
 When('I toggle the CMS enable switch on', async ({ page }) => {
@@ -94,25 +80,9 @@ Then('the templates section should not be visible', async ({ page }) => {
 })
 
 Then('the CMS toggle section should show {string} in its status summary', async ({ page }, text: string) => {
-  // The SettingsSection wrapper has id="cms-toggle" and renders statusSummary ONLY when collapsed.
-  // The section defaults to expanded, so collapse it first.
-  const section = page.getByTestId('cms-toggle')
-  await expect(section).toBeVisible({ timeout: Timeouts.ELEMENT })
-
-  // Check if expanded — if CollapsibleContent is visible, collapse the section
-  const toggle = page.getByTestId('cms-enable-toggle')
-  const isExpanded = await toggle.isVisible({ timeout: 2000 }).catch(() => false)
-  if (isExpanded) {
-    // Click the card title area to collapse. Use data-slot="card-title" which is the h3 inside the trigger.
-    const title = section.locator('[data-slot="card-title"]')
-    if (await title.count() > 0) {
-      await title.first().click()
-    } else {
-      // Fallback: click the section div itself (triggers CollapsibleTrigger via parent)
-      await section.locator('h3').first().click()
-    }
-    // Wait for Collapsible animation to complete
-  }
+  // The SettingsSection wrapper has id="cms-toggle" and renders statusSummary ONLY when
+  // collapsed. The section defaults to expanded, so collapse it deterministically first.
+  const section = await collapseSettingsSection(page, 'cms-toggle')
 
   // The status summary renders as a span with "hidden sm:block" when section is collapsed.
   const summary = section.locator('span').filter({ hasText: new RegExp(text, 'i') })
@@ -122,19 +92,7 @@ Then('the CMS toggle section should show {string} in its status summary', async 
 // --- Templates ---
 
 When('I expand the templates section', async ({ page }) => {
-  const section = page.getByTestId('templates')
-  await expect(section).toBeVisible({ timeout: Timeouts.ELEMENT })
-  await section.scrollIntoViewIfNeeded()
-  const content = section.locator('[data-testid="template-card"]')
-  const isExpanded = await content.first().isVisible({ timeout: 2000 }).catch(() => false)
-  if (!isExpanded) {
-    const header = section.locator('[data-slot="card-header"]')
-    if (await header.count() > 0) {
-      await header.click()
-    } else {
-      await section.locator('h3, [class*="CardTitle"]').first().click()
-    }
-  }
+  await expandSettingsSection(page, 'templates')
 })
 
 Then('at least one template card should be visible', async ({ page }) => {
@@ -192,22 +150,10 @@ Given('no entity types have been created', async ({ backendRequest: request, wor
 // --- Entity type list ---
 
 When('I expand the entity types section', async ({ page }) => {
-  const section = page.getByTestId('entity-types')
-  await expect(section).toBeVisible({ timeout: Timeouts.ELEMENT })
-  await section.scrollIntoViewIfNeeded()
+  const section = await expandSettingsSection(page, 'entity-types')
+  // Entity types load asynchronously on first expand — wait for rows or the add button.
   const content = section.locator('[data-testid="entity-type-row"], [data-testid="entity-type-add-btn"]')
-  const isExpanded = await content.first().isVisible({ timeout: 2000 }).catch(() => false)
-  if (!isExpanded) {
-    const header = section.locator('[data-slot="card-header"]')
-    if (await header.count() > 0) {
-      await header.click()
-    } else {
-      await section.locator('h3, [class*="CardTitle"]').first().click()
-    }
-    // Wait for Collapsible animation + async entity type data load
-    // Entity types load asynchronously on first expand — wait for rows or add button
-    await content.first().waitFor({ state: 'visible', timeout: Timeouts.ELEMENT }).catch(() => {})
-  }
+  await expect(content.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('at least one entity type row should be visible', async ({ page }) => {
