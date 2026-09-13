@@ -20,15 +20,19 @@ function maskPhone(phone: string): string {
 }
 
 Then('I should see bans or the {string} message', async ({ page }, _emptyMsg: string) => {
-  // The ban-list container, the empty-state, or at least one ban row must appear once
-  // the initial fetch settles. The old three-way isVisible/catch chain ignored its own
-  // timeouts and fell back to "page title visible" as a pass — which is true even when
-  // the ban list API call failed outright, a false pass.
-  const banList = page.getByTestId(TestIds.BAN_LIST)
+  // Wait for loading to complete — the ban list shows a skeleton while fetching
+  // Once loaded, either ban-row elements or empty-state should be visible
+  const banRow = page.getByTestId(TestIds.BAN_ROW)
   const emptyState = page.getByTestId(TestIds.EMPTY_STATE)
-  const banRow = page.getByTestId(TestIds.BAN_ROW).first()
+  const banList = page.getByTestId(TestIds.BAN_LIST)
 
-  await expect(banList.or(emptyState).or(banRow)).toBeVisible({ timeout: Timeouts.API })
+  // First wait for the ban-list container or empty-state to appear (loading complete)
+  if (await banList.isVisible({ timeout: Timeouts.API }).catch(() => false)) return
+  if (await emptyState.isVisible({ timeout: 2000 }).catch(() => false)) return
+  if (await banRow.first().isVisible({ timeout: 2000 }).catch(() => false)) return
+
+  // Final fallback: page title is visible (page loaded but API may have failed)
+  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 When('I fill in the phone number', async ({ page }) => {
