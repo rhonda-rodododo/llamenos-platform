@@ -224,20 +224,16 @@ When('I change their role to {string} via the dropdown', async ({ page }, roleNa
   // Navigate to volunteers page first
   await Navigation.goToVolunteers(page)
   const volName = (await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_vol_name)) as string
-  if (volName) {
-    const row = page.getByTestId(TestIds.VOLUNTEER_ROW).filter({ hasText: volName })
-    const dropdown = row.locator('select, [role="combobox"]').first()
-    if (await dropdown.isVisible({ timeout: 2000 }).catch(() => false)) {
-      const tagName = await dropdown.evaluate(el => el.tagName.toLowerCase())
-      if (tagName === 'select') {
-        await dropdown.selectOption({ label: roleName })
-      } else {
-        // Radix Select combobox — click to open, then click the option
-        await dropdown.click()
-        await page.getByRole('option', { name: roleName }).click()
-      }
-    }
-  }
+  expect(volName, 'a volunteer must exist first (see "a volunteer with {string} role")').toBeTruthy()
+  // users.tsx renders role changes as a Radix Select (role="combobox") — there is no
+  // native <select> in this row, so the old tagName branch never applied. The old
+  // isVisible({timeout}).catch(() => false) probe also ignored its own timeout and
+  // could silently skip the assignment entirely.
+  const row = page.getByTestId(TestIds.VOLUNTEER_ROW).filter({ hasText: volName })
+  const dropdown = row.getByRole('combobox')
+  await expect(dropdown).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await dropdown.click()
+  await page.getByRole('option', { name: roleName }).click()
 })
 
 Then('the volunteer should display the {string} badge', async ({ page }, roleName: string) => {
@@ -292,12 +288,14 @@ When('I open the Add Volunteer form', async ({ page }) => {
 })
 
 When('I open the Invite form', async ({ page }) => {
-  // Navigate to volunteers page first, then open invite form
+  // Navigate to volunteers page first, then open invite form.
+  // The invite button always renders for an admin on this page (only gated on
+  // `isAdmin`), so the old isVisible/catch probe could only ever silently skip
+  // opening the form — never legitimately branch around a missing button.
   await Navigation.goToVolunteers(page)
   const inviteBtn = page.getByTestId(TestIds.INVITE_BTN)
-  if (await inviteBtn.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
-    await inviteBtn.click()
-  }
+  await expect(inviteBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await inviteBtn.click()
 })
 
 Then('I should see all available roles in the form', async ({ page }) => {

@@ -16,16 +16,14 @@ import {
   getPermissionsCatalogViaApi,
   createVolunteerViaApi,
   updateVolunteerViaApi,
+  seedHexToPubkey,
 } from '../../api-helpers'
 
-When('I request the roles list', async ({ page, request, rolesWorld }) => {
-  // Navigate to roles section in UI — look for a roles trigger button
-  const rolesTrigger = page.getByRole('button', { name: /roles/i }).first()
-  if (await rolesTrigger.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await rolesTrigger.click()
-  }
-
-  // Also fetch via API for behavioral verification
+When('I request the roles list', async ({ request, rolesWorld }) => {
+  // The Then steps for this scenario verify entirely via API (rolesWorld.cachedRoles) —
+  // there is no UI assertion downstream, so no UI navigation is needed here. The removed
+  // branch clicked a `getByRole('button', { name: /roles/i })` that raced page load and,
+  // even when it fired, verified nothing.
   rolesWorld.cachedRoles = await listRolesViaApi(request)
 })
 
@@ -69,7 +67,7 @@ Then('the {string} role should be the default role', async ({ request, rolesWorl
   expect(role!.isDefault).toBe(true)
 })
 
-When('I create a custom role {string} with permissions', async ({ page, request, rolesWorld }, roleName: string) => {
+When('I create a custom role {string} with permissions', async ({ request, rolesWorld }, roleName: string) => {
   // Create via API for reliability, then verify in UI
   const slug = roleName.toLowerCase().replace(/\s+/g, '-')
   try {
@@ -88,13 +86,10 @@ When('I create a custom role {string} with permissions', async ({ page, request,
     }
   }
 
-  // Also try via UI for the visual flow
-  const createBtn = page.getByTestId(TestIds.ROLE_CREATE_BTN)
-  if (await createBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await createBtn.click()
-    await page.getByLabel(/name/i).fill(roleName)
-    await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
-  }
+  // No UI verification here: TestIds.ROLE_CREATE_BTN ('role-create-btn') never matches
+  // real DOM (platform-roles-section.tsx renders 'platform-role-create-btn'; the hub
+  // roles-section.tsx renders no create-role testid at all), so this branch never fired
+  // and never asserted anything either way. The API path above is the real, verified write.
 })
 
 Then('the role should be created successfully', async ({ request, rolesWorld }) => {
@@ -130,18 +125,15 @@ Given('a custom role {string} exists', async ({ request, rolesWorld }, roleName:
   }
 })
 
-When('I delete the {string} role', async ({ page, request, rolesWorld }, roleName: string) => {
-  // Delete via API
+When('I delete the {string} role', async ({ request, rolesWorld }, _roleName: string) => {
+  // Delete via API — the real, verified write.
+  // No UI branch: TestIds.ROLE_ROW ('role-row') / ROLE_DELETE_BTN ('role-delete-btn')
+  // never match real DOM (roles rendered as `role-item-${slug}` / `role-delete-${slug}`
+  // in platform-roles-section.tsx, and with no testid at all in the hub roles-section.tsx),
+  // so this branch never fired and the Then step verifies via API only.
   if (rolesWorld.lastCreatedRoleId) {
     const result = await deleteRoleViaApi(request, rolesWorld.lastCreatedRoleId)
     expect(result.status).toBe(200)
-  }
-
-  // Also verify in UI if role row is visible
-  const roleRow = page.getByTestId(TestIds.ROLE_ROW).filter({ hasText: roleName })
-  const deleteBtn = roleRow.getByTestId(TestIds.ROLE_DELETE_BTN)
-  if (await deleteBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
-    await deleteBtn.click()
   }
 })
 
@@ -170,17 +162,28 @@ Then('the deletion should fail with a {int} error', async () => {
   expect(status).toBe(403)
 })
 
-When('I assign the {string} role to the volunteer', async ({ page }, _roleName: string) => {
-  const volunteerRow = page.getByTestId(TestIds.VOLUNTEER_ROW).first()
-  const assignBtnRole = volunteerRow.getByRole('button', { name: /assign/i })
-  if (await assignBtnRole.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await assignBtnRole.click()
-    return
-  }
-  const selectEl = volunteerRow.locator('select')
-  if (await selectEl.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await selectEl.click()
-  }
+When('I assign the {string} role to the volunteer', async ({ page, request }, roleName: string) => {
+  // The old probe chain (an "assign" button, then a native <select>) matched neither:
+  // users.tsx renders role changes as a Radix Select (role="combobox", no button named
+  // "assign", no native <select>). Both isVisible() checks silently returned false, so
+  // this step was a complete no-op — no role was ever assigned — while the Then step's
+  // own fallback ("any row visible") passed vacuously regardless. Fix: scope to the
+  // volunteer created by "a volunteer exists" via its pubkey-derived data-volunteer-id,
+  // and drive the real Select control.
+  const nsec = (await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_vol_nsec)) as string | undefined
+  expect(nsec, 'a volunteer must exist first (see "a volunteer exists")').toBeTruthy()
+  const pubkey = seedHexToPubkey(nsec!)
+
+  const roles = await listRolesViaApi(request)
+  const targetRole = roles.find(r => r.name === roleName)
+  expect(targetRole, `role "${roleName}" must exist`).toBeTruthy()
+
+  const volunteerRow = page.locator(`[data-testid="${TestIds.VOLUNTEER_ROW}"][data-volunteer-id="${pubkey.slice(0, 8)}"]`)
+  await expect(volunteerRow).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await volunteerRow.getByRole('combobox').click()
+  const patchResponse = page.waitForResponse(res => res.url().includes(`/users/${pubkey}`) && res.request().method() === 'PATCH')
+  await page.getByRole('option', { name: roleName }).click()
+  await patchResponse
 })
 
 Then('the volunteer should have the {string} role', async ({ page }, roleName: string) => {
@@ -214,8 +217,10 @@ Then('it should not have {string} permission', async ({}, permission: string) =>
 
 // --- Feature file steps that need additional coverage ---
 
-When('I create a custom role with an existing slug', async ({ page, request }) => {
-  // First create a role, then try to create another with the same slug
+When('I create a custom role with an existing slug', async ({ request }) => {
+  // Create a role, then try to create another with the same slug — expected to fail.
+  // No UI branch: TestIds.ROLE_CREATE_BTN never matches real DOM (see above), so it
+  // never fired and never asserted the duplicate-slug error either way.
   try {
     await createRoleViaApi(request, {
       name: 'Duplicate Test',
@@ -224,13 +229,6 @@ When('I create a custom role with an existing slug', async ({ page, request }) =
     })
   } catch {
     // Expected to fail — duplicate slug
-  }
-  // Try via UI too
-  const createBtn = page.getByTestId(TestIds.ROLE_CREATE_BTN)
-  if (await createBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
-    await createBtn.click()
-    await page.getByLabel(/name/i).fill('Call Monitor')
-    await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
   }
 })
 
@@ -243,13 +241,10 @@ Then('I should see a duplicate slug error', async ({ page }) => {
   await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
-When('I create a role with slug {string}', async ({ page }, slug: string) => {
-  const createBtn = page.getByTestId(TestIds.ROLE_CREATE_BTN)
-  if (await createBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
-    await createBtn.click()
-    await page.getByLabel(/name/i).fill(slug)
-    await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
-  }
+When('I create a role with slug {string}', async ({}, _slug: string) => {
+  // No-op: TestIds.ROLE_CREATE_BTN never matches real DOM (see above), so the removed
+  // UI attempt never fired. Nothing else in this step drove a real write either way —
+  // the Then step below already falls back to asserting the page rendered at all.
 })
 
 Then('I should see an invalid slug error', async ({ page }) => {

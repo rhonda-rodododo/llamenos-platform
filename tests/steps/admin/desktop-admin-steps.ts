@@ -38,12 +38,13 @@ async function advanceWizardToStep(page: Page, targetStep: number, channel = 'Re
   await navigateAfterLogin(page, '/')
   await navigateAfterLogin(page, '/setup')
 
-  // Step 0 – Identity: fill hotline name
+  // Step 0 – Identity: fill hotline name. The Organization field (StepIdentity.tsx) is
+  // optional to fill but always rendered — the old isVisible/catch probe just raced the
+  // wizard's remount instead of guarding a genuinely conditional field.
   await page.getByLabel(/hotline name|name/i).first().fill(`TestHotline ${Date.now()}`)
   const orgInput = page.getByLabel(/organization/i)
-  if (await orgInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await orgInput.fill('Test Org')
-  }
+  await expect(orgInput).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await orgInput.fill('Test Org')
   if (targetStep === 0) return
 
   // Advance 0→1: Channels — wait for step 1 progressbar to confirm transition
@@ -59,13 +60,12 @@ async function advanceWizardToStep(page: Page, targetStep: number, channel = 'Re
   await expect(page.locator('[role="progressbar"][aria-valuenow="3"]')).toBeVisible({ timeout: 10000 })
   if (targetStep === 2) return
 
-  // Step 2 – Providers: skip
-  const skipBtn = page.getByRole('button', { name: /skip/i })
-  if (await skipBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await skipBtn.click()
-  } else {
-    await page.getByTestId(TestIds.SETUP_NEXT_BTN).click()
-  }
+  // Step 2 – Providers: skip. SetupWizard.tsx renders `setup-skip-btn` unconditionally
+  // for every step >= 2, so the "else click Next" fallback was dead code masking the
+  // timeout-ignoring isVisible() probe.
+  const skipBtn = page.getByTestId('setup-skip-btn')
+  await expect(skipBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await skipBtn.click()
   await expect(page.locator('[role="progressbar"][aria-valuenow="4"]')).toBeVisible({ timeout: 10000 })
   if (targetStep === 3) return
 
@@ -77,6 +77,18 @@ async function advanceWizardToStep(page: Page, targetStep: number, channel = 'Re
   // Step 4 – Invite: advance
   await page.getByTestId(TestIds.SETUP_NEXT_BTN).click()
   await expect(page.locator('[role="progressbar"][aria-valuenow="6"]')).toBeVisible({ timeout: 10000 })
+}
+
+/**
+ * Locator for the sidebar hub switcher trigger (hub-switcher.tsx).
+ *
+ * It is a plain `<button aria-haspopup="listbox">` + `role="option"` popover, not a
+ * native `<select>` or Radix `[role="combobox"]` — a `'select, [role="combobox"]'`
+ * locator never matches it. It also only renders when `isMultiHub` (more than one hub
+ * configured), so callers must wait for it rather than assume it always exists.
+ */
+function hubSwitcherTrigger(page: Page) {
+  return page.getByRole('button', { name: /switch hub|select hub/i })
 }
 
 // --- Telephony provider ---
@@ -104,24 +116,21 @@ When('I navigate to the telephony settings', async ({ page }) => {
 })
 
 When('I fill in valid Twilio credentials', async ({ page }) => {
-  const sidInput = page.getByTestId(TestIds.ACCOUNT_SID).or(page.getByLabel(/account sid/i))
-  if (await sidInput.first().isVisible({ timeout: 2000 }).catch(() => false)) {
-    await sidInput.first().fill('TEST_SID_00000000000000000000000')
-  }
+  const sidInput = page.getByTestId(TestIds.ACCOUNT_SID).or(page.getByLabel(/account sid/i)).first()
+  await expect(sidInput).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await sidInput.fill('TEST_SID_00000000000000000000000')
 })
 
 When('I fill in Twilio credentials', async ({ page }) => {
-  const sidInput = page.getByTestId(TestIds.ACCOUNT_SID).or(page.getByLabel(/account sid/i))
-  if (await sidInput.first().isVisible({ timeout: 2000 }).catch(() => false)) {
-    await sidInput.first().fill('TEST_SID_00000000000000000000000')
-  }
+  const sidInput = page.getByTestId(TestIds.ACCOUNT_SID).or(page.getByLabel(/account sid/i)).first()
+  await expect(sidInput).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await sidInput.fill('TEST_SID_00000000000000000000000')
 })
 
 When('I fill in invalid Twilio credentials', async ({ page }) => {
-  const sidInput = page.getByTestId(TestIds.ACCOUNT_SID).or(page.getByLabel(/account sid/i))
-  if (await sidInput.first().isVisible({ timeout: 2000 }).catch(() => false)) {
-    await sidInput.first().fill('invalid')
-  }
+  const sidInput = page.getByTestId(TestIds.ACCOUNT_SID).or(page.getByLabel(/account sid/i)).first()
+  await expect(sidInput).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await sidInput.fill('invalid')
 })
 
 Then('I should see available provider options', async ({ page }) => {
@@ -214,14 +223,16 @@ Given('multiple hubs exist', async ({ backendRequest }) => {
 })
 
 When('I select a different hub', async ({ page }) => {
-  const hubSelector = page.locator('select, [role="combobox"]').first()
-  if (await hubSelector.isVisible({ timeout: 2000 }).catch(() => false)) {
-    // Select the second option
-    const options = await hubSelector.locator('option').all()
-    if (options.length > 1) {
-      await hubSelector.selectOption({ index: 1 })
-    }
-  }
+  // "Given multiple hubs exist" creates the second hub via the backend API — the page's
+  // config (hub list, isMultiHub) was fetched once on mount and won't know about it
+  // without a reload. The old locator also matched neither a native <select> nor a
+  // Radix combobox (hub-switcher.tsx is a plain button + role="option" popover), so
+  // this step silently selected nothing either way.
+  await page.reload()
+  const trigger = hubSwitcherTrigger(page)
+  await expect(trigger).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await trigger.click()
+  await page.getByRole('option').nth(1).click()
 })
 
 Then('the app should switch to the selected hub context', async ({ page }) => {
@@ -238,13 +249,13 @@ Then('I should see the hub-specific configuration', async ({ page }) => {
 })
 
 When('I switch to a specific hub', async ({ page }) => {
-  const hubSelector = page.locator('select, [role="combobox"]').first()
-  if (await hubSelector.isVisible({ timeout: 3000 }).catch(() => false)) {
-    const options = await hubSelector.locator('option').all()
-    if (options.length > 1) {
-      await hubSelector.selectOption({ index: 1 })
-    }
-  }
+  // Same fix as "I select a different hub": reload to pick up the hub created by
+  // "Given multiple hubs exist", and drive the real hub-switcher control.
+  await page.reload()
+  const trigger = hubSwitcherTrigger(page)
+  await expect(trigger).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await trigger.click()
+  await page.getByRole('option').nth(1).click()
 })
 
 Then('I should see only volunteers for that hub', async ({ page }) => {
@@ -276,36 +287,30 @@ When('I click {string} on the hub', async ({ page }, text: string) => {
 })
 
 When('I confirm the deletion', async ({ page }) => {
-  // Some components use window.confirm() (already auto-accepted via page.once('dialog')),
-  // others use a React AlertDialog. Handle both cases.
+  // Hub deletion always goes through DeleteHubDialog (routes/admin/hubs.tsx) — a Radix
+  // Dialog, never window.confirm() — and its confirm button stays disabled until the
+  // hub's name is typed into the confirmation input exactly. The old three-level
+  // isVisible/catch cascade could silently skip typing the name (leaving the confirm
+  // button permanently disabled) or skip clicking it outright.
   const dialog = page.getByRole('dialog')
-  if (await dialog.isVisible({ timeout: 2000 }).catch(() => false)) {
-    // The DeleteHubDialog requires typing the hub name into the confirmation input
-    // before the "Delete Hub" confirm button becomes enabled.
-    const confirmInput = page.getByTestId('delete-hub-confirm-input')
-    const hasInput = await confirmInput.isVisible({ timeout: 2000 }).catch(() => false)
-    if (hasInput) {
-      // Read the expected hub name displayed above the input (the <p> with font-mono class)
-      const hubNameLabel = dialog.locator('p.font-mono.font-medium').first()
-      const hubName = await hubNameLabel.textContent({ timeout: 2000 }).catch(() => null)
-      if (hubName) {
-        await confirmInput.fill(hubName.trim())
-      }
-    }
-    const okBtn = page.getByTestId(TestIds.CONFIRM_DIALOG_OK)
-    const hasOk = await okBtn.isVisible({ timeout: 2000 }).catch(() => false)
-    if (hasOk) await okBtn.click()
-  }
-  // If no dialog visible, the window.confirm() was already accepted by the dialog handler
+  await expect(dialog).toBeVisible({ timeout: Timeouts.ELEMENT })
+
+  const hubNameLabel = dialog.locator('p.font-mono.font-medium').first()
+  await expect(hubNameLabel).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const hubName = await hubNameLabel.textContent()
+  expect(hubName, 'delete confirmation dialog must display the hub name').toBeTruthy()
+
+  await page.getByTestId('delete-hub-confirm-input').fill(hubName!.trim())
+  const okBtn = page.getByTestId(TestIds.CONFIRM_DIALOG_OK)
+  await expect(okBtn).toBeEnabled({ timeout: Timeouts.ELEMENT })
+  await okBtn.click()
 })
 
 Then('the hub should be removed', async ({ page }) => {
-  // After deletion, a success toast should appear or the hub should no longer be in the list.
-  // Check toast first; fall back to text match only if needed (avoid .or() strict mode violations).
-  const toast = page.locator('[role="status"]').first()
-  const hasToast = await toast.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (hasToast) return
-  await expect(page.getByText(/deleted|removed/i).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // After deletion, either a success toast or "deleted/removed" text appears.
+  await expect(
+    page.locator('[role="status"]').first().or(page.getByText(/deleted|removed/i).first()),
+  ).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 // --- Setup wizard ---
@@ -323,10 +328,10 @@ When('I fill in the hotline name', async ({ page }) => {
 })
 
 When('I fill in the organization name', async ({ page }) => {
+  // Optional to fill, but always rendered (StepIdentity.tsx) — see advanceWizardToStep.
   const orgInput = page.getByLabel(/organization/i)
-  if (await orgInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await orgInput.fill('Test Organization')
-  }
+  await expect(orgInput).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await orgInput.fill('Test Organization')
 })
 
 Given('I am on the channels step', async ({ page }) => {
@@ -494,13 +499,13 @@ Then('I should see reports in the list', async ({ page }) => {
 })
 
 When('I click on the report', async ({ page }) => {
-  // Navigate to reports if not already there
-  const reportCard = page.getByTestId(TestIds.REPORT_CARD).first()
-  const isVisible = await reportCard.isVisible({ timeout: 2000 }).catch(() => false)
-  if (!isVisible) {
+  // Navigate to reports if not already there — use the URL (a fact about current
+  // navigation state) instead of racing the report card's render with isVisible().
+  if (!page.url().includes('/reports')) {
     await page.getByTestId(TestIds.NAV_REPORTS).click()
     await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
   }
+  const reportCard = page.getByTestId(TestIds.REPORT_CARD).first()
   await expect(reportCard).toBeVisible({ timeout: Timeouts.ELEMENT })
   await reportCard.click()
 })
@@ -567,20 +572,19 @@ Given('demo mode has been enabled', async ({ page }) => {
 // --- Blasts ---
 
 When('I compose a blast message', async ({ page }) => {
-  const nameInput = page.getByTestId(TestIds.BLAST_NAME).or(page.getByLabel(/name|subject/i))
-  if (await nameInput.first().isVisible({ timeout: 2000 }).catch(() => false)) {
-    await nameInput.first().fill(`Blast ${Date.now()}`)
-  }
-  const textInput = page.getByTestId(TestIds.BLAST_TEXT).or(page.locator('textarea'))
-  await textInput.first().fill('Test blast message content')
+  // BlastComposer.tsx always renders both fields unconditionally.
+  const nameInput = page.getByTestId(TestIds.BLAST_NAME)
+  await expect(nameInput).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await nameInput.fill(`Blast ${Date.now()}`)
+  await page.getByTestId(TestIds.BLAST_TEXT).fill('Test blast message content')
 })
 
-When('I select recipients', async ({ page }) => {
-  // Select all available recipients
-  const selectAll = page.getByText(/select all/i).first().or(page.locator('input[type="checkbox"]').first())
-  if (await selectAll.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await selectAll.click()
-  }
+When('I select recipients', async () => {
+  // BlastComposer.tsx has no per-recipient selection UI — delivery targets are the
+  // channel toggles (SMS/WhatsApp/Signal/RCS), which default to SMS already selected.
+  // There is nothing to click for "Create a blast message" to succeed; this is a
+  // documented no-op instead of a snapshot-racing best-effort click on a "select all"
+  // checkbox that does not exist in the current composer.
 })
 
 Then('the blast should appear in the blast list', async ({ page }) => {
@@ -596,16 +600,12 @@ Then('I should see the recipient selection interface', async ({ page }) => {
 })
 
 Then('I should be able to select individual volunteers', async ({ page }) => {
-  // Accept checkboxes (subscriber list) OR channel toggle buttons (blast composer)
-  const checkbox = page.locator('input[type="checkbox"]').first()
-  const hasCheckbox = await checkbox.isVisible({ timeout: 2000 }).catch(() => false)
-  if (hasCheckbox) {
-    await expect(checkbox).toBeVisible({ timeout: Timeouts.ELEMENT })
-    return
-  }
-  // Blast composer: channel toggle buttons serve as per-channel selection
-  const toggleBtn = page.locator('button.rounded-lg').first()
-  await expect(toggleBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // Accept checkboxes (subscriber list) OR channel toggle buttons (blast composer) —
+  // a single waiting assertion instead of a non-waiting probe that always fell through
+  // to the toggle-button branch (BlastComposer has no checkbox).
+  await expect(
+    page.locator('input[type="checkbox"]').first().or(page.locator('button.rounded-lg').first()),
+  ).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('I should be able to select all volunteers', async ({ page }) => {
@@ -615,28 +615,26 @@ Then('I should be able to select all volunteers', async ({ page }) => {
 })
 
 When('I set a future send time', async ({ page }) => {
-  // Prefer the testid-anchored schedule input; fall back to any datetime-local
-  const dateInput = page.getByTestId('blast-schedule-input').or(
-    page.locator('input[type="datetime-local"]').first()
-  )
-  if (await dateInput.first().isVisible({ timeout: 2000 }).catch(() => false)) {
-    // tomorrow in local datetime-local format (YYYY-MM-DDTHH:mm)
-    const d = new Date(Date.now() + 86400000)
-    const pad = (n: number) => String(n).padStart(2, '0')
-    const tomorrow = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
-    const input = dateInput.first()
-    // Set value via JS to reliably trigger React's onChange on controlled datetime-local inputs
-    await input.evaluate((el: HTMLInputElement, val: string) => {
-      const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set
-      if (nativeSetter) {
-        nativeSetter.call(el, val)
-      } else {
-        el.value = val
-      }
-      el.dispatchEvent(new Event('input', { bubbles: true }))
-      el.dispatchEvent(new Event('change', { bubbles: true }))
-    }, tomorrow)
-  }
+  // schedule-picker.tsx always renders `blast-schedule-input` unconditionally — the
+  // native-datetime-local fallback and the isVisible/catch guard around the whole
+  // block were dead code that could silently skip setting the schedule entirely.
+  const dateInput = page.getByTestId('blast-schedule-input')
+  await expect(dateInput).toBeVisible({ timeout: Timeouts.ELEMENT })
+  // tomorrow in local datetime-local format (YYYY-MM-DDTHH:mm)
+  const d = new Date(Date.now() + 86400000)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const tomorrow = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  // Set value via JS to reliably trigger React's onChange on controlled datetime-local inputs
+  await dateInput.evaluate((el: HTMLInputElement, val: string) => {
+    const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set
+    if (nativeSetter) {
+      nativeSetter.call(el, val)
+    } else {
+      el.value = val
+    }
+    el.dispatchEvent(new Event('input', { bubbles: true }))
+    el.dispatchEvent(new Event('change', { bubbles: true }))
+  }, tomorrow)
 })
 
 Then('the blast should appear as {string}', async ({ page }, status: string) => {
@@ -647,36 +645,27 @@ Then('the blast should appear as {string}', async ({ page }, status: string) => 
 Given('a blast has been sent', async ({ page }) => {
   // Navigate to blasts page
   await page.getByTestId(TestIds.NAV_BLASTS).click()
-  await page.waitForLoadState('domcontentloaded')
+  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
 
-  // If no blasts exist, create one via UI so the delivery status step has something to assert
-  const hasBlast = await page.getByTestId(TestIds.BLAST_CARD).first().isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (!hasBlast) {
+  // The list settles into exactly one of these two states — wait for whichever it is,
+  // rather than probing with an ignored timeout and silently skipping blast creation
+  // (and every fill inside it) if the check lost the race.
+  const existingCard = page.getByTestId(TestIds.BLAST_CARD).first()
+  const noBlasts = page.getByTestId('no-blasts')
+  await expect(existingCard.or(noBlasts)).toBeVisible({ timeout: Timeouts.ELEMENT })
+
+  if (await noBlasts.isVisible()) {
     const newBlastBtn = page.getByTestId(TestIds.BLAST_NEW_BTN)
-    if (await newBlastBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await newBlastBtn.click()
-      // Fill in blast name and content
-      const nameInput = page.getByTestId(TestIds.BLAST_NAME).or(page.getByLabel(/name|subject/i))
-      if (await nameInput.first().isVisible({ timeout: 2000 }).catch(() => false)) {
-        await nameInput.first().fill(`Test Blast ${Date.now()}`)
-      }
-      const textInput = page.getByTestId(TestIds.BLAST_TEXT).or(page.locator('textarea'))
-      if (await textInput.first().isVisible({ timeout: 2000 }).catch(() => false)) {
-        await textInput.first().fill('Test blast message for delivery status verification')
-      }
-      // Submit the form
-      const createBtn = page.getByRole('button', { name: /create|save|submit/i })
-      if (await createBtn.first().isVisible({ timeout: 2000 }).catch(() => false)) {
-        await createBtn.first().click()
-      }
-    }
+    await expect(newBlastBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
+    await newBlastBtn.click()
+    await page.getByTestId(TestIds.BLAST_NAME).fill(`Test Blast ${Date.now()}`)
+    await page.getByTestId(TestIds.BLAST_TEXT).fill('Test blast message for delivery status verification')
+    await page.getByTestId('blast-send-btn').click()
+    await expect(page.getByTestId(TestIds.BLAST_CARD).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
   }
 
   // Click the first blast card to open the detail panel (which contains the status badge)
-  const blastCard = page.getByTestId(TestIds.BLAST_CARD).first()
-  if (await blastCard.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
-    await blastCard.click()
-  }
+  await page.getByTestId(TestIds.BLAST_CARD).first().click()
 })
 
 Then('I should see the delivery status for the blast', async ({ page }) => {
@@ -690,13 +679,17 @@ Then('I should see the delivery status for the blast', async ({ page }) => {
 // --- Multi-hub extended ---
 
 Given('I have selected a hub', async ({ page }) => {
-  // If a hub selector is visible, select the first available hub
-  const hubSelector = page.locator('select, [role="combobox"]').first()
-  if (await hubSelector.isVisible({ timeout: 2000 }).catch(() => false)) {
-    const options = await hubSelector.locator('option').all()
-    if (options.length > 0) {
-      await hubSelector.selectOption({ index: 0 })
-    }
+  // Single-hub deployments render no switcher at all (hub-switcher.tsx returns null
+  // unless isMultiHub) — the default hub is already the active context, and this step
+  // is a genuine no-op there. When multiple hubs do exist, open the switcher and pick
+  // the first one. Unlike the plain isVisible() probes elsewhere in this file, waitFor()
+  // here actually honors its timeout instead of returning instantly, so this is a real
+  // bounded wait for a feature-gated element rather than a snapshot race.
+  const trigger = hubSwitcherTrigger(page)
+  const hasSwitcher = await trigger.waitFor({ state: 'visible', timeout: Timeouts.ELEMENT }).then(() => true).catch(() => false)
+  if (hasSwitcher) {
+    await trigger.click()
+    await page.getByRole('option').first().click()
   }
 })
 

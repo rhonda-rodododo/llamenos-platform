@@ -53,8 +53,13 @@ When('I filter by {string} event type', async ({ page }, eventType: string) => {
   const trigger = page.getByTestId(TestIds.AUDIT_EVENT_FILTER)
   await expect(trigger).toBeVisible({ timeout: Timeouts.ELEMENT })
   await trigger.click()
-  const option = page.getByRole('option', { name: new RegExp(eventType, 'i') })
-  await option.first().click()
+  // Exact match instead of a case-insensitive substring + .first(): audit.tsx renders
+  // one option per EVENT_CATEGORIES entry with distinct labels ("All Events", "Calls",
+  // "Volunteers", ...), so a substring match risks silently picking the wrong option
+  // if two labels ever overlap instead of failing loudly.
+  const option = page.getByRole('option', { name: eventType, exact: true })
+  await expect(option).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await option.click()
 })
 
 Then('only {string} events should be visible', async ({ page, backendRequest: request, workerHub }, eventType: string) => {
