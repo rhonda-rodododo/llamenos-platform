@@ -21,7 +21,7 @@ function deps(over: Partial<TickDeps> = {}): TickDeps {
     checkHalt: async () => ({ halted: false }),
     readLedger: () => [],
     resumedAt: () => 0,
-    listItems: async () => [item('1')],
+    listItems: async () => ({ ok: true as const, items: [item('1')] }),
     readLabels: async () => ['agent-dispatchable', 'lane:ios'],
     // Default dispatch resolves SUCCESS but WITHOUT pr/branch/worktree, so it
     // never falls into the verify/review pipeline unless a test opts
@@ -75,10 +75,25 @@ describe('tick', () => {
   })
 
   it('aborts the whole pass when the source is unreadable', async () => {
-    const d = deps({ listItems: async () => undefined })
+    const d = deps({ listItems: async () => ({ ok: false as const, detail: 'exit 1: gh: could not authenticate' }) })
     const r = await tick(d)
     expect(r.aborted).toBe('source-unreadable')
     expect(d.dispatch).not.toHaveBeenCalled()
+  })
+
+  // A fail-closed abort that destroys its own cause cannot be told apart from
+  // a rate limit, a network blip or a real outage. The reason must reach the
+  // one line an operator reads.
+  it('names the underlying gh failure in the abort line', async () => {
+    const lines: string[] = []
+    const d = deps({
+      listItems: async () => ({ ok: false as const, detail: 'exit 1: gh: Bad credentials (HTTP 401)' }),
+      log: (msg: string) => { lines.push(msg) },
+    })
+    const r = await tick(d)
+    expect(r.aborted).toBe('source-unreadable')
+    expect(lines).toContainEqual(
+      'source unreadable for lane ios — aborting pass: exit 1: gh: Bad credentials (HTTP 401)')
   })
 
   it('does not dispatch in shadow mode but does record a SHADOW row', async () => {
@@ -104,7 +119,7 @@ describe('tick', () => {
     let calls = 0
     const d = deps({
       lanes: [lane('ios', 'live')],
-      listItems: async () => [item('1'), item('2')],
+      listItems: async () => ({ ok: true as const, items: [item('1'), item('2')] }),
       checkHalt: async () => { calls++; return { halted: calls > 2 } },
     })
     const d2 = { ...d, lanes: [{ ...lane('ios', 'live'), cap: 5 }] }
@@ -115,7 +130,7 @@ describe('tick', () => {
   it('honours the per-lane cap', async () => {
     const d = deps({
       lanes: [{ ...lane('ios', 'live'), cap: 1 }],
-      listItems: async () => [item('1'), item('2'), item('3')],
+      listItems: async () => ({ ok: true as const, items: [item('1'), item('2'), item('3')] }),
     })
     await tick(d)
     expect(d.dispatch).toHaveBeenCalledTimes(1)
@@ -141,7 +156,7 @@ describe('tick', () => {
       .mockResolvedValueOnce({ outcome: 'SUCCESS' as const })
     const d = deps({
       lanes: [{ ...lane('ios', 'live'), cap: 2 }],
-      listItems: async () => [item('1'), item('2')],
+      listItems: async () => ({ ok: true as const, items: [item('1'), item('2')] }),
       acquireLock: () => ({ held: true, release }),
       dispatch,
     })
@@ -221,7 +236,7 @@ describe('tick', () => {
     const iosItems = [item('i1'), item('i2')]
     const d = deps({
       lanes: [{ ...lane('backend', 'live'), cap: 1 }, { ...lane('ios', 'live'), cap: 1 }],
-      listItems: async (l: Lane) => (l.id === 'backend' ? backendItems : iosItems),
+      listItems: async (l: Lane) => ({ ok: true as const, items: l.id === 'backend' ? backendItems : iosItems }),
       readLabels: async (id: string) =>
         id.startsWith('b') ? ['agent-dispatchable', 'lane:backend'] : ['agent-dispatchable', 'lane:ios'],
       dispatch,

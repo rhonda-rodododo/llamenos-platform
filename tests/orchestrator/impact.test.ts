@@ -75,6 +75,22 @@ describe('classifyImpact', () => {
     expect(classifyImpact([f], 5).impact).toBe('high')
   })
 
+  // Widened 2026-09-13 (PR #794) to match what CODEOWNERS actually enforces:
+  // the whole `.github/workflows/` directory (not just `ci.yml`), plus
+  // `knope.toml` (release automation — a supply-chain surface, independent
+  // of user count) and the deanonymization surfaces `sip-bridge/` and
+  // `signal-notifier/` (caller phone numbers / HMAC-hashed contacts). Not
+  // narrowed with the no-users-yet argument: these protect identity and the
+  // supply chain, not deployment risk.
+  it.each([
+    ['.github/workflows/e2e-docker.yml'],
+    ['knope.toml'],
+    ['sip-bridge/src/ari-adapter.ts'],
+    ['signal-notifier/src/contact-resolver.ts'],
+  ])('treats %s as high impact', (f) => {
+    expect(classifyImpact([f], 5).impact).toBe('high')
+  })
+
   // Boundary-exact: ONLY `apps/desktop/src/crypto.rs` is restored above, not
   // the whole `apps/desktop/src/` directory — an ordinary desktop source file
   // stays low impact.
@@ -92,10 +108,10 @@ describe('classifyImpact', () => {
     ['drizzle/migrations/0001_init.sql'],
     ['packages/shared/migrations/0002_x.sql'],
     ['apps/worker/db/schema/users.ts'],
-    // `.github/workflows/ci.yml` used to be in this list. It is HIGH impact
-    // now, and not because of deployment risk: it is where the gate's own
-    // rule — check out the base, never the head — is written down, so a PR
-    // editing it is editing the machinery that judges it. Asserted in
+    // `.github/workflows/ci.yml` and `knope.toml` used to be in this list.
+    // Every workflow and knope.toml are HIGH impact now, matching CODEOWNERS
+    // (PR #794): the gate's own definition and the release supply chain are
+    // the machinery that judges and ships every other PR. Asserted in
     // guards.test.ts instead.
     ['deploy/helm/llamenos/values.yaml'],
     ['apps/ios/fastlane/Fastfile'],
@@ -106,7 +122,6 @@ describe('classifyImpact', () => {
     ['scripts/extract-cert-pins.sh'],
     ['scripts/verify-build.sh'],
     ['Dockerfile.build'],
-    ['knope.toml'],
   ])('treats %s as low impact (narrowed 2026-09-12 — no production users yet)', (f) => {
     expect(classifyImpact([f], 5).impact).toBe('low')
   })
