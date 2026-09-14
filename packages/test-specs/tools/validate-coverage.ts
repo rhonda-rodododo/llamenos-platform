@@ -329,7 +329,7 @@ function stepMatchesCucumberPhrase(gherkinStep: string, cucumberPhrase: string):
   // Step 2: Single-pass — handle Cucumber escapes, parameters, and regex-escape
   //         everything else simultaneously (avoids double-escaping from
   //         unescape-then-re-escape chains)
-  let pattern = cucumberPhrase
+  const pattern = cucumberPhrase
     .replace(/\\\\/g, "\\")
     .replace(/\\[\/()]|\{(?:string|int|word)\}|[.*+?^${}()|\\[\]]/g, (match) => {
       switch (match) {
@@ -590,7 +590,6 @@ function checkAndroidCoverage(scenarios: Scenario[]): { covered: number; missing
     }
   }
 
-  const methodNames = new Set(allMethods.map((m) => m.name));
   console.log(
     `  Found ${allMethods.length} Android @Test methods across ${new Set(allMethods.map(m => m.file)).size} test files\n`
   );
@@ -606,10 +605,9 @@ function checkAndroidCoverage(scenarios: Scenario[]): { covered: number; missing
     }
 
     const expectedMethod = scenarioToMethodName(scenario.title);
-    const found = methodNames.has(expectedMethod);
+    const method = allMethods.find((m) => m.name === expectedMethod);
 
-    if (found) {
-      const method = allMethods.find((m) => m.name === expectedMethod)!;
+    if (method) {
       console.log(
         `    ✓ ${scenario.title}\n      ${method.className}.${method.name}`
       );
@@ -821,7 +819,6 @@ function checkIosCoverage(scenarios: Scenario[]): { covered: number; missing: nu
     allMethods.push(...parseSwiftTestFile(file));
   }
 
-  const methodNames = new Set(allMethods.map((m) => m.name));
   console.log(
     `  Found ${allMethods.length} Swift test methods across ${testFiles.length} test files\n`
   );
@@ -837,10 +834,9 @@ function checkIosCoverage(scenarios: Scenario[]): { covered: number; missing: nu
     }
 
     const expectedMethod = scenarioToSwiftMethod(scenario.title);
-    const found = methodNames.has(expectedMethod);
+    const method = allMethods.find((m) => m.name === expectedMethod);
 
-    if (found) {
-      const method = allMethods.find((m) => m.name === expectedMethod)!;
+    if (method) {
       console.log(
         `    ✓ ${scenario.title}\n      ${method.className}.${method.name}`
       );
@@ -996,7 +992,6 @@ function main() {
   // Check for duplicate feature basenames
   checkDuplicateFeatureNames(featureFiles);
 
-  let totalMissing = 0;
   const results: { platform: string; total: number; covered: number; missing: number }[] = [];
 
   for (const platform of platforms) {
@@ -1034,7 +1029,6 @@ function main() {
       covered: result.covered,
       missing: result.missing,
     });
-    totalMissing += result.missing;
   }
 
   console.log(`\n${"=".repeat(60)}`);

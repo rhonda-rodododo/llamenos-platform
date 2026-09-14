@@ -1,7 +1,7 @@
 import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
-  { ignores: ['dist/', '.features-gen/', 'packages/protocol/generated/'] },
+  { ignores: ['dist/', '.features-gen/', 'packages/protocol/generated/', 'packages/i18n/generated/'] },
   ...tseslint.configs.recommended,
   {
     rules: {
