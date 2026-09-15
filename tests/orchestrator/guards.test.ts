@@ -468,6 +468,54 @@ describe('rail: fleet/review runs once, at merge time, not on every push', () =>
 })
 
 /**
+ * Ruleset 15885614 (the merge queue's branch protection ruleset) requires
+ * exactly these four status contexts before a PR can merge: `ci-status`,
+ * `gitleaks`, `fleet/verify`, `fleet/review`. A required context that never
+ * reports on the queue's own `merge_group` ref blocks the merge queue
+ * forever — GitHub waits indefinitely for a check that will never appear,
+ * rather than failing loudly. `CodeQL` is the fifth required context but is
+ * GitHub default-setup, not a workflow file in this repo, so it is
+ * deliberately excluded from this table (see the operator step in the PR
+ * body for verifying it separately once the queue is live).
+ *
+ * The mapping below is hardcoded rather than derived, on purpose: this rail
+ * exists to catch a workflow file quietly losing its `merge_group` trigger
+ * (as `secret-scan.yml` had, until this PR), and a derived lookup would only
+ * ever tell you the code agrees with itself.
+ */
+describe('rail: every ruleset-15885614-required context reports on merge_group', () => {
+  const REQUIRED_CONTEXT_WORKFLOWS: Record<string, string> = {
+    'ci-status': 'ci.yml',
+    'fleet/verify': 'ci.yml',
+    'fleet/review': 'ci.yml',
+    gitleaks: 'secret-scan.yml',
+  }
+
+  const workflowYaml = (file: string): string =>
+    readFileSync(join(process.cwd(), '.github', 'workflows', file), 'utf8')
+
+  /** Scoped to the workflow's own top-level `on:` block, before `jobs:` —
+   *  `merge_group` also shows up in prose comments and job bodies (env vars,
+   *  context field names), and this must only match the trigger itself. */
+  function triggersOnMergeGroup(yaml: string): boolean {
+    const onBlock = yaml.split(/\njobs:\n/)[0] ?? ''
+    return /\n {2}merge_group:/.test(onBlock)
+  }
+
+  it('the mapping table itself is non-empty and covers all four workflow-backed contexts', () => {
+    expect(Object.keys(REQUIRED_CONTEXT_WORKFLOWS).sort()).toEqual(
+      ['ci-status', 'fleet/review', 'fleet/verify', 'gitleaks'].sort(),
+    )
+  })
+
+  for (const [context, workflowFile] of Object.entries(REQUIRED_CONTEXT_WORKFLOWS)) {
+    it(`"${context}" is produced by ${workflowFile}, which triggers on merge_group`, () => {
+      expect(triggersOnMergeGroup(workflowYaml(workflowFile))).toBe(true)
+    })
+  }
+})
+
+/**
  * The review engine's own turn/timeout budget (review.ts) — cut from a
  * 20-turn/25-minute high-impact allowance to a single pass, because that
  * allowance was enough for one review to explore the export at length
