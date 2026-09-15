@@ -268,8 +268,8 @@ This table applies to **tmux workers only** (`dispatch-one.sh`). Native subagent
 | `fable` | `claude --model fable` | Newest Claude alias; accepted by the dispatcher and verified to resolve. Treat as a peer of `sonnet` until you have your own evidence about where it lands on cost/quality. |
 | `glm` | `claude --model glm-5.3` against `https://api.z.ai/api/anthropic` | GLM-5.3 (Zhipu) inside the **Claude Code agent loop**. 1M context, strong agentic tool-calling, flat-rate Coding Plan quota separate from Claude Max. Default for bulk work you would otherwise give Sonnet. Needs `ZHIPU_API_KEY`. |
 | `glm:<model>` | same, with the model pinned | e.g. `glm:glm-5.3-flash` (cheap, same 1M context — triage and mechanical edits), `glm:glm-5.3-highspeed`, `glm:glm-4.7`. |
-| `kimi` | `opencode run --model kimi-for-coding/k2p6` | Long-context exploration, bulk migrations across many files, scaffolding a new module from a clear spec, frontend-heavy work. Uses paid Kimi for Coding subscription ($99/mo). |
-| `kimi-thinking` | `opencode run --model kimi-for-coding/kimi-k2-thinking` | Same as kimi but with extended thinking/reasoning. Use for harder problems that benefit from chain-of-thought. |
+| `kimi` | `opencode run --model kimi-for-coding/k3-256k` | Long-context exploration, bulk migrations across many files, scaffolding a new module from a clear spec, frontend-heavy work. Uses paid Kimi for Coding subscription ($99/mo). |
+| `kimi-thinking` | `opencode run --model kimi-for-coding/k3-256k` | Same model as `kimi` — `kimi-for-coding/kimi-k2-thinking` does not exist in the opencode provider registry (checked via `opencode models`) and there is no extended-thinking variant under `kimi-for-coding` to route to instead. Kept as a separate token for prompt-clarity only; behaves identically to `kimi` until a real thinking variant ships. |
 | `opencode:<model>` | `opencode run --model <provider/model>` | Any model available in opencode (e.g., `opencode:opencode/gpt-5-nano`, `opencode:vultr/DeepSeek-V3.2`). Use for free/cheap models on grunt work. |
 | `copilot` | `copilot --allow-all --no-ask-user -p` | GitHub Copilot CLI (auto model selection). Best for workers running inside an existing VS Code / Copilot subscription — no separate Claude Max quota consumed. |
 | `copilot:<model>` | `copilot --model=<model> --allow-all --no-ask-user -p` | Copilot CLI with a pinned model. Use explicit model tokens like `copilot:claude-sonnet-4.6`, `copilot:gpt-5.4`, `copilot:gpt-5.4-mini`. |
@@ -356,7 +356,7 @@ This triples effective throughput without increasing budget. Keep Queue A short 
 ```bash
 opencode models  # List all available models
 ```
-Current options: `kimi-for-coding/k2p6` (what `model=kimi` actually launches — see dispatch-one.sh), `zai-coding-plan/glm-5.3`, `vultr/DeepSeek-V3.2`, `vultr/GLM-5-FP8`, `opencode/gpt-5-nano`, `opencode/minimax-m2.5-free`, `opencode/nemotron-3-super-free`, and more.
+Current options: `kimi-for-coding/k3-256k` (what `model=kimi` and `model=kimi-thinking` actually launch — see dispatch-one.sh), `zai-coding-plan/glm-5.3`, `vultr/DeepSeek-V3.2`, `vultr/GLM-5-FP8`, `opencode/gpt-5-nano`, `opencode/minimax-m2.5-free`, `opencode/nemotron-3-super-free`, and more. Verify against `opencode models | grep -i kimi` before trusting any hardcoded id here — the registry changes without notice (`k2p6` and `kimi-k2-thinking` both disappeared at some point, which is what broke dispatch on 2026-09-12).
 
 ## Queue entry format
 
@@ -466,11 +466,11 @@ gh pr create --title "<type>(<scope>): <description>" --body "## Summary\n<bulle
 Use `gh` CLI for PR operations. Poll `gh pr view <n> --json statusCheckRollup` for CI status.
 
 ### Merging (GitHub)
-- **Only merge when** `mergeStateStatus=CLEAN` AND every required check is green
-- ```bash
-  gh pr merge <n> --squash --delete-branch
-  ```
-- No flake excuses, no "almost green"
+- **Never merge.** Open exactly one PR, put `Closes #<issue>` on its own line in the body, and stop.
+  The fleet enables auto-merge; GitHub merges only when every required check passes and any
+  required code-owner review exists.
+- Never pass `--admin`, `--force`, `--approve`, `--request-changes`, or `--no-verify` to anything.
+- A red check is fixed or reported — never re-run to "get green", never merged around.
 
 ### Build + Test Verification (ALL tiers, MANDATORY before pushing)
 

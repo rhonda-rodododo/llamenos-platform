@@ -11,21 +11,19 @@ export const LARGE_DIFF_LINES = 1500
  * restore. `orchestrator/` and its tests: a defect there disables the checks
  * that would have caught it.
  *
- * This list is currently enforced TWICE, and deliberately so while the gate
- * moves from userland to the platform. `classifyImpact` marks a diff high and
- * `mayAutoMerge` (merge.ts) refuses it — enforcement nothing outside this
- * process can see, and therefore nothing outside this process is bound by.
- * Every path below is now ALSO owned in `CODEOWNERS`, where GitHub's own
- * "require review from Code Owners" rule binds anyone, whoever or whatever
- * opened the PR. `tests/orchestrator/guards.test.ts` asserts that coverage
- * against the real tree, so a path added here without a matching `CODEOWNERS`
- * line fails the suite.
+ * THIS LIST NO LONGER GATES ANYTHING. It used to be half of a userland merge
+ * gate — `classifyImpact` marked a diff high and `mayAutoMerge` refused it —
+ * enforcement nothing outside this process could see, and therefore nothing
+ * outside this process was bound by. Every path below is owned in
+ * `CODEOWNERS`, where GitHub's own "require review from Code Owners" rule
+ * binds anyone, whoever or whatever opened the PR.
+ * `tests/orchestrator/guards.test.ts` asserts that coverage against the real
+ * tree, so a path added here without a matching `CODEOWNERS` line fails the
+ * suite.
  *
- * The in-process half goes away with `mayAutoMerge` once the CI gates are
- * required (PR C of that sequence). What remains here afterwards is
- * DESCRIPTION, not decision: the gate trace, the digest, the reviewer's turn
- * and timeout budget (review.ts), and the subset `CRYPTO_REVIEW_PATHS`
- * derives for the crypto-security-reviewer.
+ * What survives here is DESCRIPTION, not decision: the gate trace, the
+ * digest, the reviewer's turn and timeout budget (review.ts), and the subset
+ * `CRYPTO_REVIEW_PATHS` derives for the crypto-security-reviewer.
  *
  * NOT the full secrets list: every path `checkScope` refuses to write
  * (`SECRET_PATH_PATTERNS` in config.ts, the never-write source of truth) is
@@ -67,13 +65,24 @@ export const HIGH_IMPACT_PATHS: readonly string[] = [
 
   // The build's own trust base, and the reason this list gained entries in
   // the round that fixed the gate. The gate jobs install from the lockfile
-  // and run from the workflow definition; a PR editing any of these is a PR
-  // editing the machinery that judges it. `ci.yml` most of all — it is where
-  // "check out the base, not the head" is written down.
+  // and run from workflow definitions; a PR editing any of these is a PR
+  // editing the machinery that judges it or the supply chain around a
+  // release. Widened from the single `ci.yml` entry to the whole
+  // `.github/workflows/` directory (PR #794) to match what CODEOWNERS
+  // actually enforces — the impact classifier disagreeing with CODEOWNERS
+  // about which workflow files are high-impact is worse than a broad match.
   'package.json',
   'bun.lockb',
   'lefthook.yml',
-  '.github/workflows/ci.yml',
+  '.github/workflows/',
+  'knope.toml',
+
+  // Deanonymization surfaces (PR #794, matching CODEOWNERS): sip-bridge/
+  // routes PSTN calls and handles caller phone numbers; signal-notifier/
+  // does HMAC-hashed contact resolution. Both are top-level, NOT under
+  // apps/ despite what older docs say.
+  'sip-bridge/',
+  'signal-notifier/',
 
   // Auth, sessions, sigchain, identity: state a revert does not restore.
   // `.test.ts` siblings are listed explicitly — weakening the test is the

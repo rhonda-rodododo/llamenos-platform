@@ -1794,6 +1794,7 @@
     "bannerText": "Ambiente de teste — não insira informações reais de quem liga. Os dados aqui não são confidenciais e podem ser excluídos a qualquer momento.",
     "bannerTextSchedule": "Ambiente de teste — não insira informações reais de quem liga. Os dados são redefinidos {{schedule}} e não são confidenciais.",
     "dismiss": "Dismiss",
+    "getStarted": "Deploy your own",
     "pickAccount": "Pick a demo account to explore",
     "resetNotice": "Demo data resets daily",
     "tryDemo": "Try the demo",
@@ -3734,6 +3735,20 @@
     "version": "Version",
     "voicemail": "Voicemail",
     "webrtcNotConfigured": "Chamadas pelo navegador não estão disponíveis. Seu administrador precisa ativar WebRTC nas configurações do provedor de telefonia."
+  },
+  "serverAddress": {
+    "checking": "Checking...",
+    "connect": "Connect",
+    "errorWithDetail": "Couldn't reach that server: {{detail}}",
+    "firstRunDescription": "This app needs to know which Llámenos server to connect to before it can sign in.",
+    "firstRunTitle": "Connect to your hotline server",
+    "help": "Enter your organization's server address, e.g. app.example.org. We'll infer https:// unless you specify otherwise.",
+    "label": "Server address",
+    "placeholder": "app.example.org",
+    "saveAndReconnect": "Save and reconnect",
+    "settingsDescription": "Change which server this desktop app connects to.",
+    "settingsTitle": "Server connection",
+    "unreachable": "Couldn't reach that server. Check the address and try again."
   },
   "setup": {
     "autoResponse": "Auto-Response Template",

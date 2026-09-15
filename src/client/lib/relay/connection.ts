@@ -11,6 +11,7 @@
  */
 
 import { ed25519Sign, ed25519Verify, decryptServerEvent } from '../platform'
+import { createRelaySocket } from '../net'
 import { bytesToHex, utf8ToBytes } from '@shared/encoding'
 import { LABEL_WS_CHALLENGE } from '@shared/crypto-labels'
 import { wsServerMessageSchema } from '@protocol/schemas/ws-messages'
@@ -122,7 +123,9 @@ export class RelayConnection {
     this.setState('connecting')
 
     try {
-      const ws = new WebSocket(this.relayUrl)
+      // Routes through the Rust-enforced WS proxy in a packaged/dev Tauri build
+      // with a configured remote backend (#739); a plain WebSocket otherwise.
+      const ws = createRelaySocket(this.relayUrl)
 
       await new Promise<void>((resolve, reject) => {
         const timeout = setTimeout(() => {

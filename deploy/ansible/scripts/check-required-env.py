@@ -15,6 +15,14 @@ in the Ansible templates) fails CI immediately instead of silently drifting
 again.
 
 Usage:
+    python3 deploy/ansible/scripts/check-required-env.py
+
+When the rendered files are absent (the normal case in CI, where main's
+workflow invokes this script directly), the script renders them itself by
+running playbooks/check-env-templates.yml twice -- once for the
+production/required-vars scenario, once for the all-optional-features
+scenario. The renders can also be produced manually beforehand:
+
     cd deploy/ansible
     ansible-playbook playbooks/check-env-templates.yml \\
         -e @vars.example.yml -e app_environment=production \\
@@ -24,12 +32,15 @@ Usage:
     python3 scripts/check-required-env.py
 
 Exits non-zero (and prints exactly what's missing, from which file) on any
-gap. Run from deploy/ansible/ or pass --repo-root explicitly.
+gap. Run from anywhere; pass --repo-root explicitly if the auto-computed
+root is wrong.
 """
 from __future__ import annotations
 
 import argparse
 import re
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -110,6 +121,63 @@ def rendered_keys(env_file: Path) -> set[str]:
     return keys
 
 
+def ensure_rendered(repo_root: Path, rendered: list[Path]) -> None:
+    """Render the four .env outputs if they don't exist yet.
+
+    Main's ci.yml invokes this script directly (no separate render step), so
+    the script must be able to produce its own inputs. If the files already
+    exist (a dev ran playbooks/check-env-templates.yml manually), they are
+    used as-is.
+    """
+    if all(p.is_file() for p in rendered):
+        return
+
+    ansible_dir = repo_root / "deploy" / "ansible"
+    playbook = ansible_dir / "playbooks" / "check-env-templates.yml"
+    if shutil.which("ansible-playbook") is None:
+        raise SystemExit(
+            "[check-required-env] Rendered files missing and ansible-playbook "
+            "is not on PATH -- install ansible (pip install ansible) or run "
+            "playbooks/check-env-templates.yml yourself first (see docstring)."
+        )
+
+    print("[check-required-env] Rendered files missing -- rendering via ansible-playbook ...")
+    commands = [
+        [
+            "ansible-playbook",
+            str(playbook),
+            "-e",
+            "@vars.example.yml",
+            "-e",
+            "app_environment=production",
+            "-e",
+            "webhook_base_url=https://example.org",
+        ],
+        [
+            "ansible-playbook",
+            str(playbook),
+            "-e",
+            "@vars.example.yml",
+            "-e",
+            "@scripts/full-scenario.extra-vars.json",
+        ],
+    ]
+    for cmd in commands:
+        proc = subprocess.run(cmd, cwd=ansible_dir)
+        if proc.returncode != 0:
+            raise SystemExit(
+                f"[check-required-env] FATAL: render failed ({proc.returncode}): "
+                f"{' '.join(cmd)}"
+            )
+
+    missing = [str(p) for p in rendered if not p.is_file()]
+    if missing:
+        raise SystemExit(
+            "[check-required-env] FATAL: render playbook succeeded but did not "
+            f"produce: {', '.join(missing)}"
+        )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -148,6 +216,14 @@ def main() -> int:
         "every optional feature enabled.",
     )
     args = parser.parse_args()
+
+    rendered = [
+        args.monolithic_env,
+        args.app_env,
+        args.monolithic_env_full,
+        args.app_env_full,
+    ]
+    ensure_rendered(args.repo_root, rendered)
 
     config_ts = args.repo_root / "apps" / "worker" / "lib" / "config.ts"
     if not config_ts.is_file():

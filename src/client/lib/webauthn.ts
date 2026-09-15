@@ -6,8 +6,8 @@
 import { startRegistration, startAuthentication, type PublicKeyCredentialCreationOptionsJSON, type PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/browser'
 import * as keyManager from './key-manager'
 import { createAuthToken } from './platform'
-
-const API_BASE = '/api'
+import { getApiUrl, getApiPath } from './api-config'
+import { netFetch } from './net'
 
 // Monotonic timestamp shared with api.ts — prevents nonce replay when
 // webauthn auth headers are generated concurrently with other API calls.
@@ -28,7 +28,7 @@ async function getAuthHeaders(method: string, path: string): Promise<Record<stri
   if (keyManager.isUnlocked()) {
     try {
       const nonce = Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('')
-      const token = await createAuthToken(monotoneNow(), method, `${API_BASE}${path}`, nonce)
+      const token = await createAuthToken(monotoneNow(), method, getApiPath(path), nonce)
       return { 'Authorization': `Bearer ${token}` }
     } catch {
       return {}
@@ -53,7 +53,7 @@ export function isWebAuthnAvailable(): boolean {
 export async function registerCredential(label: string): Promise<void> {
   // 1. Get registration options from server
   const optionsHeaders = await getAuthHeaders('POST', '/webauthn/register/options')
-  const optionsRes = await fetch(`${API_BASE}/webauthn/register/options`, {
+  const optionsRes = await netFetch(getApiUrl('/webauthn/register/options'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...optionsHeaders },
     body: JSON.stringify({ label }),
@@ -66,7 +66,7 @@ export async function registerCredential(label: string): Promise<void> {
 
   // 3. Verify with server
   const verifyHeaders = await getAuthHeaders('POST', '/webauthn/register/verify')
-  const verifyRes = await fetch(`${API_BASE}/webauthn/register/verify`, {
+  const verifyRes = await netFetch(getApiUrl('/webauthn/register/verify'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...verifyHeaders },
     body: JSON.stringify({ attestation, label, challengeId }),
@@ -80,7 +80,7 @@ export async function registerCredential(label: string): Promise<void> {
  */
 export async function loginWithPasskey(): Promise<{ token: string; pubkey: string }> {
   // 1. Get authentication options from server (no auth needed)
-  const optionsRes = await fetch(`${API_BASE}/webauthn/login/options`, {
+  const optionsRes = await netFetch(getApiUrl('/webauthn/login/options'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
   })
@@ -91,7 +91,7 @@ export async function loginWithPasskey(): Promise<{ token: string; pubkey: strin
   const assertion = await startAuthentication({ optionsJSON })
 
   // 3. Verify with server — returns session token
-  const verifyRes = await fetch(`${API_BASE}/webauthn/login/verify`, {
+  const verifyRes = await netFetch(getApiUrl('/webauthn/login/verify'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ assertion, challengeId }),
@@ -107,7 +107,7 @@ import type { WebAuthnCredentialInfo } from '@protocol/schemas/webauthn'
  */
 export async function listCredentials(): Promise<WebAuthnCredentialInfo[]> {
   const headers = await getAuthHeaders('GET', '/webauthn/credentials')
-  const res = await fetch(`${API_BASE}/webauthn/credentials`, { headers })
+  const res = await netFetch(getApiUrl('/webauthn/credentials'), { headers })
   if (!res.ok) throw new Error('Failed to list credentials')
   const data = await res.json() as { credentials: WebAuthnCredentialInfo[] }
   return data.credentials
@@ -118,7 +118,7 @@ export async function listCredentials(): Promise<WebAuthnCredentialInfo[]> {
  */
 export async function deleteCredential(id: string): Promise<void> {
   const headers = await getAuthHeaders('DELETE', `/webauthn/credentials/${encodeURIComponent(id)}`)
-  const res = await fetch(`${API_BASE}/webauthn/credentials/${encodeURIComponent(id)}`, {
+  const res = await netFetch(getApiUrl(`/webauthn/credentials/${encodeURIComponent(id)}`), {
     method: 'DELETE',
     headers,
   })

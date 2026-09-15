@@ -1335,3 +1335,140 @@ export async function platformRelaunch(): Promise<void> {
   }
   throw new Error('platformRelaunch: not in Tauri context')
 }
+
+// ── Backend address + network egress (#738, #739) ────────────────────
+//
+// A packaged build's CSP `connect-src` is `ipc:` only, so every request to the
+// configured backend is proxied through Rust (apps/desktop/src/net.rs), and the
+// backend address itself is persisted and validated in Rust
+// (apps/desktop/src/api_config.rs) — the webview holds no store-plugin grant for
+// it. `api-config.ts` and `net.ts` build on these; nothing else should call them.
+
+/** A Rust-proxied HTTP response — body is base64 so binary payloads survive IPC. */
+export interface NetResponse {
+  status: number
+  headers: Record<string, string>
+  bodyBase64: string
+}
+
+export interface NetRequest {
+  method: string
+  url: string
+  headers: Record<string, string>
+  bodyBase64: string | null
+}
+
+/** Frame events the Rust WebSocket proxy emits on `net-ws:<id>`. */
+export type NetWsPayload =
+  | { type: 'open' }
+  | { type: 'message'; data: string }
+  | { type: 'close'; code: number; reason: string }
+  | { type: 'error'; message: string }
+
+/**
+ * Tauri rejects a failed command with the Rust `Err(String)` itself, not an
+ * `Error` — normalise so callers never lose the message.
+ */
+export function ipcErrorMessage(err: unknown): string {
+  if (typeof err === 'string') return err
+  if (err instanceof Error) return err.message
+  return String(err)
+}
+
+/** The configured backend origin, or `null` on first run. */
+export async function getConfiguredApiBase(): Promise<string | null> {
+  if (useTauri) {
+    return tauriInvoke<string | null>('api_config_get')
+  }
+  throw new Error('getConfiguredApiBase: not in Tauri context')
+}
+
+/**
+ * Persist the backend origin. Rust re-validates it (https-only outside debug
+ * builds) and refuses while another address is configured; returns the
+ * canonical origin actually stored.
+ */
+export async function persistApiBase(origin: string): Promise<string> {
+  if (useTauri) {
+    return tauriInvoke<string>('api_config_set', { url: origin })
+  }
+  throw new Error('persistApiBase: not in Tauri context')
+}
+
+/** Forget the backend address — the app returns to first-run configuration. */
+export async function clearConfiguredApiBase(): Promise<void> {
+  if (useTauri) {
+    await tauriInvoke<void>('api_config_clear')
+    return
+  }
+  throw new Error('clearConfiguredApiBase: not in Tauri context')
+}
+
+/** Proxy a request to the configured backend (exact-origin allowlist, redirects not followed). */
+export async function netFetchViaRust(request: NetRequest): Promise<NetResponse> {
+  if (useTauri) {
+    return tauriInvoke<NetResponse>('net_fetch', { ...request })
+  }
+  throw new Error('netFetchViaRust: not in Tauri context')
+}
+
+/**
+ * First-run only: whether `<candidate origin>/api/health` answers 2xx. Rust
+ * refuses once a backend is configured, and rate-limits to one probe per second.
+ */
+export async function netProbeHealth(candidate: string): Promise<boolean> {
+  if (useTauri) {
+    return tauriInvoke<boolean>('net_probe_health', { url: candidate })
+  }
+  throw new Error('netProbeHealth: not in Tauri context')
+}
+
+export async function netWsConnect(id: string, url: string): Promise<void> {
+  if (useTauri) {
+    await tauriInvoke<void>('net_ws_connect', { id, url })
+    return
+  }
+  throw new Error('netWsConnect: not in Tauri context')
+}
+
+export async function netWsSend(id: string, data: string): Promise<void> {
+  if (useTauri) {
+    await tauriInvoke<void>('net_ws_send', { id, data })
+    return
+  }
+  throw new Error('netWsSend: not in Tauri context')
+}
+
+export async function netWsClose(id: string): Promise<void> {
+  if (useTauri) {
+    await tauriInvoke<void>('net_ws_close', { id })
+    return
+  }
+  throw new Error('netWsClose: not in Tauri context')
+}
+
+/**
+ * Subscribe to a Rust-proxied WebSocket's frame events. Playwright builds use
+ * an in-page registry that tests/mocks/tauri-core.ts's `net_ws_*` handlers emit
+ * into, mirroring `platformListen`.
+ */
+export async function listenNetWs(
+  id: string,
+  handler: (payload: NetWsPayload) => void,
+): Promise<() => void> {
+  const channel = `net-ws:${id}`
+  if (import.meta.env.PLAYWRIGHT_TEST) {
+    const win = window as unknown as Record<string, unknown>
+    if (!win.__NET_WS_LISTENERS__) win.__NET_WS_LISTENERS__ = {}
+    const map = win.__NET_WS_LISTENERS__ as Record<string, Array<(p: NetWsPayload) => void>>
+    ;(map[channel] ??= []).push(handler)
+    return () => {
+      map[channel] = (map[channel] ?? []).filter(h => h !== handler)
+    }
+  }
+  if (useTauri) {
+    const { listen } = await import('@tauri-apps/api/event')
+    return listen<NetWsPayload>(channel, event => handler(event.payload))
+  }
+  throw new Error('listenNetWs: not in Tauri context')
+}

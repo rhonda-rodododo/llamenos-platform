@@ -39,28 +39,30 @@ final class ScreenshotAuditTests: BaseUITest {
     }
 
     /// Onboarding — after tapping "Create Identity" on the login screen.
+    /// V3 device key model: this lands directly on PIN set — there is no
+    /// separate backup/"continue-to-pin" screen anymore (see
+    /// AuthViewModel.swift's "V3 device key model" doc comment).
     func testScreenshot_01b_Onboarding() {
         launchClean()
         let createBtn = find("create-identity")
         guard createBtn.waitForExistence(timeout: 10) else { return }
         createBtn.tap()
-        let continueBtn = find("continue-to-pin")
-        _ = continueBtn.waitForExistence(timeout: 5)
+        let pinInput = find("pin-input")
+        _ = pinInput.waitForExistence(timeout: 5)
         screenshot("01b-onboarding")
     }
 
     /// PIN setup — shown after identity creation to set a lock PIN.
+    /// PINSetView.swift uses a free-text SecureField ("pin-input"), not the
+    /// digit PINPadView — that component is only used on the lock/unlock
+    /// screen (PINUnlockView.swift).
     func testScreenshot_01c_PINSet() {
         launchClean()
         let createBtn = find("create-identity")
         guard createBtn.waitForExistence(timeout: 10) else { return }
         createBtn.tap()
-        let continueBtn = find("continue-to-pin")
-        if continueBtn.waitForExistence(timeout: 5) {
-            continueBtn.tap()
-        }
-        let pinPad = find("pin-pad")
-        _ = pinPad.waitForExistence(timeout: 5)
+        let pinInput = find("pin-input")
+        _ = pinInput.waitForExistence(timeout: 5)
         screenshot("01c-pin-set")
     }
 

@@ -167,7 +167,14 @@ describe('loadLaneScopes against the real fragments', () => {
     const scopes = await loadLaneScopes(process.cwd())
 
     expect(scopes.desktop).toEqual({
-      owned: ['apps/desktop/', 'src/client/', 'tests/', 'tests/mocks/', 'playwright.config.ts'],
+      owned: [
+        'apps/desktop/',
+        'src/client/',
+        'tests/',
+        'tests/mocks/',
+        'playwright.config.ts',
+        '.github/ci/*-baseline.json',
+      ],
       notOwned: ['tests/steps/', 'packages/test-specs/'],
     })
 

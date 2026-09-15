@@ -3,6 +3,7 @@ import {
   runVerifyCi, runReviewCi, laneIdFromBranch, verdictSummary, ciContextFromEnv,
   REVIEW_KEY_ENV, UNSCOPED_LANE, type CiContext, type VerifyCiDeps, type ReviewCiDeps,
 } from '../../orchestrator/src/ci.js'
+import { parseVerdict } from '../../orchestrator/src/review.js'
 import type { Lane } from '../../orchestrator/src/config.js'
 import type { VerifyInput, VerifyReport } from '../../orchestrator/src/verify.js'
 
@@ -34,11 +35,18 @@ describe('laneIdFromBranch', () => {
 })
 
 describe('verdictSummary', () => {
-  it('prefers the reviewer\'s own VERDICT line', () => {
-    expect(verdictSummary('some preamble\nVERDICT: FAIL — scope creep\ntrailing')).toBe('VERDICT: FAIL — scope creep')
+  it('is the reviewer\'s final VERDICT line', () => {
+    expect(verdictSummary('some preamble\nVERDICT: FAIL — scope creep\n\n')).toBe('VERDICT: FAIL — scope creep')
   })
-  it('falls back to the first non-empty line when there is no verdict line', () => {
-    expect(verdictSummary('\n\nengine exploded\nmore')).toBe('engine exploded')
+  // Expectation CHANGED (was the VERDICT line, then the first line): the
+  // summary is the same line parseVerdict judged. A verdict line with text
+  // after it is UNREADABLE, so the summary must show what came after — not a
+  // verdict that did not count.
+  it('names the same final line parseVerdict judged, never an earlier VERDICT line', () => {
+    const text = 'VERDICT: PASS\ntrailing'
+    expect(parseVerdict(text)).toBe('UNREADABLE')
+    expect(verdictSummary(text)).toBe('trailing')
+    expect(verdictSummary('\n\nengine exploded\nmore')).toBe('more')
   })
   it('never invents a summary for empty output', () => {
     expect(verdictSummary('   \n ')).toBe('(no reviewer output)')
@@ -112,7 +120,7 @@ describe('fleet/verify in CI', () => {
   it('passes with the gate trace as its summary when verification passes', async () => {
     expect(await runVerifyCi(deps())).toEqual({
       ok: true,
-      summary: 'scope=pass impact=low tests=orchestrator:pass review=not-run merge=not-run sha=c0ffee',
+      summary: 'scope=pass impact=low tests=orchestrator:pass review=not-run sha=c0ffee',
     })
   })
 
