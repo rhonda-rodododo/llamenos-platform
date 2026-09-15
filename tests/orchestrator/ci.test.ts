@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, type Mock } from 'vitest'
 import {
-  runVerifyCi, runReviewCi, laneIdFromBranch, verdictSummary, ciContextFromEnv,
+  runVerifyCi, runReviewCi, laneIdFromBranch, itemIdFromBranch, fleetBranchFor, verdictSummary, ciContextFromEnv,
   REVIEW_KEY_ENV, UNSCOPED_LANE, type CiContext, type VerifyCiDeps, type ReviewCiDeps,
 } from '../../orchestrator/src/ci.js'
 import { parseVerdict } from '../../orchestrator/src/review.js'
@@ -32,6 +32,21 @@ describe('laneIdFromBranch', () => {
   })
   it.each(['main', 'feat/whatever', 'fleet/ios', 'fleet/ios/123/extra', 'notfleet/ios/1'])(
     'returns undefined for %s', (b) => { expect(laneIdFromBranch(b)).toBeUndefined() })
+})
+
+describe('fleetBranchFor', () => {
+  it('writes the branch the readers parse back — round trip', () => {
+    const b = fleetBranchFor('shared', '704')
+    expect(b).toBe('fleet/shared/704')
+    expect(laneIdFromBranch(b)).toBe('shared')
+    expect(itemIdFromBranch(b)).toBe('704')
+  })
+  // A writer that produced a branch its own reader rejects would silently
+  // recreate #812: the fleet must refuse to dispatch such an item instead.
+  it.each([['ios', '7/04'], ['io/s', '704'], ['', '704'], ['ios', '']])(
+    'throws for lane "%s" / item "%s" rather than writing an unreadable branch', (laneId, itemId) => {
+      expect(() => fleetBranchFor(laneId, itemId)).toThrow(/fleet branch/)
+    })
 })
 
 describe('verdictSummary', () => {
