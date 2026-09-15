@@ -4,6 +4,11 @@
 # Deploys the Llamenos demo instance to the 'demo' inventory group.
 # Loads demo_vars.yml (or a custom vars file) before running.
 #
+# Per issue #718, the demo instance IS the Internal Availability milestone's
+# staging backend: demo_vars.yml should set app_environment: demo and
+# demo_mode: true (plus demo_mode_confirm: "DESTROY_ALL_DATA") rather than
+# standing up a separate third deployment target.
+#
 # Usage:
 #   ansible-playbook playbooks/deploy-demo.yml --ask-vault-pass
 #   ansible-playbook playbooks/deploy-demo.yml --ask-vault-pass -e demo_vars_file=../demo_vars.yml
@@ -15,6 +20,13 @@
     - name: Include demo vars file
       ansible.builtin.include_vars:
         file: "{{ demo_vars_file | default('../demo_vars.yml') }}"
+      tags: always
+
+    # Demo/dev-only settings must never leak into a host mislabeled
+    # app_environment: production. See deploy/ansible/playbooks/tasks/guard-demo-mode.yml
+    # and issue #716.
+    - name: Include shared demo/dev-mode production safety guard
+      ansible.builtin.include_tasks: tasks/guard-demo-mode.yml
       tags: always
 
 - name: Harden demo server
