@@ -1791,8 +1791,8 @@
   "demo": {
     "admin": "Admin",
     "banner": "Demo Mode",
-    "bannerText": "You're exploring the Llamenos demo. Data resets daily.",
-    "bannerTextSchedule": "You're exploring the Llamenos demo. Data resets on schedule.",
+    "bannerText": "Ambiente de teste — não insira informações reais de quem liga. Os dados aqui não são confidenciais e podem ser excluídos a qualquer momento.",
+    "bannerTextSchedule": "Ambiente de teste — não insira informações reais de quem liga. Os dados são redefinidos {{schedule}} e não são confidenciais.",
     "dismiss": "Dismiss",
     "getStarted": "Deploy your own",
     "pickAccount": "Pick a demo account to explore",
