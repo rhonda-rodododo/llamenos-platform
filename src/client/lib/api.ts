@@ -2,6 +2,8 @@ import * as keyManager from './key-manager'
 import { createAuthToken } from './platform'
 import { APP_API_VERSION, emitUpdateRequired } from './version'
 import { offlineQueue, isQueueableMethod, isNetworkError as isOfflineNetworkError } from './offline-queue'
+import { getApiUrl, getApiPath } from './api-config'
+import { netFetch } from './net'
 
 // --- Protocol schema imports (Epic 364) ---
 import type { CreateShiftBody } from '@protocol/schemas/shifts'
@@ -75,8 +77,6 @@ import type {
   TagResponse,
 } from '@protocol/schemas'
 
-const API_BASE = '/api'
-
 // Auth expiry callback — set by AuthProvider to handle 401s reactively
 let onAuthExpired: (() => void) | null = null
 export function setOnAuthExpired(cb: (() => void) | null) { onAuthExpired = cb }
@@ -103,7 +103,7 @@ async function getAuthHeaders(method: string, apiPath: string): Promise<Record<s
   if (keyManager.isUnlocked()) {
     try {
       const nonce = randomNonce()
-      const token = await createAuthToken(monotoneNow(), method, `${API_BASE}${apiPath}`, nonce)
+      const token = await createAuthToken(monotoneNow(), method, getApiPath(apiPath), nonce)
       return { 'Authorization': `Bearer ${token}` }
     } catch {
       return {}
@@ -197,7 +197,7 @@ export async function request<T>(path: string, options: RequestInit & { retries?
         ...await getAuthHeaders(method, pathOnly),
         ...options.headers,
       }
-      const res = await fetch(`${API_BASE}${path}`, {
+      const res = await netFetch(getApiUrl(path), {
         ...options,
         headers,
         signal: controller.signal,
@@ -310,7 +310,7 @@ export async function getConfig() {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
   try {
-    const res = await fetch(`${API_BASE}/config`, {
+    const res = await netFetch(getApiUrl('/config'), {
       headers: { 'X-API-Version': String(APP_API_VERSION), 'Cache-Control': 'no-cache' },
       signal: controller.signal,
     })
@@ -353,7 +353,7 @@ export async function bootstrapAdmin(pubkey: string, timestamp: number, token: s
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
   try {
-    const res = await fetch(`${API_BASE}/auth/bootstrap`, {
+    const res = await netFetch(getApiUrl('/auth/bootstrap'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pubkey, timestamp, token, ...(nonce ? { nonce } : {}) }),
@@ -740,7 +740,7 @@ export async function getCallRecording(callId: string): Promise<ArrayBuffer> {
     const timeout = setTimeout(() => controller.abort(), 30_000)
     try {
       const headers = await getAuthHeaders('GET', pathOnly)
-      const res = await fetch(`${API_BASE}${hp(`/calls/${callId}/recording`)}`, { headers, signal: controller.signal })
+      const res = await netFetch(getApiUrl(hp(`/calls/${callId}/recording`)), { headers, signal: controller.signal })
       if (!res.ok) {
         if (res.status === 401 && 'Authorization' in headers) {
           if (attempt < MAX_RETRIES) continue
@@ -891,7 +891,7 @@ export async function validateInvite(code: string) {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
   try {
-    const res = await fetch(`${API_BASE}/invites/validate/${code}`, { signal: controller.signal })
+    const res = await netFetch(getApiUrl(`/invites/validate/${code}`), { signal: controller.signal })
     return res.json() as Promise<{ valid: boolean; name?: string; roleIds?: string[]; error?: string }>
   } finally {
     clearTimeout(timeout)
@@ -908,7 +908,7 @@ export async function redeemInvite(
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
   try {
-    const res = await fetch(`${API_BASE}/invites/redeem`, {
+    const res = await netFetch(getApiUrl('/invites/redeem'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code, pubkey, timestamp, token }),
@@ -944,7 +944,7 @@ export async function uploadIvrAudio(promptType: string, language: string, audio
       ...await getAuthHeaders('PUT', `/settings/ivr-audio/${promptType}/${language}`),
       'Content-Type': audioBlob.type || 'audio/webm',
     }
-    const res = await fetch(`${API_BASE}/settings/ivr-audio/${promptType}/${language}`, {
+    const res = await netFetch(getApiUrl(`/settings/ivr-audio/${promptType}/${language}`), {
       method: 'PUT',
       headers,
       body: audioBlob,
@@ -969,8 +969,13 @@ export async function deleteIvrAudio(promptType: string, language: string) {
   return request<{ ok: true }>(`/settings/ivr-audio/${promptType}/${language}`, { method: 'DELETE' })
 }
 
+// NOTE: this returns a literal URL for an <audio>/<img>-style `src`, not a
+// fetch() call — it is NOT routed through netFetch. Against a remote backend
+// this also needs a CSP `media-src`/`img-src` allowance or a blob-URL rework
+// (fetch via netFetch, then `URL.createObjectURL`) — tracked as a follow-up
+// to #738/#739; same-origin dev/test playback is unaffected.
 export function getIvrAudioUrl(promptType: string, language: string) {
-  return `${API_BASE}/ivr-audio/${promptType}/${language}`
+  return getApiUrl(`/ivr-audio/${promptType}/${language}`)
 }
 
 // --- Custom Fields ---
@@ -1503,7 +1508,7 @@ export async function uploadChunk(uploadId: string, chunkIndex: number, data: Ar
         ...await getAuthHeaders('PUT', `/uploads/${uploadId}/chunks/${chunkIndex}`),
         'Content-Type': 'application/octet-stream',
       }
-      const res = await fetch(`${API_BASE}/uploads/${uploadId}/chunks/${chunkIndex}`, {
+      const res = await netFetch(getApiUrl(`/uploads/${uploadId}/chunks/${chunkIndex}`), {
         method: 'PUT',
         headers,
         body: data,
@@ -1549,7 +1554,7 @@ export async function downloadFile(fileId: string): Promise<ArrayBuffer> {
     const timeout = setTimeout(() => controller.abort(), 30_000)
     try {
       const headers: Record<string, string> = await getAuthHeaders('GET', `/files/${fileId}/content`)
-      const res = await fetch(`${API_BASE}/files/${fileId}/content`, { headers, signal: controller.signal })
+      const res = await netFetch(getApiUrl(`/files/${fileId}/content`), { headers, signal: controller.signal })
       if (!res.ok) {
         if (res.status === 401 && 'Authorization' in headers) {
           if (attempt < MAX_RETRIES) continue
@@ -2747,7 +2752,7 @@ export async function initiateRecovery(
   userIdentifier: string,
   newDevicePubkey: string,
 ): Promise<{ sessionId: string; verificationSent: boolean }> {
-  const res = await fetch(`/api/recovery-group/initiate`, {
+  const res = await netFetch(getApiUrl('/recovery-group/initiate'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ hubId, userIdentifier, newDevicePubkey }),
@@ -2763,7 +2768,7 @@ export async function verifyRecoveryCode(
   sessionId: string,
   verificationCode: string,
 ): Promise<{ ok: boolean; expiresAt: string }> {
-  const res = await fetch(`/api/recovery-group/initiate/verify`, {
+  const res = await netFetch(getApiUrl('/recovery-group/initiate/verify'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ sessionId, verificationCode }),

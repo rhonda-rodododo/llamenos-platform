@@ -3,8 +3,6 @@ import type { SecondOpinionResult } from './review.js'
 
 export type ReviewVerdict = SecondOpinionResult['verdict']
 
-export interface MergeDecision { merge: boolean; reason: string }
-
 export interface GateTraceInput {
   /** `undefined` when `verifyMechanical` never ran at all for this item —
    *  distinct from a report that ran and failed. */
@@ -15,9 +13,6 @@ export interface GateTraceInput {
   /** The reviewer's own text — surfaced only for UNREADABLE, so the trace
    *  says WHY a review could not be trusted, not just that it wasn't PASS. */
   reviewText?: string
-  /** `undefined` when `mayAutoMerge` was never reached (mechanical failure,
-   *  or the review did not pass). */
-  decision?: MergeDecision
 }
 
 /**
@@ -62,20 +57,17 @@ function reviewSummary(verdict: ReviewVerdict | undefined, text: string | undefi
   return `UNREADABLE(${reason})`
 }
 
-function mergeSummary(decision: MergeDecision | undefined): string {
-  if (decision === undefined) return 'not-run'
-  return `${decision.merge ? 'yes' : 'no'}(${decision.reason})`
-}
-
 /**
  * A compact, one-line, machine-parseable summary of every gate a dispatched
- * item passed through — scope, impact, tests, review, merge, and the exact
- * SHA `verifyMechanical` examined — meant to live in the ledger's terminal
+ * item passed through — scope, impact, tests, review, and the exact SHA
+ * `verifyMechanical` examined — meant to live in the ledger's terminal
  * `note` (tick.ts). This is G2's fix: before this, the ledger could not tell
  * "the gate refused" from "the gate never ran" for a given item, which is the
  * exact ambiguity that produced most of this project's bugs (issue #660/PR
  * #662: a bare pass-through `SUCCESS` with the worker's own note was
- * indistinguishable from a fully verified merge).
+ * indistinguishable from a fully verified merge). There is no `merge=` field
+ * any more: whether a PR merged is a fact about GitHub, derived live by
+ * `llamenos-fleet status <issue>`, never a claim this trace could cache.
  *
  * Every stage renders EXPLICITLY — `not-run` / `none` / `unknown`, never an
  * absent key — so a stage that never happened can never be misread as one
@@ -88,7 +80,6 @@ export function buildGateTrace(input: GateTraceInput): string {
     `impact=${report ? impactSummary(report) : 'not-run'}`,
     `tests=${report ? testsSummary(report) : 'not-run'}`,
     `review=${reviewSummary(input.reviewVerdict, input.reviewText)}`,
-    `merge=${mergeSummary(input.decision)}`,
     `sha=${report?.verifiedCommit ?? 'none'}`,
   ]
   return parts.join(' ')

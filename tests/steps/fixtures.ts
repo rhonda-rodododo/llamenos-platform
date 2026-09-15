@@ -11,6 +11,8 @@ export type AdminWorld = {
   lastUserPubkey: string
   lastShiftName: string
   lastPhone: string
+  lastHubId: string
+  lastHubName: string
 }
 
 export type RolesWorld = {
@@ -136,7 +138,7 @@ export const test = base.extend<
   }, { auto: true }],
   // Scenario-scoped world objects — fresh per test, no cross-scenario leakage.
   adminWorld: async ({}, use) => {
-    await use({ lastUserName: '', lastUserPubkey: '', lastShiftName: '', lastPhone: '' })
+    await use({ lastUserName: '', lastUserPubkey: '', lastShiftName: '', lastPhone: '', lastHubId: '', lastHubName: '' })
   },
   rolesWorld: async ({}, use) => {
     await use({ cachedRoles: [], lastCreatedRoleId: '', volunteerNsec: '', reporterNsec: '' })

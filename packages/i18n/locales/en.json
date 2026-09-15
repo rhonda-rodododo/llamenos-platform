@@ -3581,6 +3581,20 @@
     "voicemail": "Voicemail",
     "webrtcNotConfigured": "Browser calling is not available. Your admin needs to enable WebRTC in the telephony provider settings."
   },
+  "serverAddress": {
+    "checking": "Checking...",
+    "connect": "Connect",
+    "errorWithDetail": "Couldn't reach that server: {{detail}}",
+    "firstRunDescription": "This app needs to know which Llámenos server to connect to before it can sign in.",
+    "firstRunTitle": "Connect to your hotline server",
+    "help": "Enter your organization's server address, e.g. app.example.org. We'll infer https:// unless you specify otherwise.",
+    "label": "Server address",
+    "placeholder": "app.example.org",
+    "saveAndReconnect": "Save and reconnect",
+    "settingsDescription": "Change which server this desktop app connects to.",
+    "settingsTitle": "Server connection",
+    "unreachable": "Couldn't reach that server. Check the address and try again."
+  },
   "setup": {
     "autoResponse": "Auto-Response Template",
     "autoResponseHelp": "Automatically sent when a new conversation starts.",

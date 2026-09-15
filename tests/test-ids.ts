@@ -42,6 +42,16 @@ export const TestIds = {
   VOLUNTEER_ROW: 'volunteer-row',
   VOLUNTEER_ADD_BTN: 'volunteer-add-btn',
   VOLUNTEER_DELETE_BTN: 'volunteer-delete-btn',
+  VOLUNTEER_ROW_ROLE_SELECT: 'volunteer-row-role-select',
+  VOLUNTEER_ROW_ROLE_OPTION: 'volunteer-row-role-option',
+  VOLUNTEER_ROW_ROLE_BADGE: 'volunteer-row-role-badge',
+  VOLUNTEER_ROW_NAME_LINK: 'volunteer-row-name-link',
+  HUB_SWITCHER_TRIGGER: 'hub-switcher-trigger',
+  HUB_SWITCHER_OPTION: 'hub-switcher-option',
+  DELETE_HUB_CONFIRM_NAME: 'delete-hub-confirm-name',
+  DELETE_HUB_CONFIRM_INPUT: 'delete-hub-confirm-input',
+  USER_FORM_ROLE_SELECT: 'user-form-role-select',
+  USER_FORM_ROLE_OPTION: 'user-form-role-option',
   VOLUNTEER_EDIT_BTN: 'volunteer-edit-btn',
   VOLUNTEER_DEVICE_KEY_CARD: 'volunteer-device-key-card',
   VOLUNTEER_DEVICE_KEY_CODE: 'volunteer-device-key-code',
@@ -302,6 +312,15 @@ export const TestIds = {
   SUCCESS_TOAST: 'success-toast',
   IMPORT_CSV: 'import-csv',
   BACK_BTN: 'back-btn',
+
+  // ============ Server Address (#738/#739) ============
+  SERVER_ADDRESS_TITLE: 'server-address-title',
+  SERVER_ADDRESS_INPUT: 'server-address-input',
+  SERVER_ADDRESS_SUBMIT: 'server-address-submit',
+  SERVER_ADDRESS_ERROR: 'server-address-error',
+  SETTINGS_SERVER_ADDRESS_INPUT: 'settings-server-address-input',
+  SETTINGS_SERVER_ADDRESS_SUBMIT: 'settings-server-address-submit',
+  SETTINGS_SERVER_ADDRESS_ERROR: 'settings-server-address-error',
 } as const
 
 export type TestId = (typeof TestIds)[keyof typeof TestIds]

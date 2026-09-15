@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import type { Lane } from './config.js'
 import type { VerifyInput, VerifyReport } from './verify.js'
+import { finalLine } from './review.js'
 import type { SecondOpinionInput, SecondOpinionResult } from './review.js'
 import { join } from 'node:path'
 import { buildGateTrace } from './trace.js'
@@ -15,15 +16,9 @@ const execFileAsync = promisify(execFile)
  * commit — never on the operator's laptop before the PR exists, and with no
  * branch-name opt-out.
  *
- * STATE OF PLAY, because this is mid-migration and a comment describing the
- * finished system would be a lie about the current one. As of this commit
- * these entry points are DEAD CODE: no workflow invokes them. The jobs that
- * do arrive in the next PR, and they are advisory until the repo ruleset
- * lists them as required checks — a step outside this repo. The gate that
- * actually stops a merge today is still `mayAutoMerge` (merge.ts), in this
- * process, where nothing outside it is bound by the result. That is the whole
- * point of the migration, and it is not finished until the ruleset is applied
- * and merge.ts is deleted, in that order. The previous design decided
+ * The migration is complete as of this commit: the ruleset requires both
+ * checks, and `merge.ts`'s in-process gate — which nothing outside this
+ * process was ever bound by — is deleted. What stops a merge now is GitHub. The previous design decided
  * "may this merge?" in-process and then ran the merge itself; GitHub knew
  * nothing about it, so anyone could merge a fleet PR on the repo's own CI
  * alone, which is what happened to the fleet's first live PR (#662).
@@ -112,11 +107,12 @@ export function itemIdFromBranch(branch: string): string | undefined {
   return FLEET_BRANCH_RE.exec(branch)?.[2]
 }
 
-/** The reviewer's own `VERDICT: PASS|FAIL` line if it wrote one, else its
- *  first non-empty line — never an invented summary. */
+/** The reviewer's final non-empty line — the same line `parseVerdict` judges,
+ *  selected by the same function, so the printed summary can never name a
+ *  different line from the one that decided the job. Never an invented
+ *  summary. */
 export function verdictSummary(text: string): string {
-  const lines = text.split('\n').map((l) => l.trim()).filter((l) => l.length > 0)
-  return lines.find((l) => /verdict:/i.test(l)) ?? lines[0] ?? '(no reviewer output)'
+  return finalLine(text) ?? '(no reviewer output)'
 }
 
 export interface CiContext {

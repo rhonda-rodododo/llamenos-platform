@@ -9,6 +9,7 @@ import {
   apiGet,
   apiPost,
   apiDelete,
+  apiPatch,
   createUserViaApi,
 } from '../../api-helpers'
 
@@ -29,6 +30,21 @@ function getS(world: Record<string, unknown>): ErasureTestState {
 Before(async ({ world }) => {
   setState<ErasureTestState>(world, STATE_KEY, {})
 })
+
+/** Feature files use the literal hub id "test-hub"; map it to this scenario's isolated hub. */
+function hubPath(path: string, workerHub: string): string {
+  return path.replace('/hubs/test-hub/', `/hubs/${workerHub}/`)
+}
+
+interface ErasureConfigBody {
+  config?: {
+    hubId?: string
+    delayHours?: number
+    emergencyOverrideEnabled?: boolean
+    updatedAt?: string | null
+    updatedBy?: string | null
+  }
+}
 
 // ── Given ──────────────────────────────────────────────────────────
 
@@ -73,10 +89,10 @@ Given('a target volunteer user with a known device pubkey', async ({ request, wo
 
 // ── When ───────────────────────────────────────────────────────────
 
-When('the volunteer POSTs to {string} with a justification', async ({ request, world }, path: string) => {
+When('the volunteer POSTs to {string} with a justification', async ({ request, world, workerHub }, path: string) => {
   const s = getS(world)
   expect(s.volunteer).toBeDefined()
-  const res = await apiPost(request, path, { justification: 'I want my data removed' }, s.volunteer!.deviceKey)
+  const res = await apiPost(request, hubPath(path, workerHub), { justification: 'I want my data removed' }, s.volunteer!.deviceKey)
   setLastResponse(world, res)
 })
 
@@ -94,17 +110,17 @@ When('the volunteer DELETEs {string}', async ({ request, world }, path: string) 
   setLastResponse(world, res)
 })
 
-When('the volunteer GETs {string}', async ({ request, world }, path: string) => {
+When('the volunteer GETs {string}', async ({ request, world, workerHub }, path: string) => {
   const s = getS(world)
   expect(s.volunteer).toBeDefined()
-  const res = await apiGet(request, path, s.volunteer!.deviceKey)
+  const res = await apiGet(request, hubPath(path, workerHub), s.volunteer!.deviceKey)
   setLastResponse(world, res)
 })
 
-When('the admin GETs {string}', async ({ request, world }, path: string) => {
+When('the admin GETs {string}', async ({ request, world, workerHub }, path: string) => {
   const s = getS(world)
   expect(s.admin).toBeDefined()
-  const res = await apiGet(request, path, s.admin!.deviceKey)
+  const res = await apiGet(request, hubPath(path, workerHub), s.admin!.deviceKey)
   setLastResponse(world, res)
 })
 
@@ -128,7 +144,52 @@ When('the admin POSTs to {string}', async ({ request, world }, pathTemplate: str
   setLastResponse(world, res)
 })
 
+When(
+  'the admin PATCHes {string} with delayHours {int} and emergency override {string}',
+  async ({ request, world, workerHub }, path: string, delayHours: number, override: string) => {
+    const s = getS(world)
+    expect(s.admin).toBeDefined()
+    const res = await apiPatch(
+      request,
+      hubPath(path, workerHub),
+      { delayHours, emergencyOverrideEnabled: override === 'enabled' },
+      s.admin!.deviceKey,
+    )
+    setLastResponse(world, res)
+  },
+)
+
+When('the admin PATCHes {string} with delayHours {int}', async ({ request, world, workerHub }, path: string, delayHours: number) => {
+  const s = getS(world)
+  expect(s.admin).toBeDefined()
+  const res = await apiPatch(request, hubPath(path, workerHub), { delayHours }, s.admin!.deviceKey)
+  setLastResponse(world, res)
+})
+
 // ── Then ───────────────────────────────────────────────────────────
+
+Then(
+  'the response should contain an erasure config for the hub with delayHours {int} and emergency override {string}',
+  ({ world, workerHub }, delayHours: number, override: string) => {
+    const body = getSharedState(world).lastResponse?.data as ErasureConfigBody
+    expect(body?.config?.hubId).toBe(workerHub)
+    expect(body?.config?.delayHours).toBe(delayHours)
+    expect(body?.config?.emergencyOverrideEnabled).toBe(override === 'enabled')
+  },
+)
+
+Then('the erasure config should not have been saved yet', ({ world }) => {
+  const body = getSharedState(world).lastResponse?.data as ErasureConfigBody
+  expect(body?.config?.updatedAt).toBeNull()
+  expect(body?.config?.updatedBy).toBeNull()
+})
+
+Then('the erasure config should record the admin as the last updater', ({ world }) => {
+  const s = getS(world)
+  const body = getSharedState(world).lastResponse?.data as ErasureConfigBody
+  expect(body?.config?.updatedBy).toBe(s.admin!.pubkey)
+  expect(Number.isNaN(Date.parse(body?.config?.updatedAt ?? ''))).toBe(false)
+})
 
 Then('the response should contain an erasure request with status {string}', ({ world }, status: string) => {
   const state = getSharedState(world)

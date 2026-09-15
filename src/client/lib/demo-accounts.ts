@@ -1,4 +1,6 @@
 import { DEMO_ACCOUNTS } from '@shared/demo-accounts'
+import { getApiUrl } from './api-config'
+import { netFetch } from './net'
 
 /**
  * Demo account seed values — fetched from the server at login time.
@@ -9,7 +11,7 @@ let demoSeeds: Record<string, string> | null = null
 
 async function loadSeeds(): Promise<Record<string, string>> {
   if (!demoSeeds) {
-    const res = await fetch('/api/config/demo/credentials')
+    const res = await netFetch(getApiUrl('/config/demo/credentials'))
     if (!res.ok) return {}
     const data = await res.json() as { credentials: Array<{ pubkey: string; seedHex: string }> }
     demoSeeds = Object.fromEntries(data.credentials.map(c => [c.pubkey, c.seedHex]))
