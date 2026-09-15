@@ -99,3 +99,41 @@ Feature: Recovery Group Lifecycle
   Scenario: Contributing share to non-existent session returns 404
     When an authenticated user contributes a share to session "nonexistent-session-id"
     Then the response status is 404
+
+  # -- Session listing (EP09 errata #1 / issue #729) --
+
+  @backend
+  Scenario: Admin lists recovery sessions for a hub
+    Given a recovery session exists for the hub
+    When the admin lists recovery sessions for the hub
+    Then the response status is 200
+    And the listed sessions include the seeded session
+
+  @backend
+  Scenario: Listing sessions requires recovery:view permission
+    Given a recovery session exists for the hub
+    And a user without "recovery:view" permission
+    When that user lists recovery sessions for the hub
+    Then the response status is 403
+
+  # -- Atomic group rotation with envelope re-wrap (EP09 errata #5 / issue #729) --
+
+  @backend @crypto
+  Scenario: Rotating a recovery group excludes the departed holder and re-wraps user envelopes
+    Given a recovery group with a real HPKE keypair is enrolled for the hub
+    When the admin rotates the recovery group, excluding the departed holder, and re-wraps the user envelope
+    Then the response status is 200
+    And the rotated recovery group excludes the departed holder
+    And the departed group key cannot decrypt the rotated envelope, but the new group key can
+
+  # -- Full recovery ceremony + recovery-device-add sigchain link (EP09 errata #12 / issue #729) --
+
+  @backend @crypto
+  Scenario: Completing recovery authorizes the new device via a self-signed sigchain link and decrypts the PUK seed
+    Given a recovery group is enrolled with two real contributing holders
+    When each contributing holder submits their share to the new device
+    Then the recovering device reconstructs the group key from the released contributions
+    When the new device completes recovery with a self-authorizing sigchain link
+    Then the response status is 200
+    And the recovering user's sigchain shows a recovery-device-add link signed by the new device
+    And the recovered device decrypts the PUK seed envelope
