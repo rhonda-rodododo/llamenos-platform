@@ -12,7 +12,17 @@ const execFileAsync = promisify(execFile)
  */
 export const REPO = 'rhonda-rodododo/llamenos-platform'
 
+/**
+ * `gh api` has no `-R`/`--repo` flag at all — confirmed live against the
+ * pinned `gh` binary: `unknown shorthand flag: 'R' in -R`. Every other
+ * subcommand this fleet calls (`issue`, `pr`, …) does accept it, which is
+ * what made appending it unconditionally look safe for as long as nothing
+ * called `api`. `api` callers are expected to name `repos/{owner}/{repo}/…`
+ * in the endpoint path themselves instead (ci.ts's cache lookups do), so
+ * there is nothing to add here — this is an exemption, not a gap.
+ */
 export function ghArgs(args: string[]): string[] {
+  if (args[0] === 'api') return args
   return args.includes('-R') || args.includes('--repo') ? args : [...args, '-R', REPO]
 }
 

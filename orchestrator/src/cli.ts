@@ -16,7 +16,7 @@ import { dispatch as dispatchWorker, type EffortLevel } from './engines.js'
 import { verifyMechanical } from './verify.js'
 import { secondOpinion, postReview } from './review.js'
 import {
-  runVerifyCi, runReviewCi, ciContextFromEnv, ciDiff,
+  runVerifyCi, runReviewCi, ciContextFromEnv, ciDiff, ciReviewKey, defaultFindCachedReview,
   REVIEW_JOB, REVIEW_KEY_ENV, VERIFY_JOB, itemIdFromBranch, fleetBranchFor, type CiContext, type CiVerdict,
 } from './ci.js'
 import {
@@ -1174,6 +1174,8 @@ const HANDLERS: Record<string, CommandHandler> = {
     log: ciLog,
     prDiff: () => ciDiff(ctx),
     secondOpinion,
+    reviewKey: (diff) => ciReviewKey(ctx, diff),
+    findCachedReview: defaultFindCachedReview(ctx),
   })),
   plan: () => runPlan(),
   integrate: () => runIntegrate(),

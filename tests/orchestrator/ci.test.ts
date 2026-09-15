@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, type Mock } from 'vitest'
 import {
   runVerifyCi, runReviewCi, laneIdFromBranch, itemIdFromBranch, fleetBranchFor, verdictSummary, ciContextFromEnv,
-  REVIEW_KEY_ENV, UNSCOPED_LANE, type CiContext, type VerifyCiDeps, type ReviewCiDeps,
+  reviewKeyFor, extractLoggedReviewKey,
+  REVIEW_JOB, REVIEW_KEY_ENV, UNSCOPED_LANE, type CiContext, type VerifyCiDeps, type ReviewCiDeps,
+  type CachedReviewVerdict,
 } from '../../orchestrator/src/ci.js'
 import { parseVerdict } from '../../orchestrator/src/review.js'
 import type { Lane } from '../../orchestrator/src/config.js'
@@ -211,6 +213,8 @@ describe('fleet/review in CI', () => {
     log: () => {},
     prDiff: vi.fn(async () => 'diff --git a/x b/x'),
     secondOpinion: vi.fn(async () => ({ verdict: 'PASS' as const, text: 'looks fine\nVERDICT: PASS' })),
+    reviewKey: vi.fn(async () => 'a'.repeat(64)),
+    findCachedReview: vi.fn(async () => undefined),
     ...over,
   })
 
@@ -305,6 +309,118 @@ describe('fleet/review in CI', () => {
     expect(d.secondOpinion).toHaveBeenCalledWith(
       expect.objectContaining({ authorEngine: 'claude', pr: '42', snapshotDir: '/tmp/head' }))
   })
+
+  // The review-key cache (#812-class quota incident: a merge-from-main
+  // re-reviewed an unchanged diff on every push). `reviewKey` is computed
+  // from the diff `prDiff()` returned, and handed to `findCachedReview` —
+  // that wiring is what a mutation swapping the key to `ctx.headSha` would
+  // have no reason to preserve, since `deps.reviewKey` never sees `ctx` at
+  // all here (it is injected as a pure function of the diff text).
+  describe('review-key cache', () => {
+    const cachedPass: CachedReviewVerdict = { sha: 'earliersha', verdict: 'PASS', text: 'VERDICT: PASS' }
+
+    it('reuses a prior PASS for the same content key — the engine is never invoked', async () => {
+      const findCachedReview = vi.fn(async () => cachedPass)
+      const d = deps({ findCachedReview })
+      const v = await runReviewCi(d)
+      expect(v.ok).toBe(true)
+      expect(v.summary).toContain(`reused verdict for review-key=${'a'.repeat(64)} from earliersha`)
+      expect(d.secondOpinion).not.toHaveBeenCalled()
+    })
+
+    it('invokes the engine when the only prior verdict for this key was FAIL — a FAIL is never reused', async () => {
+      const findCachedReview = vi.fn(async () => ({ sha: 'earliersha', verdict: 'FAIL' as const, text: 'VERDICT: FAIL — x' }))
+      const d = deps({ findCachedReview })
+      const v = await runReviewCi(d)
+      expect(v.ok).toBe(true) // the (mocked) engine's own PASS, not the cached FAIL
+      expect(d.secondOpinion).toHaveBeenCalledTimes(1)
+      expect(v.summary).not.toContain('reused verdict')
+    })
+
+    it('invokes the engine when the lookup finds nothing for this key (a different diff)', async () => {
+      const findCachedReview = vi.fn(async () => undefined)
+      const d = deps({ findCachedReview })
+      await runReviewCi(d)
+      expect(d.secondOpinion).toHaveBeenCalledTimes(1)
+    })
+
+    it('invokes the engine when the cache lookup itself throws — fail safe, never fail cheap', async () => {
+      const findCachedReview = vi.fn(async () => { throw new Error('gh api rate limited') })
+      const d = deps({ findCachedReview })
+      const v = await runReviewCi(d)
+      expect(d.secondOpinion).toHaveBeenCalledTimes(1)
+      expect(v.ok).toBe(true) // the engine's own PASS, reached despite the lookup failure
+    })
+
+    // Wiring pin: the key is derived from the diff `prDiff()` returned, not
+    // from anything on `ctx` — a mutation keying on `ctx.headSha` instead
+    // would still compile (both are strings) but would call `reviewKey` with
+    // the wrong argument, which this assertion catches directly.
+    it('computes the key from the diff text, not from the head sha', async () => {
+      const d = deps({ prDiff: vi.fn(async () => 'diff --git a/y b/y') })
+      await runReviewCi(d)
+      expect(d.reviewKey).toHaveBeenCalledWith('diff --git a/y b/y')
+    })
+  })
+})
+
+describe('reviewKeyFor', () => {
+  it('is stable for the same merge-base and diff text', () => {
+    expect(reviewKeyFor('base1', 'diff-content')).toBe(reviewKeyFor('base1', 'diff-content'))
+  })
+
+  it('changes when the diff content differs by a single byte', () => {
+    expect(reviewKeyFor('base1', 'diff-content')).not.toBe(reviewKeyFor('base1', 'diff-contentx'))
+  })
+
+  // Merge-base is a second, independent input — not folded into "the diff
+  // text already encodes it" as an excuse to drop it.
+  it('changes when the merge-base differs, even for identical diff text', () => {
+    expect(reviewKeyFor('base1', 'diff-content')).not.toBe(reviewKeyFor('base2', 'diff-content'))
+  })
+
+  it('is a lowercase 64-character hex sha256 digest', () => {
+    expect(reviewKeyFor('b', 'd')).toMatch(/^[0-9a-f]{64}$/)
+  })
+})
+
+describe('extractLoggedReviewKey', () => {
+  const line = (iso: string, text: string): string => `${iso} ${text}`
+
+  it('reads the standalone review-key line and the fleet/review summary that follows it', () => {
+    const key = 'b'.repeat(64)
+    const log = [
+      line('2026-09-15T01:10:50.0000000Z', 'gate (no code from the commit under judgement executed): scope=pass'),
+      line('2026-09-15T01:10:51.0000000Z', `review-key=${key}`),
+      line('2026-09-15T01:10:52.0000000Z', `${REVIEW_JOB}: PASS — VERDICT: PASS`),
+    ].join('\n')
+    expect(extractLoggedReviewKey(log)).toEqual({ key, summary: 'PASS — VERDICT: PASS' })
+  })
+
+  it('joins a multi-line summary — the runner timestamps every line of one write call individually', () => {
+    const key = 'c'.repeat(64)
+    const log = [
+      line('2026-09-15T01:10:51.0000000Z', `review-key=${key}`),
+      line('2026-09-15T01:10:52.0000000Z', `${REVIEW_JOB}: FAIL — VERDICT: FAIL — widens scope`),
+      line('2026-09-15T01:10:52.0000001Z', ''),
+      line('2026-09-15T01:10:52.0000002Z', 'full reviewer text goes here'),
+    ].join('\n')
+    const found = extractLoggedReviewKey(log)
+    expect(found?.key).toBe(key)
+    expect(found?.summary).toBe('FAIL — VERDICT: FAIL — widens scope\n\nfull reviewer text goes here')
+  })
+
+  it('returns undefined for a log with no review-key line — an older run, or one that crashed first', () => {
+    const log = [line('2026-09-15T01:10:50.0000000Z', `${REVIEW_JOB}: PASS — VERDICT: PASS`)].join('\n')
+    expect(extractLoggedReviewKey(log)).toBeUndefined()
+  })
+
+  it('ignores a review-key substring that is not its own standalone line', () => {
+    const log = [
+      line('2026-09-15T01:10:50.0000000Z', `some text mentioning review-key=${'d'.repeat(64)} inline`),
+    ].join('\n')
+    expect(extractLoggedReviewKey(log)).toBeUndefined()
+  })
 })
 
 // The load-bearing invariant of the round that fixed the gate: a `.git` in
@@ -331,6 +447,7 @@ describe('the commit under judgement is data, never a checkout', () => {
       ctx: ctx(), apiKey: 'a-key', lanes: async () => [lane()], verify: vi.fn(async () => passing),
       pathExists: hasGitInHead, log: () => {},
       prDiff: vi.fn(async () => ''), secondOpinion,
+      reviewKey: vi.fn(async () => 'a'.repeat(64)), findCachedReview: vi.fn(async () => undefined),
     })
     expect(v.ok).toBe(false)
     expect(v.summary).toContain('must be exported as data')

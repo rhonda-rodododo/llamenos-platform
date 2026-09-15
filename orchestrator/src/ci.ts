@@ -1,10 +1,12 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
+import { createHash } from 'node:crypto'
 import type { Lane } from './config.js'
 import type { VerifyInput, VerifyReport } from './verify.js'
 import { finalLine, type SecondOpinionInput, type SecondOpinionResult } from './review.js'
 import { join } from 'node:path'
 import { buildGateTrace } from './trace.js'
+import { REPO, gh, ghJson } from './gh.js'
 
 const execFileAsync = promisify(execFile)
 
@@ -167,11 +169,44 @@ export interface CiDeps {
 
 export type VerifyCiDeps = CiDeps
 
+/**
+ * A previously-recorded `fleet/review` verdict for THIS pull request, found
+ * by `ReviewCiDeps.findCachedReview` under an exact content-key match. Carries
+ * `verdict` rather than being PASS-only so the fail-safe rule below — a
+ * cached FAIL is never reused — lives in `runReviewCi`, next to its own test,
+ * instead of inside an untested `gh`-calling implementation.
+ */
+export interface CachedReviewVerdict {
+  /** The commit whose `fleet/review` run produced this verdict. */
+  sha: string
+  verdict: 'PASS' | 'FAIL'
+  text: string
+}
+
 export interface ReviewCiDeps extends CiDeps {
   /** `undefined`/empty when the repo secret is not configured. */
   apiKey: string | undefined
   prDiff(): Promise<string>
   secondOpinion(input: SecondOpinionInput): Promise<SecondOpinionResult>
+  /**
+   * The content key for this diff: sha256 of the merge-base sha and the diff
+   * TEXT (see `reviewKeyFor`) — never the head sha. A merge-from-main moves
+   * the head sha on every push without changing what the PR proposes; keying
+   * on the head sha would mean this cache never hits the case it exists for.
+   */
+  reviewKey(diff: string): Promise<string>
+  /**
+   * Looks up whatever `fleet/review` verdict was most recently recorded for
+   * THIS pull request under the given content key — never another PR's,
+   * never another base branch's: the search space this function is given is
+   * this one PR's own commit/check-run history and nothing else.
+   *
+   * May throw. `runReviewCi` treats a throw exactly like "nothing found":
+   * fail SAFE, not fail cheap — a lookup that could not be completed must
+   * never be read as "no prior review exists" in the sense of skipping the
+   * engine, it must read as "run the engine, same as always".
+   */
+  findCachedReview(key: string): Promise<CachedReviewVerdict | undefined>
 }
 
 /**
@@ -246,6 +281,32 @@ export async function runVerifyCi(deps: VerifyCiDeps): Promise<CiVerdict> {
 }
 
 /**
+ * Fail-safe wrapper around `deps.findCachedReview`: a lookup that throws, or
+ * that finds nothing, or that finds a prior FAIL for this exact key, is
+ * treated identically — never reused, always fall through to the engine. A
+ * cached FAIL must be re-earned after any push; it is a fact about the OLD
+ * content, and the whole point of keying on content rather than the head sha
+ * is that a push which changed nothing about the diff should not have to
+ * re-earn a PASS, but a push that is under review because something DID need
+ * fixing gets no such shortcut.
+ */
+async function findReusableVerdict(deps: ReviewCiDeps, key: string): Promise<CachedReviewVerdict | undefined> {
+  let found: CachedReviewVerdict | undefined
+  try {
+    found = await deps.findCachedReview(key)
+  } catch (e) {
+    deps.log(`review-key=${key}: cache lookup failed, running the engine: ${e instanceof Error ? e.message : String(e)}`)
+    return undefined
+  }
+  if (found === undefined) return undefined
+  if (found.verdict !== 'PASS') {
+    deps.log(`review-key=${key} was last recorded FAIL at ${found.sha} — a FAIL is never reused, running the engine`)
+    return undefined
+  }
+  return found
+}
+
+/**
  * `fleet/review` — the non-author model's verdict on EVERY pull request,
  * produced on the runner against the exact head commit by an engine that is
  * not the one that wrote the diff (`secondOpinion` picks it, and hands it a
@@ -256,6 +317,13 @@ export async function runVerifyCi(deps: VerifyCiDeps): Promise<CiVerdict> {
  * re-check is the invariant `secondOpinion` already enforces by throwing — a
  * review may only downgrade a mechanical pass, never rescue a failure — so a
  * diff that failed scope gets no review at all.
+ *
+ * Before invoking the engine at all, a content key is computed from the diff
+ * (`deps.reviewKey`) and checked against this PR's own prior `fleet/review`
+ * history (`deps.findCachedReview`, wrapped by `findReusableVerdict`). A hit
+ * republishes the earlier PASS verbatim and never calls `secondOpinion` —
+ * see the module-level comment block for why this exists (#812-class
+ * quota incident: a merge-from-main re-reviews an unchanged diff).
  */
 export async function runReviewCi(deps: ReviewCiDeps): Promise<CiVerdict> {
   const refusal = headDirRefusal(deps)
@@ -275,9 +343,29 @@ export async function runReviewCi(deps: ReviewCiDeps): Promise<CiVerdict> {
     }
   }
 
+  let diff: string
+  try {
+    diff = await deps.prDiff()
+  } catch (e) {
+    return { ok: false, summary: `review unavailable: ${e instanceof Error ? e.message : String(e)}` }
+  }
+
+  // The content key is computed from the diff itself (see reviewKeyFor), not
+  // from ctx.headSha — a merge-from-main changes the head sha on every push
+  // without changing a single byte of what the PR proposes, which is exactly
+  // the case this cache exists to skip.
+  const key = await deps.reviewKey(diff)
+  deps.log(`review-key=${key}`)
+
+  const cached = await findReusableVerdict(deps, key)
+  if (cached !== undefined) {
+    const line = `reused verdict for review-key=${key} from ${cached.sha}`
+    deps.log(line)
+    return { ok: true, summary: `${line}\n\n${cached.text}` }
+  }
+
   let result: SecondOpinionResult
   try {
-    const diff = await deps.prDiff()
     // `snapshotDir`, never `worktree`: the export already exists, so this
     // job runs no git and creates nothing. Zero execution of the judged
     // commit's code anywhere in this job — which is what lets it hold the key.
@@ -315,4 +403,128 @@ export async function ciDiff(ctx: CiContext): Promise<string> {
     { maxBuffer: 32 * 1024 * 1024 },
   )
   return stdout
+}
+
+// ---------------------------------------------------------------------------
+// review-key content cache (#812-class incident: every push re-reviewed an
+// identical diff and burned the whole week's provider quota on it)
+// ---------------------------------------------------------------------------
+
+/**
+ * `git diff <base>...<head>` (triple-dot) already computes the merge-base
+ * itself, but that merge-base is never surfaced by `ciDiff` — it is
+ * recomputed here, independently, as an explicit second input to the key.
+ * Belt and suspenders: the diff TEXT already reflects the merge-base
+ * (`git diff --no-color base...head`'s content changes if the merge-base
+ * moves), so this cannot silently drift out of step with it, but a key
+ * computed from diff text alone would make it easy for a future edit to
+ * accidentally key on something that is not actually anchored to the diff
+ * (e.g. re-adding a head-sha shortcut) without a test noticing — see the two
+ * `reviewKeyFor` tests that hold both inputs load-bearing.
+ */
+export async function ciMergeBase(ctx: CiContext): Promise<string> {
+  const { stdout } = await execFileAsync('git', ['-C', ctx.repoDir, 'merge-base', ctx.baseSha, ctx.headSha])
+  return stdout.trim()
+}
+
+/**
+ * The content key: sha256 of the merge-base sha and the diff text, NEVER the
+ * head sha. Pure and synchronous so it is exhaustively testable on its own —
+ * `runReviewCi`'s own review-key handling only ever calls this indirectly,
+ * through `ReviewCiDeps.reviewKey`, which is what lets tests there inject an
+ * arbitrary key without touching git or the hash algorithm at all.
+ */
+export function reviewKeyFor(mergeBase: string, diff: string): string {
+  return createHash('sha256').update(`${mergeBase}\n${diff}`).digest('hex')
+}
+
+/** The real `ReviewCiDeps.reviewKey` implementation cli.ts wires in. */
+export async function ciReviewKey(ctx: CiContext, diff: string): Promise<string> {
+  return reviewKeyFor(await ciMergeBase(ctx), diff)
+}
+
+const LOG_TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z /
+const REVIEW_KEY_LINE_RE = /^review-key=([0-9a-f]{64})$/
+
+/**
+ * Reconstructs `runReviewCi`'s own printed output from a raw GitHub Actions
+ * job log (`gh api .../actions/jobs/<id>/logs`) — every line of which the
+ * runner prefixes with its own ISO timestamp, even lines that were part of
+ * the SAME multi-line `process.stdout.write` call in `ciLog`/`runCiGate`.
+ *
+ * Looks for the STANDALONE `review-key=<hex>` line `runReviewCi` writes via
+ * `deps.log` before it does anything else with the key — never the
+ * `fleet/review: PASS — …` line, which only ever *might* also contain the
+ * substring `review-key=` (it does not, by construction, but nothing should
+ * rely on that construction holding forever). `undefined` when no such line
+ * exists at all: an older run, from before this cache existed, or a run that
+ * crashed before reaching that print — both correctly read as "no usable key
+ * recorded here" by the caller.
+ */
+export function extractLoggedReviewKey(logText: string): { key: string; summary: string } | undefined {
+  const lines = logText.split('\n').map((l) => l.replace(LOG_TIMESTAMP_RE, ''))
+  const keyIdx = lines.findIndex((l) => REVIEW_KEY_LINE_RE.test(l))
+  if (keyIdx === -1) return undefined
+  const key = REVIEW_KEY_LINE_RE.exec(lines[keyIdx] as string)?.[1] as string
+  const jobLinePrefix = `${REVIEW_JOB}: `
+  const jobLineIdx = lines.findIndex((l, i) => i > keyIdx && l.startsWith(jobLinePrefix))
+  const summary = jobLineIdx === -1 ? '' : lines.slice(jobLineIdx).join('\n').slice(jobLinePrefix.length)
+  return { key, summary }
+}
+
+interface GhCheckRunsResponse {
+  check_runs: { id: number; status: string; conclusion: string | null }[]
+}
+
+/** Every commit this PR has ever had as its head, most recent first — most
+ *  pushes are a merge-from-main or an amend that never earns its own
+ *  `fleet/review` run, so searching newest-first finds a real match fastest. */
+async function prCommitShasNewestFirst(pr: string): Promise<string[]> {
+  const commits = await ghJson<{ sha: string }[]>(['api', `repos/${REPO}/pulls/${pr}/commits`, '--paginate'])
+  return (commits ?? []).map((c) => c.sha).reverse()
+}
+
+async function fleetReviewCheckRunsFor(sha: string): Promise<GhCheckRunsResponse['check_runs']> {
+  const res = await ghJson<GhCheckRunsResponse>([
+    'api', `repos/${REPO}/commits/${sha}/check-runs?check_name=${encodeURIComponent(REVIEW_JOB)}`,
+  ])
+  return res?.check_runs ?? []
+}
+
+/**
+ * The real, GitHub-backed `ReviewCiDeps.findCachedReview` cli.ts wires in.
+ * Searches ONLY this PR's own prior commits (`prCommitShasNewestFirst`) —
+ * never another PR's, never another base branch's, because that is the
+ * entire search space this function is given — for a completed `fleet/review`
+ * run whose logged `review-key=` line matches exactly.
+ *
+ * A run's `conclusion` field (`success`/`failure`) — the same field GitHub
+ * itself used to colour that check red or green — decides PASS vs FAIL here,
+ * never any text parsing of the verdict: it is the one fact about that old
+ * run that cannot have been garbled by a log-formatting change since.
+ *
+ * Deliberately thin and NOT unit-tested directly, matching the
+ * `haltedOnGitHub`/`haltedOnGitHubFrom` split in killswitch.ts: the decision
+ * logic lives in the pure, tested `extractLoggedReviewKey` and in
+ * `runReviewCi`'s own `findReusableVerdict`; this function is the one thing
+ * standing between them and the network. `ghJson` never throws (it returns
+ * `undefined` on any failure); the raw `gh()` log fetch below CAN throw, and
+ * is left to — `runReviewCi` catches it and runs the engine, per the fail-safe
+ * contract on `ReviewCiDeps.findCachedReview`.
+ */
+export function defaultFindCachedReview(ctx: CiContext): (key: string) => Promise<CachedReviewVerdict | undefined> {
+  return async (key: string): Promise<CachedReviewVerdict | undefined> => {
+    for (const sha of await prCommitShasNewestFirst(ctx.pr)) {
+      if (sha === ctx.headSha) continue
+      for (const run of await fleetReviewCheckRunsFor(sha)) {
+        if (run.status !== 'completed') continue
+        if (run.conclusion !== 'success' && run.conclusion !== 'failure') continue
+        const logText = await gh(['api', `repos/${REPO}/actions/jobs/${run.id}/logs`, '--allow-escape-sequences'])
+        const found = extractLoggedReviewKey(logText)
+        if (found === undefined || found.key !== key) continue
+        return { sha, verdict: run.conclusion === 'success' ? 'PASS' : 'FAIL', text: found.summary }
+      }
+    }
+    return undefined
+  }
 }

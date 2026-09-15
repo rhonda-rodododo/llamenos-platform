@@ -1521,12 +1521,21 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
-      # contents: read and nothing else. The reviewer runs inside this job
-      # with the review key on disk, so the containment that matters is that
+      # contents: read plus three READ-ONLY scopes the review-key cache needs
+      # to look itself up before spending a review on a diff it already
+      # judged: pull-requests (this PR's own commit list), checks (whether an
+      # earlier one of those commits already has a completed fleet/review
+      # run) and actions (that run's OWN job log, which is where its
+      # `review-key=` line lives — see findCachedReview in ci.ts). None of
+      # these is `checks: write` or `statuses: write`; the reviewer runs with
+      # the review key on disk, so the containment that matters is that
       # NOTHING from the commit under judgement ever executes here: it is a
       # `git archive` export the model reads, never a checkout, never
       # installed, never on a module path.
       contents: read
+      pull-requests: read
+      checks: read
+      actions: read
     # HIGH_IMPACT_TIMEOUT_MS alone is 25 minutes (review.ts); checkout, deps,
     # the engine download and the smoke call have to fit around it.
     timeout-minutes: 40
@@ -1721,6 +1730,9 @@ jobs:
           # Absent fails the job — never a skip and never a pass. A review
           # that could not run is not a review that passed.
           FLEET_REVIEW_API_KEY: ${{ secrets.FLEET_REVIEW_API_KEY }}
+          # The `gh` CLI `findCachedReview` (ci.ts) shells out to, read-only,
+          # scoped by the job's own `permissions:` block above — never write.
+          GH_TOKEN: ${{ github.token }}
           FLEET_CI_BRANCH: ${{ github.head_ref }}
           FLEET_CI_PR: ${{ github.event.pull_request.number }}
           FLEET_CI_HEAD_DIR: ${{ runner.temp }}/head
