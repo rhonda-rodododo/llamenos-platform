@@ -273,6 +273,43 @@ Eight, each a file, each asserted by a test rather than promised by a comment.
    the scope breaker nothing to compare against. Asserted in a test that refuses
    to let such a lane be `live`.
 
+#### Switching the review engine provider
+
+`fleet/review`'s non-author reviewer (rail 1, above) runs on `opencode`,
+driven entirely by two repo variables — `vars.FLEET_REVIEW_PROVIDER` (default
+`kimi-for-coding`) and `vars.FLEET_REVIEW_MODEL` (default
+`kimi-for-coding/k3-256k`) — plus the `FLEET_REVIEW_API_KEY` secret. Switching
+provider needs **no code change**:
+
+1. Set the two repo variables (repo Settings → Secrets and variables →
+   Actions → Variables) to the new provider id and its `provider/model`
+   string, e.g. `zai-coding-plan` / `zai-coding-plan/glm-5.3`.
+2. Replace `FLEET_REVIEW_API_KEY` with a key valid for that provider.
+3. Re-run `fleet/review` on any open PR. The "Authenticate the review engine"
+   step keys `~/.local/share/opencode/auth.json` off `FLEET_REVIEW_PROVIDER`
+   itself (never a literal), the "Smoke-test the review engine" step passes
+   `FLEET_REVIEW_MODEL` to `--model`, and the real "Review" step
+   (`review-ci` → `review.ts`'s `VERIFIER_ENGINE`) reads the same
+   `FLEET_REVIEW_MODEL` env var — so all three move together from the one
+   variable change.
+
+This is what unblocked the fleet on 2026-09-15: the Moonshot Kimi
+subscription backing the hardcoded `kimi-for-coding` provider had exhausted
+its weekly quota, so every `fleet/review` smoke test failed and the required
+check was red repo-wide, with no way to recover short of waiting out the
+week. Fail-closed on a real outage is correct; being un-switchable to a
+different provider was not.
+
+The smoke-test step also now names *why* the engine call failed, on one line,
+before it fails the job — it never turns a bad call into a pass. Three
+causes: `engine-quota` (weekly/usage-limit language from the provider),
+`engine-auth` (401 / invalid or missing key), or `engine-unavailable`
+(anything else — a bad model id, a network error, a rejected config, or the
+engine running but never producing a valid verdict). See the comment above
+"Smoke-test the review engine" in `.github/workflows/ci.yml` for the exact
+classification, which is a best-effort heuristic over the engine's own error
+text, not a structured error code opencode exposes.
+
 ### 5.6 Agent-to-agent messaging
 
 **GitHub is the channel. There is no separate message bus.**
