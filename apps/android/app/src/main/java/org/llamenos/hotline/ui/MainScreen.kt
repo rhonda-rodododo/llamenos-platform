@@ -30,6 +30,8 @@ import org.llamenos.hotline.R
 import org.llamenos.hotline.api.NetworkMonitor
 import org.llamenos.hotline.api.WebSocketService
 import org.llamenos.hotline.service.OfflineQueue
+import org.llamenos.hotline.ui.components.DemoBanner
+import org.llamenos.hotline.ui.components.DemoBannerViewModel
 import org.llamenos.hotline.ui.components.OfflineBanner
 import org.llamenos.hotline.crypto.CryptoService
 import org.llamenos.hotline.crypto.KeystoreService
@@ -122,6 +124,8 @@ fun MainScreen(
     val notesViewModel: NotesViewModel = hiltViewModel()
     val conversationsViewModel: ConversationsViewModel = hiltViewModel()
     val shiftsViewModel: ShiftsViewModel = hiltViewModel()
+    val demoBannerViewModel: DemoBannerViewModel = hiltViewModel()
+    val demoBannerUiState by demoBannerViewModel.uiState.collectAsState()
 
     // Unread count for conversations badge
     val conversationsUiState by conversationsViewModel.uiState.collectAsState()
@@ -171,6 +175,13 @@ fun MainScreen(
     ) { paddingValues ->
         Column(modifier = Modifier.padding(paddingValues)) {
             OfflineBanner(networkMonitor, offlineQueue)
+
+            if (demoBannerUiState.visible) {
+                DemoBanner(
+                    onDismiss = demoBannerViewModel::dismiss,
+                    demoResetSchedule = demoBannerUiState.demoResetSchedule,
+                )
+            }
 
             when (MainTab.entries[selectedTab]) {
                 MainTab.DASHBOARD -> {

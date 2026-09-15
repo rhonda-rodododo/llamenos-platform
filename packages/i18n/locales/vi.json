@@ -1791,8 +1791,8 @@
   "demo": {
     "admin": "Admin",
     "banner": "Demo Mode",
-    "bannerText": "You're exploring the Llamenos demo. Data resets daily.",
-    "bannerTextSchedule": "You're exploring the Llamenos demo. Data resets on schedule.",
+    "bannerText": "Môi trường thử nghiệm — không nhập thông tin thật của người gọi. Dữ liệu ở đây không bảo mật và có thể bị xóa bất cứ lúc nào.",
+    "bannerTextSchedule": "Môi trường thử nghiệm — không nhập thông tin thật của người gọi. Dữ liệu được đặt lại {{schedule}} và không bảo mật.",
     "dismiss": "Dismiss",
     "getStarted": "Deploy your own",
     "pickAccount": "Pick a demo account to explore",

@@ -1791,8 +1791,8 @@
   "demo": {
     "admin": "Admin",
     "banner": "Demo Mode",
-    "bannerText": "You're exploring the Llamenos demo. Data resets daily.",
-    "bannerTextSchedule": "You're exploring the Llamenos demo. Data resets on schedule.",
+    "bannerText": "Kapaligiran ng pagsubok — huwag maglagay ng tunay na impormasyon ng tumatawag. Ang datos dito ay hindi kumpidensyal at maaaring tanggalin anumang oras.",
+    "bannerTextSchedule": "Kapaligiran ng pagsubok — huwag maglagay ng tunay na impormasyon ng tumatawag. Nire-reset ang datos {{schedule}} at hindi ito kumpidensyal.",
     "dismiss": "Dismiss",
     "getStarted": "Deploy your own",
     "pickAccount": "Pick a demo account to explore",
