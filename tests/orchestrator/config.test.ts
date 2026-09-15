@@ -1,7 +1,10 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, afterEach, vi } from 'vitest'
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 import {
   LANES, LIMITS, NEVER_WRITE_PATHS, MAX_ATTEMPTS_PER_ITEM,
-  assertLiveLanesHaveScope,
+  assertLiveLanesHaveScope, readLaneModes,
 } from '../../orchestrator/src/config.js'
 import type { Lane } from '../../orchestrator/src/config.js'
 import { checkScope } from '../../orchestrator/src/scope.js'
@@ -109,5 +112,89 @@ describe('config', () => {
 
   it('sets a conservative first-night dispatch ceiling', () => {
     expect(LIMITS.maxDispatchesPerHour).toBeLessThanOrEqual(12)
+  })
+})
+
+describe('readLaneModes', () => {
+  const dirs: string[] = []
+  afterEach(() => {
+    for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true })
+  })
+
+  function modesFile(content: unknown): string {
+    const dir = mkdtempSync(join(tmpdir(), 'fleet-lane-modes-'))
+    dirs.push(dir)
+    const file = join(dir, 'lanes.json')
+    writeFileSync(file, typeof content === 'string' ? content : JSON.stringify(content))
+    return file
+  }
+
+  it('parses the legacy bare-mode-string shape', () => {
+    expect(readLaneModes(modesFile({ backend: 'live', ios: 'off' })))
+      .toEqual({ backend: { mode: 'live' }, ios: { mode: 'off' } })
+  })
+
+  it('parses the object shape with engine and model', () => {
+    const file = modesFile({ backend: { mode: 'live', engine: 'opencode', model: 'kimi-for-coding/k3-256k' } })
+    expect(readLaneModes(file)).toEqual({
+      backend: { mode: 'live', engine: 'opencode', model: 'kimi-for-coding/k3-256k' },
+    })
+  })
+
+  it('accepts both shapes in the same file', () => {
+    const file = modesFile({ backend: 'live', ios: { mode: 'shadow', engine: 'opencode' } })
+    expect(readLaneModes(file)).toEqual({
+      backend: { mode: 'live' },
+      ios: { mode: 'shadow', engine: 'opencode' },
+    })
+  })
+
+  it('rejects an invalid engine: lane stays off and the reason is reported', () => {
+    const onReject = vi.fn()
+    const file = modesFile({ backend: { mode: 'live', engine: 'gpt' } })
+    expect(readLaneModes(file, onReject)).toEqual({})
+    expect(onReject).toHaveBeenCalledOnce()
+    expect(onReject.mock.calls[0]?.[0]).toBe('backend')
+    expect(onReject.mock.calls[0]?.[1]).toMatch(/invalid engine/i)
+  })
+
+  it('rejects an invalid mode: lane stays off and the reason is reported', () => {
+    const onReject = vi.fn()
+    const file = modesFile({ backend: { mode: 'turbo' }, ios: 'shadow' })
+    expect(readLaneModes(file, onReject)).toEqual({ ios: { mode: 'shadow' } })
+    expect(onReject).toHaveBeenCalledOnce()
+    expect(onReject.mock.calls[0]?.[1]).toMatch(/invalid mode/i)
+  })
+
+  it('rejects unknown keys in the object shape', () => {
+    const onReject = vi.fn()
+    const file = modesFile({ backend: { mode: 'live', engine: 'opencode', model: 'kimi', cap: 5 } })
+    expect(readLaneModes(file, onReject)).toEqual({})
+    expect(onReject).toHaveBeenCalledOnce()
+    expect(onReject.mock.calls[0]?.[1]).toMatch(/unknown override key/i)
+    expect(onReject.mock.calls[0]?.[1]).toContain('cap')
+  })
+
+  it('rejects a non-string model', () => {
+    const onReject = vi.fn()
+    const file = modesFile({ backend: { mode: 'live', engine: 'opencode', model: 42 } })
+    expect(readLaneModes(file, onReject)).toEqual({})
+    expect(onReject.mock.calls[0]?.[1]).toMatch(/invalid model/i)
+  })
+
+  it('rejects unrecognized entry shapes (numbers, arrays, null)', () => {
+    const onReject = vi.fn()
+    const file = modesFile({ backend: 1, ios: ['live'], android: null })
+    expect(readLaneModes(file, onReject)).toEqual({})
+    expect(onReject).toHaveBeenCalledTimes(3)
+  })
+
+  it('never throws on malformed JSON — every lane stays off', () => {
+    const onReject = vi.fn()
+    expect(readLaneModes(modesFile('{not json'), onReject)).toEqual({})
+  })
+
+  it('never throws on a missing file — every lane stays off', () => {
+    expect(readLaneModes(join(tmpdir(), 'definitely-not-here-lanes.json'))).toEqual({})
   })
 })

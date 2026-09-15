@@ -49,6 +49,16 @@ function log(msg: string): void {
 }
 
 /**
+ * Rejected lanes.json entries must surface where an operator actually looks:
+ * the fleet log and stdout. Fail-closed (the lane stays off) is only safe if
+ * the rejection is also loud — a silently ignored override reads as "the dial
+ * did nothing" and gets debugged as a fleet bug.
+ */
+function rejectLogger(laneId: string, reason: string): void {
+  log(`lanes.json rejected: ${reason}`)
+}
+
+/**
  * The fleet log is a plain append-only stream of `<timestamp> <message>`
  * lines, and one message per tick is the JSON-encoded TickResult. Reading it
  * back lets `doctor` and `status` — neither of which calls `tick()` — report
@@ -109,10 +119,22 @@ export async function doctor(): Promise<number> {
     remotes.length === 1 && remotes[0] === 'origin',
     'git remote remove <name> — this repo must only ever have origin -> llamenos-platform'])
 
-  const lanes = await loadLanes(REPO_ROOT)
+  const lanes = await loadLanes(REPO_ROOT, LANE_MODES_FILE, rejectLogger)
   for (const l of lanes) {
     checks.push([`lane ${l.id} has scope paths`, l.scope.owned.length > 0,
       `check .claude/agents/fragments/${l.id}-supervisor.md "**Owned paths:**" section`])
+  }
+
+  // A live opencode lane with no opencode binary dispatches workers that all
+  // die at launch — a hard misconfiguration, surfaced as FAIL, not WARN.
+  const liveOpencode = lanes.filter((l) => l.mode === 'live' && l.engine === 'opencode')
+  if (liveOpencode.length > 0) {
+    let opencodeOk = false
+    try { execFileSync('opencode', ['--version'], { stdio: 'pipe' }); opencodeOk = true } catch { /* not on PATH */ }
+    for (const l of liveOpencode) {
+      checks.push([`lane ${l.id} is live on opencode, opencode binary on PATH`, opencodeOk,
+        'install opencode (https://opencode.ai), or set this lane\'s engine back to claude in ~/.llamenos-fleet/lanes.json'])
+    }
   }
   checks.push(['not halted', !haltedLocally(),
     existsSync(HALT_REASON_FILE) ? `halted: ${readFileSync(HALT_REASON_FILE, 'utf8').trim()} — clear with: llamenos-fleet resume` : ''])
@@ -181,8 +203,8 @@ export async function doctor(): Promise<number> {
     }
   }
 
-  const modes = lanes.map((l) => `${l.id}=${l.mode}`).join(' ')
-  process.stdout.write(`\nlanes: ${modes}\n`)
+  const modes = lanes.map((l) => `${l.id}=${l.mode}/${l.engine}${l.model !== undefined ? `/${l.model}` : ''}`).join(' ')
+  process.stdout.write(`\nlanes (mode/engine/model): ${modes}\n`)
   process.stdout.write(`lane modes file: ${LANE_MODES_FILE}${existsSync(LANE_MODES_FILE) ? '' : ' (absent — all lanes off)'}\n`)
   if (warnings > 0) {
     process.stdout.write(`\n${warnings} warning(s) above — non-fatal, see WARN lines\n`)
@@ -221,6 +243,11 @@ const BRIEFS_DIR = join(FLEET_DIR, 'briefs')
 const DEFAULT_TIMEOUT_SEC = 90 * 60
 const DEFAULT_EFFORT: EffortLevel = 'high'
 const DEFAULT_MODEL = 'sonnet'
+// An opencode lane with no model override must not fall back to the Claude
+// default — 'sonnet' would route the dispatch to the claude CLI, silently
+// defeating the engine selection. 'kimi' is dispatch-one.sh's maintained
+// opencode token (maps to kimi-for-coding/k3-256k inside the script).
+const DEFAULT_OPENCODE_MODEL = 'kimi'
 
 /** One name identifies a dispatched item everywhere: the tmux session
  *  dispatch-one.sh starts, the status file it polls, and the handle `settle`
@@ -291,7 +318,7 @@ async function realDispatch(item: WorkItem, lane: Lane): Promise<DispatchOutcome
     lane,
     briefPath,
     timeoutSec: DEFAULT_TIMEOUT_SEC,
-    model: lane.model ?? DEFAULT_MODEL,
+    model: lane.model ?? (lane.engine === 'opencode' ? DEFAULT_OPENCODE_MODEL : DEFAULT_MODEL),
     effort: DEFAULT_EFFORT,
   })
   const resolved = await resolveDispatchResult(result, branch, REPO_ROOT, findWorktreeForBranch)
@@ -475,7 +502,7 @@ function defaultIssueLinkDeps(): IssueLinkDeps {
 }
 
 async function runTick(): Promise<number> {
-  const lanes = await loadLanes(REPO_ROOT)
+  const lanes = await loadLanes(REPO_ROOT, LANE_MODES_FILE, rejectLogger)
 
   const deps: TickDeps = {
     lanes,
@@ -816,7 +843,7 @@ async function runDigest(hoursArg?: string): Promise<number> {
     hours = parsed
   }
 
-  const lanes = await loadLanes(REPO_ROOT)
+  const lanes = await loadLanes(REPO_ROOT, LANE_MODES_FILE, rejectLogger)
   const haltedNow = haltedLocally()
   const haltReason = haltedNow && existsSync(HALT_REASON_FILE)
     ? readFileSync(HALT_REASON_FILE, 'utf8').trim()
@@ -1105,7 +1132,7 @@ const HANDLERS: Record<string, CommandHandler> = {
   digest: (rest) => runDigest(rest[0]),
   'verify-ci': () => runCiGate(VERIFY_JOB, (ctx) => runVerifyCi({
     ctx,
-    lanes: () => loadLanes(REPO_ROOT),
+    lanes: () => loadLanes(REPO_ROOT, LANE_MODES_FILE, rejectLogger),
     verify: verifyMechanical,
     pathExists: existsSync,
     log: ciLog,
@@ -1113,7 +1140,7 @@ const HANDLERS: Record<string, CommandHandler> = {
   'review-ci': () => runCiGate(REVIEW_JOB, (ctx) => runReviewCi({
     ctx,
     apiKey: process.env[REVIEW_KEY_ENV],
-    lanes: () => loadLanes(REPO_ROOT),
+    lanes: () => loadLanes(REPO_ROOT, LANE_MODES_FILE, rejectLogger),
     verify: verifyMechanical,
     pathExists: existsSync,
     log: ciLog,

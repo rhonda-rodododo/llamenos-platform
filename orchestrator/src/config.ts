@@ -39,6 +39,72 @@ export const LANES: Lane[] = LANE_IDS.map((id) => ({
 export const LANE_MODES_FILE = join(FLEET_DIR, 'lanes.json')
 
 /**
+ * One lane's operator override, parsed from `lanes.json`. `mode` is always
+ * present; `engine`/`model` are only meaningful for lanes that should run on
+ * a non-default engine (e.g. `opencode` with a Kimi subscription while the
+ * Anthropic account is exhausted).
+ */
+export interface LaneOverride {
+  mode: LaneMode
+  engine?: EngineId
+  model?: string
+}
+
+/** Keys a per-lane override object may carry. Anything else is rejected. */
+const OVERRIDE_KEYS: ReadonlySet<string> = new Set(['mode', 'engine', 'model'])
+
+function isLaneMode(v: unknown): v is LaneMode {
+  return v === 'off' || v === 'shadow' || v === 'live'
+}
+
+function isEngineId(v: unknown): v is EngineId {
+  return v === 'claude' || v === 'opencode'
+}
+
+/**
+ * Parses one lane's file entry into an override, or returns a rejection
+ * reason. Two shapes are accepted, backward compatible:
+ *   "backend": "live"
+ *   "backend": {"mode":"live","engine":"opencode","model":"kimi-for-coding/k3-256k"}
+ *
+ * Fail CLOSED, never throw: any malformed entry — unknown keys, an invalid
+ * mode or engine, a non-string model — rejects that one lane (the caller
+ * treats it as `off`) and reports the reason through `onReject`. A bad dial
+ * must never crash the tick, and must never silently take effect.
+ */
+function parseLaneOverride(id: string, v: unknown): { override: LaneOverride } | { reason: string } {
+  if (typeof v === 'string') {
+    if (isLaneMode(v)) return { override: { mode: v } }
+    return { reason: `lane "${id}": invalid mode ${JSON.stringify(v)} (expected off|shadow|live)` }
+  }
+  if (typeof v === 'object' && v !== null && !Array.isArray(v)) {
+    const obj = v as Record<string, unknown>
+    const unknown = Object.keys(obj).filter((k) => !OVERRIDE_KEYS.has(k))
+    if (unknown.length > 0) {
+      return { reason: `lane "${id}": unknown override key(s): ${unknown.join(', ')} (allowed: mode, engine, model)` }
+    }
+    if (!isLaneMode(obj['mode'])) {
+      return { reason: `lane "${id}": invalid mode ${JSON.stringify(obj['mode'])} (expected off|shadow|live)` }
+    }
+    const override: LaneOverride = { mode: obj['mode'] }
+    if (obj['engine'] !== undefined) {
+      if (!isEngineId(obj['engine'])) {
+        return { reason: `lane "${id}": invalid engine ${JSON.stringify(obj['engine'])} (expected claude|opencode)` }
+      }
+      override.engine = obj['engine']
+    }
+    if (obj['model'] !== undefined) {
+      if (typeof obj['model'] !== 'string' || obj['model'].length === 0) {
+        return { reason: `lane "${id}": invalid model ${JSON.stringify(obj['model'])} (expected a non-empty string)` }
+      }
+      override.model = obj['model']
+    }
+    return { override }
+  }
+  return { reason: `lane "${id}": unrecognized entry ${JSON.stringify(v)} (expected a mode string or an override object)` }
+}
+
+/**
  * Modes live in runtime state, NOT in this source file. Two reasons: a dial
  * meant to be turned must not sit behind the merge gate (orchestrator/ is
  * high-impact, so editing it would require a human-gated PR to change a lane
@@ -51,15 +117,26 @@ export const LANE_MODES_FILE = join(FLEET_DIR, 'lanes.json')
  * `~/.llamenos-fleet/`) but is injectable so callers — tests in particular —
  * can point it at a fixture instead of depending on whatever the machine
  * running the test happens to have turned on.
+ *
+ * `onReject` receives one `(laneId, reason)` call per malformed entry. The
+ * entry is excluded from the result either way (fail closed: the lane stays
+ * `off`); the callback exists so operators see WHY their lanes.json edit did
+ * not take effect, in the fleet log, instead of the file being silently
+ * ignored.
  */
-export function readLaneModes(file: string = LANE_MODES_FILE): Record<string, LaneMode> {
+export function readLaneModes(
+  file: string = LANE_MODES_FILE,
+  onReject?: (laneId: string, reason: string) => void,
+): Record<string, LaneOverride> {
   if (!existsSync(file)) return {}
   try {
     const raw: unknown = JSON.parse(readFileSync(file, 'utf8'))
-    if (typeof raw !== 'object' || raw === null) return {}
-    const out: Record<string, LaneMode> = {}
+    if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return {}
+    const out: Record<string, LaneOverride> = {}
     for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
-      if (v === 'off' || v === 'shadow' || v === 'live') out[k] = v
+      const parsed = parseLaneOverride(k, v)
+      if ('override' in parsed) out[k] = parsed.override
+      else onReject?.(k, parsed.reason)
     }
     return out
   } catch {
@@ -85,14 +162,23 @@ export function assertLiveLanesHaveScope(lanes: Lane[]): void {
   }
 }
 
-export async function loadLanes(repoRoot: string, modesFile: string = LANE_MODES_FILE): Promise<Lane[]> {
+export async function loadLanes(
+  repoRoot: string,
+  modesFile: string = LANE_MODES_FILE,
+  onReject?: (laneId: string, reason: string) => void,
+): Promise<Lane[]> {
   const scopes = await loadLaneScopes(repoRoot)
-  const modes = readLaneModes(modesFile)
-  const lanes = LANES.map((l) => ({
-    ...l,
-    mode: modes[l.id] ?? l.mode,
-    scope: scopes[l.id] ?? { owned: [], notOwned: [] },
-  }))
+  const modes = readLaneModes(modesFile, onReject)
+  const lanes = LANES.map((l) => {
+    const override = modes[l.id]
+    return {
+      ...l,
+      mode: override?.mode ?? l.mode,
+      engine: override?.engine ?? l.engine,
+      model: override?.model ?? l.model,
+      scope: scopes[l.id] ?? { owned: [], notOwned: [] },
+    }
+  })
   assertLiveLanesHaveScope(lanes)
   return lanes
 }

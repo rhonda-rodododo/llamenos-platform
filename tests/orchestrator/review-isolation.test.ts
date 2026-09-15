@@ -29,7 +29,15 @@ import type { VerifyReport } from '../../orchestrator/src/verify.js'
  * assertions cannot pass vacuously.
  */
 
-const FAKE_OPENCODE = String.raw`#!/usr/bin/env bun
+// The shebang and the module runner below use process.execPath — the
+// absolute path of the bun binary running this suite — NOT `env bun`. On a
+// box where `bun` on PATH is a version-manager shim (volta, mise), the shim
+// resolves its toolchain through $HOME; the suite's isolated-HOME runs
+// (HOME=$(mktemp -d)) would then hang the fake until the reviewer timeout
+// and turn every assertion here into UNREADABLE.
+const BUN = process.execPath
+
+const FAKE_OPENCODE = String.raw`#!${BUN}
 'use strict'
 const fs = require('node:fs')
 const path = require('node:path')
@@ -42,7 +50,7 @@ const prompt = fs.readFileSync(0, 'utf8')
 const projectConfigDisabled = process.env.OPENCODE_DISABLE_PROJECT_CONFIG === '1'
 const ls = (d) => (d && fs.existsSync(d) ? fs.readdirSync(d).sort() : null)
 const modules = (sub) => (ls(path.join(project, '.opencode', sub)) || []).map((f) => path.join(project, '.opencode', sub, f))
-const runModule = (file) => spawnSync('bun', [file], { stdio: ['ignore', 'inherit', 'inherit'] })
+const runModule = (file) => spawnSync(process.execPath, [file], { stdio: ['ignore', 'inherit', 'inherit'] })
 
 const configDir = process.env.OPENCODE_CONFIG_DIR
 const exportDir = (/exported, read-only, at:\n\n([^\n]+)\n/.exec(prompt) || [])[1]

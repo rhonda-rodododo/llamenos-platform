@@ -311,7 +311,7 @@ describe('rail: lane modes are runtime state, not source', () => {
     for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true })
   })
 
-  function tempModesFile(modes: Record<string, string>): string {
+  function tempModesFile(modes: Record<string, unknown>): string {
     const dir = mkdtempSync(join(tmpdir(), 'fleet-guards-lane-modes-'))
     dirs.push(dir)
     const file = join(dir, 'lanes.json')
@@ -321,7 +321,7 @@ describe('rail: lane modes are runtime state, not source', () => {
 
   it('readLaneModes reads a lane mode from file content, not from source', () => {
     const file = tempModesFile({ backend: 'shadow' })
-    expect(readLaneModes(file)).toEqual({ backend: 'shadow' })
+    expect(readLaneModes(file)).toEqual({ backend: { mode: 'shadow' } })
   })
 
   it('loadLanes turns a lane on from the modes file alone, with no source change', async () => {
@@ -330,5 +330,26 @@ describe('rail: lane modes are runtime state, not source', () => {
     expect(lanes.find((l) => l.id === 'ios')?.mode).toBe('live')
     // Every other lane is untouched by that same file.
     expect(lanes.filter((l) => l.id !== 'ios').every((l) => l.mode === 'off')).toBe(true)
+  })
+
+  it('loadLanes applies the object shape on top of the LANES defaults', async () => {
+    const file = tempModesFile({
+      backend: { mode: 'shadow', engine: 'opencode', model: 'kimi-for-coding/k3-256k' },
+    })
+    const lanes = await loadLanes(process.cwd(), file)
+    const backend = lanes.find((l) => l.id === 'backend')
+    expect(backend).toMatchObject({ mode: 'shadow', engine: 'opencode', model: 'kimi-for-coding/k3-256k' })
+    const ios = lanes.find((l) => l.id === 'ios')
+    expect(ios).toMatchObject({ mode: 'off', engine: 'claude' })
+    expect(ios?.model).toBeUndefined()
+  })
+
+  it('loadLanes fails closed: a rejected override leaves the lane off', async () => {
+    const file = tempModesFile({ backend: { mode: 'live', engine: 'wat' } })
+    const rejections: string[] = []
+    const lanes = await loadLanes(process.cwd(), file, (_id, reason) => { rejections.push(reason) })
+    expect(lanes.find((l) => l.id === 'backend')?.mode).toBe('off')
+    expect(rejections).toHaveLength(1)
+    expect(rejections[0]).toMatch(/invalid engine/i)
   })
 })
