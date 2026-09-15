@@ -72,8 +72,28 @@ app_dir: /opt/llamenos
 # Name displayed in the UI (use a generic name for security)
 hotline_name: Hotline
 
-# Application environment
-environment: production
+# Application environment. Consumed as ENVIRONMENT by the worker container
+# (apps/worker/lib/config.ts requires it non-empty at startup) and by
+# playbooks/tasks/guard-demo-mode.yml to refuse demo_mode/dev_routes_enabled/
+# dev_reset_secret on anything but a demo/staging/development host.
+#
+# NOTE: this used to be a var literally named `environment`, which Ansible
+# treats as a reserved name (it collides with the per-task `environment:`
+# keyword) and which no template here ever actually read — every template
+# reads `app_environment`. That dead, confusingly-named var is why nobody
+# noticed `app_environment` had no documented example value. Renamed as part
+# of the #716/#771 review round 2 fix; if you have an existing vars.yml with
+# `environment:` set, it was never doing anything — switch it to
+# `app_environment:`.
+app_environment: production
+
+# Public base URL for this deployment, e.g. https://api.yourdomain.org.
+# REQUIRED by apps/worker/lib/config.ts whenever app_environment is
+# "production" — without it, webhook signature validation falls back to the
+# spoofable Host header and the app refuses to start. Optional (with a
+# startup warning) for demo/staging/development. See
+# playbooks/preflight.yml's webhook_base_url assert.
+webhook_base_url: ""
 
 # Admin public key (generate with: bun run bootstrap-admin)
 # Ed25519 pubkey of the admin account
@@ -129,8 +149,57 @@ ari_username: llamenos
 ari_password: ""
 bridge_secret: ""
 
-# Signal bridge settings (only used if signal is enabled)
-# No additional config needed beyond enabling
+# Signal bridge settings (only used if signal is enabled).
+# Must match the token configured in the signal-notifier sidecar.
+# Generate with: openssl rand -hex 32
+signal_notifier_bearer_token: ""
+
+# ─── Push Notifications (Epic 86) ────────────────────────────────
+# APNs (iOS push). Get these from the Apple Developer Portal → Keys.
+# Leave all three empty to disable — iOS push is skipped gracefully.
+apns_key_p8: "" # PEM-formatted auth key contents
+apns_key_id: ""
+apns_team_id: ""
+
+# ntfy/UnifiedPush (Android push). Requires a self-hosted ntfy instance
+# reachable from the app container (standing that service up is #717 —
+# not yet automated by this playbook). Leave llamenos_ntfy_enabled: false
+# until that instance exists.
+llamenos_ntfy_enabled: false
+ntfy_url: "http://ntfy:80" # Compose service name:port, not a public URL
+ntfy_auth_token: "" # Optional bearer token for the ntfy instance
+
+# ─── Crash Reporting (Epic 293) ──────────────────────────────────
+# GlitchTip/Sentry-compatible DSN for client-side crash reporting.
+# Leave empty to disable — crash reporting is skipped gracefully.
+glitchtip_dsn: ""
+
+# ─── Demo / Staging Mode ──────────────────────────────────────────
+# See docs/deploy/staging.md. NEVER set demo_mode: true when
+# app_environment is "production" — both the app and an Ansible preflight
+# assert (playbooks/tasks/guard-demo-mode.yml) refuse to proceed if you do.
+# When demo_mode is true, demo_mode_confirm MUST be exactly the literal
+# string "DESTROY_ALL_DATA" — this two-factor confirmation is required by
+# apps/worker/lib/config.ts before it will run scheduled data resets.
+demo_mode: false
+demo_mode_confirm: ""
+
+# Optional human-readable label describing how often YOU manually re-run
+# playbooks/reset-demo.yml, e.g. "every 4 hours". Purely cosmetic — there is
+# no actual cron/scheduler for demo resets, reset-demo.yml is manual
+# workflow_dispatch only (see docs/deploy/staging.md). Shown verbatim in the
+# demo banner (apps/worker/routes/config.ts -> demoResetSchedule ->
+# src/client/components/demo-banner.tsx). Leave empty to omit the schedule
+# clause from the banner text. Only takes effect when demo_mode is true.
+demo_reset_cron: ""
+
+# ─── Developer/Test Routes ────────────────────────────────────────
+# NEVER set dev_routes_enabled: true or a non-empty dev_reset_secret when
+# app_environment is "production" — same guard as demo_mode applies.
+# Currently only takes effect when app_environment is "development"
+# (widening that to staging/demo instances is tracked separately — #723).
+dev_routes_enabled: false
+dev_reset_secret: ""
 
 # ─── Cross-Host Networking ──────────────────────────────────────
 # Enable TLS between services on different hosts (recommended for multi-host)
