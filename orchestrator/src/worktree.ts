@@ -128,6 +128,21 @@ export async function findWorktreeForBranch(repoRoot: string, branch: string): P
 }
 
 /**
+ * The branch `worktree` actually has checked out, asked of that worktree's
+ * own git — `undefined` when it cannot be read (the path is gone, or is not
+ * a worktree). A detached HEAD reads as the literal `HEAD`, which is never a
+ * fleet branch and so is reported as a mismatch by the caller, not hidden.
+ */
+export async function currentBranch(worktree: string): Promise<string | undefined> {
+  try {
+    const out = (await run('git', ['-C', worktree, 'rev-parse', '--abbrev-ref', 'HEAD'])).trim()
+    return out.length > 0 ? out : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/**
  * Deletes a local branch by name, swallowing "no such branch" the same way
  * `stopSession` swallows "no such session" — the common caller (`revert`)
  * may run this after `gh pr close --delete-branch` already removed it, or

@@ -1791,8 +1791,8 @@
   "demo": {
     "admin": "Admin",
     "banner": "Demo Mode",
-    "bannerText": "You're exploring the Llamenos demo. Data resets daily.",
-    "bannerTextSchedule": "You're exploring the Llamenos demo. Data resets on schedule.",
+    "bannerText": "Entorno de prueba: no ingrese información real de quienes llaman. Los datos aquí no son confidenciales y pueden eliminarse en cualquier momento.",
+    "bannerTextSchedule": "Entorno de prueba: no ingrese información real de quienes llaman. Los datos se restablecen {{schedule}} y no son confidenciales.",
     "dismiss": "Dismiss",
     "getStarted": "Deploy your own",
     "pickAccount": "Pick a demo account to explore",

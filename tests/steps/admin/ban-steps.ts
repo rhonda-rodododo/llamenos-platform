@@ -19,20 +19,20 @@ function maskPhone(phone: string): string {
   return phone.length >= 4 ? `***${phone.slice(-4)}` : '***'
 }
 
-Then('I should see bans or the {string} message', async ({ page }, _emptyMsg: string) => {
-  // Wait for loading to complete — the ban list shows a skeleton while fetching
-  // Once loaded, either ban-row elements or empty-state should be visible
-  const banRow = page.getByTestId(TestIds.BAN_ROW)
-  const emptyState = page.getByTestId(TestIds.EMPTY_STATE)
+Then('I should see bans or the {string} message', async ({ page }, emptyMsg: string) => {
+  // bans.tsx renders exactly one of: skeleton (loading) | empty-state | ban-list. Wait for
+  // the fetch to settle into one of the two terminal states, then assert that state's
+  // content. The old three-way isVisible/catch chain ignored its own timeouts, never read
+  // the message it was given, and fell back to "page title visible" as a pass.
   const banList = page.getByTestId(TestIds.BAN_LIST)
+  const emptyState = page.getByTestId(TestIds.EMPTY_STATE)
+  await expect(banList.or(emptyState)).toBeVisible({ timeout: Timeouts.API })
 
-  // First wait for the ban-list container or empty-state to appear (loading complete)
-  if (await banList.isVisible({ timeout: Timeouts.API }).catch(() => false)) return
-  if (await emptyState.isVisible({ timeout: 2000 }).catch(() => false)) return
-  if (await banRow.first().isVisible({ timeout: 2000 }).catch(() => false)) return
-
-  // Final fallback: page title is visible (page loaded but API may have failed)
-  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  if (await emptyState.count() > 0) {
+    await expect(emptyState).toContainText(emptyMsg)
+  } else {
+    await expect(banList.getByTestId(TestIds.BAN_ROW).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  }
 })
 
 When('I fill in the phone number', async ({ page }) => {

@@ -9,11 +9,6 @@ export function HubSwitcher() {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
-  // Don't show for single-hub deployments
-  if (!isMultiHub) return null
-
-  const currentHub = hubs.find(h => h.id === currentHubId)
-
   // Close on outside click
   useEffect(() => {
     if (!open) return
@@ -26,9 +21,17 @@ export function HubSwitcher() {
     return () => document.removeEventListener('mousedown', handleClick)
   }, [open])
 
+  // Don't show for single-hub deployments. Must come after every hook: hubs load
+  // asynchronously, so an early return above useEffect changes the hook count between
+  // renders once isMultiHub flips to true.
+  if (!isMultiHub) return null
+
+  const currentHub = hubs.find(h => h.id === currentHubId)
+
   return (
     <div ref={ref} className="relative px-3 py-2">
       <button
+        data-testid="hub-switcher-trigger"
         onClick={() => setOpen(!open)}
         className="flex w-full items-center gap-2 rounded-md border border-sidebar-border bg-sidebar-accent/50 px-3 py-2 text-left text-sm transition-colors hover:bg-sidebar-accent"
         aria-expanded={open}
@@ -47,6 +50,8 @@ export function HubSwitcher() {
           {hubs.map(hub => (
             <button
               key={hub.id}
+              data-testid="hub-switcher-option"
+              data-hub-id={hub.id}
               onClick={() => {
                 setCurrentHubId(hub.id)
                 setOpen(false)
