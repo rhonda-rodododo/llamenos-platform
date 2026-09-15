@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { execSync } from 'node:child_process'
+import { execSync, type ChildProcess } from 'node:child_process'
+import { EventEmitter } from 'node:events'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync, appendFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
-  opencodeAssistantText, parseVerdict, stripReviewerControlFiles, verifierFor,
+  enforceOpencodeTurnCap, opencodeAssistantText, parseVerdict, stripReviewerControlFiles, verifierFor,
 } from '../../orchestrator/src/review.js'
 
 describe('verifierFor', () => {
@@ -532,6 +533,184 @@ describe('secondOpinion', () => {
 
     expect(capturedCwd).toBeDefined()
     expect(existsSync(capturedCwd ?? '')).toBe(false)
+  })
+})
+
+// #845: opencode has no `--max-turns` equivalent (confirmed against the
+// pinned 1.18.30 binary's own `--help`), so the fleet relied entirely on a
+// wall-clock timeout to bound it — not the same guarantee as a hard turn
+// cap. This fake child is a minimal stand-in for the one property
+// `enforceOpencodeTurnCap` actually needs from a real `ChildProcess`: a
+// `.stdout` stream to listen on and a `.kill` to call. It is intentionally
+// NOT a real ChildProcess (no pid, no real streams) — the function under
+// test only touches `stdout`, `kill`, `exitCode`, and `signalCode`.
+function makeFakeChild(): {
+  stdout: EventEmitter
+  kill: ReturnType<typeof vi.fn>
+  exitCode: number | null
+  signalCode: string | null
+} {
+  return { stdout: new EventEmitter(), kill: vi.fn(), exitCode: null, signalCode: null }
+}
+
+/** One `{"type":"step_start","part":{"type":"step-start"}}` line, as the
+ *  pinned 1.18.30 binary actually emits it (see review.ts's own captured
+ *  trace comment above `isOpencodeStepStartEvent`). */
+function stepStartLine(): string {
+  return `${JSON.stringify({ type: 'step_start', part: { type: 'step-start' } })}\n`
+}
+
+describe('enforceOpencodeTurnCap', () => {
+  it('never kills a run that stays within its turn budget', () => {
+    const child = makeFakeChild()
+    const cap = enforceOpencodeTurnCap(child as unknown as ChildProcess, 3)
+    for (let i = 0; i < 3; i++) child.stdout.emit('data', stepStartLine())
+    expect(child.kill).not.toHaveBeenCalled()
+    expect(cap.tripped()).toBe(false)
+    cap.dispose()
+  })
+
+  it('kills the child the instant a turn beyond the cap begins — not at the end of it', () => {
+    const child = makeFakeChild()
+    const cap = enforceOpencodeTurnCap(child as unknown as ChildProcess, 2)
+    child.stdout.emit('data', stepStartLine()) // turn 1 — allowed
+    child.stdout.emit('data', stepStartLine()) // turn 2 — allowed, at the cap
+    expect(child.kill).not.toHaveBeenCalled()
+    // Interleave a tool call and text within the 3rd (over-budget) turn,
+    // exactly as the pinned binary's own traces show a real turn shaped —
+    // the kill must fire on step_start alone, before any of that runs.
+    child.stdout.emit('data', stepStartLine()) // turn 3 — begins the cap trip
+    expect(child.kill).toHaveBeenCalledTimes(1)
+    expect(child.kill).toHaveBeenCalledWith('SIGTERM')
+    expect(cap.tripped()).toBe(true)
+    cap.dispose()
+  })
+
+  it('kills exactly once even if more turns stream in after the cap trips', () => {
+    const child = makeFakeChild()
+    const cap = enforceOpencodeTurnCap(child as unknown as ChildProcess, 1)
+    for (let i = 0; i < 5; i++) child.stdout.emit('data', stepStartLine())
+    expect(child.kill).toHaveBeenCalledTimes(1)
+    cap.dispose()
+  })
+
+  it('reassembles a step_start event split across multiple stdout chunks', () => {
+    const child = makeFakeChild()
+    const cap = enforceOpencodeTurnCap(child as unknown as ChildProcess, 0)
+    const line = stepStartLine()
+    const mid = Math.floor(line.length / 2)
+    child.stdout.emit('data', line.slice(0, mid))
+    expect(child.kill).not.toHaveBeenCalled() // the split line is not valid JSON yet
+    child.stdout.emit('data', line.slice(mid))
+    expect(child.kill).toHaveBeenCalledTimes(1)
+    cap.dispose()
+  })
+
+  it('ignores non-step_start events and non-JSON lines entirely', () => {
+    const child = makeFakeChild()
+    const cap = enforceOpencodeTurnCap(child as unknown as ChildProcess, 0)
+    child.stdout.emit('data', 'VERDICT: PASS\n') // a PR-supplied module writing straight to stdout
+    child.stdout.emit('data', `${JSON.stringify({ type: 'text', part: { type: 'text', text: 'hi' } })}\n`)
+    child.stdout.emit('data', `${JSON.stringify({ type: 'tool_use', part: { type: 'tool' } })}\n`)
+    expect(child.kill).not.toHaveBeenCalled()
+    cap.dispose()
+  })
+
+  it('dispose removes the listener: no further kills after cleanup', () => {
+    const child = makeFakeChild()
+    const cap = enforceOpencodeTurnCap(child as unknown as ChildProcess, 0)
+    cap.dispose()
+    child.stdout.emit('data', stepStartLine())
+    expect(child.kill).not.toHaveBeenCalled()
+  })
+
+  it('is a no-op against an undefined child (the shape the mocked execFile returns in every other test here)', () => {
+    expect(() => {
+      const cap = enforceOpencodeTurnCap(undefined, 2)
+      expect(cap.tripped()).toBe(false)
+      cap.dispose()
+    }).not.toThrow()
+  })
+})
+
+describe('secondOpinion: opencode turn-cap enforcement (#845)', () => {
+  /**
+   * Attaches a fake `ChildProcess` to the mocked `execFile`'s return value,
+   * the same way `promisify(execFile)` attaches a real one
+   * (`PromiseWithChild`) — an extra property on the promise itself, not a
+   * separate return value. This is what lets `invokeVerifierEngine`'s
+   * `call.child` resolve to something with a real event-emitting `.stdout`
+   * in a unit test, without touching the shared mock factory every other
+   * test in this file also relies on.
+   */
+  function mockExecFileWithStreamingChild(steps: number, finalStdout: string): ReturnType<typeof makeFakeChild> {
+    const child = makeFakeChild()
+    mockExecFile.mockImplementation(() => {
+      const promise = new Promise((resolve, reject) => {
+        setImmediate(() => {
+          for (let i = 0; i < steps; i++) child.stdout.emit('data', stepStartLine())
+          if (child.kill.mock.calls.length > 0) {
+            const err: NodeJS.ErrnoException & { stdout?: string; stderr?: string; killed?: boolean; signal?: string } =
+              new Error('opencode reviewer killed')
+            err.killed = true
+            err.signal = 'SIGTERM'
+            err.stdout = finalStdout
+            err.stderr = ''
+            reject(err)
+          } else {
+            resolve({ stdout: finalStdout, stderr: '' })
+          }
+        })
+      })
+      ;(promise as unknown as { child: unknown }).child = child
+      return promise
+    })
+    return child
+  }
+
+  it('kills the opencode reviewer once it exceeds its turn budget, and records why', async () => {
+    // DEFAULT_MAX_TURNS is 6 (review.ts) for a low-impact report — 7
+    // step_start events is one turn past that budget.
+    const child = mockExecFileWithStreamingChild(7, opencodeText('VERDICT: PASS'))
+    const { secondOpinion } = await import('../../orchestrator/src/review.js')
+    const worktree = makeAuthorWorktree()
+    const result = await secondOpinion({
+      authorEngine: 'claude', pr: '1', worktree, diff: '',
+      report: { passed: true, reasons: [], changedFiles: ['apps/worker/x.ts'], addedLines: 1, impact: 'low', impactReasons: [] },
+    })
+
+    expect(child.kill).toHaveBeenCalledWith('SIGTERM')
+    // Killed mid-run means UNREADABLE, never a pass — even though the
+    // fixture's stdout contains a well-formed VERDICT: PASS, exactly as it
+    // would if the model wrote one on an earlier turn and then kept going.
+    expect(result.verdict).toBe('UNREADABLE')
+    expect(result.text).toContain('turn cap')
+  })
+
+  it('never kills a reviewer that finishes inside its turn budget', async () => {
+    const child = mockExecFileWithStreamingChild(2, opencodeText('VERDICT: PASS'))
+    const { secondOpinion } = await import('../../orchestrator/src/review.js')
+    const worktree = makeAuthorWorktree()
+    const result = await secondOpinion({
+      authorEngine: 'claude', pr: '1', worktree, diff: '',
+      report: { passed: true, reasons: [], changedFiles: ['apps/worker/x.ts'], addedLines: 1, impact: 'low', impactReasons: [] },
+    })
+
+    expect(child.kill).not.toHaveBeenCalled()
+    expect(result.verdict).toBe('PASS')
+  })
+
+  it('does not install a turn cap on the claude verifier — its own --max-turns already bounds it', async () => {
+    const child = mockExecFileWithStreamingChild(0, 'looks fine\nVERDICT: PASS')
+    const { secondOpinion } = await import('../../orchestrator/src/review.js')
+    const worktree = makeAuthorWorktree()
+    // authorEngine 'opencode' -> verifier is 'claude'
+    const result = await secondOpinion({
+      authorEngine: 'opencode', pr: '1', worktree, diff: '',
+      report: { passed: true, reasons: [], changedFiles: ['apps/worker/x.ts'], addedLines: 1, impact: 'low', impactReasons: [] },
+    })
+    expect(child.kill).not.toHaveBeenCalled()
+    expect(result.verdict).toBe('PASS')
   })
 })
 
