@@ -104,6 +104,9 @@ function parseLaneOverride(id: string, v: unknown): { override: LaneOverride } |
   return { reason: `lane "${id}": unrecognized entry ${JSON.stringify(v)} (expected a mode string or an override object)` }
 }
 
+/** Lane ids the modes file may name — any other key is ignored and reported. */
+const LANE_ID_SET: ReadonlySet<string> = new Set(LANE_IDS)
+
 /**
  * Modes live in runtime state, NOT in this source file. Two reasons: a dial
  * meant to be turned must not sit behind the merge gate (orchestrator/ is
@@ -111,7 +114,19 @@ function parseLaneOverride(id: string, v: unknown): { override: LaneOverride } |
  * from off to shadow), and a mode baked into source makes the "every lane
  * starts off" test false the moment anyone turns one on.
  *
- * Unknown lane ids and unreadable files both yield the default: off.
+ * Unknown lane ids and unreadable files both yield the default: off. Unknown
+ * ids — including `__proto__`, `constructor`, and `prototype` — are rejected
+ * against the LANE_IDS allowlist and reported through `onReject`, never
+ * silently kept: a key that is not a real lane can never take effect, so it
+ * must surface in the fleet log rather than sit inert in the file.
+ *
+ * The result map is a null-prototype object (`Object.create(null)`), so a
+ * lookup for an unlisted lane can never inherit an override through the
+ * prototype chain. This is belt and braces with the allowlist: the allowlist
+ * stops a poisoned key from being assigned, and the null prototype means that
+ * even if one ever were, `modes[unlistedLane]` still could not find it. A
+ * `"__proto__": "live"` entry in lanes.json must fail CLOSED (every lane
+ * stays off), not silently turn every lane live.
  *
  * `file` defaults to the real operator state (`LANE_MODES_FILE`, under
  * `~/.llamenos-fleet/`) but is injectable so callers — tests in particular —
@@ -132,8 +147,12 @@ export function readLaneModes(
   try {
     const raw: unknown = JSON.parse(readFileSync(file, 'utf8'))
     if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return {}
-    const out: Record<string, LaneOverride> = {}
+    const out: Record<string, LaneOverride> = Object.create(null)
     for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+      if (!LANE_ID_SET.has(k)) {
+        onReject?.(k, `unknown lane id ${JSON.stringify(k)} (expected one of: ${LANE_IDS.join(', ')}) — entry ignored`)
+        continue
+      }
       const parsed = parseLaneOverride(k, v)
       if ('override' in parsed) out[k] = parsed.override
       else onReject?.(k, parsed.reason)
@@ -170,7 +189,11 @@ export async function loadLanes(
   const scopes = await loadLaneScopes(repoRoot)
   const modes = readLaneModes(modesFile, onReject)
   const lanes = LANES.map((l) => {
-    const override = modes[l.id]
+    // Object.hasOwn, never `modes[l.id]` unguarded: a lane's override must be
+    // an OWN property of the modes map, never something inherited through a
+    // (poisoned) prototype chain. readLaneModes already returns a
+    // null-prototype map allowlisted to LANE_IDS; this is the second fence.
+    const override = Object.hasOwn(modes, l.id) ? modes[l.id] : undefined
     return {
       ...l,
       mode: override?.mode ?? l.mode,

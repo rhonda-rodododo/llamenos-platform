@@ -197,4 +197,61 @@ describe('readLaneModes', () => {
   it('never throws on a missing file — every lane stays off', () => {
     expect(readLaneModes(join(tmpdir(), 'definitely-not-here-lanes.json'))).toEqual({})
   })
+
+  // Regression for the fleet/review FAIL on PR #840: a `"__proto__"` key in
+  // lanes.json assigned onto a plain object literal sets the map's PROTOTYPE
+  // instead of an own property, so `modes[unlistedLane]` would inherit the
+  // poisoned override — a fail-open that turns every lane live. The fixtures
+  // must be raw strings: an object literal `{"__proto__": ...}` in test code
+  // would itself set the fixture's prototype and JSON.stringify would drop it.
+  it('fails closed on a __proto__ object entry: only real lanes are read, the key is reported', () => {
+    const onReject = vi.fn()
+    const file = modesFile('{"__proto__":{"mode":"live"},"backend":"live"}')
+    const modes = readLaneModes(file, onReject)
+    expect(modes).toEqual({ backend: { mode: 'live' } })
+    expect(Object.hasOwn(modes, '__proto__')).toBe(false)
+    for (const id of ['shared', 'desktop', 'ios', 'android', 'infra']) {
+      expect(modes[id]).toBeUndefined()
+    }
+    expect(onReject).toHaveBeenCalledOnce()
+    expect(onReject.mock.calls[0]?.[0]).toBe('__proto__')
+    expect(onReject.mock.calls[0]?.[1]).toMatch(/unknown lane id/i)
+  })
+
+  it('fails closed on a __proto__ string entry: every lane stays off, the key is reported', () => {
+    const onReject = vi.fn()
+    const file = modesFile('{"__proto__":"live"}')
+    const modes = readLaneModes(file, onReject)
+    expect(modes).toEqual({})
+    for (const id of ['backend', 'shared', 'desktop', 'ios', 'android', 'infra']) {
+      expect(modes[id]).toBeUndefined()
+    }
+    expect(onReject).toHaveBeenCalledOnce()
+    expect(onReject.mock.calls[0]?.[0]).toBe('__proto__')
+  })
+
+  it('rejects other prototype-chain keys (constructor, prototype) as unknown lane ids', () => {
+    const onReject = vi.fn()
+    const file = modesFile('{"constructor":{"mode":"live"},"prototype":"live","backend":"shadow"}')
+    expect(readLaneModes(file, onReject)).toEqual({ backend: { mode: 'shadow' } })
+    expect(onReject).toHaveBeenCalledTimes(2)
+  })
+
+  it('rejects unknown lane ids generally — ignored and reported, never silently kept', () => {
+    const onReject = vi.fn()
+    const file = modesFile({ backend: 'shadow', marketing: 'live' })
+    expect(readLaneModes(file, onReject)).toEqual({ backend: { mode: 'shadow' } })
+    expect(onReject).toHaveBeenCalledOnce()
+    expect(onReject.mock.calls[0]?.[0]).toBe('marketing')
+    expect(onReject.mock.calls[0]?.[1]).toMatch(/unknown lane id/i)
+  })
+
+  // Mutation guard: the map MUST be null-prototype. Reverting
+  // `Object.create(null)` to a plain `{}` literal must fail this test even
+  // though the LANE_IDS allowlist alone would still reject a `__proto__` key —
+  // the two defenses are independent on purpose.
+  it('returns a null-prototype map so lookups can never consult a prototype chain', () => {
+    const file = modesFile({ backend: 'live' })
+    expect(Object.getPrototypeOf(readLaneModes(file))).toBeNull()
+  })
 })

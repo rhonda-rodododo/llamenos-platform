@@ -352,4 +352,22 @@ describe('rail: lane modes are runtime state, not source', () => {
     expect(rejections).toHaveLength(1)
     expect(rejections[0]).toMatch(/invalid engine/i)
   })
+
+  // End-to-end proof of the PR #840 fleet/review finding: a poisoned
+  // `__proto__` entry must not turn unlisted lanes live through prototype
+  // inheritance. Raw JSON string — `tempModesFile({ "__proto__": ... })` would
+  // set the fixture object's own prototype and JSON.stringify would drop the
+  // key, silently neutering the test.
+  it('loadLanes fails closed on a poisoned __proto__ entry: every lane except backend stays off', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'fleet-guards-lane-modes-'))
+    dirs.push(dir)
+    const file = join(dir, 'lanes.json')
+    writeFileSync(file, '{"__proto__":{"mode":"live"},"backend":"shadow"}')
+    const rejections: string[] = []
+    const lanes = await loadLanes(process.cwd(), file, (_id, reason) => { rejections.push(reason) })
+    expect(lanes.find((l) => l.id === 'backend')?.mode).toBe('shadow')
+    expect(lanes.filter((l) => l.id !== 'backend').every((l) => l.mode === 'off')).toBe(true)
+    expect(rejections).toHaveLength(1)
+    expect(rejections[0]).toMatch(/unknown lane id/i)
+  })
 })

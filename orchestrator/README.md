@@ -153,9 +153,12 @@ echo '{"backend":"shadow","shared":"shadow"}' > ~/.llamenos-fleet/lanes.json
 ```
 
 Valid values per lane are `"off"`, `"shadow"`, `"live"` (though `tick`
-currently refuses to run at all if any lane is `"live"` — see above). Unknown
-lane ids and an absent or unreadable file both fall back to `off`, never to
-some other default.
+currently refuses to run at all if any lane is `"live"` — see above). Keys
+that are not one of the six lane ids — including `__proto__`, `constructor`,
+and `prototype` — are ignored and reported to the fleet log as unknown lane
+ids; an absent or unreadable file falls back to `off`, never to some other
+default. Lookups never consult the map's prototype chain, so a poisoned key
+can never turn an unlisted lane on.
 
 A lane entry may also be an object that overrides the dispatch engine and
 model for that lane, e.g. to run a lane on opencode/Kimi while the Anthropic
