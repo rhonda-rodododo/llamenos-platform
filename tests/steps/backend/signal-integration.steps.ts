@@ -40,7 +40,7 @@ function getSignalState(world: Record<string, unknown>): SignalIntegrationState 
 
 // ── Given ────────────────────────────────────────────────────────────
 
-Given('the Signal webhook is configured', async () => {
+Given('the Signal webhook is configured', async ({ world }) => {
   // Verify Signal messaging config is present (or at least the webhook route is reachable)
   // We don't require a real Signal bridge — the dev simulation endpoint handles inbound messages
   const state = getScenarioState(world)
