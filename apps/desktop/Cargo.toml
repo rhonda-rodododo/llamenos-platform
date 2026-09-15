@@ -46,6 +46,7 @@ futures-util = { version = "0.3", default-features = false, features = ["sink", 
 tokio = { version = "1", features = ["sync", "net"] }
 url = "2"
 base64 = "0.22"
+tauri-plugin-dialog = "2"
 
 [features]
 default = ["custom-protocol", "updater"]
