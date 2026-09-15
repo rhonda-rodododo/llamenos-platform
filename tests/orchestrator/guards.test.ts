@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, afterEach, vi } from 'vitest'
 import { LANES, NEVER_WRITE_PATHS, loadLanes, readLaneModes, assertLiveLanesHaveScope } from '../../orchestrator/src/config.js'
 import { classifyImpact, HIGH_IMPACT_PATHS } from '../../orchestrator/src/impact.js'
 import { checkScope } from '../../orchestrator/src/scope.js'
@@ -7,6 +7,11 @@ import { codeownersMatcher, codeownersPatterns, trackedFiles, trackedFilesUnder 
 import { mkdtempSync, rmSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { runReviewCi, type CiContext, type ReviewCiDeps } from '../../orchestrator/src/ci.js'
+import { DEFAULT_MAX_TURNS, HIGH_IMPACT_MAX_TURNS, DEFAULT_TIMEOUT_MS, HIGH_IMPACT_TIMEOUT_MS } from '../../orchestrator/src/review.js'
+import { diffHash, cacheArtifactName, type ReviewCache, type CachedVerdict, type ReviewCacheKey } from '../../orchestrator/src/review-cache.js'
+import type { Lane } from '../../orchestrator/src/config.js'
+import type { VerifyReport } from '../../orchestrator/src/verify.js'
 
 describe('rail: a live lane must have a write scope', () => {
   // Asserted against a synthetic lane, not the live config: every configured
@@ -344,5 +349,314 @@ describe('rail: lane modes are runtime state, not source', () => {
     expect(lanes.find((l) => l.id === 'ios')?.mode).toBe('live')
     // Every other lane is untouched by that same file.
     expect(lanes.filter((l) => l.id !== 'ios').every((l) => l.mode === 'off')).toBe(true)
+  })
+})
+
+/**
+ * `fleet/review` moved off `pull_request` and onto `merge_group` (#812): the
+ * old trigger re-ran a non-author MODEL call — against a paid, weekly-quota'd
+ * provider — on every push and every `gh pr update-branch`, and that call
+ * volume is what exhausted the quota and made the repo unmergeable. Text
+ * assertions over `.github/workflows/ci.yml` are the right instrument here,
+ * the same reasoning `guards.test.ts` already applies to `orchestrator/src`
+ * argv rails above: there is no runtime behaviour of a YAML trigger
+ * condition to exercise, only the literal condition itself, and a regex over
+ * the source is what a mutation to it actually breaks.
+ */
+describe('rail: fleet/review runs once, at merge time, not on every push', () => {
+  const ciYaml = (): string => readFileSync(join(process.cwd(), '.github', 'workflows', 'ci.yml'), 'utf8')
+
+  /** The text of one named job, from its `  <name>:` line up to (but not
+   *  including) the next job at the same two-space indentation — matching
+   *  every job key actually declared in this file, not a hardcoded guess at
+   *  what might come next. */
+  function jobBlock(text: string, name: string): string {
+    const jobHeaderRe = /\n {2}([a-zA-Z0-9_-]+):\n/g
+    const starts: { name: string; index: number }[] = []
+    for (const m of text.matchAll(jobHeaderRe)) starts.push({ name: m[1] as string, index: m.index })
+    const at = starts.findIndex((s) => s.name === name)
+    if (at === -1) throw new Error(`no "${name}:" job found in ci.yml — the grep must not pass vacuously`)
+    const end = at + 1 < starts.length ? starts[at + 1]?.index : text.length
+    return text.slice(starts[at]?.index, end)
+  }
+
+  it('finds fleet-verify and fleet-review as real jobs in ci.yml — the parser must not pass vacuously', () => {
+    expect(jobBlock(ciYaml(), 'fleet-verify')).toContain('name: fleet/verify')
+    expect(jobBlock(ciYaml(), 'fleet-review')).toContain('name: fleet/review')
+  })
+
+  it('triggers on merge_group at the workflow level', () => {
+    // Scoped to before the `jobs:` key: `merge_group` also appears in prose
+    // comments and in job bodies (context field names, env vars), and this
+    // assertion is specifically about the workflow's OWN `on:` block.
+    const onBlock = ciYaml().split(/\njobs:\n/)[0] ?? ''
+    expect(onBlock).toMatch(/\n {2}merge_group:/)
+  })
+
+  /** The JOB-level `if:`, not a step's — always at exactly four-space
+   *  indentation, always before `steps:`, in this file's own convention
+   *  (matching `runs-on:`/`permissions:` at the same level). A step-level
+   *  `if:` (e.g. `lint`'s `if: steps.changed.outputs.files != ''`) sits
+   *  deeper, inside `steps:`, and must never be mistaken for this one. */
+  function jobLevelIf(block: string): string {
+    const beforeSteps = block.split(/\n {4}steps:\n/)[0] ?? block
+    return beforeSteps.match(/\n {4}if:\s*(.+)/)?.[1] ?? ''
+  }
+
+  it('fleet/verify runs on merge_group (in addition to pull_request)', () => {
+    const ifLine = jobLevelIf(jobBlock(ciYaml(), 'fleet-verify'))
+    expect(ifLine).toContain('merge_group')
+    expect(ifLine).toContain('pull_request')
+  })
+
+  // The load-bearing assertion of this whole rail. A re-added `pull_request`
+  // trigger on fleet/review is exactly the regression #812 exists to
+  // prevent — it silently restores the per-push call volume that exhausted
+  // the quota, and every other job in this file still going green would not
+  // reveal that on its own.
+  it('fleet/review has NO pull_request trigger of its own', () => {
+    const ifLine = jobLevelIf(jobBlock(ciYaml(), 'fleet-review'))
+    expect(ifLine.length).toBeGreaterThan(0)
+    expect(ifLine).not.toContain('pull_request')
+    expect(ifLine).toContain('merge_group')
+  })
+
+  it('fleet/review still carries no write permission and no --approve', () => {
+    const block = jobBlock(ciYaml(), 'fleet-review')
+    const permsBlock = block.match(/\n {4}permissions:\n((?:\s{6}.*\n)*)/)?.[1] ?? ''
+    expect(permsBlock.length, 'fleet-review has no permissions: block to check').toBeGreaterThan(0)
+    // Actual `key: value` permission lines only — comment lines (this very
+    // block explains, in prose, why there is no `: write` here, which would
+    // otherwise make the string "`: write`" match its own explanation).
+    const permissionLines = permsBlock.split('\n').filter((l) => !l.trim().startsWith('#') && l.trim().length > 0)
+    for (const line of permissionLines) expect(line).not.toMatch(/:\s*write\b/)
+    expect(ciYaml()).not.toContain('--approve')
+  })
+
+  // `ci-status` aggregates the repo's OWN required jobs (never fleet/verify
+  // or fleet/review — see the "Fleet gates" comment above fleet-verify for
+  // why those stay out of its `needs`). Every one of them must also report
+  // on `merge_group`: a required check that only reports on `pull_request`
+  // or `push` leaves its status permanently missing on the queue ref, and a
+  // missing required check blocks the queue forever rather than failing it
+  // loudly.
+  it('every job ci-status depends on can report on merge_group', () => {
+    const yaml = ciYaml()
+    const needsLine = jobBlock(yaml, 'ci-status').match(/\n\s*needs:\s*\[([^\]]+)\]/)?.[1] ?? ''
+    const required = needsLine.split(',').map((s) => s.trim()).filter((s) => s.length > 0)
+    expect(required.length, 'ci-status needs list parsed empty — the grep must not pass vacuously').toBeGreaterThan(5)
+
+    const excludesMergeGroup = (ifLine: string): boolean => {
+      // A job with NO if: at all runs on every event the workflow triggers
+      // on — merge_group included, now that it is in the workflow's `on:`.
+      if (ifLine.length === 0) return false
+      // An `if:` that names an event at all must name merge_group too, or
+      // it silently excludes the one event this rail is about; an `if:`
+      // that never mentions an event (e.g. `needs.changes.outputs...`) is
+      // unaffected by which event triggered the run and passes through.
+      const namesAnEvent = /event_name|github\.event\.(before|after|head_commit)/.test(ifLine)
+      return namesAnEvent && !ifLine.includes('merge_group')
+    }
+
+    const offenders: string[] = []
+    for (const job of required) {
+      const ifLine = jobLevelIf(jobBlock(yaml, job))
+      if (excludesMergeGroup(ifLine)) offenders.push(`${job}: if: ${ifLine}`)
+    }
+    expect(offenders, `required job(s) whose if: excludes merge_group:\n${offenders.join('\n')}`).toEqual([])
+  })
+})
+
+/**
+ * The review engine's own turn/timeout budget (review.ts) — cut from a
+ * 20-turn/25-minute high-impact allowance to a single pass, because that
+ * allowance was enough for one review to explore the export at length
+ * rather than read the diff and file list it was already handed (both are
+ * now in the prompt — see `buildReviewPrompt`), which burned the same
+ * provider quota per call that moving off `pull_request` (the rail above)
+ * fixed per PR. Pinned to the actual exported numbers, not a description of
+ * them: a PR that quietly raises `HIGH_IMPACT_MAX_TURNS` back toward its old
+ * value must fail THIS test, not just read wrong in a comment.
+ */
+describe('rail: the reviewer gets a single pass, not an investigation', () => {
+  it('caps turns at a small, single-pass budget', () => {
+    expect(DEFAULT_MAX_TURNS).toBe(2)
+    expect(HIGH_IMPACT_MAX_TURNS).toBe(3)
+    // High impact may get a LITTLE more room, never a return to "explore the
+    // export" scale — this is the inequality a mutation raising the cap back
+    // toward 20 would still violate even if it forgot to update the exact
+    // values above.
+    expect(HIGH_IMPACT_MAX_TURNS).toBeGreaterThanOrEqual(DEFAULT_MAX_TURNS)
+    expect(HIGH_IMPACT_MAX_TURNS).toBeLessThanOrEqual(3)
+  })
+
+  it('drops the high-impact timeout from 25 minutes to about 8', () => {
+    expect(DEFAULT_TIMEOUT_MS).toBe(5 * 60_000)
+    expect(HIGH_IMPACT_TIMEOUT_MS).toBe(8 * 60_000)
+    expect(HIGH_IMPACT_TIMEOUT_MS).toBeLessThanOrEqual(10 * 60_000)
+    expect(HIGH_IMPACT_TIMEOUT_MS).toBeGreaterThanOrEqual(DEFAULT_TIMEOUT_MS)
+  })
+})
+
+describe('review-cache: pure key functions', () => {
+  it('hashes deterministically, and differently for a different diff', () => {
+    const a = diffHash('diff --git a/x b/x\n+hello\n')
+    const b = diffHash('diff --git a/x b/x\n+hello\n')
+    const c = diffHash('diff --git a/x b/x\n+goodbye\n')
+    expect(a).toBe(b)
+    expect(a).not.toBe(c)
+    expect(a).toMatch(/^[0-9a-f]{64}$/)
+  })
+
+  it('names an artifact with only characters safe in a URL query param and an Actions artifact name', () => {
+    const name = cacheArtifactName('42', diffHash('anything'))
+    expect(name).toMatch(/^[a-zA-Z0-9-]+$/)
+    expect(name).toContain('42')
+  })
+
+  it('never names two different PRs\' identical diffs the same artifact', () => {
+    const hash = diffHash('same diff content')
+    expect(cacheArtifactName('1', hash)).not.toBe(cacheArtifactName('2', hash))
+  })
+})
+
+/**
+ * "Exactly one review per PR" — the operator addendum this rail pins. Tested
+ * against `runReviewCi` directly with an injected in-memory `ReviewCache`,
+ * never against the real `artifactReviewCache` (which talks to the Actions
+ * API): the property under test is `ci.ts`'s OWN branching — look up before
+ * invoking the engine, record only a fresh PASS, treat a lookup failure
+ * exactly like a miss — not whether GitHub's artifact API works.
+ */
+describe('rail: fleet/review reviews exactly once per diff, never twice on an identical re-queue', () => {
+  const lane = (): Lane => ({
+    id: 'ios', mode: 'off', cap: 1, engine: 'claude',
+    requireLabel: 'agent-dispatchable', vetoLabels: ['needs-human'],
+    scope: { owned: ['apps/ios/'], notOwned: [] },
+  })
+  const ctx = (): CiContext => ({
+    branch: 'fleet/ios/123', repoDir: '/base', headDir: '/tmp/head',
+    baseSha: 'base111', headSha: 'head222', pr: '42',
+  })
+  const passing: VerifyReport = {
+    passed: true, reasons: [], changedFiles: ['apps/ios/a.swift'], addedLines: 3,
+    impact: 'low', impactReasons: [], testsRun: ['orchestrator'], testsPassed: true, verifiedCommit: 'c0ffee',
+  }
+
+  /** An in-memory `ReviewCache`, seeded with zero or one PASS entries — never
+   *  the real Actions-backed one, which this suite is not testing. */
+  function fakeCache(seed?: { key: ReviewCacheKey; verdict: CachedVerdict }): ReviewCache & { recordCalls: number } {
+    const store = new Map<string, CachedVerdict>()
+    if (seed !== undefined) store.set(`${seed.key.pr}:${seed.key.diffHash}`, seed.verdict)
+    const cache = {
+      recordCalls: 0,
+      async lookup(key: ReviewCacheKey) { return store.get(`${key.pr}:${key.diffHash}`) },
+      async record(key: ReviewCacheKey, verdict: CachedVerdict) {
+        cache.recordCalls += 1
+        store.set(`${key.pr}:${key.diffHash}`, verdict)
+      },
+    }
+    return cache
+  }
+
+  const deps = (over: Partial<ReviewCiDeps> = {}): ReviewCiDeps => ({
+    ctx: ctx(),
+    apiKey: 'a-key',
+    lanes: async () => [lane()],
+    verify: vi.fn(async () => passing),
+    pathExists: (p) => p !== '/tmp/head/.git',
+    log: () => {},
+    prDiff: vi.fn(async () => 'diff --git a/x b/x\n+hello\n'),
+    secondOpinion: vi.fn(async () => ({ verdict: 'PASS' as const, text: 'looks fine\nVERDICT: PASS' })),
+    ...over,
+  })
+
+  it('records a fresh PASS exactly once', async () => {
+    const cache = fakeCache()
+    const v = await runReviewCi(deps({ cache }))
+    expect(v.ok).toBe(true)
+    expect(cache.recordCalls).toBe(1)
+  })
+
+  it('re-publishes a cached PASS for an identical diff instead of invoking the engine again', async () => {
+    const diff = 'diff --git a/x b/x\n+hello\n'
+    const cache = fakeCache({
+      key: { pr: '42', diffHash: diffHash(diff) },
+      verdict: { verdict: 'PASS', text: 'VERDICT: PASS (cached)' },
+    })
+    const secondOpinion = vi.fn(async () => ({ verdict: 'PASS' as const, text: 'VERDICT: PASS' }))
+    const v = await runReviewCi(deps({ cache, prDiff: vi.fn(async () => diff), secondOpinion }))
+    expect(v.ok).toBe(true)
+    expect(secondOpinion).not.toHaveBeenCalled()
+  })
+
+  // A re-queue after the queue rebases this PR onto a newer main changes the
+  // head SHA but not the PR's own diff — the cache must still hit. Proven
+  // here by feeding the SAME diff text through two calls with a DIFFERENT
+  // ctx.headSha, rather than trusting that the key is diff-based by reading
+  // the implementation.
+  it('hits the cache across two different head SHAs, given the identical diff', async () => {
+    const diff = 'diff --git a/x b/x\n+hello\n'
+    const cache = fakeCache()
+    const secondOpinion = vi.fn(async () => ({ verdict: 'PASS' as const, text: 'VERDICT: PASS' }))
+    await runReviewCi(deps({ cache, prDiff: vi.fn(async () => diff), secondOpinion, ctx: ctx() }))
+    expect(secondOpinion).toHaveBeenCalledTimes(1)
+    await runReviewCi(deps({
+      cache, prDiff: vi.fn(async () => diff), secondOpinion,
+      ctx: { ...ctx(), headSha: 'a-totally-different-rebased-head-sha' },
+    }))
+    expect(secondOpinion).toHaveBeenCalledTimes(1)
+  })
+
+  // The load-bearing property: nothing that ever returns FAIL is reused. A
+  // FAIL is never recorded in the first place, so a second call with the
+  // identical diff invokes the engine again rather than re-publishing.
+  it('never reuses a FAIL — a diff that failed is reviewed again next time', async () => {
+    const diff = 'diff --git a/x b/x\n+bad\n'
+    const cache = fakeCache()
+    const failing = vi.fn(async () => ({ verdict: 'FAIL' as const, text: 'VERDICT: FAIL — leaks a key' }))
+    const first = await runReviewCi(deps({ cache, prDiff: vi.fn(async () => diff), secondOpinion: failing }))
+    expect(first.ok).toBe(false)
+    expect(cache.recordCalls).toBe(0)
+
+    const second = await runReviewCi(deps({ cache, prDiff: vi.fn(async () => diff), secondOpinion: failing }))
+    expect(second.ok).toBe(false)
+    expect(failing).toHaveBeenCalledTimes(2)
+  })
+
+  // "If the lookup errors, run the engine (fail safe)." A cache whose lookup
+  // throws must never be mistaken for a cache that found nothing AND must
+  // never be mistaken for a cache that found a PASS — the only safe
+  // direction is to run the engine, exactly like a real miss.
+  it('runs the engine when the cache lookup throws, rather than failing the job or assuming a pass', async () => {
+    const cache: ReviewCache = {
+      lookup: vi.fn(async () => { throw new Error('artifacts API rate limited') }),
+      record: vi.fn(async () => {}),
+    }
+    const secondOpinion = vi.fn(async () => ({ verdict: 'PASS' as const, text: 'VERDICT: PASS' }))
+    const v = await runReviewCi(deps({ cache, secondOpinion }))
+    expect(v.ok).toBe(true)
+    expect(secondOpinion).toHaveBeenCalledTimes(1)
+  })
+
+  // A cache record failure must not un-pass a review the engine already
+  // passed — recording is a courtesy to the NEXT run, not a gate on this one.
+  it('still returns the fresh PASS even when recording it fails', async () => {
+    const cache: ReviewCache = {
+      lookup: vi.fn(async () => undefined),
+      record: vi.fn(async () => { throw new Error('disk full') }),
+    }
+    const v = await runReviewCi(deps({ cache }))
+    expect(v.ok).toBe(true)
+  })
+
+  // No `cache` at all (the default before this existed, and any call site
+  // that never heard of one) must behave exactly as it always did: review
+  // every time, no lookup, no record.
+  it('behaves exactly as before when no cache is wired in at all', async () => {
+    const secondOpinion = vi.fn(async () => ({ verdict: 'PASS' as const, text: 'VERDICT: PASS' }))
+    const v = await runReviewCi(deps({ secondOpinion }))
+    expect(v.ok).toBe(true)
+    expect(secondOpinion).toHaveBeenCalledTimes(1)
   })
 })

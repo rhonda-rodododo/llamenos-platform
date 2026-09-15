@@ -17,9 +17,35 @@ on:
   push:
     branches: [main, desktop]
   pull_request:
+  # The merge queue's own ref. `fleet/verify` runs here too (mechanical, cheap
+  # — see the "Fleet gates" comment below), and `fleet/review` runs ONLY here:
+  # once per PR, immediately before the commit lands, reviewing exactly what
+  # will land rather than a snapshot from whenever the PR was last pushed.
+  merge_group:
+    types: [checks_requested]
+  # For `fleet/review` only, and only with `pr_number` supplied — a manual
+  # re-run when the merge queue itself is not the thing being exercised (e.g.
+  # testing a review-engine change against an already-open PR). Every other
+  # job still runs too on a manual dispatch (an operator invoking this
+  # expects a full CI pass, same as any other workflow_dispatch), they just
+  # get no PR/merge_group context to specialize their diff detection with —
+  # see `changes`' and `lint`'s `HEAD^` fallback.
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number — required only to manually run fleet/review'
+        required: false
+        type: string
 
 concurrency:
   group: ${{ github.event_name == 'pull_request' && format('ci-pr-{0}', github.ref) || format('ci-push-{0}', github.sha) }}
+  # Never cancelled: a merge_group check that gets cancelled mid-run leaves
+  # its required check permanently missing (GitHub does not distinguish
+  # "cancelled" from "still running" for queue purposes the same way it
+  # would surface a failure), which stalls the queue rather than failing it
+  # loudly. `github.sha` on a merge_group event is the queue's own commit
+  # SHA (unique per attempt), so a re-queue after a rebase gets its own
+  # concurrency group rather than cancelling the attempt still in flight.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions: {}  # deny-all; per-job permissions below
@@ -1239,6 +1265,14 @@ jobs:
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             BASE="${{ github.event.pull_request.base.sha }}"
             HEAD="${{ github.event.pull_request.head.sha }}"
+          elif [[ "${{ github.event_name }}" == "merge_group" ]]; then
+            # The queue's own base/head, not `before`/`after` — a merge_group
+            # event carries neither (that pair is push-only), and lint's own
+            # required-check status must still land on this ref: see the
+            # "Fleet gates" comment above fleet-verify for why a required
+            # check that never reports on merge_group blocks the queue.
+            BASE="${{ github.event.merge_group.base_sha }}"
+            HEAD="${{ github.event.merge_group.head_sha }}"
           else
             BASE="${{ github.event.before }}"
             HEAD="${{ github.event.after }}"
@@ -1393,19 +1427,31 @@ jobs:
   # same verdict, and the `statuses: write` it needed is what makes fork PRs
   # (whose GITHUB_TOKEN is read-only) permanently unmergeable.
   #
-  # Both jobs run their FULL logic on every pull request — no branch-name
-  # opt-out and no path filter. A human PR has no lane, so it gets no
-  # owned-path scope check, but never-write still binds it and the non-author
-  # review still runs.
+  # Both jobs run their FULL logic against every pull request's content — no
+  # branch-name opt-out and no path filter. A human PR has no lane, so it
+  # gets no owned-path scope check, but never-write still binds it and the
+  # non-author review still runs.
   #
-  # The ONE `if:` here is an EVENT filter, and the distinction matters: a
+  # The two jobs no longer share ONE trigger. `fleet/verify` is mechanical
+  # and cheap (scope, never-write, impact, diff-targeted tests), so it still
+  # runs on `pull_request` for fast feedback AND on `merge_group` so it is
+  # satisfied as a required check on the queue ref too. `fleet/review` is the
+  # expensive, rate-limited one — a non-author MODEL call against a paid,
+  # weekly-quota'd provider — and moved OFF `pull_request` entirely (#812):
+  # it used to re-run on every push and every `gh pr update-branch`, which
+  # burned that quota on partial diffs nobody was about to merge yet. It now
+  # runs exactly once, on `merge_group`, immediately before the commit lands
+  # — reviewing exactly what will land, not a snapshot from whenever the PR
+  # was last pushed. (`workflow_dispatch` also reaches it, but only for a
+  # manual re-run with an explicit `pr_number` — see the job's own `if:`.)
+  #
+  # Each job's `if:` is an EVENT filter, and the distinction matters: a
   # skipped job's check reports as *skipped*, which GitHub treats as
-  # satisfying a required check, so any condition that can skip on a PULL
-  # REQUEST would be fail-open. `github.event_name == 'pull_request'` cannot:
-  # on a push to main/desktop there is no PR to gate, `origin/main...HEAD` is
-  # empty, and the review job would otherwise go red on every merge. On a
-  # pull request — the only event the ruleset acts on — both jobs always run
-  # and always report.
+  # satisfying a required check, so any condition that can skip on the event
+  # that actually gates a merge would be fail-open. Neither job's `if:` can:
+  # on a push to main/desktop there is no PR and no queue entry to gate, and
+  # `merge_group`/`pull_request` are exactly the events the ruleset's merge
+  # queue acts on.
   #
   # Neither is in `ci-status`'s `needs` list, so skipping them on push does
   # not affect it at all.
@@ -1414,20 +1460,76 @@ jobs:
   # verdict, these are the fleet's, so a reader can tell which one refused.
   fleet-verify:
     name: fleet/verify
-    if: github.event_name == 'pull_request'
+    # `merge_group` alongside `pull_request`: cheap and mechanical, so it runs
+    # at PR-open time for fast feedback AND again on the queue ref right
+    # before the commit lands, satisfying it as a required check there too
+    # (a required check that never reports on `merge_group` blocks the queue
+    # forever). `fleet/review` does NOT get this treatment — see that job.
+    if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      # merge_group carries no PR context of its own (no `head.ref`, no
+      # `number`) — only a queue ref (`gh-readonly-queue/<base>/pr-<n>-<sha>`)
+      # with no lane grammar of its own. Resolving the PR's actual branch
+      # name (`fleet/<lane>/<item>`, which is what `resolveLane` in ci.ts
+      # reads) needs exactly one read of the PR's own metadata.
+      pull-requests: read
     timeout-minutes: 20
 
     steps:
+      # One step resolves what every later step and the CLI itself need,
+      # regardless of which event triggered this run — nothing past this
+      # point branches on `github.event_name` again.
+      #
+      # On `pull_request` these are the event's own base/head/branch/number.
+      # On `merge_group` they are the QUEUE's base/head — the exact commits
+      # that will land, which can differ from the PR's raw head if the queue
+      # rebased it onto other entries ahead of it in line — and the PR's
+      # ORIGINAL branch name, looked up because the queue ref does not carry
+      # it. `head_ref`'s format is `refs/heads/gh-readonly-queue/<base>/
+      # pr-<number>-<sha>` (confirmed against GitHub's published payload
+      # example); the PR number is parsed out of it and validated as digits
+      # only, before it goes anywhere near a `gh api` path segment.
+      - name: Resolve the base/head SHAs and PR context for this event
+        id: ctx
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_HEAD_REF: ${{ github.head_ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          MQ_BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          MQ_HEAD_SHA: ${{ github.event.merge_group.head_sha }}
+          MQ_HEAD_REF: ${{ github.event.merge_group.head_ref }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            base_sha="$PR_BASE_SHA"; head_sha="$PR_HEAD_SHA"; branch="$PR_HEAD_REF"; pr="$PR_NUMBER"
+          else
+            pr=$(echo "$MQ_HEAD_REF" | grep -oE 'pr-[0-9]+-' | grep -oE '[0-9]+' || true)
+            if [[ ! "$pr" =~ ^[0-9]+$ ]]; then
+              echo "::error::could not parse a numeric PR number out of merge_group.head_ref: $MQ_HEAD_REF"
+              exit 1
+            fi
+            branch=$(gh api "repos/${{ github.repository }}/pulls/$pr" --jq '.head.ref')
+            base_sha="$MQ_BASE_SHA"; head_sha="$MQ_HEAD_SHA"
+          fi
+          {
+            echo "base_sha=$base_sha"
+            echo "head_sha=$head_sha"
+            echo "branch=$branch"
+            echo "pr=$pr"
+          } >> "$GITHUB_OUTPUT"
+
       # The BASE commit, not the head. Everything the gate decides is computed
       # from this tree: its git history, its orchestrator code, its lockfile,
       # its node_modules. The commit under judgement never becomes code here.
       - name: Checkout the PR BASE (trusted)
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
+          ref: ${{ steps.ctx.outputs.base_sha }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -1437,7 +1539,7 @@ jobs:
       # appears in there — see headDirRefusal in ci.ts.
       - name: Export the PR head as data
         env:
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_SHA: ${{ steps.ctx.outputs.head_sha }}
         run: |
           set -euo pipefail
           git fetch --no-tags origin "$HEAD_SHA"
@@ -1509,36 +1611,105 @@ jobs:
 
       - name: Verify
         env:
-          FLEET_CI_BRANCH: ${{ github.head_ref }}
-          FLEET_CI_PR: ${{ github.event.pull_request.number }}
+          FLEET_CI_BRANCH: ${{ steps.ctx.outputs.branch }}
+          FLEET_CI_PR: ${{ steps.ctx.outputs.pr }}
           FLEET_CI_HEAD_DIR: ${{ runner.temp }}/head
-          FLEET_CI_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          FLEET_CI_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          FLEET_CI_HEAD_SHA: ${{ steps.ctx.outputs.head_sha }}
+          FLEET_CI_BASE_SHA: ${{ steps.ctx.outputs.base_sha }}
         run: bun orchestrator/src/cli.ts verify-ci
 
   fleet-review:
     name: fleet/review
-    if: github.event_name == 'pull_request'
+    # ONLY `merge_group` (plus a manual `workflow_dispatch` re-run that
+    # supplies a PR number) — never `pull_request`. This is the whole point
+    # of #812: the old `pull_request` trigger re-ran this job on every push
+    # and every `gh pr update-branch`, and each run is one non-author MODEL
+    # call against a paid, weekly-quota'd provider — that call volume is what
+    # exhausted it and made the repo unmergeable. Reviewing once, on the
+    # queue ref, right before the commit lands, is both cheaper AND more
+    # correct: it judges exactly what will land, not whatever the PR looked
+    # like whenever it was last pushed.
+    if: github.event_name == 'merge_group' || (github.event_name == 'workflow_dispatch' && github.event.inputs.pr_number != '')
     runs-on: ubuntu-latest
     permissions:
-      # contents: read and nothing else. The reviewer runs inside this job
-      # with the review key on disk, so the containment that matters is that
-      # NOTHING from the commit under judgement ever executes here: it is a
-      # `git archive` export the model reads, never a checkout, never
-      # installed, never on a module path.
+      # contents: read — the reviewer runs inside this job with the review
+      # key on disk, so the containment that matters is that NOTHING from
+      # the commit under judgement ever executes here: it is a `git archive`
+      # export the model reads, never a checkout, never installed, never on
+      # a module path.
       contents: read
-    # HIGH_IMPACT_TIMEOUT_MS alone is 25 minutes (review.ts); checkout, deps,
-    # the engine download and the smoke call have to fit around it.
-    timeout-minutes: 40
+      # merge_group carries no PR context of its own — resolving the PR's
+      # actual branch name needs one read of its metadata (same as
+      # fleet/verify, above).
+      pull-requests: read
+      # Read-only, for the review-cache lookup (`review-cache.ts`'s
+      # `GET .../actions/artifacts?name=...`) — never `: write`. See the
+      # "review job still has no write permission" rail in guards.test.ts:
+      # this line is exactly why that rail asserts `read`, not the whole
+      # key's absence.
+      actions: read
+    # HIGH_IMPACT_TIMEOUT_MS is 8 minutes (review.ts, cut from 25 at #812 —
+    # see the comment above it); checkout, deps, the engine download, the
+    # smoke call and the cache lookup have to fit around it.
+    timeout-minutes: 20
 
     steps:
+      # `pull_request` is deliberately absent here — this job never runs on
+      # that event any more. On `merge_group` the base/head are the QUEUE's
+      # own (the exact commits that will land — see the job comment above),
+      # and the PR's ORIGINAL branch name (needed for `resolveLane` in
+      # ci.ts, which reads the `fleet/<lane>/<item>` grammar the queue ref
+      # itself does not carry) is looked up by the PR number parsed out of
+      # `merge_group.head_ref`. On `workflow_dispatch`, `pr_number` is the
+      # operator-supplied input — validated as digits-only before it goes
+      # anywhere near a `gh api` path segment, same discipline as the
+      # merge_group branch, even though this input is not attacker-reachable
+      # (workflow_dispatch requires write access to trigger at all).
+      - name: Resolve the base/head SHAs and PR context for this event
+        id: ctx
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          MQ_BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          MQ_HEAD_SHA: ${{ github.event.merge_group.head_sha }}
+          MQ_HEAD_REF: ${{ github.event.merge_group.head_ref }}
+          DISPATCH_PR: ${{ github.event.inputs.pr_number }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "merge_group" ]]; then
+            pr=$(echo "$MQ_HEAD_REF" | grep -oE 'pr-[0-9]+-' | grep -oE '[0-9]+' || true)
+          else
+            pr="$DISPATCH_PR"
+          fi
+          if [[ ! "$pr" =~ ^[0-9]+$ ]]; then
+            echo "::error::no numeric PR number to review (merge_group.head_ref=$MQ_HEAD_REF, workflow_dispatch pr_number=$DISPATCH_PR)"
+            exit 1
+          fi
+          pr_json="$(gh api "repos/${{ github.repository }}/pulls/$pr")"
+          branch="$(echo "$pr_json" | jq -r '.head.ref')"
+          if [[ "$EVENT_NAME" == "merge_group" ]]; then
+            base_sha="$MQ_BASE_SHA"; head_sha="$MQ_HEAD_SHA"
+          else
+            # A manual re-run has no queue entry to read a base/head from —
+            # review the PR's own current head against its own current base,
+            # same range `fleet/verify` already validated at PR-open time.
+            base_sha="$(echo "$pr_json" | jq -r '.base.sha')"
+            head_sha="$(echo "$pr_json" | jq -r '.head.sha')"
+          fi
+          {
+            echo "base_sha=$base_sha"
+            echo "head_sha=$head_sha"
+            echo "branch=$branch"
+            echo "pr=$pr"
+          } >> "$GITHUB_OUTPUT"
+
       # The BASE commit, not the head. Everything the gate decides is computed
       # from this tree: its git history, its orchestrator code, its lockfile,
       # its node_modules. The commit under judgement never becomes code here.
       - name: Checkout the PR BASE (trusted)
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
+          ref: ${{ steps.ctx.outputs.base_sha }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -1556,10 +1727,10 @@ jobs:
       # turn the reviewer's read access to this tree into read access to
       # `~/.local/share/opencode/auth.json`. review.ts strips the same set
       # again (REVIEWER_CONTROL_NAMES) from base code, because this workflow
-      # file is the PR's own copy on a pull_request run.
+      # file is the PR's own copy on the ref this job checked out.
       - name: Export the PR head as data
         env:
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_SHA: ${{ steps.ctx.outputs.head_sha }}
         run: |
           set -euo pipefail
           git fetch --no-tags origin "$HEAD_SHA"
@@ -1717,16 +1888,44 @@ jobs:
           esac
 
       - name: Review
+        id: review
         env:
           # Absent fails the job — never a skip and never a pass. A review
           # that could not run is not a review that passed.
           FLEET_REVIEW_API_KEY: ${{ secrets.FLEET_REVIEW_API_KEY }}
-          FLEET_CI_BRANCH: ${{ github.head_ref }}
-          FLEET_CI_PR: ${{ github.event.pull_request.number }}
+          FLEET_CI_BRANCH: ${{ steps.ctx.outputs.branch }}
+          FLEET_CI_PR: ${{ steps.ctx.outputs.pr }}
           FLEET_CI_HEAD_DIR: ${{ runner.temp }}/head
-          FLEET_CI_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          FLEET_CI_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          FLEET_CI_HEAD_SHA: ${{ steps.ctx.outputs.head_sha }}
+          FLEET_CI_BASE_SHA: ${{ steps.ctx.outputs.base_sha }}
+          # Read-only lookup of a prior PASS for this exact diff — see
+          # `review-cache.ts`. `GH_TOKEN` is what lets that lookup call
+          # `gh api`; `FLEET_REVIEW_CACHE_DIR` is where a FRESH pass (never a
+          # replayed cache hit — `runReviewCi` in ci.ts only records one it
+          # just produced) gets written for the upload step below to pick up.
+          GH_TOKEN: ${{ github.token }}
+          FLEET_REVIEW_CACHE_DIR: ${{ runner.temp }}/review-cache
         run: bun orchestrator/src/cli.ts review-ci
+
+      # Best-effort and never affects this job's own result (`if: always()`,
+      # and `if-no-files-found: ignore` for the ordinary case where this run
+      # was itself a cache hit, or FAILed, and `record()` therefore wrote
+      # nothing at all — see the "FAIL is never reused" comment in
+      # review-cache.ts). Uploading uses the ephemeral per-run Actions
+      # artifact token, never the job's own read-only `permissions:` above —
+      # this step needs no permission this job does not already have to be a
+      # write.
+      - name: Cache the verdict, if this run produced a fresh PASS
+        if: always() && steps.review.outputs.cache_artifact_name != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.review.outputs.cache_artifact_name }}
+          path: ${{ runner.temp }}/review-cache
+          # Long enough to outlive a PR that sits in the queue across a few
+          # re-attempts; short enough that a cache this small never becomes
+          # its own storage-cost concern.
+          retention-days: 30
+          if-no-files-found: ignore
 
   ci-status:
     needs: [no-generated-files-in-git, verify-updater-config, build, audit, lint, crypto-tests, backend-bdd, backend-unit, desktop-unit, android-build-test, android-e2e, e2e, ios-build-test, crypto-guardrails, migration-drift, ansible-validate, docs-guard]
