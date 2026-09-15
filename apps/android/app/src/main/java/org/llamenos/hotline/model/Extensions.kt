@@ -55,7 +55,7 @@ val BanListResponseBan.createdBy: String
 val BanListResponseBan.createdAt: String
     get() = bannedAt
 
-// ── SharedEntry (typealias AuditEntry) ────────────────────────────────────
+// ── SharedEntry (audit log entry) ───────────────────────────────────────────
 
 /** Timestamp — maps to `createdAt` in the generated type. */
 val SharedEntry.timestamp: String

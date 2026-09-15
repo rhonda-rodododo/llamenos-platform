@@ -8,7 +8,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.llamenos.hotline.api.WebSocketService
 import org.llamenos.hotline.model.ActiveCall
-import org.llamenos.hotline.model.AuditEntry
+import org.llamenos.protocol.SharedEntry
 import org.llamenos.hotline.model.BanEntry
 import org.llamenos.hotline.model.ContactSummary
 import org.llamenos.hotline.model.Conversation
@@ -417,7 +417,7 @@ class ScreenshotTests {
     )
 
     private val sampleAuditEntries = listOf(
-        AuditEntry(
+        SharedEntry(
             id = "audit-001",
             action = "call.answered",
             actorPubkey = samplePubkey,
@@ -426,7 +426,7 @@ class ScreenshotTests {
             previousEntryHash = null,
             createdAt = sampleTimestamp,
         ),
-        AuditEntry(
+        SharedEntry(
             id = "audit-002",
             action = "note.created",
             actorPubkey = samplePubkey,
@@ -435,7 +435,7 @@ class ScreenshotTests {
             previousEntryHash = "sha256-001",
             createdAt = sampleTimestamp2,
         ),
-        AuditEntry(
+        SharedEntry(
             id = "audit-003",
             action = "user.created",
             actorPubkey = "npub1admin000000000000000000000000000000000000000000000000000000ad",

@@ -32,10 +32,6 @@ typealias BanListResponse = org.llamenos.protocol.BanListResponse
 typealias BulkBanRequest = org.llamenos.protocol.BulkBanBody
 
 // ---- Audit Log ----
-// Generated SharedEntry has: id, action, actorPubkey, details (JsonObject), entryHash?, previousEntryHash?, createdAt.
-// Shared with EvidenceAccessLogResponse.entries — codegen dedups identical entry shapes across schemas.
-// Extension properties in Extensions.kt provide detailsString and timestamp.
-typealias AuditEntry = org.llamenos.protocol.SharedEntry
 typealias AuditLogResponse = org.llamenos.protocol.AuditListResponse
 
 // ---- Invites ----
