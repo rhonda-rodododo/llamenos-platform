@@ -22,7 +22,7 @@ describe('parseVerdict', () => {
   it('reads an explicit PASS on the final line', () => {
     expect(parseVerdict('SCOPE: ok\nVERDICT: PASS')).toBe('PASS')
   })
-  it('reads an explicit FAIL, with its reason', () => {
+  it('reads an explicit FAIL with its reason', () => {
     expect(parseVerdict('VERDICT: FAIL — touched files outside its lane')).toBe('FAIL')
   })
   it('treats a missing verdict as UNREADABLE, not as a pass', () => {
@@ -30,31 +30,70 @@ describe('parseVerdict', () => {
   })
   it('treats empty output as UNREADABLE', () => {
     expect(parseVerdict('')).toBe('UNREADABLE')
+    expect(parseVerdict('  \n\n ')).toBe('UNREADABLE')
   })
   it('does not mistake a mention of the word "pass" without the VERDICT label for a verdict', () => {
     expect(parseVerdict('this diff should pass CI once merged')).toBe('UNREADABLE')
   })
-  // Expectation CHANGED (was PASS): the brief asks for exactly `VERDICT: PASS`,
-  // and a case-insensitive match is how quoted or reasoned-about text leaked
-  // into the verdict.
-  it('rejects a lowercase verdict', () => {
-    expect(parseVerdict('verdict: pass')).toBe('UNREADABLE')
-  })
-  // A reviewer that walks the diff quotes it, and this repo's own tests
-  // contain the literal line `VERDICT: PASS`.
-  it('reads FAIL when the output quotes a diff containing VERDICT: PASS and then ends in FAIL', () => {
-    const output = ['The diff adds this fixture:', '+VERDICT: PASS', 'VERDICT: PASS', 'but it leaks a key.',
-      'VERDICT: FAIL — leaks a key'].join('\n')
+  // #801 — the verdict is the FINAL line, exactly as VERIFIER_BRIEF demands.
+  it('takes the final FAIL, not a VERDICT: PASS quoted earlier from the diff', () => {
+    const output = [
+      'Walking through the diff:',
+      '',
+      '```diff',
+      "+    secondOpinion: vi.fn(async () => ({ verdict: 'PASS' as const, text: 'looks fine' })),",
+      'VERDICT: PASS',
+      '```',
+      '',
+      'That quoted line is test data, not my verdict. The change also logs the hub key.',
+      'VERDICT: FAIL — writes the hub key to the job log',
+    ].join('\n')
     expect(parseVerdict(output)).toBe('FAIL')
   })
-  it('treats a VERDICT: PASS line followed by further prose as UNREADABLE', () => {
-    expect(parseVerdict('VERDICT: PASS\nactually, on reflection, not sure')).toBe('UNREADABLE')
+  it('takes the final FAIL over an earlier verdict reached while reasoning in the open', () => {
+    expect(parseVerdict('My first read said VERDICT: PASS, but on closer inspection…\nVERDICT: FAIL — leaks a key')).toBe('FAIL')
   })
-  it('tolerates trailing newlines and whitespace after a valid final line', () => {
-    expect(parseVerdict('looks right\nVERDICT: PASS   \n\n  \n')).toBe('PASS')
+  it('is UNREADABLE when a well-formed VERDICT: PASS is followed by more prose', () => {
+    expect(parseVerdict('VERDICT: PASS\nActually, one more thing I noticed.')).toBe('UNREADABLE')
   })
-  it('rejects anything after PASS on the same line', () => {
-    expect(parseVerdict('VERDICT: PASS — but see above')).toBe('UNREADABLE')
+  // Accepted risk, stated so the next edit to VERDICT_LINE_RE sees it: last
+  // line wins in the PERMISSIVE direction too. The brief demands exactly one
+  // verdict line at the end; a reviewer talked out of an earlier FAIL (or
+  // prompt-injected into a final PASS) ends on PASS, and the parser cannot
+  // tell those apart — that is an LLM-layer problem, not a parsing one.
+  it('takes a final PASS over an earlier FAIL: the last line wins in both directions', () => {
+    expect(parseVerdict('VERDICT: FAIL — leaks key\nOn reflection the key is a test fixture.\nVERDICT: PASS')).toBe('PASS')
+  })
+  it('tolerates trailing newlines and trailing whitespace after a valid final line', () => {
+    expect(parseVerdict('ok\nVERDICT: PASS   \n\n  \n')).toBe('PASS')
+    expect(parseVerdict('ok\r\nVERDICT: FAIL — nope\t\r\n')).toBe('FAIL')
+  })
+  // FAIL matches on `\b`, which a stray `\r` would not break; PASS is anchored
+  // with `$`, which it would. So CRLF has to be pinned on PASS specifically.
+  it('reads a CRLF-terminated PASS: the `$` anchor must not see the carriage return', () => {
+    expect(parseVerdict('ok\r\nVERDICT: PASS\r\n')).toBe('PASS')
+  })
+  // Fail closed on terminal colour codes — and the CI smoke step now judges
+  // the engine's output with this same function, so an engine that starts
+  // emitting them fails the smoke step instead of passing it.
+  it('is UNREADABLE when the verdict line carries ANSI escape codes', () => {
+    expect(parseVerdict('\x1b[32mVERDICT: PASS\x1b[0m')).toBe('UNREADABLE')
+    expect(parseVerdict('VERDICT: PASS\x1b[0m')).toBe('UNREADABLE')
+    expect(parseVerdict('VERDICT: PASS\n\x1b[0m')).toBe('UNREADABLE')
+  })
+  it('is case-sensitive: a lowercase verdict line is UNREADABLE', () => {
+    expect(parseVerdict('verdict: pass')).toBe('UNREADABLE')
+    expect(parseVerdict('VERDICT: Pass')).toBe('UNREADABLE')
+  })
+  it('is anchored: a verdict that does not start its line is UNREADABLE', () => {
+    expect(parseVerdict('  VERDICT: PASS')).toBe('UNREADABLE')
+    expect(parseVerdict('**VERDICT: PASS**')).toBe('UNREADABLE')
+    expect(parseVerdict('so, VERDICT: PASS')).toBe('UNREADABLE')
+  })
+  it('accepts nothing after PASS, and no word merely beginning with PASS or FAIL', () => {
+    expect(parseVerdict('VERDICT: PASS — but only just')).toBe('UNREADABLE')
+    expect(parseVerdict('VERDICT: PASSED')).toBe('UNREADABLE')
+    expect(parseVerdict('VERDICT: FAILED')).toBe('UNREADABLE')
   })
 })
 

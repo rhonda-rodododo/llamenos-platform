@@ -2,8 +2,7 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import type { Lane } from './config.js'
 import type { VerifyInput, VerifyReport } from './verify.js'
-import { finalLine } from './review.js'
-import type { SecondOpinionInput, SecondOpinionResult } from './review.js'
+import { finalLine, type SecondOpinionInput, type SecondOpinionResult } from './review.js'
 import { join } from 'node:path'
 import { buildGateTrace } from './trace.js'
 
@@ -128,10 +127,10 @@ export function itemIdFromBranch(branch: string): string | undefined {
   return FLEET_BRANCH_RE.exec(branch)?.[2]
 }
 
-/** The reviewer's final non-empty line — the same line `parseVerdict` judges,
- *  selected by the same function, so the printed summary can never name a
- *  different line from the one that decided the job. Never an invented
- *  summary. */
+/** The one line `parseVerdict` judged — the reviewer's final non-empty line,
+ *  selected by the same function (`finalLine`), so the printed summary and the
+ *  job's exit code can never name different verdicts. Never an invented
+ *  summary and never a search of its own. */
 export function verdictSummary(text: string): string {
   return finalLine(text) ?? '(no reviewer output)'
 }
@@ -238,7 +237,11 @@ export async function runVerifyCi(deps: VerifyCiDeps): Promise<CiVerdict> {
   const withTests = await deps.verify({ ...rangeFor(deps.ctx), lane, testDir: deps.ctx.headDir })
   return {
     ok: withTests.passed,
-    summary: [buildGateTrace({ report: withTests }), ...withTests.reasons.map((r) => `- ${r}`)].join('\n'),
+    summary: [
+      buildGateTrace({ report: withTests }),
+      ...(withTests.testResults ?? []).map((r) => `- ${r}`),
+      ...withTests.reasons.map((r) => `- ${r}`),
+    ].join('\n'),
   }
 }
 

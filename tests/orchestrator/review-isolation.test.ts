@@ -29,8 +29,15 @@ import type { VerifyReport } from '../../orchestrator/src/verify.js'
  * assertions cannot pass vacuously.
  */
 
-const FAKE_OPENCODE = String.raw`#!/usr/bin/env bun
-'use strict'
+// The shebang must name the bun RUNNING THIS TEST by absolute path. The
+// secondOpinion tests hand the engine a deliberately minimal environment
+// (VERIFIER_ENV_ALLOWLIST), and this suite is also run under a fresh, empty
+// HOME — `#!/usr/bin/env bun` resolves through a version-manager shim
+// (Volta/mise) keyed off HOME or VOLTA_HOME, neither of which is present in
+// either situation, so the fake would die with "Could not find executable"
+// instead of reviewing anything. Same reason the module runner below uses
+// the fake's own process.execPath rather than `bun` from PATH.
+const FAKE_OPENCODE = `#!${process.execPath}\n` + String.raw`'use strict'
 const fs = require('node:fs')
 const path = require('node:path')
 const { spawnSync } = require('node:child_process')
@@ -42,7 +49,7 @@ const prompt = fs.readFileSync(0, 'utf8')
 const projectConfigDisabled = process.env.OPENCODE_DISABLE_PROJECT_CONFIG === '1'
 const ls = (d) => (d && fs.existsSync(d) ? fs.readdirSync(d).sort() : null)
 const modules = (sub) => (ls(path.join(project, '.opencode', sub)) || []).map((f) => path.join(project, '.opencode', sub, f))
-const runModule = (file) => spawnSync('bun', [file], { stdio: ['ignore', 'inherit', 'inherit'] })
+const runModule = (file) => spawnSync(process.execPath, [file], { stdio: ['ignore', 'inherit', 'inherit'] })
 
 const configDir = process.env.OPENCODE_CONFIG_DIR
 const exportDir = (/exported, read-only, at:\n\n([^\n]+)\n/.exec(prompt) || [])[1]
