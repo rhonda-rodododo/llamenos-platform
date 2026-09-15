@@ -171,10 +171,12 @@ const VERDICT_LINE_RE = /^VERDICT: (?:(PASS)$|(FAIL)\b)/
  * tracked files contain the literal line `VERDICT: PASS`; a reviewer that
  * reasons in the open ("my first read said VERDICT: PASS, but…") writes one
  * before its real answer; and code the PR managed to run inside the reviewer
- * could print one before the model ever spoke — which is exactly what the
- * first-match-anywhere parser this replaced let through. Anything that is not
- * that one line — a hedge, a lowercase `verdict: pass`, empty output from a
- * reviewer that never ran — is UNREADABLE, never a pass.
+ * could print one before the model ever spoke. Accepting the first match
+ * anywhere — the parser this replaced — let any of those supply the verdict.
+ *
+ * Anything else — a well-formed verdict line followed by more prose, a
+ * lowercase `verdict: pass`, a hedge, empty output from a reviewer that never
+ * ran — is UNREADABLE, never a pass. UNREADABLE blocks exactly as FAIL does.
  */
 export function parseVerdict(output: string): 'PASS' | 'FAIL' | 'UNREADABLE' {
   const line = finalLine(output)

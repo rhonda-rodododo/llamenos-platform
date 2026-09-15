@@ -15,7 +15,7 @@ import {
   simulateIncomingMessage,
   uniqueCallerNumber,
 } from '../../simulation-helpers'
-import { apiGet, apiPost, apiPatch, devPost } from '../../api-helpers'
+import { apiGet, apiPost, devPost } from '../../api-helpers'
 
 // ── Local State ──────────────────────────────────────────────────────
 
@@ -40,7 +40,7 @@ function getSignalState(world: Record<string, unknown>): SignalIntegrationState 
 
 // ── Given ────────────────────────────────────────────────────────────
 
-Given('the Signal webhook is configured', async ({ request, world }) => {
+Given('the Signal webhook is configured', async ({ world }) => {
   // Verify Signal messaging config is present (or at least the webhook route is reachable)
   // We don't require a real Signal bridge — the dev simulation endpoint handles inbound messages
   const state = getScenarioState(world)
@@ -433,7 +433,7 @@ Then(
 
 Then(
   'the message should be appended to the existing conversation',
-  async ({ request, world }) => {
+  async ({ world }) => {
     const state = getScenarioState(world)
     const signalState = getSignalState(world)
     // The new message should belong to the same original conversation

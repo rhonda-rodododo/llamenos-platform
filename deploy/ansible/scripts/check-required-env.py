@@ -1,120 +1,314 @@
 #!/usr/bin/env python3
-"""Assert every Ansible template that renders the worker's .env carries every
-env var apps/worker/lib/config.ts requires at Bun startup.
+"""Assert every env var apps/worker/lib/config.ts requires at startup is
+actually produced by BOTH Ansible .env templates.
 
-Context (issue #798): the repo has accumulated more than one Jinja template
-that renders the worker's environment (one per deploy topology — the
-deprecated monolithic `llamenos` role and the split `llamenos-app` role).
-Nothing enforced that they stay in sync, so a var added to config.ts's
-required list (or added to one template but not its sibling) could silently
-leave a real deploy path unable to boot. This script parses the required-var
-list out of config.ts itself — the single source of truth — and asserts every
-listed template contains all of them, so a future drift fails CI loudly
-instead of failing a real deploy quietly.
+Why this exists (PR #771 review round 2, issue #716): roles/llamenos/templates/
+env.j2 (the monolithic/demo deploy path) silently drifted from
+roles/llamenos-app/templates/env/app.j2 (the per-service production path) and
+ended up missing DATABASE_URL entirely -- config.ts hard-fails at startup
+without it, so the container never booted. That bug shipped because nothing
+checked the two templates stayed in sync. This script is that check.
 
-Only vars validateConfig() asserts *unconditionally* are checked here.
-WEBHOOK_BASE_URL is required only when ENVIRONMENT=production (a runtime
-value, not a template-time constant) and is intentionally not enforced by
-this script — see apps/worker/lib/config.ts for that check.
+It does NOT hand-maintain its own copy of the required-var list -- it parses
+apps/worker/lib/config.ts itself, so a future var added there (and forgotten
+in the Ansible templates) fails CI immediately instead of silently drifting
+again.
 
-Run from repo root or anywhere; paths below are repo-root-relative.
+Usage:
+    python3 deploy/ansible/scripts/check-required-env.py
+
+When the rendered files are absent (the normal case in CI, where main's
+workflow invokes this script directly), the script renders them itself by
+running playbooks/check-env-templates.yml twice -- once for the
+production/required-vars scenario, once for the all-optional-features
+scenario. The renders can also be produced manually beforehand:
+
+    cd deploy/ansible
+    ansible-playbook playbooks/check-env-templates.yml \\
+        -e @vars.example.yml -e app_environment=production \\
+        -e webhook_base_url=https://example.org
+    ansible-playbook playbooks/check-env-templates.yml \\
+        -e @vars.example.yml -e @scripts/full-scenario.extra-vars.json
+    python3 scripts/check-required-env.py
+
+Exits non-zero (and prints exactly what's missing, from which file) on any
+gap. Run from anywhere; pass --repo-root explicitly if the auto-computed
+root is wrong.
 """
-
 from __future__ import annotations
 
+import argparse
 import re
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
+# Unconditionally-required vars are extracted generically from any
+# `assertNonEmpty(env, 'X')` / `assertHex64(env, 'X')` call site in
+# config.ts -- including the one INSIDE assertDatabaseUrl(), which itself
+# calls `assertNonEmpty(env, 'DATABASE_URL')`. No hardcoded var names here.
+UNCONDITIONAL_RE = re.compile(r"assert(?:NonEmpty|Hex64)\(\s*env\s*,\s*'([A-Z_][A-Z0-9_]*)'\s*\)")
 
-CONFIG_TS = REPO_ROOT / "apps/worker/lib/config.ts"
+# Conditionally-required vars (e.g. WEBHOOK_BASE_URL, only required when
+# ENVIRONMENT === 'production') are expressed as raw env['...'] lookups
+# inside the "--- Production-required vars ---" section rather than an
+# assertX(env, 'X') call, so they need a section-scoped pattern -- still
+# parsed FROM config.ts's source text, not hardcoded independently of it.
+SECTION_RE = re.compile(
+    r"// --- Production-required vars ---(.*?)// --- ", re.DOTALL
+)
+ENV_LOOKUP_RE = re.compile(r"env\['([A-Z_][A-Z0-9_]*)'\]")
 
-# Every Ansible template that renders a full worker environment (either as a
-# standalone .env file or as an embedded `environment:` block in a compose
-# file). Add new ones here the moment they're introduced — that's the whole
-# point of this gate.
-TEMPLATES = [
-    REPO_ROOT / "deploy/ansible/roles/llamenos/templates/env.j2",
-    REPO_ROOT / "deploy/ansible/roles/llamenos/templates/docker-compose.j2",
-    REPO_ROOT / "deploy/ansible/roles/llamenos-app/templates/env/app.j2",
-    REPO_ROOT / "deploy/ansible/roles/llamenos-app/templates/compose/app.j2",
+# Optional vars: unlike the required list above, these are never asserted by
+# config.ts (they gate an optional feature and warn-not-throw when absent),
+# so there's no single call-site shape to parse generically. Hand-maintained
+# here, but each one names its real consumer so "is this actually dead" stays
+# checkable by grep, not by trusting this comment:
+#   APNS_KEY_P8/APNS_KEY_ID/APNS_TEAM_ID -> apps/worker/lib/voip-push.ts,
+#     apps/worker/lib/push-dispatch.ts (iOS VoIP + regular push signing)
+#   NTFY_URL/NTFY_AUTH_TOKEN             -> same two files (Android push via ntfy)
+#   GLITCHTIP_DSN                        -> apps/worker/routes/config.ts (client crash reporting DSN)
+#   SIGNAL_NOTIFIER_BEARER_TOKEN         -> signal-notifier/ sidecar auth
+#   DEMO_RESET_CRON                      -> apps/worker/routes/config.ts -> demoResetSchedule
+#                                            -> src/client/components/demo-banner.tsx (display only)
+#
+# Verified in review round 2 (PR #771): the first four groups already had
+# real consumers AND unit test coverage (push-dispatch.test.ts,
+# voip-push.test.ts) despite the review flagging them as possibly dead --
+# only DEMO_RESET_CRON was genuinely unwired at the Ansible layer (no var
+# existed in vars.example.yml or either .env template) despite already
+# having an app-side consumer and test (config.test.ts). This list, checked
+# against the "optional vars" scenario render
+# (scripts/full-scenario.extra-vars.json), is what proves that's still true
+# and stays true.
+OPTIONAL_VARS_WITH_CONSUMERS = [
+    "APNS_KEY_P8",
+    "APNS_KEY_ID",
+    "APNS_TEAM_ID",
+    "NTFY_URL",
+    "NTFY_AUTH_TOKEN",
+    "GLITCHTIP_DSN",
+    "SIGNAL_NOTIFIER_BEARER_TOKEN",
+    "DEMO_RESET_CRON",
 ]
 
-# Matches assertNonEmpty(env, 'KEY') / assertHex64(env, 'KEY') calls with a
-# literal string key — deliberately does NOT match the generic internal call
-# `assertNonEmpty(env, key)` inside assertHex64/assertDatabaseUrl themselves,
-# since that argument is a variable, not a quoted literal.
-REQUIRED_VAR_RE = re.compile(
-    r"""assert(?:NonEmpty|Hex64)\(\s*env\s*,\s*['"]([A-Z][A-Z0-9_]*)['"]\s*\)"""
-)
 
-
-def extract_required_vars(config_ts: Path) -> set[str]:
-    if not config_ts.is_file():
-        print(f"ERROR: config source not found: {config_ts}", file=sys.stderr)
-        sys.exit(2)
-
-    text = config_ts.read_text()
-    required = set(REQUIRED_VAR_RE.findall(text))
-
-    # assertDatabaseUrl(env) hardcodes the 'DATABASE_URL' key internally
-    # rather than taking it as an argument — special-cased here.
-    if "assertDatabaseUrl(env)" in text:
-        required.add("DATABASE_URL")
-
-    if not required:
-        print(
-            f"ERROR: parsed zero required vars out of {config_ts} — "
-            "the parser regex is stale relative to validateConfig()'s shape.",
-            file=sys.stderr,
+def extract_required_vars(config_ts: Path) -> tuple[list[str], list[str]]:
+    src = config_ts.read_text()
+    unconditional = sorted(set(UNCONDITIONAL_RE.findall(src)))
+    conditional: list[str] = []
+    section_match = SECTION_RE.search(src)
+    if section_match:
+        conditional = sorted(set(ENV_LOOKUP_RE.findall(section_match.group(1))))
+    if not unconditional:
+        raise SystemExit(
+            f"[check-required-env] Parsed zero required vars out of {config_ts}. "
+            "Either config.ts changed shape (update UNCONDITIONAL_RE) or this "
+            "script is pointed at the wrong file -- refusing to pass trivially."
         )
-        sys.exit(2)
-
-    return required
+    return unconditional, conditional
 
 
-def var_present(template_text: str, var: str) -> bool:
-    return re.search(rf"\b{re.escape(var)}=", template_text) is not None
+def rendered_keys(env_file: Path) -> set[str]:
+    keys: set[str] = set()
+    for line in env_file.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" in line:
+            keys.add(line.split("=", 1)[0])
+    return keys
+
+
+def ensure_rendered(repo_root: Path, rendered: list[Path]) -> None:
+    """Render the four .env outputs if they don't exist yet.
+
+    Main's ci.yml invokes this script directly (no separate render step), so
+    the script must be able to produce its own inputs. If the files already
+    exist (a dev ran playbooks/check-env-templates.yml manually), they are
+    used as-is.
+    """
+    if all(p.is_file() for p in rendered):
+        return
+
+    ansible_dir = repo_root / "deploy" / "ansible"
+    playbook = ansible_dir / "playbooks" / "check-env-templates.yml"
+    if shutil.which("ansible-playbook") is None:
+        raise SystemExit(
+            "[check-required-env] Rendered files missing and ansible-playbook "
+            "is not on PATH -- install ansible (pip install ansible) or run "
+            "playbooks/check-env-templates.yml yourself first (see docstring)."
+        )
+
+    print("[check-required-env] Rendered files missing -- rendering via ansible-playbook ...")
+    commands = [
+        [
+            "ansible-playbook",
+            str(playbook),
+            "-e",
+            "@vars.example.yml",
+            "-e",
+            "app_environment=production",
+            "-e",
+            "webhook_base_url=https://example.org",
+        ],
+        [
+            "ansible-playbook",
+            str(playbook),
+            "-e",
+            "@vars.example.yml",
+            "-e",
+            "@scripts/full-scenario.extra-vars.json",
+        ],
+    ]
+    for cmd in commands:
+        proc = subprocess.run(cmd, cwd=ansible_dir)
+        if proc.returncode != 0:
+            raise SystemExit(
+                f"[check-required-env] FATAL: render failed ({proc.returncode}): "
+                f"{' '.join(cmd)}"
+            )
+
+    missing = [str(p) for p in rendered if not p.is_file()]
+    if missing:
+        raise SystemExit(
+            "[check-required-env] FATAL: render playbook succeeded but did not "
+            f"produce: {', '.join(missing)}"
+        )
 
 
 def main() -> int:
-    required_vars = extract_required_vars(CONFIG_TS)
-    print(f"Required vars from {CONFIG_TS.relative_to(REPO_ROOT)}: {sorted(required_vars)}")
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--repo-root",
+        type=Path,
+        default=Path(__file__).resolve().parents[3],
+        help="Path to the llamenos-platform repo root (default: computed from script location).",
+    )
+    parser.add_argument(
+        "--monolithic-env",
+        type=Path,
+        default=Path("/tmp/llamenos-check-env-monolithic.env"),
+        help="Rendered output of roles/llamenos/templates/env.j2 "
+        "(produced by playbooks/check-env-templates.yml).",
+    )
+    parser.add_argument(
+        "--app-env",
+        type=Path,
+        default=Path("/tmp/llamenos-check-env-app.env"),
+        help="Rendered output of roles/llamenos-app/templates/env/app.j2 "
+        "(produced by playbooks/check-env-templates.yml).",
+    )
+    parser.add_argument(
+        "--monolithic-env-full",
+        type=Path,
+        default=Path("/tmp/llamenos-check-env-monolithic-full.env"),
+        help="Rendered output of roles/llamenos/templates/env.j2 with every "
+        "optional feature enabled (produced by playbooks/check-env-templates.yml "
+        "-e @scripts/full-scenario.extra-vars.json).",
+    )
+    parser.add_argument(
+        "--app-env-full",
+        type=Path,
+        default=Path("/tmp/llamenos-check-env-app-full.env"),
+        help="Rendered output of roles/llamenos-app/templates/env/app.j2 with "
+        "every optional feature enabled.",
+    )
+    args = parser.parse_args()
 
-    failures: list[tuple[Path, list[str]]] = []
+    rendered = [
+        args.monolithic_env,
+        args.app_env,
+        args.monolithic_env_full,
+        args.app_env_full,
+    ]
+    ensure_rendered(args.repo_root, rendered)
 
-    for template in TEMPLATES:
-        if not template.is_file():
-            print(f"ERROR: listed template not found: {template}", file=sys.stderr)
-            return 2
+    config_ts = args.repo_root / "apps" / "worker" / "lib" / "config.ts"
+    if not config_ts.is_file():
+        print(f"[check-required-env] FATAL: {config_ts} not found", file=sys.stderr)
+        return 2
 
-        text = template.read_text()
-        missing = sorted(v for v in required_vars if not var_present(text, v))
+    unconditional, conditional = extract_required_vars(config_ts)
+    print(f"[check-required-env] Parsed from {config_ts}:")
+    print(f"  unconditionally required : {', '.join(unconditional)}")
+    print(f"  required in production   : {', '.join(conditional) or '(none found)'}")
+
+    # The render this script checks against is run with app_environment=production
+    # and every conditional var given a real value (see
+    # playbooks/check-env-templates.yml's usage comment) specifically so the
+    # conditional vars are expected to appear too -- this proves both templates
+    # CAN carry them, not merely that they exist somewhere unreachable.
+    required = unconditional + conditional
+
+    targets = {
+        "roles/llamenos/templates/env.j2 (monolithic/demo role)": args.monolithic_env,
+        "roles/llamenos-app/templates/env/app.j2 (per-service app role)": args.app_env,
+    }
+
+    failures: list[str] = []
+    for label, path in targets.items():
+        if not path.is_file():
+            failures.append(
+                f"{label}: rendered file {path} does not exist -- run "
+                "playbooks/check-env-templates.yml first"
+            )
+            continue
+        keys = rendered_keys(path)
+        missing = [v for v in required if v not in keys]
         if missing:
-            failures.append((template, missing))
+            failures.append(f"{label}: missing {', '.join(missing)} (rendered file: {path})")
+        else:
+            print(f"[check-required-env] OK   {label}: all {len(required)} required vars present")
+
+    # Second pass: optional-but-has-a-real-consumer vars, checked against the
+    # "everything enabled" scenario render. See OPTIONAL_VARS_WITH_CONSUMERS
+    # above for why this list is hand-maintained instead of parsed.
+    print(f"\n[check-required-env] Optional vars with real consumers (not dead plumbing):")
+    print(f"  {', '.join(OPTIONAL_VARS_WITH_CONSUMERS)}")
+
+    full_targets = {
+        "roles/llamenos/templates/env.j2 (monolithic/demo role, full scenario)": args.monolithic_env_full,
+        "roles/llamenos-app/templates/env/app.j2 (per-service app role, full scenario)": args.app_env_full,
+    }
+    for label, path in full_targets.items():
+        if not path.is_file():
+            failures.append(
+                f"{label}: rendered file {path} does not exist -- run "
+                "playbooks/check-env-templates.yml -e @vars.example.yml "
+                "-e @scripts/full-scenario.extra-vars.json first"
+            )
+            continue
+        keys = rendered_keys(path)
+        missing = [v for v in OPTIONAL_VARS_WITH_CONSUMERS if v not in keys]
+        if missing:
+            failures.append(
+                f"{label}: missing {', '.join(missing)} even with every optional "
+                f"feature enabled -- dead plumbing (rendered file: {path})"
+            )
+        else:
+            print(
+                f"[check-required-env] OK   {label}: all "
+                f"{len(OPTIONAL_VARS_WITH_CONSUMERS)} optional vars reachable"
+            )
 
     if failures:
-        print("\nFAIL: one or more templates are missing required env vars:\n", file=sys.stderr)
-        for template, missing in failures:
-            rel = template.relative_to(REPO_ROOT)
-            print(f"  {rel}:", file=sys.stderr)
-            for var in missing:
-                print(f"    - {var}", file=sys.stderr)
+        print("\n[check-required-env] FAILED:", file=sys.stderr)
+        for f in failures:
+            print(f"  - {f}", file=sys.stderr)
         print(
-            "\nEvery template listed in TEMPLATES must render every var "
-            "apps/worker/lib/config.ts requires at startup, so no deploy "
-            "topology can produce an env the app immediately refuses to "
-            "boot with. Add the missing var(s), or if a template "
-            "genuinely doesn't need one (e.g. it's not on that deploy "
-            "path), remove it from TEMPLATES with a comment explaining why.",
+            "\nEvery var apps/worker/lib/config.ts requires at startup must be "
+            "templated in deploy/ansible/templates/env/_worker-required-env.j2 "
+            "(the single shared source both roles include). See that file's "
+            "header comment.",
             file=sys.stderr,
         )
         return 1
 
-    print(f"\nOK: all {len(TEMPLATES)} templates carry all {len(required_vars)} required vars.")
+    print("\n[check-required-env] PASSED: both templates render every required and reachable-optional var.")
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

@@ -5,7 +5,7 @@ import {
   revert, digestInputFrom, COMMANDS, type RevertDeps,
   runPlanWith, type PlanDeps,
   runIntegrateWith, type IntegrateDeps, type DirtyFleetPr,
-  resolveDispatchResult, statusForItemWith, type StatusItemDeps,
+  resolveDispatchResult, statusForItemWith, type StatusItemDeps, type ResolveDispatchDeps,
   resolveAwaitingHumanWith, settleTargetFor,
   ensureClosesLine, ensureIssueLinkWith, type IssueLinkDeps,
 } from '../../orchestrator/src/cli.js'
@@ -335,50 +335,103 @@ describe('runIntegrateWith', () => {
   })
 })
 
-// G3's root-caused fix for issue #660/PR #662: `dispatch-one.sh`'s WORKER-
-// written terminal status never carries `branch`/`worktree` (only the
-// throwaway pre-worker seed file does) — see `resolveDispatchResult`'s own
-// doc comment in cli.ts. These tests pin the repair directly, independent of
-// the rest of the dispatch/tick machinery.
+// G3 (issue #660/PR #662) + issue #812: `dispatch-one.sh`'s WORKER-written
+// terminal status never carries `branch`/`worktree`, and the worktree it cut
+// used to be on the worker NAME rather than `fleet/<lane>/<item>`. These pin
+// `resolveDispatchResult` directly, independent of the rest of the
+// dispatch/tick machinery — including that a worktree or PR on the WRONG
+// branch is a FAILED run with reason `branch-mismatch:<actual>`, never a
+// silently skipped verify.
 describe('resolveDispatchResult', () => {
+  const EXPECTED = 'fleet/infra/660'
   const findWorktree = vi.fn(async (_repoRoot: string, _branch: string): Promise<string | undefined> => '/wt/found')
-  beforeEach(() => { findWorktree.mockClear() })
+  const currentBranch = vi.fn(async (_wt: string): Promise<string | undefined> => EXPECTED)
+  const prHeadBranch = vi.fn(async (_pr: string): Promise<string | undefined> => EXPECTED)
+  const deps = (over: Partial<ResolveDispatchDeps> = {}): ResolveDispatchDeps =>
+    ({ findWorktree, currentBranch, prHeadBranch, ...over })
+  beforeEach(() => { findWorktree.mockClear(); currentBranch.mockClear(); prHeadBranch.mockClear() })
 
   it('fills in the deterministic branch when the dispatch result is missing it', async () => {
-    const result = await resolveDispatchResult(
-      { outcome: 'SUCCESS', pr: '662' }, 'fleet/infra/660', REPO_ROOT, findWorktree,
-    )
-    expect(result.branch).toBe('fleet/infra/660')
+    const result = await resolveDispatchResult({ outcome: 'SUCCESS', pr: '662' }, EXPECTED, REPO_ROOT, deps())
+    expect(result.branch).toBe(EXPECTED)
+    expect(result.outcome).toBe('SUCCESS')
+    expect(result.branchMismatch).toBeUndefined()
   })
 
   it('resolves the worktree via git (findWorktreeForBranch) when the dispatch result is missing it', async () => {
-    const result = await resolveDispatchResult(
-      { outcome: 'SUCCESS', pr: '662' }, 'fleet/infra/660', REPO_ROOT, findWorktree,
-    )
+    const result = await resolveDispatchResult({ outcome: 'SUCCESS', pr: '662' }, EXPECTED, REPO_ROOT, deps())
     expect(result.worktree).toBe('/wt/found')
-    expect(findWorktree).toHaveBeenCalledWith(REPO_ROOT, 'fleet/infra/660')
+    expect(findWorktree).toHaveBeenCalledWith(REPO_ROOT, EXPECTED)
   })
 
-  it('never overrides a branch or worktree the dispatch result already reported', async () => {
+  it('verifies the actual checked-out branch of a worktree the dispatch result reported', async () => {
     const result = await resolveDispatchResult(
-      { outcome: 'SUCCESS', pr: '662', branch: 'worker-reported-branch', worktree: '/wt/worker-reported' },
-      'fleet/infra/660', REPO_ROOT, findWorktree,
+      { outcome: 'SUCCESS', pr: '662', worktree: '/wt/seed-reported' }, EXPECTED, REPO_ROOT, deps(),
     )
-    expect(result.branch).toBe('worker-reported-branch')
-    expect(result.worktree).toBe('/wt/worker-reported')
     expect(findWorktree).not.toHaveBeenCalled()
+    expect(currentBranch).toHaveBeenCalledWith('/wt/seed-reported')
+    expect(result.worktree).toBe('/wt/seed-reported')
+    expect(result.outcome).toBe('SUCCESS')
+  })
+
+  it('never trusts a worker-reported branch over git', async () => {
+    const result = await resolveDispatchResult(
+      { outcome: 'SUCCESS', pr: '662', branch: 'worker-reported-branch', worktree: '/wt/w' }, EXPECTED, REPO_ROOT, deps(),
+    )
+    expect(result.branch).toBe(EXPECTED)
+  })
+
+  // The live #812 shape: PR #836 on `fleet-shared-704`.
+  it('marks a worktree on the wrong branch FAILED with branch-mismatch:<actual>', async () => {
+    const result = await resolveDispatchResult(
+      { outcome: 'SUCCESS', pr: '836', worktree: '/wt/llamenos-fleet-shared-704', note: 'dep:abc worker done' },
+      'fleet/shared/704', REPO_ROOT, deps({ currentBranch: async () => 'fleet-shared-704' }),
+    )
+    expect(result.outcome).toBe('FAILED')
+    expect(result.branchMismatch).toBe('fleet-shared-704')
+    expect(result.branch).toBe('fleet-shared-704')
+    expect(result.note).toBe('branch-mismatch:fleet-shared-704 dep:abc worker done')
+    expect(result.pr).toBe('836')
+  })
+
+  it('marks an unreadable worktree branch as a mismatch — never assumes it is right', async () => {
+    const result = await resolveDispatchResult(
+      { outcome: 'SUCCESS', pr: '662', worktree: '/wt/gone' }, EXPECTED, REPO_ROOT, deps({ currentBranch: async () => undefined }),
+    )
+    expect(result.outcome).toBe('FAILED')
+    expect(result.note).toBe('branch-mismatch:unknown')
+    expect(result.branch).toBeUndefined()
+  })
+
+  it('marks a PR whose head is a different branch FAILED even when the worktree is right', async () => {
+    const result = await resolveDispatchResult(
+      { outcome: 'SUCCESS', pr: '662' }, EXPECTED, REPO_ROOT, deps({ prHeadBranch: async () => 'some-other-branch' }),
+    )
+    expect(result.outcome).toBe('FAILED')
+    expect(result.branchMismatch).toBe('some-other-branch')
+  })
+
+  it('fails closed when the PR head cannot be read', async () => {
+    const result = await resolveDispatchResult(
+      { outcome: 'SUCCESS', pr: '662' }, EXPECTED, REPO_ROOT, deps({ prHeadBranch: async () => undefined }),
+    )
+    expect(result.outcome).toBe('FAILED')
+    expect(result.branchMismatch).toBe('unreadable-pr-head')
+    expect(result.branch).toBeUndefined()
   })
 
   it('leaves worktree undefined when git cannot find one either — never fabricates a path', async () => {
     const result = await resolveDispatchResult(
-      { outcome: 'SUCCESS', pr: '662' }, 'fleet/infra/660', REPO_ROOT, async () => undefined,
+      { outcome: 'SUCCESS', pr: '662' }, EXPECTED, REPO_ROOT, deps({ findWorktree: async () => undefined }),
     )
     expect(result.worktree).toBeUndefined()
+    expect(currentBranch).not.toHaveBeenCalled()
+    expect(result.outcome).toBe('SUCCESS')
   })
 
   it('preserves every other field on the result unchanged', async () => {
     const result = await resolveDispatchResult(
-      { outcome: 'BLOCKED', pr: '662', note: 'worker note' }, 'fleet/infra/660', REPO_ROOT, findWorktree,
+      { outcome: 'BLOCKED', pr: '662', note: 'worker note' }, EXPECTED, REPO_ROOT, deps(),
     )
     expect(result.outcome).toBe('BLOCKED')
     expect(result.note).toBe('worker note')

@@ -29,16 +29,15 @@ import type { VerifyReport } from '../../orchestrator/src/verify.js'
  * assertions cannot pass vacuously.
  */
 
-// The shebang and the module runner below use process.execPath — the
-// absolute path of the bun binary running this suite — NOT `env bun`. On a
-// box where `bun` on PATH is a version-manager shim (volta, mise), the shim
-// resolves its toolchain through $HOME; the suite's isolated-HOME runs
-// (HOME=$(mktemp -d)) would then hang the fake until the reviewer timeout
-// and turn every assertion here into UNREADABLE.
-const BUN = process.execPath
-
-const FAKE_OPENCODE = String.raw`#!${BUN}
-'use strict'
+// The shebang must name the bun RUNNING THIS TEST by absolute path. The
+// secondOpinion tests hand the engine a deliberately minimal environment
+// (VERIFIER_ENV_ALLOWLIST), and this suite is also run under a fresh, empty
+// HOME — `#!/usr/bin/env bun` resolves through a version-manager shim
+// (Volta/mise) keyed off HOME or VOLTA_HOME, neither of which is present in
+// either situation, so the fake would die with "Could not find executable"
+// instead of reviewing anything. Same reason the module runner below uses
+// the fake's own process.execPath rather than `bun` from PATH.
+const FAKE_OPENCODE = `#!${process.execPath}\n` + String.raw`'use strict'
 const fs = require('node:fs')
 const path = require('node:path')
 const { spawnSync } = require('node:child_process')
