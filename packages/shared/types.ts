@@ -1,7 +1,6 @@
 // --- ECIES Key Envelopes ---
 // Canonical types are inferred from Zod schemas in @protocol/schemas/common.
 export type { RecipientEnvelope, KeyEnvelope, RecipientKeyEnvelope, FileKeyEnvelope } from '@protocol/schemas/common'
-import type { FileKeyEnvelope } from '@protocol/schemas/common'
 
 // --- Telephony Provider Config ---
 // TelephonyProviderType canonical definition is in @protocol/schemas/settings
