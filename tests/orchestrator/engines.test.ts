@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { statusToOutcome, parseStatusFile, buildArgs, isTerminalStatus } from '../../orchestrator/src/engines.js'
+import { statusToOutcome, parseStatusFile, buildArgs, isTerminalStatus, resolveDispatchModel } from '../../orchestrator/src/engines.js'
 import { itemIdFromBranch, laneIdFromBranch } from '../../orchestrator/src/ci.js'
 import type { Lane } from '../../orchestrator/src/config.js'
 
@@ -100,5 +100,67 @@ describe('buildArgs', () => {
   it('passes name, brief path, timeout and model as positionals after the flags', () => {
     const a = buildArgs({ name: 'n', itemId: '704', briefPath: '/b', lane, timeoutSec: 60, model: 'sonnet', effort: 'medium' })
     expect(a.slice(-4)).toEqual(['n', '/b', '60', 'sonnet'])
+  })
+})
+
+describe('buildArgs with an opencode lane', () => {
+  const ocLane: Lane = {
+    id: 'backend', mode: 'live', cap: 1, engine: 'opencode',
+    requireLabel: 'agent-dispatchable', vetoLabels: [],
+    scope: { owned: ['apps/worker/'], notOwned: [] },
+  }
+  const req = { name: 'n', itemId: '704', briefPath: '/b', timeoutSec: 60, effort: 'high' as const }
+
+  it('omits --effort entirely (dispatch-one.sh only warns and ignores it for opencode)', () => {
+    const a = buildArgs({ ...req, lane: ocLane, model: 'kimi' })
+    expect(a).not.toContain('--effort')
+  })
+
+  it('still passes --effort for a claude lane', () => {
+    const a = buildArgs({ ...req, lane: { ...ocLane, engine: 'claude' }, model: 'sonnet' })
+    expect(a[a.indexOf('--effort') + 1]).toBe('high')
+  })
+
+  it('passes the lane model through as the final positional argument', () => {
+    const a = buildArgs({ ...req, lane: ocLane, model: 'kimi-thinking' })
+    expect(a[a.length - 1]).toBe('kimi-thinking')
+    expect(a.slice(-4)).toEqual(['n', '/b', '60', 'kimi-thinking'])
+  })
+
+  it('maps the raw kimi registry model id to the dispatcher\'s kimi token', () => {
+    const a = buildArgs({ ...req, lane: ocLane, model: 'kimi-for-coding/k3-256k' })
+    expect(a[a.length - 1]).toBe('kimi')
+  })
+
+  it('wraps any other raw provider/model id as opencode:<model>', () => {
+    const a = buildArgs({ ...req, lane: ocLane, model: 'zai-coding-plan/glm-4.6' })
+    expect(a[a.length - 1]).toBe('opencode:zai-coding-plan/glm-4.6')
+  })
+
+  it('passes existing dispatcher tokens through untouched', () => {
+    for (const token of ['kimi', 'kimi-thinking', 'opencode:foo/bar', 'glm', 'glm:glm-5.3-flash', 'copilot', 'copilot:gpt-5.4', 'kimi-cli', 'kimi-cli:kimi-code/kimi-for-coding']) {
+      const a = buildArgs({ ...req, lane: ocLane, model: token })
+      expect(a[a.length - 1]).toBe(token)
+    }
+  })
+})
+
+describe('resolveDispatchModel', () => {
+  it('leaves claude-engine models untouched', () => {
+    expect(resolveDispatchModel('claude', 'sonnet')).toBe('sonnet')
+    expect(resolveDispatchModel('claude', 'opus')).toBe('opus')
+  })
+
+  it('maps the kimi registry id to the kimi token for the opencode engine', () => {
+    expect(resolveDispatchModel('opencode', 'kimi-for-coding/k3-256k')).toBe('kimi')
+  })
+
+  it('wraps unknown raw ids as opencode:<model>', () => {
+    expect(resolveDispatchModel('opencode', 'some-provider/some-model')).toBe('opencode:some-provider/some-model')
+  })
+
+  it('does not double-wrap a model that is already a dispatcher token', () => {
+    expect(resolveDispatchModel('opencode', 'opencode:some-provider/some-model')).toBe('opencode:some-provider/some-model')
+    expect(resolveDispatchModel('opencode', 'kimi-thinking')).toBe('kimi-thinking')
   })
 })

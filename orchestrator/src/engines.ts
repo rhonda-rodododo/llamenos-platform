@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { DISPATCH_SCRIPT } from './paths.js'
 import { checkDispatchDependency } from './dependency.js'
 import { fleetBranchFor } from './ci.js'
-import type { Lane } from './config.js'
+import type { Lane, EngineId } from './config.js'
 import type { WorkItem } from './source.js'
 import type { Outcome } from './ledger.js'
 
@@ -158,6 +158,31 @@ interface BuildArgsInput {
 }
 
 /**
+ * The model selectors `dispatch-one.sh`'s `case "$model"` already understands
+ * as whole tokens (audited against the script): the Claude CLI names, the
+ * opencode shorthands, and the other runtimes' `name[:model]` forms. A model
+ * string matching this passes through untouched; anything else under the
+ * `opencode` engine is a raw provider/model id that must be wrapped as
+ * `opencode:<id>` for the dispatcher to route it to the right runtime.
+ */
+const DISPATCHER_TOKEN = /^(?:opus|sonnet|haiku|fable|kimi|kimi-thinking|glm|copilot|kimi-cli)(?::.*)?$|^opencode:.+$/
+
+/**
+ * dispatch-one.sh maps the bare `kimi`/`kimi-thinking` tokens to exactly this
+ * verified-working opencode registry model, so a lane configured with the raw
+ * id maps back to the token rather than to `opencode:<id>` — same runtime,
+ * same model, but via the dispatcher's maintained selector.
+ */
+const KIMI_DISPATCHER_MODEL = 'kimi-for-coding/k3-256k'
+
+export function resolveDispatchModel(engine: EngineId, model: string): string {
+  if (engine !== 'opencode') return model
+  if (DISPATCHER_TOKEN.test(model)) return model
+  if (model === KIMI_DISPATCHER_MODEL) return 'kimi'
+  return `opencode:${model}`
+}
+
+/**
  * `--owns` is the ONLY thing standing between two concurrent workers and the
  * same file — it is rendered into the worker's prompt as the FILE OWNERSHIP
  * block that the scope checker later verifies the diff against. A lane with
@@ -180,17 +205,25 @@ export function buildArgs(req: BuildArgsInput): string[] {
   // worktree on the worker NAME (`fleet-<lane>-<item>`), which is a tmux
   // session name, not the `fleet/<lane>/<item>` grammar everything
   // downstream derives lane, item and worktree from (issue #812).
-  return [
+  const args = [
     '--branch', fleetBranchFor(req.lane.id, req.itemId),
     '--agent', `${req.lane.id}-supervisor`,
     '--owns', req.lane.scope.owned.join(','),
-    '--effort', req.effort,
+  ]
+  // Only the Claude CLI accepts --effort; dispatch-one.sh warns and ignores it
+  // for every other runtime. Omit it outright for opencode lanes instead of
+  // paying a spurious warning on every dispatch.
+  if (req.lane.engine !== 'opencode') {
+    args.push('--effort', req.effort)
+  }
+  args.push(
     '--rules', 'llamenos',
     req.name,
     req.briefPath,
     String(req.timeoutSec),
-    req.model,
-  ]
+    resolveDispatchModel(req.lane.engine, req.model),
+  )
+  return args
 }
 
 function sleep(ms: number): Promise<void> {
