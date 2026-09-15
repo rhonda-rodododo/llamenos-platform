@@ -92,6 +92,8 @@ import type {
   ReportFieldDefinition,
 } from '@protocol/schemas/report-types'
 import { IVR_LANGUAGES, LANGUAGE_CODES } from '@shared/languages'
+import type { IvrVoiceCatalog } from '../telephony/ivr-menu'
+import { getIvrVoiceCatalogForProvider } from '../telephony/ivr-voice-catalogs'
 import type { Role } from '@shared/permissions'
 import { DEFAULT_ROLES } from '@shared/permissions'
 import {
@@ -447,6 +449,26 @@ export class SettingsService {
     return row.ivrLanguages ?? [...IVR_LANGUAGES]
   }
 
+  /**
+   * Resolve the IVR voice catalog for whichever provider will actually
+   * answer this hub's calls — hub-specific config first, then the global
+   * fallback (mirrors `getHubTelephonyFromService`'s resolution order in
+   * lib/service-factories.ts). `undefined` means "no provider configured
+   * yet to check against", not "nothing is speakable" — callers must not
+   * reject on `undefined`.
+   */
+  private async getEffectiveIvrVoiceCatalog(
+    hubId?: string,
+  ): Promise<IvrVoiceCatalog<unknown> | undefined> {
+    try {
+      const hubConfig = hubId ? await this.getHubTelephonyProvider(hubId) : null
+      const config = hubConfig ?? (await this.getTelephonyProvider())
+      return getIvrVoiceCatalogForProvider(config?.type)
+    } catch {
+      return undefined
+    }
+  }
+
   async updateIvrLanguages(data: {
     enabledLanguages: string[]
   }, hubId?: string): Promise<{ enabledLanguages: string[] }> {
@@ -464,6 +486,19 @@ export class SettingsService {
     )
     if (valid.length === 0) {
       throw new ServiceError(400, 'No valid IVR language codes provided')
+    }
+    // Constrain to what the active provider can actually speak (#732) —
+    // reuses the catalog resolution built for #679 / PR #673 rather than
+    // duplicating "which locales does this provider have a voice for".
+    const catalog = await this.getEffectiveIvrVoiceCatalog(hubId)
+    if (catalog) {
+      const unspeakable = valid.filter((code) => !catalog.speaks(code))
+      if (unspeakable.length > 0) {
+        throw new ServiceError(
+          400,
+          `The active telephony provider (${catalog.provider}) cannot speak: ${unspeakable.join(', ')}`,
+        )
+      }
     }
     if (hubId) {
       await this.updateHubSettings(hubId, { ivrLanguages: valid })
