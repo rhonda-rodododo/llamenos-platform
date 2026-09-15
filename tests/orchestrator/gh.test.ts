@@ -10,6 +10,15 @@ describe('gh', () => {
   it('does not duplicate an explicit -R', () => {
     expect(ghArgs(['issue', 'list', '-R', 'other/repo'])).toEqual(['issue', 'list', '-R', 'other/repo'])
   })
+
+  // `gh api` rejects -R outright ("unknown shorthand flag: 'R' in -R") —
+  // confirmed live. Appending it unconditionally would break every `gh api`
+  // call, silently, the moment one was ever added (ci.ts's review-key cache
+  // is the first).
+  it('never appends -R to a `gh api` call — the endpoint path names the repo itself', () => {
+    expect(ghArgs(['api', `repos/${REPO}/pulls/1/commits`])).toEqual(['api', `repos/${REPO}/pulls/1/commits`])
+    expect(ghArgs(['api', 'user', '--jq', '.login'])).toEqual(['api', 'user', '--jq', '.login'])
+  })
 })
 
 /**
