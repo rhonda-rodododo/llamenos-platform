@@ -3,7 +3,7 @@ package org.llamenos.hotline.model
 import org.llamenos.protocol.BanListResponseBan
 import org.llamenos.protocol.CallRecordResponse
 import org.llamenos.protocol.Calls
-import org.llamenos.protocol.AuditListResponseEntry
+import org.llamenos.protocol.SharedEntry
 import org.llamenos.protocol.HubResponse
 import org.llamenos.protocol.Invite
 import org.llamenos.protocol.Server
@@ -55,14 +55,14 @@ val BanListResponseBan.createdBy: String
 val BanListResponseBan.createdAt: String
     get() = bannedAt
 
-// ── AuditListResponseEntry (typealias AuditEntry) ─────────────────────────
+// ── SharedEntry (typealias AuditEntry) ────────────────────────────────────
 
 /** Timestamp — maps to `createdAt` in the generated type. */
-val AuditListResponseEntry.timestamp: String
+val SharedEntry.timestamp: String
     get() = createdAt
 
 /** Details as a display string (generated type uses `JsonObject`). */
-val AuditListResponseEntry.detailsString: String?
+val SharedEntry.detailsString: String?
     get() = details.takeIf { it.isNotEmpty() }?.toString()
 
 // ── Invite ─────────────────────────────────────────────────────────────────
