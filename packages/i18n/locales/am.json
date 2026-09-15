@@ -4182,10 +4182,10 @@
     "volunteer": "ፈቃደኛ",
     "admin": "አስተዳዳሪ",
     "dismiss": "አስወግድ",
-    "banner": "Demo Mode",
-    "bannerText": "You're exploring the Llamenos demo. Data resets daily.",
-    "bannerTextSchedule": "You're exploring the Llamenos demo. Data resets on schedule.",
     "getStarted": "Deploy your own",
+    "banner": "Demo Mode",
+    "bannerText": "የሙከራ አካባቢ ነው — እውነተኛ የደዋይ መረጃ አያስገቡ። እዚህ ያለው መረጃ ሚስጥር አይደለም፤ በማንኛውም ጊዜ ሊሰረዝ ይችላል።",
+    "bannerTextSchedule": "የሙከራ አካባቢ ነው — እውነተኛ የደዋይ መረጃ አያስገቡ። መረጃው {{schedule}} ዳግም ይጀምራል፤ ሚስጥርም አይደለም።",
     "pickAccount": "Pick a demo account to explore",
     "resetNotice": "Demo data resets daily",
     "tryDemo": "Try the demo"
