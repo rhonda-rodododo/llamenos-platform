@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs'
-import { halt } from './killswitch.js'
+import { halt, defaultHaltNotifyDeps, type HaltNotifyDeps } from './killswitch.js'
 import { RESUMED_AT_FILE } from './paths.js'
 import type { Outcome, RunRecord } from './ledger.js'
 
@@ -71,15 +71,33 @@ export function readResumedAt(): number {
  * "breaker tripped:" wording) so the halt reason file — read by both `doctor`
  * and `status` — names which breaker fired, not just that something did.
  */
-export function checkBreakers(rows: RunRecord[], limits: Limits, now: number, resumedAt: number): string | undefined {
+/**
+ * `notifyDeps` defaults to the real GitHub-backed deps (production
+ * behaviour, unchanged) but is threaded through to `halt()` so tests can
+ * inject a fake and assert on it — or simply avoid a real network call —
+ * without mocking `node:child_process` wholesale. See killswitch.test.ts.
+ */
+export async function checkBreakers(
+  rows: RunRecord[],
+  limits: Limits,
+  now: number,
+  resumedAt: number,
+  notifyDeps: HaltNotifyDeps = defaultHaltNotifyDeps(),
+): Promise<string | undefined> {
   const rate = rateBreaker(rows, limits, now)
   if (rate !== undefined) {
-    halt(`rate breaker tripped: ${rate}`)
+    // Issue #838: awaited, not fire-and-forget — tick.ts's caller chain runs
+    // inside a one-shot CLI process (`process.exit(await handler(...))`,
+    // cli.ts's `main()`), which kills anything still in flight the instant
+    // the promise this function returns resolves. Not awaiting here would
+    // mean the BLOCKED ping `halt()` sends usually, but not reliably, makes
+    // it out before the process dies.
+    await halt(`rate breaker tripped: ${rate}`, notifyDeps)
     return rate
   }
   const failure = failureBreaker(rows, limits, resumedAt)
   if (failure !== undefined) {
-    halt(`failure breaker tripped: ${failure}`)
+    await halt(`failure breaker tripped: ${failure}`, notifyDeps)
     return failure
   }
   return undefined

@@ -12,7 +12,19 @@ const execFileAsync = promisify(execFile)
  */
 export const REPO = 'rhonda-rodododo/llamenos-platform'
 
+/**
+ * `gh api` does NOT accept `-R`/`--repo` at all (confirmed against a real
+ * `gh api` invocation while building #838's `GitHubSink.editComment` —
+ * appending it unconditionally, as every other subcommand here wants,
+ * fails outright with "unknown shorthand flag: 'R'"). Every `gh api` call
+ * in this codebase fully-qualifies the endpoint path
+ * (`repos/{owner}/{repo}/...`) instead — see `cli.ts`'s own
+ * `gh api user --jq .login` call, which bypasses this function entirely for
+ * the same reason. Pinning the repo is still enforced there, just via the
+ * literal path rather than a flag.
+ */
 export function ghArgs(args: string[]): string[] {
+  if (args[0] === 'api') return args
   return args.includes('-R') || args.includes('--repo') ? args : [...args, '-R', REPO]
 }
 

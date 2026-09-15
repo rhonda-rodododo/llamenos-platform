@@ -10,6 +10,15 @@ describe('gh', () => {
   it('does not duplicate an explicit -R', () => {
     expect(ghArgs(['issue', 'list', '-R', 'other/repo'])).toEqual(['issue', 'list', '-R', 'other/repo'])
   })
+
+  // Issue #838: `gh api` does not accept `-R`/`--repo` at all — appending it
+  // the way every other subcommand wants fails outright with "unknown
+  // shorthand flag: 'R'" (confirmed against a real invocation). `gh api`
+  // callers fully-qualify the endpoint path instead.
+  it('never appends -R for the api subcommand, which does not accept it', () => {
+    expect(ghArgs(['api', 'repos/o/r/issues/comments/1', '-X', 'PATCH', '-f', 'body=hi']))
+      .toEqual(['api', 'repos/o/r/issues/comments/1', '-X', 'PATCH', '-f', 'body=hi'])
+  })
 })
 
 /**
