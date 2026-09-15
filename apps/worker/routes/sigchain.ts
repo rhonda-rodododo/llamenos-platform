@@ -27,6 +27,8 @@ const sigchainLinkSchema = z.object({
   signature: z.string(),
   prevHash: z.string(),
   hash: z.string(),
+  signerDeviceId: z.string(),
+  signerPubkey: z.string(),
   createdAt: z.string(),
 })
 

@@ -3,6 +3,8 @@
  *
  * Authenticated routes (permission-gated):
  *   POST   /enroll                  — Configure recovery group (recovery:manage)
+ *   POST   /rotate                  — Rotate recovery group, re-wrap envelopes (recovery:manage)
+ *   GET    /sessions                — List recovery sessions for a hub (recovery:view)
  *   GET    /:hubId                  — Get recovery group config (recovery:view)
  *   POST   /session/:id/contribute  — Submit share contribution (recovery:hold-share)
  *   GET    /session/:id             — Get session status (recovery:view, hub-scoped)
@@ -14,9 +16,12 @@
  * Unauthenticated routes (rate-limited):
  *   POST   /initiate                — Start recovery (Signal verification)
  *   POST   /initiate/verify         — Verify Signal code
+ *   POST   /session/:id/complete    — Complete recovery, authorize new device via sigchain
+ *   GET    /user-envelope/:hubId    — Retrieve wrapped PUK seed envelope (session-scoped)
  */
 import { Hono } from 'hono'
 import { describeRoute, resolver, validator } from 'hono-openapi'
+import { z } from 'zod'
 import type { AppEnv } from '../types'
 import { requirePermission } from '../middleware/permission-guard'
 import { checkPermission } from '../middleware/permission-guard'
@@ -41,6 +46,89 @@ import {
 } from '@protocol/schemas/recovery-group'
 import { okResponseSchema } from '@protocol/schemas/common'
 import { safeFetch } from '../lib/safe-fetch'
+
+// ---------------------------------------------------------------------------
+// Inline zod schemas — small, backend-only surface not shared with other
+// platforms (no desktop/mobile UI consumes these two flows yet), following
+// the same precedent as routes/sigchain.ts's inline `appendLinkBodySchema`.
+// ---------------------------------------------------------------------------
+
+const rewrappedUserEnvelopeSchema = z.object({
+  userPubkey: z.string(),
+  envelope: z.string(),
+})
+
+const shareEnvelopeSchema = z.object({
+  holderPubkey: z.string(),
+  shareEnvelope: z.string(),
+})
+
+const recoveryGroupRotateSchema = z.object({
+  hubId: z.string().uuid(),
+  threshold: z.number().int().min(2).max(5),
+  totalShares: z.number().int().min(3).max(5),
+  groupPublicKey: z.string(),
+  shareEnvelopes: z.array(shareEnvelopeSchema),
+  shareCommitments: z.array(z.string()),
+  duressCommitments: z.array(z.string().nullable()).optional(),
+  sigchainLinkHash: z.string(),
+  delayHours: z.number().int().min(4).max(168).optional().default(24),
+  emergencyFloorHours: z.number().int().min(1).max(24).optional().default(4),
+  /** Every user recovery envelope for this hub, re-wrapped client-side under `groupPublicKey`. */
+  rewrappedUserEnvelopes: z.array(rewrappedUserEnvelopeSchema),
+})
+
+const recoveryListSessionsResponseSchema = z.array(z.object({
+  sessionId: z.string(),
+  hubId: z.string(),
+  userPubkey: z.string(),
+  newDevicePubkey: z.string(),
+  status: z.string(),
+  signalVerified: z.boolean(),
+  expiresAt: z.string(),
+  createdAt: z.string(),
+  completedAt: z.string().nullable(),
+  cancelledAt: z.string().nullable(),
+  cancelledBy: z.string().nullable(),
+}))
+
+const recoveryCompleteSchema = z.object({
+  /** Next sigchain seqNo for the recovering user's chain. */
+  sigchainSeqNo: z.number().int().nonnegative(),
+  /** Must include { sessionId, contributingHolderPubkeys }. Server independently verifies both. */
+  sigchainPayload: z.record(z.string(), z.unknown()),
+  /** Ed25519 signature over `hash`, made with the NEW device's own key (self-authorizing). Hex. */
+  signature: z.string().regex(/^[0-9a-f]{128}$/i, 'Must be 64-byte Ed25519 signature in hex'),
+  /** SHA-256 hash of the previous sigchain link (hex), or empty string if this is seq 0. */
+  prevHash: z.string().regex(/^([0-9a-f]{64}|)$/i, 'Must be SHA-256 hex or empty string'),
+  /** SHA-256 hash of this link's canonical form (hex). Server recomputes and verifies. */
+  hash: z.string().regex(/^[0-9a-f]{64}$/i, 'Must be SHA-256 hex'),
+  /** Device ID the new device wants to register itself under. */
+  signerDeviceId: z.string().min(1),
+  /** ISO-8601 timestamp of link creation. */
+  timestamp: z.string().min(1),
+})
+
+const recoveryCompleteResponseSchema = z.object({
+  ok: z.boolean(),
+  sigchainLink: z.object({
+    id: z.string(),
+    userPubkey: z.string(),
+    seqNo: z.number(),
+    linkType: z.string(),
+    payload: z.unknown(),
+    signature: z.string(),
+    prevHash: z.string(),
+    hash: z.string(),
+    signerDeviceId: z.string(),
+    signerPubkey: z.string(),
+    createdAt: z.string(),
+  }),
+})
+
+const recoveryUserEnvelopeResponseSchema = z.object({
+  envelope: z.string().nullable(),
+})
 
 // ---------------------------------------------------------------------------
 // Authenticated routes
@@ -92,6 +180,87 @@ authenticatedRoutes.post('/enroll',
       }
       throw err
     }
+  },
+)
+
+// POST /rotate — Atomically rotate a recovery group and re-wrap user envelopes
+authenticatedRoutes.post('/rotate',
+  describeRoute({
+    tags: ['Recovery Group'],
+    summary: 'Rotate a recovery group, re-wrapping every user recovery envelope',
+    description: 'Atomic D13 rotation: replaces the group keypair and per-holder shares (e.g. on share holder departure), and re-wraps every existing user recovery envelope under the new group public key in the same transaction. The caller performs the HPKE re-wrap client-side — the server only relays ciphertext. Requires recovery:manage permission and an existing group for the hub (use /enroll for initial setup).',
+    responses: {
+      200: {
+        description: 'Recovery group rotated',
+        content: {
+          'application/json': {
+            schema: resolver(okResponseSchema),
+          },
+        },
+      },
+      ...authErrors,
+      ...notFoundError,
+    },
+  }),
+  requirePermission('recovery:manage'),
+  validator('json', recoveryGroupRotateSchema),
+  async (c) => {
+    const body = c.req.valid('json')
+    const services = c.get('services')
+    const callerPubkey = c.get('pubkey')
+
+    try {
+      await services.recoveryGroup.rotateGroup({
+        hubId: body.hubId,
+        rotatedBy: callerPubkey,
+        threshold: body.threshold,
+        totalShares: body.totalShares,
+        groupPublicKey: body.groupPublicKey,
+        shareEnvelopes: body.shareEnvelopes,
+        shareCommitments: body.shareCommitments,
+        duressCommitments: body.duressCommitments,
+        sigchainLinkHash: body.sigchainLinkHash,
+        delayHours: body.delayHours,
+        emergencyFloorHours: body.emergencyFloorHours,
+        rewrappedUserEnvelopes: body.rewrappedUserEnvelopes,
+      })
+      return c.json({ ok: true })
+    } catch (err) {
+      if (err instanceof RecoveryGroupError) {
+        return c.json({ error: err.message }, err.status)
+      }
+      throw err
+    }
+  },
+)
+
+// GET /sessions — List recovery sessions for a hub
+// Registered BEFORE /:hubId so it isn't swallowed by that catch-all param route.
+authenticatedRoutes.get('/sessions',
+  describeRoute({
+    tags: ['Recovery Group'],
+    summary: 'List recovery sessions for a hub',
+    description: 'Returns all recovery sessions (any status) for the given hub, ordered by creation time. Requires recovery:view permission.',
+    responses: {
+      200: {
+        description: 'Recovery sessions',
+        content: {
+          'application/json': {
+            schema: resolver(recoveryListSessionsResponseSchema),
+          },
+        },
+      },
+      ...authErrors,
+    },
+  }),
+  requirePermission('recovery:view'),
+  async (c) => {
+    const hubId = c.req.query('hubId')
+    if (!hubId) return c.json({ error: 'Missing hubId query parameter' }, 400)
+
+    const services = c.get('services')
+    const sessions = await services.recoveryGroup.listSessions(hubId)
+    return c.json(sessions)
   },
 )
 
@@ -508,6 +677,90 @@ publicRoutes.post('/initiate/verify',
         hmacSecret: c.env.HMAC_SECRET || '',
       })
       return c.json(result)
+    } catch (err) {
+      if (err instanceof RecoveryGroupError) {
+        return c.json({ error: err.message }, err.status)
+      }
+      throw err
+    }
+  },
+)
+
+// POST /session/:id/complete — Complete recovery, authorize the new device
+publicRoutes.post('/session/:id/complete',
+  describeRoute({
+    tags: ['Recovery Group'],
+    summary: 'Complete a recovery session by appending a self-authorizing sigchain link',
+    description: 'Unauthenticated: the recovering device has no prior session, so it cannot use the authenticated sigchain-append route. The link is signed by the new device\'s own key (not the account\'s lost identity key) and is only accepted once the session has reached `active` (>= threshold contributions) and its post-verification delay has elapsed. The payload must reference this session and list the verified contributing share holders as evidence.',
+    responses: {
+      200: {
+        description: 'Recovery completed — device authorized',
+        content: {
+          'application/json': {
+            schema: resolver(recoveryCompleteResponseSchema),
+          },
+        },
+      },
+      ...publicErrors,
+      ...notFoundError,
+    },
+  }),
+  validator('json', recoveryCompleteSchema),
+  async (c) => {
+    const sessionId = c.req.param('id')
+    const body = c.req.valid('json')
+    const services = c.get('services')
+
+    try {
+      const result = await services.recoveryGroup.completeRecovery({
+        sessionId,
+        sigchainSeqNo: body.sigchainSeqNo,
+        sigchainPayload: body.sigchainPayload,
+        signature: body.signature,
+        prevHash: body.prevHash,
+        hash: body.hash,
+        signerDeviceId: body.signerDeviceId,
+        timestamp: body.timestamp,
+      })
+      return c.json({ ok: true, sigchainLink: result.sigchainLink })
+    } catch (err) {
+      if (err instanceof RecoveryGroupError) {
+        return c.json({ error: err.message }, err.status)
+      }
+      throw err
+    }
+  },
+)
+
+// GET /user-envelope/:hubId — Retrieve the wrapped PUK seed envelope
+publicRoutes.get('/user-envelope/:hubId',
+  describeRoute({
+    tags: ['Recovery Group'],
+    summary: 'Retrieve the recovering user\'s wrapped PUK seed envelope',
+    description: 'Unauthenticated (session-scoped): the recovering device fetches the HPKE-encrypted PUK seed envelope so it can reconstruct the recovery group private key and decrypt it. Released once the session\'s delay has elapsed and threshold contributions have been received — matching the same gate that releases contribution ciphertext on GET /session/:id.',
+    responses: {
+      200: {
+        description: 'Recovery envelope (null if none stored for this user/hub)',
+        content: {
+          'application/json': {
+            schema: resolver(recoveryUserEnvelopeResponseSchema),
+          },
+        },
+      },
+      ...publicErrors,
+      ...notFoundError,
+    },
+  }),
+  async (c) => {
+    const hubId = c.req.param('hubId')
+    const sessionId = c.req.query('sessionId')
+    if (!sessionId) return c.json({ error: 'Missing sessionId query parameter' }, 400)
+
+    const services = c.get('services')
+
+    try {
+      const envelope = await services.recoveryGroup.getUserEnvelope(sessionId, hubId)
+      return c.json({ envelope })
     } catch (err) {
       if (err instanceof RecoveryGroupError) {
         return c.json({ error: err.message }, err.status)
