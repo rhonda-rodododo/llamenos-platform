@@ -57,6 +57,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import org.llamenos.hotline.R
 import org.llamenos.hotline.model.JoinFieldType
+import org.llamenos.hotline.model.LocationResult
 import org.llamenos.hotline.model.ReportTypeDefinitionField
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -109,12 +110,16 @@ fun TypedReportCreateScreen(
         }
     }
 
-    // Compute whether all required fields are filled
+    // Compute whether all required fields are filled.
+    // File fields are excluded from this check: mobile file uploads are not
+    // implemented yet (see the JoinFieldType.File branch in DynamicField below),
+    // so a report type that marks a file field required would otherwise be
+    // permanently unsubmittable from Android.
     val allRequiredFilled = remember(fieldValues, title, reportType) {
         if (reportType == null) false
         else {
             title.isNotBlank() && reportType.fields
-                .filter { it.required }
+                .filter { it.required && it.type != JoinFieldType.File }
                 .all { field ->
                     val value = fieldValues[field.name]
                     !value.isNullOrBlank()
@@ -123,7 +128,15 @@ fun TypedReportCreateScreen(
     }
 
     val screenTitle = if (reportType != null) {
-        stringResource(R.string.report_typed_create_title, reportType.label)
+        // report_typed_create_title is sourced from packages/i18n as "New %@ Report" —
+        // %@ is Swift's String(format:) placeholder, not a valid Java Formatter
+        // conversion, so passing reportType.label as a stringResource() vararg
+        // throws UnknownFormatConversionException (discovered via the location-field
+        // Roborazzi screenshot test added for issue #768; this codepath was previously
+        // untested with a non-null reportType). Substitute manually instead, matching
+        // the existing workaround for the same iOS-format placeholder in
+        // SettingsScreen.kt's crash_reporting_pending_reports_description usage.
+        stringResource(R.string.report_typed_create_title).replace("%@", reportType.label)
     } else {
         stringResource(R.string.report_type_picker_title)
     }
@@ -242,6 +255,7 @@ fun TypedReportCreateScreen(
                         onValueChange = { newValue ->
                             fieldValues = fieldValues + (field.name to newValue)
                         },
+                        onSearchLocation = viewModel::searchLocations,
                     )
                 }
 
@@ -295,6 +309,7 @@ private fun DynamicField(
     field: ReportTypeDefinitionField,
     value: String,
     onValueChange: (String) -> Unit,
+    onSearchLocation: suspend (String) -> List<LocationResult>,
     modifier: Modifier = Modifier,
 ) {
     val labelText = buildString {
@@ -357,26 +372,26 @@ private fun DynamicField(
             )
 
             JoinFieldType.File -> {
-                // File uploads are not supported in the mobile form —
-                // render as a disabled text field indicating desktop-only
-                TextInputField(
-                    field = field,
-                    label = "$labelText (desktop only)",
-                    value = value,
-                    onValueChange = onValueChange,
-                    singleLine = true,
-                )
+                // Mobile file uploads are a decision point (issue #768): rather
+                // than the old disabled-but-editable text field (which accepted
+                // typed input that was silently discarded on submit), this is a
+                // genuinely disabled field with an explicit "Coming soon" label.
+                // Decision: keep disabled for now — Android has no file picker,
+                // upload flow, or attachment-encryption wiring for reports yet
+                // (packages/crypto file-key labels exist and are used elsewhere,
+                // but there is no ViewModel/API path for it in apps/android/).
+                // Required file fields are excluded from the required-fields
+                // check above so this never blocks report submission.
+                FileUploadUnavailableField(field = field)
             }
 
             JoinFieldType.Location -> {
-                // Location picker not yet implemented on mobile —
-                // render as a text field for manual coordinate/address entry
-                TextInputField(
+                LocationPickerField(
                     field = field,
                     label = labelText,
                     value = value,
                     onValueChange = onValueChange,
-                    singleLine = true,
+                    onSearch = onSearchLocation,
                 )
             }
         }
@@ -396,6 +411,40 @@ private fun DynamicField(
 }
 
 // ---- Field Type Composables ----
+
+/**
+ * Placeholder for `file`-typed fields, which mobile does not support yet.
+ *
+ * Rendered as a genuinely disabled field (not an editable one) so the user
+ * cannot type an attachment reference that gets silently dropped on submit.
+ * The "Coming soon" copy ([R.string.report_file_coming_soon]) signals this is
+ * a temporary gap, not a permanent desktop-only restriction — see the
+ * JoinFieldType.File decision comment in DynamicField above.
+ *
+ * Uses `supportingText`, not `placeholder`: Material3's OutlinedTextField
+ * only draws its placeholder when the field is focused or has non-empty
+ * content (otherwise the label sits in that same space) — a field that is
+ * both disabled and always empty can never satisfy either condition, so a
+ * `placeholder`-only "Coming soon" would never actually render.
+ */
+@Composable
+private fun FileUploadUnavailableField(
+    field: ReportTypeDefinitionField,
+    modifier: Modifier = Modifier,
+) {
+    OutlinedTextField(
+        value = "",
+        onValueChange = {},
+        enabled = false,
+        readOnly = true,
+        label = { Text(field.label) },
+        supportingText = { Text(stringResource(R.string.report_file_coming_soon)) },
+        singleLine = true,
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("field-${field.name}"),
+    )
+}
 
 @Composable
 private fun TextInputField(

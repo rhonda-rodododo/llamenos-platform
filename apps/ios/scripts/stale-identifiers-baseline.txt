@@ -1,0 +1,32 @@
+# Known pre-existing stale accessibility identifiers, found when
+# check-stale-identifiers.py was introduced in #755.
+#
+# These are NOT related to the device-key migration #755 fixed (they span
+# recovery-group, events, hubs, call, and settings-pubkey-display screens) —
+# a real but separate cleanup, same relationship as the desktop probe sweeps
+# (#681/#687/#688/#689) that issue explicitly scopes out as "same class of
+# defect, different suite". Recorded here so the check can be a hard gate on
+# NEW stale identifiers today without blocking on unrelated pre-existing
+# debt. This list should only shrink — see check-stale-identifiers.py's
+# module docstring for the exact contract.
+account-recovery-view
+call-in-progress
+call-ringing-indicator
+copy-npub
+copy-pubkey
+dashboard-active-call
+dashboard-events-action
+dashboard-npub
+empty-state
+event-detail-tabs
+events-empty
+hubs-empty
+incoming-call-banner
+login-recover-account
+notes-empty
+recovery-hub-url-input
+recovery-requests-view
+recovery-setup-button
+recovery-start-button
+settings-npub
+settings-pubkey

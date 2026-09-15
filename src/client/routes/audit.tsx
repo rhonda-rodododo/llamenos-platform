@@ -129,7 +129,7 @@ export function AuditPage() {
               </SelectTrigger>
               <SelectContent>
                 {EVENT_CATEGORIES.map(cat => (
-                  <SelectItem key={cat.value} value={cat.value}>
+                  <SelectItem key={cat.value} value={cat.value} data-testid={`audit-event-filter-option-${cat.value}`}>
                     {t(cat.labelKey, { defaultValue: cat.value === 'all' ? 'All Events' : cat.value.charAt(0).toUpperCase() + cat.value.slice(1) })}
                   </SelectItem>
                 ))}
@@ -181,7 +181,7 @@ export function AuditPage() {
               ))}
             </div>
           ) : entries.length === 0 ? (
-            <div className="py-8 text-center text-muted-foreground">
+            <div data-testid="empty-state" className="py-8 text-center text-muted-foreground">
               <ScrollText className="mx-auto mb-2 h-8 w-8 opacity-40" />
               {t('auditLog.noEntries')}
             </div>

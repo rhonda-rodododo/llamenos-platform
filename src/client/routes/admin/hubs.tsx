@@ -343,7 +343,7 @@ function DeleteHubDialog({
           </div>
           <div className="space-y-2">
             <Label htmlFor="delete-hub-confirm">{t('hubs.deleteHubConfirmLabel')}</Label>
-            <p className="text-xs text-muted-foreground font-mono font-medium">{hub.name}</p>
+            <p data-testid="delete-hub-confirm-name" className="text-xs text-muted-foreground font-mono font-medium">{hub.name}</p>
             <Input
               id="delete-hub-confirm"
               data-testid="delete-hub-confirm-input"
