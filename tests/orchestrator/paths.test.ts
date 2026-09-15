@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, readFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -90,5 +90,42 @@ describe('FLEET_HOME — single resolution point for fleet state paths', () => {
     const { HALT_FILE } = await import('../../orchestrator/src/paths.js')
     expect(HALT_FILE.startsWith(tempHome)).toBe(true)
     expect(HALT_FILE).not.toBe(join(homedir(), '.llamenos-fleet-disabled'))
+  })
+
+  // Non-self-referential: this asserts the literal suffix
+  // `/.llamenos-fleet/env`, not "whatever fleetHome() + something computes
+  // to" — a regression back to `join(fleetHome(), 'env')` (FLEET_ENV_FILE's
+  // state before this fix) resolves to `<tempHome>/env`, which does NOT end
+  // with `/.llamenos-fleet/env`, so that mutation fails this test.
+  it('FLEET_ENV_FILE resolves under FLEET_HOME AND ends with the literal /.llamenos-fleet/env suffix the wrapper and systemd units hardcode', async () => {
+    tempHome = mkdtempSync(join(tmpdir(), 'llamenos-fleet-paths-test-'))
+    process.env['FLEET_HOME'] = tempHome
+    vi.resetModules()
+    const { FLEET_ENV_FILE } = await import('../../orchestrator/src/paths.js')
+    expect(FLEET_ENV_FILE.startsWith(tempHome)).toBe(true)
+    expect(FLEET_ENV_FILE.endsWith('/.llamenos-fleet/env')).toBe(true)
+  })
+
+  // The wrapper (`orchestrator/bin/llamenos-fleet`) and both systemd units
+  // hardcode `.llamenos-fleet/env` as a literal string — they cannot import
+  // FLEET_DIR (one is bash, the other is a unit file), so the only way to
+  // keep them in sync with FLEET_DIR's basename is to assert the literal
+  // here. If FLEET_DIR's basename ever changes without updating these three
+  // files, this is the test that catches it.
+  it('FLEET_DIR basename + "/env" matches the literal path hardcoded in the wrapper and both systemd units', async () => {
+    vi.resetModules()
+    const { FLEET_DIR } = await import('../../orchestrator/src/paths.js')
+    const expectedSuffix = `${FLEET_DIR.split('/').pop()}/env`
+    expect(expectedSuffix).toBe('.llamenos-fleet/env')
+
+    const wrapperPath = join(import.meta.dirname, '..', '..', 'orchestrator', 'bin', 'llamenos-fleet')
+    const wrapperContent = readFileSync(wrapperPath, 'utf8')
+    expect(wrapperContent).toContain(`$HOME/${expectedSuffix}`)
+
+    for (const unit of ['llamenos-fleet-tick.service', 'llamenos-fleet-digest.service']) {
+      const unitPath = join(import.meta.dirname, '..', '..', 'orchestrator', 'systemd', unit)
+      const unitContent = readFileSync(unitPath, 'utf8')
+      expect(unitContent).toContain(`%h/${expectedSuffix}`)
+    }
   })
 })

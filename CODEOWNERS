@@ -98,11 +98,16 @@ package.json                        @rhonda-rodododo
 bun.lockb                           @rhonda-rodododo
 bunfig.toml                         @rhonda-rodododo
 lefthook.yml                        @rhonda-rodododo
+# vitest's MAIN process executes its config — and the config's globalSetup
+# and plugins — and that process writes the result file and owns the exit
+# code fleet/verify judges. fleet/verify installs the BASE's config bytes over
+# a PR's copy, so an edit here is never in effect on its own PR; what merges,
+# though, judges every PR after it. Rooted glob: the root configs only.
+/vitest.*.config.ts                 @rhonda-rodododo
 
 # ─── Supply chain, release, deployment ─────────────────────────────────
 .github/workflows/                  @rhonda-rodododo
 knope.toml                          @rhonda-rodododo
-deploy/                             @rhonda-rodododo
 
 # ─── The fleet judging itself ──────────────────────────────────────────
 # Narrower than #615's blanket `tests/`, deliberately: every other test

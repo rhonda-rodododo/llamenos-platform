@@ -76,6 +76,20 @@ describe('rail: the fleet cannot merge its own changes', () => {
     expect(unowned, `high-impact files with no CODEOWNERS owner:\n${unowned.join('\n')}`).toEqual([])
   })
 
+  // fleet/verify's judge is vitest's MAIN process, and that process executes
+  // the config. A root vitest config added later must be owned and described
+  // as high-impact from its first commit — not once someone remembers.
+  it('every root vitest config is code-owned and high impact', () => {
+    const configs = trackedFiles().filter((f) => /^vitest\.[^/]+\.config\.ts$/.test(f))
+    expect(configs).toContain('vitest.orchestrator.config.ts')
+    expect(configs).toContain('vitest.unit.config.ts')
+    const owner = codeownersMatcher()
+    for (const f of configs) {
+      expect(owner.owns(f), `${f} has no CODEOWNERS owner`).toBe(true)
+      expect(HIGH_IMPACT_PATHS, `${f} is missing from HIGH_IMPACT_PATHS`).toContain(f)
+    }
+  })
+
   it('has no catch-all `*` rule — one would gate every PR and stop the fleet merging anything', () => {
     expect(codeownersPatterns()).not.toContain('*')
   })
@@ -263,10 +277,11 @@ describe('rail: never-write binds even an unrestricted lane', () => {
 
   // CI and deploy stay WRITABLE — a lane owning them can still fix its own
   // CI, and never-write is about secrets, not about review. `deploy/` stays
-  // low-impact (owned in CODEOWNERS via #615's policy, but not part of the
-  // gate's own trust base). `ci.yml` is now HIGH impact, because it is where
-  // "check out the base, not the head" is written down: a PR editing the
-  // gate's own definition is editing the machinery that judges it.
+  // low-impact and unowned in CODEOWNERS (PR #794: no production users yet,
+  // so a bad deploy config is recoverable). `ci.yml` is HIGH impact via the
+  // `.github/workflows/` prefix, because it is where "check out the base,
+  // not the head" is written down: a PR editing the gate's own definition is
+  // editing the machinery that judges it.
   it('leaves CI and deploy writable, and treats the gate definition itself as high impact', () => {
     expect(checkScope(['.github/workflows/ci.yml'], { owned: [], notOwned: [] }, [...NEVER_WRITE_PATHS]).forbidden)
       .toEqual([])

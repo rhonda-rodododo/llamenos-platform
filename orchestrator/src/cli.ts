@@ -9,6 +9,7 @@ import { readAll, append, since, type RunRecord } from './ledger.js'
 import { readResumedAt } from './circuit.js'
 import { loadLanes, LIMITS, LANE_MODES_FILE, type Lane } from './config.js'
 import { checkDispatchDependency, type DependencyReport } from './dependency.js'
+import { checkFleetEnvFile } from './fleet-env.js'
 import { buildBrief, renderBrief } from './brief.js'
 import { loadContracts, contractsFor, buildMemoryContext, augmentBrief } from './memory.js'
 import { dispatch as dispatchWorker, type EffortLevel } from './engines.js'
@@ -16,12 +17,13 @@ import { verifyMechanical } from './verify.js'
 import { secondOpinion, postReview } from './review.js'
 import {
   runVerifyCi, runReviewCi, ciContextFromEnv, ciDiff,
-  REVIEW_JOB, REVIEW_KEY_ENV, VERIFY_JOB, itemIdFromBranch, type CiContext, type CiVerdict,
+  REVIEW_JOB, REVIEW_KEY_ENV, VERIFY_JOB, itemIdFromBranch, fleetBranchFor, type CiContext, type CiVerdict,
 } from './ci.js'
 import {
   settle as settleWorktree,
   destroyWorktree,
   findWorktreeForBranch,
+  currentBranch,
   deleteLocalBranch,
   type SettleTarget,
 } from './worktree.js'
@@ -31,7 +33,7 @@ import type { WorkItem } from './source.js'
 import { renderDigest, resumeCommand, waitingOnHuman, type DigestInput, type LaneStatus } from './digest.js'
 import { deriveItemStatus, renderItemStatus, type PrFacts, type PrState } from './status.js'
 import { notify } from './notify.js'
-import { FLEET_DIR, LOG_FILE, HALT_REASON_FILE, DISPATCH_SCRIPT } from './paths.js'
+import { FLEET_DIR, LOG_FILE, HALT_REASON_FILE, DISPATCH_SCRIPT, FLEET_ENV_FILE } from './paths.js'
 import { REPO, gh, ghJson } from './gh.js'
 import { proposeIssues, buildIssueCreateArgs, type ProposedIssue } from './roles/planner.js'
 import { updateBranchFromMain, type UpdateBranchInput, type UpdateBranchResult } from './roles/integrator.js'
@@ -73,6 +75,10 @@ function lastTickResult(): TickResult | undefined {
 
 export async function doctor(): Promise<number> {
   const checks: [string, boolean, string][] = []
+  // Declared here (not beside the lane-scope loop below, where it used to
+  // live) so the fleet-env WARN case below and the lane-owned-path WARN case
+  // further down share one counter and one summary line.
+  let warnings = 0
   let ghOk = false
   try { execFileSync('gh', ['auth', 'status'], { stdio: 'pipe' }); ghOk = true } catch { /* not authed */ }
   checks.push(['gh authenticated', ghOk, 'run: gh auth login'])
@@ -135,10 +141,27 @@ export async function doctor(): Promise<number> {
   checks.push([`dispatch dependency ok (${DISPATCH_SCRIPT})`, depHardProblems.length === 0,
     depHardProblems.join('; ')])
 
+  // #773: the fleet's GitHub identity. `absent` is the expected state until
+  // the bot account's token is placed here, so it is a WARNING, printed
+  // alongside the lane-scope warnings below — never a hard FAIL, and never
+  // something this loop or `bad` below sees. `fail`/`ok` DO go through the
+  // normal checks list: once the file exists, wrong permissions or a missing
+  // GH_TOKEN are real misconfiguration, not a transitional state.
+  const envFile = checkFleetEnvFile()
+  if (envFile.state === 'absent') {
+    warnings++
+  } else {
+    checks.push([`fleet env file (${FLEET_ENV_FILE})`, envFile.state === 'ok', envFile.message])
+  }
+
   let bad = 0
   for (const [name, ok, fix] of checks) {
     process.stdout.write(`${ok ? '  ok  ' : ' FAIL '} ${name}${ok || !fix ? '' : `\n        ${fix}`}\n`)
     if (!ok) bad++
+  }
+
+  if (envFile.state === 'absent') {
+    process.stdout.write(` WARN  ${envFile.message}\n`)
   }
 
   // F7: a lane's owned list being non-empty (checked above) says nothing
@@ -150,7 +173,6 @@ export async function doctor(): Promise<number> {
   // expected to fire for real drift already present on this branch (see
   // backend's fragment), and doctor must stay usable while that is fixed
   // separately rather than refusing to run at all.
-  let warnings = 0
   for (const l of lanes) {
     const missing = l.scope.owned.filter((p) => !p.includes('*') && !existsSync(join(REPO_ROOT, p)))
     if (missing.length > 0) {
@@ -164,7 +186,7 @@ export async function doctor(): Promise<number> {
   process.stdout.write(`\nlanes: ${modes}\n`)
   process.stdout.write(`lane modes file: ${LANE_MODES_FILE}${existsSync(LANE_MODES_FILE) ? '' : ' (absent — all lanes off)'}\n`)
   if (warnings > 0) {
-    process.stdout.write(`\n${warnings} lane(s) with owned paths that do not exist on disk (warning only — see above)\n`)
+    process.stdout.write(`\n${warnings} warning(s) above — non-fatal, see WARN lines\n`)
   }
 
   process.stdout.write(`\ndispatch dependency: ${DISPATCH_SCRIPT}\n`)
@@ -175,6 +197,18 @@ export async function doctor(): Promise<number> {
       process.stdout.write(`${isWarning ? ' WARN ' : ' FAIL '} dispatch dependency: ${p}\n`)
     }
   }
+
+  // Informational only. #773's bot account isn't live yet, so today this is
+  // normally the operator's own login — that's expected, not a problem, and
+  // this print is not wired into any check, `bad`, or `warnings` above. It
+  // exists purely so a human reading doctor output can see which identity a
+  // dispatch would actually push/comment/merge as, without turning "which
+  // login is this" into a pass/fail decision doctor makes on anyone's behalf.
+  let ghLogin = '(unknown — gh api user failed)'
+  try {
+    ghLogin = execFileSync('gh', ['api', 'user', '--jq', '.login'], { stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8' }).trim()
+  } catch { /* informational only — the "gh authenticated" check above already reports auth failures */ }
+  process.stdout.write(`\ngh token resolves to GitHub login: ${ghLogin}\n`)
 
   return bad === 0 ? 0 : 1
 }
@@ -198,48 +232,97 @@ function nameFor(lane: Lane, item: WorkItem): string {
   return `fleet-${lane.id}-${item.id}`
 }
 
+export interface ResolveDispatchDeps {
+  /** `git worktree list` lookup — worktree.ts's `findWorktreeForBranch`. */
+  findWorktree(repoRoot: string, branch: string): Promise<string | undefined>
+  /** `git -C <wt> rev-parse --abbrev-ref HEAD` — worktree.ts's `currentBranch`. */
+  currentBranch(worktree: string): Promise<string | undefined>
+  /** The PR's head branch as GitHub reports it; `undefined` when unreadable. */
+  prHeadBranch(pr: string): Promise<string | undefined>
+}
+
 /**
- * G3's root-caused fix for issue #660/PR #662: audited directly against
- * `dispatch-one.sh` (`~/.claude/skills/supervising-dispatched-sessions/`),
- * the WORKER's own terminal status write (as opposed to the throwaway
- * DISPATCHED seed file the launcher writes before the worker starts) only
- * ever carries `session`, `status`, `pr`, `merged_sha`, `duration_sec`, and
- * `notes` — NEVER `branch` or `worktree`, even though the seed file has
- * both. `engines.ts`'s `dispatch()` reads the WORKER's file, so
- * `DispatchResult.branch`/`.worktree` are `undefined` for every real
- * terminal status a worker writes itself — which is exactly what silently
- * skipped the mechanical verify -> review -> merge pipeline for #660: the
- * `result.outcome === 'SUCCESS' && branch !== undefined && pr !== undefined
- * && worktree !== undefined` guard in `tick.ts`'s `runLiveDispatch` was
- * never satisfied, so the item fell straight to the pass-through branch with
- * zero scope check, zero tests, and zero non-author review.
+ * Turns a worker's dispatch report into the facts the pipeline acts on, and
+ * refuses to act on a report whose work is not on the branch it dispatched.
  *
- * This does not change `engines.ts` or ask it to guess at a contract it does
- * not own (`dispatch-one.sh` is a separate, unvendored dependency — see
- * paths.ts's `DISPATCH_SCRIPT` comment). It repairs both fields at the one
- * place that already has a correct answer independent of the worker's own
- * report:
- *   - `branch` is deterministic and known BEFORE dispatch even starts (built
- *     right below) — the worker's report is never trusted for it.
- *   - `worktree` is asked of git directly via `findWorktreeForBranch`
- *     (worktree.ts), exactly the reasoning that function's own doc comment
- *     already gives for `revert`/`integrate`.
+ * G3 (issue #660/PR #662): audited directly against `dispatch-one.sh`
+ * (`~/.claude/skills/supervising-dispatched-sessions/`), the WORKER's own
+ * terminal status write (as opposed to the throwaway DISPATCHED seed file
+ * the launcher writes before the worker starts) only ever carries `session`,
+ * `status`, `pr`, `merged_sha`, `duration_sec`, and `notes` — NEVER `branch`
+ * or `worktree`. `branch` is therefore the one known BEFORE dispatch
+ * (`fleetBranchFor`, passed to dispatch-one.sh as `--branch` by
+ * engines.ts's `buildArgs`), and `worktree` is the one dispatch-one.sh's
+ * launch seed reported (engines.ts reads it before the worker can overwrite
+ * the file) or, failing that, asked of git directly via `findWorktree`.
  *
- * Exported and pure-ish (the git lookup is injected) so this exact repair is
- * unit-tested without a real dispatch-one.sh in sight.
+ * Issue #812: knowing the expected branch is not the same as the work being
+ * on it. dispatch-one.sh used to cut every worktree on the worker NAME
+ * (`fleet-shared-704`), so `findWorktree` for `fleet/shared/704` found
+ * nothing and tick.ts skipped verification for a "missing worktree" while
+ * the PR sat open on a branch neither the fleet nor CI recognised. Both the
+ * worktree's ACTUAL checked-out branch and the PR's ACTUAL head branch are
+ * now checked against the expected one, and any difference — including one
+ * that cannot be read — marks the run FAILED with note
+ * `branch-mismatch:<actual>` and sets `branchMismatch`, which tick.ts turns
+ * into a PR comment + `needs-human` and never into a verify or an arming.
+ * Fail-closed on an unreadable PR head on purpose: auto-merge is armed on a
+ * PR NUMBER, and a number whose head is unknown may merge a diff nobody
+ * verified.
+ *
+ * A worker-reported `branch` is never trusted over git: it is replaced by
+ * the verified expected branch, or by the actual one on a mismatch.
+ *
+ * Exported and pure-ish (the git/gh lookups are injected) so this exact
+ * repair is unit-tested without a real dispatch-one.sh in sight.
  */
 export async function resolveDispatchResult(
   result: DispatchOutcome,
-  branch: string,
+  expectedBranch: string,
   repoRoot: string,
-  findWorktree: (repoRoot: string, branch: string) => Promise<string | undefined>,
+  deps: ResolveDispatchDeps,
 ): Promise<DispatchOutcome> {
-  const worktree = result.worktree ?? await findWorktree(repoRoot, branch)
-  return { ...result, branch: result.branch ?? branch, worktree }
+  const worktree = result.worktree ?? await deps.findWorktree(repoRoot, expectedBranch)
+
+  // `actual` is what the note reports; `actualBranch` is only ever a branch
+  // git or GitHub really named — a placeholder must never reach the ledger's
+  // `branch`, which `revert` later deletes and salvage names branches after.
+  let actual: string | undefined
+  let actualBranch: string | undefined
+  if (worktree !== undefined) {
+    const onWorktree = await deps.currentBranch(worktree)
+    if (onWorktree !== expectedBranch) { actual = onWorktree ?? 'unknown'; actualBranch = onWorktree }
+  }
+  if (actual === undefined && result.pr !== undefined) {
+    const head = await deps.prHeadBranch(result.pr)
+    if (head !== expectedBranch) { actual = head ?? 'unreadable-pr-head'; actualBranch = head }
+  }
+
+  if (actual !== undefined) {
+    const reason = `branch-mismatch:${actual}`
+    return {
+      ...result,
+      outcome: 'FAILED',
+      branch: actualBranch,
+      worktree,
+      branchMismatch: actual,
+      note: result.note ? `${reason} ${result.note}` : reason,
+    }
+  }
+  return { ...result, branch: expectedBranch, worktree }
+}
+
+function defaultResolveDispatchDeps(): ResolveDispatchDeps {
+  return {
+    findWorktree: findWorktreeForBranch,
+    currentBranch,
+    prHeadBranch: async (pr) =>
+      (await ghJson<{ headRefName: string }>(['pr', 'view', pr, '--json', 'headRefName']))?.headRefName,
+  }
 }
 
 async function realDispatch(item: WorkItem, lane: Lane): Promise<DispatchOutcome> {
-  const branch = `fleet/${lane.id}/${item.id}`
+  const branch = fleetBranchFor(lane.id, item.id)
   const baseBrief = buildBrief(item, lane, branch)
   // Prior-attempt history and governing contracts are memory.ts's sole
   // concern (see brief.ts's own comment on why: a caller rendering both
@@ -261,12 +344,17 @@ async function realDispatch(item: WorkItem, lane: Lane): Promise<DispatchOutcome
     model: lane.model ?? DEFAULT_MODEL,
     effort: DEFAULT_EFFORT,
   })
-  const resolved = await resolveDispatchResult(result, branch, REPO_ROOT, findWorktreeForBranch)
+  const resolved = await resolveDispatchResult(result, branch, REPO_ROOT, defaultResolveDispatchDeps())
+  if (resolved.branchMismatch !== undefined) {
+    log(`dispatch: item ${item.id} ${resolved.note ?? ''} — expected ${branch}`)
+  }
 
   // At PR open, which is the earliest moment the PR exists. Best-effort: the
   // worst case is an issue that stays open after its PR merges, which the
   // digest already surfaces, and it must never cost the dispatch itself.
-  if (resolved.pr !== undefined) {
+  // Not on a mismatched branch: the item number is derived from the PR's
+  // head branch, which by definition is not a fleet branch there.
+  if (resolved.pr !== undefined && resolved.branchMismatch === undefined) {
     try {
       await ensureIssueLinkWith(resolved.pr, defaultIssueLinkDeps())
     } catch (e) {

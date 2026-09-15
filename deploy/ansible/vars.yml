@@ -130,6 +130,48 @@ twilio_phone_number: ""
 # Generate with: openssl rand -hex 32
 server_secret: ""
 
+# ─── Push Notifications (Epic 86) ────────────────────────────────
+# APNs (iOS). Leave all three empty to disable iOS push — the app already
+# no-ops safely without them. Get these from the Apple Developer Portal.
+apns_key_p8: ""
+apns_key_id: ""
+apns_team_id: ""
+
+# ntfy/UnifiedPush (Android). Requires a self-hosted ntfy instance reachable
+# at ntfy_url from the app container — standing that service up is tracked
+# separately (#717); this only wires the app's side of the connection.
+llamenos_ntfy_enabled: false
+ntfy_url: "http://ntfy:80"
+ntfy_auth_token: ""
+
+# ─── Crash Reporting (Epic 293) ──────────────────────────────────
+# GlitchTip/Sentry DSN for client-side crash reporting. Leave empty to
+# disable — the app already no-ops safely without it.
+glitchtip_dsn: ""
+
+# ─── Signal Messaging Sidecar Auth ───────────────────────────────
+# Must match the token configured in the signal-notifier sidecar.
+# Generate with: openssl rand -hex 32
+signal_notifier_bearer_token: ""
+
+# ─── Demo / Staging Mode ──────────────────────────────────────────
+# NEVER set demo_mode: true when app_environment is 'production' — both the
+# app (apps/worker/lib/config.ts) and the Ansible preflight guard
+# (playbooks/tasks/guard-demo-mode.yml) hard-fail if you do.
+# When demo_mode is true, demo_mode_confirm must be exactly "DESTROY_ALL_DATA"
+# (two-factor confirmation the app requires at startup before it will run
+# scheduled data resets).
+demo_mode: false
+demo_mode_confirm: ""
+
+# ─── Developer/Test Routes ────────────────────────────────────────
+# NEVER set dev_routes_enabled: true or a non-empty dev_reset_secret in
+# production — same guard as demo_mode above applies. Currently these only
+# take effect when app_environment is 'development' (widening that to
+# staging/demo is tracked separately — #723).
+dev_routes_enabled: false
+dev_reset_secret: ""
+
 # ─── Optional Profiles ──────────────────────────────────────────
 # Docker Compose profiles to enable
 # Available: transcription, asterisk, signal, monitoring

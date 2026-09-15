@@ -3,8 +3,9 @@ import { LIMITS, MAX_ATTEMPTS_PER_ITEM, type Lane } from './config.js'
 import { failedAttemptsIn, type Outcome, type RunRecord } from './ledger.js'
 import { runReviewLoop, type SecondOpinionInput, type SecondOpinionResult } from './review.js'
 import { judge, selectForLane, type Rejection } from './select.js'
-import type { WorkItem } from './source.js'
+import type { ListResult, WorkItem } from './source.js'
 import { buildGateTrace } from './trace.js'
+import { fleetBranchFor } from './ci.js'
 import type { VerifyInput, VerifyReport } from './verify.js'
 
 export interface DispatchOutcome {
@@ -13,6 +14,16 @@ export interface DispatchOutcome {
   pr?: string
   branch?: string
   worktree?: string
+  /**
+   * Set when the work did NOT land on the `fleet/<lane>/<item>` branch this
+   * item was dispatched for: the worktree's checked-out branch, or the PR's
+   * head branch, is something else (value: that actual branch, or
+   * `unknown`/`unreadable-pr-head` when it could not be read). See
+   * `resolveDispatchResult` (cli.ts). A run carrying this is never verified
+   * and never armed — the diff the fleet would verify is not the diff that
+   * would merge.
+   */
+  branchMismatch?: string
 }
 
 /**
@@ -45,9 +56,11 @@ export interface SettleInput {
    * keeps the item from being re-claimed on the next pass. An ordinary
    * mechanical or review REJECTED is still retried up to
    * `MAX_ATTEMPTS_PER_ITEM` (the worker may simply fix it next attempt), so
-   * exactly one case sets this now: a worker-reported SUCCESS that could not
+   * exactly two cases set this now: a worker-reported SUCCESS that could not
    * be run through the pipeline at all (missing branch/worktree) — see the
-   * `else` branch in `runLiveDispatch`. That is the shape of issue #660/PR
+   * `else` branch in `runLiveDispatch` — and a branch mismatch (issue #812:
+   * the work landed on a branch other than `fleet/<lane>/<item>`), whatever
+   * the worker claimed. The former is the shape of issue #660/PR
    * #662: a claimed success with an open, UNVERIFIED PR is far more
    * dangerous left agent-dispatchable than a routine rejection is.
    *
@@ -65,7 +78,7 @@ export interface TickDeps {
   checkHalt(): Promise<{ halted: boolean; reason?: string }>
   readLedger(): RunRecord[]
   resumedAt(): number
-  listItems(lane: Lane): Promise<WorkItem[] | undefined>
+  listItems(lane: Lane): Promise<ListResult>
   readLabels(id: string): Promise<string[] | undefined>
   dispatch(item: WorkItem, lane: Lane): Promise<DispatchOutcome>
   /** Mechanical gates: scope, never-write, diff-targeted tests. Injected so
@@ -233,7 +246,36 @@ async function runLiveDispatch(
     branch = result.branch
     pr = result.pr
 
-    if (result.outcome === 'SUCCESS' && branch !== undefined && pr !== undefined && worktree !== undefined) {
+    if (result.branchMismatch !== undefined) {
+      // Issue #812: the work is on a branch this item was not dispatched
+      // for (live shape: PR #836 on `fleet-shared-704`). Checked BEFORE the
+      // outcome, and terminal whatever the worker claimed: verifying the
+      // expected branch would judge a diff that is not the one that merges,
+      // and verifying the actual one would run lane scope against a branch
+      // CI itself does not recognise as a fleet branch. FAILED, never armed
+      // (`armed` stays false, so the disarm below also clears any earlier
+      // arming), `needs-human` so it is not silently re-claimed, and the PR
+      // told plainly that nothing verified it.
+      const mismatch = result.branchMismatch
+      needsHuman = true
+      deps.log(
+        `verify: item ${item.id} pr ${pr ?? '(none)'} REFUSED — branch-mismatch:${mismatch} ` +
+        `(dispatched for ${fleetBranchFor(lane.id, item.id)}) — not verified, auto-merge not armed`,
+      )
+      if (pr !== undefined) {
+        await deps.commentOnPr(
+          pr,
+          `This PR is on branch \`${mismatch}\`, but the fleet dispatched issue #${item.id} on ` +
+          `\`${fleetBranchFor(lane.id, item.id)}\`. It was NOT verified by the fleet — no scope check, ` +
+          'no diff-targeted tests, no non-author review — and auto-merge has not been armed. ' +
+          'It needs a human: review it from scratch, or close it and re-dispatch the issue.',
+        )
+      }
+      final = {
+        ...base, outcome: 'FAILED', branch, pr,
+        note: truncateNote(result.note ?? `branch-mismatch:${mismatch}`),
+      }
+    } else if (result.outcome === 'SUCCESS' && branch !== undefined && pr !== undefined && worktree !== undefined) {
       // The bounded mechanical-verify -> second-opinion -> (on FAIL) revise
       // -> re-verify loop (task 13, review.ts). Mechanical failure is
       // terminal on whatever round it happens (no review is ever requested
@@ -456,13 +498,17 @@ export async function tick(deps: TickDeps): Promise<TickResult> {
     const labelCache = new Map<string, string[] | undefined>()
 
     for (const lane of active) {
-      const items = await deps.listItems(lane)
+      const read = await deps.listItems(lane)
       // An unreadable source is NOT an empty one. Aborting the whole pass is
-      // the only way a credential failure cannot masquerade as a quiet night.
-      if (items === undefined) {
-        deps.log(`source unreadable for lane ${lane.id} — aborting pass`)
+      // the only way a credential failure cannot masquerade as a quiet night —
+      // and the REASON travels with it, because a fail-closed abort that
+      // destroys its own cause cannot be told apart from a rate limit, a
+      // network blip or a real outage by whoever reads this line next.
+      if (!read.ok) {
+        deps.log(`source unreadable for lane ${lane.id} — aborting pass: ${read.detail}`)
         return empty({ ran: true, aborted: 'source-unreadable' })
       }
+      const items = read.items
       for (const item of items) {
         if (!labelCache.has(item.id)) labelCache.set(item.id, await deps.readLabels(item.id))
       }

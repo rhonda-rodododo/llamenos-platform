@@ -53,8 +53,12 @@ When('I filter by {string} event type', async ({ page }, eventType: string) => {
   const trigger = page.getByTestId(TestIds.AUDIT_EVENT_FILTER)
   await expect(trigger).toBeVisible({ timeout: Timeouts.ELEMENT })
   await trigger.click()
-  const option = page.getByRole('option', { name: new RegExp(eventType, 'i') })
-  await option.first().click()
+  // Each option carries a testid derived from its EVENT_CATEGORIES value (audit.tsx), so
+  // select it by testid instead of a case-insensitive role/name substring + .first(),
+  // which could silently pick the wrong option if two labels ever overlapped.
+  const option = page.getByTestId(`${TestIds.AUDIT_EVENT_FILTER}-option-${eventType.toLowerCase()}`)
+  await expect(option).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await option.click()
 })
 
 Then('only {string} events should be visible', async ({ page, backendRequest: request, workerHub }, eventType: string) => {
@@ -87,13 +91,13 @@ Then('the search input should be empty', async ({ page }) => {
 })
 
 Then('the audit results should update', async ({ page }) => {
-  // After search/filter, the audit list should still be visible
+  // audit.tsx settles into exactly one of: skeleton (loading) | empty-state | entries.
+  // Wait for either terminal state in one assertion. The old non-waiting isVisible()
+  // probe raced the reload, and its empty-state fallback could never match — the audit
+  // empty state had no testid until this change.
   const auditEntries = page.getByTestId(TestIds.AUDIT_ENTRY)
   const emptyState = page.getByTestId(TestIds.EMPTY_STATE)
-  // Either entries or empty state should be visible
-  const hasEntries = await auditEntries.first().isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (hasEntries) return
-  await expect(emptyState).toBeVisible({ timeout: 3000 })
+  await expect(auditEntries.first().or(emptyState)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Then('the {string} badge should have the purple color class', async ({ page }, text: string) => {
