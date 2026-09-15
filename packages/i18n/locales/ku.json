@@ -3911,11 +3911,11 @@
   "demo": {
     "volunteer": "Xwebexş",
     "dismiss": "Paşguh bike",
+    "getStarted": "Deploy your own",
     "admin": "Rêvebir",
     "banner": "Demo Mode",
-    "bannerText": "You're exploring the Llamenos demo. Data resets daily.",
-    "bannerTextSchedule": "You're exploring the Llamenos demo. Data resets on schedule.",
-    "getStarted": "Deploy your own",
+    "bannerText": "Hawîrdora tesê — agahiyên rastîn ên bangkeran têxe nake. Daneyên li vir ne veşartî ne û dikarin di her demê de werin jêbirin.",
+    "bannerTextSchedule": "Hawîrdora tesê — agahiyên rastîn ên bangkeran têxe nake. Dane {{schedule}} têne resetkirin û ne veşartî ne.",
     "pickAccount": "Pick a demo account to explore",
     "resetNotice": "Demo data resets daily",
     "tryDemo": "Try the demo"
