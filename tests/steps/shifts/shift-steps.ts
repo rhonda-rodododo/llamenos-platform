@@ -5,7 +5,7 @@
  *   - packages/test-specs/features/shifts/clock-in-out.feature
  */
 import { expect } from '@playwright/test'
-import { Given, When, Then } from '../fixtures'
+import { Then } from '../fixtures'
 import { TestIds } from '../../test-ids'
 import { Timeouts } from '../../helpers'
 
@@ -37,7 +37,7 @@ Then('I should see either the shifts list, empty state, or loading indicator', a
 
 // --- Clock in/out steps ---
 
-Then('the clock status should update', async ({ page }) => {
+Then('the clock status should update', async () => {
   // Wait for status to change
 })
 

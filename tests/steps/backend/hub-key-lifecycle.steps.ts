@@ -110,7 +110,7 @@ Given(
 
 When(
   'the admin sets hub key envelopes for all {int} members',
-  async ({ request, world }, count: number) => {
+  async ({ request, world }, _count: number) => {
     expect(getHubKeyState(world).hubId).toBeTruthy()
 
     const envelopes: EnvelopeEntry[] = []
@@ -130,7 +130,7 @@ When(
   },
 )
 
-Given('hub key envelopes are set for all {int} members', async ({ request, world }, count: number) => {
+Given('hub key envelopes are set for all {int} members', async ({ request, world }, _count: number) => {
   expect(getHubKeyState(world).hubId).toBeTruthy()
 
   const envelopes: EnvelopeEntry[] = []
