@@ -3,6 +3,7 @@ import {
   runVerifyCi, runReviewCi, laneIdFromBranch, verdictSummary, ciContextFromEnv,
   REVIEW_KEY_ENV, UNSCOPED_LANE, type CiContext, type VerifyCiDeps, type ReviewCiDeps,
 } from '../../orchestrator/src/ci.js'
+import { parseVerdict } from '../../orchestrator/src/review.js'
 import type { Lane } from '../../orchestrator/src/config.js'
 import type { VerifyInput, VerifyReport } from '../../orchestrator/src/verify.js'
 
@@ -47,6 +48,15 @@ describe('verdictSummary', () => {
   })
   it('falls back to the final non-empty line when there is no verdict line', () => {
     expect(verdictSummary('\n\nengine exploded\nmore\n')).toBe('more')
+  })
+  // And the converse pin from the other direction: a verdict line with text
+  // after it is UNREADABLE, so the summary must show what came after — not a
+  // verdict that did not count.
+  it('names the same final line parseVerdict judged, never an earlier VERDICT line', () => {
+    const text = 'VERDICT: PASS\ntrailing'
+    expect(parseVerdict(text)).toBe('UNREADABLE')
+    expect(verdictSummary(text)).toBe('trailing')
+    expect(verdictSummary('\n\nengine exploded\nmore')).toBe('more')
   })
   it('never invents a summary for empty output', () => {
     expect(verdictSummary('   \n ')).toBe('(no reviewer output)')

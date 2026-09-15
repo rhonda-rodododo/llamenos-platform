@@ -106,10 +106,10 @@ export function itemIdFromBranch(branch: string): string | undefined {
   return FLEET_BRANCH_RE.exec(branch)?.[2]
 }
 
-/** The one line `parseVerdict` judged — the reviewer's last non-empty line —
- *  never an invented summary and never a search of its own. Selecting the
- *  line in one place (`finalLine`) is what keeps the printed summary and the
- *  job's exit code from ever naming different verdicts. */
+/** The one line `parseVerdict` judged — the reviewer's final non-empty line,
+ *  selected by the same function (`finalLine`), so the printed summary and the
+ *  job's exit code can never name different verdicts. Never an invented
+ *  summary and never a search of its own. */
 export function verdictSummary(text: string): string {
   return finalLine(text) ?? '(no reviewer output)'
 }

@@ -642,6 +642,14 @@ jobs:
             -i inventory.example.yml \
             --extra-vars "@vars.example.yml"
 
+      # Parses the required-env-var list straight out of
+      # apps/worker/lib/config.ts and asserts every Ansible template that
+      # renders the worker's .env carries all of them — the two role
+      # templates drifting out of sync (or a future third copy rotting
+      # unnoticed) is exactly the bug class issue #798 fixed.
+      - name: Check required env vars across templates
+        run: python3 deploy/ansible/scripts/check-required-env.py
+
   desktop-unit:
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
@@ -1538,6 +1546,17 @@ jobs:
       # `git archive | tar`. No `.git`, no checkout, nothing on a module path,
       # nothing executed. verify-ci/review-ci refuse outright if a `.git` ever
       # appears in there — see headDirRefusal in ci.ts.
+      #
+      # Agent instructions and configuration are then stripped, with every
+      # symlink: `opencode.json(c)` declares MCP servers that get spawned,
+      # `.opencode/` holds tool and plugin modules that get imported and run,
+      # `AGENTS.md`/`CONTEXT.md`/`CLAUDE.md` are prompt text an engine obeys,
+      # `.claude/` and `.agents/` carry hooks and skills. A PR controls all of
+      # them, and the reviewer runs next to the review key. A symlink would
+      # turn the reviewer's read access to this tree into read access to
+      # `~/.local/share/opencode/auth.json`. review.ts strips the same set
+      # again (REVIEWER_CONTROL_NAMES) from base code, because this workflow
+      # file is the PR's own copy on a pull_request run.
       - name: Export the PR head as data
         env:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
@@ -1547,6 +1566,15 @@ jobs:
           mkdir -p "$RUNNER_TEMP/head"
           git archive "$HEAD_SHA" | tar -x -C "$RUNNER_TEMP/head"
           test ! -e "$RUNNER_TEMP/head/.git"
+          control=( \( -iname opencode.json -o -iname opencode.jsonc -o -iname .opencode
+            -o -iname AGENTS.md -o -iname CONTEXT.md -o -iname .agents
+            -o -iname CLAUDE.md -o -iname .claude -o -type l \) )
+          find "$RUNNER_TEMP/head" -mindepth 1 "${control[@]}" -prune -print -exec rm -rf {} +
+          left="$(find "$RUNNER_TEMP/head" -mindepth 1 "${control[@]}" -print -quit)"
+          if [ -n "$left" ]; then
+            echo "::error::agent configuration survived the strip: $left"
+            exit 1
+          fi
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2.0.2
@@ -1611,27 +1639,55 @@ jobs:
             > "$HOME/.local/share/opencode/auth.json"
           chmod 600 "$HOME/.local/share/opencode/auth.json"
 
-      # Proves the engine, the key, the provider and the model id all work
-      # BEFORE the real review runs — so "the reviewer is misconfigured" can
-      # never again be indistinguishable from "the reviewer read the diff and
-      # could not produce a verdict". Exactly the failure this round fixed:
-      # the model id did not exist and `--format text` was not a valid choice,
-      # so every review had silently been UNREADABLE.
+      # Proves the engine, the key, the provider, the model id AND the
+      # reviewer's permission config all work BEFORE the real review runs — so
+      # "the reviewer is misconfigured" can never again be indistinguishable
+      # from "the reviewer read the diff and could not produce a verdict". An
+      # earlier round's model id did not exist and `--format text` was not a
+      # valid choice, so every review had silently been UNREADABLE; an
+      # array-shaped `permission` does the same thing (1.18.30 rejects it and
+      # exits 1).
       #
-      # Judged by the review's OWN parser (`parseVerdict`, from this trusted
-      # base checkout), never a looser substring match: an engine whose output
+      # Invoked the way review.ts's invokeVerifierEngine invokes it: from an
+      # EMPTY project root, never from an export (a PR's `.opencode/` and
+      # `opencode.json` execute when the PR is the project root); settings
+      # only from a fresh OPENCODE_CONFIG_DIR holding the object-form deny-all
+      # permission; `--format json`. `opencode debug config` makes the binary
+      # itself validate the config shape — it exits non-zero on a shape it
+      # rejects. (review.ts additionally grants read access to the export
+      # under `external_directory`; there is no export here to grant.)
+      #
+      # Judged by the review's OWN code — `opencodeAssistantText` (assistant
+      # text parts only, never tool output or stray stdout) and `parseVerdict`
+      # (exact final line), both imported from this trusted base checkout —
+      # never a looser substring or shell comparison: an engine whose output
       # grows colour codes or a trailing line must fail HERE, not pass the
       # smoke step and then make every real review UNREADABLE.
       - name: Smoke-test the review engine
         run: |
           set -euo pipefail
-          out=$(printf 'Reply with exactly: VERDICT: PASS\n' \
-            | opencode run --pure --model kimi-for-coding/k3-256k --format default --dir "$RUNNER_TEMP")
-          echo "$out"
+          root="$(mktemp -d)"
+          cfg="$(mktemp -d)"
+          jq -n '{
+            "$schema": "https://opencode.ai/config.json",
+            "permission": {
+              "bash": "deny", "edit": "deny", "webfetch": "deny", "websearch": "deny",
+              "external_directory": { "*": "deny" }
+            }
+          }' > "$cfg/opencode.json"
+          export OPENCODE_CONFIG_DIR="$cfg" OPENCODE_DISABLE_PROJECT_CONFIG=1
+          (cd "$root" && opencode debug config --pure) > "$RUNNER_TEMP/opencode-config.json"
+          jq -e '.permission | .bash == "deny" and .edit == "deny" and .webfetch == "deny" and .websearch == "deny"' \
+            "$RUNNER_TEMP/opencode-config.json"
+          out="$(cd "$root" && printf 'Reply with exactly: VERDICT: PASS\n' \
+            | opencode run --pure --model kimi-for-coding/k3-256k --format json --dir "$root")"
           printf '%s' "$out" | bun -e '
-            import { parseVerdict } from "./orchestrator/src/review.ts"
-            const verdict = parseVerdict(await Bun.stdin.text())
-            console.log("smoke verdict (parseVerdict): " + verdict)
+            import { opencodeAssistantText, parseVerdict } from "./orchestrator/src/review.ts"
+            const { text, errors } = opencodeAssistantText(await Bun.stdin.text())
+            console.log(text)
+            for (const e of errors) console.log("engine error event: " + e)
+            const verdict = parseVerdict(text)
+            console.log("smoke verdict (parseVerdict of assistant text): " + verdict)
             process.exit(verdict === "PASS" ? 0 : 1)
           '
 
