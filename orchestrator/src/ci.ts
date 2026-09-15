@@ -2,8 +2,7 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import type { Lane } from './config.js'
 import type { VerifyInput, VerifyReport } from './verify.js'
-import { finalLine } from './review.js'
-import type { SecondOpinionInput, SecondOpinionResult } from './review.js'
+import { finalLine, type SecondOpinionInput, type SecondOpinionResult } from './review.js'
 import { join } from 'node:path'
 import { buildGateTrace } from './trace.js'
 
@@ -99,6 +98,27 @@ export interface CiVerdict { ok: boolean; summary: string }
  */
 const FLEET_BRANCH_RE = /^fleet\/([^/]+)\/([^/]+)$/
 
+/**
+ * The one WRITER of that grammar, next to the one reader. `buildArgs`
+ * (engines.ts) passes this to `dispatch-one.sh --branch`, and `realDispatch`
+ * (cli.ts) verifies the worktree and PR head against it — neither may spell
+ * the format out itself. Issue #812: the dispatcher used to name the branch
+ * after the worker (`fleet-shared-704`), which this regex does not
+ * recognise, so the fleet skipped verify/review for the PR and CI treated it
+ * as a non-fleet branch with no lane scope.
+ *
+ * Throws rather than returning a branch its own reader would reject: a lane
+ * or item id containing `/` (or an empty one) would otherwise produce a
+ * branch every consumer above treats as "not a fleet branch".
+ */
+export function fleetBranchFor(laneId: string, itemId: string): string {
+  const branch = `fleet/${laneId}/${itemId}`
+  if (laneIdFromBranch(branch) !== laneId || itemIdFromBranch(branch) !== itemId) {
+    throw new Error(`lane "${laneId}" / item "${itemId}" cannot form a fleet branch (fleet/<lane>/<item>)`)
+  }
+  return branch
+}
+
 export function laneIdFromBranch(branch: string): string | undefined {
   return FLEET_BRANCH_RE.exec(branch)?.[1]
 }
@@ -107,10 +127,10 @@ export function itemIdFromBranch(branch: string): string | undefined {
   return FLEET_BRANCH_RE.exec(branch)?.[2]
 }
 
-/** The reviewer's final non-empty line — the same line `parseVerdict` judges,
- *  selected by the same function, so the printed summary can never name a
- *  different line from the one that decided the job. Never an invented
- *  summary. */
+/** The one line `parseVerdict` judged — the reviewer's final non-empty line,
+ *  selected by the same function (`finalLine`), so the printed summary and the
+ *  job's exit code can never name different verdicts. Never an invented
+ *  summary and never a search of its own. */
 export function verdictSummary(text: string): string {
   return finalLine(text) ?? '(no reviewer output)'
 }
@@ -217,7 +237,11 @@ export async function runVerifyCi(deps: VerifyCiDeps): Promise<CiVerdict> {
   const withTests = await deps.verify({ ...rangeFor(deps.ctx), lane, testDir: deps.ctx.headDir })
   return {
     ok: withTests.passed,
-    summary: [buildGateTrace({ report: withTests }), ...withTests.reasons.map((r) => `- ${r}`)].join('\n'),
+    summary: [
+      buildGateTrace({ report: withTests }),
+      ...(withTests.testResults ?? []).map((r) => `- ${r}`),
+      ...withTests.reasons.map((r) => `- ${r}`),
+    ].join('\n'),
   }
 }
 

@@ -1456,12 +1456,26 @@ jobs:
       - name: Install dependencies (base lockfile, no install scripts)
         run: bun install --frozen-lockfile --ignore-scripts
 
-      # The head export has no node_modules of its own. The base install is
-      # linked in so the phase-2 tests resolve their RUNNER from the trusted
-      # tree — a PR cannot swap vitest out from under its own verification,
-      # only supply the test files it is entitled to supply.
+      # The head export must have no node_modules of its own. `git archive`
+      # exports whatever is committed, and a plain `ln -s` onto an existing
+      # directory does not fail — it nests the link INSIDE it, leaving the
+      # PR's own `node_modules/.bin/vitest` in place. So a committed
+      # `node_modules` (directory, file or symlink) is refused before anything
+      # is linked, and `ln -T` refuses to nest regardless.
+      #
+      # This is one of three locks on the same door: verify.ts also runs the
+      # runner by absolute path from $GITHUB_WORKSPACE (never `bunx` from the
+      # export), and refuses an export whose node_modules is not, by realpath,
+      # this trusted install. The PR supplies test files and nothing else.
       - name: Make base dependencies available to the head export
-        run: ln -s "$GITHUB_WORKSPACE/node_modules" "$RUNNER_TEMP/head/node_modules"
+        run: |
+          set -euo pipefail
+          head_modules="$RUNNER_TEMP/head/node_modules"
+          if [ -e "$head_modules" ] || [ -L "$head_modules" ]; then
+            echo "::error::the commit under judgement contains node_modules — refusing to judge it with a runner it could supply"
+            exit 1
+          fi
+          ln -s -T "$GITHUB_WORKSPACE/node_modules" "$head_modules"
 
       # Two phases inside one command: scope/never-write/impact first, from
       # the base checkout with nothing of the PR's executing; then the PR's
@@ -1638,12 +1652,17 @@ jobs:
       # EMPTY project root, never from an export (a PR's `.opencode/` and
       # `opencode.json` execute when the PR is the project root); settings
       # only from a fresh OPENCODE_CONFIG_DIR holding the object-form deny-all
-      # permission; `--format json`; and the verdict taken from the final
-      # non-empty line of assistant text parts only, exactly as parseVerdict
-      # reads it. `opencode debug config` makes the binary itself validate the
-      # config shape — it exits non-zero on a shape it rejects. (review.ts
-      # additionally grants read access to the export under
-      # `external_directory`; there is no export here to grant.)
+      # permission; `--format json`. `opencode debug config` makes the binary
+      # itself validate the config shape — it exits non-zero on a shape it
+      # rejects. (review.ts additionally grants read access to the export
+      # under `external_directory`; there is no export here to grant.)
+      #
+      # Judged by the review's OWN code — `opencodeAssistantText` (assistant
+      # text parts only, never tool output or stray stdout) and `parseVerdict`
+      # (exact final line), both imported from this trusted base checkout —
+      # never a looser substring or shell comparison: an engine whose output
+      # grows colour codes or a trailing line must fail HERE, not pass the
+      # smoke step and then make every real review UNREADABLE.
       - name: Smoke-test the review engine
         run: |
           set -euo pipefail
@@ -1656,22 +1675,21 @@ jobs:
               "external_directory": { "*": "deny" }
             }
           }' > "$cfg/opencode.json"
-          cd "$root"
           export OPENCODE_CONFIG_DIR="$cfg" OPENCODE_DISABLE_PROJECT_CONFIG=1
-          opencode debug config --pure > "$RUNNER_TEMP/opencode-config.json"
+          (cd "$root" && opencode debug config --pure) > "$RUNNER_TEMP/opencode-config.json"
           jq -e '.permission | .bash == "deny" and .edit == "deny" and .webfetch == "deny" and .websearch == "deny"' \
             "$RUNNER_TEMP/opencode-config.json"
-          out="$(printf 'Reply with exactly: VERDICT: PASS\n' \
+          out="$(cd "$root" && printf 'Reply with exactly: VERDICT: PASS\n' \
             | opencode run --pure --model kimi-for-coding/k3-256k --format json --dir "$root")"
-          text="$(printf '%s\n' "$out" \
-            | jq -Rr 'fromjson? | select(.type == "text" and .part.type == "text" and ((.part.synthetic // false) | not)) | .part.text')"
-          echo "$text"
-          last="$(printf '%s\n' "$text" | sed -e 's/[[:space:]]*$//' | awk 'NF { last = $0 } END { print last }')"
-          if [ "$last" != "VERDICT: PASS" ]; then
-            echo "::error::the review engine did not return an exact 'VERDICT: PASS' as its final assistant line"
-            printf '%s\n' "$out" | tail -n 20
-            exit 1
-          fi
+          printf '%s' "$out" | bun -e '
+            import { opencodeAssistantText, parseVerdict } from "./orchestrator/src/review.ts"
+            const { text, errors } = opencodeAssistantText(await Bun.stdin.text())
+            console.log(text)
+            for (const e of errors) console.log("engine error event: " + e)
+            const verdict = parseVerdict(text)
+            console.log("smoke verdict (parseVerdict of assistant text): " + verdict)
+            process.exit(verdict === "PASS" ? 0 : 1)
+          '
 
 
       # Bootstrap guard. The gate runs from the BASE checkout by design, so

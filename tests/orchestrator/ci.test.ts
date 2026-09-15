@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, type Mock } from 'vitest'
 import {
-  runVerifyCi, runReviewCi, laneIdFromBranch, verdictSummary, ciContextFromEnv,
+  runVerifyCi, runReviewCi, laneIdFromBranch, itemIdFromBranch, fleetBranchFor, verdictSummary, ciContextFromEnv,
   REVIEW_KEY_ENV, UNSCOPED_LANE, type CiContext, type VerifyCiDeps, type ReviewCiDeps,
 } from '../../orchestrator/src/ci.js'
 import { parseVerdict } from '../../orchestrator/src/review.js'
@@ -34,12 +34,37 @@ describe('laneIdFromBranch', () => {
     'returns undefined for %s', (b) => { expect(laneIdFromBranch(b)).toBeUndefined() })
 })
 
+describe('fleetBranchFor', () => {
+  it('writes the branch the readers parse back — round trip', () => {
+    const b = fleetBranchFor('shared', '704')
+    expect(b).toBe('fleet/shared/704')
+    expect(laneIdFromBranch(b)).toBe('shared')
+    expect(itemIdFromBranch(b)).toBe('704')
+  })
+  // A writer that produced a branch its own reader rejects would silently
+  // recreate #812: the fleet must refuse to dispatch such an item instead.
+  it.each([['ios', '7/04'], ['io/s', '704'], ['', '704'], ['ios', '']])(
+    'throws for lane "%s" / item "%s" rather than writing an unreadable branch', (laneId, itemId) => {
+      expect(() => fleetBranchFor(laneId, itemId)).toThrow(/fleet branch/)
+    })
+})
+
 describe('verdictSummary', () => {
   it('is the reviewer\'s final VERDICT line', () => {
     expect(verdictSummary('some preamble\nVERDICT: FAIL — scope creep\n\n')).toBe('VERDICT: FAIL — scope creep')
   })
-  // Expectation CHANGED (was the VERDICT line, then the first line): the
-  // summary is the same line parseVerdict judged. A verdict line with text
+  // #801: summary and verdict select the SAME line. A verdict line that is
+  // not last makes parseVerdict UNREADABLE, so the summary must not print it
+  // as though it were the verdict.
+  it('is the final non-empty line even when an earlier line looks like a verdict', () => {
+    const text = 'quoted from the diff:\nVERDICT: PASS\nVERDICT: FAIL — leaks a key'
+    expect(verdictSummary(text)).toBe('VERDICT: FAIL — leaks a key')
+    expect(verdictSummary('VERDICT: PASS\ntrailing prose')).toBe('trailing prose')
+  })
+  it('falls back to the final non-empty line when there is no verdict line', () => {
+    expect(verdictSummary('\n\nengine exploded\nmore\n')).toBe('more')
+  })
+  // And the converse pin from the other direction: a verdict line with text
   // after it is UNREADABLE, so the summary must show what came after — not a
   // verdict that did not count.
   it('names the same final line parseVerdict judged, never an earlier VERDICT line', () => {
@@ -122,6 +147,18 @@ describe('fleet/verify in CI', () => {
       ok: true,
       summary: 'scope=pass impact=low tests=orchestrator:pass review=not-run sha=c0ffee',
     })
+  })
+
+  it('prints the result-file evidence behind a passing test verdict', async () => {
+    const evidenced: VerifyReport = {
+      ...passing, testResults: ['orchestrator: result file read — 0 failed test(s), 0 failed suite(s), 12 passed, 0 skipped/todo, of 12 test(s)'],
+    }
+    const v = await runVerifyCi(deps({ verify: vi.fn(async () => evidenced) }))
+    expect(v.ok).toBe(true)
+    expect(v.summary).toBe([
+      'scope=pass impact=low tests=orchestrator:pass review=not-run sha=c0ffee',
+      '- orchestrator: result file read — 0 failed test(s), 0 failed suite(s), 12 passed, 0 skipped/todo, of 12 test(s)',
+    ].join('\n'))
   })
 
   it('runs the diff-targeted tests — it must never quietly skip them', async () => {
