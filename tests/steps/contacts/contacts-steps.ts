@@ -8,9 +8,9 @@
  * No .or(PAGE_TITLE) fallbacks.
  */
 import { expect } from '@playwright/test'
-import { Given, When, Then } from '../fixtures'
+import { When, Then } from '../fixtures'
 import { TestIds } from '../../test-ids'
-import { Timeouts, Navigation } from '../../helpers'
+import { Timeouts } from '../../helpers'
 import { createContactByNameViaApi, listContactsViaApi, createReportViaApi } from '../../api-helpers'
 
 // --- Contacts list steps ---

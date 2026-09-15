@@ -14,7 +14,6 @@
 import { expect } from '@playwright/test'
 import { Given, When, Then, getState, setState } from './fixtures'
 import { getScenarioState } from './common.steps'
-import { apiGet, apiPost } from '../../api-helpers'
 
 // ── Constants ────────────────────────────────────────────────────────
 
@@ -271,7 +270,7 @@ When('the signal-notifier health endpoint is requested', async ({ request, world
 
 // ── Then ─────────────────────────────────────────────────────────────
 
-Then('the contact should be stored in the notification service', async ({ request, world }) => {
+Then('the contact should be stored in the notification service', async ({ world }) => {
   const notifState = getNotifState(world)
   if (!notifState.registrationSuccess) return // Sidecar not running — skip assertion
   expect(notifState.contactNumber).toBeDefined()
