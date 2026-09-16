@@ -312,6 +312,90 @@ describe('rail: every lane starts off', () => {
   })
 })
 
+/**
+ * `fleet/review`'s non-author engine is opencode, and until 2026-09-15 its
+ * provider (`kimi-for-coding`) and model (`kimi-for-coding/k3-256k`) were
+ * both string literals baked into `.github/workflows/ci.yml` — twice, once
+ * for `auth.json`'s key and once for the smoke-test's `--model` flag. When
+ * that provider's weekly quota ran out, the ONLY way to switch providers was
+ * a PR editing a required, code-owned workflow file — which cannot itself go
+ * green while the current review engine has no quota. This rail asserts the
+ * property that makes a provider switch an operator action instead: the job
+ * reads `vars.FLEET_REVIEW_PROVIDER` / `vars.FLEET_REVIEW_MODEL` (with safe
+ * defaults matching today's engine, so an unconfigured repo behaves exactly
+ * as before), the `auth.json` key comes from that variable rather than a
+ * literal, and the smoke step can name why the engine failed.
+ *
+ * A grep over the workflow YAML's raw text, deliberately — like the
+ * `--admin`/`--force` rail above, there is no runtime behaviour to invoke
+ * here (this is CI-only shell, never imported by orchestrator code), so the
+ * argv/config text IS the thing to assert.
+ */
+describe('rail: the review engine provider is a repo variable, never a hardcoded literal', () => {
+  const CI_YML_PATH = join(process.cwd(), '.github', 'workflows', 'ci.yml')
+
+  function fleetReviewJobText(): string {
+    const text = readFileSync(CI_YML_PATH, 'utf8')
+    // From the `fleet-review:` job key to the next top-level (2-space
+    // indented) job key — `ci-status:` today. Scoped rather than whole-file
+    // so a future job that happens to mention these same strings can never
+    // satisfy this rail by accident.
+    const start = text.indexOf('\n  fleet-review:')
+    expect(start, 'fleet-review job not found in ci.yml').toBeGreaterThan(-1)
+    const rest = text.slice(start + 1)
+    const nextJob = rest.slice('  fleet-review:'.length).search(/\n {2}\S/)
+    return nextJob === -1 ? rest : rest.slice(0, '  fleet-review:'.length + nextJob)
+  }
+
+  it('finds the fleet-review job to scan at all — the grep must not pass vacuously', () => {
+    expect(fleetReviewJobText().length).toBeGreaterThan(500)
+  })
+
+  it('reads FLEET_REVIEW_PROVIDER from vars with the kimi-for-coding default', () => {
+    expect(fleetReviewJobText()).toMatch(
+      /FLEET_REVIEW_PROVIDER:\s*\$\{\{\s*vars\.FLEET_REVIEW_PROVIDER\s*\|\|\s*'kimi-for-coding'\s*\}\}/,
+    )
+  })
+
+  it('reads FLEET_REVIEW_MODEL from vars with the kimi-for-coding/k3-256k default', () => {
+    expect(fleetReviewJobText()).toMatch(
+      /FLEET_REVIEW_MODEL:\s*\$\{\{\s*vars\.FLEET_REVIEW_MODEL\s*\|\|\s*'kimi-for-coding\/k3-256k'\s*\}\}/,
+    )
+  })
+
+  it('derives the auth.json key from the provider variable, not a literal', () => {
+    const text = fleetReviewJobText()
+    // The dynamic-key jq construction: `--arg p "$FLEET_REVIEW_PROVIDER"`
+    // feeding a `{($p): ...}` filter. Reverting to a hardcoded provider name
+    // here (`jq -n --arg k "$FLEET_REVIEW_API_KEY" '{"kimi-for-coding":...}'`)
+    // is exactly the regression this asserts against: the auth file would
+    // silently stop matching whatever `vars.FLEET_REVIEW_PROVIDER` was set to.
+    expect(text).toMatch(/--arg p "\$FLEET_REVIEW_PROVIDER"/)
+    expect(text).toMatch(/\{\(\$p\):\s*\{"type":"api","key":\$k\}\}/)
+    expect(text, 'auth.json is keyed by a hardcoded provider literal again')
+      .not.toMatch(/\{"kimi-for-coding":\s*\{"type":"api"/)
+  })
+
+  it('passes the model variable, not a literal, to the smoke-test --model flag', () => {
+    const text = fleetReviewJobText()
+    expect(text).toMatch(/opencode run --pure --model "\$FLEET_REVIEW_MODEL"/)
+    expect(text, 'smoke test pins a literal model again instead of the variable')
+      .not.toMatch(/opencode run --pure --model kimi-for-coding\/k3-256k/)
+  })
+
+  it('classifies a smoke-test failure as engine-quota, engine-auth, or engine-unavailable', () => {
+    const text = fleetReviewJobText()
+    for (const cause of ['engine-quota', 'engine-auth', 'engine-unavailable']) {
+      expect(text, `${cause} classification missing from the smoke-test step`).toContain(cause)
+    }
+  })
+
+  it('review.ts reads the opencode model from FLEET_REVIEW_MODEL, not a bare literal', () => {
+    const text = readFileSync(join(process.cwd(), 'orchestrator', 'src', 'review.ts'), 'utf8')
+    expect(text).toMatch(/opencode:\s*\{\s*binary:\s*'opencode',\s*model:\s*process\.env\['FLEET_REVIEW_MODEL'\]\s*\|\|\s*DEFAULT_OPENCODE_MODEL\s*\}/)
+  })
+})
+
 describe('rail: lane modes are runtime state, not source', () => {
   // orchestrator/ is high-impact and human-gated. If a lane's mode lived in
   // config.ts, flipping it from off to shadow would need a reviewed PR —
