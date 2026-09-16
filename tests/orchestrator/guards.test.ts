@@ -468,6 +468,97 @@ describe('rail: fleet/review runs once, at merge time, not on every push', () =>
 })
 
 /**
+ * CodeQL `actions/cache-poisoning/poisonable-step` (3 alerts, PR #844 round
+ * 3, at the "Install dependencies", "Check the base provides the gate" and
+ * "Verify" steps). `fleet/verify` triggers on `merge_group`, which grants
+ * cache-WRITE scope for the TARGET branch (not just PR-scoped read access),
+ * and its "Verify" step deliberately executes the PR HEAD's own tests — see
+ * the "Two phases inside one command" comment above that step in ci.yml.
+ * `setup-bun` saves its toolcache from a `post:` step that runs after every
+ * other step in the job, including that untrusted test run (see its
+ * `action.yml`: `post: dist/cache-save/index.js`, `post-if: success()`), so a
+ * malicious PR's test step could tamper with the runner between "tests ran"
+ * and "cache saved" and poison what `main`'s later builds restore.
+ * `no-cache: true` is the action's only toggle — it has no restore-only /
+ * lookup-only mode — so this rail asserts the toggle is set on the one job
+ * that needs it, not that some cache action is merely present.
+ *
+ * `fleet/review` is deliberately NOT covered here: it never executes HEAD
+ * code, only reads it as data for the review model (the "Export the PR head
+ * as data" step strips and never runs it) — CodeQL agrees, 0 alerts on that
+ * job — so it keeps normal setup-bun caching. If a future job gains both
+ * `merge_group` and a step that runs head-derived code, it belongs in
+ * `JOBS_THAT_EXECUTE_HEAD_CODE` below, matching this file's existing
+ * convention of a hardcoded, human-reviewed table (see
+ * `REQUIRED_CONTEXT_WORKFLOWS` above) rather than a derived lookup that could
+ * only ever agree with itself.
+ */
+describe('rail: no job that executes the judged commit\'s code may save to the cache', () => {
+  const ciYaml = (): string => readFileSync(join(process.cwd(), '.github', 'workflows', 'ci.yml'), 'utf8')
+
+  /** Same convention as the `fleet/review` rail above: one named job's text,
+   *  from its `  <name>:` line up to the next job at the same indentation. */
+  function jobBlock(text: string, name: string): string {
+    const jobHeaderRe = /\n {2}([a-zA-Z0-9_-]+):\n/g
+    const starts: { name: string; index: number }[] = []
+    for (const m of text.matchAll(jobHeaderRe)) starts.push({ name: m[1] as string, index: m.index })
+    const at = starts.findIndex((s) => s.name === name)
+    if (at === -1) throw new Error(`no "${name}:" job found in ci.yml — the grep must not pass vacuously`)
+    const end = at + 1 < starts.length ? starts[at + 1]?.index : text.length
+    return text.slice(starts[at]?.index, end)
+  }
+
+  /** One named step's text within a job block, from its `      - name:` line
+   *  (six-space indent — every step in this file) up to the next step at the
+   *  same indentation. */
+  function stepBlock(block: string, name: string): string {
+    const stepHeaderRe = /\n {6}- name: ([^\n]+)\n/g
+    const starts: { name: string; index: number }[] = []
+    for (const m of block.matchAll(stepHeaderRe)) starts.push({ name: (m[1] as string).trim(), index: m.index })
+    const at = starts.findIndex((s) => s.name === name)
+    if (at === -1) throw new Error(`no "${name}" step found in this job block — the grep must not pass vacuously`)
+    const end = at + 1 < starts.length ? starts[at + 1]?.index : block.length
+    return block.slice(starts[at]?.index, end)
+  }
+
+  // Hardcoded, not derived — see the doc comment above. Each entry is a job
+  // that (a) triggers on merge_group and (b) has a step that runs code from
+  // the PR HEAD export, which is exactly the combination CodeQL flags.
+  const JOBS_THAT_EXECUTE_HEAD_CODE = ['fleet-verify']
+
+  for (const job of JOBS_THAT_EXECUTE_HEAD_CODE) {
+    it(`${job} still triggers on merge_group and still executes HEAD code (the premise this rail depends on)`, () => {
+      const block = jobBlock(ciYaml(), job)
+      const ifLine = block.split(/\n {4}steps:\n/)[0]?.match(/\n {4}if:\s*(.+)/)?.[1] ?? ''
+      expect(ifLine).toContain('merge_group')
+      // The "Verify" step is what actually runs the judged commit's tests —
+      // see verify-ci in orchestrator/src/ci.ts. If this step is ever
+      // renamed or removed, the premise of this rail changes and it must be
+      // revisited, not silently pass.
+      expect(() => stepBlock(block, 'Verify')).not.toThrow()
+    })
+
+    it(`${job}'s "Setup Bun" step disables cache-save (no-cache: true)`, () => {
+      const setupBun = stepBlock(jobBlock(ciYaml(), job), 'Setup Bun')
+      expect(setupBun).toContain('oven-sh/setup-bun@')
+      expect(setupBun).toMatch(/\n\s*no-cache:\s*true\b/)
+    })
+  }
+
+  // fleet/review is the documented exception: it never executes HEAD code,
+  // so leaving its setup-bun cache on is correct, not an oversight. This
+  // assertion exists so a future edit can't "fix" that job's caching the
+  // same way without first confirming it still holds.
+  it('fleet/review still never runs a step named "Verify" (the exception this rail relies on)', () => {
+    const block = jobBlock(ciYaml(), 'fleet-review')
+    expect(() => {
+      const stepHeaderRe = /\n {6}- name: Verify\n/
+      if (stepHeaderRe.test(block)) throw new Error('fleet-review now has a "Verify" step')
+    }).not.toThrow()
+  })
+})
+
+/**
  * Ruleset 15885614 (the merge queue's branch protection ruleset) requires
  * exactly these four status contexts before a PR can merge: `ci-status`,
  * `gitleaks`, `fleet/verify`, `fleet/review`. A required context that never

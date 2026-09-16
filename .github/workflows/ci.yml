@@ -1547,10 +1547,26 @@ jobs:
           git archive "$HEAD_SHA" | tar -x -C "$RUNNER_TEMP/head"
           test ! -e "$RUNNER_TEMP/head/.git"
 
+      # `no-cache: true` — this job later runs `verify-ci`, which deliberately
+      # executes the PR HEAD's own tests (see the "Verify" step below). Under
+      # `merge_group` that run has cache-WRITE scope for the target branch, not
+      # just PR-scoped read access, because the queue ref is treated as trusted
+      # by GitHub's cache backend. `setup-bun`'s default behavior is to save its
+      # toolcache in a `post:` step that fires after every other step in this
+      # job — including the untrusted test run — so leaving it on would let a
+      # malicious PR's test step tamper with the runner (e.g. overwrite the
+      # cached `bun` binary or its resolved path) between "tests ran" and
+      # "cache saved", poisoning what `main`'s later builds restore. The action
+      # has no restore-only/lookup-only mode (see its `action.yml`: `no-cache`
+      # only toggles the whole feature), so this disables caching outright
+      # rather than leaving a partial save path open. `fleet/review`, below,
+      # never executes HEAD code — only reads it as data for the model — so it
+      # keeps normal caching (CodeQL agrees: 0 alerts on that job).
       - name: Setup Bun
         uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2.0.2
         with:
           bun-version: ${{ env.BUN_VERSION }}
+          no-cache: true
 
       # From the BASE lockfile, and `--ignore-scripts` on top: a postinstall is
       # the shortest path from "PR edits a dependency" to "PR runs code inside
