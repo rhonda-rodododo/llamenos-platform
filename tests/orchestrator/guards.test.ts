@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, afterEach, vi } from 'vitest'
 import { LANES, NEVER_WRITE_PATHS, loadLanes, readLaneModes, assertLiveLanesHaveScope } from '../../orchestrator/src/config.js'
 import { classifyImpact, HIGH_IMPACT_PATHS } from '../../orchestrator/src/impact.js'
 import { checkScope } from '../../orchestrator/src/scope.js'
@@ -7,6 +7,11 @@ import { codeownersMatcher, codeownersPatterns, trackedFiles, trackedFilesUnder 
 import { mkdtempSync, rmSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { runReviewCi, type CiContext, type ReviewCiDeps } from '../../orchestrator/src/ci.js'
+import { DEFAULT_MAX_TURNS, HIGH_IMPACT_MAX_TURNS, DEFAULT_TIMEOUT_MS, HIGH_IMPACT_TIMEOUT_MS } from '../../orchestrator/src/review.js'
+import { diffHash, cacheArtifactName, type ReviewCache, type CachedVerdict, type ReviewCacheKey } from '../../orchestrator/src/review-cache.js'
+import type { Lane } from '../../orchestrator/src/config.js'
+import type { VerifyReport } from '../../orchestrator/src/verify.js'
 
 describe('rail: a live lane must have a write scope', () => {
   // Asserted against a synthetic lane, not the live config: every configured
@@ -428,5 +433,520 @@ describe('rail: lane modes are runtime state, not source', () => {
     expect(lanes.find((l) => l.id === 'ios')?.mode).toBe('live')
     // Every other lane is untouched by that same file.
     expect(lanes.filter((l) => l.id !== 'ios').every((l) => l.mode === 'off')).toBe(true)
+  })
+})
+
+/**
+ * `fleet/review` moved off `pull_request` and onto `merge_group` (#812): the
+ * old trigger re-ran a non-author MODEL call — against a paid, weekly-quota'd
+ * provider — on every push and every `gh pr update-branch`, and that call
+ * volume is what exhausted the quota and made the repo unmergeable. Text
+ * assertions over the workflow files are the right instrument here, the same
+ * reasoning `guards.test.ts` already applies to `orchestrator/src` argv rails
+ * above: there is no runtime behaviour of a YAML trigger condition to
+ * exercise, only the literal condition itself, and a regex over the source is
+ * what a mutation to it actually breaks.
+ *
+ * `fleet/verify` moved out of `ci.yml` into its own `fleet-verify.yml` in
+ * round 3 of #844 (CodeQL cache-poisoning — see the rail below this one for
+ * why), so this block reads two files, not one. `fleet/review` stays in
+ * `ci.yml`.
+ */
+describe('rail: fleet/review runs once, at merge time, not on every push', () => {
+  const workflowYaml = (file: string): string =>
+    readFileSync(join(process.cwd(), '.github', 'workflows', file), 'utf8')
+  const ciYaml = (): string => workflowYaml('ci.yml')
+  const fleetVerifyYaml = (): string => workflowYaml('fleet-verify.yml')
+
+  /** The text of one named job, from its `  <name>:` line up to (but not
+   *  including) the next job at the same two-space indentation — matching
+   *  every job key actually declared in the file, not a hardcoded guess at
+   *  what might come next. */
+  function jobBlock(text: string, name: string): string {
+    const jobHeaderRe = /\n {2}([a-zA-Z0-9_-]+):\n/g
+    const starts: { name: string; index: number }[] = []
+    for (const m of text.matchAll(jobHeaderRe)) starts.push({ name: m[1] as string, index: m.index })
+    const at = starts.findIndex((s) => s.name === name)
+    if (at === -1) throw new Error(`no "${name}:" job found in this workflow file — the grep must not pass vacuously`)
+    const end = at + 1 < starts.length ? starts[at + 1]?.index : text.length
+    return text.slice(starts[at]?.index, end)
+  }
+
+  it('finds fleet-verify (fleet-verify.yml) and fleet-review (ci.yml) as real jobs — the parser must not pass vacuously', () => {
+    expect(jobBlock(fleetVerifyYaml(), 'fleet-verify')).toContain('name: fleet/verify')
+    expect(jobBlock(ciYaml(), 'fleet-review')).toContain('name: fleet/review')
+  })
+
+  it('ci.yml triggers on merge_group at the workflow level (fleet/review and other required jobs still live there)', () => {
+    // Scoped to before the `jobs:` key: `merge_group` also appears in prose
+    // comments and in job bodies (context field names, env vars), and this
+    // assertion is specifically about the workflow's OWN `on:` block.
+    const onBlock = ciYaml().split(/\njobs:\n/)[0] ?? ''
+    expect(onBlock).toMatch(/\n {2}merge_group:/)
+  })
+
+  it('fleet-verify.yml triggers on merge_group AND pull_request, and nothing else with default-branch cache-write access', () => {
+    const onBlock = fleetVerifyYaml().split(/\njobs:\n/)[0] ?? ''
+    expect(onBlock).toMatch(/\n {2}pull_request:/)
+    expect(onBlock).toMatch(/\n {2}merge_group:/)
+    // The whole point of the split (see the CodeQL rail below): none of
+    // these may appear at the top level, or CodeQL's
+    // hasDefaultBranchCacheWriteAccess goes true again for this job.
+    for (const cacheWriteEvent of ['push', 'workflow_dispatch', 'repository_dispatch', 'schedule']) {
+      expect(onBlock).not.toMatch(new RegExp(`\\n {2}${cacheWriteEvent}:`))
+    }
+  })
+
+  /** The JOB-level `if:`, not a step's — always at exactly four-space
+   *  indentation, always before `steps:`, in this file's own convention
+   *  (matching `runs-on:`/`permissions:` at the same level). A step-level
+   *  `if:` (e.g. `lint`'s `if: steps.changed.outputs.files != ''`) sits
+   *  deeper, inside `steps:`, and must never be mistaken for this one. */
+  function jobLevelIf(block: string): string {
+    const beforeSteps = block.split(/\n {4}steps:\n/)[0] ?? block
+    return beforeSteps.match(/\n {4}if:\s*(.+)/)?.[1] ?? ''
+  }
+
+  it('fleet/verify runs on merge_group (in addition to pull_request)', () => {
+    const ifLine = jobLevelIf(jobBlock(fleetVerifyYaml(), 'fleet-verify'))
+    expect(ifLine).toContain('merge_group')
+    expect(ifLine).toContain('pull_request')
+  })
+
+  // The load-bearing assertion of this whole rail. A re-added `pull_request`
+  // trigger on fleet/review is exactly the regression #812 exists to
+  // prevent — it silently restores the per-push call volume that exhausted
+  // the quota, and every other job in this file still going green would not
+  // reveal that on its own.
+  it('fleet/review has NO pull_request trigger of its own', () => {
+    const ifLine = jobLevelIf(jobBlock(ciYaml(), 'fleet-review'))
+    expect(ifLine.length).toBeGreaterThan(0)
+    expect(ifLine).not.toContain('pull_request')
+    expect(ifLine).toContain('merge_group')
+  })
+
+  it('fleet/review still carries no write permission and no --approve', () => {
+    const block = jobBlock(ciYaml(), 'fleet-review')
+    const permsBlock = block.match(/\n {4}permissions:\n((?:\s{6}.*\n)*)/)?.[1] ?? ''
+    expect(permsBlock.length, 'fleet-review has no permissions: block to check').toBeGreaterThan(0)
+    // Actual `key: value` permission lines only — comment lines (this very
+    // block explains, in prose, why there is no `: write` here, which would
+    // otherwise make the string "`: write`" match its own explanation).
+    const permissionLines = permsBlock.split('\n').filter((l) => !l.trim().startsWith('#') && l.trim().length > 0)
+    for (const line of permissionLines) expect(line).not.toMatch(/:\s*write\b/)
+    expect(ciYaml()).not.toContain('--approve')
+  })
+
+  // `ci-status` aggregates the repo's OWN required jobs (never fleet/verify
+  // or fleet/review — see the "Fleet gates" comment above fleet-verify for
+  // why those stay out of its `needs`). Every one of them must also report
+  // on `merge_group`: a required check that only reports on `pull_request`
+  // or `push` leaves its status permanently missing on the queue ref, and a
+  // missing required check blocks the queue forever rather than failing it
+  // loudly.
+  it('every job ci-status depends on can report on merge_group', () => {
+    const yaml = ciYaml()
+    const needsLine = jobBlock(yaml, 'ci-status').match(/\n\s*needs:\s*\[([^\]]+)\]/)?.[1] ?? ''
+    const required = needsLine.split(',').map((s) => s.trim()).filter((s) => s.length > 0)
+    expect(required.length, 'ci-status needs list parsed empty — the grep must not pass vacuously').toBeGreaterThan(5)
+
+    const excludesMergeGroup = (ifLine: string): boolean => {
+      // A job with NO if: at all runs on every event the workflow triggers
+      // on — merge_group included, now that it is in the workflow's `on:`.
+      if (ifLine.length === 0) return false
+      // An `if:` that names an event at all must name merge_group too, or
+      // it silently excludes the one event this rail is about; an `if:`
+      // that never mentions an event (e.g. `needs.changes.outputs...`) is
+      // unaffected by which event triggered the run and passes through.
+      const namesAnEvent = /event_name|github\.event\.(before|after|head_commit)/.test(ifLine)
+      return namesAnEvent && !ifLine.includes('merge_group')
+    }
+
+    const offenders: string[] = []
+    for (const job of required) {
+      const ifLine = jobLevelIf(jobBlock(yaml, job))
+      if (excludesMergeGroup(ifLine)) offenders.push(`${job}: if: ${ifLine}`)
+    }
+    expect(offenders, `required job(s) whose if: excludes merge_group:\n${offenders.join('\n')}`).toEqual([])
+  })
+})
+
+/**
+ * CodeQL `actions/cache-poisoning/poisonable-step` (3 HIGH alerts, PR #844
+ * round 3, originally at the "Install dependencies", "Check the base
+ * provides the gate" and "Verify" steps of `fleet-verify` back when it lived
+ * in `ci.yml`). The mechanism, read from CodeQL's own `actions` query pack
+ * (`codeql/actions-all`, `CachePoisoningQuery.qll` + `PoisonableSteps.qll` +
+ * `ext/config/poisonable_steps.yml`), is NOT about any specific
+ * cache-writing action:
+ *
+ * - `poisonableCommandsDataModel` lists bare command names whose lifecycle
+ *   scripts/plugins could act on the job's ambient `ACTIONS_RUNTIME_TOKEN`
+ *   (which grants cache read/write independent of any `actions/cache` step
+ *   being present at all) — `bun` is literally on that list, alongside
+ *   `npm`/`cargo`/`pip install -r`/etc. Every `run: bun ...` step in the job
+ *   is a "poisonable step" by definition, regardless of caching config.
+ * - `hasDefaultBranchCacheWriteAccess(job, event)` is true when the job's
+ *   EVENT has default-branch cache-write scope — `push`, `workflow_dispatch`,
+ *   `repository_dispatch`, `delete`, `registry_package`, `page_build`, or
+ *   `schedule` (NOT `pull_request`, NOT `merge_group` — neither appears in
+ *   that list). Critically, `JobImpl.getATriggerEvent()` returns every event
+ *   the ENCLOSING WORKFLOW responds to, not filtered by the job's own `if:`.
+ *   `fleet-verify` sat in `ci.yml`, which also triggers on `push` and
+ *   `workflow_dispatch` for its other jobs, so CodeQL treated `fleet-verify`
+ *   as reachable from both — regardless of its `if:` excluding them.
+ *
+ * Tried first and confirmed NOT sufficient: `no-cache: true` on the "Setup
+ * Bun" step. It genuinely disables `setup-bun`'s own cache-save (verified by
+ * reading its `dist/setup/index.js` and `dist/cache-save/index.js`), but
+ * CodeQL's model never inspects that input at all — the flagged "poisonable
+ * steps" are the `bun` commands themselves. The fix that actually cleared
+ * the alerts (verified via the `code-scanning/alerts` API against the exact
+ * commit) is what this rail asserts: `fleet-verify` moved into its OWN
+ * workflow file (`fleet-verify.yml`) whose `on:` block is `pull_request` +
+ * `merge_group` only — neither has default-branch cache-write access, so
+ * `hasDefaultBranchCacheWriteAccess` is false for every event this job can
+ * be triggered by, full stop. `no-cache: true` is kept as defense in depth
+ * (asserted below) but is not what CodeQL is actually satisfied by.
+ *
+ * `fleet/review` is deliberately NOT covered here: it never executes HEAD
+ * code, only reads it as data for the review model (the "Export the PR head
+ * as data" step strips and never runs it), and its explicit
+ * `secrets.FLEET_REVIEW_API_KEY` access makes CodeQL's `isPrivileged()` true
+ * for that job — which this specific query excludes on purpose (a privileged
+ * job reachable by an externally-triggerable event is the subject of a
+ * different, more severe query instead). CodeQL agrees either way: 0 alerts
+ * on `fleet/review`. If a future job gains both a head-code-execution step
+ * and reachability from a workflow with `push`/`workflow_dispatch`, it needs
+ * the same file-isolation treatment, not a per-step cache tweak.
+ */
+describe('rail: the job that executes the judged commit\'s code cannot be reached by a cache-write event', () => {
+  const workflowYaml = (file: string): string =>
+    readFileSync(join(process.cwd(), '.github', 'workflows', file), 'utf8')
+
+  /** One named job's text, from its `  <name>:` line up to the next job at
+   *  the same two-space indentation. */
+  function jobBlock(text: string, name: string): string {
+    const jobHeaderRe = /\n {2}([a-zA-Z0-9_-]+):\n/g
+    const starts: { name: string; index: number }[] = []
+    for (const m of text.matchAll(jobHeaderRe)) starts.push({ name: m[1] as string, index: m.index })
+    const at = starts.findIndex((s) => s.name === name)
+    if (at === -1) throw new Error(`no "${name}:" job found in this workflow file — the grep must not pass vacuously`)
+    const end = at + 1 < starts.length ? starts[at + 1]?.index : text.length
+    return text.slice(starts[at]?.index, end)
+  }
+
+  /** One named step's text within a job block, from its `      - name:` line
+   *  (six-space indent — every step in these files) up to the next step at
+   *  the same indentation. */
+  function stepBlock(block: string, name: string): string {
+    const stepHeaderRe = /\n {6}- name: ([^\n]+)\n/g
+    const starts: { name: string; index: number }[] = []
+    for (const m of block.matchAll(stepHeaderRe)) starts.push({ name: (m[1] as string).trim(), index: m.index })
+    const at = starts.findIndex((s) => s.name === name)
+    if (at === -1) throw new Error(`no "${name}" step found in this job block — the grep must not pass vacuously`)
+    const end = at + 1 < starts.length ? starts[at + 1]?.index : block.length
+    return block.slice(starts[at]?.index, end)
+  }
+
+  // Hardcoded, not derived — see the doc comment above. Each entry is a job
+  // that has a step running code from the PR HEAD export, mapped to the
+  // workflow file that must isolate it from default-branch-cache-write
+  // events. Mirrors this file's existing convention of a hardcoded,
+  // human-reviewed table (see `REQUIRED_CONTEXT_WORKFLOWS` below) rather than
+  // a derived lookup that could only ever agree with itself.
+  const JOBS_THAT_EXECUTE_HEAD_CODE: { job: string; file: string }[] = [{ job: 'fleet-verify', file: 'fleet-verify.yml' }]
+
+  // Any event name CodeQL's `defaultBranchCacheWriteEvent()` treats as
+  // granting cache-write access to the default branch. `pull_request` and
+  // `merge_group` are deliberately absent from this list — they are the only
+  // two events fleet-verify.yml may trigger on.
+  const CACHE_WRITE_EVENTS = ['push', 'workflow_dispatch', 'repository_dispatch', 'delete', 'registry_package', 'page_build', 'schedule']
+
+  for (const { job, file } of JOBS_THAT_EXECUTE_HEAD_CODE) {
+    it(`${job} (${file}) still executes HEAD code (the premise this rail depends on)`, () => {
+      const block = jobBlock(workflowYaml(file), job)
+      // The "Verify" step is what actually runs the judged commit's tests —
+      // see verify-ci in orchestrator/src/ci.ts. If this step is ever
+      // renamed or removed, the premise of this rail changes and it must be
+      // revisited, not silently pass.
+      expect(() => stepBlock(block, 'Verify')).not.toThrow()
+    })
+
+    it(`${job}'s workflow (${file}) triggers on pull_request and merge_group only — no default-branch-cache-write event`, () => {
+      const onBlock = workflowYaml(file).split(/\njobs:\n/)[0] ?? ''
+      expect(onBlock).toMatch(/\n {2}pull_request:/)
+      expect(onBlock).toMatch(/\n {2}merge_group:/)
+      for (const cacheWriteEvent of CACHE_WRITE_EVENTS) {
+        expect(onBlock, `${file} must not trigger on "${cacheWriteEvent}" — that would restore CodeQL's cache-write reachability`)
+          .not.toMatch(new RegExp(`\\n {2}${cacheWriteEvent}:`))
+      }
+    })
+
+    it(`${job}'s "Setup Bun" step disables cache-save (no-cache: true) — defense in depth, not the CodeQL fix itself`, () => {
+      const setupBun = stepBlock(jobBlock(workflowYaml(file), job), 'Setup Bun')
+      expect(setupBun).toContain('oven-sh/setup-bun@')
+      expect(setupBun).toMatch(/\n\s*no-cache:\s*true\b/)
+    })
+  }
+
+  // fleet/review is the documented exception: it never executes HEAD code,
+  // so leaving it in ci.yml (which does trigger on push/workflow_dispatch)
+  // is correct, not an oversight. This assertion exists so a future edit
+  // can't "fix" that job's isolation the same way without first confirming
+  // it still holds.
+  it('fleet/review (ci.yml) still never runs a step named "Verify" (the exception this rail relies on)', () => {
+    const block = jobBlock(workflowYaml('ci.yml'), 'fleet-review')
+    expect(() => {
+      const stepHeaderRe = /\n {6}- name: Verify\n/
+      if (stepHeaderRe.test(block)) throw new Error('fleet-review now has a "Verify" step')
+    }).not.toThrow()
+  })
+})
+
+/**
+ * Ruleset 15885614 (the merge queue's branch protection ruleset) requires
+ * exactly these four status contexts before a PR can merge: `ci-status`,
+ * `gitleaks`, `fleet/verify`, `fleet/review`. A required context that never
+ * reports on the queue's own `merge_group` ref blocks the merge queue
+ * forever — GitHub waits indefinitely for a check that will never appear,
+ * rather than failing loudly. `CodeQL` is the fifth required context but is
+ * GitHub default-setup, not a workflow file in this repo, so it is
+ * deliberately excluded from this table (see the operator step in the PR
+ * body for verifying it separately once the queue is live).
+ *
+ * The mapping below is hardcoded rather than derived, on purpose: this rail
+ * exists to catch a workflow file quietly losing its `merge_group` trigger
+ * (as `secret-scan.yml` had, until this PR), and a derived lookup would only
+ * ever tell you the code agrees with itself.
+ *
+ * `fleet/verify` moved from `ci.yml` to its own `fleet-verify.yml` in round 3
+ * of #844 (CodeQL cache-poisoning isolation — see the rail above) — updated
+ * here to match, or this rail would itself start failing vacuously against a
+ * job that no longer exists in `ci.yml`.
+ */
+describe('rail: every ruleset-15885614-required context reports on merge_group', () => {
+  const REQUIRED_CONTEXT_WORKFLOWS: Record<string, string> = {
+    'ci-status': 'ci.yml',
+    'fleet/verify': 'fleet-verify.yml',
+    'fleet/review': 'ci.yml',
+    gitleaks: 'secret-scan.yml',
+  }
+
+  const workflowYaml = (file: string): string =>
+    readFileSync(join(process.cwd(), '.github', 'workflows', file), 'utf8')
+
+  /** Scoped to the workflow's own top-level `on:` block, before `jobs:` —
+   *  `merge_group` also shows up in prose comments and job bodies (env vars,
+   *  context field names), and this must only match the trigger itself. */
+  function triggersOnMergeGroup(yaml: string): boolean {
+    const onBlock = yaml.split(/\njobs:\n/)[0] ?? ''
+    return /\n {2}merge_group:/.test(onBlock)
+  }
+
+  it('the mapping table itself is non-empty and covers all four workflow-backed contexts', () => {
+    expect(Object.keys(REQUIRED_CONTEXT_WORKFLOWS).sort()).toEqual(
+      ['ci-status', 'fleet/review', 'fleet/verify', 'gitleaks'].sort(),
+    )
+  })
+
+  for (const [context, workflowFile] of Object.entries(REQUIRED_CONTEXT_WORKFLOWS)) {
+    it(`"${context}" is produced by ${workflowFile}, which triggers on merge_group`, () => {
+      expect(triggersOnMergeGroup(workflowYaml(workflowFile))).toBe(true)
+    })
+  }
+})
+
+/**
+ * The review engine's own turn/timeout budget (review.ts) — cut from a
+ * 20-turn/25-minute high-impact allowance to a single pass, because that
+ * allowance was enough for one review to explore the export at length
+ * rather than read the diff and file list it was already handed (both are
+ * now in the prompt — see `buildReviewPrompt`), which burned the same
+ * provider quota per call that moving off `pull_request` (the rail above)
+ * fixed per PR. Pinned to the actual exported numbers, not a description of
+ * them: a PR that quietly raises `HIGH_IMPACT_MAX_TURNS` back toward its old
+ * value must fail THIS test, not just read wrong in a comment.
+ */
+describe('rail: the reviewer gets a single pass, not an investigation', () => {
+  it('caps turns at a small, single-pass budget', () => {
+    expect(DEFAULT_MAX_TURNS).toBe(2)
+    expect(HIGH_IMPACT_MAX_TURNS).toBe(3)
+    // High impact may get a LITTLE more room, never a return to "explore the
+    // export" scale — this is the inequality a mutation raising the cap back
+    // toward 20 would still violate even if it forgot to update the exact
+    // values above.
+    expect(HIGH_IMPACT_MAX_TURNS).toBeGreaterThanOrEqual(DEFAULT_MAX_TURNS)
+    expect(HIGH_IMPACT_MAX_TURNS).toBeLessThanOrEqual(3)
+  })
+
+  it('drops the high-impact timeout from 25 minutes to about 8', () => {
+    expect(DEFAULT_TIMEOUT_MS).toBe(5 * 60_000)
+    expect(HIGH_IMPACT_TIMEOUT_MS).toBe(8 * 60_000)
+    expect(HIGH_IMPACT_TIMEOUT_MS).toBeLessThanOrEqual(10 * 60_000)
+    expect(HIGH_IMPACT_TIMEOUT_MS).toBeGreaterThanOrEqual(DEFAULT_TIMEOUT_MS)
+  })
+})
+
+describe('review-cache: pure key functions', () => {
+  it('hashes deterministically, and differently for a different diff', () => {
+    const a = diffHash('diff --git a/x b/x\n+hello\n')
+    const b = diffHash('diff --git a/x b/x\n+hello\n')
+    const c = diffHash('diff --git a/x b/x\n+goodbye\n')
+    expect(a).toBe(b)
+    expect(a).not.toBe(c)
+    expect(a).toMatch(/^[0-9a-f]{64}$/)
+  })
+
+  it('names an artifact with only characters safe in a URL query param and an Actions artifact name', () => {
+    const name = cacheArtifactName('42', diffHash('anything'))
+    expect(name).toMatch(/^[a-zA-Z0-9-]+$/)
+    expect(name).toContain('42')
+  })
+
+  it('never names two different PRs\' identical diffs the same artifact', () => {
+    const hash = diffHash('same diff content')
+    expect(cacheArtifactName('1', hash)).not.toBe(cacheArtifactName('2', hash))
+  })
+})
+
+/**
+ * "Exactly one review per PR" — the operator addendum this rail pins. Tested
+ * against `runReviewCi` directly with an injected in-memory `ReviewCache`,
+ * never against the real `artifactReviewCache` (which talks to the Actions
+ * API): the property under test is `ci.ts`'s OWN branching — look up before
+ * invoking the engine, record only a fresh PASS, treat a lookup failure
+ * exactly like a miss — not whether GitHub's artifact API works.
+ */
+describe('rail: fleet/review reviews exactly once per diff, never twice on an identical re-queue', () => {
+  const lane = (): Lane => ({
+    id: 'ios', mode: 'off', cap: 1, engine: 'claude',
+    requireLabel: 'agent-dispatchable', vetoLabels: ['needs-human'],
+    scope: { owned: ['apps/ios/'], notOwned: [] },
+  })
+  const ctx = (): CiContext => ({
+    branch: 'fleet/ios/123', repoDir: '/base', headDir: '/tmp/head',
+    baseSha: 'base111', headSha: 'head222', pr: '42',
+  })
+  const passing: VerifyReport = {
+    passed: true, reasons: [], changedFiles: ['apps/ios/a.swift'], addedLines: 3,
+    impact: 'low', impactReasons: [], testsRun: ['orchestrator'], testsPassed: true, verifiedCommit: 'c0ffee',
+  }
+
+  /** An in-memory `ReviewCache`, seeded with zero or one PASS entries — never
+   *  the real Actions-backed one, which this suite is not testing. */
+  function fakeCache(seed?: { key: ReviewCacheKey; verdict: CachedVerdict }): ReviewCache & { recordCalls: number } {
+    const store = new Map<string, CachedVerdict>()
+    if (seed !== undefined) store.set(`${seed.key.pr}:${seed.key.diffHash}`, seed.verdict)
+    const cache = {
+      recordCalls: 0,
+      async lookup(key: ReviewCacheKey) { return store.get(`${key.pr}:${key.diffHash}`) },
+      async record(key: ReviewCacheKey, verdict: CachedVerdict) {
+        cache.recordCalls += 1
+        store.set(`${key.pr}:${key.diffHash}`, verdict)
+      },
+    }
+    return cache
+  }
+
+  const deps = (over: Partial<ReviewCiDeps> = {}): ReviewCiDeps => ({
+    ctx: ctx(),
+    apiKey: 'a-key',
+    lanes: async () => [lane()],
+    verify: vi.fn(async () => passing),
+    pathExists: (p) => p !== '/tmp/head/.git',
+    log: () => {},
+    prDiff: vi.fn(async () => 'diff --git a/x b/x\n+hello\n'),
+    secondOpinion: vi.fn(async () => ({ verdict: 'PASS' as const, text: 'looks fine\nVERDICT: PASS' })),
+    ...over,
+  })
+
+  it('records a fresh PASS exactly once', async () => {
+    const cache = fakeCache()
+    const v = await runReviewCi(deps({ cache }))
+    expect(v.ok).toBe(true)
+    expect(cache.recordCalls).toBe(1)
+  })
+
+  it('re-publishes a cached PASS for an identical diff instead of invoking the engine again', async () => {
+    const diff = 'diff --git a/x b/x\n+hello\n'
+    const cache = fakeCache({
+      key: { pr: '42', diffHash: diffHash(diff) },
+      verdict: { verdict: 'PASS', text: 'VERDICT: PASS (cached)' },
+    })
+    const secondOpinion = vi.fn(async () => ({ verdict: 'PASS' as const, text: 'VERDICT: PASS' }))
+    const v = await runReviewCi(deps({ cache, prDiff: vi.fn(async () => diff), secondOpinion }))
+    expect(v.ok).toBe(true)
+    expect(secondOpinion).not.toHaveBeenCalled()
+  })
+
+  // A re-queue after the queue rebases this PR onto a newer main changes the
+  // head SHA but not the PR's own diff — the cache must still hit. Proven
+  // here by feeding the SAME diff text through two calls with a DIFFERENT
+  // ctx.headSha, rather than trusting that the key is diff-based by reading
+  // the implementation.
+  it('hits the cache across two different head SHAs, given the identical diff', async () => {
+    const diff = 'diff --git a/x b/x\n+hello\n'
+    const cache = fakeCache()
+    const secondOpinion = vi.fn(async () => ({ verdict: 'PASS' as const, text: 'VERDICT: PASS' }))
+    await runReviewCi(deps({ cache, prDiff: vi.fn(async () => diff), secondOpinion, ctx: ctx() }))
+    expect(secondOpinion).toHaveBeenCalledTimes(1)
+    await runReviewCi(deps({
+      cache, prDiff: vi.fn(async () => diff), secondOpinion,
+      ctx: { ...ctx(), headSha: 'a-totally-different-rebased-head-sha' },
+    }))
+    expect(secondOpinion).toHaveBeenCalledTimes(1)
+  })
+
+  // The load-bearing property: nothing that ever returns FAIL is reused. A
+  // FAIL is never recorded in the first place, so a second call with the
+  // identical diff invokes the engine again rather than re-publishing.
+  it('never reuses a FAIL — a diff that failed is reviewed again next time', async () => {
+    const diff = 'diff --git a/x b/x\n+bad\n'
+    const cache = fakeCache()
+    const failing = vi.fn(async () => ({ verdict: 'FAIL' as const, text: 'VERDICT: FAIL — leaks a key' }))
+    const first = await runReviewCi(deps({ cache, prDiff: vi.fn(async () => diff), secondOpinion: failing }))
+    expect(first.ok).toBe(false)
+    expect(cache.recordCalls).toBe(0)
+
+    const second = await runReviewCi(deps({ cache, prDiff: vi.fn(async () => diff), secondOpinion: failing }))
+    expect(second.ok).toBe(false)
+    expect(failing).toHaveBeenCalledTimes(2)
+  })
+
+  // "If the lookup errors, run the engine (fail safe)." A cache whose lookup
+  // throws must never be mistaken for a cache that found nothing AND must
+  // never be mistaken for a cache that found a PASS — the only safe
+  // direction is to run the engine, exactly like a real miss.
+  it('runs the engine when the cache lookup throws, rather than failing the job or assuming a pass', async () => {
+    const cache: ReviewCache = {
+      lookup: vi.fn(async () => { throw new Error('artifacts API rate limited') }),
+      record: vi.fn(async () => {}),
+    }
+    const secondOpinion = vi.fn(async () => ({ verdict: 'PASS' as const, text: 'VERDICT: PASS' }))
+    const v = await runReviewCi(deps({ cache, secondOpinion }))
+    expect(v.ok).toBe(true)
+    expect(secondOpinion).toHaveBeenCalledTimes(1)
+  })
+
+  // A cache record failure must not un-pass a review the engine already
+  // passed — recording is a courtesy to the NEXT run, not a gate on this one.
+  it('still returns the fresh PASS even when recording it fails', async () => {
+    const cache: ReviewCache = {
+      lookup: vi.fn(async () => undefined),
+      record: vi.fn(async () => { throw new Error('disk full') }),
+    }
+    const v = await runReviewCi(deps({ cache }))
+    expect(v.ok).toBe(true)
+  })
+
+  // No `cache` at all (the default before this existed, and any call site
+  // that never heard of one) must behave exactly as it always did: review
+  // every time, no lookup, no record.
+  it('behaves exactly as before when no cache is wired in at all', async () => {
+    const secondOpinion = vi.fn(async () => ({ verdict: 'PASS' as const, text: 'VERDICT: PASS' }))
+    const v = await runReviewCi(deps({ secondOpinion }))
+    expect(v.ok).toBe(true)
+    expect(secondOpinion).toHaveBeenCalledTimes(1)
   })
 })

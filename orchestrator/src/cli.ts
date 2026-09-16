@@ -15,6 +15,7 @@ import { loadContracts, contractsFor, buildMemoryContext, augmentBrief } from '.
 import { dispatch as dispatchWorker, type EffortLevel } from './engines.js'
 import { verifyMechanical } from './verify.js'
 import { secondOpinion, postReview } from './review.js'
+import { artifactReviewCache } from './review-cache.js'
 import {
   runVerifyCi, runReviewCi, ciContextFromEnv, ciDiff,
   REVIEW_JOB, REVIEW_KEY_ENV, VERIFY_JOB, itemIdFromBranch, fleetBranchFor, type CiContext, type CiVerdict,
@@ -1174,6 +1175,10 @@ const HANDLERS: Record<string, CommandHandler> = {
     log: ciLog,
     prDiff: () => ciDiff(ctx),
     secondOpinion,
+    // `FLEET_REVIEW_CACHE_DIR` unset (e.g. a local run) disables recording
+    // without disabling lookup — a lookup that finds nothing behaves
+    // identically either way, and this command still runs the engine.
+    cache: artifactReviewCache(process.env['FLEET_REVIEW_CACHE_DIR'], ciLog),
   })),
   plan: () => runPlan(),
   integrate: () => runIntegrate(),
