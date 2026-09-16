@@ -285,9 +285,10 @@ provider needs **no code change**:
    Actions → Variables) to the new provider id and its `provider/model`
    string, e.g. `zai-coding-plan` / `zai-coding-plan/glm-5.3`.
 2. Replace `FLEET_REVIEW_API_KEY` with a key valid for that provider.
-3. Re-run `fleet/review` on any open PR:
-   `gh workflow run fleet-review.yml --ref <branch> -f pr_number=<n>`. The
-   "Authenticate the review engine" step keys
+3. Force a re-review of any open PR outside the normal label flow (manual
+   debugging only): `gh workflow run fleet-review.yml --ref <branch>
+   -f pr_number=<n>`. The normal path is applying the `review` label to the
+   PR — see below. The "Authenticate the review engine" step keys
    `~/.local/share/opencode/auth.json` off `FLEET_REVIEW_PROVIDER` itself
    (never a literal), the "Smoke-test the review engine" step passes
    `FLEET_REVIEW_MODEL` to `--model`, and the real "Review" step
@@ -318,15 +319,36 @@ own error text, not a structured error code opencode exposes.
 event was still *instantiated* on every PR — and GitHub's branch protection
 treats a skipped required check as satisfied, exactly like a green one. #844
 merged with `fleet/review` reporting "skipping" and no model review ever run,
-as a direct result. `fleet-review.yml`'s `on:` block never mentions
-`pull_request` (or `push`) at all, so on an ordinary PR the check is now
-MISSING — which blocks a merge exactly like a failing check does, never like
-a passing one. The only way to produce a green `fleet/review` today is the
-operator dispatch above; there is no path that runs it automatically on a
-PR, and that absence is the intended default. `merge_group` is also kept as
-a trigger on `fleet-review.yml`, harmless today because this repo's GitHub
-merge queue is unavailable (owner type `User` — the ruleset's `merge_queue`
-rule is rejected outright), for the day an org migration enables it.
+as a direct result.
+
+`fleet-review.yml`'s first version (#848) triggered on `workflow_dispatch` +
+`merge_group` only, so an ordinary PR produced no `fleet/review` context at
+all — MISSING, which blocks a merge exactly like a failing check does. That
+fixed the fail-open bug, but exposed a second one, found on #848 itself:
+`workflow_dispatch` is a repository-level event with no PR of its own to
+attach a check run to, so a dispatched run's result — even a correct,
+passing one — never counts toward a PR's required contexts. `gh pr view 848
+--json statusCheckRollup` never listed it, and `gh pr merge` was refused with
+"the base branch policy prohibits the merge", despite the dispatched run
+having succeeded against the PR's own head SHA.
+
+The fix: `fleet-review.yml` now triggers on `pull_request`, scoped to
+`types: [labeled]`, gated by `if: github.event_name == 'workflow_dispatch' ||
+github.event.label.name == 'review'`. Applying the `review` label to a PR is
+now the real trigger — a `pull_request`-triggered run's check result attaches
+to the PR's head SHA automatically, the same mechanism `fleet/verify`
+(`fleet-verify.yml`) already relies on. With no label, the workflow never
+runs and the `fleet/review` context stays ABSENT — fail closed, same
+semantics as before. Re-adding the label to unchanged content reuses the
+prior PASS via the diff-content review cache (`review-cache.ts`); a FAIL is
+never cached, so a re-label after a real fix reviews again for real.
+`workflow_dispatch` remains as a manual escape hatch (see step 3 above) but
+is no longer positioned as the primary path, since it cannot satisfy a
+required context on its own. `merge_group` is dropped as a trigger entirely:
+this repo's GitHub merge queue is unavailable today (owner type `User` — the
+ruleset's `merge_queue` rule is rejected outright), and keeping `merge_group`
+as a trigger while excluding it from the job's `if:` would recreate the
+original fail-open bug this file exists to prevent.
 
 ### 5.6 Agent-to-agent messaging
 

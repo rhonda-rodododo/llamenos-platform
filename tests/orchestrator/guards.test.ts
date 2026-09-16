@@ -447,18 +447,30 @@ describe('rail: lane modes are runtime state, not source', () => {
  * old trigger re-ran a non-author MODEL call — against a paid, weekly-quota'd
  * provider — on every push and every `gh pr update-branch`, and that call
  * volume is what exhausted the quota and made the repo unmergeable. That fix
- * had its own bug, found and fixed in this PR: the job stayed in `ci.yml`,
+ * had its own bug, found and fixed at #844: the job stayed in `ci.yml`,
  * gated by a job-level `if:` — but `ci.yml` ALSO triggers on `pull_request`,
  * so on every ordinary PR the job was still INSTANTIATED and merely skipped
  * by that `if:`, and GitHub treats a *skipped* required check as satisfying
  * it, exactly like a green one. #844 itself merged this way, with
  * `fleet/review` reporting "skipping" and no model review ever run. The real
- * fix is not a smarter `if:` — GitHub does not distinguish "correctly
+ * fix was not a smarter `if:` — GitHub does not distinguish "correctly
  * skipped" from "should have blocked" once a job exists on the trigger at
- * all — so `fleet/review` now lives in its OWN workflow file
- * (`fleet-review.yml`), whose `on:` block never mentions `pull_request` (or
- * `push`) at all. On an ordinary PR the check is now MISSING, not skipped,
- * and a missing required check blocks a merge exactly like a failing one.
+ * all — so `fleet/review` moved into its OWN workflow file
+ * (`fleet-review.yml`) at #848, on `workflow_dispatch` + `merge_group` only.
+ *
+ * #848's own trigger had a DIFFERENT bug, found on #848 itself:
+ * `workflow_dispatch` is a repository-level event with no PR of its own, so
+ * a dispatched run's check result — even a correct, passing one, verified
+ * against #848's real run — never counts toward a PR's required contexts at
+ * all. `gh pr view 848 --json statusCheckRollup` never listed it, and
+ * `gh pr merge` refused with "the base branch policy prohibits the merge".
+ * The fix here: trigger from the PR's OWN check suite — `pull_request`,
+ * scoped to `types: [labeled]` so it fires on exactly one signal (the
+ * `review` label), never on an ordinary push. A `pull_request`-triggered
+ * run's check result attaches to the PR head SHA automatically, which is
+ * what actually satisfies a required context — the same mechanism
+ * `fleet/verify` already relies on. `merge_group` is dropped as a trigger
+ * (see the "reports on merge_group" rail below for why that is safe today).
  *
  * Text assertions over the workflow files are the right instrument here, the
  * same reasoning `guards.test.ts` already applies to `orchestrator/src` argv
@@ -468,10 +480,10 @@ describe('rail: lane modes are runtime state, not source', () => {
  *
  * `fleet/verify` moved out of `ci.yml` into its own `fleet-verify.yml` in
  * round 3 of #844 (CodeQL cache-poisoning — see the rail below this one for
- * why). `fleet/review` makes the same move in this PR, so this block now
- * reads three files.
+ * why). `fleet/review` made the same move at #848 and changed its own
+ * trigger again here, so this block now reads three files.
  */
-describe('rail: fleet/review runs once, at merge time, not on every push', () => {
+describe('rail: fleet/review runs once per review label, not on every push', () => {
   const workflowYaml = (file: string): string =>
     readFileSync(join(process.cwd(), '.github', 'workflows', file), 'utf8')
   const ciYaml = (): string => workflowYaml('ci.yml')
@@ -529,18 +541,28 @@ describe('rail: fleet/review runs once, at merge time, not on every push', () =>
   })
 
   // The load-bearing assertion for fleet-review.yml's own trigger list:
-  // exactly `workflow_dispatch` + `merge_group`, and specifically never
-  // `pull_request` or `push` — either of those reachable from this file
-  // reintroduces the fail-open bug this whole rail exists to prevent (a job
-  // instantiated on an event it then skips via `if:`, which GitHub's branch
-  // protection treats as satisfied). `merge_group` is kept even though this
-  // repo's merge queue is currently unavailable (owner type `User` — see the
-  // file's own header comment) for the day an org migration enables it.
-  it('fleet-review.yml triggers on workflow_dispatch AND merge_group, and NEVER pull_request or push', () => {
+  // `pull_request` scoped to `types: [labeled]` ONLY (never `synchronize`,
+  // which would reopen the every-push bug #812 fixed the first time) plus
+  // `workflow_dispatch` for manual debugging, and specifically never `push`
+  // or `merge_group` — `merge_group` reachable here without a matching `if:`
+  // arm (asserted below) would reintroduce the fail-open bug this whole rail
+  // exists to prevent (a job instantiated on an event it then skips via
+  // `if:`, which GitHub's branch protection treats as satisfied).
+  it('fleet-review.yml triggers on pull_request (labeled only) AND workflow_dispatch, and NEVER push or merge_group', () => {
     const onBlock = fleetReviewYaml().split(/\njobs:\n/)[0] ?? ''
+    expect(onBlock).toMatch(/\n {2}pull_request:\n {4}types:\s*\[\s*labeled\s*\]/)
     expect(onBlock).toMatch(/\n {2}workflow_dispatch:/)
-    expect(onBlock).toMatch(/\n {2}merge_group:/)
-    for (const forbiddenEvent of ['pull_request', 'push']) {
+    // Scoped to the LITERAL pull_request trigger sub-block (from its own
+    // `\n  pull_request:` line to the next 2-space-indented key), not the
+    // whole pre-`jobs:` text — the file's own prose comments above `on:`
+    // legitimately discuss why `synchronize` is absent, and a whole-text
+    // check would fail on that explanation rather than on an actual second
+    // `types:` entry.
+    const pullRequestBlock = onBlock.match(/\n {2}pull_request:\n((?:\n| {4,}.*\n)*)/)?.[0] ?? ''
+    expect(pullRequestBlock.length, 'pull_request trigger sub-block not found').toBeGreaterThan(0)
+    expect(pullRequestBlock, 'fleet-review.yml pull_request trigger must be labeled-only — adding synchronize reopens the every-push bug')
+      .not.toContain('synchronize')
+    for (const forbiddenEvent of ['push', 'merge_group']) {
       expect(onBlock, `fleet-review.yml must never trigger on "${forbiddenEvent}" — that reopens the fail-open bug`)
         .not.toMatch(new RegExp(`\\n {2}${forbiddenEvent}:`))
     }
@@ -562,12 +584,19 @@ describe('rail: fleet/review runs once, at merge time, not on every push', () =>
     expect(ifLine).toContain('pull_request')
   })
 
-  it('fleet/review\'s own if: names merge_group and workflow_dispatch, and NEVER pull_request', () => {
+  // The label `if:` is what actually gates the real trigger — `types:
+  // [labeled]` alone only narrows away `synchronize`/`opened`/etc, but a PR
+  // can carry many labels, and without this check applying ANY other label
+  // (e.g. `agent-dispatchable`) would spend a review call by accident. A
+  // mutation that drops the label condition, or that gates on a bare
+  // `github.event_name == 'pull_request'` instead, must fail this test.
+  it('fleet/review\'s own if: gates on workflow_dispatch OR the review label, and never a bare pull_request event_name check', () => {
     const ifLine = jobLevelIf(jobBlock(fleetReviewYaml(), 'fleet-review'))
     expect(ifLine.length).toBeGreaterThan(0)
-    expect(ifLine).not.toContain('pull_request')
-    expect(ifLine).toContain('merge_group')
     expect(ifLine).toContain('workflow_dispatch')
+    expect(ifLine).toMatch(/event\.label\.name\s*==\s*'review'/)
+    expect(ifLine).not.toMatch(/event_name\s*==\s*'pull_request'/)
+    expect(ifLine).not.toContain('merge_group')
   })
 
   it('fleet/review still carries no write permission and no --approve', () => {
@@ -769,24 +798,35 @@ describe('rail: the job that executes the judged commit\'s code cannot be reache
  *
  * The mapping below is hardcoded rather than derived, on purpose: this rail
  * exists to catch a workflow file quietly losing its `merge_group` trigger
- * (as `secret-scan.yml` had, until this PR), and a derived lookup would only
+ * (as `secret-scan.yml` had, until #844), and a derived lookup would only
  * ever tell you the code agrees with itself.
  *
  * `fleet/verify` moved from `ci.yml` to its own `fleet-verify.yml` in round 3
- * of #844 (CodeQL cache-poisoning isolation — see the rail above), and
- * `fleet/review` makes the same move to `fleet-review.yml` in this PR (the
- * fail-open fix — see the "runs once, at merge time" rail) — both updated
+ * of #844 (CodeQL cache-poisoning isolation — see the rail above), updated
  * here to match, or this rail would itself start failing vacuously against a
- * job that no longer exists in `ci.yml`. `fleet/review` keeping its
- * `merge_group` trigger in the new file (harmless today — this repo's merge
- * queue is unavailable, see fleet-review.yml's header comment) is exactly
- * what keeps this assertion true for it.
+ * job that no longer exists in `ci.yml`.
+ *
+ * `fleet/review` is DELIBERATELY NOT in this table. It moved off
+ * `merge_group` entirely (see the "runs once per review label" rail above):
+ * a `workflow_dispatch`-only trigger could never satisfy a required PR
+ * context in the first place (verified on #848), and keeping `merge_group`
+ * as a trigger while excluding it from the job's `if:` would recreate the
+ * exact fail-open bug this whole file of rails exists to catch. This is safe
+ * TODAY because this repo's merge queue is unavailable (owner type `User` —
+ * the ruleset's `merge_queue` rule is rejected outright, see
+ * fleet-review.yml's own header). The day an org migration enables the
+ * queue, `fleet/review` genuinely will not report on a `merge_group` ref and
+ * the queue will stall on it forever — that migration must re-add a
+ * `merge_group` arm to both the trigger and the job's `if:` together, not
+ * silently inherit this gap. The assertion below pins that `fleet/review`
+ * does NOT trigger on `merge_group`, specifically so a future PR that adds
+ * it back without also fixing the `if:` fails loudly here instead of
+ * reintroducing the bug quietly.
  */
-describe('rail: every ruleset-15885614-required context reports on merge_group', () => {
+describe('rail: every ruleset-15885614-required context reports on merge_group, except fleet/review', () => {
   const REQUIRED_CONTEXT_WORKFLOWS: Record<string, string> = {
     'ci-status': 'ci.yml',
     'fleet/verify': 'fleet-verify.yml',
-    'fleet/review': 'fleet-review.yml',
     gitleaks: 'secret-scan.yml',
   }
 
@@ -801,9 +841,9 @@ describe('rail: every ruleset-15885614-required context reports on merge_group',
     return /\n {2}merge_group:/.test(onBlock)
   }
 
-  it('the mapping table itself is non-empty and covers all four workflow-backed contexts', () => {
+  it('the mapping table itself is non-empty and covers the three merge_group-reporting contexts', () => {
     expect(Object.keys(REQUIRED_CONTEXT_WORKFLOWS).sort()).toEqual(
-      ['ci-status', 'fleet/review', 'fleet/verify', 'gitleaks'].sort(),
+      ['ci-status', 'fleet/verify', 'gitleaks'].sort(),
     )
   })
 
@@ -812,6 +852,10 @@ describe('rail: every ruleset-15885614-required context reports on merge_group',
       expect(triggersOnMergeGroup(workflowYaml(workflowFile))).toBe(true)
     })
   }
+
+  it('fleet/review (fleet-review.yml) does NOT trigger on merge_group — known and deliberate while the merge queue is unavailable', () => {
+    expect(triggersOnMergeGroup(workflowYaml('fleet-review.yml'))).toBe(false)
+  })
 })
 
 /**
