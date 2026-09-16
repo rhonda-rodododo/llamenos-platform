@@ -7,7 +7,7 @@ import { codeownersMatcher, codeownersPatterns, trackedFiles, trackedFilesUnder 
 import { mkdtempSync, rmSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { runReviewCi, type CiContext, type ReviewCiDeps } from '../../orchestrator/src/ci.js'
+import { runReviewCi, decideReviewGate, type CiContext, type ReviewCiDeps } from '../../orchestrator/src/ci.js'
 import { DEFAULT_MAX_TURNS, HIGH_IMPACT_MAX_TURNS, DEFAULT_TIMEOUT_MS, HIGH_IMPACT_TIMEOUT_MS } from '../../orchestrator/src/review.js'
 import { diffHash, cacheArtifactName, type ReviewCache, type CachedVerdict, type ReviewCacheKey } from '../../orchestrator/src/review-cache.js'
 import type { Lane } from '../../orchestrator/src/config.js'
@@ -584,19 +584,108 @@ describe('rail: fleet/review runs once per review label, not on every push', () 
     expect(ifLine).toContain('pull_request')
   })
 
-  // The label `if:` is what actually gates the real trigger — `types:
-  // [labeled]` alone only narrows away `synchronize`/`opened`/etc, but a PR
-  // can carry many labels, and without this check applying ANY other label
-  // (e.g. `agent-dispatchable`) would spend a review call by accident. A
-  // mutation that drops the label condition, or that gates on a bare
-  // `github.event_name == 'pull_request'` instead, must fail this test.
-  it('fleet/review\'s own if: gates on workflow_dispatch OR the review label, and never a bare pull_request event_name check', () => {
+  /**
+   * #848 fixed the fail-open bug once, by moving the job out of `ci.yml`,
+   * and then reintroduced the SAME bug class inside this very file: a
+   * job-level `if: github.event_name == 'workflow_dispatch' ||
+   * github.event.label.name == 'review'` on a job whose trigger is
+   * `pull_request: types: [labeled]` — which GitHub cannot filter by label
+   * VALUE — so applying ANY other label (e.g. `agent-dispatchable`) still
+   * INSTANTIATES the job and the `if:` then SKIPS it, satisfying branch
+   * protection with no review ever run. `fleet/review`'s own verdict on
+   * this PR (#848's own follow-up) is what caught it before merge.
+   *
+   * The fix this rail pins: NO job-level `if:` at all, ever again. What
+   * used to be that `if:` is now the "Decide whether to run the review
+   * engine" step, further down in the job, whose exit code and `outcome`
+   * output are what the LATER steps key off — see the rails below this one.
+   */
+  it('fleet/review carries NO job-level if: at all — a job-level if: on this trigger is exactly the fail-open bug this file exists to prevent', () => {
     const ifLine = jobLevelIf(jobBlock(fleetReviewYaml(), 'fleet-review'))
-    expect(ifLine.length).toBeGreaterThan(0)
-    expect(ifLine).toContain('workflow_dispatch')
-    expect(ifLine).toMatch(/event\.label\.name\s*==\s*'review'/)
-    expect(ifLine).not.toMatch(/event_name\s*==\s*'pull_request'/)
-    expect(ifLine).not.toContain('merge_group')
+    expect(ifLine).toBe('')
+  })
+
+  /** A single step's own `if:`, found by its `name:` — scoped from that
+   *  step's own `- name: <name>` line to the next `\n      - name:` (or
+   *  `\n      - uses:`) at the same six-space step indentation, so a later
+   *  step's `if:` (or lack of one) is never mistaken for this step's. */
+  function stepIf(block: string, stepName: string): string {
+    const escaped = stepName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const stepHeaderRe = new RegExp(`\\n {6}- name: ${escaped}\\n`)
+    const m = block.match(stepHeaderRe)
+    if (m === null || m.index === undefined) {
+      throw new Error(`no "- name: ${stepName}" step found — the grep must not pass vacuously`)
+    }
+    // The newline ending the "- name: ..." line itself, kept as the LEADING
+    // newline of `rest` — every downstream match below (the next step
+    // header, this step's own `if:`) is anchored on `\n {N}...`, so a `rest`
+    // missing its own leading newline would silently fail to match its
+    // FIRST line, exactly the bug this comment replaces.
+    const nameLineEnd = block.indexOf('\n', m.index + 1)
+    const rest = block.slice(nameLineEnd)
+    const nextStep = rest.search(/\n {6}- (name|uses):/)
+    const stepBlock = nextStep === -1 ? rest : rest.slice(0, nextStep)
+    return stepBlock.match(/\n {8}if:\s*(.+)/)?.[1] ?? ''
+  }
+
+  it('finds real steps to scan at all — the stepIf grep must not pass vacuously', () => {
+    const block = jobBlock(fleetReviewYaml(), 'fleet-review')
+    expect(() => stepIf(block, 'Setup Bun')).not.toThrow()
+  })
+
+  // The ctx step's own shell computes `requested` — the property the old
+  // job-level `if:` encoded — from the SAME two conditions the old `if:`
+  // used: a manual workflow_dispatch, or the label just applied being named
+  // exactly `review`. A mutation that drops the label condition, or widens
+  // it to a bare `event_name == 'pull_request'` (which would make every
+  // label event "requested"), must fail this test — that is the exact
+  // fail-open shape #848 shipped.
+  it('the ctx step computes "requested" from workflow_dispatch OR the review label, never a bare pull_request event_name check', () => {
+    const block = jobBlock(fleetReviewYaml(), 'fleet-review')
+    expect(block).toMatch(/EVENT_NAME"\s*==\s*"workflow_dispatch"\s*\|\|\s*"\$LABEL_NAME"\s*==\s*"review"/)
+    expect(block).not.toMatch(/"\$EVENT_NAME"\s*==\s*"pull_request"\s*\]\];\s*then\s*\n\s*requested=true/)
+    expect(block).toMatch(/echo "requested=\$requested"/)
+  })
+
+  // The gate step is what used to be the job-level `if:` (see the rail
+  // above) — it must never itself be conditioned on its OWN output, or it
+  // could never run at all.
+  it('the "Decide whether to run the review engine" step (the gate) always runs — it is never itself gated', () => {
+    const block = jobBlock(fleetReviewYaml(), 'fleet-review')
+    expect(stepIf(block, 'Decide whether to run the review engine')).toBe('')
+    expect(block).toMatch(/- name: Decide whether to run the review engine\n\s+id: gate\n/)
+    expect(block).toContain('bun orchestrator/src/cli.ts review-gate')
+  })
+
+  // The load-bearing assertion for the new design: EVERY step that can
+  // spend a model call — installing the engine, authenticating it, the
+  // smoke test (which itself makes a real provider call), and the real
+  // review — is gated on `steps.gate.outputs.outcome == 'run-engine'`.
+  // Dropping this `if:` from any one of them is branch (a)/(c) calling the
+  // engine anyway — exactly the "cheap and non-destructive" property the
+  // cache-hit/not-requested branches exist to guarantee.
+  it.each([
+    'Install the non-author review engine',
+    'Authenticate the review engine',
+    'Smoke-test the review engine',
+    'Check the base provides the gate',
+    'Review',
+  ])('the "%s" step only runs when the gate said run-engine', (stepName) => {
+    const block = jobBlock(fleetReviewYaml(), 'fleet-review')
+    expect(stepIf(block, stepName)).toBe("steps.gate.outputs.outcome == 'run-engine'")
+  })
+
+  // Branch (c)'s fail-closed message, verbatim — an operator or agent
+  // reading a red `fleet/review` must be told exactly what to do (apply the
+  // `review` label), not left to guess why a check that "did nothing" is
+  // failing.
+  it('the review-gate CLI command fails with the exact "review not requested" message on branch (c)', () => {
+    const text = readFileSync(join(process.cwd(), 'orchestrator', 'src', 'cli.ts'), 'utf8')
+    // Backtick-escaped in the SOURCE (this string is built inside a
+    // template literal, so a literal backtick in the source is `\``, not
+    // `` ` ``) — matched here against the raw file text, not the runtime
+    // string it evaluates to.
+    expect(text).toContain('review not requested — add the \\`review\\` label to run the non-author review')
   })
 
   it('fleet/review still carries no write permission and no --approve', () => {
@@ -1049,5 +1138,109 @@ describe('rail: fleet/review reviews exactly once per diff, never twice on an id
     const v = await runReviewCi(deps({ secondOpinion }))
     expect(v.ok).toBe(true)
     expect(secondOpinion).toHaveBeenCalledTimes(1)
+  })
+})
+
+/**
+ * `decideReviewGate` is what `fleet-review.yml`'s "Decide whether to run the
+ * review engine" step calls — the runtime logic behind the three branches
+ * the file header (and the YAML rails above) describe. Those YAML rails pin
+ * the WIRING (which steps key off `outcome == 'run-engine'`, that no
+ * job-level `if:` exists); these pin the DECISION ITSELF, so a mutation that
+ * keeps the wiring intact but flips the logic — e.g. concluding
+ * `run-engine` when `requested` is false, or `not-requested` when a cache
+ * hit exists — still fails a test. Mirrors the `fakeCache` pattern from the
+ * "reviews exactly once per diff" rail above, deliberately not shared with
+ * it: that suite exercises `runReviewCi`'s full pipeline (verify, secondOpinion,
+ * recording); this one exercises only the preflight decision, with no
+ * `verify`/`secondOpinion` in sight — a passing test here cannot be mistaken
+ * for a passing review.
+ */
+describe('rail: decideReviewGate enforces the three fleet/review branches (cache-hit / not-requested / run-engine)', () => {
+  const ctx = (): CiContext => ({
+    branch: 'fleet/ios/123', repoDir: '/base', headDir: '/tmp/head',
+    baseSha: 'base111', headSha: 'head222', pr: '42',
+  })
+
+  function fakeCache(seed?: { key: ReviewCacheKey; verdict: CachedVerdict }): ReviewCache {
+    const store = new Map<string, CachedVerdict>()
+    if (seed !== undefined) store.set(`${seed.key.pr}:${seed.key.diffHash}`, seed.verdict)
+    return {
+      async lookup(key: ReviewCacheKey) { return store.get(`${key.pr}:${key.diffHash}`) },
+      async record() { /* decideReviewGate never records — only runReviewCi does */ },
+    }
+  }
+
+  const diff = 'diff --git a/x b/x\n+hello\n'
+
+  // Branch (a): a cache hit concludes `cache-hit` regardless of whether this
+  // event was the `review` label — an unrelated label event on an
+  // already-reviewed diff must reuse the verdict, never fall through to
+  // `not-requested` or `run-engine`. Proven with `requested: false`, the
+  // harder of the two cases: a mutation that checked `requested` BEFORE the
+  // cache would send this down the `not-requested` branch instead of
+  // reusing the cached PASS.
+  it('concludes cache-hit when a prior PASS exists, even when this event did not request a review', async () => {
+    const cache = fakeCache({
+      key: { pr: '42', diffHash: diffHash(diff) },
+      verdict: { verdict: 'PASS', text: 'VERDICT: PASS (cached)' },
+    })
+    const outcome = await decideReviewGate({
+      ctx: ctx(), prDiff: async () => diff, cache, requested: false, log: () => {},
+    })
+    expect(outcome.kind).toBe('cache-hit')
+  })
+
+  // Branch (c): a cache miss on an event that did NOT request a review
+  // fails closed — the exact regression this whole PR exists to prevent.
+  it('concludes not-requested on a cache miss when this event did not request a review', async () => {
+    const cache = fakeCache()
+    const outcome = await decideReviewGate({
+      ctx: ctx(), prDiff: async () => diff, cache, requested: false, log: () => {},
+    })
+    expect(outcome.kind).toBe('not-requested')
+  })
+
+  // Branch (b): a cache miss on an event that DID request a review (the
+  // `review` label, or workflow_dispatch) proceeds to the engine.
+  it('concludes run-engine on a cache miss when this event requested a review', async () => {
+    const cache = fakeCache()
+    const outcome = await decideReviewGate({
+      ctx: ctx(), prDiff: async () => diff, cache, requested: true, log: () => {},
+    })
+    expect(outcome.kind).toBe('run-engine')
+  })
+
+  // Same fail-safe direction as `runReviewCi`'s own cache lookup: a lookup
+  // that THROWS must never be mistaken for a hit, and must never crash the
+  // step — it degrades to a miss, which then still respects `requested`.
+  it('treats a throwing cache lookup as a miss, never a hit and never a crash', async () => {
+    const cache: ReviewCache = {
+      lookup: async () => { throw new Error('artifacts API rate limited') },
+      record: async () => {},
+    }
+    const requestedOutcome = await decideReviewGate({
+      ctx: ctx(), prDiff: async () => diff, cache, requested: true, log: () => {},
+    })
+    expect(requestedOutcome.kind).toBe('run-engine')
+
+    const unrequestedOutcome = await decideReviewGate({
+      ctx: ctx(), prDiff: async () => diff, cache, requested: false, log: () => {},
+    })
+    expect(unrequestedOutcome.kind).toBe('not-requested')
+  })
+
+  // The cache key is diff-content-based, matching `runReviewCi`'s own — a
+  // hit for PR #42's diff must never leak into a decision for PR #7's
+  // identical diff text.
+  it('never cross-publishes a cache hit between two different PRs with the identical diff', async () => {
+    const cache = fakeCache({
+      key: { pr: '42', diffHash: diffHash(diff) },
+      verdict: { verdict: 'PASS', text: 'VERDICT: PASS (cached)' },
+    })
+    const outcome = await decideReviewGate({
+      ctx: { ...ctx(), pr: '7' }, prDiff: async () => diff, cache, requested: false, log: () => {},
+    })
+    expect(outcome.kind).toBe('not-requested')
   })
 })
