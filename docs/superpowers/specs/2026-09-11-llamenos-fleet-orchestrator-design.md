@@ -285,9 +285,11 @@ provider needs **no code change**:
    Actions → Variables) to the new provider id and its `provider/model`
    string, e.g. `zai-coding-plan` / `zai-coding-plan/glm-5.3`.
 2. Replace `FLEET_REVIEW_API_KEY` with a key valid for that provider.
-3. Re-run `fleet/review` on any open PR. The "Authenticate the review engine"
-   step keys `~/.local/share/opencode/auth.json` off `FLEET_REVIEW_PROVIDER`
-   itself (never a literal), the "Smoke-test the review engine" step passes
+3. Re-run `fleet/review` on any open PR:
+   `gh workflow run fleet-review.yml --ref <branch> -f pr_number=<n>`. The
+   "Authenticate the review engine" step keys
+   `~/.local/share/opencode/auth.json` off `FLEET_REVIEW_PROVIDER` itself
+   (never a literal), the "Smoke-test the review engine" step passes
    `FLEET_REVIEW_MODEL` to `--model`, and the real "Review" step
    (`review-ci` → `review.ts`'s `VERIFIER_ENGINE`) reads the same
    `FLEET_REVIEW_MODEL` env var — so all three move together from the one
@@ -306,9 +308,25 @@ causes: `engine-quota` (weekly/usage-limit language from the provider),
 `engine-auth` (401 / invalid or missing key), or `engine-unavailable`
 (anything else — a bad model id, a network error, a rejected config, or the
 engine running but never producing a valid verdict). See the comment above
-"Smoke-test the review engine" in `.github/workflows/ci.yml` for the exact
-classification, which is a best-effort heuristic over the engine's own error
-text, not a structured error code opencode exposes.
+"Smoke-test the review engine" in `.github/workflows/fleet-review.yml` for
+the exact classification, which is a best-effort heuristic over the engine's
+own error text, not a structured error code opencode exposes.
+
+**`fleet/review` now lives in its own workflow file, `fleet-review.yml`, not
+`ci.yml`.** It moved there to fix a fail-open bug: `ci.yml` also triggers on
+`pull_request`, so a job living there and merely `if:`-gated to skip on that
+event was still *instantiated* on every PR — and GitHub's branch protection
+treats a skipped required check as satisfied, exactly like a green one. #844
+merged with `fleet/review` reporting "skipping" and no model review ever run,
+as a direct result. `fleet-review.yml`'s `on:` block never mentions
+`pull_request` (or `push`) at all, so on an ordinary PR the check is now
+MISSING — which blocks a merge exactly like a failing check does, never like
+a passing one. The only way to produce a green `fleet/review` today is the
+operator dispatch above; there is no path that runs it automatically on a
+PR, and that absence is the intended default. `merge_group` is also kept as
+a trigger on `fleet-review.yml`, harmless today because this repo's GitHub
+merge queue is unavailable (owner type `User` — the ruleset's `merge_queue`
+rule is rejected outright), for the day an org migration enables it.
 
 ### 5.6 Agent-to-agent messaging
 
