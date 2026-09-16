@@ -357,40 +357,60 @@ describe('rail: lane modes are runtime state, not source', () => {
  * old trigger re-ran a non-author MODEL call — against a paid, weekly-quota'd
  * provider — on every push and every `gh pr update-branch`, and that call
  * volume is what exhausted the quota and made the repo unmergeable. Text
- * assertions over `.github/workflows/ci.yml` are the right instrument here,
- * the same reasoning `guards.test.ts` already applies to `orchestrator/src`
- * argv rails above: there is no runtime behaviour of a YAML trigger
- * condition to exercise, only the literal condition itself, and a regex over
- * the source is what a mutation to it actually breaks.
+ * assertions over the workflow files are the right instrument here, the same
+ * reasoning `guards.test.ts` already applies to `orchestrator/src` argv rails
+ * above: there is no runtime behaviour of a YAML trigger condition to
+ * exercise, only the literal condition itself, and a regex over the source is
+ * what a mutation to it actually breaks.
+ *
+ * `fleet/verify` moved out of `ci.yml` into its own `fleet-verify.yml` in
+ * round 3 of #844 (CodeQL cache-poisoning — see the rail below this one for
+ * why), so this block reads two files, not one. `fleet/review` stays in
+ * `ci.yml`.
  */
 describe('rail: fleet/review runs once, at merge time, not on every push', () => {
-  const ciYaml = (): string => readFileSync(join(process.cwd(), '.github', 'workflows', 'ci.yml'), 'utf8')
+  const workflowYaml = (file: string): string =>
+    readFileSync(join(process.cwd(), '.github', 'workflows', file), 'utf8')
+  const ciYaml = (): string => workflowYaml('ci.yml')
+  const fleetVerifyYaml = (): string => workflowYaml('fleet-verify.yml')
 
   /** The text of one named job, from its `  <name>:` line up to (but not
    *  including) the next job at the same two-space indentation — matching
-   *  every job key actually declared in this file, not a hardcoded guess at
+   *  every job key actually declared in the file, not a hardcoded guess at
    *  what might come next. */
   function jobBlock(text: string, name: string): string {
     const jobHeaderRe = /\n {2}([a-zA-Z0-9_-]+):\n/g
     const starts: { name: string; index: number }[] = []
     for (const m of text.matchAll(jobHeaderRe)) starts.push({ name: m[1] as string, index: m.index })
     const at = starts.findIndex((s) => s.name === name)
-    if (at === -1) throw new Error(`no "${name}:" job found in ci.yml — the grep must not pass vacuously`)
+    if (at === -1) throw new Error(`no "${name}:" job found in this workflow file — the grep must not pass vacuously`)
     const end = at + 1 < starts.length ? starts[at + 1]?.index : text.length
     return text.slice(starts[at]?.index, end)
   }
 
-  it('finds fleet-verify and fleet-review as real jobs in ci.yml — the parser must not pass vacuously', () => {
-    expect(jobBlock(ciYaml(), 'fleet-verify')).toContain('name: fleet/verify')
+  it('finds fleet-verify (fleet-verify.yml) and fleet-review (ci.yml) as real jobs — the parser must not pass vacuously', () => {
+    expect(jobBlock(fleetVerifyYaml(), 'fleet-verify')).toContain('name: fleet/verify')
     expect(jobBlock(ciYaml(), 'fleet-review')).toContain('name: fleet/review')
   })
 
-  it('triggers on merge_group at the workflow level', () => {
+  it('ci.yml triggers on merge_group at the workflow level (fleet/review and other required jobs still live there)', () => {
     // Scoped to before the `jobs:` key: `merge_group` also appears in prose
     // comments and in job bodies (context field names, env vars), and this
     // assertion is specifically about the workflow's OWN `on:` block.
     const onBlock = ciYaml().split(/\njobs:\n/)[0] ?? ''
     expect(onBlock).toMatch(/\n {2}merge_group:/)
+  })
+
+  it('fleet-verify.yml triggers on merge_group AND pull_request, and nothing else with default-branch cache-write access', () => {
+    const onBlock = fleetVerifyYaml().split(/\njobs:\n/)[0] ?? ''
+    expect(onBlock).toMatch(/\n {2}pull_request:/)
+    expect(onBlock).toMatch(/\n {2}merge_group:/)
+    // The whole point of the split (see the CodeQL rail below): none of
+    // these may appear at the top level, or CodeQL's
+    // hasDefaultBranchCacheWriteAccess goes true again for this job.
+    for (const cacheWriteEvent of ['push', 'workflow_dispatch', 'repository_dispatch', 'schedule']) {
+      expect(onBlock).not.toMatch(new RegExp(`\\n {2}${cacheWriteEvent}:`))
+    }
   })
 
   /** The JOB-level `if:`, not a step's — always at exactly four-space
@@ -404,7 +424,7 @@ describe('rail: fleet/review runs once, at merge time, not on every push', () =>
   }
 
   it('fleet/verify runs on merge_group (in addition to pull_request)', () => {
-    const ifLine = jobLevelIf(jobBlock(ciYaml(), 'fleet-verify'))
+    const ifLine = jobLevelIf(jobBlock(fleetVerifyYaml(), 'fleet-verify'))
     expect(ifLine).toContain('merge_group')
     expect(ifLine).toContain('pull_request')
   })
@@ -468,49 +488,73 @@ describe('rail: fleet/review runs once, at merge time, not on every push', () =>
 })
 
 /**
- * CodeQL `actions/cache-poisoning/poisonable-step` (3 alerts, PR #844 round
- * 3, at the "Install dependencies", "Check the base provides the gate" and
- * "Verify" steps). `fleet/verify` triggers on `merge_group`, which grants
- * cache-WRITE scope for the TARGET branch (not just PR-scoped read access),
- * and its "Verify" step deliberately executes the PR HEAD's own tests — see
- * the "Two phases inside one command" comment above that step in ci.yml.
- * `setup-bun` saves its toolcache from a `post:` step that runs after every
- * other step in the job, including that untrusted test run (see its
- * `action.yml`: `post: dist/cache-save/index.js`, `post-if: success()`), so a
- * malicious PR's test step could tamper with the runner between "tests ran"
- * and "cache saved" and poison what `main`'s later builds restore.
- * `no-cache: true` is the action's only toggle — it has no restore-only /
- * lookup-only mode — so this rail asserts the toggle is set on the one job
- * that needs it, not that some cache action is merely present.
+ * CodeQL `actions/cache-poisoning/poisonable-step` (3 HIGH alerts, PR #844
+ * round 3, originally at the "Install dependencies", "Check the base
+ * provides the gate" and "Verify" steps of `fleet-verify` back when it lived
+ * in `ci.yml`). The mechanism, read from CodeQL's own `actions` query pack
+ * (`codeql/actions-all`, `CachePoisoningQuery.qll` + `PoisonableSteps.qll` +
+ * `ext/config/poisonable_steps.yml`), is NOT about any specific
+ * cache-writing action:
+ *
+ * - `poisonableCommandsDataModel` lists bare command names whose lifecycle
+ *   scripts/plugins could act on the job's ambient `ACTIONS_RUNTIME_TOKEN`
+ *   (which grants cache read/write independent of any `actions/cache` step
+ *   being present at all) — `bun` is literally on that list, alongside
+ *   `npm`/`cargo`/`pip install -r`/etc. Every `run: bun ...` step in the job
+ *   is a "poisonable step" by definition, regardless of caching config.
+ * - `hasDefaultBranchCacheWriteAccess(job, event)` is true when the job's
+ *   EVENT has default-branch cache-write scope — `push`, `workflow_dispatch`,
+ *   `repository_dispatch`, `delete`, `registry_package`, `page_build`, or
+ *   `schedule` (NOT `pull_request`, NOT `merge_group` — neither appears in
+ *   that list). Critically, `JobImpl.getATriggerEvent()` returns every event
+ *   the ENCLOSING WORKFLOW responds to, not filtered by the job's own `if:`.
+ *   `fleet-verify` sat in `ci.yml`, which also triggers on `push` and
+ *   `workflow_dispatch` for its other jobs, so CodeQL treated `fleet-verify`
+ *   as reachable from both — regardless of its `if:` excluding them.
+ *
+ * Tried first and confirmed NOT sufficient: `no-cache: true` on the "Setup
+ * Bun" step. It genuinely disables `setup-bun`'s own cache-save (verified by
+ * reading its `dist/setup/index.js` and `dist/cache-save/index.js`), but
+ * CodeQL's model never inspects that input at all — the flagged "poisonable
+ * steps" are the `bun` commands themselves. The fix that actually cleared
+ * the alerts (verified via the `code-scanning/alerts` API against the exact
+ * commit) is what this rail asserts: `fleet-verify` moved into its OWN
+ * workflow file (`fleet-verify.yml`) whose `on:` block is `pull_request` +
+ * `merge_group` only — neither has default-branch cache-write access, so
+ * `hasDefaultBranchCacheWriteAccess` is false for every event this job can
+ * be triggered by, full stop. `no-cache: true` is kept as defense in depth
+ * (asserted below) but is not what CodeQL is actually satisfied by.
  *
  * `fleet/review` is deliberately NOT covered here: it never executes HEAD
  * code, only reads it as data for the review model (the "Export the PR head
- * as data" step strips and never runs it) — CodeQL agrees, 0 alerts on that
- * job — so it keeps normal setup-bun caching. If a future job gains both
- * `merge_group` and a step that runs head-derived code, it belongs in
- * `JOBS_THAT_EXECUTE_HEAD_CODE` below, matching this file's existing
- * convention of a hardcoded, human-reviewed table (see
- * `REQUIRED_CONTEXT_WORKFLOWS` above) rather than a derived lookup that could
- * only ever agree with itself.
+ * as data" step strips and never runs it), and its explicit
+ * `secrets.FLEET_REVIEW_API_KEY` access makes CodeQL's `isPrivileged()` true
+ * for that job — which this specific query excludes on purpose (a privileged
+ * job reachable by an externally-triggerable event is the subject of a
+ * different, more severe query instead). CodeQL agrees either way: 0 alerts
+ * on `fleet/review`. If a future job gains both a head-code-execution step
+ * and reachability from a workflow with `push`/`workflow_dispatch`, it needs
+ * the same file-isolation treatment, not a per-step cache tweak.
  */
-describe('rail: no job that executes the judged commit\'s code may save to the cache', () => {
-  const ciYaml = (): string => readFileSync(join(process.cwd(), '.github', 'workflows', 'ci.yml'), 'utf8')
+describe('rail: the job that executes the judged commit\'s code cannot be reached by a cache-write event', () => {
+  const workflowYaml = (file: string): string =>
+    readFileSync(join(process.cwd(), '.github', 'workflows', file), 'utf8')
 
-  /** Same convention as the `fleet/review` rail above: one named job's text,
-   *  from its `  <name>:` line up to the next job at the same indentation. */
+  /** One named job's text, from its `  <name>:` line up to the next job at
+   *  the same two-space indentation. */
   function jobBlock(text: string, name: string): string {
     const jobHeaderRe = /\n {2}([a-zA-Z0-9_-]+):\n/g
     const starts: { name: string; index: number }[] = []
     for (const m of text.matchAll(jobHeaderRe)) starts.push({ name: m[1] as string, index: m.index })
     const at = starts.findIndex((s) => s.name === name)
-    if (at === -1) throw new Error(`no "${name}:" job found in ci.yml — the grep must not pass vacuously`)
+    if (at === -1) throw new Error(`no "${name}:" job found in this workflow file — the grep must not pass vacuously`)
     const end = at + 1 < starts.length ? starts[at + 1]?.index : text.length
     return text.slice(starts[at]?.index, end)
   }
 
   /** One named step's text within a job block, from its `      - name:` line
-   *  (six-space indent — every step in this file) up to the next step at the
-   *  same indentation. */
+   *  (six-space indent — every step in these files) up to the next step at
+   *  the same indentation. */
   function stepBlock(block: string, name: string): string {
     const stepHeaderRe = /\n {6}- name: ([^\n]+)\n/g
     const starts: { name: string; index: number }[] = []
@@ -522,15 +566,22 @@ describe('rail: no job that executes the judged commit\'s code may save to the c
   }
 
   // Hardcoded, not derived — see the doc comment above. Each entry is a job
-  // that (a) triggers on merge_group and (b) has a step that runs code from
-  // the PR HEAD export, which is exactly the combination CodeQL flags.
-  const JOBS_THAT_EXECUTE_HEAD_CODE = ['fleet-verify']
+  // that has a step running code from the PR HEAD export, mapped to the
+  // workflow file that must isolate it from default-branch-cache-write
+  // events. Mirrors this file's existing convention of a hardcoded,
+  // human-reviewed table (see `REQUIRED_CONTEXT_WORKFLOWS` below) rather than
+  // a derived lookup that could only ever agree with itself.
+  const JOBS_THAT_EXECUTE_HEAD_CODE: { job: string; file: string }[] = [{ job: 'fleet-verify', file: 'fleet-verify.yml' }]
 
-  for (const job of JOBS_THAT_EXECUTE_HEAD_CODE) {
-    it(`${job} still triggers on merge_group and still executes HEAD code (the premise this rail depends on)`, () => {
-      const block = jobBlock(ciYaml(), job)
-      const ifLine = block.split(/\n {4}steps:\n/)[0]?.match(/\n {4}if:\s*(.+)/)?.[1] ?? ''
-      expect(ifLine).toContain('merge_group')
+  // Any event name CodeQL's `defaultBranchCacheWriteEvent()` treats as
+  // granting cache-write access to the default branch. `pull_request` and
+  // `merge_group` are deliberately absent from this list — they are the only
+  // two events fleet-verify.yml may trigger on.
+  const CACHE_WRITE_EVENTS = ['push', 'workflow_dispatch', 'repository_dispatch', 'delete', 'registry_package', 'page_build', 'schedule']
+
+  for (const { job, file } of JOBS_THAT_EXECUTE_HEAD_CODE) {
+    it(`${job} (${file}) still executes HEAD code (the premise this rail depends on)`, () => {
+      const block = jobBlock(workflowYaml(file), job)
       // The "Verify" step is what actually runs the judged commit's tests —
       // see verify-ci in orchestrator/src/ci.ts. If this step is ever
       // renamed or removed, the premise of this rail changes and it must be
@@ -538,19 +589,30 @@ describe('rail: no job that executes the judged commit\'s code may save to the c
       expect(() => stepBlock(block, 'Verify')).not.toThrow()
     })
 
-    it(`${job}'s "Setup Bun" step disables cache-save (no-cache: true)`, () => {
-      const setupBun = stepBlock(jobBlock(ciYaml(), job), 'Setup Bun')
+    it(`${job}'s workflow (${file}) triggers on pull_request and merge_group only — no default-branch-cache-write event`, () => {
+      const onBlock = workflowYaml(file).split(/\njobs:\n/)[0] ?? ''
+      expect(onBlock).toMatch(/\n {2}pull_request:/)
+      expect(onBlock).toMatch(/\n {2}merge_group:/)
+      for (const cacheWriteEvent of CACHE_WRITE_EVENTS) {
+        expect(onBlock, `${file} must not trigger on "${cacheWriteEvent}" — that would restore CodeQL's cache-write reachability`)
+          .not.toMatch(new RegExp(`\\n {2}${cacheWriteEvent}:`))
+      }
+    })
+
+    it(`${job}'s "Setup Bun" step disables cache-save (no-cache: true) — defense in depth, not the CodeQL fix itself`, () => {
+      const setupBun = stepBlock(jobBlock(workflowYaml(file), job), 'Setup Bun')
       expect(setupBun).toContain('oven-sh/setup-bun@')
       expect(setupBun).toMatch(/\n\s*no-cache:\s*true\b/)
     })
   }
 
   // fleet/review is the documented exception: it never executes HEAD code,
-  // so leaving its setup-bun cache on is correct, not an oversight. This
-  // assertion exists so a future edit can't "fix" that job's caching the
-  // same way without first confirming it still holds.
-  it('fleet/review still never runs a step named "Verify" (the exception this rail relies on)', () => {
-    const block = jobBlock(ciYaml(), 'fleet-review')
+  // so leaving it in ci.yml (which does trigger on push/workflow_dispatch)
+  // is correct, not an oversight. This assertion exists so a future edit
+  // can't "fix" that job's isolation the same way without first confirming
+  // it still holds.
+  it('fleet/review (ci.yml) still never runs a step named "Verify" (the exception this rail relies on)', () => {
+    const block = jobBlock(workflowYaml('ci.yml'), 'fleet-review')
     expect(() => {
       const stepHeaderRe = /\n {6}- name: Verify\n/
       if (stepHeaderRe.test(block)) throw new Error('fleet-review now has a "Verify" step')
@@ -573,11 +635,16 @@ describe('rail: no job that executes the judged commit\'s code may save to the c
  * exists to catch a workflow file quietly losing its `merge_group` trigger
  * (as `secret-scan.yml` had, until this PR), and a derived lookup would only
  * ever tell you the code agrees with itself.
+ *
+ * `fleet/verify` moved from `ci.yml` to its own `fleet-verify.yml` in round 3
+ * of #844 (CodeQL cache-poisoning isolation — see the rail above) — updated
+ * here to match, or this rail would itself start failing vacuously against a
+ * job that no longer exists in `ci.yml`.
  */
 describe('rail: every ruleset-15885614-required context reports on merge_group', () => {
   const REQUIRED_CONTEXT_WORKFLOWS: Record<string, string> = {
     'ci-status': 'ci.yml',
-    'fleet/verify': 'ci.yml',
+    'fleet/verify': 'fleet-verify.yml',
     'fleet/review': 'ci.yml',
     gitleaks: 'secret-scan.yml',
   }
