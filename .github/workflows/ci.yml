@@ -1511,6 +1511,19 @@ jobs:
     # smoke call and the cache lookup have to fit around it.
     timeout-minutes: 20
 
+    # Repo Settings > Secrets and variables > Actions > Variables, with safe
+    # defaults matching today's engine — so a quota-exhausted or revoked
+    # provider is an operator action (set two variables, rotate one secret),
+    # never a code change or a PR. Both steps below that talk to opencode
+    # (auth + smoke) key off these; so does the "Review" step, which reads
+    # `FLEET_REVIEW_MODEL` itself (review.ts's VERIFIER_ENGINE) rather than a
+    # literal, precisely so a variable change moves the smoke test and the
+    # real review together. See "Switching the review engine provider" in
+    # docs/superpowers/specs/2026-09-11-llamenos-fleet-orchestrator-design.md.
+    env:
+      FLEET_REVIEW_PROVIDER: ${{ vars.FLEET_REVIEW_PROVIDER || 'kimi-for-coding' }}
+      FLEET_REVIEW_MODEL: ${{ vars.FLEET_REVIEW_MODEL || 'kimi-for-coding/k3-256k' }}
+
     steps:
       # `pull_request` is deliberately absent here — this job never runs on
       # that event any more. On `merge_group` the base/head are the QUEUE's
@@ -1646,11 +1659,14 @@ jobs:
       # Written to a file rather than passed through the environment, so the
       # key is never in the verifier subprocess's env at all.
       # This is the shape confirmed on the operator's own machine. No
-      # `opencode.json` is written: `kimi-for-coding` is a provider in
-      # opencode's built-in models.dev registry, verified by resolving
-      # `kimi-for-coding/k3-256k` from a HOME containing nothing but this
-      # file — so a committed provider block would only be a second copy that
-      # can drift from the registry.
+      # `opencode.json` is written: opencode resolves `FLEET_REVIEW_MODEL`
+      # against its built-in models.dev registry directly, so a committed
+      # provider block would only be a second copy that can drift from the
+      # registry. The `auth.json` key is `$FLEET_REVIEW_PROVIDER` itself, not
+      # a literal — that is the whole mechanism that makes a provider switch a
+      # variable change rather than a code change (see the job-level `env:`
+      # comment above, and the runbook in
+      # docs/superpowers/specs/2026-09-11-llamenos-fleet-orchestrator-design.md).
       - name: Authenticate the review engine
         env:
           FLEET_REVIEW_API_KEY: ${{ secrets.FLEET_REVIEW_API_KEY }}
@@ -1663,8 +1679,8 @@ jobs:
             exit 0
           fi
           mkdir -p "$HOME/.local/share/opencode"
-          jq -n --arg k "$FLEET_REVIEW_API_KEY" \
-            '{"kimi-for-coding":{"type":"api","key":$k}}' \
+          jq -n --arg p "$FLEET_REVIEW_PROVIDER" --arg k "$FLEET_REVIEW_API_KEY" \
+            '{($p):{"type":"api","key":$k}}' \
             > "$HOME/.local/share/opencode/auth.json"
           chmod 600 "$HOME/.local/share/opencode/auth.json"
 
@@ -1692,9 +1708,21 @@ jobs:
       # never a looser substring or shell comparison: an engine whose output
       # grows colour codes or a trailing line must fail HERE, not pass the
       # smoke step and then make every real review UNREADABLE.
+      #
+      # A failure here is ALWAYS a job failure — nothing below turns a bad
+      # engine call into a pass. What changed is that a failure now names
+      # WHY, on one line, before the job goes red, distinguishing three
+      # causes so an operator never again has to open the log to tell "the
+      # provider's weekly quota ran out" (`engine-quota`) from "the key is
+      # wrong" (`engine-auth`) from everything else (`engine-unavailable` —
+      # a bad model id, a network error, a rejected config, or the engine
+      # running but never producing a valid verdict). This exact ambiguity —
+      # a Moonshot Kimi subscription's weekly quota silently exhausted — is
+      # what made `fleet/review` red repo-wide with no actionable signal on
+      # 2026-09-15.
       - name: Smoke-test the review engine
         run: |
-          set -euo pipefail
+          set -uo pipefail
           root="$(mktemp -d)"
           cfg="$(mktemp -d)"
           jq -n '{
@@ -1705,12 +1733,47 @@ jobs:
             }
           }' > "$cfg/opencode.json"
           export OPENCODE_CONFIG_DIR="$cfg" OPENCODE_DISABLE_PROJECT_CONFIG=1
-          (cd "$root" && opencode debug config --pure) > "$RUNNER_TEMP/opencode-config.json"
+
+          # $1: engine-quota | engine-auth | engine-unavailable. $2: the raw
+          # engine text to print for a human, then always exits 1 — this
+          # function is the only way the step fails, and it always fails.
+          fail() {
+            echo "review engine smoke test FAILED: $1 (provider=$FLEET_REVIEW_PROVIDER model=$FLEET_REVIEW_MODEL)"
+            printf '%s\n' "$2"
+            exit 1
+          }
+
+          # Best-effort classification of the engine's own error text — heuristic,
+          # not authoritative, because opencode does not expose a structured error
+          # code here. Weekly/usage-limit language is engine-quota; 401/invalid-key
+          # or missing-credential language is engine-auth; anything else the
+          # engine said is engine-unavailable.
+          classify() {
+            local text="$1"
+            if printf '%s' "$text" | grep -qiE 'quota|rate.?limit|usage.?limit|too many requests|\b429\b'; then
+              echo "engine-quota"
+            elif printf '%s' "$text" | grep -qiE '\b401\b|unauthorized|invalid.*(api.?key|token)|no.*api.?key|authenticat(e|ion)? (fail|error|required)'; then
+              echo "engine-auth"
+            else
+              echo "engine-unavailable"
+            fi
+          }
+
+          config_out="$(cd "$root" && opencode debug config --pure 2>&1)" || fail "$(classify "$config_out")" "$config_out"
+          printf '%s' "$config_out" > "$RUNNER_TEMP/opencode-config.json"
           jq -e '.permission | .bash == "deny" and .edit == "deny" and .webfetch == "deny" and .websearch == "deny"' \
-            "$RUNNER_TEMP/opencode-config.json"
-          out="$(cd "$root" && printf 'Reply with exactly: VERDICT: PASS\n' \
-            | opencode run --pure --model kimi-for-coding/k3-256k --format json --dir "$root")"
-          printf '%s' "$out" | bun -e '
+            "$RUNNER_TEMP/opencode-config.json" \
+            || fail "engine-unavailable" "opencode debug config did not round-trip the deny-all permission block"
+
+          run_out="$(cd "$root" && printf 'Reply with exactly: VERDICT: PASS\n' \
+            | opencode run --pure --model "$FLEET_REVIEW_MODEL" --format json --dir "$root" 2>"$RUNNER_TEMP/opencode-run-stderr.log")"
+          run_status=$?
+          run_err="$(cat "$RUNNER_TEMP/opencode-run-stderr.log" 2>/dev/null || true)"
+          if [ "$run_status" -ne 0 ]; then
+            fail "$(classify "$run_out"$'\n'"$run_err")" "$run_out"$'\n'"$run_err"
+          fi
+
+          verdict_out="$(printf '%s' "$run_out" | bun -e '
             import { opencodeAssistantText, parseVerdict } from "./orchestrator/src/review.ts"
             const { text, errors } = opencodeAssistantText(await Bun.stdin.text())
             console.log(text)
@@ -1718,7 +1781,13 @@ jobs:
             const verdict = parseVerdict(text)
             console.log("smoke verdict (parseVerdict of assistant text): " + verdict)
             process.exit(verdict === "PASS" ? 0 : 1)
-          '
+          ')"
+          verdict_status=$?
+          if [ "$verdict_status" -ne 0 ]; then
+            fail "engine-unavailable" "$verdict_out"
+          fi
+          printf '%s\n' "$verdict_out"
+          echo "review engine smoke test OK (provider=$FLEET_REVIEW_PROVIDER model=$FLEET_REVIEW_MODEL)"
 
 
       # Bootstrap guard. The gate runs from the BASE checkout by design, so

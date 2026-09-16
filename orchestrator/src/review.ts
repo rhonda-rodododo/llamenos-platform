@@ -201,11 +201,25 @@ export function parseVerdict(output: string): 'PASS' | 'FAIL' | 'UNREADABLE' {
  * failed and was recorded UNREADABLE, which correctly blocked but looked
  * exactly like "the engine was unreachable". `kimi-for-coding/k3-256k` is a
  * real id in the registry (`opencode models`), and its 256k context is the
- * reason to prefer it over `k3` for a whole-diff review.
+ * reason to prefer it over `k3` for a whole-diff review. It remains the
+ * DEFAULT for exactly that reason — it is a known-good id, not a guess.
+ *
+ * The opencode model is read from `FLEET_REVIEW_MODEL` (env), falling back to
+ * that default when unset (e.g. a local `bun orchestrator/src/cli.ts` run
+ * outside CI). `.github/workflows/ci.yml`'s `fleet-review` job sets this from
+ * `vars.FLEET_REVIEW_MODEL` with the same default, and its own
+ * "Authenticate the review engine" step keys `~/.local/share/opencode/
+ * auth.json` off the matching `vars.FLEET_REVIEW_PROVIDER` — so switching the
+ * whole non-author reviewer to a different provider (a different quota, a
+ * different vendor) is two repo variables and one secret rotation, never a
+ * code change here. See "Switching the review engine provider" in
+ * docs/superpowers/specs/2026-09-11-llamenos-fleet-orchestrator-design.md.
  */
+const DEFAULT_OPENCODE_MODEL = 'kimi-for-coding/k3-256k'
+
 const VERIFIER_ENGINE: Record<EngineId, { binary: string; model: string }> = {
   claude: { binary: 'claude', model: 'sonnet' },
-  opencode: { binary: 'opencode', model: 'kimi-for-coding/k3-256k' },
+  opencode: { binary: 'opencode', model: process.env['FLEET_REVIEW_MODEL'] || DEFAULT_OPENCODE_MODEL },
 }
 
 /**
