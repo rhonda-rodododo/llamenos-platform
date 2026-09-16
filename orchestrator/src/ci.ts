@@ -349,6 +349,81 @@ export async function runReviewCi(deps: ReviewCiDeps): Promise<CiVerdict> {
   return verdict
 }
 
+/**
+ * The three outcomes `fleet-review.yml`'s job-level `if:` used to encode —
+ * see #848 and this function's own comment for why that design fails open.
+ * The job now has NO `if:` at all and always reaches a real conclusion; this
+ * is what a step INSIDE it calls, before installing the review engine, to
+ * decide which of the three branches applies:
+ *
+ *  - `cache-hit`  — a prior PASS exists for this exact diff. Concludes the
+ *    job successfully with no engine call, regardless of which label fired
+ *    this run — this is what makes an unrelated label event (say,
+ *    `agent-dispatchable` on an already-reviewed PR) cheap and
+ *    non-destructive instead of a wasted (or worse, skipped) re-review.
+ *  - `not-requested` — no cached PASS, and this run was not the `review`
+ *    label (nor a manual `workflow_dispatch`). Fails the job outright: a
+ *    `fleet/review` a reader has not yet asked for is not a passing review,
+ *    and the old design's mistake was ever treating "not asked for" as
+ *    anything other than a fail-closed red check.
+ *  - `run-engine` — no cached PASS, and the review WAS requested. The
+ *    workflow proceeds through engine install, auth, the smoke test and the
+ *    real review exactly as before this file's `if:` removal.
+ *
+ * `runReviewCi` itself still opens with the identical cache lookup (see its
+ * own comment) — so a direct call to it from anywhere else stays correct on
+ * its own — at the cost of one redundant lookup on the `run-engine` path
+ * once this decision has already been made. That redundancy is cheap and
+ * never a correctness risk: both reads hit the same cache with the same key.
+ */
+export type ReviewGateOutcome =
+  | { kind: 'cache-hit'; cacheKey: ReviewCacheKey; verdict: CachedVerdict }
+  | { kind: 'not-requested'; cacheKey: ReviewCacheKey }
+  | { kind: 'run-engine'; cacheKey: ReviewCacheKey }
+
+export interface ReviewGateDeps {
+  ctx: CiContext
+  prDiff(): Promise<string>
+  cache: ReviewCache
+  /** Whether THIS event is the one that asks for a review: the `review`
+   *  label being applied, or a manual `workflow_dispatch`. Computed by the
+   *  workflow from `github.event_name` / `github.event.label.name` — never
+   *  re-derived here, so this function has exactly one job: cache first,
+   *  request second. */
+  requested: boolean
+  log(msg: string): void
+}
+
+export async function decideReviewGate(deps: ReviewGateDeps): Promise<ReviewGateOutcome> {
+  const diff = await deps.prDiff()
+  const cacheKey: ReviewCacheKey = { pr: deps.ctx.pr, diffHash: diffHash(diff) }
+
+  // Identical fail-safe direction as `runReviewCi`: a lookup failure and a
+  // genuine miss are indistinguishable on purpose, because both mean "this
+  // is not yet a known-good diff" — see `artifactReviewCache`'s own doc.
+  let cached: CachedVerdict | undefined
+  try {
+    cached = await deps.cache.lookup(cacheKey)
+  } catch (e) {
+    deps.log(`review cache lookup threw — treating pr=${cacheKey.pr} as a miss (fail safe): ${e instanceof Error ? e.message : String(e)}`)
+    cached = undefined
+  }
+  if (cached !== undefined) {
+    deps.log(`reused verdict for pr=${cacheKey.pr} sha256:${cacheKey.diffHash.slice(0, 12)}… — no engine call`)
+    return { kind: 'cache-hit', cacheKey, verdict: cached }
+  }
+
+  if (!deps.requested) {
+    deps.log(
+      `review not requested for pr=${cacheKey.pr} sha256:${cacheKey.diffHash.slice(0, 12)}… — ` +
+      'add the `review` label to run the non-author review',
+    )
+    return { kind: 'not-requested', cacheKey }
+  }
+
+  return { kind: 'run-engine', cacheKey }
+}
+
 /** `undefined` when the workflow did not supply a branch — a CI entry point
  *  with no idea what it is judging must refuse, not guess. */
 export function ciContextFromEnv(env: NodeJS.ProcessEnv, repoDir: string): CiContext | undefined {

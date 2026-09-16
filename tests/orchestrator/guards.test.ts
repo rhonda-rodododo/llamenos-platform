@@ -7,7 +7,7 @@ import { codeownersMatcher, codeownersPatterns, trackedFiles, trackedFilesUnder 
 import { mkdtempSync, rmSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { runReviewCi, type CiContext, type ReviewCiDeps } from '../../orchestrator/src/ci.js'
+import { runReviewCi, decideReviewGate, type CiContext, type ReviewCiDeps } from '../../orchestrator/src/ci.js'
 import { DEFAULT_MAX_TURNS, HIGH_IMPACT_MAX_TURNS, DEFAULT_TIMEOUT_MS, HIGH_IMPACT_TIMEOUT_MS } from '../../orchestrator/src/review.js'
 import { diffHash, cacheArtifactName, type ReviewCache, type CachedVerdict, type ReviewCacheKey } from '../../orchestrator/src/review-cache.js'
 import type { Lane } from '../../orchestrator/src/config.js'
@@ -948,5 +948,108 @@ describe('rail: fleet/review reviews exactly once per diff, never twice on an id
     const v = await runReviewCi(deps({ secondOpinion }))
     expect(v.ok).toBe(true)
     expect(secondOpinion).toHaveBeenCalledTimes(1)
+  })
+})
+
+/**
+ * `decideReviewGate` is what `fleet-review.yml`'s "Decide whether to run the
+ * review engine" step calls — the runtime logic behind the three branches
+ * a bootstrap workflow change (#848) needs on the base ref before it can be
+ * wired into that workflow. These rails pin the DECISION ITSELF, so a
+ * mutation that flips the logic — e.g. concluding `run-engine` when
+ * `requested` is false, or `not-requested` when a cache hit exists — fails a
+ * test even before any workflow YAML exists to call it. Mirrors the
+ * `fakeCache` pattern from the "reviews exactly once per diff" rail above,
+ * deliberately not shared with it: that suite exercises `runReviewCi`'s full
+ * pipeline (verify, secondOpinion, recording); this one exercises only the
+ * preflight decision, with no `verify`/`secondOpinion` in sight — a passing
+ * test here cannot be mistaken for a passing review.
+ */
+describe('rail: decideReviewGate enforces the three fleet/review branches (cache-hit / not-requested / run-engine)', () => {
+  const ctx = (): CiContext => ({
+    branch: 'fleet/ios/123', repoDir: '/base', headDir: '/tmp/head',
+    baseSha: 'base111', headSha: 'head222', pr: '42',
+  })
+
+  function fakeCache(seed?: { key: ReviewCacheKey; verdict: CachedVerdict }): ReviewCache {
+    const store = new Map<string, CachedVerdict>()
+    if (seed !== undefined) store.set(`${seed.key.pr}:${seed.key.diffHash}`, seed.verdict)
+    return {
+      async lookup(key: ReviewCacheKey) { return store.get(`${key.pr}:${key.diffHash}`) },
+      async record() { /* decideReviewGate never records — only runReviewCi does */ },
+    }
+  }
+
+  const diff = 'diff --git a/x b/x\n+hello\n'
+
+  // Branch (a): a cache hit concludes `cache-hit` regardless of whether this
+  // event was the `review` label — an unrelated label event on an
+  // already-reviewed diff must reuse the verdict, never fall through to
+  // `not-requested` or `run-engine`. Proven with `requested: false`, the
+  // harder of the two cases: a mutation that checked `requested` BEFORE the
+  // cache would send this down the `not-requested` branch instead of
+  // reusing the cached PASS.
+  it('concludes cache-hit when a prior PASS exists, even when this event did not request a review', async () => {
+    const cache = fakeCache({
+      key: { pr: '42', diffHash: diffHash(diff) },
+      verdict: { verdict: 'PASS', text: 'VERDICT: PASS (cached)' },
+    })
+    const outcome = await decideReviewGate({
+      ctx: ctx(), prDiff: async () => diff, cache, requested: false, log: () => {},
+    })
+    expect(outcome.kind).toBe('cache-hit')
+  })
+
+  // Branch (c): a cache miss on an event that did NOT request a review
+  // fails closed — the exact regression this whole PR exists to prevent.
+  it('concludes not-requested on a cache miss when this event did not request a review', async () => {
+    const cache = fakeCache()
+    const outcome = await decideReviewGate({
+      ctx: ctx(), prDiff: async () => diff, cache, requested: false, log: () => {},
+    })
+    expect(outcome.kind).toBe('not-requested')
+  })
+
+  // Branch (b): a cache miss on an event that DID request a review (the
+  // `review` label, or workflow_dispatch) proceeds to the engine.
+  it('concludes run-engine on a cache miss when this event requested a review', async () => {
+    const cache = fakeCache()
+    const outcome = await decideReviewGate({
+      ctx: ctx(), prDiff: async () => diff, cache, requested: true, log: () => {},
+    })
+    expect(outcome.kind).toBe('run-engine')
+  })
+
+  // Same fail-safe direction as `runReviewCi`'s own cache lookup: a lookup
+  // that THROWS must never be mistaken for a hit, and must never crash the
+  // step — it degrades to a miss, which then still respects `requested`.
+  it('treats a throwing cache lookup as a miss, never a hit and never a crash', async () => {
+    const cache: ReviewCache = {
+      lookup: async () => { throw new Error('artifacts API rate limited') },
+      record: async () => {},
+    }
+    const requestedOutcome = await decideReviewGate({
+      ctx: ctx(), prDiff: async () => diff, cache, requested: true, log: () => {},
+    })
+    expect(requestedOutcome.kind).toBe('run-engine')
+
+    const unrequestedOutcome = await decideReviewGate({
+      ctx: ctx(), prDiff: async () => diff, cache, requested: false, log: () => {},
+    })
+    expect(unrequestedOutcome.kind).toBe('not-requested')
+  })
+
+  // The cache key is diff-content-based, matching `runReviewCi`'s own — a
+  // hit for PR #42's diff must never leak into a decision for PR #7's
+  // identical diff text.
+  it('never cross-publishes a cache hit between two different PRs with the identical diff', async () => {
+    const cache = fakeCache({
+      key: { pr: '42', diffHash: diffHash(diff) },
+      verdict: { verdict: 'PASS', text: 'VERDICT: PASS (cached)' },
+    })
+    const outcome = await decideReviewGate({
+      ctx: { ...ctx(), pr: '7' }, prDiff: async () => diff, cache, requested: false, log: () => {},
+    })
+    expect(outcome.kind).toBe('not-requested')
   })
 })
