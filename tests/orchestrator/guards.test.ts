@@ -1146,12 +1146,15 @@ describe('rail: fleet/review reviews exactly once per diff, never twice on an id
  * review engine" step calls — the runtime logic behind the three branches
  * the file header (and the YAML rails above) describe. Those YAML rails pin
  * the WIRING (which steps key off `outcome == 'run-engine'`, that no
- * job-level `if:` exists); these pin the DECISION ITSELF, so a mutation that
- * keeps the wiring intact but flips the logic — e.g. concluding
- * `run-engine` when `requested` is false, or `not-requested` when a cache
- * hit exists — still fails a test. Mirrors the `fakeCache` pattern from the
- * "reviews exactly once per diff" rail above, deliberately not shared with
- * it: that suite exercises `runReviewCi`'s full pipeline (verify, secondOpinion,
+ * job-level `if:` exists); these pin the DECISION ITSELF — the same
+ * bootstrap-order split as the CLI: `review-gate` (#851) needs this decision
+ * on the base ref before `fleet-review.yml` (#848) can call it — so a
+ * mutation that keeps the wiring intact but flips the logic — e.g.
+ * concluding `run-engine` when `requested` is false, or `not-requested` when
+ * a cache hit exists — still fails a test, even before any workflow YAML
+ * exists to call it. Mirrors the `fakeCache` pattern from the "reviews
+ * exactly once per diff" rail above, deliberately not shared with it: that
+ * suite exercises `runReviewCi`'s full pipeline (verify, secondOpinion,
  * recording); this one exercises only the preflight decision, with no
  * `verify`/`secondOpinion` in sight — a passing test here cannot be mistaken
  * for a passing review.
