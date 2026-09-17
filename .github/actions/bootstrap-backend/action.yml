@@ -74,40 +74,66 @@ runs:
         # andrius/asterisk) — sip-bridge and signal-notifier are local builds
         # and unaffected by this. A single Docker Hub connection reset must
         # not fail the whole job: the core `app` service is already up from
-        # the previous step and is all the BDD suite strictly requires — the
-        # health-wait steps below already treat a missing sidecar as
-        # non-fatal (they emit a `::warning::` and continue). Retry the pull
-        # with backoff, then fall through without starting the sidecars if
-        # it still fails, rather than letting `up` (which also pulls)
-        # propagate a transient registry error as a job failure.
-        pull_ok=false
-        for attempt in 1 2 3; do
-          if $TIMEOUT_CMD 180 docker compose --env-file .env \
-              --profile signal --profile asterisk \
-              -f deploy/docker/docker-compose.yml \
-              -f deploy/docker/docker-compose.test.yml \
-              pull signal-cli asterisk; then
-            pull_ok=true
-            break
+        # the previous step and is all the BDD suite strictly requires. Pull
+        # each registry image independently with retry/backoff, so a failure
+        # on one (e.g. asterisk) doesn't also withhold the other (signal-cli)
+        # that pulled fine — then fall through without starting the affected
+        # sidecar(s) rather than letting `up` (which also pulls) propagate a
+        # transient registry error as a job failure.
+        #
+        # This does NOT make sidecar-dependent scenarios pass — the @signal
+        # and @telephony BDD steps probe the sidecar's own health endpoint
+        # directly and throw if it's unreachable, so a pull/start failure here
+        # surfaces as an explicit, loud scenario failure downstream, never a
+        # silent skip or a vacuous pass. Record per-service outcome so the
+        # warning below (and CI logs) name exactly which image failed.
+        pull_one() {
+          local service="$1" profile="$2"
+          local ok=false
+          for attempt in 1 2 3; do
+            if $TIMEOUT_CMD 180 docker compose --env-file .env \
+                --profile "$profile" \
+                -f deploy/docker/docker-compose.yml \
+                -f deploy/docker/docker-compose.test.yml \
+                pull "$service"; then
+              ok=true
+              break
+            fi
+            echo "::warning::${service} image pull failed (attempt ${attempt}/3) — retrying after backoff"
+            sleep $((attempt * 10))
+          done
+          if [ "$ok" != "true" ]; then
+            echo "::warning::Could not pull ${service} image after 3 attempts — continuing without it. Scenarios that depend on it will fail explicitly (they check sidecar health directly); the core backend-bdd suite is unaffected."
           fi
-          echo "::warning::Sidecar image pull failed (attempt ${attempt}/3) — retrying after backoff"
-          sleep $((attempt * 10))
-        done
-        if [ "$pull_ok" != "true" ]; then
-          echo "::warning::Could not pull optional sidecar images (signal-notifier/sip-bridge dependencies) after 3 attempts — continuing without them. Sidecar-dependent BDD scenarios (@signal, sip-bridge) will fail explicitly; the core backend-bdd suite is unaffected."
-        fi
-        echo "PULL_OK=$pull_ok" >> "$GITHUB_ENV"
+          echo "$ok"
+        }
+        signal_pull_ok=$(pull_one signal-cli signal)
+        asterisk_pull_ok=$(pull_one asterisk asterisk)
+        echo "SIGNAL_PULL_OK=$signal_pull_ok" >> "$GITHUB_ENV"
+        echo "ASTERISK_PULL_OK=$asterisk_pull_ok" >> "$GITHUB_ENV"
 
-    - name: Start sidecar profiles (signal + telephony)
-      if: inputs.with_sidecars == 'true' && env.PULL_OK == 'true'
+    - name: Start signal sidecar profile
+      if: inputs.with_sidecars == 'true' && env.SIGNAL_PULL_OK == 'true'
       shell: bash
       run: |
         if ! $TIMEOUT_CMD 300 docker compose --env-file .env \
-            --profile signal --profile asterisk \
+            --profile signal \
             -f deploy/docker/docker-compose.yml \
             -f deploy/docker/docker-compose.test.yml \
             up -d --build --no-recreate; then
-          echo "::warning::Sidecar containers failed to start after a successful pull — continuing without them. Sidecar-dependent BDD scenarios (@signal, sip-bridge) will fail explicitly; the core backend-bdd suite is unaffected."
+          echo "::warning::signal sidecar containers failed to start after a successful pull — continuing without them. @signal BDD scenarios will fail explicitly (they check signal-notifier health directly); the core backend-bdd suite is unaffected."
+        fi
+
+    - name: Start telephony (asterisk) sidecar profile
+      if: inputs.with_sidecars == 'true' && env.ASTERISK_PULL_OK == 'true'
+      shell: bash
+      run: |
+        if ! $TIMEOUT_CMD 300 docker compose --env-file .env \
+            --profile asterisk \
+            -f deploy/docker/docker-compose.yml \
+            -f deploy/docker/docker-compose.test.yml \
+            up -d --build --no-recreate; then
+          echo "::warning::telephony (asterisk/sip-bridge) sidecar containers failed to start after a successful pull — continuing without them. @telephony BDD scenarios will fail explicitly (they check sip-bridge health directly); the core backend-bdd suite is unaffected."
         fi
 
     - name: Wait for signal-notifier health
@@ -121,7 +147,7 @@ runs:
             break
           fi
           if [ "$i" -eq 30 ]; then
-            echo "::warning::signal-notifier did not become healthy — sidecar tests will be skipped"
+            echo "::warning::signal-notifier did not become healthy — @signal BDD scenarios will fail explicitly (they check sidecar health directly and never pass or skip silently)"
           fi
           sleep 3
         done
