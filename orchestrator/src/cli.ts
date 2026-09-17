@@ -15,8 +15,9 @@ import { loadContracts, contractsFor, buildMemoryContext, augmentBrief } from '.
 import { dispatch as dispatchWorker, type EffortLevel } from './engines.js'
 import { verifyMechanical } from './verify.js'
 import { secondOpinion, postReview } from './review.js'
+import { artifactReviewCache } from './review-cache.js'
 import {
-  runVerifyCi, runReviewCi, ciContextFromEnv, ciDiff,
+  runVerifyCi, runReviewCi, decideReviewGate, ciContextFromEnv, ciDiff,
   REVIEW_JOB, REVIEW_KEY_ENV, VERIFY_JOB, itemIdFromBranch, fleetBranchFor, type CiContext, type CiVerdict,
 } from './ci.js'
 import {
@@ -1155,6 +1156,48 @@ async function runCiGate(job: string, run: (ctx: CiContext) => Promise<CiVerdict
   return verdict.ok ? 0 : 1
 }
 
+/**
+ * `review-gate` — the step `fleet-review.yml` runs BEFORE installing the
+ * review engine, now that the job carries no job-level `if:` at all (#848's
+ * fail-open bug — a job instantiated on an event and then skipped by `if:`
+ * satisfies branch protection exactly like a green check). Its exit code is
+ * what actually enforces branch (c) of `decideReviewGate`'s three outcomes:
+ * a `not-requested` result exits 1 here, which is what stops every
+ * subsequent step (engine install, auth, the smoke test, the real review)
+ * from ever running — GitHub Actions does not run later steps after one
+ * fails unless they opt in with `if: always()`/`if: failure()`, and none of
+ * the engine steps do. `cache-hit` and `run-engine` both exit 0; the
+ * `outcome` step output is what the workflow's own `if:` on each later step
+ * reads to decide whether IT runs.
+ */
+async function runReviewGate(): Promise<number> {
+  const ctx = ciContextFromEnv(process.env, REPO_ROOT)
+  if (ctx === undefined) {
+    process.stderr.write(
+      'review-gate: FLEET_CI_BRANCH, FLEET_CI_HEAD_DIR, FLEET_CI_HEAD_SHA and FLEET_CI_BASE_SHA ' +
+      'must all be set — refusing to judge an unknown tree\n',
+    )
+    return 2
+  }
+  const outcome = await decideReviewGate({
+    ctx,
+    prDiff: () => ciDiff(ctx),
+    cache: artifactReviewCache(process.env['FLEET_REVIEW_CACHE_DIR'], ciLog),
+    requested: process.env['FLEET_REVIEW_REQUESTED'] === 'true',
+    log: ciLog,
+  })
+  const ghOutput = process.env['GITHUB_OUTPUT']
+  if (ghOutput !== undefined) appendFileSync(ghOutput, `outcome=${outcome.kind}\n`)
+  if (outcome.kind === 'not-requested') {
+    process.stderr.write(
+      `${REVIEW_JOB}: review not requested — add the \`review\` label to run the non-author review\n`,
+    )
+    return 1
+  }
+  ciLog(`${REVIEW_JOB}: gate outcome = ${outcome.kind}`)
+  return 0
+}
+
 type CommandHandler = (rest: string[]) => Promise<number> | number
 
 /**
@@ -1201,7 +1244,12 @@ const HANDLERS: Record<string, CommandHandler> = {
     log: ciLog,
     prDiff: () => ciDiff(ctx),
     secondOpinion,
+    // `FLEET_REVIEW_CACHE_DIR` unset (e.g. a local run) disables recording
+    // without disabling lookup — a lookup that finds nothing behaves
+    // identically either way, and this command still runs the engine.
+    cache: artifactReviewCache(process.env['FLEET_REVIEW_CACHE_DIR'], ciLog),
   })),
+  'review-gate': () => runReviewGate(),
   plan: () => runPlan(),
   integrate: () => runIntegrate(),
 }
