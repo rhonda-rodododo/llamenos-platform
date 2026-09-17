@@ -333,22 +333,69 @@ passing one — never counts toward a PR's required contexts. `gh pr view 848
 having succeeded against the PR's own head SHA.
 
 The fix: `fleet-review.yml` now triggers on `pull_request`, scoped to
-`types: [labeled]`, gated by `if: github.event_name == 'workflow_dispatch' ||
-github.event.label.name == 'review'`. Applying the `review` label to a PR is
-now the real trigger — a `pull_request`-triggered run's check result attaches
-to the PR's head SHA automatically, the same mechanism `fleet/verify`
-(`fleet-verify.yml`) already relies on. With no label, the workflow never
-runs and the `fleet/review` context stays ABSENT — fail closed, same
-semantics as before. Re-adding the label to unchanged content reuses the
-prior PASS via the diff-content review cache (`review-cache.ts`); a FAIL is
-never cached, so a re-label after a real fix reviews again for real.
-`workflow_dispatch` remains as a manual escape hatch (see step 3 above) but
-is no longer positioned as the primary path, since it cannot satisfy a
-required context on its own. `merge_group` is dropped as a trigger entirely:
-this repo's GitHub merge queue is unavailable today (owner type `User` — the
-ruleset's `merge_queue` rule is rejected outright), and keeping `merge_group`
-as a trigger while excluding it from the job's `if:` would recreate the
-original fail-open bug this file exists to prevent.
+`types: [labeled]`. Applying the `review` label to a PR is the real trigger —
+a `pull_request`-triggered run's check result attaches to the PR's head SHA
+automatically, the same mechanism `fleet/verify` (`fleet-verify.yml`) already
+relies on.
+
+#848's own first fix reintroduced the exact bug class it closed: it narrowed
+the `labeled` trigger back down with a job-level `if:
+github.event_name == 'workflow_dispatch' || github.event.label.name ==
+'review'`. GitHub cannot filter a `pull_request` trigger by label *value* —
+only by `types:` — so applying any *other* label (e.g. the fleet's own
+`agent-dispatchable`) still instantiated the job, which the `if:` then
+skipped, and a skipped required check satisfies branch protection with no
+review ever run. `fleet/review`'s own verdict caught this on #848 itself,
+before #848 merged.
+
+The job now carries **no job-level `if:` at all** — it always runs and always
+reaches a real conclusion, on every `labeled` event. What used to be the
+job's `if:` is instead the **"Decide whether to run the review engine" step**
+— the `review-gate` CLI subcommand (`orchestrator/src/cli.ts`), which wraps
+`decideReviewGate` (`orchestrator/src/ci.ts`) — whose exit code and `outcome`
+output gate every step after it via their own step-level `if:
+steps.gate.outputs.outcome == 'run-engine'`:
+
+- **`cache-hit`** — a prior PASS is cached for this exact diff content
+  (`review-cache.ts`). The gate step exits 0 with `outcome=cache-hit`; every
+  later step (engine install, auth, smoke test, the real review) is skipped
+  by its own `if:`, and the job concludes **SUCCESS** with no engine call at
+  all. This is what makes applying an unrelated label to an already-reviewed
+  PR cheap and non-destructive, instead of either a wasted model call or (the
+  old bug) a silently-satisfied skip.
+- **`run-engine`** — no cached PASS, and this event is the `review` label (or
+  a manual `workflow_dispatch`). The gate step exits 0 with
+  `outcome=run-engine`, and the pipeline runs exactly as before: install the
+  engine, authenticate, smoke-test it, then the real review.
+- **`not-requested`** — no cached PASS, and this event is any other label.
+  The gate step **fails** (exit 1) with "review not requested — add the
+  `review` label to run the non-author review". No engine call, no skip — the
+  job goes red, which is the correct, honest state for a PR nobody has asked
+  to be reviewed yet.
+
+A step failing mid-job is not a "skipped" job: GitHub Actions still runs the
+job to a real conclusion (failure), and that conclusion is what
+`fleet/review`'s required check reports. This is the structural difference
+from the job-level `if:` bug: a job-level `if:` can make the whole job (and
+therefore its check run) never run at all while GitHub still reports
+"skipped", which branch protection treats as green; a step skipped by its
+*own* `if:` inside an always-instantiated job changes nothing about whether
+the job itself concludes. `tests/orchestrator/guards.test.ts` pins the rail
+that no job-level `if:` exists on this job again.
+
+With no label applied at all, the workflow's `on: pull_request: types:
+[labeled]` trigger never fires and the `fleet/review` context stays ABSENT —
+fail closed, same semantics as before. Re-adding the label to unchanged
+content reuses the prior PASS via the diff-content review cache
+(`review-cache.ts`); a FAIL is never cached, so a re-label after a real fix
+reviews again for real. `workflow_dispatch` remains as a manual escape hatch
+(see step 3 above) but is no longer positioned as the primary path, since a
+`workflow_dispatch` run has no PR of its own and cannot satisfy a required
+context on its own. `merge_group` is dropped as a trigger entirely: this
+repo's GitHub merge queue is unavailable today (owner type `User` — the
+ruleset's `merge_queue` rule is rejected outright), and re-adding it later
+needs its own request-detection arm and its own rail, not a trigger sitting
+ahead of a queue that does not exist yet.
 
 ### 5.6 Agent-to-agent messaging
 
