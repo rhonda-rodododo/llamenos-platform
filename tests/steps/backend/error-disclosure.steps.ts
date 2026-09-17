@@ -10,7 +10,6 @@ import { Given, When, Then, Before, getState, setState } from './fixtures'
 import { setLastResponse } from './shared-state'
 import {
   generateTestKeypair,
-  ADMIN_SEED,
 } from '../../api-helpers'
 import { ed25519 } from '@noble/curves/ed25519.js'
 import { hexToBytes, bytesToHex, utf8ToBytes } from '@shared/encoding'

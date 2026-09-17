@@ -9,22 +9,18 @@ import { Given, When, Then, Before, getState, setState } from './fixtures'
 import { getScenarioState } from './common.steps'
 import {
   apiGet,
-  apiPost,
   apiPatch,
   createVolunteerViaApi,
   createReportViaApi,
   assignReportViaApi,
   listReportsViaApi,
-  createRecordViaApi,
   createCaseFromReportViaApi,
   getRecordViaApi,
   enableCaseManagementViaApi,
   createEntityTypeViaApi,
   updateReportStatusViaApi,
-  ADMIN_NSEC,
 } from '../../api-helpers'
 import { assertIsObject } from '../../integrity-helpers'
-import { TestDB } from '../../db-helpers'
 
 // ── Local State ────────────────────────────────────────────────────
 
@@ -113,7 +109,7 @@ Then('a case record should be created', async ({ world }) => {
   expect(getLifecycleState(world).caseRecordId).toBeTruthy()
 })
 
-Then('the case should be linked to the original report', async ({ request, world }) => {
+Then('the case should be linked to the original report', async ({ world }) => {
   expect(getLifecycleState(world).caseRecordId).toBeTruthy()
   expect(getLifecycleState(world).reportId).toBeTruthy()
   // The link was created by createCaseFromReportViaApi
@@ -182,7 +178,7 @@ When('{string} lists their own reports', async ({ request, world }, reporterName
   expect(reporter).toBeTruthy()
 
   // List reports as the reporter
-  const { status, data } = await apiGet<{ conversations: Array<{ id: string; metadata?: { reportTitle?: string } }> }>(
+  const { data } = await apiGet<{ conversations: Array<{ id: string; metadata?: { reportTitle?: string } }> }>(
     request,
     '/reports',
     reporter!.seedHex,
@@ -191,7 +187,7 @@ When('{string} lists their own reports', async ({ request, world }, reporterName
   getLifecycleState(world).lastFetchedReport = { conversations: data?.conversations ?? [], reporterName }
 })
 
-Then('{string} should see {string}', async ({ world }, reporterName: string, title: string) => {
+Then('{string} should see {string}', async ({ world }, reporterName: string, _title: string) => {
   const reporter = getLifecycleState(world).reporters.get(reporterName)
   expect(reporter).toBeTruthy()
 
@@ -208,7 +204,7 @@ Then('{string} should see {string}', async ({ world }, reporterName: string, tit
   expect(found).toBe(true)
 })
 
-Then('{string} should not see {string}', async ({ world }, reporterName: string, title: string) => {
+Then('{string} should not see {string}', async ({ world }, reporterName: string, _title: string) => {
   const reporter = getLifecycleState(world).reporters.get(reporterName)
   expect(reporter).toBeTruthy()
 

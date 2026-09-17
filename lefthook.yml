@@ -5,7 +5,7 @@ pre-commit:
       run: bun run typecheck
       stage_fixed: true
     lint:
-      glob: "{src,apps/worker,orchestrator,tests/orchestrator}/**/*.{ts,tsx}"
+      glob: "**/*.{ts,tsx}"
       files: git diff --cached --diff-filter=d --name-only
       run: bunx eslint {files}
       stage_fixed: true

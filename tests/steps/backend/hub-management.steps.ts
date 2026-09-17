@@ -8,7 +8,7 @@
 import { expect } from '@playwright/test'
 import { Given, When, Then, Before, After, getState, setState } from './fixtures'
 import { apiGet, apiPost, apiDelete } from '../../api-helpers'
-import { getSharedState, setLastResponse } from './shared-state'
+import { setLastResponse } from './shared-state'
 
 // ── Local State ────────────────────────────────────────────────────
 
