@@ -320,10 +320,10 @@ describe('rail: every lane starts off', () => {
 /**
  * `fleet/review`'s non-author engine is opencode, and until 2026-09-15 its
  * provider (`kimi-for-coding`) and model (`kimi-for-coding/k3-256k`) were
- * both string literals baked into `.github/workflows/ci.yml` — twice, once
- * for `auth.json`'s key and once for the smoke-test's `--model` flag. When
- * that provider's weekly quota ran out, the ONLY way to switch providers was
- * a PR editing a required, code-owned workflow file — which cannot itself go
+ * both string literals baked into the workflow file — twice, once for
+ * `auth.json`'s key and once for the smoke-test's `--model` flag. When that
+ * provider's weekly quota ran out, the ONLY way to switch providers was a PR
+ * editing a required, code-owned workflow file — which cannot itself go
  * green while the current review engine has no quota. This rail asserts the
  * property that makes a provider switch an operator action instead: the job
  * reads `vars.FLEET_REVIEW_PROVIDER` / `vars.FLEET_REVIEW_MODEL` (with safe
@@ -331,22 +331,28 @@ describe('rail: every lane starts off', () => {
  * as before), the `auth.json` key comes from that variable rather than a
  * literal, and the smoke step can name why the engine failed.
  *
+ * `fleet/review` moved out of `ci.yml` into its own `fleet-review.yml` in the
+ * PR that also fixed its fail-open trigger bug — see the "runs once, at
+ * merge time" rail below for that history. This rail reads `fleet-review.yml`
+ * now, not `ci.yml`.
+ *
  * A grep over the workflow YAML's raw text, deliberately — like the
  * `--admin`/`--force` rail above, there is no runtime behaviour to invoke
  * here (this is CI-only shell, never imported by orchestrator code), so the
  * argv/config text IS the thing to assert.
  */
 describe('rail: the review engine provider is a repo variable, never a hardcoded literal', () => {
-  const CI_YML_PATH = join(process.cwd(), '.github', 'workflows', 'ci.yml')
+  const FLEET_REVIEW_YML_PATH = join(process.cwd(), '.github', 'workflows', 'fleet-review.yml')
 
   function fleetReviewJobText(): string {
-    const text = readFileSync(CI_YML_PATH, 'utf8')
+    const text = readFileSync(FLEET_REVIEW_YML_PATH, 'utf8')
     // From the `fleet-review:` job key to the next top-level (2-space
-    // indented) job key — `ci-status:` today. Scoped rather than whole-file
-    // so a future job that happens to mention these same strings can never
-    // satisfy this rail by accident.
+    // indented) job key, if any (this file has exactly one job today, so
+    // this normally runs to EOF) — scoped rather than trusting "whole file
+    // has one job" as an invariant, so a future second job in this file
+    // can never satisfy this rail by accident.
     const start = text.indexOf('\n  fleet-review:')
-    expect(start, 'fleet-review job not found in ci.yml').toBeGreaterThan(-1)
+    expect(start, 'fleet-review job not found in fleet-review.yml').toBeGreaterThan(-1)
     const rest = text.slice(start + 1)
     const nextJob = rest.slice('  fleet-review:'.length).search(/\n {2}\S/)
     return nextJob === -1 ? rest : rest.slice(0, '  fleet-review:'.length + nextJob)
@@ -440,23 +446,49 @@ describe('rail: lane modes are runtime state, not source', () => {
  * `fleet/review` moved off `pull_request` and onto `merge_group` (#812): the
  * old trigger re-ran a non-author MODEL call — against a paid, weekly-quota'd
  * provider — on every push and every `gh pr update-branch`, and that call
- * volume is what exhausted the quota and made the repo unmergeable. Text
- * assertions over the workflow files are the right instrument here, the same
- * reasoning `guards.test.ts` already applies to `orchestrator/src` argv rails
- * above: there is no runtime behaviour of a YAML trigger condition to
+ * volume is what exhausted the quota and made the repo unmergeable. That fix
+ * had its own bug, found and fixed at #844: the job stayed in `ci.yml`,
+ * gated by a job-level `if:` — but `ci.yml` ALSO triggers on `pull_request`,
+ * so on every ordinary PR the job was still INSTANTIATED and merely skipped
+ * by that `if:`, and GitHub treats a *skipped* required check as satisfying
+ * it, exactly like a green one. #844 itself merged this way, with
+ * `fleet/review` reporting "skipping" and no model review ever run. The real
+ * fix was not a smarter `if:` — GitHub does not distinguish "correctly
+ * skipped" from "should have blocked" once a job exists on the trigger at
+ * all — so `fleet/review` moved into its OWN workflow file
+ * (`fleet-review.yml`) at #848, on `workflow_dispatch` + `merge_group` only.
+ *
+ * #848's own trigger had a DIFFERENT bug, found on #848 itself:
+ * `workflow_dispatch` is a repository-level event with no PR of its own, so
+ * a dispatched run's check result — even a correct, passing one, verified
+ * against #848's real run — never counts toward a PR's required contexts at
+ * all. `gh pr view 848 --json statusCheckRollup` never listed it, and
+ * `gh pr merge` refused with "the base branch policy prohibits the merge".
+ * The fix here: trigger from the PR's OWN check suite — `pull_request`,
+ * scoped to `types: [labeled]` so it fires on exactly one signal (the
+ * `review` label), never on an ordinary push. A `pull_request`-triggered
+ * run's check result attaches to the PR head SHA automatically, which is
+ * what actually satisfies a required context — the same mechanism
+ * `fleet/verify` already relies on. `merge_group` is dropped as a trigger
+ * (see the "reports on merge_group" rail below for why that is safe today).
+ *
+ * Text assertions over the workflow files are the right instrument here, the
+ * same reasoning `guards.test.ts` already applies to `orchestrator/src` argv
+ * rails above: there is no runtime behaviour of a YAML trigger condition to
  * exercise, only the literal condition itself, and a regex over the source is
  * what a mutation to it actually breaks.
  *
  * `fleet/verify` moved out of `ci.yml` into its own `fleet-verify.yml` in
  * round 3 of #844 (CodeQL cache-poisoning — see the rail below this one for
- * why), so this block reads two files, not one. `fleet/review` stays in
- * `ci.yml`.
+ * why). `fleet/review` made the same move at #848 and changed its own
+ * trigger again here, so this block now reads three files.
  */
-describe('rail: fleet/review runs once, at merge time, not on every push', () => {
+describe('rail: fleet/review runs once per review label, not on every push', () => {
   const workflowYaml = (file: string): string =>
     readFileSync(join(process.cwd(), '.github', 'workflows', file), 'utf8')
   const ciYaml = (): string => workflowYaml('ci.yml')
   const fleetVerifyYaml = (): string => workflowYaml('fleet-verify.yml')
+  const fleetReviewYaml = (): string => workflowYaml('fleet-review.yml')
 
   /** The text of one named job, from its `  <name>:` line up to (but not
    *  including) the next job at the same two-space indentation — matching
@@ -472,12 +504,23 @@ describe('rail: fleet/review runs once, at merge time, not on every push', () =>
     return text.slice(starts[at]?.index, end)
   }
 
-  it('finds fleet-verify (fleet-verify.yml) and fleet-review (ci.yml) as real jobs — the parser must not pass vacuously', () => {
+  it('finds fleet-verify (fleet-verify.yml) and fleet-review (fleet-review.yml) as real jobs — the parser must not pass vacuously', () => {
     expect(jobBlock(fleetVerifyYaml(), 'fleet-verify')).toContain('name: fleet/verify')
-    expect(jobBlock(ciYaml(), 'fleet-review')).toContain('name: fleet/review')
+    expect(jobBlock(fleetReviewYaml(), 'fleet-review')).toContain('name: fleet/review')
   })
 
-  it('ci.yml triggers on merge_group at the workflow level (fleet/review and other required jobs still live there)', () => {
+  // The load-bearing assertion of this whole rail, in its post-#844-fail-open
+  // form: `fleet/review` must not exist as a job anywhere in `ci.yml` at all
+  // — not gated by an `if:`, not skipped, ABSENT. A job that exists on
+  // `ci.yml`'s `pull_request`/`push` trigger and is merely `if:`-gated to
+  // skip on those events is exactly the regression this rail exists to catch
+  // (a skipped required check satisfies branch protection same as a green
+  // one), and re-adding the job under any `if:` reproduces it.
+  it('ci.yml contains no job named fleet-review — the job must be ABSENT on pull_request, not skipped', () => {
+    expect(() => jobBlock(ciYaml(), 'fleet-review')).toThrow()
+  })
+
+  it('ci.yml triggers on merge_group at the workflow level (ci-status, the repo\'s own required aggregate, still must report there)', () => {
     // Scoped to before the `jobs:` key: `merge_group` also appears in prose
     // comments and in job bodies (context field names, env vars), and this
     // assertion is specifically about the workflow's OWN `on:` block.
@@ -497,6 +540,34 @@ describe('rail: fleet/review runs once, at merge time, not on every push', () =>
     }
   })
 
+  // The load-bearing assertion for fleet-review.yml's own trigger list:
+  // `pull_request` scoped to `types: [labeled]` ONLY (never `synchronize`,
+  // which would reopen the every-push bug #812 fixed the first time) plus
+  // `workflow_dispatch` for manual debugging, and specifically never `push`
+  // or `merge_group` — `merge_group` reachable here without a matching `if:`
+  // arm (asserted below) would reintroduce the fail-open bug this whole rail
+  // exists to prevent (a job instantiated on an event it then skips via
+  // `if:`, which GitHub's branch protection treats as satisfied).
+  it('fleet-review.yml triggers on pull_request (labeled only) AND workflow_dispatch, and NEVER push or merge_group', () => {
+    const onBlock = fleetReviewYaml().split(/\njobs:\n/)[0] ?? ''
+    expect(onBlock).toMatch(/\n {2}pull_request:\n {4}types:\s*\[\s*labeled\s*\]/)
+    expect(onBlock).toMatch(/\n {2}workflow_dispatch:/)
+    // Scoped to the LITERAL pull_request trigger sub-block (from its own
+    // `\n  pull_request:` line to the next 2-space-indented key), not the
+    // whole pre-`jobs:` text — the file's own prose comments above `on:`
+    // legitimately discuss why `synchronize` is absent, and a whole-text
+    // check would fail on that explanation rather than on an actual second
+    // `types:` entry.
+    const pullRequestBlock = onBlock.match(/\n {2}pull_request:\n((?:\n| {4,}.*\n)*)/)?.[0] ?? ''
+    expect(pullRequestBlock.length, 'pull_request trigger sub-block not found').toBeGreaterThan(0)
+    expect(pullRequestBlock, 'fleet-review.yml pull_request trigger must be labeled-only — adding synchronize reopens the every-push bug')
+      .not.toContain('synchronize')
+    for (const forbiddenEvent of ['push', 'merge_group']) {
+      expect(onBlock, `fleet-review.yml must never trigger on "${forbiddenEvent}" — that reopens the fail-open bug`)
+        .not.toMatch(new RegExp(`\\n {2}${forbiddenEvent}:`))
+    }
+  })
+
   /** The JOB-level `if:`, not a step's — always at exactly four-space
    *  indentation, always before `steps:`, in this file's own convention
    *  (matching `runs-on:`/`permissions:` at the same level). A step-level
@@ -513,20 +584,112 @@ describe('rail: fleet/review runs once, at merge time, not on every push', () =>
     expect(ifLine).toContain('pull_request')
   })
 
-  // The load-bearing assertion of this whole rail. A re-added `pull_request`
-  // trigger on fleet/review is exactly the regression #812 exists to
-  // prevent — it silently restores the per-push call volume that exhausted
-  // the quota, and every other job in this file still going green would not
-  // reveal that on its own.
-  it('fleet/review has NO pull_request trigger of its own', () => {
-    const ifLine = jobLevelIf(jobBlock(ciYaml(), 'fleet-review'))
-    expect(ifLine.length).toBeGreaterThan(0)
-    expect(ifLine).not.toContain('pull_request')
-    expect(ifLine).toContain('merge_group')
+  /**
+   * #848 fixed the fail-open bug once, by moving the job out of `ci.yml`,
+   * and then reintroduced the SAME bug class inside this very file: a
+   * job-level `if: github.event_name == 'workflow_dispatch' ||
+   * github.event.label.name == 'review'` on a job whose trigger is
+   * `pull_request: types: [labeled]` — which GitHub cannot filter by label
+   * VALUE — so applying ANY other label (e.g. `agent-dispatchable`) still
+   * INSTANTIATES the job and the `if:` then SKIPS it, satisfying branch
+   * protection with no review ever run. `fleet/review`'s own verdict on
+   * this PR (#848's own follow-up) is what caught it before merge.
+   *
+   * The fix this rail pins: NO job-level `if:` at all, ever again. What
+   * used to be that `if:` is now the "Decide whether to run the review
+   * engine" step, further down in the job, whose exit code and `outcome`
+   * output are what the LATER steps key off — see the rails below this one.
+   */
+  it('fleet/review carries NO job-level if: at all — a job-level if: on this trigger is exactly the fail-open bug this file exists to prevent', () => {
+    const ifLine = jobLevelIf(jobBlock(fleetReviewYaml(), 'fleet-review'))
+    expect(ifLine).toBe('')
+  })
+
+  /** A single step's own `if:`, found by its `name:` — scoped from that
+   *  step's own `- name: <name>` line to the next `\n      - name:` (or
+   *  `\n      - uses:`) at the same six-space step indentation, so a later
+   *  step's `if:` (or lack of one) is never mistaken for this step's. */
+  function stepIf(block: string, stepName: string): string {
+    const escaped = stepName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const stepHeaderRe = new RegExp(`\\n {6}- name: ${escaped}\\n`)
+    const m = block.match(stepHeaderRe)
+    if (m === null || m.index === undefined) {
+      throw new Error(`no "- name: ${stepName}" step found — the grep must not pass vacuously`)
+    }
+    // The newline ending the "- name: ..." line itself, kept as the LEADING
+    // newline of `rest` — every downstream match below (the next step
+    // header, this step's own `if:`) is anchored on `\n {N}...`, so a `rest`
+    // missing its own leading newline would silently fail to match its
+    // FIRST line, exactly the bug this comment replaces.
+    const nameLineEnd = block.indexOf('\n', m.index + 1)
+    const rest = block.slice(nameLineEnd)
+    const nextStep = rest.search(/\n {6}- (name|uses):/)
+    const stepBlock = nextStep === -1 ? rest : rest.slice(0, nextStep)
+    return stepBlock.match(/\n {8}if:\s*(.+)/)?.[1] ?? ''
+  }
+
+  it('finds real steps to scan at all — the stepIf grep must not pass vacuously', () => {
+    const block = jobBlock(fleetReviewYaml(), 'fleet-review')
+    expect(() => stepIf(block, 'Setup Bun')).not.toThrow()
+  })
+
+  // The ctx step's own shell computes `requested` — the property the old
+  // job-level `if:` encoded — from the SAME two conditions the old `if:`
+  // used: a manual workflow_dispatch, or the label just applied being named
+  // exactly `review`. A mutation that drops the label condition, or widens
+  // it to a bare `event_name == 'pull_request'` (which would make every
+  // label event "requested"), must fail this test — that is the exact
+  // fail-open shape #848 shipped.
+  it('the ctx step computes "requested" from workflow_dispatch OR the review label, never a bare pull_request event_name check', () => {
+    const block = jobBlock(fleetReviewYaml(), 'fleet-review')
+    expect(block).toMatch(/EVENT_NAME"\s*==\s*"workflow_dispatch"\s*\|\|\s*"\$LABEL_NAME"\s*==\s*"review"/)
+    expect(block).not.toMatch(/"\$EVENT_NAME"\s*==\s*"pull_request"\s*\]\];\s*then\s*\n\s*requested=true/)
+    expect(block).toMatch(/echo "requested=\$requested"/)
+  })
+
+  // The gate step is what used to be the job-level `if:` (see the rail
+  // above) — it must never itself be conditioned on its OWN output, or it
+  // could never run at all.
+  it('the "Decide whether to run the review engine" step (the gate) always runs — it is never itself gated', () => {
+    const block = jobBlock(fleetReviewYaml(), 'fleet-review')
+    expect(stepIf(block, 'Decide whether to run the review engine')).toBe('')
+    expect(block).toMatch(/- name: Decide whether to run the review engine\n\s+id: gate\n/)
+    expect(block).toContain('bun orchestrator/src/cli.ts review-gate')
+  })
+
+  // The load-bearing assertion for the new design: EVERY step that can
+  // spend a model call — installing the engine, authenticating it, the
+  // smoke test (which itself makes a real provider call), and the real
+  // review — is gated on `steps.gate.outputs.outcome == 'run-engine'`.
+  // Dropping this `if:` from any one of them is branch (a)/(c) calling the
+  // engine anyway — exactly the "cheap and non-destructive" property the
+  // cache-hit/not-requested branches exist to guarantee.
+  it.each([
+    'Install the non-author review engine',
+    'Authenticate the review engine',
+    'Smoke-test the review engine',
+    'Check the base provides the gate',
+    'Review',
+  ])('the "%s" step only runs when the gate said run-engine', (stepName) => {
+    const block = jobBlock(fleetReviewYaml(), 'fleet-review')
+    expect(stepIf(block, stepName)).toBe("steps.gate.outputs.outcome == 'run-engine'")
+  })
+
+  // Branch (c)'s fail-closed message, verbatim — an operator or agent
+  // reading a red `fleet/review` must be told exactly what to do (apply the
+  // `review` label), not left to guess why a check that "did nothing" is
+  // failing.
+  it('the review-gate CLI command fails with the exact "review not requested" message on branch (c)', () => {
+    const text = readFileSync(join(process.cwd(), 'orchestrator', 'src', 'cli.ts'), 'utf8')
+    // Backtick-escaped in the SOURCE (this string is built inside a
+    // template literal, so a literal backtick in the source is `\``, not
+    // `` ` ``) — matched here against the raw file text, not the runtime
+    // string it evaluates to.
+    expect(text).toContain('review not requested — add the \\`review\\` label to run the non-author review')
   })
 
   it('fleet/review still carries no write permission and no --approve', () => {
-    const block = jobBlock(ciYaml(), 'fleet-review')
+    const block = jobBlock(fleetReviewYaml(), 'fleet-review')
     const permsBlock = block.match(/\n {4}permissions:\n((?:\s{6}.*\n)*)/)?.[1] ?? ''
     expect(permsBlock.length, 'fleet-review has no permissions: block to check').toBeGreaterThan(0)
     // Actual `key: value` permission lines only — comment lines (this very
@@ -534,7 +697,13 @@ describe('rail: fleet/review runs once, at merge time, not on every push', () =>
     // otherwise make the string "`: write`" match its own explanation).
     const permissionLines = permsBlock.split('\n').filter((l) => !l.trim().startsWith('#') && l.trim().length > 0)
     for (const line of permissionLines) expect(line).not.toMatch(/:\s*write\b/)
-    expect(ciYaml()).not.toContain('--approve')
+    expect(fleetReviewYaml()).not.toContain('--approve')
+    // The workflow-level `permissions: {}` (deny-all) too, matching
+    // fleet-verify.yml's and ci.yml's own convention — belt-and-suspenders
+    // on top of the job-level grants asserted above. Zero-indented: a
+    // top-level key, sibling to `on:`/`jobs:`, not nested under either.
+    const onBlock = fleetReviewYaml().split(/\njobs:\n/)[0] ?? ''
+    expect(onBlock).toMatch(/\npermissions:\s*\{\}/)
   })
 
   // `ci-status` aggregates the repo's OWN required jobs (never fleet/verify
@@ -691,12 +860,13 @@ describe('rail: the job that executes the judged commit\'s code cannot be reache
   }
 
   // fleet/review is the documented exception: it never executes HEAD code,
-  // so leaving it in ci.yml (which does trigger on push/workflow_dispatch)
-  // is correct, not an oversight. This assertion exists so a future edit
-  // can't "fix" that job's isolation the same way without first confirming
-  // it still holds.
-  it('fleet/review (ci.yml) still never runs a step named "Verify" (the exception this rail relies on)', () => {
-    const block = jobBlock(workflowYaml('ci.yml'), 'fleet-review')
+  // so its own workflow file (fleet-review.yml, which DOES also trigger on
+  // workflow_dispatch) needing no CodeQL cache-poisoning isolation is
+  // correct, not an oversight — see that file's own header comment. This
+  // assertion exists so a future edit can't "fix" that job's isolation the
+  // same way without first confirming it still holds.
+  it('fleet/review (fleet-review.yml) still never runs a step named "Verify" (the exception this rail relies on)', () => {
+    const block = jobBlock(workflowYaml('fleet-review.yml'), 'fleet-review')
     expect(() => {
       const stepHeaderRe = /\n {6}- name: Verify\n/
       if (stepHeaderRe.test(block)) throw new Error('fleet-review now has a "Verify" step')
@@ -717,19 +887,35 @@ describe('rail: the job that executes the judged commit\'s code cannot be reache
  *
  * The mapping below is hardcoded rather than derived, on purpose: this rail
  * exists to catch a workflow file quietly losing its `merge_group` trigger
- * (as `secret-scan.yml` had, until this PR), and a derived lookup would only
+ * (as `secret-scan.yml` had, until #844), and a derived lookup would only
  * ever tell you the code agrees with itself.
  *
  * `fleet/verify` moved from `ci.yml` to its own `fleet-verify.yml` in round 3
- * of #844 (CodeQL cache-poisoning isolation — see the rail above) — updated
+ * of #844 (CodeQL cache-poisoning isolation — see the rail above), updated
  * here to match, or this rail would itself start failing vacuously against a
  * job that no longer exists in `ci.yml`.
+ *
+ * `fleet/review` is DELIBERATELY NOT in this table. It moved off
+ * `merge_group` entirely (see the "runs once per review label" rail above):
+ * a `workflow_dispatch`-only trigger could never satisfy a required PR
+ * context in the first place (verified on #848), and keeping `merge_group`
+ * as a trigger while excluding it from the job's `if:` would recreate the
+ * exact fail-open bug this whole file of rails exists to catch. This is safe
+ * TODAY because this repo's merge queue is unavailable (owner type `User` —
+ * the ruleset's `merge_queue` rule is rejected outright, see
+ * fleet-review.yml's own header). The day an org migration enables the
+ * queue, `fleet/review` genuinely will not report on a `merge_group` ref and
+ * the queue will stall on it forever — that migration must re-add a
+ * `merge_group` arm to both the trigger and the job's `if:` together, not
+ * silently inherit this gap. The assertion below pins that `fleet/review`
+ * does NOT trigger on `merge_group`, specifically so a future PR that adds
+ * it back without also fixing the `if:` fails loudly here instead of
+ * reintroducing the bug quietly.
  */
-describe('rail: every ruleset-15885614-required context reports on merge_group', () => {
+describe('rail: every ruleset-15885614-required context reports on merge_group, except fleet/review', () => {
   const REQUIRED_CONTEXT_WORKFLOWS: Record<string, string> = {
     'ci-status': 'ci.yml',
     'fleet/verify': 'fleet-verify.yml',
-    'fleet/review': 'ci.yml',
     gitleaks: 'secret-scan.yml',
   }
 
@@ -744,9 +930,9 @@ describe('rail: every ruleset-15885614-required context reports on merge_group',
     return /\n {2}merge_group:/.test(onBlock)
   }
 
-  it('the mapping table itself is non-empty and covers all four workflow-backed contexts', () => {
+  it('the mapping table itself is non-empty and covers the three merge_group-reporting contexts', () => {
     expect(Object.keys(REQUIRED_CONTEXT_WORKFLOWS).sort()).toEqual(
-      ['ci-status', 'fleet/review', 'fleet/verify', 'gitleaks'].sort(),
+      ['ci-status', 'fleet/verify', 'gitleaks'].sort(),
     )
   })
 
@@ -755,6 +941,10 @@ describe('rail: every ruleset-15885614-required context reports on merge_group',
       expect(triggersOnMergeGroup(workflowYaml(workflowFile))).toBe(true)
     })
   }
+
+  it('fleet/review (fleet-review.yml) does NOT trigger on merge_group — known and deliberate while the merge queue is unavailable', () => {
+    expect(triggersOnMergeGroup(workflowYaml('fleet-review.yml'))).toBe(false)
+  })
 })
 
 /**
@@ -954,16 +1144,20 @@ describe('rail: fleet/review reviews exactly once per diff, never twice on an id
 /**
  * `decideReviewGate` is what `fleet-review.yml`'s "Decide whether to run the
  * review engine" step calls — the runtime logic behind the three branches
- * a bootstrap workflow change (#848) needs on the base ref before it can be
- * wired into that workflow. These rails pin the DECISION ITSELF, so a
- * mutation that flips the logic — e.g. concluding `run-engine` when
- * `requested` is false, or `not-requested` when a cache hit exists — fails a
- * test even before any workflow YAML exists to call it. Mirrors the
- * `fakeCache` pattern from the "reviews exactly once per diff" rail above,
- * deliberately not shared with it: that suite exercises `runReviewCi`'s full
- * pipeline (verify, secondOpinion, recording); this one exercises only the
- * preflight decision, with no `verify`/`secondOpinion` in sight — a passing
- * test here cannot be mistaken for a passing review.
+ * the file header (and the YAML rails above) describe. Those YAML rails pin
+ * the WIRING (which steps key off `outcome == 'run-engine'`, that no
+ * job-level `if:` exists); these pin the DECISION ITSELF — the same
+ * bootstrap-order split as the CLI: `review-gate` (#851) needs this decision
+ * on the base ref before `fleet-review.yml` (#848) can call it — so a
+ * mutation that keeps the wiring intact but flips the logic — e.g.
+ * concluding `run-engine` when `requested` is false, or `not-requested` when
+ * a cache hit exists — still fails a test, even before any workflow YAML
+ * exists to call it. Mirrors the `fakeCache` pattern from the "reviews
+ * exactly once per diff" rail above, deliberately not shared with it: that
+ * suite exercises `runReviewCi`'s full pipeline (verify, secondOpinion,
+ * recording); this one exercises only the preflight decision, with no
+ * `verify`/`secondOpinion` in sight — a passing test here cannot be mistaken
+ * for a passing review.
  */
 describe('rail: decideReviewGate enforces the three fleet/review branches (cache-hit / not-requested / run-engine)', () => {
   const ctx = (): CiContext => ({

@@ -4,71 +4,142 @@
 # comment above `fleet-verify` in `fleet-verify.yml` for the split rationale
 # between the two gate jobs). This job used to live inside `ci.yml`, gated by
 # a job-level `if:` restricting it to `merge_group` (plus a manual
-# `workflow_dispatch` re-run) — see #812/#842/#844. That design has a fail-open
+# `workflow_dispatch` re-run) — see #812/#842/#844. That design had a fail-open
 # bug: `ci.yml` ALSO triggers on `pull_request`, so on every ordinary PR push
-# this job is still INSTANTIATED by the workflow, just skipped by its own
+# this job was still INSTANTIATED by the workflow, just skipped by its own
 # `if:` — and GitHub's branch-protection rules treat a *skipped* required
 # check as satisfied, exactly like a green one. #844 itself merged with
 # `fleet/review` reporting "skipping" and no model review ever ran on it.
 #
-# The fix is not a smarter `if:` — GitHub does not distinguish "correctly
-# skipped" from "should have blocked" once a job exists on the trigger at
-# all. The fix is for this job to not exist on `pull_request` in the first
-# place: it now lives in its OWN workflow file, whose `on:` block never
-# mentions `pull_request` (or `push`) at all. On an ordinary PR the check is
-# now MISSING rather than skipped — and a missing required check blocks a
-# merge exactly the same way a failing one does, which is the point.
+# #848 moved the job into this standalone file, triggered only by
+# `workflow_dispatch` + `merge_group`, so an ordinary PR push produced no
+# `fleet/review` context at all — MISSING, not skipped, which blocks a merge
+# exactly like a failing check does. That fixed the fail-open bug, but left
+# the only real trigger as an operator-run
+# `gh workflow run fleet-review.yml --ref <branch> -f pr_number=<n>` — and
+# `workflow_dispatch` is a repository-level event with no PR of its own, so
+# GitHub cannot attach its result to a PR's required contexts no matter how
+# the job is written. Verified empirically on #848 itself: the dispatched run
+# succeeded, produced a `fleet/review` check-run at `conclusion: success` on
+# the PR's head SHA, and the API even reports `pull_requests: [848]` for
+# it — yet `gh pr view 848 --json statusCheckRollup` never listed it, and
+# `gh pr merge` was refused with "the base branch policy prohibits the
+# merge". A `workflow_dispatch` check does not satisfy a required PR context,
+# regardless of how correct its result is.
 #
-# This repo also cannot use `merge_group` as the actual trigger today: the
-# GitHub merge queue is unavailable on repos owned by a `User` (verified
-# twice via the ruleset UI — the `merge_queue` rule is rejected with
-# `Invalid rule 'merge_queue'`), and it requires an organization. `merge_group`
-# is kept below anyway, harmless, for the day this repo moves to an org and
-# the queue becomes available — see the job's own `if:`. Until then, the real
-# trigger is `workflow_dispatch` with an explicit `pr_number`: an operator
-# runs `gh workflow run fleet-review.yml --ref <branch> -f pr_number=<n>`
-# exactly once per PR, and the PR cannot merge until that check is green. A
-# PR with no dispatched review simply cannot merge — that is the intended
-# default, not a gap to route around.
+# #848's OWN fix reintroduced the exact bug class it was written to close:
+# `on: pull_request: types: [labeled]` fires this workflow on ANY label, and
+# the job carried a job-level `if: github.event_name == 'workflow_dispatch'
+# || github.event.label.name == 'review'` to narrow that back down. GitHub
+# cannot filter a `pull_request` trigger by label VALUE — only `types:` — so
+# applying any OTHER label (say, the fleet's own `agent-dispatchable`) still
+# INSTANTIATES this job, which the `if:` then SKIPS. A skipped required
+# check satisfies branch protection with no review ever run — caught on this
+# very PR by `fleet/review`'s own verdict on #848, before #848 merged.
+#
+# The fix this time is structural, not a smarter `if:`: this job now carries
+# **no job-level `if:` at all**. It always runs and always reaches a real
+# conclusion (success or failure), on every `labeled` event. What used to be
+# the job's `if:` is now the "Decide whether to run the review engine" step
+# below, whose OWN exit code and `outcome` output gate every step after it:
+#
+#   (a) a prior PASS is cached for this exact diff content (`review-cache.ts`)
+#       → the step logs "reused verdict for <key>", exits 0, and every later
+#       step (engine install, auth, the smoke test, the real review) is
+#       skipped via its own step-level `if: steps.gate.outputs.outcome ==
+#       'run-engine'` — the job concludes SUCCESS with no engine call at all.
+#       This is what makes applying an unrelated label to an already-reviewed
+#       PR cheap and non-destructive instead of either a wasted model call or
+#       (the old bug) a silently-satisfied skip.
+#   (b) no cached PASS, and this event IS the `review` label (or a manual
+#       `workflow_dispatch`) → the step exits 0 with `outcome=run-engine`,
+#       and the pipeline runs exactly as before: install the engine,
+#       authenticate, smoke-test it, then the real review.
+#   (c) no cached PASS, and this event is any OTHER label → the step FAILS
+#       (exit 1) with "review not requested — add the `review` label to run
+#       the non-author review". No engine call, no skip — the job goes red,
+#       which is the correct, honest state for a PR nobody has asked to be
+#       reviewed yet.
+#
+# A step failing mid-job is not a "skipped" job: GitHub Actions still runs
+# the job to a real conclusion (failure) and that conclusion IS what
+# `fleet/review`'s required check reports. Steps skipped by their OWN
+# `if:` inside an always-instantiated job are not the bug #848/#844 hit —
+# that bug was the whole JOB (and therefore its check run) never running at
+# all while still being reported "skipped", which branch protection treats
+# as green. A step-level skip changes nothing about whether the job itself
+# concludes; see `tests/orchestrator/guards.test.ts` for the rail pinning
+# that no job-level `if:` exists here again.
+#
+# Semantics, carried over from #848's intent: applying the `review` label to
+# a diff with no cached PASS is the only way to spend a fresh review; every
+# other event either reuses a cached PASS for free or fails closed. The
+# diff-content review cache (`review-cache.ts`) makes re-adding the label (or
+# any other label) to unchanged, already-passing content reuse the prior
+# PASS rather than re-spend provider quota; a FAIL is never cached, so a
+# re-label after a real fix reviews again for real.
+#
+# `merge_group` is DROPPED as a trigger here (#848 had kept it, "harmless",
+# for a future org migration). Keeping it while relying on the gate step
+# above to fail it closed on every event but the one that matters is strictly
+# more code for no behavioral gain today: this repo's merge queue is
+# unavailable regardless (owner type `User` — the ruleset's `merge_queue`
+# rule is rejected outright), so dropping it costs nothing now; re-adding it
+# later needs its own request-detection arm and its own rail together, not a
+# trigger sitting ahead of a queue that does not exist yet.
+#
+# Workflow-file honesty: on a `pull_request` event, the workflow definition
+# itself is read from the PR's OWN head — a PR can edit this file and have
+# the edited version run when it later gets labeled. This is the same
+# exposure `fleet/verify` already has on its own `pull_request` trigger
+# (finding #1 of the 2026-09-13 review), not a new gap introduced here;
+# `.github/workflows/` is CODEOWNERS-protected, and closing it fully needs a
+# required approving review from a non-author bot account — see #773.
 #
 # `fleet/verify` stays out of this file — it is cheap and mechanical, still
 # runs on `pull_request` for fast feedback (see `fleet-verify.yml`).
 # `fleet/review` is the expensive, rate-limited one — a non-author MODEL call
 # against a paid, weekly-quota'd provider — and must run at most once per PR,
-# on demand, never on every push.
+# on demand (the `review` label), never on every push.
 name: Fleet Review
 
 on:
-  # The only real trigger today (see the file header above). `pr_number` is
-  # required, not optional: this workflow's only job is reviewing one PR, so
-  # an invocation that cannot name one is not a meaningful dispatch.
+  # The real trigger (see the file header above): applying the `review`
+  # label signals "this PR is ready for the non-author review". Scoped to
+  # `labeled` only — never `synchronize` (an ordinary push), `opened`, or
+  # `unlabeled` — so this never runs on every push, which is the exact
+  # provider-quota-burning bug #812 fixed the first time.
+  pull_request:
+    types: [labeled]
+  # Manual escape hatch only — local debugging, or forcing a re-review after
+  # a provider-variable change (see "Switching the review engine provider" in
+  # docs/superpowers/specs/2026-09-11-llamenos-fleet-orchestrator-design.md).
+  # Never the primary path: see the file header above for why a
+  # workflow_dispatch run cannot satisfy a PR's required context on its own.
   workflow_dispatch:
     inputs:
       pr_number:
-        description: 'PR number to review (its current head, dispatched via --ref <branch>)'
+        description: 'PR number to review (its current head, dispatched via --ref <branch>) — manual debugging only'
         required: true
         type: string
-  # Harmless today (this repo's merge queue is disabled — see the file header
-  # above) — kept so the day an org migration enables the queue, this job is
-  # already wired to run on it without another PR.
-  merge_group:
-    types: [checks_requested]
 
 concurrency:
   # Distinct group names from ci.yml's and fleet-verify.yml's own groups —
   # concurrency groups are repo-scoped, not per-file, so reusing either of
   # their names here would cancel or queue against unrelated runs sharing the
-  # same SHA/run id. `merge_group` groups by the queue's own per-attempt SHA;
-  # `workflow_dispatch` groups by `run_id` because two dispatches can target
-  # two different PRs at once and must never collide.
-  group: ${{ github.event_name == 'merge_group' && format('fleet-review-mg-{0}', github.sha) || format('fleet-review-wd-{0}', github.run_id) }}
-  # Never cancelled: a merge_group check that gets cancelled mid-run leaves
-  # its required check permanently missing, stalling the queue rather than
-  # failing it loudly (same reasoning as ci.yml's and fleet-verify.yml's own
-  # `concurrency:` blocks). A workflow_dispatch run is already uniquely
-  # grouped by run id above, so cancellation there would only ever cancel
-  # itself — moot either way, so this stays `false` unconditionally rather
-  # than branching on event name for no behavioral difference.
+  # same SHA/run id. `pull_request` groups by PR NUMBER, so re-labeling the
+  # same PR while a run is still in flight queues behind it instead of racing
+  # two reviews of the same diff; `workflow_dispatch` groups by `run_id`
+  # because two manual dispatches can target two different PRs at once and
+  # must never collide.
+  group: ${{ github.event_name == 'pull_request' && format('fleet-review-pr-{0}', github.event.pull_request.number) || format('fleet-review-wd-{0}', github.run_id) }}
+  # Never cancelled: a required check that gets cancelled mid-run leaves its
+  # context permanently missing rather than failing loudly (same reasoning as
+  # ci.yml's and fleet-verify.yml's own `concurrency:` blocks). A
+  # workflow_dispatch run is already uniquely grouped by run id above, so
+  # cancellation there would only ever cancel itself — moot either way, so
+  # this stays `false` unconditionally rather than branching on event name
+  # for no behavioral difference.
   cancel-in-progress: false
 
 permissions: {}  # deny-all; the job below sets its own
@@ -95,7 +166,18 @@ jobs:
   # fail-open reason in the file header, not for CodeQL.
   fleet-review:
     name: fleet/review
-    if: github.event_name == 'merge_group' || (github.event_name == 'workflow_dispatch' && github.event.inputs.pr_number != '')
+    # NO job-level `if:` here — deliberately, and never again (see the file
+    # header). `types: [labeled]` on the trigger above narrows away
+    # `synchronize`/`opened`/etc, but GitHub cannot filter a `pull_request`
+    # trigger by label VALUE, only by `types:` — so this job is instantiated
+    # on EVERY label application, including ones that have nothing to do
+    # with review (e.g. `agent-dispatchable`). The "Decide whether to run
+    # the review engine" step below is what used to be this `if:`; the
+    # difference is that its `not-requested` branch FAILS the job instead of
+    # skipping it, and its `cache-hit` branch SUCCEEDS the job instead of
+    # skipping it — either way the job reaches a real, reported conclusion,
+    # which a job-level `if:` can never guarantee once GitHub decides the
+    # job merely "didn't run".
     runs-on: ubuntu-latest
     permissions:
       # contents: read — the reviewer runs inside this job with the review
@@ -104,9 +186,10 @@ jobs:
       # export the model reads, never a checkout, never installed, never on
       # a module path.
       contents: read
-      # merge_group carries no PR context of its own — resolving the PR's
-      # actual branch name needs one read of its metadata (same as
-      # fleet/verify).
+      # Used only on the workflow_dispatch path (`gh api .../pulls/$pr`) to
+      # resolve the PR's branch name and base/head SHAs. The `pull_request`
+      # (labeled) path needs no API call at all — the label event's own
+      # payload already carries all three.
       pull-requests: read
       # Read-only, for the review-cache lookup (`review-cache.ts`'s
       # `GET .../actions/artifacts?name=...`) — never `: write`. See the
@@ -133,55 +216,59 @@ jobs:
       FLEET_REVIEW_MODEL: ${{ vars.FLEET_REVIEW_MODEL || 'kimi-for-coding/k3-256k' }}
 
     steps:
-      # On `merge_group` the base/head are the QUEUE's own (the exact commits
-      # that will land), and the PR's ORIGINAL branch name (needed for
-      # `resolveLane` in ci.ts, which reads the `fleet/<lane>/<item>` grammar
-      # the queue ref itself does not carry) is looked up by the PR number
-      # parsed out of `merge_group.head_ref`.
+      # On `pull_request` (the labeled event), the base/head SHAs and the
+      # PR's own branch name all come straight from the event's own payload
+      # — GitHub computed it for exactly this label-application event, so
+      # there is no race to defend against and no extra `gh api` round trip
+      # needed (unlike the workflow_dispatch path below). This is also the
+      # event whose check-run attaches to the right commit automatically —
+      # see the file header for why that property is the whole reason this
+      # file no longer triggers on `merge_group`/`workflow_dispatch` alone.
       #
       # On `workflow_dispatch`, `pr_number` is the operator-supplied input —
       # validated as digits-only before it goes anywhere near a `gh api` path
-      # segment, same discipline as the merge_group branch, even though this
-      # input is not attacker-reachable (workflow_dispatch requires write
-      # access to trigger at all).
+      # segment, even though this input is not attacker-reachable
+      # (workflow_dispatch requires write access to trigger at all).
       #
       # `head_sha` on workflow_dispatch is `github.sha`, NOT a fresh
-      # `pulls/$pr` query of `.head.sha` — this is the fix this file exists
-      # to make. GitHub always attaches this run's check runs (including the
-      # `fleet/review` required context) to `github.sha`: for a
-      # `workflow_dispatch` event, that is fixed at trigger time to the tip
-      # of whatever `--ref <branch>` resolved to, and stays fixed even if the
-      # branch moves before this job starts. A live `.head.sha` query is a
-      # DIFFERENT commit any time a push lands in that race window — which
-      # would review a commit the check-run does not actually correspond to.
-      # Pinning to `github.sha` guarantees the two are always the same commit
-      # by construction, not by timing luck.
+      # `pulls/$pr` query of `.head.sha`: GitHub attaches this run's check
+      # runs to `github.sha`, which for a `workflow_dispatch` event is fixed
+      # at trigger time to the tip of whatever `--ref <branch>` resolved to,
+      # and stays fixed even if the branch moves before this job starts. A
+      # live `.head.sha` query is a DIFFERENT commit any time a push lands in
+      # that race window — which would review a commit the check-run does not
+      # actually correspond to. Pinning to `github.sha` guarantees the two
+      # are always the same commit by construction, not by timing luck.
       - name: Resolve the base/head SHAs and PR context for this event
         id: ctx
         env:
           GH_TOKEN: ${{ github.token }}
           EVENT_NAME: ${{ github.event_name }}
-          MQ_BASE_SHA: ${{ github.event.merge_group.base_sha }}
-          MQ_HEAD_SHA: ${{ github.event.merge_group.head_sha }}
-          MQ_HEAD_REF: ${{ github.event.merge_group.head_ref }}
+          LABEL_NAME: ${{ github.event.label.name }}
+          PR_EVENT_NUMBER: ${{ github.event.pull_request.number }}
+          PR_EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_EVENT_BRANCH: ${{ github.event.pull_request.head.ref }}
           DISPATCH_PR: ${{ github.event.inputs.pr_number }}
           DISPATCH_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          if [[ "$EVENT_NAME" == "merge_group" ]]; then
-            pr=$(echo "$MQ_HEAD_REF" | grep -oE 'pr-[0-9]+-' | grep -oE '[0-9]+' || true)
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            pr="$PR_EVENT_NUMBER"
           else
             pr="$DISPATCH_PR"
           fi
           if [[ ! "$pr" =~ ^[0-9]+$ ]]; then
-            echo "::error::no numeric PR number to review (merge_group.head_ref=$MQ_HEAD_REF, workflow_dispatch pr_number=$DISPATCH_PR)"
+            echo "::error::no numeric PR number to review (pull_request number=$PR_EVENT_NUMBER, workflow_dispatch pr_number=$DISPATCH_PR)"
             exit 1
           fi
-          pr_json="$(gh api "repos/${{ github.repository }}/pulls/$pr")"
-          branch="$(echo "$pr_json" | jq -r '.head.ref')"
-          if [[ "$EVENT_NAME" == "merge_group" ]]; then
-            base_sha="$MQ_BASE_SHA"; head_sha="$MQ_HEAD_SHA"
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            base_sha="$PR_EVENT_BASE_SHA"
+            head_sha="$PR_EVENT_HEAD_SHA"
+            branch="$PR_EVENT_BRANCH"
           else
+            pr_json="$(gh api "repos/${{ github.repository }}/pulls/$pr")"
+            branch="$(echo "$pr_json" | jq -r '.head.ref')"
             base_sha="$(echo "$pr_json" | jq -r '.base.sha')"
             head_sha="$DISPATCH_SHA"
             live_head="$(echo "$pr_json" | jq -r '.head.sha')"
@@ -189,11 +276,25 @@ jobs:
               echo "::warning::PR #$pr's current head ($live_head) differs from the dispatched commit ($head_sha) — a newer commit has landed since this run was triggered. Reviewing the dispatched commit only; re-dispatch against the new head once it is ready."
             fi
           fi
+          # Whether THIS event is the one that actually asks for a review —
+          # the ONLY thing that used to live in this job's now-removed
+          # `if:`. A manual workflow_dispatch always counts (it has no label
+          # of its own to check); a pull_request event counts only when the
+          # label just applied is named exactly `review` — applying any
+          # OTHER label (e.g. `agent-dispatchable`) must NOT set this, or it
+          # would spend a review call by accident, the same bug this file's
+          # header describes for the job-level `if:` this replaces.
+          if [[ "$EVENT_NAME" == "workflow_dispatch" || "$LABEL_NAME" == "review" ]]; then
+            requested=true
+          else
+            requested=false
+          fi
           {
             echo "base_sha=$base_sha"
             echo "head_sha=$head_sha"
             echo "branch=$branch"
             echo "pr=$pr"
+            echo "requested=$requested"
           } >> "$GITHUB_OUTPUT"
 
       # The BASE commit, not the head. Everything the gate decides is computed
@@ -251,6 +352,35 @@ jobs:
       - name: Install dependencies (base lockfile, no install scripts)
         run: bun install --frozen-lockfile --ignore-scripts
 
+      # This is what used to be the job's `if:` (see the file header) —
+      # moved inside the job, as a real step with a real exit code, so the
+      # JOB always reaches a conclusion instead of sometimes not running at
+      # all. `decideReviewGate` (ci.ts) does the actual work; this step only
+      # wires its three outcomes to the pipeline:
+      #   - `cache-hit`     → exits 0. Every later step's `if:` below reads
+      #     `outcome == 'run-engine'` and skips, so nothing past this point
+      #     spends a model call — the job still concludes SUCCESS.
+      #   - `run-engine`    → exits 0, later steps proceed exactly as before.
+      #   - `not-requested` → exits 1 (see `runReviewGate` in cli.ts), which
+      #     stops every later step from running at all (GitHub Actions does
+      #     not run subsequent steps after a failure unless they opt in with
+      #     `if: always()`/`if: failure()` — none of the engine steps do)
+      #     and fails the job. No engine call, no skip, fail closed.
+      # Needs only `contents: read` (git, already granted for the checkout
+      # above) and `actions: read` (the cache lookup, already granted below)
+      # — no new permission for this step.
+      - name: Decide whether to run the review engine
+        id: gate
+        env:
+          FLEET_CI_BRANCH: ${{ steps.ctx.outputs.branch }}
+          FLEET_CI_PR: ${{ steps.ctx.outputs.pr }}
+          FLEET_CI_HEAD_DIR: ${{ runner.temp }}/head
+          FLEET_CI_HEAD_SHA: ${{ steps.ctx.outputs.head_sha }}
+          FLEET_CI_BASE_SHA: ${{ steps.ctx.outputs.base_sha }}
+          FLEET_REVIEW_REQUESTED: ${{ steps.ctx.outputs.requested }}
+          GH_TOKEN: ${{ github.token }}
+        run: bun orchestrator/src/cli.ts review-gate
+
       # From a pinned release asset whose sha256 is recorded here — never a
       # `curl | bash` installer, in a repo that pins every action by SHA. (The
       # npm package `opencode-ai@1.18.30` was tried first, per the preferred
@@ -263,6 +393,7 @@ jobs:
       # model reviewing its own output shares its own blind spots, which is
       # the entire reason this check exists.
       - name: Install the non-author review engine
+        if: steps.gate.outputs.outcome == 'run-engine'
         env:
           OPENCODE_VERSION: "1.18.30"
           OPENCODE_SHA256: "55007246858165496ff85ba1c2b648f7421e8e2013bf4189a680c9ff8e699d17"
@@ -290,6 +421,7 @@ jobs:
       # comment above, and the runbook in
       # docs/superpowers/specs/2026-09-11-llamenos-fleet-orchestrator-design.md).
       - name: Authenticate the review engine
+        if: steps.gate.outputs.outcome == 'run-engine'
         env:
           FLEET_REVIEW_API_KEY: ${{ secrets.FLEET_REVIEW_API_KEY }}
         run: |
@@ -343,6 +475,7 @@ jobs:
       # what made `fleet/review` red repo-wide with no actionable signal on
       # 2026-09-15.
       - name: Smoke-test the review engine
+        if: steps.gate.outputs.outcome == 'run-engine'
         run: |
           set -uo pipefail
           root="$(mktemp -d)"
@@ -421,6 +554,7 @@ jobs:
       # without it means someone removed it from `main` — and that must stop
       # every PR until a human looks, never silently wave them through.
       - name: Check the base provides the gate
+        if: steps.gate.outputs.outcome == 'run-engine'
         run: |
           set -eu
           usage="$(bun orchestrator/src/cli.ts 2>&1 || true)"
@@ -438,6 +572,7 @@ jobs:
 
       - name: Review
         id: review
+        if: steps.gate.outputs.outcome == 'run-engine'
         env:
           # Absent fails the job — never a skip and never a pass. A review
           # that could not run is not a review that passed.
