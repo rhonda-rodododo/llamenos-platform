@@ -87,6 +87,14 @@ runs:
         # surfaces as an explicit, loud scenario failure downstream, never a
         # silent skip or a vacuous pass. Record per-service outcome so the
         # warning below (and CI logs) name exactly which image failed.
+        # IMPORTANT: this function's stdout is captured via $(...) by its callers
+        # below — that captured value is written verbatim into GITHUB_ENV, which
+        # requires a single-line KEY=VALUE. Every diagnostic echo() in here MUST
+        # go to stderr (>&2); only the final true/false status line may go to
+        # stdout. (A prior version let the ::warning:: echoes leak into stdout,
+        # so a real pull failure produced a multiline SIGNAL_PULL_OK/ASTERISK_PULL_OK
+        # write and GITHUB_ENV rejected it, failing the bootstrap step outright —
+        # exactly the registry-failure case this retry logic exists to tolerate.)
         pull_one() {
           local service="$1" profile="$2"
           local ok=false
@@ -99,11 +107,11 @@ runs:
               ok=true
               break
             fi
-            echo "::warning::${service} image pull failed (attempt ${attempt}/3) — retrying after backoff"
+            echo "::warning::${service} image pull failed (attempt ${attempt}/3) — retrying after backoff" >&2
             sleep $((attempt * 10))
           done
           if [ "$ok" != "true" ]; then
-            echo "::warning::Could not pull ${service} image after 3 attempts — continuing without it. Scenarios that depend on it will fail explicitly (they check sidecar health directly); the core backend-bdd suite is unaffected."
+            echo "::warning::Could not pull ${service} image after 3 attempts — continuing without it. Scenarios that depend on it will fail explicitly (they check sidecar health directly); the core backend-bdd suite is unaffected." >&2
           fi
           echo "$ok"
         }
