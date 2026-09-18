@@ -24,6 +24,5 @@
   "tests/steps/backend/screen-pop.steps.ts": 1,
   "tests/steps/backend/security.steps.ts": 6,
   "tests/steps/backend/storage-integrity.steps.ts": 4,
-  "tests/steps/backend/template-report-types.steps.ts": 1,
-  "tests/steps/cases/cms-events-steps.ts": 1
+  "tests/steps/backend/template-report-types.steps.ts": 1
 }
