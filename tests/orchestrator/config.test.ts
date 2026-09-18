@@ -1,7 +1,10 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, afterEach, vi } from 'vitest'
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 import {
   LANES, LIMITS, NEVER_WRITE_PATHS, MAX_ATTEMPTS_PER_ITEM,
-  assertLiveLanesHaveScope,
+  assertLiveLanesHaveScope, readLaneModes,
 } from '../../orchestrator/src/config.js'
 import type { Lane } from '../../orchestrator/src/config.js'
 import { checkScope } from '../../orchestrator/src/scope.js'
@@ -109,5 +112,146 @@ describe('config', () => {
 
   it('sets a conservative first-night dispatch ceiling', () => {
     expect(LIMITS.maxDispatchesPerHour).toBeLessThanOrEqual(12)
+  })
+})
+
+describe('readLaneModes', () => {
+  const dirs: string[] = []
+  afterEach(() => {
+    for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true })
+  })
+
+  function modesFile(content: unknown): string {
+    const dir = mkdtempSync(join(tmpdir(), 'fleet-lane-modes-'))
+    dirs.push(dir)
+    const file = join(dir, 'lanes.json')
+    writeFileSync(file, typeof content === 'string' ? content : JSON.stringify(content))
+    return file
+  }
+
+  it('parses the legacy bare-mode-string shape', () => {
+    expect(readLaneModes(modesFile({ backend: 'live', ios: 'off' })))
+      .toEqual({ backend: { mode: 'live' }, ios: { mode: 'off' } })
+  })
+
+  it('parses the object shape with engine and model', () => {
+    const file = modesFile({ backend: { mode: 'live', engine: 'opencode', model: 'kimi-for-coding/k3-256k' } })
+    expect(readLaneModes(file)).toEqual({
+      backend: { mode: 'live', engine: 'opencode', model: 'kimi-for-coding/k3-256k' },
+    })
+  })
+
+  it('accepts both shapes in the same file', () => {
+    const file = modesFile({ backend: 'live', ios: { mode: 'shadow', engine: 'opencode' } })
+    expect(readLaneModes(file)).toEqual({
+      backend: { mode: 'live' },
+      ios: { mode: 'shadow', engine: 'opencode' },
+    })
+  })
+
+  it('rejects an invalid engine: lane stays off and the reason is reported', () => {
+    const onReject = vi.fn()
+    const file = modesFile({ backend: { mode: 'live', engine: 'gpt' } })
+    expect(readLaneModes(file, onReject)).toEqual({})
+    expect(onReject).toHaveBeenCalledOnce()
+    expect(onReject.mock.calls[0]?.[0]).toBe('backend')
+    expect(onReject.mock.calls[0]?.[1]).toMatch(/invalid engine/i)
+  })
+
+  it('rejects an invalid mode: lane stays off and the reason is reported', () => {
+    const onReject = vi.fn()
+    const file = modesFile({ backend: { mode: 'turbo' }, ios: 'shadow' })
+    expect(readLaneModes(file, onReject)).toEqual({ ios: { mode: 'shadow' } })
+    expect(onReject).toHaveBeenCalledOnce()
+    expect(onReject.mock.calls[0]?.[1]).toMatch(/invalid mode/i)
+  })
+
+  it('rejects unknown keys in the object shape', () => {
+    const onReject = vi.fn()
+    const file = modesFile({ backend: { mode: 'live', engine: 'opencode', model: 'kimi', cap: 5 } })
+    expect(readLaneModes(file, onReject)).toEqual({})
+    expect(onReject).toHaveBeenCalledOnce()
+    expect(onReject.mock.calls[0]?.[1]).toMatch(/unknown override key/i)
+    expect(onReject.mock.calls[0]?.[1]).toContain('cap')
+  })
+
+  it('rejects a non-string model', () => {
+    const onReject = vi.fn()
+    const file = modesFile({ backend: { mode: 'live', engine: 'opencode', model: 42 } })
+    expect(readLaneModes(file, onReject)).toEqual({})
+    expect(onReject.mock.calls[0]?.[1]).toMatch(/invalid model/i)
+  })
+
+  it('rejects unrecognized entry shapes (numbers, arrays, null)', () => {
+    const onReject = vi.fn()
+    const file = modesFile({ backend: 1, ios: ['live'], android: null })
+    expect(readLaneModes(file, onReject)).toEqual({})
+    expect(onReject).toHaveBeenCalledTimes(3)
+  })
+
+  it('never throws on malformed JSON — every lane stays off', () => {
+    const onReject = vi.fn()
+    expect(readLaneModes(modesFile('{not json'), onReject)).toEqual({})
+  })
+
+  it('never throws on a missing file — every lane stays off', () => {
+    expect(readLaneModes(join(tmpdir(), 'definitely-not-here-lanes.json'))).toEqual({})
+  })
+
+  // Regression for the fleet/review FAIL on PR #840: a `"__proto__"` key in
+  // lanes.json assigned onto a plain object literal sets the map's PROTOTYPE
+  // instead of an own property, so `modes[unlistedLane]` would inherit the
+  // poisoned override — a fail-open that turns every lane live. The fixtures
+  // must be raw strings: an object literal `{"__proto__": ...}` in test code
+  // would itself set the fixture's prototype and JSON.stringify would drop it.
+  it('fails closed on a __proto__ object entry: only real lanes are read, the key is reported', () => {
+    const onReject = vi.fn()
+    const file = modesFile('{"__proto__":{"mode":"live"},"backend":"live"}')
+    const modes = readLaneModes(file, onReject)
+    expect(modes).toEqual({ backend: { mode: 'live' } })
+    expect(Object.hasOwn(modes, '__proto__')).toBe(false)
+    for (const id of ['shared', 'desktop', 'ios', 'android', 'infra']) {
+      expect(modes[id]).toBeUndefined()
+    }
+    expect(onReject).toHaveBeenCalledOnce()
+    expect(onReject.mock.calls[0]?.[0]).toBe('__proto__')
+    expect(onReject.mock.calls[0]?.[1]).toMatch(/unknown lane id/i)
+  })
+
+  it('fails closed on a __proto__ string entry: every lane stays off, the key is reported', () => {
+    const onReject = vi.fn()
+    const file = modesFile('{"__proto__":"live"}')
+    const modes = readLaneModes(file, onReject)
+    expect(modes).toEqual({})
+    for (const id of ['backend', 'shared', 'desktop', 'ios', 'android', 'infra']) {
+      expect(modes[id]).toBeUndefined()
+    }
+    expect(onReject).toHaveBeenCalledOnce()
+    expect(onReject.mock.calls[0]?.[0]).toBe('__proto__')
+  })
+
+  it('rejects other prototype-chain keys (constructor, prototype) as unknown lane ids', () => {
+    const onReject = vi.fn()
+    const file = modesFile('{"constructor":{"mode":"live"},"prototype":"live","backend":"shadow"}')
+    expect(readLaneModes(file, onReject)).toEqual({ backend: { mode: 'shadow' } })
+    expect(onReject).toHaveBeenCalledTimes(2)
+  })
+
+  it('rejects unknown lane ids generally — ignored and reported, never silently kept', () => {
+    const onReject = vi.fn()
+    const file = modesFile({ backend: 'shadow', marketing: 'live' })
+    expect(readLaneModes(file, onReject)).toEqual({ backend: { mode: 'shadow' } })
+    expect(onReject).toHaveBeenCalledOnce()
+    expect(onReject.mock.calls[0]?.[0]).toBe('marketing')
+    expect(onReject.mock.calls[0]?.[1]).toMatch(/unknown lane id/i)
+  })
+
+  // Mutation guard: the map MUST be null-prototype. Reverting
+  // `Object.create(null)` to a plain `{}` literal must fail this test even
+  // though the LANE_IDS allowlist alone would still reject a `__proto__` key —
+  // the two defenses are independent on purpose.
+  it('returns a null-prototype map so lookups can never consult a prototype chain', () => {
+    const file = modesFile({ backend: 'live' })
+    expect(Object.getPrototypeOf(readLaneModes(file))).toBeNull()
   })
 })

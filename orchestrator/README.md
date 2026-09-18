@@ -153,9 +153,30 @@ echo '{"backend":"shadow","shared":"shadow"}' > ~/.llamenos-fleet/lanes.json
 ```
 
 Valid values per lane are `"off"`, `"shadow"`, `"live"` (though `tick`
-currently refuses to run at all if any lane is `"live"` — see above). Unknown
-lane ids and an absent or unreadable file both fall back to `off`, never to
-some other default.
+currently refuses to run at all if any lane is `"live"` — see above). Keys
+that are not one of the six lane ids — including `__proto__`, `constructor`,
+and `prototype` — are ignored and reported to the fleet log as unknown lane
+ids; an absent or unreadable file falls back to `off`, never to some other
+default. Lookups never consult the map's prototype chain, so a poisoned key
+can never turn an unlisted lane on.
+
+A lane entry may also be an object that overrides the dispatch engine and
+model for that lane, e.g. to run a lane on opencode/Kimi while the Anthropic
+account's quota is exhausted:
+
+```json
+{"backend": {"mode": "live", "engine": "opencode", "model": "kimi-for-coding/k3-256k"}}
+```
+
+Allowed keys are exactly `mode`, `engine`, `model`; `engine` is `"claude"`
+(the default) or `"opencode"`. A raw opencode provider/model id is mapped to
+the dispatcher's token form (`kimi-for-coding/k3-256k` → `kimi`, anything
+else → `opencode:<id>`); dispatcher tokens pass through untouched. `--effort`
+is omitted for opencode lanes (the dispatcher only supports it for Claude).
+Any malformed entry — unknown key, invalid mode or engine — fails CLOSED:
+that lane stays `off` and the rejection reason is written to the fleet log.
+`llamenos-fleet doctor` prints each lane's mode/engine/model and fails if a
+`live` opencode lane has no `opencode` binary on PATH.
 
 ## Where state lives
 
