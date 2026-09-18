@@ -352,6 +352,64 @@ jobs:
       - name: Install dependencies (base lockfile, no install scripts)
         run: bun install --frozen-lockfile --ignore-scripts
 
+      # Bootstrap guard, part 1 of 2 — guards the INVOCATION OF THE GATE
+      # ITSELF, before it ever runs. (Part 2 is the existing "Check the base
+      # provides the gate" step further down, which guards `review-ci` the
+      # same way, once `review-gate` has already succeeded.)
+      #
+      # "Decide whether to run the review engine" below assumes the BASE
+      # checkout has both `orchestrator/src/cli.ts` and its `review-gate`
+      # command. For the PR that first introduces either, that is false by
+      # construction — the gate runs from the BASE, never from the commit it
+      # judges, so the PR that adds the gate cannot yet be judged by it (see
+      # "Check the base provides the gate" below, which already documents
+      # and handles exactly that one-time case for `review-ci`).
+      #
+      # What that existing step does NOT cover is every PR *after* that one:
+      # GitHub does not refresh an open PR's `base.sha` on every push to the
+      # base branch — it is only recomputed when the PR itself receives a
+      # synchronize/update event — so a PR nobody has touched in days (a
+      # dependabot PR routinely sits for weeks) can carry a `base.sha` from
+      # well before `review-gate` (or even `cli.ts` itself) landed on main,
+      # with no PR-side action having removed anything.
+      #
+      # Verified against two real, currently-open dependabot PRs re-labelled
+      # `review` by the operator (run 35403493398 for #630, run 35403500475
+      # for #626): #630's base predates `orchestrator/src/cli.ts` entirely,
+      # so `bun orchestrator/src/cli.ts review-gate` a few steps below failed
+      # with bun's own uncaught `error: Module not found` — no diagnostic, no
+      # `outcome` output, the job just goes red. #626's base has `cli.ts` but
+      # predates `review-gate` being registered in its command table, so the
+      # same invocation printed `usage: llamenos-fleet <doctor|tick|...>`
+      # (no `review-gate` in the list) and exited 2 — same result, different
+      # uncaught shape. Either way, because the crash happens INSIDE the gate
+      # step, the existing "Check the base provides the gate" step (which
+      # only runs `if: steps.gate.outputs.outcome == 'run-engine'`) can never
+      # be reached to explain it — `outcome` was never set.
+      #
+      # This step runs unconditionally, before that first invocation, so
+      # BOTH shapes above become one clear, actionable failure instead of an
+      # opaque crash: update or rebase the PR against a newer main to pick up
+      # `review-gate`, then re-apply the `review` label.
+      - name: Check the base provides the review gate itself
+        run: |
+          set -euo pipefail
+          if [ ! -f orchestrator/src/cli.ts ]; then
+            echo "::error::the base commit predates the fleet review gate (orchestrator/src/cli.ts does not exist), so it cannot judge this PR"
+            echo "The gate deliberately runs from the BASE, never from the commit it judges."
+            echo "This PR's base is stale — update/rebase it against a newer main to pick up fleet review support, then re-apply the \`review\` label."
+            exit 1
+          fi
+          usage="$(bun orchestrator/src/cli.ts 2>&1 || true)"
+          case "$usage" in
+            *review-gate*) ;;
+            *)
+              echo "::error::the base commit has no 'review-gate' command, so it cannot judge this PR"
+              echo "This PR's base predates the fleet review gate — update/rebase it against a newer main to pick up review-gate support, then re-apply the \`review\` label."
+              exit 1
+              ;;
+          esac
+
       # This is what used to be the job's `if:` (see the file header) —
       # moved inside the job, as a real step with a real exit code, so the
       # JOB always reaches a conclusion instead of sometimes not running at
