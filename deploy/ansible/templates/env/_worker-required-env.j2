@@ -1,0 +1,89 @@
+# Shared .env body for the Llamenos worker container — the SINGLE source of
+# truth for every env var apps/worker/lib/config.ts (and the optional
+# features it gates) can read.
+#
+# Included by BOTH deployment paths via `lookup('ansible.builtin.template', ...)`:
+#   - roles/llamenos-app/templates/env/app.j2   (per-service role — production/staging)
+#   - roles/llamenos/templates/env.j2           (monolithic role — demo/staging path)
+#
+# DO NOT duplicate this list into either of those two files again. That
+# duplication is exactly how #716/#771 happened: roles/llamenos/templates/env.j2
+# silently drifted from roles/llamenos-app/templates/env/app.j2 and ended up
+# missing DATABASE_URL entirely, so the app container failed to boot on the
+# demo/staging deploy path. If a new var needs to reach the worker container,
+# add it HERE ONCE — both roles pick it up automatically.
+#
+# Each role may still append its OWN extra vars (e.g. DOMAIN/ACME_EMAIL in the
+# monolithic role's Caddy-adjacent .env) after including this file — that's
+# fine, as long as the vars the WORKER PROCESS itself reads live only here.
+#
+# Required-by-apps/worker/lib/config.ts vars are unconditional below
+# (DATABASE_URL, HMAC_SECRET, SERVER_SECRET, HOTLINE_NAME, ENVIRONMENT,
+# WEBHOOK_BASE_URL when app_environment=production) — see
+# deploy/ansible/scripts/check-required-env.py, which parses config.ts and
+# fails CI if any of them stop appearing in a render of either role's output.
+PLATFORM=bun
+PORT=3000
+DATABASE_URL=postgresql://llamenos:{{ pg_password }}@postgres:5432/llamenos
+PG_POOL_SIZE={{ pg_pool_size | default(10) }}
+{% if (admin_pubkey | default('')) | length > 0 %}
+ADMIN_PUBKEY={{ admin_pubkey }}
+{% endif %}
+HOTLINE_NAME={{ hotline_name | default('Hotline') }}
+ENVIRONMENT={{ app_environment | default('production') }}
+HMAC_SECRET={{ hmac_secret }}
+STORAGE_ENDPOINT=http://rustfs:9000
+STORAGE_ACCESS_KEY={{ storage_access_key }}
+STORAGE_SECRET_KEY={{ storage_secret_key }}
+STORAGE_BUCKET={{ storage_bucket | default('llamenos-files') }}
+{% if llamenos_transcription_enabled | default(false) | bool %}
+WHISPER_URL=http://whisper:8080/v1/audio/transcriptions
+{% endif %}
+TWILIO_ACCOUNT_SID={{ twilio_account_sid | default('') }}
+TWILIO_AUTH_TOKEN={{ twilio_auth_token | default('') }}
+TWILIO_PHONE_NUMBER={{ twilio_phone_number | default('') }}
+SERVER_SECRET={{ server_secret }}
+{% if (webhook_base_url | default('')) | length > 0 %}
+WEBHOOK_BASE_URL={{ webhook_base_url }}
+{% endif %}
+{% if (apns_key_p8 | default('')) | length > 0 and (apns_key_id | default('')) | length > 0 and (apns_team_id | default('')) | length > 0 %}
+{#
+  APNS_KEY_P8 is a multi-line PEM. A raw multi-line value breaks Docker
+  Compose's env_file parser entirely (verified: "key cannot contain a space"
+  on line 2 of the PEM, and the WHOLE .env file fails to load — not just this
+  var). Compose's env_file parser DOES unescape literal \n inside a
+  double-quoted value back into a real newline before it reaches the
+  container's environment (verified with `docker compose config` and a real
+  container run) — so emit it as one physical line, double-quoted, with
+  embedded newlines replaced by the two-character sequence \n. No app-code
+  change needed: process.env.APNS_KEY_P8 arrives with real newlines restored.
+#}
+APNS_KEY_P8="{{ apns_key_p8 | replace('\r\n', '\n') | replace('\n', '\\n') }}"
+APNS_KEY_ID={{ apns_key_id }}
+APNS_TEAM_ID={{ apns_team_id }}
+{% endif %}
+{% if llamenos_ntfy_enabled | default(false) | bool %}
+NTFY_URL={{ ntfy_url | default('http://ntfy:80') }}
+{% if (ntfy_auth_token | default('')) | length > 0 %}
+NTFY_AUTH_TOKEN={{ ntfy_auth_token }}
+{% endif %}
+{% endif %}
+{% if (glitchtip_dsn | default('')) | length > 0 %}
+GLITCHTIP_DSN={{ glitchtip_dsn }}
+{% endif %}
+{% if llamenos_signal_enabled | default(false) | bool %}
+SIGNAL_NOTIFIER_BEARER_TOKEN={{ signal_notifier_bearer_token }}
+{% endif %}
+{% if demo_mode | default(false) | bool %}
+DEMO_MODE=true
+DEMO_MODE_CONFIRM={{ demo_mode_confirm }}
+{% if (demo_reset_cron | default('')) | length > 0 %}
+DEMO_RESET_CRON={{ demo_reset_cron }}
+{% endif %}
+{% endif %}
+{% if dev_routes_enabled | default(false) | bool %}
+DEV_ROUTES_ENABLED=true
+{% endif %}
+{% if (dev_reset_secret | default('')) | length > 0 %}
+DEV_RESET_SECRET={{ dev_reset_secret }}
+{% endif %}

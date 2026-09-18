@@ -53,7 +53,7 @@ sudo lsof -i :9000
 
 ### Strfry relay 연결 안 됨
 
-WebSocket relay (WebSocket relay)는 선택 사항이 아닌 핵심 서비스입니다. relay가 실행되지 않는 경우:
+WebSocket relay는 선택 사항이 아닌 핵심 서비스입니다. relay가 실행되지 않는 경우:
 
 ```bash
 # relay 상태 확인

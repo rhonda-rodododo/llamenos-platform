@@ -8,11 +8,8 @@ import type {
   AudioUrlMap,
 } from './adapter'
 import { SipBridgeAdapter } from './sip-bridge-adapter'
-import {
-  DEFAULT_LANGUAGE,
-  ivrIndexToDigit,
-} from '@shared/languages'
-import { IVR_PROMPTS, IVR_MORE_PROMPTS, getPrompt, resolveIvrPrompt } from '@shared/voice-prompts'
+import { getPrompt } from '@shared/voice-prompts'
+import { IvrVoiceCatalog, buildIvrLanguageMenu } from './ivr-menu'
 
 /**
  * ARI command types — JSON commands sent to the sip-bridge sidecar.
@@ -134,48 +131,30 @@ export class AsteriskAdapter extends SipBridgeAdapter {
   // --- IVR / Call flow ---
 
   async handleLanguageMenu(params: LanguageMenuParams): Promise<TelephonyResponse> {
-    const languages = params.enabledLanguages
+    const menu = buildIvrLanguageMenu(params.enabledLanguages, ASTERISK_VOICES)
 
-    if (languages.length <= 1) {
-      const lang = languages[0] || DEFAULT_LANGUAGE
+    if (menu.kind === 'single') {
       return this.ariJson([
-        this.ariSpeak(' ', lang),
+        this.ariSpeak(' ', menu.language),
         {
           action: 'gather',
           numDigits: 0,
           timeout: 0,
           callbackEvent: 'language_selected',
-          metadata: { auto: '1', forceLang: lang },
+          metadata: { auto: '1', forceLang: menu.language },
         },
       ])
     }
 
-    const commands: AriCommand[] = []
-    if (languages.length > 9) {
-      const mainMenu = languages.slice(0, 8)
-      for (let i = 0; i < mainMenu.length; i++) {
-        const prompt = IVR_PROMPTS[mainMenu[i]]
-        if (!prompt) continue
-        commands.push(this.ariSpeak(resolveIvrPrompt(prompt, String(i + 1)), mainMenu[i]))
-      }
-      const morePrompt = IVR_MORE_PROMPTS[languages[0]] || IVR_MORE_PROMPTS['en']
-      commands.push(this.ariSpeak(resolveIvrPrompt(morePrompt, '9'), 'en'))
-    } else {
-      for (let i = 0; i < languages.length; i++) {
-        const prompt = IVR_PROMPTS[languages[i]]
-        if (!prompt) continue
-        commands.push(this.ariSpeak(resolveIvrPrompt(prompt, ivrIndexToDigit(i)), languages[i]))
-      }
-    }
-
-    commands.push({
-      action: 'gather',
-      numDigits: 1,
-      timeout: 8,
-      callbackEvent: 'language_selected',
-    })
-
-    return this.ariJson(commands)
+    return this.ariJson([
+      ...menu.options.map((o): AriCommand => ({ action: 'speak', text: o.prompt, language: o.voice })),
+      {
+        action: 'gather',
+        numDigits: 1,
+        timeout: 8,
+        callbackEvent: 'language_selected',
+      },
+    ])
   }
 
   async handleIncomingCall(params: IncomingCallParams): Promise<TelephonyResponse> {
@@ -294,20 +273,24 @@ export class AsteriskAdapter extends SipBridgeAdapter {
 
 // --- Helpers ---
 
+/**
+ * Asterisk TTS language codes — the explicit, ordered list of locales the
+ * Asterisk TTS engine has a voice for. Absent locales are never offered in the
+ * IVR menu.
+ */
+export const ASTERISK_VOICES = new IvrVoiceCatalog<string>('asterisk', [
+  ['en', 'en-US'],
+  ['es', 'es'],
+  ['zh', 'zh'],
+  ['vi', 'vi'],
+  ['ar', 'ar'],
+  ['fr', 'fr'],
+  ['ko', 'ko'],
+  ['ru', 'ru'],
+  ['hi', 'hi'],
+  ['pt', 'pt-BR'],
+])
+
 function getAsteriskLang(lang: string): string {
-  const map: Record<string, string> = {
-    en: 'en-US',
-    es: 'es',
-    zh: 'zh',
-    tl: 'en-US', // Tagalog — fallback to English TTS
-    vi: 'vi',
-    ar: 'ar',
-    fr: 'fr',
-    ht: 'fr', // Haitian Creole — fallback to French
-    ko: 'ko',
-    ru: 'ru',
-    hi: 'hi',
-    pt: 'pt-BR',
-  }
-  return map[lang] || 'en-US'
+  return ASTERISK_VOICES.voiceForPrompt(lang)
 }

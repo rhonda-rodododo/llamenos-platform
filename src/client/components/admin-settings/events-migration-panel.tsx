@@ -4,6 +4,8 @@ import { useToast } from '@/lib/toast'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { AlertTriangle, Loader2 } from 'lucide-react'
+import { getApiUrl } from '@/lib/api-config'
+import { netFetch } from '@/lib/net'
 
 export function EventsMigrationPanel() {
   const { t } = useTranslation()
@@ -13,7 +15,7 @@ export function EventsMigrationPanel() {
   const [migrated, setMigrated] = useState(0)
 
   useEffect(() => {
-    fetch('/api/admin/events/migration-status')
+    netFetch(getApiUrl('/admin/events/migration-status'))
       .then(r => {
         if (!r.ok) return null
         return r.json() as Promise<{ pendingCount: number }>
@@ -31,7 +33,7 @@ export function EventsMigrationPanel() {
     setStatus('migrating')
     setMigrated(0)
     try {
-      const res = await fetch('/api/admin/events/migrate', { method: 'POST' })
+      const res = await netFetch(getApiUrl('/admin/events/migrate'), { method: 'POST' })
       const data = await res.json() as { migrated: number }
       setMigrated(data.migrated)
       setStatus('done')

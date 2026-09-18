@@ -5,12 +5,12 @@
  *
  * Behavioral depth: Steps seed data via simulation helpers when needed.
  */
-import { expect } from '@playwright/test'
+import { expect, type APIRequestContext, type Page } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
 import { TestIds } from '../../test-ids'
 import { Timeouts } from '../../helpers'
 import { Navigation } from '../../pages/index'
-import { enableMessagingViaApi } from '../../api-helpers'
+import { apiGet, enableMessagingViaApi } from '../../api-helpers'
 import { simulateIncomingMessage, uniqueCallerNumber } from '../../simulation-helpers'
 
 // --- Admin messaging settings ---
@@ -22,57 +22,66 @@ Given('I am on the admin settings page', async ({ page }) => {
   })
 })
 
-Then('I should see the messaging configuration section', async ({ page }) => {
-  // Messaging settings are inside the telephony collapsible section
-  const telephonyTrigger = page.getByTestId('telephony-trigger')
-  const hasTrigger = await telephonyTrigger.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (hasTrigger) {
-    await telephonyTrigger.click()
-    const messagingSection = page.locator('text=/messaging|channel|sms|whatsapp/i')
-    await expect(messagingSection.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
-    return
+// Each messaging channel renders its own collapsible settings section
+// (`<channel>-channel`) whose enable switch is `<channel>-enabled-toggle`.
+// Every interaction below is scoped to those testids: the admin settings page
+// has many unrelated switches, and the first one on the page is the passkey
+// policy's "require for admins" toggle — clicking it locks the admin out of
+// every API route with WEBAUTHN_REQUIRED for the rest of the run.
+
+type MessagingChannel = 'sms' | 'whatsapp'
+
+async function enableChannelViaSettingsUi(page: Page, channel: MessagingChannel): Promise<void> {
+  const trigger = page.getByTestId(`${channel}-channel-trigger`)
+  await expect(trigger).toBeVisible({ timeout: Timeouts.ELEMENT })
+  if (await trigger.getAttribute('aria-expanded') !== 'true') {
+    await trigger.click()
   }
-  // Settings page is loaded — messaging section may have different structure
-  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  const toggle = page.getByTestId(`${channel}-enabled-toggle`)
+  await expect(toggle).toBeVisible({ timeout: Timeouts.ELEMENT })
+  if (await toggle.getAttribute('aria-checked') !== 'true') {
+    await toggle.click()
+  }
+  await expect(toggle).toHaveAttribute('aria-checked', 'true')
+
+  const saved = page.waitForResponse(
+    res => res.url().endsWith('/api/settings/messaging') && res.request().method() === 'PATCH',
+    { timeout: Timeouts.API },
+  )
+  await page.getByTestId(`${channel}-save-btn`).click()
+  expect((await saved).status()).toBe(200)
+}
+
+async function expectChannelEnabled(request: APIRequestContext, channel: MessagingChannel): Promise<void> {
+  const { status, data } = await apiGet<{ enabledChannels: string[] }>(request, '/settings/messaging')
+  expect(status).toBe(200)
+  expect(data.enabledChannels).toContain(channel)
+}
+
+Then('I should see the messaging configuration section', async ({ page }) => {
+  await expect(page.getByTestId('sms-channel')).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await expect(page.getByTestId('whatsapp-channel')).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 Given('I am on the messaging settings', async ({ page }) => {
   await Navigation.goToHubSettings(page)
-  const telephonyTrigger = page.getByTestId('telephony-trigger')
-  const hasTrigger = await telephonyTrigger.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (hasTrigger) {
-    await telephonyTrigger.click()
-  }
+  await expect(page.getByTestId('sms-channel')).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
 When('I configure SMS channel with Twilio credentials', async ({ page }) => {
-  // Look for SMS toggle or label in the telephony section
-  const smsLabel = page.locator('text=/sms/i').first()
-  const hasSms = await smsLabel.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (hasSms) {
-    const toggle = page.locator('[role="switch"]').first()
-    const hasToggle = await toggle.isVisible({ timeout: 3000 }).catch(() => false)
-    if (hasToggle) await toggle.click()
-  }
+  await enableChannelViaSettingsUi(page, 'sms')
 })
 
-Then('the SMS channel should be enabled', async ({ page }) => {
-  // Verify page is loaded after configuration
-  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+Then('the SMS channel should be enabled', async ({ backendRequest }) => {
+  await expectChannelEnabled(backendRequest, 'sms')
 })
 
 When('I configure WhatsApp channel', async ({ page }) => {
-  const whatsappLabel = page.locator('text=/whatsapp/i').first()
-  const hasWhatsapp = await whatsappLabel.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-  if (hasWhatsapp) {
-    const toggle = page.locator('[role="switch"]').first()
-    const hasToggle = await toggle.isVisible({ timeout: 3000 }).catch(() => false)
-    if (hasToggle) await toggle.click()
-  }
+  await enableChannelViaSettingsUi(page, 'whatsapp')
 })
 
-Then('the WhatsApp channel should be enabled', async ({ page }) => {
-  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+Then('the WhatsApp channel should be enabled', async ({ backendRequest }) => {
+  await expectChannelEnabled(backendRequest, 'whatsapp')
 })
 
 // --- Active conversation steps ---

@@ -6,26 +6,14 @@
 
 name: iOS E2E
 
+# DISABLED on push/pull_request until #661 is resolved: the backend bootstrap
+# needs Docker, which GitHub-hosted macOS runners do not provide, so every
+# shard fails (exit 125) regardless of the change under test. Under the
+# "no red check" merge rule a check that cannot pass must be switched off
+# deliberately rather than merged around. Re-enable the triggers below in the
+# PR that closes #661.
 on:
-  push:
-    branches: [main, desktop]
-    paths:
-      - 'apps/ios/**'
-      - 'packages/crypto/**'
-      - 'packages/protocol/**'
-      - 'packages/i18n/**'
-      - 'apps/worker/**'
-      - 'packages/shared/**'
-      - '.github/workflows/ios-e2e.yml'
-  pull_request:
-    paths:
-      - 'apps/ios/**'
-      - 'packages/crypto/**'
-      - 'packages/protocol/**'
-      - 'packages/i18n/**'
-      - 'apps/worker/**'
-      - 'packages/shared/**'
-      - '.github/workflows/ios-e2e.yml'
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.event_name == 'pull_request' && format('ios-e2e-pr-{0}', github.ref) || format('ios-e2e-push-{0}', github.sha) }}
@@ -40,7 +28,7 @@ env:
 jobs:
   # ─── Detect Changed Files ─────────────────────────────────────
   changes:
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
@@ -95,6 +83,15 @@ jobs:
 
       - name: Install dependencies and run codegen
         run: bun install --frozen-lockfile && bun run codegen && bun run i18n:codegen
+
+      # Fails fast, before the expensive XCFramework/simulator build, the
+      # moment a test references an accessibility identifier the app no
+      # longer defines anywhere (see #755). New regressions fail the build;
+      # pre-existing, unrelated stale identifiers are tracked in
+      # stale-identifiers-baseline.txt so this doesn't block on debt this
+      # check didn't introduce.
+      - name: Check for stale accessibility identifiers in iOS UI tests
+        run: python3 apps/ios/scripts/check-stale-identifiers.py
 
       # Cache the XCFramework AND generated Swift bindings together.
       # Both must come from the same Rust build or checksums will mismatch.

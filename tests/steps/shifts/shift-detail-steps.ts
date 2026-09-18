@@ -60,7 +60,7 @@ When('I tap a volunteer assignment card', async ({ page }) => {
   // Count currently selected badges before toggling
   const badgesBefore = await combobox.locator('[role="button"]').count()
   await page.evaluate((count) => {
-    (window as Record<string, unknown>).__test_badge_count_before = count
+    (window as unknown as Record<string, unknown>).__test_badge_count_before = count
   }, badgesBefore)
 
   // Open the dropdown and click the first volunteer
@@ -75,7 +75,7 @@ Then('the volunteer assignment should toggle', async ({ page }) => {
   const form = page.getByTestId(TestIds.SHIFT_FORM)
   const combobox = form.getByRole('combobox')
   const badgesBefore = (await page.evaluate(() =>
-    (window as Record<string, unknown>).__test_badge_count_before,
+    (window as unknown as Record<string, unknown>).__test_badge_count_before,
   )) as number
   const badgesAfter = await combobox.locator('[role="button"]').count()
   expect(badgesAfter).not.toBe(badgesBefore)

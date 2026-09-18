@@ -1,0 +1,18 @@
+# orchestrator/systemd/llamenos-fleet-tick.timer
+[Unit]
+Description=Llámenos fleet dispatch pass, every 30 minutes
+
+[Timer]
+# ABSOLUTE wall-clock, deliberately — NOT OnBootSec + OnUnitActiveSec.
+# OnUnitActiveSec anchors off the last time the service was active, and
+# OnBootSec fires only in the first minutes after a boot. On a machine that has
+# been up for days with no recent activation there is nothing left to anchor to,
+# so systemd schedules NOTHING — while `is-enabled` still says enabled and
+# `is-active` still says active. An OnCalendar schedule cannot enter that state:
+# every expression has a next occurrence computed from the clock alone.
+OnCalendar=*-*-* *:00,30:00
+Persistent=true
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target

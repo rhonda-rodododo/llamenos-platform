@@ -7,11 +7,12 @@
  * No more `page.request.get` (unauthenticated). Uses testEndpointAccess() with
  * proper nsec for each role.
  */
-import { expect } from '@playwright/test'
+import { expect, type APIRequestContext, type Page } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
-import { TestIds, navTestIdMap, Timeouts, loginAsAdmin, loginAsVolunteer } from '../../helpers'
-import { Navigation } from '../../pages/index'
+import { TestIds, navTestIdMap, Timeouts, loginAsVolunteer } from '../../helpers'
+import { Navigation, VolunteerPage } from '../../pages/index'
 import {
+  seedHexToPubkey,
   createVolunteerViaApi,
   createRoleViaApi,
   listRolesViaApi,
@@ -73,7 +74,7 @@ Then('I should have access to all API endpoints', async ({ request }) => {
 
 // --- Multi-role steps ---
 
-Given('a volunteer has both {string} and {string} roles', async ({ page, request, rolesWorld }, role1: string, role2: string) => {
+Given('a volunteer has both {string} and {string} roles', async ({ request, rolesWorld }, role1: string, role2: string) => {
   const roles = await listRolesViaApi(request)
   const roleId1 = roles.find(r => r.name === role1)?.id
   const roleId2 = roles.find(r => r.name === role2)?.id
@@ -120,7 +121,7 @@ Given('a volunteer has only a custom {string} role', async ({ request, rolesWorl
 
 Then('they should only see endpoints allowed by that role', async ({ request, rolesWorld }) => {
   // Verify the volunteer can access calls but not admin endpoints
-  const callsStatus = await testEndpointAccess(request, 'GET', '/calls/history', rolesWorld.volunteerNsec)
+  const _callsStatus = await testEndpointAccess(request, 'GET', '/calls/history', rolesWorld.volunteerNsec)
   // Calls read should work (200 or similar)
   // Admin endpoints should be denied
   const volunteersStatus = await testEndpointAccess(request, 'GET', '/users', rolesWorld.volunteerNsec)
@@ -133,9 +134,8 @@ When('the volunteer attempts to access an unauthorized endpoint', async ({ reque
 })
 
 When('the volunteer logs in', async ({ page, rolesWorld }) => {
-  if (rolesWorld.volunteerNsec) {
-    await loginAsVolunteer(page, rolesWorld.volunteerNsec)
-  }
+  expect(rolesWorld.volunteerNsec, 'a volunteer must be created first').toBeTruthy()
+  await loginAsVolunteer(page, rolesWorld.volunteerNsec)
 })
 
 // --- Role UI steps ---
@@ -160,6 +160,25 @@ Then('I should see all navigation items including admin', async ({ page }) => {
   await expect(page.getByTestId(TestIds.NAV_BANS)).toBeVisible({ timeout: Timeouts.ELEMENT })
 })
 
+/**
+ * Open the (Add Volunteer / Invite) form's role Select and assert every system role is
+ * offered. System roles are fixed, so the expectation cannot race parallel custom-role
+ * creation.
+ */
+async function expectFormOffersSystemRoles(page: Page, request: APIRequestContext): Promise<void> {
+  const systemRoles = (await listRolesViaApi(request)).filter(r => r.isSystem)
+  expect(systemRoles.length, 'system roles must exist').toBeGreaterThan(0)
+  const trigger = page.getByTestId(TestIds.USER_FORM_ROLE_SELECT)
+  await expect(trigger).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await trigger.click()
+  for (const role of systemRoles) {
+    const option = page.locator(`[data-testid="${TestIds.USER_FORM_ROLE_OPTION}"][data-role-id="${role.id}"]`)
+    await expect(option, `role "${role.name}" offered in form`).toBeVisible({ timeout: Timeouts.ELEMENT })
+    await expect(option).toContainText(role.name)
+  }
+  await page.keyboard.press('Escape')
+}
+
 // --- Wildcard domain steps ---
 
 Given('a role with {string} wildcard permission', async ({ request, rolesWorld }, permission: string) => {
@@ -177,9 +196,8 @@ Given('a role with {string} wildcard permission', async ({ request, rolesWorld }
 })
 
 When('the user with that role logs in', async ({ page, rolesWorld }) => {
-  if (rolesWorld.volunteerNsec) {
-    await loginAsVolunteer(page, rolesWorld.volunteerNsec)
-  }
+  expect(rolesWorld.volunteerNsec, 'a volunteer must be created first').toBeTruthy()
+  await loginAsVolunteer(page, rolesWorld.volunteerNsec)
 })
 
 Then('they should have all notes-related permissions', async ({ request, rolesWorld }) => {
@@ -196,16 +214,14 @@ When('I view the volunteer list', async ({ page }) => {
   await Navigation.goToVolunteers(page)
 })
 
-Then('the role dropdown should show all default roles', async ({ page }) => {
-  // Open add form or check existing dropdown
-  const addBtn = page.getByTestId(TestIds.VOLUNTEER_ADD_BTN)
-  await addBtn.click()
-  // Role selector should be visible with all default roles
-  const roleSelector = page.locator('select, [role="combobox"], [role="listbox"]').first()
-  await expect(roleSelector).toBeVisible({ timeout: Timeouts.ELEMENT })
+Then('the role dropdown should show all default roles', async ({ page, request }) => {
+  // The old assertion was `select, [role="combobox"], [role="listbox"]`.first() being
+  // visible — satisfied by any combobox on the page, never checking a single role.
+  await page.getByTestId(TestIds.VOLUNTEER_ADD_BTN).click()
+  await expectFormOffersSystemRoles(page, request)
 })
 
-Given('a volunteer with {string} role', async ({ page, request, rolesWorld }, roleName: string) => {
+Given('a volunteer with {string} role', async ({ request, rolesWorld }, roleName: string) => {
   const roles = await listRolesViaApi(request)
   const role = roles.find(r => r.name === roleName)
   expect(role).toBeTruthy()
@@ -214,76 +230,48 @@ Given('a volunteer with {string} role', async ({ page, request, rolesWorld }, ro
     name: `RoleTest ${Date.now()}`,
     roleIds: [role!.id],
   })
+  // Kept in the rolesWorld fixture, not on `window`: the old window stash did not
+  // survive the page navigation in the next step, so the dropdown step silently no-op'd.
   rolesWorld.volunteerNsec = vol.nsec
-  await page.evaluate((name) => {
-    (window as Record<string, unknown>).__test_vol_name = name
-  }, vol.name)
 })
 
-When('I change their role to {string} via the dropdown', async ({ page }, roleName: string) => {
-  // Navigate to volunteers page first
+When('I change their role to {string} via the dropdown', async ({ page, request, rolesWorld }, roleName: string) => {
+  expect(rolesWorld.volunteerNsec, 'a volunteer must exist first (see "a volunteer with {string} role")').toBeTruthy()
+  const pubkey = seedHexToPubkey(rolesWorld.volunteerNsec)
+  const role = (await listRolesViaApi(request)).find(r => r.name === roleName)
+  expect(role, `role "${roleName}" must exist`).toBeTruthy()
+
   await Navigation.goToVolunteers(page)
-  const volName = (await page.evaluate(() => (window as Record<string, unknown>).__test_vol_name)) as string
-  if (volName) {
-    const row = page.getByTestId(TestIds.VOLUNTEER_ROW).filter({ hasText: volName })
-    const dropdown = row.locator('select, [role="combobox"]').first()
-    if (await dropdown.isVisible({ timeout: 2000 }).catch(() => false)) {
-      const tagName = await dropdown.evaluate(el => el.tagName.toLowerCase())
-      if (tagName === 'select') {
-        await dropdown.selectOption({ label: roleName })
-      } else {
-        // Radix Select combobox — click to open, then click the option
-        await dropdown.click()
-        await page.getByRole('option', { name: roleName }).click()
-      }
-    }
-  }
+  // The old step probed `select, [role="combobox"]`.first() with a non-waiting isVisible()
+  // and skipped the write whenever it lost the race (or the volunteer name was unset).
+  const row = VolunteerPage.getRowById(page, pubkey)
+  await expect(row).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await VolunteerPage.changeRole(page, row, pubkey, role!)
 })
 
-Then('the volunteer should display the {string} badge', async ({ page }, roleName: string) => {
-  const volName = (await page.evaluate(() => (window as Record<string, unknown>).__test_vol_name)) as string
-  if (volName) {
-    const row = page.getByTestId(TestIds.VOLUNTEER_ROW).filter({ hasText: volName })
-    const hasRow = await row.first().isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)
-    if (hasRow) {
-      // Role badge text might not be present if role display is different
-      const badge = row.getByText(roleName).first()
-      const hasBadge = await badge.isVisible({ timeout: 3000 }).catch(() => false)
-      if (!hasBadge) {
-        // Accept the row being visible as sufficient — role badge may not render as text
-        return
-      }
-    }
-  }
+Then('the volunteer should display the {string} badge', async ({ page, rolesWorld }, roleName: string) => {
+  // Was: row/badge isVisible probes that returned early ("accept the row being visible
+  // as sufficient") — it could never fail.
+  const row = VolunteerPage.getRowById(page, seedHexToPubkey(rolesWorld.volunteerNsec))
+  await expect(row.getByTestId(TestIds.VOLUNTEER_ROW_ROLE_BADGE)).toContainText(roleName, { timeout: Timeouts.ELEMENT })
 })
 
-Given('I changed a volunteer\'s role to {string}', async ({ page, request }, roleName: string) => {
-  // Setup: create volunteer and change role
-  const roles = await listRolesViaApi(request)
-  const role = roles.find(r => r.name === roleName)
+Given('I changed a volunteer\'s role to {string}', async ({ request, rolesWorld }, roleName: string) => {
+  // Setup: a volunteer holding the role (assigned through the API).
+  const role = (await listRolesViaApi(request)).find(r => r.name === roleName)
+  expect(role, `role "${roleName}" must exist`).toBeTruthy()
   const vol = await createVolunteerViaApi(request, {
     name: `Badge ${Date.now()}`,
     roleIds: [role!.id],
   })
-  await page.evaluate((name) => {
-    (window as Record<string, unknown>).__test_vol_name = name
-  }, vol.name)
+  rolesWorld.volunteerNsec = vol.nsec
 })
 
-Then('I should see the {string} badge on their card', async ({ page }, roleName: string) => {
-  const volName = (await page.evaluate(() => (window as Record<string, unknown>).__test_vol_name)) as string
-  if (volName) {
-    await Navigation.goToVolunteers(page)
-    const row = page.getByTestId(TestIds.VOLUNTEER_ROW).filter({ hasText: volName })
-    await expect(row.first()).toBeVisible({ timeout: Timeouts.ELEMENT })
-    // Use .first() to avoid strict mode violation when text appears in multiple sub-elements
-    const badge = row.getByText(roleName).first()
-    const hasBadge = await badge.isVisible({ timeout: 3000 }).catch(() => false)
-    if (!hasBadge) {
-      // Accept the volunteer row being visible as sufficient
-      return
-    }
-  }
+Then('I should see the {string} badge on their card', async ({ page, rolesWorld }, roleName: string) => {
+  expect(rolesWorld.volunteerNsec, 'a volunteer must exist first').toBeTruthy()
+  await Navigation.goToVolunteers(page)
+  const row = VolunteerPage.getRowById(page, seedHexToPubkey(rolesWorld.volunteerNsec))
+  await expect(row.getByTestId(TestIds.VOLUNTEER_ROW_ROLE_BADGE)).toContainText(roleName, { timeout: Timeouts.ELEMENT })
 })
 
 When('I open the Add Volunteer form', async ({ page }) => {
@@ -292,24 +280,20 @@ When('I open the Add Volunteer form', async ({ page }) => {
 })
 
 When('I open the Invite form', async ({ page }) => {
-  // Navigate to volunteers page first, then open invite form
+  // Navigate to volunteers page first, then open invite form.
+  // The invite button always renders for an admin on this page (only gated on
+  // `isAdmin`), so the old isVisible/catch probe could only ever silently skip
+  // opening the form — never legitimately branch around a missing button.
   await Navigation.goToVolunteers(page)
   const inviteBtn = page.getByTestId(TestIds.INVITE_BTN)
-  if (await inviteBtn.isVisible({ timeout: Timeouts.ELEMENT }).catch(() => false)) {
-    await inviteBtn.click()
-  }
+  await expect(inviteBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await inviteBtn.click()
 })
 
-Then('I should see all available roles in the form', async ({ page }) => {
-  // Verify the form/dialog or page content shows role options
-  const formContent = page.locator('form, [role="dialog"], [data-testid="page-title"]').first()
-  await expect(formContent).toBeVisible({ timeout: Timeouts.ELEMENT })
-  // Check for role-related content — try role text first, fall back to page-title
-  const roleContent = page.getByText(/volunteer|admin|reviewer|role/i).first()
-  const isRole = await roleContent.isVisible({ timeout: 2000 }).catch(() => false)
-  if (isRole) return
-  // Fallback: page rendered at all
-  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+Then('I should see all available roles in the form', async ({ page, request }) => {
+  // Was: `form, [role="dialog"], [data-testid="page-title"]`.first() visible, then a
+  // /volunteer|admin|reviewer|role/i text probe with a "page rendered at all" fallback.
+  await expectFormOffersSystemRoles(page, request)
 })
 
 // --- Reviewer login ---

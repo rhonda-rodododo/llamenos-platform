@@ -1,6 +1,6 @@
 # packages/i18n
 
-Localization package for Llamenos. Manages translations across 13 locales and generates platform-specific string files.
+Localization package for Llamenos. Manages translations across all locales in `locales/` (source of truth: `languages.ts` — never hardcode a locale count elsewhere) and generates platform-specific string files.
 
 ## Supported Locales
 
@@ -11,7 +11,7 @@ Localization package for Llamenos. Manages translations across 13 locales and ge
 ## Structure
 
 ```
-locales/          # 13 JSON locale files (en.json, es.json, …)
+locales/          # JSON locale files, one per language (see languages.ts for the current list)
 languages.ts      # Language metadata (codes, display labels, Twilio voice IDs)
 tools/
   i18n-codegen.ts          # Generates iOS .strings + Android strings.xml + Kotlin I18n.kt

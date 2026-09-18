@@ -139,7 +139,7 @@ test.describe('Auto-Update (Epic 289)', () => {
 
     // Clear any previous relaunch flag
     await page.evaluate(() => {
-      delete (window as Record<string, unknown>).__RELAUNCH_CALLED__
+      delete (window as unknown as Record<string, unknown>).__RELAUNCH_CALLED__
     })
 
     // Click restart
@@ -147,7 +147,7 @@ test.describe('Auto-Update (Epic 289)', () => {
 
     // platform.ts sets __RELAUNCH_CALLED__ = true in test builds
     const relaunched = await page.evaluate(() =>
-      (window as Record<string, unknown>).__RELAUNCH_CALLED__ === true,
+      (window as unknown as Record<string, unknown>).__RELAUNCH_CALLED__ === true,
     )
     expect(relaunched).toBe(true)
   })

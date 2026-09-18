@@ -16,7 +16,7 @@ use std::sync::{Mutex, MutexGuard};
 use llamenos_core::{
     auth, device_keys, hpke_envelope,
     labels::{LABEL_BACKUP_HKDF_INFO, LABEL_DEVICE_ENCRYPTION_SEED, LABEL_HUB_EVENT_EPOCH},
-    provisioning, puk, sas, sigchain,
+    puk, sas, sigchain,
 };
 use tauri::Manager;
 
@@ -1121,33 +1121,6 @@ pub fn generate_backup_from_state(
     let _ = pin;
 
     Ok(backup.to_string())
-}
-
-// ── Device provisioning (Epic 355 — primary device sends encrypted nsec) ──
-
-/// Encrypt the primary device's nsec for a new device's provisioning room.
-///
-/// The signing seed NEVER leaves Rust. Performs:
-///   1. X25519(primarySK, ephemeralPK) → shared_secret
-///   2. HKDF-SHA256(shared_secret, salt=LABEL_PROVISIONING_SALT, info=LABEL_DEVICE_PROVISION) → key
-///   3. AES-256-GCM encrypt(seed_bytes, key, aad=LABEL_DEVICE_PROVISION) → ciphertext
-///   4. SAS = HKDF(shared_secret, SAS_SALT, SAS_INFO) → 6-digit code
-///
-/// Returns { encryptedHex, sasCode } or an error string.
-#[tauri::command]
-pub fn encrypt_seed_for_provisioning(
-    state: tauri::State<'_, CryptoState>,
-    ephemeral_pubkey_hex: String,
-) -> Result<serde_json::Value, String> {
-    state.with_secrets(|secrets| {
-        let result =
-            provisioning::encrypt_seed_for_provisioning(&secrets.signing_seed, &ephemeral_pubkey_hex)
-                .map_err(err_str)?;
-        Ok(serde_json::json!({
-            "encryptedHex": result.encrypted_hex,
-            "sasCode": result.sas_code,
-        }))
-    })
 }
 
 // ── H17: Stronghold vault file wipe ─────────────────────────────────

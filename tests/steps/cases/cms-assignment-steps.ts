@@ -10,7 +10,6 @@ import {
   ADMIN_NSEC,
   createRecordViaApi,
   listEntityTypesViaApi,
-  listRecordsViaApi,
 } from '../../api-helpers'
 
 // State is now in casesWorld fixture (casesWorld.lastRecordId)
@@ -87,7 +86,7 @@ Given('auto-assignment is enabled', async () => {
 
 // --- Suggest assignees API ---
 
-When('I request assignment suggestions for the case', async ({ backendRequest: request, casesWorld, workerHub }) => {
+When('I request assignment suggestions for the case', async ({ backendRequest: request }) => {
   // API test — would call GET /records/:id/suggest-assignees
   void request
 })
