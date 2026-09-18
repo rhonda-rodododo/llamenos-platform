@@ -9,6 +9,7 @@
 
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { RelayConnection } from './connection'
+import { deriveWsBase } from '../api-config'
 import type { RelayState } from './types'
 
 interface RelayContextValue {
@@ -53,13 +54,23 @@ export function RelayProvider({
       return
     }
 
-    // Build the relay URL — if relative, construct full WebSocket URL
+    // Build the relay URL — if relative, resolve against the configured backend
+    // (api-config.ts), not window.location: under `tauri://` the webview's own
+    // origin is meaningless, so `window.location.host` would build an
+    // unreachable URL. `deriveWsBase()` returns undefined when no absolute
+    // backend is configured (dev/test), in which case window.location is the
+    // Vite dev server itself and IS the right host to fall back to.
     let wsUrl: string
     if (relayUrl.startsWith('ws://') || relayUrl.startsWith('wss://')) {
       wsUrl = relayUrl
     } else {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-      wsUrl = `${protocol}//${window.location.host}${relayUrl}`
+      const configuredBase = deriveWsBase()
+      if (configuredBase) {
+        wsUrl = `${configuredBase}${relayUrl}`
+      } else {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+        wsUrl = `${protocol}//${window.location.host}${relayUrl}`
+      }
     }
 
     const connection = new RelayConnection({

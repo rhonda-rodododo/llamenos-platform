@@ -50,11 +50,15 @@ final class SecurityUITests: BaseUITest {
                 "PIN pad should be displayed on lock screen"
             )
         }
-        and("I should see the locked npub") {
-            let lockedNpub = find("locked-npub")
-            if lockedNpub.waitForExistence(timeout: 3) {
-                XCTAssertTrue(true, "Locked npub is displayed")
-            }
+        and("I should see the locked identity") {
+            // "locked-npub" was the pre-v3 identifier (nsec/npub terminology).
+            // The lock screen now shows the device's hex signing pubkey under
+            // "locked-identity" (see PINUnlockView.swift).
+            let lockedIdentity = find("locked-identity")
+            XCTAssertTrue(
+                lockedIdentity.waitForExistence(timeout: 3),
+                "Locked identity should be displayed on the lock screen"
+            )
         }
     }
 
@@ -92,38 +96,33 @@ final class SecurityUITests: BaseUITest {
 
     // MARK: - PIN Pad Security
 
+    // NOTE: "confirm-backup" and "continue-to-pin" were steps in the pre-v3
+    // onboarding flow (device key display + backup confirmation before PIN
+    // set). They no longer exist: AuthViewModel now goes straight from
+    // create-identity to the PIN set screen (see AuthViewModel.swift's "V3
+    // device key model" doc comment). They also assumed the digit-based
+    // PINPadView ("pin-pad", "pin-\(digit)", "pin-dots") is shown during
+    // onboarding — it isn't: PINSetView.swift uses a free-text SecureField
+    // ("pin-input"/"pin-submit") so a PIN or passphrase (8+ characters) can
+    // be entered. PINPadView is only used on the lock/unlock screen
+    // (PINUnlockView.swift), so these tests are rewritten to exercise it
+    // there — preserving the original intent (verify the digit pad renders
+    // all its digits, backspace, and dots indicator) against the screen
+    // where that component actually appears today.
     func testPINPadHasAllDigits() {
-        given("the app is on the login screen") {
-            app.launchArguments.append("--test-skip-hub-validation")
-            launchClean()
-        }
-        when("I start the identity creation flow") {
-            let hubInput = find("hub-url-input")
-            guard hubInput.waitForExistence(timeout: 5) else { return }
-            hubInput.tap()
-            hubInput.typeText("https://test.example.org")
-
-            // Dismiss keyboard before tapping create button
-            dismissKeyboard()
-
-            let createButton = find("create-identity")
-            guard createButton.waitForExistence(timeout: 5) else { return }
-            createButton.tap()
-
-            // Confirm backup
-            let confirmBackup = find("confirm-backup")
-            if confirmBackup.waitForExistence(timeout: 5) {
-                confirmBackup.tap()
+        given("I am authenticated and lock the app") {
+            launchAuthenticated()
+            let lockButton = find("lock-app")
+            guard lockButton.waitForExistence(timeout: 10) else {
+                XCTFail("Lock button should exist")
+                return
             }
-            let continueButton = find("continue-to-pin")
-            if continueButton.waitForExistence(timeout: 3) {
-                continueButton.tap()
-            }
+            lockButton.tap()
         }
         then("the PIN pad should have digits 0-9 and backspace") {
             let pinPad = find("pin-pad")
             guard pinPad.waitForExistence(timeout: 5) else {
-                XCTFail("PIN pad should appear")
+                XCTFail("PIN pad should appear on the lock screen")
                 return
             }
             for digit in 0...9 {
@@ -136,37 +135,21 @@ final class SecurityUITests: BaseUITest {
     }
 
     func testPINDotsIndicator() {
-        given("the app is on the login screen") {
-            app.launchArguments.append("--test-skip-hub-validation")
-            launchClean()
-        }
-        when("I navigate to the PIN set screen") {
-            let hubInput = find("hub-url-input")
-            guard hubInput.waitForExistence(timeout: 5) else { return }
-            hubInput.tap()
-            hubInput.typeText("https://test.example.org")
-
-            // Dismiss keyboard
-            dismissKeyboard()
-
-            let createButton = find("create-identity")
-            guard createButton.waitForExistence(timeout: 5) else { return }
-            createButton.tap()
-
-            let confirmBackup = find("confirm-backup")
-            if confirmBackup.waitForExistence(timeout: 5) {
-                confirmBackup.tap()
+        given("I am authenticated and lock the app") {
+            launchAuthenticated()
+            let lockButton = find("lock-app")
+            guard lockButton.waitForExistence(timeout: 10) else {
+                XCTFail("Lock button should exist")
+                return
             }
-            let continueButton = find("continue-to-pin")
-            if continueButton.waitForExistence(timeout: 3) {
-                continueButton.tap()
-            }
+            lockButton.tap()
         }
         then("I should see the PIN dots indicator") {
             let pinDots = find("pin-dots")
-            if pinDots.waitForExistence(timeout: 5) {
-                XCTAssertTrue(true, "PIN dots indicator is displayed")
-            }
+            XCTAssertTrue(
+                pinDots.waitForExistence(timeout: 5),
+                "PIN dots indicator should be displayed on the lock screen"
+            )
         }
     }
 
@@ -223,8 +206,9 @@ final class SecurityUITests: BaseUITest {
             createButton.tap()
         }
         then("I should see an error about insecure connection") {
-            // The error message should appear (either as an alert or inline error)
-            let errorElement = find("auth-error")
+            // "auth-error" was a stale identifier — LoginView surfaces
+            // AuthViewModel.errorMessage under "login-error" (see LoginView.swift).
+            let errorElement = find("login-error")
             if errorElement.waitForExistence(timeout: 5) {
                 XCTAssertTrue(true, "HTTP rejection error is displayed")
             } else {
@@ -554,15 +538,31 @@ final class SecurityUITests: BaseUITest {
         }
     }
 
-    // MARK: - Epic 260: Device Key Input Cleared After Import (M27)
+    // MARK: - Epic 260 / Issue #755: Sensitive Credential Input Not Retained (M27)
+    //
+    // Originally "device key input cleared after import": the v2 model let a
+    // user paste a raw device key (nsec) into an "import-key" screen, and
+    // this suite checked that AuthViewModel.cancelImport() cleared it. The
+    // v3 device-key migration deleted that whole screen — "there is no nsec
+    // to display for backup" (see AuthViewModel.swift's doc comment) —
+    // device keys are now generated atomically inside PIN set
+    // (PINViewModel.handleSetPIN), and multi-device support uses QR/ECDH
+    // device linking instead of key paste/import.
+    //
+    // `find("import-key")` on the deleted screen still returned a valid
+    // (non-existent) XCUIElement, so `waitForExistence` just returned false
+    // and the test read as "the button never showed up in time" instead of
+    // "this feature doesn't exist" — a stale identifier degrading a real
+    // regression test into one that could pass without checking anything.
+    // These two tests assert the *current* place sensitive credential input
+    // must not be retained: the PIN SecureField in PINSetView.
 
-    func testDeviceKeyInputClearedAfterSuccessfulImport() {
+    func testPINInputClearedBetweenEnterAndConfirmPhase() {
         given("the app is on the login screen") {
             app.launchArguments.append("--test-skip-hub-validation")
             launchClean()
         }
-        when("I navigate to the import key screen") {
-            // Enter hub URL first (required for import navigation)
+        when("I create a new identity and enter a PIN") {
             let hubInput = find("hub-url-input")
             guard hubInput.waitForExistence(timeout: 20) else {
                 XCTFail("Hub URL input should exist")
@@ -570,66 +570,123 @@ final class SecurityUITests: BaseUITest {
             }
             hubInput.tap()
             hubInput.typeText("https://test.example.org")
-            // Dismiss keyboard
-            let coordinate = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.1))
-            coordinate.tap()
+            dismissKeyboard()
 
-            let importButton = find("import-key")
-            guard importButton.waitForExistence(timeout: 5) else {
-                XCTFail("Import key button should exist")
+            let createButton = find("create-identity")
+            guard createButton.waitForExistence(timeout: 5) else {
+                XCTFail("Create identity button should exist")
                 return
             }
-            importButton.tap()
-        }
-        then("the device key input field should be present and empty") {
-            let deviceKeyInput = find("device-key-input")
-            XCTAssertTrue(
-                deviceKeyInput.waitForExistence(timeout: 5),
-                "Device key input field should appear on import screen"
-            )
-            // The SecureField renders dots for entered text, but an empty field
-            // has no value/placeholder text. We verify the field exists and is
-            // accessible for input.
-        }
-        and("the submit button should be present") {
-            let submitButton = find("submit-import")
-            XCTAssertTrue(
-                submitButton.exists,
-                "Submit import button should exist"
-            )
-        }
-        and("the cancel button should clear the device key input") {
-            // Navigate back via cancel — AuthViewModel.cancelImport() clears deviceKeyInput
-            let cancelButton = find("cancel-import")
-            if cancelButton.waitForExistence(timeout: 3) {
-                cancelButton.tap()
+            createButton.tap()
 
-                // Return to login screen
-                let createButton = find("create-identity")
-                XCTAssertTrue(
-                    createButton.waitForExistence(timeout: 5),
-                    "Should return to login screen after cancel"
-                )
-
-                // Re-enter import screen — deviceKeyInput should be empty (cleared by cancelImport)
-                let importButton = find("import-key")
-                if importButton.waitForExistence(timeout: 3) {
-                    importButton.tap()
-                    let deviceKeyInput = find("device-key-input")
-                    if deviceKeyInput.waitForExistence(timeout: 3) {
-                        // The field should be empty — SecureField with empty string
-                        // shows the placeholder text. We verify the field has no
-                        // typed content by checking its value property.
-                        let fieldValue = deviceKeyInput.value as? String ?? ""
-                        // An empty SecureField's value is "" or the placeholder text.
-                        // It should NOT contain any device key data.
-                        XCTAssertTrue(
-                            fieldValue.isEmpty || fieldValue == deviceKeyInput.placeholderValue,
-                            "Device key input should not retain key data after cancel"
-                        )
-                    }
-                }
+            let pinInput = find("pin-input")
+            guard pinInput.waitForExistence(timeout: 10) else {
+                XCTFail("PIN input field should appear after creating a new identity")
+                return
             }
+            pinInput.tap()
+            pinInput.typeText("12345678")
+
+            let submitButton = find("pin-submit")
+            guard submitButton.waitForExistence(timeout: 3) else {
+                XCTFail("PIN submit button should exist")
+                return
+            }
+            submitButton.tap()
+        }
+        then("the PIN field should be cleared for the confirm phase, not retaining the first entry") {
+            // PINViewModel.handleSetPIN(.enter) stores the first entry and resets
+            // `pin = ""` before moving to `.confirm` — the SecureField is bound to
+            // that property, so it must render empty again, not the prior PIN.
+            let pinInput = find("pin-input")
+            guard pinInput.waitForExistence(timeout: 5) else {
+                XCTFail("PIN input field should still be present for the confirm phase")
+                return
+            }
+            let fieldValue = pinInput.value as? String ?? ""
+            XCTAssertTrue(
+                fieldValue.isEmpty || fieldValue == pinInput.placeholderValue,
+                "PIN field should not retain the first entry once the confirm phase begins"
+            )
+        }
+    }
+
+    func testPINInputNotRetainedAfterCancellingIdentityCreation() {
+        given("the app is on the login screen") {
+            app.launchArguments.append("--test-skip-hub-validation")
+            launchClean()
+        }
+        when("I start creating an identity, enter a PIN, then cancel back to login") {
+            let hubInput = find("hub-url-input")
+            guard hubInput.waitForExistence(timeout: 20) else {
+                XCTFail("Hub URL input should exist")
+                return
+            }
+            hubInput.tap()
+            hubInput.typeText("https://test.example.org")
+            dismissKeyboard()
+
+            let createButton = find("create-identity")
+            guard createButton.waitForExistence(timeout: 5) else {
+                XCTFail("Create identity button should exist")
+                return
+            }
+            createButton.tap()
+
+            let pinInput = find("pin-input")
+            guard pinInput.waitForExistence(timeout: 10) else {
+                XCTFail("PIN input field should appear after creating a new identity")
+                return
+            }
+            pinInput.tap()
+            pinInput.typeText("12345678")
+
+            // Cancel out via the PIN set screen's back button (PINSetView.swift),
+            // returning to the login screen without completing identity creation.
+            let backButton = find("back-button")
+            guard backButton.waitForExistence(timeout: 5) else {
+                XCTFail("Back button should exist on the PIN set screen")
+                return
+            }
+            backButton.tap()
+        }
+        then("the login screen should be shown again") {
+            let createButton = find("create-identity")
+            XCTAssertTrue(
+                createButton.waitForExistence(timeout: 5),
+                "Should return to the login screen after cancelling identity creation"
+            )
+        }
+        and("re-entering identity creation should show an empty PIN field, not the typed PIN") {
+            let hubInput = find("hub-url-input")
+            guard hubInput.waitForExistence(timeout: 5) else {
+                XCTFail("Hub URL input should exist")
+                return
+            }
+            hubInput.tap()
+            hubInput.typeText("https://test.example.org")
+            dismissKeyboard()
+
+            let createButton = find("create-identity")
+            guard createButton.waitForExistence(timeout: 5) else {
+                XCTFail("Create identity button should exist")
+                return
+            }
+            createButton.tap()
+
+            // PINSetView holds its PINViewModel in @State, so navigating back to
+            // login and pushing PIN set again creates a fresh view/view-model —
+            // the cancelled PIN must not survive the round trip.
+            let pinInput = find("pin-input")
+            guard pinInput.waitForExistence(timeout: 10) else {
+                XCTFail("PIN input field should appear again after re-entering identity creation")
+                return
+            }
+            let fieldValue = pinInput.value as? String ?? ""
+            XCTAssertTrue(
+                fieldValue.isEmpty || fieldValue == pinInput.placeholderValue,
+                "PIN input should not retain the previously typed PIN after cancel"
+            )
         }
     }
 

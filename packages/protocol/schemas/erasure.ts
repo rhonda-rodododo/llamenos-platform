@@ -19,8 +19,9 @@ export const erasureConfigSchema = z.object({
   hubId: z.string(),
   delayHours: z.number().int().min(24).max(168),
   emergencyOverrideEnabled: z.boolean(),
-  updatedAt: z.string(),
-  updatedBy: z.string(),
+  /** null until an admin saves a config for the hub (defaults in force) */
+  updatedAt: z.string().nullable(),
+  updatedBy: z.string().nullable(),
 })
 
 export type ErasureConfig = z.infer<typeof erasureConfigSchema>
@@ -86,6 +87,10 @@ export const reEncryptionJobSchema = z.object({
 export type ReEncryptionJob = z.infer<typeof reEncryptionJobSchema>
 
 // --- Response schemas ---
+
+export const erasureConfigResponseSchema = z.object({
+  config: erasureConfigSchema,
+})
 
 export const erasureRequestResponseSchema = z.object({
   request: erasureRequestSchema,

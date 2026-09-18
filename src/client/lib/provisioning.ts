@@ -30,6 +30,8 @@ import {
   type EncryptedDeviceKeys,
   type ProvisioningEncryptResult,
 } from './platform'
+import { getApiUrl } from './api-config'
+import { netFetch } from './net'
 
 // --- New Device Side ---
 
@@ -43,7 +45,7 @@ export async function createProvisioningRoom(): Promise<ProvisioningSession> {
   // Generate ephemeral keypair in Rust — secret stays in CryptoState
   const ephemeralPubkeyHex = await provisionCreateSession()
 
-  const res = await fetch('/api/provision/rooms', {
+  const res = await netFetch(getApiUrl('/provision/rooms'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ephemeralPubkey: ephemeralPubkeyHex }),
@@ -68,7 +70,7 @@ export async function pollProvisioningRoom(
   roomId: string,
   token: string,
 ): Promise<ProvisioningRoomStatus> {
-  const res = await fetch(`/api/provision/rooms/${roomId}?token=${token}`)
+  const res = await netFetch(getApiUrl(`/provision/rooms/${roomId}?token=${token}`))
   if (!res.ok) {
     if (res.status === 404 || res.status === 410) return { status: 'expired' }
     throw new Error('Failed to poll room')
@@ -114,7 +116,7 @@ export async function getProvisioningRoom(
   roomId: string,
   token: string,
 ): Promise<{ ephemeralPubkey: string; status: string }> {
-  const res = await fetch(`/api/provision/rooms/${roomId}?token=${token}`)
+  const res = await netFetch(getApiUrl(`/provision/rooms/${roomId}?token=${token}`))
   if (!res.ok) throw new Error('Room not found or expired')
   return await res.json() as { ephemeralPubkey: string; status: string }
 }
@@ -136,7 +138,7 @@ export async function sendProvisionedKey(
   primaryPubkey: string,
   authHeaders: Record<string, string>,
 ): Promise<void> {
-  const res = await fetch(`/api/provision/rooms/${roomId}/payload`, {
+  const res = await netFetch(getApiUrl(`/provision/rooms/${roomId}/payload`), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

@@ -20,7 +20,7 @@
  *   bun run scripts/bootstrap-admin.ts
  */
 
-import { bytesToHex } from '@noble/hashes/utils'
+import { bytesToHex } from '@noble/hashes/utils.js'
 
 function generateEd25519Keypair(): { seed: Uint8Array; pubkeyHex: string } {
   const seed = crypto.getRandomValues(new Uint8Array(32))

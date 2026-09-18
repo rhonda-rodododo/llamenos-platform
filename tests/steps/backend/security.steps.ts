@@ -4,7 +4,7 @@
  */
 import { expect } from '@playwright/test'
 import {Given, When, Then, getState, setState, Before} from './fixtures'
-import { getSharedState, setLastResponse } from './shared-state'
+import { getSharedState } from './shared-state'
 import { getScenarioState } from './common.steps'
 import {
   apiGet,
@@ -15,9 +15,7 @@ import {
   createVolunteerViaApi,
   getMeViaApi,
   testEndpointAccess,
-  encryptForTest,
   ADMIN_SEED,
-  ADMIN_NSEC,
 } from '../../api-helpers'
 import {
   generateContentKey,
@@ -28,8 +26,6 @@ import {
   x25519PubkeyFromSeed,
 } from '../../crypto-helpers'
 import { LABEL_NOTE_KEY } from '@shared/crypto-labels'
-
-const BASE_URL = process.env.TEST_HUB_URL || 'http://localhost:3000'
 
 // ── Local security test state ────────────────────────────────────
 
@@ -82,7 +78,7 @@ Given('a third party with a different keypair', async ({ world }) => {
   getSecTestState(world).thirdPartyKeypair = generateTestKeypair()
 })
 
-Given('a hub with {int} admins with known keypairs', async ({request, world}, count: number) => {
+Given('a hub with {int} admins with known keypairs', async ({world}, count: number) => {
   getSecTestState(world).adminKeypairs = []
   for (let i = 0; i < count; i++) {
     const kp = generateTestKeypair()
@@ -319,12 +315,12 @@ Given('a user with a valid session token', async ({request, world}) => {
   }
 })
 
-When('the token has expired', async ({ world }) => {
+When('the token has expired', async () => {
   // Session expiry is tested via the auth.steps.ts expired token flow
   // This step is a conceptual precondition
 })
 
-When('the user presents the expired token', async ({request, world}) => {
+When('the user presents the expired token', async ({world}) => {
   // Reuse the expired token mechanism from auth steps
   expect(getSecTestState(world).volunteerKeypair).toBeDefined()
   // We don't have a real expired session token in this context
@@ -365,7 +361,7 @@ When("an admin changes the volunteer's role", async ({request, world}) => {
   })
 })
 
-Then("the volunteer's existing session should be invalidated", async ({ world }) => {
+Then("the volunteer's existing session should be invalidated", async () => {
   // Session invalidation is a server-side effect of role change
   // Verified by the next assertion
 })
@@ -410,7 +406,7 @@ Given('a user authenticated on two devices', async ({request, world}) => {
 When('both devices make requests simultaneously', async ({request, world}) => {
   expect(getSecTestState(world).volunteerKeypair).toBeDefined()
   // Simulate concurrent requests
-  const [result1, result2] = await Promise.all([
+  const [result1, _result2] = await Promise.all([
     getMeViaApi(request, getSecTestState(world).volunteerKeypair!.seedHex),
     getMeViaApi(request, getSecTestState(world).volunteerKeypair!.seedHex),
   ])
@@ -434,7 +430,7 @@ When('the user logs out on device 1', async ({request, world}) => {
   getSecTestState(world).sessionResult = { status, data: null }
 })
 
-Then("device 1's session should be invalid", async ({ world }) => {
+Then("device 1's session should be invalid", async () => {
   // After logout, the session should be invalidated
   // The logout request itself should succeed
 })
@@ -451,7 +447,7 @@ Then("device 2's session should still be valid", async ({request, world}) => {
 
 // ── DO Routing Steps ─────────────────────────────────────────────
 
-Given('a route {string} is registered', async ({ world }, _route: string) => {
+Given('a route {string} is registered', async ({}, _route: string) => {
   // DO routing is internal — tested by hitting actual endpoints
 })
 
@@ -496,21 +492,21 @@ Then('the router should return {int}', async ({ world }, expectedStatus: number)
   }
 })
 
-Given('routes for GET, POST, and DELETE on {string}', async ({ world }, _path: string) => {
+Given('routes for GET, POST, and DELETE on {string}', async ({}, _path: string) => {
   // Routes are registered in the DO — this is a precondition
 })
 
-Then('each method dispatches to its own handler', async ({request, world}) => {
+Then('each method dispatches to its own handler', async ({request}) => {
   // Verify all three methods respond with authenticated requests
   const getRes = await apiGet(request, '/notes')
-  const postRes = await apiPost(request, '/notes', { content: 'test', callId: `dispatch-${Date.now()}` })
-  const delRes = await apiDelete(request, '/notes/nonexistent')
+  await apiPost(request, '/notes', { content: 'test', callId: `dispatch-${Date.now()}` })
+  await apiDelete(request, '/notes/nonexistent')
 
   // Each should respond (not 404 for the route itself — may be 404 for the resource)
   expect(getRes.status).not.toBe(405)
 })
 
-Given('a route with {string} parameter', async ({ world }, _param: string) => {
+Given('a route with {string} parameter', async ({}, _param: string) => {
   // Precondition for URL encoding test
 })
 

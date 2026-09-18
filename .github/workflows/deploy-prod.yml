@@ -27,6 +27,23 @@ jobs:
     timeout-minutes: 30
 
     steps:
+      # This job stays on the self-hosted box, where $HOME and /tmp are shared
+      # by every concurrent job. Scope each toolchain's cache/state under this
+      # job's own $RUNNER_TEMP so two jobs can never corrupt each other.
+      - name: Isolate per-job toolchain caches
+        run: |
+          {
+            echo "CARGO_HOME=$RUNNER_TEMP/cargo"
+            echo "RUSTUP_HOME=$RUNNER_TEMP/rustup"
+            echo "GRADLE_USER_HOME=$RUNNER_TEMP/gradle"
+            echo "BUN_INSTALL_CACHE_DIR=$RUNNER_TEMP/bun-cache"
+            echo "npm_config_cache=$RUNNER_TEMP/npm-cache"
+            echo "PIP_CACHE_DIR=$RUNNER_TEMP/pip-cache"
+            echo "ANSIBLE_COLLECTIONS_PATH=$RUNNER_TEMP/ansible-collections"
+            echo "ANSIBLE_LOCAL_TEMP=$RUNNER_TEMP/ansible-tmp"
+          } >> "$GITHUB_ENV"
+          echo "$RUNNER_TEMP/cargo/bin" >> "$GITHUB_PATH"
+
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
@@ -46,8 +63,8 @@ jobs:
         env:
           VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
         run: |
-          printf '%s' "$VAULT_PASSWORD" > /tmp/vault-pass
-          chmod 600 /tmp/vault-pass
+          printf '%s' "$VAULT_PASSWORD" > "$RUNNER_TEMP/vault-pass"
+          chmod 600 "$RUNNER_TEMP/vault-pass"
 
       - name: Write encrypted production vars
         env:
@@ -72,7 +89,7 @@ jobs:
             -i inventory-production.yml \
             -e "@vars-production.yml" \
             -e "deployment_profile=official" \
-            --vault-password-file /tmp/vault-pass
+            --vault-password-file "$RUNNER_TEMP/vault-pass"
 
       - name: Deploy
         working-directory: deploy/ansible
@@ -81,7 +98,7 @@ jobs:
             -i inventory-production.yml \
             -e "@vars-production.yml" \
             -e "deployment_profile=official" \
-            --vault-password-file /tmp/vault-pass
+            --vault-password-file "$RUNNER_TEMP/vault-pass"
 
       - name: Smoke check
         working-directory: deploy/ansible
@@ -90,7 +107,7 @@ jobs:
             -i inventory-production.yml \
             -e "@vars-production.yml" \
             -e "deployment_profile=official" \
-            --vault-password-file /tmp/vault-pass
+            --vault-password-file "$RUNNER_TEMP/vault-pass"
 
       - name: Stop SSH agent
         if: always()
@@ -99,6 +116,6 @@ jobs:
       - name: Clean up secrets
         if: always()
         run: |
-          rm -f /tmp/vault-pass
+          rm -f "$RUNNER_TEMP/vault-pass"
           rm -f deploy/ansible/inventory-production.yml
           rm -f deploy/ansible/vars-production.yml

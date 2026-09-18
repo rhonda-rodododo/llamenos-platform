@@ -53,7 +53,7 @@ Then('the identity card should display my npub', async ({ page }) => {
 Then('the npub should start with {string}', async ({ page }, prefix: string) => {
   // Check __test_keypair first (crypto-interop tests store the keypair in window)
   const keypair = await page.evaluate(
-    () => (window as Record<string, unknown>).__test_keypair as { npub?: string; publicKey?: string } | undefined,
+    () => (window as unknown as Record<string, unknown>).__test_keypair as { npub?: string; publicKey?: string } | undefined,
   )
   if (keypair?.npub && keypair.npub.startsWith(prefix)) {
     expect(keypair.npub).toMatch(new RegExp(`^${prefix}`))

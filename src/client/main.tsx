@@ -4,6 +4,8 @@ import { RouterProvider, createRouter } from '@tanstack/react-router'
 import { routeTree } from './routeTree.gen'
 import { AuthProvider } from '@/lib/auth'
 import { ConfigProvider } from '@/lib/config'
+import * as testApiConfig from '@/lib/api-config'
+import { initApiBase } from '@/lib/api-config'
 import { ThemeProvider } from '@/lib/theme'
 import { ToastProvider } from '@/lib/toast'
 import { NoteSheetProvider } from '@/lib/note-sheet-context'
@@ -17,11 +19,11 @@ import '@/app.css'
 // Install global error handlers for crash reporting (respects consent)
 installGlobalErrorHandlers()
 
-// Upload any pending crash reports from previous sessions
+// Upload any pending crash reports from previous sessions. Failures keep the
+// reports pending; where uploads are unavailable (desktop app) the reason is
+// logged by uploadPendingReports itself.
 if (isCrashReportingEnabled()) {
-  uploadPendingReports().catch(() => {
-    // Silently fail — will retry on next page load
-  })
+  uploadPendingReports().catch(() => {})
 }
 
 const router = createRouter({ routeTree })
@@ -34,6 +36,9 @@ declare global {
     __TEST_PLATFORM: typeof import('./lib/platform')
     __TEST_SET_ACTIVE_HUB: (id: string | null) => void
     __TEST_GET_ACTIVE_HUB: () => string | null
+    __TEST_API_CONFIG: typeof import('./lib/api-config')
+    /** Set via page.addInitScript to exercise packaged-desktop-only behavior (#738/#739) under the Playwright mock. */
+    __TEST_SIMULATE_PACKAGED_TAURI__?: boolean
   }
 }
 if (typeof window !== 'undefined' && (import.meta.env.DEV || import.meta.env.PLAYWRIGHT_TEST)) {
@@ -46,6 +51,7 @@ if (typeof window !== 'undefined' && (import.meta.env.DEV || import.meta.env.PLA
   window.__TEST_PLATFORM = testPlatform
   window.__TEST_SET_ACTIVE_HUB = testApi.setActiveHub
   window.__TEST_GET_ACTIVE_HUB = testApi.getActiveHub
+  window.__TEST_API_CONFIG = testApiConfig
 }
 
 declare module '@tanstack/react-router' {
@@ -53,6 +59,12 @@ declare module '@tanstack/react-router' {
     router: typeof router
   }
 }
+
+// Must resolve before first render: `RootLayout` reads `needsServerAddress()`
+// synchronously at mount to decide whether to show the first-run "Server
+// address" screen (#738), and that check depends on the persisted config
+// having already been loaded from the Tauri Store.
+await initApiBase()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

@@ -19,7 +19,7 @@ env:
 
 jobs:
   build:
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
@@ -60,6 +60,12 @@ jobs:
         with:
           context: .
           file: deploy/docker/Dockerfile
+          # `deploy/docker/Dockerfile` is multi-stage and its LAST stage is
+          # `static` (the Caddy image that serves the SPA, consumed by
+          # docker-compose.production.yml's `caddy` service). Docker defaults
+          # to the last stage, so without an explicit target this would
+          # publish the Caddy static-file server under the app image tags.
+          target: app
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha
@@ -92,14 +98,14 @@ jobs:
           severity: 'CRITICAL,HIGH'
 
       - name: Upload Trivy scan results
-        uses: github/codeql-action/upload-sarif@5595ccaf912efad79be6eef63a5619ff05969be3 # v3
+        uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v3
         if: always()
         with:
           sarif_file: 'trivy-results.sarif'
 
   # Build sip-bridge image
   bridge:
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
@@ -121,7 +127,7 @@ jobs:
 
       - name: Compute Docker tags
         id: meta
-        uses: docker/metadata-action@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9 # v6.1.0
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}-sip-bridge
           tags: |

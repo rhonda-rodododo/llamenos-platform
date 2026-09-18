@@ -15,7 +15,12 @@
 #
 # release.yml explicitly dispatches downstream workflows because
 # GitHub Releases created by GITHUB_TOKEN do NOT fire the `release: published`
-# event for downstream workflows (anti-recursion rule).
+# event for downstream workflows (anti-recursion rule). This is why the
+# `dispatch` job below calls `gh workflow run` directly instead of relying on
+# tauri-release.yml / mobile-release.yml / deploy-demo.yml to trigger
+# themselves — see #712 for the decision record. Dispatching via
+# `POST /actions/workflows/{id}/dispatches` requires `actions: write` on the
+# job token; `contents: read` alone gets the request rejected (#711).
 
 name: Release
 
@@ -41,7 +46,7 @@ jobs:
     if: >-
       github.event.pull_request.merged == true &&
       github.head_ref == 'release'
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     outputs:
@@ -63,7 +68,7 @@ jobs:
   # --- Build (needed for CHECKSUMS and attestation) ---
   build:
     needs: check
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
 
@@ -115,7 +120,7 @@ jobs:
   # --- Tag + GitHub Release, then attach signed artifacts ---
   release:
     needs: [check, build]
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
 
     permissions:
       contents: write
@@ -326,7 +331,7 @@ jobs:
 
   docker-stable:
     needs: [check, release]
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
@@ -372,6 +377,12 @@ jobs:
         with:
           context: .
           file: deploy/docker/Dockerfile
+          # `deploy/docker/Dockerfile` is multi-stage and its LAST stage is
+          # `static` (the Caddy image that serves the SPA, consumed by
+          # docker-compose.production.yml's `caddy` service). Docker defaults
+          # to the last stage, so without an explicit target this would
+          # publish the Caddy static-file server under the app image tags.
+          target: app
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha
@@ -404,38 +415,112 @@ jobs:
           severity: 'CRITICAL,HIGH'
 
       - name: Upload Trivy scan results
-        uses: github/codeql-action/upload-sarif@5595ccaf912efad79be6eef63a5619ff05969be3 # v3
+        uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v3
         if: always()
         with:
           sarif_file: 'trivy-results.sarif'
 
   # --- Dispatch downstream release workflows ---
+  #
+  # No continue-on-error here (#711): a rejected or failed `gh workflow run`
+  # must turn this job red, not green. Each step also polls `gh run list`
+  # for the run it just created and fails loudly if none appears, so the
+  # log proves a run exists rather than merely that the dispatch command
+  # exited 0.
   dispatch:
     needs: [check, release, docker-stable]
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
+      actions: write   # required by POST /actions/workflows/{id}/dispatches (#711)
     steps:
       - name: Dispatch Desktop release
-        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NEW_VERSION: ${{ needs.check.outputs.version }}
         run: |
-          gh workflow run tauri-release.yml \
+          set -euo pipefail
+          WORKFLOW="tauri-release.yml"
+          gh workflow run "$WORKFLOW" \
             --repo "${{ github.repository }}" \
             --ref "v${NEW_VERSION}" \
             -f version="$NEW_VERSION"
-          echo "Dispatched tauri-release.yml for v${NEW_VERSION}"
+          echo "Dispatched $WORKFLOW for v${NEW_VERSION}"
+
+          RUN_URL=""
+          for _ in $(seq 1 15); do
+            sleep 2
+            RUN_URL=$(gh run list --repo "${{ github.repository }}" \
+              --workflow="$WORKFLOW" --limit 5 \
+              --json url,createdAt,event \
+              --jq '[.[] | select(.event=="workflow_dispatch")] | sort_by(.createdAt) | reverse | .[0].url // empty')
+            [ -n "$RUN_URL" ] && break
+          done
+          if [ -z "$RUN_URL" ]; then
+            echo "::error::$WORKFLOW dispatch did not produce a workflow run within 30s"
+            exit 1
+          fi
+          echo "Desktop Release run: $RUN_URL"
 
       - name: Dispatch Mobile release
-        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NEW_VERSION: ${{ needs.check.outputs.version }}
         run: |
-          gh workflow run mobile-release.yml \
+          set -euo pipefail
+          WORKFLOW="mobile-release.yml"
+          gh workflow run "$WORKFLOW" \
             --repo "${{ github.repository }}" \
             --ref "v${NEW_VERSION}" \
             -f version="$NEW_VERSION"
-          echo "Dispatched mobile-release.yml for v${NEW_VERSION}"
+          echo "Dispatched $WORKFLOW for v${NEW_VERSION}"
+
+          RUN_URL=""
+          for _ in $(seq 1 15); do
+            sleep 2
+            RUN_URL=$(gh run list --repo "${{ github.repository }}" \
+              --workflow="$WORKFLOW" --limit 5 \
+              --json url,createdAt,event \
+              --jq '[.[] | select(.event=="workflow_dispatch")] | sort_by(.createdAt) | reverse | .[0].url // empty')
+            [ -n "$RUN_URL" ] && break
+          done
+          if [ -z "$RUN_URL" ]; then
+            echo "::error::$WORKFLOW dispatch did not produce a workflow run within 30s"
+            exit 1
+          fi
+          echo "Mobile Release run: $RUN_URL"
+
+      - name: Dispatch Demo deploy
+        # #712 decision: option (a), explicit dispatch from this job rather
+        # than relying on `release: [published]` (which never fires for
+        # GITHUB_TOKEN-created releases). Targets deploy-demo.yml, not
+        # auto-deploy-demo.yml — deploy-demo.yml already declares
+        # `workflow_dispatch` and needs no trigger changes; auto-deploy-demo.yml
+        # only has the dead `release: [published]` trigger and is outside this
+        # workflow's file ownership, so it is not wired up here (flagged
+        # separately for retirement/follow-up).
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEW_VERSION: ${{ needs.check.outputs.version }}
+        run: |
+          set -euo pipefail
+          WORKFLOW="deploy-demo.yml"
+          gh workflow run "$WORKFLOW" \
+            --repo "${{ github.repository }}" \
+            --ref "v${NEW_VERSION}"
+          echo "Dispatched $WORKFLOW for v${NEW_VERSION}"
+
+          RUN_URL=""
+          for _ in $(seq 1 15); do
+            sleep 2
+            RUN_URL=$(gh run list --repo "${{ github.repository }}" \
+              --workflow="$WORKFLOW" --limit 5 \
+              --json url,createdAt,event \
+              --jq '[.[] | select(.event=="workflow_dispatch")] | sort_by(.createdAt) | reverse | .[0].url // empty')
+            [ -n "$RUN_URL" ] && break
+          done
+          if [ -z "$RUN_URL" ]; then
+            echo "::error::$WORKFLOW dispatch did not produce a workflow run within 30s"
+            exit 1
+          fi
+          echo "Demo Deploy run: $RUN_URL"

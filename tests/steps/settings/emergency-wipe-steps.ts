@@ -11,7 +11,7 @@
  * on non-existent UI elements.
  */
 import { expect } from '@playwright/test'
-import { Given, When, Then } from '../fixtures'
+import { When, Then } from '../fixtures'
 import { TestIds } from '../../test-ids'
 import { Timeouts } from '../../helpers'
 

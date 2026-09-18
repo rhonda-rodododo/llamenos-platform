@@ -50,10 +50,6 @@ function fakePayload(): string {
   return bytesToHex(crypto.getRandomValues(new Uint8Array(32)))
 }
 
-function randomWakeKey(): string {
-  return bytesToHex(crypto.getRandomValues(new Uint8Array(32)))
-}
-
 function _randomPushToken(): string {
   return bytesToHex(crypto.getRandomValues(new Uint8Array(16)))
 }

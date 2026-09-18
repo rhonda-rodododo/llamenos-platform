@@ -212,13 +212,13 @@ When('I change my display name', async ({ page }) => {
   await nameInput.clear()
   await nameInput.fill(newName)
   await page.evaluate((n) => {
-    ;(window as Record<string, unknown>).__test_new_display_name = n
+    ;(window as unknown as Record<string, unknown>).__test_new_display_name = n
   }, newName)
 })
 
 Then('the new display name should persist', async ({ page }) => {
   const newName = (await page.evaluate(
-    () => (window as Record<string, unknown>).__test_new_display_name,
+    () => (window as unknown as Record<string, unknown>).__test_new_display_name,
   )) as string
   if (newName) {
     const nameInput = page.getByLabel(/name/i)

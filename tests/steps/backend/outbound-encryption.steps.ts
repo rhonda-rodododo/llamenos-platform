@@ -5,9 +5,7 @@
 import { expect } from '@playwright/test'
 import { Given, When, Then, getState, setState } from './fixtures'
 import {
-  apiGet,
   apiPost,
-  ADMIN_SEED,
 } from '../../api-helpers'
 import {
   simulateIncomingMessage,

@@ -1,19 +1,138 @@
 # CODEOWNERS
 # Each line is a file pattern followed by one or more owners.
+#
+# Policy (from PR #615, which this file is based on and supersedes): routine
+# PRs — dependency bumps, i18n, docs, app-code features — merge unattended
+# once required status checks are green. Only the paths listed below require
+# human code-owner review before merge; everything else is intentionally left
+# uncovered so it keeps auto-merging. There is deliberately NO catch-all `*`
+# rule: adding one would gate every PR again and defeat the fleet entirely.
+#
+# This file is now LOAD-BEARING, not advisory. It is the whole of the fleet's
+# "this needs a human" gate. The orchestrator used to make that call itself
+# (`classifyImpact` + `mayAutoMerge`), on the operator's laptop, before the PR
+# existed — so GitHub never knew, and anyone could merge past it. Every path
+# in `HIGH_IMPACT_PATHS` (orchestrator/src/impact.ts) is therefore owned here,
+# and tests/orchestrator/guards.test.ts fails if one of them ever stops being
+# covered. Requires the ruleset's `required_code_owner_review` to be on; until
+# that is enabled these lines request review but do not block.
+#
+# Consequence worth calling out, inherited from #615: GitHub Actions
+# dependency bumps (Dependabot PRs touching .github/workflows/) require
+# review, because a compromised or malicious action is a supply-chain vector.
 
-*                                   @rhonda-rodododo
-
-apps/desktop/                       @rhonda-rodododo
-apps/worker/                        @rhonda-rodododo
-apps/ios/                           @rhonda-rodododo
-apps/android/                       @rhonda-rodododo
-apps/sip-bridge/                    @rhonda-rodododo
-apps/signal-notifier/               @rhonda-rodododo
-
+# ─── Crypto, protocol, and the key boundaries around them ──────────────
+# Every pattern below is a REAL path. CODEOWNERS is gitignore syntax, so a
+# bare `apps/worker/lib/auth` matches a file NAMED `auth` — which does not
+# exist here. An earlier revision of this file was full of exactly that, and
+# owned nothing. tests/orchestrator/guards.test.ts now matches these patterns
+# against `git ls-files` with a gitignore matcher, so a rule that owns no real
+# file fails the suite.
 packages/crypto/                    @rhonda-rodododo
-packages/protocol/                  @rhonda-rodododo
-packages/shared/                    @rhonda-rodododo
-packages/i18n/                      @rhonda-rodododo
+packages/protocol/schemas/          @rhonda-rodododo
+packages/protocol/crypto-labels.json @rhonda-rodododo
+packages/shared/crypto-labels.ts    @rhonda-rodododo
 
-.github/                            @rhonda-rodododo
-deploy/                             @rhonda-rodododo
+# Not the crypto crate itself, but the surfaces that keep (or could leak) a
+# device private key: the webview IPC boundary, the Tauri permission grants,
+# the iOS/Android Keychain/Keystore wrappers, and the Tauri IPC mock, which
+# mirrors the Rust CryptoState.
+src/client/lib/platform.ts          @rhonda-rodododo
+apps/desktop/src/crypto.rs          @rhonda-rodododo
+apps/desktop/capabilities/          @rhonda-rodododo
+apps/ios/Sources/Services/CryptoService.swift @rhonda-rodododo
+apps/android/app/src/main/java/org/llamenos/hotline/crypto/ @rhonda-rodododo
+tests/mocks/                        @rhonda-rodododo
+
+# ─── Auth, sessions, sigchain, identity: state a revert does not restore ──
+# `.test.ts` siblings are owned too: weakening the test is the shortest route
+# to disabling the check it guards.
+apps/worker/middleware/             @rhonda-rodododo
+apps/worker/lib/auth.ts             @rhonda-rodododo
+apps/worker/lib/auth.test.ts        @rhonda-rodododo
+apps/worker/lib/webauthn.ts         @rhonda-rodododo
+apps/worker/lib/session-renewal.ts  @rhonda-rodododo
+apps/worker/lib/crypto.ts           @rhonda-rodododo
+apps/worker/lib/crypto.test.ts      @rhonda-rodododo
+apps/worker/lib/hub-event-crypto.ts @rhonda-rodododo
+apps/worker/lib/push-encryption.ts  @rhonda-rodododo
+apps/worker/lib/server-identity.ts  @rhonda-rodododo
+apps/worker/lib/agent-identity.ts   @rhonda-rodododo
+apps/worker/lib/timing-safe.ts      @rhonda-rodododo
+apps/worker/lib/blind-index-query.ts @rhonda-rodododo
+apps/worker/lib/blind-index-query.test.ts @rhonda-rodododo
+apps/worker/routes/auth.ts          @rhonda-rodododo
+apps/worker/routes/sessions.ts      @rhonda-rodododo
+apps/worker/routes/webauthn.ts      @rhonda-rodododo
+apps/worker/routes/sigchain.ts      @rhonda-rodododo
+apps/worker/db/schema/sigchain.ts   @rhonda-rodododo
+apps/worker/services/crypto-keys.ts @rhonda-rodododo
+
+# ─── Deanonymization surfaces ──────────────────────────────────────────
+# sip-bridge/ routes PSTN calls and handles caller phone numbers;
+# signal-notifier/ does HMAC-hashed contact resolution. Both are top-level,
+# NOT under apps/ despite what older docs say.
+sip-bridge/                         @rhonda-rodododo
+signal-notifier/                    @rhonda-rodododo
+
+# ─── The fleet's own trust base ────────────────────────────────────────
+# A worker that edits the orchestrator, the fragment defining its own lane's
+# write scope, or the hook enforcing the write-deny rules can widen its own
+# authority. These must never be self-approvable.
+orchestrator/                       @rhonda-rodododo
+.claude/agents/                     @rhonda-rodododo
+.claude/settings.json               @rhonda-rodododo
+CODEOWNERS                          @rhonda-rodododo
+
+# ─── The build's own trust base ────────────────────────────────────────
+# The gate jobs install from this lockfile and run from this workflow, so a
+# PR touching any of these is a PR editing the machinery that judges it. That
+# is not theoretical: the first version of these gates checked out the PR
+# head and ran `bun install` from it, so an install script added here would
+# have forged both verdicts and could have read the review key. Dependency
+# bumps now need an owner's approval — dependabot PRs are few, and this is
+# the file that makes "the judge runs only trusted code" true.
+# `bunfig.toml` does not exist yet; it is owned pre-emptively because it
+# configures the same install.
+package.json                        @rhonda-rodododo
+bun.lockb                           @rhonda-rodododo
+bunfig.toml                         @rhonda-rodododo
+lefthook.yml                        @rhonda-rodododo
+# vitest's MAIN process executes its config — and the config's globalSetup
+# and plugins — and that process writes the result file and owns the exit
+# code fleet/verify judges. fleet/verify installs the BASE's config bytes over
+# a PR's copy, so an edit here is never in effect on its own PR; what merges,
+# though, judges every PR after it. Rooted glob: the root configs only.
+/vitest.*.config.ts                 @rhonda-rodododo
+
+# ─── Supply chain, release, deployment ─────────────────────────────────
+.github/workflows/                  @rhonda-rodododo
+knope.toml                          @rhonda-rodododo
+
+# ─── The fleet judging itself ──────────────────────────────────────────
+# Narrower than #615's blanket `tests/`, deliberately: every other test
+# directory is ordinary lane work and merges on green. A blanket `tests/`
+# would have held every BDD feature PR the backend and desktop lanes write.
+# (tests/mocks/ is owned above, with the other key-boundary files.)
+tests/orchestrator/                 @rhonda-rodododo
+
+# ─── Key material, wherever it appears ─────────────────────────────────
+# Mirrors SECRET_PATH_PATTERNS (orchestrator/src/config.ts). checkScope
+# already refuses to WRITE these; this is the second half, so a secret that
+# reaches a diff by a route the write gate did not cover still stops here.
+**/.env                             @rhonda-rodododo
+**/.dev.vars                        @rhonda-rodododo
+**/.npmrc                           @rhonda-rodododo
+**/.pgpass                          @rhonda-rodododo
+**/authorized_keys                  @rhonda-rodododo
+**/id_rsa                           @rhonda-rodododo
+**/id_ed25519                       @rhonda-rodododo
+**/keystore.properties              @rhonda-rodododo
+**/*.pem                            @rhonda-rodododo
+**/*.jks                            @rhonda-rodododo
+**/*.keystore                       @rhonda-rodododo
+**/*.p8                             @rhonda-rodododo
+**/*.p12                            @rhonda-rodododo
+**/*.pfx                            @rhonda-rodododo
+**/*.key                            @rhonda-rodododo
+**/*.mobileprovision                @rhonda-rodododo
