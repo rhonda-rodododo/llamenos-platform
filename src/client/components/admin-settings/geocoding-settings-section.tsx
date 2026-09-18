@@ -7,6 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import type { GeocodingConfigAdmin } from '@protocol/schemas/geocoding'
+import { getApiUrl } from '@/lib/api-config'
+import { netFetch } from '@/lib/net'
 
 export function GeocodingSettingsSection() {
   const { t } = useTranslation()
@@ -18,7 +20,7 @@ export function GeocodingSettingsSection() {
   const [testResult, setTestResult] = useState<{ ok: boolean; latency: number } | null>(null)
 
   useEffect(() => {
-    fetch('/api/settings/geocoding', { credentials: 'include' })
+    netFetch(getApiUrl('/settings/geocoding'), { credentials: 'include' })
       .then(r => r.json())
       .then((data: unknown) => setConfig(c => ({ ...c, ...(data as Omit<GeocodingConfigAdmin, 'apiKey'>) })))
   }, [])
@@ -26,7 +28,7 @@ export function GeocodingSettingsSection() {
   async function save() {
     setSaving(true)
     try {
-      await fetch('/api/settings/geocoding', {
+      await netFetch(getApiUrl('/settings/geocoding'), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -41,7 +43,7 @@ export function GeocodingSettingsSection() {
     setTesting(true)
     setTestResult(null)
     try {
-      const res = await fetch('/api/settings/geocoding/test', { credentials: 'include' })
+      const res = await netFetch(getApiUrl('/settings/geocoding/test'), { credentials: 'include' })
       setTestResult(await res.json() as { ok: boolean; latency: number })
     } finally {
       setTesting(false)

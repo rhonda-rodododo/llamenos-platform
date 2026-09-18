@@ -53,7 +53,7 @@ If the app cannot connect to PostgreSQL:
 
 ### Strfry relay not connecting
 
-The WebSocket relay (WebSocket relay) is a core service, not optional. If the relay is not running:
+The WebSocket relay is a core service, not optional. If the relay is not running:
 
 ```bash
 # Check relay status

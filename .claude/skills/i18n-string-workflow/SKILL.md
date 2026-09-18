@@ -1,7 +1,9 @@
 ---
 name: i18n-string-workflow
 description: >
-  Manage internationalization strings across 13+ locales and 3 platforms (desktop, iOS, Android)
+  Manage internationalization strings across all locales in packages/i18n/locales/ (see
+  packages/i18n/languages.ts for the current, authoritative list — never hardcode a count) and
+  3 platforms (desktop, iOS, Android)
   in the Llamenos monorepo. Use this skill whenever adding, renaming, moving, or removing i18n
   strings, when the user mentions "i18n", "localization", "translation", "locale", "strings",
   "add a string", "new language", "all languages", "translate", "multilingual", or when modifying
@@ -15,7 +17,9 @@ description: >
 
 # i18n String Workflow for Llamenos
 
-The i18n system spans 13 locales, 3 platforms, and ~1,800 keys. Every string change requires
+The i18n system spans every locale in `packages/i18n/locales/` (source of truth:
+`packages/i18n/languages.ts` — do not hardcode a locale count or list anywhere else, it will
+drift), 3 platforms, and thousands of keys. Every string change requires
 a specific sequence of steps — skipping any step causes runtime crashes or empty strings on
 at least one platform.
 
@@ -24,7 +28,7 @@ at least one platform.
 ```
 en.json (source of truth, camelCase nested objects)
   ↓ propagate
-{ar,de,es,fr,hi,ht,ko,pt,ru,tl,vi,zh}.json (same structure, translated values)
+*.json (every file in packages/i18n/locales/ except en.json — same structure, translated values)
   ↓ bun run i18n:codegen
   ├── iOS: apps/ios/Resources/Localizable/{locale}.lproj/Localizable.strings
   ├── Android: apps/android/app/src/main/res/values-{locale}/strings.xml
@@ -66,11 +70,11 @@ snake_case keys in en.json.
 2. **Propagate to all locale files** — add the same key to every locale JSON:
    - Copy the English value as a placeholder (it will be translated later)
    - Maintain the same nested position in every file
-   - All 13 locales MUST have the key (codegen will warn on missing keys)
+   - Every locale MUST have the key (`bun run i18n:validate` fails loudly on missing keys)
 
    ```bash
-   # Files to update:
-   # packages/i18n/locales/{ar,de,es,fr,hi,ht,ko,pt,ru,tl,vi,zh}.json
+   # Files to update — every locale file except en.json. Get the current list with:
+   ls packages/i18n/locales/*.json | grep -v /en.json
    ```
 
 3. **Run codegen**:
@@ -93,7 +97,8 @@ snake_case keys in en.json.
 ### Renaming/Moving a String
 
 1. **Update en.json**: Change the key name or move to a different section
-2. **Propagate**: Make the identical change in all 12 other locale files
+2. **Propagate**: Make the identical change in every other locale file (all files in
+   `packages/i18n/locales/` except `en.json`)
 3. **Run codegen**: `bun run i18n:codegen`
 4. **Update platform references**:
    - **Desktop**: Find all `t('old.key')` → `t('new.key')` in `src/client/**/*.{ts,tsx}`
@@ -104,7 +109,7 @@ snake_case keys in en.json.
 ### Removing a String
 
 1. **Remove from en.json**
-2. **Remove from all 12 other locale files**
+2. **Remove from every other locale file** (all files in `packages/i18n/locales/` except `en.json`)
 3. **Run codegen**: `bun run i18n:codegen`
 4. **Remove all platform references** (desktop t() calls, iOS NSLocalizedString, Android R.string)
 5. **Validate**: `bun run i18n:validate:all`
@@ -250,7 +255,7 @@ Located at `packages/i18n/tools/validate-strings.ts`:
 | Mistake | Consequence | Prevention |
 |---------|-------------|------------|
 | snake_case key in en.json | Mobile gets double-snake (`some__key`) | Always use camelCase in source |
-| Forgot to propagate to a locale | Codegen warns, runtime shows key name | Check all 13 files in every edit |
+| Forgot to propagate to a locale | Codegen warns, runtime shows key name | Check every locale file in every edit (`bun run i18n:validate`) |
 | Forgot `bun run i18n:codegen` | Platform still has old strings | Always codegen after JSON changes |
 | Forgot `bun run i18n:validate:all` | Broken ref discovered in production | Always validate before committing |
 | Used `R.string.shift_clock_in` (singular) | Should be `R.string.shifts_clock_in` (from section name) | Codegen flattens section name, not singular |
@@ -273,7 +278,7 @@ bun run i18n:validate:all         # Run all three validators
 | File | Purpose |
 |------|---------|
 | `packages/i18n/locales/en.json` | Source of truth |
-| `packages/i18n/locales/*.json` | All 13 locale files |
+| `packages/i18n/locales/*.json` | All locale files (count: see `packages/i18n/languages.ts`, never hardcode it) |
 | `packages/i18n/languages.ts` | Language config (codes, labels, phone prefixes) |
 | `packages/i18n/tools/i18n-codegen.ts` | Codegen: JSON → .strings + strings.xml + I18n.kt |
 | `packages/i18n/tools/validate-strings.ts` | Cross-platform string ref validator |

@@ -14,10 +14,12 @@ db-urls = ["https://github.com/rustsec/advisory-db"]
 db-path = "~/.cargo/advisory-db"
 version = 2
 
-# Warn on unmaintained crates rather than blocking (gives us visibility
-# without hard-failing CI until we've triaged each one).
-# Change to "deny" once the initial list is clean.
-unmaintained = "warn"
+# cargo-deny 0.20 changed `unmaintained` from a severity string to a scope
+# enum (which crates to check for unmaintained status). Severity is no
+# longer configurable per-lint here — RUSTSEC "unmaintained" advisories are
+# reported at their own severity via the advisory database, and unknown/
+# unresolved advisories are handled by the `ignore` list below.
+unmaintained = "all"
 
 # Always error on yanked crates — these are explicitly retracted.
 yanked = "warn"
@@ -49,6 +51,7 @@ allow = [
   "CC0-1.0",
   "MPL-2.0",           # used by webpki, rustls
   "OpenSSL",           # ring bundles BoringSSL-derived code
+  "CDLA-Permissive-2.0", # webpki-root-certs — a data-only public CA cert bundle
 ]
 
 # Crates under AGPL (our own code) are treated as confidential and exempt.
@@ -56,6 +59,13 @@ allow = [
 exceptions = [
   # ring uses a custom license that must be evaluated separately.
   { allow = ["ISC", "MIT", "OpenSSL"], name = "ring" },
+  # llamenos-core (packages/crypto) and llamenos-desktop (apps/desktop) are
+  # our own AGPL-3.0-or-later crates. cargo-deny checks workspace members
+  # too, not only third-party deps — explicitly exempt our own packages
+  # rather than adding AGPL to the allow list (which would also permit
+  # AGPL in third-party deps).
+  { allow = ["AGPL-3.0-or-later"], name = "llamenos-core" },
+  { allow = ["AGPL-3.0-or-later"], name = "llamenos-desktop" },
 ]
 
 # Confidence threshold for license detection (0.0 – 1.0).

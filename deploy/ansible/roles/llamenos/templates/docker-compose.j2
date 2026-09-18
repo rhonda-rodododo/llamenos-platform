@@ -7,24 +7,15 @@ services:
     read_only: true
     tmpfs:
       - /tmp:size=64M
-    environment:
-      - PLATFORM=bun
-      - PORT=3000
-      - DATABASE_URL=postgresql://llamenos:{{ pg_password }}@postgres:5432/llamenos
-      - PG_POOL_SIZE={{ pg_pool_size | default(10) }}
-      - ADMIN_PUBKEY={{ admin_pubkey }}
-      - HOTLINE_NAME={{ hotline_name | default('Hotline') }}
-      - ENVIRONMENT={{ app_environment | default('production') }}
-      - HMAC_SECRET={{ hmac_secret }}
-      - STORAGE_ENDPOINT=http://rustfs:9000
-      - STORAGE_ACCESS_KEY={{ storage_access_key }}
-      - STORAGE_SECRET_KEY={{ storage_secret_key }}
-      - STORAGE_BUCKET={{ storage_bucket | default('llamenos-files') }}
-      - WHISPER_URL=http://whisper:8080/v1/audio/transcriptions
-      - TWILIO_ACCOUNT_SID={{ twilio_account_sid | default('') }}
-      - TWILIO_AUTH_TOKEN={{ twilio_auth_token | default('') }}
-      - TWILIO_PHONE_NUMBER={{ twilio_phone_number | default('') }}
-      - SERVER_SECRET={{ server_secret }}
+    # All application env vars are rendered once, in one place, by env.j2 ->
+    # .env (see roles/llamenos/tasks/main.yml). Previously this list duplicated
+    # a subset of that file inline and .env was never actually loaded by
+    # Compose (no env_file / no ${VAR} substitution), so any var added only to
+    # env.j2 silently never reached the container (issue #716). env_file is
+    # the single source of truth now — do not add an `environment:` list back
+    # here for the app service.
+    env_file:
+      - .env
     networks:
       - web
       - internal

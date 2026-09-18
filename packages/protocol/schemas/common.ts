@@ -38,6 +38,8 @@ export const isoDateSchema = z.iso.datetime().or(
 /** Standard error response envelope */
 export const errorResponseSchema = z.object({
   error: z.string(),
+  /** Machine-readable error code clients branch on (e.g. WEBAUTHN_REQUIRED) */
+  code: z.string().optional(),
   details: z.array(z.object({
     field: z.string(),
     message: z.string(),

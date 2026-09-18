@@ -1791,8 +1791,8 @@
   "demo": {
     "admin": "Admin",
     "banner": "Demo Mode",
-    "bannerText": "You're exploring the Llamenos demo. Data resets daily.",
-    "bannerTextSchedule": "You're exploring the Llamenos demo. Data resets on schedule.",
+    "bannerText": "테스트 환경입니다 — 실제 발신자 정보를 입력하지 마세요. 이곳의 데이터는 기밀이 아니며 언제든지 삭제될 수 있습니다.",
+    "bannerTextSchedule": "테스트 환경입니다 — 실제 발신자 정보를 입력하지 마세요. 데이터는 {{schedule}} 초기화되며 기밀이 아닙니다.",
     "dismiss": "Dismiss",
     "getStarted": "Deploy your own",
     "pickAccount": "Pick a demo account to explore",
@@ -3735,6 +3735,20 @@
     "version": "Version",
     "voicemail": "Voicemail",
     "webrtcNotConfigured": "브라우저 통화를 사용할 수 없습니다. 관리자가 전화 서비스 제공업체 설정에서 WebRTC를 활성화해야 합니다."
+  },
+  "serverAddress": {
+    "checking": "Checking...",
+    "connect": "Connect",
+    "errorWithDetail": "Couldn't reach that server: {{detail}}",
+    "firstRunDescription": "This app needs to know which Llámenos server to connect to before it can sign in.",
+    "firstRunTitle": "Connect to your hotline server",
+    "help": "Enter your organization's server address, e.g. app.example.org. We'll infer https:// unless you specify otherwise.",
+    "label": "Server address",
+    "placeholder": "app.example.org",
+    "saveAndReconnect": "Save and reconnect",
+    "settingsDescription": "Change which server this desktop app connects to.",
+    "settingsTitle": "Server connection",
+    "unreachable": "Couldn't reach that server. Check the address and try again."
   },
   "setup": {
     "autoResponse": "Auto-Response Template",

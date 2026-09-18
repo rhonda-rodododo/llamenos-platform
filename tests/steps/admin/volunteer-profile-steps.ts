@@ -8,20 +8,17 @@ import { TestIds } from '../../test-ids'
 import { Timeouts } from '../../helpers'
 
 When('I tap a volunteer card', async ({ page }) => {
+  // Any volunteer card will do ("a volunteer card"), but the step must land on THAT
+  // volunteer's profile. The row (UserRow in users.tsx) always renders the name link, so
+  // the old isVisible/catch fallback to `volRow.click()` was dead code that raced load.
   const volRow = page.getByTestId(TestIds.VOLUNTEER_ROW).first()
   await expect(volRow).toBeVisible({ timeout: Timeouts.ELEMENT })
-  // Click the link inside the row (volunteer name) to navigate to profile.
-  // Try link role first; if not available, click the row itself (some layouts
-  // use clickable rows instead of inner links).
-  const nameLink = volRow.getByRole('link').first()
-  const hasLink = await nameLink.isVisible({ timeout: 3000 }).catch(() => false)
-  if (hasLink) {
-    await nameLink.click()
-  } else {
-    await volRow.click()
-  }
-  // Wait for profile page to load
-  await page.waitForURL(/\/users\/[^/]+/, { timeout: Timeouts.NAVIGATION })
+  const volunteerId = await volRow.getAttribute('data-volunteer-id')
+  expect(volunteerId, 'volunteer row carries data-volunteer-id').toBeTruthy()
+  const nameLink = volRow.getByTestId(TestIds.VOLUNTEER_ROW_NAME_LINK)
+  await expect(nameLink).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await nameLink.click()
+  await page.waitForURL(new RegExp(`/users/${volunteerId}[0-9a-f]*(?:[?#]|$)`), { timeout: Timeouts.NAVIGATION })
 })
 
 Then('I should see the volunteer detail screen', async ({ page }) => {
@@ -53,11 +50,9 @@ Then('I should see the recent activity card', async ({ page }) => {
 })
 
 When('I tap the back button on the volunteer detail', async ({ page }) => {
+  // users_.$pubkey.tsx always renders `back-btn` — the browser-history fallback was
+  // dead code that only masked the timeout-ignoring isVisible() probe.
   const backBtn = page.getByTestId(TestIds.BACK_BTN)
-  const backVisible = await backBtn.isVisible({ timeout: 2000 }).catch(() => false)
-  if (backVisible) {
-    await backBtn.click()
-  } else {
-    await page.goBack()
-  }
+  await expect(backBtn).toBeVisible({ timeout: Timeouts.ELEMENT })
+  await backBtn.click()
 })

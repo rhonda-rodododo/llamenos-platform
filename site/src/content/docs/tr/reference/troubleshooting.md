@@ -53,7 +53,7 @@ Uygulama PostgreSQL'e bağlanamıyorsa:
 
 ### Strfry relay bağlanmıyor
 
-WebSocket relay (WebSocket relay) temel bir servistir, isteğe bağlı değildir. Relay çalışmıyorsa:
+WebSocket relay temel bir servistir, isteğe bağlı değildir. Relay çalışmıyorsa:
 
 ```bash
 # Relay durumunu kontrol et

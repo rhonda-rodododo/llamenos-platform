@@ -8,15 +8,11 @@
  */
 import { expect } from '@playwright/test'
 import { Given, When, Then } from '../fixtures'
-import { Timeouts, navigateAfterLogin } from '../../helpers'
+import { Timeouts } from '../../helpers'
 import {
   ADMIN_NSEC,
-  enableCaseManagementViaApi,
-  applyTemplateViaApi,
-  listTemplatesViaApi,
   createCmsReportTypeViaApi,
   createReportViaApi,
-  createRecordViaApi,
   listEntityTypesViaApi,
   createCaseFromReportViaApi,
 } from '../../api-helpers'

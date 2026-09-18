@@ -53,7 +53,7 @@ Si aplikasyon an pa kapab konekte ak PostgreSQL :
 
 ### Relè Strfry pa konekte
 
-Relè WebSocket (WebSocket relay) se yon sèvis prensipal, pa opsyonèl. Si relè a pa kouri :
+Relè WebSocket se yon sèvis prensipal, pa opsyonèl. Si relè a pa kouri :
 
 ```bash
 # Verifye estati relè a

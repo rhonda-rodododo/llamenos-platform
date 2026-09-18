@@ -166,7 +166,7 @@ Client A (дія волонтера)
     | Шифрує вміст події ключем хабу
     | Підписує як подію WebSocket (Schnorr)
     v
-WebSocket relay (ретранслятор WebSocket / Nosflare)
+WebSocket relay
     |
     | Транслює підписникам
     v

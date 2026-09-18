@@ -21,6 +21,8 @@ import org.llamenos.hotline.hub.ActiveHubState
 import org.llamenos.hotline.model.AssignReportRequest
 import org.llamenos.hotline.model.CreateReportRequest
 import org.llamenos.hotline.model.CreateTypedReportRequest
+import org.llamenos.hotline.model.GeocodingAutocompleteRequest
+import org.llamenos.hotline.model.LocationResult
 import org.llamenos.hotline.model.Report
 import org.llamenos.hotline.model.ReportCategoriesResponse
 import org.llamenos.hotline.model.ReportEnvelope
@@ -249,20 +251,26 @@ class ReportsViewModel @Inject constructor(
     /**
      * Create a new encrypted report (legacy flow without report type).
      *
-     * Encrypts the report body using the same envelope pattern as notes,
-     * then sends the title, optional category, and encrypted content to the API.
+     * Encrypts the report body with per-report forward secrecy using the same
+     * envelope pattern desktop uses for report content (`encryptMessage` /
+     * `LABEL_MESSAGE` — see src/client/components/ReportForm.tsx and
+     * src/client/components/cases/triage-report-content.tsx, which decrypts
+     * report bodies with `decryptMessage`/`LABEL_MESSAGE`). This must stay in
+     * sync with desktop's choice of label: HPKE enforces domain separation at
+     * decrypt time, so a report encrypted under a different label is
+     * unreadable cross-platform even though the ciphertext is otherwise valid.
      */
     fun createReport(title: String, category: String?, body: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isCreating = true, actionError = null, createSuccess = false) }
             try {
                 sessionState.ensureAdminPubkeyLoaded(apiService)
-                val encrypted = cryptoService.encryptNote(body, sessionState.adminPubkeys)
+                val encrypted = cryptoService.encryptMessage(body, sessionState.adminPubkeys)
                 val envelopes = encrypted.envelopes.map { env ->
                     ReportEnvelope(
-                        pubkey = env.recipientPubkey,
-                        ct = env.hpkeEnvelope.ct,
-                        enc = env.hpkeEnvelope.enc,
+                        pubkey = env.pubkey,
+                        ct = env.ct,
+                        enc = env.enc,
                     )
                 }
                 val request = CreateReportRequest(
@@ -288,8 +296,16 @@ class ReportsViewModel @Inject constructor(
     /**
      * Create a typed report using the selected report type template.
      *
-     * Field values are serialized to JSON, encrypted with the same E2EE
-     * envelope pattern, and submitted with the reportTypeId attached.
+     * Field values (including any `location`-typed field, whose value is
+     * itself a JSON-encoded [org.llamenos.hotline.model.LocationFieldValue])
+     * are serialized as a flat JSON map — the same shape desktop's case/entity
+     * field editor produces via `JSON.stringify(Object.fromEntries(...))` (see
+     * src/client/components/cases/triage-case-creation-panel.tsx and
+     * src/client/routes/cases.tsx) — then encrypted with `encryptMessage`
+     * (`LABEL_MESSAGE`), matching desktop's `encryptMessage`/`decryptMessage`
+     * pair for this same field-values payload. Using a different label here
+     * would make the field values undecryptable on the platform that reads
+     * them back, since HPKE enforces domain separation at decrypt time.
      *
      * @param reportTypeId The CMS report type ID
      * @param title The user-provided report title
@@ -310,12 +326,12 @@ class ReportsViewModel @Inject constructor(
                 )
 
                 sessionState.ensureAdminPubkeyLoaded(apiService)
-                val encrypted = cryptoService.encryptNote(fieldsJson, sessionState.adminPubkeys)
+                val encrypted = cryptoService.encryptMessage(fieldsJson, sessionState.adminPubkeys)
                 val envelopes = encrypted.envelopes.map { env ->
                     ReportEnvelope(
-                        pubkey = env.recipientPubkey,
-                        ct = env.hpkeEnvelope.ct,
-                        enc = env.hpkeEnvelope.enc,
+                        pubkey = env.pubkey,
+                        ct = env.ct,
+                        enc = env.enc,
                     )
                 }
 
@@ -345,6 +361,30 @@ class ReportsViewModel @Inject constructor(
                     )
                 }
             }
+        }
+    }
+
+    /**
+     * Search for address suggestions via the geocoding autocomplete endpoint.
+     *
+     * Backs the `location`-typed field picker in [TypedReportCreateScreen]. Mirrors
+     * desktop's `LocationField` (src/client/components/ui/location-field.tsx):
+     * same minimum query length, same endpoint, same "fail soft to no suggestions"
+     * behavior on error or rate limiting so a flaky geocoding provider never blocks
+     * report creation. `/api/geocoding/autocomplete` is not hub-scoped (mounted only
+     * on the top-level `authenticated` router in apps/worker/app.ts) so it is called
+     * with the bare path, not [ApiService.hp].
+     */
+    suspend fun searchLocations(query: String): List<LocationResult> {
+        if (query.length < 3) return emptyList()
+        return try {
+            apiService.request<List<LocationResult>>(
+                "POST",
+                "/api/geocoding/autocomplete",
+                GeocodingAutocompleteRequest(query = query),
+            )
+        } catch (_: Exception) {
+            emptyList()
         }
     }
 

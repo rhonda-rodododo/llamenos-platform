@@ -110,7 +110,7 @@ The app auto-updates when new versions are available.
 - **Custom IVR voice prompts** — record greetings per language
 - **Audit log** — every call, note, message, and admin action tracked
 - **Encrypted data export** — GDPR-compliant notes export encrypted with user's key
-- **13 languages** — English, Spanish, Chinese, Tagalog, Vietnamese, Arabic, French, Haitian Creole, Korean, Russian, Hindi, Portuguese, German
+- **22 languages** — including indigenous Central American (K'iche', Tu'un savi/Mixtec) and refugee-community languages (Amharic, Persian, Kurdish, Burmese, Somali) alongside English, Spanish, Chinese, Tagalog, Vietnamese, Arabic, French, Haitian Creole, Korean, Russian, Hindi, Portuguese, German, Ukrainian, and Turkish — see `packages/i18n/languages.ts` for the authoritative, current list
 - **Accessibility** — skip nav, ARIA labels, RTL support, screen reader friendly
 
 ## Quick Start

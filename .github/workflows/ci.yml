@@ -17,9 +17,32 @@ on:
   push:
     branches: [main, desktop]
   pull_request:
+  # The merge queue's own ref. Neither `fleet/verify` (fleet-verify.yml) nor
+  # `fleet/review` (fleet-review.yml) is defined in THIS file any more — see
+  # the "Fleet gates" comment below — but `ci-status`, this file's own
+  # required aggregate, still must report on `merge_group` too (a required
+  # context that never reports on the queue's own ref blocks the queue
+  # forever), so this trigger stays even though it now gates nothing fleet
+  # -specific of its own.
+  merge_group:
+    types: [checks_requested]
+  # A manual full-CI run — an operator invoking this expects every job to run
+  # (no PR/merge_group context to specialize `changes`' and `lint`'s `HEAD^`
+  # fallback with, but otherwise unchanged). No inputs: the one input this
+  # trigger used to carry (`pr_number`, for a manual `fleet/review` re-run)
+  # moved with that job to `fleet-review.yml`, which has its own
+  # `workflow_dispatch` trigger now.
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.event_name == 'pull_request' && format('ci-pr-{0}', github.ref) || format('ci-push-{0}', github.sha) }}
+  # Never cancelled: a merge_group check that gets cancelled mid-run leaves
+  # its required check permanently missing (GitHub does not distinguish
+  # "cancelled" from "still running" for queue purposes the same way it
+  # would surface a failure), which stalls the queue rather than failing it
+  # loudly. `github.sha` on a merge_group event is the queue's own commit
+  # SHA (unique per attempt), so a re-queue after a rebase gets its own
+  # concurrency group rather than cancelling the attempt still in flight.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions: {}  # deny-all; per-job permissions below
@@ -31,7 +54,7 @@ env:
 jobs:
   # ─── Detect Changed Files ─────────────────────────────────────
   changes:
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
@@ -84,7 +107,7 @@ jobs:
   # ─── Guard: No Generated Files In Git ────────────────────
   no-generated-files-in-git:
     name: No generated files in git
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     timeout-minutes: 2
@@ -95,24 +118,18 @@ jobs:
 
       - name: Check for tracked generated files
         run: |
-          # These paths must NEVER be tracked in git — they are generated on-the-fly
+          # These paths must NEVER be tracked in git — they are generated on-the-fly.
+          # Android/iOS locale patterns are globs so they cover EVERY locale under
+          # packages/i18n/locales/ without hardcoding a per-locale list (a hardcoded
+          # list here previously only covered 13 of 22 locales and silently let the
+          # other 9 slip through this guard — see packages/i18n/languages.ts for the
+          # authoritative locale list).
           GENERATED_PATTERNS=(
             "packages/protocol/generated/"
             "packages/i18n/generated/"
             "apps/ios/Resources/Localizable/"
             "apps/android/app/src/main/res/values/strings.xml"
-            "apps/android/app/src/main/res/values-ar/strings.xml"
-            "apps/android/app/src/main/res/values-de/strings.xml"
-            "apps/android/app/src/main/res/values-es/strings.xml"
-            "apps/android/app/src/main/res/values-fr/strings.xml"
-            "apps/android/app/src/main/res/values-hi/strings.xml"
-            "apps/android/app/src/main/res/values-ht/strings.xml"
-            "apps/android/app/src/main/res/values-ko/strings.xml"
-            "apps/android/app/src/main/res/values-pt/strings.xml"
-            "apps/android/app/src/main/res/values-ru/strings.xml"
-            "apps/android/app/src/main/res/values-tl/strings.xml"
-            "apps/android/app/src/main/res/values-vi/strings.xml"
-            "apps/android/app/src/main/res/values-zh/strings.xml"
+            "apps/android/app/src/main/res/values-*/strings.xml"
             "apps/android/app/src/main/java/org/llamenos/i18n/I18n.kt"
             "apps/ios/Sources/Generated/LlamenosCore.swift"
             "apps/ios/LlamenosCoreFFI.xcframework/"
@@ -140,7 +157,7 @@ jobs:
   # ─── Guard: Updater Pubkey Must Be Set ───────────────────
   verify-updater-config:
     name: Updater pubkey is set
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     timeout-minutes: 2
@@ -194,7 +211,7 @@ jobs:
   # ─── Build & Validate ──────────────────────────────────────
   build:
     needs: changes
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     timeout-minutes: 15
@@ -229,6 +246,15 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
 
+      - name: Typecheck tests/ (baseline-gated — see scripts/typecheck-tests-gate.ts)
+        run: bun run scripts/typecheck-tests-gate.ts
+
+      - name: Typecheck signal-notifier/
+        run: cd signal-notifier && bunx tsc --noEmit
+
+      - name: Typecheck sip-bridge/
+        run: cd sip-bridge && bun run typecheck
+
       - name: Build frontend (with Tauri IPC mocks for test builds)
         run: PLAYWRIGHT_TEST=true bun run build
 
@@ -246,7 +272,7 @@ jobs:
   crypto-tests:
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     timeout-minutes: 15
@@ -254,12 +280,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-
-      - name: Isolate rustup/cargo home (self-hosted runners share $HOME)
-        run: |
-          echo "RUSTUP_HOME=$RUNNER_TEMP/rustup" >> "$GITHUB_ENV"
-          echo "CARGO_HOME=$RUNNER_TEMP/cargo" >> "$GITHUB_ENV"
-          echo "$RUNNER_TEMP/cargo/bin" >> "$GITHUB_PATH"
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@67ef31d5b988238dd797d409d6f9574278e20537 # stable
@@ -284,7 +304,7 @@ jobs:
   # ─── Dependency Vulnerability Scan ───────────────────────────
   audit:
     needs: changes
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
 
@@ -302,27 +322,29 @@ jobs:
 
       - name: Audit dependencies
         run: |
-          # GHSA-rmmr-r34h-pfm5 flags @tanstack/history >=0 but the malicious versions
-          # were 1.161.9+ published 2026-05-11. Our pinned 1.161.6 is safe.
-          # Filter out this overbroad advisory until GitHub narrows the affected range.
-          bun audit --audit-level=high || {
-            echo "::warning::High-severity vulns found — checking for critical"
-            CRITICAL_OUTPUT=$(bun audit --audit-level=critical 2>&1) || {
-              if echo "$CRITICAL_OUTPUT" | grep -q "GHSA-rmmr-r34h-pfm5" && \
-                 ! echo "$CRITICAL_OUTPUT" | grep -v "GHSA-rmmr-r34h-pfm5" | grep -q "critical:"; then
-                echo "::warning::Only critical finding is GHSA-rmmr-r34h-pfm5 (@tanstack/history >=0 overbroad range) — our 1.161.6 is safe, skipping"
-              else
-                echo "$CRITICAL_OUTPUT"
-                exit 1
-              fi
-            }
-          }
+          # Fails on any HIGH or CRITICAL advisory that is not in the
+          # explicit, dated, individually-justified allowlist at
+          # .github/ci/audit-allowlist.txt. Any *new* high/critical finding
+          # fails CI immediately — nothing here is a blanket suppression.
+          #
+          # To update: re-run this command locally, diff the findings
+          # against the allowlist, and add a justified entry (or fix the
+          # dependency) for anything new. Do not widen --audit-level.
+          ALLOWLIST=.github/ci/audit-allowlist.txt
+          IGNORE_ARGS=()
+          while IFS= read -r id; do
+            [[ -z "$id" ]] && continue
+            IGNORE_ARGS+=("--ignore=$id")
+          done < <(grep -oE '^GHSA-[a-z0-9-]+' "$ALLOWLIST")
+
+          echo "Ignoring ${#IGNORE_ARGS[@]} allowlisted advisories from $ALLOWLIST"
+          bun audit --audit-level=high "${IGNORE_ARGS[@]}"
 
   # ─── E2E + Backend BDD Tests (Docker Compose) ──────────────
   e2e:
     needs: [changes, build]
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: ubuntu-latest  # playwright --with-deps needs root; GH-hosted has browsers
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     timeout-minutes: 30
@@ -471,7 +493,7 @@ jobs:
   backend-bdd:
     needs: [changes]
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: ubuntu-latest  # playwright --with-deps needs root; GH-hosted has browsers
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     timeout-minutes: 30
@@ -558,7 +580,7 @@ jobs:
   backend-unit:
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     timeout-minutes: 10
@@ -580,6 +602,15 @@ jobs:
           mkdir -p test-results
           bunx vitest run --config vitest.unit.config.ts --reporter=default --reporter=junit --outputFile=test-results/backend-unit.xml
 
+      # The fleet orchestrator (orchestrator/) has no backend/DB dependency —
+      # same profile as the backend unit suite above — so its safety-rail
+      # tests (guards.test.ts asserts every documented safety property) run
+      # here rather than only when a human types `bun run test:fleet`.
+      - name: Run fleet orchestrator tests
+        run: |
+          mkdir -p test-results
+          bunx vitest run --config vitest.orchestrator.config.ts --reporter=default --reporter=junit --outputFile=test-results/fleet.xml
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -592,7 +623,7 @@ jobs:
   ansible-validate:
     needs: changes
     if: needs.changes.outputs.ansible == 'true' || needs.changes.outputs.app == 'true'
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     timeout-minutes: 10
@@ -601,11 +632,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
+      # The ubuntu-24.04 hosted image ships a PEP 668 "externally managed"
+      # system Python, which rejects `pip install --user`. setup-python
+      # provides a standalone interpreter where pip installs normally.
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
       - name: Install Ansible and ansible-lint
         run: |
           pip install --user ansible==14.1.0 ansible-lint==26.6.0
-          # pip installs console scripts into ~/.local/bin, which is not on
-          # PATH for the self-hosted runner user.
+          # pip installs console scripts into ~/.local/bin, which is not on PATH.
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       # `min` is the profile ansible-lint itself defines as "prevents fatal
@@ -627,10 +665,18 @@ jobs:
             -i inventory.example.yml \
             --extra-vars "@vars.example.yml"
 
+      # Parses the required-env-var list straight out of
+      # apps/worker/lib/config.ts and asserts every Ansible template that
+      # renders the worker's .env carries all of them — the two role
+      # templates drifting out of sync (or a future third copy rotting
+      # unnoticed) is exactly the bug class issue #798 fixed.
+      - name: Check required env vars across templates
+        run: python3 deploy/ansible/scripts/check-required-env.py
+
   desktop-unit:
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     timeout-minutes: 10
@@ -664,7 +710,7 @@ jobs:
   android-build-test:
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     timeout-minutes: 25
@@ -672,12 +718,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-
-      - name: Isolate rustup/cargo home (self-hosted runners share $HOME)
-        run: |
-          echo "RUSTUP_HOME=$RUNNER_TEMP/rustup" >> "$GITHUB_ENV"
-          echo "CARGO_HOME=$RUNNER_TEMP/cargo" >> "$GITHUB_ENV"
-          echo "$RUNNER_TEMP/cargo/bin" >> "$GITHUB_PATH"
 
       - name: Setup Bun (for codegen)
         uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2.0.2
@@ -720,7 +760,7 @@ jobs:
   android-e2e:
     needs: [changes]
     if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.android == 'true'
-    runs-on: ubuntu-latest  # android emulator needs KVM (no nested-virt on Hetzner cloud)
+    runs-on: ubuntu-latest  # android emulator needs KVM (hosted x86_64 images provide it)
     permissions:
       contents: read
     timeout-minutes: 45
@@ -1093,7 +1133,7 @@ jobs:
   crypto-guardrails:
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     timeout-minutes: 5
@@ -1182,11 +1222,88 @@ jobs:
           fi
           echo "as-any check complete."
 
+  # ─── Lint (changed files only) ────────────────────────────────
+  # ESLint previously ran ONLY as a lefthook pre-commit hook globbed to
+  # {src,apps/worker}/**/*.{ts,tsx} — never in CI, so packages/, apps/desktop/,
+  # tests/, scripts/, site/, sip-bridge/, signal-notifier/ were never linted,
+  # and the covered paths were skipped entirely by anyone bypassing hooks.
+  #
+  # Repo-wide there is substantial pre-existing lint debt (over a thousand
+  # problems across all trees combined — see
+  # https://github.com/rhonda-rodododo/llamenos-platform/issues/647 for the
+  # full per-tree breakdown), so this job intentionally lints only the
+  # files changed in this PR/push rather than the whole repo. That means it
+  # cannot regress further and does not require a repo-wide cleanup before
+  # going live — but any *new* lint error introduced in a touched file fails
+  # the build immediately.
+  lint:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2.0.2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Determine changed files
+        id: changed
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+          elif [[ "${{ github.event_name }}" == "merge_group" ]]; then
+            # The queue's own base/head, not `before`/`after` — a merge_group
+            # event carries neither (that pair is push-only), and lint's own
+            # required-check status must still land on this ref: see the
+            # "Fleet gates" comment above fleet-verify for why a required
+            # check that never reports on merge_group blocks the queue.
+            BASE="${{ github.event.merge_group.base_sha }}"
+            HEAD="${{ github.event.merge_group.head_sha }}"
+          else
+            BASE="${{ github.event.before }}"
+            HEAD="${{ github.event.after }}"
+          fi
+
+          # Fall back to a single-commit diff if before/base is unavailable
+          # (e.g. force-push, or first commit on a branch).
+          if [[ -z "$BASE" ]] || ! git cat-file -e "$BASE" 2>/dev/null; then
+            BASE="HEAD^"
+          fi
+
+          FILES=$(git diff --name-only --diff-filter=d "$BASE" "$HEAD" -- '*.ts' '*.tsx' \
+            | grep -vE '^(dist/|\.features-gen|\.features-gen-backend|packages/protocol/generated/|packages/i18n/generated/)' \
+            || true)
+
+          echo "Changed lintable files:"
+          echo "$FILES"
+
+          {
+            echo "files<<EOF"
+            echo "$FILES"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Run ESLint on changed files
+        if: steps.changed.outputs.files != ''
+        run: |
+          echo "${{ steps.changed.outputs.files }}" | xargs -r bunx eslint
+
   # ─── Migration Drift Check ────────────────────────────────────
   migration-drift:
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     timeout-minutes: 5
@@ -1207,7 +1324,7 @@ jobs:
         run: bun run migration:check --ci
 
   docs-guard:
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     timeout-minutes: 3
 
     steps:
@@ -1223,7 +1340,7 @@ jobs:
   docker-canary:
     needs: ci-status
     if: github.ref == 'refs/heads/main' && needs.ci-status.result == 'success'
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
@@ -1264,6 +1381,12 @@ jobs:
         with:
           context: .
           file: deploy/docker/Dockerfile
+          # `deploy/docker/Dockerfile` is multi-stage and its LAST stage is
+          # `static` (the Caddy image that serves the SPA, consumed by
+          # docker-compose.production.yml's `caddy` service). Docker defaults
+          # to the last stage, so without an explicit target this would
+          # publish the Caddy static-file server under the app image tags.
+          target: app
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha
@@ -1287,10 +1410,44 @@ jobs:
             "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${DIGEST}"
           echo "Signed: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${DIGEST}"
 
+  # ─── Fleet gates: the ONLY place the fleet's verdicts become enforceable ──
+  #
+  # Both jobs compute the fleet's gates on GitHub's runners against the PR's
+  # exact commit. Nothing about them runs on the operator's laptop, and they
+  # fail closed: a job that does not run leaves its required check missing,
+  # and the merge is blocked.
+  #
+  # Neither `fleet/verify` nor `fleet/review` is defined in THIS file any
+  # more — both live in their own workflow files now:
+  #
+  # - `fleet/verify` (mechanical: scope, never-write, impact, diff-targeted
+  #   tests) moved to `fleet-verify.yml` in round 3 of #844. It deliberately
+  #   executes the PR HEAD's own tests, and CodeQL's actions/cache-poisoning
+  #   query flags any job that does that if its ENCLOSING WORKFLOW also
+  #   triggers on an event with default-branch cache-write access (`push`,
+  #   `workflow_dispatch`, among others). `fleet-verify.yml`'s `on:` block is
+  #   narrower — `pull_request` and `merge_group` only — to clear the alert.
+  #
+  # - `fleet/review` (the non-author MODEL call) moved to `fleet-review.yml`
+  #   in this PR. Reason: it used to live here gated by a job-level `if:`
+  #   restricting it to `merge_group`/`workflow_dispatch` — but this
+  #   workflow ALSO triggers on `pull_request`, so on every ordinary PR push
+  #   the job was still instantiated and merely skipped, and GitHub treats a
+  #   *skipped* required check as satisfying it, exactly like a green one
+  #   (this is how #844 itself merged with zero model review). Moving the
+  #   job to a workflow file whose `on:` block never mentions `pull_request`
+  #   at all makes the check MISSING on an ordinary PR instead of skipped —
+  #   and a missing required check blocks a merge, same as a failing one.
+  #   See that file's own header comment for the full explanation.
+  #
+  # Neither job is in `ci-status`'s `needs` list: that aggregate is the
+  # repo's own CI verdict, these are the fleet's, so a reader can tell which
+  # one refused.
+
   ci-status:
-    needs: [no-generated-files-in-git, verify-updater-config, build, audit, crypto-tests, backend-bdd, backend-unit, desktop-unit, android-build-test, android-e2e, e2e, ios-build-test, crypto-guardrails, migration-drift, ansible-validate, docs-guard]
+    needs: [no-generated-files-in-git, verify-updater-config, build, audit, lint, crypto-tests, backend-bdd, backend-unit, desktop-unit, android-build-test, android-e2e, e2e, ios-build-test, crypto-guardrails, migration-drift, ansible-validate, docs-guard]
     if: always()
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     timeout-minutes: 2
@@ -1308,6 +1465,7 @@ jobs:
           check_job "verify-updater-config" "${{ needs.verify-updater-config.result }}"
           check_job "build" "${{ needs.build.result }}"
           check_job "audit" "${{ needs.audit.result }}"
+          check_job "lint" "${{ needs.lint.result }}"
           check_job "crypto-tests" "${{ needs.crypto-tests.result }}"
           check_job "e2e" "${{ needs.e2e.result }}"
           check_job "backend-bdd" "${{ needs.backend-bdd.result }}"
@@ -1319,6 +1477,7 @@ jobs:
           check_job "crypto-guardrails" "${{ needs.crypto-guardrails.result }}"
           check_job "migration-drift" "${{ needs.migration-drift.result }}"
           check_job "ansible-validate" "${{ needs.ansible-validate.result }}"
+          check_job "docs-guard" "${{ needs.docs-guard.result }}"
 
           if [[ -n "$FAILED" ]]; then
             echo "Failed jobs:$FAILED"

@@ -11,12 +11,29 @@ import {
   adminErasureBodySchema,
   deviceWipeBodySchema,
   reEncryptionJobListResponseSchema,
+  erasureConfigResponseSchema,
+  updateErasureConfigBodySchema,
 } from '@protocol/schemas/erasure'
+import { platformSettingsSchema } from '@protocol/schemas/platform-settings'
 import { authErrors } from '../openapi/helpers'
 import { audit } from '../services/audit'
 import { getConnectionManager } from '../lib/ws-manager'
 
 const erasure = new Hono<AppEnv>()
+
+type EffectiveErasureConfig = Awaited<
+  ReturnType<AppEnv['Variables']['services']['erasure']['getEffectiveConfig']>
+>
+
+function serializeConfig(config: EffectiveErasureConfig) {
+  return {
+    hubId: config.hubId,
+    delayHours: config.delayHours,
+    emergencyOverrideEnabled: config.emergencyOverrideEnabled,
+    updatedAt: config.updatedAt?.toISOString() ?? null,
+    updatedBy: config.updatedBy,
+  }
+}
 
 // --- Self-service routes ---
 
@@ -262,6 +279,87 @@ erasure.get(
       })),
       total,
     })
+  },
+)
+
+erasure.get(
+  '/config',
+  describeRoute({
+    tags: ['Erasure'],
+    summary: 'Get hub erasure config',
+    responses: {
+      200: {
+        description: 'Hub erasure config (defaults if never saved)',
+        content: {
+          'application/json': {
+            schema: resolver(erasureConfigResponseSchema),
+          },
+        },
+      },
+      ...authErrors,
+    },
+  }),
+  requirePermission('erasure:admin'),
+  async (c) => {
+    const services = c.get('services')
+    const hubId = c.get('hubId')
+    if (!hubId) {
+      return c.json({ error: 'Hub context required' }, 400)
+    }
+    const config = await services.erasure.getEffectiveConfig(hubId)
+    return c.json({ config: serializeConfig(config) })
+  },
+)
+
+erasure.patch(
+  '/config',
+  describeRoute({
+    tags: ['Erasure'],
+    summary: 'Update hub erasure config',
+    responses: {
+      200: {
+        description: 'Hub erasure config updated',
+        content: {
+          'application/json': {
+            schema: resolver(erasureConfigResponseSchema),
+          },
+        },
+      },
+      ...authErrors,
+    },
+  }),
+  requirePermission('erasure:admin'),
+  validator('json', updateErasureConfigBodySchema),
+  async (c) => {
+    const services = c.get('services')
+    const pubkey = c.get('pubkey')
+    const hubId = c.get('hubId')
+    if (!hubId) {
+      return c.json({ error: 'Hub context required' }, 400)
+    }
+    const body = c.req.valid('json')
+
+    const platform = platformSettingsSchema.parse(
+      await services.settings.getPlatformSettings(),
+    )
+    await services.erasure.upsertConfig(
+      hubId,
+      body,
+      pubkey,
+      platform.erasurePlatformFloor.minDelayHours,
+    )
+
+    await audit(
+      services.audit,
+      'erasureConfigUpdated',
+      pubkey,
+      { ...body },
+      undefined,
+      hubId,
+    )
+
+    const config = await services.erasure.getEffectiveConfig(hubId)
+    return c.json({ config: serializeConfig(config) })
   },
 )
 

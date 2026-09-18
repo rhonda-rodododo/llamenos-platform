@@ -222,7 +222,7 @@ Llámenos bi tu senaryoyekî taybetî ve ne hatiye kodandin. Her tişt bi şablo
 
 ## Înfrastruktura Dem-Rast
 
-**WebSocket relay** -- WebSocket relay relay xweser (an Nosflare li ser Cloudflare) ji bo belavkirina bûyerên dem-rast. Hemû naveroka bûyerê bi kilîta hub tê şîfre kirin. Tag-ên giştî (`["t", "llamenos:event"]`) asteng dikin ku relay li asta metadata nikaribe cureyên bûyerê ji hev cuda bike.
+**WebSocket relay** -- WebSocket relay xweser (an Nosflare li ser Cloudflare) ji bo belavkirina bûyerên dem-rast. Hemû naveroka bûyerê bi kilîta hub tê şîfre kirin. Tag-ên giştî (`["t", "llamenos:event"]`) asteng dikin ku relay li asta metadata nikaribe cureyên bûyerê ji hev cuda bike.
 
 **Kilîta hub** -- 32 byteyên rasthatî (`crypto.getRandomValues`), bi navgîniya HPKE ji bo her endamê hub bi tenê tê wrap kirin bi navgîniya `LABEL_HUB_KEY_WRAP`. Dema ku endamek derdikeve tê nûve kirin -- endamên derketî nikarin bûyerên pêşerojê veşêrin.
 
@@ -268,7 +268,7 @@ Llámenos bi tu senaryoyekî taybetî ve ne hatiye kodandin. Her tişt bi şablo
 
 ### Docker Compose (Serverek Yekane)
 
-- Pergala tevahî: Bun HTTP server, PostgreSQL, RustFS (storage-a objekt), WebSocket relay (WebSocket relay)
+- Pergala tevahî: Bun HTTP server, PostgreSQL, RustFS (storage-a objekt), WebSocket relay
 - Profîlên bijarte: `--profile signal` (sidecar-a signal-cli), `--profile telephony` (Kamailio + CoTURN), `--profile inference` (ajana firehose-ê ya LLM), `--profile monitoring` (Prometheus + Grafana)
 - `docker-compose.dev.yml` ji bo pêşvebirinê ya herêmî bi şopandina pel
 - `docker-compose.production.yml` overlay ji bo zehfkirina hilberînê

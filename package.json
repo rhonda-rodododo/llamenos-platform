@@ -37,6 +37,8 @@
     "test:worker:unit": "bunx vitest run --config vitest.unit.config.ts",
     "test:worker:integration": "bunx vitest run --config vitest.integration.config.ts",
     "test:worker:watch": "bunx vitest --config vitest.unit.config.ts",
+    "test:fleet": "bunx vitest run --config vitest.orchestrator.config.ts",
+    "fleet": "bun orchestrator/src/cli.ts",
     "site:dev": "cd site && bun run dev",
     "site:build": "cd site && bun run build",
     "changelog": "git-cliff --output CHANGELOG.md",
@@ -95,7 +97,7 @@
     "setup": "bash scripts/setup.sh",
     "cert-pins:extract": "bash scripts/extract-cert-pins.sh",
     "cert-pins:inject": "bun scripts/inject-cert-pins.ts",
-    "lint": "eslint src/ apps/worker/",
+    "lint": "eslint src/ apps/worker/ orchestrator/ tests/orchestrator/",
     "supervisors": "scripts/supervisors.sh",
     "supervisors:kill": "scripts/supervisors.sh --kill"
   },
@@ -146,6 +148,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@cucumber/cucumber-expressions": "18.0.1",
     "@eslint/js": "^10.0.1",
     "@evilmartians/lefthook": "^2.1.6",
     "@playwright/test": "^1.59.1",
@@ -166,6 +169,7 @@
     "drizzle-kit": "^0.31.10",
     "eslint": "^10.2.1",
     "happy-dom": "^20.9.0",
+    "ignore": "^7.0.9",
     "playwright-bdd": "^8.5.0",
     "postgres": "^3.4.9",
     "quicktype-core": "^23.2.6",

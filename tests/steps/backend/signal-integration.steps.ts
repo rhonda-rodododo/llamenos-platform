@@ -15,7 +15,7 @@ import {
   simulateIncomingMessage,
   uniqueCallerNumber,
 } from '../../simulation-helpers'
-import { apiGet, apiPost, apiPatch, devPost } from '../../api-helpers'
+import { apiGet, apiPost, devPost } from '../../api-helpers'
 
 // ── Local State ──────────────────────────────────────────────────────
 
@@ -38,9 +38,23 @@ function getSignalState(world: Record<string, unknown>): SignalIntegrationState 
   return getState<SignalIntegrationState>(world, STATE_KEY)
 }
 
+/**
+ * Lazily initialize signal-integration state for scenarios whose Given step doesn't
+ * set it up (e.g. "the admin is authenticated" is a no-op shared across many features —
+ * see tests/steps/backend/common.steps.ts). Without this, steps that mutate state
+ * directly (e.g. `signalState.registrationState = ...`) throw on `undefined` the first
+ * time they run for a scenario that never called an Signal-message-simulating Given.
+ */
+function ensureSignalState(world: Record<string, unknown>): SignalIntegrationState {
+  if (!getState(world, STATE_KEY)) {
+    setState(world, STATE_KEY, { senderNumber: '' } satisfies SignalIntegrationState)
+  }
+  return getSignalState(world)
+}
+
 // ── Given ────────────────────────────────────────────────────────────
 
-Given('the Signal webhook is configured', async ({ request, world }) => {
+Given('the Signal webhook is configured', async ({ world }) => {
   // Verify Signal messaging config is present (or at least the webhook route is reachable)
   // We don't require a real Signal bridge — the dev simulation endpoint handles inbound messages
   const state = getScenarioState(world)
@@ -284,7 +298,7 @@ When('an unknown envelope type arrives via the Signal webhook', async ({ request
 When(
   'the admin registers Signal number {string}',
   async ({ request, world }, phoneNumber: string) => {
-    const signalState = getSignalState(world)
+    const signalState = ensureSignalState(world)
     const { status, data } = await apiPost<{ state?: string }>(
       request,
       `/admin/signal/register`,
@@ -433,7 +447,7 @@ Then(
 
 Then(
   'the message should be appended to the existing conversation',
-  async ({ request, world }) => {
+  async ({ world }) => {
     const state = getScenarioState(world)
     const signalState = getSignalState(world)
     // The new message should belong to the same original conversation
