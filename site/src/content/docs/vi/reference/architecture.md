@@ -145,7 +145,7 @@ Per-note key (random 32 bytes)
 
 Cập nhật thời gian thực qua WebSocket relay:
 
-- **Tự lưu trữ**: WebSocket relay relay chạy cùng ứng dụng trong Docker/Kubernetes
+- **Tự lưu trữ**: WebSocket relay chạy cùng ứng dụng trong Docker/Kubernetes
 - **Cloudflare**: Nosflare (relay dựa trên Cloudflare Workers)
 
 Tất cả sự kiện là tạm thời (kind 20001) và được mã hóa bằng hub key. Relay chỉ thấy blob mã hóa và chữ ký hợp lệ.

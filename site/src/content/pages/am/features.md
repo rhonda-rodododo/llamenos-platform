@@ -222,7 +222,7 @@ PostgreSQL-backed delivery queue ለbulk messaging፦
 
 ## በጊዜ-እውነታ መሠረተ ልማት
 
-**WebSocket relay** — ራስ-ሆስት WebSocket relay relay (ወይም Nosflare በCloudflare ላይ) ለበጊዜ-እውነታ ክስተት ስርጭት። ሁሉም ክስተት ይዘት በhub key የተመሰጠረ ነው። Generic tags (`["t", "llamenos:event"]`) relay-level metadata inference ስለክስተት አይነቶች ይከላከላሉ።
+**WebSocket relay** — ራስ-ሆስት WebSocket relay (ወይም Nosflare በCloudflare ላይ) ለበጊዜ-እውነታ ክስተት ስርጭት። ሁሉም ክስተት ይዘት በhub key የተመሰጠረ ነው። Generic tags (`["t", "llamenos:event"]`) relay-level metadata inference ስለክስተት አይነቶች ይከላከላሉ።
 
 **Hub key** — Random 32 bytes (`crypto.getRandomValues`)፣ HPKE-wrapped በእያንዳንዱ hub member በ`LABEL_HUB_KEY_WRAP`። በmember departure ላይ ይቀየራል — የተሰረዙ members የወደፊት ክስተቶች መተርጐም አይችሉም።
 
@@ -268,7 +268,7 @@ PostgreSQL-backed delivery queue ለbulk messaging፦
 
 ### Docker Compose (አንድ Server)
 
-- ሙሉ stack፦ Bun HTTP server፣ PostgreSQL፣ RustFS (object storage)፣ WebSocket relay (WebSocket relay)
+- ሙሉ stack፦ Bun HTTP server፣ PostgreSQL፣ RustFS (object storage)፣ WebSocket relay
 - አማራጭ profiles፦ `--profile signal` (signal-cli sidecar)፣ `--profile telephony` (Kamailio + CoTURN)፣ `--profile inference` (LLM firehose agent)፣ `--profile monitoring` (Prometheus + Grafana)
 - `docker-compose.dev.yml` ለአካባቢ ልማት ከfile watching ጋር
 - `docker-compose.production.yml` overlay ለproduction hardening

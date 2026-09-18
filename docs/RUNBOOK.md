@@ -413,7 +413,7 @@ docker compose start app
 docker compose exec app curl -sf http://localhost:3000/api/health
 ```
 
-### 4.5 WebSocket Relay (WebSocket relay) Backup
+### 4.5 WebSocket Relay Backup
 
 Back up the WebSocket relay LMDB data directory:
 
