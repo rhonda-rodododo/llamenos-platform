@@ -79,9 +79,15 @@
       tags: [update]
       block:
         # ── Phase 2: Pull New Images ───────────────────────────────
+        # Sourced from the `llamenos` role's own templates (not a second,
+        # hand-maintained copy) so a rolling update produces byte-identical
+        # output to a fresh deploy-demo.yml run. This is the monolithic
+        # single-host layout (one docker-compose.yml / .env at app_dir
+        # root, services postgres/rustfs/caddy/app) — the same layout this
+        # playbook operates on below. See issue #798.
         - name: Re-template docker-compose.yml with current vars
           ansible.builtin.template:
-            src: "../templates/docker-compose.j2"
+            src: "../roles/llamenos/templates/docker-compose.j2"
             dest: "{{ app_dir }}/docker-compose.yml"
             owner: "{{ deploy_user }}"
             group: "{{ deploy_group }}"
@@ -89,7 +95,7 @@
 
         - name: Re-template .env with current vars
           ansible.builtin.template:
-            src: "../templates/env.j2"
+            src: "../roles/llamenos/templates/env.j2"
             dest: "{{ app_dir }}/.env"
             owner: "{{ deploy_user }}"
             group: "{{ deploy_group }}"

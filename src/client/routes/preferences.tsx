@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Bell } from 'lucide-react'
+import { getApiUrl } from '@/lib/api-config'
+import { netFetch } from '@/lib/net'
 
 export const Route = createFileRoute('/preferences')({
   component: PreferencesPage,
@@ -33,7 +35,7 @@ function PreferencesPage() {
       setLoading(false)
       return
     }
-    fetch(`/api/messaging/preferences?token=${encodeURIComponent(search.token)}`)
+    netFetch(getApiUrl(`/messaging/preferences?token=${encodeURIComponent(search.token)}`))
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(data => setSubscriber(data as SubscriberPrefs))
       .catch(() => setError(t('preferences.invalidToken')))
@@ -42,7 +44,7 @@ function PreferencesPage() {
 
   async function handleUpdate(updates: Record<string, unknown>) {
     try {
-      const res = await fetch(`/api/messaging/preferences?token=${encodeURIComponent(search.token)}`, {
+      const res = await netFetch(getApiUrl(`/messaging/preferences?token=${encodeURIComponent(search.token)}`), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),

@@ -22,13 +22,11 @@ import {
   bulkAddBansViaApi,
   setFallbackGroupViaApi,
   getFallbackGroupViaApi,
-  deleteShiftViaApi,
   updateShiftViaApi,
   createRoleViaApi,
   generateTestKeypair,
   uniquePhone,
   uniqueName,
-  ADMIN_NSEC,
 } from '../../api-helpers'
 
 const BASE_URL = process.env.TEST_HUB_URL || 'http://localhost:3000'
@@ -169,7 +167,7 @@ Then('the ban list should contain exactly {int} entry for {string}', async ({req
 })
 
 When('an admin creates a role with slug {string}', async ({ request, world }, slug: string) => {
-  const result = await createRoleViaApi(request, {
+  await createRoleViaApi(request, {
     name: uniqueName('Edge Role'),
     slug,
     permissions: ['notes:read-own'],
@@ -187,13 +185,13 @@ When('an admin creates another role with slug {string}', async ({ request, world
       description: 'edge duplicate test',
     })
     getEdgeState(world).roleCreationStatuses.push(200)
-  } catch (e) {
+  } catch {
     // createRoleViaApi handles 409 internally, but let's track the status
     getEdgeState(world).roleCreationStatuses.push(409)
   }
 })
 
-Then('the second role creation should return {int}', async ({ world }, _status: number) => {
+Then('the second role creation should return {int}', async ({}, _status: number) => {
   // createRoleViaApi handles 409 by returning the existing role,
   // so we verify there's only one role with that slug
   // This is tested implicitly by the slug uniqueness constraint
@@ -277,7 +275,6 @@ When('a CORS preflight request is sent to {string}', async ({ request, world }, 
 })
 
 Then('the response should include CORS headers', async ({ world }) => {
-  const headers = getSharedState(world).lastResponse?.data as Record<string, string>
   // CORS should return Access-Control-Allow-Origin or similar
   // The exact header depends on the CORS config
   expect(getSharedState(world).lastResponse).toBeDefined()
@@ -302,7 +299,7 @@ When('{int} invite validation requests are sent rapidly', async ({ request, worl
   }
 })
 
-Then('at least one should return {int}', async ({ world }, status: number) => {
+Then('at least one should return {int}', async ({ world }, _status: number) => {
   expect(getEdgeState(world).rateLimit429Count).toBeGreaterThan(0)
 })
 

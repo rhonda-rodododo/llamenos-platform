@@ -16,33 +16,30 @@ import type {
   WebhookQueueWait,
   WebhookRecordingStatus,
 } from './adapter'
-import {
-  DEFAULT_LANGUAGE,
-  ivrIndexToDigit,
-} from '@shared/languages'
-import { IVR_PROMPTS, IVR_MORE_PROMPTS, getPrompt, getVoicemailThanks, resolveIvrPrompt } from '@shared/voice-prompts'
+import { getPrompt, getVoicemailThanks } from '@shared/voice-prompts'
+import { IvrVoiceCatalog, buildIvrLanguageMenu } from './ivr-menu'
 
 /**
- * Vonage voice language codes, keyed by ISO 639-1.
+ * Vonage NCCO talk `language` codes — the explicit, ordered list of locales
+ * Vonage has a voice for. Absent locales are never offered in the IVR menu.
  */
-const VONAGE_VOICE_CODES: Record<string, { language: string; style?: number }> = {
-  en: { language: 'en-US' },
-  es: { language: 'es-MX' },
-  zh: { language: 'cmn-CN' },
-  tl: { language: 'fil-PH' },
-  vi: { language: 'vi-VN' },
-  ar: { language: 'ar' },
-  fr: { language: 'fr-FR' },
-  ht: { language: 'fr-FR' }, // No Haitian Creole, use French
-  ko: { language: 'ko-KR' },
-  ru: { language: 'ru-RU' },
-  hi: { language: 'hi-IN' },
-  pt: { language: 'pt-BR' },
-  de: { language: 'de-DE' },
-}
+export const VONAGE_VOICES = new IvrVoiceCatalog<{ language: string; style?: number }>('vonage', [
+  ['en', { language: 'en-US' }],
+  ['es', { language: 'es-MX' }],
+  ['zh', { language: 'cmn-CN' }],
+  ['tl', { language: 'fil-PH' }],
+  ['vi', { language: 'vi-VN' }],
+  ['ar', { language: 'ar' }],
+  ['fr', { language: 'fr-FR' }],
+  ['ko', { language: 'ko-KR' }],
+  ['ru', { language: 'ru-RU' }],
+  ['hi', { language: 'hi-IN' }],
+  ['pt', { language: 'pt-BR' }],
+  ['de', { language: 'de-DE' }],
+])
 
 function getVonageVoice(lang: string) {
-  return VONAGE_VOICE_CODES[lang] ?? VONAGE_VOICE_CODES[DEFAULT_LANGUAGE]
+  return VONAGE_VOICES.voiceForPrompt(lang)
 }
 
 /** Build a talk action */
@@ -118,11 +115,11 @@ export class VonageAdapter implements TelephonyAdapter {
   }
 
   async handleLanguageMenu(params: LanguageMenuParams): Promise<TelephonyResponse> {
-    const languages = params.enabledLanguages
+    const menu = buildIvrLanguageMenu(params.enabledLanguages, VONAGE_VOICES)
     const hp = hubQP(params.hubId)
 
-    if (languages.length <= 1) {
-      const lang = languages[0] || DEFAULT_LANGUAGE
+    if (menu.kind === 'single') {
+      const lang = menu.language
       return this.ncco([
         { action: 'talk', text: ' ' },
         {
@@ -134,25 +131,6 @@ export class VonageAdapter implements TelephonyAdapter {
       ])
     }
 
-    const talkActions: Record<string, unknown>[] = []
-
-    if (languages.length > 9) {
-      const mainMenu = languages.slice(0, 8)
-      for (let i = 0; i < mainMenu.length; i++) {
-        const prompt = IVR_PROMPTS[mainMenu[i]]
-        if (!prompt) continue
-        talkActions.push(talk(resolveIvrPrompt(prompt, String(i + 1)), mainMenu[i], true))
-      }
-      const morePrompt = IVR_MORE_PROMPTS[languages[0]] || IVR_MORE_PROMPTS['en']
-      talkActions.push(talk(resolveIvrPrompt(morePrompt, '9'), 'en', true))
-    } else {
-      for (let i = 0; i < languages.length; i++) {
-        const prompt = IVR_PROMPTS[languages[i]]
-        if (!prompt) continue
-        talkActions.push(talk(resolveIvrPrompt(prompt, ivrIndexToDigit(i)), languages[i], true))
-      }
-    }
-
     return this.ncco([
       {
         action: 'input',
@@ -161,7 +139,7 @@ export class VonageAdapter implements TelephonyAdapter {
         eventUrl: ['/api/telephony/language-selected' + hubQPFirst(params.hubId)],
         eventMethod: 'POST',
       },
-      ...talkActions,
+      ...menu.options.map(o => talk(o.prompt, o.language, true)),
     ])
   }
 

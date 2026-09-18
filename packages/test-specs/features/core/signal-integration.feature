@@ -38,7 +38,7 @@ Feature: Signal Adapter Integration
   # ── Registration & Verification ──────────────────────────────────
 
   Scenario: Signal number registration and verification
-    Given an admin is authenticated
+    Given the admin is authenticated
     When the admin registers Signal number "+15559990000"
     Then the registration state should be "pending_verification"
     When the admin submits the verification code "654321"

@@ -12,6 +12,7 @@ if (!import.meta.env.PLAYWRIGHT_TEST) {
   throw new Error('FATAL: Tauri IPC mock loaded outside test environment.')
 }
 
+import { Store } from './tauri-store'
 import { ed25519 } from '@noble/curves/ed25519.js'
 import { x25519 } from '@noble/curves/ed25519.js'
 import { hkdf } from '@noble/hashes/hkdf.js'
@@ -428,6 +429,147 @@ function shamirCombineInternal(shareObjs: Array<{ x: number; y: string }>): stri
 }
 
 // ── Types ─────────────────────────────────────────────────────────────
+
+// ── Backend address + runtime-enforced network egress mock (#738, #739) ──
+//
+// Mirrors apps/desktop/src/api_config.rs and apps/desktop/src/net.rs: the same
+// persisted value (llamenos-api-config.json / apiBaseUrl, here in the mock
+// store), the same validation, the same exact-origin allowlist, the same header
+// denylist and first-run-only, rate-limited health probe — but the request is a
+// real browser `fetch`/`WebSocket` instead of reqwest/tokio-tungstenite. That
+// lets Playwright exercise the full chain (UI → api-config → net.ts → IPC → real
+// network request) against a real, separately-bound test server — see
+// tests/steps/config/.
+//
+// A Playwright build is a dev-equivalent build, so loopback `http://` is allowed
+// here exactly as Rust allows it under `cfg!(debug_assertions)`.
+//
+// Browser limits the mock cannot erase: `fetch` here IS subject to CORS (a test
+// server proving cross-origin delivery must send `Access-Control-Allow-Origin`
+// — a harness requirement only; Rust has no CORS concept), and a manual-redirect
+// fetch surfaces as an opaque status-0 response where Rust returns the real 3xx.
+// Either way, nothing is followed.
+
+const CONFIG_STORE_NAME = 'llamenos-api-config.json'
+const CONFIG_KEY = 'apiBaseUrl'
+const MOCK_ALLOW_LOOPBACK_HTTP = true
+const PROBE_MIN_INTERVAL_MS = 1000
+let lastProbeAt: number | null = null
+
+const FORBIDDEN_REQUEST_HEADERS = new Set([
+  'host', 'content-length', 'transfer-encoding', 'connection', 'keep-alive',
+  'proxy-connection', 'proxy-authenticate', 'proxy-authorization', 'te', 'trailer', 'upgrade',
+])
+
+function isLoopbackHostname(hostname: string): boolean {
+  const h = hostname.toLowerCase()
+  return h === 'localhost' || h === '127.0.0.1' || h === '[::1]'
+}
+
+/** api_config.rs `check_backend_url`. */
+function mockCheckBackendUrl(url: URL): void {
+  if (!url.hostname) throw new Error('backend address has no host')
+  if (url.protocol === 'http:') {
+    if (!(MOCK_ALLOW_LOOPBACK_HTTP && isLoopbackHostname(url.hostname))) {
+      throw new Error('backend address must use https://')
+    }
+  } else if (url.protocol !== 'https:') {
+    throw new Error(`unsupported scheme ${url.protocol}// — backend address must use https://`)
+  }
+  if (url.username || url.password) throw new Error('backend address must not contain credentials')
+}
+
+/** api_config.rs `validate_backend_origin`. */
+function mockValidateBackendOrigin(raw: string): string {
+  let url: URL
+  try {
+    url = new URL(raw.trim())
+  } catch {
+    throw new Error('invalid backend address')
+  }
+  mockCheckBackendUrl(url)
+  if (!(url.pathname === '' || url.pathname === '/') || url.search || url.hash) {
+    throw new Error('backend address must be an origin only (no path, query or fragment)')
+  }
+  return url.origin
+}
+
+async function mockReadConfiguredRaw(): Promise<string | null> {
+  const store = await Store.load(CONFIG_STORE_NAME)
+  return (await store.get<string>(CONFIG_KEY)) || null
+}
+
+/** api_config.rs `configured_origin` — fails closed on an invalid stored value. */
+async function mockConfiguredOrigin(): Promise<URL | null> {
+  const raw = await mockReadConfiguredRaw()
+  if (!raw) return null
+  try {
+    return new URL(mockValidateBackendOrigin(raw))
+  } catch (err) {
+    throw new Error(`configured backend address is invalid: ${err instanceof Error ? err.message : String(err)}`)
+  }
+}
+
+async function mockAllowedOrigin(): Promise<URL> {
+  const configured = await mockConfiguredOrigin()
+  if (!configured) throw new Error('no backend server configured')
+  return configured
+}
+
+function defaultPortFor(protocol: string): string {
+  return protocol === 'https:' || protocol === 'wss:' ? '443' : '80'
+}
+
+function sameHostAndPort(configured: URL, target: URL): boolean {
+  return configured.hostname.toLowerCase() === target.hostname.toLowerCase() &&
+    (configured.port || defaultPortFor(configured.protocol)) === (target.port || defaultPortFor(target.protocol))
+}
+
+/** net.rs `check_http_target`: exact scheme + host + port. */
+function mockCheckHttpTarget(configured: URL, target: URL): void {
+  if (target.username || target.password) throw new Error('blocked: request URL must not contain credentials')
+  if (!(target.protocol === configured.protocol && sameHostAndPort(configured, target))) {
+    throw new Error(`blocked: ${target.origin} is not the configured backend (${configured.origin})`)
+  }
+}
+
+/** net.rs `check_ws_target`: exact host + port, scheme mapped to ws/wss. */
+function mockCheckWsTarget(configured: URL, target: URL): void {
+  const expectedProtocol = configured.protocol === 'https:' ? 'wss:' : 'ws:'
+  if (target.protocol !== expectedProtocol) {
+    throw new Error(`blocked: expected ${expectedProtocol}// for the configured backend, got ${target.protocol}//`)
+  }
+  if (target.username || target.password) throw new Error('blocked: WebSocket URL must not contain credentials')
+  if (!sameHostAndPort(configured, target)) {
+    throw new Error(`blocked: ${target.host} is not the configured backend (${configured.origin})`)
+  }
+}
+
+function netBytesToBase64(bytes: Uint8Array): string {
+  let binary = ''
+  const chunkSize = 0x8000
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize))
+  }
+  return btoa(binary)
+}
+
+function netBase64ToBytes(b64: string): Uint8Array<ArrayBuffer> {
+  const binary = atob(b64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  return bytes
+}
+
+/** Emits a `net-ws:<id>` payload to listeners registered via platform.ts's `listenNetWs` (PLAYWRIGHT_TEST branch). */
+function emitNetWsEvent(id: string, payload: unknown): void {
+  const win = window as unknown as Record<string, unknown>
+  const map = (win.__NET_WS_LISTENERS__ ?? {}) as Record<string, Array<(p: unknown) => void>>
+  const channel = `net-ws:${id}`
+  for (const handler of map[channel] ?? []) handler(payload)
+}
+
+const mockWsConnections = new Map<string, WebSocket>()
 
 type Args = Record<string, unknown>
 type CommandHandler = (a: Args) => unknown | Promise<unknown>
@@ -994,14 +1136,13 @@ const commands: Record<string, CommandHandler> = {
     if (nonceBuf.length !== 32) throw new Error(`nonce must be 32 bytes, got ${nonceBuf.length}`)
 
     // Canonical ordering: min first (matches Rust)
-    let first: Uint8Array, second: Uint8Array
     let aFirst = true
     for (let i = 0; i < 32; i++) {
       if (pkA[i] < pkB[i]) { aFirst = true; break }
       if (pkA[i] > pkB[i]) { aFirst = false; break }
     }
-    first = aFirst ? pkA : pkB
-    second = aFirst ? pkB : pkA
+    const first = aFirst ? pkA : pkB
+    const second = aFirst ? pkB : pkA
 
     // Input key material: min_pubkey || max_pubkey || nonce
     const ikm = new Uint8Array(96)
@@ -1242,6 +1383,125 @@ const commands: Record<string, CommandHandler> = {
     const cipher = gcm(mockHubKey, nonce, aad)
     const plaintext = cipher.decrypt(ciphertext)
     return new TextDecoder().decode(plaintext)
+  },
+
+  // --- Backend address (#738) — mirrors apps/desktop/src/api_config.rs ---
+
+  api_config_get: async () => {
+    try {
+      const configured = await mockConfiguredOrigin()
+      return configured ? configured.origin : null
+    } catch {
+      const store = await Store.load(CONFIG_STORE_NAME)
+      await store.delete(CONFIG_KEY)
+      return null
+    }
+  },
+
+  api_config_set: async (a) => {
+    if (await mockReadConfiguredRaw()) {
+      throw new Error('refused: a backend server is already configured — clear it first')
+    }
+    const origin = mockValidateBackendOrigin(a.url as string)
+    const store = await Store.load(CONFIG_STORE_NAME)
+    await store.set(CONFIG_KEY, origin)
+    await store.save()
+    return origin
+  },
+
+  api_config_clear: async () => {
+    const store = await Store.load(CONFIG_STORE_NAME)
+    await store.delete(CONFIG_KEY)
+    await store.save()
+  },
+
+  // --- Runtime-enforced network egress (#739) — mirrors apps/desktop/src/net.rs ---
+
+  net_fetch: async (a) => {
+    const method = a.method as string
+    const url = a.url as string
+    const headers = (a.headers ?? {}) as Record<string, string>
+    const bodyBase64 = a.bodyBase64 as string | null | undefined
+
+    const configured = await mockAllowedOrigin()
+    const target = new URL(url)
+    mockCheckHttpTarget(configured, target)
+
+    const forwarded: Record<string, string> = {}
+    for (const [k, v] of Object.entries(headers)) {
+      if (!FORBIDDEN_REQUEST_HEADERS.has(k.trim().toLowerCase())) forwarded[k] = v
+    }
+    const init: RequestInit = { method, headers: forwarded, redirect: 'manual' }
+    if (bodyBase64) init.body = netBase64ToBytes(bodyBase64)
+
+    const res = await fetch(target.toString(), init)
+    const outHeaders: Record<string, string> = {}
+    res.headers.forEach((value, key) => { outHeaders[key] = value })
+    const bytes = new Uint8Array(await res.arrayBuffer())
+    return { status: res.status, headers: outHeaders, bodyBase64: netBytesToBase64(bytes) }
+  },
+
+  net_probe_health: async (a) => {
+    if (await mockConfiguredOrigin()) {
+      throw new Error('refused: a backend server is already configured')
+    }
+    let candidate: URL
+    try {
+      candidate = new URL((a.url as string).trim())
+    } catch {
+      throw new Error('invalid URL')
+    }
+    mockCheckBackendUrl(candidate)
+    const target = new URL(`${candidate.origin}/api/health`)
+
+    const now = Date.now()
+    if (lastProbeAt !== null && now - lastProbeAt < PROBE_MIN_INTERVAL_MS) {
+      throw new Error('rate limited: wait a moment before checking again')
+    }
+    lastProbeAt = now
+
+    try {
+      const res = await fetch(target.toString(), { redirect: 'manual', signal: AbortSignal.timeout(8_000) })
+      return res.status >= 200 && res.status < 300
+    } catch {
+      return false
+    }
+  },
+
+  net_ws_connect: async (a) => {
+    const id = a.id as string
+    const url = a.url as string
+    const target = new URL(url)
+    mockCheckWsTarget(await mockAllowedOrigin(), target)
+
+    const ws = new WebSocket(target.toString())
+    mockWsConnections.set(id, ws)
+    ws.addEventListener('open', () => emitNetWsEvent(id, { type: 'open' }))
+    ws.addEventListener('message', (e) => {
+      emitNetWsEvent(id, { type: 'message', data: typeof e.data === 'string' ? e.data : '' })
+    })
+    ws.addEventListener('close', (e) => {
+      emitNetWsEvent(id, { type: 'close', code: e.code, reason: e.reason })
+      mockWsConnections.delete(id)
+    })
+    ws.addEventListener('error', () => emitNetWsEvent(id, { type: 'error', message: 'websocket error' }))
+  },
+
+  net_ws_send: async (a) => {
+    const id = a.id as string
+    const data = a.data as string
+    const ws = mockWsConnections.get(id)
+    if (!ws) throw new Error('no such WebSocket connection')
+    ws.send(data)
+  },
+
+  net_ws_close: async (a) => {
+    const id = a.id as string
+    const ws = mockWsConnections.get(id)
+    if (ws) {
+      ws.close()
+      mockWsConnections.delete(id)
+    }
   },
 }
 

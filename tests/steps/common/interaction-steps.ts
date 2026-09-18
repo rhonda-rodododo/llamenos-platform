@@ -47,7 +47,6 @@ const buttonTextToTestIdMap: Record<string, string> = {
   'Log In': 'login-submit-btn',
   'Log in': 'login-submit-btn',
   'Log Out': TestIds.LOGOUT_BTN,
-  'Recovery options': TestIds.RECOVERY_OPTIONS_BTN,
   'Recovery Options': TestIds.RECOVERY_OPTIONS_BTN,
   'Confirm': TestIds.CONFIRM_DIALOG_OK,
   'Clock In': TestIds.BREAK_TOGGLE_BTN,
@@ -65,7 +64,7 @@ async function clickByTextOrTestId(page: import('@playwright/test').Page, text: 
   // Guard: if "Send" is clicked but __test_no_conversation is set (messaging backend
   // unavailable), skip gracefully instead of timing out on the send button.
   if (text === 'Send') {
-    const noConvo = await page.evaluate(() => (window as Record<string, unknown>).__test_no_conversation).catch(() => false)
+    const noConvo = await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_no_conversation).catch(() => false)
     if (noConvo) return
     // Check conversation send button first
     const sendBtn = page.getByTestId('conv-send-btn')
@@ -540,7 +539,7 @@ When('they navigate to the {string} page', async ({ page }, pageName: string) =>
       const path = pathMap[pageName]
       if (path) {
         await page.evaluate((p) => {
-          const router = (window as Record<string, unknown>).__TEST_ROUTER as { navigate: (opts: { to: string }) => void } | undefined
+          const router = (window as unknown as Record<string, unknown>).__TEST_ROUTER as { navigate: (opts: { to: string }) => void } | undefined
           if (router) router.navigate({ to: p })
         }, path)
         await page.waitForLoadState('domcontentloaded')

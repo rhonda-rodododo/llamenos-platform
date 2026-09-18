@@ -7,7 +7,7 @@ const configDir = new URL(".", import.meta.url).pathname;
 // Desktop BDD: exclude tests/steps/backend/ to avoid loading backend-only step defs
 // that use a different createBdd() instance.
 const desktopStepDirs = [
-  "admin", "auth", "calls", "cases", "common", "contacts", "conversations",
+  "admin", "auth", "calls", "cases", "common", "config", "contacts", "conversations",
   "crypto", "dashboard", "help", "hub", "messaging", "notes", "reports",
   "security", "settings", "shifts",
 ];
@@ -50,7 +50,7 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
       // Exclude bootstrap tests and screenshots — bootstrap runs in its own project above,
       // screenshots are on-demand only (run via `bun run test:screenshots`).
-      testIgnore: ["**/live/**", "**/desktop/**", "**/integration/**", "**/bootstrap.spec.ts", "**/screenshots.*", "**/screenshots.spec.ts"],
+      testIgnore: ["**/live/**", "**/desktop/**", "**/integration/**", "**/orchestrator/**", "**/bootstrap.spec.ts", "**/screenshots.*", "**/screenshots.spec.ts"],
       // Wait for bootstrap tests to complete and restore admin before parallel tests run.
       dependencies: ["bootstrap"],
     },

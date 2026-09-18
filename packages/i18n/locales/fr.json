@@ -1791,8 +1791,8 @@
   "demo": {
     "admin": "Admin",
     "banner": "Demo Mode",
-    "bannerText": "You're exploring the Llamenos demo. Data resets daily.",
-    "bannerTextSchedule": "You're exploring the Llamenos demo. Data resets on schedule.",
+    "bannerText": "Environnement de test — ne saisissez pas d'informations réelles sur les appelants. Les données ici ne sont pas confidentielles et peuvent être supprimées à tout moment.",
+    "bannerTextSchedule": "Environnement de test — ne saisissez pas d'informations réelles sur les appelants. Les données sont réinitialisées {{schedule}} et ne sont pas confidentielles.",
     "dismiss": "Dismiss",
     "getStarted": "Deploy your own",
     "pickAccount": "Pick a demo account to explore",
@@ -3735,6 +3735,20 @@
     "version": "Version",
     "voicemail": "Voicemail",
     "webrtcNotConfigured": "Les appels via le navigateur ne sont pas disponibles. Votre administrateur doit activer WebRTC dans les paramètres du fournisseur de téléphonie."
+  },
+  "serverAddress": {
+    "checking": "Checking...",
+    "connect": "Connect",
+    "errorWithDetail": "Couldn't reach that server: {{detail}}",
+    "firstRunDescription": "This app needs to know which Llámenos server to connect to before it can sign in.",
+    "firstRunTitle": "Connect to your hotline server",
+    "help": "Enter your organization's server address, e.g. app.example.org. We'll infer https:// unless you specify otherwise.",
+    "label": "Server address",
+    "placeholder": "app.example.org",
+    "saveAndReconnect": "Save and reconnect",
+    "settingsDescription": "Change which server this desktop app connects to.",
+    "settingsTitle": "Server connection",
+    "unreachable": "Couldn't reach that server. Check the address and try again."
   },
   "setup": {
     "autoResponse": "Auto-Response Template",

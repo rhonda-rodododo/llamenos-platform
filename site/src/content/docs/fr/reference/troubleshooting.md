@@ -53,7 +53,7 @@ Si l'application ne peut pas se connecter à PostgreSQL :
 
 ### Le relais WebSocket relay ne se connecte pas
 
-Le relais WebSocket (WebSocket relay) est un service principal, pas optionnel. Si le relais ne fonctionne pas :
+Le relais WebSocket est un service principal, pas optionnel. Si le relais ne fonctionne pas :
 
 ```bash
 # Vérifier le statut du relais

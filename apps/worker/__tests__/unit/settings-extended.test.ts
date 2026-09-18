@@ -468,9 +468,10 @@ describe('SettingsService.updateCustomFields', () => {
     ).rejects.toMatchObject({ status: 400 })
   })
 
-  it('saves valid fields in a transaction', async () => {
+  it('saves valid fields in a transaction, taking the replace lock before deleting', async () => {
     const { db, service } = setup()
     const tx = {
+      execute: vi.fn().mockResolvedValue([]),
       delete: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([]) }),
       insert: vi.fn().mockReturnValue({
         values: vi.fn().mockResolvedValue([]),
@@ -481,11 +482,18 @@ describe('SettingsService.updateCustomFields', () => {
     const result = await service.updateCustomFields({ fields: [validField] })
     expect((db as any).transaction).toHaveBeenCalled()
     expect(result.fields).toHaveLength(1)
+    // Concurrency itself is covered against real PostgreSQL in
+    // __tests__/integration/custom-fields-concurrency.test.ts (#686).
+    expect(tx.execute).toHaveBeenCalledTimes(1)
+    expect(tx.execute.mock.invocationCallOrder[0]).toBeLessThan(
+      tx.delete.mock.invocationCallOrder[0],
+    )
   })
 
   it('normalizes "both" context to "all"', async () => {
     const { db, service } = setup()
     const tx = {
+      execute: vi.fn().mockResolvedValue([]),
       delete: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([]) }),
       insert: vi.fn().mockReturnValue({ values: vi.fn().mockResolvedValue([]) }),
     }

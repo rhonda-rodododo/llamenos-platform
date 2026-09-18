@@ -9,7 +9,17 @@
  *
  * Pending crash reports are stored in localStorage and uploaded on next page load
  * (or immediately if consent is granted and a DSN is configured).
+ *
+ * Desktop app: uploads are disabled. The packaged app's CSP `connect-src` is
+ * `ipc:` only, and the Rust network proxy (apps/desktop/src/net.rs) reaches
+ * nothing but the one backend origin the user configured — a DSN host handed
+ * down in hub config is exactly the kind of server-chosen egress that allowlist
+ * exists to refuse. Reports are still captured locally; an upload attempt logs
+ * why it cannot run and rejects with `CrashReportUploadUnavailableError`, so the
+ * UI can say so instead of failing silently.
  */
+
+import { isPackagedTauri } from './api-config'
 
 const STORAGE_KEY_CONSENT = 'crash-reporting-enabled'
 const STORAGE_KEY_DSN = 'sentry-dsn'
@@ -25,6 +35,24 @@ export interface CrashReport {
   appVersion: string
   userAgent: string
   scope?: string
+}
+
+/** Uploading crash reports is not possible in this process (see module doc). */
+export class CrashReportUploadUnavailableError extends Error {
+  constructor(reason: string) {
+    super(reason)
+    this.name = 'CrashReportUploadUnavailableError'
+  }
+}
+
+const DESKTOP_UPLOAD_DISABLED_REASON =
+  'crash report upload is disabled in the desktop app: its network egress is limited to the configured backend origin, and the crash-reporting DSN host is not that origin'
+
+let loggedUploadDisabled = false
+
+/** Why crash reports cannot be uploaded from this process, or `null` if they can. */
+export function crashReportUploadUnavailableReason(): string | null {
+  return isPackagedTauri() ? DESKTOP_UPLOAD_DISABLED_REASON : null
 }
 
 /** Whether the user has opted in to crash reporting. */
@@ -102,20 +130,31 @@ export function captureError(
 
   saveCrashReport(report)
 
-  // Try immediate upload if consent + DSN are available
+  // Try immediate upload if consent + DSN are available. A failure keeps the
+  // report pending for the next attempt; an unavailable upload path has already
+  // been logged by uploadPendingReports.
   if (isCrashReportingEnabled()) {
-    uploadPendingReports().catch(() => {
-      // Silently fail — will retry on next page load
-    })
+    uploadPendingReports().catch(() => {})
   }
 }
 
 /**
  * Upload all pending crash reports to the Sentry/GlitchTip endpoint.
- * Returns the number of successfully uploaded reports.
+ * Returns the number of successfully uploaded reports. Rejects with
+ * `CrashReportUploadUnavailableError` (after logging the reason once) where
+ * uploads cannot run — pending reports are kept.
  */
 export async function uploadPendingReports(): Promise<number> {
   if (!isCrashReportingEnabled()) return 0
+
+  const unavailable = crashReportUploadUnavailableReason()
+  if (unavailable) {
+    if (!loggedUploadDisabled) {
+      console.warn(`[crash-reporting] ${unavailable}`)
+      loggedUploadDisabled = true
+    }
+    throw new CrashReportUploadUnavailableError(unavailable)
+  }
 
   const dsn = getSentryDsn()
   if (!dsn) return 0
