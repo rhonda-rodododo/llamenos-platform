@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '@/lib/toast'
 import {
@@ -61,19 +61,22 @@ export function CaseManagementSection({ expanded, onToggle, statusSummary }: Pro
   const [editing, setEditing] = useState<EntityTypeDraft | null>(null)
   const [activeTab, setActiveTab] = useState<EditorTab>('general')
   const [saving, setSaving] = useState(false)
-  const [loaded, setLoaded] = useState(false)
+  const [loadRequested, setLoadRequested] = useState(false)
 
   const loadEntityTypes = useCallback(() => {
     listEntityTypes()
       .then(({ entityTypes: types }) => setEntityTypes(types))
       .catch(() => toast(t('common.error'), 'error'))
-      .finally(() => { setLoading(false); setLoaded(true) })
+      .finally(() => setLoading(false))
   }, [toast, t])
 
-  // Load on first expand
-  if (expanded && !loaded) {
+  // Load once, on first expand. Fetching from the render body fired a new
+  // request on every re-render until the first one resolved.
+  useEffect(() => {
+    if (!expanded || loadRequested) return
+    setLoadRequested(true)
     loadEntityTypes()
-  }
+  }, [expanded, loadRequested, loadEntityTypes])
 
   const activeTypes = entityTypes.filter(et => !et.isArchived)
   const archivedTypes = entityTypes.filter(et => et.isArchived)
@@ -251,7 +254,7 @@ export function CaseManagementSection({ expanded, onToggle, statusSummary }: Pro
                   <div className="flex-1 space-y-0.5">
                     <div className="flex items-center gap-2">
                       {et.icon && <span className="text-base">{et.icon}</span>}
-                      <p className="text-sm font-medium">{et.label}</p>
+                      <p data-testid="entity-type-label" className="text-sm font-medium">{et.label}</p>
                       <Badge variant="outline" className="text-[10px]">
                         {ENTITY_CATEGORY_LABELS[et.category] || et.category}
                       </Badge>
@@ -661,9 +664,9 @@ function FieldsEditor({
                 </Button>
               </div>
               <div className="flex-1 space-y-0.5">
-                <p className="font-medium text-xs">{field.label}</p>
+                <p data-testid="entity-field-label" className="font-medium text-xs">{field.label}</p>
                 <div className="flex gap-1">
-                  <Badge variant="outline" className="text-[9px]">{field.type}</Badge>
+                  <Badge data-testid="entity-field-type" variant="outline" className="text-[9px]">{field.type}</Badge>
                   {field.required && <Badge variant="secondary" className="text-[9px]">{t('caseManagement.fieldRequired')}</Badge>}
                   {field.section && <Badge variant="outline" className="text-[9px]">{field.section}</Badge>}
                 </div>
@@ -927,14 +930,14 @@ function EnumListEditor({
                 />
               )}
               <div className="flex-1 space-y-0.5">
-                <p className="font-medium text-xs">{item.label}</p>
+                <p data-testid={`${testIdPrefix}-label`} className="font-medium text-xs">{item.label}</p>
                 <div className="flex gap-1">
-                  <Badge variant="outline" className="text-[9px] font-mono">{item.value}</Badge>
+                  <Badge data-testid={`${testIdPrefix}-value`} variant="outline" className="text-[9px] font-mono">{item.value}</Badge>
                   {showClosed && item.isClosed && (
                     <Badge variant="secondary" className="text-[9px]">{t('caseManagement.closedStatus')}</Badge>
                   )}
                   {defaultValue === item.value && (
-                    <Badge variant="secondary" className="text-[9px]">{t('caseManagement.defaultStatus')}</Badge>
+                    <Badge data-testid={`${testIdPrefix}-default-badge`} variant="secondary" className="text-[9px]">{t('caseManagement.defaultStatus')}</Badge>
                   )}
                 </div>
               </div>

@@ -179,7 +179,7 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  asterisk-bridge:
+  sip-bridge:
     security_opt:
       - no-new-privileges:true
     deploy:

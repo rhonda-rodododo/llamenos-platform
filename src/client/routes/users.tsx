@@ -324,12 +324,12 @@ function InviteForm({ roles, onCreated, onCancel }: {
           <div className="space-y-2">
             <Label htmlFor="invite-role">{t('users.role')}</Label>
             <Select value={roleId} onValueChange={setRoleId}>
-              <SelectTrigger id="invite-role">
+              <SelectTrigger id="invite-role" data-testid="user-form-role-select">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {roles.map(role => (
-                  <SelectItem key={role.id} value={role.id}>{role.name}</SelectItem>
+                  <SelectItem key={role.id} value={role.id} data-testid="user-form-role-option" data-role-id={role.id}>{role.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -417,12 +417,12 @@ function AddUserForm({ roles, onCreated, onCancel }: {
           <div className="space-y-2">
             <Label htmlFor="vol-role">{t('users.role')}</Label>
             <Select value={roleId} onValueChange={setRoleId}>
-              <SelectTrigger id="vol-role">
+              <SelectTrigger id="vol-role" data-testid="user-form-role-select">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {roles.map(role => (
-                  <SelectItem key={role.id} value={role.id}>{role.name}</SelectItem>
+                  <SelectItem key={role.id} value={role.id} data-testid="user-form-role-option" data-role-id={role.id}>{role.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -492,7 +492,7 @@ function UserRow({ user, roles, onUpdate, onDelete }: {
           {user.name.charAt(0).toUpperCase()}
         </Link>
         <div className="min-w-0 flex-1">
-          <Link to="/users/$pubkey" params={{ pubkey: user.pubkey }} className="text-sm font-medium hover:underline">{user.name} <span className="font-mono text-xs text-muted-foreground">({user.pubkey.slice(0, 8)})</span></Link>
+          <Link to="/users/$pubkey" params={{ pubkey: user.pubkey }} data-testid="volunteer-row-name-link" className="text-sm font-medium hover:underline">{user.name} <span className="font-mono text-xs text-muted-foreground">({user.pubkey.slice(0, 8)})</span></Link>
           {user.phone && (
             <p className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
               {showPhone ? user.phone : maskedPhone(user.phone)}
@@ -515,7 +515,7 @@ function UserRow({ user, roles, onUpdate, onDelete }: {
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
-        <Badge variant={isAdminRole ? 'default' : 'secondary'}>
+        <Badge data-testid="volunteer-row-role-badge" variant={isAdminRole ? 'default' : 'secondary'}>
           {isAdminRole && <ShieldCheck className="h-3 w-3" />}
           {primaryRole?.name || primaryRoleId}
           {user.roles.length > 1 && (
@@ -539,13 +539,13 @@ function UserRow({ user, roles, onUpdate, onDelete }: {
         )}
         <div className="flex items-center gap-1">
           <Select value={primaryRoleId} onValueChange={changeRole}>
-            <SelectTrigger className="h-7 w-auto gap-1 border-none bg-transparent px-2 text-xs shadow-none" aria-label={t('users.changeRole')}>
+            <SelectTrigger data-testid="volunteer-row-role-select" className="h-7 w-auto gap-1 border-none bg-transparent px-2 text-xs shadow-none" aria-label={t('users.changeRole')}>
               <Shield className="h-3 w-3" />
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               {roles.map(role => (
-                <SelectItem key={role.id} value={role.id}>{role.name}</SelectItem>
+                <SelectItem key={role.id} value={role.id} data-testid="volunteer-row-role-option" data-role-id={role.id}>{role.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>

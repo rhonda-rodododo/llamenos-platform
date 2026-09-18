@@ -19,20 +19,20 @@ function maskPhone(phone: string): string {
   return phone.length >= 4 ? `***${phone.slice(-4)}` : '***'
 }
 
-Then('I should see bans or the {string} message', async ({ page }, _emptyMsg: string) => {
-  // Wait for loading to complete — the ban list shows a skeleton while fetching
-  // Once loaded, either ban-row elements or empty-state should be visible
-  const banRow = page.getByTestId(TestIds.BAN_ROW)
-  const emptyState = page.getByTestId(TestIds.EMPTY_STATE)
+Then('I should see bans or the {string} message', async ({ page }, emptyMsg: string) => {
+  // bans.tsx renders exactly one of: skeleton (loading) | empty-state | ban-list. Wait for
+  // the fetch to settle into one of the two terminal states, then assert that state's
+  // content. The old three-way isVisible/catch chain ignored its own timeouts, never read
+  // the message it was given, and fell back to "page title visible" as a pass.
   const banList = page.getByTestId(TestIds.BAN_LIST)
+  const emptyState = page.getByTestId(TestIds.EMPTY_STATE)
+  await expect(banList.or(emptyState)).toBeVisible({ timeout: Timeouts.API })
 
-  // First wait for the ban-list container or empty-state to appear (loading complete)
-  if (await banList.isVisible({ timeout: Timeouts.API }).catch(() => false)) return
-  if (await emptyState.isVisible({ timeout: 2000 }).catch(() => false)) return
-  if (await banRow.first().isVisible({ timeout: 2000 }).catch(() => false)) return
-
-  // Final fallback: page title is visible (page loaded but API may have failed)
-  await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })
+  if (await emptyState.count() > 0) {
+    await expect(emptyState).toContainText(emptyMsg)
+  } else {
+    await expect(banList.getByTestId(TestIds.BAN_ROW).first()).toBeVisible({ timeout: Timeouts.ELEMENT })
+  }
 })
 
 When('I fill in the phone number', async ({ page }) => {
@@ -40,7 +40,7 @@ When('I fill in the phone number', async ({ page }) => {
   await page.getByLabel(/phone/i).fill(phone)
   await page.getByLabel(/phone/i).blur()
   await page.evaluate((p) => {
-    (window as Record<string, unknown>).__test_ban_phone = p
+    (window as unknown as Record<string, unknown>).__test_ban_phone = p
   }, phone)
 })
 
@@ -50,7 +50,7 @@ When('I fill in the phone number with {string}', async ({ page }, phone: string)
 })
 
 Then('the phone number should appear in the ban list', async ({ page, backendRequest: request, workerHub }) => {
-  const phone = (await page.evaluate(() => (window as Record<string, unknown>).__test_ban_phone)) as string
+  const phone = (await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_ban_phone)) as string
   expect(phone).toBeTruthy()
   const masked = maskPhone(phone)
 
@@ -73,7 +73,7 @@ When('I add a ban with reason {string}', async ({ page }, reason: string) => {
   await page.getByLabel(/reason/i).fill(reason)
   await page.getByTestId(TestIds.FORM_SAVE_BTN).click()
   await page.evaluate((p) => {
-    (window as Record<string, unknown>).__test_ban_phone = p
+    (window as unknown as Record<string, unknown>).__test_ban_phone = p
   }, phone)
 })
 
@@ -104,18 +104,18 @@ Given('a ban exists', async ({ page, backendRequest: request, workerHub }) => {
 
   // Store the phone for later steps — retry if context was destroyed
   await page.evaluate((p) => {
-    (window as Record<string, unknown>).__test_ban_phone = p
+    (window as unknown as Record<string, unknown>).__test_ban_phone = p
   }, phone).catch(async () => {
     // Context destroyed due to navigation — wait for page to settle and retry
     await page.waitForLoadState('domcontentloaded')
     await page.evaluate((p) => {
-      (window as Record<string, unknown>).__test_ban_phone = p
+      (window as unknown as Record<string, unknown>).__test_ban_phone = p
     }, phone)
   })
 })
 
 When('I click {string} on the ban', async ({ page }, buttonText: string) => {
-  const phone = (await page.evaluate(() => (window as Record<string, unknown>).__test_ban_phone)) as string
+  const phone = (await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_ban_phone)) as string
   expect(phone).toBeTruthy()
   const masked = maskPhone(phone)
   const row = page.getByTestId(TestIds.BAN_ROW).filter({ hasText: masked })
@@ -142,7 +142,7 @@ Then('the dialog should close', async ({ page }) => {
 })
 
 Then('the ban should no longer appear in the list', async ({ page, backendRequest: request, workerHub }) => {
-  const phone = (await page.evaluate(() => (window as Record<string, unknown>).__test_ban_phone)) as string
+  const phone = (await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_ban_phone)) as string
   expect(phone).toBeTruthy()
   const masked = maskPhone(phone)
 
@@ -158,7 +158,7 @@ Then('the ban should no longer appear in the list', async ({ page, backendReques
 })
 
 Then('the ban should still appear in the list', async ({ page, backendRequest: request, workerHub }) => {
-  const phone = (await page.evaluate(() => (window as Record<string, unknown>).__test_ban_phone)) as string
+  const phone = (await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_ban_phone)) as string
   expect(phone).toBeTruthy()
   const masked = maskPhone(phone)
 
@@ -208,14 +208,14 @@ When('I add two bans with different phone numbers', async ({ page }) => {
 
   await page.evaluate(
     ({ p1, p2 }) => {
-      (window as Record<string, unknown>).__test_ban_phones = [p1, p2]
+      (window as unknown as Record<string, unknown>).__test_ban_phones = [p1, p2]
     },
     { p1: phone1, p2: phone2 },
   )
 })
 
 Then('both phone numbers should appear in the ban list', async ({ page, backendRequest: request, workerHub }) => {
-  const phones = (await page.evaluate(() => (window as Record<string, unknown>).__test_ban_phones)) as string[] | undefined
+  const phones = (await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_ban_phones)) as string[] | undefined
   if (!phones || phones.length === 0) {
     // Prior step didn't create bans — just verify ban page is loaded
     await expect(page.getByTestId(TestIds.PAGE_TITLE)).toBeVisible({ timeout: Timeouts.ELEMENT })

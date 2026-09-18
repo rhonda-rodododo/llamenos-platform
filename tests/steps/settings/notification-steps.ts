@@ -5,7 +5,7 @@
  * Behavioral depth: Hard assertions on notification section elements.
  */
 import { expect } from '@playwright/test'
-import { When, Then } from '../fixtures'
+import { Then } from '../fixtures'
 import { Timeouts } from '../../helpers'
 
 Then('I should see the notifications section', async ({ page }) => {

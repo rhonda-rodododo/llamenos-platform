@@ -137,10 +137,9 @@ Feature: Admin & User Settings
   Scenario: Demo banner shows when logged in
     Given demo mode has been enabled
     And I am logged in as an admin
-    Then I should see "You're exploring"
-    And I should see "Deploy your own"
+    Then I should see "Test environment — do not enter real caller information. Data here is not confidential and may be deleted at any time."
     When I dismiss the demo banner
-    Then "You're exploring" should no longer be visible
+    Then "Test environment — do not enter real caller information. Data here is not confidential and may be deleted at any time." should no longer be visible
 
   @desktop @ios @android @fixme
   # fixme: Demo mode setup triggers /api/hubs/{id}/users which returns 500 in CI Docker backend

@@ -2,13 +2,23 @@
  * Centralized language configuration for Llámenos.
  * Used by both frontend (i18n, UI) and backend (telephony, voice prompts).
  *
- * Languages selected: English + top 10 most spoken by US immigrant communities
- * (Census ACS data).
+ * This file (LANGUAGE_CODES below) is, together with the locale JSON files in
+ * packages/i18n/locales/, the source of truth for "which locales exist."
+ * NEVER hardcode a separate locale list or count anywhere else — derive it
+ * from here or from `readdirSync(packages/i18n/locales)` instead, the way
+ * packages/i18n/tools/i18n-codegen.ts does. A hardcoded list drifts the
+ * moment a locale is added without updating every copy of it — that is how
+ * this file itself ended up missing 'de' for a period, and how CI silently
+ * stopped validating 9 of 22 locales. See
+ * packages/i18n/tools/validate-strings.ts's validateLocaleCoverage() for the
+ * automated guard against this drifting again.
  *
  * To add a new language:
  * 1. Add entry here with all fields
  * 2. Create packages/i18n/locales/{code}.json with all translation keys (including voice.* and ivr.*)
- * 3. Import and register it in src/client/lib/i18n.ts and packages/i18n/index.ts
+ * 3. Run `bun run i18n:validate:all` — it will fail loudly if the new locale
+ *    isn't fully wired in (languages.ts entry, packages/i18n/index.ts export,
+ *    complete key coverage).
  */
 
 export interface LanguageConfig {
@@ -138,6 +148,16 @@ export const LANGUAGES: LanguageConfig[] = [
       '+351', // Portugal
       '+244', // Angola
       '+258', // Mozambique
+    ],
+  },
+  {
+    code: 'de',
+    label: 'Deutsch',
+    flag: 'DE',
+    phonePrefixes: [
+      '+49', // Germany
+      '+43', // Austria
+      '+41', // Switzerland
     ],
   },
   // --- At-risk & diaspora communities ---

@@ -82,12 +82,12 @@ When('I tap the first report card', async ({ page, backendRequest, workerHub }) 
     await createReportViaApi(backendRequest, { title: `Auto-seeded Report ${Date.now()}`, hubId: workerHub })
     // SPA-navigate away and back to refresh without a full reload
     await page.evaluate(() => {
-      const router = (window as Record<string, unknown>).__TEST_ROUTER as { navigate: (opts: { to: string }) => void } | undefined
+      const router = (window as unknown as Record<string, unknown>).__TEST_ROUTER as { navigate: (opts: { to: string }) => void } | undefined
       if (router) router.navigate({ to: '/' })
     })
     await page.waitForURL(u => !u.toString().includes('/reports'), { timeout: 5000 }).catch(() => {})
     await page.evaluate(() => {
-      const router = (window as Record<string, unknown>).__TEST_ROUTER as { navigate: (opts: { to: string }) => void } | undefined
+      const router = (window as unknown as Record<string, unknown>).__TEST_ROUTER as { navigate: (opts: { to: string }) => void } | undefined
       if (router) router.navigate({ to: '/reports' })
     })
     await page.waitForURL(/\/reports/, { timeout: 5000 }).catch(() => {})

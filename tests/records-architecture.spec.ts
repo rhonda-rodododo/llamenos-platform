@@ -263,7 +263,7 @@ test.describe('Records Architecture', () => {
     // shows empty state despite the API call succeeding.
     const { createReportViaApi } = await import('./api-helpers')
     const activeHubId = await page.evaluate(() => {
-      const getHub = (window as Record<string, unknown>).__TEST_GET_ACTIVE_HUB as (() => string) | undefined
+      const getHub = (window as unknown as Record<string, unknown>).__TEST_GET_ACTIVE_HUB as (() => string) | undefined
       return getHub ? getHub() : undefined
     }).catch(() => undefined)
     await createReportViaApi(page.request, { title: `Isolation Report ${Date.now()}`, hubId: activeHubId })

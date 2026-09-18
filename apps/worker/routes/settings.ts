@@ -37,7 +37,7 @@ import {
   geocodingConfigAdminSchema,
   geocodingTestResponseSchema,
 } from '@protocol/schemas/geocoding'
-import { okResponseSchema } from '@protocol/schemas/common'
+import { okResponseSchema, errorResponseSchema } from '@protocol/schemas/common'
 import { authErrors } from '../openapi/helpers'
 import { audit } from '../services/audit'
 import { invalidateRolesCache } from '../services/settings'
@@ -351,6 +351,14 @@ settings.patch('/webauthn',
         },
       },
       ...authErrors,
+      409: {
+        description: 'Caller has no registered passkey and cannot enable requireForAdmins (code WEBAUTHN_CREDENTIAL_REQUIRED)',
+        content: {
+          'application/json': {
+            schema: resolver(errorResponseSchema),
+          },
+        },
+      },
     },
   }),
   requirePermission('settings:manage-webauthn'),
@@ -359,6 +367,19 @@ settings.patch('/webauthn',
     const pubkey = c.get('pubkey')
     const body = c.req.valid('json')
     const services = c.get('services')
+    // Self-lockout guard (#672): once requireForAdmins is on, the auth middleware
+    // 403s every admin without a credential — including on this route, which is the
+    // only way to turn the policy back off. The admin enabling it must already
+    // satisfy it.
+    if (body.requireForAdmins === true) {
+      const { credentials } = await services.identity.getWebAuthnCredentials(pubkey)
+      if (credentials.length === 0) {
+        return c.json({
+          error: 'Register a passkey before requiring passkeys for admins',
+          code: 'WEBAUTHN_CREDENTIAL_REQUIRED',
+        }, 409)
+      }
+    }
     const result = await services.identity.updateWebAuthnSettings(body)
     await audit(services.audit, 'webauthnSettingsUpdated', pubkey, body as Record<string, unknown>)
     return c.json(result)
