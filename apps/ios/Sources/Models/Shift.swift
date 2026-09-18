@@ -82,16 +82,73 @@ extension Shift: Identifiable {
 }
 
 // MARK: - ShiftStatusResponse
-// Generated `MyStatusResponse` has a different structure (currentShift/nextShift).
-// Keep this client-side type for the iOS-specific status endpoint shape.
+// The server returns `{ onShift, currentShift, nextShift }` from
+// `GET /api/shifts/my-status` (see `myStatusResponseSchema` in
+// packages/protocol/schemas/shifts.ts). Use the generated protocol type.
 
 /// Response from `GET /api/shifts/my-status`.
-struct ShiftStatusResponse: Codable, Sendable {
-    let onShift: Bool
-    let shiftId: String?
-    let startedAt: String?
-    let activeCallCount: Int?
-    let recentNoteCount: Int?
+typealias ShiftStatusResponse = MyStatusResponse
+
+// MARK: - CurrentShift / NextShift Display Helpers
+
+extension CurrentShift {
+    /// Human-readable time range (e.g., "09:00 - 17:00").
+    var timeRangeDisplay: String {
+        "\(ShiftDisplay.formatTime(startTime)) - \(ShiftDisplay.formatTime(endTime))"
+    }
+
+    /// Best-effort display name. The server stores the shift name base64-encoded;
+    /// decode it when it yields printable UTF-8, otherwise hide the name.
+    var displayName: String? {
+        ShiftDisplay.decodeName(encryptedName)
+    }
+}
+
+extension NextShift {
+    /// Human-readable time range (e.g., "09:00 - 17:00").
+    var timeRangeDisplay: String {
+        "\(ShiftDisplay.formatTime(startTime)) - \(ShiftDisplay.formatTime(endTime))"
+    }
+
+    /// Best-effort display name (see `CurrentShift.displayName`).
+    var displayName: String? {
+        ShiftDisplay.decodeName(encryptedName)
+    }
+
+    /// Weekday name for the shift's day (0 = Sunday, matching the server schema).
+    var dayName: String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale.current
+        let symbols = formatter.weekdaySymbols ?? ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+        let index = Int(day)
+        guard index >= 0, index < symbols.count else { return "" }
+        return symbols[index]
+    }
+}
+
+/// Shared formatting helpers for shift schedule values.
+enum ShiftDisplay {
+    /// Format an "HH:mm" server time string for display, falling back to the raw string.
+    static func formatTime(_ timeString: String) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        if let date = formatter.date(from: timeString) {
+            return date.formatted(date: .omitted, time: .shortened)
+        }
+        return timeString
+    }
+
+    /// Decode a base64-encoded shift name, returning nil for non-printable content.
+    static func decodeName(_ encoded: String) -> String? {
+        guard !encoded.isEmpty,
+              let data = Data(base64Encoded: encoded),
+              let decoded = String(data: data, encoding: .utf8),
+              !decoded.isEmpty,
+              decoded.unicodeScalars.allSatisfy({ !CharacterSet.controlCharacters.contains($0) }) else {
+            return nil
+        }
+        return decoded
+    }
 }
 
 // MARK: - ShiftsListResponse

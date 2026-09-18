@@ -34,6 +34,7 @@ final class AppState {
     let linphoneService: LinphoneService
     let wipeService: WipeService
     let permissionService: PermissionService
+    let shiftClockService: ShiftClockService
 
     // MARK: - Auth State
 
@@ -118,6 +119,12 @@ final class AppState {
         self.hubActivityService = hubActivity
         self.linphoneService = linphone
         self.permissionService = permission
+        self.shiftClockService = ShiftClockService(
+            apiService: api,
+            cryptoService: crypto,
+            hubContext: hubContext,
+            linphoneService: linphone
+        )
         self.wipeService = WipeService(
             keychainService: keychain,
             cryptoService: crypto,
@@ -170,6 +177,18 @@ final class AppState {
             keychainService.deleteAll()
             // AuthService cached hasStoredKeys/hubURL from init — reset stale values
             authService.logout()
+            // Drop any persisted active hub so tests start hub-less unless
+            // --test-hub-id (below) selects one explicitly
+            hubContext.clearActiveHub()
+        }
+
+        // Select the test hub as active (must come after --reset-keychain)
+        if let hubIdIndex = args.firstIndex(of: "--test-hub-id"),
+           hubIdIndex + 1 < args.count {
+            let hubId = args[hubIdIndex + 1]
+            if !hubId.isEmpty {
+                hubContext.setActiveHub(hubId)
+            }
         }
 
         // Configure hub URL for API access (must come before --test-register)
@@ -330,6 +349,7 @@ final class AppState {
     /// Lock the app: clear device key from memory, set locked state.
     func lockApp() {
         authService.lock()
+        shiftClockService.suspend()
         isLocked = true
         authStatus = .locked
     }
@@ -341,6 +361,8 @@ final class AppState {
         connectWebSocketIfConfigured()
         fetchUserRole()
         offlineQueue.startMonitoring()
+        // Reconcile clock-in state with the server (roster may have changed while locked)
+        Task { await shiftClockService.refresh() }
         // Replay any queued operations now that we're authenticated
         Task { await offlineQueue.replay() }
         // Retry any queued security events (e.g. a cert pin mismatch seen while

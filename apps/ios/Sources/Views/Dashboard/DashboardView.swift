@@ -28,6 +28,15 @@ struct DashboardView: View {
                             .clipped()
                     }
 
+                    #if UI_TESTING
+                    // Hidden server-side roster membership for XCUITest ringing-eligibility
+                    // assertions (same hidden-element pattern as dashboard-identity)
+                    Text(appState.shiftClockService.testRosterMembership)
+                        .accessibilityIdentifier("dashboard-roster-membership")
+                        .frame(height: 0)
+                        .clipped()
+                    #endif
+
                     // 0. Active call panel (shown above everything when on a call)
                     if let call = vm.currentCall {
                         ActiveCallView(
@@ -149,11 +158,96 @@ struct DashboardView: View {
 
                     shiftStatusBadge(vm.shiftStatus)
                 }
+
+                // Active or upcoming scheduled shift
+                if let current = vm.currentShift {
+                    HStack(spacing: 8) {
+                        Image(systemName: "clock.fill")
+                            .foregroundStyle(Color.statusActive)
+                        Text(NSLocalizedString("dashboard_current_shift", comment: "Current Shift"))
+                            .font(.brand(.caption))
+                            .foregroundStyle(Color.brandMutedForeground)
+                        Text(current.timeRangeDisplay)
+                            .font(.brand(.caption))
+                            .fontWeight(.medium)
+                            .foregroundStyle(Color.brandForeground)
+                        if let name = current.displayName {
+                            Text(name)
+                                .font(.brand(.caption))
+                                .foregroundStyle(Color.brandMutedForeground)
+                                .lineLimit(1)
+                        }
+                        Spacer()
+                    }
+                    .accessibilityIdentifier("dashboard-current-shift")
+                } else if let next = vm.nextShift {
+                    HStack(spacing: 8) {
+                        Image(systemName: "clock")
+                            .foregroundStyle(Color.brandMutedForeground)
+                        Text(NSLocalizedString("shifts_next_shift", comment: "Next shift"))
+                            .font(.brand(.caption))
+                            .foregroundStyle(Color.brandMutedForeground)
+                        Text("\(next.dayName) \(next.timeRangeDisplay)")
+                            .font(.brand(.caption))
+                            .fontWeight(.medium)
+                            .foregroundStyle(Color.brandForeground)
+                        Spacer()
+                    }
+                    .accessibilityIdentifier("dashboard-next-shift")
+                }
+
+                // Clock in/out quick toggle
+                Button {
+                    Haptics.impact(.medium)
+                    if vm.isOnShift {
+                        vm.showClockOutConfirmation = true
+                    } else {
+                        Task { await vm.clockIn() }
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        if vm.isTogglingClock {
+                            ProgressView()
+                                .tint(.white)
+                        } else {
+                            Image(systemName: vm.isOnShift ? "stop.fill" : "play.fill")
+                        }
+                        Text(vm.isOnShift
+                            ? NSLocalizedString("dashboard_clock_out", comment: "Clock Out")
+                            : NSLocalizedString("dashboard_clock_in", comment: "Clock In"))
+                            .fontWeight(.semibold)
+                    }
+                    .font(.brand(.subheadline))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(vm.isOnShift ? Color.brandDestructive : Color.statusActive)
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(vm.isTogglingClock)
+                .accessibilityIdentifier(vm.isOnShift ? "dashboard-clock-out-button" : "dashboard-clock-in-button")
             }
             .padding(16)
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("shift-status-card")
+        .alert(
+            NSLocalizedString("shifts_clock_out_title", comment: "End Shift?"),
+            isPresented: Binding(
+                get: { vm.showClockOutConfirmation },
+                set: { vm.showClockOutConfirmation = $0 }
+            )
+        ) {
+            Button(NSLocalizedString("cancel", comment: "Cancel"), role: .cancel) {}
+                .accessibilityIdentifier("clock-out-cancel")
+            Button(NSLocalizedString("shifts_clock_out_confirm", comment: "Clock Out"), role: .destructive) {
+                Task { await vm.clockOut() }
+            }
+            .accessibilityIdentifier("clock-out-confirm")
+        }
     }
 
     // MARK: - Activity Stats Row
@@ -457,7 +551,8 @@ struct DashboardView: View {
             apiService: appState.apiService,
             cryptoService: appState.cryptoService,
             webSocketService: appState.webSocketService,
-            hubContext: hubContext
+            hubContext: hubContext,
+            shiftClockService: appState.shiftClockService
         )
         DispatchQueue.main.async {
             self.viewModel = vm

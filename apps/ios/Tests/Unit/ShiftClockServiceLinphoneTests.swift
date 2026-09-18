@@ -23,41 +23,41 @@ final class MockLinphoneService: LinphoneServiceProtocol {
     }
 
     func handleVoipPush(callId: String, hubId: String) {
-        // Not exercised in ShiftsViewModel tests
+        // Not exercised in ShiftClockService tests
     }
 }
 
-// MARK: - ShiftViewModelLinphoneTests
+// MARK: - ShiftClockServiceLinphoneTests
 
-/// Tests that ShiftsViewModel correctly integrates with LinphoneService on clock in/out.
-/// Uses MockLinphoneService to verify SIP registration calls without network or Linphone Core.
+/// Tests that ShiftClockService correctly integrates with LinphoneService for the SIP
+/// account lifecycle on clock in/out. Uses MockLinphoneService to verify registration
+/// calls without network or Linphone Core.
 @MainActor
-struct ShiftViewModelLinphoneTests {
+struct ShiftClockServiceLinphoneTests {
 
-    // Creates a ShiftsViewModel wired with the given mock, using a stub APIService and HubContext.
-    private func makeViewModel(
+    private func makeService(
         mock: MockLinphoneService,
         hubId: String? = "hub-uuid-001"
-    ) -> (ShiftsViewModel, HubContext) {
+    ) -> (ShiftClockService, HubContext) {
         let hubContext = HubContext()
         if let hubId {
             hubContext.setActiveHub(hubId)
         }
         let crypto = CryptoService()
         let api = APIService(cryptoService: crypto, hubContext: hubContext)
-        let vm = ShiftsViewModel(
+        let service = ShiftClockService(
             apiService: api,
             cryptoService: crypto,
             hubContext: hubContext,
             linphoneService: mock
         )
-        return (vm, hubContext)
+        return (service, hubContext)
     }
 
     @Test func shiftStartRegistersLinphoneAccountForHub() async throws {
         let mock = MockLinphoneService()
-        let (vm, _) = makeViewModel(mock: mock)
-        await vm.onShiftStarted(
+        let (service, _) = makeService(mock: mock)
+        await service.onShiftStarted(
             hubId: "hub-uuid-001",
             sipParams: SipTokenResponse(
                 username: "testuser", domain: "sip.example.org",
@@ -69,21 +69,21 @@ struct ShiftViewModelLinphoneTests {
 
     @Test func shiftEndUnregistersLinphoneAccountForHub() {
         let mock = MockLinphoneService()
-        let (vm, _) = makeViewModel(mock: mock)
-        vm.onShiftEnded(hubId: "hub-uuid-001")
+        let (service, _) = makeService(mock: mock)
+        service.onShiftEnded(hubId: "hub-uuid-001")
         #expect(mock.unregisteredHubIds == ["hub-uuid-001"])
     }
 
     @Test func multipleHubsRegisteredAndUnregisteredIndependently() async throws {
         let mock = MockLinphoneService()
-        let (vm, _) = makeViewModel(mock: mock)
+        let (service, _) = makeService(mock: mock)
         let params = SipTokenResponse(
             username: "user", domain: "sip.example.org",
             password: "pass", transport: "tls", expiry: 3600
         )
-        await vm.onShiftStarted(hubId: "hub-aaa", sipParams: params)
-        await vm.onShiftStarted(hubId: "hub-bbb", sipParams: params)
-        vm.onShiftEnded(hubId: "hub-aaa")
+        await service.onShiftStarted(hubId: "hub-aaa", sipParams: params)
+        await service.onShiftStarted(hubId: "hub-bbb", sipParams: params)
+        service.onShiftEnded(hubId: "hub-aaa")
         #expect(mock.registeredHubIds == ["hub-aaa", "hub-bbb"])
         #expect(mock.unregisteredHubIds == ["hub-aaa"])
     }
@@ -91,9 +91,9 @@ struct ShiftViewModelLinphoneTests {
     @Test func shiftStartSilentlyHandlesLinphoneRegistrationError() async {
         let mock = MockLinphoneService()
         mock.shouldThrowOnRegister = true
-        let (vm, _) = makeViewModel(mock: mock)
+        let (service, _) = makeService(mock: mock)
         // Should not throw — errors are logged, not surfaced to the caller
-        await vm.onShiftStarted(
+        await service.onShiftStarted(
             hubId: "hub-uuid-001",
             sipParams: SipTokenResponse(
                 username: "user", domain: "sip.example.org",

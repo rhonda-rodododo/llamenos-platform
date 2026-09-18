@@ -181,6 +181,104 @@ class BaseUITest: XCTestCase {
         app.launch()
     }
 
+    // MARK: - Test API Helpers (X-Test-Secret endpoints)
+
+    /// POST to a test-only endpoint (X-Test-Secret auth) from the test process.
+    /// Returns the decoded JSON object on success, nil on failure.
+    @discardableResult
+    func testAPIPost(_ endpoint: String, body: [String: Any]) -> [String: Any]? {
+        guard let url = URL(string: "\(testHubURL)/api/\(endpoint)") else {
+            XCTFail("Invalid test API URL: \(endpoint)")
+            return nil
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue(testSecret, forHTTPHeaderField: "X-Test-Secret")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 15
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+
+        var result: [String: Any]?
+        let semaphore = DispatchSemaphore(value: 0)
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            defer { semaphore.signal() }
+            guard error == nil,
+                  let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode),
+                  let data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                let code = (response as? HTTPURLResponse)?.statusCode ?? -1
+                print("Warning: testAPIPost(\(endpoint)) failed (status \(code)): \(error?.localizedDescription ?? "")")
+                return
+            }
+            result = json
+        }.resume()
+        _ = semaphore.wait(timeout: .now() + 20)
+        return result
+    }
+
+    /// Read the app's own signing pubkey from the hidden dashboard identity element.
+    func readOwnPubkey(timeout: TimeInterval = 15) -> String? {
+        // The identity element lives on the dashboard — make sure we're there
+        navigateToDashboard()
+        let identity = find("dashboard-identity")
+        guard identity.waitForExistence(timeout: timeout) else {
+            XCTFail("dashboard-identity should exist to read the app's pubkey")
+            return nil
+        }
+        let pubkey = identity.label
+        guard pubkey.count == 64, pubkey.allSatisfy({ $0.isHexDigit }) else {
+            XCTFail("dashboard-identity should contain a 64-char hex pubkey, got: \(pubkey)")
+            return nil
+        }
+        return pubkey
+    }
+
+    /// Add the app's identity to the test class hub with the given roles.
+    /// Returns the app's pubkey on success.
+    @discardableResult
+    func addSelfToHub(roleIds: [String]) -> String? {
+        guard let pubkey = readOwnPubkey() else { return nil }
+        guard let response = testAPIPost("test-add-hub-member", body: [
+            "pubkey": pubkey,
+            "hubId": testHubId,
+            "roleIds": roleIds,
+        ]), response["ok"] as? Bool == true else {
+            XCTFail("test-add-hub-member should succeed")
+            return nil
+        }
+        return pubkey
+    }
+
+    /// Create a shift covering the current time with the app's identity on it,
+    /// so /api/shifts/my-status reports an active scheduled shift.
+    @discardableResult
+    func createShiftForSelf() -> Bool {
+        guard let pubkey = readOwnPubkey() else { return false }
+        guard let response = testAPIPost("test-create-shift", body: [
+            "pubkey": pubkey,
+            "hubId": testHubId,
+        ]), response["ok"] as? Bool == true else {
+            XCTFail("test-create-shift should succeed")
+            return false
+        }
+        return true
+    }
+
+    /// Launch connected to the API, then join the class hub with the given roles and
+    /// create an active scheduled shift for the identity. Returns the app's pubkey.
+    @discardableResult
+    func launchAsHubMemberWithShift(roleIds: [String]) -> String {
+        launchWithAPI()
+        let dashboard = find("dashboard-title")
+        _ = dashboard.waitForExistence(timeout: 15)
+        guard let pubkey = addSelfToHub(roleIds: roleIds) else {
+            XCTFail("Hub membership setup failed")
+            return ""
+        }
+        _ = createShiftForSelf()
+        return pubkey
+    }
+
     // MARK: - Server State (deprecated)
 
     /// Deprecated: hub isolation via class-level createClassHub() replaces this.

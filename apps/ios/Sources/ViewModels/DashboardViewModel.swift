@@ -33,23 +33,31 @@ struct RecentNotePreview: Identifiable, Sendable {
 
 // MARK: - DashboardViewModel
 
-/// View model for the main dashboard. Loads shift status, recent note previews,
-/// and subscribes to WebSocket events for real-time updates.
+/// View model for the main dashboard. Loads clock-in state (via the shared
+/// ShiftClockService), recent note previews, and subscribes to WebSocket events
+/// for real-time updates.
 @Observable
 final class DashboardViewModel {
     private let apiService: APIService
     private let cryptoService: CryptoService
     private let webSocketService: WebSocketService
     private let hubContext: HubContext
+    private let clock: ShiftClockService
 
-    /// Current shift status.
+    /// Current shift badge status.
     var shiftStatus: ShiftStatus = .offShift
 
-    /// Convenience: whether the volunteer is currently on shift.
-    var isOnShift: Bool { shiftStatus.isOnShift }
+    /// Whether the volunteer is currently clocked in.
+    var isOnShift: Bool { clock.isClockedIn }
 
-    /// When the current shift started, for the elapsed timer.
-    var shiftStartedAt: Date?
+    /// Whether a clock in/out operation is in flight.
+    var isTogglingClock: Bool { clock.isToggling }
+
+    /// The scheduled shift active right now, if any.
+    var currentShift: CurrentShift? { clock.currentShift }
+
+    /// The next upcoming scheduled shift, if any.
+    var nextShift: NextShift? { clock.nextShift }
 
     /// Number of active calls (loaded from API).
     var activeCallCount: Int = 0
@@ -66,31 +74,29 @@ final class DashboardViewModel {
     /// Whether the logout confirmation dialog is showing.
     var showLogoutConfirmation: Bool = false
 
+    /// Whether the clock out confirmation dialog is showing.
+    var showClockOutConfirmation: Bool = false
+
     /// Whether the dashboard is currently loading data.
     var isLoading: Bool = false
 
     /// Error message from the last failed operation.
     var errorMessage: String?
 
-    /// Active shift timer display string.
+    /// Active clock-in timer display string.
     var elapsedTimeDisplay: String {
-        guard let startedAt = shiftStartedAt else { return "--:--:--" }
-        let elapsed = Date().timeIntervalSince(startedAt)
-        let hours = Int(elapsed) / 3600
-        let minutes = (Int(elapsed) % 3600) / 60
-        let seconds = Int(elapsed) % 60
-        return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
+        clock.elapsedTimeDisplay
     }
 
     /// Background tasks
     private var eventTask: Task<Void, Never>?
-    private var timerTask: Task<Void, Never>?
 
-    init(apiService: APIService, cryptoService: CryptoService, webSocketService: WebSocketService, hubContext: HubContext) {
+    init(apiService: APIService, cryptoService: CryptoService, webSocketService: WebSocketService, hubContext: HubContext, shiftClockService: ShiftClockService) {
         self.apiService = apiService
         self.cryptoService = cryptoService
         self.webSocketService = webSocketService
         self.hubContext = hubContext
+        self.clock = shiftClockService
     }
 
     // MARK: - Data Loading
@@ -101,7 +107,7 @@ final class DashboardViewModel {
         isLoading = true
         errorMessage = nil
 
-        // Fetch shift status, active call, and recent notes in parallel
+        // Fetch clock/schedule state, active call, and recent notes in parallel
         async let statusResult: Void = fetchShiftStatus()
         async let notesResult: Void = fetchRecentNotes()
         async let callResult: Void = fetchActiveCall()
@@ -117,6 +123,28 @@ final class DashboardViewModel {
     func refresh() async {
         isLoading = false
         await loadDashboard()
+    }
+
+    // MARK: - Clock In / Out
+
+    /// Clock in from the dashboard quick toggle.
+    func clockIn() async {
+        errorMessage = nil
+        let ok = await clock.clockIn()
+        if !ok {
+            errorMessage = clock.lastError
+        }
+        updateShiftStatusBadge()
+    }
+
+    /// Clock out from the dashboard quick toggle.
+    func clockOut() async {
+        errorMessage = nil
+        let ok = await clock.clockOut()
+        if !ok {
+            errorMessage = clock.lastError
+        }
+        updateShiftStatusBadge()
     }
 
     // MARK: - WebSocket Events
@@ -138,7 +166,6 @@ final class DashboardViewModel {
     func stopEventListener() {
         eventTask?.cancel()
         eventTask = nil
-        stopTimer()
     }
 
     /// Handle a decrypted, typed hub event and refresh only relevant data.
@@ -165,24 +192,6 @@ final class DashboardViewModel {
         case .deviceWipe, .unknown:
             break
         }
-    }
-
-    // MARK: - Timer
-
-    func startTimer() {
-        stopTimer()
-        timerTask = Task { @MainActor [weak self] in
-            while !Task.isCancelled {
-                // Touch a property to trigger @Observable re-evaluation
-                self?.shiftStartedAt = self?.shiftStartedAt
-                try? await Task.sleep(for: .seconds(1))
-            }
-        }
-    }
-
-    func stopTimer() {
-        timerTask?.cancel()
-        timerTask = nil
     }
 
     // MARK: - Call Actions
@@ -233,6 +242,7 @@ final class DashboardViewModel {
                 method: "GET",
                 path: apiService.hp("/api/calls/active")
             )
+            activeCallCount = response.calls.count
             if let first = response.calls.first {
                 // Attempt E2EE decryption of call metadata
                 var callerNumber = first.callerLast4
@@ -255,36 +265,26 @@ final class DashboardViewModel {
             } else {
                 currentCall = nil
             }
+            updateShiftStatusBadge()
         } catch {
             // Non-fatal — active call state will be updated on next event
         }
     }
 
     private func fetchShiftStatus() async {
-        do {
-            let status: DashboardShiftStatusResponse = try await apiService.request(
-                method: "GET",
-                path: "/api/shifts/my-status"
-            )
-            shiftStatus = status.onShift ? .onShift : .offShift
-            activeCallCount = status.activeCallCount ?? 0
-            recentNoteCount = status.recentNoteCount ?? 0
+        await clock.refresh()
+        updateShiftStatusBadge()
+        if let clockError = clock.lastError {
+            errorMessage = clockError
+        }
+    }
 
-            if status.onShift, let startedAtString = status.startedAt {
-                shiftStartedAt = DateFormatting.parseISO(startedAtString)
-                startTimer()
-            } else {
-                shiftStartedAt = nil
-                stopTimer()
-            }
-        } catch {
-            shiftStatus = .offShift
-            activeCallCount = 0
-            if case APIError.noBaseURL = error {
-                // Expected when hub isn't configured yet
-            } else {
-                errorMessage = error.localizedDescription
-            }
+    /// Reflect clock state (and any active call) onto the badge status.
+    private func updateShiftStatusBadge() {
+        if currentCall != nil, clock.isClockedIn {
+            shiftStatus = .onCall
+        } else {
+            shiftStatus = clock.isClockedIn ? .onShift : .offShift
         }
     }
 
@@ -350,18 +350,6 @@ final class DashboardViewModel {
 
     deinit {
         eventTask?.cancel()
-        timerTask?.cancel()
     }
-}
-
-// MARK: - API Response Types
-
-/// Response from the shift status endpoint.
-private struct DashboardShiftStatusResponse: Decodable {
-    let onShift: Bool
-    let shiftId: String?
-    let startedAt: String?
-    let activeCallCount: Int?
-    let recentNoteCount: Int?
 }
 

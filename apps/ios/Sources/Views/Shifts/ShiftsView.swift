@@ -13,14 +13,23 @@ struct ShiftsView: View {
         let vm = resolvedViewModel
 
         NavigationStack {
-            Group {
-                if vm.isLoading && vm.shifts.isEmpty {
-                    loadingState
-                } else if vm.shiftDays.isEmpty && !vm.isLoading {
-                    emptyState
-                } else {
-                    shiftList(vm: vm)
+            VStack(spacing: 0) {
+                // Clock in/out is roster-based and independent of the schedule —
+                // always visible, even when no shifts are configured
+                clockCard(vm: vm)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+
+                Group {
+                    if vm.isLoading && vm.shifts.isEmpty {
+                        loadingState
+                    } else if vm.shiftDays.isEmpty && !vm.isLoading {
+                        emptyState
+                    } else {
+                        shiftList(vm: vm)
+                    }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             .navigationTitle(NSLocalizedString("shifts_title", comment: "Shifts"))
             .navigationBarTitleDisplayMode(.large)
@@ -38,16 +47,130 @@ struct ShiftsView: View {
                 )
             ) {
                 Button(NSLocalizedString("cancel", comment: "Cancel"), role: .cancel) {}
+                    .accessibilityIdentifier("clock-out-cancel")
                 Button(NSLocalizedString("shifts_clock_out_confirm", comment: "Clock Out"), role: .destructive) {
                     Task { await vm.clockOut() }
                 }
-            } message: {
-                Text(NSLocalizedString(
-                    "shifts_clock_out_message",
-                    comment: "You will stop receiving incoming calls."
-                ))
+                .accessibilityIdentifier("clock-out-confirm")
             }
         }
+    }
+
+    // MARK: - Clock Card
+
+    @ViewBuilder
+    private func clockCard(vm: ShiftsViewModel) -> some View {
+        VStack(spacing: 16) {
+            HStack(spacing: 10) {
+                if vm.isOnShift {
+                    StatusDot(status: .active, animated: true)
+                } else {
+                    StatusDot(status: .inactive)
+                }
+
+                Text(vm.isOnShift
+                    ? NSLocalizedString("shifts_on_shift", comment: "On Shift")
+                    : NSLocalizedString("shifts_off_shift", comment: "Off Shift")
+                )
+                .font(.brand(.headline))
+                .foregroundStyle(vm.isOnShift ? Color.statusActive : Color.brandMutedForeground)
+                .accessibilityIdentifier("shift-status-label")
+
+                Spacer()
+
+                if vm.isOnShift {
+                    Text(vm.elapsedTimeDisplay)
+                        .font(.brandMono(.title2))
+                        .fontWeight(.medium)
+                        .foregroundStyle(Color.statusActive)
+                        .contentTransition(.numericText())
+                        .accessibilityIdentifier("shift-elapsed-time")
+                }
+            }
+
+            // Active shift info when on shift
+            if vm.isOnShift, let current = vm.currentShift {
+                HStack(spacing: 8) {
+                    Image(systemName: "clock.fill")
+                        .foregroundStyle(Color.brandPrimary)
+                    Text(current.timeRangeDisplay)
+                        .font(.brand(.subheadline))
+                        .foregroundStyle(Color.brandMutedForeground)
+                    if let name = current.displayName {
+                        Text(name)
+                            .font(.brand(.subheadline))
+                            .foregroundStyle(Color.brandMutedForeground)
+                            .lineLimit(1)
+                    }
+                    Spacer()
+                }
+                .accessibilityIdentifier("shifts-current-shift")
+            }
+
+            // Circular clock in/out button
+            Button {
+                Haptics.impact(.medium)
+                if vm.isOnShift {
+                    vm.showClockOutConfirmation = true
+                } else {
+                    Task { await vm.clockIn() }
+                }
+            } label: {
+                ZStack {
+                    Circle()
+                        .fill(vm.isOnShift ? Color.brandDestructive : Color.statusActive)
+                        .frame(width: 80, height: 80)
+                        .shadow(color: (vm.isOnShift ? Color.brandDestructive : Color.statusActive).opacity(0.35), radius: 8, y: 4)
+
+                    if vm.isTogglingShift {
+                        ProgressView()
+                            .tint(.white)
+                    } else {
+                        Image(systemName: vm.isOnShift ? "stop.fill" : "play.fill")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundStyle(.white)
+                    }
+                }
+            }
+            .buttonStyle(CircularClockButtonStyle())
+            .disabled(vm.isTogglingShift)
+            .accessibilityIdentifier(vm.isOnShift ? "clock-out-button" : "clock-in-button")
+
+            Text(vm.isOnShift
+                ? NSLocalizedString("shifts_clock_out", comment: "Clock Out")
+                : NSLocalizedString("shifts_clock_in", comment: "Clock In")
+            )
+            .font(.brand(.caption))
+            .fontWeight(.semibold)
+            .foregroundStyle(vm.isOnShift ? Color.brandDestructive : Color.statusActive)
+
+            // Error/Success messages
+            if let error = vm.errorMessage {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                    Text(error)
+                        .font(.brand(.footnote))
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityIdentifier("shifts-error")
+            }
+
+            if let success = vm.successMessage {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                    Text(success)
+                        .font(.brand(.footnote))
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityIdentifier("shifts-success")
+            }
+        }
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: - Shift List
@@ -55,119 +178,6 @@ struct ShiftsView: View {
     @ViewBuilder
     private func shiftList(vm: ShiftsViewModel) -> some View {
         List {
-            // Clock in/out section (prominent)
-            Section {
-                VStack(spacing: 16) {
-                    HStack(spacing: 10) {
-                        if vm.isOnShift {
-                            StatusDot(status: .active, animated: true)
-                        } else {
-                            StatusDot(status: .inactive)
-                        }
-
-                        Text(vm.isOnShift
-                            ? NSLocalizedString("shifts_on_shift", comment: "On Shift")
-                            : NSLocalizedString("shifts_off_shift", comment: "Off Shift")
-                        )
-                        .font(.brand(.headline))
-                        .foregroundStyle(vm.isOnShift ? Color.statusActive : Color.brandMutedForeground)
-                        .accessibilityIdentifier("shift-status-label")
-
-                        Spacer()
-
-                        if vm.isOnShift {
-                            Text(vm.elapsedTimeDisplay)
-                                .font(.brandMono(.title2))
-                                .fontWeight(.medium)
-                                .foregroundStyle(Color.statusActive)
-                                .contentTransition(.numericText())
-                                .accessibilityIdentifier("shift-elapsed-time")
-                        }
-                    }
-
-                    // Active call count when on shift
-                    if vm.isOnShift, vm.activeCallCount > 0 {
-                        HStack(spacing: 8) {
-                            Image(systemName: "phone.fill")
-                                .foregroundStyle(Color.brandPrimary)
-                            Text(String(
-                                format: NSLocalizedString("shifts_active_calls", comment: "%d active call(s)"),
-                                vm.activeCallCount
-                            ))
-                            .font(.brand(.subheadline))
-                            .foregroundStyle(Color.brandMutedForeground)
-                            Spacer()
-                        }
-                    }
-
-                    // Circular clock in/out button
-                    Button {
-                        Haptics.impact(.medium)
-                        if vm.isOnShift {
-                            vm.showClockOutConfirmation = true
-                        } else {
-                            Task { await vm.clockIn() }
-                        }
-                    } label: {
-                        ZStack {
-                            Circle()
-                                .fill(vm.isOnShift ? Color.brandDestructive : Color.statusActive)
-                                .frame(width: 80, height: 80)
-                                .shadow(color: (vm.isOnShift ? Color.brandDestructive : Color.statusActive).opacity(0.35), radius: 8, y: 4)
-
-                            if vm.isTogglingShift {
-                                ProgressView()
-                                    .tint(.white)
-                            } else {
-                                Image(systemName: vm.isOnShift ? "stop.fill" : "play.fill")
-                                    .font(.title2)
-                                    .fontWeight(.bold)
-                                    .foregroundStyle(.white)
-                            }
-                        }
-                    }
-                    .buttonStyle(CircularClockButtonStyle())
-                    .disabled(vm.isTogglingShift)
-                    .accessibilityIdentifier(vm.isOnShift ? "clock-out-button" : "clock-in-button")
-
-                    Text(vm.isOnShift
-                        ? NSLocalizedString("shifts_clock_out", comment: "Clock Out")
-                        : NSLocalizedString("shifts_clock_in", comment: "Clock In")
-                    )
-                    .font(.brand(.caption))
-                    .fontWeight(.semibold)
-                    .foregroundStyle(vm.isOnShift ? Color.brandDestructive : Color.statusActive)
-                }
-                .frame(maxWidth: .infinity)
-            }
-
-            // Error/Success messages
-            if let error = vm.errorMessage {
-                Section {
-                    HStack(alignment: .top, spacing: 8) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.orange)
-                        Text(error)
-                            .font(.brand(.footnote))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .accessibilityIdentifier("shifts-error")
-            }
-
-            if let success = vm.successMessage {
-                Section {
-                    HStack(alignment: .top, spacing: 8) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
-                        Text(success)
-                            .font(.brand(.footnote))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .accessibilityIdentifier("shifts-success")
-            }
-
             // Weekly schedule sections
             if !vm.shiftDays.isEmpty {
                 ForEach(vm.shiftDays) { shiftDay in
@@ -306,7 +316,7 @@ struct ShiftsView: View {
             apiService: appState.apiService,
             cryptoService: appState.cryptoService,
             hubContext: hubContext,
-            linphoneService: appState.linphoneService
+            shiftClockService: appState.shiftClockService
         )
         DispatchQueue.main.async {
             self.viewModel = vm
