@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { SipBridgeAdapter } from '@worker/telephony/sip-bridge-adapter'
 import { AsteriskAdapter } from '@worker/telephony/asterisk'
 import { FreeSwitchAdapter } from '@worker/telephony/freeswitch'
-import { DEFAULT_LANGUAGE } from '@shared/languages'
 
 class TestSipBridgeAdapter extends SipBridgeAdapter {
   getEndpointFormat(phone: string): string {
@@ -807,7 +806,7 @@ describe('FreeSwitchAdapter', () => {
       expect(res.body).toContain('hub=hub-123')
     })
 
-    it('returns bind and speak for multiple languages', async () => {
+    it('forces English instead of a menu for [en, es] — Flite has no Spanish voice (#657)', async () => {
       const res = await adapter.handleLanguageMenu({
         callSid: 'CA123',
         callerNumber: '+15559876543',
@@ -815,9 +814,10 @@ describe('FreeSwitchAdapter', () => {
         enabledLanguages: ['en', 'es'],
       })
       expect(res.contentType).toBe('text/xml')
-      expect(res.body).toContain('<bind')
-      expect(res.body).toContain('<speak')
-      expect(res.body).toContain('/api/telephony/language-selected')
+      expect(res.body).not.toContain('<bind')
+      expect(res.body).not.toContain('<speak')
+      expect(res.body).toContain('caller_lang=en')
+      expect(res.body).toContain('/api/telephony/incoming')
     })
   })
 

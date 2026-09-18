@@ -17,14 +17,25 @@
  * they cannot bypass this layer to invoke raw IPC commands.
  */
 window.__TAURI_ISOLATION_HOOK__ = (payload) => {
-  // Commands the webview is allowed to invoke
+  // Commands the webview is allowed to invoke.
+  //
+  // The app (non-`plugin:`) entries must be EXACTLY the commands registered in
+  // `tauri::generate_handler![...]` in apps/desktop/src/lib.rs —
+  // src/client/lib/desktop-ipc-boundary.test.ts fails if the two sets differ.
+  // A command missing here works under `tauri:dev` and the Playwright IPC mock
+  // (neither runs this iframe) and is rejected only in a packaged build.
   const ALLOWED_COMMANDS = new Set([
     // Device key management
     'unlock_with_pin',
     'lock_crypto',
     'is_crypto_unlocked',
     'device_generate_and_load',
+    'device_import_and_load',
     'get_device_pubkeys',
+    // Panic wipe: zeroize CryptoState + delete the Stronghold vault file
+    'wipe_keys',
+    // Ephemeral keypair for admin-created users (seed returned by design)
+    'generate_ephemeral_ed25519',
     // Auth token
     'create_auth_token_from_state',
     // HPKE crypto (v3)
@@ -47,12 +58,32 @@ window.__TAURI_ISOLATION_HOOK__ = (payload) => {
     'hpke_unwrap_and_set_hub_key',
     'generate_hub_key_in_state',
     'wrap_hub_key_for_member',
+    // Hub-key field encryption (team/tag names — key stays in Rust)
+    'encrypt_hub_field',
+    'decrypt_hub_field',
     // Server event decryption
     'set_server_event_keys',
     'decrypt_hub_event',
     'decrypt_server_event',
     // SFrame voice E2EE
     'sframe_derive_key',
+    // SAS emoji verification
+    'derive_sas',
+    // Device provisioning (signing seed never enters the webview)
+    'provision_encrypt_for_device',
+    'provision_create_session',
+    'provision_compute_sas',
+    'provision_decrypt_and_import',
+    // Configured backend address (#738) — persisted + validated in Rust
+    'api_config_get',
+    'api_config_set',
+    'api_config_clear',
+    // Runtime-enforced network egress (#739) — CSP connect-src is `ipc:` only
+    'net_fetch',
+    'net_probe_health',
+    'net_ws_connect',
+    'net_ws_send',
+    'net_ws_close',
     // Shamir verification (split/combine are internal-only — secrets never enter JS)
     'shamir_commit',
     'shamir_verify',

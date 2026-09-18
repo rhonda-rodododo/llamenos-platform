@@ -8,6 +8,9 @@
  * The queue does NOT store read operations — only mutating requests (POST, PUT, PATCH, DELETE).
  */
 
+import { getApiUrl } from './api-config'
+import { netFetch } from './net'
+
 /** Types of operations that can be queued */
 export type QueuedOperationType =
   | 'note:create'
@@ -175,7 +178,7 @@ export class OfflineQueue {
           init.body = op.body
         }
 
-        const res = await fetch(`/api${op.path}`, init)
+        const res = await netFetch(getApiUrl(op.path), init)
 
         if (res.ok) {
           toRemove.push(op.id)

@@ -161,12 +161,12 @@ When('I create a note with a specific call ID', async ({ page }) => {
   // Wait for note to appear in list
   await expect(page.getByTestId(TestIds.NOTE_FORM)).not.toBeVisible({ timeout: Timeouts.ELEMENT })
   await page.evaluate((id) => {
-    (window as Record<string, unknown>).__test_call_id = id
+    (window as unknown as Record<string, unknown>).__test_call_id = id
   }, callId)
 })
 
 Then('the note card header should show a truncated call ID', async ({ page }) => {
-  const callId = (await page.evaluate(() => (window as Record<string, unknown>).__test_call_id)) as string
+  const callId = (await page.evaluate(() => (window as unknown as Record<string, unknown>).__test_call_id)) as string
   expect(callId).toBeTruthy()
   const truncated = callId.slice(0, 8)
   // Call ID appears in the note-group Card header, not inside the note-card div

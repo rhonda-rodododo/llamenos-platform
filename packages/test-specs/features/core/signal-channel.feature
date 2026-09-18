@@ -36,7 +36,7 @@ Feature: Signal Messaging Channel
   # ── Registration & Provisioning ──────────────────────────────────
 
   Scenario: Admin initiates Signal number registration
-    Given an admin is authenticated
+    Given the admin is authenticated
     And a Signal bridge is reachable at the configured URL
     When the admin submits a phone number for registration
     Then the registration state should be "pending_verification"

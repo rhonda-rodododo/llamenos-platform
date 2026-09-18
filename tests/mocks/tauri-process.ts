@@ -14,7 +14,7 @@ if (!import.meta.env.PLAYWRIGHT_TEST) {
 }
 
 export async function relaunch(): Promise<void> {
-  ;(window as Record<string, unknown>).__RELAUNCH_CALLED__ = true
+  ;(window as unknown as Record<string, unknown>).__RELAUNCH_CALLED__ = true
 }
 
 export async function exit(_code?: number): Promise<void> {

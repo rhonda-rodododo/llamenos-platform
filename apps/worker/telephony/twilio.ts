@@ -17,38 +17,31 @@ import type {
   WebhookQueueWait,
   WebhookRecordingStatus,
 } from './adapter'
-import {
-  DEFAULT_LANGUAGE,
-  ivrIndexToDigit,
-} from '@shared/languages'
-import { IVR_PROMPTS, IVR_MORE_PROMPTS, getPrompt, getVoicemailThanks, resolveIvrPrompt } from '@shared/voice-prompts'
+import { getPrompt, getVoicemailThanks } from '@shared/voice-prompts'
+import { IvrVoiceCatalog, buildIvrLanguageMenu } from './ivr-menu'
 
 /**
- * Twilio TwiML voice language codes, keyed by ISO 639-1 language code.
- * Provider-specific — lives here, not in shared config.
+ * Twilio TwiML `<Say language>` codes — the explicit, ordered list of locales
+ * Twilio has a voice for. A locale absent here is not speakable on Twilio and is
+ * never offered in the IVR menu (no "closest language" substitution).
  */
-const VOICE_CODES: Record<string, string> = {
-  en: 'en-US',
-  es: 'es-MX',
-  zh: 'cmn-CN',
-  tl: 'fil-PH',
-  vi: 'vi-VN',
-  ar: 'ar-XA',
-  fr: 'fr-FR',
-  ht: 'fr-FR', // Twilio doesn't support Haitian Creole; French is closest
-  ko: 'ko-KR',
-  ru: 'ru-RU',
-  hi: 'hi-IN',
-  pt: 'pt-BR',
-  de: 'de-DE',
-}
+export const TWILIO_VOICES = new IvrVoiceCatalog<string>('twilio', [
+  ['en', 'en-US'],
+  ['es', 'es-MX'],
+  ['zh', 'cmn-CN'],
+  ['tl', 'fil-PH'],
+  ['vi', 'vi-VN'],
+  ['ar', 'ar-XA'],
+  ['fr', 'fr-FR'],
+  ['ko', 'ko-KR'],
+  ['ru', 'ru-RU'],
+  ['hi', 'hi-IN'],
+  ['pt', 'pt-BR'],
+  ['de', 'de-DE'],
+])
 
-/**
- * Get Twilio voice language code for a language.
- * Falls back to en-US if the language isn't configured.
- */
 function getTwilioVoice(lang: string): string {
-  return VOICE_CODES[lang] ?? VOICE_CODES[DEFAULT_LANGUAGE]
+  return TWILIO_VOICES.voiceForPrompt(lang)
 }
 
 
@@ -90,54 +83,21 @@ export class TwilioAdapter implements TelephonyAdapter {
   }
 
   async handleLanguageMenu(params: LanguageMenuParams): Promise<TelephonyResponse> {
-    const languages = params.enabledLanguages
+    const menu = buildIvrLanguageMenu(params.enabledLanguages, TWILIO_VOICES)
     const hp = hubXmlParam(params.hubId)
 
-    // If only 1 language enabled, skip the menu entirely
-    if (languages.length <= 1) {
-      const lang = languages[0] || DEFAULT_LANGUAGE
+    if (menu.kind === 'single') {
       return this.twiml(`
         <Response>
-          <Redirect method="POST">/api/telephony/language-selected?auto=1&amp;forceLang=${lang}${hp}</Redirect>
+          <Redirect method="POST">/api/telephony/language-selected?auto=1&amp;forceLang=${menu.language}${hp}</Redirect>
         </Response>
       `)
     }
 
     const hubParam = params.hubId ? `?hub=${escapeXml(encodeURIComponent(params.hubId))}` : ''
-
-    // >9 languages: two-level menu. First 8 get digits 1-8, digit 9 = "more", sub-menu has rest.
-    if (languages.length > 9) {
-      const mainMenu = languages.slice(0, 8)
-      const sayElements = mainMenu.map((langCode, i) => {
-        const digit = String(i + 1)
-        const voice = getTwilioVoice(langCode)
-        const prompt = IVR_PROMPTS[langCode]
-        if (!prompt) return ''
-        return `<Say language="${voice}">${escapeXml(resolveIvrPrompt(prompt, digit))}</Say>`
-      }).filter(Boolean).join('\n      ')
-
-      const morePrompt = IVR_MORE_PROMPTS[languages[0]] || IVR_MORE_PROMPTS['en']
-      const moreVoice = getTwilioVoice('en')
-
-      return this.twiml(`
-        <Response>
-          <Gather numDigits="1" action="/api/telephony/language-selected${hubParam}" method="POST" timeout="8">
-            ${sayElements}
-            <Say language="${moreVoice}">${escapeXml(resolveIvrPrompt(morePrompt, '9'))}</Say>
-          </Gather>
-          <Redirect method="POST">/api/telephony/language-selected?auto=1${hp}</Redirect>
-        </Response>
-      `)
-    }
-
-    // <=9 languages: single-level menu with digit assignment via ivrIndexToDigit
-    const sayElements = languages.map((langCode, i) => {
-      const digit = ivrIndexToDigit(i)
-      const voice = getTwilioVoice(langCode)
-      const prompt = IVR_PROMPTS[langCode]
-      if (!prompt) return ''
-      return `<Say language="${voice}">${escapeXml(resolveIvrPrompt(prompt, digit))}</Say>`
-    }).filter(Boolean).join('\n      ')
+    const sayElements = menu.options
+      .map(o => `<Say language="${o.voice}">${escapeXml(o.prompt)}</Say>`)
+      .join('\n          ')
 
     return this.twiml(`
       <Response>

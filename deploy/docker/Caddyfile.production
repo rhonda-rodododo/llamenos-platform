@@ -7,9 +7,16 @@
 #   ACME_EMAIL    — contact for Let's Encrypt
 #
 # The caddy container is built from deploy/docker/Dockerfile with
-# `target: static` so the `frontend` build stage bakes
-# /srv/app/ and /srv/crypto/ into the image. Only api.* proxies to app:3000;
-# app.* and crypto.* are pure file_servers on distinct origins.
+# `target: static`, which bakes the built SPA into /srv/app/ and swaps in a
+# custom xcaddy-built Caddy binary (for the rate_limit directive below).
+# Only api.* proxies to app:3000; app.* and crypto.* are pure file_servers
+# on distinct origins.
+#
+# KNOWN GAP: /srv/crypto/ (the sandboxed crypto iframe served at
+# crypto.$CRYPTO_DOMAIN) is currently EMPTY — that app was developed on an
+# unmerged branch and never landed on main. crypto.* will 404 until it is
+# merged and wired into the `static` Docker stage. See that stage's comment
+# in deploy/docker/Dockerfile for detail.
 {
 	email {$ACME_EMAIL}
 }
@@ -55,9 +62,29 @@
 {$API_DOMAIN} {
 	encode gzip zstd
 
-	# Auth endpoint rate limiting — strict (login, register, WebAuthn)
-	rate_limit /api/auth/* 10r/m
-	rate_limit /api/register 5r/m
+	# Auth endpoint rate limiting — strict (login, register, WebAuthn).
+	# Requires the caddy-ratelimit plugin (github.com/mholt/caddy-ratelimit),
+	# built into the caddy image via xcaddy — see deploy/docker/Dockerfile's
+	# `caddy-builder` stage. Per-client key ({remote_host}) so one abusive
+	# IP cannot exhaust another client's quota.
+	rate_limit {
+		zone auth_limit {
+			match {
+				path /api/auth/*
+			}
+			key    {remote_host}
+			events 10
+			window 1m
+		}
+		zone register_limit {
+			match {
+				path /api/register
+			}
+			key    {remote_host}
+			events 5
+			window 1m
+		}
+	}
 
 	# CORS enforcement — allow only the SPA origin for credentialed requests.
 	# Hono middleware sets the final CORS headers for actual requests;

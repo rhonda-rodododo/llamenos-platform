@@ -87,3 +87,5 @@ tests/load/*.json
 
 # dprint cache
 .dprint/cache/
+
+.fleet-worktrees/

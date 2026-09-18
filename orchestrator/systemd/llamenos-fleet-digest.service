@@ -1,0 +1,17 @@
+# orchestrator/systemd/llamenos-fleet-digest.service
+[Unit]
+Description=Llámenos fleet — digest and notification
+After=network-online.target
+
+[Service]
+Type=oneshot
+Environment=PATH=/home/rikki/.bun/bin:/home/rikki/.local/bin:/usr/local/bin:/usr/bin:/bin
+WorkingDirectory=/media/rikki/Main/projects/llamenos
+EnvironmentFile=-%h/.llamenos-fleet/env
+ExecStart=/home/rikki/.local/bin/llamenos-fleet digest
+# A digest run does its own best-effort notification internally (notify.ts) and
+# must never fail the unit because a webhook or command sink was unreachable —
+# see notify.ts: sink failures are caught and reported inside NotifyResult,
+# never thrown. This unit only fails on an actual digest-rendering error.
+SuccessExitStatus=0
+TimeoutStartSec=300

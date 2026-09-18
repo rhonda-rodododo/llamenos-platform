@@ -1,14 +1,17 @@
 # CI workflow for mobile (iOS + Android) release builds.
 # Builds signed mobile apps and uploads to TestFlight / Play Store / GitHub Releases.
 #
-# Trigger: push to tags matching v* or manual dispatch.
+# Trigger: workflow_dispatch only, from release.yml's `dispatch` job (see #712).
+# This workflow used to also declare `on: release: [published]`, but GitHub
+# Releases created by GITHUB_TOKEN (as release.yml does) never fire that event
+# — the anti-recursion rule documented in release.yml's header — so that
+# trigger was provably dead and has been removed (#712). `gh workflow run`
+# always dispatches via workflow_dispatch regardless of how it is invoked.
 # Epic 210: Mobile Release Prep, Epic 290: Mobile App Distribution & Update Management.
 
 name: Mobile Release
 
 on:
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
       version:
@@ -24,7 +27,7 @@ env:
 jobs:
   # ─── Android Release ─────────────────────────────────────────
   build-android:
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
     name: Build (Android)
     timeout-minutes: 30
     permissions:
@@ -43,19 +46,13 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Setup Java 17
-        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
         with:
           distribution: temurin
           java-version: 17
 
       - name: Setup Gradle cache
-        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
-
-      - name: Isolate rustup/cargo home (self-hosted runners share $HOME)
-        run: |
-          echo "RUSTUP_HOME=$RUNNER_TEMP/rustup" >> "$GITHUB_ENV"
-          echo "CARGO_HOME=$RUNNER_TEMP/cargo" >> "$GITHUB_ENV"
-          echo "$RUNNER_TEMP/cargo/bin" >> "$GITHUB_PATH"
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
 
       - name: Install Rust stable (for crypto build)
         uses: dtolnay/rust-toolchain@67ef31d5b988238dd797d409d6f9574278e20537 # stable
@@ -88,12 +85,13 @@ jobs:
       - name: Resolve version
         id: version
         env:
-          EVENT_NAME: ${{ github.event_name }}
           INPUT_VER: ${{ inputs.version }}
         run: |
-          if [[ "$EVENT_NAME" == "release" ]]; then
-            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
-          elif [[ -n "$INPUT_VER" ]]; then
+          # Only workflow_dispatch triggers this workflow now (#712) — the
+          # `release` event branch this used to have was unreachable dead
+          # code (GITHUB_TOKEN-created releases never fire `release: published`)
+          # and has been removed.
+          if [[ -n "$INPUT_VER" ]]; then
             echo "version=${INPUT_VER}" >> "$GITHUB_OUTPUT"
           else
             echo "version=$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
@@ -166,7 +164,7 @@ jobs:
 
       - name: Setup Ruby
         if: env.HAS_PLAY_SERVICE_ACCOUNT == 'true'
-        uses: ruby/setup-ruby@d45b1a4e94b71acab930e56e79c6aa188764e7f9
+        uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b
         with:
           ruby-version: '3.3'
           bundler-cache: true

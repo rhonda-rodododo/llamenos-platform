@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# orchestrator/bin/llamenos-fleet
+# Resolves the repo through this symlink so the command works from any directory.
+set -euo pipefail
+
+SELF="${BASH_SOURCE[0]}"
+while [ -L "$SELF" ]; do
+  DIR="$(cd -P "$(dirname "$SELF")" && pwd)"
+  SELF="$(readlink "$SELF")"
+  [[ $SELF != /* ]] && SELF="$DIR/$SELF"
+done
+REPO_ROOT="$(cd -P "$(dirname "$SELF")/../.." && pwd)"
+
+# Secrets live here and are never in git.
+[ -f "$HOME/.llamenos-fleet/env" ] && set -a && . "$HOME/.llamenos-fleet/env" && set +a
+
+export FLEET_REPO_ROOT="$REPO_ROOT"
+exec bun "$REPO_ROOT/orchestrator/src/cli.ts" "$@"

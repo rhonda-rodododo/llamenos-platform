@@ -143,6 +143,26 @@ export const VolunteerPage = {
   },
 
   /**
+   * Change a volunteer's primary role through the row's role Select, and wait for the
+   * PATCH to succeed and the row badge to reflect it. Fails loudly at every stage — never
+   * silently skips the write.
+   */
+  async changeRole(page: Page, row: Locator, pubkey: string, role: { id: string; name: string }): Promise<void> {
+    const trigger = row.getByTestId(TestIds.VOLUNTEER_ROW_ROLE_SELECT)
+    await expect(trigger).toBeVisible({ timeout: Timeouts.ELEMENT })
+    await trigger.click()
+    const option = page.locator(`[data-testid="${TestIds.VOLUNTEER_ROW_ROLE_OPTION}"][data-role-id="${role.id}"]`)
+    await expect(option).toBeVisible({ timeout: Timeouts.ELEMENT })
+    const patchResponse = page.waitForResponse(
+      res => res.url().includes(`/users/${pubkey}`) && res.request().method() === 'PATCH',
+      { timeout: Timeouts.API },
+    )
+    await option.click()
+    expect((await patchResponse).ok(), `PATCH /users/${pubkey.slice(0, 8)} role change failed`).toBe(true)
+    await expect(row.getByTestId(TestIds.VOLUNTEER_ROW_ROLE_BADGE)).toContainText(role.name, { timeout: Timeouts.ELEMENT })
+  },
+
+  /**
    * Open the add volunteer form.
    */
   async openAddForm(page: Page): Promise<void> {

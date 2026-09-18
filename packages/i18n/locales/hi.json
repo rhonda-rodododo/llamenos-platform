@@ -1791,8 +1791,8 @@
   "demo": {
     "admin": "Admin",
     "banner": "Demo Mode",
-    "bannerText": "You're exploring the Llamenos demo. Data resets daily.",
-    "bannerTextSchedule": "You're exploring the Llamenos demo. Data resets on schedule.",
+    "bannerText": "परीक्षण वातावरण — कॉलर की वास्तविक जानकारी दर्ज न करें। यहां का डेटा गोपनीय नहीं है और किसी भी समय हटाया जा सकता है।",
+    "bannerTextSchedule": "परीक्षण वातावरण — कॉलर की वास्तविक जानकारी दर्ज न करें। डेटा {{schedule}} रीसेट होता है और यह गोपनीय नहीं है।",
     "dismiss": "Dismiss",
     "getStarted": "Deploy your own",
     "pickAccount": "Pick a demo account to explore",
@@ -3735,6 +3735,20 @@
     "version": "Version",
     "voicemail": "Voicemail",
     "webrtcNotConfigured": "ब्राउज़र कॉलिंग उपलब्ध नहीं है। आपके एडमिन को टेलीफ़ोनी प्रदाता सेटिंग्स में WebRTC सक्षम करना होगा।"
+  },
+  "serverAddress": {
+    "checking": "Checking...",
+    "connect": "Connect",
+    "errorWithDetail": "Couldn't reach that server: {{detail}}",
+    "firstRunDescription": "This app needs to know which Llámenos server to connect to before it can sign in.",
+    "firstRunTitle": "Connect to your hotline server",
+    "help": "Enter your organization's server address, e.g. app.example.org. We'll infer https:// unless you specify otherwise.",
+    "label": "Server address",
+    "placeholder": "app.example.org",
+    "saveAndReconnect": "Save and reconnect",
+    "settingsDescription": "Change which server this desktop app connects to.",
+    "settingsTitle": "Server connection",
+    "unreachable": "Couldn't reach that server. Check the address and try again."
   },
   "setup": {
     "autoResponse": "Auto-Response Template",

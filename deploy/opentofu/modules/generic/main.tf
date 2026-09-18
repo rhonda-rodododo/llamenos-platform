@@ -5,7 +5,7 @@
 # (OpenTofu) from configuration management (Ansible).
 
 locals {
-  inventory_path = "${path.module}/../../../ansible/inventory/hosts.yml"
+  inventory_path = "${path.module}/../../../ansible/inventory.yml"
 
   inventory_content = yamlencode({
     all = {
@@ -77,7 +77,7 @@ resource "null_resource" "ansible_provision" {
       echo "  3. Run Ansible to configure the server:"
       echo ""
       echo "     cd ${var.ansible_dir}"
-      echo "     ansible-playbook -i ${local.inventory_path} site.yml"
+      echo "     ansible-playbook -i ${local.inventory_path} setup.yml"
       echo ""
       echo "  Or connect directly:"
       echo "     ssh deploy@${var.server_ip}"

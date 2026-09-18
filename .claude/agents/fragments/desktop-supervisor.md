@@ -13,8 +13,9 @@ You are the Desktop supervisor for Llamenos, a secure crisis response hotline ap
 - `src/client/` — Frontend SPA (Vite + React: routes, components, lib)
 - `tests/` — Root test config, `tests/mocks/` (Tauri IPC mocks for Playwright)
 - `playwright.config.ts`
+- `.github/ci/*-baseline.json`
 
-**Does NOT own:** `tests/features/`, `tests/steps/` (backend-supervisor)
+**Does NOT own:** `tests/steps/` (backend-supervisor); `packages/test-specs/` (shared-supervisor)
 
 **Tech stack:**
 - Tauri v2, Vite + React + TanStack Router + shadcn/ui, Playwright
