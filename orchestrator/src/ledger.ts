@@ -44,6 +44,19 @@ export interface RunRecord {
   pr?: string
   outcome: Outcome
   note?: string
+  /**
+   * Issue #817: populated only when `outcome === 'QUOTA'`, straight from the
+   * worker's own raw log — `engines.ts`'s `detectQuotaFromLog`. `resetHint`
+   * is the provider's own wording verbatim (e.g. "when the current 5-hour
+   * window ends", or "1:20pm (America/New_York)") so a human reading the
+   * ledger sees exactly what the provider said; `resetAt` is that hint
+   * resolved to an absolute epoch ms ONLY when it named a parseable clock
+   * time — `undefined` when the hint was a relative description with no
+   * clock time to resolve (the 5-hour-window case), which is precisely when
+   * `circuit.ts`'s `quotaBreaker` falls back to its own 60-minute default.
+   */
+  quotaResetHint?: string
+  quotaResetAt?: number
 }
 
 /** JSONL, not SQLite: a truncated final line costs one record; a locked

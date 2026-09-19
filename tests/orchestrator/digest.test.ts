@@ -233,6 +233,48 @@ describe('renderDigest', () => {
     })
   })
 
+  // Issue #817: a quota-shaped halt is self-healing (tick.ts clears it on its
+  // own once the embedded reset time passes) — it must never render as the
+  // same "🛑 FLEET HALTED / run resume" banner a human-declared halt gets,
+  // which would send an operator to run a command the condition does not
+  // need. Real 2026-09-18/19 evidence: the fleet sat halted on
+  // "failure breaker tripped: 7 consecutive failures" (then again "3
+  // consecutive failures") for hours with nobody told it was just a quota
+  // window, not a broken fleet.
+  describe('quota-exhaustion halt renders degraded, not halted (issue #817)', () => {
+    const quotaInput: DigestInput = {
+      halted: true,
+      haltReason: 'engine quota exhausted (opencode) — retry after 2026-09-19T06:30:00.000Z',
+      resumeCommand: resumeCommand(REPO_ROOT),
+      lanes: [{ id: 'android', mode: 'live' }],
+      recentRuns: [],
+      awaitingHuman: [],
+      rejections: [],
+      dependency: DEP_OK,
+    }
+
+    it('renders a degraded banner naming the engine and the resume time, not a halted one', () => {
+      const banner = computeBanner(quotaInput)
+      expect(banner.level).toBe('degraded')
+      expect(banner.text).toContain('degraded — engine quota exhausted until 2026-09-19T06:30:00.000Z')
+      expect(banner.text).not.toContain('HALTED')
+    })
+
+    it('the full digest never tells the operator to run resume for this condition', () => {
+      const out = renderDigest(quotaInput)
+      expect(out.startsWith('# ⚠️ FLEET DEGRADED')).toBe(true)
+      expect(out).not.toContain(quotaInput.resumeCommand)
+    })
+
+    it('a human-declared halt with an unrelated reason still renders the ordinary HALTED banner', () => {
+      const humanHalt: DigestInput = { ...quotaInput, haltReason: 'halted by hand' }
+      const banner = computeBanner(humanHalt)
+      expect(banner.level).toBe('halted')
+      expect(banner.text).toContain('HALTED')
+      expect(banner.text).toContain(quotaInput.resumeCommand)
+    })
+  })
+
   it('surfaces the dependency HEAD commit', () => {
     const out = renderDigest(baseInput)
     expect(out).toContain('abc123')

@@ -1,4 +1,4 @@
-import { checkBreakers, inQuotaCooldown } from './circuit.js'
+import { checkBreakers, inQuotaCooldown, isQuotaHaltReason, parseQuotaResumeAt } from './circuit.js'
 import { LIMITS, MAX_ATTEMPTS_PER_ITEM, type Lane } from './config.js'
 import { failedAttemptsIn, type Outcome, type RunRecord } from './ledger.js'
 import { runReviewLoop, type SecondOpinionInput, type SecondOpinionResult } from './review.js'
@@ -24,6 +24,9 @@ export interface DispatchOutcome {
    * would merge.
    */
   branchMismatch?: string
+  /** See `RunRecord.quotaResetHint`/`quotaResetAt` (ledger.ts). */
+  quotaResetHint?: string
+  quotaResetAt?: number
 }
 
 /**
@@ -76,6 +79,15 @@ export interface TickDeps {
   now(): number
   acquireLock(): { held: true; release(): void } | { held: false; heldByPid: number }
   checkHalt(): Promise<{ halted: boolean; reason?: string }>
+  /**
+   * Issue #817: the ONLY halt this fleet ever clears itself, and only when
+   * `checkHalt()`'s reason is quota-shaped (`isQuotaHaltReason`) AND the
+   * absolute reset time embedded in that reason (`parseQuotaResumeAt`) has
+   * passed `now()`. Any other halt — including a human-typed `llamenos-fleet
+   * halt` or a GitHub `halt`-labelled issue — is left exactly as `checkHalt`
+   * found it; only a human's `resume` clears those.
+   */
+  resumeFleet(): void
   readLedger(): RunRecord[]
   resumedAt(): number
   listItems(lane: Lane): Promise<ListResult>
@@ -409,17 +421,15 @@ async function runLiveDispatch(
       // The worker itself did not reach a mergeable state (BLOCKED, FAILED,
       // TIMEOUT, QUOTA), recorded as-is.
       //
-      // QUOTA specifically: this plumbing (the ledger outcome, the
-      // consecutive-failure breaker excluding it, `inQuotaCooldown`'s
-      // per-lane backoff above) is correct but currently UNREACHABLE against
-      // a real worker — `engines.ts`'s `statusToOutcome` has no status
-      // string that maps to `'QUOTA'`, because `dispatch-one.sh` has no
-      // quota-detection of its own yet. A real provider rate limit today
-      // surfaces as a plain `FAILED`, which feeds the failure-streak breaker
-      // and halts the fleet — safe, just less efficient than the per-lane
-      // cooldown this exists for. Do not assume QUOTA is live end-to-end
-      // until the engine side actually detects a quota condition and reports
-      // it through the status file.
+      // QUOTA specifically: issue #817 made this reachable against a real
+      // worker — `engines.ts`'s `dispatch()` now reads the worker's own raw
+      // log directly and reclassifies FAILED -> QUOTA when the runtime died
+      // at turn <= 1 on a provider quota rejection (`detectQuotaFromLog`),
+      // since `dispatch-one.sh` itself still has no quota-detection of its
+      // own. `result` carries `quotaResetHint`/`quotaResetAt` straight onto
+      // this ledger row when that happened, which is what `circuit.ts`'s
+      // `quotaBreaker` and the per-lane `inQuotaCooldown` backoff above both
+      // read back.
       final = { ...base, ...result }
     }
   } catch (e) {
@@ -477,8 +487,29 @@ export async function tick(deps: TickDeps): Promise<TickResult> {
 
     const halt = await deps.checkHalt()
     if (halt.halted) {
-      deps.log(`halted: ${halt.reason ?? 'unknown'}`)
-      return empty({ ran: true, halted: true, haltReason: halt.reason })
+      // Issue #817: the ONE halt this fleet clears itself. A quota-shaped
+      // reason (`engine quota exhausted (<engine>) — retry after <ISO>` —
+      // circuit.ts's `quotaBreaker`) carries its own resume time; once that
+      // has passed, sitting halted is not caution, it is just downtime a
+      // human has to notice and clear by hand. Any other reason — a human's
+      // `llamenos-fleet halt`, a GitHub `halt`-labelled issue, the plain
+      // consecutive-failures breaker — still requires that human `resume`,
+      // exactly as before.
+      if (isQuotaHaltReason(halt.reason)) {
+        const resumeAt = halt.reason !== undefined ? parseQuotaResumeAt(halt.reason) : undefined
+        if (resumeAt !== undefined && deps.now() >= resumeAt) {
+          deps.resumeFleet()
+          deps.log('RESUMED (quota window elapsed)')
+          // Fall through: this pass proceeds normally below, exactly as if
+          // it had never been halted.
+        } else {
+          deps.log(`halted (quota): ${halt.reason}`)
+          return empty({ ran: true, halted: true, haltReason: halt.reason })
+        }
+      } else {
+        deps.log(`halted: ${halt.reason ?? 'unknown'}`)
+        return empty({ ran: true, halted: true, haltReason: halt.reason })
+      }
     }
 
     const rows = deps.readLedger()

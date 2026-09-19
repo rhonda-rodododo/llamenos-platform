@@ -4,6 +4,7 @@ import type { Outcome, RunRecord } from './ledger.js'
 import type { LaneMode } from './config.js'
 import type { Rejection } from './select.js'
 import type { DependencyReport } from './dependency.js'
+import { isQuotaHaltReason, parseQuotaResumeAt } from './circuit.js'
 
 export interface LaneStatus {
   id: string
@@ -215,6 +216,22 @@ export interface Banner {
  */
 export function computeBanner(input: DigestInput): Banner {
   if (input.halted) {
+    // Issue #817: a quota-shaped halt is self-healing — `tick()` clears it on
+    // its own once the embedded reset time passes (see tick.ts's own halt
+    // handling) — so it must never read to an operator as the same kind of
+    // stop as a human-declared halt or a tripped consecutive-failure
+    // breaker, both of which sit there until a person runs `resume`.
+    // Rendered `degraded`, not `halted`, specifically so this banner never
+    // tells someone to run the one command (`resume`) that is not what this
+    // condition needs.
+    if (isQuotaHaltReason(input.haltReason)) {
+      const resumeAt = input.haltReason !== undefined ? parseQuotaResumeAt(input.haltReason) : undefined
+      const until = resumeAt !== undefined ? new Date(resumeAt).toISOString() : 'unknown'
+      return {
+        level: 'degraded',
+        text: ['# ⚠️ FLEET DEGRADED', `degraded — engine quota exhausted until ${until}`].join('\n'),
+      }
+    }
     return {
       level: 'halted',
       text: [

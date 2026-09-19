@@ -28,6 +28,7 @@ function baseDeps(over: Partial<TickDeps> = {}): TickDeps {
     now: () => 1000,
     acquireLock: () => ({ held: true, release: () => {} }),
     checkHalt: async () => ({ halted: false }),
+    resumeFleet: vi.fn(),
     readLedger: () => [],
     resumedAt: () => 0,
     listItems: async () => ({ ok: true as const, items: [item()] }),
@@ -274,6 +275,25 @@ describe('tick: live dispatch pipeline (task 7)', () => {
     const d = baseDeps({ secondOpinion: vi.fn(async () => ({ verdict: 'FAIL' as const, text: 'VERDICT: FAIL — nope' })) })
     await tick(d)
     expect(d.record).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'REJECTED' }))
+  })
+
+  // Issue #817: a QUOTA outcome from dispatch() (engines.ts's own
+  // FAILED -> QUOTA reclassification off the worker's raw log) is recorded
+  // as-is, exactly like BLOCKED/FAILED/TIMEOUT — never run through the
+  // verify/review pipeline (there is no diff to verify: the worker never
+  // even started), and never armed.
+  it('a QUOTA outcome skips verify/review entirely and records the reset fields on the ledger row', async () => {
+    const dispatch = vi.fn(async (): Promise<DispatchOutcome> =>
+      ({ outcome: 'QUOTA', note: 'dep:abc | quota reset: when the current 5-hour window ends', quotaResetHint: 'when the current 5-hour window ends' }))
+    const d = baseDeps({ dispatch })
+    await tick(d)
+    expect(d.verifyMechanical).not.toHaveBeenCalled()
+    expect(d.secondOpinion).not.toHaveBeenCalled()
+    expect(d.enableAutoMerge).not.toHaveBeenCalled()
+    expect(d.record).toHaveBeenCalledWith(expect.objectContaining({
+      outcome: 'QUOTA',
+      quotaResetHint: 'when the current 5-hour window ends',
+    }))
   })
 })
 
