@@ -26,6 +26,13 @@ class CaseStatusSteps : BaseSteps() {
 
     @When("I tap the status pill")
     fun iTapTheStatusPill() {
+        // Defensive wait: the case detail body (which hosts the status pill)
+        // loads asynchronously after "a case detail is open" navigates in.
+        // Don't rely solely on the Given step's own wait — assert here too so
+        // this step is robust regardless of what precedes it.
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithTag("case-status-pill").fetchSemanticsNodes().isNotEmpty()
+        }
         onNodeWithTag("case-status-pill").assertIsDisplayed()
         onNodeWithTag("case-status-pill").performClick()
         composeRule.waitForIdle()

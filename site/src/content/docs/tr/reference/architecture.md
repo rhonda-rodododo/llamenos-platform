@@ -166,7 +166,7 @@ Tüm olaylar geçicidir (tür 20001) ve hub anahtarıyla şifrelenir. Olaylar, r
     | Olay içeriğini hub anahtarıyla şifreler
     | WebSocket olayı olarak imzalar (Schnorr)
     v
-WebSocket rölesi (WebSocket rölesi / Nosflare)
+WebSocket rölesi
     |
     | Abonelere yayınlar
     v
