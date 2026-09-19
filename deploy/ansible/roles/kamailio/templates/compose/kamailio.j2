@@ -5,7 +5,9 @@ services:
     # NOTE: "kamailio/kamailio" does not exist on Docker Hub and ":5.7" was
     # never a published tag anywhere (see #722). Pinned to the official
     # ghcr.io/kamailio/kamailio:5.7.1-bookworm image (earliest published
-    # 5.7.x patch) per scripts/update-image-digests.sh
+    # 5.7.x patch). scripts/update-image-digests.sh is owned by a different
+    # lane and still lists the old ref; needs a follow-up from that lane so
+    # refreshes don't revert this pin.
     image: ghcr.io/kamailio/kamailio:5.7.1-bookworm@sha256:a5c0564fe4bf12315ec3aed97303bc63207c0cec0c5b1150ea6500f4747163e9  # pinned 2026-09-19
     restart: unless-stopped
     ports:

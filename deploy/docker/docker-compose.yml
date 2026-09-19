@@ -184,7 +184,9 @@ services:
     # NOTE: "0.4.1" was never a published tag (see #722) — no bare/untagged
     # release exists for this image, only -cpu/-cuda variants. Pinned to
     # 0.4.0-cpu (the earliest published 0.4.x patch, matching the cpu default
-    # in WHISPER__DEVICE below) per scripts/update-image-digests.sh
+    # in WHISPER__DEVICE below). scripts/update-image-digests.sh is owned by
+    # a different lane and still lists the old ref; needs a follow-up from
+    # that lane so refreshes don't revert this pin.
     image: fedirz/faster-whisper-server:0.4.0-cpu@sha256:f77aaf85e2e811aae96a60b04c85ff7cb0e0f2be6729c6fd7600340842412539  # pinned 2026-09-19
     profiles: ["transcription"]
     restart: unless-stopped
@@ -257,7 +259,9 @@ services:
     # kamailio-ci/kamailio-store, neither suitable for production) and ":5.7"
     # was never a published tag anywhere (see #722). The project's official
     # runtime images live at ghcr.io/kamailio/kamailio; pinned to 5.7.1-bookworm,
-    # the earliest published patch in the 5.7.x line, per scripts/update-image-digests.sh
+    # the earliest published patch in the 5.7.x line. scripts/update-image-digests.sh
+    # is owned by a different lane and still lists the old ref; needs a
+    # follow-up from that lane so refreshes don't revert this pin.
     image: ghcr.io/kamailio/kamailio:5.7.1-bookworm@sha256:a5c0564fe4bf12315ec3aed97303bc63207c0cec0c5b1150ea6500f4747163e9  # pinned 2026-09-19
     profiles: ["telephony"]
     restart: unless-stopped
