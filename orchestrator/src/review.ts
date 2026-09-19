@@ -559,6 +559,24 @@ function isOpencodeErrorEvent(e: unknown): e is OpencodeErrorEvent {
   return typeof e === 'object' && e !== null && (e as { type?: unknown }).type === 'error'
 }
 
+interface OpencodeStepStartEvent { type: 'step_start'; part: { type: 'step-start' } }
+
+/**
+ * `{"type":"step_start","part":{"type":"step-start",…}}` — one model turn
+ * beginning, confirmed against the pinned 1.18.30 binary's own
+ * `--format json` output (captured live traces, not the SDK's docs alone —
+ * see the long comment above `enforceOpencodeTurnCap`, which is the reason
+ * this guard exists at all). A turn may pack in several `tool_use` events
+ * before its matching `step_finish`, so counting `step_start` occurrences —
+ * not tool calls — is what actually matches what `--max-turns` caps for
+ * `claude`.
+ */
+function isOpencodeStepStartEvent(e: unknown): e is OpencodeStepStartEvent {
+  if (typeof e !== 'object' || e === null) return false
+  const ev = e as { type?: unknown; part?: { type?: unknown } }
+  return ev.type === 'step_start' && ev.part?.type === 'step-start'
+}
+
 /**
  * Reads `opencode run --format json` output and keeps ONLY the model's own
  * assistant text parts (`{"type":"text","part":{"type":"text","text":…}}`),
@@ -650,6 +668,131 @@ function decodeEngineOutput(engine: EngineId, stdout: string, stderr: string): O
  * reviewer must never be able to do. Neither engine is ever pointed at the
  * author's real worktree — see the V1 fix note above `gitState`.
  */
+
+/** How long `enforceOpencodeTurnCap` waits after `SIGTERM` before escalating
+ *  to `SIGKILL` — the same assumption `timeout` (execFile's own option)
+ *  already makes about a child that does not exit promptly on its own. */
+const KILL_GRACE_MS = 5_000
+
+/**
+ * #845: `opencode run` has no `--max-turns` equivalent — confirmed against
+ * the pinned 1.18.30 binary's own `--help`, which lists no turn or
+ * tool-call flag at all (`claude` gets `--max-turns` directly; opencode
+ * does not). Until this, `HIGH_IMPACT_MAX_TURNS`/`DEFAULT_MAX_TURNS` were
+ * silently unenforced for opencode: the only backstop was
+ * `HIGH_IMPACT_TIMEOUT_MS`/`DEFAULT_TIMEOUT_MS`, a wall-clock kill. Wall
+ * clock is not the same guarantee as a turn cap — a reviewer stuck making
+ * many fast, cheap tool calls per turn can burn through its entire turn
+ * budget (and the paid, weekly-quota'd provider behind it) without ever
+ * approaching the timeout, which is exactly the silent-quota-exhaustion
+ * failure mode #812 exists to prevent.
+ *
+ * This installs a real-time listener on the child's own stdout — the SAME
+ * `--format json` event stream `opencodeAssistantText` parses after the
+ * fact, read here incrementally as bytes arrive instead — and counts
+ * `step_start` events (see `isOpencodeStepStartEvent`; each one is a model
+ * turn, verified against real captured traces from the pinned 1.18.30
+ * binary, not guessed at from the SDK's docs). `maxTurns` turns are allowed
+ * to run to completion, tool calls and all; the instant a `(maxTurns + 1)`th
+ * turn BEGINS, the child is killed outright — `SIGTERM` first, `SIGKILL`
+ * after `KILL_GRACE_MS` if it is somehow still alive — never waiting for
+ * that extra turn's own tool calls or text to finish first. This is
+ * independent of, and layered on top of, the existing wall-clock `timeout`
+ * passed to `execFileAsync`.
+ *
+ * A killed child rejects through the exact same path a timed-out one
+ * already does (`invokeVerifierEngine`'s catch block), so it is recorded
+ * UNREADABLE — never a pass — by code that already existed; this function
+ * only decides WHEN to kill, earlier than the wall clock would have.
+ *
+ * A no-op against the unit tests' mocked `execFile`: `child` is `undefined`
+ * there (the mock never returns a real `ChildProcess`), and every access
+ * below is behind an optional chain — see `enforceOpencodeTurnCap`'s own
+ * tests in review.test.ts for the fake-child harness that exercises the
+ * real logic instead.
+ */
+export function enforceOpencodeTurnCap(
+  child: import('node:child_process').ChildProcess | undefined,
+  maxTurns: number,
+): { tripped: () => boolean; dispose: () => void } {
+  let turns = 0
+  let tripped = false
+  let buffered = ''
+  let killTimer: NodeJS.Timeout | undefined
+
+  const onData = (chunk: Buffer | string): void => {
+    buffered += chunk.toString()
+    const lines = buffered.split('\n')
+    buffered = lines.pop() ?? '' // the last, possibly-incomplete line is carried to the next chunk
+    for (const raw of lines) {
+      const line = raw.trim()
+      if (!line.startsWith('{')) continue
+      let event: unknown
+      try {
+        event = JSON.parse(line)
+      } catch {
+        continue
+      }
+      if (!isOpencodeStepStartEvent(event)) continue
+      turns += 1
+      if (turns > maxTurns && !tripped) {
+        tripped = true
+        child?.kill('SIGTERM')
+        killTimer = setTimeout(() => {
+          if (child !== undefined && child.exitCode === null && child.signalCode === null) child.kill('SIGKILL')
+        }, KILL_GRACE_MS)
+        killTimer.unref?.()
+      }
+    }
+  }
+
+  child?.stdout?.on('data', onData)
+
+  return {
+    tripped: () => tripped,
+    dispose: () => {
+      child?.stdout?.off('data', onData)
+      if (killTimer !== undefined) clearTimeout(killTimer)
+    },
+  }
+}
+
+/**
+ * Folds `enforceOpencodeTurnCap`'s verdict into an `EngineRun`, so a human
+ * reading an UNREADABLE verdict sees WHY — "the reviewer was killed for
+ * exceeding its turn budget" reads nothing like "the engine was
+ * unreachable" or "it timed out," and conflating those was exactly G3's
+ * complaint (`buildReviewUnavailableComment`) about an earlier failure mode
+ * in this same file.
+ *
+ * Deliberately DISCARDS `decoded.assistantText` rather than appending the
+ * note alongside it: `toSecondOpinion` (below) shows `assistantText` in
+ * preference to `diagnostics` whenever it is non-empty, so a partial
+ * `VERDICT: PASS` written on an early turn — before a LATER turn ran past
+ * the cap and got the process killed — would otherwise still surface as the
+ * shown text, silently burying the fact that the run never finished. A
+ * killed run's partial text was never a completed answer regardless of what
+ * it happens to contain; folding it into `diagnostics` instead (after the
+ * note, for forensic value) guarantees the note is what a human — and
+ * `toSecondOpinion`'s own fallback — actually sees. `parseVerdict` is a
+ * moot point here too: `reached: false` already forces UNREADABLE
+ * unconditionally, but voiding `assistantText` closes the door on a future
+ * refactor that reads it before checking `reached`.
+ */
+function withTurnCapDiagnostics(
+  decoded: Omit<EngineRun, 'reached'>,
+  turnCap: { tripped: () => boolean } | undefined,
+  maxTurns: number,
+): Omit<EngineRun, 'reached'> {
+  if (turnCap?.tripped() !== true) return decoded
+  const note = `fleet/review: opencode reviewer exceeded its ${maxTurns}-turn cap and was killed before it could finish (#845) — ` +
+    'any partial output below predates the kill and was never a completed answer.'
+  return {
+    assistantText: '',
+    diagnostics: [note, decoded.assistantText, decoded.diagnostics].filter((s) => s.length > 0).join('\n'),
+  }
+}
+
 async function invokeVerifierEngine(input: {
   engine: EngineId
   exportDir: string
@@ -680,27 +823,36 @@ async function invokeVerifierEngine(input: {
       args = ['run', '--pure', '--model', cfg.model, '--format', 'json', '--dir', projectRoot]
     }
 
+    // execFile (unlike execFileSync) has no `input` option — the prompt must
+    // be written to the child's own stdin instead. `promisify(execFile)`
+    // still returns a `PromiseWithChild`, so `.child` is available
+    // synchronously before the promise settles.
+    const call = execFileAsync(cfg.binary, args, {
+      cwd: projectRoot,
+      env,
+      timeout: input.timeoutMs,
+      maxBuffer: 16 * 1024 * 1024,
+    })
+    call.child?.stdin?.end(input.prompt)
+    // #845: only opencode needs this — claude's own `--max-turns` (above) is
+    // already a genuine hard cap, enforced by that CLI itself, independent
+    // of wall clock.
+    const turnCap = input.engine === 'opencode' ? enforceOpencodeTurnCap(call.child, input.maxTurns) : undefined
     try {
-      // execFile (unlike execFileSync) has no `input` option — the prompt must
-      // be written to the child's own stdin instead. `promisify(execFile)`
-      // still returns a `PromiseWithChild`, so `.child` is available
-      // synchronously before the promise settles.
-      const call = execFileAsync(cfg.binary, args, {
-        cwd: projectRoot,
-        env,
-        timeout: input.timeoutMs,
-        maxBuffer: 16 * 1024 * 1024,
-      })
-      call.child?.stdin?.end(input.prompt)
       const { stdout, stderr } = await call
-      return { reached: true, ...decodeEngineOutput(input.engine, stdout, stderr ?? '') }
+      const decoded = decodeEngineOutput(input.engine, stdout, stderr ?? '')
+      return { reached: true, ...withTurnCapDiagnostics(decoded, turnCap, input.maxTurns) }
     } catch (e) {
-      // A crash, a timeout, or a missing binary. An unreachable reviewer is
-      // not a pass — keep whatever partial output exists (often none) for the
-      // log, and let the caller record this explicitly as UNREADABLE rather
-      // than silently falling through parseVerdict's own "no VERDICT line" path.
+      // A crash, a timeout, a turn-cap kill, or a missing binary. An
+      // unreachable reviewer is not a pass — keep whatever partial output
+      // exists (often none) for the log, and let the caller record this
+      // explicitly as UNREADABLE rather than silently falling through
+      // parseVerdict's own "no VERDICT line" path.
       const err = e as { stdout?: string; stderr?: string }
-      return { reached: false, ...decodeEngineOutput(input.engine, err.stdout ?? '', err.stderr ?? '') }
+      const decoded = decodeEngineOutput(input.engine, err.stdout ?? '', err.stderr ?? '')
+      return { reached: false, ...withTurnCapDiagnostics(decoded, turnCap, input.maxTurns) }
+    } finally {
+      turnCap?.dispose()
     }
   } finally {
     for (const dir of scratch) await rm(dir, { recursive: true, force: true })
