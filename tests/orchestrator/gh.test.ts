@@ -10,6 +10,24 @@ describe('gh', () => {
   it('does not duplicate an explicit -R', () => {
     expect(ghArgs(['issue', 'list', '-R', 'other/repo'])).toEqual(['issue', 'list', '-R', 'other/repo'])
   })
+
+  // `gh api` rejects `-R`/`--repo` outright (`unknown shorthand flag: 'R' in
+  // -R`) — verified against the real binary. This was silently breaking
+  // every artifact-cache lookup in `review-cache.ts` (`gh(['api', ...])`),
+  // which always embeds the repo directly in the endpoint path
+  // (`repos/${REPO}/...`) and never needs `-R` at all.
+  it('never appends -R to an api call — gh api has no such flag', () => {
+    expect(ghArgs(['api', 'repos/owner/repo/actions/artifacts?name=x'])).toEqual([
+      'api', 'repos/owner/repo/actions/artifacts?name=x',
+    ])
+  })
+
+  it('leaves an api call alone even if it already carries an explicit -R/--repo-shaped string', () => {
+    // Not a real use case (api calls never pass -R today), but ghArgs must
+    // stay a no-op for 'api' regardless of what else is in args — the repo
+    // is always embedded in the endpoint, never appended as a flag.
+    expect(ghArgs(['api', 'user'])).toEqual(['api', 'user'])
+  })
 })
 
 /**

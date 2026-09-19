@@ -39,6 +39,78 @@ export function rateBreaker(rows: RunRecord[], limits: Limits, now: number): str
     : undefined
 }
 
+/**
+ * Issue #817: the exact halt-reason prefix `quotaBreaker` writes and
+ * `isQuotaHaltReason`/`parseQuotaResumeAt` read back, so a human (or the
+ * digest) has one string to grep for and this file has one place that can
+ * ever go out of sync with itself.
+ */
+export const QUOTA_HALT_PREFIX = 'engine quota exhausted'
+
+/** True for exactly the halt reasons `quotaBreaker` produces below — never
+ *  for a human-typed halt, a GitHub `halt`-labelled issue, or the plain
+ *  consecutive-failures/rate breakers, all of which must still require a
+ *  human `resume`. */
+export function isQuotaHaltReason(reason: string | undefined): boolean {
+  return reason !== undefined && reason.startsWith(QUOTA_HALT_PREFIX)
+}
+
+const QUOTA_RETRY_AFTER_RE = /retry after (.+)$/
+
+/** Extracts the absolute ISO instant `quotaBreaker` embedded in its own halt
+ *  reason. `undefined` for anything that is not that exact shape — a reason
+ *  string a human wrote by hand (e.g. `halt "engine quota exhausted, just
+ *  checking"`) must never be treated as carrying a real resume time. */
+export function parseQuotaResumeAt(reason: string): number | undefined {
+  const raw = QUOTA_RETRY_AFTER_RE.exec(reason)?.[1]
+  if (raw === undefined) return undefined
+  const ms = Date.parse(raw)
+  return Number.isFinite(ms) ? ms : undefined
+}
+
+/** Falls back to a flat hour when nothing among the tripping QUOTA rows
+ *  parsed an absolute reset time (e.g. Kimi's "resets when the current
+ *  5-hour window ends" — a real window, but not a clock time this fleet can
+ *  resolve on its own). Halting forever on an un-parseable hint would be
+ *  worse than a bounded, slightly-too-long wait. */
+const QUOTA_DEFAULT_COOLDOWN_MS = 3_600_000
+
+/**
+ * Issue #817: `>= 2` `QUOTA` outcomes for the SAME engine, since the last
+ * resume, is treated as that whole engine's quota being exhausted
+ * fleet-wide — not one unlucky worker. Grouped by `engine` (not `lane`): a
+ * provider-side 5-hour or weekly usage limit is shared across every lane
+ * dispatched through that engine's account, so two DIFFERENT lanes each
+ * hitting it once is exactly the same signal one lane hitting it twice
+ * would be, and a single QUOTA row is deliberately not enough on its own —
+ * a lone rejection could still be a transient blip.
+ *
+ * Never returns anything from `FAILED`/`TIMEOUT`/`REJECTED` rows: the
+ * consecutive-failure breaker already owns those, and its own contract
+ * (`failureBreaker`, above) explicitly excludes `QUOTA` from that count —
+ * this function's whole reason to exist is to give quota exhaustion a
+ * SEPARATE, self-describing, self-healing halt path instead of it silently
+ * feeding "N consecutive failures".
+ */
+export function quotaBreaker(rows: RunRecord[], resumedAt: number, now: number): string | undefined {
+  const quotaRows = rows.filter((x) => x.ts > resumedAt && x.outcome === 'QUOTA')
+  const byEngine = new Map<string, RunRecord[]>()
+  for (const r of quotaRows) {
+    const list = byEngine.get(r.engine) ?? []
+    list.push(r)
+    byEngine.set(r.engine, list)
+  }
+  for (const [engine, list] of byEngine) {
+    if (list.length < 2) continue
+    const knownResets = list
+      .map((r) => r.quotaResetAt)
+      .filter((v): v is number => typeof v === 'number')
+    const resumeAt = knownResets.length > 0 ? Math.max(...knownResets) : now + QUOTA_DEFAULT_COOLDOWN_MS
+    return `${QUOTA_HALT_PREFIX} (${engine}) — retry after ${new Date(resumeAt).toISOString()}`
+  }
+  return undefined
+}
+
 export function failureBreaker(rows: RunRecord[], limits: Limits, resumedAt: number): string | undefined {
   const considered = rows
     .filter((x) => x.ts > resumedAt)
@@ -76,6 +148,20 @@ export function checkBreakers(rows: RunRecord[], limits: Limits, now: number, re
   if (rate !== undefined) {
     halt(`rate breaker tripped: ${rate}`)
     return rate
+  }
+  // Checked BEFORE the consecutive-failure breaker, and — unlike rate/failure
+  // — halted with its OWN reason text verbatim, never wrapped in a "breaker
+  // tripped:" prefix: that exact string (`engine quota exhausted (<engine>)
+  // — retry after <ISO>`) is what `tick()`'s auto-resume path and the
+  // digest/status "degraded" banner both parse back out of the halt-reason
+  // file (`isQuotaHaltReason`/`parseQuotaResumeAt`). A `QUOTA` outcome never
+  // feeds `failureBreaker`'s streak (see `STREAK_FAILURES`, above) — this is
+  // what gives the SAME condition a separate, self-healing halt path instead
+  // of it eventually presenting as an opaque "N consecutive failures".
+  const quota = quotaBreaker(rows, resumedAt, now)
+  if (quota !== undefined) {
+    halt(quota)
+    return quota
   }
   const failure = failureBreaker(rows, limits, resumedAt)
   if (failure !== undefined) {

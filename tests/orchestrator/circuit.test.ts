@@ -1,10 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { rateBreaker, failureBreaker, inQuotaCooldown } from '../../orchestrator/src/circuit.js'
+import {
+  rateBreaker, failureBreaker, inQuotaCooldown, quotaBreaker, isQuotaHaltReason, parseQuotaResumeAt,
+} from '../../orchestrator/src/circuit.js'
 import type { RunRecord, Outcome } from '../../orchestrator/src/ledger.js'
 
 const LIMITS = { maxDispatchesPerHour: 6, consecutiveFailuresToHalt: 3, quotaCooldownMs: 3_600_000 }
-const r = (outcome: Outcome, ts: number, lane = 'backend'): RunRecord =>
-  ({ ts, runId: 'x', lane, itemId: '1', itemName: 'n', engine: 'claude', outcome })
+const r = (outcome: Outcome, ts: number, lane = 'backend', overrides: Partial<RunRecord> = {}): RunRecord =>
+  ({ ts, runId: 'x', lane, itemId: '1', itemName: 'n', engine: 'claude', outcome, ...overrides })
 
 describe('rateBreaker', () => {
   it('trips above the hourly dispatch ceiling', () => {
@@ -80,5 +82,93 @@ describe('inQuotaCooldown', () => {
     // past this limits object's 30s cooldown — proves the value actually read
     // is limits.quotaCooldownMs, not a hardcoded default.
     expect(inQuotaCooldown([r('QUOTA', 1000, 'ios')], 'ios', 1000 + 60_000, shortCooldown)).toBe(false)
+  })
+})
+
+// Issue #817: real 2026-09-18/19 incident — two workers on the same engine
+// (opencode/Kimi) both died at turn <= 1 on a provider quota rejection, and
+// the fleet halted with "failure breaker tripped: 7 consecutive failures"
+// (2026-09-18T15:30:12Z) then again with "3 consecutive failures"
+// (2026-09-19T05:30:13Z) — a reason that named nothing about WHY, and a halt
+// that then sat for hours until a human happened to notice and clear it by
+// hand. `quotaBreaker` gives that exact condition its own, separate,
+// self-describing halt path.
+describe('quotaBreaker', () => {
+  it('does not trip on a single QUOTA outcome — one rejection could still be a blip', () => {
+    expect(quotaBreaker([r('QUOTA', 1000, 'android', { engine: 'opencode' })], 0, 2000)).toBeUndefined()
+  })
+
+  it('trips on two QUOTA outcomes for the SAME engine, even across different lanes/items', () => {
+    const rows = [
+      r('QUOTA', 1000, 'android', { engine: 'opencode', itemId: '765' }),
+      r('QUOTA', 2000, 'backend', { engine: 'opencode', itemId: '729' }),
+    ]
+    const reason = quotaBreaker(rows, 0, 3000)
+    expect(reason).toMatch(/^engine quota exhausted \(opencode\) — retry after /)
+    expect(reason).not.toMatch(/consecutive/i)
+  })
+
+  it('does NOT trip when two QUOTA outcomes are split across two DIFFERENT engines', () => {
+    const rows = [
+      r('QUOTA', 1000, 'android', { engine: 'opencode' }),
+      r('QUOTA', 2000, 'ios', { engine: 'claude' }),
+    ]
+    expect(quotaBreaker(rows, 0, 3000)).toBeUndefined()
+  })
+
+  it('ignores QUOTA rows recorded before the resume marker', () => {
+    const rows = [r('QUOTA', 1000, 'a', { engine: 'opencode' }), r('QUOTA', 2000, 'b', { engine: 'opencode' })]
+    expect(quotaBreaker(rows, 2500, 3000)).toBeUndefined()
+  })
+
+  it('retries at the latest known reset time among the tripping rows', () => {
+    const rows = [
+      r('QUOTA', 1000, 'a', { engine: 'opencode', quotaResetAt: 5000 }),
+      r('QUOTA', 2000, 'b', { engine: 'opencode', quotaResetAt: 9000 }),
+    ]
+    const reason = quotaBreaker(rows, 0, 3000) ?? ''
+    expect(reason).toContain(new Date(9000).toISOString())
+  })
+
+  it('falls back to a 60-minute cooldown from now when no tripping row parsed an absolute reset time', () => {
+    // The real fleet-android-765 fixture: "reset when the current 5-hour
+    // window ends" has no clock time engines.ts can resolve, so
+    // `quotaResetAt` is left unset on the ledger row (see engines.test.ts).
+    const rows = [r('QUOTA', 1000, 'a', { engine: 'opencode' }), r('QUOTA', 2000, 'b', { engine: 'opencode' })]
+    const now = 3000
+    const reason = quotaBreaker(rows, 0, now) ?? ''
+    expect(reason).toContain(new Date(now + 3_600_000).toISOString())
+  })
+
+  it('never fires from FAILED/TIMEOUT/REJECTED rows — only QUOTA counts', () => {
+    const rows = [r('FAILED', 1000, 'a', { engine: 'opencode' }), r('TIMEOUT', 2000, 'b', { engine: 'opencode' })]
+    expect(quotaBreaker(rows, 0, 3000)).toBeUndefined()
+  })
+})
+
+describe('isQuotaHaltReason', () => {
+  it('is true for exactly the shape quotaBreaker produces', () => {
+    expect(isQuotaHaltReason('engine quota exhausted (opencode) — retry after 2026-09-19T06:30:00.000Z')).toBe(true)
+  })
+  it('is false for a human-declared halt, a rate breaker, or the consecutive-failure breaker', () => {
+    expect(isQuotaHaltReason('halted by hand')).toBe(false)
+    expect(isQuotaHaltReason('rate breaker tripped: dispatch rate 9/h exceeds ceiling of 8')).toBe(false)
+    expect(isQuotaHaltReason('failure breaker tripped: 3 consecutive failures since last success')).toBe(false)
+  })
+  it('is false for undefined', () => {
+    expect(isQuotaHaltReason(undefined)).toBe(false)
+  })
+})
+
+describe('parseQuotaResumeAt', () => {
+  it('extracts the absolute ISO instant quotaBreaker embedded', () => {
+    const at = parseQuotaResumeAt('engine quota exhausted (opencode) — retry after 2026-09-19T06:30:00.000Z')
+    expect(at).toBe(Date.parse('2026-09-19T06:30:00.000Z'))
+  })
+  it('returns undefined for a reason with no parseable "retry after" clause', () => {
+    expect(parseQuotaResumeAt('engine quota exhausted, just checking')).toBeUndefined()
+  })
+  it('returns undefined for an unrelated halt reason', () => {
+    expect(parseQuotaResumeAt('3 consecutive failures since last success')).toBeUndefined()
   })
 })
