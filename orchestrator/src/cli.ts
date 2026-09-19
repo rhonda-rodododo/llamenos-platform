@@ -33,6 +33,7 @@ import { tick, type TickDeps, type TickResult, type SettleInput, type DispatchOu
 import type { WorkItem } from './source.js'
 import { renderDigest, resumeCommand, waitingOnHuman, type DigestInput, type LaneStatus } from './digest.js'
 import { deriveItemStatus, renderItemStatus, type PrFacts, type PrState } from './status.js'
+import { runBoard } from './board.js'
 import { notify } from './notify.js'
 import { FLEET_DIR, LOG_FILE, HALT_REASON_FILE, DISPATCH_SCRIPT, FLEET_ENV_FILE } from './paths.js'
 import { REPO, gh, ghJson } from './gh.js'
@@ -1265,6 +1266,11 @@ const HANDLERS: Record<string, CommandHandler> = {
   'review-gate': () => runReviewGate(),
   plan: () => runPlan(),
   integrate: () => runIntegrate(),
+  // The deterministic gate decision table (board.ts) — read-only: derives
+  // every PR's action live from `gh` and the fleet's own halt state, never
+  // labels/approves/merges/re-runs anything. `--porcelain` anywhere in argv
+  // selects the machine-readable form.
+  board: (rest) => runBoard(rest),
 }
 
 /** Every subcommand name this CLI actually implements — see `HANDLERS`. */
