@@ -16,10 +16,9 @@ import type { Env } from '../types'
 import type { IdentityService } from '../services/identity'
 import { NtfyClient } from './ntfy-client'
 import { createLogger } from './logger'
+import { getApnsVoipTopic } from './apns-topic'
 
 const logger = createLogger('voip-push')
-
-const APNS_BUNDLE_ID = 'org.llamenos.mobile'
 
 /**
  * Dispatch VoIP push using IdentityService instead of DO stubs.
@@ -76,7 +75,7 @@ async function sendApnsVoipPush(
       team: env.APNS_TEAM_ID!,
       keyId: env.APNS_KEY_ID!,
       signingKey: env.APNS_KEY_P8!,
-      defaultTopic: `${APNS_BUNDLE_ID}.voip`, // VoIP topic
+      defaultTopic: getApnsVoipTopic(env), // VoIP topic — `<bundle id>.voip`
     })
 
     const { PushType, Priority } = await import('@fivesheepco/cloudflare-apns2')
