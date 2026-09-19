@@ -48,6 +48,8 @@ interface PushLogEntry {
 interface PushHubDispatchState {
   volunteerPubkey?: string
   capturedEntries?: PushLogEntry[]
+  apnsTopic?: string
+  apnsVoipTopic?: string
 }
 
 function getPushState(world: Record<string, unknown>): PushHubDispatchState {
@@ -211,4 +213,34 @@ Then('the push payload should have a conversationId field', ({ world }) => {
   const entry = push.capturedEntries![0]
   expect(entry.wakePayload.conversationId).toBeDefined()
   expect(entry.wakePayload.conversationId!.length).toBeGreaterThan(0)
+})
+
+// ── APNs topic (Issue #724) ──────────────────────────────────────────
+
+// The test environment has no real APNs credentials, so a real ApnsClient
+// send never happens. This queries the same derivation (lib/apns-topic.ts)
+// that push-dispatch.ts and voip-push.ts use to build the real ApnsClient's
+// `defaultTopic`, which the underlying @fivesheepco/cloudflare-apns2 library
+// places directly into the outgoing `apns-topic` HTTP header (verified in
+// apps/worker/__tests__/unit/apns-topic.test.ts by mocking fetch against a
+// real ApnsClient/Notification pair).
+When('the backend computes the outgoing APNs topic for a push', async ({ request, world }) => {
+  const url = `${BACKEND_BASE_URL}/api/test-apns-topic`
+  const res = await request.get(url, { headers: devHeaders() })
+  expect(res.ok()).toBeTruthy()
+
+  const body = await res.json() as { topic: string; voipTopic: string }
+  const push = getPushState(world)
+  push.apnsTopic = body.topic
+  push.apnsVoipTopic = body.voipTopic
+})
+
+Then('the outgoing apns-topic header should equal {string}', ({ world }, expectedTopic: string) => {
+  const push = getPushState(world)
+  expect(push.apnsTopic).toBe(expectedTopic)
+})
+
+Then('the outgoing VoIP apns-topic header should equal {string}', ({ world }, expectedTopic: string) => {
+  const push = getPushState(world)
+  expect(push.apnsVoipTopic).toBe(expectedTopic)
 })
