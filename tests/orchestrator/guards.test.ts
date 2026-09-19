@@ -780,6 +780,109 @@ describe('rail: fleet/review runs once per review label, not on every push', () 
 })
 
 /**
+ * #812: a release PR (knope, title `chore(release): v...`) was permanently
+ * unmergeable. `changes` (ci.yml) and its ios-e2e.yml twin both carried
+ * `if: "!startsWith(github.event.head_commit.message, 'chore(release):')"`,
+ * unconditionally, on a workflow that ALSO triggers on `pull_request` and
+ * `merge_group`. `github.event.head_commit` only exists on a `push`
+ * payload — on every other event it is `null`, and `startsWith(null, ...)`
+ * coerces to `startsWith('', ...)`, which is `false`, so the negated guard
+ * happened to evaluate to "run" there. That is an accident of null
+ * coercion, not a scoped condition: the day this job (or one shaped like
+ * it) gains any OTHER push-shaped trigger, or GitHub's null-coercion
+ * behavior for a removed context field ever changes, the same starvation
+ * reappears from a different angle. `ci-status`, `gitleaks`, `fleet/verify`
+ * and `fleet/review` are all REQUIRED contexts (ruleset 15885614); a
+ * required context that never reports blocks a merge exactly like a red
+ * one, and unlike a plain bug this one is invisible in a diff review — the
+ * guard reads correct in isolation, it only starves on the specific event
+ * type its author never pictured a release commit arriving as.
+ *
+ * The fix pins the scope explicitly instead of relying on the coercion:
+ * `github.event_name != 'push' || !startsWith(...)`. On `push`, behavior is
+ * unchanged (the original, since-#812 intent — see commit 60b1e6c69,
+ * `fix(security): audit R6 medium`, which introduced this exact guard on
+ * the (now-removed) `audit` job to skip its own then-adjacent `version` job
+ * on the automated release commit — knope's PR-based release flow, and
+ * therefore any `pull_request` shape for a release commit, did not exist
+ * yet). On every other event, the first clause short-circuits the guard to
+ * always-run, by construction rather than by what a missing field happens
+ * to coerce to.
+ */
+describe('rail: the release-commit guard never starves a pull_request/merge_group run (#812)', () => {
+  const workflowYaml = (file: string): string =>
+    readFileSync(join(process.cwd(), '.github', 'workflows', file), 'utf8')
+
+  /** Job block extraction — same convention as the other describe blocks in
+   *  this file: from a job's `  <name>:` header to the next job at the same
+   *  two-space indentation. */
+  function jobBlock(text: string, name: string): string {
+    const jobHeaderRe = /\n {2}([a-zA-Z0-9_-]+):\n/g
+    const starts: { name: string; index: number }[] = []
+    for (const m of text.matchAll(jobHeaderRe)) starts.push({ name: m[1] as string, index: m.index })
+    const at = starts.findIndex((s) => s.name === name)
+    if (at === -1) throw new Error(`no "${name}:" job found in this workflow file — the grep must not pass vacuously`)
+    const end = at + 1 < starts.length ? starts[at + 1]?.index : text.length
+    return text.slice(starts[at]?.index, end)
+  }
+
+  /** The JOB-level `if:` — four-space indentation, before `steps:`, matching
+   *  this file's other `jobLevelIf` helpers. */
+  function jobLevelIf(block: string): string {
+    const beforeSteps = block.split(/\n {4}steps:\n/)[0] ?? block
+    return beforeSteps.match(/\n {4}if:\s*(.+)/)?.[1] ?? ''
+  }
+
+  /**
+   * Evaluates ONLY the exact two-clause shape this guard is pinned to
+   * (`github.event_name != '<event>' || !startsWith(github.event.head_
+   * commit.message, '<prefix>')`), against a literal (event, message) pair.
+   * `headCommitMessage: null` models a payload where `head_commit` does not
+   * exist at all (every non-`push` event) — GitHub Actions' own null
+   * coercion for `startsWith` treats that as `''`, reproduced here rather
+   * than re-invoked, since no GitHub Actions expression engine is available
+   * in a unit test.
+   *
+   * Throwing when the shape doesn't match is deliberate, not a missing
+   * feature: re-adding the old unscoped guard (no `event_name` clause at
+   * all) must fail this rail, not silently pass it by falling through to
+   * some looser match.
+   */
+  function evalReleaseGuard(ifLine: string, eventName: string, headCommitMessage: string | null): boolean {
+    const m = ifLine.match(/^"?github\.event_name != '(\w+)' \|\| !startsWith\(github\.event\.head_commit\.message, '([^']+)'\)"?$/)
+    if (m === null) throw new Error(`"${ifLine}" does not match the expected two-clause, push-scoped guard shape`)
+    const pushEvent = m[1] as string
+    const prefix = m[2] as string
+    if (eventName !== pushEvent) return true
+    return !(headCommitMessage ?? '').startsWith(prefix)
+  }
+
+  for (const file of ['ci.yml', 'ios-e2e.yml']) {
+    it(`${file}'s "changes" job guard names github.event_name — not just the message`, () => {
+      const ifLine = jobLevelIf(jobBlock(workflowYaml(file), 'changes'))
+      expect(ifLine, `no if: found on ${file}'s changes job`).not.toBe('')
+      expect(ifLine).toContain("github.event_name != 'push'")
+    })
+
+    it(`${file}: a "chore(release):"-titled commit still yields a run on pull_request and merge_group (mutation: re-add the unscoped guard → this fails)`, () => {
+      const ifLine = jobLevelIf(jobBlock(workflowYaml(file), 'changes'))
+      // Original push-only intent preserved: a real release commit landing
+      // via push still skips this job.
+      expect(evalReleaseGuard(ifLine, 'push', 'chore(release): v1.2.3')).toBe(false)
+      // Any other push commit message still runs it.
+      expect(evalReleaseGuard(ifLine, 'push', 'fix: something')).toBe(true)
+      // pull_request, merge_group and workflow_dispatch never carry
+      // head_commit at all — the job must run regardless of what a
+      // release-shaped title would have said.
+      for (const eventName of ['pull_request', 'merge_group', 'workflow_dispatch']) {
+        expect(evalReleaseGuard(ifLine, eventName, null)).toBe(true)
+        expect(evalReleaseGuard(ifLine, eventName, 'chore(release): v1.2.3')).toBe(true)
+      }
+    })
+  }
+})
+
+/**
  * CodeQL `actions/cache-poisoning/poisonable-step` (3 HIGH alerts, PR #844
  * round 3, originally at the "Install dependencies", "Check the base
  * provides the gate" and "Verify" steps of `fleet-verify` back when it lived
