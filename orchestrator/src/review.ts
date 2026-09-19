@@ -1047,7 +1047,32 @@ export async function runReviewLoop(input: ReviewLoopInput, deps: ReviewLoopDeps
 
     if (round < MAX_REVIEW_ROUNDS) {
       deps.log(`review loop: round ${round} verdict ${secondOp.verdict} for PR ${input.pr} — sending back to the author for revision`)
-      await deps.reviseWithWorker({ verdictText: secondOp.text })
+      try {
+        await deps.reviseWithWorker({ verdictText: secondOp.text })
+      } catch (e) {
+        // Issue #870, live (fleet-infra-722): `reviseWithWorker` sends `tmux
+        // send-keys` to the SAME session `dispatch-one.sh` started for this
+        // worker, on the documented assumption (see `ReviewLoopDeps.
+        // reviseWithWorker`'s own comment) that the session survives a
+        // terminal status write so a revision can still reach it. That
+        // assumption does not hold in production: a worker whose session has
+        // already exited — having already reached its OWN terminal SUCCESS,
+        // with a real PR, before this review round even ran — leaves nothing
+        // for `tmux send-keys` to reach ("can't find pane"), and letting that
+        // failure propagate out of this loop is what turned a worker that
+        // had, in fact, already finished correctly into a hard FAILED
+        // recorded by `tick.ts`'s generic catch-all. There is nothing left to revise
+        // against once the worker is gone — the loop ends here, with
+        // whatever verdict this round already reached, exactly as if this
+        // had been the last round. `needsHuman: true` because the bounded
+        // revision path could not run to completion.
+        const msg = e instanceof Error ? e.message : String(e)
+        deps.log(
+          `review loop: could not reach the worker to revise PR ${input.pr} on round ${round}: ${msg} ` +
+          '— ending the loop with the current verdict rather than treating this as a task failure',
+        )
+        return { finalVerdict: lastVerdict ?? 'FAIL', rounds, needsHuman: true, lastReport, lastVerdictText }
+      }
     }
   }
 

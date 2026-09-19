@@ -209,4 +209,53 @@ describe('runReviewLoop', () => {
       expect(log).toHaveBeenCalledWith(expect.stringContaining('failed to post the "review unavailable" comment'))
     })
   })
+
+  // Real fixture, issue #870, live incident `fleet-infra-722` (2026-09-19):
+  // round one's review service itself errored ("Unexpected server error" —
+  // an infra failure, not a real reviewer reading the diff and objecting),
+  // so `secondOpinion` correctly returned UNREADABLE — but by the time the
+  // loop tried to send that verdict back for a revision, the worker's own
+  // tmux session (dispatch-one.sh) had ALREADY exited, having already
+  // finished with its own real terminal SUCCESS and a real PR (#861). The
+  // exact `tmux send-keys` error text this loop saw in production:
+  const FLEET_INFRA_722_TMUX_ERROR =
+    'Command failed: tmux send-keys -t fleet-infra-722 The non-author reviewer requested changes on this PR:\n\n' +
+    '{"name":"UnknownError","data":{"message":"Unexpected server error. Check server logs for details.",' +
+    '"ref":"err_20e4d34c"}}\n\nPlease revise. Enter\ncan\'t find pane: fleet-infra-722\n'
+
+  describe('issue #870: reviseWithWorker unreachable (fleet-infra-722)', () => {
+    it('ends the loop gracefully with the current verdict instead of throwing the tmux failure', async () => {
+      const secondOpinion = vi.fn<ReviewLoopDeps['secondOpinion']>()
+        .mockResolvedValue({ verdict: 'UNREADABLE', text: 'Unexpected server error. Check server logs for details.' })
+      const reviseWithWorker = vi.fn(async () => { throw new Error(FLEET_INFRA_722_TMUX_ERROR) })
+      const log = vi.fn()
+      const d = deps({ secondOpinion, reviseWithWorker, log })
+
+      // Before the fix, this exception propagated straight out of
+      // runReviewLoop, through runLiveDispatch's try block, into tick.ts's
+      // generic catch-all — which recorded a hard FAILED over a worker that
+      // had, per its own status file, already finished correctly.
+      const result = await runReviewLoop(input, d)
+      expect(result.finalVerdict).toBe('UNREADABLE')
+      expect(result.needsHuman).toBe(true)
+      // Ended on round 1 — the worker was already gone, so there is no
+      // round 2 to have run at all.
+      expect(result.rounds).toBe(1)
+      expect(reviseWithWorker).toHaveBeenCalled()
+      expect(log).toHaveBeenCalledWith(expect.stringContaining('could not reach the worker to revise'))
+    })
+
+    it('never re-runs verifyMechanical or secondOpinion for a round that could not be reached', async () => {
+      const secondOpinion = vi.fn<ReviewLoopDeps['secondOpinion']>()
+        .mockResolvedValue({ verdict: 'UNREADABLE', text: 'Unexpected server error.' })
+      const reviseWithWorker = vi.fn(async () => { throw new Error(FLEET_INFRA_722_TMUX_ERROR) })
+      const verifyMechanical = vi.fn(async () => passingReport())
+      const d = deps({ secondOpinion, reviseWithWorker, verifyMechanical })
+
+      await runReviewLoop(input, d)
+
+      expect(verifyMechanical).toHaveBeenCalledTimes(1)
+      expect(secondOpinion).toHaveBeenCalledTimes(1)
+    })
+  })
 })
