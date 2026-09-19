@@ -218,33 +218,79 @@ describe('rail: the fleet never bypasses a PR\'s checks, and never reviews', () 
   })
 
   /**
-   * `mergePr` and its `--match-head-commit` pin are gone: the fleet no longer
-   * merges anything. What replaced the pin is a property of the platform —
-   * a check run is attached to ONE commit, so a push moves the head and the
-   * new head carries no green `fleet/verify` or `fleet/review` of its own,
-   * and auto-merge does not fire.
+   * `mergePr` and its `--match-head-commit` pin are gone from the AUTONOMOUS
+   * fleet: `tick.ts`'s own dispatch loop still never merges anything itself.
+   * What replaced the pin is a property of the platform — a check run is
+   * attached to ONE commit, so a push moves the head and the new head
+   * carries no green `fleet/verify` or `fleet/review` of its own, and
+   * auto-merge does not fire.
    *
-   * Exactly two `gh pr merge` calls remain and they are a pair: one ARMS
-   * GitHub's auto-merge, reached only after mechanical verification and the
-   * non-author review have both passed; one can only UN-arm, for a PR an
-   * earlier attempt armed before this one rejected it. Anything that is
-   * neither — a bare merge, or a third call — would be this process deciding
+   * Three `gh pr merge` calls exist now, not two: `review-and-merge.ts`
+   * added the OPERATOR-invoked `llamenos-fleet review-and-merge <pr>`
+   * command, which is a human running a named command against a named PR —
+   * a different act from the autonomous tick loop deciding to arm
+   * auto-merge on its own. Its one real, `--squash --delete-branch` merge is
+   * reached only after `runReviewAndMerge` has independently re-verified
+   * every required check (including a fresh `fleet/review`) is green on an
+   * unmoved head (`evaluateMergeReadiness`) — GitHub is still what actually
+   * enforces the gate; this call cannot skip a red check GitHub would
+   * refuse. It is confined to exactly that one file and never carries
+   * `--auto`/`--disable-auto` (a real merge is neither arming nor
+   * un-arming). The original pair survives unchanged: one ARMS GitHub's
+   * auto-merge for the autonomous fleet, reached only after mechanical
+   * verification and the non-author review have both passed; one can only
+   * UN-arm, for a PR an earlier attempt armed before this one rejected it.
+   * Any OTHER shape — a bare merge with none of `--auto`/`--disable-auto`/
+   * `--squash`, or a fourth call anywhere, or the real merge appearing
+   * outside `review-and-merge.ts` — would be this process deciding
    * something that is GitHub's to decide.
    */
-  it('invokes `gh pr merge` only to arm or to un-arm auto-merge, never to merge', () => {
+  it('invokes `gh pr merge` only to arm/un-arm auto-merge, or to squash-merge from review-and-merge.ts alone', () => {
     const PR_MERGE = /\[\s*'pr'\s*,\s*'merge'[^\]]*\]/g
-    const calls: string[] = []
+    const REVIEW_AND_MERGE_FILE = join(process.cwd(), 'orchestrator', 'src', 'review-and-merge.ts')
+    const arms: string[] = []
+    const disarms: string[] = []
+    const realMerges: { file: string; call: string }[] = []
+    const unknown: string[] = []
     for (const { file, text } of orchestratorSources()) {
       for (const call of text.match(PR_MERGE) ?? []) {
-        calls.push(call)
-        const arms = call.includes("'--auto'")
-        const disarms = call.includes("'--disable-auto'")
-        expect(arms !== disarms, `${file}: gh pr merge that neither arms nor disarms: ${call}`).toBe(true)
+        const isArm = call.includes("'--auto'")
+        const isDisarm = call.includes("'--disable-auto'")
+        const isRealMerge = call.includes("'--squash'")
+        if (isArm) arms.push(call)
+        else if (isDisarm) disarms.push(call)
+        else if (isRealMerge) realMerges.push({ file, call })
+        else unknown.push(`${file}: ${call}`)
       }
     }
-    expect(calls.filter((c) => c.includes("'--auto'"))).toHaveLength(1)
-    expect(calls.filter((c) => c.includes("'--disable-auto'"))).toHaveLength(1)
-    expect(calls).toHaveLength(2)
+    expect(unknown, 'gh pr merge call(s) that neither arm, un-arm, nor squash-merge').toEqual([])
+    expect(arms).toHaveLength(1)
+    expect(disarms).toHaveLength(1)
+    expect(realMerges).toHaveLength(1)
+    expect(realMerges[0]?.file, 'a real (squash) gh pr merge exists outside review-and-merge.ts')
+      .toBe(REVIEW_AND_MERGE_FILE)
+    expect(realMerges[0]?.call, 'the real merge in review-and-merge.ts must delete the branch too')
+      .toContain("'--delete-branch'")
+  })
+
+  /**
+   * The Checks API's `POST /repos/{R}/check-runs` is a write path with real
+   * consequences: whatever it posts becomes a required-status verdict on a
+   * commit, exactly as authoritative as an Actions job's own result. Only
+   * `review-and-merge.ts`'s `postReviewCheckRun` may call it — see that
+   * file's own module comment for why this is the ONE local write path this
+   * design trusts, and why it never gained a `statuses:write`-shaped
+   * capability anywhere else in the orchestrator (ci.ts's own comment above
+   * `VERIFY_JOB`/`REVIEW_JOB` explains why a same-named STATUS was rejected
+   * outright: it is what makes fork PRs unmergeable). A second call site
+   * creating a check-run — however it got there — would be a second,
+   * ungoverned place this process can post a verdict nothing here reviewed.
+   */
+  it('creates a check-run from exactly one file (review-and-merge.ts)', () => {
+    const CHECK_RUNS_CREATE = /check-runs/
+    const REVIEW_AND_MERGE_FILE = join(process.cwd(), 'orchestrator', 'src', 'review-and-merge.ts')
+    const hits = orchestratorSources().filter(({ text }) => CHECK_RUNS_CREATE.test(text))
+    expect(hits.map((h) => h.file)).toEqual([REVIEW_AND_MERGE_FILE])
   })
 })
 
