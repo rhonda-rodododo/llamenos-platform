@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { classifyImpact } from '../../orchestrator/src/impact.js'
+import { classifyImpact, tierFor, TIER1_PATHS } from '../../orchestrator/src/impact.js'
 import { NEVER_WRITE_PATHS, SECRET_PATH_PATTERNS } from '../../orchestrator/src/config.js'
 
 /**
@@ -199,5 +199,116 @@ describe('classifyImpact — secrets always classify high', () => {
     'authorized_keys',
   ])('probe path %s classifies high', (file) => {
     expect(classifyImpact([file], 5).impact).toBe('high')
+  })
+})
+
+describe('tierFor', () => {
+  it('classifies documentation prose as Tier 0', () => {
+    expect(tierFor(['docs/epics/EP01-foo.md']).tier).toBe(0)
+    expect(tierFor(['README.md']).tier).toBe(0)
+    expect(tierFor(['apps/worker/README.md']).tier).toBe(0)
+  })
+
+  it('an empty diff is Tier 0 — there is nothing to review', () => {
+    const r = tierFor([])
+    expect(r.tier).toBe(0)
+    expect(r.reasons).toEqual([])
+  })
+
+  it.each([
+    '.claude/agents/backend-supervisor.md',
+    '.claude/skills/fleet-review-and-merge/SKILL.md',
+    'docs/superpowers/specs/2026-09-19-impact-tiers-addendum.md',
+    'lefthook.yml',
+    'eslint.config.js',
+  ])('classifies %s as Tier 1 (instructions/tooling)', (f) => {
+    expect(tierFor([f]).tier).toBe(1)
+  })
+
+  // A `.md` file under `.claude/` is instruction text a coding agent obeys,
+  // not prose a human reads — it must never fall through to Tier 0 by
+  // extension alone. `CLAUDE.md` under `.claude/agents/` is covered by the
+  // TIER1_PATHS prefix above; a bare `.claude/CLAUDE.md` (not under
+  // agents/ or skills/) is covered by the `.md`-exemption alone and, having
+  // no other tier1/tier2-always hit, is Tier 2 by default — never Tier 0.
+  it('does not classify a .claude/ markdown file as Tier 0 by extension alone', () => {
+    expect(tierFor(['.claude/CLAUDE.md']).tier).not.toBe(0)
+  })
+
+  it.each([
+    'src/client/components/Button.tsx',
+    'apps/worker/routes/notes.ts',
+    'apps/ios/Sources/Views/CallView.swift',
+  ])('classifies ordinary product code %s as Tier 2 (default)', (f) => {
+    expect(tierFor([f]).tier).toBe(2)
+  })
+
+  // The Tier 2 "always" list, reused wholesale from HIGH_IMPACT_PATHS
+  // (impact.ts's own comment on `tierForFile`'s ordering) — hardcoded
+  // examples, not an `it.each(HIGH_IMPACT_PATHS)` iteration, specifically so
+  // a mutation that DELETES an entry from that list (e.g. "move
+  // packages/crypto/ out of Tier 2") is still caught: iterating the live
+  // list would just iterate over fewer entries and silently stop testing
+  // the deleted one.
+  it.each([
+    'packages/crypto/src/hpke.rs',
+    'packages/protocol/schemas/note.ts',
+    'apps/worker/lib/auth.ts',
+    'apps/worker/routes/sessions.ts',
+    'orchestrator/src/tick.ts',
+    'tests/orchestrator/impact.test.ts',
+    '.github/workflows/ci.yml',
+    'package.json',
+    'bun.lockb',
+    'knope.toml',
+    'sip-bridge/src/ari-adapter.ts',
+    'signal-notifier/src/contact-resolver.ts',
+  ])('a Tier 2 path can never be classified lower: %s stays Tier 2', (f) => {
+    expect(tierFor([f]).tier).toBe(2)
+  })
+
+  // Every SECRET_PATH_PATTERNS entry (config.ts) is also Tier 2 — the same
+  // "the two gates must not disagree about secrets" invariant classifyImpact
+  // already enforces, extended to the tier axis.
+  it.each(SECRET_PATH_PATTERNS)('a file matching secret pattern %s is Tier 2', (pattern) => {
+    expect(tierFor([realisticPathFor(pattern)]).tier).toBe(2)
+  })
+
+  // The overlap this file's own comments call out: `.claude/agents/` and
+  // `lefthook.yml` are members of BOTH `HIGH_IMPACT_PATHS` (classifyImpact
+  // still calls them "high impact") and `TIER1_PATHS` — and Tier 1 must win
+  // for the tier question, without editing `HIGH_IMPACT_PATHS`.
+  it.each(['.claude/agents/backend-supervisor.md', 'lefthook.yml'])(
+    '%s is high-impact (classifyImpact) but only Tier 1 (tierFor) — the two axes disagree on purpose',
+    (f) => {
+      expect(classifyImpact([f], 5).impact).toBe('high')
+      expect(tierFor([f]).tier).toBe(1)
+    },
+  )
+
+  it('a diff spanning tiers takes the HIGHEST tier it touches', () => {
+    const mixed = tierFor(['docs/readme.md', '.claude/agents/backend-supervisor.md', 'packages/crypto/src/lib.rs'])
+    expect(mixed.tier).toBe(2)
+    expect(mixed.reasons.join(' ')).toMatch(/packages\/crypto/)
+    // The Tier 0/1 files did not decide the outcome — they are not named in
+    // the winning reasons.
+    expect(mixed.reasons.join(' ')).not.toMatch(/docs\/readme\.md/)
+
+    const tier1AndTier0 = tierFor(['docs/readme.md', '.claude/agents/backend-supervisor.md'])
+    expect(tier1AndTier0.tier).toBe(1)
+  })
+
+  it('gives a reason naming every file that contributed to the winning tier', () => {
+    const r = tierFor(['packages/crypto/src/a.rs', 'apps/worker/lib/auth.ts'])
+    expect(r.tier).toBe(2)
+    expect(r.reasons).toHaveLength(2)
+  })
+
+  // Every TIER1_PATHS entry must actually match a realistic path under it —
+  // same discipline as the HIGH_IMPACT_PATHS/CODEOWNERS coverage rail in
+  // guards.test.ts, applied to the new list.
+  it.each(TIER1_PATHS)('TIER1_PATHS entry %s matches a realistic path under it', (p) => {
+    const file = p.endsWith('/') ? `${p}example.md` : p
+    expect(tierFor([file]).tier).toBe(1)
   })
 })
