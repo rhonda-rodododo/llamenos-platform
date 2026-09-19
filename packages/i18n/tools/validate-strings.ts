@@ -16,6 +16,7 @@
 import { readFileSync, readdirSync, statSync } from 'fs'
 import { join, resolve, dirname, relative } from 'path'
 import { fileURLToPath } from 'url'
+import { LANGUAGE_CODES } from '../languages'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -365,6 +366,104 @@ function validateKeyCasing(): number {
 }
 
 // ---------------------------------------------------------------------------
+// Locale coverage guard
+//
+// The single source of truth for "which locales exist" is the filesystem
+// (packages/i18n/locales/*.json) and packages/i18n/languages.ts. Every other
+// place that needs a locale list — CI guards, codegen, the exported locale
+// map, the skills docs — must derive from one of those two, never hardcode
+// its own list. This check is the regression guard for that rule: it fails
+// loudly the moment a locale file and languages.ts (or the exported locale
+// map in packages/i18n/index.ts) drift apart, which is exactly the failure
+// mode that let 9 of 22 locales (am, fa, ku, mix, my, quc, so, tr, uk) go
+// unvalidated for a long time.
+// ---------------------------------------------------------------------------
+
+function validateLocaleCoverage(): number {
+  const localeCodes = readdirSync(LOCALES_DIR)
+    .filter(f => f.endsWith('.json'))
+    .map(f => f.replace(/\.json$/, ''))
+    .sort()
+
+  const languageCodes = [...LANGUAGE_CODES].sort()
+
+  const errors: string[] = []
+
+  const missingFromLanguages = localeCodes.filter(c => !languageCodes.includes(c))
+  if (missingFromLanguages.length > 0) {
+    errors.push(
+      `  locale file(s) with no entry in packages/i18n/languages.ts: ${missingFromLanguages.join(', ')}`
+    )
+  }
+
+  const missingLocaleFile = languageCodes.filter(c => !localeCodes.includes(c))
+  if (missingLocaleFile.length > 0) {
+    errors.push(
+      `  languages.ts entries with no packages/i18n/locales/*.json file: ${missingLocaleFile.join(', ')}`
+    )
+  }
+
+  // packages/i18n/index.ts hand-exports each locale (for server-side lookups via
+  // `locales`). Verify every locale file actually shows up as a bare-word
+  // `export ... from './locales/<code>.json'` line, so a new locale can't be
+  // added to the filesystem without also being wired into that export map.
+  const indexSource = readFileSync(resolve(__dirname, '../index.ts'), 'utf-8')
+  const missingFromIndex = localeCodes.filter(
+    c => !new RegExp(`['"]\\./locales/${c}\\.json['"]`).test(indexSource)
+  )
+  if (missingFromIndex.length > 0) {
+    errors.push(
+      `  locale file(s) not exported from packages/i18n/index.ts: ${missingFromIndex.join(', ')}`
+    )
+  }
+
+  if (errors.length > 0) {
+    console.error(`  Locale coverage: ${errors.length} drift issue(s) found:`)
+    for (const e of errors) console.error(e)
+  } else {
+    console.log(`  Locale coverage: ${localeCodes.length} locales, all covered`)
+  }
+
+  return errors.length
+}
+
+// ---------------------------------------------------------------------------
+// Locale key completeness
+//
+// packages/i18n/tools/i18n-codegen.ts already computes this (and prints the
+// same warnings) but only fails the process when invoked with --validate
+// (`bun run i18n:validate`) — CI's "Validate i18n strings" step instead runs
+// `bun run i18n:validate:all` (this script), which previously never checked
+// per-locale key completeness at all. That meant a locale missing keys could
+// pass CI outright (the plain `bun run i18n:codegen` step that does run in
+// CI only warns and keeps going). Checking it here too closes that gap for
+// every entry point into this script.
+// ---------------------------------------------------------------------------
+
+function validateLocaleCompleteness(): number {
+  const enKeys = loadCanonicalKeysDotted()
+  const localeFiles = readdirSync(LOCALES_DIR).filter(f => f.endsWith('.json') && f !== 'en.json')
+
+  let totalMissing = 0
+  for (const file of localeFiles) {
+    const locale = file.replace(/\.json$/, '')
+    const data = JSON.parse(readFileSync(join(LOCALES_DIR, file), 'utf-8'))
+    const keys = new Set(Object.keys(flattenKeysDotted(data)))
+    const missing = [...enKeys].filter(k => !keys.has(k))
+    if (missing.length > 0) {
+      console.error(`  ${locale}: ${missing.length} missing key(s) relative to en.json`)
+      totalMissing += missing.length
+    }
+  }
+
+  if (totalMissing === 0) {
+    console.log(`  Locale completeness: all ${localeFiles.length} non-English locales have full key coverage`)
+  }
+
+  return totalMissing
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -380,8 +479,12 @@ function main() {
 
   let totalErrors = 0
 
-  // Always check key casing convention first
+  // Always check key casing convention, locale-list coverage, and per-locale
+  // key completeness first — these apply regardless of which platform is
+  // being validated.
   totalErrors += validateKeyCasing()
+  totalErrors += validateLocaleCoverage()
+  totalErrors += validateLocaleCompleteness()
 
   if (command === 'android' || command === 'all') {
     totalErrors += validateAndroid()

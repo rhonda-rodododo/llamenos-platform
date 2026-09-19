@@ -252,6 +252,23 @@ jobs:
       attestations: write
 
     steps:
+      # This job stays on the self-hosted box, where $HOME and /tmp are shared
+      # by every concurrent job. Scope each toolchain's cache/state under this
+      # job's own $RUNNER_TEMP so two jobs can never corrupt each other.
+      - name: Isolate per-job toolchain caches
+        run: |
+          {
+            echo "CARGO_HOME=$RUNNER_TEMP/cargo"
+            echo "RUSTUP_HOME=$RUNNER_TEMP/rustup"
+            echo "GRADLE_USER_HOME=$RUNNER_TEMP/gradle"
+            echo "BUN_INSTALL_CACHE_DIR=$RUNNER_TEMP/bun-cache"
+            echo "npm_config_cache=$RUNNER_TEMP/npm-cache"
+            echo "PIP_CACHE_DIR=$RUNNER_TEMP/pip-cache"
+            echo "ANSIBLE_COLLECTIONS_PATH=$RUNNER_TEMP/ansible-collections"
+            echo "ANSIBLE_LOCAL_TEMP=$RUNNER_TEMP/ansible-tmp"
+          } >> "$GITHUB_ENV"
+          echo "$RUNNER_TEMP/cargo/bin" >> "$GITHUB_PATH"
+
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
@@ -348,9 +365,9 @@ jobs:
       # ── Upload binaries to RustFS ───────────────────────────────
       - name: Install AWS CLI
         run: |
-          curl -sSf "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
-          unzip -q /tmp/awscliv2.zip -d /tmp
-          sudo /tmp/aws/install --update
+          curl -sSf "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "$RUNNER_TEMP/awscliv2.zip"
+          unzip -q "$RUNNER_TEMP/awscliv2.zip" -d "$RUNNER_TEMP"
+          sudo "$RUNNER_TEMP/aws/install" --update
           aws --version
 
       - name: Upload artifacts to RustFS staging bucket

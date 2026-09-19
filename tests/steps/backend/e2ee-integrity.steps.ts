@@ -303,7 +303,7 @@ When(
   },
 )
 
-When('the volunteer encrypts note content {string} with real crypto', async ({ request, world }, plaintext: string) => {
+When('the volunteer encrypts note content {string} with real crypto', async ({ world }, plaintext: string) => {
   // Use the first volunteer keypair
   const [, volKp] = [...getE2EEIntegrityState(world).keypairs.entries()][0]
   expect(volKp).toBeDefined()

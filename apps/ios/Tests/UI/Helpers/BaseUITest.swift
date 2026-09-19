@@ -412,7 +412,15 @@ class BaseUITest: XCTestCase {
         }
     }
 
-    /// Navigate through full onboarding: create identity, confirm backup, set PIN, reach dashboard.
+    /// Navigate through full onboarding: create identity, set + confirm PIN, reach dashboard.
+    ///
+    /// V3 device key model: there is no backup-confirmation step and no digit
+    /// PIN pad here — PINSetView.swift uses a free-text SecureField
+    /// ("pin-input"/"pin-submit") so a PIN or passphrase (8+ characters) can
+    /// be entered, and device keys are generated atomically once the same
+    /// value is entered twice (PINViewModel.handleSetPIN). The digit
+    /// PINPadView ("pin-pad", `enterPIN`) is only used on the lock/unlock
+    /// screen — see PINUnlockView.swift.
     func completeOnboarding(hubURL: String = "https://test.example.org", pin: String = "12345678") {
         // Enter hub URL
         let hubURLInput = find("hub-url-input")
@@ -428,25 +436,26 @@ class BaseUITest: XCTestCase {
             createButton.tap()
         }
 
-        // Confirm backup
-        let confirmBackup = find("confirm-backup")
-        if confirmBackup.waitForExistence(timeout: 5) {
-            confirmBackup.tap()
+        // Enter PIN (first entry)
+        let pinInput = find("pin-input")
+        guard pinInput.waitForExistence(timeout: 10) else { return }
+        pinInput.tap()
+        pinInput.typeText(pin)
+
+        let submitButton = find("pin-submit")
+        if submitButton.waitForExistence(timeout: 3) {
+            submitButton.tap()
         }
 
-        // Continue to PIN
-        let continueButton = find("continue-to-pin")
-        if continueButton.waitForExistence(timeout: 3) {
-            continueButton.tap()
+        // Confirm PIN (second entry)
+        if pinInput.waitForExistence(timeout: 5) {
+            pinInput.tap()
+            pinInput.typeText(pin)
+
+            if submitButton.waitForExistence(timeout: 3) {
+                submitButton.tap()
+            }
         }
-
-        // Wait for PIN pad
-        let pinPad = find("pin-pad")
-        _ = pinPad.waitForExistence(timeout: 5)
-
-        // Enter PIN + confirm
-        enterPIN(pin)
-        enterPIN(pin)
 
         // Wait for dashboard
         let dashboardTitle = find("dashboard-title")

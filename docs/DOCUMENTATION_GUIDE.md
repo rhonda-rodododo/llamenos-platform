@@ -48,7 +48,7 @@ API reference documentation.
 | `REPRODUCIBLE_BUILDS.md` | Build verification and SLSA provenance |
 | `DESKTOP_BUILD.md` | Desktop release build instructions |
 | `RUNBOOK.md` | Production incident runbook |
-| `RELAY_OPERATIONS.md` | WebSocket relay (WebSocket relay) operations |
+| `RELAY_OPERATIONS.md` | WebSocket relay operations |
 | `CAPACITY_PLANNING.md` | Scaling and capacity planning guidance |
 | `QUICK_REFERENCE.md` | Developer quick-reference card |
 | `NEXT_BACKLOG.md` | Pending work items (single source of truth) |

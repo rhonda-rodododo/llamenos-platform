@@ -34,3 +34,24 @@ Feature: WebAuthn Flow
   Scenario: Login options are rate limited
     When a client floods WebAuthn login options 15 times
     Then at least one response is 429
+
+  # ─── Passkey policy self-lockout guard (#672) ──────────────────────
+  # Enabling "require passkeys for admins" is server-wide. The admin enabling it
+  # must already hold a registered credential, otherwise the auth middleware
+  # returns WEBAUTHN_REQUIRED on their very next request (including the PATCH
+  # that could turn the policy back off) and no in-app path back remains.
+  #
+  # The success branch (admin WITH a passkey → 200 + persisted) is deliberately
+  # not a backend BDD scenario: this suite runs fullyParallel against one server,
+  # and persisting requireForAdmins=true would 403 every passkey-less admin in
+  # every concurrent scenario (the #671 failure mode). It is covered by the
+  # settings route unit test instead.
+
+  @backend
+  Scenario: Admin without a passkey cannot enable the admin passkey requirement
+    Given an admin user with no registered passkey
+    When that admin enables the passkey requirement for admins
+    Then the response status is 409
+    And the response error code is "WEBAUTHN_CREDENTIAL_REQUIRED"
+    And the passkey requirement for admins is still disabled
+    And that admin can still manage WebAuthn settings

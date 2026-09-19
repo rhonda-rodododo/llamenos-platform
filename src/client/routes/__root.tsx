@@ -7,6 +7,8 @@ import { useConfig, useHasMessaging } from '@/lib/config'
 import { useTheme } from '@/lib/theme'
 import { useEffect, useState, type ReactNode } from 'react'
 import { setServerEventKeys } from '@/lib/platform'
+import { needsServerAddress } from '@/lib/api-config'
+import { ServerAddressScreen } from '@/components/setup/ServerAddressScreen'
 import { RelayProvider } from '@/lib/relay/context'
 import { useCalls, useShiftStatus } from '@/lib/hooks'
 import { CommandPalette, triggerCommandPalette } from '@/components/command-palette'
@@ -84,11 +86,22 @@ function RootLayout() {
   const navigate = useNavigate()
   const location = useLocation()
 
+  // A packaged desktop build with no backend configured yet (#738) — nothing
+  // else can safely render until the user tells us which server to talk to.
+  // `needsServerAddress()` reads a value set once at boot (main.tsx awaits
+  // initApiBase() before rendering) and only changes via a full page reload —
+  // saving a new address reloads the whole app (see ServerAddressScreen)
+  // rather than flipping local state, so ConfigProvider/AuthProvider and
+  // every other "fetch once at mount" provider re-initializes cleanly against
+  // the newly-configured backend instead of staying stuck on stale defaults
+  // fetched (and failed) before any address was known.
+  const serverAddressConfigured = !needsServerAddress()
+
   // Nostr relay connection is handled by NostrProvider in AuthenticatedLayout
 
   useEffect(() => {
     // Wait for both auth and config to finish loading before redirecting
-    if (!isLoading && !configLoading && !isAuthenticated && location.pathname !== '/login' && location.pathname !== '/onboarding' && location.pathname !== '/link-device' && location.pathname !== '/setup') {
+    if (serverAddressConfigured && !isLoading && !configLoading && !isAuthenticated && location.pathname !== '/login' && location.pathname !== '/onboarding' && location.pathname !== '/link-device' && location.pathname !== '/setup') {
       // If no admin exists, redirect to setup wizard (which includes bootstrap)
       if (needsBootstrap) {
         navigate({ to: '/setup' })
@@ -100,7 +113,7 @@ function RootLayout() {
         navigate({ to: '/login' })
       }
     }
-  }, [isLoading, configLoading, isAuthenticated, location.pathname, navigate, needsBootstrap])
+  }, [serverAddressConfigured, isLoading, configLoading, isAuthenticated, location.pathname, navigate, needsBootstrap])
 
   useEffect(() => {
     if (!isLoading && isAuthenticated && (location.pathname === '/login')) {
@@ -137,7 +150,11 @@ function RootLayout() {
   // isAuthenticated flips but the overlay must remain visible)
   let content: ReactNode
 
-  if (isLoading) {
+  if (!serverAddressConfigured) {
+    content = (
+      <ServerAddressScreen onConfigured={() => window.location.reload()} />
+    )
+  } else if (isLoading) {
     content = (
       <div className="flex h-screen items-center justify-center">
         <div className="flex items-center gap-2 text-muted-foreground">
