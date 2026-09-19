@@ -30,6 +30,10 @@ export interface DispatchResult {
   pr?: string
   note?: string
   worktree?: string
+  /** See `RunRecord.quotaResetHint`/`quotaResetAt` (ledger.ts) — set only
+   *  when `outcome === 'QUOTA'`. */
+  quotaResetHint?: string
+  quotaResetAt?: number
 }
 
 /**
@@ -144,6 +148,239 @@ export function readStatus(name: string): Record<string, string> | undefined {
   } catch {
     return undefined
   }
+}
+
+/**
+ * Issue #817: `dispatch-one.sh`'s WORKER_LOG (`$HOME/<name>.log`) — raw
+ * stream-json (Claude) or JSONL (opencode/kimi) events, independent of (and
+ * more reliable than) the launcher footer's own summary written into the
+ * `.status` file's `notes:` field. That footer only knows how to summarise
+ * Claude's `{"type":"result",...}` terminal event; a real 2026-09 incident
+ * (fleet-android-765) shows it writing an EMPTY final message for an
+ * opencode/kimi worker that died on turn one with a bare
+ * `{"type":"error",...}` event, because it never recognised that shape at
+ * all. Reading the raw log directly is the only way this fleet can classify
+ * that worker as anything other than a bare, unexplained `FAILED`.
+ *
+ * Deliberately NOT routed through `FLEET_HOME` (paths.ts): this is
+ * `dispatch-one.sh`'s own file-location contract (like `STATUS_DIR` above),
+ * not this fleet's state.
+ */
+function workerLogPath(name: string): string {
+  return join(homedir(), `${name}.log`)
+}
+
+export function readWorkerLog(name: string): string | undefined {
+  const path = workerLogPath(name)
+  if (!existsSync(path)) return undefined
+  try {
+    return readFileSync(path, 'utf8')
+  } catch {
+    return undefined
+  }
+}
+
+export interface WorkerLogSignal {
+  /**
+   * Prefers Claude's own `num_turns` from its terminal `result` event when
+   * present (it is authoritative, including the case where the ONE turn that
+   * happened was itself the quota rejection — see the fleet-infra-811
+   * fixture). Otherwise counts `assistant` (Claude) and `step_start`/
+   * `step_finish` (opencode) events actually observed — for a worker that
+   * dies on its first request with a bare `{"type":"error",...}` line (the
+   * fleet-android-765 fixture), that count is zero.
+   */
+  turns: number
+  /** The last human-readable message this parse could find, from whichever
+   *  shape produced one — empty string if none did. */
+  finalMessage: string
+}
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null
+}
+
+function extractAssistantText(rec: Record<string, unknown>): string | undefined {
+  const message = rec['message']
+  if (!isRecord(message)) return undefined
+  const content = message['content']
+  if (!Array.isArray(content)) return undefined
+  const texts = content
+    .filter((b): b is Record<string, unknown> => isRecord(b) && b['type'] === 'text')
+    .map((b) => (typeof b['text'] === 'string' ? b['text'] : ''))
+    .filter((t) => t.length > 0)
+  return texts.length > 0 ? texts.join(' ') : undefined
+}
+
+/** opencode/kimi's own error shape: `{"type":"error","error":{"name":...,
+ *  "data":{"message":"..."}}}` — the fleet-android-765 fixture — plus the
+ *  more generic `{"error":{"message":"..."}}` a different provider might use. */
+function extractErrorMessage(rec: Record<string, unknown>): string | undefined {
+  const err = rec['error']
+  if (!isRecord(err)) return undefined
+  const data = err['data']
+  if (isRecord(data) && typeof data['message'] === 'string' && data['message'].length > 0) {
+    return data['message']
+  }
+  if (typeof err['message'] === 'string' && err['message'].length > 0) return err['message']
+  return undefined
+}
+
+/**
+ * Parses EITHER raw log shape line by line — never throws on a line that
+ * fails `JSON.parse` (a truncated final write mid-flush must not crash this,
+ * same reasoning as `parseStatusFile`).
+ */
+export function parseWorkerLogSignal(text: string): WorkerLogSignal {
+  let explicitTurns: number | undefined
+  let turnEvents = 0
+  let finalMessage = ''
+
+  for (const line of text.split('\n')) {
+    const trimmed = line.trim()
+    if (trimmed.length === 0) continue
+    let obj: unknown
+    try {
+      obj = JSON.parse(trimmed)
+    } catch {
+      continue
+    }
+    if (!isRecord(obj)) continue
+    const type = obj['type']
+
+    if (type === 'result') {
+      if (typeof obj['num_turns'] === 'number') explicitTurns = obj['num_turns']
+      if (typeof obj['result'] === 'string' && obj['result'].length > 0) finalMessage = obj['result']
+      continue
+    }
+    if (type === 'assistant') {
+      turnEvents++
+      const text2 = extractAssistantText(obj)
+      if (text2 !== undefined) finalMessage = text2
+      continue
+    }
+    if (type === 'step_start' || type === 'step_finish') {
+      turnEvents++
+      continue
+    }
+
+    const extracted = extractErrorMessage(obj)
+    if (extracted !== undefined) finalMessage = extracted
+  }
+
+  return { turns: explicitTurns ?? turnEvents, finalMessage }
+}
+
+/**
+ * The exact provider-exhaustion phrasing this fleet has actually seen in
+ * production (2026-09-18/19, see issue #817): Kimi's 5-hour and weekly
+ * (7-day) usage-limit rejections, Claude's own "hit your weekly limit", the
+ * generic "usage limit" wording, and a bare `rate_limit` marker some
+ * providers surface as the error type/field rather than prose.
+ */
+export const QUOTA_MESSAGE_RE =
+  /5-hour usage limit|weekly \(7-day\) usage limit|hit your weekly limit|usage limit|rate_limit/i
+
+/** Captures the provider's own reset wording verbatim, stopping at the next
+ *  sentence boundary — "reset when the current 5-hour window ends" or
+ *  "resets 1:20pm (America/New_York)", never the trailing marketing text
+ *  that usually follows it in the same message. */
+const RESET_HINT_RE = /reset(?:s)?\s+([^.;]+)/i
+
+export function extractResetHint(message: string): string | undefined {
+  const hint = RESET_HINT_RE.exec(message)?.[1]?.trim()
+  return hint !== undefined && hint.length > 0 ? hint : undefined
+}
+
+const CLOCK_HINT_RE = /^(\d{1,2})(?::(\d{2}))?\s*([ap]m)\b(?:\s*\(([^)]+)\))?/i
+
+/** `Intl`-based IANA offset lookup: formats the same instant through the
+ *  target timezone and reads back the wall-clock fields, then compares
+ *  against the UTC fields of that same instant. Standard technique — Node's
+ *  `Intl` ships full ICU data, so every zone name a provider might send
+ *  (`America/New_York`, `Europe/Berlin`, ...) resolves without a bundled
+ *  tz database of our own. */
+function tzOffsetMs(tz: string, atUtcMs: number): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz, hourCycle: 'h23',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).formatToParts(new Date(atUtcMs))
+  const get = (t: string): number => Number(parts.find((p) => p.type === t)?.value ?? '0')
+  const asIfUtc = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'))
+  return asIfUtc - atUtcMs
+}
+
+function wallClockToEpoch(hour: number, minute: number, tz: string | undefined, now: Date): number | undefined {
+  if (tz === undefined) {
+    const d = new Date(now.getTime())
+    d.setHours(hour, minute, 0, 0)
+    return d.getTime()
+  }
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
+    }).formatToParts(now)
+    const get = (t: string): string => parts.find((p) => p.type === t)?.value ?? '01'
+    const naiveUtcMs = Date.parse(
+      `${get('year')}-${get('month')}-${get('day')}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00Z`,
+    )
+    if (!Number.isFinite(naiveUtcMs)) return undefined
+    return naiveUtcMs - tzOffsetMs(tz, naiveUtcMs)
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Resolves a reset HINT (already extracted by `extractResetHint`) to an
+ * absolute epoch ms, ONLY when it names an actual clock time — "1:20pm
+ * (America/New_York)". A relative description with no clock time at all
+ * ("when the current 5-hour window ends") returns `undefined` on purpose:
+ * inventing a number here would be a guess wearing the clothes of a fact,
+ * and `circuit.ts`'s `quotaBreaker` already has a documented 60-minute
+ * fallback for exactly this case.
+ */
+export function parseResetAt(hint: string, now: Date = new Date()): number | undefined {
+  const m = CLOCK_HINT_RE.exec(hint.trim())
+  if (!m) return undefined
+  let hour = Number.parseInt(m[1] ?? '', 10)
+  const minute = m[2] !== undefined ? Number.parseInt(m[2], 10) : 0
+  const meridiem = (m[3] ?? '').toLowerCase()
+  const tz = m[4]
+  if (!Number.isFinite(hour) || hour < 1 || hour > 12 || minute < 0 || minute > 59) return undefined
+  if (meridiem === 'pm' && hour !== 12) hour += 12
+  if (meridiem === 'am' && hour === 12) hour = 0
+
+  const candidate = wallClockToEpoch(hour, minute, tz, now)
+  if (candidate === undefined) return undefined
+  // A clock time already past "now" today means the provider means tomorrow.
+  return candidate > now.getTime() ? candidate : candidate + 24 * 3_600_000
+}
+
+export interface QuotaDetection {
+  isQuota: boolean
+  resetHint?: string
+  resetAt?: number
+}
+
+/**
+ * The two-part test from issue #817: the runtime barely started (turn <= 1)
+ * AND the last thing it said is a provider quota rejection, not an ordinary
+ * task failure. Both conditions matter — a worker that ran 53 turns and
+ * *then* hit its weekly limit mid-task (the real fleet-android-765 SECOND
+ * attempt, `turns=53 cost=$1.93`) is legitimately a run that got cut off
+ * with real (if unfinished) work behind it, not a worker that never got a
+ * chance to try.
+ */
+export function detectQuotaFromLog(logText: string, now: Date = new Date()): QuotaDetection {
+  const { turns, finalMessage } = parseWorkerLogSignal(logText)
+  if (turns > 1 || finalMessage.length === 0 || !QUOTA_MESSAGE_RE.test(finalMessage)) {
+    return { isQuota: false }
+  }
+  const resetHint = extractResetHint(finalMessage)
+  const resetAt = resetHint !== undefined ? parseResetAt(resetHint, now) : undefined
+  return { isQuota: true, resetHint, resetAt }
 }
 
 interface BuildArgsInput {
@@ -286,7 +523,7 @@ export async function dispatch(req: DispatchRequest): Promise<DispatchResult> {
   }
 
   const rawStatus = status?.['status'] ?? 'DISPATCHED' // never observed a status file: treat as never-started
-  const outcome = statusToOutcome(rawStatus)
+  let outcome = statusToOutcome(rawStatus)
 
   // Record the dependency's HEAD commit in the note so a run's behaviour can
   // always be traced back to the exact version of dispatch-one.sh that
@@ -294,7 +531,31 @@ export async function dispatch(req: DispatchRequest): Promise<DispatchResult> {
   // dependency it does not vendor (see dependency.ts).
   const dep = checkDispatchDependency()
   const workerNote = status?.['notes']
-  const note = `dep:${dep.commit ?? 'unknown'}${workerNote ? ` ${workerNote}` : ''}`
+  let note = `dep:${dep.commit ?? 'unknown'}${workerNote ? ` ${workerNote}` : ''}`
+
+  // Issue #817: `dispatch-one.sh` has no quota-detection of its own, so a
+  // real provider rate limit always shows up here as a plain FAILED — worse,
+  // for an opencode/kimi worker (see `readWorkerLog`'s comment) the launcher
+  // footer's own summary can be an EMPTY final message, discarding the one
+  // piece of evidence a human would need to tell "the fleet is broken" from
+  // "the account ran out of quota" apart. Read the worker's raw log directly
+  // and reclassify — only ever FAILED -> QUOTA, never any other outcome: a
+  // worker that reported BLOCKED or SUCCESS made a deliberate claim this
+  // fleet must not silently override on a coincidental log match.
+  let quotaResetHint: string | undefined
+  let quotaResetAt: number | undefined
+  if (outcome === 'FAILED') {
+    const logText = readWorkerLog(req.name)
+    if (logText !== undefined) {
+      const detection = detectQuotaFromLog(logText)
+      if (detection.isQuota) {
+        outcome = 'QUOTA'
+        quotaResetHint = detection.resetHint
+        quotaResetAt = detection.resetAt
+        note = `${note} | quota reset: ${quotaResetHint ?? 'unknown'}`
+      }
+    }
+  }
 
   const pr = status?.['pr']
   return {
@@ -303,5 +564,7 @@ export async function dispatch(req: DispatchRequest): Promise<DispatchResult> {
     pr: pr !== undefined && pr !== 'none' ? pr : undefined,
     note,
     worktree: status?.['worktree'] ?? seed?.['worktree'],
+    quotaResetHint,
+    quotaResetAt,
   }
 }

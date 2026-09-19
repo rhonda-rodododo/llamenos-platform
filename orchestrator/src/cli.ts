@@ -6,7 +6,7 @@ import { promisify } from 'node:util'
 import { acquire } from './lock.js'
 import { checkHalt, halt, resume, haltedLocally } from './killswitch.js'
 import { readAll, append, since, type RunRecord } from './ledger.js'
-import { readResumedAt } from './circuit.js'
+import { readResumedAt, isQuotaHaltReason, parseQuotaResumeAt } from './circuit.js'
 import { loadLanes, LIMITS, LANE_MODES_FILE, type Lane } from './config.js'
 import { checkDispatchDependency, type DependencyReport } from './dependency.js'
 import { checkFleetEnvFile } from './fleet-env.js'
@@ -565,6 +565,7 @@ async function runTick(): Promise<number> {
     now: () => Date.now(),
     acquireLock: acquire,
     checkHalt,
+    resumeFleet: resume,
     readLedger: readAll,
     resumedAt: readResumedAt,
     listItems: (lane) => new GitHubSource(lane.requireLabel).list(),
@@ -614,7 +615,19 @@ function status(): number {
   const recent = since(24 * 3_600_000)
   const byOutcome = new Map<string, number>()
   for (const r of recent) byOutcome.set(r.outcome, (byOutcome.get(r.outcome) ?? 0) + 1)
-  process.stdout.write(`halted: ${haltedLocally() ? 'YES' : 'no'}\n`)
+
+  // Issue #817: a quota-shaped halt is self-healing (see tick.ts) — reporting
+  // it as the same `halted: YES` a human-declared halt gets would send an
+  // operator to run `resume` for a condition that clears itself.
+  const haltedNow = haltedLocally()
+  const haltReasonNow = haltedNow && existsSync(HALT_REASON_FILE) ? readFileSync(HALT_REASON_FILE, 'utf8').trim() : undefined
+  if (haltedNow && isQuotaHaltReason(haltReasonNow)) {
+    const resumeAt = haltReasonNow !== undefined ? parseQuotaResumeAt(haltReasonNow) : undefined
+    const until = resumeAt !== undefined ? new Date(resumeAt).toISOString() : 'unknown'
+    process.stdout.write(`status: degraded — engine quota exhausted until ${until}\n`)
+  } else {
+    process.stdout.write(`halted: ${haltedNow ? 'YES' : 'no'}\n`)
+  }
   process.stdout.write(`runs (24h): ${recent.length}\n`)
   for (const [k, v] of [...byOutcome].sort()) process.stdout.write(`  ${k}: ${v}\n`)
   process.stdout.write(`limits: ${LIMITS.maxDispatchesPerHour}/h, halt after ${LIMITS.consecutiveFailuresToHalt} consecutive failures\n`)
