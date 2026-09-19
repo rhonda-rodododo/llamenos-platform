@@ -19,6 +19,14 @@
 //!     once a backend is configured, accepts `https://` only (loopback `http://` in
 //!     debug builds), always requests the fixed `/api/health` path, answers with a
 //!     bare boolean, and is rate-limited.
+//!
+//! Allowlisting the origin says nothing about who answers *for* it, though —
+//! any certificate chaining to any OS-trusted root would otherwise be
+//! accepted. `net_fetch` and `net_ws_connect` additionally require the
+//! backend's certificate to match the pin captured for it at configuration
+//! time (#775): see `cert_pin.rs` for the pinning design and `PinnedNet`
+//! below for how the live pinned client/connector is built, held and
+//! refreshed.
 
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
@@ -33,10 +41,91 @@ use tokio_tungstenite::tungstenite::Message as WsMessage;
 use url::Url;
 
 use crate::api_config;
+use crate::cert_pin::{self, PinnedContext};
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(20);
 const PROBE_TIMEOUT: Duration = Duration::from_secs(8);
 const PROBE_MIN_INTERVAL: Duration = Duration::from_secs(1);
+
+/// The live pinned HTTP client + WebSocket TLS connector for the configured
+/// backend (#775). `None` until a backend is configured and its certificate
+/// pinned. `net_fetch`/`net_ws_connect` refuse to run without it, but in
+/// practice this never happens while `allowed_origin` succeeds: the only ways
+/// an origin becomes configured — `api_config_set` and startup rehydration in
+/// `load_or_reset_pinned_net` — always populate this alongside it, and
+/// `api_config_clear` always clears both together.
+#[derive(Default)]
+pub struct PinnedNet(Mutex<Option<PinnedContext>>);
+
+impl PinnedNet {
+    fn set(&self, ctx: PinnedContext) {
+        *self.0.lock().unwrap_or_else(|e| e.into_inner()) = Some(ctx);
+    }
+
+    pub fn clear(&self) {
+        *self.0.lock().unwrap_or_else(|e| e.into_inner()) = None;
+    }
+
+    fn get(&self) -> Option<PinnedContext> {
+        self.0.lock().unwrap_or_else(|e| e.into_inner()).clone()
+    }
+}
+
+/// TOFU-pins `origin` and installs the resulting pinned client/connector into
+/// `PinnedNet`. Called exactly once per configuration, from
+/// `api_config::api_config_set` — see `cert_pin.rs` module docs for the full
+/// design. Returns the captured pins so the caller can persist them next to
+/// `apiBaseUrl`.
+pub async fn capture_and_install_pins(
+    app: &AppHandle,
+    origin: &Url,
+) -> Result<Vec<String>, String> {
+    let pins = cert_pin::capture_pins(origin, REQUEST_TIMEOUT).await?;
+    let ctx = cert_pin::build_enforcing_context(&pins, REQUEST_TIMEOUT)?;
+    app.state::<PinnedNet>().set(ctx);
+    Ok(pins)
+}
+
+/// Loads the persisted origin + pins into the live pinned client/connector —
+/// called at startup and whenever the frontend calls `api_config_get`.
+/// Clears an invalid or incomplete stored config (an origin with no recorded
+/// pins, or a pin that no longer parses) so the app fails closed back to
+/// first-run rather than silently running unpinned. Returns the origin only
+/// when it is now backed by a live pinned context.
+pub fn load_or_reset_pinned_net(app: &AppHandle) -> Result<Option<String>, String> {
+    let origin = match api_config::configured_origin(app) {
+        Ok(Some(o)) => o,
+        Ok(None) => return Ok(None),
+        Err(e) => {
+            api_config::warn_and_clear(app, &e)?;
+            return Ok(None);
+        }
+    };
+    let pins = match api_config::configured_pins(app) {
+        Ok(Some(p)) => p,
+        Ok(None) => {
+            api_config::warn_and_clear(
+                app,
+                "configured backend is missing its pinned certificate hashes",
+            )?;
+            return Ok(None);
+        }
+        Err(e) => {
+            api_config::warn_and_clear(app, &e)?;
+            return Ok(None);
+        }
+    };
+    match cert_pin::build_enforcing_context(&pins, REQUEST_TIMEOUT) {
+        Ok(ctx) => {
+            app.state::<PinnedNet>().set(ctx);
+            Ok(Some(origin.origin().ascii_serialization()))
+        }
+        Err(e) => {
+            api_config::warn_and_clear(app, &e)?;
+            Ok(None)
+        }
+    }
+}
 
 /// Request headers the webview may never set on a proxied request: the target
 /// host (the allowlist decides the host, not the caller), framing headers the
@@ -195,18 +284,24 @@ async fn proxy_fetch(
 }
 
 /// Proxy an HTTP request to the configured backend. Rejects any target whose
-/// scheme, host or port differs from the configured origin.
+/// scheme, host or port differs from the configured origin, and — via the
+/// pinned client held in `PinnedNet` — any certificate that doesn't match the
+/// pin recorded for it (#775).
 #[tauri::command]
 pub async fn net_fetch(
     app: AppHandle,
+    pinned: State<'_, PinnedNet>,
     method: String,
     url: String,
     headers: HashMap<String, String>,
     body_base64: Option<String>,
 ) -> Result<NetResponse, String> {
     let configured = allowed_origin(&app)?;
+    let ctx = pinned
+        .get()
+        .ok_or_else(|| "backend not fully configured: missing certificate pins".to_string())?;
     proxy_fetch(
-        http_client(),
+        &ctx.client,
         &configured,
         &method,
         &url,
@@ -306,20 +401,32 @@ fn ws_channel(id: &str) -> String {
 }
 
 /// Open a WebSocket connection to the configured backend origin and start
-/// forwarding frames to the webview.
+/// forwarding frames to the webview. Uses the same pinned TLS connector as
+/// `net_fetch` (#775): a certificate that doesn't match the pin recorded for
+/// this backend is refused before any frame is exchanged.
 #[tauri::command]
 pub async fn net_ws_connect(
     app: AppHandle,
     registry: State<'_, WsRegistry>,
+    pinned: State<'_, PinnedNet>,
     id: String,
     url: String,
 ) -> Result<(), String> {
     let target = Url::parse(&url).map_err(|e| format!("invalid URL: {e}"))?;
     check_ws_target(&allowed_origin(&app)?, &target)?;
+    let ctx = pinned
+        .get()
+        .ok_or_else(|| "backend not fully configured: missing certificate pins".to_string())?;
 
-    let (ws_stream, _response) = tokio_tungstenite::connect_async(target.as_str())
-        .await
-        .map_err(|e| format!("websocket connect failed: {e}"))?;
+    let connector = tokio_tungstenite::Connector::Rustls(ctx.ws_connector.clone());
+    let (ws_stream, _response) = tokio_tungstenite::connect_async_tls_with_config(
+        target.as_str(),
+        None,
+        false,
+        Some(connector),
+    )
+    .await
+    .map_err(|e| format!("websocket connect failed: {e}"))?;
     let (write, mut read) = ws_stream.split();
 
     registry.0.lock().await.insert(id.clone(), write);
